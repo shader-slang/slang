@@ -112,6 +112,10 @@ namespace gfx
             this->m_layout = layoutImpl;
             Slang::Index subObjectCount = layoutImpl->getSubObjectCount();
             this->m_objects.setCount(subObjectCount);
+            auto dataSize = layoutImpl->getElementTypeLayout()->getSize();
+            assert(dataSize >= 0);
+            this->m_data.setCount(dataSize);
+            memset(this->m_data.getBuffer(), 0, dataSize);
             return SLANG_OK;
         }
     public:
@@ -245,7 +249,7 @@ namespace gfx
         MutableRootShaderObject(RendererBase* device, Slang::RefPtr<ShaderProgramBase> program)
         {
             this->m_device = device;
-            auto programLayout = program->slangProgram->getLayout();
+            auto programLayout = program->slangGlobalScope->getLayout();
             SlangInt entryPointCount = programLayout->getEntryPointCount();
             for (SlangInt e = 0; e < entryPointCount; ++e)
             {

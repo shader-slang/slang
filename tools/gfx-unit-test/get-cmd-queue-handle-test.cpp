@@ -17,16 +17,16 @@ namespace gfx_test
     {
         ICommandQueue::Desc queueDesc = { ICommandQueue::QueueType::Graphics };
         auto queue = device->createCommandQueue(queueDesc);
-        ICommandQueue::NativeHandle handle;
+        InteropHandle handle;
         GFX_CHECK_CALL_ABORT(queue->getNativeHandle(&handle));
         if (device->getDeviceInfo().deviceType == gfx::DeviceType::Vulkan)
         {
-            SLANG_CHECK(handle != NULL);
+            SLANG_CHECK(handle.handleValue != NULL);
         }
 #if SLANG_WINDOWS_FAMILY
         else
         {
-            auto d3d12Queue = (ID3D12CommandQueue*)handle;
+            auto d3d12Queue = (ID3D12CommandQueue*)handle.handleValue;
             Slang::ComPtr<IUnknown> testHandle1;
             GFX_CHECK_CALL_ABORT(d3d12Queue->QueryInterface<IUnknown>(testHandle1.writeRef()));
             Slang::ComPtr<ID3D12CommandQueue> testHandle2;

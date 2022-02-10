@@ -108,7 +108,7 @@ struct RendererContext
         // We can create a `gfx::IShaderProgram` object from `composedProgram`
         // so it may be used by the graphics layer.
         gfx::IShaderProgram::Desc programDesc = {};
-        programDesc.slangProgram = composedProgram.get();
+        programDesc.slangGlobalScope = composedProgram.get();
 
         shaderProgram = device->createProgram(programDesc);
 

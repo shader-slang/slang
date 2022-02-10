@@ -54,13 +54,13 @@ void ShaderCompilerUtil::Output::set(
     slang::IComponentType*              inSlangProgram)
 {
     slangProgram = inSlangProgram;
-    desc.slangProgram = inSlangProgram;
+    desc.slangGlobalScope = inSlangProgram;
 }
 
 void ShaderCompilerUtil::Output::reset()
 {
     {
-        desc.slangProgram = nullptr;
+        desc.slangGlobalScope = nullptr;
     }
 
     session = nullptr;
@@ -313,7 +313,7 @@ void ShaderCompilerUtil::Output::reset()
         SLANG_RETURN_ON_FAIL(_compileProgramImpl(session, options, input, request, out));
 
         out.m_extraRequestForReflection = slangOutput.getRequestForReflection();
-        out.desc.slangProgram = slangOutput.desc.slangProgram;
+        out.desc.slangGlobalScope = slangOutput.desc.slangGlobalScope;
         slangOutput.m_requestForKernels = nullptr;
 
         return SLANG_OK;

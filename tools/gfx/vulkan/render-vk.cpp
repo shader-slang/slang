@@ -60,6 +60,8 @@ public:
     // Renderer    implementation
     Result initVulkanInstanceAndDevice(const InteropHandle* handles, bool useValidationLayer);
     virtual SLANG_NO_THROW Result SLANG_MCALL initialize(const Desc& desc) override;
+    virtual SLANG_NO_THROW Result SLANG_MCALL getFormatSupportedResourceStates(
+        Format format, ResourceStateSet* outStates) override;
     virtual SLANG_NO_THROW Result SLANG_MCALL createTransientResourceHeap(
         const ITransientResourceHeap::Desc& desc,
         ITransientResourceHeap** outHeap) override;
@@ -92,7 +94,10 @@ public:
     virtual SLANG_NO_THROW Result SLANG_MCALL createTextureView(
         ITextureResource* texture, IResourceView::Desc const& desc, IResourceView** outView) override;
     virtual SLANG_NO_THROW Result SLANG_MCALL createBufferView(
-        IBufferResource* buffer, IResourceView::Desc const& desc, IResourceView** outView) override;
+        IBufferResource* buffer,
+        IBufferResource* counterBuffer,
+        IResourceView::Desc const& desc,
+        IResourceView** outView) override;
 
     virtual SLANG_NO_THROW Result SLANG_MCALL createInputLayout(
         IInputLayout::Desc const& desc,
@@ -119,7 +124,9 @@ public:
     virtual SLANG_NO_THROW Result SLANG_MCALL createComputePipelineState(
         const ComputePipelineStateDesc& desc,
         IPipelineState** outState) override;
-    // TODO: Add implementation for createRayTracingPipelineState() - calls VkCreateRayTracingPipelinesKHR
+    virtual SLANG_NO_THROW Result SLANG_MCALL createRayTracingPipelineState(
+        const RayTracingPipelineStateDesc& desc,
+        IPipelineState** outState) override;
     virtual SLANG_NO_THROW Result SLANG_MCALL createQueryPool(
         const IQueryPool::Desc& desc,
         IQueryPool** outPool) override;
@@ -466,6 +473,12 @@ public:
         {
             m_device->m_api.vkDestroySampler(m_device->m_api.m_device, m_sampler, nullptr);
         }
+        virtual SLANG_NO_THROW Result SLANG_MCALL getNativeHandle(InteropHandle* outHandle) override
+        {
+            outHandle->api = InteropHandleAPI::Vulkan;
+            outHandle->handleValue = (uint64_t)(m_sampler);
+            return SLANG_OK;
+        }
     };
 
     class ResourceViewImpl : public ResourceViewBase
@@ -501,6 +514,13 @@ public:
         RefPtr<TextureResourceImpl> m_texture;
         VkImageView                 m_view;
         VkImageLayout               m_layout;
+
+        virtual SLANG_NO_THROW Result SLANG_MCALL getNativeHandle(InteropHandle* outHandle) override
+        {
+            outHandle->api = InteropHandleAPI::Vulkan;
+            outHandle->handleValue = (uint64_t)(m_view);
+            return SLANG_OK;
+        }
     };
 
     class TexelBufferResourceViewImpl : public ResourceViewImpl
@@ -516,6 +536,12 @@ public:
         }
         RefPtr<BufferResourceImpl>  m_buffer;
         VkBufferView m_view;
+        virtual SLANG_NO_THROW Result SLANG_MCALL getNativeHandle(InteropHandle* outHandle) override
+        {
+            outHandle->api = InteropHandleAPI::Vulkan;
+            outHandle->handleValue = (uint64_t)(m_view);
+            return SLANG_OK;
+        }
     };
 
     class PlainBufferResourceViewImpl : public ResourceViewImpl
@@ -528,6 +554,11 @@ public:
         RefPtr<BufferResourceImpl>  m_buffer;
         VkDeviceSize                offset;
         VkDeviceSize                size;
+
+        virtual SLANG_NO_THROW Result SLANG_MCALL getNativeHandle(InteropHandle* outHandle) override
+        {
+            return m_buffer->getNativeResourceHandle(outHandle);
+        }
     };
 
     class AccelerationStructureImpl : public AccelerationStructureBase
@@ -542,6 +573,12 @@ public:
         virtual SLANG_NO_THROW DeviceAddress SLANG_MCALL getDeviceAddress() override
         {
             return m_buffer->getDeviceAddress() + m_offset;
+        }
+        virtual SLANG_NO_THROW Result SLANG_MCALL getNativeHandle(InteropHandle* outHandle) override
+        {
+            outHandle->api = InteropHandleAPI::Vulkan;
+            outHandle->handleValue = (uint64_t)(m_vkHandle);
+            return SLANG_OK;
         }
         ~AccelerationStructureImpl()
         {
@@ -903,6 +940,13 @@ public:
             PipelineStateDesc pipelineDesc;
             pipelineDesc.type = PipelineType::Compute;
             pipelineDesc.compute = inDesc;
+            initializeBase(pipelineDesc);
+        }
+        void init(const RayTracingPipelineStateDesc& inDesc)
+        {
+            PipelineStateDesc pipelineDesc;
+            pipelineDesc.type = PipelineType::RayTracing;
+            pipelineDesc.rayTracing = inDesc;
             initializeBase(pipelineDesc);
         }
 
@@ -3787,6 +3831,10 @@ public:
             return nullptr;
         }
         virtual void comFree() override { m_transientHeap.breakStrongReference(); }
+        virtual SLANG_NO_THROW Result SLANG_MCALL resetDescriptorHeaps() override
+        {
+            return SLANG_OK;
+        }
     public:
         VkCommandBuffer m_commandBuffer;
         VkCommandBuffer m_preCommandBuffer = VK_NULL_HANDLE;
@@ -4251,117 +4299,119 @@ public:
             , public RefObject
         {
         public:
-        static VkImageLayout translateImageLayout(ResourceState state)
-        {
-            switch (state)
+            static VkImageLayout translateImageLayout(ResourceState state)
             {
-            case ResourceState::Undefined:
-                return VK_IMAGE_LAYOUT_UNDEFINED;
-            case ResourceState::PreInitialized:
-                return VK_IMAGE_LAYOUT_PREINITIALIZED;
-            case ResourceState::UnorderedAccess:
-                return VK_IMAGE_LAYOUT_GENERAL;
-            case ResourceState::RenderTarget:
-                return VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-            case ResourceState::DepthRead:
-                return VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
-            case ResourceState::DepthWrite:
-                return VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-            case ResourceState::ShaderResource:
-                return VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-            case ResourceState::ResolveDestination:
-            case ResourceState::CopyDestination:
-                return VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-            case ResourceState::ResolveSource:
-            case ResourceState::CopySource:
-                return VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
-            case ResourceState::Present:
-                return VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-            default:
-                assert(!"Unsupported");
-                return VK_IMAGE_LAYOUT_UNDEFINED;
+                switch (state)
+                {
+                case ResourceState::Undefined:
+                    return VK_IMAGE_LAYOUT_UNDEFINED;
+                case ResourceState::PreInitialized:
+                    return VK_IMAGE_LAYOUT_PREINITIALIZED;
+                case ResourceState::UnorderedAccess:
+                    return VK_IMAGE_LAYOUT_GENERAL;
+                case ResourceState::RenderTarget:
+                    return VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+                case ResourceState::DepthRead:
+                    return VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
+                case ResourceState::DepthWrite:
+                    return VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+                case ResourceState::ShaderResource:
+                    return VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+                case ResourceState::ResolveDestination:
+                case ResourceState::CopyDestination:
+                    return VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+                case ResourceState::ResolveSource:
+                case ResourceState::CopySource:
+                    return VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+                case ResourceState::Present:
+                    return VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+                default:
+                    assert(!"Unsupported");
+                    return VK_IMAGE_LAYOUT_UNDEFINED;
+                }
             }
-        }
 
-        static VkAccessFlagBits calcAccessFlags(ResourceState state)
-        {
-            switch (state)
+            static VkAccessFlagBits calcAccessFlags(ResourceState state)
             {
-            case ResourceState::Undefined:
-            case ResourceState::Present:
-            case ResourceState::PreInitialized:
-                return VkAccessFlagBits(0);
-            case ResourceState::VertexBuffer:
-                return VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT;
-            case ResourceState::ConstantBuffer:
-                return VK_ACCESS_UNIFORM_READ_BIT;
-            case ResourceState::IndexBuffer:
-                return VK_ACCESS_INDEX_READ_BIT;
-            case ResourceState::RenderTarget:
-                return VkAccessFlagBits(VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_COLOR_ATTACHMENT_READ_BIT);
-            case ResourceState::ShaderResource:
-                return VK_ACCESS_INPUT_ATTACHMENT_READ_BIT;
-            case ResourceState::UnorderedAccess:
-                return VkAccessFlagBits(VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT);
-            case ResourceState::DepthRead:
-                return VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT;
-            case ResourceState::DepthWrite:
-                return VkAccessFlagBits(VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT);
-            case ResourceState::IndirectArgument:
-                return VK_ACCESS_INDIRECT_COMMAND_READ_BIT;
-            case ResourceState::ResolveDestination:
-            case ResourceState::CopyDestination:
-                return VK_ACCESS_TRANSFER_WRITE_BIT;
-            case ResourceState::ResolveSource:
-            case ResourceState::CopySource:
-                return VK_ACCESS_TRANSFER_READ_BIT;
-            case ResourceState::AccelerationStructure:
-                return VkAccessFlagBits(VK_ACCESS_ACCELERATION_STRUCTURE_READ_BIT_KHR | VK_ACCESS_ACCELERATION_STRUCTURE_WRITE_BIT_KHR);
-            default:
-                assert(!"Unsupported");
-                return VkAccessFlagBits(0);
+                switch (state)
+                {
+                case ResourceState::Undefined:
+                case ResourceState::Present:
+                case ResourceState::PreInitialized:
+                    return VkAccessFlagBits(0);
+                case ResourceState::VertexBuffer:
+                    return VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT;
+                case ResourceState::ConstantBuffer:
+                    return VK_ACCESS_UNIFORM_READ_BIT;
+                case ResourceState::IndexBuffer:
+                    return VK_ACCESS_INDEX_READ_BIT;
+                case ResourceState::RenderTarget:
+                    return VkAccessFlagBits(VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_COLOR_ATTACHMENT_READ_BIT);
+                case ResourceState::ShaderResource:
+                    return VK_ACCESS_INPUT_ATTACHMENT_READ_BIT;
+                case ResourceState::UnorderedAccess:
+                    return VkAccessFlagBits(VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT);
+                case ResourceState::DepthRead:
+                    return VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT;
+                case ResourceState::DepthWrite:
+                    return VkAccessFlagBits(VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT);
+                case ResourceState::IndirectArgument:
+                    return VK_ACCESS_INDIRECT_COMMAND_READ_BIT;
+                case ResourceState::ResolveDestination:
+                case ResourceState::CopyDestination:
+                    return VK_ACCESS_TRANSFER_WRITE_BIT;
+                case ResourceState::ResolveSource:
+                case ResourceState::CopySource:
+                    return VK_ACCESS_TRANSFER_READ_BIT;
+                case ResourceState::AccelerationStructure:
+                    return VkAccessFlagBits(VK_ACCESS_ACCELERATION_STRUCTURE_READ_BIT_KHR | VK_ACCESS_ACCELERATION_STRUCTURE_WRITE_BIT_KHR);
+                default:
+                    assert(!"Unsupported");
+                    return VkAccessFlagBits(0);
+                }
             }
-        }
 
-        static VkPipelineStageFlagBits calcPipelineStageFlags(ResourceState state, bool src)
-        {
-            switch (state)
+            static VkPipelineStageFlagBits calcPipelineStageFlags(ResourceState state, bool src)
             {
-            case ResourceState::Undefined:
-            case ResourceState::PreInitialized:
-                assert(src);
-                return VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
-            case ResourceState::IndexBuffer:
-                return VK_PIPELINE_STAGE_VERTEX_INPUT_BIT;
-            case ResourceState::ConstantBuffer:
-            case ResourceState::UnorderedAccess:
-                return VkPipelineStageFlagBits(VK_PIPELINE_STAGE_VERTEX_SHADER_BIT |
-                    VK_PIPELINE_STAGE_TESSELLATION_CONTROL_SHADER_BIT |
-                    VK_PIPELINE_STAGE_TESSELLATION_EVALUATION_SHADER_BIT |
-                    VK_PIPELINE_STAGE_GEOMETRY_SHADER_BIT |
-                    VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT |
-                    VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
-            case ResourceState::ShaderResource:
-                return VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
-            case ResourceState::RenderTarget:
-                return VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-            case ResourceState::DepthRead:
-            case ResourceState::DepthWrite:
-                return VkPipelineStageFlagBits(VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT);
-            case ResourceState::IndirectArgument:
-                return VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT;
-            case ResourceState::CopySource:
-            case ResourceState::CopyDestination:
-            case ResourceState::ResolveSource:
-            case ResourceState::ResolveDestination:
-                return VK_PIPELINE_STAGE_TRANSFER_BIT;
-            case ResourceState::Present:
-                return src ? VkPipelineStageFlagBits(VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT | VK_PIPELINE_STAGE_ALL_COMMANDS_BIT) : VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
-            default:
-                assert(!"Unsupported");
-                return VkPipelineStageFlagBits(0);
+                switch (state)
+                {
+                case ResourceState::Undefined:
+                case ResourceState::PreInitialized:
+                    assert(src);
+                    return VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+                case ResourceState::VertexBuffer:
+                case ResourceState::IndexBuffer:
+                    return VK_PIPELINE_STAGE_VERTEX_INPUT_BIT;
+                case ResourceState::ConstantBuffer:
+                case ResourceState::UnorderedAccess:
+                    return VkPipelineStageFlagBits(VK_PIPELINE_STAGE_VERTEX_SHADER_BIT |
+                        VK_PIPELINE_STAGE_TESSELLATION_CONTROL_SHADER_BIT |
+                        VK_PIPELINE_STAGE_TESSELLATION_EVALUATION_SHADER_BIT |
+                        VK_PIPELINE_STAGE_GEOMETRY_SHADER_BIT |
+                        VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT |
+                        VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
+                case ResourceState::ShaderResource:
+                    return VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+                case ResourceState::RenderTarget:
+                    return VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+                case ResourceState::DepthRead:
+                case ResourceState::DepthWrite:
+                    return VkPipelineStageFlagBits(VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT);
+                case ResourceState::IndirectArgument:
+                    return VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT;
+                case ResourceState::CopySource:
+                case ResourceState::CopyDestination:
+                case ResourceState::ResolveSource:
+                case ResourceState::ResolveDestination:
+                    return VK_PIPELINE_STAGE_TRANSFER_BIT;
+                case ResourceState::Present:
+                    return src ? VkPipelineStageFlagBits(VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT | VK_PIPELINE_STAGE_ALL_COMMANDS_BIT) : VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+                default:
+                    assert(!"Unsupported");
+                    return VkPipelineStageFlagBits(0);
+                }
             }
-        }
+
         public:
             CommandBufferImpl* m_commandBuffer;
         public:
@@ -4541,13 +4591,14 @@ public:
                     {
                         VkImageCopy region = {};
                         region.srcSubresource.aspectMask = getAspectMask(srcSubresource.aspectMask);
-                        region.srcSubresource.baseArrayLayer = layer + srcSubresource.baseArrayLayer;
-                        region.srcSubresource.mipLevel = mipId + srcSubresource.mipLevel;
+                        region.srcSubresource.baseArrayLayer = (uint32_t)(layer + srcSubresource.baseArrayLayer);
+                        region.srcSubresource.mipLevel = (uint32_t)(mipId + srcSubresource.mipLevel);
                         region.srcSubresource.layerCount = 1;
                         region.srcOffset = { (int32_t)srcOffset.x, (int32_t)srcOffset.y, (int32_t)srcOffset.z };
                         region.dstSubresource.aspectMask = getAspectMask(dstSubresource.aspectMask);
-                        region.dstSubresource.baseArrayLayer = layer + dstSubresource.baseArrayLayer;
-                        region.dstSubresource.mipLevel = mipId + dstSubresource.mipLevel;
+                        region.dstSubresource.baseArrayLayer =
+                            (uint32_t)(layer + dstSubresource.baseArrayLayer);
+                        region.dstSubresource.mipLevel = (uint32_t)(mipId + dstSubresource.mipLevel);
                         region.dstSubresource.layerCount = 1;
                         region.dstOffset = { (int32_t)dstOffset.x, (int32_t)dstOffset.y, (int32_t)dstOffset.z };
                         region.extent = { (uint32_t)extent.width, (uint32_t)extent.height, (uint32_t)extent.depth };
@@ -5224,10 +5275,10 @@ public:
             vkAPI.vkEndCommandBuffer(m_commandBuffer);
         }
 
-        virtual SLANG_NO_THROW Result SLANG_MCALL
-            getNativeHandle(NativeHandle* outHandle) override
+        virtual SLANG_NO_THROW Result SLANG_MCALL getNativeHandle(InteropHandle* outHandle) override
         {
-            *outHandle = (uint64_t)m_commandBuffer;
+            outHandle->api = InteropHandleAPI::Vulkan;
+            outHandle->handleValue = (uint64_t)m_commandBuffer;
             return SLANG_OK;
         }
     };
@@ -5286,10 +5337,10 @@ public:
             vkAPI.vkQueueWaitIdle(m_queue);
         }
 
-        virtual SLANG_NO_THROW Result SLANG_MCALL
-            getNativeHandle(NativeHandle* outHandle) override
+        virtual SLANG_NO_THROW Result SLANG_MCALL getNativeHandle(InteropHandle* outHandle) override
         {
-            *outHandle = (uint64_t)m_queue;
+            outHandle->api = InteropHandleAPI::D3D12;
+            outHandle->handleValue = (uint64_t)m_queue;
             return SLANG_OK;
         }
 
@@ -6238,7 +6289,7 @@ Result VKDevice::initVulkanInstanceAndDevice(const InteropHandle* handles, bool 
         applicationInfo.engineVersion = 1;
         applicationInfo.applicationVersion = 1;
 
-        Array<const char*, 5> instanceExtensions;
+        Array<const char*, 6> instanceExtensions;
 
         instanceExtensions.add(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
         instanceExtensions.add(VK_KHR_EXTERNAL_MEMORY_CAPABILITIES_EXTENSION_NAME);
@@ -6248,6 +6299,7 @@ Result VKDevice::initVulkanInstanceAndDevice(const InteropHandle* handles, bool 
         if (!m_api.m_module->isSoftware())
         {
             instanceExtensions.add(VK_KHR_SURFACE_EXTENSION_NAME);
+            instanceExtensions.add("VK_GOOGLE_surfaceless_query");
 #if SLANG_WINDOWS_FAMILY
             instanceExtensions.add(VK_KHR_WIN32_SURFACE_EXTENSION_NAME);
 #elif defined(SLANG_ENABLE_XLIB)
@@ -7167,6 +7219,71 @@ static VkImageUsageFlags _calcImageUsageFlags(
     return usage;
 }
 
+VkAccessFlags calcAccessFlagsFromImageLayout(VkImageLayout layout)
+{
+    switch (layout)
+    {
+    case VK_IMAGE_LAYOUT_UNDEFINED:
+    case VK_IMAGE_LAYOUT_GENERAL:
+    case VK_IMAGE_LAYOUT_PREINITIALIZED:
+    case VK_IMAGE_LAYOUT_PRESENT_SRC_KHR:
+        return (VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT);
+    case VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL:
+        return (VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT);
+    case VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL:
+    case VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL:
+    case VK_IMAGE_LAYOUT_STENCIL_ATTACHMENT_OPTIMAL:
+    case VK_IMAGE_LAYOUT_DEPTH_READ_ONLY_STENCIL_ATTACHMENT_OPTIMAL:
+    case VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_STENCIL_READ_ONLY_OPTIMAL:
+        return (VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT);
+    case VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL:
+    case VK_IMAGE_LAYOUT_DEPTH_READ_ONLY_OPTIMAL:
+    case VK_IMAGE_LAYOUT_STENCIL_READ_ONLY_OPTIMAL:
+        return VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT;
+    case VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL:
+        return VK_ACCESS_SHADER_READ_BIT;
+    case VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL:
+        return VK_ACCESS_TRANSFER_READ_BIT;
+    case VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL:
+        return VK_ACCESS_TRANSFER_WRITE_BIT;
+    default:
+        assert(!"Unsupported VkImageLayout");
+        return (VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT);
+    }
+}
+
+VkPipelineStageFlags calcPipelineStageFlagsFromImageLayout(VkImageLayout layout)
+{
+    switch (layout)
+    {
+    case VK_IMAGE_LAYOUT_UNDEFINED:
+    case VK_IMAGE_LAYOUT_PREINITIALIZED:
+    case VK_IMAGE_LAYOUT_PRESENT_SRC_KHR:
+    case VK_IMAGE_LAYOUT_GENERAL:
+        return VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
+    case VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL:
+        return VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+    case VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL:
+        return (VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT | VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
+    case VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL:
+        return VK_PIPELINE_STAGE_TRANSFER_BIT;
+    case VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL:
+        return VK_PIPELINE_STAGE_TRANSFER_BIT;
+    case VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL:
+    case VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL:
+    case VK_IMAGE_LAYOUT_DEPTH_READ_ONLY_STENCIL_ATTACHMENT_OPTIMAL:
+    case VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_STENCIL_READ_ONLY_OPTIMAL:
+    case VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL:
+    case VK_IMAGE_LAYOUT_DEPTH_READ_ONLY_OPTIMAL:
+    case VK_IMAGE_LAYOUT_STENCIL_ATTACHMENT_OPTIMAL:
+    case VK_IMAGE_LAYOUT_STENCIL_READ_ONLY_OPTIMAL:
+        return (VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT);
+    default:
+        assert(!"Unsupported VkImageLayout");
+        return VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
+    }
+}
+
 void VKDevice::_transitionImageLayout(
     VkCommandBuffer commandBuffer,
     VkImage image,
@@ -7197,91 +7314,11 @@ void VKDevice::_transitionImageLayout(
     barrier.subresourceRange.levelCount = desc.numMipLevels;
     barrier.subresourceRange.baseArrayLayer = 0;
     barrier.subresourceRange.layerCount = VK_REMAINING_ARRAY_LAYERS;
+    barrier.srcAccessMask = calcAccessFlagsFromImageLayout(oldLayout);
+    barrier.dstAccessMask = calcAccessFlagsFromImageLayout(newLayout);
 
-    VkPipelineStageFlags sourceStage;
-    VkPipelineStageFlags destinationStage;
-
-    if (oldLayout == VK_IMAGE_LAYOUT_UNDEFINED && newLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL)
-    {
-        barrier.srcAccessMask = 0;
-        barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-
-        sourceStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
-        destinationStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
-    }
-    else if (
-        oldLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL &&
-        newLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
-    {
-        barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-        barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-
-        sourceStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
-        destinationStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
-    }
-    else if (
-        oldLayout == VK_IMAGE_LAYOUT_UNDEFINED &&
-        newLayout == VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL)
-    {
-        barrier.srcAccessMask = 0;
-        barrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-
-        sourceStage = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
-        destinationStage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-    }
-    else if (
-        oldLayout == VK_IMAGE_LAYOUT_UNDEFINED &&
-        (newLayout == VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL ||
-         newLayout == VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL))
-    {
-        barrier.srcAccessMask = 0;
-        barrier.dstAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
-
-        sourceStage = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
-        destinationStage = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
-    }
-    else if (
-        oldLayout == VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL &&
-        newLayout == VK_IMAGE_LAYOUT_PRESENT_SRC_KHR)
-    {
-        barrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-        barrier.dstAccessMask = 0;
-
-        sourceStage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-        destinationStage = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
-    }
-    else if (
-        oldLayout == VK_IMAGE_LAYOUT_PRESENT_SRC_KHR &&
-        newLayout == VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL)
-    {
-        barrier.srcAccessMask = 0;
-        barrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-
-        sourceStage = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
-        destinationStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
-    }
-    else if (oldLayout == VK_IMAGE_LAYOUT_UNDEFINED && newLayout == VK_IMAGE_LAYOUT_GENERAL)
-    {
-        barrier.srcAccessMask = 0;
-        barrier.dstAccessMask = VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT;
-
-        sourceStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
-        destinationStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
-    }
-    else if (
-        oldLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL && newLayout == VK_IMAGE_LAYOUT_GENERAL)
-    {
-        barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-        barrier.dstAccessMask = VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT;
-
-        sourceStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
-        destinationStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
-    }
-    else
-    {
-        assert(!"unsupported layout transition!");
-        return;
-    }
+    VkPipelineStageFlags sourceStage = calcPipelineStageFlagsFromImageLayout(oldLayout);
+    VkPipelineStageFlags destinationStage = calcPipelineStageFlagsFromImageLayout(newLayout);
 
     m_api.vkCmdPipelineBarrier(
         commandBuffer, sourceStage, destinationStage, 0, 0, nullptr, 0, nullptr, 1, &barrier);
@@ -7956,7 +7993,96 @@ Result VKDevice::createTextureView(ITextureResource* texture, IResourceView::Des
     return SLANG_OK;
 }
 
-Result VKDevice::createBufferView(IBufferResource* buffer, IResourceView::Desc const& desc, IResourceView** outView)
+Result VKDevice::getFormatSupportedResourceStates(Format format, ResourceStateSet* outStates)
+{
+    // TODO: Add variables to VkDevice to track supported surface presentable formats
+    VkFormat vkFormat = VulkanUtil::getVkFormat(format);
+    VkFormatProperties supportedProperties;
+    m_api.vkGetPhysicalDeviceFormatProperties(m_api.m_physicalDevice, vkFormat, &supportedProperties);
+
+    uint32_t surfaceFormatCount = 0;
+    m_api.vkGetPhysicalDeviceSurfaceFormatsKHR(m_api.m_physicalDevice, VK_NULL_HANDLE, &surfaceFormatCount, nullptr);
+
+    List<VkSurfaceFormatKHR> surfaceFormats;
+    surfaceFormats.setCount(surfaceFormatCount);
+    m_api.vkGetPhysicalDeviceSurfaceFormatsKHR(m_api.m_physicalDevice, VK_NULL_HANDLE, &surfaceFormatCount, surfaceFormats.getBuffer());
+
+    HashSet<VkFormat> presentableFormats;
+    for (auto surfaceFormat : surfaceFormats)
+    {
+        presentableFormats.Add(surfaceFormat.format);
+    }
+
+    ResourceStateSet allowedStates;
+    // TODO: Currently only supports VK_IMAGE_TILING_OPTIMAL
+    auto imageFeatures = supportedProperties.optimalTilingFeatures;
+    auto bufferFeatures = supportedProperties.bufferFeatures;
+    // PreInitialized - Only supported for VK_IMAGE_TILING_LINEAR
+    // VertexBuffer
+    if (bufferFeatures & VK_FORMAT_FEATURE_VERTEX_BUFFER_BIT)
+        allowedStates.add(ResourceState::VertexBuffer);
+    // IndexBuffer - Without extensions, Vulkan only supports two formats for index buffers.
+    switch (format)
+    {
+    case Format::R32_UINT:
+    case Format::R16_UINT:
+        allowedStates.add(ResourceState::IndexBuffer);
+        break;
+    default:
+        break;
+    }
+    // ConstantBuffer
+    allowedStates.add(ResourceState::ConstantBuffer);
+    // StreamOutput - TODO: Requires VK_EXT_transform_feedback
+    // ShaderResource
+    if (imageFeatures & VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT)
+        allowedStates.add(ResourceState::ShaderResource);
+    if (bufferFeatures & VK_FORMAT_FEATURE_UNIFORM_TEXEL_BUFFER_BIT)
+        allowedStates.add(ResourceState::ShaderResource);
+    // UnorderedAccess
+    if (imageFeatures & (VK_FORMAT_FEATURE_STORAGE_IMAGE_BIT | VK_FORMAT_FEATURE_STORAGE_IMAGE_ATOMIC_BIT))
+        allowedStates.add(ResourceState::UnorderedAccess);
+    if (bufferFeatures & (VK_FORMAT_FEATURE_STORAGE_TEXEL_BUFFER_BIT | VK_FORMAT_FEATURE_STORAGE_TEXEL_BUFFER_ATOMIC_BIT))
+        allowedStates.add(ResourceState::UnorderedAccess);
+    // RenderTarget
+    if (imageFeatures & VK_FORMAT_FEATURE_COLOR_ATTACHMENT_BIT)
+        allowedStates.add(ResourceState::RenderTarget);
+    // DepthRead, DepthWrite
+    if (imageFeatures & VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT)
+    {
+        allowedStates.add(ResourceState::DepthRead);
+        allowedStates.add(ResourceState::DepthWrite);
+    }
+    // Present
+    if (presentableFormats.Contains(vkFormat))
+        allowedStates.add(ResourceState::Present);
+    // IndirectArgument
+    allowedStates.add(ResourceState::IndirectArgument);
+    // CopySource, ResolveSource
+    if (imageFeatures & VK_FORMAT_FEATURE_TRANSFER_SRC_BIT)
+    {
+        allowedStates.add(ResourceState::CopySource);
+        allowedStates.add(ResourceState::ResolveSource);
+    }
+    // CopyDestination, ResolveDestination
+    if (imageFeatures & VK_FORMAT_FEATURE_TRANSFER_DST_BIT)
+    {
+        allowedStates.add(ResourceState::CopyDestination);
+        allowedStates.add(ResourceState::ResolveDestination);
+    }
+    // AccelerationStructure
+    if (bufferFeatures & VK_FORMAT_FEATURE_ACCELERATION_STRUCTURE_VERTEX_BUFFER_BIT_KHR)
+        allowedStates.add(ResourceState::AccelerationStructure);
+
+    *outStates = allowedStates;
+    return SLANG_OK;
+}
+
+Result VKDevice::createBufferView(
+    IBufferResource* buffer,
+    IBufferResource* counterBuffer,
+    IResourceView::Desc const& desc,
+    IResourceView** outView)
 {
     auto resourceImpl = (BufferResourceImpl*) buffer;
 
@@ -8125,15 +8251,16 @@ Result VKDevice::createProgram(
     const IShaderProgram::Desc& desc, IShaderProgram** outProgram, ISlangBlob** outDiagnosticBlob)
 {
     RefPtr<ShaderProgramImpl> shaderProgram = new ShaderProgramImpl(this);
-    shaderProgram->slangProgram = desc.slangProgram;
+    shaderProgram->init(desc);
+
     m_deviceObjectsWithPotentialBackReferences.add(shaderProgram);
 
     RootShaderObjectLayout::create(
         this,
-        desc.slangProgram,
-        desc.slangProgram->getLayout(),
+        shaderProgram->linkedProgram,
+        shaderProgram->linkedProgram->getLayout(),
         shaderProgram->m_rootObjectLayout.writeRef());
-    if (desc.slangProgram->getSpecializationParamCount() != 0)
+    if (shaderProgram->isSpecializable())
     {
         // For a specializable program, we don't invoke any actual slang compilation yet.
         returnComPtr(outProgram, shaderProgram);
@@ -8141,15 +8268,15 @@ Result VKDevice::createProgram(
     }
 
     // For a fully specialized program, create `VkShaderModule`s for each shader stage.
-    auto programReflection = desc.slangProgram->getLayout();
-    for (SlangUInt i = 0; i < programReflection->getEntryPointCount(); i++)
+    auto compileShader = [&](slang::EntryPointReflection* entryPointInfo,
+                             slang::IComponentType* component,
+                             SlangInt entryPointIndex)
     {
-        auto entryPointInfo = programReflection->getEntryPointByIndex(i);
         auto stage = entryPointInfo->getStage();
         ComPtr<ISlangBlob> kernelCode;
         ComPtr<ISlangBlob> diagnostics;
-        auto compileResult = desc.slangProgram->getEntryPointCode(
-            (SlangInt)i, 0, kernelCode.writeRef(), diagnostics.writeRef());
+        auto compileResult = component->getEntryPointCode(
+            entryPointIndex, 0, kernelCode.writeRef(), diagnostics.writeRef());
         if (diagnostics)
         {
             getDebugCallback()->handleMessage(
@@ -8176,6 +8303,27 @@ Result VKDevice::createProgram(
             (VkShaderStageFlagBits)VulkanUtil::getShaderStage(stage),
             shaderModule));
         shaderProgram->m_modules.add(shaderModule);
+        return SLANG_OK;
+    };
+    if (shaderProgram->linkedEntryPoints.getCount() == 0)
+    {
+        // If the user does not explicitly specify entry point components, find them from
+        // `linkedEntryPoints`.
+        auto programReflection = shaderProgram->linkedProgram->getLayout();
+        for (SlangUInt i = 0; i < programReflection->getEntryPointCount(); i++)
+        {
+            auto entryPointInfo = programReflection->getEntryPointByIndex(i);
+            SLANG_RETURN_ON_FAIL(compileShader(entryPointInfo, shaderProgram->linkedProgram, (SlangInt)i));
+        }
+    }
+    else
+    {
+        // If the user specifies entry point components via the separated entry point array, compile
+        // code from there.
+        for (auto& entryPoint : shaderProgram->linkedEntryPoints)
+        {
+            SLANG_RETURN_ON_FAIL(compileShader(entryPoint->getLayout()->getEntryPointByIndex(0), entryPoint, 0));
+        }
     }
     returnComPtr(outProgram, shaderProgram);
     return SLANG_OK;
@@ -8463,7 +8611,7 @@ Result VKDevice::createGraphicsPipelineState(const GraphicsPipelineStateDesc& in
     colorBlending.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
     colorBlending.logicOpEnable = VK_FALSE; // TODO: D3D12 has per attachment logic op (and both have way more than one op)
     colorBlending.logicOp = VK_LOGIC_OP_COPY;
-    colorBlending.attachmentCount = (targetCount == 0) ? 1 : targetCount;
+    colorBlending.attachmentCount = (uint32_t)colorBlendAttachments.getCount();
     colorBlending.pAttachments = colorBlendAttachments.getBuffer();
     colorBlending.blendConstants[0] = 0.0f;
     colorBlending.blendConstants[1] = 0.0f;
@@ -8556,6 +8704,93 @@ Result VKDevice::createComputePipelineState(const ComputePipelineStateDesc& inDe
     pipelineStateImpl->init(desc);
     m_deviceObjectsWithPotentialBackReferences.add(pipelineStateImpl);
     pipelineStateImpl->establishStrongDeviceReference();
+    returnComPtr(outState, pipelineStateImpl);
+    return SLANG_OK;
+}
+
+VkPipelineCreateFlags translateFlags(RayTracingPipelineFlags::Enum flags)
+{
+    VkPipelineCreateFlags vkFlags = 0;
+    if (flags & RayTracingPipelineFlags::Enum::SkipTriangles)
+        vkFlags |= VK_PIPELINE_CREATE_RAY_TRACING_SKIP_TRIANGLES_BIT_KHR;
+    if (flags & RayTracingPipelineFlags::Enum::SkipProcedurals)
+        vkFlags |= VK_PIPELINE_CREATE_RAY_TRACING_SKIP_AABBS_BIT_KHR;
+
+    return vkFlags;
+}
+
+uint32_t findShaderIndexByName(const VkPipelineShaderStageCreateInfo* stageCreateInfos, size_t stageCount, const char* name)
+{
+    // TODO: Linear search is inefficient, use a Dictionary?
+    for (size_t i = 0; i < stageCount; ++i)
+    {
+        if (strcmp(stageCreateInfos[i].pName, name)) return (uint32_t)i;
+    }
+    return VK_SHADER_UNUSED_KHR;
+}
+
+Result VKDevice::createRayTracingPipelineState(const RayTracingPipelineStateDesc& desc, IPipelineState** outState)
+{
+    auto programImpl = static_cast<ShaderProgramImpl*>(desc.program);
+    if (!programImpl->m_rootObjectLayout->m_pipelineLayout)
+    {
+        RefPtr<PipelineStateImpl> pipelineStateImpl = new PipelineStateImpl(this);
+        pipelineStateImpl->init(desc);
+        m_deviceObjectsWithPotentialBackReferences.add(pipelineStateImpl);
+        pipelineStateImpl->establishStrongDeviceReference();
+        returnComPtr(outState, pipelineStateImpl);
+        return SLANG_OK;
+    }
+
+    VkRayTracingPipelineCreateInfoKHR raytracingPipelineInfo = { VK_STRUCTURE_TYPE_RAY_TRACING_PIPELINE_CREATE_INFO_KHR };
+    raytracingPipelineInfo.pNext = nullptr;
+    raytracingPipelineInfo.flags = translateFlags(desc.flags);
+
+    VkPipelineShaderStageCreateInfo shaderStageInfo = { VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO };
+    raytracingPipelineInfo.stageCount = (uint32_t)programImpl->m_stageCreateInfos.getCount();
+    raytracingPipelineInfo.pStages = programImpl->m_stageCreateInfos.getBuffer();
+
+    List<VkRayTracingShaderGroupCreateInfoKHR> shaderGroupInfos;
+    for (int32_t i = 0; i < desc.hitGroupCount; ++i)
+    {
+        VkRayTracingShaderGroupCreateInfoKHR shaderGroupInfo = { VK_STRUCTURE_TYPE_RAY_TRACING_SHADER_GROUP_CREATE_INFO_KHR };
+        auto& groupDesc = desc.hitGroups[i];
+
+        shaderGroupInfo.pNext = nullptr;
+        shaderGroupInfo.type = (groupDesc.intersectionEntryPoint)
+            ? VK_RAY_TRACING_SHADER_GROUP_TYPE_PROCEDURAL_HIT_GROUP_KHR : VK_RAY_TRACING_SHADER_GROUP_TYPE_TRIANGLES_HIT_GROUP_KHR;
+        shaderGroupInfo.generalShader = VK_SHADER_UNUSED_KHR;
+        shaderGroupInfo.closestHitShader = findShaderIndexByName(raytracingPipelineInfo.pStages, raytracingPipelineInfo.stageCount, groupDesc.closestHitEntryPoint);
+        shaderGroupInfo.anyHitShader = findShaderIndexByName(raytracingPipelineInfo.pStages, raytracingPipelineInfo.stageCount, groupDesc.anyHitEntryPoint);
+        shaderGroupInfo.intersectionShader = findShaderIndexByName(raytracingPipelineInfo.pStages, raytracingPipelineInfo.stageCount, groupDesc.intersectionEntryPoint);
+        shaderGroupInfo.pShaderGroupCaptureReplayHandle = nullptr;
+
+        shaderGroupInfos.add(shaderGroupInfo);
+    }
+    
+    raytracingPipelineInfo.groupCount = (uint32_t)shaderGroupInfos.getCount();
+    raytracingPipelineInfo.pGroups = shaderGroupInfos.getBuffer();
+
+    raytracingPipelineInfo.maxPipelineRayRecursionDepth = (uint32_t)desc.maxRecursion;
+
+    raytracingPipelineInfo.pLibraryInfo = nullptr;
+    raytracingPipelineInfo.pLibraryInterface = nullptr;
+
+    raytracingPipelineInfo.pDynamicState = nullptr;
+
+    raytracingPipelineInfo.layout = programImpl->m_rootObjectLayout->m_pipelineLayout;
+    raytracingPipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
+    raytracingPipelineInfo.basePipelineIndex = 0;
+
+    VkPipelineCache pipelineCache = VK_NULL_HANDLE;
+    VkPipeline pipeline = VK_NULL_HANDLE;
+    SLANG_VK_CHECK(m_api.vkCreateRayTracingPipelinesKHR(m_device, VK_NULL_HANDLE, pipelineCache, 1, &raytracingPipelineInfo, nullptr, &pipeline));
+
+    RefPtr<PipelineStateImpl> pipelineStateImpl = new PipelineStateImpl(this);
+    pipelineStateImpl->m_pipeline = pipeline;
+    pipelineStateImpl->init(desc);
+    pipelineStateImpl->establishStrongDeviceReference();
+    m_deviceObjectsWithPotentialBackReferences.add(pipelineStateImpl);
     returnComPtr(outState, pipelineStateImpl);
     return SLANG_OK;
 }

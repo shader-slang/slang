@@ -120,7 +120,7 @@ Result loadShaderProgram(
     // We can create a `gfx::IShaderProgram` object from `composedProgram`
     // so it may be used by the graphics layer.
     gfx::IShaderProgram::Desc programDesc = {};
-    programDesc.slangProgram = composedProgram.get();
+    programDesc.slangGlobalScope = composedProgram.get();
 
     auto shaderProgram = device->createProgram(programDesc);
 
@@ -183,7 +183,8 @@ int main()
     gfx::IResourceView::Desc viewDesc = {};
     viewDesc.type = gfx::IResourceView::Type::UnorderedAccess;
     viewDesc.format = gfx::Format::Unknown;
-    SLANG_RETURN_ON_FAIL(device->createBufferView(numbersBuffer, viewDesc, bufferView.writeRef()));
+    SLANG_RETURN_ON_FAIL(
+        device->createBufferView(numbersBuffer, nullptr, viewDesc, bufferView.writeRef()));
 
     // We have done all the set up work, now it is time to start recording a command buffer for
     // GPU execution.

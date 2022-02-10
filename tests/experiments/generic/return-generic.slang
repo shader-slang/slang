@@ -1,6 +1,6 @@
 //DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj
 
-/* A test of a generic function returning a generic struct.  types. 
+/* A test of a generic function returning a generic struct.  
 
 Since T could be any type, the compiler can't determine if it's convertable from an int. That may be surprising.
 

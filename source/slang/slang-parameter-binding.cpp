@@ -2477,6 +2477,7 @@ static void removePerEntryPointParameterKinds(
 static RefPtr<EntryPointLayout> collectEntryPointParameters(
     ParameterBindingContext*                    context,
     EntryPoint*                                 entryPoint,
+    String                                      entryPointNameOverride,
     EntryPoint::EntryPointSpecializationInfo*   specializationInfo)
 {
     auto astBuilder = context->getASTBuilder();
@@ -2487,6 +2488,7 @@ static RefPtr<EntryPointLayout> collectEntryPointParameters(
     RefPtr<EntryPointLayout> entryPointLayout = new EntryPointLayout();
     entryPointLayout->profile = entryPoint->getProfile();
     entryPointLayout->name = entryPoint->getName();
+    entryPointLayout->nameOverride = entryPointNameOverride;
 
     // The entry point layout must be added to the output
     // program layout so that it can be accessed by reflection.
@@ -2729,6 +2731,13 @@ struct CollectGlobalGenericArgumentsVisitor : ComponentTypeVisitor
 
     ParameterBindingContext* m_context;
 
+    void visitRenamedEntryPoint(
+        RenamedEntryPointComponentType* entryPoint,
+        EntryPoint::EntryPointSpecializationInfo* specializationInfo) SLANG_OVERRIDE
+    {
+        entryPoint->getBase()->acceptVisitor(this, specializationInfo);
+    }
+
     void visitEntryPoint(EntryPoint* entryPoint, EntryPoint::EntryPointSpecializationInfo* specializationInfo) SLANG_OVERRIDE
     {
         SLANG_UNUSED(entryPoint);
@@ -2829,6 +2838,7 @@ struct CollectParametersVisitor : ComponentTypeVisitor
     {}
 
     ParameterBindingContext* m_context;
+    String m_currentEntryPointNameOverride;
 
     void visitComposite(CompositeComponentType* composite, CompositeComponentType::CompositeSpecializationInfo* specializationInfo) SLANG_OVERRIDE
     {
@@ -2885,8 +2895,18 @@ struct CollectParametersVisitor : ComponentTypeVisitor
         ParameterBindingContext contextData = *m_context;
         auto context = &contextData;
         context->stage = entryPoint->getStage();
+        collectEntryPointParameters(
+            context, entryPoint, m_currentEntryPointNameOverride, specializationInfo);
+    }
 
-        collectEntryPointParameters(context, entryPoint, specializationInfo);
+    void visitRenamedEntryPoint(
+        RenamedEntryPointComponentType* renamedEntryPoint,
+        EntryPoint::EntryPointSpecializationInfo* specializationInfo) SLANG_OVERRIDE
+    {
+        auto lastNameOverride = m_currentEntryPointNameOverride;
+        m_currentEntryPointNameOverride = renamedEntryPoint->getEntryPointNameOverride(0);
+        renamedEntryPoint->getBase()->acceptVisitor(this, specializationInfo);
+        m_currentEntryPointNameOverride = lastNameOverride;
     }
 
     void visitModule(Module* module, Module::ModuleSpecializationInfo* specializationInfo) SLANG_OVERRIDE
@@ -3107,6 +3127,13 @@ struct CompleteBindingsVisitor : ComponentTypeVisitor
         completeBindingsForParameter(m_context, globalEntryPointInfo->parametersLayout);
     }
 
+    void visitRenamedEntryPoint(
+        RenamedEntryPointComponentType* renamedEntryPoint,
+        EntryPoint::EntryPointSpecializationInfo* specializationInfo) SLANG_OVERRIDE
+    {
+        renamedEntryPoint->getBase()->acceptVisitor(this, specializationInfo);
+    }
+
     void visitModule(Module* module, Module::ModuleSpecializationInfo* specializationInfo) SLANG_OVERRIDE
     {
         SLANG_UNUSED(specializationInfo);
@@ -3234,6 +3261,13 @@ struct FlushPendingDataVisitor : ComponentTypeVisitor
         // appeared in the entry-point parameter list.
         //
         _allocateBindingsForPendingData(m_context, globalEntryPointInfo->parametersLayout->pendingVarLayout);
+    }
+
+    void visitRenamedEntryPoint(
+        RenamedEntryPointComponentType* entryPoint,
+        EntryPoint::EntryPointSpecializationInfo* specializationInfo) SLANG_OVERRIDE
+    {
+        entryPoint->getBase()->acceptVisitor(this, specializationInfo);
     }
 
     void visitModule(Module* module, Module::ModuleSpecializationInfo* specializationInfo) SLANG_OVERRIDE

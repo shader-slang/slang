@@ -944,6 +944,12 @@ public:
                 return static_cast<ICommandBuffer*>(this);
             return nullptr;
         }
+
+        virtual SLANG_NO_THROW Result SLANG_MCALL resetDescriptorHeaps() override
+        {
+            return SLANG_OK;
+        }
+
     public:
         CUDADevice* m_device;
 
@@ -1178,11 +1184,9 @@ public:
 
         virtual SLANG_NO_THROW void SLANG_MCALL close() override {}
 
-        virtual SLANG_NO_THROW Result SLANG_MCALL
-            getNativeHandle(NativeHandle* outHandle) override
+        virtual SLANG_NO_THROW Result SLANG_MCALL getNativeHandle(InteropHandle* outHandle) override
         {
-            *outHandle = 0;
-            return SLANG_OK;
+            return SLANG_FAIL;
         }
     };
 
@@ -1251,11 +1255,9 @@ public:
             return SLANG_FAIL;
         }
 
-        virtual SLANG_NO_THROW Result SLANG_MCALL
-            getNativeHandle(NativeHandle* outHandle) override
+        virtual SLANG_NO_THROW Result SLANG_MCALL getNativeHandle(InteropHandle* outHandle) override
         {
-            *outHandle = (uint64_t)stream;
-            return SLANG_OK;
+            return SLANG_FAIL;
         }
 
     public:
@@ -2110,7 +2112,10 @@ public:
     }
 
     virtual SLANG_NO_THROW Result SLANG_MCALL createBufferView(
-        IBufferResource* buffer, IResourceView::Desc const& desc, IResourceView** outView) override
+        IBufferResource* buffer,
+        IBufferResource* counterBuffer,
+        IResourceView::Desc const& desc,
+        IResourceView** outView) override
     {
         RefPtr<CUDAResourceView> view = new CUDAResourceView();
         view->m_desc = desc;
@@ -2179,18 +2184,18 @@ public:
         // don't actually create any kernels. This program will be specialized later when we know
         // the shader object bindings.
         RefPtr<CUDAShaderProgram> cudaProgram = new CUDAShaderProgram();
-        cudaProgram->slangProgram = desc.slangProgram;
+        cudaProgram->init(desc);
         cudaProgram->cudaContext = m_context;
-        if (desc.slangProgram->getSpecializationParamCount() != 0)
+        if (desc.slangGlobalScope->getSpecializationParamCount() != 0)
         {
-            cudaProgram->layout = new CUDAProgramLayout(this, desc.slangProgram->getLayout());
+            cudaProgram->layout = new CUDAProgramLayout(this, desc.slangGlobalScope->getLayout());
             returnComPtr(outProgram, cudaProgram);
             return SLANG_OK;
         }
 
         ComPtr<ISlangBlob> kernelCode;
         ComPtr<ISlangBlob> diagnostics;
-        auto compileResult = desc.slangProgram->getEntryPointCode(
+        auto compileResult = desc.slangGlobalScope->getEntryPointCode(
             (SlangInt)0, 0, kernelCode.writeRef(), diagnostics.writeRef());
         if (diagnostics)
         {
@@ -2204,16 +2209,16 @@ public:
         SLANG_RETURN_ON_FAIL(compileResult);
         
         SLANG_CUDA_RETURN_ON_FAIL(cuModuleLoadData(&cudaProgram->cudaModule, kernelCode->getBufferPointer()));
-        cudaProgram->kernelName = desc.slangProgram->getLayout()->getEntryPointByIndex(0)->getName();
+        cudaProgram->kernelName = desc.slangGlobalScope->getLayout()->getEntryPointByIndex(0)->getName();
         SLANG_CUDA_RETURN_ON_FAIL(cuModuleGetFunction(
             &cudaProgram->cudaKernel, cudaProgram->cudaModule, cudaProgram->kernelName.getBuffer()));
 
-        auto slangProgram = desc.slangProgram;
-        if( slangProgram )
+        auto slangGlobalScope = desc.slangGlobalScope;
+        if( slangGlobalScope )
         {
-            cudaProgram->slangProgram = slangProgram;
+            cudaProgram->slangGlobalScope = slangGlobalScope;
 
-            auto slangProgramLayout = slangProgram->getLayout();
+            auto slangProgramLayout = slangGlobalScope->getLayout();
             if(!slangProgramLayout)
                 return SLANG_FAIL;
 

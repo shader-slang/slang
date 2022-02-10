@@ -73,7 +73,7 @@ ComPtr<gfx::IShaderProgram> loadComputeProgram(slang::IModule* slangModule, char
     gGPUPrinting.loadStrings(linkedProgram->getLayout());
 
     gfx::IShaderProgram::Desc programDesc = {};
-    programDesc.slangProgram = linkedProgram;
+    programDesc.slangGlobalScope = linkedProgram;
 
     auto shaderProgram = gDevice->createProgram(programDesc);
 
@@ -113,7 +113,7 @@ Result execute()
 
     IResourceView::Desc printBufferViewDesc;
     printBufferViewDesc.type = IResourceView::Type::UnorderedAccess;
-    auto printBufferView = gDevice->createBufferView(printBuffer, printBufferViewDesc);
+    auto printBufferView = gDevice->createBufferView(printBuffer, nullptr, printBufferViewDesc);
 
     ITransientResourceHeap::Desc transientResourceHeapDesc = {};
     transientResourceHeapDesc.constantBufferSize = 256;

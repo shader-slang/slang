@@ -728,6 +728,8 @@ SLANG_API SlangReflectionType * spReflection_FindTypeByName(SlangReflection * re
     try
     {
         Type* result = program->getTypeFromString(name, &sink);
+        if (as<ErrorType>(result))
+            return nullptr;
         return (SlangReflectionType*)result;
     }
     catch( ... )
@@ -2565,6 +2567,19 @@ SLANG_API char const* spReflectionEntryPoint_getName(
 {
     auto entryPointLayout = convert(inEntryPoint);
     return entryPointLayout ? getCstr(entryPointLayout->name) : nullptr;
+}
+
+SLANG_API char const* spReflectionEntryPoint_getNameOverride(SlangReflectionEntryPoint* inEntryPoint)
+{
+    auto entryPointLayout = convert(inEntryPoint);
+    if (entryPointLayout)
+    {
+        if (entryPointLayout->nameOverride.getLength())
+            return entryPointLayout->nameOverride.getBuffer();
+        else
+            return getCstr(entryPointLayout->name);
+    }
+    return nullptr;
 }
 
 SLANG_API unsigned spReflectionEntryPoint_getParameterCount(

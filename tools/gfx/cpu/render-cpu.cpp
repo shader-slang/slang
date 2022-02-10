@@ -1091,7 +1091,7 @@ private:
 
         ComPtr<ISlangSharedLibrary> sharedLibrary;
         ComPtr<ISlangBlob> diagnostics;
-        auto compileResult = program->slangProgram->getEntryPointHostCallable(
+        auto compileResult = program->slangGlobalScope->getEntryPointHostCallable(
             entryPointIndex, targetIndex, sharedLibrary.writeRef(), diagnostics.writeRef());
         if (diagnostics)
         {
@@ -1205,7 +1205,10 @@ public:
     }
 
     virtual SLANG_NO_THROW Result SLANG_MCALL createBufferView(
-        IBufferResource* inBuffer, IResourceView::Desc const& desc, IResourceView** outView) override
+        IBufferResource* inBuffer,
+        IBufferResource* counterBuffer,
+        IResourceView::Desc const& desc,
+        IResourceView** outView) override
     {
         auto buffer = static_cast<CPUBufferResource*>(inBuffer);
         RefPtr<CPUBufferView> view = new CPUBufferView(desc, buffer);
@@ -1266,15 +1269,11 @@ public:
         ISlangBlob** outDiagnosticBlob) override
     {
         RefPtr<CPUShaderProgram> cpuProgram = new CPUShaderProgram();
-
-        // TODO: stuff?
-
-        auto slangProgram = desc.slangProgram;
-        if( slangProgram )
+        cpuProgram->init(desc);
+        auto slangGlobalScope = cpuProgram->linkedProgram;
+        if( slangGlobalScope )
         {
-            cpuProgram->slangProgram = slangProgram;
-
-            auto slangProgramLayout = slangProgram->getLayout();
+            auto slangProgramLayout = slangGlobalScope->getLayout();
             if(!slangProgramLayout)
                 return SLANG_FAIL;
 

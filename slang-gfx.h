@@ -110,9 +110,33 @@ class ITransientResourceHeap;
 class IShaderProgram: public ISlangUnknown
 {
 public:
+    // Defines how linking should be performed for a shader program.
+    enum class LinkingStyle
+    {
+        // Compose all entry-points in a single program, then compile all entry-points together with the same
+        // set of root shader arguments.
+        SingleProgram,
+
+        // Link and compile each entry-point individually, potentially with different specializations.
+        SeparateEntryPointCompilation
+    };
+
     struct Desc
     {
-        slang::IComponentType*  slangProgram;
+        // The linking style of this program.
+        LinkingStyle linkingStyle = LinkingStyle::SingleProgram;
+
+        // The global scope or a Slang composite component that represents the entire program.
+        slang::IComponentType*  slangGlobalScope;
+
+        // Number of separate entry point components in the `slangEntryPoints` array to link in.
+        // If set to 0, then `slangGlobalScope` must contain Slang EntryPoint components.
+        // If not 0, then `slangGlobalScope` must not contain any EntryPoint components.
+        uint32_t entryPointCount = 0;
+
+        // An array of Slang entry points. The size of the array must be `entryPointCount`.
+        // Each element must define only 1 Slang EntryPoint.
+        slang::IComponentType** slangEntryPoints = nullptr;
     };
 };
 #define SLANG_UUID_IShaderProgram                                                       \
@@ -418,6 +442,13 @@ public:
         add(states...);
     }
 
+    ResourceStateSet operator&(const ResourceStateSet& that) const
+    {
+        ResourceStateSet result;
+        result.m_bitFields = this->m_bitFields & that.m_bitFields;
+        return result;
+    }
+
 private:
     uint64_t m_bitFields = 0;
     void add() {}
@@ -435,11 +466,13 @@ enum class MemoryType
 enum class InteropHandleAPI
 {
     Unknown,
-    D3D12,
-    Vulkan,
-    CUDA,
-    Win32,
-    FileDescriptor,
+    D3D12, // A D3D12 object pointer.
+    Vulkan, // A general Vulkan object handle.
+    CUDA, // A general CUDA object handle.
+    Win32, // A general Win32 HANDLE.
+    FileDescriptor, // A file descriptor.
+    DeviceAddress, // A device address.
+    D3D12CpuDescriptorHandle, // A D3D12_CPU_DESCRIPTOR_HANDLE value.
 };
 
 struct InteropHandle
@@ -549,8 +582,8 @@ struct ClearValue
 
 struct BufferRange
 {
-    uint32_t firstElement;
-    uint32_t elementCount;
+    uint64_t firstElement;
+    uint64_t elementCount;
 };
 
 enum class TextureAspect : uint32_t
@@ -720,6 +753,11 @@ public:
         float                   minLOD          = -FLT_MAX;
         float                   maxLOD          = FLT_MAX;
     };
+
+    /// Returns a native API handle representing this sampler state object.
+    /// When using D3D12, this will be a D3D12_CPU_DESCRIPTOR_HANDLE.
+    /// When using Vulkan, this will be a VkSampler.
+    virtual SLANG_NO_THROW Result SLANG_MCALL getNativeHandle(InteropHandle* outNativeHandle) = 0;
 };
 #define SLANG_UUID_ISamplerState                                                        \
     {                                                                                  \
@@ -762,6 +800,13 @@ public:
         uint32_t bufferElementSize; // 0 means raw buffer.
     };
     virtual SLANG_NO_THROW Desc* SLANG_MCALL getViewDesc() = 0;
+
+    /// Returns a native API handle representing this resource view object.
+    /// When using D3D12, this will be a D3D12_CPU_DESCRIPTOR_HANDLE or a buffer device address depending
+    /// on the type of the resource view.
+    /// When using Vulkan, this will be a VkImageView, VkBufferView, VkAccelerationStructure or a VkBuffer
+    /// depending on the type of the resource view.
+    virtual SLANG_NO_THROW Result SLANG_MCALL getNativeHandle(InteropHandle* outNativeHandle) = 0;
 };
 #define SLANG_UUID_IResourceView                                                      \
     {                                                                                 \
@@ -1232,7 +1277,8 @@ struct GraphicsPipelineStateDesc
 
 struct ComputePipelineStateDesc
 {
-    IShaderProgram*  program;
+    IShaderProgram*  program = nullptr;
+    void* d3d12RootSignatureOverride = nullptr;
 };
 
 struct RayTracingPipelineFlags
@@ -1256,11 +1302,12 @@ struct HitGroupDesc
 struct RayTracingPipelineStateDesc
 {
     IShaderProgram* program = nullptr;
-    int32_t hitGroupCount;
-    const HitGroupDesc* hitGroups;
-    int maxRecursion;
-    int maxRayPayloadSize;
-    RayTracingPipelineFlags::Enum flags;
+    int32_t hitGroupCount = 0;
+    const HitGroupDesc* hitGroups = nullptr;
+    int maxRecursion = 0;
+    int maxRayPayloadSize = 0;
+    int maxAttributeSizeInBytes = 8;
+    RayTracingPipelineFlags::Enum flags = RayTracingPipelineFlags::None;
 };
 
 class IShaderTable : public ISlangUnknown
@@ -1287,6 +1334,8 @@ public:
 
 class IPipelineState : public ISlangUnknown
 {
+public:
+    virtual SLANG_NO_THROW Result SLANG_MCALL getNativeHandle(InteropHandle* outHandle) = 0;
 };
 #define SLANG_UUID_IPipelineState                                                      \
     {                                                                                 \
@@ -1615,6 +1664,10 @@ public:
         ITextureResource* const* textures,
         ResourceState src,
         ResourceState dst) = 0;
+    void textureBarrier(ITextureResource* texture, ResourceState src, ResourceState dst)
+    {
+        textureBarrier(1, &texture, src, dst);
+    }
     virtual SLANG_NO_THROW void SLANG_MCALL textureSubresourceBarrier(
         ITextureResource* texture,
         SubresourceRange subresourceRange,
@@ -1625,6 +1678,10 @@ public:
         IBufferResource* const* buffers,
         ResourceState src,
         ResourceState dst) = 0;
+    void bufferBarrier(IBufferResource* buffer, ResourceState src, ResourceState dst)
+    {
+        bufferBarrier(1, &buffer, src, dst);
+    }
     virtual SLANG_NO_THROW void SLANG_MCALL clearResourceView(
         IResourceView* view, ClearValue* clearValue, ClearResourceViewFlags::Enum flags) = 0;
     virtual SLANG_NO_THROW void SLANG_MCALL resolveResource(
@@ -1696,9 +1753,6 @@ public:
 class ICommandBuffer : public ISlangUnknown
 {
 public:
-    // For D3D12, this is the pointer to the buffer. For Vulkan, this is the buffer itself.
-    typedef uint64_t NativeHandle;
-
     // Only one encoder may be open at a time. User must call `ICommandEncoder::endEncoding`
     // before calling other `encode*Commands` methods.
     // Once `endEncoding` is called, the `ICommandEncoder` object becomes obsolete and is
@@ -1745,7 +1799,9 @@ public:
 
     virtual SLANG_NO_THROW void SLANG_MCALL close() = 0;
 
-    virtual SLANG_NO_THROW Result SLANG_MCALL getNativeHandle(NativeHandle* outHandle) = 0;
+    virtual SLANG_NO_THROW Result SLANG_MCALL getNativeHandle(InteropHandle* outHandle) = 0;
+
+    virtual SLANG_NO_THROW Result SLANG_MCALL resetDescriptorHeaps() = 0;
 };
 #define SLANG_UUID_ICommandBuffer                                                      \
     {                                                                                  \
@@ -1780,7 +1836,7 @@ public:
         executeCommandBuffers(1, &commandBuffer, fenceToSignal, newFenceValue);
     }
 
-    virtual SLANG_NO_THROW Result SLANG_MCALL getNativeHandle(NativeHandle* outHandle) = 0;
+    virtual SLANG_NO_THROW Result SLANG_MCALL getNativeHandle(InteropHandle* outHandle) = 0;
 
     virtual SLANG_NO_THROW void SLANG_MCALL waitOnHost() = 0;
 
@@ -1947,6 +2003,8 @@ public:
         int requiredFeatureCount = 0;
         // Array of required feature names, whose size is `requiredFeatureCount`.
         const char** requiredFeatures = nullptr;
+        // A command dispatcher object that intercepts and handles actual low-level API call.
+        ISlangUnknown* apiCommandDispatcher = nullptr;
         // The slot (typically UAV) used to identify NVAPI intrinsics. If >=0 NVAPI is required.
         int nvapiExtnSlot = -1;
         // The file system for loading cached shader kernels. The layer does not maintain a strong reference to the object,
@@ -2071,12 +2129,16 @@ public:
     }
 
     virtual SLANG_NO_THROW Result SLANG_MCALL createBufferView(
-        IBufferResource* buffer, IResourceView::Desc const& desc, IResourceView** outView) = 0;
+        IBufferResource* buffer,
+        IBufferResource* counterBuffer,
+        IResourceView::Desc const& desc,
+        IResourceView** outView) = 0;
 
-    inline ComPtr<IResourceView> createBufferView(IBufferResource* buffer, IResourceView::Desc const& desc)
+    inline ComPtr<IResourceView> createBufferView(
+        IBufferResource* buffer, IBufferResource* counterBuffer, IResourceView::Desc const& desc)
     {
         ComPtr<IResourceView> view;
-        SLANG_RETURN_NULL_ON_FAIL(createBufferView(buffer, desc, view.writeRef()));
+        SLANG_RETURN_NULL_ON_FAIL(createBufferView(buffer, counterBuffer, desc, view.writeRef()));
         return view;
     }
 
@@ -2267,6 +2329,31 @@ public:
     {                                                                                    \
           0x715bdf26, 0x5135, 0x11eb, { 0xAE, 0x93, 0x02, 0x42, 0xAC, 0x13, 0x00, 0x02 } \
     }
+
+
+class IPipelineCreationAPIDispatcher : public ISlangUnknown
+{
+public:
+    virtual SLANG_NO_THROW Result SLANG_MCALL createComputePipelineState(
+        IDevice* device,
+        slang::IComponentType* program,
+        void* pipelineDesc,
+        void** outPipelineState) = 0;
+    virtual SLANG_NO_THROW Result SLANG_MCALL createGraphicsPipelineState(
+        IDevice* device,
+        slang::IComponentType* program,
+        void* pipelineDesc,
+        void** outPipelineState) = 0;
+    virtual SLANG_NO_THROW Result SLANG_MCALL
+        beforeCreateRayTracingState(IDevice* device, slang::IComponentType* program) = 0;
+    virtual SLANG_NO_THROW Result SLANG_MCALL
+        afterCreateRayTracingState(IDevice* device, slang::IComponentType* program) = 0;
+};
+#define SLANG_UUID_IPipelineCreationAPIDispatcher                                     \
+    {                                                                                 \
+        0xc3d5f782, 0xeae1, 0x4da6, { 0xab, 0x40, 0x75, 0x32, 0x31, 0x2, 0xb7, 0xdc } \
+    }
+
 
 // Global public functions
 

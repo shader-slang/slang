@@ -2114,6 +2114,9 @@ extern "C"
     SLANG_API char const* spReflectionEntryPoint_getName(
         SlangReflectionEntryPoint* entryPoint);
 
+    SLANG_API char const* spReflectionEntryPoint_getNameOverride(
+        SlangReflectionEntryPoint* entryPoint);
+
     SLANG_API unsigned spReflectionEntryPoint_getParameterCount(
         SlangReflectionEntryPoint* entryPoint);
 
@@ -2878,6 +2881,11 @@ namespace slang
         char const* getName()
         {
             return spReflectionEntryPoint_getName((SlangReflectionEntryPoint*) this);
+        }
+
+        char const* getNameOverride()
+        {
+            return spReflectionEntryPoint_getNameOverride((SlangReflectionEntryPoint*)this);
         }
 
         unsigned getParameterCount()
@@ -4248,33 +4256,39 @@ namespace slang
             (and hence the global layout) that results will be deterministic,
             but is not currently documented.
             */
-            virtual SLANG_NO_THROW SlangResult SLANG_MCALL link(
-                IComponentType**            outLinkedComponentType,
-                ISlangBlob**                outDiagnostics = nullptr) = 0;
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL link(
+            IComponentType**            outLinkedComponentType,
+            ISlangBlob**                outDiagnostics = nullptr) = 0;
 
-                /** Get entry point 'callable' functions accessible through the ISlangSharedLibrary interface.
+            /** Get entry point 'callable' functions accessible through the ISlangSharedLibrary interface.
 
-                The functions remain in scope as long as the ISlangSharedLibrary interface is in scope.
+            The functions remain in scope as long as the ISlangSharedLibrary interface is in scope.
 
-                NOTE! Requires a compilation target of SLANG_HOST_CALLABLE.
+            NOTE! Requires a compilation target of SLANG_HOST_CALLABLE.
     
-                @param entryPointIndex  The index of the entry point to get code for.
-                @param targetIndex      The index of the target to get code for (default: zero).
-                @param outSharedLibrary A pointer to a ISharedLibrary interface which functions can be queried on.
-                @returns                A `SlangResult` to indicate success or failure.
-                */
-            virtual SLANG_NO_THROW SlangResult SLANG_MCALL getEntryPointHostCallable(
-                int                     entryPointIndex,
-                int                     targetIndex,
-                ISlangSharedLibrary**   outSharedLibrary,
-                slang::IBlob**          outDiagnostics = 0) = 0;
+            @param entryPointIndex  The index of the entry point to get code for.
+            @param targetIndex      The index of the target to get code for (default: zero).
+            @param outSharedLibrary A pointer to a ISharedLibrary interface which functions can be queried on.
+            @returns                A `SlangResult` to indicate success or failure.
+            */
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL getEntryPointHostCallable(
+            int                     entryPointIndex,
+            int                     targetIndex,
+            ISlangSharedLibrary**   outSharedLibrary,
+            slang::IBlob**          outDiagnostics = 0) = 0;
+
+            /** Get a new ComponentType object that represents a renamed entry point.
+
+            The current object must be a single EntryPoint, or a CompositeComponentType or
+            SpecializedComponentType that contains one EntryPoint component.
+            */
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL renameEntryPoint(
+            const char* newName, IComponentType** outEntryPoint) = 0;
     };
     #define SLANG_UUID_IComponentType IComponentType::getTypeGuid()
 
     struct IEntryPoint : public IComponentType
     {
-        virtual SLANG_NO_THROW SlangResult SLANG_MCALL getRenamedEntryPoint(const char* newName, IEntryPoint** outEntryPoint) = 0;
-
         SLANG_COM_INTERFACE(0x8f241361, 0xf5bd, 0x4ca0, { 0xa3, 0xac, 0x2, 0xf7, 0xfa, 0x24, 0x2, 0xb8 })
     };
 
