@@ -1234,9 +1234,9 @@ public:
             bool isRootParameter = false;
             if (rootParameterAttributeName)
             {
-                if (auto variable = typeLayout->getBindingRangeVariable(bindingRangeIndex))
+                if (auto leafVariable = typeLayout->getBindingRangeLeafVariable(bindingRangeIndex))
                 {
-                    if (variable->findUserAttributeByName(
+                    if (leafVariable->findUserAttributeByName(
                             globalSession, rootParameterAttributeName))
                     {
                         isRootParameter = true;
