@@ -314,7 +314,7 @@ struct DirectionalLight : Light
 
     static const char* getTypeName() { return "DirectionalLight"; }
 
-    virtual void writeTo(ShaderCursor const& cursor)
+    virtual void writeTo(ShaderCursor const& cursor) override
     {
         cursor["direction"].setData(&direction, sizeof(direction));
         cursor["intensity"].setData(&intensity, sizeof(intensity));
@@ -333,7 +333,7 @@ struct PointLight : Light
 
     static const char* getTypeName() { return "PointLight"; }
 
-    virtual void writeTo(ShaderCursor const& cursor)
+    virtual void writeTo(ShaderCursor const& cursor) override
     {
         cursor["position"].setData(&position, sizeof(position));
         cursor["intensity"].setData(&intensity, sizeof(intensity));
