@@ -873,7 +873,7 @@ public:
     virtual SLANG_NO_THROW Result SLANG_MCALL
         setData(ShaderOffset const& offset, void const* data, size_t size) override
     {
-        size = Math::Min(size, (size_t)m_data.getCount() - offset.uniformOffset);
+        size = Math::Min(size, size_t(m_data.getCount() - offset.uniformOffset));
         memcpy((char*)m_data.getBuffer() + offset.uniformOffset, data, size);
         return SLANG_OK;
     }
