@@ -402,6 +402,21 @@ public:
             SLANG_UNIMPLEMENTED_X("resolveResource");
         }
 
+        virtual SLANG_NO_THROW void SLANG_MCALL resolveQuery(
+            IQueryPool* queryPool,
+            uint32_t index,
+            uint32_t count,
+            IBufferResource* buffer,
+            uint64_t offset) override
+        {
+            SLANG_UNUSED(queryPool);
+            SLANG_UNUSED(index);
+            SLANG_UNUSED(count);
+            SLANG_UNUSED(buffer);
+            SLANG_UNUSED(offset);
+            SLANG_UNIMPLEMENTED_X("resolveQuery");
+        }
+
         virtual SLANG_NO_THROW void SLANG_MCALL copyTextureToBuffer(
             IBufferResource* dst,
             size_t dstOffset,

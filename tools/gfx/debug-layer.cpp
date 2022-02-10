@@ -1362,6 +1362,13 @@ void DebugResourceCommandEncoder::resolveResource(
     baseObject->resolveResource(getInnerObj(source), sourceState, sourceRange, getInnerObj(dest), destState, destRange);
 }
 
+void DebugResourceCommandEncoder::resolveQuery(
+    IQueryPool* queryPool, uint32_t index, uint32_t count, IBufferResource* buffer, uint64_t offset)
+{
+    SLANG_GFX_API_FUNC;
+    baseObject->resolveQuery(getInnerObj(queryPool), index, count, buffer, offset);
+}
+
 void DebugResourceCommandEncoder::copyTextureToBuffer(
     IBufferResource* dst,
     size_t dstOffset,
