@@ -1234,6 +1234,8 @@ class ShaderTableBase
 {
 public:
     Slang::List<Slang::String> m_entryPointNames;
+    Slang::List<ShaderRecordOverwrite> m_recordOverwrites;
+
     uint32_t m_rayGenShaderCount;
     uint32_t m_missShaderCount;
     uint32_t m_hitGroupCount;

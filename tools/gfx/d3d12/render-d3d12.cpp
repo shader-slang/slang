@@ -519,7 +519,13 @@ public:
         virtual SLANG_NO_THROW Result SLANG_MCALL getResult(SlangInt queryIndex, SlangInt count, uint64_t* data) override
         {
             m_commandList->Reset(m_commandAllocator, nullptr);
-            m_commandList->ResolveQueryData(m_queryHeap, m_queryType, (UINT)queryIndex, (UINT)count, m_readBackBuffer, 0);
+            m_commandList->ResolveQueryData(
+                m_queryHeap,
+                m_queryType,
+                (UINT)queryIndex,
+                (UINT)count,
+                m_readBackBuffer,
+                sizeof(uint64_t) * queryIndex);
             m_commandList->Close();
             ID3D12CommandList* cmdList = m_commandList;
             m_commandQueue->ExecuteCommandLists(1, &cmdList);
@@ -529,7 +535,7 @@ public:
             WaitForSingleObject(m_waitEvent, INFINITE);
 
             int8_t* mappedData = nullptr;
-            D3D12_RANGE readRange = { sizeof(uint64_t) * queryIndex,sizeof(uint64_t) * (queryIndex + count) };
+            D3D12_RANGE readRange = { sizeof(uint64_t) * queryIndex, sizeof(uint64_t) * (queryIndex + count) };
             m_readBackBuffer.getResource()->Map(0, &readRange, (void**)&mappedData);
             memcpy(data, mappedData + sizeof(uint64_t) * queryIndex, sizeof(uint64_t) * count);
             m_readBackBuffer.getResource()->Unmap(0, nullptr);
@@ -1228,9 +1234,9 @@ public:
             bool isRootParameter = false;
             if (rootParameterAttributeName)
             {
-                if (auto variable = typeLayout->getBindingRangeVariable(bindingRangeIndex))
+                if (auto leafVariable = typeLayout->getBindingRangeLeafVariable(bindingRangeIndex))
                 {
-                    if (variable->findUserAttributeByName(
+                    if (leafVariable->findUserAttributeByName(
                             globalSession, rootParameterAttributeName))
                     {
                         isRootParameter = true;
@@ -3470,7 +3476,7 @@ public:
             void* stagingPtr = nullptr;
             stagingBuffer->map(nullptr, &stagingPtr);
 
-            auto copyShaderIdInto = [&](void* dest, String& name)
+            auto copyShaderIdInto = [&](void* dest, String& name, const ShaderRecordOverwrite& overwrite)
             {
                 if (name.getLength())
                 {
@@ -3481,6 +3487,10 @@ public:
                 {
                     memset(dest, 0, D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES);
                 }
+                if (overwrite.size)
+                {
+                    memcpy((uint8_t*)dest + overwrite.offset, overwrite.data, overwrite.size);
+                }
             };
 
             uint8_t* stagingBufferPtr = (uint8_t*)stagingPtr;
@@ -3489,21 +3499,24 @@ public:
                 copyShaderIdInto(
                     stagingBufferPtr + m_rayGenTableOffset +
                         D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES * i,
-                    m_entryPointNames[i]);
+                    m_entryPointNames[i],
+                    m_recordOverwrites[i]);
             }
             for (uint32_t i = 0; i < m_missShaderCount; i++)
             {
                 copyShaderIdInto(
                     stagingBufferPtr + m_missTableOffset +
                         D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES * i,
-                    m_entryPointNames[m_rayGenShaderCount + i]);
+                    m_entryPointNames[m_rayGenShaderCount + i],
+                    m_recordOverwrites[m_rayGenShaderCount + i]);
             }
             for (uint32_t i = 0; i < m_hitGroupCount; i++)
             {
                 copyShaderIdInto(
                     stagingBufferPtr + m_hitGroupTableOffset +
                         D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES * i,
-                    m_entryPointNames[m_rayGenShaderCount + m_missShaderCount + i]);
+                    m_entryPointNames[m_rayGenShaderCount + m_missShaderCount + i],
+                    m_recordOverwrites[m_rayGenShaderCount + m_missShaderCount + i]);
             }
 
             stagingBuffer->unmap(nullptr);

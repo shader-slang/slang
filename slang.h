@@ -2043,7 +2043,7 @@ extern "C"
     SLANG_API SlangBindingType spReflectionTypeLayout_getBindingRangeType(SlangReflectionTypeLayout* typeLayout, SlangInt index);
     SLANG_API SlangInt spReflectionTypeLayout_getBindingRangeBindingCount(SlangReflectionTypeLayout* typeLayout, SlangInt index);
     SLANG_API SlangReflectionTypeLayout* spReflectionTypeLayout_getBindingRangeLeafTypeLayout(SlangReflectionTypeLayout* typeLayout, SlangInt index);
-    SLANG_API SlangReflectionVariable* spReflectionTypeLayout_getBindingRangeVariable(SlangReflectionTypeLayout* typeLayout, SlangInt index);
+    SLANG_API SlangReflectionVariable* spReflectionTypeLayout_getBindingRangeLeafVariable(SlangReflectionTypeLayout* typeLayout, SlangInt index);
     SLANG_API SlangInt spReflectionTypeLayout_getFieldBindingRangeOffset(SlangReflectionTypeLayout* typeLayout, SlangInt fieldIndex);
 
     SLANG_API SlangInt spReflectionTypeLayout_getBindingRangeDescriptorSetIndex(SlangReflectionTypeLayout* typeLayout, SlangInt index);
@@ -2660,9 +2660,9 @@ namespace slang
                 index);
         }
 
-        VariableReflection* getBindingRangeVariable(SlangInt index)
+        VariableReflection* getBindingRangeLeafVariable(SlangInt index)
         {
-            return (VariableReflection*)spReflectionTypeLayout_getBindingRangeVariable(
+            return (VariableReflection*)spReflectionTypeLayout_getBindingRangeLeafVariable(
                 (SlangReflectionTypeLayout*)this, index);
         }
 
