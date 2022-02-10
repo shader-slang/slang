@@ -19,6 +19,10 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
+#if SLANG_OSX
+#   include <signal.h>
+#endif
+
 #include <time.h>
 
 namespace Slang {
