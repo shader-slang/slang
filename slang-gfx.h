@@ -1318,16 +1318,27 @@ struct RayTracingPipelineStateDesc
 class IShaderTable : public ISlangUnknown
 {
 public:
+    // Specifies the bytes to overwrite into a record in the shader table.
+    struct ShaderRecordOverwrite
+    {
+        uint32_t offset; // Offset within the shader record.
+        uint32_t size; // Number of bytes to overwrite.
+        uint8_t data[8]; // Content to overwrite.
+    };
+
     struct Desc
     {
         uint32_t rayGenShaderCount;
         const char** rayGenShaderEntryPointNames;
+        const ShaderRecordOverwrite* rayGenShaderRecordOverwrites;
 
         uint32_t missShaderCount;
         const char** missShaderEntryPointNames;
+        const ShaderRecordOverwrite* missShaderRecordOverwrites;
 
         uint32_t hitGroupCount;
         const char** hitGroupNames;
+        const ShaderRecordOverwrite* hitGroupRecordOverwrites;
 
         IShaderProgram* program;
     };

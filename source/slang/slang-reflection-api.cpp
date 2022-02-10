@@ -1559,7 +1559,7 @@ namespace Slang
 
                 TypeLayout::ExtendedInfo::BindingRangeInfo bindingRange;
                 bindingRange.leafTypeLayout = typeLayout;
-                bindingRange.variable = path.primary ? path.primary->var->getVariable() : nullptr;
+                bindingRange.leafVariable = path.primary ? path.primary->var->getVariable() : nullptr;
                 bindingRange.bindingType = bindingType;
                 bindingRange.count = multiplier;
                 bindingRange.descriptorSetIndex = -1;
@@ -1746,7 +1746,7 @@ namespace Slang
                 //
                 TypeLayout::ExtendedInfo::BindingRangeInfo bindingRange;
                 bindingRange.leafTypeLayout = typeLayout;
-                bindingRange.variable = path.primary ? path.primary->var->getVariable() : nullptr;
+                bindingRange.leafVariable = path.primary ? path.primary->var->getVariable() : nullptr;
                 bindingRange.bindingType = SLANG_BINDING_TYPE_EXISTENTIAL_VALUE;
                 bindingRange.count = multiplier;
                 bindingRange.descriptorSetIndex = 0;
@@ -1819,7 +1819,7 @@ namespace Slang
                 //
                 TypeLayout::ExtendedInfo::BindingRangeInfo bindingRange;
                 bindingRange.leafTypeLayout = typeLayout;
-                bindingRange.variable = path.primary ? path.primary->var->getVariable() : nullptr;
+                bindingRange.leafVariable = path.primary ? path.primary->var->getVariable() : nullptr;
                 bindingRange.bindingType = bindingType;
                 bindingRange.count = multiplier;
                 bindingRange.descriptorSetIndex = 0;
@@ -2019,7 +2019,7 @@ SLANG_API SlangReflectionTypeLayout* spReflectionTypeLayout_getBindingRangeLeafT
     return convert(bindingRange.leafTypeLayout);
 }
 
-SLANG_API SlangReflectionVariable* spReflectionTypeLayout_getBindingRangeVariable(
+SLANG_API SlangReflectionVariable* spReflectionTypeLayout_getBindingRangeLeafVariable(
     SlangReflectionTypeLayout* inTypeLayout, SlangInt index)
 {
     auto typeLayout = convert(inTypeLayout);
@@ -2033,7 +2033,7 @@ SLANG_API SlangReflectionVariable* spReflectionTypeLayout_getBindingRangeVariabl
         return 0;
     auto& bindingRange = extTypeLayout->m_bindingRanges[index];
 
-    return convert(bindingRange.variable);
+    return convert(bindingRange.leafVariable);
 }
 
 
