@@ -27,6 +27,9 @@
     <ClInclude Include="..\..\..\prelude\slang-llvm.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\source\slang\slang-ast-reflect.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\source\core\slang-string.cpp">
@@ -34,14 +37,11 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <CustomBuild Include="..\..\..\source\slang\core.meta.slang">
+    <None Include="..\..\..\source\slang\core.meta.slang">
       <Filter>Source Files</Filter>
-    </CustomBuild>
-    <CustomBuild Include="..\..\..\source\slang\hlsl.meta.slang">
+    </None>
+    <None Include="..\..\..\source\slang\hlsl.meta.slang">
       <Filter>Source Files</Filter>
-    </CustomBuild>
-    <CustomBuild Include="..\..\..\source\slang\slang-ast-reflect.h">
-      <Filter>Header Files</Filter>
-    </CustomBuild>
+    </None>
   </ItemGroup>
 </Project>

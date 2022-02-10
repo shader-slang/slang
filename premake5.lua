@@ -1042,7 +1042,7 @@ newoption {
  
      local buildcmd = '"' .. builddir .. '/slang-cpp-extractor" -d ' .. sourcePath .. " " .. table.concat(inputFiles, " ") .. " " .. table.concat(options, " ")
  
-     buildcommands { buildcmd }
+     prebuildcommands { buildcmd }
  
      -- Specify the files output by the extactor - so custom action will run when these files are needed.
      --
@@ -1076,7 +1076,7 @@ newoption {
      -- path with forward slashes, which confused the shell if we don't
      -- quote the executable path.
      --
-     buildcommands { '"' .. builddir .. '/slang-generate" %{file.relpath}' }
+     prebuildcommands { '"' .. builddir .. '/slang-generate" %{file.relpath}' }
  
      -- Given `foo.meta.slang` we woutput `foo.meta.slang.h`.
      -- This needs to be specified because the custom action will only
@@ -1218,6 +1218,9 @@ newoption {
  
  if enableEmbedStdLib then
      generatorProject("embed-stdlib-generator", nil)
+ 
+         -- We include these, even though they are not really part of the dummy
+         -- build, so that the filters below can pick up the appropriate locations.
  
          files
          {
