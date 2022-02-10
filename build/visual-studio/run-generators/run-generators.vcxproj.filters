@@ -9,25 +9,13 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\..\prelude\slang-cpp-prelude.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\..\prelude\slang-cpp-scalar-intrinsics.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\prelude\slang-cpp-types.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\prelude\slang-cuda-prelude.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\prelude\slang-hlsl-prelude.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\..\prelude\slang-llvm.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\source\slang\slang-ast-reflect.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
@@ -37,11 +25,23 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <None Include="..\..\..\source\slang\core.meta.slang">
+    <CustomBuild Include="..\..\..\prelude\slang-cpp-prelude.h">
+      <Filter>Header Files</Filter>
+    </CustomBuild>
+    <CustomBuild Include="..\..\..\prelude\slang-cuda-prelude.h">
+      <Filter>Header Files</Filter>
+    </CustomBuild>
+    <CustomBuild Include="..\..\..\prelude\slang-hlsl-prelude.h">
+      <Filter>Header Files</Filter>
+    </CustomBuild>
+    <CustomBuild Include="..\..\..\source\slang\core.meta.slang">
       <Filter>Source Files</Filter>
-    </None>
-    <None Include="..\..\..\source\slang\hlsl.meta.slang">
+    </CustomBuild>
+    <CustomBuild Include="..\..\..\source\slang\hlsl.meta.slang">
       <Filter>Source Files</Filter>
-    </None>
+    </CustomBuild>
+    <CustomBuild Include="..\..\..\source\slang\slang-ast-reflect.h">
+      <Filter>Header Files</Filter>
+    </CustomBuild>
   </ItemGroup>
 </Project>

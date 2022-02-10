@@ -8,7 +8,12 @@ git describe --tags | sed -e "s/\(.*\)/\#define SLANG_TAG_VERSION \"\1\"/" > sla
 cat slang-tag-version.h 
 
 # Create the makefile
-./premake5 gmake --cc=${CC} --enable-embed-stdlib=true --enable-xlib=false --arch=${ARCH} --deps=true --no-progress=true 
+#
+# NOTE! For now we disable stdlib embedding, because on OSX it produces an error when generating
+# thinking it's creating a lib, but has no source
+#
+# --enable-embed-stdlib=true
+./premake5 gmake --cc=${CC}  --enable-xlib=false --arch=${ARCH} --deps=true --no-progress=true 
 
 # Build the configuration
 make config=${CONFIGURATION}_x64 -j`sysctl -n hw.ncpu`

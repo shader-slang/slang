@@ -642,8 +642,9 @@ newoption {
      -- Set up the project, but do NOT add any source files.
      baseSlangProject(name, sourcePath)
  
-     -- Utility 
-     kind "Utility"
+     -- For now we just use static lib to force something
+     -- to build.
+     kind "StaticLib"
  end
  
  --
@@ -1042,7 +1043,7 @@ newoption {
  
      local buildcmd = '"' .. builddir .. '/slang-cpp-extractor" -d ' .. sourcePath .. " " .. table.concat(inputFiles, " ") .. " " .. table.concat(options, " ")
  
-     prebuildcommands { buildcmd }
+     buildcommands { buildcmd }
  
      -- Specify the files output by the extactor - so custom action will run when these files are needed.
      --
@@ -1076,7 +1077,7 @@ newoption {
      -- path with forward slashes, which confused the shell if we don't
      -- quote the executable path.
      --
-     prebuildcommands { '"' .. builddir .. '/slang-generate" %{file.relpath}' }
+     buildcommands { '"' .. builddir .. '/slang-generate" %{file.relpath}' }
  
      -- Given `foo.meta.slang` we woutput `foo.meta.slang.h`.
      -- This needs to be specified because the custom action will only
@@ -1112,7 +1113,7 @@ newoption {
      filter(f)
  
      buildmessage "slang-embed %{file.relpath}"
-     prebuildcommands { '"' .. builddir .. '/slang-embed" %{file.relpath}' }
+     buildcommands { '"' .. builddir .. '/slang-embed" %{file.relpath}' }
      buildoutputs { "%{file.abspath}.cpp" }
      buildinputs { builddir .. "/slang-embed" .. getExecutableSuffix() }
  end
@@ -1229,7 +1230,7 @@ newoption {
              -- does not depend on anything that is generated, so we take something
              -- from core that will compile without any generation.
              --
-
+ 
              "source/slang/slang-stdlib-api.cpp",
          }
  
@@ -1243,22 +1244,20 @@ newoption {
          local absDirectory = path.getabsolute("source/slang")
          local absOutputPath = absDirectory .. "/slang-stdlib-generated.h"
  
+         -- I don't know why I need a filter, but without it nothing works (!)
+         filter("files:source/slang/slang-stdlib-api.cpp")
          -- Note! Has to be an absolute path else doesn't work(!)
          buildoutputs { absOutputPath }
-         
          local f = getWinArm64Filter(true)
          table.insert(f, "files:source/slang/slang-stdlib-api.cpp")
-                  
          filter(f)
              buildinputs { getWinArm64BuildDir(true) .. '/slangc-bootstrap' .. executableSuffix }
-             prebuildcommands {'"' .. getWinArm64BuildDir(true) .. '/slangc-bootstrap" -archive-type riff-lz4 -save-stdlib-bin-source "%{file.directory}/slang-stdlib-generated.h"' }
-             
+             buildcommands {'"' .. getWinArm64BuildDir(true) .. '/slangc-bootstrap" -archive-type riff-lz4 -save-stdlib-bin-source "%{file.directory}/slang-stdlib-generated.h"' }
          f = getWinArm64Filter(false)
          table.insert(f, "files:source/slang/slang-stdlib-api.cpp")
-                  
          filter(f)
              buildinputs { "%{cfg.targetdir}/slangc-bootstrap" .. executableSuffix }
-             prebuildcommands { '"%{cfg.targetdir}/slangc-bootstrap" -archive-type riff-lz4 -save-stdlib-bin-source "%{file.directory}/slang-stdlib-generated.h"' }
+             buildcommands { '"%{cfg.targetdir}/slangc-bootstrap" -archive-type riff-lz4 -save-stdlib-bin-source "%{file.directory}/slang-stdlib-generated.h"' }
  end
  
  
