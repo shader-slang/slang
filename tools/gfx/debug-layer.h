@@ -490,6 +490,13 @@ public:
         ResourceState src,
         ResourceState dst) override;
 
+    virtual SLANG_NO_THROW void SLANG_MCALL resolveQuery(
+        IQueryPool* queryPool,
+        uint32_t index,
+        uint32_t count,
+        IBufferResource* buffer,
+        uint64_t offset) override;
+
 public:
     DebugCommandBuffer* commandBuffer;
     bool isOpen = false;

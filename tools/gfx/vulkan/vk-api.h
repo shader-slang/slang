@@ -105,6 +105,7 @@ namespace gfx {
     x(vkCmdBeginQuery) \
     x(vkCmdEndQuery) \
     x(vkCmdResetQueryPool) \
+    x(vkCmdCopyQueryPoolResults) \
     \
     x(vkCreateFence) \
     x(vkDestroyFence) \

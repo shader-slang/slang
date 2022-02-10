@@ -1707,6 +1707,12 @@ public:
         ITextureResource* dest,
         ResourceState destState,
         SubresourceRange destRange) = 0;
+    virtual SLANG_NO_THROW void SLANG_MCALL resolveQuery(
+        IQueryPool* queryPool,
+        uint32_t index,
+        uint32_t count,
+        IBufferResource* buffer,
+        uint64_t offset) = 0;
 };
 
 enum class AccelerationStructureCopyMode

@@ -563,8 +563,7 @@ public:
     /// Used for query types that does not correspond to a D3D query,
     /// such as ray-tracing acceleration structure post-build info.
     class PlainBufferProxyQueryPoolImpl
-        : public IQueryPool
-        , public ComObject
+        : public QueryPoolBase
     {
     public:
         SLANG_COM_OBJECT_IUNKNOWN_ALL
@@ -4596,6 +4595,62 @@ public:
                 }
             }
 
+            virtual SLANG_NO_THROW void SLANG_MCALL resolveQuery(
+                IQueryPool* queryPool,
+                uint32_t index,
+                uint32_t count,
+                IBufferResource* buffer,
+                uint64_t offset) override
+            {
+                auto queryBase = static_cast<QueryPoolBase*>(queryPool);
+                switch (queryBase->m_desc.type)
+                {
+                case QueryType::AccelerationStructureCompactedSize:
+                case QueryType::AccelerationStructureCurrentSize:
+                case QueryType::AccelerationStructureSerializedSize:
+                    {
+                        auto queryPoolImpl = static_cast<PlainBufferProxyQueryPoolImpl*>(queryPool);
+                        auto bufferImpl = static_cast<BufferResourceImpl*>(buffer);
+                        auto srcQueryBuffer =
+                            queryPoolImpl->m_bufferResource->m_resource.getResource();
+
+                        D3D12_RESOURCE_BARRIER barrier = {};
+                        barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+                        barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
+                        barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_COPY_SOURCE;
+                        barrier.Transition.pResource = srcQueryBuffer;
+                        m_commandBuffer->m_cmdList->ResourceBarrier(1, &barrier);
+
+                        m_commandBuffer->m_cmdList->CopyBufferRegion(
+                            bufferImpl->m_resource.getResource(),
+                            offset,
+                            srcQueryBuffer,
+                            index * sizeof(uint64_t),
+                            count * sizeof(uint64_t));
+
+                        barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+                        barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_SOURCE;
+                        barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
+                        barrier.Transition.pResource = srcQueryBuffer;
+                        m_commandBuffer->m_cmdList->ResourceBarrier(1, &barrier);
+                    }
+                    break;
+                default:
+                    {
+                        auto queryPoolImpl = static_cast<QueryPoolImpl*>(queryPool);
+                        auto bufferImpl = static_cast<BufferResourceImpl*>(buffer);
+                        m_commandBuffer->m_cmdList->ResolveQueryData(
+                            queryPoolImpl->m_queryHeap.get(),
+                            queryPoolImpl->m_queryType,
+                            index,
+                            count,
+                            bufferImpl->m_resource.getResource(),
+                            offset);
+                    }
+                    break;
+                }
+            }
+
             virtual SLANG_NO_THROW void SLANG_MCALL copyTextureToBuffer(
                 IBufferResource* dst,
                 size_t dstOffset,
@@ -7730,6 +7785,8 @@ Result D3D12Device::createComputePipelineState(const ComputePipelineStateDesc& i
 
 Result D3D12Device::QueryPoolImpl::init(const IQueryPool::Desc& desc, D3D12Device* device)
 {
+    m_desc = desc;
+
     // Translate query type.
     D3D12_QUERY_HEAP_DESC heapDesc = {};
     heapDesc.Count = (UINT)desc.count;
@@ -7816,6 +7873,7 @@ Result D3D12Device::PlainBufferProxyQueryPoolImpl::init(
     m_device = device;
     m_stride = stride;
     m_count = (uint32_t)desc.count;
+    m_desc = desc;
     return SLANG_OK;
 }
 

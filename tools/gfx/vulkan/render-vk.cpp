@@ -4876,6 +4876,27 @@ public:
                 }
             }
 
+            virtual SLANG_NO_THROW void SLANG_MCALL resolveQuery(
+                IQueryPool* queryPool,
+                uint32_t index,
+                uint32_t count,
+                IBufferResource* buffer,
+                uint64_t offset) override
+            {
+                auto& vkApi = m_commandBuffer->m_renderer->m_api;
+                auto poolImpl = static_cast<QueryPoolImpl*>(queryPool);
+                auto bufferImpl = static_cast<BufferResourceImpl*>(buffer);
+                vkApi.vkCmdCopyQueryPoolResults(
+                    m_commandBuffer->m_commandBuffer,
+                    poolImpl->m_pool,
+                    index,
+                    count,
+                    bufferImpl->m_buffer.m_buffer,
+                    offset,
+                    sizeof(uint64_t),
+                    VK_QUERY_RESULT_64_BIT | VK_QUERY_RESULT_WAIT_BIT);
+            }
+
             virtual SLANG_NO_THROW void SLANG_MCALL copyTextureToBuffer(
                 IBufferResource* dst,
                 size_t dstOffset,
