@@ -14,6 +14,11 @@ ARCHITECTURE=$(uname -p)
 # Darwin is actually macosx (for paths etc)
 if [ "${PLATFORM}" == "darwin" ]; then
     PLATFORM="macosx"
+    
+    # Modern OSX is only 64 bit, so assume that
+    if [ "${ARCHITECTURE}" == "i386" ]; then
+        ARCHITECTURE="x64"
+    fi
 fi    
 
 if [ "${ARCHITECTURE}" == "x86_64" ]; then
