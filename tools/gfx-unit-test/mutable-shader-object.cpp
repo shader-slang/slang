@@ -51,7 +51,8 @@ namespace gfx_test
         IResourceView::Desc viewDesc = {};
         viewDesc.type = IResourceView::Type::UnorderedAccess;
         viewDesc.format = Format::Unknown;
-        GFX_CHECK_CALL_ABORT(device->createBufferView(numbersBuffer, viewDesc, bufferView.writeRef()));
+        GFX_CHECK_CALL_ABORT(
+            device->createBufferView(numbersBuffer, nullptr, viewDesc, bufferView.writeRef()));
 
         {
             slang::TypeReflection* addTransformerType =

@@ -761,6 +761,9 @@ public:
     // The name of the entry point. Always available even if entryPoint is nullptr (for example when it came from a library)
     Name* name = nullptr;
 
+    // The overrided name of the entry point.
+    String nameOverride;
+
     // Layout for any results of the entry point
     RefPtr<VarLayout> resultLayout;
 

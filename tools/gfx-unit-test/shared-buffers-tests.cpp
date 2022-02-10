@@ -70,7 +70,8 @@ namespace gfx_test
         IResourceView::Desc viewDesc = {};
         viewDesc.type = IResourceView::Type::UnorderedAccess;
         viewDesc.format = Format::Unknown;
-        GFX_CHECK_CALL_ABORT(dstDevice->createBufferView(dstBuffer, viewDesc, bufferView.writeRef()));
+        GFX_CHECK_CALL_ABORT(
+            dstDevice->createBufferView(dstBuffer, nullptr, viewDesc, bufferView.writeRef()));
 
         {
             ICommandQueue::Desc queueDesc = { ICommandQueue::QueueType::Graphics };

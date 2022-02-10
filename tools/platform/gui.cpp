@@ -98,7 +98,7 @@ GUI::GUI(
 #if 0
     gfx::IShaderProgram::Desc programDesc = {};
     programDesc.pipelineType = gfx::PipelineType::Graphics;
-    programDesc.slangProgram = slangProgram;
+    programDesc.slangGlobalScope = slangGlobalScope;
     program = device->createProgram(programDesc);
 #endif
     InputElementDesc inputElements[] = {
