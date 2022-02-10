@@ -641,9 +641,8 @@ newoption {
      -- Set up the project, but do NOT add any source files.
      baseSlangProject(name, sourcePath)
  
-     -- For now we just use static lib to force something
-     -- to build.
-     kind "StaticLib"
+     -- Utility 
+     kind "Utility"
  end
  
  --
@@ -1219,20 +1218,6 @@ newoption {
  if enableEmbedStdLib then
      generatorProject("embed-stdlib-generator", nil)
  
-         -- We include these, even though they are not really part of the dummy
-         -- build, so that the filters below can pick up the appropriate locations.
- 
-         files
-         {
-             --
-             -- To build we need to have some source! It has to be a source file that
-             -- does not depend on anything that is generated, so we take something
-             -- from core that will compile without any generation.
-             --
- 
-             "source/slang/slang-stdlib-api.cpp",
-         }
- 
          -- Only produce the embedded stdlib if that option is enabled
  
          local executableSuffix = getExecutableSuffix()
@@ -1243,17 +1228,15 @@ newoption {
          local absDirectory = path.getabsolute("source/slang")
          local absOutputPath = absDirectory .. "/slang-stdlib-generated.h"
  
-         -- I don't know why I need a filter, but without it nothing works (!)
-         filter("files:source/slang/slang-stdlib-api.cpp")
          -- Note! Has to be an absolute path else doesn't work(!)
          buildoutputs { absOutputPath }
+         
          local f = getWinArm64Filter(true)
-         table.insert(f, "files:source/slang/slang-stdlib-api.cpp")
          filter(f)
              buildinputs { getWinArm64BuildDir(true) .. '/slangc-bootstrap' .. executableSuffix }
              buildcommands {'"' .. getWinArm64BuildDir(true) .. '/slangc-bootstrap" -archive-type riff-lz4 -save-stdlib-bin-source "%{file.directory}/slang-stdlib-generated.h"' }
+             
          f = getWinArm64Filter(false)
-         table.insert(f, "files:source/slang/slang-stdlib-api.cpp")
          filter(f)
              buildinputs { "%{cfg.targetdir}/slangc-bootstrap" .. executableSuffix }
              buildcommands { '"%{cfg.targetdir}/slangc-bootstrap" -archive-type riff-lz4 -save-stdlib-bin-source "%{file.directory}/slang-stdlib-generated.h"' }
