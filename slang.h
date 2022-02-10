@@ -490,13 +490,20 @@ extern "C"
 
     // Use SLANG_PTR_ macros to determine SlangInt/SlangUInt types.
     // This is used over say using size_t/ptrdiff_t/intptr_t/uintptr_t, because on some targets, these types are distinct from
-    // their uint_t/int_t equivalents and so produce ambiguity with function overloading.   
+    // their uint_t/int_t equivalents and so produce ambiguity with function overloading.
+    //
+    // SlangSizeT is helpful as on some compilers size_t is distinct from a regular integer type and so overloading doesn't work.
+    // Casting to SlangSizeT works around this.
 #if SLANG_PTR_IS_64
     typedef int64_t    SlangInt;
     typedef uint64_t   SlangUInt;
+
+    typedef uint64_t   SlangSizeT;
 #else
     typedef int32_t    SlangInt;
     typedef uint32_t   SlangUInt;
+
+    typedef uint32_t   SlangSizeT;
 #endif
 
     typedef bool SlangBool;

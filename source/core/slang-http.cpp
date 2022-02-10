@@ -158,7 +158,7 @@ void HTTPHeader::reset()
 void HTTPHeader::append(StringBuilder& out) const
 {
     // Output the content length
-    out << g_contentLength << ": " << m_contentLength << "\r\n";
+    out << g_contentLength << ": " << SlangSizeT(m_contentLength) << "\r\n";
 
     // If either is set construct a content type
     if (m_mimeType.getLength() || m_encoding.getLength())

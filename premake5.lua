@@ -203,9 +203,10 @@ newoption {
  
  -- TODO(JS): What's the point in the enable-xlib command line option if it's just overridden here?
  
- if targetInfo.isWindows then
+ if targetInfo.isWindows or os.target() == "macosx" then
      enableXlib = false
  end
+ 
  -- Even if we have the nvapi path, we only want to currently enable on windows targets
  
  enableNvapi = not not (os.isdir(nvapiPath) and targetInfo.isWindows and _OPTIONS["enable-nvapi"] == "true")
