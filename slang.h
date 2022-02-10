@@ -3305,6 +3305,11 @@ namespace slang
             @return The compiler that is used for the transition. Returns SLANG_PASS_THROUGH_NONE it is not defined
             */
         virtual SLANG_NO_THROW SlangPassThrough SLANG_MCALL getDownstreamCompilerForTransition(SlangCompileTarget source, SlangCompileTarget target) = 0;
+
+            /** Get the time in seconds spent in the downstream compiler.
+            @return The time spent in the downstream compiler in the current global session.
+            */
+        virtual SLANG_NO_THROW double SLANG_MCALL getDownstreamCompilerElapsedTime() = 0;
     };
 
     #define SLANG_UUID_IGlobalSession IGlobalSession::getTypeGuid()
