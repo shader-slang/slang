@@ -164,6 +164,8 @@ namespace gfx {
     x(vkDestroySwapchainKHR) \
     x(vkAcquireNextImageKHR) \
     x(vkCreateRayTracingPipelinesKHR) \
+    x(vkCmdTraceRaysKHR) \
+    x(vkGetRayTracingShaderGroupHandlesKHR) \
     /* */
 
 #if SLANG_WINDOWS_FAMILY

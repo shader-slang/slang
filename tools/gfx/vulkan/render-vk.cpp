@@ -3885,6 +3885,83 @@ public:
         List<RefPtr<EntryPointShaderObject>> m_entryPoints;
     };
 
+    class ShaderTableImpl : public ShaderTableBase
+    {
+    public:
+        uint32_t m_raygenTableSize;
+        uint32_t m_missTableSize;
+        uint32_t m_hitTableSize;
+        uint32_t m_callableTableSize;
+
+        VKDevice* m_device;
+
+        virtual RefPtr<BufferResource> createDeviceBuffer(
+            PipelineStateBase* pipeline,
+            TransientResourceHeapBase* transientHeap,
+            IResourceCommandEncoder* encoder) override
+        {
+            // Needs access to shaderGroupHandleAlignment/BaseAlignment/HandleSize from VkPhysicalDeviceRayTracingPipelinePropertiesKHR
+            uint32_t handleSize = shaderGroupHandleSize;
+            m_raygenTableSize = VulkanUtil::calcAligned(m_rayGenShaderCount * handleSize, shaderGroupBaseAlignment);
+            m_missTableSize = VulkanUtil::calcAligned(m_missShaderCount * handleSize, shaderGroupBaseAlignment);
+            m_hitTableSize = VulkanUtil::calcAligned(m_hitGroupCount * handleSize, shaderGroupBaseAlignment);
+            m_callableTableSize = 0; // TODO: Are callable shaders needed?
+            uint32_t tableSize = m_raygenTableSize + m_missTableSize + m_hitTableSize + m_callableTableSize;
+
+            auto pipelineImpl = static_cast<PipelineStateImpl*>(pipeline);
+            ComPtr<IBufferResource> bufferResource;
+            IBufferResource::Desc bufferDesc = {};
+            bufferDesc.memoryType = gfx::MemoryType::DeviceLocal;
+            bufferDesc.defaultState = ResourceState::General;
+            bufferDesc.type = IResource::Type::Buffer;
+            bufferDesc.sizeInBytes = tableSize;
+            m_device->createBufferResource(bufferDesc, nullptr, bufferResource.writeRef());
+
+            TransientResourceHeapImpl* transientHeapImpl =
+                static_cast<TransientResourceHeapImpl*>(transientHeap);
+
+            IBufferResource* stagingBuffer = nullptr;
+            transientHeapImpl->allocateStagingBuffer(
+                tableSize, stagingBuffer, ResourceState::General);
+
+            assert(stagingBuffer);
+            void* stagingPtr = nullptr;
+            stagingBuffer->map(nullptr, &stagingPtr);
+
+            List<uint8_t> handles;
+            auto handleCount = m_rayGenShaderCount + m_missShaderCount + m_hitGroupCount + 0; // TODO: Callable shaders?
+            auto totalHandleSize = handleCount * handleSize;
+            auto result = m_device->m_api.vkGetRayTracingShaderGroupHandlesKHR(m_device->m_device, pipelineImpl->m_pipeline, 0, handleCount, totalHandleSize, handles.getBuffer());
+
+            uint8_t* stagingBufferPtr = (uint8_t*)stagingPtr;
+            for (uint32_t i = 0; i < m_rayGenShaderCount; i++)
+            {
+                memcpy(stagingBufferPtr + i * handleSize, handles.getBuffer() + i * handleSize, handleSize);
+            }
+            for (uint32_t i = 0; i < m_missShaderCount; i++)
+            {
+                auto missStartLocation = stagingBufferPtr + raygenTableSize;
+                memcpy(missStartLocation + i * handleSize, handles.getBuffer() + i * handleSize, handleSize);
+            }
+            for (uint32_t i = 0; i < m_hitGroupCount; i++)
+            {
+                auto hitStartLocation = stagingBufferPtr + raygenTableSize + missTableSize;
+                memcpy(hitStartLocation + i * handleSize, handles.getBuffer() + i * handleSize, handleSize);
+            }
+            // TODO: Callable shaders?
+
+            stagingBuffer->unmap(nullptr);
+            encoder->copyBuffer(bufferResource, 0, stagingBuffer, 0, tableSize);
+            encoder->bufferBarrier(
+                1,
+                bufferResource.readRef(),
+                gfx::ResourceState::CopyDestination,
+                gfx::ResourceState::ShaderResource);
+            RefPtr<BufferResource> resultPtr = static_cast<BufferResource*>(bufferResource.get());
+            return _Move(resultPtr);
+        }
+    };
+
     class CommandBufferImpl
         : public ICommandBuffer
         , public ComObject
@@ -5506,8 +5583,7 @@ public:
             virtual SLANG_NO_THROW void SLANG_MCALL
                 bindPipeline(IPipelineState* pipeline, IShaderObject** outRootObject) override
             {
-                SLANG_UNUSED(pipeline);
-                SLANG_UNUSED(outRootObject);
+                setPipelineStateImpl(pipeline, outRootObject);
             }
 
             // TODO: Implement after implementing createRayTracingPipelineState
@@ -5518,11 +5594,36 @@ public:
                 int32_t height,
                 int32_t depth) override
             {
-                SLANG_UNUSED(raygenShaderIndex);
-                SLANG_UNUSED(shaderTable);
-                SLANG_UNUSED(width);
-                SLANG_UNUSED(height);
-                SLANG_UNUSED(depth);
+                // Needs access to shaderGroupHandleAlignment/BaseAlignment/HandleSize from VkPhysicalDeviceRayTracingPipelinePropertiesKHR
+                auto vkApi = m_commandBuffer->m_renderer->m_api;
+                auto shaderTableImpl = (ShaderTableImpl*)shaderTable;
+                auto alignedHandleSize = VulkanUtil::calcAligned(shaderGroupHandleSize, shaderGroupHandleAlignment);
+
+                ResourceCommandEncoder resourceCopyEncoder;
+                resourceCopyEncoder.init((CommandBufferImpl*)m_commandBuffer->m_commandBuffer);
+                auto shaderTableBuffer = shaderTableImpl->getOrCreateBuffer(m_currentPipeline, m_commandBuffer->m_transientHeap, &resourceCopyEncoder);
+
+                VkStridedDeviceAddressRegionKHR raygenSBT;
+                raygenSBT.deviceAddress = shaderTableBuffer->getDeviceAddress();
+                raygenSBT.stride = VulkanUtil::calcAligned(alignedHandleSize, shaderGroupBaseAlignment);
+                raygenSBT.size = raygenSBT.stride;
+
+                VkStridedDeviceAddressRegionKHR missSBT;
+                missSBT.deviceAddress = raygenSBT.deviceAddress + raygenSBT.size;
+                missSBT.stride = alignedHandleSize;
+                missSBT.size = shaderTableImpl->m_missTableSize;
+
+                VkStridedDeviceAddressRegionKHR hitSBT;
+                hitSBT.deviceAddress = missSBT.deviceAddress + missSBT.size;
+                hitSBT.stride = alignedHandleSize;
+                hitSBT.size = shaderTableImpl->m_hitTableSize;
+
+                VkStridedDeviceAddressRegionKHR callableSBT;
+                callableSBT.deviceAddress = 0; // TODO: Are callable shaders needed?
+                callableSBT.stride = 0;
+                callableSBT.size = 0;
+
+                vkApi.vkCmdTraceRaysKHR(m_commandBuffer->m_commandBuffer, &raygenSBT, &missSBT, &hitSBT, &callableSBT, (uint32_t)width, (uint32_t)height, (uint32_t)depth);
             }
 
             virtual SLANG_NO_THROW void SLANG_MCALL endEncoding() override
