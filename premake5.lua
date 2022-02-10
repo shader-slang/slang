@@ -1357,6 +1357,12 @@ newoption {
              postbuildcommands {
                  "{COPY} ../../../external/slang-binaries/bin/" .. targetName .. "/libslang-glslang.so %{cfg.targetdir}"
              }
+             
+         filter { "system:macosx" }
+             postbuildcommands {
+                 "{COPY} ../../../external/slang-binaries/bin/" .. targetName .. "/libslang-glslang.dylib %{cfg.targetdir}"
+             }     
+             
      end
  
      filter {"configurations:debug"}
