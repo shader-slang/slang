@@ -594,7 +594,7 @@ struct LightEnv : public RefObject
                 // The more interesting case is when we have a `LightArray<L,N>`,
                 // in which case we need to fill in the first field (the light count)...
                 //
-                uint32_t lightCount = uint32_t(lightTypeArray->lights.size());
+                int32_t lightCount = int32_t(lightTypeArray->lights.size());
                 lightTypeCursor["count"].setData(&lightCount, sizeof(lightCount));
                 //
                 // ... followed by an array of values of type `L` in the second field.
@@ -603,7 +603,7 @@ struct LightEnv : public RefObject
                 // not access the entries past that point.
                 //
                 auto arrayCursor = lightTypeCursor["lights"];
-                for (size_t ii = 0; ii < lightCount; ++ii)
+                for (int32_t ii = 0; ii < lightCount; ++ii)
                 {
                     lightTypeArray->lights[ii]->writeTo(arrayCursor[ii]);
                 }
