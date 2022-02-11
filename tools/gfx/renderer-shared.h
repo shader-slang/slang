@@ -1039,6 +1039,8 @@ public:
     SLANG_COM_OBJECT_IUNKNOWN_ALL
     IQueryPool* getInterface(const Slang::Guid& guid);
     virtual SLANG_NO_THROW Result SLANG_MCALL reset() override { return SLANG_OK; }
+
+    IQueryPool::Desc m_desc;
 };
 
 enum class PipelineType
