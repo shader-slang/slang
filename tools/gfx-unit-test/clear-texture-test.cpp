@@ -30,7 +30,7 @@ namespace gfx_test
             ResourceState::RenderTarget,
             ResourceState::CopySource,
             ResourceState::CopyDestination);
-        srcTexDesc.format = Format::R8G8B8A8_UNORM;
+        srcTexDesc.format = Format::R32G32B32A32_FLOAT;
 
         Slang::ComPtr<ITextureResource> srcTexture;
         GFX_CHECK_CALL_ABORT(device->createTextureResource(
@@ -39,7 +39,7 @@ namespace gfx_test
         Slang::ComPtr<IResourceView> rtv;
         IResourceView::Desc rtvDesc = {};
         rtvDesc.type = IResourceView::Type::RenderTarget;
-        rtvDesc.format = Format::R8G8B8A8_UNORM;
+        rtvDesc.format = Format::R32G32B32A32_FLOAT;
         rtvDesc.renderTarget.shape = IResource::Type::Texture2D;
         rtv = device->createTextureView(srcTexture, rtvDesc);
 
@@ -72,8 +72,11 @@ namespace gfx_test
                 blob.writeRef(),
                 &rowPitch,
                 &pixelSize);
-            uint8_t* data = (uint8_t*)blob->getBufferPointer();
-            SLANG_CHECK(data[0] == 127);
+            float* data = (float*)blob->getBufferPointer();
+            for (int i = 0; i < 4; i++)
+            {
+                SLANG_CHECK(data[i] == clearValue.color.floatValues[i]);
+            }
         }
     }
 
