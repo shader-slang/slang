@@ -261,6 +261,12 @@ SlangResult UnixPipeStream::read(void* buffer, size_t length, size_t& outReadByt
         return SLANG_FAIL;
     }
 
+    // If there are no poll events, we are done
+    if (pollResult == 0)
+    {
+        return SLANG_OK;
+    }
+
     // If there is data read that first
     if (pollInfo.revents & POLLIN)
     {
@@ -281,7 +287,16 @@ SlangResult UnixPipeStream::read(void* buffer, size_t length, size_t& outReadByt
         }
 
         outReadBytes = size_t(count);
-        return SLANG_OK;
+
+        // If no bytes were wanted, then there could still be bytes in the pipe
+        // before a HUP. So don't fall through to check for HUP.
+        // 
+        // If some bytes *were* wanted and none were read, we can allow fall through to
+        // handle HUP.
+        if (length == 0 || count > 0)
+        {
+            return SLANG_OK;
+        }
     }
 
     if (pollInfo.revents & POLLHUP)
