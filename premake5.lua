@@ -1343,6 +1343,11 @@ newoption {
              postbuildcommands {
                  "{COPY} " .. slangLLVMPath .. "/bin/" .. targetName .. "/release/libslang-llvm.so %{cfg.targetdir}"
              }
+             
+         filter { "system:macosx" }
+             postbuildcommands {
+                 "{COPY} " .. slangLLVMPath .. "/bin/" .. targetName .. "/release/libslang-llvm.dylib %{cfg.targetdir}"
+             }    
      end
  
      -- If we are not building glslang from source, then be
