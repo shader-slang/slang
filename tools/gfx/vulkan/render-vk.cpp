@@ -114,6 +114,8 @@ public:
         createMutableRootShaderObject(
         IShaderProgram* program, IShaderObject** outObject) override;
 
+    virtual SLANG_NO_THROW Result SLANG_MCALL
+        createShaderTable(const IShaderTable::Desc& desc, IShaderTable** outShaderTable) override;
     virtual SLANG_NO_THROW Result SLANG_MCALL createProgram(
         const IShaderProgram::Desc& desc,
         IShaderProgram** outProgram,
@@ -3900,11 +3902,12 @@ public:
             TransientResourceHeapBase* transientHeap,
             IResourceCommandEncoder* encoder) override
         {
-            // Needs access to shaderGroupHandleAlignment/BaseAlignment/HandleSize from VkPhysicalDeviceRayTracingPipelinePropertiesKHR
-            uint32_t handleSize = shaderGroupHandleSize;
-            m_raygenTableSize = VulkanUtil::calcAligned(m_rayGenShaderCount * handleSize, shaderGroupBaseAlignment);
-            m_missTableSize = VulkanUtil::calcAligned(m_missShaderCount * handleSize, shaderGroupBaseAlignment);
-            m_hitTableSize = VulkanUtil::calcAligned(m_hitGroupCount * handleSize, shaderGroupBaseAlignment);
+            auto vkApi = m_device->m_api;
+            auto rtProps = vkApi.m_rtProperties;
+            uint32_t handleSize = rtProps.shaderGroupHandleSize;
+            m_raygenTableSize = (uint32_t)VulkanUtil::calcAligned(m_rayGenShaderCount * handleSize, rtProps.shaderGroupBaseAlignment);
+            m_missTableSize = (uint32_t)VulkanUtil::calcAligned(m_missShaderCount * handleSize, rtProps.shaderGroupBaseAlignment);
+            m_hitTableSize = (uint32_t)VulkanUtil::calcAligned(m_hitGroupCount * handleSize, rtProps.shaderGroupBaseAlignment);
             m_callableTableSize = 0; // TODO: Are callable shaders needed?
             uint32_t tableSize = m_raygenTableSize + m_missTableSize + m_hitTableSize + m_callableTableSize;
 
@@ -3931,7 +3934,7 @@ public:
             List<uint8_t> handles;
             auto handleCount = m_rayGenShaderCount + m_missShaderCount + m_hitGroupCount + 0; // TODO: Callable shaders?
             auto totalHandleSize = handleCount * handleSize;
-            auto result = m_device->m_api.vkGetRayTracingShaderGroupHandlesKHR(m_device->m_device, pipelineImpl->m_pipeline, 0, handleCount, totalHandleSize, handles.getBuffer());
+            auto result = vkApi.vkGetRayTracingShaderGroupHandlesKHR(m_device->m_device, pipelineImpl->m_pipeline, 0, handleCount, totalHandleSize, handles.getBuffer());
 
             uint8_t* stagingBufferPtr = (uint8_t*)stagingPtr;
             for (uint32_t i = 0; i < m_rayGenShaderCount; i++)
@@ -3940,12 +3943,12 @@ public:
             }
             for (uint32_t i = 0; i < m_missShaderCount; i++)
             {
-                auto missStartLocation = stagingBufferPtr + raygenTableSize;
+                auto missStartLocation = stagingBufferPtr + m_raygenTableSize;
                 memcpy(missStartLocation + i * handleSize, handles.getBuffer() + i * handleSize, handleSize);
             }
             for (uint32_t i = 0; i < m_hitGroupCount; i++)
             {
-                auto hitStartLocation = stagingBufferPtr + raygenTableSize + missTableSize;
+                auto hitStartLocation = stagingBufferPtr + m_raygenTableSize + m_missTableSize;
                 memcpy(hitStartLocation + i * handleSize, handles.getBuffer() + i * handleSize, handleSize);
             }
             // TODO: Callable shaders?
@@ -5586,7 +5589,6 @@ public:
                 setPipelineStateImpl(pipeline, outRootObject);
             }
 
-            // TODO: Implement after implementing createRayTracingPipelineState
             virtual SLANG_NO_THROW void SLANG_MCALL dispatchRays(
                 uint32_t raygenShaderIndex,
                 IShaderTable* shaderTable,
@@ -5594,10 +5596,10 @@ public:
                 int32_t height,
                 int32_t depth) override
             {
-                // Needs access to shaderGroupHandleAlignment/BaseAlignment/HandleSize from VkPhysicalDeviceRayTracingPipelinePropertiesKHR
                 auto vkApi = m_commandBuffer->m_renderer->m_api;
+                auto rtProps = vkApi.m_rtProperties;
                 auto shaderTableImpl = (ShaderTableImpl*)shaderTable;
-                auto alignedHandleSize = VulkanUtil::calcAligned(shaderGroupHandleSize, shaderGroupHandleAlignment);
+                auto alignedHandleSize = VulkanUtil::calcAligned(rtProps.shaderGroupHandleSize, rtProps.shaderGroupHandleAlignment);
 
                 ResourceCommandEncoder resourceCopyEncoder;
                 resourceCopyEncoder.init((CommandBufferImpl*)m_commandBuffer->m_commandBuffer);
@@ -5605,7 +5607,7 @@ public:
 
                 VkStridedDeviceAddressRegionKHR raygenSBT;
                 raygenSBT.deviceAddress = shaderTableBuffer->getDeviceAddress();
-                raygenSBT.stride = VulkanUtil::calcAligned(alignedHandleSize, shaderGroupBaseAlignment);
+                raygenSBT.stride = VulkanUtil::calcAligned(alignedHandleSize, rtProps.shaderGroupBaseAlignment);
                 raygenSBT.size = raygenSBT.stride;
 
                 VkStridedDeviceAddressRegionKHR missSBT;
@@ -7050,6 +7052,13 @@ Result VKDevice::initVulkanInstanceAndDevice(const InteropHandle* handles, bool 
             deviceExtensions.add(VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME);
             m_features.add("acceleration-structure");
         }
+        if (extendedFeatures.rayTracingPipelineFeatures.rayTracingPipeline)
+        {
+            extendedFeatures.rayTracingPipelineFeatures.pNext = (void*)deviceCreateInfo.pNext;
+            deviceCreateInfo.pNext = &extendedFeatures.rayTracingPipelineFeatures;
+            deviceExtensions.add(VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME);
+            m_features.add("ray-tracing-pipeline");
+        }
         if (extendedFeatures.rayQueryFeatures.rayQuery)
         {
             extendedFeatures.rayQueryFeatures.pNext = (void*)deviceCreateInfo.pNext;
@@ -7082,6 +7091,11 @@ Result VKDevice::initVulkanInstanceAndDevice(const InteropHandle* handles, bool 
             deviceExtensions.add(VK_EXT_ROBUSTNESS_2_EXTENSION_NAME);
             m_features.add("robustness2");
         }
+
+
+        VkPhysicalDeviceProperties2 extendedProps = { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2 };
+        extendedProps.pNext = &m_api.m_rtProperties;
+        m_api.vkGetPhysicalDeviceProperties2(m_api.m_physicalDevice, &extendedProps);
 
         uint32_t extensionCount = 0;
         m_api.vkEnumerateDeviceExtensionProperties(m_api.m_physicalDevice, NULL, &extensionCount, NULL);
@@ -8847,6 +8861,15 @@ Result VKDevice::createMutableRootShaderObject(
     RefPtr<MutableRootShaderObject> result =
         new MutableRootShaderObject(this, static_cast<ShaderProgramBase*>(program));
     returnComPtr(outObject, result);
+    return SLANG_OK;
+}
+
+Result VKDevice::createShaderTable(const IShaderTable::Desc& desc, IShaderTable** outShaderTable)
+{
+    RefPtr<ShaderTableImpl> result = new ShaderTableImpl();
+    result->m_device = this;
+    result->init(desc);
+    returnComPtr(outShaderTable, result);
     return SLANG_OK;
 }
 

@@ -253,6 +253,10 @@ struct VulkanExtendedFeatureProperties
     // Acceleration structure features
     VkPhysicalDeviceAccelerationStructureFeaturesKHR accelerationStructureFeatures = {
         VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_FEATURES_KHR};
+    // Ray tracing pipeline features
+    VkPhysicalDeviceRayTracingPipelineFeaturesKHR rayTracingPipelineFeatures = {
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_FEATURES_KHR
+    };
     // Ray query (inline ray-tracing) features
     VkPhysicalDeviceRayQueryFeaturesKHR rayQueryFeatures = {
         VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_QUERY_FEATURES_KHR};
@@ -306,6 +310,7 @@ struct VulkanApi
     VkPhysicalDevice m_physicalDevice = VK_NULL_HANDLE;
 
     VkPhysicalDeviceProperties          m_deviceProperties;
+    VkPhysicalDeviceRayTracingPipelinePropertiesKHR         m_rtProperties;
     VkPhysicalDeviceFeatures            m_deviceFeatures;
     VkPhysicalDeviceMemoryProperties    m_deviceMemoryProperties;
     VulkanExtendedFeatureProperties     m_extendedFeatures;

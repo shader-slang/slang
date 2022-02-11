@@ -293,7 +293,7 @@ void onMouseUp(platform::MouseEventArgs args) { isMouseDown = false; }
 
 Slang::Result initialize()
 {
-    initializeBase("Ray Tracing Pipeline", 1024, 768);
+    initializeBase("Ray Tracing Pipeline", 1024, 768, DeviceType::Vulkan);
     gWindow->events.mouseMove = [this](const platform::MouseEventArgs& e) { onMouseMove(e); };
     gWindow->events.mouseUp = [this](const platform::MouseEventArgs& e) { onMouseUp(e); };
     gWindow->events.mouseDown = [this](const platform::MouseEventArgs& e) { onMouseDown(e); };
