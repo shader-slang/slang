@@ -30,4 +30,10 @@ jobs:
         CONFIGURATION=${{matrix.configuration}}
         ARCH=${{matrix.platform}}
         source ./github_macos_build.sh
+    - name: test
+      run: 
+        CONFIGURATION=${{matrix.configuration}}
+        CC=${{matrix.compiler}}
+        ARCH=${{matrix.platform}}
+        source ./github_test.sh       
     

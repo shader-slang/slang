@@ -125,6 +125,10 @@ static bool _isSubCommand(const char* arg)
             }
             optionsOut->binDir = *argCursor++;
         }
+        else if (strcmp(arg, "-use-shared-library") == 0)
+        {
+            optionsOut->defaultSpawnType = SpawnType::UseSharedLibrary;
+        }
         else if (strcmp(arg, "-use-test-server") == 0)
         {
             optionsOut->defaultSpawnType = SpawnType::UseTestServer;
