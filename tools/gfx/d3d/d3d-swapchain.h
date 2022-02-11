@@ -35,12 +35,14 @@ public:
 
         m_desc = desc;
 
+        m_desc.format = srgbToLinearFormat(m_desc.format);
+
         // Describe the swap chain.
         DXGI_SWAP_CHAIN_DESC swapChainDesc = {};
         swapChainDesc.BufferCount = desc.imageCount;
         swapChainDesc.BufferDesc.Width = desc.width;
         swapChainDesc.BufferDesc.Height = desc.height;
-        swapChainDesc.BufferDesc.Format = D3DUtil::getMapFormat(desc.format);
+        swapChainDesc.BufferDesc.Format = D3DUtil::getMapFormat(m_desc.format);
         swapChainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
         swapChainDesc.SwapEffect = swapEffect;
         swapChainDesc.OutputWindow = (HWND)window.handleValues[0];
