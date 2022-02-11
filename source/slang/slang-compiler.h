@@ -2602,6 +2602,10 @@ namespace Slang
 
         SLANG_NO_THROW void SLANG_MCALL setDownstreamCompilerForTransition(SlangCompileTarget source, SlangCompileTarget target, SlangPassThrough compiler) override;
         SLANG_NO_THROW SlangPassThrough SLANG_MCALL getDownstreamCompilerForTransition(SlangCompileTarget source, SlangCompileTarget target) override;
+        SLANG_NO_THROW double SLANG_MCALL getDownstreamCompilerElapsedTime() override
+        {
+            return m_downstreamCompileTime;
+        }
 
             /// Get the downstream compiler for a transition
         DownstreamCompiler* getDownstreamCompiler(CodeGenTarget source, CodeGenTarget target);
@@ -2673,6 +2677,8 @@ namespace Slang
             String const&           source);
         ~Session();
 
+        void addDownstreamCompileTime(double time) { m_downstreamCompileTime += time; }
+
         ComPtr<ISlangSharedLibraryLoader> m_sharedLibraryLoader;                    ///< The shared library loader (never null)
 
         int m_downstreamCompilerInitialized = 0;                                        
@@ -2698,6 +2704,8 @@ namespace Slang
 
         // Describes a conversion from one code gen target (source) to another (target)
         CodeGenTransitionMap m_codeGenTransitionMap;
+
+        double m_downstreamCompileTime = 0.0;
     };
 
 
