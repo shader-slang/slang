@@ -7991,7 +7991,7 @@ Result VKDevice::createBufferResource(const IBufferResource::Desc& descIn, const
             SLANG_VK_CHECK(m_api.vkMapMemory(
                 m_device, buffer->m_buffer.m_memory, 0, bufferSize, 0, &mappedData));
             ::memcpy(mappedData, initData, bufferSize);
-            m_api.vkUnmapMemory(m_device, buffer->m_uploadBuffer.m_memory);
+            m_api.vkUnmapMemory(m_device, buffer->m_buffer.m_memory);
         }
     }
 
@@ -8877,6 +8877,7 @@ Result VKDevice::createGraphicsPipelineState(const GraphicsPipelineStateDesc& in
     {
         colorBlendAttachments.setCount(1);
         auto& vkBlendDesc = colorBlendAttachments[0];
+        memset(&vkBlendDesc, 0, sizeof(vkBlendDesc));
         vkBlendDesc.blendEnable = VK_FALSE;
         vkBlendDesc.colorWriteMask = (VkColorComponentFlags)RenderTargetWriteMask::EnableAll;
     }
