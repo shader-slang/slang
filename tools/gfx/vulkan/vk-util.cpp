@@ -157,6 +157,7 @@ VkImageLayout VulkanUtil::getImageLayoutFromState(ResourceState state)
     case ResourceState::ShaderResource:
         return VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
     case ResourceState::UnorderedAccess:
+    case ResourceState::General:
         return VK_IMAGE_LAYOUT_GENERAL;
     case ResourceState::Present:
         return VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
@@ -200,8 +201,18 @@ VkImageLayout VulkanUtil::getImageLayoutFromState(ResourceState state)
 {
     switch (topology)
     {
-        case PrimitiveTopology::TriangleList:       return VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
-        default: break;
+    case PrimitiveTopology::LineList:
+        return VK_PRIMITIVE_TOPOLOGY_LINE_LIST;
+    case PrimitiveTopology::LineStrip:
+        return VK_PRIMITIVE_TOPOLOGY_LINE_STRIP;
+    case PrimitiveTopology::TriangleList:
+        return VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+    case PrimitiveTopology::TriangleStrip:
+        return VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP;
+    case PrimitiveTopology::PointList:
+        return VK_PRIMITIVE_TOPOLOGY_POINT_LIST;
+    default:
+        break;
     }
     assert(!"Unknown topology");
     return VK_PRIMITIVE_TOPOLOGY_MAX_ENUM;

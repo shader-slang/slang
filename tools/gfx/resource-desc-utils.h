@@ -96,4 +96,7 @@ inline int calcNumSubResources(const ITextureResource::Desc& desc)
 
 IBufferResource::Desc fixupBufferDesc(const IBufferResource::Desc& desc);
 ITextureResource::Desc fixupTextureDesc(const ITextureResource::Desc& desc);
+
+Format srgbToLinearFormat(Format format);
+
 }

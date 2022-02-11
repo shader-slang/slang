@@ -179,6 +179,21 @@ public:
 public:
     class TransientResourceHeapImpl;
 
+    static size_t calcRowSize(Format format, int width)
+    {
+        FormatInfo sizeInfo;
+        gfxGetFormatInfo(format, &sizeInfo);
+        return size_t(
+            (width + sizeInfo.blockWidth - 1) / sizeInfo.blockWidth * sizeInfo.blockSizeInBytes);
+    }
+
+    static size_t calcNumRows(Format format, int height)
+    {
+        FormatInfo sizeInfo;
+        gfxGetFormatInfo(format, &sizeInfo);
+        return (size_t)(height + sizeInfo.blockHeight - 1) / sizeInfo.blockHeight;
+    }
+
     class Buffer
     {
         public:
@@ -627,6 +642,8 @@ public:
 
                 dst.flags = 0;
                 dst.format = VulkanUtil::getVkFormat(renderTarget.format);
+                if (renderTarget.format == Format::Unknown)
+                    dst.format = VK_FORMAT_R8G8B8A8_UNORM;
                 dst.samples = (VkSampleCountFlagBits)renderTarget.sampleCount;
 
                 // The following load/store/layout settings does not matter.
@@ -2418,29 +2435,33 @@ public:
 
         static void _uploadBufferData(
             VkCommandBuffer commandBuffer,
+            TransientResourceHeapImpl* transientHeap,
             BufferResourceImpl* buffer,
             size_t offset,
             size_t size,
             void* data)
         {
             auto& api = buffer->m_renderer->m_api;
+            IBufferResource* stagingBuffer = nullptr;
+            transientHeap->allocateStagingBuffer(size, stagingBuffer, ResourceState::CopySource);
 
-            assert(buffer->m_uploadBuffer.isInitialized());
+            BufferResourceImpl* stagingBufferImpl =
+                static_cast<BufferResourceImpl*>(stagingBuffer);
 
             void* mappedData = nullptr;
             SLANG_VK_CHECK(api.vkMapMemory(
-                api.m_device, buffer->m_uploadBuffer.m_memory, offset, size, 0, &mappedData));
+                api.m_device, stagingBufferImpl->m_buffer.m_memory, 0, size, 0, &mappedData));
             memcpy(mappedData, data, size);
-            api.vkUnmapMemory(api.m_device, buffer->m_uploadBuffer.m_memory);
+            api.vkUnmapMemory(api.m_device, stagingBufferImpl->m_buffer.m_memory);
 
             // Copy from staging buffer to real buffer
             VkBufferCopy copyInfo = {};
             copyInfo.size = size;
             copyInfo.dstOffset = offset;
-            copyInfo.srcOffset = offset;
+            copyInfo.srcOffset = 0;
             api.vkCmdCopyBuffer(
                 commandBuffer,
-                buffer->m_uploadBuffer.m_buffer,
+                stagingBufferImpl->m_buffer.m_buffer,
                 buffer->m_buffer.m_buffer,
                 1,
                 &copyInfo);
@@ -2450,7 +2471,12 @@ public:
         {
             m_vkPreCommandBuffer = m_commandBuffer->getPreCommandBuffer();
             _uploadBufferData(
-                m_vkPreCommandBuffer, static_cast<BufferResourceImpl*>(buffer), offset, size, data);
+                m_vkPreCommandBuffer,
+                m_commandBuffer->m_transientHeap.get(),
+                static_cast<BufferResourceImpl*>(buffer),
+                offset,
+                size,
+                data);
         }
 
         Result bindRootShaderObjectImpl(VkPipelineBindPoint bindPoint);
@@ -2582,15 +2608,22 @@ public:
             if (offset.bindingRangeIndex >= layout->getBindingRangeCount())
                 return SLANG_E_INVALID_ARG;
             auto& bindingRange = layout->getBindingRange(offset.bindingRangeIndex);
-            if (resourceView->getViewDesc()->type == IResourceView::Type::AccelerationStructure)
+            if (!resourceView)
             {
-                m_resourceViews[bindingRange.baseIndex + offset.bindingArrayIndex] =
-                    static_cast<AccelerationStructureImpl*>(resourceView);
+                m_resourceViews[bindingRange.baseIndex + offset.bindingArrayIndex] = nullptr;
             }
             else
             {
-                m_resourceViews[bindingRange.baseIndex + offset.bindingArrayIndex] =
-                    static_cast<ResourceViewImpl*>(resourceView);
+                if (resourceView->getViewDesc()->type == IResourceView::Type::AccelerationStructure)
+                {
+                    m_resourceViews[bindingRange.baseIndex + offset.bindingArrayIndex] =
+                        static_cast<AccelerationStructureImpl*>(resourceView);
+                }
+                else
+                {
+                    m_resourceViews[bindingRange.baseIndex + offset.bindingArrayIndex] =
+                        static_cast<ResourceViewImpl*>(resourceView);
+                }
             }
             return SLANG_OK;
         }
@@ -2848,7 +2881,10 @@ public:
             auto descriptorSet = context.descriptorSets[offset.bindingSet];
 
             VkDescriptorBufferInfo bufferInfo = {};
-            bufferInfo.buffer = buffer->m_buffer.m_buffer;
+            if (buffer)
+            {
+                bufferInfo.buffer = buffer->m_buffer.m_buffer;
+            }
             bufferInfo.offset = bufferOffset;
             bufferInfo.range = bufferSize;
 
@@ -2922,19 +2958,19 @@ public:
             for(Index i = 0; i < count; ++i)
             {
                 auto resourceView = static_cast<TexelBufferResourceViewImpl*>(resourceViews[i].Ptr());
-                if (!resourceView)
-                    continue;
-                VkBufferView bufferView = resourceView->m_view;
-
+                VkBufferView bufferView = VK_NULL_HANDLE;
+                if (resourceView)
+                {
+                    bufferView = resourceView->m_view;
+                }
                 VkWriteDescriptorSet write = {};
                 write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-                write.descriptorCount = 1;
                 write.descriptorType = descriptorType;
                 write.dstArrayElement = uint32_t(i);
                 write.dstBinding = offset.binding;
                 write.dstSet = descriptorSet;
+                write.descriptorCount = 1;
                 write.pTexelBufferView = &bufferView;
-
                 writeDescriptor(context, write);
             }
         }
@@ -2952,12 +2988,20 @@ public:
             {
                 auto texture = slots[i].textureView;
                 auto sampler = slots[i].sampler;
-                if (!texture)
-                    continue;
                 VkDescriptorImageInfo imageInfo = {};
-                imageInfo.imageView = texture->m_view;
-                imageInfo.imageLayout = texture->m_layout;
-                imageInfo.sampler = sampler->m_sampler;
+                if (texture)
+                {
+                    imageInfo.imageView = texture->m_view;
+                    imageInfo.imageLayout = texture->m_layout;
+                }
+                if (sampler)
+                {
+                    imageInfo.sampler = sampler->m_sampler;
+                }
+                else
+                {
+                    imageInfo.sampler = context.device->m_defaultSampler;
+                }
 
                 VkWriteDescriptorSet write = {};
                 write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -2985,12 +3029,13 @@ public:
             {
                 auto accelerationStructure =
                     static_cast<AccelerationStructureImpl*>(resourceViews[i].Ptr());
-                if (!accelerationStructure)
-                    continue;
                 VkWriteDescriptorSetAccelerationStructureKHR writeAS = {};
                 writeAS.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET_ACCELERATION_STRUCTURE_KHR;
-                writeAS.accelerationStructureCount = 1;
-                writeAS.pAccelerationStructures = &accelerationStructure->m_vkHandle;
+                if (accelerationStructure)
+                {
+                    writeAS.accelerationStructureCount = 1;
+                    writeAS.pAccelerationStructures = &accelerationStructure->m_vkHandle;
+                }
                 VkWriteDescriptorSet write = {};
                 write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
                 write.descriptorCount = 1;
@@ -3015,11 +3060,12 @@ public:
             for(Index i = 0; i < count; ++i)
             {
                 auto texture = static_cast<TextureResourceViewImpl*>(resourceViews[i].Ptr());
-                if (!texture)
-                    continue;
                 VkDescriptorImageInfo imageInfo = {};
-                imageInfo.imageView = texture->m_view;
-                imageInfo.imageLayout = texture->m_layout;
+                if (texture)
+                {
+                    imageInfo.imageView = texture->m_view;
+                    imageInfo.imageLayout = texture->m_layout;
+                }
                 imageInfo.sampler = 0;
 
                 VkWriteDescriptorSet write = {};
@@ -3047,12 +3093,17 @@ public:
             for(Index i = 0; i < count; ++i)
             {
                 auto sampler = samplers[i];
-                if (!sampler)
-                    continue;
                 VkDescriptorImageInfo imageInfo = {};
                 imageInfo.imageView = 0;
                 imageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
-                imageInfo.sampler = sampler->m_sampler;
+                if (sampler)
+                {
+                    imageInfo.sampler = sampler->m_sampler;
+                }
+                else
+                {
+                    imageInfo.sampler = context.device->m_defaultSampler;
+                }
 
                 VkWriteDescriptorSet write = {};
                 write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -4448,6 +4499,7 @@ public:
             {
                 PipelineCommandEncoder::_uploadBufferData(
                     m_commandBuffer->m_commandBuffer,
+                    m_commandBuffer->m_transientHeap.get(),
                     static_cast<BufferResourceImpl*>(buffer),
                     offset,
                     size,
@@ -4459,8 +4511,7 @@ public:
                 ResourceState src,
                 ResourceState dst) override
             {
-                List<VkImageMemoryBarrier> barriers;
-                barriers.setCount(count);
+                ShortList<VkImageMemoryBarrier, 16> barriers;
 
                 for (size_t i = 0; i < count; i++)
                 {
@@ -4480,8 +4531,8 @@ public:
                         barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
                     barrier.subresourceRange.baseArrayLayer = 0;
                     barrier.subresourceRange.baseMipLevel = 0;
-                    barrier.subresourceRange.layerCount = desc->arraySize;
-                    barrier.subresourceRange.levelCount = desc->numMipLevels;
+                    barrier.subresourceRange.layerCount = VK_REMAINING_ARRAY_LAYERS;
+                    barrier.subresourceRange.levelCount = VK_REMAINING_MIP_LEVELS;
                     barrier.srcAccessMask = calcAccessFlags(src);
                     barrier.dstAccessMask = calcAccessFlags(dst);
                     barriers.add(barrier);
@@ -4491,7 +4542,17 @@ public:
                 VkPipelineStageFlagBits dstStage = calcPipelineStageFlags(dst, false);
 
                 auto& vkApi = m_commandBuffer->m_renderer->m_api;
-                vkApi.vkCmdPipelineBarrier(m_commandBuffer->m_commandBuffer, srcStage, dstStage, 0, 0, nullptr, 0, nullptr, (uint32_t)count, barriers.getBuffer());
+                vkApi.vkCmdPipelineBarrier(
+                    m_commandBuffer->m_commandBuffer,
+                    srcStage,
+                    dstStage,
+                    0,
+                    0,
+                    nullptr,
+                    0,
+                    nullptr,
+                    (uint32_t)count,
+                    barriers.getArrayView().getBuffer());
             }
             virtual SLANG_NO_THROW void SLANG_MCALL bufferBarrier(
                 size_t count,
@@ -4584,29 +4645,37 @@ public:
                 auto dstImage = static_cast<TextureResourceImpl*>(dst);
                 auto dstDesc = dstImage->getDesc();
                 auto dstImageLayout = VulkanUtil::getImageLayoutFromState(dstState);
-
-                for (Int layer = 0; layer < srcSubresource.layerCount; ++layer)
+                if (dstSubresource.layerCount == 0 && dstSubresource.mipLevelCount == 0)
                 {
-                    for (Int mipId = 0; mipId < srcSubresource.mipLevelCount; ++mipId)
-                    {
-                        VkImageCopy region = {};
-                        region.srcSubresource.aspectMask = getAspectMask(srcSubresource.aspectMask);
-                        region.srcSubresource.baseArrayLayer = (uint32_t)(layer + srcSubresource.baseArrayLayer);
-                        region.srcSubresource.mipLevel = (uint32_t)(mipId + srcSubresource.mipLevel);
-                        region.srcSubresource.layerCount = 1;
-                        region.srcOffset = { (int32_t)srcOffset.x, (int32_t)srcOffset.y, (int32_t)srcOffset.z };
-                        region.dstSubresource.aspectMask = getAspectMask(dstSubresource.aspectMask);
-                        region.dstSubresource.baseArrayLayer =
-                            (uint32_t)(layer + dstSubresource.baseArrayLayer);
-                        region.dstSubresource.mipLevel = (uint32_t)(mipId + dstSubresource.mipLevel);
-                        region.dstSubresource.layerCount = 1;
-                        region.dstOffset = { (int32_t)dstOffset.x, (int32_t)dstOffset.y, (int32_t)dstOffset.z };
-                        region.extent = { (uint32_t)extent.width, (uint32_t)extent.height, (uint32_t)extent.depth };
-
-                        auto& vkApi = m_commandBuffer->m_renderer->m_api;
-                        vkApi.vkCmdCopyImage(m_commandBuffer->m_commandBuffer, srcImage->m_image, srcImageLayout, dstImage->m_image, dstImageLayout, 1, &region);
-                    }
+                    extent = dstDesc->size;
+                    dstSubresource.layerCount = dstDesc->arraySize;
+                    if (dstSubresource.layerCount == 0)
+                        dstSubresource.layerCount = 1;
+                    dstSubresource.mipLevelCount = dstDesc->numMipLevels;
                 }
+                if (srcSubresource.layerCount == 0 && srcSubresource.mipLevelCount == 0)
+                {
+                    extent = srcDesc->size;
+                    srcSubresource.layerCount = srcDesc->arraySize;
+                    if (srcSubresource.layerCount == 0)
+                        srcSubresource.layerCount = 1;
+                    srcSubresource.mipLevelCount = dstDesc->numMipLevels;
+                }
+                VkImageCopy region = {};
+                region.srcSubresource.aspectMask = getAspectMask(srcSubresource.aspectMask);
+                region.srcSubresource.baseArrayLayer = srcSubresource.baseArrayLayer;
+                region.srcSubresource.mipLevel = srcSubresource.mipLevel;
+                region.srcSubresource.layerCount = srcSubresource.layerCount;
+                region.srcOffset = { (int32_t)srcOffset.x, (int32_t)srcOffset.y, (int32_t)srcOffset.z };
+                region.dstSubresource.aspectMask = getAspectMask(dstSubresource.aspectMask);
+                region.dstSubresource.baseArrayLayer = dstSubresource.baseArrayLayer;
+                region.dstSubresource.mipLevel = dstSubresource.mipLevel;
+                region.dstSubresource.layerCount = dstSubresource.layerCount;
+                region.dstOffset = { (int32_t)dstOffset.x, (int32_t)dstOffset.y, (int32_t)dstOffset.z };
+                region.extent = { (uint32_t)extent.width, (uint32_t)extent.height, (uint32_t)extent.depth };
+
+                auto& vkApi = m_commandBuffer->m_renderer->m_api;
+                vkApi.vkCmdCopyImage(m_commandBuffer->m_commandBuffer, srcImage->m_image, srcImageLayout, dstImage->m_image, dstImageLayout, 1, &region);
             }
 
             virtual SLANG_NO_THROW void SLANG_MCALL uploadTextureData(
@@ -4617,13 +4686,137 @@ public:
                 ITextureResource::SubresourceData* subResourceData,
                 size_t subResourceDataCount) override
             {
-                SLANG_UNUSED(dst);
-                SLANG_UNUSED(subResourceRange);
-                SLANG_UNUSED(offset);
-                SLANG_UNUSED(extend);
-                SLANG_UNUSED(subResourceData);
-                SLANG_UNUSED(subResourceDataCount);
-                SLANG_UNIMPLEMENTED_X("uploadTextureData");
+                // VALIDATION: dst must be in TransferDst state.
+
+                auto& vkApi = m_commandBuffer->m_renderer->m_api;
+                auto dstImpl = static_cast<TextureResourceImpl*>(dst);
+                List<TextureResource::Size> mipSizes;
+
+                VkCommandBuffer commandBuffer = m_commandBuffer->m_commandBuffer;
+                auto& desc = *dstImpl->getDesc();
+                // Calculate how large the buffer has to be
+                size_t bufferSize = 0;
+                // Calculate how large an array entry is
+                for (uint32_t j = subResourceRange.mipLevel;
+                     j < subResourceRange.mipLevel + subResourceRange.mipLevelCount;
+                     ++j)
+                {
+                    const TextureResource::Size mipSize = calcMipSize(desc.size, j);
+
+                    auto rowSizeInBytes = calcRowSize(desc.format, mipSize.width);
+                    auto numRows = calcNumRows(desc.format, mipSize.height);
+
+                    mipSizes.add(mipSize);
+
+                    bufferSize += (rowSizeInBytes * numRows) * mipSize.depth;
+                }
+
+                // Calculate the total size taking into account the array
+                bufferSize *= subResourceRange.layerCount;
+
+                IBufferResource* uploadBuffer = nullptr;
+                m_commandBuffer->m_transientHeap->allocateStagingBuffer(
+                    bufferSize, uploadBuffer, gfx::ResourceState::CopySource);
+
+                // Copy into upload buffer
+                {
+                    int subResourceCounter = 0;
+
+                    uint8_t* dstData;
+                    uploadBuffer->map(nullptr, (void**)&dstData);
+                    uint8_t* dstDataStart;
+                    dstDataStart = dstData;
+
+                    size_t dstSubresourceOffset = 0;
+                    for (uint32_t i = 0; i <subResourceRange.layerCount; ++i)
+                    {
+                        for (Index j = 0; j < mipSizes.getCount(); ++j)
+                        {
+                            const auto& mipSize = mipSizes[j];
+
+                            int subResourceIndex = subResourceCounter++;
+                            auto initSubresource = subResourceData[subResourceIndex];
+
+                            const ptrdiff_t srcRowStride = (ptrdiff_t)initSubresource.strideY;
+                            const ptrdiff_t srcLayerStride = (ptrdiff_t)initSubresource.strideZ;
+
+                            auto dstRowSizeInBytes = calcRowSize(desc.format, mipSize.width);
+                            auto numRows = calcNumRows(desc.format, mipSize.height);
+                            auto dstLayerSizeInBytes = dstRowSizeInBytes * numRows;
+
+                            const uint8_t* srcLayer = (const uint8_t*)initSubresource.data;
+                            uint8_t* dstLayer = dstData + dstSubresourceOffset;
+
+                            for (int k = 0; k < mipSize.depth; k++)
+                            {
+                                const uint8_t* srcRow = srcLayer;
+                                uint8_t* dstRow = dstLayer;
+
+                                for (uint32_t l = 0; l < numRows; l++)
+                                {
+                                    ::memcpy(dstRow, srcRow, dstRowSizeInBytes);
+
+                                    dstRow += dstRowSizeInBytes;
+                                    srcRow += srcRowStride;
+                                }
+
+                                dstLayer += dstLayerSizeInBytes;
+                                srcLayer += srcLayerStride;
+                            }
+
+                            dstSubresourceOffset += dstLayerSizeInBytes * mipSize.depth;
+                        }
+                    }
+                    uploadBuffer->unmap(nullptr);
+                }
+                {
+                    size_t srcOffset = 0;
+                    for (uint32_t i = 0; i < subResourceRange.layerCount; ++i)
+                    {
+                        for (Index j = 0; j < mipSizes.getCount(); ++j)
+                        {
+                            const auto& mipSize = mipSizes[j];
+
+                            auto rowSizeInBytes = calcRowSize(desc.format, mipSize.width);
+                            auto numRows = calcNumRows(desc.format, mipSize.height);
+
+                            // https://www.khronos.org/registry/vulkan/specs/1.1-extensions/man/html/VkBufferImageCopy.html
+                            // bufferRowLength and bufferImageHeight specify the data in buffer
+                            // memory as a subregion of a larger two- or three-dimensional image,
+                            // and control the addressing calculations of data in buffer memory. If
+                            // either of these values is zero, that aspect of the buffer memory is
+                            // considered to be tightly packed according to the imageExtent.
+
+                            VkBufferImageCopy region = {};
+
+                            region.bufferOffset = srcOffset;
+                            region.bufferRowLength = 0; // rowSizeInBytes;
+                            region.bufferImageHeight = 0;
+
+                            region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+                            region.imageSubresource.mipLevel = uint32_t(j);
+                            region.imageSubresource.baseArrayLayer = subResourceRange.baseArrayLayer + i;
+                            region.imageSubresource.layerCount = 1;
+                            region.imageOffset = {0, 0, 0};
+                            region.imageExtent = {
+                                uint32_t(mipSize.width),
+                                uint32_t(mipSize.height),
+                                uint32_t(mipSize.depth)};
+
+                            // Do the copy (do all depths in a single go)
+                            vkApi.vkCmdCopyBufferToImage(
+                                commandBuffer,
+                                static_cast<BufferResourceImpl*>(uploadBuffer)->m_buffer.m_buffer,
+                                dstImpl->m_image,
+                                VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                                1,
+                                &region);
+
+                            // Next
+                            srcOffset += rowSizeInBytes * numRows * mipSize.depth;
+                        }
+                    }
+                }
             }
 
             void _clearColorImage(TextureResourceViewImpl* viewImpl, ClearValue* clearValue)
@@ -5448,13 +5641,17 @@ public:
             submitInfo.signalSemaphoreCount = (uint32_t)signalSemaphores.getCount();
             submitInfo.pSignalSemaphores = signalSemaphores.getBuffer();
 
-            auto commandBufferImpl = static_cast<CommandBufferImpl*>(commandBuffers[0]);
-            auto vkFence = commandBufferImpl->m_transientHeap->getCurrentFence();
-            vkAPI.vkResetFences(vkAPI.m_device, 1, &vkFence);
+            VkFence vkFence = VK_NULL_HANDLE;
+            if (count)
+            {
+                auto commandBufferImpl = static_cast<CommandBufferImpl*>(commandBuffers[0]);
+                vkFence = commandBufferImpl->m_transientHeap->getCurrentFence();
+                vkAPI.vkResetFences(vkAPI.m_device, 1, &vkFence);
+                commandBufferImpl->m_transientHeap->advanceFence();
+            }
             vkAPI.vkQueueSubmit(m_queue, 1, &submitInfo, vkFence);
             m_pendingWaitSemaphores[0] = m_semaphore;
             m_pendingWaitSemaphores[1] = VK_NULL_HANDLE;
-            commandBufferImpl->m_transientHeap->advanceFence();
         }
 
         virtual SLANG_NO_THROW void SLANG_MCALL executeCommandBuffers(
@@ -5924,20 +6121,24 @@ public:
                     waitSemaphores.add(s);
                 }
             }
+            m_queue->m_pendingWaitSemaphores[0] = VK_NULL_HANDLE;
+            m_queue->m_pendingWaitSemaphores[1] = VK_NULL_HANDLE;
             presentInfo.waitSemaphoreCount = (uint32_t)waitSemaphores.getCount();
             if (presentInfo.waitSemaphoreCount)
             {
                 presentInfo.pWaitSemaphores = waitSemaphores.getBuffer();
             }
-            m_api->vkQueuePresentKHR(m_queue->m_queue, &presentInfo);
-            m_queue->m_pendingWaitSemaphores[0] = VK_NULL_HANDLE;
-            m_queue->m_pendingWaitSemaphores[1] = VK_NULL_HANDLE;
+            if (m_currentImageIndex != -1)
+                m_api->vkQueuePresentKHR(m_queue->m_queue, &presentInfo);
             return SLANG_OK;
         }
         virtual SLANG_NO_THROW int SLANG_MCALL acquireNextImage() override
         {
             if (!m_images.getCount())
+            {
+                m_queue->m_pendingWaitSemaphores[1] = VK_NULL_HANDLE;
                 return -1;
+            }
 
             m_currentImageIndex = -1;
             VkResult result = m_api->vkAcquireNextImageKHR(
@@ -6025,6 +6226,8 @@ public:
     // worrying the `ShaderProgramImpl` object getting destroyed after the completion of
     // `VKDevice::~VKDevice()'.
     ChunkedList<RefPtr<RefObject>, 1024> m_deviceObjectsWithPotentialBackReferences;
+
+    VkSampler m_defaultSampler;
 };
 
 void VKDevice::PipelineCommandEncoder::init(CommandBufferImpl* commandBuffer)
@@ -6192,7 +6395,8 @@ VKDevice::~VKDevice()
     shaderCache.free();
     m_deviceObjectsWithPotentialBackReferences.clearAndDeallocate();
 
-    // Same as clear but, also dtors all elements, which clear does not
+    m_api.vkDestroySampler(m_device, m_defaultSampler, nullptr);
+
     m_deviceQueue.destroy();
 
     descriptorSetAllocator.close();
@@ -6320,7 +6524,8 @@ Result VKDevice::initVulkanInstanceAndDevice(const InteropHandle* handles, bool 
         if (!m_api.m_module->isSoftware())
         {
             instanceExtensions.add(VK_KHR_SURFACE_EXTENSION_NAME);
-            instanceExtensions.add("VK_GOOGLE_surfaceless_query");
+            // Note: this extension is not yet supported by nvidia drivers, disable for now.
+            // instanceExtensions.add("VK_GOOGLE_surfaceless_query");
 #if SLANG_WINDOWS_FAMILY
             instanceExtensions.add(VK_KHR_WIN32_SURFACE_EXTENSION_NAME);
 #elif defined(SLANG_ENABLE_XLIB)
@@ -6547,6 +6752,10 @@ Result VKDevice::initVulkanInstanceAndDevice(const InteropHandle* handles, bool 
         extendedFeatures.atomicInt64Features.pNext = deviceFeatures2.pNext;
         deviceFeatures2.pNext = &extendedFeatures.atomicInt64Features;
 
+        // robustness2 features
+        extendedFeatures.robustness2Features.pNext = deviceFeatures2.pNext;
+        deviceFeatures2.pNext = &extendedFeatures.robustness2Features;
+
         // Atomic Float
         // To detect atomic float we need
         // https://www.khronos.org/registry/vulkan/specs/1.2-extensions/man/html/VkPhysicalDeviceShaderAtomicFloatFeaturesEXT.html
@@ -6645,6 +6854,7 @@ Result VKDevice::initVulkanInstanceAndDevice(const InteropHandle* handles, bool 
             deviceExtensions.add(VK_KHR_SHADER_SUBGROUP_EXTENDED_TYPES_EXTENSION_NAME);
             m_features.add("shader-subgroup-extended-types");
         }
+        #if 0
         if (extendedFeatures.accelerationStructureFeatures.accelerationStructure)
         {
             extendedFeatures.accelerationStructureFeatures.pNext = (void*)deviceCreateInfo.pNext;
@@ -6653,7 +6863,6 @@ Result VKDevice::initVulkanInstanceAndDevice(const InteropHandle* handles, bool 
             deviceExtensions.add(VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME);
             m_features.add("acceleration-structure");
         }
-
         if (extendedFeatures.rayQueryFeatures.rayQuery)
         {
             extendedFeatures.rayQueryFeatures.pNext = (void*)deviceCreateInfo.pNext;
@@ -6662,6 +6871,7 @@ Result VKDevice::initVulkanInstanceAndDevice(const InteropHandle* handles, bool 
             m_features.add("ray-query");
             m_features.add("ray-tracing");
         }
+        #endif
         if (extendedFeatures.bufferDeviceAddressFeatures.bufferDeviceAddress)
         {
             extendedFeatures.bufferDeviceAddressFeatures.pNext = (void*)deviceCreateInfo.pNext;
@@ -6677,6 +6887,14 @@ Result VKDevice::initVulkanInstanceAndDevice(const InteropHandle* handles, bool 
             deviceCreateInfo.pNext = &extendedFeatures.inlineUniformBlockFeatures;
             deviceExtensions.add(VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME);
             m_features.add("inline-uniform-block");
+        }
+
+        if (extendedFeatures.robustness2Features.nullDescriptor)
+        {
+            extendedFeatures.robustness2Features.pNext = (void*)deviceCreateInfo.pNext;
+            deviceCreateInfo.pNext = &extendedFeatures.robustness2Features;
+            deviceExtensions.add(VK_EXT_ROBUSTNESS_2_EXTENSION_NAME);
+            m_features.add("robustness2");
         }
 
         uint32_t extensionCount = 0;
@@ -6784,6 +7002,27 @@ SlangResult VKDevice::initialize(const Desc& desc)
         SLANG_SPIRV,
         "sm_5_1",
         makeArray(slang::PreprocessorMacroDesc{ "__VK__", "1" }).getView()));
+
+    // Create default sampler.
+    {
+        VkSamplerCreateInfo samplerInfo = {VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO};
+        samplerInfo.magFilter = VK_FILTER_NEAREST;
+        samplerInfo.minFilter = VK_FILTER_NEAREST;
+        samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
+        samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
+        samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
+        samplerInfo.anisotropyEnable = VK_FALSE;
+        samplerInfo.maxAnisotropy = 1;
+        samplerInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
+        samplerInfo.unnormalizedCoordinates = VK_FALSE;
+        samplerInfo.compareEnable = VK_FALSE;
+        samplerInfo.compareOp = VK_COMPARE_OP_NEVER;
+        samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_NEAREST;
+        samplerInfo.minLod = 0.0f;
+        samplerInfo.maxLod = 0.0f;
+        SLANG_VK_RETURN_ON_FAIL(m_api.vkCreateSampler(m_device, &samplerInfo, nullptr, &m_defaultSampler));
+    }
+
     return SLANG_OK;
 }
 
@@ -6918,20 +7157,6 @@ Result VKDevice::createFramebuffer(const IFramebuffer::Desc& desc, IFramebuffer*
     SLANG_RETURN_ON_FAIL(fb->init(this, desc));
     returnComPtr(outFramebuffer, fb);
     return SLANG_OK;
-}
-
-size_t calcRowSize(Format format, int width)
-{
-    FormatInfo sizeInfo;
-    gfxGetFormatInfo(format, &sizeInfo);
-    return size_t((width + sizeInfo.blockWidth - 1) / sizeInfo.blockWidth * sizeInfo.blockSizeInBytes);
-}
-
-size_t calcNumRows(Format format, int height)
-{
-    FormatInfo sizeInfo;
-    gfxGetFormatInfo(format, &sizeInfo);
-    return (size_t)(height + sizeInfo.blockHeight - 1) / sizeInfo.blockHeight;
 }
 
 SlangResult VKDevice::readTextureResource(
@@ -7205,6 +7430,8 @@ static VkImageUsageFlagBits _calcImageUsageFlags(ResourceState state)
         return VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
     case ResourceState::ResolveDestination:
         return VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+    case ResourceState::General:
+        return (VkImageUsageFlagBits)0;
     default:
         {
             assert(!"Unsupported");
@@ -7722,7 +7949,8 @@ Result VKDevice::createBufferResource(const IBufferResource::Desc& descIn, const
         usage |= VK_BUFFER_USAGE_TRANSFER_DST_BIT;
     }
 
-    if (desc.allowedStates.contains(ResourceState::ConstantBuffer))
+    if (desc.allowedStates.contains(ResourceState::ConstantBuffer) ||
+        desc.memoryType == MemoryType::Upload || desc.memoryType == MemoryType::ReadBack)
     {
         reqMemoryProperties = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
     }
@@ -7737,29 +7965,34 @@ Result VKDevice::createBufferResource(const IBufferResource::Desc& descIn, const
         SLANG_RETURN_ON_FAIL(buffer->m_buffer.init(m_api, desc.sizeInBytes, usage, reqMemoryProperties));
     }
 
-    if (desc.memoryType == MemoryType::Upload || initData)
-    {
-        SLANG_RETURN_ON_FAIL(buffer->m_uploadBuffer.init(m_api, bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT));
-    }
-
     if (initData)
     {
-        // TODO: only create staging buffer if the memory type
-        // used for the buffer doesn't let us fill things in
-        // directly.
-        // Copy into staging buffer
-        void* mappedData = nullptr;
-        SLANG_VK_CHECK(m_api.vkMapMemory(m_device, buffer->m_uploadBuffer.m_memory, 0, bufferSize, 0, &mappedData));
-        ::memcpy(mappedData, initData, bufferSize);
-        m_api.vkUnmapMemory(m_device, buffer->m_uploadBuffer.m_memory);
+        if (desc.memoryType == MemoryType::DeviceLocal)
+        {
+            SLANG_RETURN_ON_FAIL(buffer->m_uploadBuffer.init(m_api, bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT));
+            // Copy into staging buffer
+            void* mappedData = nullptr;
+            SLANG_VK_CHECK(m_api.vkMapMemory(m_device, buffer->m_uploadBuffer.m_memory, 0, bufferSize, 0, &mappedData));
+            ::memcpy(mappedData, initData, bufferSize);
+            m_api.vkUnmapMemory(m_device, buffer->m_uploadBuffer.m_memory);
 
-        // Copy from staging buffer to real buffer
-        VkCommandBuffer commandBuffer = m_deviceQueue.getCommandBuffer();
+            // Copy from staging buffer to real buffer
+            VkCommandBuffer commandBuffer = m_deviceQueue.getCommandBuffer();
 
-        VkBufferCopy copyInfo = {};
-        copyInfo.size = bufferSize;
-        m_api.vkCmdCopyBuffer(commandBuffer, buffer->m_uploadBuffer.m_buffer, buffer->m_buffer.m_buffer, 1, &copyInfo);
-        m_deviceQueue.flush();
+            VkBufferCopy copyInfo = {};
+            copyInfo.size = bufferSize;
+            m_api.vkCmdCopyBuffer(commandBuffer, buffer->m_uploadBuffer.m_buffer, buffer->m_buffer.m_buffer, 1, &copyInfo);
+            m_deviceQueue.flush();
+        }
+        else
+        {
+            // Copy into mapped buffer directly
+            void* mappedData = nullptr;
+            SLANG_VK_CHECK(m_api.vkMapMemory(
+                m_device, buffer->m_buffer.m_memory, 0, bufferSize, 0, &mappedData));
+            ::memcpy(mappedData, initData, bufferSize);
+            m_api.vkUnmapMemory(m_device, buffer->m_uploadBuffer.m_memory);
+        }
     }
 
     returnComPtr(outResource, buffer);
@@ -7936,13 +8169,33 @@ Result VKDevice::createTextureView(ITextureResource* texture, IResourceView::Des
     auto resourceImpl = static_cast<TextureResourceImpl*>(texture);
     RefPtr<TextureResourceViewImpl> view = new TextureResourceViewImpl(this);
     view->m_texture = resourceImpl;
+    view->m_desc = desc;
+    if (!texture)
+    {
+        view->m_view = VK_NULL_HANDLE;
+        returnComPtr(outView, view);
+        return SLANG_OK;
+    }
+    bool isArray = false;
+    switch (desc.type)
+    {
+    case IResourceView::Type::DepthStencil:
+    case IResourceView::Type::RenderTarget:
+        isArray = desc.renderTarget.arraySize > 1;
+        break;
+    case IResourceView::Type::ShaderResource:
+    case IResourceView::Type::UnorderedAccess:
+        isArray = desc.subresourceRange.layerCount > 1;
+        break;
+    default:
+        break;
+    }
     VkImageViewCreateInfo createInfo = {};
     createInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
     createInfo.flags = 0;
     createInfo.format = gfxIsTypelessFormat(texture->getDesc()->format) ? VulkanUtil::getVkFormat(desc.format) : resourceImpl->m_vkformat;
     createInfo.image = resourceImpl->m_image;
     createInfo.components = VkComponentMapping{ VK_COMPONENT_SWIZZLE_R, VK_COMPONENT_SWIZZLE_G,VK_COMPONENT_SWIZZLE_B,VK_COMPONENT_SWIZZLE_A };
-    bool isArray = resourceImpl->getDesc()->arraySize != 0;
     switch (resourceImpl->getType())
     {
     case IResource::Type::Texture1D:
@@ -8008,7 +8261,6 @@ Result VKDevice::createTextureView(ITextureResource* texture, IResourceView::Des
         SLANG_UNIMPLEMENTED_X("Unknown TextureViewDesc type.");
         break;
     }
-    view->m_desc = desc;
     m_api.vkCreateImageView(m_device, &createInfo, nullptr, &view->m_view);
     returnComPtr(outView, view);
     return SLANG_OK;
@@ -8017,22 +8269,36 @@ Result VKDevice::createTextureView(ITextureResource* texture, IResourceView::Des
 Result VKDevice::getFormatSupportedResourceStates(Format format, ResourceStateSet* outStates)
 {
     // TODO: Add variables to VkDevice to track supported surface presentable formats
+
     VkFormat vkFormat = VulkanUtil::getVkFormat(format);
-    VkFormatProperties supportedProperties;
-    m_api.vkGetPhysicalDeviceFormatProperties(m_api.m_physicalDevice, vkFormat, &supportedProperties);
 
-    uint32_t surfaceFormatCount = 0;
-    m_api.vkGetPhysicalDeviceSurfaceFormatsKHR(m_api.m_physicalDevice, VK_NULL_HANDLE, &surfaceFormatCount, nullptr);
-
-    List<VkSurfaceFormatKHR> surfaceFormats;
-    surfaceFormats.setCount(surfaceFormatCount);
-    m_api.vkGetPhysicalDeviceSurfaceFormatsKHR(m_api.m_physicalDevice, VK_NULL_HANDLE, &surfaceFormatCount, surfaceFormats.getBuffer());
+    VkFormatProperties supportedProperties = {};
+    m_api.vkGetPhysicalDeviceFormatProperties(
+        m_api.m_physicalDevice, vkFormat, &supportedProperties);
 
     HashSet<VkFormat> presentableFormats;
+    // TODO: enable this once we have VK_GOOGLE_surfaceless_query.
+#if 0
+    List<VkSurfaceFormatKHR> surfaceFormats;
+
+    uint32_t surfaceFormatCount = 0;
+    m_api.vkGetPhysicalDeviceSurfaceFormatsKHR(
+        m_api.m_physicalDevice, VK_NULL_HANDLE, &surfaceFormatCount, nullptr);
+
+    surfaceFormats.setCount(surfaceFormatCount);
+    m_api.vkGetPhysicalDeviceSurfaceFormatsKHR(m_api.m_physicalDevice, VK_NULL_HANDLE, &surfaceFormatCount, surfaceFormats.getBuffer());
     for (auto surfaceFormat : surfaceFormats)
     {
         presentableFormats.Add(surfaceFormat.format);
     }
+#else
+    // Until we have a solution to query presentable formats without needing a surface,
+    // hard code presentable formats that is supported by most drivers.
+    presentableFormats.Add(VK_FORMAT_R8G8B8A8_UNORM);
+    presentableFormats.Add(VK_FORMAT_B8G8R8A8_UNORM);
+    presentableFormats.Add(VK_FORMAT_R8G8B8A8_SRGB);
+    presentableFormats.Add(VK_FORMAT_B8G8R8A8_SRGB);
+#endif
 
     ResourceStateSet allowedStates;
     // TODO: Currently only supports VK_IMAGE_TILING_OPTIMAL
@@ -8108,7 +8374,7 @@ Result VKDevice::createBufferView(
     auto resourceImpl = (BufferResourceImpl*) buffer;
 
     // TODO: These should come from the `ResourceView::Desc`
-    auto stride = resourceImpl->getDesc()->elementSize;
+    auto stride = buffer ? resourceImpl->getDesc()->elementSize : 0;
     if (stride == 0)
     {
         if (desc.format == Format::Unknown)
@@ -8124,8 +8390,9 @@ Result VKDevice::createBufferView(
         }
     }
     VkDeviceSize offset = (VkDeviceSize)desc.bufferRange.firstElement * stride;
-    VkDeviceSize size = desc.bufferRange.elementCount == 0 ? resourceImpl->getDesc()->sizeInBytes
-                                                           : (VkDeviceSize)desc.bufferRange.elementCount * stride;
+    VkDeviceSize size = desc.bufferRange.elementCount == 0
+                            ? (buffer ? resourceImpl->getDesc()->sizeInBytes : 0)
+                            : (VkDeviceSize)desc.bufferRange.elementCount * stride;
 
     // There are two different cases we need to think about for buffers.
     //
@@ -8177,13 +8444,17 @@ Result VKDevice::createBufferView(
         {
             VkBufferViewCreateInfo info = { VK_STRUCTURE_TYPE_BUFFER_VIEW_CREATE_INFO };
 
-            info.format = VulkanUtil::getVkFormat(desc.format);
-            info.buffer = resourceImpl->m_buffer.m_buffer;
-            info.offset = offset;
-            info.range = size;
+            VkBufferView view = VK_NULL_HANDLE;
 
-            VkBufferView view;
-            SLANG_VK_RETURN_ON_FAIL(m_api.vkCreateBufferView(m_device, &info, nullptr, &view));
+            if (buffer)
+            {
+                info.format = VulkanUtil::getVkFormat(desc.format);
+                info.buffer = resourceImpl->m_buffer.m_buffer;
+                info.offset = offset;
+                info.range = size;
+
+                SLANG_VK_RETURN_ON_FAIL(m_api.vkCreateBufferView(m_device, &info, nullptr, &view));
+            }
 
             RefPtr<TexelBufferResourceViewImpl> viewImpl = new TexelBufferResourceViewImpl(this);
             viewImpl->m_buffer = resourceImpl;
@@ -8596,7 +8867,7 @@ Result VKDevice::createGraphicsPipelineState(const GraphicsPipelineStateDesc& in
     multisampling.alphaToCoverageEnable = blendDesc.alphaToCoverageEnable;
     multisampling.alphaToOneEnable = VK_FALSE;
 
-    auto targetCount = blendDesc.targetCount;
+    auto targetCount = Math::Min(framebufferLayoutImpl->m_renderTargetCount, (uint32_t)blendDesc.targetCount);
     List<VkPipelineColorBlendAttachmentState> colorBlendAttachments;
 
     // Regardless of whether blending is enabled, Vulkan always applies the color write mask operation,
