@@ -1330,10 +1330,9 @@ newoption {
      dependson { "run-generators" }
  
      -- If we have slang-llvm copy it
+     local slangLLVMPath = deps:getProjectRelativePath("slang-llvm", "../../..")
      
      if slangLLVMPath then
-         local slangLLVMPath = deps:getProjectRelativePath("slang-llvm", "../../..")
-        
          filter { "system:linux or macosx or windows" }
              local sharedLibName = slangUtil.getSharedLibraryFileName(targetInfo, "slang-llvm")            
              postbuildcommands {
