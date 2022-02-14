@@ -20,6 +20,9 @@
     <ClCompile Include="..\..\..\tools\gfx-unit-test\buffer-barrier-test.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\tools\gfx-unit-test\clear-texture-test.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\..\tools\gfx-unit-test\compute-smoke.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
