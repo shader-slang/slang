@@ -597,38 +597,7 @@ public:
         return SLANG_OK;
     }
 
-    void setSpecializationArgsForContainerElement(ExtendedShaderObjectTypeList& specializationArgs)
-    {
-        // Compute specialization args for the structured buffer object.
-        // If we haven't filled anything to `m_structuredBufferSpecializationArgs` yet,
-        // use `specializationArgs` directly.
-        if (m_structuredBufferSpecializationArgs.getCount() == 0)
-        {
-            m_structuredBufferSpecializationArgs = Slang::_Move(specializationArgs);
-        }
-        else
-        {
-            // If `m_structuredBufferSpecializationArgs` already contains some arguments, we
-            // need to check if they are the same as `specializationArgs`, and replace
-            // anything that is different with `__Dynamic` because we cannot specialize the
-            // buffer type if the element types are not the same.
-            SLANG_ASSERT(
-                m_structuredBufferSpecializationArgs.getCount() == specializationArgs.getCount());
-            auto device = getRenderer();
-            for (Slang::Index i = 0; i < m_structuredBufferSpecializationArgs.getCount(); i++)
-            {
-                if (m_structuredBufferSpecializationArgs[i].componentID !=
-                    specializationArgs[i].componentID)
-                {
-                    auto dynamicType = device->slangContext.session->getDynamicType();
-                    m_structuredBufferSpecializationArgs.componentIDs[i] =
-                        device->shaderCache.getComponentId(dynamicType);
-                    m_structuredBufferSpecializationArgs.components[i] =
-                        slang::SpecializationArg::fromType(dynamicType);
-                }
-            }
-        }
-    }
+    void setSpecializationArgsForContainerElement(ExtendedShaderObjectTypeList& specializationArgs);
 
     virtual SLANG_NO_THROW Result SLANG_MCALL
         setObject(ShaderOffset const& offset, IShaderObject* object) SLANG_OVERRIDE
@@ -795,26 +764,7 @@ public:
     Result getExtendedShaderTypeListFromSpecializationArgs(
         ExtendedShaderObjectTypeList& list,
         const slang::SpecializationArg* args,
-        uint32_t count)
-    {
-        auto device = getRenderer();
-        for (uint32_t i = 0; i < count; i++)
-        {
-            gfx::ExtendedShaderObjectType extendedType;
-            switch (args[i].kind)
-            {
-            case slang::SpecializationArg::Kind::Type:
-                extendedType.slangType = args[i].type;
-                extendedType.componentID = device->shaderCache.getComponentId(args[i].type);
-                break;
-            default:
-                SLANG_ASSERT(false && "Unexpected specialization argument kind.");
-                return SLANG_FAIL;
-            }
-            list.add(extendedType);
-        }
-        return SLANG_OK;
-    }
+        uint32_t count);
 
     virtual SLANG_NO_THROW Result SLANG_MCALL setSpecializationArgs(
         ShaderOffset const& offset,
@@ -1312,6 +1262,70 @@ inline IDebugCallback* getDebugCallback()
     {
         return _getNullDebugCallback();
     }
+}
+
+
+// Implementations that have to come after RendererBase
+
+//--------------------------------------------------------------------------------
+template<typename TShaderObjectImpl, typename TShaderObjectLayoutImpl, typename TShaderObjectData>
+void ShaderObjectBaseImpl<TShaderObjectImpl, TShaderObjectLayoutImpl, TShaderObjectData>::setSpecializationArgsForContainerElement(ExtendedShaderObjectTypeList& specializationArgs)
+{
+    // Compute specialization args for the structured buffer object.
+    // If we haven't filled anything to `m_structuredBufferSpecializationArgs` yet,
+    // use `specializationArgs` directly.
+    if (m_structuredBufferSpecializationArgs.getCount() == 0)
+    {
+        m_structuredBufferSpecializationArgs = Slang::_Move(specializationArgs);
+    }
+    else
+    {
+        // If `m_structuredBufferSpecializationArgs` already contains some arguments, we
+        // need to check if they are the same as `specializationArgs`, and replace
+        // anything that is different with `__Dynamic` because we cannot specialize the
+        // buffer type if the element types are not the same.
+        SLANG_ASSERT(
+            m_structuredBufferSpecializationArgs.getCount() == specializationArgs.getCount());
+        auto device = getRenderer();
+        for (Slang::Index i = 0; i < m_structuredBufferSpecializationArgs.getCount(); i++)
+        {
+            if (m_structuredBufferSpecializationArgs[i].componentID !=
+                specializationArgs[i].componentID)
+            {
+                auto dynamicType = device->slangContext.session->getDynamicType();
+                m_structuredBufferSpecializationArgs.componentIDs[i] =
+                    device->shaderCache.getComponentId(dynamicType);
+                m_structuredBufferSpecializationArgs.components[i] =
+                    slang::SpecializationArg::fromType(dynamicType);
+            }
+        }
+    }
+}
+
+//--------------------------------------------------------------------------------
+template<typename TShaderObjectImpl, typename TShaderObjectLayoutImpl, typename TShaderObjectData>
+Result ShaderObjectBaseImpl<TShaderObjectImpl, TShaderObjectLayoutImpl, TShaderObjectData>::getExtendedShaderTypeListFromSpecializationArgs(
+    ExtendedShaderObjectTypeList& list,
+    const slang::SpecializationArg* args,
+    uint32_t count)
+{
+    auto device = getRenderer();
+    for (uint32_t i = 0; i < count; i++)
+    {
+        gfx::ExtendedShaderObjectType extendedType;
+        switch (args[i].kind)
+        {
+            case slang::SpecializationArg::Kind::Type:
+                extendedType.slangType = args[i].type;
+                extendedType.componentID = device->shaderCache.getComponentId(args[i].type);
+                break;
+            default:
+                SLANG_ASSERT(false && "Unexpected specialization argument kind.");
+                return SLANG_FAIL;
+        }
+        list.add(extendedType);
+    }
+    return SLANG_OK;
 }
 
 }
