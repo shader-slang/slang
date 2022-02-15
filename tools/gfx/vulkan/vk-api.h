@@ -105,6 +105,7 @@ namespace gfx {
     x(vkCmdBeginQuery) \
     x(vkCmdEndQuery) \
     x(vkCmdResetQueryPool) \
+    x(vkCmdCopyQueryPoolResults) \
     \
     x(vkCreateFence) \
     x(vkDestroyFence) \
@@ -256,6 +257,9 @@ struct VulkanExtendedFeatureProperties
     // Inline uniform block features
     VkPhysicalDeviceInlineUniformBlockFeaturesEXT inlineUniformBlockFeatures = {
         VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_INLINE_UNIFORM_BLOCK_FEATURES_EXT};
+    // Robustness2 features
+    VkPhysicalDeviceRobustness2FeaturesEXT robustness2Features = {
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ROBUSTNESS_2_FEATURES_EXT};
 };
 
 struct VulkanApi

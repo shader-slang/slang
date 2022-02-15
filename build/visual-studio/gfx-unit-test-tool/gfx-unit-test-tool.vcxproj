@@ -273,6 +273,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\tools\gfx-unit-test\buffer-barrier-test.cpp" />
+    <ClCompile Include="..\..\..\tools\gfx-unit-test\clear-texture-test.cpp" />
     <ClCompile Include="..\..\..\tools\gfx-unit-test\compute-smoke.cpp" />
     <ClCompile Include="..\..\..\tools\gfx-unit-test\copy-texture-tests.cpp" />
     <ClCompile Include="..\..\..\tools\gfx-unit-test\create-buffer-from-handle.cpp" />
@@ -289,6 +290,7 @@
     <ClCompile Include="..\..\..\tools\gfx-unit-test\nested-parameter-block.cpp" />
     <ClCompile Include="..\..\..\tools\gfx-unit-test\resolve-resource-tests.cpp" />
     <ClCompile Include="..\..\..\tools\gfx-unit-test\root-mutable-shader-object.cpp" />
+    <ClCompile Include="..\..\..\tools\gfx-unit-test\root-shader-parameter.cpp" />
     <ClCompile Include="..\..\..\tools\gfx-unit-test\shared-buffers-tests.cpp" />
     <ClCompile Include="..\..\..\tools\gfx-unit-test\shared-textures-tests.cpp" />
     <ClCompile Include="..\..\..\tools\unit-test\slang-unit-test.cpp" />
@@ -302,6 +304,7 @@
     <None Include="..\..\..\tools\gfx-unit-test\mutable-shader-object.slang" />
     <None Include="..\..\..\tools\gfx-unit-test\nested-parameter-block.slang" />
     <None Include="..\..\..\tools\gfx-unit-test\resolve-resource-shader.slang" />
+    <None Include="..\..\..\tools\gfx-unit-test\root-shader-parameter.slang" />
     <None Include="..\..\..\tools\gfx-unit-test\trivial-copy.slang" />
   </ItemGroup>
   <ItemGroup>

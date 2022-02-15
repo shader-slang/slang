@@ -44,6 +44,11 @@ typedef uint64_t DeviceAddress;
 
 const uint64_t kTimeoutInfinite = 0xFFFFFFFFFFFFFFFF;
 
+enum class StructType
+{
+    D3D12ExtendedDesc,
+};
+
 enum class StageType
 {
     Unknown,
@@ -1313,16 +1318,27 @@ struct RayTracingPipelineStateDesc
 class IShaderTable : public ISlangUnknown
 {
 public:
+    // Specifies the bytes to overwrite into a record in the shader table.
+    struct ShaderRecordOverwrite
+    {
+        uint32_t offset; // Offset within the shader record.
+        uint32_t size; // Number of bytes to overwrite.
+        uint8_t data[8]; // Content to overwrite.
+    };
+
     struct Desc
     {
         uint32_t rayGenShaderCount;
         const char** rayGenShaderEntryPointNames;
+        const ShaderRecordOverwrite* rayGenShaderRecordOverwrites;
 
         uint32_t missShaderCount;
         const char** missShaderEntryPointNames;
+        const ShaderRecordOverwrite* missShaderRecordOverwrites;
 
         uint32_t hitGroupCount;
         const char** hitGroupNames;
+        const ShaderRecordOverwrite* hitGroupRecordOverwrites;
 
         IShaderProgram* program;
     };
@@ -1691,6 +1707,12 @@ public:
         ITextureResource* dest,
         ResourceState destState,
         SubresourceRange destRange) = 0;
+    virtual SLANG_NO_THROW void SLANG_MCALL resolveQuery(
+        IQueryPool* queryPool,
+        uint32_t index,
+        uint32_t count,
+        IBufferResource* buffer,
+        uint64_t offset) = 0;
 };
 
 enum class AccelerationStructureCopyMode
@@ -2012,6 +2034,9 @@ public:
         ISlangFileSystem* shaderCacheFileSystem = nullptr;
         // Configurations for Slang compiler.
         SlangDesc slang = {};
+
+        uint32_t extendedDescCount = 0;
+        void** extendedDescs = nullptr;
     };
 
     virtual SLANG_NO_THROW Result SLANG_MCALL getNativeDeviceHandles(InteropHandles* outHandles) = 0;
@@ -2384,4 +2409,12 @@ extern "C"
     SLANG_GFX_API const char* SLANG_MCALL gfxGetDeviceTypeName(DeviceType type);
 }
 
-}// renderer_test
+// Extended descs.
+struct D3D12DeviceExtendedDesc
+{
+    StructType structType = StructType::D3D12ExtendedDesc;
+    const char* rootParameterShaderAttributeName = nullptr;
+    bool debugBreakOnD3D12Error = false;
+};
+
+}

@@ -1,0 +1,39 @@
+name: MacOS Build CI
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  build: 
+    name: MacOS Build CI
+
+    runs-on: macos-latest
+    
+    strategy:
+      matrix:
+        configuration: ['release'] # 'debug'
+        compiler: ['clang']
+        platform: ['x64'] 
+        
+    steps:
+    - uses: actions/checkout@v2.3.4
+      with:
+        submodules: 'true'
+        fetch-depth: '0'
+        
+    - name: build
+      run: 
+        CC=${{matrix.compiler}}
+        CONFIGURATION=${{matrix.configuration}}
+        ARCH=${{matrix.platform}}
+        source ./github_macos_build.sh
+    - name: test
+      run: 
+        CONFIGURATION=${{matrix.configuration}}
+        CC=${{matrix.compiler}}
+        ARCH=${{matrix.platform}}
+        source ./github_test.sh       
+    

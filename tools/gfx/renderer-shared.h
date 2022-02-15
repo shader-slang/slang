@@ -1039,6 +1039,8 @@ public:
     SLANG_COM_OBJECT_IUNKNOWN_ALL
     IQueryPool* getInterface(const Slang::Guid& guid);
     virtual SLANG_NO_THROW Result SLANG_MCALL reset() override { return SLANG_OK; }
+
+    IQueryPool::Desc m_desc;
 };
 
 enum class PipelineType
@@ -1234,6 +1236,8 @@ class ShaderTableBase
 {
 public:
     Slang::List<Slang::String> m_entryPointNames;
+    Slang::List<ShaderRecordOverwrite> m_recordOverwrites;
+
     uint32_t m_rayGenShaderCount;
     uint32_t m_missShaderCount;
     uint32_t m_hitGroupCount;

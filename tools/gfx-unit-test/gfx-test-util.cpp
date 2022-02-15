@@ -202,6 +202,14 @@ namespace gfx_test
         const char* searchPaths[] = { "", "../../tools/gfx-unit-test", "tools/gfx-unit-test" };
         deviceDesc.slang.searchPathCount = (SlangInt)SLANG_COUNT_OF(searchPaths);
         deviceDesc.slang.searchPaths = searchPaths;
+
+        gfx::D3D12DeviceExtendedDesc extDesc = {};
+        extDesc.rootParameterShaderAttributeName = "root";
+
+        deviceDesc.extendedDescCount = 1;
+        void* extDescPtr = &extDesc;
+        deviceDesc.extendedDescs = &extDescPtr;
+
         auto createDeviceResult = gfxCreateDevice(&deviceDesc, device.writeRef());
         if (SLANG_FAILED(createDeviceResult))
         {
