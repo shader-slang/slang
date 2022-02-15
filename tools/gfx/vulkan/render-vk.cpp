@@ -6395,7 +6395,10 @@ VKDevice::~VKDevice()
     shaderCache.free();
     m_deviceObjectsWithPotentialBackReferences.clearAndDeallocate();
 
-    m_api.vkDestroySampler(m_device, m_defaultSampler, nullptr);
+    if (m_api.vkDestroySampler)
+    {
+        m_api.vkDestroySampler(m_device, m_defaultSampler, nullptr);
+    }
 
     m_deviceQueue.destroy();
 
