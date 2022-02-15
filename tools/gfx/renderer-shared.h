@@ -860,111 +860,7 @@ public:
 
     // Appends all types that are used to specialize the element type of this shader object in
     // `args` list.
-    virtual Result collectSpecializationArgs(ExtendedShaderObjectTypeList& args) override
-    {
-        if (m_layout->getContainerType() != ShaderObjectContainerType::None)
-        {
-            args.addRange(m_structuredBufferSpecializationArgs);
-            return SLANG_OK;
-        }
-
-        auto device = getRenderer();
-        auto& subObjectRanges = getLayout()->getSubObjectRanges();
-        // The following logic is built on the assumption that all fields that involve
-        // existential types (and therefore require specialization) will results in a sub-object
-        // range in the type layout. This allows us to simply scan the sub-object ranges to find
-        // out all specialization arguments.
-        Slang::Index subObjectRangeCount = subObjectRanges.getCount();
-
-        for (Slang::Index subObjectRangeIndex = 0; subObjectRangeIndex < subObjectRangeCount;
-             subObjectRangeIndex++)
-        {
-            auto const& subObjectRange = subObjectRanges[subObjectRangeIndex];
-            auto const& bindingRange =
-                getLayout()->getBindingRange(subObjectRange.bindingRangeIndex);
-
-            Slang::Index oldArgsCount = args.getCount();
-
-            Slang::Index count = bindingRange.count;
-
-            for (Slang::Index subObjectIndexInRange = 0; subObjectIndexInRange < count;
-                 subObjectIndexInRange++)
-            {
-                ExtendedShaderObjectTypeList typeArgs;
-                Slang::Index objectIndex = bindingRange.subObjectIndex + subObjectIndexInRange;
-                auto subObject = m_objects[objectIndex];
-
-                if (!subObject)
-                    continue;
-
-                if (objectIndex < m_userProvidedSpecializationArgs.getCount() &&
-                    m_userProvidedSpecializationArgs[objectIndex])
-                {
-                    args.addRange(*m_userProvidedSpecializationArgs[objectIndex]);
-                    continue;
-                }
-
-                switch (bindingRange.bindingType)
-                {
-                case slang::BindingType::ExistentialValue:
-                    {
-                        // A binding type of `ExistentialValue` means the sub-object represents a
-                        // interface-typed field. In this case the specialization argument for this
-                        // field is the actual specialized type of the bound shader object. If the
-                        // shader object's type is an ordinary type without existential fields, then
-                        // the type argument will simply be the ordinary type. But if the sub
-                        // object's type is itself a specialized type, we need to make sure to use
-                        // that type as the specialization argument.
-
-                        ExtendedShaderObjectType specializedSubObjType;
-                        SLANG_RETURN_ON_FAIL(
-                            subObject->getSpecializedShaderObjectType(&specializedSubObjType));
-                        typeArgs.add(specializedSubObjType);
-                        break;
-                    }
-                case slang::BindingType::ParameterBlock:
-                case slang::BindingType::ConstantBuffer:
-                case slang::BindingType::RawBuffer:
-                case slang::BindingType::MutableRawBuffer:
-                    // Currently we only handle the case where the field's type is
-                    // `ParameterBlock<SomeStruct>` or `ConstantBuffer<SomeStruct>`, where
-                    // `SomeStruct` is a struct type (not directly an interface type). In this case,
-                    // we just recursively collect the specialization arguments from the bound sub
-                    // object.
-                    SLANG_RETURN_ON_FAIL(subObject->collectSpecializationArgs(typeArgs));
-                    // TODO: we need to handle the case where the field is of the form
-                    // `ParameterBlock<IFoo>`. We should treat this case the same way as the
-                    // `ExistentialValue` case here, but currently we lack a mechanism to
-                    // distinguish the two scenarios.
-                    break;
-                }
-
-                auto addedTypeArgCountForCurrentRange = args.getCount() - oldArgsCount;
-                if (addedTypeArgCountForCurrentRange == 0)
-                {
-                    args.addRange(typeArgs);
-                }
-                else
-                {
-                    // If type arguments for each elements in the array is different, use
-                    // `__Dynamic` type for the differing argument to disable specialization.
-                    SLANG_ASSERT(addedTypeArgCountForCurrentRange == typeArgs.getCount());
-                    for (Slang::Index i = 0; i < addedTypeArgCountForCurrentRange; i++)
-                    {
-                        if (args[i + oldArgsCount].componentID != typeArgs[i].componentID)
-                        {
-                            auto dynamicType = device->slangContext.session->getDynamicType();
-                            args.componentIDs[i + oldArgsCount] =
-                                device->shaderCache.getComponentId(dynamicType);
-                            args.components[i + oldArgsCount] =
-                                slang::SpecializationArg::fromType(dynamicType);
-                        }
-                    }
-                }
-            }
-        }
-        return SLANG_OK;
-    }
+    inline virtual Result collectSpecializationArgs(ExtendedShaderObjectTypeList& args) override;
 };
 
 class ShaderProgramBase : public IShaderProgram, public Slang::ComObject
@@ -1417,4 +1313,115 @@ inline IDebugCallback* getDebugCallback()
         return _getNullDebugCallback();
     }
 }
+
+
+// Impls that need to use types later defined
+
+// ---------------------------------------------------------------------------
+inline Result ShaderObjectBaseImpl::collectSpecializationArgs(ExtendedShaderObjectTypeList& args) 
+{
+    if (m_layout->getContainerType() != ShaderObjectContainerType::None)
+    {
+        args.addRange(m_structuredBufferSpecializationArgs);
+        return SLANG_OK;
+    }
+
+    auto device = getRenderer();
+    auto& subObjectRanges = getLayout()->getSubObjectRanges();
+    // The following logic is built on the assumption that all fields that involve
+    // existential types (and therefore require specialization) will results in a sub-object
+    // range in the type layout. This allows us to simply scan the sub-object ranges to find
+    // out all specialization arguments.
+    Slang::Index subObjectRangeCount = subObjectRanges.getCount();
+
+    for (Slang::Index subObjectRangeIndex = 0; subObjectRangeIndex < subObjectRangeCount;
+        subObjectRangeIndex++)
+    {
+        auto const& subObjectRange = subObjectRanges[subObjectRangeIndex];
+        auto const& bindingRange =
+            getLayout()->getBindingRange(subObjectRange.bindingRangeIndex);
+
+        Slang::Index oldArgsCount = args.getCount();
+
+        Slang::Index count = bindingRange.count;
+
+        for (Slang::Index subObjectIndexInRange = 0; subObjectIndexInRange < count;
+            subObjectIndexInRange++)
+        {
+            ExtendedShaderObjectTypeList typeArgs;
+            Slang::Index objectIndex = bindingRange.subObjectIndex + subObjectIndexInRange;
+            auto subObject = m_objects[objectIndex];
+
+            if (!subObject)
+                continue;
+
+            if (objectIndex < m_userProvidedSpecializationArgs.getCount() &&
+                m_userProvidedSpecializationArgs[objectIndex])
+            {
+                args.addRange(*m_userProvidedSpecializationArgs[objectIndex]);
+                continue;
+            }
+
+            switch (bindingRange.bindingType)
+            {
+                case slang::BindingType::ExistentialValue:
+                {
+                    // A binding type of `ExistentialValue` means the sub-object represents a
+                    // interface-typed field. In this case the specialization argument for this
+                    // field is the actual specialized type of the bound shader object. If the
+                    // shader object's type is an ordinary type without existential fields, then
+                    // the type argument will simply be the ordinary type. But if the sub
+                    // object's type is itself a specialized type, we need to make sure to use
+                    // that type as the specialization argument.
+
+                    ExtendedShaderObjectType specializedSubObjType;
+                    SLANG_RETURN_ON_FAIL(
+                        subObject->getSpecializedShaderObjectType(&specializedSubObjType));
+                    typeArgs.add(specializedSubObjType);
+                    break;
+                }
+                case slang::BindingType::ParameterBlock:
+                case slang::BindingType::ConstantBuffer:
+                case slang::BindingType::RawBuffer:
+                case slang::BindingType::MutableRawBuffer:
+                    // Currently we only handle the case where the field's type is
+                    // `ParameterBlock<SomeStruct>` or `ConstantBuffer<SomeStruct>`, where
+                    // `SomeStruct` is a struct type (not directly an interface type). In this case,
+                    // we just recursively collect the specialization arguments from the bound sub
+                    // object.
+                    SLANG_RETURN_ON_FAIL(subObject->collectSpecializationArgs(typeArgs));
+                    // TODO: we need to handle the case where the field is of the form
+                    // `ParameterBlock<IFoo>`. We should treat this case the same way as the
+                    // `ExistentialValue` case here, but currently we lack a mechanism to
+                    // distinguish the two scenarios.
+                    break;
+            }
+
+            auto addedTypeArgCountForCurrentRange = args.getCount() - oldArgsCount;
+            if (addedTypeArgCountForCurrentRange == 0)
+            {
+                args.addRange(typeArgs);
+            }
+            else
+            {
+                // If type arguments for each elements in the array is different, use
+                // `__Dynamic` type for the differing argument to disable specialization.
+                SLANG_ASSERT(addedTypeArgCountForCurrentRange == typeArgs.getCount());
+                for (Slang::Index i = 0; i < addedTypeArgCountForCurrentRange; i++)
+                {
+                    if (args[i + oldArgsCount].componentID != typeArgs[i].componentID)
+                    {
+                        auto dynamicType = device->slangContext.session->getDynamicType();
+                        args.componentIDs[i + oldArgsCount] =
+                            device->shaderCache.getComponentId(dynamicType);
+                        args.components[i + oldArgsCount] =
+                            slang::SpecializationArg::fromType(dynamicType);
+                    }
+                }
+            }
+        }
+    }
+    return SLANG_OK;
+}
+
 }
