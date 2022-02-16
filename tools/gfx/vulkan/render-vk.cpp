@@ -640,7 +640,7 @@ public:
     {
     public:
         VkRenderPass m_renderPass;
-        BreakableReference<VKDevice> m_renderer;
+        VKDevice* m_renderer;
         Array<VkAttachmentDescription, kMaxAttachments> m_attachmentDescs;
         Array<VkAttachmentReference, kMaxRenderTargets> m_colorReferences;
         VkAttachmentReference m_depthReference;
@@ -653,7 +653,6 @@ public:
         {
             m_renderer->m_api.vkDestroyRenderPass(m_renderer->m_api.m_device, m_renderPass, nullptr);
         }
-        virtual void comFree() override { m_renderer.breakStrongReference(); }
         Result init(VKDevice* renderer, const IFramebufferLayout::Desc& desc)
         {
             m_renderer = renderer;
@@ -2939,8 +2938,8 @@ public:
                 if(bufferView)
                 {
                     bufferInfo.buffer = bufferView->m_buffer->m_buffer.m_buffer;
-                    bufferInfo.offset = 0;
-                    bufferInfo.range = bufferView->m_buffer->getDesc()->sizeInBytes;
+                    bufferInfo.offset = bufferView->offset;
+                    bufferInfo.range = bufferView->size;
                 }
                 else
                 {
@@ -7218,7 +7217,6 @@ Result VKDevice::createFramebufferLayout(const IFramebufferLayout::Desc& desc, I
 {
     RefPtr<FramebufferLayoutImpl> layout = new FramebufferLayoutImpl();
     SLANG_RETURN_ON_FAIL(layout->init(this, desc));
-    m_deviceObjectsWithPotentialBackReferences.add(layout);
     returnComPtr(outLayout, layout);
     return SLANG_OK;
 }
@@ -8448,7 +8446,7 @@ Result VKDevice::createBufferView(
     auto resourceImpl = (BufferResourceImpl*) buffer;
 
     // TODO: These should come from the `ResourceView::Desc`
-    auto stride = buffer ? resourceImpl->getDesc()->elementSize : 0;
+    auto stride = desc.bufferElementSize;
     if (stride == 0)
     {
         if (desc.format == Format::Unknown)

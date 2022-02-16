@@ -4,6 +4,8 @@
 #version 460
 #extension GL_EXT_ray_tracing : require
 #extension GL_EXT_ray_query : require
+layout(row_major) uniform;
+layout(row_major) buffer;
 
 struct SLANG_ParameterGroup_C_0
 {
@@ -29,12 +31,6 @@ struct RayDesc_0
     vec3 Direction_0;
     float TMax_0;
 };
-
-void RayQuery_TraceRayInline_0(rayQueryEXT this_0, accelerationStructureEXT accelerationStructure_0, uint rayFlags_1, uint instanceInclusionMask_0, RayDesc_0 ray_0)
-{
-    rayQueryInitializeEXT((this_0), (accelerationStructure_0), (rayFlags_1), (instanceInclusionMask_0), (ray_0.Origin_0), (ray_0.TMin_0), (ray_0.Direction_0), (ray_0.TMax_0));
-    return;
-}
 
 layout(binding = 0)
 uniform accelerationStructureEXT myAccelerationStructure_0;
@@ -95,9 +91,9 @@ void main()
     MyRayPayload_0 payload_5;
     MyRayPayload_0 _S2 = { -1 };
     payload_5 = _S2;
- 
-    RayDesc_0 ray_1 = { C_0._data.origin_0, C_0._data.tMin_0, C_0._data.direction_0, C_0._data.tMax_0 };
-    RayQuery_TraceRayInline_0(query_0, myAccelerationStructure_0, C_0._data.rayFlags_0, C_0._data.instanceMask_0, ray_1);
+
+    RayDesc_0 ray_0 = { C_0._data.origin_0, C_0._data.tMin_0, C_0._data.direction_0, C_0._data.tMax_0 };
+    rayQueryInitializeEXT((query_0), (myAccelerationStructure_0), (C_0._data.rayFlags_0), (C_0._data.instanceMask_0), (ray_0.Origin_0), (ray_0.TMin_0), (ray_0.Direction_0), (ray_0.TMax_0));
 
     MyProceduralHitAttrs_0 _S3;
     committedProceduralAttrs_0 = _S3;
@@ -117,10 +113,8 @@ void main()
                 MyProceduralHitAttrs_0 candidateProceduralAttrs_0;
                 MyProceduralHitAttrs_0 _S6 = { 0 };
                 candidateProceduralAttrs_0 = _S6;
-
                 float tHit_1;
                 tHit_1 = 0.00000000000000000000;
-
                 bool _S7 = myProceduralIntersection_0(tHit_1, candidateProceduralAttrs_0);
                 if(_S7)
                 {
