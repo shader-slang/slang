@@ -1365,6 +1365,12 @@ extern "C"
         int targetIndex,
         SlangLineDirectiveMode  mode);
 
+    /*! @see slang::ICompileRequest::setTargetLineDirectiveMode */
+    SLANG_API void spSetTargetForceGLSLScalarBufferLayout(
+        SlangCompileRequest*    request,
+        int targetIndex,
+        bool forceScalarLayout);
+
     /*! @see slang::ICompileRequest::setCodeGenTarget */
     SLANG_API void spSetCodeGenTarget(
         SlangCompileRequest*    request,
@@ -3867,6 +3873,12 @@ namespace slang
         virtual SLANG_NO_THROW void SLANG_MCALL setTargetLineDirectiveMode(
             SlangInt targetIndex,
             SlangLineDirectiveMode mode) = 0;
+
+            /** Set whether to use scalar buffer layouts for GLSL/Vulkan targets.
+                If true, the generated GLSL/Vulkan code will use `scalar` layout for storage buffers.
+                If false, the resulting code will std430 for storage buffers.
+            */
+        virtual SLANG_NO_THROW void SLANG_MCALL setTargetForceGLSLScalarBufferLayout(int targetIndex, bool forceScalarLayout) = 0;
     };
 
     #define SLANG_UUID_ICompileRequest ICompileRequest::getTypeGuid()
@@ -3901,6 +3913,10 @@ namespace slang
             /** The line directive mode for output source code.
             */
         SlangLineDirectiveMode lineDirectiveMode = SLANG_LINE_DIRECTIVE_MODE_DEFAULT;
+
+            /** Whether to force `scalar` layout for glsl shader storage buffers.
+            */
+        bool forceGLSLScalarBufferLayout = false;
     };
 
     typedef uint32_t SessionFlags;

@@ -774,6 +774,7 @@ SlangResult emitEntryPointsSourceFromIR(
     CLikeSourceEmitter::Desc desc;
 
     desc.compileRequest = compileRequest;
+    desc.targetRequest = targetRequest;
     desc.target = target;
     // TODO(DG): Can't assume a single entry point stage for multiple entry points
     if (entryPointIndices.getCount() == 1)
