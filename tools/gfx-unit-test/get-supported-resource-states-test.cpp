@@ -112,6 +112,12 @@ namespace
             for (uint32_t i = 1; i < (uint32_t)Format::CountOf; ++i)
             {
                 auto baseFormat = (Format)i;
+                FormatInfo info;
+                gfxGetFormatInfo(baseFormat, &info);
+                // Ignore 3-channel textures for now since validation layer seem to report unsupported errors there.
+                if (info.channelCount == 3)
+                    continue;
+
                 auto format = gfxIsTypelessFormat(baseFormat) ? convertTypelessFormat(baseFormat) : baseFormat;
                 GFX_CHECK_CALL_ABORT(device->getFormatSupportedResourceStates(format, &formatSupportedStates));
 

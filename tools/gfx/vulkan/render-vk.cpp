@@ -4099,7 +4099,8 @@ public:
                         VK_PIPELINE_STAGE_TESSELLATION_EVALUATION_SHADER_BIT |
                         VK_PIPELINE_STAGE_GEOMETRY_SHADER_BIT |
                         VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT |
-                        VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
+                        VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT |
+                        VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR);
                 case ResourceState::ShaderResource:
                     return VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
                 case ResourceState::RenderTarget:
@@ -4123,6 +4124,16 @@ public:
                                : VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
                 case ResourceState::General:
                     return VkPipelineStageFlagBits(VK_PIPELINE_STAGE_ALL_COMMANDS_BIT);
+                case ResourceState::AccelerationStructure:
+                    return VkPipelineStageFlagBits(
+                        VK_PIPELINE_STAGE_VERTEX_SHADER_BIT |
+                        VK_PIPELINE_STAGE_TESSELLATION_CONTROL_SHADER_BIT |
+                        VK_PIPELINE_STAGE_TESSELLATION_EVALUATION_SHADER_BIT |
+                        VK_PIPELINE_STAGE_GEOMETRY_SHADER_BIT |
+                        VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT |
+                        VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT |
+                        VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR |
+                        VK_PIPELINE_STAGE_ACCELERATION_STRUCTURE_BUILD_BIT_KHR);
                 default:
                     assert(!"Unsupported");
                     return VkPipelineStageFlagBits(0);
@@ -7513,6 +7524,8 @@ static VkImageUsageFlagBits _calcImageUsageFlags(ResourceState state)
         return VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
     case ResourceState::ResolveDestination:
         return VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+    case ResourceState::Present:
+        return VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
     case ResourceState::General:
         return (VkImageUsageFlagBits)0;
     default:
