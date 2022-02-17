@@ -2570,8 +2570,8 @@ public:
 
             m_layout = layout;
 
-            m_constantBufferTransientHeap = nullptr;
-            m_constantBufferTransientHeapVersion = 0;
+            m_cachedTransientHeap = nullptr;
+            m_cachedTransientHeapVersion = 0;
             m_isConstantBufferDirty = true;
 
             // If the layout tells us that there is any uniform data,
@@ -2763,8 +2763,8 @@ public:
 
         bool shouldAllocateConstantBuffer(TransientResourceHeapImpl* transientHeap)
         {
-            return m_isConstantBufferDirty || m_constantBufferTransientHeap != transientHeap ||
-                m_constantBufferTransientHeapVersion != transientHeap->getVersion();
+            return m_isConstantBufferDirty || m_cachedTransientHeap != transientHeap ||
+                m_cachedTransientHeapVersion != transientHeap->getVersion();
         }
 
         /// Ensure that the `m_ordinaryDataBuffer` has been created, if it is needed
@@ -2780,8 +2780,8 @@ public:
                 return SLANG_OK;
             }
             m_isConstantBufferDirty = false;
-            m_constantBufferTransientHeap = encoder->m_transientHeap;
-            m_constantBufferTransientHeapVersion = encoder->m_transientHeap->getVersion();
+            m_cachedTransientHeap = encoder->m_transientHeap;
+            m_cachedTransientHeapVersion = encoder->m_transientHeap->getVersion();
 
             // Computing the size of the ordinary data buffer is *not* just as simple
             // as using the size of the `m_ordinayData` array that we store. The reason
@@ -2930,6 +2930,11 @@ public:
             BindingOffset const&    offset,
             ShaderObjectLayoutImpl* specializedLayout)
         {
+            if (m_cachedTransientHeap == context->transientHeap &&
+                m_cachedTransientHeapVersion == m_cachedTransientHeap->getVersion())
+            {
+
+            }
             // The first step to binding an object as a parameter block is to allocate a descriptor
             // set (consisting of zero or one resource descriptor table and zero or one sampler
             // descriptor table) to represent its values.
@@ -3142,6 +3147,8 @@ public:
         }
             /// A CPU-memory descriptor set holding any descriptors used to represent the resources/samplers in this object's state
         DescriptorSet m_descriptorSet;
+            /// A cached descriptor set on GPU heap.
+        DescriptorSet m_cachedGPUDescriptorSet;
 
         ShortList<RefPtr<Resource>, 8> m_boundResources;
         List<D3D12_GPU_VIRTUAL_ADDRESS> m_rootArguments;
@@ -3155,10 +3162,10 @@ public:
 
         /// Dirty bit tracking whether the constant buffer needs to be updated.
         bool m_isConstantBufferDirty = true;
-        /// The transient heap from which the constant buffer is allocated.
-        TransientResourceHeapImpl* m_constantBufferTransientHeap;
-        /// The version of the transient heap when the constant buffer is allocated.
-        uint64_t m_constantBufferTransientHeapVersion;
+        /// The transient heap from which the constant buffer and descriptor set is allocated.
+        TransientResourceHeapImpl* m_cachedTransientHeap;
+        /// The version of the transient heap when the constant buffer and descriptor set is allocated.
+        uint64_t m_cachedTransientHeapVersion;
 
         /// Get the layout of this shader object with specialization arguments considered
         ///

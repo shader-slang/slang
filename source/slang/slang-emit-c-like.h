@@ -41,6 +41,8 @@ public:
         ExtensionTracker* extensionTracker = nullptr;
 
         SourceWriter* sourceWriter = nullptr;
+
+        TargetRequest* targetRequest = nullptr;
     };
 
     enum
@@ -475,6 +477,7 @@ public:
     List<IRWitnessTableEntry*> getSortedWitnessTableEntries(IRWitnessTable* witnessTable);
     
     BackEndCompileRequest* m_compileRequest = nullptr;
+    TargetRequest* m_targetRequest = nullptr;
     IRModule* m_irModule = nullptr;
 
     // The stage for which we are emitting code.

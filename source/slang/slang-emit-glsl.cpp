@@ -40,6 +40,11 @@ SlangResult GLSLSourceEmitter::init()
         default: break;
     }
 
+    if (m_targetRequest->getForceGLSLScalarBufferLayout())
+    {
+        m_glslExtensionTracker->requireExtension(
+            UnownedStringSlice::fromLiteral("GL_EXT_scalar_block_layout"));
+    }
     return SLANG_OK;
 }
 
@@ -115,7 +120,8 @@ void GLSLSourceEmitter::_emitGLSLStructuredBuffer(IRGlobalParam* varDecl, IRHLSL
     // TODO: we should require either the extension or the version...
     _requireGLSLVersion(430);
 
-    m_writer->emit("layout(std430");
+    m_writer->emit("layout(");
+    m_writer->emit(m_targetRequest->getForceGLSLScalarBufferLayout() ? "scalar" : "std430");
 
     auto layout = getVarLayout(varDecl);
     if (layout)
@@ -189,7 +195,8 @@ void GLSLSourceEmitter::_emitGLSLByteAddressBuffer(IRGlobalParam* varDecl, IRByt
     // TODO: we should require either the extension or the version...
     _requireGLSLVersion(430);
 
-    m_writer->emit("layout(std430");
+    m_writer->emit("layout(");
+    m_writer->emit(m_targetRequest->getForceGLSLScalarBufferLayout() ? "scalar" : "std430");
 
     auto layout = getVarLayout(varDecl);
     if (layout)
