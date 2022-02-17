@@ -288,6 +288,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="..\..\..\slang-gfx.h" />
+    <ClInclude Include="..\..\..\tools\gfx\command-encoder-com-forward.h" />
     <ClInclude Include="..\..\..\tools\gfx\command-writer.h" />
     <ClInclude Include="..\..\..\tools\gfx\cpu\render-cpu.h" />
     <ClInclude Include="..\..\..\tools\gfx\cuda\render-cuda.h" />

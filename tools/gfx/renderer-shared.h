@@ -411,17 +411,12 @@ public:
                     typeLayout = typeLayout->getElementTypeLayout();
                 }
                 return typeLayout;
-            default:
-                break;
-            }
-            switch (typeLayout->getKind())
-            {
-            default:
-                return typeLayout;
             case slang::TypeReflection::Kind::ConstantBuffer:
             case slang::TypeReflection::Kind::ParameterBlock:
                 typeLayout = typeLayout->getElementTypeLayout();
                 continue;
+            default:
+                return typeLayout;
             }
         }
     }

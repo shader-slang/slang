@@ -16,7 +16,6 @@ namespace gfx_test
     void getBufferResourceHandleTestImpl(IDevice* device, UnitTestContext* context)
     {
         const int numberCount = 1;
-        float initialData[] = { 0.0f };
         IBufferResource::Desc bufferDesc = {};
         bufferDesc.sizeInBytes = numberCount * sizeof(float);
         bufferDesc.format = gfx::Format::Unknown;
@@ -32,7 +31,7 @@ namespace gfx_test
         ComPtr<IBufferResource> buffer;
         GFX_CHECK_CALL_ABORT(device->createBufferResource(
             bufferDesc,
-            (void*)initialData,
+            nullptr,
             buffer.writeRef()));
 
         InteropHandle handle;
