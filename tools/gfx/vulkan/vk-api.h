@@ -309,11 +309,11 @@ struct VulkanApi
     VkDevice m_device = VK_NULL_HANDLE;
     VkPhysicalDevice m_physicalDevice = VK_NULL_HANDLE;
 
-    VkPhysicalDeviceProperties          m_deviceProperties;
+    VkPhysicalDeviceProperties                              m_deviceProperties;
     VkPhysicalDeviceRayTracingPipelinePropertiesKHR         m_rtProperties;
-    VkPhysicalDeviceFeatures            m_deviceFeatures;
-    VkPhysicalDeviceMemoryProperties    m_deviceMemoryProperties;
-    VulkanExtendedFeatureProperties     m_extendedFeatures;
+    VkPhysicalDeviceFeatures                                m_deviceFeatures;
+    VkPhysicalDeviceMemoryProperties                        m_deviceMemoryProperties;
+    VulkanExtendedFeatureProperties                         m_extendedFeatures;
 };
 
 } // renderer_test
