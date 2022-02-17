@@ -7101,6 +7101,7 @@ Result VKDevice::initVulkanInstanceAndDevice(const InteropHandle* handles, bool 
             deviceExtensions.add(VK_KHR_SHADER_SUBGROUP_EXTENDED_TYPES_EXTENSION_NAME);
             m_features.add("shader-subgroup-extended-types");
         }
+
         if (extendedFeatures.accelerationStructureFeatures.accelerationStructure)
         {
             extendedFeatures.accelerationStructureFeatures.pNext = (void*)deviceCreateInfo.pNext;
@@ -7109,6 +7110,7 @@ Result VKDevice::initVulkanInstanceAndDevice(const InteropHandle* handles, bool 
             deviceExtensions.add(VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME);
             m_features.add("acceleration-structure");
         }
+
         if (extendedFeatures.rayTracingPipelineFeatures.rayTracingPipeline)
         {
             extendedFeatures.rayTracingPipelineFeatures.pNext = (void*)deviceCreateInfo.pNext;
@@ -7116,6 +7118,7 @@ Result VKDevice::initVulkanInstanceAndDevice(const InteropHandle* handles, bool 
             deviceExtensions.add(VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME);
             m_features.add("ray-tracing-pipeline");
         }
+
         if (extendedFeatures.rayQueryFeatures.rayQuery)
         {
             extendedFeatures.rayQueryFeatures.pNext = (void*)deviceCreateInfo.pNext;
@@ -7124,6 +7127,7 @@ Result VKDevice::initVulkanInstanceAndDevice(const InteropHandle* handles, bool 
             m_features.add("ray-query");
             m_features.add("ray-tracing");
         }
+
         if (extendedFeatures.bufferDeviceAddressFeatures.bufferDeviceAddress)
         {
             extendedFeatures.bufferDeviceAddressFeatures.pNext = (void*)deviceCreateInfo.pNext;
@@ -7148,7 +7152,6 @@ Result VKDevice::initVulkanInstanceAndDevice(const InteropHandle* handles, bool 
             deviceExtensions.add(VK_EXT_ROBUSTNESS_2_EXTENSION_NAME);
             m_features.add("robustness2");
         }
-
 
         VkPhysicalDeviceProperties2 extendedProps = { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2 };
         VkPhysicalDeviceRayTracingPipelinePropertiesKHR rtProps = { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_PROPERTIES_KHR };
