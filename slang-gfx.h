@@ -908,7 +908,7 @@ public:
     {
         // The enum values are kept consistent with D3D12_RAYTRACING_INSTANCE_FLAGS
         // and VkGeometryInstanceFlagBitsKHR.
-        enum Enum : uint8_t
+        enum Enum : uint32_t
         {
             None = 0,
             TriangleFacingCullDisable = 0x00000001,
@@ -926,7 +926,7 @@ public:
         uint32_t instanceID : 24;
         uint32_t instanceMask : 8;
         uint32_t instanceContributionToHitGroupIndex : 24;
-        GeometryInstanceFlags::Enum flags : 8;
+        uint32_t flags : 8; // Combination of GeometryInstanceFlags::Enum values.
         DeviceAddress accelerationStructure;
     };
 

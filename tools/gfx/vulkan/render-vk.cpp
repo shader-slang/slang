@@ -904,7 +904,8 @@ public:
                 m_height = getMipLevelSize(viewDesc->subresourceRange.mipLevel, size.height);
                 layerCount = viewDesc->subresourceRange.layerCount;
             }
-
+            if (layerCount == 0)
+                layerCount = 1;
             // Create render pass.
             int numAttachments = desc.renderTargetCount;
             if (desc.depthStencilView)
