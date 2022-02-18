@@ -544,7 +544,7 @@ public:
     }
 
     virtual SLANG_NO_THROW Result SLANG_MCALL
-        copyFrom(IShaderObject* object, ITransientResourceHeap* transientHeap) override;
+        copyFrom(IShaderObject* object, ITransientResourceHeap* transientHeap);
 
     virtual SLANG_NO_THROW const void* SLANG_MCALL getRawData() override
     {
@@ -593,6 +593,13 @@ public:
     }
 
     void setSpecializationArgsForContainerElement(ExtendedShaderObjectTypeList& specializationArgs);
+
+    Slang::Index getSubObjectIndex(ShaderOffset offset)
+    {
+        auto layout = getLayout();
+        auto bindingRange = layout->getBindingRange(offset.bindingRangeIndex);
+        return bindingRange.subObjectIndex + offset.bindingArrayIndex;
+    }
 
     virtual SLANG_NO_THROW Result SLANG_MCALL
         setObject(ShaderOffset const& offset, IShaderObject* object) SLANG_OVERRIDE

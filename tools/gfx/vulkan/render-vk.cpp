@@ -2499,6 +2499,14 @@ public:
             return SLANG_OK;
         }
 
+        Result setPipelineStateWithRootObjectImpl(IPipelineState* state, IShaderObject* inObject)
+        {
+            IShaderObject* rootObject = nullptr;
+            SLANG_RETURN_ON_FAIL(setPipelineStateImpl(state, &rootObject));
+            static_cast<ShaderObjectBase*>(rootObject)->copyFrom(inObject, m_commandBuffer->m_transientHeap);
+            return SLANG_OK;
+        }
+
         void flushBindingState(VkPipelineBindPoint pipelineBindPoint)
         {
             auto& api = *m_api;
@@ -4954,6 +4962,12 @@ public:
                 return setPipelineStateImpl(pipelineState, outRootObject);
             }
 
+            virtual SLANG_NO_THROW Result SLANG_MCALL
+                bindPipelineWithRootObject(IPipelineState* pipelineState, IShaderObject* rootObject) override
+            {
+                return setPipelineStateWithRootObjectImpl(pipelineState, rootObject);
+            }
+
             virtual SLANG_NO_THROW void SLANG_MCALL
                 setViewports(uint32_t count, const Viewport* viewports) override
             {
@@ -5236,6 +5250,12 @@ public:
                 return setPipelineStateImpl(pipelineState, outRootObject);
             }
 
+            virtual SLANG_NO_THROW Result SLANG_MCALL bindPipelineWithRootObject(
+                IPipelineState* pipelineState, IShaderObject* rootObject) override
+            {
+                return setPipelineStateWithRootObjectImpl(pipelineState, rootObject);
+            }
+
             virtual SLANG_NO_THROW void SLANG_MCALL dispatchCompute(int x, int y, int z) override
             {
                 auto pipeline = static_cast<PipelineStateImpl*>(m_currentPipeline.Ptr());
@@ -5508,6 +5528,12 @@ public:
             {
                 SLANG_UNUSED(pipeline);
                 SLANG_UNUSED(outRootObject);
+            }
+
+            virtual SLANG_NO_THROW Result SLANG_MCALL bindPipelineWithRootObject(
+                IPipelineState* pipelineState, IShaderObject* rootObject) override
+            {
+                return setPipelineStateWithRootObjectImpl(pipelineState, rootObject);
             }
 
             // TODO: Implement after implementing createRayTracingPipelineState

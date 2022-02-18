@@ -33,7 +33,7 @@ public:
         createCommandBuffer(ICommandBuffer** outCommandBuffer) override
     {
         Slang::RefPtr<TCommandBuffer> newCmdBuffer = new TCommandBuffer();
-        newCmdBuffer->init(m_device);
+        newCmdBuffer->init(m_device, this);
         returnComPtr(outCommandBuffer, newCmdBuffer);
         return SLANG_OK;
     }

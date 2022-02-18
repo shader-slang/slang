@@ -61,7 +61,11 @@ struct ID3D12GraphicsCommandList1 {};
 #endif
 //
 
+#ifdef _DEBUG
 #define ENABLE_DEBUG_LAYER 1
+#else
+#define ENABLE_DEBUG_LAYER 0
+#endif
 
 namespace gfx {
 
@@ -824,6 +828,9 @@ public:
         D3D12DescriptorHeap& getCurrentViewHeap() { return m_viewHeaps[m_currentViewHeapIndex]; }
         D3D12DescriptorHeap& getCurrentSamplerHeap() { return m_samplerHeaps[m_currentSamplerHeapIndex]; }
 
+        D3D12LinearExpandingDescriptorHeap m_stagingCpuViewHeap;
+        D3D12LinearExpandingDescriptorHeap m_stagingCpuSamplerHeap;
+
         ~TransientResourceHeapImpl()
         {
             synchronizeAndReset();
@@ -843,6 +850,17 @@ public:
             m_canResize = (desc.flags & ITransientResourceHeap::Flags::AllowResizing) != 0;
             m_viewHeapSize = viewHeapSize;
             m_samplerHeapSize = samplerHeapSize;
+
+            m_stagingCpuViewHeap.init(
+                device->m_device,
+                1000000,
+                D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV,
+                D3D12_DESCRIPTOR_HEAP_FLAG_NONE);
+            m_stagingCpuSamplerHeap.init(
+                device->m_device,
+                1000000,
+                D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER,
+                D3D12_DESCRIPTOR_HEAP_FLAG_NONE);
 
             auto d3dDevice = device->m_device;
             SLANG_RETURN_ON_FAIL(d3dDevice->CreateCommandAllocator(
@@ -1021,11 +1039,20 @@ public:
         {
             m_currentPipeline = static_cast<PipelineStateBase*>(pipelineState);
             auto rootObject = &m_commandBuffer->m_rootShaderObject;
+            m_commandBuffer->m_mutableRootShaderObject = nullptr;
             SLANG_RETURN_ON_FAIL(rootObject->reset(
                 m_renderer,
                 m_currentPipeline->getProgram<ShaderProgramImpl>()->m_rootObjectLayout,
                 m_commandBuffer->m_transientHeap));
             *outRootObject = rootObject;
+            m_bindingDirty = true;
+            return SLANG_OK;
+        }
+
+        Result bindPipelineWithRootObjectImpl(IPipelineState* pipelineState, IShaderObject* rootObject)
+        {
+            m_currentPipeline = static_cast<PipelineStateBase*>(pipelineState);
+            m_commandBuffer->m_mutableRootShaderObject = static_cast<MutableRootShaderObjectImpl*>(rootObject);
             m_bindingDirty = true;
             return SLANG_OK;
         }
@@ -1484,7 +1511,7 @@ public:
                     switch(slangBindingType)
                     {
                     default:
-                        break;
+                        continue;
 
                     case slang::BindingType::ConstantBuffer:
                         {
@@ -2429,6 +2456,11 @@ public:
         ShaderObjectLayoutImpl,
         SimpleShaderObjectData>
     {
+        typedef ShaderObjectBaseImpl<
+            ShaderObjectImpl,
+            ShaderObjectLayoutImpl,
+            SimpleShaderObjectData>
+            Super;
     public:
         static Result create(
             D3D12Device* device,
@@ -2495,6 +2527,24 @@ public:
 
             m_isConstantBufferDirty = true;
 
+            m_version++;
+
+            return SLANG_OK;
+        }
+
+        SLANG_NO_THROW Result SLANG_MCALL
+            setObject(ShaderOffset const& offset, IShaderObject* object) SLANG_OVERRIDE
+        {
+            SLANG_RETURN_ON_FAIL(Super::setObject(offset, object));
+            if (m_isMutable)
+            {
+                auto subObjectIndex = getSubObjectIndex(offset);
+                if (subObjectIndex >= m_subObjectVersions.getCount())
+                    m_subObjectVersions.setCount(subObjectIndex + 1);
+                m_subObjectVersions[subObjectIndex] =
+                    static_cast<ShaderObjectImpl*>(object)->m_version;
+                m_version++;
+            }
             return SLANG_OK;
         }
 
@@ -2519,6 +2569,7 @@ public:
                     (int32_t)offset.bindingArrayIndex),
                 samplerImpl->m_descriptor.cpuHandle,
                 D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER);
+            m_version++;
             return SLANG_OK;
         }
 
@@ -2554,11 +2605,9 @@ public:
                 samplerImpl->m_descriptor.cpuHandle,
                 D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER);
 #endif
+            m_version++;
             return SLANG_OK;
         }
-
-    public:
-
     protected:
         Result init(
             D3D12Device* device,
@@ -2763,8 +2812,12 @@ public:
 
         bool shouldAllocateConstantBuffer(TransientResourceHeapImpl* transientHeap)
         {
-            return m_isConstantBufferDirty || m_cachedTransientHeap != transientHeap ||
-                m_cachedTransientHeapVersion != transientHeap->getVersion();
+            if (m_isConstantBufferDirty || m_cachedTransientHeap != transientHeap ||
+                m_cachedTransientHeapVersion != transientHeap->getVersion())
+            {
+                return true;
+            }
+            return false;
         }
 
         /// Ensure that the `m_ordinaryDataBuffer` has been created, if it is needed
@@ -2838,7 +2891,38 @@ public:
         }
 
     public:
+        void updateSubObjectsRecursive()
+        {
+            if (!m_isMutable)
+                return;
+            auto& subObjectRanges = getLayout()->getSubObjectRanges();
+            for (Slang::Index subObjectRangeIndex = 0;
+                 subObjectRangeIndex < subObjectRanges.getCount();
+                 subObjectRangeIndex++)
+            {
+                auto const& subObjectRange = subObjectRanges[subObjectRangeIndex];
+                auto const& bindingRange =
+                    getLayout()->getBindingRange(subObjectRange.bindingRangeIndex);
+                Slang::Index count = bindingRange.count;
 
+                for (Slang::Index subObjectIndexInRange = 0; subObjectIndexInRange < count;
+                     subObjectIndexInRange++)
+                {
+                    Slang::Index objectIndex = bindingRange.subObjectIndex + subObjectIndexInRange;
+                    auto subObject = m_objects[objectIndex].Ptr();
+                    if (!subObject)
+                        continue;
+                    subObject->updateSubObjectsRecursive();
+                    if (m_subObjectVersions[objectIndex] != m_objects[objectIndex]->m_version)
+                    {
+                        ShaderOffset offset;
+                        offset.bindingRangeIndex = subObjectRange.bindingRangeIndex;
+                        offset.bindingArrayIndex = subObjectIndexInRange;
+                        setObject(offset, subObject);
+                    }
+                }
+            }
+        }
             /// Prepare to bind this object as a parameter block.
             ///
             /// This involves allocating and binding any descriptor tables necessary
@@ -2930,24 +3014,55 @@ public:
             BindingOffset const&    offset,
             ShaderObjectLayoutImpl* specializedLayout)
         {
-            if (m_cachedTransientHeap == context->transientHeap &&
-                m_cachedTransientHeapVersion == m_cachedTransientHeap->getVersion())
+            do
             {
+                if (shouldAllocateConstantBuffer(context->transientHeap))
+                    break;
+                if (m_isMutable && m_version != m_cachedGPUDescriptorSetVersion)
+                    break;
+                if (m_cachedGPUDescriptorSet.resourceTable.getDescriptorCount() != 0 &&
+                    m_cachedGPUDescriptorSet.resourceTable.m_heap.ptr.linearHeap->getHeap() !=
+                        m_cachedTransientHeap->getCurrentViewHeap().getHeap())
+                    break;
+                if (m_cachedGPUDescriptorSet.samplerTable.getDescriptorCount() != 0 &&
+                    m_cachedGPUDescriptorSet.samplerTable.m_heap.ptr.linearHeap->getHeap() !=
+                        m_cachedTransientHeap->getCurrentSamplerHeap().getHeap())
+                    break;
 
-            }
+                // If we already have a valid gpu descriptor table in the current
+                // heap, bind it.
+                auto rootParamIndex = offset.rootParam;
+                if (m_cachedGPUDescriptorSet.resourceTable.getDescriptorCount())
+                {
+                    auto tableRootParamIndex = rootParamIndex++;
+                    context->submitter->setRootDescriptorTable(
+                        tableRootParamIndex,
+                        m_cachedGPUDescriptorSet.resourceTable.getGpuHandle());
+                }
+                if (m_cachedGPUDescriptorSet.samplerTable.getDescriptorCount())
+                {
+                    auto tableRootParamIndex = rootParamIndex++;
+                    context->submitter->setRootDescriptorTable(
+                        tableRootParamIndex,
+                        m_cachedGPUDescriptorSet.samplerTable.getGpuHandle());
+                }
+                m_cachedGPUDescriptorSetVersion = m_version;
+                return SLANG_OK;
+            } while (false);
+
             // The first step to binding an object as a parameter block is to allocate a descriptor
             // set (consisting of zero or one resource descriptor table and zero or one sampler
             // descriptor table) to represent its values.
             //
             BindingOffset subOffset = offset;
-            DescriptorSet descriptorSet;
             SLANG_RETURN_ON_FAIL(prepareToBindAsParameterBlock(
-                context, /* inout */ subOffset, specializedLayout, descriptorSet));
+                context, /* inout */ subOffset, specializedLayout, m_cachedGPUDescriptorSet));
 
             // Next we bind the object into that descriptor set as if it were being used
             // as a `ConstantBuffer<X>`.
             //
-            SLANG_RETURN_ON_FAIL(bindAsConstantBuffer(context, descriptorSet, subOffset, specializedLayout));
+            SLANG_RETURN_ON_FAIL(bindAsConstantBuffer(
+                context, m_cachedGPUDescriptorSet, subOffset, specializedLayout));
             return SLANG_OK;
         }
 
@@ -3141,7 +3256,10 @@ public:
             }
             for (auto& subObject : m_objects)
             {
-                SLANG_RETURN_ON_FAIL(subObject->bindRootArguments(context, index));
+                if (subObject)
+                {
+                    SLANG_RETURN_ON_FAIL(subObject->bindRootArguments(context, index));
+                }
             }
             return SLANG_OK;
         }
@@ -3166,6 +3284,15 @@ public:
         TransientResourceHeapImpl* m_cachedTransientHeap;
         /// The version of the transient heap when the constant buffer and descriptor set is allocated.
         uint64_t m_cachedTransientHeapVersion;
+
+        /// Whether this shader object is allowed to be mutable.
+        bool m_isMutable = false;
+        /// The version of a mutable shader object.
+        uint32_t m_version = 0;
+        /// The version of this mutable shader object when the gpu descriptor table is cached.
+        uint32_t m_cachedGPUDescriptorSetVersion = -1;
+        /// The versions of bound subobjects.
+        List<uint32_t> m_subObjectVersions;
 
         /// Get the layout of this shader object with specialization arguments considered
         ///
@@ -3204,9 +3331,6 @@ public:
 
         RefPtr<ShaderObjectLayoutImpl> m_specializedLayout;
     };
-
-    class MutableShaderObjectImpl : public MutableShaderObject<MutableShaderObjectImpl, ShaderObjectLayoutImpl>
-    {};
 
     class RootShaderObjectImpl : public ShaderObjectImpl
     {
@@ -3247,13 +3371,9 @@ public:
         virtual SLANG_NO_THROW Result SLANG_MCALL
             copyFrom(IShaderObject* object, ITransientResourceHeap* transientHeap) override
         {
-            SLANG_RETURN_ON_FAIL(Super::copyFrom(object, transientHeap));
-            if (auto srcObj = dynamic_cast<MutableRootShaderObject*>(object))
+            if (auto srcObj = dynamic_cast<MutableRootShaderObjectImpl*>(object))
             {
-                for (Index i = 0; i < srcObj->m_entryPoints.getCount(); i++)
-                {
-                    m_entryPoints[i]->copyFrom(srcObj->m_entryPoints[i], transientHeap);
-                }
+                *this = *srcObj;
                 return SLANG_OK;
             }
             return SLANG_FAIL;
@@ -3264,6 +3384,9 @@ public:
             BindingContext*             context,
             RootShaderObjectLayoutImpl* specializedLayout)
         {
+            // Pull updates from sub-objects when this is a mutable root shader object.
+            updateSubObjectsRecursive();
+
             // A root shader object always binds as if it were a parameter block,
             // insofar as it needs to allocate a descriptor set to hold the bindings
             // for its own state and any sub-objects.
@@ -3292,6 +3415,8 @@ public:
                 auto entryPointOffset = rootOffset;
                 entryPointOffset += entryPointInfo.offset;
 
+                entryPoint->updateSubObjectsRecursive();
+
                 SLANG_RETURN_ON_FAIL(entryPoint->bindAsConstantBuffer(context, descriptorSet, entryPointOffset, entryPointInfo.layout));
             }
 
@@ -3302,16 +3427,28 @@ public:
 
         Result init(D3D12Device* device)
         {
-            SLANG_RETURN_ON_FAIL(m_cpuViewHeap.init(
-                device->m_device,
-                64,
-                D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV,
-                D3D12_DESCRIPTOR_HEAP_FLAG_NONE));
-            SLANG_RETURN_ON_FAIL(m_cpuSamplerHeap.init(
-                device->m_device,
-                8,
-                D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER,
-                D3D12_DESCRIPTOR_HEAP_FLAG_NONE));
+            return SLANG_OK;
+        }
+
+        Result resetImpl(
+            D3D12Device* device,
+            RootShaderObjectLayoutImpl* layout,
+            DescriptorHeapReference viewHeap,
+            DescriptorHeapReference samplerHeap,
+            bool isMutable)
+        {
+            SLANG_RETURN_ON_FAIL(Super::init(device, layout, viewHeap, samplerHeap));
+            m_isMutable = isMutable;
+            m_specializedLayout = nullptr;
+            m_entryPoints.clear();
+            for (auto entryPointInfo : layout->getEntryPoints())
+            {
+                RefPtr<ShaderObjectImpl> entryPoint;
+                SLANG_RETURN_ON_FAIL(
+                    ShaderObjectImpl::create(device, entryPointInfo.layout, entryPoint.writeRef()));
+                entryPoint->m_isMutable = isMutable;
+                m_entryPoints.add(entryPoint);
+            }
             return SLANG_OK;
         }
 
@@ -3320,19 +3457,8 @@ public:
             RootShaderObjectLayoutImpl* layout,
             TransientResourceHeapImpl* heap)
         {
-            m_cpuViewHeap.deallocateAll();
-            m_cpuSamplerHeap.deallocateAll();
-            SLANG_RETURN_ON_FAIL(Super::init(device, layout, &m_cpuViewHeap, &m_cpuSamplerHeap));
-            m_specializedLayout = nullptr;
-            m_entryPoints.clear();
-            for (auto entryPointInfo : layout->getEntryPoints())
-            {
-                RefPtr<ShaderObjectImpl> entryPoint;
-                SLANG_RETURN_ON_FAIL(
-                    ShaderObjectImpl::create(device, entryPointInfo.layout, entryPoint.writeRef()));
-                m_entryPoints.add(entryPoint);
-            }
-            return SLANG_OK;
+            return resetImpl(
+                device, layout, &heap->m_stagingCpuViewHeap, &heap->m_stagingCpuSamplerHeap, false);
         }
 
     protected:
@@ -3434,12 +3560,18 @@ public:
         }
 
         List<RefPtr<ShaderObjectImpl>> m_entryPoints;
+    };
 
+    class MutableRootShaderObjectImpl : public RootShaderObjectImpl
+    {
     public:
-        // Descriptor heaps for the root object. Resets with the life cycle of each root shader
-        // object use.
-        D3D12DescriptorHeap m_cpuViewHeap;
-        D3D12DescriptorHeap m_cpuSamplerHeap;
+        // Override default reference counting behavior to disable lifetime management via ComPtr.
+        // Root objects are managed by command buffer and does not need to be freed by the user.
+        SLANG_NO_THROW uint32_t SLANG_MCALL addRef() override { return ShaderObjectBase::addRef(); }
+        SLANG_NO_THROW uint32_t SLANG_MCALL release() override
+        {
+            return ShaderObjectBase::release();
+        }
     };
 
     class ShaderTableImpl : public ShaderTableBase
@@ -3586,6 +3718,7 @@ public:
         // device.
         D3D12Device* m_renderer;
         RootShaderObjectImpl m_rootShaderObject;
+        RefPtr<MutableRootShaderObjectImpl> m_mutableRootShaderObject;
 
         void bindDescriptorHeaps()
         {
@@ -3610,6 +3743,11 @@ public:
 
 #if SLANG_GFX_HAS_DXR_SUPPORT
             m_cmdList->QueryInterface<ID3D12GraphicsCommandList4>(m_cmdList4.writeRef());
+            if (m_cmdList4)
+            {
+                m_cmdList1 = m_cmdList4;
+                return;
+            }
 #endif
             m_cmdList->QueryInterface<ID3D12GraphicsCommandList1>(m_cmdList1.writeRef());
         }
@@ -4473,6 +4611,12 @@ public:
                 return bindPipelineImpl(state, outRootObject);
             }
 
+            virtual SLANG_NO_THROW Result SLANG_MCALL
+                bindPipelineWithRootObject(IPipelineState* state, IShaderObject* rootObject) override
+            {
+                return bindPipelineWithRootObjectImpl(state, rootObject);
+            }
+
             virtual SLANG_NO_THROW void SLANG_MCALL
                 setViewports(uint32_t count, const Viewport* viewports) override
             {
@@ -4799,6 +4943,12 @@ public:
                 return bindPipelineImpl(state, outRootObject);
             }
 
+            virtual SLANG_NO_THROW Result SLANG_MCALL bindPipelineWithRootObject(
+                IPipelineState* state, IShaderObject* rootObject) override
+            {
+                return bindPipelineWithRootObjectImpl(state, rootObject);
+            }
+
             virtual SLANG_NO_THROW void SLANG_MCALL dispatchCompute(int x, int y, int z) override
             {
                 // Submit binding for compute
@@ -4874,6 +5024,11 @@ public:
                 DeviceAddress source) override;
             virtual SLANG_NO_THROW void SLANG_MCALL
                 bindPipeline(IPipelineState* state, IShaderObject** outRootObject) override;
+            virtual SLANG_NO_THROW Result SLANG_MCALL bindPipelineWithRootObject(
+                IPipelineState* state, IShaderObject* rootObject) override
+            {
+                return bindPipelineWithRootObjectImpl(state, rootObject);
+            }
             virtual SLANG_NO_THROW void SLANG_MCALL dispatchRays(
                 uint32_t rayGenShaderIndex,
                 IShaderTable* shaderTable,
@@ -5279,6 +5434,8 @@ SLANG_NO_THROW Result SLANG_MCALL D3D12Device::TransientResourceHeapImpl::synchr
     m_currentSamplerHeapIndex = -1;
     allocateNewViewDescriptorHeap(m_device);
     allocateNewSamplerDescriptorHeap(m_device);
+    m_stagingCpuSamplerHeap.freeAll();
+    m_stagingCpuViewHeap.freeAll();
     m_commandListAllocId = 0;
     SLANG_RETURN_ON_FAIL(m_commandAllocator->Reset());
     Super::reset();
@@ -5316,7 +5473,9 @@ Result D3D12Device::TransientResourceHeapImpl::createCommandBuffer(ICommandBuffe
 
 Result D3D12Device::PipelineCommandEncoder::_bindRenderState(Submitter* submitter, RefPtr<PipelineStateBase>& newPipeline)
 {
-    RootShaderObjectImpl* rootObjectImpl = &m_commandBuffer->m_rootShaderObject;
+    RootShaderObjectImpl* rootObjectImpl = m_commandBuffer->m_mutableRootShaderObject
+                                               ? m_commandBuffer->m_mutableRootShaderObject.Ptr()
+                                               : &m_commandBuffer->m_rootShaderObject;
     SLANG_RETURN_ON_FAIL(m_renderer->maybeSpecializePipeline(m_currentPipeline, rootObjectImpl, newPipeline));
     PipelineStateBase* newPipelineImpl = static_cast<PipelineStateBase*>(newPipeline.Ptr());
     auto commandList = m_d3dCmdList;
@@ -5324,10 +5483,7 @@ Result D3D12Device::PipelineCommandEncoder::_bindRenderState(Submitter* submitte
     auto programImpl = static_cast<ShaderProgramImpl*>(newPipelineImpl->m_program.Ptr());
     submitter->setRootSignature(programImpl->m_rootObjectLayout->m_rootSignature);
     submitter->setPipelineState(newPipelineImpl);
-    RefPtr<ShaderObjectLayoutImpl> specializedRootLayout;
-    SLANG_RETURN_ON_FAIL(rootObjectImpl->getSpecializedLayout(specializedRootLayout.writeRef()));
-    RootShaderObjectLayoutImpl* rootLayoutImpl =
-        static_cast<RootShaderObjectLayoutImpl*>(specializedRootLayout.Ptr());
+    RootShaderObjectLayoutImpl* rootLayoutImpl = programImpl->m_rootObjectLayout;
 
     // We need to set up a context for binding shader objects to the pipeline state.
     // This type mostly exists to bundle together a bunch of parameters that would
@@ -7538,19 +7694,18 @@ Result D3D12Device::createMutableShaderObject(
     ShaderObjectLayoutBase* layout,
     IShaderObject** outObject)
 {
-    auto layoutImpl = static_cast<ShaderObjectLayoutImpl*>(layout);
-
-    RefPtr<MutableShaderObjectImpl> result = new MutableShaderObjectImpl();
-    SLANG_RETURN_ON_FAIL(result->init(this, layoutImpl));
-    returnComPtr(outObject, result);
-
-    return SLANG_OK;
+    auto result = createShaderObject(layout, outObject);
+    SLANG_RETURN_ON_FAIL(result);
+    static_cast<ShaderObjectImpl*>(*outObject)->m_isMutable = true;
+    return result;
 }
 
 Result D3D12Device::createMutableRootShaderObject(IShaderProgram* program, IShaderObject** outObject)
 {
-    RefPtr<MutableRootShaderObject> result =
-        new MutableRootShaderObject(this, static_cast<ShaderProgramBase*>(program));
+    RefPtr<MutableRootShaderObjectImpl> result = new MutableRootShaderObjectImpl();
+    result->init(this);
+    auto programImpl = static_cast<ShaderProgramImpl*>(program);
+    result->resetImpl(this, programImpl->m_rootObjectLayout, m_cpuViewHeap.Ptr(), m_cpuSamplerHeap.Ptr(), true);
     returnComPtr(outObject, result);
     return SLANG_OK;
 }
@@ -8506,6 +8661,8 @@ Result D3D12Device::ShaderObjectImpl::setResource(ShaderOffset const& offset, IR
     auto layout = getLayout();
     if (offset.bindingRangeIndex >= layout->getBindingRangeCount())
         return SLANG_E_INVALID_ARG;
+
+    m_version++;
 
     ID3D12Device* d3dDevice = static_cast<D3D12Device*>(getDevice())->m_device;
 

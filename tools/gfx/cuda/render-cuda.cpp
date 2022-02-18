@@ -953,8 +953,14 @@ public:
 
     public:
         CUDADevice* m_device;
+        TransientResourceHeapBase* m_transientHeap;
 
-        void init(CUDADevice* device) { m_device = device; }
+        void init(CUDADevice* device, TransientResourceHeapBase* transientHeap)
+        {
+            m_device = device;
+            m_transientHeap = transientHeap;
+        }
+
         virtual SLANG_NO_THROW void SLANG_MCALL encodeRenderCommands(
             IRenderPassLayout* renderPass,
             IFramebuffer* framebuffer,
@@ -1168,6 +1174,17 @@ public:
                 SLANG_RETURN_ON_FAIL(m_commandBuffer->m_device->createRootShaderObject(
                     pipelineImpl->m_program, m_rootObject.writeRef()));
                 returnComPtr(outRootObject, m_rootObject);
+                return SLANG_OK;
+            }
+
+            virtual SLANG_NO_THROW Result SLANG_MCALL
+                bindPipelineWithRootObject(IPipelineState* state, IShaderObject* rootObject) override
+            {
+                m_writer->setPipelineState(state);
+                PipelineStateBase* pipelineImpl = static_cast<PipelineStateBase*>(state);
+                SLANG_RETURN_ON_FAIL(m_commandBuffer->m_device->createRootShaderObject(
+                    pipelineImpl->m_program, m_rootObject.writeRef()));
+                m_rootObject->copyFrom(rootObject, m_commandBuffer->m_transientHeap);
                 return SLANG_OK;
             }
 

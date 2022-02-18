@@ -1088,9 +1088,6 @@ public:
         ITransientResourceHeap* transientHeap,
         IShaderObject** outObject) = 0;
 
-        /// Copies contents from another shader object to this object.
-    virtual SLANG_NO_THROW Result SLANG_MCALL copyFrom(IShaderObject* other, ITransientResourceHeap* transientHeap) = 0;
-
     virtual SLANG_NO_THROW const void* SLANG_MCALL getRawData() = 0;
 
     virtual SLANG_NO_THROW size_t SLANG_MCALL getSize() = 0;
@@ -1618,7 +1615,7 @@ public:
     // Sets the current pipeline state. This method returns a transient shader object for
     // writing shader parameters. This shader object will not retain any resources or
     // sub-shader-objects bound to it. The user must be responsible for ensuring that any
-    // resources or shader objects that is set into `outRooShaderObject` stays alive during
+    // resources or shader objects that is set into `outRootShaderObject` stays alive during
     // the execution of the command buffer.
     virtual SLANG_NO_THROW Result SLANG_MCALL
         bindPipeline(IPipelineState* state, IShaderObject** outRootShaderObject) = 0;
@@ -1628,6 +1625,10 @@ public:
         SLANG_RETURN_NULL_ON_FAIL(bindPipeline(state, &rootObject));
         return rootObject;
     }
+
+    // Sets the current pipeline state along with a pre-created mutable root shader object.
+    virtual SLANG_NO_THROW Result SLANG_MCALL
+        bindPipelineWithRootObject(IPipelineState* state, IShaderObject* rootObject) = 0;
 
     virtual SLANG_NO_THROW void
         SLANG_MCALL setViewports(uint32_t count, const Viewport* viewports) = 0;
@@ -1706,7 +1707,9 @@ public:
         SLANG_RETURN_NULL_ON_FAIL(bindPipeline(state, &rootObject));
         return rootObject;
     }
-
+    // Sets the current pipeline state along with a pre-created mutable root shader object.
+    virtual SLANG_NO_THROW Result SLANG_MCALL
+        bindPipelineWithRootObject(IPipelineState* state, IShaderObject* rootObject) = 0;
     virtual SLANG_NO_THROW void SLANG_MCALL dispatchCompute(int x, int y, int z) = 0;
     virtual SLANG_NO_THROW void SLANG_MCALL dispatchComputeIndirect(IBufferResource* cmdBuffer, uint64_t offset) = 0;
 };
@@ -1748,6 +1751,9 @@ public:
 
     virtual SLANG_NO_THROW void SLANG_MCALL
         bindPipeline(IPipelineState* state, IShaderObject** outRootObject) = 0;
+    // Sets the current pipeline state along with a pre-created mutable root shader object.
+    virtual SLANG_NO_THROW Result SLANG_MCALL
+        bindPipelineWithRootObject(IPipelineState* state, IShaderObject* rootObject) = 0;
 
     /// Issues a dispatch command to start ray tracing workload with a ray tracing pipeline.
     /// `rayGenShaderIndex` specifies the index into the shader table that identifies the ray generation shader.
