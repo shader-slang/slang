@@ -899,6 +899,7 @@ void Linkage::addTarget(
     target->addTargetFlags(desc.flags);
     target->setTargetProfile(Profile(desc.profile));
     target->setLineDirectiveMode(LineDirectiveMode(desc.lineDirectiveMode));
+    target->setForceGLSLScalarBufferLayout(desc.forceGLSLScalarBufferLayout);
 }
 
 #if 0
@@ -4187,6 +4188,11 @@ void EndToEndCompileRequest::setTargetFlags(int targetIndex, SlangTargetFlags fl
     getLinkage()->targets[targetIndex]->addTargetFlags(flags);
 }
 
+void EndToEndCompileRequest::setTargetForceGLSLScalarBufferLayout(int targetIndex, bool value)
+{
+    getLinkage()->targets[targetIndex]->setForceGLSLScalarBufferLayout(value);
+}
+
 void EndToEndCompileRequest::setTargetFloatingPointMode(int targetIndex, SlangFloatingPointMode  mode)
 {
     getLinkage()->targets[targetIndex]->setFloatingPointMode(FloatingPointMode(mode));
@@ -4848,5 +4854,3 @@ SlangResult EndToEndCompileRequest::getEntryPoint(SlangInt entryPointIndex, slan
 }
 
 } // namespace Slang
-
-

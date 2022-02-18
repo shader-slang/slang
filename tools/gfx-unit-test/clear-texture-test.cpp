@@ -41,6 +41,8 @@ namespace gfx_test
         rtvDesc.type = IResourceView::Type::RenderTarget;
         rtvDesc.format = Format::R32G32B32A32_FLOAT;
         rtvDesc.renderTarget.shape = IResource::Type::Texture2D;
+        rtvDesc.subresourceRange.layerCount = 1;
+        rtvDesc.subresourceRange.mipLevelCount = 1;
         rtv = device->createTextureView(srcTexture, rtvDesc);
 
         {

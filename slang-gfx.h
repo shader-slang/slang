@@ -787,10 +787,6 @@ public:
     {
         // The resource shape of this render target view.
         IResource::Type shape;
-        uint32_t mipSlice;
-        uint32_t arrayIndex;
-        uint32_t arraySize;
-        uint32_t planeIndex;
     };
 
     struct Desc
@@ -798,11 +794,14 @@ public:
         Type    type;
         Format  format;
 
-        // Fields for `RenderTarget` and `DepthStencil` views.
+        // Required fields for `RenderTarget` and `DepthStencil` views.
         RenderTargetDesc renderTarget;
+        // Specifies the range of a texture resource for a ShaderRsource/UnorderedAccess/RenderTarget/DepthStencil view.
         SubresourceRange subresourceRange;
+        // Specifies the range of a buffer resource for a ShaderResource/UnorderedAccess view.
         BufferRange bufferRange;
-        uint32_t bufferElementSize; // 0 means raw buffer.
+        // Specifies the element size of a structured buffer. Pass 0 for a raw buffer view.
+        uint32_t bufferElementSize;
     };
     virtual SLANG_NO_THROW Desc* SLANG_MCALL getViewDesc() = 0;
 
@@ -927,7 +926,7 @@ public:
         uint32_t instanceID : 24;
         uint32_t instanceMask : 8;
         uint32_t instanceContributionToHitGroupIndex : 24;
-        GeometryInstanceFlags::Enum flags : 8;
+        uint32_t flags : 8; // Combination of GeometryInstanceFlags::Enum values.
         DeviceAddress accelerationStructure;
     };
 
@@ -1533,7 +1532,87 @@ struct ClearResourceViewFlags
     };
 };
 
-class IRenderCommandEncoder : public ICommandEncoder
+class IResourceCommandEncoder : public ICommandEncoder
+{
+public:
+    virtual SLANG_NO_THROW void SLANG_MCALL copyBuffer(
+        IBufferResource* dst,
+        size_t dstOffset,
+        IBufferResource* src,
+        size_t srcOffset,
+        size_t size) = 0;
+
+    /// Copies texture from src to dst. If dstSubresource and srcSubresource has mipLevelCount = 0
+    /// and layerCount = 0, the entire resource is being copied and dstOffset, srcOffset and extent
+    /// arguments are ignored.
+    virtual SLANG_NO_THROW void SLANG_MCALL copyTexture(
+        ITextureResource* dst,
+        ResourceState dstState,
+        SubresourceRange dstSubresource,
+        ITextureResource::Offset3D dstOffset,
+        ITextureResource* src,
+        ResourceState srcState,
+        SubresourceRange srcSubresource,
+        ITextureResource::Offset3D srcOffset,
+        ITextureResource::Size extent) = 0;
+
+    /// Copies texture to a buffer. Each row is aligned to kTexturePitchAlignment.
+    virtual SLANG_NO_THROW void SLANG_MCALL copyTextureToBuffer(
+        IBufferResource* dst,
+        size_t dstOffset,
+        size_t dstSize,
+        ITextureResource* src,
+        ResourceState srcState,
+        SubresourceRange srcSubresource,
+        ITextureResource::Offset3D srcOffset,
+        ITextureResource::Size extent) = 0;
+    virtual SLANG_NO_THROW void SLANG_MCALL uploadTextureData(
+        ITextureResource* dst,
+        SubresourceRange subResourceRange,
+        ITextureResource::Offset3D offset,
+        ITextureResource::Size extent,
+        ITextureResource::SubresourceData* subResourceData,
+        size_t subResourceDataCount) = 0;
+    virtual SLANG_NO_THROW void SLANG_MCALL
+        uploadBufferData(IBufferResource* dst, size_t offset, size_t size, void* data) = 0;
+
+    virtual SLANG_NO_THROW void SLANG_MCALL textureBarrier(
+        size_t count, ITextureResource* const* textures, ResourceState src, ResourceState dst) = 0;
+    void textureBarrier(ITextureResource* texture, ResourceState src, ResourceState dst)
+    {
+        textureBarrier(1, &texture, src, dst);
+    }
+    virtual SLANG_NO_THROW void SLANG_MCALL textureSubresourceBarrier(
+        ITextureResource* texture,
+        SubresourceRange subresourceRange,
+        ResourceState src,
+        ResourceState dst) = 0;
+    virtual SLANG_NO_THROW void SLANG_MCALL bufferBarrier(
+        size_t count, IBufferResource* const* buffers, ResourceState src, ResourceState dst) = 0;
+    void bufferBarrier(IBufferResource* buffer, ResourceState src, ResourceState dst)
+    {
+        bufferBarrier(1, &buffer, src, dst);
+    }
+    virtual SLANG_NO_THROW void SLANG_MCALL clearResourceView(
+        IResourceView* view, ClearValue* clearValue, ClearResourceViewFlags::Enum flags) = 0;
+    virtual SLANG_NO_THROW void SLANG_MCALL resolveResource(
+        ITextureResource* source,
+        ResourceState sourceState,
+        SubresourceRange sourceRange,
+        ITextureResource* dest,
+        ResourceState destState,
+        SubresourceRange destRange) = 0;
+    virtual SLANG_NO_THROW void SLANG_MCALL resolveQuery(
+        IQueryPool* queryPool,
+        uint32_t index,
+        uint32_t count,
+        IBufferResource* buffer,
+        uint64_t offset) = 0;
+    virtual SLANG_NO_THROW void SLANG_MCALL beginDebugEvent(const char* name, float rgbColor[3]) = 0;
+    virtual SLANG_NO_THROW void SLANG_MCALL endDebugEvent() = 0;
+};
+
+class IRenderCommandEncoder : public IResourceCommandEncoder
 {
 public:
     // Sets the current pipeline state. This method returns a transient shader object for
@@ -1611,7 +1690,7 @@ public:
         uint32_t startInstanceLocation) = 0;
 };
 
-class IComputeCommandEncoder : public ICommandEncoder
+class IComputeCommandEncoder : public IResourceCommandEncoder
 {
 public:
     // Sets the current pipeline state. This method returns a transient shader object for
@@ -1632,89 +1711,6 @@ public:
     virtual SLANG_NO_THROW void SLANG_MCALL dispatchComputeIndirect(IBufferResource* cmdBuffer, uint64_t offset) = 0;
 };
 
-class IResourceCommandEncoder : public ICommandEncoder
-{
-public:
-    virtual SLANG_NO_THROW void SLANG_MCALL copyBuffer(
-        IBufferResource* dst,
-        size_t dstOffset,
-        IBufferResource* src,
-        size_t srcOffset,
-        size_t size) = 0;
-
-    /// Copies texture from src to dst. If dstSubresource and srcSubresource has mipLevelCount = 0 and layerCount = 0,
-    /// the entire resource is being copied and dstOffset, srcOffset and extent arguments are ignored.
-    virtual SLANG_NO_THROW void SLANG_MCALL copyTexture(
-        ITextureResource* dst,
-        ResourceState dstState,
-        SubresourceRange dstSubresource,
-        ITextureResource::Offset3D dstOffset,
-        ITextureResource* src,
-        ResourceState srcState,
-        SubresourceRange srcSubresource,
-        ITextureResource::Offset3D srcOffset,
-        ITextureResource::Size extent) = 0;
-
-    /// Copies texture to a buffer. Each row is aligned to kTexturePitchAlignment.
-    virtual SLANG_NO_THROW void SLANG_MCALL copyTextureToBuffer(
-        IBufferResource* dst,
-        size_t dstOffset,
-        size_t dstSize,
-        ITextureResource* src,
-        ResourceState srcState,
-        SubresourceRange srcSubresource,
-        ITextureResource::Offset3D srcOffset,
-        ITextureResource::Size extent) = 0;
-    virtual SLANG_NO_THROW void SLANG_MCALL uploadTextureData(
-        ITextureResource* dst,
-        SubresourceRange subResourceRange,
-        ITextureResource::Offset3D offset,
-        ITextureResource::Size extent,
-        ITextureResource::SubresourceData* subResourceData,
-        size_t subResourceDataCount) = 0;
-    virtual SLANG_NO_THROW void SLANG_MCALL
-        uploadBufferData(IBufferResource* dst, size_t offset, size_t size, void* data) = 0;
-
-    virtual SLANG_NO_THROW void SLANG_MCALL textureBarrier(
-        size_t count,
-        ITextureResource* const* textures,
-        ResourceState src,
-        ResourceState dst) = 0;
-    void textureBarrier(ITextureResource* texture, ResourceState src, ResourceState dst)
-    {
-        textureBarrier(1, &texture, src, dst);
-    }
-    virtual SLANG_NO_THROW void SLANG_MCALL textureSubresourceBarrier(
-        ITextureResource* texture,
-        SubresourceRange subresourceRange,
-        ResourceState src,
-        ResourceState dst) = 0;
-    virtual SLANG_NO_THROW void SLANG_MCALL bufferBarrier(
-        size_t count,
-        IBufferResource* const* buffers,
-        ResourceState src,
-        ResourceState dst) = 0;
-    void bufferBarrier(IBufferResource* buffer, ResourceState src, ResourceState dst)
-    {
-        bufferBarrier(1, &buffer, src, dst);
-    }
-    virtual SLANG_NO_THROW void SLANG_MCALL clearResourceView(
-        IResourceView* view, ClearValue* clearValue, ClearResourceViewFlags::Enum flags) = 0;
-    virtual SLANG_NO_THROW void SLANG_MCALL resolveResource(
-        ITextureResource* source,
-        ResourceState sourceState,
-        SubresourceRange sourceRange,
-        ITextureResource* dest,
-        ResourceState destState,
-        SubresourceRange destRange) = 0;
-    virtual SLANG_NO_THROW void SLANG_MCALL resolveQuery(
-        IQueryPool* queryPool,
-        uint32_t index,
-        uint32_t count,
-        IBufferResource* buffer,
-        uint64_t offset) = 0;
-};
-
 enum class AccelerationStructureCopyMode
 {
     Clone, Compact
@@ -1729,7 +1725,7 @@ struct AccelerationStructureQueryDesc
     int32_t firstQueryIndex;
 };
 
-class IRayTracingCommandEncoder : public ICommandEncoder
+class IRayTracingCommandEncoder : public IResourceCommandEncoder
 {
 public:
     virtual SLANG_NO_THROW void SLANG_MCALL buildAccelerationStructure(
@@ -1749,11 +1745,6 @@ public:
         serializeAccelerationStructure(DeviceAddress dest, IAccelerationStructure* source) = 0;
     virtual SLANG_NO_THROW void SLANG_MCALL
         deserializeAccelerationStructure(IAccelerationStructure* dest, DeviceAddress source) = 0;
-    virtual SLANG_NO_THROW void SLANG_MCALL memoryBarrier(
-        int count,
-        IAccelerationStructure* const* structures,
-        AccessFlag sourceAccess,
-        AccessFlag destAccess) = 0;
 
     virtual SLANG_NO_THROW void SLANG_MCALL
         bindPipeline(IPipelineState* state, IShaderObject** outRootObject) = 0;

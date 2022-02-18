@@ -30,7 +30,7 @@ namespace gfx_test
 
         return buffer;
     }
-    void rootShaderParameterTestImpl(IDevice* device, UnitTestContext* context)
+    void samplerArrayTestImpl(IDevice* device, UnitTestContext* context)
     {
         Slang::ComPtr<ITransientResourceHeap> transientHeap;
         ITransientResourceHeap::Desc transientHeapDesc = {};
@@ -40,7 +40,7 @@ namespace gfx_test
 
         ComPtr<IShaderProgram> shaderProgram;
         slang::ProgramLayout* slangReflection;
-        GFX_CHECK_CALL_ABORT(loadComputeProgram(device, shaderProgram, "root-shader-parameter", "computeMain", slangReflection));
+        GFX_CHECK_CALL_ABORT(loadComputeProgram(device, shaderProgram, "sampler-array", "computeMain", slangReflection));
 
         ComputePipelineStateDesc pipelineDesc = {};
         pipelineDesc.program = shaderProgram.get();
@@ -48,62 +48,87 @@ namespace gfx_test
         GFX_CHECK_CALL_ABORT(
             device->createComputePipelineState(pipelineDesc, pipelineState.writeRef()));
 
-        Slang::List<ComPtr<IBufferResource>> buffers;
-        Slang::List<ComPtr<IResourceView>> srvs, uavs;
+        Slang::List<ComPtr<ISamplerState>> samplers;
+        Slang::List<ComPtr<IResourceView>> srvs;
+        ComPtr<IResourceView> uav;
+        ComPtr<ITextureResource> texture;
+        ComPtr<IBufferResource> buffer = createBuffer(device, 0);
 
-        for (uint32_t i = 0; i < 9; i++)
         {
-            buffers.add(createBuffer(device, i == 0 ? 10 : i));
-
-            ComPtr<IResourceView> bufferView;
             IResourceView::Desc viewDesc = {};
             viewDesc.type = IResourceView::Type::UnorderedAccess;
             viewDesc.format = Format::Unknown;
             GFX_CHECK_CALL_ABORT(
-                device->createBufferView(buffers[i], nullptr, viewDesc, bufferView.writeRef()));
-            uavs.add(bufferView);
-
-            viewDesc.type = IResourceView::Type::ShaderResource;
-            viewDesc.format = Format::Unknown;
+                device->createBufferView(buffer, nullptr, viewDesc, uav.writeRef()));
+        }
+        {
+            ITextureResource::Desc textureDesc = {};
+            textureDesc.type = IResource::Type::Texture2D;
+            textureDesc.format = Format::R8G8B8A8_UNORM;
+            textureDesc.size.width = 2;
+            textureDesc.size.height = 2;
+            textureDesc.size.depth = 1;
+            textureDesc.numMipLevels = 2;
+            textureDesc.memoryType = MemoryType::DeviceLocal;
+            textureDesc.defaultState = ResourceState::ShaderResource;
+            textureDesc.allowedStates.add(ResourceState::CopyDestination);
+            uint32_t data[] = {0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF};
+            ITextureResource::SubresourceData subResourceData[2] = {{data, 8, 16}, {data, 8, 16}};
             GFX_CHECK_CALL_ABORT(
-                device->createBufferView(buffers[i], nullptr, viewDesc, bufferView.writeRef()));
-            srvs.add(bufferView);
+                device->createTextureResource(textureDesc, subResourceData, texture.writeRef()));
+        }
+        for (uint32_t i = 0; i < 32; i++)
+        {
+            ComPtr<IResourceView> srv;
+            IResourceView::Desc viewDesc = {};
+            viewDesc.type = IResourceView::Type::ShaderResource;
+            viewDesc.format = Format::R8G8B8A8_UNORM;
+            viewDesc.subresourceRange.layerCount = 1;
+            viewDesc.subresourceRange.mipLevelCount = 1;
+            GFX_CHECK_CALL_ABORT(
+                device->createTextureView(texture, viewDesc, srv.writeRef()));
+            srvs.add(srv);
+        }
+
+        for (uint32_t i = 0; i < 32; i++)
+        {
+            ISamplerState::Desc desc = {};
+            ComPtr<ISamplerState> sampler;
+            GFX_CHECK_CALL_ABORT(device->createSamplerState(desc, sampler.writeRef()));
+            samplers.add(sampler);
         }
 
         ComPtr<IShaderObject> rootObject;
         device->createMutableRootShaderObject(shaderProgram, rootObject.writeRef());
 
-        ComPtr<IShaderObject> g, s1, s2;
+        ComPtr<IShaderObject> g;
         device->createMutableShaderObject(
             slangReflection->findTypeByName("S0"), ShaderObjectContainerType::None, g.writeRef());
+
+        ComPtr<IShaderObject> s1;
         device->createMutableShaderObject(
             slangReflection->findTypeByName("S1"), ShaderObjectContainerType::None, s1.writeRef());
-        device->createMutableShaderObject(
-            slangReflection->findTypeByName("S1"), ShaderObjectContainerType::None, s2.writeRef());
 
         {
             auto cursor = ShaderCursor(s1);
-            cursor["c0"].setResource(srvs[2]);
-            cursor["c1"].setResource(uavs[3]);
-            cursor["c2"].setResource(srvs[4]);
+            for (uint32_t i = 0; i < 32; i++)
+            {
+                cursor["samplers"][i].setSampler(samplers[i]);
+                cursor["tex"][i].setResource(srvs[i]);
+            }
+            cursor["data"].setData(1.0f);
         }
-        {
-            auto cursor = ShaderCursor(s2);
-            cursor["c0"].setResource(srvs[5]);
-            cursor["c1"].setResource(uavs[6]);
-            cursor["c2"].setResource(srvs[7]);
-        }
+
         {
             auto cursor = ShaderCursor(g);
-            cursor["b0"].setResource(srvs[0]);
-            cursor["b1"].setResource(srvs[1]);
-            cursor["s1"].setObject(s1);
-            cursor["s2"].setObject(s2);
+            cursor["s"].setObject(s1);
+            cursor["data"].setData(2.0f);
         }
+
         {
             auto cursor = ShaderCursor(rootObject);
             cursor["g"].setObject(g);
-            cursor["buffer"].setResource(uavs[8]);
+            cursor["buffer"].setResource(uav);
         }
 
         {
@@ -125,11 +150,11 @@ namespace gfx_test
         }
 
         compareComputeResult(
-            device, buffers[8], Slang::makeArray<uint32_t>(10 - 1 + 2 - 3 + 4 + 5 - 6 + 7));
+            device, buffer, Slang::makeArray<float>(4.0f));
     }
 
-    SLANG_UNIT_TEST(rootShaderParameterD3D12)
+    SLANG_UNIT_TEST(samplerArrayVulkan)
     {
-        runTestImpl(rootShaderParameterTestImpl, unitTestContext, Slang::RenderApiFlag::D3D12);
+        runTestImpl(samplerArrayTestImpl, unitTestContext, Slang::RenderApiFlag::Vulkan);
     }
 }

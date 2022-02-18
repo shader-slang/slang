@@ -1461,6 +1461,11 @@ namespace Slang
         {
             dumpIntermediates = value;
         }
+        void setForceGLSLScalarBufferLayout(bool value)
+        {
+            forceGLSLScalarBufferLayout = value;
+        }
+
         void addCapability(CapabilityAtom capability);
 
         bool shouldEmitSPIRVDirectly()
@@ -1482,6 +1487,7 @@ namespace Slang
         LineDirectiveMode getLineDirectiveMode() { return lineDirectiveMode; }
         SlangTargetFlags getTargetFlags() { return targetFlags; }
         CapabilitySet getTargetCaps();
+        bool getForceGLSLScalarBufferLayout() { return forceGLSLScalarBufferLayout; }
 
         Session* getSession();
         MatrixLayoutMode getDefaultMatrixLayoutMode();
@@ -1503,6 +1509,7 @@ namespace Slang
         CapabilitySet           cookedCapabilities;
         LineDirectiveMode       lineDirectiveMode = LineDirectiveMode::Default;
         bool                    dumpIntermediates = false;
+        bool                    forceGLSLScalarBufferLayout = false;
     };
 
         /// Are we generating code for a D3D API?
@@ -2243,6 +2250,7 @@ namespace Slang
         virtual SLANG_NO_THROW void SLANG_MCALL setTargetFlags(int targetIndex, SlangTargetFlags flags) SLANG_OVERRIDE;
         virtual SLANG_NO_THROW void SLANG_MCALL setTargetFloatingPointMode(int targetIndex, SlangFloatingPointMode mode) SLANG_OVERRIDE;
         virtual SLANG_NO_THROW void SLANG_MCALL setTargetMatrixLayoutMode(int targetIndex, SlangMatrixLayoutMode mode) SLANG_OVERRIDE;
+        virtual SLANG_NO_THROW void SLANG_MCALL setTargetForceGLSLScalarBufferLayout(int targetIndex, bool value) SLANG_OVERRIDE;
         virtual SLANG_NO_THROW void SLANG_MCALL setMatrixLayoutMode(SlangMatrixLayoutMode mode) SLANG_OVERRIDE;
         virtual SLANG_NO_THROW void SLANG_MCALL setDebugInfoLevel(SlangDebugInfoLevel level) SLANG_OVERRIDE;
         virtual SLANG_NO_THROW void SLANG_MCALL setOptimizationLevel(SlangOptimizationLevel level) SLANG_OVERRIDE;

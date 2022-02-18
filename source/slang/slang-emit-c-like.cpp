@@ -98,6 +98,7 @@ CLikeSourceEmitter::CLikeSourceEmitter(const Desc& desc)
     m_targetCaps = desc.targetCaps;
 
     m_compileRequest = desc.compileRequest;
+    m_targetRequest = desc.targetRequest;
     m_entryPointStage = desc.entryPointStage;
     m_effectiveProfile = desc.effectiveProfile;
 }

@@ -197,6 +197,9 @@ namespace gfx {
     x(vkWaitSemaphores) \
     x(vkWaitSemaphoresKHR) \
     x(vkCmdSetSampleLocationsEXT) \
+    x(vkCmdDebugMarkerBeginEXT) \
+    x(vkCmdDebugMarkerEndEXT) \
+    x(vkDebugMarkerSetObjectNameEXT) \
     /* */
 
 #define VK_API_ALL_GLOBAL_PROCS(x) \

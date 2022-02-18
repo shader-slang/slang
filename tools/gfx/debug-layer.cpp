@@ -1076,12 +1076,6 @@ void DebugComputeCommandEncoder::dispatchComputeIndirect(
     baseObject->dispatchComputeIndirect(getInnerObj(cmdBuffer), offset);
 }
 
-void DebugComputeCommandEncoder::writeTimestamp(IQueryPool* pool, SlangInt index)
-{
-    SLANG_GFX_API_FUNC;
-    baseObject->writeTimestamp(static_cast<DebugQueryPool*>(pool)->baseObject, index);
-}
-
 void DebugRenderCommandEncoder::endEncoding()
 {
     SLANG_GFX_API_FUNC;
@@ -1189,12 +1183,6 @@ void DebugRenderCommandEncoder::setStencilReference(uint32_t referenceValue)
     return baseObject->setStencilReference(referenceValue);
 }
 
-void DebugRenderCommandEncoder::writeTimestamp(IQueryPool* pool, SlangInt index)
-{
-    SLANG_GFX_API_FUNC;
-    baseObject->writeTimestamp(static_cast<DebugQueryPool*>(pool)->baseObject, index);
-}
-
 Result DebugRenderCommandEncoder::setSamplePositions(
     uint32_t samplesPerPixel, uint32_t pixelCount, const SamplePosition* samplePositions)
 {
@@ -1232,13 +1220,13 @@ void DebugResourceCommandEncoder::endEncoding()
     baseObject->endEncoding();
 }
 
-void DebugResourceCommandEncoder::writeTimestamp(IQueryPool* pool, SlangInt index)
+void DebugResourceCommandEncoderImpl::writeTimestamp(IQueryPool* pool, SlangInt index)
 {
     SLANG_GFX_API_FUNC;
-    baseObject->writeTimestamp(static_cast<DebugQueryPool*>(pool)->baseObject, index);
+    getBaseResourceEncoder()->writeTimestamp(static_cast<DebugQueryPool*>(pool)->baseObject, index);
 }
 
-void DebugResourceCommandEncoder::copyBuffer(
+void DebugResourceCommandEncoderImpl::copyBuffer(
     IBufferResource* dst,
     size_t dstOffset,
     IBufferResource* src,
@@ -1248,10 +1236,11 @@ void DebugResourceCommandEncoder::copyBuffer(
     SLANG_GFX_API_FUNC;
     auto dstImpl = static_cast<DebugBufferResource*>(dst);
     auto srcImpl = static_cast<DebugBufferResource*>(src);
-    baseObject->copyBuffer(dstImpl->baseObject, dstOffset, srcImpl->baseObject, srcOffset, size);
+    getBaseResourceEncoder()->copyBuffer(
+        dstImpl->baseObject, dstOffset, srcImpl->baseObject, srcOffset, size);
 }
 
-void DebugResourceCommandEncoder::uploadBufferData(
+void DebugResourceCommandEncoderImpl::uploadBufferData(
     IBufferResource* dst,
     size_t offset,
     size_t size,
@@ -1259,10 +1248,10 @@ void DebugResourceCommandEncoder::uploadBufferData(
 {
     SLANG_GFX_API_FUNC;
     auto dstImpl = static_cast<DebugBufferResource*>(dst);
-    baseObject->uploadBufferData(dstImpl->baseObject, offset, size, data);
+    getBaseResourceEncoder()->uploadBufferData(dstImpl->baseObject, offset, size, data);
 }
 
-void DebugResourceCommandEncoder::textureBarrier(
+void DebugResourceCommandEncoderImpl::textureBarrier(
     size_t count,
     ITextureResource* const* textures,
     ResourceState src,
@@ -1275,10 +1264,10 @@ void DebugResourceCommandEncoder::textureBarrier(
     {
         innerTextures.add(static_cast<DebugTextureResource*>(textures[i])->baseObject.get());
     }
-    baseObject->textureBarrier(count, innerTextures.getBuffer(), src, dst);
+    getBaseResourceEncoder()->textureBarrier(count, innerTextures.getBuffer(), src, dst);
 }
 
-void DebugResourceCommandEncoder::bufferBarrier(
+void DebugResourceCommandEncoderImpl::bufferBarrier(
     size_t count,
     IBufferResource* const* buffers,
     ResourceState src,
@@ -1291,10 +1280,10 @@ void DebugResourceCommandEncoder::bufferBarrier(
     {
         innerBuffers.add(static_cast<DebugBufferResource*>(buffers[i])->baseObject.get());
     }
-    baseObject->bufferBarrier(count, innerBuffers.getBuffer(), src, dst);
+    getBaseResourceEncoder()->bufferBarrier(count, innerBuffers.getBuffer(), src, dst);
 }
 
-void DebugResourceCommandEncoder::copyTexture(
+void DebugResourceCommandEncoderImpl::copyTexture(
     ITextureResource* dst,
     ResourceState dstState,
     SubresourceRange dstSubresource,
@@ -1306,7 +1295,7 @@ void DebugResourceCommandEncoder::copyTexture(
     ITextureResource::Size extent)
 {
     SLANG_GFX_API_FUNC;
-    baseObject->copyTexture(
+    getBaseResourceEncoder()->copyTexture(
         getInnerObj(dst),
         dstState,
         dstSubresource,
@@ -1318,7 +1307,7 @@ void DebugResourceCommandEncoder::copyTexture(
         extent);
 }
 
-void DebugResourceCommandEncoder::uploadTextureData(
+void DebugResourceCommandEncoderImpl::uploadTextureData(
     ITextureResource* dst,
     SubresourceRange subResourceRange,
     ITextureResource::Offset3D offset,
@@ -1327,11 +1316,11 @@ void DebugResourceCommandEncoder::uploadTextureData(
     size_t subResourceDataCount)
 {
     SLANG_GFX_API_FUNC;
-    baseObject->uploadTextureData(
+    getBaseResourceEncoder()->uploadTextureData(
         getInnerObj(dst), subResourceRange, offset, extent, subResourceData, subResourceDataCount);
 }
 
-void DebugResourceCommandEncoder::clearResourceView(
+void DebugResourceCommandEncoderImpl::clearResourceView(
     IResourceView* view, ClearValue* clearValue, ClearResourceViewFlags::Enum flags)
 {
     SLANG_GFX_API_FUNC;
@@ -1347,10 +1336,10 @@ void DebugResourceCommandEncoder::clearResourceView(
             "RenderTarget or UnorderedAccess views can be cleared.",
             getDebugObj(view)->uid);
     }
-    baseObject->clearResourceView(getInnerObj(view), clearValue, flags);
+    getBaseResourceEncoder()->clearResourceView(getInnerObj(view), clearValue, flags);
 }
 
-void DebugResourceCommandEncoder::resolveResource(
+void DebugResourceCommandEncoderImpl::resolveResource(
     ITextureResource* source,
     ResourceState sourceState,
     SubresourceRange sourceRange,
@@ -1359,17 +1348,18 @@ void DebugResourceCommandEncoder::resolveResource(
     SubresourceRange destRange)
 {
     SLANG_GFX_API_FUNC;
-    baseObject->resolveResource(getInnerObj(source), sourceState, sourceRange, getInnerObj(dest), destState, destRange);
+    getBaseResourceEncoder()->resolveResource(
+        getInnerObj(source), sourceState, sourceRange, getInnerObj(dest), destState, destRange);
 }
 
-void DebugResourceCommandEncoder::resolveQuery(
+void DebugResourceCommandEncoderImpl::resolveQuery(
     IQueryPool* queryPool, uint32_t index, uint32_t count, IBufferResource* buffer, uint64_t offset)
 {
     SLANG_GFX_API_FUNC;
-    baseObject->resolveQuery(getInnerObj(queryPool), index, count, buffer, offset);
+    getBaseResourceEncoder()->resolveQuery(getInnerObj(queryPool), index, count, buffer, offset);
 }
 
-void DebugResourceCommandEncoder::copyTextureToBuffer(
+void DebugResourceCommandEncoderImpl::copyTextureToBuffer(
     IBufferResource* dst,
     size_t dstOffset,
     size_t dstSize,
@@ -1380,18 +1370,31 @@ void DebugResourceCommandEncoder::copyTextureToBuffer(
     ITextureResource::Size extent)
 {
     SLANG_GFX_API_FUNC;
-    baseObject->copyTextureToBuffer(
+    getBaseResourceEncoder()->copyTextureToBuffer(
         getInnerObj(dst), dstOffset, dstSize, getInnerObj(src), srcState, srcSubresource, srcOffset, extent);
 }
 
-void DebugResourceCommandEncoder::textureSubresourceBarrier(
+void DebugResourceCommandEncoderImpl::textureSubresourceBarrier(
     ITextureResource* texture,
     SubresourceRange subresourceRange,
     ResourceState src,
     ResourceState dst)
 {
     SLANG_GFX_API_FUNC;
-    baseObject->textureSubresourceBarrier(getInnerObj(texture), subresourceRange, src, dst);
+    getBaseResourceEncoder()->textureSubresourceBarrier(
+        getInnerObj(texture), subresourceRange, src, dst);
+}
+
+void DebugResourceCommandEncoderImpl::beginDebugEvent(const char* name, float rgbColor[3])
+{
+    SLANG_GFX_API_FUNC;
+    getBaseResourceEncoder()->beginDebugEvent(name, rgbColor);
+}
+
+void DebugResourceCommandEncoderImpl::endDebugEvent()
+{
+    SLANG_GFX_API_FUNC;
+    getBaseResourceEncoder()->endDebugEvent();
 }
 
 void DebugRayTracingCommandEncoder::endEncoding()
@@ -1399,13 +1402,6 @@ void DebugRayTracingCommandEncoder::endEncoding()
     SLANG_GFX_API_FUNC;
     isOpen = false;
     baseObject->endEncoding();
-}
-
-SLANG_NO_THROW void SLANG_MCALL
-    DebugRayTracingCommandEncoder::writeTimestamp(IQueryPool* pool, SlangInt index)
-{
-    SLANG_GFX_API_FUNC;
-    baseObject->writeTimestamp(static_cast<DebugQueryPool*>(pool)->baseObject, index);
 }
 
 void DebugRayTracingCommandEncoder::buildAccelerationStructure(
@@ -1475,21 +1471,6 @@ void DebugRayTracingCommandEncoder::deserializeAccelerationStructure(
 {
     SLANG_GFX_API_FUNC;
     baseObject->deserializeAccelerationStructure(getInnerObj(dest), source);
-}
-
-void DebugRayTracingCommandEncoder::memoryBarrier(
-    int count,
-    IAccelerationStructure* const* structures,
-    AccessFlag sourceAccess,
-    AccessFlag destAccess)
-{
-    SLANG_GFX_API_FUNC;
-    List<IAccelerationStructure*> innerAS;
-    for (int i = 0; i < count; i++)
-    {
-        innerAS.add(getInnerObj(structures[i]));
-    }
-    baseObject->memoryBarrier(count, innerAS.getBuffer(), sourceAccess, destAccess);
 }
 
 void DebugRayTracingCommandEncoder::bindPipeline(

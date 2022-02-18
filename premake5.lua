@@ -1333,36 +1333,21 @@ newoption {
      local slangLLVMPath = deps:getProjectRelativePath("slang-llvm", "../../..")
      
      if slangLLVMPath then
-     
-        filter { "system:windows" }
+         filter { "system:linux or macosx or windows" }
+             local sharedLibName = slangUtil.getSharedLibraryFileName(targetInfo, "slang-llvm")            
              postbuildcommands {
-                 "{COPY} " .. slangLLVMPath .."/bin/" .. targetName .. "/release/slang-llvm.dll %{cfg.targetdir}"
-             }
- 
-         filter { "system:linux" }
-             postbuildcommands {
-                 "{COPY} " .. slangLLVMPath .. "/bin/" .. targetName .. "/release/libslang-llvm.so %{cfg.targetdir}"
+                 "{COPY} " .. slangLLVMPath .."/bin/" .. targetName .. "/release/" .. sharedLibName .. " %{cfg.targetdir}"
              }
      end
  
      -- If we are not building glslang from source, then be
      -- sure to copy a binary copy over to the output directory
      if not buildGlslang then
-         filter { "system:windows" }
+         filter { "system:linux or macosx or windows" }
+             local sharedLibName = slangUtil.getSharedLibraryFileName(targetInfo, "slang-glslang")            
              postbuildcommands {
-                 "{COPY} ../../../external/slang-binaries/bin/" .. targetName .. "/slang-glslang.dll %{cfg.targetdir}"
-             }
- 
-         filter { "system:linux" }
-             postbuildcommands {
-                 "{COPY} ../../../external/slang-binaries/bin/" .. targetName .. "/libslang-glslang.so %{cfg.targetdir}"
-             }
-             
-         filter { "system:macosx" }
-             postbuildcommands {
-                 "{COPY} ../../../external/slang-binaries/bin/" .. targetName .. "/libslang-glslang.dylib %{cfg.targetdir}"
-             }     
-             
+                 "{COPY} ../../../external/slang-binaries/bin/" .. targetName .. "/" .. sharedLibName .. " %{cfg.targetdir}"
+             }        
      end
  
      filter {"configurations:debug"}

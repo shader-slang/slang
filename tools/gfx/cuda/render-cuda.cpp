@@ -15,6 +15,7 @@
 #include "../mutable-shader-object.h"
 #include "../simple-transient-resource-heap.h"
 #include "../slang-context.h"
+#include "../command-encoder-com-forward.h"
 
 #   ifdef RENDER_TEST_OPTIX
 
@@ -964,67 +965,12 @@ public:
             *outEncoder = nullptr;
         }
 
-        class ComputeCommandEncoderImpl
-            : public IComputeCommandEncoder
-        {
-        public:
-            CommandWriter* m_writer;
-            CommandBufferImpl* m_commandBuffer;
-            RefPtr<ShaderObjectBase> m_rootObject;
-            virtual SLANG_NO_THROW void SLANG_MCALL endEncoding() override {}
-            void init(CommandBufferImpl* cmdBuffer)
-            {
-                m_writer = cmdBuffer;
-                m_commandBuffer = cmdBuffer;
-            }
-
-            virtual SLANG_NO_THROW Result SLANG_MCALL
-                bindPipeline(IPipelineState* state, IShaderObject** outRootObject) override
-            {
-                m_writer->setPipelineState(state);
-                PipelineStateBase* pipelineImpl = static_cast<PipelineStateBase*>(state);
-                SLANG_RETURN_ON_FAIL(m_commandBuffer->m_device->createRootShaderObject(
-                    pipelineImpl->m_program, m_rootObject.writeRef()));
-                returnComPtr(outRootObject, m_rootObject);
-                return SLANG_OK;
-            }
-
-            virtual SLANG_NO_THROW void SLANG_MCALL dispatchCompute(int x, int y, int z) override
-            {
-                m_writer->bindRootShaderObject(m_rootObject);
-                m_writer->dispatchCompute(x, y, z);
-            }
-
-            virtual SLANG_NO_THROW void SLANG_MCALL writeTimestamp(IQueryPool* pool, SlangInt index) override
-            {
-                m_writer->writeTimestamp(pool, index);
-            }
-
-            virtual SLANG_NO_THROW void SLANG_MCALL
-                dispatchComputeIndirect(IBufferResource* argBuffer, uint64_t offset) override
-            {
-                SLANG_UNIMPLEMENTED_X("dispatchComputeIndirect");
-            }
-        };
-
-        ComputeCommandEncoderImpl m_computeCommandEncoder;
-        virtual SLANG_NO_THROW void SLANG_MCALL
-            encodeComputeCommands(IComputeCommandEncoder** outEncoder) override
-        {
-            m_computeCommandEncoder.init(this);
-            *outEncoder = &m_computeCommandEncoder;
-        }
-
-        class ResourceCommandEncoderImpl
-            : public IResourceCommandEncoder
+        class ResourceCommandEncoderImpl : public IResourceCommandEncoder
         {
         public:
             CommandWriter* m_writer;
 
-            void init(CommandBufferImpl* cmdBuffer)
-            {
-                m_writer = cmdBuffer;
-            }
+            void init(CommandBufferImpl* cmdBuffer) { m_writer = cmdBuffer; }
 
             virtual SLANG_NO_THROW void SLANG_MCALL endEncoding() override {}
             virtual SLANG_NO_THROW void SLANG_MCALL copyBuffer(
@@ -1042,24 +988,23 @@ public:
                 ITextureResource* const* textures,
                 ResourceState src,
                 ResourceState dst) override
-            {
-            }
+            {}
 
             virtual SLANG_NO_THROW void SLANG_MCALL bufferBarrier(
                 size_t count,
                 IBufferResource* const* buffers,
                 ResourceState src,
                 ResourceState dst) override
-            {
-            }
+            {}
 
-            virtual SLANG_NO_THROW void SLANG_MCALL
-                uploadBufferData(IBufferResource* dst, size_t offset, size_t size, void* data) override
+            virtual SLANG_NO_THROW void SLANG_MCALL uploadBufferData(
+                IBufferResource* dst, size_t offset, size_t size, void* data) override
             {
                 m_writer->uploadBufferData(dst, offset, size, data);
             }
 
-            virtual SLANG_NO_THROW void SLANG_MCALL writeTimestamp(IQueryPool* pool, SlangInt index) override
+            virtual SLANG_NO_THROW void SLANG_MCALL
+                writeTimestamp(IQueryPool* pool, SlangInt index) override
             {
                 m_writer->writeTimestamp(pool, index);
             }
@@ -1180,6 +1125,13 @@ public:
                 SLANG_UNUSED(dst);
                 SLANG_UNIMPLEMENTED_X("textureSubresourceBarrier");
             }
+            virtual SLANG_NO_THROW void SLANG_MCALL
+                beginDebugEvent(const char* name, float rgbColor[3]) override
+            {
+                SLANG_UNUSED(name);
+                SLANG_UNUSED(rgbColor);
+            }
+            virtual SLANG_NO_THROW void SLANG_MCALL endDebugEvent() override {}
         };
 
         ResourceCommandEncoderImpl m_resourceCommandEncoder;
@@ -1189,6 +1141,55 @@ public:
         {
             m_resourceCommandEncoder.init(this);
             *outEncoder = &m_resourceCommandEncoder;
+        }
+
+        class ComputeCommandEncoderImpl
+            : public IComputeCommandEncoder
+            , public ResourceCommandEncoderImpl
+        {
+        public:
+            SLANG_GFX_FORWARD_RESOURCE_COMMAND_ENCODER_IMPL(ResourceCommandEncoderImpl)
+        public:
+            CommandWriter* m_writer;
+            CommandBufferImpl* m_commandBuffer;
+            RefPtr<ShaderObjectBase> m_rootObject;
+            virtual SLANG_NO_THROW void SLANG_MCALL endEncoding() override {}
+            void init(CommandBufferImpl* cmdBuffer)
+            {
+                m_writer = cmdBuffer;
+                m_commandBuffer = cmdBuffer;
+            }
+
+            virtual SLANG_NO_THROW Result SLANG_MCALL
+                bindPipeline(IPipelineState* state, IShaderObject** outRootObject) override
+            {
+                m_writer->setPipelineState(state);
+                PipelineStateBase* pipelineImpl = static_cast<PipelineStateBase*>(state);
+                SLANG_RETURN_ON_FAIL(m_commandBuffer->m_device->createRootShaderObject(
+                    pipelineImpl->m_program, m_rootObject.writeRef()));
+                returnComPtr(outRootObject, m_rootObject);
+                return SLANG_OK;
+            }
+
+            virtual SLANG_NO_THROW void SLANG_MCALL dispatchCompute(int x, int y, int z) override
+            {
+                m_writer->bindRootShaderObject(m_rootObject);
+                m_writer->dispatchCompute(x, y, z);
+            }
+
+            virtual SLANG_NO_THROW void SLANG_MCALL
+                dispatchComputeIndirect(IBufferResource* argBuffer, uint64_t offset) override
+            {
+                SLANG_UNIMPLEMENTED_X("dispatchComputeIndirect");
+            }
+        };
+
+        ComputeCommandEncoderImpl m_computeCommandEncoder;
+        virtual SLANG_NO_THROW void SLANG_MCALL
+            encodeComputeCommands(IComputeCommandEncoder** outEncoder) override
+        {
+            m_computeCommandEncoder.init(this);
+            *outEncoder = &m_computeCommandEncoder;
         }
 
         virtual SLANG_NO_THROW void SLANG_MCALL

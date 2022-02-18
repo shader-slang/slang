@@ -16,6 +16,7 @@
 #include "slang-ir-explicit-global-init.h"
 #include "slang-ir-glsl-legalize.h"
 #include "slang-ir-insts.h"
+#include "slang-ir-inline.h"
 #include "slang-ir-legalize-varying-params.h"
 #include "slang-ir-link.h"
 #include "slang-ir-lower-generics.h"
@@ -349,6 +350,10 @@ Result linkAndOptimizeIR(
 #endif
     validateIRModuleIfEnabled(compileRequest, irModule);
 
+    // Inline calls to any functions marked with [__unsafeInlineEarly] again,
+    // since we may be missing out cases prevented by the generic constructs
+    // that we just lowered out.
+    performMandatoryEarlyInlining(irModule);
 
     // Specialization can introduce dead code that could trip
     // up downstream passes like type legalization, so we
@@ -769,6 +774,7 @@ SlangResult emitEntryPointsSourceFromIR(
     CLikeSourceEmitter::Desc desc;
 
     desc.compileRequest = compileRequest;
+    desc.targetRequest = targetRequest;
     desc.target = target;
     // TODO(DG): Can't assume a single entry point stage for multiple entry points
     if (entryPointIndices.getCount() == 1)
