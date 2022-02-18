@@ -5948,7 +5948,15 @@ Result D3D12Device::_createDevice(DeviceCheckFlags deviceCheckFlags, const Unown
             {
                 infoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_ERROR, true);
             }
-            
+            D3D12_MESSAGE_ID hideMessages[] = {
+                D3D12_MESSAGE_ID_CLEARRENDERTARGETVIEW_MISMATCHINGCLEARVALUE,
+                D3D12_MESSAGE_ID_CLEARDEPTHSTENCILVIEW_MISMATCHINGCLEARVALUE,
+            };
+            D3D12_INFO_QUEUE_FILTER f = {};
+            f.DenyList.NumIDs = (UINT)SLANG_COUNT_OF(hideMessages);
+            f.DenyList.pIDList = hideMessages;
+            infoQueue->AddStorageFilterEntries(&f);
+
             // Apparently there is a problem with sm 6.3 with spurious errors, with debug layer enabled
             D3D12_FEATURE_DATA_SHADER_MODEL featureShaderModel;
             featureShaderModel.HighestShaderModel = D3D_SHADER_MODEL(0x63);
