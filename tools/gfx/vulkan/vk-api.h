@@ -169,6 +169,7 @@ namespace gfx {
 #if SLANG_WINDOWS_FAMILY
 #   define VK_API_DEVICE_PLATFORM_OPT_PROCS(x) \
     x(vkGetMemoryWin32HandleKHR) \
+    x(vkGetSemaphoreWin32HandleKHR) \
     /* */
 #else
 #   define VK_API_DEVICE_PLATFORM_OPT_PROCS(x) \

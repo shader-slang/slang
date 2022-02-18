@@ -4947,8 +4947,19 @@ public:
 
         virtual SLANG_NO_THROW Result SLANG_MCALL getSharedHandle(InteropHandle* outHandle) override
         {
-            outHandle->handleValue = 0;
-            return SLANG_FAIL;
+            // Check if a shared handle already exists.
+            if (sharedHandle.handleValue != 0)
+            {
+                *outHandle = sharedHandle;
+                return SLANG_OK;
+            }
+
+            ComPtr<ID3D12Device> devicePtr;
+            m_fence->GetDevice(IID_PPV_ARGS(devicePtr.writeRef()));
+            SLANG_RETURN_ON_FAIL(devicePtr->CreateSharedHandle(m_fence, NULL, GENERIC_ALL, nullptr, (HANDLE*)&outHandle->handleValue));
+            outHandle->api = InteropHandleAPI::D3D12;
+            sharedHandle = *outHandle;
+            return SLANG_OK;
         }
 
         virtual SLANG_NO_THROW Result SLANG_MCALL
