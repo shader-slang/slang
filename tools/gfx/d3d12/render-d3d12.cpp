@@ -3024,27 +3024,55 @@ public:
             return SLANG_OK;
         }
 
+        bool checkIfCachedDescriptorSetIsValidRecursive(BindingContext* context)
+        {
+            if (shouldAllocateConstantBuffer(context->transientHeap))
+                return false;
+            if (m_isMutable && m_version != m_cachedGPUDescriptorSetVersion)
+                return false;
+            if (m_cachedGPUDescriptorSet.resourceTable.getDescriptorCount() != 0 &&
+                m_cachedGPUDescriptorSet.resourceTable.m_heap.ptr.linearHeap->getHeap() !=
+                    m_cachedTransientHeap->getCurrentViewHeap().getHeap())
+                return false;
+            if (m_cachedGPUDescriptorSet.samplerTable.getDescriptorCount() != 0 &&
+                m_cachedGPUDescriptorSet.samplerTable.m_heap.ptr.linearHeap->getHeap() !=
+                    m_cachedTransientHeap->getCurrentSamplerHeap().getHeap())
+                return false;
+
+            auto& subObjectRanges = getLayout()->getSubObjectRanges();
+            for (Slang::Index subObjectRangeIndex = 0;
+                 subObjectRangeIndex < subObjectRanges.getCount();
+                 subObjectRangeIndex++)
+            {
+                auto const& subObjectRange = subObjectRanges[subObjectRangeIndex];
+                auto const& bindingRange =
+                    getLayout()->getBindingRange(subObjectRange.bindingRangeIndex);
+                if (bindingRange.bindingType != slang::BindingType::ParameterBlock)
+                    continue;
+                Slang::Index count = bindingRange.count;
+
+                for (Slang::Index subObjectIndexInRange = 0; subObjectIndexInRange < count;
+                     subObjectIndexInRange++)
+                {
+                    Slang::Index objectIndex = bindingRange.subObjectIndex + subObjectIndexInRange;
+                    auto subObject = m_objects[objectIndex].Ptr();
+                    if (!subObject)
+                        continue;
+                    if (subObject->checkIfCachedDescriptorSetIsValidRecursive(context))
+                        return false;
+                }
+            }
+            return true;
+        }
+
             /// Bind this object as a `ParameterBlock<X>`
         Result bindAsParameterBlock(
             BindingContext*         context,
             BindingOffset const&    offset,
             ShaderObjectLayoutImpl* specializedLayout)
         {
-            do
+            if (checkIfCachedDescriptorSetIsValidRecursive(context))
             {
-                if (shouldAllocateConstantBuffer(context->transientHeap))
-                    break;
-                if (m_isMutable && m_version != m_cachedGPUDescriptorSetVersion)
-                    break;
-                if (m_cachedGPUDescriptorSet.resourceTable.getDescriptorCount() != 0 &&
-                    m_cachedGPUDescriptorSet.resourceTable.m_heap.ptr.linearHeap->getHeap() !=
-                        m_cachedTransientHeap->getCurrentViewHeap().getHeap())
-                    break;
-                if (m_cachedGPUDescriptorSet.samplerTable.getDescriptorCount() != 0 &&
-                    m_cachedGPUDescriptorSet.samplerTable.m_heap.ptr.linearHeap->getHeap() !=
-                        m_cachedTransientHeap->getCurrentSamplerHeap().getHeap())
-                    break;
-
                 // If we already have a valid gpu descriptor table in the current
                 // heap, bind it.
                 auto rootParamIndex = offset.rootParam;
@@ -3052,18 +3080,16 @@ public:
                 {
                     auto tableRootParamIndex = rootParamIndex++;
                     context->submitter->setRootDescriptorTable(
-                        tableRootParamIndex,
-                        m_cachedGPUDescriptorSet.resourceTable.getGpuHandle());
+                        tableRootParamIndex, m_cachedGPUDescriptorSet.resourceTable.getGpuHandle());
                 }
                 if (m_cachedGPUDescriptorSet.samplerTable.getDescriptorCount())
                 {
                     auto tableRootParamIndex = rootParamIndex++;
                     context->submitter->setRootDescriptorTable(
-                        tableRootParamIndex,
-                        m_cachedGPUDescriptorSet.samplerTable.getGpuHandle());
+                        tableRootParamIndex, m_cachedGPUDescriptorSet.samplerTable.getGpuHandle());
                 }
                 return SLANG_OK;
-            } while (false);
+            }
 
             // The first step to binding an object as a parameter block is to allocate a descriptor
             // set (consisting of zero or one resource descriptor table and zero or one sampler
@@ -5214,7 +5240,6 @@ public:
                 waitInfo.fence = m_fence;
             }
             m_d3dQueue->Signal(m_fence, m_fenceValue);
-            ResetEvent(globalWaitHandle);
 
             if (fence)
             {
