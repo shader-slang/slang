@@ -3772,6 +3772,12 @@ public:
             m_cmdList->SetDescriptorHeaps(SLANG_COUNT_OF(heaps), heaps);
         }
 
+        void reinit()
+        {
+            bindDescriptorHeaps();
+            m_rootShaderObject.init(m_renderer);
+        }
+
         void init(
             D3D12Device* renderer,
             ID3D12GraphicsCommandList* d3dCommandList,
@@ -3781,8 +3787,7 @@ public:
             m_renderer = renderer;
             m_cmdList = d3dCommandList;
 
-            bindDescriptorHeaps();
-            m_rootShaderObject.init(renderer);
+            reinit();
 
 #if SLANG_GFX_HAS_DXR_SUPPORT
             m_cmdList->QueryInterface<ID3D12GraphicsCommandList4>(m_cmdList4.writeRef());
@@ -5491,7 +5496,7 @@ Result D3D12Device::TransientResourceHeapImpl::createCommandBuffer(ICommandBuffe
         auto result = static_cast<D3D12Device::CommandBufferImpl*>(
             m_commandBufferPool[m_commandListAllocId].Ptr());
         m_d3dCommandListPool[m_commandListAllocId]->Reset(m_commandAllocator, nullptr);
-        result->init(m_device, m_d3dCommandListPool[m_commandListAllocId], this);
+        result->reinit();
         ++m_commandListAllocId;
         returnComPtr(outCmdBuffer, result);
         return SLANG_OK;
