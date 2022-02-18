@@ -1511,7 +1511,23 @@ public:
                     switch(slangBindingType)
                     {
                     default:
-                        continue;
+                        {
+                            // We only treat buffers of interface types as actual sub-object binding range.
+                            auto bindingRangeTypeLayout =
+                                typeLayout->getBindingRangeLeafTypeLayout(bindingRangeIndex);
+                            if (!bindingRangeTypeLayout)
+                                continue;
+                            auto elementType =
+                                typeLayout->getBindingRangeLeafTypeLayout(bindingRangeIndex)
+                                    ->getElementTypeLayout();
+                            if (!elementType)
+                                continue;
+                            if (elementType->getKind() != slang::TypeReflection::Kind::Interface)
+                            {
+                                continue;
+                            }
+                        }
+                        break;
 
                     case slang::BindingType::ConstantBuffer:
                         {
@@ -1589,7 +1605,7 @@ public:
                     }
 
                     // Once we've computed the usage for each object in the range, we can
-                    // easily compute the rusage for the entire range.
+                    // easily compute the usage for the entire range.
                     //
                     auto rangeResourceCount     = count * objectCounts.resource;
                     auto rangeSamplerCount      = count * objectCounts.sampler;
@@ -3046,7 +3062,6 @@ public:
                         tableRootParamIndex,
                         m_cachedGPUDescriptorSet.samplerTable.getGpuHandle());
                 }
-                m_cachedGPUDescriptorSetVersion = m_version;
                 return SLANG_OK;
             } while (false);
 
@@ -3063,6 +3078,8 @@ public:
             //
             SLANG_RETURN_ON_FAIL(bindAsConstantBuffer(
                 context, m_cachedGPUDescriptorSet, subOffset, specializedLayout));
+
+            m_cachedGPUDescriptorSetVersion = m_version;
             return SLANG_OK;
         }
 
