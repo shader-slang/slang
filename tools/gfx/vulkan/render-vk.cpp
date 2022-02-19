@@ -412,8 +412,25 @@ public:
 
         virtual SLANG_NO_THROW Result SLANG_MCALL getSharedHandle(InteropHandle* outHandle) override
         {
-            outHandle->handleValue = 0;
-            return SLANG_FAIL;
+            // Check if a shared handle already exists.
+            if (sharedHandle.handleValue != 0)
+            {
+                *outHandle = sharedHandle;
+                return SLANG_OK;
+            }
+
+#if SLANG_WINDOWS_FAMILY
+            VkSemaphoreGetWin32HandleInfoKHR handleInfo = { VK_STRUCTURE_TYPE_SEMAPHORE_GET_WIN32_HANDLE_INFO_KHR };
+            handleInfo.pNext = nullptr;
+            handleInfo.semaphore = m_semaphore;
+            handleInfo.handleType = VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_WIN32_BIT;
+
+            SLANG_VK_RETURN_ON_FAIL(
+                m_device->m_api.vkGetSemaphoreWin32HandleKHR(m_device->m_api.m_device, &handleInfo, (HANDLE*)&outHandle->handleValue)
+            );
+#endif
+            sharedHandle.api = InteropHandleAPI::Vulkan;
+            return SLANG_OK;
         }
 
         virtual SLANG_NO_THROW Result SLANG_MCALL

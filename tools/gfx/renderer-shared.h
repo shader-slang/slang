@@ -192,6 +192,8 @@ class FenceBase : public IFence, public Slang::ComObject
 public:
     SLANG_COM_OBJECT_IUNKNOWN_ALL
     IFence* getInterface(const Slang::Guid& guid);
+protected:
+    InteropHandle sharedHandle = {};
 };
 
 class Resource : public Slang::ComObject
