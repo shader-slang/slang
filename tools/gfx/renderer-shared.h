@@ -1076,7 +1076,7 @@ class ShaderTableBase
     , public Slang::ComObject
 {
 public:
-    Slang::List<Slang::String> m_entryPointNames;
+    Slang::List<Slang::String> m_shaderGroupNames;
     Slang::List<ShaderRecordOverwrite> m_recordOverwrites;
 
     uint32_t m_rayGenShaderCount;
