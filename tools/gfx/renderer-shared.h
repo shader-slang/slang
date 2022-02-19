@@ -192,6 +192,8 @@ class FenceBase : public IFence, public Slang::ComObject
 public:
     SLANG_COM_OBJECT_IUNKNOWN_ALL
     IFence* getInterface(const Slang::Guid& guid);
+protected:
+    InteropHandle sharedHandle = {};
 };
 
 class Resource : public Slang::ComObject
@@ -1083,7 +1085,7 @@ class ShaderTableBase
     , public Slang::ComObject
 {
 public:
-    Slang::List<Slang::String> m_entryPointNames;
+    Slang::List<Slang::String> m_shaderGroupNames;
     Slang::List<ShaderRecordOverwrite> m_recordOverwrites;
 
     uint32_t m_rayGenShaderCount;

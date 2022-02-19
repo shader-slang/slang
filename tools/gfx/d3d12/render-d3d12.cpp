@@ -3687,7 +3687,7 @@ public:
                 copyShaderIdInto(
                     stagingBufferPtr + m_rayGenTableOffset +
                         D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES * i,
-                    m_entryPointNames[i],
+                    m_shaderGroupNames[i],
                     m_recordOverwrites[i]);
             }
             for (uint32_t i = 0; i < m_missShaderCount; i++)
@@ -3695,7 +3695,7 @@ public:
                 copyShaderIdInto(
                     stagingBufferPtr + m_missTableOffset +
                         D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES * i,
-                    m_entryPointNames[m_rayGenShaderCount + i],
+                    m_shaderGroupNames[m_rayGenShaderCount + i],
                     m_recordOverwrites[m_rayGenShaderCount + i]);
             }
             for (uint32_t i = 0; i < m_hitGroupCount; i++)
@@ -3703,7 +3703,7 @@ public:
                 copyShaderIdInto(
                     stagingBufferPtr + m_hitGroupTableOffset +
                         D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES * i,
-                    m_entryPointNames[m_rayGenShaderCount + m_missShaderCount + i],
+                    m_shaderGroupNames[m_rayGenShaderCount + m_missShaderCount + i],
                     m_recordOverwrites[m_rayGenShaderCount + m_missShaderCount + i]);
             }
 
@@ -5150,8 +5150,19 @@ public:
 
         virtual SLANG_NO_THROW Result SLANG_MCALL getSharedHandle(InteropHandle* outHandle) override
         {
-            outHandle->handleValue = 0;
-            return SLANG_FAIL;
+            // Check if a shared handle already exists.
+            if (sharedHandle.handleValue != 0)
+            {
+                *outHandle = sharedHandle;
+                return SLANG_OK;
+            }
+
+            ComPtr<ID3D12Device> devicePtr;
+            m_fence->GetDevice(IID_PPV_ARGS(devicePtr.writeRef()));
+            SLANG_RETURN_ON_FAIL(devicePtr->CreateSharedHandle(m_fence, NULL, GENERIC_ALL, nullptr, (HANDLE*)&outHandle->handleValue));
+            outHandle->api = InteropHandleAPI::D3D12;
+            sharedHandle = *outHandle;
+            return SLANG_OK;
         }
 
         virtual SLANG_NO_THROW Result SLANG_MCALL
