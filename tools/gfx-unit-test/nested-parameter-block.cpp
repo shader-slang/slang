@@ -128,9 +128,8 @@ namespace gfx_test
             auto commandBuffer = transientHeap->createCommandBuffer();
             auto encoder = commandBuffer->encodeComputeCommands();
 
-            auto rootObject = encoder->bindPipeline(pipelineState);
-            rootObject->copyFrom(shaderObject, transientHeap);
-
+            encoder->bindPipelineWithRootObject(pipelineState, shaderObject);
+            
             encoder->dispatchCompute(1, 1, 1);
             encoder->endEncoding();
             commandBuffer->close();

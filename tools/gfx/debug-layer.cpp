@@ -1063,6 +1063,13 @@ Result DebugComputeCommandEncoder::bindPipeline(
     return result;
 }
 
+Result DebugComputeCommandEncoder::bindPipelineWithRootObject(
+    IPipelineState* state, IShaderObject* rootObject)
+{
+    SLANG_GFX_API_FUNC;
+    return baseObject->bindPipelineWithRootObject(getInnerObj(state), getInnerObj(rootObject));
+}
+
 void DebugComputeCommandEncoder::dispatchCompute(int x, int y, int z)
 {
     SLANG_GFX_API_FUNC;
@@ -1096,6 +1103,13 @@ Result DebugRenderCommandEncoder::bindPipeline(
     commandBuffer->rootObject.baseObject.attach(innerRootObject);
     *outRootShaderObject = &commandBuffer->rootObject;
     return result;
+}
+
+Result DebugRenderCommandEncoder::bindPipelineWithRootObject(
+    IPipelineState* state, IShaderObject* rootObject)
+{
+    SLANG_GFX_API_FUNC;
+    return baseObject->bindPipelineWithRootObject(getInnerObj(state), getInnerObj(rootObject));
 }
 
 void DebugRenderCommandEncoder::setViewports(uint32_t count, const Viewport* viewports)
@@ -1485,6 +1499,13 @@ void DebugRayTracingCommandEncoder::bindPipeline(
     *outRootObject = &commandBuffer->rootObject;
 }
 
+Result DebugRayTracingCommandEncoder::bindPipelineWithRootObject(
+    IPipelineState* state, IShaderObject* rootObject)
+{
+    SLANG_GFX_API_FUNC;
+    return baseObject->bindPipelineWithRootObject(getInnerObj(state), getInnerObj(rootObject));
+}
+
 void DebugRayTracingCommandEncoder::dispatchRays(
     uint32_t rayGenShaderIndex,
     IShaderTable* shaderTable,
@@ -1765,12 +1786,6 @@ Result DebugShaderObject::getCurrentVersion(
     debugShaderObject->m_typeName = innerObject->getElementTypeLayout()->getName();
     returnComPtr(outObject, debugShaderObject);
     return SLANG_OK;
-}
-
-Result DebugShaderObject::copyFrom(IShaderObject* other, ITransientResourceHeap* transientHeap)
-{
-    SLANG_GFX_API_FUNC;
-    return baseObject->copyFrom(getInnerObj(other), getInnerObj(transientHeap));
 }
 
 const void* DebugShaderObject::getRawData()
