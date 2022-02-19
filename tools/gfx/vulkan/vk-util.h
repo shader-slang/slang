@@ -44,6 +44,9 @@ struct VulkanUtil
 
     static VkImageLayout getImageLayoutFromState(ResourceState state);
 
+    /// Calculate size taking into account alignment. Alignment must be a power of 2
+    static UInt calcAligned(UInt size, UInt alignment) { return (size + alignment - 1) & ~(alignment - 1); }
+
     static inline bool isDepthFormat(VkFormat format)
     {
         switch (format)

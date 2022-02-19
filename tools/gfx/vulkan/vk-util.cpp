@@ -140,6 +140,8 @@ VkShaderStageFlags VulkanUtil::getShaderStage(SlangStage stage)
         return VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT;
     case SLANG_STAGE_INTERSECTION:
         return VK_SHADER_STAGE_INTERSECTION_BIT_KHR;
+    case SLANG_STAGE_MISS:
+        return VK_SHADER_STAGE_MISS_BIT_KHR;
     case SLANG_STAGE_RAY_GENERATION:
         return VK_SHADER_STAGE_RAYGEN_BIT_KHR;
     case SLANG_STAGE_VERTEX:
