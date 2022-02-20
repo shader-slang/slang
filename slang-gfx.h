@@ -110,6 +110,8 @@ enum class AccessFlag
     Write,
 };
 
+const uint32_t kMaxRenderTargetCount = 8;
+
 class ITransientResourceHeap;
 
 class IShaderProgram: public ISlangUnknown
@@ -1238,7 +1240,7 @@ struct TargetBlendDesc
 
 struct BlendDesc
 {
-    TargetBlendDesc const*  targets     = nullptr;
+    TargetBlendDesc         targets[kMaxRenderTargetCount];
     UInt                    targetCount = 0;
 
     bool alphaToCoverageEnable  = false;

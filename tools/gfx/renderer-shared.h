@@ -902,6 +902,72 @@ enum class PipelineType
     CountOf,
 };
 
+struct OwnedHitGroupDesc
+{
+    Slang::String hitGroupName;
+    Slang::String closestHitEntryPoint;
+    Slang::String anyHitEntryPoint;
+    Slang::String intersectionEntryPoint;
+
+    void set(const HitGroupDesc& desc)
+    {
+        hitGroupName = desc.hitGroupName;
+        closestHitEntryPoint = desc.closestHitEntryPoint;
+        anyHitEntryPoint = desc.anyHitEntryPoint;
+        intersectionEntryPoint = desc.intersectionEntryPoint;
+    }
+
+    HitGroupDesc get()
+    {
+        HitGroupDesc desc;
+        desc.hitGroupName = hitGroupName.getBuffer();
+        desc.closestHitEntryPoint = closestHitEntryPoint.getBuffer();
+        desc.anyHitEntryPoint = anyHitEntryPoint.getBuffer();
+        desc.intersectionEntryPoint = intersectionEntryPoint.getBuffer();
+        return desc;
+    }
+};
+
+struct OwnedRayTracingPipelineStateDesc
+{
+    Slang::RefPtr<ShaderProgramBase> program;
+    Slang::List<OwnedHitGroupDesc> hitGroups;
+    Slang::List<HitGroupDesc> hitGroupDescs;
+    int maxRecursion = 0;
+    int maxRayPayloadSize = 0;
+    int maxAttributeSizeInBytes = 8;
+    RayTracingPipelineFlags::Enum flags = RayTracingPipelineFlags::None;
+
+    RayTracingPipelineStateDesc get()
+    {
+        RayTracingPipelineStateDesc desc;
+        desc.program = program.Ptr();
+        desc.hitGroupCount = (int32_t)hitGroupDescs.getCount();
+        desc.hitGroups = hitGroupDescs.getBuffer();
+        desc.maxRecursion = maxRecursion;
+        desc.maxRayPayloadSize = maxRayPayloadSize;
+        desc.maxAttributeSizeInBytes = maxAttributeSizeInBytes;
+        desc.flags = flags;
+        return desc;
+    }
+
+    void set(const RayTracingPipelineStateDesc& inDesc)
+    {
+        program = static_cast<ShaderProgramBase*>(inDesc.program);
+        for (int32_t i = 0; i < inDesc.hitGroupCount; i++)
+        {
+            OwnedHitGroupDesc ownedHitGroupDesc;
+            ownedHitGroupDesc.set(inDesc.hitGroups[i]);
+            hitGroups.add(ownedHitGroupDesc);
+            hitGroupDescs.add(ownedHitGroupDesc.get());
+        }
+        maxRecursion = inDesc.maxRecursion;
+        maxRayPayloadSize = inDesc.maxRayPayloadSize;
+        maxAttributeSizeInBytes = inDesc.maxAttributeSizeInBytes;
+        flags = inDesc.flags;
+    }
+};
+
 class PipelineStateBase
     : public IPipelineState
     , public Slang::ComObject
@@ -915,7 +981,7 @@ public:
         PipelineType type;
         GraphicsPipelineStateDesc graphics;
         ComputePipelineStateDesc compute;
-        RayTracingPipelineStateDesc rayTracing;
+        OwnedRayTracingPipelineStateDesc rayTracing;
         ShaderProgramBase* getProgram()
         {
             switch (type)
@@ -950,6 +1016,7 @@ public:
     }
 
     virtual SLANG_NO_THROW Result SLANG_MCALL getNativeHandle(InteropHandle* outHandle) override;
+    virtual Result ensureAPIPipelineStateCreated() { return SLANG_OK; };
 
 protected:
     void initializeBase(const PipelineStateDesc& inDesc);
@@ -1439,5 +1506,4 @@ Result ShaderObjectBaseImpl<TShaderObjectImpl, TShaderObjectLayoutImpl, TShaderO
     }
     return SLANG_OK;
 }
-
 }
