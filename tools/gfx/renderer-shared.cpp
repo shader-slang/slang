@@ -873,7 +873,7 @@ Result RendererBase::maybeSpecializePipeline(
             case PipelineType::Graphics:
             {
                 auto pipelineDesc = currentPipeline->desc.graphics;
-                pipelineDesc.program = specializedProgram;
+                pipelineDesc.program = static_cast<ShaderProgramBase*>(specializedProgram.get());
                 SLANG_RETURN_ON_FAIL(createGraphicsPipelineState(
                     pipelineDesc, specializedPipelineComPtr.writeRef()));
                 break;
@@ -881,9 +881,9 @@ Result RendererBase::maybeSpecializePipeline(
             case PipelineType::RayTracing:
             {
                 auto pipelineDesc = currentPipeline->desc.rayTracing;
-                pipelineDesc.program = specializedProgram;
+                pipelineDesc.program = static_cast<ShaderProgramBase*>(specializedProgram.get());
                 SLANG_RETURN_ON_FAIL(createRayTracingPipelineState(
-                    pipelineDesc, specializedPipelineComPtr.writeRef()));
+                    pipelineDesc.get(), specializedPipelineComPtr.writeRef()));
                 break;
             }
             default:

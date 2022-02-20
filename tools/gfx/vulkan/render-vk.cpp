@@ -1023,7 +1023,7 @@ public:
         {
             PipelineStateDesc pipelineDesc;
             pipelineDesc.type = PipelineType::RayTracing;
-            pipelineDesc.rayTracing = inDesc;
+            pipelineDesc.rayTracing.set(inDesc);
             initializeBase(pipelineDesc);
         }
 
