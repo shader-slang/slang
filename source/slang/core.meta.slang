@@ -63,25 +63,24 @@ syntax unorm : UNormModifier;
 ///
 syntax snorm : SNormModifier;
 
-/// Modifier to indicate that a function name should not be mangled
+/// Modifier to indicate that a declaration's name should not be mangled
 /// by the Slang compiler.
-///
-/// The `__unmangled` modifier should only be valid on functions
-/// and is mainly useful for the experimental heterogeneous
-/// features of Slang.
 ///
 syntax __unmangled : UnmangledModifier;
 
-/// Modifier to indicate that a function name should be exported
-/// directly. Used in tandem with `__unmangled` in heterogeneous
-/// features of Slang.
+/// Modifier to indicate that a declaration's name should be exported
+/// directly. When being emitted, the mangled name is used directly
+/// and any Slang specific suffixes and prefixes are avoided.
 ///
-syntax __exportDirectly : __exportDirectly;
-
-/// Modifier to indicate that a struct is defined externally and
-/// should therefore not be exported by Slang.
+/// TODO: This currently contains a bad hack for passing through
+///       namespaces that relies on name hints. Potentially can be
+///       relegated to another existing decoration (intrinsic)
+/// TODO: The behavior that this modifier implies should technically
+///       be the default, whereas the current compiler behavior of
+///       generating unique names for most things should be
+///       considered a bit of a bug.
 ///
-syntax __externLib : __externLib;
+syntax __exportDirectly : ExportDirectlyModifier;
 
 /// A type that can be used as an operand for builtins
 [sealed]

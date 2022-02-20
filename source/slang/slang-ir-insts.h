@@ -269,8 +269,7 @@ IR_SIMPLE_DECORATION(PublicDecoration)
 IR_SIMPLE_DECORATION(KeepAliveDecoration)
 IR_SIMPLE_DECORATION(RequiresNVAPIDecoration)
 IR_SIMPLE_DECORATION(NoInlineDecoration)
-IR_SIMPLE_DECORATION(__exportDirectly)
-IR_SIMPLE_DECORATION(__externLib)
+IR_SIMPLE_DECORATION(ExportDirectlyDecoration)
 
 struct IRNVAPIMagicDecoration : IRDecoration
 {
@@ -2869,12 +2868,7 @@ public:
 
     void addExportDirectlyDecoration(IRInst* value)
     {
-        addDecoration(value, kIROp___exportDirectly);
-    }
-
-    void addExternLibDecoration(IRInst* value)
-    {
-        addDecoration(value, kIROp___externLib);
+        addDecoration(value, kIROp_ExportDirectlyDecoration);
     }
 };
 

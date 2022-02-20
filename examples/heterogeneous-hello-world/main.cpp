@@ -44,7 +44,7 @@ void diagnoseIfNeeded(slang::IBlob *diagnosticsBlob)
     }
 }
 
-gfx::IDevice *createDevice()
+gfx::IDevice* createDevice()
 {
     ComPtr<gfx::IDevice> device;
     IDevice::Desc deviceDesc = {};
@@ -56,7 +56,7 @@ gfx::IDevice *createDevice()
 
 // Loads the shader code defined in `shader.slang` for use by the `gfx` layer.
 //
-gfx::IShaderProgram *loadShaderProgram(gfx::IDevice *device, char* entryPoint, char* moduleName)
+gfx::IShaderProgram* loadShaderProgram(gfx::IDevice *device, char* entryPoint, char* moduleName)
 {
     // We need to obtain a compilation session (`slang::ISession`) that will provide
     // a scope to all the compilation and loading of code we do.
@@ -82,9 +82,6 @@ gfx::IShaderProgram *loadShaderProgram(gfx::IDevice *device, char* entryPoint, c
     if (!module)
         return NULL;
 
-    // Look up entry point
-    //
-    // char const *computeEntryPointName = entryPoint.getBuffer();
     ComPtr<slang::IEntryPoint> computeEntryPoint;
     SLANG_RETURN_NULL_ON_FAIL(
         module->findEntryPointByName(entryPoint, computeEntryPoint.writeRef()));
@@ -126,7 +123,7 @@ gfx::IShaderProgram *loadShaderProgram(gfx::IDevice *device, char* entryPoint, c
     // We can create a `gfx::IShaderProgram` object from `composedProgram`
     // so it may be used by the graphics layer.
     gfx::IShaderProgram::Desc programDesc = {};
-    programDesc.slangProgram = composedProgram.get();
+    programDesc.slangGlobalScope = composedProgram.get();
 
     gProgram = device->createProgram(programDesc);
 
@@ -158,20 +155,20 @@ gfx::IBufferResource* createStructuredBuffer(gfx::IDevice* device, FixedArray<fl
     return gBufferResource;
 }
 
-gfx::IResourceView *createBufferView(
-    gfx::IDevice *device,
-    gfx::IBufferResource *buffer)
+gfx::IResourceView* createBufferView(
+    gfx::IDevice* device,
+    gfx::IBufferResource* buffer)
 {
     // Create a resource view for the structured buffer
     //
     gfx::IResourceView::Desc viewDesc = {};
     viewDesc.type = gfx::IResourceView::Type::UnorderedAccess;
     viewDesc.format = gfx::Format::Unknown;
-    SLANG_RETURN_NULL_ON_FAIL(device->createBufferView(buffer, viewDesc, gResourceView.writeRef()));
+    SLANG_RETURN_NULL_ON_FAIL(device->createBufferView(buffer, nullptr, viewDesc, gResourceView.writeRef()));
     return gResourceView;
 }
 
-gfx::ITransientResourceHeap *buildTransientHeap(gfx::IDevice *device)
+gfx::ITransientResourceHeap* buildTransientHeap(gfx::IDevice* device)
 {
     ITransientResourceHeap::Desc transientHeapDesc = {};
     transientHeapDesc.constantBufferSize = 4096;
@@ -180,9 +177,9 @@ gfx::ITransientResourceHeap *buildTransientHeap(gfx::IDevice *device)
     return gTransientHeap;
 }
 
-gfx::IPipelineState *buildPipelineState(
-    gfx::IDevice *device,
-    gfx::IShaderProgram *shaderProgram)
+gfx::IPipelineState* buildPipelineState(
+    gfx::IDevice* device,
+    gfx::IShaderProgram* shaderProgram)
 {
     gfx::ComputePipelineStateDesc pipelineDesc = {};
     pipelineDesc.program = shaderProgram;
@@ -202,10 +199,10 @@ void printInitialValues(FixedArray<float, 4> initialArray, int length)
 }
 
 void dispatchComputation(
-    gfx::IDevice *device,
-    gfx::ITransientResourceHeap *transientHeap,
-    gfx::IPipelineState *pipelineState,
-    gfx::IResourceView *bufferView,
+    gfx::IDevice* device,
+    gfx::ITransientResourceHeap* transientHeap,
+    gfx::IPipelineState* pipelineState,
+    gfx::IResourceView* bufferView,
     unsigned int gridDimsX,
     unsigned int gridDimsY,
     unsigned int gridDimsZ)
@@ -232,8 +229,8 @@ void dispatchComputation(
 }
 
 bool printOutputValues(
-    gfx::IDevice *device,
-    gfx::IBufferResource *buffer,
+    gfx::IDevice* device,
+    gfx::IBufferResource* buffer,
     int length)
 {
     ComPtr<ISlangBlob> resultBlob;
@@ -255,7 +252,7 @@ RWStructuredBuffer<float> convertBuffer(gfx::IBufferResource* _0) {
     return result;
 }
 
-gfx::IBufferResource *unconvertBuffer(RWStructuredBuffer<float> _0)
+gfx::IBufferResource* unconvertBuffer(RWStructuredBuffer<float> _0)
 {
     return (gfx::IBufferResource *)(_0.data);
 }

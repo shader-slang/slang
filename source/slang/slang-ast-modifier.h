@@ -29,8 +29,7 @@ class ExportedModifier : public Modifier { SLANG_AST_CLASS(ExportedModifier)};
 class ConstExprModifier : public Modifier { SLANG_AST_CLASS(ConstExprModifier)};
 class GloballyCoherentModifier : public Modifier { SLANG_AST_CLASS(GloballyCoherentModifier)};
 class UnmangledModifier : public Modifier { SLANG_AST_CLASS(UnmangledModifier)};
-class __exportDirectly : public Modifier { SLANG_AST_CLASS(__exportDirectly)};
-class __externLib : public Modifier { SLANG_AST_CLASS(__externLib)};
+class ExportDirectlyModifier : public Modifier { SLANG_AST_CLASS(ExportDirectlyModifier)};
 
     /// A modifier that indicates an `InheritanceDecl` should be ignored during name lookup (and related checks).
 class IgnoreForLookupModifier : public Modifier { SLANG_AST_CLASS(IgnoreForLookupModifier) };

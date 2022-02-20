@@ -18,14 +18,23 @@ void computeMain(uniform RWStructuredBuffer<float> ioBuffer, uint3 dispatchThrea
 
 
 // Forward declarations of gfx types
+// TODO:
+// The last 4 types don't actually need __target_intrinsic because they are not used in this slang file, 
+// therefore they are by default not emitted (although ideally they should have the label and it should just work).
+//
+// Instead, they're used in the generated computeMain_wrapper, which forces them to be declared at the same time as
+// computeMain_wrapper is emitted.
+//
+// Something else worth noting is that __target_intrinsic(cpp) would output the struct type as name rather than
+// gfx::name, being able to output gfx::name without needing to write it all out would be a nice goal.
 //
 namespace gfx {
-    __externLib __exportDirectly struct IDevice{};
-    __externLib __exportDirectly struct IBufferResource{};
-    __exportDirectly struct ITransientResourceHeap{};
-    __exportDirectly struct IPipelineState{};
-    __exportDirectly struct IShaderProgram{};
-    __exportDirectly struct IResourceView{};
+    __target_intrinsic(cpp, "gfx::IDevice") struct IDevice{};
+    __target_intrinsic(cpp, "gfx::IBufferResource") struct IBufferResource{};
+    __target_intrinsic(cpp, "gfx::ITransientResourceHeap") struct ITransientResourceHeap{};
+    __target_intrinsic(cpp, "gfx::IPipelineState") struct IPipelineState{};
+    __target_intrinsic(cpp, "gfx::IShaderProgram") struct IShaderProgram{};
+    __target_intrinsic(cpp, "gfx::IResourceView") struct IResourceView{};
 }
 
 // Forward declarations of cpp functions
