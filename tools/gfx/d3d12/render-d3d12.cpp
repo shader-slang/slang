@@ -2778,7 +2778,7 @@ public:
 
             SLANG_ASSERT(srcSize <= destSize);
 
-            _uploadBufferData(encoder->m_device, encoder->m_d3dCmdList, encoder->m_transientHeap, buffer, offset, srcSize, src, false);
+            _uploadBufferData(encoder->m_device, encoder->m_d3dCmdList, encoder->m_transientHeap, buffer, offset, srcSize, src);
 
             // In the case where this object has any sub-objects of
             // existential/interface type, we need to recurse on those objects
