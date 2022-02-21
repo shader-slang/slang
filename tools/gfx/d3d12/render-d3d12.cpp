@@ -556,6 +556,7 @@ public:
             m_fence->SetEventOnCompletion(m_eventValue, m_waitEvent);
             m_commandQueue->Signal(m_fence, m_eventValue);
             WaitForSingleObject(m_waitEvent, INFINITE);
+            m_commandAllocator->Reset();
 
             int8_t* mappedData = nullptr;
             D3D12_RANGE readRange = { sizeof(uint64_t) * queryIndex, sizeof(uint64_t) * (queryIndex + count) };
@@ -881,22 +882,6 @@ public:
             allocateNewViewDescriptorHeap(device);
             allocateNewSamplerDescriptorHeap(device);
 
-            if (desc.constantBufferSize != 0)
-            {
-                ComPtr<IBufferResource> bufferResourcePtr;
-                IBufferResource::Desc bufferDesc;
-                bufferDesc.type = IResource::Type::Buffer;
-                bufferDesc.defaultState = ResourceState::ConstantBuffer;
-                bufferDesc.allowedStates =
-                    ResourceStateSet(ResourceState::ConstantBuffer, ResourceState::CopyDestination);
-                bufferDesc.sizeInBytes = desc.constantBufferSize;
-                bufferDesc.memoryType = MemoryType::Upload;
-                SLANG_RETURN_ON_FAIL(device->createBufferResource(
-                    bufferDesc,
-                    nullptr,
-                    bufferResourcePtr.writeRef()));
-                m_constantBuffers.add(static_cast<BufferResourceImpl*>(bufferResourcePtr.get()));
-            }
             return SLANG_OK;
         }
 
@@ -957,15 +942,12 @@ public:
         size_t size,
         void* data)
     {
-        D3D12_RANGE readRange = {};
-        readRange.Begin = offset;
-        readRange.End = offset + size;
-
-
         IBufferResource* uploadResource;
+        size_t uploadResourceOffset = 0;
         if (buffer->getDesc()->memoryType != MemoryType::Upload)
         {
-            transientHeap->allocateStagingBuffer(size, uploadResource, ResourceState::General);
+            SLANG_RETURN_ON_FAIL(transientHeap->allocateStagingBuffer(
+                size, uploadResource, uploadResourceOffset, MemoryType::Upload));
         }
 
         D3D12Resource& uploadResourceRef =
@@ -973,32 +955,26 @@ public:
                 ? buffer->m_resource
                 : static_cast<BufferResourceImpl*>(uploadResource)->m_resource;
 
+        D3D12_RANGE readRange = {};
+        readRange.Begin = 0;
+        readRange.End = 0;
         void* uploadData;
         SLANG_RETURN_ON_FAIL(uploadResourceRef.getResource()->Map(
             0, &readRange, reinterpret_cast<void**>(&uploadData)));
-        memcpy((uint8_t*)uploadData + offset, data, size);
-        uploadResourceRef.getResource()->Unmap(0, &readRange);
+        memcpy((uint8_t*)uploadData + uploadResourceOffset + offset, data, size);
+        D3D12_RANGE writtenRange = {};
+        writtenRange.Begin = uploadResourceOffset + offset;
+        writtenRange.End = uploadResourceOffset + offset + size;
+        uploadResourceRef.getResource()->Unmap(0, &writtenRange);
 
         if (buffer->getDesc()->memoryType != MemoryType::Upload)
         {
-            {
-                D3D12BarrierSubmitter submitter(cmdList);
-                submitter.transition(
-                    buffer->m_resource, buffer->m_defaultState, D3D12_RESOURCE_STATE_COPY_DEST);
-            }
             cmdList->CopyBufferRegion(
                 buffer->m_resource.getResource(),
                 offset,
                 uploadResourceRef.getResource(),
-                offset,
+                uploadResourceOffset + offset,
                 size);
-
-            // Should already be in COPY_DEST if write flag was set.
-            {
-                D3D12BarrierSubmitter submitter(cmdList);
-                submitter.transition(
-                    buffer->m_resource, D3D12_RESOURCE_STATE_COPY_DEST, buffer->m_defaultState);
-            }
         }
 
         return SLANG_OK;
@@ -2802,7 +2778,7 @@ public:
 
             SLANG_ASSERT(srcSize <= destSize);
 
-            _uploadBufferData(encoder->m_device, encoder->m_d3dCmdList, encoder->m_transientHeap, buffer, offset, srcSize, src);
+            _uploadBufferData(encoder->m_device, encoder->m_d3dCmdList, encoder->m_transientHeap, buffer, offset, srcSize, src, false);
 
             // In the case where this object has any sub-objects of
             // existential/interface type, we need to recurse on those objects
@@ -3725,8 +3701,9 @@ public:
                 static_cast<TransientResourceHeapImpl*>(transientHeap);
 
             IBufferResource* stagingBuffer = nullptr;
+            size_t stagingBufferOffset = 0;
             transientHeapImpl->allocateStagingBuffer(
-                tableSize, stagingBuffer, ResourceState::General);
+                tableSize, stagingBuffer, stagingBufferOffset, MemoryType::Upload);
 
             assert(stagingBuffer);
             void* stagingPtr = nullptr;
@@ -3749,7 +3726,7 @@ public:
                 }
             };
 
-            uint8_t* stagingBufferPtr = (uint8_t*)stagingPtr;
+            uint8_t* stagingBufferPtr = (uint8_t*)stagingPtr + stagingBufferOffset;
             for (uint32_t i = 0; i < m_rayGenShaderCount; i++)
             {
                 copyShaderIdInto(
@@ -3776,7 +3753,7 @@ public:
             }
 
             stagingBuffer->unmap(nullptr);
-            encoder->copyBuffer(bufferResource, 0, stagingBuffer, 0, tableSize);
+            encoder->copyBuffer(bufferResource, 0, stagingBuffer, stagingBufferOffset, tableSize);
             encoder->bufferBarrier(
                 1,
                 bufferResource.readRef(),
@@ -4119,7 +4096,6 @@ public:
                     D3D12_TEXTURE_COPY_LOCATION srcRegion = {};
                     srcRegion.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
                     D3D12_PLACED_SUBRESOURCE_FOOTPRINT& footprint = srcRegion.PlacedFootprint;
-
                     footprint.Offset = 0;
                     footprint.Footprint.Format = texDesc.Format;
                     uint32_t mipLevel = D3DUtil::getSubresourceMipLevel(
@@ -4162,9 +4138,10 @@ public:
                         footprint.Footprint.RowPitch * rowCount * footprint.Footprint.Depth;
 
                     IBufferResource* stagingBuffer;
+                    size_t stagingBufferOffset = 0;
                     m_commandBuffer->m_transientHeap->allocateStagingBuffer(
-                        bufferSize, stagingBuffer, ResourceState::General);
-
+                        bufferSize, stagingBuffer, stagingBufferOffset, MemoryType::Upload, true);
+                    assert(stagingBufferOffset == 0);
                     BufferResourceImpl* bufferImpl =
                         static_cast<BufferResourceImpl*>(stagingBuffer);
                     uint8_t* bufferData = nullptr;
@@ -4185,9 +4162,7 @@ public:
                         }
                     }
                     bufferImpl->m_resource.getResource()->Unmap(0, nullptr);
-
                     srcRegion.pResource = bufferImpl->m_resource.getResource();
-
                     m_commandBuffer->m_cmdList->CopyTextureRegion(
                         &dstRegion, offset.x, offset.y, offset.z, &srcRegion, nullptr);
                 }
@@ -5438,10 +5413,11 @@ public:
         }
         virtual SLANG_NO_THROW Result SLANG_MCALL present() override
         {
+            m_fence->SetEventOnCompletion(fenceValue, m_frameEvents[m_swapChain3->GetCurrentBackBufferIndex()]);
             SLANG_RETURN_ON_FAIL(D3DSwapchainBase::present());
             fenceValue++;
-            m_fence->SetEventOnCompletion(fenceValue, m_frameEvents[m_swapChain3->GetCurrentBackBufferIndex()]);
             m_queue->Signal(m_fence, fenceValue);
+
             return SLANG_OK;
         }
     };
@@ -5842,7 +5818,7 @@ static void _initSrvDesc(
 
 Result D3D12Device::createBuffer(const D3D12_RESOURCE_DESC& resourceDesc, const void* srcData, size_t srcDataSize, D3D12_RESOURCE_STATES finalState, D3D12Resource& resourceOut, bool isShared, MemoryType memoryType)
 {
-   const  size_t bufferSize = size_t(resourceDesc.Width);
+   const size_t bufferSize = size_t(resourceDesc.Width);
 
    D3D12_HEAP_PROPERTIES heapProps;
    heapProps.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
@@ -6982,16 +6958,10 @@ Result D3D12Device::createBufferResource(const IBufferResource::Desc& descIn, co
 {
     BufferResource::Desc srcDesc = fixupBufferDesc(descIn);
 
-    // Always align up to 256 bytes, since that is required for constant buffers.
-    //
-    // TODO: only do this for buffers that could potentially be bound as constant buffers...
-    //
-    const size_t alignedSizeInBytes = D3DUtil::calcAligned(srcDesc.sizeInBytes, 256);
-
     RefPtr<BufferResourceImpl> buffer(new BufferResourceImpl(srcDesc));
 
     D3D12_RESOURCE_DESC bufferDesc;
-    _initBufferResourceDesc(alignedSizeInBytes, bufferDesc);
+    _initBufferResourceDesc(descIn.sizeInBytes, bufferDesc);
 
     bufferDesc.Flags |= _calcResourceFlags(srcDesc.allowedStates);
 
