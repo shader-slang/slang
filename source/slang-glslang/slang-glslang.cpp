@@ -619,6 +619,19 @@ static int glslang_compileGLSLToSPIRV(const glslang_CompileRequest_1_1& request)
         }
     }
 
+    // Options for compilation of glsl to Spv
+
+    // spvOptions ctors with default options (this it the same as passing nullptr to GlslangToSpv)
+    glslang::SpvOptions spvOptions;
+
+    const SlangDebugInfoLevel debugLevel = (SlangDebugInfoLevel)request.debugInfoType;
+
+    // Enable generation of debug info, if any debug level other than none is requested
+    if (debugLevel != SLANG_DEBUG_INFO_LEVEL_NONE)
+    {
+        spvOptions.generateDebugInfo = true;
+    }
+
     for(int stage = 0; stage < EShLangCount; ++stage)
     {
         auto stageIntermediate = program->getIntermediate((EShLanguage)stage);
@@ -628,7 +641,7 @@ static int glslang_compileGLSLToSPIRV(const glslang_CompileRequest_1_1& request)
         std::vector<unsigned int> spirv;
         spv::SpvBuildLogger logger;
 
-        glslang::GlslangToSpv(*stageIntermediate, spirv, &logger);
+        glslang::GlslangToSpv(*stageIntermediate, spirv, &logger, &spvOptions);
 
         int optErrorCount = 0;
 
