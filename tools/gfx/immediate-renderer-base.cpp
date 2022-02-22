@@ -38,10 +38,12 @@ public:
     bool m_hasWriteTimestamps = false;
     RefPtr<ImmediateRendererBase> m_renderer;
     RefPtr<ShaderObjectBase> m_rootShaderObject;
+    TransientResourceHeapBase* m_transientHeap;
 
-    void init(ImmediateRendererBase* renderer)
+    void init(ImmediateRendererBase* renderer, TransientResourceHeapBase* transientHeap)
     {
         m_renderer = renderer;
+        m_transientHeap = transientHeap;
     }
 
     void reset()
@@ -289,6 +291,17 @@ public:
             return SLANG_OK;
         }
 
+        virtual SLANG_NO_THROW Result SLANG_MCALL
+            bindPipelineWithRootObject(IPipelineState* state, IShaderObject* rootObject) override
+        {
+            m_writer->setPipelineState(state);
+            auto stateImpl = static_cast<PipelineStateBase*>(state);
+            SLANG_RETURN_ON_FAIL(m_commandBuffer->m_renderer->createRootShaderObject(
+                stateImpl->m_program, m_commandBuffer->m_rootShaderObject.writeRef()));
+            m_commandBuffer->m_rootShaderObject->copyFrom(rootObject, m_commandBuffer->m_transientHeap);
+            return SLANG_OK;
+        }
+
         virtual SLANG_NO_THROW void SLANG_MCALL
             setViewports(uint32_t count, const Viewport* viewports) override
         {
@@ -432,6 +445,18 @@ public:
             SLANG_RETURN_ON_FAIL(m_commandBuffer->m_renderer->createRootShaderObject(
                 stateImpl->m_program, m_commandBuffer->m_rootShaderObject.writeRef()));
             *outRootObject = m_commandBuffer->m_rootShaderObject.Ptr();
+            return SLANG_OK;
+        }
+
+        virtual SLANG_NO_THROW Result SLANG_MCALL
+            bindPipelineWithRootObject(IPipelineState* state, IShaderObject* rootObject) override
+        {
+            m_writer->setPipelineState(state);
+            auto stateImpl = static_cast<PipelineStateBase*>(state);
+            SLANG_RETURN_ON_FAIL(m_commandBuffer->m_renderer->createRootShaderObject(
+                stateImpl->m_program, m_commandBuffer->m_rootShaderObject.writeRef()));
+            m_commandBuffer->m_rootShaderObject->copyFrom(
+                rootObject, m_commandBuffer->m_transientHeap);
             return SLANG_OK;
         }
 

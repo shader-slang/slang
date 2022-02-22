@@ -305,8 +305,6 @@ public:
 
     virtual SLANG_NO_THROW Result SLANG_MCALL getCurrentVersion(
         ITransientResourceHeap* transientHeap, IShaderObject** outObject) override;
-    virtual SLANG_NO_THROW Result SLANG_MCALL
-        copyFrom(IShaderObject* other, ITransientResourceHeap* transientHeap) override;
     virtual SLANG_NO_THROW const void* SLANG_MCALL getRawData() override;
     virtual SLANG_NO_THROW size_t SLANG_MCALL getSize() override;
     virtual SLANG_NO_THROW Result SLANG_MCALL
@@ -437,6 +435,8 @@ public:
     virtual SLANG_NO_THROW void SLANG_MCALL endEncoding() override;
     virtual SLANG_NO_THROW Result SLANG_MCALL
         bindPipeline(IPipelineState* state, IShaderObject** outRootShaderObject) override;
+    virtual SLANG_NO_THROW Result SLANG_MCALL
+        bindPipelineWithRootObject(IPipelineState* state, IShaderObject* rootObject) override;
     virtual SLANG_NO_THROW void SLANG_MCALL dispatchCompute(int x, int y, int z) override;
     virtual SLANG_NO_THROW void SLANG_MCALL
         dispatchComputeIndirect(IBufferResource* cmdBuffer, uint64_t offset) override;
@@ -482,6 +482,8 @@ public:
     virtual SLANG_NO_THROW void SLANG_MCALL endEncoding() override;
     virtual SLANG_NO_THROW Result SLANG_MCALL
         bindPipeline(IPipelineState* state, IShaderObject** outRootShaderObject) override;
+    virtual SLANG_NO_THROW Result SLANG_MCALL
+        bindPipelineWithRootObject(IPipelineState* state, IShaderObject* rootObject) override;
     virtual SLANG_NO_THROW void SLANG_MCALL
         setViewports(uint32_t count, const Viewport* viewports) override;
     virtual SLANG_NO_THROW void SLANG_MCALL
@@ -566,6 +568,8 @@ public:
         DeviceAddress source) override;
     virtual SLANG_NO_THROW void SLANG_MCALL
         bindPipeline(IPipelineState* state, IShaderObject** outRootObject) override;
+    virtual SLANG_NO_THROW Result SLANG_MCALL
+        bindPipelineWithRootObject(IPipelineState* state, IShaderObject* rootObject) override;
     virtual SLANG_NO_THROW void SLANG_MCALL dispatchRays(
         uint32_t rayGenShaderIndex,
         IShaderTable* shaderTable,

@@ -77,8 +77,7 @@ namespace gfx_test
             auto commandBuffer = transientHeap->createCommandBuffer();
             {
                 auto encoder = commandBuffer->encodeComputeCommands();
-                auto root = encoder->bindPipeline(pipelineState);
-                root->copyFrom(rootObject, transientHeap);
+                encoder->bindPipelineWithRootObject(pipelineState, rootObject);
                 encoder->dispatchCompute(1, 1, 1);
                 encoder->endEncoding();
             }
@@ -92,8 +91,7 @@ namespace gfx_test
             ShaderCursor(transformer).getPath("c").setData(&c, sizeof(float));
             {
                 auto encoder = commandBuffer->encodeComputeCommands();
-                auto root = encoder->bindPipeline(pipelineState);
-                root->copyFrom(rootObject, transientHeap);
+                encoder->bindPipelineWithRootObject(pipelineState, rootObject);
                 encoder->dispatchCompute(1, 1, 1);
                 encoder->endEncoding();
             }
@@ -114,8 +112,8 @@ namespace gfx_test
         runTestImpl(mutableRootShaderObjectTestImpl, unitTestContext, Slang::RenderApiFlag::D3D12);
     }
 
-    SLANG_UNIT_TEST(mutableRootShaderObjectVulkan)
+    /*SLANG_UNIT_TEST(mutableRootShaderObjectVulkan)
     {
         runTestImpl(mutableRootShaderObjectTestImpl, unitTestContext, Slang::RenderApiFlag::Vulkan);
-    }
+    }*/
 }

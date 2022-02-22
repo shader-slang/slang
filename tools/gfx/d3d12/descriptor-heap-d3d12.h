@@ -5,9 +5,9 @@
 #include <d3d12.h>
 
 #include "slang-com-ptr.h"
-#include "core/slang-smart-pointer.h"
-#include "core/slang-list.h"
 #include "core/slang-virtual-object-pool.h"
+#include "core/slang-short-list.h"
+#include "core/slang-basic.h"
 
 namespace gfx {
 
@@ -273,17 +273,85 @@ public:
     }
 };
 
+class D3D12LinearExpandingDescriptorHeap : public Slang::RefObject
+{
+    ID3D12Device* m_device;
+    D3D12_DESCRIPTOR_HEAP_TYPE m_type;
+    D3D12_DESCRIPTOR_HEAP_FLAGS m_flag;
+    int m_chunkSize;
+    Slang::ShortList<D3D12DescriptorHeap, 4> m_subHeaps;
+    int32_t m_subHeapIndex;
+
+public:
+    Slang::Result newSubHeap()
+    {
+        m_subHeapIndex++;
+        if (m_subHeapIndex <= m_subHeaps.getCount())
+        {
+            D3D12DescriptorHeap subHeap;
+            SLANG_RETURN_ON_FAIL(subHeap.init(m_device, m_chunkSize, m_type, m_flag));
+            m_subHeaps.add(Slang::_Move(subHeap));
+        }
+        return SLANG_OK;
+    }
+
+    Slang::Result init(
+        ID3D12Device* device,
+        int chunkSize,
+        D3D12_DESCRIPTOR_HEAP_TYPE type,
+        D3D12_DESCRIPTOR_HEAP_FLAGS flag)
+    {
+        m_device = device;
+        m_chunkSize = chunkSize;
+        m_type = type;
+        m_flag = flag;
+        m_subHeapIndex = -1;
+        return newSubHeap();
+    }
+
+    int allocate(int count)
+    {
+        auto result = m_subHeaps[m_subHeapIndex].allocate(count);
+        if (result == -1)
+        {
+            newSubHeap();
+            return allocate(count);
+        }
+        assert(result <= 0xFFFFFF);
+        assert(m_subHeapIndex <= 255);
+        return (m_subHeapIndex << 24) + result;
+    }
+
+    SLANG_FORCE_INLINE D3D12_CPU_DESCRIPTOR_HANDLE getCpuHandle(int index) const
+    {
+        auto subHeapIndex = ((uint32_t)(index >> 24) & 0xFF);
+        return m_subHeaps[subHeapIndex].getCpuHandle(index & 0xFFFFFF);
+    }
+
+    void free(int index, int count) { assert(0 && "not supported"); }
+
+    void free(D3D12Descriptor descriptor) { assert(0 && "not supported"); }
+
+    void freeAll()
+    {
+        for (auto& subHeap : m_subHeaps)
+            subHeap.deallocateAll();
+        m_subHeapIndex = 0;
+    }
+};
+
 struct DescriptorHeapReference
 {
     enum class Type
     {
-        Linear, General, ExpandingGeneral
+        Linear, General, ExpandingGeneral, ExpandingLinear
     };
     union Ptr
     {
         D3D12DescriptorHeap* linearHeap;
         D3D12GeneralDescriptorHeap* generalHeap;
         D3D12GeneralExpandingDescriptorHeap* generalExpandingHeap;
+        D3D12LinearExpandingDescriptorHeap* linearExpandingHeap;
     };
     Type type;
     Ptr ptr;
@@ -303,6 +371,11 @@ struct DescriptorHeapReference
         type = Type::ExpandingGeneral;
         ptr.generalExpandingHeap = heap;
     }
+    DescriptorHeapReference(D3D12LinearExpandingDescriptorHeap* heap)
+    {
+        type = Type::ExpandingLinear;
+        ptr.linearExpandingHeap = heap;
+    }
     D3D12_CPU_DESCRIPTOR_HANDLE getCpuHandle(int index) const
     {
         switch (type)
@@ -311,8 +384,12 @@ struct DescriptorHeapReference
             return ptr.linearHeap->getCpuHandle(index);
         case Type::General:
             return ptr.generalHeap->getCpuHandle(index);
-        default:
+        case Type::ExpandingGeneral:
             return ptr.generalExpandingHeap->getCpuHandle(index);
+        case Type::ExpandingLinear:
+            return ptr.linearExpandingHeap->getCpuHandle(index);
+        default:
+            return D3D12_CPU_DESCRIPTOR_HANDLE();
         }
     }
     D3D12_GPU_DESCRIPTOR_HANDLE getGpuHandle(int index) const
@@ -323,8 +400,10 @@ struct DescriptorHeapReference
             return ptr.linearHeap->getGpuHandle(index);
         case Type::General:
             return ptr.generalHeap->getGpuHandle(index);
-        default:
+        case Type::ExpandingGeneral:
             return ptr.generalExpandingHeap->getGpuHandle(index);
+        default:
+            return D3D12_GPU_DESCRIPTOR_HANDLE();
         }
     }
     int allocate(int numDescriptors)
@@ -335,20 +414,23 @@ struct DescriptorHeapReference
             return ptr.linearHeap->allocate(numDescriptors);
         case Type::General:
             return ptr.generalHeap->allocate(numDescriptors);
-        default:
+        case Type::ExpandingGeneral:
             return ptr.generalExpandingHeap->allocate(numDescriptors);
+        default:
+            return ptr.linearExpandingHeap->allocate(numDescriptors);
         }
     }
     void free(int index, int count)
     {
         switch (type)
         {
+        default:
         case Type::Linear:
             SLANG_ASSERT(!"Linear heap does not support free().");
             break;
         case Type::General:
             return ptr.generalHeap->free(index, count);
-        default:
+        case Type::ExpandingGeneral:
             return ptr.generalExpandingHeap->free(index, count);
         }
     }
@@ -360,8 +442,10 @@ struct DescriptorHeapReference
             return;
         case Type::General:
             return ptr.generalHeap->free(index, count);
-        default:
+        case Type::ExpandingGeneral:
             return ptr.generalExpandingHeap->free(index, count);
+        default:
+            break;
         }
     }
 };

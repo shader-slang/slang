@@ -123,7 +123,7 @@ GUI::GUI(
     pipelineDesc.framebufferLayout = framebufferLayout;
     pipelineDesc.program = program;
     pipelineDesc.inputLayout = inputLayout;
-    pipelineDesc.blend.targets = &targetBlendDesc;
+    pipelineDesc.blend.targets[0] = targetBlendDesc;
     pipelineDesc.blend.targetCount = 1;
     pipelineDesc.rasterizer.cullMode = CullMode::None;
 
