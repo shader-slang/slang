@@ -641,7 +641,10 @@ static int glslang_compileGLSLToSPIRV(const glslang_CompileRequest_1_1& request)
         std::vector<unsigned int> spirv;
         spv::SpvBuildLogger logger;
 
-        glslang::GlslangToSpv(*stageIntermediate, spirv, &logger, &spvOptions);
+        // Copy options to make sure spvOptions not altered 
+        glslang::SpvOptions copySpvOptions(spvOptions);
+
+        glslang::GlslangToSpv(*stageIntermediate, spirv, &logger, &copySpvOptions);
 
         int optErrorCount = 0;
 
