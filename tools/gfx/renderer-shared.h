@@ -41,6 +41,7 @@ struct GfxGUID
     static const Slang::Guid IID_IFence;
     static const Slang::Guid IID_IShaderTable;
     static const Slang::Guid IID_IPipelineCreationAPIDispatcher;
+    static const Slang::Guid IID_ID3D12TransientResourceHeap;
 };
 
 // We use a `BreakableReference` to avoid the cyclic reference situation in gfx implementation.

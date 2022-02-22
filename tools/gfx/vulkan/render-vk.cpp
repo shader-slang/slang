@@ -4061,10 +4061,6 @@ public:
             return nullptr;
         }
         virtual void comFree() override { m_transientHeap.breakStrongReference(); }
-        virtual SLANG_NO_THROW Result SLANG_MCALL resetDescriptorHeaps() override
-        {
-            return SLANG_OK;
-        }
     public:
         VkCommandBuffer m_commandBuffer;
         VkCommandBuffer m_preCommandBuffer = VK_NULL_HANDLE;
