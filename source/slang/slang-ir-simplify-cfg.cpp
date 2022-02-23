@@ -21,15 +21,14 @@ void processFunc(IRFunc* func)
         workList.fastRemoveAt(0);
         while (block)
         {
-            auto branch = as<IRUnconditionalBranch>(block->getTerminator());
             // If `block` does not end with an unconditional branch, bail.
-            if (!branch)
+            if (block->getTerminator()->getOp() != kIROp_unconditionalBranch)
                 break;
+            auto branch = as<IRUnconditionalBranch>(block->getTerminator());
             auto successor = branch->getTargetBlock();
             // Only perform the merge if `block` is the only predecessor of `successor`.
-            if (successor->getPredecessors().getCount() != 1)
+            if (successor->hasMoreThanOneUse())
                 break;
-
             Index paramIndex = 0;
             auto inst = successor->getFirstDecorationOrChild();
             while (inst)
@@ -48,6 +47,7 @@ void processFunc(IRFunc* func)
                 inst = next;
             }
             branch->removeAndDeallocate();
+            assert(!successor->hasUses());
             successor->removeAndDeallocate();
         }
         for (auto successor : block->getSuccessors())

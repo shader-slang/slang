@@ -313,7 +313,7 @@ struct InliningPassBase
         }
 
         // For now, our inlining pass only handles the case where
-        // the callee is a "trivial" function, which means the callee
+        // the callee is a "single-return" function, which means the callee
         // function contains only one return at the end of the body.
         if (isSingleReturnFunc(callee))
         {
@@ -381,13 +381,8 @@ struct InliningPassBase
         // serialization.
         // 
         // For now this punts on this, and just assumes [__unsafeForceInlineEarly] is not in user code.
-    static IRInst* _cloneInstWithSourceLoc(CallSiteInfo const& callSite,
-        IRCloneEnv*     env,
-        IRBuilder*      builder,
-        IRInst*         inst)
+    static void _setSourceLoc(IRInst* clonedInst, IRInst* srcInst, CallSiteInfo const& callSite)
     {
-        IRInst* clonedInst = cloneInst(env, builder, inst);
-
         SourceLoc sourceLoc;
 
         if (callSite.call->sourceLoc.isValid())
@@ -395,13 +390,21 @@ struct InliningPassBase
             // Default to using the source loc at the call site
             sourceLoc = callSite.call->sourceLoc;
         }
-        else if (inst->sourceLoc.isValid())
+        else if (srcInst->sourceLoc.isValid())
         {
             // If we don't have that copy the inst being cloned sourceLoc
-            sourceLoc = inst->sourceLoc;
+            sourceLoc = srcInst->sourceLoc;
         }
 
         clonedInst->sourceLoc = sourceLoc;
+    }
+    static IRInst* _cloneInstWithSourceLoc(CallSiteInfo const& callSite,
+        IRCloneEnv*     env,
+        IRBuilder*      builder,
+        IRInst*         inst)
+    {
+        IRInst* clonedInst = cloneInst(env, builder, inst);
+        _setSourceLoc(clonedInst, inst, callSite);
         return clonedInst;
     }
 
@@ -422,7 +425,13 @@ struct InliningPassBase
         // Break the basic block containing the call inst into two basic blocks.
         auto callerBlock = callSite.call->getParent();
         builder->setInsertInto(callerBlock->getParent());
-        auto afterBlock = builder->emitBlock();
+        auto afterBlock = builder->createBlock();
+        
+        // Many operations (e.g. `cloneInst`) has define-before-use assumptions on the IR.
+        // It is important to make sure we keep the ordering of blocks by inserting the
+        // second half of the basic block right after `callerBlock`.
+        afterBlock->insertAfter(callerBlock);
+        afterBlock->sourceLoc = callSite.call->getNextInst()->sourceLoc;
         // Move all insts after the call in `callerBlock` to `afterBlock`.
         {
             auto inst = callSite.call->getNextInst();
@@ -438,14 +447,16 @@ struct InliningPassBase
         List<IRBlock*> clonedBlocks;
         for (auto calleeBlock : callee->getBlocks())
         {
-            auto clonedBlock = builder->emitBlock();
+            auto clonedBlock = builder->createBlock();
+            clonedBlock->insertBefore(afterBlock);
+            _setSourceLoc(clonedBlock, calleeBlock, callSite);
             env->mapOldValToNew[calleeBlock] = clonedBlock;
         }
 
         // Insert a branch into the cloned first block at the end of `callerBlock`.
         builder->setInsertInto(callerBlock);
-        builder->emitBranch(as<IRBlock>(env->mapOldValToNew[callee->getFirstBlock()].GetValue()));
-
+        auto newBranch = builder->emitBranch(as<IRBlock>(env->mapOldValToNew[callee->getFirstBlock()].GetValue()));
+        _setSourceLoc(newBranch, call, callSite);
         // Clone all basic blocks over to the call site.
         bool isFirstBlock = true;
         for (auto calleeBlock : callee->getBlocks())
@@ -481,7 +492,10 @@ struct InliningPassBase
                 case kIROp_ReturnVoid:
                     // A return with no operand is replaced with a branch into `afterBlock`
                     // to return the control flow to the location after the original `call`.
-                    builder->emitBranch(afterBlock);
+                    {
+                        auto returnBranch = builder->emitBranch(afterBlock);
+                        _setSourceLoc(returnBranch, inst, callSite);
+                    }
                     break;
 
                 case kIROp_ReturnVal:
@@ -490,8 +504,11 @@ struct InliningPassBase
                     // returned, so that we can use it to replace the value
                     // of the original call.
                     //
-                    builder->emitBranch(afterBlock);
-                    returnedValue = findCloneForOperand(env, inst->getOperand(0));
+                    {
+                        auto returnBranch = builder->emitBranch(afterBlock);
+                        _setSourceLoc(returnBranch, inst, callSite);
+                        returnedValue = findCloneForOperand(env, inst->getOperand(0));
+                    }
                     break;
                 }
             }
