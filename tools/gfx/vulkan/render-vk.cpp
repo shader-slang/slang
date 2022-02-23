@@ -399,14 +399,20 @@ public:
 
         virtual SLANG_NO_THROW Result SLANG_MCALL setCurrentValue(uint64_t value) override
         {
-            VkSemaphoreSignalInfo signalInfo;
-            signalInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SIGNAL_INFO;
-            signalInfo.pNext = NULL;
-            signalInfo.semaphore = m_semaphore;
-            signalInfo.value = 2;
+            uint64_t currentValue = 0;
+            SLANG_VK_RETURN_ON_FAIL(m_device->m_api.vkGetSemaphoreCounterValue(
+                m_device->m_api.m_device, m_semaphore, &currentValue));
+            if (currentValue < value)
+            {
+                VkSemaphoreSignalInfo signalInfo;
+                signalInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SIGNAL_INFO;
+                signalInfo.pNext = NULL;
+                signalInfo.semaphore = m_semaphore;
+                signalInfo.value = value;
 
-            SLANG_VK_RETURN_ON_FAIL(
-                m_device->m_api.vkSignalSemaphore(m_device->m_api.m_device, &signalInfo));
+                SLANG_VK_RETURN_ON_FAIL(
+                    m_device->m_api.vkSignalSemaphore(m_device->m_api.m_device, &signalInfo));
+            }
             return SLANG_OK;
         }
 
@@ -7179,6 +7185,7 @@ Result VKDevice::initVulkanInstanceAndDevice(const InteropHandle* handles, bool 
             deviceExtensions.add(VK_KHR_RAY_QUERY_EXTENSION_NAME);
             m_features.add("ray-query");
             m_features.add("ray-tracing");
+            m_features.add("sm_6_6");
         }
 
         if (extendedFeatures.bufferDeviceAddressFeatures.bufferDeviceAddress)

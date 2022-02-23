@@ -313,12 +313,11 @@ struct InliningPassBase
         }
 
         // For now, our inlining pass only handles the case where
-        // the callee is a "trivial" function, which can support
-        // a very simple approach to inlining.
-        //
-        if( isTrivialFunc(callee) )
+        // the callee is a "trivial" function, which means the callee
+        // function contains only one return at the end of the body.
+        if (isSingleReturnFunc(callee))
         {
-            inlineTrivialFuncBody(callSite, &env, &builder);
+            inlineSingleReturnFuncBody(callSite, &env, &builder);    
         }
         else
         {
@@ -329,26 +328,34 @@ struct InliningPassBase
         }
     }
 
-        /// Check if `func` represents a trivial single-block callee that can be inlined simply
-    bool isTrivialFunc(IRFunc* func)
+        /// Check if `func` represents a simple callee that has only a single `return`.
+    bool isSingleReturnFunc(IRFunc* func)
     {
-        // The function must have a single bocy block to be trivial.
-        //
         auto firstBlock = func->getFirstBlock();
-        if( firstBlock->getNextBlock() )
-            return false;
 
         // If the body block is decorated (for some reason), then the function is non-trivial.
         //
         if( firstBlock->getFirstDecoration() )
             return false;
 
-        // If the body block terminates in something other than a `return` then the function is non-trivial.
-        //
-        auto terminator = firstBlock->getTerminator();
-        if( !as<IRReturn>(terminator) )
-            return false;
-
+        // If the body has more than one returns, we cannot inline it now.
+        bool returnFound = false;
+        for (auto block : func->getBlocks())
+        {
+            for (auto inst : block->getChildren())
+            {
+                if (inst->getOp() == kIROp_ReturnVal || inst->getOp() == kIROp_ReturnVoid)
+                {
+                    // If the return is not at the end of the block, we cannot handle it.
+                    if (inst != block->getTerminator())
+                        return false;
+                    // If there is already a return found, this function cannot be simple.
+                    if (returnFound)
+                        return false;
+                    returnFound = true;
+                }
+            }
+        }
         return true;
     }
 
@@ -398,57 +405,97 @@ struct InliningPassBase
         return clonedInst;
     }
 
-        /// Inline the body of the callee for `callSite`, where the callee is trivial as tested by `isTrivialFunc`
-    void inlineTrivialFuncBody(CallSiteInfo const& callSite, IRCloneEnv* env, IRBuilder* builder)
+        /// Inline the body of the callee for `callSite`, where the callee has a single return.
+    void inlineSingleReturnFuncBody(
+        CallSiteInfo const& callSite, IRCloneEnv* env, IRBuilder* builder)
     {
         auto call = callSite.call;
         auto callee = callSite.callee;
-        auto firstBlock = callee->getFirstBlock();
 
-        // We know that the callee has a single block, so if we encounter
+        // We know that the callee has a single return block, so if we encounter
         // a `returnVal` instruction then it must be the one and only
-        // return point for the block, and its operand will be the value
-        // the calee returns.
+        // return point for the function, and its operand will be the value
+        // the callee returns.
         //
         IRInst* returnedValue = nullptr;
 
-        // We will loop over the instructions of the one and only block,
-        // and clone each of them appropriately.
-        //
-        for( auto inst : firstBlock->getChildren() )
+        // Break the basic block containing the call inst into two basic blocks.
+        auto callerBlock = callSite.call->getParent();
+        builder->setInsertInto(callerBlock->getParent());
+        auto afterBlock = builder->emitBlock();
+        // Move all insts after the call in `callerBlock` to `afterBlock`.
         {
-            switch( inst->getOp() )
+            auto inst = callSite.call->getNextInst();
+            while (inst)
             {
-            default:
-                // The default value is to clone the instruction using
-                // the existing cloning infrastructure and the `env`
-                // we have already set up.
-                //
-                // SourceLoc information is copied if there is appropriate data available.
-                _cloneInstWithSourceLoc(callSite, env, builder, inst);
-                break;
-
-            case kIROp_Param:
-                // Parameters can be completely ignored in the single-block
-                // case, because they have all been replaced via `env`.
-                break;
-
-            case kIROp_ReturnVoid:
-                // A return with no operand can be ignored, since a return
-                // from the inlined call should just continue after the
-                // call site.
-                //
-                break;
-
-            case kIROp_ReturnVal:
-                // A return with a value is similar to `returnVoid` except
-                // that we need to note the (clone of the) value being
-                // returned, so that we can use it to replace the value
-                // of the original call.
-                //
-                returnedValue = findCloneForOperand(env, inst->getOperand(0));
-                break;
+                auto next = inst->getNextInst();
+                inst->removeFromParent();
+                inst->insertAtEnd(afterBlock);
+                inst = next;
             }
+        }
+
+        List<IRBlock*> clonedBlocks;
+        for (auto calleeBlock : callee->getBlocks())
+        {
+            auto clonedBlock = builder->emitBlock();
+            env->mapOldValToNew[calleeBlock] = clonedBlock;
+        }
+
+        // Insert a branch into the cloned first block at the end of `callerBlock`.
+        builder->setInsertInto(callerBlock);
+        builder->emitBranch(as<IRBlock>(env->mapOldValToNew[callee->getFirstBlock()].GetValue()));
+
+        // Clone all basic blocks over to the call site.
+        bool isFirstBlock = true;
+        for (auto calleeBlock : callee->getBlocks())
+        {
+            auto clonedBlock = env->mapOldValToNew[calleeBlock].GetValue();
+            builder->setInsertInto(clonedBlock);
+            // We will loop over the instructions of the each block,
+            // and clone each of them appropriately.
+            //
+            for (auto inst : calleeBlock->getChildren())
+            {
+                if (inst->getOp() == kIROp_Param)
+                {
+                    // Parameters in the first block can be completely ignored
+                    // because they have all been replaced via `env`.
+                    if (isFirstBlock)
+                    {
+                        continue;
+                    }
+                }
+
+                switch (inst->getOp())
+                {
+                default:
+                    // The default value is to clone the instruction using
+                    // the existing cloning infrastructure and the `env`
+                    // we have already set up.
+                    //
+                    // SourceLoc information is copied if there is appropriate data available.
+                    _cloneInstWithSourceLoc(callSite, env, builder, inst);
+                    break;
+
+                case kIROp_ReturnVoid:
+                    // A return with no operand is replaced with a branch into `afterBlock`
+                    // to return the control flow to the location after the original `call`.
+                    builder->emitBranch(afterBlock);
+                    break;
+
+                case kIROp_ReturnVal:
+                    // A return with a value is similar to `returnVoid` except
+                    // that we need to note the (clone of the) value being
+                    // returned, so that we can use it to replace the value
+                    // of the original call.
+                    //
+                    builder->emitBranch(afterBlock);
+                    returnedValue = findCloneForOperand(env, inst->getOperand(0));
+                    break;
+                }
+            }
+            isFirstBlock = false;
         }
 
         // If there was a `returnVal` instruction that established
@@ -491,5 +538,45 @@ void performMandatoryEarlyInlining(IRModule* module)
     MandatoryEarlyInliningPass pass(module);
     pass.considerAllCallSites();
 }
+
+
+    // Defined in slang-ir-specialize-resource.cpp
+bool isResourceType(IRType* type);
+
+    /// An inlining pass that inlines calls functions that returns resources.
+    /// This is needed for glsl targets.
+struct GLSLResourceReturnFunctionInliningPass : InliningPassBase
+{
+    typedef InliningPassBase Super;
+
+    GLSLResourceReturnFunctionInliningPass(IRModule* module)
+        : Super(module)
+    {}
+
+    bool shouldInline(CallSiteInfo const& info)
+    {
+        if (isResourceType(info.callee->getResultType()))
+        {
+            return true;
+        }
+        for (auto param : info.callee->getParams())
+        {
+            auto outType = as<IROutTypeBase>(param->getFullType());
+            if (!outType)
+                continue;
+            auto outValueType = outType->getValueType();
+            if (isResourceType(outValueType))
+                return true;
+        }
+        return false;
+    }
+};
+
+void performGLSLResourceReturnFunctionInlining(IRModule* module)
+{
+    GLSLResourceReturnFunctionInliningPass pass(module);
+    pass.considerAllCallSites();
+}
+
 
 } // namespace Slang

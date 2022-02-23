@@ -64,6 +64,11 @@ __target_intrinsic(hlsl, "NvInterlockedAddUint64($0, $1, $2)")
 [__requiresNVAPI]
 uint2 __atomicAdd(RWByteAddressBuffer buf, uint offset, uint2);
 
+// atomic add for hlsl using SM6.6
+__target_intrinsic(hlsl, "$0.InterlockedAdd64($1, $2, $3)")
+void __atomicAdd(RWByteAddressBuffer buf, uint offset, int64_t value, out int64_t originalValue);
+__target_intrinsic(hlsl, "$0.InterlockedAdd64($1, $2, $3)")
+void __atomicAdd(RWByteAddressBuffer buf, uint offset, uint64_t value, out uint64_t originalValue);
 
 // Int versions require glsl 4.30
 // https://www.khronos.org/registry/OpenGL-Refpages/gl4/html/atomicAdd.xhtml
@@ -81,6 +86,11 @@ __glsl_version(430)
 __glsl_extension(GL_EXT_shader_atomic_int64)
 int64_t __atomicAdd(__ref int64_t value, int64_t amount);
 
+__target_intrinsic(glsl, "atomicAdd($0, $1)")
+__glsl_version(430)
+__glsl_extension(GL_EXT_shader_atomic_int64)
+int64_t __atomicAdd(__ref uint64_t value, uint64_t amount);
+
 // Cas - Compare and swap
 
 // Helper for HLSL, using NVAPI
@@ -88,6 +98,17 @@ int64_t __atomicAdd(__ref int64_t value, int64_t amount);
 __target_intrinsic(hlsl, "NvInterlockedCompareExchangeUint64($0, $1, $2, $3)")
 [__requiresNVAPI]
 uint2 __cas(RWByteAddressBuffer buf, uint offset, uint2 compareValue, uint2 value);
+
+// CAS using SM6.6
+__target_intrinsic(hlsl, "$0.InterlockedCompareExchange64($1, $2, $3, $4)")
+void __cas(RWByteAddressBuffer buf, uint offset, in int64_t compare_value, in int64_t value, out int64_t original_value);
+__target_intrinsic(hlsl, "$0.InterlockedCompareExchange64($1, $2, $3, $4)")
+void __cas(RWByteAddressBuffer buf, uint offset, in uint64_t compare_value, in uint64_t value, out uint64_t original_value);
+
+__target_intrinsic(glsl, "atomicCompSwap($0, $1, $2)")
+__glsl_version(430)
+__glsl_extension(GL_EXT_shader_atomic_int64)
+uint64_t __cas(__ref int64_t ioValue, int64_t compareValue, int64_t newValue);
 
 __target_intrinsic(glsl, "atomicCompSwap($0, $1, $2)")
 __glsl_version(430)
@@ -482,6 +503,51 @@ ${{{{
         return __atomicExchange(buf[byteAddress / 8], value);
     }
 
+    // SM6.6 6 64bit atomics.
+    __specialized_for_target(hlsl)
+    void InterlockedAdd64(uint byteAddress, int64_t valueToAdd, out int64_t outOriginalValue)
+    {
+        __atomicAdd(this, byteAddress, valueToAdd, outOriginalValue);
+    }
+    __specialized_for_target(glsl)
+    void InterlockedAdd64(uint byteAddress, int64_t valueToAdd, out int64_t originalValue)
+    {
+        RWStructuredBuffer<int64_t> buf = __getEquivalentStructuredBuffer<int64_t>(this);
+        originalValue = __atomicAdd(buf[byteAddress / 8], valueToAdd);
+    }
+    __specialized_for_target(hlsl)
+    void InterlockedAdd64(uint byteAddress, uint64_t valueToAdd, out uint64_t outOriginalValue)
+    {
+        __atomicAdd(this, byteAddress, valueToAdd, outOriginalValue);
+    }
+    __specialized_for_target(glsl)
+    void InterlockedAdd64(uint byteAddress, uint64_t valueToAdd, out uint64_t originalValue)
+    {
+        RWStructuredBuffer<uint64_t> buf = __getEquivalentStructuredBuffer<uint64_t>(this);
+        originalValue = __atomicAdd(buf[byteAddress / 8], valueToAdd);
+    }
+    __specialized_for_target(hlsl)
+    void InterlockedCompareExchange64(uint byteAddress, int64_t compareValue, int64_t value, out int64_t outOriginalValue)
+    {
+        __cas(this, byteAddress, compareValue, value, outOriginalValue);
+    }
+    __specialized_for_target(glsl)
+    void InterlockedCompareExchange64(uint byteAddress, int64_t compareValue, int64_t value, out int64_t outOriginalValue)
+    {
+        RWStructuredBuffer<int64_t> buf = __getEquivalentStructuredBuffer<int64_t>(this);
+        outOriginalValue = __cas(buf[byteAddress / 8], compareValue, value);
+    }
+    __specialized_for_target(hlsl)
+    void InterlockedCompareExchange64(uint byteAddress, uint64_t compareValue, uint64_t value, out uint64_t outOriginalValue)
+    {
+        __cas(this, byteAddress, compareValue, value, outOriginalValue);
+    }
+    __specialized_for_target(glsl)
+    void InterlockedCompareExchange64(uint byteAddress, uint64_t compareValue, uint64_t value, out uint64_t outOriginalValue)
+    {
+        RWStructuredBuffer<uint64_t> buf = __getEquivalentStructuredBuffer<uint64_t>(this);
+        outOriginalValue = __cas(buf[byteAddress / 8], compareValue, value);
+    }
 ${{{{
     }
 }}}}

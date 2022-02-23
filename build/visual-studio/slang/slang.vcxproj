@@ -377,6 +377,7 @@ IF EXIST ..\..\..\external\slang-binaries\bin\windows-aarch64\slang-glslang.dll\
     <ClInclude Include="..\..\..\source\slang\slang-ir-restructure-scoping.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-restructure.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-sccp.h" />
+    <ClInclude Include="..\..\..\source\slang\slang-ir-simplify-cfg.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-specialize-arrays.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-specialize-buffer-load-arg.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-specialize-dispatch.h" />
@@ -508,6 +509,7 @@ IF EXIST ..\..\..\external\slang-binaries\bin\windows-aarch64\slang-glslang.dll\
     <ClCompile Include="..\..\..\source\slang\slang-ir-restructure-scoping.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-restructure.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-sccp.cpp" />
+    <ClCompile Include="..\..\..\source\slang\slang-ir-simplify-cfg.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-specialize-arrays.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-specialize-buffer-load-arg.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-specialize-dispatch.cpp" />

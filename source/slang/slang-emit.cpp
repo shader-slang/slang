@@ -26,6 +26,7 @@
 #include "slang-ir-optix-entry-point-uniforms.h"
 #include "slang-ir-restructure.h"
 #include "slang-ir-restructure-scoping.h"
+#include "slang-ir-sccp.h"
 #include "slang-ir-specialize.h"
 #include "slang-ir-specialize-arrays.h"
 #include "slang-ir-specialize-buffer-load-arg.h"
@@ -324,6 +325,7 @@ Result linkAndOptimizeIR(
         specializeModule(irModule);
     dumpIRIfEnabled(compileRequest, irModule, "AFTER-SPECIALIZE");
 
+    applySparseConditionalConstantPropagation(irModule);
     eliminateDeadCode(irModule);
 
     lowerReinterpret(targetRequest, irModule, sink);
@@ -362,6 +364,7 @@ Result linkAndOptimizeIR(
     // TODO: Are there other cleanup optimizations we should
     // apply at this point?
     //
+    applySparseConditionalConstantPropagation(irModule);
     eliminateDeadCode(irModule);
 #if 0
     dumpIRIfEnabled(compileRequest, irModule, "AFTER DCE");
@@ -455,8 +458,8 @@ Result linkAndOptimizeIR(
     // * Specalize call sites based on the actual resources
     //   that a called function will return/output.
     //
-    // * Specialize called functions based on teh actual resources
-    //   passed ass input at specific call sites.
+    // * Specialize called functions based on the actual resources
+    //   passed as input at specific call sites.
     //
     // Because the legalization may depend on what target
     // we are compiling for (certain things might be okay
@@ -464,6 +467,16 @@ Result linkAndOptimizeIR(
     // pass down the target request along with the IR.
     //
     specializeResourceOutputs(compileRequest, targetRequest, irModule);
+    if (isKhronosTarget(targetRequest))
+    {
+        // GLSL targets does not support using a resource/sampler type in a return position.
+        // If we detect such case, we need to inline the problematic function to avoid generating
+        // invalid glsl.
+        performGLSLResourceReturnFunctionInlining(irModule);
+        applySparseConditionalConstantPropagation(irModule);
+        eliminateDeadCode(irModule);
+    }
+
     //
     // After specialization of function outputs, we may find that there
     // are cases where opaque-typed local variables can now be eliminated
@@ -716,6 +729,7 @@ Result linkAndOptimizeIR(
     // dead-code-elimination (DCE) pass that only retains
     // whatever code is "live."
     //
+    applySparseConditionalConstantPropagation(irModule);
     eliminateDeadCode(irModule);
 #if 0
     dumpIRIfEnabled(compileRequest, irModule, "AFTER DCE");
@@ -725,8 +739,8 @@ Result linkAndOptimizeIR(
     // Lower all bit_cast operations on complex types into leaf-level
     // bit_cast on basic types.
     lowerBitCast(targetRequest, irModule);
+    applySparseConditionalConstantPropagation(irModule);
     eliminateDeadCode(irModule);
-
 
     // We include one final step to (optionally) dump the IR and validate
     // it after all of the optimization passes are complete. This should
