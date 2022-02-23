@@ -556,6 +556,7 @@ public:
             m_fence->SetEventOnCompletion(m_eventValue, m_waitEvent);
             m_commandQueue->Signal(m_fence, m_eventValue);
             WaitForSingleObject(m_waitEvent, INFINITE);
+            m_commandAllocator->Reset();
 
             int8_t* mappedData = nullptr;
             D3D12_RANGE readRange = { sizeof(uint64_t) * queryIndex, sizeof(uint64_t) * (queryIndex + count) };
@@ -787,6 +788,7 @@ public:
 
     class TransientResourceHeapImpl
         : public TransientResourceHeapBaseImpl<D3D12Device, BufferResourceImpl>
+        , public ID3D12TransientResourceHeap
     {
     private:
         typedef TransientResourceHeapBaseImpl<D3D12Device, BufferResourceImpl> Super;
@@ -843,6 +845,39 @@ public:
         D3D12LinearExpandingDescriptorHeap m_stagingCpuViewHeap;
         D3D12LinearExpandingDescriptorHeap m_stagingCpuSamplerHeap;
 
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL
+            queryInterface(SlangUUID const& uuid, void** outObject) override
+        {
+            if (uuid == GfxGUID::IID_ID3D12TransientResourceHeap)
+            {
+                *outObject = static_cast<ID3D12TransientResourceHeap*>(this);
+                addRef();
+                return SLANG_OK;
+            }
+            return Super::queryInterface(uuid, outObject);
+        }
+
+        virtual SLANG_NO_THROW uint32_t SLANG_MCALL addRef() override { return Super::addRef(); }
+        virtual SLANG_NO_THROW uint32_t SLANG_MCALL release() override { return Super::release(); }
+
+        virtual SLANG_NO_THROW Result SLANG_MCALL allocateTransientDescriptorTable(
+            DescriptorType type,
+            uint32_t count,
+            uint64_t& outDescriptorOffset,
+            void** outD3DDescriptorHeapHandle) override
+        {
+            auto& heap = (type == DescriptorType::ResourceView) ? getCurrentViewHeap()
+                                                                : getCurrentSamplerHeap();
+            int allocResult = heap.allocate((int)count);
+            if (allocResult == -1)
+            {
+                return SLANG_E_OUT_OF_MEMORY;
+            }
+            outDescriptorOffset = (uint64_t)allocResult;
+            *outD3DDescriptorHeapHandle = heap.getHeap();
+            return SLANG_OK;
+        }
+
         ~TransientResourceHeapImpl()
         {
             synchronizeAndReset();
@@ -881,22 +916,6 @@ public:
             allocateNewViewDescriptorHeap(device);
             allocateNewSamplerDescriptorHeap(device);
 
-            if (desc.constantBufferSize != 0)
-            {
-                ComPtr<IBufferResource> bufferResourcePtr;
-                IBufferResource::Desc bufferDesc;
-                bufferDesc.type = IResource::Type::Buffer;
-                bufferDesc.defaultState = ResourceState::ConstantBuffer;
-                bufferDesc.allowedStates =
-                    ResourceStateSet(ResourceState::ConstantBuffer, ResourceState::CopyDestination);
-                bufferDesc.sizeInBytes = desc.constantBufferSize;
-                bufferDesc.memoryType = MemoryType::Upload;
-                SLANG_RETURN_ON_FAIL(device->createBufferResource(
-                    bufferDesc,
-                    nullptr,
-                    bufferResourcePtr.writeRef()));
-                m_constantBuffers.add(static_cast<BufferResourceImpl*>(bufferResourcePtr.get()));
-            }
             return SLANG_OK;
         }
 
@@ -957,15 +976,12 @@ public:
         size_t size,
         void* data)
     {
-        D3D12_RANGE readRange = {};
-        readRange.Begin = offset;
-        readRange.End = offset + size;
-
-
         IBufferResource* uploadResource;
+        size_t uploadResourceOffset = 0;
         if (buffer->getDesc()->memoryType != MemoryType::Upload)
         {
-            transientHeap->allocateStagingBuffer(size, uploadResource, ResourceState::General);
+            SLANG_RETURN_ON_FAIL(transientHeap->allocateStagingBuffer(
+                size, uploadResource, uploadResourceOffset, MemoryType::Upload));
         }
 
         D3D12Resource& uploadResourceRef =
@@ -973,32 +989,26 @@ public:
                 ? buffer->m_resource
                 : static_cast<BufferResourceImpl*>(uploadResource)->m_resource;
 
+        D3D12_RANGE readRange = {};
+        readRange.Begin = 0;
+        readRange.End = 0;
         void* uploadData;
         SLANG_RETURN_ON_FAIL(uploadResourceRef.getResource()->Map(
             0, &readRange, reinterpret_cast<void**>(&uploadData)));
-        memcpy((uint8_t*)uploadData + offset, data, size);
-        uploadResourceRef.getResource()->Unmap(0, &readRange);
+        memcpy((uint8_t*)uploadData + uploadResourceOffset + offset, data, size);
+        D3D12_RANGE writtenRange = {};
+        writtenRange.Begin = uploadResourceOffset + offset;
+        writtenRange.End = uploadResourceOffset + offset + size;
+        uploadResourceRef.getResource()->Unmap(0, &writtenRange);
 
         if (buffer->getDesc()->memoryType != MemoryType::Upload)
         {
-            {
-                D3D12BarrierSubmitter submitter(cmdList);
-                submitter.transition(
-                    buffer->m_resource, buffer->m_defaultState, D3D12_RESOURCE_STATE_COPY_DEST);
-            }
             cmdList->CopyBufferRegion(
                 buffer->m_resource.getResource(),
                 offset,
                 uploadResourceRef.getResource(),
-                offset,
+                uploadResourceOffset + offset,
                 size);
-
-            // Should already be in COPY_DEST if write flag was set.
-            {
-                D3D12BarrierSubmitter submitter(cmdList);
-                submitter.transition(
-                    buffer->m_resource, D3D12_RESOURCE_STATE_COPY_DEST, buffer->m_defaultState);
-            }
         }
 
         return SLANG_OK;
@@ -3725,8 +3735,9 @@ public:
                 static_cast<TransientResourceHeapImpl*>(transientHeap);
 
             IBufferResource* stagingBuffer = nullptr;
+            size_t stagingBufferOffset = 0;
             transientHeapImpl->allocateStagingBuffer(
-                tableSize, stagingBuffer, ResourceState::General);
+                tableSize, stagingBuffer, stagingBufferOffset, MemoryType::Upload);
 
             assert(stagingBuffer);
             void* stagingPtr = nullptr;
@@ -3749,7 +3760,7 @@ public:
                 }
             };
 
-            uint8_t* stagingBufferPtr = (uint8_t*)stagingPtr;
+            uint8_t* stagingBufferPtr = (uint8_t*)stagingPtr + stagingBufferOffset;
             for (uint32_t i = 0; i < m_rayGenShaderCount; i++)
             {
                 copyShaderIdInto(
@@ -3776,7 +3787,7 @@ public:
             }
 
             stagingBuffer->unmap(nullptr);
-            encoder->copyBuffer(bufferResource, 0, stagingBuffer, 0, tableSize);
+            encoder->copyBuffer(bufferResource, 0, stagingBuffer, stagingBufferOffset, tableSize);
             encoder->bufferBarrier(
                 1,
                 bufferResource.readRef(),
@@ -3813,12 +3824,6 @@ public:
             return SLANG_OK;
         }
 
-        virtual SLANG_NO_THROW Result SLANG_MCALL resetDescriptorHeaps() override
-        {
-            bindDescriptorHeaps();
-            return SLANG_OK;
-        }
-
     public:
         ComPtr<ID3D12GraphicsCommandList> m_cmdList;
         ComPtr<ID3D12GraphicsCommandList1> m_cmdList1;
@@ -3830,19 +3835,26 @@ public:
         D3D12Device* m_renderer;
         RootShaderObjectImpl m_rootShaderObject;
         RefPtr<MutableRootShaderObjectImpl> m_mutableRootShaderObject;
+        bool m_descriptorHeapsBound = false;
 
         void bindDescriptorHeaps()
         {
-            ID3D12DescriptorHeap* heaps[] = {
-                m_transientHeap->getCurrentViewHeap().getHeap(),
-                m_transientHeap->getCurrentSamplerHeap().getHeap(),
-            };
-            m_cmdList->SetDescriptorHeaps(SLANG_COUNT_OF(heaps), heaps);
+            if (!m_descriptorHeapsBound)
+            {
+                ID3D12DescriptorHeap* heaps[] = {
+                    m_transientHeap->getCurrentViewHeap().getHeap(),
+                    m_transientHeap->getCurrentSamplerHeap().getHeap(),
+                };
+                m_cmdList->SetDescriptorHeaps(SLANG_COUNT_OF(heaps), heaps);
+                m_descriptorHeapsBound = true;
+            }
         }
+
+        void invalidateDescriptorHeapBinding() { m_descriptorHeapsBound = false; }
 
         void reinit()
         {
-            bindDescriptorHeaps();
+            invalidateDescriptorHeapBinding();
             m_rootShaderObject.init(m_renderer);
         }
 
@@ -3936,23 +3948,9 @@ public:
                         auto arraySize = textureDesc->arraySize;
                         if (arraySize == 0)
                             arraySize = 1;
-                        for (uint32_t planeIndex = 0; planeIndex < planeCount; planeIndex++)
-                        {
-                            for (int layer = 0; layer < arraySize; layer++)
-                            {
-                                for (int mip = 0; mip < textureDesc->numMipLevels; mip++)
-                                {
-                                    barrier.Transition.Subresource = D3DUtil::getSubresourceIndex(
-                                        mip,
-                                        layer,
-                                        planeIndex,
-                                        textureImpl->getDesc()->numMipLevels,
-                                        arraySize);
-                                    barriers.add(barrier);
-                                }
-                            }
-                        }
+                        barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
                     }
+                    barriers.add(barrier);
                 }
                 if (barriers.getCount())
                 {
@@ -4119,7 +4117,6 @@ public:
                     D3D12_TEXTURE_COPY_LOCATION srcRegion = {};
                     srcRegion.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
                     D3D12_PLACED_SUBRESOURCE_FOOTPRINT& footprint = srcRegion.PlacedFootprint;
-
                     footprint.Offset = 0;
                     footprint.Footprint.Format = texDesc.Format;
                     uint32_t mipLevel = D3DUtil::getSubresourceMipLevel(
@@ -4162,9 +4159,10 @@ public:
                         footprint.Footprint.RowPitch * rowCount * footprint.Footprint.Depth;
 
                     IBufferResource* stagingBuffer;
+                    size_t stagingBufferOffset = 0;
                     m_commandBuffer->m_transientHeap->allocateStagingBuffer(
-                        bufferSize, stagingBuffer, ResourceState::General);
-
+                        bufferSize, stagingBuffer, stagingBufferOffset, MemoryType::Upload, true);
+                    assert(stagingBufferOffset == 0);
                     BufferResourceImpl* bufferImpl =
                         static_cast<BufferResourceImpl*>(stagingBuffer);
                     uint8_t* bufferData = nullptr;
@@ -4185,9 +4183,7 @@ public:
                         }
                     }
                     bufferImpl->m_resource.getResource()->Unmap(0, nullptr);
-
                     srcRegion.pResource = bufferImpl->m_resource.getResource();
-
                     m_commandBuffer->m_cmdList->CopyTextureRegion(
                         &dstRegion, offset.x, offset.y, offset.z, &srcRegion, nullptr);
                 }
@@ -4252,8 +4248,6 @@ public:
                                 m_commandBuffer->m_renderer);
                             gpuHandleIndex =
                                 m_commandBuffer->m_transientHeap->getCurrentViewHeap().allocate(1);
-                            auto d3dViewHeap =
-                                m_commandBuffer->m_transientHeap->getCurrentViewHeap().getHeap();
                             m_commandBuffer->bindDescriptorHeaps();
                         }
                         this->m_commandBuffer->m_renderer->m_device->CopyDescriptorsSimple(
@@ -4495,13 +4489,6 @@ public:
             {
                 auto textureImpl = static_cast<TextureResourceImpl*>(texture);
 
-                if (subresourceRange.mipLevelCount == 0)
-                    subresourceRange.mipLevelCount = textureImpl->getDesc()->numMipLevels;
-                if (subresourceRange.layerCount == 0)
-                    subresourceRange.layerCount = textureImpl->getDesc()->arraySize;
-
-                auto d3dFormat = D3DUtil::getMapFormat(textureImpl->getDesc()->format);
-
                 ShortList<D3D12_RESOURCE_BARRIER> barriers;
                 D3D12_RESOURCE_BARRIER barrier;
                 barrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
@@ -4509,13 +4496,17 @@ public:
                 {
                     barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
                     barrier.UAV.pResource = textureImpl->m_resource.getResource();
+                    barriers.add(barrier);
                 }
                 else
                 {
                     barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
                     barrier.Transition.StateBefore = D3DUtil::getResourceState(src);
                     barrier.Transition.StateAfter = D3DUtil::getResourceState(dst);
+                    if (barrier.Transition.StateBefore == barrier.Transition.StateAfter)
+                        return;
                     barrier.Transition.pResource = textureImpl->m_resource.getResource();
+                    auto d3dFormat = D3DUtil::getMapFormat(textureImpl->getDesc()->format);
                     auto aspectMask = (int32_t)subresourceRange.aspectMask;
                     if (subresourceRange.aspectMask == TextureAspect::Default)
                         aspectMask = (int32_t)TextureAspect::Color;
@@ -5438,10 +5429,11 @@ public:
         }
         virtual SLANG_NO_THROW Result SLANG_MCALL present() override
         {
+            m_fence->SetEventOnCompletion(fenceValue, m_frameEvents[m_swapChain3->GetCurrentBackBufferIndex()]);
             SLANG_RETURN_ON_FAIL(D3DSwapchainBase::present());
             fenceValue++;
-            m_fence->SetEventOnCompletion(fenceValue, m_frameEvents[m_swapChain3->GetCurrentBackBufferIndex()]);
             m_queue->Signal(m_fence, fenceValue);
+
             return SLANG_OK;
         }
     };
@@ -5630,6 +5622,7 @@ Result D3D12Device::PipelineCommandEncoder::_bindRenderState(Submitter* submitte
     // themselves will be responsible for allocating, binding, and filling in
     // any descriptor tables or other root parameters needed.
     //
+    m_commandBuffer->bindDescriptorHeaps();
     if (rootObjectImpl->bindAsRoot(&context, rootLayoutImpl) == SLANG_E_OUT_OF_MEMORY)
     {
         if (!m_transientHeap->canResize())
@@ -5639,6 +5632,7 @@ Result D3D12Device::PipelineCommandEncoder::_bindRenderState(Submitter* submitte
 
         // If we run out of heap space while binding, allocate new descriptor heaps and try again.
         ID3D12DescriptorHeap* d3dheap = nullptr;
+        m_commandBuffer->invalidateDescriptorHeapBinding();
         switch (context.outOfMemoryHeap)
         {
         case D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV:
@@ -5842,7 +5836,7 @@ static void _initSrvDesc(
 
 Result D3D12Device::createBuffer(const D3D12_RESOURCE_DESC& resourceDesc, const void* srcData, size_t srcDataSize, D3D12_RESOURCE_STATES finalState, D3D12Resource& resourceOut, bool isShared, MemoryType memoryType)
 {
-   const  size_t bufferSize = size_t(resourceDesc.Width);
+   const size_t bufferSize = size_t(resourceDesc.Width);
 
    D3D12_HEAP_PROPERTIES heapProps;
    heapProps.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
@@ -6982,16 +6976,10 @@ Result D3D12Device::createBufferResource(const IBufferResource::Desc& descIn, co
 {
     BufferResource::Desc srcDesc = fixupBufferDesc(descIn);
 
-    // Always align up to 256 bytes, since that is required for constant buffers.
-    //
-    // TODO: only do this for buffers that could potentially be bound as constant buffers...
-    //
-    const size_t alignedSizeInBytes = D3DUtil::calcAligned(srcDesc.sizeInBytes, 256);
-
     RefPtr<BufferResourceImpl> buffer(new BufferResourceImpl(srcDesc));
 
     D3D12_RESOURCE_DESC bufferDesc;
-    _initBufferResourceDesc(alignedSizeInBytes, bufferDesc);
+    _initBufferResourceDesc(descIn.sizeInBytes, bufferDesc);
 
     bufferDesc.Flags |= _calcResourceFlags(srcDesc.allowedStates);
 

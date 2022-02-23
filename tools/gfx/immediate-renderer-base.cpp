@@ -31,8 +31,6 @@ public:
         return nullptr;
     }
 
-    virtual SLANG_NO_THROW Result SLANG_MCALL resetDescriptorHeaps() override { return SLANG_OK; }
-
 public:
     CommandWriter m_writer;
     bool m_hasWriteTimestamps = false;

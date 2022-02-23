@@ -1015,12 +1015,6 @@ Result DebugCommandBuffer::getNativeHandle(InteropHandle* outHandle)
     return baseObject->getNativeHandle(outHandle);
 }
 
-Result DebugCommandBuffer::resetDescriptorHeaps()
-{
-    SLANG_GFX_API_FUNC;
-    return baseObject->resetDescriptorHeaps();
-}
-
 void DebugCommandBuffer::checkEncodersClosedBeforeNewEncoder()
 {
     if (m_renderCommandEncoder.isOpen || m_resourceCommandEncoder.isOpen ||
