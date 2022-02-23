@@ -87,20 +87,6 @@ public:
             SLANG_RETURN_ON_FAIL(swapChain1->QueryInterface(m_swapChain.writeRef()));
         }
 
-        if (!desc.enableVSync)
-        {
-            m_swapChainWaitableObject = m_swapChain->GetFrameLatencyWaitableObject();
-
-            int maxLatency = desc.imageCount - 2;
-
-            // Make sure the maximum latency is in the range required by dx runtime
-            maxLatency = (maxLatency < 1) ? 1 : maxLatency;
-            maxLatency = (maxLatency > DXGI_MAX_SWAP_CHAIN_BUFFERS) ? DXGI_MAX_SWAP_CHAIN_BUFFERS
-                                                                    : maxLatency;
-
-            m_swapChain->SetMaximumFrameLatency(maxLatency);
-        }
-
         createSwapchainBufferImages();
         return SLANG_OK;
     }
@@ -113,25 +99,9 @@ public:
     }
     virtual SLANG_NO_THROW Result SLANG_MCALL present() override
     {
-        if (m_swapChainWaitableObject)
+        if (SLANG_FAILED(m_swapChain->Present(m_desc.enableVSync ? 1 : 0, 0)))
         {
-            // check if now is good time to present
-            // This doesn't wait - because the wait time is 0. If it returns WAIT_TIMEOUT it
-            // means that no frame is waiting to be be displayed so there is no point doing a
-            // present.
-            const bool shouldPresent =
-                (WaitForSingleObjectEx(m_swapChainWaitableObject, 0, TRUE) != WAIT_TIMEOUT);
-            if (shouldPresent)
-            {
-                m_swapChain->Present(0, 0);
-            }
-        }
-        else
-        {
-            if (SLANG_FAILED(m_swapChain->Present(1, 0)))
-            {
-                return SLANG_FAIL;
-            }
+            return SLANG_FAIL;
         }
         return SLANG_OK;
     }
@@ -171,7 +141,6 @@ public:
     virtual IDXGIFactory* getDXGIFactory() = 0;
     virtual IUnknown* getOwningDevice() = 0;
     ISwapchain::Desc m_desc;
-    HANDLE m_swapChainWaitableObject = nullptr;
     ComPtr<IDXGISwapChain2> m_swapChain;
     Slang::ShortList<Slang::RefPtr<TextureResource>> m_images;
 };

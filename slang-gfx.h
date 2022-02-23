@@ -1821,8 +1821,6 @@ public:
     virtual SLANG_NO_THROW void SLANG_MCALL close() = 0;
 
     virtual SLANG_NO_THROW Result SLANG_MCALL getNativeHandle(InteropHandle* outHandle) = 0;
-
-    virtual SLANG_NO_THROW Result SLANG_MCALL resetDescriptorHeaps() = 0;
 };
 #define SLANG_UUID_ICommandBuffer                                                      \
     {                                                                                  \
@@ -1912,6 +1910,23 @@ public:
         0xcd48bd29, 0xee72, 0x41b8, { 0xbc, 0xff, 0xa, 0x2b, 0x3a, 0xaa, 0x6d, 0xeb } \
     }
 
+class ID3D12TransientResourceHeap : public ISlangUnknown
+{
+public:
+    enum class DescriptorType
+    {
+        ResourceView, Sampler
+    };
+    virtual SLANG_NO_THROW Result SLANG_MCALL allocateTransientDescriptorTable(
+        DescriptorType type,
+        uint32_t count,
+        uint64_t& outDescriptorOffset,
+        void** outD3DDescriptorHeapHandle) = 0;
+};
+#define SLANG_UUID_ID3D12TransientResourceHeap                                             \
+    {                                                                                  \
+        0x9bc6a8bc, 0x5f7a, 0x454a, { 0x93, 0xef, 0x3b, 0x10, 0x5b, 0xb7, 0x63, 0x7e } \
+    }
 
 class ISwapchain : public ISlangUnknown
 {

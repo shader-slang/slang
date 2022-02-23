@@ -2482,22 +2482,29 @@ public:
         {
             auto& api = buffer->m_renderer->m_api;
             IBufferResource* stagingBuffer = nullptr;
-            transientHeap->allocateStagingBuffer(size, stagingBuffer, ResourceState::CopySource);
+            size_t stagingBufferOffset = 0;
+            transientHeap->allocateStagingBuffer(
+                size, stagingBuffer, stagingBufferOffset, MemoryType::Upload);
 
             BufferResourceImpl* stagingBufferImpl =
                 static_cast<BufferResourceImpl*>(stagingBuffer);
 
             void* mappedData = nullptr;
             SLANG_VK_CHECK(api.vkMapMemory(
-                api.m_device, stagingBufferImpl->m_buffer.m_memory, 0, size, 0, &mappedData));
-            memcpy(mappedData, data, size);
+                api.m_device,
+                stagingBufferImpl->m_buffer.m_memory,
+                0,
+                stagingBufferOffset + size,
+                0,
+                &mappedData));
+            memcpy((char*)mappedData + stagingBufferOffset, data, size);
             api.vkUnmapMemory(api.m_device, stagingBufferImpl->m_buffer.m_memory);
 
             // Copy from staging buffer to real buffer
             VkBufferCopy copyInfo = {};
             copyInfo.size = size;
             copyInfo.dstOffset = offset;
-            copyInfo.srcOffset = 0;
+            copyInfo.srcOffset = stagingBufferOffset;
             api.vkCmdCopyBuffer(
                 commandBuffer,
                 stagingBufferImpl->m_buffer.m_buffer,
@@ -3962,8 +3969,9 @@ public:
                 static_cast<TransientResourceHeapImpl*>(transientHeap);
 
             IBufferResource* stagingBuffer = nullptr;
+            size_t stagingBufferOffset = 0;
             transientHeapImpl->allocateStagingBuffer(
-                tableSize, stagingBuffer, ResourceState::General);
+                tableSize, stagingBuffer, stagingBufferOffset, MemoryType::Upload);
 
             assert(stagingBuffer);
             void* stagingPtr = nullptr;
@@ -3975,7 +3983,7 @@ public:
             handles.setCount(totalHandleSize);
             auto result = vkApi.vkGetRayTracingShaderGroupHandlesKHR(m_device->m_device, pipelineImpl->m_pipeline, 0, (uint32_t)handleCount, totalHandleSize, handles.getBuffer());
 
-            uint8_t* stagingBufferPtr = (uint8_t*)stagingPtr;
+            uint8_t* stagingBufferPtr = (uint8_t*)stagingPtr + stagingBufferOffset;
             auto subTablePtr = stagingBufferPtr;
             Int shaderTableEntryCounter = 0;
 
@@ -4026,7 +4034,7 @@ public:
             // TODO: Callable shaders?
 
             stagingBuffer->unmap(nullptr);
-            encoder->copyBuffer(bufferResource, 0, stagingBuffer, 0, tableSize);
+            encoder->copyBuffer(bufferResource, 0, stagingBuffer, stagingBufferOffset, tableSize);
             encoder->bufferBarrier(
                 1,
                 bufferResource.readRef(),
@@ -4053,10 +4061,6 @@ public:
             return nullptr;
         }
         virtual void comFree() override { m_transientHeap.breakStrongReference(); }
-        virtual SLANG_NO_THROW Result SLANG_MCALL resetDescriptorHeaps() override
-        {
-            return SLANG_OK;
-        }
     public:
         VkCommandBuffer m_commandBuffer;
         VkCommandBuffer m_preCommandBuffer = VK_NULL_HANDLE;
@@ -4557,8 +4561,9 @@ public:
                 bufferSize *= subResourceRange.layerCount;
 
                 IBufferResource* uploadBuffer = nullptr;
+                size_t uploadBufferOffset = 0;
                 m_commandBuffer->m_transientHeap->allocateStagingBuffer(
-                    bufferSize, uploadBuffer, gfx::ResourceState::CopySource);
+                    bufferSize, uploadBuffer, uploadBufferOffset, MemoryType::Upload);
 
                 // Copy into upload buffer
                 {
@@ -4566,8 +4571,9 @@ public:
 
                     uint8_t* dstData;
                     uploadBuffer->map(nullptr, (void**)&dstData);
+                    dstData += uploadBufferOffset;
                     uint8_t* dstDataStart;
-                    dstDataStart = dstData;
+                    dstDataStart = dstData ;
 
                     size_t dstSubresourceOffset = 0;
                     for (uint32_t i = 0; i < subResourceRange.layerCount; ++i)
@@ -4612,7 +4618,7 @@ public:
                     uploadBuffer->unmap(nullptr);
                 }
                 {
-                    size_t srcOffset = 0;
+                    size_t srcOffset = uploadBufferOffset;
                     for (uint32_t i = 0; i < subResourceRange.layerCount; ++i)
                     {
                         for (Index j = 0; j < mipSizes.getCount(); ++j)
@@ -6569,15 +6575,18 @@ Result VKDevice::PipelineCommandEncoder::bindRootShaderObjectImpl(
     // Once we've filled in all the descriptor sets, we bind them
     // to the pipeline at once.
     //
-    m_device->m_api.vkCmdBindDescriptorSets(
-        m_commandBuffer->m_commandBuffer,
-        bindPoint,
-        specializedLayout->m_pipelineLayout,
-        0,
-        (uint32_t) descriptorSetCount,
-        descriptorSets,
-        0,
-        nullptr);
+    if (descriptorSetCount > 0)
+    {
+        m_device->m_api.vkCmdBindDescriptorSets(
+            m_commandBuffer->m_commandBuffer,
+            bindPoint,
+            specializedLayout->m_pipelineLayout,
+            0,
+            (uint32_t) descriptorSetCount,
+            descriptorSets,
+            0,
+            nullptr);
+    }
 
     return SLANG_OK;
 }
@@ -7226,9 +7235,13 @@ Result VKDevice::initVulkanInstanceAndDevice(const InteropHandle* handles, bool 
 #endif
             m_features.add("external-memory");
         }
-        if (extensionNames.Contains(VK_EXT_DEBUG_MARKER_EXTENSION_NAME))
+        if (extensionNames.Contains(VK_EXT_DEBUG_REPORT_EXTENSION_NAME))
         {
-            deviceExtensions.add(VK_EXT_DEBUG_MARKER_EXTENSION_NAME);
+            deviceExtensions.add(VK_EXT_DEBUG_REPORT_EXTENSION_NAME);
+            if (extensionNames.Contains(VK_EXT_DEBUG_MARKER_EXTENSION_NAME))
+            {
+                deviceExtensions.add(VK_EXT_DEBUG_MARKER_EXTENSION_NAME);
+            }
         }
         if (extensionNames.Contains(VK_EXT_SHADER_VIEWPORT_INDEX_LAYER_EXTENSION_NAME))
         {
