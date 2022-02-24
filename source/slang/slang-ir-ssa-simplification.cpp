@@ -1,6 +1,5 @@
 // slang-ir-ssa-simplification.cpp
-#pragma once
-
+#include "slang-ir-ssa-simplification.h"
 #include "slang-ir.h"
 #include "slang-ir-ssa.h"
 #include "slang-ir-sccp.h"
