@@ -370,6 +370,14 @@ protected:
             m_renderer->m_immediateContext->ClearState();
             return D3DSwapchainBase::resize(width, height);
         }
+        virtual SLANG_NO_THROW bool SLANG_MCALL isOccluded() override
+        {
+            return false;
+        }
+        virtual SLANG_NO_THROW Result SLANG_MCALL setFullScreenMode(bool mode) override
+        {
+            return SLANG_FAIL;
+        }
     };
 
     class InputLayoutImpl: public InputLayoutBase

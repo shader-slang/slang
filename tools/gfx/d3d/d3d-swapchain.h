@@ -143,6 +143,7 @@ public:
     ISwapchain::Desc m_desc;
     ComPtr<IDXGISwapChain2> m_swapChain;
     Slang::ShortList<Slang::RefPtr<TextureResource>> m_images;
+    bool isWindowOccluded = false;
 };
 
 }

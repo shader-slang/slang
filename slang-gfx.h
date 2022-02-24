@@ -1955,6 +1955,12 @@ public:
     /// Resizes the back buffers of this swapchain. All render target views and framebuffers
     /// referencing the back buffer images must be freed before calling this method.
     virtual SLANG_NO_THROW Result SLANG_MCALL resize(uint32_t width, uint32_t height) = 0;
+
+    // Check if the window is occluded.
+    virtual SLANG_NO_THROW bool SLANG_MCALL isOccluded() = 0;
+
+    // Toggle full screen mode.
+    virtual SLANG_NO_THROW Result SLANG_MCALL setFullScreenMode(bool mode) = 0;
 };
 #define SLANG_UUID_ISwapchain                                                        \
     {                                                                                \
