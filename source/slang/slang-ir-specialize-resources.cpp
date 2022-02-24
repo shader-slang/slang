@@ -55,7 +55,7 @@ struct ResourceParameterSpecializationCondition : FunctionCallSpecializeConditio
 
         // For GL/Vulkan targets, we also need to specialize
         // any parameters that use structured or byte-addressed
-        // buffers.
+        // buffers or images with format qualifiers.
         //
         if( isKhronosTarget(targetRequest) )
         {
@@ -63,6 +63,19 @@ struct ResourceParameterSpecializationCondition : FunctionCallSpecializeConditio
                 return true;
             if(as<IRByteAddressBufferTypeBase>(type))
                 return true;
+            if (as<IRGLSLImageType>(type))
+                return true;
+            if (auto texType = as<IRTextureType>(type))
+            {
+                switch (texType->getAccess())
+                {
+                case SLANG_RESOURCE_ACCESS_READ_WRITE:
+                case SLANG_RESOURCE_ACCESS_RASTER_ORDERED:
+                    return true;
+                default:
+                    break;
+                }
+            }
         }
 
         // For now, we will not treat any other parameters as

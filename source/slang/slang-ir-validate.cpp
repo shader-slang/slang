@@ -196,6 +196,50 @@ namespace Slang
         }
     }
 
+    void validateCodeBody(IRValidateContext* context, IRGlobalValueWithCode* code)
+    {
+        HashSet<IRBlock*> blocks;
+        for (auto block : code->getBlocks())
+            blocks.Add(block);
+        auto validateBranchTarget = [&](IRInst* inst, IRBlock* target)
+        {
+            validate(
+                context,
+                blocks.Contains(target),
+                inst,
+                "branch inst must have a valid target block that is defined within the same "
+                "scope.");
+        };
+        for (auto block : code->getBlocks())
+        {
+            auto terminator = block->getTerminator();
+            validate(context, terminator, block, "block must have valid terminator inst.");
+            switch (terminator->getOp())
+            {
+            case kIROp_conditionalBranch:
+                validateBranchTarget(
+                    terminator, as<IRConditionalBranch>(terminator)->getTrueBlock());
+                validateBranchTarget(
+                    terminator, as<IRConditionalBranch>(terminator)->getFalseBlock());
+                break;
+            case kIROp_loop:
+            case kIROp_unconditionalBranch:
+                validateBranchTarget(terminator, as<IRUnconditionalBranch>(terminator)->getTargetBlock());
+                break;
+            case kIROp_Switch:
+                {
+                    auto switchInst = as<IRSwitch>(terminator);
+                    for (UInt i = 0; i < switchInst->getCaseCount(); i++)
+                    {
+                        validateBranchTarget(switchInst, switchInst->getCaseLabel(i));
+                    }
+                    validateBranchTarget(switchInst, switchInst->getDefaultLabel());
+                    validateBranchTarget(switchInst, switchInst->getBreakLabel());
+                }
+            }
+        }
+    }
+
     void validateIRInst(
         IRValidateContext*  context,
         IRInst*             inst)
@@ -207,6 +251,11 @@ namespace Slang
         // If `inst` is itself a parent instruction, then we need to recursively
         // validate its children.
         validateIRInstChildren(context, inst);
+
+        if (auto code = as<IRGlobalValueWithCode>(inst))
+        {
+            validateCodeBody(context, code);
+        }
     }
 
     void validateIRModule(IRModule* module, DiagnosticSink* sink)

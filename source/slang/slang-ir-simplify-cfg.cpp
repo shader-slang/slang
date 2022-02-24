@@ -6,11 +6,13 @@
 namespace Slang
 {
 
-void processFunc(IRFunc* func)
+bool processFunc(IRFunc* func)
 {
     auto firstBlock = func->getFirstBlock();
     if (!firstBlock)
-        return;
+        return false;
+
+    bool changed = false;
 
     List<IRBlock*> workList;
     HashSet<IRBlock*> processedBlock;
@@ -27,8 +29,11 @@ void processFunc(IRFunc* func)
             auto branch = as<IRUnconditionalBranch>(block->getTerminator());
             auto successor = branch->getTargetBlock();
             // Only perform the merge if `block` is the only predecessor of `successor`.
+            // We also need to make sure not to merge a block that serves as the
+            // merge point in CFG. Such blocks will have more than one use.
             if (successor->hasMoreThanOneUse())
                 break;
+            changed = true;
             Index paramIndex = 0;
             auto inst = successor->getFirstDecorationOrChild();
             while (inst)
@@ -58,17 +63,20 @@ void processFunc(IRFunc* func)
             }
         }
     }
+    return changed;
 }
 
-void simplifyCFG(IRModule* module)
+bool simplifyCFG(IRModule* module)
 {
+    bool changed = false;
     for (auto inst : module->getGlobalInsts())
     {
         if (auto func = as<IRFunc>(inst))
         {
-            processFunc(func);
+            changed |= processFunc(func);
         }
     }
+    return changed;
 }
 
 } // namespace Slang

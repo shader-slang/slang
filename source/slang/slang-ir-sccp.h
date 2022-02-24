@@ -12,7 +12,8 @@ namespace Slang
         /// also eliminates conditional branches where the condition will
         /// always evaluate to a constant (which can lead to entire blocks
         /// becoming dead code)
-    void applySparseConditionalConstantPropagation(
+        /// Returns true if IR is changed.
+    bool applySparseConditionalConstantPropagation(
         IRModule*       module);
 }
 

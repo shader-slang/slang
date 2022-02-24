@@ -893,10 +893,20 @@ void CLikeSourceEmitter::emitSimpleValueImpl(IRInst* inst)
                     return;
                 }
                 case BaseType::UInt8:
+                    {
+                        m_writer->emit(UInt(uint8_t(litInst->value.intVal)));
+                        m_writer->emit("U");
+                        break;
+                    }
                 case BaseType::UInt16:
+                    {
+                        m_writer->emit(UInt(uint16_t(litInst->value.intVal)));
+                        m_writer->emit("U");
+                        break;
+                    }
                 case BaseType::UInt:
                 {
-                    m_writer->emit(UInt(litInst->value.intVal));
+                    m_writer->emit(UInt(uint32_t(litInst->value.intVal)));
                     m_writer->emit("U");
                     break;
                 }

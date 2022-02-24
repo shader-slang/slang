@@ -801,98 +801,98 @@ struct SCCPContext
         switch (inst->getOp())
         {
         case kIROp_Construct:
-            return evalConstruct(inst->getFullType(), getLatticeVal(inst->getOperand(0)));
+            return evalConstruct(inst->getDataType(), getLatticeVal(inst->getOperand(0)));
         case kIROp_Add:
             return evalAdd(
-                inst->getFullType(),
+                inst->getDataType(),
                 getLatticeVal(inst->getOperand(0)),
                 getLatticeVal(inst->getOperand(1)));
         case kIROp_Sub:
             return evalSub(
-                inst->getFullType(),
+                inst->getDataType(),
                 getLatticeVal(inst->getOperand(0)),
                 getLatticeVal(inst->getOperand(1)));
         case kIROp_Mul:
             return evalMul(
-                inst->getFullType(),
+                inst->getDataType(),
                 getLatticeVal(inst->getOperand(0)),
                 getLatticeVal(inst->getOperand(1)));
         case kIROp_Div:
             return evalDiv(
-                inst->getFullType(),
+                inst->getDataType(),
                 getLatticeVal(inst->getOperand(0)),
                 getLatticeVal(inst->getOperand(1)));
         case kIROp_Eql:
             return evalEql(
-                inst->getFullType(),
+                inst->getDataType(),
                 getLatticeVal(inst->getOperand(0)),
                 getLatticeVal(inst->getOperand(1)));
         case kIROp_Neq:
             return evalNeq(
-                inst->getFullType(),
+                inst->getDataType(),
                 getLatticeVal(inst->getOperand(0)),
                 getLatticeVal(inst->getOperand(1)));
         case kIROp_Greater:
             return evalGreater(
-                inst->getFullType(),
+                inst->getDataType(),
                 getLatticeVal(inst->getOperand(0)),
                 getLatticeVal(inst->getOperand(1)));
         case kIROp_Less:
             return evalLess(
-                inst->getFullType(),
+                inst->getDataType(),
                 getLatticeVal(inst->getOperand(0)),
                 getLatticeVal(inst->getOperand(1)));
         case kIROp_Leq:
             return evalLeq(
-                inst->getFullType(),
+                inst->getDataType(),
                 getLatticeVal(inst->getOperand(0)),
                 getLatticeVal(inst->getOperand(1)));
         case kIROp_Geq:
             return evalGeq(
-                inst->getFullType(),
+                inst->getDataType(),
                 getLatticeVal(inst->getOperand(0)),
                 getLatticeVal(inst->getOperand(1)));
         case kIROp_And:
             return evalAnd(
-                inst->getFullType(),
+                inst->getDataType(),
                 getLatticeVal(inst->getOperand(0)),
                 getLatticeVal(inst->getOperand(1)));
         case kIROp_Or:
             return evalOr(
-                inst->getFullType(),
+                inst->getDataType(),
                 getLatticeVal(inst->getOperand(0)),
                 getLatticeVal(inst->getOperand(1)));
         case kIROp_Not:
-            return evalNot(inst->getFullType(), getLatticeVal(inst->getOperand(0)));
+            return evalNot(inst->getDataType(), getLatticeVal(inst->getOperand(0)));
         case kIROp_BitAnd:
             return evalBitAnd(
-                inst->getFullType(),
+                inst->getDataType(),
                 getLatticeVal(inst->getOperand(0)),
                 getLatticeVal(inst->getOperand(1)));
         case kIROp_BitOr:
             return evalBitOr(
-                inst->getFullType(),
+                inst->getDataType(),
                 getLatticeVal(inst->getOperand(0)),
                 getLatticeVal(inst->getOperand(1)));
         case kIROp_BitNot:
-            return evalBitNot(inst->getFullType(), getLatticeVal(inst->getOperand(0)));
+            return evalBitNot(inst->getDataType(), getLatticeVal(inst->getOperand(0)));
         case kIROp_BitXor:
             return evalBitXor(
-                inst->getFullType(),
+                inst->getDataType(),
                 getLatticeVal(inst->getOperand(0)),
                 getLatticeVal(inst->getOperand(1)));
         case kIROp_BitCast:
-            return evalBitCast(inst->getFullType(), getLatticeVal(inst->getOperand(0)));
+            return evalBitCast(inst->getDataType(), getLatticeVal(inst->getOperand(0)));
         case kIROp_Neg:
-            return evalNeg(inst->getFullType(), getLatticeVal(inst->getOperand(0)));
+            return evalNeg(inst->getDataType(), getLatticeVal(inst->getOperand(0)));
         case kIROp_Lsh:
             return evalLsh(
-                inst->getFullType(),
+                inst->getDataType(),
                 getLatticeVal(inst->getOperand(0)),
                 getLatticeVal(inst->getOperand(1)));
         case kIROp_Rsh:
             return evalRsh(
-                inst->getFullType(),
+                inst->getDataType(),
                 getLatticeVal(inst->getOperand(0)),
                 getLatticeVal(inst->getOperand(1)));
         case kIROp_Select:
@@ -1179,7 +1179,7 @@ struct SCCPContext
     }
 
     // Run the constant folding on global scope only.
-    void applyOnGlobalScope(IRModule* module)
+    bool applyOnGlobalScope(IRModule* module)
     {
         builderStorage.init(shared->sharedBuilder);
         for (auto child : module->getModuleInst()->getChildren())
@@ -1194,9 +1194,13 @@ struct SCCPContext
         {
             auto inst = ssaWorkList[0];
             ssaWorkList.fastRemoveAt(0);
+            // Only consider evaluable opcodes and insts at global scope.
+            if (!isEvaluableOpCode(inst->getOp()) || inst->getParent() != module->getModuleInst())
+                continue;
             updateValueForInst(inst);
         }
 
+        bool changed = false;
         // Replace the insts with their values.
         List<IRInst*> instsToRemove;
         for (auto child : module->getModuleInst()->getChildren())
@@ -1214,17 +1218,20 @@ struct SCCPContext
 
         if (instsToRemove.getCount())
         {
+            changed = true;
             for (auto inst : instsToRemove)
                 inst->removeAndDeallocate();
             // Rebuild global value map.
             builderStorage.getSharedBuilder()->deduplicateAndRebuildGlobalNumberingMap();
         }
+        return changed;
     }
 
     // The `apply()` function will run the full algorithm.
     //
-    void apply()
+    bool apply()
     {
+        bool changed = false;
         // We start with the busy-work of setting up our IR builder.
         //
         builderStorage.init(shared->sharedBuilder);
@@ -1387,6 +1394,9 @@ struct SCCPContext
             }
         }
 
+        if (instsToRemove.getCount() != 0)
+            changed = true;
+
         // Once we've replaced the uses of instructions that evaluate
         // to constants, we make a second pass to remove the instructions
         // themselves (or at least those without side effects).
@@ -1440,6 +1450,7 @@ struct SCCPContext
                     builder->setInsertBefore(terminator);
                     builder->emitBranch(target);
                     terminator->removeAndDeallocate();
+                    changed = true;
                 }
             }
             else if(auto condBranchInst = as<IRConditionalBranch>(terminator))
@@ -1454,6 +1465,7 @@ struct SCCPContext
                     builder->setInsertBefore(terminator);
                     builder->emitBranch(target);
                     terminator->removeAndDeallocate();
+                    changed = true;
                 }
             
             }
@@ -1565,13 +1577,15 @@ struct SCCPContext
                 builder->emitUnreachable();
             }
         }
+        return changed;
     }
 };
 
-static void applySparseConditionalConstantPropagationRec(
+static bool applySparseConditionalConstantPropagationRec(
     const SCCPContext&  globalContext,
     IRInst*             inst)
 {
+    bool changed = false;
     if( auto code = as<IRGlobalValueWithCode>(inst) )
     {
         if( code->getFirstBlock() )
@@ -1580,17 +1594,18 @@ static void applySparseConditionalConstantPropagationRec(
             context.shared = globalContext.shared;
             context.code = code;
             context.mapInstToLatticeVal = globalContext.mapInstToLatticeVal;
-            context.apply();
+            changed |= context.apply();
         }
     }
 
     for( auto childInst : inst->getDecorationsAndChildren() )
     {
-        applySparseConditionalConstantPropagationRec(globalContext, childInst);
+        changed |= applySparseConditionalConstantPropagationRec(globalContext, childInst);
     }
+    return changed;
 }
 
-void applySparseConditionalConstantPropagation(
+bool applySparseConditionalConstantPropagation(
     IRModule*       module)
 {
     SharedSCCPContext shared;
@@ -1601,12 +1616,13 @@ void applySparseConditionalConstantPropagation(
     SCCPContext globalContext;
     globalContext.shared = &shared;
     globalContext.code = nullptr;
-    globalContext.applyOnGlobalScope(module);
+    bool changed = globalContext.applyOnGlobalScope(module);
 
     // Now run recursive SCCP passes on each child code block.
-    applySparseConditionalConstantPropagationRec(globalContext, module->getModuleInst());
+    changed |= applySparseConditionalConstantPropagationRec(globalContext, module->getModuleInst());
 
-    simplifyCFG(module);
+    changed |= simplifyCFG(module);
+    return changed;
 }
 
 }

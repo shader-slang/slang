@@ -89,7 +89,7 @@ int64_t __atomicAdd(__ref int64_t value, int64_t amount);
 __target_intrinsic(glsl, "atomicAdd($0, $1)")
 __glsl_version(430)
 __glsl_extension(GL_EXT_shader_atomic_int64)
-int64_t __atomicAdd(__ref uint64_t value, uint64_t amount);
+uint64_t __atomicAdd(__ref uint64_t value, uint64_t amount);
 
 // Cas - Compare and swap
 

@@ -1341,6 +1341,16 @@ void legalizeEntryPointParameterForGLSL(
         }
     }
 
+    if (stage == Stage::Geometry)
+    {
+        // If the user provided no parameters with a input primitive type qualifier, we
+        // default to `triangle`.
+        if (!func->findDecoration<IRGeometryInputPrimitiveTypeDecoration>())
+        {
+            builder->addDecoration(func, kIROp_TriangleInputPrimitiveTypeDecoration);
+        }
+    }
+
     // There *can* be multiple streamout parameters, to an entry point (points if nothing else)
     {
         IRType* type = pp->getFullType();

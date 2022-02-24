@@ -774,38 +774,38 @@ void GLSLSourceEmitter::emitSimpleValueImpl(IRInst* inst)
                     {
                         emitType(type);
                         m_writer->emit("(");
-                        m_writer->emit(litInst->value.intVal);
+                        m_writer->emit(int8_t(litInst->value.intVal));
                         m_writer->emit(")");
                         return;
                     }
                     case BaseType::Int16:
                     {
-                        m_writer->emit(litInst->value.intVal);
+                        m_writer->emit(int16_t(litInst->value.intVal));
                         m_writer->emit("S");
                         return;
                     }
                     case BaseType::Int:
                     {
-                        m_writer->emit(litInst->value.intVal);
+                        m_writer->emit(int32_t(litInst->value.intVal));
                         return;
                     }
                     case BaseType::UInt8:
                     {
                         emitType(type);
                         m_writer->emit("(");
-                        m_writer->emit(UInt(litInst->value.intVal));
+                        m_writer->emit(UInt(uint8_t(litInst->value.intVal)));
                         m_writer->emit("U)");
                         return;
                     }
                     case BaseType::UInt16:
                     {
-                        m_writer->emit(UInt(litInst->value.intVal));
+                        m_writer->emit(UInt(uint16_t(litInst->value.intVal)));
                         m_writer->emit("US");
                         return;
                     }
                     case BaseType::UInt:
                     {
-                        m_writer->emit(UInt(litInst->value.intVal));
+                        m_writer->emit(UInt(uint32_t(litInst->value.intVal)));
                         m_writer->emit("U");
                         return;
                     }

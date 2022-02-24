@@ -773,7 +773,7 @@ struct GLSLLayoutRulesFamilyImpl : LayoutRulesFamilyImpl
     virtual LayoutRulesImpl* getVaryingInputRules() override;
     virtual LayoutRulesImpl* getVaryingOutputRules() override;
     virtual LayoutRulesImpl* getSpecializationConstantRules() override;
-    virtual LayoutRulesImpl* getShaderStorageBufferRules() override;
+    virtual LayoutRulesImpl* getShaderStorageBufferRules(TargetRequest* request) override;
     virtual LayoutRulesImpl* getParameterBlockRules() override;
 
     LayoutRulesImpl* getRayPayloadParameterRules()      override;
@@ -794,7 +794,7 @@ struct HLSLLayoutRulesFamilyImpl : LayoutRulesFamilyImpl
     virtual LayoutRulesImpl* getVaryingInputRules() override;
     virtual LayoutRulesImpl* getVaryingOutputRules() override;
     virtual LayoutRulesImpl* getSpecializationConstantRules() override;
-    virtual LayoutRulesImpl* getShaderStorageBufferRules() override;
+    virtual LayoutRulesImpl* getShaderStorageBufferRules(TargetRequest* request) override;
     virtual LayoutRulesImpl* getParameterBlockRules() override;
 
     LayoutRulesImpl* getRayPayloadParameterRules()      override;
@@ -815,7 +815,7 @@ struct CPULayoutRulesFamilyImpl : LayoutRulesFamilyImpl
     virtual LayoutRulesImpl* getVaryingInputRules() override;
     virtual LayoutRulesImpl* getVaryingOutputRules() override;
     virtual LayoutRulesImpl* getSpecializationConstantRules() override;
-    virtual LayoutRulesImpl* getShaderStorageBufferRules() override;
+    virtual LayoutRulesImpl* getShaderStorageBufferRules(TargetRequest* request) override;
     virtual LayoutRulesImpl* getParameterBlockRules() override;
 
     LayoutRulesImpl* getRayPayloadParameterRules()      override;
@@ -835,7 +835,7 @@ struct CUDALayoutRulesFamilyImpl : LayoutRulesFamilyImpl
     virtual LayoutRulesImpl* getVaryingInputRules() override;
     virtual LayoutRulesImpl* getVaryingOutputRules() override;
     virtual LayoutRulesImpl* getSpecializationConstantRules() override;
-    virtual LayoutRulesImpl* getShaderStorageBufferRules() override;
+    virtual LayoutRulesImpl* getShaderStorageBufferRules(TargetRequest* request) override;
     virtual LayoutRulesImpl* getParameterBlockRules() override;
 
     LayoutRulesImpl* getRayPayloadParameterRules()      override;
@@ -1140,8 +1140,10 @@ LayoutRulesImpl* GLSLLayoutRulesFamilyImpl::getSpecializationConstantRules()
     return &kGLSLSpecializationConstantLayoutRulesImpl_;
 }
 
-LayoutRulesImpl* GLSLLayoutRulesFamilyImpl::getShaderStorageBufferRules()
+LayoutRulesImpl* GLSLLayoutRulesFamilyImpl::getShaderStorageBufferRules(TargetRequest* request)
 {
+    if (request->getForceGLSLScalarBufferLayout())
+        return &kHLSLStructuredBufferLayoutRulesImpl_;
     return &kStd430LayoutRulesImpl_;
 }
 
@@ -1219,7 +1221,7 @@ LayoutRulesImpl* HLSLLayoutRulesFamilyImpl::getSpecializationConstantRules()
     return nullptr;
 }
 
-LayoutRulesImpl* HLSLLayoutRulesFamilyImpl::getShaderStorageBufferRules()
+LayoutRulesImpl* HLSLLayoutRulesFamilyImpl::getShaderStorageBufferRules(TargetRequest*)
 {
     return nullptr;
 }
@@ -1273,7 +1275,7 @@ LayoutRulesImpl* CPULayoutRulesFamilyImpl::getSpecializationConstantRules()
 {
     return nullptr;
 }
-LayoutRulesImpl* CPULayoutRulesFamilyImpl::getShaderStorageBufferRules()
+LayoutRulesImpl* CPULayoutRulesFamilyImpl::getShaderStorageBufferRules(TargetRequest*)
 {
     return nullptr;
 }
@@ -1339,7 +1341,7 @@ LayoutRulesImpl* CUDALayoutRulesFamilyImpl::getSpecializationConstantRules()
 {
     return nullptr;
 }
-LayoutRulesImpl* CUDALayoutRulesFamilyImpl::getShaderStorageBufferRules()
+LayoutRulesImpl* CUDALayoutRulesFamilyImpl::getShaderStorageBufferRules(TargetRequest*)
 {
     return nullptr;
 }
@@ -2538,7 +2540,8 @@ static RefPtr<TypeLayout> _createParameterGroupTypeLayout(
 
 LayoutRulesImpl* getParameterBufferElementTypeLayoutRules(
     ParameterGroupType*  parameterGroupType,
-    LayoutRulesImpl*            rules)
+    LayoutRulesImpl*     rules,
+    TargetRequest*       targetRequest)
 {
     if( as<ConstantBufferType>(parameterGroupType) )
     {
@@ -2558,7 +2561,7 @@ LayoutRulesImpl* getParameterBufferElementTypeLayoutRules(
     }
     else if( as<GLSLShaderStorageBufferType>(parameterGroupType) )
     {
-        return rules->getLayoutRulesFamily()->getShaderStorageBufferRules();
+        return rules->getLayoutRulesFamily()->getShaderStorageBufferRules(targetRequest);
     }
     else if (as<ParameterBlockType>(parameterGroupType))
     {
@@ -2580,7 +2583,8 @@ RefPtr<TypeLayout> createParameterGroupTypeLayout(
     // Determine the layout rules to use for the contents of the block
     auto elementTypeRules = getParameterBufferElementTypeLayoutRules(
         parameterGroupType,
-        parameterGroupRules);
+        parameterGroupRules,
+        context.targetReq);
 
     auto elementType = parameterGroupType->elementType;
 

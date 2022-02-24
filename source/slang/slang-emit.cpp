@@ -32,6 +32,7 @@
 #include "slang-ir-specialize-buffer-load-arg.h"
 #include "slang-ir-specialize-resources.h"
 #include "slang-ir-ssa.h"
+#include "slang-ir-ssa-simplification.h"
 #include "slang-ir-strip-witness-tables.h"
 #include "slang-ir-synthesize-active-mask.h"
 #include "slang-ir-union.h"
@@ -330,6 +331,8 @@ Result linkAndOptimizeIR(
 
     lowerReinterpret(targetRequest, irModule, sink);
 
+    validateIRModuleIfEnabled(compileRequest, irModule);
+
     // For targets that supports dynamic dispatch, we need to lower the
     // generics / interface types to ordinary functions and types using
     // function pointers.
@@ -361,11 +364,7 @@ Result linkAndOptimizeIR(
     // up downstream passes like type legalization, so we
     // will run a DCE pass to clean up after the specialization.
     //
-    // TODO: Are there other cleanup optimizations we should
-    // apply at this point?
-    //
-    applySparseConditionalConstantPropagation(irModule);
-    eliminateDeadCode(irModule);
+    simplifyIR(irModule);
 #if 0
     dumpIRIfEnabled(compileRequest, irModule, "AFTER DCE");
 #endif
@@ -438,7 +437,7 @@ Result linkAndOptimizeIR(
     // to see if we can clean up any temporaries created by legalization.
     // (e.g., things that used to be aggregated might now be split up,
     // so that we can work with the individual fields).
-    constructSSA(irModule);
+    simplifyIR(irModule);
 
 #if 0
     dumpIRIfEnabled(compileRequest, irModule, "AFTER SSA");
@@ -473,8 +472,6 @@ Result linkAndOptimizeIR(
         // If we detect such case, we need to inline the problematic function to avoid generating
         // invalid glsl.
         performGLSLResourceReturnFunctionInlining(irModule);
-        applySparseConditionalConstantPropagation(irModule);
-        eliminateDeadCode(irModule);
     }
 
     //
@@ -489,7 +486,7 @@ Result linkAndOptimizeIR(
     // a single combined pass that makes all of the relevant changes and
     // iterates to convergence.
     //
-    constructSSA(irModule);
+    simplifyIR(irModule);
     //
     specializeFuncsForBufferLoadArgs(compileRequest, targetRequest, irModule);
     specializeResourceParameters(compileRequest, targetRequest, irModule);
@@ -725,12 +722,9 @@ Result linkAndOptimizeIR(
     // functions, so there might still be invalid code in
     // our IR module.
     //
-    // To clean up the code, we will apply a fairly general
-    // dead-code-elimination (DCE) pass that only retains
-    // whatever code is "live."
+    // We run IR simplification passes again to clean things up.
     //
-    applySparseConditionalConstantPropagation(irModule);
-    eliminateDeadCode(irModule);
+    simplifyIR(irModule);
 #if 0
     dumpIRIfEnabled(compileRequest, irModule, "AFTER DCE");
 #endif
@@ -739,8 +733,7 @@ Result linkAndOptimizeIR(
     // Lower all bit_cast operations on complex types into leaf-level
     // bit_cast on basic types.
     lowerBitCast(targetRequest, irModule);
-    applySparseConditionalConstantPropagation(irModule);
-    eliminateDeadCode(irModule);
+    simplifyIR(irModule);
 
     // We include one final step to (optionally) dump the IR and validate
     // it after all of the optimization passes are complete. This should

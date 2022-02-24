@@ -7,6 +7,6 @@ namespace Slang
 
         /// Simplifies control flow graph by merging basic blocks that
         /// forms a simple linear chain.
-        ///
-    void simplifyCFG(IRModule* module);
+        /// Returns true if changed.
+    bool simplifyCFG(IRModule* module);
 }
