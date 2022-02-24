@@ -5438,11 +5438,7 @@ public:
         }
         virtual SLANG_NO_THROW bool SLANG_MCALL isOccluded() override
         {
-            if (isWindowOccluded)
-            {
-                isWindowOccluded = (m_swapChain3->Present(0, DXGI_PRESENT_TEST) == DXGI_STATUS_OCCLUDED);
-            }
-            return isWindowOccluded;
+            return (m_swapChain3->Present(0, DXGI_PRESENT_TEST) == DXGI_STATUS_OCCLUDED);
         }
         virtual SLANG_NO_THROW Result SLANG_MCALL setFullScreenMode(bool mode) override
         {
