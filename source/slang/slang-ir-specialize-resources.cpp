@@ -6,6 +6,9 @@
 #include "slang-ir-insts.h"
 
 #include "slang-ir-clone.h"
+#include "slang-ir-ssa-simplification.h"
+
+#include "slang-ir-inline.h"
 
 namespace Slang
 {
@@ -59,23 +62,7 @@ struct ResourceParameterSpecializationCondition : FunctionCallSpecializeConditio
         //
         if( isKhronosTarget(targetRequest) )
         {
-            if(as<IRHLSLStructuredBufferTypeBase>(type))
-                return true;
-            if(as<IRByteAddressBufferTypeBase>(type))
-                return true;
-            if (as<IRGLSLImageType>(type))
-                return true;
-            if (auto texType = as<IRTextureType>(type))
-            {
-                switch (texType->getAccess())
-                {
-                case SLANG_RESOURCE_ACCESS_READ_WRITE:
-                case SLANG_RESOURCE_ACCESS_RASTER_ORDERED:
-                    return true;
-                default:
-                    break;
-                }
-            }
+            return isIllegalGLSLParameterType(type);
         }
 
         // For now, we will not treat any other parameters as
@@ -97,14 +84,22 @@ struct ResourceParameterSpecializationCondition : FunctionCallSpecializeConditio
     }
 };
 
-void specializeResourceParameters(
+bool specializeResourceParameters(
     BackEndCompileRequest* compileRequest,
     TargetRequest*  targetRequest,
     IRModule*       module)
 {
+    bool result = false;
     ResourceParameterSpecializationCondition condition;
     condition.targetRequest = targetRequest;
-    specializeFunctionCalls(compileRequest, targetRequest, module, &condition);
+    bool changed = true;
+    while (changed)
+    {
+        changed = specializeFunctionCalls(compileRequest, targetRequest, module, &condition);
+        simplifyIR(module);
+        result |= changed;
+    }
+    return result;
 }
 
     /// A pass to specialize resource-typed function outputs
@@ -124,8 +119,13 @@ struct ResourceOutputSpecializationPass
     SharedIRBuilder sharedBuilder;
     SharedIRBuilder* getSharedBuilder() { return &sharedBuilder; }
 
-    void processModule()
+    // Functions that requires specialization but are currently unspecializable.
+    List<IRFunc*>* unspecializableFuncs;
+
+    bool processModule()
     {
+        bool changed = false;
+
         // We start by setting up the shared IR building state.
         //
         sharedBuilder.init(module);
@@ -140,11 +140,12 @@ struct ResourceOutputSpecializationPass
             if(!func)
                 continue;
 
-            processFunc(func);
+            changed |= processFunc(func);
         }
+        return changed;
     }
 
-    void processFunc(IRFunc* oldFunc)
+    bool processFunc(IRFunc* oldFunc)
     {
         // We don't want to waste any effort on functions that don't merit
         // specialization, so the first step is to identify if the function
@@ -154,7 +155,7 @@ struct ResourceOutputSpecializationPass
         // the given function.
         //
         if(!shouldSpecializeFunc(oldFunc))
-            return;
+            return false;
 
         // It is possible that we have a function that we *should* specialize
         // (based on its signature), but we *cannot* yet specialize it.
@@ -214,7 +215,9 @@ struct ResourceOutputSpecializationPass
             // are sure we can optimize/simplify, so that the error
             // messages can be front-end rather than back-end errors.
             //
-            return;
+            newFunc->removeAndDeallocate();
+            unspecializableFuncs->add(oldFunc);
+            return false;
         }
 
         // Specialization might have changed the signature of `newFunc`,
@@ -278,6 +281,7 @@ struct ResourceOutputSpecializationPass
         {
             specializeCallSite(oldCall, newFunc, funcInfo);
         }
+        return true;
     }
 
     // With the overall flow of the pass described, we can now drill down
@@ -1109,16 +1113,13 @@ struct ResourceOutputSpecializationPass
     // but transforming them so that the function signatures are changed makes
     // the challenge more explicit and thus perhaps easier to tackle.
 
-    // TODO: We probably need to update the two passes in this file so that they
-    // work in an iterative fashion (combined with some SSA "cleanup" on function
-    // bodies), because each optimization may open up opportunties for the other
-    // to apply.
 };
 
-void specializeResourceOutputs(
+bool specializeResourceOutputs(
     BackEndCompileRequest*  compileRequest,
     TargetRequest*          targetRequest,
-    IRModule*               module)
+    IRModule*               module,
+    List<IRFunc*>&          unspecializableFuncs)
 {
     if(isD3DTarget(targetRequest) || isKhronosTarget(targetRequest))
     {}
@@ -1131,14 +1132,102 @@ void specializeResourceOutputs(
         // of conditional in a way that doesn't involve explicitly
         // enumerating matching targets.
         //
-        return;
+        return false;
     }
 
     ResourceOutputSpecializationPass pass;
     pass.compileRequest = compileRequest;
     pass.targetRequest = targetRequest;
     pass.module = module;
-    pass.processModule();
+    pass.unspecializableFuncs = &unspecializableFuncs;
+    return pass.processModule();
+}
+
+bool specializeResourceUsage(
+    BackEndCompileRequest* compileRequest, TargetRequest* targetRequest, IRModule* irModule)
+{
+    bool result = false;
+    // We apply two kinds of specialization to clean up resource value usage:
+    //
+    // * Specalize call sites based on the actual resources
+    //   that a called function will return/output.
+    //
+    // * Specialize called functions based on the actual resources
+    //   passed as input at specific call sites.
+    //
+    // We need to run the two passes in an iterative fashion (combined with IR
+    // simplification passes), because each optimization may open up opportunties
+    // for the other to apply.
+    //
+    for (;;)
+    {
+        bool changed = true;
+        List<IRFunc*> unspecializableFuncs;
+        while (changed)
+        {
+            changed = false;
+            unspecializableFuncs.clear();
+            // Because the legalization may depend on what target
+            // we are compiling for (certain things might be okay
+            // for D3D targets that are not okay for Vulkan), we
+            // pass down the target request along with the IR.
+            //
+            changed |= specializeResourceOutputs(
+                compileRequest, targetRequest, irModule, unspecializableFuncs);
+            changed |= specializeResourceParameters(compileRequest, targetRequest, irModule);
+
+            // After specialization of function outputs, we may find that there
+            // are cases where opaque-typed local variables can now be eliminated
+            // and turned into SSA temporaries. Such optimization may enable
+            // the following passes to "see" and specialize more cases.
+            //
+            simplifyIR(irModule);
+            result |= changed;
+        }
+        if (unspecializableFuncs.getCount() == 0)
+            break;
+
+        // Inline unspecializable resource output functions and then continue trying.
+        for (auto func : unspecializableFuncs)
+        {
+            for (auto use = func->firstUse; use; use = use->nextUse)
+            {
+                auto user = use->getUser();
+                auto call = as<IRCall>(user);
+                if (!call)
+                    continue;
+                if (call->getCallee() != func)
+                    continue;
+                inlineCall(call);
+            }
+        }
+        simplifyIR(irModule);
+    }
+    return result;
+}
+
+bool isIllegalGLSLParameterType(IRType* type)
+{
+    if (as<IRUniformParameterGroupType>(type))
+        return true;
+    if (as<IRHLSLStructuredBufferTypeBase>(type))
+        return true;
+    if (as<IRByteAddressBufferTypeBase>(type))
+        return true;
+    if (as<IRGLSLImageType>(type))
+        return true;
+    if (auto texType = as<IRTextureType>(type))
+    {
+        switch (texType->getAccess())
+        {
+        case SLANG_RESOURCE_ACCESS_READ_WRITE:
+        case SLANG_RESOURCE_ACCESS_RASTER_ORDERED:
+            return true;
+        default:
+            break;
+        }
+    }
+    return false;
 }
 
 } // namespace Slang

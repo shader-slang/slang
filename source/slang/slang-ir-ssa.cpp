@@ -1039,7 +1039,7 @@ static void breakCriticalEdges(
 }
 
 // Construct SSA form for a global value with code
-void constructSSA(ConstructSSAContext* context)
+bool constructSSA(ConstructSSAContext* context)
 {
     // First, detect and and break any critical edges in the CFG,
     // because our representation of SSA form doesn't allow for them.
@@ -1052,7 +1052,7 @@ void constructSSA(ConstructSSAContext* context)
     // If none of the variables are promote-able,
     // then we can exit without making any changes
     if (context->promotableVars.getCount() == 0)
-        return;
+        return false;
 
     // We are going to walk the blocks in order,
     // and try to process each, by replacing loads
@@ -1187,10 +1187,12 @@ void constructSSA(ConstructSSAContext* context)
     {
         var->removeAndDeallocate();
     }
+
+    return true;
 }
 
 // Construct SSA form for a global value with code
-void constructSSA(IRModule* module, IRGlobalValueWithCode* globalVal)
+bool constructSSA(IRModule* module, IRGlobalValueWithCode* globalVal)
 {
     ConstructSSAContext context;
     context.globalVal = globalVal;
@@ -1200,28 +1202,31 @@ void constructSSA(IRModule* module, IRGlobalValueWithCode* globalVal)
     context.builder.init(context.sharedBuilder);
     context.builder.setInsertInto(module);
 
-    constructSSA(&context);
+    return constructSSA(&context);
 }
 
-void constructSSA(IRModule* module, IRInst* globalVal)
+bool constructSSA(IRModule* module, IRInst* globalVal)
 {
     switch (globalVal->getOp())
     {
     case kIROp_Func:
     case kIROp_GlobalVar:
-        constructSSA(module, (IRGlobalValueWithCode*)globalVal);
+        return constructSSA(module, (IRGlobalValueWithCode*)globalVal);
 
     default:
         break;
     }
+    return false;
 }
 
-void constructSSA(IRModule* module)
+bool constructSSA(IRModule* module)
 {
+    bool changed = false;
     for(auto ii : module->getGlobalInsts())
     {
-        constructSSA(module, ii);
+        changed |= constructSSA(module, ii);
     }
+    return changed;
 }
 
 }

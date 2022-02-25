@@ -6,6 +6,7 @@ namespace Slang
     class BackEndCompileRequest;
     class TargetRequest;
     struct IRModule;
+    struct IRType;
 
         /// Specialize calls to functions with resource-type parameters.
         ///
@@ -17,13 +18,20 @@ namespace Slang
         /// those resource parameters (and instead, e.g, refers to the
         /// global shader parameters directly).
         ///
-    void specializeResourceParameters(
+    bool specializeResourceParameters(
         BackEndCompileRequest* compileRequest,
         TargetRequest*  targetRequest,
         IRModule*       module);
 
-    void specializeResourceOutputs(
+    bool specializeResourceOutputs(
         BackEndCompileRequest*  compileRequest,
         TargetRequest*          targetRequest,
         IRModule*               module);
+
+        /// Combined iterative passes of `specializeResourceParameters` and `specializeResourceOutputs`.
+    bool specializeResourceUsage(
+        BackEndCompileRequest* compileRequest, TargetRequest* targetRequest, IRModule* irModule);
+
+    bool isIllegalGLSLParameterType(IRType* type);
+
 }

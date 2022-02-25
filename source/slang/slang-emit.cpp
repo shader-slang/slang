@@ -452,39 +452,12 @@ Result linkAndOptimizeIR(
     // Many of our targets place restrictions on how certain
     // resource types can be used, so that having them as
     // function parameters, reults, etc. is invalid.
-    // To clean this up, we apply two kinds of specialization:
-    //
-    // * Specalize call sites based on the actual resources
-    //   that a called function will return/output.
-    //
-    // * Specialize called functions based on the actual resources
-    //   passed as input at specific call sites.
-    //
-    // Because the legalization may depend on what target
-    // we are compiling for (certain things might be okay
-    // for D3D targets that are not okay for Vulkan), we
-    // pass down the target request along with the IR.
-    //
-    specializeResourceOutputs(compileRequest, targetRequest, irModule);
-
-    //
-    // After specialization of function outputs, we may find that there
-    // are cases where opaque-typed local variables can now be eliminated
-    // and turned into SSA temporaries. Such optimization may enable
-    // the following passes to "see" and specialize more cases.
-    //
-    // TODO: We should consider whether there are cases that will require
-    // iterating the passes as given here in order to achieve a fully
-    // specialized result. If that is the case, we might consider implementing
-    // a single combined pass that makes all of the relevant changes and
-    // iterates to convergence.
-    //
-    simplifyIR(irModule);
-    //
+    // We clean up the usages of resource values here.
+    specializeResourceUsage(compileRequest, targetRequest, irModule);
     specializeFuncsForBufferLoadArgs(compileRequest, targetRequest, irModule);
 
+    //
     simplifyIR(irModule);
-    specializeResourceParameters(compileRequest, targetRequest, irModule);
 
     // For GLSL targets, we also want to specialize calls to functions that
     // takes array parameters if possible, to avoid performance issues on
@@ -492,6 +465,7 @@ Result linkAndOptimizeIR(
     if (isKhronosTarget(targetRequest))
     {
         specializeArrayParameters(compileRequest, targetRequest, irModule);
+        simplifyIR(irModule);
     }
 
 #if 0
@@ -636,15 +610,6 @@ Result linkAndOptimizeIR(
         break;
     }
 
-    if (isKhronosTarget(targetRequest))
-    {
-        // As a fallback, if the above steps failed to remove resource type parameters, we will
-        // inline the functions in question to make sure we can produce valid GLSL.
-        simplifyIR(irModule);
-        performGLSLResourceReturnFunctionInlining(irModule);
-        simplifyIR(irModule);
-    }
-
     // For GLSL only, we will need to perform "legalization" of
     // the entry point and any entry-point parameters.
     //
@@ -740,6 +705,13 @@ Result linkAndOptimizeIR(
     // We run IR simplification passes again to clean things up.
     //
     simplifyIR(irModule);
+
+    if (isKhronosTarget(targetRequest))
+    {
+        // As a fallback, if the above specialization steps failed to remove resource type parameters, we will
+        // inline the functions in question to make sure we can produce valid GLSL.
+        performGLSLResourceReturnFunctionInlining(irModule);
+    }
 #if 0
     dumpIRIfEnabled(compileRequest, irModule, "AFTER DCE");
 #endif

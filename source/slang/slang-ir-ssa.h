@@ -4,6 +4,7 @@
 namespace Slang
 {
     struct IRModule;
-
-    void constructSSA(IRModule* module);
+    struct IRGlobalValueWithCode;
+    bool constructSSA(IRModule* module, IRGlobalValueWithCode* globalVal);
+    bool constructSSA(IRModule* module);
 }

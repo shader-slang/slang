@@ -4,6 +4,7 @@
 #include "slang-ir-ssa.h"
 #include "slang-ir-sccp.h"
 #include "slang-ir-dce.h"
+#include "slang-ir-simplify-cfg.h"
 
 namespace Slang
 {
@@ -14,14 +15,22 @@ namespace Slang
     void simplifyIR(IRModule* module)
     {
         bool changed = true;
-        int iterationCounter = 8;
-        while (changed && iterationCounter > 0)
+        const int kMaxIterations = 8;
+        int iterationCounter = 0;
+        while (changed && iterationCounter < kMaxIterations)
         {
             changed = false;
             changed |= applySparseConditionalConstantPropagation(module);
+            changed |= simplifyCFG(module);
+
+            // Note: we disregard the `changed` state from dead code elimination pass since
+            // SCCP pass could be generating temporarily evaluated constant values and never actually use them.
+            // DCE will always remove those nearly generated consts and always returns true here.
             eliminateDeadCode(module);
-            constructSSA(module);
-            iterationCounter--;
+
+            changed |= constructSSA(module);
+
+            iterationCounter++;
         }
     }
 }

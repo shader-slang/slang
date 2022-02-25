@@ -1,6 +1,8 @@
 // slang-ir-inline.cpp
 #include "slang-ir-inline.h"
 
+#include "slang-ir-ssa-simplification.h"
+
 // This file provides general facilities for inlining function calls.
 
 //
@@ -33,17 +35,18 @@ struct InliningPassBase
     }
 
         /// Consider all the call sites in the module for inliing
-    void considerAllCallSites()
+    bool considerAllCallSites()
     {
-        considerAllCallSitesRec(m_module->getModuleInst());
+        return considerAllCallSitesRec(m_module->getModuleInst());
     }
 
         /// Consider all call sites at or under `inst` for inlining
-    void considerAllCallSitesRec(IRInst* inst)
+    bool considerAllCallSitesRec(IRInst* inst)
     {
+        bool changed = false;
         if( auto call = as<IRCall>(inst) )
         {
-            considerCallSite(call);
+            changed = considerCallSite(call);
         }
 
         // Note: we defensively iterate through the child instructions
@@ -54,8 +57,9 @@ struct InliningPassBase
         for( auto child = inst->getFirstChild(); child; child = next )
         {
             next = child->getNextInst();
-            considerAllCallSitesRec(child);
+            changed |= considerAllCallSitesRec(child);
         }
+        return changed;
     }
 
     // In order to inline a call site, we need certain information
@@ -93,7 +97,7 @@ struct InliningPassBase
     // basic proces of considering a call site for inlining.
 
         /// Consider the given `call` site, and possibly inline it.
-    void considerCallSite(IRCall* call)
+    bool considerCallSite(IRCall* call)
     {
         // We start by checking if inlining would even be possible,
         // since doing so collects information about the call site
@@ -104,7 +108,7 @@ struct InliningPassBase
         //
         CallSiteInfo callSite;
         if(!canInline(call, callSite))
-            return;
+            return false;
 
         // If we've decided that we *can* inline the given call
         // site, we next need to check if we *should*. The rules
@@ -112,13 +116,14 @@ struct InliningPassBase
         // so `shouldInline` is a virtual method.
         //
         if(!shouldInline(callSite))
-            return;
+            return false;
 
         // Finally, if we both *can* and *should* inline the
         // given call site, we hand off the a worker routine
         // that does the meat of the work.
         //
         inlineCallSite(callSite);
+        return true;
     }
 
     // Every subclas of `InliningPassBase` should provide its own
@@ -559,6 +564,7 @@ void performMandatoryEarlyInlining(IRModule* module)
 
     // Defined in slang-ir-specialize-resource.cpp
 bool isResourceType(IRType* type);
+bool isIllegalGLSLParameterType(IRType* type);
 
     /// An inlining pass that inlines calls functions that returns resources.
     /// This is needed for glsl targets.
@@ -578,9 +584,7 @@ struct GLSLResourceReturnFunctionInliningPass : InliningPassBase
         }
         for (auto param : info.callee->getParams())
         {
-            if (as<IRBuiltinGenericType>(param->getDataType()))
-                return true;
-            if (as<IRUntypedBufferResourceType>(param->getDataType()))
+            if (isIllegalGLSLParameterType(param->getDataType()))
                 return true;
             auto outType = as<IROutTypeBase>(param->getDataType());
             if (!outType)
@@ -596,7 +600,33 @@ struct GLSLResourceReturnFunctionInliningPass : InliningPassBase
 void performGLSLResourceReturnFunctionInlining(IRModule* module)
 {
     GLSLResourceReturnFunctionInliningPass pass(module);
-    pass.considerAllCallSites();
+    bool changed = true;
+
+    while (changed)
+    {
+        changed = pass.considerAllCallSites();
+        simplifyIR(module);
+    }
+}
+
+struct CustomInliningPass : InliningPassBase
+{
+    typedef InliningPassBase Super;
+
+    CustomInliningPass(IRModule* module)
+        : Super(module)
+    {}
+
+    bool shouldInline(CallSiteInfo const&)
+    {
+        return true;
+    }
+};
+
+bool inlineCall(IRCall* call)
+{
+    CustomInliningPass pass(call->getModule());
+    return pass.considerCallSite(call);
 }
 
 

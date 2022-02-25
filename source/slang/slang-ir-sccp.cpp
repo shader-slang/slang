@@ -3,7 +3,6 @@
 
 #include "slang-ir.h"
 #include "slang-ir-insts.h"
-#include "slang-ir-simplify-cfg.h"
 
 namespace Slang {
 
@@ -1611,6 +1610,7 @@ bool applySparseConditionalConstantPropagation(
     SharedSCCPContext shared;
     shared.module = module;
     shared.sharedBuilder.init(module);
+    shared.sharedBuilder.deduplicateAndRebuildGlobalNumberingMap();
 
     // First we fold constants at global scope.
     SCCPContext globalContext;
@@ -1621,7 +1621,6 @@ bool applySparseConditionalConstantPropagation(
     // Now run recursive SCCP passes on each child code block.
     changed |= applySparseConditionalConstantPropagationRec(globalContext, module->getModuleInst());
 
-    changed |= simplifyCFG(module);
     return changed;
 }
 
