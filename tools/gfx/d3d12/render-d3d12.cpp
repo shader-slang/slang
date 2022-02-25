@@ -5436,6 +5436,14 @@ public:
 
             return SLANG_OK;
         }
+        virtual SLANG_NO_THROW bool SLANG_MCALL isOccluded() override
+        {
+            return (m_swapChain3->Present(0, DXGI_PRESENT_TEST) == DXGI_STATUS_OCCLUDED);
+        }
+        virtual SLANG_NO_THROW Result SLANG_MCALL setFullScreenMode(bool mode) override
+        {
+            return m_swapChain3->SetFullscreenState(mode, nullptr);
+        }
     };
 
     static PROC loadProc(HMODULE module, char const* name);
