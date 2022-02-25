@@ -6724,7 +6724,9 @@ VKDevice::~VKDevice()
     m_deviceQueue.destroy();
 
     descriptorSetAllocator.close();
-    
+
+    m_emptyFramebuffer = nullptr;
+
     if (m_device != VK_NULL_HANDLE)
     {
         if (m_desc.existingDeviceHandles.handles[2].handleValue == 0)
