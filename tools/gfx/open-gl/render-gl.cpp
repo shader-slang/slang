@@ -582,6 +582,15 @@ public:
             return SLANG_OK;
         }
 
+        virtual SLANG_NO_THROW bool SLANG_MCALL isOccluded() override
+        {
+            return false;
+        }
+        virtual SLANG_NO_THROW Result SLANG_MCALL setFullScreenMode(bool mode) override
+        {
+            return SLANG_FAIL;
+        }
+
     public:
         RefPtr<WeakSink<GLDevice>> m_renderer = nullptr;
         GLuint m_framebuffer;

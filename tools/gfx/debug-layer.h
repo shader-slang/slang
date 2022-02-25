@@ -735,6 +735,8 @@ public:
     virtual SLANG_NO_THROW Result SLANG_MCALL present() override;
     virtual SLANG_NO_THROW int SLANG_MCALL acquireNextImage() override;
     virtual SLANG_NO_THROW Result SLANG_MCALL resize(uint32_t width, uint32_t height) override;
+    virtual SLANG_NO_THROW bool SLANG_MCALL isOccluded() override;
+    virtual SLANG_NO_THROW Result SLANG_MCALL setFullScreenMode(bool mode) override;
 
 public:
     Slang::RefPtr<DebugCommandQueue> queue;

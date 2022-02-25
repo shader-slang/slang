@@ -1638,6 +1638,18 @@ Result DebugSwapchain::resize(uint32_t width, uint32_t height)
     return baseObject->resize(width, height);
 }
 
+bool DebugSwapchain::isOccluded()
+{
+    SLANG_GFX_API_FUNC;
+    return baseObject->isOccluded();
+}
+
+Result DebugSwapchain::setFullScreenMode(bool mode)
+{
+    SLANG_GFX_API_FUNC;
+    return baseObject->setFullScreenMode(mode);
+}
+
 void DebugSwapchain::maybeRebuildImageList()
 {
     SLANG_GFX_API_FUNC;

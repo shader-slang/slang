@@ -6449,6 +6449,14 @@ public:
             m_queue->m_pendingWaitSemaphores[1] = m_nextImageSemaphore;
             return m_currentImageIndex;
         }
+        virtual SLANG_NO_THROW bool SLANG_MCALL isOccluded() override
+        {
+            return false;
+        }
+        virtual SLANG_NO_THROW Result SLANG_MCALL setFullScreenMode(bool mode) override
+        {
+            return SLANG_FAIL;
+        }
     };
 
     VkBool32 handleDebugMessage(VkDebugReportFlagsEXT flags, VkDebugReportObjectTypeEXT objType, uint64_t srcObject,
