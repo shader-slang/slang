@@ -578,7 +578,11 @@ struct GLSLResourceReturnFunctionInliningPass : InliningPassBase
         }
         for (auto param : info.callee->getParams())
         {
-            auto outType = as<IROutTypeBase>(param->getFullType());
+            if (as<IRBuiltinGenericType>(param->getDataType()))
+                return true;
+            if (as<IRUntypedBufferResourceType>(param->getDataType()))
+                return true;
+            auto outType = as<IROutTypeBase>(param->getDataType());
             if (!outType)
                 continue;
             auto outValueType = outType->getValueType();

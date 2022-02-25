@@ -8,8 +8,141 @@
 
 namespace Slang
 {
+int getIRVectorElementSize(IRType* type)
+{
+    if (type->getOp() != kIROp_VectorType)
+        return 1;
+    return (int)(as<IRIntLit>(as<IRVectorType>(type)->getElementCount())->value.intVal);
+}
+IRType* getIRVectorBaseType(IRType* type)
+{
+    if (type->getOp() != kIROp_VectorType)
+        return type;
+    return as<IRVectorType>(type)->getElementType();
+}
 
-//
+void legalizeImageSubscriptStoreForGLSL(IRBuilder& builder, IRInst* storeInst)
+{
+    builder.setInsertBefore(storeInst);
+    auto imageSubscript = as<IRImageSubscript>(storeInst->getOperand(0));
+    assert(imageSubscript);
+    auto imageElementType = cast<IRPtrTypeBase>(imageSubscript->getDataType())->getValueType();
+    auto coordType = imageSubscript->getCoord()->getDataType();
+    auto coordVectorSize = getIRVectorElementSize(coordType);
+    if (coordVectorSize != 1)
+    {
+        coordType = builder.getVectorType(
+            builder.getIntType(), builder.getIntValue(builder.getIntType(), coordVectorSize));
+    }
+    else
+    {
+        coordType = builder.getIntType();
+    }
+    auto legalizedCoord = imageSubscript->getCoord();
+    if (coordType != imageSubscript->getCoord()->getDataType())
+    {
+        legalizedCoord = builder.emitConstructorInst(coordType, 1, &legalizedCoord);
+    }
+    switch (storeInst->getOp())
+    {
+    case kIROp_Store:
+        {
+            auto newValue = storeInst->getOperand(1);
+            if (getIRVectorElementSize(imageElementType) != 4)
+            {
+                auto vectorBaseType = getIRVectorBaseType(imageElementType);
+                newValue = builder.emitConstructorInst(
+                    builder.getVectorType(
+                        vectorBaseType, builder.getIntValue(builder.getIntType(), 4)),
+                    1,
+                    &newValue);
+            }
+            auto imageStore = builder.emitImageStore(
+                builder.getVoidType(),
+                imageSubscript->getImage(),
+                legalizedCoord,
+                newValue);
+            storeInst->replaceUsesWith(imageStore);
+            storeInst->removeAndDeallocate();
+            if (!imageSubscript->hasUses())
+            {
+                imageSubscript->removeAndDeallocate();
+            }
+        }
+        break;
+    case kIROp_SwizzledStore:
+        {
+            auto swizzledStore = cast<IRSwizzledStore>(storeInst);
+            // Here we assume the imageElementType is already lowered into float4/uint4 types from any
+            // user-defined type.
+            assert(imageElementType->getOp() == kIROp_VectorType);
+            auto originalValue = builder.emitImageLoad(imageElementType, imageSubscript->getImage(), legalizedCoord);
+            Array<IRInst*, 4> indices;
+            for (UInt i = 0; i < swizzledStore->getElementCount(); i++)
+            {
+                indices.add(swizzledStore->getElementIndex(i));
+            }
+            auto newValue = builder.emitSwizzleSet(
+                imageElementType,
+                originalValue,
+                swizzledStore->getSource(),
+                swizzledStore->getElementCount(),
+                indices.getBuffer());
+            if (getIRVectorElementSize(imageElementType) != 4)
+            {
+                auto vectorBaseType = getIRVectorBaseType(imageElementType);
+                newValue = builder.emitConstructorInst(
+                    builder.getVectorType(
+                        vectorBaseType, builder.getIntValue(builder.getIntType(), 4)),
+                    1,
+                    &newValue);
+            }
+            auto imageStore = builder.emitImageStore(
+                builder.getVoidType(), imageSubscript->getImage(), legalizedCoord, newValue);
+            storeInst->replaceUsesWith(imageStore);
+            storeInst->removeAndDeallocate();
+            if (!imageSubscript->hasUses())
+            {
+                imageSubscript->removeAndDeallocate();
+            }
+        }
+        break;
+    default:
+        break;
+    }
+}
+
+void legalizeImageSubscriptForGLSL(IRModule* module)
+{
+    SharedIRBuilder shared(module);
+    IRBuilder builder(shared);
+    for (auto globalInst : module->getModuleInst()->getChildren())
+    {
+        auto func = as<IRFunc>(globalInst);
+        if (!func)
+            continue;
+        for (auto block : func->getBlocks())
+        {
+            auto inst = block->getFirstInst();
+            IRInst* next;
+            for ( ; inst; inst = next)
+            {
+                next = inst->getNextInst();
+                switch (inst->getOp())
+                {
+                case kIROp_Store:
+                case kIROp_SwizzledStore:
+                    if (inst->getOperand(0)->getOp() == kIROp_ImageSubscript)
+                    {
+                        legalizeImageSubscriptStoreForGLSL(builder, inst);
+                    }
+                }
+            }   
+        }
+    }
+}
+
+    //
 // Legalization of entry points for GLSL:
 //
 

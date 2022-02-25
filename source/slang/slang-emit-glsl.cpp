@@ -1636,6 +1636,26 @@ bool GLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             emitOperand(inst->getOperand(0), outerPrec);
             return true;
         }
+        case kIROp_ImageLoad:
+        {
+            m_writer->emit("imageLoad(");
+            emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+            m_writer->emit(",");
+            emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
+            m_writer->emit(")");
+            return true;
+        }
+        case kIROp_ImageStore:
+        {
+            m_writer->emit("imageStore(");
+            emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+            m_writer->emit(",");
+            emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
+            m_writer->emit(",");
+            emitOperand(inst->getOperand(2), getInfo(EmitOp::General));
+            m_writer->emit(")");
+            return true;
+        }
         case kIROp_StructuredBufferLoad:
         {
             auto outerPrec = inOuterPrec;

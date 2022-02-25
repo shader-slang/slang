@@ -1368,6 +1368,27 @@ struct IRGetAddress : IRInst
     IR_LEAF_ISA(getAddr);
 };
 
+struct IRImageSubscript : IRInst
+{
+    IR_LEAF_ISA(ImageSubscript);
+    IRInst* getImage() { return getOperand(0); }
+    IRInst* getCoord() { return getOperand(1); }
+};
+
+struct IRImageLoad : IRInst
+{
+    IR_LEAF_ISA(ImageLoad);
+    IRInst* getImage() { return getOperand(0); }
+    IRInst* getCoord() { return getOperand(1); }
+};
+
+struct IRImageStore : IRInst
+{
+    IR_LEAF_ISA(ImageStore);
+    IRInst* getImage() { return getOperand(0); }
+    IRInst* getCoord() { return getOperand(1); }
+    IRInst* getValue() { return getOperand(2); }
+};
 // Terminators
 
 struct IRReturn : IRTerminatorInst
@@ -2412,6 +2433,17 @@ public:
     IRInst* emitStore(
         IRInst*    dstPtr,
         IRInst*    srcVal);
+
+    IRInst* emitImageLoad(
+        IRType* type,
+        IRInst* image,
+        IRInst* coord);
+
+    IRInst* emitImageStore(
+        IRType* type,
+        IRInst* image,
+        IRInst* coord,
+        IRInst* value);
 
     IRInst* emitFieldExtract(
         IRType*         type,

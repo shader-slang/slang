@@ -20,4 +20,6 @@ void legalizeEntryPointsForGLSL(
     DiagnosticSink*         sink,
     GLSLExtensionTracker*   glslExtensionTracker);
 
+void legalizeImageSubscriptForGLSL(IRModule* module);
+
 }

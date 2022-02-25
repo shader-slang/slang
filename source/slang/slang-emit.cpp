@@ -466,13 +466,6 @@ Result linkAndOptimizeIR(
     // pass down the target request along with the IR.
     //
     specializeResourceOutputs(compileRequest, targetRequest, irModule);
-    if (isKhronosTarget(targetRequest))
-    {
-        // GLSL targets does not support using a resource/sampler type in a return position.
-        // If we detect such case, we need to inline the problematic function to avoid generating
-        // invalid glsl.
-        performGLSLResourceReturnFunctionInlining(irModule);
-    }
 
     //
     // After specialization of function outputs, we may find that there
@@ -489,6 +482,8 @@ Result linkAndOptimizeIR(
     simplifyIR(irModule);
     //
     specializeFuncsForBufferLoadArgs(compileRequest, targetRequest, irModule);
+
+    simplifyIR(irModule);
     specializeResourceParameters(compileRequest, targetRequest, irModule);
 
     // For GLSL targets, we also want to specialize calls to functions that
@@ -641,6 +636,15 @@ Result linkAndOptimizeIR(
         break;
     }
 
+    if (isKhronosTarget(targetRequest))
+    {
+        // As a fallback, if the above steps failed to remove resource type parameters, we will
+        // inline the functions in question to make sure we can produce valid GLSL.
+        simplifyIR(irModule);
+        performGLSLResourceReturnFunctionInlining(irModule);
+        simplifyIR(irModule);
+    }
+
     // For GLSL only, we will need to perform "legalization" of
     // the entry point and any entry-point parameters.
     //
@@ -685,6 +689,17 @@ Result linkAndOptimizeIR(
         break;
     }
 
+    // Legalize `ImageSubscript` for GLSL.
+    switch (target)
+    {
+    case CodeGenTarget::GLSL:
+        {
+            legalizeImageSubscriptForGLSL(irModule);
+        }
+        break;
+    default:
+        break;
+    }
 
     switch( target )
     {

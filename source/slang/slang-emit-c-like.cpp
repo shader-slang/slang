@@ -1020,6 +1020,7 @@ bool CLikeSourceEmitter::shouldFoldInstIntoUseSites(IRInst* inst)
     //
     case kIROp_makeStruct:
     case kIROp_makeArray:
+    case kIROp_swizzleSet:
         return false;
 
     }
