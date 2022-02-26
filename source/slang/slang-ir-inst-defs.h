@@ -296,6 +296,11 @@ INST(getAddr, getAddr, 1, 0)
 // "Subscript" an image at a pixel coordinate to get pointer
 INST(ImageSubscript, imageSubscript, 2, 0)
 
+// Load from an Image.
+INST(ImageLoad, imageLoad, 2, 0)
+// Store into an Image.
+INST(ImageStore, imageStore, 3, 0)
+
 // Load (almost) arbitrary-type data from a byte-address buffer
 //
 // %dst = byteAddressBufferLoad(%buffer, %offset)

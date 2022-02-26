@@ -43,13 +43,12 @@ void main()
     float HitT_0 = (gl_RayTmaxNV);
     RayData.PackedHitInfoA_0.x = HitT_0;
 
-    const uint use_rcp_0 = uint(0);
 
-    float offsfloat_0 = ((gParamBlock_sbuf_0)._data[(int(uint(0)))]);
+    float offsfloat_0 = ((gParamBlock_sbuf_0)._data[(0)]);
 
-    uint use_rcp_1 = use_rcp_0|uint(HitT_0 > 0.00000000000000000000);
+    uint use_rcp_0 = 0U | uint(HitT_0 > 0.00000000000000000000);
 
-    if(bool(use_rcp_1))
+    if(bool(use_rcp_0))
     {
 
         float tmpA = rcp_0(offsfloat_0);
@@ -60,7 +59,7 @@ void main()
     else
     {
 
-        if(use_rcp_1 > uint(0)&&offsfloat_0 == 0.00000000000000000000)
+        if(use_rcp_0 > 0U&&offsfloat_0 == 0.00000000000000000000)
         {
 
             float tmpB = (inversesqrt((offsfloat_0 + 1.00000000000000000000)));

@@ -100,7 +100,7 @@ struct FunctionParameterSpecializationContext
     // With the basic state out of the way, let's walk
     // through the overall flow of the pass.
     //
-    void processModule()
+    bool processModule()
     {
         // We will start by initializing our IR building state.
         //
@@ -111,6 +111,8 @@ struct FunctionParameterSpecializationContext
         // recursively finding every single call site in the module.
         //
         addCallsToWorkListRec(module->getModuleInst());
+
+        bool changed = false;
 
         // We will process the work list until it goes dry,
         // treating it like a stack of work items.
@@ -130,8 +132,10 @@ struct FunctionParameterSpecializationContext
             if( canSpecializeCall(call) )
             {
                 specializeCall(call);
+                changed = true;
             }
         }
+        return changed;
     }
 
     // Setting up the work list is a simple recursive procedure.
@@ -353,6 +357,7 @@ struct FunctionParameterSpecializationContext
         // we need to generate a call to it, and then use the new
         // call as a replacement for the old one.
         //
+        SLANG_ASSERT(newFunc != oldCall->getCallee());
         auto newCall = getBuilder()->emitCallInst(
             oldCall->getFullType(),
             newFunc,
@@ -877,7 +882,7 @@ struct FunctionParameterSpecializationContext
 // is straighforward. We set up the context object
 // and then defer to it for the real work.
 //
-void specializeFunctionCalls(
+bool specializeFunctionCalls(
     BackEndCompileRequest* compileRequest,
     TargetRequest*  targetRequest,
     IRModule*       module,
@@ -889,7 +894,7 @@ void specializeFunctionCalls(
     context.module = module;
     context.condition = condition;
 
-    context.processModule();
+    return context.processModule();
 }
 
 } // namesapce Slang

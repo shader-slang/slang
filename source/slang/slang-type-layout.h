@@ -1001,7 +1001,7 @@ struct LayoutRulesFamilyImpl
     virtual LayoutRulesImpl* getVaryingInputRules()         = 0;
     virtual LayoutRulesImpl* getVaryingOutputRules()        = 0;
     virtual LayoutRulesImpl* getSpecializationConstantRules()= 0;
-    virtual LayoutRulesImpl* getShaderStorageBufferRules()  = 0;
+    virtual LayoutRulesImpl* getShaderStorageBufferRules(TargetRequest* request)  = 0;
     virtual LayoutRulesImpl* getParameterBlockRules()       = 0;
 
     virtual LayoutRulesImpl* getRayPayloadParameterRules()  = 0;
