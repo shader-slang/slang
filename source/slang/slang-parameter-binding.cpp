@@ -678,7 +678,7 @@ RefPtr<TypeLayout> getTypeLayoutForGlobalShaderParameter(
     // An "ordinary" global variable is implicitly a uniform
     // shader parameter.
     return createTypeLayout(
-        layoutContext.with(rules->getConstantBufferRules()),
+        layoutContext.with(rules->getConstantBufferRules(context->getTargetRequest())),
         type);
 }
 
@@ -2080,7 +2080,8 @@ static RefPtr<TypeLayout> computeEntryPointParameterTypeLayout(
         // constant buffer (e.g., the `$Params` constant buffer seen in fxc/dxc output).
         //
         return createTypeLayout(
-            context->layoutContext.with(context->getRulesFamily()->getConstantBufferRules()),
+            context->layoutContext.with(
+                context->getRulesFamily()->getConstantBufferRules(context->getTargetRequest())),
             paramType);
     }
     else
@@ -2431,7 +2432,9 @@ static ParameterBindingAndKindInfo maybeAllocateConstantBufferBinding(
     UInt space = context->shared->defaultSpace;
     auto usedRangeSet = findUsedRangeSetForSpace(context, space);
 
-    auto layoutInfo = context->getRulesFamily()->getConstantBufferRules()->GetObjectLayout(
+    auto layoutInfo = context->getRulesFamily()
+                          ->getConstantBufferRules(context->getTargetRequest())
+                          ->GetObjectLayout(
         ShaderParameterKind::ConstantBuffer);
 
     ParameterBindingAndKindInfo info;

@@ -767,14 +767,14 @@ CUDARayTracingLayoutRulesImpl kCUDAHitAttributesParameterLayoutRulesImpl(LayoutR
 struct GLSLLayoutRulesFamilyImpl : LayoutRulesFamilyImpl
 {
     virtual LayoutRulesImpl* getAnyValueRules() override;
-    virtual LayoutRulesImpl* getConstantBufferRules() override;
+    virtual LayoutRulesImpl* getConstantBufferRules(TargetRequest* request) override;
     virtual LayoutRulesImpl* getPushConstantBufferRules() override;
     virtual LayoutRulesImpl* getTextureBufferRules() override;
     virtual LayoutRulesImpl* getVaryingInputRules() override;
     virtual LayoutRulesImpl* getVaryingOutputRules() override;
     virtual LayoutRulesImpl* getSpecializationConstantRules() override;
     virtual LayoutRulesImpl* getShaderStorageBufferRules(TargetRequest* request) override;
-    virtual LayoutRulesImpl* getParameterBlockRules() override;
+    virtual LayoutRulesImpl* getParameterBlockRules(TargetRequest* request) override;
 
     LayoutRulesImpl* getRayPayloadParameterRules()      override;
     LayoutRulesImpl* getCallablePayloadParameterRules() override;
@@ -782,20 +782,20 @@ struct GLSLLayoutRulesFamilyImpl : LayoutRulesFamilyImpl
 
     LayoutRulesImpl* getShaderRecordConstantBufferRules() override;
 
-    LayoutRulesImpl* getStructuredBufferRules() override;
+    LayoutRulesImpl* getStructuredBufferRules(TargetRequest* request) override;
 };
 
 struct HLSLLayoutRulesFamilyImpl : LayoutRulesFamilyImpl
 {
     virtual LayoutRulesImpl* getAnyValueRules() override;
-    virtual LayoutRulesImpl* getConstantBufferRules() override;
+    virtual LayoutRulesImpl* getConstantBufferRules(TargetRequest* request) override;
     virtual LayoutRulesImpl* getPushConstantBufferRules() override;
     virtual LayoutRulesImpl* getTextureBufferRules() override;
     virtual LayoutRulesImpl* getVaryingInputRules() override;
     virtual LayoutRulesImpl* getVaryingOutputRules() override;
     virtual LayoutRulesImpl* getSpecializationConstantRules() override;
     virtual LayoutRulesImpl* getShaderStorageBufferRules(TargetRequest* request) override;
-    virtual LayoutRulesImpl* getParameterBlockRules() override;
+    virtual LayoutRulesImpl* getParameterBlockRules(TargetRequest* request) override;
 
     LayoutRulesImpl* getRayPayloadParameterRules()      override;
     LayoutRulesImpl* getCallablePayloadParameterRules() override;
@@ -803,47 +803,47 @@ struct HLSLLayoutRulesFamilyImpl : LayoutRulesFamilyImpl
 
     LayoutRulesImpl* getShaderRecordConstantBufferRules() override;
     
-    LayoutRulesImpl* getStructuredBufferRules() override;
+    LayoutRulesImpl* getStructuredBufferRules(TargetRequest* request) override;
 };
 
 struct CPULayoutRulesFamilyImpl : LayoutRulesFamilyImpl
 {
     virtual LayoutRulesImpl* getAnyValueRules() override;
-    virtual LayoutRulesImpl* getConstantBufferRules() override;
+    virtual LayoutRulesImpl* getConstantBufferRules(TargetRequest* request) override;
     virtual LayoutRulesImpl* getPushConstantBufferRules() override;
     virtual LayoutRulesImpl* getTextureBufferRules() override;
     virtual LayoutRulesImpl* getVaryingInputRules() override;
     virtual LayoutRulesImpl* getVaryingOutputRules() override;
     virtual LayoutRulesImpl* getSpecializationConstantRules() override;
     virtual LayoutRulesImpl* getShaderStorageBufferRules(TargetRequest* request) override;
-    virtual LayoutRulesImpl* getParameterBlockRules() override;
+    virtual LayoutRulesImpl* getParameterBlockRules(TargetRequest* request) override;
 
     LayoutRulesImpl* getRayPayloadParameterRules()      override;
     LayoutRulesImpl* getCallablePayloadParameterRules() override;
     LayoutRulesImpl* getHitAttributesParameterRules()   override;
 
     LayoutRulesImpl* getShaderRecordConstantBufferRules() override;
-    LayoutRulesImpl* getStructuredBufferRules() override;
+    LayoutRulesImpl* getStructuredBufferRules(TargetRequest* request) override;
 };
 
 struct CUDALayoutRulesFamilyImpl : LayoutRulesFamilyImpl
 {
     virtual LayoutRulesImpl* getAnyValueRules() override;
-    virtual LayoutRulesImpl* getConstantBufferRules() override;
+    virtual LayoutRulesImpl* getConstantBufferRules(TargetRequest* request) override;
     virtual LayoutRulesImpl* getPushConstantBufferRules() override;
     virtual LayoutRulesImpl* getTextureBufferRules() override;
     virtual LayoutRulesImpl* getVaryingInputRules() override;
     virtual LayoutRulesImpl* getVaryingOutputRules() override;
     virtual LayoutRulesImpl* getSpecializationConstantRules() override;
     virtual LayoutRulesImpl* getShaderStorageBufferRules(TargetRequest* request) override;
-    virtual LayoutRulesImpl* getParameterBlockRules() override;
+    virtual LayoutRulesImpl* getParameterBlockRules(TargetRequest* request) override;
 
     LayoutRulesImpl* getRayPayloadParameterRules()      override;
     LayoutRulesImpl* getCallablePayloadParameterRules() override;
     LayoutRulesImpl* getHitAttributesParameterRules()   override;
 
     LayoutRulesImpl* getShaderRecordConstantBufferRules() override;
-    LayoutRulesImpl* getStructuredBufferRules() override;
+    LayoutRulesImpl* getStructuredBufferRules(TargetRequest* request) override;
 };
 
 GLSLLayoutRulesFamilyImpl kGLSLLayoutRulesFamilyImpl;
@@ -1013,6 +1013,12 @@ LayoutRulesImpl kStd430LayoutRulesImpl_ = {
     &kGLSLLayoutRulesFamilyImpl, &kStd430LayoutRulesImpl, &kGLSLObjectLayoutRulesImpl,
 };
 
+LayoutRulesImpl kScalarLayoutRulesImpl_ = {
+    &kGLSLLayoutRulesFamilyImpl,
+    &kDefaultLayoutRulesImpl,
+    &kGLSLObjectLayoutRulesImpl,
+};
+
 LayoutRulesImpl kGLSLAnyValueLayoutRulesImpl_ = {
     &kGLSLLayoutRulesFamilyImpl,
     &kDefaultLayoutRulesImpl,
@@ -1099,14 +1105,17 @@ LayoutRulesImpl* GLSLLayoutRulesFamilyImpl::getAnyValueRules()
     return &kGLSLAnyValueLayoutRulesImpl_;
 }
 
-LayoutRulesImpl* GLSLLayoutRulesFamilyImpl::getConstantBufferRules()
+LayoutRulesImpl* GLSLLayoutRulesFamilyImpl::getConstantBufferRules(TargetRequest* targetReq)
 {
+    if (targetReq->getForceGLSLScalarBufferLayout())
+        return &kScalarLayoutRulesImpl_;
     return &kStd140LayoutRulesImpl_;
 }
 
-LayoutRulesImpl* GLSLLayoutRulesFamilyImpl::getParameterBlockRules()
+LayoutRulesImpl* GLSLLayoutRulesFamilyImpl::getParameterBlockRules(TargetRequest* targetReq)
 {
-    // TODO: actually pick something appropriate
+    if (targetReq->getForceGLSLScalarBufferLayout())
+        return &kScalarLayoutRulesImpl_;
     return &kStd140LayoutRulesImpl_;
 }
 
@@ -1143,7 +1152,7 @@ LayoutRulesImpl* GLSLLayoutRulesFamilyImpl::getSpecializationConstantRules()
 LayoutRulesImpl* GLSLLayoutRulesFamilyImpl::getShaderStorageBufferRules(TargetRequest* request)
 {
     if (request->getForceGLSLScalarBufferLayout())
-        return &kHLSLStructuredBufferLayoutRulesImpl_;
+        return &kScalarLayoutRulesImpl_;
     return &kStd430LayoutRulesImpl_;
 }
 
@@ -1162,8 +1171,10 @@ LayoutRulesImpl* GLSLLayoutRulesFamilyImpl::getHitAttributesParameterRules()
     return &kGLSLHitAttributesParameterLayoutRulesImpl_;
 }
 
-LayoutRulesImpl* GLSLLayoutRulesFamilyImpl::getStructuredBufferRules()
+LayoutRulesImpl* GLSLLayoutRulesFamilyImpl::getStructuredBufferRules(TargetRequest* targetReq)
 {
+    if (targetReq->getForceGLSLScalarBufferLayout())
+        return &kScalarLayoutRulesImpl_;
     return &kGLSLStructuredBufferLayoutRulesImpl_;
 }
 
@@ -1174,12 +1185,12 @@ LayoutRulesImpl* HLSLLayoutRulesFamilyImpl::getAnyValueRules()
     return &kHLSLAnyValueLayoutRulesImpl_;
 }
 
-LayoutRulesImpl* HLSLLayoutRulesFamilyImpl::getConstantBufferRules()
+LayoutRulesImpl* HLSLLayoutRulesFamilyImpl::getConstantBufferRules(TargetRequest*)
 {
     return &kHLSLConstantBufferLayoutRulesImpl_;
 }
 
-LayoutRulesImpl* HLSLLayoutRulesFamilyImpl::getParameterBlockRules()
+LayoutRulesImpl* HLSLLayoutRulesFamilyImpl::getParameterBlockRules(TargetRequest*)
 {
     // TODO: actually pick something appropriate...
     return &kHLSLConstantBufferLayoutRulesImpl_;
@@ -1196,7 +1207,7 @@ LayoutRulesImpl* HLSLLayoutRulesFamilyImpl::getShaderRecordConstantBufferRules()
     return &kHLSLConstantBufferLayoutRulesImpl_;
 }
 
-LayoutRulesImpl* HLSLLayoutRulesFamilyImpl::getStructuredBufferRules()
+LayoutRulesImpl* HLSLLayoutRulesFamilyImpl::getStructuredBufferRules(TargetRequest*)
 {
     return &kHLSLStructuredBufferLayoutRulesImpl_;
 }
@@ -1248,7 +1259,7 @@ LayoutRulesImpl* CPULayoutRulesFamilyImpl::getAnyValueRules()
     return &kCPUAnyValueLayoutRulesImpl_;
 }
 
-LayoutRulesImpl* CPULayoutRulesFamilyImpl::getConstantBufferRules()
+LayoutRulesImpl* CPULayoutRulesFamilyImpl::getConstantBufferRules(TargetRequest*)
 {
     return &kCPULayoutRulesImpl_;
 }
@@ -1279,7 +1290,7 @@ LayoutRulesImpl* CPULayoutRulesFamilyImpl::getShaderStorageBufferRules(TargetReq
 {
     return nullptr;
 }
-LayoutRulesImpl* CPULayoutRulesFamilyImpl::getParameterBlockRules()
+LayoutRulesImpl* CPULayoutRulesFamilyImpl::getParameterBlockRules(TargetRequest*)
 {
     // Not clear - just use similar to CPU 
     return &kCPULayoutRulesImpl_;
@@ -1302,7 +1313,7 @@ LayoutRulesImpl* CPULayoutRulesFamilyImpl::getShaderRecordConstantBufferRules()
     return &kCPULayoutRulesImpl_;
 }
 
-LayoutRulesImpl* CPULayoutRulesFamilyImpl::getStructuredBufferRules()
+LayoutRulesImpl* CPULayoutRulesFamilyImpl::getStructuredBufferRules(TargetRequest*)
 {
     return &kCPULayoutRulesImpl_;
 }
@@ -1314,7 +1325,7 @@ LayoutRulesImpl* CUDALayoutRulesFamilyImpl::getAnyValueRules()
     return &kCUDAAnyValueLayoutRulesImpl_;
 }
 
-LayoutRulesImpl* CUDALayoutRulesFamilyImpl::getConstantBufferRules()
+LayoutRulesImpl* CUDALayoutRulesFamilyImpl::getConstantBufferRules(TargetRequest*)
 {
     return &kCUDALayoutRulesImpl_;
 }
@@ -1345,7 +1356,7 @@ LayoutRulesImpl* CUDALayoutRulesFamilyImpl::getShaderStorageBufferRules(TargetRe
 {
     return nullptr;
 }
-LayoutRulesImpl* CUDALayoutRulesFamilyImpl::getParameterBlockRules()
+LayoutRulesImpl* CUDALayoutRulesFamilyImpl::getParameterBlockRules(TargetRequest*)
 {
     // Not clear - just use similar to CPU 
     return &kCUDALayoutRulesImpl_;
@@ -1369,7 +1380,7 @@ LayoutRulesImpl* CUDALayoutRulesFamilyImpl::getShaderRecordConstantBufferRules()
     return &kCUDALayoutRulesImpl_;
 }
 
-LayoutRulesImpl* CUDALayoutRulesFamilyImpl::getStructuredBufferRules()
+LayoutRulesImpl* CUDALayoutRulesFamilyImpl::getStructuredBufferRules(TargetRequest*)
 {
     return &kCUDALayoutRulesImpl_;
 }
@@ -1436,7 +1447,7 @@ TypeLayoutContext getInitialLayoutContextForTarget(TargetRequest* targetReq, Pro
 
     if( rulesFamily )
     {
-        context.rules = rulesFamily->getConstantBufferRules();
+        context.rules = rulesFamily->getConstantBufferRules(targetReq);
     }
 
     return context;
@@ -2545,7 +2556,7 @@ LayoutRulesImpl* getParameterBufferElementTypeLayoutRules(
 {
     if( as<ConstantBufferType>(parameterGroupType) )
     {
-        return rules->getLayoutRulesFamily()->getConstantBufferRules();
+        return rules->getLayoutRulesFamily()->getConstantBufferRules(targetRequest);
     }
     else if( as<TextureBufferType>(parameterGroupType) )
     {
@@ -2565,7 +2576,7 @@ LayoutRulesImpl* getParameterBufferElementTypeLayoutRules(
     }
     else if (as<ParameterBlockType>(parameterGroupType))
     {
-        return rules->getLayoutRulesFamily()->getParameterBlockRules();
+        return rules->getLayoutRulesFamily()->getParameterBlockRules(targetRequest);
     }
     else
     {
@@ -2647,7 +2658,7 @@ createStructuredBufferTypeLayout(
     Type*                elementType)
 {
     // look up the appropriate rules via the `LayoutRulesFamily` 
-    auto structuredBufferLayoutRules = context.getRulesFamily()->getStructuredBufferRules();
+    auto structuredBufferLayoutRules = context.getRulesFamily()->getStructuredBufferRules(context.targetReq);
 
     // Create and save type layout for the buffer contents.
     auto elementTypeLayout = createTypeLayout(

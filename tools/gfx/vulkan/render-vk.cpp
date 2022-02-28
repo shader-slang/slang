@@ -6393,7 +6393,7 @@ public:
                 m_desc.format = Format::B8G8R8A8_UNORM;
             }
 
-            SLANG_RETURN_ON_FAIL(createSwapchainAndImages());
+            createSwapchainAndImages();
             return SLANG_OK;
         }
 

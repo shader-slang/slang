@@ -2278,6 +2278,12 @@ public:
         slang::TypeReflection* type,
         ShaderObjectContainerType container,
         IShaderObject** outObject) = 0;
+    
+    virtual SLANG_NO_THROW Result SLANG_MCALL createShaderObjectFromTypeLayout(
+        slang::TypeLayoutReflection* typeLayout, IShaderObject** outObject) = 0;
+
+    virtual SLANG_NO_THROW Result SLANG_MCALL createMutableShaderObjectFromTypeLayout(
+        slang::TypeLayoutReflection* typeLayout, IShaderObject** outObject) = 0;
 
     virtual SLANG_NO_THROW Result SLANG_MCALL createMutableRootShaderObject(
         IShaderProgram* program,

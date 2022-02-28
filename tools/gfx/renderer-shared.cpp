@@ -459,6 +459,22 @@ SLANG_NO_THROW Result SLANG_MCALL RendererBase::createMutableShaderObject(
     return createMutableShaderObject(shaderObjectLayout, outObject);
 }
 
+SLANG_NO_THROW Result SLANG_MCALL RendererBase::createShaderObjectFromTypeLayout(
+    slang::TypeLayoutReflection* typeLayout, IShaderObject** outObject)
+{
+    RefPtr<ShaderObjectLayoutBase> shaderObjectLayout;
+    SLANG_RETURN_ON_FAIL(getShaderObjectLayout(typeLayout, shaderObjectLayout.writeRef()));
+    return createShaderObject(shaderObjectLayout, outObject);
+}
+
+SLANG_NO_THROW Result SLANG_MCALL RendererBase::createMutableShaderObjectFromTypeLayout(
+    slang::TypeLayoutReflection* typeLayout, IShaderObject** outObject)
+{
+    RefPtr<ShaderObjectLayoutBase> shaderObjectLayout;
+    SLANG_RETURN_ON_FAIL(getShaderObjectLayout(typeLayout, shaderObjectLayout.writeRef()));
+    return createMutableShaderObject(shaderObjectLayout, outObject);
+}
+
 Result RendererBase::getAccelerationStructurePrebuildInfo(
     const IAccelerationStructure::BuildInputs& buildInputs,
     IAccelerationStructure::PrebuildInfo* outPrebuildInfo)
@@ -531,7 +547,6 @@ Result RendererBase::getShaderObjectLayout(
     ShaderObjectContainerType container,
     ShaderObjectLayoutBase** outLayout)
 {
-    RefPtr<ShaderObjectLayoutBase> shaderObjectLayout;
     switch (container)
     {
     case ShaderObjectContainerType::StructuredBuffer:
@@ -544,11 +559,18 @@ Result RendererBase::getShaderObjectLayout(
         break;
     }
 
-    if( !m_shaderObjectLayoutCache.TryGetValue(type, shaderObjectLayout) )
+    auto typeLayout = slangContext.session->getTypeLayout(type);
+    return getShaderObjectLayout(typeLayout, outLayout);
+}
+
+Result RendererBase::getShaderObjectLayout(
+    slang::TypeLayoutReflection* typeLayout, ShaderObjectLayoutBase** outLayout)
+{
+    RefPtr<ShaderObjectLayoutBase> shaderObjectLayout;
+    if (!m_shaderObjectLayoutCache.TryGetValue(typeLayout, shaderObjectLayout))
     {
-        auto typeLayout = slangContext.session->getTypeLayout(type);
         SLANG_RETURN_ON_FAIL(createShaderObjectLayout(typeLayout, shaderObjectLayout.writeRef()));
-        m_shaderObjectLayoutCache.Add(type, shaderObjectLayout);
+        m_shaderObjectLayoutCache.Add(typeLayout, shaderObjectLayout);
     }
     *outLayout = shaderObjectLayout.detach();
     return SLANG_OK;
