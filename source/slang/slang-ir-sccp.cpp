@@ -373,6 +373,37 @@ struct SCCPContext
         return LatticeVal::getConstant(resultVal);
     }
 
+    LatticeVal evalDefaultConstruct(IRType* type)
+    {
+        IRInst* resultVal = nullptr;
+        switch (type->getOp())
+        {
+        case kIROp_Int8Type:
+        case kIROp_Int16Type:
+        case kIROp_IntType:
+        case kIROp_Int64Type:
+        case kIROp_UInt8Type:
+        case kIROp_UInt16Type:
+        case kIROp_UIntType:
+        case kIROp_UInt64Type:
+            resultVal = getBuilder()->getIntValue(type, (IRIntegerValue)0);
+            break;
+
+        case kIROp_FloatType:
+        case kIROp_DoubleType:
+        case kIROp_HalfType:
+            resultVal = getBuilder()->getFloatValue(type, (IRFloatingPointValue)0.0);
+            break;
+
+        case kIROp_BoolType:
+            resultVal = getBuilder()->getBoolValue(false);
+            break;
+        }
+        if (!resultVal)
+            return LatticeVal::getAny();
+        return LatticeVal::getConstant(resultVal);
+    }
+
     template<typename TIntFunc, typename TFloatFunc>
     LatticeVal evalBinaryImpl(
         IRType* type,
@@ -800,7 +831,17 @@ struct SCCPContext
         switch (inst->getOp())
         {
         case kIROp_Construct:
-            return evalConstruct(inst->getDataType(), getLatticeVal(inst->getOperand(0)));
+            switch (inst->getOperandCount())
+            {
+            case 0:
+                return evalDefaultConstruct(inst->getDataType());
+
+            case 1:
+                return evalConstruct(inst->getDataType(), getLatticeVal(inst->getOperand(0)));
+
+            default:
+                return LatticeVal::getAny();
+            }
         case kIROp_Add:
             return evalAdd(
                 inst->getDataType(),
