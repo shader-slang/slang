@@ -366,6 +366,7 @@ Result RendererBase::getFormatSupportedResourceStates(Format format, ResourceSta
 {
     SLANG_UNUSED(format);
     outStates->add(ResourceState::AccelerationStructure);
+    outStates->add(ResourceState::AccelerationStructureBuildInput);
     outStates->add(ResourceState::ConstantBuffer);
     outStates->add(ResourceState::CopyDestination);
     outStates->add(ResourceState::CopySource);

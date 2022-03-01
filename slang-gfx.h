@@ -426,6 +426,7 @@ enum class ResourceState
     ResolveSource,
     ResolveDestination,
     AccelerationStructure,
+    AccelerationStructureBuildInput,
     _Count
 };
 

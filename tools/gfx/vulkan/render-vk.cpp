@@ -4252,6 +4252,8 @@ public:
                     return VkAccessFlagBits(
                         VK_ACCESS_ACCELERATION_STRUCTURE_READ_BIT_KHR |
                         VK_ACCESS_ACCELERATION_STRUCTURE_WRITE_BIT_KHR);
+                case ResourceState::AccelerationStructureBuildInput:
+                    return VkAccessFlagBits(VK_ACCESS_ACCELERATION_STRUCTURE_READ_BIT_KHR);
                 case ResourceState::General:
                     return VkAccessFlagBits(VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT);
                 default:
@@ -4314,6 +4316,8 @@ public:
                         VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT |
                         VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR |
                         VK_PIPELINE_STAGE_ACCELERATION_STRUCTURE_BUILD_BIT_KHR);
+                case ResourceState::AccelerationStructureBuildInput:
+                    return VkPipelineStageFlagBits(VK_PIPELINE_STAGE_ACCELERATION_STRUCTURE_BUILD_BIT_KHR);
                 default:
                     assert(!"Unsupported");
                     return VkPipelineStageFlagBits(0);
@@ -4666,7 +4670,8 @@ public:
                             region.bufferImageHeight = 0;
 
                             region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-                            region.imageSubresource.mipLevel = uint32_t(j);
+                            region.imageSubresource.mipLevel =
+                                subResourceRange.mipLevel + uint32_t(j);
                             region.imageSubresource.baseArrayLayer =
                                 subResourceRange.baseArrayLayer + i;
                             region.imageSubresource.layerCount = 1;
@@ -7771,7 +7776,8 @@ static VkBufferUsageFlagBits _calcBufferUsageFlags(ResourceState state)
     case ResourceState::UnorderedAccess:
         return (VkBufferUsageFlagBits)(VK_BUFFER_USAGE_STORAGE_TEXEL_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
     case ResourceState::ShaderResource:
-        return (VkBufferUsageFlagBits)(VK_BUFFER_USAGE_UNIFORM_TEXEL_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+        return (VkBufferUsageFlagBits)(VK_BUFFER_USAGE_UNIFORM_TEXEL_BUFFER_BIT |
+                                       VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
     case ResourceState::CopySource:
         return VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
     case ResourceState::CopyDestination:
@@ -7780,6 +7786,8 @@ static VkBufferUsageFlagBits _calcBufferUsageFlags(ResourceState state)
         return VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_STORAGE_BIT_KHR;
     case ResourceState::IndirectArgument:
         return VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT;
+    case ResourceState::AccelerationStructureBuildInput:
+        return VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR;
     default:
         return VkBufferUsageFlagBits(0);
     }
@@ -8740,7 +8748,10 @@ Result VKDevice::getFormatSupportedResourceStates(Format format, ResourceStateSe
     }
     // AccelerationStructure
     if (bufferFeatures & VK_FORMAT_FEATURE_ACCELERATION_STRUCTURE_VERTEX_BUFFER_BIT_KHR)
+    {
         allowedStates.add(ResourceState::AccelerationStructure);
+        allowedStates.add(ResourceState::AccelerationStructureBuildInput);
+    }
 
     *outStates = allowedStates;
     return SLANG_OK;
