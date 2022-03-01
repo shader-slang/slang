@@ -4278,7 +4278,7 @@ char const* EndToEndCompileRequest::getDiagnosticOutput()
 
 SlangResult EndToEndCompileRequest::getDiagnosticOutputBlob(ISlangBlob** outBlob)   
 {
-    if (!outBlob) return SLANG_ERROR_INVALID_PARAMETER;
+    if (!outBlob) return SLANG_E_INVALID_ARG;
 
     if (!m_diagnosticOutputBlob)
     {
@@ -4623,14 +4623,14 @@ static SlangResult _getEntryPointResult(
     Index targetCount = linkage->targets.getCount();
     if ((targetIndex < 0) || (targetIndex >= targetCount))
     {
-        return SLANG_ERROR_INVALID_PARAMETER;
+        return SLANG_E_INVALID_ARG;
     }
     auto targetReq = linkage->targets[targetIndex];
 
     Index entryPointCount = req->m_entryPoints.getCount();
     if ((entryPointIndex < 0) || (entryPointIndex >= entryPointCount))
     {
-        return SLANG_ERROR_INVALID_PARAMETER;
+        return SLANG_E_INVALID_ARG;
     }
     auto entryPointReq = program->getEntryPoint(entryPointIndex);
 
@@ -4653,7 +4653,7 @@ static SlangResult _getWholeProgramResult(
     Index targetCount = linkage->targets.getCount();
     if ((targetIndex < 0) || (targetIndex >= targetCount))
     {
-        return SLANG_ERROR_INVALID_PARAMETER;
+        return SLANG_E_INVALID_ARG;
     }
     auto targetReq = linkage->targets[targetIndex];
 
@@ -4666,7 +4666,7 @@ static SlangResult _getWholeProgramResult(
 
 SlangResult EndToEndCompileRequest::getEntryPointCodeBlob(int entryPointIndex, int targetIndex, ISlangBlob** outBlob)
 {
-    if (!outBlob) return SLANG_ERROR_INVALID_PARAMETER;
+    if (!outBlob) return SLANG_E_INVALID_ARG;
 
     CompileResult* compileResult = nullptr;
     SLANG_RETURN_ON_FAIL(_getEntryPointResult(this, entryPointIndex, targetIndex, &compileResult));
@@ -4679,7 +4679,7 @@ SlangResult EndToEndCompileRequest::getEntryPointCodeBlob(int entryPointIndex, i
 
 SlangResult EndToEndCompileRequest::getEntryPointHostCallable(int entryPointIndex, int targetIndex, ISlangSharedLibrary** outSharedLibrary)
 {
-    if (!outSharedLibrary) return SLANG_ERROR_INVALID_PARAMETER;
+    if (!outSharedLibrary) return SLANG_E_INVALID_ARG;
 
     CompileResult* compileResult = nullptr;
     SLANG_RETURN_ON_FAIL(_getEntryPointResult(this, entryPointIndex, targetIndex, &compileResult));
@@ -4693,7 +4693,7 @@ SlangResult EndToEndCompileRequest::getEntryPointHostCallable(int entryPointInde
 SlangResult EndToEndCompileRequest::getTargetCodeBlob(int targetIndex, ISlangBlob** outBlob)
 {
     if (!outBlob)
-        return SLANG_ERROR_INVALID_PARAMETER;
+        return SLANG_E_INVALID_ARG;
 
     CompileResult* compileResult = nullptr;
     SLANG_RETURN_ON_FAIL(_getWholeProgramResult(this, targetIndex, &compileResult));
@@ -4707,7 +4707,7 @@ SlangResult EndToEndCompileRequest::getTargetCodeBlob(int targetIndex, ISlangBlo
 SlangResult EndToEndCompileRequest::getTargetHostCallable(int targetIndex,ISlangSharedLibrary** outSharedLibrary)
 {
     if (!outSharedLibrary)
-        return SLANG_ERROR_INVALID_PARAMETER;
+        return SLANG_E_INVALID_ARG;
 
     CompileResult* compileResult = nullptr;
     SLANG_RETURN_ON_FAIL(_getWholeProgramResult(this, targetIndex, &compileResult));
