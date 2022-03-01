@@ -669,6 +669,42 @@ Result DebugDevice::createMutableRootShaderObject(
     return result;
 }
 
+Result DebugDevice::createShaderObjectFromTypeLayout(
+    slang::TypeLayoutReflection* typeLayout, IShaderObject** outShaderObject)
+{
+    SLANG_GFX_API_FUNC;
+
+    RefPtr<DebugShaderObject> outObject = new DebugShaderObject();
+    auto result = baseObject->createShaderObjectFromTypeLayout(typeLayout, outObject->baseObject.writeRef());
+    auto type = typeLayout->getType();
+    auto typeName = type->getName();
+    outObject->m_typeName = typeName;
+    outObject->m_device = this;
+    outObject->m_slangType = type;
+    if (SLANG_FAILED(result))
+        return result;
+    returnComPtr(outShaderObject, outObject);
+    return result;
+}
+
+Result DebugDevice::createMutableShaderObjectFromTypeLayout(
+    slang::TypeLayoutReflection* typeLayout, IShaderObject** outShaderObject)
+{
+    SLANG_GFX_API_FUNC;
+    RefPtr<DebugShaderObject> outObject = new DebugShaderObject();
+    auto result = baseObject->createMutableShaderObjectFromTypeLayout(
+        typeLayout, outObject->baseObject.writeRef());
+    if (SLANG_FAILED(result))
+        return result;
+    auto type = typeLayout->getType();
+    auto typeName = type->getName();
+    outObject->m_typeName = typeName;
+    outObject->m_device = this;
+    outObject->m_slangType = type;
+    returnComPtr(outShaderObject, outObject);
+    return result;
+}
+
 Result DebugDevice::createProgram(
     const IShaderProgram::Desc& desc, IShaderProgram** outProgram, ISlangBlob** outDiagnostics)
 {

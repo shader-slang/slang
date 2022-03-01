@@ -120,6 +120,10 @@ public:
         slang::TypeReflection* type,
         ShaderObjectContainerType container,
         IShaderObject** outObject) override;
+    virtual SLANG_NO_THROW Result SLANG_MCALL createShaderObjectFromTypeLayout(
+        slang::TypeLayoutReflection* typeLayout, IShaderObject** outObject) override;
+    virtual SLANG_NO_THROW Result SLANG_MCALL createMutableShaderObjectFromTypeLayout(
+        slang::TypeLayoutReflection* typeLayout, IShaderObject** outObject) override;
     virtual SLANG_NO_THROW Result SLANG_MCALL
         createMutableRootShaderObject(IShaderProgram* program, IShaderObject** outObject) override;
     virtual SLANG_NO_THROW Result SLANG_MCALL

@@ -290,14 +290,18 @@ void GLSLSourceEmitter::_emitGLSLParameterGroup(IRGlobalParam* varDecl, IRUnifor
     }
     else if (as<IRGLSLShaderStorageBufferType>(type))
     {
-        // Is writable 
-        m_writer->emit("layout(std430) buffer ");
+        // Is writable
+        m_writer->emit("layout(");
+        m_writer->emit(m_targetRequest->getForceGLSLScalarBufferLayout() ? "scalar" : "std430");
+        m_writer->emit(") buffer ");
     }
     // TODO: what to do with HLSL `tbuffer` style buffers?
     else
     {
         // uniform is implicitly read only
-        m_writer->emit("layout(std140) uniform ");
+        m_writer->emit("layout(");
+        m_writer->emit(m_targetRequest->getForceGLSLScalarBufferLayout() ? "scalar" : "std140");
+        m_writer->emit(") uniform ");
     }
 
     // Generate a dummy name for the block

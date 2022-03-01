@@ -804,7 +804,7 @@ void RenderTestApp::_initializeAccelerationStructure()
         instanceBufferDesc.type = IResource::Type::Buffer;
         instanceBufferDesc.sizeInBytes =
             instanceDescs.getCount() * sizeof(IAccelerationStructure::InstanceDesc);
-        instanceBufferDesc.defaultState = ResourceState::ShaderResource;
+        instanceBufferDesc.defaultState = ResourceState::AccelerationStructureBuildInput;
         ComPtr<IBufferResource> instanceBuffer =
             m_device->createBufferResource(instanceBufferDesc, instanceDescs.getBuffer());
 

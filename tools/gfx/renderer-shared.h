@@ -1240,6 +1240,12 @@ public:
         ShaderObjectContainerType containerType,
         IShaderObject** outObject) SLANG_OVERRIDE;
 
+    virtual SLANG_NO_THROW Result SLANG_MCALL createShaderObjectFromTypeLayout(
+        slang::TypeLayoutReflection* typeLayout, IShaderObject** outObject) override;
+
+    virtual SLANG_NO_THROW Result SLANG_MCALL createMutableShaderObjectFromTypeLayout(
+        slang::TypeLayoutReflection* typeLayout, IShaderObject** outObject) override;
+
     // Provides a default implementation that returns SLANG_E_NOT_AVAILABLE for platforms
     // without ray tracing support.
     virtual SLANG_NO_THROW Result SLANG_MCALL getAccelerationStructurePrebuildInfo(
@@ -1283,6 +1289,10 @@ public:
         ShaderObjectContainerType   container,
         ShaderObjectLayoutBase**    outLayout);
 
+    Result getShaderObjectLayout(
+        slang::TypeLayoutReflection* typeLayout,
+        ShaderObjectLayoutBase** outLayout);
+
 public:
     ExtendedShaderObjectTypeList specializationArgs;
     // Given current pipeline and root shader object binding, generate and bind a specialized pipeline if necessary.
@@ -1316,7 +1326,7 @@ public:
     SlangContext slangContext;
     ShaderCache shaderCache;
 
-    Slang::Dictionary<slang::TypeReflection*, Slang::RefPtr<ShaderObjectLayoutBase>> m_shaderObjectLayoutCache;
+    Slang::Dictionary<slang::TypeLayoutReflection*, Slang::RefPtr<ShaderObjectLayoutBase>> m_shaderObjectLayoutCache;
 };
 
 bool isDepthFormat(Format format);
