@@ -129,10 +129,10 @@ For completeness, here are the options that `slangc` currently accepts:
 * `-o <path>`: Specify a path where generated output should be written
   * When multiple `-entry` options are present, each `-o` associates with the first `-entry` to its left.
 
-* `-pass-through <name>`: Don't actually perform Slang parsing/checking/etc. on the input and instead pass it through (more or less) unmodified to the existing compiler `<name>`"
+* `-pass-through <name>`: Don't actually perform Slang parsing/checking/etc. on the input and instead pass it through (more or less) unmodified to the existing compiler `<name>`
   * `fxc`: Use the `D3DCompile` API as exposed by `d3dcompiler_47.dll`
   * `glslang`: Use Slang's internal version of `glslang` as exposed by `slang-glslang.dll`
-  * 'dxc': Use DirectXShaderCompiler (https://github.com/Microsoft/DirectXShaderCompiler)
+  * `dxc`: Use DirectXShaderCompiler (https://github.com/Microsoft/DirectXShaderCompiler)
   * These are intended for debugging/testing purposes, when you want to be able to see what these existing compilers do with the "same" input and options
 
 * `-verbose-paths`: When displaying diagnostic output aim to display more detailed path information. In practice this is typically the complete 'canonical' path to the source file used.
@@ -236,9 +236,9 @@ Means that the dxc compilation in the render test (assuming dxc is invoked) will
 
 ### Specifying where dlls/shared libraries are loaded from
 
-On windows if you want a dll loaded from a specific path, the path must be specified absolutely. See the *'LoadLibrary'* documentation for more details. A relative path will cause Windows to check all locations along it's search procedure.
+On windows if you want a dll loaded from a specific path, the path must be specified absolutely. See the [LoadLibrary documentation](https://docs.microsoft.com/en-us/windows/win32/api/libloaderapi/nf-libloaderapi-loadlibrarya) for more details. A relative path will cause Windows to check all locations along it's search procedure.
 
-On linux it's similar, but any path (relative or not) will override the regular search mechanism. See *'dlopen'* for more details. 
+On linux it's similar, but any path (relative or not) will override the regular search mechanism. See [dlopen](https://man7.org/linux/man-pages/man3/dlopen.3.html) for more details. 
 
 * `-dxc-path`: Sets the path where dxc dll/shared libraries are loaded from (dxcompiler & dxil).
 
@@ -248,14 +248,14 @@ On linux it's similar, but any path (relative or not) will override the regular 
 
 Paths can specify a directory that holds the appropriate binaries. It can also be used to name a specific downstream binary - be it a shared library or an executable. Note that if it is a shared library, it is not necessary to provide the full filesystem name - just the path and/or name that will be used to load it. For example on windows `fxc` can be loaded from `D:/mydlls` with
 
-* `D:/mydlls' - will look for `d3dcompiler_47.dll` in this directory
+* `D:/mydlls` - will look for `d3dcompiler_47.dll` in this directory
 * `D:/mydlls/d3dcompiler_47` - it's not necessary to specify .dll to load a dll on windows
 * `D:/mydlls/d3dcompiler_47.dll` - it is also possible name the shared library explicitly for example
 
-That if you name the shared library/executable you can use a name other than the default for a specific version, for example by using `D:/mydlls/dxcompiler-some-version` for a specific version of `dxc`. 
+The name of the shared library/executable can be used to specify a specific version, for example by using `D:/mydlls/dxcompiler-some-version` for a specific version of `dxc`. 
 
 Limitations
 -----------
 
-A major limitation of the `slangc` command today is that there is no provision for getting reflection data out along with the compiled shade rcode.
+A major limitation of the `slangc` command today is that there is no provision for getting reflection data out along with the compiled shader code.
 For now, the command-line tool is best seen as a debugging/testing tool, and all serious applications should drive Slang through the API.
