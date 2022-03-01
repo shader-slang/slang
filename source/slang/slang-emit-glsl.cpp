@@ -290,14 +290,18 @@ void GLSLSourceEmitter::_emitGLSLParameterGroup(IRGlobalParam* varDecl, IRUnifor
     }
     else if (as<IRGLSLShaderStorageBufferType>(type))
     {
-        // Is writable 
-        m_writer->emit("layout(std430) buffer ");
+        // Is writable
+        m_writer->emit("layout(");
+        m_writer->emit(m_targetRequest->getForceGLSLScalarBufferLayout() ? "scalar" : "std430");
+        m_writer->emit(") buffer ");
     }
     // TODO: what to do with HLSL `tbuffer` style buffers?
     else
     {
         // uniform is implicitly read only
-        m_writer->emit("layout(std140) uniform ");
+        m_writer->emit("layout(");
+        m_writer->emit(m_targetRequest->getForceGLSLScalarBufferLayout() ? "scalar" : "std140");
+        m_writer->emit(") uniform ");
     }
 
     // Generate a dummy name for the block
@@ -774,38 +778,38 @@ void GLSLSourceEmitter::emitSimpleValueImpl(IRInst* inst)
                     {
                         emitType(type);
                         m_writer->emit("(");
-                        m_writer->emit(litInst->value.intVal);
+                        m_writer->emit(int8_t(litInst->value.intVal));
                         m_writer->emit(")");
                         return;
                     }
                     case BaseType::Int16:
                     {
-                        m_writer->emit(litInst->value.intVal);
+                        m_writer->emit(int16_t(litInst->value.intVal));
                         m_writer->emit("S");
                         return;
                     }
                     case BaseType::Int:
                     {
-                        m_writer->emit(litInst->value.intVal);
+                        m_writer->emit(int32_t(litInst->value.intVal));
                         return;
                     }
                     case BaseType::UInt8:
                     {
                         emitType(type);
                         m_writer->emit("(");
-                        m_writer->emit(UInt(litInst->value.intVal));
+                        m_writer->emit(UInt(uint8_t(litInst->value.intVal)));
                         m_writer->emit("U)");
                         return;
                     }
                     case BaseType::UInt16:
                     {
-                        m_writer->emit(UInt(litInst->value.intVal));
+                        m_writer->emit(UInt(uint16_t(litInst->value.intVal)));
                         m_writer->emit("US");
                         return;
                     }
                     case BaseType::UInt:
                     {
-                        m_writer->emit(UInt(litInst->value.intVal));
+                        m_writer->emit(UInt(uint32_t(litInst->value.intVal)));
                         m_writer->emit("U");
                         return;
                     }
@@ -1634,6 +1638,26 @@ bool GLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             //
             EmitOpInfo outerPrec = inOuterPrec;
             emitOperand(inst->getOperand(0), outerPrec);
+            return true;
+        }
+        case kIROp_ImageLoad:
+        {
+            m_writer->emit("imageLoad(");
+            emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+            m_writer->emit(",");
+            emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
+            m_writer->emit(")");
+            return true;
+        }
+        case kIROp_ImageStore:
+        {
+            m_writer->emit("imageStore(");
+            emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+            m_writer->emit(",");
+            emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
+            m_writer->emit(",");
+            emitOperand(inst->getOperand(2), getInfo(EmitOp::General));
+            m_writer->emit(")");
             return true;
         }
         case kIROp_StructuredBufferLoad:

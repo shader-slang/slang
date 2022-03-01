@@ -669,6 +669,42 @@ Result DebugDevice::createMutableRootShaderObject(
     return result;
 }
 
+Result DebugDevice::createShaderObjectFromTypeLayout(
+    slang::TypeLayoutReflection* typeLayout, IShaderObject** outShaderObject)
+{
+    SLANG_GFX_API_FUNC;
+
+    RefPtr<DebugShaderObject> outObject = new DebugShaderObject();
+    auto result = baseObject->createShaderObjectFromTypeLayout(typeLayout, outObject->baseObject.writeRef());
+    auto type = typeLayout->getType();
+    auto typeName = type->getName();
+    outObject->m_typeName = typeName;
+    outObject->m_device = this;
+    outObject->m_slangType = type;
+    if (SLANG_FAILED(result))
+        return result;
+    returnComPtr(outShaderObject, outObject);
+    return result;
+}
+
+Result DebugDevice::createMutableShaderObjectFromTypeLayout(
+    slang::TypeLayoutReflection* typeLayout, IShaderObject** outShaderObject)
+{
+    SLANG_GFX_API_FUNC;
+    RefPtr<DebugShaderObject> outObject = new DebugShaderObject();
+    auto result = baseObject->createMutableShaderObjectFromTypeLayout(
+        typeLayout, outObject->baseObject.writeRef());
+    if (SLANG_FAILED(result))
+        return result;
+    auto type = typeLayout->getType();
+    auto typeName = type->getName();
+    outObject->m_typeName = typeName;
+    outObject->m_device = this;
+    outObject->m_slangType = type;
+    returnComPtr(outShaderObject, outObject);
+    return result;
+}
+
 Result DebugDevice::createProgram(
     const IShaderProgram::Desc& desc, IShaderProgram** outProgram, ISlangBlob** outDiagnostics)
 {
@@ -1013,12 +1049,6 @@ Result DebugCommandBuffer::getNativeHandle(InteropHandle* outHandle)
 {
     SLANG_GFX_API_FUNC;
     return baseObject->getNativeHandle(outHandle);
-}
-
-Result DebugCommandBuffer::resetDescriptorHeaps()
-{
-    SLANG_GFX_API_FUNC;
-    return baseObject->resetDescriptorHeaps();
 }
 
 void DebugCommandBuffer::checkEncodersClosedBeforeNewEncoder()
@@ -1642,6 +1672,18 @@ Result DebugSwapchain::resize(uint32_t width, uint32_t height)
     }
     m_images.clearAndDeallocate();
     return baseObject->resize(width, height);
+}
+
+bool DebugSwapchain::isOccluded()
+{
+    SLANG_GFX_API_FUNC;
+    return baseObject->isOccluded();
+}
+
+Result DebugSwapchain::setFullScreenMode(bool mode)
+{
+    SLANG_GFX_API_FUNC;
+    return baseObject->setFullScreenMode(mode);
 }
 
 void DebugSwapchain::maybeRebuildImageList()

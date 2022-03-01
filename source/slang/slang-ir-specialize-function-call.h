@@ -26,8 +26,8 @@ namespace Slang
     /// a specialized variant of the function that does not have
     /// those resource parameters (and instead, e.g, refers to the
     /// global shader parameters directly).
-    ///
-    void specializeFunctionCalls(
+    /// Returns true if any changes are made.
+    bool specializeFunctionCalls(
         BackEndCompileRequest* compileRequest,
         TargetRequest* targetRequest,
         IRModule* module,

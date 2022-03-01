@@ -123,14 +123,14 @@ IRFunc* specializeDispatchFunction(SharedGenericsLoweringContext* sharedContext,
     // the witness table sequential ID passed in.
     builder->setInsertInto(newDispatchFunc);
 
-    
+
     if (witnessTables.getCount() == 1)
     {
         // If there is only 1 case, no switch statement is necessary.
         builder->setInsertInto(newBlock);
         builder->emitBranch(defaultBlock);
     }
-    else
+    else if (witnessTables.getCount() > 1)
     {
         auto breakBlock = builder->emitBlock();
         builder->setInsertInto(breakBlock);
@@ -143,6 +143,21 @@ IRFunc* specializeDispatchFunction(SharedGenericsLoweringContext* sharedContext,
             defaultBlock,
             caseBlocks.getCount(),
             caseBlocks.getBuffer());
+    }
+    else
+    {
+        // We have no witness tables that implements this interface.
+        // Just return a default value.
+        builder->setInsertInto(newBlock);
+        if (callInst->getDataType()->getOp() == kIROp_VoidType)
+        {
+            builder->emitReturn();
+        }
+        else
+        {
+            auto defaultValue = builder->emitConstructorInst(callInst->getDataType(), 0, nullptr);
+            builder->emitReturn(defaultValue);
+        }
     }
     // Remove old implementation.
     dispatchFunc->replaceUsesWith(newDispatchFunc);

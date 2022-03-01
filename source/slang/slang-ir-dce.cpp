@@ -81,7 +81,7 @@ struct DeadCodeEliminationContext
     // dive into the task of actually finding all
     // the live code in a module.
     //
-    void processModule()
+    bool processModule()
     {
         // First of all, we know that the root module instruction
         // should be considered as live, because otherwise
@@ -174,11 +174,12 @@ struct DeadCodeEliminationContext
         // recursively and eliminate those that are "dead" by
         // virtue of not having been found live.
         //
-        eliminateDeadInstsRec(module->getModuleInst());
+        return eliminateDeadInstsRec(module->getModuleInst());
     }
 
-    void eliminateDeadInstsRec(IRInst* inst)
+    bool eliminateDeadInstsRec(IRInst* inst)
     {
+        bool changed = false;
         // Given the instruction `inst` we need to eliminate
         // any dead code at, or under it.
         //
@@ -192,6 +193,7 @@ struct DeadCodeEliminationContext
             // mark the parent of a live instruction as live).
             //
             inst->removeAndDeallocate();
+            changed = true;
         }
         else
         {
@@ -208,9 +210,10 @@ struct DeadCodeEliminationContext
             for( IRInst* child = inst->getFirstDecorationOrChild(); child; child = next )
             {
                 next = child->getNextInst();
-                eliminateDeadInstsRec(child);
+                changed |= eliminateDeadInstsRec(child);
             }
         }
+        return changed;
     }
 
     // Now we come to the decision procedure we put off before:
@@ -336,7 +339,7 @@ struct DeadCodeEliminationContext
 // is straighforward. We set up the context object
 // and then defer to it for the real work.
 //
-void eliminateDeadCode(
+bool eliminateDeadCode(
     IRModule*                           module,
     IRDeadCodeEliminationOptions const& options)
 {
@@ -344,7 +347,7 @@ void eliminateDeadCode(
     context.module = module;
     context.options = options;
 
-    context.processModule();
+    return context.processModule();
 }
 
 }

@@ -945,12 +945,6 @@ public:
                 return static_cast<ICommandBuffer*>(this);
             return nullptr;
         }
-
-        virtual SLANG_NO_THROW Result SLANG_MCALL resetDescriptorHeaps() override
-        {
-            return SLANG_OK;
-        }
-
     public:
         CUDADevice* m_device;
         TransientResourceHeapBase* m_transientHeap;

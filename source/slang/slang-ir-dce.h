@@ -17,8 +17,8 @@ namespace Slang
         /// "global" dead code elimination (DCE), such as removing
         /// types that are unused, functions that are never called,
         /// etc.
-        ///
-    void eliminateDeadCode(
+        /// Returns true if changed.
+    bool eliminateDeadCode(
         IRModule*                           module,
         IRDeadCodeEliminationOptions const& options = IRDeadCodeEliminationOptions());
 }

@@ -3541,6 +3541,21 @@ namespace Slang
         return inst;
     }
 
+    IRInst* IRBuilder::emitImageLoad(IRType* type, IRInst* image, IRInst* coord)
+    {
+        auto inst = createInst<IRImageLoad>(this, kIROp_ImageLoad, type, image, coord);
+        addInst(inst);
+        return inst;
+    }
+
+    IRInst* IRBuilder::emitImageStore(IRType* type, IRInst* image, IRInst* coord, IRInst* value)
+    {
+        IRInst* args[] = {image, coord, value};
+        auto inst = createInst<IRImageStore>(this, kIROp_ImageStore, type, 3, args);
+        addInst(inst);
+        return inst;
+    }
+
     IRInst* IRBuilder::emitFieldExtract(
         IRType* type,
         IRInst* base,
@@ -5730,6 +5745,7 @@ namespace Slang
         case kIROp_makeArray:
         case kIROp_makeStruct:
         case kIROp_Load:    // We are ignoring the possibility of loads from bad addresses, or `volatile` loads
+        case kIROp_ImageSubscript:
         case kIROp_FieldExtract:
         case kIROp_FieldAddress:
         case kIROp_getElement:

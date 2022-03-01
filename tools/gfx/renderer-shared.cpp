@@ -34,6 +34,7 @@ const Slang::Guid GfxGUID::IID_IAccelerationStructure = SLANG_UUID_IAcceleration
 const Slang::Guid GfxGUID::IID_IFence = SLANG_UUID_IFence;
 const Slang::Guid GfxGUID::IID_IShaderTable = SLANG_UUID_IShaderTable;
 const Slang::Guid GfxGUID::IID_IPipelineCreationAPIDispatcher = SLANG_UUID_IPipelineCreationAPIDispatcher;
+const Slang::Guid GfxGUID::IID_ID3D12TransientResourceHeap = SLANG_UUID_ID3D12TransientResourceHeap;
 
 
 StageType translateStage(SlangStage slangStage)
@@ -365,6 +366,7 @@ Result RendererBase::getFormatSupportedResourceStates(Format format, ResourceSta
 {
     SLANG_UNUSED(format);
     outStates->add(ResourceState::AccelerationStructure);
+    outStates->add(ResourceState::AccelerationStructureBuildInput);
     outStates->add(ResourceState::ConstantBuffer);
     outStates->add(ResourceState::CopyDestination);
     outStates->add(ResourceState::CopySource);
@@ -458,6 +460,22 @@ SLANG_NO_THROW Result SLANG_MCALL RendererBase::createMutableShaderObject(
     return createMutableShaderObject(shaderObjectLayout, outObject);
 }
 
+SLANG_NO_THROW Result SLANG_MCALL RendererBase::createShaderObjectFromTypeLayout(
+    slang::TypeLayoutReflection* typeLayout, IShaderObject** outObject)
+{
+    RefPtr<ShaderObjectLayoutBase> shaderObjectLayout;
+    SLANG_RETURN_ON_FAIL(getShaderObjectLayout(typeLayout, shaderObjectLayout.writeRef()));
+    return createShaderObject(shaderObjectLayout, outObject);
+}
+
+SLANG_NO_THROW Result SLANG_MCALL RendererBase::createMutableShaderObjectFromTypeLayout(
+    slang::TypeLayoutReflection* typeLayout, IShaderObject** outObject)
+{
+    RefPtr<ShaderObjectLayoutBase> shaderObjectLayout;
+    SLANG_RETURN_ON_FAIL(getShaderObjectLayout(typeLayout, shaderObjectLayout.writeRef()));
+    return createMutableShaderObject(shaderObjectLayout, outObject);
+}
+
 Result RendererBase::getAccelerationStructurePrebuildInfo(
     const IAccelerationStructure::BuildInputs& buildInputs,
     IAccelerationStructure::PrebuildInfo* outPrebuildInfo)
@@ -530,7 +548,6 @@ Result RendererBase::getShaderObjectLayout(
     ShaderObjectContainerType container,
     ShaderObjectLayoutBase** outLayout)
 {
-    RefPtr<ShaderObjectLayoutBase> shaderObjectLayout;
     switch (container)
     {
     case ShaderObjectContainerType::StructuredBuffer:
@@ -543,11 +560,18 @@ Result RendererBase::getShaderObjectLayout(
         break;
     }
 
-    if( !m_shaderObjectLayoutCache.TryGetValue(type, shaderObjectLayout) )
+    auto typeLayout = slangContext.session->getTypeLayout(type);
+    return getShaderObjectLayout(typeLayout, outLayout);
+}
+
+Result RendererBase::getShaderObjectLayout(
+    slang::TypeLayoutReflection* typeLayout, ShaderObjectLayoutBase** outLayout)
+{
+    RefPtr<ShaderObjectLayoutBase> shaderObjectLayout;
+    if (!m_shaderObjectLayoutCache.TryGetValue(typeLayout, shaderObjectLayout))
     {
-        auto typeLayout = slangContext.session->getTypeLayout(type);
         SLANG_RETURN_ON_FAIL(createShaderObjectLayout(typeLayout, shaderObjectLayout.writeRef()));
-        m_shaderObjectLayoutCache.Add(type, shaderObjectLayout);
+        m_shaderObjectLayoutCache.Add(typeLayout, shaderObjectLayout);
     }
     *outLayout = shaderObjectLayout.detach();
     return SLANG_OK;

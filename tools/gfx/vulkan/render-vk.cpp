@@ -399,14 +399,20 @@ public:
 
         virtual SLANG_NO_THROW Result SLANG_MCALL setCurrentValue(uint64_t value) override
         {
-            VkSemaphoreSignalInfo signalInfo;
-            signalInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SIGNAL_INFO;
-            signalInfo.pNext = NULL;
-            signalInfo.semaphore = m_semaphore;
-            signalInfo.value = 2;
+            uint64_t currentValue = 0;
+            SLANG_VK_RETURN_ON_FAIL(m_device->m_api.vkGetSemaphoreCounterValue(
+                m_device->m_api.m_device, m_semaphore, &currentValue));
+            if (currentValue < value)
+            {
+                VkSemaphoreSignalInfo signalInfo;
+                signalInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SIGNAL_INFO;
+                signalInfo.pNext = NULL;
+                signalInfo.semaphore = m_semaphore;
+                signalInfo.value = value;
 
-            SLANG_VK_RETURN_ON_FAIL(
-                m_device->m_api.vkSignalSemaphore(m_device->m_api.m_device, &signalInfo));
+                SLANG_VK_RETURN_ON_FAIL(
+                    m_device->m_api.vkSignalSemaphore(m_device->m_api.m_device, &signalInfo));
+            }
             return SLANG_OK;
         }
 
@@ -881,7 +887,7 @@ public:
         ComPtr<IResourceView> depthStencilView;
         uint32_t m_width;
         uint32_t m_height;
-        RefPtr<VKDevice> m_renderer;
+        BreakableReference<VKDevice> m_renderer;
         VkClearValue m_clearValues[kMaxAttachments];
         RefPtr<FramebufferLayoutImpl> m_layout;
     public:
@@ -911,7 +917,7 @@ public:
                 m_height = getMipLevelSize(viewDesc->subresourceRange.mipLevel, size.height);
                 layerCount = viewDesc->subresourceRange.layerCount;
             }
-            else
+            else if (desc.renderTargetCount)
             {
                 // If we don't have a depth attachment, then we must have at least
                 // one color attachment. Get frame dimension from there.
@@ -922,6 +928,12 @@ public:
                 m_width = getMipLevelSize(viewDesc->subresourceRange.mipLevel, size.width);
                 m_height = getMipLevelSize(viewDesc->subresourceRange.mipLevel, size.height);
                 layerCount = viewDesc->subresourceRange.layerCount;
+            }
+            else
+            {
+                m_width = 1;
+                m_height = 1;
+                layerCount = 1;
             }
             if (layerCount == 0)
                 layerCount = 1;
@@ -2482,22 +2494,29 @@ public:
         {
             auto& api = buffer->m_renderer->m_api;
             IBufferResource* stagingBuffer = nullptr;
-            transientHeap->allocateStagingBuffer(size, stagingBuffer, ResourceState::CopySource);
+            size_t stagingBufferOffset = 0;
+            transientHeap->allocateStagingBuffer(
+                size, stagingBuffer, stagingBufferOffset, MemoryType::Upload);
 
             BufferResourceImpl* stagingBufferImpl =
                 static_cast<BufferResourceImpl*>(stagingBuffer);
 
             void* mappedData = nullptr;
             SLANG_VK_CHECK(api.vkMapMemory(
-                api.m_device, stagingBufferImpl->m_buffer.m_memory, 0, size, 0, &mappedData));
-            memcpy(mappedData, data, size);
+                api.m_device,
+                stagingBufferImpl->m_buffer.m_memory,
+                0,
+                stagingBufferOffset + size,
+                0,
+                &mappedData));
+            memcpy((char*)mappedData + stagingBufferOffset, data, size);
             api.vkUnmapMemory(api.m_device, stagingBufferImpl->m_buffer.m_memory);
 
             // Copy from staging buffer to real buffer
             VkBufferCopy copyInfo = {};
             copyInfo.size = size;
             copyInfo.dstOffset = offset;
-            copyInfo.srcOffset = 0;
+            copyInfo.srcOffset = stagingBufferOffset;
             api.vkCmdCopyBuffer(
                 commandBuffer,
                 stagingBufferImpl->m_buffer.m_buffer,
@@ -2971,19 +2990,20 @@ public:
             Index count = resourceViews.getCount();
             for(Index i = 0; i < count; ++i)
             {
-                auto bufferView = static_cast<PlainBufferResourceViewImpl*>(resourceViews[i].Ptr());
-
                 VkDescriptorBufferInfo bufferInfo = {};
+                bufferInfo.range = VK_WHOLE_SIZE;
 
-                if(bufferView)
+                if (resourceViews[i])
                 {
-                    bufferInfo.buffer = bufferView->m_buffer->m_buffer.m_buffer;
-                    bufferInfo.offset = bufferView->offset;
-                    bufferInfo.range = bufferView->size;
-                }
-                else
-                {
-                    bufferInfo.range = VK_WHOLE_SIZE;
+                    auto boundViewType = static_cast<ResourceViewImpl*>(resourceViews[i].Ptr())->m_type;
+                    if (boundViewType == ResourceViewImpl::ViewType::PlainBuffer)
+                    {
+                        auto bufferView =
+                            static_cast<PlainBufferResourceViewImpl*>(resourceViews[i].Ptr());
+                        bufferInfo.buffer = bufferView->m_buffer->m_buffer.m_buffer;
+                        bufferInfo.offset = bufferView->offset;
+                        bufferInfo.range = bufferView->size;
+                    }
                 }
 
                 VkWriteDescriptorSet write = {};
@@ -3010,11 +3030,17 @@ public:
             Index count = resourceViews.getCount();
             for(Index i = 0; i < count; ++i)
             {
-                auto resourceView = static_cast<TexelBufferResourceViewImpl*>(resourceViews[i].Ptr());
                 VkBufferView bufferView = VK_NULL_HANDLE;
-                if (resourceView)
+                if (resourceViews[i])
                 {
-                    bufferView = resourceView->m_view;
+                    auto boundViewType =
+                        static_cast<ResourceViewImpl*>(resourceViews[i].Ptr())->m_type;
+                    if (boundViewType == ResourceViewImpl::ViewType::TexelBuffer)
+                    {
+                        auto resourceView =
+                            static_cast<TexelBufferResourceViewImpl*>(resourceViews[i].Ptr());
+                        bufferView = resourceView->m_view;
+                    }
                 }
                 VkWriteDescriptorSet write = {};
                 write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -3118,12 +3144,17 @@ public:
             Index count = resourceViews.getCount();
             for(Index i = 0; i < count; ++i)
             {
-                auto texture = static_cast<TextureResourceViewImpl*>(resourceViews[i].Ptr());
                 VkDescriptorImageInfo imageInfo = {};
-                if (texture)
+                if (resourceViews[i])
                 {
-                    imageInfo.imageView = texture->m_view;
-                    imageInfo.imageLayout = texture->m_layout;
+                    auto boundViewType =
+                        static_cast<ResourceViewImpl*>(resourceViews[i].Ptr())->m_type;
+                    if (boundViewType == ResourceViewImpl::ViewType::Texture)
+                    {
+                        auto texture = static_cast<TextureResourceViewImpl*>(resourceViews[i].Ptr());
+                        imageInfo.imageView = texture->m_view;
+                        imageInfo.imageLayout = texture->m_layout;
+                    }
                 }
                 imageInfo.sampler = 0;
 
@@ -3962,8 +3993,9 @@ public:
                 static_cast<TransientResourceHeapImpl*>(transientHeap);
 
             IBufferResource* stagingBuffer = nullptr;
+            size_t stagingBufferOffset = 0;
             transientHeapImpl->allocateStagingBuffer(
-                tableSize, stagingBuffer, ResourceState::General);
+                tableSize, stagingBuffer, stagingBufferOffset, MemoryType::Upload);
 
             assert(stagingBuffer);
             void* stagingPtr = nullptr;
@@ -3975,7 +4007,7 @@ public:
             handles.setCount(totalHandleSize);
             auto result = vkApi.vkGetRayTracingShaderGroupHandlesKHR(m_device->m_device, pipelineImpl->m_pipeline, 0, (uint32_t)handleCount, totalHandleSize, handles.getBuffer());
 
-            uint8_t* stagingBufferPtr = (uint8_t*)stagingPtr;
+            uint8_t* stagingBufferPtr = (uint8_t*)stagingPtr + stagingBufferOffset;
             auto subTablePtr = stagingBufferPtr;
             Int shaderTableEntryCounter = 0;
 
@@ -4026,7 +4058,7 @@ public:
             // TODO: Callable shaders?
 
             stagingBuffer->unmap(nullptr);
-            encoder->copyBuffer(bufferResource, 0, stagingBuffer, 0, tableSize);
+            encoder->copyBuffer(bufferResource, 0, stagingBuffer, stagingBufferOffset, tableSize);
             encoder->bufferBarrier(
                 1,
                 bufferResource.readRef(),
@@ -4053,10 +4085,6 @@ public:
             return nullptr;
         }
         virtual void comFree() override { m_transientHeap.breakStrongReference(); }
-        virtual SLANG_NO_THROW Result SLANG_MCALL resetDescriptorHeaps() override
-        {
-            return SLANG_OK;
-        }
     public:
         VkCommandBuffer m_commandBuffer;
         VkCommandBuffer m_preCommandBuffer = VK_NULL_HANDLE;
@@ -4224,6 +4252,8 @@ public:
                     return VkAccessFlagBits(
                         VK_ACCESS_ACCELERATION_STRUCTURE_READ_BIT_KHR |
                         VK_ACCESS_ACCELERATION_STRUCTURE_WRITE_BIT_KHR);
+                case ResourceState::AccelerationStructureBuildInput:
+                    return VkAccessFlagBits(VK_ACCESS_ACCELERATION_STRUCTURE_READ_BIT_KHR);
                 case ResourceState::General:
                     return VkAccessFlagBits(VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT);
                 default:
@@ -4286,6 +4316,8 @@ public:
                         VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT |
                         VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR |
                         VK_PIPELINE_STAGE_ACCELERATION_STRUCTURE_BUILD_BIT_KHR);
+                case ResourceState::AccelerationStructureBuildInput:
+                    return VkPipelineStageFlagBits(VK_PIPELINE_STAGE_ACCELERATION_STRUCTURE_BUILD_BIT_KHR);
                 default:
                     assert(!"Unsupported");
                     return VkPipelineStageFlagBits(0);
@@ -4557,8 +4589,9 @@ public:
                 bufferSize *= subResourceRange.layerCount;
 
                 IBufferResource* uploadBuffer = nullptr;
+                size_t uploadBufferOffset = 0;
                 m_commandBuffer->m_transientHeap->allocateStagingBuffer(
-                    bufferSize, uploadBuffer, gfx::ResourceState::CopySource);
+                    bufferSize, uploadBuffer, uploadBufferOffset, MemoryType::Upload);
 
                 // Copy into upload buffer
                 {
@@ -4566,8 +4599,9 @@ public:
 
                     uint8_t* dstData;
                     uploadBuffer->map(nullptr, (void**)&dstData);
+                    dstData += uploadBufferOffset;
                     uint8_t* dstDataStart;
-                    dstDataStart = dstData;
+                    dstDataStart = dstData ;
 
                     size_t dstSubresourceOffset = 0;
                     for (uint32_t i = 0; i < subResourceRange.layerCount; ++i)
@@ -4612,7 +4646,7 @@ public:
                     uploadBuffer->unmap(nullptr);
                 }
                 {
-                    size_t srcOffset = 0;
+                    size_t srcOffset = uploadBufferOffset;
                     for (uint32_t i = 0; i < subResourceRange.layerCount; ++i)
                     {
                         for (Index j = 0; j < mipSizes.getCount(); ++j)
@@ -4636,7 +4670,8 @@ public:
                             region.bufferImageHeight = 0;
 
                             region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-                            region.imageSubresource.mipLevel = uint32_t(j);
+                            region.imageSubresource.mipLevel =
+                                subResourceRange.mipLevel + uint32_t(j);
                             region.imageSubresource.baseArrayLayer =
                                 subResourceRange.baseArrayLayer + i;
                             region.imageSubresource.layerCount = 1;
@@ -5075,6 +5110,8 @@ public:
             void beginPass(IRenderPassLayout* renderPass, IFramebuffer* framebuffer)
             {
                 FramebufferImpl* framebufferImpl = static_cast<FramebufferImpl*>(framebuffer);
+                if (!framebuffer)
+                    framebufferImpl = this->m_device->m_emptyFramebuffer;
                 RenderPassLayoutImpl* renderPassImpl =
                     static_cast<RenderPassLayoutImpl*>(renderPass);
                 VkClearValue clearValues[kMaxAttachments] = {};
@@ -6361,7 +6398,7 @@ public:
                 m_desc.format = Format::B8G8R8A8_UNORM;
             }
 
-            SLANG_RETURN_ON_FAIL(createSwapchainAndImages());
+            createSwapchainAndImages();
             return SLANG_OK;
         }
 
@@ -6443,6 +6480,14 @@ public:
             m_queue->m_pendingWaitSemaphores[1] = m_nextImageSemaphore;
             return m_currentImageIndex;
         }
+        virtual SLANG_NO_THROW bool SLANG_MCALL isOccluded() override
+        {
+            return false;
+        }
+        virtual SLANG_NO_THROW Result SLANG_MCALL setFullScreenMode(bool mode) override
+        {
+            return SLANG_FAIL;
+        }
     };
 
     VkBool32 handleDebugMessage(VkDebugReportFlagsEXT flags, VkDebugReportObjectTypeEXT objType, uint64_t srcObject,
@@ -6512,6 +6557,8 @@ public:
     ChunkedList<RefPtr<RefObject>, 1024> m_deviceObjectsWithPotentialBackReferences;
 
     VkSampler m_defaultSampler;
+
+    RefPtr<FramebufferImpl> m_emptyFramebuffer;
 };
 
 void VKDevice::PipelineCommandEncoder::init(CommandBufferImpl* commandBuffer)
@@ -6569,15 +6616,18 @@ Result VKDevice::PipelineCommandEncoder::bindRootShaderObjectImpl(
     // Once we've filled in all the descriptor sets, we bind them
     // to the pipeline at once.
     //
-    m_device->m_api.vkCmdBindDescriptorSets(
-        m_commandBuffer->m_commandBuffer,
-        bindPoint,
-        specializedLayout->m_pipelineLayout,
-        0,
-        (uint32_t) descriptorSetCount,
-        descriptorSets,
-        0,
-        nullptr);
+    if (descriptorSetCount > 0)
+    {
+        m_device->m_api.vkCmdBindDescriptorSets(
+            m_commandBuffer->m_commandBuffer,
+            bindPoint,
+            specializedLayout->m_pipelineLayout,
+            0,
+            (uint32_t) descriptorSetCount,
+            descriptorSets,
+            0,
+            nullptr);
+    }
 
     return SLANG_OK;
 }
@@ -6687,7 +6737,9 @@ VKDevice::~VKDevice()
     m_deviceQueue.destroy();
 
     descriptorSetAllocator.close();
-    
+
+    m_emptyFramebuffer = nullptr;
+
     if (m_device != VK_NULL_HANDLE)
     {
         if (m_desc.existingDeviceHandles.handles[2].handleValue == 0)
@@ -7170,6 +7222,7 @@ Result VKDevice::initVulkanInstanceAndDevice(const InteropHandle* handles, bool 
             deviceExtensions.add(VK_KHR_RAY_QUERY_EXTENSION_NAME);
             m_features.add("ray-query");
             m_features.add("ray-tracing");
+            m_features.add("sm_6_6");
         }
 
         if (extendedFeatures.bufferDeviceAddressFeatures.bufferDeviceAddress)
@@ -7226,9 +7279,20 @@ Result VKDevice::initVulkanInstanceAndDevice(const InteropHandle* handles, bool 
 #endif
             m_features.add("external-memory");
         }
-        if (extensionNames.Contains(VK_EXT_DEBUG_MARKER_EXTENSION_NAME))
+        if (extensionNames.Contains(VK_EXT_CONSERVATIVE_RASTERIZATION_EXTENSION_NAME))
         {
-            deviceExtensions.add(VK_EXT_DEBUG_MARKER_EXTENSION_NAME);
+            deviceExtensions.add(VK_EXT_CONSERVATIVE_RASTERIZATION_EXTENSION_NAME);
+            m_features.add("conservative-rasterization-3");
+            m_features.add("conservative-rasterization-2");
+            m_features.add("conservative-rasterization-1");
+        }
+        if (extensionNames.Contains(VK_EXT_DEBUG_REPORT_EXTENSION_NAME))
+        {
+            deviceExtensions.add(VK_EXT_DEBUG_REPORT_EXTENSION_NAME);
+            if (extensionNames.Contains(VK_EXT_DEBUG_MARKER_EXTENSION_NAME))
+            {
+                deviceExtensions.add(VK_EXT_DEBUG_MARKER_EXTENSION_NAME);
+            }
         }
         if (extensionNames.Contains(VK_EXT_SHADER_VIEWPORT_INDEX_LAYER_EXTENSION_NAME))
         {
@@ -7335,6 +7399,21 @@ SlangResult VKDevice::initialize(const Desc& desc)
         samplerInfo.minLod = 0.0f;
         samplerInfo.maxLod = 0.0f;
         SLANG_VK_RETURN_ON_FAIL(m_api.vkCreateSampler(m_device, &samplerInfo, nullptr, &m_defaultSampler));
+    }
+
+    // Create empty frame buffer.
+    {
+        IFramebufferLayout::Desc layoutDesc = {};
+        layoutDesc.renderTargetCount = 0;
+        layoutDesc.depthStencil = nullptr;
+        ComPtr<IFramebufferLayout> layout;
+        SLANG_RETURN_ON_FAIL(createFramebufferLayout(layoutDesc, layout.writeRef()));
+        IFramebuffer::Desc desc = {};
+        desc.layout = layout;
+        ComPtr<IFramebuffer> framebuffer;
+        SLANG_RETURN_ON_FAIL(createFramebuffer(desc, framebuffer.writeRef()));
+        m_emptyFramebuffer = static_cast<FramebufferImpl*>(framebuffer.get());
+        m_emptyFramebuffer->m_renderer.breakStrongReference();
     }
 
     return SLANG_OK;
@@ -7697,7 +7776,8 @@ static VkBufferUsageFlagBits _calcBufferUsageFlags(ResourceState state)
     case ResourceState::UnorderedAccess:
         return (VkBufferUsageFlagBits)(VK_BUFFER_USAGE_STORAGE_TEXEL_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
     case ResourceState::ShaderResource:
-        return (VkBufferUsageFlagBits)(VK_BUFFER_USAGE_UNIFORM_TEXEL_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+        return (VkBufferUsageFlagBits)(VK_BUFFER_USAGE_UNIFORM_TEXEL_BUFFER_BIT |
+                                       VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
     case ResourceState::CopySource:
         return VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
     case ResourceState::CopyDestination:
@@ -7706,6 +7786,8 @@ static VkBufferUsageFlagBits _calcBufferUsageFlags(ResourceState state)
         return VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_STORAGE_BIT_KHR;
     case ResourceState::IndirectArgument:
         return VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT;
+    case ResourceState::AccelerationStructureBuildInput:
+        return VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR;
     default:
         return VkBufferUsageFlagBits(0);
     }
@@ -8666,7 +8748,10 @@ Result VKDevice::getFormatSupportedResourceStates(Format format, ResourceStateSe
     }
     // AccelerationStructure
     if (bufferFeatures & VK_FORMAT_FEATURE_ACCELERATION_STRUCTURE_VERTEX_BUFFER_BIT_KHR)
+    {
         allowedStates.add(ResourceState::AccelerationStructure);
+        allowedStates.add(ResourceState::AccelerationStructureBuildInput);
+    }
 
     *outStates = allowedStates;
     return SLANG_OK;
@@ -9172,6 +9257,16 @@ Result VKDevice::createGraphicsPipelineState(const GraphicsPipelineStateDesc& in
     rasterizer.depthBiasClamp = rasterizerDesc.depthBiasClamp;
     rasterizer.depthBiasSlopeFactor = rasterizerDesc.slopeScaledDepthBias;
     rasterizer.lineWidth = 1.0f; // TODO: Currently unsupported
+
+    VkPipelineRasterizationConservativeStateCreateInfoEXT conservativeRasterInfo = {};
+    conservativeRasterInfo.sType =
+        VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_CONSERVATIVE_STATE_CREATE_INFO_EXT;
+    conservativeRasterInfo.conservativeRasterizationMode =
+        VK_CONSERVATIVE_RASTERIZATION_MODE_OVERESTIMATE_EXT;
+    if (desc.rasterizer.enableConservativeRasterization)
+    {
+        rasterizer.pNext = &conservativeRasterInfo;
+    }
 
     auto framebufferLayoutImpl = static_cast<FramebufferLayoutImpl*>(desc.framebufferLayout);
     auto forcedSampleCount = rasterizerDesc.forcedSampleCount;

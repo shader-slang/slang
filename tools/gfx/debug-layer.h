@@ -120,6 +120,10 @@ public:
         slang::TypeReflection* type,
         ShaderObjectContainerType container,
         IShaderObject** outObject) override;
+    virtual SLANG_NO_THROW Result SLANG_MCALL createShaderObjectFromTypeLayout(
+        slang::TypeLayoutReflection* typeLayout, IShaderObject** outObject) override;
+    virtual SLANG_NO_THROW Result SLANG_MCALL createMutableShaderObjectFromTypeLayout(
+        slang::TypeLayoutReflection* typeLayout, IShaderObject** outObject) override;
     virtual SLANG_NO_THROW Result SLANG_MCALL
         createMutableRootShaderObject(IShaderProgram* program, IShaderObject** outObject) override;
     virtual SLANG_NO_THROW Result SLANG_MCALL
@@ -624,7 +628,6 @@ public:
         encodeRayTracingCommands(IRayTracingCommandEncoder** outEncoder) override;
     virtual SLANG_NO_THROW void SLANG_MCALL close() override;
     virtual SLANG_NO_THROW Result SLANG_MCALL getNativeHandle(InteropHandle* outHandle) override;
-    virtual SLANG_NO_THROW Result SLANG_MCALL resetDescriptorHeaps() override;
 
 private:
     void checkEncodersClosedBeforeNewEncoder();
@@ -736,6 +739,8 @@ public:
     virtual SLANG_NO_THROW Result SLANG_MCALL present() override;
     virtual SLANG_NO_THROW int SLANG_MCALL acquireNextImage() override;
     virtual SLANG_NO_THROW Result SLANG_MCALL resize(uint32_t width, uint32_t height) override;
+    virtual SLANG_NO_THROW bool SLANG_MCALL isOccluded() override;
+    virtual SLANG_NO_THROW Result SLANG_MCALL setFullScreenMode(bool mode) override;
 
 public:
     Slang::RefPtr<DebugCommandQueue> queue;
