@@ -157,6 +157,8 @@ public:
     virtual SLANG_NO_THROW Result SLANG_MCALL getTextureAllocationInfo(
         const ITextureResource::Desc& desc, size_t* outSize, size_t* outAlignment) override;
 
+    virtual SLANG_NO_THROW Result SLANG_MCALL getTextureRowAlignment(size_t* outAlignment) override;
+
     virtual SLANG_NO_THROW Result SLANG_MCALL
         createFence(const IFence::Desc& desc, IFence** outFence) override;
 
@@ -4993,6 +4995,7 @@ public:
                 IBufferResource* dst,
                 size_t dstOffset,
                 size_t dstSize,
+                size_t dstRowStride,
                 ITextureResource* src,
                 ResourceState srcState,
                 SubresourceRange srcSubresource,
@@ -8059,6 +8062,12 @@ Result VKDevice::getTextureAllocationInfo(
     *outAlignment = (size_t)memRequirements.alignment;
 
     m_api.vkDestroyImage(m_device, image, nullptr);
+    return SLANG_OK;
+}
+
+Result VKDevice::getTextureRowAlignment(size_t* outAlignment)
+{
+    *outAlignment = 1;
     return SLANG_OK;
 }
 
