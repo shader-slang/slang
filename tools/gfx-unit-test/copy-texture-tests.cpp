@@ -77,7 +77,7 @@ namespace gfx_test
 
             FormatInfo formatInfo;
             gfxGetFormatInfo(format, &formatInfo);
-            UInt alignment;
+            size_t alignment;
             device->getTextureRowAlignment(&alignment);
             alignedRowPitch = (dstTextureInfo.extent.width * formatInfo.blockSizeInBytes + alignment - 1) & ~(alignment - 1);
             IBufferResource::Desc bufferDesc = {};
