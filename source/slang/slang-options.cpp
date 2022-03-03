@@ -1178,7 +1178,7 @@ struct OptionsParser
                     }
                     else
                     {
-                        while (reader.hasArg() && reader.peekValue().startsWith("-"))
+                        while (reader.hasArg() && !reader.peekValue().startsWith("-"))
                         {
                             SLANG_RETURN_ON_FAIL(addInputPath(reader.getValueAndAdvance().getBuffer(), sourceLanguage));
                         }
