@@ -1284,7 +1284,8 @@ public:
         {
             SLANG_RETURN_ON_FAIL(ensureAPIPipelineStateCreated());
             outHandle->api = InteropHandleAPI::Vulkan;
-            outHandle->handleValue = reinterpret_cast<uint64_t>(m_pipeline);
+            outHandle->handleValue = 0;
+            memcpy(&outHandle->handleValue, &m_pipeline, sizeof(m_pipeline));
             return SLANG_OK;
         }
 
@@ -1448,7 +1449,8 @@ public:
         {
             SLANG_RETURN_ON_FAIL(ensureAPIPipelineStateCreated());
             outHandle->api = InteropHandleAPI::Vulkan;
-            outHandle->handleValue = reinterpret_cast<uint64_t>(m_pipeline);
+            outHandle->handleValue = 0;
+            memcpy(&outHandle->handleValue, &m_pipeline, sizeof(m_pipeline));
             return SLANG_OK;
         }
     };
