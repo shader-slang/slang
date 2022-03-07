@@ -72,6 +72,34 @@ struct VulkanUtil
         }
         return false;
     }
+
+    static VkSampleCountFlagBits translateSampleCount(uint32_t sampleCount);
+
+    static VkCullModeFlags translateCullMode(CullMode cullMode);
+
+    static VkFrontFace translateFrontFaceMode(FrontFaceMode frontFaceMode);
+
+    static VkPolygonMode translateFillMode(FillMode fillMode);
+
+    static VkBlendFactor translateBlendFactor(BlendFactor blendFactor);
+
+    static VkBlendOp translateBlendOp(BlendOp op);
+
+    static VkPrimitiveTopology translatePrimitiveTypeToListTopology(
+        PrimitiveType primitiveType);
+
+    static VkStencilOp translateStencilOp(StencilOp op);
+    
+    static VkFilter translateFilterMode(TextureFilteringMode mode);
+
+    static VkSamplerMipmapMode translateMipFilterMode(TextureFilteringMode mode);
+
+    static VkSamplerAddressMode translateAddressingMode(TextureAddressingMode mode);
+
+    static VkCompareOp translateComparisonFunc(ComparisonFunc func);
+
+    static VkStencilOpState translateStencilState(DepthStencilOpDesc desc);
+
 };
 
 struct AccelerationStructureBuildGeometryInfoBuilder

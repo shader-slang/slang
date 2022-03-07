@@ -821,6 +821,62 @@ void ShaderProgramBase::init(const IShaderProgram::Desc& inDesc)
     }
 }
 
+Result ShaderProgramBase::compileShaders()
+{
+    // For a fully specialized program, read and store its kernel code in `shaderProgram`.
+    auto compileShader = [&](slang::EntryPointReflection* entryPointInfo,
+                             slang::IComponentType* entryPointComponent,
+                             SlangInt entryPointIndex)
+    {
+        auto stage = entryPointInfo->getStage();
+        ComPtr<ISlangBlob> kernelCode;
+        ComPtr<ISlangBlob> diagnostics;
+        auto compileResult = entryPointComponent->getEntryPointCode(
+            entryPointIndex, 0, kernelCode.writeRef(), diagnostics.writeRef());
+        if (diagnostics)
+        {
+            getDebugCallback()->handleMessage(
+                compileResult == SLANG_OK ? DebugMessageType::Warning : DebugMessageType::Error,
+                DebugMessageSource::Slang,
+                (char*)diagnostics->getBufferPointer());
+        }
+        SLANG_RETURN_ON_FAIL(compileResult);
+        SLANG_RETURN_ON_FAIL(createShaderModule(entryPointInfo, kernelCode));
+        return SLANG_OK;
+    };
+
+    if (linkedEntryPoints.getCount() == 0)
+    {
+        // If the user does not explicitly specify entry point components, find them from
+        // `linkedEntryPoints`.
+        auto programReflection = linkedProgram->getLayout();
+        for (SlangUInt i = 0; i < programReflection->getEntryPointCount(); i++)
+        {
+            SLANG_RETURN_ON_FAIL(compileShader(
+                programReflection->getEntryPointByIndex(i), linkedProgram, (SlangInt)i));
+        }
+    }
+    else
+    {
+        // If the user specifies entry point components via the separated entry point array,
+        // compile code from there.
+        for (auto& entryPoint : linkedEntryPoints)
+        {
+            SLANG_RETURN_ON_FAIL(
+                compileShader(entryPoint->getLayout()->getEntryPointByIndex(0), entryPoint, 0));
+        }
+    }
+    return SLANG_OK;
+}
+
+Result ShaderProgramBase::createShaderModule(
+    slang::EntryPointReflection* entryPointInfo, ComPtr<ISlangBlob> kernelCode)
+{
+    SLANG_UNUSED(entryPointInfo);
+    SLANG_UNUSED(kernelCode);
+    return SLANG_OK;
+}
+
 Result RendererBase::maybeSpecializePipeline(
     PipelineStateBase* currentPipeline,
     ShaderObjectBase* rootObject,

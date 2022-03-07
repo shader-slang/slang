@@ -2478,68 +2478,26 @@ public:
     {
         SlangStage stage;
         slang::EntryPointReflection* entryPointInfo;
+        String actualEntryPointNameInAPI;
         List<uint8_t> code;
     };
 
     class ShaderProgramImpl : public ShaderProgramBase
     {
     public:
-        List<ShaderBinary> m_shaders;
         RefPtr<RootShaderObjectLayoutImpl> m_rootObjectLayout;
-        Result compileShaders()
-        {
-            // For a fully specialized program, read and store its kernel code in `shaderProgram`.
-            auto compileShader = [&](slang::EntryPointReflection* entryPointInfo,
-                                     slang::IComponentType* entryPointComponent,
-                                     SlangInt entryPointIndex)
-            {
-                auto stage = entryPointInfo->getStage();
-                ComPtr<ISlangBlob> kernelCode;
-                ComPtr<ISlangBlob> diagnostics;
-                auto compileResult = entryPointComponent->getEntryPointCode(
-                    entryPointIndex, 0, kernelCode.writeRef(), diagnostics.writeRef());
-                if (diagnostics)
-                {
-                    getDebugCallback()->handleMessage(
-                        compileResult == SLANG_OK ? DebugMessageType::Warning
-                                                  : DebugMessageType::Error,
-                        DebugMessageSource::Slang,
-                        (char*)diagnostics->getBufferPointer());
-                }
-                SLANG_RETURN_ON_FAIL(compileResult);
-                ShaderBinary shaderBin;
-                shaderBin.stage = stage;
-                shaderBin.entryPointInfo = entryPointInfo;
-                shaderBin.code.addRange(
-                    reinterpret_cast<const uint8_t*>(kernelCode->getBufferPointer()),
-                    (Index)kernelCode->getBufferSize());
-                m_shaders.add(_Move(shaderBin));
-                return SLANG_OK;
-            };
+        List<ShaderBinary> m_shaders;
 
-            if (linkedEntryPoints.getCount() == 0)
-            {
-                // If the user does not explicitly specify entry point components, find them from
-                // `linkedEntryPoints`.
-                auto programReflection = linkedProgram->getLayout();
-                for (SlangUInt i = 0; i < programReflection->getEntryPointCount(); i++)
-                {
-                    SLANG_RETURN_ON_FAIL(compileShader(
-                        programReflection->getEntryPointByIndex(i),
-                        linkedProgram,
-                        (SlangInt)i));
-                }
-            }
-            else
-            {
-                // If the user specifies entry point components via the separated entry point array,
-                // compile code from there.
-                for (auto& entryPoint : linkedEntryPoints)
-                {
-                    SLANG_RETURN_ON_FAIL(compileShader(
-                        entryPoint->getLayout()->getEntryPointByIndex(0), entryPoint, 0));
-                }
-            }
+        virtual Result createShaderModule(
+            slang::EntryPointReflection* entryPointInfo, ComPtr<ISlangBlob> kernelCode) override
+        {
+            ShaderBinary shaderBin;
+            shaderBin.stage = entryPointInfo->getStage();
+            shaderBin.entryPointInfo = entryPointInfo;
+            shaderBin.code.addRange(
+                reinterpret_cast<const uint8_t*>(kernelCode->getBufferPointer()),
+                (Index)kernelCode->getBufferSize());
+            m_shaders.add(_Move(shaderBin));
             return SLANG_OK;
         }
     };
