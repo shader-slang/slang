@@ -4471,9 +4471,8 @@ declarations over time.
 extern "C" {
 #endif
 
-
-#define SLANG_ERROR_INSUFFICIENT_BUFFER -1
-#define SLANG_ERROR_INVALID_PARAMETER -2
+#define SLANG_ERROR_INSUFFICIENT_BUFFER SLANG_E_BUFFER_TOO_SMALL
+#define SLANG_ERROR_INVALID_PARAMETER SLANG_E_INVALID_ARG
 
 SLANG_API char const* spGetTranslationUnitSource(
     SlangCompileRequest*    request,
