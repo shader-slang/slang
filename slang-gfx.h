@@ -1561,6 +1561,7 @@ public:
         IBufferResource* dst,
         size_t dstOffset,
         size_t dstSize,
+        size_t dstRowStride,
         ITextureResource* src,
         ResourceState srcState,
         SubresourceRange srcSubresource,
@@ -2375,6 +2376,8 @@ public:
 
     virtual SLANG_NO_THROW Result SLANG_MCALL getTextureAllocationInfo(
         const ITextureResource::Desc& desc, size_t* outSize, size_t* outAlignment) = 0;
+
+    virtual SLANG_NO_THROW Result SLANG_MCALL getTextureRowAlignment(size_t* outAlignment) = 0;
 };
 
 #define SLANG_UUID_IDevice                                                               \

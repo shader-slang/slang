@@ -77,7 +77,8 @@ namespace gfx_test
 
             FormatInfo formatInfo;
             gfxGetFormatInfo(format, &formatInfo);
-            UInt alignment = 256; // D3D requires rows to be aligned to a multiple of 256 bytes.
+            size_t alignment;
+            device->getTextureRowAlignment(&alignment);
             alignedRowPitch = (dstTextureInfo.extent.width * formatInfo.blockSizeInBytes + alignment - 1) & ~(alignment - 1);
             IBufferResource::Desc bufferDesc = {};
             bufferDesc.sizeInBytes = dstTextureInfo.extent.height * alignedRowPitch;
@@ -120,7 +121,7 @@ namespace gfx_test
             encoder->textureSubresourceBarrier(srcTexture, srcSubresource, ResourceState::UnorderedAccess, ResourceState::CopySource);
             encoder->copyTexture(dstTexture, ResourceState::CopyDestination, dstSubresource, dstOffset, srcTexture, ResourceState::CopySource, srcSubresource, srcOffset, extent);
             encoder->textureSubresourceBarrier(dstTexture, dstSubresource, ResourceState::CopyDestination, ResourceState::CopySource);
-            encoder->copyTextureToBuffer(resultsBuffer, 0, textureSize, dstTexture, ResourceState::CopySource, dstSubresource, dstOffset, extent);
+            encoder->copyTextureToBuffer(resultsBuffer, 0, textureSize, alignedRowPitch, dstTexture, ResourceState::CopySource, dstSubresource, dstOffset, extent);
             encoder->endEncoding();
             commandBuffer->close();
             queue->executeCommandBuffer(commandBuffer);
