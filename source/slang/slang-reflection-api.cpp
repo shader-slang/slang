@@ -265,27 +265,28 @@ SlangReflectionType* spReflectionUserAttribute_GetArgumentType(SlangReflectionUs
 SLANG_API SlangResult spReflectionUserAttribute_GetArgumentValueInt(SlangReflectionUserAttribute* attrib, unsigned int index, int * rs)
 {
     auto userAttr = convert(attrib);
-    if (!userAttr) return SLANG_ERROR_INVALID_PARAMETER;
-    if (index >= (unsigned int)userAttr->args.getCount()) return SLANG_ERROR_INVALID_PARAMETER;
+    if (!userAttr) return SLANG_E_INVALID_ARG;
+    if (index >= (unsigned int)userAttr->args.getCount()) return SLANG_E_INVALID_ARG;
+
     NodeBase* val = nullptr;
     if (userAttr->intArgVals.TryGetValue(index, val))
     {
         *rs = (int)as<ConstantIntVal>(val)->value;
         return 0;
     }
-    return SLANG_ERROR_INVALID_PARAMETER;
+    return SLANG_E_INVALID_ARG;
 }
 SLANG_API SlangResult spReflectionUserAttribute_GetArgumentValueFloat(SlangReflectionUserAttribute* attrib, unsigned int index, float * rs)
 {
     auto userAttr = convert(attrib);
-    if (!userAttr) return SLANG_ERROR_INVALID_PARAMETER;
-    if (index >= (unsigned int)userAttr->args.getCount()) return SLANG_ERROR_INVALID_PARAMETER;
+    if (!userAttr) return SLANG_E_INVALID_ARG;
+    if (index >= (unsigned int)userAttr->args.getCount()) return SLANG_E_INVALID_ARG;
     if (auto cexpr = as<FloatingPointLiteralExpr>(userAttr->args[index]))
     {
         *rs = (float)cexpr->value;
         return 0;
     }
-    return SLANG_ERROR_INVALID_PARAMETER;
+    return SLANG_E_INVALID_ARG;
 }
 SLANG_API const char* spReflectionUserAttribute_GetArgumentValueString(SlangReflectionUserAttribute* attrib, unsigned int index, size_t* bufLen)
 {
