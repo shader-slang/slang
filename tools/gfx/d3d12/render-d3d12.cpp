@@ -1361,6 +1361,12 @@ Result DeviceImpl::getTextureAllocationInfo(
     return SLANG_OK;
 }
 
+Result DeviceImpl::getTextureRowAlignment(size_t* outAlignment)
+{
+    *outAlignment = D3D12_TEXTURE_DATA_PITCH_ALIGNMENT;
+    return SLANG_OK;
+}
+
 Result DeviceImpl::createTextureResource(
     const ITextureResource::Desc& descIn,
     const ITextureResource::SubresourceData* initData,
@@ -6946,6 +6952,7 @@ void ResourceCommandEncoderImpl::copyTextureToBuffer(
     IBufferResource* dst,
     size_t dstOffset,
     size_t dstSize,
+    size_t dstRowStride,
     ITextureResource* src,
     ResourceState srcState,
     SubresourceRange srcSubresource,
@@ -7018,9 +7025,9 @@ void ResourceCommandEncoderImpl::copyTextureToBuffer(
         {
             footprint.Footprint.Depth = Math::Max(1, (textureSize.depth >> mipLevel)) - srcOffset.z;
         }
-        footprint.Footprint.RowPitch = (UINT)D3DUtil::calcAligned(
-            footprint.Footprint.Width * (UInt)formatInfo.blockSizeInBytes,
-            (uint32_t)D3D12_TEXTURE_DATA_PITCH_ALIGNMENT);
+
+        assert(dstRowStride % D3D12_TEXTURE_DATA_PITCH_ALIGNMENT == 0);
+        footprint.Footprint.RowPitch = dstRowStride;
 
         auto bufferSize =
             footprint.Footprint.RowPitch * footprint.Footprint.Height * footprint.Footprint.Depth;
