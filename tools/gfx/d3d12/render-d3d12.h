@@ -44,22 +44,6 @@ typedef HRESULT(WINAPI* PFN_EndEventOnCommandList)(ID3D12GraphicsCommandList* co
 static const Int kMaxNumRenderFrames = 4;
 static const Int kMaxRTVCount = 8;
 
-struct Submitter
-{
-    virtual void setRootConstantBufferView(
-        int index, D3D12_GPU_VIRTUAL_ADDRESS gpuBufferLocation) = 0;
-    virtual void setRootUAV(int index, D3D12_GPU_VIRTUAL_ADDRESS gpuBufferLocation) = 0;
-    virtual void setRootSRV(int index, D3D12_GPU_VIRTUAL_ADDRESS gpuBufferLocation) = 0;
-    virtual void setRootDescriptorTable(int index, D3D12_GPU_DESCRIPTOR_HANDLE BaseDescriptor) = 0;
-    virtual void setRootSignature(ID3D12RootSignature* rootSignature) = 0;
-    virtual void setRootConstants(
-        Index rootParamIndex,
-        Index dstOffsetIn32BitValues,
-        Index countOf32BitValues,
-        void const* srcData) = 0;
-    virtual void setPipelineState(PipelineStateBase* pipelineState) = 0;
-};
-
 struct D3D12DeviceInfo
 {
     void clear()
@@ -562,6 +546,21 @@ public:
     virtual SLANG_NO_THROW Result SLANG_MCALL synchronizeAndReset() override;
 };
 
+struct Submitter
+{
+    virtual void setRootConstantBufferView(
+        int index, D3D12_GPU_VIRTUAL_ADDRESS gpuBufferLocation) = 0;
+    virtual void setRootUAV(int index, D3D12_GPU_VIRTUAL_ADDRESS gpuBufferLocation) = 0;
+    virtual void setRootSRV(int index, D3D12_GPU_VIRTUAL_ADDRESS gpuBufferLocation) = 0;
+    virtual void setRootDescriptorTable(int index, D3D12_GPU_DESCRIPTOR_HANDLE BaseDescriptor) = 0;
+    virtual void setRootSignature(ID3D12RootSignature* rootSignature) = 0;
+    virtual void setRootConstants(
+        Index rootParamIndex,
+        Index dstOffsetIn32BitValues,
+        Index countOf32BitValues,
+        void const* srcData) = 0;
+    virtual void setPipelineState(PipelineStateBase* pipelineState) = 0;
+};
 
 class PipelineCommandEncoder
 {
