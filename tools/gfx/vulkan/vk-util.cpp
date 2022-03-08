@@ -183,6 +183,277 @@ VkImageLayout VulkanUtil::getImageLayoutFromState(ResourceState state)
     return VkImageLayout();
 }
 
+VkSampleCountFlagBits VulkanUtil::translateSampleCount(uint32_t sampleCount)
+{
+    switch (sampleCount)
+    {
+    case 1:
+        return VK_SAMPLE_COUNT_1_BIT;
+    case 2:
+        return VK_SAMPLE_COUNT_2_BIT;
+    case 4:
+        return VK_SAMPLE_COUNT_4_BIT;
+    case 8:
+        return VK_SAMPLE_COUNT_8_BIT;
+    case 16:
+        return VK_SAMPLE_COUNT_16_BIT;
+    case 32:
+        return VK_SAMPLE_COUNT_32_BIT;
+    case 64:
+        return VK_SAMPLE_COUNT_64_BIT;
+    default:
+        assert(!"Unsupported sample count");
+        return VK_SAMPLE_COUNT_1_BIT;
+    }
+}
+
+VkCullModeFlags VulkanUtil::translateCullMode(CullMode cullMode)
+{
+    switch (cullMode)
+    {
+    case CullMode::None:
+        return VK_CULL_MODE_NONE;
+    case CullMode::Front:
+        return VK_CULL_MODE_FRONT_BIT;
+    case CullMode::Back:
+        return VK_CULL_MODE_BACK_BIT;
+    default:
+        assert(!"Unsupported cull mode");
+        return VK_CULL_MODE_NONE;
+    }
+}
+
+VkFrontFace VulkanUtil::translateFrontFaceMode(FrontFaceMode frontFaceMode)
+{
+    switch (frontFaceMode)
+    {
+    case FrontFaceMode::CounterClockwise:
+        return VK_FRONT_FACE_COUNTER_CLOCKWISE;
+    case FrontFaceMode::Clockwise:
+        return VK_FRONT_FACE_CLOCKWISE;
+    default:
+        assert(!"Unsupported front face mode");
+        return VK_FRONT_FACE_CLOCKWISE;
+    }
+}
+
+VkPolygonMode VulkanUtil::translateFillMode(FillMode fillMode)
+{
+    switch (fillMode)
+    {
+    case FillMode::Solid:
+        return VK_POLYGON_MODE_FILL;
+    case FillMode::Wireframe:
+        return VK_POLYGON_MODE_LINE;
+    default:
+        assert(!"Unsupported fill mode");
+        return VK_POLYGON_MODE_FILL;
+    }
+}
+
+VkBlendFactor VulkanUtil::translateBlendFactor(BlendFactor blendFactor)
+{
+    switch (blendFactor)
+    {
+    case BlendFactor::Zero:
+        return VK_BLEND_FACTOR_ZERO;
+    case BlendFactor::One:
+        return VK_BLEND_FACTOR_ONE;
+    case BlendFactor::SrcColor:
+        return VK_BLEND_FACTOR_SRC_COLOR;
+    case BlendFactor::InvSrcColor:
+        return VK_BLEND_FACTOR_ONE_MINUS_SRC_COLOR;
+    case BlendFactor::SrcAlpha:
+        return VK_BLEND_FACTOR_SRC_ALPHA;
+    case BlendFactor::InvSrcAlpha:
+        return VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+    case BlendFactor::DestAlpha:
+        return VK_BLEND_FACTOR_DST_ALPHA;
+    case BlendFactor::InvDestAlpha:
+        return VK_BLEND_FACTOR_ONE_MINUS_DST_ALPHA;
+    case BlendFactor::DestColor:
+        return VK_BLEND_FACTOR_DST_COLOR;
+    case BlendFactor::InvDestColor:
+        return VK_BLEND_FACTOR_ONE_MINUS_DST_ALPHA;
+    case BlendFactor::SrcAlphaSaturate:
+        return VK_BLEND_FACTOR_SRC_ALPHA_SATURATE;
+    case BlendFactor::BlendColor:
+        return VK_BLEND_FACTOR_CONSTANT_COLOR;
+    case BlendFactor::InvBlendColor:
+        return VK_BLEND_FACTOR_ONE_MINUS_CONSTANT_COLOR;
+    case BlendFactor::SecondarySrcColor:
+        return VK_BLEND_FACTOR_SRC1_COLOR;
+    case BlendFactor::InvSecondarySrcColor:
+        return VK_BLEND_FACTOR_ONE_MINUS_SRC1_COLOR;
+    case BlendFactor::SecondarySrcAlpha:
+        return VK_BLEND_FACTOR_SRC1_ALPHA;
+    case BlendFactor::InvSecondarySrcAlpha:
+        return VK_BLEND_FACTOR_ONE_MINUS_SRC1_ALPHA;
+
+    default:
+        assert(!"Unsupported blend factor");
+        return VK_BLEND_FACTOR_ONE;
+    }
+}
+
+VkBlendOp VulkanUtil::translateBlendOp(BlendOp op)
+{
+    switch (op)
+    {
+    case BlendOp::Add:
+        return VK_BLEND_OP_ADD;
+    case BlendOp::Subtract:
+        return VK_BLEND_OP_SUBTRACT;
+    case BlendOp::ReverseSubtract:
+        return VK_BLEND_OP_REVERSE_SUBTRACT;
+    case BlendOp::Min:
+        return VK_BLEND_OP_MIN;
+    case BlendOp::Max:
+        return VK_BLEND_OP_MAX;
+    default:
+        assert(!"Unsupported blend op");
+        return VK_BLEND_OP_ADD;
+    }
+}
+
+VkPrimitiveTopology VulkanUtil::translatePrimitiveTypeToListTopology(
+    PrimitiveType primitiveType)
+{
+    switch (primitiveType)
+    {
+    case PrimitiveType::Point:
+        return VK_PRIMITIVE_TOPOLOGY_POINT_LIST;
+    case PrimitiveType::Line:
+        return VK_PRIMITIVE_TOPOLOGY_LINE_LIST;
+    case PrimitiveType::Triangle:
+        return VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+    case PrimitiveType::Patch:
+        return VK_PRIMITIVE_TOPOLOGY_PATCH_LIST;
+    default:
+        assert(!"unknown topology type.");
+        return VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+    }
+}
+
+VkStencilOp VulkanUtil::translateStencilOp(StencilOp op)
+{
+    switch (op)
+    {
+    case StencilOp::DecrementSaturate:
+        return VK_STENCIL_OP_DECREMENT_AND_CLAMP;
+    case StencilOp::DecrementWrap:
+        return VK_STENCIL_OP_DECREMENT_AND_WRAP;
+    case StencilOp::IncrementSaturate:
+        return VK_STENCIL_OP_INCREMENT_AND_CLAMP;
+    case StencilOp::IncrementWrap:
+        return VK_STENCIL_OP_INCREMENT_AND_WRAP;
+    case StencilOp::Invert:
+        return VK_STENCIL_OP_INVERT;
+    case StencilOp::Keep:
+        return VK_STENCIL_OP_KEEP;
+    case StencilOp::Replace:
+        return VK_STENCIL_OP_REPLACE;
+    case StencilOp::Zero:
+        return VK_STENCIL_OP_ZERO;
+    default:
+        return VK_STENCIL_OP_KEEP;
+    }
+}
+
+VkFilter VulkanUtil::translateFilterMode(TextureFilteringMode mode)
+{
+    switch (mode)
+    {
+    default:
+        return VkFilter(0);
+
+#define CASE(SRC, DST)              \
+    case TextureFilteringMode::SRC: \
+        return VK_FILTER_##DST
+
+        CASE(Point, NEAREST);
+        CASE(Linear, LINEAR);
+
+#undef CASE
+    }
+}
+
+VkSamplerMipmapMode VulkanUtil::translateMipFilterMode(TextureFilteringMode mode)
+{
+    switch (mode)
+    {
+    default:
+        return VkSamplerMipmapMode(0);
+
+#define CASE(SRC, DST)              \
+    case TextureFilteringMode::SRC: \
+        return VK_SAMPLER_MIPMAP_MODE_##DST
+
+        CASE(Point, NEAREST);
+        CASE(Linear, LINEAR);
+
+#undef CASE
+    }
+}
+
+VkSamplerAddressMode VulkanUtil::translateAddressingMode(TextureAddressingMode mode)
+{
+    switch (mode)
+    {
+    default:
+        return VkSamplerAddressMode(0);
+
+#define CASE(SRC, DST)               \
+    case TextureAddressingMode::SRC: \
+        return VK_SAMPLER_ADDRESS_MODE_##DST
+
+        CASE(Wrap, REPEAT);
+        CASE(ClampToEdge, CLAMP_TO_EDGE);
+        CASE(ClampToBorder, CLAMP_TO_BORDER);
+        CASE(MirrorRepeat, MIRRORED_REPEAT);
+        CASE(MirrorOnce, MIRROR_CLAMP_TO_EDGE);
+
+#undef CASE
+    }
+}
+
+VkCompareOp VulkanUtil::translateComparisonFunc(ComparisonFunc func)
+{
+    switch (func)
+    {
+    default:
+        // TODO: need to report failures
+        return VK_COMPARE_OP_ALWAYS;
+
+#define CASE(FROM, TO)         \
+    case ComparisonFunc::FROM: \
+        return VK_COMPARE_OP_##TO
+
+        CASE(Never, NEVER);
+        CASE(Less, LESS);
+        CASE(Equal, EQUAL);
+        CASE(LessEqual, LESS_OR_EQUAL);
+        CASE(Greater, GREATER);
+        CASE(NotEqual, NOT_EQUAL);
+        CASE(GreaterEqual, GREATER_OR_EQUAL);
+        CASE(Always, ALWAYS);
+#undef CASE
+    }
+}
+
+VkStencilOpState VulkanUtil::translateStencilState(DepthStencilOpDesc desc)
+{
+    VkStencilOpState rs;
+    rs.compareMask = 0xFF;
+    rs.compareOp = translateComparisonFunc(desc.stencilFunc);
+    rs.depthFailOp = translateStencilOp(desc.stencilDepthFailOp);
+    rs.failOp = translateStencilOp(desc.stencilFailOp);
+    rs.passOp = translateStencilOp(desc.stencilPassOp);
+    rs.reference = 0;
+    rs.writeMask = 0xFF;
+    return rs;
+}
+
 /* static */Slang::Result VulkanUtil::handleFail(VkResult res)
 {
     if (res != VK_SUCCESS)

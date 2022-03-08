@@ -853,6 +853,10 @@ public:
         }
         return false;
     }
+
+    Slang::Result compileShaders();
+    virtual Slang::Result createShaderModule(
+        slang::EntryPointReflection* entryPointInfo, Slang::ComPtr<ISlangBlob> kernelCode);
 };
 
 class InputLayoutBase
