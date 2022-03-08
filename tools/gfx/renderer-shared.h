@@ -1324,13 +1324,13 @@ protected:
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL initialize(const Desc& desc);
 protected:
     Slang::List<Slang::String> m_features;
-    Slang::ComPtr<IPipelineCreationAPIDispatcher> m_pipelineCreationAPIDispatcher;
 
 public:
     SlangContext slangContext;
     ShaderCache shaderCache;
 
     Slang::Dictionary<slang::TypeLayoutReflection*, Slang::RefPtr<ShaderObjectLayoutBase>> m_shaderObjectLayoutCache;
+    Slang::ComPtr<IPipelineCreationAPIDispatcher> m_pipelineCreationAPIDispatcher;
 };
 
 bool isDepthFormat(Format format);
