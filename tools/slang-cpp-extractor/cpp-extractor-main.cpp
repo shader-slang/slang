@@ -20,6 +20,7 @@
 #include "../../source/compiler-core/slang-diagnostic-sink.h"
 #include "../../source/compiler-core/slang-name.h"
 #include "../../source/compiler-core/slang-name-convention-util.h"
+#include "../../source/compiler-core/slang-doc-extractor.h"
 
 #include "node.h"
 #include "diagnostics.h"
@@ -63,6 +64,8 @@ public:
 
 protected:
 
+    SlangResult _extractDoc(NodeTree* nodeTree);
+
     NamePool m_namePool;
 
     Options m_options;
@@ -72,6 +75,112 @@ protected:
     StringSlicePool m_slicePool;
 };
 
+
+// Work out an appropriate search type for a node type.
+//
+// TODO(JS):
+// NOTE! Currently extractor doesn't extract callable types and so doesn't extract callable types parameters
+static DocMarkupExtractor::SearchStyle _getSearchStyle(Node* node)
+{
+    typedef DocMarkupExtractor::SearchStyle SearchStyle;
+
+    if (!node->getSourceLoc().isValid())
+    {
+        return SearchStyle::None;
+    }
+
+    switch (node->m_type)
+    {
+        case Node::Type::Invalid:
+        {
+            return SearchStyle::None;
+        }
+        case Node::Type::Field:
+        {
+            return SearchStyle::Variable;
+        }
+        case Node::Type::EnumCase:
+        {
+            return SearchStyle::EnumCase;
+        }
+        case Node::Type::TypeDef:
+        {
+            return SearchStyle::Variable;
+        }
+        default: break;
+    }
+
+    // Default is to only allow before.
+    return SearchStyle::Before;
+}
+
+SlangResult App::_extractDoc(NodeTree* nodeTree)
+{
+    // Find all of the nodes
+    List<Node*> nodes;
+    // Add the root
+    nodes.add(nodeTree->getRootNode());
+
+    // Traverse all nodes
+    for (Index startIndex = 0; startIndex < nodes.getCount(); ++startIndex)
+    {
+        Node* node = nodes[startIndex];
+
+        ScopeNode* scopeNode = as<ScopeNode>(node);
+
+        if (scopeNode)
+        {
+            for (Node* child : scopeNode->m_children)
+            {
+                nodes.add(child);
+            }
+        }
+    }
+
+    // Find out what to find
+
+    List<DocMarkupExtractor::SearchItemInput> inputItems;
+
+    for (Node* node : nodes)
+    {
+        auto searchStyle = _getSearchStyle(node);
+
+        DocMarkupExtractor::SearchItemInput inputItem;
+        inputItem.searchStyle = searchStyle;
+        inputItem.sourceLoc = node->getSourceLoc();
+
+        inputItems.add(inputItem);
+    }
+
+    List<DocMarkupExtractor::SearchItemOutput> outputItems;
+
+    List<SourceView*> views;
+
+    DocMarkupExtractor extractor;
+
+    SLANG_RETURN_ON_FAIL(extractor.extract(inputItems.getBuffer(), inputItems.getCount(), m_sourceManager, m_sink, views, outputItems));
+
+    // Put what was extracted into the nodes
+    {
+        const Index count = inputItems.getCount();
+        SLANG_ASSERT(count == outputItems.getCount());
+        for (Index i = 0; i < count; ++i)
+        {
+            const auto& inputItem = inputItems[i];
+            const auto& outputItem = outputItems[i];
+
+            if (inputItem.searchStyle != DocMarkupExtractor::SearchStyle::None && outputItem.text.getLength())
+            {
+                Node* node = nodes[i];
+
+                node->m_markup = outputItem.text;
+                node->m_markupVisibility = outputItem.visibilty;
+            }
+        }
+    }
+
+    return SLANG_OK;
+}
 
 SlangResult App::execute(const Options& options)
 {
@@ -141,6 +250,11 @@ SlangResult App::execute(const Options& options)
                 typeSet->m_typeName = buf.ProduceString();
             }
         }
+    }
+
+    if (options.m_extractDoc)
+    {
+        SLANG_RETURN_ON_FAIL(_extractDoc(&tree));
     }
 
     // Dump out the tree

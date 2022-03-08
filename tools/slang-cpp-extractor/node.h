@@ -3,6 +3,8 @@
 
 #include "diagnostics.h"
 
+#include "../../source/compiler-core/slang-doc-extractor.h"
+
 namespace CppExtract {
 using namespace Slang;
 
@@ -94,6 +96,8 @@ public:
         /// True if reflected
     bool isReflected() const { return m_reflectionType == ReflectionType::Reflected; }
 
+    SourceLoc getSourceLoc() const { return m_name.getLoc(); }
+
     ScopeNode* getRootScope();
 
     typedef bool(*Filter)(Node* node);
@@ -130,7 +134,10 @@ public:
     }
 
     Type m_type;                        ///< The type of node this is
-    ReflectionType m_reflectionType;    /// Classes can be traversed, but not reflected. To be reflected they have to contain the marker
+    ReflectionType m_reflectionType;    ///< Classes can be traversed, but not reflected. To be reflected they have to contain the marker
+    
+    MarkupVisibility m_markupVisibility = MarkupVisibility::Public;         ///< The visibility of the markup
+    String m_markup;                                                        ///< Documentation associated with this node
 
     Token m_name;                       ///< The name of this scope/type    
 

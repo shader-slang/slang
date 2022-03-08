@@ -721,6 +721,11 @@ SlangResult DocMarkupExtractor::extract(const SearchItemInput* inputs, Index inp
 
         for (auto& entry : entries)
         {
+            if (entry.searchStyle == SearchStyle::None)
+            {
+                continue;
+            }
+
             const SourceLoc loc = SourceLoc::fromRaw(entry.locOrOffset);
 
             if (sourceView == nullptr || !sourceView->getRange().contains(loc))
