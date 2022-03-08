@@ -167,7 +167,7 @@ namespace Slang
 					return FindPositionResult(hashPos, -1);
 				}
 				numProbes++;
-				hashPos = (hashPos + GetProbeOffset(numProbes)) % bucketSizeMinusOne;
+				hashPos = (hashPos + GetProbeOffset(numProbes)) & bucketSizeMinusOne;
 			}
 			if (insertPos != -1)
 				return FindPositionResult(-1, insertPos);
@@ -738,7 +738,7 @@ namespace Slang
                     return FindPositionResult(hashPos, -1);
                 }
                 numProbes++;
-                hashPos = (hashPos + GetProbeOffset(numProbes)) % bucketSizeMinusOne;
+                hashPos = (hashPos + GetProbeOffset(numProbes)) & bucketSizeMinusOne;
             }
             if (insertPos != -1)
                 return FindPositionResult(-1, insertPos);
