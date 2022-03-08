@@ -126,6 +126,9 @@ public:
 
     static void splitPath(const UnownedStringSlice& slice, List<UnownedStringSlice>& outSplitPath);
 
+        /// If markup is specified dump it
+    void dumpMarkup(int indent, StringBuilder& out);
+
     Node(Type type) :
         m_type(type),
         m_parentScope(nullptr),
@@ -272,7 +275,8 @@ struct EnumCaseNode : public Node
     {
     }
 
-    Token m_value;              ///< If not defined will be invalid
+    // Tokens that make up the value. If not defined will be empty
+    List<Token> m_valueTokens;
 };
 
 struct EnumNode : public ScopeNode
@@ -288,7 +292,7 @@ struct EnumNode : public ScopeNode
         SLANG_ASSERT(isEnumLikeType(type));
     }
 
-    Token m_backingToken;
+    List<Token> m_backingTokens;
 };
 
 struct TypeDefNode : public Node

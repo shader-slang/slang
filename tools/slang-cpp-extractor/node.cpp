@@ -3,12 +3,47 @@
 #include "file-util.h"
 
 #include "../../source/core/slang-string-util.h"
+#include "../../source/core/slang-string-escape-util.h"
 
 namespace CppExtract {
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! Node Impl !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 SLANG_FORCE_INLINE static void _indent(Index indentCount, StringBuilder& out) { FileUtil::indent(indentCount, out); }
+
+void Node::dumpMarkup(int indentCount, StringBuilder& out)
+{
+    if (m_markup.getLength() <= 0)
+    {
+        return;
+    }
+
+    List<UnownedStringSlice> lines;
+    StringUtil::calcLines(m_markup.getUnownedSlice(), lines);
+
+    // Remove empty lines from the end
+    while (lines.getCount())
+    {
+        auto lastLine = lines.getLast();
+        if (lastLine.trim().getLength() == 0)
+        {
+            lines.removeLast();
+            continue;
+        }
+        break;
+    }
+
+    if (lines.getCount() == 0)
+    {
+        return;
+    }
+
+    for (auto line : lines)
+    {
+        _indent(indentCount, out);
+        out << "// " << line << "\n";
+    }
+}
 
 ScopeNode* Node::getRootScope()
 {
@@ -298,6 +333,8 @@ void ScopeNode::calcScopeDepthFirst(List<Node*>& outNodes)
 
 void ScopeNode::dump(int indentCount, StringBuilder& out)
 {
+    dumpMarkup(indentCount, out);
+
     _indent(indentCount, out);
 
     switch (m_type)
@@ -331,17 +368,66 @@ void ScopeNode::dump(int indentCount, StringBuilder& out)
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! EnumCaseNode !!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
+/* Returns true if needs space between the tokens.
+It determines this based on the locs, and if they contain something between them.
+*/
+static bool _needsSpace(const Token& prevTok, const Token& tok)
+{
+    auto prevLoc = prevTok.getLoc();
+    auto loc = tok.getLoc();
+
+    auto prevContent = prevTok.getContent();
+    auto content = tok.getContent();
+
+    if (prevLoc + prevContent.getLength() == loc)
+    {
+        return false;
+    }
+
+    return true;
+}
+
+
+static void _dumpTokens(const Token* toks, Index count, StringBuilder& out)
+{
+    if (count > 0)
+    {
+        out << toks[0].getContent();
+
+        for (Index i = 1; i < count; ++i)
+        {
+            const auto& prevToken = toks[i - 1];
+            const auto& token = toks[i];
+
+            if (_needsSpace(prevToken, token))
+            {
+                out << " ";
+            }
+
+            out << token.getContent();
+        }
+    }
+}
+
+static void _dumpTokens(const List<Token>& toks, StringBuilder& out)
+{
+    _dumpTokens(toks.getBuffer(), toks.getCount(), out);
+}
+
+
 void EnumCaseNode::dump(int indent, StringBuilder& out)
 {
     if (isReflected())
     {
+        dumpMarkup(indent, out);
+
         _indent(indent, out);
         out << m_name.getContent();
 
-        if (m_value.type != TokenType::Invalid)
+        if (m_valueTokens.getCount())
         {
             out << " = ";
-            out << m_value.getContent();
+            _dumpTokens(m_valueTokens, out);
         }
 
         out << ",\n";
@@ -354,16 +440,13 @@ void TypeDefNode::dump(int indent, StringBuilder& out)
 {
     if (isReflected())
     {
+        dumpMarkup(indent, out);
+
         _indent(indent, out);
 
         out << "typedef ";
-
-        for (auto& tok : m_targetTypeTokens)
-        {
-            out << tok.getContent() << " ";
-        }
-
-        out << m_name.getContent() << ";\n";
+        _dumpTokens(m_targetTypeTokens, out);
+        out << " " << m_name.getContent() << ";\n";
     }
 }
 
@@ -375,6 +458,8 @@ void EnumNode::dump(int indent, StringBuilder& out)
     {
         return;
     }
+
+    dumpMarkup(indent, out);
 
     _indent(indent, out);
 
@@ -390,9 +475,10 @@ void EnumNode::dump(int indent, StringBuilder& out)
         out << m_name.getContent();
     }
 
-    if (m_backingToken.type != TokenType::Invalid)
-    {
-        out << " : " << m_backingToken.getContent();
+    if (m_backingTokens.getCount() > 0)
+    { 
+        out << " : ";
+        _dumpTokens(m_backingTokens, out);
     }
 
     out << "\n";
@@ -414,6 +500,8 @@ void FieldNode::dump(int indent, StringBuilder& out)
 {
     if (isReflected())
     {
+        dumpMarkup(indent, out);
+
         _indent(indent, out);
         out << m_fieldType << " " << m_name.getContent() << "\n";
     }
@@ -506,6 +594,8 @@ void ClassLikeNode::getReflectedDerivedTypes(List<ClassLikeNode*>& out) const
 
 void ClassLikeNode::dump(int indentCount, StringBuilder& out)
 {
+    dumpMarkup(indentCount, out);
+
     _indent(indentCount, out);
 
     const char* typeName = (m_type == Type::StructType) ? "struct" : "class";

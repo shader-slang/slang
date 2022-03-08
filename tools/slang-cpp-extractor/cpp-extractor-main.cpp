@@ -163,15 +163,19 @@ SlangResult App::_extractDoc(NodeTree* nodeTree)
     // Put what was extracted into the nodes
     {
         const Index count = inputItems.getCount();
-        SLANG_ASSERT(count == outputItems.getCount());
+        SLANG_ASSERT(count == outputItems.getCount() && count == nodes.getCount());
+
         for (Index i = 0; i < count; ++i)
         {
-            const auto& inputItem = inputItems[i];
             const auto& outputItem = outputItems[i];
+
+            // We need to use the index used for input, because in output they can be reordered.
+            const auto inputIndex = outputItem.inputIndex;
+            const auto& inputItem = inputItems[inputIndex];
 
             if (inputItem.searchStyle != DocMarkupExtractor::SearchStyle::None && outputItem.text.getLength())
             {
-                Node* node = nodes[i];
+                Node* node = nodes[inputIndex];
 
                 node->m_markup = outputItem.text;
                 node->m_markupVisibility = outputItem.visibilty;

@@ -28,11 +28,16 @@ Parser::Parser(NodeTree* nodeTree, DiagnosticSink* sink) :
         Node::Type::Namespace,
         Node::Type::AnonymousNamespace,
         Node::Type::Field,
+
+        // These are disabled by default because AST uses macro magic to build up the types
+        // Node::Type::TypeDef,
+        // Node::Type::Enum,
+        // Node::Type::EnumClass,
     };
     setTypesEnabled(defaultEnabled, SLANG_COUNT_OF(defaultEnabled));
 }
 
-void Parser::setTypeEnabled(Node::Type type, bool isEnabled )
+void Parser::setTypeEnabled(Node::Type type, bool isEnabled)
 {
     if (isEnabled)
     {
@@ -328,9 +333,9 @@ SlangResult Parser::_parseEnum()
         // for our uses here.
         // If we can't find the type, we could assume it's size is undefined
 
-        if (backingTokens.getCount() == 1)
+        if (backingTokens.getCount() > 0)
         {
-            node->m_backingToken = backingTokens[0];
+            node->m_backingTokens.swapWith(backingTokens);
         }
     }
 
@@ -400,9 +405,9 @@ SlangResult Parser::_parseEnum()
                 valueTokens.add(m_reader.advanceToken());
             }
 
-            if (valueTokens.getCount() == 1)
+            if (valueTokens.getCount() > 0)
             {
-                caseNode->m_value = valueTokens[0];
+                caseNode->m_valueTokens.swapWith(valueTokens);
             }
         }
 
