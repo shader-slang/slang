@@ -3,8 +3,8 @@
 
 #include "../core/slang-string-util.h"
 
-#include "slang-ast-builder.h"
-#include "slang-ast-print.h"
+//#include "slang-ast-builder.h"
+//#include "slang-ast-print.h"
 
 namespace Slang {
 
