@@ -184,6 +184,7 @@ public:
             IBufferResource* dst,
             size_t dstOffset,
             size_t dstSize,
+            size_t dstRowStride,
             ITextureResource* src,
             ResourceState srcState,
             SubresourceRange srcSubresource,
@@ -193,6 +194,7 @@ public:
             SLANG_UNUSED(dst);
             SLANG_UNUSED(dstOffset);
             SLANG_UNUSED(dstSize);
+            SLANG_UNUSED(dstRowStride);
             SLANG_UNUSED(src);
             SLANG_UNUSED(srcState);
             SLANG_UNUSED(srcSubresource);
