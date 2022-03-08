@@ -96,6 +96,7 @@ public:
 
     virtual SLANG_NO_THROW Result SLANG_MCALL getTextureAllocationInfo(
         const ITextureResource::Desc& desc, size_t* outSize, size_t* outAlignment) override;
+    virtual SLANG_NO_THROW Result SLANG_MCALL getTextureRowAlignment(size_t* outAlignment) override;
     virtual SLANG_NO_THROW Result SLANG_MCALL createTextureResource(
         const ITextureResource::Desc& desc,
         const ITextureResource::SubresourceData* initData,
@@ -4346,6 +4347,7 @@ public:
                 IBufferResource* dst,
                 size_t dstOffset,
                 size_t dstSize,
+                size_t dstRowStride,
                 ITextureResource* src,
                 ResourceState srcState,
                 SubresourceRange srcSubresource,
@@ -4420,9 +4422,9 @@ public:
                         footprint.Footprint.Depth =
                             Math::Max(1, (textureSize.depth >> mipLevel)) - srcOffset.z;
                     }
-                    footprint.Footprint.RowPitch = (UINT)D3DUtil::calcAligned(
-                        footprint.Footprint.Width * (UInt)formatInfo.blockSizeInBytes,
-                        (uint32_t)D3D12_TEXTURE_DATA_PITCH_ALIGNMENT);
+
+                    assert(dstRowStride % D3D12_TEXTURE_DATA_PITCH_ALIGNMENT == 0);
+                    footprint.Footprint.RowPitch = dstRowStride;
 
                     auto bufferSize = footprint.Footprint.RowPitch * footprint.Footprint.Height *
                                       footprint.Footprint.Depth;
@@ -6714,6 +6716,12 @@ Result D3D12Device::getTextureAllocationInfo(
     auto allocInfo = m_device->GetResourceAllocationInfo(0, 1, &resourceDesc);
     *outSize = (size_t)allocInfo.SizeInBytes;
     *outAlignment = (size_t)allocInfo.Alignment;
+    return SLANG_OK;
+}
+
+Result D3D12Device::getTextureRowAlignment(size_t* outAlignment)
+{
+    *outAlignment = D3D12_TEXTURE_DATA_PITCH_ALIGNMENT;
     return SLANG_OK;
 }
 

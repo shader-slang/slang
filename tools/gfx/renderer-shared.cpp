@@ -543,6 +543,12 @@ Result RendererBase::getTextureAllocationInfo(
     return SLANG_E_NOT_AVAILABLE;
 }
 
+Result RendererBase::getTextureRowAlignment(size_t* outAlignment)
+{
+    *outAlignment = 0;
+    return SLANG_E_NOT_AVAILABLE;
+}
+
 Result RendererBase::getShaderObjectLayout(
     slang::TypeReflection* type,
     ShaderObjectContainerType container,
