@@ -31,14 +31,14 @@ public:
         /// Parse the contents of the source file
     SlangResult parse(SourceOrigin* sourceOrigin, const Options* options);
 
-    void setTypeEnabled(Node::Type type, bool isEnabled = true);
-    bool isTypeEnabled(Node::Type type) { return (m_nodeTypeEnabled & (NodeTypeBitType(1) << int(type))) != 0; }
-    void setTypesEnabled(const Node::Type* types, Index typesCount, bool isEnabled = true);
+    void setKindEnabled(Node::Kind kind, bool isEnabled = true);
+    bool isTypeEnabled(Node::Kind kind) { return (m_nodeTypeEnabled & (NodeTypeBitType(1) << int(kind))) != 0; }
+    void setKindsEnabled(const Node::Kind* kinds, Index kindsCount, bool isEnabled = true);
 
     Parser(NodeTree* nodeTree, DiagnosticSink* sink);
 
 protected:
-    static Node::Type _toNodeType(IdentifierStyle style);
+    static Node::Kind _toNodeKind(IdentifierStyle style);
 
     bool _isMarker(const UnownedStringSlice& name);
 
@@ -47,7 +47,7 @@ protected:
     SlangResult _parsePreDeclare();
     SlangResult _parseTypeSet();
 
-    SlangResult _maybeParseNode(Node::Type type);
+    SlangResult _maybeParseNode(Node::Kind kind);
     SlangResult _maybeParseField();
 
     SlangResult _parseTypeDef();

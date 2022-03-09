@@ -82,7 +82,7 @@ void Node::calcAbsoluteName(StringBuilder& outName) const
             outName << "::";
         }
 
-        if (node->m_type == Type::AnonymousNamespace)
+        if (node->m_kind == Kind::AnonymousNamespace)
         {
             outName << "{Anonymous}";
         }
@@ -154,7 +154,7 @@ void Node::calcAbsoluteName(StringBuilder& outName) const
     for (Node* node : scope->m_children)
     {
         EnumNode* enumNode = as<EnumNode>(node);
-        if (enumNode && enumNode->m_type == Node::Type::Enum)
+        if (enumNode && enumNode->m_kind == Node::Kind::Enum)
         {
             Node** nodePtr = enumNode->m_childMap.TryGetValue(name);
             if (nodePtr)
@@ -286,7 +286,7 @@ ScopeNode* ScopeNode::getAnonymousNamespace()
 {
     if (!m_anonymousNamespace)
     {
-        m_anonymousNamespace = new ScopeNode(Type::AnonymousNamespace);
+        m_anonymousNamespace = new ScopeNode(Kind::AnonymousNamespace);
         m_anonymousNamespace->m_parentScope = this;
         m_children.add(m_anonymousNamespace);
     }
@@ -298,7 +298,7 @@ void ScopeNode::addChild(Node* child)
 {
     SLANG_ASSERT(child->m_parentScope == nullptr);
     // Can't add anonymous namespace this way - should be added via getAnonymousNamespace
-    SLANG_ASSERT(child->m_type != Type::AnonymousNamespace);
+    SLANG_ASSERT(child->m_kind != Kind::AnonymousNamespace);
 
     child->m_parentScope = this;
     m_children.add(child);
@@ -337,13 +337,13 @@ void ScopeNode::dump(int indentCount, StringBuilder& out)
 
     _indent(indentCount, out);
 
-    switch (m_type)
+    switch (m_kind)
     {
-        case Type::AnonymousNamespace:
+        case Kind::AnonymousNamespace:
         {
             out << "namespace {\n";
         }
-        case Type::Namespace:
+        case Kind::Namespace:
         {
             if (m_name.hasContent())
             {
@@ -465,7 +465,7 @@ void EnumNode::dump(int indent, StringBuilder& out)
 
     out << "enum ";
 
-    if (m_type == Type::EnumClass)
+    if (m_kind == Kind::EnumClass)
     {
         out << "class ";
     }
@@ -598,7 +598,7 @@ void ClassLikeNode::dump(int indentCount, StringBuilder& out)
 
     _indent(indentCount, out);
 
-    const char* typeName = (m_type == Type::StructType) ? "struct" : "class";
+    const char* typeName = (m_kind == Kind::StructType) ? "struct" : "class";
 
     out << typeName << " ";
 

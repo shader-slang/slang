@@ -89,21 +89,21 @@ static DocMarkupExtractor::SearchStyle _getSearchStyle(Node* node)
         return SearchStyle::None;
     }
 
-    switch (node->m_type)
+    switch (node->m_kind)
     {
-        case Node::Type::Invalid:
+        case Node::Kind::Invalid:
         {
             return SearchStyle::None;
         }
-        case Node::Type::Field:
+        case Node::Kind::Field:
         {
             return SearchStyle::Variable;
         }
-        case Node::Type::EnumCase:
+        case Node::Kind::EnumCase:
         {
             return SearchStyle::EnumCase;
         }
-        case Node::Type::TypeDef:
+        case Node::Kind::TypeDef:
         {
             return SearchStyle::Variable;
         }

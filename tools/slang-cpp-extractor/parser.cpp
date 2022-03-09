@@ -11,7 +11,7 @@ namespace CppExtract {
 using namespace Slang;
 
 // If fails then we need more bits to identify types
-SLANG_COMPILE_TIME_ASSERT(int(Node::Type::CountOf) <= 8 * sizeof(uint32_t));
+SLANG_COMPILE_TIME_ASSERT(int(Node::Kind::CountOf) <= 8 * sizeof(uint32_t));
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! Parser !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
@@ -21,39 +21,39 @@ Parser::Parser(NodeTree* nodeTree, DiagnosticSink* sink) :
     m_nodeTypeEnabled(0)
 {
     // Enable types by default
-    const Node::Type defaultEnabled[] =
+    const Node::Kind defaultEnabled[] =
     {
-        Node::Type::ClassType,
-        Node::Type::StructType,
-        Node::Type::Namespace,
-        Node::Type::AnonymousNamespace,
-        Node::Type::Field,
+        Node::Kind::ClassType,
+        Node::Kind::StructType,
+        Node::Kind::Namespace,
+        Node::Kind::AnonymousNamespace,
+        Node::Kind::Field,
 
         // These are disabled by default because AST uses macro magic to build up the types
         // Node::Type::TypeDef,
         // Node::Type::Enum,
         // Node::Type::EnumClass,
     };
-    setTypesEnabled(defaultEnabled, SLANG_COUNT_OF(defaultEnabled));
+    setKindsEnabled(defaultEnabled, SLANG_COUNT_OF(defaultEnabled));
 }
 
-void Parser::setTypeEnabled(Node::Type type, bool isEnabled)
+void Parser::setKindEnabled(Node::Kind kind, bool isEnabled)
 {
     if (isEnabled)
     {
-        m_nodeTypeEnabled |= (NodeTypeBitType(1) << int(type));
+        m_nodeTypeEnabled |= (NodeTypeBitType(1) << int(kind));
     }
     else
     {
-        m_nodeTypeEnabled &= ~(NodeTypeBitType(1) << int(type));
+        m_nodeTypeEnabled &= ~(NodeTypeBitType(1) << int(kind));
     }
 }
 
-void Parser::setTypesEnabled(const Node::Type* types, Index typesCount, bool isEnabled)
+void Parser::setKindsEnabled(const Node::Kind* kinds, Index kindsCount, bool isEnabled)
 {
-    for (Index i = 0; i < typesCount; ++i)
+    for (Index i = 0; i < kindsCount; ++i)
     {
-        setTypeEnabled(types[i], isEnabled);
+        setKindEnabled(kinds[i], isEnabled);
     }
 }
 
@@ -162,9 +162,9 @@ SlangResult Parser::pushScope(ScopeNode* scopeNode)
                 return SLANG_FAIL;
             }
 
-            if (foundNode->m_type == Node::Type::Namespace)
+            if (foundNode->m_kind == Node::Kind::Namespace)
             {
-                if (foundNode->m_type != scopeNode->m_type)
+                if (foundNode->m_kind != scopeNode->m_kind)
                 {
                     // Different types can't work
                     m_sink->diagnose(m_reader.peekToken(), CPPDiagnostics::typeAlreadyDeclared, scopeNode->m_name.getContent());
@@ -285,7 +285,7 @@ SlangResult Parser::_parseEnum()
         return SLANG_FAIL;
     }
 
-    Node::Type type = Node::Type::Enum;
+    Node::Kind kind = Node::Kind::Enum;
 
     Token nameToken;
     if (advanceIfToken(TokenType::Identifier, &nameToken))
@@ -294,7 +294,7 @@ SlangResult Parser::_parseEnum()
 
         if (style == IdentifierStyle::Class)
         {
-            type = Node::Type::EnumClass;
+            kind = Node::Kind::EnumClass;
             SLANG_RETURN_ON_FAIL(expect(TokenType::Identifier, &nameToken));
         }
         else if (style == IdentifierStyle::None)
@@ -308,7 +308,7 @@ SlangResult Parser::_parseEnum()
         }
     }
 
-    RefPtr<EnumNode> node = new EnumNode(type);
+    RefPtr<EnumNode> node = new EnumNode(kind);
     node->m_name = nameToken;
 
     if (advanceIfToken(TokenType::Colon))
@@ -350,7 +350,7 @@ SlangResult Parser::_parseEnum()
             {
                 // Strictly speaking we should check the backing type etc, match, but for now ignore and assume it's ok
 
-                if (node->m_type == type)
+                if (node->m_kind == kind)
                 {
                     return SLANG_OK;
                 }
@@ -427,12 +427,12 @@ SlangResult Parser::_parseEnum()
     return popScope();
 }
 
-SlangResult Parser::_maybeParseNode(Node::Type type)
+SlangResult Parser::_maybeParseNode(Node::Kind kind)
 {
     // We are looking for
     // struct/class identifier [: [public|private|protected] Identifier ] { [public|private|proctected:]* marker ( identifier );
 
-    if (type == Node::Type::Namespace)
+    if (kind == Node::Kind::Namespace)
     {
         // consume namespace
         SLANG_RETURN_ON_FAIL(expect(TokenType::Identifier));
@@ -447,7 +447,7 @@ SlangResult Parser::_maybeParseNode(Node::Type type)
             if (advanceIfToken(TokenType::LBrace))
             {
                 // Okay looks like we are opening a namespace
-                RefPtr<ScopeNode> node(new ScopeNode(Node::Type::Namespace));
+                RefPtr<ScopeNode> node(new ScopeNode(Node::Kind::Namespace));
                 node->m_name = name;
                 // Push the node
                 return pushScope(node);
@@ -457,14 +457,14 @@ SlangResult Parser::_maybeParseNode(Node::Type type)
         // Just ignore it then
         return SLANG_OK;
     }
-    else if (Node::isEnumLikeType(type))
+    else if (Node::isEnumLikeType(kind))
     {
         return _parseEnum();
     }
 
     // Must be class | struct
 
-    SLANG_ASSERT(type == Node::Type::ClassType || type == Node::Type::StructType);
+    SLANG_ASSERT(kind == Node::Kind::ClassType || kind == Node::Kind::StructType);
 
     Token name;
 
@@ -479,7 +479,7 @@ SlangResult Parser::_maybeParseNode(Node::Type type)
         return SLANG_OK;
     }
 
-    RefPtr<ClassLikeNode> node(new ClassLikeNode(type));
+    RefPtr<ClassLikeNode> node(new ClassLikeNode(kind));
     node->m_name = name;
 
     // Defaults to not reflected
@@ -1083,16 +1083,16 @@ SlangResult Parser::_maybeParseField()
     return SLANG_OK;
 }
 
-/* static */Node::Type Parser::_toNodeType(IdentifierStyle style)
+/* static */Node::Kind Parser::_toNodeKind(IdentifierStyle style)
 {
     switch (style)
     {
-        case IdentifierStyle::Class:        return Node::Type::ClassType;
-        case IdentifierStyle::Struct:       return Node::Type::StructType;
-        case IdentifierStyle::Namespace:    return Node::Type::Namespace;
-        case IdentifierStyle::Enum:         return Node::Type::Enum;
-        case IdentifierStyle::TypeDef:      return Node::Type::TypeDef;
-        default: return Node::Type::Invalid;
+        case IdentifierStyle::Class:        return Node::Kind::ClassType;
+        case IdentifierStyle::Struct:       return Node::Kind::StructType;
+        case IdentifierStyle::Namespace:    return Node::Kind::Namespace;
+        case IdentifierStyle::Enum:         return Node::Kind::Enum;
+        case IdentifierStyle::TypeDef:      return Node::Kind::TypeDef;
+        default: return Node::Kind::Invalid;
     }
 }
 
@@ -1123,7 +1123,7 @@ SlangResult Parser::_parsePreDeclare()
     SLANG_RETURN_ON_FAIL(expect(TokenType::Comma));
 
     // Get the type of type
-    Node::Type nodeType;
+    Node::Kind nodeKind;
     {
         Token typeToken;
         SLANG_RETURN_ON_FAIL(expect(TokenType::Identifier, &typeToken));
@@ -1135,7 +1135,7 @@ SlangResult Parser::_parsePreDeclare()
             m_sink->diagnose(typeToken, CPPDiagnostics::expectingTypeKeyword, typeToken.getContent());
             return SLANG_FAIL;
         }
-        nodeType = _toNodeType(style);
+        nodeKind = _toNodeKind(style);
     }
 
     Token name;
@@ -1150,12 +1150,12 @@ SlangResult Parser::_parsePreDeclare()
 
     SLANG_RETURN_ON_FAIL(expect(TokenType::RParent));
 
-    switch (nodeType)
+    switch (nodeKind)
     {
-        case Node::Type::ClassType:
-        case Node::Type::StructType:
+        case Node::Kind::ClassType:
+        case Node::Kind::StructType:
         {
-            RefPtr<ClassLikeNode> node(new ClassLikeNode(nodeType));
+            RefPtr<ClassLikeNode> node(new ClassLikeNode(nodeKind));
 
             node->m_name = name;
             node->m_super = super;
@@ -1279,7 +1279,7 @@ SlangResult Parser::parse(SourceOrigin* sourceOrigin, const Options* options)
                     }
                     case IdentifierStyle::TypeDef:
                     {
-                        if (isTypeEnabled(Node::Type::TypeDef))
+                        if (isTypeEnabled(Node::Kind::TypeDef))
                         {
                             SLANG_RETURN_ON_FAIL(_parseTypeDef());
                         }
@@ -1296,12 +1296,12 @@ SlangResult Parser::parse(SourceOrigin* sourceOrigin, const Options* options)
 
                         if (flags & IdentifierFlag::StartScope)
                         {
-                            Node::Type type = _toNodeType(style);
-                            SLANG_ASSERT(type != Node::Type::Invalid);
+                            Node::Kind kind = _toNodeKind(style);
+                            SLANG_ASSERT(kind != Node::Kind::Invalid);
 
-                            if (isTypeEnabled(type))
+                            if (isTypeEnabled(kind))
                             {
-                                SLANG_RETURN_ON_FAIL(_maybeParseNode(type));
+                                SLANG_RETURN_ON_FAIL(_maybeParseNode(kind));
                             }
                             else
                             {

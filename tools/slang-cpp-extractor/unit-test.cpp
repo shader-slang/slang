@@ -67,8 +67,8 @@ static const char someSource[] =
         Parser parser(&tree, &state.m_sink);
 
         {
-            const Node::Type enableTypes[] = { Node::Type::Enum, Node::Type::EnumClass, Node::Type::EnumCase, Node::Type::TypeDef };
-            parser.setTypesEnabled(enableTypes, SLANG_COUNT_OF(enableTypes));
+            const Node::Kind enableKinds[] = { Node::Kind::Enum, Node::Kind::EnumClass, Node::Kind::EnumCase, Node::Kind::TypeDef };
+            parser.setKindsEnabled(enableKinds, SLANG_COUNT_OF(enableKinds));
         }
 
         SLANG_RETURN_ON_FAIL(parser.parse(sourceOrigin, &state.m_options));
