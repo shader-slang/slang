@@ -7027,7 +7027,7 @@ void ResourceCommandEncoderImpl::copyTextureToBuffer(
         }
 
         assert(dstRowStride % D3D12_TEXTURE_DATA_PITCH_ALIGNMENT == 0);
-        footprint.Footprint.RowPitch = dstRowStride;
+        footprint.Footprint.RowPitch = (UINT)dstRowStride;
 
         auto bufferSize =
             footprint.Footprint.RowPitch * footprint.Footprint.Height * footprint.Footprint.Depth;
