@@ -1266,7 +1266,7 @@ SlangResult Parser::_maybeParseContained(Node** outNode)
                     paramName = m_reader.advanceToken();
                 }
 
-                // If it's a comma we consume
+                // Check if we have a default value
                 auto peekType = m_reader.peekTokenType();
 
                 if (peekType == TokenType::OpAssign)
@@ -1279,6 +1279,12 @@ SlangResult Parser::_maybeParseContained(Node** outNode)
                     // Update the peek type
                     peekType = m_reader.peekTokenType();
                 }
+
+                CallableNode::Param param;
+                param.m_name = name;
+                param.m_type = type;
+
+                params.add(param);
 
                 if (peekType == TokenType::RParent)
                 {
@@ -1398,6 +1404,13 @@ SlangResult Parser::_maybeParseContained(Node** outNode)
             StringSlicePool* typePool = m_nodeTree->m_typePool;
 
             typeName = typePool->getSlice(typePool->add(buf));
+        }
+
+        // Check if has a default value
+        if (advanceIfToken(TokenType::OpAssign))
+        {
+            List<Token> exprTokens;
+            SLANG_RETURN_ON_FAIL(_parseExpression(exprTokens));
         }
 
         // Hit end of field/variable

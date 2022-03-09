@@ -379,8 +379,7 @@ static bool _needsSpace(const Token& prevTok, const Token& tok)
     auto loc = tok.getLoc();
 
     auto prevContent = prevTok.getContent();
-    auto content = tok.getContent();
-
+    
     if (prevLoc + prevContent.getLength() == loc)
     {
         return false;
