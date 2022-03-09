@@ -2942,7 +2942,7 @@ public:
                 pipeline = VK_NULL_HANDLE;
         }
 
-        static void _uploadBufferData(
+        static void uploadBufferData(
             VkCommandBuffer commandBuffer,
             TransientResourceHeapImpl* transientHeap,
             BufferResourceImpl* buffer,
@@ -2986,7 +2986,7 @@ public:
         void uploadBufferDataImpl(IBufferResource* buffer, size_t offset, size_t size, void* data)
         {
             m_vkPreCommandBuffer = m_commandBuffer->getPreCommandBuffer();
-            _uploadBufferData(
+            uploadBufferData(
                 m_vkPreCommandBuffer,
                 m_commandBuffer->m_transientHeap.get(),
                 static_cast<BufferResourceImpl*>(buffer),
@@ -4816,7 +4816,7 @@ public:
             virtual SLANG_NO_THROW void SLANG_MCALL uploadBufferData(
                 IBufferResource* buffer, size_t offset, size_t size, void* data) override
             {
-                PipelineCommandEncoder::_uploadBufferData(
+                PipelineCommandEncoder::uploadBufferData(
                     m_commandBuffer->m_commandBuffer,
                     m_commandBuffer->m_transientHeap.get(),
                     static_cast<BufferResourceImpl*>(buffer),
