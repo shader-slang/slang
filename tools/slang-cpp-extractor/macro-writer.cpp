@@ -214,7 +214,7 @@ SlangResult MacroWriter::calcTypeHeader(NodeTree* tree, TypeSet* typeSet, String
 
     for (Node* scopeNode : baseScopePath)
     {
-        SLANG_ASSERT(scopeNode->m_type == Node::Type::Namespace);
+        SLANG_ASSERT(scopeNode->m_kind == Node::Kind::Namespace);
         out << "namespace " << scopeNode->m_name.getContent() << " {\n";
     }
 
@@ -262,7 +262,7 @@ SlangResult MacroWriter::calcTypeHeader(NodeTree* tree, TypeSet* typeSet, String
             // If it's not reflected we don't output, in the enum list
             if (node->isReflected())
             {
-                const char* type = (node->m_type == Node::Type::ClassType) ? "class" : "struct";
+                const char* type = (node->m_kind == Node::Kind::ClassType) ? "class" : "struct";
                 out << type << " " << node->m_name.getContent() << ";\n";
             }
         }

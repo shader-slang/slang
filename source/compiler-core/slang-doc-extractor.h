@@ -3,7 +3,9 @@
 #define SLANG_DOC_EXTRACTOR_H
 
 #include "../core/slang-basic.h"
-#include "slang-ast-all.h"
+
+#include "slang-source-loc.h"
+#include "slang-lexer.h"
 
 namespace Slang {
 
@@ -13,55 +15,6 @@ enum class MarkupVisibility : uint8_t
     Internal,               ///< Can be available in more verbose 'internal' documentation
     Hidden,                 ///< Not generally available
 };
-
-/* Holds the documentation markup that is associated with each node (typically a decl) from a module */
-class DocMarkup : public RefObject
-{
-public:
-    struct Entry
-    {
-        NodeBase* m_node;                                           ///< The node this documentation is associated with
-        String m_markup;                                            ///< The raw contents of of markup associated with the decoration
-        MarkupVisibility m_visibility = MarkupVisibility::Public;   ///< How visible this decl is
-    };
-
-        /// Adds an entry, returns the reference to pre-existing node if there is one
-    Entry& addEntry(NodeBase* base);
-        /// Gets an entry for a node. Returns nullptr if there is no markup.
-    Entry* getEntry(NodeBase* base);
-
-        /// Get list of all of the entries in source order
-    const List<Entry>& getEntries() const { return m_entries; }
-
-protected:
-
-        /// Map from AST nodes to documentation entries
-    Dictionary<NodeBase*, Index> m_entryMap;
-        /// All of the documentation entries in source order
-    List<Entry> m_entries;
-};
-
-// ---------------------------------------------------------------------------
-SLANG_INLINE DocMarkup::Entry& DocMarkup::addEntry(NodeBase* base)
-{
-    const Index count = m_entries.getCount();
-    const Index index = m_entryMap.GetOrAddValue(base, count);
-
-    if (index == count)
-    {
-        Entry entry;
-        entry.m_node = base;
-        m_entries.add(entry);
-    }
-    return m_entries[index];
-}
-
-// ---------------------------------------------------------------------------
-SLANG_INLINE DocMarkup::Entry* DocMarkup::getEntry(NodeBase* base)
-{
-    Index* indexPtr = m_entryMap.TryGetValue(base);
-    return (indexPtr) ? &m_entries[*indexPtr] : nullptr;
-}
 
 /* Extracts 'markup' from comments in Slang source core. The comments are extracted and associated in declarations. The association
 is held in DocMarkup type. The comment style follows the doxygen style */
@@ -168,22 +121,13 @@ public:
         Index lineIndex;                ///< The line number for the decl
     };
 
-        /// Extracts documentation from the nodes held in the module using the source manager. Found documentation is placed
-        /// in outMarkup
-    static SlangResult extract(ModuleDecl* moduleDecl, SourceManager* sourceManager, DiagnosticSink* sink, DocMarkup* outMarkup);
-
+    
         /// Extracts 'markup' doc information for the specified input items
         /// The output is placed in out - with the items now in the source order *not* the order of the input items
         /// The inputIndex on the output holds the input item index
         /// The outViews holds the views specified in viewIndex in the output, which may be useful for determining where the documentation was placed in source
     SlangResult extract(const SearchItemInput* inputItems, Index inputCount, SourceManager* sourceManager, DiagnosticSink* sink, List<SourceView*>& outViews, List<SearchItemOutput>& out);
 
-        /// Given a module finds all the decls, and places in outDecls
-    static void findDecls(ModuleDecl* moduleDecl, List<Decl*>& outDecls);
-
-        /// Given a decl determines the search style that is appropriate. Returns None if can't determine a suitable style
-    static SearchStyle getSearchStyle(Decl* decl);
-    
     static MarkupFlags getFlags(MarkupType type);
     static MarkupType findMarkupType(const Token& tok);
     static UnownedStringSlice removeStart(MarkupType type, const UnownedStringSlice& comment);
