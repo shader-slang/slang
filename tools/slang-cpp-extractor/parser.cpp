@@ -279,7 +279,7 @@ SlangResult Parser::_parseEnum()
     // consume enum
     SLANG_RETURN_ON_FAIL(expect(TokenType::Identifier, &enumToken));
 
-    if (!m_currentScope->acceptsTypes())
+    if (!m_currentScope->canContainTypes())
     {
         m_sink->diagnose(enumToken.loc, CPPDiagnostics::cannotDeclareTypeInScope);
         return SLANG_FAIL;
@@ -457,7 +457,7 @@ SlangResult Parser::_maybeParseNode(Node::Kind kind)
         // Just ignore it then
         return SLANG_OK;
     }
-    else if (Node::isEnumLikeType(kind))
+    else if (Node::isKindEnumLike(kind))
     {
         return _parseEnum();
     }
@@ -967,7 +967,7 @@ SlangResult Parser::_parseBalanced(DiagnosticSink* sink)
 
 SlangResult Parser::_parseTypeDef()
 {
-    if (!m_currentScope->acceptsTypes())
+    if (!m_currentScope->canContainTypes())
     {
         m_sink->diagnose(m_reader.peekLoc(), CPPDiagnostics::cannotDeclareTypeInScope);
         return SLANG_FAIL;
@@ -1312,7 +1312,7 @@ SlangResult Parser::parse(SourceOrigin* sourceOrigin, const Options* options)
                         {
                             // Special case the node that's the root of the hierarchy (as far as reflection is concerned)
                             // This could be a field
-                            if (m_currentScope->acceptsFields())
+                            if (m_currentScope->canContainFields())
                             {
                                 SLANG_RETURN_ON_FAIL(_maybeParseField());
                             }
