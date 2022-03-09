@@ -2071,7 +2071,7 @@ SlangResult SLANG_MCALL createD3D11Device(const IDevice::Desc* desc, IDevice** o
     return SLANG_OK;
 }
 
-static void _initSrvDesc(IResource::Type resourceType, const ITextureResource::Desc& textureDesc, DXGI_FORMAT pixelFormat, D3D11_SHADER_RESOURCE_VIEW_DESC& descOut)
+static void initSrvDesc(IResource::Type resourceType, const ITextureResource::Desc& textureDesc, DXGI_FORMAT pixelFormat, D3D11_SHADER_RESOURCE_VIEW_DESC& descOut)
 {
     // create SRV
     descOut = D3D11_SHADER_RESOURCE_VIEW_DESC();
@@ -2170,7 +2170,7 @@ D3D11Device::ScopeNVAPI::~ScopeNVAPI()
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!! Renderer interface !!!!!!!!!!!!!!!!!!!!!!!!!!
 
-static bool _isSupportedNVAPIOp(IUnknown* dev, uint32_t op)
+static bool isSupportedNVAPIOp(IUnknown* dev, uint32_t op)
 {
 #ifdef GFX_NVAPI
     {
@@ -2347,11 +2347,11 @@ SlangResult D3D11Device::initialize(const Desc& desc)
             return SLANG_E_NOT_AVAILABLE;
         }
 
-        if (_isSupportedNVAPIOp(m_device, NV_EXTN_OP_UINT64_ATOMIC ))
+        if (isSupportedNVAPIOp(m_device, NV_EXTN_OP_UINT64_ATOMIC ))
         {
             m_features.add("atomic-int64");
         }
-        if (_isSupportedNVAPIOp(m_device, NV_EXTN_OP_FP32_ATOMIC))
+        if (isSupportedNVAPIOp(m_device, NV_EXTN_OP_FP32_ATOMIC))
         {
             m_features.add("atomic-float");
         }
@@ -2548,7 +2548,7 @@ SlangResult D3D11Device::readTextureResource(
     }
 }
 
-static D3D11_BIND_FLAG _calcResourceFlag(ResourceState state)
+static D3D11_BIND_FLAG calcResourceFlag(ResourceState state)
 {
     switch (state)
     {
@@ -2581,7 +2581,7 @@ static int _calcResourceBindFlags(ResourceStateSet allowedStates)
     {
         auto state = (ResourceState)i;
         if (allowedStates.contains(state))
-            dstFlags |= _calcResourceFlag(state);
+            dstFlags |= calcResourceFlag(state);
     }
     return dstFlags;
 }
@@ -3000,7 +3000,7 @@ Result D3D11Device::createTextureView(ITextureResource* texture, IResourceView::
     case IResourceView::Type::ShaderResource:
         {
             D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc;
-            _initSrvDesc(resourceImpl->getType(), *resourceImpl->getDesc(), D3DUtil::getMapFormat(desc.format), srvDesc);
+            initSrvDesc(resourceImpl->getType(), *resourceImpl->getDesc(), D3DUtil::getMapFormat(desc.format), srvDesc);
 
             ComPtr<ID3D11ShaderResourceView> srv;
             SLANG_RETURN_ON_FAIL(m_device->CreateShaderResourceView(resourceImpl->m_resource, &srvDesc, srv.writeRef()));
