@@ -1,4 +1,4 @@
-// vk-swap-chain.h
+// vk-device-queue.h
 #pragma once
 
 #include "vk-api.h"

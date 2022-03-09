@@ -3,7 +3,6 @@
 #include "../../source/core/slang-math.h"
 #include "d3d11/render-d3d11.h"
 #include "open-gl/render-gl.h"
-#include "vulkan/render-vk.h"
 #include "cuda/render-cuda.h"
 #include "cpu/render-cpu.h"
 #include "debug-layer.h"
@@ -14,6 +13,7 @@ namespace gfx {
 using namespace Slang;
 
 Result SLANG_MCALL createD3D12Device(const IDevice::Desc* desc, IDevice** outDevice);
+Result SLANG_MCALL createVKDevice(const IDevice::Desc* desc, IDevice** outDevice);
 
 static bool debugLayerEnabled = false;
 

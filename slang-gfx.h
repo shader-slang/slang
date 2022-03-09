@@ -618,7 +618,6 @@ struct SubresourceRange
 class ITextureResource: public IResource
 {
 public:
-    static const uint32_t kTexturePitchAlignment = 256;
     static const uint32_t kRemainingTextureSize = 0xFFFFFFFF;
     struct Offset3D
     {
