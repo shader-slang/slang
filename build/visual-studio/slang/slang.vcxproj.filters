@@ -72,7 +72,7 @@
     <ClInclude Include="..\..\..\source\slang\slang-diagnostics.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\source\slang\slang-doc-extractor.h">
+    <ClInclude Include="..\..\..\source\slang\slang-doc-ast.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\source\slang\slang-doc-markdown-writer.h">
@@ -467,7 +467,7 @@
     <ClCompile Include="..\..\..\source\slang\slang-diagnostics.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\source\slang\slang-doc-extractor.cpp">
+    <ClCompile Include="..\..\..\source\slang\slang-doc-ast.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\source\slang\slang-doc-markdown-writer.cpp">
