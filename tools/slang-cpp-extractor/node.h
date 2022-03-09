@@ -41,6 +41,8 @@ public:
 
         TypeDef,
 
+        Callable,
+
         CountOf,
     };
 
@@ -64,7 +66,7 @@ public:
 
         /// Returns true if kind can cast to this type
         /// Used for implementing as<T> casting
-    static bool isOfKind(Kind type) { return true; }
+    static bool isOfKind(Kind kind) { SLANG_UNUSED(kind);  return true; }
 
     static bool isKindScope(Kind kind) { return int(kind) >= int(KindRange::ScopeStart) && int(kind) <= int(KindRange::ScopeEnd); }
     static bool isKindClassLike(Kind kind) { return int(kind) >= int(KindRange::ClassLikeStart) &&  int(kind) <= int(KindRange::ClassLikeEnd); }
@@ -185,6 +187,8 @@ struct ScopeNode : public Node
 
         /// Add a child node to this nodes scope
     void addChild(Node* child);
+        /// Adds the child but does not add the name to the map
+    void addChildIgnoringName(Node* child);
 
         /// Find a child node in this scope with the specified name. Return nullptr if not found
     Node* findChild(const UnownedStringSlice& name) const;
@@ -216,7 +220,7 @@ struct FieldNode : public Node
 {
     typedef Node Super;
 
-    static bool isOfKind(Kind type) { return type == Kind::Field; }
+    static bool isOfKind(Kind kind) { return kind == Kind::Field; }
 
     virtual void dump(int indent, StringBuilder& out) SLANG_OVERRIDE;
 
@@ -279,6 +283,31 @@ struct ClassLikeNode : public ScopeNode
 
     Token m_super;                   ///< Super class name
     ClassLikeNode* m_superNode;      ///< If this is a class/struct, the type it is derived from (or nullptr if base)
+};
+
+struct CallableNode : public Node
+{
+    typedef Node Super;
+
+    static bool isOfKind(Kind kind) { return kind == Kind::Callable; }
+
+    virtual void dump(int indent, StringBuilder& out) SLANG_OVERRIDE;
+
+    CallableNode() :Super(Kind::Callable) {}
+
+    struct Param
+    {
+        UnownedStringSlice m_type;
+        Token m_name;
+    };
+
+    UnownedStringSlice m_returnType;
+
+    CallableNode* m_nextOverload = nullptr;
+
+    List<Param> m_params;
+    bool m_isVirtual = false;
+    bool m_isPure = false;
 };
 
 struct EnumCaseNode : public Node

@@ -48,13 +48,16 @@ protected:
     SlangResult _parseTypeSet();
 
     SlangResult _maybeParseNode(Node::Kind kind);
-    SlangResult _maybeParseField();
+    SlangResult _maybeParseContained(Node** outNode);
 
     SlangResult _parseTypeDef();
     SlangResult _parseEnum();
+    SlangResult _parseTemplate();
 
     SlangResult _maybeParseType(List<Token>& outToks);
     SlangResult _maybeParseType(UnownedStringSlice& outType);
+
+    SlangResult _parseExpression(List<Token>& outExprTokens);
 
     SlangResult _maybeParseType(Index& ioTemplateDepth);
     SlangResult _maybeParseTemplateArgs(Index& ioTemplateDepth);

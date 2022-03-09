@@ -46,6 +46,10 @@ DIAGNOSTIC(100012, Error, typeInDifferentTypeSet, "Type $0 in different type set
 DIAGNOSTIC(100013, Error, expectingIdentifier, "Expecting an identifier, found $0")
 DIAGNOSTIC(100014, Error, cannotDeclareTypeInScope, "Cannot declare types in this scope")
 DIAGNOSTIC(100015, Error, identifierAlreadyDefined, "Identifier already defined '$0'")
+DIAGNOSTIC(100016, Error, expectingType, "Expecting a type")
+DIAGNOSTIC(100017, Error, cannotParseExpression, "Cannot parse expression")
+DIAGNOSTIC(100018, Error, cannotOverload, "Cannot overload this declaration");
+
 
 // Command line errors 100100
 

@@ -294,7 +294,7 @@ ScopeNode* ScopeNode::getAnonymousNamespace()
     return m_anonymousNamespace;
 }
 
-void ScopeNode::addChild(Node* child)
+void ScopeNode::addChildIgnoringName(Node* child)
 {
     SLANG_ASSERT(child->m_parentScope == nullptr);
     // Can't add anonymous namespace this way - should be added via getAnonymousNamespace
@@ -302,6 +302,11 @@ void ScopeNode::addChild(Node* child)
 
     child->m_parentScope = this;
     m_children.add(child);
+}
+
+void ScopeNode::addChild(Node* child)
+{
+    addChildIgnoringName(child);
 
     if (child->m_name.hasContent())
     {
@@ -316,9 +321,6 @@ Node* ScopeNode::findChild(const UnownedStringSlice& name) const
     {
         return *nodePtr;
     }
-
-
-
     return nullptr;
 }
 
@@ -492,6 +494,51 @@ void EnumNode::dump(int indent, StringBuilder& out)
 
     _indent(indent, out);
     out << "}\n";
+}
+
+/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!! CallableNode !!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
+
+void CallableNode::dump(int indent, StringBuilder& out)
+{
+    if (!isReflected())
+    {
+        return;
+    }
+
+    _indent(indent, out);
+
+    if (m_isVirtual)
+    {
+        out << "virtual ";
+    }
+
+    out << m_returnType << " ";
+    out << m_name.getContent() << "(";
+
+    const Index count = m_params.getCount();
+    for (Index i = 0; i < count; ++i)
+    {
+        if (i > 0)
+        {
+            out << ", ";
+        }
+
+        const auto& param = m_params[i];
+        out << param.m_type;
+        if (param.m_name.type == TokenType::Identifier)
+        {
+            out << " " << param.m_name.getContent();
+        }
+    }
+
+    out << ")";
+
+    if (m_isPure)
+    {
+        out << " = 0";
+    }
+
+    out << "\n";
 }
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! FieldNode !!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
