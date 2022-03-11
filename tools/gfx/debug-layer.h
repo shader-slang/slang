@@ -724,6 +724,7 @@ public:
 public:
     ITransientResourceHeap* getInterface(const Slang::Guid& guid);
     virtual SLANG_NO_THROW Result SLANG_MCALL synchronizeAndReset() override;
+    virtual SLANG_NO_THROW Result SLANG_MCALL finish() override;
     virtual SLANG_NO_THROW Result SLANG_MCALL
         createCommandBuffer(ICommandBuffer** outCommandBuffer) override;
 };

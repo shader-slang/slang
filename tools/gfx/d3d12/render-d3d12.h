@@ -490,9 +490,11 @@ public:
     {
         uint64_t waitValue;
         HANDLE fenceEvent;
+        ComPtr<ID3D12CommandQueue> queue;
         ComPtr<ID3D12Fence> fence = nullptr;
     };
     ShortList<QueueWaitInfo, 4> m_waitInfos;
+    Array<HANDLE, 16> m_waitHandles;
 
     QueueWaitInfo& getQueueWaitInfo(uint32_t queueIndex);
     // During command submission, we need all the descriptor tables that get
@@ -545,6 +547,8 @@ public:
         createCommandBuffer(ICommandBuffer** outCommandBuffer) override;
 
     virtual SLANG_NO_THROW Result SLANG_MCALL synchronizeAndReset() override;
+
+    virtual SLANG_NO_THROW Result SLANG_MCALL finish() override;
 };
 
 struct Submitter
