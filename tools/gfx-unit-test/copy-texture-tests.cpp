@@ -14,28 +14,21 @@ using namespace gfx;
 
 namespace gfx_test
 {
-    struct Texel
-    {
-        float channels[4];
-    };
-
-    struct SubresourceStuff : RefObject
-    {
-        List<Texel> texels;
-    };
-
-    struct TextureStuff : RefObject
-    {
-        List<RefPtr<SubresourceStuff>> subresourceObjects;
-        List<ITextureResource::SubresourceData> subresourceDatas;
-    };
+//     struct Texel
+//     {
+//         float channels[4];
+//     };
+// 
+//     struct SubresourceStuff : RefObject
+//     {
+//         List<Texel> texels;
+//     };
 
     struct ValidationTextureFormatBase : RefObject
     {
         virtual void validateBlocksEqual(const void* actual, const void* expected) = 0;
 
-        // = generateTextureData except for the specified texel
-        //virtual void initializeTexel(void* texel, int x, int y, int z, int mipLevel, int arrayLayer) = 0;
+        virtual void initializeTexel(void* texel, int x, int y, int z, int mipLevel, int arrayLayer) = 0;
     };
 
     template <typename T>
@@ -54,6 +47,42 @@ namespace gfx_test
             {
                 SLANG_CHECK(a[i] == e[i]);
             }
+        }
+
+        virtual void initializeTexel(void* texel, int x, int y, int z, int mipLevel, int arrayLayer) override
+        {
+            //List<T> temp;
+            auto temp = (T*)texel;
+
+            switch (componentCount)
+            {
+            case 1:
+                //temp.setCount(1);
+                temp[0] = T(x + y + z + mipLevel + arrayLayer);
+                break;
+            case 2:
+                //temp.setCount(2);
+                temp[0] = T(x + z + arrayLayer);
+                temp[1] = T(y + mipLevel);
+                break;
+            case 3:
+                //temp.setCount(3);
+                temp[0] = T(x + mipLevel);
+                temp[1] = T(y + arrayLayer);
+                temp[2] = T(z);
+                break;
+            case 4:
+                //temp.setCount(4);
+                temp[0] = T(x + arrayLayer);
+                temp[1] = (T)y;
+                temp[2] = (T)z;
+                temp[3] = (T)mipLevel;
+                break;
+            default:
+                assert(!"component count should be no greater than 4");
+            }
+
+            //*(T*)texel = *temp.getBuffer();
         }
     };
 
@@ -81,6 +110,33 @@ namespace gfx_test
             }
         }
 
+        virtual void initializeTexel(void* texel, int x, int y, int z, int mipLevel, int arrayLayer) override
+        {
+            T temp = 0;
+
+            // The only formats which currently use this have either 3 or 4 channels. TODO: BC formats?
+            if (aBits == 0)
+            {
+                temp |= z;
+                temp <<= gBits;
+                temp |= (y + arrayLayer);
+                temp <<= rBits;
+                temp |= (x + mipLevel);
+            }
+            else
+            {
+                temp |= mipLevel;
+                temp <<= bBits;
+                temp |= z;
+                temp <<= gBits;
+                temp |= y;
+                temp <<= rBits;
+                temp |= (x + arrayLayer);
+            }
+
+            *(T*)texel = temp;
+        }
+
         void unpackTexel(T texel, T* outComponents)
         {
             outComponents[0] = texel & ((1 << rBits) - 1);
@@ -99,24 +155,31 @@ namespace gfx_test
         }
     };
 
-    struct ValidationTextureData // = SubresourceStuff
+    struct ValidationTextureData : RefObject // = SubresourceStuff
     {
         const void* textureData; // = SubresourceStuff.texels
         ITextureResource::Size extents;
         ITextureResource::Offset3D strides;
 
-        ValidationTextureFormatBase* format;
+        RefPtr<ValidationTextureFormatBase> format;
 
-        const void* getBlockAt(Int x, Int y, Int z)
+        void* getBlockAt(Int x, Int y, Int z)
         {
             assert(x >= 0 && x < extents.width);
             assert(y >= 0 && y < extents.height);
             assert(z >= 0 && z < extents.depth);
 
-            const char* layerData = (const char*)textureData + z * strides.z;
-            const char* rowData = layerData + y * strides.y;
+            char* layerData = (char*)textureData + z * strides.z;
+            char* rowData = layerData + y * strides.y;
             return rowData + x * strides.x;
         }
+    };
+
+    struct TextureStuff : RefObject
+    {
+        //List<RefPtr<SubresourceStuff>> subresourceObjects;
+        List<RefPtr<ValidationTextureData>> subresourceObjects;
+        List<ITextureResource::SubresourceData> subresourceDatas;
     };
 
     struct BaseCopyTextureTest
@@ -144,38 +207,74 @@ namespace gfx_test
             this->context = context;
         }
 
-        RefPtr<TextureStuff> generateTextureData(int width, int height, uint32_t mipLevels, uint32_t arrayLayers)
+        RefPtr<TextureStuff> generateTextureData(int width, int height, uint32_t mipLevels, uint32_t arrayLayers, Format format)
         {
+            FormatInfo formatInfo;
+            gfxGetFormatInfo(format, &formatInfo);
+
             RefPtr<TextureStuff> texture = new TextureStuff();
             for (uint32_t layer = 0; layer < arrayLayers; ++layer)
             {
                 for (uint32_t mip = 0; mip < mipLevels; ++mip)
                 {
-                    RefPtr<SubresourceStuff> subresource = new SubresourceStuff();
+                    RefPtr<ValidationTextureData> subresource = new ValidationTextureData();
+
+                    auto mipWidth = Math::Max(width >> mip, 1);
+                    auto mipHeight = Math::Max(height >> mip, 1);
+                    auto texelSize = formatInfo.blockSizeInBytes / formatInfo.pixelsPerBlock;
+                    auto mipSize = mipWidth * mipHeight * texelSize;
+                    subresource->textureData = malloc(mipSize);
+                    SLANG_CHECK_ABORT(subresource->textureData);
+
+                    subresource->extents.width = width;
+                    subresource->extents.height = height;
+                    subresource->extents.depth = 1; // This should be passed in for Texture3Ds
+                    subresource->strides.x = texelSize;
+                    subresource->strides.y = mipWidth * texelSize;
+                    subresource->strides.z = mipHeight * subresource->strides.y;
+                    subresource->format = getValidationTextureFormat(format);
                     texture->subresourceObjects.add(subresource);
 
-                    int mipWidth = Math::Max(width >> mip, 1);
-                    int mipHeight = Math::Max(height >> mip, 1);
-
-                    int mipTexelCount = mipWidth * mipHeight;
-                    subresource->texels.setCount(mipTexelCount);
                     for (int h = 0; h < mipHeight; ++h)
                     {
                         for (int w = 0; w < mipWidth; ++w)
                         {
-                            // 4 channels per pixel
-                            subresource->texels[h * mipWidth + w].channels[0] = (float)w;
-                            subresource->texels[h * mipWidth + w].channels[1] = (float)h;
-                            subresource->texels[h * mipWidth + w].channels[2] = (float)mip;
-                            subresource->texels[h * mipWidth + w].channels[3] = (float)layer;
+                            auto texel = subresource->getBlockAt(w, h, 0);
+                            subresource->format->initializeTexel(texel, w, h, 0, mip, layer);
                         }
                     }
 
                     ITextureResource::SubresourceData subData = {};
-                    subData.data = subresource->texels.getBuffer();
-                    subData.strideY = mipWidth * sizeof(Texel);
-                    subData.strideZ = mipHeight * subData.strideY;
+                    subData.data = subresource->textureData;
+                    subData.strideY = subresource->strides.y;
+                    subData.strideZ = subresource->strides.z;
                     texture->subresourceDatas.add(subData);
+
+//                     RefPtr<SubresourceStuff> subresource = new SubresourceStuff();
+//                     texture->subresourceObjects.add(subresource);
+// 
+//                     int mipWidth = Math::Max(width >> mip, 1);
+//                     int mipHeight = Math::Max(height >> mip, 1);
+// 
+//                     int mipTexelCount = mipWidth * mipHeight;
+//                     subresource->texels.setCount(mipTexelCount);
+//                     for (int h = 0; h < mipHeight; ++h)
+//                     {
+//                         for (int w = 0; w < mipWidth; ++w)
+//                         {
+//                             // 4 channels per pixel
+//                             subresource->texels[h * mipWidth + w].channels[0] = (float)w;
+//                             subresource->texels[h * mipWidth + w].channels[1] = (float)h;
+//                             subresource->texels[h * mipWidth + w].channels[2] = (float)mip;
+//                             subresource->texels[h * mipWidth + w].channels[3] = (float)layer;
+//                         }
+//                     }
+// 
+//                     ITextureResource::SubresourceData subData = {};
+//                     subData.data = subresource->texels.getBuffer();
+//                     subData.strideY = mipWidth * sizeof(Texel);
+//                     subData.strideZ = mipHeight * subData.strideY;
+//                     texture->subresourceDatas.add(subData);
                 }
             }
             return texture;
@@ -188,9 +287,8 @@ namespace gfx_test
             srcTexDesc.numMipLevels = srcTextureInfo.numMipLevels;
             srcTexDesc.arraySize = srcTextureInfo.arraySize;
             srcTexDesc.size = srcTextureInfo.extent;
-            srcTexDesc.defaultState = ResourceState::UnorderedAccess;
+            srcTexDesc.defaultState = ResourceState::ShaderResource;
             srcTexDesc.allowedStates = ResourceStateSet(
-                ResourceState::UnorderedAccess,
                 ResourceState::ShaderResource,
                 ResourceState::CopySource);
             srcTexDesc.format = format;
@@ -263,7 +361,7 @@ namespace gfx_test
             auto commandBuffer = transientHeap->createCommandBuffer();
             auto encoder = commandBuffer->encodeResourceCommands();
 
-            encoder->textureSubresourceBarrier(srcTexture, srcSubresource, ResourceState::UnorderedAccess, ResourceState::CopySource);
+            encoder->textureSubresourceBarrier(srcTexture, srcSubresource, ResourceState::ShaderResource, ResourceState::CopySource);
             encoder->copyTexture(dstTexture, ResourceState::CopyDestination, dstSubresource, dstOffset, srcTexture, ResourceState::CopySource, srcSubresource, srcOffset, texCopyExtent);
             encoder->textureSubresourceBarrier(dstTexture, dstSubresource, ResourceState::CopyDestination, ResourceState::CopySource);
             encoder->copyTextureToBuffer(resultsBuffer, 0, minBufferSize, alignedRowStride, dstTexture, ResourceState::CopySource, dstSubresource, bufferCopyOffset, bufferCopyExtent);
@@ -450,11 +548,15 @@ namespace gfx_test
 
             auto validationFormat = getValidationTextureFormat(format);
 
+            FormatInfo formatInfo;
+            gfxGetFormatInfo(format, &formatInfo);
+            auto texelSize = formatInfo.blockSizeInBytes / formatInfo.pixelsPerBlock;
+
             ValidationTextureData actual;
             actual.extents = dstExtent;
             actual.format = validationFormat;
             actual.textureData = results;
-            actual.strides.x = sizeof(Texel);
+            actual.strides.x = texelSize;
             actual.strides.y = (uint32_t)alignedRowStride;
             actual.strides.z = dstExtent.height * actual.strides.y;
 
@@ -462,7 +564,7 @@ namespace gfx_test
             expectedCopied.extents = srcExtent;
             expectedCopied.format = validationFormat;
             expectedCopied.textureData = expectedCopiedData;
-            expectedCopied.strides.x = sizeof(Texel);
+            expectedCopied.strides.x = texelSize;
             expectedCopied.strides.y = srcExtent.width * expectedCopied.strides.x;
             expectedCopied.strides.z = srcExtent.height * expectedCopied.strides.y;
 
@@ -472,7 +574,7 @@ namespace gfx_test
                 expectedOriginal.extents = dstExtent;
                 expectedOriginal.format = validationFormat;
                 expectedOriginal.textureData = expectedOriginalData;
-                expectedOriginal.strides.x = sizeof(Texel);
+                expectedOriginal.strides.x = texelSize;
                 expectedOriginal.strides.y = dstExtent.width * expectedOriginal.strides.x;
                 expectedOriginal.strides.z = dstExtent.height * expectedOriginal.strides.y;
             }
@@ -521,6 +623,7 @@ namespace gfx_test
     struct SimpleCopyTexture : BaseCopyTextureTest
     {
         Format format = Format::R32G32B32A32_FLOAT;
+        //Format format = Format::B4G4R4A4_UNORM;
 
         void run()
         {
@@ -531,7 +634,7 @@ namespace gfx_test
             auto mipLevelCount = 1;
             auto arrayLayerCount = 1;
             
-            auto srcTextureStuff = generateTextureData(extent.width, extent.height, mipLevelCount, arrayLayerCount);
+            auto srcTextureStuff = generateTextureData(extent.width, extent.height, mipLevelCount, arrayLayerCount, format);
 
             TextureInfo srcTextureInfo = { extent, mipLevelCount, arrayLayerCount, srcTextureStuff->subresourceDatas.getBuffer() };
             TextureInfo dstTextureInfo = { extent, mipLevelCount, arrayLayerCount, nullptr };
@@ -577,7 +680,7 @@ namespace gfx_test
             auto mipLevelCount = 2;
             auto arrayLayerCount = 2;
 
-            auto srcTextureStuff = generateTextureData(extent.width, extent.height, mipLevelCount, arrayLayerCount);
+            auto srcTextureStuff = generateTextureData(extent.width, extent.height, mipLevelCount, arrayLayerCount, format);
             
             TextureInfo srcTextureInfo = { extent, mipLevelCount, arrayLayerCount, srcTextureStuff->subresourceDatas.getBuffer() };
             TextureInfo dstTextureInfo = { extent, mipLevelCount, arrayLayerCount, nullptr };
@@ -622,7 +725,7 @@ namespace gfx_test
             auto srcMipLevelCount = 1;
             auto srcArrayLayerCount = 1;
 
-            auto srcTextureStuff = generateTextureData(srcExtent.width, srcExtent.height, srcMipLevelCount, srcArrayLayerCount);
+            auto srcTextureStuff = generateTextureData(srcExtent.width, srcExtent.height, srcMipLevelCount, srcArrayLayerCount, format);
             TextureInfo srcTextureInfo = { srcExtent, srcMipLevelCount, srcArrayLayerCount, srcTextureStuff->subresourceDatas.getBuffer() };
 
             ITextureResource::Size dstExtent = {};
@@ -674,7 +777,7 @@ namespace gfx_test
             auto srcMipLevelCount = 1;
             auto srcArrayLayerCount = 1;
 
-            auto srcTextureStuff = generateTextureData(srcExtent.width, srcExtent.height, srcMipLevelCount, srcArrayLayerCount);
+            auto srcTextureStuff = generateTextureData(srcExtent.width, srcExtent.height, srcMipLevelCount, srcArrayLayerCount, format);
             TextureInfo srcTextureInfo = { srcExtent, srcMipLevelCount, srcArrayLayerCount, srcTextureStuff->subresourceDatas.getBuffer() };
 
             ITextureResource::Size dstExtent = {};
@@ -684,7 +787,7 @@ namespace gfx_test
             auto dstMipLevelCount = 1;
             auto dstArrayLayerCount = 1;
 
-            auto dstTextureStuff = generateTextureData(dstExtent.width, dstExtent.height, dstMipLevelCount, dstArrayLayerCount);
+            auto dstTextureStuff = generateTextureData(dstExtent.width, dstExtent.height, dstMipLevelCount, dstArrayLayerCount, format);
             TextureInfo dstTextureInfo = { dstExtent, dstMipLevelCount, dstArrayLayerCount, dstTextureStuff->subresourceDatas.getBuffer() };
 
             SubresourceRange srcSubresource = {};
@@ -730,7 +833,7 @@ namespace gfx_test
             auto srcMipLevelCount = 4;
             auto srcArrayLayerCount = 1;
 
-            auto srcTextureStuff = generateTextureData(srcExtent.width, srcExtent.height, srcMipLevelCount, srcArrayLayerCount);
+            auto srcTextureStuff = generateTextureData(srcExtent.width, srcExtent.height, srcMipLevelCount, srcArrayLayerCount, format);
             TextureInfo srcTextureInfo = { srcExtent, srcMipLevelCount, srcArrayLayerCount, srcTextureStuff->subresourceDatas.getBuffer() };
 
             ITextureResource::Size dstExtent = {};
@@ -740,7 +843,7 @@ namespace gfx_test
             auto dstMipLevelCount = 4;
             auto dstArrayLayerCount = 1;
 
-            auto dstTextureStuff = generateTextureData(dstExtent.width, dstExtent.height, dstMipLevelCount, dstArrayLayerCount);
+            auto dstTextureStuff = generateTextureData(dstExtent.width, dstExtent.height, dstMipLevelCount, dstArrayLayerCount, format);
             TextureInfo dstTextureInfo = { dstExtent, dstMipLevelCount, dstArrayLayerCount, dstTextureStuff->subresourceDatas.getBuffer() };
 
             SubresourceRange srcSubresource = {};
@@ -795,7 +898,7 @@ namespace gfx_test
             auto srcMipLevelCount = 1;
             auto srcArrayLayerCount = 2;
 
-            auto srcTextureStuff = generateTextureData(srcExtent.width, srcExtent.height, srcMipLevelCount, srcArrayLayerCount);
+            auto srcTextureStuff = generateTextureData(srcExtent.width, srcExtent.height, srcMipLevelCount, srcArrayLayerCount, format);
             TextureInfo srcTextureInfo = { srcExtent, srcMipLevelCount, srcArrayLayerCount, srcTextureStuff->subresourceDatas.getBuffer() };
 
             ITextureResource::Size dstExtent = {};
@@ -805,7 +908,7 @@ namespace gfx_test
             auto dstMipLevelCount = 1;
             auto dstArrayLayerCount = 2;
 
-            auto dstTextureStuff = generateTextureData(dstExtent.width, dstExtent.height, dstMipLevelCount, dstArrayLayerCount);
+            auto dstTextureStuff = generateTextureData(dstExtent.width, dstExtent.height, dstMipLevelCount, dstArrayLayerCount, format);
             TextureInfo dstTextureInfo = { dstExtent, dstMipLevelCount, dstArrayLayerCount, dstTextureStuff->subresourceDatas.getBuffer() };
 
             SubresourceRange srcSubresource = {};
@@ -850,7 +953,7 @@ namespace gfx_test
             auto srcMipLevelCount = 1;
             auto srcArrayLayerCount = 1;
 
-            auto srcTextureStuff = generateTextureData(srcExtent.width, srcExtent.height, srcMipLevelCount, srcArrayLayerCount);
+            auto srcTextureStuff = generateTextureData(srcExtent.width, srcExtent.height, srcMipLevelCount, srcArrayLayerCount, format);
             TextureInfo srcTextureInfo = { srcExtent, srcMipLevelCount, srcArrayLayerCount, srcTextureStuff->subresourceDatas.getBuffer() };
 
             ITextureResource::Size dstExtent = {};
@@ -860,7 +963,7 @@ namespace gfx_test
             auto dstMipLevelCount = 1;
             auto dstArrayLayerCount = 1;
 
-            auto dstTextureStuff = generateTextureData(dstExtent.width, dstExtent.height, dstMipLevelCount, dstArrayLayerCount);
+            auto dstTextureStuff = generateTextureData(dstExtent.width, dstExtent.height, dstMipLevelCount, dstArrayLayerCount, format);
             TextureInfo dstTextureInfo = { dstExtent, dstMipLevelCount, dstArrayLayerCount, dstTextureStuff->subresourceDatas.getBuffer() };
 
             SubresourceRange srcSubresource = {};
@@ -919,7 +1022,7 @@ namespace gfx_test
             auto srcMipLevelCount = 1;
             auto srcArrayLayerCount = 1;
 
-            auto srcTextureStuff = generateTextureData(srcExtent.width, srcExtent.height, srcMipLevelCount, srcArrayLayerCount);
+            auto srcTextureStuff = generateTextureData(srcExtent.width, srcExtent.height, srcMipLevelCount, srcArrayLayerCount, format);
             TextureInfo srcTextureInfo = { srcExtent, srcMipLevelCount, srcArrayLayerCount, srcTextureStuff->subresourceDatas.getBuffer() };
 
             ITextureResource::Size dstExtent = {};
@@ -929,7 +1032,7 @@ namespace gfx_test
             auto dstMipLevelCount = 1;
             auto dstArrayLayerCount = 1;
 
-            auto dstTextureStuff = generateTextureData(dstExtent.width, dstExtent.height, dstMipLevelCount, dstArrayLayerCount);
+            auto dstTextureStuff = generateTextureData(dstExtent.width, dstExtent.height, dstMipLevelCount, dstArrayLayerCount, format);
             TextureInfo dstTextureInfo = { dstExtent, dstMipLevelCount, dstArrayLayerCount, dstTextureStuff->subresourceDatas.getBuffer() };
 
             SubresourceRange srcSubresource = {};
@@ -980,7 +1083,7 @@ namespace gfx_test
             auto srcMipLevelCount = 1;
             auto srcArrayLayerCount = 1;
 
-            auto srcTextureStuff = generateTextureData(srcExtent.width, srcExtent.height, srcMipLevelCount, srcArrayLayerCount);
+            auto srcTextureStuff = generateTextureData(srcExtent.width, srcExtent.height, srcMipLevelCount, srcArrayLayerCount, format);
             TextureInfo srcTextureInfo = { srcExtent, srcMipLevelCount, srcArrayLayerCount, srcTextureStuff->subresourceDatas.getBuffer() };
 
             ITextureResource::Size dstExtent = {};
@@ -990,7 +1093,7 @@ namespace gfx_test
             auto dstMipLevelCount = 1;
             auto dstArrayLayerCount = 1;
 
-            auto dstTextureStuff = generateTextureData(dstExtent.width, dstExtent.height, dstMipLevelCount, dstArrayLayerCount);
+            auto dstTextureStuff = generateTextureData(dstExtent.width, dstExtent.height, dstMipLevelCount, dstArrayLayerCount, format);
             TextureInfo dstTextureInfo = { dstExtent, dstMipLevelCount, dstArrayLayerCount, dstTextureStuff->subresourceDatas.getBuffer() };
 
             SubresourceRange srcSubresource = {};
@@ -1058,23 +1161,23 @@ namespace gfx_test
 
     SLANG_UNIT_TEST(copyTextureTests)
     {
-//         runTestImpl(copyTextureTestImpl<SimpleCopyTexture>, unitTestContext, Slang::RenderApiFlag::D3D12);
-//         runTestImpl(copyTextureTestImpl<SimpleCopyTexture>, unitTestContext, Slang::RenderApiFlag::Vulkan);
-//         runTestImpl(copyTextureTestImpl<CopyTextureSection>, unitTestContext, Slang::RenderApiFlag::D3D12);
-//         runTestImpl(copyTextureTestImpl<CopyTextureSection>, unitTestContext, Slang::RenderApiFlag::Vulkan);
-//         runTestImpl(copyTextureTestImpl<SmallSrcToLargeDst>, unitTestContext, Slang::RenderApiFlag::D3D12);
-//         runTestImpl(copyTextureTestImpl<SmallSrcToLargeDst>, unitTestContext, Slang::RenderApiFlag::Vulkan);
-//         runTestImpl(copyTextureTestImpl<CopyBetweenMips>, unitTestContext, Slang::RenderApiFlag::D3D12);
-//         runTestImpl(copyTextureTestImpl<CopyBetweenMips>, unitTestContext, Slang::RenderApiFlag::Vulkan);
-//         runTestImpl(copyTextureTestImpl<CopyBetweenLayers>, unitTestContext, Slang::RenderApiFlag::D3D12);
-//         runTestImpl(copyTextureTestImpl<CopyBetweenLayers>, unitTestContext, Slang::RenderApiFlag::Vulkan);
-//         runTestImpl(copyTextureTestImpl<CopyWithOffsets>, unitTestContext, Slang::RenderApiFlag::D3D12);
-//         runTestImpl(copyTextureTestImpl<CopyWithOffsets>, unitTestContext, Slang::RenderApiFlag::Vulkan);
-//         runTestImpl(copyTextureTestImpl<CopySectionWithSetExtent>, unitTestContext, Slang::RenderApiFlag::D3D12);
-//         runTestImpl(copyTextureTestImpl<CopySectionWithSetExtent>, unitTestContext, Slang::RenderApiFlag::Vulkan);
+        runTestImpl(copyTextureTestImpl<SimpleCopyTexture>, unitTestContext, Slang::RenderApiFlag::D3D12);
+        runTestImpl(copyTextureTestImpl<SimpleCopyTexture>, unitTestContext, Slang::RenderApiFlag::Vulkan);
+        runTestImpl(copyTextureTestImpl<CopyTextureSection>, unitTestContext, Slang::RenderApiFlag::D3D12);
+        runTestImpl(copyTextureTestImpl<CopyTextureSection>, unitTestContext, Slang::RenderApiFlag::Vulkan);
+        runTestImpl(copyTextureTestImpl<SmallSrcToLargeDst>, unitTestContext, Slang::RenderApiFlag::D3D12);
+        runTestImpl(copyTextureTestImpl<SmallSrcToLargeDst>, unitTestContext, Slang::RenderApiFlag::Vulkan);
+        runTestImpl(copyTextureTestImpl<CopyBetweenMips>, unitTestContext, Slang::RenderApiFlag::D3D12);
+        runTestImpl(copyTextureTestImpl<CopyBetweenMips>, unitTestContext, Slang::RenderApiFlag::Vulkan);
+        runTestImpl(copyTextureTestImpl<CopyBetweenLayers>, unitTestContext, Slang::RenderApiFlag::D3D12);
+        runTestImpl(copyTextureTestImpl<CopyBetweenLayers>, unitTestContext, Slang::RenderApiFlag::Vulkan);
+        runTestImpl(copyTextureTestImpl<CopyWithOffsets>, unitTestContext, Slang::RenderApiFlag::D3D12);
+        runTestImpl(copyTextureTestImpl<CopyWithOffsets>, unitTestContext, Slang::RenderApiFlag::Vulkan);
+        runTestImpl(copyTextureTestImpl<CopySectionWithSetExtent>, unitTestContext, Slang::RenderApiFlag::D3D12);
+        runTestImpl(copyTextureTestImpl<CopySectionWithSetExtent>, unitTestContext, Slang::RenderApiFlag::Vulkan);
 
-        runTestImpl(copyTextureTestImpl<CopyToBufferWithOffset>, unitTestContext, Slang::RenderApiFlag::D3D12);
-        runTestImpl(copyTextureTestImpl<CopyToBufferWithOffset>, unitTestContext, Slang::RenderApiFlag::Vulkan);
+//         runTestImpl(copyTextureTestImpl<CopyToBufferWithOffset>, unitTestContext, Slang::RenderApiFlag::D3D12);
+//         runTestImpl(copyTextureTestImpl<CopyToBufferWithOffset>, unitTestContext, Slang::RenderApiFlag::Vulkan);
     }
 
     SLANG_UNIT_TEST(copyTextureSimple)
