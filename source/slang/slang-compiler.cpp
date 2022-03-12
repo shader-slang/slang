@@ -2191,6 +2191,11 @@ namespace Slang
             switch(c)
             {
             case ' ':
+            case ':':
+            case '#':
+            case '[':
+            case ']':
+            case '\\':
                 builder.appendChar('\\');
                 break;
 
