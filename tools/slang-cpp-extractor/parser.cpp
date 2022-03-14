@@ -1058,6 +1058,46 @@ SlangResult Parser::_parseBalanced(DiagnosticSink* sink)
     }
 }
 
+SlangResult Parser::_consumeBalancedParens()
+{
+    SLANG_ASSERT(m_reader.peekTokenType() == TokenType::LParent);
+
+    Index parenCount = 0;
+
+    while (true)
+    {
+        const TokenType tokenType = m_reader.peekTokenType();
+
+        switch (tokenType)
+        {
+            case TokenType::LParent:
+            {
+                parenCount++;
+                break;
+            }
+            case TokenType::RParent:
+            {
+                --parenCount;
+                // If no more parens then we are done
+                if (parenCount == 0)
+                {
+                    m_reader.advanceToken();
+                    return SLANG_OK;
+                }
+                break;
+            }
+            case TokenType::EndOfFile:
+            {
+                // If we hit the end of the file, then not balanced
+                return SLANG_FAIL;
+            }
+            default: break;
+        }
+
+        m_reader.advanceToken();
+    }
+}
+
 SlangResult Parser::_parseExpression(List<Token>& outExprTokens)
 {
     Index parenCount = 0;
@@ -1089,6 +1129,7 @@ SlangResult Parser::_parseExpression(List<Token>& outExprTokens)
                         m_sink->diagnose(m_reader.peekLoc(), CPPDiagnostics::cannotParseExpression);
                         return SLANG_FAIL;
                     }
+
                     return SLANG_OK;
                 }
                 --parenCount;
@@ -1187,9 +1228,6 @@ SlangResult Parser::_maybeParseContained(Node** outNode)
     bool isStatic = false;
     bool isVirtual = false;
 
-    // Can only add a field if we are in a class
-    SLANG_ASSERT(m_currentScope->isClassLike());
-
     while (m_reader.peekTokenType() == TokenType::Identifier)
     {
         const IdentifierStyle style = m_nodeTree->m_identifierLookup->get(m_reader.peekToken().getContent());
@@ -1226,7 +1264,7 @@ SlangResult Parser::_maybeParseContained(Node** outNode)
     }
 
     // Has a calling convention (must be a function/method)
-    if (m_reader.peekTokenType() == TokenType::Identifier && m_nodeTree->m_identifierLookup->get(m_reader.peekToken().getContent()) == IdentifierStyle::CallingConvention)
+    if (advanceIfStyle(IdentifierStyle::CallingConvention))
     {
         // Could store the calling convention type, but for now we just consume
         m_reader.advanceToken();
@@ -1252,6 +1290,15 @@ SlangResult Parser::_maybeParseContained(Node** outNode)
 
     if (m_reader.peekTokenType() == TokenType::LParent)
     {
+        if (!m_currentScope->canContainCallable())
+        {
+            SLANG_RETURN_ON_FAIL(_consumeBalancedParens());
+            // Consume everything up to ; or {
+            SLANG_RETURN_ON_FAIL(_consumeToSync());
+            
+            return SLANG_OK;
+        }
+
         // Looks like it's a callable
         m_reader.advanceToken();
 
@@ -1395,6 +1442,11 @@ SlangResult Parser::_maybeParseContained(Node** outNode)
     else
     {
         // Looks like variable
+        if (!m_currentScope->canContainFields())
+        {
+            _consumeToSync();
+            return SLANG_OK;
+        }
 
         if (m_reader.peekTokenType() == TokenType::LBracket)
         {
@@ -1680,7 +1732,7 @@ SlangResult Parser::parse(SourceOrigin* sourceOrigin, const Options* options)
                         {
                             // Special case the node that's the root of the hierarchy (as far as reflection is concerned)
                             // This could be a field
-                            if (m_currentScope->canContainFields())
+                            if (m_currentScope->canContainFields() || m_currentScope->canContainCallable())
                             {
                                 Node* containedNode = nullptr;
                                 SLANG_RETURN_ON_FAIL(_maybeParseContained(&containedNode));

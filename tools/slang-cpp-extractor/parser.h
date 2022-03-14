@@ -72,6 +72,8 @@ protected:
     void _consumeTypeModifiers();
 
     SlangResult _consumeToSync();
+        /// Consumes balanced parens. Will return an error if not matched. Assumes starts on opening (
+    SlangResult _consumeBalancedParens();
 
     NodeTypeBitType m_nodeTypeEnabled;
 

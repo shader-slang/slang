@@ -97,7 +97,10 @@ public:
         return false;
     }
 
+    bool isNamespace() const { return m_kind == Kind::Namespace; }
     bool isClassLike() const { return isKindClassLike(m_kind); }
+    bool isScope() const { return isKindScope(m_kind); }
+    bool isEnumLike() const { return isKindEnumLike(m_kind); }
 
         /// These are useful for the filter
     static bool isClassLikeAndReflected(Node* node) { return node->isClassLike() && node->isReflected(); }
@@ -177,8 +180,12 @@ struct ScopeNode : public Node
     virtual void dump(int indent, StringBuilder& out) SLANG_OVERRIDE;
     virtual void calcScopeDepthFirst(List<Node*>& outNodes) SLANG_OVERRIDE;
 
+        /// True if can contain callable entries
+    bool canContainCallable() const { return isClassLike() || isNamespace(); }
+
         /// True if can accept fields (class like types can)
     bool canContainFields() const { return isClassLike(); }
+
         /// True if the scope can accept types
     bool canContainTypes() const { return canKindContainTypes(m_kind); }
 
