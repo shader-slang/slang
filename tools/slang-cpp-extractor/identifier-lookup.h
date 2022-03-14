@@ -33,7 +33,9 @@ enum class IdentifierStyle
     CallingConvention,  ///< Used on a method
     Virtual,            ///< 
 
-    Template,           
+    Template,
+
+    Static,         
 
     CountOf,
 };

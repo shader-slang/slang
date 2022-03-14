@@ -1184,21 +1184,33 @@ SlangResult Parser::_maybeParseContained(Node** outNode)
 {
     *outNode = nullptr;
 
+    bool isStatic = false;
+    bool isVirtual = false;
+
     // Can only add a field if we are in a class
     SLANG_ASSERT(m_currentScope->isClassLike());
 
-    // Check for virtualness
-
-    bool isVirtual = false;
-    if (m_reader.peekTokenType() == TokenType::Identifier)
+    while (m_reader.peekTokenType() == TokenType::Identifier)
     {
         const IdentifierStyle style = m_nodeTree->m_identifierLookup->get(m_reader.peekToken().getContent());
 
+        // Check for virtualness
         if (style == IdentifierStyle::Virtual)
         {
             isVirtual = true;
             m_reader.advanceToken();
+            continue;
         }
+
+        // Check if static 
+        if (style == IdentifierStyle::Static)
+        {
+            isStatic = true;
+            m_reader.advanceToken();
+            continue;
+        } 
+
+        break;
     }
 
     UnownedStringSlice typeName;
@@ -1221,18 +1233,16 @@ SlangResult Parser::_maybeParseContained(Node** outNode)
     }
 
     // Expecting a name
-
-    if (m_reader.peekTokenType() != TokenType::Identifier)
+    Token nameToken;
+    if (!advanceIfToken(TokenType::Identifier, &nameToken))
     {
         _consumeToSync();
         return SLANG_OK;
     }
 
-    Token name = m_reader.advanceToken();
-
     // Handles other scenarios, but here for catching operator overloading
     {
-        const auto style = m_nodeTree->m_identifierLookup->get(name.getContent());
+        const auto style = m_nodeTree->m_identifierLookup->get(nameToken.getContent());
         if (style != IdentifierStyle::None)
         {
             _consumeToSync();
@@ -1281,7 +1291,7 @@ SlangResult Parser::_maybeParseContained(Node** outNode)
                 }
 
                 CallableNode::Param param;
-                param.m_name = name;
+                param.m_name = nameToken;
                 param.m_type = type;
 
                 params.add(param);
@@ -1348,14 +1358,16 @@ SlangResult Parser::_maybeParseContained(Node** outNode)
         RefPtr<CallableNode> callableNode = new CallableNode;
 
         callableNode->m_returnType = typeName;
-        callableNode->m_name = name;
+        callableNode->m_name = nameToken;
         callableNode->m_reflectionType = m_currentScope->getContainedReflectionType();
 
         callableNode->m_isVirtual = isVirtual;
         callableNode->m_isPure = isPure;
+        callableNode->m_isStatic = isStatic;
+
         callableNode->m_params.swapWith(params);
 
-        Node* nodeWithName = m_currentScope->findChild(name.getContent());
+        Node* nodeWithName = m_currentScope->findChild(nameToken.getContent());
 
         if (nodeWithName)
         {
@@ -1419,8 +1431,9 @@ SlangResult Parser::_maybeParseContained(Node** outNode)
             FieldNode* fieldNode = new FieldNode;
 
             fieldNode->m_fieldType = typeName;
-            fieldNode->m_name = name;
+            fieldNode->m_name = nameToken;
             fieldNode->m_reflectionType = m_currentScope->getContainedReflectionType();
+            fieldNode->m_isStatic = isStatic;
 
             m_currentScope->addChild(fieldNode);
 

@@ -231,7 +231,9 @@ struct FieldNode : public Node
 
     UnownedStringSlice m_fieldType;
 
-    // We may want to add initializer tokens
+    bool m_isStatic = false;
+
+    /// TODO(JS): We may want to add initializer tokens
 };
 
 struct ClassLikeNode : public ScopeNode
@@ -306,6 +308,8 @@ struct CallableNode : public Node
     CallableNode* m_nextOverload = nullptr;
 
     List<Param> m_params;
+
+    bool m_isStatic = false;
     bool m_isVirtual = false;
     bool m_isPure = false;
 };
