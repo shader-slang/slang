@@ -504,8 +504,14 @@ void CallableNode::dump(int indent, StringBuilder& out)
         return;
     }
 
+    dumpMarkup(indent, out);
+
     _indent(indent, out);
 
+    if (m_isStatic)
+    {
+        out << "static ";
+    }
     if (m_isVirtual)
     {
         out << "virtual ";
@@ -544,13 +550,21 @@ void CallableNode::dump(int indent, StringBuilder& out)
 
 void FieldNode::dump(int indent, StringBuilder& out)
 {
-    if (isReflected())
+    if (!isReflected())
     {
-        dumpMarkup(indent, out);
-
-        _indent(indent, out);
-        out << m_fieldType << " " << m_name.getContent() << "\n";
+        return;
     }
+
+    dumpMarkup(indent, out);
+
+    _indent(indent, out);
+
+    if (m_isStatic)
+    {
+        out << "static ";
+    }
+
+    out << m_fieldType << " " << m_name.getContent() << "\n";
 }
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ClassLikeNode !!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */

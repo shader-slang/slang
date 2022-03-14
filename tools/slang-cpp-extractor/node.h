@@ -43,6 +43,9 @@ public:
 
         Callable,
 
+        Other,              ///< Used 'other' parsing like for TYPE
+        Unknown,            ///< Used for marking tokens consumed but usage is not known
+
         CountOf,
     };
 
