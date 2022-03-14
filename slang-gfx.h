@@ -618,7 +618,6 @@ struct SubresourceRange
 class ITextureResource: public IResource
 {
 public:
-    static const uint32_t kTexturePitchAlignment = 256;
     static const uint32_t kRemainingTextureSize = 0xFFFFFFFF;
     struct Offset3D
     {
@@ -1561,6 +1560,7 @@ public:
         IBufferResource* dst,
         size_t dstOffset,
         size_t dstSize,
+        size_t dstRowStride,
         ITextureResource* src,
         ResourceState srcState,
         SubresourceRange srcSubresource,
@@ -1890,7 +1890,16 @@ public:
         uint32_t constantBufferDescriptorCount;
         uint32_t accelerationStructureDescriptorCount;
     };
+
+    // Waits until GPU commands issued before last call to `finish()` has been completed, and resets
+    // all transient resources holds by the heap.
+    // This method must be called before using the transient heap to issue new GPU commands.
+    // In most situations this method should be called at the beginning of each frame.
     virtual SLANG_NO_THROW Result SLANG_MCALL synchronizeAndReset() = 0;
+
+    // Must be called when the application has done using this heap to issue commands. In most situations
+    // this method should be called at the end of each frame.
+    virtual SLANG_NO_THROW Result SLANG_MCALL finish() = 0;
 
     // Command buffers are one-time use. Once it is submitted to the queue via
     // `executeCommandBuffers` a command buffer is no longer valid to be used any more. Command
@@ -2375,6 +2384,8 @@ public:
 
     virtual SLANG_NO_THROW Result SLANG_MCALL getTextureAllocationInfo(
         const ITextureResource::Desc& desc, size_t* outSize, size_t* outAlignment) = 0;
+
+    virtual SLANG_NO_THROW Result SLANG_MCALL getTextureRowAlignment(size_t* outAlignment) = 0;
 };
 
 #define SLANG_UUID_IDevice                                                               \

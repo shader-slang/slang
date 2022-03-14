@@ -221,7 +221,7 @@ void DownstreamDiagnostics::requireErrorDiagnostic()
     DownstreamDiagnostic diagnostic;
     diagnostic.reset();
     diagnostic.severity = DownstreamDiagnostic::Severity::Error;
-    diagnostic.text = "Generic error during compilation";
+    diagnostic.text = rawDiagnostics;
 
     // Add the diagnostic
     diagnostics.add(diagnostic);
