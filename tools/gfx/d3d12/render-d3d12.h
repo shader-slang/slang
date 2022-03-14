@@ -494,7 +494,7 @@ public:
         ComPtr<ID3D12Fence> fence = nullptr;
     };
     ShortList<QueueWaitInfo, 4> m_waitInfos;
-    Array<HANDLE, 16> m_waitHandles;
+    ShortList<HANDLE, 4> m_waitHandles;
 
     QueueWaitInfo& getQueueWaitInfo(uint32_t queueIndex);
     // During command submission, we need all the descriptor tables that get
