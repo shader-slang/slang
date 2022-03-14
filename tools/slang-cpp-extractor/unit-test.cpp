@@ -46,7 +46,11 @@ static const char someSource[] =
 "    Value,\n"
 "    Another = 10,\n"
 "};\n"
-"typedef SomeEnum AliasEnum;\n";
+"typedef SomeEnum AliasEnum;\n"
+"void someFunc(int a, float b) { }\n"
+"namespace Blah {\n"
+"int add(int a, int b) { return a + b; }\n"
+"}\n";
 
 
 /* static */SlangResult UnitTestUtil::run()
@@ -72,6 +76,14 @@ static const char someSource[] =
         }
 
         SLANG_RETURN_ON_FAIL(parser.parse(sourceOrigin, &state.m_options));
+
+
+        {
+            StringBuilder buf;
+            tree.getRootNode()->dump(0, buf);
+
+            SLANG_UNUSED(buf);
+        }
     }
 
     return SLANG_OK;

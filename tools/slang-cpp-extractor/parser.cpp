@@ -34,6 +34,8 @@ Parser::Parser(NodeTree* nodeTree, DiagnosticSink* sink) :
         // Node::Type::TypeDef,
         // Node::Type::Enum,
         // Node::Type::EnumClass,
+
+        Node::Kind::Callable,
     };
     setKindsEnabled(defaultEnabled, SLANG_COUNT_OF(defaultEnabled));
 }
@@ -312,6 +314,7 @@ SlangResult Parser::_parseEnum()
 
     RefPtr<EnumNode> node = new EnumNode(kind);
     node->m_name = nameToken;
+    node->m_reflectionType = m_currentScope->getContainedReflectionType();
 
     if (advanceIfToken(TokenType::Colon))
     {
@@ -383,6 +386,8 @@ SlangResult Parser::_parseEnum()
             m_sink->diagnose(caseNode->m_name.loc, CPPDiagnostics::identifierAlreadyDefined, caseNode->m_name.getContent());
             return SLANG_FAIL;
         }
+
+        caseNode->m_reflectionType = m_currentScope->getContainedReflectionType();
 
         // Add the value
         node->addChild(caseNode);
@@ -527,6 +532,8 @@ SlangResult Parser::_maybeParseNode(Node::Kind kind)
                 // Okay looks like we are opening a namespace
                 RefPtr<ScopeNode> node(new ScopeNode(Node::Kind::Namespace));
                 node->m_name = name;
+
+                node->m_reflectionType = m_currentScope->getContainedReflectionType();
                 // Push the node
                 return pushScope(node);
             }
@@ -1219,6 +1226,7 @@ SlangResult Parser::_parseTypeDef()
 
     RefPtr<TypeDefNode> node = new TypeDefNode;
     node->m_name = name;
+    node->m_reflectionType = m_currentScope->getContainedReflectionType();
 
     // Set what aliases too
     node->m_targetTypeTokens.swapWith(toks);
@@ -1487,7 +1495,7 @@ SlangResult Parser::_maybeParseContained(Node** outNode)
         // Hit end of field/variable
         if (m_reader.peekTokenType() == TokenType::Semicolon)
         {
-            FieldNode* fieldNode = new FieldNode;
+            RefPtr<FieldNode> fieldNode = new FieldNode;
 
             fieldNode->m_fieldType = typeName;
             fieldNode->m_name = nameToken;
