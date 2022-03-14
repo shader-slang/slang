@@ -567,8 +567,16 @@ SlangResult Parser::_maybeParseNode(Node::Kind kind)
     RefPtr<ClassLikeNode> node(new ClassLikeNode(kind));
     node->m_name = name;
 
-    // Defaults to not reflected
-    SLANG_ASSERT(!node->isReflected());
+    // We default to the containing scope for reflection type.
+    if (!m_requireMarker)
+    {
+        node->m_reflectionType = m_currentScope->getContainedReflectionType();
+    }
+    else
+    {
+        // Defaults to not reflected
+        SLANG_ASSERT(!node->isReflected());
+    }
 
     if (advanceIfToken(TokenType::Colon))
     {
@@ -580,6 +588,8 @@ SlangResult Parser::_maybeParseNode(Node::Kind kind)
             return SLANG_OK;
         }
     }
+
+    // We only accept a single super class. Consume everything afterwards until we hit the { brace
 
     if (m_reader.peekTokenType() != TokenType::LBrace)
     {
@@ -603,89 +613,12 @@ SlangResult Parser::_maybeParseNode(Node::Kind kind)
         return pushScope(node);
     }
 
-    Token braceToken = m_reader.advanceToken();
+    const Token braceToken = m_reader.advanceToken();
 
-    while (true)
-    {
-        // Okay now we are looking for the markers, or visibility qualifiers
-        if (advanceIfStyle(IdentifierStyle::Access))
-        {
-            // Consume it and a colon
-            if (SLANG_FAILED(expect(TokenType::Colon)))
-            {
-                consumeToClosingBrace(&braceToken);
-                return SLANG_OK;
-            }
-            continue;
-        }
-
-        switch (m_reader.peekTokenType())
-        {
-            case TokenType::Identifier:  break;
-            case TokenType::RBrace:
-            {
-                SLANG_RETURN_ON_FAIL(pushScope(node));
-                SLANG_RETURN_ON_FAIL(popScope());
-                m_reader.advanceToken();
-                return SLANG_OK;
-            }
-            default:
-            {
-                SLANG_RETURN_ON_FAIL(pushScope(node));
-                return SLANG_OK;
-            }
-        }
-
-        // If it's one of the markers, then we continue to extract parameter
-        if (advanceIfMarker(&node->m_marker))
-        {
-            break;
-        }
-
-        // We still need to add the node,
-        SLANG_RETURN_ON_FAIL(pushScope(node));
-        return SLANG_OK;
-    }
-
-    // Let's extract the type set
-    {
-        UnownedStringSlice slice(node->m_marker.getContent());
-
-        SLANG_ASSERT(_isMarker(slice));
-
-        // Strip the prefix and suffix
-        slice = UnownedStringSlice(slice.begin() + m_options->m_markPrefix.getLength(), slice.end() - m_options->m_markSuffix.getLength());
-
-        // Strip ABSTRACT_ if it's there
-        UnownedStringSlice abstractSlice("ABSTRACT_");
-        if (slice.startsWith(abstractSlice))
-        {
-            slice = UnownedStringSlice(slice.begin() + abstractSlice.getLength(), slice.end());
-        }
-
-        // TODO: We could strip other stuff or have other heuristics there, but this is
-        // probably okay for now
-
-        // Set the typeSet 
-        node->m_typeSet = m_nodeTree->getOrAddTypeSet(slice);
-    }
-
-    // Okay now looking for ( identifier)
-    Token typeNameToken;
-
-    SLANG_RETURN_ON_FAIL(expect(TokenType::LParent));
-    SLANG_RETURN_ON_FAIL(expect(TokenType::Identifier, &typeNameToken));
-    SLANG_RETURN_ON_FAIL(expect(TokenType::RParent));
-
-    if (typeNameToken.getContent() != node->m_name.getContent())
-    {
-        m_sink->diagnose(typeNameToken, CPPDiagnostics::typeNameDoesntMatch, node->m_name.getContent());
-        return SLANG_FAIL;
-    }
-
-    node->m_reflectionType = ReflectionType::Reflected;
+    // Push the class scope
     return pushScope(node);
 }
+    
 
 SlangResult Parser::_consumeToSync()
 {
@@ -960,6 +893,61 @@ SlangResult Parser::_maybeParseType(List<Token>& outToks)
         outToks.add(m_reader.advanceToken());
     }
 
+    return SLANG_OK;
+}
+
+SlangResult Parser::_parseMarker()
+{
+    SLANG_ASSERT(m_reader.peekTokenType() == TokenType::Identifier &&
+        _isMarker(m_reader.peekToken().getContent()) &&
+        m_currentScope->isClassLike());
+
+    ClassLikeNode* node = as<ClassLikeNode>(m_currentScope);
+
+    if (node->m_marker.type != TokenType::Unknown)
+    {
+        m_sink->diagnose(m_reader.peekToken(), CPPDiagnostics::classMarkerAlreadyFound, node->m_name.getContent());
+        m_sink->diagnose(node->m_marker, CPPDiagnostics::previousLocation);
+        return SLANG_FAIL;
+    }
+
+    // Set the marker token.
+    node->m_marker = m_reader.advanceToken();
+
+    // Looks like it's a marker
+    UnownedStringSlice slice(node->m_marker.getContent());
+
+    // Strip the prefix and suffix
+    slice = UnownedStringSlice(slice.begin() + m_options->m_markPrefix.getLength(), slice.end() - m_options->m_markSuffix.getLength());
+
+    // Strip ABSTRACT_ if it's there
+    UnownedStringSlice abstractSlice("ABSTRACT_");
+    if (slice.startsWith(abstractSlice))
+    {
+        slice = UnownedStringSlice(slice.begin() + abstractSlice.getLength(), slice.end());
+    }
+
+    // TODO: We could strip other stuff or have other heuristics there, but this is
+    // probably okay for now
+
+    // Set the typeSet 
+    node->m_typeSet = m_nodeTree->getOrAddTypeSet(slice);
+
+    // Okay now looking for ( identifier)
+    Token typeNameToken;
+
+    SLANG_RETURN_ON_FAIL(expect(TokenType::LParent));
+    SLANG_RETURN_ON_FAIL(expect(TokenType::Identifier, &typeNameToken));
+    SLANG_RETURN_ON_FAIL(expect(TokenType::RParent));
+
+    if (typeNameToken.getContent() != node->m_name.getContent())
+    {
+        m_sink->diagnose(typeNameToken, CPPDiagnostics::typeNameDoesntMatch, node->m_name.getContent());
+        return SLANG_FAIL;
+    }
+
+    // If has the marker it is assumed reflected
+    node->m_reflectionType = ReflectionType::Reflected;
     return SLANG_OK;
 }
 
@@ -1279,12 +1267,9 @@ SlangResult Parser::_maybeParseContained(Node** outNode)
     }
 
     // Has a calling convention (must be a function/method)
-    if (advanceIfStyle(IdentifierStyle::CallingConvention))
-    {
-        // Could store the calling convention type, but for now we just consume
-        m_reader.advanceToken();
-    }
-
+    Token callingConventionToken;
+    advanceIfStyle(IdentifierStyle::CallingConvention, &callingConventionToken);
+    
     // Expecting a name
     Token nameToken;
     if (!advanceIfToken(TokenType::Identifier, &nameToken))
@@ -1745,6 +1730,19 @@ SlangResult Parser::parse(SourceOrigin* sourceOrigin, const Options* options)
                         }
                         else
                         {
+                            // If it's a marker handle it
+                            if (_isMarker(m_reader.peekToken().getContent()))
+                            {
+                                if (!m_currentScope->isClassLike())
+                                {
+                                    m_sink->diagnose(m_reader.peekLoc(), CPPDiagnostics::classMarkerOutsideOfClass);
+                                    return SLANG_FAIL;
+                                }
+
+                                SLANG_RETURN_ON_FAIL(_parseMarker());
+                                break;
+                            }
+
                             // Special case the node that's the root of the hierarchy (as far as reflection is concerned)
                             // This could be a field
                             if (m_currentScope->canContainFields() || m_currentScope->canContainCallable())

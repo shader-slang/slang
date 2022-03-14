@@ -41,6 +41,16 @@ struct TestState
 };
 
 static const char someSource[] =
+"#define SLANG_REFLECTED\n"
+"\n"
+"SLANG_REFLECTED\n"  
+"class ISomeInterface\n"
+"{\n"
+"    public:\n"
+"    virtual int SLANG_MCALL someMethod(int a, int b) const = 0;\n"
+"    virtual float SLANG_MCALL anotherMethod(float a) = 0;\n"
+"};\n"
+"\n"
 "enum SomeEnum\n"
 "{\n"
 "    Value,\n"
@@ -69,6 +79,8 @@ static const char someSource[] =
         SourceOrigin* sourceOrigin = tree.addSourceOrigin(sourceFile, state.m_options);
 
         Parser parser(&tree, &state.m_sink);
+        // We don't require markers to reflect
+        parser.setRequireMarker(false);
 
         {
             const Node::Kind enableKinds[] = { Node::Kind::Enum, Node::Kind::EnumClass, Node::Kind::EnumCase, Node::Kind::TypeDef };
