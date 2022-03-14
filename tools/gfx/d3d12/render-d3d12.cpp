@@ -2787,7 +2787,7 @@ Result AccelerationStructureImpl::getNativeHandle(InteropHandle* outHandle)
 Result TransientResourceHeapImpl::synchronizeAndReset()
 {
     WaitForMultipleObjects(
-        (DWORD)m_waitHandles.getCount(), m_waitHandles.getBuffer(), TRUE, INFINITE);
+        (DWORD)m_waitHandles.getCount(), m_waitHandles.getArrayView().getBuffer(), TRUE, INFINITE);
     m_waitHandles.clear();
     m_currentViewHeapIndex = -1;
     m_currentSamplerHeapIndex = -1;
