@@ -414,11 +414,12 @@ SlangResult Parser::_parseEnum()
     return popScope();
 }
 
-SlangResult Parser::_parseTemplate()
+SlangResult Parser::_consumeTemplate()
 {
-    // We don't really parse the template, we just consume it.
+    // Skip the current 'template' token.
     m_reader.advanceToken();
 
+    // Consume everything in <>
     SLANG_RETURN_ON_FAIL(expect(TokenType::OpLess));
 
     {
@@ -467,6 +468,7 @@ SlangResult Parser::_parseTemplate()
         }
     }
 
+    // Search for { or ; to consume remaining 
     while (true)
     {
         auto tokenType = m_reader.peekTokenType();
@@ -480,17 +482,22 @@ SlangResult Parser::_parseTemplate()
             }
             case TokenType::Semicolon:
             {
+                // Ends with semicolon if it's a template pre-declaration
                 m_reader.advanceToken();
                 return SLANG_OK;
             }
             case TokenType::LBrace:
             {
+                // If ends with {, means could be body of a struct/class or a body of a function/method.
+                // Consume it
                 SLANG_RETURN_ON_FAIL(consumeToClosingBrace());
+                // If we hit a ; just consume and ignore
                 advanceIfToken(TokenType::Semicolon);
                 return SLANG_OK;
             }
             default:
             {
+                // Consume
                 m_reader.advanceToken();
                 break;
             }
@@ -1660,7 +1667,7 @@ SlangResult Parser::parse(SourceOrigin* sourceOrigin, const Options* options)
                 {
                     case IdentifierStyle::Template:
                     {
-                        SLANG_RETURN_ON_FAIL(_parseTemplate());
+                        SLANG_RETURN_ON_FAIL(_consumeTemplate());
                         break;
                     }
                     case IdentifierStyle::PreDeclare:

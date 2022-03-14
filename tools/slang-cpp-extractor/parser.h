@@ -52,8 +52,7 @@ protected:
 
     SlangResult _parseTypeDef();
     SlangResult _parseEnum();
-    SlangResult _parseTemplate();
-
+    
     SlangResult _maybeParseType(List<Token>& outToks);
     SlangResult _maybeParseType(UnownedStringSlice& outType);
 
@@ -68,6 +67,9 @@ protected:
 
         /// Concatenate all tokens from start to the current position
     UnownedStringSlice _concatTokens(TokenReader::ParsingCursor start);
+
+        /// Consume what looks like a template definition
+    SlangResult _consumeTemplate();
 
     void _consumeTypeModifiers();
 
