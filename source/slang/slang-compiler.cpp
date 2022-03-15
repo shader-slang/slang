@@ -2177,12 +2177,12 @@ namespace Slang
         return SLANG_OK;
     }
 
-    static void writeString(Stream& stream, const char* string)
+    static void _writeString(Stream& stream, const char* string)
     {
         stream.write(string, strlen(string));
     }
 
-    static void escapeDependencyString(const char* string, StringBuilder& builder)
+    static void _escapeDependencyString(const char* string, StringBuilder& outBuilder)
     {
         // make has unusual escaping rules, but we only care about characters that are acceptable in a path
         for (const char* p = string; *p; ++p)
@@ -2196,37 +2196,37 @@ namespace Slang
             case '[':
             case ']':
             case '\\':
-                builder.appendChar('\\');
+                outBuilder.appendChar('\\');
                 break;
 
             case '$':
-                builder.appendChar('$');
+                outBuilder.appendChar('$');
                 break;
             }
 
-            builder.appendChar(c);
+            outBuilder.appendChar(c);
         }
     }
 
     // Writes a line to the file stream, formatted like this:
     //   <output-file>: <dependency-file> <dependency-file...>
-    static void writeDependencyStatement(Stream& stream, EndToEndCompileRequest* compileRequest, const String& outputPath)
+    static void _writeDependencyStatement(Stream& stream, EndToEndCompileRequest* compileRequest, const String& outputPath)
     {
         if (outputPath.getLength() == 0)
             return;
 
         StringBuilder builder;
-        escapeDependencyString(outputPath.begin(), builder);
-        writeString(stream, builder.begin());
-        writeString(stream, ": ");
+        _escapeDependencyString(outputPath.begin(), builder);
+        _writeString(stream, builder.begin());
+        _writeString(stream, ": ");
 
         int dependencyCount = compileRequest->getDependencyFileCount();
         for (int dependencyIndex = 0; dependencyIndex < dependencyCount; ++dependencyIndex)
         {
             builder.Clear();
-            escapeDependencyString(compileRequest->getDependencyFilePath(dependencyIndex), builder);
-            writeString(stream, builder.begin());
-            writeString(stream, (dependencyIndex + 1 < dependencyCount) ? " " : "\n");
+            _escapeDependencyString(compileRequest->getDependencyFilePath(dependencyIndex), builder);
+            _writeString(stream, builder.begin());
+            _writeString(stream, (dependencyIndex + 1 < dependencyCount) ? " " : "\n");
         }
     }
 
@@ -2250,7 +2250,7 @@ namespace Slang
                 RefPtr<EndToEndCompileRequest::TargetInfo> targetInfo;
                 if (compileRequest->m_targetInfos.TryGetValue(targetReq, targetInfo))
                 {
-                    writeDependencyStatement(stream, compileRequest, targetInfo->wholeTargetOutputPath);
+                    _writeDependencyStatement(stream, compileRequest, targetInfo->wholeTargetOutputPath);
                 }
             }
             else
@@ -2264,7 +2264,7 @@ namespace Slang
                         String outputPath;
                         if (targetInfo->entryPointOutputPaths.TryGetValue(entryPointIndex, outputPath))
                         {
-                            writeDependencyStatement(stream, compileRequest, outputPath);
+                            _writeDependencyStatement(stream, compileRequest, outputPath);
                         }
                     }
                 }
