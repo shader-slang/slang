@@ -195,6 +195,13 @@ SlangResult Parser::pushScope(ScopeNode* scopeNode)
 
 SlangResult Parser::popScope()
 {
+    // Handle "special" scopes if there is one
+    if (m_specialScopeCount > 0)
+    {
+        --m_specialScopeCount;
+        return SLANG_OK;
+    }
+
     if (m_currentScope->m_parentScope == nullptr)
     {
         m_sink->diagnose(m_reader.peekLoc(), CPPDiagnostics::scopeNotClosed);
@@ -568,7 +575,7 @@ SlangResult Parser::_maybeParseNode(Node::Kind kind)
     node->m_name = name;
 
     // We default to the containing scope for reflection type.
-    if (!m_requireMarker)
+    if (!m_options->m_requireMark)
     {
         node->m_reflectionType = m_currentScope->getContainedReflectionType();
     }
@@ -619,7 +626,6 @@ SlangResult Parser::_maybeParseNode(Node::Kind kind)
     return pushScope(node);
 }
     
-
 SlangResult Parser::_consumeToSync()
 {
     while (true)
@@ -800,7 +806,14 @@ SlangResult Parser::_maybeParseType(Index& ioTemplateDepth)
         {
             const IdentifierStyle style = m_nodeTree->m_identifierLookup->get(m_reader.peekToken().getContent());
 
-            if (style != IdentifierStyle::TypeModifier && hasFlag(style, IdentifierFlag::Keyword))
+            if (style == IdentifierStyle::TypeModifier ||
+                style == IdentifierStyle::IntegerModifier ||
+                style == IdentifierStyle::Class ||
+                style == IdentifierStyle::Struct)
+            {
+                // These are ok keywords in this context
+            }
+            else if (hasFlag(style, IdentifierFlag::Keyword))
             {
                 return SLANG_FAIL;
             }
@@ -808,9 +821,27 @@ SlangResult Parser::_maybeParseType(Index& ioTemplateDepth)
 
         _consumeTypeModifiers();
 
+        if (advanceIfStyle(IdentifierStyle::IntegerModifier))
+        {
+            // Consume the integer typename
+            advanceIfToken(TokenType::Identifier);
+            break;
+        }
+        
         advanceIfToken(TokenType::Scope);
         while (true)
         {
+            // if we have a struct/class prefix in front of a name just consume it.
+            if (m_reader.peekTokenType() == TokenType::Identifier)
+            {
+                const IdentifierStyle style = m_nodeTree->m_identifierLookup->get(m_reader.peekToken().getContent());
+                if (style == IdentifierStyle::Class ||
+                    style == IdentifierStyle::Struct)
+                {
+                    m_reader.advanceToken();
+                }
+            }
+
             Token identifierToken;
             if (!advanceIfToken(TokenType::Identifier, &identifierToken))
             {
@@ -1638,6 +1669,11 @@ SlangResult Parser::parse(SourceOrigin* sourceOrigin, const Options* options)
 
     m_currentScope = m_nodeTree->m_rootNode;
 
+    if (!options->m_requireMark)
+    {
+        m_currentScope->m_reflectionOverride = ReflectionType::Reflected;
+    }
+
     lexer.initialize(sourceView, m_sink, m_nodeTree->m_namePool, manager->getMemoryArena());
     m_tokenList = lexer.lexAllSemanticTokens();
     // See if there were any errors
@@ -1658,6 +1694,19 @@ SlangResult Parser::parse(SourceOrigin* sourceOrigin, const Options* options)
 
                 switch (style)
                 {
+                    case IdentifierStyle::Extern:
+                    {
+                        m_reader.advanceToken();
+
+                        Token externType;
+                        SLANG_RETURN_ON_FAIL(expect(TokenType::StringLiteral, &externType));
+
+                        if (advanceIfToken(TokenType::LBrace))
+                        {
+                            m_specialScopeCount++;
+                        }
+                        break;
+                    }
                     case IdentifierStyle::Template:
                     {
                         SLANG_RETURN_ON_FAIL(_consumeTemplate());

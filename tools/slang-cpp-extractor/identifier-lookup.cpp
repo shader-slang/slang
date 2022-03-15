@@ -27,6 +27,10 @@ using namespace Slang;
     0,                                                    /// Calling convention
     IdentifierFlag::Keyword,                              /// template
     IdentifierFlag::Keyword,                              /// static
+
+    IdentifierFlag::Keyword,                              /// unsigned/signed
+
+    IdentifierFlag::Keyword,                              /// extern
 };
 
 void IdentifierLookup::set(const UnownedStringSlice& name, IdentifierStyle style)
@@ -98,6 +102,7 @@ void IdentifierLookup::initDefault(const UnownedStringSlice& markPrefix)
         set("SLANG_MCALL", IdentifierStyle::CallingConvention);
         set("template", IdentifierStyle::Template);
         set("static", IdentifierStyle::Static);
+        set("extern", IdentifierStyle::Extern);
     }
 
     // Keywords which introduce types/scopes
@@ -118,6 +123,11 @@ void IdentifierLookup::initDefault(const UnownedStringSlice& markPrefix)
     {
         const char* names[] = { "private", "protected", "public" };
         set(names, SLANG_COUNT_OF(names), IdentifierStyle::Access);
+    }
+    {
+        const char* names[] = { "signed", "unsigned"};
+
+        set(names, SLANG_COUNT_OF(names), IdentifierStyle::IntegerModifier);
     }
 }
 

@@ -37,6 +37,10 @@ enum class IdentifierStyle
 
     Static,         
 
+    IntegerModifier,
+
+    Extern,
+
     CountOf,
 };
 

@@ -34,10 +34,6 @@ public:
     void setKindEnabled(Node::Kind kind, bool isEnabled = true);
     bool isTypeEnabled(Node::Kind kind) { return (m_nodeTypeEnabled & (NodeTypeBitType(1) << int(kind))) != 0; }
 
-        /// If set classes require a 'marker' to be reflected
-    void setRequireMarker(bool requireMarker) { m_requireMarker = requireMarker;  }
-    bool getRequireMarker() const { return m_requireMarker; }
-
     void setKindsEnabled(const Node::Kind* kinds, Index kindsCount, bool isEnabled = true);
 
     Parser(NodeTree* nodeTree, DiagnosticSink* sink);
@@ -88,14 +84,16 @@ protected:
     TokenList m_tokenList;
     TokenReader m_reader;
 
+        /// For handling special scopes such as extern "C" {. The count is the amount of non regular scopes.
+        /// The can be seen as the amount of scopes on top of the current scope.
+    Index m_specialScopeCount = 0;
+
     ScopeNode* m_currentScope;          ///< The current scope being processed
     SourceOrigin* m_sourceOrigin;       ///< The source origin that all tokens are in
 
     DiagnosticSink* m_sink;             ///< Diagnostic sink 
 
     NodeTree* m_nodeTree;    ///< Shared state between parses. Nodes will be added to this
-
-    bool m_requireMarker = true;
 
     const Options* m_options;
 };
