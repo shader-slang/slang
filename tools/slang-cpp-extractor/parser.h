@@ -54,26 +54,33 @@ protected:
     SlangResult _parseTypeDef();
     SlangResult _parseEnum();
     SlangResult _parseMarker();
+    SlangResult _parseSpecialMacro();
 
-    SlangResult _maybeParseType(List<Token>& outToks);
-    SlangResult _maybeParseType(UnownedStringSlice& outType);
+    SlangResult _maybeParseType(List<Token>& outToks, Token& outName);
+    SlangResult _maybeParseType(UnownedStringSlice& outType, Token& outName);
+    SlangResult _maybeParseType(Index& ioTemplateDepth, TokenReader::ParsingCursor& outCursor);
 
     SlangResult _parseExpression(List<Token>& outExprTokens);
-
-    SlangResult _maybeParseType(Index& ioTemplateDepth);
+    
     SlangResult _maybeParseTemplateArgs(Index& ioTemplateDepth);
     SlangResult _maybeParseTemplateArg(Index& ioTemplateDepth);
 
         /// Parse balanced - if a sink is set will report to that sink
     SlangResult _parseBalanced(DiagnosticSink* sink);
 
+    bool _isCtor();
+
         /// Concatenate all tokens from start to the current position
     UnownedStringSlice _concatTokens(TokenReader::ParsingCursor start);
+    UnownedStringSlice _concatTokens(const Token* toks, Index toksCount);
+
+    UnownedStringSlice _concatType(TokenReader::ParsingCursor start, TokenReader::ParsingCursor nameCursor);
+
+    void _getTypeTokens(TokenReader::ParsingCursor start, TokenReader::ParsingCursor nameCursor, List<Token>& outToks);
 
         /// Consume what looks like a template definition
     SlangResult _consumeTemplate();
-
-    void _consumeTypeModifiers();
+    SlangResult _maybeConsume(IdentifierStyle style);
 
     SlangResult _consumeToSync();
         /// Consumes balanced parens. Will return an error if not matched. Assumes starts on opening (
@@ -84,9 +91,7 @@ protected:
     TokenList m_tokenList;
     TokenReader m_reader;
 
-        /// For handling special scopes such as extern "C" {. The count is the amount of non regular scopes.
-        /// The can be seen as the amount of scopes on top of the current scope.
-    Index m_specialScopeCount = 0;
+    List<ScopeNode*> m_scopeStack;
 
     ScopeNode* m_currentScope;          ///< The current scope being processed
     SourceOrigin* m_sourceOrigin;       ///< The source origin that all tokens are in

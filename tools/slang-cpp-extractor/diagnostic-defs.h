@@ -52,6 +52,9 @@ DIAGNOSTIC(100017, Error, cannotParseExpression, "Cannot parse expression")
 DIAGNOSTIC(100018, Error, cannotOverload, "Cannot overload this declaration");
 DIAGNOSTIC(100019, Error, classMarkerOutsideOfClass, "A class/struct marker is found outside of class or struct");
 DIAGNOSTIC(100020, Error, classMarkerAlreadyFound, "A class/struct marker already found in type '$0'");
+DIAGNOSTIC(100021, Error, cannotParseType, "Cannot parse type");
+DIAGNOSTIC(100022, Error, destructorNameDoesntMatch, "Destructor name doesn't match class name '$0'");
+DIAGNOSTIC(100023, Error, cannotParseCallable, "Cannot parse callable");
 
 // Command line errors 100100
 
