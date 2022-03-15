@@ -139,6 +139,113 @@ namespace gfx_test
         }
     };
 
+    RefPtr<ValidationTextureFormatBase> getValidationTextureFormat(Format format)
+    {
+        switch (format)
+        {
+        case Format::R32G32B32A32_TYPELESS:         return new ValidationTextureFormat<uint32_t>(4);
+        case Format::R32G32B32_TYPELESS:            return new ValidationTextureFormat<uint32_t>(3);
+        case Format::R32G32_TYPELESS:               return new ValidationTextureFormat<uint32_t>(2);
+        case Format::R32_TYPELESS:                  return new ValidationTextureFormat<uint32_t>(1);
+
+        case Format::R16G16B16A16_TYPELESS:         return new ValidationTextureFormat<uint16_t>(4);
+        case Format::R16G16_TYPELESS:               return new ValidationTextureFormat<uint16_t>(2);
+        case Format::R16_TYPELESS:                  return new ValidationTextureFormat<uint16_t>(1);
+
+        case Format::R8G8B8A8_TYPELESS:             return new ValidationTextureFormat<uint8_t>(4);
+        case Format::R8G8_TYPELESS:                 return new ValidationTextureFormat<uint8_t>(2);
+        case Format::R8_TYPELESS:                   return new ValidationTextureFormat<uint8_t>(1);
+        case Format::B8G8R8A8_TYPELESS:             return new ValidationTextureFormat<uint8_t>(4);
+
+        case Format::R32G32B32A32_FLOAT:            return new ValidationTextureFormat<float>(4);
+        case Format::R32G32B32_FLOAT:               return new ValidationTextureFormat<float>(3);
+        case Format::R32G32_FLOAT:                  return new ValidationTextureFormat<float>(2);
+        case Format::R32_FLOAT:                     return new ValidationTextureFormat<float>(1);
+
+        case Format::R16G16B16A16_FLOAT:            return new ValidationTextureFormat<uint16_t>(4);
+        case Format::R16G16_FLOAT:                  return new ValidationTextureFormat<uint16_t>(2);
+        case Format::R16_FLOAT:                     return new ValidationTextureFormat<uint16_t>(1);
+
+        case Format::R32G32B32A32_UINT:             return new ValidationTextureFormat<uint32_t>(4);
+        case Format::R32G32B32_UINT:                return new ValidationTextureFormat<uint32_t>(3);
+        case Format::R32G32_UINT:                   return new ValidationTextureFormat<uint32_t>(2);
+        case Format::R32_UINT:                      return new ValidationTextureFormat<uint32_t>(1);
+
+        case Format::R16G16B16A16_UINT:             return new ValidationTextureFormat<uint16_t>(4);
+        case Format::R16G16_UINT:                   return new ValidationTextureFormat<uint16_t>(2);
+        case Format::R16_UINT:                      return new ValidationTextureFormat<uint16_t>(1);
+
+        case Format::R8G8B8A8_UINT:                 return new ValidationTextureFormat<uint8_t>(4);
+        case Format::R8G8_UINT:                     return new ValidationTextureFormat<uint8_t>(2);
+        case Format::R8_UINT:                       return new ValidationTextureFormat<uint8_t>(1);
+
+        case Format::R32G32B32A32_SINT:             return new ValidationTextureFormat<int32_t>(4);
+        case Format::R32G32B32_SINT:                return new ValidationTextureFormat<int32_t>(3);
+        case Format::R32G32_SINT:                   return new ValidationTextureFormat<int32_t>(2);
+        case Format::R32_SINT:                      return new ValidationTextureFormat<int32_t>(1);
+
+        case Format::R16G16B16A16_SINT:             return new ValidationTextureFormat<int16_t>(4);
+        case Format::R16G16_SINT:                   return new ValidationTextureFormat<int16_t>(2);
+        case Format::R16_SINT:                      return new ValidationTextureFormat<int16_t>(1);
+
+        case Format::R8G8B8A8_SINT:                 return new ValidationTextureFormat<int8_t>(4);
+        case Format::R8G8_SINT:                     return new ValidationTextureFormat<int8_t>(2);
+        case Format::R8_SINT:                       return new ValidationTextureFormat<int8_t>(1);
+
+        case Format::R16G16B16A16_UNORM:            return new ValidationTextureFormat<uint16_t>(4);
+        case Format::R16G16_UNORM:                  return new ValidationTextureFormat<uint16_t>(2);
+        case Format::R16_UNORM:                     return new ValidationTextureFormat<uint16_t>(1);
+
+        case Format::R8G8B8A8_UNORM:                return new ValidationTextureFormat<uint8_t>(4);
+        case Format::R8G8B8A8_UNORM_SRGB:           return new ValidationTextureFormat<uint8_t>(4);
+        case Format::R8G8_UNORM:                    return new ValidationTextureFormat<uint8_t>(2);
+        case Format::R8_UNORM:                      return new ValidationTextureFormat<uint8_t>(1);
+        case Format::B8G8R8A8_UNORM:                return new ValidationTextureFormat<uint8_t>(4);
+        case Format::B8G8R8A8_UNORM_SRGB:           return new ValidationTextureFormat<uint8_t>(4);
+        case Format::B8G8R8X8_UNORM:                return new ValidationTextureFormat<uint8_t>(3);
+        case Format::B8G8R8X8_UNORM_SRGB:           return new ValidationTextureFormat<uint8_t>(3);
+
+        case Format::R16G16B16A16_SNORM:            return new ValidationTextureFormat<int16_t>(4);
+        case Format::R16G16_SNORM:                  return new ValidationTextureFormat<int16_t>(2);
+        case Format::R16_SNORM:                     return new ValidationTextureFormat<int16_t>(1);
+
+        case Format::R8G8B8A8_SNORM:                return new ValidationTextureFormat<int8_t>(4);
+        case Format::R8G8_SNORM:                    return new ValidationTextureFormat<int8_t>(2);
+        case Format::R8_SNORM:                      return new ValidationTextureFormat<int8_t>(1);
+
+        case Format::D32_FLOAT:                     return new ValidationTextureFormat<float>(1);
+        case Format::D16_UNORM:                     return new ValidationTextureFormat<uint16_t>(1);
+
+        case Format::B4G4R4A4_UNORM:                return new PackedValidationTextureFormat<uint16_t>(4, 4, 4, 4);
+        case Format::B5G6R5_UNORM:                  return new PackedValidationTextureFormat<uint16_t>(5, 6, 5, 0);
+        case Format::B5G5R5A1_UNORM:                return new PackedValidationTextureFormat<uint16_t>(5, 5, 5, 1);
+
+        case Format::R9G9B9E5_SHAREDEXP:            return new ValidationTextureFormat<uint32_t>(1);
+        case Format::R10G10B10A2_TYPELESS:          return new PackedValidationTextureFormat<uint32_t>(10, 10, 10, 2);
+        case Format::R10G10B10A2_UNORM:             return new PackedValidationTextureFormat<uint32_t>(10, 10, 10, 2);
+        case Format::R10G10B10A2_UINT:              return new PackedValidationTextureFormat<uint32_t>(10, 10, 10, 2);
+        case Format::R11G11B10_FLOAT:               return new PackedValidationTextureFormat<uint32_t>(11, 11, 10, 0);
+
+            // TODO: Add testing support for BC formats
+//                     BC1_UNORM,
+//                     BC1_UNORM_SRGB,
+//                     BC2_UNORM,
+//                     BC2_UNORM_SRGB,
+//                     BC3_UNORM,
+//                     BC3_UNORM_SRGB,
+//                     BC4_UNORM,
+//                     BC4_SNORM,
+//                     BC5_UNORM,
+//                     BC5_SNORM,
+//                     BC6H_UF16,
+//                     BC6H_SF16,
+//                     BC7_UNORM,
+//                     BC7_UNORM_SRGB,
+        default:
+            return nullptr;
+        }
+    }
+
     struct ValidationTextureData : RefObject
     {
         const void* textureData;
@@ -170,11 +277,13 @@ namespace gfx_test
         IDevice* device;
         UnitTestContext* context;
 
+        Format format;
+        size_t alignedRowStride;
+
         ComPtr<ITextureResource> srcTexture;
         ComPtr<ITextureResource> dstTexture;
         ComPtr<IBufferResource> resultsBuffer;
-
-        size_t alignedRowStride;
+        RefPtr<ValidationTextureFormatBase> validationFormat;
 
         struct TextureInfo
         {
@@ -184,13 +293,15 @@ namespace gfx_test
             ITextureResource::SubresourceData const* initData;
         };
 
-        void init(IDevice* device, UnitTestContext* context)
+        void init(IDevice* device, UnitTestContext* context, Format format, RefPtr<ValidationTextureFormatBase> validationFormat)
         {
             this->device = device;
             this->context = context;
+            this->format = format;
+            this->validationFormat = validationFormat;
         }
 
-        RefPtr<TextureStuff> generateTextureData(int width, int height, uint32_t mipLevels, uint32_t arrayLayers, Format format)
+        RefPtr<TextureStuff> generateTextureData(int width, int height, uint32_t mipLevels, uint32_t arrayLayers)
         {
             FormatInfo formatInfo;
             gfxGetFormatInfo(format, &formatInfo);
@@ -215,7 +326,7 @@ namespace gfx_test
                     subresource->strides.x = texelSize;
                     subresource->strides.y = mipWidth * texelSize;
                     subresource->strides.z = mipHeight * subresource->strides.y;
-                    subresource->format = getValidationTextureFormat(format);
+                    subresource->format = validationFormat;
                     texture->subresourceObjects.add(subresource);
 
                     for (int h = 0; h < mipHeight; ++h)
@@ -237,7 +348,19 @@ namespace gfx_test
             return texture;
         }
 
-        void createRequiredResources(TextureInfo srcTextureInfo, TextureInfo dstTextureInfo, ITextureResource::Size bufferCopyExtents, Format format)
+        TextureAspect getTextureAspect()
+        {
+            switch (format)
+            {
+            case Format::D16_UNORM:
+            case Format::D32_FLOAT:
+                return TextureAspect::Depth;
+            default:
+                return TextureAspect::Color;
+            }
+        }
+
+        void createRequiredResources(TextureInfo srcTextureInfo, TextureInfo dstTextureInfo, ITextureResource::Size bufferCopyExtents)
         {
             ITextureResource::Desc srcTexDesc = {};
             srcTexDesc.type = IResource::Type::Texture2D;
@@ -248,6 +371,11 @@ namespace gfx_test
             srcTexDesc.allowedStates = ResourceStateSet(
                 ResourceState::ShaderResource,
                 ResourceState::CopySource);
+            if (format == Format::D32_FLOAT || format == Format::D16_UNORM)
+            {
+                srcTexDesc.allowedStates.add(ResourceState::DepthWrite);
+                srcTexDesc.allowedStates.add(ResourceState::DepthRead);
+            }
             srcTexDesc.format = format;
 
             GFX_CHECK_CALL_ABORT(device->createTextureResource(
@@ -265,6 +393,11 @@ namespace gfx_test
                 ResourceState::ShaderResource,
                 ResourceState::CopyDestination,
                 ResourceState::CopySource);
+            if (format == Format::D32_FLOAT || format == Format::D16_UNORM)
+            {
+                srcTexDesc.allowedStates.add(ResourceState::DepthWrite);
+                srcTexDesc.allowedStates.add(ResourceState::DepthRead);
+            }
             dstTexDesc.format = format;
 
             GFX_CHECK_CALL_ABORT(device->createTextureResource(
@@ -286,6 +419,11 @@ namespace gfx_test
                 ResourceState::UnorderedAccess,
                 ResourceState::CopyDestination,
                 ResourceState::CopySource);
+            if (format == Format::D32_FLOAT || format == Format::D16_UNORM)
+            {
+                srcTexDesc.allowedStates.add(ResourceState::DepthWrite);
+                srcTexDesc.allowedStates.add(ResourceState::DepthRead);
+            }
             bufferDesc.defaultState = ResourceState::CopyDestination;
             bufferDesc.memoryType = MemoryType::DeviceLocal;
 
@@ -326,114 +464,6 @@ namespace gfx_test
             commandBuffer->close();
             queue->executeCommandBuffer(commandBuffer);
             queue->waitOnHost();
-        }
-
-        // should return refptr to avoid leaking memory
-        RefPtr<ValidationTextureFormatBase> getValidationTextureFormat(Format format)
-        {
-            switch (format)
-            {
-            case Format::R32G32B32A32_TYPELESS:         return new ValidationTextureFormat<uint32_t>(4);
-            case Format::R32G32B32_TYPELESS:            return new ValidationTextureFormat<uint32_t>(3);
-            case Format::R32G32_TYPELESS:               return new ValidationTextureFormat<uint32_t>(2);
-            case Format::R32_TYPELESS:                  return new ValidationTextureFormat<uint32_t>(1);
-
-            case Format::R16G16B16A16_TYPELESS:         return new ValidationTextureFormat<uint16_t>(4);
-            case Format::R16G16_TYPELESS:               return new ValidationTextureFormat<uint16_t>(2);
-            case Format::R16_TYPELESS:                  return new ValidationTextureFormat<uint16_t>(1);
-
-            case Format::R8G8B8A8_TYPELESS:             return new ValidationTextureFormat<uint8_t>(4);
-            case Format::R8G8_TYPELESS:                 return new ValidationTextureFormat<uint8_t>(2);
-            case Format::R8_TYPELESS:                   return new ValidationTextureFormat<uint8_t>(1);
-            case Format::B8G8R8A8_TYPELESS:             return new ValidationTextureFormat<uint8_t>(4);
-
-            case Format::R32G32B32A32_FLOAT:            return new ValidationTextureFormat<float>(4);
-            case Format::R32G32B32_FLOAT:               return new ValidationTextureFormat<float>(3);
-            case Format::R32G32_FLOAT:                  return new ValidationTextureFormat<float>(2);
-            case Format::R32_FLOAT:                     return new ValidationTextureFormat<float>(1);
-
-//                     R16G16B16A16_FLOAT,
-//                     R16G16_FLOAT,
-//                     R16_FLOAT,
- 
-            case Format::R32G32B32A32_UINT:             return new ValidationTextureFormat<uint32_t>(4);
-            case Format::R32G32B32_UINT:                return new ValidationTextureFormat<uint32_t>(3);
-            case Format::R32G32_UINT:                   return new ValidationTextureFormat<uint32_t>(2);
-            case Format::R32_UINT:                      return new ValidationTextureFormat<uint32_t>(1);
-
-            case Format::R16G16B16A16_UINT:             return new ValidationTextureFormat<uint16_t>(4);
-            case Format::R16G16_UINT:                   return new ValidationTextureFormat<uint16_t>(2);
-            case Format::R16_UINT:                      return new ValidationTextureFormat<uint16_t>(1);
-
-            case Format::R8G8B8A8_UINT:                 return new ValidationTextureFormat<uint8_t>(4);
-            case Format::R8G8_UINT:                     return new ValidationTextureFormat<uint8_t>(2);
-            case Format::R8_UINT:                       return new ValidationTextureFormat<uint8_t>(1);
-
-            case Format::R32G32B32A32_SINT:             return new ValidationTextureFormat<int32_t>(4);
-            case Format::R32G32B32_SINT:                return new ValidationTextureFormat<int32_t>(3);
-            case Format::R32G32_SINT:                   return new ValidationTextureFormat<int32_t>(2);
-            case Format::R32_SINT:                      return new ValidationTextureFormat<int32_t>(1);
-
-            case Format::R16G16B16A16_SINT:             return new ValidationTextureFormat<int16_t>(4);
-            case Format::R16G16_SINT:                   return new ValidationTextureFormat<int16_t>(2);
-            case Format::R16_SINT:                      return new ValidationTextureFormat<int16_t>(1);
-
-            case Format::R8G8B8A8_SINT:                 return new ValidationTextureFormat<int8_t>(4);
-            case Format::R8G8_SINT:                     return new ValidationTextureFormat<int8_t>(2);
-            case Format::R8_SINT:                       return new ValidationTextureFormat<int8_t>(1);
-
-            case Format::R16G16B16A16_UNORM:            return new ValidationTextureFormat<uint16_t>(4);
-            case Format::R16G16_UNORM:                  return new ValidationTextureFormat<uint16_t>(2);
-            case Format::R16_UNORM:                     return new ValidationTextureFormat<uint16_t>(1);
-
-            case Format::R8G8B8A8_UNORM:                return new ValidationTextureFormat<uint8_t>(4);
-            case Format::R8G8B8A8_UNORM_SRGB:           return new ValidationTextureFormat<uint8_t>(4);
-            case Format::R8G8_UNORM:                    return new ValidationTextureFormat<uint8_t>(2);
-            case Format::R8_UNORM:                      return new ValidationTextureFormat<uint8_t>(1);
-            case Format::B8G8R8A8_UNORM:                return new ValidationTextureFormat<uint8_t>(4);
-            case Format::B8G8R8A8_UNORM_SRGB:           return new ValidationTextureFormat<uint8_t>(4);
-            case Format::B8G8R8X8_UNORM:                return new ValidationTextureFormat<uint8_t>(3); // 3 or 4 channels?
-            case Format::B8G8R8X8_UNORM_SRGB:           return new ValidationTextureFormat<uint8_t>(3);
-
-            case Format::R16G16B16A16_SNORM:            return new ValidationTextureFormat<int16_t>(4);
-            case Format::R16G16_SNORM:                  return new ValidationTextureFormat<int16_t>(2);
-            case Format::R16_SNORM:                     return new ValidationTextureFormat<int16_t>(1);
-
-            case Format::R8G8B8A8_SNORM:                return new ValidationTextureFormat<int8_t>(4);
-            case Format::R8G8_SNORM:                    return new ValidationTextureFormat<int8_t>(2);
-            case Format::R8_SNORM:                      return new ValidationTextureFormat<int8_t>(1);
-
-            case Format::D32_FLOAT:                     return new ValidationTextureFormat<float>(1); // broken in VK
-            case Format::D16_UNORM:                     return new ValidationTextureFormat<uint16_t>(1); // broken in VK
-
-            case Format::B4G4R4A4_UNORM:                return new PackedValidationTextureFormat<uint16_t>(4, 4, 4, 4);
-            case Format::B5G6R5_UNORM:                  return new PackedValidationTextureFormat<uint16_t>(5, 6, 5, 0);
-            case Format::B5G5R5A1_UNORM:                return new PackedValidationTextureFormat<uint16_t>(5, 5, 5, 1);
-
-//                     R9G9B9E5_SHAREDEXP,
-            case Format::R10G10B10A2_TYPELESS:          return new PackedValidationTextureFormat<uint32_t>(10, 10, 10, 2);
-            case Format::R10G10B10A2_UNORM:             return new PackedValidationTextureFormat<uint32_t>(10, 10, 10, 2);
-            case Format::R10G10B10A2_UINT:              return new PackedValidationTextureFormat<uint32_t>(10, 10, 10, 2);
-            case Format::R11G11B10_FLOAT:               return new PackedValidationTextureFormat<uint32_t>(11, 11, 10, 0);
-
-//                     BC1_UNORM,
-//                     BC1_UNORM_SRGB,
-//                     BC2_UNORM,
-//                     BC2_UNORM_SRGB,
-//                     BC3_UNORM,
-//                     BC3_UNORM_SRGB,
-//                     BC4_UNORM,
-//                     BC4_SNORM,
-//                     BC5_UNORM,
-//                     BC5_SNORM,
-//                     BC6H_UF16,
-//                     BC6H_SF16,
-//                     BC7_UNORM,
-//                     BC7_UNORM_SRGB,
-            default:
-                SLANG_CHECK_ABORT(false);
-                return nullptr;
-            }
         }
 
         bool isWithinCopyBounds(int x, int y, int z, ITextureResource::Offset3D copyOffset, ITextureResource::Size copyExtents)
@@ -501,9 +531,6 @@ namespace gfx_test
             ComPtr<ISlangBlob> resultBlob;
             auto resultsSize = dstExtent.depth * dstExtent.height * alignedRowStride;
             GFX_CHECK_CALL_ABORT(device->readBufferResource(resultsBuffer, 0, resultsSize, resultBlob.writeRef()));
-//             size_t outRowPitch;
-//             size_t outPixelSize;
-//             GFX_CHECK_CALL_ABORT(device->readTextureResource(srcTexture, ResourceState::CopySource, resultBlob.writeRef(), &outRowPitch, &outPixelSize));
             auto results = resultBlob->getBufferPointer();
 
             auto validationFormat = getValidationTextureFormat(format);
@@ -541,112 +568,53 @@ namespace gfx_test
 
             validateTestResults(actual, expectedCopied, expectedOriginal, copyExtent, srcTexOffset, dstTexOffset);
         }
-
-//         template <typename T>
-//         void checkTestResults(
-//             ITextureResource::Size srcExtent,
-//             ITextureResource::Size dstExtent,
-//             ITextureResource::Size copyExtent,
-//             ITextureResource::Offset3D srcOffset,
-//             const void* expectedSubresourceData)
-//         {
-//             ComPtr<ISlangBlob> resultBlob;
-//             auto resultsSize = dstExtent.width * dstExtent.height * dstExtent.depth * 4 * sizeof(T);
-//             GFX_CHECK_CALL_ABORT(device->readBufferResource(resultsBuffer, 0, resultsSize, resultBlob.writeRef()));
-//             auto results = (T*)resultBlob->getBufferPointer();
-//             auto expecteds = (T*)expectedSubresourceData;
-//             for (Int w = 0; w < dstExtent.width; ++w)
-//             {
-//                 for (Int h = 0; h < dstExtent.height; ++h)
-//                 {
-//                     if (w < srcOffset.x || h < srcOffset.y || w >= copyExtent.width + srcOffset.x || h >= copyExtent.height + srcOffset.y)
-//                     {
-//                         // Outside of the bounds of the copy operation
-//                         SLANG_CHECK(results[4 * (h * dstExtent.width + w)] == 0);
-//                         SLANG_CHECK(results[4 * (h * dstExtent.width + w) + 1] == 0);
-//                         SLANG_CHECK(results[4 * (h * dstExtent.width + w) + 2] == 0);
-//                         SLANG_CHECK(results[4 * (h * dstExtent.width + w) + 3] == 0);
-//                     }
-//                     else
-//                     {
-//                         // Inside the bounds of the copy operation
-//                         SLANG_CHECK(results[4 * (h * dstExtent.width + w)] == expecteds[4 * (h * srcExtent.width + w)]);
-//                         SLANG_CHECK(results[4 * (h * dstExtent.width + w) + 1] == expecteds[4 * (h * srcExtent.width + w) + 1]);
-//                         SLANG_CHECK(results[4 * (h * dstExtent.width + w) + 2] == expecteds[4 * (h * srcExtent.width + w) + 2]);
-//                         SLANG_CHECK(results[4 * (h * dstExtent.width + w) + 3] == expecteds[4 * (h * srcExtent.width + w) + 3]);
-//                     }
-//                 }
-//             }
-//         }
     };
 
     struct SimpleCopyTexture : BaseCopyTextureTest
     {
         void run()
         {
-            // Skip Format::Unknown
-            for (uint32_t i = 1; i < (uint32_t)Format::CountOf; ++i)
-            {
-                if (i == 16 || i == 17 || i == 18 || i == 61 || i >= 66)
-                {
-                    continue;
-                }
+            ITextureResource::Size extent = {};
+            extent.width = 4;
+            extent.height = 4;
+            extent.depth = 1;
+            auto mipLevelCount = 1;
+            auto arrayLayerCount = 1;
 
-                //if (i == 56 || i == 57) continue;
+            auto srcTextureStuff = generateTextureData(extent.width, extent.height, mipLevelCount, arrayLayerCount);
 
-                printf("%d", i);
-                auto format = (Format)i;
+            TextureInfo srcTextureInfo = { extent, mipLevelCount, arrayLayerCount, srcTextureStuff->subresourceDatas.getBuffer() };
+            TextureInfo dstTextureInfo = { extent, mipLevelCount, arrayLayerCount, nullptr };
 
-                ITextureResource::Size extent = {};
-                extent.width = 4;
-                extent.height = 4;
-                extent.depth = 1;
-                auto mipLevelCount = 1;
-                auto arrayLayerCount = 1;
+            createRequiredResources(srcTextureInfo, dstTextureInfo, extent);
 
-                auto srcTextureStuff = generateTextureData(extent.width, extent.height, mipLevelCount, arrayLayerCount, format);
+            SubresourceRange srcSubresource = {};
+            srcSubresource.aspectMask = getTextureAspect();
+            srcSubresource.mipLevel = 0;
+            srcSubresource.mipLevelCount = 1;
+            srcSubresource.baseArrayLayer = 0;
+            srcSubresource.layerCount = 1;
 
-                TextureInfo srcTextureInfo = { extent, mipLevelCount, arrayLayerCount, srcTextureStuff->subresourceDatas.getBuffer() };
-                TextureInfo dstTextureInfo = { extent, mipLevelCount, arrayLayerCount, nullptr };
+            ITextureResource::Offset3D srcOffset;
 
-                createRequiredResources(srcTextureInfo, dstTextureInfo, extent, format);
+            SubresourceRange dstSubresource = {};
+            dstSubresource.aspectMask = getTextureAspect();
+            dstSubresource.mipLevel = 0;
+            dstSubresource.mipLevelCount = 1;
+            dstSubresource.baseArrayLayer = 0;
+            dstSubresource.layerCount = 1;
 
-//                 ComPtr<ISlangBlob> resultBlob;
-//                 size_t outRowPitch;
-//                 size_t outPixelSize;
-//                 GFX_CHECK_CALL_ABORT(device->readTextureResource(srcTexture, ResourceState::CopySource, resultBlob.writeRef(), &outRowPitch, &outPixelSize));
-//                 auto results = resultBlob->getBufferPointer();
+            ITextureResource::Offset3D dstOffset;
 
-                SubresourceRange srcSubresource = {};
-                srcSubresource.aspectMask = TextureAspect::Color;
-                srcSubresource.mipLevel = 0;
-                srcSubresource.mipLevelCount = 1;
-                srcSubresource.baseArrayLayer = 0;
-                srcSubresource.layerCount = 1;
+            submitGPUWork(srcSubresource, dstSubresource, srcOffset, dstOffset, extent, extent, 16);
 
-                ITextureResource::Offset3D srcOffset;
-
-                SubresourceRange dstSubresource = {};
-                dstSubresource.aspectMask = TextureAspect::Color;
-                dstSubresource.mipLevel = 0;
-                dstSubresource.mipLevelCount = 1;
-                dstSubresource.baseArrayLayer = 0;
-                dstSubresource.layerCount = 1;
-
-                ITextureResource::Offset3D dstOffset;
-
-                submitGPUWork(srcSubresource, dstSubresource, srcOffset, dstOffset, extent, extent, 16);
-
-                auto expectedData = srcTextureStuff->subresourceDatas[0];
-                checkTestResults(extent, extent, extent, srcOffset, dstOffset, format, expectedData.data, nullptr);
-            }
+            auto expectedData = srcTextureStuff->subresourceDatas[0];
+            checkTestResults(extent, extent, extent, srcOffset, dstOffset, format, expectedData.data, nullptr);
         }
     };
 
     struct CopyTextureSection : BaseCopyTextureTest
     {
-        Format format = Format::R32G32B32A32_FLOAT;
-
         void run()
         {
             ITextureResource::Size extent = {};
@@ -657,15 +625,15 @@ namespace gfx_test
             auto mipLevelCount = 2;
             auto arrayLayerCount = 2;
 
-            auto srcTextureStuff = generateTextureData(extent.width, extent.height, mipLevelCount, arrayLayerCount, format);
+            auto srcTextureStuff = generateTextureData(extent.width, extent.height, mipLevelCount, arrayLayerCount);
             
             TextureInfo srcTextureInfo = { extent, mipLevelCount, arrayLayerCount, srcTextureStuff->subresourceDatas.getBuffer() };
             TextureInfo dstTextureInfo = { extent, mipLevelCount, arrayLayerCount, nullptr };
 
-            createRequiredResources(srcTextureInfo, dstTextureInfo, extent, format);
+            createRequiredResources(srcTextureInfo, dstTextureInfo, extent);
 
             SubresourceRange srcSubresource = {};
-            srcSubresource.aspectMask = TextureAspect::Color;
+            srcSubresource.aspectMask = getTextureAspect();
             srcSubresource.mipLevel = 0;
             srcSubresource.mipLevelCount = 1;
             srcSubresource.baseArrayLayer = 1;
@@ -674,7 +642,7 @@ namespace gfx_test
             ITextureResource::Offset3D srcOffset;
 
             SubresourceRange dstSubresource = {};
-            dstSubresource.aspectMask = TextureAspect::Color;
+            dstSubresource.aspectMask = getTextureAspect();
             dstSubresource.mipLevel = 0;
             dstSubresource.mipLevelCount = 1;
             dstSubresource.baseArrayLayer = 0;
@@ -693,8 +661,6 @@ namespace gfx_test
     {
         void run()
         {
-            Format format = Format::R32G32B32A32_FLOAT;
-
             ITextureResource::Size srcExtent = {};
             srcExtent.width = 16;
             srcExtent.height = 16;
@@ -702,7 +668,7 @@ namespace gfx_test
             auto srcMipLevelCount = 1;
             auto srcArrayLayerCount = 1;
 
-            auto srcTextureStuff = generateTextureData(srcExtent.width, srcExtent.height, srcMipLevelCount, srcArrayLayerCount, format);
+            auto srcTextureStuff = generateTextureData(srcExtent.width, srcExtent.height, srcMipLevelCount, srcArrayLayerCount);
             TextureInfo srcTextureInfo = { srcExtent, srcMipLevelCount, srcArrayLayerCount, srcTextureStuff->subresourceDatas.getBuffer() };
 
             ITextureResource::Size dstExtent = {};
@@ -714,10 +680,10 @@ namespace gfx_test
 
             TextureInfo dstTextureInfo = { dstExtent, dstMipLevelCount, dstArrayLayerCount, nullptr };
 
-            createRequiredResources(srcTextureInfo, dstTextureInfo, dstExtent, format);
+            createRequiredResources(srcTextureInfo, dstTextureInfo, dstExtent);
 
             SubresourceRange srcSubresource = {};
-            srcSubresource.aspectMask = TextureAspect::Color;
+            srcSubresource.aspectMask = getTextureAspect();
             srcSubresource.mipLevel = 0;
             srcSubresource.mipLevelCount = 1;
             srcSubresource.baseArrayLayer = 0;
@@ -726,7 +692,7 @@ namespace gfx_test
             ITextureResource::Offset3D srcOffset;
 
             SubresourceRange dstSubresource = {};
-            dstSubresource.aspectMask = TextureAspect::Color;
+            dstSubresource.aspectMask = getTextureAspect();
             dstSubresource.mipLevel = 0;
             dstSubresource.mipLevelCount = 1;
             dstSubresource.baseArrayLayer = 0;
@@ -745,8 +711,6 @@ namespace gfx_test
     {
         void run()
         {
-            Format format = Format::R32G32B32A32_FLOAT;
-
             ITextureResource::Size srcExtent = {};
             srcExtent.width = 4;
             srcExtent.height = 4;
@@ -754,7 +718,7 @@ namespace gfx_test
             auto srcMipLevelCount = 1;
             auto srcArrayLayerCount = 1;
 
-            auto srcTextureStuff = generateTextureData(srcExtent.width, srcExtent.height, srcMipLevelCount, srcArrayLayerCount, format);
+            auto srcTextureStuff = generateTextureData(srcExtent.width, srcExtent.height, srcMipLevelCount, srcArrayLayerCount);
             TextureInfo srcTextureInfo = { srcExtent, srcMipLevelCount, srcArrayLayerCount, srcTextureStuff->subresourceDatas.getBuffer() };
 
             ITextureResource::Size dstExtent = {};
@@ -764,11 +728,11 @@ namespace gfx_test
             auto dstMipLevelCount = 1;
             auto dstArrayLayerCount = 1;
 
-            auto dstTextureStuff = generateTextureData(dstExtent.width, dstExtent.height, dstMipLevelCount, dstArrayLayerCount, format);
+            auto dstTextureStuff = generateTextureData(dstExtent.width, dstExtent.height, dstMipLevelCount, dstArrayLayerCount);
             TextureInfo dstTextureInfo = { dstExtent, dstMipLevelCount, dstArrayLayerCount, dstTextureStuff->subresourceDatas.getBuffer() };
 
             SubresourceRange srcSubresource = {};
-            srcSubresource.aspectMask = TextureAspect::Color;
+            srcSubresource.aspectMask = getTextureAspect();
             srcSubresource.mipLevel = 0;
             srcSubresource.mipLevelCount = 1;
             srcSubresource.baseArrayLayer = 0;
@@ -777,7 +741,7 @@ namespace gfx_test
             ITextureResource::Offset3D srcOffset;
 
             SubresourceRange dstSubresource = {};
-            dstSubresource.aspectMask = TextureAspect::Color;
+            dstSubresource.aspectMask = getTextureAspect();
             dstSubresource.mipLevel = 0;
             dstSubresource.mipLevelCount = 1;
             dstSubresource.baseArrayLayer = 0;
@@ -788,7 +752,7 @@ namespace gfx_test
             ITextureResource::Size texCopyExtent = srcExtent;
             ITextureResource::Size bufferCopyExtent = dstExtent;
 
-            createRequiredResources(srcTextureInfo, dstTextureInfo, bufferCopyExtent, format);
+            createRequiredResources(srcTextureInfo, dstTextureInfo, bufferCopyExtent);
             submitGPUWork(srcSubresource, dstSubresource, srcOffset, dstOffset, texCopyExtent, bufferCopyExtent, dstExtent.height * alignedRowStride);
 
             auto expectedCopiedData = srcTextureStuff->subresourceDatas[0];
@@ -801,8 +765,6 @@ namespace gfx_test
     {
         void run()
         {
-            Format format = Format::R32G32B32A32_FLOAT;
-
             ITextureResource::Size srcExtent = {};
             srcExtent.width = 16;
             srcExtent.height = 16;
@@ -810,7 +772,7 @@ namespace gfx_test
             auto srcMipLevelCount = 4;
             auto srcArrayLayerCount = 1;
 
-            auto srcTextureStuff = generateTextureData(srcExtent.width, srcExtent.height, srcMipLevelCount, srcArrayLayerCount, format);
+            auto srcTextureStuff = generateTextureData(srcExtent.width, srcExtent.height, srcMipLevelCount, srcArrayLayerCount);
             TextureInfo srcTextureInfo = { srcExtent, srcMipLevelCount, srcArrayLayerCount, srcTextureStuff->subresourceDatas.getBuffer() };
 
             ITextureResource::Size dstExtent = {};
@@ -820,11 +782,11 @@ namespace gfx_test
             auto dstMipLevelCount = 4;
             auto dstArrayLayerCount = 1;
 
-            auto dstTextureStuff = generateTextureData(dstExtent.width, dstExtent.height, dstMipLevelCount, dstArrayLayerCount, format);
+            auto dstTextureStuff = generateTextureData(dstExtent.width, dstExtent.height, dstMipLevelCount, dstArrayLayerCount);
             TextureInfo dstTextureInfo = { dstExtent, dstMipLevelCount, dstArrayLayerCount, dstTextureStuff->subresourceDatas.getBuffer() };
 
             SubresourceRange srcSubresource = {};
-            srcSubresource.aspectMask = TextureAspect::Color;
+            srcSubresource.aspectMask = getTextureAspect();
             srcSubresource.mipLevel = 2;
             srcSubresource.mipLevelCount = 1;
             srcSubresource.baseArrayLayer = 0;
@@ -833,7 +795,7 @@ namespace gfx_test
             ITextureResource::Offset3D srcOffset;
 
             SubresourceRange dstSubresource = {};
-            dstSubresource.aspectMask = TextureAspect::Color;
+            dstSubresource.aspectMask = getTextureAspect();
             dstSubresource.mipLevel = 1;
             dstSubresource.mipLevelCount = 1;
             dstSubresource.baseArrayLayer = 0;
@@ -853,7 +815,7 @@ namespace gfx_test
             bufferCopyExtent.height = 8;
             bufferCopyExtent.depth = 1;
 
-            createRequiredResources(srcTextureInfo, dstTextureInfo, bufferCopyExtent, format);
+            createRequiredResources(srcTextureInfo, dstTextureInfo, bufferCopyExtent);
             submitGPUWork(srcSubresource, dstSubresource, srcOffset, dstOffset, texCopyExtent, bufferCopyExtent, bufferCopyExtent.height * alignedRowStride);
 
             auto expectedCopiedData = srcTextureStuff->subresourceDatas[2];
@@ -866,8 +828,6 @@ namespace gfx_test
     {
         void run()
         {
-            Format format = Format::R32G32B32A32_FLOAT;
-
             ITextureResource::Size srcExtent = {};
             srcExtent.width = 4;
             srcExtent.height = 4;
@@ -875,7 +835,7 @@ namespace gfx_test
             auto srcMipLevelCount = 1;
             auto srcArrayLayerCount = 2;
 
-            auto srcTextureStuff = generateTextureData(srcExtent.width, srcExtent.height, srcMipLevelCount, srcArrayLayerCount, format);
+            auto srcTextureStuff = generateTextureData(srcExtent.width, srcExtent.height, srcMipLevelCount, srcArrayLayerCount);
             TextureInfo srcTextureInfo = { srcExtent, srcMipLevelCount, srcArrayLayerCount, srcTextureStuff->subresourceDatas.getBuffer() };
 
             ITextureResource::Size dstExtent = {};
@@ -885,11 +845,11 @@ namespace gfx_test
             auto dstMipLevelCount = 1;
             auto dstArrayLayerCount = 2;
 
-            auto dstTextureStuff = generateTextureData(dstExtent.width, dstExtent.height, dstMipLevelCount, dstArrayLayerCount, format);
+            auto dstTextureStuff = generateTextureData(dstExtent.width, dstExtent.height, dstMipLevelCount, dstArrayLayerCount);
             TextureInfo dstTextureInfo = { dstExtent, dstMipLevelCount, dstArrayLayerCount, dstTextureStuff->subresourceDatas.getBuffer() };
 
             SubresourceRange srcSubresource = {};
-            srcSubresource.aspectMask = TextureAspect::Color;
+            srcSubresource.aspectMask = getTextureAspect();
             srcSubresource.mipLevel = 0;
             srcSubresource.mipLevelCount = 1;
             srcSubresource.baseArrayLayer = 0;
@@ -898,7 +858,7 @@ namespace gfx_test
             ITextureResource::Offset3D srcOffset;
 
             SubresourceRange dstSubresource = {};
-            dstSubresource.aspectMask = TextureAspect::Color;
+            dstSubresource.aspectMask = getTextureAspect();
             dstSubresource.mipLevel = 0;
             dstSubresource.mipLevelCount = 1;
             dstSubresource.baseArrayLayer = 1;
@@ -908,7 +868,7 @@ namespace gfx_test
 
             ITextureResource::Size copyExtent = srcExtent;
 
-            createRequiredResources(srcTextureInfo, dstTextureInfo, copyExtent, format);
+            createRequiredResources(srcTextureInfo, dstTextureInfo, copyExtent);
             submitGPUWork(srcSubresource, dstSubresource, srcOffset, dstOffset, copyExtent, copyExtent, copyExtent.height * alignedRowStride);
 
             auto expectedCopiedData = srcTextureStuff->subresourceDatas[0];
@@ -921,8 +881,6 @@ namespace gfx_test
     {
         void run()
         {
-            Format format = Format::R32G32B32A32_FLOAT;
-
             ITextureResource::Size srcExtent = {};
             srcExtent.width = 8;
             srcExtent.height = 8;
@@ -930,7 +888,7 @@ namespace gfx_test
             auto srcMipLevelCount = 1;
             auto srcArrayLayerCount = 1;
 
-            auto srcTextureStuff = generateTextureData(srcExtent.width, srcExtent.height, srcMipLevelCount, srcArrayLayerCount, format);
+            auto srcTextureStuff = generateTextureData(srcExtent.width, srcExtent.height, srcMipLevelCount, srcArrayLayerCount);
             TextureInfo srcTextureInfo = { srcExtent, srcMipLevelCount, srcArrayLayerCount, srcTextureStuff->subresourceDatas.getBuffer() };
 
             ITextureResource::Size dstExtent = {};
@@ -940,11 +898,11 @@ namespace gfx_test
             auto dstMipLevelCount = 1;
             auto dstArrayLayerCount = 1;
 
-            auto dstTextureStuff = generateTextureData(dstExtent.width, dstExtent.height, dstMipLevelCount, dstArrayLayerCount, format);
+            auto dstTextureStuff = generateTextureData(dstExtent.width, dstExtent.height, dstMipLevelCount, dstArrayLayerCount);
             TextureInfo dstTextureInfo = { dstExtent, dstMipLevelCount, dstArrayLayerCount, dstTextureStuff->subresourceDatas.getBuffer() };
 
             SubresourceRange srcSubresource = {};
-            srcSubresource.aspectMask = TextureAspect::Color;
+            srcSubresource.aspectMask = getTextureAspect();
             srcSubresource.mipLevel = 0;
             srcSubresource.mipLevelCount = 1;
             srcSubresource.baseArrayLayer = 0;
@@ -956,7 +914,7 @@ namespace gfx_test
             srcOffset.z = 0;
 
             SubresourceRange dstSubresource = {};
-            dstSubresource.aspectMask = TextureAspect::Color;
+            dstSubresource.aspectMask = getTextureAspect();
             dstSubresource.mipLevel = 0;
             dstSubresource.mipLevelCount = 1;
             dstSubresource.baseArrayLayer = 0;
@@ -977,7 +935,7 @@ namespace gfx_test
             bufferCopyExtent.height = 16;
             bufferCopyExtent.depth = 1;
 
-            createRequiredResources(srcTextureInfo, dstTextureInfo, dstExtent, format);
+            createRequiredResources(srcTextureInfo, dstTextureInfo, dstExtent);
             submitGPUWork(srcSubresource, dstSubresource, srcOffset, dstOffset, texCopyExtent, bufferCopyExtent, bufferCopyExtent.height * alignedRowStride);
 
             auto expectedCopiedData = srcTextureStuff->subresourceDatas[0];
@@ -990,8 +948,6 @@ namespace gfx_test
     {
         void run()
         {
-            Format format = Format::R32G32B32A32_FLOAT;
-
             ITextureResource::Size srcExtent = {};
             srcExtent.width = 8;
             srcExtent.height = 8;
@@ -999,7 +955,7 @@ namespace gfx_test
             auto srcMipLevelCount = 1;
             auto srcArrayLayerCount = 1;
 
-            auto srcTextureStuff = generateTextureData(srcExtent.width, srcExtent.height, srcMipLevelCount, srcArrayLayerCount, format);
+            auto srcTextureStuff = generateTextureData(srcExtent.width, srcExtent.height, srcMipLevelCount, srcArrayLayerCount);
             TextureInfo srcTextureInfo = { srcExtent, srcMipLevelCount, srcArrayLayerCount, srcTextureStuff->subresourceDatas.getBuffer() };
 
             ITextureResource::Size dstExtent = {};
@@ -1009,11 +965,11 @@ namespace gfx_test
             auto dstMipLevelCount = 1;
             auto dstArrayLayerCount = 1;
 
-            auto dstTextureStuff = generateTextureData(dstExtent.width, dstExtent.height, dstMipLevelCount, dstArrayLayerCount, format);
+            auto dstTextureStuff = generateTextureData(dstExtent.width, dstExtent.height, dstMipLevelCount, dstArrayLayerCount);
             TextureInfo dstTextureInfo = { dstExtent, dstMipLevelCount, dstArrayLayerCount, dstTextureStuff->subresourceDatas.getBuffer() };
 
             SubresourceRange srcSubresource = {};
-            srcSubresource.aspectMask = TextureAspect::Color;
+            srcSubresource.aspectMask = getTextureAspect();
             srcSubresource.mipLevel = 0;
             srcSubresource.mipLevelCount = 1;
             srcSubresource.baseArrayLayer = 0;
@@ -1022,7 +978,7 @@ namespace gfx_test
             ITextureResource::Offset3D srcOffset;
 
             SubresourceRange dstSubresource = {};
-            dstSubresource.aspectMask = TextureAspect::Color;
+            dstSubresource.aspectMask = getTextureAspect();
             dstSubresource.mipLevel = 0;
             dstSubresource.mipLevelCount = 1;
             dstSubresource.baseArrayLayer = 0;
@@ -1038,7 +994,7 @@ namespace gfx_test
             copyExtent.height = 4;
             copyExtent.depth = 1;
 
-            createRequiredResources(srcTextureInfo, dstTextureInfo, dstExtent, format);
+            createRequiredResources(srcTextureInfo, dstTextureInfo, dstExtent);
             submitGPUWork(srcSubresource, dstSubresource, srcOffset, dstOffset, copyExtent, dstExtent, dstExtent.height * alignedRowStride);
 
             auto expectedCopiedData = srcTextureStuff->subresourceDatas[0];
@@ -1060,7 +1016,7 @@ namespace gfx_test
             auto srcMipLevelCount = 1;
             auto srcArrayLayerCount = 1;
 
-            auto srcTextureStuff = generateTextureData(srcExtent.width, srcExtent.height, srcMipLevelCount, srcArrayLayerCount, format);
+            auto srcTextureStuff = generateTextureData(srcExtent.width, srcExtent.height, srcMipLevelCount, srcArrayLayerCount);
             TextureInfo srcTextureInfo = { srcExtent, srcMipLevelCount, srcArrayLayerCount, srcTextureStuff->subresourceDatas.getBuffer() };
 
             ITextureResource::Size dstExtent = {};
@@ -1070,7 +1026,7 @@ namespace gfx_test
             auto dstMipLevelCount = 1;
             auto dstArrayLayerCount = 1;
 
-            auto dstTextureStuff = generateTextureData(dstExtent.width, dstExtent.height, dstMipLevelCount, dstArrayLayerCount, format);
+            auto dstTextureStuff = generateTextureData(dstExtent.width, dstExtent.height, dstMipLevelCount, dstArrayLayerCount);
             TextureInfo dstTextureInfo = { dstExtent, dstMipLevelCount, dstArrayLayerCount, dstTextureStuff->subresourceDatas.getBuffer() };
 
             SubresourceRange srcSubresource = {};
@@ -1099,7 +1055,7 @@ namespace gfx_test
 
             ITextureResource::Offset3D dstOffset;
 
-            createRequiredResources(srcTextureInfo, dstTextureInfo, dstExtent, format);
+            createRequiredResources(srcTextureInfo, dstTextureInfo, dstExtent);
 
             auto textureSize = copyExtent.width * copyExtent.height * copyExtent.depth * 16; // Size of the texture section being copied.
 
@@ -1131,27 +1087,38 @@ namespace gfx_test
     template<typename T>
     void copyTextureTestImpl(IDevice* device, UnitTestContext* context)
     {
-        T test;
-        test.init(device, context);
-        test.run();
+        for (uint32_t i = 1; i < (uint32_t)Format::CountOf; ++i)
+        {
+            auto format = (Format)i;
+            auto validationFormat = getValidationTextureFormat(format);
+            if (!validationFormat)
+                continue;
+
+            printf("%d", i);
+            T test;
+            test.init(device, context, format, validationFormat);
+            test.run();
+        }
     }
 
     SLANG_UNIT_TEST(copyTextureTests)
     {
-        //runTestImpl(copyTextureTestImpl<SimpleCopyTexture>, unitTestContext, Slang::RenderApiFlag::D3D12);
-        runTestImpl(copyTextureTestImpl<SimpleCopyTexture>, unitTestContext, Slang::RenderApiFlag::Vulkan);
+//         runTestImpl(copyTextureTestImpl<SimpleCopyTexture>, unitTestContext, Slang::RenderApiFlag::D3D12);
+//         runTestImpl(copyTextureTestImpl<SimpleCopyTexture>, unitTestContext, Slang::RenderApiFlag::Vulkan);
 //         runTestImpl(copyTextureTestImpl<CopyTextureSection>, unitTestContext, Slang::RenderApiFlag::D3D12);
 //         runTestImpl(copyTextureTestImpl<CopyTextureSection>, unitTestContext, Slang::RenderApiFlag::Vulkan);
+//         runTestImpl(copyTextureTestImpl<LargeSrcToSmallDst>, unitTestContext, Slang::RenderApiFlag::D3D12);
+//         runTestImpl(copyTextureTestImpl<LargeSrcToSmallDst>, unitTestContext, Slang::RenderApiFlag::Vulkan);
 //         runTestImpl(copyTextureTestImpl<SmallSrcToLargeDst>, unitTestContext, Slang::RenderApiFlag::D3D12);
 //         runTestImpl(copyTextureTestImpl<SmallSrcToLargeDst>, unitTestContext, Slang::RenderApiFlag::Vulkan);
-//         runTestImpl(copyTextureTestImpl<CopyBetweenMips>, unitTestContext, Slang::RenderApiFlag::D3D12);
-//         runTestImpl(copyTextureTestImpl<CopyBetweenMips>, unitTestContext, Slang::RenderApiFlag::Vulkan);
-//         runTestImpl(copyTextureTestImpl<CopyBetweenLayers>, unitTestContext, Slang::RenderApiFlag::D3D12);
-//         runTestImpl(copyTextureTestImpl<CopyBetweenLayers>, unitTestContext, Slang::RenderApiFlag::Vulkan);
-//         runTestImpl(copyTextureTestImpl<CopyWithOffsets>, unitTestContext, Slang::RenderApiFlag::D3D12);
-//         runTestImpl(copyTextureTestImpl<CopyWithOffsets>, unitTestContext, Slang::RenderApiFlag::Vulkan);
-//         runTestImpl(copyTextureTestImpl<CopySectionWithSetExtent>, unitTestContext, Slang::RenderApiFlag::D3D12);
-//         runTestImpl(copyTextureTestImpl<CopySectionWithSetExtent>, unitTestContext, Slang::RenderApiFlag::Vulkan);
+        runTestImpl(copyTextureTestImpl<CopyBetweenMips>, unitTestContext, Slang::RenderApiFlag::D3D12);
+        runTestImpl(copyTextureTestImpl<CopyBetweenMips>, unitTestContext, Slang::RenderApiFlag::Vulkan);
+        runTestImpl(copyTextureTestImpl<CopyBetweenLayers>, unitTestContext, Slang::RenderApiFlag::D3D12);
+        runTestImpl(copyTextureTestImpl<CopyBetweenLayers>, unitTestContext, Slang::RenderApiFlag::Vulkan);
+        runTestImpl(copyTextureTestImpl<CopyWithOffsets>, unitTestContext, Slang::RenderApiFlag::D3D12);
+        runTestImpl(copyTextureTestImpl<CopyWithOffsets>, unitTestContext, Slang::RenderApiFlag::Vulkan);
+        runTestImpl(copyTextureTestImpl<CopySectionWithSetExtent>, unitTestContext, Slang::RenderApiFlag::D3D12);
+        runTestImpl(copyTextureTestImpl<CopySectionWithSetExtent>, unitTestContext, Slang::RenderApiFlag::Vulkan);
 
 //         runTestImpl(copyTextureTestImpl<CopyToBufferWithOffset>, unitTestContext, Slang::RenderApiFlag::D3D12);
 //         runTestImpl(copyTextureTestImpl<CopyToBufferWithOffset>, unitTestContext, Slang::RenderApiFlag::Vulkan);
