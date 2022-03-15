@@ -107,6 +107,10 @@ static DocMarkupExtractor::SearchStyle _getSearchStyle(Node* node)
         {
             return SearchStyle::Variable;
         }
+        case Node::Kind::Callable:
+        {
+            return SearchStyle::Before;
+        }
         default: break;
     }
 

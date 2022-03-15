@@ -30,6 +30,13 @@ enum class IdentifierStyle
     Reflected,
     Unreflected,
 
+    CallingConvention,  ///< Used on a method
+    Virtual,            ///< 
+
+    Template,
+
+    Static,         
+
     CountOf,
 };
 
