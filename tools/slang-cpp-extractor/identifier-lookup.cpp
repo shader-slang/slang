@@ -22,6 +22,11 @@ using namespace Slang;
     IdentifierFlag::Keyword,                              /// Access
     IdentifierFlag::Reflection,                           /// Reflected
     IdentifierFlag::Reflection,                           /// Unreflected
+
+    IdentifierFlag::Keyword,                              /// virtual
+    0,                                                    /// Calling convention
+    IdentifierFlag::Keyword,                              /// template
+    IdentifierFlag::Keyword,                              /// static
 };
 
 void IdentifierLookup::set(const UnownedStringSlice& name, IdentifierStyle style)
@@ -63,7 +68,7 @@ void IdentifierLookup::initDefault(const UnownedStringSlice& markPrefix)
 
     // Some keywords
     {
-        const char* names[] = { "virtual", "continue", "if", "case", "break", "catch", "default", "delete", "do", "else", "for", "new", "goto", "return", "switch", "throw", "using", "while", "operator" };
+        const char* names[] = { "continue", "if", "case", "break", "catch", "default", "delete", "do", "else", "for", "new", "goto", "return", "switch", "throw", "using", "while", "operator", "explicit"};
         set(names, SLANG_COUNT_OF(names), IdentifierStyle::Keyword);
     }
 
@@ -86,6 +91,13 @@ void IdentifierLookup::initDefault(const UnownedStringSlice& markPrefix)
             buf << markPrefix << names[i];
             set(buf.getUnownedSlice(), styles[i]);
         }
+    }
+
+    {
+        set("virtual", IdentifierStyle::Virtual);
+        set("SLANG_MCALL", IdentifierStyle::CallingConvention);
+        set("template", IdentifierStyle::Template);
+        set("static", IdentifierStyle::Static);
     }
 
     // Keywords which introduce types/scopes

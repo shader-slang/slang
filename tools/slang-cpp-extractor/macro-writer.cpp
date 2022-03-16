@@ -120,13 +120,16 @@ SlangResult MacroWriter::calcChildrenHeader(NodeTree* tree, TypeSet* typeSet, St
             // Define the derived types
             out << "#define " << m_options->m_markPrefix << "FIELDS_" << reflectTypeName << "_" << classNode->m_name.getContent() << "(_x_, _param_)";
 
-            // Find all of the fields
+            // Find all of the instance fields fields
             List<FieldNode*> fields;
             for (Node* child : classNode->m_children)
             {
                 if (auto field = as<FieldNode>(child))
                 {
-                    fields.add(field);
+                    if (!field->m_isStatic)
+                    {
+                        fields.add(field);
+                    }
                 }
             }
 

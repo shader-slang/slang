@@ -2378,6 +2378,7 @@ void DeviceImpl::submitResourceCommandsAndWait(const DeviceImpl::ResourceCommand
 {
     info.commandBuffer->close();
     m_resourceCommandQueue->executeCommandBuffer(info.commandBuffer);
+    m_resourceCommandTransientHeap->finish();
     m_resourceCommandTransientHeap->synchronizeAndReset();
 }
 
@@ -2785,18 +2786,9 @@ Result AccelerationStructureImpl::getNativeHandle(InteropHandle* outHandle)
 
 Result TransientResourceHeapImpl::synchronizeAndReset()
 {
-    Array<HANDLE, 16> waitHandles;
-    for (auto& waitInfo : m_waitInfos)
-    {
-        if (waitInfo.waitValue == 0)
-            continue;
-        if (waitInfo.fence)
-        {
-            waitInfo.fence->SetEventOnCompletion(waitInfo.waitValue, waitInfo.fenceEvent);
-            waitHandles.add(waitInfo.fenceEvent);
-        }
-    }
-    WaitForMultipleObjects((DWORD)waitHandles.getCount(), waitHandles.getBuffer(), TRUE, INFINITE);
+    WaitForMultipleObjects(
+        (DWORD)m_waitHandles.getCount(), m_waitHandles.getArrayView().getBuffer(), TRUE, INFINITE);
+    m_waitHandles.clear();
     m_currentViewHeapIndex = -1;
     m_currentSamplerHeapIndex = -1;
     allocateNewViewDescriptorHeap(m_device);
@@ -2806,6 +2798,22 @@ Result TransientResourceHeapImpl::synchronizeAndReset()
     m_commandListAllocId = 0;
     SLANG_RETURN_ON_FAIL(m_commandAllocator->Reset());
     Super::reset();
+    return SLANG_OK;
+}
+
+Result TransientResourceHeapImpl::finish()
+{
+    for (auto& waitInfo : m_waitInfos)
+    {
+        if (waitInfo.waitValue == 0)
+            continue;
+        if (waitInfo.fence)
+        {
+            waitInfo.queue->Signal(waitInfo.fence, waitInfo.waitValue);
+            waitInfo.fence->SetEventOnCompletion(waitInfo.waitValue, waitInfo.fenceEvent);
+            m_waitHandles.add(waitInfo.fenceEvent);
+        }
+    }
     return SLANG_OK;
 }
 
@@ -3462,10 +3470,8 @@ void RayTracingCommandEncoderImpl::dispatchRays(
 
     auto shaderTableImpl = static_cast<ShaderTableImpl*>(shaderTable);
 
-    ResourceCommandEncoderImpl resourceCopyEncoder;
-    resourceCopyEncoder.init(m_commandBuffer);
     auto shaderTableBuffer =
-        shaderTableImpl->getOrCreateBuffer(pipelineImpl, m_transientHeap, &resourceCopyEncoder);
+        shaderTableImpl->getOrCreateBuffer(pipelineImpl, m_transientHeap, static_cast<ResourceCommandEncoderImpl*>(this));
     auto shaderTableAddr = shaderTableBuffer->getDeviceAddress();
 
     D3D12_DISPATCH_RAYS_DESC dispatchDesc = {};
@@ -5015,8 +5021,8 @@ void CommandQueueImpl::executeCommandBuffers(
             auto& waitInfo = transientHeap->getQueueWaitInfo(m_queueIndex);
             waitInfo.waitValue = m_fenceValue;
             waitInfo.fence = m_fence;
+            waitInfo.queue = m_d3dQueue;
         }
-        m_d3dQueue->Signal(m_fence, m_fenceValue);
     }
 
     if (fence)
@@ -6556,10 +6562,7 @@ void ResourceCommandEncoderImpl::textureBarrier(
 void ResourceCommandEncoderImpl::bufferBarrier(
     size_t count, IBufferResource* const* buffers, ResourceState src, ResourceState dst)
 {
-
-    List<D3D12_RESOURCE_BARRIER> barriers;
-    barriers.reserve(count);
-
+    ShortList<D3D12_RESOURCE_BARRIER, 16> barriers;
     for (size_t i = 0; i < count; i++)
     {
         auto bufferImpl = static_cast<BufferResourceImpl*>(buffers[i]);

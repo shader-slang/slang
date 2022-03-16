@@ -1619,6 +1619,12 @@ Result DebugTransientResourceHeap::synchronizeAndReset()
     return baseObject->synchronizeAndReset();
 }
 
+Result DebugTransientResourceHeap::finish()
+{
+    SLANG_GFX_API_FUNC;
+    return baseObject->finish();
+}
+
 Result DebugTransientResourceHeap::createCommandBuffer(ICommandBuffer** outCommandBuffer)
 {
     SLANG_GFX_API_FUNC;

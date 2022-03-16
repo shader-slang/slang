@@ -1150,6 +1150,8 @@ public:
             return static_cast<ITransientResourceHeap*>(this);
         return nullptr;
     }
+
+    virtual SLANG_NO_THROW Result SLANG_MCALL finish() override { return SLANG_OK; }
 };
 
 class ShaderTableBase

@@ -21,6 +21,7 @@
 DIAGNOSTIC(-1, Note, seeDeclarationOf, "see declaration of '$0'")
 DIAGNOSTIC(-1, Note, seeOpen, "see open $0")
 DIAGNOSTIC(-1, Note, commandLine, "Command line: $0")
+DIAGNOSTIC(-1, Note, previousLocation, "previous location")
 
 DIAGNOSTIC(1, Error, cannotOpenFile, "cannot open file '$0'.")
 DIAGNOSTIC(1, Error, errorAccessingFile, "error accessing file '$0'.")
@@ -46,6 +47,11 @@ DIAGNOSTIC(100012, Error, typeInDifferentTypeSet, "Type $0 in different type set
 DIAGNOSTIC(100013, Error, expectingIdentifier, "Expecting an identifier, found $0")
 DIAGNOSTIC(100014, Error, cannotDeclareTypeInScope, "Cannot declare types in this scope")
 DIAGNOSTIC(100015, Error, identifierAlreadyDefined, "Identifier already defined '$0'")
+DIAGNOSTIC(100016, Error, expectingType, "Expecting a type")
+DIAGNOSTIC(100017, Error, cannotParseExpression, "Cannot parse expression")
+DIAGNOSTIC(100018, Error, cannotOverload, "Cannot overload this declaration");
+DIAGNOSTIC(100019, Error, classMarkerOutsideOfClass, "A class/struct marker is found outside of class or struct");
+DIAGNOSTIC(100020, Error, classMarkerAlreadyFound, "A class/struct marker already found in type '$0'");
 
 // Command line errors 100100
 
