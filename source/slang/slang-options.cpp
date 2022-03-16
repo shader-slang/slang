@@ -501,6 +501,7 @@ struct OptionsParser
             "General options:\n"
             "\n"
             "  -D<name>[=<value>], -D <name>[=<value>]: Insert a preprocessor macro.\n"
+            "  -depfile <path>: Save the source file dependency list in a file.\n"
             "  -entry <name>: Specify the name of an entry-point function.\n"
             "    Multiple -entry options may be used in a single invocation.\n"
             "    If no -entry options are given, compiler will use [shader(...)]\n"
@@ -1258,6 +1259,22 @@ struct OptionsParser
                     SLANG_RETURN_ON_FAIL(reader.expectArg(outputPath));
 
                     addOutputPath(outputPath.value.getBuffer());
+                }
+                // A -depfile option is used to specify the file name where the dependency lists will be written
+                else if (argValue == "-depfile")
+                {
+                    CommandLineArg dependencyPath;
+                    SLANG_RETURN_ON_FAIL(reader.expectArg(dependencyPath));
+
+                    if (requestImpl->m_dependencyOutputPath.getLength() == 0)
+                    {
+                        requestImpl->m_dependencyOutputPath = dependencyPath.value;
+                    }
+                    else
+                    {
+                        sink->diagnose(dependencyPath.loc, Diagnostics::duplicateDependencyOutputPaths);
+                        return SLANG_FAIL;
+                    }
                 }
                 else if(argValue == "-matrix-layout-row-major")
                 {

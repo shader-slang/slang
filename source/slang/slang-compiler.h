@@ -2369,6 +2369,8 @@ namespace Slang
             String wholeTargetOutputPath;
         };
         Dictionary<TargetRequest*, RefPtr<TargetInfo>> m_targetInfos;
+        
+        String m_dependencyOutputPath;
 
             /// Writes the modules in a container to the stream
         SlangResult writeContainerToStream(Stream* stream);
