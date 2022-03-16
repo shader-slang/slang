@@ -2231,7 +2231,7 @@ namespace Slang
     }
 
     // Writes a file with dependency info, with one line in the output file per compile product.
-    static SlangResult writeDependencyFile(EndToEndCompileRequest* compileRequest)
+    static SlangResult _writeDependencyFile(EndToEndCompileRequest* compileRequest)
     {
         if (compileRequest->m_dependencyOutputPath.getLength() == 0)
             return SLANG_OK;
@@ -2363,7 +2363,7 @@ namespace Slang
             compileRequest->maybeCreateContainer();
             compileRequest->maybeWriteContainer(compileRequest->m_containerOutputPath);
 
-            writeDependencyFile(compileRequest);
+            _writeDependencyFile(compileRequest);
         }
     }
 
