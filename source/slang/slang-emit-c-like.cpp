@@ -850,8 +850,7 @@ void CLikeSourceEmitter::emitSimpleValueImpl(IRInst* inst)
             switch (type->getBaseType())
             {
                 default:
-                case BaseType::Int8:
-                case BaseType::Int16:
+                
                 case BaseType::Int:
                 {
                     // NOTE! This hack is required, otherwise we get different results across targets.
@@ -884,14 +883,32 @@ void CLikeSourceEmitter::emitSimpleValueImpl(IRInst* inst)
                     // This little hack is needed for gcc that if we have the expression
                     // int(-0x80000000) we get the warning: warning :  integer overflow in expression [-Woverflow]
                     // 0x80000000 and -0x80000000 mean the same thing when casted to 32 bit int, so we just flip the value here.
-                    IRIntegerValue value = litInst->value.intVal;
-                    value = (value == -0x80000000ll) ? -value : value;
-
+                    IRIntegerValue value = (litInst->value.intVal & 0xFFFFFFFF);
                     m_writer->emit("int(");
-                    m_writer->emit(value);
+                    m_writer->emit(int32_t(value));
                     m_writer->emit(")");
                     return;
                 }
+                case BaseType::Int8:
+                    {
+                        IRIntegerValue value = (litInst->value.intVal & 0xFF);
+                        value = (value == -0x80ll) ? -value : value;
+
+                        m_writer->emit("int8_t(");
+                        m_writer->emit(int8_t(value));
+                        m_writer->emit(")");
+                        return;
+                    }
+                case BaseType::Int16:
+                    {
+                        IRIntegerValue value = (litInst->value.intVal & 0xFFFF);
+                        value = (value == -0x8000ll) ? -value : value;
+
+                        m_writer->emit("int16_t(");
+                        m_writer->emit(int16_t(value));
+                        m_writer->emit(")");
+                        return;
+                    }
                 case BaseType::UInt8:
                     {
                         m_writer->emit(UInt(uint8_t(litInst->value.intVal)));

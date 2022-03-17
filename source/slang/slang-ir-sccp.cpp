@@ -309,24 +309,6 @@ struct SCCPContext
             case kIROp_BoolLit:
                 {
                     IRIntegerValue intVal = irConstant->value.intVal;
-                    switch (type->getOp())
-                    {
-                    case kIROp_Int8Type:
-                    case kIROp_UInt8Type:
-                        intVal = intVal & 0xFF;
-                        break;
-                    case kIROp_Int16Type:
-                    case kIROp_UInt16Type:
-                        intVal = intVal & 0xFFFF;
-                        break;
-                    case kIROp_IntType:
-                    case kIROp_UIntType:
-                    case kIROp_BoolType:
-                        intVal = intVal & 0xFFFFFFFF;
-                        break;
-                    default:
-                        break;
-                    }
                     resultVal = getBuilder()->getIntValue(type, (IRIntegerValue)intVal);
                 }
                 break;
