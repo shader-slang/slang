@@ -288,7 +288,11 @@ struct SCCPContext
     {
         SLANG_SCCP_RETURN_IF_NONE_OR_ANY(v0)
         auto irConstant = as<IRConstant>(v0.value);
+
         IRInst* resultVal = nullptr;
+        if (type->getOp() == irConstant->getOp())
+            return LatticeVal::getConstant(irConstant);
+
         switch (type->getOp())
         {
         case kIROp_Int8Type:
