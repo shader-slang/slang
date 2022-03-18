@@ -2081,7 +2081,32 @@ namespace Slang
         memset(&keyInst, 0, sizeof(keyInst));
         keyInst.m_op = kIROp_IntLit;
         keyInst.typeUse.usedValue = type;
-        keyInst.value.intVal = inValue;
+        // Truncate the input value based on `type`.
+        switch (type->getOp())
+        {
+        case kIROp_Int8Type:
+            keyInst.value.intVal = static_cast<int8_t>(inValue);
+            break;
+        case kIROp_Int16Type:
+            keyInst.value.intVal = static_cast<int16_t>(inValue);
+            break;
+        case kIROp_IntType:
+            keyInst.value.intVal = static_cast<int32_t>(inValue);
+            break;
+        case kIROp_UInt8Type:
+            keyInst.value.intVal = static_cast<uint8_t>(inValue);
+            break;
+        case kIROp_UInt16Type:
+            keyInst.value.intVal = static_cast<uint16_t>(inValue);
+            break;
+        case kIROp_BoolType:
+        case kIROp_UIntType:
+            keyInst.value.intVal = static_cast<uint32_t>(inValue);
+            break;
+        default:
+            keyInst.value.intVal = inValue;
+            break;
+        }
         return _findOrEmitConstant(keyInst);
     }
 
@@ -2091,7 +2116,20 @@ namespace Slang
         memset(&keyInst, 0, sizeof(keyInst));
         keyInst.m_op = kIROp_FloatLit;
         keyInst.typeUse.usedValue = type;
-        keyInst.value.floatVal = inValue;
+        // Truncate the input value based on `type`.
+        switch (type->getOp())
+        {
+        case kIROp_FloatType:
+            keyInst.value.floatVal = static_cast<float>(inValue);
+            break;
+        case kIROp_HalfType:
+            keyInst.value.floatVal = HalfToFloat(FloatToHalf((float)inValue));
+            break;
+        default:
+            keyInst.value.floatVal = inValue;
+            break;
+        }
+        
         return _findOrEmitConstant(keyInst);
     }
 
