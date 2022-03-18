@@ -978,7 +978,9 @@ namespace gfx_test
 
             texCopyInfo.srcSubresource = srcSubresource;
             texCopyInfo.dstSubresource = dstSubresource;
-            texCopyInfo.extent = { 4, 4, 1 };
+            texCopyInfo.extent.width = 4;
+            texCopyInfo.extent.height = 4;
+            texCopyInfo.extent.depth = 1;
             texCopyInfo.srcOffset = { 2, 2, 0 };
             texCopyInfo.dstOffset = { 4, 4, 0 };
 
@@ -1043,7 +1045,9 @@ namespace gfx_test
 
             texCopyInfo.srcSubresource = srcSubresource;
             texCopyInfo.dstSubresource = dstSubresource;
-            texCopyInfo.extent = { 4, 4, 1 };
+            texCopyInfo.extent.width = 4;
+            texCopyInfo.extent.height = 4;
+            texCopyInfo.extent.depth = 1;
             texCopyInfo.srcOffset = { 0, 0, 0 };
             texCopyInfo.dstOffset = { 4, 4, 0 };
 
