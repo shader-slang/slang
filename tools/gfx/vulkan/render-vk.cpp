@@ -1212,6 +1212,25 @@ Result DeviceImpl::createFramebuffer(const IFramebuffer::Desc& desc, IFramebuffe
     return SLANG_OK;
 }
 
+VkImageAspectFlags getAspectMaskFromFormat(VkFormat format)
+{
+    switch (format)
+    {
+    case VK_FORMAT_D16_UNORM_S8_UINT:
+    case VK_FORMAT_D24_UNORM_S8_UINT:
+    case VK_FORMAT_D32_SFLOAT_S8_UINT:
+        return VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT;
+    case VK_FORMAT_D16_UNORM:
+    case VK_FORMAT_D32_SFLOAT:
+    case VK_FORMAT_X8_D24_UNORM_PACK32:
+        return VK_IMAGE_ASPECT_DEPTH_BIT;
+    case VK_FORMAT_S8_UINT:
+        return VK_IMAGE_ASPECT_STENCIL_BIT;
+    default:
+        return VK_IMAGE_ASPECT_COLOR_BIT;
+    }
+}
+
 SlangResult DeviceImpl::readTextureResource(
     ITextureResource* texture,
     ResourceState state,
@@ -1280,7 +1299,7 @@ SlangResult DeviceImpl::readTextureResource(
             region.bufferRowLength = 0;
             region.bufferImageHeight = 0;
 
-            region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+            region.imageSubresource.aspectMask = getAspectMaskFromFormat(VulkanUtil::getVkFormat(desc->format));
             region.imageSubresource.mipLevel = uint32_t(j);
             region.imageSubresource.baseArrayLayer = i;
             region.imageSubresource.layerCount = 1;
@@ -1432,12 +1451,7 @@ void DeviceImpl::_transitionImageLayout(
     barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
     barrier.image = image;
 
-    if (VulkanUtil::isDepthFormat(format))
-        barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
-    if (VulkanUtil::isStencilFormat(format))
-        barrier.subresourceRange.aspectMask |= VK_IMAGE_ASPECT_STENCIL_BIT;
-    if (barrier.subresourceRange.aspectMask == 0)
-        barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    barrier.subresourceRange.aspectMask = getAspectMaskFromFormat(format);
 
     barrier.subresourceRange.baseMipLevel = 0;
     barrier.subresourceRange.levelCount = desc.numMipLevels;
@@ -1808,7 +1822,7 @@ Result DeviceImpl::createTextureResource(
                     region.bufferRowLength = 0; // rowSizeInBytes;
                     region.bufferImageHeight = 0;
 
-                    region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+                    region.imageSubresource.aspectMask = getAspectMaskFromFormat(format);
                     region.imageSubresource.mipLevel = uint32_t(j);
                     region.imageSubresource.baseArrayLayer = i;
                     region.imageSubresource.layerCount = 1;
@@ -2044,26 +2058,8 @@ Result DeviceImpl::createTextureView(
         SLANG_UNIMPLEMENTED_X("Unknown Texture type.");
         break;
     }
-    switch (resourceImpl->m_vkformat)
-    {
-    case VK_FORMAT_D16_UNORM_S8_UINT:
-    case VK_FORMAT_D24_UNORM_S8_UINT:
-    case VK_FORMAT_D32_SFLOAT_S8_UINT:
-        createInfo.subresourceRange.aspectMask =
-            VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT;
-        break;
-    case VK_FORMAT_D16_UNORM:
-    case VK_FORMAT_D32_SFLOAT:
-    case VK_FORMAT_X8_D24_UNORM_PACK32:
-        createInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
-        break;
-    case VK_FORMAT_S8_UINT:
-        createInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_STENCIL_BIT;
-        break;
-    default:
-        createInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-        break;
-    }
+
+    createInfo.subresourceRange.aspectMask = getAspectMaskFromFormat(resourceImpl->m_vkformat);
 
     createInfo.subresourceRange.baseArrayLayer = desc.subresourceRange.baseArrayLayer;
     createInfo.subresourceRange.baseMipLevel = desc.subresourceRange.mipLevel;
@@ -6480,12 +6476,7 @@ void ResourceCommandEncoder::textureBarrier(
         barrier.image = image->m_image;
         barrier.oldLayout = translateImageLayout(src);
         barrier.newLayout = translateImageLayout(dst);
-        if (VulkanUtil::isDepthFormat(image->m_vkformat))
-            barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
-        if (VulkanUtil::isStencilFormat(image->m_vkformat))
-            barrier.subresourceRange.aspectMask |= VK_IMAGE_ASPECT_STENCIL_BIT;
-        if (barrier.subresourceRange.aspectMask == 0)
-            barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        barrier.subresourceRange.aspectMask = getAspectMaskFromFormat(VulkanUtil::getVkFormat(desc->format));
         barrier.subresourceRange.baseArrayLayer = 0;
         barrier.subresourceRange.baseMipLevel = 0;
         barrier.subresourceRange.layerCount = VK_REMAINING_ARRAY_LAYERS;
@@ -6579,11 +6570,15 @@ void ResourceCommandEncoder::writeTimestamp(IQueryPool* queryPool, SlangInt inde
 
 VkImageAspectFlags ResourceCommandEncoder::getAspectMask(TextureAspect aspect)
 {
-    if (aspect == TextureAspect::Depth)
-        return VK_IMAGE_ASPECT_DEPTH_BIT;
-    if (aspect == TextureAspect::Stencil)
-        return VK_IMAGE_ASPECT_STENCIL_BIT;
-    return VK_IMAGE_ASPECT_COLOR_BIT;
+    VkImageAspectFlags flags = 0;
+
+    if ((uint32_t)aspect & (uint32_t)TextureAspect::Depth)
+        flags |= VK_IMAGE_ASPECT_DEPTH_BIT;
+    if ((uint32_t)aspect & (uint32_t)TextureAspect::Stencil)
+        flags |= VK_IMAGE_ASPECT_STENCIL_BIT;
+    if ((uint32_t)aspect & (uint32_t)TextureAspect::Color)
+        flags |= VK_IMAGE_ASPECT_COLOR_BIT;
+    return flags;
 }
 
 void ResourceCommandEncoder::copyTexture(
@@ -6760,7 +6755,7 @@ void ResourceCommandEncoder::uploadTextureData(
                 region.bufferRowLength = 0; // rowSizeInBytes;
                 region.bufferImageHeight = 0;
 
-                region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+                region.imageSubresource.aspectMask = getAspectMaskFromFormat(dstImpl->m_vkformat);
                 region.imageSubresource.mipLevel = subResourceRange.mipLevel + uint32_t(j);
                 region.imageSubresource.baseArrayLayer = subResourceRange.baseArrayLayer + i;
                 region.imageSubresource.layerCount = 1;
