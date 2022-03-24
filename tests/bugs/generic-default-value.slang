@@ -18,6 +18,6 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 
     Check<float> v = {};
     
-	outputBuffer[index] = index + v.v; 
+    outputBuffer[index] = index + v.v; 
 }
 

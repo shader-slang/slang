@@ -16,5 +16,5 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     // Invalid as should only accept a type
     Check<2 + 2> v; 
     
-	outputBuffer[index] = index; 
+    outputBuffer[index] = index; 
 }

@@ -199,12 +199,12 @@ namespace Slang
                 {
                     // The diagnostic for expectedAType wants to say what it 'got'.
                     // The solution given here, currently is to just use the node name.
-                    //
                     // How useful that might be could depend, and perhaps some other mechanism
                     // that catagorized 'what' the wrong thing was is. For now this seems sufficient.
-                    // Get the node name
                     //
                     // Note that use originalExpr (not expr) because we want original expr for diagnostic.
+
+                    // Get the AST node type info, so we can output a 'got' name
                     auto info = ASTClassInfo::getInfo(originalExpr->astNodeType);
                     diagSink->diagnose(originalExpr, Diagnostics::expectedAType, info->m_name);
                 }
