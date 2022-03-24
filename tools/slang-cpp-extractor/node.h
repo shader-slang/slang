@@ -3,6 +3,8 @@
 
 #include "diagnostics.h"
 
+#include "../../source/compiler-core/slang-doc-extractor.h"
+
 namespace CppExtract {
 using namespace Slang;
 
@@ -21,7 +23,7 @@ struct ScopeNode;
 class Node : public RefObject
 {
 public:
-    enum class Type : uint8_t
+    enum class Kind : uint8_t
     {
         Invalid,
 
@@ -39,32 +41,57 @@ public:
 
         TypeDef,
 
+        Callable,           ///< Functions/methods
+
+        Other,              ///< Used 'other' parsing like for TYPE
+        Unknown,            ///< Used for marking tokens consumed but usage is not known
+
         CountOf,
     };
 
-    enum class TypeRange
+    enum class KindRange
     {
-        ScopeStart = int(Type::StructType),
-        ScopeEnd = int(Type::AnonymousNamespace),
+        ScopeStart = int(Kind::StructType),
+        ScopeEnd = int(Kind::AnonymousNamespace),
 
-        ClassLikeStart = int(Type::StructType),
-        ClassLikeEnd = int(Type::ClassType),
+        ClassLikeStart = int(Kind::StructType),
+        ClassLikeEnd = int(Kind::ClassType),
 
-        EnumStart = int(Type::Enum),
-        EnumEnd = int(Type::EnumClass),
+        ScopeTypeStart = int(Kind::StructType),
+        ScopeTypeEnd = int(Kind::EnumClass),
+
+        OtherTypeStart = int(Kind::TypeDef),
+        OtherTypeEnd = int(Kind::TypeDef),
+
+        EnumStart = int(Kind::Enum),
+        EnumEnd = int(Kind::EnumClass),
     };
 
-    static bool isScopeType(Type type) { return int(type) >= int(TypeRange::ScopeStart) && int(type) <= int(TypeRange::ScopeEnd); }
-    static bool isClassLikeType(Type type) { return int(type) >= int(TypeRange::ClassLikeStart) &&  int(type) <= int(TypeRange::ClassLikeEnd); }
-    static bool isEnumLikeType(Type type) { return int(type) >= int(TypeRange::EnumStart) &&  int(type) <= int(TypeRange::EnumEnd); }
-    static bool canAcceptTypes(Type type)
+        /// Returns true if kind can cast to this type
+        /// Used for implementing as<T> casting
+    static bool isOfKind(Kind kind) { SLANG_UNUSED(kind);  return true; }
+
+    static bool isKindScope(Kind kind) { return int(kind) >= int(KindRange::ScopeStart) && int(kind) <= int(KindRange::ScopeEnd); }
+    static bool isKindClassLike(Kind kind) { return int(kind) >= int(KindRange::ClassLikeStart) &&  int(kind) <= int(KindRange::ClassLikeEnd); }
+    static bool isKindEnumLike(Kind kind) { return int(kind) >= int(KindRange::EnumStart) &&  int(kind) <= int(KindRange::EnumEnd); }
+
+        /// It a type, but doesn't have a scope
+    static bool isKindOtherType(Kind kind) { return int(kind) >= int(KindRange::OtherTypeStart) && int(kind) <= int(KindRange::OtherTypeEnd); }
+        /// Is a type and has a scope
+    static bool isKindScopeType(Kind kind) { return int(kind) >= int(KindRange::ScopeTypeStart) && int(kind) <= int(KindRange::ScopeTypeEnd); }
+
+        /// True if the kind is any type
+    static bool isKindType(Kind kind) { return isKindOtherType(kind) || isKindScopeType(kind); }
+
+        /// True if the kind can accept contained types
+    static bool canKindContainTypes(Kind type)
     {
         switch (type)
         {
-            case Type::StructType:
-            case Type::ClassType:
-            case Type::Namespace:
-            case Type::AnonymousNamespace:
+            case Kind::StructType:
+            case Kind::ClassType:
+            case Kind::Namespace:
+            case Kind::AnonymousNamespace:
             {
                 return true;
             }
@@ -73,9 +100,14 @@ public:
         return false;
     }
 
-    static bool isType(Type type) { return true; }
+    bool isNamespace() const { return m_kind == Kind::Namespace; }
+    bool isClassLike() const { return isKindClassLike(m_kind); }
+    bool isScope() const { return isKindScope(m_kind); }
+    bool isEnumLike() const { return isKindEnumLike(m_kind); }
 
-    bool isClassLike() const { return isClassLikeType(m_type); }
+        /// These are useful for the filter
+    static bool isClassLikeAndReflected(Node* node) { return node->isClassLike() && node->isReflected(); }
+    static bool isClassLike(Node* node) { return isKindClassLike(node->m_kind); }
 
     virtual void dump(int indent, StringBuilder& out) = 0;
 
@@ -94,13 +126,12 @@ public:
         /// True if reflected
     bool isReflected() const { return m_reflectionType == ReflectionType::Reflected; }
 
+    SourceLoc getSourceLoc() const { return m_name.getLoc(); }
+
     ScopeNode* getRootScope();
 
     typedef bool(*Filter)(Node* node);
-
-    static bool isClassLikeAndReflected(Node* node) { return node->isClassLike() && node->isReflected(); }
-    static bool isClassLike(Node* node) { return isClassLikeType(node->m_type); }
-
+    
     template <typename T>
     static void filter(Filter filter, List<T*>& io) { const Node* _isNodeDerived = (T*)nullptr; SLANG_UNUSED(_isNodeDerived); filterImpl(filter, reinterpret_cast<List<Node*>&>(io)); }
 
@@ -122,15 +153,21 @@ public:
 
     static void splitPath(const UnownedStringSlice& slice, List<UnownedStringSlice>& outSplitPath);
 
-    Node(Type type) :
-        m_type(type),
+        /// If markup is specified dump it
+    void dumpMarkup(int indent, StringBuilder& out);
+
+    Node(Kind type) :
+        m_kind(type),
         m_parentScope(nullptr),
         m_reflectionType(ReflectionType::NotReflected)
     {
     }
 
-    Type m_type;                        ///< The type of node this is
-    ReflectionType m_reflectionType;    /// Classes can be traversed, but not reflected. To be reflected they have to contain the marker
+    Kind m_kind;                        ///< The kind of node this is
+    ReflectionType m_reflectionType;    ///< Classes can be traversed, but not reflected. To be reflected they have to contain the marker
+    
+    MarkupVisibility m_markupVisibility = MarkupVisibility::Public;         ///< The visibility of the markup
+    String m_markup;                                                        ///< Documentation associated with this node
 
     Token m_name;                       ///< The name of this scope/type    
 
@@ -141,21 +178,27 @@ struct ScopeNode : public Node
 {
     typedef Node Super;
 
-    static bool isType(Type type) { return isScopeType(type); }
+    static bool isOfKind(Kind kind) { return isKindScope(kind); }
 
     virtual void dump(int indent, StringBuilder& out) SLANG_OVERRIDE;
     virtual void calcScopeDepthFirst(List<Node*>& outNodes) SLANG_OVERRIDE;
 
+        /// True if can contain callable entries
+    bool canContainCallable() const { return isClassLike() || isNamespace(); }
+
         /// True if can accept fields (class like types can)
-    bool acceptsFields() const { return isClassLike(); }
+    bool canContainFields() const { return isClassLike(); }
+
         /// True if the scope can accept types
-    bool acceptsTypes() const { return canAcceptTypes(m_type); }
+    bool canContainTypes() const { return canKindContainTypes(m_kind); }
 
         /// Gets the reflection for any contained types
     ReflectionType getContainedReflectionType() const { return m_reflectionType == ReflectionType::NotReflected ? ReflectionType::NotReflected : m_reflectionOverride; }
 
         /// Add a child node to this nodes scope
     void addChild(Node* child);
+        /// Adds the child but does not add the name to the map
+    void addChildIgnoringName(Node* child);
 
         /// Find a child node in this scope with the specified name. Return nullptr if not found
     Node* findChild(const UnownedStringSlice& name) const;
@@ -163,8 +206,8 @@ struct ScopeNode : public Node
         /// Gets the anonymous namespace associated with this scope
     ScopeNode* getAnonymousNamespace();
 
-    ScopeNode(Type type) :
-        Super(type),
+    ScopeNode(Kind kind) :
+        Super(kind),
         m_reflectionOverride(ReflectionType::Reflected),
         m_anonymousNamespace(nullptr)
     {
@@ -187,25 +230,27 @@ struct FieldNode : public Node
 {
     typedef Node Super;
 
-    static bool isType(Type type) { return type == Type::Field; }
+    static bool isOfKind(Kind kind) { return kind == Kind::Field; }
 
     virtual void dump(int indent, StringBuilder& out) SLANG_OVERRIDE;
 
     FieldNode() :
-        Super(Type::Field)
+        Super(Kind::Field)
     {
     }
 
     UnownedStringSlice m_fieldType;
 
-    // We may want to add initializer tokens
+    bool m_isStatic = false;
+
+    /// TODO(JS): We may want to add initializer tokens
 };
 
 struct ClassLikeNode : public ScopeNode
 {
     typedef ScopeNode Super;
 
-    static bool isType(Type type) { return isClassLikeType(type); }
+    static bool isOfKind(Kind kind) { return isKindClassLike(kind); }
 
         /// Add a node that is derived from this
     void addDerived(ClassLikeNode* derived);
@@ -231,13 +276,13 @@ struct ClassLikeNode : public ScopeNode
     // Node Impl
     virtual void dump(int indent, StringBuilder& out) SLANG_OVERRIDE;
 
-    ClassLikeNode(Type type) :
-        Super(type),
+    ClassLikeNode(Kind kind) :
+        Super(kind),
         m_origin(nullptr),
         m_typeSet(nullptr),
         m_superNode(nullptr)
     {
-        SLANG_ASSERT(type == Type::ClassType || type == Type::StructType);
+        SLANG_ASSERT(kind == Kind::ClassType || kind == Kind::StructType);
     }
 
     SourceOrigin* m_origin;                             ///< Defines where this was uniquely defined. 
@@ -252,47 +297,75 @@ struct ClassLikeNode : public ScopeNode
     ClassLikeNode* m_superNode;      ///< If this is a class/struct, the type it is derived from (or nullptr if base)
 };
 
+struct CallableNode : public Node
+{
+    typedef Node Super;
+
+    static bool isOfKind(Kind kind) { return kind == Kind::Callable; }
+
+    virtual void dump(int indent, StringBuilder& out) SLANG_OVERRIDE;
+
+    CallableNode() :Super(Kind::Callable) {}
+
+    struct Param
+    {
+        UnownedStringSlice m_type;
+        Token m_name;
+    };
+
+    UnownedStringSlice m_returnType;
+
+    CallableNode* m_nextOverload = nullptr;
+
+    List<Param> m_params;
+
+    bool m_isStatic = false;
+    bool m_isVirtual = false;
+    bool m_isPure = false;
+};
+
 struct EnumCaseNode : public Node
 {
     typedef Node Super;
 
-    static bool isType(Type type) { return type == Type::EnumCase; }
+    static bool isOfKind(Kind kind) { return kind == Kind::EnumCase; }
 
     virtual void dump(int indent, StringBuilder& out) SLANG_OVERRIDE;
 
     EnumCaseNode():
-        Super(Type::EnumCase)
+        Super(Kind::EnumCase)
     {
     }
 
-    Token m_value;              ///< If not defined will be invalid
+    // Tokens that make up the value. If not defined will be empty
+    List<Token> m_valueTokens;
 };
 
 struct EnumNode : public ScopeNode
 {
     typedef ScopeNode Super;
-    static bool isType(Type type) { return isEnumLikeType(type); }
+    static bool isOfKind(Kind kind) { return isKindEnumLike(kind); }
 
     virtual void dump(int indent, StringBuilder& out) SLANG_OVERRIDE;
 
-    EnumNode(Type type):
-        Super(type)
+    EnumNode(Kind kind):
+        Super(kind)
     {
-        SLANG_ASSERT(isEnumLikeType(type));
+        SLANG_ASSERT(isKindEnumLike(kind));
     }
 
-    Token m_backingToken;
+    List<Token> m_backingTokens;
 };
 
 struct TypeDefNode : public Node
 {
     typedef Node Super;
-    static bool isType(Type type) { return type == Type::TypeDef; }
+    static bool isOfKind(Kind kind) { return kind == Kind::TypeDef; }
 
     virtual void dump(int indent, StringBuilder& out) SLANG_OVERRIDE;
 
     TypeDefNode():
-        Super(Type::TypeDef)
+        Super(Kind::TypeDef)
     {
     }
 
@@ -300,7 +373,7 @@ struct TypeDefNode : public Node
 };
 
 template <typename T>
-T* as(Node* node) { return (node && T::isType(node->m_type)) ? static_cast<T*>(node) : nullptr; }
+T* as(Node* node) { return (node && T::isOfKind(node->m_kind)) ? static_cast<T*>(node) : nullptr; }
 
 } // CppExtract
 

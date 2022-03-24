@@ -18,6 +18,9 @@
     <ClInclude Include="..\..\..\source\compiler-core\slang-diagnostic-sink.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\source\compiler-core\slang-doc-extractor.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\..\source\compiler-core\slang-downstream-compiler.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -108,6 +111,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\source\compiler-core\slang-diagnostic-sink.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\source\compiler-core\slang-doc-extractor.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\source\compiler-core\slang-downstream-compiler.cpp">

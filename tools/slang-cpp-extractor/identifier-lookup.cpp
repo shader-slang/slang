@@ -22,6 +22,20 @@ using namespace Slang;
     IdentifierFlag::Keyword,                              /// Access
     IdentifierFlag::Reflection,                           /// Reflected
     IdentifierFlag::Reflection,                           /// Unreflected
+
+    IdentifierFlag::Keyword,                              /// virtual
+    0,                                                    /// Calling convention
+    IdentifierFlag::Keyword,                              /// template
+    IdentifierFlag::Keyword,                              /// static
+
+    IdentifierFlag::Keyword,                              /// unsigned/signed
+
+    IdentifierFlag::Keyword,                              /// extern
+
+    0,                                                    /// Callable misc
+    0,                                                    /// IntegerType int, short, char, long
+
+    IdentifierFlag::Keyword,                              /// default
 };
 
 void IdentifierLookup::set(const UnownedStringSlice& name, IdentifierStyle style)
@@ -63,7 +77,7 @@ void IdentifierLookup::initDefault(const UnownedStringSlice& markPrefix)
 
     // Some keywords
     {
-        const char* names[] = { "virtual", "continue", "if", "case", "break", "catch", "default", "delete", "do", "else", "for", "new", "goto", "return", "switch", "throw", "using", "while", "operator" };
+        const char* names[] = { "continue", "if", "case", "break", "catch", "delete", "do", "else", "for", "new", "goto", "return", "switch", "throw", "using", "while", "operator", "explicit"};
         set(names, SLANG_COUNT_OF(names), IdentifierStyle::Keyword);
     }
 
@@ -88,6 +102,30 @@ void IdentifierLookup::initDefault(const UnownedStringSlice& markPrefix)
         }
     }
 
+    {
+        set("virtual", IdentifierStyle::Virtual);
+        
+        set("template", IdentifierStyle::Template);
+        set("static", IdentifierStyle::Static);
+        set("extern", IdentifierStyle::Extern);
+        set("default", IdentifierStyle::Default);
+    }
+
+    {
+        const char* names[] = { "char", "short", "int", "long"};
+        set(names, SLANG_COUNT_OF(names), IdentifierStyle::IntegerType);
+    }
+
+    {
+        const char* names[] = { "SLANG_MCALL" };
+        set(names, SLANG_COUNT_OF(names), IdentifierStyle::CallingConvention);
+    }
+
+    {
+        const char* names[] = { "SLANG_NO_THROW", "inline"};
+        set(names, SLANG_COUNT_OF(names), IdentifierStyle::CallableMisc);
+    }
+
     // Keywords which introduce types/scopes
     {
         const Pair pairs[] =
@@ -106,6 +144,11 @@ void IdentifierLookup::initDefault(const UnownedStringSlice& markPrefix)
     {
         const char* names[] = { "private", "protected", "public" };
         set(names, SLANG_COUNT_OF(names), IdentifierStyle::Access);
+    }
+    {
+        const char* names[] = { "signed", "unsigned"};
+
+        set(names, SLANG_COUNT_OF(names), IdentifierStyle::IntegerModifier);
     }
 }
 

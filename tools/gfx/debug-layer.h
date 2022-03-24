@@ -162,6 +162,7 @@ public:
         uint64_t timeout) override;
     virtual SLANG_NO_THROW Result SLANG_MCALL getTextureAllocationInfo(
         const ITextureResource::Desc& desc, size_t* outSize, size_t* outAlignment) override;
+    virtual SLANG_NO_THROW Result SLANG_MCALL getTextureRowAlignment(size_t* outAlignment) override;
     virtual SLANG_NO_THROW Result SLANG_MCALL
         createShaderTable(const IShaderTable::Desc& desc, IShaderTable** outTable) override;
 };
@@ -405,6 +406,7 @@ public:
         IBufferResource* dst,
         size_t dstOffset,
         size_t dstSize,
+        size_t dstRowStride,
         ITextureResource* src,
         ResourceState srcState,
         SubresourceRange srcSubresource,
@@ -722,6 +724,7 @@ public:
 public:
     ITransientResourceHeap* getInterface(const Slang::Guid& guid);
     virtual SLANG_NO_THROW Result SLANG_MCALL synchronizeAndReset() override;
+    virtual SLANG_NO_THROW Result SLANG_MCALL finish() override;
     virtual SLANG_NO_THROW Result SLANG_MCALL
         createCommandBuffer(ICommandBuffer** outCommandBuffer) override;
 };

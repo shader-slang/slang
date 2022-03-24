@@ -105,6 +105,7 @@ void WindowedAppBase::mainLoop()
 
     gTransientHeaps[frameBufferIndex]->synchronizeAndReset();
     renderFrame(frameBufferIndex);
+    gTransientHeaps[frameBufferIndex]->finish();
 }
 
 void WindowedAppBase::createSwapchainFramebuffers()

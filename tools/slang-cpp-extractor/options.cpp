@@ -114,6 +114,13 @@ SlangResult OptionsParser::parse(int argc, const char*const* argv, DiagnosticSin
                 SLANG_RETURN_ON_FAIL(_parseArgFlag("-unit-test", outOptions.m_runUnitTests));
                 continue;
             }
+            else if (arg == "-unmarked")
+            {
+                bool unmarked;
+                SLANG_RETURN_ON_FAIL(_parseArgFlag("-unmarked", unmarked));
+                outOptions.m_requireMark = !unmarked;
+                continue;
+            }
 
             m_sink->diagnose(SourceLoc(), CPPDiagnostics::unknownOption, arg);
             return SLANG_FAIL;

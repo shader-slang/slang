@@ -841,6 +841,12 @@ Result DebugDevice::getTextureAllocationInfo(
     return baseObject->getTextureAllocationInfo(desc, outSize, outAlignment);
 }
 
+Result DebugDevice::getTextureRowAlignment(size_t* outAlignment)
+{
+    SLANG_GFX_API_FUNC;
+    return baseObject->getTextureRowAlignment(outAlignment);
+}
+
 Result DebugDevice::createShaderTable(const IShaderTable::Desc& desc, IShaderTable** outTable)
 {
     SLANG_GFX_API_FUNC;
@@ -1407,6 +1413,7 @@ void DebugResourceCommandEncoderImpl::copyTextureToBuffer(
     IBufferResource* dst,
     size_t dstOffset,
     size_t dstSize,
+    size_t dstRowStride,
     ITextureResource* src,
     ResourceState srcState,
     SubresourceRange srcSubresource,
@@ -1415,7 +1422,7 @@ void DebugResourceCommandEncoderImpl::copyTextureToBuffer(
 {
     SLANG_GFX_API_FUNC;
     getBaseResourceEncoder()->copyTextureToBuffer(
-        getInnerObj(dst), dstOffset, dstSize, getInnerObj(src), srcState, srcSubresource, srcOffset, extent);
+        getInnerObj(dst), dstOffset, dstSize, dstRowStride, getInnerObj(src), srcState, srcSubresource, srcOffset, extent);
 }
 
 void DebugResourceCommandEncoderImpl::textureSubresourceBarrier(
@@ -1610,6 +1617,12 @@ Result DebugTransientResourceHeap::synchronizeAndReset()
 {
     SLANG_GFX_API_FUNC;
     return baseObject->synchronizeAndReset();
+}
+
+Result DebugTransientResourceHeap::finish()
+{
+    SLANG_GFX_API_FUNC;
+    return baseObject->finish();
 }
 
 Result DebugTransientResourceHeap::createCommandBuffer(ICommandBuffer** outCommandBuffer)

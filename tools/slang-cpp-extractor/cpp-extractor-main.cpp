@@ -20,6 +20,7 @@
 #include "../../source/compiler-core/slang-diagnostic-sink.h"
 #include "../../source/compiler-core/slang-name.h"
 #include "../../source/compiler-core/slang-name-convention-util.h"
+#include "../../source/compiler-core/slang-doc-extractor.h"
 
 #include "node.h"
 #include "diagnostics.h"
@@ -63,6 +64,8 @@ public:
 
 protected:
 
+    SlangResult _extractDoc(NodeTree* nodeTree);
+
     NamePool m_namePool;
 
     Options m_options;
@@ -72,6 +75,120 @@ protected:
     StringSlicePool m_slicePool;
 };
 
+
+// Work out an appropriate search type for a node type.
+//
+// TODO(JS):
+// NOTE! Currently extractor doesn't extract callable types and so doesn't extract callable types parameters
+static DocMarkupExtractor::SearchStyle _getSearchStyle(Node* node)
+{
+    typedef DocMarkupExtractor::SearchStyle SearchStyle;
+
+    if (!node->getSourceLoc().isValid())
+    {
+        return SearchStyle::None;
+    }
+
+    switch (node->m_kind)
+    {
+        case Node::Kind::Invalid:
+        {
+            return SearchStyle::None;
+        }
+        case Node::Kind::Field:
+        {
+            return SearchStyle::Variable;
+        }
+        case Node::Kind::EnumCase:
+        {
+            return SearchStyle::EnumCase;
+        }
+        case Node::Kind::TypeDef:
+        {
+            return SearchStyle::Variable;
+        }
+        case Node::Kind::Callable:
+        {
+            return SearchStyle::Before;
+        }
+        default: break;
+    }
+
+    // Default is to only allow before.
+    return SearchStyle::Before;
+}
+
+SlangResult App::_extractDoc(NodeTree* nodeTree)
+{
+    // Find all of the nodes
+    List<Node*> nodes;
+    // Add the root
+    nodes.add(nodeTree->getRootNode());
+
+    // Traverse all nodes
+    for (Index startIndex = 0; startIndex < nodes.getCount(); ++startIndex)
+    {
+        Node* node = nodes[startIndex];
+
+        ScopeNode* scopeNode = as<ScopeNode>(node);
+
+        if (scopeNode)
+        {
+            for (Node* child : scopeNode->m_children)
+            {
+                nodes.add(child);
+            }
+        }
+    }
+
+    // Find out what to find
+
+    List<DocMarkupExtractor::SearchItemInput> inputItems;
+
+    for (Node* node : nodes)
+    {
+        auto searchStyle = _getSearchStyle(node);
+
+        DocMarkupExtractor::SearchItemInput inputItem;
+        inputItem.searchStyle = searchStyle;
+        inputItem.sourceLoc = node->getSourceLoc();
+
+        inputItems.add(inputItem);
+    }
+
+    List<DocMarkupExtractor::SearchItemOutput> outputItems;
+
+    List<SourceView*> views;
+
+    DocMarkupExtractor extractor;
+
+    SLANG_RETURN_ON_FAIL(extractor.extract(inputItems.getBuffer(), inputItems.getCount(), m_sourceManager, m_sink, views, outputItems));
+
+    // Put what was extracted into the nodes
+    {
+        const Index count = inputItems.getCount();
+        SLANG_ASSERT(count == outputItems.getCount() && count == nodes.getCount());
+
+        for (Index i = 0; i < count; ++i)
+        {
+            const auto& outputItem = outputItems[i];
+
+            // We need to use the index used for input, because in output they can be reordered.
+            const auto inputIndex = outputItem.inputIndex;
+            const auto& inputItem = inputItems[inputIndex];
+
+            if (inputItem.searchStyle != DocMarkupExtractor::SearchStyle::None && outputItem.text.getLength())
+            {
+                Node* node = nodes[inputIndex];
+
+                node->m_markup = outputItem.text;
+                node->m_markupVisibility = outputItem.visibilty;
+            }
+        }
+    }
+
+    return SLANG_OK;
+}
 
 SlangResult App::execute(const Options& options)
 {
@@ -143,6 +260,11 @@ SlangResult App::execute(const Options& options)
         }
     }
 
+    if (options.m_extractDoc)
+    {
+        SLANG_RETURN_ON_FAIL(_extractDoc(&tree));
+    }
+
     // Dump out the tree
     if (options.m_dump)
     {
@@ -191,6 +313,21 @@ SlangResult App::executeWithArgs(int argc, const char*const* argv)
 }
 
 } // namespace CppExtract
+
+
+/*
+The typical command line for producing generated slang files. Can be determined by setting `dumpCommandLine` belong and compiling.
+
+```
+-d E:\git\slang-jsmall-nvidia\source\slang\ slang-ast-support-types.h slang-ast-base.h slang-ast-decl.h slang-ast-expr.h slang-ast-modifier.h slang-ast-stmt.h slang-ast-type.h slang-ast-val.h -strip-prefix slang- -o slang-generated -output-fields -mark-suffix _CLASS
+```
+
+A command line to try and parse the slang.h
+
+```
+-d E:\git\slang-jsmall-nvidia slang.h -mark-suffix _CLASS -dump  -unmarked -unit-test
+```
+*/
 
 int main(int argc, const char*const* argv)
 {
