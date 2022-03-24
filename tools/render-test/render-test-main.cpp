@@ -939,6 +939,7 @@ Result RenderTestApp::writeBindingOutput(const String& fileName)
 
                 commandBuffer->close();
                 m_queue->executeCommandBuffer(commandBuffer);
+                m_transientHeap->finish();
                 m_transientHeap->synchronizeAndReset();
 
                 m_device->readBufferResource(stagingBuffer, 0, bufferSize, blob.writeRef());

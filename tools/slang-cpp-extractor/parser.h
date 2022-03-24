@@ -31,14 +31,15 @@ public:
         /// Parse the contents of the source file
     SlangResult parse(SourceOrigin* sourceOrigin, const Options* options);
 
-    void setTypeEnabled(Node::Type type, bool isEnabled = true);
-    bool isTypeEnabled(Node::Type type) { return (m_nodeTypeEnabled & (NodeTypeBitType(1) << int(type))) != 0; }
-    void setTypesEnabled(const Node::Type* types, Index typesCount, bool isEnabled = true);
+    void setKindEnabled(Node::Kind kind, bool isEnabled = true);
+    bool isTypeEnabled(Node::Kind kind) { return (m_nodeTypeEnabled & (NodeTypeBitType(1) << int(kind))) != 0; }
+
+    void setKindsEnabled(const Node::Kind* kinds, Index kindsCount, bool isEnabled = true);
 
     Parser(NodeTree* nodeTree, DiagnosticSink* sink);
 
 protected:
-    static Node::Type _toNodeType(IdentifierStyle style);
+    static Node::Kind _toNodeKind(IdentifierStyle style);
 
     bool _isMarker(const UnownedStringSlice& name);
 
@@ -47,33 +48,50 @@ protected:
     SlangResult _parsePreDeclare();
     SlangResult _parseTypeSet();
 
-    SlangResult _maybeParseNode(Node::Type type);
-    SlangResult _maybeParseField();
+    SlangResult _maybeParseNode(Node::Kind kind);
+    SlangResult _maybeParseContained(Node** outNode);
 
     SlangResult _parseTypeDef();
     SlangResult _parseEnum();
+    SlangResult _parseMarker();
+    SlangResult _parseSpecialMacro();
 
-    SlangResult _maybeParseType(List<Token>& outToks);
-    SlangResult _maybeParseType(UnownedStringSlice& outType);
+    SlangResult _maybeParseType(List<Token>& outToks, Token& outName);
+    SlangResult _maybeParseType(UnownedStringSlice& outType, Token& outName);
+    SlangResult _maybeParseType(Index& ioTemplateDepth, TokenReader::ParsingCursor& outCursor);
 
-    SlangResult _maybeParseType(Index& ioTemplateDepth);
+    SlangResult _parseExpression(List<Token>& outExprTokens);
+    
     SlangResult _maybeParseTemplateArgs(Index& ioTemplateDepth);
     SlangResult _maybeParseTemplateArg(Index& ioTemplateDepth);
 
         /// Parse balanced - if a sink is set will report to that sink
     SlangResult _parseBalanced(DiagnosticSink* sink);
 
+    bool _isCtor();
+
         /// Concatenate all tokens from start to the current position
     UnownedStringSlice _concatTokens(TokenReader::ParsingCursor start);
+    UnownedStringSlice _concatTokens(const Token* toks, Index toksCount);
 
-    void _consumeTypeModifiers();
+    UnownedStringSlice _concatType(TokenReader::ParsingCursor start, TokenReader::ParsingCursor nameCursor);
+
+    void _getTypeTokens(TokenReader::ParsingCursor start, TokenReader::ParsingCursor nameCursor, List<Token>& outToks);
+
+        /// Consume what looks like a template definition
+    SlangResult _consumeTemplate();
+    SlangResult _maybeConsume(IdentifierStyle style);
 
     SlangResult _consumeToSync();
+        /// Consumes balanced parens. Will return an error if not matched. Assumes starts on opening (
+    SlangResult _consumeBalancedParens();
 
     NodeTypeBitType m_nodeTypeEnabled;
 
     TokenList m_tokenList;
     TokenReader m_reader;
+
+    List<ScopeNode*> m_scopeStack;
 
     ScopeNode* m_currentScope;          ///< The current scope being processed
     SourceOrigin* m_sourceOrigin;       ///< The source origin that all tokens are in

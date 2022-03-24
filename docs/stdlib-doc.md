@@ -57578,6 +57578,8 @@ T OutputPatch<T, N:int>.subscript(uint index);
 * `InterlockedOrU64`
 * `InterlockedXorU64`
 * `InterlockedExchangeU64`
+* `InterlockedAdd64`
+* `InterlockedCompareExchange64`
 * `InterlockedAdd`
 * `InterlockedAnd`
 * `InterlockedCompareExchange`
@@ -57899,6 +57901,53 @@ uint64_t RWByteAddressBuffer.InterlockedExchangeU64(
 
 * `byteAddress`
 * `value`
+
+--------------------------------------------------------------------------------
+# `RWByteAddressBuffer.InterlockedAdd64`
+
+## Signature 
+
+```
+void RWByteAddressBuffer.InterlockedAdd64(
+    uint                 byteAddress,
+    int64_t              valueToAdd,
+    out int64_t          outOriginalValue);
+void RWByteAddressBuffer.InterlockedAdd64(
+    uint                 byteAddress,
+    uint64_t             valueToAdd,
+    out uint64_t         outOriginalValue);
+```
+
+## Parameters
+
+* `byteAddress`
+* `valueToAdd`
+* `outOriginalValue`
+
+--------------------------------------------------------------------------------
+# `RWByteAddressBuffer.InterlockedCompareExchange64`
+
+## Signature 
+
+```
+void RWByteAddressBuffer.InterlockedCompareExchange64(
+    uint                 byteAddress,
+    int64_t              compareValue,
+    int64_t              value,
+    out int64_t          outOriginalValue);
+void RWByteAddressBuffer.InterlockedCompareExchange64(
+    uint                 byteAddress,
+    uint64_t             compareValue,
+    uint64_t             value,
+    out uint64_t         outOriginalValue);
+```
+
+## Parameters
+
+* `byteAddress`
+* `compareValue`
+* `value`
+* `outOriginalValue`
 
 --------------------------------------------------------------------------------
 # `RWByteAddressBuffer.InterlockedAdd`

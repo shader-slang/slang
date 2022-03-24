@@ -18,7 +18,7 @@ NodeTree::NodeTree(StringSlicePool* typePool, NamePool* namePool, IdentifierLook
     m_identifierLookup(identifierLookup),
     m_typeSetPool(StringSlicePool::Style::Empty)
 {
-    m_rootNode = new ScopeNode(Node::Type::Namespace);
+    m_rootNode = new ScopeNode(Node::Kind::Namespace);
     m_rootNode->m_reflectionType = ReflectionType::Reflected;
 }
 
@@ -131,7 +131,7 @@ SlangResult NodeTree::_calcDerivedTypesRec(ScopeNode* inScopeNode, DiagnosticSin
         else
         {
             // Add to it's own typeset
-            if (classLikeNode->isReflected())
+            if (classLikeNode->isReflected() && classLikeNode->m_typeSet)
             {
                 classLikeNode->m_typeSet->m_baseTypes.add(classLikeNode);
             }

@@ -120,13 +120,16 @@ SlangResult MacroWriter::calcChildrenHeader(NodeTree* tree, TypeSet* typeSet, St
             // Define the derived types
             out << "#define " << m_options->m_markPrefix << "FIELDS_" << reflectTypeName << "_" << classNode->m_name.getContent() << "(_x_, _param_)";
 
-            // Find all of the fields
+            // Find all of the instance fields fields
             List<FieldNode*> fields;
             for (Node* child : classNode->m_children)
             {
                 if (auto field = as<FieldNode>(child))
                 {
-                    fields.add(field);
+                    if (!field->m_isStatic)
+                    {
+                        fields.add(field);
+                    }
                 }
             }
 
@@ -214,7 +217,7 @@ SlangResult MacroWriter::calcTypeHeader(NodeTree* tree, TypeSet* typeSet, String
 
     for (Node* scopeNode : baseScopePath)
     {
-        SLANG_ASSERT(scopeNode->m_type == Node::Type::Namespace);
+        SLANG_ASSERT(scopeNode->m_kind == Node::Kind::Namespace);
         out << "namespace " << scopeNode->m_name.getContent() << " {\n";
     }
 
@@ -262,7 +265,7 @@ SlangResult MacroWriter::calcTypeHeader(NodeTree* tree, TypeSet* typeSet, String
             // If it's not reflected we don't output, in the enum list
             if (node->isReflected())
             {
-                const char* type = (node->m_type == Node::Type::ClassType) ? "class" : "struct";
+                const char* type = (node->m_kind == Node::Kind::ClassType) ? "class" : "struct";
                 out << type << " " << node->m_name.getContent() << ";\n";
             }
         }

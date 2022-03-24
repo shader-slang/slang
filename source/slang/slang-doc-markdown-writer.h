@@ -2,7 +2,8 @@
 #ifndef SLANG_DOC_MARKDOWN_WRITER_H
 #define SLANG_DOC_MARKDOWN_WRITER_H
 
-#include "slang-doc-extractor.h"
+#include "slang-doc-ast.h"
+
 #include "slang-ast-print.h"
 #include "slang-compiler.h"
 
@@ -50,19 +51,19 @@ struct DocMarkdownWriter
     void writeAll();
 
         /// This will write information about *all* of the overridden versions of a function/method
-    void writeCallableOverridable(const DocMarkup::Entry& entry, CallableDecl* callable);
+    void writeCallableOverridable(const ASTMarkup::Entry& entry, CallableDecl* callable);
 
-    void writeEnum(const DocMarkup::Entry& entry, EnumDecl* enumDecl);
-    void writeAggType(const DocMarkup::Entry& entry, AggTypeDeclBase* aggTypeDecl);
-    void writeDecl(const DocMarkup::Entry& entry, Decl* decl);
-    void writeVar(const DocMarkup::Entry& entry, VarDecl* varDecl);
+    void writeEnum(const ASTMarkup::Entry& entry, EnumDecl* enumDecl);
+    void writeAggType(const ASTMarkup::Entry& entry, AggTypeDeclBase* aggTypeDecl);
+    void writeDecl(const ASTMarkup::Entry& entry, Decl* decl);
+    void writeVar(const ASTMarkup::Entry& entry, VarDecl* varDecl);
 
-    void writePreamble(const DocMarkup::Entry& entry);
-    void writeDescription(const DocMarkup::Entry& entry);
+    void writePreamble(const ASTMarkup::Entry& entry);
+    void writeDescription(const ASTMarkup::Entry& entry);
 
     void writeSignature(CallableDecl* callableDecl);
 
-    bool isVisible(const DocMarkup::Entry& entry);
+    bool isVisible(const ASTMarkup::Entry& entry);
     bool isVisible(Decl* decl);
     bool isVisible(const Name* name);
 
@@ -70,7 +71,7 @@ struct DocMarkdownWriter
     const StringBuilder& getOutput() const { return m_builder; }
 
         /// Ctor.
-    DocMarkdownWriter(DocMarkup* markup, ASTBuilder* astBuilder) :
+    DocMarkdownWriter(ASTMarkup* markup, ASTBuilder* astBuilder) :
         m_markup(markup),
         m_astBuilder(astBuilder)
     {
@@ -92,7 +93,7 @@ struct DocMarkdownWriter
     String _getName(Decl* decl);
     String _getName(InheritanceDecl* decl);
 
-    NameAndText _getNameAndText(DocMarkup::Entry* entry, Decl* decl);
+    NameAndText _getNameAndText(ASTMarkup::Entry* entry, Decl* decl);
     NameAndText _getNameAndText(Decl* decl);
 
     template <typename T>
@@ -134,7 +135,7 @@ struct DocMarkdownWriter
 
     void _appendAggTypeName(AggTypeDeclBase* aggTypeDecl);
 
-    DocMarkup* m_markup;
+    ASTMarkup* m_markup;
     ASTBuilder* m_astBuilder;
     StringBuilder m_builder;
 };

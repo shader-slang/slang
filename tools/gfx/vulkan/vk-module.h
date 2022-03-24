@@ -15,6 +15,14 @@
 
 #include <vulkan/include/vulkan/vulkan.h>
 
+// Undef xlib macros
+#ifdef Always
+#    undef Always
+#endif
+#ifdef None
+#    undef None
+#endif
+
 namespace gfx {
 
 struct VulkanModule

@@ -31,7 +31,7 @@
 #include "slang-serialize-ir.h"
 #include "slang-serialize-container.h"
 
-#include "slang-doc-extractor.h"
+#include "slang-doc-ast.h"
 #include "slang-doc-markdown-writer.h"
 
 #include "slang-check-impl.h"
@@ -300,8 +300,8 @@ SlangResult Session::compileStdLib(slang::CompileStdLibFlags compileFlags)
         // For all the modules add their doc output to docStrings
         for (Module* stdlibModule : stdlibModules)
         { 
-            RefPtr<DocMarkup> markup(new DocMarkup);
-            DocMarkupExtractor::extract(stdlibModule->getModuleDecl(), sourceManager, &sink, markup);
+            RefPtr<ASTMarkup> markup(new ASTMarkup);
+            ASTMarkupUtil::extract(stdlibModule->getModuleDecl(), sourceManager, &sink, markup);
 
             DocMarkdownWriter writer(markup, astBuilder);
             writer.writeAll();
@@ -2150,8 +2150,8 @@ SlangResult FrontEndCompileRequest::executeActionsInner()
         {
             for (TranslationUnitRequest* translationUnit : translationUnits)
             {
-                RefPtr<DocMarkup> markup(new DocMarkup);
-                DocMarkupExtractor::extract(translationUnit->getModuleDecl(), getSourceManager(), getSink(), markup);
+                RefPtr<ASTMarkup> markup(new ASTMarkup);
+                ASTMarkupUtil::extract(translationUnit->getModuleDecl(), getSourceManager(), getSink(), markup);
 
                 // Convert to markdown            
                 DocMarkdownWriter markdownWriter(markup, astBuilder);
