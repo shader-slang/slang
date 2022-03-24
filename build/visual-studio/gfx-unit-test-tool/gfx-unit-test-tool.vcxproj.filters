@@ -15,6 +15,9 @@
     <ClInclude Include="..\..\..\tools\unit-test\slang-unit-test.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\tools\gfx-unit-test\gfx-test-texture-util.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\tools\gfx-unit-test\buffer-barrier-test.cpp">
@@ -84,6 +87,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\tools\unit-test\slang-unit-test.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\tools\gfx-unit-test\gfx-test-texture-util.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
