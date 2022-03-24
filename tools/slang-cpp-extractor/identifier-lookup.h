@@ -37,6 +37,16 @@ enum class IdentifierStyle
 
     Static,         
 
+    IntegerModifier,
+
+    Extern,
+
+    CallableMisc,       ///< For SLANG_NO_THROW etc
+
+    IntegerType,        ///< Built in integer type
+
+    Default,            /// default
+
     CountOf,
 };
 
