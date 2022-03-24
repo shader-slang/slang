@@ -455,9 +455,9 @@ namespace Slang
 
         auto decl = declRef.getDecl();
 
-        // Handle `__unmangled` modifier by simply emitting
+        // Handle `__extern_cpp` modifier by simply emitting
         // the given name.
-        if (decl->hasModifier<UnmangledModifier>())
+        if (decl->hasModifier<ExternCppModifier>())
         {
             emit(context, decl->getName()->text);
             return;

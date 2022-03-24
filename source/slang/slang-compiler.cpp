@@ -55,7 +55,19 @@ namespace Slang
 
     // !!!!!!!!!!!!!!!!!!!!!! free functions for DiagnosicSink !!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-    void printDiagnosticArg(StringBuilder& sb, CodeGenTarget val)
+bool isHeterogeneousTarget(CodeGenTarget target)
+{
+    switch (target)
+    {
+    case CodeGenTarget::HostCPPSource:
+    case CodeGenTarget::HostExecutable:
+        return true;
+    default:
+        return false;
+    }
+}
+
+void printDiagnosticArg(StringBuilder& sb, CodeGenTarget val)
     {
         switch (val)
         {
@@ -527,6 +539,7 @@ namespace Slang
             case CodeGenTarget::HLSL:
             case CodeGenTarget::CUDASource:
             case CodeGenTarget::CPPSource:
+            case CodeGenTarget::HostCPPSource:
             case CodeGenTarget::CSource:
             {
                 return PassThroughMode::None;
@@ -555,9 +568,9 @@ namespace Slang
             {
                 return PassThroughMode::Glslang;
             }
-            case CodeGenTarget::HostCallable:
-            case CodeGenTarget::SharedLibrary:
-            case CodeGenTarget::Executable:
+            case CodeGenTarget::ShaderHostCallable:
+            case CodeGenTarget::ShaderSharedLibrary:
+            case CodeGenTarget::HostExecutable:
             {
                 // We need some C/C++ compiler
                 return PassThroughMode::GenericCCpp;
@@ -973,12 +986,11 @@ namespace Slang
     {
         switch (target)
         {
-            case CodeGenTarget::HostCallable:
-            case CodeGenTarget::SharedLibrary:
-            case CodeGenTarget::Executable:
-            {
+            case CodeGenTarget::ShaderHostCallable:
+            case CodeGenTarget::ShaderSharedLibrary:
                 return CodeGenTarget::CPPSource;
-            }
+            case CodeGenTarget::HostExecutable:
+                return CodeGenTarget::HostCPPSource;
             case CodeGenTarget::PTX:                return CodeGenTarget::CUDASource;
             case CodeGenTarget::DXBytecode:         return CodeGenTarget::HLSL;
             case CodeGenTarget::DXIL:               return CodeGenTarget::HLSL;
@@ -988,6 +1000,17 @@ namespace Slang
         return CodeGenTarget::Unknown;
     }
 
+    static bool _isCPUHostTarget(CodeGenTarget target)
+    {
+        switch (target)
+        {
+        case CodeGenTarget::HostCPPSource:
+        case CodeGenTarget::HostExecutable:
+            return true;
+        default:
+            return false;
+        }
+    }
 
     SlangResult emitWithDownstreamForEntryPoints(
         ComponentType*          program,
@@ -1027,7 +1050,7 @@ namespace Slang
                 return SLANG_FAIL;
             }
         }
-        
+
         SLANG_ASSERT(compilerType != PassThroughMode::None);
 
         // Get the required downstream compiler
@@ -1259,9 +1282,15 @@ namespace Slang
         }
 
         // If we aren't using LLVM 'host callable', we want downstream compile to produce a shared library
-        if (compilerType != PassThroughMode::LLVM && target == CodeGenTarget::HostCallable)
+        if (compilerType != PassThroughMode::LLVM && target == CodeGenTarget::ShaderHostCallable)
         {
-            target = CodeGenTarget::SharedLibrary;
+            target = CodeGenTarget::ShaderSharedLibrary;
+        }
+
+        if (_isCPUHostTarget(target))
+        {
+            options.libraryPaths.add(Path::getParentDirectory(Path::getExecutablePath()));
+            options.libraries.add("slang-rt");
         }
 
         options.targetType = (SlangCompileTarget)target;
@@ -1527,9 +1556,9 @@ namespace Slang
             case CodeGenTarget::DXIL:
             case CodeGenTarget::DXBytecode:
             case CodeGenTarget::PTX:
-            case CodeGenTarget::HostCallable:
-            case CodeGenTarget::SharedLibrary:
-            case CodeGenTarget::Executable:
+            case CodeGenTarget::ShaderHostCallable:
+            case CodeGenTarget::ShaderSharedLibrary:
+            case CodeGenTarget::HostExecutable:
             {
                 RefPtr<DownstreamCompileResult> downstreamResult;
 
@@ -1583,9 +1612,9 @@ namespace Slang
         case CodeGenTarget::DXIL:
         case CodeGenTarget::DXBytecode:
         case CodeGenTarget::PTX:
-        case CodeGenTarget::HostCallable:
-        case CodeGenTarget::SharedLibrary:
-        case CodeGenTarget::Executable:
+        case CodeGenTarget::ShaderHostCallable:
+        case CodeGenTarget::ShaderSharedLibrary:
+        case CodeGenTarget::HostExecutable:
             {
                 RefPtr<DownstreamCompileResult> downstreamResult;
 
@@ -1606,6 +1635,7 @@ namespace Slang
         case CodeGenTarget::HLSL:
         case CodeGenTarget::CUDASource:
         case CodeGenTarget::CPPSource:
+        case CodeGenTarget::HostCPPSource:
         case CodeGenTarget::CSource:
             {
                 RefPtr<ExtensionTracker> extensionTracker = _newExtensionTracker(target);
@@ -1796,7 +1826,7 @@ namespace Slang
                 ComPtr<ISlangBlob> blob;
                 if (SLANG_FAILED(result.getBlob(blob)))
                 {
-                    if (targetReq->getTarget() == CodeGenTarget::HostCallable)
+                    if (targetReq->getTarget() == CodeGenTarget::ShaderHostCallable)
                     {
                         // Some HostCallable are not directly representable as a 'binary'.
                         // So here, we just ignore if that appears the case, and don't output an unexpected error.
@@ -1840,9 +1870,9 @@ namespace Slang
                     case CodeGenTarget::PTX:
                         // For now we just dump PTX out as hex
 
-                    case CodeGenTarget::HostCallable:
-                    case CodeGenTarget::SharedLibrary:
-                    case CodeGenTarget::Executable:
+                    case CodeGenTarget::ShaderHostCallable:
+                    case CodeGenTarget::ShaderSharedLibrary:
+                    case CodeGenTarget::HostExecutable:
                         HexDumpUtil::dumpWithMarkers((const uint8_t*)blobData, blobSize, 24, writer);
                         break;
 
@@ -2453,11 +2483,12 @@ namespace Slang
             case CodeGenTarget::CSource:            return ".c";
             case CodeGenTarget::CUDASource:         return ".cu";
             case CodeGenTarget::CPPSource:          return ".cpp";
+            case CodeGenTarget::HostCPPSource:      return ".cpp";
                 // What these should be called is target specific, but just use these exts to make clear for now
                 // for now
-            case CodeGenTarget::Executable:         return ".exe";
-            case CodeGenTarget::HostCallable:
-            case CodeGenTarget::SharedLibrary:      return ".shared-lib";
+            case CodeGenTarget::HostExecutable:      return ".exe";
+            case CodeGenTarget::ShaderHostCallable:
+            case CodeGenTarget::ShaderSharedLibrary: return ".shared-lib";
             default: break;
         }
         return nullptr;
@@ -2475,6 +2506,7 @@ namespace Slang
         switch (target)
         {    
             case CodeGenTarget::CPPSource:
+            case CodeGenTarget::HostCPPSource:
             case CodeGenTarget::CUDASource:
             case CodeGenTarget::CSource:
             case CodeGenTarget::DXILAssembly:
@@ -2513,9 +2545,9 @@ namespace Slang
                 break;
             }
 
-            case CodeGenTarget::HostCallable:
-            case CodeGenTarget::SharedLibrary:
-            case CodeGenTarget::Executable:
+            case CodeGenTarget::ShaderHostCallable:
+            case CodeGenTarget::ShaderSharedLibrary:
+            case CodeGenTarget::HostExecutable:
             {
                 dumpIntermediateBinary(compileRequest, data, size, _getTargetExtension(target));
                 break;

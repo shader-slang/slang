@@ -558,9 +558,6 @@ INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
     INST(InstanceDecoration,                instance,               1, 0)
     INST(NumThreadsDecoration,              numThreads,             3, 0)
 
-    INST(__exportDirectly,                  __exportDirectly,       0, 0)
-    INST(__externLib,                       __externLib,            0, 0)
-
         // Added to IRParam parameters to an entry point
     /* GeometryInputPrimitiveTypeDecoration */
         INST(PointInputPrimitiveTypeDecoration,  pointPrimitiveType,     0, 0)

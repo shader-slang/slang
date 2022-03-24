@@ -18,7 +18,7 @@
 #include "../../source/core/slang-string.h"
 #include "../../source/core/slang-string-util.h"
 #include "../../source/core/slang-io.h"
-
+#include "../../source/core/slang-dictionary.h"
 
 // Utility to free pointers on scope exit
 struct ScopedMemory
@@ -59,6 +59,7 @@ struct App
 {
     char const* appName = "slang-embed";
     char const* inputPath = nullptr;
+    Slang::HashSet<Slang::String> includedFiles;
 
     void parseOptions(int argc, char** argv)
     {
@@ -88,6 +89,13 @@ struct App
     void processInputFile(FILE* outputFile, Slang::String inputPath)
     {
         using namespace Slang;
+
+        String canonicalPath;
+        if (SLANG_SUCCEEDED(Slang::Path::getCanonical(inputPath, canonicalPath)))
+        {
+            if (!includedFiles.Add(canonicalPath))
+                return;
+        }
 
         // We open the input file in text mode because we are currently
         // embedding textual source files. If/when this utility gets

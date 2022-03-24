@@ -1143,7 +1143,7 @@ public:
     {
         SLANG_RETURN_ON_FAIL(slangContext.initialize(
             desc.slang,
-            SLANG_HOST_CALLABLE,
+            SLANG_SHADER_HOST_CALLABLE,
             "sm_5_1",
             makeArray(slang::PreprocessorMacroDesc{ "__CPU__", "1" }).getView()));
 

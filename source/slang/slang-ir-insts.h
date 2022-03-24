@@ -269,8 +269,6 @@ IR_SIMPLE_DECORATION(PublicDecoration)
 IR_SIMPLE_DECORATION(KeepAliveDecoration)
 IR_SIMPLE_DECORATION(RequiresNVAPIDecoration)
 IR_SIMPLE_DECORATION(NoInlineDecoration)
-IR_SIMPLE_DECORATION(__exportDirectly)
-IR_SIMPLE_DECORATION(__externLib)
 
 struct IRNVAPIMagicDecoration : IRDecoration
 {
@@ -2865,16 +2863,6 @@ public:
     void addSequentialIDDecoration(IRInst* inst, IRIntegerValue id)
     {
         addDecoration(inst, kIROp_SequentialIDDecoration, getIntValue(getUIntType(), id));
-    }
-
-    void addExportDirectlyDecoration(IRInst* value)
-    {
-        addDecoration(value, kIROp___exportDirectly);
-    }
-
-    void addExternLibDecoration(IRInst* value)
-    {
-        addDecoration(value, kIROp___externLib);
     }
 };
 

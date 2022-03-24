@@ -62,7 +62,7 @@ namespace Slang
         return (((unsigned char)ch) & 0xC0) == 0x80;
     }
 
-    struct UnownedStringSlice
+    struct SLANG_RT_API UnownedStringSlice
     {
     public:
         typedef UnownedStringSlice ThisType;
@@ -190,7 +190,7 @@ namespace Slang
 
     // A `StringRepresentation` provides the backing storage for
     // all reference-counted string-related types.
-    class StringRepresentation : public RefObject
+    class SLANG_RT_API StringRepresentation : public RefObject
     {
     public:
         Index length;
@@ -286,7 +286,7 @@ namespace Slang
 
 
 
-    struct UnownedTerminatedStringSlice : public UnownedStringSlice
+    struct SLANG_RT_API UnownedTerminatedStringSlice : public UnownedStringSlice
     {
     public:
         UnownedTerminatedStringSlice(char const* b)
@@ -294,7 +294,7 @@ namespace Slang
         {}
     };
 
-    struct StringSlice
+    struct SLANG_RT_API StringSlice
     {
     public:
         StringSlice();
@@ -333,7 +333,7 @@ namespace Slang
     };
 
     /// String as expected by underlying platform APIs
-    class OSString
+    class SLANG_RT_API OSString
     {
     public:
             /// Default
@@ -394,7 +394,7 @@ namespace Slang
     @brief Represents a UTF-8 encoded string.
     */
 
-    class String
+    class SLANG_RT_API String
     {
         friend struct StringSlice;
         friend class StringBuilder;
@@ -837,7 +837,7 @@ namespace Slang
         }
     };
 
-    class StringBuilder : public String
+    class SLANG_RT_API StringBuilder : public String
     {
     private:
         enum { InitialSize = 1024 };

@@ -1047,14 +1047,6 @@ static void addLinkageDecoration(
         builder->addPublicDecoration(inst);
         builder->addKeepAliveDecoration(inst);
     }
-    if (decl->findModifier<__exportDirectly>())
-    {
-        builder->addExportDirectlyDecoration(inst);
-    }
-    if (decl->findModifier<__externLib>())
-    {
-        builder->addExternLibDecoration(inst);
-    }
 }
 
 static void addLinkageDecoration(
@@ -1994,12 +1986,7 @@ static String getNameForNameHint(
 
     StringBuilder sb;
     sb.append(parentName);
-    if (decl->hasModifier<__exportDirectly>()) {
-        sb.append("::");
-    }
-    else {
-        sb.append(".");
-    }
+    sb.append(".");
     sb.append(leafName->text);
 
     return sb.ProduceString();

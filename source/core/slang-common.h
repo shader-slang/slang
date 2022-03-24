@@ -94,3 +94,22 @@ template<typename T> void slang_use_obj(T&) {}
 #define SLANG_UNREFERENCED_PARAMETER(P) slang_use_obj(P)
 #define SLANG_UNREFERENCED_VARIABLE(P) slang_use_obj(P)
 #endif
+
+#if defined(SLANG_RT_DYNAMIC)
+#if defined(_MSC_VER)
+#    ifdef SLANG_RT_DYNAMIC_EXPORT
+#        define SLANG_RT_API SLANG_DLL_EXPORT
+#    else
+#        define SLANG_RT_API __declspec(dllimport)
+#    endif
+#else
+// TODO: need to consider compiler capabilities
+//#     ifdef SLANG_RT_DYNAMIC_EXPORT
+#    define SLANG_RT_API SLANG_DLL_EXPORT
+//#     endif
+#endif
+#endif
+
+#ifndef SLANG_RT_API
+#define SLANG_RT_API
+#endif
