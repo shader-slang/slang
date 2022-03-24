@@ -131,7 +131,7 @@ SlangResult NodeTree::_calcDerivedTypesRec(ScopeNode* inScopeNode, DiagnosticSin
         else
         {
             // Add to it's own typeset
-            if (classLikeNode->isReflected())
+            if (classLikeNode->isReflected() && classLikeNode->m_typeSet)
             {
                 classLikeNode->m_typeSet->m_baseTypes.add(classLikeNode);
             }

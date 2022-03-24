@@ -314,6 +314,21 @@ SlangResult App::executeWithArgs(int argc, const char*const* argv)
 
 } // namespace CppExtract
 
+
+/*
+The typical command line for producing generated slang files. Can be determined by setting `dumpCommandLine` belong and compiling.
+
+```
+-d E:\git\slang-jsmall-nvidia\source\slang\ slang-ast-support-types.h slang-ast-base.h slang-ast-decl.h slang-ast-expr.h slang-ast-modifier.h slang-ast-stmt.h slang-ast-type.h slang-ast-val.h -strip-prefix slang- -o slang-generated -output-fields -mark-suffix _CLASS
+```
+
+A command line to try and parse the slang.h
+
+```
+-d E:\git\slang-jsmall-nvidia slang.h -mark-suffix _CLASS -dump  -unmarked -unit-test
+```
+*/
+
 int main(int argc, const char*const* argv)
 {
     using namespace CppExtract;

@@ -3016,15 +3016,17 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
         UNREACHABLE_RETURN(LoweredValInfo());
     }
 
-    LoweredValInfo getDefaultVal(VarDeclBase* decl)
+    LoweredValInfo getDefaultVal(DeclRef<VarDeclBase> decl)
     {
-        if(auto initExpr = decl->initExpr)
+        if(auto initExpr = decl.getDecl()->initExpr)
         {
             return lowerRValueExpr(context, initExpr);
         }
         else
         {
-            return getDefaultVal(decl->type);
+            Type* type = decl.substitute(getASTBuilder(), decl.getDecl()->type);
+            SLANG_ASSERT(type);
+            return getDefaultVal(type);
         }
     }
 

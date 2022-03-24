@@ -29,6 +29,9 @@ struct TestState
         m_sink.init(&m_sourceManager, Lexer::sourceLocationLexer);
 
         m_namePool.setRootNamePool(&m_rootNamePool);
+
+        // We don't require marker
+        m_options.m_requireMark = false;
     }
 
     RootNamePool m_rootNamePool;
@@ -41,9 +44,6 @@ struct TestState
 };
 
 static const char someSource[] =
-"#define SLANG_REFLECTED\n"
-"\n"
-"SLANG_REFLECTED\n"  
 "class ISomeInterface\n"
 "{\n"
 "    public:\n"
@@ -51,15 +51,30 @@ static const char someSource[] =
 "    virtual float SLANG_MCALL anotherMethod(float a) = 0;\n"
 "};\n"
 "\n"
+"struct SomeStruct\n"
+"{\n"
+"    SomeStruct() = default;\n"
+"    SomeStruct(float v = 0.0f):b(v) {}\n"
+"    ~SomeStruct() {}\n"
+"    int a = 10; \n"
+"    float b; \n"
+"    int another[10];\n"
+"    const char* yetAnother = nullptr;\n"
+"};\n"
+"\n"
 "enum SomeEnum\n"
 "{\n"
 "    Value,\n"
 "    Another = 10,\n"
 "};\n"
+"\n"
+"typedef int (*SomeFunc)(int a);\n"
+"\n"
 "typedef SomeEnum AliasEnum;\n"
 "void someFunc(int a, float b) { }\n"
 "namespace Blah {\n"
 "int add(int a, int b) { return a + b; }\n"
+"unsigned add(unsigned a, unsigned b) { return a + b; }\n"
 "}\n";
 
 
@@ -79,16 +94,24 @@ static const char someSource[] =
         SourceOrigin* sourceOrigin = tree.addSourceOrigin(sourceFile, state.m_options);
 
         Parser parser(&tree, &state.m_sink);
-        // We don't require markers to reflect
-        parser.setRequireMarker(false);
 
+        
         {
             const Node::Kind enableKinds[] = { Node::Kind::Enum, Node::Kind::EnumClass, Node::Kind::EnumCase, Node::Kind::TypeDef };
             parser.setKindsEnabled(enableKinds, SLANG_COUNT_OF(enableKinds));
         }
 
-        SLANG_RETURN_ON_FAIL(parser.parse(sourceOrigin, &state.m_options));
+        SlangResult res = parser.parse(sourceOrigin, &state.m_options);
 
+        if (state.m_sink.outputBuffer.getLength())
+        {
+            printf("%s\n", state.m_sink.outputBuffer.getBuffer());
+        }
+
+        if (SLANG_FAILED(res))
+        {
+            return res;
+        }
 
         {
             StringBuilder buf;

@@ -62,6 +62,11 @@ namespace Slang
         }
         struct ParsingCursor
         {
+            bool operator==(const ParsingCursor& rhs) const { return tokenReaderCursor == rhs.tokenReaderCursor; }
+            bool operator!=(const ParsingCursor& rhs) const { return !(*this == rhs); }
+
+            bool isValid() const {  return tokenReaderCursor != nullptr; }
+
             Token nextToken;
             const Token* tokenReaderCursor = nullptr;
         };
