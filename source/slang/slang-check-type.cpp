@@ -172,10 +172,11 @@ namespace Slang
         DiagnosticSink* diagSink)
     {
         Type* type = typeExp.type;
-        if(!type && typeExp.exp)
-        {
-            auto expr = typeExp.exp;
+        auto originalExpr = typeExp.exp;
+        auto expr = originalExpr;
 
+        if(!type && expr)
+        {
             expr = maybeResolveOverloadedExpr(expr, LookupMask::type, diagSink);
 
             if(auto typeType = as<TypeType>(expr->type))
@@ -186,6 +187,29 @@ namespace Slang
 
         if (!type)
         {
+            // Only output diagnostic if we have a sink.
+            if (diagSink)
+            {
+                // This function *can* be called with typeExp with both exp and type = nullptr.
+                // Previous behavior didn't output a diagnostic if originalExpr was null, so this keeps that behavior.
+                // 
+                // Additional we check for ErrorType on expr, because if it's set a diagnostic has already been output via
+                // previous code or via maybeResolveOverloadedExpr.
+                if (originalExpr && (expr == nullptr || as<ErrorType>(expr->type) == nullptr))
+                {
+                    // The diagnostic for expectedAType wants to say what it 'got'.
+                    // The solution given here, currently is to just use the node name.
+                    // How useful that might be could depend, and perhaps some other mechanism
+                    // that catagorized 'what' the wrong thing was is. For now this seems sufficient.
+                    //
+                    // Note that use originalExpr (not expr) because we want original expr for diagnostic.
+
+                    // Get the AST node type info, so we can output a 'got' name
+                    auto info = ASTClassInfo::getInfo(originalExpr->astNodeType);
+                    diagSink->diagnose(originalExpr, Diagnostics::expectedAType, info->m_name);
+                }
+            }
+
             if (outProperType)
             {
                 *outProperType = nullptr;
