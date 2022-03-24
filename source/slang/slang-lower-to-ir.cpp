@@ -1047,6 +1047,10 @@ static void addLinkageDecoration(
         builder->addPublicDecoration(inst);
         builder->addKeepAliveDecoration(inst);
     }
+    if (decl->findModifier<ExternCppModifier>())
+    {
+        builder->addExternCppDecoration(inst, mangledName);
+    }
 }
 
 static void addLinkageDecoration(

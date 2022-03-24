@@ -781,11 +781,11 @@ String CLikeSourceEmitter::generateName(IRInst* inst)
         return generateEntryPointNameImpl(entryPointDecor);
     }
 
-    // If the instruction has a linkage decoration, just use that. 
-    if(auto linkageDecoration = inst->findDecoration<IRLinkageDecoration>())
+    // If the instruction has a linkage decoration, just use that.
+    if (auto externCppDecoration = inst->findDecoration<IRExternCppDecoration>())
     {
         // Just use the linkages mangled name directly.
-        return linkageDecoration->getMangledName();
+        return externCppDecoration->getName();
     }
 
     // If we have a name hint on the instruction, then we will try to use that
@@ -793,6 +793,13 @@ String CLikeSourceEmitter::generateName(IRInst* inst)
     if(auto nameHintDecoration = inst->findDecoration<IRNameHintDecoration>())
     {
         return _generateUniqueName(nameHintDecoration->getName());
+    }
+
+    // If the instruction has a linkage decoration, just use that. 
+    if(auto linkageDecoration = inst->findDecoration<IRLinkageDecoration>())
+    {
+        // Just use the linkages mangled name directly.
+        return linkageDecoration->getMangledName();
     }
 
     // Otherwise fall back to a construct temporary name

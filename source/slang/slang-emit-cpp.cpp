@@ -2399,6 +2399,9 @@ void CPPSourceEmitter::emitPreprocessorDirectivesImpl()
     
     if (m_target == CodeGenTarget::CPPSource)
     {
+        // When generating kernel code in C++, put all into an anonymous namespace
+        // This includes any generated types, and generated intrinsics.
+        m_writer->emit("namespace { // anonymous \n\n");
         m_writer->emit("#ifdef SLANG_PRELUDE_NAMESPACE\n");
         m_writer->emit("using namespace SLANG_PRELUDE_NAMESPACE;\n");
         m_writer->emit("#endif\n\n");
@@ -2698,6 +2701,12 @@ void CPPSourceEmitter::emitModuleImpl(IRModule* module, DiagnosticSink* sink)
 
     // Emit all witness table definitions.
     _emitWitnessTableDefinitions();
+
+    if (m_target == CodeGenTarget::CPPSource)
+    {
+        // Need to close the anonymous namespace when outputting for C++ kernel.
+        m_writer->emit("} // anonymous\n\n");
+    }
 
      // Finally we need to output dll entry points
 

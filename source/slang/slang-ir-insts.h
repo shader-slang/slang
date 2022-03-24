@@ -417,6 +417,19 @@ struct IRExportDecoration : IRLinkageDecoration
     IR_LEAF_ISA(ExportDecoration)
 };
 
+struct IRExternCppDecoration : IRDecoration
+{
+    enum
+    {
+        kOp = kIROp_ExternCppDecoration
+    };
+    IR_LEAF_ISA(ExternCppDecoration)
+
+    IRStringLit* getNameOperand() { return cast<IRStringLit>(getOperand(0)); }
+
+    UnownedStringSlice getName() { return getNameOperand()->getStringSlice(); }
+};
+
 struct IRFormatDecoration : IRDecoration
 {
     enum { kOp = kIROp_FormatDecoration };
@@ -2791,6 +2804,11 @@ public:
     void addExportDecoration(IRInst* value, UnownedStringSlice const& mangledName)
     {
         addDecoration(value, kIROp_ExportDecoration, getStringValue(mangledName));
+    }
+
+    void addExternCppDecoration(IRInst* value, UnownedStringSlice const& mangledName)
+    {
+        addDecoration(value, kIROp_ExternCppDecoration, getStringValue(mangledName));
     }
 
     void addEntryPointDecoration(IRInst* value, Profile profile, UnownedStringSlice const& name, UnownedStringSlice const& moduleName)
