@@ -604,6 +604,8 @@ enum class TextureAspect : uint32_t
     Plane0 = 0x00000010,
     Plane1 = 0x00000020,
     Plane2 = 0x00000040,
+
+    DepthStencil = Depth | Stencil,
 };
 
 struct SubresourceRange
