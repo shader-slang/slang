@@ -1287,10 +1287,13 @@ void printDiagnosticArg(StringBuilder& sb, CodeGenTarget val)
             target = CodeGenTarget::ShaderSharedLibrary;
         }
 
-        if (_isCPUHostTarget(target))
+        if (!isPassThroughEnabled(endToEndReq))
         {
-            options.libraryPaths.add(Path::getParentDirectory(Path::getExecutablePath()));
-            options.libraries.add("slang-rt");
+            if (_isCPUHostTarget(target))
+            {
+                options.libraryPaths.add(Path::getParentDirectory(Path::getExecutablePath()));
+                options.libraries.add("slang-rt");
+            }
         }
 
         options.targetType = (SlangCompileTarget)target;
