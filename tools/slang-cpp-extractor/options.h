@@ -28,6 +28,7 @@ struct Options
     bool m_extractDoc = true;       ///< If set will try to extract documentation associated with nodes
 
     bool m_outputFields = false;     ///< When dumping macros also dump field definitions
+    bool m_requireMark = true;
 
     List<String> m_inputPaths;      ///< The input paths to the files to be processed
 

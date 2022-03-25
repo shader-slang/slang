@@ -268,6 +268,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="..\..\..\tools\gfx-unit-test\gfx-test-texture-util.h" />
     <ClInclude Include="..\..\..\tools\gfx-unit-test\gfx-test-util.h" />
     <ClInclude Include="..\..\..\tools\unit-test\slang-unit-test.h" />
   </ItemGroup>
@@ -284,6 +285,7 @@
     <ClCompile Include="..\..\..\tools\gfx-unit-test\get-cmd-queue-handle-test.cpp" />
     <ClCompile Include="..\..\..\tools\gfx-unit-test\get-supported-resource-states-test.cpp" />
     <ClCompile Include="..\..\..\tools\gfx-unit-test\get-texture-resource-handle-test.cpp" />
+    <ClCompile Include="..\..\..\tools\gfx-unit-test\gfx-test-texture-util.cpp" />
     <ClCompile Include="..\..\..\tools\gfx-unit-test\gfx-test-util.cpp" />
     <ClCompile Include="..\..\..\tools\gfx-unit-test\instanced-draw-tests.cpp" />
     <ClCompile Include="..\..\..\tools\gfx-unit-test\mutable-shader-object.cpp" />
