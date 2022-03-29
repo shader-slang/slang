@@ -1403,9 +1403,9 @@ LayoutRulesFamilyImpl* getDefaultLayoutRulesFamilyForTarget(TargetRequest* targe
     case CodeGenTarget::SPIRVAssembly:
         return &kGLSLLayoutRulesFamilyImpl;
 
-    case CodeGenTarget::HostCallable:
-    case CodeGenTarget::Executable:
-    case CodeGenTarget::SharedLibrary:
+    case CodeGenTarget::ShaderHostCallable:
+    case CodeGenTarget::HostExecutable:
+    case CodeGenTarget::ShaderSharedLibrary:
     case CodeGenTarget::CPPSource:
     case CodeGenTarget::CSource:
     {
@@ -1610,9 +1610,9 @@ bool isCPUTarget(TargetRequest* targetReq)
 
     case CodeGenTarget::CPPSource:
     case CodeGenTarget::CSource:
-    case CodeGenTarget::HostCallable:
-    case CodeGenTarget::Executable:
-    case CodeGenTarget::SharedLibrary:
+    case CodeGenTarget::ShaderHostCallable:
+    case CodeGenTarget::HostExecutable:
+    case CodeGenTarget::ShaderSharedLibrary:
         return true;
     }
 }

@@ -1161,10 +1161,6 @@ struct OptionsParser
 
                     rawEntryPoints.add(rawEntryPoint);
                 }
-                else if (argValue == "-heterogeneous")
-                {
-                    requestImpl->getLinkage()->m_heterogeneous = true;
-                }
                 else if (argValue == "-lang")
                 {
                     CommandLineArg name;
@@ -1995,9 +1991,9 @@ struct OptionsParser
                     case CodeGenTarget::CPPSource:
                     case CodeGenTarget::PTX:
                     case CodeGenTarget::CUDASource:
-                    case CodeGenTarget::HostCallable:
-                    case CodeGenTarget::Executable:
-                    case CodeGenTarget::SharedLibrary:
+                    case CodeGenTarget::ShaderHostCallable:
+                    case CodeGenTarget::HostExecutable:
+                    case CodeGenTarget::ShaderSharedLibrary:
                         rawOutput.isWholeProgram = true;
                         break;
                     default:

@@ -215,8 +215,8 @@ void Session::_initCodeGenTransitionMap()
             // We *don't* add a default for host callable, as we will determine what is suitable depending on what
             // is available. We prefer LLVM if that's available. If it's not we can use generic C/C++ compiler
 
-            map.addTransition(source, CodeGenTarget::SharedLibrary, PassThroughMode::GenericCCpp);
-            map.addTransition(source, CodeGenTarget::Executable, PassThroughMode::GenericCCpp);
+            map.addTransition(source, CodeGenTarget::ShaderSharedLibrary, PassThroughMode::GenericCCpp);
+            map.addTransition(source, CodeGenTarget::HostExecutable, PassThroughMode::GenericCCpp);
             map.addTransition(source, CodeGenTarget::ObjectCode, PassThroughMode::GenericCCpp);
         }
     }
@@ -666,7 +666,7 @@ SlangPassThrough Session::getDownstreamCompilerForTransition(SlangCompileTarget 
     }
 
     // Special case host-callable
-    if (target == CodeGenTarget::HostCallable)
+    if (target == CodeGenTarget::ShaderHostCallable)
     {
         if (source == CodeGenTarget::CSource || source == CodeGenTarget::CPPSource)
         {
@@ -1326,9 +1326,9 @@ CapabilitySet TargetRequest::getTargetCaps()
         break;
 
     case CodeGenTarget::CPPSource:
-    case CodeGenTarget::Executable:
-    case CodeGenTarget::SharedLibrary:
-    case CodeGenTarget::HostCallable:
+    case CodeGenTarget::HostExecutable:
+    case CodeGenTarget::ShaderSharedLibrary:
+    case CodeGenTarget::ShaderHostCallable:
         atoms.add(CapabilityAtom::CPP);
         break;
 

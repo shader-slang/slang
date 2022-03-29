@@ -59,6 +59,8 @@
 
 #include <assert.h>
 
+Slang::String get_slang_cpp_host_prelude();
+
 namespace Slang {
 
 EntryPointLayout* findEntryPointLayout(
@@ -257,6 +259,8 @@ Result linkAndOptimizeIR(
         CollectEntryPointUniformParamsOptions passOptions;
         switch( target )
         {
+        case CodeGenTarget::HostCPPSource:
+            break;
         case CodeGenTarget::CUDASource:
             collectOptiXEntryPointUniformParams(irModule);
             #if 0
@@ -286,7 +290,7 @@ Result linkAndOptimizeIR(
     #endif
         validateIRModuleIfEnabled(compileRequest, irModule);
         break;
-
+    case CodeGenTarget::HostCPPSource:
     case CodeGenTarget::CPPSource:
     case CodeGenTarget::CUDASource:
         break;
@@ -873,6 +877,11 @@ SlangResult emitEntryPointsSourceFromIR(
 
     sourceEmitter->emitPreludeDirectives();
 
+    if (isHeterogeneousTarget(target))
+    {
+        sourceWriter.emit(get_slang_cpp_host_prelude());
+    }
+    else
     {
         // If there is a prelude emit it
         const auto& prelude = compileRequest->getSession()->getPreludeForLanguage(sourceLanguage);

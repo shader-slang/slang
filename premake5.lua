@@ -680,30 +680,17 @@ newoption {
  
  example "cpu-hello-world"
      kind "ConsoleApp"
-
  if enableExperimental then
-    project "heterogeneous-first-gen"
-        kind "Utility"
+    project "heterogeneous-hello-world"
+        kind "ConsoleApp"
         links "slangc"
         location("build/" .. slangUtil.getBuildLocationName(targetInfo) .. "/heterogeneous-hello-world")
         prebuildcommands {
-            "\"%{wks.location:lower()}/bin/" .. targetName .. "/%{cfg.buildcfg:lower()}/slangc\"  \"%{wks.location:lower()}/examples/heterogeneous-hello-world/shader.slang\" -o \"%{wks.location:lower()}/examples/heterogeneous-hello-world/shader.cpp\" -heterogeneous -target cpp -target hlsl"
+            "\"%{cfg.targetdir}/slangc\"  \"%{wks.location:lower()}/examples/heterogeneous-hello-world/main.slang\" -o \"%{cfg.targetdir}/heterogeneous-hello-world.exe\""
         }
-    
-    example "heterogeneous-hello-world"
-        kind "ConsoleApp"
-        -- Additionally add slangc for compiling shader.cpp
-        links { "example-base", "slang", "gfx", "gfx-util", "slangc", "platform", "core", "heterogeneous-first-gen" }
-        -- Generate shader.cpp from shader.slang
-        prebuildmessage "Generating shader.cpp in %{wks.location:lower()}/examples/heterogeneous-hello-world/"
-        prebuildcommands {
-            "\"%{wks.location:lower()}/bin/" .. targetName .. "/%{cfg.buildcfg:lower()}/slangc\"  \"%{wks.location:lower()}/examples/heterogeneous-hello-world/shader.slang\" -o \"%{wks.location:lower()}/examples/heterogeneous-hello-world/shader.cpp\" -heterogeneous -target cpp -target hlsl"
-        }
-        files {
-            "examples/heterogeneous-hello-world/shader.cpp"
-        }
+        files  {"examples/heterogeneous-hello-world/*.slang"}
+ 
  end
-
  -- Most of the other projects have more interesting configuration going
  -- on, so let's walk through them in order of increasing complexity.
  --
@@ -754,6 +741,21 @@ newoption {
          addSourceDir "source/compiler-core/unix"
      end
  
+standardProject("slang-rt", "source/slang-rt")
+    uuid "DFC79D72-91DE-434C-871B-B3943B488BEB"
+    kind "SharedLib"
+    pic "On"
+    warnings "Extra"
+    links {"miniz", "lz4"}
+    flags { "FatalWarnings" }
+    defines { "SLANG_RT_DYNAMIC", "SLANG_RT_DYNAMIC_EXPORT" }
+    addSourceDir "source/core"
+    if targetInfo.isWindows then
+        addSourceDir "source/core/windows"
+    else
+        addSourceDir "source/core/unix"
+    end
+
  --
  -- The cpp extractor is a tool that scans C++ header files to extract
  -- reflection like information, and generate files to handle
@@ -1213,7 +1215,8 @@ newoption {
          files {
              "prelude/slang-cuda-prelude.h.cpp",
              "prelude/slang-hlsl-prelude.h.cpp",
-             "prelude/slang-cpp-prelude.h.cpp"
+             "prelude/slang-cpp-prelude.h.cpp",
+             "prelude/slang-cpp-host-prelude.h.cpp"
          }
  end
  
@@ -1318,7 +1321,8 @@ newoption {
      files {
          "prelude/slang-cuda-prelude.h.cpp",
          "prelude/slang-hlsl-prelude.h.cpp",
-         "prelude/slang-cpp-prelude.h.cpp"
+         "prelude/slang-cpp-prelude.h.cpp",
+         "prelude/slang-cpp-host-prelude.h.cpp"
      }
  
      --
@@ -1396,7 +1400,8 @@ newoption {
          files {
              "prelude/slang-cuda-prelude.h.cpp",
              "prelude/slang-hlsl-prelude.h.cpp",
-             "prelude/slang-cpp-prelude.h.cpp"
+             "prelude/slang-cpp-prelude.h.cpp",
+             "prelude/slang-cpp-host-prelude.h.cpp"
          }
  
          -- Add the slang source

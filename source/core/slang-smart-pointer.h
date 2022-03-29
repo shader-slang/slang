@@ -10,7 +10,7 @@
 namespace Slang
 {
     // Base class for all reference-counted objects
-    class RefObject
+    class SLANG_RT_API RefObject
     {
     private:
         UInt referenceCount;
@@ -86,8 +86,7 @@ namespace Slang
     SLANG_FORCE_INLINE const T* as(const RefObject* obj) { return dynamicCast<T>(obj); }
 
     // "Smart" pointer to a reference-counted object
-    template<typename T>
-    struct RefPtr
+    template<typename T> struct SLANG_RT_API RefPtr
     {
         RefPtr()
             : pointer(nullptr)
