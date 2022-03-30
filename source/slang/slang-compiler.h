@@ -71,14 +71,17 @@ namespace Slang
         DXILAssembly        = SLANG_DXIL_ASM,
         CSource             = SLANG_C_SOURCE,
         CPPSource           = SLANG_CPP_SOURCE,
-        Executable          = SLANG_EXECUTABLE,
-        SharedLibrary       = SLANG_SHARED_LIBRARY,
-        HostCallable        = SLANG_HOST_CALLABLE,
+        HostCPPSource       = SLANG_HOST_CPP_SOURCE,
+        HostExecutable      = SLANG_HOST_EXECUTABLE,
+        ShaderSharedLibrary = SLANG_SHADER_SHARED_LIBRARY,
+        ShaderHostCallable  = SLANG_SHADER_HOST_CALLABLE,
         CUDASource          = SLANG_CUDA_SOURCE,
         PTX                 = SLANG_PTX,
         ObjectCode          = SLANG_OBJECT_CODE,
         CountOf             = SLANG_TARGET_COUNT_OF,
     };
+
+    bool isHeterogeneousTarget(CodeGenTarget target);
 
     void printDiagnosticArg(StringBuilder& sb, CodeGenTarget val);
 
@@ -1457,6 +1460,7 @@ namespace Slang
         {
             lineDirectiveMode = mode;
         }
+        
         void setDumpIntermediates(bool value)
         {
             dumpIntermediates = value;
@@ -1657,9 +1661,6 @@ namespace Slang
         SourceManager* m_sourceManager = nullptr;
 
         bool m_obfuscateCode = false;
-
-        // Determine whether to output heterogeneity-related code
-        bool m_heterogeneous = false;
 
         /// Holds any args that are destined for downstream compilers/tools etc
         DownstreamArgs m_downstreamArgs;

@@ -1204,7 +1204,7 @@ static SlangResult _innerMain(Slang::StdWriters* stdWriters, SlangSession* sessi
             slangPassThrough = SLANG_PASS_THROUGH_GLSLANG;
 			break;
         case DeviceType::CPU:
-            input.target = SLANG_HOST_CALLABLE;
+            input.target = SLANG_SHADER_HOST_CALLABLE;
             input.profile = "";
             nativeLanguage = SLANG_SOURCE_LANGUAGE_CPP;
             slangPassThrough = SLANG_PASS_THROUGH_GENERIC_C_CPP;

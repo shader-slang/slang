@@ -415,12 +415,12 @@ static SlangResult _parseGCCFamilyLine(const UnownedStringSlice& line, LineParse
 
     switch (options.targetType)
     {
-        case SLANG_SHARED_LIBRARY:
+        case SLANG_SHADER_SHARED_LIBRARY:
         {
             outPath << SharedLibrary::calcPlatformPath(options.modulePath.getUnownedSlice());
             return SLANG_OK;
         }
-        case SLANG_EXECUTABLE:
+        case SLANG_HOST_EXECUTABLE:
         {
             outPath << options.modulePath;
             outPath << Process::getExecutableSuffix();
@@ -547,7 +547,7 @@ static SlangResult _parseGCCFamilyLine(const UnownedStringSlice& line, LineParse
 
     switch (options.targetType)
     {
-        case SLANG_SHARED_LIBRARY:
+        case SLANG_SHADER_SHARED_LIBRARY:
         {
             // Shared library
             cmdLine.addArg("-shared");
@@ -559,7 +559,7 @@ static SlangResult _parseGCCFamilyLine(const UnownedStringSlice& line, LineParse
             }
             break;
         }
-        case SLANG_EXECUTABLE:
+        case SLANG_HOST_EXECUTABLE:
         {
             break;
         }
@@ -601,7 +601,7 @@ static SlangResult _parseGCCFamilyLine(const UnownedStringSlice& line, LineParse
         //cmdLine.addArg(linkOptions);
     }
 
-    if (options.targetType == SLANG_SHARED_LIBRARY)
+    if (options.targetType == SLANG_SHADER_SHARED_LIBRARY)
     {
         if (!PlatformUtil::isFamily(PlatformFamily::Apple, platformKind))
         {

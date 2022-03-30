@@ -83,7 +83,7 @@ static SlangResult _innerMain(int argc, char** argv)
     // We would like to request a CPU code that can be executed directly on the host -
     // which is the 'SLANG_HOST_CALLABLE' target. 
     // If we wanted a just a shared library/dll, we could have used SLANG_SHARED_LIBRARY.
-    int targetIndex = spAddCodeGenTarget(slangRequest, SLANG_HOST_CALLABLE);
+    int targetIndex = spAddCodeGenTarget(slangRequest, SLANG_SHADER_HOST_CALLABLE);
 
     // Set the target flag to indicate that we want to compile all the entrypoints in the
     // slang shader file into a library.

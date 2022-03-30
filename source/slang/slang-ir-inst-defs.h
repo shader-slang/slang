@@ -558,9 +558,6 @@ INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
     INST(InstanceDecoration,                instance,               1, 0)
     INST(NumThreadsDecoration,              numThreads,             3, 0)
 
-    INST(__exportDirectly,                  __exportDirectly,       0, 0)
-    INST(__externLib,                       __externLib,            0, 0)
-
         // Added to IRParam parameters to an entry point
     /* GeometryInputPrimitiveTypeDecoration */
         INST(PointInputPrimitiveTypeDecoration,  pointPrimitiveType,     0, 0)
@@ -603,6 +600,9 @@ INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
         INST(ImportDecoration, import, 1, 0)
         INST(ExportDecoration, export, 1, 0)
     INST_RANGE(LinkageDecoration, ImportDecoration, ExportDecoration)
+
+        /// An extern_cpp decoration marks the inst to emit its name without mangling for C++ interop.
+    INST(ExternCppDecoration, externCpp, 1, 0)
 
     /* Decorations for RTTI objects */
     INST(RTTITypeSizeDecoration, RTTI_typeSize, 1, 0)

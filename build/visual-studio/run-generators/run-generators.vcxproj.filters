@@ -25,6 +25,9 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
+    <CustomBuild Include="..\..\..\prelude\slang-cpp-host-prelude.h">
+      <Filter>Header Files</Filter>
+    </CustomBuild>
     <CustomBuild Include="..\..\..\prelude\slang-cpp-prelude.h">
       <Filter>Header Files</Filter>
     </CustomBuild>

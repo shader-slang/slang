@@ -681,9 +681,6 @@ namespace Misc {
         {
             switch (data[i])
             {
-            case ' ':
-                sb << "\\s";
-                break;
             case '\n':
                 sb << "\\n";
                 break;

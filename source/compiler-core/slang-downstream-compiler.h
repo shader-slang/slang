@@ -274,7 +274,7 @@ public:
 
         OptimizationLevel optimizationLevel = OptimizationLevel::Default;
         DebugInfoType debugInfoType = DebugInfoType::Standard;
-        SlangCompileTarget targetType = SLANG_EXECUTABLE;
+        SlangCompileTarget targetType = SLANG_HOST_EXECUTABLE;
         SlangSourceLanguage sourceLanguage = SLANG_SOURCE_LANGUAGE_CPP;
         FloatingPointMode floatingPointMode = FloatingPointMode::Default;
         PipelineType pipelineType = PipelineType::Unknown;
@@ -301,6 +301,9 @@ public:
 
         List<String> includePaths;
         List<String> libraryPaths;
+
+            /// Libraries to link against.
+        List<String> libraries;
 
         List<CapabilityVersion> requiredCapabilityVersions;
 
