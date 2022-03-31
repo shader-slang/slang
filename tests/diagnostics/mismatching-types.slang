@@ -45,23 +45,23 @@ void main(uint3 dispatchThreadID : SV_DispatchThreadID)
     GenericOuter<int> a;
     GenericOuter<float> b;
     NonGenericOuter c;
-    NonGenericOuter::GenericInner<int> d;
+    NonGenericOuter.GenericInner<int> d;
     
     // expected an expression of type 'GenericOuter<int>', got 'int'
     a = 0;
-    // expected an expression of type 'GenericOuter<int>::GenericInner<int>', got 'int'
+    // expected an expression of type 'GenericOuter<int>.GenericInner<int>', got 'int'
     a.g = 0;
-    // expected an expression of type 'GenericOuter<int>::NonGenericInner', got 'int'
+    // expected an expression of type 'GenericOuter<int>.NonGenericInner', got 'int'
     a.ng = 0;
-    // expected an expression of type 'GenericOuter<int>::GenericInner<int>', got 'GenericOuter<float>::GenericInner<float>'
+    // expected an expression of type 'GenericOuter<int>.GenericInner<int>', got 'GenericOuter<float>.GenericInner<float>'
     a.g = b.g;
-    // expected an expression of type 'GenericOuter<int>::NonGenericInner', got 'GenericOuter<float>::NonGenericInner'
+    // expected an expression of type 'GenericOuter<int>.NonGenericInner', got 'GenericOuter<float>.NonGenericInner'
     a.ng = b.ng;
-    // expected an expression of type 'NonGenericOuter::GenericInner<int>', got 'int'
+    // expected an expression of type 'NonGenericOuter.GenericInner<int>', got 'int'
     c.i = 0;
-    // expected an expression of type 'NonGenericOuter::GenericInner<int>', got 'NonGenericOuter::GenericInner<float>'
+    // expected an expression of type 'NonGenericOuter.GenericInner<int>', got 'NonGenericOuter.GenericInner<float>'
     c.i = c.f;
-    // expected an expression of type 'NonGenericOuter::GenericInner<int>::ReallyNested', got 'int'
+    // expected an expression of type 'NonGenericOuter.GenericInner<int>.ReallyNested', got 'int'
     c.i.n = 0;
     // OK
     c.i.n.val = 0;

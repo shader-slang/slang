@@ -1152,7 +1152,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
                 if (parentGeneric && parentGeneric->inner == decl)
                     return;
 
-                out << "::";
+                out << ".";
             }
         }
         
