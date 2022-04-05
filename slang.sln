@@ -65,6 +65,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "slang", "build\visual-studi
 		{E145B2B8-CD13-A6BE-B6A7-16E5A2148223} = {E145B2B8-CD13-A6BE-B6A7-16E5A2148223}
 	EndProjectSection
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "slang-rt", "build\visual-studio\slang-rt\slang-rt.vcxproj", "{DFC79D72-91DE-434C-871B-B3943B488BEB}"
+EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "slangc", "build\visual-studio\slangc\slangc.vcxproj", "{D56CBCEB-1EB5-4CA8-AEC4-48EA35ED61C7}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "test-tool", "test-tool", "{57B5AA5E-C340-1823-CC51-9B17385C7423}"
@@ -387,6 +389,18 @@ Global
 		{DB00DA62-0533-4AFD-B59F-A67D5B3A0808}.Release|Win32.Build.0 = Release|Win32
 		{DB00DA62-0533-4AFD-B59F-A67D5B3A0808}.Release|x64.ActiveCfg = Release|x64
 		{DB00DA62-0533-4AFD-B59F-A67D5B3A0808}.Release|x64.Build.0 = Release|x64
+		{DFC79D72-91DE-434C-871B-B3943B488BEB}.Debug|aarch64.ActiveCfg = Debug aarch64|ARM
+		{DFC79D72-91DE-434C-871B-B3943B488BEB}.Debug|aarch64.Build.0 = Debug aarch64|ARM
+		{DFC79D72-91DE-434C-871B-B3943B488BEB}.Debug|Win32.ActiveCfg = Debug|Win32
+		{DFC79D72-91DE-434C-871B-B3943B488BEB}.Debug|Win32.Build.0 = Debug|Win32
+		{DFC79D72-91DE-434C-871B-B3943B488BEB}.Debug|x64.ActiveCfg = Debug|x64
+		{DFC79D72-91DE-434C-871B-B3943B488BEB}.Debug|x64.Build.0 = Debug|x64
+		{DFC79D72-91DE-434C-871B-B3943B488BEB}.Release|aarch64.ActiveCfg = Release aarch64|ARM
+		{DFC79D72-91DE-434C-871B-B3943B488BEB}.Release|aarch64.Build.0 = Release aarch64|ARM
+		{DFC79D72-91DE-434C-871B-B3943B488BEB}.Release|Win32.ActiveCfg = Release|Win32
+		{DFC79D72-91DE-434C-871B-B3943B488BEB}.Release|Win32.Build.0 = Release|Win32
+		{DFC79D72-91DE-434C-871B-B3943B488BEB}.Release|x64.ActiveCfg = Release|x64
+		{DFC79D72-91DE-434C-871B-B3943B488BEB}.Release|x64.Build.0 = Release|x64
 		{D56CBCEB-1EB5-4CA8-AEC4-48EA35ED61C7}.Debug|aarch64.ActiveCfg = Debug aarch64|ARM
 		{D56CBCEB-1EB5-4CA8-AEC4-48EA35ED61C7}.Debug|aarch64.Build.0 = Debug aarch64|ARM
 		{D56CBCEB-1EB5-4CA8-AEC4-48EA35ED61C7}.Debug|Win32.ActiveCfg = Debug|Win32

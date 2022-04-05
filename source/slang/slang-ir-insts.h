@@ -269,8 +269,6 @@ IR_SIMPLE_DECORATION(PublicDecoration)
 IR_SIMPLE_DECORATION(KeepAliveDecoration)
 IR_SIMPLE_DECORATION(RequiresNVAPIDecoration)
 IR_SIMPLE_DECORATION(NoInlineDecoration)
-IR_SIMPLE_DECORATION(__exportDirectly)
-IR_SIMPLE_DECORATION(__externLib)
 
 struct IRNVAPIMagicDecoration : IRDecoration
 {
@@ -417,6 +415,19 @@ struct IRExportDecoration : IRLinkageDecoration
 {
     enum { kOp = kIROp_ExportDecoration };
     IR_LEAF_ISA(ExportDecoration)
+};
+
+struct IRExternCppDecoration : IRDecoration
+{
+    enum
+    {
+        kOp = kIROp_ExternCppDecoration
+    };
+    IR_LEAF_ISA(ExternCppDecoration)
+
+    IRStringLit* getNameOperand() { return cast<IRStringLit>(getOperand(0)); }
+
+    UnownedStringSlice getName() { return getNameOperand()->getStringSlice(); }
 };
 
 struct IRFormatDecoration : IRDecoration
@@ -2795,6 +2806,11 @@ public:
         addDecoration(value, kIROp_ExportDecoration, getStringValue(mangledName));
     }
 
+    void addExternCppDecoration(IRInst* value, UnownedStringSlice const& mangledName)
+    {
+        addDecoration(value, kIROp_ExternCppDecoration, getStringValue(mangledName));
+    }
+
     void addEntryPointDecoration(IRInst* value, Profile profile, UnownedStringSlice const& name, UnownedStringSlice const& moduleName)
     {
         IRInst* operands[] = { getIntValue(getIntType(), profile.raw), getStringValue(name), getStringValue(moduleName) };
@@ -2865,16 +2881,6 @@ public:
     void addSequentialIDDecoration(IRInst* inst, IRIntegerValue id)
     {
         addDecoration(inst, kIROp_SequentialIDDecoration, getIntValue(getUIntType(), id));
-    }
-
-    void addExportDirectlyDecoration(IRInst* value)
-    {
-        addDecoration(value, kIROp___exportDirectly);
-    }
-
-    void addExternLibDecoration(IRInst* value)
-    {
-        addDecoration(value, kIROp___externLib);
     }
 };
 

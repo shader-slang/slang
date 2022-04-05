@@ -759,6 +759,7 @@ static PassThroughFlags _getPassThroughFlagsForTarget(SlangCompileTarget target)
         case SLANG_GLSL:
         case SLANG_C_SOURCE:
         case SLANG_CPP_SOURCE:
+        case SLANG_HOST_CPP_SOURCE:
         case SLANG_CUDA_SOURCE:
         {
             return 0;
@@ -779,9 +780,9 @@ static PassThroughFlags _getPassThroughFlagsForTarget(SlangCompileTarget target)
             return PassThroughFlag::Dxc;
         }
 
-        case SLANG_HOST_CALLABLE:
-        case SLANG_EXECUTABLE:
-        case SLANG_SHARED_LIBRARY:
+        case SLANG_SHADER_HOST_CALLABLE:
+        case SLANG_HOST_EXECUTABLE:
+        case SLANG_SHADER_SHARED_LIBRARY:
         {
             return PassThroughFlag::Generic_C_CPP;
         }
@@ -891,7 +892,7 @@ static SlangResult _extractRenderTestRequirements(const CommandLine& cmdLine, Te
             passThru = SLANG_PASS_THROUGH_GLSLANG;
             break;
         case RenderApiType::CPU:
-            target = SLANG_HOST_CALLABLE;
+            target = SLANG_SHADER_HOST_CALLABLE;
             nativeLanguage = SLANG_SOURCE_LANGUAGE_CPP;
             passThru = SLANG_PASS_THROUGH_GENERIC_C_CPP;
             break;
@@ -1364,7 +1365,7 @@ TestResult runSimpleTest(TestContext* context, TestInput& input)
     }
 
     // If it's executable we run it and use it's output
-    if (target == SLANG_EXECUTABLE)
+    if (target == SLANG_HOST_EXECUTABLE)
     {
         ExecuteResult runExeRes;
         if (SLANG_FAILED(_executeBinary(exeRes.standardOutput.getUnownedSlice(), runExeRes)))
@@ -1797,7 +1798,7 @@ static TestResult runCPPCompilerSharedLibrary(TestContext* context, TestInput& i
     options.sourceLanguage = (ext == "c") ? SLANG_SOURCE_LANGUAGE_C : SLANG_SOURCE_LANGUAGE_CPP;
 
     // Build a shared library
-    options.targetType = SLANG_SHARED_LIBRARY;
+    options.targetType = SLANG_SHADER_SHARED_LIBRARY;
 
     // Compile this source
     options.sourceFiles.add(filePath);

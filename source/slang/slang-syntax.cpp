@@ -1132,16 +1132,68 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         return builder;
     }
 
+    // Prints a partially qualified type name with generic substitutions.
+    static void _printNestedDecl(const Substitutions* substitutions, Decl* decl, StringBuilder& out)
+    {
+        // If there is a parent scope for the declaration, print it first.
+        // Exclude top-level namespaces like `tu0` or `core`.
+        if (decl->parentDecl && !Slang::as<ModuleDecl>(decl->parentDecl))
+        {
+            auto parentGeneric = Slang::as<GenericDecl>(decl->parentDecl);
+
+            // Exclude function or operator names.
+            // Avoids excessively verbose messages like `func<T>(func::T)`
+            if (!(parentGeneric && Slang::as<CallableDecl>(parentGeneric->inner)))
+            {
+                _printNestedDecl(substitutions, decl->parentDecl, out);
+
+                // If the parent is a generic for this type, skip *this* type.
+                // Avoids duplicate types like `MyType<T>::MyType`
+                if (parentGeneric && parentGeneric->inner == decl)
+                    return;
+
+                out << ".";
+            }
+        }
+        
+        // Print this type's name.
+        auto name = decl->getName();
+        if (name)
+        {
+            out << name->text;
+        }
+
+        // Look for generic substitutions on this type.
+        for (const Substitutions* subst = substitutions; subst; subst = subst->outer)
+        {
+            auto genericSubstitution = Slang::as<GenericSubstitution>(subst);
+            if (!genericSubstitution)
+                continue;
+
+            // If the substitution is for this type, print it.
+            if (genericSubstitution->genericDecl == decl)
+            {
+                out << "<";
+                bool isFirst = true;
+                for (const auto& it : genericSubstitution->args)
+                {
+                    if (!isFirst)
+                        out << ", ";
+                    isFirst = false;
+                    it->toText(out);
+                }
+                out << ">";
+
+                break;
+            }
+        }
+    }
+
     void DeclRefBase::toText(StringBuilder& out) const
     {
         if (decl)
         {
-            auto name = decl->getName();
-            if (name)
-            {
-                // TODO: need to print out substitutions too!
-                out << name->text;
-            }
+            _printNestedDecl(substitutions, decl, out);
         }
     }
 

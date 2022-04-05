@@ -258,6 +258,23 @@
     <ClCompile Include="..\..\..\source\core\slang-string.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <CustomBuild Include="..\..\..\prelude\slang-cpp-host-prelude.h">
+      <FileType>Document</FileType>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">"../../../bin/windows-x86/debug/slang-embed" %(Identity)</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">"../../../bin/windows-x64/debug/slang-embed" %(Identity)</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug aarch64|ARM'">"$(SolutionDir)/bin/windows-x64/debug/slang-embed" %(Identity)</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">"../../../bin/windows-x86/release/slang-embed" %(Identity)</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">"../../../bin/windows-x64/release/slang-embed" %(Identity)</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release aarch64|ARM'">"$(SolutionDir)/bin/windows-x64/release/slang-embed" %(Identity)</Command>
+      <Outputs>../../../prelude/slang-cpp-host-prelude.h.cpp</Outputs>
+      <Message>slang-embed %(Identity)</Message>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">../../../bin/windows-x86/debug/slang-embed.exe</AdditionalInputs>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">../../../bin/windows-x64/debug/slang-embed.exe</AdditionalInputs>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug aarch64|ARM'">../../../bin/windows-x64/debug/slang-embed.exe</AdditionalInputs>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">../../../bin/windows-x86/release/slang-embed.exe</AdditionalInputs>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">../../../bin/windows-x64/release/slang-embed.exe</AdditionalInputs>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release aarch64|ARM'">../../../bin/windows-x64/release/slang-embed.exe</AdditionalInputs>
+    </CustomBuild>
     <CustomBuild Include="..\..\..\prelude\slang-cpp-prelude.h">
       <FileType>Document</FileType>
       <Command Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">"../../../bin/windows-x86/debug/slang-embed" %(Identity)</Command>

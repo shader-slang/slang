@@ -3033,9 +3033,9 @@ static bool _isCPUTarget(CodeGenTarget target)
     {
         case CodeGenTarget::CPPSource:
         case CodeGenTarget::CSource:
-        case CodeGenTarget::Executable:
-        case CodeGenTarget::SharedLibrary:
-        case CodeGenTarget::HostCallable:
+        case CodeGenTarget::HostExecutable:
+        case CodeGenTarget::ShaderSharedLibrary:
+        case CodeGenTarget::ShaderHostCallable:
         {
             return true;
         }
