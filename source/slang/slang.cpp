@@ -2202,17 +2202,6 @@ SlangResult FrontEndCompileRequest::executeActionsInner()
     return SLANG_OK;
 }
 
-BackEndCompileRequest::BackEndCompileRequest(
-    Linkage*        linkage,
-    DiagnosticSink* sink,
-    ComponentType*  program)
-    : CompileRequestBase(linkage, sink)
-    , m_program(program)
-    , m_dumpIntermediatePrefix("slang-dump-")
-
-{
-}
-
 EndToEndCompileRequest::EndToEndCompileRequest(
     Session* session)
     : m_session(session)
@@ -2265,8 +2254,6 @@ void EndToEndCompileRequest::init()
     }
 
     m_frontEndReq = new FrontEndCompileRequest(getLinkage(), m_writers, getSink());
-
-    m_backEndReq = new BackEndCompileRequest(getLinkage(), getSink());
 }
 
 SlangResult EndToEndCompileRequest::executeActionsInner()
@@ -2382,8 +2369,7 @@ SlangResult EndToEndCompileRequest::executeActionsInner()
     }
 
     // Generate output code, in whatever format was requested
-    getBackEndReq()->setProgram(getSpecializedGlobalAndEntryPointsComponentType());
-    generateOutput(this);
+    generateOutput();
     if (getSink()->getErrorCount() != 0)
         return SLANG_FAIL;
 
@@ -4129,7 +4115,7 @@ void EndToEndCompileRequest::setCompileFlags(SlangCompileFlags flags)
 
 void EndToEndCompileRequest::setDumpIntermediates(int enable)
 {
-    getBackEndReq()->shouldDumpIntermediates = (enable != 0);
+    shouldDumpIntermediates = (enable != 0);
 
     // Change all existing targets to use the new setting.
     auto linkage = getLinkage();
@@ -4141,7 +4127,7 @@ void EndToEndCompileRequest::setDumpIntermediates(int enable)
 
 void EndToEndCompileRequest::setDumpIntermediatePrefix(const char* prefix)
 {
-    getBackEndReq()->m_dumpIntermediatePrefix = prefix;
+    m_dumpIntermediatePrefix = prefix;
 }
 
 void EndToEndCompileRequest::setLineDirectiveMode(SlangLineDirectiveMode mode)
