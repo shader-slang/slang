@@ -1749,7 +1749,7 @@ Result DeviceImpl::createTextureView(
                 rtvDesc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE3D;
                 rtvDesc.Texture3D.MipSlice = desc.subresourceRange.mipLevel;
                 rtvDesc.Texture3D.FirstWSlice = desc.subresourceRange.baseArrayLayer;
-                rtvDesc.Texture3D.WSize = desc.subresourceRange.layerCount;
+                rtvDesc.Texture3D.WSize = (desc.subresourceRange.layerCount == 0) ? -1 : desc.subresourceRange.layerCount;
                 break;
             case IResource::Type::Buffer:
                 rtvDesc.ViewDimension = D3D12_RTV_DIMENSION_BUFFER;
