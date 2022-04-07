@@ -157,7 +157,6 @@ namespace gfx_test
     struct TextureInfo : RefObject
     {
         Format format;
-        uint32_t texelSize;
         ITextureResource::Type textureType;
 
         ITextureResource::Size extents;
@@ -168,8 +167,9 @@ namespace gfx_test
         List<ITextureResource::SubresourceData> subresourceDatas;
     };
 
-    RefPtr<ValidationTextureFormatBase> getValidationTextureFormat(Format format);
-    TextureAspect getTextureAspect(gfx::Format format);
+    TextureAspect getTextureAspect(Format format);
+    uint32_t getTexelSize(Format format);
     uint32_t getSubresourceIndex(uint32_t mipLevel, uint32_t mipLevelCount, uint32_t baseArrayLayer);
+    RefPtr<ValidationTextureFormatBase> getValidationTextureFormat(Format format);
     void generateTextureData(RefPtr<TextureInfo> texture, ValidationTextureFormatBase* validationFormat);
 }

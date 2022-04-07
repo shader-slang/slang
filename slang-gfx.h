@@ -785,6 +785,8 @@ public:
         ShaderResource,
         UnorderedAccess,
         AccelerationStructure,
+
+        CountOf_,
     };
 
     struct RenderTargetDesc
