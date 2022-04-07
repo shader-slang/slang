@@ -18,7 +18,7 @@ void main(
 	BuiltInTriangleIntersectionAttributes 	attributes,
 	in out ReflectionRay 					ioPayload)
 {
-	uint materialID = InstanceIndex()
+	uint materialID = (InstanceIndex() << 1)
 		+ InstanceID()
 		+ PrimitiveIndex()
 		+ HitKind()

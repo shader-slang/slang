@@ -4736,12 +4736,12 @@ uint RayFlags();
 
 // 10.4.3 - Primitive/Object Space System Values
 
-__target_intrinsic(GL_NV_ray_tracing, "(gl_InstanceCustomIndexNV)")
-__target_intrinsic(GL_EXT_ray_tracing, "(gl_InstanceCustomIndexEXT)")
+__target_intrinsic(__glslRayTracing, "(gl_InstanceID)")
 __target_intrinsic(cuda, "optixGetInstanceIndex")
 uint InstanceIndex();
 
-__target_intrinsic(__glslRayTracing, "(gl_InstanceID)")
+__target_intrinsic(GL_NV_ray_tracing, "(gl_InstanceCustomIndexNV)")
+__target_intrinsic(GL_EXT_ray_tracing, "(gl_InstanceCustomIndexEXT)")
 __target_intrinsic(cuda, "optixGetInstanceId")
 uint InstanceID();
 
@@ -5148,12 +5148,12 @@ struct RayQuery <let rayFlags : RAY_FLAG = RAY_FLAG_NONE>
     __glsl_version(460)
     float4x3 CandidateWorldToObject4x3();
 
-    __target_intrinsic(glsl, "rayQueryGetIntersectionInstanceCustomIndexEXT($0, false)")
+    __target_intrinsic(glsl, "rayQueryGetIntersectionInstanceIdEXT($0, false)")
     __glsl_extension(GL_EXT_ray_query)
     __glsl_version(460)
     uint CandidateInstanceIndex();
 
-    __target_intrinsic(glsl, "rayQueryGetIntersectionInstanceIdEXT($0, false)")
+    __target_intrinsic(glsl, "rayQueryGetIntersectionInstanceCustomIndexEXT($0, false)")
     __glsl_extension(GL_EXT_ray_query)
     __glsl_version(460)
     uint CandidateInstanceID();
@@ -5255,12 +5255,12 @@ struct RayQuery <let rayFlags : RAY_FLAG = RAY_FLAG_NONE>
     __glsl_version(460)
     float CommittedRayT();
 
-    __target_intrinsic(glsl, "rayQueryGetIntersectionInstanceCustomIndexEXT($0, true)")
+    __target_intrinsic(glsl, "rayQueryGetIntersectionInstanceIdEXT($0, true)")
     __glsl_extension(GL_EXT_ray_query)
     __glsl_version(460)
     uint CommittedInstanceIndex();
 
-    __target_intrinsic(glsl, "rayQueryGetIntersectionInstanceIdEXT($0, true)")
+    __target_intrinsic(glsl, "rayQueryGetIntersectionInstanceCustomIndexEXT($0, true)")
     __glsl_extension(GL_EXT_ray_query)
     __glsl_version(460)
     uint CommittedInstanceID();
