@@ -127,7 +127,6 @@ namespace gfx_test
         size_t pixelSize = 0;
         GFX_CHECK_CALL_ABORT(device->readTextureResource(
             texture, state, resultBlob.writeRef(), &rowPitch, &pixelSize));
-        auto result = (float*)resultBlob->getBufferPointer();
         // Compare results.
         for (size_t row = 0; row < rowCount; row++)
         {
@@ -146,7 +145,6 @@ namespace gfx_test
         GFX_CHECK_CALL_ABORT(device->readBufferResource(
             buffer, offset, expectedBufferSize, resultBlob.writeRef()));
         SLANG_CHECK(resultBlob->getBufferSize() == expectedBufferSize);
-        auto result = (float*)resultBlob->getBufferPointer();
         // Compare results.
         SLANG_CHECK(memcmp(resultBlob->getBufferPointer(), (uint8_t*)expectedResult, expectedBufferSize) == 0);
     }
