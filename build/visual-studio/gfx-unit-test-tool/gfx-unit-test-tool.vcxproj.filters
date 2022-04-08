@@ -92,6 +92,9 @@
     <ClCompile Include="..\..\..\tools\gfx-unit-test\gfx-test-texture-util.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\tools\gfx-unit-test\texture-types-tests.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\..\..\tools\gfx-unit-test\buffer-barrier-test.slang">
@@ -125,6 +128,9 @@
       <Filter>Source Files</Filter>
     </None>
     <None Include="..\..\..\tools\gfx-unit-test\trivial-copy.slang">
+      <Filter>Source Files</Filter>
+    </None>
+    <None Include="..\..\..\tools\gfx-unit-test\trivial-copy-textures.slang">
       <Filter>Source Files</Filter>
     </None>
   </ItemGroup>

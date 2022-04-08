@@ -668,7 +668,7 @@ Result DeviceImpl::captureTextureToSurface(
     size_t rowPitch = int(desc.Width) * bytesPerPixel;
     static const size_t align = 256; // D3D requires minimum 256 byte alignment for texture data.
     rowPitch = (rowPitch + align - 1) & ~(align - 1); // Bit trick for rounding up
-    size_t bufferSize = rowPitch * int(desc.Height);
+    size_t bufferSize = rowPitch * int(desc.Height) * int(desc.DepthOrArraySize);
     if (outRowPitch)
         *outRowPitch = rowPitch;
     if (outPixelSize)
@@ -717,7 +717,7 @@ Result DeviceImpl::captureTextureToSurface(
         dstLoc.PlacedFootprint.Footprint.Format = desc.Format;
         dstLoc.PlacedFootprint.Footprint.Width = UINT(desc.Width);
         dstLoc.PlacedFootprint.Footprint.Height = UINT(desc.Height);
-        dstLoc.PlacedFootprint.Footprint.Depth = 1;
+        dstLoc.PlacedFootprint.Footprint.Depth = UINT(desc.DepthOrArraySize);
         dstLoc.PlacedFootprint.Footprint.RowPitch = UINT(rowPitch);
 
         encodeInfo.d3dCommandList->CopyTextureRegion(&dstLoc, 0, 0, 0, &srcLoc, nullptr);
@@ -1749,7 +1749,7 @@ Result DeviceImpl::createTextureView(
                 rtvDesc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE3D;
                 rtvDesc.Texture3D.MipSlice = desc.subresourceRange.mipLevel;
                 rtvDesc.Texture3D.FirstWSlice = desc.subresourceRange.baseArrayLayer;
-                rtvDesc.Texture3D.WSize = desc.subresourceRange.layerCount;
+                rtvDesc.Texture3D.WSize = (desc.subresourceRange.layerCount == 0) ? -1 : desc.subresourceRange.layerCount;
                 break;
             case IResource::Type::Buffer:
                 rtvDesc.ViewDimension = D3D12_RTV_DIMENSION_BUFFER;

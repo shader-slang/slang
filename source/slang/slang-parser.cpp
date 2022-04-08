@@ -2928,8 +2928,7 @@ namespace Slang
         // any non-null pointer we return to the AST).
         //
         NamespaceDecl* namespaceDecl = nullptr;
-        NodeBase* result = nullptr;
-        //
+
         // In order to find out what case we are in, we start by looking
         // for a namespace declaration of the same name in the parent
         // declaration.
@@ -2985,14 +2984,6 @@ namespace Slang
             {
                 namespaceDecl = parser->astBuilder->create<NamespaceDecl>();
                 namespaceDecl->nameAndLoc = nameAndLoc;
-
-                // In the case where we are creating the first
-                // declaration of the given namesapce, we need
-                // to use it as the return value of the parsing
-                // callback, so that it is appropriately added
-                // to the parent declaration.
-                //
-                result = namespaceDecl;
             }
         }
 
@@ -3003,7 +2994,7 @@ namespace Slang
         //
         parseDeclBody(parser, namespaceDecl);
 
-        return result;
+        return namespaceDecl;
     }
 
     static NodeBase* parseUsingDecl(Parser* parser, void* /*userData*/)
@@ -3590,6 +3581,16 @@ namespace Slang
         ContainerDecl*		containerDecl,
         Modifiers			modifiers)
     {
+
+        // If this is a namespace and already added, we don't want to add to the parent
+        // Or add any modifiers
+        if (as<NamespaceDecl>(decl) && decl->parentDecl)
+        {
+            // Presumably we have no modifiers.
+            SLANG_ASSERT(modifiers.isEmpty());
+            return;
+        }
+
         // Add any modifiers we parsed before the declaration to the list
         // of modifiers on the declaration itself.
         //
@@ -3601,9 +3602,9 @@ namespace Slang
             declToModify = genericDecl->inner;
         _addModifiers(declToModify, modifiers);
 
-        // Make sure the decl is properly nested inside its lexical parent
         if (containerDecl)
         {
+            // Make sure the decl is properly nested inside its lexical parent
             AddMember(containerDecl, decl);
         }
     }

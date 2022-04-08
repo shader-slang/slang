@@ -1,4 +1,5 @@
 #include "gfx-test-texture-util.h"
+#include "gfx-test-util.h"
 #include "tools/unit-test/slang-unit-test.h"
 
 #include <slang-com-ptr.h>
@@ -26,6 +27,13 @@ namespace gfx_test
         default:
             return TextureAspect::Color;
         }
+    }
+
+    uint32_t getTexelSize(Format format)
+    {
+        FormatInfo info;
+        GFX_CHECK_CALL_ABORT(gfxGetFormatInfo(format, &info));
+        return info.blockSizeInBytes / info.pixelsPerBlock;
     }
 
     uint32_t getSubresourceIndex(uint32_t mipLevel, uint32_t mipLevelCount, uint32_t baseArrayLayer)
@@ -145,7 +153,7 @@ namespace gfx_test
         auto extents = texture->extents;
         auto arrayLayers = texture->arrayLayerCount;
         auto mipLevels = texture->mipLevelCount;
-        auto texelSize = texture->texelSize;
+        auto texelSize = getTexelSize(texture->format);
 
         for (uint32_t layer = 0; layer < arrayLayers; ++layer)
         {

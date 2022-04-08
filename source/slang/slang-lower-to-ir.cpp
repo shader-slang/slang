@@ -5723,9 +5723,35 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         return paramVal;
     }
 
-    LoweredValInfo lowerConstantDeclCommon(VarDeclBase* decl, IRGenContext* subContext)
+    LoweredValInfo lowerConstantDeclCommon(VarDeclBase* decl) 
     {
-        auto builder = subContext->irBuilder;
+        // It's constant, so shoul dhave this modifier
+        SLANG_ASSERT(decl->hasModifier<ConstModifier>());
+
+        NestedContext nested(this);
+        auto subBuilder = nested.getBuilder();
+        auto subContext = nested.getContext();
+        IRGeneric* outerGeneric = emitOuterGenerics(subContext, decl, decl);
+
+        // TODO(JS): Is this right? 
+        //
+        // If we *are* in a generic, then outputting this in the (current) generic scope would be correct.
+        // If we *aren't* we want to go the level above for insertion
+        //
+        // Just inserting into the parent doesn't work with a generic that holds a function that has a static const
+        // variable.
+        // 
+        // This tries to match the behavior of previous `lowerFunctionStaticConstVarDecl` functionality
+        if (!outerGeneric && isFunctionStaticVarDecl(decl))
+        {
+            // We need to insert the constant at a level above
+            // the function being emitted. This will usually
+            // be the global scope, but it might be an outer
+            // generic if we are lowering a generic function.
+
+            subBuilder->setInsertInto(subBuilder->getFunc()->getParent());
+        }
+
         auto initExpr = decl->initExpr;
 
         // We want to be able to support cases where a global constant is defined in
@@ -5752,7 +5778,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             // a global constant IR node with the right type.
             //
             auto irType = lowerType(subContext, decl->getType());
-            irConstant = builder->emitGlobalConstant(irType);
+            irConstant = subBuilder->emitGlobalConstant(irType);
         }
         else
         {
@@ -5768,7 +5794,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             // We construct a distinct IR instruction to represent the
             // constant itself, with the value as an operand.
             //
-            irConstant = builder->emitGlobalConstant(
+            irConstant = subBuilder->emitGlobalConstant(
                 irInitVal->getFullType(),
                 irInitVal);
         }
@@ -5776,24 +5802,30 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // All of the attributes/decorations we can attach
         // belong on the IR constant node.
         //
+
         addLinkageDecoration(context, irConstant, decl);
+        
         addNameHint(context, irConstant, decl);
         addVarDecorations(context, irConstant, decl);
+
         getBuilder()->addHighLevelDeclDecoration(irConstant, decl);
+
+        // Finish of generic
+
+        auto loweredValue = LoweredValInfo::simple(finishOuterGenerics(subBuilder, irConstant, outerGeneric));
 
         // Register the value that was emitted as the value
         // for any references to the constant from elsewhere
         // in the code.
         //
-        auto constantVal = LoweredValInfo::simple(irConstant);
-        setGlobalValue(context, decl, constantVal);
+        setGlobalValue(context, decl, loweredValue);
 
-        return constantVal;
+        return loweredValue;
     }
 
     LoweredValInfo lowerGlobalConstantDecl(VarDecl* decl)
     {
-        return lowerConstantDeclCommon(decl, context);
+        return lowerConstantDeclCommon(decl);
     }
 
     LoweredValInfo lowerGlobalVarDecl(VarDecl* decl)
@@ -5919,18 +5951,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
     LoweredValInfo lowerFunctionStaticConstVarDecl(
         VarDeclBase* decl)
     {
-        // We need to insert the constant at a level above
-        // the function being emitted. This will usually
-        // be the global scope, but it might be an outer
-        // generic if we are lowering a generic function.
-        //
-        NestedContext nestedContext(this);
-        auto subBuilder = nestedContext.getBuilder();
-        auto subContext = nestedContext.getContext();
-
-        subBuilder->setInsertInto(subBuilder->getFunc()->getParent());
-
-        return lowerConstantDeclCommon(decl, subContext);
+        return lowerConstantDeclCommon(decl);
     }
 
     LoweredValInfo lowerFunctionStaticVarDecl(
@@ -7590,6 +7611,13 @@ LoweredValInfo ensureDecl(
         env = env->outer;
     }
 
+    // If we have a decl that's a generic value/type decl then something has gone seriously
+    // wrong
+    if (as<GenericValueParamDecl>(decl) || as<GenericTypeParamDecl>(decl))
+    {
+        SLANG_UNEXPECTED("Generic type/value shouldn't be handled here!");
+    }
+
     IRBuilder subIRBuilder(context->irBuilder->getSharedBuilder());
     subIRBuilder.setInsertInto(subIRBuilder.getModule());
 
@@ -7625,6 +7653,15 @@ bool canDeclLowerToAGeneric(Decl* decl)
     // a generic that returns a type (a simple type-level function).
     if(as<TypeDefDecl>(decl)) return true;
 
+    // If we have a variable declaration that is *static* and *const* we can lower to a generic
+    if (auto varDecl = as<VarDecl>(decl))
+    {
+        if (varDecl->hasModifier<HLSLStaticModifier>() && varDecl->hasModifier<ConstModifier>())
+        {
+            return true;
+        }
+    }
+    
     return false;
 }
 
@@ -7674,6 +7711,9 @@ LoweredValInfo emitDeclRef(
     Substitutions*   subst,
     IRType*                 type)
 {
+    const auto initialSubst = subst;
+    SLANG_UNUSED(initialSubst);
+
     // We need to proceed by considering the specializations that
     // have been put in place.
 

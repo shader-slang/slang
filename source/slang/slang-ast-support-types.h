@@ -310,6 +310,9 @@ namespace Slang
         template<typename T>
         bool hasModifier() { return findModifier<T>() != nullptr; }
 
+            /// True if has no modifiers
+        bool isEmpty() const { return first == nullptr; }
+
         FilteredModifierList<Modifier>::Iterator begin() { return FilteredModifierList<Modifier>::Iterator(first); }
         FilteredModifierList<Modifier>::Iterator end() { return FilteredModifierList<Modifier>::Iterator(nullptr); }
     };
