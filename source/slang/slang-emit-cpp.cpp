@@ -2023,6 +2023,29 @@ void CPPSourceEmitter::_emitType(IRType* type, DeclaratorInfo* declarator)
             _emitType(ptrType->getValueType(), &refDeclarator);
         }
         break;
+    case kIROp_ArrayType:
+        {
+            auto arrayType = static_cast<IRArrayType*>(type);
+            auto elementType = arrayType->getElementType();
+            int elementCount = int(getIntVal(arrayType->getElementCount()));
+
+            m_writer->emit("FixedArray<");
+            _emitType(elementType, nullptr);
+            m_writer->emit(", ");
+            m_writer->emit(elementCount);
+            m_writer->emit(">");
+        }
+        break;
+    case kIROp_UnsizedArrayType:
+        {
+            auto arrayType = static_cast<IRUnsizedArrayType*>(type);
+            auto elementType = arrayType->getElementType();
+
+            m_writer->emit("Array<");
+            _emitType(elementType, nullptr);
+            m_writer->emit(">");
+        }
+        break;
     case kIROp_FuncType:
         {
             auto funcType = cast<IRFuncType>(type);
