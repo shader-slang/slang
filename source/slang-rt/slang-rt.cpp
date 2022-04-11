@@ -2,7 +2,7 @@
 #include "../core/slang-basic.h"
 #include "../core/slang-shared-library.h"
 
-#ifdef SLANG_WINDOWS_FAMILY
+#if SLANG_WINDOWS_FAMILY
 #    include <Windows.h>
 #endif
 
@@ -14,7 +14,7 @@ extern "C"
     SLANG_RT_API void SLANG_MCALL _slang_rt_abort(Slang::String errorMessage)
     {
         fprintf(stderr, "%s", errorMessage.getBuffer());
-#ifdef SLANG_WINDOWS_FAMILY
+#if SLANG_WINDOWS_FAMILY
         MessageBoxA(0, errorMessage.getBuffer(), "Slang Runtime Error", MB_ICONERROR);
 #endif
         abort();
