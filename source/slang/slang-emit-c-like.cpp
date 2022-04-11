@@ -92,14 +92,11 @@ struct CLikeSourceEmitter::ComputeEmitActionsContext
 CLikeSourceEmitter::CLikeSourceEmitter(const Desc& desc)
 {
     m_writer = desc.sourceWriter;
-    m_sourceLanguage = getSourceLanguage(desc.target);
+    m_sourceLanguage = getSourceLanguage(desc.codeGenContext->getTargetFormat());
     SLANG_ASSERT(m_sourceLanguage != SourceLanguage::Unknown);
 
-    m_target = desc.target;
-    m_targetCaps = desc.targetCaps;
-
-    m_compileRequest = desc.compileRequest;
-    m_targetRequest = desc.targetRequest;
+    m_target = desc.codeGenContext->getTargetFormat();
+    m_codeGenContext = desc.codeGenContext;
     m_entryPointStage = desc.entryPointStage;
     m_effectiveProfile = desc.effectiveProfile;
 }

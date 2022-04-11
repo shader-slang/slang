@@ -85,17 +85,16 @@ struct ResourceParameterSpecializationCondition : FunctionCallSpecializeConditio
 };
 
 bool specializeResourceParameters(
-    BackEndCompileRequest* compileRequest,
-    TargetRequest*  targetRequest,
+    CodeGenContext* codeGenContext,
     IRModule*       module)
 {
     bool result = false;
     ResourceParameterSpecializationCondition condition;
-    condition.targetRequest = targetRequest;
+    condition.targetRequest = codeGenContext->getTargetReq();
     bool changed = true;
     while (changed)
     {
-        changed = specializeFunctionCalls(compileRequest, targetRequest, module, &condition);
+        changed = specializeFunctionCalls(codeGenContext, module, &condition);
         simplifyIR(module);
         result |= changed;
     }
@@ -112,7 +111,7 @@ struct ResourceOutputSpecializationPass
     // via `return` or `out`/`inout` parmeters), and then specializes the
     // *call sites* for those functions based on the values that are output.
 
-    BackEndCompileRequest* compileRequest;
+    CodeGenContext* codeGenContext;
     TargetRequest*  targetRequest;
     IRModule*       module;
 
@@ -1116,11 +1115,11 @@ struct ResourceOutputSpecializationPass
 };
 
 bool specializeResourceOutputs(
-    BackEndCompileRequest*  compileRequest,
-    TargetRequest*          targetRequest,
+    CodeGenContext*         codeGenContext,
     IRModule*               module,
     List<IRFunc*>&          unspecializableFuncs)
 {
+    auto targetRequest = codeGenContext->getTargetReq();
     if(isD3DTarget(targetRequest) || isKhronosTarget(targetRequest))
     {}
     else
@@ -1136,7 +1135,7 @@ bool specializeResourceOutputs(
     }
 
     ResourceOutputSpecializationPass pass;
-    pass.compileRequest = compileRequest;
+    pass.codeGenContext = codeGenContext;
     pass.targetRequest = targetRequest;
     pass.module = module;
     pass.unspecializableFuncs = &unspecializableFuncs;
@@ -1144,7 +1143,8 @@ bool specializeResourceOutputs(
 }
 
 bool specializeResourceUsage(
-    BackEndCompileRequest* compileRequest, TargetRequest* targetRequest, IRModule* irModule)
+    CodeGenContext* codeGenContext,
+    IRModule*       irModule)
 {
     bool result = false;
     // We apply two kinds of specialization to clean up resource value usage:
@@ -1173,8 +1173,8 @@ bool specializeResourceUsage(
             // pass down the target request along with the IR.
             //
             changed |= specializeResourceOutputs(
-                compileRequest, targetRequest, irModule, unspecializableFuncs);
-            changed |= specializeResourceParameters(compileRequest, targetRequest, irModule);
+                codeGenContext, irModule, unspecializableFuncs);
+            changed |= specializeResourceParameters(codeGenContext, irModule);
 
             // After specialization of function outputs, we may find that there
             // are cases where opaque-typed local variables can now be eliminated

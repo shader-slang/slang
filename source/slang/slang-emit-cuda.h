@@ -56,7 +56,7 @@ public:
     CUDASourceEmitter(const Desc& desc) :
         Super(desc)
     {
-        m_extensionTracker = dynamicCast<CUDAExtensionTracker>(desc.extensionTracker);
+        m_extensionTracker = dynamicCast<CUDAExtensionTracker>(desc.codeGenContext->getExtensionTracker());
         SLANG_ASSERT(m_extensionTracker);
     }
 

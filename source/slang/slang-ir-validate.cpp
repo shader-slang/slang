@@ -285,4 +285,15 @@ namespace Slang
         auto sink = compileRequest->getSink();
         validateIRModule(module, sink);
     }
+
+    void validateIRModuleIfEnabled(
+        CodeGenContext* codeGenContext,
+        IRModule* module)
+    {
+        if (!codeGenContext->shouldValidateIR())
+            return;
+
+        auto sink = codeGenContext->getSink();
+        validateIRModule(module, sink);
+    }
 }

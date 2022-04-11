@@ -22,10 +22,7 @@ namespace Slang
     // target will be used.
     //
     LinkedIR linkIR(
-        BackEndCompileRequest*  compileRequest,
-        const List<Int>&        entryPointIndices,
-        CodeGenTarget           target,
-        TargetProgram*          targetProgram);
+        CodeGenContext* codeGenContext);
 
     // Replace any global constants in the IR module with their
     // definitions, if possible.
