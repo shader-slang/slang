@@ -1038,6 +1038,9 @@ TResult slang_bit_cast(TInput val)
     return *(TResult*)(&val);
 }
 
+template<typename TResult, typename... Args>
+using Slang_FuncType = TResult(SLANG_MCALL *)(Args...);
+
 #ifdef SLANG_PRELUDE_NAMESPACE
 }
 #endif

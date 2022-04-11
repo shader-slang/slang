@@ -5,12 +5,10 @@
 #include <cmath>
 #include <cstring>
 
-#include "../source/core/slang-string.h"
-#include "../source/core/slang-smart-pointer.h"
+#include "../source/slang-rt/slang-rt.h"
 #include "../slang-com-ptr.h"
-#include "../slang-gfx.h"
+#include "slang-cpp-types.h"
 
 using namespace Slang;
-using namespace gfx;
 
 #endif

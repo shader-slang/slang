@@ -920,6 +920,13 @@ class AnyValueSizeAttribute : public Attribute
     int32_t size;
 };
 
+class DllImportAttribute : public Attribute
+{
+    SLANG_AST_CLASS(DllImportAttribute)
+
+    String modulePath;
+};
+
     /// A `[__requiresNVAPI]` attribute indicates that the declaration being modifed
     /// requires NVAPI operations for its implementation on D3D.
 class RequiresNVAPIAttribute : public Attribute

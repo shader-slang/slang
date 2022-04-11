@@ -1051,6 +1051,11 @@ static void addLinkageDecoration(
     {
         builder->addExternCppDecoration(inst, mangledName);
     }
+    if (auto dllImportModifier = decl->findModifier<DllImportAttribute>())
+    {
+        auto libraryName = dllImportModifier->modulePath;
+        builder->addDllImportDecoration(inst, libraryName.getUnownedSlice(), decl->getName()->text.getUnownedSlice());
+    }
 }
 
 static void addLinkageDecoration(
@@ -3171,6 +3176,11 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
     LoweredValInfo visitBoolLiteralExpr(BoolLiteralExpr* expr)
     {
         return LoweredValInfo::simple(context->irBuilder->getBoolValue(expr->value));
+    }
+
+    LoweredValInfo visitNullPtrLiteralExpr(NullPtrLiteralExpr*)
+    {
+        return LoweredValInfo::simple(context->irBuilder->getPtrValue(nullptr));
     }
 
     LoweredValInfo visitIntegerLiteralExpr(IntegerLiteralExpr* expr)

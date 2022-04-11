@@ -159,6 +159,14 @@ void CLikeSourceEmitter::emitDeclarator(DeclaratorInfo* declarator)
         }
         break;
 
+    case DeclaratorInfo::Flavor::Ref:
+        {
+            auto refDeclarator = (RefDeclaratorInfo*)declarator;
+            m_writer->emit("&");
+            emitDeclarator(refDeclarator->next);
+        }
+        break;
+
     case DeclaratorInfo::Flavor::LiteralSizedArray:
         {
             auto arrayDeclarator = (LiteralSizedArrayDeclaratorInfo*)declarator;
@@ -180,8 +188,6 @@ void CLikeSourceEmitter::emitDeclarator(DeclaratorInfo* declarator)
             emitDeclarator(attributedDeclarator->next);
         }
         break;
-
-
     default:
         SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unknown declarator flavor");
         break;
@@ -214,6 +220,8 @@ void CLikeSourceEmitter::emitSimpleType(IRType* type)
 
         case kIROp_FloatType:   return UnownedStringSlice("float");    
         case kIROp_DoubleType:  return UnownedStringSlice("double");
+
+        case kIROp_CharType:    return UnownedStringSlice("uint8_t");
         default:                return UnownedStringSlice();
     }
 }
@@ -324,7 +332,6 @@ void CLikeSourceEmitter::_emitType(IRType* type, DeclaratorInfo* declarator)
         }
         break;
     }
-
 }
 
 void CLikeSourceEmitter::emitWitnessTable(IRWitnessTable* witnessTable)
@@ -3305,8 +3312,15 @@ void CLikeSourceEmitter::ensureInstOperandsRec(ComputeEmitActionsContext* ctx, I
 
     UInt operandCount = inst->operandCount;
     auto requiredLevel = EmitAction::Definition;
-    if (inst->getOp() == kIROp_InterfaceType)
+    switch (inst->getOp())
+    {
+    case kIROp_InterfaceType:
+    case kIROp_PtrType:
         requiredLevel = EmitAction::ForwardDeclaration;
+        break;
+    default:
+        break;
+    }
 
     for(UInt ii = 0; ii < operandCount; ++ii)
     {
@@ -3404,6 +3418,23 @@ void CLikeSourceEmitter::computeEmitActions(IRModule* module, List<EmitAction>& 
     }
 }
 
+void CLikeSourceEmitter::emitForwardDeclaration(IRInst* inst)
+{
+    switch (inst->getOp())
+    {
+    case kIROp_Func:
+        emitFuncDecl(cast<IRFunc>(inst));
+        break;
+    case kIROp_StructType:
+        m_writer->emit("struct ");
+        m_writer->emit(getName(inst));
+        m_writer->emit(";\n");
+        break;
+    default:
+        SLANG_UNREACHABLE("emit forward declaration");
+    }
+}
+
 void CLikeSourceEmitter::executeEmitActions(List<EmitAction> const& actions)
 {
     for(auto action : actions)
@@ -3411,7 +3442,7 @@ void CLikeSourceEmitter::executeEmitActions(List<EmitAction> const& actions)
         switch(action.level)
         {
         case EmitAction::Level::ForwardDeclaration:
-            emitFuncDecl(cast<IRFunc>(action.inst));
+            emitForwardDeclaration(action.inst);
             break;
 
         case EmitAction::Level::Definition:

@@ -335,6 +335,7 @@
     <ClInclude Include="..\..\..\source\core\slang-virtual-object-pool.h" />
     <ClInclude Include="..\..\..\source\core\slang-writer.h" />
     <ClInclude Include="..\..\..\source\core\slang-zip-file-system.h" />
+    <ClInclude Include="..\..\..\source\slang-rt\slang-rt.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\source\core\slang-archive-file-system.cpp" />
@@ -378,6 +379,7 @@
     <ClCompile Include="..\..\..\source\core\slang-writer.cpp" />
     <ClCompile Include="..\..\..\source\core\slang-zip-file-system.cpp" />
     <ClCompile Include="..\..\..\source\core\windows\slang-win-process.cpp" />
+    <ClCompile Include="..\..\..\source\slang-rt\slang-rt.cpp" />
   </ItemGroup>
   <ItemGroup>
     <Natvis Include="..\..\..\source\core\core.natvis" />
