@@ -33,14 +33,15 @@ namespace vk
 {
 namespace
 {
-size_t calcRowSize(Format format, int width)
+Size calcRowSize(Format format, int width)
 {
     FormatInfo sizeInfo;
     gfxGetFormatInfo(format, &sizeInfo);
-    return size_t(
+    return Size(
         (width + sizeInfo.blockWidth - 1) / sizeInfo.blockWidth * sizeInfo.blockSizeInBytes);
 }
 
+// TODO: Change size_t to Count?
 size_t calcNumRows(Format format, int height)
 {
     FormatInfo sizeInfo;
@@ -487,11 +488,12 @@ DeviceImpl::~DeviceImpl()
     }
 }
 
+// TODO: Is "location" still needed for this function?
 VkBool32 DeviceImpl::handleDebugMessage(
     VkDebugReportFlagsEXT flags,
     VkDebugReportObjectTypeEXT objType,
     uint64_t srcObject,
-    size_t location,
+    Size location,
     int32_t msgCode,
     const char* pLayerPrefix,
     const char* pMsg)
@@ -512,7 +514,7 @@ VkBool32 DeviceImpl::handleDebugMessage(
 
     // pMsg can be really big (it can be assembler dump for example)
     // Use a dynamic buffer to store
-    size_t bufferSize = strlen(pMsg) + 1 + 1024;
+    Size bufferSize = strlen(pMsg) + 1 + 1024;
     List<char> bufferArray;
     bufferArray.setCount(bufferSize);
     char* buffer = bufferArray.getBuffer();
@@ -527,7 +529,7 @@ VKAPI_ATTR VkBool32 VKAPI_CALL DeviceImpl::debugMessageCallback(
     VkDebugReportFlagsEXT flags,
     VkDebugReportObjectTypeEXT objType,
     uint64_t srcObject,
-    size_t location,
+    Size location,
     int32_t msgCode,
     const char* pLayerPrefix,
     const char* pMsg,
@@ -1235,8 +1237,8 @@ SlangResult DeviceImpl::readTextureResource(
     ITextureResource* texture,
     ResourceState state,
     ISlangBlob** outBlob,
-    size_t* outRowPitch,
-    size_t* outPixelSize)
+    Size* outRowPitch,
+    Size* outPixelSize)
 {
     auto textureImpl = static_cast<TextureResourceImpl*>(texture);
     RefPtr<ListBlob> blob = new ListBlob();
@@ -1246,8 +1248,8 @@ SlangResult DeviceImpl::readTextureResource(
     auto height = desc->size.height;
     FormatInfo sizeInfo;
     SLANG_RETURN_ON_FAIL(gfxGetFormatInfo(desc->format, &sizeInfo));
-    size_t pixelSize = sizeInfo.blockSizeInBytes / sizeInfo.pixelsPerBlock;
-    size_t rowPitch = width * pixelSize;
+    Size pixelSize = sizeInfo.blockSizeInBytes / sizeInfo.pixelsPerBlock;
+    Size rowPitch = width * pixelSize;
 
     List<TextureResource::Size> mipSizes;
 
@@ -1255,7 +1257,7 @@ SlangResult DeviceImpl::readTextureResource(
     auto arraySize = calcEffectiveArraySize(*desc);
 
     // Calculate how large the buffer has to be
-    size_t bufferSize = 0;
+    Size bufferSize = 0;
     // Calculate how large an array entry is
     for (int j = 0; j < numMipMaps; ++j)
     {
@@ -1270,6 +1272,7 @@ SlangResult DeviceImpl::readTextureResource(
     }
     // Calculate the total size taking into account the array
     bufferSize *= arraySize;
+    // TODO: Change Index to Count?
     blob->m_data.setCount(Index(bufferSize));
 
     VKBufferHandleRAII staging;
@@ -1283,7 +1286,7 @@ SlangResult DeviceImpl::readTextureResource(
     VkImage srcImage = textureImpl->m_image;
     VkImageLayout srcImageLayout = VulkanUtil::getImageLayoutFromState(state);
 
-    size_t dstOffset = 0;
+    Offset dstOffset = 0;
     for (int i = 0; i < arraySize; ++i)
     {
         for (Index j = 0; j < mipSizes.getCount(); ++j)
@@ -1331,7 +1334,7 @@ SlangResult DeviceImpl::readTextureResource(
 }
 
 SlangResult DeviceImpl::readBufferResource(
-    IBufferResource* inBuffer, size_t offset, size_t size, ISlangBlob** outBlob)
+    IBufferResource* inBuffer, Offset offset, Size size, ISlangBlob** outBlob)
 {
     BufferResourceImpl* buffer = static_cast<BufferResourceImpl*>(inBuffer);
 
@@ -1489,7 +1492,7 @@ void DeviceImpl::_transitionImageLayout(
 }
 
 Result DeviceImpl::getTextureAllocationInfo(
-    const ITextureResource::Desc& descIn, size_t* outSize, size_t* outAlignment)
+    const ITextureResource::Desc& descIn, Size* outSize, Size* outAlignment)
 {
     TextureResource::Desc desc = fixupTextureDesc(descIn);
 
@@ -1561,14 +1564,14 @@ Result DeviceImpl::getTextureAllocationInfo(
     VkMemoryRequirements memRequirements;
     m_api.vkGetImageMemoryRequirements(m_device, image, &memRequirements);
 
-    *outSize = (size_t)memRequirements.size;
-    *outAlignment = (size_t)memRequirements.alignment;
+    *outSize = (Size)memRequirements.size;
+    *outAlignment = (Size)memRequirements.alignment;
 
     m_api.vkDestroyImage(m_device, image, nullptr);
     return SLANG_OK;
 }
 
-Result DeviceImpl::getTextureRowAlignment(size_t* outAlignment)
+Result DeviceImpl::getTextureRowAlignment(Size* outAlignment)
 {
     *outAlignment = 1;
     return SLANG_OK;
@@ -1713,7 +1716,7 @@ Result DeviceImpl::createTextureResource(
         const int numMipMaps = desc.numMipLevels;
 
         // Calculate how large the buffer has to be
-        size_t bufferSize = 0;
+        Size bufferSize = 0;
         // Calculate how large an array entry is
         for (int j = 0; j < numMipMaps; ++j)
         {
@@ -1747,7 +1750,7 @@ Result DeviceImpl::createTextureResource(
             uint8_t* dstDataStart;
             dstDataStart = dstData;
 
-            size_t dstSubresourceOffset = 0;
+            Offset dstSubresourceOffset = 0;
             for (int i = 0; i < arraySize; ++i)
             {
                 for (Index j = 0; j < mipSizes.getCount(); ++j)
@@ -1799,7 +1802,7 @@ Result DeviceImpl::createTextureResource(
             VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 
         {
-            size_t srcOffset = 0;
+            Offset srcOffset = 0;
             for (int i = 0; i < arraySize; ++i)
             {
                 for (Index j = 0; j < mipSizes.getCount(); ++j)
@@ -1875,7 +1878,7 @@ Result DeviceImpl::createBufferResource(
 {
     BufferResource::Desc desc = fixupBufferDesc(descIn);
 
-    const size_t bufferSize = desc.sizeInBytes;
+    const Size bufferSize = desc.sizeInBytes;
 
     VkMemoryPropertyFlags reqMemoryProperties = 0;
 
@@ -2575,7 +2578,7 @@ Result TransientResourceHeapImpl::synchronizeAndReset()
 
 Result VKBufferHandleRAII::init(
     const VulkanApi& api,
-    size_t bufferSize,
+    Size bufferSize,
     VkBufferUsageFlags usage,
     VkMemoryPropertyFlags reqMemoryProperties,
     bool isShared,
@@ -4743,8 +4746,10 @@ Result ShaderObjectImpl::getEntryPoint(UInt index, IShaderObject** outEntryPoint
 
 const void* ShaderObjectImpl::getRawData() { return m_data.getBuffer(); }
 
+// TODO: Change size_t to Count?
 size_t ShaderObjectImpl::getSize() { return (size_t)m_data.getCount(); }
 
+// TODO: Change size_t and Index to Size?
 Result ShaderObjectImpl::setData(ShaderOffset const& inOffset, void const* data, size_t inSize)
 {
     Index offset = inOffset.uniformOffset;
@@ -4849,6 +4854,7 @@ Result ShaderObjectImpl::init(IDevice* device, ShaderObjectLayoutImpl* layout)
     // uniform data (which includes values from this object and
     // any existential-type sub-objects).
     //
+    // TODO: Change size_t to Count?
     size_t uniformSize = layout->getElementTypeLayout()->getSize();
     if (uniformSize)
     {
@@ -4911,11 +4917,12 @@ Result ShaderObjectImpl::init(IDevice* device, ShaderObjectLayoutImpl* layout)
 Result ShaderObjectImpl::_writeOrdinaryData(
     PipelineCommandEncoder* encoder,
     IBufferResource* buffer,
-    size_t offset,
-    size_t destSize,
+    Offset offset,
+    Size destSize,
     ShaderObjectLayoutImpl* specializedLayout)
 {
     auto src = m_data.getBuffer();
+    // TODO: Change size_t to Count?
     auto srcSize = size_t(m_data.getCount());
 
     SLANG_ASSERT(srcSize <= destSize);
@@ -4976,8 +4983,8 @@ Result ShaderObjectImpl::_writeOrdinaryData(
         // layout logic does for complex cases with multiple layers of nested arrays and
         // structures.
         //
-        size_t subObjectRangePendingDataOffset = subObjectRangeInfo.offset.pendingOrdinaryData;
-        size_t subObjectRangePendingDataStride = subObjectRangeInfo.stride.pendingOrdinaryData;
+        Offset subObjectRangePendingDataOffset = subObjectRangeInfo.offset.pendingOrdinaryData;
+        Size subObjectRangePendingDataStride = subObjectRangeInfo.stride.pendingOrdinaryData;
 
         // If the range doesn't actually need/use the "pending" allocation at all, then
         // we need to detect that case and skip such ranges.
@@ -5023,8 +5030,8 @@ void ShaderObjectImpl::writeBufferDescriptor(
     BindingOffset const& offset,
     VkDescriptorType descriptorType,
     BufferResourceImpl* buffer,
-    size_t bufferOffset,
-    size_t bufferSize)
+    Offset bufferOffset,
+    Size bufferSize)
 {
     auto descriptorSet = context.descriptorSets[offset.bindingSet];
 
@@ -5995,7 +6002,7 @@ RefPtr<BufferResource> ShaderTableImpl::createDeviceBuffer(
         static_cast<TransientResourceHeapImpl*>(transientHeap);
 
     IBufferResource* stagingBuffer = nullptr;
-    size_t stagingBufferOffset = 0;
+    Offset stagingBufferOffset = 0;
     transientHeapImpl->allocateStagingBuffer(
         tableSize, stagingBuffer, stagingBufferOffset, MemoryType::Upload);
 
@@ -6268,13 +6275,13 @@ void PipelineCommandEncoder::_uploadBufferData(
     VkCommandBuffer commandBuffer,
     TransientResourceHeapImpl* transientHeap,
     BufferResourceImpl* buffer,
-    size_t offset,
-    size_t size,
+    Offset offset,
+    Size size,
     void* data)
 {
     auto& api = buffer->m_renderer->m_api;
     IBufferResource* stagingBuffer = nullptr;
-    size_t stagingBufferOffset = 0;
+    Offset stagingBufferOffset = 0;
     transientHeap->allocateStagingBuffer(
         size, stagingBuffer, stagingBufferOffset, MemoryType::Upload);
 
@@ -6305,7 +6312,7 @@ void PipelineCommandEncoder::_uploadBufferData(
 }
 
 void PipelineCommandEncoder::uploadBufferDataImpl(
-    IBufferResource* buffer, size_t offset, size_t size, void* data)
+    IBufferResource* buffer, Offset offset, Size size, void* data)
 {
     m_vkPreCommandBuffer = m_commandBuffer->getPreCommandBuffer();
     _uploadBufferData(
@@ -6425,7 +6432,7 @@ void PipelineCommandEncoder::bindRenderState(VkPipelineBindPoint pipelineBindPoi
 }
 
 void ResourceCommandEncoder::copyBuffer(
-    IBufferResource* dst, size_t dstOffset, IBufferResource* src, size_t srcOffset, size_t size)
+    IBufferResource* dst, Offset dstOffset, IBufferResource* src, Offset srcOffset, Size size)
 {
     auto& vkAPI = m_commandBuffer->m_renderer->m_api;
 
@@ -6450,7 +6457,7 @@ void ResourceCommandEncoder::copyBuffer(
 }
 
 void ResourceCommandEncoder::uploadBufferData(
-    IBufferResource* buffer, size_t offset, size_t size, void* data)
+    IBufferResource* buffer, Offset offset, Size size, void* data)
 {
     PipelineCommandEncoder::_uploadBufferData(
         m_commandBuffer->m_commandBuffer,
@@ -6461,6 +6468,7 @@ void ResourceCommandEncoder::uploadBufferData(
         data);
 }
 
+// TODO: Change size_t to Count?
 void ResourceCommandEncoder::textureBarrier(
     size_t count, ITextureResource* const* textures, ResourceState src, ResourceState dst)
 {
@@ -6503,6 +6511,7 @@ void ResourceCommandEncoder::textureBarrier(
         barriers.getArrayView().getBuffer());
 }
 
+// TODO: Change size_t to Count?
 void ResourceCommandEncoder::bufferBarrier(
     size_t count, IBufferResource* const* buffers, ResourceState src, ResourceState dst)
 {
@@ -6638,6 +6647,7 @@ void ResourceCommandEncoder::copyTexture(
         &region);
 }
 
+// TODO: Change size_t to Count?
 void ResourceCommandEncoder::uploadTextureData(
     ITextureResource* dst,
     SubresourceRange subResourceRange,
@@ -6655,7 +6665,7 @@ void ResourceCommandEncoder::uploadTextureData(
     VkCommandBuffer commandBuffer = m_commandBuffer->m_commandBuffer;
     auto& desc = *dstImpl->getDesc();
     // Calculate how large the buffer has to be
-    size_t bufferSize = 0;
+    Size bufferSize = 0;
     // Calculate how large an array entry is
     for (uint32_t j = subResourceRange.mipLevel;
          j < subResourceRange.mipLevel + subResourceRange.mipLevelCount;
@@ -6675,7 +6685,7 @@ void ResourceCommandEncoder::uploadTextureData(
     bufferSize *= subResourceRange.layerCount;
 
     IBufferResource* uploadBuffer = nullptr;
-    size_t uploadBufferOffset = 0;
+    Offset uploadBufferOffset = 0;
     m_commandBuffer->m_transientHeap->allocateStagingBuffer(
         bufferSize, uploadBuffer, uploadBufferOffset, MemoryType::Upload);
 
@@ -6689,7 +6699,7 @@ void ResourceCommandEncoder::uploadTextureData(
         uint8_t* dstDataStart;
         dstDataStart = dstData;
 
-        size_t dstSubresourceOffset = 0;
+        Offset dstSubresourceOffset = 0;
         for (uint32_t i = 0; i < subResourceRange.layerCount; ++i)
         {
             for (Index j = 0; j < mipSizes.getCount(); ++j)
@@ -6732,7 +6742,7 @@ void ResourceCommandEncoder::uploadTextureData(
         uploadBuffer->unmap(nullptr);
     }
     {
-        size_t srcOffset = uploadBufferOffset;
+        Offset srcOffset = uploadBufferOffset;
         for (uint32_t i = 0; i < subResourceRange.layerCount; ++i)
         {
             for (Index j = 0; j < mipSizes.getCount(); ++j)
@@ -7050,9 +7060,9 @@ void ResourceCommandEncoder::resolveQuery(
 
 void ResourceCommandEncoder::copyTextureToBuffer(
     IBufferResource* dst,
-    size_t dstOffset,
-    size_t dstSize,
-    size_t dstRowStride,
+    Offset dstOffset,
+    Size dstSize,
+    Size dstRowStride,
     ITextureResource* src,
     ResourceState srcState,
     SubresourceRange srcSubresource,

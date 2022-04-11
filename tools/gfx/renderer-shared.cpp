@@ -408,7 +408,7 @@ SLANG_NO_THROW Result SLANG_MCALL RendererBase::createTextureFromNativeHandle(
 SLANG_NO_THROW Result SLANG_MCALL RendererBase::createTextureFromSharedHandle(
     InteropHandle handle,
     const ITextureResource::Desc& srcDesc,
-    const size_t size,
+    const Size size,
     ITextureResource** outResource)
 {
     SLANG_UNUSED(handle);
@@ -535,7 +535,7 @@ Result RendererBase::waitForFences(
 }
 
 Result RendererBase::getTextureAllocationInfo(
-    const ITextureResource::Desc& desc, size_t* outSize, size_t* outAlignment)
+    const ITextureResource::Desc& desc, Size* outSize, Size* outAlignment)
 {
     SLANG_UNUSED(desc);
     *outSize = 0;
@@ -543,7 +543,7 @@ Result RendererBase::getTextureAllocationInfo(
     return SLANG_E_NOT_AVAILABLE;
 }
 
-Result RendererBase::getTextureRowAlignment(size_t* outAlignment)
+Result RendererBase::getTextureRowAlignment(Size* outAlignment)
 {
     *outAlignment = 0;
     return SLANG_E_NOT_AVAILABLE;
@@ -743,7 +743,7 @@ ResourceViewBase* SimpleShaderObjectData::getResourceView(
         desc.elementSize = (int)elementLayout->getSize();
         desc.format = Format::Unknown;
         desc.type = IResource::Type::Buffer;
-        desc.sizeInBytes = (size_t)m_ordinaryData.getCount();
+        desc.sizeInBytes = (Size)m_ordinaryData.getCount();
         ComPtr<IBufferResource> bufferResource;
         SLANG_RETURN_NULL_ON_FAIL(device->createBufferResource(
             desc, m_ordinaryData.getBuffer(), bufferResource.writeRef()));
@@ -1013,7 +1013,7 @@ Result ShaderObjectBase::copyFrom(IShaderObject* object, ITransientResourceHeap*
 {
     if (auto srcObj = dynamic_cast<MutableRootShaderObject*>(object))
     {
-        setData(gfx::ShaderOffset(), srcObj->m_data.begin(), (size_t)srcObj->m_data.getCount());
+        setData(gfx::ShaderOffset(), srcObj->m_data.begin(), (size_t)srcObj->m_data.getCount()); // TODO: Change size_t to Count?
         for (auto& kv : srcObj->m_objects)
         {
             ComPtr<IShaderObject> subObject;

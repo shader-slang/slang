@@ -31,6 +31,11 @@
 #undef Always
 #undef None
 
+// GLOBAL TODO: doc comments
+// GLOBAL TODO: Rationalize integer types (not a smush of uint/int/Uint/Int/etc)
+//    - need typedefs in gfx namespace for Count, Index, Size, Offset (ex. DeviceAddress)
+//    - Index and Count are for arrays, and indexing into array - like things(XY coordinates of pixels, etc.)
+//    - Offset and Size are almost always for bytes and things measured in bytes.
 namespace gfx {
 
 using Slang::ComPtr;
@@ -41,6 +46,10 @@ typedef SlangResult Result;
 typedef SlangInt Int;
 typedef SlangUInt UInt;
 typedef uint64_t DeviceAddress;
+typedef SlangInt Index;
+typedef SlangInt Count;
+typedef size_t Size;
+typedef size_t Offset;
 
 const uint64_t kTimeoutInfinite = 0xFFFFFFFFFFFFFFFF;
 
@@ -49,6 +58,7 @@ enum class StructType
     D3D12ExtendedDesc,
 };
 
+// TODO: Rename to Stage
 enum class StageType
 {
     Unknown,
@@ -69,6 +79,7 @@ enum class StageType
     CountOf,
 };
 
+// TODO: Implementation or backend or something else?
 enum class DeviceType
 {
     Unknown,
@@ -82,6 +93,7 @@ enum class DeviceType
     CountOf,
 };
 
+// TODO: Why does this exist it should go poof
 enum class ProjectionStyle
 {
     Unknown,
@@ -91,6 +103,7 @@ enum class ProjectionStyle
     CountOf,
 };
 
+// TODO: This should also go poof
 /// The style of the binding
 enum class BindingStyle
 {
@@ -103,6 +116,7 @@ enum class BindingStyle
     CountOf,
 };
 
+// TODO: Is this actually a flag when there are no bit fields?
 enum class AccessFlag
 {
     None,
@@ -110,6 +124,7 @@ enum class AccessFlag
     Write,
 };
 
+// TODO: Needed? Shouldn't be hard-coded if so
 const uint32_t kMaxRenderTargetCount = 8;
 
 class ITransientResourceHeap;
@@ -130,9 +145,11 @@ public:
 
     struct Desc
     {
+        // TODO: Tess doesn't like this but doesn't know what to do about it
         // The linking style of this program.
         LinkingStyle linkingStyle = LinkingStyle::SingleProgram;
 
+        // TODO: Remove slang prefix?
         // The global scope or a Slang composite component that represents the entire program.
         slang::IComponentType*  slangGlobalScope;
 
@@ -141,6 +158,7 @@ public:
         // If not 0, then `slangGlobalScope` must not contain any EntryPoint components.
         uint32_t entryPointCount = 0;
 
+        // TODO: Remove slang prefix?
         // An array of Slang entry points. The size of the array must be `entryPointCount`.
         // Each element must define only 1 Slang EntryPoint.
         slang::IComponentType** slangEntryPoints = nullptr;
@@ -151,6 +169,8 @@ public:
         0x9d32d0ad, 0x915c, 0x4ffd, { 0x91, 0xe2, 0x50, 0x85, 0x54, 0xa0, 0x4a, 0x76 } \
     }
 
+// TODO: Confirm with Yong that we really want this naming convention
+// TODO: Rename to what?
 // Dont' change without keeping in sync with Format
 #define GFX_FORMAT(x) \
     x( Unknown, 0, 0) \
@@ -253,6 +273,8 @@ public:
     x(BC7_UNORM, 16, 16) \
     x(BC7_UNORM_SRGB, 16, 16)
 
+// TODO: This should be generated from above
+// TODO: enum class should be explicitly uint32_t or whatever's appropriate
 /// Different formats of things like pixels or elements of vertices
 /// NOTE! Any change to this type (adding, removing, changing order) - must also be reflected in changes GFX_FORMAT
 enum class Format
@@ -360,11 +382,17 @@ enum class Format
     BC7_UNORM,
     BC7_UNORM_SRGB,
 
-    CountOf,
+    CountOf, // TODO: Rename to Count
 };
 
+// TODO: Aspect = Color, Depth, Stencil, etc.
+// TODO: Channel = R, G, B, A, D, S, etc.
+// TODO: Pick : pixel or texel
+// TODO: Block is a good term for what it is
+// TODO: Width/Height/Depth/whatever should not be used. We should use extentX, extentY, etc.
 struct FormatInfo
 {
+    // TODO: Change to uint32_t
     uint8_t channelCount;          ///< The amount of channels in the format. Only set if the channelType is set 
     uint8_t channelType;           ///< One of SlangScalarType None if type isn't made up of elements of type.
 
@@ -557,7 +585,7 @@ class IBufferResource: public IResource
 public:
     struct Desc: public DescBase
     {
-        size_t sizeInBytes = 0;     ///< Total size in bytes
+        Size sizeInBytes = 0;     ///< Total size in bytes
         int elementSize = 0;        ///< Get the element stride. If > 0, this is a structured buffer
         Format format = Format::Unknown;
     };
@@ -1008,7 +1036,7 @@ public:
 
 struct ShaderOffset
 {
-    SlangInt uniformOffset = 0;
+    SlangInt uniformOffset = 0; // TODO: Change to Offset?
     SlangInt bindingRangeIndex = 0;
     SlangInt bindingArrayIndex = 0;
     uint32_t getHashCode() const
@@ -1070,7 +1098,7 @@ public:
     virtual SLANG_NO_THROW Result SLANG_MCALL
         getEntryPoint(UInt index, IShaderObject** entryPoint) = 0;
     virtual SLANG_NO_THROW Result SLANG_MCALL
-        setData(ShaderOffset const& offset, void const* data, size_t size) = 0;
+        setData(ShaderOffset const& offset, void const* data, Size size) = 0;
     virtual SLANG_NO_THROW Result SLANG_MCALL
         getObject(ShaderOffset const& offset, IShaderObject** object) = 0;
     virtual SLANG_NO_THROW Result SLANG_MCALL
@@ -1096,7 +1124,7 @@ public:
 
     virtual SLANG_NO_THROW const void* SLANG_MCALL getRawData() = 0;
 
-    virtual SLANG_NO_THROW size_t SLANG_MCALL getSize() = 0;
+    virtual SLANG_NO_THROW Size SLANG_MCALL getSize() = 0;
 
         /// Use the provided constant buffer instead of the internally created one.
     virtual SLANG_NO_THROW Result SLANG_MCALL setConstantBufferOverride(IBufferResource* constantBuffer) = 0;
@@ -1540,10 +1568,10 @@ class IResourceCommandEncoder : public ICommandEncoder
 public:
     virtual SLANG_NO_THROW void SLANG_MCALL copyBuffer(
         IBufferResource* dst,
-        size_t dstOffset,
+        Size dstOffset,
         IBufferResource* src,
-        size_t srcOffset,
-        size_t size) = 0;
+        Size srcOffset,
+        Size size) = 0;
 
     /// Copies texture from src to dst. If dstSubresource and srcSubresource has mipLevelCount = 0
     /// and layerCount = 0, the entire resource is being copied and dstOffset, srcOffset and extent
@@ -1562,9 +1590,9 @@ public:
     /// Copies texture to a buffer. Each row is aligned to kTexturePitchAlignment.
     virtual SLANG_NO_THROW void SLANG_MCALL copyTextureToBuffer(
         IBufferResource* dst,
-        size_t dstOffset,
-        size_t dstSize,
-        size_t dstRowStride,
+        Size dstOffset,
+        Size dstSize,
+        Size dstRowStride,
         ITextureResource* src,
         ResourceState srcState,
         SubresourceRange srcSubresource,
@@ -1576,12 +1604,11 @@ public:
         ITextureResource::Offset3D offset,
         ITextureResource::Size extent,
         ITextureResource::SubresourceData* subResourceData,
-        size_t subResourceDataCount) = 0;
+        size_t subResourceDataCount) = 0; // TODO: Change size_t to Count?
     virtual SLANG_NO_THROW void SLANG_MCALL
-        uploadBufferData(IBufferResource* dst, size_t offset, size_t size, void* data) = 0;
-
+        uploadBufferData(IBufferResource* dst, Offset offset, Size size, void* data) = 0;
     virtual SLANG_NO_THROW void SLANG_MCALL textureBarrier(
-        size_t count, ITextureResource* const* textures, ResourceState src, ResourceState dst) = 0;
+        size_t count, ITextureResource* const* textures, ResourceState src, ResourceState dst) = 0; // TODO: Change size_t to Count?
     void textureBarrier(ITextureResource* texture, ResourceState src, ResourceState dst)
     {
         textureBarrier(1, &texture, src, dst);
@@ -1592,7 +1619,7 @@ public:
         ResourceState src,
         ResourceState dst) = 0;
     virtual SLANG_NO_THROW void SLANG_MCALL bufferBarrier(
-        size_t count, IBufferResource* const* buffers, ResourceState src, ResourceState dst) = 0;
+        size_t count, IBufferResource* const* buffers, ResourceState src, ResourceState dst) = 0; // TODO: Change size_t to Count?
     void bufferBarrier(IBufferResource* buffer, ResourceState src, ResourceState dst)
     {
         bufferBarrier(1, &buffer, src, dst);
@@ -1887,7 +1914,7 @@ public:
     struct Desc
     {
         Flags::Enum flags;
-        size_t constantBufferSize;
+        Size constantBufferSize;
         uint32_t samplerDescriptorCount;
         uint32_t uavDescriptorCount;
         uint32_t srvDescriptorCount;
@@ -2139,7 +2166,7 @@ public:
     virtual SLANG_NO_THROW Result SLANG_MCALL createTextureFromSharedHandle(
         InteropHandle handle,
         const ITextureResource::Desc& srcDesc,
-        const size_t size,
+        const Size size,
         ITextureResource** outResource) = 0;
 
         /// Create a buffer resource
@@ -2248,7 +2275,7 @@ public:
         return layout;
     }
 
-    inline Result createInputLayout(size_t vertexSize, InputElementDesc const* inputElements, Int inputElementCount, IInputLayout** outLayout)
+    inline Result createInputLayout(Size vertexSize, InputElementDesc const* inputElements, Int inputElementCount, IInputLayout** outLayout)
     {
         VertexStreamDesc streamDesc = { (uint32_t)vertexSize, InputSlotClass::PerVertex, 0 };
 
@@ -2260,7 +2287,7 @@ public:
         return createInputLayout(inputLayoutDesc, outLayout);
     }
 
-    inline ComPtr<IInputLayout> createInputLayout(size_t vertexSize, InputElementDesc const* inputElements, Int inputElementCount)
+    inline ComPtr<IInputLayout> createInputLayout(Size vertexSize, InputElementDesc const* inputElements, Int inputElementCount)
     {
         ComPtr<IInputLayout> layout;
         SLANG_RETURN_NULL_ON_FAIL(createInputLayout(vertexSize, inputElements, inputElementCount, layout.writeRef()));
@@ -2350,13 +2377,13 @@ public:
         ITextureResource* resource,
         ResourceState state,
         ISlangBlob** outBlob,
-        size_t* outRowPitch,
-        size_t* outPixelSize) = 0;
+        Size* outRowPitch,
+        Size* outPixelSize) = 0;
 
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL readBufferResource(
         IBufferResource* buffer,
-        size_t offset,
-        size_t size,
+        Offset offset,
+        Size size,
         ISlangBlob** outBlob) = 0;
 
         /// Get the type of this renderer
@@ -2387,7 +2414,7 @@ public:
         uint64_t timeout) = 0;
 
     virtual SLANG_NO_THROW Result SLANG_MCALL getTextureAllocationInfo(
-        const ITextureResource::Desc& desc, size_t* outSize, size_t* outAlignment) = 0;
+        const ITextureResource::Desc& desc, Size* outSize, size_t* outAlignment) = 0;
 
     virtual SLANG_NO_THROW Result SLANG_MCALL getTextureRowAlignment(size_t* outAlignment) = 0;
 };
