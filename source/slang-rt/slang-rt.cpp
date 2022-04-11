@@ -44,6 +44,6 @@ extern "C"
         {
             _slang_rt_abort("Cannot find function \"" + funcName + "\" in loaded library.");
         }
-        return funcPtr;
+        return (void*)funcPtr;
     }
 }
