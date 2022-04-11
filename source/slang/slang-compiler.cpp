@@ -1222,31 +1222,44 @@ void printDiagnosticArg(StringBuilder& sb, CodeGenTarget val)
         // Disable exceptions and security checks
         options.flags &= ~(CompileOptions::Flag::EnableExceptionHandling | CompileOptions::Flag::EnableSecurityChecks);
 
+        Profile profile;
+
         if (compilerType == PassThroughMode::Fxc ||
             compilerType == PassThroughMode::Dxc ||
             compilerType == PassThroughMode::Glslang)
         {
-            if (entryPointIndices.getCount() != 1)
+            const auto entryPointIndicesCount = entryPointIndices.getCount();
+             
+            if (entryPointIndicesCount == 0 && compilerType == PassThroughMode::Dxc)
+            {
+                // Can support no entry points on DXC because we can build libraries
+                profile = targetReq->getTargetProfile();
+            }
+            else if (entryPointIndicesCount == 1)
+            {
+                // All support a single entry point
+                const Index entryPointIndex = entryPointIndices[0];
+
+                auto entryPoint = program->getEntryPoint(entryPointIndex);
+                profile = getEffectiveProfile(entryPoint, targetReq);
+
+                options.entryPointName = getText(entryPoint->getName());
+                auto entryPointNameOverride = program->getEntryPointNameOverride(entryPointIndex);
+                if (entryPointNameOverride.getLength() != 0)
+                {
+                    options.entryPointName = entryPointNameOverride;
+                }
+            }
+            else 
             {
                 // We only support a single entry point on this target
                 SLANG_ASSERT(!"Can only compile with a single entry point on this target");
                 return SLANG_FAIL;
             }
-
-            const Index entryPointIndex = entryPointIndices[0];
-
-            auto entryPoint = program->getEntryPoint(entryPointIndex);
-            auto profile = getEffectiveProfile(entryPoint, targetReq);
-
+            
             options.stage = SlangStage(profile.getStage());
 
             // Set the entry point name
-            options.entryPointName = getText(entryPoint->getName());
-            auto entryPointNameOverride = program->getEntryPointNameOverride(entryPointIndex);
-            if (entryPointNameOverride.getLength() != 0)
-            {
-                options.entryPointName = entryPointNameOverride;
-            }
             if (compilerType == PassThroughMode::Dxc)
             {
                 // We will enable the flag to generate proper code for 16 - bit types
@@ -1265,20 +1278,12 @@ void printDiagnosticArg(StringBuilder& sb, CodeGenTarget val)
                     options.flags |= CompileOptions::Flag::EnableFloat16;
                 }
 
-                // Only set the profile if the stage is set
-                if (options.stage != SLANG_STAGE_NONE)
-                {
-                    options.profileName = GetHLSLProfileName(profile);
-                }
-
                 // Set the matrix layout
                 options.matrixLayout = targetReq->getDefaultMatrixLayoutMode();
             }
-            else if (compilerType == PassThroughMode::Fxc)
-            {
-                // Set the profile
-                options.profileName = GetHLSLProfileName(profile);
-            }
+
+            // Set the profile
+            options.profileName = GetHLSLProfileName(profile);
         }
 
         // If we aren't using LLVM 'host callable', we want downstream compile to produce a shared library

@@ -1994,6 +1994,9 @@ struct OptionsParser
                     case CodeGenTarget::ShaderHostCallable:
                     case CodeGenTarget::HostExecutable:
                     case CodeGenTarget::ShaderSharedLibrary:
+
+                    case CodeGenTarget::DXIL:
+
                         rawOutput.isWholeProgram = true;
                         break;
                     default:
