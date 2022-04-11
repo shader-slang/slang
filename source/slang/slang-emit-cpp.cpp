@@ -2358,7 +2358,7 @@ bool CPPSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOut
                 m_writer->emit("reinterpret_cast<");
                 emitType(inst->getFullType());
                 m_writer->emit(">(");
-                m_writer->emit(reinterpret_cast<uint64_t>(ptrVal));
+                m_writer->emitUInt64((uint64_t)ptrVal);
                 m_writer->emit(")");
             }
             return true;
