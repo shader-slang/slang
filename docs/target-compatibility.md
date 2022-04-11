@@ -12,7 +12,7 @@ Items with ^ means there is some discussion about support later in the document 
 | Half Type                   |     No       |     Yes ^    |   Yes      |     Yes ^     |    No +
 | Double Type                 |     Yes      |     Yes      |   Yes      |     Yes       |    Yes
 | Double Intrinsics           |     No       |   Limited +  |  Limited   |     Most      |    Yes
-| u/int8_t Type               |     No       |   No         |    No      |     Yes       |    Yes
+| u/int8_t Type               |     No       |   No         |   Yes ^    |     Yes       |    Yes
 | u/int16_t Type              |     No       |   Yes ^      |   Yes ^    |     Yes       |    Yes
 | u/int64_t Type              |     No       |   Yes ^      |   Yes      |     Yes       |    Yes
 | u/int64_t Intrinsics        |     No       |   No         |   Yes      |     Yes       |    Yes
@@ -51,7 +51,9 @@ In order for half to work in CUDA, NVRTC must be able to include `cuda_fp16.h` a
 
 ## u/int8_t Type
 
-Not currently supported for HLSL/DXIL/DXBC or GLSL/SPIR-V/Vulkan. 
+Not currently supported in D3D11/D3D12 because not supported in HLSL/DXIL/DXBC. 
+
+Supported in Vulkan via the extensions `GL_EXT_shader_explicit_arithmetic_types` and `GL_EXT_shader_8bit_storage`.
 
 ## u/int16_t Type
 
