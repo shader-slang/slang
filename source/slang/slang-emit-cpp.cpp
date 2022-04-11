@@ -2644,7 +2644,17 @@ void CPPSourceEmitter::_emitForwardDeclarations(const List<EmitAction>& actions)
         switch (action.level)
         {
             case EmitAction::Level::ForwardDeclaration:
-                emitFuncDecl(cast<IRFunc>(action.inst));
+                {
+                    switch (action.inst->getOp())
+                    {
+                    case kIROp_Func:
+                    case kIROp_StructType:
+                        emitForwardDeclaration(action.inst);
+                        break;
+                    default:
+                        break;
+                    }
+                }
                 break;
 
             case EmitAction::Level::Definition:

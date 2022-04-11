@@ -3315,7 +3315,6 @@ void CLikeSourceEmitter::ensureInstOperandsRec(ComputeEmitActionsContext* ctx, I
     switch (inst->getOp())
     {
     case kIROp_InterfaceType:
-    case kIROp_PtrType:
         requiredLevel = EmitAction::ForwardDeclaration;
         break;
     default:

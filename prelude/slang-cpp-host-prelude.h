@@ -11,4 +11,7 @@
 
 using namespace Slang;
 
+template<typename TResult, typename... Args>
+using Slang_FuncType = TResult(SLANG_MCALL *)(Args...);
+
 #endif
