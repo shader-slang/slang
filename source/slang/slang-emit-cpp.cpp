@@ -2011,7 +2011,7 @@ void CPPSourceEmitter::_emitType(IRType* type, DeclaratorInfo* declarator)
     case kIROp_InOutType:
     case kIROp_OutType:
         {
-            auto ptrType = cast<IRPtrType>(type);
+            auto ptrType = cast<IRPtrTypeBase>(type);
             PtrDeclaratorInfo ptrDeclarator(declarator);
             _emitType(ptrType->getValueType(), &ptrDeclarator);
         }
@@ -2033,7 +2033,8 @@ void CPPSourceEmitter::_emitType(IRType* type, DeclaratorInfo* declarator)
             _emitType(elementType, nullptr);
             m_writer->emit(", ");
             m_writer->emit(elementCount);
-            m_writer->emit(">");
+            m_writer->emit("> ");
+            emitDeclarator(declarator);
         }
         break;
     case kIROp_UnsizedArrayType:
@@ -2043,7 +2044,8 @@ void CPPSourceEmitter::_emitType(IRType* type, DeclaratorInfo* declarator)
 
             m_writer->emit("Array<");
             _emitType(elementType, nullptr);
-            m_writer->emit(">");
+            m_writer->emit("> ");
+            emitDeclarator(declarator);
         }
         break;
     case kIROp_FuncType:
