@@ -2000,11 +2000,14 @@ RefPtr<ComponentType> createSpecializedGlobalAndEntryPointsComponentType(
 
 void FrontEndCompileRequest::checkAllTranslationUnits()
 {
+    LoadedModuleDictionary loadedModules;
+
     // Iterate over all translation units and
     // apply the semantic checking logic.
     for( auto& translationUnit : translationUnits )
     {
-        checkTranslationUnit(translationUnit.Ptr());
+        checkTranslationUnit(translationUnit.Ptr(), loadedModules);
+        loadedModules.Add(translationUnit->moduleName, translationUnit->getModule());
     }
     checkEntryPoints();
 }
@@ -2661,7 +2664,8 @@ bool Linkage::isBeingImported(Module* module)
 RefPtr<Module> Linkage::findOrImportModule(
     Name*               name,
     SourceLoc const&    loc,
-    DiagnosticSink*     sink)
+    DiagnosticSink*     sink,
+    const LoadedModuleDictionary*  loadedModules)
 {
     // Have we already loaded a module matching this name?
     //
@@ -2687,6 +2691,16 @@ RefPtr<Module> Linkage::findOrImportModule(
         }
 
         return loadedModule;
+    }
+
+    // If the user is providing an additional list of loaded modules, we find
+    // if the module being imported is in that list. This allows a translation
+    // unit to use previously checked translation units in the same
+    // FrontEndCompileRequest.
+    Module* previouslyLoadedModule = nullptr;
+    if (loadedModules && loadedModules->TryGetValue(name, previouslyLoadedModule))
+    {
+        return previouslyLoadedModule;
     }
 
     // Derive a file name for the module, by taking the given
@@ -4017,9 +4031,10 @@ RefPtr<Module> findOrImportModule(
     Linkage*            linkage,
     Name*               name,
     SourceLoc const&    loc,
-    DiagnosticSink*     sink)
+    DiagnosticSink*     sink,
+    const LoadedModuleDictionary* loadedModules)
 {
-    return linkage->findOrImportModule(name, loc, sink);
+    return linkage->findOrImportModule(name, loc, sink, loadedModules);
 }
 
 void Session::addBuiltinSource(
