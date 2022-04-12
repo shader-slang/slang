@@ -1643,7 +1643,7 @@ SlangResult CPPSourceEmitter::calcFuncName(const HLSLIntrinsic* specOp, StringBu
 CPPSourceEmitter::CPPSourceEmitter(const Desc& desc):
     Super(desc),
     m_slicePool(StringSlicePool::Style::Default),
-    m_typeSet(desc.compileRequest->getSession()),
+    m_typeSet(desc.codeGenContext->getSession()),
     m_opLookup(new HLSLIntrinsicOpLookup),
     m_intrinsicSet(&m_typeSet, m_opLookup)
 {

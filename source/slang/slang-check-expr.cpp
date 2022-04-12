@@ -584,6 +584,9 @@ namespace Slang
 
     Expr* SemanticsVisitor::maybeResolveOverloadedExpr(Expr* expr, LookupMask mask, DiagnosticSink* diagSink)
     {
+        if (IsErrorExpr(expr))
+            return expr;
+
         if( auto overloadedExpr = as<OverloadedExpr>(expr) )
         {
             return _resolveOverloadedExprImpl(overloadedExpr, mask, diagSink);

@@ -840,13 +840,12 @@ struct OptionsParser
                 else if (argValue == "-dump-ir-ids")
                 {
                     requestImpl->getFrontEndReq()->m_irDumpOptions.flags |= IRDumpOptions::Flag::DumpDebugIds;
-                    requestImpl->getBackEndReq()->m_irDumpOptions.flags |= IRDumpOptions::Flag::DumpDebugIds;
                 }
                 else if (argValue == "-dump-intermediate-prefix")
                 {
                     CommandLineArg prefix;
                     SLANG_RETURN_ON_FAIL(reader.expectArg(prefix));
-                    requestImpl->getBackEndReq()->m_dumpIntermediatePrefix = prefix.value;
+                    requestImpl->m_dumpIntermediatePrefix = prefix.value;
                 }
                 else if (argValue == "-output-includes")
                 {
@@ -855,7 +854,6 @@ struct OptionsParser
                 else if(argValue == "-dump-ir" )
                 {
                     requestImpl->getFrontEndReq()->shouldDumpIR = true;
-                    requestImpl->getBackEndReq()->shouldDumpIR = true;
                 }
                 else if (argValue == "-E" || argValue == "-output-preprocessor")
                 {
@@ -993,11 +991,11 @@ struct OptionsParser
                 }
                 else if (argValue == "-disable-specialization")
                 {
-                    requestImpl->getBackEndReq()->disableSpecialization = true;
+                    requestImpl->disableSpecialization = true;
                 }
                 else if (argValue == "-disable-dynamic-dispatch")
                 {
-                    requestImpl->getBackEndReq()->disableDynamicDispatch = true;
+                    requestImpl->disableDynamicDispatch = true;
                 }
                 else if (argValue == "-verbose-paths")
                 {
@@ -1010,7 +1008,6 @@ struct OptionsParser
                 else if(argValue == "-validate-ir" )
                 {
                     requestImpl->getFrontEndReq()->shouldValidateIR = true;
-                    requestImpl->getBackEndReq()->shouldValidateIR = true;
                 }
                 else if(argValue == "-skip-codegen" )
                 {
@@ -1365,7 +1362,7 @@ struct OptionsParser
                 }
                 else if( argValue == "-default-image-format-unknown" )
                 {
-                    requestImpl->getBackEndReq()->useUnknownImageFormatAsDefault = true;
+                    requestImpl->useUnknownImageFormatAsDefault = true;
                 }
                 else if (argValue == "-obfuscate")
                 {

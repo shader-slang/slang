@@ -3,8 +3,7 @@
 
 namespace Slang
 {
-class BackEndCompileRequest;
-class TargetRequest;
+struct CodeGenContext;
 struct IRModule;
 
 
@@ -38,7 +37,6 @@ struct IRModule;
     /// of the contents of `gParams`.
     ///
 void specializeFuncsForBufferLoadArgs(
-    BackEndCompileRequest* compileRequest,
-    TargetRequest* targetRequest,
-    IRModule* module);
+    CodeGenContext* codeGenContext,
+    IRModule*       module);
 }
