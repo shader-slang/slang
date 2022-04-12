@@ -565,6 +565,8 @@ DIAGNOSTIC(52005, Error, unableToReadFile, "unable to read file '$0'")
 
 DIAGNOSTIC(52006, Error, compilerNotDefinedForTransition, "compiler not defined for transition '$0' to '$1'.")
 
+DIAGNOSTIC(53001,Error, invalidTypeMarshallingForImportedDLLSymbol, "invalid type marshalling in imported func $0.")
+
 //
 // 8xxxx - Issues specific to a particular library/technology/platform/etc.
 //

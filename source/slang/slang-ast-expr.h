@@ -88,6 +88,11 @@ class BoolLiteralExpr : public LiteralExpr
     bool value;
 };
 
+class NullPtrLiteralExpr : public LiteralExpr
+{
+    SLANG_AST_CLASS(NullPtrLiteralExpr)
+};
+
 class StringLiteralExpr : public LiteralExpr
 {
     SLANG_AST_CLASS(StringLiteralExpr)

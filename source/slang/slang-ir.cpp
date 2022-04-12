@@ -2466,6 +2466,11 @@ namespace Slang
         return (IRBasicType*)getType(kIROp_UInt64Type);
     }
 
+    IRBasicType* IRBuilder::getCharType()
+    {
+        return (IRBasicType*)getType(kIROp_CharType);
+    }
+
     IRStringType* IRBuilder::getStringType()
     {
         return (IRStringType*)getType(kIROp_StringType);
@@ -2957,20 +2962,6 @@ namespace Slang
             kIROp_Alloca,
             (IRType*)type,
             rttiObjPtr);
-
-        addInst(inst);
-        return inst;
-    }
-
-    IRInst* IRBuilder::emitCopy(IRInst* dst, IRInst* src, IRInst* rttiObjPtr)
-    {
-        IRInst* args[] = { dst, src, rttiObjPtr };
-        auto inst = createInst<IRCopy>(
-            this,
-            kIROp_Copy,
-            getVoidType(),
-            3,
-            args);
 
         addInst(inst);
         return inst;

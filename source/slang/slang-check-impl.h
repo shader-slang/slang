@@ -1534,6 +1534,7 @@ namespace Slang
         {}
 
         Expr* visitBoolLiteralExpr(BoolLiteralExpr* expr);
+        Expr* visitNullPtrLiteralExpr(NullPtrLiteralExpr* expr);
         Expr* visitIntegerLiteralExpr(IntegerLiteralExpr* expr);
         Expr* visitFloatingPointLiteralExpr(FloatingPointLiteralExpr* expr);
         Expr* visitStringLiteralExpr(StringLiteralExpr* expr);
