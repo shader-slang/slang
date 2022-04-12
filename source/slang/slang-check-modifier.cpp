@@ -528,6 +528,17 @@ namespace Slang
 
             allowAttr->diagnostic = diagnosticInfo;
         }
+        else if (auto dllImportAttr = as<DllImportAttribute>(attr))
+        {
+            SLANG_ASSERT(attr->args.getCount() == 1);
+
+            String libraryName;
+            if (!checkLiteralStringVal(dllImportAttr->args[0], &libraryName))
+            {
+                return false;
+            }
+            dllImportAttr->modulePath = libraryName;
+        }
         else
         {
             if(attr->args.getCount() == 0)

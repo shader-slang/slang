@@ -67,3 +67,4 @@ build/**/*.tlog
 build/**/*.lastbuildstate
 build/**/*.recipe
 build/**/*.log
+*.dll

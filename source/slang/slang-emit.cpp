@@ -9,6 +9,7 @@
 #include "slang-ir-byte-address-legalize.h"
 #include "slang-ir-collect-global-uniforms.h"
 #include "slang-ir-dce.h"
+#include "slang-ir-dll-import.h"
 #include "slang-ir-entry-point-uniforms.h"
 #include "slang-ir-entry-point-raw-ptr-params.h"
 #include "slang-ir-explicit-global-context.h"
@@ -679,6 +680,15 @@ Result linkAndOptimizeIR(
         dumpIRIfEnabled(codeGenContext, irModule, "EXPLICIT GLOBAL CONTEXT INTRODUCED");
     #endif
         validateIRModuleIfEnabled(codeGenContext, irModule);
+        break;
+    }
+
+    switch (target)
+    {
+    default:
+        break;
+    case CodeGenTarget::HostCPPSource:
+        generateDllImportFuncs(irModule, sink);
         break;
     }
 

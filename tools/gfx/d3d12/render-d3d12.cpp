@@ -2784,11 +2784,18 @@ Result AccelerationStructureImpl::getNativeHandle(InteropHandle* outHandle)
 
 #endif // SLANG_GFX_HAS_DXR_SUPPORT
 
-Result TransientResourceHeapImpl::synchronizeAndReset()
+Result TransientResourceHeapImpl::synchronize()
 {
     WaitForMultipleObjects(
         (DWORD)m_waitHandles.getCount(), m_waitHandles.getArrayView().getBuffer(), TRUE, INFINITE);
     m_waitHandles.clear();
+    return SLANG_OK;
+}
+
+Result TransientResourceHeapImpl::synchronizeAndReset()
+{
+    synchronize();
+    
     m_currentViewHeapIndex = -1;
     m_currentSamplerHeapIndex = -1;
     allocateNewViewDescriptorHeap(m_device);
@@ -2875,7 +2882,7 @@ Result TransientResourceHeapImpl::allocateTransientDescriptorTable(
 
 TransientResourceHeapImpl::~TransientResourceHeapImpl()
 {
-    synchronizeAndReset();
+    synchronize();
     for (auto& waitInfo : m_waitInfos)
         CloseHandle(waitInfo.fenceEvent);
 }
