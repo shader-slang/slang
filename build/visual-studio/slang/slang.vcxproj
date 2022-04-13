@@ -322,6 +322,7 @@ IF EXIST ..\..\..\external\slang-binaries\bin\windows-aarch64\slang-glslang.dll\
     <ClInclude Include="..\..\..\source\slang\slang-capability.h" />
     <ClInclude Include="..\..\..\source\slang\slang-check-impl.h" />
     <ClInclude Include="..\..\..\source\slang\slang-check.h" />
+    <ClInclude Include="..\..\..\source\slang\slang-compile-product.h" />
     <ClInclude Include="..\..\..\source\slang\slang-compiler.h" />
     <ClInclude Include="..\..\..\source\slang\slang-diagnostic-defs.h" />
     <ClInclude Include="..\..\..\source\slang\slang-diagnostics.h" />
@@ -457,6 +458,7 @@ IF EXIST ..\..\..\external\slang-binaries\bin\windows-aarch64\slang-glslang.dll\
     <ClCompile Include="..\..\..\source\slang\slang-check-stmt.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-check-type.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-check.cpp" />
+    <ClCompile Include="..\..\..\source\slang\slang-compile-product.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-compiler.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-diagnostics.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-doc-ast.cpp" />
