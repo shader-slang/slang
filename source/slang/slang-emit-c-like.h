@@ -68,6 +68,7 @@ public:
         {
             Name,
             Ptr,
+            Ref,
             SizedArray,
             UnsizedArray,
             LiteralSizedArray,
@@ -110,6 +111,13 @@ public:
         {}
     };
 
+    struct RefDeclaratorInfo : ChainedDeclaratorInfo
+    {
+        RefDeclaratorInfo(DeclaratorInfo* next)
+            : ChainedDeclaratorInfo(Flavor::Ref, next)
+        {}
+    };
+
     struct SizedArrayDeclaratorInfo : ChainedDeclaratorInfo
     {
         IRInst* elementCount;
@@ -145,6 +153,16 @@ public:
         {}
 
         IRInst* instWithAttributes;
+    };
+
+    struct FuncTypeDeclaratorInfo : ChainedDeclaratorInfo
+    {
+        FuncTypeDeclaratorInfo(DeclaratorInfo* next, IRFuncType* funcTypeInst)
+            : ChainedDeclaratorInfo(Flavor::Attributed, next)
+            , funcType(funcTypeInst)
+        {}
+
+        IRFuncType* funcType;
     };
 
     struct ComputeEmitActionsContext;
@@ -344,6 +362,7 @@ public:
 
     void emitStruct(IRStructType* structType);
 
+
         /// Emit type attributes that should appear after, e.g., a `struct` keyword
     void emitPostKeywordTypeAttributes(IRInst* inst) { emitPostKeywordTypeAttributesImpl(inst); }
 
@@ -378,9 +397,12 @@ public:
 
     void ensureGlobalInst(ComputeEmitActionsContext* ctx, IRInst* inst, EmitAction::Level requiredLevel);
 
+    void emitForwardDeclaration(IRInst* inst);
+
     void computeEmitActions(IRModule* module, List<EmitAction>& ioActions);
 
     void executeEmitActions(List<EmitAction> const& actions);
+
     void emitModule(IRModule* module, DiagnosticSink* sink)
         { m_irModule = module; emitModuleImpl(module, sink); }
 
@@ -458,7 +480,9 @@ public:
 
     virtual void emitPostKeywordTypeAttributesImpl(IRInst* inst) { SLANG_UNUSED(inst); }
 
-    void _emitType(IRType* type, DeclaratorInfo* declarator);
+    void _emitFuncTypeDeclaration(IRFuncType* type, IRAttributedType* attributes);
+
+    virtual void _emitType(IRType* type, DeclaratorInfo* declarator);
     void _emitInst(IRInst* inst);
 
     virtual void _emitPrefixTypeAttr(IRAttr* attr);

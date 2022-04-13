@@ -342,11 +342,18 @@ ${{{{
 // Declare built-in pointer type
 // (eventually we can have the traditional syntax sugar for this)
 }}}}
+
+__magic_type(NullPtrType)
+struct NullPtr
+{
+};
+
 __generic<T>
 __magic_type(PtrType)
 __intrinsic_type($(kIROp_PtrType))
 struct Ptr
-{};
+{
+};
 
 __generic<T>
 __magic_type(OutType)
@@ -2164,6 +2171,10 @@ attribute_syntax [__extern] : ExternAttribute;
 __attributeTarget(FunctionDeclBase)
 attribute_syntax [__unsafeForceInlineEarly] : UnsafeForceInlineEarlyAttribute;
 
+__attributeTarget(FuncDecl)
+attribute_syntax [DllImport(modulePath: String)] : DllImportAttribute;
+
+
 // Inheritance Control
 __attributeTarget(AggTypeDecl)
 attribute_syntax [sealed] : SealedAttribute;
@@ -2185,3 +2196,4 @@ attribute_syntax [noinline] : NoInlineAttribute;
 
 __attributeTarget(StructDecl)
 attribute_syntax [payload] : PayloadAttribute;
+
