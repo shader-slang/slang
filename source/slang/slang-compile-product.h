@@ -158,10 +158,10 @@ class CompileProduct : public RefObject
 {
 public:
 
-    enum class CacheBehavior
+    enum class Cache
     {
-        Cache,
-        DontCache,
+        Yes,
+        No,
     };
 
     /* A compile product can be made up of multiple representations. Note! Some types allow multiple entries.
@@ -218,7 +218,7 @@ public:
     T* findObjectInstance();
 
         /// Load as a blob
-    SlangResult loadBlob(CacheBehavior cacheBehavior, ComPtr<ISlangBlob>& outBlob);
+    SlangResult loadBlob(Cache cacheBehavior, ComPtr<ISlangBlob>& outBlob);
         /// Get path to contents
     SlangResult getFilePath(String& outPath);
 
@@ -286,7 +286,7 @@ T* CompileProduct::findObjectInstance()
 
 
 // Given a product make available as a module
-SlangResult loadModuleLibrary(CompileProduct::CacheBehavior cacheBehavior, CompileProduct* product, EndToEndCompileRequest* req, RefPtr<ModuleLibrary>& module);
+SlangResult loadModuleLibrary(CompileProduct::Cache cacheBehavior, CompileProduct* product, EndToEndCompileRequest* req, RefPtr<ModuleLibrary>& module);
 
 } // namespace Slang
 

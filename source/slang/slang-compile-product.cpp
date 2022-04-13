@@ -338,7 +338,7 @@ SlangResult CompileProduct::requireFilePath(String& outFilePath)
     ComPtr<ISlangBlob> blob;
 
     // Get the contents as a blob. If we can't do that, then we can't write anything...
-    SLANG_RETURN_ON_FAIL(loadBlob(CacheBehavior::DontCache, blob));
+    SLANG_RETURN_ON_FAIL(loadBlob(Cache::No, blob));
 
     const UnownedStringSlice ext = m_desc.getDefaultExtension();
 
@@ -384,7 +384,7 @@ SlangResult CompileProduct::requireFilePath(String& outFilePath)
     return SLANG_OK;
 }
 
-SlangResult CompileProduct::loadBlob(CacheBehavior cacheBehavior, ComPtr<ISlangBlob>& outBlob)
+SlangResult CompileProduct::loadBlob(Cache cacheBehavior, ComPtr<ISlangBlob>& outBlob)
 {
     Index index = indexOf(Entry::Type::Blob);
     if (index >= 0)
@@ -412,7 +412,7 @@ SlangResult CompileProduct::loadBlob(CacheBehavior cacheBehavior, ComPtr<ISlangB
     RefPtr<RawBlob> blob = RawBlob::moveCreate(alloc);
 
     // Put in cache 
-    if (cacheBehavior == CacheBehavior::Cache)
+    if (cacheBehavior == Cache::Yes)
     {
         add(Entry::Type::Blob, static_cast<ISlangBlob*>(blob));
     }
@@ -421,7 +421,7 @@ SlangResult CompileProduct::loadBlob(CacheBehavior cacheBehavior, ComPtr<ISlangB
     return SLANG_OK;
 }
 
-SlangResult loadModuleLibrary(CompileProduct::CacheBehavior cacheBehavior, CompileProduct* product, EndToEndCompileRequest* req, RefPtr<ModuleLibrary>& outLibrary)
+SlangResult loadModuleLibrary(CompileProduct::Cache cacheBehavior, CompileProduct* product, EndToEndCompileRequest* req, RefPtr<ModuleLibrary>& outLibrary)
 {
     if (auto foundLibrary = product->findObjectInstance<ModuleLibrary>())
     {
@@ -432,7 +432,7 @@ SlangResult loadModuleLibrary(CompileProduct::CacheBehavior cacheBehavior, Compi
     ComPtr<ISlangBlob> blob;
 
     // Load but don't require caching
-    SLANG_RETURN_ON_FAIL(product->loadBlob(CompileProduct::CacheBehavior::DontCache, blob));
+    SLANG_RETURN_ON_FAIL(product->loadBlob(CompileProduct::Cache::No, blob));
 
     RefPtr<ModuleLibrary> library = new ModuleLibrary;
 
@@ -481,7 +481,7 @@ SlangResult loadModuleLibrary(CompileProduct::CacheBehavior cacheBehavior, Compi
         }
     }
 
-    if (cacheBehavior == CompileProduct::CacheBehavior::Cache)
+    if (cacheBehavior == CompileProduct::Cache::Yes)
     {
         product->addInstance(library);
     }
