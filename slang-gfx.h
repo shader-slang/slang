@@ -46,8 +46,8 @@ typedef SlangResult Result;
 typedef SlangInt Int;
 typedef SlangUInt UInt;
 typedef uint64_t DeviceAddress;
-typedef SlangInt Index;
-typedef SlangInt Count;
+typedef int32_t GfxIndex;
+typedef int32_t GfxCount;
 typedef size_t Size;
 typedef size_t Offset;
 
