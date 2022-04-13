@@ -43,7 +43,7 @@ All signed integers used two's complement representation.
 All arithmetic operations on integers (both signed and unsigned) wrap on overflow/underflow.
 
 All target platforms must support the `int` and `uint` types.
-Specific target platforms may not support the other integer types.
+Specific [target platforms](../target-compatibility.md) may not support the other integer types.
 
 All integer types are stored in memory with their natural size and alignment on all targets that support them.
 
@@ -61,7 +61,7 @@ All floating-point types are laid out in memory using the matching IEEE 754 stan
 Target platforms may define their own rules for rounding, precision, denormals, infinities, and not-a-number values.
 
 All target platforms must support the `float` type.
-Specific targets may not support the other floating-point types.
+Specific [targets](../target-compatibility.md) may not support the other floating-point types.
 
 All floating-point types are stored in memory with their natural size and alignment on all targets that support them.
 
