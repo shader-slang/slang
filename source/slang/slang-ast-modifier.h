@@ -761,23 +761,27 @@ class EntryPointAttribute : public Attribute
     Stage stage;
 };
 
-// A `[__vulkanRayPayload]` attribute, which is used in the
+// A `[__vulkanRayPayload(location)]` attribute, which is used in the
 // standard library implementation to indicate that a variable
 // actually represents the input/output interface for a Vulkan
 // ray tracing shader to pass per-ray payload information.
 class VulkanRayPayloadAttribute : public Attribute 
 {
     SLANG_AST_CLASS(VulkanRayPayloadAttribute)
+
+    int location;
 };
 
 
-// A `[__vulkanCallablePayload]` attribute, which is used in the
+// A `[__vulkanCallablePayload(location)]` attribute, which is used in the
 // standard library implementation to indicate that a variable
 // actually represents the input/output interface for a Vulkan
 // ray tracing shader to pass payload information to/from a callee.
 class VulkanCallablePayloadAttribute : public Attribute 
 {
     SLANG_AST_CLASS(VulkanCallablePayloadAttribute)
+
+    int location;
 };
 
 

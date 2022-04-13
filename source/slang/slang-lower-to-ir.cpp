@@ -1876,13 +1876,13 @@ void addVarDecorations(
         {
             builder->addInterpolationModeDecoration(inst, IRInterpolationMode::Centroid);
         }
-        else if(as<VulkanRayPayloadAttribute>(mod))
+        else if(auto rayPayloadAttr = as<VulkanRayPayloadAttribute>(mod))
         {
-            builder->addSimpleDecoration<IRVulkanRayPayloadDecoration>(inst);
+            builder->addVulkanRayPayloadDecoration(inst, rayPayloadAttr->location);
         }
-        else if(as<VulkanCallablePayloadAttribute>(mod))
+        else if(auto callablePayloadAttr = as<VulkanCallablePayloadAttribute>(mod))
         {
-            builder->addSimpleDecoration<IRVulkanCallablePayloadDecoration>(inst);
+            builder->addVulkanCallablePayloadDecoration(inst, callablePayloadAttr->location);
         }
         else if(as<VulkanHitAttributesAttribute>(mod))
         {

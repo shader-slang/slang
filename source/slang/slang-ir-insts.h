@@ -2891,6 +2891,16 @@ public:
     {
         addDecoration(inst, kIROp_SequentialIDDecoration, getIntValue(getUIntType(), id));
     }
+
+    void addVulkanRayPayloadDecoration(IRInst* inst, int location)
+    {
+        addDecoration(inst, kIROp_VulkanRayPayloadDecoration, getIntValue(getIntType(), location));
+    }
+
+    void addVulkanCallablePayloadDecoration(IRInst* inst, int location)
+    {
+        addDecoration(inst, kIROp_VulkanCallablePayloadDecoration, getIntValue(getIntType(), location));
+    }
 };
 
 void addHoistableInst(

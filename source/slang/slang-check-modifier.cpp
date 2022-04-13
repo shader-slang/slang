@@ -539,6 +539,24 @@ namespace Slang
             }
             dllImportAttr->modulePath = libraryName;
         }
+        else if (auto rayPayloadAttr = as<VulkanRayPayloadAttribute>(attr))
+        {
+            SLANG_ASSERT(attr->args.getCount() == 1);
+            auto val = checkConstantIntVal(attr->args[0]);
+
+            if (!val) return false;
+
+            rayPayloadAttr->location = (int32_t)val->value;
+        }
+        else if (auto callablePayloadAttr = as<VulkanCallablePayloadAttribute>(attr))
+        {
+            SLANG_ASSERT(attr->args.getCount() == 1);
+            auto val = checkConstantIntVal(attr->args[0]);
+
+            if (!val) return false;
+
+            callablePayloadAttr->location = (int32_t)val->value;
+        }
         else
         {
             if(attr->args.getCount() == 0)
