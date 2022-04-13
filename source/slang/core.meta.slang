@@ -2129,10 +2129,10 @@ attribute_syntax [numthreads(x: int, y: int = 1, z: int = 1)]   : NumThreadsAttr
 
 //
 __attributeTarget(VarDeclBase)
-attribute_syntax [__vulkanRayPayload] : VulkanRayPayloadAttribute;
+attribute_syntax [__vulkanRayPayload(location : int = -1)] : VulkanRayPayloadAttribute;
 
 __attributeTarget(VarDeclBase)
-attribute_syntax [__vulkanCallablePayload] : VulkanCallablePayloadAttribute;
+attribute_syntax [__vulkanCallablePayload(location : int = -1)] : VulkanCallablePayloadAttribute;
 
 __attributeTarget(VarDeclBase)
 attribute_syntax [__vulkanHitAttributes] : VulkanHitAttributesAttribute;
