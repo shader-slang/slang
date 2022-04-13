@@ -7,6 +7,8 @@
 #include "../core/slang-type-text-util.h"
 #include "../core/slang-type-convert-util.h"
 
+#include "slang-compile-product.h"
+
 #include "slang-check.h"
 #include "slang-parameter-binding.h"
 #include "slang-lower-to-ir.h"
@@ -4309,52 +4311,14 @@ void EndToEndCompileRequest::setDefaultModuleName(const char* defaultModuleName)
     frontEndReq->m_defaultModuleName = namePool->getName(defaultModuleName);
 }
 
-SlangResult _addLibraryReference(EndToEndCompileRequest* req, Stream* stream)
+SlangResult _addLibraryReference(EndToEndCompileRequest* req, CompileProduct* product)
 {
-    // Load up the module
-    RiffContainer riffContainer;
-    SLANG_RETURN_ON_FAIL(RiffUtil::read(stream, riffContainer));
+    RefPtr<ModuleLibrary> library;
 
-    auto linkage = req->getLinkage();
+    SLANG_RETURN_ON_FAIL(loadModuleLibrary(CompileProduct::Cache::Yes, product, req, library));
 
-    // TODO(JS): May be better to have a ITypeComponent that encapsulates a collection of modules
-    // For now just add to the linkage
-
-    {
-        SerialContainerData containerData;
-
-        SerialContainerUtil::ReadOptions options;
-        options.namePool = req->getNamePool();
-        options.session = req->getSession();
-        options.sharedASTBuilder = linkage->getASTBuilder()->getSharedASTBuilder();
-        options.sourceManager = linkage->getSourceManager();
-        options.linkage = req->getLinkage();
-        options.sink = req->getSink();
-
-        SLANG_RETURN_ON_FAIL(SerialContainerUtil::read(&riffContainer, options, containerData));
-
-        for (const auto& module : containerData.modules)
-        {
-            // If the irModule is set, add it
-            if (module.irModule)
-            {
-                linkage->m_libModules.add(module.irModule);
-            }
-        }
-
-        FrontEndCompileRequest* frontEndRequest = req->getFrontEndReq();
-
-        for (const auto& entryPoint : containerData.entryPoints)
-        {
-            FrontEndCompileRequest::ExtraEntryPointInfo dst;
-            dst.mangledName = entryPoint.mangledName;
-            dst.name = entryPoint.name;
-            dst.profile = entryPoint.profile;
-
-            // Add entry point
-            frontEndRequest->m_extraEntryPoints.add(dst);
-        }
-    }
+    FrontEndCompileRequest* frontEndRequest = req->getFrontEndReq();
+    frontEndRequest->m_extraEntryPoints.addRange(library->m_entryPoints.getBuffer(), library->m_entryPoints.getCount());
 
     return SLANG_OK;
 }
@@ -4362,8 +4326,15 @@ SlangResult _addLibraryReference(EndToEndCompileRequest* req, Stream* stream)
 SlangResult EndToEndCompileRequest::addLibraryReference(const void* libData, size_t libDataSize)
 {
     // We need to deserialize and add the modules
-    MemoryStreamBase fileStream(FileAccess::Read, libData, libDataSize);
-    return _addLibraryReference(this, &fileStream);
+    RefPtr<ModuleLibrary> library;
+    SLANG_RETURN_ON_FAIL(loadModuleLibrary((const Byte*)libData, libDataSize, this, library));
+
+    const auto desc = CompileProductDesc::make(CompileProductDesc::ContainerType::Library, CompileProductDesc::PayloadType::SlangIR, CompileProductDesc::Style::Unknown);
+    RefPtr<CompileProduct> product = new CompileProduct(desc);
+
+    product->add(library);
+
+    return _addLibraryReference(this, product);
 }
 
 void EndToEndCompileRequest::addTranslationUnitPreprocessorDefine(int translationUnitIndex, const char* key, const char* value)

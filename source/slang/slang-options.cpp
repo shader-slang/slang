@@ -9,6 +9,7 @@
 
 #include "slang-compiler.h"
 #include "slang-profile.h"
+#include "slang-compile-product.h"
 
 #include "slang-repro.h"
 #include "slang-serialize-ir.h"
@@ -23,7 +24,7 @@
 
 namespace Slang {
 
-SlangResult _addLibraryReference(EndToEndCompileRequest* req, Stream* stream);
+SlangResult _addLibraryReference(EndToEndCompileRequest* req, CompileProduct* product);
 
 struct OptionsParser
 {
@@ -1401,13 +1402,13 @@ struct OptionsParser
                     CommandLineArg referenceModuleName;
                     SLANG_RETURN_ON_FAIL(reader.expectArg(referenceModuleName));
 
-                    // We need to deserialize and add the modules
-                    FileStream fileStream;
-                    SLANG_RETURN_ON_FAIL(fileStream.init(referenceModuleName.value, FileMode::Open, FileAccess::Read, FileShare::ReadWrite));
+                    auto desc = CompileProductDesc::make(CompileProductDesc::ContainerType::Library, CompileProductDesc::PayloadType::SlangIR, CompileProductDesc::Style::Unknown, 0);
 
-                    // TODO: probably near an error when we can't open the file?
+                    RefPtr<CompileProduct> product = new CompileProduct(desc);
+                    product->setPath(CompileProduct::PathType::Existing, referenceModuleName.value);
 
-                    _addLibraryReference(requestImpl, &fileStream);
+                    
+                    SLANG_RETURN_ON_FAIL(_addLibraryReference(requestImpl, product));
                 }
                 else if (argValue == "-v" || argValue == "-version")
                 {

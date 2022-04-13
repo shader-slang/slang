@@ -7,12 +7,6 @@
 namespace Slang
 {
 
-/*
-CompileProduct
-
-CompileContainer 
-*/
-
 /**
 A value type to describe aspects of a CompileArtifact.
 **/
@@ -163,50 +157,31 @@ public:
         Yes,
         No,
     };
+    enum PathType
+    {
+        None,
+        Temporary,
+        Existing,
+    };
 
-    /* A compile product can be made up of multiple representations. Note! Some types allow multiple entries.
-    For example there potentially be multiple InterfaceInstance/ObjectInstance associated.
-
-    There can be only zero or one File/TemporaryFile/Blob. These are all supposed to represent the same thing.
+    /* A compile product can be made up of multiple representations.
     */
-    
     struct Entry
     {
-        enum class DataStyle
-        {
-            RawPointer,
-            StringRep,
-            Object,
-            Interface,
-        };
-
         /// NOTE! Instance types in general won't work across dll/shared library boundaries
         /// because casting does not work across those boundaries.
         
-        /// There is an ABI issue around string types, but is less of an issue because
-        /// we mark with an enum. Assuming the structure of StringRepresentation is the same
-        /// it will be ok.
-
-        // TODO(JS): We might want to add types for
-        // * Specifying a file/temporary filename if a file needs to be written.
-
         // The Type of the entry
         enum class Type
         {
-            File,                       ///< Held as a file on the file system. Can only have File/TemporaryFile set
-            TemporaryFile,              ///< Held as a file on the file system, it is temporary and will be deleted when goes out of scope
-            Blob,                       ///< Held in memory as a blob
             InterfaceInstance,          ///< An interface instance 
             ObjectInstance,             ///< An object instance
+            RawPtr,
         };
-
-            /// Given the type return the style of the data
-        static DataStyle getStyle(Type type);
 
         Type type;
         union
         {
-            StringRepresentation* stringRep;
             RefObject* object;
             ISlangUnknown* intf;
             void* rawPointer;
@@ -219,9 +194,7 @@ public:
 
         /// Load as a blob
     SlangResult loadBlob(Cache cacheBehavior, ComPtr<ISlangBlob>& outBlob);
-        /// Get path to contents
-    SlangResult getFilePath(String& outPath);
-
+    
         /// Get as a file. May need to serialize and write as a temporary file.
     SlangResult requireFilePath(String& outPath);
 
@@ -229,17 +202,16 @@ public:
 
         /// Returns the index of the entry
     Index indexOf(Entry::Type type) const;
-    Index indexOfPath() const;
-
+    
         /// Add items
-    void addFile(const String& filePath) { return add(Entry::Type::File, filePath.getStringRepresentation()); }
-    void addTemporaryFile(const String& filePath) { return add(Entry::Type::TemporaryFile, filePath.getStringRepresentation()); }
-    void addBlob(ISlangBlob* blob) { return add(Entry::Type::Blob, blob); } 
-    void addInstance(RefObject* obj) { return add(Entry::Type::ObjectInstance, obj); }
-    void addInstance(ISlangUnknown* intf) { return add(Entry::Type::InterfaceInstance, intf); }
+    void setPath(PathType pathType, const String& filePath) { m_pathType = pathType; m_path = filePath; }
+    void setBlob(ISlangBlob* blob) { m_blob = blob; }
 
-    void add(Entry::Type type, RefObject* obj);
-    void add(Entry::Type type, ISlangUnknown* intf);
+    void add(RefObject* obj);
+    void add(ISlangUnknown* intf);
+
+    PathType getPathType() const { return m_pathType;  }
+    const String& getPath() const { return m_path;  }
 
     const List<Entry>& getEntries() const { return m_entries; }
 
@@ -250,6 +222,12 @@ public:
 
 protected:
     CompileProductDesc m_desc;
+
+    PathType m_pathType = PathType::None;       ///< What the path indicates
+    String m_path;                              ///< The path 
+
+    ComPtr<ISlangBlob> m_blob;                  ///< Blob to store result in memory
+
     List<Entry> m_entries;
 };
 
@@ -284,6 +262,7 @@ T* CompileProduct::findObjectInstance()
     return nullptr;
 }
 
+SlangResult loadModuleLibrary(const Byte* inBytes, size_t bytesCount, EndToEndCompileRequest* req, RefPtr<ModuleLibrary>& module);
 
 // Given a product make available as a module
 SlangResult loadModuleLibrary(CompileProduct::Cache cacheBehavior, CompileProduct* product, EndToEndCompileRequest* req, RefPtr<ModuleLibrary>& module);

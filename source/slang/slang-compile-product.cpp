@@ -188,60 +188,26 @@ UnownedStringSlice CompileProductDesc::getDefaultExtension()
     SLANG_UNEXPECTED("Unknown content type");
 }
 
-/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! CompileProduct::Entry !!!!!!!!!!!!!!!!!!!!!!!!! */
-
-/* static */CompileProduct::Entry::DataStyle CompileProduct::Entry::getStyle(Type type)
-{
-    switch (type)
-    {
-        case Type::File:                return DataStyle::StringRep;
-        case Type::TemporaryFile:       return DataStyle::StringRep;
-        case Type::Blob:
-        case Type::InterfaceInstance:
-        {
-            return DataStyle::Interface;
-        }
-        case Type::ObjectInstance:      return DataStyle::Object;
-        default: break;
-    }
-    SLANG_UNEXPECTED("Unknown type");
-}
-
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! CompileProduct !!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
 CompileProduct::~CompileProduct()
 {
+    if (m_pathType == PathType::Temporary)
+    {
+        File::remove(m_path);
+    }
+
     for (const auto& entry : m_entries)
     {
-        // Handle special cases
+        // Release the associated data
         switch (entry.type)
         {
-            case Entry::Type::TemporaryFile:
-            {
-                File::remove(String(entry.stringRep));
-                break;
-            }
-            default: break;
-        }
-
-        // Release the associated data
-        switch (Entry::getStyle(entry.type))
-        {
-            case Entry::DataStyle::StringRep:
-            {
-                // We need to special case StringRep as we can allow null ptr for an empty string
-                if (entry.stringRep)
-                {
-                    entry.stringRep->releaseReference();
-                }
-                break;
-            }
-            case Entry::DataStyle::Object:
+            case Entry::Type::ObjectInstance:
             {
                 entry.object->releaseReference();
                 break;
             }
-            case Entry::DataStyle::Interface:
+            case Entry::Type::InterfaceInstance:
             {
                 entry.intf->release();
                 break;
@@ -251,75 +217,31 @@ CompileProduct::~CompileProduct()
     }
 }
 
-Index CompileProduct::indexOfPath() const
-{
-    return m_entries.findFirstIndex([&](const Entry& entry) -> bool
-        { return entry.type == Entry::Type::TemporaryFile || entry.type == Entry::Type::File; });
-}
-
 Index CompileProduct::indexOf(Entry::Type type) const
 {
     return m_entries.findFirstIndex([&](const Entry& entry) -> bool { return entry.type == type; });
 }
 
-SlangResult CompileProduct::getFilePath(String& outPath)
+void CompileProduct::add(RefObject* obj)
 {
-    const Index index = indexOfPath();
-    if (index >= 0)
-    {
-        outPath = String(m_entries[index].stringRep);
-        return SLANG_OK;
-    }
-    return SLANG_E_NOT_FOUND;
-}
-
-void CompileProduct::add(Entry::Type type, RefObject* obj)
-{
-    auto const style = Entry::getStyle(type);
-    SLANG_UNUSED(style);
-
-    // Check it's an object type
-    SLANG_ASSERT(style == Entry::DataStyle::StringRep || style == Entry::DataStyle::Object);
-
-    // Only StringRep allows null
-    SLANG_ASSERT(style == Entry::DataStyle::StringRep || obj);
-
-    if (type == Entry::Type::File ||
-        type == Entry::Type::TemporaryFile)
-    {
-        if (indexOfPath() >= 0)
-        {
-            SLANG_ASSERT(!"Already has a file associated");
-            return;
-        }
-    }
+    SLANG_ASSERT(obj);
 
     Entry entry;
-    entry.type = type;
-    if (obj)
-    {
-        obj->addReference();
-    }
+    entry.type = Entry::Type::ObjectInstance;
     entry.object = obj;
+
+    obj->addReference();
+    
     m_entries.add(entry);
 }
 
-void CompileProduct::add(Entry::Type type, ISlangUnknown* intf)
+void CompileProduct::add(ISlangUnknown* intf)
 {
-    if (type == Entry::Type::Blob &&
-        indexOf(Entry::Type::Blob) >= 0)
-    {
-        SLANG_ASSERT(!"Already has a blob");
-        return;
-    }
-
-    // Check it's an interface type
-    SLANG_ASSERT(Entry::getStyle(type) == Entry::DataStyle::Interface);
     // Can't be nullptr
     SLANG_ASSERT(intf);
 
     Entry entry;
-    entry.type = type;
+    entry.type = Entry::Type::InterfaceInstance;
     intf->addRef();
 
     entry.intf = intf;
@@ -328,10 +250,9 @@ void CompileProduct::add(Entry::Type type, ISlangUnknown* intf)
 
 SlangResult CompileProduct::requireFilePath(String& outFilePath)
 {
-    const auto index = indexOfPath();
-    if (index >= 0)
+    if (m_pathType != PathType::None)
     {
-        outFilePath = String(m_entries[index].stringRep);
+        outFilePath = m_path; 
         return SLANG_OK;
     }
 
@@ -379,34 +300,30 @@ SlangResult CompileProduct::requireFilePath(String& outFilePath)
     SLANG_RETURN_ON_FAIL(File::writeAllBytes(path, blob->getBufferPointer(), blob->getBufferSize()));
 
     // Okay we can now add this as temporary path too
-    addTemporaryFile(path);
+    setPath(PathType::Temporary, path);
 
     return SLANG_OK;
 }
 
 SlangResult CompileProduct::loadBlob(Cache cacheBehavior, ComPtr<ISlangBlob>& outBlob)
 {
-    Index index = indexOf(Entry::Type::Blob);
-    if (index >= 0)
+    if (m_blob)
     {
-        outBlob = static_cast<ISlangBlob*>(m_entries[index].intf);
+        outBlob = m_blob;
         return SLANG_OK;
     }
 
     // TODO(JS): 
     // Strictly speaking we could *potentially* convert some other representation into
     // a blob by serializing it, but we don't worry about any of that here
-    index = indexOfPath();
-    if (index <= 0)
+    if (m_pathType == PathType::None)
     {
         return SLANG_E_NOT_FOUND;
     }
 
-    String path(m_entries[index].stringRep);
-
     // Read into a blob
     ScopedAllocation alloc;
-    SLANG_RETURN_ON_FAIL(File::readAllBytes(path, alloc));
+    SLANG_RETURN_ON_FAIL(File::readAllBytes(m_path, alloc));
 
     // Create as a blob
     RefPtr<RawBlob> blob = RawBlob::moveCreate(alloc);
@@ -414,30 +331,19 @@ SlangResult CompileProduct::loadBlob(Cache cacheBehavior, ComPtr<ISlangBlob>& ou
     // Put in cache 
     if (cacheBehavior == Cache::Yes)
     {
-        add(Entry::Type::Blob, static_cast<ISlangBlob*>(blob));
+        setBlob(blob);
     }
 
     outBlob = blob;
     return SLANG_OK;
 }
 
-SlangResult loadModuleLibrary(CompileProduct::Cache cacheBehavior, CompileProduct* product, EndToEndCompileRequest* req, RefPtr<ModuleLibrary>& outLibrary)
+SlangResult loadModuleLibrary(const Byte* inBytes, size_t bytesCount, EndToEndCompileRequest* req, RefPtr<ModuleLibrary>& outLibrary)
 {
-    if (auto foundLibrary = product->findObjectInstance<ModuleLibrary>())
-    {
-        outLibrary = foundLibrary;
-        return SLANG_OK;
-    }
-
-    ComPtr<ISlangBlob> blob;
-
-    // Load but don't require caching
-    SLANG_RETURN_ON_FAIL(product->loadBlob(CompileProduct::Cache::No, blob));
-
     RefPtr<ModuleLibrary> library = new ModuleLibrary;
 
     // Load up the module
-    MemoryStreamBase memoryStream(FileAccess::Read, blob->getBufferPointer(), blob->getBufferSize());
+    MemoryStreamBase memoryStream(FileAccess::Read, inBytes, bytesCount);
 
     RiffContainer riffContainer;
     SLANG_RETURN_ON_FAIL(RiffUtil::read(&memoryStream, riffContainer));
@@ -481,9 +387,29 @@ SlangResult loadModuleLibrary(CompileProduct::Cache cacheBehavior, CompileProduc
         }
     }
 
+    outLibrary = library;
+    return SLANG_OK;
+}
+
+SlangResult loadModuleLibrary(CompileProduct::Cache cacheBehavior, CompileProduct* product, EndToEndCompileRequest* req, RefPtr<ModuleLibrary>& outLibrary)
+{
+    if (auto foundLibrary = product->findObjectInstance<ModuleLibrary>())
+    {
+        outLibrary = foundLibrary;
+        return SLANG_OK;
+    }
+
+    ComPtr<ISlangBlob> blob;
+
+    // Load but don't require caching
+    SLANG_RETURN_ON_FAIL(product->loadBlob(CompileProduct::Cache::No, blob));
+
+    RefPtr<ModuleLibrary> library;
+    SLANG_RETURN_ON_FAIL(loadModuleLibrary((const Byte*)blob->getBufferPointer(), blob->getBufferSize(), req, library));
+    
     if (cacheBehavior == CompileProduct::Cache::Yes)
     {
-        product->addInstance(library);
+        product->add(library);
     }
 
     outLibrary = library;
