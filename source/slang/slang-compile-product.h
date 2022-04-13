@@ -158,6 +158,12 @@ class CompileProduct : public RefObject
 {
 public:
 
+    enum class CacheBehavior
+    {
+        Cache,
+        DontCache,
+    };
+
     /* A compile product can be made up of multiple representations. Note! Some types allow multiple entries.
     For example there potentially be multiple InterfaceInstance/ObjectInstance associated.
 
@@ -207,8 +213,12 @@ public:
         };
     };
 
-        /// Get as a blob
-    SlangResult loadBlob(ComPtr<ISlangBlob>& outBlob);
+        /// Given a type T find the associated instance
+    template <typename T>
+    T* findObjectInstance();
+
+        /// Load as a blob
+    SlangResult loadBlob(CacheBehavior cacheBehavior, ComPtr<ISlangBlob>& outBlob);
         /// Get path to contents
     SlangResult getFilePath(String& outPath);
 
@@ -242,6 +252,41 @@ protected:
     CompileProductDesc m_desc;
     List<Entry> m_entries;
 };
+
+// Class to hold information serialized in from a -r slang-lib/slang-module
+class ModuleLibrary : public RefObject
+{
+public:
+
+    List<FrontEndCompileRequest::ExtraEntryPointInfo> m_entryPoints;
+    List<RefPtr<IRModule>> m_modules;
+};
+
+// ----------------------------------------------------------------------
+template <typename T>
+T* CompileProduct::findObjectInstance()
+{
+    RefObject* check = static_cast<T*>(nullptr);
+    SLANG_UNUSED(check);
+
+    // Check if we already have it
+    for (const auto& entry : m_entries)
+    {
+        if (entry.type == CompileProduct::Entry::Type::ObjectInstance)
+        {
+            auto obj = as<T>(entry.object);
+            if (obj)
+            {
+                return obj;
+            }
+        }
+    }
+    return nullptr;
+}
+
+
+// Given a product make available as a module
+SlangResult loadModuleLibrary(CompileProduct::CacheBehavior cacheBehavior, CompileProduct* product, EndToEndCompileRequest* req, RefPtr<ModuleLibrary>& module);
 
 } // namespace Slang
 

@@ -3,6 +3,11 @@
 #include <assert.h>
 
 #include "../core/slang-blob.h"
+#include "../core/slang-riff.h"
+
+// Serialization
+#include "slang-serialize-ir.h"
+#include "slang-serialize-container.h"
 
 namespace Slang {
 
@@ -331,8 +336,9 @@ SlangResult CompileProduct::requireFilePath(String& outFilePath)
     }
 
     ComPtr<ISlangBlob> blob;
+
     // Get the contents as a blob. If we can't do that, then we can't write anything...
-    SLANG_RETURN_ON_FAIL(loadBlob(blob));
+    SLANG_RETURN_ON_FAIL(loadBlob(CacheBehavior::DontCache, blob));
 
     const UnownedStringSlice ext = m_desc.getDefaultExtension();
 
@@ -378,7 +384,7 @@ SlangResult CompileProduct::requireFilePath(String& outFilePath)
     return SLANG_OK;
 }
 
-SlangResult CompileProduct::loadBlob(ComPtr<ISlangBlob>& outBlob)
+SlangResult CompileProduct::loadBlob(CacheBehavior cacheBehavior, ComPtr<ISlangBlob>& outBlob)
 {
     Index index = indexOf(Entry::Type::Blob);
     if (index >= 0)
@@ -404,9 +410,83 @@ SlangResult CompileProduct::loadBlob(ComPtr<ISlangBlob>& outBlob)
 
     // Create as a blob
     RefPtr<RawBlob> blob = RawBlob::moveCreate(alloc);
-    add(Entry::Type::Blob, static_cast<ISlangBlob*>(blob));
+
+    // Put in cache 
+    if (cacheBehavior == CacheBehavior::Cache)
+    {
+        add(Entry::Type::Blob, static_cast<ISlangBlob*>(blob));
+    }
 
     outBlob = blob;
+    return SLANG_OK;
+}
+
+SlangResult loadModuleLibrary(CompileProduct::CacheBehavior cacheBehavior, CompileProduct* product, EndToEndCompileRequest* req, RefPtr<ModuleLibrary>& outLibrary)
+{
+    if (auto foundLibrary = product->findObjectInstance<ModuleLibrary>())
+    {
+        outLibrary = foundLibrary;
+        return SLANG_OK;
+    }
+
+    ComPtr<ISlangBlob> blob;
+
+    // Load but don't require caching
+    SLANG_RETURN_ON_FAIL(product->loadBlob(CompileProduct::CacheBehavior::DontCache, blob));
+
+    RefPtr<ModuleLibrary> library = new ModuleLibrary;
+
+    // Load up the module
+    MemoryStreamBase memoryStream(FileAccess::Read, blob->getBufferPointer(), blob->getBufferSize());
+
+    RiffContainer riffContainer;
+    SLANG_RETURN_ON_FAIL(RiffUtil::read(&memoryStream, riffContainer));
+
+    auto linkage = req->getLinkage();
+
+    // TODO(JS): May be better to have a ITypeComponent that encapsulates a collection of modules
+    // For now just add to the linkage
+
+    {
+        SerialContainerData containerData;
+
+        SerialContainerUtil::ReadOptions options;
+        options.namePool = req->getNamePool();
+        options.session = req->getSession();
+        options.sharedASTBuilder = linkage->getASTBuilder()->getSharedASTBuilder();
+        options.sourceManager = linkage->getSourceManager();
+        options.linkage = req->getLinkage();
+        options.sink = req->getSink();
+
+        SLANG_RETURN_ON_FAIL(SerialContainerUtil::read(&riffContainer, options, containerData));
+
+        for (const auto& module : containerData.modules)
+        {
+            // If the irModule is set, add it
+            if (module.irModule)
+            {
+                library->m_modules.add(module.irModule);
+            }
+        }
+
+        for (const auto& entryPoint : containerData.entryPoints)
+        {
+            FrontEndCompileRequest::ExtraEntryPointInfo dst;
+            dst.mangledName = entryPoint.mangledName;
+            dst.name = entryPoint.name;
+            dst.profile = entryPoint.profile;
+
+            // Add entry point
+            library->m_entryPoints.add(dst);
+        }
+    }
+
+    if (cacheBehavior == CompileProduct::CacheBehavior::Cache)
+    {
+        product->addInstance(library);
+    }
+
+    outLibrary = library;
     return SLANG_OK;
 }
 
