@@ -127,6 +127,7 @@ DIAGNOSTIC(    93, Error, unableExtractReproToDirectory, "unable to extract repr
 DIAGNOSTIC(    94, Error, unableToReadRiff, "unable to read as 'riff'/not a 'riff' file")
 
 DIAGNOSTIC(    95, Error, unknownLibraryKind, "unknown library kind '$0'")
+DIAGNOSTIC(    96, Error, kindNotLinkable, "not a known linkable kind '$0'")
 
 //
 // 001xx - Downstream Compilers

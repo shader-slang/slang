@@ -1412,6 +1412,18 @@ struct OptionsParser
                         return SLANG_FAIL;
                     }
 
+                    // If it's a GPU binary, then we'll assume it's a library
+                    if (desc.isGpuBinary())
+                    {
+                        desc.kind = ArtifactKind::Library;
+                    }
+
+                    if (!desc.isBinaryLinkable())
+                    {
+                        sink->diagnose(referenceModuleName.loc, Diagnostics::kindNotLinkable, Path::getPathExt(path));
+                        return SLANG_FAIL;
+                    }
+
                     // Create the artifact
                     RefPtr<Artifact> artifact = new Artifact(desc);
                     // Set the path

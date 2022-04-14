@@ -108,10 +108,13 @@ public:
     inline Packed getPacked() const;
 
         /// True if the container appears to be binary linkable
-    bool isBinaryLinkable() const { return isBinaryLinkable(kind); }
-        /// True if is a CPU payload
-    bool isCpu() const { return isCpu(payload); }
+    bool isBinaryLinkable() const;
+        /// True if is a CPU binary
+    bool isCpuBinary() const { return isPayloadCpuBinary(payload); }
+        /// True if is a GPU binary
+    bool isGpuBinary() const { return isPayloadCpuBinary(payload); }
 
+   
         /// Gets the default file extension for the artifact type. Returns empty slice if not known
     UnownedStringSlice getDefaultExtension();
 
@@ -121,9 +124,15 @@ public:
     static UnownedStringSlice getCpuExtensionForKind(Kind kind);
 
         /// Returns true if the kind is binary linkable 
-    static bool isBinaryLinkable(Kind kind);
+    static bool isKindBinaryLinkable(Kind kind);
+
         /// Returns true if the payload type is CPU
-    static bool isCpu(Payload payloadType);
+    static bool isPayloadCpuBinary(Payload payload);
+        /// Returns true if the payload type is applicable to the GPU
+    static bool isPayloadGpuBinary(Payload payload);
+
+        /// True if the payload type is in principal binary linkable
+    static bool isPayloadGpuBinaryLinkable(Payload payload);
 
         /// Try to determine the desc from a path
     static This fromPath(const UnownedStringSlice& slice);

@@ -111,7 +111,23 @@ static const KindExtension g_cpuKindExts[] =
     SLANG_UNEXPECTED("Unhandled type");
 }
 
-/* static */bool ArtifactDesc::isCpu(Payload payloadType)
+/* static */bool ArtifactDesc::isPayloadGpuBinary(Payload payloadType)
+{
+    switch (payloadType)
+    {
+        case Payload::DXIL:
+        case Payload::DXBC:
+        case Payload::SPIRV:
+        case Payload::PTX:
+        {
+            return true;
+        }
+        default: break;
+    }
+    return false;
+}
+
+/* static */bool ArtifactDesc::isPayloadCpuBinary(Payload payloadType)
 {
     switch (payloadType)
     {
@@ -128,7 +144,34 @@ static const KindExtension g_cpuKindExts[] =
     return false;
 }
 
-/* static */bool ArtifactDesc::isBinaryLinkable(Kind kind)
+/* static */bool ArtifactDesc::isPayloadGpuBinaryLinkable(Payload payload)
+{
+    switch (payload)
+    {
+        case Payload::DXIL:
+        case Payload::PTX:
+        case Payload::SPIRV:
+        {
+            // We can't *actually* link PTX or SPIR-V currently but it is in principal possible
+            // so let's say we accept for now
+            return true;
+        }
+        default: break;
+    }
+    return false;
+}
+
+bool ArtifactDesc::isBinaryLinkable() const
+{
+    if (isKindBinaryLinkable(kind))
+    {
+        return isPayloadCpuBinary(payload) || isPayloadGpuBinaryLinkable(payload);
+    }
+    
+    return false;
+}
+
+/* static */bool ArtifactDesc::isKindBinaryLinkable(Kind kind)
 {
     switch (kind)
     {
@@ -156,7 +199,7 @@ static const KindExtension g_cpuKindExts[] =
 
 UnownedStringSlice ArtifactDesc::getDefaultExtension()
 {
-    if (isCpu(payload))
+    if (isPayloadCpuBinary(payload))
     {
         return getCpuExtensionForKind(kind);
     }
@@ -164,8 +207,6 @@ UnownedStringSlice ArtifactDesc::getDefaultExtension()
     {
         return getDefaultExtensionForPayload(payload);
     }
-
-    SLANG_UNEXPECTED("Unknown ArtifactDesc type");
 }
 
 /* static */UnownedStringSlice ArtifactDesc::getDefaultExtensionForPayload(Payload payload)
@@ -289,7 +330,7 @@ SlangResult Artifact::requireFilePath(String& outFilePath)
     String path;
     SLANG_RETURN_ON_FAIL(File::generateTemporary(UnownedStringSlice::fromLiteral("slang-generated"), path));
 
-    if (m_desc.isCpu() && m_desc.kind == ArtifactKind::SharedLibrary)
+    if (m_desc.isCpuBinary() && m_desc.kind == ArtifactKind::SharedLibrary)
     {
         const bool isSharedLibraryPrefixPlatform = SLANG_LINUX_FAMILY || SLANG_APPLE_FAMILY;
         if (isSharedLibraryPrefixPlatform)
