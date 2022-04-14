@@ -4500,7 +4500,7 @@ __generic<Payload>
 __specialized_for_target(glsl)
 void CallShader(uint shaderIndex, inout Payload payload)
 {
-    [__vulkanRayPayload]
+    [__vulkanCallablePayload]
     static Payload p;
 
     p = payload;

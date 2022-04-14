@@ -20,7 +20,7 @@ struct MaterialPayload_0
 };
 
 layout(location = 0)
-rayPayloadNV
+callableDataNV
 MaterialPayload_0 p_0;
 
 void CallShader_0(uint shaderIndex_1, inout MaterialPayload_0 payload_0)
