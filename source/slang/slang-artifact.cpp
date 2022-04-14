@@ -5,11 +5,75 @@
 #include "../core/slang-blob.h"
 #include "../core/slang-riff.h"
 
+#include "../core/slang-type-text-util.h"
+
 // Serialization
 #include "slang-serialize-ir.h"
 #include "slang-serialize-container.h"
 
 namespace Slang {
+
+namespace { // anonymous
+struct KindExtension
+{
+    ArtifactKind kind;
+    UnownedStringSlice ext;
+};
+} // anonymous
+
+#define SLANG_KIND_EXTENSION(kind, ext) \
+    { ArtifactKind::kind, UnownedStringSlice::fromLiteral(ext) },
+
+static const KindExtension g_cpuKindExts[] =
+{
+#if SLANG_WINDOWS_FAMILY
+    SLANG_KIND_EXTENSION(Library, "lib")
+    SLANG_KIND_EXTENSION(ObjectCode, "obj")
+    SLANG_KIND_EXTENSION(Executable, "exe")
+    SLANG_KIND_EXTENSION(SharedLibrary, "dll")
+#else 
+    SLANG_KIND_EXTENSION(Library, "a")
+    SLANG_KIND_EXTENSION(ObjectCode, "o")
+    SLANG_KIND_EXTENSION(Executable, "")
+
+#if __CYGWIN__
+    SLANG_KIND_EXTENSION(SharedLibrary, "dll")
+#elif SLANG_APPLE_FAMILY
+    SLANG_KIND_EXTENSION(SharedLibrary, "dylib")
+#else
+    SLANG_KIND_EXTENSION(SharedLibrary, "so")
+#endif
+
+#endif
+};
+
+/* static */ArtifactDesc ArtifactDesc::fromPath(const UnownedStringSlice& slice)
+{
+    auto extension = Path::getPathExt(slice);
+    return fromExtension(extension);
+}
+
+/* static */ ArtifactDesc ArtifactDesc::fromExtension(const UnownedStringSlice& slice)
+{
+    if (slice == "slang-module" ||
+        slice == "slang-lib")
+    {
+        return make(ArtifactKind::Library, ArtifactPayload::SlangIR, ArtifactStyle::Unknown);
+    }
+
+    for (const auto& kindExt : g_cpuKindExts)
+    {
+        if (slice == kindExt.ext)
+        {
+            // We'll assume it's for the host CPU for now..
+            return make(kindExt.kind, Payload::HostCPU, Style::Unknown);
+        }
+    }
+
+    const auto target = (CodeGenTarget)TypeTextUtil::findCompileTargetFromExtension(slice);
+
+    return make(target);
+}
 
 /* static */ArtifactDesc ArtifactDesc::make(CodeGenTarget target)
 {
@@ -78,67 +142,23 @@ namespace Slang {
     return false;
 }
 
+/* static*/ UnownedStringSlice ArtifactDesc::getCpuExtensionForKind(Kind kind)
+{
+    for (const auto& kindExt : g_cpuKindExts)
+    {
+        if (kind == kindExt.kind)
+        {
+            return kindExt.ext;
+        }
+    }
+    return UnownedStringSlice();
+}
+
 UnownedStringSlice ArtifactDesc::getDefaultExtension()
 {
     if (isCpu(payload))
     {
-        switch (kind)
-        {
-            case Kind::None:
-            case Kind::Unknown:
-            case Kind::Callable:
-            case Kind::Container:
-            {
-                return UnownedStringSlice();
-            }
-            case Kind::Text:
-            {
-                auto ext = getDefaultExtensionForPayload(payload);
-                if (ext.getLength())
-                {
-                    return ext;
-                }
-                // Default to txt then...
-                return UnownedStringSlice::fromLiteral("txt");
-            }
-            case Kind::Library:
-            {
-#if SLANG_WINDOWS_FAMILY
-                return UnownedStringSlice::fromLiteral("lib");
-#else
-                return UnownedStringSlice::fromLiteral("a");
-#endif
-            }
-            case Kind::ObjectCode:
-            {
-#if SLANG_WINDOWS_FAMILY
-                return UnownedStringSlice::fromLiteral("obj");
-#else
-                return UnownedStringSlice::fromLiteral("o");
-#endif
-            }
-            case Kind::Executable:
-            {
-#if SLANG_WINDOWS_FAMILY
-                return UnownedStringSlice::fromLiteral("exe");
-#else
-                return UnownedStringSlice();
-#endif
-            }
-            case Kind::SharedLibrary:
-            {
-#if __CYGWIN__ || SLANG_WINDOWS_FAMILY
-                return UnownedStringSlice::fromLiteral("dll");
-#elif SLANG_APPLE_FAMILY
-                return UnownedStringSlice::fromLiteral("dylib");
-#elif SLANG_LINUX_FAMILY
-                return UnownedStringSlice::fromLiteral("so");
-#else
-                return UnownedStringSlice();
-#endif
-            }
-            default: break;
-        }
+        return getCpuExtensionForKind(kind);
     }
     else
     {

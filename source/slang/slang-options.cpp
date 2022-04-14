@@ -1402,12 +1402,22 @@ struct OptionsParser
                     CommandLineArg referenceModuleName;
                     SLANG_RETURN_ON_FAIL(reader.expectArg(referenceModuleName));
 
-                    auto desc = ArtifactDesc::make(ArtifactKind::Library, ArtifactPayload::SlangIR, ArtifactStyle::Unknown);
+                    auto path = referenceModuleName.value;
 
-                    RefPtr<Artifact> product = new Artifact(desc);
-                    product->setPath(Artifact::PathType::Existing, referenceModuleName.value);
+                    auto desc = ArtifactDesc::fromPath(path.getUnownedSlice());
 
-                    SLANG_RETURN_ON_FAIL(_addLibraryReference(requestImpl, product));
+                    if (desc.kind == ArtifactKind::Unknown)
+                    {
+                        sink->diagnose(referenceModuleName.loc, Diagnostics::unknownLibraryKind, Path::getPathExt(path));
+                        return SLANG_FAIL;
+                    }
+
+                    // Create the artifact
+                    RefPtr<Artifact> artifact = new Artifact(desc);
+                    // Set the path
+                    artifact->setPath(Artifact::PathType::Existing, referenceModuleName.value);
+
+                    SLANG_RETURN_ON_FAIL(_addLibraryReference(requestImpl, artifact));
                 }
                 else if (argValue == "-v" || argValue == "-version")
                 {

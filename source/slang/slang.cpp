@@ -4313,12 +4313,26 @@ void EndToEndCompileRequest::setDefaultModuleName(const char* defaultModuleName)
 
 SlangResult _addLibraryReference(EndToEndCompileRequest* req, Artifact* artifact)
 {
-    RefPtr<ModuleLibrary> library;
+    auto desc = artifact->getDesc();
 
-    SLANG_RETURN_ON_FAIL(loadModuleLibrary(Artifact::Cache::Yes, artifact, req, library));
+    if (desc.kind == ArtifactKind::Library && desc.payload == ArtifactPayload::SlangIR)
+    {
+        RefPtr<ModuleLibrary> library;
 
-    FrontEndCompileRequest* frontEndRequest = req->getFrontEndReq();
-    frontEndRequest->m_extraEntryPoints.addRange(library->m_entryPoints.getBuffer(), library->m_entryPoints.getCount());
+        SLANG_RETURN_ON_FAIL(loadModuleLibrary(Artifact::Cache::Yes, artifact, req, library));
+
+        FrontEndCompileRequest* frontEndRequest = req->getFrontEndReq();
+        frontEndRequest->m_extraEntryPoints.addRange(library->m_entryPoints.getBuffer(), library->m_entryPoints.getCount());
+    }
+    else
+    {
+        // TODO(JS): 
+        // Do we want to check the path exists?
+    }
+
+    // Add to the m_libModules
+    auto linkage = req->getLinkage();
+    linkage->m_libModules.add(artifact);
 
     return SLANG_OK;
 }

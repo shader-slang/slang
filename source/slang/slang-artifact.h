@@ -117,10 +117,18 @@ public:
 
     static UnownedStringSlice getDefaultExtensionForPayload(Payload payload);
 
-        /// Returns true if the container type is binary linkable 
-    static bool isBinaryLinkable(Kind containerType);
+        /// Get the extension for CPU/Host for a kind
+    static UnownedStringSlice getCpuExtensionForKind(Kind kind);
+
+        /// Returns true if the kind is binary linkable 
+    static bool isBinaryLinkable(Kind kind);
         /// Returns true if the payload type is CPU
     static bool isCpu(Payload payloadType);
+
+        /// Try to determine the desc from a path
+    static This fromPath(const UnownedStringSlice& slice);
+        /// Try to determine the desc from just a file extension (passed without .)
+    static This fromExtension(const UnownedStringSlice& slice);
 
         /// Given a code gen target, get the equivalent ArtifactDesc
     static This make(CodeGenTarget target);
