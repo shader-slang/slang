@@ -243,12 +243,6 @@ public:
     */
     struct Entry
     {
-        // TODO(JS): We may want distinguish between entries which are representations of the
-        // archive itself or
-        //
-        // * Contained items (for example the paths of contained Artifacts)
-        // * Ancilliary items (for example a custom ISlangFileSystem could be associated with an Artifact)
-        
         /// NOTE! Only interface innstances work across dll/shared library boundaries
         /// because casting other types does not work across those boundaries.
 
@@ -261,9 +255,9 @@ public:
         };
         enum class Style : uint8_t
         {
-            Artifact,       ///< Means this can *wholey* represent the artifact
+            Artifact,       ///< Means this entry *can* represent the whole artifact
             Child,          ///< Some part of the artifact
-            Info,           ///< Information
+            Info,           ///< Informational
             Other,          ///< Other
         };
 
