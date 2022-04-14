@@ -243,6 +243,9 @@ UnownedStringSlice ArtifactDesc::getDefaultExtension()
         case Payload::CUDA:         return UnownedStringSlice::fromLiteral("cu");
 
         case Payload::Slang:        return UnownedStringSlice::fromLiteral("slang");
+
+        case Payload::Zip:          return UnownedStringSlice::fromLiteral("zip");
+
         default: break;
     }
 
