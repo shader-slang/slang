@@ -309,6 +309,33 @@ void Artifact::add(ISlangUnknown* intf)
     m_entries.add(entry);
 }
 
+bool Artifact::exists() const
+{
+    // If we have an associated entry something exists
+    // TODO(JS):
+    // We may need in the future to distinguish between an Entry that is 'useful', but doesn't
+    // represent the artifact. In that case we'll need to check each entry
+    if (m_entries.getCount() > 0)
+    {
+        return true;
+    }
+
+    if (m_blob)
+    {
+        // If we have a blob it exists
+        return true;
+    }
+
+    // If we don't have a path then it can't exist
+    if (m_pathType == PathType::None)
+    {
+        return false;
+    }
+
+    // If the file exists we assume it exists
+    return File::exists(m_path);
+}
+
 SlangResult Artifact::requireFilePath(String& outFilePath)
 {
     if (m_pathType != PathType::None)

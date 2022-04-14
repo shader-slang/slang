@@ -128,6 +128,7 @@ DIAGNOSTIC(    94, Error, unableToReadRiff, "unable to read as 'riff'/not a 'rif
 
 DIAGNOSTIC(    95, Error, unknownLibraryKind, "unknown library kind '$0'")
 DIAGNOSTIC(    96, Error, kindNotLinkable, "not a known linkable kind '$0'")
+DIAGNOSTIC(    97, Error, libraryDoesNotExist, "library '$0' does not exist")
 
 //
 // 001xx - Downstream Compilers

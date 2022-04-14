@@ -1429,6 +1429,11 @@ struct OptionsParser
                     // Set the path
                     artifact->setPath(Artifact::PathType::Existing, referenceModuleName.value);
 
+                    // TODO(JS): We might want to check if the artifact exists.
+                    // If the artifact is a CPU (or downstream compiler) library
+                    // it may be findable by some other mechanism, so we probably don't want to check existance and just let the
+                    // downstream compiler handle.
+                    
                     SLANG_RETURN_ON_FAIL(_addLibraryReference(requestImpl, artifact));
                 }
                 else if (argValue == "-v" || argValue == "-version")

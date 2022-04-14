@@ -114,7 +114,6 @@ public:
         /// True if is a GPU binary
     bool isGpuBinary() const { return isPayloadCpuBinary(payload); }
 
-   
         /// Gets the default file extension for the artifact type. Returns empty slice if not known
     UnownedStringSlice getDefaultExtension();
 
@@ -231,6 +230,9 @@ public:
         /// Given a type T find the associated instance
     template <typename T>
     T* findObjectInstance();
+
+        /// Returns true if the artifact in principal exists (it could be invalid)
+    bool exists() const;
 
         /// Load as a blob
     SlangResult loadBlob(Cache cacheBehavior, ComPtr<ISlangBlob>& outBlob);
