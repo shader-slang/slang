@@ -113,7 +113,7 @@ public:
         /// True if is a CPU binary
     bool isCpuBinary() const { return isPayloadCpuBinary(payload); }
         /// True if is a GPU binary
-    bool isGpuBinary() const { return isPayloadCpuBinary(payload); }
+    bool isGpuBinary() const { return isPayloadGpuBinary(payload); }
 
         /// Gets the default file extension for the artifact type. Returns empty slice if not known
     UnownedStringSlice getDefaultExtension();
@@ -138,6 +138,9 @@ public:
     static This fromPath(const UnownedStringSlice& slice);
         /// Try to determine the desc from just a file extension (passed without .)
     static This fromExtension(const UnownedStringSlice& slice);
+
+    bool operator==(const This& rhs) const { return kind == rhs.kind && payload == rhs.payload && style == rhs.style && flags == rhs.flags;  }
+    bool operator!=(const This& rhs) const { return !(*this == rhs); }
 
         /// Given a code gen target, get the equivalent ArtifactDesc
     static This make(CodeGenTarget target);
