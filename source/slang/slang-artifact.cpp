@@ -283,12 +283,13 @@ Index Artifact::indexOf(Entry::Type type) const
     return m_entries.findFirstIndex([&](const Entry& entry) -> bool { return entry.type == type; });
 }
 
-void Artifact::add(RefObject* obj)
+void Artifact::add(Entry::Style style, RefObject* obj)
 {
     SLANG_ASSERT(obj);
 
     Entry entry;
     entry.type = Entry::Type::ObjectInstance;
+    entry.style = style;
     entry.object = obj;
 
     obj->addReference();
@@ -296,13 +297,15 @@ void Artifact::add(RefObject* obj)
     m_entries.add(entry);
 }
 
-void Artifact::add(ISlangUnknown* intf)
+void Artifact::add(Entry::Style style, ISlangUnknown* intf)
 {
     // Can't be nullptr
     SLANG_ASSERT(intf);
 
     Entry entry;
     entry.type = Entry::Type::InterfaceInstance;
+    entry.style = style;
+
     intf->addRef();
 
     entry.intf = intf;
@@ -311,19 +314,20 @@ void Artifact::add(ISlangUnknown* intf)
 
 bool Artifact::exists() const
 {
-    // If we have an associated entry something exists
-    // TODO(JS):
-    // We may need in the future to distinguish between an Entry that is 'useful', but doesn't
-    // represent the artifact. In that case we'll need to check each entry
-    if (m_entries.getCount() > 0)
+    // If we have a blob it exists
+    if (m_blob)
     {
         return true;
     }
 
-    if (m_blob)
+    // If we have an associated entry that represents the artifact it exists
+    for (const auto& entry : m_entries)
     {
-        // If we have a blob it exists
-        return true;
+        if (entry.style == Entry::Style::Artifact)
+        {
+            // There is a representation that 'is' the artifact
+            return true;
+        }
     }
 
     // If we don't have a path then it can't exist
@@ -334,6 +338,27 @@ bool Artifact::exists() const
 
     // If the file exists we assume it exists
     return File::exists(m_path);
+}
+
+ISlangUnknown* Artifact::findInterfaceInstance(const Guid& guid)
+{
+    for (const auto& entry : m_entries)
+    {
+        if (entry.type == Entry::Type::InterfaceInstance)
+        {
+            ISlangUnknown* intf = nullptr;
+            if (SLANG_SUCCEEDED(entry.intf->queryInterface(guid, (void**)&intf)) && intf)
+            {
+                // NOTE! This assumes we *DONT* need to ref count to keep an interface in scope
+                // (as strict COM requires so as to allow on demand interfaces).
+                intf->release();
+
+                return intf;
+            }
+        }
+    }
+
+    return nullptr;
 }
 
 SlangResult Artifact::requireFilePath(Keep keep, String& outFilePath)
@@ -497,7 +522,7 @@ SlangResult loadModuleLibrary(Artifact::Keep keep, Artifact* product, EndToEndCo
     
     if (Artifact::canKeep(keep))
     {
-        product->add(library);
+        product->add(Artifact::Entry::Style::Artifact, library);
     }
 
     outLibrary = library;

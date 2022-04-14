@@ -4346,7 +4346,7 @@ SlangResult EndToEndCompileRequest::addLibraryReference(const void* libData, siz
     const auto desc = ArtifactDesc::make(ArtifactKind::Library, ArtifactPayload::SlangIR, ArtifactStyle::Unknown);
     RefPtr<Artifact> artifact = new Artifact(desc);
 
-    artifact->add(library);
+    artifact->add(Artifact::Entry::Style::Artifact, library);
 
     return _addLibraryReference(this, artifact);
 }

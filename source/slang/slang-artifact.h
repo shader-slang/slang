@@ -90,7 +90,7 @@ struct ArtifactFlag
 
 
 /**
-A value type to describe aspects of a CompileArtifact.
+A value type to describe aspects of the contents of an Artifact.
 **/
 struct ArtifactDesc
 {
@@ -183,7 +183,36 @@ inline /* static */ArtifactDesc ArtifactDesc::make(Packed inPacked)
     return r;
 }
 
-/* The Artifact can contain multiple entries which represent the contained data in different forms. */
+/* The Artifact type is a type designed to represent some Artifact of compilation. It could be input to or output from a compilation.
+
+An abstraction is desirable here, because depending on the compiler the artifact/s could be
+
+* A file on the file system
+* A blob
+* Multiple files
+* Some other (perhaps multiple) in memory representations 
+
+The artifact uses the Blob as the standard representation of in memory data. 
+
+Some downstream compilers require the artifact to be available as a file system file, or to produce
+artifacts that are files. The Artifact type allows to abstract away this difference, including the
+ability to turn an in memory representation into a temporary file on the system file. 
+
+The mechanism also allows for 'Containers' which allow for Artifacts to contain other Artifacts (amongst other things).
+Those artifacts may be other files. For example a downstream compilation that produces results as well as temporary
+files could be a Container containing artifacts for
+
+* Diagnostics
+* Temporary files (of known and unknown types)
+* Files that contain known types
+* Callable interface (an ISlangSharedLibrary)
+
+A more long term goal would be to
+
+* Make Artifact an interface (such that it can work long term over binary boundaries)
+* Make Diagnostics into an interface (such it can be added to a Artifact result)
+* Use Artifact and related types for downstream compiler 
+*/
 class Artifact : public RefObject
 {
 public:
@@ -224,14 +253,22 @@ public:
         /// because casting other types does not work across those boundaries.
 
         // The Type of the entry
-        enum class Type
+        enum class Type : uint8_t
         {
             InterfaceInstance,          ///< An interface instance 
             ObjectInstance,             ///< An object instance
             RawInstance,
         };
+        enum class Style : uint8_t
+        {
+            Artifact,       ///< Means this can *wholey* represent the artifact
+            Child,          ///< Some part of the artifact
+            Info,           ///< Information
+            Other,          ///< Other
+        };
 
         Type type;
+        Style style;
         union
         {
             RefObject* object;
@@ -243,6 +280,9 @@ public:
         /// Given a type T find the associated instance
     template <typename T>
     T* findObjectInstance();
+
+        /// Finds an instance of that has the guid.
+    ISlangUnknown* findInterfaceInstance(const Guid& guid);
 
         /// Returns true if the artifact in principal exists (it could be invalid)
     bool exists() const;
@@ -262,8 +302,8 @@ public:
     void setPath(PathType pathType, const String& filePath) { m_pathType = pathType; m_path = filePath; }
     void setBlob(ISlangBlob* blob) { m_blob = blob; }
 
-    void add(RefObject* obj);
-    void add(ISlangUnknown* intf);
+    void add(Entry::Style style, RefObject* obj);
+    void add(Entry::Style style, ISlangUnknown* intf);
 
     PathType getPathType() const { return m_pathType;  }
     const String& getPath() const { return m_path;  }
