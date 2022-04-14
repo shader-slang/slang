@@ -731,6 +731,28 @@ void HLSLSourceEmitter::emitFuncDecorationImpl(IRDecoration* decoration)
 {
     switch( decoration->getOp() )
     {
+    case kIROp_PublicDecoration:
+    {
+        auto profile = m_effectiveProfile;
+        
+        const auto family = profile.getFamily();
+        const auto stage = profile.getStage();
+        const auto version = profile.getVersion();
+
+        // I would perhaps ideally know that this was being compiled for 'library' stage.
+        // Stage::Unknown is currently also used for lib profiles.
+
+        // TODO(JS): Potentially can do export for fxc too, but for now we don't add.
+        
+        if (family == ProfileFamily::DX &&
+            version >= ProfileVersion::DX_6_1 &&
+            stage == Stage::Unknown)
+        {
+            m_writer->emit("export\n");
+        }
+        break;
+    }
+        
     case kIROp_NoInlineDecoration:
         m_writer->emit("[noinline]\n");
         break;
