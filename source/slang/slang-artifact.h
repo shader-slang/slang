@@ -88,6 +88,7 @@ struct ArtifactFlag
     };
 };
 
+
 /**
 A value type to describe aspects of a CompileArtifact.
 **/
@@ -191,11 +192,14 @@ public:
     typedef ArtifactStyle Style;
     typedef ArtifactFlags Flags;
 
-    enum class Cache
+    // Controls what items can be kept. 
+    enum class Keep
     {
-        Yes,
-        No,
+        No,         ///< Don't keep the item
+        Yes,        ///< Yes keep the final item
+        All,        ///< Keep the final item and any intermediataries
     };
+
     enum PathType
     {
         None,
@@ -207,15 +211,21 @@ public:
     */
     struct Entry
     {
-        /// NOTE! Instance types in general won't work across dll/shared library boundaries
-        /// because casting does not work across those boundaries.
+        // TODO(JS): We may want distinguish between entries which are representations of the
+        // archive itself or
+        //
+        // * Contained items (for example the paths of contained Artifacts)
+        // * Ancilliary items (for example a custom ISlangFileSystem could be associated with an Artifact)
         
+        /// NOTE! Only interface innstances work across dll/shared library boundaries
+        /// because casting other types does not work across those boundaries.
+
         // The Type of the entry
         enum class Type
         {
             InterfaceInstance,          ///< An interface instance 
             ObjectInstance,             ///< An object instance
-            RawPtr,
+            RawInstance,
         };
 
         Type type;
@@ -223,7 +233,7 @@ public:
         {
             RefObject* object;
             ISlangUnknown* intf;
-            void* rawPointer;
+            void* raw;
         };
     };
 
@@ -235,10 +245,10 @@ public:
     bool exists() const;
 
         /// Load as a blob
-    SlangResult loadBlob(Cache cacheBehavior, ComPtr<ISlangBlob>& outBlob);
+    SlangResult loadBlob(Keep keep, ComPtr<ISlangBlob>& outBlob);
     
         /// Get as a file. May need to serialize and write as a temporary file.
-    SlangResult requireFilePath(String& outPath);
+    SlangResult requireFilePath(Keep keep, String& outPath);
 
     SLANG_FORCE_INLINE const Desc& getDesc() { return m_desc; }
 
@@ -256,6 +266,14 @@ public:
     const String& getPath() const { return m_path;  }
 
     const List<Entry>& getEntries() const { return m_entries; }
+
+        /// True if can keep an intermediate item
+    static bool canKeepIntermediate(Keep keep) { return keep == Keep::All; }
+        /// True if can keep
+    static bool canKeep(Keep keep) { return Index(keep) >= Index(Keep::Yes); }
+
+        /// Returns the keep type for an intermediate
+    static Keep getIntermediateKeep(Keep keep) { return (keep == Keep::All) ? Keep::All : Keep::No;  }
 
         /// Ctor
     Artifact(const Desc& desc) :m_desc(desc) {}
@@ -308,7 +326,7 @@ public:
 SlangResult loadModuleLibrary(const Byte* inBytes, size_t bytesCount, EndToEndCompileRequest* req, RefPtr<ModuleLibrary>& module);
 
 // Given a product make available as a module
-SlangResult loadModuleLibrary(Artifact::Cache cacheBehavior, Artifact* artifact, EndToEndCompileRequest* req, RefPtr<ModuleLibrary>& module);
+SlangResult loadModuleLibrary(Artifact::Keep keep, Artifact* artifact, EndToEndCompileRequest* req, RefPtr<ModuleLibrary>& module);
 
 } // namespace Slang
 

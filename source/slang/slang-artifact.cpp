@@ -165,7 +165,7 @@ bool ArtifactDesc::isBinaryLinkable() const
 {
     if (isKindBinaryLinkable(kind))
     {
-        return isPayloadCpuBinary(payload) || isPayloadGpuBinaryLinkable(payload);
+        return isPayloadCpuBinary(payload) || isPayloadGpuBinaryLinkable(payload) ||  payload == ArtifactPayload::SlangIR;
     }
     
     return false;
@@ -336,7 +336,7 @@ bool Artifact::exists() const
     return File::exists(m_path);
 }
 
-SlangResult Artifact::requireFilePath(String& outFilePath)
+SlangResult Artifact::requireFilePath(Keep keep, String& outFilePath)
 {
     if (m_pathType != PathType::None)
     {
@@ -347,7 +347,7 @@ SlangResult Artifact::requireFilePath(String& outFilePath)
     ComPtr<ISlangBlob> blob;
 
     // Get the contents as a blob. If we can't do that, then we can't write anything...
-    SLANG_RETURN_ON_FAIL(loadBlob(Cache::No, blob));
+    SLANG_RETURN_ON_FAIL(loadBlob(getIntermediateKeep(keep), blob));
 
     const UnownedStringSlice ext = m_desc.getDefaultExtension();
 
@@ -393,7 +393,7 @@ SlangResult Artifact::requireFilePath(String& outFilePath)
     return SLANG_OK;
 }
 
-SlangResult Artifact::loadBlob(Cache cacheBehavior, ComPtr<ISlangBlob>& outBlob)
+SlangResult Artifact::loadBlob(Keep keep, ComPtr<ISlangBlob>& outBlob)
 {
     if (m_blob)
     {
@@ -417,7 +417,7 @@ SlangResult Artifact::loadBlob(Cache cacheBehavior, ComPtr<ISlangBlob>& outBlob)
     RefPtr<RawBlob> blob = RawBlob::moveCreate(alloc);
 
     // Put in cache 
-    if (cacheBehavior == Cache::Yes)
+    if (canKeep(keep))
     {
         setBlob(blob);
     }
@@ -479,7 +479,7 @@ SlangResult loadModuleLibrary(const Byte* inBytes, size_t bytesCount, EndToEndCo
     return SLANG_OK;
 }
 
-SlangResult loadModuleLibrary(Artifact::Cache cacheBehavior, Artifact* product, EndToEndCompileRequest* req, RefPtr<ModuleLibrary>& outLibrary)
+SlangResult loadModuleLibrary(Artifact::Keep keep, Artifact* product, EndToEndCompileRequest* req, RefPtr<ModuleLibrary>& outLibrary)
 {
     if (auto foundLibrary = product->findObjectInstance<ModuleLibrary>())
     {
@@ -487,15 +487,15 @@ SlangResult loadModuleLibrary(Artifact::Cache cacheBehavior, Artifact* product, 
         return SLANG_OK;
     }
 
+    // Load the blob
     ComPtr<ISlangBlob> blob;
+    SLANG_RETURN_ON_FAIL(product->loadBlob(Artifact::getIntermediateKeep(keep), blob));
 
-    // Load but don't require caching
-    SLANG_RETURN_ON_FAIL(product->loadBlob(Artifact::Cache::No, blob));
-
+    // Load the module
     RefPtr<ModuleLibrary> library;
     SLANG_RETURN_ON_FAIL(loadModuleLibrary((const Byte*)blob->getBufferPointer(), blob->getBufferSize(), req, library));
     
-    if (cacheBehavior == Artifact::Cache::Yes)
+    if (Artifact::canKeep(keep))
     {
         product->add(library);
     }
