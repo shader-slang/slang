@@ -1,5 +1,5 @@
-// slang-compile-product.cpp
-#include "slang-compile-product.h"
+// slang-artifact.cpp
+#include "slang-artifact.h"
 #include <assert.h>
 
 #include "../core/slang-blob.h"
@@ -11,51 +11,51 @@
 
 namespace Slang {
 
-/* static */CompileProductDesc CompileProductDesc::make(CodeGenTarget target)
+/* static */ArtifactDesc ArtifactDesc::make(CodeGenTarget target)
 {
     switch (target)
     {
-        case CodeGenTarget::Unknown:                return make(ContainerType::Unknown, PayloadType::None, Style::Unknown, 0);
-        case CodeGenTarget::None:                   return make(ContainerType::None, PayloadType::None, Style::Unknown, 0);
+        case CodeGenTarget::Unknown:                return make(Kind::Unknown, Payload::None, Style::Unknown, 0);
+        case CodeGenTarget::None:                   return make(Kind::None, Payload::None, Style::Unknown, 0);
         case CodeGenTarget::GLSL_Vulkan:
         case CodeGenTarget::GLSL_Vulkan_OneDesc:
         case CodeGenTarget::GLSL:
         {
             // For the moment we make all just map to GLSL, but we could use flags
             // or some other mechanism to distinguish the types
-            return make(ContainerType::Text, PayloadType::GLSL, Style::Kernel, 0);
+            return make(Kind::Text, Payload::GLSL, Style::Kernel, 0);
         }
-        case CodeGenTarget::HLSL:                   return make(ContainerType::Text, PayloadType::HLSL, Style::Kernel, 0);
-        case CodeGenTarget::SPIRV:                  return make(ContainerType::Executable, PayloadType::SPIRV, Style::Kernel, 0);
-        case CodeGenTarget::SPIRVAssembly:          return make(ContainerType::Text, PayloadType::SPIRVAssembly, Style::Kernel, 0);
-        case CodeGenTarget::DXBytecode:             return make(ContainerType::Executable, PayloadType::DXBC, Style::Kernel, 0);
-        case CodeGenTarget::DXBytecodeAssembly:     return make(ContainerType::Text, PayloadType::DXBCAssembly, Style::Kernel, 0);
-        case CodeGenTarget::DXIL:                   return make(ContainerType::Executable, PayloadType::DXIL, Style::Kernel, 0);
-        case CodeGenTarget::DXILAssembly:           return make(ContainerType::Text, PayloadType::DXILAssembly, Style::Kernel, 0);
-        case CodeGenTarget::CSource:                return make(ContainerType::Text, PayloadType::C, Style::Kernel, 0);
-        case CodeGenTarget::CPPSource:              return make(ContainerType::Text, PayloadType::CPP, Style::Kernel, 0);
-        case CodeGenTarget::HostCPPSource:          return make(ContainerType::Text, PayloadType::CPP, Style::Host, 0);
-        case CodeGenTarget::HostExecutable:         return make(ContainerType::Executable, PayloadType::HostCPU, Style::Host, 0);
-        case CodeGenTarget::ShaderSharedLibrary:    return make(ContainerType::SharedLibrary, PayloadType::HostCPU, Style::Kernel, 0);
-        case CodeGenTarget::ShaderHostCallable:     return make(ContainerType::Callable, PayloadType::HostCPU, Style::Kernel, 0);
-        case CodeGenTarget::CUDASource:             return make(ContainerType::Text, PayloadType::CUDA, Style::Kernel, 0);
-        case CodeGenTarget::PTX:                    return make(ContainerType::Executable, PayloadType::PTX, Style::Kernel, 0);
-        case CodeGenTarget::ObjectCode:             return make(ContainerType::ObjectCode, PayloadType::HostCPU, Style::Kernel, 0);
+        case CodeGenTarget::HLSL:                   return make(Kind::Text, Payload::HLSL, Style::Kernel, 0);
+        case CodeGenTarget::SPIRV:                  return make(Kind::Executable, Payload::SPIRV, Style::Kernel, 0);
+        case CodeGenTarget::SPIRVAssembly:          return make(Kind::Text, Payload::SPIRVAssembly, Style::Kernel, 0);
+        case CodeGenTarget::DXBytecode:             return make(Kind::Executable, Payload::DXBC, Style::Kernel, 0);
+        case CodeGenTarget::DXBytecodeAssembly:     return make(Kind::Text, Payload::DXBCAssembly, Style::Kernel, 0);
+        case CodeGenTarget::DXIL:                   return make(Kind::Executable, Payload::DXIL, Style::Kernel, 0);
+        case CodeGenTarget::DXILAssembly:           return make(Kind::Text, Payload::DXILAssembly, Style::Kernel, 0);
+        case CodeGenTarget::CSource:                return make(Kind::Text, Payload::C, Style::Kernel, 0);
+        case CodeGenTarget::CPPSource:              return make(Kind::Text, Payload::CPP, Style::Kernel, 0);
+        case CodeGenTarget::HostCPPSource:          return make(Kind::Text, Payload::CPP, Style::Host, 0);
+        case CodeGenTarget::HostExecutable:         return make(Kind::Executable, Payload::HostCPU, Style::Host, 0);
+        case CodeGenTarget::ShaderSharedLibrary:    return make(Kind::SharedLibrary, Payload::HostCPU, Style::Kernel, 0);
+        case CodeGenTarget::ShaderHostCallable:     return make(Kind::Callable, Payload::HostCPU, Style::Kernel, 0);
+        case CodeGenTarget::CUDASource:             return make(Kind::Text, Payload::CUDA, Style::Kernel, 0);
+        case CodeGenTarget::PTX:                    return make(Kind::Executable, Payload::PTX, Style::Kernel, 0);
+        case CodeGenTarget::ObjectCode:             return make(Kind::ObjectCode, Payload::HostCPU, Style::Kernel, 0);
         default: break;
     }
 
     SLANG_UNEXPECTED("Unhandled type");
 }
 
-/* static */bool CompileProductDesc::isCpu(PayloadType payloadType)
+/* static */bool ArtifactDesc::isCpu(Payload payloadType)
 {
     switch (payloadType)
     {
-        case PayloadType::X86:
-        case PayloadType::X86_64:
-        case PayloadType::AARCH:
-        case PayloadType::AARCH64:
-        case PayloadType::HostCPU:
+        case Payload::X86:
+        case Payload::X86_64:
+        case Payload::AARCH:
+        case Payload::AARCH64:
+        case Payload::HostCPU:
         {
             return true;
         }
@@ -64,12 +64,12 @@ namespace Slang {
     return false;
 }
 
-/* static */bool CompileProductDesc::isBinaryLinkable(ContainerType kind)
+/* static */bool ArtifactDesc::isBinaryLinkable(Kind kind)
 {
     switch (kind)
     {
-        case ContainerType::Library:
-        case ContainerType::ObjectCode:
+        case Kind::Library:
+        case Kind::ObjectCode:
         {
             return true;
         }
@@ -78,22 +78,22 @@ namespace Slang {
     return false;
 }
 
-UnownedStringSlice CompileProductDesc::getDefaultExtension()
+UnownedStringSlice ArtifactDesc::getDefaultExtension()
 {
-    if (isCpu(payloadType))
+    if (isCpu(payload))
     {
-        switch (containerType)
+        switch (kind)
         {
-            case ContainerType::None:
-            case ContainerType::Unknown:
-            case ContainerType::Callable:
-            case ContainerType::Container:
+            case Kind::None:
+            case Kind::Unknown:
+            case Kind::Callable:
+            case Kind::Container:
             {
                 return UnownedStringSlice();
             }
-            case ContainerType::Text:
+            case Kind::Text:
             {
-                auto ext = getDefaultExtensionForPayloadType(payloadType);
+                auto ext = getDefaultExtensionForPayload(payload);
                 if (ext.getLength())
                 {
                     return ext;
@@ -101,7 +101,7 @@ UnownedStringSlice CompileProductDesc::getDefaultExtension()
                 // Default to txt then...
                 return UnownedStringSlice::fromLiteral("txt");
             }
-            case ContainerType::Library:
+            case Kind::Library:
             {
 #if SLANG_WINDOWS_FAMILY
                 return UnownedStringSlice::fromLiteral("lib");
@@ -109,7 +109,7 @@ UnownedStringSlice CompileProductDesc::getDefaultExtension()
                 return UnownedStringSlice::fromLiteral("a");
 #endif
             }
-            case ContainerType::ObjectCode:
+            case Kind::ObjectCode:
             {
 #if SLANG_WINDOWS_FAMILY
                 return UnownedStringSlice::fromLiteral("obj");
@@ -117,7 +117,7 @@ UnownedStringSlice CompileProductDesc::getDefaultExtension()
                 return UnownedStringSlice::fromLiteral("o");
 #endif
             }
-            case ContainerType::Executable:
+            case Kind::Executable:
             {
 #if SLANG_WINDOWS_FAMILY
                 return UnownedStringSlice::fromLiteral("exe");
@@ -125,7 +125,7 @@ UnownedStringSlice CompileProductDesc::getDefaultExtension()
                 return UnownedStringSlice();
 #endif
             }
-            case ContainerType::SharedLibrary:
+            case Kind::SharedLibrary:
             {
 #if __CYGWIN__ || SLANG_WINDOWS_FAMILY
                 return UnownedStringSlice::fromLiteral("dll");
@@ -142,55 +142,55 @@ UnownedStringSlice CompileProductDesc::getDefaultExtension()
     }
     else
     {
-        return getDefaultExtensionForPayloadType(payloadType);
+        return getDefaultExtensionForPayload(payload);
     }
 
-    SLANG_UNEXPECTED("Unknown CompileProductDesc type");
+    SLANG_UNEXPECTED("Unknown ArtifactDesc type");
 }
 
-/* static */UnownedStringSlice CompileProductDesc::getDefaultExtensionForPayloadType(PayloadType payloadType)
+/* static */UnownedStringSlice ArtifactDesc::getDefaultExtensionForPayload(Payload payload)
 {
-    switch (payloadType)
+    switch (payload)
     {
-        case PayloadType::None:         return UnownedStringSlice();
-        case PayloadType::Unknown:      return UnownedStringSlice::fromLiteral("unknown");
+        case Payload::None:         return UnownedStringSlice();
+        case Payload::Unknown:      return UnownedStringSlice::fromLiteral("unknown");
 
-        case PayloadType::DXIL:         return UnownedStringSlice::fromLiteral("dxil");
-        case PayloadType::DXBC:         return UnownedStringSlice::fromLiteral("dxbc");
-        case PayloadType::SPIRV:        return UnownedStringSlice::fromLiteral("spirv");
+        case Payload::DXIL:         return UnownedStringSlice::fromLiteral("dxil");
+        case Payload::DXBC:         return UnownedStringSlice::fromLiteral("dxbc");
+        case Payload::SPIRV:        return UnownedStringSlice::fromLiteral("spirv");
 
-        case PayloadType::PTX:          return UnownedStringSlice::fromLiteral("ptx");
+        case Payload::PTX:          return UnownedStringSlice::fromLiteral("ptx");
 
-        case PayloadType::X86:
-        case PayloadType::X86_64:
-        case PayloadType::AARCH:
-        case PayloadType::AARCH64:
-        case PayloadType::HostCPU:
+        case Payload::X86:
+        case Payload::X86_64:
+        case Payload::AARCH:
+        case Payload::AARCH64:
+        case Payload::HostCPU:
         {
             return UnownedStringSlice();
         }
 
-        case PayloadType::SlangIR:      return UnownedStringSlice::fromLiteral("slang-ir");
-        case PayloadType::LLVMIR:       return UnownedStringSlice::fromLiteral("llvm-ir");
+        case Payload::SlangIR:      return UnownedStringSlice::fromLiteral("slang-ir");
+        case Payload::LLVMIR:       return UnownedStringSlice::fromLiteral("llvm-ir");
 
-        case PayloadType::HLSL:         return UnownedStringSlice::fromLiteral("hlsl");
-        case PayloadType::GLSL:         return UnownedStringSlice::fromLiteral("glsl");
+        case Payload::HLSL:         return UnownedStringSlice::fromLiteral("hlsl");
+        case Payload::GLSL:         return UnownedStringSlice::fromLiteral("glsl");
 
-        case PayloadType::CPP:          return UnownedStringSlice::fromLiteral("cpp");
-        case PayloadType::C:            return UnownedStringSlice::fromLiteral("c");
+        case Payload::CPP:          return UnownedStringSlice::fromLiteral("cpp");
+        case Payload::C:            return UnownedStringSlice::fromLiteral("c");
 
-        case PayloadType::CUDA:         return UnownedStringSlice::fromLiteral("cu");
+        case Payload::CUDA:         return UnownedStringSlice::fromLiteral("cu");
 
-        case PayloadType::Slang:        return UnownedStringSlice::fromLiteral("slang");
+        case Payload::Slang:        return UnownedStringSlice::fromLiteral("slang");
         default: break;
     }
 
     SLANG_UNEXPECTED("Unknown content type");
 }
 
-/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! CompileProduct !!!!!!!!!!!!!!!!!!!!!!!!!!! */
+/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! Artifact !!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
-CompileProduct::~CompileProduct()
+Artifact::~Artifact()
 {
     if (m_pathType == PathType::Temporary)
     {
@@ -217,12 +217,12 @@ CompileProduct::~CompileProduct()
     }
 }
 
-Index CompileProduct::indexOf(Entry::Type type) const
+Index Artifact::indexOf(Entry::Type type) const
 {
     return m_entries.findFirstIndex([&](const Entry& entry) -> bool { return entry.type == type; });
 }
 
-void CompileProduct::add(RefObject* obj)
+void Artifact::add(RefObject* obj)
 {
     SLANG_ASSERT(obj);
 
@@ -235,7 +235,7 @@ void CompileProduct::add(RefObject* obj)
     m_entries.add(entry);
 }
 
-void CompileProduct::add(ISlangUnknown* intf)
+void Artifact::add(ISlangUnknown* intf)
 {
     // Can't be nullptr
     SLANG_ASSERT(intf);
@@ -248,7 +248,7 @@ void CompileProduct::add(ISlangUnknown* intf)
     m_entries.add(entry);
 }
 
-SlangResult CompileProduct::requireFilePath(String& outFilePath)
+SlangResult Artifact::requireFilePath(String& outFilePath)
 {
     if (m_pathType != PathType::None)
     {
@@ -269,7 +269,7 @@ SlangResult CompileProduct::requireFilePath(String& outFilePath)
     String path;
     SLANG_RETURN_ON_FAIL(File::generateTemporary(UnownedStringSlice::fromLiteral("slang-generated"), path));
 
-    if (m_desc.isCpu() && m_desc.containerType == CompileProductDesc::ContainerType::SharedLibrary)
+    if (m_desc.isCpu() && m_desc.kind == ArtifactKind::SharedLibrary)
     {
         const bool isSharedLibraryPrefixPlatform = SLANG_LINUX_FAMILY || SLANG_APPLE_FAMILY;
         if (isSharedLibraryPrefixPlatform)
@@ -305,7 +305,7 @@ SlangResult CompileProduct::requireFilePath(String& outFilePath)
     return SLANG_OK;
 }
 
-SlangResult CompileProduct::loadBlob(Cache cacheBehavior, ComPtr<ISlangBlob>& outBlob)
+SlangResult Artifact::loadBlob(Cache cacheBehavior, ComPtr<ISlangBlob>& outBlob)
 {
     if (m_blob)
     {
@@ -391,7 +391,7 @@ SlangResult loadModuleLibrary(const Byte* inBytes, size_t bytesCount, EndToEndCo
     return SLANG_OK;
 }
 
-SlangResult loadModuleLibrary(CompileProduct::Cache cacheBehavior, CompileProduct* product, EndToEndCompileRequest* req, RefPtr<ModuleLibrary>& outLibrary)
+SlangResult loadModuleLibrary(Artifact::Cache cacheBehavior, Artifact* product, EndToEndCompileRequest* req, RefPtr<ModuleLibrary>& outLibrary)
 {
     if (auto foundLibrary = product->findObjectInstance<ModuleLibrary>())
     {
@@ -402,12 +402,12 @@ SlangResult loadModuleLibrary(CompileProduct::Cache cacheBehavior, CompileProduc
     ComPtr<ISlangBlob> blob;
 
     // Load but don't require caching
-    SLANG_RETURN_ON_FAIL(product->loadBlob(CompileProduct::Cache::No, blob));
+    SLANG_RETURN_ON_FAIL(product->loadBlob(Artifact::Cache::No, blob));
 
     RefPtr<ModuleLibrary> library;
     SLANG_RETURN_ON_FAIL(loadModuleLibrary((const Byte*)blob->getBufferPointer(), blob->getBufferSize(), req, library));
     
-    if (cacheBehavior == CompileProduct::Cache::Yes)
+    if (cacheBehavior == Artifact::Cache::Yes)
     {
         product->add(library);
     }

@@ -36,7 +36,7 @@ namespace Slang
     class TargetProgram;
     class TargetRequest;
     class TypeLayout;
-    class CompileProduct;
+    class Artifact;
 
     enum class CompilerMode
     {
@@ -1802,7 +1802,7 @@ namespace Slang
         bool m_useFalcorCustomSharedKeywordSemantics = false;
 
         // Modules that have been read in with the -r option
-        List<RefPtr<CompileProduct>> m_libModules;
+        List<RefPtr<Artifact>> m_libModules;
 
         void _stopRetainingParentSession()
         {

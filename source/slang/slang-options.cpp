@@ -9,7 +9,7 @@
 
 #include "slang-compiler.h"
 #include "slang-profile.h"
-#include "slang-compile-product.h"
+#include "slang-artifact.h"
 
 #include "slang-repro.h"
 #include "slang-serialize-ir.h"
@@ -24,7 +24,7 @@
 
 namespace Slang {
 
-SlangResult _addLibraryReference(EndToEndCompileRequest* req, CompileProduct* product);
+SlangResult _addLibraryReference(EndToEndCompileRequest* req, Artifact* artifact);
 
 struct OptionsParser
 {
@@ -1402,12 +1402,11 @@ struct OptionsParser
                     CommandLineArg referenceModuleName;
                     SLANG_RETURN_ON_FAIL(reader.expectArg(referenceModuleName));
 
-                    auto desc = CompileProductDesc::make(CompileProductDesc::ContainerType::Library, CompileProductDesc::PayloadType::SlangIR, CompileProductDesc::Style::Unknown, 0);
+                    auto desc = ArtifactDesc::make(ArtifactKind::Library, ArtifactPayload::SlangIR, ArtifactStyle::Unknown);
 
-                    RefPtr<CompileProduct> product = new CompileProduct(desc);
-                    product->setPath(CompileProduct::PathType::Existing, referenceModuleName.value);
+                    RefPtr<Artifact> product = new Artifact(desc);
+                    product->setPath(Artifact::PathType::Existing, referenceModuleName.value);
 
-                    
                     SLANG_RETURN_ON_FAIL(_addLibraryReference(requestImpl, product));
                 }
                 else if (argValue == "-v" || argValue == "-version")

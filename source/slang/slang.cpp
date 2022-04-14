@@ -7,7 +7,7 @@
 #include "../core/slang-type-text-util.h"
 #include "../core/slang-type-convert-util.h"
 
-#include "slang-compile-product.h"
+#include "slang-artifact.h"
 
 #include "slang-check.h"
 #include "slang-parameter-binding.h"
@@ -4311,11 +4311,11 @@ void EndToEndCompileRequest::setDefaultModuleName(const char* defaultModuleName)
     frontEndReq->m_defaultModuleName = namePool->getName(defaultModuleName);
 }
 
-SlangResult _addLibraryReference(EndToEndCompileRequest* req, CompileProduct* product)
+SlangResult _addLibraryReference(EndToEndCompileRequest* req, Artifact* artifact)
 {
     RefPtr<ModuleLibrary> library;
 
-    SLANG_RETURN_ON_FAIL(loadModuleLibrary(CompileProduct::Cache::Yes, product, req, library));
+    SLANG_RETURN_ON_FAIL(loadModuleLibrary(Artifact::Cache::Yes, artifact, req, library));
 
     FrontEndCompileRequest* frontEndRequest = req->getFrontEndReq();
     frontEndRequest->m_extraEntryPoints.addRange(library->m_entryPoints.getBuffer(), library->m_entryPoints.getCount());
@@ -4329,12 +4329,12 @@ SlangResult EndToEndCompileRequest::addLibraryReference(const void* libData, siz
     RefPtr<ModuleLibrary> library;
     SLANG_RETURN_ON_FAIL(loadModuleLibrary((const Byte*)libData, libDataSize, this, library));
 
-    const auto desc = CompileProductDesc::make(CompileProductDesc::ContainerType::Library, CompileProductDesc::PayloadType::SlangIR, CompileProductDesc::Style::Unknown);
-    RefPtr<CompileProduct> product = new CompileProduct(desc);
+    const auto desc = ArtifactDesc::make(ArtifactKind::Library, ArtifactPayload::SlangIR, ArtifactStyle::Unknown);
+    RefPtr<Artifact> artifact = new Artifact(desc);
 
-    product->add(library);
+    artifact->add(library);
 
-    return _addLibraryReference(this, product);
+    return _addLibraryReference(this, artifact);
 }
 
 void EndToEndCompileRequest::addTranslationUnitPreprocessorDefine(int translationUnitIndex, const char* key, const char* value)
