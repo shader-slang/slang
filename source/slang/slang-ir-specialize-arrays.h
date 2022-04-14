@@ -3,8 +3,7 @@
 
 namespace Slang
 {
-    class BackEndCompileRequest;
-    class TargetRequest;
+    struct CodeGenContext;
     struct IRModule;
 
     /// Specialize calls to functions that take parameters of
@@ -19,7 +18,6 @@ namespace Slang
     /// This is an optimization for GL/VK backend since the downstream
     /// compiler doesn't seem to optimize such code well.
     void specializeArrayParameters(
-        BackEndCompileRequest* compileRequest,
-        TargetRequest* targetRequest,
-        IRModule* module);
+        CodeGenContext* codeGenContext,
+        IRModule*       module);
 }

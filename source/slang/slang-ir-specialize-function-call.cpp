@@ -74,7 +74,7 @@ struct FunctionParameterSpecializationContext
     // the parameters that were passed to the top-level
     // `specializeFunctionParameters` function.
     //
-    BackEndCompileRequest* compileRequest;
+    CodeGenContext* codeGenContext;
     TargetRequest*  targetRequest;
     IRModule*       module;
 
@@ -883,14 +883,13 @@ struct FunctionParameterSpecializationContext
 // and then defer to it for the real work.
 //
 bool specializeFunctionCalls(
-    BackEndCompileRequest* compileRequest,
-    TargetRequest*  targetRequest,
+    CodeGenContext* codeGenContext,
     IRModule*       module,
     FunctionCallSpecializeCondition* condition)
 {
     FunctionParameterSpecializationContext context;
-    context.compileRequest = compileRequest;
-    context.targetRequest = targetRequest;
+    context.codeGenContext = codeGenContext;
+    context.targetRequest = codeGenContext->getTargetReq();
     context.module = module;
     context.condition = condition;
 

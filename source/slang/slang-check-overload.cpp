@@ -216,6 +216,7 @@ namespace Slang
                     }
                     else
                     {
+                        arg = ExpectATypeRepr(arg);
                         typeArg = CoerceToProperType(TypeExp(arg));
                     }
                 }

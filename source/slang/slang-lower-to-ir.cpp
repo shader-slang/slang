@@ -1051,6 +1051,11 @@ static void addLinkageDecoration(
     {
         builder->addExternCppDecoration(inst, mangledName);
     }
+    if (auto dllImportModifier = decl->findModifier<DllImportAttribute>())
+    {
+        auto libraryName = dllImportModifier->modulePath;
+        builder->addDllImportDecoration(inst, libraryName.getUnownedSlice(), decl->getName()->text.getUnownedSlice());
+    }
 }
 
 static void addLinkageDecoration(
@@ -1871,13 +1876,13 @@ void addVarDecorations(
         {
             builder->addInterpolationModeDecoration(inst, IRInterpolationMode::Centroid);
         }
-        else if(as<VulkanRayPayloadAttribute>(mod))
+        else if(auto rayPayloadAttr = as<VulkanRayPayloadAttribute>(mod))
         {
-            builder->addSimpleDecoration<IRVulkanRayPayloadDecoration>(inst);
+            builder->addVulkanRayPayloadDecoration(inst, rayPayloadAttr->location);
         }
-        else if(as<VulkanCallablePayloadAttribute>(mod))
+        else if(auto callablePayloadAttr = as<VulkanCallablePayloadAttribute>(mod))
         {
-            builder->addSimpleDecoration<IRVulkanCallablePayloadDecoration>(inst);
+            builder->addVulkanCallablePayloadDecoration(inst, callablePayloadAttr->location);
         }
         else if(as<VulkanHitAttributesAttribute>(mod))
         {
@@ -3171,6 +3176,11 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
     LoweredValInfo visitBoolLiteralExpr(BoolLiteralExpr* expr)
     {
         return LoweredValInfo::simple(context->irBuilder->getBoolValue(expr->value));
+    }
+
+    LoweredValInfo visitNullPtrLiteralExpr(NullPtrLiteralExpr*)
+    {
+        return LoweredValInfo::simple(context->irBuilder->getPtrValue(nullptr));
     }
 
     LoweredValInfo visitIntegerLiteralExpr(IntegerLiteralExpr* expr)

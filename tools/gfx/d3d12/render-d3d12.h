@@ -546,6 +546,8 @@ public:
     virtual SLANG_NO_THROW Result SLANG_MCALL
         createCommandBuffer(ICommandBuffer** outCommandBuffer) override;
 
+    Result synchronize();
+
     virtual SLANG_NO_THROW Result SLANG_MCALL synchronizeAndReset() override;
 
     virtual SLANG_NO_THROW Result SLANG_MCALL finish() override;

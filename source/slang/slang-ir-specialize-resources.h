@@ -3,8 +3,7 @@
 
 namespace Slang
 {
-    class BackEndCompileRequest;
-    class TargetRequest;
+    struct CodeGenContext;
     struct IRModule;
     struct IRType;
 
@@ -19,18 +18,17 @@ namespace Slang
         /// global shader parameters directly).
         ///
     bool specializeResourceParameters(
-        BackEndCompileRequest* compileRequest,
-        TargetRequest*  targetRequest,
+        CodeGenContext* codeGenContext,
         IRModule*       module);
 
     bool specializeResourceOutputs(
-        BackEndCompileRequest*  compileRequest,
-        TargetRequest*          targetRequest,
-        IRModule*               module);
+        CodeGenContext* codeGenContext,
+        IRModule*       module);
 
         /// Combined iterative passes of `specializeResourceParameters` and `specializeResourceOutputs`.
     bool specializeResourceUsage(
-        BackEndCompileRequest* compileRequest, TargetRequest* targetRequest, IRModule* irModule);
+        CodeGenContext* codeGenContext,
+        IRModule*       irModule);
 
     bool isIllegalGLSLParameterType(IRType* type);
 
