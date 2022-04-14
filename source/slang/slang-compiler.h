@@ -1569,6 +1569,8 @@ namespace Slang
         }
     };
 
+        /// A dictionary of currently loaded modules. Used by `findOrImportModule` to
+        /// lookup additional loaded modules.
     typedef Dictionary<Name*, Module*> LoadedModuleDictionary;
 
         /// A context for loading and re-using code modules.

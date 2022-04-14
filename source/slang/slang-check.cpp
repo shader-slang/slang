@@ -164,10 +164,11 @@ namespace Slang
         TranslationUnitRequest* translationUnit,
         LoadedModuleDictionary& loadedModules)
     {
-        SharedSemanticsContext sharedSemanticsContext(translationUnit->compileRequest->getLinkage(),
-                                                      translationUnit->getModule(),
-                                                      translationUnit->compileRequest->getSink(),
-                                                      &loadedModules);
+        SharedSemanticsContext sharedSemanticsContext(
+            translationUnit->compileRequest->getLinkage(),
+            translationUnit->getModule(),
+            translationUnit->compileRequest->getSink(),
+            &loadedModules);
 
         SemanticsDeclVisitorBase visitor(&sharedSemanticsContext);
 

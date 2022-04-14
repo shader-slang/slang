@@ -2007,6 +2007,13 @@ void FrontEndCompileRequest::checkAllTranslationUnits()
     for( auto& translationUnit : translationUnits )
     {
         checkTranslationUnit(translationUnit.Ptr(), loadedModules);
+
+        // Add the checked module to list of loadedModules so that they can be
+        // discovered by `findOrImportModule` when processing future `import` decls.
+        // TODO: this does not handle the case where a translation unit to discover
+        // another translation unit added later to the compilation request.
+        // We should output an error message when we detect such a case, or support
+        // this scenario with a recursive style checking.
         loadedModules.Add(translationUnit->moduleName, translationUnit->getModule());
     }
     checkEntryPoints();
