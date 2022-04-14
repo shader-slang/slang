@@ -377,7 +377,7 @@ Result initTextureResourceDesc(
     return SLANG_OK;
 }
 
-void initBufferResourceDesc(size_t bufferSize, D3D12_RESOURCE_DESC& out)
+void initBufferResourceDesc(Size bufferSize, D3D12_RESOURCE_DESC& out)
 {
     out = {};
 
@@ -399,12 +399,12 @@ Result uploadBufferDataImpl(
     ID3D12GraphicsCommandList* cmdList,
     TransientResourceHeapImpl* transientHeap,
     BufferResourceImpl* buffer,
-    size_t offset,
-    size_t size,
+    Offset offset,
+    Size size,
     void* data)
 {
     IBufferResource* uploadResource;
-    size_t uploadResourceOffset = 0;
+    Offset uploadResourceOffset = 0;
     if (buffer->getDesc()->memoryType != MemoryType::Upload)
     {
         SLANG_RETURN_ON_FAIL(transientHeap->allocateStagingBuffer(
@@ -542,13 +542,13 @@ Result createNullDescriptor(
 Result DeviceImpl::createBuffer(
     const D3D12_RESOURCE_DESC& resourceDesc,
     const void* srcData,
-    size_t srcDataSize,
+    Size srcDataSize,
     D3D12_RESOURCE_STATES finalState,
     D3D12Resource& resourceOut,
     bool isShared,
     MemoryType memoryType)
 {
-    const size_t bufferSize = size_t(resourceDesc.Width);
+    const Size bufferSize = Size(resourceDesc.Width);
 
     D3D12_HEAP_PROPERTIES heapProps;
     heapProps.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
@@ -645,8 +645,8 @@ Result DeviceImpl::captureTextureToSurface(
     TextureResourceImpl* resourceImpl,
     ResourceState state,
     ISlangBlob** outBlob,
-    size_t* outRowPitch,
-    size_t* outPixelSize)
+    Size* outRowPitch,
+    Size* outPixelSize)
 {
     auto& resource = resourceImpl->m_resource;
 
@@ -664,11 +664,11 @@ Result DeviceImpl::captureTextureToSurface(
 
     FormatInfo formatInfo;
     gfxGetFormatInfo(gfxDesc.format, &formatInfo);
-    size_t bytesPerPixel = formatInfo.blockSizeInBytes / formatInfo.pixelsPerBlock;
-    size_t rowPitch = int(desc.Width) * bytesPerPixel;
-    static const size_t align = 256; // D3D requires minimum 256 byte alignment for texture data.
+    Size bytesPerPixel = formatInfo.blockSizeInBytes / formatInfo.pixelsPerBlock;
+    Size rowPitch = int(desc.Width) * bytesPerPixel;
+    static const Size align = 256; // D3D requires minimum 256 byte alignment for texture data.
     rowPitch = (rowPitch + align - 1) & ~(align - 1); // Bit trick for rounding up
-    size_t bufferSize = rowPitch * int(desc.Height) * int(desc.DepthOrArraySize);
+    Size bufferSize = rowPitch * int(desc.Height) * int(desc.DepthOrArraySize);
     if (outRowPitch)
         *outRowPitch = rowPitch;
     if (outPixelSize)
@@ -1342,26 +1342,26 @@ SlangResult DeviceImpl::readTextureResource(
     ITextureResource* resource,
     ResourceState state,
     ISlangBlob** outBlob,
-    size_t* outRowPitch,
-    size_t* outPixelSize)
+    Size* outRowPitch,
+    Size* outPixelSize)
 {
     return captureTextureToSurface(
         static_cast<TextureResourceImpl*>(resource), state, outBlob, outRowPitch, outPixelSize);
 }
 
 Result DeviceImpl::getTextureAllocationInfo(
-    const ITextureResource::Desc& desc, size_t* outSize, size_t* outAlignment)
+    const ITextureResource::Desc& desc, Size* outSize, Size* outAlignment)
 {
     TextureResource::Desc srcDesc = fixupTextureDesc(desc);
     D3D12_RESOURCE_DESC resourceDesc = {};
     initTextureResourceDesc(resourceDesc, srcDesc);
     auto allocInfo = m_device->GetResourceAllocationInfo(0, 1, &resourceDesc);
-    *outSize = (size_t)allocInfo.SizeInBytes;
-    *outAlignment = (size_t)allocInfo.Alignment;
+    *outSize = (Size)allocInfo.SizeInBytes;
+    *outAlignment = (Size)allocInfo.Alignment;
     return SLANG_OK;
 }
 
-Result DeviceImpl::getTextureRowAlignment(size_t* outAlignment)
+Result DeviceImpl::getTextureRowAlignment(Size* outAlignment)
 {
     *outAlignment = D3D12_TEXTURE_DATA_PITCH_ALIGNMENT;
     return SLANG_OK;
@@ -1534,7 +1534,7 @@ Result DeviceImpl::createTextureResource(
                                 : 1; // BC compressed formats are organized into 4x4 blocks
                     for (int k = 0; k < mipSize.height; k += j)
                     {
-                        ::memcpy(dstRow, srcRow, (size_t)mipRowSize);
+                        ::memcpy(dstRow, srcRow, (Size)mipRowSize);
 
                         srcRow += srcMipRowPitch;
                         dstRow += dstMipRowPitch;
@@ -2155,7 +2155,7 @@ Result DeviceImpl::createInputLayout(IInputLayout::Desc const& desc, IInputLayou
     RefPtr<InputLayoutImpl> layout(new InputLayoutImpl);
 
     // Work out a buffer size to hold all text
-    size_t textSize = 0;
+    Size textSize = 0;
     auto inputElementCount = desc.inputElementCount;
     auto inputElements = desc.inputElements;
     auto vertexStreamCount = desc.vertexStreamCount;
@@ -2210,12 +2210,12 @@ Result DeviceImpl::createInputLayout(IInputLayout::Desc const& desc, IInputLayou
 const gfx::DeviceInfo& DeviceImpl::getDeviceInfo() const { return m_info; }
 
 Result DeviceImpl::readBufferResource(
-    IBufferResource* bufferIn, size_t offset, size_t size, ISlangBlob** outBlob)
+    IBufferResource* bufferIn, Offset offset, Size size, ISlangBlob** outBlob)
 {
 
     BufferResourceImpl* buffer = static_cast<BufferResourceImpl*>(bufferIn);
 
-    const size_t bufferSize = buffer->getDesc()->sizeInBytes;
+    const Size bufferSize = buffer->getDesc()->sizeInBytes;
 
     // This will be slow!!! - it blocks CPU on GPU completion
     D3D12Resource& resource = buffer->m_resource;
@@ -2500,7 +2500,7 @@ Result DeviceImpl::createRayTracingPipelineState(
 
 Result DeviceImpl::createTransientResourceHeapImpl(
     ITransientResourceHeap::Flags::Enum flags,
-    size_t constantBufferSize,
+    Size constantBufferSize,
     uint32_t viewDescriptors,
     uint32_t samplerDescriptors,
     TransientResourceHeapImpl** outHeap)
@@ -3263,7 +3263,7 @@ Result PlainBufferProxyQueryPoolImpl::getResult(SlangInt queryIndex, SlangInt co
 
         D3D12Resource stageBuf;
 
-        auto size = (size_t)m_count * m_stride;
+        auto size = (Size)m_count * m_stride;
         D3D12_HEAP_PROPERTIES heapProps;
         heapProps.Type = D3D12_HEAP_TYPE_READBACK;
         heapProps.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
@@ -3686,8 +3686,10 @@ Result ShaderObjectImpl::getEntryPoint(UInt index, IShaderObject** outEntryPoint
 
 const void* ShaderObjectImpl::getRawData() { return m_data.getBuffer(); }
 
+// TODO: Change to Count?
 size_t ShaderObjectImpl::getSize() { return (size_t)m_data.getCount(); }
 
+// TODO: Change Index to Offset/Size?
 Result ShaderObjectImpl::setData(ShaderOffset const& inOffset, void const* data, size_t inSize)
 {
     Index offset = inOffset.uniformOffset;
@@ -3887,12 +3889,12 @@ Result ShaderObjectImpl::init(
 Result ShaderObjectImpl::_writeOrdinaryData(
     PipelineCommandEncoder* encoder,
     BufferResourceImpl* buffer,
-    size_t offset,
-    size_t destSize,
+    Offset offset,
+    Size destSize,
     ShaderObjectLayoutImpl* specializedLayout)
 {
     auto src = m_data.getBuffer();
-    auto srcSize = size_t(m_data.getCount());
+    auto srcSize = Size(m_data.getCount());
 
     SLANG_ASSERT(srcSize <= destSize);
 
@@ -3959,8 +3961,8 @@ Result ShaderObjectImpl::_writeOrdinaryData(
         // layout logic does for complex cases with multiple layers of nested arrays and
         // structures.
         //
-        size_t subObjectRangePendingDataOffset = subObjectRangeInfo.offset.pendingOrdinaryData;
-        size_t subObjectRangePendingDataStride = subObjectRangeInfo.stride.pendingOrdinaryData;
+        Offset subObjectRangePendingDataOffset = subObjectRangeInfo.offset.pendingOrdinaryData;
+        Size subObjectRangePendingDataStride = subObjectRangeInfo.stride.pendingOrdinaryData;
 
         // If the range doesn't actually need/use the "pending" allocation at all, then
         // we need to detect that case and skip such ranges.
@@ -6344,7 +6346,7 @@ RefPtr<BufferResource> ShaderTableImpl::createDeviceBuffer(
         static_cast<TransientResourceHeapImpl*>(transientHeap);
 
     IBufferResource* stagingBuffer = nullptr;
-    size_t stagingBufferOffset = 0;
+    Offset stagingBufferOffset = 0;
     transientHeapImpl->allocateStagingBuffer(
         tableSize, stagingBuffer, stagingBufferOffset, MemoryType::Upload);
 
@@ -6499,7 +6501,7 @@ void CommandBufferImpl::encodeRayTracingCommands(IRayTracingCommandEncoder** out
 void CommandBufferImpl::close() { m_cmdList->Close(); }
 
 void ResourceCommandEncoderImpl::copyBuffer(
-    IBufferResource* dst, size_t dstOffset, IBufferResource* src, size_t srcOffset, size_t size)
+    IBufferResource* dst, Offset dstOffset, IBufferResource* src, Offset srcOffset, Size size)
 {
     auto dstBuffer = static_cast<BufferResourceImpl*>(dst);
     auto srcBuffer = static_cast<BufferResourceImpl*>(src);
@@ -6513,7 +6515,7 @@ void ResourceCommandEncoderImpl::copyBuffer(
 }
 
 void ResourceCommandEncoderImpl::uploadBufferData(
-    IBufferResource* dst, size_t offset, size_t size, void* data)
+    IBufferResource* dst, Offset offset, Size size, void* data)
 {
     uploadBufferDataImpl(
         m_commandBuffer->m_renderer->m_device,
@@ -6525,6 +6527,7 @@ void ResourceCommandEncoderImpl::uploadBufferData(
         data);
 }
 
+// TODO: Change size_t to Count?
 void ResourceCommandEncoderImpl::textureBarrier(
     size_t count, ITextureResource* const* textures, ResourceState src, ResourceState dst)
 {
@@ -6566,6 +6569,7 @@ void ResourceCommandEncoderImpl::textureBarrier(
     }
 }
 
+// TODO: Change size_t to Count?
 void ResourceCommandEncoderImpl::bufferBarrier(
     size_t count, IBufferResource* const* buffers, ResourceState src, ResourceState dst)
 {
@@ -6679,6 +6683,7 @@ void ResourceCommandEncoderImpl::copyTexture(
     }
 }
 
+// TODO: Change size_t to Count?
 void ResourceCommandEncoderImpl::uploadTextureData(
     ITextureResource* dst,
     SubresourceRange subResourceRange,
@@ -6750,7 +6755,7 @@ void ResourceCommandEncoderImpl::uploadTextureData(
         auto bufferSize = footprint.Footprint.RowPitch * rowCount * footprint.Footprint.Depth;
 
         IBufferResource* stagingBuffer;
-        size_t stagingBufferOffset = 0;
+        Offset stagingBufferOffset = 0;
         m_commandBuffer->m_transientHeap->allocateStagingBuffer(
             bufferSize, stagingBuffer, stagingBufferOffset, MemoryType::Upload, true);
         assert(stagingBufferOffset == 0);
@@ -6760,12 +6765,12 @@ void ResourceCommandEncoderImpl::uploadTextureData(
         bufferImpl->m_resource.getResource()->Map(0, &mapRange, (void**)&bufferData);
         for (uint32_t z = 0; z < footprint.Footprint.Depth; z++)
         {
-            auto imageStart = bufferData + footprint.Footprint.RowPitch * rowCount * (size_t)z;
+            auto imageStart = bufferData + footprint.Footprint.RowPitch * rowCount * (Size)z;
             auto srcData = (uint8_t*)subResourceData->data + subResourceData->strideZ * z;
             for (uint32_t row = 0; row < rowCount; row++)
             {
                 memcpy(
-                    imageStart + row * (size_t)footprint.Footprint.RowPitch,
+                    imageStart + row * (Size)footprint.Footprint.RowPitch,
                     srcData + subResourceData->strideY * row,
                     rowSize);
             }
@@ -6960,9 +6965,9 @@ void ResourceCommandEncoderImpl::resolveQuery(
 
 void ResourceCommandEncoderImpl::copyTextureToBuffer(
     IBufferResource* dst,
-    size_t dstOffset,
-    size_t dstSize,
-    size_t dstRowStride,
+    Offset dstOffset,
+    Size dstSize,
+    Size dstRowStride,
     ITextureResource* src,
     ResourceState srcState,
     SubresourceRange srcSubresource,
