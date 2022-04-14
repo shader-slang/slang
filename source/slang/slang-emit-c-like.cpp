@@ -2945,6 +2945,14 @@ void CLikeSourceEmitter::emitInterpolationModifiers(IRInst* varInst, IRType* val
 
 UInt CLikeSourceEmitter::getRayPayloadLocation(IRInst* inst)
 {
+    if (auto rayPayloadDecoration = inst->findDecoration<IRVulkanRayPayloadDecoration>())
+    {
+        int explicitLocation = int(getIntVal(rayPayloadDecoration->getOperand(0)));
+
+        if (explicitLocation >= 0)
+            return UInt(explicitLocation);
+    }
+
     auto& map = m_mapIRValueToRayPayloadLocation;
     UInt value = 0;
     if(map.TryGetValue(inst, value))
@@ -2957,6 +2965,14 @@ UInt CLikeSourceEmitter::getRayPayloadLocation(IRInst* inst)
 
 UInt CLikeSourceEmitter::getCallablePayloadLocation(IRInst* inst)
 {
+    if (auto callablePayloadDecoration = inst->findDecoration<IRVulkanCallablePayloadDecoration>())
+    {
+        int explicitLocation = int(getIntVal(callablePayloadDecoration->getOperand(0)));
+
+        if (explicitLocation >= 0)
+            return UInt(explicitLocation);
+    }
+
     auto& map = m_mapIRValueToCallablePayloadLocation;
     UInt value = 0;
     if(map.TryGetValue(inst, value))
