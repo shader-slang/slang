@@ -4308,7 +4308,7 @@ SlangResult _addLibraryReference(EndToEndCompileRequest* req, Artifact* artifact
     {
         RefPtr<ModuleLibrary> library;
 
-        SLANG_RETURN_ON_FAIL(loadModuleLibrary(Artifact::Keep::Yes, artifact, req, library));
+        SLANG_RETURN_ON_FAIL(loadModuleLibrary(ArtifactKeep::Yes, artifact, req, library));
 
         FrontEndCompileRequest* frontEndRequest = req->getFrontEndReq();
         frontEndRequest->m_extraEntryPoints.addRange(library->m_entryPoints.getBuffer(), library->m_entryPoints.getCount());

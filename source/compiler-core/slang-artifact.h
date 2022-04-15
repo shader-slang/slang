@@ -91,6 +91,14 @@ struct ArtifactFlag
     };
 };
 
+// Controls what items can be kept. 
+enum class ArtifactKeep
+{
+    No,         ///< Don't keep the item
+    Yes,        ///< Yes keep the final item
+    All,        ///< Keep the final item and any intermediataries
+};
+
 
 /**
 A value type to describe aspects of the contents of an Artifact.
@@ -226,15 +234,8 @@ public:
     typedef ArtifactPayload Payload;
     typedef ArtifactStyle Style;
     typedef ArtifactFlags Flags;
-
-    // Controls what items can be kept. 
-    enum class Keep
-    {
-        No,         ///< Don't keep the item
-        Yes,        ///< Yes keep the final item
-        All,        ///< Keep the final item and any intermediataries
-    };
-
+    typedef ArtifactKeep Keep;
+    
     enum PathType
     {
         None,
@@ -346,11 +347,11 @@ T* Artifact::findObjectInstance()
 }
 
 /// True if can keep an intermediate item
-SLANG_INLINE  bool canKeepIntermediate(Artifact::Keep keep) { return keep == Artifact::Keep::All; }
+SLANG_INLINE  bool canKeepIntermediate(ArtifactKeep keep) { return keep == ArtifactKeep::All; }
     /// True if can keep
-SLANG_INLINE bool canKeep(Artifact::Keep keep) { return Index(keep) >= Index(Artifact::Keep::Yes); }
+SLANG_INLINE bool canKeep(ArtifactKeep keep) { return Index(keep) >= Index(ArtifactKeep::Yes); }
     /// Returns the keep type for an intermediate
-SLANG_INLINE Artifact::Keep getIntermediateKeep(Artifact::Keep keep) { return (keep == Artifact::Keep::All) ? Artifact::Keep::All : Artifact::Keep::No; }
+SLANG_INLINE ArtifactKeep getIntermediateKeep(ArtifactKeep keep) { return (keep == ArtifactKeep::All) ? ArtifactKeep::All : ArtifactKeep::No; }
 
 } // namespace Slang
 

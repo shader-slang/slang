@@ -21,7 +21,7 @@ public:
 SlangResult loadModuleLibrary(const Byte* inBytes, size_t bytesCount, EndToEndCompileRequest* req, RefPtr<ModuleLibrary>& module);
 
 // Given a product make available as a module
-SlangResult loadModuleLibrary(Artifact::Keep keep, Artifact* artifact, EndToEndCompileRequest* req, RefPtr<ModuleLibrary>& module);
+SlangResult loadModuleLibrary(ArtifactKeep keep, Artifact* artifact, EndToEndCompileRequest* req, RefPtr<ModuleLibrary>& module);
 
 } // namespace Slang
 
