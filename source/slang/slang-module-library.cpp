@@ -77,13 +77,13 @@ SlangResult loadModuleLibrary(Artifact::Keep keep, Artifact* product, EndToEndCo
 
     // Load the blob
     ComPtr<ISlangBlob> blob;
-    SLANG_RETURN_ON_FAIL(product->loadBlob(Artifact::getIntermediateKeep(keep), blob));
+    SLANG_RETURN_ON_FAIL(product->loadBlob(getIntermediateKeep(keep), blob));
 
     // Load the module
     RefPtr<ModuleLibrary> library;
     SLANG_RETURN_ON_FAIL(loadModuleLibrary((const Byte*)blob->getBufferPointer(), blob->getBufferSize(), req, library));
     
-    if (Artifact::canKeep(keep))
+    if (canKeep(keep))
     {
         product->add(Artifact::Entry::Style::Artifact, library);
     }

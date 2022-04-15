@@ -307,14 +307,6 @@ public:
 
     const List<Entry>& getEntries() const { return m_entries; }
 
-        /// True if can keep an intermediate item
-    static bool canKeepIntermediate(Keep keep) { return keep == Keep::All; }
-        /// True if can keep
-    static bool canKeep(Keep keep) { return Index(keep) >= Index(Keep::Yes); }
-
-        /// Returns the keep type for an intermediate
-    static Keep getIntermediateKeep(Keep keep) { return (keep == Keep::All) ? Keep::All : Keep::No;  }
-
         /// Ctor
     Artifact(const Desc& desc) :m_desc(desc) {}
         /// Dtor
@@ -352,6 +344,13 @@ T* Artifact::findObjectInstance()
     }
     return nullptr;
 }
+
+/// True if can keep an intermediate item
+SLANG_INLINE  bool canKeepIntermediate(Artifact::Keep keep) { return keep == Artifact::Keep::All; }
+    /// True if can keep
+SLANG_INLINE bool canKeep(Artifact::Keep keep) { return Index(keep) >= Index(Artifact::Keep::Yes); }
+    /// Returns the keep type for an intermediate
+SLANG_INLINE Artifact::Keep getIntermediateKeep(Artifact::Keep keep) { return (keep == Artifact::Keep::All) ? Artifact::Keep::All : Artifact::Keep::No; }
 
 } // namespace Slang
 
