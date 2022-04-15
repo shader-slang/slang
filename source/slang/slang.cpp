@@ -7,6 +7,8 @@
 #include "../core/slang-type-text-util.h"
 #include "../core/slang-type-convert-util.h"
 
+#include "slang-artifact.h"
+
 #include "slang-check.h"
 #include "slang-parameter-binding.h"
 #include "slang-lower-to-ir.h"
@@ -4296,52 +4298,28 @@ void EndToEndCompileRequest::setDefaultModuleName(const char* defaultModuleName)
     frontEndReq->m_defaultModuleName = namePool->getName(defaultModuleName);
 }
 
-SlangResult _addLibraryReference(EndToEndCompileRequest* req, Stream* stream)
+SlangResult _addLibraryReference(EndToEndCompileRequest* req, Artifact* artifact)
 {
-    // Load up the module
-    RiffContainer riffContainer;
-    SLANG_RETURN_ON_FAIL(RiffUtil::read(stream, riffContainer));
+    auto desc = artifact->getDesc();
 
-    auto linkage = req->getLinkage();
-
-    // TODO(JS): May be better to have a ITypeComponent that encapsulates a collection of modules
-    // For now just add to the linkage
-
+    if (desc.kind == ArtifactKind::Library && desc.payload == ArtifactPayload::SlangIR)
     {
-        SerialContainerData containerData;
+        RefPtr<ModuleLibrary> library;
 
-        SerialContainerUtil::ReadOptions options;
-        options.namePool = req->getNamePool();
-        options.session = req->getSession();
-        options.sharedASTBuilder = linkage->getASTBuilder()->getSharedASTBuilder();
-        options.sourceManager = linkage->getSourceManager();
-        options.linkage = req->getLinkage();
-        options.sink = req->getSink();
-
-        SLANG_RETURN_ON_FAIL(SerialContainerUtil::read(&riffContainer, options, containerData));
-
-        for (const auto& module : containerData.modules)
-        {
-            // If the irModule is set, add it
-            if (module.irModule)
-            {
-                linkage->m_libModules.add(module.irModule);
-            }
-        }
+        SLANG_RETURN_ON_FAIL(loadModuleLibrary(Artifact::Keep::Yes, artifact, req, library));
 
         FrontEndCompileRequest* frontEndRequest = req->getFrontEndReq();
-
-        for (const auto& entryPoint : containerData.entryPoints)
-        {
-            FrontEndCompileRequest::ExtraEntryPointInfo dst;
-            dst.mangledName = entryPoint.mangledName;
-            dst.name = entryPoint.name;
-            dst.profile = entryPoint.profile;
-
-            // Add entry point
-            frontEndRequest->m_extraEntryPoints.add(dst);
-        }
+        frontEndRequest->m_extraEntryPoints.addRange(library->m_entryPoints.getBuffer(), library->m_entryPoints.getCount());
     }
+    else
+    {
+        // TODO(JS): 
+        // Do we want to check the path exists?
+    }
+
+    // Add to the m_libModules
+    auto linkage = req->getLinkage();
+    linkage->m_libModules.add(artifact);
 
     return SLANG_OK;
 }
@@ -4349,8 +4327,15 @@ SlangResult _addLibraryReference(EndToEndCompileRequest* req, Stream* stream)
 SlangResult EndToEndCompileRequest::addLibraryReference(const void* libData, size_t libDataSize)
 {
     // We need to deserialize and add the modules
-    MemoryStreamBase fileStream(FileAccess::Read, libData, libDataSize);
-    return _addLibraryReference(this, &fileStream);
+    RefPtr<ModuleLibrary> library;
+    SLANG_RETURN_ON_FAIL(loadModuleLibrary((const Byte*)libData, libDataSize, this, library));
+
+    const auto desc = ArtifactDesc::make(ArtifactKind::Library, ArtifactPayload::SlangIR, ArtifactStyle::Unknown);
+    RefPtr<Artifact> artifact = new Artifact(desc);
+
+    artifact->add(Artifact::Entry::Style::Artifact, library);
+
+    return _addLibraryReference(this, artifact);
 }
 
 void EndToEndCompileRequest::addTranslationUnitPreprocessorDefine(int translationUnitIndex, const char* key, const char* value)
