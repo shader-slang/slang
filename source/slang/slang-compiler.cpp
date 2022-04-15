@@ -1285,7 +1285,13 @@ void printDiagnosticArg(StringBuilder& sb, CodeGenTarget val)
             if (_isCPUHostTarget(target))
             {
                 options.libraryPaths.add(Path::getParentDirectory(Path::getExecutablePath()));
-                options.libraries.add("slang-rt");
+
+                // Set up the library artifact
+                const ArtifactDesc desc = ArtifactDesc::make(ArtifactKind::Library, Artifact::Payload::HostCPU, ArtifactStyle::Unknown);
+                RefPtr<Artifact> artifact = new Artifact(desc);
+                artifact->setPath(Artifact::PathType::Existing, "slang-rt");
+
+                options.libraries.add(artifact);
             }
         }
 

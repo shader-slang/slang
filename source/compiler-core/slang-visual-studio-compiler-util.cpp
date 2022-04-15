@@ -257,9 +257,19 @@ namespace Slang
     }
 
     // Link libraries.
-    for (const auto& lib : options.libraries)
+    for (Artifact* artifact : options.libraries)
     {
-        cmdLine.addPrefixPathArg("", lib, ".lib");
+        if (artifact->getDesc().isCpuBinary())
+        {
+            String path;
+            SLANG_RETURN_ON_FAIL(artifact->requireFilePath(ArtifactKeep::No, path));
+
+            if (Path::getPathExt(path).getLength() == 0)
+            {
+                path.append(".lib");
+            }
+            cmdLine.addArg(path);
+        }
     }
 
     return SLANG_OK;
