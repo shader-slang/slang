@@ -1,7 +1,7 @@
 #include "slang-riff-file-system.h"
 
-#include "../../slang-com-helper.h"
-#include "../../slang-com-ptr.h"
+#include "slang/slang-com-helper.h"
+#include "slang/slang-com-ptr.h"
 
 #include "slang-io.h"
 #include "slang-string-util.h"

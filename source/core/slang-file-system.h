@@ -2,8 +2,8 @@
 #define SLANG_FILE_SYSTEM_H_INCLUDED
 
 #include "../../slang.h"
-#include "../../slang-com-helper.h"
-#include "../../slang-com-ptr.h"
+#include "slang/slang-com-helper.h"
+#include "slang/slang-com-ptr.h"
 
 #include "../core/slang-blob.h"
 

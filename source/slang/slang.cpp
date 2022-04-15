@@ -38,7 +38,7 @@
 
 #include "slang-check-impl.h"
 
-#include "../../slang-tag-version.h"
+#include "slang/slang-tag-version.h"
 
 // Used to print exception type names in internal-compiler-error messages
 #include <typeinfo>

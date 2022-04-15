@@ -3,9 +3,9 @@
 
 #include <stdint.h>
 
-#include "slang-com-helper.h"
+#include "slang/slang-com-helper.h"
 
-#include "slang-com-ptr.h"
+#include "slang/slang-com-ptr.h"
 #include "core/slang-basic.h"
 
 #include "../flag-combiner.h"

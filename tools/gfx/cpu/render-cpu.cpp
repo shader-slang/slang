@@ -4,8 +4,8 @@
 #include <chrono>
 
 #include "slang.h"
-#include "slang-com-ptr.h"
-#include "slang-com-helper.h"
+#include "slang/slang-com-ptr.h"
+#include "slang/slang-com-helper.h"
 #include "core/slang-basic.h"
 #include "core/slang-blob.h"
 

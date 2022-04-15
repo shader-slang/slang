@@ -3,7 +3,7 @@
 
 #include "slang.h"
 
-#include "slang-com-helper.h"
+#include "slang/slang-com-helper.h"
 
 #if SLANG_WINDOWS_FAMILY
 #   define VK_USE_PLATFORM_WIN32_KHR 1

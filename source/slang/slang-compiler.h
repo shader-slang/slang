@@ -13,7 +13,7 @@
 
 #include "../core/slang-std-writers.h"
 
-#include "../../slang-com-ptr.h"
+#include "slang/slang-com-ptr.h"
 
 #include "slang-capability.h"
 #include "slang-diagnostics.h"

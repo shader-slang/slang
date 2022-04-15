@@ -4,7 +4,7 @@
 #include "slang-gfx.h"
 #include "vector-math.h"
 #include "window.h"
-#include "slang-com-ptr.h"
+#include "slang/slang-com-ptr.h"
 #include "external/imgui/imgui.h"
 #include "source/core/slang-basic.h"
 

@@ -9,7 +9,7 @@
 // shader parameters.
 //
 #include <slang.h>
-#include <slang-com-ptr.h>
+#include <slang/slang-com-ptr.h>
 using Slang::ComPtr;
 
 #include "slang-gfx.h"

@@ -19,9 +19,9 @@
 #include <slang.h>
 
 // Allows use of ComPtr - which we can use to scope any 'com-like' pointers easily
-#include <slang-com-ptr.h>
+#include <slang/slang-com-ptr.h>
 // Provides macros for handling SlangResult values easily 
-#include <slang-com-helper.h>
+#include <slang/slang-com-helper.h>
 
 // This includes a useful small function for setting up the prelude (described more further below).
 #include "../../source/core/slang-test-tool-util.h"

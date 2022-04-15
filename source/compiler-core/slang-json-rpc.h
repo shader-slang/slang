@@ -2,8 +2,8 @@
 #define SLANG_COMPILER_CORE_JSON_RPC_H
 
 #include "../../slang.h"
-#include "../../slang-com-helper.h"
-#include "../../slang-com-ptr.h"
+#include "slang/slang-com-helper.h"
+#include "slang/slang-com-ptr.h"
 
 #include "slang-json-value.h"
 

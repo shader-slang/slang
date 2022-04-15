@@ -8,7 +8,7 @@
 #include "../d3d/d3d-util.h"
 #include "../flag-combiner.h"
 #include "../nvapi/nvapi-util.h"
-#include "slang-com-ptr.h"
+#include "slang/slang-com-ptr.h"
 #include <stdio.h>
 
 #ifdef _DEBUG

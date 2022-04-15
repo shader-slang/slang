@@ -13,7 +13,7 @@
 #include "../../source/compiler-core/slang-downstream-compiler.h"
 #include "../../source/compiler-core/slang-json-rpc-connection.h"
 
-#include "../../slang-com-ptr.h"
+#include "slang/slang-com-ptr.h"
 
 #include "options.h"
 

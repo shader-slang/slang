@@ -6,7 +6,7 @@
 #include "../core/slang-memory-arena.h"
 #include "../core/slang-string-slice-pool.h"
 
-#include "../../slang-com-ptr.h"
+#include "slang/slang-com-ptr.h"
 #include "../../slang.h"
 
 namespace Slang {

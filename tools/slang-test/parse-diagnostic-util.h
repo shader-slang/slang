@@ -8,7 +8,7 @@
 
 #include "../../source/compiler-core/slang-downstream-compiler.h"
 
-#include "../../slang-com-ptr.h"
+#include "slang/slang-com-ptr.h"
 
 struct ParseDiagnosticUtil
 {

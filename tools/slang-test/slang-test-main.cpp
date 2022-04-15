@@ -7,7 +7,7 @@
 #include "../../source/core/slang-type-text-util.h"
 #include "../../source/core/slang-memory-arena.h"
 
-#include "../../slang-com-helper.h"
+#include "slang/slang-com-helper.h"
 
 #include "../../source/core/slang-string-util.h"
 #include "../../source/core/slang-string-escape-util.h"

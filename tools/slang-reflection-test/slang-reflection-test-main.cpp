@@ -6,7 +6,7 @@
 #include <string.h>
 
 #include <slang.h>
-#include <slang-com-helper.h>
+#include <slang/slang-com-helper.h>
 
 #include "../../source/core/slang-test-tool-util.h"
 

@@ -3,7 +3,7 @@
 
 #include "slang-gfx.h"
 #include "vector-math.h"
-#include "slang-com-ptr.h"
+#include "slang/slang-com-ptr.h"
 #include <vector>
 #include <string>
 

@@ -7,7 +7,7 @@
 #define SLANG_HANDLE_RESULT_FAIL(x) assert(!"failure")
 #endif
 
-#include "../../slang-com-helper.h"
+#include "slang/slang-com-helper.h"
 #include "../../source/core/slang-writer.h"
 
 #include "../../source/core/slang-process-util.h"

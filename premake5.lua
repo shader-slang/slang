@@ -495,6 +495,8 @@ newoption {
          overrideModule.addBaseProjectOptions()
      end
  
+     includedirs "include/"
+
      --
      -- Add the files in the sourceDir
      -- NOTE! This doesn't recursively add files in subdirectories

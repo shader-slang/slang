@@ -8,7 +8,7 @@
 // shader code.
 //
 #include <slang.h>
-#include <slang-com-ptr.h>
+#include <slang/slang-com-ptr.h>
 
 #include "vulkan-api.h"
 #include "examples/example-base/example-base.h"

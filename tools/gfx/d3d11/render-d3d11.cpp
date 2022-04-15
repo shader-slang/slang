@@ -16,7 +16,7 @@
 
 //#include <slang.h>
 
-#include "slang-com-ptr.h"
+#include "slang/slang-com-ptr.h"
 #include "../flag-combiner.h"
 
 // We will be rendering with Direct3D 11, so we need to include

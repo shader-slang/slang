@@ -6,7 +6,7 @@
 #include "../slang-string-util.h"
 #include "../slang-process-util.h"
 
-#include "../../../slang-com-helper.h"
+#include "slang/slang-com-helper.h"
 
 #ifdef _WIN32
 // Include Windows header in a way that minimized namespace pollution.
