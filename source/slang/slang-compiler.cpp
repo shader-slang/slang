@@ -1392,6 +1392,9 @@ void printDiagnosticArg(StringBuilder& sb, CodeGenTarget val)
                     options.defines.add(define);
                 }
             }
+
+            // Add all of the module libraries
+            options.libraries.addRange(linkage->m_libModules.getBuffer(), linkage->m_libModules.getCount());
         }
 
         // Compile

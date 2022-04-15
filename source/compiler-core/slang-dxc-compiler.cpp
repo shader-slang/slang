@@ -50,6 +50,52 @@ static UnownedStringSlice _getSlice(IDxcBlob* blob) { return StringUtil::getSlic
 // 7f61fc7d-950d-467f-b3e3-3c02fb49187c
 static const Guid IID_IDxcIncludeHandler = { 0x7f61fc7d, 0x950d, 0x467f, { 0x3c, 0x02, 0xfb, 0x49, 0x18, 0x7c } };
 
+namespace { // anonymous
+
+class LibraryNameList
+{
+public:
+    void addName(Artifact* library)
+    {
+        String name;
+        if (library->getPathType() == Artifact::Existing)
+        {
+            name = Path::getFileNameWithoutExt(library->getPath());
+        }
+        addName(name);
+    }
+    void addName(const String& inName)
+    {
+        String name(inName);
+        if (name.getLength() == 0)
+        {
+            name = "unnamed";
+        }
+
+        if (m_names.indexOf(name) >= 0)
+        {
+            StringBuilder buf;
+            for (Index i = 1; ; ++i)
+            {
+                buf.Clear();
+                buf << name << "_" << i;
+
+                if (m_names.indexOf(buf) < 0)
+                {
+                    name = buf;
+                    break;
+                }
+            }
+        }
+
+        m_names.add(name);
+    }
+
+    List<String> m_names;
+};
+
+} // anonymous
+
 class DxcIncludeHandler : public IDxcIncludeHandler
 {
 public:
@@ -137,6 +183,8 @@ public:
 protected:
 
     DxcCreateInstanceProc m_createInstance = nullptr;
+
+
     ComPtr<ISlangSharedLibrary> m_sharedLibrary;
 };
 
@@ -183,6 +231,60 @@ static SlangResult _parseDiagnosticLine(const UnownedStringSlice& line, List<Uno
     return SLANG_OK;
 }
 
+static SlangResult _handleOperationResult(IDxcOperationResult* dxcResult, DownstreamDiagnostics& ioDiagnostics, ComPtr<IDxcBlob>& outBlob)
+{
+    // Retrieve result.
+    HRESULT resultCode = S_OK;
+    SLANG_RETURN_ON_FAIL(dxcResult->GetStatus(&resultCode));
+
+    // Note: it seems like the dxcompiler interface
+    // doesn't support querying diagnostic output
+    // *unless* the compile failed (no way to get
+    // warnings out!?).
+
+    if (SLANG_SUCCEEDED(ioDiagnostics.result))
+    {
+        ioDiagnostics.result = resultCode;
+    }
+
+    // Try getting the error/diagnostics blob
+    ComPtr<IDxcBlobEncoding> dxcErrorBlob;
+    dxcResult->GetErrorBuffer(dxcErrorBlob.writeRef());
+
+    if (dxcErrorBlob)
+    {
+        const UnownedStringSlice diagnosticsSlice = _getSlice(dxcErrorBlob);
+        if (diagnosticsSlice.getLength())
+        {
+            if (ioDiagnostics.rawDiagnostics.getLength() > 0)
+            {
+                ioDiagnostics.rawDiagnostics.append("\n");
+            }
+            ioDiagnostics.rawDiagnostics.append(diagnosticsSlice);
+
+            SlangResult diagnosticParseRes = DownstreamDiagnostic::parseColonDelimitedDiagnostics(diagnosticsSlice, 0, _parseDiagnosticLine, ioDiagnostics.diagnostics);
+
+            SLANG_UNUSED(diagnosticParseRes);
+            SLANG_ASSERT(SLANG_SUCCEEDED(diagnosticParseRes));
+        }
+    }
+
+    // If it failed, make sure we have an error in the diagnostics
+    if (SLANG_FAILED(resultCode))
+    {
+        // In case the parsing failed, we still have an error -> so require there is one in the diagnostics
+        ioDiagnostics.requireErrorDiagnostic();
+    }
+    else
+    {
+        // Okay, the compile supposedly succeeded, so we
+        // just need to grab the buffer with the output DXIL.
+        SLANG_RETURN_ON_FAIL(dxcResult->GetResult(outBlob.writeRef()));
+    }
+
+    return SLANG_OK;
+}
+
 SlangResult DXCDownstreamCompiler::compile(const CompileOptions& options, RefPtr<DownstreamCompileResult>& outResult)
 {
     // This compiler doesn't read files, they should be read externally and stored in sourceContents/sourceContentsPath
@@ -195,6 +297,22 @@ SlangResult DXCDownstreamCompiler::compile(const CompileOptions& options, RefPtr
     {
         SLANG_ASSERT(!"Can only compile HLSL to DXIL");
         return SLANG_FAIL;
+    }
+
+    // Find all of the libraries
+    List<Artifact*> libraries;
+    for (Artifact* library : options.libraries)
+    {
+        const auto desc = library->getDesc();
+
+        if (desc.kind == ArtifactKind::Library && desc.payload == ArtifactPayload::DXIL)
+        {
+            // Make sure they all have blobs
+            ComPtr<ISlangBlob> libraryBlob;
+            SLANG_RETURN_ON_FAIL(library->loadBlob(ArtifactKeep::Yes, libraryBlob));
+
+            libraries.add(library);
+        }
     }
 
     ComPtr<IDxcCompiler> dxcCompiler;
@@ -289,8 +407,28 @@ SlangResult DXCDownstreamCompiler::compile(const CompileOptions& options, RefPtr
     //
     args.add(L"-no-warnings");
 
+    String profileName = options.profileName;
+    // If we are going to link we have to compile in the lib profile style
+    if (libraries.getCount())
+    {
+        if (!profileName.startsWith("lib"))
+        {
+            const Index index = profileName.indexOf('_');
+            if (index < 0)
+            {
+                profileName = "lib_6_3";
+            }
+            else
+            {
+                StringBuilder buf;
+                buf << "lib" << profileName.getUnownedSlice().tail(index);
+                profileName = buf;
+            }
+        }
+    }
+
     OSString wideEntryPointName = options.entryPointName.toWString();
-    OSString wideProfileName = options.profileName.toWString();
+    OSString wideProfileName = profileName.toWString();
 
     if (options.flags & CompileOptions::Flag::EnableFloat16)
     {
@@ -319,50 +457,80 @@ SlangResult DXCDownstreamCompiler::compile(const CompileOptions& options, RefPtr
         &includeHandler,    // `#include` handler
         dxcResult.writeRef()));
 
-    // Retrieve result.
-    HRESULT resultCode = S_OK;
-    SLANG_RETURN_ON_FAIL(dxcResult->GetStatus(&resultCode));
-
-    // Note: it seems like the dxcompiler interface
-    // doesn't support querying diagnostic output
-    // *unless* the compile failed (no way to get
-    // warnings out!?).
-
     DownstreamDiagnostics diagnostics;
-    diagnostics.result = resultCode;
-
-    // Try getting the error/diagnostics blob
-    ComPtr<IDxcBlobEncoding> dxcErrorBlob;
-    dxcResult->GetErrorBuffer(dxcErrorBlob.writeRef());
-
-    if (dxcErrorBlob)
-    {
-        const UnownedStringSlice diagnosticsSlice = _getSlice(dxcErrorBlob);
-        if (diagnosticsSlice.getLength())
-        {
-            diagnostics.rawDiagnostics = String(diagnosticsSlice);
-
-            SlangResult diagnosticParseRes = DownstreamDiagnostic::parseColonDelimitedDiagnostics(diagnosticsSlice, 0, _parseDiagnosticLine, diagnostics.diagnostics);
-
-            SLANG_UNUSED(diagnosticParseRes);
-            SLANG_ASSERT(SLANG_SUCCEEDED(diagnosticParseRes));
-        }
-    }
 
     ComPtr<IDxcBlob> dxcResultBlob;
 
-    // If it failed, make sure we have an error in the diagnostics
-    if (SLANG_FAILED(resultCode))
+    SLANG_RETURN_ON_FAIL(_handleOperationResult(dxcResult, diagnostics, dxcResultBlob));
+
+    // If we have libraries then we need to link...
+    if (libraries.getCount())
     {
-        // In case the parsing failed, we still have an error -> so require there is one in the diagnostics
-        diagnostics.requireErrorDiagnostic();
+        ComPtr<IDxcLinker> linker;
+        SLANG_RETURN_ON_FAIL(m_createInstance(CLSID_DxcLinker, __uuidof(linker), (void**)linker.writeRef()));
+
+        List<ComPtr<ISlangBlob>> libraryBlobs;
+
+        LibraryNameList libraryNames;
+
+        for (Artifact* library : libraries)
+        {
+            ComPtr<ISlangBlob> blob;
+            SLANG_RETURN_ON_FAIL(library->loadBlob(ArtifactKeep::Yes, blob));
+
+            libraryBlobs.add(blob);
+            libraryNames.addName(library);
+        }
+
+        // Add the compiled blob name
+
+        {
+            auto blob = (ISlangBlob*)dxcResultBlob.get();
+            libraryBlobs.add(ComPtr<ISlangBlob>(blob));
+        }
+
+        if (options.modulePath.getLength())
+        {
+            libraryNames.addName(Path::getFileNameWithoutExt(options.modulePath));
+        }
+        else if (options.sourceContentsPath.getLength())
+        {
+            libraryNames.addName(Path::getFileNameWithoutExt(options.sourceContentsPath));
+        }
+        else
+        {
+            libraryNames.addName("");
+        }
+
+        const Index librariesCount = libraryNames.m_names.getCount();
+        SLANG_ASSERT(libraryBlobs.getCount() == librariesCount);
+
+        List<const wchar_t*> linkLibraryNames;
+        List<OSString> wideLibraryNames;
+
+        linkLibraryNames.setCount(librariesCount);
+        wideLibraryNames.setCount(librariesCount);
+
+        for (Index i = 0; i < librariesCount; ++i)
+        {
+            wideLibraryNames[i] = libraryNames.m_names[i].toWString();
+            linkLibraryNames[i] = wideLibraryNames[i].begin();
+
+            // Register the library
+            SLANG_RETURN_ON_FAIL(linker->RegisterLibrary(linkLibraryNames[i], (IDxcBlob*)libraryBlobs[i].get()));
+        }
+
+        // Use the original profile name
+        wideProfileName = options.profileName.toWString();
+
+        ComPtr<IDxcOperationResult> linkDxcResult;
+        SLANG_RETURN_ON_FAIL(linker->Link(wideEntryPointName.begin(), wideProfileName.begin(), linkLibraryNames.getBuffer(), UINT32(librariesCount), nullptr, 0, linkDxcResult.writeRef()));
+
+        ComPtr<IDxcBlob> linkedBlob;
+        SLANG_RETURN_ON_FAIL(_handleOperationResult(linkDxcResult, diagnostics, linkedBlob));
+
+        dxcResultBlob = linkedBlob;
     }
-    else
-    {
-        // Okay, the compile supposedly succeeded, so we
-        // just need to grab the buffer with the output DXIL.
-        SLANG_RETURN_ON_FAIL(dxcResult->GetResult(dxcResultBlob.writeRef()));
-   }
 
     outResult = new BlobDownstreamCompileResult(diagnostics, (ISlangBlob*)dxcResultBlob.get());
     return SLANG_OK;
