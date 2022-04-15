@@ -6,6 +6,7 @@
 #include "slang-ir-insts.h"
 #include "slang-mangle.h"
 #include "slang-ir-string-hash.h"
+#include "slang-artifact.h"
 
 namespace Slang
 {
@@ -1387,8 +1388,14 @@ LinkedIR linkIR(
     {
         irModules.add(irModule);
     });
-    irModules.addRange(linkage->m_libModules.getBuffer()->readRef(), linkage->m_libModules.getCount());
-
+    for (Artifact* artifact : linkage->m_libModules)
+    {
+        ModuleLibrary* library = artifact->findObjectInstance<ModuleLibrary>();
+        if (library)
+        {
+            irModules.addRange(library->m_modules.getBuffer()->readRef(), library->m_modules.getCount());
+        }
+    }
     
     // Add any modules that were loaded as libraries
     for (IRModule* irModule : irModules)

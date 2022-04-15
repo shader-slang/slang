@@ -9,6 +9,7 @@
 
 #include "slang-compiler.h"
 #include "slang-profile.h"
+#include "slang-artifact.h"
 
 #include "slang-repro.h"
 #include "slang-serialize-ir.h"
@@ -23,7 +24,7 @@
 
 namespace Slang {
 
-SlangResult _addLibraryReference(EndToEndCompileRequest* req, Stream* stream);
+SlangResult _addLibraryReference(EndToEndCompileRequest* req, Artifact* artifact);
 
 struct OptionsParser
 {
@@ -1398,13 +1399,39 @@ struct OptionsParser
                     CommandLineArg referenceModuleName;
                     SLANG_RETURN_ON_FAIL(reader.expectArg(referenceModuleName));
 
-                    // We need to deserialize and add the modules
-                    FileStream fileStream;
-                    SLANG_RETURN_ON_FAIL(fileStream.init(referenceModuleName.value, FileMode::Open, FileAccess::Read, FileShare::ReadWrite));
+                    auto path = referenceModuleName.value;
 
-                    // TODO: probably near an error when we can't open the file?
+                    auto desc = ArtifactDesc::fromPath(path.getUnownedSlice());
 
-                    _addLibraryReference(requestImpl, &fileStream);
+                    if (desc.kind == ArtifactKind::Unknown)
+                    {
+                        sink->diagnose(referenceModuleName.loc, Diagnostics::unknownLibraryKind, Path::getPathExt(path));
+                        return SLANG_FAIL;
+                    }
+
+                    // If it's a GPU binary, then we'll assume it's a library
+                    if (desc.isGpuBinary())
+                    {
+                        desc.kind = ArtifactKind::Library;
+                    }
+
+                    if (!desc.isBinaryLinkable())
+                    {
+                        sink->diagnose(referenceModuleName.loc, Diagnostics::kindNotLinkable, Path::getPathExt(path));
+                        return SLANG_FAIL;
+                    }
+
+                    // Create the artifact
+                    RefPtr<Artifact> artifact = new Artifact(desc);
+                    // Set the path
+                    artifact->setPath(Artifact::PathType::Existing, referenceModuleName.value);
+
+                    // TODO(JS): We might want to check if the artifact exists.
+                    // If the artifact is a CPU (or downstream compiler) library
+                    // it may be findable by some other mechanism, so we probably don't want to check existance and just let the
+                    // downstream compiler handle.
+                    
+                    SLANG_RETURN_ON_FAIL(_addLibraryReference(requestImpl, artifact));
                 }
                 else if (argValue == "-v" || argValue == "-version")
                 {
@@ -1991,6 +2018,9 @@ struct OptionsParser
                     case CodeGenTarget::ShaderHostCallable:
                     case CodeGenTarget::HostExecutable:
                     case CodeGenTarget::ShaderSharedLibrary:
+
+                    case CodeGenTarget::DXIL:
+
                         rawOutput.isWholeProgram = true;
                         break;
                     default:

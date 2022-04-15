@@ -126,6 +126,10 @@ DIAGNOSTIC(    92, Error, unableToCreateDirectory, "unable to create directory '
 DIAGNOSTIC(    93, Error, unableExtractReproToDirectory, "unable to extract repro to directory '$0'")
 DIAGNOSTIC(    94, Error, unableToReadRiff, "unable to read as 'riff'/not a 'riff' file")
 
+DIAGNOSTIC(    95, Error, unknownLibraryKind, "unknown library kind '$0'")
+DIAGNOSTIC(    96, Error, kindNotLinkable, "not a known linkable kind '$0'")
+DIAGNOSTIC(    97, Error, libraryDoesNotExist, "library '$0' does not exist")
+
 //
 // 001xx - Downstream Compilers
 //

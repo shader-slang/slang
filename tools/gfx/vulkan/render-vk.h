@@ -104,11 +104,11 @@ public:
         ITextureResource* texture,
         ResourceState state,
         ISlangBlob** outBlob,
-        size_t* outRowPitch,
-        size_t* outPixelSize) override;
+        Size* outRowPitch,
+        Size* outPixelSize) override;
 
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL readBufferResource(
-        IBufferResource* buffer, size_t offset, size_t size, ISlangBlob** outBlob) override;
+        IBufferResource* buffer, Offset offset, Size size, ISlangBlob** outBlob) override;
 
     virtual SLANG_NO_THROW Result SLANG_MCALL getAccelerationStructurePrebuildInfo(
         const IAccelerationStructure::BuildInputs& buildInputs,
@@ -118,9 +118,9 @@ public:
         const IAccelerationStructure::CreateDesc& desc, IAccelerationStructure** outView) override;
 
     virtual SLANG_NO_THROW Result SLANG_MCALL getTextureAllocationInfo(
-        const ITextureResource::Desc& desc, size_t* outSize, size_t* outAlignment) override;
+        const ITextureResource::Desc& desc, Size* outSize, Size* outAlignment) override;
 
-    virtual SLANG_NO_THROW Result SLANG_MCALL getTextureRowAlignment(size_t* outAlignment) override;
+    virtual SLANG_NO_THROW Result SLANG_MCALL getTextureRowAlignment(Size* outAlignment) override;
 
     virtual SLANG_NO_THROW Result SLANG_MCALL
         createFence(const IFence::Desc& desc, IFence** outFence) override;
@@ -146,7 +146,7 @@ public:
         VkDebugReportFlagsEXT flags,
         VkDebugReportObjectTypeEXT objType,
         uint64_t srcObject,
-        size_t location,
+        Size location, // TODO: Is "location" still needed for this function?
         int32_t msgCode,
         const char* pLayerPrefix,
         const char* pMsg);
@@ -155,7 +155,7 @@ public:
         VkDebugReportFlagsEXT flags,
         VkDebugReportObjectTypeEXT objType,
         uint64_t srcObject,
-        size_t location,
+        Size location, // TODO: Is "location" still needed? Calls handleDebugMessage() which doesn't use it
         int32_t msgCode,
         const char* pLayerPrefix,
         const char* pMsg,
@@ -222,7 +222,7 @@ public:
     /// Initialize a buffer with specified size, and memory props
     Result init(
         const VulkanApi& api,
-        size_t bufferSize,
+        Size bufferSize,
         VkBufferUsageFlags usage,
         VkMemoryPropertyFlags reqMemoryProperties,
         bool isShared = false,
@@ -1073,11 +1073,11 @@ public:
         VkCommandBuffer commandBuffer,
         TransientResourceHeapImpl* transientHeap,
         BufferResourceImpl* buffer,
-        size_t offset,
-        size_t size,
+        Offset offset,
+        Size size,
         void* data);
 
-    void uploadBufferDataImpl(IBufferResource* buffer, size_t offset, size_t size, void* data);
+    void uploadBufferDataImpl(IBufferResource* buffer, Offset offset, Size size, void* data);
 
     Result bindRootShaderObjectImpl(VkPipelineBindPoint bindPoint);
 
@@ -1132,8 +1132,10 @@ public:
 
     virtual SLANG_NO_THROW const void* SLANG_MCALL getRawData() override;
 
+    // TODO: Change size_t to Count?
     virtual SLANG_NO_THROW size_t SLANG_MCALL getSize() override;
 
+    // TODO: Changed size_t to Size? inSize assigned to an Index variable inside implementation
     virtual SLANG_NO_THROW Result SLANG_MCALL
         setData(ShaderOffset const& inOffset, void const* data, size_t inSize) override;
 
@@ -1156,8 +1158,8 @@ protected:
     Result _writeOrdinaryData(
         PipelineCommandEncoder* encoder,
         IBufferResource* buffer,
-        size_t offset,
-        size_t destSize,
+        Offset offset,
+        Size destSize,
         ShaderObjectLayoutImpl* specializedLayout);
 
 public:
@@ -1169,8 +1171,8 @@ public:
         BindingOffset const& offset,
         VkDescriptorType descriptorType,
         BufferResourceImpl* buffer,
-        size_t bufferOffset,
-        size_t bufferSize);
+        Offset bufferOffset,
+        Size bufferSize);
 
     static void writeBufferDescriptor(
         RootBindingContext& context,
@@ -1272,8 +1274,8 @@ public:
     // weak referenced.
     IBufferResource* m_constantBuffer = nullptr;
     // The offset into the transient constant buffer where the constant data starts.
-    size_t m_constantBufferOffset = 0;
-    size_t m_constantBufferSize = 0;
+    Offset m_constantBufferOffset = 0;
+    Size m_constantBufferSize = 0;
 
     /// Dirty bit tracking whether the constant buffer needs to be updated.
     bool m_isConstantBufferDirty = true;
@@ -1386,19 +1388,19 @@ class ResourceCommandEncoder
 public:
     virtual SLANG_NO_THROW void SLANG_MCALL copyBuffer(
         IBufferResource* dst,
-        size_t dstOffset,
+        Offset dstOffset,
         IBufferResource* src,
-        size_t srcOffset,
-        size_t size) override;
+        Offset srcOffset,
+        Size size) override;
     virtual SLANG_NO_THROW void SLANG_MCALL
-        uploadBufferData(IBufferResource* buffer, size_t offset, size_t size, void* data) override;
+        uploadBufferData(IBufferResource* buffer, Offset offset, Size size, void* data) override;
     virtual SLANG_NO_THROW void SLANG_MCALL textureBarrier(
-        size_t count,
+        size_t count, // TODO: Change size_t to Count?
         ITextureResource* const* textures,
         ResourceState src,
         ResourceState dst) override;
     virtual SLANG_NO_THROW void SLANG_MCALL bufferBarrier(
-        size_t count,
+        size_t count, // TODO: Change size_t to Count?
         IBufferResource* const* buffers,
         ResourceState src,
         ResourceState dst) override;
@@ -1426,7 +1428,7 @@ public:
         ITextureResource::Offset3D offset,
         ITextureResource::Size extend,
         ITextureResource::SubresourceData* subResourceData,
-        size_t subResourceDataCount) override;
+        size_t subResourceDataCount) override; // TODO: Change size_t to Count?
 
     void _clearColorImage(TextureResourceViewImpl* viewImpl, ClearValue* clearValue);
 
@@ -1458,9 +1460,9 @@ public:
 
     virtual SLANG_NO_THROW void SLANG_MCALL copyTextureToBuffer(
         IBufferResource* dst,
-        size_t dstOffset,
-        size_t dstSize,
-        size_t dstRowStride,
+        Offset dstOffset,
+        Size dstSize,
+        Size dstRowStride,
         ITextureResource* src,
         ResourceState srcState,
         SubresourceRange srcSubresource,
