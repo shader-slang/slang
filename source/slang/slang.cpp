@@ -7,7 +7,9 @@
 #include "../core/slang-type-text-util.h"
 #include "../core/slang-type-convert-util.h"
 
-#include "slang-artifact.h"
+#include "../compiler-core/slang-artifact.h"
+
+#include "slang-module-library.h"
 
 #include "slang-check.h"
 #include "slang-parameter-binding.h"

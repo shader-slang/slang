@@ -9,7 +9,8 @@
 
 #include "slang-compiler.h"
 #include "slang-profile.h"
-#include "slang-artifact.h"
+
+#include "../compiler-core/slang-artifact.h"
 
 #include "slang-repro.h"
 #include "slang-serialize-ir.h"

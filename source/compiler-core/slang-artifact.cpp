@@ -1,15 +1,8 @@
 // slang-artifact.cpp
 #include "slang-artifact.h"
-#include <assert.h>
-
-#include "../core/slang-blob.h"
-#include "../core/slang-riff.h"
 
 #include "../core/slang-type-text-util.h"
-
-// Serialization
-#include "slang-serialize-ir.h"
-#include "slang-serialize-container.h"
+#include "../core/slang-io.h"
 
 namespace Slang {
 
@@ -70,41 +63,41 @@ static const KindExtension g_cpuKindExts[] =
         }
     }
 
-    const auto target = (CodeGenTarget)TypeTextUtil::findCompileTargetFromExtension(slice);
+    const auto target = TypeTextUtil::findCompileTargetFromExtension(slice);
 
-    return make(target);
+    return makeFromCompileTarget(target);
 }
 
-/* static */ArtifactDesc ArtifactDesc::make(CodeGenTarget target)
+/* static */ArtifactDesc ArtifactDesc::makeFromCompileTarget(SlangCompileTarget target)
 {
     switch (target)
     {
-        case CodeGenTarget::Unknown:                return make(Kind::Unknown, Payload::None, Style::Unknown, 0);
-        case CodeGenTarget::None:                   return make(Kind::None, Payload::None, Style::Unknown, 0);
-        case CodeGenTarget::GLSL_Vulkan:
-        case CodeGenTarget::GLSL_Vulkan_OneDesc:
-        case CodeGenTarget::GLSL:
+        case SLANG_TARGET_UNKNOWN:                return make(Kind::Unknown, Payload::None, Style::Unknown, 0);
+        case SLANG_TARGET_NONE:                   return make(Kind::None, Payload::None, Style::Unknown, 0);
+        case SLANG_GLSL_VULKAN:
+        case SLANG_GLSL_VULKAN_ONE_DESC:
+        case SLANG_GLSL:
         {
             // For the moment we make all just map to GLSL, but we could use flags
             // or some other mechanism to distinguish the types
             return make(Kind::Text, Payload::GLSL, Style::Kernel, 0);
         }
-        case CodeGenTarget::HLSL:                   return make(Kind::Text, Payload::HLSL, Style::Kernel, 0);
-        case CodeGenTarget::SPIRV:                  return make(Kind::Executable, Payload::SPIRV, Style::Kernel, 0);
-        case CodeGenTarget::SPIRVAssembly:          return make(Kind::Text, Payload::SPIRVAssembly, Style::Kernel, 0);
-        case CodeGenTarget::DXBytecode:             return make(Kind::Executable, Payload::DXBC, Style::Kernel, 0);
-        case CodeGenTarget::DXBytecodeAssembly:     return make(Kind::Text, Payload::DXBCAssembly, Style::Kernel, 0);
-        case CodeGenTarget::DXIL:                   return make(Kind::Executable, Payload::DXIL, Style::Kernel, 0);
-        case CodeGenTarget::DXILAssembly:           return make(Kind::Text, Payload::DXILAssembly, Style::Kernel, 0);
-        case CodeGenTarget::CSource:                return make(Kind::Text, Payload::C, Style::Kernel, 0);
-        case CodeGenTarget::CPPSource:              return make(Kind::Text, Payload::CPP, Style::Kernel, 0);
-        case CodeGenTarget::HostCPPSource:          return make(Kind::Text, Payload::CPP, Style::Host, 0);
-        case CodeGenTarget::HostExecutable:         return make(Kind::Executable, Payload::HostCPU, Style::Host, 0);
-        case CodeGenTarget::ShaderSharedLibrary:    return make(Kind::SharedLibrary, Payload::HostCPU, Style::Kernel, 0);
-        case CodeGenTarget::ShaderHostCallable:     return make(Kind::Callable, Payload::HostCPU, Style::Kernel, 0);
-        case CodeGenTarget::CUDASource:             return make(Kind::Text, Payload::CUDA, Style::Kernel, 0);
-        case CodeGenTarget::PTX:                    return make(Kind::Executable, Payload::PTX, Style::Kernel, 0);
-        case CodeGenTarget::ObjectCode:             return make(Kind::ObjectCode, Payload::HostCPU, Style::Kernel, 0);
+        case SLANG_HLSL:                    return make(Kind::Text, Payload::HLSL, Style::Kernel, 0);
+        case SLANG_SPIRV:                   return make(Kind::Executable, Payload::SPIRV, Style::Kernel, 0);
+        case SLANG_SPIRV_ASM:               return make(Kind::Text, Payload::SPIRVAssembly, Style::Kernel, 0);
+        case SLANG_DXBC:                    return make(Kind::Executable, Payload::DXBC, Style::Kernel, 0);
+        case SLANG_DXBC_ASM:                return make(Kind::Text, Payload::DXBCAssembly, Style::Kernel, 0);
+        case SLANG_DXIL:                    return make(Kind::Executable, Payload::DXIL, Style::Kernel, 0);
+        case SLANG_DXIL_ASM:                return make(Kind::Text, Payload::DXILAssembly, Style::Kernel, 0);
+        case SLANG_C_SOURCE:                return make(Kind::Text, Payload::C, Style::Kernel, 0);
+        case SLANG_CPP_SOURCE:              return make(Kind::Text, Payload::CPP, Style::Kernel, 0);
+        case SLANG_HOST_CPP_SOURCE:         return make(Kind::Text, Payload::CPP, Style::Host, 0);
+        case SLANG_HOST_EXECUTABLE:         return make(Kind::Executable, Payload::HostCPU, Style::Host, 0);
+        case SLANG_SHADER_SHARED_LIBRARY:   return make(Kind::SharedLibrary, Payload::HostCPU, Style::Kernel, 0);
+        case SLANG_SHADER_HOST_CALLABLE:    return make(Kind::Callable, Payload::HostCPU, Style::Kernel, 0);
+        case SLANG_CUDA_SOURCE:             return make(Kind::Text, Payload::CUDA, Style::Kernel, 0);
+        case SLANG_PTX:                     return make(Kind::Executable, Payload::PTX, Style::Kernel, 0);
+        case SLANG_OBJECT_CODE:             return make(Kind::ObjectCode, Payload::HostCPU, Style::Kernel, 0);
         default: break;
     }
 
@@ -460,84 +453,6 @@ SlangResult Artifact::loadBlob(Keep keep, ComPtr<ISlangBlob>& outBlob)
     }
 
     outBlob = blob;
-    return SLANG_OK;
-}
-
-SlangResult loadModuleLibrary(const Byte* inBytes, size_t bytesCount, EndToEndCompileRequest* req, RefPtr<ModuleLibrary>& outLibrary)
-{
-    RefPtr<ModuleLibrary> library = new ModuleLibrary;
-
-    // Load up the module
-    MemoryStreamBase memoryStream(FileAccess::Read, inBytes, bytesCount);
-
-    RiffContainer riffContainer;
-    SLANG_RETURN_ON_FAIL(RiffUtil::read(&memoryStream, riffContainer));
-
-    auto linkage = req->getLinkage();
-
-    // TODO(JS): May be better to have a ITypeComponent that encapsulates a collection of modules
-    // For now just add to the linkage
-
-    {
-        SerialContainerData containerData;
-
-        SerialContainerUtil::ReadOptions options;
-        options.namePool = req->getNamePool();
-        options.session = req->getSession();
-        options.sharedASTBuilder = linkage->getASTBuilder()->getSharedASTBuilder();
-        options.sourceManager = linkage->getSourceManager();
-        options.linkage = req->getLinkage();
-        options.sink = req->getSink();
-
-        SLANG_RETURN_ON_FAIL(SerialContainerUtil::read(&riffContainer, options, containerData));
-
-        for (const auto& module : containerData.modules)
-        {
-            // If the irModule is set, add it
-            if (module.irModule)
-            {
-                library->m_modules.add(module.irModule);
-            }
-        }
-
-        for (const auto& entryPoint : containerData.entryPoints)
-        {
-            FrontEndCompileRequest::ExtraEntryPointInfo dst;
-            dst.mangledName = entryPoint.mangledName;
-            dst.name = entryPoint.name;
-            dst.profile = entryPoint.profile;
-
-            // Add entry point
-            library->m_entryPoints.add(dst);
-        }
-    }
-
-    outLibrary = library;
-    return SLANG_OK;
-}
-
-SlangResult loadModuleLibrary(Artifact::Keep keep, Artifact* product, EndToEndCompileRequest* req, RefPtr<ModuleLibrary>& outLibrary)
-{
-    if (auto foundLibrary = product->findObjectInstance<ModuleLibrary>())
-    {
-        outLibrary = foundLibrary;
-        return SLANG_OK;
-    }
-
-    // Load the blob
-    ComPtr<ISlangBlob> blob;
-    SLANG_RETURN_ON_FAIL(product->loadBlob(Artifact::getIntermediateKeep(keep), blob));
-
-    // Load the module
-    RefPtr<ModuleLibrary> library;
-    SLANG_RETURN_ON_FAIL(loadModuleLibrary((const Byte*)blob->getBufferPointer(), blob->getBufferSize(), req, library));
-    
-    if (Artifact::canKeep(keep))
-    {
-        product->add(Artifact::Entry::Style::Artifact, library);
-    }
-
-    outLibrary = library;
     return SLANG_OK;
 }
 

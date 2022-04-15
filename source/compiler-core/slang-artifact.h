@@ -2,7 +2,10 @@
 #ifndef SLANG_ARTIFACT_H
 #define SLANG_ARTIFACT_H
 
-#include "slang-compiler.h" 
+#include "../core/slang-basic.h"
+
+#include "../../slang-com-helper.h"
+#include "../../slang-com-ptr.h"
 
 namespace Slang
 {
@@ -143,7 +146,7 @@ public:
     bool operator!=(const This& rhs) const { return !(*this == rhs); }
 
         /// Given a code gen target, get the equivalent ArtifactDesc
-    static This make(CodeGenTarget target);
+    static This makeFromCompileTarget(SlangCompileTarget target);
 
         /// Construct from the elements
     static This make(Kind inKind, Payload inPayload, Style inStyle = Style::Kernel, Flags flags = 0)
@@ -349,21 +352,6 @@ T* Artifact::findObjectInstance()
     }
     return nullptr;
 }
-
-
-// Class to hold information serialized in from a -r slang-lib/slang-module
-class ModuleLibrary : public RefObject
-{
-public:
-
-    List<FrontEndCompileRequest::ExtraEntryPointInfo> m_entryPoints;
-    List<RefPtr<IRModule>> m_modules;
-};
-
-SlangResult loadModuleLibrary(const Byte* inBytes, size_t bytesCount, EndToEndCompileRequest* req, RefPtr<ModuleLibrary>& module);
-
-// Given a product make available as a module
-SlangResult loadModuleLibrary(Artifact::Keep keep, Artifact* artifact, EndToEndCompileRequest* req, RefPtr<ModuleLibrary>& module);
 
 } // namespace Slang
 
