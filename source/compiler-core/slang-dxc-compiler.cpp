@@ -50,51 +50,39 @@ static UnownedStringSlice _getSlice(IDxcBlob* blob) { return StringUtil::getSlic
 // 7f61fc7d-950d-467f-b3e3-3c02fb49187c
 static const Guid IID_IDxcIncludeHandler = { 0x7f61fc7d, 0x950d, 0x467f, { 0x3c, 0x02, 0xfb, 0x49, 0x18, 0x7c } };
 
-namespace { // anonymous
-
-class LibraryNameList
+static UnownedStringSlice _addName(const UnownedStringSlice& inSlice, StringSlicePool& pool)
 {
-public:
-    void addName(Artifact* library)
+    UnownedStringSlice slice = inSlice;
+    if (slice.getLength() == 0)
     {
-        String name;
-        if (library->getPathType() == Artifact::Existing)
-        {
-            name = Path::getFileNameWithoutExt(library->getPath());
-        }
-        addName(name);
-    }
-    void addName(const String& inName)
-    {
-        String name(inName);
-        if (name.getLength() == 0)
-        {
-            name = "unnamed";
-        }
-
-        if (m_names.indexOf(name) >= 0)
-        {
-            StringBuilder buf;
-            for (Index i = 1; ; ++i)
-            {
-                buf.Clear();
-                buf << name << "_" << i;
-
-                if (m_names.indexOf(buf) < 0)
-                {
-                    name = buf;
-                    break;
-                }
-            }
-        }
-
-        m_names.add(name);
+        slice = UnownedStringSlice::fromLiteral("unnamed");
     }
 
-    List<String> m_names;
-};
+    StringBuilder buf;
+    const Index length = slice.getLength();
+    buf << slice;
 
-} // anonymous
+    for (Index i = 0; ; ++i)
+    {
+        buf.reduceLength(length);
+    
+        if (i > 0)
+        {
+            buf << "_" << i;
+        }
+
+        StringSlicePool::Handle handle;
+        if (!pool.findOrAdd(buf.getUnownedSlice(), handle))
+        {
+            return pool.getSlice(handle);
+        }
+    }
+}
+
+static UnownedStringSlice _addName(Artifact* artifact, StringSlicePool& pool)
+{
+    return _addName(artifact->getBaseName().getUnownedSlice(), pool);
+}
 
 class DxcIncludeHandler : public IDxcIncludeHandler
 {
@@ -469,9 +457,10 @@ SlangResult DXCDownstreamCompiler::compile(const CompileOptions& options, RefPtr
         ComPtr<IDxcLinker> linker;
         SLANG_RETURN_ON_FAIL(m_createInstance(CLSID_DxcLinker, __uuidof(linker), (void**)linker.writeRef()));
 
-        List<ComPtr<ISlangBlob>> libraryBlobs;
+        StringSlicePool pool(StringSlicePool::Style::Default);
 
-        LibraryNameList libraryNames;
+        List<ComPtr<ISlangBlob>> libraryBlobs;
+        List<OSString> libraryNames;
 
         for (Artifact* library : libraries)
         {
@@ -479,42 +468,37 @@ SlangResult DXCDownstreamCompiler::compile(const CompileOptions& options, RefPtr
             SLANG_RETURN_ON_FAIL(library->loadBlob(ArtifactKeep::Yes, blob));
 
             libraryBlobs.add(blob);
-            libraryNames.addName(library);
+            libraryNames.add(String(_addName(library, pool)).toWString());
         }
 
         // Add the compiled blob name
-
-        {
-            auto blob = (ISlangBlob*)dxcResultBlob.get();
-            libraryBlobs.add(ComPtr<ISlangBlob>(blob));
-        }
-
+        String name;
         if (options.modulePath.getLength())
         {
-            libraryNames.addName(Path::getFileNameWithoutExt(options.modulePath));
+            name = Path::getFileNameWithoutExt(options.modulePath);
         }
         else if (options.sourceContentsPath.getLength())
         {
-            libraryNames.addName(Path::getFileNameWithoutExt(options.sourceContentsPath));
-        }
-        else
-        {
-            libraryNames.addName("");
+            name = Path::getFileNameWithoutExt(options.sourceContentsPath);
         }
 
-        const Index librariesCount = libraryNames.m_names.getCount();
+        // Add the blob with name
+        {
+            auto blob = (ISlangBlob*)dxcResultBlob.get();
+            libraryBlobs.add(ComPtr<ISlangBlob>(blob));
+            libraryNames.add(String(_addName(name.getUnownedSlice(), pool)).toWString());
+        }
+
+        const Index librariesCount = libraryNames.getCount();
         SLANG_ASSERT(libraryBlobs.getCount() == librariesCount);
 
         List<const wchar_t*> linkLibraryNames;
-        List<OSString> wideLibraryNames;
-
+        
         linkLibraryNames.setCount(librariesCount);
-        wideLibraryNames.setCount(librariesCount);
-
+        
         for (Index i = 0; i < librariesCount; ++i)
         {
-            wideLibraryNames[i] = libraryNames.m_names[i].toWString();
-            linkLibraryNames[i] = wideLibraryNames[i].begin();
+            linkLibraryNames[i] = libraryNames[i].begin();
 
             // Register the library
             SLANG_RETURN_ON_FAIL(linker->RegisterLibrary(linkLibraryNames[i], (IDxcBlob*)libraryBlobs[i].get()));

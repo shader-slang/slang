@@ -1422,8 +1422,11 @@ struct OptionsParser
                         return SLANG_FAIL;
                     }
 
+                    const String name = Artifact::getBaseNameFromPath(desc, referenceModuleName.value.getUnownedSlice());
+
                     // Create the artifact
-                    RefPtr<Artifact> artifact = new Artifact(desc);
+                    RefPtr<Artifact> artifact = new Artifact(desc, name); 
+
                     // Set the path
                     artifact->setPath(Artifact::PathType::Existing, referenceModuleName.value);
 
