@@ -222,7 +222,15 @@ A more long term goal would be to
 
 * Make Artifact an interface (such that it can work long term over binary boundaries)
 * Make Diagnostics into an interface (such it can be added to a Artifact result)
-* Use Artifact and related types for downstream compiler 
+* Use Artifact and related types for downstream compiler
+
+TODO(JS): There is an issue here around libraries in that downstream compilers can use
+named libraries, but the name doesn't directly relate to a file. If it is a file it may
+not be easily possible to determine it's location. So there is a desire to indicate the
+`name` as opposed to the path.
+
+As a second related issue. Lets say we have a blob (and not a file). 
+
 */
 class Artifact : public RefObject
 {
