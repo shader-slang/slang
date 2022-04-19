@@ -6,6 +6,83 @@
 
 namespace Slang {
 
+static ArtifactPayloadInfo::Lookup _makePayloadInfoLookup()
+{
+    ArtifactPayloadInfo::Lookup values;
+    memset(&values, 0, sizeof(values));
+    
+    // Set all of the kinds
+    {
+        typedef ArtifactPayload Payload;
+        typedef ArtifactPayloadInfo::Flag Flag;
+        typedef ArtifactPayloadInfo::Flags Flags;
+
+        typedef ArtifactPayloadInfo::Kind Kind;
+        struct Info
+        {
+            Payload payload;
+            Kind kind;
+            Flags flags;
+        };
+
+        const Info infos[] =
+        {
+            {Payload::None, Kind::None, 0},
+            {Payload::Unknown, Kind::Unknown, 0},
+
+            // It seems as if DXBC is potentially linkable from
+            // https://docs.microsoft.com/en-us/windows/win32/direct3dhlsl/dx-graphics-hlsl-appendix-keywords#export
+
+            // We can't *actually* link PTX or SPIR-V currently but it is in principal possible
+            // so let's say we accept for now
+
+            {Payload::DXIL,             Kind::Binary,       Flag::IsGpuNative | Flag::IsLinkable},
+            {Payload::DXBC,             Kind::Binary,       Flag::IsGpuNative | Flag::IsLinkable}, 
+            {Payload::SPIRV,            Kind::Binary,       Flag::IsGpuNative | Flag::IsLinkable }, 
+            {Payload::PTX,              Kind::Binary,       Flag::IsGpuNative | Flag::IsLinkable },
+
+            {Payload::DXILAssembly,     Kind::Assembly,     0},
+            {Payload::DXBCAssembly,     Kind::Assembly,     0},
+            {Payload::SPIRVAssembly,    Kind::Assembly,     0},
+            {Payload::PTXAssembly,      Kind::Assembly,     0},
+
+            {Payload::HostCPU,          Kind::Binary,       Flag::IsCpuNative | Flag::IsLinkable},
+
+            // Do we want some other kind for these?
+            {Payload::SlangIR,          Kind::Binary,       Flag::IsLinkable},
+            {Payload::LLVMIR,           Kind::Binary,       0},
+            {Payload::SlangAST,         Kind::Binary,       0},
+
+            {Payload::X86,              Kind::Binary,       Flag::IsCpuNative | Flag::IsLinkable},
+            {Payload::X86_64,           Kind::Binary,       Flag::IsCpuNative | Flag::IsLinkable},
+            {Payload::AARCH,            Kind::Binary,       Flag::IsCpuNative | Flag::IsLinkable},
+            {Payload::AARCH64,          Kind::Binary,       Flag::IsCpuNative | Flag::IsLinkable},
+
+            {Payload::HLSL,             Kind::Source,       0},
+            {Payload::GLSL,             Kind::Source,       0},
+            {Payload::CPP,              Kind::Source,       0},
+            {Payload::C,                Kind::Source,       0},
+            {Payload::CUDA,             Kind::Source,       0},
+            {Payload::Slang,            Kind::Source,       0},
+
+            {Payload::DebugInfo,        Kind::Binary,       0},
+
+            {Payload::Zip,              Kind::Container,    0},
+        };
+
+        for (auto info : infos)
+        {
+            auto& v = values.values[Index(info.payload)];
+            v.kind = info.kind;
+            v.flags = info.flags;
+        }
+    }
+
+    return values;
+}
+
+/* static */const ArtifactPayloadInfo::Lookup ArtifactPayloadInfo::Lookup::g_values = _makePayloadInfoLookup();
+
 namespace { // anonymous
 struct KindExtension
 {
@@ -104,71 +181,10 @@ static const KindExtension g_cpuKindExts[] =
     SLANG_UNEXPECTED("Unhandled type");
 }
 
-/* static */bool ArtifactDesc::isPayloadGpuBinary(Payload payloadType)
-{
-    switch (payloadType)
-    {
-        case Payload::DXIL:
-        case Payload::DXBC:
-        case Payload::SPIRV:
-        case Payload::PTX:
-        {
-            return true;
-        }
-        default: break;
-    }
-    return false;
-}
-
-/* static */bool ArtifactDesc::isPayloadCpuBinary(Payload payloadType)
-{
-    switch (payloadType)
-    {
-        case Payload::X86:
-        case Payload::X86_64:
-        case Payload::AARCH:
-        case Payload::AARCH64:
-        case Payload::HostCPU:
-        {
-            return true;
-        }
-        default: break;
-    }
-    return false;
-}
-
-/* static */bool ArtifactDesc::isPayloadGpuBinaryLinkable(Payload payload)
-{
-    switch (payload)
-    {
-        case Payload::DXBC:
-        {
-            // It seems as if DXBC is potentially linkable from
-            // https://docs.microsoft.com/en-us/windows/win32/direct3dhlsl/dx-graphics-hlsl-appendix-keywords#export
-            return true;
-        }
-
-        case Payload::DXIL:
-        case Payload::PTX:
-        case Payload::SPIRV:
-        {
-            // We can't *actually* link PTX or SPIR-V currently but it is in principal possible
-            // so let's say we accept for now
-            return true;
-        }
-        default: break;
-    }
-    return false;
-}
-
 bool ArtifactDesc::isBinaryLinkable() const
 {
-    if (isKindBinaryLinkable(kind))
-    {
-        return isPayloadCpuBinary(payload) || isPayloadGpuBinaryLinkable(payload) ||  payload == ArtifactPayload::SlangIR;
-    }
-    
-    return false;
+    return isKindBinaryLinkable(kind) && 
+        getInfo(payload).isSet(ArtifactPayloadInfo::Flag::IsLinkable);
 }
 
 /* static */bool ArtifactDesc::isKindBinaryLinkable(Kind kind)

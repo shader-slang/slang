@@ -100,6 +100,54 @@ enum class ArtifactKeep
 };
 
 
+
+/* We want to centralize information about artifact descs and related types, such that when new types are added they only need
+to be added/altered in one place */
+struct ArtifactPayloadInfo
+{
+    typedef ArtifactPayloadInfo This;
+    enum class Kind : uint8_t
+    {
+        Unknown,
+        None,
+        Assembly,
+        Source,
+        Container,
+        Binary, 
+        CountOf,
+    };
+
+    typedef uint8_t Flags;
+    struct Flag
+    {
+        enum Enum : Flags
+        {
+            IsCpuNative = 0x01,     ///< True if is a CPU native type
+            IsGpuNative = 0x02,     ///< True if is a GPU native type
+            IsLinkable  = 0x04,     ///< True if in principal is linkable
+        };
+    };
+
+    bool isSet(Flag::Enum flag) const { return (flags & Flags(flag)) != 0; }
+    bool isReset(Flag::Enum flag) const { return (flags & Flags(flag)) == 0; }
+
+    struct Lookup;
+
+    Flags flags;
+    Kind kind;
+};
+
+struct ArtifactPayloadInfo::Lookup
+{
+    void setFlag(ArtifactPayload payload, Flag::Enum flag) { values[Index(payload)].flags |= Flags(flag); }
+    void setFlags(ArtifactPayload payload, Flags flags) { values[Index(payload)].flags |= flags; }
+
+    This values[Index(ArtifactPayload::CountOf)];
+    static const Lookup g_values;
+};
+
+SLANG_FORCE_INLINE ArtifactPayloadInfo getInfo(ArtifactPayload payload) { return ArtifactPayloadInfo::Lookup::g_values.values[Index(payload)]; }
+
 /**
 A value type to describe aspects of the contents of an Artifact.
 **/
@@ -138,12 +186,9 @@ public:
     static bool isKindBinaryLinkable(Kind kind);
 
         /// Returns true if the payload type is CPU
-    static bool isPayloadCpuBinary(Payload payload);
+    static bool isPayloadCpuBinary(Payload payload) { auto info = getInfo(payload); return info.isSet(ArtifactPayloadInfo::Flag::IsCpuNative) && info.kind == ArtifactPayloadInfo::Kind::Binary; }
         /// Returns true if the payload type is applicable to the GPU
-    static bool isPayloadGpuBinary(Payload payload);
-
-        /// True if the payload type is in principal binary linkable
-    static bool isPayloadGpuBinaryLinkable(Payload payload);
+    static bool isPayloadGpuBinary(Payload payload) { auto info = getInfo(payload); return info.isSet(ArtifactPayloadInfo::Flag::IsGpuNative) && info.kind == ArtifactPayloadInfo::Kind::Binary; }
 
         /// Try to determine the desc from a path
     static This fromPath(const UnownedStringSlice& slice);
