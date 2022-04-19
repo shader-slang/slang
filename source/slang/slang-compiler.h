@@ -1569,7 +1569,11 @@ namespace Slang
                 Slang::getHashCode(elementType), Slang::getHashCode(containerType));
         }
     };
-    
+
+        /// A dictionary of currently loaded modules. Used by `findOrImportModule` to
+        /// lookup additional loaded modules.
+    typedef Dictionary<Name*, Module*> LoadedModuleDictionary;
+
         /// A context for loading and re-using code modules.
     class Linkage : public RefObject, public slang::ISession
     {
@@ -1764,7 +1768,8 @@ namespace Slang
         RefPtr<Module> findOrImportModule(
             Name*               name,
             SourceLoc const&    loc,
-            DiagnosticSink*     sink);
+            DiagnosticSink*     sink,
+            const LoadedModuleDictionary* loadedModules = nullptr);
 
         SourceManager* getSourceManager()
         {
@@ -2916,6 +2921,21 @@ namespace Slang
         double m_downstreamCompileTime = 0.0;
     };
 
+    void checkTranslationUnit(
+        TranslationUnitRequest* translationUnit, LoadedModuleDictionary& loadedModules);
+
+    // Look for a module that matches the given name:
+    // either one we've loaded already, or one we
+    // can find vai the search paths available to us.
+    //
+    // Needed by import declaration checking.
+    //
+    RefPtr<Module> findOrImportModule(
+        Linkage* linkage,
+        Name* name,
+        SourceLoc const& loc,
+        DiagnosticSink* sink,
+        const LoadedModuleDictionary* additionalLoadedModules);
 
 //
 // The following functions are utilties to convert between
