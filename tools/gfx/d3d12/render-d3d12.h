@@ -1608,7 +1608,7 @@ public:
 public:
     virtual SLANG_NO_THROW void SLANG_MCALL buildAccelerationStructure(
         const IAccelerationStructure::BuildDesc& desc,
-        int propertyQueryCount,
+        GfxCount propertyQueryCount,
         AccelerationStructureQueryDesc* queryDescs) override;
     virtual SLANG_NO_THROW void SLANG_MCALL copyAccelerationStructure(
         IAccelerationStructure* dest,

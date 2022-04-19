@@ -2865,7 +2865,7 @@ Result TransientResourceHeapImpl::queryInterface(SlangUUID const& uuid, void** o
 Result TransientResourceHeapImpl::allocateTransientDescriptorTable(
     DescriptorType type,
     GfxCount count,
-    uint64_t& outDescriptorOffset,
+    Offset& outDescriptorOffset,
     void** outD3DDescriptorHeapHandle)
 {
     auto& heap =
@@ -2875,7 +2875,7 @@ Result TransientResourceHeapImpl::allocateTransientDescriptorTable(
     {
         return SLANG_E_OUT_OF_MEMORY;
     }
-    outDescriptorOffset = (uint64_t)allocResult;
+    outDescriptorOffset = (Offset)allocResult;
     *outD3DDescriptorHeapHandle = heap.getHeap();
     return SLANG_OK;
 }
@@ -3343,7 +3343,7 @@ void translatePostBuildInfoDescs(
 
 void RayTracingCommandEncoderImpl::buildAccelerationStructure(
     const IAccelerationStructure::BuildDesc& desc,
-    int propertyQueryCount,
+    GfxCount propertyQueryCount,
     AccelerationStructureQueryDesc* queryDescs)
 {
     if (!m_commandBuffer->m_cmdList4)

@@ -466,7 +466,7 @@ public:
             m_writer->dispatchCompute(x, y, z);
         }
 
-        virtual SLANG_NO_THROW void SLANG_MCALL dispatchComputeIndirect(IBufferResource* argBuffer, uint64_t offset) override
+        virtual SLANG_NO_THROW void SLANG_MCALL dispatchComputeIndirect(IBufferResource* argBuffer, Offset offset) override
         {
             SLANG_UNIMPLEMENTED_X("ImmediateRenderBase::dispatchComputeIndirect");
         }

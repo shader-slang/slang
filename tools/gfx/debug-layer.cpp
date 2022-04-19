@@ -1457,7 +1457,7 @@ void DebugRayTracingCommandEncoder::endEncoding()
 
 void DebugRayTracingCommandEncoder::buildAccelerationStructure(
     const IAccelerationStructure::BuildDesc& desc,
-    int propertyQueryCount,
+    GfxCount propertyQueryCount,
     AccelerationStructureQueryDesc* queryDescs)
 {
     SLANG_GFX_API_FUNC;

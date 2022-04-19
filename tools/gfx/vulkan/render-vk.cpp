@@ -1389,9 +1389,9 @@ Result DeviceImpl::getAccelerationStructurePrebuildInfo(
         &geomInfoBuilder.buildInfo,
         geomInfoBuilder.primitiveCounts.getBuffer(),
         &sizeInfo);
-    outPrebuildInfo->resultDataMaxSize = sizeInfo.accelerationStructureSize;
-    outPrebuildInfo->scratchDataSize = sizeInfo.buildScratchSize;
-    outPrebuildInfo->updateScratchDataSize = sizeInfo.updateScratchSize;
+    outPrebuildInfo->resultDataMaxSize = (Size)sizeInfo.accelerationStructureSize;
+    outPrebuildInfo->scratchDataSize = (Size)sizeInfo.buildScratchSize;
+    outPrebuildInfo->updateScratchDataSize = (Size)sizeInfo.updateScratchSize;
     return SLANG_OK;
 }
 
@@ -6472,7 +6472,7 @@ void ResourceCommandEncoder::textureBarrier(
 {
     ShortList<VkImageMemoryBarrier, 16> barriers;
 
-    for (size_t i = 0; i < count; i++)
+    for (GfxIndex i = 0; i < count; i++)
     {
         auto image = static_cast<TextureResourceImpl*>(textures[i]);
         auto desc = image->getDesc();
@@ -6516,7 +6516,7 @@ void ResourceCommandEncoder::bufferBarrier(
     List<VkBufferMemoryBarrier> barriers;
     barriers.reserve(count);
 
-    for (size_t i = 0; i < count; i++)
+    for (GfxIndex i = 0; i < count; i++)
     {
         auto bufferImpl = static_cast<BufferResourceImpl*>(buffers[i]);
 
@@ -7555,7 +7555,7 @@ void RayTracingCommandEncoder::_queryAccelerationStructureProperties(
 
 void RayTracingCommandEncoder::buildAccelerationStructure(
     const IAccelerationStructure::BuildDesc& desc,
-    int propertyQueryCount,
+    GfxCount propertyQueryCount,
     AccelerationStructureQueryDesc* queryDescs)
 {
     AccelerationStructureBuildGeometryInfoBuilder geomInfoBuilder;
