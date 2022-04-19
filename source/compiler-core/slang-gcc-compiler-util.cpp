@@ -10,6 +10,8 @@
 #include "../core/slang-char-util.h"
 #include "../core/slang-string-slice-pool.h"
 
+#include "slang-artifact-info.h"
+
 namespace Slang
 {
 
@@ -633,7 +635,7 @@ static SlangResult _parseGCCFamilyLine(const UnownedStringSlice& line, LineParse
     {
         const auto desc = artifact->getDesc();
         // If it's a library for CPU types, try and use it
-        if (desc.isCpuBinary() && desc.kind == ArtifactKind::Library)
+        if (ArtifactInfoUtil::isCpuBinary(desc) && desc.kind == ArtifactKind::Library)
         {
             // Get the name and path (can be empty) to the library
             SLANG_RETURN_ON_FAIL(artifact->requireFileLike(ArtifactKeep::No));

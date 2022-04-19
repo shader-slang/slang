@@ -99,55 +99,6 @@ enum class ArtifactKeep
     All,        ///< Keep the final item and any intermediataries
 };
 
-
-
-/* We want to centralize information about artifact descs and related types, such that when new types are added they only need
-to be added/altered in one place */
-struct ArtifactPayloadInfo
-{
-    typedef ArtifactPayloadInfo This;
-    enum class Flavor : uint8_t
-    {
-        Unknown,
-        None,
-        Assembly,
-        Source,
-        Container,
-        Binary, 
-        CountOf,
-    };
-
-    typedef uint8_t Flags;
-    struct Flag
-    {
-        enum Enum : Flags
-        {
-            IsCpuNative = 0x01,     ///< True if is a CPU native type
-            IsGpuNative = 0x02,     ///< True if is a GPU native type
-            IsLinkable  = 0x04,     ///< True if in principal is linkable
-        };
-    };
-
-    bool isSet(Flag::Enum flag) const { return (flags & Flags(flag)) != 0; }
-    bool isReset(Flag::Enum flag) const { return (flags & Flags(flag)) == 0; }
-
-    struct Lookup;
-
-    Flags flags;
-    Flavor flavor;
-};
-
-struct ArtifactPayloadInfo::Lookup
-{
-    void setFlag(ArtifactPayload payload, Flag::Enum flag) { values[Index(payload)].flags |= Flags(flag); }
-    void setFlags(ArtifactPayload payload, Flags flags) { values[Index(payload)].flags |= flags; }
-
-    This values[Index(ArtifactPayload::CountOf)];
-    static const Lookup g_values;
-};
-
-SLANG_FORCE_INLINE ArtifactPayloadInfo getInfo(ArtifactPayload payload) { return ArtifactPayloadInfo::Lookup::g_values.values[Index(payload)]; }
-
 /**
 A value type to describe aspects of the contents of an Artifact.
 **/
@@ -167,34 +118,6 @@ public:
         /// Get in packed format
     inline Packed getPacked() const;
 
-        /// True if the container appears to be binary linkable
-    bool isBinaryLinkable() const;
-        /// True if is a CPU binary
-    bool isCpuBinary() const { return isPayloadCpuBinary(payload); }
-        /// True if is a GPU binary
-    bool isGpuBinary() const { return isPayloadGpuBinary(payload); }
-
-        /// Gets the default file extension for the artifact type. Returns empty slice if not known
-    UnownedStringSlice getDefaultExtension();
-
-    static UnownedStringSlice getDefaultExtensionForPayload(Payload payload);
-
-        /// Get the extension for CPU/Host for a kind
-    static UnownedStringSlice getCpuExtensionForKind(Kind kind);
-
-        /// Returns true if the kind is binary linkable 
-    static bool isKindBinaryLinkable(Kind kind);
-
-        /// Returns true if the payload type is CPU
-    static bool isPayloadCpuBinary(Payload payload) { auto info = getInfo(payload); return info.isSet(ArtifactPayloadInfo::Flag::IsCpuNative) && info.flavor == ArtifactPayloadInfo::Flavor::Binary; }
-        /// Returns true if the payload type is applicable to the GPU
-    static bool isPayloadGpuBinary(Payload payload) { auto info = getInfo(payload); return info.isSet(ArtifactPayloadInfo::Flag::IsGpuNative) && info.flavor == ArtifactPayloadInfo::Flavor::Binary; }
-
-        /// Try to determine the desc from a path
-    static This fromPath(const UnownedStringSlice& slice);
-        /// Try to determine the desc from just a file extension (passed without .)
-    static This fromExtension(const UnownedStringSlice& slice);
-
     bool operator==(const This& rhs) const { return kind == rhs.kind && payload == rhs.payload && style == rhs.style && flags == rhs.flags;  }
     bool operator!=(const This& rhs) const { return !(*this == rhs); }
 
@@ -202,10 +125,8 @@ public:
     static This makeFromCompileTarget(SlangCompileTarget target);
 
         /// Construct from the elements
-    static This make(Kind inKind, Payload inPayload, Style inStyle = Style::Unknown, Flags flags = 0)
-    {
-        return This{ inKind, inPayload, inStyle, flags };
-    }
+    static This make(Kind inKind, Payload inPayload, Style inStyle = Style::Unknown, Flags flags = 0) { return This{ inKind, inPayload, inStyle, flags }; }
+
         /// Construct from the packed format
     inline static This make(Packed inPacked);
 

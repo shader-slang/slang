@@ -12,6 +12,7 @@
 #endif
 
 #include "../core/slang-io.h"
+#include "slang-artifact-info.h"
 
 namespace Slang
 {
@@ -263,7 +264,7 @@ namespace Slang
     {
         auto desc = artifact->getDesc();
 
-        if (desc.isCpuBinary() && desc.kind == ArtifactKind::Library)
+        if (ArtifactInfoUtil::isCpuBinary(desc) && desc.kind == ArtifactKind::Library)
         {
             // Get the libray name and path
             SLANG_RETURN_ON_FAIL(artifact->requireFileLike(ArtifactKeep::No));
