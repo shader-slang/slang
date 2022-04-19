@@ -1802,7 +1802,7 @@ namespace Slang
         bool m_useFalcorCustomSharedKeywordSemantics = false;
 
         // Modules that have been read in with the -r option
-        List<RefPtr<Artifact>> m_libModules;
+        List<ComPtr<IArtifact>> m_libModules;
 
         void _stopRetainingParentSession()
         {

@@ -19,6 +19,8 @@
 
 #include "../core/slang-shared-library.h"
 
+#include "../compiler-core/slang-artifact-info.h"
+
 // Enable calling through to  `dxc` to
 // generate code on Windows.
 #ifdef _WIN32
@@ -79,9 +81,9 @@ static UnownedStringSlice _addName(const UnownedStringSlice& inSlice, StringSlic
     }
 }
 
-static UnownedStringSlice _addName(Artifact* artifact, StringSlicePool& pool)
+static UnownedStringSlice _addName(IArtifact* artifact, StringSlicePool& pool)
 {
-    return _addName(artifact->getBaseName().getUnownedSlice(), pool);
+    return _addName(ArtifactInfoUtil::getBaseName(artifact).getUnownedSlice(), pool);
 }
 
 class DxcIncludeHandler : public IDxcIncludeHandler
@@ -288,8 +290,8 @@ SlangResult DXCDownstreamCompiler::compile(const CompileOptions& options, RefPtr
     }
 
     // Find all of the libraries
-    List<Artifact*> libraries;
-    for (Artifact* library : options.libraries)
+    List<IArtifact*> libraries;
+    for (IArtifact* library : options.libraries)
     {
         const auto desc = library->getDesc();
 
@@ -297,7 +299,7 @@ SlangResult DXCDownstreamCompiler::compile(const CompileOptions& options, RefPtr
         {
             // Make sure they all have blobs
             ComPtr<ISlangBlob> libraryBlob;
-            SLANG_RETURN_ON_FAIL(library->loadBlob(ArtifactKeep::Yes, libraryBlob));
+            SLANG_RETURN_ON_FAIL(library->loadBlob(ArtifactKeep::Yes, libraryBlob.writeRef()));
 
             libraries.add(library);
         }
@@ -462,10 +464,10 @@ SlangResult DXCDownstreamCompiler::compile(const CompileOptions& options, RefPtr
         List<ComPtr<ISlangBlob>> libraryBlobs;
         List<OSString> libraryNames;
 
-        for (Artifact* library : libraries)
+        for (IArtifact* library : libraries)
         {
             ComPtr<ISlangBlob> blob;
-            SLANG_RETURN_ON_FAIL(library->loadBlob(ArtifactKeep::Yes, blob));
+            SLANG_RETURN_ON_FAIL(library->loadBlob(ArtifactKeep::Yes, blob.writeRef()));
 
             libraryBlobs.add(blob);
             libraryNames.add(String(_addName(library, pool)).toWString());

@@ -245,4 +245,68 @@ UnownedStringSlice ArtifactInfoUtil::getDefaultExtension(const ArtifactDesc& des
     }
 }
 
+/* static */String ArtifactInfoUtil::getBaseNameFromPath(const ArtifactDesc& desc, const UnownedStringSlice& path)
+{
+    String name = Path::getFileName(path);
+
+    const bool isSharedLibraryPrefixPlatform = SLANG_LINUX_FAMILY || SLANG_APPLE_FAMILY;
+    if (isSharedLibraryPrefixPlatform)
+    {
+        // Strip lib prefix
+        if (ArtifactInfoUtil::isCpuBinary(desc) &&
+            (desc.kind == ArtifactKind::Library ||
+                desc.kind == ArtifactKind::SharedLibrary))
+        {
+            // If it starts with lib strip it
+            if (name.startsWith("lib"))
+            {
+                const String stripLib = name.getUnownedSlice().tail(3);
+                name = stripLib;
+            }
+        }
+    }
+
+    // Strip any extension 
+    {
+        auto descExt = ArtifactInfoUtil::getDefaultExtension(desc);
+        // Strip the extension if it's a match
+        if (descExt.getLength() &&
+            Path::getPathExt(name) == descExt)
+        {
+            name = Path::getFileNameWithoutExt(name);
+        }
+    }
+
+    return name;
+}
+
+/* static */String ArtifactInfoUtil::getBaseName(IArtifact* artifact)
+{
+    const auto pathType = artifact->getPathType();
+
+    // If we have a path, get the base name from that
+    if (pathType != ArtifactPathType::None)
+    {
+        UnownedStringSlice path(artifact->getPath());
+        const auto desc = artifact->getDesc();
+
+        return getBaseNameFromPath(desc, path);
+    }
+
+    // Else use the name
+    return artifact->getName();
+}
+
+/* static */String ArtifactInfoUtil::getParentPath(IArtifact* artifact)
+{
+    const auto pathType = artifact->getPathType();
+    const auto path = artifact->getPath();
+    
+    if (pathType != ArtifactPathType::None && *path != 0)
+    {
+        return Path::getParentDirectory(path);
+    }
+    return String();
+}
+
 } // namespace Slang

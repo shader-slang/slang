@@ -4300,7 +4300,7 @@ void EndToEndCompileRequest::setDefaultModuleName(const char* defaultModuleName)
     frontEndReq->m_defaultModuleName = namePool->getName(defaultModuleName);
 }
 
-SlangResult _addLibraryReference(EndToEndCompileRequest* req, Artifact* artifact)
+SlangResult _addLibraryReference(EndToEndCompileRequest* req, IArtifact* artifact)
 {
     auto desc = artifact->getDesc();
 

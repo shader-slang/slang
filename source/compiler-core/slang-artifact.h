@@ -7,6 +7,8 @@
 #include "../../slang-com-helper.h"
 #include "../../slang-com-ptr.h"
 
+#include "../core/slang-com-object.h"
+
 namespace Slang
 {
 
@@ -91,13 +93,6 @@ struct ArtifactFlag
     };
 };
 
-// Controls what items can be kept. 
-enum class ArtifactKeep
-{
-    No,         ///< Don't keep the item
-    Yes,        ///< Yes keep the final item
-    All,        ///< Keep the final item and any intermediataries
-};
 
 /**
 A value type to describe aspects of the contents of an Artifact.
@@ -160,6 +155,70 @@ inline /* static */ArtifactDesc ArtifactDesc::make(Packed inPacked)
     return r;
 }
 
+
+// Controls what items can be kept. 
+enum class ArtifactKeep
+{
+    No,         ///< Don't keep the item
+    Yes,        ///< Yes keep the final item
+    All,        ///< Keep the final item and any intermediataries
+};
+
+/// True if can keep an intermediate item
+SLANG_INLINE  bool canKeepIntermediate(ArtifactKeep keep) { return keep == ArtifactKeep::All; }
+/// True if can keep
+SLANG_INLINE bool canKeep(ArtifactKeep keep) { return Index(keep) >= Index(ArtifactKeep::Yes); }
+/// Returns the keep type for an intermediate
+SLANG_INLINE ArtifactKeep getIntermediateKeep(ArtifactKeep keep) { return (keep == ArtifactKeep::All) ? ArtifactKeep::All : ArtifactKeep::No; }
+
+enum ArtifactPathType
+{
+    None,
+    Temporary,
+    Existing,
+};
+
+/*
+We have some scenarios
+
+* Is using a backing zip
+* Contains an 'instance' that can represent the whole artifact 
+* Contains callable code
+* Contains optional values (like diagnostics)
+
+We don't want artifacts in general to have to handle
+
+* Having multiple sub artifacts
+* Have file system handling
+
+We could assume that there can only be one serializable alternate representation. 
+If we have that we can just have that set on the artifact. That instance type could just be 
+standalone.
+
+For a zip, we could add a ISlangFileSystem. This would allow for traversing of the contents (via mechanisms we already have). 
+For callable, we could add a ISlangSharedLibrary interface.
+For diagnostics we could add IDiagnostics interface (not defined yet).
+
+For a Artifact that contains diagnostics and other things, we can create as a collection, with unknown contents. Then 
+the contents can be examined via querying the contents.
+*/
+
+/* The ArtifactInstance represents a single instance of a type that can be part of an artifact. It's special in so far 
+as an ArtifactInstance can be queried for it's underlying classs. Any instance is assumed to contain all the 
+same information as any IArtifact it is part of. */
+class IArtifactInstance : public ISlangUnknown
+{
+    SLANG_COM_INTERFACE(0x311457a8, 0x1796, 0x4ebb, { 0x9a, 0xfc, 0x46, 0xa5, 0x44, 0xc7, 0x6e, 0xa9 })
+
+        /// Convert the instance into a serializable blob. 
+        /// Returns SLANG_E_NOT_IMPLEMENTED if an implementation doesn't implement
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL writeToBlob(ISlangBlob** blob) = 0;
+
+        /// Given a guid returns the backing class. Returns nullptr if backing type isn't a match.
+        /// NOTE! Dangerous to do across ABI boundary
+    virtual SLANG_NO_THROW void* SLANG_MCALL getClassInstance(const Guid& classGuid) = 0;
+};
+
 /* The Artifact type is a type designed to represent some Artifact of compilation. It could be input to or output from a compilation.
 
 An abstraction is desirable here, because depending on the compiler the artifact/s could be
@@ -191,9 +250,10 @@ A more long term goal would be to
 * Make Diagnostics into an interface (such it can be added to a Artifact result)
 * Use Artifact and related types for downstream compiler
 */
-class Artifact : public RefObject
+class IArtifact : public ISlangUnknown
 {
 public:
+    SLANG_COM_INTERFACE(0x57375e20, 0xbed, 0x42b6, { 0x9f, 0x5e, 0x59, 0x4f, 0x6, 0x2b, 0xe6, 0x90 })
 
     typedef ArtifactDesc Desc;
 
@@ -202,62 +262,20 @@ public:
     typedef ArtifactStyle Style;
     typedef ArtifactFlags Flags;
     typedef ArtifactKeep Keep;
+    typedef ArtifactPathType PathType;
     
-    enum PathType
-    {
-        None,
-        Temporary,
-        Existing,
-    };
+        /// Get the Desc defining the contents of the artifact
+    virtual SLANG_NO_THROW Desc SLANG_MCALL getDesc() = 0;
 
-    /* A compile product can be made up of multiple representations.
-    */
-    struct Entry
-    {
-        /// NOTE! Only interface innstances work across dll/shared library boundaries
-        /// because casting other types does not work across those boundaries.
-
-        // The Type of the entry
-        enum class Type : uint8_t
-        {
-            InterfaceInstance,          ///< An interface instance 
-            ObjectInstance,             ///< An object instance
-            RawInstance,
-        };
-        enum class Style : uint8_t
-        {
-            Artifact,       ///< Means this entry *can* represent the whole artifact
-            Child,          ///< Some part of the artifact
-            Info,           ///< Informational
-            Other,          ///< Other
-        };
-
-        Type type;
-        Style style;
-        union
-        {
-            RefObject* object;
-            ISlangUnknown* intf;
-            void* raw;
-        };
-    };
-
-        /// Given a type T find the associated instance
-    template <typename T>
-    T* findObjectInstance();
-
-        /// Finds an instance of that has the guid.
-    ISlangUnknown* findInterfaceInstance(const Guid& guid);
-
-        /// Returns true if the artifact in principal exists (it could be invalid)
-    bool exists() const;
+        /// Returns true if the artifact in principal exists
+    virtual SLANG_NO_THROW bool SLANG_MCALL exists() = 0;
 
         /// Load as a blob
-    SlangResult loadBlob(Keep keep, ComPtr<ISlangBlob>& outBlob);
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL loadBlob(Keep keep, ISlangBlob** outBlob) = 0;
     
         /// Require artifact is available as a file.
         /// NOTE! May need to serialize and write as a temporary file.
-    SlangResult requireFile(Keep keep);
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL requireFile(Keep keep) = 0;
 
         /// Require artifact is available in file-like scenarion.
         ///
@@ -267,91 +285,84 @@ public:
         /// For example when system libraries are specified - the library paths may be known to
         /// a downstream compiler (or the path is passed in explicitly), in that case only the
         /// artifact name needs to be correct.
-    SlangResult requireFileLike(Keep keep);
-
-        /// Get the base name of this artifact.
-        /// If there is a path set, will extract the name from that (stripping prefix, extension as necessary).
-        /// Else if there is an explicit name set, this is returned.
-        /// Else returns the empty string
-    String getBaseName();
-
-        /// Get the parent path (empty if there isn't one)
-    String getParentPath();
-
-        /// Get the Desc defining the contents of the artifact
-    SLANG_FORCE_INLINE const Desc& getDesc() { return m_desc; }
-
-        /// Returns the index of the entry
-    Index indexOf(Entry::Type type) const;
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL requireFileLike(Keep keep) = 0;
     
+        /// Finds an instance of that has the guid.
+    virtual SLANG_NO_THROW ISlangUnknown* SLANG_MCALL findElement(const Guid& guid) = 0;
+
+        /// The guid is the class guid type
+    virtual SLANG_NO_THROW void* SLANG_MCALL findElementClass(const Guid& classGuid) = 0;
+
         /// Add items
-    void setPath(PathType pathType, const String& filePath) { m_pathType = pathType; m_path = filePath; }
+    virtual SLANG_NO_THROW void SLANG_MCALL setPath(PathType pathType, const char* filePath) = 0;
 
         /// Set the blob representing the contents of the asset
-    void setBlob(ISlangBlob* blob) { m_blob = blob; }
+    virtual SLANG_NO_THROW void SLANG_MCALL setBlob(ISlangBlob* blob) = 0;
 
-    void add(Entry::Style style, RefObject* obj);
-    void add(Entry::Style style, ISlangUnknown* intf);
-
-    PathType getPathType() const { return m_pathType;  }
-    const String& getPath() const { return m_path;  }
+        /// Get the path type
+    virtual SLANG_NO_THROW PathType SLANG_MCALL getPathType() = 0;
+        /// Get the path
+    virtual SLANG_NO_THROW const char* SLANG_MCALL getPath() = 0;
 
         /// Get the name of the artifact. This can be empty.
-    const String& getName() const { return m_name; }
+    virtual SLANG_NO_THROW const char* SLANG_MCALL getName() = 0;
 
-    const List<Entry>& getEntries() const { return m_entries; }
+        /// Add an interface
+    virtual SLANG_NO_THROW void SLANG_MCALL addElement(ISlangUnknown* intf) = 0;
+    
+        /// Get the item at the index
+    virtual SLANG_NO_THROW ISlangUnknown* SLANG_MCALL getElementAt(Index i) = 0;
 
-        /// Given a desc and a path returns the base name from the path (stripped of prefix and extension)
-    static String getBaseNameFromPath(Desc& desc, const UnownedStringSlice& path);
+        /// Get the amount of elements
+    virtual SLANG_NO_THROW Index SLANG_MCALL getElementCount() = 0;
+};
 
-        /// Ctor
-    Artifact(const Desc& desc, const String& name):
+class Artifact : public ComObject, public IArtifact
+{
+public:
+    
+    SLANG_COM_OBJECT_IUNKNOWN_ALL
+    
+        /// IArtifact impl
+    virtual SLANG_NO_THROW Desc SLANG_MCALL getDesc() SLANG_OVERRIDE { return m_desc; }
+    virtual SLANG_NO_THROW bool SLANG_MCALL exists() SLANG_OVERRIDE;
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL loadBlob(Keep keep, ISlangBlob** outBlob) SLANG_OVERRIDE;
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL requireFile(Keep keep) SLANG_OVERRIDE;
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL requireFileLike(Keep keep) SLANG_OVERRIDE;
+    virtual SLANG_NO_THROW ISlangUnknown* SLANG_MCALL findElement(const Guid& guid) SLANG_OVERRIDE;
+    virtual SLANG_NO_THROW void* SLANG_MCALL findElementClass(const Guid& classGuid) SLANG_OVERRIDE;
+    virtual SLANG_NO_THROW void SLANG_MCALL setPath(PathType pathType, const char* path) SLANG_OVERRIDE { _setPath(pathType, path); }
+    virtual SLANG_NO_THROW void SLANG_MCALL setBlob(ISlangBlob* blob) SLANG_OVERRIDE { m_blob = blob; }
+    virtual SLANG_NO_THROW PathType SLANG_MCALL getPathType() SLANG_OVERRIDE { return m_pathType; }
+    virtual SLANG_NO_THROW const char* SLANG_MCALL getPath() SLANG_OVERRIDE { return m_path.getBuffer(); }
+    virtual SLANG_NO_THROW const char* SLANG_MCALL getName() SLANG_OVERRIDE { return m_name.getBuffer(); }
+    virtual SLANG_NO_THROW void SLANG_MCALL addElement(ISlangUnknown* intf) SLANG_OVERRIDE { SLANG_ASSERT(intf); m_elements.add(ComPtr<ISlangUnknown>(intf)); }
+    virtual SLANG_NO_THROW ISlangUnknown* SLANG_MCALL getElementAt(Index i) SLANG_OVERRIDE { return m_elements[i]; }
+    virtual SLANG_NO_THROW Index SLANG_MCALL getElementCount() SLANG_OVERRIDE { return m_elements.getCount(); }
+
+    /// Ctor
+    Artifact(const Desc& desc, const String& name) :
         m_desc(desc),
         m_name(name)
     {}
-        /// Dtor
+    /// Dtor
     ~Artifact();
 
 protected:
-    Desc m_desc;
-    String m_name;
+    void* getInterface(const Guid& uuid);
+
+    void _setPath(PathType pathType, const String& path) { m_pathType = pathType; m_path = path; }
+
+    Desc m_desc;                                ///< Description of the artifact
+    String m_name;                              ///< Name of this artifact
 
     PathType m_pathType = PathType::None;       ///< What the path indicates
     String m_path;                              ///< The path 
 
     ComPtr<ISlangBlob> m_blob;                  ///< Blob to store result in memory
 
-    List<Entry> m_entries;
+    List<ComPtr<ISlangUnknown>> m_elements;     ///< Associated elements
 };
-
-// ----------------------------------------------------------------------
-template <typename T>
-T* Artifact::findObjectInstance()
-{
-    RefObject* check = static_cast<T*>(nullptr);
-    SLANG_UNUSED(check);
-
-    // Check if we already have it
-    for (const auto& entry : m_entries)
-    {
-        if (entry.type == Entry::Type::ObjectInstance)
-        {
-            auto obj = as<T>(entry.object);
-            if (obj)
-            {
-                return obj;
-            }
-        }
-    }
-    return nullptr;
-}
-
-/// True if can keep an intermediate item
-SLANG_INLINE  bool canKeepIntermediate(ArtifactKeep keep) { return keep == ArtifactKeep::All; }
-    /// True if can keep
-SLANG_INLINE bool canKeep(ArtifactKeep keep) { return Index(keep) >= Index(ArtifactKeep::Yes); }
-    /// Returns the keep type for an intermediate
-SLANG_INLINE ArtifactKeep getIntermediateKeep(ArtifactKeep keep) { return (keep == ArtifactKeep::All) ? ArtifactKeep::All : ArtifactKeep::No; }
 
 } // namespace Slang
 
