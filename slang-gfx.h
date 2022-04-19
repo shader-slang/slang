@@ -664,7 +664,7 @@ public:
         int quality = 0;                        ///< The quality measure for the samples
     };
 
-    struct Size
+    struct Extents
     {
         GfxCount width = 0;              ///< Width in pixels
         GfxCount height = 0;             ///< Height in pixels (if 2d or 3d)
@@ -673,7 +673,7 @@ public:
 
     struct Desc: public DescBase
     {
-        Size size;
+        Extents size;
 
         GfxCount arraySize = 0;          ///< Array size
 
@@ -1586,7 +1586,7 @@ public:
         ResourceState srcState,
         SubresourceRange srcSubresource,
         ITextureResource::Offset3D srcOffset,
-        ITextureResource::Size extent) = 0;
+        ITextureResource::Extents extent) = 0;
 
     /// Copies texture to a buffer. Each row is aligned to kTexturePitchAlignment.
     virtual SLANG_NO_THROW void SLANG_MCALL copyTextureToBuffer(
@@ -1598,12 +1598,12 @@ public:
         ResourceState srcState,
         SubresourceRange srcSubresource,
         ITextureResource::Offset3D srcOffset,
-        ITextureResource::Size extent) = 0;
+        ITextureResource::Extents extent) = 0;
     virtual SLANG_NO_THROW void SLANG_MCALL uploadTextureData(
         ITextureResource* dst,
         SubresourceRange subResourceRange,
         ITextureResource::Offset3D offset,
-        ITextureResource::Size extent,
+        ITextureResource::Extents extent,
         ITextureResource::SubresourceData* subResourceData,
         GfxCount subResourceDataCount) = 0;
     virtual SLANG_NO_THROW void SLANG_MCALL

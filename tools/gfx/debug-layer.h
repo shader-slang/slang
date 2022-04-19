@@ -385,12 +385,12 @@ public:
         ResourceState srcState,
         SubresourceRange srcSubresource,
         ITextureResource::Offset3D srcOffset,
-        ITextureResource::Size extent);
+        ITextureResource::Extents extent);
     virtual SLANG_NO_THROW void SLANG_MCALL uploadTextureData(
         ITextureResource* dst,
         SubresourceRange subResourceRange,
         ITextureResource::Offset3D offset,
-        ITextureResource::Size extent,
+        ITextureResource::Extents extent,
         ITextureResource::SubresourceData* subResourceData,
         GfxCount subResourceDataCount);
     virtual SLANG_NO_THROW void SLANG_MCALL clearResourceView(
@@ -411,7 +411,7 @@ public:
         ResourceState srcState,
         SubresourceRange srcSubresource,
         ITextureResource::Offset3D srcOffset,
-        ITextureResource::Size extent);
+        ITextureResource::Extents extent);
     virtual SLANG_NO_THROW void SLANG_MCALL textureSubresourceBarrier(
         ITextureResource* texture,
         SubresourceRange subresourceRange,

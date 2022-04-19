@@ -1342,7 +1342,7 @@ void DebugResourceCommandEncoderImpl::copyTexture(
     ResourceState srcState,
     SubresourceRange srcSubresource,
     ITextureResource::Offset3D srcOffset,
-    ITextureResource::Size extent)
+    ITextureResource::Extents extent)
 {
     SLANG_GFX_API_FUNC;
     getBaseResourceEncoder()->copyTexture(
@@ -1361,7 +1361,7 @@ void DebugResourceCommandEncoderImpl::uploadTextureData(
     ITextureResource* dst,
     SubresourceRange subResourceRange,
     ITextureResource::Offset3D offset,
-    ITextureResource::Size extent,
+    ITextureResource::Extents extent,
     ITextureResource::SubresourceData* subResourceData,
     GfxCount subResourceDataCount)
 {
@@ -1418,7 +1418,7 @@ void DebugResourceCommandEncoderImpl::copyTextureToBuffer(
     ResourceState srcState,
     SubresourceRange srcSubresource,
     ITextureResource::Offset3D srcOffset,
-    ITextureResource::Size extent)
+    ITextureResource::Extents extent)
 {
     SLANG_GFX_API_FUNC;
     getBaseResourceEncoder()->copyTextureToBuffer(

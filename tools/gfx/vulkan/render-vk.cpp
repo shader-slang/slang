@@ -1251,7 +1251,7 @@ SlangResult DeviceImpl::readTextureResource(
     Size pixelSize = sizeInfo.blockSizeInBytes / sizeInfo.pixelsPerBlock;
     Size rowPitch = width * pixelSize;
 
-    List<TextureResource::Size> mipSizes;
+    List<TextureResource::Extents> mipSizes;
 
     const int numMipMaps = desc->numMipLevels;
     auto arraySize = calcEffectiveArraySize(*desc);
@@ -1261,7 +1261,7 @@ SlangResult DeviceImpl::readTextureResource(
     // Calculate how large an array entry is
     for (int j = 0; j < numMipMaps; ++j)
     {
-        const TextureResource::Size mipSize = calcMipSize(desc->size, j);
+        const TextureResource::Extents mipSize = calcMipSize(desc->size, j);
 
         auto rowSizeInBytes = calcRowSize(desc->format, mipSize.width);
         auto numRows = calcNumRows(desc->format, mipSize.height);
@@ -1709,7 +1709,7 @@ Result DeviceImpl::createTextureResource(
     VKBufferHandleRAII uploadBuffer;
     if (initData)
     {
-        List<TextureResource::Size> mipSizes;
+        List<TextureResource::Extents> mipSizes;
 
         VkCommandBuffer commandBuffer = m_deviceQueue.getCommandBuffer();
 
@@ -1720,7 +1720,7 @@ Result DeviceImpl::createTextureResource(
         // Calculate how large an array entry is
         for (int j = 0; j < numMipMaps; ++j)
         {
-            const TextureResource::Size mipSize = calcMipSize(desc.size, j);
+            const TextureResource::Extents mipSize = calcMipSize(desc.size, j);
 
             auto rowSizeInBytes = calcRowSize(desc.format, mipSize.width);
             auto numRows = calcNumRows(desc.format, mipSize.height);
@@ -6597,7 +6597,7 @@ void ResourceCommandEncoder::copyTexture(
     ResourceState srcState,
     SubresourceRange srcSubresource,
     ITextureResource::Offset3D srcOffset,
-    ITextureResource::Size extent)
+    ITextureResource::Extents extent)
 {
     auto srcImage = static_cast<TextureResourceImpl*>(src);
     auto srcDesc = srcImage->getDesc();
@@ -6649,7 +6649,7 @@ void ResourceCommandEncoder::uploadTextureData(
     ITextureResource* dst,
     SubresourceRange subResourceRange,
     ITextureResource::Offset3D offset,
-    ITextureResource::Size extend,
+    ITextureResource::Extents extend,
     ITextureResource::SubresourceData* subResourceData,
     GfxCount subResourceDataCount)
 {
@@ -6657,7 +6657,7 @@ void ResourceCommandEncoder::uploadTextureData(
 
     auto& vkApi = m_commandBuffer->m_renderer->m_api;
     auto dstImpl = static_cast<TextureResourceImpl*>(dst);
-    List<TextureResource::Size> mipSizes;
+    List<TextureResource::Extents> mipSizes;
 
     VkCommandBuffer commandBuffer = m_commandBuffer->m_commandBuffer;
     auto& desc = *dstImpl->getDesc();
@@ -6668,7 +6668,7 @@ void ResourceCommandEncoder::uploadTextureData(
          j < subResourceRange.mipLevel + subResourceRange.mipLevelCount;
          ++j)
     {
-        const TextureResource::Size mipSize = calcMipSize(desc.size, j);
+        const TextureResource::Extents mipSize = calcMipSize(desc.size, j);
 
         auto rowSizeInBytes = calcRowSize(desc.format, mipSize.width);
         auto numRows = calcNumRows(desc.format, mipSize.height);
@@ -7064,7 +7064,7 @@ void ResourceCommandEncoder::copyTextureToBuffer(
     ResourceState srcState,
     SubresourceRange srcSubresource,
     ITextureResource::Offset3D srcOffset,
-    ITextureResource::Size extent)
+    ITextureResource::Extents extent)
 {
     assert(srcSubresource.mipLevelCount <= 1);
 

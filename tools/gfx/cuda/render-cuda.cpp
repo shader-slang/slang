@@ -1018,7 +1018,7 @@ public:
                 ResourceState srcState,
                 SubresourceRange srcSubresource,
                 ITextureResource::Offset3D srcOffset,
-                ITextureResource::Size extent) override
+                ITextureResource::Extents extent) override
             {
                 SLANG_UNUSED(dst);
                 SLANG_UNUSED(dstState);
@@ -1036,7 +1036,7 @@ public:
                 ITextureResource* dst,
                 SubresourceRange subResourceRange,
                 ITextureResource::Offset3D offset,
-                ITextureResource::Size extent,
+                ITextureResource::Extents extent,
                 ITextureResource::SubresourceData* subResourceData,
                 GfxCount subResourceDataCount) override
             {
@@ -1101,7 +1101,7 @@ public:
                 ResourceState srcState,
                 SubresourceRange srcSubresource,
                 ITextureResource::Offset3D srcOffset,
-                ITextureResource::Size extent) override
+                ITextureResource::Extents extent) override
             {
                 SLANG_UNUSED(dst);
                 SLANG_UNUSED(dstOffset);

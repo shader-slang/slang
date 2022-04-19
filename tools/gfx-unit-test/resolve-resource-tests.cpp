@@ -101,7 +101,7 @@ namespace
 
         struct TextureInfo
         {
-            ITextureResource::Size extent;
+            ITextureResource::Extents extent;
             int numMipLevels;
             int arraySize;
             ITextureResource::SubresourceData const* initData;
@@ -222,7 +222,7 @@ namespace
             GFX_CHECK_CALL_ABORT(device->createFramebuffer(framebufferDesc, framebuffer.writeRef()));
         }
 
-        void submitGPUWork(SubresourceRange msaaSubresource, SubresourceRange dstSubresource, ITextureResource::Size extent)
+        void submitGPUWork(SubresourceRange msaaSubresource, SubresourceRange dstSubresource, ITextureResource::Extents extent)
         {
             Slang::ComPtr<ITransientResourceHeap> transientHeap;
             ITransientResourceHeap::Desc transientHeapDesc = {};
@@ -296,7 +296,7 @@ namespace
     {
         void run()
         {
-            ITextureResource::Size extent = {};
+            ITextureResource::Extents extent = {};
             extent.width = kWidth;
             extent.height = kHeight;
             extent.depth = 1;

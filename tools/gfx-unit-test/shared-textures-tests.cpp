@@ -67,7 +67,7 @@ namespace gfx_test
         }
     }
 
-    ComPtr<ITextureResource> createTexture(IDevice* device, ITextureResource::Size extents, gfx::Format format, ITextureResource::SubresourceData* initialData)
+    ComPtr<ITextureResource> createTexture(IDevice* device, ITextureResource::Extents extents, gfx::Format format, ITextureResource::SubresourceData* initialData)
     {
         ITextureResource::Desc texDesc = {};
         texDesc.type = IResource::Type::Texture2D;
@@ -152,12 +152,12 @@ namespace gfx_test
         auto intResults = createBuffer<uint32_t>(dstDevice, 16, initIntData);
         auto intBufferView = createOutBufferView(dstDevice, intResults);
 
-        ITextureResource::Size size = {};
+        ITextureResource::Extents size = {};
         size.width = 2;
         size.height = 2;
         size.depth = 1;
 
-        ITextureResource::Size bcSize = {};
+        ITextureResource::Extents bcSize = {};
         bcSize.width = 4;
         bcSize.height = 4;
         bcSize.depth = 1;

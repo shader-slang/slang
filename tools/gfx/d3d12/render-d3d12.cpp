@@ -1500,7 +1500,7 @@ Result DeviceImpl::createTextureResource(
                 const D3D12_PLACED_SUBRESOURCE_FOOTPRINT& layout = layouts[j];
                 const D3D12_SUBRESOURCE_FOOTPRINT& footprint = layout.Footprint;
 
-                TextureResource::Size mipSize = calcMipSize(srcDesc.size, j);
+                TextureResource::Extents mipSize = calcMipSize(srcDesc.size, j);
                 if (gfxIsCompressedFormat(descIn.format))
                 {
                     mipSize.width = int(D3DUtil::calcAligned(mipSize.width, 4));
@@ -6618,7 +6618,7 @@ void ResourceCommandEncoderImpl::copyTexture(
     ResourceState srcState,
     SubresourceRange srcSubresource,
     ITextureResource::Offset3D srcOffset,
-    ITextureResource::Size extent)
+    ITextureResource::Extents extent)
 {
     auto dstTexture = static_cast<TextureResourceImpl*>(dst);
     auto srcTexture = static_cast<TextureResourceImpl*>(src);
@@ -6684,7 +6684,7 @@ void ResourceCommandEncoderImpl::uploadTextureData(
     ITextureResource* dst,
     SubresourceRange subResourceRange,
     ITextureResource::Offset3D offset,
-    ITextureResource::Size extent,
+    ITextureResource::Extents extent,
     ITextureResource::SubresourceData* subResourceData,
     GfxCount subResourceDataCount)
 {
@@ -6968,7 +6968,7 @@ void ResourceCommandEncoderImpl::copyTextureToBuffer(
     ResourceState srcState,
     SubresourceRange srcSubresource,
     ITextureResource::Offset3D srcOffset,
-    ITextureResource::Size extent)
+    ITextureResource::Extents extent)
 {
     assert(srcSubresource.mipLevelCount <= 1);
 

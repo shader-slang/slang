@@ -19,7 +19,7 @@ namespace gfx_test
     {
         SubresourceRange srcSubresource;
         SubresourceRange dstSubresource;
-        ITextureResource::Size extent;
+        ITextureResource::Extents extent;
         ITextureResource::Offset3D srcOffset;
         ITextureResource::Offset3D dstOffset;
     };
@@ -27,7 +27,7 @@ namespace gfx_test
     struct TextureToBufferCopyInfo
     {
         SubresourceRange srcSubresource;
-        ITextureResource::Size extent;
+        ITextureResource::Extents extent;
         ITextureResource::Offset3D textureOffset;
         Offset bufferOffset;
         Offset bufferSize;
@@ -241,7 +241,7 @@ namespace gfx_test
             }
         }
 
-        void checkTestResults(ITextureResource::Size srcMipExtent, const void* expectedCopiedData, const void* expectedOriginalData)
+        void checkTestResults(ITextureResource::Extents srcMipExtent, const void* expectedCopiedData, const void* expectedOriginalData)
         {
             ComPtr<ISlangBlob> resultBlob;
             GFX_CHECK_CALL_ABORT(device->readBufferResource(resultsBuffer, 0, bufferCopyInfo.bufferSize, resultBlob.writeRef()));

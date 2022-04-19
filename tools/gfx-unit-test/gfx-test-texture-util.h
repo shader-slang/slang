@@ -144,7 +144,7 @@ namespace gfx_test
     struct ValidationTextureData : RefObject
     {
         const void* textureData;
-        ITextureResource::Size extents;
+        ITextureResource::Extents extents;
         Strides strides;
 
         void* getBlockAt(GfxIndex x, GfxIndex y, GfxIndex z)
@@ -166,7 +166,7 @@ namespace gfx_test
         Format format;
         ITextureResource::Type textureType;
 
-        ITextureResource::Size extents;
+        ITextureResource::Extents extents;
         GfxCount mipLevelCount;
         GfxCount arrayLayerCount;
 

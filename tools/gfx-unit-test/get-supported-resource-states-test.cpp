@@ -148,7 +148,7 @@ namespace
                     ResourceState::CopyDestination);
 
                 ResourceState currentState = ResourceState::CopySource;
-                ITextureResource::Size extent;
+                ITextureResource::Extents extent;
                 extent.width = 4;
                 extent.height = 4;
                 extent.depth = 1;
