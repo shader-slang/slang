@@ -106,7 +106,7 @@ to be added/altered in one place */
 struct ArtifactPayloadInfo
 {
     typedef ArtifactPayloadInfo This;
-    enum class Kind : uint8_t
+    enum class Flavor : uint8_t
     {
         Unknown,
         None,
@@ -134,7 +134,7 @@ struct ArtifactPayloadInfo
     struct Lookup;
 
     Flags flags;
-    Kind kind;
+    Flavor flavor;
 };
 
 struct ArtifactPayloadInfo::Lookup
@@ -186,9 +186,9 @@ public:
     static bool isKindBinaryLinkable(Kind kind);
 
         /// Returns true if the payload type is CPU
-    static bool isPayloadCpuBinary(Payload payload) { auto info = getInfo(payload); return info.isSet(ArtifactPayloadInfo::Flag::IsCpuNative) && info.kind == ArtifactPayloadInfo::Kind::Binary; }
+    static bool isPayloadCpuBinary(Payload payload) { auto info = getInfo(payload); return info.isSet(ArtifactPayloadInfo::Flag::IsCpuNative) && info.flavor == ArtifactPayloadInfo::Flavor::Binary; }
         /// Returns true if the payload type is applicable to the GPU
-    static bool isPayloadGpuBinary(Payload payload) { auto info = getInfo(payload); return info.isSet(ArtifactPayloadInfo::Flag::IsGpuNative) && info.kind == ArtifactPayloadInfo::Kind::Binary; }
+    static bool isPayloadGpuBinary(Payload payload) { auto info = getInfo(payload); return info.isSet(ArtifactPayloadInfo::Flag::IsGpuNative) && info.flavor == ArtifactPayloadInfo::Flavor::Binary; }
 
         /// Try to determine the desc from a path
     static This fromPath(const UnownedStringSlice& slice);

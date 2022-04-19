@@ -11,71 +11,69 @@ static ArtifactPayloadInfo::Lookup _makePayloadInfoLookup()
     ArtifactPayloadInfo::Lookup values;
     memset(&values, 0, sizeof(values));
     
-    // Set all of the kinds
+    
+    typedef ArtifactPayload Payload;
+    typedef ArtifactPayloadInfo::Flag Flag;
+    typedef ArtifactPayloadInfo::Flags Flags;
+    typedef ArtifactPayloadInfo::Flavor Flavor;
+
+    struct Info
     {
-        typedef ArtifactPayload Payload;
-        typedef ArtifactPayloadInfo::Flag Flag;
-        typedef ArtifactPayloadInfo::Flags Flags;
+        Payload payload;
+        Flavor flavor;
+        Flags flags;
+    };
 
-        typedef ArtifactPayloadInfo::Kind Kind;
-        struct Info
-        {
-            Payload payload;
-            Kind kind;
-            Flags flags;
-        };
+    const Info infos[] =
+    {
+        {Payload::None,             Flavor::None,         0},
+        {Payload::Unknown,          Flavor::Unknown,      0},
 
-        const Info infos[] =
-        {
-            {Payload::None, Kind::None, 0},
-            {Payload::Unknown, Kind::Unknown, 0},
+        // It seems as if DXBC is potentially linkable from
+        // https://docs.microsoft.com/en-us/windows/win32/direct3dhlsl/dx-graphics-hlsl-appendix-keywords#export
 
-            // It seems as if DXBC is potentially linkable from
-            // https://docs.microsoft.com/en-us/windows/win32/direct3dhlsl/dx-graphics-hlsl-appendix-keywords#export
+        // We can't *actually* link PTX or SPIR-V currently but it is in principal possible
+        // so let's say we accept for now
 
-            // We can't *actually* link PTX or SPIR-V currently but it is in principal possible
-            // so let's say we accept for now
+        {Payload::DXIL,             Flavor::Binary,       Flag::IsGpuNative | Flag::IsLinkable},
+        {Payload::DXBC,             Flavor::Binary,       Flag::IsGpuNative | Flag::IsLinkable}, 
+        {Payload::SPIRV,            Flavor::Binary,       Flag::IsGpuNative | Flag::IsLinkable }, 
+        {Payload::PTX,              Flavor::Binary,       Flag::IsGpuNative | Flag::IsLinkable },
 
-            {Payload::DXIL,             Kind::Binary,       Flag::IsGpuNative | Flag::IsLinkable},
-            {Payload::DXBC,             Kind::Binary,       Flag::IsGpuNative | Flag::IsLinkable}, 
-            {Payload::SPIRV,            Kind::Binary,       Flag::IsGpuNative | Flag::IsLinkable }, 
-            {Payload::PTX,              Kind::Binary,       Flag::IsGpuNative | Flag::IsLinkable },
+        {Payload::DXILAssembly,     Flavor::Assembly,     0},
+        {Payload::DXBCAssembly,     Flavor::Assembly,     0},
+        {Payload::SPIRVAssembly,    Flavor::Assembly,     0},
+        {Payload::PTXAssembly,      Flavor::Assembly,     0},
 
-            {Payload::DXILAssembly,     Kind::Assembly,     0},
-            {Payload::DXBCAssembly,     Kind::Assembly,     0},
-            {Payload::SPIRVAssembly,    Kind::Assembly,     0},
-            {Payload::PTXAssembly,      Kind::Assembly,     0},
+        {Payload::HostCPU,          Flavor::Binary,       Flag::IsCpuNative | Flag::IsLinkable},
 
-            {Payload::HostCPU,          Kind::Binary,       Flag::IsCpuNative | Flag::IsLinkable},
+        // Do we want some other Flavor for these?
+        {Payload::SlangIR,          Flavor::Binary,       Flag::IsLinkable},
+        {Payload::LLVMIR,           Flavor::Binary,       0},
+        {Payload::SlangAST,         Flavor::Binary,       0},
 
-            // Do we want some other kind for these?
-            {Payload::SlangIR,          Kind::Binary,       Flag::IsLinkable},
-            {Payload::LLVMIR,           Kind::Binary,       0},
-            {Payload::SlangAST,         Kind::Binary,       0},
+        {Payload::X86,              Flavor::Binary,       Flag::IsCpuNative | Flag::IsLinkable},
+        {Payload::X86_64,           Flavor::Binary,       Flag::IsCpuNative | Flag::IsLinkable},
+        {Payload::AARCH,            Flavor::Binary,       Flag::IsCpuNative | Flag::IsLinkable},
+        {Payload::AARCH64,          Flavor::Binary,       Flag::IsCpuNative | Flag::IsLinkable},
 
-            {Payload::X86,              Kind::Binary,       Flag::IsCpuNative | Flag::IsLinkable},
-            {Payload::X86_64,           Kind::Binary,       Flag::IsCpuNative | Flag::IsLinkable},
-            {Payload::AARCH,            Kind::Binary,       Flag::IsCpuNative | Flag::IsLinkable},
-            {Payload::AARCH64,          Kind::Binary,       Flag::IsCpuNative | Flag::IsLinkable},
+        {Payload::HLSL,             Flavor::Source,       0},
+        {Payload::GLSL,             Flavor::Source,       0},
+        {Payload::CPP,              Flavor::Source,       0},
+        {Payload::C,                Flavor::Source,       0},
+        {Payload::CUDA,             Flavor::Source,       0},
+        {Payload::Slang,            Flavor::Source,       0},
 
-            {Payload::HLSL,             Kind::Source,       0},
-            {Payload::GLSL,             Kind::Source,       0},
-            {Payload::CPP,              Kind::Source,       0},
-            {Payload::C,                Kind::Source,       0},
-            {Payload::CUDA,             Kind::Source,       0},
-            {Payload::Slang,            Kind::Source,       0},
+        {Payload::DebugInfo,        Flavor::Unknown,      0},
 
-            {Payload::DebugInfo,        Kind::Binary,       0},
+        {Payload::Zip,              Flavor::Container,    0},
+    };
 
-            {Payload::Zip,              Kind::Container,    0},
-        };
-
-        for (auto info : infos)
-        {
-            auto& v = values.values[Index(info.payload)];
-            v.kind = info.kind;
-            v.flags = info.flags;
-        }
+    for (auto info : infos)
+    {
+        auto& v = values.values[Index(info.payload)];
+        v.flavor = info.flavor;
+        v.flags = info.flags;
     }
 
     return values;
