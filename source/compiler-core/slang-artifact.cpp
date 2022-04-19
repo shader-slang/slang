@@ -122,18 +122,6 @@ void* Artifact::findElementClass(const Guid& classGuid)
     return nullptr;
 }
 
-const char* _allocate(const String& string, IArenaAllocator* allocator)
-{
-    Index length = string.getLength();
-    if (length == 0)
-    {
-        return "";
-    }
-    char* dst = (char*)allocator->allocate(length + 1);
-    ::memcpy(dst, string.getBuffer(), length + 1);
-    return dst;
-}
-
 SlangResult Artifact::requireFileLike(Keep keep)
 {
     // If there is no path set and no blob we still need a name. 
