@@ -2324,7 +2324,7 @@ Result DeviceImpl::createInputLayout(IInputLayout::Desc const& desc, IInputLayou
     {
         auto& dstStream = dstStreams[i];
         auto& srcStream = srcVertexStreams[i];
-        dstStream.stride = srcStream.stride;
+        dstStream.stride = (uint32_t)srcStream.stride;
         dstStream.binding = (uint32_t)i;
         dstStream.inputRate = (srcStream.slotClass == InputSlotClass::PerInstance)
                                   ? VK_VERTEX_INPUT_RATE_INSTANCE
@@ -2473,10 +2473,10 @@ Result DeviceImpl::createFence(const IFence::Desc& desc, IFence** outFence)
 }
 
 Result DeviceImpl::waitForFences(
-    uint32_t fenceCount, IFence** fences, uint64_t* fenceValues, bool waitForAll, uint64_t timeout)
+    GfxCount fenceCount, IFence** fences, uint64_t* fenceValues, bool waitForAll, uint64_t timeout)
 {
     ShortList<VkSemaphore> semaphores;
-    for (uint32_t i = 0; i < fenceCount; ++i)
+    for (GfxIndex i = 0; i < fenceCount; ++i)
     {
         auto fenceImpl = static_cast<FenceImpl*>(fences[i]);
         semaphores.add(fenceImpl->m_semaphore);
@@ -3007,7 +3007,7 @@ Result FramebufferLayoutImpl::init(DeviceImpl* renderer, const IFramebufferLayou
     }
     // We need extra space if we have depth buffer
     m_attachmentDescs.setCount(numAttachments);
-    for (uint32_t i = 0; i < desc.renderTargetCount; ++i)
+    for (GfxIndex i = 0; i < desc.renderTargetCount; ++i)
     {
         auto& renderTarget = desc.renderTargets[i];
         VkAttachmentDescription& dst = m_attachmentDescs[i];
@@ -3051,7 +3051,7 @@ Result FramebufferLayoutImpl::init(DeviceImpl* renderer, const IFramebufferLayou
 
     Array<VkAttachmentReference, kMaxRenderTargets>& colorReferences = m_colorReferences;
     colorReferences.setCount(desc.renderTargetCount);
-    for (uint32_t i = 0; i < desc.renderTargetCount; ++i)
+    for (GfxIndex i = 0; i < desc.renderTargetCount; ++i)
     {
         VkAttachmentReference& dst = colorReferences[i];
         dst.attachment = i;
@@ -3108,7 +3108,7 @@ Result RenderPassLayoutImpl::init(DeviceImpl* renderer, const IRenderPassLayout:
     // We need extra space if we have depth buffer
     Array<VkAttachmentDescription, kMaxAttachments> attachmentDescs;
     attachmentDescs = framebufferLayout->m_attachmentDescs;
-    for (uint32_t i = 0; i < desc.renderTargetCount; ++i)
+    for (GfxIndex i = 0; i < desc.renderTargetCount; ++i)
     {
         VkAttachmentDescription& dst = attachmentDescs[i];
         auto access = desc.renderTargetAccess[i];
@@ -3207,7 +3207,7 @@ Result FramebufferImpl::init(DeviceImpl* renderer, const IFramebuffer::Desc& des
     Array<VkImageView, kMaxAttachments> imageViews;
     imageViews.setCount(numAttachments);
     renderTargetViews.setCount(desc.renderTargetCount);
-    for (uint32_t i = 0; i < desc.renderTargetCount; ++i)
+    for (GfxIndex i = 0; i < desc.renderTargetCount; ++i)
     {
         auto resourceView = static_cast<TextureResourceViewImpl*>(desc.renderTargetViews[i]);
         renderTargetViews[i] = resourceView;
@@ -4736,9 +4736,9 @@ Result ShaderObjectImpl::create(
 
 RendererBase* ShaderObjectImpl::getDevice() { return m_layout->getDevice(); }
 
-UInt ShaderObjectImpl::getEntryPointCount() { return 0; }
+GfxCount ShaderObjectImpl::getEntryPointCount() { return 0; }
 
-Result ShaderObjectImpl::getEntryPoint(UInt index, IShaderObject** outEntryPoint)
+Result ShaderObjectImpl::getEntryPoint(GfxIndex index, IShaderObject** outEntryPoint)
 {
     *outEntryPoint = nullptr;
     return SLANG_OK;
@@ -4746,8 +4746,7 @@ Result ShaderObjectImpl::getEntryPoint(UInt index, IShaderObject** outEntryPoint
 
 const void* ShaderObjectImpl::getRawData() { return m_data.getBuffer(); }
 
-// TODO: Change size_t to Count?
-size_t ShaderObjectImpl::getSize() { return (size_t)m_data.getCount(); }
+Size ShaderObjectImpl::getSize() { return (Size)m_data.getCount(); }
 
 // TODO: Change size_t and Index to Size?
 Result ShaderObjectImpl::setData(ShaderOffset const& inOffset, void const* data, size_t inSize)
@@ -5792,9 +5791,9 @@ List<RefPtr<EntryPointShaderObject>> const& RootShaderObjectImpl::getEntryPoints
     return m_entryPoints;
 }
 
-UInt RootShaderObjectImpl::getEntryPointCount() { return (UInt)m_entryPoints.getCount(); }
+GfxCount RootShaderObjectImpl::getEntryPointCount() { return (GfxCount)m_entryPoints.getCount(); }
 
-Result RootShaderObjectImpl::getEntryPoint(UInt index, IShaderObject** outEntryPoint)
+Result RootShaderObjectImpl::getEntryPoint(GfxIndex index, IShaderObject** outEntryPoint)
 {
     returnComPtr(outEntryPoint, m_entryPoints[index]);
     return SLANG_OK;
@@ -6468,9 +6467,8 @@ void ResourceCommandEncoder::uploadBufferData(
         data);
 }
 
-// TODO: Change size_t to Count?
 void ResourceCommandEncoder::textureBarrier(
-    size_t count, ITextureResource* const* textures, ResourceState src, ResourceState dst)
+    GfxCount count, ITextureResource* const* textures, ResourceState src, ResourceState dst)
 {
     ShortList<VkImageMemoryBarrier, 16> barriers;
 
@@ -6513,7 +6511,7 @@ void ResourceCommandEncoder::textureBarrier(
 
 // TODO: Change size_t to Count?
 void ResourceCommandEncoder::bufferBarrier(
-    size_t count, IBufferResource* const* buffers, ResourceState src, ResourceState dst)
+    GfxCount count, IBufferResource* const* buffers, ResourceState src, ResourceState dst)
 {
     List<VkBufferMemoryBarrier> barriers;
     barriers.reserve(count);
@@ -6571,7 +6569,7 @@ void ResourceCommandEncoder::endEncoding()
         nullptr);
 }
 
-void ResourceCommandEncoder::writeTimestamp(IQueryPool* queryPool, SlangInt index)
+void ResourceCommandEncoder::writeTimestamp(IQueryPool* queryPool, GfxIndex index)
 {
     _writeTimestamp(
         &m_commandBuffer->m_renderer->m_api, m_commandBuffer->m_commandBuffer, queryPool, index);
@@ -6647,14 +6645,13 @@ void ResourceCommandEncoder::copyTexture(
         &region);
 }
 
-// TODO: Change size_t to Count?
 void ResourceCommandEncoder::uploadTextureData(
     ITextureResource* dst,
     SubresourceRange subResourceRange,
     ITextureResource::Offset3D offset,
     ITextureResource::Size extend,
     ITextureResource::SubresourceData* subResourceData,
-    size_t subResourceDataCount)
+    GfxCount subResourceDataCount)
 {
     // VALIDATION: dst must be in TransferDst state.
 
@@ -6667,7 +6664,7 @@ void ResourceCommandEncoder::uploadTextureData(
     // Calculate how large the buffer has to be
     Size bufferSize = 0;
     // Calculate how large an array entry is
-    for (uint32_t j = subResourceRange.mipLevel;
+    for (GfxIndex j = subResourceRange.mipLevel;
          j < subResourceRange.mipLevel + subResourceRange.mipLevelCount;
          ++j)
     {
@@ -6700,9 +6697,9 @@ void ResourceCommandEncoder::uploadTextureData(
         dstDataStart = dstData;
 
         Offset dstSubresourceOffset = 0;
-        for (uint32_t i = 0; i < subResourceRange.layerCount; ++i)
+        for (GfxIndex i = 0; i < subResourceRange.layerCount; ++i)
         {
-            for (Index j = 0; j < mipSizes.getCount(); ++j)
+            for (GfxIndex j = 0; j < (GfxCount)mipSizes.getCount(); ++j)
             {
                 const auto& mipSize = mipSizes[j];
 
@@ -6743,9 +6740,9 @@ void ResourceCommandEncoder::uploadTextureData(
     }
     {
         Offset srcOffset = uploadBufferOffset;
-        for (uint32_t i = 0; i < subResourceRange.layerCount; ++i)
+        for (GfxIndex i = 0; i < subResourceRange.layerCount; ++i)
         {
-            for (Index j = 0; j < mipSizes.getCount(); ++j)
+            for (GfxIndex j = 0; j < (GfxCount)mipSizes.getCount(); ++j)
             {
                 const auto& mipSize = mipSizes[j];
 
@@ -7010,9 +7007,9 @@ void ResourceCommandEncoder::resolveResource(
     auto srcImageLayout = VulkanUtil::getImageLayoutFromState(sourceState);
     auto dstImageLayout = VulkanUtil::getImageLayoutFromState(destState);
 
-    for (uint32_t layer = 0; layer < sourceRange.layerCount; ++layer)
+    for (GfxIndex layer = 0; layer < sourceRange.layerCount; ++layer)
     {
-        for (uint32_t mip = 0; mip < sourceRange.mipLevelCount; ++mip)
+        for (GfxIndex mip = 0; mip < sourceRange.mipLevelCount; ++mip)
         {
             VkImageResolve region = {};
             region.srcSubresource.aspectMask = getAspectMask(sourceRange.aspectMask);
@@ -7042,7 +7039,7 @@ void ResourceCommandEncoder::resolveResource(
 }
 
 void ResourceCommandEncoder::resolveQuery(
-    IQueryPool* queryPool, uint32_t index, uint32_t count, IBufferResource* buffer, uint64_t offset)
+    IQueryPool* queryPool, GfxIndex index, GfxCount count, IBufferResource* buffer, Offset offset)
 {
     auto& vkApi = m_commandBuffer->m_renderer->m_api;
     auto poolImpl = static_cast<QueryPoolImpl*>(queryPool);
@@ -7204,13 +7201,13 @@ Result RenderCommandEncoder::bindPipelineWithRootObject(
     return setPipelineStateWithRootObjectImpl(pipelineState, rootObject);
 }
 
-void RenderCommandEncoder::setViewports(uint32_t count, const Viewport* viewports)
+void RenderCommandEncoder::setViewports(GfxCount count, const Viewport* viewports)
 {
     static const int kMaxViewports = 8; // TODO: base on device caps
     assert(count <= kMaxViewports);
 
     m_viewports.setCount(count);
-    for (UInt ii = 0; ii < count; ++ii)
+    for (GfxIndex ii = 0; ii < count; ++ii)
     {
         auto& inViewport = viewports[ii];
         auto& vkViewport = m_viewports[ii];
@@ -7227,13 +7224,13 @@ void RenderCommandEncoder::setViewports(uint32_t count, const Viewport* viewport
     api.vkCmdSetViewport(m_vkCommandBuffer, 0, uint32_t(count), m_viewports.getBuffer());
 }
 
-void RenderCommandEncoder::setScissorRects(uint32_t count, const ScissorRect* rects)
+void RenderCommandEncoder::setScissorRects(GfxCount count, const ScissorRect* rects)
 {
     static const int kMaxScissorRects = 8; // TODO: base on device caps
     assert(count <= kMaxScissorRects);
 
     m_scissorRects.setCount(count);
-    for (UInt ii = 0; ii < count; ++ii)
+    for (GfxIndex ii = 0; ii < count; ++ii)
     {
         auto& inRect = rects[ii];
         auto& vkRect = m_scissorRects[ii];
@@ -7273,14 +7270,14 @@ void RenderCommandEncoder::setPrimitiveTopology(PrimitiveTopology topology)
 }
 
 void RenderCommandEncoder::setVertexBuffers(
-    uint32_t startSlot,
-    uint32_t slotCount,
+    GfxIndex startSlot,
+    GfxCount slotCount,
     IBufferResource* const* buffers,
-    const uint32_t* offsets)
+    const Offset* offsets)
 {
-    for (Index i = 0; i < Index(slotCount); i++)
+    for (GfxIndex i = 0; i < GfxIndex(slotCount); i++)
     {
-        Index slotIndex = startSlot + i;
+        GfxIndex slotIndex = startSlot + i;
         BufferResourceImpl* buffer = static_cast<BufferResourceImpl*>(buffers[i]);
         if (buffer)
         {
@@ -7294,7 +7291,7 @@ void RenderCommandEncoder::setVertexBuffers(
 }
 
 void RenderCommandEncoder::setIndexBuffer(
-    IBufferResource* buffer, Format indexFormat, uint32_t offset)
+    IBufferResource* buffer, Format indexFormat, Offset offset)
 {
     VkIndexType indexType = VK_INDEX_TYPE_UINT16;
     switch (indexFormat)
@@ -7326,7 +7323,7 @@ void RenderCommandEncoder::prepareDraw()
     bindRenderState(VK_PIPELINE_BIND_POINT_GRAPHICS);
 }
 
-void RenderCommandEncoder::draw(uint32_t vertexCount, uint32_t startVertex)
+void RenderCommandEncoder::draw(GfxCount vertexCount, GfxIndex startVertex)
 {
     prepareDraw();
     auto& api = *m_api;
@@ -7334,7 +7331,7 @@ void RenderCommandEncoder::draw(uint32_t vertexCount, uint32_t startVertex)
 }
 
 void RenderCommandEncoder::drawIndexed(
-    uint32_t indexCount, uint32_t startIndex, uint32_t baseVertex)
+    GfxCount indexCount, GfxIndex startIndex, GfxIndex baseVertex)
 {
     prepareDraw();
     auto& api = *m_api;
@@ -7348,11 +7345,11 @@ void RenderCommandEncoder::setStencilReference(uint32_t referenceValue)
 }
 
 void RenderCommandEncoder::drawIndirect(
-    uint32_t maxDrawCount,
+    GfxCount maxDrawCount,
     IBufferResource* argBuffer,
-    uint64_t argOffset,
+    Offset argOffset,
     IBufferResource* countBuffer,
-    uint64_t countOffset)
+    Offset countOffset)
 {
     // Vulkan does not support sourcing the count from a buffer.
     assert(!countBuffer);
@@ -7369,11 +7366,11 @@ void RenderCommandEncoder::drawIndirect(
 }
 
 void RenderCommandEncoder::drawIndexedIndirect(
-    uint32_t maxDrawCount,
+    GfxCount maxDrawCount,
     IBufferResource* argBuffer,
-    uint64_t argOffset,
+    Offset argOffset,
     IBufferResource* countBuffer,
-    uint64_t countOffset)
+    Offset countOffset)
 {
     // Vulkan does not support sourcing the count from a buffer.
     assert(!countBuffer);
@@ -7390,7 +7387,7 @@ void RenderCommandEncoder::drawIndexedIndirect(
 }
 
 Result RenderCommandEncoder::setSamplePositions(
-    uint32_t samplesPerPixel, uint32_t pixelCount, const SamplePosition* samplePositions)
+    GfxCount samplesPerPixel, GfxCount pixelCount, const SamplePosition* samplePositions)
 {
     if (m_api->vkCmdSetSampleLocationsEXT)
     {
@@ -7405,10 +7402,10 @@ Result RenderCommandEncoder::setSamplePositions(
 }
 
 void RenderCommandEncoder::drawInstanced(
-    uint32_t vertexCount,
-    uint32_t instanceCount,
-    uint32_t startVertex,
-    uint32_t startInstanceLocation)
+    GfxCount vertexCount,
+    GfxCount instanceCount,
+    GfxIndex startVertex,
+    GfxIndex startInstanceLocation)
 {
     prepareDraw();
     auto& api = *m_api;
@@ -7417,11 +7414,11 @@ void RenderCommandEncoder::drawInstanced(
 }
 
 void RenderCommandEncoder::drawIndexedInstanced(
-    uint32_t indexCount,
-    uint32_t instanceCount,
-    uint32_t startIndexLocation,
-    int32_t baseVertexLocation,
-    uint32_t startInstanceLocation)
+    GfxCount indexCount,
+    GfxCount instanceCount,
+    GfxIndex startIndexLocation,
+    GfxIndex baseVertexLocation,
+    GfxIndex startInstanceLocation)
 {
     prepareDraw();
     auto& api = *m_api;
@@ -7462,7 +7459,7 @@ void ComputeCommandEncoder::dispatchCompute(int x, int y, int z)
     m_api->vkCmdDispatch(m_vkCommandBuffer, x, y, z);
 }
 
-void ComputeCommandEncoder::dispatchComputeIndirect(IBufferResource* argBuffer, uint64_t offset)
+void ComputeCommandEncoder::dispatchComputeIndirect(IBufferResource* argBuffer, Offset offset)
 {
     SLANG_UNIMPLEMENTED_X("dispatchComputeIndirect");
 }
@@ -7671,11 +7668,11 @@ Result RayTracingCommandEncoder::bindPipelineWithRootObject(
 }
 
 void RayTracingCommandEncoder::dispatchRays(
-    uint32_t raygenShaderIndex,
+    GfxIndex raygenShaderIndex,
     IShaderTable* shaderTable,
-    int32_t width,
-    int32_t height,
-    int32_t depth)
+    GfxCount width,
+    GfxCount height,
+    GfxCount depth)
 {
     auto vkApi = m_commandBuffer->m_renderer->m_api;
     auto vkCommandBuffer = m_commandBuffer->m_commandBuffer;
@@ -7769,9 +7766,9 @@ Result CommandQueueImpl::getNativeHandle(InteropHandle* outHandle)
 const CommandQueueImpl::Desc& CommandQueueImpl::getDesc() { return m_desc; }
 
 Result CommandQueueImpl::waitForFenceValuesOnDevice(
-    uint32_t fenceCount, IFence** fences, uint64_t* waitValues)
+    GfxCount fenceCount, IFence** fences, uint64_t* waitValues)
 {
-    for (uint32_t i = 0; i < fenceCount; ++i)
+    for (GfxIndex i = 0; i < fenceCount; ++i)
     {
         FenceWaitInfo waitInfo;
         waitInfo.fence = static_cast<FenceImpl*>(fences[i]);
@@ -7857,7 +7854,7 @@ void CommandQueueImpl::queueSubmitImpl(
 }
 
 void CommandQueueImpl::executeCommandBuffers(
-    uint32_t count, ICommandBuffer* const* commandBuffers, IFence* fence, uint64_t valueToSignal)
+    GfxCount count, ICommandBuffer* const* commandBuffers, IFence* fence, uint64_t valueToSignal)
 {
     if (count == 0 && fence == nullptr)
         return;
@@ -7898,7 +7895,7 @@ QueryPoolImpl::~QueryPoolImpl()
     m_device->m_api.vkDestroyQueryPool(m_device->m_api.m_device, m_pool, nullptr);
 }
 
-Result QueryPoolImpl::getResult(SlangInt index, SlangInt count, uint64_t* data)
+Result QueryPoolImpl::getResult(GfxIndex index, GfxCount count, uint64_t* data)
 {
     if (!m_pool)
     {
@@ -8056,7 +8053,7 @@ Result SwapchainImpl::createSwapchainAndImages()
             m_api->m_device, m_swapChain, &numSwapChainImages, vkImages.getBuffer());
     }
 
-    for (uint32_t i = 0; i < m_desc.imageCount; i++)
+    for (GfxIndex i = 0; i < m_desc.imageCount; i++)
     {
         ITextureResource::Desc imageDesc = {};
         imageDesc.allowedStates = ResourceStateSet(
@@ -8185,7 +8182,7 @@ Result SwapchainImpl::init(DeviceImpl* renderer, const ISwapchain::Desc& desc, W
     return SLANG_OK;
 }
 
-Result SwapchainImpl::getImage(uint32_t index, ITextureResource** outResource)
+Result SwapchainImpl::getImage(GfxIndex index, ITextureResource** outResource)
 {
     if (m_images.getCount() <= (Index)index)
         return SLANG_FAIL;
@@ -8193,7 +8190,7 @@ Result SwapchainImpl::getImage(uint32_t index, ITextureResource** outResource)
     return SLANG_OK;
 }
 
-Result SwapchainImpl::resize(uint32_t width, uint32_t height)
+Result SwapchainImpl::resize(GfxCount width, GfxCount height)
 {
     SLANG_UNUSED(width);
     SLANG_UNUSED(height);

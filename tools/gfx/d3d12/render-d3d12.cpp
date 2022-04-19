@@ -205,7 +205,7 @@ uint32_t getViewDescriptorCount(const ITransientResourceHeap::Desc& desc)
             desc.uavDescriptorCount,
             desc.accelerationStructureDescriptorCount),
         desc.constantBufferDescriptorCount,
-        2048u);
+        2048);
 }
 
 void initSrvDesc(
@@ -879,7 +879,7 @@ Result DeviceImpl::initialize(const Desc& desc)
     SLANG_RETURN_ON_FAIL(RendererBase::initialize(desc));
 
     // Find extended desc.
-    for (uint32_t i = 0; i < desc.extendedDescCount; i++)
+    for (GfxIndex i = 0; i < desc.extendedDescCount; i++)
     {
         StructType stype;
         memcpy(&stype, desc.extendedDescs[i], sizeof(stype));
@@ -1315,7 +1315,7 @@ Result DeviceImpl::createTransientResourceHeap(
         desc.flags,
         desc.constantBufferSize,
         getViewDescriptorCount(desc),
-        Math::Max(1024u, desc.samplerDescriptorCount),
+        Math::Max(1024, desc.samplerDescriptorCount),
         heap.writeRef()));
     returnComPtr(outHeap, heap);
     return SLANG_OK;
@@ -1962,7 +1962,7 @@ Result DeviceImpl::createBufferView(
             uint64_t viewSize = 0;
             if (desc.bufferElementSize)
             {
-                uavDesc.Buffer.StructureByteStride = desc.bufferElementSize;
+                uavDesc.Buffer.StructureByteStride = (UINT)desc.bufferElementSize;
                 uavDesc.Buffer.NumElements =
                     desc.bufferRange.elementCount == 0
                         ? UINT(resourceDesc.sizeInBytes / desc.bufferElementSize)
@@ -2023,7 +2023,7 @@ Result DeviceImpl::createBufferView(
             uint64_t viewSize = 0;
             if (desc.bufferElementSize)
             {
-                srvDesc.Buffer.StructureByteStride = desc.bufferElementSize;
+                srvDesc.Buffer.StructureByteStride = (UINT)desc.bufferElementSize;
                 srvDesc.Buffer.NumElements =
                     desc.bufferRange.elementCount == 0
                         ? UINT(resourceDesc.sizeInBytes / desc.bufferElementSize)
@@ -2079,7 +2079,7 @@ Result DeviceImpl::createFramebuffer(IFramebuffer::Desc const& desc, IFramebuffe
     framebuffer->renderTargetViews.setCount(desc.renderTargetCount);
     framebuffer->renderTargetDescriptors.setCount(desc.renderTargetCount);
     framebuffer->renderTargetClearValues.setCount(desc.renderTargetCount);
-    for (uint32_t i = 0; i < desc.renderTargetCount; i++)
+    for (GfxIndex i = 0; i < desc.renderTargetCount; i++)
     {
         framebuffer->renderTargetViews[i] =
             static_cast<ResourceViewImpl*>(desc.renderTargetViews[i]);
@@ -2123,7 +2123,7 @@ Result DeviceImpl::createFramebufferLayout(
 {
     RefPtr<FramebufferLayoutImpl> layout = new FramebufferLayoutImpl();
     layout->m_renderTargets.setCount(desc.renderTargetCount);
-    for (uint32_t i = 0; i < desc.renderTargetCount; i++)
+    for (GfxIndex i = 0; i < desc.renderTargetCount; i++)
     {
         layout->m_renderTargets[i] = desc.renderTargets[i];
     }
@@ -2198,9 +2198,9 @@ Result DeviceImpl::createInputLayout(IInputLayout::Desc const& desc, IInputLayou
 
     auto& vertexStreamStrides = layout->m_vertexStreamStrides;
     vertexStreamStrides.setCount(vertexStreamCount);
-    for (Int i = 0; i < vertexStreamCount; ++i)
+    for (GfxIndex i = 0; i < vertexStreamCount; ++i)
     {
-        vertexStreamStrides[i] = vertexStreams[i].stride;
+        vertexStreamStrides[i] = (UINT)vertexStreams[i].stride;
     }
 
     returnComPtr(outLayout, layout);
@@ -2418,10 +2418,10 @@ Result DeviceImpl::createFence(const IFence::Desc& desc, IFence** outFence)
 }
 
 Result DeviceImpl::waitForFences(
-    uint32_t fenceCount, IFence** fences, uint64_t* fenceValues, bool waitForAll, uint64_t timeout)
+    GfxCount fenceCount, IFence** fences, uint64_t* fenceValues, bool waitForAll, uint64_t timeout)
 {
     ShortList<HANDLE> waitHandles;
-    for (uint32_t i = 0; i < fenceCount; ++i)
+    for (GfxCount i = 0; i < fenceCount; ++i)
     {
         auto fenceImpl = static_cast<FenceImpl*>(fences[i]);
         waitHandles.add(fenceImpl->getWaitEvent());
@@ -2864,7 +2864,7 @@ Result TransientResourceHeapImpl::queryInterface(SlangUUID const& uuid, void** o
 
 Result TransientResourceHeapImpl::allocateTransientDescriptorTable(
     DescriptorType type,
-    uint32_t count,
+    GfxCount count,
     uint64_t& outDescriptorOffset,
     void** outD3DDescriptorHeapHandle)
 {
@@ -3173,7 +3173,7 @@ Result QueryPoolImpl::init(const IQueryPool::Desc& desc, DeviceImpl* device)
     return SLANG_OK;
 }
 
-Result QueryPoolImpl::getResult(SlangInt queryIndex, SlangInt count, uint64_t* data)
+Result QueryPoolImpl::getResult(GfxIndex queryIndex, GfxCount count, uint64_t* data)
 {
     m_commandList->Reset(m_commandAllocator, nullptr);
     m_commandList->ResolveQueryData(
@@ -3201,7 +3201,7 @@ Result QueryPoolImpl::getResult(SlangInt queryIndex, SlangInt count, uint64_t* d
     return SLANG_OK;
 }
 
-void QueryPoolImpl::writeTimestamp(ID3D12GraphicsCommandList* cmdList, SlangInt index)
+void QueryPoolImpl::writeTimestamp(ID3D12GraphicsCommandList* cmdList, GfxIndex index)
 {
     cmdList->EndQuery(m_queryHeap, D3D12_QUERY_TYPE_TIMESTAMP, (UINT)index);
 }
@@ -3249,7 +3249,7 @@ Result PlainBufferProxyQueryPoolImpl::reset()
     return SLANG_OK;
 }
 
-Result PlainBufferProxyQueryPoolImpl::getResult(SlangInt queryIndex, SlangInt count, uint64_t* data)
+Result PlainBufferProxyQueryPoolImpl::getResult(GfxIndex queryIndex, GfxCount count, uint64_t* data)
 {
     if (m_resultDirty)
     {
@@ -3443,11 +3443,11 @@ void RayTracingCommandEncoderImpl::bindPipeline(
 }
 
 void RayTracingCommandEncoderImpl::dispatchRays(
-    uint32_t rayGenShaderIndex,
+    GfxIndex rayGenShaderIndex,
     IShaderTable* shaderTable,
-    int32_t width,
-    int32_t height,
-    int32_t depth)
+    GfxCount width,
+    GfxCount height,
+    GfxCount depth)
 {
     RefPtr<PipelineStateBase> newPipeline;
     PipelineStateBase* pipeline = m_currentPipeline.Ptr();
@@ -3632,8 +3632,8 @@ Result RayTracingPipelineStateImpl::ensureAPIPipelineStateCreated()
     D3D12_RAYTRACING_SHADER_CONFIG shaderConfig = {};
     // According to DXR spec, fixed function triangle intersections must use float2 as ray
     // attributes that defines the barycentric coordinates at intersection.
-    shaderConfig.MaxAttributeSizeInBytes = desc.rayTracing.maxAttributeSizeInBytes;
-    shaderConfig.MaxPayloadSizeInBytes = desc.rayTracing.maxRayPayloadSize;
+    shaderConfig.MaxAttributeSizeInBytes = (UINT)desc.rayTracing.maxAttributeSizeInBytes;
+    shaderConfig.MaxPayloadSizeInBytes = (UINT)desc.rayTracing.maxRayPayloadSize;
     D3D12_STATE_SUBOBJECT shaderConfigSubObject = {};
     shaderConfigSubObject.Type = D3D12_STATE_SUBOBJECT_TYPE_RAYTRACING_SHADER_CONFIG;
     shaderConfigSubObject.pDesc = &shaderConfig;
@@ -3676,9 +3676,9 @@ Result RayTracingPipelineStateImpl::ensureAPIPipelineStateCreated()
 
 #endif
 
-UInt ShaderObjectImpl::getEntryPointCount() { return 0; }
+GfxCount ShaderObjectImpl::getEntryPointCount() { return 0; }
 
-Result ShaderObjectImpl::getEntryPoint(UInt index, IShaderObject** outEntryPoint)
+Result ShaderObjectImpl::getEntryPoint(GfxIndex index, IShaderObject** outEntryPoint)
 {
     *outEntryPoint = nullptr;
     return SLANG_OK;
@@ -3686,8 +3686,7 @@ Result ShaderObjectImpl::getEntryPoint(UInt index, IShaderObject** outEntryPoint
 
 const void* ShaderObjectImpl::getRawData() { return m_data.getBuffer(); }
 
-// TODO: Change to Count?
-size_t ShaderObjectImpl::getSize() { return (size_t)m_data.getCount(); }
+Size ShaderObjectImpl::getSize() { return (Size)m_data.getCount(); }
 
 // TODO: Change Index to Offset/Size?
 Result ShaderObjectImpl::setData(ShaderOffset const& inOffset, void const* data, size_t inSize)
@@ -4098,8 +4097,8 @@ void ShaderObjectImpl::updateSubObjectsRecursive()
             if (m_subObjectVersions[objectIndex] != m_objects[objectIndex]->m_version)
             {
                 ShaderOffset offset;
-                offset.bindingRangeIndex = subObjectRange.bindingRangeIndex;
-                offset.bindingArrayIndex = subObjectIndexInRange;
+                offset.bindingRangeIndex = (GfxIndex)subObjectRange.bindingRangeIndex;
+                offset.bindingArrayIndex = (GfxIndex)subObjectIndexInRange;
                 setObject(offset, subObject);
             }
         }
@@ -4754,7 +4753,7 @@ Result PipelineStateImpl::ensureAPIPipelineStateCreated()
             blend.IndependentBlendEnable = FALSE;
             blend.AlphaToCoverageEnable = desc.graphics.blend.alphaToCoverageEnable ? TRUE : FALSE;
             blend.RenderTarget[0].RenderTargetWriteMask = (uint8_t)RenderTargetWriteMask::EnableAll;
-            for (uint32_t i = 0; i < desc.graphics.blend.targetCount; i++)
+            for (GfxIndex i = 0; i < desc.graphics.blend.targetCount; i++)
             {
                 auto& d3dDesc = blend.RenderTarget[i];
                 d3dDesc.BlendEnable = desc.graphics.blend.targets[i].enableBlend ? TRUE : FALSE;
@@ -4772,7 +4771,7 @@ Result PipelineStateImpl::ensureAPIPipelineStateCreated()
                 d3dDesc.SrcBlendAlpha =
                     D3DUtil::getBlendFactor(desc.graphics.blend.targets[i].alpha.srcFactor);
             }
-            for (uint32_t i = 1; i < desc.graphics.blend.targetCount; i++)
+            for (GfxIndex i = 1; i < desc.graphics.blend.targetCount; i++)
             {
                 if (memcmp(
                         &desc.graphics.blend.targets[i],
@@ -4906,7 +4905,7 @@ Result SwapchainImpl::init(
     renderer->m_device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(m_fence.writeRef()));
 
     SLANG_RETURN_ON_FAIL(m_swapChain->QueryInterface(m_swapChain3.writeRef()));
-    for (uint32_t i = 0; i < swapchainDesc.imageCount; i++)
+    for (GfxIndex i = 0; i < swapchainDesc.imageCount; i++)
     {
         m_frameEvents.add(CreateEventEx(
             nullptr,
@@ -4917,7 +4916,7 @@ Result SwapchainImpl::init(
     return SLANG_OK;
 }
 
-Result SwapchainImpl::resize(uint32_t width, uint32_t height)
+Result SwapchainImpl::resize(GfxCount width, GfxCount height)
 {
     for (auto evt : m_frameEvents)
         SetEvent(evt);
@@ -4929,7 +4928,7 @@ void SwapchainImpl::createSwapchainBufferImages()
 {
     m_images.clear();
 
-    for (uint32_t i = 0; i < m_desc.imageCount; i++)
+    for (GfxIndex i = 0; i < m_desc.imageCount; i++)
     {
         ComPtr<ID3D12Resource> d3dResource;
         m_swapChain->GetBuffer(i, IID_PPV_ARGS(d3dResource.writeRef()));
@@ -5007,10 +5006,10 @@ CommandQueueImpl::~CommandQueueImpl()
 }
 
 void CommandQueueImpl::executeCommandBuffers(
-    uint32_t count, ICommandBuffer* const* commandBuffers, IFence* fence, uint64_t valueToSignal)
+    GfxCount count, ICommandBuffer* const* commandBuffers, IFence* fence, uint64_t valueToSignal)
 {
     ShortList<ID3D12CommandList*> commandLists;
-    for (uint32_t i = 0; i < count; i++)
+    for (GfxCount i = 0; i < count; i++)
     {
         auto cmdImpl = static_cast<CommandBufferImpl*>(commandBuffers[i]);
         commandLists.add(cmdImpl->m_cmdList);
@@ -5021,7 +5020,7 @@ void CommandQueueImpl::executeCommandBuffers(
 
         m_fenceValue++;
 
-        for (uint32_t i = 0; i < count; i++)
+        for (GfxCount i = 0; i < count; i++)
         {
             if (i > 0 && commandBuffers[i] == commandBuffers[i - 1])
                 continue;
@@ -5051,9 +5050,9 @@ void CommandQueueImpl::waitOnHost()
 }
 
 Result CommandQueueImpl::waitForFenceValuesOnDevice(
-    uint32_t fenceCount, IFence** fences, uint64_t* waitValues)
+    GfxCount fenceCount, IFence** fences, uint64_t* waitValues)
 {
-    for (uint32_t i = 0; i < fenceCount; ++i)
+    for (GfxCount i = 0; i < fenceCount; ++i)
     {
         auto fenceImpl = static_cast<FenceImpl*>(fences[i]);
         m_d3dQueue->Wait(fenceImpl->m_fence.get(), waitValues[i]);
@@ -6117,9 +6116,9 @@ RootShaderObjectLayoutImpl* RootShaderObjectImpl::getLayout()
     return static_cast<RootShaderObjectLayoutImpl*>(m_layout.Ptr());
 }
 
-UInt RootShaderObjectImpl::getEntryPointCount() { return (UInt)m_entryPoints.getCount(); }
+GfxCount RootShaderObjectImpl::getEntryPointCount() { return (GfxCount)m_entryPoints.getCount(); }
 
-SlangResult RootShaderObjectImpl::getEntryPoint(UInt index, IShaderObject** outEntryPoint)
+SlangResult RootShaderObjectImpl::getEntryPoint(GfxIndex index, IShaderObject** outEntryPoint)
 {
     returnComPtr(outEntryPoint, m_entryPoints[index]);
     return SLANG_OK;
@@ -6527,13 +6526,12 @@ void ResourceCommandEncoderImpl::uploadBufferData(
         data);
 }
 
-// TODO: Change size_t to Count?
 void ResourceCommandEncoderImpl::textureBarrier(
-    size_t count, ITextureResource* const* textures, ResourceState src, ResourceState dst)
+    GfxCount count, ITextureResource* const* textures, ResourceState src, ResourceState dst)
 {
     ShortList<D3D12_RESOURCE_BARRIER> barriers;
 
-    for (size_t i = 0; i < count; i++)
+    for (GfxIndex i = 0; i < count; i++)
     {
         auto textureImpl = static_cast<TextureResourceImpl*>(textures[i]);
         auto d3dFormat = D3DUtil::getMapFormat(textureImpl->getDesc()->format);
@@ -6569,12 +6567,11 @@ void ResourceCommandEncoderImpl::textureBarrier(
     }
 }
 
-// TODO: Change size_t to Count?
 void ResourceCommandEncoderImpl::bufferBarrier(
-    size_t count, IBufferResource* const* buffers, ResourceState src, ResourceState dst)
+    GfxCount count, IBufferResource* const* buffers, ResourceState src, ResourceState dst)
 {
     ShortList<D3D12_RESOURCE_BARRIER, 16> barriers;
-    for (size_t i = 0; i < count; i++)
+    for (GfxIndex i = 0; i < count; i++)
     {
         auto bufferImpl = static_cast<BufferResourceImpl*>(buffers[i]);
 
@@ -6607,7 +6604,7 @@ void ResourceCommandEncoderImpl::bufferBarrier(
     }
 }
 
-void ResourceCommandEncoderImpl::writeTimestamp(IQueryPool* pool, SlangInt index)
+void ResourceCommandEncoderImpl::writeTimestamp(IQueryPool* pool, GfxIndex index)
 {
     static_cast<QueryPoolImpl*>(pool)->writeTimestamp(m_commandBuffer->m_cmdList, index);
 }
@@ -6643,9 +6640,9 @@ void ResourceCommandEncoderImpl::copyTexture(
         auto aspect = Math::getLowestBit((int32_t)aspectMask);
         aspectMask &= ~aspect;
         auto planeIndex = D3DUtil::getPlaneSlice(d3dFormat, (TextureAspect)aspect);
-        for (uint32_t layer = 0; layer < dstSubresource.layerCount; layer++)
+        for (GfxIndex layer = 0; layer < dstSubresource.layerCount; layer++)
         {
-            for (uint32_t mipLevel = 0; mipLevel < dstSubresource.mipLevelCount; mipLevel++)
+            for (GfxIndex mipLevel = 0; mipLevel < dstSubresource.mipLevelCount; mipLevel++)
             {
                 D3D12_TEXTURE_COPY_LOCATION dstRegion = {};
 
@@ -6683,14 +6680,13 @@ void ResourceCommandEncoderImpl::copyTexture(
     }
 }
 
-// TODO: Change size_t to Count?
 void ResourceCommandEncoderImpl::uploadTextureData(
     ITextureResource* dst,
     SubresourceRange subResourceRange,
     ITextureResource::Offset3D offset,
     ITextureResource::Size extent,
     ITextureResource::SubresourceData* subResourceData,
-    size_t subResourceDataCount)
+    GfxCount subResourceDataCount)
 {
     auto dstTexture = static_cast<TextureResourceImpl*>(dst);
     auto baseSubresourceIndex = D3DUtil::getSubresourceIndex(
@@ -6702,7 +6698,7 @@ void ResourceCommandEncoderImpl::uploadTextureData(
     auto textureSize = dstTexture->getDesc()->size;
     FormatInfo formatInfo = {};
     gfxGetFormatInfo(dstTexture->getDesc()->format, &formatInfo);
-    for (uint32_t i = 0; i < (uint32_t)subResourceDataCount; i++)
+    for (GfxCount i = 0; i < subResourceDataCount; i++)
     {
         auto subresourceIndex = baseSubresourceIndex + i;
         // Get the footprint
@@ -6883,9 +6879,9 @@ void ResourceCommandEncoderImpl::resolveResource(
     auto dstTexture = static_cast<TextureResourceImpl*>(dest);
     auto dstDesc = dstTexture->getDesc();
 
-    for (uint32_t layer = 0; layer < sourceRange.layerCount; ++layer)
+    for (GfxIndex layer = 0; layer < sourceRange.layerCount; ++layer)
     {
-        for (uint32_t mip = 0; mip < sourceRange.mipLevelCount; ++mip)
+        for (GfxIndex mip = 0; mip < sourceRange.mipLevelCount; ++mip)
         {
             auto srcSubresourceIndex = D3DUtil::getSubresourceIndex(
                 mip + sourceRange.mipLevel,
@@ -6913,7 +6909,7 @@ void ResourceCommandEncoderImpl::resolveResource(
 }
 
 void ResourceCommandEncoderImpl::resolveQuery(
-    IQueryPool* queryPool, uint32_t index, uint32_t count, IBufferResource* buffer, uint64_t offset)
+    IQueryPool* queryPool, GfxIndex index, GfxCount count, IBufferResource* buffer, Offset offset)
 {
     auto queryBase = static_cast<QueryPoolBase*>(queryPool);
     switch (queryBase->m_desc.type)
@@ -6935,7 +6931,7 @@ void ResourceCommandEncoderImpl::resolveQuery(
 
             m_commandBuffer->m_cmdList->CopyBufferRegion(
                 bufferImpl->m_resource.getResource(),
-                offset,
+                (uint64_t)offset,
                 srcQueryBuffer,
                 index * sizeof(uint64_t),
                 count * sizeof(uint64_t));
@@ -6992,7 +6988,7 @@ void ResourceCommandEncoderImpl::copyTextureToBuffer(
     if (srcSubresource.layerCount == 0)
         srcSubresource.layerCount = srcTexture->getDesc()->arraySize;
 
-    for (uint32_t layer = 0; layer < srcSubresource.layerCount; layer++)
+    for (GfxCount layer = 0; layer < srcSubresource.layerCount; layer++)
     {
         // Get the footprint
         D3D12_RESOURCE_DESC texDesc = srcTexture->m_resource.getResource()->GetDesc();
@@ -7092,9 +7088,9 @@ void ResourceCommandEncoderImpl::textureSubresourceBarrier(
             auto aspect = Math::getLowestBit((int32_t)aspectMask);
             aspectMask &= ~aspect;
             auto planeIndex = D3DUtil::getPlaneSlice(d3dFormat, (TextureAspect)aspect);
-            for (uint32_t layer = 0; layer < subresourceRange.layerCount; layer++)
+            for (GfxCount layer = 0; layer < subresourceRange.layerCount; layer++)
             {
-                for (uint32_t mip = 0; mip < subresourceRange.mipLevelCount; mip++)
+                for (GfxCount mip = 0; mip < subresourceRange.mipLevelCount; mip++)
                 {
                     barrier.Transition.Subresource = D3DUtil::getSubresourceIndex(
                         mip + subresourceRange.mipLevel,
@@ -7263,11 +7259,11 @@ Result RenderCommandEncoderImpl::bindPipelineWithRootObject(
     return bindPipelineWithRootObjectImpl(state, rootObject);
 }
 
-void RenderCommandEncoderImpl::setViewports(uint32_t count, const Viewport* viewports)
+void RenderCommandEncoderImpl::setViewports(GfxCount count, const Viewport* viewports)
 {
     static const int kMaxViewports = D3D12_VIEWPORT_AND_SCISSORRECT_OBJECT_COUNT_PER_PIPELINE;
     assert(count <= kMaxViewports && count <= kMaxRTVCount);
-    for (UInt ii = 0; ii < count; ++ii)
+    for (GfxIndex ii = 0; ii < count; ++ii)
     {
         auto& inViewport = viewports[ii];
         auto& dxViewport = m_viewports[ii];
@@ -7282,12 +7278,12 @@ void RenderCommandEncoderImpl::setViewports(uint32_t count, const Viewport* view
     m_d3dCmdList->RSSetViewports(UINT(count), m_viewports);
 }
 
-void RenderCommandEncoderImpl::setScissorRects(uint32_t count, const ScissorRect* rects)
+void RenderCommandEncoderImpl::setScissorRects(GfxCount count, const ScissorRect* rects)
 {
     static const int kMaxScissorRects = D3D12_VIEWPORT_AND_SCISSORRECT_OBJECT_COUNT_PER_PIPELINE;
     assert(count <= kMaxScissorRects && count <= kMaxRTVCount);
 
-    for (UInt ii = 0; ii < count; ++ii)
+    for (GfxIndex ii = 0; ii < count; ++ii)
     {
         auto& inRect = rects[ii];
         auto& dxRect = m_scissorRects[ii];
@@ -7308,10 +7304,10 @@ void RenderCommandEncoderImpl::setPrimitiveTopology(PrimitiveTopology topology)
 }
 
 void RenderCommandEncoderImpl::setVertexBuffers(
-    uint32_t startSlot,
-    uint32_t slotCount,
+    GfxIndex startSlot,
+    GfxCount slotCount,
     IBufferResource* const* buffers,
-    const uint32_t* offsets)
+    const Offset* offsets)
 {
     {
         const Index num = startSlot + slotCount;
@@ -7321,7 +7317,7 @@ void RenderCommandEncoderImpl::setVertexBuffers(
         }
     }
 
-    for (UInt i = 0; i < slotCount; i++)
+    for (GfxIndex i = 0; i < slotCount; i++)
     {
         BufferResourceImpl* buffer = static_cast<BufferResourceImpl*>(buffers[i]);
 
@@ -7332,11 +7328,11 @@ void RenderCommandEncoderImpl::setVertexBuffers(
 }
 
 void RenderCommandEncoderImpl::setIndexBuffer(
-    IBufferResource* buffer, Format indexFormat, uint32_t offset)
+    IBufferResource* buffer, Format indexFormat, Offset offset)
 {
     m_boundIndexBuffer = (BufferResourceImpl*)buffer;
     m_boundIndexFormat = D3DUtil::getMapFormat(indexFormat);
-    m_boundIndexOffset = offset;
+    m_boundIndexOffset = (UINT)offset;
 }
 
 void RenderCommandEncoderImpl::prepareDraw()
@@ -7400,17 +7396,17 @@ void RenderCommandEncoderImpl::prepareDraw()
     }
 }
 
-void RenderCommandEncoderImpl::draw(uint32_t vertexCount, uint32_t startVertex)
+void RenderCommandEncoderImpl::draw(GfxCount vertexCount, GfxIndex startVertex)
 {
     prepareDraw();
-    m_d3dCmdList->DrawInstanced(vertexCount, 1, startVertex, 0);
+    m_d3dCmdList->DrawInstanced((uint32_t)vertexCount, 1, (uint32_t)startVertex, 0);
 }
 
 void RenderCommandEncoderImpl::drawIndexed(
-    uint32_t indexCount, uint32_t startIndex, uint32_t baseVertex)
+    GfxCount indexCount, GfxIndex startIndex, GfxIndex baseVertex)
 {
     prepareDraw();
-    m_d3dCmdList->DrawIndexedInstanced(indexCount, 1, startIndex, baseVertex, 0);
+    m_d3dCmdList->DrawIndexedInstanced((uint32_t)indexCount, 1, (uint32_t)startIndex, (uint32_t)baseVertex, 0);
 }
 
 void RenderCommandEncoderImpl::endEncoding()
@@ -7462,11 +7458,11 @@ void RenderCommandEncoderImpl::setStencilReference(uint32_t referenceValue)
 }
 
 void RenderCommandEncoderImpl::drawIndirect(
-    uint32_t maxDrawCount,
+    GfxCount maxDrawCount,
     IBufferResource* argBuffer,
-    uint64_t argOffset,
+    Offset argOffset,
     IBufferResource* countBuffer,
-    uint64_t countOffset)
+    Offset countOffset)
 {
     prepareDraw();
 
@@ -7475,19 +7471,19 @@ void RenderCommandEncoderImpl::drawIndirect(
 
     m_d3dCmdList->ExecuteIndirect(
         m_renderer->drawIndirectCmdSignature,
-        maxDrawCount,
+        (uint32_t)maxDrawCount,
         argBufferImpl->m_resource,
-        argOffset,
+        (uint64_t)argOffset,
         countBufferImpl ? countBufferImpl->m_resource.getResource() : nullptr,
-        countOffset);
+        (uint64_t)countOffset);
 }
 
 void RenderCommandEncoderImpl::drawIndexedIndirect(
-    uint32_t maxDrawCount,
+    GfxCount maxDrawCount,
     IBufferResource* argBuffer,
-    uint64_t argOffset,
+    Offset argOffset,
     IBufferResource* countBuffer,
-    uint64_t countOffset)
+    Offset countOffset)
 {
     prepareDraw();
 
@@ -7496,45 +7492,53 @@ void RenderCommandEncoderImpl::drawIndexedIndirect(
 
     m_d3dCmdList->ExecuteIndirect(
         m_renderer->drawIndexedIndirectCmdSignature,
-        maxDrawCount,
+        (uint32_t)maxDrawCount,
         argBufferImpl->m_resource,
-        argOffset,
+        (uint64_t)argOffset,
         countBufferImpl ? countBufferImpl->m_resource.getResource() : nullptr,
-        countOffset);
+        (uint64_t)countOffset);
 }
 
 Result RenderCommandEncoderImpl::setSamplePositions(
-    uint32_t samplesPerPixel, uint32_t pixelCount, const SamplePosition* samplePositions)
+    GfxCount samplesPerPixel, GfxCount pixelCount, const SamplePosition* samplePositions)
 {
     if (m_commandBuffer->m_cmdList1)
     {
         m_commandBuffer->m_cmdList1->SetSamplePositions(
-            samplesPerPixel, pixelCount, (D3D12_SAMPLE_POSITION*)samplePositions);
+            (uint32_t)samplesPerPixel, (uint32_t)pixelCount, (D3D12_SAMPLE_POSITION*)samplePositions);
         return SLANG_OK;
     }
     return SLANG_E_NOT_AVAILABLE;
 }
 
 void RenderCommandEncoderImpl::drawInstanced(
-    uint32_t vertexCount,
-    uint32_t instanceCount,
-    uint32_t startVertex,
-    uint32_t startInstanceLocation)
+    GfxCount vertexCount,
+    GfxCount instanceCount,
+    GfxIndex startVertex,
+    GfxIndex startInstanceLocation)
 {
     prepareDraw();
-    m_d3dCmdList->DrawInstanced(vertexCount, instanceCount, startVertex, startInstanceLocation);
+    m_d3dCmdList->DrawInstanced(
+        (uint32_t)vertexCount,
+        (uint32_t)instanceCount,
+        (uint32_t)startVertex,
+        (uint32_t)startInstanceLocation);
 }
 
 void RenderCommandEncoderImpl::drawIndexedInstanced(
-    uint32_t indexCount,
-    uint32_t instanceCount,
-    uint32_t startIndexLocation,
-    int32_t baseVertexLocation,
-    uint32_t startInstanceLocation)
+    GfxCount indexCount,
+    GfxCount instanceCount,
+    GfxIndex startIndexLocation,
+    GfxIndex baseVertexLocation,
+    GfxIndex startInstanceLocation)
 {
     prepareDraw();
     m_d3dCmdList->DrawIndexedInstanced(
-        indexCount, instanceCount, startIndexLocation, baseVertexLocation, startInstanceLocation);
+        (uint32_t)indexCount,
+        (uint32_t)instanceCount,
+        (uint32_t)startIndexLocation,
+        baseVertexLocation,
+        (uint32_t)startInstanceLocation);
 }
 
 void ComputeCommandEncoderImpl::endEncoding() { PipelineCommandEncoder::endEncodingImpl(); }
@@ -7573,7 +7577,7 @@ void ComputeCommandEncoderImpl::dispatchCompute(int x, int y, int z)
     m_d3dCmdList->Dispatch(x, y, z);
 }
 
-void ComputeCommandEncoderImpl::dispatchComputeIndirect(IBufferResource* argBuffer, uint64_t offset)
+void ComputeCommandEncoderImpl::dispatchComputeIndirect(IBufferResource* argBuffer, Offset offset)
 {
     // Submit binding for compute
     {
@@ -7587,7 +7591,7 @@ void ComputeCommandEncoderImpl::dispatchComputeIndirect(IBufferResource* argBuff
     auto argBufferImpl = static_cast<BufferResourceImpl*>(argBuffer);
 
     m_d3dCmdList->ExecuteIndirect(
-        m_renderer->dispatchIndirectCmdSignature, 1, argBufferImpl->m_resource, offset, nullptr, 0);
+        m_renderer->dispatchIndirectCmdSignature, 1, argBufferImpl->m_resource, (uint64_t)offset, nullptr, 0);
 }
 
 FenceImpl::~FenceImpl()

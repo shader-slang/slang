@@ -35,7 +35,7 @@ static bool _checkFormat()
 #define GFX_FORMAT_CHECK(name, blockSizeInBytes, pixelsPerblock) count += Index(Index(Format::name) == value++);
     GFX_FORMAT(GFX_FORMAT_CHECK)
 
-    const bool r = (count == Index(Format::CountOf));
+    const bool r = (count == Index(Format::_Count));
     SLANG_ASSERT(r);
     return r;
 }
@@ -168,14 +168,14 @@ struct FormatInfoMap
 
     const FormatInfo& get(Format format) const { return m_infos[Index(format)]; }
 
-    FormatInfo m_infos[Index(Format::CountOf)];
+    FormatInfo m_infos[Index(Format::_Count)];
 };
 
 static const FormatInfoMap s_formatInfoMap;
 
 static void _compileTimeAsserts()
 {
-    SLANG_COMPILE_TIME_ASSERT(SLANG_COUNT_OF(s_formatSizeInfo) == int(Format::CountOf));
+    SLANG_COMPILE_TIME_ASSERT(SLANG_COUNT_OF(s_formatSizeInfo) == int(Format::_Count));
 }
 
 extern "C"
