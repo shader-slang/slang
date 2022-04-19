@@ -7504,20 +7504,20 @@ void RayTracingCommandEncoder::_memoryBarrier(
 }
 
 void RayTracingCommandEncoder::_queryAccelerationStructureProperties(
-    int accelerationStructureCount,
+    GfxCount accelerationStructureCount,
     IAccelerationStructure* const* accelerationStructures,
-    int queryCount,
+    GfxCount queryCount,
     AccelerationStructureQueryDesc* queryDescs)
 {
     ShortList<VkAccelerationStructureKHR> vkHandles;
     vkHandles.setCount(accelerationStructureCount);
-    for (int i = 0; i < accelerationStructureCount; i++)
+    for (GfxIndex i = 0; i < accelerationStructureCount; i++)
     {
         vkHandles[i] =
             static_cast<AccelerationStructureImpl*>(accelerationStructures[i])->m_vkHandle;
     }
     auto vkHandlesView = vkHandles.getArrayView();
-    for (int i = 0; i < queryCount; i++)
+    for (GfxIndex i = 0; i < queryCount; i++)
     {
         VkQueryType queryType;
         switch (queryDescs[i].queryType)
@@ -7623,9 +7623,9 @@ void RayTracingCommandEncoder::copyAccelerationStructure(
 }
 
 void RayTracingCommandEncoder::queryAccelerationStructureProperties(
-    int accelerationStructureCount,
+    GfxCount accelerationStructureCount,
     IAccelerationStructure* const* accelerationStructures,
-    int queryCount,
+    GfxCount queryCount,
     AccelerationStructureQueryDesc* queryDescs)
 {
     _queryAccelerationStructureProperties(

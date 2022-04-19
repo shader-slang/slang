@@ -1775,7 +1775,7 @@ public:
         IAccelerationStructure* src,
         AccelerationStructureCopyMode mode) = 0;
     virtual SLANG_NO_THROW void SLANG_MCALL queryAccelerationStructureProperties(
-        int accelerationStructureCount,
+        GfxCount accelerationStructureCount,
         IAccelerationStructure* const* accelerationStructures,
         GfxCount queryCount,
         AccelerationStructureQueryDesc* queryDescs) = 0;

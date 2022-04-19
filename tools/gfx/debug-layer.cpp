@@ -1113,7 +1113,7 @@ void DebugComputeCommandEncoder::dispatchCompute(int x, int y, int z)
 }
 
 void DebugComputeCommandEncoder::dispatchComputeIndirect(
-    IBufferResource* cmdBuffer, uint64_t offset)
+    IBufferResource* cmdBuffer, Offset offset)
 {
     SLANG_GFX_API_FUNC;
     baseObject->dispatchComputeIndirect(getInnerObj(cmdBuffer), offset);
@@ -1175,7 +1175,7 @@ void DebugRenderCommandEncoder::setVertexBuffers(
     SLANG_GFX_API_FUNC;
 
     List<IBufferResource*> innerBuffers;
-    for (UInt i = 0; i < slotCount; i++)
+    for (GfxIndex i = 0; i < slotCount; i++)
     {
         innerBuffers.add(static_cast<DebugBufferResource*>(buffers[i])->baseObject.get());
     }
@@ -1278,10 +1278,10 @@ void DebugResourceCommandEncoderImpl::writeTimestamp(IQueryPool* pool, GfxIndex 
 
 void DebugResourceCommandEncoderImpl::copyBuffer(
     IBufferResource* dst,
-    size_t dstOffset,
+    Offset dstOffset,
     IBufferResource* src,
-    size_t srcOffset,
-    size_t size)
+    Offset srcOffset,
+    Size size)
 {
     SLANG_GFX_API_FUNC;
     auto dstImpl = static_cast<DebugBufferResource*>(dst);
@@ -1292,8 +1292,8 @@ void DebugResourceCommandEncoderImpl::copyBuffer(
 
 void DebugResourceCommandEncoderImpl::uploadBufferData(
     IBufferResource* dst,
-    size_t offset,
-    size_t size,
+    Offset offset,
+    Size size,
     void* data)
 {
     SLANG_GFX_API_FUNC;
@@ -1487,14 +1487,14 @@ void DebugRayTracingCommandEncoder::copyAccelerationStructure(
 }
 
 void DebugRayTracingCommandEncoder::queryAccelerationStructureProperties(
-    int accelerationStructureCount,
+    GfxCount accelerationStructureCount,
     IAccelerationStructure* const* accelerationStructures,
-    int queryCount,
+    GfxCount queryCount,
     AccelerationStructureQueryDesc* queryDescs)
 {
     SLANG_GFX_API_FUNC;
     List<IAccelerationStructure*> innerAS;
-    for (int i = 0; i < accelerationStructureCount; i++)
+    for (GfxIndex i = 0; i < accelerationStructureCount; i++)
     {
         innerAS.add(getInnerObj(accelerationStructures[i]));
     }

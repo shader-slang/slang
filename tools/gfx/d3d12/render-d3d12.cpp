@@ -2451,9 +2451,9 @@ Result DeviceImpl::getAccelerationStructurePrebuildInfo(
     D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO prebuildInfo;
     m_device5->GetRaytracingAccelerationStructurePrebuildInfo(&inputsBuilder.desc, &prebuildInfo);
 
-    outPrebuildInfo->resultDataMaxSize = prebuildInfo.ResultDataMaxSizeInBytes;
-    outPrebuildInfo->scratchDataSize = prebuildInfo.ScratchDataSizeInBytes;
-    outPrebuildInfo->updateScratchDataSize = prebuildInfo.UpdateScratchDataSizeInBytes;
+    outPrebuildInfo->resultDataMaxSize = (Size)prebuildInfo.ResultDataMaxSizeInBytes;
+    outPrebuildInfo->scratchDataSize = (Size)prebuildInfo.ScratchDataSizeInBytes;
+    outPrebuildInfo->updateScratchDataSize = (Size)prebuildInfo.UpdateScratchDataSizeInBytes;
     return SLANG_OK;
 }
 
@@ -3401,15 +3401,15 @@ void RayTracingCommandEncoderImpl::copyAccelerationStructure(
 }
 
 void RayTracingCommandEncoderImpl::queryAccelerationStructureProperties(
-    int accelerationStructureCount,
+    GfxCount accelerationStructureCount,
     IAccelerationStructure* const* accelerationStructures,
-    int queryCount,
+    GfxCount queryCount,
     AccelerationStructureQueryDesc* queryDescs)
 {
     List<D3D12_RAYTRACING_ACCELERATION_STRUCTURE_POSTBUILD_INFO_DESC> postBuildInfoDescs;
     List<DeviceAddress> asAddresses;
     asAddresses.setCount(accelerationStructureCount);
-    for (int i = 0; i < accelerationStructureCount; i++)
+    for (GfxIndex i = 0; i < accelerationStructureCount; i++)
         asAddresses[i] = accelerationStructures[i]->getDeviceAddress();
     translatePostBuildInfoDescs(queryCount, queryDescs, postBuildInfoDescs);
     m_commandBuffer->m_cmdList4->EmitRaytracingAccelerationStructurePostbuildInfo(

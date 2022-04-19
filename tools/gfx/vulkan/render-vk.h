@@ -1595,9 +1595,9 @@ public:
         AccessFlag destAccess);
 
     void _queryAccelerationStructureProperties(
-        int accelerationStructureCount,
+        GfxCount accelerationStructureCount,
         IAccelerationStructure* const* accelerationStructures,
-        int queryCount,
+        GfxCount queryCount,
         AccelerationStructureQueryDesc* queryDescs);
 
     virtual SLANG_NO_THROW void SLANG_MCALL buildAccelerationStructure(
@@ -1611,9 +1611,9 @@ public:
         AccelerationStructureCopyMode mode) override;
 
     virtual SLANG_NO_THROW void SLANG_MCALL queryAccelerationStructureProperties(
-        int accelerationStructureCount,
+        GfxCount accelerationStructureCount,
         IAccelerationStructure* const* accelerationStructures,
-        int queryCount,
+        GfxCount queryCount,
         AccelerationStructureQueryDesc* queryDescs) override;
 
     virtual SLANG_NO_THROW void SLANG_MCALL

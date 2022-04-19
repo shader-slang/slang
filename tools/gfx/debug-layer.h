@@ -445,7 +445,7 @@ public:
         bindPipelineWithRootObject(IPipelineState* state, IShaderObject* rootObject) override;
     virtual SLANG_NO_THROW void SLANG_MCALL dispatchCompute(int x, int y, int z) override;
     virtual SLANG_NO_THROW void SLANG_MCALL
-        dispatchComputeIndirect(IBufferResource* cmdBuffer, uint64_t offset) override;
+        dispatchComputeIndirect(IBufferResource* cmdBuffer, Offset offset) override;
 
 public:
     DebugCommandBuffer* commandBuffer;
@@ -563,9 +563,9 @@ public:
         IAccelerationStructure* src,
         AccelerationStructureCopyMode mode) override;
     virtual SLANG_NO_THROW void SLANG_MCALL queryAccelerationStructureProperties(
-        int accelerationStructureCount,
+        GfxCount accelerationStructureCount,
         IAccelerationStructure* const* accelerationStructures,
-        int queryCount,
+        GfxCount queryCount,
         AccelerationStructureQueryDesc* queryDescs) override;
     virtual SLANG_NO_THROW void SLANG_MCALL
         serializeAccelerationStructure(DeviceAddress dest, IAccelerationStructure* source) override;

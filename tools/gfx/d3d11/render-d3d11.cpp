@@ -3320,7 +3320,7 @@ void D3D11Device::setVertexBuffers(
 
 	auto buffers = (BufferResourceImpl*const*)buffersIn;
 
-    for (UInt ii = 0; ii < slotCount; ++ii)
+    for (GfxIndex ii = 0; ii < slotCount; ++ii)
     {
         auto inputLayout = (InputLayoutImpl*)m_currentPipelineState->inputLayout.Ptr();
         vertexStrides[ii] = inputLayout->m_vertexStreamStrides[startSlot + ii];
@@ -3343,7 +3343,7 @@ void D3D11Device::setViewports(GfxCount count, Viewport const* viewports)
     assert(count <= kMaxViewports);
 
     D3D11_VIEWPORT dxViewports[kMaxViewports];
-    for(UInt ii = 0; ii < count; ++ii)
+    for(GfxIndex ii = 0; ii < count; ++ii)
     {
         auto& inViewport = viewports[ii];
         auto& dxViewport = dxViewports[ii];
@@ -3365,7 +3365,7 @@ void D3D11Device::setScissorRects(GfxCount count, ScissorRect const* rects)
     assert(count <= kMaxScissorRects);
 
     D3D11_RECT dxRects[kMaxScissorRects];
-    for(UInt ii = 0; ii < count; ++ii)
+    for(GfxIndex ii = 0; ii < count; ++ii)
     {
         auto& inRect = rects[ii];
         auto& dxRect = dxRects[ii];
@@ -3903,7 +3903,7 @@ Result D3D11Device::createGraphicsPipelineState(const GraphicsPipelineStateDesc&
         static const UInt kMaxTargets = D3D11_SIMULTANEOUS_RENDER_TARGET_COUNT;
         if(srcDesc.targetCount > kMaxTargets) return SLANG_FAIL;
 
-        for(UInt ii = 0; ii < kMaxTargets; ++ii)
+        for(GfxIndex ii = 0; ii < kMaxTargets; ++ii)
         {
             TargetBlendDesc const* srcTargetBlendDescPtr = nullptr;
             if(ii < srcDesc.targetCount)
@@ -3983,10 +3983,10 @@ Result D3D11Device::createComputePipelineState(const ComputePipelineStateDesc& i
 
 void D3D11Device::copyBuffer(
     IBufferResource* dst,
-    size_t dstOffset,
+    Offset dstOffset,
     IBufferResource* src,
-    size_t srcOffset,
-    size_t size)
+    Offset srcOffset,
+    Size size)
 {
     auto dstImpl = static_cast<BufferResourceImpl*>(dst);
     auto srcImpl = static_cast<BufferResourceImpl*>(src);

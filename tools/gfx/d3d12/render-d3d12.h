@@ -1615,9 +1615,9 @@ public:
         IAccelerationStructure* src,
         AccelerationStructureCopyMode mode) override;
     virtual SLANG_NO_THROW void SLANG_MCALL queryAccelerationStructureProperties(
-        int accelerationStructureCount,
+        GfxCount accelerationStructureCount,
         IAccelerationStructure* const* accelerationStructures,
-        int queryCount,
+        GfxCount queryCount,
         AccelerationStructureQueryDesc* queryDescs) override;
     virtual SLANG_NO_THROW void SLANG_MCALL
         serializeAccelerationStructure(DeviceAddress dest, IAccelerationStructure* source) override;
