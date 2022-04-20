@@ -1,4 +1,4 @@
-// unit-test-byte-encode.cpp
+// unit-test-find-type-by-name.cpp
 
 #include "../../slang.h"
 
