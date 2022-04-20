@@ -487,6 +487,7 @@ SlangResult SerialWriter::write(Stream* stream)
 
             const size_t nextAlignment = SerialInfo::getAlignment(next->info);
             const size_t alignment = SerialInfo::getAlignment(entry->info);
+            SLANG_UNUSED(alignment);
 
             entry->info = SerialInfo::combineWithNext(entry->info, next->info);
 
@@ -559,6 +560,7 @@ SlangResult SerialWriter::writeIntoContainer(FourCC fourCc, RiffContainer* conta
 
                 const size_t nextAlignment = SerialInfo::getAlignment(next->info);
                 const size_t alignment = SerialInfo::getAlignment(entry->info);
+                SLANG_UNUSED(alignment);
 
                 entry->info = SerialInfo::combineWithNext(entry->info, next->info);
 
