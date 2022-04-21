@@ -104,14 +104,19 @@ ISlangUnknown* Artifact::findElement(const Guid& guid)
     return nullptr;
 }
 
-void* Artifact::findElementClass(const Guid& classGuid)
+void Artifact::removeElementAt(Index i)
+{
+    m_elements.removeAt(i);
+}
+
+void* Artifact::findElementObject(const Guid& classGuid)
 {
     ComPtr<IArtifactInstance> instance;
     for (ISlangUnknown* element : m_elements)
     {
         if (SLANG_SUCCEEDED(element->queryInterface(IArtifactInstance::getTypeGuid(), (void**)instance.writeRef())) && instance)
         {
-            void* classInstance = instance->getClassInstance(classGuid);
+            void* classInstance = instance->queryObject(classGuid);
             if (classInstance)
             {
                 return classInstance;

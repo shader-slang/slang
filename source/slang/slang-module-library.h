@@ -20,7 +20,7 @@ public:
 
     // IArtifactInstance
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL writeToBlob(ISlangBlob** blob) SLANG_OVERRIDE { SLANG_UNUSED(blob); return SLANG_E_NOT_IMPLEMENTED; }
-    virtual SLANG_NO_THROW void* SLANG_MCALL getClassInstance(const Guid& classGuid) SLANG_OVERRIDE { return classGuid == getTypeGuid() ? this : nullptr; }
+    virtual SLANG_NO_THROW void* SLANG_MCALL queryObject(const Guid& classGuid) SLANG_OVERRIDE { return classGuid == getTypeGuid() ? this : nullptr; }
 
     List<FrontEndCompileRequest::ExtraEntryPointInfo> m_entryPoints;
     List<RefPtr<IRModule>> m_modules;

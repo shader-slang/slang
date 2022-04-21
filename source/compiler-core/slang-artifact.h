@@ -23,7 +23,7 @@ enum class ArtifactKind : uint8_t
 
     Executable,                 ///< Self contained such it can exectuted. On GPU this would be a kernel.
     SharedLibrary,              ///< Shared library/dll 
-    Callable,                   ///< Callable directly (typically means there isn't a binary artifact)
+    Callable,                   ///< Callable directly (can mean there isn't a binary artifact)
 
     Text,                       ///< Text
 
@@ -179,7 +179,9 @@ enum ArtifactPathType
 };
 
 /*
-We have some scenarios
+There are several scenarios around the kind of things an Artifact is and what it might contain.
+
+An artifact could be
 
 * Is using a backing zip
 * Contains an 'instance' that can represent the whole artifact 
@@ -199,7 +201,7 @@ For a zip, we could add a ISlangFileSystem. This would allow for traversing of t
 For callable, we could add a ISlangSharedLibrary interface.
 For diagnostics we could add IDiagnostics interface (not defined yet).
 
-For a Artifact that contains diagnostics and other things, we can create as a collection, with unknown contents. Then 
+For an Artifact that contains diagnostics and other things, we can create as a collection, with unknown contents. Then 
 the contents can be examined via querying the contents.
 */
 
@@ -214,9 +216,13 @@ class IArtifactInstance : public ISlangUnknown
         /// Returns SLANG_E_NOT_IMPLEMENTED if an implementation doesn't implement
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL writeToBlob(ISlangBlob** blob) = 0;
 
-        /// Given a guid returns the backing class. Returns nullptr if backing type isn't a match.
-        /// NOTE! Dangerous to do across ABI boundary
-    virtual SLANG_NO_THROW void* SLANG_MCALL getClassInstance(const Guid& classGuid) = 0;
+        /// Queries for the backing object type. The type is represented by a guid. 
+        /// If the object doesn't derive from the type guid the function returns nullptr. 
+        /// Unlike the analagous queryInterface method the ref count remains unchanged. 
+        /// NOTE! 
+        /// Whilst this method *could) be used across an ABI boundary (whereas using something like dynamic_cast would not),
+        /// it is generally dangerous to do so.
+    virtual SLANG_NO_THROW void* SLANG_MCALL queryObject(const Guid& classGuid) = 0;
 };
 
 /* The Artifact type is a type designed to represent some Artifact of compilation. It could be input to or output from a compilation.
@@ -229,10 +235,10 @@ An abstraction is desirable here, because depending on the compiler the artifact
 * Some other (perhaps multiple) in memory representations 
 * A name 
 
-The artifact uses the Blob as the standard representation of in memory data. 
+The artifact uses the Blob as the canonical in memory representation. 
 
 Some downstream compilers require the artifact to be available as a file system file, or to produce
-artifacts that are files. The Artifact type allows to abstract away this difference, including the
+artifacts that are files. The IArtifact type allows to abstract away this difference, including the
 ability to turn an in memory representation into a temporary file on the system file. 
 
 The mechanism also allows for 'Containers' which allow for Artifacts to contain other Artifacts (amongst other things).
@@ -246,7 +252,6 @@ files could be a Container containing artifacts for
 
 A more long term goal would be to
 
-* Make Artifact an interface (such that it can work long term over binary boundaries)
 * Make Diagnostics into an interface (such it can be added to a Artifact result)
 * Use Artifact and related types for downstream compiler
 */
@@ -287,11 +292,11 @@ public:
         /// artifact name needs to be correct.
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL requireFileLike(Keep keep) = 0;
     
-        /// Finds an instance of that has the guid.
+        /// Finds an instance of that has the the interface guid
     virtual SLANG_NO_THROW ISlangUnknown* SLANG_MCALL findElement(const Guid& guid) = 0;
 
-        /// The guid is the class guid type
-    virtual SLANG_NO_THROW void* SLANG_MCALL findElementClass(const Guid& classGuid) = 0;
+        /// Find an element that derives from IArtifactInstance, and which queryObject works with the classGuid
+    virtual SLANG_NO_THROW void* SLANG_MCALL findElementObject(const Guid& classGuid) = 0;
 
         /// Add items
     virtual SLANG_NO_THROW void SLANG_MCALL setPath(PathType pathType, const char* filePath) = 0;
@@ -313,6 +318,9 @@ public:
         /// Get the item at the index
     virtual SLANG_NO_THROW ISlangUnknown* SLANG_MCALL getElementAt(Index i) = 0;
 
+        /// Remove the element at the specified index. 
+    virtual SLANG_NO_THROW void SLANG_MCALL removeElementAt(Index i) = 0;
+
         /// Get the amount of elements
     virtual SLANG_NO_THROW Index SLANG_MCALL getElementCount() = 0;
 };
@@ -330,7 +338,7 @@ public:
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL requireFile(Keep keep) SLANG_OVERRIDE;
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL requireFileLike(Keep keep) SLANG_OVERRIDE;
     virtual SLANG_NO_THROW ISlangUnknown* SLANG_MCALL findElement(const Guid& guid) SLANG_OVERRIDE;
-    virtual SLANG_NO_THROW void* SLANG_MCALL findElementClass(const Guid& classGuid) SLANG_OVERRIDE;
+    virtual SLANG_NO_THROW void* SLANG_MCALL findElementObject(const Guid& classGuid) SLANG_OVERRIDE;
     virtual SLANG_NO_THROW void SLANG_MCALL setPath(PathType pathType, const char* path) SLANG_OVERRIDE { _setPath(pathType, path); }
     virtual SLANG_NO_THROW void SLANG_MCALL setBlob(ISlangBlob* blob) SLANG_OVERRIDE { m_blob = blob; }
     virtual SLANG_NO_THROW PathType SLANG_MCALL getPathType() SLANG_OVERRIDE { return m_pathType; }
@@ -338,6 +346,7 @@ public:
     virtual SLANG_NO_THROW const char* SLANG_MCALL getName() SLANG_OVERRIDE { return m_name.getBuffer(); }
     virtual SLANG_NO_THROW void SLANG_MCALL addElement(ISlangUnknown* intf) SLANG_OVERRIDE { SLANG_ASSERT(intf); m_elements.add(ComPtr<ISlangUnknown>(intf)); }
     virtual SLANG_NO_THROW ISlangUnknown* SLANG_MCALL getElementAt(Index i) SLANG_OVERRIDE { return m_elements[i]; }
+    virtual SLANG_NO_THROW void SLANG_MCALL removeElementAt(Index i) SLANG_OVERRIDE;
     virtual SLANG_NO_THROW Index SLANG_MCALL getElementCount() SLANG_OVERRIDE { return m_elements.getCount(); }
 
     /// Ctor
