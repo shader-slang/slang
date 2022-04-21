@@ -85,12 +85,11 @@ struct FuncBufferLoadSpecializationCondition : FunctionCallSpecializeCondition
 };
 
 void specializeFuncsForBufferLoadArgs(
-    BackEndCompileRequest*  compileRequest,
-    TargetRequest*          targetRequest,
+    CodeGenContext*         codegenContext,
     IRModule*               module)
 {
     FuncBufferLoadSpecializationCondition condition;
-    specializeFunctionCalls(compileRequest, targetRequest, module, &condition);
+    specializeFunctionCalls(codegenContext, module, &condition);
 }
 
 }

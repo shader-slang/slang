@@ -362,7 +362,7 @@ static String _scrubName(const String& in)
         RequestState* dst = base[requestState];
 
         dst->compileFlags = request->getFrontEndReq()->compileFlags;
-        dst->shouldDumpIntermediates = request->getBackEndReq()->shouldDumpIntermediates;
+        dst->shouldDumpIntermediates = request->shouldDumpIntermediates;
 
         dst->debugInfoLevel = linkage->debugInfoLevel;
         dst->optimizationLevel = linkage->optimizationLevel;
@@ -370,7 +370,7 @@ static String _scrubName(const String& in)
         dst->passThroughMode = request->m_passThrough;
 
 
-        dst->useUnknownImageFormatAsDefault = request->getBackEndReq()->useUnknownImageFormatAsDefault;
+        dst->useUnknownImageFormatAsDefault = request->useUnknownImageFormatAsDefault;
         dst->obfuscateCode = linkage->m_obfuscateCode;
 
         dst->defaultMatrixLayoutMode = linkage->defaultMatrixLayoutMode;
@@ -909,7 +909,7 @@ struct LoadContext
         externalRequest->setOutputContainerFormat(SlangContainerFormat(requestState->containerFormat));
         externalRequest->setPassThrough(SlangPassThrough(request->m_passThrough));
 
-        request->getBackEndReq()->useUnknownImageFormatAsDefault = requestState->useUnknownImageFormatAsDefault;
+        request->useUnknownImageFormatAsDefault = requestState->useUnknownImageFormatAsDefault;
         linkage->m_obfuscateCode = requestState->obfuscateCode;
 
         linkage->setMatrixLayoutMode(requestState->defaultMatrixLayoutMode);

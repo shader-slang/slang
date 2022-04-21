@@ -210,6 +210,11 @@ namespace Slang
 
         DiagnosticSink* m_sink      = nullptr;
 
+            /// (optional) modules that comes from previously processed translation units in the
+            /// front-end request that are made visible to the module being checked. This allows
+            /// `import` to use them instead of trying to find the files in file system.
+        LoadedModuleDictionary* m_environmentModules = nullptr;
+
         DiagnosticSink* getSink()
         {
             return m_sink;
@@ -227,10 +232,12 @@ namespace Slang
         SharedSemanticsContext(
             Linkage*        linkage,
             Module*         module,
-            DiagnosticSink* sink)
+            DiagnosticSink* sink,
+            LoadedModuleDictionary* environmentModules = nullptr)
             : m_linkage(linkage)
             , m_module(module)
             , m_sink(sink)
+            , m_environmentModules(environmentModules)
         {}
 
         Session* getSession()
@@ -1534,6 +1541,7 @@ namespace Slang
         {}
 
         Expr* visitBoolLiteralExpr(BoolLiteralExpr* expr);
+        Expr* visitNullPtrLiteralExpr(NullPtrLiteralExpr* expr);
         Expr* visitIntegerLiteralExpr(IntegerLiteralExpr* expr);
         Expr* visitFloatingPointLiteralExpr(FloatingPointLiteralExpr* expr);
         Expr* visitStringLiteralExpr(StringLiteralExpr* expr);

@@ -3,6 +3,7 @@
 
 namespace Slang
 {
+    struct CodeGenContext;
     class CompileRequestBase;
     class DiagnosticSink;
     struct IRModule;
@@ -32,4 +33,8 @@ namespace Slang
     void validateIRModuleIfEnabled(
         CompileRequestBase* compileRequest,
         IRModule*           module);
+
+    void validateIRModuleIfEnabled(
+        CodeGenContext* codeGenContext,
+        IRModule*       module);
 }

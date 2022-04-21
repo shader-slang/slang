@@ -134,8 +134,8 @@ public:
         const ISwapchain::Desc& desc, WindowHandle window, ISwapchain** outSwapchain) override;
 
     virtual SLANG_NO_THROW Result SLANG_MCALL getTextureAllocationInfo(
-        const ITextureResource::Desc& desc, size_t* outSize, size_t* outAlignment) override;
-    virtual SLANG_NO_THROW Result SLANG_MCALL getTextureRowAlignment(size_t* outAlignment) override;
+        const ITextureResource::Desc& desc, Size* outSize, Size* outAlignment) override;
+    virtual SLANG_NO_THROW Result SLANG_MCALL getTextureRowAlignment(Size* outAlignment) override;
     virtual SLANG_NO_THROW Result SLANG_MCALL createTextureResource(
         const ITextureResource::Desc& desc,
         const ITextureResource::SubresourceData* initData,
@@ -215,11 +215,11 @@ public:
         ITextureResource* resource,
         ResourceState state,
         ISlangBlob** outBlob,
-        size_t* outRowPitch,
-        size_t* outPixelSize) override;
+        Size* outRowPitch,
+        Size* outPixelSize) override;
 
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL readBufferResource(
-        IBufferResource* resource, size_t offset, size_t size, ISlangBlob** outBlob) override;
+        IBufferResource* resource, Offset offset, Size size, ISlangBlob** outBlob) override;
 
     virtual SLANG_NO_THROW const gfx::DeviceInfo& SLANG_MCALL getDeviceInfo() const override;
 
@@ -243,7 +243,7 @@ public:
 
     Result createTransientResourceHeapImpl(
         ITransientResourceHeap::Flags::Enum flags,
-        size_t constantBufferSize,
+        Size constantBufferSize,
         uint32_t viewDescriptors,
         uint32_t samplerDescriptors,
         TransientResourceHeapImpl** outHeap);
@@ -251,7 +251,7 @@ public:
     Result createBuffer(
         const D3D12_RESOURCE_DESC& resourceDesc,
         const void* srcData,
-        size_t srcDataSize,
+        Size srcDataSize,
         D3D12_RESOURCE_STATES finalState,
         D3D12Resource& resourceOut,
         bool isShared,
@@ -261,8 +261,8 @@ public:
         TextureResourceImpl* resource,
         ResourceState state,
         ISlangBlob** blob,
-        size_t* outRowPitch,
-        size_t* outPixelSize);
+        Size* outRowPitch,
+        Size* outPixelSize);
 
     Result _createDevice(
         DeviceCheckFlags deviceCheckFlags,
@@ -545,6 +545,8 @@ public:
 
     virtual SLANG_NO_THROW Result SLANG_MCALL
         createCommandBuffer(ICommandBuffer** outCommandBuffer) override;
+
+    Result synchronize();
 
     virtual SLANG_NO_THROW Result SLANG_MCALL synchronizeAndReset() override;
 
@@ -1187,10 +1189,11 @@ public:
 
     virtual SLANG_NO_THROW const void* SLANG_MCALL getRawData() override;
 
+    // TODO: Change size_t to Count?
     virtual SLANG_NO_THROW size_t SLANG_MCALL getSize() override;
 
     virtual SLANG_NO_THROW Result SLANG_MCALL
-        setData(ShaderOffset const& inOffset, void const* data, size_t inSize) override;
+        setData(ShaderOffset const& inOffset, void const* data, Size inSize) override;
     virtual SLANG_NO_THROW Result SLANG_MCALL
         setObject(ShaderOffset const& offset, IShaderObject* object) override;
 
@@ -1215,8 +1218,8 @@ protected:
     Result _writeOrdinaryData(
         PipelineCommandEncoder* encoder,
         BufferResourceImpl* buffer,
-        size_t offset,
-        size_t destSize,
+        Offset offset,
+        Size destSize,
         ShaderObjectLayoutImpl* specializedLayout);
 
     bool shouldAllocateConstantBuffer(TransientResourceHeapImpl* transientHeap);
@@ -1288,8 +1291,8 @@ public:
     ///
     /// Allocated from transient heap on demand with `_createOrdinaryDataBufferIfNeeded()`
     IBufferResource* m_constantBufferWeakPtr = nullptr;
-    size_t m_constantBufferOffset = 0;
-    size_t m_constantBufferSize = 0;
+    Offset m_constantBufferOffset = 0;
+    Size m_constantBufferSize = 0;
 
     /// Dirty bit tracking whether the constant buffer needs to be updated.
     bool m_isConstantBufferDirty = true;
@@ -1397,19 +1400,19 @@ class ResourceCommandEncoderImpl
 public:
     virtual SLANG_NO_THROW void SLANG_MCALL copyBuffer(
         IBufferResource* dst,
-        size_t dstOffset,
+        Offset dstOffset,
         IBufferResource* src,
-        size_t srcOffset,
-        size_t size) override;
+        Offset srcOffset,
+        Size size) override;
     virtual SLANG_NO_THROW void SLANG_MCALL
-        uploadBufferData(IBufferResource* dst, size_t offset, size_t size, void* data) override;
+        uploadBufferData(IBufferResource* dst, Offset offset, Size size, void* data) override;
     virtual SLANG_NO_THROW void SLANG_MCALL textureBarrier(
-        size_t count,
+        size_t count, // TODO: Change size_t to Count?
         ITextureResource* const* textures,
         ResourceState src,
         ResourceState dst) override;
     virtual SLANG_NO_THROW void SLANG_MCALL bufferBarrier(
-        size_t count,
+        size_t count, // TODO: Change size_t to Count?
         IBufferResource* const* buffers,
         ResourceState src,
         ResourceState dst) override;
@@ -1433,7 +1436,7 @@ public:
         ITextureResource::Offset3D offset,
         ITextureResource::Size extent,
         ITextureResource::SubresourceData* subResourceData,
-        size_t subResourceDataCount) override;
+        size_t subResourceDataCount) override; // TODO: Change size_t to Count?
 
     virtual SLANG_NO_THROW void SLANG_MCALL clearResourceView(
         IResourceView* view, ClearValue* clearValue, ClearResourceViewFlags::Enum flags) override;
@@ -1455,9 +1458,9 @@ public:
 
     virtual SLANG_NO_THROW void SLANG_MCALL copyTextureToBuffer(
         IBufferResource* dst,
-        size_t dstOffset,
-        size_t dstSize,
-        size_t dstRowStride,
+        Offset dstOffset,
+        Size dstSize,
+        Size dstRowStride,
         ITextureResource* src,
         ResourceState srcState,
         SubresourceRange srcSubresource,

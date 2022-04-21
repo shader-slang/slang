@@ -7,6 +7,8 @@
 #include "../core/slang-type-text-util.h"
 #include "../core/slang-type-convert-util.h"
 
+#include "slang-artifact.h"
+
 #include "slang-check.h"
 #include "slang-parameter-binding.h"
 #include "slang-lower-to-ir.h"
@@ -70,6 +72,7 @@ namespace Slang {
     { uint8_t(sizeof(uint16_t)), BaseTypeInfo::Flag::FloatingPoint , uint8_t(BaseType::Half) },
     { uint8_t(sizeof(float)),    BaseTypeInfo::Flag::FloatingPoint , uint8_t(BaseType::Float) },
     { uint8_t(sizeof(double)),   BaseTypeInfo::Flag::FloatingPoint , uint8_t(BaseType::Double) },
+    { uint8_t(sizeof(char)),     BaseTypeInfo::Flag::Signed | BaseTypeInfo::Flag::Integer , uint8_t(BaseType::Char) },
 };
 
 /* static */bool BaseTypeInfo::check()
@@ -957,7 +960,8 @@ SLANG_NO_THROW slang::IModule* SLANG_MCALL Linkage::loadModuleFromSource(
             PathInfo::makeFromString(moduleName),
             source,
             SourceLoc(),
-            &sink);
+            &sink,
+            nullptr);
         sink.getBlobIfNeeded(outDiagnostics);
         return asExternal(module);
 
@@ -1999,11 +2003,23 @@ RefPtr<ComponentType> createSpecializedGlobalAndEntryPointsComponentType(
 
 void FrontEndCompileRequest::checkAllTranslationUnits()
 {
+    LoadedModuleDictionary loadedModules;
+    if (additionalLoadedModules)
+        loadedModules = *additionalLoadedModules;
+
     // Iterate over all translation units and
     // apply the semantic checking logic.
     for( auto& translationUnit : translationUnits )
     {
-        checkTranslationUnit(translationUnit.Ptr());
+        checkTranslationUnit(translationUnit.Ptr(), loadedModules);
+
+        // Add the checked module to list of loadedModules so that they can be
+        // discovered by `findOrImportModule` when processing future `import` decls.
+        // TODO: this does not handle the case where a translation unit to discover
+        // another translation unit added later to the compilation request.
+        // We should output an error message when we detect such a case, or support
+        // this scenario with a recursive style checking.
+        loadedModules.Add(translationUnit->moduleName, translationUnit->getModule());
     }
     checkEntryPoints();
 }
@@ -2202,17 +2218,6 @@ SlangResult FrontEndCompileRequest::executeActionsInner()
     return SLANG_OK;
 }
 
-BackEndCompileRequest::BackEndCompileRequest(
-    Linkage*        linkage,
-    DiagnosticSink* sink,
-    ComponentType*  program)
-    : CompileRequestBase(linkage, sink)
-    , m_program(program)
-    , m_dumpIntermediatePrefix("slang-dump-")
-
-{
-}
-
 EndToEndCompileRequest::EndToEndCompileRequest(
     Session* session)
     : m_session(session)
@@ -2265,8 +2270,6 @@ void EndToEndCompileRequest::init()
     }
 
     m_frontEndReq = new FrontEndCompileRequest(getLinkage(), m_writers, getSink());
-
-    m_backEndReq = new BackEndCompileRequest(getLinkage(), getSink());
 }
 
 SlangResult EndToEndCompileRequest::executeActionsInner()
@@ -2382,8 +2385,7 @@ SlangResult EndToEndCompileRequest::executeActionsInner()
     }
 
     // Generate output code, in whatever format was requested
-    getBackEndReq()->setProgram(getSpecializedGlobalAndEntryPointsComponentType());
-    generateOutput(this);
+    generateOutput();
     if (getSink()->getErrorCount() != 0)
         return SLANG_FAIL;
 
@@ -2605,9 +2607,12 @@ RefPtr<Module> Linkage::loadModule(
     const PathInfo&     filePathInfo,
     ISlangBlob*         sourceBlob, 
     SourceLoc const&    srcLoc,
-    DiagnosticSink*     sink)
+    DiagnosticSink*     sink,
+    const LoadedModuleDictionary* additionalLoadedModules)
 {
     RefPtr<FrontEndCompileRequest> frontEndReq = new FrontEndCompileRequest(this, nullptr, sink);
+
+    frontEndReq->additionalLoadedModules = additionalLoadedModules;
 
     RefPtr<TranslationUnitRequest> translationUnit = new TranslationUnitRequest(frontEndReq);
     translationUnit->compileRequest = frontEndReq;
@@ -2674,7 +2679,8 @@ bool Linkage::isBeingImported(Module* module)
 RefPtr<Module> Linkage::findOrImportModule(
     Name*               name,
     SourceLoc const&    loc,
-    DiagnosticSink*     sink)
+    DiagnosticSink*     sink,
+    const LoadedModuleDictionary*  loadedModules)
 {
     // Have we already loaded a module matching this name?
     //
@@ -2700,6 +2706,16 @@ RefPtr<Module> Linkage::findOrImportModule(
         }
 
         return loadedModule;
+    }
+
+    // If the user is providing an additional list of loaded modules, we find
+    // if the module being imported is in that list. This allows a translation
+    // unit to use previously checked translation units in the same
+    // FrontEndCompileRequest.
+    Module* previouslyLoadedModule = nullptr;
+    if (loadedModules && loadedModules->TryGetValue(name, previouslyLoadedModule))
+    {
+        return previouslyLoadedModule;
     }
 
     // Derive a file name for the module, by taking the given
@@ -2757,7 +2773,8 @@ RefPtr<Module> Linkage::findOrImportModule(
         filePathInfo,
         fileContents,
         loc,
-        sink);
+        sink,
+        loadedModules);
 }
 
 //
@@ -4030,9 +4047,10 @@ RefPtr<Module> findOrImportModule(
     Linkage*            linkage,
     Name*               name,
     SourceLoc const&    loc,
-    DiagnosticSink*     sink)
+    DiagnosticSink*     sink,
+    const LoadedModuleDictionary* loadedModules)
 {
-    return linkage->findOrImportModule(name, loc, sink);
+    return linkage->findOrImportModule(name, loc, sink, loadedModules);
 }
 
 void Session::addBuiltinSource(
@@ -4129,7 +4147,7 @@ void EndToEndCompileRequest::setCompileFlags(SlangCompileFlags flags)
 
 void EndToEndCompileRequest::setDumpIntermediates(int enable)
 {
-    getBackEndReq()->shouldDumpIntermediates = (enable != 0);
+    shouldDumpIntermediates = (enable != 0);
 
     // Change all existing targets to use the new setting.
     auto linkage = getLinkage();
@@ -4141,7 +4159,7 @@ void EndToEndCompileRequest::setDumpIntermediates(int enable)
 
 void EndToEndCompileRequest::setDumpIntermediatePrefix(const char* prefix)
 {
-    getBackEndReq()->m_dumpIntermediatePrefix = prefix;
+    m_dumpIntermediatePrefix = prefix;
 }
 
 void EndToEndCompileRequest::setLineDirectiveMode(SlangLineDirectiveMode mode)
@@ -4309,52 +4327,28 @@ void EndToEndCompileRequest::setDefaultModuleName(const char* defaultModuleName)
     frontEndReq->m_defaultModuleName = namePool->getName(defaultModuleName);
 }
 
-SlangResult _addLibraryReference(EndToEndCompileRequest* req, Stream* stream)
+SlangResult _addLibraryReference(EndToEndCompileRequest* req, Artifact* artifact)
 {
-    // Load up the module
-    RiffContainer riffContainer;
-    SLANG_RETURN_ON_FAIL(RiffUtil::read(stream, riffContainer));
+    auto desc = artifact->getDesc();
 
-    auto linkage = req->getLinkage();
-
-    // TODO(JS): May be better to have a ITypeComponent that encapsulates a collection of modules
-    // For now just add to the linkage
-
+    if (desc.kind == ArtifactKind::Library && desc.payload == ArtifactPayload::SlangIR)
     {
-        SerialContainerData containerData;
+        RefPtr<ModuleLibrary> library;
 
-        SerialContainerUtil::ReadOptions options;
-        options.namePool = req->getNamePool();
-        options.session = req->getSession();
-        options.sharedASTBuilder = linkage->getASTBuilder()->getSharedASTBuilder();
-        options.sourceManager = linkage->getSourceManager();
-        options.linkage = req->getLinkage();
-        options.sink = req->getSink();
-
-        SLANG_RETURN_ON_FAIL(SerialContainerUtil::read(&riffContainer, options, containerData));
-
-        for (const auto& module : containerData.modules)
-        {
-            // If the irModule is set, add it
-            if (module.irModule)
-            {
-                linkage->m_libModules.add(module.irModule);
-            }
-        }
+        SLANG_RETURN_ON_FAIL(loadModuleLibrary(Artifact::Keep::Yes, artifact, req, library));
 
         FrontEndCompileRequest* frontEndRequest = req->getFrontEndReq();
-
-        for (const auto& entryPoint : containerData.entryPoints)
-        {
-            FrontEndCompileRequest::ExtraEntryPointInfo dst;
-            dst.mangledName = entryPoint.mangledName;
-            dst.name = entryPoint.name;
-            dst.profile = entryPoint.profile;
-
-            // Add entry point
-            frontEndRequest->m_extraEntryPoints.add(dst);
-        }
+        frontEndRequest->m_extraEntryPoints.addRange(library->m_entryPoints.getBuffer(), library->m_entryPoints.getCount());
     }
+    else
+    {
+        // TODO(JS): 
+        // Do we want to check the path exists?
+    }
+
+    // Add to the m_libModules
+    auto linkage = req->getLinkage();
+    linkage->m_libModules.add(artifact);
 
     return SLANG_OK;
 }
@@ -4362,8 +4356,15 @@ SlangResult _addLibraryReference(EndToEndCompileRequest* req, Stream* stream)
 SlangResult EndToEndCompileRequest::addLibraryReference(const void* libData, size_t libDataSize)
 {
     // We need to deserialize and add the modules
-    MemoryStreamBase fileStream(FileAccess::Read, libData, libDataSize);
-    return _addLibraryReference(this, &fileStream);
+    RefPtr<ModuleLibrary> library;
+    SLANG_RETURN_ON_FAIL(loadModuleLibrary((const Byte*)libData, libDataSize, this, library));
+
+    const auto desc = ArtifactDesc::make(ArtifactKind::Library, ArtifactPayload::SlangIR, ArtifactStyle::Unknown);
+    RefPtr<Artifact> artifact = new Artifact(desc);
+
+    artifact->add(Artifact::Entry::Style::Artifact, library);
+
+    return _addLibraryReference(this, artifact);
 }
 
 void EndToEndCompileRequest::addTranslationUnitPreprocessorDefine(int translationUnitIndex, const char* key, const char* value)

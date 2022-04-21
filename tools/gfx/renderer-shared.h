@@ -578,7 +578,7 @@ public:
     }
 
     void* getBuffer() { return m_data.getBuffer(); }
-    size_t getBufferSize() { return (size_t)m_data.getCount(); }
+    size_t getBufferSize() { return (size_t)m_data.getCount(); } // TODO: Change size_t to Count?
 
     virtual SLANG_NO_THROW Result SLANG_MCALL
         getObject(ShaderOffset const& offset, IShaderObject** outObject) SLANG_OVERRIDE
@@ -663,7 +663,7 @@ public:
             SLANG_RETURN_ON_FAIL(setData(
                 payloadOffset,
                 subObject->m_data.getBuffer(),
-                (size_t)subObject->m_data.getCount()));
+                (size_t)subObject->m_data.getCount())); // TODO: Change size_t to Count?
 
             setSpecializationArgsForContainerElement(specializationArgs);
             return SLANG_OK;
@@ -1223,7 +1223,7 @@ public:
     virtual SLANG_NO_THROW Result SLANG_MCALL createTextureFromSharedHandle(
         InteropHandle handle,
         const ITextureResource::Desc& srcDesc,
-        const size_t size,
+        const Size size,
         ITextureResource** outResource) SLANG_OVERRIDE;
 
     virtual SLANG_NO_THROW Result SLANG_MCALL createBufferFromNativeHandle(
@@ -1288,7 +1288,7 @@ public:
 
     // Provides a default implementation that returns SLANG_E_NOT_AVAILABLE.
     virtual SLANG_NO_THROW Result SLANG_MCALL getTextureAllocationInfo(
-        const ITextureResource::Desc& desc, size_t* outSize, size_t* outAlignment) override;
+        const ITextureResource::Desc& desc, Size* outSize, Size* outAlignment) override;
 
     // Provides a default implementation that returns SLANG_E_NOT_AVAILABLE.
     virtual SLANG_NO_THROW Result SLANG_MCALL getTextureRowAlignment(size_t* outAlignment) override;

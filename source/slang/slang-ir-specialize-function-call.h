@@ -3,11 +3,11 @@
 
 namespace Slang
 {
-    class BackEndCompileRequest;
-    class TargetRequest;
+    struct CodeGenContext;
     struct IRInst;
     struct IRModule;
     struct IRParam;
+    class Module;
 
     class FunctionCallSpecializeCondition
     {
@@ -28,8 +28,7 @@ namespace Slang
     /// global shader parameters directly).
     /// Returns true if any changes are made.
     bool specializeFunctionCalls(
-        BackEndCompileRequest* compileRequest,
-        TargetRequest* targetRequest,
+        CodeGenContext* codeGenContext,
         IRModule* module,
         FunctionCallSpecializeCondition* condition);
 }

@@ -3551,8 +3551,9 @@ namespace Slang
         {
             // User is specifying the class that should be construted
             auto classNameAndLoc = expectIdentifier(parser);
-
             syntaxClass = parser->astBuilder->findSyntaxClass(classNameAndLoc.name);
+
+            assert(syntaxClass.classInfo);
         }
         else
         {
@@ -4820,6 +4821,11 @@ namespace Slang
     static NodeBase* parseFalseExpr(Parser* parser, void* /*userData*/)
     {
         return parseBoolLitExpr(parser, false);
+    }
+
+    static NodeBase* parseNullPtrExpr(Parser* parser, void* /*userData*/)
+    {
+        return parser->astBuilder->create<NullPtrLiteralExpr>();
     }
 
     static bool _isFinite(double value)
@@ -6296,6 +6302,7 @@ namespace Slang
         _makeParseExpr("This",  parseThisTypeExpr),
         _makeParseExpr("true",  parseTrueExpr),
         _makeParseExpr("false", parseFalseExpr),
+        _makeParseExpr("nullptr", parseNullPtrExpr),
         _makeParseExpr("__TaggedUnion", parseTaggedUnionType),
     };
 
