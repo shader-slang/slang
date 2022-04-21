@@ -66,6 +66,8 @@ static ArtifactPayloadInfo::Lookup _makePayloadInfoLookup()
 
         {Payload::DebugInfo,        Flavor::Unknown,      0},
 
+        {Payload::Diagnostics,      Flavor::Unknown,      0},
+
         {Payload::Zip,              Flavor::Container,    0},
     };
 

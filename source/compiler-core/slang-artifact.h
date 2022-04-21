@@ -69,6 +69,8 @@ enum class ArtifactPayload : uint8_t
 
     DebugInfo,      ///< Debug information 
 
+    Diagnostics,    ///< Diagnostics
+
     Zip,            ///< It's a zip 
 
     CountOf,
