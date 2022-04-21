@@ -20,9 +20,9 @@ int doRecursive(int a)
 [numthreads(4, 1, 1)]
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
-	uint tid = dispatchThreadID.x;
+    uint tid = dispatchThreadID.x;
 
     let val = doRecursive(tid);
 
-	outputBuffer[tid] = val;
+    outputBuffer[tid] = val;
 } 
