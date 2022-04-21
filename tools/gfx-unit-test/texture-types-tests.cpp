@@ -10,50 +10,11 @@
 #include <d3d12.h>
 #endif
 
-#include <stdlib.h>
-#include <stdio.h>
-
-#define STB_IMAGE_WRITE_IMPLEMENTATION
-#include "external/stb/stb_image_write.h"
-
 using namespace Slang;
 using namespace gfx;
 
 namespace gfx_test
 {
-    Slang::Result writeImage(
-        const char* filename,
-        ISlangBlob* pixels,
-        uint32_t width,
-        uint32_t height,
-        size_t rowPitch = 0)
-    {
-        int stbResult = 0;
-        if (rowPitch == 0)
-        {
-            stbResult = stbi_write_hdr(filename, width, height, 4, (float*)pixels->getBufferPointer());
-        }
-        else
-        {
-            List<float> data;
-            for (Int y = 0; y < height; ++y)
-            {
-                for (Int x = 0; x < width; ++x)
-                {
-                    for (Int c = 0; c < 4; ++c)
-                    {
-                        auto rowPtr = (char*)pixels->getBufferPointer() + y * rowPitch;
-                        auto channelPtr = (float*)rowPtr + x * 4 + c;
-                        data.add(*channelPtr);
-                    }
-                }
-            }
-            stbResult = stbi_write_hdr(filename, width, height, 4, data.getBuffer());
-        }
-
-        return stbResult ? SLANG_OK : SLANG_FAIL;
-    }
-
     struct BaseTextureViewTest
     {
         IDevice* device;
@@ -303,14 +264,14 @@ namespace gfx_test
                 ValidationTextureData textureResults;
                 textureResults.extents = textureInfo->extents;
                 textureResults.textureData = textureValues;
-                textureResults.strides.x = pixelSize;
-                textureResults.strides.y = rowPitch;
+                textureResults.strides.x = (uint32_t)pixelSize;
+                textureResults.strides.y = (uint32_t)rowPitch;
                 textureResults.strides.z = textureResults.extents.height * textureResults.strides.y;
 
                 ValidationTextureData originalData;
                 originalData.extents = textureInfo->extents;
                 originalData.textureData = textureInfo->subresourceDatas.getBuffer();
-                originalData.strides.x = pixelSize;
+                originalData.strides.x = (uint32_t)pixelSize;
                 originalData.strides.y = textureInfo->extents.width * originalData.strides.x;
                 originalData.strides.z = textureInfo->extents.height * originalData.strides.y;
 
@@ -530,9 +491,9 @@ namespace gfx_test
             auto rootObject = renderEncoder->bindPipeline(pipelineState);
 
             gfx::Viewport viewport = {};
-            viewport.maxZ = textureInfo->extents.depth;
-            viewport.extentX = textureInfo->extents.width;
-            viewport.extentY = textureInfo->extents.height;
+            viewport.maxZ = (float)textureInfo->extents.depth;
+            viewport.extentX = (float)textureInfo->extents.width;
+            viewport.extentY = (float)textureInfo->extents.height;
             renderEncoder->setViewportAndScissor(viewport);
 
             renderEncoder->setVertexBuffer(0, vertexBuffer);
@@ -617,8 +578,8 @@ namespace gfx_test
             ValidationTextureData textureResults;
             textureResults.extents = textureInfo->extents;
             textureResults.textureData = textureValues;
-            textureResults.strides.x = pixelSize;
-            textureResults.strides.y = rowPitch;
+            textureResults.strides.x = (uint32_t)pixelSize;
+            textureResults.strides.y = (uint32_t)rowPitch;
             textureResults.strides.z = textureResults.extents.height * textureResults.strides.y;
 
             validateTextureValues(textureResults);

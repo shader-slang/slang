@@ -6,6 +6,7 @@
 #include "slang-ir-insts.h"
 #include "slang-mangle.h"
 #include "slang-ir-string-hash.h"
+#include "slang-artifact.h"
 
 namespace Slang
 {
@@ -1345,12 +1346,14 @@ struct IRSpecializationState
 };
 
 LinkedIR linkIR(
-    BackEndCompileRequest*  compileRequest,
-    const List<Int>&        entryPointIndices,
-    CodeGenTarget           target,
-    TargetProgram*          targetProgram)
+    CodeGenContext* codeGenContext)
 {
-    auto targetReq = targetProgram->getTargetReq();
+    auto linkage = codeGenContext->getLinkage();
+    auto program = codeGenContext->getProgram();
+    auto session = codeGenContext->getSession();
+    auto target = codeGenContext->getTargetFormat();
+    auto targetProgram = codeGenContext->getTargetProgram();
+    auto targetReq = codeGenContext->getTargetReq();
 
     // TODO: We need to make sure that the program we are being asked
     // to compile has been "resolved" so that it has no outstanding
@@ -1362,19 +1365,17 @@ LinkedIR linkIR(
     state->target = target;
     state->targetReq = targetReq;
 
-    auto program = compileRequest->getProgram();
 
     auto sharedContext = state->getSharedContext();
     initializeSharedSpecContext(
         sharedContext,
-        compileRequest->getSession(),
+        session,
         nullptr,
         target,
         targetReq);
 
     state->irModule = sharedContext->module;
 
-    auto linkage = compileRequest->getLinkage();
 
     // We need to be able to look up IR definitions for any symbols in
     // modules that the program depends on (transitively). To
@@ -1387,8 +1388,14 @@ LinkedIR linkIR(
     {
         irModules.add(irModule);
     });
-    irModules.addRange(linkage->m_libModules.getBuffer()->readRef(), linkage->m_libModules.getCount());
-
+    for (Artifact* artifact : linkage->m_libModules)
+    {
+        ModuleLibrary* library = artifact->findObjectInstance<ModuleLibrary>();
+        if (library)
+        {
+            irModules.addRange(library->m_modules.getBuffer()->readRef(), library->m_modules.getCount());
+        }
+    }
     
     // Add any modules that were loaded as libraries
     for (IRModule* irModule : irModules)
@@ -1437,7 +1444,7 @@ LinkedIR linkIR(
     //
 
     List<IRFunc*> irEntryPoints;
-    for (auto entryPointIndex : entryPointIndices)
+    for (auto entryPointIndex : codeGenContext->getEntryPointIndices())
     {
         auto entryPointMangledName = program->getEntryPointMangledName(entryPointIndex);
         auto nameOverride = program->getEntryPointNameOverride(entryPointIndex);

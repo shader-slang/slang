@@ -36,6 +36,7 @@ namespace Slang
     class TargetProgram;
     class TargetRequest;
     class TypeLayout;
+    class Artifact;
 
     enum class CompilerMode
     {
@@ -133,11 +134,11 @@ namespace Slang
         Maximal = SLANG_OPTIMIZATION_LEVEL_MAXIMAL,
     };
 
+    struct CodeGenContext;
+    class EndToEndCompileRequest;
+    class FrontEndCompileRequest;
     class Linkage;
     class Module;
-    class FrontEndCompileRequest;
-    class BackEndCompileRequest;
-    class EndToEndCompileRequest;
     class TranslationUnitRequest;
 
     // Result of compiling an entry point.
@@ -1568,7 +1569,11 @@ namespace Slang
                 Slang::getHashCode(elementType), Slang::getHashCode(containerType));
         }
     };
-    
+
+        /// A dictionary of currently loaded modules. Used by `findOrImportModule` to
+        /// lookup additional loaded modules.
+    typedef Dictionary<Name*, Module*> LoadedModuleDictionary;
+
         /// A context for loading and re-using code modules.
     class Linkage : public RefObject, public slang::ISession
     {
@@ -1763,7 +1768,8 @@ namespace Slang
         RefPtr<Module> findOrImportModule(
             Name*               name,
             SourceLoc const&    loc,
-            DiagnosticSink*     sink);
+            DiagnosticSink*     sink,
+            const LoadedModuleDictionary* loadedModules = nullptr);
 
         SourceManager* getSourceManager()
         {
@@ -1801,7 +1807,7 @@ namespace Slang
         bool m_useFalcorCustomSharedKeywordSemantics = false;
 
         // Modules that have been read in with the -r option
-        List<RefPtr<IRModule>> m_libModules;
+        List<RefPtr<Artifact>> m_libModules;
 
         void _stopRetainingParentSession()
         {
@@ -2143,8 +2149,9 @@ namespace Slang
         }
 
         CompileResult& _createWholeProgramResult(
-            BackEndCompileRequest*  backEndRequest,
-            EndToEndCompileRequest* endToEndRequest);
+            DiagnosticSink*         sink,
+            EndToEndCompileRequest* endToEndReq = nullptr);
+
             /// Internal helper for `getOrCreateEntryPointResult`.
             ///
             /// This is used so that command-line and API-based
@@ -2154,8 +2161,8 @@ namespace Slang
             ///
         CompileResult& _createEntryPointResult(
             Int                     entryPointIndex,
-            BackEndCompileRequest*  backEndRequest,
-            EndToEndCompileRequest* endToEndRequest);
+            DiagnosticSink*         sink,
+            EndToEndCompileRequest* endToEndReq = nullptr);
 
         RefPtr<IRModule> getOrCreateIRModuleForLayout(DiagnosticSink* sink);
 
@@ -2185,40 +2192,257 @@ namespace Slang
         RefPtr<IRModule> m_irModuleForLayout;
     };
 
-        /// A request to generate code for a program
-    class BackEndCompileRequest : public CompileRequestBase
+        /// A back-end-specific object to track optional feaures/capabilities/extensions
+        /// that are discovered to be used by a program/kernel as part of code generation.
+    class ExtensionTracker : public RefObject
+    {
+        // TODO: The existence of this type is evidence of a design/architecture problem.
+        //
+        // A better formulation of things requires a few key changes:
+        //
+        // 1. All optional capabilities need to be enumerated as part of the `CapabilitySet`
+        //  system, so that they can be reasoned about uniformly across different targets
+        //  and different layers of the compiler.
+        //
+        // 2. The front-end should be responsible for either or both of:
+        //
+        //   * Checking that `public` or otherwise externally-visible items (declarations/definitions)
+        //     explicitly declare the capabilities they require, and that they only ever
+        //     make use of items that are comatible with those required capabilities.
+        //
+        //   * Inferring the capabilities required by items that are not externally visible,
+        //     and attaching those capabilities explicit as a modifier or other synthesized AST node.
+        //
+        // 3. The capabilities required by a given `ComponentType` and its entry points should be
+        // explicitly know-able, and they should be something we can compare to the capabilities
+        // of a code generation target *before* back-end code generation is started. We should be
+        // able to issue error messages around lacking capabilities in a way the user can understand,
+        // in terms of the high-level-language entities.
+
+    public:
+    };
+
+        /// A context for code generation in the compiler back-end
+    struct CodeGenContext
     {
     public:
-        BackEndCompileRequest(
-            Linkage*        linkage,
-            DiagnosticSink* sink,
-            ComponentType*  program = nullptr);
+        typedef List<Index> EntryPointIndices;
 
-        // Should we dump intermediate results along the way, for debugging?
-        bool shouldDumpIntermediates = false;
+        struct Shared
+        {
+        public:
+            Shared(
+                TargetProgram*              targetProgram,
+                EntryPointIndices const&    entryPointIndices,
+                DiagnosticSink*             sink,
+                EndToEndCompileRequest*     endToEndReq)
+                : targetProgram(targetProgram)
+                , entryPointIndices(entryPointIndices)
+                , sink(sink)
+                , endToEndReq(endToEndReq)
+            {}
 
-        ComponentType* getProgram() { return m_program; }
-        void setProgram(ComponentType* program) { m_program = program; }
+//            Shared(
+//                TargetProgram*              targetProgram,
+//                EndToEndCompileRequest*     endToEndReq);
 
-        // Should R/W images without explicit formats be assumed to have "unknown" format?
+            TargetProgram*          targetProgram = nullptr;
+            EntryPointIndices       entryPointIndices;
+            DiagnosticSink*         sink = nullptr;
+            EndToEndCompileRequest* endToEndReq = nullptr;
+        };
+
+        CodeGenContext(
+            Shared* shared)
+            : m_shared(shared)
+            , m_targetFormat(shared->targetProgram->getTargetReq()->getTarget())
+        {}
+
+        CodeGenContext(
+            CodeGenContext*     base,
+            CodeGenTarget       targetFormat,
+            ExtensionTracker*   extensionTracker = nullptr)
+            : m_shared(base->m_shared)
+            , m_targetFormat(targetFormat)
+            , m_extensionTracker(extensionTracker)
+        {}
+
+            /// Get the diagnostic sink
+        DiagnosticSink* getSink()
+        {
+            return m_shared->sink;
+        }
+
+        TargetProgram* getTargetProgram()
+        {
+            return m_shared->targetProgram;
+        }
+
+        EntryPointIndices const& getEntryPointIndices()
+        {
+            return m_shared->entryPointIndices;
+        }
+
+        CodeGenTarget getTargetFormat()
+        {
+            return m_targetFormat;
+        }
+
+        ExtensionTracker* getExtensionTracker()
+        {
+            return m_extensionTracker;
+        }
+
+        TargetRequest* getTargetReq()
+        {
+            return getTargetProgram()->getTargetReq();
+        }
+
+        CapabilitySet getTargetCaps()
+        {
+            return getTargetReq()->getTargetCaps();
+        }
+
+        CodeGenTarget getFinalTargetFormat()
+        {
+            return getTargetReq()->getTarget();
+        }
+
+        ComponentType* getProgram()
+        {
+            return getTargetProgram()->getProgram();
+        }
+
+        Linkage* getLinkage()
+        {
+            return getProgram()->getLinkage();
+        }
+
+        Session* getSession()
+        {
+            return getLinkage()->getSessionImpl();
+        }
+
+            /// Get the source manager
+        SourceManager* getSourceManager()
+        {
+            return getLinkage()->getSourceManager();
+        }
+
+        ISlangFileSystemExt* getFileSystemExt()
+        {
+            return getLinkage()->getFileSystemExt();
+        }
+
+        EndToEndCompileRequest* isEndToEndCompile()
+        {
+            return m_shared->endToEndReq;
+        }
+
+        EndToEndCompileRequest* isPassThroughEnabled();
+
+        Count getEntryPointCount()
+        {
+            return getEntryPointIndices().getCount();
+        }
+
+        EntryPoint* getEntryPoint(Index index)
+        {
+            return getProgram()->getEntryPoint(index);
+        }
+
+        Index getSingleEntryPointIndex()
+        {
+            SLANG_ASSERT(getEntryPointCount() == 1);
+            return getEntryPointIndices()[0];
+        }
+
         //
-        // The default behavior is to make a best-effort guess as to what format is intended.
+
+        IRDumpOptions getIRDumpOptions();
+
+        bool shouldValidateIR();
+        bool shouldDumpIR();
+
+        bool shouldDumpIntermediates();
+        String getIntermediateDumpPrefix();
+
+        bool getUseUnknownImageFormatAsDefault();
+
+        bool isSpecializationDisabled();
+
         //
-        bool useUnknownImageFormatAsDefault = false;
 
-        // If true will disable generics/existential value specialization pass.
-        bool disableSpecialization = false;
+        CompileResult emitEntryPoints();
 
-        // If true will disable generating dynamic dispatch code.
-        bool disableDynamicDispatch = false;
+        SlangResult dissassembleWithDownstream(
+            const void* data,
+            size_t          dataSizeInBytes,
+            ISlangBlob** outBlob);
 
-        // The default IR dumping options
-        IRDumpOptions m_irDumpOptions;
+        SlangResult dissassembleWithDownstream(
+            DownstreamCompileResult* downstreamResult,
+            ISlangBlob** outBlob);
 
-        String m_dumpIntermediatePrefix;
+    protected:
+        CodeGenTarget m_targetFormat = CodeGenTarget::Unknown;
+        ExtensionTracker* m_extensionTracker = nullptr;
+
+        // Helper to dump intermediate output when debugging
+        void maybeDumpIntermediate(
+            void const* data,
+            size_t      size);
+        void maybeDumpIntermediate(
+            char const* text);
+
+        void maybeDumpIntermediate(
+            DownstreamCompileResult* compileResult);
+
+        void dumpIntermediate(
+            void const* data,
+            size_t      size,
+            char const* ext,
+            bool        isBinary);
+
+        void dumpIntermediateText(
+            void const* data,
+            size_t      size,
+            char const* ext);
+
+        void dumpIntermediateBinary(
+            void const* data,
+            size_t      size,
+            char const* ext);
+
+        /* Emits entry point source taking into account if a pass-through or not. Uses 'targetFormat' to determine
+        the target (not targetReq) */
+        SlangResult emitEntryPointsSource(
+            String& outSource);
+
+        SlangResult emitEntryPointsSourceFromIR(
+            String& outSource);
+
+        SlangResult emitWithDownstreamForEntryPoints(
+            RefPtr<DownstreamCompileResult>& outResult);
+
+        /* Determines a suitable filename to identify the input for a given entry point being compiled.
+        If the end-to-end compile is a pass-through case, will attempt to find the (unique) source file
+        pathname for the translation unit containing the entry point at `entryPointIndex.
+        If the compilation is not in a pass-through case, then always returns `"slang-generated"`.
+        @param endToEndReq The end-to-end compile request which might be using pass-through compilation
+        @param entryPointIndex The index of the entry point to compute a filename for.
+        @return the appropriate source filename */
+        String calcSourcePathForEntryPoints();
+
+        TranslationUnitRequest* findPassThroughTranslationUnit(
+            Int                     entryPointIndex);
+
+
+        SlangResult _emitEntryPoints(
+            RefPtr<DownstreamCompileResult>& outDownstreamResult);
 
     private:
-        RefPtr<ComponentType> m_program;
+        Shared* m_shared = nullptr;
     };
 
         /// A compile request that spans the front and back ends of the compiler
@@ -2402,7 +2626,6 @@ namespace Slang
         NamePool* getNamePool() { return getLinkage()->getNamePool(); }
 
         FrontEndCompileRequest* getFrontEndReq() { return m_frontEndReq; }
-        BackEndCompileRequest* getBackEndReq() { return m_backEndReq; }
 
         ComponentType* getUnspecializedGlobalComponentType() { return getFrontEndReq()->getGlobalComponentType(); }
         ComponentType* getUnspecializedGlobalAndEntryPointsComponentType()
@@ -2422,9 +2645,46 @@ namespace Slang
             m_linkage = nullptr;
             m_frontEndReq = nullptr;
         }
+
+        void generateOutput();
+
+
+        // Note: The following settings used to be considered part of the "back-end" compile
+        // request, but were only being used as part of end-to-end compilation anyway,
+        // so they were moved here.
+        //
+
+        // Should we dump intermediate results along the way, for debugging?
+        bool shouldDumpIntermediates = false;
+
+        // Should R/W images without explicit formats be assumed to have "unknown" format?
+        //
+        // The default behavior is to make a best-effort guess as to what format is intended.
+        //
+        bool useUnknownImageFormatAsDefault = false;
+
+        // If true will disable generics/existential value specialization pass.
+        bool disableSpecialization = false;
+
+        // If true will disable generating dynamic dispatch code.
+        bool disableDynamicDispatch = false;
+
+        // The default IR dumping options
+//        IRDumpOptions m_irDumpOptions;
+
+        String m_dumpIntermediatePrefix;
+
     private:
+        void writeWholeProgramResult(
+            TargetRequest* targetReq);
+        void writeEntryPointResult(
+            TargetRequest* targetReq,
+            Int             entryPointIndex);
 
         ISlangUnknown* getInterface(const Guid& guid);
+
+        void generateOutput(ComponentType* program);
+        void generateOutput(TargetProgram* targetProgram);
 
         void init();
 
@@ -2435,34 +2695,11 @@ namespace Slang
         RefPtr<ComponentType>           m_specializedGlobalComponentType;
         RefPtr<ComponentType>           m_specializedGlobalAndEntryPointsComponentType;
         List<RefPtr<ComponentType>>     m_specializedEntryPoints;
-        RefPtr<BackEndCompileRequest>   m_backEndReq;
 
         // For output
 
         RefPtr<StdWriters> m_writers;
     };
-
-    void generateOutput(
-        BackEndCompileRequest* compileRequest);
-
-    void generateOutput(
-        EndToEndCompileRequest* compileRequest);
-
-    // Helper to dump intermediate output when debugging
-    void maybeDumpIntermediate(
-        BackEndCompileRequest* compileRequest,
-        void const*     data,
-        size_t          size,
-        CodeGenTarget   target);
-    void maybeDumpIntermediate(
-        BackEndCompileRequest* compileRequest,
-        char const*     text,
-        CodeGenTarget   target);
-
-    void maybeDumpIntermediate(
-        BackEndCompileRequest* compileRequest,
-        DownstreamCompileResult* compileResult,
-        CodeGenTarget   target);
 
     /* Returns SLANG_OK if pass through support is available */
     SlangResult checkExternalCompilerSupport(Session* session, PassThroughMode passThrough);
@@ -2472,41 +2709,6 @@ namespace Slang
     @param diagnostic The diagnostic string associated with the compile failure
     @param sink The diagnostic sink to report to */
     void reportExternalCompileError(const char* compilerName, SlangResult res, const UnownedStringSlice& diagnostic, DiagnosticSink* sink);
-
-    /* Determines a suitable filename to identify the input for a given entry point being compiled.
-    If the end-to-end compile is a pass-through case, will attempt to find the (unique) source file
-    pathname for the translation unit containing the entry point at `entryPointIndex.
-    If the compilation is not in a pass-through case, then always returns `"slang-generated"`.
-    @param endToEndReq The end-to-end compile request which might be using pass-through compilation
-    @param entryPointIndex The index of the entry point to compute a filename for.
-    @return the appropriate source filename */
-    String calcSourcePathForEntryPoint(EndToEndCompileRequest* endToEndReq, Int entryPointIndex);
-    String calcSourcePathForEntryPoints(EndToEndCompileRequest* endToEndReq, const List<Int>& entryPointIndices);
-
-    class ExtensionTracker : public RefObject
-    {
-    public:
-    };
-
-    /* Emits entry point source taking into account if a pass-through or not. Uses 'target' to determine
-    the target (not targetReq) */
-    SlangResult emitEntryPointsSource(
-        BackEndCompileRequest*  compileRequest,
-        const List<Int>&        entryPointIndices,
-        TargetRequest*          targetReq,
-        CodeGenTarget           target,
-        EndToEndCompileRequest* endToEndReq,
-        ExtensionTracker*       extensionTracker,
-        String&                 outSource);
-
-    SlangResult emitEntryPointSource(
-        BackEndCompileRequest*  compileRequest,
-        Int                     entryPointIndex,
-        TargetRequest*          targetReq,
-        CodeGenTarget           target,
-        EndToEndCompileRequest* endToEndReq,
-        ExtensionTracker*       extensionTracker,
-        String&                 outSource);
 
     //
 
@@ -2719,6 +2921,21 @@ namespace Slang
         double m_downstreamCompileTime = 0.0;
     };
 
+    void checkTranslationUnit(
+        TranslationUnitRequest* translationUnit, LoadedModuleDictionary& loadedModules);
+
+    // Look for a module that matches the given name:
+    // either one we've loaded already, or one we
+    // can find vai the search paths available to us.
+    //
+    // Needed by import declaration checking.
+    //
+    RefPtr<Module> findOrImportModule(
+        Linkage* linkage,
+        Name* name,
+        SourceLoc const& loc,
+        DiagnosticSink* sink,
+        const LoadedModuleDictionary* additionalLoadedModules);
 
 //
 // The following functions are utilties to convert between

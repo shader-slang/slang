@@ -19,6 +19,7 @@ namespace Slang
     X(Half)                     \
     X(Float)                    \
     X(Double)                   \
+    X(Char)                     \
 /* end */
 
     enum class BaseType

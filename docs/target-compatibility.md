@@ -9,9 +9,11 @@ Items with ^ means there is some discussion about support later in the document 
 
 | Feature                     |    D3D11     |    D3D12     |     VK     |      CUDA     |    CPU
 |-----------------------------|--------------|--------------|------------|---------------|---------------
-| Half Type                   |     No       |     Yes      |   Yes      |     Yes ^     |    No +
+| Half Type                   |     No       |     Yes ^    |   Yes      |     Yes ^     |    No +
 | Double Type                 |     Yes      |     Yes      |   Yes      |     Yes       |    Yes
 | Double Intrinsics           |     No       |   Limited +  |  Limited   |     Most      |    Yes
+| u/int8_t Type               |     No       |   No         |   Yes ^    |     Yes       |    Yes
+| u/int16_t Type              |     No       |   Yes ^      |   Yes ^    |     Yes       |    Yes
 | u/int64_t Type              |     No       |   Yes ^      |   Yes      |     Yes       |    Yes
 | u/int64_t Intrinsics        |     No       |   No         |   Yes      |     Yes       |    Yes
 | int matrix                  |     Yes      |   Yes        |   No +     |     Yes       |    Yes
@@ -46,6 +48,18 @@ Items with ^ means there is some discussion about support later in the document 
 There appears to be a problem writing to a StructuredBuffer containing half on D3D12. D3D12 also appears to have problems doing calculations with half.
 
 In order for half to work in CUDA, NVRTC must be able to include `cuda_fp16.h` and related files. Please read the [CUDA target documentation](cuda-target.md) for more details. 
+
+## u/int8_t Type
+
+Not currently supported in D3D11/D3D12 because not supported in HLSL/DXIL/DXBC. 
+
+Supported in Vulkan via the extensions `GL_EXT_shader_explicit_arithmetic_types` and `GL_EXT_shader_8bit_storage`.
+
+## u/int16_t Type
+
+Requires SM6.2 which requires DXIL and therefore DXC and D3D12. For DXC this is discussed [here](https://github.com/Microsoft/DirectXShaderCompiler/wiki/16-Bit-Scalar-Types).
+
+Supported in Vulkan via the extensions `GL_EXT_shader_explicit_arithmetic_types` and `GL_EXT_shader_16bit_storage`.
 
 ## u/int64_t Type
 

@@ -185,7 +185,7 @@ namespace gfx_test
             queue->waitOnHost();
         }
 
-        bool isWithinCopyBounds(int x, int y, int z)
+        bool isWithinCopyBounds(Int x, Int y, Int z)
         {
             auto copyExtents = texCopyInfo.extent;
             auto copyOffset = texCopyInfo.dstOffset;
