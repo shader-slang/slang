@@ -875,6 +875,7 @@ standardProject("slang-rt", "source/slang-rt")
      kind "SharedLib"
      links { "core", "slang" }
      pic "On"
+	 flags { "FatalWarnings" }
  
      defines { "SLANG_GFX_DYNAMIC", "SLANG_GFX_DYNAMIC_EXPORT" }
  
