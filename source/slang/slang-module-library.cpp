@@ -93,7 +93,7 @@ SlangResult loadModuleLibrary(ArtifactKeep keep, IArtifact* artifact, EndToEndCo
     
     if (canKeep(keep))
     {
-        artifact->addElement(library);
+        artifact->addElement(artifact->getDesc(), library);
     }
 
     outLibrary = library;

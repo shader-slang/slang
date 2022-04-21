@@ -178,36 +178,12 @@ enum ArtifactPathType
     Existing,
 };
 
-/*
-There are several scenarios around the kind of things an Artifact is and what it might contain.
+/* The IArtifactInstance interface represents a single instance of a type that can be part of an artifact. It's special in so far 
+as 
 
-An artifact could be
-
-* Is using a backing zip
-* Contains an 'instance' that can represent the whole artifact 
-* Contains callable code
-* Contains optional values (like diagnostics)
-
-We don't want artifacts in general to have to handle
-
-* Having multiple sub artifacts
-* Have file system handling
-
-We could assume that there can only be one serializable alternate representation. 
-If we have that we can just have that set on the artifact. That instance type could just be 
-standalone.
-
-For a zip, we could add a ISlangFileSystem. This would allow for traversing of the contents (via mechanisms we already have). 
-For callable, we could add a ISlangSharedLibrary interface.
-For diagnostics we could add IDiagnostics interface (not defined yet).
-
-For an Artifact that contains diagnostics and other things, we can create as a collection, with unknown contents. Then 
-the contents can be examined via querying the contents.
+* IArtifactInstance can be queried for it's underlying object class
+* Can optionally serialize into a blob
 */
-
-/* The ArtifactInstance represents a single instance of a type that can be part of an artifact. It's special in so far 
-as an ArtifactInstance can be queried for it's underlying classs. Any instance is assumed to contain all the 
-same information as any IArtifact it is part of. */
 class IArtifactInstance : public ISlangUnknown
 {
     SLANG_COM_INTERFACE(0x311457a8, 0x1796, 0x4ebb, { 0x9a, 0xfc, 0x46, 0xa5, 0x44, 0xc7, 0x6e, 0xa9 })
@@ -225,7 +201,7 @@ class IArtifactInstance : public ISlangUnknown
     virtual SLANG_NO_THROW void* SLANG_MCALL queryObject(const Guid& classGuid) = 0;
 };
 
-/* The Artifact type is a type designed to represent some Artifact of compilation. It could be input to or output from a compilation.
+/* The IArtifact interface is designed to represent some Artifact of compilation. It could be input to or output from a compilation.
 
 An abstraction is desirable here, because depending on the compiler the artifact/s could be
 
@@ -239,7 +215,7 @@ The artifact uses the Blob as the canonical in memory representation.
 
 Some downstream compilers require the artifact to be available as a file system file, or to produce
 artifacts that are files. The IArtifact type allows to abstract away this difference, including the
-ability to turn an in memory representation into a temporary file on the system file. 
+ability to turn an in memory representation into a temporary file on the file system. 
 
 The mechanism also allows for 'Containers' which allow for Artifacts to contain other Artifacts (amongst other things).
 Those artifacts may be other files. For example a downstream compilation that produces results as well as temporary
@@ -250,7 +226,12 @@ files could be a Container containing artifacts for
 * Files that contain known types
 * Callable interface (an ISlangSharedLibrary)
 
-A more long term goal would be to
+Each one of these additions is an 'Element'. An Element is an interface pointer and a Desc that describes what the 
+inteface represents. Having the associated desc provides more detail about what the interface pointer actually is
+without having to make the interface know what it is being used for. This allows an interface to be used in multiple 
+ways - for example the ISlangBlob interface could be used to represent some text, or a compiled kernel. 
+
+A more long term goals would be to
 
 * Make Diagnostics into an interface (such it can be added to a Artifact result)
 * Use Artifact and related types for downstream compiler
@@ -313,10 +294,12 @@ public:
     virtual SLANG_NO_THROW const char* SLANG_MCALL getName() = 0;
 
         /// Add an interface
-    virtual SLANG_NO_THROW void SLANG_MCALL addElement(ISlangUnknown* intf) = 0;
+    virtual SLANG_NO_THROW void SLANG_MCALL addElement(const Desc& desc, ISlangUnknown* intf) = 0;
     
         /// Get the item at the index
     virtual SLANG_NO_THROW ISlangUnknown* SLANG_MCALL getElementAt(Index i) = 0;
+        /// Get the desc associated with an element
+    virtual SLANG_NO_THROW Desc SLANG_MCALL getElementDescAt(Index i) = 0;
 
         /// Remove the element at the specified index. 
     virtual SLANG_NO_THROW void SLANG_MCALL removeElementAt(Index i) = 0;
@@ -344,8 +327,9 @@ public:
     virtual SLANG_NO_THROW PathType SLANG_MCALL getPathType() SLANG_OVERRIDE { return m_pathType; }
     virtual SLANG_NO_THROW const char* SLANG_MCALL getPath() SLANG_OVERRIDE { return m_path.getBuffer(); }
     virtual SLANG_NO_THROW const char* SLANG_MCALL getName() SLANG_OVERRIDE { return m_name.getBuffer(); }
-    virtual SLANG_NO_THROW void SLANG_MCALL addElement(ISlangUnknown* intf) SLANG_OVERRIDE { SLANG_ASSERT(intf); m_elements.add(ComPtr<ISlangUnknown>(intf)); }
-    virtual SLANG_NO_THROW ISlangUnknown* SLANG_MCALL getElementAt(Index i) SLANG_OVERRIDE { return m_elements[i]; }
+    virtual SLANG_NO_THROW void SLANG_MCALL addElement(const Desc& desc, ISlangUnknown* intf) SLANG_OVERRIDE;
+    virtual SLANG_NO_THROW ISlangUnknown* SLANG_MCALL getElementAt(Index i) SLANG_OVERRIDE { return m_elements[i].value; }
+    virtual SLANG_NO_THROW Desc SLANG_MCALL getElementDescAt(Index i) SLANG_OVERRIDE { return m_elements[i].desc; }
     virtual SLANG_NO_THROW void SLANG_MCALL removeElementAt(Index i) SLANG_OVERRIDE;
     virtual SLANG_NO_THROW Index SLANG_MCALL getElementCount() SLANG_OVERRIDE { return m_elements.getCount(); }
 
@@ -362,6 +346,12 @@ protected:
 
     void _setPath(PathType pathType, const String& path) { m_pathType = pathType; m_path = path; }
 
+    struct Element
+    {
+        ArtifactDesc desc;
+        ComPtr<ISlangUnknown> value;
+    };
+
     Desc m_desc;                                ///< Description of the artifact
     String m_name;                              ///< Name of this artifact
 
@@ -370,7 +360,7 @@ protected:
 
     ComPtr<ISlangBlob> m_blob;                  ///< Blob to store result in memory
 
-    List<ComPtr<ISlangUnknown>> m_elements;     ///< Associated elements
+    List<Element> m_elements;                   ///< Associated elements
 };
 
 } // namespace Slang

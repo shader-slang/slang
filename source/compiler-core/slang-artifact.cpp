@@ -89,10 +89,12 @@ bool Artifact::exists()
 
 ISlangUnknown* Artifact::findElement(const Guid& guid)
 {
-    for (ISlangUnknown* element : m_elements)
+    for (auto const& element : m_elements)
     {
+        ISlangUnknown* value = element.value;
+
         ISlangUnknown* intf = nullptr;
-        if (SLANG_SUCCEEDED(element->queryInterface(guid, (void**)&intf)) && intf)
+        if (SLANG_SUCCEEDED(value->queryInterface(guid, (void**)&intf)) && intf)
         {
             // NOTE! This assumes we *DONT* need to ref count to keep an interface in scope
             // (as strict COM requires so as to allow on demand interfaces).
@@ -104,6 +106,13 @@ ISlangUnknown* Artifact::findElement(const Guid& guid)
     return nullptr;
 }
 
+void Artifact::addElement(const Desc& desc, ISlangUnknown* intf) 
+{ 
+    SLANG_ASSERT(intf); 
+    Element element{ desc, ComPtr<ISlangUnknown>(intf) };
+    m_elements.add(element); 
+}
+
 void Artifact::removeElementAt(Index i)
 {
     m_elements.removeAt(i);
@@ -112,9 +121,11 @@ void Artifact::removeElementAt(Index i)
 void* Artifact::findElementObject(const Guid& classGuid)
 {
     ComPtr<IArtifactInstance> instance;
-    for (ISlangUnknown* element : m_elements)
+    for (auto const& element : m_elements)
     {
-        if (SLANG_SUCCEEDED(element->queryInterface(IArtifactInstance::getTypeGuid(), (void**)instance.writeRef())) && instance)
+        ISlangUnknown* value = element.value;
+
+        if (SLANG_SUCCEEDED(value->queryInterface(IArtifactInstance::getTypeGuid(), (void**)instance.writeRef())) && instance)
         {
             void* classInstance = instance->queryObject(classGuid);
             if (classInstance)
@@ -246,8 +257,10 @@ SlangResult Artifact::loadBlob(Keep keep, ISlangBlob** outBlob)
         }
         else
         {
-            for (ISlangUnknown* intf : m_elements)
+            for (const auto element : m_elements)
             {
+                ISlangUnknown* intf = element.value;
+
                 ComPtr<IArtifactInstance> inst;
                 if (SLANG_SUCCEEDED(intf->queryInterface(IArtifactInstance::getTypeGuid(), (void**)inst.writeRef())) && inst)
                 {
