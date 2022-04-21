@@ -310,6 +310,30 @@ public:
     virtual SLANG_NO_THROW Index SLANG_MCALL getElementCount() = 0;
 };
 
+/*
+Discussion:
+
+It could make sense to remove the explicit variables of a ISlangBlob, and the file backing from this interface, as they could 
+all be implemented as element types presumably deriving from IArtifactInstance. Doing so would mean how a 'file' is turned into
+a blob is abstracted. 
+
+It may be helpful to be able to add temporary files to the artifact (such that they will be deleted when the artifact goes out of 
+scope). Using an implementation of the File backed IArtifactInstance, with a suitable desc would sort of work, but it breaks the idea 
+that any IArtifactInstance *represents* the contents of Artifact that contains it. Of course there could be types *not* deriving 
+from IArtifactInstance that handle temporary file existance. This is probably the simplest answer to the problem.
+
+Another issue occurs around wanting to hold multiple kernels within a container. The problem here is that although through the desc
+we can identify what target a kernel is for, there is no way of telling what stage it is for.
+
+When discussing the idea of a shader cache, one idea was to use a ISlangFileSystem (which could actually be a zip, or directory or in memory rep)
+as the main structure. Within this it can contain kernels, and then a json manifest can describe what each of these actually are.
+
+This all 'works', in that we can add an element of ISlangFileSystem with a desc of Container. Code that uses this can then go through the process 
+of finding, and getting the blob, and find from the manifest what it means. That does sound a little tedious though. Perhaps we just have an interface
+that handles this detail, such that we search for that first. That interface is just attached to the artifact as an element.
+*/
+
+/* Implementation of the IArtifact interface */
 class Artifact : public ComObject, public IArtifact
 {
 public:
