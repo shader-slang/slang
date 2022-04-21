@@ -234,11 +234,11 @@ namespace gfx_test
         void validateTextureValues(ValidationTextureData actual, ValidationTextureData original)
         {
             // TODO: needs to be extended to cover mip levels and array layers
-            for (Int x = 0; x < actual.extents.width; ++x)
+            for (GfxIndex x = 0; x < actual.extents.width; ++x)
             {
-                for (Int y = 0; y < actual.extents.height; ++y)
+                for (GfxIndex y = 0; y < actual.extents.height; ++y)
                 {
-                    for (Int z = 0; z < actual.extents.depth; ++z)
+                    for (GfxIndex z = 0; z < actual.extents.depth; ++z)
                     {
                         auto actualBlock = (uint8_t*)actual.getBlockAt(x, y, z);
                         for (Int i = 0; i < 4; ++i)
@@ -536,11 +536,11 @@ namespace gfx_test
         // TODO: Needs to handle either the correct slice or array layer (will not always check z)
         void validateTextureValues(ValidationTextureData actual)
         {
-            for (Int x = 0; x < actual.extents.width; ++x)
+            for (GfxIndex x = 0; x < actual.extents.width; ++x)
             {
-                for (Int y = 0; y < actual.extents.height; ++y)
+                for (GfxIndex y = 0; y < actual.extents.height; ++y)
                 {
-                    for (Int z = 0; z < actual.extents.depth; ++z)
+                    for (GfxIndex z = 0; z < actual.extents.depth; ++z)
                     {
                         auto actualBlock = (float*)actual.getBlockAt(x, y, z);
                         for (Int i = 0; i < 4; ++i)
