@@ -23,8 +23,36 @@ namespace Slang
             sb << nameHint->getName();
     }
 
-    // !!!!!!!!!!!!!!!!!!!!!!!!!!!! DiagnosticSink Impls !!!!!!!!!!!!!!!!!!!!!
+    // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
+
+    bool isSimpleDecoration(IROp op)
+    {
+        switch (op)
+        {
+            case kIROp_EarlyDepthStencilDecoration: return true;
+            case kIROp_GloballyCoherentDecoration: return true;
+            case kIROp_KeepAliveDecoration: return true;
+            case kIROp_LineAdjInputPrimitiveTypeDecoration: return true;
+            case kIROp_LineInputPrimitiveTypeDecoration: return true;
+            case kIROp_NoInlineDecoration: return true;
+            case kIROp_PointInputPrimitiveTypeDecoration: return true;
+            case kIROp_PreciseDecoration: return true;
+            case kIROp_PublicDecoration: return true;
+            case kIROp_ReadNoneDecoration: return true;
+            case kIROp_RequiresNVAPIDecoration: return true;
+            case kIROp_TriangleAdjInputPrimitiveTypeDecoration: return true;
+            case kIROp_TriangleInputPrimitiveTypeDecoration: return true;
+            case kIROp_UnsafeForceInlineEarlyDecoration: return true;
+            case kIROp_VulkanCallablePayloadDecoration: return true;
+            case kIROp_VulkanHitAttributesDecoration: return true;
+            case kIROp_VulkanRayPayloadDecoration: return true;
+            default: break;
+        }
+        return false;
+    }
+
+    
     IRInst* cloneGlobalValueWithLinkage(
         IRSpecContext*          context,
         IRInst*                 originalVal,
@@ -4172,6 +4200,16 @@ namespace Slang
 
     IRDecoration* IRBuilder::addDecoration(IRInst* value, IROp op, IRInst* const* operands, Int operandCount)
     {
+        // If it's a simple (ie stateless) decoration, don't add it again.
+        if (operandCount == 0 && isSimpleDecoration(op))
+        {
+            auto decoration = value->findDecorationImpl(op);
+            if (decoration)
+            {
+                return decoration;
+            }
+        }
+
         auto decoration = createInstWithTrailingArgs<IRDecoration>(
             this,
             op,
