@@ -135,6 +135,9 @@ DIAGNOSTIC(    97, Error, libraryDoesNotExist, "library '$0' does not exist")
 //
 
 DIAGNOSTIC(  100, Error, failedToLoadDownstreamCompiler, "failed to load downstream compiler '$0'")
+DIAGNOSTIC(  101, Error, downstreamCompilerDoesntSupportWholeProgramCompilation, "downstream compiler '$0' doesn't support whole program compilation")
+
+
 DIAGNOSTIC(99999, Note, noteFailedToLoadDynamicLibrary, "failed to load dynamic library '$0'")
 
 //

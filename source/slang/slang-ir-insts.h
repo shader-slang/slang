@@ -196,6 +196,8 @@ struct IRTypeConstraintDecoration : IRDecoration
     };                                  \
     /**/
 
+bool isSimpleDecoration(IROp op);
+
 /// A decoration that indicates that a variable represents
 /// a vulkan ray payload, and should have a location assigned
 /// to it.
@@ -2833,7 +2835,7 @@ public:
 
     void addPublicDecoration(IRInst* value)
     {
-        addDecoration(value, kIROp_PublicDecoration);
+        addDecoration(value, kIROp_PublicDecoration);   
     }
 
     void addNVAPIMagicDecoration(IRInst* value, UnownedStringSlice const& name)

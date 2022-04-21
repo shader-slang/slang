@@ -148,6 +148,13 @@ static const KindExtension g_cpuKindExts[] =
 {
     switch (payload)
     {
+        case Payload::DXBC:
+        {
+            // It seems as if DXBC is potentially linkable from
+            // https://docs.microsoft.com/en-us/windows/win32/direct3dhlsl/dx-graphics-hlsl-appendix-keywords#export
+            return true;
+        }
+
         case Payload::DXIL:
         case Payload::PTX:
         case Payload::SPIRV:
@@ -397,16 +404,18 @@ SlangResult Artifact::requireFilePath(Keep keep, String& outFilePath)
             auto parentDir = Path::getParentDirectory(path);
             if (parentDir.getLength())
             {
-                // Prefix the lib
+                // Combine the name with path if their is a parent 
                 path = Path::combine(parentDir, buf);
             }
             else
             {
+                // Just use the name as is
                 path = buf;
             }
         }
     }
 
+    // If there is an extension append it
     if (ext.getLength())
     {
         path.appendChar('.');

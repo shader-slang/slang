@@ -1203,11 +1203,26 @@ void printDiagnosticArg(StringBuilder& sb, CodeGenTarget val)
             auto targetReq = getTargetReq();
 
             const auto entryPointIndicesCount = entryPointIndices.getCount();
-             
-            if (entryPointIndicesCount == 0 && compilerType == PassThroughMode::Dxc)
+
+            // Whole program means
+            // * can have 0-N entry points
+            // * 'doesn't build into an executable/kernel'
+            // 
+            // So in some sense it is a library
+            if (targetReq->isWholeProgramRequest())
             {
-                // Can support no entry points on DXC because we can build libraries
-                profile = targetReq->getTargetProfile();
+                if (compilerType == PassThroughMode::Dxc)
+                {
+                    // Can support no entry points on DXC because we can build libraries
+                    profile = targetReq->getTargetProfile();
+                }
+                else
+                {
+                    auto downstreamCompilerName = TypeTextUtil::getPassThroughName((SlangPassThrough)compilerType);
+
+                    sink->diagnose(SourceLoc(), Diagnostics::downstreamCompilerDoesntSupportWholeProgramCompilation, downstreamCompilerName);
+                    return SLANG_FAIL;
+                }
             }
             else if (entryPointIndicesCount == 1)
             {
@@ -1909,11 +1924,12 @@ void printDiagnosticArg(StringBuilder& sb, CodeGenTarget val)
         // The current logic of `emitEntryPoints` takes a list of entry-point indices to
         // emit code for, so we construct such a list first.
         List<Int> entryPointIndices;
+
         m_entryPointResults.setCount(m_program->getEntryPointCount());
         entryPointIndices.setCount(m_program->getEntryPointCount());
         for (Index i = 0; i < entryPointIndices.getCount(); i++)
             entryPointIndices[i] = i;
-
+    
         auto& result = m_wholeProgramResult;
 
         CodeGenContext::Shared sharedCodeGenContext(this, entryPointIndices, sink, endToEndReq);
@@ -1929,7 +1945,7 @@ void printDiagnosticArg(StringBuilder& sb, CodeGenTarget val)
         DiagnosticSink*         sink,
         EndToEndCompileRequest* endToEndReq)
     {
-        // It is possible that entry points goot added to the `Program`
+        // It is possible that entry points got added to the `Program`
         // *after* we created this `TargetProgram`, so there might be
         // a request for an entry point that we didn't allocate space for.
         //
