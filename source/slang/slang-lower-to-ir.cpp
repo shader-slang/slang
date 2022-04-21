@@ -7424,9 +7424,14 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             getBuilder()->addSimpleDecoration<IRNoInlineDecoration>(irFunc);
         }
 
-        if (decl->findModifier<PublicModifier>()) {
+#if 0
+        // Not needed as added as part of adding linkage decoration.
+        // Ie in call to addLinkageDecoration
+        if (decl->findModifier<PublicModifier>())
+        {
             getBuilder()->addSimpleDecoration<IRPublicDecoration>(irFunc);
         }
+#endif
 
         if (auto attr = decl->findModifier<InstanceAttribute>())
         {
