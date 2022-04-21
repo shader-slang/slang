@@ -121,7 +121,7 @@ void Artifact::removeElementAt(Index i)
 void* Artifact::findElementObject(const Guid& classGuid)
 {
     ComPtr<IArtifactInstance> instance;
-    for (auto const& element : m_elements)
+    for (const auto& element : m_elements)
     {
         ISlangUnknown* value = element.value;
 
@@ -257,7 +257,7 @@ SlangResult Artifact::loadBlob(Keep keep, ISlangBlob** outBlob)
         }
         else
         {
-            for (const auto element : m_elements)
+            for (const auto& element : m_elements)
             {
                 ISlangUnknown* intf = element.value;
 
