@@ -109,7 +109,7 @@ namespace
         void run()
         {
             // Skip Format::Unknown
-            for (uint32_t i = 1; i < (uint32_t)Format::CountOf; ++i)
+            for (uint32_t i = 1; i < (uint32_t)Format::_Count; ++i)
             {
                 auto baseFormat = (Format)i;
                 FormatInfo info;
@@ -148,7 +148,7 @@ namespace
                     ResourceState::CopyDestination);
 
                 ResourceState currentState = ResourceState::CopySource;
-                ITextureResource::Size extent;
+                ITextureResource::Extents extent;
                 extent.width = 4;
                 extent.height = 4;
                 extent.depth = 1;

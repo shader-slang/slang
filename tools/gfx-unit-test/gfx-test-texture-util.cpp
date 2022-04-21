@@ -29,14 +29,14 @@ namespace gfx_test
         }
     }
 
-    uint32_t getTexelSize(Format format)
+    Size getTexelSize(Format format)
     {
         FormatInfo info;
         GFX_CHECK_CALL_ABORT(gfxGetFormatInfo(format, &info));
         return info.blockSizeInBytes / info.pixelsPerBlock;
     }
 
-    uint32_t getSubresourceIndex(uint32_t mipLevel, uint32_t mipLevelCount, uint32_t baseArrayLayer)
+    GfxIndex getSubresourceIndex(GfxIndex mipLevel, GfxCount mipLevelCount, GfxIndex baseArrayLayer)
     {
         return baseArrayLayer * mipLevelCount + mipLevel;
     }
@@ -155,9 +155,9 @@ namespace gfx_test
         auto mipLevels = texture->mipLevelCount;
         auto texelSize = getTexelSize(texture->format);
 
-        for (uint32_t layer = 0; layer < arrayLayers; ++layer)
+        for (GfxIndex layer = 0; layer < arrayLayers; ++layer)
         {
-            for (uint32_t mip = 0; mip < mipLevels; ++mip)
+            for (GfxIndex mip = 0; mip < mipLevels; ++mip)
             {
                 RefPtr<ValidationTextureData> subresource = new ValidationTextureData();
 

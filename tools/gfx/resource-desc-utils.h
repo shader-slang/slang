@@ -12,9 +12,9 @@ inline int calcMipSize(int size, int level)
     return size > 0 ? size : 1;
 }
 
-inline ITextureResource::Size calcMipSize(ITextureResource::Size size, int mipLevel)
+inline ITextureResource::Extents calcMipSize(ITextureResource::Extents size, int mipLevel)
 {
-    ITextureResource::Size rs;
+    ITextureResource::Extents rs;
     rs.width = calcMipSize(size.width, mipLevel);
     rs.height = calcMipSize(size.height, mipLevel);
     rs.depth = calcMipSize(size.depth, mipLevel);
@@ -45,7 +45,7 @@ inline int calcEffectiveArraySize(const ITextureResource::Desc& desc)
 }
 
 /// Given the type works out the maximum dimension size
-inline int calcMaxDimension(ITextureResource::Size size, IResource::Type type)
+inline int calcMaxDimension(ITextureResource::Extents size, IResource::Type type)
 {
     switch (type)
     {
@@ -64,7 +64,7 @@ inline int calcMaxDimension(ITextureResource::Size size, IResource::Type type)
 }
 
 /// Given the type, calculates the number of mip maps. 0 on error
-inline int calcNumMipLevels(IResource::Type type, ITextureResource::Size size)
+inline int calcNumMipLevels(IResource::Type type, ITextureResource::Extents size)
 {
     const int maxDimensionSize = calcMaxDimension(size, type);
     return (maxDimensionSize > 0) ? (Slang::Math::Log2Floor(maxDimensionSize) + 1) : 0;

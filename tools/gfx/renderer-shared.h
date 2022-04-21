@@ -520,9 +520,9 @@ public:
         ShaderOffset offset);
 
 public:
-    SLANG_NO_THROW UInt SLANG_MCALL getEntryPointCount() SLANG_OVERRIDE { return 0; }
+    SLANG_NO_THROW GfxCount SLANG_MCALL getEntryPointCount() SLANG_OVERRIDE { return 0; }
 
-    SLANG_NO_THROW Result SLANG_MCALL getEntryPoint(UInt index, IShaderObject** outEntryPoint)
+    SLANG_NO_THROW Result SLANG_MCALL getEntryPoint(GfxIndex index, IShaderObject** outEntryPoint)
         SLANG_OVERRIDE
     {
         *outEntryPoint = nullptr;
@@ -774,7 +774,7 @@ public:
     virtual SLANG_NO_THROW Result SLANG_MCALL setSpecializationArgs(
         ShaderOffset const& offset,
         const slang::SpecializationArg* args,
-        uint32_t count) override
+        GfxCount count) override
     {
         auto layout = getLayout();
 
@@ -939,8 +939,8 @@ struct OwnedRayTracingPipelineStateDesc
     Slang::List<OwnedHitGroupDesc> hitGroups;
     Slang::List<HitGroupDesc> hitGroupDescs;
     int maxRecursion = 0;
-    int maxRayPayloadSize = 0;
-    int maxAttributeSizeInBytes = 8;
+    Size maxRayPayloadSize = 0;
+    Size maxAttributeSizeInBytes = 8;
     RayTracingPipelineFlags::Enum flags = RayTracingPipelineFlags::None;
 
     RayTracingPipelineStateDesc get()
@@ -1208,7 +1208,7 @@ public:
 
     virtual SLANG_NO_THROW Result SLANG_MCALL getNativeDeviceHandles(InteropHandles* outHandles) SLANG_OVERRIDE;
     virtual SLANG_NO_THROW Result SLANG_MCALL getFeatures(
-        const char** outFeatures, UInt bufferSize, UInt* outFeatureCount) SLANG_OVERRIDE;
+        const char** outFeatures, Size bufferSize, GfxCount* outFeatureCount) SLANG_OVERRIDE;
     virtual SLANG_NO_THROW bool SLANG_MCALL hasFeature(const char* featureName) SLANG_OVERRIDE;
     virtual SLANG_NO_THROW Result SLANG_MCALL
         getFormatSupportedResourceStates(Format format, ResourceStateSet* outStates) override;
@@ -1284,7 +1284,7 @@ public:
 
     // Provides a default implementation that returns SLANG_E_NOT_AVAILABLE.
     virtual SLANG_NO_THROW Result SLANG_MCALL
-        waitForFences(uint32_t fenceCount, IFence** fences, uint64_t* fenceValues, bool waitForAll, uint64_t timeout) override;
+        waitForFences(GfxCount fenceCount, IFence** fences, uint64_t* fenceValues, bool waitForAll, uint64_t timeout) override;
 
     // Provides a default implementation that returns SLANG_E_NOT_AVAILABLE.
     virtual SLANG_NO_THROW Result SLANG_MCALL getTextureAllocationInfo(
