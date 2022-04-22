@@ -343,7 +343,7 @@ SLANG_NO_THROW Result SLANG_MCALL RendererBase::getNativeDeviceHandles(InteropHa
 }
 
 SLANG_NO_THROW Result SLANG_MCALL RendererBase::getFeatures(
-    const char** outFeatures, UInt bufferSize, UInt* outFeatureCount)
+    const char** outFeatures, Size bufferSize, GfxCount* outFeatureCount)
 {
     if (bufferSize >= (UInt)m_features.getCount())
     {
@@ -353,7 +353,7 @@ SLANG_NO_THROW Result SLANG_MCALL RendererBase::getFeatures(
         }
     }
     if (outFeatureCount)
-        *outFeatureCount = (UInt)m_features.getCount();
+        *outFeatureCount = (GfxCount)m_features.getCount();
     return SLANG_OK;
 }
 
@@ -524,7 +524,7 @@ Result RendererBase::createFence(const IFence::Desc& desc, IFence** outFence)
 }
 
 Result RendererBase::waitForFences(
-    uint32_t fenceCount, IFence** fences, uint64_t* fenceValues, bool waitForAll, uint64_t timeout)
+    GfxCount fenceCount, IFence** fences, uint64_t* fenceValues, bool waitForAll, uint64_t timeout)
 {
     SLANG_UNUSED(fenceCount);
     SLANG_UNUSED(fences);
@@ -781,7 +781,7 @@ void ShaderProgramBase::init(const IShaderProgram::Desc& inDesc)
     desc = inDesc;
 
     slangGlobalScope = desc.slangGlobalScope;
-    for (uint32_t i = 0; i < desc.entryPointCount; i++)
+    for (GfxIndex i = 0; i < desc.entryPointCount; i++)
     {
         slangEntryPoints.add(ComPtr<slang::IComponentType>(desc.slangEntryPoints[i]));
     }
@@ -794,7 +794,7 @@ void ShaderProgramBase::init(const IShaderProgram::Desc& inDesc)
         {
             components.add(desc.slangGlobalScope);
         }
-        for (uint32_t i = 0; i < desc.entryPointCount; i++)
+        for (GfxIndex i = 0; i < desc.entryPointCount; i++)
         {
             if (!session)
             {
@@ -807,7 +807,7 @@ void ShaderProgramBase::init(const IShaderProgram::Desc& inDesc)
     }
     else
     {
-        for (uint32_t i = 0; i < desc.entryPointCount; i++)
+        for (GfxIndex i = 0; i < desc.entryPointCount; i++)
         {
             if (desc.slangGlobalScope)
             {
@@ -1044,7 +1044,7 @@ Result ShaderTableBase::init(const IShaderTable::Desc& desc)
     m_hitGroupCount = desc.hitGroupCount;
     m_shaderGroupNames.reserve(desc.hitGroupCount + desc.missShaderCount + desc.rayGenShaderCount);
     m_recordOverwrites.reserve(desc.hitGroupCount + desc.missShaderCount + desc.rayGenShaderCount);
-    for (uint32_t i = 0; i < desc.rayGenShaderCount; i++)
+    for (GfxIndex i = 0; i < desc.rayGenShaderCount; i++)
     {
         m_shaderGroupNames.add(desc.rayGenShaderEntryPointNames[i]);
         if (desc.rayGenShaderRecordOverwrites)
@@ -1056,7 +1056,7 @@ Result ShaderTableBase::init(const IShaderTable::Desc& desc)
             m_recordOverwrites.add(ShaderRecordOverwrite{});
         }
     }
-    for (uint32_t i = 0; i < desc.missShaderCount; i++)
+    for (GfxIndex i = 0; i < desc.missShaderCount; i++)
     {
         m_shaderGroupNames.add(desc.missShaderEntryPointNames[i]);
         if (desc.missShaderRecordOverwrites)
@@ -1068,7 +1068,7 @@ Result ShaderTableBase::init(const IShaderTable::Desc& desc)
             m_recordOverwrites.add(ShaderRecordOverwrite{});
         }
     }
-    for (uint32_t i = 0; i < desc.hitGroupCount; i++)
+    for (GfxIndex i = 0; i < desc.hitGroupCount; i++)
     {
         m_shaderGroupNames.add(desc.hitGroupNames[i]);
         if (desc.hitGroupRecordOverwrites)

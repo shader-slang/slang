@@ -35,6 +35,7 @@
 // GLOBAL TODO: Rationalize integer types (not a smush of uint/int/Uint/Int/etc)
 //    - need typedefs in gfx namespace for Count, Index, Size, Offset (ex. DeviceAddress)
 //    - Index and Count are for arrays, and indexing into array - like things(XY coordinates of pixels, etc.)
+//         - Count is also for anything where we need to measure how many of something there are. This includes things like extents.
 //    - Offset and Size are almost always for bytes and things measured in bytes.
 namespace gfx {
 
@@ -46,8 +47,8 @@ typedef SlangResult Result;
 typedef SlangInt Int;
 typedef SlangUInt UInt;
 typedef uint64_t DeviceAddress;
-typedef int32_t GfxIndex;
-typedef int32_t GfxCount;
+typedef int GfxIndex;
+typedef int GfxCount;
 typedef size_t Size;
 typedef size_t Offset;
 
@@ -125,7 +126,7 @@ enum class AccessFlag
 };
 
 // TODO: Needed? Shouldn't be hard-coded if so
-const uint32_t kMaxRenderTargetCount = 8;
+const GfxCount kMaxRenderTargetCount = 8;
 
 class ITransientResourceHeap;
 
@@ -149,16 +150,14 @@ public:
         // The linking style of this program.
         LinkingStyle linkingStyle = LinkingStyle::SingleProgram;
 
-        // TODO: Remove slang prefix?
         // The global scope or a Slang composite component that represents the entire program.
         slang::IComponentType*  slangGlobalScope;
 
         // Number of separate entry point components in the `slangEntryPoints` array to link in.
         // If set to 0, then `slangGlobalScope` must contain Slang EntryPoint components.
         // If not 0, then `slangGlobalScope` must not contain any EntryPoint components.
-        uint32_t entryPointCount = 0;
+        GfxCount entryPointCount = 0;
 
-        // TODO: Remove slang prefix?
         // An array of Slang entry points. The size of the array must be `entryPointCount`.
         // Each element must define only 1 Slang EntryPoint.
         slang::IComponentType** slangEntryPoints = nullptr;
@@ -382,7 +381,7 @@ enum class Format
     BC7_UNORM,
     BC7_UNORM_SRGB,
 
-    CountOf, // TODO: Rename to Count
+    _Count,
 };
 
 // TODO: Aspect = Color, Depth, Stencil, etc.
@@ -392,14 +391,13 @@ enum class Format
 // TODO: Width/Height/Depth/whatever should not be used. We should use extentX, extentY, etc.
 struct FormatInfo
 {
-    // TODO: Change to uint32_t
-    uint8_t channelCount;          ///< The amount of channels in the format. Only set if the channelType is set 
-    uint8_t channelType;           ///< One of SlangScalarType None if type isn't made up of elements of type.
+    GfxCount channelCount;         ///< The amount of channels in the format. Only set if the channelType is set 
+    uint8_t channelType;           ///< One of SlangScalarType None if type isn't made up of elements of type. TODO: Change to uint32_t?
 
-    uint32_t blockSizeInBytes;     ///< The size of a block in bytes.
-    uint32_t pixelsPerBlock;       ///< The number of pixels contained in a block.
-    uint32_t blockWidth;
-    uint32_t blockHeight;
+    Size blockSizeInBytes;         ///< The size of a block in bytes.
+    GfxCount pixelsPerBlock;       ///< The number of pixels contained in a block.
+    GfxCount blockWidth;           ///< The width of a block in pixels.
+    GfxCount blockHeight;          ///< The height of a block in pixels.
 };
 
 enum class InputSlotClass
@@ -409,18 +407,18 @@ enum class InputSlotClass
 
 struct InputElementDesc
 {
-    char const* semanticName;
-    UInt semanticIndex;
-    Format format;
-    UInt offset;
-    UInt bufferSlotIndex;
+    char const* semanticName;      ///< The name of the corresponding parameter in shader code.
+    GfxIndex semanticIndex;        ///< The index of the corresponding parameter in shader code. Only needed if multiple parameters share a semantic name.
+    Format format;                 ///< The format of the data being fetched for this element.
+    Offset offset;                 ///< The offset in bytes of this element from the start of the corresponding chunk of vertex stream data.
+    GfxIndex bufferSlotIndex;      ///< The index of the vertex stream to fetch this element's data from.
 };
 
 struct VertexStreamDesc
 {
-    uint32_t stride;
-    InputSlotClass slotClass;
-    UInt instanceDataStepRate;
+    Size stride;                   ///< The stride in bytes for this vertex stream.
+    InputSlotClass slotClass;      ///< Whether the stream contains per-vertex or per-instance data.
+    GfxCount instanceDataStepRate; ///< How many instances to draw per chunk of data.
 };
 
 enum class PrimitiveType
@@ -524,9 +522,9 @@ public:
     struct Desc
     {
         InputElementDesc const* inputElements = nullptr;
-        Int inputElementCount = 0;
+        GfxCount inputElementCount = 0;
         VertexStreamDesc const* vertexStreams = nullptr;
-        Int vertexStreamCount = 0;
+        GfxCount vertexStreamCount = 0;
     };
 };
 #define SLANG_UUID_IInputLayout                                                         \
@@ -547,7 +545,7 @@ public:
         Texture2D,          ///< A 2d texture
         Texture3D,          ///< A 3d texture
         TextureCube,        ///< A cubemap consists of 6 Texture2D like faces
-        CountOf,
+        _Count,
     };
 
         /// Base class for Descs
@@ -576,6 +574,7 @@ public:
 
 struct MemoryRange
 {
+    // TODO: Change to Offset/Size?
     uint64_t offset;
     uint64_t size;
 };
@@ -585,8 +584,8 @@ class IBufferResource: public IResource
 public:
     struct Desc: public DescBase
     {
-        Size sizeInBytes = 0;     ///< Total size in bytes
-        int elementSize = 0;        ///< Get the element stride. If > 0, this is a structured buffer
+        Size sizeInBytes = 0;        ///< Total size in bytes
+        Size elementSize = 0;        ///< Get the element stride. If > 0, this is a structured buffer
         Format format = Format::Unknown;
     };
 
@@ -618,6 +617,7 @@ struct ClearValue
 
 struct BufferRange
 {
+    // TODO: Change to Index and Count?
     uint64_t firstElement;
     uint64_t elementCount;
 };
@@ -639,47 +639,47 @@ enum class TextureAspect : uint32_t
 struct SubresourceRange
 {
     TextureAspect aspectMask;
-    uint32_t mipLevel;
-    uint32_t mipLevelCount;
-    uint32_t baseArrayLayer; // For Texture3D, this is WSlice.
-    uint32_t layerCount; // For cube maps, this is a multiple of 6.
+    GfxIndex mipLevel;
+    GfxCount mipLevelCount;
+    GfxIndex baseArrayLayer; // For Texture3D, this is WSlice.
+    GfxCount layerCount; // For cube maps, this is a multiple of 6.
 };
 
 class ITextureResource: public IResource
 {
 public:
-    static const uint32_t kRemainingTextureSize = 0xFFFFFFFF;
+    static const Size kRemainingTextureSize = 0xFFFFFFFF;
     struct Offset3D
     {
-        uint32_t x = 0;
-        uint32_t y = 0;
-        uint32_t z = 0;
+        GfxIndex x = 0;
+        GfxIndex y = 0;
+        GfxIndex z = 0;
         Offset3D() = default;
-        Offset3D(uint32_t _x, uint32_t _y, uint32_t _z) :x(_x), y(_y), z(_z) {}
+        Offset3D(GfxIndex _x, GfxIndex _y, GfxIndex _z) :x(_x), y(_y), z(_z) {}
     };
 
     struct SampleDesc
     {
-        int numSamples = 1;                     ///< Number of samples per pixel
+        GfxCount numSamples = 1;                ///< Number of samples per pixel
         int quality = 0;                        ///< The quality measure for the samples
     };
 
-    struct Size
+    struct Extents
     {
-        int width = 0;              ///< Width in pixels
-        int height = 0;             ///< Height in pixels (if 2d or 3d)
-        int depth = 0;              ///< Depth (if 3d)
+        GfxCount width = 0;              ///< Width in pixels
+        GfxCount height = 0;             ///< Height in pixels (if 2d or 3d)
+        GfxCount depth = 0;              ///< Depth (if 3d)
     };
 
     struct Desc: public DescBase
     {
-        Size size;
+        Extents size;
 
-        int arraySize = 0;          ///< Array size
+        GfxCount arraySize = 0;          ///< Array size
 
-        int numMipLevels = 0;       ///< Number of mip levels - if 0 will create all mip levels
-        Format format;              ///< The resources format
-        SampleDesc sampleDesc;      ///< How the resource is sampled
+        GfxCount numMipLevels = 0;       ///< Number of mip levels - if 0 will create all mip levels
+        Format format;                   ///< The resources format
+        SampleDesc sampleDesc;           ///< How the resource is sampled
         ClearValue optimalClearValue;
     };
 
@@ -715,7 +715,7 @@ public:
             /// Devices may not support all possible values for `strideY`.
             /// In particular, they may only support strictly positive strides.
             ///
-        int64_t     strideY;
+        gfx::Size strideY;
 
             /// Stride in bytes between layers of the subresource tensor.
             ///
@@ -725,7 +725,7 @@ public:
             /// Devices may not support all possible values for `strideZ`.
             /// In particular, they may only support strictly positive strides.
             ///
-        int64_t     strideZ;
+        gfx::Size strideZ;
     };
 
     virtual SLANG_NO_THROW Desc* SLANG_MCALL getDesc() = 0;
@@ -834,8 +834,8 @@ public:
         SubresourceRange subresourceRange;
         // Specifies the range of a buffer resource for a ShaderResource/UnorderedAccess view.
         BufferRange bufferRange;
-        // Specifies the element size of a structured buffer. Pass 0 for a raw buffer view.
-        uint32_t bufferElementSize;
+        // Specifies the element size in bytes of a structured buffer. Pass 0 for a raw buffer view.
+        Size bufferElementSize;
     };
     virtual SLANG_NO_THROW Desc* SLANG_MCALL getViewDesc() = 0;
 
@@ -898,11 +898,11 @@ public:
         DeviceAddress transform3x4;
         Format indexFormat;
         Format vertexFormat;
-        uint32_t indexCount;
-        uint32_t vertexCount;
+        GfxCount indexCount;
+        GfxCount vertexCount;
         DeviceAddress indexData;
         DeviceAddress vertexData;
-        uint64_t vertexStride;
+        Size vertexStride;
     };
 
     struct ProceduralAABB
@@ -918,13 +918,13 @@ public:
     struct ProceduralAABBDesc
     {
         /// Number of AABBs.
-        uint64_t count;
+        GfxCount count;
 
         /// Pointer to an array of `ProceduralAABB` values in device memory.
         DeviceAddress data;
 
         /// Stride in bytes of the AABB values array.
-        uint64_t stride;
+        Size stride;
     };
 
     struct GeometryDesc
@@ -952,6 +952,7 @@ public:
         };
     };
 
+    // TODO: Should any of these be changed?
     // The layout of this struct is intentionally consistent with D3D12_RAYTRACING_INSTANCE_DESC
     // and VkAccelerationStructureInstanceKHR.
     struct InstanceDesc
@@ -966,9 +967,9 @@ public:
 
     struct PrebuildInfo
     {
-        uint64_t resultDataMaxSize;
-        uint64_t scratchDataSize;
-        uint64_t updateScratchDataSize;
+        Size resultDataMaxSize;
+        Size scratchDataSize;
+        Size updateScratchDataSize;
     };
 
     struct BuildInputs
@@ -977,7 +978,7 @@ public:
 
         BuildFlags::Enum flags;
 
-        int32_t descCount;
+        GfxCount descCount;
 
         /// Array of `InstanceDesc` values in device memory.
         /// Used when `kind` is `TopLevel`.
@@ -992,8 +993,8 @@ public:
     {
         Kind kind;
         IBufferResource* buffer;
-        uint64_t offset;
-        uint64_t size;
+        Offset offset;
+        Size size;
     };
 
     struct BuildDesc
@@ -1037,8 +1038,8 @@ public:
 struct ShaderOffset
 {
     SlangInt uniformOffset = 0; // TODO: Change to Offset?
-    SlangInt bindingRangeIndex = 0;
-    SlangInt bindingArrayIndex = 0;
+    GfxIndex bindingRangeIndex = 0;
+    GfxIndex bindingArrayIndex = 0;
     uint32_t getHashCode() const
     {
         return (uint32_t)(((bindingRangeIndex << 20) + bindingArrayIndex) ^ uniformOffset);
@@ -1087,16 +1088,16 @@ public:
 
     virtual SLANG_NO_THROW slang::TypeLayoutReflection* SLANG_MCALL getElementTypeLayout() = 0;
     virtual SLANG_NO_THROW ShaderObjectContainerType SLANG_MCALL getContainerType() = 0;
-    virtual SLANG_NO_THROW UInt SLANG_MCALL getEntryPointCount() = 0;
+    virtual SLANG_NO_THROW GfxCount SLANG_MCALL getEntryPointCount() = 0;
 
-    ComPtr<IShaderObject> getEntryPoint(UInt index)
+    ComPtr<IShaderObject> getEntryPoint(GfxIndex index)
     {
         ComPtr<IShaderObject> entryPoint = nullptr;
         SLANG_RETURN_NULL_ON_FAIL(getEntryPoint(index, entryPoint.writeRef()));
         return entryPoint;
     }
     virtual SLANG_NO_THROW Result SLANG_MCALL
-        getEntryPoint(UInt index, IShaderObject** entryPoint) = 0;
+        getEntryPoint(GfxIndex index, IShaderObject** entryPoint) = 0;
     virtual SLANG_NO_THROW Result SLANG_MCALL
         setData(ShaderOffset const& offset, void const* data, Size size) = 0;
     virtual SLANG_NO_THROW Result SLANG_MCALL
@@ -1116,7 +1117,7 @@ public:
     virtual SLANG_NO_THROW Result SLANG_MCALL setSpecializationArgs(
         ShaderOffset const& offset,
         const slang::SpecializationArg* args,
-        uint32_t count) = 0;
+        GfxCount count) = 0;
 
     virtual SLANG_NO_THROW Result SLANG_MCALL getCurrentVersion(
         ITransientResourceHeap* transientHeap,
@@ -1180,8 +1181,8 @@ struct DepthStencilDesc
     ComparisonFunc  depthFunc           = ComparisonFunc::Less;
 
     bool                stencilEnable       = false;
-    uint32_t             stencilReadMask     = 0xFFFFFFFF;
-    uint32_t             stencilWriteMask    = 0xFFFFFFFF;
+    uint32_t            stencilReadMask     = 0xFFFFFFFF;
+    uint32_t            stencilWriteMask    = 0xFFFFFFFF;
     DepthStencilOpDesc  frontFace;
     DepthStencilOpDesc  backFace;
 
@@ -1273,7 +1274,7 @@ struct TargetBlendDesc
 struct BlendDesc
 {
     TargetBlendDesc         targets[kMaxRenderTargetCount];
-    UInt                    targetCount = 0;
+    GfxCount                targetCount = 0;
 
     bool alphaToCoverageEnable  = false;
 };
@@ -1284,11 +1285,11 @@ public:
     struct AttachmentLayout
     {
         Format format;
-        int sampleCount;
+        GfxCount sampleCount;
     };
     struct Desc
     {
-        uint32_t renderTargetCount;
+        GfxCount renderTargetCount;
         AttachmentLayout* renderTargets = nullptr;
         AttachmentLayout* depthStencil = nullptr;
     };
@@ -1337,11 +1338,11 @@ struct HitGroupDesc
 struct RayTracingPipelineStateDesc
 {
     IShaderProgram* program = nullptr;
-    int32_t hitGroupCount = 0;
+    GfxCount hitGroupCount = 0;
     const HitGroupDesc* hitGroups = nullptr;
     int maxRecursion = 0;
-    int maxRayPayloadSize = 0;
-    int maxAttributeSizeInBytes = 8;
+    Size maxRayPayloadSize = 0;
+    Size maxAttributeSizeInBytes = 8;
     RayTracingPipelineFlags::Enum flags = RayTracingPipelineFlags::None;
 };
 
@@ -1351,22 +1352,22 @@ public:
     // Specifies the bytes to overwrite into a record in the shader table.
     struct ShaderRecordOverwrite
     {
-        uint32_t offset; // Offset within the shader record.
-        uint32_t size; // Number of bytes to overwrite.
+        Offset offset; // Offset within the shader record.
+        Size size; // Number of bytes to overwrite.
         uint8_t data[8]; // Content to overwrite.
     };
 
     struct Desc
     {
-        uint32_t rayGenShaderCount;
+        GfxCount rayGenShaderCount;
         const char** rayGenShaderEntryPointNames;
         const ShaderRecordOverwrite* rayGenShaderRecordOverwrites;
 
-        uint32_t missShaderCount;
+        GfxCount missShaderCount;
         const char** missShaderEntryPointNames;
         const ShaderRecordOverwrite* missShaderRecordOverwrites;
 
-        uint32_t hitGroupCount;
+        GfxCount hitGroupCount;
         const char** hitGroupNames;
         const ShaderRecordOverwrite* hitGroupRecordOverwrites;
 
@@ -1412,7 +1413,7 @@ class IFramebuffer : public ISlangUnknown
 public:
     struct Desc
     {
-        uint32_t renderTargetCount;
+        GfxCount renderTargetCount;
         IResourceView* const* renderTargetViews;
         IResourceView* depthStencilView;
         IFramebufferLayout* layout;
@@ -1481,7 +1482,7 @@ public:
     struct Desc
     {
         IFramebufferLayout* framebufferLayout = nullptr;
-        uint32_t renderTargetCount;
+        GfxCount renderTargetCount;
         AttachmentAccessDesc* renderTargetAccess = nullptr;
         AttachmentAccessDesc* depthStencilAccess = nullptr;
     };
@@ -1505,10 +1506,10 @@ public:
     struct Desc
     {
         QueryType type;
-        SlangInt count;
+        GfxCount count;
     };
 public:
-    virtual SLANG_NO_THROW Result SLANG_MCALL getResult(SlangInt queryIndex, SlangInt count, uint64_t* data) = 0;
+    virtual SLANG_NO_THROW Result SLANG_MCALL getResult(GfxIndex queryIndex, GfxCount count, uint64_t* data) = 0;
     virtual SLANG_NO_THROW Result SLANG_MCALL reset() = 0;
 };
 #define SLANG_UUID_IQueryPool                                                         \
@@ -1519,31 +1520,31 @@ class ICommandEncoder
 {
 public:
     virtual SLANG_NO_THROW void SLANG_MCALL endEncoding() = 0;
-    virtual SLANG_NO_THROW void SLANG_MCALL writeTimestamp(IQueryPool* queryPool, SlangInt queryIndex) = 0;
+    virtual SLANG_NO_THROW void SLANG_MCALL writeTimestamp(IQueryPool* queryPool, GfxIndex queryIndex) = 0;
 };
 
 struct IndirectDispatchArguments
 {
-    uint32_t ThreadGroupCountX;
-    uint32_t ThreadGroupCountY;
-    uint32_t ThreadGroupCountZ;
+    GfxCount ThreadGroupCountX;
+    GfxCount ThreadGroupCountY;
+    GfxCount ThreadGroupCountZ;
 };
 
 struct IndirectDrawArguments
 {
-    uint32_t VertexCountPerInstance;
-    uint32_t InstanceCount;
-    uint32_t StartVertexLocation;
-    uint32_t StartInstanceLocation;
+    GfxCount VertexCountPerInstance;
+    GfxCount InstanceCount;
+    GfxIndex StartVertexLocation;
+    GfxIndex StartInstanceLocation;
 };
 
 struct IndirectDrawIndexedArguments
 {
-    uint32_t IndexCountPerInstance;
-    uint32_t InstanceCount;
-    uint32_t StartIndexLocation;
-    int32_t  BaseVertexLocation;
-    uint32_t StartInstanceLocation;
+    GfxCount IndexCountPerInstance;
+    GfxCount InstanceCount;
+    GfxIndex StartIndexLocation;
+    GfxIndex BaseVertexLocation;
+    GfxIndex StartInstanceLocation;
 };
 
 struct SamplePosition
@@ -1568,9 +1569,9 @@ class IResourceCommandEncoder : public ICommandEncoder
 public:
     virtual SLANG_NO_THROW void SLANG_MCALL copyBuffer(
         IBufferResource* dst,
-        Size dstOffset,
+        Offset dstOffset,
         IBufferResource* src,
-        Size srcOffset,
+        Offset srcOffset,
         Size size) = 0;
 
     /// Copies texture from src to dst. If dstSubresource and srcSubresource has mipLevelCount = 0
@@ -1585,30 +1586,30 @@ public:
         ResourceState srcState,
         SubresourceRange srcSubresource,
         ITextureResource::Offset3D srcOffset,
-        ITextureResource::Size extent) = 0;
+        ITextureResource::Extents extent) = 0;
 
     /// Copies texture to a buffer. Each row is aligned to kTexturePitchAlignment.
     virtual SLANG_NO_THROW void SLANG_MCALL copyTextureToBuffer(
         IBufferResource* dst,
-        Size dstOffset,
+        Offset dstOffset,
         Size dstSize,
         Size dstRowStride,
         ITextureResource* src,
         ResourceState srcState,
         SubresourceRange srcSubresource,
         ITextureResource::Offset3D srcOffset,
-        ITextureResource::Size extent) = 0;
+        ITextureResource::Extents extent) = 0;
     virtual SLANG_NO_THROW void SLANG_MCALL uploadTextureData(
         ITextureResource* dst,
         SubresourceRange subResourceRange,
         ITextureResource::Offset3D offset,
-        ITextureResource::Size extent,
+        ITextureResource::Extents extent,
         ITextureResource::SubresourceData* subResourceData,
-        size_t subResourceDataCount) = 0; // TODO: Change size_t to Count?
+        GfxCount subResourceDataCount) = 0;
     virtual SLANG_NO_THROW void SLANG_MCALL
         uploadBufferData(IBufferResource* dst, Offset offset, Size size, void* data) = 0;
     virtual SLANG_NO_THROW void SLANG_MCALL textureBarrier(
-        size_t count, ITextureResource* const* textures, ResourceState src, ResourceState dst) = 0; // TODO: Change size_t to Count?
+        GfxCount count, ITextureResource* const* textures, ResourceState src, ResourceState dst) = 0;
     void textureBarrier(ITextureResource* texture, ResourceState src, ResourceState dst)
     {
         textureBarrier(1, &texture, src, dst);
@@ -1619,7 +1620,7 @@ public:
         ResourceState src,
         ResourceState dst) = 0;
     virtual SLANG_NO_THROW void SLANG_MCALL bufferBarrier(
-        size_t count, IBufferResource* const* buffers, ResourceState src, ResourceState dst) = 0; // TODO: Change size_t to Count?
+        GfxCount count, IBufferResource* const* buffers, ResourceState src, ResourceState dst) = 0;
     void bufferBarrier(IBufferResource* buffer, ResourceState src, ResourceState dst)
     {
         bufferBarrier(1, &buffer, src, dst);
@@ -1635,10 +1636,10 @@ public:
         SubresourceRange destRange) = 0;
     virtual SLANG_NO_THROW void SLANG_MCALL resolveQuery(
         IQueryPool* queryPool,
-        uint32_t index,
-        uint32_t count,
+        GfxIndex index,
+        GfxCount count,
         IBufferResource* buffer,
-        uint64_t offset) = 0;
+        Offset offset) = 0;
     virtual SLANG_NO_THROW void SLANG_MCALL beginDebugEvent(const char* name, float rgbColor[3]) = 0;
     virtual SLANG_NO_THROW void SLANG_MCALL endDebugEvent() = 0;
 };
@@ -1665,9 +1666,9 @@ public:
         bindPipelineWithRootObject(IPipelineState* state, IShaderObject* rootObject) = 0;
 
     virtual SLANG_NO_THROW void
-        SLANG_MCALL setViewports(uint32_t count, const Viewport* viewports) = 0;
+        SLANG_MCALL setViewports(GfxCount count, const Viewport* viewports) = 0;
     virtual SLANG_NO_THROW void
-        SLANG_MCALL setScissorRects(uint32_t count, const ScissorRect* scissors) = 0;
+        SLANG_MCALL setScissorRects(GfxCount count, const ScissorRect* scissors) = 0;
 
     /// Sets the viewport, and sets the scissor rect to match the viewport.
     inline void setViewportAndScissor(Viewport const& viewport)
@@ -1681,48 +1682,48 @@ public:
 
     virtual SLANG_NO_THROW void SLANG_MCALL setPrimitiveTopology(PrimitiveTopology topology) = 0;
     virtual SLANG_NO_THROW void SLANG_MCALL setVertexBuffers(
-        uint32_t startSlot,
-        uint32_t slotCount,
+        GfxIndex startSlot,
+        GfxCount slotCount,
         IBufferResource* const* buffers,
-        const uint32_t* offsets) = 0;
+        const Offset* offsets) = 0;
     inline void setVertexBuffer(
-        uint32_t slot, IBufferResource* buffer, uint32_t offset = 0)
+        GfxIndex slot, IBufferResource* buffer, Offset offset = 0)
     {
         setVertexBuffers(slot, 1, &buffer, &offset);
     }
 
     virtual SLANG_NO_THROW void SLANG_MCALL
-        setIndexBuffer(IBufferResource* buffer, Format indexFormat, uint32_t offset = 0) = 0;
+        setIndexBuffer(IBufferResource* buffer, Format indexFormat, Offset offset = 0) = 0;
     virtual SLANG_NO_THROW void SLANG_MCALL
-        draw(uint32_t vertexCount, uint32_t startVertex = 0) = 0;
+        draw(GfxCount vertexCount, GfxIndex startVertex = 0) = 0;
     virtual SLANG_NO_THROW void SLANG_MCALL
-        drawIndexed(uint32_t indexCount, uint32_t startIndex = 0, uint32_t baseVertex = 0) = 0;
+        drawIndexed(GfxCount indexCount, GfxIndex startIndex = 0, GfxIndex baseVertex = 0) = 0;
     virtual SLANG_NO_THROW void SLANG_MCALL drawIndirect(
-        uint32_t maxDrawCount,
+        GfxCount maxDrawCount,
         IBufferResource* argBuffer,
-        uint64_t argOffset,
+        Offset argOffset,
         IBufferResource* countBuffer = nullptr,
-        uint64_t countOffset = 0) = 0;
+        Offset countOffset = 0) = 0;
     virtual SLANG_NO_THROW void SLANG_MCALL drawIndexedIndirect(
-        uint32_t maxDrawCount,
+        GfxCount maxDrawCount,
         IBufferResource* argBuffer,
-        uint64_t argOffset,
+        Offset argOffset,
         IBufferResource* countBuffer = nullptr,
-        uint64_t countOffset = 0) = 0;
+        Offset countOffset = 0) = 0;
     virtual SLANG_NO_THROW void SLANG_MCALL setStencilReference(uint32_t referenceValue) = 0;
     virtual SLANG_NO_THROW Result SLANG_MCALL setSamplePositions(
-        uint32_t samplesPerPixel, uint32_t pixelCount, const SamplePosition* samplePositions) = 0;
+        GfxCount samplesPerPixel, GfxCount pixelCount, const SamplePosition* samplePositions) = 0;
     virtual SLANG_NO_THROW void SLANG_MCALL drawInstanced(
-        uint32_t vertexCount,
-        uint32_t instanceCount,
-        uint32_t startVertex,
-        uint32_t startInstanceLocation) = 0;
+        GfxCount vertexCount,
+        GfxCount instanceCount,
+        GfxIndex startVertex,
+        GfxIndex startInstanceLocation) = 0;
     virtual SLANG_NO_THROW void SLANG_MCALL drawIndexedInstanced(
-        uint32_t indexCount,
-        uint32_t instanceCount,
-        uint32_t startIndexLocation,
-        int32_t baseVertexLocation,
-        uint32_t startInstanceLocation) = 0;
+        GfxCount indexCount,
+        GfxCount instanceCount,
+        GfxIndex startIndexLocation,
+        GfxIndex baseVertexLocation,
+        GfxIndex startInstanceLocation) = 0;
 };
 
 class IComputeCommandEncoder : public IResourceCommandEncoder
@@ -1745,7 +1746,7 @@ public:
     virtual SLANG_NO_THROW Result SLANG_MCALL
         bindPipelineWithRootObject(IPipelineState* state, IShaderObject* rootObject) = 0;
     virtual SLANG_NO_THROW void SLANG_MCALL dispatchCompute(int x, int y, int z) = 0;
-    virtual SLANG_NO_THROW void SLANG_MCALL dispatchComputeIndirect(IBufferResource* cmdBuffer, uint64_t offset) = 0;
+    virtual SLANG_NO_THROW void SLANG_MCALL dispatchComputeIndirect(IBufferResource* cmdBuffer, Offset offset) = 0;
 };
 
 enum class AccelerationStructureCopyMode
@@ -1759,7 +1760,7 @@ struct AccelerationStructureQueryDesc
 
     IQueryPool* queryPool;
 
-    int32_t firstQueryIndex;
+    GfxIndex firstQueryIndex;
 };
 
 class IRayTracingCommandEncoder : public IResourceCommandEncoder
@@ -1767,16 +1768,16 @@ class IRayTracingCommandEncoder : public IResourceCommandEncoder
 public:
     virtual SLANG_NO_THROW void SLANG_MCALL buildAccelerationStructure(
         const IAccelerationStructure::BuildDesc& desc,
-        int propertyQueryCount,
+        GfxCount propertyQueryCount,
         AccelerationStructureQueryDesc* queryDescs) = 0;
     virtual SLANG_NO_THROW void SLANG_MCALL copyAccelerationStructure(
         IAccelerationStructure* dest,
         IAccelerationStructure* src,
         AccelerationStructureCopyMode mode) = 0;
     virtual SLANG_NO_THROW void SLANG_MCALL queryAccelerationStructureProperties(
-        int accelerationStructureCount,
+        GfxCount accelerationStructureCount,
         IAccelerationStructure* const* accelerationStructures,
-        int queryCount,
+        GfxCount queryCount,
         AccelerationStructureQueryDesc* queryDescs) = 0;
     virtual SLANG_NO_THROW void SLANG_MCALL
         serializeAccelerationStructure(DeviceAddress dest, IAccelerationStructure* source) = 0;
@@ -1792,11 +1793,11 @@ public:
     /// Issues a dispatch command to start ray tracing workload with a ray tracing pipeline.
     /// `rayGenShaderIndex` specifies the index into the shader table that identifies the ray generation shader.
     virtual SLANG_NO_THROW void SLANG_MCALL dispatchRays(
-        uint32_t rayGenShaderIndex,
+        GfxIndex rayGenShaderIndex,
         IShaderTable* shaderTable,
-        int32_t width,
-        int32_t height,
-        int32_t depth) = 0;
+        GfxCount width,
+        GfxCount height,
+        GfxCount depth) = 0;
 };
 #define SLANG_UUID_IRayTracingCommandEncoder                                           \
     {                                                                                  \
@@ -1877,7 +1878,7 @@ public:
     virtual SLANG_NO_THROW const Desc& SLANG_MCALL getDesc() = 0;
 
     virtual SLANG_NO_THROW void SLANG_MCALL executeCommandBuffers(
-        uint32_t count,
+        GfxCount count,
         ICommandBuffer* const* commandBuffers,
         IFence* fenceToSignal,
         uint64_t newFenceValue) = 0;
@@ -1893,7 +1894,7 @@ public:
 
     /// Queues a device side wait for the given fences.
     virtual SLANG_NO_THROW Result SLANG_MCALL
-        waitForFenceValuesOnDevice(uint32_t fenceCount, IFence** fences, uint64_t* waitValues) = 0;
+        waitForFenceValuesOnDevice(GfxCount fenceCount, IFence** fences, uint64_t* waitValues) = 0;
 };
 #define SLANG_UUID_ICommandQueue                                                    \
     {                                                                               \
@@ -1915,11 +1916,11 @@ public:
     {
         Flags::Enum flags;
         Size constantBufferSize;
-        uint32_t samplerDescriptorCount;
-        uint32_t uavDescriptorCount;
-        uint32_t srvDescriptorCount;
-        uint32_t constantBufferDescriptorCount;
-        uint32_t accelerationStructureDescriptorCount;
+        GfxCount samplerDescriptorCount;
+        GfxCount uavDescriptorCount;
+        GfxCount srvDescriptorCount;
+        GfxCount constantBufferDescriptorCount;
+        GfxCount accelerationStructureDescriptorCount;
     };
 
     // Waits until GPU commands issued before last call to `finish()` has been completed, and resets
@@ -1960,8 +1961,8 @@ public:
     };
     virtual SLANG_NO_THROW Result SLANG_MCALL allocateTransientDescriptorTable(
         DescriptorType type,
-        uint32_t count,
-        uint64_t& outDescriptorOffset,
+        GfxCount count,
+        Offset& outDescriptorOffset,
         void** outD3DDescriptorHeapHandle) = 0;
 };
 #define SLANG_UUID_ID3D12TransientResourceHeap                                             \
@@ -1975,8 +1976,8 @@ public:
     struct Desc
     {
         Format format;
-        uint32_t width, height;
-        uint32_t imageCount;
+        GfxCount width, height;
+        GfxCount imageCount;
         ICommandQueue* queue;
         bool enableVSync;
     };
@@ -1984,7 +1985,7 @@ public:
 
     /// Returns the back buffer image at `index`.
     virtual SLANG_NO_THROW Result SLANG_MCALL
-        getImage(uint32_t index, ITextureResource** outResource) = 0;
+        getImage(GfxIndex index, ITextureResource** outResource) = 0;
 
     /// Present the next image in the swapchain.
     virtual SLANG_NO_THROW Result SLANG_MCALL present() = 0;
@@ -1995,7 +1996,7 @@ public:
 
     /// Resizes the back buffers of this swapchain. All render target views and framebuffers
     /// referencing the back buffer images must be freed before calling this method.
-    virtual SLANG_NO_THROW Result SLANG_MCALL resize(uint32_t width, uint32_t height) = 0;
+    virtual SLANG_NO_THROW Result SLANG_MCALL resize(GfxCount width, GfxCount height) = 0;
 
     // Check if the window is occluded.
     virtual SLANG_NO_THROW bool SLANG_MCALL isOccluded() = 0;
@@ -2055,10 +2056,10 @@ public:
         SlangMatrixLayoutMode defaultMatrixLayoutMode = SLANG_MATRIX_LAYOUT_ROW_MAJOR;
 
         char const* const* searchPaths = nullptr;
-        SlangInt            searchPathCount = 0;
+        GfxCount           searchPathCount = 0;
 
         slang::PreprocessorMacroDesc const* preprocessorMacros = nullptr;
-        SlangInt                        preprocessorMacroCount = 0;
+        GfxCount                            preprocessorMacroCount = 0;
 
         const char* targetProfile = nullptr; // (optional) Target shader profile. If null this will be set to platform dependent default.
         SlangFloatingPointMode floatingPointMode = SLANG_FLOATING_POINT_MODE_DEFAULT;
@@ -2083,20 +2084,20 @@ public:
         // Name to identify the adapter to use
         const char* adapter = nullptr;
         // Number of required features.
-        int requiredFeatureCount = 0;
+        GfxCount requiredFeatureCount = 0;
         // Array of required feature names, whose size is `requiredFeatureCount`.
         const char** requiredFeatures = nullptr;
         // A command dispatcher object that intercepts and handles actual low-level API call.
         ISlangUnknown* apiCommandDispatcher = nullptr;
         // The slot (typically UAV) used to identify NVAPI intrinsics. If >=0 NVAPI is required.
-        int nvapiExtnSlot = -1;
+        GfxIndex nvapiExtnSlot = -1;
         // The file system for loading cached shader kernels. The layer does not maintain a strong reference to the object,
         // instead the user is responsible for holding the object alive during the lifetime of an `IDevice`.
         ISlangFileSystem* shaderCacheFileSystem = nullptr;
         // Configurations for Slang compiler.
         SlangDesc slang = {};
 
-        uint32_t extendedDescCount = 0;
+        GfxCount extendedDescCount = 0;
         void** extendedDescs = nullptr;
     };
 
@@ -2105,7 +2106,7 @@ public:
     virtual SLANG_NO_THROW bool SLANG_MCALL hasFeature(const char* feature) = 0;
 
         /// Returns a list of features supported by the renderer.
-    virtual SLANG_NO_THROW Result SLANG_MCALL getFeatures(const char** outFeatures, UInt bufferSize, UInt* outFeatureCount) = 0;
+    virtual SLANG_NO_THROW Result SLANG_MCALL getFeatures(const char** outFeatures, Size bufferSize, GfxCount* outFeatureCount) = 0;
 
     virtual SLANG_NO_THROW Result SLANG_MCALL getFormatSupportedResourceStates(Format format, ResourceStateSet* outStates) = 0;
 
@@ -2275,9 +2276,9 @@ public:
         return layout;
     }
 
-    inline Result createInputLayout(Size vertexSize, InputElementDesc const* inputElements, Int inputElementCount, IInputLayout** outLayout)
+    inline Result createInputLayout(Size vertexSize, InputElementDesc const* inputElements, GfxCount inputElementCount, IInputLayout** outLayout)
     {
-        VertexStreamDesc streamDesc = { (uint32_t)vertexSize, InputSlotClass::PerVertex, 0 };
+        VertexStreamDesc streamDesc = { vertexSize, InputSlotClass::PerVertex, 0 };
 
         IInputLayout::Desc inputLayoutDesc = {};
         inputLayoutDesc.inputElementCount = inputElementCount;
@@ -2287,7 +2288,7 @@ public:
         return createInputLayout(inputLayoutDesc, outLayout);
     }
 
-    inline ComPtr<IInputLayout> createInputLayout(Size vertexSize, InputElementDesc const* inputElements, Int inputElementCount)
+    inline ComPtr<IInputLayout> createInputLayout(Size vertexSize, InputElementDesc const* inputElements, GfxCount inputElementCount)
     {
         ComPtr<IInputLayout> layout;
         SLANG_RETURN_NULL_ON_FAIL(createInputLayout(vertexSize, inputElements, inputElementCount, layout.writeRef()));
@@ -2407,16 +2408,16 @@ public:
     /// Wait on the host for the fences to signals.
     /// `timeout` is in nanoseconds, can be set to `kTimeoutInfinite`.
     virtual SLANG_NO_THROW Result SLANG_MCALL waitForFences(
-        uint32_t fenceCount,
+        GfxCount fenceCount,
         IFence** fences,
         uint64_t* values,
         bool waitForAll,
         uint64_t timeout) = 0;
 
     virtual SLANG_NO_THROW Result SLANG_MCALL getTextureAllocationInfo(
-        const ITextureResource::Desc& desc, Size* outSize, size_t* outAlignment) = 0;
+        const ITextureResource::Desc& desc, Size* outSize, Size* outAlignment) = 0;
 
-    virtual SLANG_NO_THROW Result SLANG_MCALL getTextureRowAlignment(size_t* outAlignment) = 0;
+    virtual SLANG_NO_THROW Result SLANG_MCALL getTextureRowAlignment(Size* outAlignment) = 0;
 };
 
 #define SLANG_UUID_IDevice                                                               \
