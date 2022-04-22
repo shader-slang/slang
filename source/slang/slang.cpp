@@ -962,7 +962,8 @@ SLANG_NO_THROW slang::IModule* SLANG_MCALL Linkage::loadModuleFromSource(
             PathInfo::makeFromString(moduleName),
             source,
             SourceLoc(),
-            &sink);
+            &sink,
+            nullptr);
         sink.getBlobIfNeeded(outDiagnostics);
         return asExternal(module);
 
@@ -2005,6 +2006,8 @@ RefPtr<ComponentType> createSpecializedGlobalAndEntryPointsComponentType(
 void FrontEndCompileRequest::checkAllTranslationUnits()
 {
     LoadedModuleDictionary loadedModules;
+    if (additionalLoadedModules)
+        loadedModules = *additionalLoadedModules;
 
     // Iterate over all translation units and
     // apply the semantic checking logic.
@@ -2606,9 +2609,12 @@ RefPtr<Module> Linkage::loadModule(
     const PathInfo&     filePathInfo,
     ISlangBlob*         sourceBlob, 
     SourceLoc const&    srcLoc,
-    DiagnosticSink*     sink)
+    DiagnosticSink*     sink,
+    const LoadedModuleDictionary* additionalLoadedModules)
 {
     RefPtr<FrontEndCompileRequest> frontEndReq = new FrontEndCompileRequest(this, nullptr, sink);
+
+    frontEndReq->additionalLoadedModules = additionalLoadedModules;
 
     RefPtr<TranslationUnitRequest> translationUnit = new TranslationUnitRequest(frontEndReq);
     translationUnit->compileRequest = frontEndReq;
@@ -2769,7 +2775,8 @@ RefPtr<Module> Linkage::findOrImportModule(
         filePathInfo,
         fileContents,
         loc,
-        sink);
+        sink,
+        loadedModules);
 }
 
 //

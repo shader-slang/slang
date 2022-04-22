@@ -567,9 +567,9 @@ public:
     virtual SLANG_NO_THROW Result SLANG_MCALL
         init(IDevice* device, CUDAShaderObjectLayout* typeLayout);
 
-    virtual SLANG_NO_THROW UInt SLANG_MCALL getEntryPointCount() override { return 0; }
+    virtual SLANG_NO_THROW GfxCount SLANG_MCALL getEntryPointCount() override { return 0; }
     virtual SLANG_NO_THROW Result SLANG_MCALL
-        getEntryPoint(UInt index, IShaderObject** outEntryPoint) override
+        getEntryPoint(GfxIndex index, IShaderObject** outEntryPoint) override
     {
         *outEntryPoint = nullptr;
         return SLANG_OK;
@@ -580,15 +580,15 @@ public:
         return m_data.getBuffer();
     }
 
-    virtual SLANG_NO_THROW size_t SLANG_MCALL getSize() override
+    virtual SLANG_NO_THROW Size SLANG_MCALL getSize() override
     {
-        return (size_t)m_data.getCount();
+        return (Size)m_data.getCount();
     }
 
     virtual SLANG_NO_THROW Result SLANG_MCALL
-        setData(ShaderOffset const& offset, void const* data, size_t size) override
+        setData(ShaderOffset const& offset, void const* data, Size size) override
     {
-        size = Math::Min(size, (size_t)m_data.getCount() - offset.uniformOffset);
+        size = Math::Min(size, (Size)m_data.getCount() - offset.uniformOffset);
         SLANG_CUDA_RETURN_ON_FAIL(cudaMemcpy(
             (uint8_t*)m_data.getBuffer() + offset.uniformOffset, data, size, cudaMemcpyDefault));
         return SLANG_OK;
@@ -709,9 +709,9 @@ public:
     List<RefPtr<CUDAEntryPointShaderObject>> entryPointObjects;
     virtual SLANG_NO_THROW Result SLANG_MCALL
         init(IDevice* device, CUDAShaderObjectLayout* typeLayout) override;
-    virtual SLANG_NO_THROW UInt SLANG_MCALL getEntryPointCount() override { return entryPointObjects.getCount(); }
+    virtual SLANG_NO_THROW GfxCount SLANG_MCALL getEntryPointCount() override { return (GfxCount)entryPointObjects.getCount(); }
     virtual SLANG_NO_THROW Result SLANG_MCALL
-        getEntryPoint(UInt index, IShaderObject** outEntryPoint) override
+        getEntryPoint(GfxIndex index, IShaderObject** outEntryPoint) override
     {
         returnComPtr(outEntryPoint, entryPointObjects[index]);
         return SLANG_OK;
@@ -786,9 +786,9 @@ public:
     }
 
     virtual SLANG_NO_THROW Result SLANG_MCALL getResult(
-        SlangInt queryIndex, SlangInt count, uint64_t* data) override
+        GfxIndex queryIndex, GfxCount count, uint64_t* data) override
     {
-        for (SlangInt i = 0; i < count; i++)
+        for (GfxIndex i = 0; i < count; i++)
         {
             float time = 0.0f;
             cuEventSynchronize(m_events[i + queryIndex]);
@@ -975,36 +975,36 @@ public:
             virtual SLANG_NO_THROW void SLANG_MCALL endEncoding() override {}
             virtual SLANG_NO_THROW void SLANG_MCALL copyBuffer(
                 IBufferResource* dst,
-                size_t dstOffset,
+                Offset dstOffset,
                 IBufferResource* src,
-                size_t srcOffset,
-                size_t size) override
+                Offset srcOffset,
+                Size size) override
             {
                 m_writer->copyBuffer(dst, dstOffset, src, srcOffset, size);
             }
 
             virtual SLANG_NO_THROW void SLANG_MCALL textureBarrier(
-                size_t count,
+                GfxCount count,
                 ITextureResource* const* textures,
                 ResourceState src,
                 ResourceState dst) override
             {}
 
             virtual SLANG_NO_THROW void SLANG_MCALL bufferBarrier(
-                size_t count,
+                GfxCount count,
                 IBufferResource* const* buffers,
                 ResourceState src,
                 ResourceState dst) override
             {}
 
             virtual SLANG_NO_THROW void SLANG_MCALL uploadBufferData(
-                IBufferResource* dst, size_t offset, size_t size, void* data) override
+                IBufferResource* dst, Offset offset, Size size, void* data) override
             {
                 m_writer->uploadBufferData(dst, offset, size, data);
             }
 
             virtual SLANG_NO_THROW void SLANG_MCALL
-                writeTimestamp(IQueryPool* pool, SlangInt index) override
+                writeTimestamp(IQueryPool* pool, GfxIndex index) override
             {
                 m_writer->writeTimestamp(pool, index);
             }
@@ -1018,7 +1018,7 @@ public:
                 ResourceState srcState,
                 SubresourceRange srcSubresource,
                 ITextureResource::Offset3D srcOffset,
-                ITextureResource::Size extent) override
+                ITextureResource::Extents extent) override
             {
                 SLANG_UNUSED(dst);
                 SLANG_UNUSED(dstState);
@@ -1036,9 +1036,9 @@ public:
                 ITextureResource* dst,
                 SubresourceRange subResourceRange,
                 ITextureResource::Offset3D offset,
-                ITextureResource::Size extent,
+                ITextureResource::Extents extent,
                 ITextureResource::SubresourceData* subResourceData,
-                size_t subResourceDataCount) override
+                GfxCount subResourceDataCount) override
             {
                 SLANG_UNUSED(dst);
                 SLANG_UNUSED(subResourceRange);
@@ -1079,10 +1079,10 @@ public:
 
             virtual SLANG_NO_THROW void SLANG_MCALL resolveQuery(
                 IQueryPool* queryPool,
-                uint32_t index,
-                uint32_t count,
+                GfxIndex index,
+                GfxCount count,
                 IBufferResource* buffer,
-                uint64_t offset) override
+                Offset offset) override
             {
                 SLANG_UNUSED(queryPool);
                 SLANG_UNUSED(index);
@@ -1094,14 +1094,14 @@ public:
 
             virtual SLANG_NO_THROW void SLANG_MCALL copyTextureToBuffer(
                 IBufferResource* dst,
-                size_t dstOffset,
-                size_t dstSize,
-                size_t dstRowStride,
+                Offset dstOffset,
+                Size dstSize,
+                Size dstRowStride,
                 ITextureResource* src,
                 ResourceState srcState,
                 SubresourceRange srcSubresource,
                 ITextureResource::Offset3D srcOffset,
-                ITextureResource::Size extent) override
+                ITextureResource::Extents extent) override
             {
                 SLANG_UNUSED(dst);
                 SLANG_UNUSED(dstOffset);
@@ -1191,7 +1191,7 @@ public:
             }
 
             virtual SLANG_NO_THROW void SLANG_MCALL
-                dispatchComputeIndirect(IBufferResource* argBuffer, uint64_t offset) override
+                dispatchComputeIndirect(IBufferResource* argBuffer, Offset offset) override
             {
                 SLANG_UNIMPLEMENTED_X("dispatchComputeIndirect");
             }
@@ -1260,12 +1260,12 @@ public:
         }
 
         virtual SLANG_NO_THROW void SLANG_MCALL executeCommandBuffers(
-            uint32_t count, ICommandBuffer* const* commandBuffers, IFence* fence, uint64_t valueToSignal) override
+            GfxCount count, ICommandBuffer* const* commandBuffers, IFence* fence, uint64_t valueToSignal) override
         {
             SLANG_UNUSED(valueToSignal);
             // TODO: implement fence.
             assert(fence == nullptr);
-            for (uint32_t i = 0; i < count; i++)
+            for (GfxIndex i = 0; i < count; i++)
             {
                 execute(static_cast<CommandBufferImpl*>(commandBuffers[i]));
             }
@@ -1279,7 +1279,7 @@ public:
         }
 
         virtual SLANG_NO_THROW Result SLANG_MCALL waitForFenceValuesOnDevice(
-            uint32_t fenceCount, IFence** fences, uint64_t* waitValues) override
+            GfxCount fenceCount, IFence** fences, uint64_t* waitValues) override
         {
             return SLANG_FAIL;
         }
@@ -2472,8 +2472,8 @@ SlangResult CUDAShaderObject::init(IDevice* device, CUDAShaderObjectLayout* type
 
             ShaderOffset offset;
             offset.uniformOffset = bindingRangeInfo.uniformOffset + sizeof(void*) * i;
-            offset.bindingRangeIndex = subObjectRange.bindingRangeIndex;
-            offset.bindingArrayIndex = i;
+            offset.bindingRangeIndex = (GfxIndex)subObjectRange.bindingRangeIndex;
+            offset.bindingArrayIndex = (GfxIndex)i;
 
             SLANG_RETURN_ON_FAIL(setObject(offset, subObject));
         }

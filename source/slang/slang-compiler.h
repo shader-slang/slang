@@ -1754,7 +1754,8 @@ namespace Slang
             const PathInfo&     filePathInfo,
             ISlangBlob*         fileContentsBlob,
             SourceLoc const&    loc,
-            DiagnosticSink*     sink);
+            DiagnosticSink*     sink,
+            const LoadedModuleDictionary* additionalLoadedModules);
 
         void loadParsedModule(
             RefPtr<FrontEndCompileRequest>  compileRequest,
@@ -1937,6 +1938,9 @@ namespace Slang
 
         // Translation units we are being asked to compile
         List<RefPtr<TranslationUnitRequest> > translationUnits;
+
+        // Additional modules that needs to be made visible to `import` while checking.
+        const LoadedModuleDictionary* additionalLoadedModules = nullptr;
 
         RefPtr<TranslationUnitRequest> getTranslationUnit(UInt index) { return translationUnits[index]; }
 
