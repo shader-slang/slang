@@ -1,6 +1,6 @@
 Slang
 =====
-![Linux Build Status](https://github.com/shader-slang/slang/actions/workflows/c-cpp.yml/badge.svg)
+![Linux Build Status](https://github.com/shader-slang/slang/actions/workflows/linux.yml/badge.svg)
 ![Windows Build Status](https://github.com/shader-slang/slang/actions/workflows/windows.yml/badge.svg)
 
 Slang is a shading language that makes it easier to build and maintain large shader codebases in a modular and extensible fashion, while also maintaining the highest possible performance on modern GPUs and graphics APIs.
