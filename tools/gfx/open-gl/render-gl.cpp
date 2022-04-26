@@ -362,9 +362,9 @@ public:
     class FramebufferLayoutImpl : public FramebufferLayoutBase
     {
     public:
-        ShortList<IFramebufferLayout::AttachmentLayout> m_renderTargets;
+        ShortList<IFramebufferLayout::TargetLayout> m_renderTargets;
         bool m_hasDepthStencil = false;
-        IFramebufferLayout::AttachmentLayout m_depthStencil;
+        IFramebufferLayout::TargetLayout m_depthStencil;
     };
 
     class FramebufferImpl : public FramebufferBase

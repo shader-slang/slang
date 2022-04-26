@@ -21,8 +21,8 @@ public:
     IRenderPassLayout* getInterface(const Slang::Guid& guid);
 
 public:
-    Slang::ShortList<AttachmentAccessDesc> m_renderTargetAccesses;
-    AttachmentAccessDesc m_depthStencilAccess;
+    Slang::ShortList<TargetAccessDesc> m_renderTargetAccesses;
+    TargetAccessDesc m_depthStencilAccess;
     bool m_hasDepthStencil;
     void init(const IRenderPassLayout::Desc& desc);
 };
