@@ -113,6 +113,9 @@
     <ClCompile Include="..\..\..\source\compiler-core\slang-artifact-info.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\source\compiler-core\slang-artifact.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\..\source\compiler-core\slang-command-line-args.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
