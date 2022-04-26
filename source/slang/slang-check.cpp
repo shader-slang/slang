@@ -161,12 +161,14 @@ namespace Slang
     }
 
     void checkTranslationUnit(
-        TranslationUnitRequest* translationUnit)
+        TranslationUnitRequest* translationUnit,
+        LoadedModuleDictionary& loadedModules)
     {
         SharedSemanticsContext sharedSemanticsContext(
             translationUnit->compileRequest->getLinkage(),
             translationUnit->getModule(),
-            translationUnit->compileRequest->getSink());
+            translationUnit->compileRequest->getSink(),
+            &loadedModules);
 
         SemanticsDeclVisitorBase visitor(&sharedSemanticsContext);
 

@@ -293,7 +293,7 @@ struct AssignValsFromLayoutContext
             if(field.name.getLength() == 0)
             {
                 // If no name was given, assume by-indexing matching is requested
-                auto fieldCursor = dstCursor.getElement(fieldIndex);
+                auto fieldCursor = dstCursor.getElement((GfxIndex)fieldIndex);
                 if(!fieldCursor.isValid())
                 {
                     StdWriters::getError().print("error: could not find shader parameter at index %d\n", (int)fieldIndex);

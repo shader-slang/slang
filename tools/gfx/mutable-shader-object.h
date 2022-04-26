@@ -276,20 +276,20 @@ namespace gfx
             return ShaderObjectContainerType::None;
         }
 
-        virtual SLANG_NO_THROW UInt SLANG_MCALL getEntryPointCount() override
+        virtual SLANG_NO_THROW GfxCount SLANG_MCALL getEntryPointCount() override
         {
-            return (UInt)m_entryPoints.getCount();
+            return (GfxCount)m_entryPoints.getCount();
         }
 
         virtual SLANG_NO_THROW Result SLANG_MCALL
-            getEntryPoint(UInt index, IShaderObject** entryPoint) override
+            getEntryPoint(GfxIndex index, IShaderObject** entryPoint) override
         {
             returnComPtr(entryPoint, m_entryPoints[index]);
             return SLANG_OK;
         }
 
         virtual SLANG_NO_THROW Result SLANG_MCALL
-            setData(ShaderOffset const& offset, void const* data, size_t size) override
+            setData(ShaderOffset const& offset, void const* data, Size size) override
         {
             auto newSize = Slang::Index(size + offset.uniformOffset);
             if (newSize > m_data.getCount())
@@ -342,7 +342,7 @@ namespace gfx
         virtual SLANG_NO_THROW Result SLANG_MCALL setSpecializationArgs(
             ShaderOffset const& offset,
             const slang::SpecializationArg* args,
-            uint32_t count) override
+            GfxCount count) override
         {
             Slang::List<slang::SpecializationArg> specArgs;
             specArgs.addRange(args, count);
@@ -368,9 +368,9 @@ namespace gfx
             return m_data.begin();
         }
 
-        virtual SLANG_NO_THROW size_t SLANG_MCALL getSize() override
+        virtual SLANG_NO_THROW Size SLANG_MCALL getSize() override
         {
-            return (size_t)m_data.getCount();
+            return (Size)m_data.getCount();
         }
 
         virtual SLANG_NO_THROW Result SLANG_MCALL

@@ -962,7 +962,8 @@ SLANG_NO_THROW slang::IModule* SLANG_MCALL Linkage::loadModuleFromSource(
             PathInfo::makeFromString(moduleName),
             source,
             SourceLoc(),
-            &sink);
+            &sink,
+            nullptr);
         sink.getBlobIfNeeded(outDiagnostics);
         return asExternal(module);
 
@@ -2004,11 +2005,23 @@ RefPtr<ComponentType> createSpecializedGlobalAndEntryPointsComponentType(
 
 void FrontEndCompileRequest::checkAllTranslationUnits()
 {
+    LoadedModuleDictionary loadedModules;
+    if (additionalLoadedModules)
+        loadedModules = *additionalLoadedModules;
+
     // Iterate over all translation units and
     // apply the semantic checking logic.
     for( auto& translationUnit : translationUnits )
     {
-        checkTranslationUnit(translationUnit.Ptr());
+        checkTranslationUnit(translationUnit.Ptr(), loadedModules);
+
+        // Add the checked module to list of loadedModules so that they can be
+        // discovered by `findOrImportModule` when processing future `import` decls.
+        // TODO: this does not handle the case where a translation unit to discover
+        // another translation unit added later to the compilation request.
+        // We should output an error message when we detect such a case, or support
+        // this scenario with a recursive style checking.
+        loadedModules.Add(translationUnit->moduleName, translationUnit->getModule());
     }
     checkEntryPoints();
 }
@@ -2596,9 +2609,12 @@ RefPtr<Module> Linkage::loadModule(
     const PathInfo&     filePathInfo,
     ISlangBlob*         sourceBlob, 
     SourceLoc const&    srcLoc,
-    DiagnosticSink*     sink)
+    DiagnosticSink*     sink,
+    const LoadedModuleDictionary* additionalLoadedModules)
 {
     RefPtr<FrontEndCompileRequest> frontEndReq = new FrontEndCompileRequest(this, nullptr, sink);
+
+    frontEndReq->additionalLoadedModules = additionalLoadedModules;
 
     RefPtr<TranslationUnitRequest> translationUnit = new TranslationUnitRequest(frontEndReq);
     translationUnit->compileRequest = frontEndReq;
@@ -2665,7 +2681,8 @@ bool Linkage::isBeingImported(Module* module)
 RefPtr<Module> Linkage::findOrImportModule(
     Name*               name,
     SourceLoc const&    loc,
-    DiagnosticSink*     sink)
+    DiagnosticSink*     sink,
+    const LoadedModuleDictionary*  loadedModules)
 {
     // Have we already loaded a module matching this name?
     //
@@ -2691,6 +2708,16 @@ RefPtr<Module> Linkage::findOrImportModule(
         }
 
         return loadedModule;
+    }
+
+    // If the user is providing an additional list of loaded modules, we find
+    // if the module being imported is in that list. This allows a translation
+    // unit to use previously checked translation units in the same
+    // FrontEndCompileRequest.
+    Module* previouslyLoadedModule = nullptr;
+    if (loadedModules && loadedModules->TryGetValue(name, previouslyLoadedModule))
+    {
+        return previouslyLoadedModule;
     }
 
     // Derive a file name for the module, by taking the given
@@ -2748,7 +2775,8 @@ RefPtr<Module> Linkage::findOrImportModule(
         filePathInfo,
         fileContents,
         loc,
-        sink);
+        sink,
+        loadedModules);
 }
 
 //
@@ -4021,9 +4049,10 @@ RefPtr<Module> findOrImportModule(
     Linkage*            linkage,
     Name*               name,
     SourceLoc const&    loc,
-    DiagnosticSink*     sink)
+    DiagnosticSink*     sink,
+    const LoadedModuleDictionary* loadedModules)
 {
-    return linkage->findOrImportModule(name, loc, sink);
+    return linkage->findOrImportModule(name, loc, sink, loadedModules);
 }
 
 void Session::addBuiltinSource(

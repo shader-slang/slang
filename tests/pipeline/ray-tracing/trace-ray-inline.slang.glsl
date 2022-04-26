@@ -93,7 +93,7 @@ void main()
     payload_5 = _S2;
 
     RayDesc_0 ray_0 = { C_0._data.origin_0, C_0._data.tMin_0, C_0._data.direction_0, C_0._data.tMax_0 };
-    rayQueryInitializeEXT((query_0), (myAccelerationStructure_0), (C_0._data.rayFlags_0), (C_0._data.instanceMask_0), (ray_0.Origin_0), (ray_0.TMin_0), (ray_0.Direction_0), (ray_0.TMax_0));
+    rayQueryInitializeEXT((query_0), (myAccelerationStructure_0), (C_0._data.rayFlags_0 | 512), (C_0._data.instanceMask_0), (ray_0.Origin_0), (ray_0.TMin_0), (ray_0.Direction_0), (ray_0.TMax_0));
 
     MyProceduralHitAttrs_0 _S3;
     committedProceduralAttrs_0 = _S3;
