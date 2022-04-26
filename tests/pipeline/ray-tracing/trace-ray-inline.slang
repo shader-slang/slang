@@ -104,7 +104,7 @@ void main(uint3 tid : SV_DispatchThreadID)
 {
 	uint index = tid.x;
 
-	RayQuery<RAY_FLAG_NONE> query;
+	RayQuery<RAY_FLAG_SKIP_PROCEDURAL_PRIMITIVES> query;
 	MyProceduralHitAttrs committedProceduralAttrs;
 
 	MyRayPayload payload = { -1 };
