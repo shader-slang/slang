@@ -43,12 +43,11 @@ struct ArrayParameterSpecializationCondition : FunctionCallSpecializeCondition
 };
 
 void specializeArrayParameters(
-    BackEndCompileRequest* compileRequest,
-    TargetRequest*  targetRequest,
+    CodeGenContext* codeGenContext,
     IRModule*       module)
 {
     ArrayParameterSpecializationCondition condition;
-    specializeFunctionCalls(compileRequest, targetRequest, module, &condition);
+    specializeFunctionCalls(codeGenContext, module, &condition);
 }
 
 } // namesapce Slang

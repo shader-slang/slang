@@ -196,6 +196,8 @@ struct IRTypeConstraintDecoration : IRDecoration
     };                                  \
     /**/
 
+bool isSimpleDecoration(IROp op);
+
 /// A decoration that indicates that a variable represents
 /// a vulkan ray payload, and should have a location assigned
 /// to it.
@@ -430,6 +432,21 @@ struct IRExternCppDecoration : IRDecoration
     UnownedStringSlice getName() { return getNameOperand()->getStringSlice(); }
 };
 
+struct IRDllImportDecoration : IRDecoration
+{
+    enum
+    {
+        kOp = kIROp_DllImportDecoration
+    };
+    IR_LEAF_ISA(DllImportDecoration)
+
+    IRStringLit* getLibraryNameOperand() { return cast<IRStringLit>(getOperand(0)); }
+    UnownedStringSlice getLibraryName() { return getLibraryNameOperand()->getStringSlice(); }
+
+    IRStringLit* getFunctionNameOperand() { return cast<IRStringLit>(getOperand(1)); }
+    UnownedStringSlice getFunctionName() { return getFunctionNameOperand()->getStringSlice(); }
+};
+
 struct IRFormatDecoration : IRDecoration
 {
     enum { kOp = kIROp_FormatDecoration };
@@ -540,17 +557,6 @@ struct IRAlloca : IRInst
     IR_LEAF_ISA(Alloca)
 
     IRInst* getAllocSize() { return getOperand(0); }
-};
-
-/// Copies `size` bytes from `src` to `dst`.
-///
-struct IRCopy : IRInst
-{
-    IR_LEAF_ISA(Copy)
-
-    IRInst* getDst() { return getOperand(0); }
-    IRInst* getSrc() { return getOperand(1); }
-    IRInst* getSize() { return getOperand(2); }
 };
 
 /// Packs a value into an `AnyValue`.
@@ -2025,7 +2031,9 @@ public:
     IRBasicType* getIntType();
     IRBasicType* getUIntType();
     IRBasicType* getUInt64Type();
+    IRBasicType* getCharType();
     IRStringType* getStringType();
+
     IRType* getCapabilitySetType();
 
     IRAssociatedType* getAssociatedType(ArrayView<IRInterfaceType*> constraintTypes);
@@ -2193,8 +2201,6 @@ public:
     IRInst* emitGetSequentialIDInst(IRInst* rttiObj);
 
     IRInst* emitAlloca(IRInst* type, IRInst* rttiObjPtr);
-
-    IRInst* emitCopy(IRInst* dst, IRInst* src, IRInst* rttiObjPtr);
 
     IRInst* emitPackAnyValue(IRType* type, IRInst* value);
 
@@ -2811,6 +2817,11 @@ public:
         addDecoration(value, kIROp_ExternCppDecoration, getStringValue(mangledName));
     }
 
+    void addDllImportDecoration(IRInst* value, UnownedStringSlice const& libraryName, UnownedStringSlice const& functionName)
+    {
+        addDecoration(value, kIROp_DllImportDecoration, getStringValue(libraryName), getStringValue(functionName));
+    }
+
     void addEntryPointDecoration(IRInst* value, Profile profile, UnownedStringSlice const& name, UnownedStringSlice const& moduleName)
     {
         IRInst* operands[] = { getIntValue(getIntType(), profile.raw), getStringValue(name), getStringValue(moduleName) };
@@ -2824,7 +2835,7 @@ public:
 
     void addPublicDecoration(IRInst* value)
     {
-        addDecoration(value, kIROp_PublicDecoration);
+        addDecoration(value, kIROp_PublicDecoration);   
     }
 
     void addNVAPIMagicDecoration(IRInst* value, UnownedStringSlice const& name)
@@ -2881,6 +2892,16 @@ public:
     void addSequentialIDDecoration(IRInst* inst, IRIntegerValue id)
     {
         addDecoration(inst, kIROp_SequentialIDDecoration, getIntValue(getUIntType(), id));
+    }
+
+    void addVulkanRayPayloadDecoration(IRInst* inst, int location)
+    {
+        addDecoration(inst, kIROp_VulkanRayPayloadDecoration, getIntValue(getIntType(), location));
+    }
+
+    void addVulkanCallablePayloadDecoration(IRInst* inst, int location)
+    {
+        addDecoration(inst, kIROp_VulkanCallablePayloadDecoration, getIntValue(getIntType(), location));
     }
 };
 

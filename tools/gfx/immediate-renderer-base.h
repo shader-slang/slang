@@ -56,43 +56,43 @@ public:
     virtual void setPipelineState(IPipelineState* state) = 0;
     virtual void setFramebuffer(IFramebuffer* frameBuffer) = 0;
     virtual void clearFrame(uint32_t colorBufferMask, bool clearDepth, bool clearStencil) = 0;
-    virtual void setViewports(UInt count, const Viewport* viewports) = 0;
-    virtual void setScissorRects(UInt count, const ScissorRect* scissors) = 0;
+    virtual void setViewports(GfxCount count, const Viewport* viewports) = 0;
+    virtual void setScissorRects(GfxCount count, const ScissorRect* scissors) = 0;
     virtual void setPrimitiveTopology(PrimitiveTopology topology) = 0;
     virtual void setVertexBuffers(
-        uint32_t startSlot,
-        uint32_t slotCount,
+        GfxIndex startSlot,
+        GfxCount slotCount,
         IBufferResource* const* buffers,
-        const uint32_t* offsets) = 0;
+        const Offset* offsets) = 0;
     virtual void setIndexBuffer(
-        IBufferResource* buffer, Format indexFormat, uint32_t offset = 0) = 0;
-    virtual void draw(uint32_t vertexCount, uint32_t startVertex = 0) = 0;
+        IBufferResource* buffer, Format indexFormat, Offset offset = 0) = 0;
+    virtual void draw(GfxCount vertexCount, GfxIndex startVertex = 0) = 0;
     virtual void drawIndexed(
-        uint32_t indexCount, uint32_t startIndex = 0, uint32_t baseVertex = 0) = 0;
+        GfxCount indexCount, GfxIndex startIndex = 0, GfxIndex baseVertex = 0) = 0;
     virtual void drawInstanced(
-        uint32_t vertexCount,
-        uint32_t instanceCount,
-        uint32_t startVertex,
-        uint32_t startInstanceLocation) = 0;
+        GfxCount vertexCount,
+        GfxCount instanceCount,
+        GfxIndex startVertex,
+        GfxIndex startInstanceLocation) = 0;
     virtual void drawIndexedInstanced(
-        uint32_t indexCount,
-        uint32_t instanceCount,
-        uint32_t startIndexLocation,
-        int32_t baseVertexLocation,
-        uint32_t startInstanceLocation) = 0;
+        GfxCount indexCount,
+        GfxCount instanceCount,
+        GfxIndex startIndexLocation,
+        GfxIndex baseVertexLocation,
+        GfxIndex startInstanceLocation) = 0;
     virtual void setStencilReference(uint32_t referenceValue) = 0;
     virtual void dispatchCompute(int x, int y, int z) = 0;
     virtual void copyBuffer(
         IBufferResource* dst,
-        size_t dstOffset,
+        Offset dstOffset,
         IBufferResource* src,
-        size_t srcOffset,
-        size_t size) = 0;
+        Offset srcOffset,
+        Size size) = 0;
     virtual void submitGpuWork() = 0;
     virtual void waitForGpu() = 0;
     virtual void* map(IBufferResource* buffer, MapFlavor flavor) = 0;
     virtual void unmap(IBufferResource* buffer, size_t offsetWritten, size_t sizeWritten) = 0;
-    virtual void writeTimestamp(IQueryPool* pool, SlangInt index) = 0;
+    virtual void writeTimestamp(IQueryPool* pool, GfxIndex index) = 0;
     virtual void beginCommandBuffer(const CommandBufferInfo&) {}
     virtual void endCommandBuffer(const CommandBufferInfo&) {}
 
@@ -113,13 +113,13 @@ public:
 
     void uploadBufferData(
         IBufferResource* dst,
-        size_t offset,
-        size_t size, void* data);
+        Offset offset,
+        Size size, void* data);
 
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL readBufferResource(
         IBufferResource* buffer,
-        size_t offset,
-        size_t size,
+        Offset offset,
+        Size size,
         ISlangBlob** outBlob) override;
 };
 
@@ -134,12 +134,12 @@ public:
         SLANG_UNUSED(clearDepth);
         SLANG_UNUSED(clearStencil);
     }
-    virtual void setViewports(UInt count, const Viewport* viewports) override
+    virtual void setViewports(GfxCount count, const Viewport* viewports) override
     {
         SLANG_UNUSED(count);
         SLANG_UNUSED(viewports);
     }
-    virtual void setScissorRects(UInt count, const ScissorRect* scissors) override
+    virtual void setScissorRects(GfxCount count, const ScissorRect* scissors) override
     {
         SLANG_UNUSED(count);
         SLANG_UNUSED(scissors);
@@ -149,10 +149,10 @@ public:
         SLANG_UNUSED(topology);
     }
     virtual void setVertexBuffers(
-        uint32_t startSlot,
-        uint32_t slotCount,
+        GfxIndex startSlot,
+        GfxCount slotCount,
         IBufferResource* const* buffers,
-        const uint32_t* offsets) override
+        const Offset* offsets) override
     {
         SLANG_UNUSED(startSlot);
         SLANG_UNUSED(slotCount);
@@ -160,30 +160,30 @@ public:
         SLANG_UNUSED(offsets);
     }
     virtual void setIndexBuffer(
-        IBufferResource* buffer, Format indexFormat, uint32_t offset = 0)
+        IBufferResource* buffer, Format indexFormat, Offset offset = 0)
         override
     {
         SLANG_UNUSED(buffer);
         SLANG_UNUSED(indexFormat);
         SLANG_UNUSED(offset);
     }
-    virtual void draw(uint32_t vertexCount, uint32_t startVertex = 0) override
+    virtual void draw(GfxCount vertexCount, GfxIndex startVertex = 0) override
     {
         SLANG_UNUSED(vertexCount);
         SLANG_UNUSED(startVertex);
     }
     virtual void drawIndexed(
-        uint32_t indexCount, uint32_t startIndex = 0, uint32_t baseVertex = 0) override
+        GfxCount indexCount, GfxIndex startIndex = 0, GfxIndex baseVertex = 0) override
     {
         SLANG_UNUSED(indexCount);
         SLANG_UNUSED(startIndex);
         SLANG_UNUSED(baseVertex);
     }
     virtual void drawInstanced(
-        uint32_t vertexCount,
-        uint32_t instanceCount,
-        uint32_t startVertex,
-        uint32_t startInstanceLocation) override
+        GfxCount vertexCount,
+        GfxCount instanceCount,
+        GfxIndex startVertex,
+        GfxIndex startInstanceLocation) override
     {
         SLANG_UNUSED(vertexCount);
         SLANG_UNUSED(instanceCount);
@@ -192,11 +192,11 @@ public:
     }
 
     virtual void drawIndexedInstanced(
-        uint32_t indexCount,
-        uint32_t instanceCount,
-        uint32_t startIndexLocation,
-        int32_t baseVertexLocation,
-        uint32_t startInstanceLocation) override
+        GfxCount indexCount,
+        GfxCount instanceCount,
+        GfxIndex startIndexLocation,
+        GfxIndex baseVertexLocation,
+        GfxIndex startInstanceLocation) override
     {
         SLANG_UNUSED(indexCount);
         SLANG_UNUSED(instanceCount);
@@ -263,8 +263,8 @@ public:
         ITextureResource* texture,
         ResourceState state,
         ISlangBlob** outBlob,
-        size_t* outRowPitch,
-        size_t* outPixelSize) override
+        Size* outRowPitch,
+        Size* outPixelSize) override
     {
         SLANG_UNUSED(texture);
         SLANG_UNUSED(outBlob);

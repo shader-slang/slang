@@ -97,7 +97,7 @@ namespace gfx_test
 
     ComPtr<IResourceView> createTexView(
         IDevice* device,
-        ITextureResource::Size size,
+        ITextureResource::Extents size,
         gfx::Format format,
         ITextureResource::SubresourceData* data,
         int mips = 1)
@@ -175,12 +175,12 @@ namespace gfx_test
         auto intResults = createBuffer<uint32_t>(device, 16, initIntData);
         auto intBufferView = createBufferView(device, intResults);
 
-        ITextureResource::Size size = {};
+        ITextureResource::Extents size = {};
         size.width = 2;
         size.height = 2;
         size.depth = 1;
 
-        ITextureResource::Size bcSize = {};
+        ITextureResource::Extents bcSize = {};
         bcSize.width = 4;
         bcSize.height = 4;
         bcSize.depth = 1;
@@ -939,7 +939,7 @@ namespace gfx_test
                 ITextureResource::SubresourceData {(void*)texData, 16, 32},
                 ITextureResource::SubresourceData {(void*)(texData + 32), 8, 0}
             };
-            ITextureResource::Size size = {};
+            ITextureResource::Extents size = {};
             size.width = 8;
             size.height = 8;
             size.depth = 1;

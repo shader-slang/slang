@@ -489,6 +489,11 @@ class PtrTypeBase : public BuiltinType
     Type* getValueType();
 };
 
+class NullPtrType : public BuiltinType
+{
+    SLANG_AST_CLASS(NullPtrType)
+};
+
 // A true (user-visible) pointer type, e.g., `T*`
 class PtrType : public PtrTypeBase 
 {

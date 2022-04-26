@@ -3,10 +3,10 @@
 #define SLANG_GFX_FORWARD_RESOURCE_COMMAND_ENCODER_IMPL(ResourceCommandEncoderBase)                     \
     virtual SLANG_NO_THROW void SLANG_MCALL copyBuffer(                                                 \
         IBufferResource* dst,                                                                           \
-        size_t dstOffset,                                                                               \
+        Offset dstOffset,                                                                               \
         IBufferResource* src,                                                                           \
-        size_t srcOffset,                                                                               \
-        size_t size) override                                                                           \
+        Offset srcOffset,                                                                               \
+        Size size) override                                                                             \
     {                                                                                                   \
         ResourceCommandEncoderBase::copyBuffer(dst, dstOffset, src, srcOffset, size);                   \
     }                                                                                                   \
@@ -19,7 +19,7 @@
         ResourceState srcState,                                                                         \
         SubresourceRange srcSubresource,                                                                \
         ITextureResource::Offset3D srcOffset,                                                           \
-        ITextureResource::Size extent) override                                                         \
+        ITextureResource::Extents extent) override                                                         \
     {                                                                                                   \
         ResourceCommandEncoderBase::copyTexture(                                                        \
             dst,                                                                                        \
@@ -34,14 +34,14 @@
     }                                                                                                   \
     virtual SLANG_NO_THROW void SLANG_MCALL copyTextureToBuffer(                                        \
         IBufferResource* dst,                                                                           \
-        size_t dstOffset,                                                                               \
-        size_t dstSize,                                                                                 \
-        size_t dstRowStride,                                                                            \
+        Offset dstOffset,                                                                               \
+        Size dstSize,                                                                                   \
+        Size dstRowStride,                                                                              \
         ITextureResource* src,                                                                          \
         ResourceState srcState,                                                                         \
         SubresourceRange srcSubresource,                                                                \
         ITextureResource::Offset3D srcOffset,                                                           \
-        ITextureResource::Size extent) override                                                         \
+        ITextureResource::Extents extent) override                                                         \
     {                                                                                                   \
         ResourceCommandEncoderBase::copyTextureToBuffer(                                                \
             dst, dstOffset, dstSize, dstRowStride, src, srcState, srcSubresource, srcOffset, extent);   \
@@ -50,20 +50,20 @@
         ITextureResource* dst,                                                                          \
         SubresourceRange subResourceRange,                                                              \
         ITextureResource::Offset3D offset,                                                              \
-        ITextureResource::Size extent,                                                                  \
+        ITextureResource::Extents extent,                                                                  \
         ITextureResource::SubresourceData* subResourceData,                                             \
-        size_t subResourceDataCount) override                                                           \
+        GfxCount subResourceDataCount) override                                                         \
     {                                                                                                   \
         ResourceCommandEncoderBase::uploadTextureData(                                                  \
             dst, subResourceRange, offset, extent, subResourceData, subResourceDataCount);              \
     }                                                                                                   \
     virtual SLANG_NO_THROW void SLANG_MCALL uploadBufferData(                                           \
-        IBufferResource* dst, size_t offset, size_t size, void* data) override                          \
+        IBufferResource* dst, Offset offset, Size size, void* data) override                            \
     {                                                                                                   \
         ResourceCommandEncoderBase::uploadBufferData(dst, offset, size, data);                          \
     }                                                                                                   \
     virtual SLANG_NO_THROW void SLANG_MCALL textureBarrier(                                             \
-        size_t count, ITextureResource* const* textures, ResourceState src, ResourceState dst)          \
+        GfxCount count, ITextureResource* const* textures, ResourceState src, ResourceState dst)        \
         override                                                                                        \
     {                                                                                                   \
         ResourceCommandEncoderBase::textureBarrier(count, textures, src, dst);                          \
@@ -78,7 +78,7 @@
             texture, subresourceRange, src, dst);                                                       \
     }                                                                                                   \
     virtual SLANG_NO_THROW void SLANG_MCALL bufferBarrier(                                              \
-        size_t count, IBufferResource* const* buffers, ResourceState src, ResourceState dst)            \
+        GfxCount count, IBufferResource* const* buffers, ResourceState src, ResourceState dst)          \
         override                                                                                        \
     {                                                                                                   \
         ResourceCommandEncoderBase::bufferBarrier(count, buffers, src, dst);                            \
@@ -101,14 +101,14 @@
     }                                                                                                   \
     virtual SLANG_NO_THROW void SLANG_MCALL resolveQuery(                                               \
         IQueryPool* queryPool,                                                                          \
-        uint32_t index,                                                                                 \
-        uint32_t count,                                                                                 \
+        GfxIndex index,                                                                                 \
+        GfxCount count,                                                                                 \
         IBufferResource* buffer,                                                                        \
-        uint64_t offset) override                                                                       \
+        Offset offset) override                                                                         \
     {                                                                                                   \
         ResourceCommandEncoderBase::resolveQuery(queryPool, index, count, buffer, offset);              \
     }                                                                                                   \
-    virtual SLANG_NO_THROW void SLANG_MCALL writeTimestamp(IQueryPool* pool, SlangInt index)            \
+    virtual SLANG_NO_THROW void SLANG_MCALL writeTimestamp(IQueryPool* pool, GfxIndex index)            \
         override                                                                                        \
     {                                                                                                   \
         ResourceCommandEncoderBase::writeTimestamp(pool, index);                                        \

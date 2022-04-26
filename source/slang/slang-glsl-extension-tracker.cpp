@@ -40,6 +40,16 @@ void GLSLExtensionTracker::requireBaseTypeExtension(BaseType baseType)
 
     switch (baseType)
     {
+        case BaseType::UInt8:
+        case BaseType::Int8:
+        {
+            // https://github.com/KhronosGroup/GLSL/blob/master/extensions/ext/GL_EXT_shader_8bit_storage.txt
+            requireExtension(UnownedStringSlice::fromLiteral("GL_EXT_shader_8bit_storage"));
+
+            // https://github.com/KhronosGroup/GLSL/blob/master/extensions/ext/GL_EXT_shader_explicit_arithmetic_types.txt
+            requireExtension(UnownedStringSlice::fromLiteral("GL_EXT_shader_explicit_arithmetic_types"));
+            break;
+        }
         case BaseType::Half:
         case BaseType::UInt16:
         case BaseType::Int16:

@@ -217,6 +217,8 @@ static bool _isCppOrCudaTarget(CodeGenTarget target)
 
         case kIROp_FloatType:   return UnownedStringSlice("float");
         case kIROp_DoubleType:  return UnownedStringSlice("double");
+        case kIROp_CharType:    return UnownedStringSlice("char");
+
         default:                return UnownedStringSlice();
     }
 }
@@ -429,22 +431,6 @@ SlangResult CPPSourceEmitter::calcTypeName(IRType* type, CodeGenTarget target, S
 {
     switch (type->getOp())
     {
-        case kIROp_OutType:
-        case kIROp_InOutType:
-        case kIROp_PtrType:
-        {
-            auto ptrType = static_cast<IRPtrType*>(type);
-            SLANG_RETURN_ON_FAIL(calcTypeName(ptrType->getValueType(), target, out));
-            out << "*";
-            return SLANG_OK;
-        }
-        case kIROp_RefType:
-        {
-            auto refType = static_cast<IRRefType*>(type);
-            SLANG_RETURN_ON_FAIL(calcTypeName(refType->getValueType(), target, out));
-            out << "&";
-            return SLANG_OK;
-        }
         case kIROp_HalfType:
         {
             // Special case half
@@ -499,27 +485,6 @@ SlangResult CPPSourceEmitter::calcTypeName(IRType* type, CodeGenTarget target, S
                 out << rowCount;
                 out << colCount;
             }
-            return SLANG_OK;
-        }
-        case kIROp_ArrayType:
-        {
-            auto arrayType = static_cast<IRArrayType*>(type);
-            auto elementType = arrayType->getElementType();
-            int elementCount = int(getIntVal(arrayType->getElementCount()));
-
-            out << "FixedArray<";
-            SLANG_RETURN_ON_FAIL(calcTypeName(elementType, target, out));
-            out << ", " << elementCount << ">";
-            return SLANG_OK;
-        }
-        case kIROp_UnsizedArrayType:
-        {
-            auto arrayType = static_cast<IRUnsizedArrayType*>(type);
-            auto elementType = arrayType->getElementType();
-
-            out << "Array<";
-            SLANG_RETURN_ON_FAIL(calcTypeName(elementType, target, out));
-            out << ">";
             return SLANG_OK;
         }
         case kIROp_WitnessTableType:
@@ -1573,8 +1538,15 @@ SlangResult CPPSourceEmitter::calcFuncName(const HLSLIntrinsic* specOp, StringBu
     {
         IRType* paramType = specOp->signatureType->getParamType(0);
         IRBasicType* basicType = as<IRBasicType>(paramType);
-        SLANG_ASSERT(basicType);
-        return calcScalarFuncName(specOp->op, basicType, outBuilder);
+        if (basicType)
+        {
+            return calcScalarFuncName(specOp->op, basicType, outBuilder);
+        }
+        else
+        {
+            outBuilder << getName(paramType) << HLSLIntrinsic::getInfo(specOp->op).name;
+            return SLANG_OK;
+        }
     }
     else
     {
@@ -1643,7 +1615,7 @@ SlangResult CPPSourceEmitter::calcFuncName(const HLSLIntrinsic* specOp, StringBu
 CPPSourceEmitter::CPPSourceEmitter(const Desc& desc):
     Super(desc),
     m_slicePool(StringSlicePool::Style::Default),
-    m_typeSet(desc.compileRequest->getSession()),
+    m_typeSet(desc.codeGenContext->getSession()),
     m_opLookup(new HLSLIntrinsicOpLookup),
     m_intrinsicSet(&m_typeSet, m_opLookup)
 {
@@ -1651,40 +1623,8 @@ CPPSourceEmitter::CPPSourceEmitter(const Desc& desc):
     //m_semanticUsedFlags = SemanticUsedFlag::GroupID | SemanticUsedFlag::GroupThreadID | SemanticUsedFlag::DispatchThreadID;
 }
 
-void CPPSourceEmitter::_emitInOutParamType(IRType* type, String const& name, IRType* valueType)
-{
-    StringSliceLoc nameAndLoc(name.getUnownedSlice());
-
-    if (auto refType = as<IRRefType>(type))
-    {
-        m_writer->emit("const ");
-    }
-
-    UnownedStringSlice slice = _getTypeName(valueType);
-    m_writer->emit(slice);
-    m_writer->emit("* ");
-    m_writer->emitName(nameAndLoc);
-}
-
 void CPPSourceEmitter::emitParamTypeImpl(IRType* type, String const& name)
 {
-    // An `out` or `inout` parameter will have been
-    // encoded as a parameter of pointer type, so
-    // we need to decode that here.
-    //
-    if (auto outType = as<IROutType>(type))
-    {
-        return _emitInOutParamType(type, name, outType->getValueType());
-    }
-    else if (auto inOutType = as<IRInOutType>(type))
-    {
-        return _emitInOutParamType(type, name, inOutType->getValueType());
-    }
-    else if (auto refType = as<IRRefType>(type))
-    {
-        return _emitInOutParamType(type, name, refType->getValueType());
-    }
-
     emitType(type, name);
 }
 
@@ -2059,15 +1999,69 @@ void CPPSourceEmitter::emitSimpleTypeImpl(IRType* inType)
     m_writer->emit(slice);
 }
 
-void CPPSourceEmitter::emitTypeImpl(IRType* type, const StringSliceLoc* nameLoc)
+void CPPSourceEmitter::_emitType(IRType* type, DeclaratorInfo* declarator)
 {
-    UnownedStringSlice slice = _getTypeName(type);
-    m_writer->emit(slice);
-
-    if (nameLoc)
+    switch (type->getOp())
     {
-        m_writer->emit(" ");
-        m_writer->emitName(*nameLoc);
+    default:
+        CLikeSourceEmitter::_emitType(type, declarator);
+        break;
+
+    case kIROp_PtrType:
+    case kIROp_InOutType:
+    case kIROp_OutType:
+        {
+            auto ptrType = cast<IRPtrTypeBase>(type);
+            PtrDeclaratorInfo ptrDeclarator(declarator);
+            _emitType(ptrType->getValueType(), &ptrDeclarator);
+        }
+        break;
+    case kIROp_RefType:
+        {
+            auto ptrType = cast<IRPtrTypeBase>(type);
+            RefDeclaratorInfo refDeclarator(declarator);
+            _emitType(ptrType->getValueType(), &refDeclarator);
+        }
+        break;
+    case kIROp_ArrayType:
+        {
+            auto arrayType = static_cast<IRArrayType*>(type);
+            auto elementType = arrayType->getElementType();
+            int elementCount = int(getIntVal(arrayType->getElementCount()));
+
+            m_writer->emit("FixedArray<");
+            _emitType(elementType, nullptr);
+            m_writer->emit(", ");
+            m_writer->emit(elementCount);
+            m_writer->emit("> ");
+            emitDeclarator(declarator);
+        }
+        break;
+    case kIROp_UnsizedArrayType:
+        {
+            auto arrayType = static_cast<IRUnsizedArrayType*>(type);
+            auto elementType = arrayType->getElementType();
+
+            m_writer->emit("Array<");
+            _emitType(elementType, nullptr);
+            m_writer->emit("> ");
+            emitDeclarator(declarator);
+        }
+        break;
+    case kIROp_FuncType:
+        {
+            auto funcType = cast<IRFuncType>(type);
+            m_writer->emit("Slang_FuncType<");
+            _emitType(funcType->getResultType(), nullptr);
+            for (UInt i = 0; i < funcType->getParamCount(); i++)
+            {
+                m_writer->emit(", ");
+                _emitType(funcType->getParamType(i), nullptr);
+            }
+            m_writer->emit("> ");
+            emitDeclarator(declarator);
+        }
+        break;
     }
 }
 
@@ -2336,17 +2330,6 @@ bool CPPSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOut
             m_writer->emit("->typeSize)");
             return true;
         }
-        case kIROp_Copy:
-        {
-            m_writer->emit("memcpy(");
-            emitOperand(inst->getOperand(0), EmitOpInfo::get(EmitOp::General));
-            m_writer->emit(", ");
-            emitOperand(inst->getOperand(1), EmitOpInfo::get(EmitOp::General));
-            m_writer->emit(", ");
-            emitOperand(inst->getOperand(2), EmitOpInfo::get(EmitOp::Postfix));
-            m_writer->emit("->typeSize)");
-            return true;
-        }
         case kIROp_BitCast:
         {
             m_writer->emit("(slang_bit_cast<");
@@ -2363,7 +2346,23 @@ bool CPPSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOut
             m_writer->emit(")");
             return true;
         }
-
+        case kIROp_PtrLit:
+        {
+            auto ptrVal = as<IRPtrLit>(inst)->value.ptrVal;
+            if (ptrVal == nullptr)
+            {
+                m_writer->emit("nullptr");
+            }
+            else
+            {
+                m_writer->emit("reinterpret_cast<");
+                emitType(inst->getFullType());
+                m_writer->emit(">(");
+                m_writer->emitUInt64((uint64_t)ptrVal);
+                m_writer->emit(")");
+            }
+            return true;
+        }
     }
 }
 
@@ -2647,7 +2646,17 @@ void CPPSourceEmitter::_emitForwardDeclarations(const List<EmitAction>& actions)
         switch (action.level)
         {
             case EmitAction::Level::ForwardDeclaration:
-                emitFuncDecl(cast<IRFunc>(action.inst));
+                {
+                    switch (action.inst->getOp())
+                    {
+                    case kIROp_Func:
+                    case kIROp_StructType:
+                        emitForwardDeclaration(action.inst);
+                        break;
+                    default:
+                        break;
+                    }
+                }
                 break;
 
             case EmitAction::Level::Definition:
