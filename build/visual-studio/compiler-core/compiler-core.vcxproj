@@ -274,6 +274,7 @@
     </Lib>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="..\..\..\source\compiler-core\slang-artifact.h" />
     <ClInclude Include="..\..\..\source\compiler-core\slang-command-line-args.h" />
     <ClInclude Include="..\..\..\source\compiler-core\slang-core-diagnostics.h" />
     <ClInclude Include="..\..\..\source\compiler-core\slang-diagnostic-sink.h" />
@@ -307,6 +308,7 @@
     <ClInclude Include="..\..\..\source\compiler-core\windows\slang-win-visual-studio-util.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="..\..\..\source\compiler-core\slang-artifact.cpp" />
     <ClCompile Include="..\..\..\source\compiler-core\slang-command-line-args.cpp" />
     <ClCompile Include="..\..\..\source\compiler-core\slang-core-diagnostics.cpp" />
     <ClCompile Include="..\..\..\source\compiler-core\slang-diagnostic-sink.cpp" />

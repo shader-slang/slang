@@ -305,7 +305,6 @@ IF EXIST ..\..\..\external\slang-binaries\bin\windows-aarch64\slang-glslang.dll\
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="..\..\..\slang.h" />
-    <ClInclude Include="..\..\..\source\slang\slang-artifact.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ast-all.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ast-base.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ast-builder.h" />
@@ -405,6 +404,7 @@ IF EXIST ..\..\..\external\slang-binaries\bin\windows-aarch64\slang-glslang.dll\
     <ClInclude Include="..\..\..\source\slang\slang-lower-to-ir.h" />
     <ClInclude Include="..\..\..\source\slang\slang-mangle.h" />
     <ClInclude Include="..\..\..\source\slang\slang-mangled-lexer.h" />
+    <ClInclude Include="..\..\..\source\slang\slang-module-library.h" />
     <ClInclude Include="..\..\..\source\slang\slang-options.h" />
     <ClInclude Include="..\..\..\source\slang\slang-parameter-binding.h" />
     <ClInclude Include="..\..\..\source\slang\slang-parser.h" />
@@ -438,7 +438,6 @@ IF EXIST ..\..\..\external\slang-binaries\bin\windows-aarch64\slang-glslang.dll\
     <ClCompile Include="..\..\..\prelude\slang-cuda-prelude.h.cpp" />
     <ClCompile Include="..\..\..\prelude\slang-hlsl-prelude.h.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-api.cpp" />
-    <ClCompile Include="..\..\..\source\slang\slang-artifact.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ast-builder.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ast-decl.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ast-dump.cpp" />
@@ -542,6 +541,7 @@ IF EXIST ..\..\..\external\slang-binaries\bin\windows-aarch64\slang-glslang.dll\
     <ClCompile Include="..\..\..\source\slang\slang-lower-to-ir.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-mangle.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-mangled-lexer.cpp" />
+    <ClCompile Include="..\..\..\source\slang\slang-module-library.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-options.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-parameter-binding.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-parser.cpp" />

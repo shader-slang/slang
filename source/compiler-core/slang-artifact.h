@@ -2,7 +2,10 @@
 #ifndef SLANG_ARTIFACT_H
 #define SLANG_ARTIFACT_H
 
-#include "slang-compiler.h" 
+#include "../core/slang-basic.h"
+
+#include "../../slang-com-helper.h"
+#include "../../slang-com-ptr.h"
 
 namespace Slang
 {
@@ -88,6 +91,14 @@ struct ArtifactFlag
     };
 };
 
+// Controls what items can be kept. 
+enum class ArtifactKeep
+{
+    No,         ///< Don't keep the item
+    Yes,        ///< Yes keep the final item
+    All,        ///< Keep the final item and any intermediataries
+};
+
 
 /**
 A value type to describe aspects of the contents of an Artifact.
@@ -143,7 +154,7 @@ public:
     bool operator!=(const This& rhs) const { return !(*this == rhs); }
 
         /// Given a code gen target, get the equivalent ArtifactDesc
-    static This make(CodeGenTarget target);
+    static This makeFromCompileTarget(SlangCompileTarget target);
 
         /// Construct from the elements
     static This make(Kind inKind, Payload inPayload, Style inStyle = Style::Kernel, Flags flags = 0)
@@ -211,7 +222,15 @@ A more long term goal would be to
 
 * Make Artifact an interface (such that it can work long term over binary boundaries)
 * Make Diagnostics into an interface (such it can be added to a Artifact result)
-* Use Artifact and related types for downstream compiler 
+* Use Artifact and related types for downstream compiler
+
+TODO(JS): There is an issue here around libraries in that downstream compilers can use
+named libraries, but the name doesn't directly relate to a file. If it is a file it may
+not be easily possible to determine it's location. So there is a desire to indicate the
+`name` as opposed to the path.
+
+As a second related issue. Lets say we have a blob (and not a file). 
+
 */
 class Artifact : public RefObject
 {
@@ -223,15 +242,8 @@ public:
     typedef ArtifactPayload Payload;
     typedef ArtifactStyle Style;
     typedef ArtifactFlags Flags;
-
-    // Controls what items can be kept. 
-    enum class Keep
-    {
-        No,         ///< Don't keep the item
-        Yes,        ///< Yes keep the final item
-        All,        ///< Keep the final item and any intermediataries
-    };
-
+    typedef ArtifactKeep Keep;
+    
     enum PathType
     {
         None,
@@ -304,14 +316,6 @@ public:
 
     const List<Entry>& getEntries() const { return m_entries; }
 
-        /// True if can keep an intermediate item
-    static bool canKeepIntermediate(Keep keep) { return keep == Keep::All; }
-        /// True if can keep
-    static bool canKeep(Keep keep) { return Index(keep) >= Index(Keep::Yes); }
-
-        /// Returns the keep type for an intermediate
-    static Keep getIntermediateKeep(Keep keep) { return (keep == Keep::All) ? Keep::All : Keep::No;  }
-
         /// Ctor
     Artifact(const Desc& desc) :m_desc(desc) {}
         /// Dtor
@@ -350,20 +354,12 @@ T* Artifact::findObjectInstance()
     return nullptr;
 }
 
-
-// Class to hold information serialized in from a -r slang-lib/slang-module
-class ModuleLibrary : public RefObject
-{
-public:
-
-    List<FrontEndCompileRequest::ExtraEntryPointInfo> m_entryPoints;
-    List<RefPtr<IRModule>> m_modules;
-};
-
-SlangResult loadModuleLibrary(const Byte* inBytes, size_t bytesCount, EndToEndCompileRequest* req, RefPtr<ModuleLibrary>& module);
-
-// Given a product make available as a module
-SlangResult loadModuleLibrary(Artifact::Keep keep, Artifact* artifact, EndToEndCompileRequest* req, RefPtr<ModuleLibrary>& module);
+/// True if can keep an intermediate item
+SLANG_INLINE  bool canKeepIntermediate(ArtifactKeep keep) { return keep == ArtifactKeep::All; }
+    /// True if can keep
+SLANG_INLINE bool canKeep(ArtifactKeep keep) { return Index(keep) >= Index(ArtifactKeep::Yes); }
+    /// Returns the keep type for an intermediate
+SLANG_INLINE ArtifactKeep getIntermediateKeep(ArtifactKeep keep) { return (keep == ArtifactKeep::All) ? ArtifactKeep::All : ArtifactKeep::No; }
 
 } // namespace Slang
 

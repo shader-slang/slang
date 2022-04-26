@@ -7,7 +7,9 @@
 #include "../core/slang-type-text-util.h"
 #include "../core/slang-type-convert-util.h"
 
-#include "slang-artifact.h"
+#include "../compiler-core/slang-artifact.h"
+
+#include "slang-module-library.h"
 
 #include "slang-check.h"
 #include "slang-parameter-binding.h"
@@ -4335,7 +4337,7 @@ SlangResult _addLibraryReference(EndToEndCompileRequest* req, Artifact* artifact
     {
         RefPtr<ModuleLibrary> library;
 
-        SLANG_RETURN_ON_FAIL(loadModuleLibrary(Artifact::Keep::Yes, artifact, req, library));
+        SLANG_RETURN_ON_FAIL(loadModuleLibrary(ArtifactKeep::Yes, artifact, req, library));
 
         FrontEndCompileRequest* frontEndRequest = req->getFrontEndReq();
         frontEndRequest->m_extraEntryPoints.addRange(library->m_entryPoints.getBuffer(), library->m_entryPoints.getCount());
