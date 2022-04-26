@@ -364,11 +364,88 @@ ISlangUnknown* Artifact::findInterfaceInstance(const Guid& guid)
     return nullptr;
 }
 
-SlangResult Artifact::requireFilePath(Keep keep, String& outFilePath)
+/* static */String Artifact::getBaseNameFromPath(Desc& desc, const UnownedStringSlice& path)
+{
+    String name = Path::getFileName(path);
+
+    const bool isSharedLibraryPrefixPlatform = SLANG_LINUX_FAMILY || SLANG_APPLE_FAMILY;
+    if (isSharedLibraryPrefixPlatform)
+    {
+        // Strip lib prefix
+        if (desc.isCpuBinary() &&
+            (desc.kind == ArtifactKind::Library ||
+                desc.kind == ArtifactKind::SharedLibrary))
+        {
+            // If it starts with lib strip it
+            if (name.startsWith("lib"))
+            {
+                const String stripLib = name.getUnownedSlice().tail(3);
+                name = stripLib;
+            }
+        }
+    }
+
+    // Strip any extension 
+    {
+        auto descExt = desc.getDefaultExtension();
+        // Strip the extension if it's a match
+        if (descExt.getLength() &&
+            Path::getPathExt(name) == descExt)
+        {
+            name = Path::getFileNameWithoutExt(name);
+        }
+    }
+
+    return name;
+}
+
+String Artifact::getBaseName()
 {
     if (m_pathType != PathType::None)
     {
-        outFilePath = m_path; 
+        return getBaseNameFromPath(m_desc, m_path.getUnownedSlice());
+    }
+    return m_name; 
+}
+
+String Artifact::getParentPath()
+{
+    if (m_pathType != PathType::None && m_path.getLength())
+    {
+        return Path::getParentDirectory(m_path);
+    }
+    return String();
+}
+
+SlangResult Artifact::requireFileLike(Keep keep)
+{
+    // If there is no path set and no blob we still need a name. 
+    // If the artifact is a library we can assume it's a system level library, 
+    // or it can be found by appropriate search paths. 
+    if (m_pathType == PathType::None && 
+        m_blob == nullptr && 
+        (m_desc.kind == ArtifactKind::Library || 
+         m_desc.kind == ArtifactKind::SharedLibrary))
+    {
+        if (m_name.getLength() > 0)
+        {
+            return SLANG_OK;
+        }
+
+        // TODO(JS): If we could serialize, we could turn some other representation into a file, and therefore 
+        // a name, but currently that's not supported
+        return SLANG_E_NOT_FOUND;
+    }
+
+    // Will turn into a file if necessary
+    SLANG_RETURN_ON_FAIL(requireFile(keep));
+    return SLANG_OK;
+}
+
+SlangResult Artifact::requireFile(Keep keep)
+{
+    if (m_pathType != PathType::None)
+    {
         return SLANG_OK;
     }
 
@@ -377,15 +454,28 @@ SlangResult Artifact::requireFilePath(Keep keep, String& outFilePath)
     // Get the contents as a blob. If we can't do that, then we can't write anything...
     SLANG_RETURN_ON_FAIL(loadBlob(getIntermediateKeep(keep), blob));
 
-    const UnownedStringSlice ext = m_desc.getDefaultExtension();
+    // If we have a name, make the generated name based on that name
+    // Else just use 'slang-generated' the basis
+
+    UnownedStringSlice nameBase;
+    if (m_name.getLength() > 0)
+    {
+        nameBase = m_name.getUnownedSlice();
+    }
+    else
+    {
+        nameBase = UnownedStringSlice::fromLiteral("slang-generated");
+    }
 
     // TODO(JS): NOTE! This isn't strictly correct, as the generated filename is not guarenteed to be unique
     // if we change it with an extension (or prefix).
     // This doesn't change the previous behavior though.
     String path;
-    SLANG_RETURN_ON_FAIL(File::generateTemporary(UnownedStringSlice::fromLiteral("slang-generated"), path));
+    SLANG_RETURN_ON_FAIL(File::generateTemporary(nameBase, path));
 
-    if (m_desc.isCpuBinary() && m_desc.kind == ArtifactKind::SharedLibrary)
+    if (m_desc.isCpuBinary() && 
+        (m_desc.kind == ArtifactKind::SharedLibrary ||
+         m_desc.kind == ArtifactKind::Library))
     {
         const bool isSharedLibraryPrefixPlatform = SLANG_LINUX_FAMILY || SLANG_APPLE_FAMILY;
         if (isSharedLibraryPrefixPlatform)
@@ -409,6 +499,9 @@ SlangResult Artifact::requireFilePath(Keep keep, String& outFilePath)
     }
 
     // If there is an extension append it
+
+    const UnownedStringSlice ext = m_desc.getDefaultExtension();
+
     if (ext.getLength())
     {
         path.appendChar('.');

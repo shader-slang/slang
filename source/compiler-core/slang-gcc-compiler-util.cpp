@@ -8,6 +8,7 @@
 #include "../core/slang-io.h"
 #include "../core/slang-shared-library.h"
 #include "../core/slang-char-util.h"
+#include "../core/slang-string-slice-pool.h"
 
 namespace Slang
 {
@@ -620,64 +621,27 @@ static SlangResult _parseGCCFamilyLine(const UnownedStringSlice& line, LineParse
     }
 
     // Add the library paths
-    List<String> libraryPaths;
-    libraryPaths.addRange(options.libraryPaths.getBuffer(), options.libraryPaths.getCount());
+    StringSlicePool libPathPool(StringSlicePool::Style::Default);
+
+    for (const auto& libPath : options.libraryPaths)
+    {
+        libPathPool.add(libPath);
+    }
 
     // Artifacts might add library paths
     for (Artifact* artifact : options.libraries)
     {
         const auto desc = artifact->getDesc();
         // If it's a library for CPU types, try and use it
-        if (desc.isCpuBinary())
-        {           
-            if (desc.kind == ArtifactKind::Library)
-            {
-                String path;
-                SLANG_RETURN_ON_FAIL(artifact->requireFilePath(ArtifactKeep::No, path));
+        if (desc.isCpuBinary() && desc.kind == ArtifactKind::Library)
+        {
+            // Get the name and path (can be empty) to the library
+            SLANG_RETURN_ON_FAIL(artifact->requireFileLike(ArtifactKeep::No));
 
-                String parentDir = Path::getParentDirectory(parentDir);
-                if (parentDir.getLength())
-                {
-                    // Check if we already have the library path, only add it if it's not found
-                    if (libraryPaths.indexOf(parentDir) < 0)
-                    {
-                        libraryPaths.add(parentDir);
-                    }
-                    path = Path::getFileName(path);
-                }
-
-                // If it starts with lib strip it
-                if (path.startsWith("lib"))
-                {
-                    const String stripLib = path.getUnownedSlice().tail(3);
-                    path = stripLib;
-                }
-
-                // Strip the extension if it's a match
-                auto extension = Path::getPathExt(path);
-                if (extension.getLength())
-                {
-                    auto libExt = ArtifactDesc::make(ArtifactKind::Library, ArtifactPayload::HostCPU).getDefaultExtension();
-                    if (extension == libExt)
-                    {
-                        path = Path::getFileNameWithoutExt(path);
-                    }
-                }
-
-                cmdLine.addPrefixPathArg("-l", path);
-            }
+            libPathPool.add(artifact->getParentPath());
+            cmdLine.addPrefixPathArg("-l", artifact->getBaseName());
         }
     }
-
-    for (const auto& libPath : options.libraryPaths)
-    {
-        // Note that any escaping of the path is handled in the ProcessUtil::
-        cmdLine.addArg("-L");
-        cmdLine.addArg(libPath);
-        cmdLine.addArg("-F");
-        cmdLine.addArg(libPath);
-    }
-
 
     if (options.sourceLanguage == SLANG_SOURCE_LANGUAGE_CPP && !PlatformUtil::isFamily(PlatformFamily::Windows, platformKind))
     {
@@ -685,6 +649,15 @@ static SlangResult _parseGCCFamilyLine(const UnownedStringSlice& line, LineParse
         cmdLine.addArg("-lstdc++");
         // Make maths lib available
         cmdLine.addArg("-lm");
+    }
+
+    for (const auto& libPath : libPathPool.getAdded())
+    {
+        // Note that any escaping of the path is handled in the ProcessUtil::
+        cmdLine.addArg("-L");
+        cmdLine.addArg(libPath);
+        cmdLine.addArg("-F");
+        cmdLine.addArg(libPath);
     }
 
     return SLANG_OK;

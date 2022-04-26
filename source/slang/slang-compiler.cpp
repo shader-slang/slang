@@ -1285,12 +1285,8 @@ void printDiagnosticArg(StringBuilder& sb, CodeGenTarget val)
             if (_isCPUHostTarget(target))
             {
                 options.libraryPaths.add(Path::getParentDirectory(Path::getExecutablePath()));
-
                 // Set up the library artifact
-                const ArtifactDesc desc = ArtifactDesc::make(ArtifactKind::Library, Artifact::Payload::HostCPU, ArtifactStyle::Unknown);
-                RefPtr<Artifact> artifact = new Artifact(desc);
-                artifact->setPath(Artifact::PathType::Existing, "slang-rt");
-
+                RefPtr<Artifact> artifact = new Artifact(ArtifactDesc::make(ArtifactKind::Library, Artifact::Payload::HostCPU), "slang-rt");
                 options.libraries.add(artifact);
             }
         }

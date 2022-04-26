@@ -4361,8 +4361,10 @@ SlangResult EndToEndCompileRequest::addLibraryReference(const void* libData, siz
     RefPtr<ModuleLibrary> library;
     SLANG_RETURN_ON_FAIL(loadModuleLibrary((const Byte*)libData, libDataSize, this, library));
 
-    const auto desc = ArtifactDesc::make(ArtifactKind::Library, ArtifactPayload::SlangIR, ArtifactStyle::Unknown);
-    RefPtr<Artifact> artifact = new Artifact(desc);
+    const auto desc = ArtifactDesc::make(ArtifactKind::Library, ArtifactPayload::SlangIR);
+
+    // Create an artifact without any name (as one is not provided)
+    RefPtr<Artifact> artifact = new Artifact(desc, String());
 
     artifact->add(Artifact::Entry::Style::Artifact, library);
 

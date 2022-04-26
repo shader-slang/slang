@@ -157,7 +157,7 @@ public:
     static This makeFromCompileTarget(SlangCompileTarget target);
 
         /// Construct from the elements
-    static This make(Kind inKind, Payload inPayload, Style inStyle = Style::Kernel, Flags flags = 0)
+    static This make(Kind inKind, Payload inPayload, Style inStyle = Style::Unknown, Flags flags = 0)
     {
         return This{ inKind, inPayload, inStyle, flags };
     }
@@ -202,6 +202,7 @@ An abstraction is desirable here, because depending on the compiler the artifact
 * A blob
 * Multiple files
 * Some other (perhaps multiple) in memory representations 
+* A name 
 
 The artifact uses the Blob as the standard representation of in memory data. 
 
@@ -223,14 +224,6 @@ A more long term goal would be to
 * Make Artifact an interface (such that it can work long term over binary boundaries)
 * Make Diagnostics into an interface (such it can be added to a Artifact result)
 * Use Artifact and related types for downstream compiler
-
-TODO(JS): There is an issue here around libraries in that downstream compilers can use
-named libraries, but the name doesn't directly relate to a file. If it is a file it may
-not be easily possible to determine it's location. So there is a desire to indicate the
-`name` as opposed to the path.
-
-As a second related issue. Lets say we have a blob (and not a file). 
-
 */
 class Artifact : public RefObject
 {
@@ -296,9 +289,30 @@ public:
         /// Load as a blob
     SlangResult loadBlob(Keep keep, ComPtr<ISlangBlob>& outBlob);
     
-        /// Get as a file. May need to serialize and write as a temporary file.
-    SlangResult requireFilePath(Keep keep, String& outPath);
+        /// Require artifact is available as a file.
+        /// NOTE! May need to serialize and write as a temporary file.
+    SlangResult requireFile(Keep keep);
 
+        /// Require artifact is available in file-like scenarion.
+        ///
+        /// This is similar to requireFile, but for some special cases doesn't actually require a
+        /// *explicit* path/file.
+        ///
+        /// For example when system libraries are specified - the library paths may be known to
+        /// a downstream compiler (or the path is passed in explicitly), in that case only the
+        /// artifact name needs to be correct.
+    SlangResult requireFileLike(Keep keep);
+
+        /// Get the base name of this artifact.
+        /// If there is a path set, will extract the name from that (stripping prefix, extension as necessary).
+        /// Else if there is an explicit name set, this is returned.
+        /// Else returns the empty string
+    String getBaseName();
+
+        /// Get the parent path (empty if there isn't one)
+    String getParentPath();
+
+        /// Get the Desc defining the contents of the artifact
     SLANG_FORCE_INLINE const Desc& getDesc() { return m_desc; }
 
         /// Returns the index of the entry
@@ -306,6 +320,8 @@ public:
     
         /// Add items
     void setPath(PathType pathType, const String& filePath) { m_pathType = pathType; m_path = filePath; }
+
+        /// Set the blob representing the contents of the asset
     void setBlob(ISlangBlob* blob) { m_blob = blob; }
 
     void add(Entry::Style style, RefObject* obj);
@@ -314,15 +330,25 @@ public:
     PathType getPathType() const { return m_pathType;  }
     const String& getPath() const { return m_path;  }
 
+        /// Get the name of the artifact. This can be empty.
+    const String& getName() const { return m_name; }
+
     const List<Entry>& getEntries() const { return m_entries; }
 
+        /// Given a desc and a path returns the base name from the path (stripped of prefix and extension)
+    static String getBaseNameFromPath(Desc& desc, const UnownedStringSlice& path);
+
         /// Ctor
-    Artifact(const Desc& desc) :m_desc(desc) {}
+    Artifact(const Desc& desc, const String& name):
+        m_desc(desc),
+        m_name(name)
+    {}
         /// Dtor
     ~Artifact();
 
 protected:
     Desc m_desc;
+    String m_name;
 
     PathType m_pathType = PathType::None;       ///< What the path indicates
     String m_path;                              ///< The path 
