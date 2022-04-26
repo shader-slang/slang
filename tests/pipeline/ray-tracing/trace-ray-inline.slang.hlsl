@@ -75,7 +75,7 @@ void main(vector<uint,3> tid_0 : SV_DISPATCHTHREADID)
     MyRayPayload_0 payload_7;
     MyProceduralHitAttrs_0 committedProceduralAttrs_3;
 
-    RayQuery<int(0) > query_0;
+    RayQuery<int(512) > query_0;
 
     MyRayPayload_0 _S1 = { int(-1) };
     RayDesc ray_0 = { C_0.origin_0, C_0.tMin_0, C_0.direction_0, C_0.tMax_0 };

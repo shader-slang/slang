@@ -5033,7 +5033,8 @@ namespace Slang
             getLinkage(),
             name,
             decl->moduleNameAndLoc.loc,
-            getSink());
+            getSink(),
+            m_shared->m_environmentModules);
 
         // If we didn't find a matching module, then bail out
         if (!importedModule)

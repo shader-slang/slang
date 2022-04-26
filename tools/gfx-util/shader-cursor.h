@@ -63,7 +63,7 @@ struct ShaderCursor
         return cursor;
     }
 
-    ShaderCursor getElement(SlangInt index) const;
+    ShaderCursor getElement(GfxIndex index) const;
 
     static Result followPath(const char* path, ShaderCursor& ioCursor);
 
@@ -82,7 +82,7 @@ struct ShaderCursor
         , m_containerType(object->getContainerType())
     {}
 
-    SlangResult setData(void const* data, size_t size) const
+    SlangResult setData(void const* data, Size size) const
     {
         return m_baseObject->setData(m_offset, data, size);
     }
@@ -98,7 +98,7 @@ struct ShaderCursor
         return m_baseObject->setObject(m_offset, object);
     }
 
-    SlangResult setSpecializationArgs(const slang::SpecializationArg* args, uint32_t count) const
+    SlangResult setSpecializationArgs(const slang::SpecializationArg* args, GfxCount count) const
     {
         return m_baseObject->setSpecializationArgs(m_offset, args, count);
     }
@@ -129,13 +129,13 @@ struct ShaderCursor
         /// Produce a cursor to the element or field with the given `index`.
         ///
         /// This is a convenience wrapper around `getElement()`.
-    ShaderCursor operator[](int64_t index) const { return getElement((SlangInt)index); }
-    ShaderCursor operator[](uint64_t index) const { return getElement((SlangInt)index); }
-    ShaderCursor operator[](int32_t index) const { return getElement((SlangInt)index); }
-    ShaderCursor operator[](uint32_t index) const { return getElement((SlangInt)index); }
-    ShaderCursor operator[](int16_t index) const { return getElement((SlangInt)index); }
-    ShaderCursor operator[](uint16_t index) const { return getElement((SlangInt)index); }
-    ShaderCursor operator[](int8_t index) const { return getElement((SlangInt)index); }
-    ShaderCursor operator[](uint8_t index) const { return getElement((SlangInt)index); }
+    ShaderCursor operator[](int64_t index) const { return getElement((GfxIndex)index); }
+    ShaderCursor operator[](uint64_t index) const { return getElement((GfxIndex)index); }
+    ShaderCursor operator[](int32_t index) const { return getElement((GfxIndex)index); }
+    ShaderCursor operator[](uint32_t index) const { return getElement((GfxIndex)index); }
+    ShaderCursor operator[](int16_t index) const { return getElement((GfxIndex)index); }
+    ShaderCursor operator[](uint16_t index) const { return getElement((GfxIndex)index); }
+    ShaderCursor operator[](int8_t index) const { return getElement((GfxIndex)index); }
+    ShaderCursor operator[](uint8_t index) const { return getElement((GfxIndex)index); }
 };
 }

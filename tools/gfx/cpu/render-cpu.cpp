@@ -78,7 +78,7 @@ struct CPUTextureBaseShapeInfo
     int32_t implicitArrayElementCount;
 };
 
-static const CPUTextureBaseShapeInfo kCPUTextureBaseShapeInfos[(int)ITextureResource::Type::CountOf] =
+static const CPUTextureBaseShapeInfo kCPUTextureBaseShapeInfos[(int)ITextureResource::Type::_Count] =
 {
     /* Unknown */       { 0, 0, 0 },
     /* Buffer */        { 1, 1, 1 },
@@ -208,7 +208,7 @@ struct CPUFormatInfoMap
     }
     SLANG_FORCE_INLINE const CPUTextureFormatInfo& get(Format format) const { return m_infos[Index(format)]; }
 
-    CPUTextureFormatInfo m_infos[Index(Format::CountOf)];
+    CPUTextureFormatInfo m_infos[Index(Format::_Count)];
 };
 
 static const CPUFormatInfoMap g_formatInfoMap;
@@ -852,9 +852,9 @@ public:
     virtual SLANG_NO_THROW Result SLANG_MCALL
         init(IDevice* device, CPUShaderObjectLayout* typeLayout);
 
-    virtual SLANG_NO_THROW UInt SLANG_MCALL getEntryPointCount() override { return 0; }
+    virtual SLANG_NO_THROW GfxCount SLANG_MCALL getEntryPointCount() override { return 0; }
     virtual SLANG_NO_THROW Result SLANG_MCALL
-        getEntryPoint(UInt index, IShaderObject** outEntryPoint) override
+        getEntryPoint(GfxIndex index, IShaderObject** outEntryPoint) override
     {
         *outEntryPoint = nullptr;
         return SLANG_OK;
@@ -993,9 +993,9 @@ public:
 
     List<RefPtr<CPUEntryPointShaderObject>> m_entryPoints;
 
-    virtual SLANG_NO_THROW UInt SLANG_MCALL getEntryPointCount() override { return m_entryPoints.getCount(); }
+    virtual SLANG_NO_THROW GfxCount SLANG_MCALL getEntryPointCount() override { return (GfxCount)m_entryPoints.getCount(); }
     virtual SLANG_NO_THROW Result SLANG_MCALL
-        getEntryPoint(UInt index, IShaderObject** outEntryPoint) override
+        getEntryPoint(GfxIndex index, IShaderObject** outEntryPoint) override
     {
         returnComPtr(outEntryPoint, m_entryPoints[index]);
         return SLANG_OK;
@@ -1045,9 +1045,9 @@ public:
         return SLANG_OK;
     }
     virtual SLANG_NO_THROW Result SLANG_MCALL getResult(
-        SlangInt queryIndex, SlangInt count, uint64_t* data) override
+        GfxIndex queryIndex, GfxCount count, uint64_t* data) override
     {
-        for (SlangInt i = 0; i < count; i++)
+        for (GfxCount i = 0; i < count; i++)
         {
             data[i] = m_queries[queryIndex + i];
         }
@@ -1305,7 +1305,7 @@ public:
         return SLANG_OK;
     }
 
-    virtual void writeTimestamp(IQueryPool* pool, SlangInt index) override
+    virtual void writeTimestamp(IQueryPool* pool, GfxIndex index) override
     {
         static_cast<CPUQueryPool*>(pool)->m_queries[index] =
             std::chrono::high_resolution_clock::now().time_since_epoch().count();
@@ -1395,8 +1395,8 @@ SlangResult CPUShaderObject::init(IDevice* device, CPUShaderObjectLayout* typeLa
 
             ShaderOffset offset;
             offset.uniformOffset = bindingRangeInfo.uniformOffset + sizeof(void*) * i;
-            offset.bindingRangeIndex = subObjectRange.bindingRangeIndex;
-            offset.bindingArrayIndex = i;
+            offset.bindingRangeIndex = (GfxIndex)subObjectRange.bindingRangeIndex;
+            offset.bindingArrayIndex = (GfxIndex)i;
 
             SLANG_RETURN_ON_FAIL(setObject(offset, subObject));
         }
