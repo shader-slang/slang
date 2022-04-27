@@ -4165,7 +4165,7 @@ namespace Slang
             // isn't a keyword should we fall back to the approach
             // here.
             //
-            ParseType();
+            Expr* type = ParseType();
 
             // We don't actually care about the type, though, so
             // don't retain it
@@ -4178,6 +4178,8 @@ namespace Slang
             // then we can use `A.b` as the left-hand-side expression
             // when starting to parse an infix expression.
             //
+            type = nullptr;
+            SLANG_UNUSED(type);
 
             // TODO: If we decide to intermix parsing of statement bodies
             // with semantic checking (by delaying the parsing of bodies
