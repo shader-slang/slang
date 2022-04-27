@@ -28,6 +28,8 @@ const Slang::Guid GfxGUID::IID_IShaderObject = SLANG_UUID_IShaderObject;
 const Slang::Guid GfxGUID::IID_IRenderPassLayout = SLANG_UUID_IRenderPassLayout;
 const Slang::Guid GfxGUID::IID_IRayTracingCommandEncoder = SLANG_UUID_IRayTracingCommandEncoder;
 const Slang::Guid GfxGUID::IID_ICommandBuffer = SLANG_UUID_ICommandBuffer;
+const Slang::Guid GfxGUID::IID_ICommandBufferD3D12 = SLANG_UUID_ICommandBufferD3D12;
+
 const Slang::Guid GfxGUID::IID_ICommandQueue = SLANG_UUID_ICommandQueue;
 const Slang::Guid GfxGUID::IID_IQueryPool = SLANG_UUID_IQueryPool;
 const Slang::Guid GfxGUID::IID_IAccelerationStructure = SLANG_UUID_IAccelerationStructure;
