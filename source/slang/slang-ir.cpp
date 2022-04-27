@@ -2890,6 +2890,36 @@ namespace Slang
         return inst;
     }
 
+    IRLiveStart* IRBuilder::emitLiveStart(IRInst* referenced)
+    {
+        // This instruction doesn't produce any result, 
+        // so we make it's type void.
+        auto inst = createInst<IRLiveStart>(
+            this,
+            kIROp_LiveStart,
+            getVoidType(),
+            referenced);
+        
+        addInst(inst);
+
+        return inst;
+    }
+
+    IRLiveEnd* IRBuilder::emitLiveEnd(IRInst* referenced)
+    {
+        // This instruction doesn't produce any result, 
+        // so we make it's type void.
+        auto inst = createInst<IRLiveEnd>(
+            this,
+            kIROp_LiveStart,
+            getVoidType(),
+            referenced);
+
+        addInst(inst);
+
+        return inst;
+    }
+
     IRInst* IRBuilder::emitExtractExistentialValue(
         IRType* type,
         IRInst* existentialValue)

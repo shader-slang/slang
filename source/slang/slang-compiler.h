@@ -1485,6 +1485,10 @@ namespace Slang
 
         bool shouldDumpIntermediates() { return dumpIntermediates; }
 
+        void setTrackLiveness(bool enable) { enableTrackLiveness = enable; }
+
+        bool shouldTrackLiveness() { return enableTrackLiveness; }
+
         Linkage* getLinkage() { return linkage; }
         CodeGenTarget getTarget() { return format; }
         Profile getTargetProfile() { return targetProfile; }
@@ -1515,6 +1519,7 @@ namespace Slang
         LineDirectiveMode       lineDirectiveMode = LineDirectiveMode::Default;
         bool                    dumpIntermediates = false;
         bool                    forceGLSLScalarBufferLayout = false;
+        bool                    enableTrackLiveness = false;
     };
 
         /// Are we generating code for a D3D API?
@@ -2652,6 +2657,7 @@ namespace Slang
 
         void generateOutput();
 
+        void setTrackLiveness(bool enable);
 
         // Note: The following settings used to be considered part of the "back-end" compile
         // request, but were only being used as part of end-to-end compilation anyway,

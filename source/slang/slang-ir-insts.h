@@ -1807,6 +1807,39 @@ struct IRExtractExistentialWitnessTable : IRInst
     IR_LEAF_ISA(ExtractExistentialWitnessTable);
 };
 
+/* Base class for instructions that track liveness */
+struct IRLiveBase : IRInst
+{
+    IR_PARENT_ISA(LiveBase)
+};
+
+struct IRLiveStart : IRLiveBase
+{
+    IR_LEAF_ISA(LiveStart);
+
+        // TODO(JS): It might be useful to track how many bytes are live in the item referenced. 
+        // It's not entirely clear how that will work across different targets, or even what such a 
+        // size means on some targets.
+        // 
+        // Here we assume the size is the size of the type being referenced (whatever that means on a target)
+        //
+        // Potentially we could have a count, for defining (say) a range of an array. It's not clear this is 
+        // needed, so we just have the item referenced.
+
+        /// The referenced item whose liveness starts after this instruction
+    IRInst* getReferenced() { return getOperand(0); }
+};
+
+struct IRLiveEnd : IRLiveBase
+{
+    IR_LEAF_ISA(LiveEnd);
+
+        /// Demarks where the referenced item is no longer live, at a point before 
+        ///
+        /// It is assumed that Live Start/End match on their referenced item. 
+    IRInst* getReferenced() { return getOperand(0); }
+};
+
 // Description of an instruction to be used for global value numbering
 struct IRInstKey
 {
@@ -2166,6 +2199,12 @@ public:
     {
         return getAttributedType(baseType, attributes.getCount(), attributes.getBuffer());
     }
+
+        /// Emit an LiveStart instruction indicating the referenced item is live following this instruction
+    IRLiveStart* emitLiveStart(IRInst* referenced);
+
+        /// Emit a LiveEnd instruction indicating the referenced item is no longer live when this instruction is reached.
+    IRLiveEnd* emitLiveEnd(IRInst* referenced);
 
     // Set the data type of an instruction, while preserving
     // its rate, if any.

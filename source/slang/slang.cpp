@@ -4159,6 +4159,16 @@ void EndToEndCompileRequest::setDumpIntermediates(int enable)
     }
 }
 
+void EndToEndCompileRequest::setTrackLiveness(bool v)
+{
+    // Change all existing targets to use the new setting.
+    auto linkage = getLinkage();
+    for (auto& target : linkage->targets)
+    {
+        target->setTrackLiveness(v);
+    }
+}
+
 void EndToEndCompileRequest::setDumpIntermediatePrefix(const char* prefix)
 {
     m_dumpIntermediatePrefix = prefix;
