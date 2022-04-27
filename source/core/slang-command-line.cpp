@@ -71,7 +71,16 @@ void ExecutableLocation::append(StringBuilder& out) const
 void CommandLine::addPrefixPathArg(const char* prefix, const String& path, const char* pathPostfix)
 {
     StringBuilder builder;
-    builder << prefix << path;
+    builder << prefix;
+
+    // TODO(JS): The assumption here is that quoting will be added as necessary and
+    // -prefixSomething Else
+    // is okay as
+    // "-prefixSomething Else" rather than
+    // -prefix"Something Else"
+
+    builder << path;
+
     if (pathPostfix)
     {
         // Work out the path with the postfix

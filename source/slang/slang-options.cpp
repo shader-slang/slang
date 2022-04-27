@@ -9,7 +9,8 @@
 
 #include "slang-compiler.h"
 #include "slang-profile.h"
-#include "slang-artifact.h"
+
+#include "../compiler-core/slang-artifact.h"
 
 #include "slang-repro.h"
 #include "slang-serialize-ir.h"
@@ -19,6 +20,7 @@
 #include "../core/slang-hex-dump-util.h"
 
 #include "../compiler-core/slang-command-line-args.h"
+#include "../compiler-core/slang-artifact-info.h"
 
 #include <assert.h>
 
@@ -1401,7 +1403,7 @@ struct OptionsParser
 
                     auto path = referenceModuleName.value;
 
-                    auto desc = ArtifactDesc::fromPath(path.getUnownedSlice());
+                    auto desc = ArtifactInfoUtil::getDescFromPath(path.getUnownedSlice());
 
                     if (desc.kind == ArtifactKind::Unknown)
                     {
@@ -1410,19 +1412,22 @@ struct OptionsParser
                     }
 
                     // If it's a GPU binary, then we'll assume it's a library
-                    if (desc.isGpuBinary())
+                    if (ArtifactInfoUtil::isGpuBinary(desc))
                     {
                         desc.kind = ArtifactKind::Library;
                     }
 
-                    if (!desc.isBinaryLinkable())
+                    if (!ArtifactInfoUtil::isBinaryLinkable(desc))
                     {
                         sink->diagnose(referenceModuleName.loc, Diagnostics::kindNotLinkable, Path::getPathExt(path));
                         return SLANG_FAIL;
                     }
 
+                    const String name = Artifact::getBaseNameFromPath(desc, referenceModuleName.value.getUnownedSlice());
+
                     // Create the artifact
-                    RefPtr<Artifact> artifact = new Artifact(desc);
+                    RefPtr<Artifact> artifact = new Artifact(desc, name); 
+
                     // Set the path
                     artifact->setPath(Artifact::PathType::Existing, referenceModuleName.value);
 
