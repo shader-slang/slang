@@ -35,6 +35,7 @@ struct GfxGUID
     static const Slang::Guid IID_IResourceCommandEncoder;
     static const Slang::Guid IID_IRayTracingCommandEncoder;
     static const Slang::Guid IID_ICommandBuffer;
+    static const Slang::Guid IID_ICommandBufferD3D12;
     static const Slang::Guid IID_ICommandQueue;
     static const Slang::Guid IID_IQueryPool;
     static const Slang::Guid IID_IAccelerationStructure;

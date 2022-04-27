@@ -7,7 +7,9 @@
 #include "../core/slang-type-text-util.h"
 #include "../core/slang-type-convert-util.h"
 
-#include "slang-artifact.h"
+#include "../compiler-core/slang-artifact.h"
+
+#include "slang-module-library.h"
 
 #include "slang-check.h"
 #include "slang-parameter-binding.h"
@@ -4327,7 +4329,7 @@ void EndToEndCompileRequest::setDefaultModuleName(const char* defaultModuleName)
     frontEndReq->m_defaultModuleName = namePool->getName(defaultModuleName);
 }
 
-SlangResult _addLibraryReference(EndToEndCompileRequest* req, Artifact* artifact)
+SlangResult _addLibraryReference(EndToEndCompileRequest* req, IArtifact* artifact)
 {
     auto desc = artifact->getDesc();
 
@@ -4335,7 +4337,7 @@ SlangResult _addLibraryReference(EndToEndCompileRequest* req, Artifact* artifact
     {
         RefPtr<ModuleLibrary> library;
 
-        SLANG_RETURN_ON_FAIL(loadModuleLibrary(Artifact::Keep::Yes, artifact, req, library));
+        SLANG_RETURN_ON_FAIL(loadModuleLibrary(ArtifactKeep::Yes, artifact, req, library));
 
         FrontEndCompileRequest* frontEndRequest = req->getFrontEndReq();
         frontEndRequest->m_extraEntryPoints.addRange(library->m_entryPoints.getBuffer(), library->m_entryPoints.getCount());
@@ -4348,7 +4350,7 @@ SlangResult _addLibraryReference(EndToEndCompileRequest* req, Artifact* artifact
 
     // Add to the m_libModules
     auto linkage = req->getLinkage();
-    linkage->m_libModules.add(artifact);
+    linkage->m_libModules.add(ComPtr<IArtifact>(artifact));
 
     return SLANG_OK;
 }
@@ -4359,10 +4361,12 @@ SlangResult EndToEndCompileRequest::addLibraryReference(const void* libData, siz
     RefPtr<ModuleLibrary> library;
     SLANG_RETURN_ON_FAIL(loadModuleLibrary((const Byte*)libData, libDataSize, this, library));
 
-    const auto desc = ArtifactDesc::make(ArtifactKind::Library, ArtifactPayload::SlangIR, ArtifactStyle::Unknown);
-    RefPtr<Artifact> artifact = new Artifact(desc);
+    const auto desc = ArtifactDesc::make(ArtifactKind::Library, ArtifactPayload::SlangIR);
 
-    artifact->add(Artifact::Entry::Style::Artifact, library);
+    // Create an artifact without any name (as one is not provided)
+    RefPtr<Artifact> artifact = new Artifact(desc, String());
+
+    artifact->addElement(desc, library);
 
     return _addLibraryReference(this, artifact);
 }

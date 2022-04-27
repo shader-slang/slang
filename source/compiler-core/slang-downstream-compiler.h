@@ -13,6 +13,8 @@
 
 #include "../../slang-com-ptr.h"
 
+#include "slang-artifact.h"
+
 namespace Slang
 {
 
@@ -303,7 +305,7 @@ public:
         List<String> libraryPaths;
 
             /// Libraries to link against.
-        List<String> libraries;
+        List<ComPtr<IArtifact>> libraries;
 
         List<CapabilityVersion> requiredCapabilityVersions;
 
