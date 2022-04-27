@@ -5026,7 +5026,7 @@ __target_intrinsic(hlsl, RayQuery)
 __target_intrinsic(glsl, rayQueryEXT)
 __glsl_extension(GL_EXT_ray_query)
 __glsl_version(460)
-struct RayQuery <let rayFlags : RAY_FLAG = RAY_FLAG_NONE>
+struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
 {
     // Initialize the query object in a "fresh" state.
     //
@@ -5074,7 +5074,7 @@ struct RayQuery <let rayFlags : RAY_FLAG = RAY_FLAG_NONE>
     {
         __rayQueryInitializeEXT(
             accelerationStructure,
-            rayFlags,
+            rayFlags | rayFlagsGeneric,
             instanceInclusionMask,
             ray.Origin,
             ray.TMin,
