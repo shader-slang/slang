@@ -1,4 +1,4 @@
-// slang-artifact.h
+// slang-artifact-info.h
 #ifndef SLANG_ARTIFACT_INFO_H
 #define SLANG_ARTIFACT_INFO_H
 
