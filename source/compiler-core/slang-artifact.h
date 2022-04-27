@@ -99,7 +99,6 @@ enum class ArtifactKeep
     All,        ///< Keep the final item and any intermediataries
 };
 
-
 /**
 A value type to describe aspects of the contents of an Artifact.
 **/
@@ -119,37 +118,6 @@ public:
         /// Get in packed format
     inline Packed getPacked() const;
 
-        /// True if the container appears to be binary linkable
-    bool isBinaryLinkable() const;
-        /// True if is a CPU binary
-    bool isCpuBinary() const { return isPayloadCpuBinary(payload); }
-        /// True if is a GPU binary
-    bool isGpuBinary() const { return isPayloadGpuBinary(payload); }
-
-        /// Gets the default file extension for the artifact type. Returns empty slice if not known
-    UnownedStringSlice getDefaultExtension();
-
-    static UnownedStringSlice getDefaultExtensionForPayload(Payload payload);
-
-        /// Get the extension for CPU/Host for a kind
-    static UnownedStringSlice getCpuExtensionForKind(Kind kind);
-
-        /// Returns true if the kind is binary linkable 
-    static bool isKindBinaryLinkable(Kind kind);
-
-        /// Returns true if the payload type is CPU
-    static bool isPayloadCpuBinary(Payload payload);
-        /// Returns true if the payload type is applicable to the GPU
-    static bool isPayloadGpuBinary(Payload payload);
-
-        /// True if the payload type is in principal binary linkable
-    static bool isPayloadGpuBinaryLinkable(Payload payload);
-
-        /// Try to determine the desc from a path
-    static This fromPath(const UnownedStringSlice& slice);
-        /// Try to determine the desc from just a file extension (passed without .)
-    static This fromExtension(const UnownedStringSlice& slice);
-
     bool operator==(const This& rhs) const { return kind == rhs.kind && payload == rhs.payload && style == rhs.style && flags == rhs.flags;  }
     bool operator!=(const This& rhs) const { return !(*this == rhs); }
 
@@ -157,10 +125,8 @@ public:
     static This makeFromCompileTarget(SlangCompileTarget target);
 
         /// Construct from the elements
-    static This make(Kind inKind, Payload inPayload, Style inStyle = Style::Unknown, Flags flags = 0)
-    {
-        return This{ inKind, inPayload, inStyle, flags };
-    }
+    static This make(Kind inKind, Payload inPayload, Style inStyle = Style::Unknown, Flags flags = 0) { return This{ inKind, inPayload, inStyle, flags }; }
+
         /// Construct from the packed format
     inline static This make(Packed inPacked);
 
