@@ -24,7 +24,7 @@ namespace Slang
             : referenceCount(0)
         {}
 
-        RefObject& operator=(const RefObject& rhs) = default;
+        RefObject& operator=(const RefObject&) { return *this; }
 
         virtual ~RefObject()
         {}

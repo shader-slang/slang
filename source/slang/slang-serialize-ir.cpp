@@ -852,6 +852,7 @@ Result IRSerialReader::read(const IRSerialData& data, Session* session, SerialSo
     {
         const Ser::Inst& srcInst = data.m_insts[i];
         const IROp op((IROp)srcInst.m_op);
+        SLANG_UNUSED(op);
 
         IRInst* dstInst = insts[i];
 

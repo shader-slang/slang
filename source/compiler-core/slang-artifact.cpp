@@ -46,68 +46,24 @@ namespace Slang {
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! Artifact !!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
+void* Artifact::getInterface(const Guid& uuid)
+{
+    if (uuid == ISlangUnknown::getTypeGuid() || uuid == IArtifact::getTypeGuid())
+    {
+        return static_cast<IArtifact*>(this);
+    }
+    return nullptr;
+}
+
 Artifact::~Artifact()
 {
     if (m_pathType == PathType::Temporary)
     {
         File::remove(m_path);
     }
-
-    for (const auto& entry : m_entries)
-    {
-        // Release the associated data
-        switch (entry.type)
-        {
-            case Entry::Type::ObjectInstance:
-            {
-                entry.object->releaseReference();
-                break;
-            }
-            case Entry::Type::InterfaceInstance:
-            {
-                entry.intf->release();
-                break;
-            }
-            default: break;
-        }
-    }
 }
 
-Index Artifact::indexOf(Entry::Type type) const
-{
-    return m_entries.findFirstIndex([&](const Entry& entry) -> bool { return entry.type == type; });
-}
-
-void Artifact::add(Entry::Style style, RefObject* obj)
-{
-    SLANG_ASSERT(obj);
-
-    Entry entry;
-    entry.type = Entry::Type::ObjectInstance;
-    entry.style = style;
-    entry.object = obj;
-
-    obj->addReference();
-    
-    m_entries.add(entry);
-}
-
-void Artifact::add(Entry::Style style, ISlangUnknown* intf)
-{
-    // Can't be nullptr
-    SLANG_ASSERT(intf);
-
-    Entry entry;
-    entry.type = Entry::Type::InterfaceInstance;
-    entry.style = style;
-
-    intf->addRef();
-
-    entry.intf = intf;
-    m_entries.add(entry);
-}
-
-bool Artifact::exists() const
+bool Artifact::exists()
 {
     // If we have a blob it exists
     if (m_blob)
@@ -116,13 +72,9 @@ bool Artifact::exists() const
     }
 
     // If we have an associated entry that represents the artifact it exists
-    for (const auto& entry : m_entries)
+    if (findElement(IArtifactInstance::getTypeGuid()))
     {
-        if (entry.style == Entry::Style::Artifact)
-        {
-            // There is a representation that 'is' the artifact
-            return true;
-        }
+        return true;
     }
 
     // If we don't have a path then it can't exist
@@ -135,78 +87,55 @@ bool Artifact::exists() const
     return File::exists(m_path);
 }
 
-ISlangUnknown* Artifact::findInterfaceInstance(const Guid& guid)
+ISlangUnknown* Artifact::findElement(const Guid& guid)
 {
-    for (const auto& entry : m_entries)
+    for (auto const& element : m_elements)
     {
-        if (entry.type == Entry::Type::InterfaceInstance)
-        {
-            ISlangUnknown* intf = nullptr;
-            if (SLANG_SUCCEEDED(entry.intf->queryInterface(guid, (void**)&intf)) && intf)
-            {
-                // NOTE! This assumes we *DONT* need to ref count to keep an interface in scope
-                // (as strict COM requires so as to allow on demand interfaces).
-                intf->release();
+        ISlangUnknown* value = element.value;
 
-                return intf;
-            }
+        ISlangUnknown* intf = nullptr;
+        if (SLANG_SUCCEEDED(value->queryInterface(guid, (void**)&intf)) && intf)
+        {
+            // NOTE! This assumes we *DONT* need to ref count to keep an interface in scope
+            // (as strict COM requires so as to allow on demand interfaces).
+            intf->release();
+            return intf;
         }
     }
 
     return nullptr;
 }
 
-/* static */String Artifact::getBaseNameFromPath(Desc& desc, const UnownedStringSlice& path)
-{
-    String name = Path::getFileName(path);
+void Artifact::addElement(const Desc& desc, ISlangUnknown* intf) 
+{ 
+    SLANG_ASSERT(intf); 
+    Element element{ desc, ComPtr<ISlangUnknown>(intf) };
+    m_elements.add(element); 
+}
 
-    const bool isSharedLibraryPrefixPlatform = SLANG_LINUX_FAMILY || SLANG_APPLE_FAMILY;
-    if (isSharedLibraryPrefixPlatform)
+void Artifact::removeElementAt(Index i)
+{
+    m_elements.removeAt(i);
+}
+
+void* Artifact::findElementObject(const Guid& classGuid)
+{
+    ComPtr<IArtifactInstance> instance;
+    for (const auto& element : m_elements)
     {
-        // Strip lib prefix
-        if (ArtifactInfoUtil::isCpuBinary(desc) &&
-            (desc.kind == ArtifactKind::Library ||
-                desc.kind == ArtifactKind::SharedLibrary))
+        ISlangUnknown* value = element.value;
+
+        if (SLANG_SUCCEEDED(value->queryInterface(IArtifactInstance::getTypeGuid(), (void**)instance.writeRef())) && instance)
         {
-            // If it starts with lib strip it
-            if (name.startsWith("lib"))
+            void* classInstance = instance->queryObject(classGuid);
+            if (classInstance)
             {
-                const String stripLib = name.getUnownedSlice().tail(3);
-                name = stripLib;
+                return classInstance;
             }
         }
     }
 
-    // Strip any extension 
-    {
-        auto descExt = ArtifactInfoUtil::getDefaultExtension(desc);
-        // Strip the extension if it's a match
-        if (descExt.getLength() &&
-            Path::getPathExt(name) == descExt)
-        {
-            name = Path::getFileNameWithoutExt(name);
-        }
-    }
-
-    return name;
-}
-
-String Artifact::getBaseName()
-{
-    if (m_pathType != PathType::None)
-    {
-        return getBaseNameFromPath(m_desc, m_path.getUnownedSlice());
-    }
-    return m_name; 
-}
-
-String Artifact::getParentPath()
-{
-    if (m_pathType != PathType::None && m_path.getLength())
-    {
-        return Path::getParentDirectory(m_path);
-    }
-    return String();
+    return nullptr;
 }
 
 SlangResult Artifact::requireFileLike(Keep keep)
@@ -244,7 +173,7 @@ SlangResult Artifact::requireFile(Keep keep)
     ComPtr<ISlangBlob> blob;
 
     // Get the contents as a blob. If we can't do that, then we can't write anything...
-    SLANG_RETURN_ON_FAIL(loadBlob(getIntermediateKeep(keep), blob));
+    SLANG_RETURN_ON_FAIL(loadBlob(getIntermediateKeep(keep), blob.writeRef()));
 
     // If we have a name, make the generated name based on that name
     // Else just use 'slang-generated' the basis
@@ -303,41 +232,62 @@ SlangResult Artifact::requireFile(Keep keep)
     SLANG_RETURN_ON_FAIL(File::writeAllBytes(path, blob->getBufferPointer(), blob->getBufferSize()));
 
     // Okay we can now add this as temporary path too
-    setPath(PathType::Temporary, path);
+    _setPath(PathType::Temporary, path);
 
     return SLANG_OK;
 }
 
-SlangResult Artifact::loadBlob(Keep keep, ComPtr<ISlangBlob>& outBlob)
+SlangResult Artifact::loadBlob(Keep keep, ISlangBlob** outBlob)
 {
-    if (m_blob)
+    ComPtr<ISlangBlob> blob(m_blob);
+
+    if (!blob)
     {
-        outBlob = m_blob;
-        return SLANG_OK;
+        // TODO(JS): 
+        // Strictly speaking we could *potentially* convert some other representation into
+        // a blob by serializing it, but we don't worry about any of that here
+        if (m_pathType != PathType::None)
+        {
+            // Read into a blob
+            ScopedAllocation alloc;
+            SLANG_RETURN_ON_FAIL(File::readAllBytes(m_path, alloc));
+
+            // Create as a blob
+            blob = RawBlob::moveCreate(alloc);
+        }
+        else
+        {
+            for (const auto& element : m_elements)
+            {
+                ISlangUnknown* intf = element.value;
+
+                ComPtr<IArtifactInstance> inst;
+                if (SLANG_SUCCEEDED(intf->queryInterface(IArtifactInstance::getTypeGuid(), (void**)inst.writeRef())) && inst)
+                {
+                    SlangResult res = inst->writeToBlob(blob.writeRef());
+                    if (SLANG_SUCCEEDED(res) && blob)
+                    {
+                        break;
+                    }
+                }
+            }
+        }
+
+        // Wasn't able to construct
+
+        if (!blob)
+        {
+            return SLANG_E_NOT_FOUND;
+        }
+
+        // Put in cache 
+        if (canKeep(keep))
+        {
+            setBlob(blob);
+        }
     }
 
-    // TODO(JS): 
-    // Strictly speaking we could *potentially* convert some other representation into
-    // a blob by serializing it, but we don't worry about any of that here
-    if (m_pathType == PathType::None)
-    {
-        return SLANG_E_NOT_FOUND;
-    }
-
-    // Read into a blob
-    ScopedAllocation alloc;
-    SLANG_RETURN_ON_FAIL(File::readAllBytes(m_path, alloc));
-
-    // Create as a blob
-    RefPtr<RawBlob> blob = RawBlob::moveCreate(alloc);
-
-    // Put in cache 
-    if (canKeep(keep))
-    {
-        setBlob(blob);
-    }
-
-    outBlob = blob;
+    *outBlob = blob.detach();
     return SLANG_OK;
 }
 

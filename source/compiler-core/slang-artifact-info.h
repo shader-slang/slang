@@ -1,4 +1,4 @@
-// slang-artifact.h
+// slang-artifact-info.h
 #ifndef SLANG_ARTIFACT_INFO_H
 #define SLANG_ARTIFACT_INFO_H
 
@@ -89,6 +89,18 @@ struct ArtifactInfoUtil
 
         /// Get the extension for CPU/Host for a kind
     static UnownedStringSlice getCpuExtensionForKind(Kind kind);
+
+        /// Given a desc and a path returns the base name (stripped of prefix and extension)
+    static String getBaseNameFromPath(const ArtifactDesc& desc, const UnownedStringSlice& path);
+
+        /// Get the base name of this artifact.
+        /// If there is a path set, will extract the name from that (stripping prefix, extension as necessary).
+        /// Else if there is an explicit name set, this is returned.
+        /// Else returns the empty string
+    static String getBaseName(IArtifact* artifact);
+
+        /// Get the parent path (empty if there isn't one)
+    static String getParentPath(IArtifact* artifact);
 };
 
 } // namespace Slang
