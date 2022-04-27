@@ -6,7 +6,10 @@
 #include "slang-ir-insts.h"
 #include "slang-mangle.h"
 #include "slang-ir-string-hash.h"
-#include "slang-artifact.h"
+
+#include "slang-module-library.h"
+
+#include "../compiler-core/slang-artifact.h"
 
 namespace Slang
 {

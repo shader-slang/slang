@@ -7,7 +7,9 @@
 #include "../core/slang-type-text-util.h"
 #include "../core/slang-type-convert-util.h"
 
-#include "slang-artifact.h"
+#include "../compiler-core/slang-artifact.h"
+
+#include "slang-module-library.h"
 
 #include "slang-check.h"
 #include "slang-parameter-binding.h"
@@ -4335,7 +4337,7 @@ SlangResult _addLibraryReference(EndToEndCompileRequest* req, Artifact* artifact
     {
         RefPtr<ModuleLibrary> library;
 
-        SLANG_RETURN_ON_FAIL(loadModuleLibrary(Artifact::Keep::Yes, artifact, req, library));
+        SLANG_RETURN_ON_FAIL(loadModuleLibrary(ArtifactKeep::Yes, artifact, req, library));
 
         FrontEndCompileRequest* frontEndRequest = req->getFrontEndReq();
         frontEndRequest->m_extraEntryPoints.addRange(library->m_entryPoints.getBuffer(), library->m_entryPoints.getCount());
@@ -4359,8 +4361,10 @@ SlangResult EndToEndCompileRequest::addLibraryReference(const void* libData, siz
     RefPtr<ModuleLibrary> library;
     SLANG_RETURN_ON_FAIL(loadModuleLibrary((const Byte*)libData, libDataSize, this, library));
 
-    const auto desc = ArtifactDesc::make(ArtifactKind::Library, ArtifactPayload::SlangIR, ArtifactStyle::Unknown);
-    RefPtr<Artifact> artifact = new Artifact(desc);
+    const auto desc = ArtifactDesc::make(ArtifactKind::Library, ArtifactPayload::SlangIR);
+
+    // Create an artifact without any name (as one is not provided)
+    RefPtr<Artifact> artifact = new Artifact(desc, String());
 
     artifact->add(Artifact::Entry::Style::Artifact, library);
 
