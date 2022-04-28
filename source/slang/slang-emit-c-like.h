@@ -309,6 +309,8 @@ public:
 
     void emitCallExpr(IRCall* inst, EmitOpInfo outerPrec);
 
+    void emitLiveness(IRInst* inst) { emitLivenessImpl(inst); }
+
     void emitInstExpr(IRInst* inst, EmitOpInfo const& inOuterPrec);
     void defaultEmitInstExpr(IRInst* inst, EmitOpInfo const& inOuterPrec);
     void diagnoseUnhandledInst(IRInst* inst);
@@ -465,6 +467,7 @@ public:
     virtual void emitFunctionPreambleImpl(IRInst* inst) { SLANG_UNUSED(inst); }
     virtual void emitLoopControlDecorationImpl(IRLoopControlDecoration* decl) { SLANG_UNUSED(decl); }
     virtual void emitFuncDecorationImpl(IRDecoration* decoration) { SLANG_UNUSED(decoration); }
+    virtual void emitLivenessImpl(IRInst* inst);
 
         // Only needed for glsl output with $ prefix intrinsics - so perhaps removable in the future
     virtual void emitTextureOrTextureSamplerTypeImpl(IRTextureTypeBase*  type, char const* baseName) { SLANG_UNUSED(type); SLANG_UNUSED(baseName); }
