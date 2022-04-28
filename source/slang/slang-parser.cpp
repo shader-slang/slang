@@ -4210,6 +4210,7 @@ namespace Slang
             // when starting to parse an infix expression.
             //
             type = nullptr;
+            SLANG_UNUSED(type);
 
             // TODO: If we decide to intermix parsing of statement bodies
             // with semantic checking (by delaying the parsing of bodies
