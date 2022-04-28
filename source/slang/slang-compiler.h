@@ -140,26 +140,103 @@ namespace Slang
     class EndToEndCompileRequest;
     class TranslationUnitRequest;
 
+    struct ShaderBindingRange
+    {
+        slang::ParameterCategory category = slang::ParameterCategory::None;
+        int spaceIndex = 0;
+        int registerIndex = 0;
+        int registerCount = 0; // 0 for unsized
+
+        bool isInfinite() const
+        {
+            return registerCount == 0;
+        }
+
+        bool containsBinding(slang::ParameterCategory _category, int _spaceIndex, int _registerIndex) const
+        {
+            return category == _category
+                && spaceIndex == _spaceIndex
+                && registerIndex <= _registerIndex
+                && (isInfinite() || registerCount + registerIndex > _registerIndex);
+        }
+
+        bool intersectsWith(const ShaderBindingRange& other) const
+        {
+            if (category != other.category || spaceIndex != other.spaceIndex)
+                return false;
+
+            const bool leftIntersection = (registerIndex < other.registerIndex + other.registerCount) || other.isInfinite();
+            const bool rightIntersection = (other.registerIndex < registerIndex + registerCount) || isInfinite();
+
+            return leftIntersection && rightIntersection;
+        }
+
+        bool adjacentTo(const ShaderBindingRange& other) const
+        {
+            if (category != other.category || spaceIndex != other.spaceIndex)
+                return false;
+
+            const bool leftIntersection = (registerIndex <= other.registerIndex + other.registerCount) || other.isInfinite();
+            const bool rightIntersection = (other.registerIndex <= registerIndex + registerCount) || isInfinite();
+
+            return leftIntersection && rightIntersection;
+        }
+
+        void mergeWith(const ShaderBindingRange other)
+        {
+            int newRegisterIndex = Math::Min(registerIndex, other.registerIndex);
+
+            if (other.isInfinite())
+                registerCount = 0;
+            else if (!isInfinite())
+                registerCount = Math::Max(registerIndex + registerCount, other.registerIndex + other.registerCount) - newRegisterIndex;
+
+            registerIndex = newRegisterIndex;
+        }
+    };
+
+    struct PostEmitMetadata : public RefObject
+    {
+        List<ShaderBindingRange> usedBindings;
+    };
+
     // Result of compiling an entry point.
     // Should only ever be string, binary or shared library
     class CompileResult
     {
     public:
         CompileResult() = default;
-        explicit CompileResult(String const& str) : format(ResultFormat::Text), outputString(str) {}
-        explicit CompileResult(ISlangBlob* inBlob) : format(ResultFormat::Binary), blob(inBlob) {}
-        explicit CompileResult(DownstreamCompileResult* inDownstreamResult): format(ResultFormat::Binary), downstreamResult(inDownstreamResult) {}
-        explicit CompileResult(const UnownedStringSlice& slice ) : format(ResultFormat::Text), outputString(slice) {}
+        explicit CompileResult(String const& str, RefPtr<PostEmitMetadata> metadata)
+            : format(ResultFormat::Text)
+            , outputString(str)
+            , postEmitMetadata(metadata) {}
+
+        explicit CompileResult(ISlangBlob* inBlob)
+            : format(ResultFormat::Binary)
+            , blob(inBlob) {}
+
+        explicit CompileResult(DownstreamCompileResult* inDownstreamResult, RefPtr<PostEmitMetadata> metadata)
+            : format(ResultFormat::Binary)
+            , downstreamResult(inDownstreamResult)
+            , postEmitMetadata(metadata) {}
+
+        explicit CompileResult(const UnownedStringSlice& slice )
+            : format(ResultFormat::Text)
+            , outputString(slice) {}
 
         SlangResult getBlob(ComPtr<ISlangBlob>& outBlob) const;
         SlangResult getSharedLibrary(ComPtr<ISlangSharedLibrary>& outSharedLibrary);
 
+        SlangResult isParameterLocationUsed(SlangParameterCategory category, int spaceIndex, int registerIndex, bool& outUsed);
+                
         ResultFormat format = ResultFormat::None;
         String outputString;                    ///< Only set if result type is ResultFormat::Text
 
         mutable ComPtr<ISlangBlob> blob;
 
         RefPtr<DownstreamCompileResult> downstreamResult;
+
+        RefPtr<PostEmitMetadata> postEmitMetadata;
     };
 
         /// Information collected about global or entry-point shader parameters
@@ -938,7 +1015,7 @@ namespace Slang
 
         Index getShaderParamCount() SLANG_OVERRIDE { return 0; }
         ShaderParamInfo getShaderParam(Index index) SLANG_OVERRIDE { SLANG_UNUSED(index); return ShaderParamInfo(); }
-
+        
         class EntryPointSpecializationInfo : public SpecializationInfo
         {
         public:
@@ -2301,6 +2378,7 @@ namespace Slang
         virtual SLANG_NO_THROW void SLANG_MCALL setCommandLineCompilerMode() SLANG_OVERRIDE;
         virtual SLANG_NO_THROW SlangResult SLANG_MCALL addTargetCapability(SlangInt targetIndex, SlangCapabilityID capability) SLANG_OVERRIDE;
         virtual SLANG_NO_THROW SlangResult SLANG_MCALL getProgramWithEntryPoints(slang::IComponentType** outProgram) SLANG_OVERRIDE;
+        virtual SLANG_NO_THROW SlangResult isParameterLocationUsed(int entryPointIndex, int targetIndex, SlangParameterCategory category, int spaceIndex, int registerIndex, bool& outUsed) SLANG_OVERRIDE;
         virtual SLANG_NO_THROW void SLANG_MCALL setTargetLineDirectiveMode(
             SlangInt targetIndex,
             SlangLineDirectiveMode mode) SLANG_OVERRIDE;
@@ -2497,7 +2575,8 @@ namespace Slang
         CodeGenTarget           target,
         EndToEndCompileRequest* endToEndReq,
         ExtensionTracker*       extensionTracker,
-        String&                 outSource);
+        String&                 outSource,
+        RefPtr<PostEmitMetadata>& outMetadata);
 
     SlangResult emitEntryPointSource(
         BackEndCompileRequest*  compileRequest,
@@ -2506,7 +2585,8 @@ namespace Slang
         CodeGenTarget           target,
         EndToEndCompileRequest* endToEndReq,
         ExtensionTracker*       extensionTracker,
-        String&                 outSource);
+        String&                 outSource,
+        RefPtr<PostEmitMetadata>& outMetadata);
 
     //
 

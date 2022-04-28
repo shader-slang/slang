@@ -4853,4 +4853,14 @@ SlangResult EndToEndCompileRequest::getEntryPoint(SlangInt entryPointIndex, slan
     return SLANG_OK;
 }
 
+SlangResult EndToEndCompileRequest::isParameterLocationUsed(int entryPointIndex, int targetIndex, SlangParameterCategory category, int spaceIndex, int registerIndex, bool& outUsed)
+{
+    CompileResult* compileResult = nullptr;
+    if (_getEntryPointResult(this, entryPointIndex, targetIndex, &compileResult) != SLANG_OK)
+        return SLANG_E_INVALID_ARG;
+
+    return compileResult->isParameterLocationUsed(category, spaceIndex, registerIndex, outUsed);
+}
+
+
 } // namespace Slang

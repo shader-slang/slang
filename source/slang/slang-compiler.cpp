@@ -144,6 +144,25 @@ void printDiagnosticArg(StringBuilder& sb, CodeGenTarget val)
         return SLANG_OK;
     }
 
+    SlangResult CompileResult::isParameterLocationUsed(SlangParameterCategory category, int spaceIndex, int registerIndex, bool& outUsed)
+    {
+        if (!postEmitMetadata)
+            return SLANG_E_NOT_AVAILABLE;
+
+        // TODO: optimize this with a binary search through a sorted list
+        for (const auto& range : postEmitMetadata->usedBindings)
+        {
+            if (range.containsBinding((slang::ParameterCategory)category, spaceIndex, registerIndex))
+            {
+                outUsed = true;
+                return SLANG_OK;
+            }
+        }
+        
+        outUsed = false;
+        return SLANG_OK;
+    }
+
     //
     // FrontEndEntryPointRequest
     //
@@ -659,7 +678,8 @@ void printDiagnosticArg(StringBuilder& sb, CodeGenTarget val)
         CodeGenTarget           target,
         EndToEndCompileRequest* endToEndReq,
         ExtensionTracker*       extensionTracker, 
-        String&                 outSource)
+        String&                 outSource,
+        RefPtr<PostEmitMetadata>& outMetadata)
     {
         outSource = String();
 
@@ -716,7 +736,8 @@ void printDiagnosticArg(StringBuilder& sb, CodeGenTarget val)
                 target,
                 targetReq,
                 extensionTracker,
-                outSource);
+                outSource,
+                outMetadata);
         }
     }
 
@@ -727,12 +748,13 @@ void printDiagnosticArg(StringBuilder& sb, CodeGenTarget val)
         CodeGenTarget           target,
         EndToEndCompileRequest* endToEndReq,
         ExtensionTracker*       extensionTracker,
-        String&                 outSource)
+        String&                 outSource,
+        RefPtr<PostEmitMetadata>& outMetadata)
     {
         List<Int> entryPointIndices;
         entryPointIndices.add(entryPointIndex);
         return emitEntryPointsSource(compileRequest, entryPointIndices, targetReq,
-            target, endToEndReq, extensionTracker, outSource);
+            target, endToEndReq, extensionTracker, outSource, outMetadata);
     }
 
     String GetHLSLProfileName(Profile profile)
@@ -1019,7 +1041,8 @@ void printDiagnosticArg(StringBuilder& sb, CodeGenTarget val)
         TargetRequest*          targetReq,
         CodeGenTarget           target,
         EndToEndCompileRequest* endToEndReq,
-        RefPtr<DownstreamCompileResult>& outResult)
+        RefPtr<DownstreamCompileResult>& outResult,
+        RefPtr<PostEmitMetadata>& outMetadata)
     {
         outResult.setNull();
 
@@ -1157,7 +1180,7 @@ void printDiagnosticArg(StringBuilder& sb, CodeGenTarget val)
                 // If it's not file based we can set an appropriate path name, and it doesn't matter if it doesn't
                 // exist on the file system
                 options.sourceContentsPath = calcSourcePathForEntryPoints(endToEndReq, entryPointIndices);
-                SLANG_RETURN_ON_FAIL(emitEntryPointsSource(slangRequest, entryPointIndices, targetReq, sourceTarget, endToEndReq, extensionTracker, options.sourceContents));
+                SLANG_RETURN_ON_FAIL(emitEntryPointsSource(slangRequest, entryPointIndices, targetReq, sourceTarget, endToEndReq, extensionTracker, options.sourceContents, outMetadata));
             }
             else
             {
@@ -1173,7 +1196,7 @@ void printDiagnosticArg(StringBuilder& sb, CodeGenTarget val)
         }
         else
         {
-            SLANG_RETURN_ON_FAIL(emitEntryPointsSource(slangRequest, entryPointIndices, targetReq, sourceTarget, endToEndReq, extensionTracker, options.sourceContents));
+            SLANG_RETURN_ON_FAIL(emitEntryPointsSource(slangRequest, entryPointIndices, targetReq, sourceTarget, endToEndReq, extensionTracker, options.sourceContents, outMetadata));
             maybeDumpIntermediate(slangRequest, options.sourceContents.getBuffer(), sourceTarget);
 
             sourceLanguage = (SourceLanguage)TypeConvertUtil::getSourceLanguageFromTarget((SlangCompileTarget)sourceTarget);
@@ -1511,7 +1534,8 @@ void printDiagnosticArg(StringBuilder& sb, CodeGenTarget val)
         BackEndCompileRequest*  compileRequest,
         const List<Int>&        entryPointIndices,
         TargetRequest*          targetReq,
-        List<uint8_t>&          spirvOut);
+        List<uint8_t>&          spirvOut,
+        RefPtr<PostEmitMetadata>& outMetadata);
 
     static CodeGenTarget _getIntermediateTarget(CodeGenTarget target)
     {
@@ -1532,7 +1556,8 @@ void printDiagnosticArg(StringBuilder& sb, CodeGenTarget val)
         TargetRequest*                  targetReq,
         CodeGenTarget                   target,
         EndToEndCompileRequest*         endToEndReq,
-        RefPtr<DownstreamCompileResult>& outDownstreamResult)
+        RefPtr<DownstreamCompileResult>& outDownstreamResult,
+        RefPtr<PostEmitMetadata>&       outMetadata)
     {
         switch (target)
         {
@@ -1544,7 +1569,7 @@ void printDiagnosticArg(StringBuilder& sb, CodeGenTarget val)
 
                 // Compile the intermediate target
                 const CodeGenTarget intermediateTarget = _getIntermediateTarget(target);
-                SLANG_RETURN_ON_FAIL(_emitEntryPoints(program, compileRequest, entryPointIndices, targetReq, intermediateTarget, endToEndReq, code));
+                SLANG_RETURN_ON_FAIL(_emitEntryPoints(program, compileRequest, entryPointIndices, targetReq, intermediateTarget, endToEndReq, code, outMetadata));
 
                 maybeDumpIntermediate(compileRequest, code, intermediateTarget);
 
@@ -1568,7 +1593,7 @@ void printDiagnosticArg(StringBuilder& sb, CodeGenTarget val)
                 if (target == CodeGenTarget::SPIRV && targetReq->shouldEmitSPIRVDirectly())
                 {
                     List<uint8_t> spirv;
-                    SLANG_RETURN_ON_FAIL(emitSPIRVForEntryPointsDirectly(compileRequest, entryPointIndices, targetReq, spirv));
+                    SLANG_RETURN_ON_FAIL(emitSPIRVForEntryPointsDirectly(compileRequest, entryPointIndices, targetReq, spirv, outMetadata));
                     auto spirvBlob = ListBlob::moveCreate(spirv);
                     downstreamResult = new BlobDownstreamCompileResult(DownstreamDiagnostics(), spirvBlob);
                 }
@@ -1581,7 +1606,8 @@ void printDiagnosticArg(StringBuilder& sb, CodeGenTarget val)
                         targetReq,
                         target,
                         endToEndReq,
-                        downstreamResult));
+                        downstreamResult,
+                        outMetadata));
                 }
     
                 outDownstreamResult = downstreamResult;
@@ -1620,6 +1646,7 @@ void printDiagnosticArg(StringBuilder& sb, CodeGenTarget val)
         case CodeGenTarget::HostExecutable:
             {
                 RefPtr<DownstreamCompileResult> downstreamResult;
+                RefPtr<PostEmitMetadata> metadata;
 
                 if (SLANG_SUCCEEDED(_emitEntryPoints(program,
                         compileRequest,
@@ -1627,10 +1654,11 @@ void printDiagnosticArg(StringBuilder& sb, CodeGenTarget val)
                         targetReq,
                         target,
                         endToEndReq,
-                        downstreamResult)))
+                        downstreamResult,
+                        metadata)))
                 {
                     maybeDumpIntermediate(compileRequest, downstreamResult, target);
-                    result = CompileResult(downstreamResult);
+                    result = CompileResult(downstreamResult, metadata);
                 }
             }
             break;
@@ -1642,6 +1670,7 @@ void printDiagnosticArg(StringBuilder& sb, CodeGenTarget val)
         case CodeGenTarget::CSource:
             {
                 RefPtr<ExtensionTracker> extensionTracker = _newExtensionTracker(target);
+                RefPtr<PostEmitMetadata> metadata;
 
                 String code;
                 if (SLANG_FAILED(emitEntryPointsSource(compileRequest,
@@ -1650,13 +1679,14 @@ void printDiagnosticArg(StringBuilder& sb, CodeGenTarget val)
                     target,
                     endToEndReq,
                     extensionTracker,
-                    code)))
+                    code,
+                    metadata)))
                 {
                     return result;
                 }
 
                 maybeDumpIntermediate(compileRequest, code.getBuffer(), target);
-                result = CompileResult(code);
+                result = CompileResult(code, metadata);
             }
             break;
 

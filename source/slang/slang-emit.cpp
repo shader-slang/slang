@@ -23,6 +23,7 @@
 #include "slang-ir-lower-tuple-types.h"
 #include "slang-ir-lower-bit-cast.h"
 #include "slang-ir-lower-reinterpret.h"
+#include "slang-ir-metadata.h"
 #include "slang-ir-optix-entry-point-uniforms.h"
 #include "slang-ir-restructure.h"
 #include "slang-ir-restructure-scoping.h"
@@ -735,6 +736,9 @@ Result linkAndOptimizeIR(
 #endif
     validateIRModuleIfEnabled(compileRequest, irModule);
 
+    outLinkedIR.metadata = new PostEmitMetadata();
+    collectMetadata(irModule, *outLinkedIR.metadata);
+
     return SLANG_OK;
 }
 
@@ -748,7 +752,8 @@ SlangResult emitEntryPointsSourceFromIR(
     CodeGenTarget           target,
     TargetRequest*          targetRequest,
     ExtensionTracker*       extensionTracker, 
-    String&                 outSource)
+    String&                 outSource,
+    RefPtr<PostEmitMetadata>& outMetadata)
 {
     outSource = String();
 
@@ -857,6 +862,8 @@ SlangResult emitEntryPointsSourceFromIR(
 
         auto irModule = linkedIR.module;
 
+        outMetadata = linkedIR.metadata;
+
         // After all of the required optimization and legalization
         // passes have been performed, we can emit target code from
         // the IR module.
@@ -934,7 +941,8 @@ SlangResult emitSPIRVForEntryPointsDirectly(
     BackEndCompileRequest*  compileRequest,
     const List<Int>&        entryPointIndices,
     TargetRequest*          targetRequest,
-    List<uint8_t>&          spirvOut)
+    List<uint8_t>&          spirvOut,
+    RefPtr<PostEmitMetadata>& outMetadata)
 {
     auto sink = compileRequest->getSink();
     auto program = compileRequest->getProgram();
@@ -958,6 +966,8 @@ SlangResult emitSPIRVForEntryPointsDirectly(
     auto irEntryPoints = linkedIR.entryPoints;
 
     emitSPIRVFromIR(compileRequest, targetRequest, irModule, irEntryPoints, spirvOut);
+
+    outMetadata = linkedIR.metadata;
 
     return SLANG_OK;
 }

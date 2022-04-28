@@ -2124,6 +2124,15 @@ extern "C"
     SLANG_API unsigned spReflectionParameter_GetBindingIndex(SlangReflectionParameter* parameter);
     SLANG_API unsigned spReflectionParameter_GetBindingSpace(SlangReflectionParameter* parameter);
 
+    SLANG_API SlangResult spIsParameterLocationUsed(
+        SlangCompileRequest* request,
+        int entryPointIndex,
+        int targetIndex,
+        SlangParameterCategory category, // is this a `t` register? `s` register?
+        int spaceIndex,      // `space` for D3D12, `set` for Vulkan
+        int registerIndex,   // `register` for D3D12, `binding` for Vulkan
+        bool& outUsed);
+
     // Entry Point Reflection
 
     SLANG_API char const* spReflectionEntryPoint_getName(
@@ -3868,6 +3877,14 @@ namespace slang
             */
         virtual SLANG_NO_THROW SlangResult SLANG_MCALL getProgramWithEntryPoints(
             slang::IComponentType** outProgram) = 0;
+
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL isParameterLocationUsed(
+            int entryPointIndex,
+            int targetIndex,
+            SlangParameterCategory category,
+            int spaceIndex,
+            int registerIndex,
+            bool& outUsed) = 0;
 
             /** Set the line directive mode for a target.
             */

@@ -42,6 +42,7 @@ namespace Slang
         CodeGenTarget           target,
         TargetRequest*          targetRequest,
         ExtensionTracker*       extensionTracker, 
-        String&                 outSource);
+        String&                 outSource,
+        RefPtr<PostEmitMetadata>& outMetadata);
 }
 #endif
