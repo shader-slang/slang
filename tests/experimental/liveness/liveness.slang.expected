@@ -8,20 +8,20 @@ standard output = {
 
 #pragma pack_matrix(column_major)
 
-#line 18 "tests/experimental/liveness/liveness.slang"
+#line 24 "tests/experimental/liveness/liveness.slang"
 int someSlowFunc_0(int a_0)
 {
     int i_0;
     uint v_0;
 
-#line 20
+#line 26
     uint _S1 = (uint) a_0;
     i_0 = int(0);
     v_0 = _S1;
     for(;;)
     {
 
-#line 21
+#line 27
         if(i_0 < a_0 * int(20))
         {
         }
@@ -30,18 +30,38 @@ int someSlowFunc_0(int a_0)
             break;
         }
 
-#line 23
+#line 29
         uint _S2 = (uint) ((int) ((bool) (v_0 >> int(1)) || (bool) (v_0 << int(31))) * i_0);
 
-#line 21
+#line 27
         int i_1 = i_0 + int(1);
 
-#line 21
+#line 27
         i_0 = i_1;
         v_0 = _S2;
     }
 
     return (int) v_0;
+}
+
+
+#line 6
+struct SomeStruct_0
+{
+    int a_1;
+    int x_0;
+    int  c_0[int(100)];
+};
+
+
+#line 17
+SomeStruct_0 makeSomeStruct_0()
+{
+    int  _S3[int(100)] = { int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0) };
+
+#line 19
+    SomeStruct_0 s_0 = { int(0), int(0), _S3 };
+    return s_0;
 }
 
 
@@ -52,22 +72,15 @@ RWStructuredBuffer<int > anotherBuffer_0 : register(u1);
 #line 4
 RWStructuredBuffer<int > outputBuffer_0 : register(u0);
 
-struct SomeStruct_0
-{
-    int a_1;
-    int x_0;
-    int  c_0[int(100)];
-};
 
-
-#line 29
+#line 35
 [shader("compute")][numthreads(4, 1, 1)]
 void computeMain(uint3 dispatchThreadID_0 : SV_DISPATCHTHREADID)
 {
     int i_2;
     int res_0;
 
-#line 31
+#line 37
     int index_0 = (int) dispatchThreadID_0.x;
 
 
@@ -77,7 +90,7 @@ void computeMain(uint3 dispatchThreadID_0 : SV_DISPATCHTHREADID)
     for(;;)
     {
 
-#line 35
+#line 41
         if(i_2 < index_0)
         {
         }
@@ -86,38 +99,63 @@ void computeMain(uint3 dispatchThreadID_0 : SV_DISPATCHTHREADID)
             break;
         }
 
-#line 37
+#line 43
         int v_1 = someSlowFunc_0(index_0);
 
-        SomeStruct_0 s_0;
+        SomeStruct_0 s_1;
 
-#line 39
-        SLANG_LIVE_START(s_0)
+#line 45
+        SLANG_LIVE_START(s_1)
+        SomeStruct_0 t_0;
+
+#line 46
+        SLANG_LIVE_START(t_0)
+
+#line 46
+        SomeStruct_0 _S4 = makeSomeStruct_0();
+
+#line 46
+        t_0 = _S4;
+        SomeStruct_0 u_0;
+
+#line 47
+        SLANG_LIVE_START(u_0)
+
+#line 47
+        int  _S5[int(100)] = { int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0) };
+
+#line 47
+        SomeStruct_0 _S6 = { int(0), int(0), _S5 };
+
+#line 47
+        u_0 = _S6;
 
         if((bool) (v_1 & int(256)))
         {
-            s_0.x_0 = anotherBuffer_0[(uint) (v_1 & int(3))];
+            s_1.x_0 = anotherBuffer_0[(uint) (v_1 & int(3))];
+            t_0.x_0 = anotherBuffer_0[(uint) (v_1 & int(3))];
+            u_0.x_0 = anotherBuffer_0[(uint) (v_1 & int(3))] + int(1);
 
-#line 41
+#line 49
         }
         else
         {
 
-#line 41
+#line 49
         }
 
-#line 47
-        int _S3 = s_0.x_0;
+#line 57
+        int _S7 = s_1.x_0 + t_0.x_0 + u_0.x_0;
 
-#line 35
+#line 41
         int i_3 = i_2 + int(1);
 
-#line 35
+#line 41
         i_2 = i_3;
-        res_0 = _S3;
+        res_0 = _S7;
     }
 
-#line 50
+#line 60
     outputBuffer_0[(uint) index_0] = res_0;
     return;
 }

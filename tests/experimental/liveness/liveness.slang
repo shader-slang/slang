@@ -1,4 +1,4 @@
-//TEST:SIMPLE:-target hlsl -entry computeMain -profile cs_6_3 -track-liveness 
+//TEST:SIMPLE:-target hlsl -entry computeMain -profile cs_6_3 -track-liveness
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name outputBuffer
 RWStructuredBuffer<int> outputBuffer;
@@ -13,6 +13,12 @@ struct SomeStruct
 
 //TEST_INPUT:ubuffer(data=[1 4 27 17], stride=4):name anotherBuffer
 RWStructuredBuffer<int> anotherBuffer;
+
+SomeStruct makeSomeStruct()
+{
+    SomeStruct s = {};
+    return s;
+}
 
 // A silly function that is in some sense 'slow'
 int someSlowFunc(int a)
@@ -37,14 +43,18 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
         int v = someSlowFunc(index);         // s mut not be considered live here.
         
         SomeStruct s;
+        SomeStruct t = makeSomeStruct();
+        SomeStruct u = {};
         
         if (v & 0x100)
         {
             s.x = anotherBuffer[v & 3];
+            t.x = anotherBuffer[v & 3];
+            u.x = anotherBuffer[v & 3] + 1;
         }
         
         // Could be undefined or 
-        res = s.x; 
+        res = s.x + t.x + u.x;
     }
     
     outputBuffer[index] = res;
