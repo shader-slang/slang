@@ -50,7 +50,7 @@ SlangResult DeflateCompressionSystemImpl::compress(const CompressionStyle* style
     size_t compressedSizeInBytes;
 
     const int flags = 0;
-    void* compressed = tdefl_compress_mem_to_heap(src, srcSizeInBytes, &compressedSizeInBytes, 0);
+    void* compressed = tdefl_compress_mem_to_heap(src, srcSizeInBytes, &compressedSizeInBytes, flags);
 
     if (!compressed)
     {

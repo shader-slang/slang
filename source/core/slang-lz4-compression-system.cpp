@@ -56,6 +56,7 @@ SlangResult LZ4CompressionSystemImpl::compress(const CompressionStyle* style, co
 SlangResult LZ4CompressionSystemImpl::decompress(const void* compressed, size_t compressedSizeInBytes, size_t decompressedSizeInBytes, void* outDecompressed)
 {
     const int decompressedSize = LZ4_decompress_safe((const char*)compressed, (char*)outDecompressed, int(compressedSizeInBytes), int(decompressedSizeInBytes));
+    SLANG_UNUSED(decompressedSize);
     SLANG_ASSERT(size_t(decompressedSize) == decompressedSizeInBytes);
     return SLANG_OK;
 }

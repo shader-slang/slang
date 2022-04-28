@@ -447,8 +447,7 @@ SlangResult DocMarkupExtractor::_findMarkup(const FindInfo& info, Location locat
     out.reset();
 
     const auto& toks = info.tokenList->m_tokens;
-    const Index tokIndex = info.tokenIndex;
-
+    
     // The starting token index
     Index startIndex = _findStartIndex(info, location);
     if (startIndex <= 0)
