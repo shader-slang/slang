@@ -4161,6 +4161,8 @@ void EndToEndCompileRequest::setDumpIntermediates(int enable)
 
 void EndToEndCompileRequest::setTrackLiveness(bool v)
 {
+    enableLivenessTracking = v;
+
     // Change all existing targets to use the new setting.
     auto linkage = getLinkage();
     for (auto& target : linkage->targets)

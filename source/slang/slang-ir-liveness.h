@@ -7,7 +7,8 @@ namespace Slang
 
 struct IRModule;
 
-void addLivenessTracking(IRModule* module);
+/// Adds LiveStart and LiveEnd instructions to demark the start and end of the liveness of a variable.
+void addLivenessTrackingToModule(IRModule* module);
 
 }
 

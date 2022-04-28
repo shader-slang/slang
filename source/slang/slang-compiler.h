@@ -2373,6 +2373,8 @@ namespace Slang
         bool shouldValidateIR();
         bool shouldDumpIR();
 
+        bool shouldTrackLiveness();
+
         bool shouldDumpIntermediates();
         String getIntermediateDumpPrefix();
 
@@ -2666,6 +2668,9 @@ namespace Slang
 
         // Should we dump intermediate results along the way, for debugging?
         bool shouldDumpIntermediates = false;
+
+        // True if liveness tracking is enabled
+        bool enableLivenessTracking = false;
 
         // Should R/W images without explicit formats be assumed to have "unknown" format?
         //

@@ -20,15 +20,28 @@ struct LivenessContext
         // So post specialization
 
         IRModuleInst* moduleInst = m_module->getModuleInst();
-
-        IRInst* nextChild;
+        
         for (IRInst* child = moduleInst->getFirstDecorationOrChild(); child; child = child->getNextInst())
         {
             if (auto funcInst = as<IRFunc>(child))
             {
-                // Get the first block, if it doesn't have one we are doen
-                if (auto firstBlock = funcInst->getFirstBlock())
+                // Iterate through blocks 
+
+                for (auto block = funcInst->getFirstBlock(); block; block = block->getNextBlock())
                 {
+                    for (auto inst = block->getFirstChild(); inst; inst = inst->getNextInst())
+                    {
+                        if (auto varInst = as<IRVar>(inst))
+                        {
+                            // TODO(JS): 
+                            // For now we'll just add start liveness information, just to check out this path
+                            // all works
+                            m_builder.setInsertLoc(IRInsertLoc::after(varInst));
+
+                            // Emit the start
+                            m_builder.emitLiveStart(varInst);
+                        }
+                    }
                 }
             }
         }
@@ -48,7 +61,7 @@ struct LivenessContext
 
 } // anonymous
 
-void addLivenessTracking(IRModule* module)
+void addLivenessTrackingToModule(IRModule* module)
 {
     LivenessContext context(module);
 

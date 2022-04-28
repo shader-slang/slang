@@ -1,4 +1,4 @@
-//TEST:SIMPLE:-target hlsl -entry computeMain -track-liveness -profile cs_6_3
+//TEST:SIMPLE:-target hlsl -entry computeMain -profile cs_6_3 -track-liveness 
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name outputBuffer
 RWStructuredBuffer<int> outputBuffer;

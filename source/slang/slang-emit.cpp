@@ -38,6 +38,8 @@
 #include "slang-ir-union.h"
 #include "slang-ir-validate.h"
 #include "slang-ir-wrap-structured-buffers.h"
+#include "slang-ir-liveness.h"
+
 #include "slang-legalize-types.h"
 #include "slang-lower-to-ir.h"
 #include "slang-mangle.h"
@@ -484,9 +486,9 @@ Result linkAndOptimizeIR(
         {
             wrapStructuredBuffersOfMatrices(irModule);
 #if 0
-                dumpIRIfEnabled(codeGenContext, irModule, "STRUCTURED BUFFERS WRAPPED");
+            dumpIRIfEnabled(codeGenContext, irModule, "STRUCTURED BUFFERS WRAPPED");
 #endif
-                validateIRModuleIfEnabled(codeGenContext, irModule);
+            validateIRModuleIfEnabled(codeGenContext, irModule);
         }
         break;
 
@@ -727,6 +729,38 @@ Result linkAndOptimizeIR(
     // bit_cast on basic types.
     lowerBitCast(targetRequest, irModule);
     simplifyIR(irModule);
+
+    // TODO(JS): We probably want to add a pass that moves phi-node temporaries to 
+    // IR.
+    // 
+    // Currently these are added as part of emit in
+    // emitPhiVarAssignments and emitPhiVarDecls
+    // 
+    // A possible mechanism might be:
+    // 1) Find all of the parameters passed between blocks
+    // 2) Make a variable for each one of them 
+    //    This could be at the scope for the function, or more ideally a scope that is 'most appropriate' for how the parameter is passed 
+    //    ie the closest scope such that the variable is in scope across the branch.
+    // 3) Replace all uses of the parameters passed into a block (except the entry block), with the temporary
+    // 3a) Remove the parameters from the start of a block (other than the entry block)
+    // 4) For all of the branches in a function
+    // 4a) For each parameter passed in the branch, assign to the temporary
+    // 4b) Replace the branch with a branch that has no parameters
+    //
+    // This should lead to an equivalent function, where the parameter passing between blocks is removed, and all the temporaries
+    // are explicit in the output.
+    // 
+    // I guess there could be a desire to combine the liveness tracking into this pass, because once a phi-temporary has been moved
+    // we have lost(?) information about liveness. That could potentially be recovered, but for the phi-temporaries, their 
+    // initial liveness is trivial, it's when the assignment takes place, at the branch point. 
+    // 
+    // If all the temporaries were marked as such, then this would be fairly trivial to recreate. 
+
+    // TODO(JS): Without a pass to make all variables (including phi ones), the liveness tracking can't track everything
+    if (codeGenContext->shouldTrackLiveness())
+    {
+        addLivenessTrackingToModule(irModule);
+    }
 
     // We include one final step to (optionally) dump the IR and validate
     // it after all of the optimization passes are complete. This should
