@@ -2508,7 +2508,7 @@ void CLikeSourceEmitter::emitRegion(Region* inRegion)
                 // instead of the current `if(condition) {} else { elseRegion }`
 
                 m_writer->emit("if(");
-                emitOperand(ifRegion->condition, getInfo(EmitOp::General));
+                emitOperand(ifRegion->getCondition(), getInfo(EmitOp::General));
                 m_writer->emit(")\n{\n");
                 m_writer->indent();
                 emitRegion(ifRegion->thenRegion);
@@ -2570,7 +2570,7 @@ void CLikeSourceEmitter::emitRegion(Region* inRegion)
 
                 // Emit the start of our statement.
                 m_writer->emit("switch(");
-                emitOperand(switchRegion->condition, getInfo(EmitOp::General));
+                emitOperand(switchRegion->getCondition(), getInfo(EmitOp::General));
                 m_writer->emit(")\n{\n");
 
                 auto defaultCase = switchRegion->defaultCase;
