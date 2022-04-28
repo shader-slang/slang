@@ -31,22 +31,25 @@ void collectMetadata(const IRModule* irModule, PostEmitMetadata& outMetadata)
 {
     for (const auto& inst : irModule->getGlobalInsts())
     {
-        if (auto param = as<IRGlobalParam>(inst))
+        auto param = as<IRGlobalParam>(inst);
+        if (!param) continue;
+        
+        auto layoutDecoration = param->findDecoration<IRLayoutDecoration>();
+        if (!layoutDecoration) continue;
+        
+        auto varLayout = as<IRVarLayout>(layoutDecoration->getLayout());
+        if (!varLayout) continue;
+        
+        for(auto sizeAttr : varLayout->getTypeLayout()->getSizeAttrs())
         {
-            if (auto varLayout = as<IRVarLayout>(param->findDecoration<IRLayoutDecoration>()))
+            auto kind = sizeAttr->getResourceKind();
+            if (auto offsetAttr = varLayout->findOffsetAttr(kind))
             {
-                for(auto sizeAttr : varLayout->getTypeLayout()->getSizeAttrs())
-                {
-                    auto kind = sizeAttr->getResourceKind();
-                    if (auto offsetAttr = varLayout->findOffsetAttr(kind))
-                    {
-                        auto spaceIndex = offsetAttr->getSpace();
-                        auto registerIndex = offsetAttr->getOffset();
-                        auto size = sizeAttr->getSize();
-                        auto count = size.isFinite() ? size.getFiniteValue() : 0;
-                        _insertBinding(outMetadata.usedBindings, kind, spaceIndex, registerIndex, (int)count);
-                    }
-                }
+                auto spaceIndex = offsetAttr->getSpace();
+                auto registerIndex = offsetAttr->getOffset();
+                auto size = sizeAttr->getSize();
+                auto count = size.isFinite() ? size.getFiniteValue() : 0;
+                _insertBinding(outMetadata.usedBindings, kind, spaceIndex, registerIndex, (int)count);
             }
         }
     }
