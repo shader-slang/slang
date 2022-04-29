@@ -65,7 +65,8 @@ to be used in the next iteration. This isn't a problem in the original version b
 a new `s` is constructed each iteration. The key observation being that when doSomething is executing, `s` doesn't exist,
 and so doesn't need to take any register space.
 
-Why hoist? Some compilers define structures via `alloca`s, and these allocas can only be placed at the start of the function.
+Why hoist? Some compilers define variables via `alloca`s, and these allocas can only be placed at the start of the function. That being the case 
+their scoping for where the contents is 'live' is lost.
 
 This would be one level of `liveness`. 
 
@@ -144,12 +145,24 @@ Presumably a variable in a prior block is potentially available if it's defined 
 is therefore a question of examining that tree. It would seem it would have to add a live end at the last read acess or it or some subpart of it (after all a write is invisible if it's never read). 
 If there are branches doesn't that imply (unless there is some kind of merge point), that there can be multiple ends depending on the unique paths possible?
 
-How does scoping work with phi nodes? 
+How does scoping work with phi nodes? By making phi node variables not passed by parameter, we can see where they are in effect `live`, when they are assigned to. 
 
-By making phi node variables not passed by parameter, we can see where they are in effect `live`, when they are assigned to. 
+We can of course determine the scope of variables by using the Region mechanism (as seen in slang-ir-restructure.h). This doesn't seem quite right - or at least it would 
+mean that the liveness would in some sense be based on how the code is restructured such that it is output as source. On the other hand depending how restructuring works 
+could determine where `liveness` is appropriately added. 
 
 Can parameters to a dominating block be seen by subsequent blocks?
 
+> The Slang IR stores structured control-flow information (akin to the merge points stored in SPIR-V), which allows us to better understand what code belongs inside vs. outside of loops and other constructs.
+
+Observations:
+
+Instructions (and therefore values) from dominating blocks are available in dominated blocks.
+
+If we traverse the dominator tree from the start block to find the furthest reachable blocks where there is an access, we implicitly see the transition to the start block as being the last possible block, 
+because the start block is where scope started (so this must be the end).
+
+Isn't this all kind of inter-related? We can move phi outside, and use assignments
 */
 
 /// Adds LiveStart and LiveEnd instructions to demark the start and end of the liveness of a variable.
