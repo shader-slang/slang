@@ -54,153 +54,297 @@ struct LivenessContext
         IRLiveStart* liveStart;
     };
 
-    FoundResult processBlock(IRBlock* parent, IRInst* rootInst)
+    void _addAccess(IRInst* inst)
     {
-        SLANG_ASSERT(rootInst == nullptr || rootInst->parent == parent);
-
-        // I guess I could use the 'Use' mechanism to do this.
-        // I find all of the uses of the root. Then we find all the uses of that, and so on 
-        // 
-        // We'd probably end up storing for each block all of the use sites.
-        // 
-        
-        
-
-
-
-
-
-     
-
-        IRInst* lastAccess = nullptr;
-
+        if (as<IRLiveBase>(inst) ||
+            as<IRAttr>(inst) ||
+            as<IRDecoration>(inst))
         {
-            IRInst* cur = rootInst ? rootInst : parent->getFirstChild();
+            return;
+        }
 
-            for (; cur; cur = cur->getNextInst())
+#if 0
+        // If it's
+        // * Return       - do we mark the scope end? It can't be after the return. Doing before seems wrong
+        //                - So perhaps we don't end scope if it's a return?
+        // * Conditional  - We want to place the access at the start of the targets
+        // * Discard      - You could argue the ending scope before a discard is reasonable
+
+        switch (inst->getOp())
+        {
+            case kIROp_ifElse:
+            case kIROp_Switch:
+            case kIROp_ReturnVal:
+            case kIROp_ReturnVoid:
+            case kIROp_discard:
             {
+            }
+
+
+            default:
+            {
+
+                
+                break;
+            }
+        }
+
+        // Can't be the last instruction as we handled those earlier
+        SLANG_ASSERT(inst->getNextInst());
+#endif
+
+        m_accessSet.Add(inst);
+    }
+
+    void _addScopeEndAtBlockStart(IRBlock* block, IRInst* root)
+    {
+        // Insert before the first ordinary inst
+        auto inst = block->getFirstOrdinaryInst();
+        SLANG_ASSERT(inst);
+
+        m_builder.setInsertLoc(IRInsertLoc::before(inst));
+
+        // Add the live end inst
+        m_builder.emitLiveEnd(root);
+    }
+    IRInst* _findLastAccessInBlock(IRBlock* block)
+    {
+        for (IRInst* cur = block->getLastChild(); cur; cur = cur->getPrevInst())
+        {
+            if (m_accessSet.Contains(cur))
+            {
+                return cur;
+            }
+        }
+        return nullptr;
+    }
+
+    FoundResult processBlock(IRBlock* block, IRInst* root)
+    {
+        const auto children = m_dominatorTree->getImmediatelyDominatedBlocks(block);
+
+        const auto count = children.getCount();
+
+        List<FoundResult> childResults;
+        childResults.setCount(count);
+        Index foundCount = 0;
+
+        auto cur = children.begin();
+        
+        for (Index i = 0; i < count; ++i, ++cur)
+        {
+            auto child = *cur;
+
+            auto childResult = processBlock(child, root);
+
+            childResults[i] = childResult;
+            foundCount += Index(childResult == FoundResult::Found);
+        }
+
+        if (foundCount == count)
+        {
+            return FoundResult::Found;
+        }
+
+        if (foundCount != 0)
+        {
+            // We want to place an end scope in all blocks where it wasn't found
+
+            cur = children.begin();
+        
+            for (Index i = 0; i < count; ++i, ++cur)
+            {
+                auto child = *cur;
+                const auto childResult = childResults[i];
+
+                if (childResult != FoundResult::NotFound)
+                {
+                    _addScopeEndAtBlockStart(child, root);
+                }
+            }
+            return FoundResult::Found;
+        }
+
+        // Search the instructions in this block in reverse order, to find first access
+
+        
+        IRInst* lastAccess = _findLastAccessInBlock(block);
+
+        // Wasn't an access so we are done
+        if (lastAccess == nullptr)
+        {
+            return FoundResult::NotFound;
+        }
+
+        // We need to specially handle last accesses that are terminators
+        // * Return       - do we mark the scope end? It can't be after the return. Doing before seems wrong
+        //                - So perhaps we don't end scope if it's a return?
+        // * Conditional  - We want to place the access at the start of the targets
+        // * Discard      - You could argue the ending scope before a discard is reasonable
+
+        if (as<IRTerminatorInst>(lastAccess))
+        {
+            switch (lastAccess->getOp())
+            {
+                case kIROp_ReturnVal:
+                case kIROp_ReturnVoid:
+                {
+                    // It's arguable what to do here. We can't add a scope end afterwards, there is no afterwards
+                    // We don't want to add before, because that isn't correct. 
+                    // For now we ignore
+                    return FoundResult::Found;
+                }
+                case kIROp_discard:
+                {
+                    // Can end scope before the discard
+                    m_builder.setInsertLoc(IRInsertLoc::before(lastAccess));
+
+                    // Add the live end inst
+                    m_builder.emitLiveEnd(root);
+                    return FoundResult::Found;
+                      
+                }
+                default: break;
+            }
+
+            // For others terminators, we just add to all the children 
+            cur = children.begin();
+            for (Index i = 0; i < count; ++i, ++cur)
+            {
+                _addScopeEndAtBlockStart(*cur, root);
+            }
+            return FoundResult::Found;
+        }
+
+        // Just add end of scope after the inst 
+
+        m_builder.setInsertLoc(IRInsertLoc::after(lastAccess));
+
+        // Add the live end inst
+        m_builder.emitLiveEnd(root);
+        return FoundResult::Found;
+    }
+
+    void processRoot(const RootInfo& rootInfo)
+    {
+        m_accessSet.Clear();
+        m_aliases.clear();
+
+        auto root = rootInfo.root;
+
+        m_aliases.add(root);
+
+        // If we had a way to determine the index (or relative ordering) of two instructions in a block, 
+        // then we wouldn't need to store 'access' information, just the the last one found for a block.
+        // 
+        // A way to do this is to just start from one, and see if the other is hit, but the more accesses 
+        // from within the block there is the more inefficient this becomes
+        // 
+        // A more mundane way would be to work out the set of all blocks that have an access. 
+        // We could then iterate in order over the instructions in order. The last one that is a an access must be the last
+        // the problem is that it's not trivial to work out which instructions are an access, without traversing the *args*
+        //
+        // So perhaps the best you can do is
+        // 1) Find the set of blocks that have accesses.
+        // 2) Make a set of all the accessed instructions.
+        // 
+        // When we traverse the blocks from the root, we can determine quickly
+        // 1) If a block contains any accesses (> 0 instructions that access it
+        // 2) If it does, we go through the instructions to find the last access
+        //
+        // A small improvement would be to *count* the amount of instructions that access for a block, which makes it easier to work out termination
+        //
+        // If we use the dominator tree to map blocks to indices, we can do this relatively easily.
+
+        for (Index i = 0; i < m_aliases.getCount(); ++i)
+        {
+            IRInst* alias = m_aliases[i];
+
+            // Find all the uses of this alias/root
+            for (IRUse* use = alias->firstUse; use; use = use->nextUse)
+            {
+                IRInst* cur = use->get();
+                IRInst* base = nullptr;
+
+                IRBlock* block = as<IRBlock>(cur->getParent());
+                if (!block)
+                {
+                    continue;
+                }
+
+                // 
+                bool isAlias = false;
+
                 // We want to find instructions that access the root
                 switch (cur->getOp())
                 {
                     case kIROp_getElement:
                     {
-                        IRInst* base = static_cast<IRGetElement*>(cur)->getBase();
-                        if (m_referencesToRoot.Contains(base))
-                        {
-                            lastAccess = cur;
-                        }
+                        base = static_cast<IRGetElement*>(cur)->getBase();
                         break;
                     }
                     case kIROp_getElementPtr:
                     {
-                        IRInst* base = static_cast<IRGetElementPtr*>(cur)->getBase();
-                        if (m_referencesToRoot.Contains(base))
-                        {
-                            m_referencesToRoot.Add(base);
-                        }
+                        base = static_cast<IRGetElementPtr*>(cur)->getBase();
+                        isAlias = true;
                         break;
                     }
                     case kIROp_FieldAddress:
                     {
-                        IRInst* base = static_cast<IRFieldAddress*>(cur)->getBase();
-                        if (m_referencesToRoot.Contains(base))
-                        {
-                            m_referencesToRoot.Add(base);
-                        }
+                        base = static_cast<IRFieldAddress*>(cur)->getBase();
+                        isAlias = true;
                         break;
                     }
                     case kIROp_FieldExtract:
                     {
-                        IRInst* base = static_cast<IRFieldExtract*>(cur)->getBase();
-
-                        if (m_referencesToRoot.Contains(base))
-                        {
-                            lastAccess = cur;
-                        }
+                        base = static_cast<IRFieldExtract*>(cur)->getBase();
                         break;
                     }
                     case kIROp_Load:
                     {
-                        IRLoad* load = static_cast<IRLoad*>(cur);
-                        if (m_referencesToRoot.Contains(load->getPtr()))
-                        {
-                            lastAccess = load;
-                        }
+                        base = static_cast<IRLoad*>(cur)->getPtr();
                         break;
                     }
                     case kIROp_Store:
                     {
-                        IRStore* store = static_cast<IRStore*>(cur);
-                        if (m_referencesToRoot.Contains(store->getPtr()))
-                        {
-                            lastAccess = store;
-                        }
+                        base = static_cast<IRStore*>(cur)->getPtr();
                         break;
                     }
                     case kIROp_getAddr:
                     {
                         IRGetAddress* getAddr = static_cast<IRGetAddress*>(cur);
-                        IRInst* target = getAddr->getOperand(0);
-
-                        if (m_referencesToRoot.Contains(target))
-                        {
-                            m_referencesToRoot.Add(target);
-                        }
+                        base = getAddr->getOperand(0);
+                        isAlias = true;
                         break;
                     }
-                    default:
-                    {
-                        if (as<IRLiveBase>(cur) || 
-                            as<IRAttr>(cur) ||
-                            as<IRDecoration>(cur))
-                        {
-                            // Don't need to do anything
-                        }
-                        else
-                        {
-                            // Go through the args. 
-                            // If used 
-                        }
-                    }
+                    default: break;
                 }
+
+                // If the instruction is making an alias like reference,
+                // we add to the list of things that indirectly *reference* items
+                if (base == alias && isAlias)
+                {
+                    // Add this instruction to the aliases to the root.
+                    m_aliases.add(cur);
+                }
+
+                _addAccess(cur);
             }
         }
 
-        // When we look at children there can be these scenarios
-        // 1) None of the children access. 
-        // 2) One or more of the children access
-        // 
-        // If none access, then we can look at the last access in this block. If we find one
-        // we set the scope as after this
-
-        auto childBlocks = m_dominatorTree->getImmediatelyDominatedBlocks(parent);
-
-        const Index count = childBlocks.getCount();
-
-        List<FoundResult> childResults;
-        childResults.setCount(count);
-
-        // We need to record what the result is for all of the child blocks
-        
-        auto cur = childBlocks.begin();
-        const auto end = childBlocks.end();
-
-        Index foundCount = 0;
-
-        for (Index i = 0; cur != end; ++cur, ++i)
         {
-            const FoundResult childResult = processBlock(*cur, nullptr);
-            // Save the result
-            childResults[i] = childResult;
+            IRBlock* parent = as<IRBlock>(root->parent);
 
-            foundCount += Index(childResult == FoundResult::Found);
+            auto foundResult = processBlock(parent, root);
+
+            if (foundResult == FoundResult::NotFound)
+            {
+                // Means there is no access to this variable(!)
+                // Which means we can end the scope, after the the start scope
+                m_builder.setInsertLoc(IRInsertLoc::after(rootInfo.liveStart));
+                m_builder.emitLiveEnd(root);
+            }
         }
-
-
-            // If it's passed as a parameter
-            //
-
-
     }
 
     void processFunction(IRFunc* funcInst)
@@ -241,31 +385,11 @@ struct LivenessContext
         // Create the dominator tree.
         m_dominatorTree = computeDominatorTree(funcInst);
 
-        // If we go depth first, if a child doesn't identify 
-
-        // Okay, lets go through each block again and look for accesses. 
-        // Any access must be built on other accesses
+        // Process the roots
         for (const auto& rootInfo : rootInfos)
         {
-            m_referencesToRoot.Clear();
-
-            auto root = rootInfo.root;
-
-            // An access to the root itself qualifies
-            m_referencesToRoot.Add(root);
-
-            IRBlock* parent = as<IRBlock>(root->parent);
-
-            auto foundResult = processBlock(parent, root);
-            
-            if (foundResult == FoundResult::NotFound)
-            {
-                // Means there is no access to this variable(!)
-                // Which means we can end the scope, after the the start scope
-                m_builder.setInsertLoc(IRInsertLoc::after(rootInfo.liveStart));
-                m_builder.emitLiveEnd(root);
-            }
-        }
+            processRoot(rootInfo);
+        } 
     }
 
     void processModule()
@@ -279,7 +403,6 @@ struct LivenessContext
 
         IRModuleInst* moduleInst = m_module->getModuleInst();
        
-     
         for (IRInst* child = moduleInst->getFirstDecorationOrChild(); child; child = child->getNextInst())
         {
             if (auto funcInst = as<IRFunc>(child))
@@ -296,8 +419,14 @@ struct LivenessContext
         m_builder.init(m_sharedBuilder);
     }
 
-    HashSet<IRInst*> m_referencesToRoot;
+    // The dominator tree for the current function
     RefPtr<IRDominatorTree> m_dominatorTree;
+
+    // Holds a set of all the functions that in some way access the root.
+    HashSet<IRInst*> m_accessSet;
+
+    // A list of instructions that alias to a root
+    List<IRInst*> m_aliases;
 
     IRModule* m_module;
     SharedIRBuilder m_sharedBuilder;
