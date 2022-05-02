@@ -90,48 +90,75 @@ struct LivenessContext
         return nullptr;
     }
 
-    FoundResult processBlock(IRBlock* block, IRInst* root)
+    FoundResult _addResult(IRBlock* block, FoundResult result)
     {
-        const auto children = m_dominatorTree->getImmediatelyDominatedBlocks(block);
+        m_blockResult.AddIfNotExists(block, result);
+        return result;
+    }
 
-        const auto count = children.getCount();
+    FoundResult processSuccessor(IRBlock* block)
+    {
+        auto res = m_blockResult.TryGetValue(block);
+        if (res)
+        {
+            return *res;
+        }
 
-        List<FoundResult> childResults;
-        childResults.setCount(count);
+        SLANG_ASSERT(m_dominatorTree->properlyDominates(m_rootBlock, block));
+        return processBlock(block);
+    }
+
+    FoundResult processBlock(IRBlock* block)
+    {
+        List<IRBlock*> dominatedSuccessors;
+        {
+            // Find result for all successors
+            for (auto succ : block->getSuccessors())
+            {
+                if (m_dominatorTree->properlyDominates(m_rootBlock, succ))
+                {
+                    dominatedSuccessors.add(succ);
+                }
+            }
+        }
+
+        const Index count = dominatedSuccessors.getCount();
+        List<FoundResult> successorResults;
+        successorResults.setCount(count);
+
         Index foundCount = 0;
 
-        auto cur = children.begin();
-        
-        for (Index i = 0; i < count; ++i, ++cur)
+        for (Index i = 0; i < count; ++i)
         {
-            auto child = *cur;
+            auto succ = dominatedSuccessors[i];
 
-            auto childResult = processBlock(child, root);
-
-            childResults[i] = childResult;
-            foundCount += Index(childResult == FoundResult::Found);
+            auto successorResult = processSuccessor(succ);
+            successorResults.add(successorResult);
+            foundCount += Index(successorResult == FoundResult::Found);
         }
 
         if (count > 0)
         {
+            // If all successors have result, we are done
             if (foundCount == count)
             {
-                return FoundResult::Found;
+                return _addResult(block, FoundResult::Found);
             }
 
             // We want to place an end scope in all blocks where it wasn't found
-            cur = children.begin();
-            for (Index i = 0; i < count; ++i, ++cur)
+            for (Index i = 0; i < count; ++i)
             {
-                auto child = *cur;
-                const auto childResult = childResults[i];
+                auto successor = dominatedSuccessors[i];
+                const auto successorResult = successorResults[i];
 
-                if (childResult == FoundResult::NotFound)
+                if (successorResult == FoundResult::NotFound)
                 {
-                    _addLiveEndAtBlockStart(child, root);
+                    _addLiveEndAtBlockStart(successor, m_root);
+                    _addResult(successor, FoundResult::Found);
                 }
             }
-            return FoundResult::Found;
+
+            return _addResult(block, FoundResult::Found);
         }
 
         // Search the instructions in this block in reverse order, to find first access
@@ -140,7 +167,7 @@ struct LivenessContext
         // Wasn't an access so we are done
         if (lastAccess == nullptr)
         {
-            return FoundResult::NotFound;
+            return _addResult(block, FoundResult::NotFound);
         }
 
         // We need to specially handle last accesses that are terminators
@@ -159,7 +186,7 @@ struct LivenessContext
                     // It's arguable what to do here. We can't add a scope end afterwards, there is no afterwards
                     // We don't want to add before, because that isn't correct. 
                     // For now we ignore
-                    return FoundResult::Found;
+                    return _addResult(block, FoundResult::Found);
                 }
                 case kIROp_discard:
                 {
@@ -167,37 +194,36 @@ struct LivenessContext
                     m_builder.setInsertLoc(IRInsertLoc::before(lastAccess));
 
                     // Add the live end inst
-                    m_builder.emitLiveEnd(root);
-                    return FoundResult::Found;
+                    m_builder.emitLiveEnd(m_root);
+                    return _addResult(block, FoundResult::Found);
                       
                 }
                 default: break;
             }
 
-#if 0
-            // For others terminators, we just add to all the children 
-            cur = children.begin();
-            for (Index i = 0; i < count; ++i, ++cur)
+            // For others terminators, we just add to all the successors
+            for (auto successor : dominatedSuccessors)
             {
-                _addLiveEndAtBlockStart(*cur, root);
+                _addLiveEndAtBlockStart(successor, m_root);
             }
-#endif
-            return FoundResult::Found;
+
+            return _addResult(block, FoundResult::Found);
         }
 
         // Just add end of scope after the inst 
-
         m_builder.setInsertLoc(IRInsertLoc::after(lastAccess));
 
         // Add the live end inst
-        m_builder.emitLiveEnd(root);
-        return FoundResult::Found;
+        m_builder.emitLiveEnd(m_root);
+        return _addResult(block, FoundResult::Found);
     }
 
     void processRoot(const RootInfo& rootInfo)
     {
         m_accessSet.Clear();
         m_aliases.clear();
+
+        m_blockResult.Clear();
 
         auto root = rootInfo.root;
 
@@ -302,9 +328,10 @@ struct LivenessContext
         }
 
         {
-            IRBlock* parent = as<IRBlock>(root->parent);
+            m_rootBlock = as<IRBlock>(root->parent);
+            m_root = root;
 
-            auto foundResult = processBlock(parent, root);
+            auto foundResult = processBlock(m_rootBlock);
 
             if (foundResult == FoundResult::NotFound)
             {
@@ -390,12 +417,16 @@ struct LivenessContext
 
     // The dominator tree for the current function
     RefPtr<IRDominatorTree> m_dominatorTree;
+    IRBlock* m_rootBlock;
+    IRInst* m_root;
 
     // Holds a set of all the functions that in some way access the root.
     HashSet<IRInst*> m_accessSet;
 
     // A list of instructions that alias to a root
     List<IRInst*> m_aliases;
+
+    Dictionary<IRBlock*, FoundResult> m_blockResult;
 
     IRModule* m_module;
     SharedIRBuilder m_sharedBuilder;
