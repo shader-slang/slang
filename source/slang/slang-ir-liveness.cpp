@@ -66,7 +66,7 @@ struct LivenessContext
         m_accessSet.Add(inst);
     }
 
-    void _addScopeEndAtBlockStart(IRBlock* block, IRInst* root)
+    void _addLiveEndAtBlockStart(IRBlock* block, IRInst* root)
     {
         // Insert before the first ordinary inst
         auto inst = block->getFirstOrdinaryInst();
@@ -126,9 +126,9 @@ struct LivenessContext
                 auto child = *cur;
                 const auto childResult = childResults[i];
 
-                if (childResult != FoundResult::NotFound)
+                if (childResult == FoundResult::NotFound)
                 {
-                    _addScopeEndAtBlockStart(child, root);
+                    _addLiveEndAtBlockStart(child, root);
                 }
             }
             return FoundResult::Found;
@@ -174,12 +174,14 @@ struct LivenessContext
                 default: break;
             }
 
+#if 0
             // For others terminators, we just add to all the children 
             cur = children.begin();
             for (Index i = 0; i < count; ++i, ++cur)
             {
-                _addScopeEndAtBlockStart(*cur, root);
+                _addLiveEndAtBlockStart(*cur, root);
             }
+#endif
             return FoundResult::Found;
         }
 
