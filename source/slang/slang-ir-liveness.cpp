@@ -38,14 +38,44 @@ is created that is then just copied into the variable. That temporary being some
 could perhaps have liveness issues.
 */
 
+/* Theres a problem here around where to insert `end` and how that works with branches
+
+Take the block 
+
+A<----+
+|     |
+B     |
+| \   |
+C   --^
+|     |
+D     |
+ \    |
+   ---+
+
+Lets say C has an access, and D doesnt. Simple enough we can add at appropriate location in C.
+What happens in B? I guess nothing because B doesn't properly dominate A.
+
+This does add an extra scenario. It's not enough to know for children that they returned a result of 'NotFound', we need to know why. 
+If it's due to domination, we can just ignore.
+
+*/
+
 namespace { // anonymous
 
 struct LivenessContext
 {
     enum class FoundResult
     {
-        Found,
-        NotFound,
+        Found,              ///< All paths were either not dominated, found 
+        NotFound,           ///< It is dominated but no access was found
+        NotDominated,       ///< If it's not dominated it doesn't need to have a scope end
+    };
+
+    enum class AccessType
+    {
+        None,
+        Alias,
+        Access,
     };
 
     struct RootInfo
@@ -53,18 +83,6 @@ struct LivenessContext
         IRInst* root;
         IRLiveStart* liveStart;
     };
-
-    void _addAccess(IRInst* inst)
-    {
-        if (as<IRLiveBase>(inst) ||
-            as<IRAttr>(inst) ||
-            as<IRDecoration>(inst))
-        {
-            return;
-        }
-
-        m_accessSet.Add(inst);
-    }
 
     void _addLiveEndAtBlockStart(IRBlock* block, IRInst* root)
     {
@@ -104,53 +122,51 @@ struct LivenessContext
             return *res;
         }
 
-        SLANG_ASSERT(m_dominatorTree->properlyDominates(m_rootBlock, block));
+        if (!m_dominatorTree->properlyDominates(m_rootBlock, block))
+        {
+            return _addResult(block, FoundResult::NotDominated);
+        }
+
         return processBlock(block);
     }
 
     FoundResult processBlock(IRBlock* block)
     {
-        List<IRBlock*> dominatedSuccessors;
-        {
-            // Find result for all successors
-            for (auto succ : block->getSuccessors())
-            {
-                if (m_dominatorTree->properlyDominates(m_rootBlock, succ))
-                {
-                    dominatedSuccessors.add(succ);
-                }
-            }
-        }
+        auto successors = block->getSuccessors();
+        const Index count = successors.getCount();
 
-        const Index count = dominatedSuccessors.getCount();
         List<FoundResult> successorResults;
         successorResults.setCount(count);
 
         Index foundCount = 0;
+        Index notDominatedCount = 0;
 
-        for (Index i = 0; i < count; ++i)
         {
-            auto succ = dominatedSuccessors[i];
-
-            auto successorResult = processSuccessor(succ);
-            successorResults.add(successorResult);
-            foundCount += Index(successorResult == FoundResult::Found);
+            auto cur = successors.begin();
+            for (Index i = 0; i < count; ++i, ++cur)
+            {
+                auto succ = *cur;
+                auto successorResult = processSuccessor(succ);
+                successorResults[i] = successorResult;
+                foundCount += Index(successorResult == FoundResult::Found);
+                notDominatedCount += Index(successorResult == FoundResult::NotDominated);
+            }
         }
 
-        if (count > 0)
+        if (foundCount > 0)
         {
-            // If all successors have result, we are done
-            if (foundCount == count)
+            // If all successors have result, or are not dominated
+            if (foundCount + notDominatedCount == count)
             {
                 return _addResult(block, FoundResult::Found);
             }
 
             // We want to place an end scope in all blocks where it wasn't found
-            for (Index i = 0; i < count; ++i)
+            auto cur = successors.begin();
+            for (Index i = 0; i < count; ++i, ++cur)
             {
-                auto successor = dominatedSuccessors[i];
+                auto successor = *cur;
                 const auto successorResult = successorResults[i];
-
                 if (successorResult == FoundResult::NotFound)
                 {
                     _addLiveEndAtBlockStart(successor, m_root);
@@ -170,45 +186,9 @@ struct LivenessContext
             return _addResult(block, FoundResult::NotFound);
         }
 
-        // We need to specially handle last accesses that are terminators
-        // * Return       - do we mark the scope end? It can't be after the return. Doing before seems wrong
-        //                - So perhaps we don't end scope if it's a return?
-        // * Conditional  - We want to place the access at the start of the targets
-        // * Discard      - You could argue the ending scope before a discard is reasonable
-
-        if (as<IRTerminatorInst>(lastAccess))
-        {
-            switch (lastAccess->getOp())
-            {
-                case kIROp_ReturnVal:
-                case kIROp_ReturnVoid:
-                {
-                    // It's arguable what to do here. We can't add a scope end afterwards, there is no afterwards
-                    // We don't want to add before, because that isn't correct. 
-                    // For now we ignore
-                    return _addResult(block, FoundResult::Found);
-                }
-                case kIROp_discard:
-                {
-                    // Can end scope before the discard
-                    m_builder.setInsertLoc(IRInsertLoc::before(lastAccess));
-
-                    // Add the live end inst
-                    m_builder.emitLiveEnd(m_root);
-                    return _addResult(block, FoundResult::Found);
-                      
-                }
-                default: break;
-            }
-
-            // For others terminators, we just add to all the successors
-            for (auto successor : dominatedSuccessors)
-            {
-                _addLiveEndAtBlockStart(successor, m_root);
-            }
-
-            return _addResult(block, FoundResult::Found);
-        }
+        // Can never be a terminator, because logic to find the access instructions does not 
+        // include terminators.
+        SLANG_ASSERT(as<IRTerminatorInst>(lastAccess) == nullptr);
 
         // Just add end of scope after the inst 
         m_builder.setInsertLoc(IRInsertLoc::after(lastAccess));
@@ -266,64 +246,72 @@ struct LivenessContext
                 {
                     continue;
                 }
-
-                // 
-                bool isAlias = false;
+                
+                AccessType accessType = AccessType::None;
 
                 // We want to find instructions that access the root
                 switch (cur->getOp())
                 {
-                    case kIROp_getElement:
-                    {
-                        base = static_cast<IRGetElement*>(cur)->getBase();
-                        break;
-                    }
                     case kIROp_getElementPtr:
                     {
                         base = static_cast<IRGetElementPtr*>(cur)->getBase();
-                        isAlias = true;
+                        accessType = AccessType::Alias;
                         break;
                     }
                     case kIROp_FieldAddress:
                     {
                         base = static_cast<IRFieldAddress*>(cur)->getBase();
-                        isAlias = true;
-                        break;
-                    }
-                    case kIROp_FieldExtract:
-                    {
-                        base = static_cast<IRFieldExtract*>(cur)->getBase();
-                        break;
-                    }
-                    case kIROp_Load:
-                    {
-                        base = static_cast<IRLoad*>(cur)->getPtr();
-                        break;
-                    }
-                    case kIROp_Store:
-                    {
-                        base = static_cast<IRStore*>(cur)->getPtr();
+                        accessType = AccessType::Alias;
                         break;
                     }
                     case kIROp_getAddr:
                     {
                         IRGetAddress* getAddr = static_cast<IRGetAddress*>(cur);
                         base = getAddr->getOperand(0);
-                        isAlias = true;
+                        accessType = AccessType::Alias;
+                        break;
+                    }
+                    case kIROp_Load:
+                    {
+                        // We only care about loads in terms of identifying liveness
+                        base = static_cast<IRLoad*>(cur)->getPtr();
+                        accessType = AccessType::Access;
+                        break;
+                    }
+                    case kIROp_Store:
+                    {
+                        // In terms of liveness, stores can be ignored
+                        break;
+                    }
+                    
+                    case kIROp_getElement:
+                    case kIROp_FieldExtract:
+                    {
+                        // These will never take place on the var which is accessed through a pointer, so can be ignored
                         break;
                     }
                     default: break;
                 }
 
-                // If the instruction is making an alias like reference,
-                // we add to the list of things that indirectly *reference* items
-                if (base == alias && isAlias)
+                switch (accessType)
                 {
-                    // Add this instruction to the aliases to the root.
-                    m_aliases.add(cur);
+                    case AccessType::Alias:
+                    {
+                        // If the thing being accessed is the current thing being aliased...
+                        if (base == alias)
+                        {
+                            // Add this instruction to the aliases
+                            m_aliases.add(cur);
+                        }
+                        break;
+                    }
+                    case AccessType::Access:
+                    {
+                        m_accessSet.Add(cur);
+                        break;
+                    }
+                    default: break;
                 }
-
-                _addAccess(cur);
             }
         }
 
@@ -359,16 +347,13 @@ struct LivenessContext
                 // We look for var declarations.
                 if (auto varInst = as<IRVar>(inst))
                 {
-                    // TODO(JS): 
-                    // For now we'll just add start liveness information, just to check out this path
-                    // all works
+                    // Add the start location
                     m_builder.setInsertLoc(IRInsertLoc::after(varInst));
 
                     // Emit the start
                     auto liveStart = m_builder.emitLiveStart(varInst);
 
                     // Add as a root
-
                     RootInfo rootInfo;
                     rootInfo.root = varInst;
                     rootInfo.liveStart = liveStart;
