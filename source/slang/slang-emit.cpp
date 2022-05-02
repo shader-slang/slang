@@ -760,6 +760,8 @@ Result linkAndOptimizeIR(
     if (codeGenContext->shouldTrackLiveness())
     {
         addLivenessTrackingToModule(irModule);
+
+        dumpIRIfEnabled(codeGenContext, irModule, "LIVENESS");
     }
 
     // We include one final step to (optionally) dump the IR and validate

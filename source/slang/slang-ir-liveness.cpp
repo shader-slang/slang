@@ -63,36 +63,6 @@ struct LivenessContext
             return;
         }
 
-#if 0
-        // If it's
-        // * Return       - do we mark the scope end? It can't be after the return. Doing before seems wrong
-        //                - So perhaps we don't end scope if it's a return?
-        // * Conditional  - We want to place the access at the start of the targets
-        // * Discard      - You could argue the ending scope before a discard is reasonable
-
-        switch (inst->getOp())
-        {
-            case kIROp_ifElse:
-            case kIROp_Switch:
-            case kIROp_ReturnVal:
-            case kIROp_ReturnVoid:
-            case kIROp_discard:
-            {
-            }
-
-
-            default:
-            {
-
-                
-                break;
-            }
-        }
-
-        // Can't be the last instruction as we handled those earlier
-        SLANG_ASSERT(inst->getNextInst());
-#endif
-
         m_accessSet.Add(inst);
     }
 
@@ -109,6 +79,7 @@ struct LivenessContext
     }
     IRInst* _findLastAccessInBlock(IRBlock* block)
     {
+        // Search the instructions in this block in reverse order, to find first access
         for (IRInst* cur = block->getLastChild(); cur; cur = cur->getPrevInst())
         {
             if (m_accessSet.Contains(cur))
@@ -141,17 +112,15 @@ struct LivenessContext
             foundCount += Index(childResult == FoundResult::Found);
         }
 
-        if (foundCount == count)
+        if (count > 0)
         {
-            return FoundResult::Found;
-        }
+            if (foundCount == count)
+            {
+                return FoundResult::Found;
+            }
 
-        if (foundCount != 0)
-        {
             // We want to place an end scope in all blocks where it wasn't found
-
             cur = children.begin();
-        
             for (Index i = 0; i < count; ++i, ++cur)
             {
                 auto child = *cur;
@@ -166,8 +135,6 @@ struct LivenessContext
         }
 
         // Search the instructions in this block in reverse order, to find first access
-
-        
         IRInst* lastAccess = _findLastAccessInBlock(block);
 
         // Wasn't an access so we are done
@@ -263,7 +230,7 @@ struct LivenessContext
             // Find all the uses of this alias/root
             for (IRUse* use = alias->firstUse; use; use = use->nextUse)
             {
-                IRInst* cur = use->get();
+                IRInst* cur = use->getUser();
                 IRInst* base = nullptr;
 
                 IRBlock* block = as<IRBlock>(cur->getParent());

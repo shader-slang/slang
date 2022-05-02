@@ -2911,7 +2911,7 @@ namespace Slang
         // so we make it's type void.
         auto inst = createInst<IRLiveEnd>(
             this,
-            kIROp_LiveStart,
+            kIROp_LiveEnd,
             getVoidType(),
             referenced);
 
