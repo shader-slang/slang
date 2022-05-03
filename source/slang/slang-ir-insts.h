@@ -1834,9 +1834,14 @@ struct IRLiveEnd : IRLiveBase
 {
     IR_LEAF_ISA(LiveEnd);
 
-        /// Demarks where the referenced item is no longer live, at a point before 
+        /// Demarks where the referenced item is no longer live, optimimally (although not
+        /// necessarily) at the previous instruction. 
+        /// 
+        /// There *can* be acceses to the referenced item after the end, if those accesses
+        /// can never be seen. For example if there is a store, without any subsequent loads, 
+        /// the store will never be seen (by a load) and so can be ignored.
         ///
-        /// It is assumed that Live Start/End match on their referenced item. 
+        /// In general there can be one or more 'ends' for every start.
     IRInst* getReferenced() { return getOperand(0); }
 };
 

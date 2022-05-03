@@ -8,8 +8,11 @@ namespace Slang
 struct IRModule;
 
 /* 
-Current Status
-==============
+
+Liveness
+========
+
+## Status
 
 Currently liveness tracking only tracks local variables in functions. 
 
@@ -23,10 +26,7 @@ In particular it doesn't handle:
 
 If enabled output source will output with SLANG_LIVE_START and SLANG_LIVE_END macros. It's a user space problem as to how to use these definitions (for example by adding a prelude).
 
-Discussion
-==========
-
-Motivation for tracking liveness.
+## Motivation
 
 At a first approximation liveness means variable is `in scope`. The underlying issue might be described as
 
@@ -45,7 +45,7 @@ int someFunction()
 	{
 		doSomething();
 
-	    SomeStruct s;
+		SomeStruct s;
 		s.value = ...;
 
 		doSomethingElse(s);
@@ -78,19 +78,24 @@ int someFunction()
 }
 ```
 
-The problem is that now `s` is in scope over the loop, and there is potential for values from one interation 
-to be used in the next iteration. This isn't a problem in the original version because it is 'obvious' that 
+The problem is that now `s` is in scope over the loop, and there is potential for values from one interation
+to be used in the next iteration. This isn't a problem in the original version because it is 'obvious' that
 a new `s` is constructed each iteration. The key observation being that when doSomething is executing, `s` doesn't exist,
 and so doesn't need to take any register space.
 
-Why hoist? Some compilers define variables via `alloca`s, and these allocas can only be placed at the start of the function. That being the case 
+Why hoist? Some compilers define variables via `alloca`s, and these allocas can only be placed at the start of the function. That being the case
 their scoping for where the contents is 'live' is lost.
 
-This would be one level of `liveness`. 
+So liveness here is adding additional information about variables use. The start of the range is where there is a 'fresh' copy of the variable, and the 
+end is where where the values held in the variable can no longer alter execution results. 
 
-Another observation could be around field liveness. s has no `__init` and isn't initialized in any way. s.value does set some
-state, but `large` is untouched. So in a sense s.value holds *all* of the state of s at that point, and only s.value 
-would need to be stored to reconstruct s (the rest could be undefined). 
+## Discussion
+
+The previous discussion of liveness could be described as being at the 'variable' level.
+
+Liveness could be tracked in a more fine grain manner - such as tracking field liveness. `s` has no `__init` and isn't 
+initialized in any way. s.value does set some state, but `large` is untouched. So in a sense s.value holds *all* of the 
+state of s at that point, and only s.value would need to be stored to reconstruct s (the rest could be undefined). 
 
 Is this more nuanced information useful to a downstream compilation? Maybe, but the downstream compiler could perform all the same 
 analysis. All it's really missing is knowing when there is a `fresh version` of s.
@@ -151,11 +156,9 @@ int someFunction()
 Here because of the initialization of *all* of `s`, a downstream compiler can infer that during `doSomething` it doesn't have to potentially store the contents
 of `s` because it will be wiped out after the function. 
 
-All of this gets more confusing around branches. But again that is something a downstream compiler can track if it has a way of knowing when a variable is in scope. 
+All of this gets more complex around branches. But again that is something a downstream compiler can track if it has a way of knowing when a variable is in scope. 
 Similarly calling into a function could return a struct that contains fields which aren't set - this is something a downstream compiler could determine when 
 fully specialized.
-
-From the Slang stores where s comes into scope. 
 */
 
 	/// Adds LiveStart and LiveEnd instructions to demark the start and end of the liveness of a variable.
