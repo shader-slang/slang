@@ -7,12 +7,30 @@ namespace Slang
 
 struct IRModule;
 
-/* Motivation for tracking liveness.
+/* 
+Current Status
+==============
+
+Currently liveness tracking only tracks local variables in functions. 
+
+In particular it doesn't handle:
+
+* PHI temporaries 
+* Variables that aren't constructed via IRVar
+* Variables that might be introduced via slang-ir-restructure-scoping.h/.cpp
+* Possible variable 'escape' via pointers (shouldn't be possible right now - but restructuring might introduce issues)
+* Any tracking around undefined values
+
+If enabled output source will output with SLANG_LIVE_START and SLANG_LIVE_END macros. It's a user space problem as to how to use these definitions (for example by adding a prelude).
+
+Discussion
+==========
+
+Motivation for tracking liveness.
 
 At a first approximation liveness means variable is `in scope`. The underlying issue might be described as
 
 ```HLSL
-
 struct SomeStruct
 {
 	int value;
@@ -138,34 +156,9 @@ Similarly calling into a function could return a struct that contains fields whi
 fully specialized.
 
 From the Slang stores where s comes into scope. 
-
-Questions?
-
-Presumably a variable in a prior block is potentially available if it's defined in a block that dominates the node where it is defined. Determining where scope ends
-is therefore a question of examining that tree. It would seem it would have to add a live end at the last read acess or it or some subpart of it (after all a write is invisible if it's never read). 
-If there are branches doesn't that imply (unless there is some kind of merge point), that there can be multiple ends depending on the unique paths possible?
-
-How does scoping work with phi nodes? By making phi node variables not passed by parameter, we can see where they are in effect `live`, when they are assigned to. 
-
-We can of course determine the scope of variables by using the Region mechanism (as seen in slang-ir-restructure.h). This doesn't seem quite right - or at least it would 
-mean that the liveness would in some sense be based on how the code is restructured such that it is output as source. On the other hand depending how restructuring works 
-could determine where `liveness` is appropriately added. 
-
-Can parameters to a dominating block be seen by subsequent blocks?
-
-> The Slang IR stores structured control-flow information (akin to the merge points stored in SPIR-V), which allows us to better understand what code belongs inside vs. outside of loops and other constructs.
-
-Observations:
-
-Instructions (and therefore values) from dominating blocks are available in dominated blocks.
-
-If we traverse the dominator tree from the start block to find the furthest reachable blocks where there is an access, we implicitly see the transition to the start block as being the last possible block, 
-because the start block is where scope started (so this must be the end).
-
-Isn't this all kind of inter-related? We can move phi outside, and use assignments
 */
 
-/// Adds LiveStart and LiveEnd instructions to demark the start and end of the liveness of a variable.
+	/// Adds LiveStart and LiveEnd instructions to demark the start and end of the liveness of a variable.
 void addLivenessTrackingToModule(IRModule* module);
 
 }
