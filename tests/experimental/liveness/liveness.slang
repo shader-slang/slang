@@ -50,7 +50,14 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
         {
             s.x = anotherBuffer[v & 3];
             t.x = anotherBuffer[v & 3];
-            u.x = anotherBuffer[v & 3] + 1;
+        }
+        else
+        {
+            {
+                SomeStruct x = u;
+                x.x = anotherBuffer[v & 3] + 1;
+                u = x;
+            }
         }
         
         // Could be undefined or 

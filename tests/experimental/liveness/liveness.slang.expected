@@ -79,6 +79,7 @@ void computeMain(uint3 dispatchThreadID_0 : SV_DISPATCHTHREADID)
 {
     int i_2;
     int res_0;
+    SomeStruct_0 u_0;
 
 #line 37
     int index_0 = (int) dispatchThreadID_0.x;
@@ -116,46 +117,64 @@ void computeMain(uint3 dispatchThreadID_0 : SV_DISPATCHTHREADID)
 
 #line 46
         t_0 = _S4;
-        SomeStruct_0 u_0;
-
-#line 47
-        SLANG_LIVE_START(u_0)
-
-#line 47
         int  _S5[int(100)] = { int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0) };
 
 #line 47
-        SomeStruct_0 _S6 = { int(0), int(0), _S5 };
-
-#line 47
-        u_0 = _S6;
+        SomeStruct_0 u_1 = { int(0), int(0), _S5 };
 
         if((bool) (v_1 & int(256)))
         {
             s_1.x_0 = anotherBuffer_0[(uint) (v_1 & int(3))];
             t_0.x_0 = anotherBuffer_0[(uint) (v_1 & int(3))];
-            u_0.x_0 = anotherBuffer_0[(uint) (v_1 & int(3))] + int(1);
 
 #line 49
+            u_0 = u_1;
         }
         else
         {
 
-#line 49
-        }
+#line 57
+            SomeStruct_0 x_1;
 
 #line 57
-        int _S7 = s_1.x_0 + t_0.x_0 + u_0.x_0;
+            SLANG_LIVE_START(x_1)
+
+#line 57
+            x_1 = u_1;
+            x_1.x_0 = anotherBuffer_0[(uint) (v_1 & int(3))] + int(1);
+            SomeStruct_0 _S6 = x_1;
+
+#line 59
+            SLANG_LIVE_END(x_1)
+
+#line 49
+            u_0 = _S6;
+        }
+
+#line 64
+        int _S7 = s_1.x_0;
+
+#line 64
+        SLANG_LIVE_END(s_1)
+
+#line 64
+        int _S8 = t_0.x_0;
+
+#line 64
+        SLANG_LIVE_END(t_0)
+
+#line 64
+        int _S9 = _S7 + _S8 + u_0.x_0;
 
 #line 41
         int i_3 = i_2 + int(1);
 
 #line 41
         i_2 = i_3;
-        res_0 = _S7;
+        res_0 = _S9;
     }
 
-#line 60
+#line 67
     outputBuffer_0[(uint) index_0] = res_0;
     return;
 }
