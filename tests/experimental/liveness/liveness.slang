@@ -60,8 +60,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
             }
         }
         
-        // Could be undefined or 
-        res = s.x + t.x + u.x;
+        res += s.x + t.x + u.x;
     }
     
     outputBuffer[index] = res;

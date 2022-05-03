@@ -151,30 +151,30 @@ void computeMain(uint3 dispatchThreadID_0 : SV_DISPATCHTHREADID)
             u_0 = _S6;
         }
 
-#line 64
+#line 63
         int _S7 = s_1.x_0;
 
-#line 64
+#line 63
         SLANG_LIVE_END(s_1)
 
-#line 64
+#line 63
         int _S8 = t_0.x_0;
 
-#line 64
+#line 63
         SLANG_LIVE_END(t_0)
 
-#line 64
-        int _S9 = _S7 + _S8 + u_0.x_0;
+#line 63
+        int res_1 = res_0 + (_S7 + _S8 + u_0.x_0);
 
 #line 41
         int i_3 = i_2 + int(1);
 
 #line 41
         i_2 = i_3;
-        res_0 = _S9;
+        res_0 = res_1;
     }
 
-#line 67
+#line 66
     outputBuffer_0[(uint) index_0] = res_0;
     return;
 }
