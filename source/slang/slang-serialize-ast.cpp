@@ -107,6 +107,8 @@ struct ASTFieldAccess
 
                 const size_t writtenSize = writtenEntry->calcSize(classes);
                 const size_t readSize = readEntry->calcSize(classes);
+                SLANG_UNUSED(writtenSize);
+                SLANG_UNUSED(readSize);
 
                 SLANG_ASSERT(readSize == writtenSize);
                 // Check the payload is the same

@@ -51,7 +51,6 @@ namespace Slang
     {
         DeduplicateContext context;
         context.builder = this;
-        bool changed = true;
         m_constantMap.Clear();
         m_globalValueNumberingMap.Clear();
         for (auto inst : m_module->getGlobalInsts())
@@ -69,7 +68,6 @@ namespace Slang
                 auto newInst = context.addTypeValue(inst);
                 if (newInst != inst)
                 {
-                    changed = true;
                     inst->replaceUsesWith(newInst);
                     instToRemove.add(inst);
                 }

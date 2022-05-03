@@ -4341,7 +4341,7 @@ void EndToEndCompileRequest::setDefaultModuleName(const char* defaultModuleName)
     frontEndReq->m_defaultModuleName = namePool->getName(defaultModuleName);
 }
 
-SlangResult _addLibraryReference(EndToEndCompileRequest* req, Artifact* artifact)
+SlangResult _addLibraryReference(EndToEndCompileRequest* req, IArtifact* artifact)
 {
     auto desc = artifact->getDesc();
 
@@ -4362,7 +4362,7 @@ SlangResult _addLibraryReference(EndToEndCompileRequest* req, Artifact* artifact
 
     // Add to the m_libModules
     auto linkage = req->getLinkage();
-    linkage->m_libModules.add(artifact);
+    linkage->m_libModules.add(ComPtr<IArtifact>(artifact));
 
     return SLANG_OK;
 }
@@ -4378,7 +4378,7 @@ SlangResult EndToEndCompileRequest::addLibraryReference(const void* libData, siz
     // Create an artifact without any name (as one is not provided)
     RefPtr<Artifact> artifact = new Artifact(desc, String());
 
-    artifact->add(Artifact::Entry::Style::Artifact, library);
+    artifact->addElement(desc, library);
 
     return _addLibraryReference(this, artifact);
 }

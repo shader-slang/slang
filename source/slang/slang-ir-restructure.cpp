@@ -270,13 +270,12 @@ namespace Slang
                     // region representing an `if` statement.
                     //
                     auto ifInst = (IRIfElse*)terminator;
-                    auto condition = ifInst->getCondition();
                     auto trueBlock = ifInst->getTrueBlock();
                     auto falseBlock = ifInst->getFalseBlock();
                     auto afterBlock = ifInst->getAfterBlock();
 
 
-                    RefPtr<IfRegion> ifRegion = new IfRegion(parentRegion, condition);
+                    RefPtr<IfRegion> ifRegion = new IfRegion(parentRegion, ifInst);
 
                     // The region for the "then" part of things will consist of
                     // the range of blocks `[trueBlock, afterBlock)`.
@@ -461,11 +460,10 @@ namespace Slang
                     // require something like the Relooper algorithm, though.
                     //
                     auto switchInst = (IRSwitch*) terminator;
-                    auto condition = switchInst->getCondition();
                     auto breakLabel = switchInst->getBreakLabel();
                     auto defaultLabel = switchInst->getDefaultLabel();
 
-                    RefPtr<SwitchRegion> switchRegion = new SwitchRegion(parentRegion, condition);
+                    RefPtr<SwitchRegion> switchRegion = new SwitchRegion(parentRegion, switchInst);
 
                     // A direct branch to the block after the `switch` can
                     // be emitted as a `break` statement, so we will register

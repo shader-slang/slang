@@ -305,7 +305,7 @@ public:
         List<String> libraryPaths;
 
             /// Libraries to link against.
-        List<RefPtr<Artifact>> libraries;
+        List<ComPtr<IArtifact>> libraries;
 
         List<CapabilityVersion> requiredCapabilityVersions;
 

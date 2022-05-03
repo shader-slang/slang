@@ -26,7 +26,7 @@
 
 namespace Slang {
 
-SlangResult _addLibraryReference(EndToEndCompileRequest* req, Artifact* artifact);
+SlangResult _addLibraryReference(EndToEndCompileRequest* req, IArtifact* artifact);
 
 struct OptionsParser
 {
@@ -1406,7 +1406,7 @@ struct OptionsParser
                     CommandLineArg referenceModuleName;
                     SLANG_RETURN_ON_FAIL(reader.expectArg(referenceModuleName));
 
-                    auto path = referenceModuleName.value;
+                    const auto path = referenceModuleName.value;
 
                     auto desc = ArtifactInfoUtil::getDescFromPath(path.getUnownedSlice());
 
@@ -1428,13 +1428,21 @@ struct OptionsParser
                         return SLANG_FAIL;
                     }
 
-                    const String name = Artifact::getBaseNameFromPath(desc, referenceModuleName.value.getUnownedSlice());
+                    const String name = ArtifactInfoUtil::getBaseNameFromPath(desc, path.getUnownedSlice());
 
                     // Create the artifact
-                    RefPtr<Artifact> artifact = new Artifact(desc, name); 
+                    ComPtr<IArtifact> artifact(new Artifact(desc, name)); 
 
-                    // Set the path
-                    artifact->setPath(Artifact::PathType::Existing, referenceModuleName.value);
+                    // There is a problem here if I want to reference a library that is a 'system' library or is not directly a file
+                    // In that case the path shouldn't be set and the name should completely define the library.
+                    // Seeing as on all targets the baseName doesn't have an extension, and all library types do
+                    // if the name doesn't have an extension we can assume there is no path to it.
+                    
+                    if (Path::getPathExt(path).getLength() > 0)
+                    {
+                        // Set the path
+                        artifact->setPath(Artifact::PathType::Existing, path.getBuffer());
+                    }
 
                     // TODO(JS): We might want to check if the artifact exists.
                     // If the artifact is a CPU (or downstream compiler) library

@@ -24,7 +24,7 @@ namespace Slang
             : referenceCount(0)
         {}
 
-        RefObject& operator=(const RefObject& rhs) = default;
+        RefObject& operator=(const RefObject&) { return *this; }
 
         virtual ~RefObject()
         {}
@@ -285,6 +285,7 @@ namespace Slang
         TransformablePtr(T* ptr) { *this = ptr; }
         TransformablePtr(RefPtr<T> ptr) { *this = ptr; }
         TransformablePtr(const TransformablePtr<T>& ptr) = default;
+        TransformablePtr<T>& operator=(const TransformablePtr<T>& ptr) = default;
 
         void promoteToStrongReference() { m_strongPtr = m_weakPtr; }
         void demoteToWeakReference() { m_strongPtr = nullptr; }

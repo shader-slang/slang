@@ -1286,7 +1286,7 @@ void printDiagnosticArg(StringBuilder& sb, CodeGenTarget val)
             {
                 options.libraryPaths.add(Path::getParentDirectory(Path::getExecutablePath()));
                 // Set up the library artifact
-                RefPtr<Artifact> artifact = new Artifact(ArtifactDesc::make(ArtifactKind::Library, Artifact::Payload::HostCPU), "slang-rt");
+                ComPtr<IArtifact> artifact(new Artifact(ArtifactDesc::make(ArtifactKind::Library, Artifact::Payload::HostCPU), "slang-rt"));
                 options.libraries.add(artifact);
             }
         }

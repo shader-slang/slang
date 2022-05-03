@@ -1860,6 +1860,16 @@ public:
         0x5d56063f, 0x91d4, 0x4723, { 0xa7, 0xa7, 0x7a, 0x15, 0xaf, 0x93, 0xeb, 0x48 } \
     }
 
+class ICommandBufferD3D12 : public ICommandBuffer
+{
+public:
+    virtual SLANG_NO_THROW void SLANG_MCALL invalidateDescriptorHeapBinding() = 0;
+};
+#define SLANG_UUID_ICommandBufferD3D12                                                 \
+    {                                                                                  \
+        0xd56b7616, 0x6c14, 0x4841, { 0x9d, 0x9c, 0x7b, 0x7f, 0xdb, 0x9f, 0xd9, 0xb8 } \
+    }
+
 class ICommandQueue : public ISlangUnknown
 {
 public:

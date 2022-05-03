@@ -1391,9 +1391,9 @@ LinkedIR linkIR(
     {
         irModules.add(irModule);
     });
-    for (Artifact* artifact : linkage->m_libModules)
+    for (IArtifact* artifact : linkage->m_libModules)
     {
-        ModuleLibrary* library = artifact->findObjectInstance<ModuleLibrary>();
+        ModuleLibrary* library = (ModuleLibrary*)artifact->findElementObject(ModuleLibrary::getTypeGuid());
         if (library)
         {
             irModules.addRange(library->m_modules.getBuffer()->readRef(), library->m_modules.getCount());
