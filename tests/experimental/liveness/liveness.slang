@@ -71,7 +71,9 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
             }
         }
         
-        res += s.x + t.x + u.x + doThing(t) + somethingElse(t);
+        s.c[index & 7]++;
+        
+        res += s.x + t.x + u.x + doThing(t) + somethingElse(t) + s.c[2];
     }
     
     outputBuffer[index] = res;

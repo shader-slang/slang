@@ -167,28 +167,33 @@ void computeMain(uint3 dispatchThreadID_0 : SV_DISPATCHTHREADID)
         }
 
 #line 74
-        int _S7 = s_3.x_0;
+        s_3.c_0[index_0 & int(7)] = s_3.c_0[index_0 & int(7)] + int(1);
 
-#line 74
-        SLANG_LIVE_END(s_3)
+        int _S7 = s_3.x_0 + t_0.x_0 + u_0.x_0;
 
-#line 74
-        int _S8 = _S7 + t_0.x_0 + u_0.x_0;
+#line 76
+        int _S8 = doThing_0(t_0);
 
-#line 74
-        int _S9 = doThing_0(t_0);
+#line 76
+        int _S9 = _S7 + _S8;
 
-#line 74
-        int _S10 = _S8 + _S9;
+#line 76
+        int _S10 = somethingElse_0(t_0);
 
-#line 74
-        int _S11 = somethingElse_0(t_0);
-
-#line 74
+#line 76
         SLANG_LIVE_END(t_0)
 
-#line 74
-        int res_1 = res_0 + (_S10 + _S11);
+#line 76
+        int _S11 = _S9 + _S10;
+
+#line 76
+        int _S12 = s_3.c_0[int(2)];
+
+#line 76
+        SLANG_LIVE_END(s_3)
+
+#line 76
+        int res_1 = res_0 + (_S11 + _S12);
 
 #line 52
         int i_3 = i_2 + int(1);
@@ -198,7 +203,7 @@ void computeMain(uint3 dispatchThreadID_0 : SV_DISPATCHTHREADID)
         res_0 = res_1;
     }
 
-#line 77
+#line 79
     outputBuffer_0[(uint) index_0] = res_0;
     return;
 }
