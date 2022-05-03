@@ -69,11 +69,26 @@ SomeStruct_0 makeSomeStruct_0()
 RWStructuredBuffer<int > anotherBuffer_0 : register(u1);
 
 
+#line 40
+int doThing_0(SomeStruct_0 s_1)
+{
+    return s_1.x_0 * int(2) + int(1);
+}
+
+
+#line 34
+int somethingElse_0(inout SomeStruct_0 s_2)
+{
+    s_2.x_0 = s_2.x_0 + int(1);
+    return s_2.x_0;
+}
+
+
 #line 4
 RWStructuredBuffer<int > outputBuffer_0 : register(u0);
 
 
-#line 35
+#line 46
 [shader("compute")][numthreads(4, 1, 1)]
 void computeMain(uint3 dispatchThreadID_0 : SV_DISPATCHTHREADID)
 {
@@ -81,7 +96,7 @@ void computeMain(uint3 dispatchThreadID_0 : SV_DISPATCHTHREADID)
     int res_0;
     SomeStruct_0 u_0;
 
-#line 37
+#line 48
     int index_0 = (int) dispatchThreadID_0.x;
 
 
@@ -91,7 +106,7 @@ void computeMain(uint3 dispatchThreadID_0 : SV_DISPATCHTHREADID)
     for(;;)
     {
 
-#line 41
+#line 52
         if(i_2 < index_0)
         {
         }
@@ -100,81 +115,90 @@ void computeMain(uint3 dispatchThreadID_0 : SV_DISPATCHTHREADID)
             break;
         }
 
-#line 43
+#line 54
         int v_1 = someSlowFunc_0(index_0);
 
-        SomeStruct_0 s_1;
+        SomeStruct_0 s_3;
 
-#line 45
-        SLANG_LIVE_START(s_1)
+#line 56
+        SLANG_LIVE_START(s_3)
         SomeStruct_0 t_0;
 
-#line 46
+#line 57
         SLANG_LIVE_START(t_0)
 
-#line 46
+#line 57
         SomeStruct_0 _S4 = makeSomeStruct_0();
 
-#line 46
+#line 57
         t_0 = _S4;
         int  _S5[int(100)] = { int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0) };
 
-#line 47
+#line 58
         SomeStruct_0 u_1 = { int(0), int(0), _S5 };
 
         if((bool) (v_1 & int(256)))
         {
-            s_1.x_0 = anotherBuffer_0[(uint) (v_1 & int(3))];
+            s_3.x_0 = anotherBuffer_0[(uint) (v_1 & int(3))];
             t_0.x_0 = anotherBuffer_0[(uint) (v_1 & int(3))];
 
-#line 49
+#line 60
             u_0 = u_1;
         }
         else
         {
 
-#line 57
+#line 68
             SomeStruct_0 x_1;
 
-#line 57
+#line 68
             SLANG_LIVE_START(x_1)
 
-#line 57
+#line 68
             x_1 = u_1;
             x_1.x_0 = anotherBuffer_0[(uint) (v_1 & int(3))] + int(1);
             SomeStruct_0 _S6 = x_1;
 
-#line 59
+#line 70
             SLANG_LIVE_END(x_1)
 
-#line 49
+#line 60
             u_0 = _S6;
         }
 
-#line 63
-        int _S7 = s_1.x_0;
+#line 74
+        int _S7 = s_3.x_0;
 
-#line 63
-        SLANG_LIVE_END(s_1)
+#line 74
+        SLANG_LIVE_END(s_3)
 
-#line 63
-        int _S8 = t_0.x_0;
+#line 74
+        int _S8 = _S7 + t_0.x_0 + u_0.x_0;
 
-#line 63
+#line 74
+        int _S9 = doThing_0(t_0);
+
+#line 74
+        int _S10 = _S8 + _S9;
+
+#line 74
+        int _S11 = somethingElse_0(t_0);
+
+#line 74
         SLANG_LIVE_END(t_0)
 
-#line 63
-        int res_1 = res_0 + (_S7 + _S8 + u_0.x_0);
+#line 74
+        int res_1 = res_0 + (_S10 + _S11);
 
-#line 41
+#line 52
         int i_3 = i_2 + int(1);
 
-#line 41
+#line 52
         i_2 = i_3;
         res_0 = res_1;
     }
 
-#line 66
+#line 77
     outputBuffer_0[(uint) index_0] = res_0;
     return;
 }

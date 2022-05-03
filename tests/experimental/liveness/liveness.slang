@@ -31,6 +31,17 @@ int someSlowFunc(int a)
     return v;
 }
 
+int somethingElse(inout SomeStruct s)
+{
+    s.x ++;
+    return s.x;
+}
+
+int doThing(SomeStruct s)
+{
+    return s.x * 2 + 1;
+}
+
 [numthreads(4, 1, 1)]
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {    
@@ -60,7 +71,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
             }
         }
         
-        res += s.x + t.x + u.x;
+        res += s.x + t.x + u.x + doThing(t) + somethingElse(t);
     }
     
     outputBuffer[index] = res;

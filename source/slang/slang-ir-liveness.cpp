@@ -8,7 +8,53 @@
 namespace Slang
 {
 
+
 /* 
+Discussion 
+==========
+
+Currently we are only tracking 'var'/IRVar local variables. They are accessed via pointers. This
+means
+
+* We don't need to care about extractField / extractElement, as they only work directly on the value
+* We need to track aliases created via getFieldPtr / getElementPtr
+* There is a distinction between a 'pointer' and an 'address'.
+  * A "pointer" can 'escape' just as in other languages, and is the general case
+  * If we are talking about an "address", then this is constrained by our language rules,
+  
+NOTE! Confusingly there is getElementPtr and getFieldAddress (and getAddress). I also don't see Addr/Addr type as a distinct thing 
+from Ptr, so I assume that differentiation is aspirational?
+
+A) We don't need to worry about a phi node temporary holding a pointer (or scope ending *on* the branch), because
+the phi node will pass the result by value, leading to a *load* before the branch..
+
+Other
+
+```
+ let foo : Ptr<SomeStruct> = var;
+...
+store(someOtherPtr, foo); // this is `store`, but not a store *to* foo!!!!!
+...
+```
+
+Here a *pointer* is being stored into someOtherPtr. This means all bets are off. Liveness will have to be assumed anywhere the 
+variable is accessible. 
+TODO(JS): Note that currently this scenario isn't handled by this algorithm.
+
+```
+   let foo : Ptr<SomeStruct> = var;
+   ...
+   br SomeOtherThing(foo); // OH NO!!!
+```
+
+It is believed this can't happen in current code. Leading to assertion A) above.
+
+* Long-term IR type-system thing: we should probably have an explicit instruction
+  that casts a local `Ptr<Foo>` to either an `Out<Foo>` or `InOut<Foo>` for exactly
+  these cases (and then use the *cast* operation to tell us what is going on).
+*/
+
+/*
 Take the code sequence
 
 ```HLSL
@@ -313,6 +359,7 @@ void LivenessContext::processRoot(const RootInfo& rootInfo)
             // We want to find instructions that access the root
             switch (cur->getOp())
             {
+            
             case kIROp_getElementPtr:
             {
                 base = static_cast<IRGetElementPtr*>(cur)->getBase();
@@ -330,6 +377,25 @@ void LivenessContext::processRoot(const RootInfo& rootInfo)
                 IRGetAddress* getAddr = static_cast<IRGetAddress*>(cur);
                 base = getAddr->getOperand(0);
                 accessType = AccessType::Alias;
+                break;
+            }
+            case kIROp_Call:
+            {
+                // TODO(JS): This is arguably too conservative. 
+                // 
+                // Depending on how the parameter is used - in, out, inout changes the interpretation
+                // 
+                // *If we are talking about a real "pointer" then this is basically the general case again.
+                //     the callee  could store  the pointer into a global, dictionary, whatever.
+                //
+                // * If we are talking about an "address", then this is constrained by our language rules,
+                //    and we kind of need to find the type of the matching parameter :
+                //   * If the parameter is an `out` parameter, this is basically like a `store`
+                //   * If the parameter is an `inout` parameter, this is basically like a `load`
+
+                // We can assume it accesses the base
+                base = alias;
+                accessType = AccessType::Access;
                 break;
             }
             case kIROp_Load:
