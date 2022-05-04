@@ -431,13 +431,13 @@ namespace gfx_test
             slang::ProgramLayout* slangReflection;
             GFX_CHECK_CALL_ABORT(loadGraphicsProgram(device, shaderProgram, "trivial-copy-textures", "vertexMain", "fragmentMain", slangReflection));
 
-            IFramebufferLayout::AttachmentLayout attachmentLayout;
-            attachmentLayout.format = textureInfo->format;
-            attachmentLayout.sampleCount = sampleCount;
+            IFramebufferLayout::TargetLayout targetLayout;
+            targetLayout.format = textureInfo->format;
+            targetLayout.sampleCount = sampleCount;
 
             IFramebufferLayout::Desc framebufferLayoutDesc;
             framebufferLayoutDesc.renderTargetCount = 1;
-            framebufferLayoutDesc.renderTargets = &attachmentLayout;
+            framebufferLayoutDesc.renderTargets = &targetLayout;
             ComPtr<gfx::IFramebufferLayout> framebufferLayout = device->createFramebufferLayout(framebufferLayoutDesc);
             SLANG_CHECK_ABORT(framebufferLayout != nullptr);
 
@@ -453,9 +453,9 @@ namespace gfx_test
             IRenderPassLayout::Desc renderPassDesc = {};
             renderPassDesc.framebufferLayout = framebufferLayout;
             renderPassDesc.renderTargetCount = 1;
-            IRenderPassLayout::AttachmentAccessDesc renderTargetAccess = {};
-            renderTargetAccess.loadOp = IRenderPassLayout::AttachmentLoadOp::Clear;
-            renderTargetAccess.storeOp = IRenderPassLayout::AttachmentStoreOp::Store;
+            IRenderPassLayout::TargetAccessDesc renderTargetAccess = {};
+            renderTargetAccess.loadOp = IRenderPassLayout::TargetLoadOp::Clear;
+            renderTargetAccess.storeOp = IRenderPassLayout::TargetStoreOp::Store;
             renderTargetAccess.initialState = getDefaultResourceStateForViewType(viewType);
             renderTargetAccess.finalState = ResourceState::ResolveSource;
             renderPassDesc.renderTargetAccess = &renderTargetAccess;
