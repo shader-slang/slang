@@ -199,7 +199,7 @@ static void comma(PrettyWriter& writer)
 
 
 static void emitReflectionVarInfoJSON(PrettyWriter& writer, slang::VariableReflection* var);
-static void emitReflectionTypeLayoutJSON(PrettyWriter& writer, SlangCompileRequest* request, slang::TypeLayoutReflection* type);
+static void emitReflectionTypeLayoutJSON(PrettyWriter& writer, slang::TypeLayoutReflection* type);
 static void emitReflectionTypeJSON(PrettyWriter& writer, slang::TypeReflection* type);
 
 static void emitReflectionVarBindingInfoJSON(
@@ -273,8 +273,9 @@ static void emitReflectionVarBindingInfoJSON(
 
 static void emitReflectionVarBindingInfoJSON(
     PrettyWriter&                       writer,
-    SlangCompileRequest*                request,
-    slang::VariableLayoutReflection*    var)
+    slang::VariableLayoutReflection*    var,
+    SlangCompileRequest*                request = nullptr,
+    int                                 entryPointIndex = -1)
 {
     auto stage = var->getStage();
     if (stage != SLANG_STAGE_NONE)
@@ -321,21 +322,29 @@ static void emitReflectionVarBindingInfoJSON(
             auto index = var->getOffset(category);
             auto space = var->getBindingSpace(category);
             auto count = typeLayout->getSize(category);
+
+            // Query the paramater usage for the specified entry point.
+            // Note: both `request` and `entryPointIndex` may be invalid here, but that should just make the function return a failure.
             bool used = false;
-            bool usedAvailable = spIsParameterLocationUsed(request, 0, 0, category, space, index, used) == SLANG_OK;
+            bool usedAvailable = spIsParameterLocationUsed(request, entryPointIndex, 0, category, space, index, used) == SLANG_OK;
 
             if (cc != 0) write(writer, ",\n");
 
             write(writer,"{");
+            
             emitReflectionVarBindingInfoJSON(
                 writer,
                 category,
                 index,
                 count,
                 space);
+                
             if (usedAvailable)
-            write(writer, ", \"used\": ");
-            write(writer, used);
+            {
+                write(writer, ", \"used\": ");
+                write(writer, used);
+            }
+
             write(writer,"}");
         }
 
@@ -455,7 +464,6 @@ static void emitUserAttributes(PrettyWriter& writer, slang::VariableReflection* 
 
 static void emitReflectionVarLayoutJSON(
     PrettyWriter&                       writer,
-    SlangCompileRequest*                request,
     slang::VariableLayoutReflection*    var)
 {
     write(writer, "{\n");
@@ -471,11 +479,11 @@ static void emitReflectionVarLayoutJSON(
 
     comma(writer);
     write(writer, "\"type\": ");
-    emitReflectionTypeLayoutJSON(writer, request, var->getTypeLayout());
+    emitReflectionTypeLayoutJSON(writer, var->getTypeLayout());
 
     emitReflectionModifierInfoJSON(writer, var->getVariable());
 
-    emitReflectionVarBindingInfoJSON(writer, request, var);
+    emitReflectionVarBindingInfoJSON(writer, var);
 
     emitUserAttributes(writer, var->getVariable());
     dedent(writer);
@@ -763,7 +771,6 @@ static void emitReflectionTypeInfoJSON(
 
 static void emitReflectionParameterGroupTypeLayoutInfoJSON(
     PrettyWriter&                   writer,
-    SlangCompileRequest*            request,
     slang::TypeLayoutReflection*    typeLayout,
     const char*                     kind)
 {
@@ -774,7 +781,6 @@ static void emitReflectionParameterGroupTypeLayoutInfoJSON(
     write(writer, ",\n\"elementType\": ");
     emitReflectionTypeLayoutJSON(
         writer,
-        request,
         typeLayout->getElementTypeLayout());
 
     // Note: There is a subtle detail below when it comes to the
@@ -813,7 +819,7 @@ static void emitReflectionParameterGroupTypeLayoutInfoJSON(
 
         write(writer, ",\n\"containerVarLayout\": {\n");
         indent(writer);
-        emitReflectionVarBindingInfoJSON(writer, request, typeLayout->getContainerVarLayout());
+        emitReflectionVarBindingInfoJSON(writer, typeLayout->getContainerVarLayout());
         dedent(writer);
         write(writer, "\n}");
     }
@@ -821,13 +827,11 @@ static void emitReflectionParameterGroupTypeLayoutInfoJSON(
     write(writer, ",\n\"elementVarLayout\": ");
     emitReflectionVarLayoutJSON(
         writer,
-        request,
         typeLayout->getElementVarLayout());
 }
 
 static void emitReflectionTypeLayoutInfoJSON(
     PrettyWriter&                   writer,
-    SlangCompileRequest*            request,
     slang::TypeLayoutReflection*    typeLayout)
 {
     switch( typeLayout->getKind() )
@@ -851,7 +855,6 @@ static void emitReflectionTypeLayoutInfoJSON(
             write(writer, "\"elementType\": ");
             emitReflectionTypeLayoutJSON(
                 writer,
-                request,
                 elementTypeLayout);
 
             if (arrayTypeLayout->getSize(SLANG_PARAMETER_CATEGORY_UNIFORM) != 0)
@@ -884,7 +887,6 @@ static void emitReflectionTypeLayoutInfoJSON(
                 if (ff != 0) write(writer, ",\n");
                 emitReflectionVarLayoutJSON(
                     writer,
-                    request,
                     structTypeLayout->getFieldByIndex(ff));
             }
             dedent(writer);
@@ -895,15 +897,15 @@ static void emitReflectionTypeLayoutInfoJSON(
         break;
 
     case slang::TypeReflection::Kind::ConstantBuffer:
-        emitReflectionParameterGroupTypeLayoutInfoJSON(writer, request, typeLayout, "constantBuffer");
+        emitReflectionParameterGroupTypeLayoutInfoJSON(writer, typeLayout, "constantBuffer");
         break;
 
     case slang::TypeReflection::Kind::ParameterBlock:
-        emitReflectionParameterGroupTypeLayoutInfoJSON(writer, request, typeLayout, "parameterBlock");
+        emitReflectionParameterGroupTypeLayoutInfoJSON(writer, typeLayout, "parameterBlock");
         break;
 
     case slang::TypeReflection::Kind::TextureBuffer:
-        emitReflectionParameterGroupTypeLayoutInfoJSON(writer, request, typeLayout, "textureBuffer");
+        emitReflectionParameterGroupTypeLayoutInfoJSON(writer, typeLayout, "textureBuffer");
         break;
 
     case slang::TypeReflection::Kind::ShaderStorageBuffer:
@@ -914,7 +916,6 @@ static void emitReflectionTypeLayoutInfoJSON(
         write(writer, "\"elementType\": ");
         emitReflectionTypeLayoutJSON(
             writer,
-            request,
             typeLayout->getElementTypeLayout());
         break;
     case slang::TypeReflection::Kind::GenericTypeParameter:
@@ -954,7 +955,6 @@ static void emitReflectionTypeLayoutInfoJSON(
                     write(writer, "\"resultType\": ");
                     emitReflectionTypeLayoutJSON(
                         writer,
-                        request,
                         resultTypeLayout);
                 }
             }
@@ -980,13 +980,12 @@ static void emitReflectionTypeLayoutInfoJSON(
 
 static void emitReflectionTypeLayoutJSON(
     PrettyWriter&                   writer,
-    SlangCompileRequest*            request,
     slang::TypeLayoutReflection*    typeLayout)
 {
     CommaTrackerRAII commaTracker(writer);
     write(writer, "{\n");
     indent(writer);
-    emitReflectionTypeLayoutInfoJSON(writer, request, typeLayout);
+    emitReflectionTypeLayoutInfoJSON(writer, typeLayout);
     dedent(writer);
     write(writer, "\n}");
 }
@@ -1018,7 +1017,6 @@ static void emitReflectionVarInfoJSON(
 
 static void emitReflectionParamJSON(
     PrettyWriter&                       writer,
-    SlangCompileRequest*                request,
     slang::VariableLayoutReflection*    param)
 {
     // TODO: This function is likely redundant with `emitReflectionVarLayoutJSON`
@@ -1037,11 +1035,32 @@ static void emitReflectionParamJSON(
 
     emitReflectionModifierInfoJSON(writer, param->getVariable());
 
-    emitReflectionVarBindingInfoJSON(writer, request, param);
+    emitReflectionVarBindingInfoJSON(writer, param);
 
     comma(writer);
     write(writer, "\"type\": ");
-    emitReflectionTypeLayoutJSON(writer, request, param->getTypeLayout());
+    emitReflectionTypeLayoutJSON(writer, param->getTypeLayout());
+
+    dedent(writer);
+    write(writer, "\n}");
+}
+
+
+static void emitEntryPointParamJSON(
+    PrettyWriter&                       writer,
+    slang::VariableLayoutReflection*    param,
+    SlangCompileRequest*                request,
+    int                                 entryPointIndex)
+{
+    write(writer, "{\n");
+    indent(writer);
+
+    if( auto name = param->getName() )
+    {
+        emitReflectionNameInfoJSON(writer, name);
+    }
+
+    emitReflectionVarBindingInfoJSON(writer, param, request, entryPointIndex);
 
     dedent(writer);
     write(writer, "\n}");
@@ -1128,8 +1147,11 @@ static void emitReflectionTypeParamJSON(
 static void emitReflectionEntryPointJSON(
     PrettyWriter&                   writer,
     SlangCompileRequest*            request,
-    slang::EntryPointReflection*    entryPoint)
+    slang::ShaderReflection*        programReflection,
+    int                             entryPointIndex)
 {
+    slang::EntryPointReflection* entryPoint = programReflection->getEntryPointByIndex(entryPointIndex);
+
     write(writer, "{\n");
     indent(writer);
 
@@ -1158,7 +1180,7 @@ static void emitReflectionEntryPointJSON(
             if(pp != 0) write(writer, ",\n");
 
             auto parameter = entryPoint->getParameterByIndex(pp);
-            emitReflectionParamJSON(writer, request, parameter);
+            emitReflectionParamJSON(writer, parameter);
         }
 
         dedent(writer);
@@ -1171,7 +1193,7 @@ static void emitReflectionEntryPointJSON(
     if( auto resultVarLayout = entryPoint->getResultVarLayout() )
     {
         write(writer, ",\n\"result:\": ");
-        emitReflectionParamJSON(writer, request, resultVarLayout);
+        emitReflectionParamJSON(writer, resultVarLayout);
     }
 
     if (entryPoint->getStage() == SLANG_STAGE_COMPUTE)
@@ -1186,6 +1208,25 @@ static void emitReflectionEntryPointJSON(
             write(writer, threadGroupSize[ii]);
         }
         write(writer, "]");
+    }
+
+    // If code generation has been performed, print out the parameter usage by this entry point.
+    if ((request->getCompileFlags() & SLANG_COMPILE_FLAG_NO_CODEGEN) == 0)
+    {
+        write(writer, ",\n\"bindings\": {\n");
+        indent(writer);
+
+        auto parameterCount = programReflection->getParameterCount();
+        for( auto pp : range(parameterCount) )
+        {
+            if(pp != 0) write(writer, ",\n");
+
+            auto parameter = programReflection->getParameterByIndex(pp);
+            emitEntryPointParamJSON(writer, parameter, request, entryPointIndex);
+        }
+
+        dedent(writer);
+        write(writer, "\n}");
     }
 
     dedent(writer);
@@ -1208,7 +1249,7 @@ static void emitReflectionJSON(
         if(pp != 0) write(writer, ",\n");
 
         auto parameter = programReflection->getParameterByIndex(pp);
-        emitReflectionParamJSON(writer, request, parameter);
+        emitReflectionParamJSON(writer, parameter);
     }
 
     dedent(writer);
@@ -1224,8 +1265,7 @@ static void emitReflectionJSON(
         {
             if (ee != 0) write(writer, ",\n");
 
-            auto entryPoint = programReflection->getEntryPointByIndex(ee);
-            emitReflectionEntryPointJSON(writer, request, entryPoint);
+            emitReflectionEntryPointJSON(writer, request, programReflection, ee);
         }
 
         dedent(writer);
@@ -1305,15 +1345,6 @@ static SlangResult maybeDumpDiagnostic(SlangResult res, SlangCompileRequest* req
 
 SlangResult performCompilationAndReflection(SlangCompileRequest* request, int argc, const char*const* argv)
 {
-    // We don't actually need codegen to get reflection.
-    // 
-    // Ideally perhaps this would use a call to
-    // request->setCompileFlags(flags);
-    // But that relies on knowing what flags are set, and there isn't a way to get that, so do it arg way
-
-    const char* noCodeGenArgs[] = { "-no-codegen" };
-    //SLANG_RETURN_ON_FAIL(maybeDumpDiagnostic(spProcessCommandLineArguments(request, noCodeGenArgs, SLANG_COUNT_OF(noCodeGenArgs)), request));
-
     SLANG_RETURN_ON_FAIL(maybeDumpDiagnostic(spProcessCommandLineArguments(request, &argv[1], argc - 1), request));
     SLANG_RETURN_ON_FAIL(maybeDumpDiagnostic(spCompile(request), request));
 
