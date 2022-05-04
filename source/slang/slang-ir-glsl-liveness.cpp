@@ -134,7 +134,7 @@ void GLSLLivenessContext::_replaceStart(IRLiveStart* liveStart)
     }
     else
     {
-        IRType* paramTypes[2] = 
+        IRType* paramTypes[] = 
         {
             m_builder.getRefType(type),
             m_builder.getIntType(),
@@ -174,9 +174,10 @@ void GLSLLivenessContext::_replaceEnd(IRLiveEnd* liveEnd)
     }
     else
     {
-        IRType* paramTypes[1] =
+        IRType* paramTypes[] =
         {
-            m_builder.getRefType(type)
+            m_builder.getRefType(type),
+            m_builder.getIntType(),
         };
 
         func = m_builder.createFunc();
@@ -192,6 +193,7 @@ void GLSLLivenessContext::_replaceEnd(IRLiveEnd* liveEnd)
     IRInst* args[] =
     {
         liveEnd->getReferenced(),
+        m_builder.getIntValue(m_builder.getIntType(), 0)
     };
 
     m_builder.setInsertLoc(IRInsertLoc::after(liveEnd));
@@ -218,23 +220,23 @@ void GLSLLivenessContext::processModule()
         }
     }
     
+    // If we didn't find any liveness instructions then we are done
     if (!m_insts.getCount())
     {
         return;
     }
 
+    // Set up some values that will be needed on instructions
     m_extensionLit = m_builder.getStringValue(UnownedStringSlice::fromLiteral("GL_EXT_spirv_intrinsics"));
 
     // https://www.khronos.org/registry/SPIR-V/specs/unified1/SPIRV.html#OpLifetimeStart
     m_startOpValue = m_builder.getIntValue(m_builder.getIntType(), 256);
     m_endOpValue = m_builder.getIntValue(m_builder.getIntType(), 257);
 
-    if (m_insts.getCount())
-    {
-        m_startLit = m_builder.getStringValue(UnownedStringSlice::fromLiteral("livenessStart"));
-        m_endLit = m_builder.getStringValue(UnownedStringSlice::fromLiteral("livenessEnd"));
-    }
+    m_startLit = m_builder.getStringValue(UnownedStringSlice::fromLiteral("livenessStart"));
+    m_endLit = m_builder.getStringValue(UnownedStringSlice::fromLiteral("livenessEnd"));
     
+    // Iterate across instructions, replacing with a call to a generated function (one that just is a declaration defining the SPIR-V op)
     for (auto inst : m_insts)
     {
         switch (inst->getOp())
