@@ -245,6 +245,13 @@ SLANG_API void spSetCompileFlags(
     request->setCompileFlags(flags);
 }
 
+SLANG_API SlangCompileFlags spGetCompileFlags(
+    slang::ICompileRequest*    request)
+{
+    SLANG_ASSERT(request);
+    return request->getCompileFlags();
+}
+
 SLANG_API void spSetDumpIntermediates(
     slang::ICompileRequest*    request,
     int                     enable)

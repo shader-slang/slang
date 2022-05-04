@@ -4127,6 +4127,11 @@ void EndToEndCompileRequest::setCompileFlags(SlangCompileFlags flags)
     getFrontEndReq()->compileFlags = flags;
 }
 
+SlangCompileFlags EndToEndCompileRequest::getCompileFlags()
+{
+    return getFrontEndReq()->compileFlags;
+}
+
 void EndToEndCompileRequest::setDumpIntermediates(int enable)
 {
     getBackEndReq()->shouldDumpIntermediates = (enable != 0);

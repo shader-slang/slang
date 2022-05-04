@@ -2319,6 +2319,7 @@ namespace Slang
         // slang::ICompileRequest
         virtual SLANG_NO_THROW void SLANG_MCALL setFileSystem(ISlangFileSystem* fileSystem) SLANG_OVERRIDE;
         virtual SLANG_NO_THROW void SLANG_MCALL setCompileFlags(SlangCompileFlags flags) SLANG_OVERRIDE;
+        virtual SLANG_NO_THROW SlangCompileFlags SLANG_MCALL getCompileFlags() SLANG_OVERRIDE;
         virtual SLANG_NO_THROW void SLANG_MCALL setDumpIntermediates(int  enable) SLANG_OVERRIDE;
         virtual SLANG_NO_THROW void SLANG_MCALL setDumpIntermediatePrefix(const char* prefix) SLANG_OVERRIDE;
         virtual SLANG_NO_THROW void SLANG_MCALL setLineDirectiveMode(SlangLineDirectiveMode  mode) SLANG_OVERRIDE;

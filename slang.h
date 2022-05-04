@@ -1344,6 +1344,10 @@ extern "C"
         SlangCompileRequest*    request,
         SlangCompileFlags       flags);
 
+    /*! @see slang::ICompileRequest::getCompileFlags */
+    SLANG_API SlangCompileFlags spGetCompileFlags(
+        SlangCompileRequest*    request);
+
     /*! @see slang::ICompileRequest::setDumpIntermediates */
     SLANG_API void spSetDumpIntermediates(
         SlangCompileRequest*    request,
@@ -3355,6 +3359,11 @@ namespace slang
             */
         virtual SLANG_NO_THROW void SLANG_MCALL setCompileFlags(
             SlangCompileFlags       flags) = 0;
+
+            /*!
+            @brief Returns the compilation flags previously set with `setCompileFlags`
+            */
+        virtual SLANG_NO_THROW SlangCompileFlags SLANG_MCALL getCompileFlags() = 0;
 
             /*!
             @brief Set whether to dump intermediate results (for debugging) or not.
