@@ -14,7 +14,6 @@ struct GLSLLivenessContext
 {
     enum class Kind
     {
-        Invalid,
         Start,
         End,
         CountOf,
@@ -33,7 +32,7 @@ struct GLSLLivenessContext
         m_builder.init(m_sharedBuilder);
     }
 
-    void _replace(Kind kind, IRLiveBase* liveStart);
+    void _replace(IRLiveRangeMarker* liveMarker);
     void _addDecorations(Kind kind, IRFunc* func);
 
     IRType* _getType(IRInst* referenced);
@@ -42,11 +41,11 @@ struct GLSLLivenessContext
     {
         switch (op)
         {
-            case kIROp_LiveStart: return Kind::Start;
-            case kIROp_LiveEnd:     return Kind::End;
+            case kIROp_LiveRangeStart: return Kind::Start;
+            case kIROp_LiveRangeEnd:   return Kind::End;
             default: break;
         }
-        return Kind::Invalid;
+        SLANG_UNREACHABLE("Invalid op");
     }
 
     struct Info
@@ -56,7 +55,7 @@ struct GLSLLivenessContext
         IRInst* m_opValue = nullptr;
     };
 
-    List<IRInst*> m_insts;
+    List<IRLiveRangeMarker*> m_markerInsts;
     Info m_infos[Index(Kind::CountOf)];
     IRStringLit* m_extensionLit;
 
@@ -72,9 +71,10 @@ void GLSLLivenessContext::processFunction(IRFunc* funcInst)
     {
         for (auto inst = block->getFirstChild(); inst; inst = inst->getNextInst())
         {
-            if (getKind(inst->getOp()) != Kind::Invalid)
+            IRLiveRangeMarker* marker = as<IRLiveRangeMarker>(inst);
+            if (marker)
             {
-                m_insts.add(inst);
+                m_markerInsts.add(marker);
             }
         }
     }
@@ -110,10 +110,11 @@ IRType* GLSLLivenessContext::_getType(IRInst* referenced)
     return type;
 }
 
-void GLSLLivenessContext::_replace(Kind kind, IRLiveBase* live)
+void GLSLLivenessContext::_replace(IRLiveRangeMarker* markerInst)
 {
-    // TODO(JS): Probably better to use a getReferenced method, but this is the easiest way to go for now.
-    IRInst* referenced = live->getOperand(0);
+    const auto kind = getKind(markerInst->getOp());
+    
+    IRInst* referenced = markerInst->getReferenced();
 
     IRType* type = _getType(referenced);
 
@@ -150,10 +151,10 @@ void GLSLLivenessContext::_replace(Kind kind, IRLiveBase* live)
         m_builder.getIntValue(m_builder.getIntType(), 0)
     };
 
-    m_builder.setInsertLoc(IRInsertLoc::after(live));
+    m_builder.setInsertLoc(IRInsertLoc::after(markerInst));
     m_builder.emitCallInst(m_builder.getVoidType(), func, SLANG_COUNT_OF(args), args);
 
-    live->removeAndDeallocate();
+    markerInst->removeAndDeallocate();
 }
 
 void GLSLLivenessContext::processModule()
@@ -175,7 +176,7 @@ void GLSLLivenessContext::processModule()
     }
     
     // If we didn't find any liveness instructions then we are done
-    if (!m_insts.getCount())
+    if (!m_markerInsts.getCount())
     {
         return;
     }
@@ -197,11 +198,9 @@ void GLSLLivenessContext::processModule()
     }
 
     // Iterate across instructions, replacing with a call to a generated function (one that just is a declaration defining the SPIR-V op)
-    for (auto inst : m_insts)
+    for (auto markerInst : m_markerInsts)
     {
-        const auto kind = getKind(inst->getOp());
-        SLANG_ASSERT(kind != Kind::Invalid);
-        _replace(kind, static_cast<IRLiveBase*>(inst));
+        _replace(markerInst);
     }
 }
 
