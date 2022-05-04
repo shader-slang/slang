@@ -36,6 +36,10 @@ struct GLSLLivenessContext
     
     IRStringLit* m_startLit = nullptr;
     IRStringLit* m_endLit = nullptr;
+    IRStringLit* m_extensionLit = nullptr;
+
+    IRInst* m_startOpValue = nullptr;
+    IRInst* m_endOpValue = nullptr;
 
     Dictionary<IRType*, IRFunc*> m_startFuncs;
     Dictionary<IRType*, IRFunc*> m_endFuncs;
@@ -68,23 +72,22 @@ void GLSLLivenessContext::processFunction(IRFunc* funcInst)
 
 void GLSLLivenessContext::_addDecorations(IRLiveBase* live, IRFunc* func)
 {
-    // We need the spirv extension
-
+    // We might(?) want to add a decoration saying this is GLSL specific, but at this point
+    // we can only be in GLSL dependent IR.
+    //
     // m_builder.addTargetDecoration();
 
-    auto extensionName = UnownedStringSlice::fromLiteral("GL_EXT_spirv_intrinsics");
-    m_builder.addRequireGLSLExtensionDecoration(func, extensionName);
+    // We need the spirv extension
+    m_builder.addDecoration(func, kIROp_RequireGLSLExtensionDecoration, m_extensionLit);
 
     // TODO(JS): We need to add the spirv id number 
 
-    // https://www.khronos.org/registry/SPIR-V/specs/unified1/SPIRV.html#OpLifetimeStart
-
-    int spirvOp = 0;
+    IRInst* opValue = nullptr;
     switch (live->getOp())
     {
     case kIROp_LiveStart:   
     {
-        spirvOp = 256; 
+        opValue = m_startOpValue; 
         if (m_startLit)
         {
             m_builder.addNameHintDecoration(func, m_startLit);
@@ -97,17 +100,16 @@ void GLSLLivenessContext::_addDecorations(IRLiveBase* live, IRFunc* func)
         {
             m_builder.addNameHintDecoration(func, m_endLit);
         }
-        spirvOp = 257; 
+        opValue = m_endOpValue;
         break;
     }
     default: break;
     }
 
-    SLANG_ASSERT(spirvOp);
+    SLANG_ASSERT(opValue);
 
-    SLANG_UNUSED(spirvOp);
+    m_builder.addDecoration(func, kIROp_SPIRVOpDecoration, opValue);
 }
-
 
 IRType* GLSLLivenessContext::_getType(IRInst* referenced)
 {
@@ -215,6 +217,17 @@ void GLSLLivenessContext::processModule()
             processFunction(funcInst);
         }
     }
+    
+    if (!m_insts.getCount())
+    {
+        return;
+    }
+
+    m_extensionLit = m_builder.getStringValue(UnownedStringSlice::fromLiteral("GL_EXT_spirv_intrinsics"));
+
+    // https://www.khronos.org/registry/SPIR-V/specs/unified1/SPIRV.html#OpLifetimeStart
+    m_startOpValue = m_builder.getIntValue(m_builder.getIntType(), 256);
+    m_endOpValue = m_builder.getIntValue(m_builder.getIntType(), 257);
 
     if (m_insts.getCount())
     {

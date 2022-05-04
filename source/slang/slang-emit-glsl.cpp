@@ -1852,6 +1852,20 @@ void GLSLSourceEmitter::emitParamTypeImpl(IRType* type, String const& name)
     Super::emitParamTypeImpl(type, name);
 }
 
+void GLSLSourceEmitter::emitFuncDecorationImpl(IRDecoration* decoration)
+{
+    if (decoration->getOp() == kIROp_SPIRVOpDecoration)
+    {
+        m_writer->emit("spirv_instruction(id = ");
+        emitSimpleValue(decoration->getOperand(0));
+        m_writer->emit(")\n");
+    }
+    else
+    {
+        Super::emitFuncDecorationImpl(decoration);
+    }
+}
+
 void GLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
 {
     switch (type->getOp())
