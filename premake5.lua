@@ -875,7 +875,6 @@ standardProject("slang-rt", "source/slang-rt")
      kind "SharedLib"
      links { "core", "slang" }
      pic "On"
-     flags { "FatalWarnings" }
  
      defines { "SLANG_GFX_DYNAMIC", "SLANG_GFX_DYNAMIC_EXPORT" }
  
@@ -904,6 +903,7 @@ standardProject("slang-rt", "source/slang-rt")
          addSourceDir "tools/gfx/d3d"
          addSourceDir "tools/gfx/d3d11"
          addSourceDir "tools/gfx/d3d12"
+         flags { "FatalWarnings" }
      elseif targetInfo.os == "mingw" or targetInfo.os == "cygwin" then
          -- Don't support any render techs...
      elseif os.target() == "macosx" then
