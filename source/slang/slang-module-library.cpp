@@ -13,6 +13,14 @@
 
 namespace Slang {
 
+void* ModuleLibrary::getInterface(const Guid& uuid)
+{
+    if (uuid == ISlangUnknown::getTypeGuid() || uuid == IArtifactInstance::getTypeGuid())
+    {
+        return static_cast<IArtifactInstance*>(this);
+    }
+    return nullptr;
+}
 
 SlangResult loadModuleLibrary(const Byte* inBytes, size_t bytesCount, EndToEndCompileRequest* req, RefPtr<ModuleLibrary>& outLibrary)
 {
@@ -67,9 +75,9 @@ SlangResult loadModuleLibrary(const Byte* inBytes, size_t bytesCount, EndToEndCo
     return SLANG_OK;
 }
 
-SlangResult loadModuleLibrary(ArtifactKeep keep, Artifact* product, EndToEndCompileRequest* req, RefPtr<ModuleLibrary>& outLibrary)
+SlangResult loadModuleLibrary(ArtifactKeep keep, IArtifact* artifact, EndToEndCompileRequest* req, RefPtr<ModuleLibrary>& outLibrary)
 {
-    if (auto foundLibrary = product->findObjectInstance<ModuleLibrary>())
+    if (auto foundLibrary = (ModuleLibrary*)artifact->findElementObject(ModuleLibrary::getTypeGuid()))
     {
         outLibrary = foundLibrary;
         return SLANG_OK;
@@ -77,7 +85,7 @@ SlangResult loadModuleLibrary(ArtifactKeep keep, Artifact* product, EndToEndComp
 
     // Load the blob
     ComPtr<ISlangBlob> blob;
-    SLANG_RETURN_ON_FAIL(product->loadBlob(getIntermediateKeep(keep), blob));
+    SLANG_RETURN_ON_FAIL(artifact->loadBlob(getIntermediateKeep(keep), blob.writeRef()));
 
     // Load the module
     RefPtr<ModuleLibrary> library;
@@ -85,7 +93,7 @@ SlangResult loadModuleLibrary(ArtifactKeep keep, Artifact* product, EndToEndComp
     
     if (canKeep(keep))
     {
-        product->add(Artifact::Entry::Style::Artifact, library);
+        artifact->addElement(artifact->getDesc(), library);
     }
 
     outLibrary = library;

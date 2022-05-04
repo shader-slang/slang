@@ -6408,10 +6408,11 @@ RefPtr<BufferResource> ShaderTableImpl::createDeviceBuffer(
 // a `CommandBuffer` created from the heap. We need to break the cycle upon
 // the public reference count of a command buffer dropping to 0.
 
-ICommandBuffer* CommandBufferImpl::getInterface(const Guid& guid)
+ICommandBufferD3D12* CommandBufferImpl::getInterface(const Guid& guid)
 {
-    if (guid == GfxGUID::IID_ISlangUnknown || guid == GfxGUID::IID_ICommandBuffer)
-        return static_cast<ICommandBuffer*>(this);
+    if (guid == GfxGUID::IID_ISlangUnknown || guid == GfxGUID::IID_ICommandBuffer ||
+        guid == GfxGUID::IID_ICommandBufferD3D12)
+        return static_cast<ICommandBufferD3D12*>(this);
     return nullptr;
 }
 

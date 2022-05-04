@@ -2179,10 +2179,36 @@ namespace Slang
         }
         else if( parser->LookAheadToken("class") )
         {
-            auto decl = parser->ParseClass();
-            typeSpec.decl = decl;
-            typeSpec.expr = createDeclRefType(parser, decl);
-            return typeSpec;
+            // TODO(JS): Class type doesn't currently have the correct semantics. This is covered here
+            // https://github.com/shader-slang/slang/issues/2206
+            // 
+            // For now the use of `class` is disabled. 
+            // The remaining code around `class` left intact as likely will be the basis for the future
+            // implementation.
+
+            const bool disableClass = true;
+
+            if (disableClass)
+            {
+                parser->sink->diagnose(parser->tokenReader.peekLoc(), Diagnostics::classIsReservedKeyword);
+
+                // Consume `class`
+                advanceToken(parser);
+
+                // Indicate in recovering state.
+                parser->isRecovering = true;
+
+                // Check to confirm the result is invalid
+                SLANG_ASSERT(typeSpec.decl == nullptr && typeSpec.expr == nullptr);
+                return typeSpec;
+            }
+            else
+            {
+                auto decl = parser->ParseClass();
+                typeSpec.decl = decl;
+                typeSpec.expr = createDeclRefType(parser, decl);
+                return typeSpec;
+            }
         }
         else if(parser->LookAheadToken("enum"))
         {
@@ -2292,6 +2318,11 @@ namespace Slang
 
         Modifiers modifiers = inModifiers;
         auto typeSpec = _parseTypeSpec(parser, modifiers);
+
+        if (typeSpec.expr == nullptr && typeSpec.decl == nullptr)
+        {
+            return nullptr;
+        }
 
         // We may need to build up multiple declarations in a group,
         // but the common case will be when we have just a single
@@ -4179,6 +4210,7 @@ namespace Slang
             // when starting to parse an infix expression.
             //
             type = nullptr;
+            SLANG_UNUSED(type);
 
             // TODO: If we decide to intermix parsing of statement bodies
             // with semantic checking (by delaying the parsing of bodies

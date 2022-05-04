@@ -1180,8 +1180,6 @@ namespace Slang
         auto genericSpecializationParamCount = getGenericSpecializationParamCount();
         SLANG_ASSERT(argCount >= genericSpecializationParamCount);
 
-        Result result = SLANG_OK;
-
         RefPtr<EntryPointSpecializationInfo> info = new EntryPointSpecializationInfo();
 
         DeclRef<FuncDecl> specializedFuncDeclRef = m_funcDeclRef;
@@ -1226,7 +1224,6 @@ namespace Slang
                 {
                     // TODO: diagnose a problem here
                     sink->diagnose(constraintDecl, Diagnostics::typeArgumentDoesNotConformToInterface, sub, sup);
-                    result = SLANG_FAIL;
                     continue;
                 }
             }
@@ -1263,7 +1260,6 @@ namespace Slang
                 // If no witness was found, then we will be unable to satisfy
                 // the conformances required.
                 sink->diagnose(SourceLoc(), Diagnostics::typeArgumentDoesNotConformToInterface, argType, paramType);
-                result = SLANG_FAIL;
                 continue;
             }
 

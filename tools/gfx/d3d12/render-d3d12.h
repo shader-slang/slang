@@ -1641,7 +1641,7 @@ public:
 #endif
 
 class CommandBufferImpl
-    : public ICommandBuffer
+    : public ICommandBufferD3D12
     , public ComObject
 {
 public:
@@ -1650,7 +1650,7 @@ public:
     // the public reference count of a command buffer dropping to 0.
     SLANG_COM_OBJECT_IUNKNOWN_ALL
 
-    ICommandBuffer* getInterface(const Guid& guid);
+    ICommandBufferD3D12* getInterface(const Guid& guid);
     virtual void comFree() override { m_transientHeap.breakStrongReference(); }
 
     virtual SLANG_NO_THROW Result SLANG_MCALL getNativeHandle(InteropHandle* handle) override;
@@ -1670,7 +1670,7 @@ public:
 
     void bindDescriptorHeaps();
 
-    void invalidateDescriptorHeapBinding() { m_descriptorHeapsBound = false; }
+    virtual SLANG_NO_THROW void SLANG_MCALL invalidateDescriptorHeapBinding() override { m_descriptorHeapsBound = false; }
 
     void reinit();
 

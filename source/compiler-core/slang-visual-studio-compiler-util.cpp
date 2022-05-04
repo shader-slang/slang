@@ -12,6 +12,7 @@
 #endif
 
 #include "../core/slang-io.h"
+#include "slang-artifact-info.h"
 
 namespace Slang
 {
@@ -259,18 +260,18 @@ namespace Slang
     }
 
     // Link libraries.
-    for (Artifact* artifact : options.libraries)
+    for (IArtifact* artifact : options.libraries)
     {
         auto desc = artifact->getDesc();
 
-        if (desc.isCpuBinary() && desc.kind == ArtifactKind::Library)
+        if (ArtifactInfoUtil::isCpuBinary(desc) && desc.kind == ArtifactKind::Library)
         {
             // Get the libray name and path
             SLANG_RETURN_ON_FAIL(artifact->requireFileLike(ArtifactKeep::No));
 
-            libPathPool.add(artifact->getParentPath());
+            libPathPool.add(ArtifactInfoUtil::getParentPath(artifact));
             // We need the extension for windows
-            cmdLine.addArg(artifact->getBaseName() + ".lib");
+            cmdLine.addArg(ArtifactInfoUtil::getBaseName(artifact) + ".lib");
         }
     }
 

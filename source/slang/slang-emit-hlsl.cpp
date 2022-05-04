@@ -736,7 +736,6 @@ void HLSLSourceEmitter::emitFuncDecorationImpl(IRDecoration* decoration)
         auto profile = m_effectiveProfile;
         
         const auto family = profile.getFamily();
-        const auto stage = profile.getStage();
         const auto version = profile.getVersion();
 
         // If it's whole program and it's for a late enough version of shader model

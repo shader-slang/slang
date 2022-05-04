@@ -3,6 +3,8 @@
 
 #include "../core/slang-basic.h"
 
+#include "slang-ir-insts.h"
+
 namespace Slang
 {
     class DiagnosticSink;
@@ -107,13 +109,15 @@ namespace Slang
     class IfRegion : public SeqRegion
     {
     public:
-        IfRegion(Region* parent, IRInst* condition)
+        IfRegion(Region* parent, IRIfElse* ifElseInst)
             : SeqRegion(Region::Flavor::If, parent)
-            , condition(condition)
+            , ifElseInst(ifElseInst)
         {}
 
-        /// The IR value that controls the conditional branch
-        IRInst* condition;
+        /// The IR `ifElse` instruction
+        IRIfElse* ifElseInst;
+
+        IRInst* getCondition() { return ifElseInst->getCondition(); }
 
         /// The region to execute if the `condition` is `true`
         RefPtr<Region> thenRegion;
@@ -182,13 +186,15 @@ namespace Slang
     class SwitchRegion : public BreakableRegion
     {
     public:
-         SwitchRegion(Region* parent, IRInst* condition)
+         SwitchRegion(Region* parent, IRSwitch* switchInst)
             : BreakableRegion(Region::Flavor::Switch, parent)
-            , condition(condition)
+            , switchInst(switchInst)
         {}
 
-        /// The IR value that controls the conditional branch
-        IRInst* condition;
+        /// The IR `switch` instruction
+        IRSwitch* switchInst;
+
+        IRInst* getCondition() { return switchInst->getCondition(); }
 
         /// A collection of `case`s that share the same code.
         class Case : public RefObject
