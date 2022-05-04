@@ -818,12 +818,12 @@ standardProject("slang-rt", "source/slang-rt")
  -- to do its job:
  --
  
- tool "slang-reflection-test"
+ toolSharedLibrary "slang-reflection-test"
      uuid "C5ACCA6E-C04D-4B36-8516-3752B3C13C2F"
  
      includedirs { "." }
  
-     kind "ConsoleApp"
+     kind "SharedLib"
      links { "core", "slang" }
  
  --
