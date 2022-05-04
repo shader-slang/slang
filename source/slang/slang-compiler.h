@@ -1485,9 +1485,9 @@ namespace Slang
 
         bool shouldDumpIntermediates() { return dumpIntermediates; }
 
-        void setTrackLiveness(bool enable) { enableTrackLiveness = enable; }
+        void setTrackLiveness(bool enable) { enableLivenessTracking = enable; }
 
-        bool shouldTrackLiveness() { return enableTrackLiveness; }
+        bool shouldTrackLiveness() { return enableLivenessTracking; }
 
         Linkage* getLinkage() { return linkage; }
         CodeGenTarget getTarget() { return format; }
@@ -1519,7 +1519,7 @@ namespace Slang
         LineDirectiveMode       lineDirectiveMode = LineDirectiveMode::Default;
         bool                    dumpIntermediates = false;
         bool                    forceGLSLScalarBufferLayout = false;
-        bool                    enableTrackLiveness = false;
+        bool                    enableLivenessTracking = false;
     };
 
         /// Are we generating code for a D3D API?

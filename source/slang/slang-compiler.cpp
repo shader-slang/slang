@@ -2514,7 +2514,7 @@ void printDiagnosticArg(StringBuilder& sb, CodeGenTarget val)
     {
         auto endToEndReq = isEndToEndCompile();
         return (endToEndReq && endToEndReq->enableLivenessTracking) || 
-            getTargetReq()->shouldDumpIntermediates();
+            getTargetReq()->shouldTrackLiveness();
     }
 
     String CodeGenContext::getIntermediateDumpPrefix()
