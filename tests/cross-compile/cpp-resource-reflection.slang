@@ -1,4 +1,4 @@
-//TEST:CPU_REFLECTION: -profile cs_5_0 -entry computeMain -target cpp 
+//TEST:CPU_REFLECTION: -profile cs_5_0 -entry computeMain -target cpp -no-codegen
 
 
 struct Thing

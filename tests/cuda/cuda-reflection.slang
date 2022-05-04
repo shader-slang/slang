@@ -1,6 +1,6 @@
 // cuda-reflection.slang
 
-//TEST:REFLECTION:-stage compute -entry main -target cuda
+//TEST:REFLECTION:-stage compute -entry main -target cuda -no-codegen
 
 struct PadLadenStruct
 {
