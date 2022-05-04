@@ -1,4 +1,4 @@
-//TEST(smoke):REFLECTION:-profile glsl_fragment -target glsl
+//TEST(smoke):REFLECTION:-profile glsl_fragment -target glsl -no-codegen
 
 // Confirm that when targetting GLSL via cross compilation,
 // we use the Vulkan layout rules instead of HLSL ones

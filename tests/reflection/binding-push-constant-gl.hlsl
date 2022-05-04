@@ -1,4 +1,4 @@
-//TEST:REFLECTION:-profile ps_4_0 -target spirv
+//TEST:REFLECTION:-profile ps_4_0 -target spirv -no-codegen
 
 // Confirm that we can generate reflection info for arrays
 //

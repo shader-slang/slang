@@ -1,4 +1,4 @@
-//TEST:REFLECTION:-profile sm_5_1 -stage fragment -target hlsl
+//TEST:REFLECTION:-profile sm_5_1 -stage fragment -target hlsl -no-codegen
 
 // This test is to confirm that we do not allocate a "default"
 // space/set for global shader parameters unless it is

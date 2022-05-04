@@ -1,6 +1,6 @@
 // parameter-block-explicit-space.slang
 
-//TEST:REFLECTION:-D__SLANG__ -stage fragment -entry main -profile sm_5_1 -target hlsl
+//TEST:REFLECTION:-D__SLANG__ -stage fragment -entry main -profile sm_5_1 -target hlsl -no-codegen
 //TEST:COMPARE_HLSL:-stage fragment -entry main -profile sm_5_1
 
 #ifdef __SLANG__

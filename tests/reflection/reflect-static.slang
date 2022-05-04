@@ -1,4 +1,4 @@
-//TEST:REFLECTION:-profile cs_6_0  -target hlsl -entry computeMain
+//TEST:REFLECTION:-profile cs_6_0  -target hlsl -entry computeMain -no-codegen
 
 struct Thing
 {
