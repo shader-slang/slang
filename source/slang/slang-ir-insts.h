@@ -1808,41 +1808,40 @@ struct IRExtractExistentialWitnessTable : IRInst
 };
 
 /* Base class for instructions that track liveness */
-struct IRLiveBase : IRInst
+struct IRLiveRangeMarker : IRInst
 {
-    IR_PARENT_ISA(LiveBase)
-};
+    IR_PARENT_ISA(LiveRangeMarker)
 
-struct IRLiveStart : IRLiveBase
-{
-    IR_LEAF_ISA(LiveStart);
-
-        // TODO(JS): It might be useful to track how many bytes are live in the item referenced. 
-        // It's not entirely clear how that will work across different targets, or even what such a 
-        // size means on some targets.
-        // 
-        // Here we assume the size is the size of the type being referenced (whatever that means on a target)
-        //
-        // Potentially we could have a count, for defining (say) a range of an array. It's not clear this is 
-        // needed, so we just have the item referenced.
+    // TODO(JS): It might be useful to track how many bytes are live in the item referenced. 
+    // It's not entirely clear how that will work across different targets, or even what such a 
+    // size means on some targets.
+    // 
+    // Here we assume the size is the size of the type being referenced (whatever that means on a target)
+    //
+    // Potentially we could have a count, for defining (say) a range of an array. It's not clear this is 
+    // needed, so we just have the item referenced.
 
         /// The referenced item whose liveness starts after this instruction
     IRInst* getReferenced() { return getOperand(0); }
 };
 
-struct IRLiveEnd : IRLiveBase
+/// Identifies then the item references starts being live.
+struct IRLiveRangeStart : IRLiveRangeMarker
 {
-    IR_LEAF_ISA(LiveEnd);
+    IR_LEAF_ISA(LiveRangeStart);        
+};
 
-        /// Demarks where the referenced item is no longer live, optimimally (although not
-        /// necessarily) at the previous instruction. 
-        /// 
-        /// There *can* be acceses to the referenced item after the end, if those accesses
-        /// can never be seen. For example if there is a store, without any subsequent loads, 
-        /// the store will never be seen (by a load) and so can be ignored.
-        ///
-        /// In general there can be one or more 'ends' for every start.
-    IRInst* getReferenced() { return getOperand(0); }
+/// Demarks where the referenced item is no longer live, optimimally (although not
+/// necessarily) at the previous instruction. 
+/// 
+/// There *can* be acceses to the referenced item after the end, if those accesses
+/// can never be seen. For example if there is a store, without any subsequent loads, 
+/// the store will never be seen (by a load) and so can be ignored.
+///
+/// In general there can be one or more 'ends' for every start.
+struct IRLiveRangeEnd : IRLiveRangeMarker
+{
+    IR_LEAF_ISA(LiveRangeEnd);
 };
 
 // Description of an instruction to be used for global value numbering
@@ -2205,11 +2204,11 @@ public:
         return getAttributedType(baseType, attributes.getCount(), attributes.getBuffer());
     }
 
-        /// Emit an LiveStart instruction indicating the referenced item is live following this instruction
-    IRLiveStart* emitLiveStart(IRInst* referenced);
+        /// Emit an LiveRangeStart instruction indicating the referenced item is live following this instruction
+    IRLiveRangeStart* emitLiveRangeStart(IRInst* referenced);
 
-        /// Emit a LiveEnd instruction indicating the referenced item is no longer live when this instruction is reached.
-    IRLiveEnd* emitLiveEnd(IRInst* referenced);
+        /// Emit a LiveRangeEnd instruction indicating the referenced item is no longer live when this instruction is reached.
+    IRLiveRangeEnd* emitLiveRangeEnd(IRInst* referenced);
 
     // Set the data type of an instruction, while preserving
     // its rate, if any.

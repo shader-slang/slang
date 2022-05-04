@@ -408,28 +408,30 @@ void CLikeSourceEmitter::emitType(IRType* type, NameLoc const& nameAndLoc)
 
 void CLikeSourceEmitter::emitLivenessImpl(IRInst* inst)
 {
-    IRInst* referenced = nullptr;
+    
+    auto liveMarker = as<IRLiveRangeMarker>(inst);
+    if (!liveMarker)
+    {
+        return;
+    }
+
+    IRInst* referenced = liveMarker->getReferenced();
+    SLANG_ASSERT(referenced);
+
     UnownedStringSlice text;
     switch (inst->getOp())
     {
-        case kIROp_LiveStart:
+        case kIROp_LiveRangeStart:
         {
             text = UnownedStringSlice::fromLiteral("SLANG_LIVE_START");
-            referenced = static_cast<IRLiveStart*>(inst)->getReferenced();
             break;
         }
-        case kIROp_LiveEnd:
+        case kIROp_LiveRangeEnd:
         {
             text = UnownedStringSlice::fromLiteral("SLANG_LIVE_END");
-            referenced = static_cast<IRLiveEnd*>(inst)->getReferenced();
             break;
         }
         default: break;
-    }
-
-    if (!referenced)
-    {
-        return;
     }
 
     m_writer->emit(text);
@@ -2064,8 +2066,8 @@ void CLikeSourceEmitter::_emitInst(IRInst* inst)
         m_writer->emit(";\n");
         break;
 
-    case kIROp_LiveStart:
-    case kIROp_LiveEnd:
+    case kIROp_LiveRangeStart:
+    case kIROp_LiveRangeEnd:
         emitLiveness(inst);
         break;
     case kIROp_undefined:

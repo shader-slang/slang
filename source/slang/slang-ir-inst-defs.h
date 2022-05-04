@@ -721,9 +721,9 @@ INST_RANGE(Layout, VarLayout, EntryPointLayout)
 INST_RANGE(Attr, PendingLayoutAttr, VarOffsetAttr)
 
 /* Liveness */
-    INST(LiveStart, liveStart, 2, 0)
-    INST(LiveEnd, liveEnd, 0, 0)
-INST_RANGE(LiveBase, LiveStart, LiveEnd)
+    INST(LiveRangeStart, liveRangeStart, 2, 0)
+    INST(LiveRangeEnd, liveRangeEnd, 0, 0)
+INST_RANGE(LiveRangeMarker, LiveRangeStart, LiveRangeEnd)
 
 #undef PARENT
 #undef USE_OTHER
