@@ -12,7 +12,14 @@ namespace { // anonymous
 
 struct GLSLLivenessContext
 {
-        
+    enum class Kind
+    {
+        Invalid,
+        Start,
+        End,
+        CountOf,
+    };
+
         /// Process a function in the module
     void processFunction(IRFunc* funcInst);
 
@@ -26,23 +33,32 @@ struct GLSLLivenessContext
         m_builder.init(m_sharedBuilder);
     }
 
-    void _replaceStart(IRLiveStart* liveStart);
-    void _replaceEnd(IRLiveEnd* liveEnd);   
-    void _addDecorations(IRLiveBase* live, IRFunc* func);
+    void _replace(Kind kind, IRLiveBase* liveStart);
+    void _addDecorations(Kind kind, IRFunc* func);
 
     IRType* _getType(IRInst* referenced);
 
+    Kind getKind(IROp op)
+    {
+        switch (op)
+        {
+            case kIROp_LiveStart: return Kind::Start;
+            case kIROp_LiveEnd:     return Kind::End;
+            default: break;
+        }
+        return Kind::Invalid;
+    }
+
+    struct Info
+    {
+        Dictionary<IRType*, IRFunc*> m_funcs;
+        IRStringLit* m_nameLit = nullptr;
+        IRInst* m_opValue = nullptr;
+    };
+
     List<IRInst*> m_insts;
-    
-    IRStringLit* m_startLit = nullptr;
-    IRStringLit* m_endLit = nullptr;
-    IRStringLit* m_extensionLit = nullptr;
-
-    IRInst* m_startOpValue = nullptr;
-    IRInst* m_endOpValue = nullptr;
-
-    Dictionary<IRType*, IRFunc*> m_startFuncs;
-    Dictionary<IRType*, IRFunc*> m_endFuncs;
+    Info m_infos[Index(Kind::CountOf)];
+    IRStringLit* m_extensionLit;
 
     IRModule* m_module;
     SharedIRBuilder m_sharedBuilder;
@@ -56,21 +72,15 @@ void GLSLLivenessContext::processFunction(IRFunc* funcInst)
     {
         for (auto inst = block->getFirstChild(); inst; inst = inst->getNextInst())
         {
-            switch (inst->getOp())
+            if (getKind(inst->getOp()) != Kind::Invalid)
             {
-                case kIROp_LiveEnd:
-                case kIROp_LiveStart:
-                {
-                    m_insts.add(inst);
-                    break;
-                }
-                default: break;
+                m_insts.add(inst);
             }
         }
     }
 }
 
-void GLSLLivenessContext::_addDecorations(IRLiveBase* live, IRFunc* func)
+void GLSLLivenessContext::_addDecorations(Kind kind, IRFunc* func)
 {
     // We might(?) want to add a decoration saying this is GLSL specific, but at this point
     // we can only be in GLSL dependent IR.
@@ -80,35 +90,13 @@ void GLSLLivenessContext::_addDecorations(IRLiveBase* live, IRFunc* func)
     // We need the spirv extension
     m_builder.addDecoration(func, kIROp_RequireGLSLExtensionDecoration, m_extensionLit);
 
-    // TODO(JS): We need to add the spirv id number 
-
-    IRInst* opValue = nullptr;
-    switch (live->getOp())
+    const auto& info = m_infos[Index(kind)];
+    if (info.m_nameLit)
     {
-    case kIROp_LiveStart:   
-    {
-        opValue = m_startOpValue; 
-        if (m_startLit)
-        {
-            m_builder.addNameHintDecoration(func, m_startLit);
-        }
-        break;
-    }
-    case kIROp_LiveEnd:     
-    {
-        if (m_endLit)
-        {
-            m_builder.addNameHintDecoration(func, m_endLit);
-        }
-        opValue = m_endOpValue;
-        break;
-    }
-    default: break;
+        m_builder.addNameHintDecoration(func, info.m_nameLit);
     }
 
-    SLANG_ASSERT(opValue);
-
-    m_builder.addDecoration(func, kIROp_SPIRVOpDecoration, opValue);
+    m_builder.addDecoration(func, kIROp_SPIRVOpDecoration, info.m_opValue);
 }
 
 IRType* GLSLLivenessContext::_getType(IRInst* referenced)
@@ -122,13 +110,18 @@ IRType* GLSLLivenessContext::_getType(IRInst* referenced)
     return type;
 }
 
-void GLSLLivenessContext::_replaceStart(IRLiveStart* liveStart)
+void GLSLLivenessContext::_replace(Kind kind, IRLiveBase* live)
 {
-    IRType* type = _getType(liveStart->getReferenced());
+    // TODO(JS): Probably better to use a getReferenced method, but this is the easiest way to go for now.
+    IRInst* referenced = live->getOperand(0);
+
+    IRType* type = _getType(referenced);
 
     IRFunc* func = nullptr;
     
-    if (IRFunc** funcPtr = m_startFuncs.TryGetValue(type))
+    auto& info = m_infos[Index(kind)];
+
+    if (IRFunc** funcPtr = info.m_funcs.TryGetValue(type))
     {
         func = *funcPtr;
     }
@@ -145,61 +138,22 @@ void GLSLLivenessContext::_replaceStart(IRLiveStart* liveStart)
         auto funcType = m_builder.getFuncType(SLANG_COUNT_OF(paramTypes), paramTypes, m_builder.getVoidType());
         m_builder.setDataType(func, funcType);
 
-        _addDecorations(liveStart, func);
+        _addDecorations(kind, func);
 
-        m_startFuncs.Add(type, func);
+        info.m_funcs.Add(type, func);
     }
+    SLANG_ASSERT(func);
 
     IRInst* args[] = 
     {
-        liveStart->getReferenced(),
+        referenced,
         m_builder.getIntValue(m_builder.getIntType(), 0)
     };
 
-    m_builder.setInsertLoc(IRInsertLoc::after(liveStart));
+    m_builder.setInsertLoc(IRInsertLoc::after(live));
     m_builder.emitCallInst(m_builder.getVoidType(), func, SLANG_COUNT_OF(args), args);
 
-    liveStart->removeAndDeallocate();
-}
-
-void GLSLLivenessContext::_replaceEnd(IRLiveEnd* liveEnd)
-{
-    IRType* type = _getType(liveEnd->getReferenced());
-
-    IRFunc* func = nullptr;
-
-    if (IRFunc** funcPtr = m_endFuncs.TryGetValue(type))
-    {
-        func = *funcPtr;
-    }
-    else
-    {
-        IRType* paramTypes[] =
-        {
-            m_builder.getRefType(type),
-            m_builder.getIntType(),
-        };
-
-        func = m_builder.createFunc();
-
-        auto funcType = m_builder.getFuncType(SLANG_COUNT_OF(paramTypes), paramTypes, m_builder.getVoidType());
-        m_builder.setDataType(func, funcType);
-
-        _addDecorations(liveEnd, func);
-
-        m_endFuncs.Add(type, func);
-    }
-
-    IRInst* args[] =
-    {
-        liveEnd->getReferenced(),
-        m_builder.getIntValue(m_builder.getIntType(), 0)
-    };
-
-    m_builder.setInsertLoc(IRInsertLoc::after(liveEnd));
-    m_builder.emitCallInst(m_builder.getVoidType(), func, SLANG_COUNT_OF(args), args);
-
-    liveEnd->removeAndDeallocate();
+    live->removeAndDeallocate();
 }
 
 void GLSLLivenessContext::processModule()
@@ -230,29 +184,24 @@ void GLSLLivenessContext::processModule()
     m_extensionLit = m_builder.getStringValue(UnownedStringSlice::fromLiteral("GL_EXT_spirv_intrinsics"));
 
     // https://www.khronos.org/registry/SPIR-V/specs/unified1/SPIRV.html#OpLifetimeStart
-    m_startOpValue = m_builder.getIntValue(m_builder.getIntType(), 256);
-    m_endOpValue = m_builder.getIntValue(m_builder.getIntType(), 257);
 
-    m_startLit = m_builder.getStringValue(UnownedStringSlice::fromLiteral("livenessStart"));
-    m_endLit = m_builder.getStringValue(UnownedStringSlice::fromLiteral("livenessEnd"));
-    
+    {
+        auto& info = m_infos[Index(Kind::Start)];
+        info.m_nameLit = m_builder.getStringValue(UnownedStringSlice::fromLiteral("livenessStart"));
+        info.m_opValue = m_builder.getIntValue(m_builder.getIntType(), 256);
+    }
+    {
+        auto& info = m_infos[Index(Kind::End)];
+        info.m_nameLit = m_builder.getStringValue(UnownedStringSlice::fromLiteral("livenessEnd"));
+        info.m_opValue = m_builder.getIntValue(m_builder.getIntType(), 257);
+    }
+
     // Iterate across instructions, replacing with a call to a generated function (one that just is a declaration defining the SPIR-V op)
     for (auto inst : m_insts)
     {
-        switch (inst->getOp())
-        {
-            case kIROp_LiveStart:
-            {
-                _replaceStart(static_cast<IRLiveStart*>(inst));
-                break;
-            }
-            case kIROp_LiveEnd:
-            {
-                _replaceEnd(static_cast<IRLiveEnd*>(inst));
-                break;
-            }
-            default: break;
-        }
+        const auto kind = getKind(inst->getOp());
+        SLANG_ASSERT(kind != Kind::Invalid);
+        _replace(kind, static_cast<IRLiveBase*>(inst));
     }
 }
 
