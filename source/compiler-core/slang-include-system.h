@@ -15,6 +15,7 @@ struct SearchDirectory
     SearchDirectory(String const& path)
         : path(path)
     {}
+    SearchDirectory& operator=(SearchDirectory const& other) = default;
 
     String path;
 };
