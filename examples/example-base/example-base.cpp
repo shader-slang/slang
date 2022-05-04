@@ -58,8 +58,8 @@ Slang::Result WindowedAppBase::initializeBase(
     gfx::WindowHandle windowHandle = gWindow->getNativeHandle().convert<gfx::WindowHandle>();
     gSwapchain = gDevice->createSwapchain(swapchainDesc, windowHandle);
 
-    IFramebufferLayout::AttachmentLayout renderTargetLayout = {gSwapchain->getDesc().format, 1};
-    IFramebufferLayout::AttachmentLayout depthLayout = {gfx::Format::D32_FLOAT, 1};
+    IFramebufferLayout::TargetLayout renderTargetLayout = {gSwapchain->getDesc().format, 1};
+    IFramebufferLayout::TargetLayout depthLayout = {gfx::Format::D32_FLOAT, 1};
     IFramebufferLayout::Desc framebufferLayoutDesc;
     framebufferLayoutDesc.renderTargetCount = 1;
     framebufferLayoutDesc.renderTargets = &renderTargetLayout;
@@ -80,14 +80,14 @@ Slang::Result WindowedAppBase::initializeBase(
     gfx::IRenderPassLayout::Desc renderPassDesc = {};
     renderPassDesc.framebufferLayout = gFramebufferLayout;
     renderPassDesc.renderTargetCount = 1;
-    IRenderPassLayout::AttachmentAccessDesc renderTargetAccess = {};
-    IRenderPassLayout::AttachmentAccessDesc depthStencilAccess = {};
-    renderTargetAccess.loadOp = IRenderPassLayout::AttachmentLoadOp::Clear;
-    renderTargetAccess.storeOp = IRenderPassLayout::AttachmentStoreOp::Store;
+    IRenderPassLayout::TargetAccessDesc renderTargetAccess = {};
+    IRenderPassLayout::TargetAccessDesc depthStencilAccess = {};
+    renderTargetAccess.loadOp = IRenderPassLayout::TargetLoadOp::Clear;
+    renderTargetAccess.storeOp = IRenderPassLayout::TargetStoreOp::Store;
     renderTargetAccess.initialState = ResourceState::Undefined;
     renderTargetAccess.finalState = ResourceState::Present;
-    depthStencilAccess.loadOp = IRenderPassLayout::AttachmentLoadOp::Clear;
-    depthStencilAccess.storeOp = IRenderPassLayout::AttachmentStoreOp::Store;
+    depthStencilAccess.loadOp = IRenderPassLayout::TargetLoadOp::Clear;
+    depthStencilAccess.storeOp = IRenderPassLayout::TargetStoreOp::Store;
     depthStencilAccess.initialState = ResourceState::Undefined;
     depthStencilAccess.finalState = ResourceState::DepthWrite;
     renderPassDesc.renderTargetAccess = &renderTargetAccess;

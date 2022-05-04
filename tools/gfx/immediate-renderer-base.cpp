@@ -256,7 +256,7 @@ public:
             {
                 auto& access = renderPass->m_renderTargetAccesses[i];
                 // Clear.
-                if (access.loadOp == IRenderPassLayout::AttachmentLoadOp::Clear)
+                if (access.loadOp == IRenderPassLayout::TargetLoadOp::Clear)
                 {
                     clearMask |= (1 << (uint32_t)i);
                 }
@@ -267,12 +267,12 @@ public:
             {
                 // Clear.
                 if (renderPass->m_depthStencilAccess.loadOp ==
-                    IRenderPassLayout::AttachmentLoadOp::Clear)
+                    IRenderPassLayout::TargetLoadOp::Clear)
                 {
                     clearDepth = true;
                 }
                 if (renderPass->m_depthStencilAccess.stencilLoadOp ==
-                    IRenderPassLayout::AttachmentLoadOp::Clear)
+                    IRenderPassLayout::TargetLoadOp::Clear)
                 {
                     clearStencil = true;
                 }

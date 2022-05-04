@@ -48,24 +48,24 @@ size_t calcNumRows(Format format, int height)
     gfxGetFormatInfo(format, &sizeInfo);
     return (size_t)(height + sizeInfo.blockHeight - 1) / sizeInfo.blockHeight;
 }
-VkAttachmentLoadOp translateLoadOp(IRenderPassLayout::AttachmentLoadOp loadOp)
+VkAttachmentLoadOp translateLoadOp(IRenderPassLayout::TargetLoadOp loadOp)
 {
     switch (loadOp)
     {
-    case IRenderPassLayout::AttachmentLoadOp::Clear:
+    case IRenderPassLayout::TargetLoadOp::Clear:
         return VK_ATTACHMENT_LOAD_OP_CLEAR;
-    case IRenderPassLayout::AttachmentLoadOp::Load:
+    case IRenderPassLayout::TargetLoadOp::Load:
         return VK_ATTACHMENT_LOAD_OP_LOAD;
     default:
         return VK_ATTACHMENT_LOAD_OP_DONT_CARE;
     }
 }
 
-VkAttachmentStoreOp translateStoreOp(IRenderPassLayout::AttachmentStoreOp storeOp)
+VkAttachmentStoreOp translateStoreOp(IRenderPassLayout::TargetStoreOp storeOp)
 {
     switch (storeOp)
     {
-    case IRenderPassLayout::AttachmentStoreOp::Store:
+    case IRenderPassLayout::TargetStoreOp::Store:
         return VK_ATTACHMENT_STORE_OP_STORE;
     default:
         return VK_ATTACHMENT_STORE_OP_DONT_CARE;
@@ -2999,18 +2999,18 @@ Result FramebufferLayoutImpl::init(DeviceImpl* renderer, const IFramebufferLayou
     m_renderer = renderer;
     m_renderTargetCount = desc.renderTargetCount;
     // Create render pass.
-    int numAttachments = m_renderTargetCount;
-    m_hasDepthStencilAttachment = (desc.depthStencil != nullptr);
-    if (m_hasDepthStencilAttachment)
+    int numTargets = m_renderTargetCount;
+    m_hasDepthStencilTarget = (desc.depthStencil != nullptr);
+    if (m_hasDepthStencilTarget)
     {
-        numAttachments++;
+        numTargets++;
     }
     // We need extra space if we have depth buffer
-    m_attachmentDescs.setCount(numAttachments);
+    m_targetDescs.setCount(numTargets);
     for (GfxIndex i = 0; i < desc.renderTargetCount; ++i)
     {
         auto& renderTarget = desc.renderTargets[i];
-        VkAttachmentDescription& dst = m_attachmentDescs[i];
+        VkAttachmentDescription& dst = m_targetDescs[i];
 
         dst.flags = 0;
         dst.format = VulkanUtil::getVkFormat(renderTarget.format);
@@ -3035,7 +3035,7 @@ Result FramebufferLayoutImpl::init(DeviceImpl* renderer, const IFramebufferLayou
 
     if (desc.depthStencil)
     {
-        VkAttachmentDescription& dst = m_attachmentDescs[desc.renderTargetCount];
+        VkAttachmentDescription& dst = m_targetDescs[desc.renderTargetCount];
         dst.flags = 0;
         dst.format = VulkanUtil::getVkFormat(desc.depthStencil->format);
         dst.samples = (VkSampleCountFlagBits)desc.depthStencil->sampleCount;
@@ -3070,14 +3070,14 @@ Result FramebufferLayoutImpl::init(DeviceImpl* renderer, const IFramebufferLayou
     subpassDesc.colorAttachmentCount = desc.renderTargetCount;
     subpassDesc.pColorAttachments = colorReferences.getBuffer();
     subpassDesc.pResolveAttachments = nullptr;
-    subpassDesc.pDepthStencilAttachment = m_hasDepthStencilAttachment ? &m_depthReference : nullptr;
+    subpassDesc.pDepthStencilAttachment = m_hasDepthStencilTarget ? &m_depthReference : nullptr;
     subpassDesc.preserveAttachmentCount = 0u;
     subpassDesc.pPreserveAttachments = nullptr;
 
     VkRenderPassCreateInfo renderPassCreateInfo = {};
     renderPassCreateInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
-    renderPassCreateInfo.attachmentCount = numAttachments;
-    renderPassCreateInfo.pAttachments = m_attachmentDescs.getBuffer();
+    renderPassCreateInfo.attachmentCount = numTargets;
+    renderPassCreateInfo.pAttachments = m_targetDescs.getBuffer();
     renderPassCreateInfo.subpassCount = 1;
     renderPassCreateInfo.pSubpasses = &subpassDesc;
     SLANG_VK_RETURN_ON_FAIL(m_renderer->m_api.vkCreateRenderPass(
@@ -3106,11 +3106,11 @@ Result RenderPassLayoutImpl::init(DeviceImpl* renderer, const IRenderPassLayout:
     assert(desc.renderTargetCount == framebufferLayout->m_renderTargetCount);
 
     // We need extra space if we have depth buffer
-    Array<VkAttachmentDescription, kMaxAttachments> attachmentDescs;
-    attachmentDescs = framebufferLayout->m_attachmentDescs;
+    Array<VkAttachmentDescription, kMaxTargets> targetDescs;
+    targetDescs = framebufferLayout->m_targetDescs;
     for (GfxIndex i = 0; i < desc.renderTargetCount; ++i)
     {
-        VkAttachmentDescription& dst = attachmentDescs[i];
+        VkAttachmentDescription& dst = targetDescs[i];
         auto access = desc.renderTargetAccess[i];
         // Fill in loadOp/storeOp and layout from desc.
         dst.loadOp = translateLoadOp(access.loadOp);
@@ -3121,9 +3121,9 @@ Result RenderPassLayoutImpl::init(DeviceImpl* renderer, const IRenderPassLayout:
         dst.finalLayout = VulkanUtil::mapResourceStateToLayout(access.finalState);
     }
 
-    if (framebufferLayout->m_hasDepthStencilAttachment)
+    if (framebufferLayout->m_hasDepthStencilTarget)
     {
-        VkAttachmentDescription& dst = attachmentDescs[desc.renderTargetCount];
+        VkAttachmentDescription& dst = targetDescs[desc.renderTargetCount];
         auto access = *desc.depthStencilAccess;
         dst.loadOp = translateLoadOp(access.loadOp);
         dst.storeOp = translateStoreOp(access.storeOp);
@@ -3141,7 +3141,7 @@ Result RenderPassLayoutImpl::init(DeviceImpl* renderer, const IRenderPassLayout:
     subpassDesc.colorAttachmentCount = desc.renderTargetCount;
     subpassDesc.pColorAttachments = framebufferLayout->m_colorReferences.getBuffer();
     subpassDesc.pResolveAttachments = nullptr;
-    subpassDesc.pDepthStencilAttachment = framebufferLayout->m_hasDepthStencilAttachment
+    subpassDesc.pDepthStencilAttachment = framebufferLayout->m_hasDepthStencilTarget
                                               ? &framebufferLayout->m_depthReference
                                               : nullptr;
     subpassDesc.preserveAttachmentCount = 0u;
@@ -3149,8 +3149,8 @@ Result RenderPassLayoutImpl::init(DeviceImpl* renderer, const IRenderPassLayout:
 
     VkRenderPassCreateInfo renderPassCreateInfo = {};
     renderPassCreateInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
-    renderPassCreateInfo.attachmentCount = (uint32_t)attachmentDescs.getCount();
-    renderPassCreateInfo.pAttachments = attachmentDescs.getBuffer();
+    renderPassCreateInfo.attachmentCount = (uint32_t)targetDescs.getCount();
+    renderPassCreateInfo.pAttachments = targetDescs.getBuffer();
     renderPassCreateInfo.subpassCount = 1;
     renderPassCreateInfo.pSubpasses = &subpassDesc;
     SLANG_VK_RETURN_ON_FAIL(m_renderer->m_api.vkCreateRenderPass(
@@ -3201,11 +3201,11 @@ Result FramebufferImpl::init(DeviceImpl* renderer, const IFramebuffer::Desc& des
     if (layerCount == 0)
         layerCount = 1;
     // Create render pass.
-    int numAttachments = desc.renderTargetCount;
+    int numTargets = desc.renderTargetCount;
     if (desc.depthStencilView)
-        numAttachments++;
-    Array<VkImageView, kMaxAttachments> imageViews;
-    imageViews.setCount(numAttachments);
+        numTargets++;
+    Array<VkImageView, kMaxTargets> imageViews;
+    imageViews.setCount(numTargets);
     renderTargetViews.setCount(desc.renderTargetCount);
     for (GfxIndex i = 0; i < desc.renderTargetCount; ++i)
     {
@@ -3233,7 +3233,7 @@ Result FramebufferImpl::init(DeviceImpl* renderer, const IFramebuffer::Desc& des
     VkFramebufferCreateInfo framebufferInfo = {};
     framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
     framebufferInfo.renderPass = m_layout->m_renderPass;
-    framebufferInfo.attachmentCount = numAttachments;
+    framebufferInfo.attachmentCount = numTargets;
     framebufferInfo.pAttachments = imageViews.getBuffer();
     framebufferInfo.width = m_width;
     framebufferInfo.height = m_height;
@@ -3463,16 +3463,16 @@ Result PipelineStateImpl::createVKGraphicsPipelineState()
     multisampling.alphaToOneEnable = VK_FALSE;
 
     auto targetCount =
-        Math::Min(framebufferLayoutImpl->m_renderTargetCount, (uint32_t)blendDesc.targetCount);
-    List<VkPipelineColorBlendAttachmentState> colorBlendAttachments;
+        GfxCount(Math::Min(framebufferLayoutImpl->m_renderTargetCount, (uint32_t)blendDesc.targetCount));
+    List<VkPipelineColorBlendAttachmentState> colorBlendTargets;
 
     // Regardless of whether blending is enabled, Vulkan always applies the color write mask
     // operation, so if there is no blending then we need to add an attachment that defines
     // the color write mask to ensure colors are actually written.
     if (targetCount == 0)
     {
-        colorBlendAttachments.setCount(1);
-        auto& vkBlendDesc = colorBlendAttachments[0];
+        colorBlendTargets.setCount(1);
+        auto& vkBlendDesc = colorBlendTargets[0];
         memset(&vkBlendDesc, 0, sizeof(vkBlendDesc));
         vkBlendDesc.blendEnable = VK_FALSE;
         vkBlendDesc.srcColorBlendFactor = VK_BLEND_FACTOR_ONE;
@@ -3485,11 +3485,11 @@ Result PipelineStateImpl::createVKGraphicsPipelineState()
     }
     else
     {
-        colorBlendAttachments.setCount(targetCount);
-        for (UInt i = 0; i < targetCount; ++i)
+        colorBlendTargets.setCount(targetCount);
+        for (GfxIndex i = 0; i < targetCount; ++i)
         {
             auto& gfxBlendDesc = blendDesc.targets[i];
-            auto& vkBlendDesc = colorBlendAttachments[i];
+            auto& vkBlendDesc = colorBlendTargets[i];
 
             vkBlendDesc.blendEnable = gfxBlendDesc.enableBlend;
             vkBlendDesc.srcColorBlendFactor =
@@ -3511,8 +3511,8 @@ Result PipelineStateImpl::createVKGraphicsPipelineState()
     colorBlending.logicOpEnable = VK_FALSE; // TODO: D3D12 has per attachment logic op (and
                                             // both have way more than one op)
     colorBlending.logicOp = VK_LOGIC_OP_COPY;
-    colorBlending.attachmentCount = (uint32_t)colorBlendAttachments.getCount();
-    colorBlending.pAttachments = colorBlendAttachments.getBuffer();
+    colorBlending.attachmentCount = (uint32_t)colorBlendTargets.getCount();
+    colorBlending.pAttachments = colorBlendTargets.getBuffer();
     colorBlending.blendConstants[0] = 0.0f;
     colorBlending.blendConstants[1] = 0.0f;
     colorBlending.blendConstants[2] = 0.0f;
@@ -7166,15 +7166,15 @@ void RenderCommandEncoder::beginPass(IRenderPassLayout* renderPass, IFramebuffer
     if (!framebuffer)
         framebufferImpl = this->m_device->m_emptyFramebuffer;
     RenderPassLayoutImpl* renderPassImpl = static_cast<RenderPassLayoutImpl*>(renderPass);
-    VkClearValue clearValues[kMaxAttachments] = {};
+    VkClearValue clearValues[kMaxTargets] = {};
     VkRenderPassBeginInfo beginInfo = {};
     beginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
     beginInfo.framebuffer = framebufferImpl->m_handle;
     beginInfo.renderPass = renderPassImpl->m_renderPass;
-    uint32_t attachmentCount = (uint32_t)framebufferImpl->renderTargetViews.getCount();
+    uint32_t targetCount = (uint32_t)framebufferImpl->renderTargetViews.getCount();
     if (framebufferImpl->depthStencilView)
-        attachmentCount++;
-    beginInfo.clearValueCount = attachmentCount;
+        targetCount++;
+    beginInfo.clearValueCount = targetCount;
     beginInfo.renderArea.extent.width = framebufferImpl->m_width;
     beginInfo.renderArea.extent.height = framebufferImpl->m_height;
     beginInfo.pClearValues = framebufferImpl->m_clearValues;

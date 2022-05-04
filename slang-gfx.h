@@ -1282,7 +1282,7 @@ struct BlendDesc
 class IFramebufferLayout : public ISlangUnknown
 {
 public:
-    struct AttachmentLayout
+    struct TargetLayout
     {
         Format format;
         GfxCount sampleCount;
@@ -1290,8 +1290,8 @@ public:
     struct Desc
     {
         GfxCount renderTargetCount;
-        AttachmentLayout* renderTargets = nullptr;
-        AttachmentLayout* depthStencil = nullptr;
+        TargetLayout* renderTargets = nullptr;
+        TargetLayout* depthStencil = nullptr;
     };
 };
 #define SLANG_UUID_IFramebufferLayout                                                \
@@ -1462,20 +1462,20 @@ struct FaceMask
 class IRenderPassLayout : public ISlangUnknown
 {
 public:
-    enum class AttachmentLoadOp
+    enum class TargetLoadOp
     {
         Load, Clear, DontCare
     };
-    enum class AttachmentStoreOp
+    enum class TargetStoreOp
     {
         Store, DontCare
     };
-    struct AttachmentAccessDesc
+    struct TargetAccessDesc
     {
-        AttachmentLoadOp loadOp;
-        AttachmentLoadOp stencilLoadOp;
-        AttachmentStoreOp storeOp;
-        AttachmentStoreOp stencilStoreOp;
+        TargetLoadOp loadOp;
+        TargetLoadOp stencilLoadOp;
+        TargetStoreOp storeOp;
+        TargetStoreOp stencilStoreOp;
         ResourceState initialState;
         ResourceState finalState;
     };
@@ -1483,8 +1483,8 @@ public:
     {
         IFramebufferLayout* framebufferLayout = nullptr;
         GfxCount renderTargetCount;
-        AttachmentAccessDesc* renderTargetAccess = nullptr;
-        AttachmentAccessDesc* depthStencilAccess = nullptr;
+        TargetAccessDesc* renderTargetAccess = nullptr;
+        TargetAccessDesc* depthStencilAccess = nullptr;
     };
 };
 #define SLANG_UUID_IRenderPassLayout                                                   \
