@@ -2890,13 +2890,13 @@ namespace Slang
         return inst;
     }
 
-    IRLiveStart* IRBuilder::emitLiveStart(IRInst* referenced)
+    IRLiveRangeStart* IRBuilder::emitLiveRangeStart(IRInst* referenced)
     {
         // This instruction doesn't produce any result, 
         // so we make it's type void.
-        auto inst = createInst<IRLiveStart>(
+        auto inst = createInst<IRLiveRangeStart>(
             this,
-            kIROp_LiveStart,
+            kIROp_LiveRangeStart,
             getVoidType(),
             referenced);
         
@@ -2905,13 +2905,13 @@ namespace Slang
         return inst;
     }
 
-    IRLiveEnd* IRBuilder::emitLiveEnd(IRInst* referenced)
+    IRLiveRangeEnd* IRBuilder::emitLiveRangeEnd(IRInst* referenced)
     {
         // This instruction doesn't produce any result, 
         // so we make it's type void.
-        auto inst = createInst<IRLiveEnd>(
+        auto inst = createInst<IRLiveRangeEnd>(
             this,
-            kIROp_LiveEnd,
+            kIROp_LiveRangeEnd,
             getVoidType(),
             referenced);
 

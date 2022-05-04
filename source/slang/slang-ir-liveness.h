@@ -161,7 +161,7 @@ Similarly calling into a function could return a struct that contains fields whi
 fully specialized.
 */
 
-	/// Adds LiveStart and LiveEnd instructions to demark the start and end of the liveness of a variable.
+	/// Adds LiveRangeStart and LiveRangeEnd instructions to demark the start and end of the liveness of a variable.
 void addLivenessTrackingToModule(IRModule* module);
 
 }

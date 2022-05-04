@@ -106,7 +106,7 @@ struct LivenessContext
     struct RootInfo
     {
         IRInst* root;
-        IRLiveStart* liveStart;
+        IRLiveRangeStart* liveStart;
     };
 
         /// Processor a successor to a block
@@ -132,7 +132,7 @@ struct LivenessContext
     }
 
         // Add a live end instruction at the start of block, referencing the root 'root'.
-    void _addLiveEndAtBlockStart(IRBlock* block, IRInst* root);
+    void _addLiveRangeEndAtBlockStart(IRBlock* block, IRInst* root);
 
         /// Find the last instruction in block that accesses one of the roots or it's aliases
         /// Requires that m_accessSet contains all of the accesses
@@ -159,7 +159,7 @@ struct LivenessContext
     IRBuilder m_builder;
 };
 
-void LivenessContext::_addLiveEndAtBlockStart(IRBlock* block, IRInst* root)
+void LivenessContext::_addLiveRangeEndAtBlockStart(IRBlock* block, IRInst* root)
 {
     // Insert before the first ordinary inst
     auto inst = block->getFirstOrdinaryInst();
@@ -168,7 +168,7 @@ void LivenessContext::_addLiveEndAtBlockStart(IRBlock* block, IRInst* root)
     m_builder.setInsertLoc(IRInsertLoc::before(inst));
 
     // Add the live end inst
-    m_builder.emitLiveEnd(root);
+    m_builder.emitLiveRangeEnd(root);
 }
 
 IRInst* LivenessContext::_findLastAccessInBlock(IRBlock* block)
@@ -276,7 +276,7 @@ LivenessContext::FoundResult LivenessContext::processBlock(IRBlock* block)
             const auto successorResult = successorResults[i];
             if (successorResult == FoundResult::NotFound)
             {
-                _addLiveEndAtBlockStart(successor, m_root);
+                _addLiveRangeEndAtBlockStart(successor, m_root);
                 _addResult(successor, FoundResult::Found);
             }
         }
@@ -303,7 +303,7 @@ LivenessContext::FoundResult LivenessContext::processBlock(IRBlock* block)
     m_builder.setInsertLoc(IRInsertLoc::after(lastAccess));
 
     // Add the live end inst
-    m_builder.emitLiveEnd(m_root);
+    m_builder.emitLiveRangeEnd(m_root);
     return _addResult(block, FoundResult::Found);
 }
 
@@ -458,7 +458,7 @@ void LivenessContext::processRoot(const RootInfo& rootInfo)
             // Means there is no access to this variable(!)
             // Which means we can end the scope, after the the start scope
             m_builder.setInsertLoc(IRInsertLoc::after(rootInfo.liveStart));
-            m_builder.emitLiveEnd(root);
+            m_builder.emitLiveRangeEnd(root);
         }
     }
 }
@@ -479,7 +479,7 @@ void LivenessContext::processFunction(IRFunc* funcInst)
                 m_builder.setInsertLoc(IRInsertLoc::after(varInst));
 
                 // Emit the start
-                auto liveStart = m_builder.emitLiveStart(varInst);
+                auto liveStart = m_builder.emitLiveRangeStart(varInst);
 
                 // Add as a root
                 RootInfo rootInfo;
