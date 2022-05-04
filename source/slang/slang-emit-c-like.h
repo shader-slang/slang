@@ -321,13 +321,6 @@ public:
 
     void emitLayoutSemantics(IRInst* inst, char const* uniformSemanticSpelling = "register");
 
-        // When we are about to traverse an edge from one block to another,
-        // we need to emit the assignments that conceptually occur "along"
-        // the edge. In traditional SSA these are the phi nodes in the
-        // target block, while in our representation these use the arguments
-        // to the branch instruction to fill in the parameters of the target.
-    void emitPhiVarAssignments(UInt argCount, IRUse* args, IRBlock* targetBlock);
-
         /// Emit high-level language statements from a structured region.
     void emitRegion(Region* inRegion);
 
@@ -338,8 +331,6 @@ public:
     bool isDefinition(IRFunc* func);
 
     void emitEntryPointAttributes(IRFunc* irFunc, IREntryPointDecoration* entryPointDecor);
-
-    void emitPhiVarDecls(IRFunc* func);
 
         /// Emit high-level statements for the body of a function.
     void emitFunctionBody(IRGlobalValueWithCode* code);

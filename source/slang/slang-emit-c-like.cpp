@@ -2081,13 +2081,8 @@ void CLikeSourceEmitter::_emitInst(IRInst* inst)
 
     case kIROp_Var:
         {
-            auto ptrType = cast<IRPtrType>(inst->getDataType());
-            auto valType = ptrType->getValueType();
-
-            auto name = getName(inst);
-            emitRateQualifiers(inst);
-            emitType(valType, name);
-            m_writer->emit(";\n");
+            auto var = cast<IRVar>(inst);
+            emitVar(var);
         }
         break;
 
@@ -2222,212 +2217,6 @@ void CLikeSourceEmitter::emitLayoutSemantics(IRInst* inst, char const* uniformSe
     emitLayoutSemanticsImpl(inst, uniformSemanticSpelling);
 }
 
-void CLikeSourceEmitter::emitPhiVarAssignments(UInt argCount, IRUse* args, IRBlock* targetBlock)
-{
-    // The basic setup here is that we are at the end of a block
-    // and are about to branch to `targetBlock`. The target block
-    // has parameters (representing the phi variables/nodes in SSA
-    // form), and the block we are branching from provided arguments
-    // (given as `args` and `argCount` here) to be passed to those
-    // parameters.
-    //
-    // An earlier step will have already emitted a local variable
-    // declaration for each phi node (block parameter), so we should
-    // be able to "pass" an argument to a parameter by assigning
-    // to the variable that represents the parameter.
-    //
-    // A naive approach would simply loop over the parameters/arguments
-    // in tandem and emit assignments like:
-    //
-    //      <param_i> = <arg_i>;
-    //
-    // This approach has an important and known failure case, which
-    // can occur when one of the arguments is also one of the parameters.
-    //
-    // If we have a block like:
-    //
-    //      block b(
-    //          param x: Int,
-    //          y: Int)
-    //          ...
-    //
-    // and then a branch to it like:
-    //
-    //      br(b, y, x);
-    //
-    // Then the naive approach for emitting the assignments for
-    // that branch would output:
-    //
-    //      x = y;
-    //      y = x;
-    //
-    // But that is not the semantics that the "parameter passing"
-    // model is meant to capture.
-    //
-    // The simplest way to restore the correct semantics would
-    // be to assign each of the arguments to a temporary, and
-    // then to assign those temporaries to the parameters:
-    //
-    //      let tmp0 = y;
-    //      let tmp1 = x;
-    //      x = tmp0;
-    //      y = tmp1;
-    //
-    // Adding temporaries like that unconditionally would clutter
-    // up the generated code, so it would be nicer to only
-    // introduce them when strictly necessary.
-    //
-    // A temporary should only be necessary when we have:
-    //
-    // * A parameter `destParam` of the `targetBlock`
-    // * Where the argument value for `destParam` is another parameter, `srcParam`, of `targetBlock`
-    // * And `srcParam` appears before `destParam` in the parameter list
-    //
-    // We start by looking for such cases, and collecting the
-    // set of block parameters that will require a defensive
-    // temporary.
-    //
-    // Note: an alternative approach would first look for a total
-    // order on the arguments/parameters such that we avoid
-    // the problem, and then only resort to introducing temporaries
-    // as a means of breaking cycles.
-    //
-    // We will track the parameters that need temporaries by
-    // building a dictionary mapping parameters to the name
-    // of the temporary they will use, if any.
-    //
-    Dictionary<IRParam*, String> mapParamToTempName;
-    {
-        // To know whether a  parameter occurs earlier in
-        // the list than another, we will rely on a set
-        // of parameters we have already "seen" during
-        // our iteration.
-        //
-        // TODO: This is a strong candidate for using a
-        // hash set optimized for a small number of entries
-        // (and thus using a stack allocation in the common case),
-        // given that most blocks will only have a handful
-        // of parameters.
-        //
-        HashSet<IRParam*> seenParams;
-
-        UInt argCounter = 0;
-        for (auto destParam = targetBlock->getFirstParam(); destParam; destParam = destParam->getNextParam())
-        {
-            seenParams.Add(destParam);
-
-            UInt argIndex = argCounter++;
-            if (argIndex >= argCount)
-            {
-                SLANG_UNEXPECTED("not enough arguments for branch");
-                break;
-            }
-            IRInst* arg = args[argIndex].get();
-
-            // Is the argument also a parameter of the same block?
-            //
-            // If not, then we don't have to worry about this assignment.
-            //
-            IRParam* srcParam = as<IRParam>(arg);
-            if(!srcParam)
-                continue;
-            if(srcParam->getParent() != targetBlock)
-                continue;
-
-            // Is the argument an *earlier* parameter of the same block?
-            // We test this by checking if we've already seen it during
-            // our iteration.
-            //
-            // If the parameter isn't an earlier one, then we don't have
-            // to worry about the order of assignment creating problems.
-            //
-            if(!seenParams.Contains(srcParam))
-                continue;
-
-            // At this point we've detected a problem case: the `dstParam`
-            // would naively be assigned the value of `srcParam` *after*
-            // we've already assigned to `srcParam`.
-            //
-            // We will need to avoid the problem by introducing a temporary
-            // for `srcParam`.
-            //
-            if( !mapParamToTempName.ContainsKey(srcParam) )
-            {
-                String tempName = "tmp_" + getName(srcParam);
-                mapParamToTempName.Add(srcParam, tempName);
-            }
-        }
-    }
-
-    // Now that we've determined which of the parameters could cause problems,
-    // we can do an initial round of assignments, where we move form the
-    // argument values into either a parameter (if there were no problems)
-    // or a temporary (if we needed to avoid a problem).
-    //
-    {
-        UInt argCounter = 0;
-        for (auto param = targetBlock->getFirstParam(); param; param = param->getNextParam())
-        {
-            UInt argIndex = argCounter++;
-            if (argIndex >= argCount)
-            {
-                SLANG_UNEXPECTED("not enough arguments for branch");
-                break;
-            }
-            IRInst* arg = args[argIndex].get();
-
-            auto outerPrec = getInfo(EmitOp::General);
-            auto prec = getInfo(EmitOp::Assign);
-
-            String tempName;
-            if( mapParamToTempName.TryGetValue(param, tempName) )
-            {
-                // This parameter was involved in a confounding assignment,
-                // where it was used as the argument value for a later
-                // parameter on this same branch/edge.
-                //
-                // We need to assign to a temporary instead of
-                // to the parameter itself. We will declare
-                // the temporary here so that the assignment
-                // of the argument serves as the initializer.
-                //
-                emitType(param->getFullType(), tempName);
-            }
-            else
-            {
-                // This parameter was not involved in any confounding assignments,
-                // so we can simply us the parameter itself as the left-hand side
-                // of an assignment.
-                //
-                emitOperand(param, leftSide(outerPrec, prec));
-            }
-
-            m_writer->emit(" = ");
-            emitOperand(arg, rightSide(prec, outerPrec));
-            m_writer->emit(";\n");
-        }
-    }
-
-    // Finally, after all the assignments from argument values have been completed,
-    // we will make a cleanup pass that copies from any of the temporary variables
-    // we introduced over to the parameter that needed a temporary.
-    //
-    for (auto param = targetBlock->getFirstParam(); param; param = param->getNextParam())
-    {
-        String tempName;
-        if( !mapParamToTempName.TryGetValue(param, tempName) )
-            continue;
-
-        auto outerPrec = getInfo(EmitOp::General);
-        auto prec = getInfo(EmitOp::Assign);
-
-        emitOperand(param, leftSide(outerPrec, prec));
-        m_writer->emit(" = ");
-        m_writer->emit(tempName);
-        m_writer->emit(";\n");
-    }
-}
-
 void CLikeSourceEmitter::emitRegion(Region* inRegion)
 {
     // We will use a loop so that we can process sequential (simple)
@@ -2477,43 +2266,6 @@ void CLikeSourceEmitter::emitRegion(Region* inRegion)
                     // them here, so that we don't have to allocate
                     // separate `Region`s for them.
                     emitInst(terminator);
-                    break;
-
-                // We will also handle any unconditional branches
-                // here, since they may have arguments to pass
-                // to the target block (our encoding of SSA
-                // "phi" operations).
-                //
-                // TODO: A better approach would be to move out of SSA
-                // as an IR pass, and introduce explicit variables to
-                // replace any "phi nodes." This would avoid possible
-                // complications if we ever end up in the bad case where
-                // one of the block arguments on a branch is also
-                // a parameter of the target block, so that the order
-                // of operations is important.
-                //
-                case kIROp_unconditionalBranch:
-                    {
-                        auto t = (IRUnconditionalBranch*)terminator;
-                        UInt argCount = t->getOperandCount();
-                        static const UInt kFixedArgCount = 1;
-                        emitPhiVarAssignments(
-                            argCount - kFixedArgCount,
-                            t->getOperands() + kFixedArgCount,
-                            t->getTargetBlock());
-                    }
-                    break;
-                case kIROp_loop:
-                    {
-                        auto t = (IRLoop*) terminator;
-                        UInt argCount = t->getOperandCount();
-                        static const UInt kFixedArgCount = 3;
-                        emitPhiVarAssignments(
-                            argCount - kFixedArgCount,
-                            t->getOperands() + kFixedArgCount,
-                            t->getTargetBlock());
-
-                    }
                     break;
                 }
 
@@ -2666,26 +2418,6 @@ void CLikeSourceEmitter::emitEntryPointAttributes(IRFunc* irFunc, IREntryPointDe
     emitEntryPointAttributesImpl(irFunc, entryPointDecor);
 }
 
-void CLikeSourceEmitter::emitPhiVarDecls(IRFunc* func)
-{
-    // We will skip the first block, since its parameters are
-    // the parameters of the whole function.
-    auto bb = func->getFirstBlock();
-    if (!bb)
-        return;
-    bb = bb->getNextBlock();
-
-    for (; bb; bb = bb->getNextBlock())
-    {
-        for (auto pp = bb->getFirstParam(); pp; pp = pp->getNextParam())
-        {
-            emitTempModifiers(pp);
-            emitType(pp->getFullType(), getName(pp));
-            m_writer->emit(";\n");
-        }
-    }
-}
-
 void CLikeSourceEmitter::emitFunctionBody(IRGlobalValueWithCode* code)
 {
     // Compute a structured region tree that can represent
@@ -2781,10 +2513,6 @@ void CLikeSourceEmitter::emitSimpleFuncImpl(IRFunc* func)
     {
         m_writer->emit("\n{\n");
         m_writer->indent();
-
-        // HACK: forward-declare all the local variables needed for the
-        // parameters of non-entry blocks.
-        emitPhiVarDecls(func);
 
         // Need to emit the operations in the blocks of the function
         emitFunctionBody(func);

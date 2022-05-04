@@ -307,24 +307,39 @@ static void fixValueScopingForInst(
         // If we've gotten this far, we know that `u` is a "bad"
         // use of `def`, and needs fixing.
         //
-        // We will create the `tmp` variable on demand, so
-        // that we create it when the first "bad" use is encountered,
-        // and then re-use it for subsequent bad uses.
+        // We will use a temporary variable to resolve the bad scoping,
+        // creating it on-demand when we ecounter a first "bad" use, and
+        // then re-using that temporary for any subsequent bad uses.
         //
         if( !tmp )
         {
-            // We will create a temporary to represent `def`,
-            // and insert a `store` into it right after `def`.
+            // If the value is *already* a temporary variable, then
+            // we are really just trying to fix the scoping of the
+            // variable declaration itself, and the variable can
+            // effectively be its own temporary.
             //
-            // Note: we are inserting the new variable right
-            // after `def` for now, just because we don't
-            // yet know the final region that it should be
-            // placed into. We will move it to the correct
-            // location when we are done.
-            //
-            builder.setInsertBefore(def->getNextInst());
-            tmp = builder.emitVar(def->getDataType());
-            builder.emitStore(tmp, def);
+            if(auto varDef = as<IRVar>(def))
+            {
+                tmp = varDef;
+            }
+            else
+            {
+                // We will create a temporary to represent `def`,
+                // and insert a `store` into it right after `def`.
+                //
+                // Note: we are inserting the new variable right
+                // after `def` for now, just because we don't
+                // yet know the final region that it should be
+                // placed into. We will move it to the correct
+                // location when we are done.
+                //
+                builder.setInsertBefore(def->getNextInst());
+                tmp = builder.emitVar(def->getDataType());
+                builder.emitStore(tmp, def);
+                //
+                // Note: the lifetime for the new variable starts
+                // right after the store we have emitted.
+            }
         }
 
         // In order to know where `tmp` should be defined
@@ -345,19 +360,40 @@ static void fixValueScopingForInst(
                 rr);
         }
 
-        // To fix up the use `u`, we will need to change
-        // it from using `def` to using a load from `tmp`
+        // We need to fix up the use `u`, but the way we fix
+        // it depends on whether we moving `def` itself (in which
+        // case `tmp` and `def` are the same), or if we have
+        // introduced an intermediate temporary.
         //
-        builder.setInsertBefore(user);
-        IRInst* tmpVal = builder.emitLoad(tmp);
+        if (def == tmp)
+        {
+            // If we are moving the definition itself, we don't
+            // need to do any kind of fix-up work at use sites.
+        }
+        else
+        {
+            // Othwerise we need to fix up the use `use` so
+            // that it uses a value loaded from `tmp` instead
+            // of `def`.
+            //
+            builder.setInsertBefore(user);
+            IRInst* tmpVal = builder.emitLoad(tmp);
 
-        // We are clobbering the value used by the `IRUse` `u`,
-        // while will cut it out of the list of uses for `def`.
-        // We need to be careful when doing this to not disrupt
-        // our iteration of the uses of `def`, so we carefully
-        // used the `nextUse` temporary at the start of the loop.
-        //
-        u->set(tmpVal);
+            // We are clobbering the value used by the `IRUse` `u`,
+            // while will cut it out of the list of uses for `def`.
+            // We need to be careful when doing this to not disrupt
+            // our iteration of the uses of `def`, so we carefully
+            // used the `nextUse` temporary at the start of the loop.
+            //
+            // Note(tfoley): This is more subtle than the comment makes
+            // it out to be, because we are *also* injecting a new use
+            // of `def` in the logic that creates `tmp` (because `def`
+            // is used as an operand to the `store` that initializes
+            // `tmp`). We really ought to work on a copy of the use-def
+            // information.
+            //
+            u->set(tmpVal);
+        }
     }
 
     // At the end of the loop, the `tmp` variable will have
@@ -421,8 +457,27 @@ void fixValueScoping(RegionTree* regionTree)
         if(!parentRegion)
             continue;
 
-        for(auto inst : block->getDecorationsAndChildren())
+        // Note: This pass will end up modifying the IR while also
+        // iterating over it. As such, we need to be careful not
+        // to let our iteration logic get confused.
+        //
+        // In particular, it is possible that `inst` will get moved
+        // to another block, as a way to resolve scoping issues, and
+        // if we did not account for that result, we might end up
+        // walking to the next instruction after `inst` even though
+        // it isn't inside `block`.
+        //
+        // We defensively cache the next instruction to visit so that
+        // we can continue our iteration after `inst` even if it gets
+        // moved. For now we are confident that the operations on
+        // `inst` won't affect `nextInst`, since the pass is not supposed
+        // to move or delete any *other* instructions.
+        //
+        IRInst* nextInst = nullptr;
+        for (auto inst = block->getFirstOrdinaryInst(); inst; inst = nextInst)
         {
+            nextInst = inst->getNextInst();
+
             fixValueScopingForInst(inst, parentRegion, regionTree);
         }
     }
