@@ -1831,6 +1831,26 @@ void GLSLSourceEmitter::emitVectorTypeNameImpl(IRType* elementType, IRIntegerVal
     }
 }
 
+void GLSLSourceEmitter::emitTypeImpl(IRType* type, const StringSliceLoc* nameAndLoc)
+{
+    if (auto refType = as<IRRefType>(type))
+    {
+        m_writer->emit("spirv_by_reference ");
+        type = refType->getValueType();
+    }
+    return Super::emitTypeImpl(type, nameAndLoc);
+}
+
+void GLSLSourceEmitter::emitParamTypeImpl(IRType* type, String const& name)
+{
+    if (auto refType = as<IRRefType>(type))
+    {
+        // 
+        m_writer->emit("spirv_by_reference  ");
+        type = refType->getValueType();
+    }
+    Super::emitParamTypeImpl(type, name);
+}
 
 void GLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
 {

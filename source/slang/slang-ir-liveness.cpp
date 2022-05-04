@@ -508,7 +508,7 @@ void LivenessContext::processModule()
 
     IRModuleInst* moduleInst = m_module->getModuleInst();
 
-    for (IRInst* child = moduleInst->getFirstDecorationOrChild(); child; child = child->getNextInst())
+    for (IRInst* child : moduleInst->getChildren())
     {
         // We want to find all of the functions, and process them
         if (auto funcInst = as<IRFunc>(child))
