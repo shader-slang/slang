@@ -257,7 +257,7 @@ namespace Slang
     ///
     /// The resulting `RegionTree` will encode a structured (statement-like)
     /// form for the control flow graph (CFG) of `code`.
-    /// In cases where our current restructuring approach is now powerful
+    /// In cases where our current restructuring approach is not powerful
     /// enough to handle something in the input CFG, diagnostic messages
     /// will be output to the given `sink`.
     ///

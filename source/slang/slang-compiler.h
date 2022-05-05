@@ -1485,6 +1485,10 @@ namespace Slang
 
         bool shouldDumpIntermediates() { return dumpIntermediates; }
 
+        void setTrackLiveness(bool enable) { enableLivenessTracking = enable; }
+
+        bool shouldTrackLiveness() { return enableLivenessTracking; }
+
         Linkage* getLinkage() { return linkage; }
         CodeGenTarget getTarget() { return format; }
         Profile getTargetProfile() { return targetProfile; }
@@ -1515,6 +1519,7 @@ namespace Slang
         LineDirectiveMode       lineDirectiveMode = LineDirectiveMode::Default;
         bool                    dumpIntermediates = false;
         bool                    forceGLSLScalarBufferLayout = false;
+        bool                    enableLivenessTracking = false;
     };
 
         /// Are we generating code for a D3D API?
@@ -2368,6 +2373,8 @@ namespace Slang
         bool shouldValidateIR();
         bool shouldDumpIR();
 
+        bool shouldTrackLiveness();
+
         bool shouldDumpIntermediates();
         String getIntermediateDumpPrefix();
 
@@ -2652,6 +2659,7 @@ namespace Slang
 
         void generateOutput();
 
+        void setTrackLiveness(bool enable);
 
         // Note: The following settings used to be considered part of the "back-end" compile
         // request, but were only being used as part of end-to-end compilation anyway,
@@ -2660,6 +2668,9 @@ namespace Slang
 
         // Should we dump intermediate results along the way, for debugging?
         bool shouldDumpIntermediates = false;
+
+        // True if liveness tracking is enabled
+        bool enableLivenessTracking = false;
 
         // Should R/W images without explicit formats be assumed to have "unknown" format?
         //
