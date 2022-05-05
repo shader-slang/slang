@@ -1408,8 +1408,6 @@ public:
     virtual SLANG_NO_THROW void SLANG_MCALL
         writeTimestamp(IQueryPool* queryPool, GfxIndex index) override;
 
-    VkImageAspectFlags getAspectMask(TextureAspect aspect);
-
     virtual SLANG_NO_THROW void SLANG_MCALL copyTexture(
         ITextureResource* dst,
         ResourceState dstState,
