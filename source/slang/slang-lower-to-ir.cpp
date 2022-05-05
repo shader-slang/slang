@@ -1047,6 +1047,11 @@ static void addLinkageDecoration(
         builder->addPublicDecoration(inst);
         builder->addKeepAliveDecoration(inst);
     }
+    if (decl->findModifier<HLSLExportModifier>())
+    {
+        builder->addHLSLExportDecoration(inst);
+        builder->addKeepAliveDecoration(inst);
+    }
     if (decl->findModifier<ExternCppModifier>())
     {
         builder->addExternCppDecoration(inst, mangledName);
@@ -5408,6 +5413,10 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
     bool isPublicType(Type* type)
     {
+        // TODO(JS):
+        // Not clear how should handle HLSLExportModifier here. 
+        // In the HLSL spec 'export' is only applicable to functions. So for now we ignore.
+
         if (auto declRefType = as<DeclRefType>(type))
         {
             if (declRefType->declRef.getDecl()->findModifier<PublicModifier>())
@@ -5595,6 +5604,11 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         irWitnessTable->setOperand(0, irSubType);
 
         addLinkageDecoration(context, irWitnessTable, inheritanceDecl, mangledName.getUnownedSlice());
+
+        // TODO(JS):
+        // Not clear what to do here around HLSLExportModifier. 
+        // In HLSL it only (currently) applies to functions, so perhaps do nothing is reasonable.
+        
         if (parentDecl->findModifier<PublicModifier>())
         {
             subBuilder->addPublicDecoration(irWitnessTable);
@@ -6340,7 +6354,11 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             SLANG_UNREACHABLE("associatedtype should have been handled by visitAssocTypeDecl.");
         }
 
-        bool isPublicType = decl->findModifier<PublicModifier>() != nullptr;
+        // TODO(JS): 
+        // Not clear what to do around HLSLExportModifier. 
+        // The HLSL spec says it only applies to functions, so we ignore for now.
+
+        const bool isPublicType = decl->findModifier<PublicModifier>() != nullptr;
 
         // Given a declaration of a type, we need to make sure
         // to output "witness tables" for any interfaces this
@@ -7423,15 +7441,6 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         {
             getBuilder()->addSimpleDecoration<IRNoInlineDecoration>(irFunc);
         }
-
-#if 0
-        // Not needed as added as part of adding linkage decoration.
-        // Ie in call to addLinkageDecoration
-        if (decl->findModifier<PublicModifier>())
-        {
-            getBuilder()->addSimpleDecoration<IRPublicDecoration>(irFunc);
-        }
-#endif
 
         if (auto attr = decl->findModifier<InstanceAttribute>())
         {
