@@ -1,0 +1,49 @@
+result code = 0
+standard error = {
+}
+standard output = {
+#ifdef SLANG_HLSL_ENABLE_NVAPI
+#include "nvHLSLExtns.h"
+#endif
+
+#pragma pack_matrix(column_major)
+
+#line 7 "tests/hlsl/simple/rate-param.hlsl"
+static groupshared uint  gs_values_0[int(4)];
+
+void someFunction_0(groupshared inout uint  a_0[int(4)], int index_0, int value_0)
+{
+    a_0[index_0] = a_0[index_0] + (uint) value_0;
+    return;
+}
+
+
+#line 5
+RWStructuredBuffer<int > outputBuffer_0 : register(u0);
+
+
+#line 16
+[numthreads(4, 1, 1)]
+void computeMain(uint3 dispatchThreadID_0 : SV_DISPATCHTHREADID)
+{
+
+#line 18
+    int index_1 = (int) dispatchThreadID_0.x;
+
+
+    gs_values_0[int(3) - index_1] = (uint) index_1;
+
+    GroupMemoryBarrierWithGroupSync();
+
+    someFunction_0(gs_values_0, index_1, index_1 * int(2) + int(1));
+
+    GroupMemoryBarrierWithGroupSync();
+
+    int _S1 = (int) gs_values_0[index_1];
+
+#line 29
+    outputBuffer_0[(uint) index_1] = _S1;
+    return;
+}
+
+}
