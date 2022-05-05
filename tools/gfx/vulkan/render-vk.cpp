@@ -2007,6 +2007,10 @@ Result DeviceImpl::createSamplerState(ISamplerState::Desc const& desc, ISamplerS
     samplerInfo.minLod = Math::Max(0.0f, desc.minLOD);
     samplerInfo.maxLod = Math::Clamp(desc.maxLOD, samplerInfo.minLod, VK_LOD_CLAMP_NONE);
 
+    VkSamplerReductionModeCreateInfo reductionInfo = {VK_STRUCTURE_TYPE_SAMPLER_REDUCTION_MODE_CREATE_INFO};
+    reductionInfo.reductionMode = VulkanUtil::translateReductionOp(desc.reductionOp);
+    samplerInfo.pNext = &reductionInfo;
+
     VkSampler sampler;
     SLANG_VK_RETURN_ON_FAIL(m_api.vkCreateSampler(m_device, &samplerInfo, nullptr, &sampler));
 
@@ -6575,19 +6579,6 @@ void ResourceCommandEncoder::writeTimestamp(IQueryPool* queryPool, GfxIndex inde
         &m_commandBuffer->m_renderer->m_api, m_commandBuffer->m_commandBuffer, queryPool, index);
 }
 
-VkImageAspectFlags ResourceCommandEncoder::getAspectMask(TextureAspect aspect)
-{
-    VkImageAspectFlags flags = 0;
-
-    if ((uint32_t)aspect & (uint32_t)TextureAspect::Depth)
-        flags |= VK_IMAGE_ASPECT_DEPTH_BIT;
-    if ((uint32_t)aspect & (uint32_t)TextureAspect::Stencil)
-        flags |= VK_IMAGE_ASPECT_STENCIL_BIT;
-    if ((uint32_t)aspect & (uint32_t)TextureAspect::Color)
-        flags |= VK_IMAGE_ASPECT_COLOR_BIT;
-    return flags;
-}
-
 void ResourceCommandEncoder::copyTexture(
     ITextureResource* dst,
     ResourceState dstState,
@@ -6622,12 +6613,12 @@ void ResourceCommandEncoder::copyTexture(
         srcSubresource.mipLevelCount = dstDesc->numMipLevels;
     }
     VkImageCopy region = {};
-    region.srcSubresource.aspectMask = getAspectMask(srcSubresource.aspectMask);
+    region.srcSubresource.aspectMask = VulkanUtil::getAspectMask(srcSubresource.aspectMask, srcImage->m_vkformat);
     region.srcSubresource.baseArrayLayer = srcSubresource.baseArrayLayer;
     region.srcSubresource.mipLevel = srcSubresource.mipLevel;
     region.srcSubresource.layerCount = srcSubresource.layerCount;
     region.srcOffset = {(int32_t)srcOffset.x, (int32_t)srcOffset.y, (int32_t)srcOffset.z};
-    region.dstSubresource.aspectMask = getAspectMask(dstSubresource.aspectMask);
+    region.dstSubresource.aspectMask = VulkanUtil::getAspectMask(dstSubresource.aspectMask, dstImage->m_vkformat);
     region.dstSubresource.baseArrayLayer = dstSubresource.baseArrayLayer;
     region.dstSubresource.mipLevel = dstSubresource.mipLevel;
     region.dstSubresource.layerCount = dstSubresource.layerCount;
@@ -6959,8 +6950,11 @@ void ResourceCommandEncoder::clearResourceView(
                     auto viewImpl = static_cast<PlainBufferResourceViewImpl*>(viewImplBase);
                     uint64_t clearStart = viewImpl->m_desc.bufferRange.firstElement;
                     uint64_t clearSize = viewImpl->m_desc.bufferRange.elementCount;
+
                     if (clearSize == 0)
                         clearSize = viewImpl->m_buffer->getDesc()->sizeInBytes - clearStart;
+                    if (viewImpl->m_desc.bufferElementSize != 0)
+                        clearSize *= viewImpl->m_desc.bufferElementSize;
                     api.vkCmdFillBuffer(
                         m_commandBuffer->m_commandBuffer,
                         viewImpl->m_buffer->m_buffer.m_buffer,
@@ -7012,12 +7006,12 @@ void ResourceCommandEncoder::resolveResource(
         for (GfxIndex mip = 0; mip < sourceRange.mipLevelCount; ++mip)
         {
             VkImageResolve region = {};
-            region.srcSubresource.aspectMask = getAspectMask(sourceRange.aspectMask);
+            region.srcSubresource.aspectMask = VulkanUtil::getAspectMask(sourceRange.aspectMask, srcTexture->m_vkformat);
             region.srcSubresource.baseArrayLayer = layer + sourceRange.baseArrayLayer;
             region.srcSubresource.layerCount = 1;
             region.srcSubresource.mipLevel = mip + sourceRange.mipLevel;
             region.srcOffset = {0, 0, 0};
-            region.dstSubresource.aspectMask = getAspectMask(destRange.aspectMask);
+            region.dstSubresource.aspectMask = VulkanUtil::getAspectMask(destRange.aspectMask, dstTexture->m_vkformat);
             region.dstSubresource.baseArrayLayer = layer + destRange.baseArrayLayer;
             region.dstSubresource.layerCount = 1;
             region.dstSubresource.mipLevel = mip + destRange.mipLevel;
@@ -7077,7 +7071,7 @@ void ResourceCommandEncoder::copyTextureToBuffer(
     region.bufferOffset = dstOffset;
     region.bufferRowLength = 0;
     region.bufferImageHeight = 0;
-    region.imageSubresource.aspectMask = getAspectMask(srcSubresource.aspectMask);
+    region.imageSubresource.aspectMask = VulkanUtil::getAspectMask(srcSubresource.aspectMask, image->m_vkformat);
     region.imageSubresource.mipLevel = srcSubresource.mipLevel;
     region.imageSubresource.baseArrayLayer = srcSubresource.baseArrayLayer;
     region.imageSubresource.layerCount = srcSubresource.layerCount;
@@ -7109,7 +7103,7 @@ void ResourceCommandEncoder::textureSubresourceBarrier(
     barrier.image = image->m_image;
     barrier.oldLayout = translateImageLayout(src);
     barrier.newLayout = translateImageLayout(dst);
-    barrier.subresourceRange.aspectMask = getAspectMask(subresourceRange.aspectMask);
+    barrier.subresourceRange.aspectMask = VulkanUtil::getAspectMask(subresourceRange.aspectMask, image->m_vkformat);
     barrier.subresourceRange.baseArrayLayer = subresourceRange.baseArrayLayer;
     barrier.subresourceRange.baseMipLevel = subresourceRange.mipLevel;
     barrier.subresourceRange.layerCount = subresourceRange.layerCount;

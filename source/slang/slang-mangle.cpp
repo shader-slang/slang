@@ -330,6 +330,12 @@ namespace Slang
             return;
         }
 
+        // TODO: we should special case GenericTypeParamDecl and GenericValueParamDecl nodes
+        // instead of just dumping their names here to avoid the name of a generic parameter
+        // to have affect the binary signature.
+        // For each generic parameter, we should assign it a unique ID (i, j), where i is the
+        // nesting level of the generic, and j is the sequential order of the parameter within
+        // its generic parent, and use this 2D ID to refer to such a parameter.
         emitName(context, declRef.getName());
 
         // Special case: accessors need some way to distinguish themselves
@@ -403,10 +409,17 @@ namespace Slang
                         emitRaw(context, "v");
                         emitType(context, getType(context->astBuilder, genericValueParamDecl));
                     }
-                    else if(mm.as<GenericTypeConstraintDecl>())
+                    else if(auto genericTypeConstraintDecl = mm.as<GenericTypeConstraintDecl>())
                     {
                         emitRaw(context, "C");
-                        // TODO: actually emit info about the constraint
+                        emitType(context, genericTypeConstraintDecl.getDecl()->sub.type);
+                        emitType(
+                            context,
+                            genericTypeConstraintDecl.getDecl()->getSup().type);
+                        // TODO: we need to be more robust on different syntax of type constraints by
+                        // canonicalize the list of constraints first, and then emit the list.
+                        // for an example, g<T:IA&IB>, g<T> where T:IA, T:IB should all have the same
+                        // mangled name. For now since we don't allow the `where` syntax, this is fine.
                     }
                     else
                     {

@@ -1582,7 +1582,7 @@ T distance(vector<T, N> x, vector<T, N> y)
 
 // Vector dot product
 
-__generic<T : __BuiltinArithmeticType, let N : int>
+__generic<T : __BuiltinFloatingPointType, let N : int>
 __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
 T dot(vector<T, N> x, vector<T, N> y)
@@ -1592,6 +1592,17 @@ T dot(vector<T, N> x, vector<T, N> y)
         result += x[i] * y[i];
     return result;
 }
+
+__generic<T : __BuiltinIntegerType, let N : int>
+__target_intrinsic(hlsl)
+T dot(vector<T, N> x, vector<T, N> y)
+{
+    T result = T(0);
+    for(int i = 0; i < N; ++i)
+        result += x[i] * y[i];
+    return result;
+}
+
 
 // Helper for computing distance terms for lighting (obsolete)
 
@@ -2568,9 +2579,15 @@ __intrinsic_op($(kIROp_Mul))
 matrix<T, N, M> mul(T x, matrix<T, N, M> y);
 
 // vector-vector (dot product)
-__generic<T : __BuiltinArithmeticType, let N : int>
+__generic<T : __BuiltinFloatingPointType, let N : int>
 __target_intrinsic(hlsl)
 __target_intrinsic(glsl, "dot")
+T mul(vector<T, N> x, vector<T, N> y)
+{
+    return dot(x, y);
+}
+__generic<T : __BuiltinIntegerType, let N : int>
+__target_intrinsic(hlsl)
 T mul(vector<T, N> x, vector<T, N> y)
 {
     return dot(x, y);
