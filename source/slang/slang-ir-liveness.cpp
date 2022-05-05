@@ -83,6 +83,23 @@ is created that is then just copied into the variable. That temporary being some
 could perhaps have liveness issues.
 */
 
+/* This implementation could potentially be improved in a few ways:
+
+## Use Dominator tree block indexing
+
+The dominator tree has a mapping from block insts to integer values. These integer value could be used to allow information about blocks to 
+be stored in an array. A downside, would be exposing that aspect of the implementation to the dominator tree.
+
+## Store if a block has an access instruction
+
+As it stands, when traversing the tree to find the last access, the implementation searches for each block backwards to find the last access
+by looking if it's in the m_accessSet. 
+
+This searching could be avoided, by when accesses are added the block they are in is marked as having an access. If a block had no accesses
+this would remove the linear search for the first access instruction, if the block indicates it doesn't have any. The downside being that every 
+access would also have to mark the block it is in.
+*/
+
 namespace { // anonymous
 
 struct LivenessContext
@@ -118,9 +135,6 @@ struct LivenessContext
         /// Process a 'root'. A variable that has liveness tracking
     void processRoot(const RootInfo& rootInfo);
 
-        /// Process a function in the module
-    void processFunction(IRFunc* funcInst);
-
         /// Process the module
     void processModule();
 
@@ -130,6 +144,9 @@ struct LivenessContext
         m_sharedBuilder.init(module);
         m_builder.init(m_sharedBuilder);
     }
+
+        /// Process a function in the module
+    void _processFunction(IRFunc* funcInst);
 
         // Add a live end instruction at the start of block, referencing the root 'root'.
     void _addLiveRangeEndAtBlockStart(IRBlock* block, IRInst* root);
@@ -463,7 +480,7 @@ void LivenessContext::processRoot(const RootInfo& rootInfo)
     }
 }
 
-void LivenessContext::processFunction(IRFunc* funcInst)
+void LivenessContext::_processFunction(IRFunc* funcInst)
 {
     List<RootInfo> rootInfos;
 
@@ -515,7 +532,7 @@ void LivenessContext::processModule()
         {
             // Then we want to look through their definition
             // inserting instructions that mark the liveness start/end
-            processFunction(funcInst);
+            _processFunction(funcInst);
         }
     }
 }
