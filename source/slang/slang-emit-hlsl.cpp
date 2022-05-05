@@ -1029,6 +1029,8 @@ void HLSLSourceEmitter::_emitPrefixTypeAttr(IRAttr* attr)
 
 void HLSLSourceEmitter::emitSimpleFuncParamImpl(IRParam* param)
 {
+    emitRateQualifiers(param);
+
     if (auto decor = param->findDecoration<IRGeometryInputPrimitiveTypeDecoration>())
     {
         switch (decor->getOp())

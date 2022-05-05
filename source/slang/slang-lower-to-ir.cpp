@@ -2484,6 +2484,7 @@ IRLoweringParameterInfo getParameterInfo(
     DeclRef<VarDeclBase> const& paramDecl)
 {
     IRLoweringParameterInfo info;
+
     info.type = getType(context->astBuilder, paramDecl);
     info.decl = paramDecl;
     info.direction = getParameterDirection(paramDecl);
@@ -2691,6 +2692,11 @@ void _lowerFuncDeclBaseTypeInfo(
         if( paramInfo.decl )
         {
             irParamType = maybeGetConstExprType(builder, irParamType, paramInfo.decl);
+        }
+
+        if (paramInfo.decl && paramInfo.decl->hasModifier<HLSLGroupSharedModifier>())
+        {
+            irParamType = builder->getRateQualifiedType(builder->getGroupSharedRate(), irParamType);
         }
 
         paramTypes.add(irParamType);
