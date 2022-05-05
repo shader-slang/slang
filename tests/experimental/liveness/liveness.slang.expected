@@ -1,0 +1,211 @@
+result code = 0
+standard error = {
+}
+standard output = {
+#ifdef SLANG_HLSL_ENABLE_NVAPI
+#include "nvHLSLExtns.h"
+#endif
+
+#pragma pack_matrix(column_major)
+
+#line 24 "tests/experimental/liveness/liveness.slang"
+int someSlowFunc_0(int a_0)
+{
+    int i_0;
+    uint v_0;
+
+#line 26
+    uint _S1 = (uint) a_0;
+    i_0 = int(0);
+    v_0 = _S1;
+    for(;;)
+    {
+
+#line 27
+        if(i_0 < a_0 * int(20))
+        {
+        }
+        else
+        {
+            break;
+        }
+
+#line 29
+        uint _S2 = (uint) ((int) ((bool) (v_0 >> int(1)) || (bool) (v_0 << int(31))) * i_0);
+
+#line 27
+        int i_1 = i_0 + int(1);
+
+#line 27
+        i_0 = i_1;
+        v_0 = _S2;
+    }
+
+    return (int) v_0;
+}
+
+
+#line 6
+struct SomeStruct_0
+{
+    int a_1;
+    int x_0;
+    int  c_0[int(100)];
+};
+
+
+#line 17
+SomeStruct_0 makeSomeStruct_0()
+{
+    int  _S3[int(100)] = { int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0) };
+
+#line 19
+    SomeStruct_0 s_0 = { int(0), int(0), _S3 };
+    return s_0;
+}
+
+
+#line 15
+RWStructuredBuffer<int > anotherBuffer_0 : register(u1);
+
+
+#line 40
+int doThing_0(SomeStruct_0 s_1)
+{
+    return s_1.x_0 * int(2) + int(1);
+}
+
+
+#line 34
+int somethingElse_0(inout SomeStruct_0 s_2)
+{
+    s_2.x_0 = s_2.x_0 + int(1);
+    return s_2.x_0;
+}
+
+
+#line 4
+RWStructuredBuffer<int > outputBuffer_0 : register(u0);
+
+
+#line 46
+[shader("compute")][numthreads(4, 1, 1)]
+void computeMain(uint3 dispatchThreadID_0 : SV_DISPATCHTHREADID)
+{
+    int i_2;
+    int res_0;
+    SomeStruct_0 u_0;
+
+#line 48
+    int index_0 = (int) dispatchThreadID_0.x;
+
+
+
+    i_2 = int(0);
+    res_0 = index_0;
+    for(;;)
+    {
+
+#line 52
+        if(i_2 < index_0)
+        {
+        }
+        else
+        {
+            break;
+        }
+
+#line 54
+        int v_1 = someSlowFunc_0(index_0);
+
+        SomeStruct_0 s_3;
+
+#line 56
+        SLANG_LIVE_START(s_3)
+        SomeStruct_0 t_0;
+
+#line 57
+        SLANG_LIVE_START(t_0)
+
+#line 57
+        SomeStruct_0 _S4 = makeSomeStruct_0();
+
+#line 57
+        t_0 = _S4;
+        int  _S5[int(100)] = { int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0), int(0) };
+
+#line 58
+        SomeStruct_0 u_1 = { int(0), int(0), _S5 };
+
+        if((bool) (v_1 & int(256)))
+        {
+            s_3.x_0 = anotherBuffer_0[(uint) (v_1 & int(3))];
+            t_0.x_0 = anotherBuffer_0[(uint) (v_1 & int(3))];
+
+#line 60
+            u_0 = u_1;
+        }
+        else
+        {
+
+#line 68
+            SomeStruct_0 x_1;
+
+#line 68
+            SLANG_LIVE_START(x_1)
+
+#line 68
+            x_1 = u_1;
+            x_1.x_0 = anotherBuffer_0[(uint) (v_1 & int(3))] + int(1);
+            SomeStruct_0 _S6 = x_1;
+
+#line 70
+            SLANG_LIVE_END(x_1)
+
+#line 60
+            u_0 = _S6;
+        }
+
+#line 74
+        s_3.c_0[index_0 & int(7)] = s_3.c_0[index_0 & int(7)] + int(1);
+
+        int _S7 = s_3.x_0 + t_0.x_0 + u_0.x_0;
+
+#line 76
+        int _S8 = doThing_0(t_0);
+
+#line 76
+        int _S9 = _S7 + _S8;
+
+#line 76
+        int _S10 = somethingElse_0(t_0);
+
+#line 76
+        SLANG_LIVE_END(t_0)
+
+#line 76
+        int _S11 = _S9 + _S10;
+
+#line 76
+        int _S12 = s_3.c_0[int(2)];
+
+#line 76
+        SLANG_LIVE_END(s_3)
+
+#line 76
+        int res_1 = res_0 + (_S11 + _S12);
+
+#line 52
+        int i_3 = i_2 + int(1);
+
+#line 52
+        i_2 = i_3;
+        res_0 = res_1;
+    }
+
+#line 79
+    outputBuffer_0[(uint) index_0] = res_0;
+    return;
+}
+
+}

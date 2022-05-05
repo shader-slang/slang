@@ -638,6 +638,8 @@ INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
 
     INST(SemanticDecoration, semantic, 2, 0)
 
+    INST(SPIRVOpDecoration, spirvOpDecoration, 1, 0)
+
         /// Marks a struct type as being used as a structured buffer block.
         /// Recognized by SPIRV-emit pass so we can emit a SPIRV `BufferBlock` decoration.
     INST(SPIRVBufferBlockDecoration, spvBufferBlock, 0, 0)
@@ -717,6 +719,11 @@ INST_RANGE(Layout, VarLayout, EntryPointLayout)
         INST(VarOffsetAttr, offset, 2, 0)
     INST_RANGE(LayoutResourceInfoAttr, TypeSizeAttr, VarOffsetAttr)
 INST_RANGE(Attr, PendingLayoutAttr, VarOffsetAttr)
+
+/* Liveness */
+    INST(LiveRangeStart, liveRangeStart, 2, 0)
+    INST(LiveRangeEnd, liveRangeEnd, 0, 0)
+INST_RANGE(LiveRangeMarker, LiveRangeStart, LiveRangeEnd)
 
 #undef PARENT
 #undef USE_OTHER

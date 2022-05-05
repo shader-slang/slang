@@ -2509,6 +2509,14 @@ void printDiagnosticArg(StringBuilder& sb, CodeGenTarget val)
         return false;
     }
 
+
+    bool CodeGenContext::shouldTrackLiveness()
+    {
+        auto endToEndReq = isEndToEndCompile();
+        return (endToEndReq && endToEndReq->enableLivenessTracking) || 
+            getTargetReq()->shouldTrackLiveness();
+    }
+
     String CodeGenContext::getIntermediateDumpPrefix()
     {
         if (auto endToEndReq = isEndToEndCompile())
