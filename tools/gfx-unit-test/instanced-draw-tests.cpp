@@ -161,13 +161,13 @@ namespace gfx_test
             slang::ProgramLayout* slangReflection;
             GFX_CHECK_CALL_ABORT(loadGraphicsProgram(device, shaderProgram, "graphics-smoke", "vertexMain", "fragmentMain", slangReflection));
 
-            IFramebufferLayout::AttachmentLayout attachmentLayout;
-            attachmentLayout.format = format;
-            attachmentLayout.sampleCount = 1;
+            IFramebufferLayout::TargetLayout targetLayout;
+            targetLayout.format = format;
+            targetLayout.sampleCount = 1;
 
             IFramebufferLayout::Desc framebufferLayoutDesc;
             framebufferLayoutDesc.renderTargetCount = 1;
-            framebufferLayoutDesc.renderTargets = &attachmentLayout;
+            framebufferLayoutDesc.renderTargets = &targetLayout;
             ComPtr<gfx::IFramebufferLayout> framebufferLayout = device->createFramebufferLayout(framebufferLayoutDesc);
             SLANG_CHECK_ABORT(framebufferLayout != nullptr);
 
@@ -183,9 +183,9 @@ namespace gfx_test
             IRenderPassLayout::Desc renderPassDesc = {};
             renderPassDesc.framebufferLayout = framebufferLayout;
             renderPassDesc.renderTargetCount = 1;
-            IRenderPassLayout::AttachmentAccessDesc renderTargetAccess = {};
-            renderTargetAccess.loadOp = IRenderPassLayout::AttachmentLoadOp::Clear;
-            renderTargetAccess.storeOp = IRenderPassLayout::AttachmentStoreOp::Store;
+            IRenderPassLayout::TargetAccessDesc renderTargetAccess = {};
+            renderTargetAccess.loadOp = IRenderPassLayout::TargetLoadOp::Clear;
+            renderTargetAccess.storeOp = IRenderPassLayout::TargetStoreOp::Store;
             renderTargetAccess.initialState = ResourceState::RenderTarget;
             renderTargetAccess.finalState = ResourceState::CopySource;
             renderPassDesc.renderTargetAccess = &renderTargetAccess;

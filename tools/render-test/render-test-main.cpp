@@ -640,12 +640,12 @@ void RenderTestApp::_initializeRenderPass()
     ComPtr<gfx::IResourceView> dsv =
         m_device->createTextureView(depthBufferResource.get(), depthBufferViewDesc);
 
-    IFramebufferLayout::AttachmentLayout colorAttachment = {gfx::Format::R8G8B8A8_UNORM, 1};
-    IFramebufferLayout::AttachmentLayout depthAttachment = {gfx::Format::D32_FLOAT, 1};
+    IFramebufferLayout::TargetLayout colorTarget = {gfx::Format::R8G8B8A8_UNORM, 1};
+    IFramebufferLayout::TargetLayout depthTarget = {gfx::Format::D32_FLOAT, 1};
     gfx::IFramebufferLayout::Desc framebufferLayoutDesc;
     framebufferLayoutDesc.renderTargetCount = 1;
-    framebufferLayoutDesc.renderTargets = &colorAttachment;
-    framebufferLayoutDesc.depthStencil = &depthAttachment;
+    framebufferLayoutDesc.renderTargets = &colorTarget;
+    framebufferLayoutDesc.depthStencil = &depthTarget;
     m_device->createFramebufferLayout(framebufferLayoutDesc, m_framebufferLayout.writeRef());
 
     gfx::IFramebuffer::Desc framebufferDesc;
@@ -658,14 +658,14 @@ void RenderTestApp::_initializeRenderPass()
     IRenderPassLayout::Desc renderPassDesc = {};
     renderPassDesc.framebufferLayout = m_framebufferLayout;
     renderPassDesc.renderTargetCount = 1;
-    IRenderPassLayout::AttachmentAccessDesc renderTargetAccess = {};
-    IRenderPassLayout::AttachmentAccessDesc depthStencilAccess = {};
-    renderTargetAccess.loadOp = IRenderPassLayout::AttachmentLoadOp::Clear;
-    renderTargetAccess.storeOp = IRenderPassLayout::AttachmentStoreOp::Store;
+    IRenderPassLayout::TargetAccessDesc renderTargetAccess = {};
+    IRenderPassLayout::TargetAccessDesc depthStencilAccess = {};
+    renderTargetAccess.loadOp = IRenderPassLayout::TargetLoadOp::Clear;
+    renderTargetAccess.storeOp = IRenderPassLayout::TargetStoreOp::Store;
     renderTargetAccess.initialState = ResourceState::Undefined;
     renderTargetAccess.finalState = ResourceState::RenderTarget;
-    depthStencilAccess.loadOp = IRenderPassLayout::AttachmentLoadOp::Clear;
-    depthStencilAccess.storeOp = IRenderPassLayout::AttachmentStoreOp::Store;
+    depthStencilAccess.loadOp = IRenderPassLayout::TargetLoadOp::Clear;
+    depthStencilAccess.storeOp = IRenderPassLayout::TargetStoreOp::Store;
     depthStencilAccess.initialState = ResourceState::Undefined;
     depthStencilAccess.finalState = ResourceState::DepthWrite;
     renderPassDesc.renderTargetAccess = &renderTargetAccess;

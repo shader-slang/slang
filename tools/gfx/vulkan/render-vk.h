@@ -19,7 +19,7 @@ using namespace Slang;
 enum
 {
     kMaxRenderTargets = 8,
-    kMaxAttachments = kMaxRenderTargets + 1,
+    kMaxTargets = kMaxRenderTargets + 1,
     kMaxPushConstantSize = 256,
     kMaxDescriptorSets = 8,
 };
@@ -411,10 +411,10 @@ class FramebufferLayoutImpl : public FramebufferLayoutBase
 public:
     VkRenderPass m_renderPass;
     DeviceImpl* m_renderer;
-    Array<VkAttachmentDescription, kMaxAttachments> m_attachmentDescs;
+    Array<VkAttachmentDescription, kMaxTargets> m_targetDescs;
     Array<VkAttachmentReference, kMaxRenderTargets> m_colorReferences;
     VkAttachmentReference m_depthReference;
-    bool m_hasDepthStencilAttachment;
+    bool m_hasDepthStencilTarget;
     uint32_t m_renderTargetCount;
     VkSampleCountFlagBits m_sampleCount = VK_SAMPLE_COUNT_1_BIT;
 
@@ -448,7 +448,7 @@ public:
     uint32_t m_width;
     uint32_t m_height;
     BreakableReference<DeviceImpl> m_renderer;
-    VkClearValue m_clearValues[kMaxAttachments];
+    VkClearValue m_clearValues[kMaxTargets];
     RefPtr<FramebufferLayoutImpl> m_layout;
 
 public:

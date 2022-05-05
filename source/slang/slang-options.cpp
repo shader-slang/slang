@@ -652,6 +652,7 @@ struct OptionsParser
             "  -save-stdlib <filename>: Save the StdLib modules to an archive file.\n"
             "  -save-stdlib-bin-source <filename>: Same as -save-stdlib but output\n"
             "      the data as a C array.\n"
+            "  -track-liveness: Enable liveness tracking. Places SLANG_LIVE_START, and SLANG_LIVE_END in output source to indicate value liveness.\n"
             "\n"
             "Deprecated options (allowed but ignored; may be removed in future):\n"
             "\n"
@@ -999,6 +1000,10 @@ struct OptionsParser
                 else if (argValue == "-disable-dynamic-dispatch")
                 {
                     requestImpl->disableDynamicDispatch = true;
+                }
+                else if (argValue == "-track-liveness")
+                {
+                    requestImpl->setTrackLiveness(true);
                 }
                 else if (argValue == "-verbose-paths")
                 {
