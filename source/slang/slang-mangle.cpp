@@ -2,6 +2,7 @@
 
 #include "../compiler-core/slang-name.h"
 #include "slang-syntax.h"
+#include "slang-check.h"
 
 namespace Slang
 {
@@ -398,33 +399,34 @@ namespace Slang
                 }
 
                 emit(context, genericParameterCount);
-                for( auto mm : getMembers(parentGenericDeclRef) )
+
+                OrderedDictionary<GenericTypeParamDecl*, List<Type*>> genericConstraints;
+                for (auto mm : getMembers(parentGenericDeclRef))
                 {
-                    if(auto genericTypeParamDecl = mm.as<GenericTypeParamDecl>())
+                    if (auto genericTypeParamDecl = mm.as<GenericTypeParamDecl>())
                     {
                         emitRaw(context, "T");
                     }
-                    else if(auto genericValueParamDecl = mm.as<GenericValueParamDecl>())
+                    else if (auto genericValueParamDecl = mm.as<GenericValueParamDecl>())
                     {
                         emitRaw(context, "v");
                         emitType(context, getType(context->astBuilder, genericValueParamDecl));
                     }
-                    else if(auto genericTypeConstraintDecl = mm.as<GenericTypeConstraintDecl>())
+                    else
+                    {}
+                }
+
+                auto canonicalizedConstraints = getCanonicalGenericConstraints(parentGenericDeclRef);
+                for (auto& constraint : canonicalizedConstraints)
+                {
+                    for (auto type : constraint.Value)
                     {
                         emitRaw(context, "C");
-                        emitType(context, genericTypeConstraintDecl.getDecl()->sub.type);
-                        emitType(
-                            context,
-                            genericTypeConstraintDecl.getDecl()->getSup().type);
-                        // TODO: we need to be more robust on different syntax of type constraints by
-                        // canonicalize the list of constraints first, and then emit the list.
-                        // for an example, g<T:IA&IB>, g<T> where T:IA, T:IB should all have the same
-                        // mangled name. For now since we don't allow the `where` syntax, this is fine.
-                    }
-                    else
-                    {
+                        emitQualifiedName(context, DeclRef<Decl>(constraint.Key, nullptr));
+                            emitType(context, type);
                     }
                 }
+
             }
         }
 
