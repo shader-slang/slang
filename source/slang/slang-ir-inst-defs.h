@@ -546,6 +546,7 @@ INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
     INST(GloballyCoherentDecoration,        globallyCoherent,       0, 0)
     INST(PreciseDecoration,                 precise,                0, 0)
     INST(PublicDecoration,                  public,                 0, 0)
+    INST(HLSLExportDecoration,              hlslExport,             0, 0)
     INST(PatchConstantFuncDecoration,       patchConstantFunc,      1, 0)
 
     INST(OutputControlPointsDecoration,     outputControlPoints,    1, 0)
@@ -637,6 +638,8 @@ INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
     INST_RANGE(StageAccessDecoration, StageReadAccessDecoration, StageWriteAccessDecoration)
 
     INST(SemanticDecoration, semantic, 2, 0)
+
+    INST(SPIRVOpDecoration, spirvOpDecoration, 1, 0)
 
         /// Marks a struct type as being used as a structured buffer block.
         /// Recognized by SPIRV-emit pass so we can emit a SPIRV `BufferBlock` decoration.

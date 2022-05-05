@@ -39,6 +39,7 @@
 #include "slang-ir-validate.h"
 #include "slang-ir-wrap-structured-buffers.h"
 #include "slang-ir-liveness.h"
+#include "slang-ir-glsl-liveness.h"
 
 #include "slang-legalize-types.h"
 #include "slang-lower-to-ir.h"
@@ -762,6 +763,11 @@ Result linkAndOptimizeIR(
         addLivenessTrackingToModule(irModule);
 
         dumpIRIfEnabled(codeGenContext, irModule, "LIVENESS");
+
+        if (isKhronosTarget(targetRequest))
+        {
+            applyGLSLLiveness(irModule);
+        }
     }
 
     // We include one final step to (optionally) dump the IR and validate

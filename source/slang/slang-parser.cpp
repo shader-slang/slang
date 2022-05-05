@@ -6278,7 +6278,7 @@ namespace Slang
         _makeParseModifier("require",       RequireModifier::kReflectClassInfo),
         _makeParseModifier("param",         ParamModifier::kReflectClassInfo),
         _makeParseModifier("extern",        ExternModifier::kReflectClassInfo),
-
+        
         _makeParseModifier("row_major",     HLSLRowMajorLayoutModifier::kReflectClassInfo),
         _makeParseModifier("column_major",  HLSLColumnMajorLayoutModifier::kReflectClassInfo),
 
@@ -6293,6 +6293,7 @@ namespace Slang
         _makeParseModifier("static",        HLSLStaticModifier::kReflectClassInfo),
         _makeParseModifier("uniform",       HLSLUniformModifier::kReflectClassInfo),
         _makeParseModifier("volatile",      HLSLVolatileModifier::kReflectClassInfo),
+        _makeParseModifier("export",        HLSLExportModifier::kReflectClassInfo),
 
         // Modifiers for geometry shader input
         _makeParseModifier("point",         HLSLPointModifier::kReflectClassInfo),

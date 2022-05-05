@@ -22,4 +22,7 @@ namespace Slang
     bool isFromStdLib(Decl* decl);
 
     void registerBuiltinDecls(Session* session, Decl* decl);
+
+    OrderedDictionary<GenericTypeParamDecl*, List<Type*>> getCanonicalGenericConstraints(
+        DeclRef<ContainerDecl> genericDecl);
 }
