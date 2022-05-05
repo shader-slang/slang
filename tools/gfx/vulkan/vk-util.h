@@ -25,6 +25,8 @@ struct VulkanUtil
         /// Returns VK_FORMAT_UNDEFINED if a match is not found
     static VkFormat getVkFormat(Format format);
 
+    static VkImageAspectFlags getAspectMask(TextureAspect aspect, VkFormat format);
+
         /// Called by SLANG_VK_RETURN_FAIL if a res is a failure.
         /// On debug builds this will cause an assertion on failure.
     static Slang::Result handleFail(VkResult res);
@@ -99,6 +101,8 @@ struct VulkanUtil
     static VkCompareOp translateComparisonFunc(ComparisonFunc func);
 
     static VkStencilOpState translateStencilState(DepthStencilOpDesc desc);
+
+    static VkSamplerReductionMode translateReductionOp(TextureReductionOp op);
 
 };
 

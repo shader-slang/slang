@@ -12,6 +12,8 @@
 
 #include "slang-lookup.h"
 
+#include "slang-syntax.h"
+
 namespace Slang
 {
         /// Visitor to transition declarations to `DeclCheckState::CheckedModifiers`
@@ -5340,6 +5342,51 @@ namespace Slang
             SemanticsDeclBodyVisitor(shared).dispatch(decl);
             break;
         }
+    }
+
+    static void _getCanonicalConstraintTypes(List<Type*>& outTypeList, Type* type)
+    {
+        if (auto andType = as<AndType>(type))
+        {
+            _getCanonicalConstraintTypes(outTypeList, andType->left);
+            _getCanonicalConstraintTypes(outTypeList, andType->right);
+        }
+        else
+        {
+            outTypeList.add(type);
+        }
+    }
+    OrderedDictionary<GenericTypeParamDecl*, List<Type*>> getCanonicalGenericConstraints(
+        DeclRef<ContainerDecl> genericDecl)
+    {
+        OrderedDictionary<GenericTypeParamDecl*, List<Type*>> genericConstraints;
+        for (auto mm : getMembersOfType<GenericTypeParamDecl>(genericDecl))
+        {
+            genericConstraints[mm.getDecl()] = List<Type*>();
+        }
+        for (auto genericTypeConstraintDecl : getMembersOfType<GenericTypeConstraintDecl>(genericDecl))
+        {
+            assert(
+                genericTypeConstraintDecl.getDecl()->sub.type->astNodeType ==
+                ASTNodeType::DeclRefType);
+            auto typeParamDecl = as<DeclRefType>(genericTypeConstraintDecl.getDecl()->sub.type)->declRef.getDecl();
+            List<Type*>* constraintTypes = genericConstraints.TryGetValue(typeParamDecl);
+            assert(constraintTypes);
+            constraintTypes->add(genericTypeConstraintDecl.getDecl()->getSup().type);
+        }
+
+        OrderedDictionary<GenericTypeParamDecl*, List<Type*>> result;
+        for (auto& constraints : genericConstraints)
+        {
+            List<Type*> typeList;
+            for (auto type : constraints.Value)
+            {
+                _getCanonicalConstraintTypes(typeList, type);
+            }
+            // TODO: we also need to sort the types within the list for each generic type param.
+            result[constraints.Key] = typeList;
+        }
+        return result;
     }
 
 }

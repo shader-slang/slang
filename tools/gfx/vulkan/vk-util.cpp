@@ -113,6 +113,50 @@ namespace gfx {
     }
 }
 
+VkImageAspectFlags VulkanUtil::getAspectMask(TextureAspect aspect, VkFormat format)
+{
+    switch (aspect)
+    {
+    case TextureAspect::Default:
+        switch (format)
+        {
+        case VK_FORMAT_D16_UNORM_S8_UINT:
+        case VK_FORMAT_D24_UNORM_S8_UINT:
+        case VK_FORMAT_D32_SFLOAT_S8_UINT:
+            return VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT;
+        case VK_FORMAT_D16_UNORM:
+        case VK_FORMAT_D32_SFLOAT:
+        case VK_FORMAT_X8_D24_UNORM_PACK32:
+            return VK_IMAGE_ASPECT_DEPTH_BIT;
+        case VK_FORMAT_S8_UINT:
+            return VK_IMAGE_ASPECT_STENCIL_BIT;
+        default:
+            return VK_IMAGE_ASPECT_COLOR_BIT;
+        }
+    case TextureAspect::Color:
+        return VK_IMAGE_ASPECT_COLOR_BIT;
+    case TextureAspect::Depth:
+        return VK_IMAGE_ASPECT_DEPTH_BIT;
+    case TextureAspect::DepthStencil:
+        return VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT;
+    case TextureAspect::Stencil:
+        return VK_IMAGE_ASPECT_STENCIL_BIT;
+    case TextureAspect::Plane0:
+        return VK_IMAGE_ASPECT_PLANE_0_BIT;
+    case TextureAspect::Plane1:
+        return VK_IMAGE_ASPECT_PLANE_1_BIT;
+
+    case TextureAspect::Plane2:
+        return VK_IMAGE_ASPECT_PLANE_2_BIT;
+
+    case TextureAspect::MetaData:
+        return VK_IMAGE_ASPECT_METADATA_BIT;
+    default:
+        SLANG_UNREACHABLE("getAspectMask");
+        return 0;
+    }
+}
+
 /* static */SlangResult VulkanUtil::toSlangResult(VkResult res)
 {
     return (res == VK_SUCCESS) ? SLANG_OK : SLANG_FAIL;
@@ -452,6 +496,19 @@ VkStencilOpState VulkanUtil::translateStencilState(DepthStencilOpDesc desc)
     rs.reference = 0;
     rs.writeMask = 0xFF;
     return rs;
+}
+
+VkSamplerReductionMode VulkanUtil::translateReductionOp(TextureReductionOp op)
+{
+    switch (op)
+    {
+    case gfx::TextureReductionOp::Minimum:
+        return VK_SAMPLER_REDUCTION_MODE_MIN;
+    case gfx::TextureReductionOp::Maximum:
+        return VK_SAMPLER_REDUCTION_MODE_MAX;
+    default:
+        return VK_SAMPLER_REDUCTION_MODE_WEIGHTED_AVERAGE;
+    }
 }
 
 /* static */Slang::Result VulkanUtil::handleFail(VkResult res)
