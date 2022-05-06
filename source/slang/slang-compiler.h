@@ -2505,13 +2505,16 @@ namespace Slang
         /* Emits entry point source taking into account if a pass-through or not. Uses 'targetFormat' to determine
         the target (not targetReq) */
         SlangResult emitEntryPointsSource(
-            String& outSource);
+            String& outSource,
+            RefPtr<PostEmitMetadata>& outMetadata);
 
         SlangResult emitEntryPointsSourceFromIR(
-            String& outSource);
+            String& outSource,
+            RefPtr<PostEmitMetadata>& outMetadata);
 
         SlangResult emitWithDownstreamForEntryPoints(
-            RefPtr<DownstreamCompileResult>& outResult);
+            RefPtr<DownstreamCompileResult>& outResult,
+            RefPtr<PostEmitMetadata>& outMetadata);
 
         /* Determines a suitable filename to identify the input for a given entry point being compiled.
         If the end-to-end compile is a pass-through case, will attempt to find the (unique) source file
@@ -2527,7 +2530,8 @@ namespace Slang
 
 
         SlangResult _emitEntryPoints(
-            RefPtr<DownstreamCompileResult>& outDownstreamResult);
+            RefPtr<DownstreamCompileResult>& outDownstreamResult,
+            RefPtr<PostEmitMetadata>& outMetadata);
 
     private:
         Shared* m_shared = nullptr;

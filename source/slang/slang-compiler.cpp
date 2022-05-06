@@ -1571,7 +1571,7 @@ void printDiagnosticArg(StringBuilder& sb, CodeGenTarget val)
                 if (getTargetReq()->shouldEmitSPIRVDirectly())
                 {
                     List<uint8_t> spirv;
-                    SLANG_RETURN_ON_FAIL(emitSPIRVForEntryPointsDirectly(this, spirv));
+                    SLANG_RETURN_ON_FAIL(emitSPIRVForEntryPointsDirectly(this, spirv, outMetadata));
                     auto spirvBlob = ListBlob::moveCreate(spirv);
                     outDownstreamResult = new BlobDownstreamCompileResult(DownstreamDiagnostics(), spirvBlob);
                     return SLANG_OK;
