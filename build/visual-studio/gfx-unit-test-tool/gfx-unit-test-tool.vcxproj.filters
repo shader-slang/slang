@@ -9,14 +9,14 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\..\..\tools\gfx-unit-test\gfx-test-texture-util.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\..\tools\gfx-unit-test\gfx-test-util.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\tools\unit-test\slang-unit-test.h">
       <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\tools\gfx-unit-test\gfx-test-texture-util.h">
-      <Filter>Source Files</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -56,6 +56,9 @@
     <ClCompile Include="..\..\..\tools\gfx-unit-test\get-texture-resource-handle-test.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\tools\gfx-unit-test\gfx-test-texture-util.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\..\tools\gfx-unit-test\gfx-test-util.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -87,9 +90,6 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\tools\unit-test\slang-unit-test.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\tools\gfx-unit-test\gfx-test-texture-util.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
