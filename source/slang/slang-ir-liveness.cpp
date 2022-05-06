@@ -109,7 +109,8 @@ struct LivenessContext
     enum class FoundResult
     {
         Found,              ///< All paths were either not dominated, found 
-        NotFound,           ///< It is dominated but no access was found
+        NotFound,           ///< It is dominated but no access was found. 
+        Visited,
         NotDominated,       ///< If it's not dominated it can't have a liveness end 
     };
 
@@ -239,6 +240,9 @@ LivenessContext::FoundResult LivenessContext::processSuccessor(IRBlock* block)
         return _addResult(block, FoundResult::NotDominated);
     }
 
+    // Mark that it is visited
+    m_blockResult.Add(block, FoundResult::Visited);
+
     // Else process the block to try and find the last used instruction
     return processBlock(block);
 }
@@ -254,7 +258,7 @@ LivenessContext::FoundResult LivenessContext::processBlock(IRBlock* block)
     successorResults.setCount(count);
 
     Index foundCount = 0;
-    Index notDominatedCount = 0;
+    Index notFoundCount = 0;
 
     {
         auto cur = successors.begin();
@@ -270,9 +274,11 @@ LivenessContext::FoundResult LivenessContext::processBlock(IRBlock* block)
 
             // Change counts depending on the result
             foundCount += Index(successorResult == FoundResult::Found);
-            notDominatedCount += Index(successorResult == FoundResult::NotDominated);
+            notFoundCount += Index(successorResult == FoundResult::NotFound);
         }
     }
+
+    const Index otherCount = count - (foundCount + notFoundCount);
 
     // If one or more of the successors (or successors of successors),
     // was found to have the last access, we need to mark the end of scope
@@ -280,7 +286,7 @@ LivenessContext::FoundResult LivenessContext::processBlock(IRBlock* block)
     if (foundCount > 0)
     {
         // If all successors have result, or are not dominated
-        if (foundCount + notDominatedCount == count)
+        if (foundCount + otherCount == count)
         {
             return _addResult(block, FoundResult::Found);
         }
@@ -468,6 +474,10 @@ void LivenessContext::processRoot(const RootInfo& rootInfo)
     // by the root. 
 
     {
+        // Mark the root as visited to stop an infinite loop
+        _addResult(m_rootBlock, FoundResult::Visited);
+
+        // Recursively find results
         auto foundResult = processBlock(m_rootBlock);
 
         if (foundResult == FoundResult::NotFound)
@@ -482,6 +492,12 @@ void LivenessContext::processRoot(const RootInfo& rootInfo)
 
 void LivenessContext::_processFunction(IRFunc* funcInst)
 {
+    // If it has no body, then we are done
+    if (funcInst->getFirstBlock() == nullptr)
+    {
+        return;
+    }
+
     List<RootInfo> rootInfos;
 
     // Iterate through blocks in the function, looking for variables to live track
