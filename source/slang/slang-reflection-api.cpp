@@ -2582,11 +2582,11 @@ SLANG_API unsigned spReflectionParameter_GetBindingSpace(SlangReflectionParamete
 
 SLANG_API SlangResult spIsParameterLocationUsed(
     SlangCompileRequest* request,
-    int entryPointIndex,
-    int targetIndex,
+    SlangInt entryPointIndex,
+    SlangInt targetIndex,
     SlangParameterCategory category,
-    int spaceIndex,
-    int registerIndex,
+    SlangUInt spaceIndex,
+    SlangUInt registerIndex,
     bool& outUsed)
 {    
     if (!request)

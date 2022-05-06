@@ -1265,7 +1265,7 @@ static void emitReflectionJSON(
         {
             if (ee != 0) write(writer, ",\n");
 
-            emitReflectionEntryPointJSON(writer, request, programReflection, ee);
+            emitReflectionEntryPointJSON(writer, request, programReflection, (int)ee);
         }
 
         dedent(writer);

@@ -7,7 +7,7 @@
 namespace Slang
 {
 
-static void _insertBinding(List<ShaderBindingRange>& ranges, LayoutResourceKind kind, int spaceIndex, int registerIndex, int count)
+static void _insertBinding(List<ShaderBindingRange>& ranges, LayoutResourceKind kind, UInt spaceIndex, UInt registerIndex, UInt count)
 {
     ShaderBindingRange newRange;
     newRange.category = kind;
@@ -49,7 +49,7 @@ void collectMetadata(const IRModule* irModule, PostEmitMetadata& outMetadata)
                 auto registerIndex = offsetAttr->getOffset();
                 auto size = sizeAttr->getSize();
                 auto count = size.isFinite() ? size.getFiniteValue() : 0;
-                _insertBinding(outMetadata.usedBindings, kind, spaceIndex, registerIndex, (int)count);
+                _insertBinding(outMetadata.usedBindings, kind, spaceIndex, registerIndex, count);
             }
         }
     }

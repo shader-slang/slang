@@ -2130,11 +2130,11 @@ extern "C"
 
     SLANG_API SlangResult spIsParameterLocationUsed(
         SlangCompileRequest* request,
-        int entryPointIndex,
-        int targetIndex,
+        SlangInt entryPointIndex,
+        SlangInt targetIndex,
         SlangParameterCategory category, // is this a `t` register? `s` register?
-        int spaceIndex,      // `space` for D3D12, `set` for Vulkan
-        int registerIndex,   // `register` for D3D12, `binding` for Vulkan
+        SlangUInt spaceIndex,      // `space` for D3D12, `set` for Vulkan
+        SlangUInt registerIndex,   // `register` for D3D12, `binding` for Vulkan
         bool& outUsed);
 
     // Entry Point Reflection
@@ -3888,11 +3888,11 @@ namespace slang
             slang::IComponentType** outProgram) = 0;
 
         virtual SLANG_NO_THROW SlangResult SLANG_MCALL isParameterLocationUsed(
-            int entryPointIndex,
-            int targetIndex,
+            SlangInt entryPointIndex,
+            SlangInt targetIndex,
             SlangParameterCategory category,
-            int spaceIndex,
-            int registerIndex,
+            SlangUInt spaceIndex,
+            SlangUInt registerIndex,
             bool& outUsed) = 0;
 
             /** Set the line directive mode for a target.

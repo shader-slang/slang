@@ -144,7 +144,7 @@ void printDiagnosticArg(StringBuilder& sb, CodeGenTarget val)
         return SLANG_OK;
     }
 
-    SlangResult CompileResult::isParameterLocationUsed(SlangParameterCategory category, int spaceIndex, int registerIndex, bool& outUsed)
+    SlangResult CompileResult::isParameterLocationUsed(SlangParameterCategory category, UInt spaceIndex, UInt registerIndex, bool& outUsed)
     {
         if (!postEmitMetadata)
             return SLANG_E_NOT_AVAILABLE;

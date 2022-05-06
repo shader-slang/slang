@@ -143,16 +143,16 @@ namespace Slang
     struct ShaderBindingRange
     {
         slang::ParameterCategory category = slang::ParameterCategory::None;
-        int spaceIndex = 0;
-        int registerIndex = 0;
-        int registerCount = 0; // 0 for unsized
+        UInt spaceIndex = 0;
+        UInt registerIndex = 0;
+        UInt registerCount = 0; // 0 for unsized
 
         bool isInfinite() const
         {
             return registerCount == 0;
         }
 
-        bool containsBinding(slang::ParameterCategory _category, int _spaceIndex, int _registerIndex) const
+        bool containsBinding(slang::ParameterCategory _category, UInt _spaceIndex, UInt _registerIndex) const
         {
             return category == _category
                 && spaceIndex == _spaceIndex
@@ -184,7 +184,7 @@ namespace Slang
 
         void mergeWith(const ShaderBindingRange other)
         {
-            int newRegisterIndex = Math::Min(registerIndex, other.registerIndex);
+            UInt newRegisterIndex = Math::Min(registerIndex, other.registerIndex);
 
             if (other.isInfinite())
                 registerCount = 0;
@@ -227,7 +227,7 @@ namespace Slang
         SlangResult getBlob(ComPtr<ISlangBlob>& outBlob) const;
         SlangResult getSharedLibrary(ComPtr<ISlangSharedLibrary>& outSharedLibrary);
 
-        SlangResult isParameterLocationUsed(SlangParameterCategory category, int spaceIndex, int registerIndex, bool& outUsed);
+        SlangResult isParameterLocationUsed(SlangParameterCategory category, UInt spaceIndex, UInt registerIndex, bool& outUsed);
                 
         ResultFormat format = ResultFormat::None;
         String outputString;                    ///< Only set if result type is ResultFormat::Text
@@ -2379,7 +2379,7 @@ namespace Slang
         virtual SLANG_NO_THROW void SLANG_MCALL setCommandLineCompilerMode() SLANG_OVERRIDE;
         virtual SLANG_NO_THROW SlangResult SLANG_MCALL addTargetCapability(SlangInt targetIndex, SlangCapabilityID capability) SLANG_OVERRIDE;
         virtual SLANG_NO_THROW SlangResult SLANG_MCALL getProgramWithEntryPoints(slang::IComponentType** outProgram) SLANG_OVERRIDE;
-        virtual SLANG_NO_THROW SlangResult isParameterLocationUsed(int entryPointIndex, int targetIndex, SlangParameterCategory category, int spaceIndex, int registerIndex, bool& outUsed) SLANG_OVERRIDE;
+        virtual SLANG_NO_THROW SlangResult isParameterLocationUsed(SlangInt entryPointIndex, SlangInt targetIndex, SlangParameterCategory category, SlangUInt spaceIndex, SlangUInt registerIndex, bool& outUsed) SLANG_OVERRIDE;
         virtual SLANG_NO_THROW void SLANG_MCALL setTargetLineDirectiveMode(
             SlangInt targetIndex,
             SlangLineDirectiveMode mode) SLANG_OVERRIDE;
