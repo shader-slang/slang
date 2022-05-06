@@ -110,11 +110,14 @@ struct LivenessContext
     {
         Found,              ///< All paths were either not dominated, found 
         NotFound,           ///< It is dominated but no access was found. 
-        Visited,
+        Visited,            ///< The block has been visited (as part of a traversal), but does not yet have a result. Used to detect loops.
         NotDominated,       ///< If it's not dominated it can't have a liveness end 
 
         CountOf,
     };
+
+        /// True if a result can be premoted `from` to `to`
+    static bool canPromote(FoundResult from, FoundResult to) { return Index(to) <= Index(from) && from != FoundResult::NotDominated; }
 
     enum class AccessType
     {
@@ -165,7 +168,7 @@ struct LivenessContext
 
     RefPtr<IRDominatorTree> m_dominatorTree;    ///< The dominator tree for the current function
 
-    IRInst* m_root;                             ///< The root item we are searching for accesses to, to determine scope/liveness
+    RootInfo m_rootInfo;                        ///< The root item we are searching for accesses to, to determine scope/liveness
     IRBlock* m_rootBlock;                       ///< The block the root is in
     
     HashSet<IRInst*> m_accessSet;               ///< Holds a set of all the functions that in some way access the root.
@@ -193,14 +196,20 @@ void LivenessContext::_addLiveRangeEndAtBlockStart(IRBlock* block, IRInst* root)
 
 IRInst* LivenessContext::_findLastAccessInBlock(IRBlock* block)
 {
-    // Search the instructions in this block in reverse order, to find first access
-    for (IRInst* cur = block->getLastChild(); cur; cur = cur->getPrevInst())
+    // If we are in the root block, we don't want to search *before* the liveStart
+    IRInst* lastInst = (block == m_rootBlock) ? m_rootInfo.liveStart : nullptr;
+
+    // Search backwards for first access
+    for (IRInst* cur = block->getLastChild(); cur != lastInst; cur = cur->getPrevInst())
     {
+        SLANG_ASSERT(cur);
+
         if (m_accessSet.Contains(cur))
         {
             return cur;
         }
     }
+
     return nullptr;
 }
 
@@ -210,12 +219,9 @@ LivenessContext::FoundResult LivenessContext::_addResult(IRBlock* block, FoundRe
     if (currentResultPtr)
     {
         const auto currentResult = *currentResultPtr;
-        // If it were NotDominated, it cannot be promoted to Found/NotFound.
-        SLANG_ASSERT(currentResult != FoundResult::NotDominated);
-
-        // We can only promote from NotFound -> Found
-
-        SLANG_ASSERT(Index(result) <= Index(currentResult));
+        
+        // Check we can promote
+        SLANG_ASSERT(canPromote(currentResult, result));
 
         // Set the new result
         *currentResultPtr = result;
@@ -303,7 +309,7 @@ LivenessContext::FoundResult LivenessContext::processBlock(IRBlock* block)
             const auto successorResult = successorResults[i];
             if (successorResult == FoundResult::NotFound)
             {
-                _addLiveRangeEndAtBlockStart(successor, m_root);
+                _addLiveRangeEndAtBlockStart(successor, m_rootInfo.root);
                 _addResult(successor, FoundResult::Found);
             }
         }
@@ -314,7 +320,7 @@ LivenessContext::FoundResult LivenessContext::processBlock(IRBlock* block)
 
     // Search the instructions in this block in reverse order, to find last access
     IRInst* lastAccess = _findLastAccessInBlock(block);
-
+    
     // Wasn't an access so we are done
     if (lastAccess == nullptr)
     {
@@ -329,7 +335,7 @@ LivenessContext::FoundResult LivenessContext::processBlock(IRBlock* block)
     m_builder.setInsertLoc(IRInsertLoc::after(lastAccess));
 
     // Add the live end inst
-    m_builder.emitLiveRangeEnd(m_root);
+    m_builder.emitLiveRangeEnd(m_rootInfo.root);
     return _addResult(block, FoundResult::Found);
 }
 
@@ -343,9 +349,9 @@ void LivenessContext::processRoot(const RootInfo& rootInfo)
     auto root = rootInfo.root;
 
     // Store root information, so don't have to pass around methods
+    m_rootInfo = rootInfo;
     m_rootBlock = as<IRBlock>(root->parent);
-    m_root = root;
-
+    
     // Add the root to the list of aliases, to start lookup
     m_aliases.add(root);
 
