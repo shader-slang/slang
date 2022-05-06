@@ -170,33 +170,33 @@ public:
     virtual void setPrimitiveTopology(PrimitiveTopology topology) override;
 
     virtual void setVertexBuffers(
-        uint32_t startSlot,
-        uint32_t slotCount,
+        GfxIndex startSlot,
+        GfxCount slotCount,
         IBufferResource* const* buffers,
-        const uint32_t* offsets) override;
+        const Offset* offsets) override;
     virtual void setIndexBuffer(
-        IBufferResource* buffer, Format indexFormat, uint32_t offset) override;
-    virtual void setViewports(UInt count, Viewport const* viewports) override;
-    virtual void setScissorRects(UInt count, ScissorRect const* rects) override;
+        IBufferResource* buffer, Format indexFormat, Offset offset) override;
+    virtual void setViewports(GfxCount count, Viewport const* viewports) override;
+    virtual void setScissorRects(GfxCount count, ScissorRect const* rects) override;
     virtual void setPipelineState(IPipelineState* state) override;
-    virtual void draw(uint32_t vertexCount, uint32_t startVertex) override;
+    virtual void draw(GfxCount vertexCount, GfxCount startVertex) override;
     virtual void drawIndexed(
-        uint32_t indexCount, uint32_t startIndex, uint32_t baseVertex) override;
+        GfxCount indexCount, GfxIndex startIndex, GfxIndex baseVertex) override;
     virtual void drawInstanced(
-        uint32_t vertexCount,
-        uint32_t instanceCount,
-        uint32_t startVertex,
-        uint32_t startInstanceLocation) override;
+        GfxCount vertexCount,
+        GfxCount instanceCount,
+        GfxIndex startVertex,
+        GfxIndex startInstanceLocation) override;
     virtual void drawIndexedInstanced(
-        uint32_t indexCount,
-        uint32_t instanceCount,
-        uint32_t startIndexLocation,
-        int32_t baseVertexLocation,
-        uint32_t startInstanceLocation) override;
+        GfxCount indexCount,
+        GfxCount instanceCount,
+        GfxIndex startIndexLocation,
+        GfxIndex baseVertexLocation,
+        GfxIndex startInstanceLocation) override;
     virtual void dispatchCompute(int x, int y, int z) override;
     virtual void submitGpuWork() override {}
     virtual void waitForGpu() override {}
-    virtual void writeTimestamp(IQueryPool* pool, SlangInt index) override
+    virtual void writeTimestamp(IQueryPool* pool, GfxIndex index) override
     {
         SLANG_UNUSED(pool);
         SLANG_UNUSED(index);
@@ -362,9 +362,9 @@ public:
     class FramebufferLayoutImpl : public FramebufferLayoutBase
     {
     public:
-        ShortList<IFramebufferLayout::AttachmentLayout> m_renderTargets;
+        ShortList<IFramebufferLayout::TargetLayout> m_renderTargets;
         bool m_hasDepthStencil = false;
-        IFramebufferLayout::AttachmentLayout m_depthStencil;
+        IFramebufferLayout::TargetLayout m_depthStencil;
     };
 
     class FramebufferImpl : public FramebufferBase
@@ -496,7 +496,7 @@ public:
                     GL_READ_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, m_backBuffer, 0);
 
                 m_images.clear();
-                for (uint32_t i = 0; i < m_desc.imageCount; i++)
+                for (GfxIndex i = 0; i < m_desc.imageCount; i++)
                 {
                     ITextureResource::Desc imageDesc = {};
                     imageDesc.allowedStates = ResourceStateSet(
@@ -535,7 +535,7 @@ public:
         }
         virtual SLANG_NO_THROW const Desc& SLANG_MCALL getDesc() override { return m_desc; }
         virtual SLANG_NO_THROW Result SLANG_MCALL
-            getImage(uint32_t index, ITextureResource** outResource) override
+            getImage(GfxIndex index, ITextureResource** outResource) override
         {
             returnComPtr(outResource, m_images[index]);
             return SLANG_OK;
@@ -570,7 +570,7 @@ public:
             return -1;
         }
 
-        virtual SLANG_NO_THROW Result SLANG_MCALL resize(uint32_t width, uint32_t height) override
+        virtual SLANG_NO_THROW Result SLANG_MCALL resize(GfxCount width, GfxCount height) override
         {
             if (width > 0 && height > 0 && (width != m_desc.width || height != m_desc.height))
             {
@@ -983,9 +983,9 @@ public:
 
         RendererBase* getDevice() { return m_layout->getDevice(); }
 
-        SLANG_NO_THROW UInt SLANG_MCALL getEntryPointCount() SLANG_OVERRIDE { return 0; }
+        SLANG_NO_THROW GfxCount SLANG_MCALL getEntryPointCount() SLANG_OVERRIDE { return 0; }
 
-        SLANG_NO_THROW Result SLANG_MCALL getEntryPoint(UInt index, IShaderObject** outEntryPoint)
+        SLANG_NO_THROW Result SLANG_MCALL getEntryPoint(GfxIndex index, IShaderObject** outEntryPoint)
             SLANG_OVERRIDE
         {
             *outEntryPoint = nullptr;
@@ -1450,8 +1450,8 @@ public:
 
         RootShaderObjectLayoutImpl* getLayout() { return static_cast<RootShaderObjectLayoutImpl*>(m_layout.Ptr()); }
 
-        UInt SLANG_MCALL getEntryPointCount() SLANG_OVERRIDE { return (UInt)m_entryPoints.getCount(); }
-        SlangResult SLANG_MCALL getEntryPoint(UInt index, IShaderObject** outEntryPoint) SLANG_OVERRIDE
+        GfxCount SLANG_MCALL getEntryPointCount() SLANG_OVERRIDE { return (GfxCount)m_entryPoints.getCount(); }
+        SlangResult SLANG_MCALL getEntryPoint(GfxIndex index, IShaderObject** outEntryPoint) SLANG_OVERRIDE
         {
             *outEntryPoint = m_entryPoints[index];
             m_entryPoints[index]->addRef();
@@ -2175,7 +2175,7 @@ SLANG_NO_THROW Result SLANG_MCALL GLDevice::createFramebufferLayout(
 {
     RefPtr<FramebufferLayoutImpl> layout = new FramebufferLayoutImpl();
     layout->m_renderTargets.setCount(desc.renderTargetCount);
-    for (uint32_t i = 0; i < desc.renderTargetCount; i++)
+    for (GfxIndex i = 0; i < desc.renderTargetCount; i++)
     {
         layout->m_renderTargets[i] = desc.renderTargets[i];
     }
@@ -2198,7 +2198,7 @@ SLANG_NO_THROW Result SLANG_MCALL
 {
     RefPtr<FramebufferImpl> framebuffer = new FramebufferImpl(m_weakRenderer);
     framebuffer->renderTargetViews.setCount(desc.renderTargetCount);
-    for (uint32_t i = 0; i < desc.renderTargetCount; i++)
+    for (GfxIndex i = 0; i < desc.renderTargetCount; i++)
     {
         framebuffer->renderTargetViews[i] =
             static_cast<TextureViewImpl*>(desc.renderTargetViews[i]);
@@ -2222,10 +2222,10 @@ void GLDevice::setStencilReference(uint32_t referenceValue)
 
 void GLDevice::copyBuffer(
     IBufferResource* dst,
-    size_t dstOffset,
+    Offset dstOffset,
     IBufferResource* src,
-    size_t srcOffset,
-    size_t size)
+    Offset srcOffset,
+    Size size)
 {
     auto dstImpl = static_cast<BufferResourceImpl*>(dst);
     auto srcImpl = static_cast<BufferResourceImpl*>(src);
@@ -2235,7 +2235,7 @@ void GLDevice::copyBuffer(
 }
 
 SLANG_NO_THROW Result SLANG_MCALL GLDevice::readTextureResource(
-    ITextureResource* texture, ResourceState state, ISlangBlob** outBlob, size_t* outRowPitch, size_t* outPixelSize)
+    ITextureResource* texture, ResourceState state, ISlangBlob** outBlob, Size* outRowPitch, Size* outPixelSize)
 {
     SLANG_UNUSED(state);
     auto resource = static_cast<TextureResourceImpl*>(texture);
@@ -2652,10 +2652,10 @@ void GLDevice::setPrimitiveTopology(PrimitiveTopology topology)
 }
 
 void GLDevice::setVertexBuffers(
-    uint32_t startSlot,
-    uint32_t slotCount,
+    GfxIndex startSlot,
+    GfxCount slotCount,
     IBufferResource* const* buffers,
-    const uint32_t* offsets)
+    const Offset* offsets)
 {
     for (UInt ii = 0; ii < slotCount; ++ii)
     {
@@ -2669,7 +2669,7 @@ void GLDevice::setVertexBuffers(
     }
 }
 
-void GLDevice::setIndexBuffer(IBufferResource* buffer, Format indexFormat, uint32_t offset)
+void GLDevice::setIndexBuffer(IBufferResource* buffer, Format indexFormat, Offset offset)
 {
     auto bufferImpl = static_cast<BufferResourceImpl*>(buffer);
     m_boundIndexBuffer = bufferImpl->m_handle;
@@ -2677,7 +2677,7 @@ void GLDevice::setIndexBuffer(IBufferResource* buffer, Format indexFormat, uint3
     m_boundIndexBufferSize = bufferImpl->m_size;
 }
 
-void GLDevice::setViewports(UInt count, Viewport const* viewports)
+void GLDevice::setViewports(GfxCount count, Viewport const* viewports)
 {
     assert(count == 1);
     auto viewport = viewports[0];
@@ -2689,7 +2689,7 @@ void GLDevice::setViewports(UInt count, Viewport const* viewports)
     glDepthRange(viewport.minZ, viewport.maxZ);
 }
 
-void GLDevice::setScissorRects(UInt count, ScissorRect const* rects)
+void GLDevice::setScissorRects(GfxCount count, ScissorRect const* rects)
 {
     assert(count <= 1);
     if( count )
@@ -2728,14 +2728,14 @@ void GLDevice::setPipelineState(IPipelineState* state)
     glUseProgram(programID);
 }
 
-void GLDevice::draw(uint32_t vertexCount, uint32_t startVertex = 0)
+void GLDevice::draw(GfxCount vertexCount, GfxIndex startVertex = 0)
 {
     flushStateForDraw();
 
     glDrawArrays(m_boundPrimitiveTopology, (GLint)startVertex, (GLsizei)vertexCount);
 }
 
-void GLDevice::drawIndexed(uint32_t indexCount, uint32_t startIndex, uint32_t baseVertex)
+void GLDevice::drawIndexed(GfxCount indexCount, GfxIndex startIndex, GfxIndex baseVertex)
 {
     flushStateForDraw();
 
@@ -2748,20 +2748,20 @@ void GLDevice::drawIndexed(uint32_t indexCount, uint32_t startIndex, uint32_t ba
 }
 
 void GLDevice::drawInstanced(
-    uint32_t vertexCount,
-    uint32_t instanceCount,
-    uint32_t startVertex,
-    uint32_t startInstanceLocation)
+    GfxCount vertexCount,
+    GfxCount instanceCount,
+    GfxIndex startVertex,
+    GfxIndex startInstanceLocation)
 {
     SLANG_UNIMPLEMENTED_X("drawInstanced");
 }
 
 void GLDevice::drawIndexedInstanced(
-    uint32_t indexCount,
-    uint32_t instanceCount,
-    uint32_t startIndexLocation,
-    int32_t baseVertexLocation,
-    uint32_t startInstanceLocation)
+    GfxCount indexCount,
+    GfxCount instanceCount,
+    GfxIndex startIndexLocation,
+    GfxIndex baseVertexLocation,
+    GfxIndex startInstanceLocation)
 {
     SLANG_UNIMPLEMENTED_X("drawIndexedInstanced");
 }

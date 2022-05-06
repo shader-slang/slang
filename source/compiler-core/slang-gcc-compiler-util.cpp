@@ -8,6 +8,9 @@
 #include "../core/slang-io.h"
 #include "../core/slang-shared-library.h"
 #include "../core/slang-char-util.h"
+#include "../core/slang-string-slice-pool.h"
+
+#include "slang-artifact-info.h"
 
 namespace Slang
 {
@@ -619,13 +622,27 @@ static SlangResult _parseGCCFamilyLine(const UnownedStringSlice& line, LineParse
         cmdLine.addArg(sourceFile);
     }
 
+    // Add the library paths
+    StringSlicePool libPathPool(StringSlicePool::Style::Default);
+
     for (const auto& libPath : options.libraryPaths)
     {
-        // Note that any escaping of the path is handled in the ProcessUtil::
-        cmdLine.addArg("-L");
-        cmdLine.addArg(libPath);
-        cmdLine.addArg("-F");
-        cmdLine.addArg(libPath);
+        libPathPool.add(libPath);
+    }
+
+    // Artifacts might add library paths
+    for (IArtifact* artifact : options.libraries)
+    {
+        const auto desc = artifact->getDesc();
+        // If it's a library for CPU types, try and use it
+        if (ArtifactInfoUtil::isCpuBinary(desc) && desc.kind == ArtifactKind::Library)
+        {
+            // Get the name and path (can be empty) to the library
+            SLANG_RETURN_ON_FAIL(artifact->requireFileLike(ArtifactKeep::No));
+
+            libPathPool.add(ArtifactInfoUtil::getParentPath(artifact));
+            cmdLine.addPrefixPathArg("-l", ArtifactInfoUtil::getBaseName(artifact));
+        }
     }
 
     if (options.sourceLanguage == SLANG_SOURCE_LANGUAGE_CPP && !PlatformUtil::isFamily(PlatformFamily::Windows, platformKind))
@@ -634,6 +651,15 @@ static SlangResult _parseGCCFamilyLine(const UnownedStringSlice& line, LineParse
         cmdLine.addArg("-lstdc++");
         // Make maths lib available
         cmdLine.addArg("-lm");
+    }
+
+    for (const auto& libPath : libPathPool.getAdded())
+    {
+        // Note that any escaping of the path is handled in the ProcessUtil::
+        cmdLine.addArg("-L");
+        cmdLine.addArg(libPath);
+        cmdLine.addArg("-F");
+        cmdLine.addArg(libPath);
     }
 
     return SLANG_OK;

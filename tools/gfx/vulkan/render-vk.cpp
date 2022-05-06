@@ -33,38 +33,39 @@ namespace vk
 {
 namespace
 {
-size_t calcRowSize(Format format, int width)
+Size calcRowSize(Format format, int width)
 {
     FormatInfo sizeInfo;
     gfxGetFormatInfo(format, &sizeInfo);
-    return size_t(
+    return Size(
         (width + sizeInfo.blockWidth - 1) / sizeInfo.blockWidth * sizeInfo.blockSizeInBytes);
 }
 
+// TODO: Change size_t to Count?
 size_t calcNumRows(Format format, int height)
 {
     FormatInfo sizeInfo;
     gfxGetFormatInfo(format, &sizeInfo);
     return (size_t)(height + sizeInfo.blockHeight - 1) / sizeInfo.blockHeight;
 }
-VkAttachmentLoadOp translateLoadOp(IRenderPassLayout::AttachmentLoadOp loadOp)
+VkAttachmentLoadOp translateLoadOp(IRenderPassLayout::TargetLoadOp loadOp)
 {
     switch (loadOp)
     {
-    case IRenderPassLayout::AttachmentLoadOp::Clear:
+    case IRenderPassLayout::TargetLoadOp::Clear:
         return VK_ATTACHMENT_LOAD_OP_CLEAR;
-    case IRenderPassLayout::AttachmentLoadOp::Load:
+    case IRenderPassLayout::TargetLoadOp::Load:
         return VK_ATTACHMENT_LOAD_OP_LOAD;
     default:
         return VK_ATTACHMENT_LOAD_OP_DONT_CARE;
     }
 }
 
-VkAttachmentStoreOp translateStoreOp(IRenderPassLayout::AttachmentStoreOp storeOp)
+VkAttachmentStoreOp translateStoreOp(IRenderPassLayout::TargetStoreOp storeOp)
 {
     switch (storeOp)
     {
-    case IRenderPassLayout::AttachmentStoreOp::Store:
+    case IRenderPassLayout::TargetStoreOp::Store:
         return VK_ATTACHMENT_STORE_OP_STORE;
     default:
         return VK_ATTACHMENT_STORE_OP_DONT_CARE;
@@ -487,11 +488,12 @@ DeviceImpl::~DeviceImpl()
     }
 }
 
+// TODO: Is "location" still needed for this function?
 VkBool32 DeviceImpl::handleDebugMessage(
     VkDebugReportFlagsEXT flags,
     VkDebugReportObjectTypeEXT objType,
     uint64_t srcObject,
-    size_t location,
+    Size location,
     int32_t msgCode,
     const char* pLayerPrefix,
     const char* pMsg)
@@ -512,7 +514,7 @@ VkBool32 DeviceImpl::handleDebugMessage(
 
     // pMsg can be really big (it can be assembler dump for example)
     // Use a dynamic buffer to store
-    size_t bufferSize = strlen(pMsg) + 1 + 1024;
+    Size bufferSize = strlen(pMsg) + 1 + 1024;
     List<char> bufferArray;
     bufferArray.setCount(bufferSize);
     char* buffer = bufferArray.getBuffer();
@@ -527,7 +529,7 @@ VKAPI_ATTR VkBool32 VKAPI_CALL DeviceImpl::debugMessageCallback(
     VkDebugReportFlagsEXT flags,
     VkDebugReportObjectTypeEXT objType,
     uint64_t srcObject,
-    size_t location,
+    Size location,
     int32_t msgCode,
     const char* pLayerPrefix,
     const char* pMsg,
@@ -1235,8 +1237,8 @@ SlangResult DeviceImpl::readTextureResource(
     ITextureResource* texture,
     ResourceState state,
     ISlangBlob** outBlob,
-    size_t* outRowPitch,
-    size_t* outPixelSize)
+    Size* outRowPitch,
+    Size* outPixelSize)
 {
     auto textureImpl = static_cast<TextureResourceImpl*>(texture);
     RefPtr<ListBlob> blob = new ListBlob();
@@ -1246,20 +1248,20 @@ SlangResult DeviceImpl::readTextureResource(
     auto height = desc->size.height;
     FormatInfo sizeInfo;
     SLANG_RETURN_ON_FAIL(gfxGetFormatInfo(desc->format, &sizeInfo));
-    size_t pixelSize = sizeInfo.blockSizeInBytes / sizeInfo.pixelsPerBlock;
-    size_t rowPitch = width * pixelSize;
+    Size pixelSize = sizeInfo.blockSizeInBytes / sizeInfo.pixelsPerBlock;
+    Size rowPitch = width * pixelSize;
 
-    List<TextureResource::Size> mipSizes;
+    List<TextureResource::Extents> mipSizes;
 
     const int numMipMaps = desc->numMipLevels;
     auto arraySize = calcEffectiveArraySize(*desc);
 
     // Calculate how large the buffer has to be
-    size_t bufferSize = 0;
+    Size bufferSize = 0;
     // Calculate how large an array entry is
     for (int j = 0; j < numMipMaps; ++j)
     {
-        const TextureResource::Size mipSize = calcMipSize(desc->size, j);
+        const TextureResource::Extents mipSize = calcMipSize(desc->size, j);
 
         auto rowSizeInBytes = calcRowSize(desc->format, mipSize.width);
         auto numRows = calcNumRows(desc->format, mipSize.height);
@@ -1270,6 +1272,7 @@ SlangResult DeviceImpl::readTextureResource(
     }
     // Calculate the total size taking into account the array
     bufferSize *= arraySize;
+    // TODO: Change Index to Count?
     blob->m_data.setCount(Index(bufferSize));
 
     VKBufferHandleRAII staging;
@@ -1283,7 +1286,7 @@ SlangResult DeviceImpl::readTextureResource(
     VkImage srcImage = textureImpl->m_image;
     VkImageLayout srcImageLayout = VulkanUtil::getImageLayoutFromState(state);
 
-    size_t dstOffset = 0;
+    Offset dstOffset = 0;
     for (int i = 0; i < arraySize; ++i)
     {
         for (Index j = 0; j < mipSizes.getCount(); ++j)
@@ -1331,7 +1334,7 @@ SlangResult DeviceImpl::readTextureResource(
 }
 
 SlangResult DeviceImpl::readBufferResource(
-    IBufferResource* inBuffer, size_t offset, size_t size, ISlangBlob** outBlob)
+    IBufferResource* inBuffer, Offset offset, Size size, ISlangBlob** outBlob)
 {
     BufferResourceImpl* buffer = static_cast<BufferResourceImpl*>(inBuffer);
 
@@ -1386,9 +1389,9 @@ Result DeviceImpl::getAccelerationStructurePrebuildInfo(
         &geomInfoBuilder.buildInfo,
         geomInfoBuilder.primitiveCounts.getBuffer(),
         &sizeInfo);
-    outPrebuildInfo->resultDataMaxSize = sizeInfo.accelerationStructureSize;
-    outPrebuildInfo->scratchDataSize = sizeInfo.buildScratchSize;
-    outPrebuildInfo->updateScratchDataSize = sizeInfo.updateScratchSize;
+    outPrebuildInfo->resultDataMaxSize = (Size)sizeInfo.accelerationStructureSize;
+    outPrebuildInfo->scratchDataSize = (Size)sizeInfo.buildScratchSize;
+    outPrebuildInfo->updateScratchDataSize = (Size)sizeInfo.updateScratchSize;
     return SLANG_OK;
 }
 
@@ -1489,7 +1492,7 @@ void DeviceImpl::_transitionImageLayout(
 }
 
 Result DeviceImpl::getTextureAllocationInfo(
-    const ITextureResource::Desc& descIn, size_t* outSize, size_t* outAlignment)
+    const ITextureResource::Desc& descIn, Size* outSize, Size* outAlignment)
 {
     TextureResource::Desc desc = fixupTextureDesc(descIn);
 
@@ -1561,14 +1564,14 @@ Result DeviceImpl::getTextureAllocationInfo(
     VkMemoryRequirements memRequirements;
     m_api.vkGetImageMemoryRequirements(m_device, image, &memRequirements);
 
-    *outSize = (size_t)memRequirements.size;
-    *outAlignment = (size_t)memRequirements.alignment;
+    *outSize = (Size)memRequirements.size;
+    *outAlignment = (Size)memRequirements.alignment;
 
     m_api.vkDestroyImage(m_device, image, nullptr);
     return SLANG_OK;
 }
 
-Result DeviceImpl::getTextureRowAlignment(size_t* outAlignment)
+Result DeviceImpl::getTextureRowAlignment(Size* outAlignment)
 {
     *outAlignment = 1;
     return SLANG_OK;
@@ -1706,18 +1709,18 @@ Result DeviceImpl::createTextureResource(
     VKBufferHandleRAII uploadBuffer;
     if (initData)
     {
-        List<TextureResource::Size> mipSizes;
+        List<TextureResource::Extents> mipSizes;
 
         VkCommandBuffer commandBuffer = m_deviceQueue.getCommandBuffer();
 
         const int numMipMaps = desc.numMipLevels;
 
         // Calculate how large the buffer has to be
-        size_t bufferSize = 0;
+        Size bufferSize = 0;
         // Calculate how large an array entry is
         for (int j = 0; j < numMipMaps; ++j)
         {
-            const TextureResource::Size mipSize = calcMipSize(desc.size, j);
+            const TextureResource::Extents mipSize = calcMipSize(desc.size, j);
 
             auto rowSizeInBytes = calcRowSize(desc.format, mipSize.width);
             auto numRows = calcNumRows(desc.format, mipSize.height);
@@ -1747,7 +1750,7 @@ Result DeviceImpl::createTextureResource(
             uint8_t* dstDataStart;
             dstDataStart = dstData;
 
-            size_t dstSubresourceOffset = 0;
+            Offset dstSubresourceOffset = 0;
             for (int i = 0; i < arraySize; ++i)
             {
                 for (Index j = 0; j < mipSizes.getCount(); ++j)
@@ -1799,7 +1802,7 @@ Result DeviceImpl::createTextureResource(
             VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 
         {
-            size_t srcOffset = 0;
+            Offset srcOffset = 0;
             for (int i = 0; i < arraySize; ++i)
             {
                 for (Index j = 0; j < mipSizes.getCount(); ++j)
@@ -1875,7 +1878,7 @@ Result DeviceImpl::createBufferResource(
 {
     BufferResource::Desc desc = fixupBufferDesc(descIn);
 
-    const size_t bufferSize = desc.sizeInBytes;
+    const Size bufferSize = desc.sizeInBytes;
 
     VkMemoryPropertyFlags reqMemoryProperties = 0;
 
@@ -2003,6 +2006,10 @@ Result DeviceImpl::createSamplerState(ISamplerState::Desc const& desc, ISamplerS
     samplerInfo.mipmapMode = VulkanUtil::translateMipFilterMode(desc.mipFilter);
     samplerInfo.minLod = Math::Max(0.0f, desc.minLOD);
     samplerInfo.maxLod = Math::Clamp(desc.maxLOD, samplerInfo.minLod, VK_LOD_CLAMP_NONE);
+
+    VkSamplerReductionModeCreateInfo reductionInfo = {VK_STRUCTURE_TYPE_SAMPLER_REDUCTION_MODE_CREATE_INFO};
+    reductionInfo.reductionMode = VulkanUtil::translateReductionOp(desc.reductionOp);
+    samplerInfo.pNext = &reductionInfo;
 
     VkSampler sampler;
     SLANG_VK_RETURN_ON_FAIL(m_api.vkCreateSampler(m_device, &samplerInfo, nullptr, &sampler));
@@ -2321,7 +2328,7 @@ Result DeviceImpl::createInputLayout(IInputLayout::Desc const& desc, IInputLayou
     {
         auto& dstStream = dstStreams[i];
         auto& srcStream = srcVertexStreams[i];
-        dstStream.stride = srcStream.stride;
+        dstStream.stride = (uint32_t)srcStream.stride;
         dstStream.binding = (uint32_t)i;
         dstStream.inputRate = (srcStream.slotClass == InputSlotClass::PerInstance)
                                   ? VK_VERTEX_INPUT_RATE_INSTANCE
@@ -2470,10 +2477,10 @@ Result DeviceImpl::createFence(const IFence::Desc& desc, IFence** outFence)
 }
 
 Result DeviceImpl::waitForFences(
-    uint32_t fenceCount, IFence** fences, uint64_t* fenceValues, bool waitForAll, uint64_t timeout)
+    GfxCount fenceCount, IFence** fences, uint64_t* fenceValues, bool waitForAll, uint64_t timeout)
 {
     ShortList<VkSemaphore> semaphores;
-    for (uint32_t i = 0; i < fenceCount; ++i)
+    for (GfxIndex i = 0; i < fenceCount; ++i)
     {
         auto fenceImpl = static_cast<FenceImpl*>(fences[i]);
         semaphores.add(fenceImpl->m_semaphore);
@@ -2575,7 +2582,7 @@ Result TransientResourceHeapImpl::synchronizeAndReset()
 
 Result VKBufferHandleRAII::init(
     const VulkanApi& api,
-    size_t bufferSize,
+    Size bufferSize,
     VkBufferUsageFlags usage,
     VkMemoryPropertyFlags reqMemoryProperties,
     bool isShared,
@@ -2996,18 +3003,18 @@ Result FramebufferLayoutImpl::init(DeviceImpl* renderer, const IFramebufferLayou
     m_renderer = renderer;
     m_renderTargetCount = desc.renderTargetCount;
     // Create render pass.
-    int numAttachments = m_renderTargetCount;
-    m_hasDepthStencilAttachment = (desc.depthStencil != nullptr);
-    if (m_hasDepthStencilAttachment)
+    int numTargets = m_renderTargetCount;
+    m_hasDepthStencilTarget = (desc.depthStencil != nullptr);
+    if (m_hasDepthStencilTarget)
     {
-        numAttachments++;
+        numTargets++;
     }
     // We need extra space if we have depth buffer
-    m_attachmentDescs.setCount(numAttachments);
-    for (uint32_t i = 0; i < desc.renderTargetCount; ++i)
+    m_targetDescs.setCount(numTargets);
+    for (GfxIndex i = 0; i < desc.renderTargetCount; ++i)
     {
         auto& renderTarget = desc.renderTargets[i];
-        VkAttachmentDescription& dst = m_attachmentDescs[i];
+        VkAttachmentDescription& dst = m_targetDescs[i];
 
         dst.flags = 0;
         dst.format = VulkanUtil::getVkFormat(renderTarget.format);
@@ -3032,7 +3039,7 @@ Result FramebufferLayoutImpl::init(DeviceImpl* renderer, const IFramebufferLayou
 
     if (desc.depthStencil)
     {
-        VkAttachmentDescription& dst = m_attachmentDescs[desc.renderTargetCount];
+        VkAttachmentDescription& dst = m_targetDescs[desc.renderTargetCount];
         dst.flags = 0;
         dst.format = VulkanUtil::getVkFormat(desc.depthStencil->format);
         dst.samples = (VkSampleCountFlagBits)desc.depthStencil->sampleCount;
@@ -3048,7 +3055,7 @@ Result FramebufferLayoutImpl::init(DeviceImpl* renderer, const IFramebufferLayou
 
     Array<VkAttachmentReference, kMaxRenderTargets>& colorReferences = m_colorReferences;
     colorReferences.setCount(desc.renderTargetCount);
-    for (uint32_t i = 0; i < desc.renderTargetCount; ++i)
+    for (GfxIndex i = 0; i < desc.renderTargetCount; ++i)
     {
         VkAttachmentReference& dst = colorReferences[i];
         dst.attachment = i;
@@ -3067,14 +3074,14 @@ Result FramebufferLayoutImpl::init(DeviceImpl* renderer, const IFramebufferLayou
     subpassDesc.colorAttachmentCount = desc.renderTargetCount;
     subpassDesc.pColorAttachments = colorReferences.getBuffer();
     subpassDesc.pResolveAttachments = nullptr;
-    subpassDesc.pDepthStencilAttachment = m_hasDepthStencilAttachment ? &m_depthReference : nullptr;
+    subpassDesc.pDepthStencilAttachment = m_hasDepthStencilTarget ? &m_depthReference : nullptr;
     subpassDesc.preserveAttachmentCount = 0u;
     subpassDesc.pPreserveAttachments = nullptr;
 
     VkRenderPassCreateInfo renderPassCreateInfo = {};
     renderPassCreateInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
-    renderPassCreateInfo.attachmentCount = numAttachments;
-    renderPassCreateInfo.pAttachments = m_attachmentDescs.getBuffer();
+    renderPassCreateInfo.attachmentCount = numTargets;
+    renderPassCreateInfo.pAttachments = m_targetDescs.getBuffer();
     renderPassCreateInfo.subpassCount = 1;
     renderPassCreateInfo.pSubpasses = &subpassDesc;
     SLANG_VK_RETURN_ON_FAIL(m_renderer->m_api.vkCreateRenderPass(
@@ -3103,11 +3110,11 @@ Result RenderPassLayoutImpl::init(DeviceImpl* renderer, const IRenderPassLayout:
     assert(desc.renderTargetCount == framebufferLayout->m_renderTargetCount);
 
     // We need extra space if we have depth buffer
-    Array<VkAttachmentDescription, kMaxAttachments> attachmentDescs;
-    attachmentDescs = framebufferLayout->m_attachmentDescs;
-    for (uint32_t i = 0; i < desc.renderTargetCount; ++i)
+    Array<VkAttachmentDescription, kMaxTargets> targetDescs;
+    targetDescs = framebufferLayout->m_targetDescs;
+    for (GfxIndex i = 0; i < desc.renderTargetCount; ++i)
     {
-        VkAttachmentDescription& dst = attachmentDescs[i];
+        VkAttachmentDescription& dst = targetDescs[i];
         auto access = desc.renderTargetAccess[i];
         // Fill in loadOp/storeOp and layout from desc.
         dst.loadOp = translateLoadOp(access.loadOp);
@@ -3118,9 +3125,9 @@ Result RenderPassLayoutImpl::init(DeviceImpl* renderer, const IRenderPassLayout:
         dst.finalLayout = VulkanUtil::mapResourceStateToLayout(access.finalState);
     }
 
-    if (framebufferLayout->m_hasDepthStencilAttachment)
+    if (framebufferLayout->m_hasDepthStencilTarget)
     {
-        VkAttachmentDescription& dst = attachmentDescs[desc.renderTargetCount];
+        VkAttachmentDescription& dst = targetDescs[desc.renderTargetCount];
         auto access = *desc.depthStencilAccess;
         dst.loadOp = translateLoadOp(access.loadOp);
         dst.storeOp = translateStoreOp(access.storeOp);
@@ -3138,7 +3145,7 @@ Result RenderPassLayoutImpl::init(DeviceImpl* renderer, const IRenderPassLayout:
     subpassDesc.colorAttachmentCount = desc.renderTargetCount;
     subpassDesc.pColorAttachments = framebufferLayout->m_colorReferences.getBuffer();
     subpassDesc.pResolveAttachments = nullptr;
-    subpassDesc.pDepthStencilAttachment = framebufferLayout->m_hasDepthStencilAttachment
+    subpassDesc.pDepthStencilAttachment = framebufferLayout->m_hasDepthStencilTarget
                                               ? &framebufferLayout->m_depthReference
                                               : nullptr;
     subpassDesc.preserveAttachmentCount = 0u;
@@ -3146,8 +3153,8 @@ Result RenderPassLayoutImpl::init(DeviceImpl* renderer, const IRenderPassLayout:
 
     VkRenderPassCreateInfo renderPassCreateInfo = {};
     renderPassCreateInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
-    renderPassCreateInfo.attachmentCount = (uint32_t)attachmentDescs.getCount();
-    renderPassCreateInfo.pAttachments = attachmentDescs.getBuffer();
+    renderPassCreateInfo.attachmentCount = (uint32_t)targetDescs.getCount();
+    renderPassCreateInfo.pAttachments = targetDescs.getBuffer();
     renderPassCreateInfo.subpassCount = 1;
     renderPassCreateInfo.pSubpasses = &subpassDesc;
     SLANG_VK_RETURN_ON_FAIL(m_renderer->m_api.vkCreateRenderPass(
@@ -3187,7 +3194,7 @@ Result FramebufferImpl::init(DeviceImpl* renderer, const IFramebuffer::Desc& des
         auto size = resourceDesc->size;
         m_width = getMipLevelSize(viewDesc->subresourceRange.mipLevel, size.width);
         m_height = getMipLevelSize(viewDesc->subresourceRange.mipLevel, size.height);
-        layerCount = viewDesc->subresourceRange.layerCount;
+        layerCount = (resourceDesc->type == IResource::Type::Texture3D) ? size.depth : viewDesc->subresourceRange.layerCount;
     }
     else
     {
@@ -3198,13 +3205,13 @@ Result FramebufferImpl::init(DeviceImpl* renderer, const IFramebuffer::Desc& des
     if (layerCount == 0)
         layerCount = 1;
     // Create render pass.
-    int numAttachments = desc.renderTargetCount;
+    int numTargets = desc.renderTargetCount;
     if (desc.depthStencilView)
-        numAttachments++;
-    Array<VkImageView, kMaxAttachments> imageViews;
-    imageViews.setCount(numAttachments);
+        numTargets++;
+    Array<VkImageView, kMaxTargets> imageViews;
+    imageViews.setCount(numTargets);
     renderTargetViews.setCount(desc.renderTargetCount);
-    for (uint32_t i = 0; i < desc.renderTargetCount; ++i)
+    for (GfxIndex i = 0; i < desc.renderTargetCount; ++i)
     {
         auto resourceView = static_cast<TextureResourceViewImpl*>(desc.renderTargetViews[i]);
         renderTargetViews[i] = resourceView;
@@ -3230,7 +3237,7 @@ Result FramebufferImpl::init(DeviceImpl* renderer, const IFramebuffer::Desc& des
     VkFramebufferCreateInfo framebufferInfo = {};
     framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
     framebufferInfo.renderPass = m_layout->m_renderPass;
-    framebufferInfo.attachmentCount = numAttachments;
+    framebufferInfo.attachmentCount = numTargets;
     framebufferInfo.pAttachments = imageViews.getBuffer();
     framebufferInfo.width = m_width;
     framebufferInfo.height = m_height;
@@ -3460,16 +3467,16 @@ Result PipelineStateImpl::createVKGraphicsPipelineState()
     multisampling.alphaToOneEnable = VK_FALSE;
 
     auto targetCount =
-        Math::Min(framebufferLayoutImpl->m_renderTargetCount, (uint32_t)blendDesc.targetCount);
-    List<VkPipelineColorBlendAttachmentState> colorBlendAttachments;
+        GfxCount(Math::Min(framebufferLayoutImpl->m_renderTargetCount, (uint32_t)blendDesc.targetCount));
+    List<VkPipelineColorBlendAttachmentState> colorBlendTargets;
 
     // Regardless of whether blending is enabled, Vulkan always applies the color write mask
     // operation, so if there is no blending then we need to add an attachment that defines
     // the color write mask to ensure colors are actually written.
     if (targetCount == 0)
     {
-        colorBlendAttachments.setCount(1);
-        auto& vkBlendDesc = colorBlendAttachments[0];
+        colorBlendTargets.setCount(1);
+        auto& vkBlendDesc = colorBlendTargets[0];
         memset(&vkBlendDesc, 0, sizeof(vkBlendDesc));
         vkBlendDesc.blendEnable = VK_FALSE;
         vkBlendDesc.srcColorBlendFactor = VK_BLEND_FACTOR_ONE;
@@ -3482,11 +3489,11 @@ Result PipelineStateImpl::createVKGraphicsPipelineState()
     }
     else
     {
-        colorBlendAttachments.setCount(targetCount);
-        for (UInt i = 0; i < targetCount; ++i)
+        colorBlendTargets.setCount(targetCount);
+        for (GfxIndex i = 0; i < targetCount; ++i)
         {
             auto& gfxBlendDesc = blendDesc.targets[i];
-            auto& vkBlendDesc = colorBlendAttachments[i];
+            auto& vkBlendDesc = colorBlendTargets[i];
 
             vkBlendDesc.blendEnable = gfxBlendDesc.enableBlend;
             vkBlendDesc.srcColorBlendFactor =
@@ -3508,8 +3515,8 @@ Result PipelineStateImpl::createVKGraphicsPipelineState()
     colorBlending.logicOpEnable = VK_FALSE; // TODO: D3D12 has per attachment logic op (and
                                             // both have way more than one op)
     colorBlending.logicOp = VK_LOGIC_OP_COPY;
-    colorBlending.attachmentCount = (uint32_t)colorBlendAttachments.getCount();
-    colorBlending.pAttachments = colorBlendAttachments.getBuffer();
+    colorBlending.attachmentCount = (uint32_t)colorBlendTargets.getCount();
+    colorBlending.pAttachments = colorBlendTargets.getBuffer();
     colorBlending.blendConstants[0] = 0.0f;
     colorBlending.blendConstants[1] = 0.0f;
     colorBlending.blendConstants[2] = 0.0f;
@@ -4733,9 +4740,9 @@ Result ShaderObjectImpl::create(
 
 RendererBase* ShaderObjectImpl::getDevice() { return m_layout->getDevice(); }
 
-UInt ShaderObjectImpl::getEntryPointCount() { return 0; }
+GfxCount ShaderObjectImpl::getEntryPointCount() { return 0; }
 
-Result ShaderObjectImpl::getEntryPoint(UInt index, IShaderObject** outEntryPoint)
+Result ShaderObjectImpl::getEntryPoint(GfxIndex index, IShaderObject** outEntryPoint)
 {
     *outEntryPoint = nullptr;
     return SLANG_OK;
@@ -4743,8 +4750,9 @@ Result ShaderObjectImpl::getEntryPoint(UInt index, IShaderObject** outEntryPoint
 
 const void* ShaderObjectImpl::getRawData() { return m_data.getBuffer(); }
 
-size_t ShaderObjectImpl::getSize() { return (size_t)m_data.getCount(); }
+Size ShaderObjectImpl::getSize() { return (Size)m_data.getCount(); }
 
+// TODO: Change size_t and Index to Size?
 Result ShaderObjectImpl::setData(ShaderOffset const& inOffset, void const* data, size_t inSize)
 {
     Index offset = inOffset.uniformOffset;
@@ -4849,6 +4857,7 @@ Result ShaderObjectImpl::init(IDevice* device, ShaderObjectLayoutImpl* layout)
     // uniform data (which includes values from this object and
     // any existential-type sub-objects).
     //
+    // TODO: Change size_t to Count?
     size_t uniformSize = layout->getElementTypeLayout()->getSize();
     if (uniformSize)
     {
@@ -4911,11 +4920,12 @@ Result ShaderObjectImpl::init(IDevice* device, ShaderObjectLayoutImpl* layout)
 Result ShaderObjectImpl::_writeOrdinaryData(
     PipelineCommandEncoder* encoder,
     IBufferResource* buffer,
-    size_t offset,
-    size_t destSize,
+    Offset offset,
+    Size destSize,
     ShaderObjectLayoutImpl* specializedLayout)
 {
     auto src = m_data.getBuffer();
+    // TODO: Change size_t to Count?
     auto srcSize = size_t(m_data.getCount());
 
     SLANG_ASSERT(srcSize <= destSize);
@@ -4976,8 +4986,8 @@ Result ShaderObjectImpl::_writeOrdinaryData(
         // layout logic does for complex cases with multiple layers of nested arrays and
         // structures.
         //
-        size_t subObjectRangePendingDataOffset = subObjectRangeInfo.offset.pendingOrdinaryData;
-        size_t subObjectRangePendingDataStride = subObjectRangeInfo.stride.pendingOrdinaryData;
+        Offset subObjectRangePendingDataOffset = subObjectRangeInfo.offset.pendingOrdinaryData;
+        Size subObjectRangePendingDataStride = subObjectRangeInfo.stride.pendingOrdinaryData;
 
         // If the range doesn't actually need/use the "pending" allocation at all, then
         // we need to detect that case and skip such ranges.
@@ -5023,8 +5033,8 @@ void ShaderObjectImpl::writeBufferDescriptor(
     BindingOffset const& offset,
     VkDescriptorType descriptorType,
     BufferResourceImpl* buffer,
-    size_t bufferOffset,
-    size_t bufferSize)
+    Offset bufferOffset,
+    Size bufferSize)
 {
     auto descriptorSet = context.descriptorSets[offset.bindingSet];
 
@@ -5785,9 +5795,9 @@ List<RefPtr<EntryPointShaderObject>> const& RootShaderObjectImpl::getEntryPoints
     return m_entryPoints;
 }
 
-UInt RootShaderObjectImpl::getEntryPointCount() { return (UInt)m_entryPoints.getCount(); }
+GfxCount RootShaderObjectImpl::getEntryPointCount() { return (GfxCount)m_entryPoints.getCount(); }
 
-Result RootShaderObjectImpl::getEntryPoint(UInt index, IShaderObject** outEntryPoint)
+Result RootShaderObjectImpl::getEntryPoint(GfxIndex index, IShaderObject** outEntryPoint)
 {
     returnComPtr(outEntryPoint, m_entryPoints[index]);
     return SLANG_OK;
@@ -5995,7 +6005,7 @@ RefPtr<BufferResource> ShaderTableImpl::createDeviceBuffer(
         static_cast<TransientResourceHeapImpl*>(transientHeap);
 
     IBufferResource* stagingBuffer = nullptr;
-    size_t stagingBufferOffset = 0;
+    Offset stagingBufferOffset = 0;
     transientHeapImpl->allocateStagingBuffer(
         tableSize, stagingBuffer, stagingBufferOffset, MemoryType::Upload);
 
@@ -6268,13 +6278,13 @@ void PipelineCommandEncoder::_uploadBufferData(
     VkCommandBuffer commandBuffer,
     TransientResourceHeapImpl* transientHeap,
     BufferResourceImpl* buffer,
-    size_t offset,
-    size_t size,
+    Offset offset,
+    Size size,
     void* data)
 {
     auto& api = buffer->m_renderer->m_api;
     IBufferResource* stagingBuffer = nullptr;
-    size_t stagingBufferOffset = 0;
+    Offset stagingBufferOffset = 0;
     transientHeap->allocateStagingBuffer(
         size, stagingBuffer, stagingBufferOffset, MemoryType::Upload);
 
@@ -6305,7 +6315,7 @@ void PipelineCommandEncoder::_uploadBufferData(
 }
 
 void PipelineCommandEncoder::uploadBufferDataImpl(
-    IBufferResource* buffer, size_t offset, size_t size, void* data)
+    IBufferResource* buffer, Offset offset, Size size, void* data)
 {
     m_vkPreCommandBuffer = m_commandBuffer->getPreCommandBuffer();
     _uploadBufferData(
@@ -6425,7 +6435,7 @@ void PipelineCommandEncoder::bindRenderState(VkPipelineBindPoint pipelineBindPoi
 }
 
 void ResourceCommandEncoder::copyBuffer(
-    IBufferResource* dst, size_t dstOffset, IBufferResource* src, size_t srcOffset, size_t size)
+    IBufferResource* dst, Offset dstOffset, IBufferResource* src, Offset srcOffset, Size size)
 {
     auto& vkAPI = m_commandBuffer->m_renderer->m_api;
 
@@ -6450,7 +6460,7 @@ void ResourceCommandEncoder::copyBuffer(
 }
 
 void ResourceCommandEncoder::uploadBufferData(
-    IBufferResource* buffer, size_t offset, size_t size, void* data)
+    IBufferResource* buffer, Offset offset, Size size, void* data)
 {
     PipelineCommandEncoder::_uploadBufferData(
         m_commandBuffer->m_commandBuffer,
@@ -6462,11 +6472,11 @@ void ResourceCommandEncoder::uploadBufferData(
 }
 
 void ResourceCommandEncoder::textureBarrier(
-    size_t count, ITextureResource* const* textures, ResourceState src, ResourceState dst)
+    GfxCount count, ITextureResource* const* textures, ResourceState src, ResourceState dst)
 {
     ShortList<VkImageMemoryBarrier, 16> barriers;
 
-    for (size_t i = 0; i < count; i++)
+    for (GfxIndex i = 0; i < count; i++)
     {
         auto image = static_cast<TextureResourceImpl*>(textures[i]);
         auto desc = image->getDesc();
@@ -6503,13 +6513,14 @@ void ResourceCommandEncoder::textureBarrier(
         barriers.getArrayView().getBuffer());
 }
 
+// TODO: Change size_t to Count?
 void ResourceCommandEncoder::bufferBarrier(
-    size_t count, IBufferResource* const* buffers, ResourceState src, ResourceState dst)
+    GfxCount count, IBufferResource* const* buffers, ResourceState src, ResourceState dst)
 {
     List<VkBufferMemoryBarrier> barriers;
     barriers.reserve(count);
 
-    for (size_t i = 0; i < count; i++)
+    for (GfxIndex i = 0; i < count; i++)
     {
         auto bufferImpl = static_cast<BufferResourceImpl*>(buffers[i]);
 
@@ -6562,23 +6573,10 @@ void ResourceCommandEncoder::endEncoding()
         nullptr);
 }
 
-void ResourceCommandEncoder::writeTimestamp(IQueryPool* queryPool, SlangInt index)
+void ResourceCommandEncoder::writeTimestamp(IQueryPool* queryPool, GfxIndex index)
 {
     _writeTimestamp(
         &m_commandBuffer->m_renderer->m_api, m_commandBuffer->m_commandBuffer, queryPool, index);
-}
-
-VkImageAspectFlags ResourceCommandEncoder::getAspectMask(TextureAspect aspect)
-{
-    VkImageAspectFlags flags = 0;
-
-    if ((uint32_t)aspect & (uint32_t)TextureAspect::Depth)
-        flags |= VK_IMAGE_ASPECT_DEPTH_BIT;
-    if ((uint32_t)aspect & (uint32_t)TextureAspect::Stencil)
-        flags |= VK_IMAGE_ASPECT_STENCIL_BIT;
-    if ((uint32_t)aspect & (uint32_t)TextureAspect::Color)
-        flags |= VK_IMAGE_ASPECT_COLOR_BIT;
-    return flags;
 }
 
 void ResourceCommandEncoder::copyTexture(
@@ -6590,7 +6588,7 @@ void ResourceCommandEncoder::copyTexture(
     ResourceState srcState,
     SubresourceRange srcSubresource,
     ITextureResource::Offset3D srcOffset,
-    ITextureResource::Size extent)
+    ITextureResource::Extents extent)
 {
     auto srcImage = static_cast<TextureResourceImpl*>(src);
     auto srcDesc = srcImage->getDesc();
@@ -6615,12 +6613,12 @@ void ResourceCommandEncoder::copyTexture(
         srcSubresource.mipLevelCount = dstDesc->numMipLevels;
     }
     VkImageCopy region = {};
-    region.srcSubresource.aspectMask = getAspectMask(srcSubresource.aspectMask);
+    region.srcSubresource.aspectMask = VulkanUtil::getAspectMask(srcSubresource.aspectMask, srcImage->m_vkformat);
     region.srcSubresource.baseArrayLayer = srcSubresource.baseArrayLayer;
     region.srcSubresource.mipLevel = srcSubresource.mipLevel;
     region.srcSubresource.layerCount = srcSubresource.layerCount;
     region.srcOffset = {(int32_t)srcOffset.x, (int32_t)srcOffset.y, (int32_t)srcOffset.z};
-    region.dstSubresource.aspectMask = getAspectMask(dstSubresource.aspectMask);
+    region.dstSubresource.aspectMask = VulkanUtil::getAspectMask(dstSubresource.aspectMask, dstImage->m_vkformat);
     region.dstSubresource.baseArrayLayer = dstSubresource.baseArrayLayer;
     region.dstSubresource.mipLevel = dstSubresource.mipLevel;
     region.dstSubresource.layerCount = dstSubresource.layerCount;
@@ -6642,26 +6640,26 @@ void ResourceCommandEncoder::uploadTextureData(
     ITextureResource* dst,
     SubresourceRange subResourceRange,
     ITextureResource::Offset3D offset,
-    ITextureResource::Size extend,
+    ITextureResource::Extents extend,
     ITextureResource::SubresourceData* subResourceData,
-    size_t subResourceDataCount)
+    GfxCount subResourceDataCount)
 {
     // VALIDATION: dst must be in TransferDst state.
 
     auto& vkApi = m_commandBuffer->m_renderer->m_api;
     auto dstImpl = static_cast<TextureResourceImpl*>(dst);
-    List<TextureResource::Size> mipSizes;
+    List<TextureResource::Extents> mipSizes;
 
     VkCommandBuffer commandBuffer = m_commandBuffer->m_commandBuffer;
     auto& desc = *dstImpl->getDesc();
     // Calculate how large the buffer has to be
-    size_t bufferSize = 0;
+    Size bufferSize = 0;
     // Calculate how large an array entry is
-    for (uint32_t j = subResourceRange.mipLevel;
+    for (GfxIndex j = subResourceRange.mipLevel;
          j < subResourceRange.mipLevel + subResourceRange.mipLevelCount;
          ++j)
     {
-        const TextureResource::Size mipSize = calcMipSize(desc.size, j);
+        const TextureResource::Extents mipSize = calcMipSize(desc.size, j);
 
         auto rowSizeInBytes = calcRowSize(desc.format, mipSize.width);
         auto numRows = calcNumRows(desc.format, mipSize.height);
@@ -6675,7 +6673,7 @@ void ResourceCommandEncoder::uploadTextureData(
     bufferSize *= subResourceRange.layerCount;
 
     IBufferResource* uploadBuffer = nullptr;
-    size_t uploadBufferOffset = 0;
+    Offset uploadBufferOffset = 0;
     m_commandBuffer->m_transientHeap->allocateStagingBuffer(
         bufferSize, uploadBuffer, uploadBufferOffset, MemoryType::Upload);
 
@@ -6689,10 +6687,10 @@ void ResourceCommandEncoder::uploadTextureData(
         uint8_t* dstDataStart;
         dstDataStart = dstData;
 
-        size_t dstSubresourceOffset = 0;
-        for (uint32_t i = 0; i < subResourceRange.layerCount; ++i)
+        Offset dstSubresourceOffset = 0;
+        for (GfxIndex i = 0; i < subResourceRange.layerCount; ++i)
         {
-            for (Index j = 0; j < mipSizes.getCount(); ++j)
+            for (GfxIndex j = 0; j < (GfxCount)mipSizes.getCount(); ++j)
             {
                 const auto& mipSize = mipSizes[j];
 
@@ -6732,10 +6730,10 @@ void ResourceCommandEncoder::uploadTextureData(
         uploadBuffer->unmap(nullptr);
     }
     {
-        size_t srcOffset = uploadBufferOffset;
-        for (uint32_t i = 0; i < subResourceRange.layerCount; ++i)
+        Offset srcOffset = uploadBufferOffset;
+        for (GfxIndex i = 0; i < subResourceRange.layerCount; ++i)
         {
-            for (Index j = 0; j < mipSizes.getCount(); ++j)
+            for (GfxIndex j = 0; j < (GfxCount)mipSizes.getCount(); ++j)
             {
                 const auto& mipSize = mipSizes[j];
 
@@ -6952,8 +6950,11 @@ void ResourceCommandEncoder::clearResourceView(
                     auto viewImpl = static_cast<PlainBufferResourceViewImpl*>(viewImplBase);
                     uint64_t clearStart = viewImpl->m_desc.bufferRange.firstElement;
                     uint64_t clearSize = viewImpl->m_desc.bufferRange.elementCount;
+
                     if (clearSize == 0)
                         clearSize = viewImpl->m_buffer->getDesc()->sizeInBytes - clearStart;
+                    if (viewImpl->m_desc.bufferElementSize != 0)
+                        clearSize *= viewImpl->m_desc.bufferElementSize;
                     api.vkCmdFillBuffer(
                         m_commandBuffer->m_commandBuffer,
                         viewImpl->m_buffer->m_buffer.m_buffer,
@@ -7000,17 +7001,17 @@ void ResourceCommandEncoder::resolveResource(
     auto srcImageLayout = VulkanUtil::getImageLayoutFromState(sourceState);
     auto dstImageLayout = VulkanUtil::getImageLayoutFromState(destState);
 
-    for (uint32_t layer = 0; layer < sourceRange.layerCount; ++layer)
+    for (GfxIndex layer = 0; layer < sourceRange.layerCount; ++layer)
     {
-        for (uint32_t mip = 0; mip < sourceRange.mipLevelCount; ++mip)
+        for (GfxIndex mip = 0; mip < sourceRange.mipLevelCount; ++mip)
         {
             VkImageResolve region = {};
-            region.srcSubresource.aspectMask = getAspectMask(sourceRange.aspectMask);
+            region.srcSubresource.aspectMask = VulkanUtil::getAspectMask(sourceRange.aspectMask, srcTexture->m_vkformat);
             region.srcSubresource.baseArrayLayer = layer + sourceRange.baseArrayLayer;
             region.srcSubresource.layerCount = 1;
             region.srcSubresource.mipLevel = mip + sourceRange.mipLevel;
             region.srcOffset = {0, 0, 0};
-            region.dstSubresource.aspectMask = getAspectMask(destRange.aspectMask);
+            region.dstSubresource.aspectMask = VulkanUtil::getAspectMask(destRange.aspectMask, dstTexture->m_vkformat);
             region.dstSubresource.baseArrayLayer = layer + destRange.baseArrayLayer;
             region.dstSubresource.layerCount = 1;
             region.dstSubresource.mipLevel = mip + destRange.mipLevel;
@@ -7032,7 +7033,7 @@ void ResourceCommandEncoder::resolveResource(
 }
 
 void ResourceCommandEncoder::resolveQuery(
-    IQueryPool* queryPool, uint32_t index, uint32_t count, IBufferResource* buffer, uint64_t offset)
+    IQueryPool* queryPool, GfxIndex index, GfxCount count, IBufferResource* buffer, Offset offset)
 {
     auto& vkApi = m_commandBuffer->m_renderer->m_api;
     auto poolImpl = static_cast<QueryPoolImpl*>(queryPool);
@@ -7050,14 +7051,14 @@ void ResourceCommandEncoder::resolveQuery(
 
 void ResourceCommandEncoder::copyTextureToBuffer(
     IBufferResource* dst,
-    size_t dstOffset,
-    size_t dstSize,
-    size_t dstRowStride,
+    Offset dstOffset,
+    Size dstSize,
+    Size dstRowStride,
     ITextureResource* src,
     ResourceState srcState,
     SubresourceRange srcSubresource,
     ITextureResource::Offset3D srcOffset,
-    ITextureResource::Size extent)
+    ITextureResource::Extents extent)
 {
     assert(srcSubresource.mipLevelCount <= 1);
 
@@ -7070,7 +7071,7 @@ void ResourceCommandEncoder::copyTextureToBuffer(
     region.bufferOffset = dstOffset;
     region.bufferRowLength = 0;
     region.bufferImageHeight = 0;
-    region.imageSubresource.aspectMask = getAspectMask(srcSubresource.aspectMask);
+    region.imageSubresource.aspectMask = VulkanUtil::getAspectMask(srcSubresource.aspectMask, image->m_vkformat);
     region.imageSubresource.mipLevel = srcSubresource.mipLevel;
     region.imageSubresource.baseArrayLayer = srcSubresource.baseArrayLayer;
     region.imageSubresource.layerCount = srcSubresource.layerCount;
@@ -7102,7 +7103,7 @@ void ResourceCommandEncoder::textureSubresourceBarrier(
     barrier.image = image->m_image;
     barrier.oldLayout = translateImageLayout(src);
     barrier.newLayout = translateImageLayout(dst);
-    barrier.subresourceRange.aspectMask = getAspectMask(subresourceRange.aspectMask);
+    barrier.subresourceRange.aspectMask = VulkanUtil::getAspectMask(subresourceRange.aspectMask, image->m_vkformat);
     barrier.subresourceRange.baseArrayLayer = subresourceRange.baseArrayLayer;
     barrier.subresourceRange.baseMipLevel = subresourceRange.mipLevel;
     barrier.subresourceRange.layerCount = subresourceRange.layerCount;
@@ -7159,15 +7160,15 @@ void RenderCommandEncoder::beginPass(IRenderPassLayout* renderPass, IFramebuffer
     if (!framebuffer)
         framebufferImpl = this->m_device->m_emptyFramebuffer;
     RenderPassLayoutImpl* renderPassImpl = static_cast<RenderPassLayoutImpl*>(renderPass);
-    VkClearValue clearValues[kMaxAttachments] = {};
+    VkClearValue clearValues[kMaxTargets] = {};
     VkRenderPassBeginInfo beginInfo = {};
     beginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
     beginInfo.framebuffer = framebufferImpl->m_handle;
     beginInfo.renderPass = renderPassImpl->m_renderPass;
-    uint32_t attachmentCount = (uint32_t)framebufferImpl->renderTargetViews.getCount();
+    uint32_t targetCount = (uint32_t)framebufferImpl->renderTargetViews.getCount();
     if (framebufferImpl->depthStencilView)
-        attachmentCount++;
-    beginInfo.clearValueCount = attachmentCount;
+        targetCount++;
+    beginInfo.clearValueCount = targetCount;
     beginInfo.renderArea.extent.width = framebufferImpl->m_width;
     beginInfo.renderArea.extent.height = framebufferImpl->m_height;
     beginInfo.pClearValues = framebufferImpl->m_clearValues;
@@ -7194,13 +7195,13 @@ Result RenderCommandEncoder::bindPipelineWithRootObject(
     return setPipelineStateWithRootObjectImpl(pipelineState, rootObject);
 }
 
-void RenderCommandEncoder::setViewports(uint32_t count, const Viewport* viewports)
+void RenderCommandEncoder::setViewports(GfxCount count, const Viewport* viewports)
 {
     static const int kMaxViewports = 8; // TODO: base on device caps
     assert(count <= kMaxViewports);
 
     m_viewports.setCount(count);
-    for (UInt ii = 0; ii < count; ++ii)
+    for (GfxIndex ii = 0; ii < count; ++ii)
     {
         auto& inViewport = viewports[ii];
         auto& vkViewport = m_viewports[ii];
@@ -7217,13 +7218,13 @@ void RenderCommandEncoder::setViewports(uint32_t count, const Viewport* viewport
     api.vkCmdSetViewport(m_vkCommandBuffer, 0, uint32_t(count), m_viewports.getBuffer());
 }
 
-void RenderCommandEncoder::setScissorRects(uint32_t count, const ScissorRect* rects)
+void RenderCommandEncoder::setScissorRects(GfxCount count, const ScissorRect* rects)
 {
     static const int kMaxScissorRects = 8; // TODO: base on device caps
     assert(count <= kMaxScissorRects);
 
     m_scissorRects.setCount(count);
-    for (UInt ii = 0; ii < count; ++ii)
+    for (GfxIndex ii = 0; ii < count; ++ii)
     {
         auto& inRect = rects[ii];
         auto& vkRect = m_scissorRects[ii];
@@ -7263,14 +7264,14 @@ void RenderCommandEncoder::setPrimitiveTopology(PrimitiveTopology topology)
 }
 
 void RenderCommandEncoder::setVertexBuffers(
-    uint32_t startSlot,
-    uint32_t slotCount,
+    GfxIndex startSlot,
+    GfxCount slotCount,
     IBufferResource* const* buffers,
-    const uint32_t* offsets)
+    const Offset* offsets)
 {
-    for (Index i = 0; i < Index(slotCount); i++)
+    for (GfxIndex i = 0; i < GfxIndex(slotCount); i++)
     {
-        Index slotIndex = startSlot + i;
+        GfxIndex slotIndex = startSlot + i;
         BufferResourceImpl* buffer = static_cast<BufferResourceImpl*>(buffers[i]);
         if (buffer)
         {
@@ -7284,7 +7285,7 @@ void RenderCommandEncoder::setVertexBuffers(
 }
 
 void RenderCommandEncoder::setIndexBuffer(
-    IBufferResource* buffer, Format indexFormat, uint32_t offset)
+    IBufferResource* buffer, Format indexFormat, Offset offset)
 {
     VkIndexType indexType = VK_INDEX_TYPE_UINT16;
     switch (indexFormat)
@@ -7316,7 +7317,7 @@ void RenderCommandEncoder::prepareDraw()
     bindRenderState(VK_PIPELINE_BIND_POINT_GRAPHICS);
 }
 
-void RenderCommandEncoder::draw(uint32_t vertexCount, uint32_t startVertex)
+void RenderCommandEncoder::draw(GfxCount vertexCount, GfxIndex startVertex)
 {
     prepareDraw();
     auto& api = *m_api;
@@ -7324,7 +7325,7 @@ void RenderCommandEncoder::draw(uint32_t vertexCount, uint32_t startVertex)
 }
 
 void RenderCommandEncoder::drawIndexed(
-    uint32_t indexCount, uint32_t startIndex, uint32_t baseVertex)
+    GfxCount indexCount, GfxIndex startIndex, GfxIndex baseVertex)
 {
     prepareDraw();
     auto& api = *m_api;
@@ -7338,11 +7339,11 @@ void RenderCommandEncoder::setStencilReference(uint32_t referenceValue)
 }
 
 void RenderCommandEncoder::drawIndirect(
-    uint32_t maxDrawCount,
+    GfxCount maxDrawCount,
     IBufferResource* argBuffer,
-    uint64_t argOffset,
+    Offset argOffset,
     IBufferResource* countBuffer,
-    uint64_t countOffset)
+    Offset countOffset)
 {
     // Vulkan does not support sourcing the count from a buffer.
     assert(!countBuffer);
@@ -7359,11 +7360,11 @@ void RenderCommandEncoder::drawIndirect(
 }
 
 void RenderCommandEncoder::drawIndexedIndirect(
-    uint32_t maxDrawCount,
+    GfxCount maxDrawCount,
     IBufferResource* argBuffer,
-    uint64_t argOffset,
+    Offset argOffset,
     IBufferResource* countBuffer,
-    uint64_t countOffset)
+    Offset countOffset)
 {
     // Vulkan does not support sourcing the count from a buffer.
     assert(!countBuffer);
@@ -7380,7 +7381,7 @@ void RenderCommandEncoder::drawIndexedIndirect(
 }
 
 Result RenderCommandEncoder::setSamplePositions(
-    uint32_t samplesPerPixel, uint32_t pixelCount, const SamplePosition* samplePositions)
+    GfxCount samplesPerPixel, GfxCount pixelCount, const SamplePosition* samplePositions)
 {
     if (m_api->vkCmdSetSampleLocationsEXT)
     {
@@ -7395,10 +7396,10 @@ Result RenderCommandEncoder::setSamplePositions(
 }
 
 void RenderCommandEncoder::drawInstanced(
-    uint32_t vertexCount,
-    uint32_t instanceCount,
-    uint32_t startVertex,
-    uint32_t startInstanceLocation)
+    GfxCount vertexCount,
+    GfxCount instanceCount,
+    GfxIndex startVertex,
+    GfxIndex startInstanceLocation)
 {
     prepareDraw();
     auto& api = *m_api;
@@ -7407,11 +7408,11 @@ void RenderCommandEncoder::drawInstanced(
 }
 
 void RenderCommandEncoder::drawIndexedInstanced(
-    uint32_t indexCount,
-    uint32_t instanceCount,
-    uint32_t startIndexLocation,
-    int32_t baseVertexLocation,
-    uint32_t startInstanceLocation)
+    GfxCount indexCount,
+    GfxCount instanceCount,
+    GfxIndex startIndexLocation,
+    GfxIndex baseVertexLocation,
+    GfxIndex startInstanceLocation)
 {
     prepareDraw();
     auto& api = *m_api;
@@ -7452,7 +7453,7 @@ void ComputeCommandEncoder::dispatchCompute(int x, int y, int z)
     m_api->vkCmdDispatch(m_vkCommandBuffer, x, y, z);
 }
 
-void ComputeCommandEncoder::dispatchComputeIndirect(IBufferResource* argBuffer, uint64_t offset)
+void ComputeCommandEncoder::dispatchComputeIndirect(IBufferResource* argBuffer, Offset offset)
 {
     SLANG_UNIMPLEMENTED_X("dispatchComputeIndirect");
 }
@@ -7497,20 +7498,20 @@ void RayTracingCommandEncoder::_memoryBarrier(
 }
 
 void RayTracingCommandEncoder::_queryAccelerationStructureProperties(
-    int accelerationStructureCount,
+    GfxCount accelerationStructureCount,
     IAccelerationStructure* const* accelerationStructures,
-    int queryCount,
+    GfxCount queryCount,
     AccelerationStructureQueryDesc* queryDescs)
 {
     ShortList<VkAccelerationStructureKHR> vkHandles;
     vkHandles.setCount(accelerationStructureCount);
-    for (int i = 0; i < accelerationStructureCount; i++)
+    for (GfxIndex i = 0; i < accelerationStructureCount; i++)
     {
         vkHandles[i] =
             static_cast<AccelerationStructureImpl*>(accelerationStructures[i])->m_vkHandle;
     }
     auto vkHandlesView = vkHandles.getArrayView();
-    for (int i = 0; i < queryCount; i++)
+    for (GfxIndex i = 0; i < queryCount; i++)
     {
         VkQueryType queryType;
         switch (queryDescs[i].queryType)
@@ -7548,7 +7549,7 @@ void RayTracingCommandEncoder::_queryAccelerationStructureProperties(
 
 void RayTracingCommandEncoder::buildAccelerationStructure(
     const IAccelerationStructure::BuildDesc& desc,
-    int propertyQueryCount,
+    GfxCount propertyQueryCount,
     AccelerationStructureQueryDesc* queryDescs)
 {
     AccelerationStructureBuildGeometryInfoBuilder geomInfoBuilder;
@@ -7616,9 +7617,9 @@ void RayTracingCommandEncoder::copyAccelerationStructure(
 }
 
 void RayTracingCommandEncoder::queryAccelerationStructureProperties(
-    int accelerationStructureCount,
+    GfxCount accelerationStructureCount,
     IAccelerationStructure* const* accelerationStructures,
-    int queryCount,
+    GfxCount queryCount,
     AccelerationStructureQueryDesc* queryDescs)
 {
     _queryAccelerationStructureProperties(
@@ -7661,11 +7662,11 @@ Result RayTracingCommandEncoder::bindPipelineWithRootObject(
 }
 
 void RayTracingCommandEncoder::dispatchRays(
-    uint32_t raygenShaderIndex,
+    GfxIndex raygenShaderIndex,
     IShaderTable* shaderTable,
-    int32_t width,
-    int32_t height,
-    int32_t depth)
+    GfxCount width,
+    GfxCount height,
+    GfxCount depth)
 {
     auto vkApi = m_commandBuffer->m_renderer->m_api;
     auto vkCommandBuffer = m_commandBuffer->m_commandBuffer;
@@ -7759,9 +7760,9 @@ Result CommandQueueImpl::getNativeHandle(InteropHandle* outHandle)
 const CommandQueueImpl::Desc& CommandQueueImpl::getDesc() { return m_desc; }
 
 Result CommandQueueImpl::waitForFenceValuesOnDevice(
-    uint32_t fenceCount, IFence** fences, uint64_t* waitValues)
+    GfxCount fenceCount, IFence** fences, uint64_t* waitValues)
 {
-    for (uint32_t i = 0; i < fenceCount; ++i)
+    for (GfxIndex i = 0; i < fenceCount; ++i)
     {
         FenceWaitInfo waitInfo;
         waitInfo.fence = static_cast<FenceImpl*>(fences[i]);
@@ -7847,7 +7848,7 @@ void CommandQueueImpl::queueSubmitImpl(
 }
 
 void CommandQueueImpl::executeCommandBuffers(
-    uint32_t count, ICommandBuffer* const* commandBuffers, IFence* fence, uint64_t valueToSignal)
+    GfxCount count, ICommandBuffer* const* commandBuffers, IFence* fence, uint64_t valueToSignal)
 {
     if (count == 0 && fence == nullptr)
         return;
@@ -7888,7 +7889,7 @@ QueryPoolImpl::~QueryPoolImpl()
     m_device->m_api.vkDestroyQueryPool(m_device->m_api.m_device, m_pool, nullptr);
 }
 
-Result QueryPoolImpl::getResult(SlangInt index, SlangInt count, uint64_t* data)
+Result QueryPoolImpl::getResult(GfxIndex index, GfxCount count, uint64_t* data)
 {
     if (!m_pool)
     {
@@ -8046,7 +8047,7 @@ Result SwapchainImpl::createSwapchainAndImages()
             m_api->m_device, m_swapChain, &numSwapChainImages, vkImages.getBuffer());
     }
 
-    for (uint32_t i = 0; i < m_desc.imageCount; i++)
+    for (GfxIndex i = 0; i < m_desc.imageCount; i++)
     {
         ITextureResource::Desc imageDesc = {};
         imageDesc.allowedStates = ResourceStateSet(
@@ -8175,7 +8176,7 @@ Result SwapchainImpl::init(DeviceImpl* renderer, const ISwapchain::Desc& desc, W
     return SLANG_OK;
 }
 
-Result SwapchainImpl::getImage(uint32_t index, ITextureResource** outResource)
+Result SwapchainImpl::getImage(GfxIndex index, ITextureResource** outResource)
 {
     if (m_images.getCount() <= (Index)index)
         return SLANG_FAIL;
@@ -8183,7 +8184,7 @@ Result SwapchainImpl::getImage(uint32_t index, ITextureResource** outResource)
     return SLANG_OK;
 }
 
-Result SwapchainImpl::resize(uint32_t width, uint32_t height)
+Result SwapchainImpl::resize(GfxCount width, GfxCount height)
 {
     SLANG_UNUSED(width);
     SLANG_UNUSED(height);

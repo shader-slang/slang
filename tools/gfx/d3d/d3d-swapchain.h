@@ -92,7 +92,7 @@ public:
     }
     virtual SLANG_NO_THROW const Desc& SLANG_MCALL getDesc() override { return m_desc; }
     virtual SLANG_NO_THROW Result SLANG_MCALL
-        getImage(uint32_t index, ITextureResource** outResource) override
+        getImage(GfxIndex index, ITextureResource** outResource) override
     {
         returnComPtr(outResource, m_images[index]);
         return SLANG_OK;
@@ -114,7 +114,7 @@ public:
     }
 
 
-    virtual SLANG_NO_THROW Result SLANG_MCALL resize(uint32_t width, uint32_t height) override
+    virtual SLANG_NO_THROW Result SLANG_MCALL resize(GfxCount width, GfxCount height) override
     {
         if (width == m_desc.width && height == m_desc.height)
             return SLANG_OK;

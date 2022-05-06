@@ -1047,9 +1047,19 @@ static void addLinkageDecoration(
         builder->addPublicDecoration(inst);
         builder->addKeepAliveDecoration(inst);
     }
+    if (decl->findModifier<HLSLExportModifier>())
+    {
+        builder->addHLSLExportDecoration(inst);
+        builder->addKeepAliveDecoration(inst);
+    }
     if (decl->findModifier<ExternCppModifier>())
     {
         builder->addExternCppDecoration(inst, mangledName);
+    }
+    if (auto dllImportModifier = decl->findModifier<DllImportAttribute>())
+    {
+        auto libraryName = dllImportModifier->modulePath;
+        builder->addDllImportDecoration(inst, libraryName.getUnownedSlice(), decl->getName()->text.getUnownedSlice());
     }
 }
 
@@ -1871,13 +1881,13 @@ void addVarDecorations(
         {
             builder->addInterpolationModeDecoration(inst, IRInterpolationMode::Centroid);
         }
-        else if(as<VulkanRayPayloadAttribute>(mod))
+        else if(auto rayPayloadAttr = as<VulkanRayPayloadAttribute>(mod))
         {
-            builder->addSimpleDecoration<IRVulkanRayPayloadDecoration>(inst);
+            builder->addVulkanRayPayloadDecoration(inst, rayPayloadAttr->location);
         }
-        else if(as<VulkanCallablePayloadAttribute>(mod))
+        else if(auto callablePayloadAttr = as<VulkanCallablePayloadAttribute>(mod))
         {
-            builder->addSimpleDecoration<IRVulkanCallablePayloadDecoration>(inst);
+            builder->addVulkanCallablePayloadDecoration(inst, callablePayloadAttr->location);
         }
         else if(as<VulkanHitAttributesAttribute>(mod))
         {
@@ -3171,6 +3181,11 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
     LoweredValInfo visitBoolLiteralExpr(BoolLiteralExpr* expr)
     {
         return LoweredValInfo::simple(context->irBuilder->getBoolValue(expr->value));
+    }
+
+    LoweredValInfo visitNullPtrLiteralExpr(NullPtrLiteralExpr*)
+    {
+        return LoweredValInfo::simple(context->irBuilder->getPtrValue(nullptr));
     }
 
     LoweredValInfo visitIntegerLiteralExpr(IntegerLiteralExpr* expr)
@@ -5398,6 +5413,10 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
     bool isPublicType(Type* type)
     {
+        // TODO(JS):
+        // Not clear how should handle HLSLExportModifier here. 
+        // In the HLSL spec 'export' is only applicable to functions. So for now we ignore.
+
         if (auto declRefType = as<DeclRefType>(type))
         {
             if (declRefType->declRef.getDecl()->findModifier<PublicModifier>())
@@ -5585,6 +5604,11 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         irWitnessTable->setOperand(0, irSubType);
 
         addLinkageDecoration(context, irWitnessTable, inheritanceDecl, mangledName.getUnownedSlice());
+
+        // TODO(JS):
+        // Not clear what to do here around HLSLExportModifier. 
+        // In HLSL it only (currently) applies to functions, so perhaps do nothing is reasonable.
+        
         if (parentDecl->findModifier<PublicModifier>())
         {
             subBuilder->addPublicDecoration(irWitnessTable);
@@ -5723,9 +5747,35 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         return paramVal;
     }
 
-    LoweredValInfo lowerConstantDeclCommon(VarDeclBase* decl, IRGenContext* subContext)
+    LoweredValInfo lowerConstantDeclCommon(VarDeclBase* decl) 
     {
-        auto builder = subContext->irBuilder;
+        // It's constant, so shoul dhave this modifier
+        SLANG_ASSERT(decl->hasModifier<ConstModifier>());
+
+        NestedContext nested(this);
+        auto subBuilder = nested.getBuilder();
+        auto subContext = nested.getContext();
+        IRGeneric* outerGeneric = emitOuterGenerics(subContext, decl, decl);
+
+        // TODO(JS): Is this right? 
+        //
+        // If we *are* in a generic, then outputting this in the (current) generic scope would be correct.
+        // If we *aren't* we want to go the level above for insertion
+        //
+        // Just inserting into the parent doesn't work with a generic that holds a function that has a static const
+        // variable.
+        // 
+        // This tries to match the behavior of previous `lowerFunctionStaticConstVarDecl` functionality
+        if (!outerGeneric && isFunctionStaticVarDecl(decl))
+        {
+            // We need to insert the constant at a level above
+            // the function being emitted. This will usually
+            // be the global scope, but it might be an outer
+            // generic if we are lowering a generic function.
+
+            subBuilder->setInsertInto(subBuilder->getFunc()->getParent());
+        }
+
         auto initExpr = decl->initExpr;
 
         // We want to be able to support cases where a global constant is defined in
@@ -5752,7 +5802,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             // a global constant IR node with the right type.
             //
             auto irType = lowerType(subContext, decl->getType());
-            irConstant = builder->emitGlobalConstant(irType);
+            irConstant = subBuilder->emitGlobalConstant(irType);
         }
         else
         {
@@ -5768,7 +5818,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             // We construct a distinct IR instruction to represent the
             // constant itself, with the value as an operand.
             //
-            irConstant = builder->emitGlobalConstant(
+            irConstant = subBuilder->emitGlobalConstant(
                 irInitVal->getFullType(),
                 irInitVal);
         }
@@ -5776,24 +5826,30 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // All of the attributes/decorations we can attach
         // belong on the IR constant node.
         //
+
         addLinkageDecoration(context, irConstant, decl);
+        
         addNameHint(context, irConstant, decl);
         addVarDecorations(context, irConstant, decl);
+
         getBuilder()->addHighLevelDeclDecoration(irConstant, decl);
+
+        // Finish of generic
+
+        auto loweredValue = LoweredValInfo::simple(finishOuterGenerics(subBuilder, irConstant, outerGeneric));
 
         // Register the value that was emitted as the value
         // for any references to the constant from elsewhere
         // in the code.
         //
-        auto constantVal = LoweredValInfo::simple(irConstant);
-        setGlobalValue(context, decl, constantVal);
+        setGlobalValue(context, decl, loweredValue);
 
-        return constantVal;
+        return loweredValue;
     }
 
     LoweredValInfo lowerGlobalConstantDecl(VarDecl* decl)
     {
-        return lowerConstantDeclCommon(decl, context);
+        return lowerConstantDeclCommon(decl);
     }
 
     LoweredValInfo lowerGlobalVarDecl(VarDecl* decl)
@@ -5919,18 +5975,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
     LoweredValInfo lowerFunctionStaticConstVarDecl(
         VarDeclBase* decl)
     {
-        // We need to insert the constant at a level above
-        // the function being emitted. This will usually
-        // be the global scope, but it might be an outer
-        // generic if we are lowering a generic function.
-        //
-        NestedContext nestedContext(this);
-        auto subBuilder = nestedContext.getBuilder();
-        auto subContext = nestedContext.getContext();
-
-        subBuilder->setInsertInto(subBuilder->getFunc()->getParent());
-
-        return lowerConstantDeclCommon(decl, subContext);
+        return lowerConstantDeclCommon(decl);
     }
 
     LoweredValInfo lowerFunctionStaticVarDecl(
@@ -6309,7 +6354,11 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             SLANG_UNREACHABLE("associatedtype should have been handled by visitAssocTypeDecl.");
         }
 
-        bool isPublicType = decl->findModifier<PublicModifier>() != nullptr;
+        // TODO(JS): 
+        // Not clear what to do around HLSLExportModifier. 
+        // The HLSL spec says it only applies to functions, so we ignore for now.
+
+        const bool isPublicType = decl->findModifier<PublicModifier>() != nullptr;
 
         // Given a declaration of a type, we need to make sure
         // to output "witness tables" for any interfaces this
@@ -7393,10 +7442,6 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             getBuilder()->addSimpleDecoration<IRNoInlineDecoration>(irFunc);
         }
 
-        if (decl->findModifier<PublicModifier>()) {
-            getBuilder()->addSimpleDecoration<IRPublicDecoration>(irFunc);
-        }
-
         if (auto attr = decl->findModifier<InstanceAttribute>())
         {
             IRIntLit* intLit = _getIntLitFromAttribute(getBuilder(), attr);
@@ -7590,6 +7635,13 @@ LoweredValInfo ensureDecl(
         env = env->outer;
     }
 
+    // If we have a decl that's a generic value/type decl then something has gone seriously
+    // wrong
+    if (as<GenericValueParamDecl>(decl) || as<GenericTypeParamDecl>(decl))
+    {
+        SLANG_UNEXPECTED("Generic type/value shouldn't be handled here!");
+    }
+
     IRBuilder subIRBuilder(context->irBuilder->getSharedBuilder());
     subIRBuilder.setInsertInto(subIRBuilder.getModule());
 
@@ -7625,6 +7677,15 @@ bool canDeclLowerToAGeneric(Decl* decl)
     // a generic that returns a type (a simple type-level function).
     if(as<TypeDefDecl>(decl)) return true;
 
+    // If we have a variable declaration that is *static* and *const* we can lower to a generic
+    if (auto varDecl = as<VarDecl>(decl))
+    {
+        if (varDecl->hasModifier<HLSLStaticModifier>() && varDecl->hasModifier<ConstModifier>())
+        {
+            return true;
+        }
+    }
+    
     return false;
 }
 
@@ -7674,6 +7735,9 @@ LoweredValInfo emitDeclRef(
     Substitutions*   subst,
     IRType*                 type)
 {
+    const auto initialSubst = subst;
+    SLANG_UNUSED(initialSubst);
+
     // We need to proceed by considering the specializations that
     // have been put in place.
 

@@ -1582,7 +1582,7 @@ T distance(vector<T, N> x, vector<T, N> y)
 
 // Vector dot product
 
-__generic<T : __BuiltinArithmeticType, let N : int>
+__generic<T : __BuiltinFloatingPointType, let N : int>
 __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
 T dot(vector<T, N> x, vector<T, N> y)
@@ -1592,6 +1592,17 @@ T dot(vector<T, N> x, vector<T, N> y)
         result += x[i] * y[i];
     return result;
 }
+
+__generic<T : __BuiltinIntegerType, let N : int>
+__target_intrinsic(hlsl)
+T dot(vector<T, N> x, vector<T, N> y)
+{
+    T result = T(0);
+    for(int i = 0; i < N; ++i)
+        result += x[i] * y[i];
+    return result;
+}
+
 
 // Helper for computing distance terms for lighting (obsolete)
 
@@ -2568,9 +2579,15 @@ __intrinsic_op($(kIROp_Mul))
 matrix<T, N, M> mul(T x, matrix<T, N, M> y);
 
 // vector-vector (dot product)
-__generic<T : __BuiltinArithmeticType, let N : int>
+__generic<T : __BuiltinFloatingPointType, let N : int>
 __target_intrinsic(hlsl)
 __target_intrinsic(glsl, "dot")
+T mul(vector<T, N> x, vector<T, N> y)
+{
+    return dot(x, y);
+}
+__generic<T : __BuiltinIntegerType, let N : int>
+__target_intrinsic(hlsl)
 T mul(vector<T, N> x, vector<T, N> y)
 {
     return dot(x, y);
@@ -4500,7 +4517,7 @@ __generic<Payload>
 __specialized_for_target(glsl)
 void CallShader(uint shaderIndex, inout Payload payload)
 {
-    [__vulkanRayPayload]
+    [__vulkanCallablePayload]
     static Payload p;
 
     p = payload;
@@ -4736,12 +4753,12 @@ uint RayFlags();
 
 // 10.4.3 - Primitive/Object Space System Values
 
-__target_intrinsic(GL_NV_ray_tracing, "(gl_InstanceCustomIndexNV)")
-__target_intrinsic(GL_EXT_ray_tracing, "(gl_InstanceCustomIndexEXT)")
+__target_intrinsic(__glslRayTracing, "(gl_InstanceID)")
 __target_intrinsic(cuda, "optixGetInstanceIndex")
 uint InstanceIndex();
 
-__target_intrinsic(__glslRayTracing, "(gl_InstanceID)")
+__target_intrinsic(GL_NV_ray_tracing, "(gl_InstanceCustomIndexNV)")
+__target_intrinsic(GL_EXT_ray_tracing, "(gl_InstanceCustomIndexEXT)")
 __target_intrinsic(cuda, "optixGetInstanceId")
 uint InstanceID();
 
@@ -5026,7 +5043,7 @@ __target_intrinsic(hlsl, RayQuery)
 __target_intrinsic(glsl, rayQueryEXT)
 __glsl_extension(GL_EXT_ray_query)
 __glsl_version(460)
-struct RayQuery <let rayFlags : RAY_FLAG = RAY_FLAG_NONE>
+struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
 {
     // Initialize the query object in a "fresh" state.
     //
@@ -5074,7 +5091,7 @@ struct RayQuery <let rayFlags : RAY_FLAG = RAY_FLAG_NONE>
     {
         __rayQueryInitializeEXT(
             accelerationStructure,
-            rayFlags,
+            rayFlags | rayFlagsGeneric,
             instanceInclusionMask,
             ray.Origin,
             ray.TMin,
@@ -5148,12 +5165,12 @@ struct RayQuery <let rayFlags : RAY_FLAG = RAY_FLAG_NONE>
     __glsl_version(460)
     float4x3 CandidateWorldToObject4x3();
 
-    __target_intrinsic(glsl, "rayQueryGetIntersectionInstanceCustomIndexEXT($0, false)")
+    __target_intrinsic(glsl, "rayQueryGetIntersectionInstanceIdEXT($0, false)")
     __glsl_extension(GL_EXT_ray_query)
     __glsl_version(460)
     uint CandidateInstanceIndex();
 
-    __target_intrinsic(glsl, "rayQueryGetIntersectionInstanceIdEXT($0, false)")
+    __target_intrinsic(glsl, "rayQueryGetIntersectionInstanceCustomIndexEXT($0, false)")
     __glsl_extension(GL_EXT_ray_query)
     __glsl_version(460)
     uint CandidateInstanceID();
@@ -5255,12 +5272,12 @@ struct RayQuery <let rayFlags : RAY_FLAG = RAY_FLAG_NONE>
     __glsl_version(460)
     float CommittedRayT();
 
-    __target_intrinsic(glsl, "rayQueryGetIntersectionInstanceCustomIndexEXT($0, true)")
+    __target_intrinsic(glsl, "rayQueryGetIntersectionInstanceIdEXT($0, true)")
     __glsl_extension(GL_EXT_ray_query)
     __glsl_version(460)
     uint CommittedInstanceIndex();
 
-    __target_intrinsic(glsl, "rayQueryGetIntersectionInstanceIdEXT($0, true)")
+    __target_intrinsic(glsl, "rayQueryGetIntersectionInstanceCustomIndexEXT($0, true)")
     __glsl_extension(GL_EXT_ray_query)
     __glsl_version(460)
     uint CommittedInstanceID();

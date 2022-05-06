@@ -174,12 +174,12 @@ GUI::GUI(
     {
         IRenderPassLayout::Desc desc;
         desc.framebufferLayout = framebufferLayout;
-        IRenderPassLayout::AttachmentAccessDesc colorAccess;
+        IRenderPassLayout::TargetAccessDesc colorAccess;
         desc.depthStencilAccess = nullptr;
         colorAccess.initialState = ResourceState::Present;
         colorAccess.finalState = ResourceState::Present;
-        colorAccess.loadOp = IRenderPassLayout::AttachmentLoadOp::Load;
-        colorAccess.storeOp = IRenderPassLayout::AttachmentStoreOp::Store;
+        colorAccess.loadOp = IRenderPassLayout::TargetLoadOp::Load;
+        colorAccess.storeOp = IRenderPassLayout::TargetStoreOp::Store;
         desc.renderTargetAccess = &colorAccess;
         desc.renderTargetCount = 1;
         renderPass = device->createRenderPassLayout(desc);

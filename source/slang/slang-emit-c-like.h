@@ -22,10 +22,7 @@ class CLikeSourceEmitter: public SourceEmitterBase
 public:
     struct Desc
     {
-        BackEndCompileRequest* compileRequest = nullptr;
-
-        /// The target language we want to generate code for
-        CodeGenTarget target = CodeGenTarget::Unknown;
+        CodeGenContext* codeGenContext = nullptr;
 
             /// The stage for the entry point we are being asked to compile
         Stage entryPointStage = Stage::Unknown;
@@ -34,15 +31,7 @@ public:
             /// combining information from the target and entry point.
         Profile effectiveProfile = Profile::RawEnum::Unknown;
 
-            /// The capabilities of the target
-        CapabilitySet targetCaps;
-
-            /// The associated extension tracker
-        ExtensionTracker* extensionTracker = nullptr;
-
         SourceWriter* sourceWriter = nullptr;
-
-        TargetRequest* targetRequest = nullptr;
     };
 
     enum
@@ -79,6 +68,7 @@ public:
         {
             Name,
             Ptr,
+            Ref,
             SizedArray,
             UnsizedArray,
             LiteralSizedArray,
@@ -121,6 +111,13 @@ public:
         {}
     };
 
+    struct RefDeclaratorInfo : ChainedDeclaratorInfo
+    {
+        RefDeclaratorInfo(DeclaratorInfo* next)
+            : ChainedDeclaratorInfo(Flavor::Ref, next)
+        {}
+    };
+
     struct SizedArrayDeclaratorInfo : ChainedDeclaratorInfo
     {
         IRInst* elementCount;
@@ -156,6 +153,16 @@ public:
         {}
 
         IRInst* instWithAttributes;
+    };
+
+    struct FuncTypeDeclaratorInfo : ChainedDeclaratorInfo
+    {
+        FuncTypeDeclaratorInfo(DeclaratorInfo* next, IRFuncType* funcTypeInst)
+            : ChainedDeclaratorInfo(Flavor::Attributed, next)
+            , funcType(funcTypeInst)
+        {}
+
+        IRFuncType* funcType;
     };
 
     struct ComputeEmitActionsContext;
@@ -202,13 +209,13 @@ public:
 
     
         /// Get the source manager
-    SourceManager* getSourceManager() { return m_compileRequest->getSourceManager(); }
+    SourceManager* getSourceManager() { return m_codeGenContext->getSourceManager(); }
 
         /// Get the source writer used
     SourceWriter* getSourceWriter() const { return m_writer; }
 
         /// Get the diagnostic sink
-    DiagnosticSink* getSink() { return m_compileRequest->getSink();}
+    DiagnosticSink* getSink() { return m_codeGenContext->getSink();}
 
         /// Get the code gen target
     CodeGenTarget getTarget() { return m_target; }
@@ -217,7 +224,14 @@ public:
 
     void noteInternalErrorLoc(SourceLoc loc) { return getSink()->noteInternalErrorLoc(loc); }
 
-    CapabilitySet getTargetCaps() { return m_targetCaps; }
+    CapabilitySet getTargetCaps() { return m_codeGenContext->getTargetCaps(); }
+
+    CodeGenContext* getCodeGenContext() { return m_codeGenContext; }
+    TargetRequest* getTargetReq() { return m_codeGenContext->getTargetReq(); }
+    Session* getSession() { return m_codeGenContext->getSession(); }
+    Linkage* getLinkage() { return m_codeGenContext->getLinkage(); }
+    ComponentType* getProgram() { return m_codeGenContext->getProgram(); }
+    TargetProgram* getTargetProgram() { return m_codeGenContext->getTargetProgram(); }
 
     //
     // Types
@@ -295,6 +309,8 @@ public:
 
     void emitCallExpr(IRCall* inst, EmitOpInfo outerPrec);
 
+    void emitLiveness(IRInst* inst) { emitLivenessImpl(inst); }
+
     void emitInstExpr(IRInst* inst, EmitOpInfo const& inOuterPrec);
     void defaultEmitInstExpr(IRInst* inst, EmitOpInfo const& inOuterPrec);
     void diagnoseUnhandledInst(IRInst* inst);
@@ -344,9 +360,10 @@ public:
     bool isTargetIntrinsic(IRFunc* func);
 
     void emitFunc(IRFunc* func);
-    void emitFuncDecorations(IRFunc* func);
+    void emitFuncDecorations(IRFunc* func) { emitFuncDecorationsImpl(func); }
 
     void emitStruct(IRStructType* structType);
+
 
         /// Emit type attributes that should appear after, e.g., a `struct` keyword
     void emitPostKeywordTypeAttributes(IRInst* inst) { emitPostKeywordTypeAttributesImpl(inst); }
@@ -382,9 +399,12 @@ public:
 
     void ensureGlobalInst(ComputeEmitActionsContext* ctx, IRInst* inst, EmitAction::Level requiredLevel);
 
+    void emitForwardDeclaration(IRInst* inst);
+
     void computeEmitActions(IRModule* module, List<EmitAction>& ioActions);
 
     void executeEmitActions(List<EmitAction> const& actions);
+
     void emitModule(IRModule* module, DiagnosticSink* sink)
         { m_irModule = module; emitModuleImpl(module, sink); }
 
@@ -447,6 +467,9 @@ public:
     virtual void emitFunctionPreambleImpl(IRInst* inst) { SLANG_UNUSED(inst); }
     virtual void emitLoopControlDecorationImpl(IRLoopControlDecoration* decl) { SLANG_UNUSED(decl); }
     virtual void emitFuncDecorationImpl(IRDecoration* decoration) { SLANG_UNUSED(decoration); }
+    virtual void emitLivenessImpl(IRInst* inst);
+
+    virtual void emitFuncDecorationsImpl(IRFunc* func);
 
         // Only needed for glsl output with $ prefix intrinsics - so perhaps removable in the future
     virtual void emitTextureOrTextureSamplerTypeImpl(IRTextureTypeBase*  type, char const* baseName) { SLANG_UNUSED(type); SLANG_UNUSED(baseName); }
@@ -462,7 +485,9 @@ public:
 
     virtual void emitPostKeywordTypeAttributesImpl(IRInst* inst) { SLANG_UNUSED(inst); }
 
-    void _emitType(IRType* type, DeclaratorInfo* declarator);
+    void _emitFuncTypeDeclaration(IRFuncType* type, IRAttributedType* attributes);
+
+    virtual void _emitType(IRType* type, DeclaratorInfo* declarator);
     void _emitInst(IRInst* inst);
 
     virtual void _emitPrefixTypeAttr(IRAttr* attr);
@@ -475,9 +500,8 @@ public:
 
         // Sort witnessTable entries according to the order defined in the witnessed interface type.
     List<IRWitnessTableEntry*> getSortedWitnessTableEntries(IRWitnessTable* witnessTable);
-    
-    BackEndCompileRequest* m_compileRequest = nullptr;
-    TargetRequest* m_targetRequest = nullptr;
+
+    CodeGenContext* m_codeGenContext = nullptr;
     IRModule* m_irModule = nullptr;
 
     // The stage for which we are emitting code.
@@ -491,9 +515,6 @@ public:
 
     // The target language we want to generate code for
     CodeGenTarget m_target;
-
-        /// The capabilities of the target
-    CapabilitySet m_targetCaps;
 
     // Source language (based on the more nuanced m_target)
     SourceLanguage m_sourceLanguage;

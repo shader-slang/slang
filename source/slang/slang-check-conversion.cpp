@@ -753,6 +753,18 @@ namespace Slang
             return true;
         }
 
+        // nullptr_t can be cast into any pointer type.
+        if (as<NullPtrType>(fromType) && as<PtrType>(toType))
+        {
+            if (outCost)
+            {
+                *outCost = kConversionCost_None;
+            }
+            if (outToExpr)
+                *outToExpr = fromExpr;
+            return true;
+        }
+
         // If we are casting to an interface type, then that will succeed
         // if the "from" type conforms to the interface.
         //

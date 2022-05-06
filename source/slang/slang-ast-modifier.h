@@ -20,6 +20,7 @@ class PublicModifier : public Modifier { SLANG_AST_CLASS(PublicModifier)};
 class RequireModifier : public Modifier { SLANG_AST_CLASS(RequireModifier)};
 class ParamModifier : public Modifier { SLANG_AST_CLASS(ParamModifier)};
 class ExternModifier : public Modifier { SLANG_AST_CLASS(ExternModifier)};
+class HLSLExportModifier : public Modifier { SLANG_AST_CLASS(HLSLExportModifier) };
 class InputModifier : public Modifier { SLANG_AST_CLASS(InputModifier)};
 class TransparentModifier : public Modifier { SLANG_AST_CLASS(TransparentModifier)};
 class FromStdLibModifier : public Modifier { SLANG_AST_CLASS(FromStdLibModifier)};
@@ -761,23 +762,27 @@ class EntryPointAttribute : public Attribute
     Stage stage;
 };
 
-// A `[__vulkanRayPayload]` attribute, which is used in the
+// A `[__vulkanRayPayload(location)]` attribute, which is used in the
 // standard library implementation to indicate that a variable
 // actually represents the input/output interface for a Vulkan
 // ray tracing shader to pass per-ray payload information.
 class VulkanRayPayloadAttribute : public Attribute 
 {
     SLANG_AST_CLASS(VulkanRayPayloadAttribute)
+
+    int location;
 };
 
 
-// A `[__vulkanCallablePayload]` attribute, which is used in the
+// A `[__vulkanCallablePayload(location)]` attribute, which is used in the
 // standard library implementation to indicate that a variable
 // actually represents the input/output interface for a Vulkan
 // ray tracing shader to pass payload information to/from a callee.
 class VulkanCallablePayloadAttribute : public Attribute 
 {
     SLANG_AST_CLASS(VulkanCallablePayloadAttribute)
+
+    int location;
 };
 
 
@@ -918,6 +923,13 @@ class AnyValueSizeAttribute : public Attribute
     SLANG_AST_CLASS(AnyValueSizeAttribute)
 
     int32_t size;
+};
+
+class DllImportAttribute : public Attribute
+{
+    SLANG_AST_CLASS(DllImportAttribute)
+
+    String modulePath;
 };
 
     /// A `[__requiresNVAPI]` attribute indicates that the declaration being modifed

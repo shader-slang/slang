@@ -19,7 +19,7 @@ namespace gfx_test
     {
         SubresourceRange srcSubresource;
         SubresourceRange dstSubresource;
-        ITextureResource::Size extent;
+        ITextureResource::Extents extent;
         ITextureResource::Offset3D srcOffset;
         ITextureResource::Offset3D dstOffset;
     };
@@ -27,10 +27,10 @@ namespace gfx_test
     struct TextureToBufferCopyInfo
     {
         SubresourceRange srcSubresource;
-        ITextureResource::Size extent;
+        ITextureResource::Extents extent;
         ITextureResource::Offset3D textureOffset;
-        size_t bufferOffset;
-        size_t bufferSize;
+        Offset bufferOffset;
+        Offset bufferSize;
     };
 
     struct BaseCopyTextureTest
@@ -38,7 +38,7 @@ namespace gfx_test
         IDevice* device;
         UnitTestContext* context;
 
-        size_t alignedRowStride;
+        Size alignedRowStride;
 
         RefPtr<TextureInfo> srcTextureInfo;
         RefPtr<TextureInfo> dstTextureInfo;
@@ -62,19 +62,13 @@ namespace gfx_test
             this->context = context;
             this->validationFormat = validationFormat;
 
-            FormatInfo formatInfo;
-            GFX_CHECK_CALL_ABORT(gfxGetFormatInfo(format, &formatInfo));
-            auto texelSize = formatInfo.blockSizeInBytes / formatInfo.pixelsPerBlock;
-
             this->srcTextureInfo = new TextureInfo();
             this->srcTextureInfo->format = format;
             this->srcTextureInfo->textureType = type;
-            this->srcTextureInfo->texelSize = texelSize;
 
             this->dstTextureInfo = new TextureInfo();
             this->dstTextureInfo->format = format;
             this->dstTextureInfo->textureType = type;
-            this->dstTextureInfo->texelSize = texelSize;
         }
 
         void createRequiredResources()
@@ -123,9 +117,10 @@ namespace gfx_test
                 dstTexture.writeRef()));
 
             auto bufferCopyExtents = bufferCopyInfo.extent;
+            auto texelSize = getTexelSize(dstTextureInfo->format);
             size_t alignment;
             device->getTextureRowAlignment(&alignment);
-            alignedRowStride = (bufferCopyExtents.width * dstTextureInfo->texelSize + alignment - 1) & ~(alignment - 1);
+            alignedRowStride = (bufferCopyExtents.width * texelSize + alignment - 1) & ~(alignment - 1);
             IBufferResource::Desc bufferDesc = {};
             bufferDesc.sizeInBytes = bufferCopyExtents.height * bufferCopyExtents.depth * alignedRowStride;
             bufferDesc.format = Format::Unknown;
@@ -190,7 +185,7 @@ namespace gfx_test
             queue->waitOnHost();
         }
 
-        bool isWithinCopyBounds(int x, int y, int z)
+        bool isWithinCopyBounds(GfxIndex x, GfxIndex y, GfxIndex z)
         {
             auto copyExtents = texCopyInfo.extent;
             auto copyOffset = texCopyInfo.dstOffset;
@@ -218,11 +213,11 @@ namespace gfx_test
             auto srcTexOffset = texCopyInfo.srcOffset;
             auto dstTexOffset = texCopyInfo.dstOffset;
 
-            for (Int x = 0; x < actualExtents.width; ++x)
+            for (GfxIndex x = 0; x < actualExtents.width; ++x)
             {
-                for (Int y = 0; y < actualExtents.height; ++y)
+                for (GfxIndex y = 0; y < actualExtents.height; ++y)
                 {
-                    for (Int z = 0; z < actualExtents.depth; ++z)
+                    for (GfxIndex z = 0; z < actualExtents.depth; ++z)
                     {
                         auto actualBlock = actual.getBlockAt(x, y, z);
                         if (isWithinCopyBounds(x, y, z))
@@ -246,7 +241,7 @@ namespace gfx_test
             }
         }
 
-        void checkTestResults(ITextureResource::Size srcMipExtent, const void* expectedCopiedData, const void* expectedOriginalData)
+        void checkTestResults(ITextureResource::Extents srcMipExtent, const void* expectedCopiedData, const void* expectedOriginalData)
         {
             ComPtr<ISlangBlob> resultBlob;
             GFX_CHECK_CALL_ABORT(device->readBufferResource(resultsBuffer, 0, bufferCopyInfo.bufferSize, resultBlob.writeRef()));
@@ -255,14 +250,14 @@ namespace gfx_test
             ValidationTextureData actual;
             actual.extents = bufferCopyInfo.extent;
             actual.textureData = results;
-            actual.strides.x = dstTextureInfo->texelSize;
-            actual.strides.y = (uint32_t)alignedRowStride;
+            actual.strides.x = getTexelSize(dstTextureInfo->format);
+            actual.strides.y = alignedRowStride;
             actual.strides.z = actual.extents.height * actual.strides.y;
 
             ValidationTextureData expectedCopied;
             expectedCopied.extents = srcMipExtent;
             expectedCopied.textureData = expectedCopiedData;
-            expectedCopied.strides.x = srcTextureInfo->texelSize;
+            expectedCopied.strides.x = getTexelSize(srcTextureInfo->format);
             expectedCopied.strides.y = expectedCopied.extents.width * expectedCopied.strides.x;
             expectedCopied.strides.z = expectedCopied.extents.height * expectedCopied.strides.y;
 
@@ -271,7 +266,7 @@ namespace gfx_test
             {
                 expectedOriginal.extents = bufferCopyInfo.extent;
                 expectedOriginal.textureData = expectedOriginalData;
-                expectedOriginal.strides.x = dstTextureInfo->texelSize;
+                expectedOriginal.strides.x = getTexelSize(dstTextureInfo->format);
                 expectedOriginal.strides.y = expectedOriginal.extents.width * expectedOriginal.strides.x;
                 expectedOriginal.strides.z = expectedOriginal.extents.height * expectedOriginal.strides.y;
             }
@@ -751,9 +746,9 @@ namespace gfx_test
     {
         // Skip Type::Unknown and Type::Buffer as well as Format::Unknown
         // TODO: Add support for TextureCube
-        for (uint32_t i = 2; i < (uint32_t)ITextureResource::Type::CountOf - 1; ++i)
+        for (uint32_t i = 2; i < (uint32_t)ITextureResource::Type::_Count - 1; ++i)
         {
-            for (uint32_t j = 1; j < (uint32_t)Format::CountOf; ++j)
+            for (uint32_t j = 1; j < (uint32_t)Format::_Count; ++j)
             {
                 auto type = (ITextureResource::Type)i;
                 auto format = (Format)j;
@@ -766,33 +761,6 @@ namespace gfx_test
                 test.run();
             }
         }
-    }
-
-    SLANG_UNIT_TEST(copyTextureTests)
-    {
-        runTestImpl(copyTextureTestImpl<SimpleCopyTexture>, unitTestContext, Slang::RenderApiFlag::D3D12);
-        runTestImpl(copyTextureTestImpl<SimpleCopyTexture>, unitTestContext, Slang::RenderApiFlag::Vulkan);
-    
-        runTestImpl(copyTextureTestImpl<CopyTextureSection>, unitTestContext, Slang::RenderApiFlag::D3D12);
-        runTestImpl(copyTextureTestImpl<CopyTextureSection>, unitTestContext, Slang::RenderApiFlag::Vulkan);
-    
-        runTestImpl(copyTextureTestImpl<LargeSrcToSmallDst>, unitTestContext, Slang::RenderApiFlag::D3D12);
-        runTestImpl(copyTextureTestImpl<LargeSrcToSmallDst>, unitTestContext, Slang::RenderApiFlag::Vulkan);
-    
-        runTestImpl(copyTextureTestImpl<SmallSrcToLargeDst>, unitTestContext, Slang::RenderApiFlag::D3D12);
-        runTestImpl(copyTextureTestImpl<SmallSrcToLargeDst>, unitTestContext, Slang::RenderApiFlag::Vulkan);
-    
-        runTestImpl(copyTextureTestImpl<CopyBetweenMips>, unitTestContext, Slang::RenderApiFlag::D3D12);
-        runTestImpl(copyTextureTestImpl<CopyBetweenMips>, unitTestContext, Slang::RenderApiFlag::Vulkan);
-    
-        runTestImpl(copyTextureTestImpl<CopyBetweenLayers>, unitTestContext, Slang::RenderApiFlag::D3D12);
-        runTestImpl(copyTextureTestImpl<CopyBetweenLayers>, unitTestContext, Slang::RenderApiFlag::Vulkan);
-    
-        runTestImpl(copyTextureTestImpl<CopyWithOffsets>, unitTestContext, Slang::RenderApiFlag::D3D12);
-        runTestImpl(copyTextureTestImpl<CopyWithOffsets>, unitTestContext, Slang::RenderApiFlag::Vulkan);
-    
-        runTestImpl(copyTextureTestImpl<CopySectionWithSetExtent>, unitTestContext, Slang::RenderApiFlag::D3D12);
-        runTestImpl(copyTextureTestImpl<CopySectionWithSetExtent>, unitTestContext, Slang::RenderApiFlag::Vulkan);
     }
 
     SLANG_UNIT_TEST(copyTextureSimple)

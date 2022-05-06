@@ -78,20 +78,20 @@ public:
         }
 
         virtual SLANG_NO_THROW void SLANG_MCALL
-            writeTimestamp(IQueryPool* pool, SlangInt index) override
+            writeTimestamp(IQueryPool* pool, GfxIndex index) override
         {
             m_writer->writeTimestamp(pool, index);
         }
 
         virtual SLANG_NO_THROW void SLANG_MCALL textureBarrier(
-            size_t count,
+            GfxCount count,
             ITextureResource* const* textures,
             ResourceState src,
             ResourceState dst) override
         {}
 
         virtual SLANG_NO_THROW void SLANG_MCALL bufferBarrier(
-            size_t count,
+            GfxCount count,
             IBufferResource* const* buffers,
             ResourceState src,
             ResourceState dst) override
@@ -106,7 +106,7 @@ public:
             ResourceState srcState,
             SubresourceRange srcSubresource,
             ITextureResource::Offset3D srcOffset,
-            ITextureResource::Size extent) override
+            ITextureResource::Extents extent) override
         {
             SLANG_UNUSED(dst);
             SLANG_UNUSED(dstState);
@@ -124,9 +124,9 @@ public:
             ITextureResource* dst,
             SubresourceRange subResourceRange,
             ITextureResource::Offset3D offset,
-            ITextureResource::Size extend,
+            ITextureResource::Extents extend,
             ITextureResource::SubresourceData* subResourceData,
-            size_t subResourceDataCount) override
+            GfxCount subResourceDataCount) override
         {
             SLANG_UNUSED(dst);
             SLANG_UNUSED(subResourceRange);
@@ -167,10 +167,10 @@ public:
 
         virtual SLANG_NO_THROW void SLANG_MCALL resolveQuery(
             IQueryPool* queryPool,
-            uint32_t index,
-            uint32_t count,
+            GfxIndex index,
+            GfxCount count,
             IBufferResource* buffer,
-            uint64_t offset) override
+            Offset offset) override
         {
             SLANG_UNUSED(queryPool);
             SLANG_UNUSED(index);
@@ -182,14 +182,14 @@ public:
 
         virtual SLANG_NO_THROW void SLANG_MCALL copyTextureToBuffer(
             IBufferResource* dst,
-            size_t dstOffset,
-            size_t dstSize,
-            size_t dstRowStride,
+            Offset dstOffset,
+            Size dstSize,
+            Size dstRowStride,
             ITextureResource* src,
             ResourceState srcState,
             SubresourceRange srcSubresource,
             ITextureResource::Offset3D srcOffset,
-            ITextureResource::Size extent) override
+            ITextureResource::Extents extent) override
         {
             SLANG_UNUSED(dst);
             SLANG_UNUSED(dstOffset);
@@ -256,7 +256,7 @@ public:
             {
                 auto& access = renderPass->m_renderTargetAccesses[i];
                 // Clear.
-                if (access.loadOp == IRenderPassLayout::AttachmentLoadOp::Clear)
+                if (access.loadOp == IRenderPassLayout::TargetLoadOp::Clear)
                 {
                     clearMask |= (1 << (uint32_t)i);
                 }
@@ -267,12 +267,12 @@ public:
             {
                 // Clear.
                 if (renderPass->m_depthStencilAccess.loadOp ==
-                    IRenderPassLayout::AttachmentLoadOp::Clear)
+                    IRenderPassLayout::TargetLoadOp::Clear)
                 {
                     clearDepth = true;
                 }
                 if (renderPass->m_depthStencilAccess.stencilLoadOp ==
-                    IRenderPassLayout::AttachmentLoadOp::Clear)
+                    IRenderPassLayout::TargetLoadOp::Clear)
                 {
                     clearStencil = true;
                 }
@@ -303,12 +303,12 @@ public:
         }
 
         virtual SLANG_NO_THROW void SLANG_MCALL
-            setViewports(uint32_t count, const Viewport* viewports) override
+            setViewports(GfxCount count, const Viewport* viewports) override
         {
             m_writer->setViewports(count, viewports);
         }
         virtual SLANG_NO_THROW void SLANG_MCALL
-            setScissorRects(uint32_t count, const ScissorRect* scissors) override
+            setScissorRects(GfxCount count, const ScissorRect* scissors) override
         {
             m_writer->setScissorRects(count, scissors);
         }
@@ -317,29 +317,29 @@ public:
             m_writer->setPrimitiveTopology(topology);
         }
         virtual SLANG_NO_THROW void SLANG_MCALL setVertexBuffers(
-            uint32_t startSlot,
-            uint32_t slotCount,
+            GfxIndex startSlot,
+            GfxCount slotCount,
             IBufferResource* const* buffers,
-            const uint32_t* offsets) override
+            const Offset* offsets) override
         {
             m_writer->setVertexBuffers(startSlot, slotCount, buffers, offsets);
         }
 
         virtual SLANG_NO_THROW void SLANG_MCALL
-            setIndexBuffer(IBufferResource* buffer, Format indexFormat, uint32_t offset) override
+            setIndexBuffer(IBufferResource* buffer, Format indexFormat, Offset offset) override
         {
             m_writer->setIndexBuffer(buffer, indexFormat, offset);
         }
 
         virtual SLANG_NO_THROW void SLANG_MCALL
-            draw(uint32_t vertexCount, uint32_t startVertex) override
+            draw(GfxCount vertexCount, GfxIndex startVertex) override
         {
             m_writer->bindRootShaderObject(m_commandBuffer->m_rootShaderObject);
             m_writer->draw(vertexCount, startVertex);
         }
 
         virtual SLANG_NO_THROW void SLANG_MCALL
-            drawIndexed(uint32_t indexCount, uint32_t startIndex, uint32_t baseVertex) override
+            drawIndexed(GfxCount indexCount, GfxIndex startIndex, GfxIndex baseVertex) override
         {
             m_writer->bindRootShaderObject(m_commandBuffer->m_rootShaderObject);
             m_writer->drawIndexed(indexCount, startIndex, baseVertex);
@@ -351,11 +351,11 @@ public:
         }
 
         virtual SLANG_NO_THROW void SLANG_MCALL drawIndirect(
-            uint32_t maxDrawCount,
+            GfxCount maxDrawCount,
             IBufferResource* argBuffer,
-            uint64_t argOffset,
+            Offset argOffset,
             IBufferResource* countBuffer,
-            uint64_t countOffset) override
+            Offset countOffset) override
         {
             SLANG_UNUSED(maxDrawCount);
             SLANG_UNUSED(argBuffer);
@@ -366,11 +366,11 @@ public:
         }
 
         virtual SLANG_NO_THROW void SLANG_MCALL drawIndexedIndirect(
-            uint32_t maxDrawCount,
+            GfxCount maxDrawCount,
             IBufferResource* argBuffer,
-            uint64_t argOffset,
+            Offset argOffset,
             IBufferResource* countBuffer,
-            uint64_t countOffset) override
+            Offset countOffset) override
         {
             SLANG_UNUSED(maxDrawCount);
             SLANG_UNUSED(argBuffer);
@@ -381,8 +381,8 @@ public:
         }
 
         virtual SLANG_NO_THROW Result SLANG_MCALL setSamplePositions(
-            uint32_t samplesPerPixel,
-            uint32_t pixelCount,
+            GfxCount samplesPerPixel,
+            GfxCount pixelCount,
             const SamplePosition* samplePositions) override
         {
             SLANG_UNUSED(samplesPerPixel);
@@ -392,21 +392,21 @@ public:
         }
 
         virtual SLANG_NO_THROW void SLANG_MCALL drawInstanced(
-            uint32_t vertexCount,
-            uint32_t instanceCount,
-            uint32_t startVertex,
-            uint32_t startInstanceLocation) override
+            GfxCount vertexCount,
+            GfxCount instanceCount,
+            GfxIndex startVertex,
+            GfxIndex startInstanceLocation) override
         {
             m_writer->bindRootShaderObject(m_commandBuffer->m_rootShaderObject);
             m_writer->drawInstanced(vertexCount, instanceCount, startVertex, startInstanceLocation);
         }
 
         virtual SLANG_NO_THROW void SLANG_MCALL drawIndexedInstanced(
-            uint32_t indexCount,
-            uint32_t instanceCount,
-            uint32_t startIndexLocation,
-            int32_t baseVertexLocation,
-            uint32_t startInstanceLocation) override
+            GfxCount indexCount,
+            GfxCount instanceCount,
+            GfxIndex startIndexLocation,
+            GfxIndex baseVertexLocation,
+            GfxIndex startInstanceLocation) override
         {
             m_writer->bindRootShaderObject(m_commandBuffer->m_rootShaderObject);
             m_writer->drawIndexedInstanced(indexCount, instanceCount, startIndexLocation, baseVertexLocation, startInstanceLocation);
@@ -466,7 +466,7 @@ public:
             m_writer->dispatchCompute(x, y, z);
         }
 
-        virtual SLANG_NO_THROW void SLANG_MCALL dispatchComputeIndirect(IBufferResource* argBuffer, uint64_t offset) override
+        virtual SLANG_NO_THROW void SLANG_MCALL dispatchComputeIndirect(IBufferResource* argBuffer, Offset offset) override
         {
             SLANG_UNIMPLEMENTED_X("ImmediateRenderBase::dispatchComputeIndirect");
         }
@@ -536,7 +536,7 @@ public:
                         cmd.operands[0],
                         cmd.operands[1],
                         bufferResources.getArrayView().getBuffer(),
-                        m_writer.getData<uint32_t>(cmd.operands[3]));
+                        m_writer.getData<Offset>(cmd.operands[3]));
                 }
                 break;
             case CommandName::SetIndexBuffer:
@@ -583,7 +583,7 @@ public:
                     cmd.operands[4]);
                 break;
             case CommandName::WriteTimestamp:
-                m_renderer->writeTimestamp(m_writer.getObject<QueryPoolBase>(cmd.operands[0]), (SlangInt)cmd.operands[1]);
+                m_renderer->writeTimestamp(m_writer.getObject<QueryPoolBase>(cmd.operands[0]), (GfxIndex)cmd.operands[1]);
                 break;
             default:
                 assert(!"unknown command");
@@ -619,18 +619,18 @@ public:
     virtual SLANG_NO_THROW const Desc& SLANG_MCALL getDesc() override { return m_desc; }
 
     virtual SLANG_NO_THROW void SLANG_MCALL executeCommandBuffers(
-        uint32_t count, ICommandBuffer* const* commandBuffers, IFence* fence, uint64_t valueToSignal) override
+        GfxCount count, ICommandBuffer* const* commandBuffers, IFence* fence, uint64_t valueToSignal) override
     {
         // TODO: implement fence signal.
         assert(fence == nullptr);
 
         CommandBufferInfo info = {};
-        for (uint32_t i = 0; i < count; i++)
+        for (GfxIndex i = 0; i < count; i++)
         {
             info.hasWriteTimestamps |= static_cast<CommandBufferImpl*>(commandBuffers[i])->m_writer.m_hasWriteTimestamps;
         }
         static_cast<ImmediateRendererBase*>(m_renderer.get())->beginCommandBuffer(info);
-        for (uint32_t i = 0; i < count; i++)
+        for (GfxIndex i = 0; i < count; i++)
         {
             static_cast<CommandBufferImpl*>(commandBuffers[i])->execute();
         }
@@ -640,7 +640,7 @@ public:
     virtual SLANG_NO_THROW void SLANG_MCALL waitOnHost() override { getRenderer()->waitForGpu(); }
 
     virtual SLANG_NO_THROW Result SLANG_MCALL waitForFenceValuesOnDevice(
-        uint32_t fenceCount, IFence** fences, uint64_t* waitValues) override
+        GfxCount fenceCount, IFence** fences, uint64_t* waitValues) override
     {
         return SLANG_FAIL;
     }

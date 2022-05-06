@@ -96,6 +96,7 @@ void ImplicitDirectoryCollector::addRemainingPath(SlangPathType pathType, const 
     }
 
     const Index countIndex = m_map.findOrAdd(pathRemainder, pathType);
+    SLANG_UNUSED(countIndex);
     // Make sure they are the same type
     SLANG_ASSERT(SlangPathType(m_map.getValueAt(countIndex)) == pathType);
 }

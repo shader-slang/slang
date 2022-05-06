@@ -110,6 +110,16 @@ Type* SharedASTBuilder::getDynamicType()
     return m_dynamicType;
 }
 
+Type* SharedASTBuilder::getNullPtrType()
+{
+    if (!m_nullPtrType)
+    {
+        auto nullPtrTypeDecl = findMagicDecl("NullPtrType");
+        m_nullPtrType = DeclRefType::create(m_astBuilder, makeDeclRef<Decl>(nullPtrTypeDecl));
+    }
+    return m_nullPtrType;
+}
+
 SharedASTBuilder::~SharedASTBuilder()
 {
     // Release built in types..

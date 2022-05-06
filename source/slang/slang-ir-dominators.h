@@ -85,6 +85,8 @@ namespace Slang
             Iterator begin() const;
             Iterator end() const;
 
+            Count getCount() const { return Count(mEnd - mBegin); }
+
         private:
             friend struct IRDominatorTree;
             DominatedList(

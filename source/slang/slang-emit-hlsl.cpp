@@ -727,6 +727,36 @@ void HLSLSourceEmitter::emitLoopControlDecorationImpl(IRLoopControlDecoration* d
     }
 }
 
+static bool _canEmitExport(const Profile& profile)
+{
+    const auto family = profile.getFamily();
+    const auto version = profile.getVersion();
+    // Is ita late enough version of shader model to output with 'export'
+    return (family == ProfileFamily::DX && version >= ProfileVersion::DX_6_1);
+}
+
+/* virtual */void HLSLSourceEmitter::emitFuncDecorationsImpl(IRFunc* func)
+{
+    // Specially handle export, as we don't want to emit it multiple times
+    if (getTargetReq()->isWholeProgramRequest() && 
+        _canEmitExport(m_effectiveProfile))
+    {
+        for (auto decoration : func->getDecorations())
+        {
+            const auto op = decoration->getOp();
+            if (op == kIROp_PublicDecoration ||
+                op == kIROp_HLSLExportDecoration)
+            {
+                m_writer->emit("export\n");
+                break;
+            }
+        }
+    }
+
+    // Use the default for others
+    Super::emitFuncDecorationsImpl(func);
+}
+
 void HLSLSourceEmitter::emitFuncDecorationImpl(IRDecoration* decoration)
 {
     switch( decoration->getOp() )

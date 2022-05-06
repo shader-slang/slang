@@ -42,17 +42,13 @@ namespace Slang
             IRType* paramValType = paramType;
             IRType* argValType = arg->getDataType();
             IRInst* argVal = arg;
-            bool isParamPointer = false;
             if (auto ptrType = as<IRPtrTypeBase>(paramType))
             {
-                isParamPointer = true;
                 paramValType = ptrType->getValueType();
             }
-            bool isArgPointer = false;
             auto argType = arg->getDataType();
             if (auto argPtrType = as<IRPtrTypeBase>(argType))
             {
-                isArgPointer = true;
                 argValType = argPtrType->getValueType();
                 argVal = builder->emitLoad(arg);
             }

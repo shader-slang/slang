@@ -18,24 +18,11 @@ namespace Slang
 
     class TranslationUnitRequest;
 
-    void checkTranslationUnit(
-        TranslationUnitRequest* translationUnit);
-
-    // Look for a module that matches the given name:
-    // either one we've loaded already, or one we
-    // can find vai the search paths available to us.
-    //
-    // Needed by import declaration checking.
-    //
-    // TODO: need a better location to declare this.
-    RefPtr<Module> findOrImportModule(
-        Linkage*            linkage,
-        Name*               name,
-        SourceLoc const&    loc,
-        DiagnosticSink*     sink);
-
     bool isGlobalShaderParameter(VarDeclBase* decl);
     bool isFromStdLib(Decl* decl);
 
     void registerBuiltinDecls(Session* session, Decl* decl);
+
+    OrderedDictionary<GenericTypeParamDecl*, List<Type*>> getCanonicalGenericConstraints(
+        DeclRef<ContainerDecl> genericDecl);
 }

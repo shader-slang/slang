@@ -126,11 +126,18 @@ DIAGNOSTIC(    92, Error, unableToCreateDirectory, "unable to create directory '
 DIAGNOSTIC(    93, Error, unableExtractReproToDirectory, "unable to extract repro to directory '$0'")
 DIAGNOSTIC(    94, Error, unableToReadRiff, "unable to read as 'riff'/not a 'riff' file")
 
+DIAGNOSTIC(    95, Error, unknownLibraryKind, "unknown library kind '$0'")
+DIAGNOSTIC(    96, Error, kindNotLinkable, "not a known linkable kind '$0'")
+DIAGNOSTIC(    97, Error, libraryDoesNotExist, "library '$0' does not exist")
+
 //
 // 001xx - Downstream Compilers
 //
 
 DIAGNOSTIC(  100, Error, failedToLoadDownstreamCompiler, "failed to load downstream compiler '$0'")
+DIAGNOSTIC(  101, Error, downstreamCompilerDoesntSupportWholeProgramCompilation, "downstream compiler '$0' doesn't support whole program compilation")
+
+
 DIAGNOSTIC(99999, Note, noteFailedToLoadDynamicLibrary, "failed to load dynamic library '$0'")
 
 //
@@ -220,6 +227,9 @@ DIAGNOSTIC(20008, Error, invalidOperator, "invalid operator '$0'.")
 DIAGNOSTIC(20011, Error, unexpectedColon, "unexpected ':'.")
 DIAGNOSTIC(20012, Error, invalidSPIRVVersion, "Expecting SPIR-V version as either 'major.minor', or quoted if has patch (eg for SPIR-V 1.2, '1.2' or \"1.2\"')")
 DIAGNOSTIC(20013, Error, invalidCUDASMVersion, "Expecting CUDA SM version as either 'major.minor', or quoted if has patch (eg for '7.0' or \"7.0\"')")
+
+DIAGNOSTIC(20014, Error, classIsReservedKeyword, "'class' is a reserved keyword in this context; use 'struct' instead.")
+
 //
 // 3xxxx - Semantic analysis
 //
@@ -564,6 +574,8 @@ DIAGNOSTIC(52004, Error, unableToWriteFile, "unable to write file '$0'")
 DIAGNOSTIC(52005, Error, unableToReadFile, "unable to read file '$0'")
 
 DIAGNOSTIC(52006, Error, compilerNotDefinedForTransition, "compiler not defined for transition '$0' to '$1'.")
+
+DIAGNOSTIC(53001,Error, invalidTypeMarshallingForImportedDLLSymbol, "invalid type marshalling in imported func $0.")
 
 //
 // 8xxxx - Issues specific to a particular library/technology/platform/etc.

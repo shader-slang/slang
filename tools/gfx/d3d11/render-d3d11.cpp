@@ -137,29 +137,29 @@ public:
     virtual void setPrimitiveTopology(PrimitiveTopology topology) override;
 
     virtual void setVertexBuffers(
-        uint32_t startSlot,
-        uint32_t slotCount,
+        GfxIndex startSlot,
+        GfxCount slotCount,
         IBufferResource* const* buffers,
-        const uint32_t* offsets) override;
+        const Offset* offsets) override;
     virtual void setIndexBuffer(
-        IBufferResource* buffer, Format indexFormat, uint32_t offset) override;
-    virtual void setViewports(UInt count, Viewport const* viewports) override;
-    virtual void setScissorRects(UInt count, ScissorRect const* rects) override;
+        IBufferResource* buffer, Format indexFormat, Offset  offset) override;
+    virtual void setViewports(GfxCount count, Viewport const* viewports) override;
+    virtual void setScissorRects(GfxCount count, ScissorRect const* rects) override;
     virtual void setPipelineState(IPipelineState* state) override;
-    virtual void draw(uint32_t vertexCount, uint32_t startVertex) override;
+    virtual void draw(GfxCount vertexCount, GfxIndex startVertex) override;
     virtual void drawIndexed(
-        uint32_t indexCount, uint32_t startIndex, uint32_t baseVertex) override;
+        GfxCount indexCount, GfxIndex startIndex, GfxIndex baseVertex) override;
     virtual void drawInstanced(
-        uint32_t vertexCount,
-        uint32_t instanceCount,
-        uint32_t startVertex,
-        uint32_t startInstanceLocation) override;
+        GfxCount vertexCount,
+        GfxCount instanceCount,
+        GfxIndex startVertex,
+        GfxIndex startInstanceLocation) override;
     virtual void drawIndexedInstanced(
-        uint32_t indexCount,
-        uint32_t instanceCount,
-        uint32_t startIndexLocation,
-        int32_t baseVertexLocation,
-        uint32_t startInstanceLocation) override;
+        GfxCount indexCount,
+        GfxCount instanceCount,
+        GfxIndex startIndexLocation,
+        GfxIndex baseVertexLocation,
+        GfxIndex startInstanceLocation) override;
     virtual void dispatchCompute(int x, int y, int z) override;
     virtual void submitGpuWork() override {}
     virtual void waitForGpu() override
@@ -184,7 +184,7 @@ public:
             m_immediateContext->End(m_disjointQuery);
         }
     }
-    virtual void writeTimestamp(IQueryPool* pool, SlangInt index) override
+    virtual void writeTimestamp(IQueryPool* pool, GfxIndex index) override
     {
         auto poolImpl = static_cast<QueryPoolImpl*>(pool);
         m_immediateContext->End(poolImpl->getQuery(index));
@@ -308,9 +308,9 @@ protected:
     class FramebufferLayoutImpl : public FramebufferLayoutBase
     {
     public:
-        ShortList<IFramebufferLayout::AttachmentLayout> m_renderTargets;
+        ShortList<IFramebufferLayout::TargetLayout> m_renderTargets;
         bool m_hasDepthStencil = false;
-        IFramebufferLayout::AttachmentLayout m_depthStencil;
+        IFramebufferLayout::TargetLayout m_depthStencil;
     };
 
     class FramebufferImpl : public FramebufferBase
@@ -357,14 +357,14 @@ protected:
                 ResourceState::RenderTarget);
             RefPtr<TextureResourceImpl> image = new TextureResourceImpl(imageDesc);
             image->m_resource = d3dResource;
-            for (uint32_t i = 0; i < m_desc.imageCount; i++)
+            for (GfxIndex i = 0; i < m_desc.imageCount; i++)
             {
                 m_images.add(image);
             }
         }
         virtual IDXGIFactory* getDXGIFactory() override { return m_dxgiFactory; }
         virtual IUnknown* getOwningDevice() override { return m_device; }
-        virtual SLANG_NO_THROW Result SLANG_MCALL resize(uint32_t width, uint32_t height) override
+        virtual SLANG_NO_THROW Result SLANG_MCALL resize(GfxCount width, GfxCount height) override
         {
             m_renderer->m_currentFramebuffer = nullptr;
             m_renderer->m_immediateContext->ClearState();
@@ -416,7 +416,7 @@ protected:
         }
 
         virtual SLANG_NO_THROW Result SLANG_MCALL getResult(
-            SlangInt queryIndex, SlangInt count, uint64_t* data) override
+            GfxIndex queryIndex, GfxCount count, uint64_t* data) override
         {
             D3D11_QUERY_DATA_TIMESTAMP_DISJOINT disjointData;
             while (S_OK != m_device->m_immediateContext->GetData(
@@ -1268,9 +1268,9 @@ protected:
 
         RendererBase* getDevice() { return m_layout->getDevice(); }
 
-        SLANG_NO_THROW UInt SLANG_MCALL getEntryPointCount() SLANG_OVERRIDE { return 0; }
+        SLANG_NO_THROW GfxCount SLANG_MCALL getEntryPointCount() SLANG_OVERRIDE { return 0; }
 
-        SLANG_NO_THROW Result SLANG_MCALL getEntryPoint(UInt index, IShaderObject** outEntryPoint)
+        SLANG_NO_THROW Result SLANG_MCALL getEntryPoint(GfxIndex index, IShaderObject** outEntryPoint)
             SLANG_OVERRIDE
         {
             *outEntryPoint = nullptr;
@@ -1859,8 +1859,8 @@ protected:
 
         RootShaderObjectLayoutImpl* getLayout() { return static_cast<RootShaderObjectLayoutImpl*>(m_layout.Ptr()); }
 
-        UInt SLANG_MCALL getEntryPointCount() SLANG_OVERRIDE { return (UInt)m_entryPoints.getCount(); }
-        SlangResult SLANG_MCALL getEntryPoint(UInt index, IShaderObject** outEntryPoint) SLANG_OVERRIDE
+        GfxCount SLANG_MCALL getEntryPointCount() SLANG_OVERRIDE { return (GfxCount)m_entryPoints.getCount(); }
+        SlangResult SLANG_MCALL getEntryPoint(GfxIndex index, IShaderObject** outEntryPoint) SLANG_OVERRIDE
         {
             returnComPtr(outEntryPoint, m_entryPoints[index]);
             return SLANG_OK;
@@ -2417,7 +2417,7 @@ Result D3D11Device::createFramebufferLayout(
 {
     RefPtr<FramebufferLayoutImpl> layout = new FramebufferLayoutImpl();
     layout->m_renderTargets.setCount(desc.renderTargetCount);
-    for (uint32_t i = 0; i < desc.renderTargetCount; i++)
+    for (GfxIndex i = 0; i < desc.renderTargetCount; i++)
     {
         layout->m_renderTargets[i] = desc.renderTargets[i];
     }
@@ -2441,7 +2441,7 @@ Result D3D11Device::createFramebuffer(
     RefPtr<FramebufferImpl> framebuffer = new FramebufferImpl();
     framebuffer->renderTargetViews.setCount(desc.renderTargetCount);
     framebuffer->d3dRenderTargetViews.setCount(desc.renderTargetCount);
-    for (uint32_t i = 0; i < desc.renderTargetCount; i++)
+    for (GfxIndex i = 0; i < desc.renderTargetCount; i++)
     {
         framebuffer->renderTargetViews[i] = static_cast<RenderTargetViewImpl*>(desc.renderTargetViews[i]);
         framebuffer->d3dRenderTargetViews[i] = framebuffer->renderTargetViews[i]->m_rtv;
@@ -2782,7 +2782,7 @@ Result D3D11Device::createBufferResource(const IBufferResource::Desc& descIn, co
         //desc.BindFlags = D3D11_BIND_UNORDERED_ACCESS | D3D11_BIND_SHADER_RESOURCE;
         if (srcDesc.elementSize != 0)
         {
-            bufferDesc.StructureByteStride = srcDesc.elementSize;
+            bufferDesc.StructureByteStride = (UINT)srcDesc.elementSize;
             bufferDesc.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
         }
         else
@@ -3191,7 +3191,7 @@ Result D3D11Device::createInputLayout(IInputLayout::Desc const& desc, IInputLayo
     impl->m_vertexStreamStrides.setCount(vertexStreamCount);
     for (Int i = 0; i < vertexStreamCount; ++i)
     {
-        impl->m_vertexStreamStrides[i] = desc.vertexStreams[i].stride;
+        impl->m_vertexStreamStrides[i] = (UINT)desc.vertexStreams[i].stride;
     }
 
     returnComPtr(outLayout, impl);
@@ -3305,10 +3305,10 @@ void D3D11Device::setPrimitiveTopology(PrimitiveTopology topology)
 }
 
 void D3D11Device::setVertexBuffers(
-    uint32_t startSlot,
-    uint32_t slotCount,
+    GfxIndex startSlot,
+    GfxCount slotCount,
     IBufferResource* const* buffersIn,
-    const uint32_t* offsetsIn)
+    const Offset* offsetsIn)
 {
     static const int kMaxVertexBuffers = 16;
 	assert(slotCount <= kMaxVertexBuffers);
@@ -3320,7 +3320,7 @@ void D3D11Device::setVertexBuffers(
 
 	auto buffers = (BufferResourceImpl*const*)buffersIn;
 
-    for (UInt ii = 0; ii < slotCount; ++ii)
+    for (GfxIndex ii = 0; ii < slotCount; ++ii)
     {
         auto inputLayout = (InputLayoutImpl*)m_currentPipelineState->inputLayout.Ptr();
         vertexStrides[ii] = inputLayout->m_vertexStreamStrides[startSlot + ii];
@@ -3331,19 +3331,19 @@ void D3D11Device::setVertexBuffers(
     m_immediateContext->IASetVertexBuffers((UINT)startSlot, (UINT)slotCount, dxBuffers, &vertexStrides[0], &vertexOffsets[0]);
 }
 
-void D3D11Device::setIndexBuffer(IBufferResource* buffer, Format indexFormat, uint32_t offset)
+void D3D11Device::setIndexBuffer(IBufferResource* buffer, Format indexFormat, Offset offset)
 {
     DXGI_FORMAT dxFormat = D3DUtil::getMapFormat(indexFormat);
     m_immediateContext->IASetIndexBuffer(((BufferResourceImpl*)buffer)->m_buffer, dxFormat, UINT(offset));
 }
 
-void D3D11Device::setViewports(UInt count, Viewport const* viewports)
+void D3D11Device::setViewports(GfxCount count, Viewport const* viewports)
 {
     static const int kMaxViewports = D3D11_VIEWPORT_AND_SCISSORRECT_MAX_INDEX + 1;
     assert(count <= kMaxViewports);
 
     D3D11_VIEWPORT dxViewports[kMaxViewports];
-    for(UInt ii = 0; ii < count; ++ii)
+    for(GfxIndex ii = 0; ii < count; ++ii)
     {
         auto& inViewport = viewports[ii];
         auto& dxViewport = dxViewports[ii];
@@ -3359,13 +3359,13 @@ void D3D11Device::setViewports(UInt count, Viewport const* viewports)
     m_immediateContext->RSSetViewports(UINT(count), dxViewports);
 }
 
-void D3D11Device::setScissorRects(UInt count, ScissorRect const* rects)
+void D3D11Device::setScissorRects(GfxCount count, ScissorRect const* rects)
 {
     static const int kMaxScissorRects = D3D11_VIEWPORT_AND_SCISSORRECT_MAX_INDEX + 1;
     assert(count <= kMaxScissorRects);
 
     D3D11_RECT dxRects[kMaxScissorRects];
-    for(UInt ii = 0; ii < count; ++ii)
+    for(GfxIndex ii = 0; ii < count; ++ii)
     {
         auto& inRect = rects[ii];
         auto& dxRect = dxRects[ii];
@@ -3451,23 +3451,23 @@ void D3D11Device::setPipelineState(IPipelineState* state)
     /// ...
 }
 
-void D3D11Device::draw(uint32_t vertexCount, uint32_t startVertex)
+void D3D11Device::draw(GfxCount vertexCount, GfxIndex startVertex)
 {
     _flushGraphicsState();
     m_immediateContext->Draw(vertexCount, startVertex);
 }
 
-void D3D11Device::drawIndexed(uint32_t indexCount, uint32_t startIndex, uint32_t baseVertex)
+void D3D11Device::drawIndexed(GfxCount indexCount, GfxIndex startIndex, GfxIndex baseVertex)
 {
     _flushGraphicsState();
     m_immediateContext->DrawIndexed(indexCount, startIndex, baseVertex);
 }
 
 void D3D11Device::drawInstanced(
-    uint32_t vertexCount,
-    uint32_t instanceCount,
-    uint32_t startVertex,
-    uint32_t startInstanceLocation)
+    GfxCount vertexCount,
+    GfxCount instanceCount,
+    GfxIndex startVertex,
+    GfxIndex startInstanceLocation)
 {
     _flushGraphicsState();
     m_immediateContext->DrawInstanced(
@@ -3478,11 +3478,11 @@ void D3D11Device::drawInstanced(
 }
 
 void D3D11Device::drawIndexedInstanced(
-    uint32_t indexCount,
-    uint32_t instanceCount,
-    uint32_t startIndexLocation,
-    int32_t baseVertexLocation,
-    uint32_t startInstanceLocation)
+    GfxCount indexCount,
+    GfxCount instanceCount,
+    GfxIndex startIndexLocation,
+    GfxIndex baseVertexLocation,
+    GfxIndex startInstanceLocation)
 {
     _flushGraphicsState();
     m_immediateContext->DrawIndexedInstanced(
@@ -3903,7 +3903,7 @@ Result D3D11Device::createGraphicsPipelineState(const GraphicsPipelineStateDesc&
         static const UInt kMaxTargets = D3D11_SIMULTANEOUS_RENDER_TARGET_COUNT;
         if(srcDesc.targetCount > kMaxTargets) return SLANG_FAIL;
 
-        for(UInt ii = 0; ii < kMaxTargets; ++ii)
+        for(GfxIndex ii = 0; ii < kMaxTargets; ++ii)
         {
             TargetBlendDesc const* srcTargetBlendDescPtr = nullptr;
             if(ii < srcDesc.targetCount)
@@ -3983,10 +3983,10 @@ Result D3D11Device::createComputePipelineState(const ComputePipelineStateDesc& i
 
 void D3D11Device::copyBuffer(
     IBufferResource* dst,
-    size_t dstOffset,
+    Offset dstOffset,
     IBufferResource* src,
-    size_t srcOffset,
-    size_t size)
+    Offset srcOffset,
+    Size size)
 {
     auto dstImpl = static_cast<BufferResourceImpl*>(dst);
     auto srcImpl = static_cast<BufferResourceImpl*>(src);

@@ -92,7 +92,6 @@ INST(Nop, nop, 0, 0)
     /* PtrTypeBase */
         INST(PtrType, Ptr, 1, 0)
         INST(RefType, Ref, 1, 0)
-
         // A `PsuedoPtr<T>` logically represents a pointer to a value of type
         // `T` on a platform that cannot support pointers. The expectation
         // is that the "pointer" will be legalized away by storing a value
@@ -284,7 +283,6 @@ INST(Var, var, 0, 0)
 
 INST(Load, load, 1, 0)
 INST(Store, store, 2, 0)
-INST(Copy, copy, 3, 0)
 
 INST(FieldExtract, get_field, 2, 0)
 INST(FieldAddress, get_field_addr, 2, 0)
@@ -548,6 +546,7 @@ INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
     INST(GloballyCoherentDecoration,        globallyCoherent,       0, 0)
     INST(PreciseDecoration,                 precise,                0, 0)
     INST(PublicDecoration,                  public,                 0, 0)
+    INST(HLSLExportDecoration,              hlslExport,             0, 0)
     INST(PatchConstantFuncDecoration,       patchConstantFunc,      1, 0)
 
     INST(OutputControlPointsDecoration,     outputControlPoints,    1, 0)
@@ -604,6 +603,10 @@ INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
         /// An extern_cpp decoration marks the inst to emit its name without mangling for C++ interop.
     INST(ExternCppDecoration, externCpp, 1, 0)
 
+        /// An dllImport decoration marks a function as imported from a DLL. Slang will generate dynamic function loading logic to use this function at runtime.
+    INST(DllImportDecoration, dllImport, 2, 0)
+
+
     /* Decorations for RTTI objects */
     INST(RTTITypeSizeDecoration, RTTI_typeSize, 1, 0)
     INST(AnyValueSizeDecoration, AnyValueSize, 1, 0)
@@ -635,6 +638,8 @@ INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
     INST_RANGE(StageAccessDecoration, StageReadAccessDecoration, StageWriteAccessDecoration)
 
     INST(SemanticDecoration, semantic, 2, 0)
+
+    INST(SPIRVOpDecoration, spirvOpDecoration, 1, 0)
 
         /// Marks a struct type as being used as a structured buffer block.
         /// Recognized by SPIRV-emit pass so we can emit a SPIRV `BufferBlock` decoration.
@@ -715,6 +720,11 @@ INST_RANGE(Layout, VarLayout, EntryPointLayout)
         INST(VarOffsetAttr, offset, 2, 0)
     INST_RANGE(LayoutResourceInfoAttr, TypeSizeAttr, VarOffsetAttr)
 INST_RANGE(Attr, PendingLayoutAttr, VarOffsetAttr)
+
+/* Liveness */
+    INST(LiveRangeStart, liveRangeStart, 2, 0)
+    INST(LiveRangeEnd, liveRangeEnd, 0, 0)
+INST_RANGE(LiveRangeMarker, LiveRangeStart, LiveRangeEnd)
 
 #undef PARENT
 #undef USE_OTHER

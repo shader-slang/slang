@@ -101,7 +101,7 @@ namespace
 
         struct TextureInfo
         {
-            ITextureResource::Size extent;
+            ITextureResource::Extents extent;
             int numMipLevels;
             int arraySize;
             ITextureResource::SubresourceData const* initData;
@@ -177,13 +177,13 @@ namespace
             slang::ProgramLayout* slangReflection;
             GFX_CHECK_CALL_ABORT(loadGraphicsProgram(device, shaderProgram, "resolve-resource-shader", "vertexMain", "fragmentMain", slangReflection));
 
-            IFramebufferLayout::AttachmentLayout attachmentLayout;
-            attachmentLayout.format = format;
-            attachmentLayout.sampleCount = 4;
+            IFramebufferLayout::TargetLayout targetLayout;
+            targetLayout.format = format;
+            targetLayout.sampleCount = 4;
 
             IFramebufferLayout::Desc framebufferLayoutDesc;
             framebufferLayoutDesc.renderTargetCount = 1;
-            framebufferLayoutDesc.renderTargets = &attachmentLayout;
+            framebufferLayoutDesc.renderTargets = &targetLayout;
             ComPtr<gfx::IFramebufferLayout> framebufferLayout = device->createFramebufferLayout(framebufferLayoutDesc);
             SLANG_CHECK_ABORT(framebufferLayout != nullptr);
 
@@ -199,9 +199,9 @@ namespace
             IRenderPassLayout::Desc renderPassDesc = {};
             renderPassDesc.framebufferLayout = framebufferLayout;
             renderPassDesc.renderTargetCount = 1;
-            IRenderPassLayout::AttachmentAccessDesc renderTargetAccess = {};
-            renderTargetAccess.loadOp = IRenderPassLayout::AttachmentLoadOp::Clear;
-            renderTargetAccess.storeOp = IRenderPassLayout::AttachmentStoreOp::Store;
+            IRenderPassLayout::TargetAccessDesc renderTargetAccess = {};
+            renderTargetAccess.loadOp = IRenderPassLayout::TargetLoadOp::Clear;
+            renderTargetAccess.storeOp = IRenderPassLayout::TargetStoreOp::Store;
             renderTargetAccess.initialState = ResourceState::RenderTarget;
             renderTargetAccess.finalState = ResourceState::ResolveSource;
             renderPassDesc.renderTargetAccess = &renderTargetAccess;
@@ -222,7 +222,7 @@ namespace
             GFX_CHECK_CALL_ABORT(device->createFramebuffer(framebufferDesc, framebuffer.writeRef()));
         }
 
-        void submitGPUWork(SubresourceRange msaaSubresource, SubresourceRange dstSubresource, ITextureResource::Size extent)
+        void submitGPUWork(SubresourceRange msaaSubresource, SubresourceRange dstSubresource, ITextureResource::Extents extent)
         {
             Slang::ComPtr<ITransientResourceHeap> transientHeap;
             ITransientResourceHeap::Desc transientHeapDesc = {};
@@ -296,7 +296,7 @@ namespace
     {
         void run()
         {
-            ITextureResource::Size extent = {};
+            ITextureResource::Extents extent = {};
             extent.width = kWidth;
             extent.height = kHeight;
             extent.depth = 1;

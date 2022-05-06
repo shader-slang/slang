@@ -4,6 +4,7 @@
 #include "../core/slang-common.h"
 #include "../../slang-com-helper.h"
 #include "../core/slang-string-util.h"
+#include "../core/slang-string-slice-pool.h"
 
 // if Visual Studio import the visual studio platform specific header
 #if SLANG_VC
@@ -11,6 +12,7 @@
 #endif
 
 #include "../core/slang-io.h"
+#include "slang-artifact-info.h"
 
 namespace Slang
 {
@@ -250,16 +252,34 @@ namespace Slang
     // Link options (parameters past /link go to linker)
     cmdLine.addArg("/link");
 
+    StringSlicePool libPathPool(StringSlicePool::Style::Default);
+
     for (const auto& libPath : options.libraryPaths)
     {
-        // Note that any escaping of the path is handled in the ProcessUtil::
-        cmdLine.addPrefixPathArg("/LIBPATH:", libPath);
+        libPathPool.add(libPath);
     }
 
     // Link libraries.
-    for (const auto& lib : options.libraries)
+    for (IArtifact* artifact : options.libraries)
     {
-        cmdLine.addPrefixPathArg("", lib, ".lib");
+        auto desc = artifact->getDesc();
+
+        if (ArtifactInfoUtil::isCpuBinary(desc) && desc.kind == ArtifactKind::Library)
+        {
+            // Get the libray name and path
+            SLANG_RETURN_ON_FAIL(artifact->requireFileLike(ArtifactKeep::No));
+
+            libPathPool.add(ArtifactInfoUtil::getParentPath(artifact));
+            // We need the extension for windows
+            cmdLine.addArg(ArtifactInfoUtil::getBaseName(artifact) + ".lib");
+        }
+    }
+
+    // Add all the library paths
+    for (const auto& libPath : libPathPool.getAdded())
+    {
+        // Note that any escaping of the path is handled in the ProcessUtil::
+        cmdLine.addPrefixPathArg("/LIBPATH:", libPath);
     }
 
     return SLANG_OK;

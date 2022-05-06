@@ -35,6 +35,7 @@ struct GfxGUID
     static const Slang::Guid IID_IResourceCommandEncoder;
     static const Slang::Guid IID_IRayTracingCommandEncoder;
     static const Slang::Guid IID_ICommandBuffer;
+    static const Slang::Guid IID_ICommandBufferD3D12;
     static const Slang::Guid IID_ICommandQueue;
     static const Slang::Guid IID_IQueryPool;
     static const Slang::Guid IID_IAccelerationStructure;
@@ -520,9 +521,9 @@ public:
         ShaderOffset offset);
 
 public:
-    SLANG_NO_THROW UInt SLANG_MCALL getEntryPointCount() SLANG_OVERRIDE { return 0; }
+    SLANG_NO_THROW GfxCount SLANG_MCALL getEntryPointCount() SLANG_OVERRIDE { return 0; }
 
-    SLANG_NO_THROW Result SLANG_MCALL getEntryPoint(UInt index, IShaderObject** outEntryPoint)
+    SLANG_NO_THROW Result SLANG_MCALL getEntryPoint(GfxIndex index, IShaderObject** outEntryPoint)
         SLANG_OVERRIDE
     {
         *outEntryPoint = nullptr;
@@ -578,7 +579,7 @@ public:
     }
 
     void* getBuffer() { return m_data.getBuffer(); }
-    size_t getBufferSize() { return (size_t)m_data.getCount(); }
+    size_t getBufferSize() { return (size_t)m_data.getCount(); } // TODO: Change size_t to Count?
 
     virtual SLANG_NO_THROW Result SLANG_MCALL
         getObject(ShaderOffset const& offset, IShaderObject** outObject) SLANG_OVERRIDE
@@ -663,7 +664,7 @@ public:
             SLANG_RETURN_ON_FAIL(setData(
                 payloadOffset,
                 subObject->m_data.getBuffer(),
-                (size_t)subObject->m_data.getCount()));
+                (size_t)subObject->m_data.getCount())); // TODO: Change size_t to Count?
 
             setSpecializationArgsForContainerElement(specializationArgs);
             return SLANG_OK;
@@ -774,7 +775,7 @@ public:
     virtual SLANG_NO_THROW Result SLANG_MCALL setSpecializationArgs(
         ShaderOffset const& offset,
         const slang::SpecializationArg* args,
-        uint32_t count) override
+        GfxCount count) override
     {
         auto layout = getLayout();
 
@@ -939,8 +940,8 @@ struct OwnedRayTracingPipelineStateDesc
     Slang::List<OwnedHitGroupDesc> hitGroups;
     Slang::List<HitGroupDesc> hitGroupDescs;
     int maxRecursion = 0;
-    int maxRayPayloadSize = 0;
-    int maxAttributeSizeInBytes = 8;
+    Size maxRayPayloadSize = 0;
+    Size maxAttributeSizeInBytes = 8;
     RayTracingPipelineFlags::Enum flags = RayTracingPipelineFlags::None;
 
     RayTracingPipelineStateDesc get()
@@ -1208,7 +1209,7 @@ public:
 
     virtual SLANG_NO_THROW Result SLANG_MCALL getNativeDeviceHandles(InteropHandles* outHandles) SLANG_OVERRIDE;
     virtual SLANG_NO_THROW Result SLANG_MCALL getFeatures(
-        const char** outFeatures, UInt bufferSize, UInt* outFeatureCount) SLANG_OVERRIDE;
+        const char** outFeatures, Size bufferSize, GfxCount* outFeatureCount) SLANG_OVERRIDE;
     virtual SLANG_NO_THROW bool SLANG_MCALL hasFeature(const char* featureName) SLANG_OVERRIDE;
     virtual SLANG_NO_THROW Result SLANG_MCALL
         getFormatSupportedResourceStates(Format format, ResourceStateSet* outStates) override;
@@ -1223,7 +1224,7 @@ public:
     virtual SLANG_NO_THROW Result SLANG_MCALL createTextureFromSharedHandle(
         InteropHandle handle,
         const ITextureResource::Desc& srcDesc,
-        const size_t size,
+        const Size size,
         ITextureResource** outResource) SLANG_OVERRIDE;
 
     virtual SLANG_NO_THROW Result SLANG_MCALL createBufferFromNativeHandle(
@@ -1284,11 +1285,11 @@ public:
 
     // Provides a default implementation that returns SLANG_E_NOT_AVAILABLE.
     virtual SLANG_NO_THROW Result SLANG_MCALL
-        waitForFences(uint32_t fenceCount, IFence** fences, uint64_t* fenceValues, bool waitForAll, uint64_t timeout) override;
+        waitForFences(GfxCount fenceCount, IFence** fences, uint64_t* fenceValues, bool waitForAll, uint64_t timeout) override;
 
     // Provides a default implementation that returns SLANG_E_NOT_AVAILABLE.
     virtual SLANG_NO_THROW Result SLANG_MCALL getTextureAllocationInfo(
-        const ITextureResource::Desc& desc, size_t* outSize, size_t* outAlignment) override;
+        const ITextureResource::Desc& desc, Size* outSize, Size* outAlignment) override;
 
     // Provides a default implementation that returns SLANG_E_NOT_AVAILABLE.
     virtual SLANG_NO_THROW Result SLANG_MCALL getTextureRowAlignment(size_t* outAlignment) override;

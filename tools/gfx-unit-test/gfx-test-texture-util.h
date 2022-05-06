@@ -10,11 +10,18 @@ using namespace gfx;
 
 namespace gfx_test
 {
+    struct Strides
+    {
+        Size x;
+        Size y;
+        Size z;
+    };
+
     struct ValidationTextureFormatBase : RefObject
     {
         virtual void validateBlocksEqual(const void* actual, const void* expected) = 0;
 
-        virtual void initializeTexel(void* texel, int x, int y, int z, int mipLevel, int arrayLayer) = 0;
+        virtual void initializeTexel(void* texel, GfxIndex x, GfxIndex y, GfxIndex z, GfxIndex mipLevel, GfxIndex arrayLayer) = 0;
     };
 
     template <typename T>
@@ -35,7 +42,7 @@ namespace gfx_test
             }
         }
 
-        virtual void initializeTexel(void* texel, int x, int y, int z, int mipLevel, int arrayLayer) override
+        virtual void initializeTexel(void* texel, GfxIndex x, GfxIndex y, GfxIndex z, GfxIndex mipLevel, GfxIndex arrayLayer) override
         {
             auto temp = (T*)texel;
 
@@ -90,7 +97,7 @@ namespace gfx_test
             }
         }
 
-        virtual void initializeTexel(void* texel, int x, int y, int z, int mipLevel, int arrayLayer) override
+        virtual void initializeTexel(void* texel, GfxIndex x, GfxIndex y, GfxIndex z, GfxIndex mipLevel, GfxIndex arrayLayer) override
         {
             T temp = 0;
 
@@ -137,10 +144,10 @@ namespace gfx_test
     struct ValidationTextureData : RefObject
     {
         const void* textureData;
-        ITextureResource::Size extents;
-        ITextureResource::Offset3D strides;
+        ITextureResource::Extents extents;
+        Strides strides;
 
-        void* getBlockAt(Int x, Int y, Int z)
+        void* getBlockAt(GfxIndex x, GfxIndex y, GfxIndex z)
         {
             assert(x >= 0 && x < extents.width);
             assert(y >= 0 && y < extents.height);
@@ -157,19 +164,19 @@ namespace gfx_test
     struct TextureInfo : RefObject
     {
         Format format;
-        uint32_t texelSize;
         ITextureResource::Type textureType;
 
-        ITextureResource::Size extents;
-        uint32_t mipLevelCount;
-        uint32_t arrayLayerCount;
+        ITextureResource::Extents extents;
+        GfxCount mipLevelCount;
+        GfxCount arrayLayerCount;
 
         List<RefPtr<ValidationTextureData>> subresourceObjects;
         List<ITextureResource::SubresourceData> subresourceDatas;
     };
 
+    TextureAspect getTextureAspect(Format format);
+    Size getTexelSize(Format format);
+    GfxIndex getSubresourceIndex(GfxIndex mipLevel, GfxCount mipLevelCount, GfxIndex baseArrayLayer);
     RefPtr<ValidationTextureFormatBase> getValidationTextureFormat(Format format);
-    TextureAspect getTextureAspect(gfx::Format format);
-    uint32_t getSubresourceIndex(uint32_t mipLevel, uint32_t mipLevelCount, uint32_t baseArrayLayer);
     void generateTextureData(RefPtr<TextureInfo> texture, ValidationTextureFormatBase* validationFormat);
 }

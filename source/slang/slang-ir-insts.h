@@ -196,6 +196,8 @@ struct IRTypeConstraintDecoration : IRDecoration
     };                                  \
     /**/
 
+bool isSimpleDecoration(IROp op);
+
 /// A decoration that indicates that a variable represents
 /// a vulkan ray payload, and should have a location assigned
 /// to it.
@@ -266,6 +268,7 @@ IR_SIMPLE_DECORATION(EarlyDepthStencilDecoration)
 IR_SIMPLE_DECORATION(GloballyCoherentDecoration)
 IR_SIMPLE_DECORATION(PreciseDecoration)
 IR_SIMPLE_DECORATION(PublicDecoration)
+IR_SIMPLE_DECORATION(HLSLExportDecoration)
 IR_SIMPLE_DECORATION(KeepAliveDecoration)
 IR_SIMPLE_DECORATION(RequiresNVAPIDecoration)
 IR_SIMPLE_DECORATION(NoInlineDecoration)
@@ -430,6 +433,21 @@ struct IRExternCppDecoration : IRDecoration
     UnownedStringSlice getName() { return getNameOperand()->getStringSlice(); }
 };
 
+struct IRDllImportDecoration : IRDecoration
+{
+    enum
+    {
+        kOp = kIROp_DllImportDecoration
+    };
+    IR_LEAF_ISA(DllImportDecoration)
+
+    IRStringLit* getLibraryNameOperand() { return cast<IRStringLit>(getOperand(0)); }
+    UnownedStringSlice getLibraryName() { return getLibraryNameOperand()->getStringSlice(); }
+
+    IRStringLit* getFunctionNameOperand() { return cast<IRStringLit>(getOperand(1)); }
+    UnownedStringSlice getFunctionName() { return getFunctionNameOperand()->getStringSlice(); }
+};
+
 struct IRFormatDecoration : IRDecoration
 {
     enum { kOp = kIROp_FormatDecoration };
@@ -540,17 +558,6 @@ struct IRAlloca : IRInst
     IR_LEAF_ISA(Alloca)
 
     IRInst* getAllocSize() { return getOperand(0); }
-};
-
-/// Copies `size` bytes from `src` to `dst`.
-///
-struct IRCopy : IRInst
-{
-    IR_LEAF_ISA(Copy)
-
-    IRInst* getDst() { return getOperand(0); }
-    IRInst* getSrc() { return getOperand(1); }
-    IRInst* getSize() { return getOperand(2); }
 };
 
 /// Packs a value into an `AnyValue`.
@@ -1801,6 +1808,43 @@ struct IRExtractExistentialWitnessTable : IRInst
     IR_LEAF_ISA(ExtractExistentialWitnessTable);
 };
 
+/* Base class for instructions that track liveness */
+struct IRLiveRangeMarker : IRInst
+{
+    IR_PARENT_ISA(LiveRangeMarker)
+
+    // TODO(JS): It might be useful to track how many bytes are live in the item referenced. 
+    // It's not entirely clear how that will work across different targets, or even what such a 
+    // size means on some targets.
+    // 
+    // Here we assume the size is the size of the type being referenced (whatever that means on a target)
+    //
+    // Potentially we could have a count, for defining (say) a range of an array. It's not clear this is 
+    // needed, so we just have the item referenced.
+
+        /// The referenced item whose liveness starts after this instruction
+    IRInst* getReferenced() { return getOperand(0); }
+};
+
+/// Identifies then the item references starts being live.
+struct IRLiveRangeStart : IRLiveRangeMarker
+{
+    IR_LEAF_ISA(LiveRangeStart);        
+};
+
+/// Demarks where the referenced item is no longer live, optimimally (although not
+/// necessarily) at the previous instruction. 
+/// 
+/// There *can* be acceses to the referenced item after the end, if those accesses
+/// can never be seen. For example if there is a store, without any subsequent loads, 
+/// the store will never be seen (by a load) and so can be ignored.
+///
+/// In general there can be one or more 'ends' for every start.
+struct IRLiveRangeEnd : IRLiveRangeMarker
+{
+    IR_LEAF_ISA(LiveRangeEnd);
+};
+
 // Description of an instruction to be used for global value numbering
 struct IRInstKey
 {
@@ -2025,7 +2069,9 @@ public:
     IRBasicType* getIntType();
     IRBasicType* getUIntType();
     IRBasicType* getUInt64Type();
+    IRBasicType* getCharType();
     IRStringType* getStringType();
+
     IRType* getCapabilitySetType();
 
     IRAssociatedType* getAssociatedType(ArrayView<IRInterfaceType*> constraintTypes);
@@ -2159,6 +2205,12 @@ public:
         return getAttributedType(baseType, attributes.getCount(), attributes.getBuffer());
     }
 
+        /// Emit an LiveRangeStart instruction indicating the referenced item is live following this instruction
+    IRLiveRangeStart* emitLiveRangeStart(IRInst* referenced);
+
+        /// Emit a LiveRangeEnd instruction indicating the referenced item is no longer live when this instruction is reached.
+    IRLiveRangeEnd* emitLiveRangeEnd(IRInst* referenced);
+
     // Set the data type of an instruction, while preserving
     // its rate, if any.
     void setDataType(IRInst* inst, IRType* dataType);
@@ -2193,8 +2245,6 @@ public:
     IRInst* emitGetSequentialIDInst(IRInst* rttiObj);
 
     IRInst* emitAlloca(IRInst* type, IRInst* rttiObjPtr);
-
-    IRInst* emitCopy(IRInst* dst, IRInst* src, IRInst* rttiObjPtr);
 
     IRInst* emitPackAnyValue(IRType* type, IRInst* value);
 
@@ -2811,6 +2861,11 @@ public:
         addDecoration(value, kIROp_ExternCppDecoration, getStringValue(mangledName));
     }
 
+    void addDllImportDecoration(IRInst* value, UnownedStringSlice const& libraryName, UnownedStringSlice const& functionName)
+    {
+        addDecoration(value, kIROp_DllImportDecoration, getStringValue(libraryName), getStringValue(functionName));
+    }
+
     void addEntryPointDecoration(IRInst* value, Profile profile, UnownedStringSlice const& name, UnownedStringSlice const& moduleName)
     {
         IRInst* operands[] = { getIntValue(getIntType(), profile.raw), getStringValue(name), getStringValue(moduleName) };
@@ -2824,9 +2879,12 @@ public:
 
     void addPublicDecoration(IRInst* value)
     {
-        addDecoration(value, kIROp_PublicDecoration);
+        addDecoration(value, kIROp_PublicDecoration);   
     }
-
+    void addHLSLExportDecoration(IRInst* value)
+    {
+        addDecoration(value, kIROp_HLSLExportDecoration);
+    }
     void addNVAPIMagicDecoration(IRInst* value, UnownedStringSlice const& name)
     {
         addDecoration(value, kIROp_NVAPIMagicDecoration, getStringValue(name));
@@ -2881,6 +2939,16 @@ public:
     void addSequentialIDDecoration(IRInst* inst, IRIntegerValue id)
     {
         addDecoration(inst, kIROp_SequentialIDDecoration, getIntValue(getUIntType(), id));
+    }
+
+    void addVulkanRayPayloadDecoration(IRInst* inst, int location)
+    {
+        addDecoration(inst, kIROp_VulkanRayPayloadDecoration, getIntValue(getIntType(), location));
+    }
+
+    void addVulkanCallablePayloadDecoration(IRInst* inst, int location)
+    {
+        addDecoration(inst, kIROp_VulkanCallablePayloadDecoration, getIntValue(getIntType(), location));
     }
 };
 

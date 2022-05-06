@@ -752,6 +752,31 @@ static void _lookUpMembersInValue(
     return _lookUpMembersInType(astBuilder, name, valueType, request, ioResult, breadcrumbs);
 }
 
+// True if the declaration is of an overloadable variety  
+// (ie can have multiple definitions with the same name)
+// 
+// For example functions are overloadable, but variables are (typically) not.
+static bool _isDeclOverloadable(Decl* decl)
+{
+    // If it's a generic strip off, to get to inner decl type
+    while (auto genericDecl = as<GenericDecl>(decl))
+    {
+        decl = genericDecl->inner;
+    }
+
+    // TODO(JS): Do we need to special case around ConstructorDecl? or AccessorDecl?
+    // It seems not as they are both function-like and potentially overloadable
+
+    // If it's callable, it's a function-like and so overloadable 
+    if (auto callableDecl = as<CallableDecl>(decl))
+    {
+        SLANG_UNUSED(callableDecl);
+        return true;
+    }
+
+    return false;
+}
+
 static void _lookUpInScopes(
     ASTBuilder*             astBuilder,
     Name*                   name,
@@ -912,9 +937,16 @@ static void _lookUpInScopes(
 
         if (result.isValid())
         {
-            // If we've found a result in this scope, then there
+            // If it's overloaded or the decl we have is of an overloadable type then we just keep going
+            if (result.isOverloaded() || 
+                _isDeclOverloadable(result.item.declRef.getDecl()))
+            {
+                continue;
+            }
+
+            // If we've found a result in this scope (and it's not overloadable), then there
             // is no reason to look further up (for now).
-            return;
+            break;
         }
     }
 

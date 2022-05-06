@@ -1,5 +1,4 @@
 // slang-emit-spirv.cpp
-#include "slang-emit.h"
 
 #include "slang-compiler.h"
 #include "slang-emit-base.h"
@@ -2860,16 +2859,18 @@ struct SPIRVEmitContext
 };
 
 SlangResult emitSPIRVFromIR(
-    BackEndCompileRequest*  compileRequest,
-    TargetRequest*          targetRequest,
+    CodeGenContext*         codeGenContext,
     IRModule*               irModule,
     const List<IRFunc*>&    irEntryPoints,
     List<uint8_t>&          spirvOut)
 {
     spirvOut.clear();
 
-    SPIRVEmitContext context(irModule, targetRequest, compileRequest->getSink());
-    legalizeIRForSPIRV(&context, irModule, irEntryPoints, compileRequest->getSink());
+    auto targetRequest = codeGenContext->getTargetReq();
+    auto sink = codeGenContext->getSink();
+
+    SPIRVEmitContext context(irModule, targetRequest, sink);
+    legalizeIRForSPIRV(&context, irModule, irEntryPoints, sink);
 
     context.emitFrontMatter();
     for (auto irEntryPoint : irEntryPoints)

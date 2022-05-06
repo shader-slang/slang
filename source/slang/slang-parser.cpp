@@ -2179,10 +2179,36 @@ namespace Slang
         }
         else if( parser->LookAheadToken("class") )
         {
-            auto decl = parser->ParseClass();
-            typeSpec.decl = decl;
-            typeSpec.expr = createDeclRefType(parser, decl);
-            return typeSpec;
+            // TODO(JS): Class type doesn't currently have the correct semantics. This is covered here
+            // https://github.com/shader-slang/slang/issues/2206
+            // 
+            // For now the use of `class` is disabled. 
+            // The remaining code around `class` left intact as likely will be the basis for the future
+            // implementation.
+
+            const bool disableClass = true;
+
+            if (disableClass)
+            {
+                parser->sink->diagnose(parser->tokenReader.peekLoc(), Diagnostics::classIsReservedKeyword);
+
+                // Consume `class`
+                advanceToken(parser);
+
+                // Indicate in recovering state.
+                parser->isRecovering = true;
+
+                // Check to confirm the result is invalid
+                SLANG_ASSERT(typeSpec.decl == nullptr && typeSpec.expr == nullptr);
+                return typeSpec;
+            }
+            else
+            {
+                auto decl = parser->ParseClass();
+                typeSpec.decl = decl;
+                typeSpec.expr = createDeclRefType(parser, decl);
+                return typeSpec;
+            }
         }
         else if(parser->LookAheadToken("enum"))
         {
@@ -2292,6 +2318,11 @@ namespace Slang
 
         Modifiers modifiers = inModifiers;
         auto typeSpec = _parseTypeSpec(parser, modifiers);
+
+        if (typeSpec.expr == nullptr && typeSpec.decl == nullptr)
+        {
+            return nullptr;
+        }
 
         // We may need to build up multiple declarations in a group,
         // but the common case will be when we have just a single
@@ -2928,8 +2959,7 @@ namespace Slang
         // any non-null pointer we return to the AST).
         //
         NamespaceDecl* namespaceDecl = nullptr;
-        NodeBase* result = nullptr;
-        //
+
         // In order to find out what case we are in, we start by looking
         // for a namespace declaration of the same name in the parent
         // declaration.
@@ -2985,14 +3015,6 @@ namespace Slang
             {
                 namespaceDecl = parser->astBuilder->create<NamespaceDecl>();
                 namespaceDecl->nameAndLoc = nameAndLoc;
-
-                // In the case where we are creating the first
-                // declaration of the given namesapce, we need
-                // to use it as the return value of the parsing
-                // callback, so that it is appropriately added
-                // to the parent declaration.
-                //
-                result = namespaceDecl;
             }
         }
 
@@ -3003,7 +3025,7 @@ namespace Slang
         //
         parseDeclBody(parser, namespaceDecl);
 
-        return result;
+        return namespaceDecl;
     }
 
     static NodeBase* parseUsingDecl(Parser* parser, void* /*userData*/)
@@ -3560,8 +3582,9 @@ namespace Slang
         {
             // User is specifying the class that should be construted
             auto classNameAndLoc = expectIdentifier(parser);
-
             syntaxClass = parser->astBuilder->findSyntaxClass(classNameAndLoc.name);
+
+            assert(syntaxClass.classInfo);
         }
         else
         {
@@ -3590,6 +3613,16 @@ namespace Slang
         ContainerDecl*		containerDecl,
         Modifiers			modifiers)
     {
+
+        // If this is a namespace and already added, we don't want to add to the parent
+        // Or add any modifiers
+        if (as<NamespaceDecl>(decl) && decl->parentDecl)
+        {
+            // Presumably we have no modifiers.
+            SLANG_ASSERT(modifiers.isEmpty());
+            return;
+        }
+
         // Add any modifiers we parsed before the declaration to the list
         // of modifiers on the declaration itself.
         //
@@ -3601,9 +3634,9 @@ namespace Slang
             declToModify = genericDecl->inner;
         _addModifiers(declToModify, modifiers);
 
-        // Make sure the decl is properly nested inside its lexical parent
         if (containerDecl)
         {
+            // Make sure the decl is properly nested inside its lexical parent
             AddMember(containerDecl, decl);
         }
     }
@@ -4177,6 +4210,7 @@ namespace Slang
             // when starting to parse an infix expression.
             //
             type = nullptr;
+            SLANG_UNUSED(type);
 
             // TODO: If we decide to intermix parsing of statement bodies
             // with semantic checking (by delaying the parsing of bodies
@@ -4819,6 +4853,11 @@ namespace Slang
     static NodeBase* parseFalseExpr(Parser* parser, void* /*userData*/)
     {
         return parseBoolLitExpr(parser, false);
+    }
+
+    static NodeBase* parseNullPtrExpr(Parser* parser, void* /*userData*/)
+    {
+        return parser->astBuilder->create<NullPtrLiteralExpr>();
     }
 
     static bool _isFinite(double value)
@@ -6239,7 +6278,7 @@ namespace Slang
         _makeParseModifier("require",       RequireModifier::kReflectClassInfo),
         _makeParseModifier("param",         ParamModifier::kReflectClassInfo),
         _makeParseModifier("extern",        ExternModifier::kReflectClassInfo),
-
+        
         _makeParseModifier("row_major",     HLSLRowMajorLayoutModifier::kReflectClassInfo),
         _makeParseModifier("column_major",  HLSLColumnMajorLayoutModifier::kReflectClassInfo),
 
@@ -6254,6 +6293,7 @@ namespace Slang
         _makeParseModifier("static",        HLSLStaticModifier::kReflectClassInfo),
         _makeParseModifier("uniform",       HLSLUniformModifier::kReflectClassInfo),
         _makeParseModifier("volatile",      HLSLVolatileModifier::kReflectClassInfo),
+        _makeParseModifier("export",        HLSLExportModifier::kReflectClassInfo),
 
         // Modifiers for geometry shader input
         _makeParseModifier("point",         HLSLPointModifier::kReflectClassInfo),
@@ -6295,6 +6335,7 @@ namespace Slang
         _makeParseExpr("This",  parseThisTypeExpr),
         _makeParseExpr("true",  parseTrueExpr),
         _makeParseExpr("false", parseFalseExpr),
+        _makeParseExpr("nullptr", parseNullPtrExpr),
         _makeParseExpr("__TaggedUnion", parseTaggedUnionType),
     };
 

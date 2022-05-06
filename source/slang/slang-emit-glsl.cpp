@@ -15,7 +15,7 @@ namespace Slang {
 GLSLSourceEmitter::GLSLSourceEmitter(const Desc& desc) :
     Super(desc)
 {
-    m_glslExtensionTracker = dynamicCast<GLSLExtensionTracker>(desc.extensionTracker);
+    m_glslExtensionTracker = dynamicCast<GLSLExtensionTracker>(desc.codeGenContext->getExtensionTracker());
     SLANG_ASSERT(m_glslExtensionTracker);
 }
 
@@ -40,7 +40,7 @@ SlangResult GLSLSourceEmitter::init()
         default: break;
     }
 
-    if (m_targetRequest->getForceGLSLScalarBufferLayout())
+    if (getTargetReq()->getForceGLSLScalarBufferLayout())
     {
         m_glslExtensionTracker->requireExtension(
             UnownedStringSlice::fromLiteral("GL_EXT_scalar_block_layout"));
@@ -121,7 +121,7 @@ void GLSLSourceEmitter::_emitGLSLStructuredBuffer(IRGlobalParam* varDecl, IRHLSL
     _requireGLSLVersion(430);
 
     m_writer->emit("layout(");
-    m_writer->emit(m_targetRequest->getForceGLSLScalarBufferLayout() ? "scalar" : "std430");
+    m_writer->emit(getTargetReq()->getForceGLSLScalarBufferLayout() ? "scalar" : "std430");
 
     auto layout = getVarLayout(varDecl);
     if (layout)
@@ -196,7 +196,7 @@ void GLSLSourceEmitter::_emitGLSLByteAddressBuffer(IRGlobalParam* varDecl, IRByt
     _requireGLSLVersion(430);
 
     m_writer->emit("layout(");
-    m_writer->emit(m_targetRequest->getForceGLSLScalarBufferLayout() ? "scalar" : "std430");
+    m_writer->emit(getTargetReq()->getForceGLSLScalarBufferLayout() ? "scalar" : "std430");
 
     auto layout = getVarLayout(varDecl);
     if (layout)
@@ -292,7 +292,7 @@ void GLSLSourceEmitter::_emitGLSLParameterGroup(IRGlobalParam* varDecl, IRUnifor
     {
         // Is writable
         m_writer->emit("layout(");
-        m_writer->emit(m_targetRequest->getForceGLSLScalarBufferLayout() ? "scalar" : "std430");
+        m_writer->emit(getTargetReq()->getForceGLSLScalarBufferLayout() ? "scalar" : "std430");
         m_writer->emit(") buffer ");
     }
     // TODO: what to do with HLSL `tbuffer` style buffers?
@@ -300,7 +300,7 @@ void GLSLSourceEmitter::_emitGLSLParameterGroup(IRGlobalParam* varDecl, IRUnifor
     {
         // uniform is implicitly read only
         m_writer->emit("layout(");
-        m_writer->emit(m_targetRequest->getForceGLSLScalarBufferLayout() ? "scalar" : "std140");
+        m_writer->emit(getTargetReq()->getForceGLSLScalarBufferLayout() ? "scalar" : "std140");
         m_writer->emit(") uniform ");
     }
 
@@ -379,7 +379,7 @@ void GLSLSourceEmitter::_emitGLSLImageFormatModifier(IRInst* var, IRTextureType*
     // treating images without explicit formats as having
     // unknown format.
     //
-    if (m_compileRequest->useUnknownImageFormatAsDefault)
+    if (getCodeGenContext()->getUseUnknownImageFormatAsDefault())
     {
         _requireGLSLExtension(UnownedStringSlice::fromLiteral("GL_EXT_shader_image_load_formatted"));
         return;
@@ -1831,6 +1831,40 @@ void GLSLSourceEmitter::emitVectorTypeNameImpl(IRType* elementType, IRIntegerVal
     }
 }
 
+void GLSLSourceEmitter::emitTypeImpl(IRType* type, const StringSliceLoc* nameAndLoc)
+{
+    if (auto refType = as<IRRefType>(type))
+    {
+        m_writer->emit("spirv_by_reference ");
+        type = refType->getValueType();
+    }
+    return Super::emitTypeImpl(type, nameAndLoc);
+}
+
+void GLSLSourceEmitter::emitParamTypeImpl(IRType* type, String const& name)
+{
+    if (auto refType = as<IRRefType>(type))
+    {
+        // 
+        m_writer->emit("spirv_by_reference  ");
+        type = refType->getValueType();
+    }
+    Super::emitParamTypeImpl(type, name);
+}
+
+void GLSLSourceEmitter::emitFuncDecorationImpl(IRDecoration* decoration)
+{
+    if (decoration->getOp() == kIROp_SPIRVOpDecoration)
+    {
+        m_writer->emit("spirv_instruction(id = ");
+        emitSimpleValue(decoration->getOperand(0));
+        m_writer->emit(")\n");
+    }
+    else
+    {
+        Super::emitFuncDecorationImpl(decoration);
+    }
+}
 
 void GLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
 {

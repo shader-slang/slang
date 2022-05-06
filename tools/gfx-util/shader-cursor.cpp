@@ -66,7 +66,7 @@ Result ShaderCursor::getField(const char* name, const char* nameEnd, ShaderCurso
             //
             fieldCursor.m_offset.uniformOffset = m_offset.uniformOffset + fieldLayout->getOffset();
             fieldCursor.m_offset.bindingRangeIndex =
-                m_offset.bindingRangeIndex + m_typeLayout->getFieldBindingRangeOffset(fieldIndex);
+                m_offset.bindingRangeIndex + (GfxIndex)m_typeLayout->getFieldBindingRangeOffset(fieldIndex);
 
             // The index of the field within any binding ranges will be the same
             // as the index computed for the parent structure.
@@ -126,8 +126,8 @@ Result ShaderCursor::getField(const char* name, const char* nameEnd, ShaderCurso
     //
     // TODO: figure out whether we should support this long-term.
     //
-    auto entryPointCount = (gfx::Int) m_baseObject->getEntryPointCount();
-    for( gfx::Int e = 0; e < entryPointCount; ++e )
+    auto entryPointCount = (GfxIndex) m_baseObject->getEntryPointCount();
+    for( GfxIndex e = 0; e < entryPointCount; ++e )
     {
         ComPtr<IShaderObject> entryPoint;
         m_baseObject->getEntryPoint(e, entryPoint.writeRef());
@@ -142,7 +142,7 @@ Result ShaderCursor::getField(const char* name, const char* nameEnd, ShaderCurso
     return SLANG_E_INVALID_ARG;
 }
 
-ShaderCursor ShaderCursor::getElement(SlangInt index) const
+ShaderCursor ShaderCursor::getElement(GfxIndex index) const
 {
     if (m_containerType != ShaderObjectContainerType::None)
     {
@@ -168,7 +168,7 @@ ShaderCursor ShaderCursor::getElement(SlangInt index) const
                 index * m_typeLayout->getElementStride(SLANG_PARAMETER_CATEGORY_UNIFORM);
             elementCursor.m_offset.bindingRangeIndex = m_offset.bindingRangeIndex;
             elementCursor.m_offset.bindingArrayIndex =
-                m_offset.bindingArrayIndex * m_typeLayout->getElementCount() + index;
+                m_offset.bindingArrayIndex * (GfxCount)m_typeLayout->getElementCount() + index;
             return elementCursor;
         }
         break;
@@ -189,7 +189,7 @@ ShaderCursor ShaderCursor::getElement(SlangInt index) const
             fieldCursor.m_typeLayout = fieldLayout->getTypeLayout();
             fieldCursor.m_offset.uniformOffset = m_offset.uniformOffset + fieldLayout->getOffset();
             fieldCursor.m_offset.bindingRangeIndex =
-                m_offset.bindingRangeIndex + m_typeLayout->getFieldBindingRangeOffset(fieldIndex);
+                m_offset.bindingRangeIndex + (GfxIndex)m_typeLayout->getFieldBindingRangeOffset(fieldIndex);
             fieldCursor.m_offset.bindingArrayIndex = m_offset.bindingArrayIndex;
 
             return fieldCursor;
@@ -266,7 +266,7 @@ Result ShaderCursor::followPath(const char* path, ShaderCursor& ioCursor)
                 return SLANG_E_INVALID_ARG;
 
             _get(rest);
-            SlangInt index = 0;
+            GfxCount index = 0;
             while (_peek(rest) != ']')
             {
                 int d = _get(rest);

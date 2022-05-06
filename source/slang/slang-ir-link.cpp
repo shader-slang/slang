@@ -7,6 +7,10 @@
 #include "slang-mangle.h"
 #include "slang-ir-string-hash.h"
 
+#include "slang-module-library.h"
+
+#include "../compiler-core/slang-artifact.h"
+
 namespace Slang
 {
 
@@ -437,6 +441,7 @@ static void cloneExtraDecorations(
             default:
                 break;
 
+            case kIROp_HLSLExportDecoration:
             case kIROp_BindExistentialSlotsDecoration:
             case kIROp_LayoutDecoration:
             case kIROp_PublicDecoration:
@@ -1344,13 +1349,29 @@ struct IRSpecializationState
     }
 };
 
-LinkedIR linkIR(
-    BackEndCompileRequest*  compileRequest,
-    const List<Int>&        entryPointIndices,
-    CodeGenTarget           target,
-    TargetProgram*          targetProgram)
+static bool _isPublicOrHLSLExported(IRInst* inst)
 {
-    auto targetReq = targetProgram->getTargetReq();
+    for (auto decoration : inst->getDecorations())
+    {
+        const auto op = decoration->getOp();
+        if (op == kIROp_PublicDecoration ||
+            op == kIROp_HLSLExportDecoration)
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
+LinkedIR linkIR(
+    CodeGenContext* codeGenContext)
+{
+    auto linkage = codeGenContext->getLinkage();
+    auto program = codeGenContext->getProgram();
+    auto session = codeGenContext->getSession();
+    auto target = codeGenContext->getTargetFormat();
+    auto targetProgram = codeGenContext->getTargetProgram();
+    auto targetReq = codeGenContext->getTargetReq();
 
     // TODO: We need to make sure that the program we are being asked
     // to compile has been "resolved" so that it has no outstanding
@@ -1362,19 +1383,17 @@ LinkedIR linkIR(
     state->target = target;
     state->targetReq = targetReq;
 
-    auto program = compileRequest->getProgram();
 
     auto sharedContext = state->getSharedContext();
     initializeSharedSpecContext(
         sharedContext,
-        compileRequest->getSession(),
+        session,
         nullptr,
         target,
         targetReq);
 
     state->irModule = sharedContext->module;
 
-    auto linkage = compileRequest->getLinkage();
 
     // We need to be able to look up IR definitions for any symbols in
     // modules that the program depends on (transitively). To
@@ -1387,8 +1406,14 @@ LinkedIR linkIR(
     {
         irModules.add(irModule);
     });
-    irModules.addRange(linkage->m_libModules.getBuffer()->readRef(), linkage->m_libModules.getCount());
-
+    for (IArtifact* artifact : linkage->m_libModules)
+    {
+        ModuleLibrary* library = (ModuleLibrary*)artifact->findElementObject(ModuleLibrary::getTypeGuid());
+        if (library)
+        {
+            irModules.addRange(library->m_modules.getBuffer()->readRef(), library->m_modules.getCount());
+        }
+    }
     
     // Add any modules that were loaded as libraries
     for (IRModule* irModule : irModules)
@@ -1437,7 +1462,7 @@ LinkedIR linkIR(
     //
 
     List<IRFunc*> irEntryPoints;
-    for (auto entryPointIndex : entryPointIndices)
+    for (auto entryPointIndex : codeGenContext->getEntryPointIndices())
     {
         auto entryPointMangledName = program->getEntryPointMangledName(entryPointIndex);
         auto nameOverride = program->getEntryPointNameOverride(entryPointIndex);
@@ -1485,14 +1510,14 @@ LinkedIR linkIR(
     {
         for (auto inst : irModule->getGlobalInsts())
         {
-            auto hasPublic = inst->findDecoration<IRPublicDecoration>();
-            if (!hasPublic)
-                continue;
-
-            auto cloned = cloneValue(context, inst);
-            if (!cloned->findDecorationImpl(kIROp_KeepAliveDecoration))
+            // Is it `public` or (HLSL) `export` clone
+            if (_isPublicOrHLSLExported(inst))
             {
-                context->builder->addKeepAliveDecoration(cloned);
+                auto cloned = cloneValue(context, inst);
+                if (!cloned->findDecorationImpl(kIROp_KeepAliveDecoration))
+                {
+                    context->builder->addKeepAliveDecoration(cloned);
+                }
             }
         }
     }

@@ -15,12 +15,13 @@ public:
     ComObject()
         : comRefCount(0)
     {}
-    ComObject(const ComObject&) : comRefCount(0) {}
-    ComObject& operator=(const ComObject&)
-    {
-        comRefCount = 0;
-        return *this;
-    };
+    ComObject(const ComObject& rhs) :
+        RefObject(rhs),
+        comRefCount(0) 
+    {}
+
+    ComObject& operator=(const ComObject&) { return *this; }
+
     virtual void comFree() {}
 
     uint32_t addRefImpl()

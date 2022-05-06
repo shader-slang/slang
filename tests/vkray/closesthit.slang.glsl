@@ -48,10 +48,12 @@ rayPayloadInNV ReflectionRay_0 tmp_payload;
 
 void main()
 {
-    uint tmp_customidx = gl_InstanceCustomIndexNV;
     uint tmp_instanceid = gl_InstanceID;
+    uint tmp_shift_0 = tmp_instanceid << 1;
 
-    uint tmp_add_0 = tmp_customidx + tmp_instanceid;
+    uint tmp_customidx = gl_InstanceCustomIndexNV;
+
+    uint tmp_add_0 = tmp_shift_0 + tmp_customidx;
     uint tmp_primid = gl_PrimitiveID;
 
     uint tmp_add_1 = tmp_add_0 + tmp_primid;

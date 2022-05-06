@@ -92,14 +92,11 @@ struct CLikeSourceEmitter::ComputeEmitActionsContext
 CLikeSourceEmitter::CLikeSourceEmitter(const Desc& desc)
 {
     m_writer = desc.sourceWriter;
-    m_sourceLanguage = getSourceLanguage(desc.target);
+    m_sourceLanguage = getSourceLanguage(desc.codeGenContext->getTargetFormat());
     SLANG_ASSERT(m_sourceLanguage != SourceLanguage::Unknown);
 
-    m_target = desc.target;
-    m_targetCaps = desc.targetCaps;
-
-    m_compileRequest = desc.compileRequest;
-    m_targetRequest = desc.targetRequest;
+    m_target = desc.codeGenContext->getTargetFormat();
+    m_codeGenContext = desc.codeGenContext;
     m_entryPointStage = desc.entryPointStage;
     m_effectiveProfile = desc.effectiveProfile;
 }
@@ -162,6 +159,14 @@ void CLikeSourceEmitter::emitDeclarator(DeclaratorInfo* declarator)
         }
         break;
 
+    case DeclaratorInfo::Flavor::Ref:
+        {
+            auto refDeclarator = (RefDeclaratorInfo*)declarator;
+            m_writer->emit("&");
+            emitDeclarator(refDeclarator->next);
+        }
+        break;
+
     case DeclaratorInfo::Flavor::LiteralSizedArray:
         {
             auto arrayDeclarator = (LiteralSizedArrayDeclaratorInfo*)declarator;
@@ -183,8 +188,6 @@ void CLikeSourceEmitter::emitDeclarator(DeclaratorInfo* declarator)
             emitDeclarator(attributedDeclarator->next);
         }
         break;
-
-
     default:
         SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unknown declarator flavor");
         break;
@@ -217,6 +220,8 @@ void CLikeSourceEmitter::emitSimpleType(IRType* type)
 
         case kIROp_FloatType:   return UnownedStringSlice("float");    
         case kIROp_DoubleType:  return UnownedStringSlice("double");
+
+        case kIROp_CharType:    return UnownedStringSlice("uint8_t");
         default:                return UnownedStringSlice();
     }
 }
@@ -327,7 +332,6 @@ void CLikeSourceEmitter::_emitType(IRType* type, DeclaratorInfo* declarator)
         }
         break;
     }
-
 }
 
 void CLikeSourceEmitter::emitWitnessTable(IRWitnessTable* witnessTable)
@@ -399,6 +403,43 @@ void CLikeSourceEmitter::emitType(IRType* type, Name* name, SourceLoc const& nam
 void CLikeSourceEmitter::emitType(IRType* type, NameLoc const& nameAndLoc)
 {
     emitType(type, nameAndLoc.name, nameAndLoc.loc);
+}
+
+
+void CLikeSourceEmitter::emitLivenessImpl(IRInst* inst)
+{
+    
+    auto liveMarker = as<IRLiveRangeMarker>(inst);
+    if (!liveMarker)
+    {
+        return;
+    }
+
+    IRInst* referenced = liveMarker->getReferenced();
+    SLANG_ASSERT(referenced);
+
+    UnownedStringSlice text;
+    switch (inst->getOp())
+    {
+        case kIROp_LiveRangeStart:
+        {
+            text = UnownedStringSlice::fromLiteral("SLANG_LIVE_START");
+            break;
+        }
+        case kIROp_LiveRangeEnd:
+        {
+            text = UnownedStringSlice::fromLiteral("SLANG_LIVE_END");
+            break;
+        }
+        default: break;
+    }
+
+    m_writer->emit(text);
+    m_writer->emit("(");
+
+    emitOperand(referenced, getInfo(EmitOp::General));
+
+    m_writer->emit(")\n");
 }
 
 //
@@ -2025,6 +2066,10 @@ void CLikeSourceEmitter::_emitInst(IRInst* inst)
         m_writer->emit(";\n");
         break;
 
+    case kIROp_LiveRangeStart:
+    case kIROp_LiveRangeEnd:
+        emitLiveness(inst);
+        break;
     case kIROp_undefined:
     case kIROp_DefaultConstruct:
         {
@@ -2504,7 +2549,7 @@ void CLikeSourceEmitter::emitRegion(Region* inRegion)
                 // instead of the current `if(condition) {} else { elseRegion }`
 
                 m_writer->emit("if(");
-                emitOperand(ifRegion->condition, getInfo(EmitOp::General));
+                emitOperand(ifRegion->getCondition(), getInfo(EmitOp::General));
                 m_writer->emit(")\n{\n");
                 m_writer->indent();
                 emitRegion(ifRegion->thenRegion);
@@ -2566,7 +2611,7 @@ void CLikeSourceEmitter::emitRegion(Region* inRegion)
 
                 // Emit the start of our statement.
                 m_writer->emit("switch(");
-                emitOperand(switchRegion->condition, getInfo(EmitOp::General));
+                emitOperand(switchRegion->getCondition(), getInfo(EmitOp::General));
                 m_writer->emit(")\n{\n");
 
                 auto defaultCase = switchRegion->defaultCase;
@@ -2883,7 +2928,7 @@ void CLikeSourceEmitter::emitFunc(IRFunc* func)
     }
 }
 
-void CLikeSourceEmitter::emitFuncDecorations(IRFunc* func)
+void CLikeSourceEmitter::emitFuncDecorationsImpl(IRFunc* func)
 {
     for(auto decoration : func->getDecorations())
     {
@@ -2941,6 +2986,14 @@ void CLikeSourceEmitter::emitInterpolationModifiers(IRInst* varInst, IRType* val
 
 UInt CLikeSourceEmitter::getRayPayloadLocation(IRInst* inst)
 {
+    if (auto rayPayloadDecoration = inst->findDecoration<IRVulkanRayPayloadDecoration>())
+    {
+        int explicitLocation = int(getIntVal(rayPayloadDecoration->getOperand(0)));
+
+        if (explicitLocation >= 0)
+            return UInt(explicitLocation);
+    }
+
     auto& map = m_mapIRValueToRayPayloadLocation;
     UInt value = 0;
     if(map.TryGetValue(inst, value))
@@ -2953,6 +3006,14 @@ UInt CLikeSourceEmitter::getRayPayloadLocation(IRInst* inst)
 
 UInt CLikeSourceEmitter::getCallablePayloadLocation(IRInst* inst)
 {
+    if (auto callablePayloadDecoration = inst->findDecoration<IRVulkanCallablePayloadDecoration>())
+    {
+        int explicitLocation = int(getIntVal(callablePayloadDecoration->getOperand(0)));
+
+        if (explicitLocation >= 0)
+            return UInt(explicitLocation);
+    }
+
     auto& map = m_mapIRValueToCallablePayloadLocation;
     UInt value = 0;
     if(map.TryGetValue(inst, value))
@@ -3308,8 +3369,14 @@ void CLikeSourceEmitter::ensureInstOperandsRec(ComputeEmitActionsContext* ctx, I
 
     UInt operandCount = inst->operandCount;
     auto requiredLevel = EmitAction::Definition;
-    if (inst->getOp() == kIROp_InterfaceType)
+    switch (inst->getOp())
+    {
+    case kIROp_InterfaceType:
         requiredLevel = EmitAction::ForwardDeclaration;
+        break;
+    default:
+        break;
+    }
 
     for(UInt ii = 0; ii < operandCount; ++ii)
     {
@@ -3407,6 +3474,23 @@ void CLikeSourceEmitter::computeEmitActions(IRModule* module, List<EmitAction>& 
     }
 }
 
+void CLikeSourceEmitter::emitForwardDeclaration(IRInst* inst)
+{
+    switch (inst->getOp())
+    {
+    case kIROp_Func:
+        emitFuncDecl(cast<IRFunc>(inst));
+        break;
+    case kIROp_StructType:
+        m_writer->emit("struct ");
+        m_writer->emit(getName(inst));
+        m_writer->emit(";\n");
+        break;
+    default:
+        SLANG_UNREACHABLE("emit forward declaration");
+    }
+}
+
 void CLikeSourceEmitter::executeEmitActions(List<EmitAction> const& actions)
 {
     for(auto action : actions)
@@ -3414,7 +3498,7 @@ void CLikeSourceEmitter::executeEmitActions(List<EmitAction> const& actions)
         switch(action.level)
         {
         case EmitAction::Level::ForwardDeclaration:
-            emitFuncDecl(cast<IRFunc>(action.inst));
+            emitForwardDeclaration(action.inst);
             break;
 
         case EmitAction::Level::Definition:
