@@ -441,6 +441,7 @@ static void cloneExtraDecorations(
             default:
                 break;
 
+            case kIROp_HLSLExportDecoration:
             case kIROp_BindExistentialSlotsDecoration:
             case kIROp_LayoutDecoration:
             case kIROp_PublicDecoration:
@@ -1348,6 +1349,20 @@ struct IRSpecializationState
     }
 };
 
+static bool _isPublicOrHLSLExported(IRInst* inst)
+{
+    for (auto decoration : inst->getDecorations())
+    {
+        const auto op = decoration->getOp();
+        if (op == kIROp_PublicDecoration ||
+            op == kIROp_HLSLExportDecoration)
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
 LinkedIR linkIR(
     CodeGenContext* codeGenContext)
 {
@@ -1495,14 +1510,14 @@ LinkedIR linkIR(
     {
         for (auto inst : irModule->getGlobalInsts())
         {
-            auto hasPublic = inst->findDecoration<IRPublicDecoration>();
-            if (!hasPublic)
-                continue;
-
-            auto cloned = cloneValue(context, inst);
-            if (!cloned->findDecorationImpl(kIROp_KeepAliveDecoration))
+            // Is it `public` or (HLSL) `export` clone
+            if (_isPublicOrHLSLExported(inst))
             {
-                context->builder->addKeepAliveDecoration(cloned);
+                auto cloned = cloneValue(context, inst);
+                if (!cloned->findDecorationImpl(kIROp_KeepAliveDecoration))
+                {
+                    context->builder->addKeepAliveDecoration(cloned);
+                }
             }
         }
     }
