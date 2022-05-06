@@ -1,5 +1,5 @@
 // rate-param.slang
-//TEST:SIMPLE: -target hlsl -entry computeMain -stage compute 
+//DISABLE_TEST:SIMPLE: -target hlsl -entry computeMain -stage compute 
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0 ], stride=4):out,name outputBuffer
 RWStructuredBuffer<int> outputBuffer;
