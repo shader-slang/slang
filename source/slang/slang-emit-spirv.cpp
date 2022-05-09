@@ -349,7 +349,11 @@ struct SPIRVEmitContext
 
         // > Version nuumber
         //
-        m_words.add(SpvVersion);
+
+        // Was SpvVersion, but that doesn't work since we upgraded to SPIR-V headers 1.6
+
+        static const uint32_t spvVersion1_5_0 = 0x00010500;
+        m_words.add(spvVersion1_5_0);
 
         // > Generator's magic number.
         // > Its value does not affect any semantics, and is allowed to be 0.
