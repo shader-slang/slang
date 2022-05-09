@@ -172,19 +172,6 @@ struct CollectGlobalUniformParametersContext
 
             auto globalParamLayout = fieldLayoutAttr->getLayout();
 
-            // If the given parameter doesn't contribute to uniform/ordinary usage, then
-            // we can safely leave it at the global scope and potentially avoid a lot
-            // of complications that might otherwise arise (that is, we don't need to worry
-            // about downstream passes that might have worked for a simple global parameter,
-            // but that would not work for one nested inside a structure.
-            //
-            // TODO: It would be more consistent and robust to *always* wrap up
-            // these global parameters appropriately, and ensure that all the downstream
-            // passes can handle that case, since they would need to do so in general.
-            //
-            if(!globalParamLayout->getTypeLayout()->findSizeAttr(LayoutResourceKind::Uniform) )
-                continue;
-
             // Once we have decided to do replacement, we need to
             // set ourselves up to emit the replacement code.
             //
@@ -195,17 +182,30 @@ struct CollectGlobalUniformParametersContext
             //
             auto fieldKey = builder->createStructKey();
 
-            // The new structure field will need to have whatever decorations
-            // had been put on the global parameter (notably including any name hint)
-            //
-            globalParam->transferDecorationsTo(fieldKey);
-
             // In order to make sure that the existing IR layout information for
             // the global scope remains valid, we will swap out the key in the
             // per-field layout information to reference the key we created
             // instead of the existing parameter (which we will be removing).
             //
             fieldLayoutAttr->setOperand(0, fieldKey);
+
+            // If the given parameter doesn't contribute to uniform/ordinary usage, then
+            // we can safely leave it at the global scope and potentially avoid a lot
+            // of complications that might otherwise arise (that is, we don't need to worry
+            // about downstream passes that might have worked for a simple global parameter,
+            // but that would not work for one nested inside a structure.
+            //
+            // TODO: It would be more consistent and robust to *always* wrap up
+            // these global parameters appropriately, and ensure that all the downstream
+            // passes can handle that case, since they would need to do so in general.
+            //
+            if (!globalParamLayout->getTypeLayout()->findSizeAttr(LayoutResourceKind::Uniform))
+                continue;
+
+            // The new structure field will need to have whatever decorations
+            // had been put on the global parameter (notably including any name hint)
+            //
+            globalParam->transferDecorationsTo(fieldKey);
 
             // Now we can add a field to the `GlobalParams` type that
             // will stand in for the parameter: it will have the key we
