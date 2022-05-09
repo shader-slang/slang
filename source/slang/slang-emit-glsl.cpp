@@ -1845,10 +1845,15 @@ void GLSLSourceEmitter::emitParamTypeImpl(IRType* type, String const& name)
 {
     if (auto refType = as<IRRefType>(type))
     {
-        // 
-        m_writer->emit("spirv_by_reference  ");
+        m_writer->emit("spirv_by_reference ");
         type = refType->getValueType();
     }
+    else if (auto spirvLiteralType = as<IRSPIRVLiteralType>(type))
+    {
+        m_writer->emit("spirv_literal ");
+        type = spirvLiteralType->getValueType();
+    }
+
     Super::emitParamTypeImpl(type, name);
 }
 
