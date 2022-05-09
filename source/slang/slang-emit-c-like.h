@@ -360,7 +360,7 @@ public:
     bool isTargetIntrinsic(IRFunc* func);
 
     void emitFunc(IRFunc* func);
-    void emitFuncDecorations(IRFunc* func);
+    void emitFuncDecorations(IRFunc* func) { emitFuncDecorationsImpl(func); }
 
     void emitStruct(IRStructType* structType);
 
@@ -468,6 +468,8 @@ public:
     virtual void emitLoopControlDecorationImpl(IRLoopControlDecoration* decl) { SLANG_UNUSED(decl); }
     virtual void emitFuncDecorationImpl(IRDecoration* decoration) { SLANG_UNUSED(decoration); }
     virtual void emitLivenessImpl(IRInst* inst);
+
+    virtual void emitFuncDecorationsImpl(IRFunc* func);
 
         // Only needed for glsl output with $ prefix intrinsics - so perhaps removable in the future
     virtual void emitTextureOrTextureSamplerTypeImpl(IRTextureTypeBase*  type, char const* baseName) { SLANG_UNUSED(type); SLANG_UNUSED(baseName); }

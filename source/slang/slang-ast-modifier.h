@@ -20,6 +20,7 @@ class PublicModifier : public Modifier { SLANG_AST_CLASS(PublicModifier)};
 class RequireModifier : public Modifier { SLANG_AST_CLASS(RequireModifier)};
 class ParamModifier : public Modifier { SLANG_AST_CLASS(ParamModifier)};
 class ExternModifier : public Modifier { SLANG_AST_CLASS(ExternModifier)};
+class HLSLExportModifier : public Modifier { SLANG_AST_CLASS(HLSLExportModifier) };
 class InputModifier : public Modifier { SLANG_AST_CLASS(InputModifier)};
 class TransparentModifier : public Modifier { SLANG_AST_CLASS(TransparentModifier)};
 class FromStdLibModifier : public Modifier { SLANG_AST_CLASS(FromStdLibModifier)};

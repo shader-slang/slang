@@ -2928,7 +2928,7 @@ void CLikeSourceEmitter::emitFunc(IRFunc* func)
     }
 }
 
-void CLikeSourceEmitter::emitFuncDecorations(IRFunc* func)
+void CLikeSourceEmitter::emitFuncDecorationsImpl(IRFunc* func)
 {
     for(auto decoration : func->getDecorations())
     {

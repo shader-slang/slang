@@ -30,23 +30,27 @@ namespace Slang
     {
         switch (op)
         {
-            case kIROp_EarlyDepthStencilDecoration: return true;
-            case kIROp_GloballyCoherentDecoration: return true;
-            case kIROp_KeepAliveDecoration: return true;
-            case kIROp_LineAdjInputPrimitiveTypeDecoration: return true;
-            case kIROp_LineInputPrimitiveTypeDecoration: return true;
-            case kIROp_NoInlineDecoration: return true;
-            case kIROp_PointInputPrimitiveTypeDecoration: return true;
-            case kIROp_PreciseDecoration: return true;
-            case kIROp_PublicDecoration: return true;
-            case kIROp_ReadNoneDecoration: return true;
-            case kIROp_RequiresNVAPIDecoration: return true;
-            case kIROp_TriangleAdjInputPrimitiveTypeDecoration: return true;
-            case kIROp_TriangleInputPrimitiveTypeDecoration: return true;
-            case kIROp_UnsafeForceInlineEarlyDecoration: return true;
-            case kIROp_VulkanCallablePayloadDecoration: return true;
-            case kIROp_VulkanHitAttributesDecoration: return true;
-            case kIROp_VulkanRayPayloadDecoration: return true;
+            case kIROp_EarlyDepthStencilDecoration: 
+            case kIROp_GloballyCoherentDecoration: 
+            case kIROp_KeepAliveDecoration: 
+            case kIROp_LineAdjInputPrimitiveTypeDecoration: 
+            case kIROp_LineInputPrimitiveTypeDecoration: 
+            case kIROp_NoInlineDecoration: 
+            case kIROp_PointInputPrimitiveTypeDecoration: 
+            case kIROp_PreciseDecoration: 
+            case kIROp_PublicDecoration: 
+            case kIROp_HLSLExportDecoration: 
+            case kIROp_ReadNoneDecoration: 
+            case kIROp_RequiresNVAPIDecoration: 
+            case kIROp_TriangleAdjInputPrimitiveTypeDecoration:
+            case kIROp_TriangleInputPrimitiveTypeDecoration:
+            case kIROp_UnsafeForceInlineEarlyDecoration:
+            case kIROp_VulkanCallablePayloadDecoration:
+            case kIROp_VulkanHitAttributesDecoration:
+            case kIROp_VulkanRayPayloadDecoration:
+            {
+                return true;
+            }
             default: break;
         }
         return false;

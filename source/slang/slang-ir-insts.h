@@ -268,6 +268,7 @@ IR_SIMPLE_DECORATION(EarlyDepthStencilDecoration)
 IR_SIMPLE_DECORATION(GloballyCoherentDecoration)
 IR_SIMPLE_DECORATION(PreciseDecoration)
 IR_SIMPLE_DECORATION(PublicDecoration)
+IR_SIMPLE_DECORATION(HLSLExportDecoration)
 IR_SIMPLE_DECORATION(KeepAliveDecoration)
 IR_SIMPLE_DECORATION(RequiresNVAPIDecoration)
 IR_SIMPLE_DECORATION(NoInlineDecoration)
@@ -2880,7 +2881,10 @@ public:
     {
         addDecoration(value, kIROp_PublicDecoration);   
     }
-
+    void addHLSLExportDecoration(IRInst* value)
+    {
+        addDecoration(value, kIROp_HLSLExportDecoration);
+    }
     void addNVAPIMagicDecoration(IRInst* value, UnownedStringSlice const& name)
     {
         addDecoration(value, kIROp_NVAPIMagicDecoration, getStringValue(name));
