@@ -62,6 +62,7 @@ struct GLSLLivenessContext
 
     IRStringLit* m_extensionStringLiteral = nullptr;        ///< The string literal holding the SPIR-V extension needed 
     IRInst* m_zeroIntLiteral = nullptr;                     ///< Zero value literal
+    IRType* m_spirvIntLiteralType = nullptr;                ///< Int type that emits as `spirv_literal`
 
     IRModule* m_module;
     SharedIRBuilder m_sharedBuilder;
@@ -138,7 +139,7 @@ void GLSLLivenessContext::_replaceMarker(IRLiveRangeMarker* markerInst)
         IRType* paramTypes[] = 
         {
             m_builder.getRefType(referencedType),       ///< Use a reference to the referenced type
-            m_builder.getIntType(),                     ///< The size type
+            m_spirvIntLiteralType,                      ///< The size type
         };
 
         func = m_builder.createFunc();
@@ -199,6 +200,9 @@ void GLSLLivenessContext::processModule()
     {
         return;
     }
+
+    // Int type that is SPIRV Literal (ie prefixed with spirv_literal)
+    m_spirvIntLiteralType = m_builder.getSPIRVLiteralType(m_builder.getIntType());
 
     // Zero value literal
     m_zeroIntLiteral = m_builder.getIntValue(m_builder.getIntType(), 0);

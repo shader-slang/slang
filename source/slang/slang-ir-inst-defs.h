@@ -195,6 +195,9 @@ INST(RTTIType, rtti_type, 0, 0)
 INST(RTTIHandleType, rtti_handle_type, 0, 0)
 INST(TupleType, tuple_type, 0, 0)
 
+// A type that identifies it's contained type as being emittable as `spirv_literal.
+INST(SPIRVLiteralType, spirvLiteralType, 1, 0)
+
 // A TypeType-typed IRValue represents a IRType.
 // It is used to represent a type parameter/argument in a generics.
 INST(TypeType, type_t, 0, 0)
