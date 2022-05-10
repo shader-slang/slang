@@ -8,7 +8,6 @@
 namespace Slang
 {
 
-
 /* 
 Discussion 
 ==========
@@ -104,6 +103,8 @@ namespace { // anonymous
 
 struct LivenessContext
 {
+    typedef LivenessUtil::Location Location;
+
     // NOTE! Care must be taken changing the order. Some checks rely on Found having a smaller value than `NotFound`.
     // Allowing NotFound to be promoted to Found.
     enum class FoundResult
@@ -141,9 +142,9 @@ struct LivenessContext
         /// Process a 'root'. A variable that has liveness tracking
     void processRoot(const RootInfo& rootInfo);
 
-        /// Process the module
-    void processModule();
-
+        /// Process all the locations
+    void processLocations(const List<Location>& locations);
+    
     LivenessContext(IRModule* module):
         m_module(module)
     {
@@ -151,8 +152,9 @@ struct LivenessContext
         m_builder.init(m_sharedBuilder);
     }
 
-        /// Process a function in the module
-    void _processFunction(IRFunc* funcInst);
+    void _processLocationsInFunction(const Location* start, Count count);
+
+    void _processLocationInFunction(const Location& location);
 
         // Add a live end instruction at the start of block, referencing the root 'root'.
     void _addLiveRangeEndAtBlockStart(IRBlock* block, IRInst* root);
@@ -504,15 +506,80 @@ void LivenessContext::processRoot(const RootInfo& rootInfo)
     }
 }
 
-void LivenessContext::_processFunction(IRFunc* funcInst)
+void LivenessContext::_processLocationInFunction(const Location& location)
+{
+    // Add the start location
+    m_builder.setInsertLoc(IRInsertLoc::after(location.start));
+    // Emit the range start
+    auto liveStart = m_builder.emitLiveRangeStart(location.root);
+
+    // We want to process this root to find all of the ends
+    RootInfo rootInfo;
+    rootInfo.liveStart = liveStart;
+    rootInfo.root = location.root;
+
+    processRoot(rootInfo);
+}
+
+void LivenessContext::_processLocationsInFunction(const Location* locations, Count count)
+{
+    if (count > 0)
+    {
+        const auto func = locations[0].function;
+        SLANG_UNUSED(func);
+
+        for (Index i = 0; i < count; ++i)
+        {
+            const auto& location = locations[i];
+            SLANG_ASSERT(location.function == func);
+
+            _processLocationInFunction(location);
+        }
+    }
+}
+
+void LivenessContext::processLocations(const List<Location>& inLocations)
+{
+    List<Location> locations(inLocations);
+
+    // Sort so we have in function order
+    locations.sort([&](const Location& a, const Location& b) -> bool { return a.function < b.function; });
+
+    const auto locationCount = locations.getCount();
+
+    Index start = 0;
+    while (start < locationCount)
+    {
+        IRFunc* func = locations[start].function;
+        Index end = start + 1;
+
+        while (end < locationCount && locations[end].function == func)
+        {
+            ++end;
+        }
+
+        // All of the locations from [start, end) are in the same function. Lets process all in one go...
+        
+        // Create the dominator tree, for the function
+        m_dominatorTree = computeDominatorTree(func);
+
+        // Process all of the locations in the function
+        _processLocationsInFunction(locations.getBuffer() + start, end - start);
+
+        // Look for next run
+        start = end;
+    }
+}
+
+} // anonymous
+
+static void _processFunction(IRFunc* funcInst, List<LivenessUtil::Location>& ioLocations)
 {
     // If it has no body, then we are done
     if (funcInst->getFirstBlock() == nullptr)
     {
         return;
     }
-
-    List<RootInfo> rootInfos;
 
     // Iterate through blocks in the function, looking for variables to live track
     for (auto block = funcInst->getFirstBlock(); block; block = block->getNextBlock())
@@ -522,38 +589,24 @@ void LivenessContext::_processFunction(IRFunc* funcInst)
             // We look for var declarations.
             if (auto varInst = as<IRVar>(inst))
             {
-                // Add the start location
-                m_builder.setInsertLoc(IRInsertLoc::after(varInst));
+                LivenessUtil::Location location;
 
-                // Emit the start
-                auto liveStart = m_builder.emitLiveRangeStart(varInst);
+                location.function = funcInst;
+                location.start = varInst;
+                location.root = varInst;
 
-                // Add as a root
-                RootInfo rootInfo;
-                rootInfo.root = varInst;
-                rootInfo.liveStart = liveStart;
-
-                rootInfos.add(rootInfo);
+                ioLocations.add(location);
             }
         }
     }
-
-    // Create the dominator tree.
-    m_dominatorTree = computeDominatorTree(funcInst);
-
-    // Process the roots
-    for (const auto& rootInfo : rootInfos)
-    {
-        processRoot(rootInfo);
-    }
 }
 
-void LivenessContext::processModule()
+/* static */void LivenessUtil::locateVariables(IRModule* module, List<Location>& ioLocations)
 {
     // When we process liveness, is prior to output for a target
     // So post specialization
 
-    IRModuleInst* moduleInst = m_module->getModuleInst();
+    IRModuleInst* moduleInst = module->getModuleInst();
 
     for (IRInst* child : moduleInst->getChildren())
     {
@@ -562,18 +615,15 @@ void LivenessContext::processModule()
         {
             // Then we want to look through their definition
             // inserting instructions that mark the liveness start/end
-            _processFunction(funcInst);
+            _processFunction(funcInst, ioLocations);
         }
     }
 }
 
-} // anonymous
-
-void addLivenessTrackingToModule(IRModule* module)
+/* static */void LivenessUtil::addLivenessRanges(IRModule* module, const List<Location>& inLocations)
 {
     LivenessContext context(module);
-
-    context.processModule();
+    context.processLocations(inLocations);
 }
 
 } // namespace Slang

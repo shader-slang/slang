@@ -744,7 +744,10 @@ Result linkAndOptimizeIR(
     //
     if (codeGenContext->shouldTrackLiveness())
     {
-        addLivenessTrackingToModule(irModule);
+        List<LivenessUtil::Location> livenessLocations;
+        LivenessUtil::locateVariables(irModule, livenessLocations);
+
+        LivenessUtil::addLivenessRanges(irModule, livenessLocations);
 
         dumpIRIfEnabled(codeGenContext, irModule, "LIVENESS");
     }
