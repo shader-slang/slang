@@ -102,12 +102,12 @@ layout(std430, binding = 0) buffer _S5 {
 
 #line 4
 spirv_instruction(id = 256)
-void livenessStart_0(spirv_by_reference  SomeStruct_0 _0, int _1);
+void livenessStart_0(spirv_by_reference SomeStruct_0 _0, spirv_literal int _1);
 
 
 #line 62
 spirv_instruction(id = 257)
-void livenessEnd_0(spirv_by_reference  SomeStruct_0 _0, int _1);
+void livenessEnd_0(spirv_by_reference SomeStruct_0 _0, spirv_literal int _1);
 
 
 #line 46

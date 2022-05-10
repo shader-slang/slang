@@ -2110,6 +2110,9 @@ public:
     IRPtrTypeBase*  getPtrType(IROp op, IRType* valueType);
     IRPtrType* getPtrType(IROp op, IRType* valueType, IRIntegerValue addressSpace);
 
+        /// Get a 'SPIRV literal' 
+    IRSPIRVLiteralType* getSPIRVLiteralType(IRType* type);
+
     IRArrayTypeBase* getArrayTypeBase(
         IROp    op,
         IRType* elementType,
