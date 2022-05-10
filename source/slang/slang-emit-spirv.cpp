@@ -350,7 +350,10 @@ struct SPIRVEmitContext
         // > Version nuumber
         //
 
-        // Was SpvVersion, but that doesn't work since we upgraded to SPIR-V headers 1.6
+        // TODO(JS): 
+        // Was previously set to SpvVersion, but that doesn't work since we 
+        // upgraded to SPIR-V headers 1.6. (It would lead to validation errors during vk tests)
+        // For now mark as version 1.5.0
 
         static const uint32_t spvVersion1_5_0 = 0x00010500;
         m_words.add(spvVersion1_5_0);
