@@ -20,6 +20,7 @@
 #include "slang-ir-inline.h"
 #include "slang-ir-legalize-varying-params.h"
 #include "slang-ir-link.h"
+#include "slang-ir-com-interface.h"
 #include "slang-ir-lower-generics.h"
 #include "slang-ir-lower-tuple-types.h"
 #include "slang-ir-lower-bit-cast.h"
@@ -692,6 +693,7 @@ Result linkAndOptimizeIR(
     default:
         break;
     case CodeGenTarget::HostCPPSource:
+        lowerComInterfaces(irModule, sink);
         generateDllImportFuncs(irModule, sink);
         break;
     }

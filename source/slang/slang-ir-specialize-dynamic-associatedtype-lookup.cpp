@@ -119,6 +119,11 @@ struct AssociatedTypeLookupSpecializationContext
 
     void processLookupInterfaceMethodInst(IRLookupWitnessMethod* inst)
     {
+        if (inst->getWitnessTable()->getDataType()->findDecoration<IRComInterfaceDecoration>())
+        {
+            return;
+        }
+
         // Ignore lookups for RTTI objects for now, since they are not used anywhere.
         if (!as<IRWitnessTableType>(inst->getDataType()))
         {

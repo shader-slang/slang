@@ -80,6 +80,9 @@ namespace Slang
         {
             if (inst->getOp() == kIROp_InterfaceType)
             {
+                if (inst->findDecoration<IRComInterfaceDecoration>())
+                    continue;
+
                 interfaceInsts.add(inst);
             }
         }
@@ -134,6 +137,8 @@ namespace Slang
                 {
                     auto witnessTableType = lookupWitnessMethod->getWitnessTable()->getDataType();
                     auto interfaceType = cast<IRWitnessTableType>(witnessTableType)->getConformanceType();
+                    if (interfaceType->findDecoration<IRComInterfaceDecoration>())
+                        return;
                     if (!implementedInterfaces.Contains(interfaceType))
                     {
                         context->sink->diagnose(interfaceType->sourceLoc, Diagnostics::noTypeConformancesFoundForInterface, interfaceType);

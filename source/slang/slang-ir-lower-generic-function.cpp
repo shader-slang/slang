@@ -152,6 +152,10 @@ namespace Slang
             // Do not lower intrinsic interfaces.
             if (isBuiltin(interfaceType))
                 return interfaceType;
+            // Do not lower COM interfaces.
+            if (interfaceType->findDecoration<IRComInterfaceDecoration>())
+                return interfaceType;
+
             List<IRInterfaceRequirementEntry*> newEntries;
 
             IRBuilder builder(sharedContext->sharedBuilderStorage);

@@ -1506,12 +1506,12 @@ void CLikeSourceEmitter::emitIntrinsicCallExprImpl(
     }
 }
 
-void CLikeSourceEmitter::_emitCallArgList(IRCall* inst)
+void CLikeSourceEmitter::_emitCallArgList(IRCall* inst, int startingOperandIndex)
 {
     bool isFirstArg = true;
     m_writer->emit("(");
     UInt argCount = inst->getOperandCount();
-    for (UInt aa = 1; aa < argCount; ++aa)
+    for (UInt aa = startingOperandIndex; aa < argCount; ++aa)
     {
         auto operand = inst->getOperand(aa);
         if (as<IRVoidType>(operand->getDataType()))
@@ -1531,12 +1531,36 @@ void CLikeSourceEmitter::_emitCallArgList(IRCall* inst)
     m_writer->emit(")");
 }
 
+void CLikeSourceEmitter::emitComInterfaceCallExpr(IRCall* inst, EmitOpInfo const& inOuterPrec)
+{
+    auto funcValue = inst->getOperand(0);
+    auto object = funcValue->getOperand(0);
+    auto methodKey = funcValue->getOperand(1);
+    auto prec = getInfo(EmitOp::Postfix);
+
+    auto outerPrec = inOuterPrec;
+    bool needClose = maybeEmitParens(outerPrec, prec);
+    emitOperand(object, leftSide(outerPrec, prec));
+    m_writer->emit("->");
+    m_writer->emit(getName(methodKey));
+    _emitCallArgList(inst, 2);
+    maybeCloseParens(needClose);
+}
+
 void CLikeSourceEmitter::emitCallExpr(IRCall* inst, EmitOpInfo outerPrec)
 {
     auto funcValue = inst->getOperand(0);
 
     // Does this function declare any requirements.
     handleRequiredCapabilities(funcValue);
+
+    // Detect if this is a call into a COM interface method.
+    if (funcValue->getOp() == kIROp_lookup_interface_method &&
+        funcValue->getOperand(0)->getDataType()->getOp() == kIROp_ComPtrType)
+    {
+        emitComInterfaceCallExpr(inst, outerPrec);
+        return;
+    }
 
     // We want to detect any call to an intrinsic operation,
     // that we can emit it directly without mangling, etc.
