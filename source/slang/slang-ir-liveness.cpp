@@ -127,21 +127,6 @@ struct LivenessContext
         Access,             ///< Is an access to the root (perhaps through an alias)
     };
 
-    struct RootInfo
-    {
-        IRInst* root;
-        IRLiveRangeStart* liveStart;
-    };
-
-        /// Processor a successor to a block
-    FoundResult processSuccessor(IRBlock* block);
-
-        /// Process a block 
-    FoundResult processBlock(IRBlock* block);
-
-        /// Process a 'root'. A variable that has liveness tracking
-    void processRoot(const RootInfo& rootInfo);
-
         /// Process all the locations
     void processLocations(const List<Location>& locations);
     
@@ -152,9 +137,23 @@ struct LivenessContext
         m_builder.init(m_sharedBuilder);
     }
 
+        /// For a given live range start find it's end and insert a LiveRangeEnd
+        /// Can only be called after a call to _findAliasesAndAccesses for the root.
+    void _findAndEmitRangeEnd(IRLiveRangeStart* liveStart);
+
+        /// Processor a successor to a block
+        /// Can only be called after a call to _findAliasesAndAccesses for the root.
+    FoundResult _processSuccessor(IRBlock* block);
+
+        /// Process a block 
+        /// Can only be called after a call to _findAliasesAndAccesses for the root.
+    FoundResult _processBlock(IRBlock* block);
+
+        /// Process all the locations in the function (locations must be ordered by root)
     void _processLocationsInFunction(const Location* start, Count count);
 
-    void _processLocationInFunction(const Location& location);
+        /// All locations must be to the same root
+    void _processRoot(const Location* locations, Count count);
 
         // Add a live end instruction at the start of block, referencing the root 'root'.
     void _addLiveRangeEndAtBlockStart(IRBlock* block, IRInst* root);
@@ -164,14 +163,19 @@ struct LivenessContext
         /// Returns nullptr if no access instruction was found in the block.
     IRInst* _findLastAccessInBlock(IRBlock* block);
 
+        /// Find all the aliases and accesses to the root
+        /// The information is stored in m_accessSet and m_aliases
+    void _findAliasesAndAccesses(IRInst* root);
+
         /// Add a result for the block
         /// Allows for promotion from NotFound -> Found if there is already a result
     FoundResult _addResult(IRBlock* block, FoundResult result);
 
     RefPtr<IRDominatorTree> m_dominatorTree;    ///< The dominator tree for the current function
 
-    RootInfo m_rootInfo;                        ///< The root item we are searching for accesses to, to determine scope/liveness
-    IRBlock* m_rootBlock;                       ///< The block the root is in
+    IRInst* m_root = nullptr;
+    IRLiveRangeStart* m_rootLiveStart = nullptr;
+    IRBlock* m_rootBlock = nullptr;             ///< The block the root is in
     
     HashSet<IRInst*> m_accessSet;               ///< Holds a set of all the functions that in some way access the root.
 
@@ -199,7 +203,7 @@ void LivenessContext::_addLiveRangeEndAtBlockStart(IRBlock* block, IRInst* root)
 IRInst* LivenessContext::_findLastAccessInBlock(IRBlock* block)
 {
     // If we are in the root block, we don't want to search *before* the liveStart
-    IRInst* lastInst = (block == m_rootBlock) ? m_rootInfo.liveStart : nullptr;
+    IRInst* lastInst = (block == m_rootBlock) ? m_rootLiveStart : nullptr;
 
     // Search backwards for first access
     for (IRInst* cur = block->getLastChild(); cur != lastInst; cur = cur->getPrevInst())
@@ -232,7 +236,7 @@ LivenessContext::FoundResult LivenessContext::_addResult(IRBlock* block, FoundRe
     return result;
 }
 
-LivenessContext::FoundResult LivenessContext::processSuccessor(IRBlock* block)
+LivenessContext::FoundResult LivenessContext::_processSuccessor(IRBlock* block)
 {
     // Check if there is already a result for this block. 
     // If there is just return that.
@@ -254,10 +258,10 @@ LivenessContext::FoundResult LivenessContext::processSuccessor(IRBlock* block)
     m_blockResult.Add(block, FoundResult::Visited);
 
     // Else process the block to try and find the last used instruction
-    return processBlock(block);
+    return _processBlock(block);
 }
 
-LivenessContext::FoundResult LivenessContext::processBlock(IRBlock* block)
+LivenessContext::FoundResult LivenessContext::_processBlock(IRBlock* block)
 {
     // Find all the successors for this block
     auto successors = block->getSuccessors();
@@ -277,7 +281,7 @@ LivenessContext::FoundResult LivenessContext::processBlock(IRBlock* block)
             auto succ = *cur;
 
             // Process the successor
-            const auto successorResult = processSuccessor(succ);
+            const auto successorResult = _processSuccessor(succ);
 
             // Store the result
             successorResults[i] = successorResult;
@@ -311,7 +315,7 @@ LivenessContext::FoundResult LivenessContext::processBlock(IRBlock* block)
             const auto successorResult = successorResults[i];
             if (successorResult == FoundResult::NotFound)
             {
-                _addLiveRangeEndAtBlockStart(successor, m_rootInfo.root);
+                _addLiveRangeEndAtBlockStart(successor, m_root);
                 _addResult(successor, FoundResult::Found);
             }
         }
@@ -337,23 +341,15 @@ LivenessContext::FoundResult LivenessContext::processBlock(IRBlock* block)
     m_builder.setInsertLoc(IRInsertLoc::after(lastAccess));
 
     // Add the live end inst
-    m_builder.emitLiveRangeEnd(m_rootInfo.root);
+    m_builder.emitLiveRangeEnd(m_root);
     return _addResult(block, FoundResult::Found);
 }
 
-void LivenessContext::processRoot(const RootInfo& rootInfo)
+void LivenessContext::_findAliasesAndAccesses(IRInst* root)
 {
-    // Clear the work structures
     m_accessSet.Clear();
     m_aliases.clear();
-    m_blockResult.Clear();
 
-    auto root = rootInfo.root;
-
-    // Store root information, so don't have to pass around methods
-    m_rootInfo = rootInfo;
-    m_rootBlock = as<IRBlock>(root->parent);
-    
     // Add the root to the list of aliases, to start lookup
     m_aliases.add(root);
 
@@ -393,64 +389,63 @@ void LivenessContext::processRoot(const RootInfo& rootInfo)
             // We want to find instructions that access the root
             switch (cur->getOp())
             {
-            
-            case kIROp_getElementPtr:
-            {
-                base = static_cast<IRGetElementPtr*>(cur)->getBase();
-                accessType = AccessType::Alias;
-                break;
-            }
-            case kIROp_FieldAddress:
-            {
-                base = static_cast<IRFieldAddress*>(cur)->getBase();
-                accessType = AccessType::Alias;
-                break;
-            }
-            case kIROp_getAddr:
-            {
-                IRGetAddress* getAddr = static_cast<IRGetAddress*>(cur);
-                base = getAddr->getOperand(0);
-                accessType = AccessType::Alias;
-                break;
-            }
-            case kIROp_Call:
-            {
-                // TODO(JS): This is arguably too conservative. 
-                // 
-                // Depending on how the parameter is used - in, out, inout changes the interpretation
-                // 
-                // *If we are talking about a real "pointer" then this is basically the general case again.
-                //     the callee  could store  the pointer into a global, dictionary, whatever.
-                //
-                // * If we are talking about an "address", then this is constrained by our language rules,
-                //    and we kind of need to find the type of the matching parameter :
-                //   * If the parameter is an `out` parameter, this is basically like a `store`
-                //   * If the parameter is an `inout` parameter, this is basically like a `load`
+                case kIROp_getElementPtr:
+                {
+                    base = static_cast<IRGetElementPtr*>(cur)->getBase();
+                    accessType = AccessType::Alias;
+                    break;
+                }
+                case kIROp_FieldAddress:
+                {
+                    base = static_cast<IRFieldAddress*>(cur)->getBase();
+                    accessType = AccessType::Alias;
+                    break;
+                }
+                case kIROp_getAddr:
+                {
+                    IRGetAddress* getAddr = static_cast<IRGetAddress*>(cur);
+                    base = getAddr->getOperand(0);
+                    accessType = AccessType::Alias;
+                    break;
+                }
+                case kIROp_Call:
+                {
+                    // TODO(JS): This is arguably too conservative. 
+                    // 
+                    // Depending on how the parameter is used - in, out, inout changes the interpretation
+                    // 
+                    // *If we are talking about a real "pointer" then this is basically the general case again.
+                    //     the callee  could store  the pointer into a global, dictionary, whatever.
+                    //
+                    // * If we are talking about an "address", then this is constrained by our language rules,
+                    //    and we kind of need to find the type of the matching parameter :
+                    //   * If the parameter is an `out` parameter, this is basically like a `store`
+                    //   * If the parameter is an `inout` parameter, this is basically like a `load`
 
-                // We can assume it accesses the base
-                base = alias;
-                accessType = AccessType::Access;
-                break;
-            }
-            case kIROp_Load:
-            {
-                // We only care about loads in terms of identifying liveness
-                base = static_cast<IRLoad*>(cur)->getPtr();
-                accessType = AccessType::Access;
-                break;
-            }
-            case kIROp_Store:
-            {
-                // In terms of liveness, stores can be ignored
-                break;
-            }
-            case kIROp_getElement:
-            case kIROp_FieldExtract:
-            {
-                // These will never take place on the var which is accessed through a pointer, so can be ignored
-                break;
-            }
-            default: break;
+                    // We can assume it accesses the base
+                    base = alias;
+                    accessType = AccessType::Access;
+                    break;
+                }
+                case kIROp_Load:
+                {
+                    // We only care about loads in terms of identifying liveness
+                    base = static_cast<IRLoad*>(cur)->getPtr();
+                    accessType = AccessType::Access;
+                    break;
+                }
+                case kIROp_Store:
+                {
+                    // In terms of liveness, stores can be ignored
+                    break;
+                }
+                case kIROp_getElement:
+                case kIROp_FieldExtract:
+                {
+                    // These will never take place on the var which is accessed through a pointer, so can be ignored
+                    break;
+                }
+                default: break;
             }
 
             // Make sure the access is through the alias (as opposed to some other part of the instructions 'use')
@@ -458,22 +453,41 @@ void LivenessContext::processRoot(const RootInfo& rootInfo)
             {
                 switch (accessType)
                 {
-                case AccessType::Alias:
-                {
-                    // Add this instruction to the aliases
-                    m_aliases.add(cur);
-                    break;
-                }
-                case AccessType::Access:
-                {
-                    m_accessSet.Add(cur);
-                    break;
-                }
-                default: break;
+                    case AccessType::Alias:
+                    {
+                        // Add this instruction to the aliases
+                        m_aliases.add(cur);
+                        break;
+                    }
+                    case AccessType::Access:
+                    {
+                        m_accessSet.Add(cur);
+                        break;
+                    }
+                    default: break;
                 }
             }
         }
     }
+}
+
+void LivenessContext::_findAndEmitRangeEnd(IRLiveRangeStart* liveRangeStart)
+{
+    // Clear the work structures
+    m_blockResult.Clear();
+
+    // Store root information, so don't have to pass around methods
+    m_rootLiveStart = liveRangeStart;
+    m_root = liveRangeStart->getReferenced();
+    m_rootBlock = as<IRBlock>(m_root->parent);
+
+    // If either of these asserts fail it probably means there hasn't been a call
+    // to `_findAliasesAndAccesses` which is required before this function can be called.
+    // 
+    // There must be at least one alias (the root itself!)
+    SLANG_ASSERT(m_aliases.getCount() > 0);
+    // The first alias should be the root itself
+    SLANG_ASSERT(m_aliases[0] == m_root);
 
     // Now we want to find the last access in the graph of successors
     //
@@ -494,47 +508,77 @@ void LivenessContext::processRoot(const RootInfo& rootInfo)
         _addResult(m_rootBlock, FoundResult::Visited);
 
         // Recursively find results
-        auto foundResult = processBlock(m_rootBlock);
+        auto foundResult = _processBlock(m_rootBlock);
 
         if (foundResult == FoundResult::NotFound)
         {
             // Means there is no access to this variable(!)
             // Which means we can end the scope, after the the start scope
-            m_builder.setInsertLoc(IRInsertLoc::after(rootInfo.liveStart));
-            m_builder.emitLiveRangeEnd(root);
+            m_builder.setInsertLoc(IRInsertLoc::after(m_rootLiveStart));
+            m_builder.emitLiveRangeEnd(m_root);
         }
     }
+
+    // Set back to nullptr for safety
+    m_rootLiveStart = nullptr;
+    m_root = nullptr;
+    m_rootBlock = nullptr;
 }
 
-void LivenessContext::_processLocationInFunction(const Location& location)
+void LivenessContext::_processRoot(const Location* locations, Count count)
 {
-    // Add the start location
-    m_builder.setInsertLoc(IRInsertLoc::after(location.start));
-    // Emit the range start
-    auto liveStart = m_builder.emitLiveRangeStart(location.root);
+    if (count <= 0)
+    {
+        return;
+    }
 
-    // We want to process this root to find all of the ends
-    RootInfo rootInfo;
-    rootInfo.liveStart = liveStart;
-    rootInfo.root = location.root;
+    auto root = locations[0].root;
 
-    processRoot(rootInfo);
+    // Find all of the aliases and access to this root
+    _findAliasesAndAccesses(root);
+
+    for (Index i = 0; i < count; ++i)
+    {
+        const auto& location = locations[i];
+        SLANG_ASSERT(location.root == root);
+
+        // Add the start location
+        m_builder.setInsertLoc(location.startLocation);
+        // Emit the range start
+        auto liveStart = m_builder.emitLiveRangeStart(location.root);
+
+        // We want to process this root to find all of the ends
+        _findAndEmitRangeEnd(liveStart);
+    }
 }
 
 void LivenessContext::_processLocationsInFunction(const Location* locations, Count count)
 {
-    if (count > 0)
+    if (count <= 0)
     {
-        const auto func = locations[0].function;
-        SLANG_UNUSED(func);
+        return;
+    }
+    
+    const auto func = locations[0].function;
+    SLANG_UNUSED(func);
+        
+    Index start = 0;
+    while (start < count)
+    {
+        SLANG_ASSERT(locations[start].function == func);
 
-        for (Index i = 0; i < count; ++i)
-        {
-            const auto& location = locations[i];
-            SLANG_ASSERT(location.function == func);
+        // Get the root at the start of this span
+        IRInst*const root = locations[start].root;
 
-            _processLocationInFunction(location);
-        }
+        // Look for the end of the run of locations with the same root
+        Index end = start + 1;
+        for (; end < count && locations[end].root == root; ++end);
+
+        // Process the root 
+        _processRoot(locations + start, end - start);       
+
+        // Set start to the beginning of the next run
+        start = end;
     }
 }
 
@@ -542,8 +586,8 @@ void LivenessContext::processLocations(const List<Location>& inLocations)
 {
     List<Location> locations(inLocations);
 
-    // Sort so we have in function order
-    locations.sort([&](const Location& a, const Location& b) -> bool { return a.function < b.function; });
+    // Sort so we have in function order, and within a function in root order
+    locations.sort([&](const Location& a, const Location& b) -> bool { return a.function < b.function || (a.function == b.function && a.root < b.root); });
 
     const auto locationCount = locations.getCount();
 
@@ -553,10 +597,7 @@ void LivenessContext::processLocations(const List<Location>& inLocations)
         IRFunc* func = locations[start].function;
         Index end = start + 1;
 
-        while (end < locationCount && locations[end].function == func)
-        {
-            ++end;
-        }
+        for (;end < locationCount && locations[end].function == func; ++end);
 
         // All of the locations from [start, end) are in the same function. Lets process all in one go...
         
@@ -592,7 +633,7 @@ static void _processFunction(IRFunc* funcInst, List<LivenessUtil::Location>& ioL
                 LivenessUtil::Location location;
 
                 location.function = funcInst;
-                location.start = varInst;
+                location.startLocation = IRInsertLoc::after(varInst);
                 location.root = varInst;
 
                 ioLocations.add(location);

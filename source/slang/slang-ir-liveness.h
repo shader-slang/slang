@@ -4,12 +4,10 @@
 
 #include "../core/slang-list.h"
 
+#include "slang-ir.h"
+
 namespace Slang
 {
-
-struct IRModule;
-struct IRInst;
-struct IRFunc;
 
 /* 
 
@@ -165,14 +163,16 @@ Similarly calling into a function could return a struct that contains fields whi
 fully specialized.
 */
 
+struct LivenessLocation
+{
+	IRFunc* function;				///< The function the associated with this location
+	IRInst* root;					///< The root variable that is being liveness tracked
+	IRInsertLoc startLocation;		///< The start location (where to insert the start of the range)
+};
+
 struct LivenessUtil
 {
-	struct Location
-	{
-		IRFunc* function;				///< The function the associated with this location
-		IRInst* start;					///< The 'root' is live immediately after this instruction
-		IRInst* root;					///< The root variable that is being liveness tracked
-	};
+	typedef LivenessLocation Location;
 
 		/// Locate all of the variables across the module and append their locations into ioLocations
 	static void locateVariables(IRModule* module, List<Location>& ioLocations);
