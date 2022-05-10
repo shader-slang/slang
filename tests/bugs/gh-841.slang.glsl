@@ -18,19 +18,18 @@ struct RasterVertex_0
 
 void main()
 {
-    vec4 result_0;
     RasterVertex_0 _S4 = RasterVertex_0(_S2, _S3);
-    vec4 result_1 = _S4.c_0;
+    vec4 result_0 = _S4.c_0;
 
+    vec4 result_1;
     if(bool(_S4.u_0 & uint(1)))
     {
-        vec4 result_2 = result_1 + 1.0;
-        result_0 = result_2;
+        result_1 = result_0 + 1.0;
     }
     else
     {
-        result_0 = result_1;
+        result_1 = result_0;
     }
-    _S1 = result_0;
+    _S1 = result_1;
     return;
 }

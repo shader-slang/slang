@@ -144,6 +144,9 @@
     <ClInclude Include="..\..\..\source\slang\slang-ir-dominators.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\source\slang\slang-ir-eliminate-phis.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\..\source\slang\slang-ir-entry-point-pass.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -558,6 +561,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\source\slang\slang-ir-dominators.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\source\slang\slang-ir-eliminate-phis.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\source\slang\slang-ir-entry-point-pass.cpp">
