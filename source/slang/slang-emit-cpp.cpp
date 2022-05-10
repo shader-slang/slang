@@ -1921,10 +1921,6 @@ void CPPSourceEmitter::emitSimpleFuncImpl(IRFunc* func)
         m_writer->emit("\n{\n");
         m_writer->indent();
 
-        // HACK: forward-declare all the local variables needed for the
-        // parameters of non-entry blocks.
-        emitPhiVarDecls(func);
-
         // Need to emit the operations in the blocks of the function
         emitFunctionBody(func);
 

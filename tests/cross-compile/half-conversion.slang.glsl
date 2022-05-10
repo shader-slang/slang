@@ -16,8 +16,8 @@ layout(std140) uniform _S1
 
 vec4 f16tof32_0(uvec4 value_0)
 {
-    int i_0;
     vec4 result_0;
+    int i_0;
     i_0 = 0;
     for(;;)
     {
@@ -25,18 +25,17 @@ vec4 f16tof32_0(uvec4 value_0)
 
         float _S2 = (unpackHalf2x16((value_0[i_0])).x);
         result_0[i_0] = _S2;
-        int _S3 = i_0 + int(1);
-        i_0 = _S3;
+        i_0 = i_0 + int(1);
     }
     return result_0;
 }
 
 layout(location = 0)
-out vec4 _S4;
+out vec4 _S3;
 
 void main()
 {
-    vec4 _S5 = f16tof32_0(C_0._data.u_0);
-    _S4 = _S5;
+    vec4 _S4 = f16tof32_0(C_0._data.u_0);
+    _S3 = _S4;
     return;
 }
