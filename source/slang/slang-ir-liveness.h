@@ -165,9 +165,9 @@ fully specialized.
 
 struct LivenessLocation
 {
-	IRFunc* function;				///< The function the associated with this location
-	IRInst* root;					///< The root variable that is being liveness tracked
-	IRInsertLoc startLocation;		///< The start location (where to insert the start of the range)
+	IRGlobalValueWithCode* function;	///< The function the associated with this location
+	IRInst* root;						///< The root variable that is being liveness tracked
+	IRInsertLoc startLocation;			///< The start location (where to insert the start of the range)
 };
 
 struct LivenessUtil

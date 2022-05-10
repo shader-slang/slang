@@ -103,7 +103,7 @@ namespace { // anonymous
 
 struct LivenessContext
 {
-    typedef LivenessUtil::Location Location;
+    typedef LivenessLocation Location;
 
     // NOTE! Care must be taken changing the order. Some checks rely on Found having a smaller value than `NotFound`.
     // Allowing NotFound to be promoted to Found.
@@ -594,7 +594,7 @@ void LivenessContext::processLocations(const List<Location>& inLocations)
     Index start = 0;
     while (start < locationCount)
     {
-        IRFunc* func = locations[start].function;
+        auto func = locations[start].function;
         Index end = start + 1;
 
         for (;end < locationCount && locations[end].function == func; ++end);
@@ -614,7 +614,7 @@ void LivenessContext::processLocations(const List<Location>& inLocations)
 
 } // anonymous
 
-static void _processFunction(IRFunc* funcInst, List<LivenessUtil::Location>& ioLocations)
+static void _processFunction(IRFunc* funcInst, List<LivenessLocation>& ioLocations)
 {
     // If it has no body, then we are done
     if (funcInst->getFirstBlock() == nullptr)
@@ -630,7 +630,7 @@ static void _processFunction(IRFunc* funcInst, List<LivenessUtil::Location>& ioL
             // We look for var declarations.
             if (auto varInst = as<IRVar>(inst))
             {
-                LivenessUtil::Location location;
+                LivenessLocation location;
 
                 location.function = funcInst;
                 location.startLocation = IRInsertLoc::after(varInst);
