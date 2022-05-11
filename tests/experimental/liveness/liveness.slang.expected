@@ -19,12 +19,12 @@ void livenessStart_1(spirv_by_reference uint _0, spirv_literal int _1);
 
 #line 85
 spirv_instruction(id = 257)
-void livenessEnd_0(spirv_by_reference uint _0, spirv_literal int _1);
+void livenessEnd_0(spirv_by_reference int _0, spirv_literal int _1);
 
 
 #line 85
 spirv_instruction(id = 257)
-void livenessEnd_1(spirv_by_reference int _0, spirv_literal int _1);
+void livenessEnd_1(spirv_by_reference uint _0, spirv_literal int _1);
 
 
 #line 24 1
@@ -54,7 +54,8 @@ int someSlowFunc_0(int a_0)
     for(;;)
     {
 
-#line 27
+#line 26
+        livenessEnd_0(i_0, 0);
         if(i_0 < a_0 * 20)
         {
         }
@@ -70,7 +71,7 @@ int someSlowFunc_0(int a_0)
         uint _S3 = v_0;
 
 #line 29
-        livenessEnd_0(v_0, 0);
+        livenessEnd_1(v_0, 0);
 
 #line 29
         uint _S4 = _S2 | _S3 << 31;
@@ -79,7 +80,7 @@ int someSlowFunc_0(int a_0)
         int _S5 = i_0;
 
 #line 29
-        livenessEnd_1(i_0, 0);
+        livenessEnd_0(i_0, 0);
 
 #line 29
         uint _S6 = _S4 * uint(_S5);
@@ -88,7 +89,7 @@ int someSlowFunc_0(int a_0)
         int _S7 = i_0;
 
 #line 27
-        livenessEnd_1(i_0, 0);
+        livenessEnd_0(i_0, 0);
 
 #line 27
         int i_1 = _S7 + 1;
@@ -109,13 +110,10 @@ int someSlowFunc_0(int a_0)
     }
 
 #line 27
-    livenessEnd_1(i_0, 0);
-
-#line 27
     uint _S8 = v_0;
 
 #line 27
-    livenessEnd_0(v_0, 0);
+    livenessEnd_1(v_0, 0);
 
 
 
@@ -209,10 +207,13 @@ void main()
     {
 
 #line 48
+        livenessEnd_0(i_2, 0);
+
+#line 48
         int _S12 = i_2;
 
 #line 48
-        livenessEnd_1(i_2, 0);
+        livenessEnd_0(i_2, 0);
 
 
 
@@ -331,7 +332,7 @@ void main()
         int _S25 = res_0;
 
 #line 76
-        livenessEnd_1(res_0, 0);
+        livenessEnd_0(res_0, 0);
 
 #line 76
         int res_1 = _S25 + _S24;
@@ -340,7 +341,7 @@ void main()
         int _S26 = i_2;
 
 #line 52
-        livenessEnd_1(i_2, 0);
+        livenessEnd_0(i_2, 0);
 
 #line 52
         int i_3 = _S26 + 1;
@@ -361,13 +362,10 @@ void main()
     }
 
 #line 52
-    livenessEnd_1(i_2, 0);
-
-#line 52
     int _S27 = res_0;
 
 #line 52
-    livenessEnd_1(res_0, 0);
+    livenessEnd_0(res_0, 0);
 
 #line 79
     ((outputBuffer_0)._data[(uint(index_0))]) = _S27;
