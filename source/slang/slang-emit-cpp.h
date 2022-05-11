@@ -69,10 +69,10 @@ protected:
     virtual void emitGlobalRTTISymbolPrefix();
     virtual void emitWitnessTable(IRWitnessTable* witnessTable) SLANG_OVERRIDE;
     virtual void emitInterface(IRInterfaceType* interfaceType) SLANG_OVERRIDE;
+    void emitComInterface(IRInterfaceType* interfaceType);
     virtual void emitRTTIObject(IRRTTIObject* rttiObject) SLANG_OVERRIDE;
     virtual bool tryEmitGlobalParamImpl(IRGlobalParam* varDecl, IRType* varType) SLANG_OVERRIDE;
     virtual void emitIntrinsicCallExprImpl(IRCall* inst, IRTargetIntrinsicDecoration* targetIntrinsic, EmitOpInfo const& inOuterPrec) SLANG_OVERRIDE;
-
     virtual void emitLoopControlDecorationImpl(IRLoopControlDecoration* decl) SLANG_OVERRIDE;
 
     virtual const UnownedStringSlice* getVectorElementNames(BaseType elemType, Index elemCount);

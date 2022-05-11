@@ -2637,6 +2637,11 @@ namespace Slang
         return (IRPtrType*)getType(op, 2, operands);
     }
 
+    IRComPtrType* IRBuilder::getComPtrType(IRType* valueType)
+    {
+        return (IRComPtrType*)getType(kIROp_ComPtrType, valueType);
+    }
+
     IRArrayTypeBase* IRBuilder::getArrayTypeBase(
         IROp    op,
         IRType* elementType,

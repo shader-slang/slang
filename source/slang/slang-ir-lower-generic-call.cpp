@@ -274,6 +274,15 @@ namespace Slang
         {
             // If we see a call(lookup_interface_method(...), ...), we need to translate
             // all occurences of associatedtypes.
+
+            // If `w` in `lookup_interface_method(w, ...)` is a COM interface, bail.
+            if (lookupInst->getWitnessTable()
+                    ->getDataType()
+                    ->findDecoration<IRComInterfaceDecoration>())
+            {
+                return;
+            }
+
             auto interfaceType = cast<IRInterfaceType>(
                 cast<IRWitnessTableTypeBase>(lookupInst->getWitnessTable()->getDataType())
                     ->getConformanceType());

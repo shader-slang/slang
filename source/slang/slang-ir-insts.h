@@ -177,6 +177,15 @@ struct IRAnyValueSizeDecoration : IRDecoration
     }
 };
 
+struct IRComInterfaceDecoration : IRDecoration
+{
+    enum
+    {
+        kOp = kIROp_ComInterfaceDecoration
+    };
+    IR_LEAF_ISA(ComInterfaceDecoration)
+};
+
 /// A decoration on `IRParam`s that represent generic parameters,
 /// marking the interface type that the generic parameter conforms to.
 /// A generic parameter can have more than one `IRTypeConstraintDecoration`s
@@ -2110,6 +2119,8 @@ public:
     IRPtrTypeBase*  getPtrType(IROp op, IRType* valueType);
     IRPtrType* getPtrType(IROp op, IRType* valueType, IRIntegerValue addressSpace);
 
+    IRComPtrType* getComPtrType(IRType* valueType);
+
         /// Get a 'SPIRV literal' 
     IRSPIRVLiteralType* getSPIRVLiteralType(IRType* type);
 
@@ -2927,6 +2938,11 @@ public:
     void addAnyValueSizeDecoration(IRInst* inst, IRIntegerValue value)
     {
         addDecoration(inst, kIROp_AnyValueSizeDecoration, getIntValue(getIntType(), value));
+    }
+
+    void addComInterfaceDecoration(IRInst* inst)
+    {
+        addDecoration(inst, kIROp_ComInterfaceDecoration);
     }
 
     void addTypeConstraintDecoration(IRInst* inst, IRInst* constraintType)

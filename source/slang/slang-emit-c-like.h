@@ -302,6 +302,8 @@ public:
     // to the new name with the arguments of the old operation.
     static bool isOrdinaryName(const UnownedStringSlice& name);
 
+    void emitComInterfaceCallExpr(IRCall* inst, EmitOpInfo const& inOuterPrec);
+
     void emitIntrinsicCallExpr(
         IRCall*                         inst,
         IRTargetIntrinsicDecoration*    targetIntrinsic,
@@ -485,7 +487,7 @@ public:
     virtual void _emitPostfixTypeAttr(IRAttr* attr);
 
         // Emit the argument list (including paranthesis) in a `CallInst`
-    void _emitCallArgList(IRCall* call);
+    void _emitCallArgList(IRCall* call, int startingOperandIndex = 1);
 
     String _generateUniqueName(const UnownedStringSlice& slice);
 

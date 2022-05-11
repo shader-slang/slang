@@ -105,7 +105,16 @@ namespace Slang
             auto builder = &builderStorage;
             builder->setInsertBefore(extractInst);
 
-            auto element = extractTupleElement(builder, extractInst->getOperand(0), elementId);
+            IRInst* element = nullptr;
+            if (extractInst->getOperand(0)->getDataType()->findDecoration<IRComInterfaceDecoration>())
+            {
+                // If this is an COM interface, the elements (witness table/rtti) are just the interface value itself.
+                element = extractInst->getOperand(0);
+            }
+            else
+            {
+                element = extractTupleElement(builder, extractInst->getOperand(0), elementId);
+            }
             extractInst->replaceUsesWith(element);
             extractInst->removeAndDeallocate();
         }

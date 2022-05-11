@@ -1287,6 +1287,8 @@ SIMPLE_IR_PARENT_TYPE(OutTypeBase, PtrTypeBase)
 SIMPLE_IR_TYPE(OutType, OutTypeBase)
 SIMPLE_IR_TYPE(InOutType, OutTypeBase)
 
+SIMPLE_IR_TYPE(ComPtrType, Type)
+
 struct IRPseudoPtrType : public IRPtrTypeBase
 {
     IR_LEAF_ISA(PseudoPtrType);

@@ -618,12 +618,14 @@ IRInterfaceType* cloneInterfaceTypeImpl(
     IROriginalValuesForClone const& originalValues)
 {
     auto clonedInterface = builder->createInterfaceType(originalInterface->getOperandCount(), nullptr);
+    registerClonedValue(context, clonedInterface, originalValues);
+
     for (UInt i = 0; i < originalInterface->getOperandCount(); i++)
     {
         auto clonedKey = cloneValue(context, originalInterface->getOperand(i));
         clonedInterface->setOperand(i, clonedKey);
     }
-    cloneSimpleGlobalValueImpl(context, originalInterface, originalValues, clonedInterface);
+    cloneSimpleGlobalValueImpl(context, originalInterface, originalValues, clonedInterface, false);
     return clonedInterface;
 }
 
