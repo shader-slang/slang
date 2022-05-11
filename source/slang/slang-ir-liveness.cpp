@@ -145,20 +145,32 @@ struct LivenessContext
         Access,             ///< Is an access to the root (perhaps through an alias)
     };
     
-    struct InstOrder
-    {
-        IRInst* inst;               ///< The inst (must be either a LiveStart or an access)
-        IRBlock* block;             ///< Block the inst belongs to
-        Index index;                ///< The index to the instruction in the block
-    };
-
     struct BlockInfo
     {
+        void init(IRBlock* inBlock) 
+        { 
+            block = inBlock; 
+            reset(); 
+        }
+        void reset() 
+        {
+            result = BlockResult::NotVisited;
+            runStart = 0;
+            runCount = 0;
+            lastInst = nullptr;
+            instCount = 0;
+        }
+        void resetResult()
+        {
+            result = BlockResult::NotVisited;
+        }
+
         IRBlock* block;             ///< The block associated with this index
         BlockResult result;         ///< The result for this block
-        Index orderStart;           ///< The start InstOrder index
-        Count orderCount;           ///< The count of the amount of InstOrder
-        Count startsCount;          ///< The number of starts (the number of accesses is orderCount - startsCount)
+        Index runStart;             ///< The start InstOrder index
+        Count runCount;             ///< The count of the amount of InstOrder
+        IRInst* lastInst;           ///< Last inst seen
+        Count instCount;            ///< The total amount of start/access instruction seen in the block
     };
 
     struct SuccessorResult
@@ -206,7 +218,31 @@ struct LivenessContext
         /// Allows for promotion if there is already a result
     BlockResult _addBlockResult(BlockIndex blockIndex, BlockResult result);
 
+        /// Adds an instruction that is an access to the root
+    void _addAccessInst(IRInst* inst);
+        /// Add a live range start 
+    void _addStartInst(IRLiveRangeStart* inst) { _addInst(inst); }
+        /// Add an instruction that is significant for liveness tracking - start or an access
+    void _addInst(IRInst* inst);
+
+        /// True if it's an instruction of interest and so will go within a run for a block
+    bool _isRunInst(IRInst* inst);
+
+        // Returns the index in the run of a start for the current root, else -1
+    Index _indexOfRootStart(const ConstArrayView<IRInst*>& run);
+
+    Index _findLastAccess(const ConstArrayView<IRInst*>& run);
+
+        /// Complete the block using the run, which can *cannot* contain a start for the current root
+    BlockResult _completeBlock(BlockIndex blockIndex, const ConstArrayView<IRInst*>& run);
+
     BlockInfo* _getInfo(BlockIndex blockIndex) { return &m_blockInfos[Index(blockIndex)]; }
+
+    ConstArrayView<IRInst*> _getRun(const BlockInfo* info) 
+    {
+        IRInst*const* buffer = m_instRuns.getBuffer();
+        return ConstArrayView<IRInst*>(buffer + info->runStart, info->runCount);
+    }
 
     RefPtr<IRDominatorTree> m_dominatorTree;    ///< The dominator tree for the current function
 
@@ -218,11 +254,11 @@ struct LivenessContext
     
     List<IRInst*> m_aliases;                        ///< A list of instructions that alias to the root
 
+    HashSet<IRInst*> m_accessSet;                   ///< If instruction is in set it is an access (or perhaps a start)  
     Dictionary<IRBlock*, BlockIndex> m_blockIndexMap;    ///< Map from a block to a block index
-
     List<BlockInfo> m_blockInfos;                   ///< Information about blocks
 
-    List<InstOrder> m_instOrders;                   ///< Instruction of interests location, and ordering
+    List<IRInst*> m_instRuns;                       ///< Instruction runs indexed into via BlockInfo
 
     List<IRLiveRangeStart*> m_liveRangeStarts;      ///< Live range starts for a root
 
@@ -283,74 +319,88 @@ LivenessContext::BlockResult LivenessContext::_processSuccessor(BlockIndex block
     return _processBlock(blockIndex);
 }
 
+Index LivenessContext::_indexOfRootStart(const ConstArrayView<IRInst*>& run)
+{
+    const Count count = run.getCount();
+    for (Index i = 0; i < count; ++i)
+    {
+        if (auto liveStart = as<IRLiveRangeStart>(run[i]))
+        {
+            if (liveStart->getReferenced() == m_root)
+            {
+                return i;
+            }
+        }
+    }
+    return -1;
+}
+
+Index LivenessContext::_findLastAccess(const ConstArrayView<IRInst*>& run)
+{
+    for (Index i = run.getCount() - 1; i >= 0; --i)
+    {
+        // If it's not a live start, it must be an access
+        if (as<IRLiveRangeStart>(run[i]) == nullptr)
+        {
+            // Check it really is an access inst..
+            SLANG_ASSERT(_isRunInst(run[i]));
+            return i;
+        }
+    }
+    return -1;
+}
+
+LivenessContext::BlockResult LivenessContext::_completeBlock(BlockIndex blockIndex, const ConstArrayView<IRInst*>& run)
+{
+    // We can't have a root start in the run!
+    SLANG_ASSERT(_indexOfRootStart(run) < 0);
+
+    // Look for the last access
+    const auto lastAccessIndex = _findLastAccess(run);
+
+    // If we found one, that is the end of the range
+    if (lastAccessIndex >= 0)
+    {
+        // Just add end of scope after the inst 
+        m_builder.setInsertLoc(IRInsertLoc::after(run[lastAccessIndex]));
+        // Add the live end inst
+        m_builder.emitLiveRangeEnd(m_root);
+        return _addBlockResult(blockIndex, BlockResult::Found);
+    }
+
+    // We didn't find anything, so mark as not found
+    return _addBlockResult(blockIndex, BlockResult::NotFound);
+}
+
 LivenessContext::BlockResult LivenessContext::_processBlock(BlockIndex blockIndex)
 {
     auto blockInfo = _getInfo(blockIndex);
     const auto block = blockInfo->block;
    
-    const Index orderEnd = blockInfo->orderStart + blockInfo->orderCount;
-
-    Index accessCount = blockInfo->orderCount - blockInfo->startsCount;
-    Index startsCount = blockInfo->startsCount;
-
-    Index orderIndex = blockInfo->orderStart;
+    auto run = _getRun(blockInfo);
 
     if (block == m_rootLiveStartBlock)
     {
-        // Must be > 0 because it has the rootLiveStart!
-        SLANG_ASSERT(startsCount > 0);
+        // We need to fix the run to be *after* the start
+        const Index startIndex = run.indexOf(m_rootLiveStart);
+        SLANG_ASSERT(startIndex >= 0);
 
-        for (; orderIndex < orderEnd; ++orderIndex)
-        {
-            auto inst = m_instOrders[orderIndex].inst;
-
-            const auto op = inst->getOp();
-
-            if (op == kIROp_LiveRangeStart)
-            {
-                startsCount--;
-                if (inst == m_rootLiveStart)
-                {
-                    ++orderIndex;
-                    break;
-                }
-            }
-            else
-            {
-                // If it's not a live range start it must be an access
-                --accessCount;
-            }
-        }
+        // Skip to the next index
+        const Index nextIndex = startIndex + 1;
+        // Fix the run
+        run = ConstArrayView<IRInst*>(run.getBuffer() + nextIndex, run.getCount() - nextIndex);
     }
 
-    // If there are any remaining starts, the last access before that start is the result
-    if (startsCount > 0)
+    // If there is another start to the same root, we can't traverse to other blocks, and the last access 
+    // in this block must be the result
     {
-        IRInst* lastAccess = nullptr;
-        for (; orderIndex < orderEnd; ++orderIndex)
+        const Index startIndex = _indexOfRootStart(run);
+        if (startIndex >= 0)
         {
-            auto inst = m_instOrders[orderIndex].inst;
-            const auto op = inst->getOp();
-            if (op == kIROp_LiveRangeStart)
-            {
-                if (lastAccess)
-                {
-                    // Just add end of scope after the inst 
-                    m_builder.setInsertLoc(IRInsertLoc::after(lastAccess));
-
-                    // Add the live end inst
-                    m_builder.emitLiveRangeEnd(m_root);
-                    return _addBlockResult(blockIndex, BlockResult::Found);
-                }
-                else
-                {
-                    // We didn't find anything
-                    return _addBlockResult(blockIndex, BlockResult::NotFound);
-                }
-            }
-
-            // Must be an access
-            lastAccess = inst;
+            // Fix the run
+            run = ConstArrayView<IRInst*>(run.getBuffer(), startIndex);
+            // Complete the block with this run
+            return _completeBlock(blockIndex, run);
         }
     }
 
@@ -421,23 +471,29 @@ LivenessContext::BlockResult LivenessContext::_processBlock(BlockIndex blockInde
         return _addBlockResult(blockIndex, BlockResult::Found);
     }
 
-    if (orderIndex < orderEnd)
-    {
-        // Since we cant have any starts, anything afterwards must be accesses
-        // and the last of those accesses must therefore be the last acces
+    return _completeBlock(blockIndex, run);
+}
 
-        const auto lastAccess = m_instOrders[orderEnd - 1].inst;
+void LivenessContext::_addInst(IRInst* inst)
+{
+    // Get the block it's in
+    auto block = as<IRBlock>(inst->getParent());
 
-        // Just add end of scope after the inst 
-        m_builder.setInsertLoc(IRInsertLoc::after(lastAccess));
+    // Get the index to get the info
+    auto blockIndex = m_blockIndexMap[block];
+    auto blockInfo = _getInfo(blockIndex);
 
-        // Add the live end inst
-        m_builder.emitLiveRangeEnd(m_root);
-        return _addBlockResult(blockIndex, BlockResult::Found);
-    }
+    // Increase the count
+    ++blockInfo->instCount;
+    // Record that this is an instruction of interest for this block
+    blockInfo->lastInst = inst;
+}
 
-    // Didn't find any accesses in this block
-    return _addBlockResult(blockIndex, BlockResult::NotFound);    
+void LivenessContext::_addAccessInst(IRInst* inst)
+{
+    // Add to the access set
+    m_accessSet.Add(inst);
+    _addInst(inst);
 }
 
 void LivenessContext::_findAliasesAndAccesses(IRInst* root)
@@ -555,10 +611,7 @@ void LivenessContext::_findAliasesAndAccesses(IRInst* root)
                     }
                     case AccessType::Access:
                     {
-                        InstOrder order;
-                        order.inst = cur;
-                        order.index = -1;
-                        order.block = as<IRBlock>(cur->getParent());
+                        _addAccessInst(cur);
                         break;
                     }
                     default: break;
@@ -571,16 +624,15 @@ void LivenessContext::_findAliasesAndAccesses(IRInst* root)
 void LivenessContext::_findAndEmitRangeEnd(IRLiveRangeStart* liveRangeStart)
 {
     // Reset the result
+    for (auto& blockInfo : m_blockInfos)
     {
-        for (auto& blockInfo : m_blockInfos)
-        {
-            blockInfo.result = BlockResult::NotVisited;
-        }
+        blockInfo.resetResult();
     }
 
     // Store root information, so don't have to pass around methods
     m_rootLiveStart = liveRangeStart;
     m_rootLiveStartBlock = as<IRBlock>(liveRangeStart->getParent());
+
     m_root = liveRangeStart->getReferenced();
     m_rootBlock = as<IRBlock>(m_root->parent);
 
@@ -628,6 +680,30 @@ void LivenessContext::_findAndEmitRangeEnd(IRLiveRangeStart* liveRangeStart)
     m_rootLiveStart = nullptr;
     m_root = nullptr;
     m_rootBlock = nullptr;
+    m_rootLiveStartBlock = nullptr;
+}
+
+bool LivenessContext::_isRunInst(IRInst* inst)
+{
+    const auto op = inst->getOp();
+
+    // If it's a live start then we need to track
+    if (op == kIROp_LiveRangeStart)
+    {
+        return true;
+    }
+
+    // NOTE!
+    // These are the only ops *currently* that indicate an access.
+    // Has to be consistent with `_findAliasesAndAccesses`
+    if (op == kIROp_Call || op == kIROp_Load)
+    {
+        // Just because it's the right type *doesn't* mean it's an access, it has to also 
+        // be in the access set
+        return m_accessSet.Contains(inst);
+    }
+
+    return false;
 }
 
 void LivenessContext::_processRoot(const Location* locations, Count locationsCount)
@@ -640,12 +716,9 @@ void LivenessContext::_processRoot(const Location* locations, Count locationsCou
     // Reset the order range for all blocks
     for (auto& info : m_blockInfos)
     {
-        info.orderStart = 0;
-        info.orderCount = 0;
-        info.startsCount = 0;
+        info.reset();
     }
-
-    m_instOrders.clear();
+    m_instRuns.clear();
 
     auto root = locations[0].root;
 
@@ -664,97 +737,64 @@ void LivenessContext::_processRoot(const Location* locations, Count locationsCou
         // Save the start
         m_liveRangeStarts[i] = liveStart;
 
-        // Add to the order list
-        InstOrder order;
-        order.inst = liveStart;
-        order.index = -1;
-        order.block = as<IRBlock>(liveStart->getParent());
-
-        m_instOrders.add(order);
+        _addStartInst(liveStart);
     }
 
     // Find all of the aliases and access to this root
     _findAliasesAndAccesses(root);
 
-    // Okay we now have InstOrder list, we can order by block
-    m_instOrders.sort([&](const InstOrder& a, const InstOrder& b) -> bool { return a.block < b.block; });
-
+    // Lets work out the instruction order for each block
     {
-        const Count ordersCount = m_instOrders.getCount();
-
-        Index start = 0;
-        while (start < ordersCount)
+        for (auto& blockInfo : m_blockInfos)
         {
-            auto block = m_instOrders[start].block;
-
-            // Find the end
-            Index end = start + 1;
-            for(; end < ordersCount && m_instOrders[end].block == block; ++end);
-
-            const Count count = end - start;
-
-            Count startsCount = 0;
-
-            // If we find more than one instruction, we need to sort the instructions with InstOrder entries, such that they are
-            // in instruction order.
-            if (count > 1)
+            if (blockInfo.instCount == 0)
             {
-                // Lets work out the indices of these instructions
-                m_instToOrderIndex.Clear();
-                for (Index i = start; i < end; ++i)
-                {
-                    m_instToOrderIndex.Add(m_instOrders[i].inst, i);
-                }
+                // Nothing to do if it's empty
+                SLANG_ASSERT(blockInfo.runCount == 0);
+            }
+            else if (blockInfo.instCount == 1)
+            {
+                // This is the easy case, since we don't need to determine the order of the instructions
+                blockInfo.runStart = m_instRuns.getCount();
+                blockInfo.runCount = 1;
+                SLANG_ASSERT(blockInfo.lastInst);
+                m_instRuns.add(blockInfo.lastInst);
+                continue;
+            }
+            else
+            {
+                // TODO(JS):
+                // NOTE That we don't need to keep all accesses in the run, only the last accesses 
+                // prior to a start/end.
+                //
+                // For now we just add them all.
 
-                Index index = 0;
-                Count remaining = count;
+                const auto start = m_instRuns.getCount();
+                blockInfo.runStart = start;
+                blockInfo.runCount = blockInfo.instCount;
 
-                for (IRInst* cur = block->getFirstChild(); cur; cur = cur->getNextInst(), ++index)
+                m_instRuns.setCount(start + blockInfo.instCount);
+                IRInst** dst = m_instRuns.getBuffer() + start;
+
+                // Find all of the instructions of interest in order
+                auto block = blockInfo.block;
+
+                for (auto inst : block->getChildren())
                 {
-                    // If there is an order associated with this instruction, set it's index
-                    auto orderIndexPtr = m_instToOrderIndex.TryGetValue(cur);
-                    if (orderIndexPtr)
+                    if (_isRunInst(inst))
                     {
-                        // Increase the start count
-                        startsCount += Index(cur->getOp() == kIROp_LiveRangeStart);
-
-                        auto& instOrder = m_instOrders[*orderIndexPtr];
-
-                        // It can't bet set yet!
-                        SLANG_ASSERT(instOrder.index == -1);
-
-                        // Set it's index within the block
-                        instOrder.index = index;
-                        // If there are none left to find we are done
-                        if (--remaining <= 0)
+                        *dst++ = inst;
+                        if (dst == m_instRuns.end())
                         {
                             break;
                         }
                     }
                 }
-
-                // We can now order by index
-                std::sort(m_instOrders.getBuffer() + start, m_instOrders.getBuffer() + end, [&](const InstOrder& a, const InstOrder& b) { return a.index < b.index; });
-            }
-            else
-            {
-                // Must be one
-                SLANG_ASSERT(count == 1);
-                // Update the starts count
-                startsCount += Index(m_instOrders[start].inst->getOp() == kIROp_LiveRangeStart);
+                SLANG_ASSERT(dst == m_instRuns.end());
             }
 
-            // Find the block index
-            const BlockIndex blockIndex = m_blockIndexMap[block];
-
-            // Set the range/startsCount
-            auto blockInfo = _getInfo(blockIndex);
-            blockInfo->orderStart = start;
-            blockInfo->orderCount = count;
-            blockInfo->startsCount = startsCount;
-
-            // next
-            start = end;
+            // The run count and the inst count must match at this point
+            SLANG_ASSERT(blockInfo.runCount == blockInfo.instCount);
         }
     }
 
@@ -779,19 +819,15 @@ void LivenessContext::_processLocationsInFunction(const Location* locations, Cou
     // Set up the map from blocks to indices
     m_blockIndexMap.Clear();
     m_blockInfos.clear();
+
     {
         Index index = 0;
         for (auto block : func->getChildren())
         {
             IRBlock* blockInst = as<IRBlock>(block);
             m_blockIndexMap.Add(blockInst, BlockIndex(index++));
-
-            BlockInfo blockInfo; 
-            blockInfo.block = blockInst;
-            blockInfo.result = BlockResult::NotVisited;
-            blockInfo.orderStart = -1;
-            blockInfo.orderCount = 0;
-
+            BlockInfo blockInfo;
+            blockInfo.init(blockInst);
             m_blockInfos.add(blockInfo);
         }
     }
