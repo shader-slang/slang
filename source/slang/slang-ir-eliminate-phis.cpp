@@ -810,7 +810,9 @@ struct PhiEliminationContext
                 // into the location might be lost.
                 //
                 // Therefore is seems appropriate to say the variable is *live* *before* the store instruction.
-                location.startLocation = IRInsertLoc::before(storeInst);
+                //
+                // startLocation is defined as inserting the StartRange *before* startLocation, so we can just use the store as the location
+                location.startLocation = storeInst;
                 location.function = m_func;
 
                 m_livenessLocations->add(location);

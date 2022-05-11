@@ -116,6 +116,35 @@ In terms of finding blocks/accesses/starts we could use the same mechanism as no
 
 namespace { // anonymous
 
+/*
+A helper class to enable using a backing array, used in a stack like manner. */
+template <typename T>
+class RAIIStackArray
+{
+public:
+    ArrayView<T> getView() { return ArrayView<T>(m_list->getBuffer() + m_startIndex, m_list->getCount() - m_startIndex); }
+    ConstArrayView<T> getConstView() const { return ConstArrayView<T>(m_list->getBuffer() + m_startIndex, m_list->getCount() - m_startIndex); }
+
+    void setCount(Count count) { m_list->setCount(m_startIndex + count); }
+    Count getCount() const { return m_list->getCount() - m_startIndex; }
+
+    T& operator[](Index i) { return m_list[m_startIndex + i]; }
+    const T& operator[](Index i) const { return m_list[m_startIndex + i]; }
+
+    RAIIStackArray(List<T>* list):
+        m_startIndex(list->getCount()),
+        m_list(list)
+    {
+    }
+    ~RAIIStackArray()
+    {
+        m_list->setCount(m_startIndex);
+    }
+
+    Index m_startIndex;
+    List<T>* m_list;
+};
+
 struct LivenessContext
 {
     typedef LivenessLocation Location;
@@ -218,6 +247,8 @@ struct LivenessContext
         /// Allows for promotion if there is already a result
     BlockResult _addBlockResult(BlockIndex blockIndex, BlockResult result);
 
+    void _findBlockInstRuns();
+
         /// Adds an instruction that is an access to the root
     void _addAccessInst(IRInst* inst);
         /// Add a live range start 
@@ -252,6 +283,8 @@ struct LivenessContext
     IRInst* m_root = nullptr;
     IRBlock* m_rootBlock = nullptr;                 ///< The block the root is in
     
+    List<SuccessorResult> m_successorResults;       ///< Storage for successor results
+
     List<IRInst*> m_aliases;                        ///< A list of instructions that alias to the root
 
     HashSet<IRInst*> m_accessSet;                   ///< If instruction is in set it is an access (or perhaps a start)  
@@ -412,13 +445,12 @@ LivenessContext::BlockResult LivenessContext::_processBlock(BlockIndex blockInde
 
     const Index successorCount = successors.getCount();
 
-    // TODO(JS): 
-    // We could just use a stack of results, and not need to allocate, but lets just allocate here to keep it simple
+    // Set up space to store successor results
+    RAIIStackArray<SuccessorResult> raiiSuccessorResults(&m_successorResults);
+    raiiSuccessorResults.setCount(successorCount);
 
-    List<SuccessorResult> successorResults;       ///< Storage for results from successors
-
-    // We need to store of the results for successors
-    successorResults.setCount(successorCount);
+    // We'll access through a view...
+    auto successorResults = raiiSuccessorResults.getView();
 
     {
         auto cur = successors.begin();
@@ -485,7 +517,11 @@ void LivenessContext::_addInst(IRInst* inst)
 
     // Increase the count
     ++blockInfo->instCount;
+
     // Record that this is an instruction of interest for this block
+    //
+    // This only really exists to capture the scenario of only having one inst in a block, so we can just overwrite what's
+    // already there.
     blockInfo->lastInst = inst;
 }
 
@@ -493,16 +529,21 @@ void LivenessContext::_addAccessInst(IRInst* inst)
 {
     // Add to the access set
     m_accessSet.Add(inst);
+
+    // Add the instruction to the block info
     _addInst(inst);
 }
 
 void LivenessContext::_findAliasesAndAccesses(IRInst* root)
 {
+    // Clear all the aliases
     m_aliases.clear();
+    // Clear the access set
+    m_accessSet.Clear();
 
     // Add the root to the list of aliases, to start lookup
     m_aliases.add(root);
-
+    
     // The challenge here is to try and determine when a root is no longer accessed, and so is no longer live
     //
     // Note that a root can be accessed directly, but also through `aliases`. For example if the root is a structure,
@@ -706,6 +747,62 @@ bool LivenessContext::_isRunInst(IRInst* inst)
     return false;
 }
 
+
+void LivenessContext::_findBlockInstRuns()
+{
+    for (auto& blockInfo : m_blockInfos)
+    {
+        if (blockInfo.instCount == 0)
+        {
+            // Nothing to do if it's empty
+            SLANG_ASSERT(blockInfo.runCount == 0);
+        }
+        else if (blockInfo.instCount == 1)
+        {
+            // This is the easy case, since we don't need to determine the order of the instructions
+            blockInfo.runStart = m_instRuns.getCount();
+            blockInfo.runCount = 1;
+            SLANG_ASSERT(blockInfo.lastInst);
+            m_instRuns.add(blockInfo.lastInst);
+            continue;
+        }
+        else
+        {
+            // TODO(JS):
+            // NOTE That we don't need to keep all accesses in the run, only the last accesses 
+            // prior to a start/end.
+            //
+            // For now we just add them all.
+
+            const auto start = m_instRuns.getCount();
+            blockInfo.runStart = start;
+            blockInfo.runCount = blockInfo.instCount;
+
+            m_instRuns.setCount(start + blockInfo.instCount);
+            IRInst** dst = m_instRuns.getBuffer() + start;
+
+            // Find all of the instructions of interest in order
+            auto block = blockInfo.block;
+
+            for (auto inst : block->getChildren())
+            {
+                if (_isRunInst(inst))
+                {
+                    *dst++ = inst;
+                    if (dst == m_instRuns.end())
+                    {
+                        break;
+                    }
+                }
+            }
+            SLANG_ASSERT(dst == m_instRuns.end());
+        }
+
+        // The run count and the inst count must match at this point
+        SLANG_ASSERT(blockInfo.runCount == blockInfo.instCount);
+    }
+}
+
 void LivenessContext::_processRoot(const Location* locations, Count locationsCount)
 {
     if (locationsCount <= 0)
@@ -719,7 +816,7 @@ void LivenessContext::_processRoot(const Location* locations, Count locationsCou
         info.reset();
     }
     m_instRuns.clear();
-
+    
     auto root = locations[0].root;
 
     // Add all the live starts
@@ -730,7 +827,7 @@ void LivenessContext::_processRoot(const Location* locations, Count locationsCou
         SLANG_ASSERT(location.root == root);
 
         // Add the start location
-        m_builder.setInsertLoc(location.startLocation);
+        m_builder.setInsertLoc(IRInsertLoc::before(location.startLocation));
         // Emit the range start
         auto liveStart = m_builder.emitLiveRangeStart(location.root);
 
@@ -743,65 +840,13 @@ void LivenessContext::_processRoot(const Location* locations, Count locationsCou
     // Find all of the aliases and access to this root
     _findAliasesAndAccesses(root);
 
-    // Lets work out the instruction order for each block
-    {
-        for (auto& blockInfo : m_blockInfos)
-        {
-            if (blockInfo.instCount == 0)
-            {
-                // Nothing to do if it's empty
-                SLANG_ASSERT(blockInfo.runCount == 0);
-            }
-            else if (blockInfo.instCount == 1)
-            {
-                // This is the easy case, since we don't need to determine the order of the instructions
-                blockInfo.runStart = m_instRuns.getCount();
-                blockInfo.runCount = 1;
-                SLANG_ASSERT(blockInfo.lastInst);
-                m_instRuns.add(blockInfo.lastInst);
-                continue;
-            }
-            else
-            {
-                // TODO(JS):
-                // NOTE That we don't need to keep all accesses in the run, only the last accesses 
-                // prior to a start/end.
-                //
-                // For now we just add them all.
-
-                const auto start = m_instRuns.getCount();
-                blockInfo.runStart = start;
-                blockInfo.runCount = blockInfo.instCount;
-
-                m_instRuns.setCount(start + blockInfo.instCount);
-                IRInst** dst = m_instRuns.getBuffer() + start;
-
-                // Find all of the instructions of interest in order
-                auto block = blockInfo.block;
-
-                for (auto inst : block->getChildren())
-                {
-                    if (_isRunInst(inst))
-                    {
-                        *dst++ = inst;
-                        if (dst == m_instRuns.end())
-                        {
-                            break;
-                        }
-                    }
-                }
-                SLANG_ASSERT(dst == m_instRuns.end());
-            }
-
-            // The run count and the inst count must match at this point
-            SLANG_ASSERT(blockInfo.runCount == blockInfo.instCount);
-        }
-    }
+    // Find the runs of 'instructions of interest' (accesses/starts) for all the blocks
+    _findBlockInstRuns();
 
     // Now we want to find all of the ends
     for (auto liveStart : m_liveRangeStarts)
     {
-        // We want to process this root to find all of the ends
+        // We want to process this RangeStart for the root, to find all of the ends
         _findAndEmitRangeEnd(liveStart);
     }
 }
@@ -815,7 +860,10 @@ void LivenessContext::_processLocationsInFunction(const Location* locations, Cou
     
     const auto func = locations[0].function;
     SLANG_UNUSED(func);
-        
+    
+    // Create the dominator tree, for the function
+    m_dominatorTree = computeDominatorTree(func);
+
     // Set up the map from blocks to indices
     m_blockIndexMap.Clear();
     m_blockInfos.clear();
@@ -871,11 +919,6 @@ void LivenessContext::processLocations(const List<Location>& inLocations)
         for (;end < locationCount && locations[end].function == func; ++end);
 
         // All of the locations from [start, end) are in the same function. Lets process all in one go...
-        
-        // Create the dominator tree, for the function
-        m_dominatorTree = computeDominatorTree(func);
-
-        // Process all of the locations in the function
         _processLocationsInFunction(locations.getBuffer() + start, end - start);
 
         // Look for next run
@@ -904,7 +947,9 @@ static void _processFunction(IRFunc* funcInst, List<LivenessLocation>& ioLocatio
                 LivenessLocation location;
 
                 location.function = funcInst;
-                location.startLocation = IRInsertLoc::after(varInst);
+                // The start location is pefore the startLocation, so we use the next inst to mark the insertion spot
+                // This is always okay, because a var can never be the last instruction in a block, as blocks have terminators.
+                location.startLocation = varInst->getNextInst();
                 location.root = varInst;
 
                 ioLocations.add(location);
