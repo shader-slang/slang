@@ -120,6 +120,8 @@ struct LivenessContext
 {
     typedef LivenessLocation Location;
 
+    enum class BlockIndex : Index;
+
     // NOTE! Care must be taken changing the order. Some checks rely on Found having a smaller value than `NotFound`.
     // Allowing NotFound to be promoted to Found.
     enum class BlockResult
@@ -162,7 +164,7 @@ struct LivenessContext
     struct SuccessorResult
     {
         BlockResult result;         ///< The result 
-        Index blockIndex;           ///< The block index of the successor
+        BlockIndex blockIndex;      ///< The block index of the successor
     };
 
         /// Process all the locations
@@ -181,11 +183,11 @@ struct LivenessContext
 
         /// Processor a successor to a block
         /// Can only be called after a call to _findAliasesAndAccesses for the root.
-    BlockResult _processSuccessor(Index blockIndex);
+    BlockResult _processSuccessor(BlockIndex blockIndex);
 
         /// Process a block 
         /// Can only be called after a call to _findAliasesAndAccesses for the root.
-    BlockResult _processBlock(Index blockIndex);
+    BlockResult _processBlock(BlockIndex blockIndex);
 
         /// Process all the locations in the function (locations must be ordered by root)
     void _processLocationsInFunction(const Location* start, Count count);
@@ -202,7 +204,9 @@ struct LivenessContext
 
         /// Add a result for the block
         /// Allows for promotion if there is already a result
-    BlockResult _addBlockResult(Index blockIndex, BlockResult result);
+    BlockResult _addBlockResult(BlockIndex blockIndex, BlockResult result);
+
+    BlockInfo* _getInfo(BlockIndex blockIndex) { return &m_blockInfos[Index(blockIndex)]; }
 
     RefPtr<IRDominatorTree> m_dominatorTree;    ///< The dominator tree for the current function
 
@@ -214,7 +218,7 @@ struct LivenessContext
     
     List<IRInst*> m_aliases;                        ///< A list of instructions that alias to the root
 
-    Dictionary<IRBlock*, Index> m_blockIndexMap;    ///< Map from a block to an index
+    Dictionary<IRBlock*, BlockIndex> m_blockIndexMap;    ///< Map from a block to a block index
 
     List<BlockInfo> m_blockInfos;                   ///< Information about blocks
 
@@ -241,28 +245,28 @@ void LivenessContext::_addLiveRangeEndAtBlockStart(IRBlock* block, IRInst* root)
     m_builder.emitLiveRangeEnd(root);
 }
 
-LivenessContext::BlockResult LivenessContext::_addBlockResult(Index blockIndex, BlockResult result)
+LivenessContext::BlockResult LivenessContext::_addBlockResult(BlockIndex blockIndex, BlockResult result)
 {
-    auto& currentResult = m_blockInfos[blockIndex].result;
+    auto& currentResult = _getInfo(blockIndex)->result;
     // Check we can promote
     SLANG_ASSERT(canPromote(currentResult, result));
     currentResult = result;
     return result;
 }
 
-LivenessContext::BlockResult LivenessContext::_processSuccessor(Index blockIndex)
+LivenessContext::BlockResult LivenessContext::_processSuccessor(BlockIndex blockIndex)
 {
-    auto& blockInfo = m_blockInfos[blockIndex];
+    auto blockInfo = _getInfo(blockIndex);
 
     // Check if there is already a result for this block. 
     // If there is just return that.
-    auto result = blockInfo.result;
+    auto result = blockInfo->result;
     if (result != BlockResult::NotVisited)
     {
         return result;
     }
 
-    auto block = blockInfo.block;
+    auto block = blockInfo->block;
 
     // If the block is *not* dominated by the root block, we know it can't 
     // end liveness. 
@@ -279,17 +283,17 @@ LivenessContext::BlockResult LivenessContext::_processSuccessor(Index blockIndex
     return _processBlock(blockIndex);
 }
 
-LivenessContext::BlockResult LivenessContext::_processBlock(Index blockIndex)
+LivenessContext::BlockResult LivenessContext::_processBlock(BlockIndex blockIndex)
 {
-    auto& blockInfo = m_blockInfos[blockIndex];
-    const auto block = blockInfo.block;
+    auto blockInfo = _getInfo(blockIndex);
+    const auto block = blockInfo->block;
    
-    const Index orderEnd = blockInfo.orderStart + blockInfo.orderCount;
+    const Index orderEnd = blockInfo->orderStart + blockInfo->orderCount;
 
-    Index accessCount = blockInfo.orderCount - blockInfo.startsCount;
-    Index startsCount = blockInfo.startsCount;
+    Index accessCount = blockInfo->orderCount - blockInfo->startsCount;
+    Index startsCount = blockInfo->startsCount;
 
-    Index orderIndex = blockInfo.orderStart;
+    Index orderIndex = blockInfo->orderStart;
 
     if (block == m_rootLiveStartBlock)
     {
@@ -408,7 +412,7 @@ LivenessContext::BlockResult LivenessContext::_processBlock(Index blockIndex)
             if (successorResult.result == BlockResult::NotFound)
             {
                 const auto successorBlockIndex = successorResult.blockIndex;
-                _addLiveRangeEndAtBlockStart(m_blockInfos[successorBlockIndex].block, m_root);
+                _addLiveRangeEndAtBlockStart(_getInfo(successorBlockIndex)->block, m_root);
                 _addBlockResult(successorBlockIndex, BlockResult::Found);
             }
         }
@@ -603,7 +607,7 @@ void LivenessContext::_findAndEmitRangeEnd(IRLiveRangeStart* liveRangeStart)
     // detect a loop. In most respect Visited behaves in the same manner as NotDominated.
 
     {
-        const Index rootBlockIndex = m_blockIndexMap[m_rootBlock];
+        const BlockIndex rootBlockIndex = m_blockIndexMap[m_rootBlock];
 
         // Mark the root as visited to stop an infinite loop
         _addBlockResult(rootBlockIndex, BlockResult::Visited);
@@ -741,13 +745,13 @@ void LivenessContext::_processRoot(const Location* locations, Count locationsCou
             }
 
             // Find the block index
-            const Index blockIndex = m_blockIndexMap[block];
+            const BlockIndex blockIndex = m_blockIndexMap[block];
 
             // Set the range/startsCount
-            auto& blockInfo = m_blockInfos[blockIndex];
-            blockInfo.orderStart = start;
-            blockInfo.orderCount = count;
-            blockInfo.startsCount = startsCount;
+            auto blockInfo = _getInfo(blockIndex);
+            blockInfo->orderStart = start;
+            blockInfo->orderCount = count;
+            blockInfo->startsCount = startsCount;
 
             // next
             start = end;
@@ -780,7 +784,7 @@ void LivenessContext::_processLocationsInFunction(const Location* locations, Cou
         for (auto block : func->getChildren())
         {
             IRBlock* blockInst = as<IRBlock>(block);
-            m_blockIndexMap.Add(blockInst, index++);
+            m_blockIndexMap.Add(blockInst, BlockIndex(index++));
 
             BlockInfo blockInfo; 
             blockInfo.block = blockInst;
