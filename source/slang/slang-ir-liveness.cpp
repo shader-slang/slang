@@ -492,15 +492,14 @@ LivenessContext::BlockResult LivenessContext::_processBlock(BlockIndex blockInde
         {
             auto succ = *cur;
 
-            SuccessorResult successorResult;
-
-            successorResult.blockIndex = m_blockIndexMap[succ];
-
-            // Process the successor
-            successorResult.result = _processSuccessor(successorResult.blockIndex);
+            const auto successorBlockIndex = m_blockIndexMap[succ];
 
             // Store the result
-            successorResults[i] = successorResult;
+            auto& successorResult = successorResults[i];
+            
+            // Process the successor
+            successorResult.blockIndex = successorBlockIndex;
+            successorResult.result = _processSuccessor(successorBlockIndex);
 
             // Change counts depending on the result
             foundCounts[Index(successorResult.result)]++;
