@@ -132,6 +132,9 @@
     <ClInclude Include="..\..\..\source\slang\slang-ir-collect-global-uniforms.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\source\slang\slang-ir-com-interface.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\..\source\slang\slang-ir-constexpr.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -546,6 +549,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\source\slang\slang-ir-collect-global-uniforms.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\source\slang\slang-ir-com-interface.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\source\slang\slang-ir-constexpr.cpp">

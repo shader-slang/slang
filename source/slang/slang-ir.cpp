@@ -2616,6 +2616,12 @@ namespace Slang
         return (IRRefType*) getPtrType(kIROp_RefType, valueType);
     }
 
+    IRSPIRVLiteralType* IRBuilder::getSPIRVLiteralType(IRType* type)
+    {
+        IRInst* operands[] = { type };
+        return (IRSPIRVLiteralType*)getType(kIROp_SPIRVLiteralType, 1, operands);
+    }
+
     IRPtrTypeBase* IRBuilder::getPtrType(IROp op, IRType* valueType)
     {
         IRInst* operands[] = { valueType };
@@ -2629,6 +2635,11 @@ namespace Slang
     {
         IRInst* operands[] = {valueType, getIntValue(getIntType(), addressSpace)};
         return (IRPtrType*)getType(op, 2, operands);
+    }
+
+    IRComPtrType* IRBuilder::getComPtrType(IRType* valueType)
+    {
+        return (IRComPtrType*)getType(kIROp_ComPtrType, valueType);
     }
 
     IRArrayTypeBase* IRBuilder::getArrayTypeBase(

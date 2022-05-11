@@ -170,9 +170,14 @@ namespace Slang
         }
         case kIROp_ThisType:
         {
+            auto interfaceType = cast<IRThisType>(paramType)->getConstraintType();
 
-            if (isBuiltin(cast<IRThisType>(paramType)->getConstraintType()))
+            if (isBuiltin(interfaceType))
                 return (IRType*)paramType;
+
+            if (interfaceType->findDecoration<IRComInterfaceDecoration>())
+                return (IRType*)interfaceType;
+
             auto anyValueSize = getInterfaceAnyValueSize(
                 cast<IRThisType>(paramType)->getConstraintType(),
                 paramType->sourceLoc);
@@ -185,6 +190,9 @@ namespace Slang
         case kIROp_InterfaceType:
         {
             if (isBuiltin(paramType))
+                return (IRType*)paramType;
+
+            if (paramType->findDecoration<IRComInterfaceDecoration>())
                 return (IRType*)paramType;
 
             // In the dynamic-dispatch case, a value of interface type

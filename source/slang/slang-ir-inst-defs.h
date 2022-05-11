@@ -105,6 +105,9 @@ INST(Nop, nop, 0, 0)
         INST_RANGE(OutTypeBase, OutType, InOutType)
     INST_RANGE(PtrTypeBase, PtrType, InOutType)
 
+    // A ComPtr<T> type is treated as a opaque type that represents a reference-counted handle to a COM object.
+    INST(ComPtrType, ComPtr, 1, 0)
+
     /* SamplerStateTypeBase */
         INST(SamplerStateType, SamplerState, 0, 0)
         INST(SamplerComparisonStateType, SamplerComparisonState, 0, 0)
@@ -194,6 +197,9 @@ INST(ThisType, this_type, 0, 0)
 INST(RTTIType, rtti_type, 0, 0)
 INST(RTTIHandleType, rtti_handle_type, 0, 0)
 INST(TupleType, tuple_type, 0, 0)
+
+// A type that identifies it's contained type as being emittable as `spirv_literal.
+INST(SPIRVLiteralType, spirvLiteralType, 1, 0)
 
 // A TypeType-typed IRValue represents a IRType.
 // It is used to represent a type parameter/argument in a generics.
@@ -606,6 +612,8 @@ INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
         /// An dllImport decoration marks a function as imported from a DLL. Slang will generate dynamic function loading logic to use this function at runtime.
     INST(DllImportDecoration, dllImport, 2, 0)
 
+        /// Marks an interface as a COM interface declaration.
+    INST(ComInterfaceDecoration, COMInterface, 0, 0)
 
     /* Decorations for RTTI objects */
     INST(RTTITypeSizeDecoration, RTTI_typeSize, 1, 0)

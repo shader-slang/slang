@@ -216,6 +216,10 @@ struct DllImportContext
         {
             builder.emitReturn(call);
         }
+        else
+        {
+            builder.emitReturn();
+        }
     }
 
     void processModule()
