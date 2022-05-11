@@ -122,14 +122,14 @@ template <typename T>
 class RAIIStackArray
 {
 public:
-    ArrayView<T> getView() { return ArrayView<T>(m_list->getBuffer() + m_startIndex, m_list->getCount() - m_startIndex); }
-    ConstArrayView<T> getConstView() const { return ConstArrayView<T>(m_list->getBuffer() + m_startIndex, m_list->getCount() - m_startIndex); }
+    ArrayView<T> getView() { return makeArrayView(m_list->getBuffer() + m_startIndex, m_list->getCount() - m_startIndex); }
+    ConstArrayView<T> getConstView() const { return makeConstArrayView(m_list->getBuffer() + m_startIndex, m_list->getCount() - m_startIndex); }
 
     void setCount(Count count) { m_list->setCount(m_startIndex + count); }
     Count getCount() const { return m_list->getCount() - m_startIndex; }
 
-    T& operator[](Index i) { return m_list[m_startIndex + i]; }
-    const T& operator[](Index i) const { return m_list[m_startIndex + i]; }
+    T& operator[](Index i) { return (*m_list)[m_startIndex + i]; }
+    const T& operator[](Index i) const { return (*m_list)[m_startIndex + i]; }
 
     RAIIStackArray(List<T>* list):
         m_startIndex(list->getCount()),
@@ -480,11 +480,8 @@ LivenessContext::BlockResult LivenessContext::_processBlock(BlockIndex blockInde
     const Index successorCount = successors.getCount();
 
     // Set up space to store successor results
-    RAIIStackArray<SuccessorResult> raiiSuccessorResults(&m_successorResults);
-    raiiSuccessorResults.setCount(successorCount);
-
-    // We'll access through a view...
-    auto successorResults = raiiSuccessorResults.getView();
+    RAIIStackArray<SuccessorResult> successorResults(&m_successorResults);
+    successorResults.setCount(successorCount);
 
     {
         auto cur = successors.begin();
@@ -494,12 +491,16 @@ LivenessContext::BlockResult LivenessContext::_processBlock(BlockIndex blockInde
 
             const auto successorBlockIndex = m_blockIndexMap[succ];
 
-            // Store the result
-            auto& successorResult = successorResults[i];
+            // NOTE! Care is needed around successorResults, because _processorSuccessor may cause the underlying list 
+            // to be reallocated. 
+            // If we always access through successorResults (ie RAIIStackArray type), things will be fine though.
             
             // Process the successor
-            successorResult.blockIndex = successorBlockIndex;
-            successorResult.result = _processSuccessor(successorBlockIndex);
+            SuccessorResult successorResult;
+            successorResult.blockIndex = blockIndex;
+            successorResult.result = _processSuccessor(successorBlockIndex);;
+
+            successorResults[i] = successorResult;
 
             // Change counts depending on the result
             foundCounts[Index(successorResult.result)]++;
@@ -522,7 +523,7 @@ LivenessContext::BlockResult LivenessContext::_processBlock(BlockIndex blockInde
             return _addBlockResult(blockIndex, BlockResult::Found);
         }
 
-        for (const auto& successorResult : successorResults)
+        for (const auto& successorResult : successorResults.getConstView())
         {
             if (successorResult.result == BlockResult::NotFound)
             {
