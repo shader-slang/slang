@@ -141,8 +141,8 @@ public:
         m_list->setCount(m_startIndex);
     }
 
-    Index m_startIndex;
-    List<T>* m_list;
+    const Index m_startIndex;
+    List<T>*const m_list;
 };
 
 struct LivenessContext
@@ -264,6 +264,9 @@ struct LivenessContext
 
     Index _findLastAccess(const ConstArrayView<IRInst*>& run);
 
+        /// Find a liveRange end from a given inst
+    IRLiveRangeEnd* findEndRootFromInst(IRInst* inst);
+
         /// Complete the block using the run, which can *cannot* contain a start for the current root
     BlockResult _completeBlock(BlockIndex blockIndex, const ConstArrayView<IRInst*>& run);
 
@@ -287,15 +290,14 @@ struct LivenessContext
 
     List<IRInst*> m_aliases;                        ///< A list of instructions that alias to the root
 
-    HashSet<IRInst*> m_accessSet;                   ///< If instruction is in set it is an access (or perhaps a start)  
+    HashSet<IRInst*> m_accessSet;                   ///< If instruction is in set it is an access 
+
     Dictionary<IRBlock*, BlockIndex> m_blockIndexMap;    ///< Map from a block to a block index
     List<BlockInfo> m_blockInfos;                   ///< Information about blocks
 
-    List<IRInst*> m_instRuns;                       ///< Instruction runs indexed into via BlockInfo
+    List<IRInst*> m_instRuns;                       ///< Instructions of interest in order. Indexed into via BlockInfo [runStart, runStart + runCount)
 
     List<IRLiveRangeStart*> m_liveRangeStarts;      ///< Live range starts for a root
-
-    Dictionary<IRInst*, Index> m_instToOrderIndex;  ///< Maps from an instruction to it's entry in m_instOrders 
 
     IRModule* m_module;
     SharedIRBuilder m_sharedBuilder;
@@ -308,10 +310,14 @@ void LivenessContext::_addLiveRangeEndAtBlockStart(IRBlock* block, IRInst* root)
     auto inst = block->getFirstOrdinaryInst();
     SLANG_ASSERT(inst);
 
-    m_builder.setInsertLoc(IRInsertLoc::before(inst));
+    // Only add the end if couldn't find one
+    if (!findEndRootFromInst(inst))
+    {
+        m_builder.setInsertLoc(IRInsertLoc::before(inst));
 
-    // Add the live end inst
-    m_builder.emitLiveRangeEnd(root);
+        // Add the live end inst
+        m_builder.emitLiveRangeEnd(root);
+    }
 }
 
 LivenessContext::BlockResult LivenessContext::_addBlockResult(BlockIndex blockIndex, BlockResult result)
@@ -383,6 +389,25 @@ Index LivenessContext::_findLastAccess(const ConstArrayView<IRInst*>& run)
     return -1;
 }
 
+IRLiveRangeEnd* LivenessContext::findEndRootFromInst(IRInst* cur)
+{
+    for (; cur ; cur = cur->getNextInst())
+    {
+        // We are only looking for ends
+        IRLiveRangeEnd* end = as<IRLiveRangeEnd>(cur);
+        if (end == nullptr)
+        {
+            return nullptr;
+        }
+        // If the end is for the root we've found it
+        if (end->getReferenced() == m_root)
+        {
+            return end;
+        }
+    }
+    return nullptr;
+}
+
 LivenessContext::BlockResult LivenessContext::_completeBlock(BlockIndex blockIndex, const ConstArrayView<IRInst*>& run)
 {
     // We can't have a root start in the run!
@@ -394,10 +419,19 @@ LivenessContext::BlockResult LivenessContext::_completeBlock(BlockIndex blockInd
     // If we found one, that is the end of the range
     if (lastAccessIndex >= 0)
     {
-        // Just add end of scope after the inst 
-        m_builder.setInsertLoc(IRInsertLoc::after(run[lastAccessIndex]));
-        // Add the live end inst
-        m_builder.emitLiveRangeEnd(m_root);
+        IRInst* lastAccessInst = run[lastAccessIndex];
+
+        // See if there is an end already after this 
+        // Skip the access (we will want our end after the access)
+        if (!findEndRootFromInst(lastAccessInst->getNextInst()))
+        {
+            // Just add end of scope after the inst 
+            m_builder.setInsertLoc(IRInsertLoc::after(lastAccessInst));
+            // Add the live end inst
+            m_builder.emitLiveRangeEnd(m_root);
+        }
+
+        // Add the result
         return _addBlockResult(blockIndex, BlockResult::Found);
     }
 
@@ -700,13 +734,13 @@ void LivenessContext::_findAndEmitRangeEnd(IRLiveRangeStart* liveRangeStart)
     // detect a loop. In most respect Visited behaves in the same manner as NotDominated.
 
     {
-        const BlockIndex rootBlockIndex = m_blockIndexMap[m_rootBlock];
+        const BlockIndex rootStartBlockIndex = m_blockIndexMap[m_rootLiveStartBlock];
 
         // Mark the root as visited to stop an infinite loop
-        _addBlockResult(rootBlockIndex, BlockResult::Visited);
+        _addBlockResult(rootStartBlockIndex, BlockResult::Visited);
 
         // Recursively find results
-        auto foundResult = _processBlock(rootBlockIndex);
+        auto foundResult = _processBlock(rootStartBlockIndex);
 
         if (foundResult == BlockResult::NotFound)
         {
@@ -737,7 +771,9 @@ bool LivenessContext::_isRunInst(IRInst* inst)
     // NOTE!
     // These are the only ops *currently* that indicate an access.
     // Has to be consistent with `_findAliasesAndAccesses`
-    if (op == kIROp_Call || op == kIROp_Load)
+    if (op == kIROp_Call || 
+        op == kIROp_Load || 
+        op == kIROp_Call)
     {
         // Just because it's the right type *doesn't* mean it's an access, it has to also 
         // be in the access set
