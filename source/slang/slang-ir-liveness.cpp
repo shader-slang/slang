@@ -863,7 +863,7 @@ void LivenessContext::_processRoot(const Location* locations, Count locationsCou
         SLANG_ASSERT(location.root == root);
 
         // Add the start location
-        m_builder.setInsertLoc(IRInsertLoc::before(location.startLocation));
+        m_builder.setInsertLoc(location.startLocation);
         // Emit the range start
         auto liveStart = m_builder.emitLiveRangeStart(location.root);
 
@@ -983,9 +983,8 @@ static void _processFunction(IRFunc* funcInst, List<LivenessLocation>& ioLocatio
                 LivenessLocation location;
 
                 location.function = funcInst;
-                // The start location is pefore the startLocation, so we use the next inst to mark the insertion spot
-                // This is always okay, because a var can never be the last instruction in a block, as blocks have terminators.
-                location.startLocation = varInst->getNextInst();
+                // Set the livness start to be after the var
+                location.startLocation = IRInsertLoc::after(varInst);
                 location.root = varInst;
 
                 ioLocations.add(location);

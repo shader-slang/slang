@@ -167,7 +167,7 @@ struct LivenessLocation
 {
 	IRGlobalValueWithCode* function;	///< The function the associated with this location
 	IRInst* root;						///< The root variable that is being liveness tracked
-	IRInst* startLocation; 				///< The start range is placed *before* this instruction
+	IRInsertLoc startLocation;			///< The location to insert start
 };
 
 struct LivenessUtil
