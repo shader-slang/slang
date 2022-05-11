@@ -836,7 +836,7 @@ void RenderCommandEncoderImpl::init(
             }
         }
         // Clear.
-        if (access.loadOp == IRenderPassLayout::AttachmentLoadOp::Clear)
+        if (access.loadOp == IRenderPassLayout::TargetLoadOp::Clear)
         {
             m_d3dCmdList->ClearRenderTargetView(
                 framebuffer->renderTargetDescriptors[i],
@@ -869,12 +869,12 @@ void RenderCommandEncoderImpl::init(
         }
         // Clear.
         uint32_t clearFlags = 0;
-        if (renderPass->m_depthStencilAccess.loadOp == IRenderPassLayout::AttachmentLoadOp::Clear)
+        if (renderPass->m_depthStencilAccess.loadOp == IRenderPassLayout::TargetLoadOp::Clear)
         {
             clearFlags |= D3D12_CLEAR_FLAG_DEPTH;
         }
         if (renderPass->m_depthStencilAccess.stencilLoadOp ==
-            IRenderPassLayout::AttachmentLoadOp::Clear)
+            IRenderPassLayout::TargetLoadOp::Clear)
         {
             clearFlags |= D3D12_CLEAR_FLAG_STENCIL;
         }
