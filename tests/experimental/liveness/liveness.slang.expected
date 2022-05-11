@@ -64,7 +64,7 @@ int someSlowFunc_0(int a_0)
         }
 
 #line 29
-        bool _S2 = bool(v_0 >> 1);
+        uint _S2 = v_0 >> 1;
 
 #line 29
         uint _S3 = v_0;
@@ -73,7 +73,7 @@ int someSlowFunc_0(int a_0)
         livenessEnd_0(v_0, 0);
 
 #line 29
-        int _S4 = int(_S2 || bool(_S3 << 31));
+        uint _S4 = _S2 | _S3 << 31;
 
 #line 29
         int _S5 = i_0;
@@ -82,7 +82,7 @@ int someSlowFunc_0(int a_0)
         livenessEnd_1(i_0, 0);
 
 #line 29
-        uint _S6 = uint(_S4 * _S5);
+        uint _S6 = _S4 * uint(_S5);
 
 #line 27
         int _S7 = i_0;
