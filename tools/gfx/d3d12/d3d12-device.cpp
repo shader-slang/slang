@@ -5,9 +5,8 @@
 #include "d3d12-buffer.h"
 #include "d3d12-fence.h"
 #include "d3d12-framebuffer.h"
-#include "d3d12-vertex-layout.h"
+#include "d3d12-pipeline-state.h"
 #include "d3d12-query.h"
-#include "d3d12-ray-tracing.h"
 #include "d3d12-render-pass.h"
 #include "d3d12-resource-views.h"
 #include "d3d12-sampler.h"
@@ -15,7 +14,7 @@
 #include "d3d12-shader-program.h"
 #include "d3d12-shader-table.h"
 #include "d3d12-swap-chain.h"
-#include "core/slang-blob.h"
+#include "d3d12-vertex-layout.h"
 
 #include "d3d12-helper-functions.h"
 

@@ -1,8 +1,7 @@
 // d3d12-buffer.h
 #pragma once
 
-#include "../renderer-shared.h"
-#include "resource-d3d12.h"
+#include "d3d12-base.h"
 
 namespace gfx
 {

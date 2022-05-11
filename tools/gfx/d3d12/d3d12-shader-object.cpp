@@ -1,5 +1,6 @@
 // d3d12-shader-object.cpp
 #include "d3d12-shader-object.h"
+
 #include "d3d12-buffer.h"
 #include "d3d12-command-encoder.h"
 #include "d3d12-device.h"

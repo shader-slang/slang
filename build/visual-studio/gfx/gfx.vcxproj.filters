@@ -33,10 +33,10 @@
     <ClInclude Include="..\..\..\tools\gfx\d3d11\render-d3d11.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\tools\gfx\d3d12\descriptor-heap-d3d12.h">
+    <ClInclude Include="..\..\..\tools\gfx\d3d12\d3d12-descriptor-heap.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\tools\gfx\d3d12\resource-d3d12.h">
+    <ClInclude Include="..\..\..\tools\gfx\d3d12\d3d12-resource.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\tools\gfx\debug-layer.h">
@@ -117,7 +117,7 @@
     <ClInclude Include="..\..\..\tools\gfx\d3d12\d3d12-vertex-layout.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\tools\gfx\d3d12\d3d12-ray-tracing.h">
+    <ClInclude Include="..\..\..\tools\gfx\d3d12\d3d12-pipeline-state.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\tools\gfx\d3d12\d3d12-device.h">
@@ -182,10 +182,10 @@
     <ClCompile Include="..\..\..\tools\gfx\d3d11\render-d3d11.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\tools\gfx\d3d12\descriptor-heap-d3d12.cpp">
+    <ClCompile Include="..\..\..\tools\gfx\d3d12\d3d12-descriptor-heap.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\tools\gfx\d3d12\resource-d3d12.cpp">
+    <ClCompile Include="..\..\..\tools\gfx\d3d12\d3d12-resource.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\tools\gfx\debug-layer.cpp">
@@ -248,7 +248,7 @@
     <ClCompile Include="..\..\..\tools\gfx\d3d12\d3d12-render-pass.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\tools\gfx\d3d12\d3d12-ray-tracing.cpp">
+    <ClCompile Include="..\..\..\tools\gfx\d3d12\d3d12-pipeline-state.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\tools\gfx\d3d12\d3d12-device.cpp">

@@ -1,7 +1,8 @@
 // d3d12-shader-table.cpp
 #include "d3d12-shader-table.h"
+
 #include "d3d12-device.h"
-#include "d3d12-ray-tracing.h"
+#include "d3d12-pipeline-state.h"
 #include "d3d12-transient-heap.h"
 
 namespace gfx

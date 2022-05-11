@@ -1,7 +1,7 @@
 // d3d12-shader-program.h
 #pragma once
 
-#include "../renderer-shared.h"
+#include "d3d12-base.h"
 #include "d3d12-shader-object-layout.h"
 
 namespace gfx

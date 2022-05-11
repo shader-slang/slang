@@ -1,4 +1,4 @@
-// texture-d3d12.cpp
+// d3d12-texture.cpp
 #include "d3d12-texture.h"
 
 namespace gfx

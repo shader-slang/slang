@@ -11,8 +11,8 @@
 #include "core/slang-basic.h"
 #include "core/slang-blob.h"
 #include "core/slang-chunked-list.h"
-#include "descriptor-heap-d3d12.h"
-#include "resource-d3d12.h"
+#include "d3d12-descriptor-heap.h"
+#include "d3d12-resource.h"
 
 #define _CRT_SECURE_NO_WARNINGS
 #define WIN32_LEAN_AND_MEAN

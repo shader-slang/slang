@@ -1,7 +1,7 @@
 // d3d12-query.h
 #pragma once
 
-#include "../renderer-shared.h"
+#include "d3d12-base.h"
 #include "d3d12-device.h"
 #include "d3d12-buffer.h"
 

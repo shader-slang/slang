@@ -1,5 +1,6 @@
 // d3d12-command-queue.cpp
 #include "d3d12-command-queue.h"
+
 #include "d3d12-command-buffer.h"
 #include "d3d12-device.h"
 #include "d3d12-fence.h"

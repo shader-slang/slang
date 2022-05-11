@@ -1,5 +1,6 @@
 // d3d12-query.cpp
 #include "d3d12-query.h"
+
 #include "d3d12-command-queue.h"
 
 #include "d3d12-helper-functions.h"

@@ -314,7 +314,7 @@
     <ClInclude Include="..\..\..\tools\gfx\d3d12\d3d12-base.h" />
     <ClInclude Include="..\..\..\tools\gfx\d3d12\d3d12-helper-functions.h" />
     <ClInclude Include="..\..\..\tools\gfx\d3d12\d3d12-query.h" />
-    <ClInclude Include="..\..\..\tools\gfx\d3d12\d3d12-ray-tracing.h" />
+    <ClInclude Include="..\..\..\tools\gfx\d3d12\d3d12-pipeline-state.h" />
     <ClInclude Include="..\..\..\tools\gfx\d3d12\d3d12-render-pass.h" />
     <ClInclude Include="..\..\..\tools\gfx\d3d12\d3d12-resource-views.h" />
     <ClInclude Include="..\..\..\tools\gfx\d3d12\d3d12-sampler.h" />
@@ -330,8 +330,8 @@
     <ClInclude Include="..\..\..\tools\gfx\d3d\d3d-swapchain.h" />
     <ClInclude Include="..\..\..\tools\gfx\d3d\d3d-util.h" />
     <ClInclude Include="..\..\..\tools\gfx\d3d11\render-d3d11.h" />
-    <ClInclude Include="..\..\..\tools\gfx\d3d12\descriptor-heap-d3d12.h" />
-    <ClInclude Include="..\..\..\tools\gfx\d3d12\resource-d3d12.h" />
+    <ClInclude Include="..\..\..\tools\gfx\d3d12\d3d12-descriptor-heap.h" />
+    <ClInclude Include="..\..\..\tools\gfx\d3d12\d3d12-resource.h" />
     <ClInclude Include="..\..\..\tools\gfx\debug-layer.h" />
     <ClInclude Include="..\..\..\tools\gfx\flag-combiner.h" />
     <ClInclude Include="..\..\..\tools\gfx\immediate-renderer-base.h" />
@@ -363,7 +363,7 @@
     <ClCompile Include="..\..\..\tools\gfx\d3d12\d3d12-fence.cpp" />
     <ClCompile Include="..\..\..\tools\gfx\d3d12\d3d12-helper-functions.cpp" />
     <ClCompile Include="..\..\..\tools\gfx\d3d12\d3d12-query.cpp" />
-    <ClCompile Include="..\..\..\tools\gfx\d3d12\d3d12-ray-tracing.cpp" />
+    <ClCompile Include="..\..\..\tools\gfx\d3d12\d3d12-pipeline-state.cpp" />
     <ClCompile Include="..\..\..\tools\gfx\d3d12\d3d12-render-pass.cpp" />
     <ClCompile Include="..\..\..\tools\gfx\d3d12\d3d12-resource-views.cpp" />
     <ClCompile Include="..\..\..\tools\gfx\d3d12\d3d12-sampler.cpp" />
@@ -378,8 +378,8 @@
     <ClCompile Include="..\..\..\tools\gfx\d3d\d3d-swapchain.cpp" />
     <ClCompile Include="..\..\..\tools\gfx\d3d\d3d-util.cpp" />
     <ClCompile Include="..\..\..\tools\gfx\d3d11\render-d3d11.cpp" />
-    <ClCompile Include="..\..\..\tools\gfx\d3d12\descriptor-heap-d3d12.cpp" />
-    <ClCompile Include="..\..\..\tools\gfx\d3d12\resource-d3d12.cpp" />
+    <ClCompile Include="..\..\..\tools\gfx\d3d12\d3d12-descriptor-heap.cpp" />
+    <ClCompile Include="..\..\..\tools\gfx\d3d12\d3d12-resource.cpp" />
     <ClCompile Include="..\..\..\tools\gfx\debug-layer.cpp" />
     <ClCompile Include="..\..\..\tools\gfx\flag-combiner.cpp" />
     <ClCompile Include="..\..\..\tools\gfx\immediate-renderer-base.cpp" />

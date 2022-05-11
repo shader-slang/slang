@@ -1,9 +1,8 @@
 // d3d12-vertex-layout.h
 #pragma once
 
-#include "../renderer-shared.h"
+#include "d3d12-base.h"
 #include "d3d12-buffer.h"
-#include <d3d12.h>
 
 namespace gfx
 {

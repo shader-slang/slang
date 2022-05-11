@@ -1,4 +1,6 @@
 // d3d12-ray-tracing.cpp
+#include "d3d12-pipeline-state.h"
+
 #ifdef GFX_NVAPI
 #    include "../nvapi/nvapi-include.h"
 #endif
@@ -6,7 +8,6 @@
 #include "../nvapi/nvapi-util.h"
 #include "d3d12-device.h"
 #include "d3d12-framebuffer.h"
-#include "d3d12-ray-tracing.h"
 #include "d3d12-shader-program.h"
 #include "d3d12-vertex-layout.h"
 

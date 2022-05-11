@@ -1,8 +1,7 @@
 // d3d12-render-pass.h
 #pragma once
 
-#include "../renderer-shared.h"
-#include "../simple-render-pass-layout.h"
+#include "d3d12-base.h"
 #include "d3d12-framebuffer.h"
 
 namespace gfx

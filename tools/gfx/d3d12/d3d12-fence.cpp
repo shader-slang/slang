@@ -1,5 +1,6 @@
 // d3d12-fence.cpp
 #include "d3d12-fence.h"
+
 #include "d3d12-device.h"
 
 namespace gfx

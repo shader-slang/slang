@@ -1,14 +1,13 @@
 // d3d12-helper-functions.cpp
 #include "d3d12-helper-functions.h"
 
-#include "d3d12-buffer.h"
-#include "d3d12-transient-heap.h"
-
 #ifdef GFX_NVAPI
 #    include "../nvapi/nvapi-include.h"
 #endif
 
 #include "../nvapi/nvapi-util.h"
+#include "d3d12-buffer.h"
+#include "d3d12-transient-heap.h"
 #include "d3d12-query.h"
 
 #ifdef _DEBUG
