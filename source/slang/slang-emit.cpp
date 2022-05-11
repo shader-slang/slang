@@ -752,9 +752,6 @@ Result linkAndOptimizeIR(
         if (shouldTrackLiveness)
         {
             LivenessUtil::locateVariables(irModule, livenessLocations);
-#if 0
-            dumpIRIfEnabled(codeGenContext, irModule, "LIVENESS");
-#endif
         }
 
         // As a late step, we need to take the SSA-form IR and move things *out*
@@ -779,6 +776,10 @@ Result linkAndOptimizeIR(
         if (shouldTrackLiveness)
         {
             LivenessUtil::addLivenessRanges(irModule, livenessLocations);
+
+#if 0
+            dumpIRIfEnabled(codeGenContext, irModule, "LIVENESS");
+#endif
         }
     }
 

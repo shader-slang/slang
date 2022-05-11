@@ -497,8 +497,8 @@ LivenessContext::BlockResult LivenessContext::_processBlock(BlockIndex blockInde
             
             // Process the successor
             SuccessorResult successorResult;
-            successorResult.blockIndex = blockIndex;
-            successorResult.result = _processSuccessor(successorBlockIndex);;
+            successorResult.blockIndex = successorBlockIndex;
+            successorResult.result = _processSuccessor(successorBlockIndex);
 
             successorResults[i] = successorResult;
 
