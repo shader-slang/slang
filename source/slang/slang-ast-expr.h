@@ -144,6 +144,28 @@ class InvokeExpr: public AppExprBase
     SLANG_AST_CLASS(InvokeExpr)
 };
 
+enum class TryClauseType
+{
+    None,
+    Standard, // Normal `try` clause
+    Optional, // (Not implemented) `try?` clause that returns an optional value.
+    Assert, // (Not implemented) `try!` clause that should always succeed and triggers runtime error if failed.
+};
+
+char const* getTryClauseTypeName(TryClauseType value);
+
+class TryExpr : public Expr
+{
+    SLANG_AST_CLASS(TryExpr)
+
+    Expr* base;
+
+    TryClauseType tryClauseType = TryClauseType::Standard;
+
+    // The scope of this expr.
+    Scope* scope = nullptr;
+};
+
 class OperatorExpr: public InvokeExpr
 {
     SLANG_AST_CLASS(OperatorExpr)

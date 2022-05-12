@@ -563,10 +563,12 @@ class FuncType : public Type
 
     List<Type*> paramTypes;
     Type* resultType = nullptr;
+    Type* errorType = nullptr;
 
     UInt getParamCount() { return paramTypes.getCount(); }
     Type* getParamType(UInt index) { return paramTypes[index]; }
     Type* getResultType() { return resultType; }
+    Type* getErrorType() { return errorType; }
 
     // Overrides should be public so base classes can access
     void _toTextOverride(StringBuilder& out);

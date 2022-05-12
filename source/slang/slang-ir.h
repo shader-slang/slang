@@ -1452,6 +1452,15 @@ struct IRTupleType : IRType
     IR_LEAF_ISA(TupleType)
 };
 
+/// Represents an `Result<T,E>`, used by functions that throws error codes.
+struct IRResultType : IRType
+{
+    IR_LEAF_ISA(ResultType)
+
+    IRType* getValueType() { return (IRType*)getOperand(0); }
+    IRType* getErrorType() { return (IRType*)getOperand(1); }
+};
+
 struct IRTypeType : IRType
 {
     IR_LEAF_ISA(TypeType);

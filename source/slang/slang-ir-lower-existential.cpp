@@ -106,7 +106,7 @@ namespace Slang
             builder->setInsertBefore(extractInst);
 
             IRInst* element = nullptr;
-            if (extractInst->getOperand(0)->getDataType()->findDecoration<IRComInterfaceDecoration>())
+            if (isComInterfaceType(extractInst->getOperand(0)->getDataType()))
             {
                 // If this is an COM interface, the elements (witness table/rtti) are just the interface value itself.
                 element = extractInst->getOperand(0);

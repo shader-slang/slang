@@ -36,6 +36,12 @@ namespace Slang
         return false;
     }
 
+    bool isComInterfaceType(IRType* type)
+    {
+        return type->findDecoration<IRComInterfaceDecoration>() != nullptr ||
+               type->getOp() == kIROp_ComPtrType;
+    }
+
     bool isTypeValue(IRInst* typeInst)
     {
         if (typeInst)
@@ -175,7 +181,7 @@ namespace Slang
             if (isBuiltin(interfaceType))
                 return (IRType*)paramType;
 
-            if (interfaceType->findDecoration<IRComInterfaceDecoration>())
+            if (isComInterfaceType((IRType*)interfaceType))
                 return (IRType*)interfaceType;
 
             auto anyValueSize = getInterfaceAnyValueSize(
@@ -192,7 +198,7 @@ namespace Slang
             if (isBuiltin(paramType))
                 return (IRType*)paramType;
 
-            if (paramType->findDecoration<IRComInterfaceDecoration>())
+            if (isComInterfaceType((IRType*)paramType))
                 return (IRType*)paramType;
 
             // In the dynamic-dispatch case, a value of interface type

@@ -549,6 +549,7 @@ void FuncType::_toTextOverride(StringBuilder& out)
         out << getParamType(pp);
     }
     out << toSlice(") -> ") << getResultType();
+    out << " throws " << getErrorType();
 }
 
 bool FuncType::_equalsImplOverride(Type * type)
@@ -571,6 +572,9 @@ bool FuncType::_equalsImplOverride(Type * type)
         if (!resultType->equals(funcType->resultType))
             return false;
 
+        if (!errorType->equals(funcType->errorType))
+            return false;
+
         // TODO: if we ever introduce other kinds
         // of qualification on function types, we'd
         // want to consider it here.
@@ -585,6 +589,9 @@ Val* FuncType::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet s
 
     // result type
     Type* substResultType = as<Type>(resultType->substituteImpl(astBuilder, subst, &diff));
+
+    // error type
+    Type* substErrorType = as<Type>(errorType->substituteImpl(astBuilder, subst, &diff));
 
     // parameter types
     List<Type*> substParamTypes;
@@ -601,6 +608,7 @@ Val* FuncType::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet s
     FuncType* substType = astBuilder->create<FuncType>();
     substType->resultType = substResultType;
     substType->paramTypes = substParamTypes;
+    substType->errorType = substErrorType;
     return substType;
 }
 
@@ -608,6 +616,7 @@ Type* FuncType::_createCanonicalTypeOverride()
 {
     // result type
     Type* canResultType = resultType->getCanonicalType();
+    Type* canErrorType = errorType->getCanonicalType();
 
     // parameter types
     List<Type*> canParamTypes;
@@ -619,7 +628,7 @@ Type* FuncType::_createCanonicalTypeOverride()
     FuncType* canType = getASTBuilder()->create<FuncType>();
     canType->resultType = canResultType;
     canType->paramTypes = canParamTypes;
-
+    canType->errorType = canErrorType;
     return canType;
 }
 
@@ -634,6 +643,7 @@ HashCode FuncType::_getHashCodeOverride()
             hashCode,
             getParamType(pp)->getHashCode());
     }
+    combineHash(hashCode, getErrorType()->getHashCode());
     return hashCode;
 }
 
