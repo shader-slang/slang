@@ -165,6 +165,9 @@
     <ClInclude Include="..\..\..\tools\gfx\vulkan\vk-util.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\tools\gfx\vulkan\vk-helper-functions.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\tools\gfx\cpu\render-cpu.cpp">
@@ -291,6 +294,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\tools\gfx\vulkan\vk-util.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\tools\gfx\vulkan\vk-helper-functions.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
