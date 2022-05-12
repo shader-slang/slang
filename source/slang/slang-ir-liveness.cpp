@@ -236,9 +236,7 @@ struct LivenessContext
         /// All locations must be to the same root
     void _processRoot(const Location* locations, Count count);
 
-        // Add a live end instruction at the start of block, referencing the root 'root'.
-    void _addLiveRangeEndAtBlockStart(IRBlock* block, IRInst* root);
-
+    
         /// Find all the aliases and accesses to the root
         /// The information is stored in m_accessSet and m_aliases
     void _findAliasesAndAccesses(IRInst* root);
@@ -264,8 +262,16 @@ struct LivenessContext
 
     Index _findLastAccess(const ConstArrayView<IRInst*>& run);
 
-        /// Find a liveRange end from a given inst
-    IRLiveRangeEnd* findEndRootFromInst(IRInst* inst);
+        /// Adds an LiveRangeEnd for the root after `inst` if there isn't one there already
+    void _maybeAddEndAfterInst(IRInst* inst);
+
+    void _maybeAddEndBeforeInst(IRInst* inst);
+
+        // Add a live end instruction at the start of block, referencing the root
+    void _maybeAddEndAtBlockStart(IRBlock* block);
+
+        /// Looks for an end,
+    IRInst* _findRootEnd(IRInst* inst);
 
         /// Complete the block using the run, which can *cannot* contain a start for the current root
     BlockResult _completeBlock(BlockIndex blockIndex, const ConstArrayView<IRInst*>& run);
@@ -304,20 +310,13 @@ struct LivenessContext
     IRBuilder m_builder;
 };
 
-void LivenessContext::_addLiveRangeEndAtBlockStart(IRBlock* block, IRInst* root)
+void LivenessContext::_maybeAddEndAtBlockStart(IRBlock* block)
 {
     // Insert before the first ordinary inst
     auto inst = block->getFirstOrdinaryInst();
+    // A block has to end with a terminator... so must always be an ordinary inst, if there is a function body
     SLANG_ASSERT(inst);
-
-    // Only add the end if couldn't find one
-    if (!findEndRootFromInst(inst))
-    {
-        m_builder.setInsertLoc(IRInsertLoc::before(inst));
-
-        // Add the live end inst
-        m_builder.emitLiveRangeEnd(root);
-    }
+    _maybeAddEndBeforeInst(inst);
 }
 
 LivenessContext::BlockResult LivenessContext::_addBlockResult(BlockIndex blockIndex, BlockResult result)
@@ -389,23 +388,48 @@ Index LivenessContext::_findLastAccess(const ConstArrayView<IRInst*>& run)
     return -1;
 }
 
-IRLiveRangeEnd* LivenessContext::findEndRootFromInst(IRInst* cur)
+
+IRInst* LivenessContext::_findRootEnd(IRInst* inst)
 {
-    for (; cur ; cur = cur->getNextInst())
+    for (auto cur = inst; cur; cur = cur->getNextInst())
     {
-        // We are only looking for ends
         IRLiveRangeEnd* end = as<IRLiveRangeEnd>(cur);
         if (end == nullptr)
         {
-            return nullptr;
+            break;
         }
-        // If the end is for the root we've found it
+
+        // If we hit an end which is already the root, then we don't need to add an
+        // end of the root
         if (end->getReferenced() == m_root)
         {
-            return end;
+            return cur;
         }
     }
+
     return nullptr;
+}
+
+void LivenessContext::_maybeAddEndAfterInst(IRInst* inst)
+{
+    if (!_findRootEnd(inst->getNextInst()))
+    {
+        // Just add end of scope after the inst 
+        m_builder.setInsertLoc(IRInsertLoc::after(inst));
+        // Add the live end inst
+        m_builder.emitLiveRangeEnd(m_root);
+    }
+}
+
+void LivenessContext::_maybeAddEndBeforeInst(IRInst* inst)
+{
+    if (!_findRootEnd(inst))
+    {
+        // Just add end of scope after the inst 
+        m_builder.setInsertLoc(IRInsertLoc::before(inst));
+        // Add the live end inst
+        m_builder.emitLiveRangeEnd(m_root);
+    }
 }
 
 LivenessContext::BlockResult LivenessContext::_completeBlock(BlockIndex blockIndex, const ConstArrayView<IRInst*>& run)
@@ -421,15 +445,8 @@ LivenessContext::BlockResult LivenessContext::_completeBlock(BlockIndex blockInd
     {
         IRInst* lastAccessInst = run[lastAccessIndex];
 
-        // See if there is an end already after this 
-        // Skip the access (we will want our end after the access)
-        if (!findEndRootFromInst(lastAccessInst->getNextInst()))
-        {
-            // Just add end of scope after the inst 
-            m_builder.setInsertLoc(IRInsertLoc::after(lastAccessInst));
-            // Add the live end inst
-            m_builder.emitLiveRangeEnd(m_root);
-        }
+        // Insert an end after the last access (if not one already)
+        _maybeAddEndAfterInst(lastAccessInst);
 
         // Add the result
         return _addBlockResult(blockIndex, BlockResult::Found);
@@ -528,7 +545,7 @@ LivenessContext::BlockResult LivenessContext::_processBlock(BlockIndex blockInde
             if (successorResult.result == BlockResult::NotFound)
             {
                 const auto successorBlockIndex = successorResult.blockIndex;
-                _addLiveRangeEndAtBlockStart(_getInfo(successorBlockIndex)->block, m_root);
+                _maybeAddEndAtBlockStart(_getInfo(successorBlockIndex)->block);
                 _addBlockResult(successorBlockIndex, BlockResult::Found);
             }
         }
@@ -746,8 +763,7 @@ void LivenessContext::_findAndEmitRangeEnd(IRLiveRangeStart* liveRangeStart)
         {
             // Means there is no access to this variable(!)
             // Which means we can end the scope, after the the start scope
-            m_builder.setInsertLoc(IRInsertLoc::after(m_rootLiveStart));
-            m_builder.emitLiveRangeEnd(m_root);
+            _maybeAddEndAfterInst(m_rootLiveStart);
         }
     }
 
