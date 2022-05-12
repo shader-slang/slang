@@ -228,7 +228,7 @@ struct LivenessContext
 
         /// Process a block 
         /// Can only be called after a call to _findAliasesAndAccesses for the root.
-    BlockResult _processBlock(BlockIndex blockIndex);
+    BlockResult _processBlock(BlockIndex blockIndex, const ConstArrayView<IRInst*>& run);
 
         /// Process all the locations in the function (locations must be ordered by root)
     void _processLocationsInFunction(const Location* start, Count count);
@@ -331,16 +331,45 @@ LivenessContext::BlockResult LivenessContext::_addBlockResult(BlockIndex blockIn
 LivenessContext::BlockResult LivenessContext::_processSuccessor(BlockIndex blockIndex)
 {
     auto blockInfo = _getInfo(blockIndex);
+    const auto block = blockInfo->block;
 
     // Check if there is already a result for this block. 
     // If there is just return that.
     auto result = blockInfo->result;
-    if (result != BlockResult::NotVisited)
-    {
-        return result;
-    }
 
-    auto block = blockInfo->block;
+    switch (result)
+    {
+        case BlockResult::NotVisited: 
+        {
+            // If not visited we need to process
+            break;
+        }
+        case BlockResult::Visited:
+        {
+            // If we are in the live start we know domination isn't an issue
+            // We could need to insert an end 
+            if (block == m_rootLiveStartBlock)
+            {
+                // We want the run to search to go from the start up to *this specific* liveness start
+                // (as opposed to any liveness start for the root)
+                auto run = _getRun(blockInfo);
+
+                // We need to fix the run to be *after* this specific start
+                const Index startIndex = run.indexOf(m_rootLiveStart);
+                SLANG_ASSERT(startIndex >= 0);
+                // We want to run all the way up to the start
+                return _processBlock(blockIndex, makeConstArrayView(run.getBuffer(), startIndex));
+            }
+
+            // Otherwise just return it's done
+            return result;
+        }
+        default:    
+        {
+            // Otherwise just return result
+            return result;
+        }
+    }
 
     // If the block is *not* dominated by the root block, we know it can't 
     // end liveness. 
@@ -354,7 +383,7 @@ LivenessContext::BlockResult LivenessContext::_processSuccessor(BlockIndex block
     _addBlockResult(blockIndex, BlockResult::Visited);
 
     // Else process the block to try and find the last used instruction
-    return _processBlock(blockIndex);
+    return _processBlock(blockIndex, _getRun(blockInfo));
 }
 
 Index LivenessContext::_indexOfRootStart(const ConstArrayView<IRInst*>& run)
@@ -456,35 +485,31 @@ LivenessContext::BlockResult LivenessContext::_completeBlock(BlockIndex blockInd
     return _addBlockResult(blockIndex, BlockResult::NotFound);
 }
 
-LivenessContext::BlockResult LivenessContext::_processBlock(BlockIndex blockIndex)
+LivenessContext::BlockResult LivenessContext::_processBlock(BlockIndex blockIndex, const ConstArrayView<IRInst*>& run)
 {
+    // Note that the run must be some part of the run for the block indicated by blockIndex. One of
+    // 
+    // * If root start block - before the start (if accessed via successor)
+    // * If root start block - after the start (if accessed initially in search)
+    // * Otherwise the whole run for the block
+    //
+    // Since this is the case, we know start is not part of the run
+    SLANG_ASSERT(run.indexOf(m_rootLiveStart) < 0);
+
     auto blockInfo = _getInfo(blockIndex);
     const auto block = blockInfo->block;
    
-    auto run = _getRun(blockInfo);
-
-    if (block == m_rootLiveStartBlock)
-    {
-        // We need to fix the run to be *after* the start
-        const Index startIndex = run.indexOf(m_rootLiveStart);
-        SLANG_ASSERT(startIndex >= 0);
-
-        // Skip to the next index
-        const Index nextIndex = startIndex + 1;
-        // Fix the run
-        run = ConstArrayView<IRInst*>(run.getBuffer() + nextIndex, run.getCount() - nextIndex);
-    }
-
-    // If there is another start to the same root, we can't traverse to other blocks, and the last access 
+    // If there is *another* start to the same root, we can't traverse to other blocks, and the last access 
     // in this block must be the result
     {
+        // NOTE! We shouldn't/can't use run.indexOf here, because we are looking for *any* start to the root 
+        // _indexOfRootStart does this search.
+        // Moreover we know (it's a condition on run passed into this function) run cannot contain the root start.
         const Index startIndex = _indexOfRootStart(run);
         if (startIndex >= 0)
         {
-            // Fix the run
-            run = ConstArrayView<IRInst*>(run.getBuffer(), startIndex);
             // Complete the block with this run
-            return _completeBlock(blockIndex, run);
+            return _completeBlock(blockIndex, makeConstArrayView(run.getBuffer(), startIndex));
         }
     }
 
@@ -752,12 +777,22 @@ void LivenessContext::_findAndEmitRangeEnd(IRLiveRangeStart* liveRangeStart)
 
     {
         const BlockIndex rootStartBlockIndex = m_blockIndexMap[m_rootLiveStartBlock];
+        auto info = _getInfo(rootStartBlockIndex);
+        auto run = _getRun(info);
+
+        // The run *must* contain this specific start start
+        const auto startIndex = run.indexOf(m_rootLiveStart);
+        SLANG_ASSERT(startIndex >= 0);
+
+        // Make run scanning start *after* the start
+        const auto nextIndex = startIndex + 1;
+        run = makeConstArrayView(run.getBuffer() + nextIndex, run.getCount() - nextIndex);
 
         // Mark the root as visited to stop an infinite loop
         _addBlockResult(rootStartBlockIndex, BlockResult::Visited);
 
         // Recursively find results
-        auto foundResult = _processBlock(rootStartBlockIndex);
+        auto foundResult = _processBlock(rootStartBlockIndex, run);
 
         if (foundResult == BlockResult::NotFound)
         {
