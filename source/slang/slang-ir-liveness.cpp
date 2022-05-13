@@ -351,8 +351,9 @@ LivenessContext::BlockResult LivenessContext::_processSuccessor(BlockIndex block
                 // We need to fix the run to be *after* this specific start
                 const Index startIndex = run.indexOf(m_rootLiveStart);
                 SLANG_ASSERT(startIndex >= 0);
+
                 // We want to run all the way up to the start
-                return _processBlock(blockIndex, makeConstArrayView(run.getBuffer(), startIndex));
+                return _processBlock(blockIndex, run.head(startIndex));
             }
 
             // Otherwise just return result
@@ -501,7 +502,7 @@ LivenessContext::BlockResult LivenessContext::_processBlock(BlockIndex blockInde
         if (startIndex >= 0)
         {
             // Complete the block with this run
-            return _completeBlock(blockIndex, makeConstArrayView(run.getBuffer(), startIndex));
+            return _completeBlock(blockIndex, run.head(startIndex));
         }
     }
 
@@ -775,8 +776,7 @@ void LivenessContext::_findAndEmitRangeEnd(IRLiveRangeStart* liveRangeStart)
         SLANG_ASSERT(startIndex >= 0);
 
         // Make run scanning start *after* the start
-        const auto nextIndex = startIndex + 1;
-        run = makeConstArrayView(run.getBuffer() + nextIndex, run.getCount() - nextIndex);
+        run = run.tail(startIndex + 1);
 
         // Mark the root as visited to stop an infinite loop
         _addBlockResult(rootStartBlockIndex, BlockResult::Visited);
