@@ -72,6 +72,11 @@ namespace Slang
             return -1;
         }
 
+        bool containsMemory(const ThisType& rhs) const
+        {
+            return rhs.getBuffer() >= getBuffer() && rhs.end() <= end(); 
+        }
+
         bool operator==(const ThisType& rhs) const
         {
             if (&rhs == this)

@@ -220,6 +220,13 @@ struct LivenessContext
         /// The run stores these instructions in the order they appear in the block within the run.
     void _findInstRunsForBlocks();
 
+        /// Returns true if the root (or some alias) is returned from blockIndex and the runIndex instruction
+        /// has no start between it and the return.
+        /// 
+        /// Run *must* be some subslice of the blocks run, and runIndex indexes into run as the instruction
+        /// the end could be placed afterward
+    bool _hasRootReturn(BlockIndex blockIndex, const ConstArrayView<IRInst*>& run, Index runIndex);
+
         /// Adds an instruction that is an access to the root
     void _addAccessInst(IRInst* inst);
         /// Add a live range start 
@@ -241,8 +248,11 @@ struct LivenessContext
 
     void _maybeAddEndBeforeInst(IRInst* inst);
 
+        /// Maybe insert an end after the instruction
+    void _maybeAddEndAfterRunIndex(BlockIndex blockIndex, const ConstArrayView<IRInst*>& run, Index runIndex);
+
         // Add a live end instruction at the start of block, referencing the root
-    void _maybeAddEndAtBlockStart(IRBlock* block);
+    void _maybeAddEndAtBlockStart(BlockIndex blockIndex);
 
         /// Look from inst for an LiveEndRange to the root.
     IRInst* _findRootEnd(IRInst* inst);
@@ -297,8 +307,10 @@ struct LivenessContext
     IRBuilder m_builder;
 };
 
-void LivenessContext::_maybeAddEndAtBlockStart(IRBlock* block)
+void LivenessContext::_maybeAddEndAtBlockStart(BlockIndex blockIndex)
 {
+    auto block = _getBlock(blockIndex);
+
     // Insert before the first ordinary inst
     auto inst = block->getFirstOrdinaryInst();
     // A block has to end with a terminator... so must always be an ordinary inst, if there is a function body
@@ -435,6 +447,73 @@ IRInst* LivenessContext::_findRootEnd(IRInst* inst)
     return nullptr;
 }
 
+bool LivenessContext::_hasRootReturn(BlockIndex blockIndex, const ConstArrayView<IRInst*>& run, Index runIndex)
+{
+    SLANG_ASSERT(run.getCount() > 0);
+
+    auto blockRun = _getRun(_getBlockInfo(blockIndex));
+
+    // Run must be a part of block run for the for the following test to work
+    SLANG_ASSERT(blockRun.containsMemory(run));
+
+    // If the block run has other stuff, past the runIndex, it means there must be a start before the end of the block
+    // That being the case we have to output the end
+    if (blockRun.end() > &run[runIndex] + 1)
+    {
+        // We want the entry after the run index (which might be outside the run)
+        auto startPtr = run.getBuffer() + runIndex + 1;
+        SLANG_ASSERT(startPtr < blockRun.end());
+        SLANG_UNUSED(startPtr);
+
+        // Must be a live range start(!)
+        SLANG_ASSERT(as<IRLiveRangeStart>(*startPtr));
+
+        return false; 
+    }
+
+    auto block = _getBlock(blockIndex);
+
+    const auto terminator = block->getTerminator();
+
+    // TODO(JS): 
+    // There's something wrong with casting around ReturnVal - looks like inst-defs isn't right
+    // For now check directly for the op and don't cast.
+    if (terminator->getOp() != kIROp_ReturnVal)
+    {
+        return false;
+    }
+
+    auto returnValInst = static_cast<IRReturnVal*>(terminator);
+
+    // If it's returning the val, if it's returning something to do with the root we were, 
+    // going to end we could just ignore
+    auto val = returnValInst->getVal();
+
+    // Strip construct
+    if (val->getOp() == kIROp_Construct && val->getOperandCount() == 1)
+    {
+        val = val->getOperand(0);
+    }
+
+    // If it's a load, see what is being loaded from
+    if (auto load = as<IRLoad>(val))
+    {
+        const auto valPtr = load->getPtr();
+        return m_aliases.contains(valPtr);
+    }
+
+    // If it *is* the variable, then it accesses the root.
+    return m_root == val;
+}
+
+void LivenessContext::_maybeAddEndAfterRunIndex(BlockIndex blockIndex, const ConstArrayView<IRInst*>& run, Index runIndex)
+{
+    if (!_hasRootReturn(blockIndex, run, runIndex))
+    {
+        return _maybeAddEndAfterInst(run[runIndex]);
+    }
+}
+
 void LivenessContext::_maybeAddEndAfterInst(IRInst* inst)
 {
     if (!_findRootEnd(inst->getNextInst()))
@@ -468,11 +547,8 @@ LivenessContext::BlockResult LivenessContext::_completeBlock(BlockIndex blockInd
     // If we found one, that is the end of the range
     if (lastAccessIndex >= 0)
     {
-        IRInst* lastAccessInst = run[lastAccessIndex];
-
-        // Insert an end after the last access (if not one already)
-        _maybeAddEndAfterInst(lastAccessInst);
-
+        _maybeAddEndAfterRunIndex(blockIndex, run, lastAccessIndex);
+        
         // Add the result
         return _addBlockResult(blockIndex, BlockResult::Found);
     }
@@ -560,7 +636,7 @@ LivenessContext::BlockResult LivenessContext::_processBlock(BlockIndex blockInde
             if (successorResult == BlockResult::NotFound)
             {
                 const auto successorBlockIndex = successors[i];
-                _maybeAddEndAtBlockStart(_getBlock(successorBlockIndex));
+                _maybeAddEndAtBlockStart(successorBlockIndex);
                 _addBlockResult(successorBlockIndex, BlockResult::Found);
             }
         }
