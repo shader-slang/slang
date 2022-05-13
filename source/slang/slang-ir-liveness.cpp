@@ -174,13 +174,9 @@ struct LivenessContext
         Access,             ///< Is an access to the root (perhaps through an alias)
     };
     
-    struct BlockInfo
+    // Block info (indexed via BlockIndex), that is valid across analysing liveness for a root
+    struct RootBlockInfo
     {
-        void init(IRBlock* inBlock) 
-        { 
-            block = inBlock; 
-            reset(); 
-        }
         void reset() 
         {
             result = BlockResult::NotVisited;
@@ -194,18 +190,26 @@ struct LivenessContext
             result = BlockResult::NotVisited;
         }
 
-        IRBlock* block;             ///< The block associated with this index
         BlockResult result;         ///< The result for this block
-        Index runStart;             ///< The start InstOrder index
-        Count runCount;             ///< The count of the amount of InstOrder
+        Index runStart;             ///< The start index in m_instRuns index. This defines a instruction of interest in order in a block.
+        Count runCount;             ///< The count of the amount insts in the run
         IRInst* lastInst;           ///< Last inst seen
         Count instCount;            ///< The total amount of start/access instruction seen in the block
     };
 
-    struct SuccessorResult
+    // Block info (indexed via BlockIndex), that is valid for a function
+    struct FunctionBlockInfo
     {
-        BlockResult result;         ///< The result 
-        BlockIndex blockIndex;      ///< The block index of the successor
+        void init(IRBlock* inBlock)
+        {
+            block = inBlock;
+            successorsStart = 0;
+            successorsCount = 0;
+        }
+
+        IRBlock* block;
+        Index successorsStart;      ///< Indexes into block successors
+        Count successorsCount;
     };
 
         /// Process all the locations
@@ -276,12 +280,18 @@ struct LivenessContext
         /// Complete the block using the run, which can *cannot* contain a start for the current root
     BlockResult _completeBlock(BlockIndex blockIndex, const ConstArrayView<IRInst*>& run);
 
-    BlockInfo* _getInfo(BlockIndex blockIndex) { return &m_blockInfos[Index(blockIndex)]; }
+    RootBlockInfo* _getRootInfo(BlockIndex blockIndex) { return &m_rootBlockInfos[Index(blockIndex)]; }
+    IRBlock* _getBlock(BlockIndex blockIndex) const { return m_functionBlockInfos[Index(blockIndex)].block; }
 
-    ConstArrayView<IRInst*> _getRun(const BlockInfo* info) 
+    ConstArrayView<IRInst*> _getRun(const RootBlockInfo* info) 
     {
         IRInst*const* buffer = m_instRuns.getBuffer();
         return ConstArrayView<IRInst*>(buffer + info->runStart, info->runCount);
+    }
+    ConstArrayView<BlockIndex> _getSuccessors(BlockIndex blockIndex)
+    {
+        const auto& info = m_functionBlockInfos[Index(blockIndex)];
+        return makeConstArrayView(m_blockSuccessors.getBuffer() + info.successorsStart, info.successorsCount);
     }
 
     RefPtr<IRDominatorTree> m_dominatorTree;    ///< The dominator tree for the current function
@@ -292,14 +302,16 @@ struct LivenessContext
     IRInst* m_root = nullptr;
     IRBlock* m_rootBlock = nullptr;                 ///< The block the root is in
     
-    List<SuccessorResult> m_successorResults;       ///< Storage for successor results
+    List<BlockResult> m_successorResults;           ///< Storage for successor results
 
     List<IRInst*> m_aliases;                        ///< A list of instructions that alias to the root
 
     HashSet<IRInst*> m_accessSet;                   ///< If instruction is in set it is an access 
 
-    Dictionary<IRBlock*, BlockIndex> m_blockIndexMap;    ///< Map from a block to a block index
-    List<BlockInfo> m_blockInfos;                   ///< Information about blocks
+    Dictionary<IRBlock*, BlockIndex> m_blockIndexMap;   ///< Map from a block to a block index
+    List<RootBlockInfo> m_rootBlockInfos;               ///< Information about blocks, for the current root
+    List<FunctionBlockInfo> m_functionBlockInfos;       ///< Information about blocks across the current function
+    List<BlockIndex> m_blockSuccessors;                 ///< Successors for a blocks, accessed via 
 
     List<IRInst*> m_instRuns;                       ///< Instructions of interest in order. Indexed into via BlockInfo [runStart, runStart + runCount)
 
@@ -321,7 +333,7 @@ void LivenessContext::_maybeAddEndAtBlockStart(IRBlock* block)
 
 LivenessContext::BlockResult LivenessContext::_addBlockResult(BlockIndex blockIndex, BlockResult result)
 {
-    auto& currentResult = _getInfo(blockIndex)->result;
+    auto& currentResult = _getRootInfo(blockIndex)->result;
     // Check we can promote
     SLANG_ASSERT(canPromote(currentResult, result));
     currentResult = result;
@@ -330,12 +342,12 @@ LivenessContext::BlockResult LivenessContext::_addBlockResult(BlockIndex blockIn
 
 LivenessContext::BlockResult LivenessContext::_processSuccessor(BlockIndex blockIndex)
 {
-    auto blockInfo = _getInfo(blockIndex);
-    const auto block = blockInfo->block;
+    auto rootBlockInfo = _getRootInfo(blockIndex);
+    const auto block = _getBlock(blockIndex);
 
     // Check if there is already a result for this block. 
     // If there is just return that.
-    auto result = blockInfo->result;
+    auto result = rootBlockInfo->result;
 
     switch (result)
     {
@@ -352,7 +364,7 @@ LivenessContext::BlockResult LivenessContext::_processSuccessor(BlockIndex block
             {
                 // We want the run to search to go from the start up to *this specific* liveness start
                 // (as opposed to any liveness start for the root)
-                auto run = _getRun(blockInfo);
+                auto run = _getRun(rootBlockInfo);
 
                 // We need to fix the run to be *after* this specific start
                 const Index startIndex = run.indexOf(m_rootLiveStart);
@@ -383,7 +395,7 @@ LivenessContext::BlockResult LivenessContext::_processSuccessor(BlockIndex block
     _addBlockResult(blockIndex, BlockResult::Visited);
 
     // Else process the block to try and find the last used instruction
-    return _processBlock(blockIndex, _getRun(blockInfo));
+    return _processBlock(blockIndex, _getRun(rootBlockInfo));
 }
 
 Index LivenessContext::_indexOfRootStart(const ConstArrayView<IRInst*>& run)
@@ -496,9 +508,6 @@ LivenessContext::BlockResult LivenessContext::_processBlock(BlockIndex blockInde
     // Since this is the case, we know start is not part of the run
     SLANG_ASSERT(run.indexOf(m_rootLiveStart) < 0);
 
-    auto blockInfo = _getInfo(blockIndex);
-    const auto block = blockInfo->block;
-   
     // If there is *another* start to the same root, we can't traverse to other blocks, and the last access 
     // in this block must be the result
     {
@@ -517,36 +526,29 @@ LivenessContext::BlockResult LivenessContext::_processBlock(BlockIndex blockInde
     Index foundCounts[Index(BlockResult::CountOf)] = { 0 };
 
     // Find all the successors for this block
-    auto successors = block->getSuccessors();
+    auto successors = _getSuccessors(blockIndex);
 
     const Index successorCount = successors.getCount();
 
     // Set up space to store successor results
-    RAIIStackArray<SuccessorResult> successorResults(&m_successorResults);
+    RAIIStackArray<BlockResult> successorResults(&m_successorResults);
     successorResults.setCount(successorCount);
 
+    for (Index i = 0; i < successorCount; ++i)
     {
-        auto cur = successors.begin();
-        for (Index i = 0; i < successorCount; ++i, ++cur)
-        {
-            auto succ = *cur;
+        const auto successorBlockIndex = successors[i];
 
-            const auto successorBlockIndex = m_blockIndexMap[succ];
-
-            // NOTE! Care is needed around successorResults, because _processorSuccessor may cause the underlying list 
-            // to be reallocated. 
-            // If we always access through successorResults (ie RAIIStackArray type), things will be fine though.
+        // NOTE! Care is needed around successorResults, because _processorSuccessor may cause the underlying list 
+        // to be reallocated. 
+        // If we always access through successorResults (ie RAIIStackArray type), things will be fine though.
             
-            // Process the successor
-            SuccessorResult successorResult;
-            successorResult.blockIndex = successorBlockIndex;
-            successorResult.result = _processSuccessor(successorBlockIndex);
+        // Process the successor
+        const auto successorResult = _processSuccessor(successorBlockIndex);
 
-            successorResults[i] = successorResult;
+        successorResults[i] = successorResult;
 
-            // Change counts depending on the result
-            foundCounts[Index(successorResult.result)]++;
-        }
+        // Change counts depending on the result
+        foundCounts[Index(successorResult)]++;
     }
 
     const Index foundCount = foundCounts[Index(BlockResult::Found)];
@@ -565,12 +567,16 @@ LivenessContext::BlockResult LivenessContext::_processBlock(BlockIndex blockInde
             return _addBlockResult(blockIndex, BlockResult::Found);
         }
 
-        for (const auto& successorResult : successorResults.getConstView())
+        auto successorResultsView = successorResults.getConstView();
+
+        for (Index i = 0; i < successorCount; ++i)
         {
-            if (successorResult.result == BlockResult::NotFound)
+            const auto successorResult = successorResultsView[i];
+
+            if (successorResult == BlockResult::NotFound)
             {
-                const auto successorBlockIndex = successorResult.blockIndex;
-                _maybeAddEndAtBlockStart(_getInfo(successorBlockIndex)->block);
+                const auto successorBlockIndex = successors[i];
+                _maybeAddEndAtBlockStart(_getBlock(successorBlockIndex));
                 _addBlockResult(successorBlockIndex, BlockResult::Found);
             }
         }
@@ -589,16 +595,17 @@ void LivenessContext::_addInst(IRInst* inst)
 
     // Get the index to get the info
     auto blockIndex = m_blockIndexMap[block];
-    auto blockInfo = _getInfo(blockIndex);
+
+    auto rootBlockInfo = _getRootInfo(blockIndex);
 
     // Increase the count
-    ++blockInfo->instCount;
+    ++rootBlockInfo->instCount;
 
     // Record that this is an instruction of interest for this block
     //
     // This only really exists to capture the scenario of only having one inst in a block, so we can just overwrite what's
     // already there.
-    blockInfo->lastInst = inst;
+    rootBlockInfo->lastInst = inst;
 }
 
 void LivenessContext::_addAccessInst(IRInst* inst)
@@ -741,7 +748,7 @@ void LivenessContext::_findAliasesAndAccesses(IRInst* root)
 void LivenessContext::_findAndEmitRangeEnd(IRLiveRangeStart* liveRangeStart)
 {
     // Reset the result
-    for (auto& blockInfo : m_blockInfos)
+    for (auto& blockInfo : m_rootBlockInfos)
     {
         blockInfo.resetResult();
     }
@@ -777,8 +784,8 @@ void LivenessContext::_findAndEmitRangeEnd(IRLiveRangeStart* liveRangeStart)
 
     {
         const BlockIndex rootStartBlockIndex = m_blockIndexMap[m_rootLiveStartBlock];
-        auto info = _getInfo(rootStartBlockIndex);
-        auto run = _getRun(info);
+        auto rootBlockInfo = _getRootInfo(rootStartBlockIndex);
+        auto run = _getRun(rootBlockInfo);
 
         // The run *must* contain this specific start start
         const auto startIndex = run.indexOf(m_rootLiveStart);
@@ -834,11 +841,13 @@ bool LivenessContext::_isRunInst(IRInst* inst)
     return false;
 }
 
-
 void LivenessContext::_findBlockInstRuns()
 {
-    for (auto& blockInfo : m_blockInfos)
+    const Count count = m_rootBlockInfos.getCount();
+    for (Index i = 0; i < count; ++i)
     {
+        auto& blockInfo = m_rootBlockInfos[i];
+
         if (blockInfo.instCount == 0)
         {
             // Nothing to do if it's empty
@@ -857,7 +866,7 @@ void LivenessContext::_findBlockInstRuns()
         {
             // TODO(JS):
             // NOTE That we don't need to keep all accesses in the run, only the last accesses 
-            // prior to a start/end.
+            // prior to a start or end of the block.
             //
             // For now we just add them all.
 
@@ -869,7 +878,7 @@ void LivenessContext::_findBlockInstRuns()
             IRInst** dst = m_instRuns.getBuffer() + start;
 
             // Find all of the instructions of interest in order
-            auto block = blockInfo.block;
+            auto block = _getBlock(BlockIndex(i));
 
             for (auto inst : block->getChildren())
             {
@@ -898,7 +907,7 @@ void LivenessContext::_processRoot(const Location* locations, Count locationsCou
     }
 
     // Reset the order range for all blocks
-    for (auto& info : m_blockInfos)
+    for (auto& info : m_rootBlockInfos)
     {
         info.reset();
     }
@@ -930,7 +939,7 @@ void LivenessContext::_processRoot(const Location* locations, Count locationsCou
     // Find the runs of 'instructions of interest' (accesses/starts) for all the blocks
     _findBlockInstRuns();
 
-    // Now we want to find all of the ends
+    // Now we want to find all of the ends for each start
     for (auto liveStart : m_liveRangeStarts)
     {
         // We want to process this RangeStart for the root, to find all of the ends
@@ -951,23 +960,63 @@ void LivenessContext::_processLocationsInFunction(const Location* locations, Cou
     // Create the dominator tree, for the function
     m_dominatorTree = computeDominatorTree(func);
 
+    // We are going to precalculate a variety of things for blocks. 
+    // Most processing is performed via BlockIndex, so we need to set up a map from the block pointer to the index
+    // By having as an index we can easily/quickly associate information with blocks with arrays
+
     // Set up the map from blocks to indices
     m_blockIndexMap.Clear();
-    m_blockInfos.clear();
+
+    m_rootBlockInfos.clear();
+    m_functionBlockInfos.clear();
+    m_blockSuccessors.clear();
 
     {
+        // First we find all the blocks in the function, we add to the map
+        // and initialize the functionBlockInfos, which hold information about blocks that is constant across a function
+        // We will associate successors too, but we can only do this once we have set up the map
         Index index = 0;
         for (auto block : func->getChildren())
         {
             IRBlock* blockInst = as<IRBlock>(block);
             m_blockIndexMap.Add(blockInst, BlockIndex(index++));
-            BlockInfo blockInfo;
-            blockInfo.init(blockInst);
-            m_blockInfos.add(blockInfo);
+
+            FunctionBlockInfo functionBlockInfo;
+            functionBlockInfo.init(blockInst);
+
+            m_functionBlockInfos.add(functionBlockInfo);
+        }
+
+        // Allocate space for the root block infos
+        m_rootBlockInfos.setCount(index);
+
+        // Now we have the map, work out the successors as BlockIndex for each block
+        // and add those to m_blockSuccessors. They are indexed via successorsIndex/Count in the FunctionBlockInfos
+        for (auto& info : m_functionBlockInfos)
+        {
+            auto block = info.block;
+
+            // Add all the successors 
+            auto successors = block->getSuccessors();
+           
+            const Index successorsStart = m_blockSuccessors.getCount();
+            const Count successorsCount = successors.getCount();
+
+            info.successorsStart = successorsStart;
+            info.successorsCount = successorsCount;
+
+            m_blockSuccessors.setCount(successorsStart + successorsCount);
+
+            BlockIndex* dst = m_blockSuccessors.getBuffer() + successorsStart;
+
+            for (auto successor : successors)
+            {
+                *dst++ = m_blockIndexMap[successor];
+            }
         }
     }
 
-    // Lets add all of the blocks 
+    // Find the run of locations that all access the same root
     Index start = 0;
     while (start < count)
     {
