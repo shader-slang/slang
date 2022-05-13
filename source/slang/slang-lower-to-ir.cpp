@@ -1056,6 +1056,11 @@ static void addLinkageDecoration(
     {
         builder->addExternCppDecoration(inst, mangledName);
     }
+    if (as<InterfaceDecl>(decl->parentDecl) &&
+        decl->parentDecl->hasModifier<ComInterfaceAttribute>())
+    {
+        builder->addExternCppDecoration(inst, decl->getName()->text.getUnownedSlice());
+    }
     if (auto dllImportModifier = decl->findModifier<DllImportAttribute>())
     {
         auto libraryName = dllImportModifier->modulePath;
@@ -6284,6 +6289,10 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         if (auto anyValueSizeAttr = decl->findModifier<AnyValueSizeAttribute>())
         {
             subBuilder->addAnyValueSizeDecoration(irInterface, anyValueSizeAttr->size);
+        }
+        if (auto comInterfaceAttr = decl->findModifier<ComInterfaceAttribute>())
+        {
+            subBuilder->addComInterfaceDecoration(irInterface);
         }
         if (auto builtinAttr = decl->findModifier<BuiltinAttribute>())
         {
