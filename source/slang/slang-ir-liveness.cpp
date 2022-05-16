@@ -183,6 +183,9 @@ struct LivenessContext
     LivenessContext(IRModule* module):
         m_module(module)
     {
+        // Disable warning if not used
+        SLANG_UNUSED(&LivenessContext::_isAnyRunInst);
+        
         m_sharedBuilder.init(module);
         m_builder.init(m_sharedBuilder);
     }
