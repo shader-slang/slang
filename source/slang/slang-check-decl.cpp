@@ -3232,6 +3232,16 @@ namespace Slang
 
             _validateCrossModuleInheritance(decl, inheritanceDecl);
         }
+
+        if (decl->findModifier<ComInterfaceAttribute>())
+        {
+            // `associatedtype` declaration is not allowed in a COM interface declaration.
+            for (auto associatedType : decl->getMembersOfType<AssocTypeDecl>())
+            {
+                getSink()->diagnose(
+                    associatedType, Diagnostics::associatedTypeNotAllowInComInterface);
+            }
+        }
     }
 
     void SemanticsDeclBasesVisitor::visitStructDecl(StructDecl* decl)

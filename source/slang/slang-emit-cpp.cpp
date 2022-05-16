@@ -537,6 +537,15 @@ SlangResult CPPSourceEmitter::calcTypeName(IRType* type, CodeGenTarget target, S
             out << "String";
             return SLANG_OK;
         }
+        case kIROp_ComPtrType:
+        {
+            out << "ComPtr<";
+            auto comPtrType = static_cast<IRComPtrType*>(type);
+            auto baseType = cast<IRType>(comPtrType->getOperand(0));
+            SLANG_RETURN_ON_FAIL(calcTypeName(baseType, target, out));
+            out << ">";
+            return SLANG_OK;
+        }
         default:
         {
             if (isNominalOp(type->getOp()))
@@ -1712,11 +1721,76 @@ void CPPSourceEmitter::_emitWitnessTableDefinitions()
     }
 }
 
+void CPPSourceEmitter::emitComInterface(IRInterfaceType* interfaceType)
+{
+    m_writer->emit("struct ");
+    emitSimpleType(interfaceType);
+    m_writer->emit(" : ");
+    // Emit base types.
+    bool isFirst = true;
+    for (UInt i = 0; i < interfaceType->getOperandCount(); i++)
+    {
+        auto entry = as<IRInterfaceRequirementEntry>(interfaceType->getOperand(i));
+        if (auto witnessTableType = as<IRWitnessTableType>(entry->getRequirementVal()))
+        {
+            if (isFirst)
+            {
+                isFirst = false;
+            }
+            else
+            {
+                m_writer->emit(", ");
+            }
+            emitType((IRType*)witnessTableType->getConformanceType());
+        }
+    }
+    if (isFirst)
+    {
+        m_writer->emit("ISlangUnknown");
+    }
+
+    // Emit methods.
+    m_writer->emit("\n{\n");
+    m_writer->indent();
+    for (UInt i = 0; i < interfaceType->getOperandCount(); i++)
+    {
+        auto entry = as<IRInterfaceRequirementEntry>(interfaceType->getOperand(i));
+        if (auto funcVal = as<IRFuncType>(entry->getRequirementVal()))
+        {
+            m_writer->emit("virtual SLANG_NO_THROW ");
+            emitType(funcVal->getResultType());
+            m_writer->emit(" SLANG_MCALL ");
+            m_writer->emit(getName(entry->getRequirementKey()));
+            m_writer->emit("(");
+            bool isFirstParam = true;
+            for (UInt p = 1; p < funcVal->getParamCount(); p++)
+            {
+                auto paramType = funcVal->getParamType(p);
+                if (!isFirstParam)
+                    m_writer->emit(", ");
+                else
+                    isFirstParam = false;
+
+                emitParamType(paramType, String("param") + String(p));
+            }
+            m_writer->emit(") = 0;\n");
+        }
+    }
+    m_writer->dedent();
+    m_writer->emit("};\n");
+}
+
 void CPPSourceEmitter::emitInterface(IRInterfaceType* interfaceType)
 {
     // Skip built-in interfaces.
     if (isBuiltin(interfaceType))
         return;
+
+    if (interfaceType->findDecoration<IRComInterfaceDecoration>())
+    {
+        emitComInterface(interfaceType);
+        return;
+    }
 
     m_writer->emit("struct ");
     emitSimpleType(interfaceType);
@@ -1920,10 +1994,6 @@ void CPPSourceEmitter::emitSimpleFuncImpl(IRFunc* func)
     {
         m_writer->emit("\n{\n");
         m_writer->indent();
-
-        // HACK: forward-declare all the local variables needed for the
-        // parameters of non-entry blocks.
-        emitPhiVarDecls(func);
 
         // Need to emit the operations in the blocks of the function
         emitFunctionBody(func);

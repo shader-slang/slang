@@ -932,6 +932,12 @@ class DllImportAttribute : public Attribute
     String modulePath;
 };
 
+    /// An attribute that marks an interface type as a COM interface declaration.
+class ComInterfaceAttribute : public Attribute
+{
+    SLANG_AST_CLASS(ComInterfaceAttribute)
+};
+
     /// A `[__requiresNVAPI]` attribute indicates that the declaration being modifed
     /// requires NVAPI operations for its implementation on D3D.
 class RequiresNVAPIAttribute : public Attribute

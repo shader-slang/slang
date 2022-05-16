@@ -50,8 +50,6 @@ layout(triangle_strip) out;
 
 void main()
 {
-    int ii_0;
-
     uint _S6 = uint(gl_PrimitiveIDIn);
 
     // TODO: Having to make this copy to transpose things is unfortunate.
@@ -66,6 +64,7 @@ void main()
         CoarseVertex_0(input_position[2], input_color[2], input_id[2])
     };
 
+    int ii_0;
     ii_0 = 0;
     for(;;)
     {
@@ -91,8 +90,7 @@ void main()
 
         EmitVertex();
 
-        int ii_1 = ii_0 + 1;
-        ii_0 = ii_1;
+        ii_0 = ii_0 + 1;
     }
 
     return;

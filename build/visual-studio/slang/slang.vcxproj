@@ -345,10 +345,12 @@ IF EXIST ..\..\..\external\slang-binaries\bin\windows-aarch64\slang-glslang.dll\
     <ClInclude Include="..\..\..\source\slang\slang-ir-byte-address-legalize.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-clone.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-collect-global-uniforms.h" />
+    <ClInclude Include="..\..\..\source\slang\slang-ir-com-interface.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-constexpr.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-dce.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-dll-import.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-dominators.h" />
+    <ClInclude Include="..\..\..\source\slang\slang-ir-eliminate-phis.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-entry-point-pass.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-entry-point-raw-ptr-params.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-entry-point-uniforms.h" />
@@ -485,11 +487,13 @@ IF EXIST ..\..\..\external\slang-binaries\bin\windows-aarch64\slang-glslang.dll\
     <ClCompile Include="..\..\..\source\slang\slang-ir-byte-address-legalize.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-clone.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-collect-global-uniforms.cpp" />
+    <ClCompile Include="..\..\..\source\slang\slang-ir-com-interface.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-constexpr.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-dce.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-deduplicate.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-dll-import.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-dominators.cpp" />
+    <ClCompile Include="..\..\..\source\slang\slang-ir-eliminate-phis.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-entry-point-pass.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-entry-point-raw-ptr-params.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-entry-point-uniforms.cpp" />

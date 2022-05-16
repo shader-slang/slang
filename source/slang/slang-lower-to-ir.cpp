@@ -1056,6 +1056,11 @@ static void addLinkageDecoration(
     {
         builder->addExternCppDecoration(inst, mangledName);
     }
+    if (as<InterfaceDecl>(decl->parentDecl) &&
+        decl->parentDecl->hasModifier<ComInterfaceAttribute>())
+    {
+        builder->addExternCppDecoration(inst, decl->getName()->text.getUnownedSlice());
+    }
     if (auto dllImportModifier = decl->findModifier<DllImportAttribute>())
     {
         auto libraryName = dllImportModifier->modulePath;
@@ -2489,6 +2494,7 @@ IRLoweringParameterInfo getParameterInfo(
     DeclRef<VarDeclBase> const& paramDecl)
 {
     IRLoweringParameterInfo info;
+
     info.type = getType(context->astBuilder, paramDecl);
     info.decl = paramDecl;
     info.direction = getParameterDirection(paramDecl);
@@ -2696,6 +2702,11 @@ void _lowerFuncDeclBaseTypeInfo(
         if( paramInfo.decl )
         {
             irParamType = maybeGetConstExprType(builder, irParamType, paramInfo.decl);
+        }
+
+        if (paramInfo.decl && paramInfo.decl->hasModifier<HLSLGroupSharedModifier>())
+        {
+            irParamType = builder->getRateQualifiedType(builder->getGroupSharedRate(), irParamType);
         }
 
         paramTypes.add(irParamType);
@@ -6278,6 +6289,10 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         if (auto anyValueSizeAttr = decl->findModifier<AnyValueSizeAttribute>())
         {
             subBuilder->addAnyValueSizeDecoration(irInterface, anyValueSizeAttr->size);
+        }
+        if (auto comInterfaceAttr = decl->findModifier<ComInterfaceAttribute>())
+        {
+            subBuilder->addComInterfaceDecoration(irInterface);
         }
         if (auto builtinAttr = decl->findModifier<BuiltinAttribute>())
         {

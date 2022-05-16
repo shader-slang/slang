@@ -15,13 +15,11 @@ void main()
 
     if(_S2.x > float(0))
     {
-        float _S3 = _S2.x * _S2.y + _S2.x;
-        z_0 = _S3;
+        z_0 = _S2.x * _S2.y + _S2.x;
     }
     else
     {
-        float _S4 = _S2.y * _S2.x + _S2.y;
-        z_0 = _S4;
+        z_0 = _S2.y * _S2.x + _S2.y;
     }
     _S1 = vec4(z_0);
     return;

@@ -1260,6 +1260,13 @@ struct IRMatrixType : IRType
     IR_LEAF_ISA(MatrixType)
 };
 
+struct IRSPIRVLiteralType : IRType
+{
+    IR_LEAF_ISA(SPIRVLiteralType)
+
+    IRType* getValueType() { return static_cast<IRType*>(getOperand(0)); }
+};
+
 struct IRPtrTypeBase : IRType
 {
     IRType* getValueType() { return (IRType*)getOperand(0); }
@@ -1279,6 +1286,8 @@ SIMPLE_IR_TYPE(RefType, PtrTypeBase)
 SIMPLE_IR_PARENT_TYPE(OutTypeBase, PtrTypeBase)
 SIMPLE_IR_TYPE(OutType, OutTypeBase)
 SIMPLE_IR_TYPE(InOutType, OutTypeBase)
+
+SIMPLE_IR_TYPE(ComPtrType, Type)
 
 struct IRPseudoPtrType : public IRPtrTypeBase
 {

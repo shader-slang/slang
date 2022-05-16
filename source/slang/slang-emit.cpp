@@ -10,6 +10,7 @@
 #include "slang-ir-collect-global-uniforms.h"
 #include "slang-ir-dce.h"
 #include "slang-ir-dll-import.h"
+#include "slang-ir-eliminate-phis.h"
 #include "slang-ir-entry-point-uniforms.h"
 #include "slang-ir-entry-point-raw-ptr-params.h"
 #include "slang-ir-explicit-global-context.h"
@@ -19,6 +20,7 @@
 #include "slang-ir-inline.h"
 #include "slang-ir-legalize-varying-params.h"
 #include "slang-ir-link.h"
+#include "slang-ir-com-interface.h"
 #include "slang-ir-lower-generics.h"
 #include "slang-ir-lower-tuple-types.h"
 #include "slang-ir-lower-bit-cast.h"
@@ -692,6 +694,7 @@ Result linkAndOptimizeIR(
     default:
         break;
     case CodeGenTarget::HostCPPSource:
+        lowerComInterfaces(irModule, sink);
         generateDllImportFuncs(irModule, sink);
         break;
     }
@@ -732,39 +735,54 @@ Result linkAndOptimizeIR(
     lowerBitCast(targetRequest, irModule);
     simplifyIR(irModule);
 
-    // TODO(JS): We probably want to add a pass that moves phi-node temporaries to 
-    // IR.
-    // 
-    // Currently these are added as part of emit in
-    // emitPhiVarAssignments and emitPhiVarDecls
-    // 
-    // A possible mechanism might be:
-    // 1) Find all of the parameters passed between blocks
-    // 2) Make a variable for each one of them 
-    //    This could be at the scope for the function, or more ideally a scope that is 'most appropriate' for how the parameter is passed 
-    //    ie the closest scope such that the variable is in scope across the branch.
-    // 3) Replace all uses of the parameters passed into a block (except the entry block), with the temporary
-    // 3a) Remove the parameters from the start of a block (other than the entry block)
-    // 4) For all of the branches in a function
-    // 4a) For each parameter passed in the branch, assign to the temporary
-    // 4b) Replace the branch with a branch that has no parameters
     //
-    // This should lead to an equivalent function, where the parameter passing between blocks is removed, and all the temporaries
-    // are explicit in the output.
-    // 
-    // I guess there could be a desire to combine the liveness tracking into this pass, because once a phi-temporary has been moved
-    // we have lost(?) information about liveness. That could potentially be recovered, but for the phi-temporaries, their 
-    // initial liveness is trivial, it's when the assignment takes place, at the branch point. 
-    // 
-    // If all the temporaries were marked as such, then this would be fairly trivial to recreate. 
-
-    // TODO(JS): Without a pass to make all variables (including phi ones), the liveness tracking can't track everything
+    // Downstream targets may benefit from having live-range information for
+    // local variables, and our IR currently encodes a reasonably good version
+    // of that information. At this point we will insert live-range markers
+    // for local variables, on when such markers are requested.
+    //
+    // After this point in optimization, any passes that introduce new
+    // temporary variables into the IR module should take responsibility for
+    // producing their own live-range information.
+    //
     if (codeGenContext->shouldTrackLiveness())
     {
         addLivenessTrackingToModule(irModule);
 
         dumpIRIfEnabled(codeGenContext, irModule, "LIVENESS");
+    }
 
+    // As a late step, we need to take the SSA-form IR and move things *out*
+    // of SSA form, by eliminating all "phi nodes" (block parameters) and
+    // introducing explicit temporaries instead. Doing this at the IR level
+    // means that subsequent emit logic doesn't need to contend with the
+    // complexities of blocks with parameters.
+    //
+    eliminatePhis(codeGenContext, irModule);
+#if 0
+    dumpIRIfEnabled(codeGenContext, irModule, "PHIS ELIMINATED");
+#endif
+
+    // TODO: We need to insert the logic that fixes variable scoping issues
+    // here (rather than doing it very late in the emit process), because
+    // otherwise the `applyGLSLLiveness()` operation below wouldn't be
+    // able to see the live-range information that pass would need to add.
+    // For now we are avoiding that problem by simply *not* emitting live-range
+    // information when we fix variable scoping later on.
+
+    // Depending on the target, certain things that were represented as
+    // single IR instructions will need to be emitted with the help of
+    // function declaratons in output high-level code.
+    //
+    // One example of this is the live-range information, which needs
+    // to be output to GLSL code that uses a glslang extension for
+    // supporting function declarations that map directly to SPIR-V opcodes.
+    //
+    // We execute a pass here to transform any live-range instructions
+    // in the module into function calls, for the targets that require it.
+    //
+    if (codeGenContext->shouldTrackLiveness())
+    {
         if (isKhronosTarget(targetRequest))
         {
             applyGLSLLiveness(irModule);

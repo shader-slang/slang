@@ -109,9 +109,15 @@ struct LivenessContext
     enum class FoundResult
     {
         Found,              ///< All paths were either not dominated, found 
-        NotFound,           ///< It is dominated but no access was found
+        NotFound,           ///< It is dominated but no access was found. 
+        Visited,            ///< The block has been visited (as part of a traversal), but does not yet have a result. Used to detect loops.
         NotDominated,       ///< If it's not dominated it can't have a liveness end 
+
+        CountOf,
     };
+
+        /// True if a result can be premoted `from` to `to`
+    static bool canPromote(FoundResult from, FoundResult to) { return Index(to) <= Index(from) && from != FoundResult::NotDominated; }
 
     enum class AccessType
     {
@@ -162,7 +168,7 @@ struct LivenessContext
 
     RefPtr<IRDominatorTree> m_dominatorTree;    ///< The dominator tree for the current function
 
-    IRInst* m_root;                             ///< The root item we are searching for accesses to, to determine scope/liveness
+    RootInfo m_rootInfo;                        ///< The root item we are searching for accesses to, to determine scope/liveness
     IRBlock* m_rootBlock;                       ///< The block the root is in
     
     HashSet<IRInst*> m_accessSet;               ///< Holds a set of all the functions that in some way access the root.
@@ -190,14 +196,20 @@ void LivenessContext::_addLiveRangeEndAtBlockStart(IRBlock* block, IRInst* root)
 
 IRInst* LivenessContext::_findLastAccessInBlock(IRBlock* block)
 {
-    // Search the instructions in this block in reverse order, to find first access
-    for (IRInst* cur = block->getLastChild(); cur; cur = cur->getPrevInst())
+    // If we are in the root block, we don't want to search *before* the liveStart
+    IRInst* lastInst = (block == m_rootBlock) ? m_rootInfo.liveStart : nullptr;
+
+    // Search backwards for first access
+    for (IRInst* cur = block->getLastChild(); cur != lastInst; cur = cur->getPrevInst())
     {
+        SLANG_ASSERT(cur);
+
         if (m_accessSet.Contains(cur))
         {
             return cur;
         }
     }
+
     return nullptr;
 }
 
@@ -207,12 +219,9 @@ LivenessContext::FoundResult LivenessContext::_addResult(IRBlock* block, FoundRe
     if (currentResultPtr)
     {
         const auto currentResult = *currentResultPtr;
-        // If it were NotDominated, it cannot be promoted to Found/NotFound.
-        SLANG_ASSERT(currentResult != FoundResult::NotDominated);
-
-        // We can only promote from NotFound -> Found
-
-        SLANG_ASSERT(Index(result) <= Index(currentResult));
+        
+        // Check we can promote
+        SLANG_ASSERT(canPromote(currentResult, result));
 
         // Set the new result
         *currentResultPtr = result;
@@ -239,6 +248,9 @@ LivenessContext::FoundResult LivenessContext::processSuccessor(IRBlock* block)
         return _addResult(block, FoundResult::NotDominated);
     }
 
+    // Mark that it is visited
+    m_blockResult.Add(block, FoundResult::Visited);
+
     // Else process the block to try and find the last used instruction
     return processBlock(block);
 }
@@ -253,8 +265,8 @@ LivenessContext::FoundResult LivenessContext::processBlock(IRBlock* block)
     List<FoundResult> successorResults;
     successorResults.setCount(count);
 
-    Index foundCount = 0;
-    Index notDominatedCount = 0;
+    // Zero initialize all the counts
+    Index foundCounts[Index(FoundResult::CountOf)] = { 0 };
 
     {
         auto cur = successors.begin();
@@ -269,10 +281,14 @@ LivenessContext::FoundResult LivenessContext::processBlock(IRBlock* block)
             successorResults[i] = successorResult;
 
             // Change counts depending on the result
-            foundCount += Index(successorResult == FoundResult::Found);
-            notDominatedCount += Index(successorResult == FoundResult::NotDominated);
+            foundCounts[Index(successorResult)]++;
         }
     }
+
+    const Index foundCount = foundCounts[Index(FoundResult::Found)];
+    const Index notFoundCount = foundCounts[Index(FoundResult::NotFound)];
+
+    const Index otherCount = count - (foundCount + notFoundCount);
 
     // If one or more of the successors (or successors of successors),
     // was found to have the last access, we need to mark the end of scope
@@ -280,7 +296,7 @@ LivenessContext::FoundResult LivenessContext::processBlock(IRBlock* block)
     if (foundCount > 0)
     {
         // If all successors have result, or are not dominated
-        if (foundCount + notDominatedCount == count)
+        if (foundCount + otherCount == count)
         {
             return _addResult(block, FoundResult::Found);
         }
@@ -293,19 +309,18 @@ LivenessContext::FoundResult LivenessContext::processBlock(IRBlock* block)
             const auto successorResult = successorResults[i];
             if (successorResult == FoundResult::NotFound)
             {
-                _addLiveRangeEndAtBlockStart(successor, m_root);
+                _addLiveRangeEndAtBlockStart(successor, m_rootInfo.root);
                 _addResult(successor, FoundResult::Found);
             }
         }
 
-        // This block, can be marked as found as all successors are either not dominated, found 
-        // or have have 
+        // This block, can now be marked as found 
         return _addResult(block, FoundResult::Found);
     }
 
-    // Search the instructions in this block in reverse order, to find first access
+    // Search the instructions in this block in reverse order, to find last access
     IRInst* lastAccess = _findLastAccessInBlock(block);
-
+    
     // Wasn't an access so we are done
     if (lastAccess == nullptr)
     {
@@ -320,7 +335,7 @@ LivenessContext::FoundResult LivenessContext::processBlock(IRBlock* block)
     m_builder.setInsertLoc(IRInsertLoc::after(lastAccess));
 
     // Add the live end inst
-    m_builder.emitLiveRangeEnd(m_root);
+    m_builder.emitLiveRangeEnd(m_rootInfo.root);
     return _addResult(block, FoundResult::Found);
 }
 
@@ -334,15 +349,15 @@ void LivenessContext::processRoot(const RootInfo& rootInfo)
     auto root = rootInfo.root;
 
     // Store root information, so don't have to pass around methods
+    m_rootInfo = rootInfo;
     m_rootBlock = as<IRBlock>(root->parent);
-    m_root = root;
-
+    
     // Add the root to the list of aliases, to start lookup
     m_aliases.add(root);
 
     // The challenge here is to try and determine when a root is no longer accessed, and so is no longer live
     //
-    // Note that a root can be accessed directly, but also through `aliases`. For example if the root is a structure
+    // Note that a root can be accessed directly, but also through `aliases`. For example if the root is a structure,
     // a pointer to a field in the root would be an alias.
     // 
     // In terms of liveness, the only accesses that are important are loads. This is because if the last operation on 
@@ -461,13 +476,22 @@ void LivenessContext::processRoot(const RootInfo& rootInfo)
     // Now we want to find the last access in the graph of successors
     //
     // This works by recursively starting from the block where the variable is defined, walking depth first the graph of 
-    // successors. We cache the results in m_blockResult
+    // successors. We cache the results in m_blockResults
     //
-    // There is an extra caveat around the dominator tree. If we just traversed the successors, if there is a loop
-    // we'd end up in an infinite loop. We can avoid this because we know that the root is only available in blocks dominated
-    // by the root. 
+    // There is an extra caveat around the dominator tree. In principal a variable in block A is accessible by any block that is 
+    // dominated by A. It's actually more restricted than this - because IR has other rules that provide more tight scoping. 
+    // The extra information can be seen in a loop instruction also indicating the break and continue blocks.
+    // 
+    // If we just traversed the successors, if there is a loop we'd end up in an infinite loop. We can partly avoid this because 
+    // we know that the root is only available in blocks dominated by the root. There is also the scenario where there is a loop 
+    // in blocks within the dominator tree. That is handled by marking 'Visited' when a final result isn't known, but we want to 
+    // detect a loop. In most respect Visited behaves in the same manner as NotDominated.
 
     {
+        // Mark the root as visited to stop an infinite loop
+        _addResult(m_rootBlock, FoundResult::Visited);
+
+        // Recursively find results
         auto foundResult = processBlock(m_rootBlock);
 
         if (foundResult == FoundResult::NotFound)
@@ -482,6 +506,12 @@ void LivenessContext::processRoot(const RootInfo& rootInfo)
 
 void LivenessContext::_processFunction(IRFunc* funcInst)
 {
+    // If it has no body, then we are done
+    if (funcInst->getFirstBlock() == nullptr)
+    {
+        return;
+    }
+
     List<RootInfo> rootInfos;
 
     // Iterate through blocks in the function, looking for variables to live track
