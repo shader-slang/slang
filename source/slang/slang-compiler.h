@@ -2632,7 +2632,7 @@ namespace Slang
         virtual SLANG_NO_THROW void SLANG_MCALL setCommandLineCompilerMode() SLANG_OVERRIDE;
         virtual SLANG_NO_THROW SlangResult SLANG_MCALL addTargetCapability(SlangInt targetIndex, SlangCapabilityID capability) SLANG_OVERRIDE;
         virtual SLANG_NO_THROW SlangResult SLANG_MCALL getProgramWithEntryPoints(slang::IComponentType** outProgram) SLANG_OVERRIDE;
-        virtual SLANG_NO_THROW SlangResult isParameterLocationUsed(SlangInt entryPointIndex, SlangInt targetIndex, SlangParameterCategory category, SlangUInt spaceIndex, SlangUInt registerIndex, bool& outUsed) SLANG_OVERRIDE;
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL isParameterLocationUsed(SlangInt entryPointIndex, SlangInt targetIndex, SlangParameterCategory category, SlangUInt spaceIndex, SlangUInt registerIndex, bool& outUsed) SLANG_OVERRIDE;
         virtual SLANG_NO_THROW void SLANG_MCALL setTargetLineDirectiveMode(
             SlangInt targetIndex,
             SlangLineDirectiveMode mode) SLANG_OVERRIDE;
