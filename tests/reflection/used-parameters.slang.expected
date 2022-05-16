@@ -337,11 +337,11 @@ standard output = {
                 },
                 {
                     "name": "UsedUniform",
-                    "binding": {"kind": "uniform", "offset": 0, "size": 4, "used": 0}
+                    "binding": {"kind": "uniform", "offset": 0, "size": 4}
                 },
                 {
                     "name": "UnusedUniform",
-                    "binding": {"kind": "uniform", "offset": 4, "size": 4, "used": 0}
+                    "binding": {"kind": "uniform", "offset": 4, "size": 4}
                 }
             ]
         }

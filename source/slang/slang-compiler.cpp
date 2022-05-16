@@ -148,6 +148,9 @@ void printDiagnosticArg(StringBuilder& sb, CodeGenTarget val)
         if (!postEmitMetadata)
             return SLANG_E_NOT_AVAILABLE;
 
+        if (!ShaderBindingRange::isUsageTracked((slang::ParameterCategory)category))
+            return SLANG_E_NOT_AVAILABLE;
+
         // TODO: optimize this with a binary search through a sorted list
         for (const auto& range : postEmitMetadata->usedBindings)
         {

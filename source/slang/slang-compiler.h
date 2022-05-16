@@ -194,6 +194,20 @@ namespace Slang
 
             registerIndex = newRegisterIndex;
         }
+
+        static bool isUsageTracked(slang::ParameterCategory category)
+        {
+            switch(category)
+            {
+            case slang::ConstantBuffer:
+            case slang::ShaderResource:
+            case slang::UnorderedAccess:
+            case slang::SamplerState:
+                return true;
+            default:
+                return false;
+            }
+        }
     };
 
     struct PostEmitMetadata : public RefObject

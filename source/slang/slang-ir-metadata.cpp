@@ -43,6 +43,10 @@ void collectMetadata(const IRModule* irModule, PostEmitMetadata& outMetadata)
         for(auto sizeAttr : varLayout->getTypeLayout()->getSizeAttrs())
         {
             auto kind = sizeAttr->getResourceKind();
+
+            if (!ShaderBindingRange::isUsageTracked(kind))
+                continue;
+
             if (auto offsetAttr = varLayout->findOffsetAttr(kind))
             {
                 auto spaceIndex = offsetAttr->getSpace();
