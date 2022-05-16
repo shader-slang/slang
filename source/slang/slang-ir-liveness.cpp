@@ -896,21 +896,28 @@ void LivenessContext::_findInstRunsForBlocks()
     const Count count = m_blockInfos.getCount();
     for (Index i = 0; i < count; ++i)
     {
-        auto& blockInfo = m_blockInfos[i];
+        const auto blockIndex = BlockIndex(i);
 
-        blockInfo.runStart = m_instRuns.getCount();
+        // Get the block
+        auto block = _getBlock(blockIndex);
 
-        if (blockInfo.instCount == 0)
+        // Get the block info
+        auto* blockInfo = _getBlockInfo(blockIndex);
+
+        const auto start = m_instRuns.getCount();
+        blockInfo->runStart = start;
+
+        if (blockInfo->instCount == 0)
         {
             // Nothing to do if it's empty
-            SLANG_ASSERT(blockInfo.runCount == 0);
+            SLANG_ASSERT(blockInfo->runCount == 0);
         }
-        else if (blockInfo.instCount == 1)
+        else if (blockInfo->instCount == 1)
         {
             // This is the easy case, since we don't need to determine the order of the instructions   
-            SLANG_ASSERT(blockInfo.lastInst);
-            m_instRuns.add(blockInfo.lastInst);
-            blockInfo.runCount = 1;
+            SLANG_ASSERT(blockInfo->lastInst);
+            m_instRuns.add(blockInfo->lastInst);
+            blockInfo->runCount = 1;
         }
         else
         {
@@ -920,16 +927,12 @@ void LivenessContext::_findInstRunsForBlocks()
             //
             // For now we just add them all.
 
-            const auto start = m_instRuns.getCount();
-            blockInfo.runStart = start;
-            blockInfo.runCount = blockInfo.instCount;
+            blockInfo->runCount = blockInfo->instCount;
 
-            m_instRuns.setCount(start + blockInfo.instCount);
+            m_instRuns.setCount(start + blockInfo->instCount);
             IRInst** dst = m_instRuns.getBuffer() + start;
 
             // Find all of the instructions of interest in order
-            auto block = _getBlock(BlockIndex(i));
-
             for (auto inst : block->getChildren())
             {
                 if (_isNormalRunInst(inst))
@@ -944,24 +947,28 @@ void LivenessContext::_findInstRunsForBlocks()
             SLANG_ASSERT(dst == m_instRuns.end());
         }   
 
-        SLANG_ASSERT(blockInfo.runCount == blockInfo.instCount);
+        SLANG_ASSERT(blockInfo->runCount == blockInfo->instCount);
 
+        // Special case the terminator - we allow a return that accesses the root 
+        // to be added to the run. 
+        //
+        // TODO(JS): We might want this behavior to be switchable with an option.
+        // If we don't add the terminator, everything else will behave correctly with regard
+        // adding live range end markers.
         {
-            // Special case the terminator
-            auto block = _getBlock(BlockIndex(i));
             auto terminator = block->getTerminator();
             if (_isAccessTerminator(terminator))
             {
                 m_instRuns.add(terminator);
-                blockInfo.runCount++;
+                blockInfo->runCount++;
             }
         }
 
-        SLANG_ASSERT(blockInfo.runStart + blockInfo.runCount == m_instRuns.getCount());
+        SLANG_ASSERT(blockInfo->runStart + blockInfo->runCount == m_instRuns.getCount());
 
         // The run count must be at least as many as the found instCount
         // There can be more instructions as we allow some special cases (for example around return)
-        SLANG_ASSERT(blockInfo.runCount >= blockInfo.instCount);
+        SLANG_ASSERT(blockInfo->runCount >= blockInfo->instCount);
     }
 }
 
