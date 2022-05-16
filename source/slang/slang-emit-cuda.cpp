@@ -840,11 +840,6 @@ void CUDASourceEmitter::handleRequiredCapabilitiesImpl(IRInst* inst)
     }
 }
 
-void CUDASourceEmitter::emitLayoutDirectivesImpl(TargetRequest* targetReq)
-{
-    SLANG_UNUSED(targetReq);
-}
-
 void CUDASourceEmitter::emitVectorTypeNameImpl(IRType* elementType, IRIntegerValue elementCount)
 {
     m_writer->emit(getVectorPrefix(elementType->getOp()));
@@ -933,9 +928,11 @@ void CUDASourceEmitter::emitMatrixLayoutModifiersImpl(IRVarLayout* layout)
     Super::emitMatrixLayoutModifiersImpl(layout);
 }
 
-void CUDASourceEmitter::emitPreprocessorDirectivesImpl()
+void CUDASourceEmitter::emitPreModuleImpl()
 {
     SourceWriter* writer = getSourceWriter();
+
+    // Emit generated types/functions
 
     writer->emit("\n");
 
@@ -960,6 +957,7 @@ void CUDASourceEmitter::emitPreprocessorDirectivesImpl()
         }
     }
 }
+
 
 bool CUDASourceEmitter::tryEmitGlobalParamImpl(IRGlobalParam* varDecl, IRType* varType)
 {

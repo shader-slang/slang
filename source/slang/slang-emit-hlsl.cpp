@@ -665,20 +665,6 @@ bool HLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
     return false;
 }
 
-void HLSLSourceEmitter::emitLayoutDirectivesImpl(TargetRequest* targetReq)
-{
-    switch (targetReq->getDefaultMatrixLayoutMode())
-    {
-        case kMatrixLayoutMode_RowMajor:
-        default:
-            m_writer->emit("#pragma pack_matrix(row_major)\n");
-            break;
-        case kMatrixLayoutMode_ColumnMajor:
-            m_writer->emit("#pragma pack_matrix(column_major)\n");
-            break;
-    }
-}
-
 void HLSLSourceEmitter::emitVectorTypeNameImpl(IRType* elementType, IRIntegerValue elementCount)
 {
     // In some cases we *need* to use the built-in syntax sugar for vector types,
@@ -1133,9 +1119,9 @@ void HLSLSourceEmitter::handleRequiredCapabilitiesImpl(IRInst* inst)
     }
 }
 
-void HLSLSourceEmitter::emitPreludeDirectivesImpl()
+void HLSLSourceEmitter::emitFrontMatterImpl(TargetRequest* targetReq) 
 {
-    if( m_extensionTracker->m_requiresNVAPI )
+    if (m_extensionTracker->m_requiresNVAPI)
     {
         // If the generated code includes implicit NVAPI use,
         // then we need to ensure that NVAPI support is included
@@ -1159,7 +1145,7 @@ void HLSLSourceEmitter::emitPreludeDirectivesImpl()
         // they could pass in these `#define`s using command-line
         // or API options.
         //
-        if( auto decor = m_irModule->getModuleInst()->findDecoration<IRNVAPISlotDecoration>() )
+        if (auto decor = m_irModule->getModuleInst()->findDecoration<IRNVAPISlotDecoration>())
         {
             m_writer->emit("#define NV_SHADER_EXTN_SLOT ");
             m_writer->emit(decor->getRegisterName());
@@ -1171,13 +1157,26 @@ void HLSLSourceEmitter::emitPreludeDirectivesImpl()
             // understanding of `space`s).
             //
             auto spaceName = decor->getSpaceName();
-            if( spaceName != "space0" )
+            if (spaceName != "space0")
             {
                 m_writer->emit("#define NV_SHADER_EXTN_REGISTER_SPACE ");
                 m_writer->emit(spaceName);
                 m_writer->emit("\n");
             }
         }
+    }
+
+    // Emit any layout declarations
+
+    switch (targetReq->getDefaultMatrixLayoutMode())
+    {
+    case kMatrixLayoutMode_RowMajor:
+    default:
+        m_writer->emit("#pragma pack_matrix(row_major)\n");
+        break;
+    case kMatrixLayoutMode_ColumnMajor:
+        m_writer->emit("#pragma pack_matrix(column_major)\n");
+        break;
     }
 }
 

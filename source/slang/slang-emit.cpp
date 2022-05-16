@@ -800,16 +800,11 @@ Result linkAndOptimizeIR(
     return SLANG_OK;
 }
 
-void trackGLSLTargetCaps(
-    GLSLExtensionTracker*   extensionTracker,
-    CapabilitySet const&    caps);
-
 SlangResult CodeGenContext::emitEntryPointsSourceFromIR(
     String&                 outSource)
 {
     outSource = String();
 
-    auto extensionTracker = getExtensionTracker();
     auto session = getSession();
     auto sink = getSink();
     auto sourceManager = getSourceManager();
@@ -929,51 +924,38 @@ SlangResult CodeGenContext::emitEntryPointsSourceFromIR(
     // Now that we've emitted the code for all the declarations in the file,
     // it is time to stitch together the final output.
 
-    sourceEmitter->emitPreludeDirectives();
-
-    if (isHeterogeneousTarget(target))
-    {
-        sourceWriter.emit(get_slang_cpp_host_prelude());
-    }
-    else
-    {
-        // If there is a prelude emit it
-        const auto& prelude = session->getPreludeForLanguage(sourceLanguage);
-        if (prelude.getLength() > 0)
-        {
-            sourceWriter.emit(prelude.getUnownedSlice());
-        }
-    }
-
     // There may be global-scope modifiers that we should emit now
     // Supress emitting line directives when emitting preprocessor directives since
     // these preprocessor directives may be required to appear in the first line
     // of the output. An example is that the "#version" line in a GLSL source must
     // appear before anything else.
     sourceWriter.supressLineDirective();
-    sourceEmitter->emitPreprocessorDirectives();
-    sourceWriter.resumeLineDirective();
+    
+    // Emit any front matter
+    sourceEmitter->emitFrontMatter(targetRequest);
 
-    if (auto glslExtensionTracker = as<GLSLExtensionTracker>(extensionTracker))
+    // If heterogeneous we output the prelude before everything else 
+    if (isHeterogeneousTarget(target))
     {
-        trackGLSLTargetCaps(glslExtensionTracker, targetRequest->getTargetCaps());
-
-        StringBuilder builder;
-        glslExtensionTracker->appendExtensionRequireLines(builder);
-        sourceWriter.emit(builder.getUnownedSlice());
+        sourceWriter.emit(get_slang_cpp_host_prelude());
+    }
+    else
+    {
+        // Get the prelude
+        String prelude = session->getPreludeForLanguage(sourceLanguage);
+        sourceWriter.emit(prelude);
     }
 
-    sourceEmitter->emitLayoutDirectives(targetRequest);
+    // Emit anything that goes before the contents of the code generated for the module
+    sourceEmitter->emitPreModule();
 
-    String prefix = sourceWriter.getContent();
-    
-    StringBuilder finalResultBuilder;
-    finalResultBuilder << prefix;
+    sourceWriter.resumeLineDirective();
 
-    finalResultBuilder << code;
+    String finalResult = sourceWriter.getContent();
+    finalResult.append(code);
 
     // Write out the result
-    outSource = finalResultBuilder.ProduceString();
+    outSource = finalResult;
     return SLANG_OK;
 }
 
