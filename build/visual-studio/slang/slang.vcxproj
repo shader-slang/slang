@@ -335,6 +335,7 @@ IF EXIST ..\..\..\external\slang-binaries\bin\windows-aarch64\slang-glslang.dll\
     <ClInclude Include="..\..\..\source\slang\slang-emit-hlsl.h" />
     <ClInclude Include="..\..\..\source\slang\slang-emit-precedence.h" />
     <ClInclude Include="..\..\..\source\slang\slang-emit-source-writer.h" />
+    <ClInclude Include="..\..\..\source\slang\slang-emit.h" />
     <ClInclude Include="..\..\..\source\slang\slang-glsl-extension-tracker.h" />
     <ClInclude Include="..\..\..\source\slang\slang-hlsl-intrinsic-set.h" />
     <ClInclude Include="..\..\..\source\slang\slang-image-format-defs.h" />

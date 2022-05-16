@@ -102,6 +102,9 @@
     <ClInclude Include="..\..\..\source\slang\slang-emit-source-writer.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\source\slang\slang-emit.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\..\source\slang\slang-glsl-extension-tracker.h">
       <Filter>Header Files</Filter>
     </ClInclude>
