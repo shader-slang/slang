@@ -951,7 +951,11 @@ SlangResult CodeGenContext::emitEntryPointsSourceFromIR(
 
     sourceWriter.resumeLineDirective();
 
-    String finalResult = sourceWriter.getContent();
+    // Get the content built so far from the front matter/prelude/preModule
+    // By getting in this way, the content is no longer referenced by the sourceWriter.
+    String finalResult = sourceWriter.getContentAndClear();
+
+    // Append the modules output code
     finalResult.append(code);
 
     // Write out the result
