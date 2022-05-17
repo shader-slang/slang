@@ -2459,15 +2459,13 @@ static Index _calcTypeOrder(IRType* a)
     }
 }
 
-void CPPSourceEmitter::emitPreprocessorDirectivesImpl()
+void CPPSourceEmitter::emitPreModuleImpl()
 {
-    SourceWriter* writer = getSourceWriter();
-
-    writer->emit("\n");
-
-    
     if (m_target == CodeGenTarget::CPPSource)
     {
+        // NOTE, that this opens an anonymous scope. 
+        // The scope is closed in `emitModuleImpl`
+
         // When generating kernel code in C++, put all into an anonymous namespace
         // This includes any generated types, and generated intrinsics.
         m_writer->emit("namespace { // anonymous \n\n");
@@ -2475,6 +2473,8 @@ void CPPSourceEmitter::emitPreprocessorDirectivesImpl()
         m_writer->emit("using namespace SLANG_PRELUDE_NAMESPACE;\n");
         m_writer->emit("#endif\n\n");
     }
+
+    // Emit generated functions and types
 
     if (m_target == CodeGenTarget::CSource)
     {
@@ -2507,7 +2507,7 @@ void CPPSourceEmitter::emitPreprocessorDirectivesImpl()
         m_intrinsicSet.getIntrinsics(intrinsics);
 
         // Emit all the intrinsics that were used
-        for (auto intrinsic: intrinsics)
+        for (auto intrinsic : intrinsics)
         {
             _maybeEmitSpecializedOperationDefinition(intrinsic);
         }
@@ -2757,7 +2757,6 @@ void CPPSourceEmitter::emitModuleImpl(IRModule* module, DiagnosticSink* sink)
     
     _emitForwardDeclarations(actions);
 
-    
     {
         // Output all the thread locals 
         for (auto action : actions)
