@@ -708,7 +708,7 @@ struct OptionsParser
 #undef EXECUTABLE_EXTENSION
     }
 
-    SlangResult overrideDiagnosticSeverity(String const& identifierList, Severity originalSeverity, Severity overrideSeverity)
+    SlangResult overrideDiagnosticSeverity(String const& identifierList, Severity overrideSeverity)
     {
         List<UnownedStringSlice> slices;
         StringUtil::split(identifierList.getUnownedSlice(), ',', slices);
@@ -721,7 +721,7 @@ struct OptionsParser
             Int warningIndex = -1;
             SLANG_RETURN_ON_FAIL(StringUtil::parseInt(warningIdentifier, warningIndex));
 
-            requestImpl->getSink()->overrideDiagnosticSeverity(int(warningIndex), originalSeverity, overrideSeverity);
+            requestImpl->getSink()->overrideDiagnosticSeverity(int(warningIndex), overrideSeverity);
         }
 
         return SLANG_OK;
@@ -1041,7 +1041,7 @@ struct OptionsParser
                         requestImpl->getSink()->setFlag(DiagnosticSink::Flag::TreatWarningsAsErrors);
                     else
                     {
-                        if (SLANG_FAILED(overrideDiagnosticSeverity(operand.value, Severity::Warning, Severity::Error)))
+                        if (SLANG_FAILED(overrideDiagnosticSeverity(operand.value, Severity::Error)))
                         {
                             sink->diagnose(operand.loc, MiscDiagnostics::invalidArgumentForOption, "-warnings-as-errors");
                             return SLANG_FAIL;
@@ -1053,7 +1053,7 @@ struct OptionsParser
                     CommandLineArg operand;
                     SLANG_RETURN_ON_FAIL(reader.expectArg(operand));
 
-                    if (SLANG_FAILED(overrideDiagnosticSeverity(operand.value, Severity::Warning, Severity::Disable)))
+                    if (SLANG_FAILED(overrideDiagnosticSeverity(operand.value, Severity::Disable)))
                     {
                         sink->diagnose(operand.loc, MiscDiagnostics::invalidArgumentForOption, "-warnings-disable");
                         return SLANG_FAIL;

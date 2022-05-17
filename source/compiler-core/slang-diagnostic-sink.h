@@ -226,9 +226,9 @@ public:
     bool isFlagSet(Flag::Enum flag) { return (m_flags & Flags(flag)) != 0; }
 
         /// Sets an override on the severity of a specific diagnostic message (by numeric identifier)
-    void overrideDiagnosticSeverity(int messageID, Severity originalSeverity, Severity overrideSeverity)
+    void overrideDiagnosticSeverity(int messageID, Severity overrideSeverity)
     {
-        m_severityOverrides[messageID] = MessageSeverityOverride{ originalSeverity, overrideSeverity };
+        m_severityOverrides[messageID] = overrideSeverity;
     }
 
         /// Get the (optional) diagnostic sink lexer. This is used to
@@ -289,15 +289,9 @@ protected:
     SourceManager* m_sourceManager = nullptr;
 
     SourceLocationLexer m_sourceLocationLexer;
-
-    struct MessageSeverityOverride
-    {
-        Severity originalValue;
-        Severity overrideValue;
-    };
-
+    
     // Configuration that allows the user to control the severity of certain diagnostic messages
-    Dictionary<int, MessageSeverityOverride> m_severityOverrides;
+    Dictionary<int, Severity> m_severityOverrides;
 };
 
     /// An `ISlangWriter` that writes directly to a diagnostic sink.

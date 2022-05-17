@@ -529,14 +529,14 @@ Severity DiagnosticSink::getEffectiveMessageSeverity(DiagnosticInfo const& info)
 {
     Severity effectiveSeverity = info.severity;
 
-    MessageSeverityOverride* pSeverityOverride = m_severityOverrides.TryGetValue(info.id);
+    Severity* pSeverityOverride = m_severityOverrides.TryGetValue(info.id);
 
-    // See if there is an override, and if that override has the right original severity
-    if (pSeverityOverride && pSeverityOverride->originalValue == info.severity)
+    // See if there is an override
+    if (pSeverityOverride)
     {
         // Override the current severity, but don't allow lowering it if it's Error or Fatal
-        if (effectiveSeverity < Severity::Error || pSeverityOverride->overrideValue >= effectiveSeverity)
-            effectiveSeverity = pSeverityOverride->overrideValue;
+        if (effectiveSeverity < Severity::Error || *pSeverityOverride >= effectiveSeverity)
+            effectiveSeverity = *pSeverityOverride;
     }
     
     if (isFlagSet(Flag::TreatWarningsAsErrors) && info.severity == Severity::Warning)

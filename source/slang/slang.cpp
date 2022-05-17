@@ -4250,10 +4250,9 @@ void EndToEndCompileRequest::setTargetLineDirectiveMode(
 
 void EndToEndCompileRequest::overrideDiagnosticSeverity(
     SlangInt messageID,
-    SlangSeverity originalSeverity,
     SlangSeverity overrideSeverity)
 {
-    getSink()->overrideDiagnosticSeverity(int(messageID), Severity(originalSeverity), Severity(overrideSeverity));
+    getSink()->overrideDiagnosticSeverity(int(messageID), Severity(overrideSeverity));
 }
 
 SlangDiagnosticFlags EndToEndCompileRequest::getDiagnosticFlags()

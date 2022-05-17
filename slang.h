@@ -1722,7 +1722,6 @@ extern "C"
     SLANG_API void spOverrideDiagnosticSeverity(
         SlangCompileRequest* request,
         SlangInt messageID,
-        SlangSeverity originalSeverity,
         SlangSeverity overrideSeverity);
 
     /*! @see slang::ICompileRequest::getDiagnosticFlags */
@@ -3909,13 +3908,11 @@ namespace slang
 
             @param messageID            Numeric identifier of the message to override,
                                         as defined in the 1st parameter of the DIAGNOSTIC macro.
-            @param originalSeverity     Original severity of the message.
-            @param overrideSeverity     New severity of the message. If originalSeverity is Error or Fatal,
-                                        the new severity cannot be Warning or lower.
+            @param overrideSeverity     New severity of the message. If the message is originally Error or Fatal,
+                                        the new severity cannot be lower than that.
             */
         virtual SLANG_NO_THROW void SLANG_MCALL overrideDiagnosticSeverity(
             SlangInt messageID,
-            SlangSeverity originalSeverity,
             SlangSeverity overrideSeverity) = 0;
 
             /** Returns the currently active flags of the request's diagnostic sink. */
