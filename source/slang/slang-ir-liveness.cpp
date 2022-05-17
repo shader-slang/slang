@@ -183,6 +183,9 @@ struct LivenessContext
     LivenessContext(IRModule* module):
         m_module(module)
     {
+        // Disable warning if not used
+        SLANG_UNUSED(&LivenessContext::_isAnyRunInst);
+        
         m_sharedBuilder.init(module);
         m_builder.init(m_sharedBuilder);
     }
@@ -228,7 +231,10 @@ struct LivenessContext
     void _addInst(IRInst* inst);
 
         /// True if it's an instruction of interest and so will go within a run for a block
-    bool _isRunInst(IRInst* inst);
+    bool _isNormalRunInst(IRInst* inst);
+
+        /// Returns true if is a normal run inst, or if is a return that accesses
+    bool _isAnyRunInst(IRInst* inst);
 
         // Returns the index in the run of a start for the current root, else -1
     Index _indexOfRootStart(const ConstArrayView<IRInst*>& run);
@@ -241,8 +247,11 @@ struct LivenessContext
 
     void _maybeAddEndBeforeInst(IRInst* inst);
 
+        /// Maybe insert an end after the instruction
+    void _maybeAddEndAfterRunIndex(BlockIndex blockIndex, const ConstArrayView<IRInst*>& run, Index runIndex);
+
         // Add a live end instruction at the start of block, referencing the root
-    void _maybeAddEndAtBlockStart(IRBlock* block);
+    void _maybeAddEndAtBlockStart(BlockIndex blockIndex);
 
         /// Look from inst for an LiveEndRange to the root.
     IRInst* _findRootEnd(IRInst* inst);
@@ -255,6 +264,10 @@ struct LivenessContext
 
         /// Get the block from the index
     IRBlock* _getBlock(BlockIndex blockIndex) const { return m_functionBlockInfos[Index(blockIndex)].block; }
+
+        /// True if the terminator can be considered an access
+        /// This allows us to elide a scope end if the root is returned 
+    bool _isAccessTerminator(IRTerminatorInst* terminator);
 
         /// Gets the instructions of interest for this info, in the order they appear within the block
     ConstArrayView<IRInst*> _getRun(const BlockInfo* info) 
@@ -297,8 +310,10 @@ struct LivenessContext
     IRBuilder m_builder;
 };
 
-void LivenessContext::_maybeAddEndAtBlockStart(IRBlock* block)
+void LivenessContext::_maybeAddEndAtBlockStart(BlockIndex blockIndex)
 {
+    auto block = _getBlock(blockIndex);
+
     // Insert before the first ordinary inst
     auto inst = block->getFirstOrdinaryInst();
     // A block has to end with a terminator... so must always be an ordinary inst, if there is a function body
@@ -403,11 +418,12 @@ Index LivenessContext::_findLastAccess(const ConstArrayView<IRInst*>& run)
 {
     for (Index i = run.getCount() - 1; i >= 0; --i)
     {
+        auto inst = run[i];
         // If it's not a live start, it must be an access
-        if (as<IRLiveRangeStart>(run[i]) == nullptr)
+        if (as<IRLiveRangeStart>(inst) == nullptr)
         {
             // Check it really is an access inst..
-            SLANG_ASSERT(_isRunInst(run[i]));
+            SLANG_ASSERT(_isAnyRunInst(inst));
             return i;
         }
     }
@@ -435,9 +451,18 @@ IRInst* LivenessContext::_findRootEnd(IRInst* inst)
     return nullptr;
 }
 
+void LivenessContext::_maybeAddEndAfterRunIndex(BlockIndex blockIndex, const ConstArrayView<IRInst*>& run, Index runIndex)
+{
+    SLANG_UNUSED(blockIndex);
+    return _maybeAddEndAfterInst(run[runIndex]);
+}
+
 void LivenessContext::_maybeAddEndAfterInst(IRInst* inst)
 {
-    if (!_findRootEnd(inst->getNextInst()))
+    // We can't add after the inst, if it's a terminator
+    // or if we find an end. 
+    if (as<IRTerminatorInst>(inst) == nullptr && 
+        !_findRootEnd(inst->getNextInst()))
     {
         // Just add end of scope after the inst 
         m_builder.setInsertLoc(IRInsertLoc::after(inst));
@@ -468,11 +493,8 @@ LivenessContext::BlockResult LivenessContext::_completeBlock(BlockIndex blockInd
     // If we found one, that is the end of the range
     if (lastAccessIndex >= 0)
     {
-        IRInst* lastAccessInst = run[lastAccessIndex];
-
-        // Insert an end after the last access (if not one already)
-        _maybeAddEndAfterInst(lastAccessInst);
-
+        _maybeAddEndAfterRunIndex(blockIndex, run, lastAccessIndex);
+        
         // Add the result
         return _addBlockResult(blockIndex, BlockResult::Found);
     }
@@ -560,7 +582,7 @@ LivenessContext::BlockResult LivenessContext::_processBlock(BlockIndex blockInde
             if (successorResult == BlockResult::NotFound)
             {
                 const auto successorBlockIndex = successors[i];
-                _maybeAddEndAtBlockStart(_getBlock(successorBlockIndex));
+                _maybeAddEndAtBlockStart(successorBlockIndex);
                 _addBlockResult(successorBlockIndex, BlockResult::Found);
             }
         }
@@ -703,6 +725,7 @@ void LivenessContext::_findAliasesAndAccesses(IRInst* root)
                     // These will never take place on the var which is accessed through a pointer, so can be ignored
                     break;
                 }
+                
                 default: break;
             }
 
@@ -740,9 +763,6 @@ void LivenessContext::_findAndEmitRangeEnd(IRLiveRangeStart* liveRangeStart)
     // Store root information, so don't have to pass around methods
     m_rootLiveStart = liveRangeStart;
     m_rootLiveStartBlock = as<IRBlock>(liveRangeStart->getParent());
-
-    m_root = liveRangeStart->getReferenced();
-    m_rootBlock = as<IRBlock>(m_root->parent);
 
     // If either of these asserts fail it probably means there hasn't been a call
     // to `_findAliasesAndAccesses` which is required before this function can be called.
@@ -794,23 +814,22 @@ void LivenessContext::_findAndEmitRangeEnd(IRLiveRangeStart* liveRangeStart)
 
     // Set back to nullptr for safety
     m_rootLiveStart = nullptr;
-    m_root = nullptr;
-    m_rootBlock = nullptr;
     m_rootLiveStartBlock = nullptr;
 }
 
-bool LivenessContext::_isRunInst(IRInst* inst)
+bool LivenessContext::_isNormalRunInst(IRInst* inst)
 {
     const auto op = inst->getOp();
 
-    // If it's a live start then we need to track
+    // Detect if it's a range start for the root.
     if (op == kIROp_LiveRangeStart)
     {
-        return true;
+        auto start = as<IRLiveRangeStart>(inst);
+        return start->getReferenced() == m_root;
     }
 
     // NOTE!
-    // These are the only ops *currently* that indicate an access.
+    // The ops in th elist above are the only ops *currently* that indicate an access.
     // Has to be consistent with `_findAliasesAndAccesses`
     if (op == kIROp_Call || 
         op == kIROp_Load || 
@@ -824,26 +843,81 @@ bool LivenessContext::_isRunInst(IRInst* inst)
     return false;
 }
 
+bool LivenessContext::_isAccessTerminator(IRTerminatorInst* terminator)
+{
+    // This is to special case when a return, returns a root or an alias
+    // 
+    // We need to detect if the return value accesses the root
+
+    if (terminator->getOp() == kIROp_ReturnVal)
+    {
+        // We are going to special case return if it hits an alias
+        auto returnVal = static_cast<IRReturnVal*>(terminator);
+
+        auto val = returnVal->getVal();
+        
+        // TODO(JS): This is perhaps somewhat argable, but it means if 
+        // we have a cast between uint/int (for example) that isn't a problem
+
+        // Strip construct
+        if (val->getOp() == kIROp_Construct && val->getOperandCount() == 1)
+        {
+            val = val->getOperand(0);
+        }
+
+        // If it *is* the root it's an access
+        if (val == m_root)
+        {
+            return true;
+        }
+
+        // If it's a load, see what is being loaded from an alias to the root
+        if (auto load = as<IRLoad>(val))
+        {
+            const auto valPtr = load->getPtr();
+            return m_aliases.contains(valPtr);
+        }
+    }
+
+    return false;
+}
+
+bool LivenessContext::_isAnyRunInst(IRInst* inst)
+{
+    if (auto terminator = as<IRTerminatorInst>(inst))
+    {
+        return _isAccessTerminator(terminator);
+    }
+    return _isNormalRunInst(inst);
+}
+
 void LivenessContext::_findInstRunsForBlocks()
 {
     const Count count = m_blockInfos.getCount();
     for (Index i = 0; i < count; ++i)
     {
-        auto& blockInfo = m_blockInfos[i];
+        const auto blockIndex = BlockIndex(i);
 
-        if (blockInfo.instCount == 0)
+        // Get the block
+        auto block = _getBlock(blockIndex);
+
+        // Get the block info
+        auto* blockInfo = _getBlockInfo(blockIndex);
+
+        const auto start = m_instRuns.getCount();
+        blockInfo->runStart = start;
+
+        if (blockInfo->instCount == 0)
         {
             // Nothing to do if it's empty
-            SLANG_ASSERT(blockInfo.runCount == 0);
+            SLANG_ASSERT(blockInfo->runCount == 0);
         }
-        else if (blockInfo.instCount == 1)
+        else if (blockInfo->instCount == 1)
         {
-            // This is the easy case, since we don't need to determine the order of the instructions
-            blockInfo.runStart = m_instRuns.getCount();
-            blockInfo.runCount = 1;
-            SLANG_ASSERT(blockInfo.lastInst);
-            m_instRuns.add(blockInfo.lastInst);
-            continue;
+            // This is the easy case, since we don't need to determine the order of the instructions   
+            SLANG_ASSERT(blockInfo->lastInst);
+            m_instRuns.add(blockInfo->lastInst);
+            blockInfo->runCount = 1;
         }
         else
         {
@@ -853,19 +927,15 @@ void LivenessContext::_findInstRunsForBlocks()
             //
             // For now we just add them all.
 
-            const auto start = m_instRuns.getCount();
-            blockInfo.runStart = start;
-            blockInfo.runCount = blockInfo.instCount;
+            blockInfo->runCount = blockInfo->instCount;
 
-            m_instRuns.setCount(start + blockInfo.instCount);
+            m_instRuns.setCount(start + blockInfo->instCount);
             IRInst** dst = m_instRuns.getBuffer() + start;
 
             // Find all of the instructions of interest in order
-            auto block = _getBlock(BlockIndex(i));
-
             for (auto inst : block->getChildren())
             {
-                if (_isRunInst(inst))
+                if (_isNormalRunInst(inst))
                 {
                     *dst++ = inst;
                     if (dst == m_instRuns.end())
@@ -875,10 +945,30 @@ void LivenessContext::_findInstRunsForBlocks()
                 }
             }
             SLANG_ASSERT(dst == m_instRuns.end());
+        }   
+
+        SLANG_ASSERT(blockInfo->runCount == blockInfo->instCount);
+
+        // Special case the terminator - we allow a return that accesses the root 
+        // to be added to the run. 
+        //
+        // TODO(JS): We might want this behavior to be switchable with an option.
+        // If we don't add the terminator, everything else will behave correctly with regard
+        // adding live range end markers.
+        {
+            auto terminator = block->getTerminator();
+            if (_isAccessTerminator(terminator))
+            {
+                m_instRuns.add(terminator);
+                blockInfo->runCount++;
+            }
         }
 
-        // The run count and the inst count must match at this point
-        SLANG_ASSERT(blockInfo.runCount == blockInfo.instCount);
+        SLANG_ASSERT(blockInfo->runStart + blockInfo->runCount == m_instRuns.getCount());
+
+        // The run count must be at least as many as the found instCount
+        // There can be more instructions as we allow some special cases (for example around return)
+        SLANG_ASSERT(blockInfo->runCount >= blockInfo->instCount);
     }
 }
 
@@ -897,6 +987,10 @@ void LivenessContext::_processRoot(const Location* locations, Count locationsCou
     m_instRuns.clear();
     
     auto root = locations[0].root;
+
+    // Set the root
+    m_root = root;
+    m_rootBlock = as<IRBlock>(m_root->parent);
 
     // Add all the live starts
     m_liveRangeStarts.setCount(locationsCount);
@@ -928,6 +1022,10 @@ void LivenessContext::_processRoot(const Location* locations, Count locationsCou
         // We want to process this RangeStart for the root, to find all of the ends
         _findAndEmitRangeEnd(liveStart);
     }
+
+    // No root is active in processing
+    m_root = nullptr;
+    m_rootBlock = nullptr;
 }
 
 void LivenessContext::_processLocationsInFunction(const Location* locations, Count count)
