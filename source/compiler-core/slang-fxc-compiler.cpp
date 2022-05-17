@@ -299,6 +299,12 @@ SlangResult FXCDownstreamCompiler::compile(const CompileOptions& options, RefPtr
         SLANG_ASSERT(SLANG_SUCCEEDED(diagnosticParseRes));
     }
 
+    // If FXC failed, make sure we have an error in the diagnostics
+    if (FAILED(hr))
+    {
+        diagnostics.requireErrorDiagnostic();
+    }
+
     // ID3DBlob is compatible with ISlangBlob, so just cast away...
     ISlangBlob* slangCodeBlob = (ISlangBlob*)codeBlob.get();
 

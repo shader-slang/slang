@@ -14,19 +14,19 @@ namespace Slang
     public:
         typedef ConstArrayView ThisType;
 
-        const T* begin() const { return m_buffer; }
+        SLANG_FORCE_INLINE const T* begin() const { return m_buffer; }
         
-        const T* end() const { return m_buffer + m_count; }
+        SLANG_FORCE_INLINE const T* end() const { return m_buffer + m_count; }
         
-        inline Index getCount() const { return m_count; }
+        SLANG_FORCE_INLINE Count getCount() const { return m_count; }
 
-        inline const T& operator [](Index idx) const
+        SLANG_FORCE_INLINE const T& operator [](Index idx) const
         {
             SLANG_ASSERT(idx >= 0 && idx < m_count);
             return m_buffer[idx];
         }
         
-        inline const T* getBuffer() const { return m_buffer; }
+        SLANG_FORCE_INLINE const T* getBuffer() const { return m_buffer; }
         
         template<typename T2>
         Index indexOf(const T2& val) const
@@ -72,13 +72,18 @@ namespace Slang
             return -1;
         }
 
+        bool containsMemory(const ThisType& rhs) const
+        {
+            return rhs.getBuffer() >= getBuffer() && rhs.end() <= end(); 
+        }
+
         bool operator==(const ThisType& rhs) const
         {
             if (&rhs == this)
             {
                 return true;
             }
-            const Index count = getCount();
+            const Count count = getCount();
             if (count != rhs.getCount())
             {
                 return false;
@@ -96,27 +101,38 @@ namespace Slang
         }
         SLANG_FORCE_INLINE bool operator!=(const ThisType& rhs) const { return !(*this == rhs); }
 
+        ThisType head(Index index) const 
+        {
+            SLANG_ASSERT(index >= 0 && index <= m_count);
+            return ThisType(m_buffer, index); 
+        }
+        ThisType tail(Index index) const
+        {
+            SLANG_ASSERT(index >= 0 && index <= m_count);
+            return ThisType(m_buffer + index, m_count - index);
+        }
+
         ConstArrayView() :
             m_buffer(nullptr),
             m_count(0)
         {
         }
 
-        ConstArrayView(const T* buffer, Index count) :
+        ConstArrayView(const T* buffer, Count count) :
             m_buffer(const_cast<T*>(buffer)),
             m_count(count)
         {
         }
 
     protected:
-        ConstArrayView(T* buffer, Index count) :
+        ConstArrayView(T* buffer, Count count) :
             m_buffer(buffer),
             m_count(count)
         {
         }
 
         T* m_buffer;        ///< Note that this isn't const, as is used for derived class ArrayView also
-        Index m_count;
+        Count m_count;
     };
 
     template<typename T>
@@ -126,7 +142,7 @@ namespace Slang
     } 
 
     template<typename T>
-    ConstArrayView<T> makeConstArrayView(const T* buffer, Index count)
+    ConstArrayView<T> makeConstArrayView(const T* buffer, Count count)
     {
         return ConstArrayView<T>(buffer, count);
     }
@@ -157,6 +173,9 @@ namespace Slang
         using Super::end;
         T* end() { return m_buffer + m_count; }
         
+        using Super::head;
+        using Super::tail;
+
         using Super::operator[];
         inline T& operator [](Index idx)
         {
@@ -166,6 +185,17 @@ namespace Slang
 
         using Super::getBuffer;
         inline T* getBuffer() { return m_buffer; }
+
+        ThisType head(Index index)
+        {
+            SLANG_ASSERT(index >= 0 && index <= m_count);
+            return ThisType(m_buffer, index);
+        }
+        ThisType tail(Index index)
+        {
+            SLANG_ASSERT(index >= 0 && index <= m_count);
+            return ThisType(m_buffer + index, m_count - index);
+        }
 
         ArrayView() : Super() {}
         ArrayView(T* buffer, Index size) :Super(buffer, size) {}
@@ -178,7 +208,7 @@ namespace Slang
     } 
         
     template<typename T>
-    ArrayView<T> makeArrayView(T* buffer, Index count)
+    ArrayView<T> makeArrayView(T* buffer, Count count)
     {
         return ArrayView<T>(buffer, count);
     }
@@ -186,7 +216,7 @@ namespace Slang
     template<typename T, size_t N>
     ArrayView<T> makeArrayView(T (&arr)[N])
     {
-        return ArrayView<T>(arr, Index(N));
+        return ArrayView<T>(arr, Count(N));
     }
 
 

@@ -1,5 +1,5 @@
-// resource-d3d12.cpp
-#include "resource-d3d12.h"
+// d3d12-resource.cpp
+#include "d3d12-resource.h"
 
 namespace gfx {
 using namespace Slang;
