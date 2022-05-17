@@ -261,9 +261,6 @@ public:
     UInt getBindingOffset(EmitVarChain* chain, LayoutResourceKind kind);
     UInt getBindingSpace(EmitVarChain* chain, LayoutResourceKind kind);
 
-        /// Emit directives to control overall layout computation for the emitted code.
-    void emitLayoutDirectives(TargetRequest* targetReq);
-
         // Utility code for generating unique IDs as needed
         // during the emit process (e.g., for declarations
         // that didn't originally have names, but now need to).
@@ -398,17 +395,15 @@ public:
 
     void executeEmitActions(List<EmitAction> const& actions);
 
+        // Emits front matter, that occurs before the prelude
+        // Doesn't emit generated function/types that's handled by emitPreModule
+    void emitFrontMatter(TargetRequest* targetReq) { emitFrontMatterImpl(targetReq); }
+
+    void emitPreModule() { emitPreModuleImpl(); }
+
     void emitModule(IRModule* module, DiagnosticSink* sink)
         { m_irModule = module; emitModuleImpl(module, sink); }
 
-        /// Emit any preprocessor directives that should come *before* the prelude code
-        ///
-        /// These are directives that are intended to customize some aspect(s) of the
-        /// prelude's behavior.
-        ///
-    void emitPreludeDirectives() { emitPreludeDirectivesImpl(); }
-
-    void emitPreprocessorDirectives() { emitPreprocessorDirectivesImpl(); }
     void emitSimpleType(IRType* type);
 
     void emitVectorTypeName(IRType* elementType, IRIntegerValue elementCount) { emitVectorTypeNameImpl(elementType, elementCount); }
@@ -438,9 +433,14 @@ public:
 
     virtual void emitImageFormatModifierImpl(IRInst* varDecl, IRType* varType) { SLANG_UNUSED(varDecl); SLANG_UNUSED(varType); }
     virtual void emitLayoutQualifiersImpl(IRVarLayout* layout) { SLANG_UNUSED(layout); }
-    virtual void emitPreludeDirectivesImpl() {}
-    virtual void emitPreprocessorDirectivesImpl() {}
-    virtual void emitLayoutDirectivesImpl(TargetRequest* targetReq) { SLANG_UNUSED(targetReq); }
+
+        /// Emit front matter inserting prelude where appropriate
+    virtual void emitFrontMatterImpl(TargetRequest* targetReq);
+        /// Emit any declarations, and other material that is needed before the modules contents
+        /// For example on targets that don't have built in vector/matrix support, this is where
+        /// the appropriate generated declarations occur.
+    virtual void emitPreModuleImpl() {}
+
     virtual void emitRateQualifiersImpl(IRRate* rate) { SLANG_UNUSED(rate); }
     virtual void emitSemanticsImpl(IRInst* inst) { SLANG_UNUSED(inst);  }
     virtual void emitSimpleFuncParamImpl(IRParam* param);

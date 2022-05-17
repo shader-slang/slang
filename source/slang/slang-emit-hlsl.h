@@ -32,7 +32,9 @@ protected:
     virtual void emitLayoutSemanticsImpl(IRInst* inst, char const* uniformSemanticSpelling) SLANG_OVERRIDE;
     virtual void emitParameterGroupImpl(IRGlobalParam* varDecl, IRUniformParameterGroupType* type) SLANG_OVERRIDE;
     virtual void emitEntryPointAttributesImpl(IRFunc* irFunc, IREntryPointDecoration* entryPointDecor) SLANG_OVERRIDE;
-    virtual void emitLayoutDirectivesImpl(TargetRequest* targetReq) SLANG_OVERRIDE;
+    
+    virtual void emitFrontMatterImpl(TargetRequest* targetReq) SLANG_OVERRIDE;
+
     virtual void emitRateQualifiersImpl(IRRate* rate) SLANG_OVERRIDE;
     virtual void emitSemanticsImpl(IRInst* inst) SLANG_OVERRIDE;
     virtual void emitSimpleFuncParamImpl(IRParam* param) SLANG_OVERRIDE;
@@ -49,8 +51,7 @@ protected:
     virtual void emitFuncDecorationsImpl(IRFunc* func) SLANG_OVERRIDE;
 
     virtual void handleRequiredCapabilitiesImpl(IRInst* inst) SLANG_OVERRIDE;
-    virtual void emitPreludeDirectivesImpl() SLANG_OVERRIDE;
-
+    
     virtual void emitGlobalInstImpl(IRInst* inst) SLANG_OVERRIDE;
 
     virtual void emitPostKeywordTypeAttributesImpl(IRInst* inst) SLANG_OVERRIDE;
