@@ -2,7 +2,7 @@
 layout: user-guide
 ---
 
-Suported Compilation Targets
+Supported Compilation Targets
 ============================
 
 This chapter provides a brief overview of the compilation targets supported by Slang, and their different capabilities.
