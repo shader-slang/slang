@@ -5842,6 +5842,10 @@ namespace Slang
         case kIROp_Block:
             return false;
 
+            /// Liveness markers have no side effects
+        case kIROp_LiveRangeStart:
+        case kIROp_LiveRangeEnd:
+
         case kIROp_Nop:
         case kIROp_undefined:
         case kIROp_DefaultConstruct:
