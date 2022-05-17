@@ -23,6 +23,14 @@ enum class Severity
     Internal
 };
 
+// Make sure that the slang.h severity constants match those defined here
+static_assert(SLANG_SEVERITY_DISABLED == int(Severity::Disable),  "mismatched Severity enum values");
+static_assert(SLANG_SEVERITY_NOTE     == int(Severity::Note),     "mismatched Severity enum values");
+static_assert(SLANG_SEVERITY_WARNING  == int(Severity::Warning),  "mismatched Severity enum values");
+static_assert(SLANG_SEVERITY_ERROR    == int(Severity::Error),    "mismatched Severity enum values");
+static_assert(SLANG_SEVERITY_FATAL    == int(Severity::Fatal),    "mismatched Severity enum values");
+static_assert(SLANG_SEVERITY_INTERNAL == int(Severity::Internal), "mismatched Severity enum values");
+
 // TODO(tfoley): move this into a source file...
 inline const char* getSeverityName(Severity severity)
 {
