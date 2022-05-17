@@ -1,5 +1,5 @@
 
-#include "descriptor-heap-d3d12.h"
+#include "d3d12-descriptor-heap.h"
 
 namespace gfx {
 using namespace Slang;

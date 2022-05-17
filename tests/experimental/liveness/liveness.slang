@@ -26,7 +26,7 @@ int someSlowFunc(int a)
     uint v = a;
     for (int i = 0; i < a * 20; ++i)
     {
-        v = ((v >> 1) || (v << 31)) * i;
+        v = ((v >> 1) | (v << 31)) * i;
     }
     return v;
 }

@@ -2,10 +2,12 @@
 #ifndef SLANG_IR_LIVENESS_H
 #define SLANG_IR_LIVENESS_H
 
+#include "../core/slang-list.h"
+
+#include "slang-ir.h"
+
 namespace Slang
 {
-
-struct IRModule;
 
 /* 
 
@@ -161,8 +163,23 @@ Similarly calling into a function could return a struct that contains fields whi
 fully specialized.
 */
 
-	/// Adds LiveRangeStart and LiveRangeEnd instructions to demark the start and end of the liveness of a variable.
-void addLivenessTrackingToModule(IRModule* module);
+struct LivenessLocation
+{
+	IRGlobalValueWithCode* function;	///< The function the associated with this location
+	IRInst* root;						///< The root variable that is being liveness tracked
+	IRInsertLoc startLocation;			///< The location to insert start
+};
+
+struct LivenessUtil
+{
+	typedef LivenessLocation Location;
+
+		/// Locate all of the variables across the module and append their locations into ioLocations
+	static void locateVariables(IRModule* module, List<Location>& ioLocations);
+
+		/// Adds LiveRangeStart and LiveRangeEnd instructions to demark the start and end of the liveness of a variable, based on tlocations
+	static void addLivenessRanges(IRModule* module, const List<Location>& locations);
+};
 
 }
 
