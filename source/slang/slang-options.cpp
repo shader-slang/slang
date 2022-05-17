@@ -1041,7 +1041,7 @@ struct OptionsParser
                         requestImpl->getSink()->setFlag(DiagnosticSink::Flag::TreatWarningsAsErrors);
                     else
                     {
-                        if (overrideDiagnosticSeverity(operand.value, Severity::Warning, Severity::Error) != SLANG_OK)
+                        if (SLANG_FAILED(overrideDiagnosticSeverity(operand.value, Severity::Warning, Severity::Error)))
                         {
                             sink->diagnose(operand.loc, MiscDiagnostics::invalidArgumentForOption, "-warnings-as-errors");
                             return SLANG_FAIL;
@@ -1053,7 +1053,7 @@ struct OptionsParser
                     CommandLineArg operand;
                     SLANG_RETURN_ON_FAIL(reader.expectArg(operand));
 
-                    if (overrideDiagnosticSeverity(operand.value, Severity::Warning, Severity::Disable) != SLANG_OK)
+                    if (SLANG_FAILED(overrideDiagnosticSeverity(operand.value, Severity::Warning, Severity::Disable)))
                     {
                         sink->diagnose(operand.loc, MiscDiagnostics::invalidArgumentForOption, "-warnings-disable");
                         return SLANG_FAIL;
