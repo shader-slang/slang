@@ -2636,6 +2636,11 @@ namespace Slang
         virtual SLANG_NO_THROW void SLANG_MCALL setTargetLineDirectiveMode(
             SlangInt targetIndex,
             SlangLineDirectiveMode mode) SLANG_OVERRIDE;
+        virtual SLANG_NO_THROW void SLANG_MCALL overrideDiagnosticSeverity(
+            SlangInt messageID,
+            SlangSeverity overrideSeverity) SLANG_OVERRIDE;
+        virtual SLANG_NO_THROW SlangDiagnosticFlags SLANG_MCALL getDiagnosticFlags() SLANG_OVERRIDE;
+        virtual SLANG_NO_THROW void SLANG_MCALL setDiagnosticFlags(SlangDiagnosticFlags flags) SLANG_OVERRIDE;
 
         EndToEndCompileRequest(
             Session* session);

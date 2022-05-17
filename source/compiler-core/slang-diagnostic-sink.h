@@ -15,18 +15,28 @@ namespace Slang
 
 enum class Severity
 {
+    Disable,
     Note,
     Warning,
     Error,
     Fatal,
-    Internal,
+    Internal
 };
+
+// Make sure that the slang.h severity constants match those defined here
+static_assert(SLANG_SEVERITY_DISABLED == int(Severity::Disable),  "mismatched Severity enum values");
+static_assert(SLANG_SEVERITY_NOTE     == int(Severity::Note),     "mismatched Severity enum values");
+static_assert(SLANG_SEVERITY_WARNING  == int(Severity::Warning),  "mismatched Severity enum values");
+static_assert(SLANG_SEVERITY_ERROR    == int(Severity::Error),    "mismatched Severity enum values");
+static_assert(SLANG_SEVERITY_FATAL    == int(Severity::Fatal),    "mismatched Severity enum values");
+static_assert(SLANG_SEVERITY_INTERNAL == int(Severity::Internal), "mismatched Severity enum values");
 
 // TODO(tfoley): move this into a source file...
 inline const char* getSeverityName(Severity severity)
 {
     switch (severity)
     {
+    case Severity::Disable:     return "ignored";
     case Severity::Note:        return "note";
     case Severity::Warning:     return "warning";
     case Severity::Error:       return "error";
@@ -128,7 +138,6 @@ struct DiagnosticArg
     {}
 };
 
-    
 class DiagnosticSink
 {
 public:
@@ -141,6 +150,7 @@ public:
             VerbosePath         = 0x1,           ///< Will display a more verbose path (if available) - such as a canonical or absolute path
             SourceLocationLine  = 0x2,           ///< If set will display the location line if source is available
             HumaneLoc           = 0x4,           ///< If set will display humane locs (filename/line number) information
+            TreatWarningsAsErrors = 0x8          ///< If set will turn all Warning type messages (after overrides) into Error type messages
         };
     };
 
@@ -215,6 +225,12 @@ public:
         /// Test if flag is set
     bool isFlagSet(Flag::Enum flag) { return (m_flags & Flags(flag)) != 0; }
 
+        /// Sets an override on the severity of a specific diagnostic message (by numeric identifier)
+    void overrideDiagnosticSeverity(int messageID, Severity overrideSeverity)
+    {
+        m_severityOverrides[messageID] = overrideSeverity;
+    }
+
         /// Get the (optional) diagnostic sink lexer. This is used to
         /// improve quality of highlighting a locations token. If not set, will just have a single
         /// character caret at location
@@ -252,8 +268,10 @@ public:
     ISlangWriter* writer = nullptr;
 
 protected:
-    void diagnoseImpl(SourceLoc const& pos, DiagnosticInfo const& info, int argCount, DiagnosticArg const* const* args);
+    void diagnoseImpl(SourceLoc const& pos, DiagnosticInfo info, int argCount, DiagnosticArg const* const* args);
     void diagnoseImpl(DiagnosticInfo const& info, const UnownedStringSlice& formattedMessage);
+
+    Severity getEffectiveMessageSeverity(DiagnosticInfo const& info);
 
         /// If set all diagnostics (as formatted by *this* sink, will be routed to the parent).
     DiagnosticSink* m_parentSink = nullptr;
@@ -271,6 +289,9 @@ protected:
     SourceManager* m_sourceManager = nullptr;
 
     SourceLocationLexer m_sourceLocationLexer;
+    
+    // Configuration that allows the user to control the severity of certain diagnostic messages
+    Dictionary<int, Severity> m_severityOverrides;
 };
 
     /// An `ISlangWriter` that writes directly to a diagnostic sink.

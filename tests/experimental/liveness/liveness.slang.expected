@@ -7,7 +7,27 @@ standard output = {
 layout(row_major) uniform;
 layout(row_major) buffer;
 
-#line 24 0
+#line 85 0
+spirv_instruction(id = 256)
+void livenessStart_0(spirv_by_reference int _0, spirv_literal int _1);
+
+
+#line 85
+spirv_instruction(id = 256)
+void livenessStart_1(spirv_by_reference uint _0, spirv_literal int _1);
+
+
+#line 85
+spirv_instruction(id = 257)
+void livenessEnd_0(spirv_by_reference uint _0, spirv_literal int _1);
+
+
+#line 85
+spirv_instruction(id = 257)
+void livenessEnd_1(spirv_by_reference int _0, spirv_literal int _1);
+
+
+#line 24 1
 int someSlowFunc_0(int a_0)
 {
     uint _S1 = uint(a_0);
@@ -19,7 +39,13 @@ int someSlowFunc_0(int a_0)
     uint v_0;
 
 #line 26
+    livenessStart_0(i_0, 0);
+
+#line 26
     i_0 = 0;
+
+#line 26
+    livenessStart_1(v_0, 0);
 
 #line 26
     v_0 = _S1;
@@ -38,16 +64,43 @@ int someSlowFunc_0(int a_0)
         }
 
 #line 29
-        uint _S2 = uint(int(bool(v_0 >> 1) || bool(v_0 << 31)) * i_0);
+        uint _S2 = v_0 >> 1;
+
+#line 29
+        uint _S3 = v_0;
+
+#line 29
+        livenessEnd_0(v_0, 0);
+
+#line 29
+        uint _S4 = (_S2 | _S3 << 31) * uint(i_0);
 
 #line 27
-        i_0 = i_0 + 1;
+        int _S5 = i_0;
 
 #line 27
-        v_0 = _S2;
+        livenessEnd_1(i_0, 0);
+
+#line 27
+        int i_1 = _S5 + 1;
+
+#line 27
+        livenessStart_0(i_0, 0);
+
+#line 27
+        i_0 = i_1;
+
+#line 27
+        livenessStart_1(v_0, 0);
+
+#line 27
+        v_0 = _S4;
 
 #line 27
     }
+
+#line 27
+    livenessEnd_1(i_0, 0);
 
 
 
@@ -67,16 +120,16 @@ struct SomeStruct_0
 #line 17
 SomeStruct_0 makeSomeStruct_0()
 {
-    const int  _S3[100] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+    const int  _S6[100] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
 
 #line 19
-    SomeStruct_0 s_0 = { 0, 0, _S3 };
+    SomeStruct_0 s_0 = { 0, 0, _S6 };
     return s_0;
 }
 
 
 #line 15
-layout(std430, binding = 1) buffer _S4 {
+layout(std430, binding = 1) buffer _S7 {
     int _data[];
 } anotherBuffer_0;
 
@@ -96,18 +149,18 @@ int somethingElse_0(inout SomeStruct_0 s_2)
 
 
 #line 4
-layout(std430, binding = 0) buffer _S5 {
+layout(std430, binding = 0) buffer _S8 {
     int _data[];
 } outputBuffer_0;
 
 #line 4
 spirv_instruction(id = 256)
-void livenessStart_0(spirv_by_reference SomeStruct_0 _0, spirv_literal int _1);
+void livenessStart_2(spirv_by_reference SomeStruct_0 _0, spirv_literal int _1);
 
 
 #line 62
 spirv_instruction(id = 257)
-void livenessEnd_0(spirv_by_reference SomeStruct_0 _0, spirv_literal int _1);
+void livenessEnd_2(spirv_by_reference SomeStruct_0 _0, spirv_literal int _1);
 
 
 #line 46
@@ -119,13 +172,19 @@ void main()
     int index_0 = int(gl_GlobalInvocationID.x);
 
 #line 48
-    int i_1;
+    int i_2;
 
 #line 48
     int res_0;
 
 #line 48
-    i_1 = 0;
+    livenessStart_0(i_2, 0);
+
+#line 48
+    i_2 = 0;
+
+#line 48
+    livenessStart_0(res_0, 0);
 
 #line 48
     res_0 = index_0;
@@ -135,7 +194,7 @@ void main()
     {
 
 
-        if(i_1 < index_0)
+        if(i_2 < index_0)
         {
         }
         else
@@ -149,21 +208,21 @@ void main()
         SomeStruct_0 s_3;
 
 #line 56
-        livenessStart_0(s_3, 0);
+        livenessStart_2(s_3, 0);
         SomeStruct_0 t_0;
 
 #line 57
-        livenessStart_0(t_0, 0);
+        livenessStart_2(t_0, 0);
 
 #line 57
-        SomeStruct_0 _S6 = makeSomeStruct_0();
+        SomeStruct_0 _S9 = makeSomeStruct_0();
 
 #line 57
-        t_0 = _S6;
-        const int  _S7[100] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+        t_0 = _S9;
+        const int  _S10[100] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
 
 #line 58
-        SomeStruct_0 u_0 = { 0, 0, _S7 };
+        SomeStruct_0 u_0 = { 0, 0, _S10 };
 
 #line 58
         SomeStruct_0 u_1;
@@ -172,6 +231,9 @@ void main()
         {
             s_3.x_0 = ((anotherBuffer_0)._data[(uint(v_1 & 3))]);
             t_0.x_0 = ((anotherBuffer_0)._data[(uint(v_1 & 3))]);
+
+#line 63
+            livenessStart_2(u_1, 0);
 
 #line 63
             u_1 = u_0;
@@ -185,18 +247,21 @@ void main()
             SomeStruct_0 x_1;
 
 #line 68
-            livenessStart_0(x_1, 0);
+            livenessStart_2(x_1, 0);
 
 #line 68
             x_1 = u_0;
             x_1.x_0 = ((anotherBuffer_0)._data[(uint(v_1 & 3))]) + 1;
-            SomeStruct_0 _S8 = x_1;
+            SomeStruct_0 _S11 = x_1;
 
 #line 70
-            livenessEnd_0(x_1, 0);
+            livenessEnd_2(x_1, 0);
 
 #line 70
-            u_1 = _S8;
+            livenessStart_2(u_1, 0);
+
+#line 70
+            u_1 = _S11;
 
 #line 70
         }
@@ -205,34 +270,67 @@ void main()
 
         s_3.c_0[index_0 & 7] = s_3.c_0[index_0 & 7] + 1;
 
-        int _S9 = s_3.x_0 + t_0.x_0 + u_1.x_0;
+        int _S12 = s_3.x_0 + t_0.x_0;
 
 #line 76
-        int _S10 = doThing_0(t_0);
+        SomeStruct_0 _S13 = u_1;
 
 #line 76
-        int _S11 = _S9 + _S10;
+        livenessEnd_2(u_1, 0);
 
 #line 76
-        int _S12 = somethingElse_0(t_0);
+        int _S14 = _S12 + _S13.x_0;
 
 #line 76
-        livenessEnd_0(t_0, 0);
+        int _S15 = doThing_0(t_0);
 
 #line 76
-        int _S13 = _S11 + _S12;
+        int _S16 = _S14 + _S15;
 
 #line 76
-        int _S14 = s_3.c_0[2];
+        int _S17 = somethingElse_0(t_0);
 
 #line 76
-        livenessEnd_0(s_3, 0);
+        livenessEnd_2(t_0, 0);
 
 #line 76
-        int res_1 = res_0 + (_S13 + _S14);
+        int _S18 = _S16 + _S17;
+
+#line 76
+        int _S19 = s_3.c_0[2];
+
+#line 76
+        livenessEnd_2(s_3, 0);
+
+#line 76
+        int _S20 = _S18 + _S19;
+
+#line 76
+        int _S21 = res_0;
+
+#line 76
+        livenessEnd_1(res_0, 0);
+
+#line 76
+        int res_1 = _S21 + _S20;
 
 #line 52
-        i_1 = i_1 + 1;
+        int _S22 = i_2;
+
+#line 52
+        livenessEnd_1(i_2, 0);
+
+#line 52
+        int i_3 = _S22 + 1;
+
+#line 52
+        livenessStart_0(i_2, 0);
+
+#line 52
+        i_2 = i_3;
+
+#line 52
+        livenessStart_0(res_0, 0);
 
 #line 52
         res_0 = res_1;
@@ -240,8 +338,17 @@ void main()
 #line 52
     }
 
+#line 52
+    livenessEnd_1(i_2, 0);
+
+#line 52
+    int _S23 = res_0;
+
+#line 52
+    livenessEnd_1(res_0, 0);
+
 #line 79
-    ((outputBuffer_0)._data[(uint(index_0))]) = res_0;
+    ((outputBuffer_0)._data[(uint(index_0))]) = _S23;
     return;
 }
 

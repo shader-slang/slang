@@ -4253,6 +4253,45 @@ void EndToEndCompileRequest::setTargetLineDirectiveMode(
     getLinkage()->targets[targetIndex]->setLineDirectiveMode(LineDirectiveMode(mode));
 }
 
+void EndToEndCompileRequest::overrideDiagnosticSeverity(
+    SlangInt messageID,
+    SlangSeverity overrideSeverity)
+{
+    getSink()->overrideDiagnosticSeverity(int(messageID), Severity(overrideSeverity));
+}
+
+SlangDiagnosticFlags EndToEndCompileRequest::getDiagnosticFlags()
+{
+    DiagnosticSink::Flags sinkFlags = getSink()->getFlags();
+
+    SlangDiagnosticFlags flags = 0;
+
+    if (sinkFlags & DiagnosticSink::Flag::VerbosePath)
+        flags |= SLANG_DIAGNOSTIC_FLAG_VERBOSE_PATHS;
+
+    if (sinkFlags & DiagnosticSink::Flag::TreatWarningsAsErrors)
+        flags |= SLANG_DIAGNOSTIC_FLAG_TREAT_WARNINGS_AS_ERRORS;
+
+    return flags;
+}
+
+void EndToEndCompileRequest::setDiagnosticFlags(SlangDiagnosticFlags flags)
+{
+    DiagnosticSink::Flags sinkFlags = getSink()->getFlags();
+
+    if (flags & SLANG_DIAGNOSTIC_FLAG_VERBOSE_PATHS)
+        sinkFlags |= DiagnosticSink::Flag::VerbosePath;
+    else
+        sinkFlags &= ~DiagnosticSink::Flag::VerbosePath;
+
+    if (flags & SLANG_DIAGNOSTIC_FLAG_TREAT_WARNINGS_AS_ERRORS)
+        sinkFlags |= DiagnosticSink::Flag::TreatWarningsAsErrors;
+    else
+        sinkFlags &= ~DiagnosticSink::Flag::TreatWarningsAsErrors;
+
+    getSink()->setFlags(sinkFlags);
+}
+
 SlangResult EndToEndCompileRequest::addTargetCapability(SlangInt targetIndex, SlangCapabilityID capability)
 {
     auto& targets = getLinkage()->targets;
