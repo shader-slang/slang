@@ -1861,6 +1861,8 @@ void GLSLSourceEmitter::emitFuncDecorationImpl(IRDecoration* decoration)
 {
     if (decoration->getOp() == kIROp_SPIRVOpDecoration)
     {
+        m_glslExtensionTracker->requireExtension(UnownedStringSlice::fromLiteral("GL_EXT_spirv_intrinsics"));
+
         m_writer->emit("spirv_instruction(id = ");
         emitSimpleValue(decoration->getOperand(0));
         m_writer->emit(")\n");
