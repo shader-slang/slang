@@ -734,33 +734,54 @@ Result linkAndOptimizeIR(
     lowerBitCast(targetRequest, irModule);
     simplifyIR(irModule);
 
-    //
-    // Downstream targets may benefit from having live-range information for
-    // local variables, and our IR currently encodes a reasonably good version
-    // of that information. At this point we will insert live-range markers
-    // for local variables, on when such markers are requested.
-    //
-    // After this point in optimization, any passes that introduce new
-    // temporary variables into the IR module should take responsibility for
-    // producing their own live-range information.
-    //
-    if (codeGenContext->shouldTrackLiveness())
     {
-        addLivenessTrackingToModule(irModule);
+        // Storage for liveness information
+        List<LivenessLocation> livenessLocations;
+        const bool shouldTrackLiveness = codeGenContext->shouldTrackLiveness();
 
-        dumpIRIfEnabled(codeGenContext, irModule, "LIVENESS");
-    }
+        //
+        // Downstream targets may benefit from having live-range information for
+        // local variables, and our IR currently encodes a reasonably good version
+        // of that information. At this point we will insert live-range markers
+        // for local variables, on when such markers are requested.
+        //
+        // After this point in optimization, any passes that introduce new
+        // temporary variables into the IR module should take responsibility for
+        // producing their own live-range information.
+        //
+        if (shouldTrackLiveness)
+        {
+            LivenessUtil::locateVariables(irModule, livenessLocations);
+        }
 
-    // As a late step, we need to take the SSA-form IR and move things *out*
-    // of SSA form, by eliminating all "phi nodes" (block parameters) and
-    // introducing explicit temporaries instead. Doing this at the IR level
-    // means that subsequent emit logic doesn't need to contend with the
-    // complexities of blocks with parameters.
-    //
-    eliminatePhis(codeGenContext, irModule);
+        // As a late step, we need to take the SSA-form IR and move things *out*
+        // of SSA form, by eliminating all "phi nodes" (block parameters) and
+        // introducing explicit temporaries instead. Doing this at the IR level
+        // means that subsequent emit logic doesn't need to contend with the
+        // complexities of blocks with parameters.
+        //
+
+        {
+            // We only want to accumulate locations if liveness tracking is enabled.
+            List<LivenessLocation>* locsPtr = shouldTrackLiveness ? &livenessLocations : nullptr;
+
+            eliminatePhis(codeGenContext, locsPtr, irModule);
 #if 0
-    dumpIRIfEnabled(codeGenContext, irModule, "PHIS ELIMINATED");
+            dumpIRIfEnabled(codeGenContext, irModule, "PHIS ELIMINATED");
 #endif
+        }
+
+        // If liveness is enabled add liveness ranges based on the accumulated liveness locations
+
+        if (shouldTrackLiveness)
+        {
+            LivenessUtil::addLivenessRanges(irModule, livenessLocations);
+
+#if 0
+            dumpIRIfEnabled(codeGenContext, irModule, "LIVENESS");
+#endif
+        }
+    }
 
     // TODO: We need to insert the logic that fixes variable scoping issues
     // here (rather than doing it very late in the emit process), because

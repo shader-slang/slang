@@ -1,4 +1,4 @@
-// resource-d3d12.h
+// d3d12-resource.h
 #pragma once
 
 #define WIN32_LEAN_AND_MEAN

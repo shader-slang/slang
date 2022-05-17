@@ -68,12 +68,14 @@ struct PhiEliminationContext
     IRModule* m_module = nullptr;
     SharedIRBuilder m_sharedBuilder;
     IRBuilder m_builder;
+    List<LivenessLocation>* m_livenessLocations;
 
-    PhiEliminationContext(CodeGenContext* codeGenContext, IRModule* module)
+    PhiEliminationContext(CodeGenContext* codeGenContext, List<LivenessLocation>* ioLivenessLocations, IRModule* module)
         : m_codeGenContext(codeGenContext)
         , m_module(module)
         , m_sharedBuilder(module)
         , m_builder(m_sharedBuilder)
+        , m_livenessLocations(ioLivenessLocations)
     {}
 
     // We start with the top-down logic of the pass, which is to process
@@ -795,7 +797,25 @@ struct PhiEliminationContext
             //
             auto& dstParam = assignment.param;
             auto& srcArg = assignment.arg;
-            m_builder.emitStore(dstParam.temp, *srcArg.currentValPtr);
+            auto storeInst = m_builder.emitStore(dstParam.temp, *srcArg.currentValPtr);
+
+            // If we have liveness tracking add the location
+            if (m_livenessLocations)
+            {
+                LivenessLocation location;
+                location.root = dstParam.temp;
+
+                // A store could (perhaps?) consist of multiple instructions
+                // If we make liveness *after* the store, then it implies anything stored 
+                // into the location might be lost.
+                //
+                // Therefore is seems appropriate to say the variable is *live* *before* the store instruction.
+                location.startLocation = IRInsertLoc::before(storeInst);
+                location.function = m_func;
+
+                m_livenessLocations->add(location);
+            }
+
             //
             // Once the store is emitted, the assignment has been performed,
             // and it can move to the _done_ state.
@@ -885,9 +905,9 @@ struct PhiEliminationContext
     }
 };
 
-void eliminatePhis(CodeGenContext* codeGenContext, IRModule* module)
+void eliminatePhis(CodeGenContext* codeGenContext, List<LivenessLocation>* ioLocations, IRModule* module)
 {
-    PhiEliminationContext context(codeGenContext, module);
+    PhiEliminationContext context(codeGenContext, ioLocations, module);
     context.eliminatePhisInModule();
 }
 
