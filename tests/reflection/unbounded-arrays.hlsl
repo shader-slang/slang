@@ -1,7 +1,7 @@
 // unbounded-arrays.hlsl
 
 //TEST:COMPARE_HLSL:-profile cs_5_1 -entry main
-//TEST:REFLECTION:-profile cs_5_1 -target hlsl -D__SLANG__
+//TEST:REFLECTION:-profile cs_5_1 -target hlsl -no-codegen -D__SLANG__
 
 //
 // This test is trying to make sure that we correctly compute

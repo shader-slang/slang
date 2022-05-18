@@ -1,4 +1,4 @@
-//TEST:REFLECTION:-profile cs_5_0 -target hlsl
+//TEST:REFLECTION:-profile cs_5_0 -target hlsl -no-codegen
 
 // Confirm that we provide reflection data for the `numthreads` attribute
 

@@ -1,0 +1,350 @@
+result code = 0
+standard error = {
+}
+standard output = {
+{
+    "parameters": [
+        {
+            "name": "UsedCB",
+            "binding": {"kind": "constantBuffer", "index": 1},
+            "type": {
+                "kind": "constantBuffer",
+                "elementType": {
+                    "kind": "struct",
+                    "name": "S",
+                    "fields": [
+                        {
+                            "name": "Size",
+                            "type": {
+                                "kind": "vector",
+                                "elementCount": 2,
+                                "elementType": {
+                                    "kind": "scalar",
+                                    "scalarType": "uint32"
+                                }
+                            },
+                            "binding": {"kind": "uniform", "offset": 0, "size": 8}
+                        }
+                    ]
+                },
+                "containerVarLayout": {
+                    "binding": {"kind": "constantBuffer", "index": 0}
+                },
+                "elementVarLayout": {
+                    "type": {
+                        "kind": "struct",
+                        "name": "S",
+                        "fields": [
+                            {
+                                "name": "Size",
+                                "type": {
+                                    "kind": "vector",
+                                    "elementCount": 2,
+                                    "elementType": {
+                                        "kind": "scalar",
+                                        "scalarType": "uint32"
+                                    }
+                                },
+                                "binding": {"kind": "uniform", "offset": 0, "size": 8}
+                            }
+                        ]
+                    },
+                    "binding": {"kind": "uniform", "offset": 0, "size": 8}
+                }
+            }
+        },
+        {
+            "name": "UnusedCB",
+            "binding": {"kind": "constantBuffer", "index": 2},
+            "type": {
+                "kind": "constantBuffer",
+                "elementType": {
+                    "kind": "struct",
+                    "name": "S",
+                    "fields": [
+                        {
+                            "name": "Size",
+                            "type": {
+                                "kind": "vector",
+                                "elementCount": 2,
+                                "elementType": {
+                                    "kind": "scalar",
+                                    "scalarType": "uint32"
+                                }
+                            },
+                            "binding": {"kind": "uniform", "offset": 0, "size": 8}
+                        }
+                    ]
+                },
+                "containerVarLayout": {
+                    "binding": {"kind": "constantBuffer", "index": 0}
+                },
+                "elementVarLayout": {
+                    "type": {
+                        "kind": "struct",
+                        "name": "S",
+                        "fields": [
+                            {
+                                "name": "Size",
+                                "type": {
+                                    "kind": "vector",
+                                    "elementCount": 2,
+                                    "elementType": {
+                                        "kind": "scalar",
+                                        "scalarType": "uint32"
+                                    }
+                                },
+                                "binding": {"kind": "uniform", "offset": 0, "size": 8}
+                            }
+                        ]
+                    },
+                    "binding": {"kind": "uniform", "offset": 0, "size": 8}
+                }
+            }
+        },
+        {
+            "name": "UsedTexture",
+            "binding": {"kind": "shaderResource", "index": 0},
+            "type": {
+                "kind": "resource",
+                "baseShape": "texture2D"
+            }
+        },
+        {
+            "name": "UnusedTexture",
+            "binding": {"kind": "shaderResource", "index": 1},
+            "type": {
+                "kind": "resource",
+                "baseShape": "texture2D"
+            }
+        },
+        {
+            "name": "UsedBuffer",
+            "binding": {"kind": "shaderResource", "index": 2},
+            "type": {
+                "kind": "resource",
+                "baseShape": "textureBuffer"
+            }
+        },
+        {
+            "name": "UnusedBuffer",
+            "binding": {"kind": "shaderResource", "index": 3},
+            "type": {
+                "kind": "resource",
+                "baseShape": "textureBuffer"
+            }
+        },
+        {
+            "name": "UsedStructuredBuffer",
+            "binding": {"kind": "shaderResource", "index": 4},
+            "type": {
+                "kind": "resource",
+                "baseShape": "structuredBuffer",
+                "resultType": {
+                    "kind": "scalar",
+                    "scalarType": "uint32"
+                }
+            }
+        },
+        {
+            "name": "UnusedStructuredBuffer",
+            "binding": {"kind": "shaderResource", "index": 5},
+            "type": {
+                "kind": "resource",
+                "baseShape": "structuredBuffer",
+                "resultType": {
+                    "kind": "scalar",
+                    "scalarType": "uint32"
+                }
+            }
+        },
+        {
+            "name": "UsedRWTexture",
+            "binding": {"kind": "unorderedAccess", "index": 0},
+            "type": {
+                "kind": "resource",
+                "baseShape": "texture2D",
+                "access": "readWrite"
+            }
+        },
+        {
+            "name": "UnusedRWTexture",
+            "binding": {"kind": "unorderedAccess", "index": 1},
+            "type": {
+                "kind": "resource",
+                "baseShape": "texture2D",
+                "access": "readWrite"
+            }
+        },
+        {
+            "name": "UsedRWBuffer",
+            "binding": {"kind": "unorderedAccess", "index": 2},
+            "type": {
+                "kind": "resource",
+                "baseShape": "textureBuffer",
+                "access": "readWrite"
+            }
+        },
+        {
+            "name": "UnusedRWBuffer",
+            "binding": {"kind": "unorderedAccess", "index": 3},
+            "type": {
+                "kind": "resource",
+                "baseShape": "textureBuffer",
+                "access": "readWrite"
+            }
+        },
+        {
+            "name": "UsedRWStructuredBuffer",
+            "binding": {"kind": "unorderedAccess", "index": 4},
+            "type": {
+                "kind": "resource",
+                "baseShape": "structuredBuffer",
+                "access": "readWrite",
+                "resultType": {
+                    "kind": "scalar",
+                    "scalarType": "uint32"
+                }
+            }
+        },
+        {
+            "name": "UnusedRWStructuredBuffer",
+            "binding": {"kind": "unorderedAccess", "index": 5},
+            "type": {
+                "kind": "resource",
+                "baseShape": "structuredBuffer",
+                "access": "readWrite",
+                "resultType": {
+                    "kind": "scalar",
+                    "scalarType": "uint32"
+                }
+            }
+        },
+        {
+            "name": "UsedSampler",
+            "binding": {"kind": "samplerState", "index": 0},
+            "type": {
+                "kind": "samplerState"
+            }
+        },
+        {
+            "name": "UnusedSampler",
+            "binding": {"kind": "samplerState", "index": 1},
+            "type": {
+                "kind": "samplerState"
+            }
+        },
+        {
+            "name": "UsedUniform",
+            "binding": {"kind": "uniform", "offset": 0, "size": 4},
+            "type": {
+                "kind": "scalar",
+                "scalarType": "uint32"
+            }
+        },
+        {
+            "name": "UnusedUniform",
+            "binding": {"kind": "uniform", "offset": 4, "size": 4},
+            "type": {
+                "kind": "scalar",
+                "scalarType": "uint32"
+            }
+        }
+    ],
+    "entryPoints": [
+        {
+            "name": "main",
+            "stage:": "compute",
+            "parameters": [
+                {
+                    "name": "dispatchThreadID",
+                    "semanticName": "SV_DISPATCHTHREADID",
+                    "type": {
+                        "kind": "vector",
+                        "elementCount": 3,
+                        "elementType": {
+                            "kind": "scalar",
+                            "scalarType": "uint32"
+                        }
+                    }
+                }
+            ],
+            "threadGroupSize": [1, 1, 1],
+            "bindings": [
+                {
+                    "name": "UsedCB",
+                    "binding": {"kind": "constantBuffer", "index": 1, "used": 1}
+                },
+                {
+                    "name": "UnusedCB",
+                    "binding": {"kind": "constantBuffer", "index": 2, "used": 0}
+                },
+                {
+                    "name": "UsedTexture",
+                    "binding": {"kind": "shaderResource", "index": 0, "used": 1}
+                },
+                {
+                    "name": "UnusedTexture",
+                    "binding": {"kind": "shaderResource", "index": 1, "used": 0}
+                },
+                {
+                    "name": "UsedBuffer",
+                    "binding": {"kind": "shaderResource", "index": 2, "used": 1}
+                },
+                {
+                    "name": "UnusedBuffer",
+                    "binding": {"kind": "shaderResource", "index": 3, "used": 0}
+                },
+                {
+                    "name": "UsedStructuredBuffer",
+                    "binding": {"kind": "shaderResource", "index": 4, "used": 1}
+                },
+                {
+                    "name": "UnusedStructuredBuffer",
+                    "binding": {"kind": "shaderResource", "index": 5, "used": 0}
+                },
+                {
+                    "name": "UsedRWTexture",
+                    "binding": {"kind": "unorderedAccess", "index": 0, "used": 1}
+                },
+                {
+                    "name": "UnusedRWTexture",
+                    "binding": {"kind": "unorderedAccess", "index": 1, "used": 0}
+                },
+                {
+                    "name": "UsedRWBuffer",
+                    "binding": {"kind": "unorderedAccess", "index": 2, "used": 1}
+                },
+                {
+                    "name": "UnusedRWBuffer",
+                    "binding": {"kind": "unorderedAccess", "index": 3, "used": 0}
+                },
+                {
+                    "name": "UsedRWStructuredBuffer",
+                    "binding": {"kind": "unorderedAccess", "index": 4, "used": 1}
+                },
+                {
+                    "name": "UnusedRWStructuredBuffer",
+                    "binding": {"kind": "unorderedAccess", "index": 5, "used": 0}
+                },
+                {
+                    "name": "UsedSampler",
+                    "binding": {"kind": "samplerState", "index": 0, "used": 1}
+                },
+                {
+                    "name": "UnusedSampler",
+                    "binding": {"kind": "samplerState", "index": 1, "used": 0}
+                },
+                {
+                    "name": "UsedUniform",
+                    "binding": {"kind": "uniform", "offset": 0, "size": 4}
+                },
+                {
+                    "name": "UnusedUniform",
+                    "binding": {"kind": "uniform", "offset": 4, "size": 4}
+                }
+            ]
+        }
+    ]
+}
+}

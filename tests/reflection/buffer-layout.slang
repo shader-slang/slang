@@ -4,8 +4,8 @@
 // to confirm that our reflection logic correctly reports the offsets
 // that the compute test sees in practice.
 
-//TEST:REFLECTION:-stage compute -entry main -target hlsl
-//TEST:REFLECTION:-stage compute -entry main -target spirv
+//TEST:REFLECTION:-stage compute -entry main -target hlsl -no-codegen
+//TEST:REFLECTION:-stage compute -entry main -target spirv -no-codegen
 
 struct A
 {

@@ -1,4 +1,4 @@
-//TEST:REFLECTION:-D__SLANG__ -entry mainVS -profile vs_4_0 -target hlsl tests/reflection/multi-file-extra.hlsl -entry mainFS -profile ps_4_0
+//TEST:REFLECTION:-D__SLANG__ -entry mainVS -profile vs_4_0 -target hlsl tests/reflection/multi-file-extra.hlsl -entry mainFS -profile ps_4_0 -no-codegen
 
 // Here we are testing the case where multiple translation units are provided
 // at once, so that we want combined reflection information for the resulting

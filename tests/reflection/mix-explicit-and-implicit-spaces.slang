@@ -1,5 +1,5 @@
 // mix-explicit-and-implicit-spaces.slang
-//TEST:REFLECTION:-profile cs_5_1 -target hlsl
+//TEST:REFLECTION:-profile cs_5_1 -target hlsl -no-codegen
 
 // Ensure that correct layout/reflection is computed
 // when mixing implicit and explicit spaces for

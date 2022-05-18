@@ -1,4 +1,4 @@
-//TEST:REFLECTION: -entry main -stage fragment -profile sm_6_5 -target hlsl
+//TEST:REFLECTION: -entry main -stage fragment -profile sm_6_5 -target hlsl -no-codegen
 //DISABLE_TEST:CROSS_COMPILE: -entry main -stage fragment -profile sm_6_5 -target dxil-assembly
 
 FeedbackTexture2D<SAMPLER_FEEDBACK_MIN_MIP> feedbackMinMip;

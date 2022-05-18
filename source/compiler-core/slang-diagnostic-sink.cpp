@@ -525,8 +525,34 @@ void DiagnosticSink::diagnoseImpl(DiagnosticInfo const& info, const UnownedStrin
     }
 }
 
-void DiagnosticSink::diagnoseImpl(SourceLoc const& pos, DiagnosticInfo const& info, int argCount, DiagnosticArg const* const* args)
+Severity DiagnosticSink::getEffectiveMessageSeverity(DiagnosticInfo const& info)
 {
+    Severity effectiveSeverity = info.severity;
+
+    Severity* pSeverityOverride = m_severityOverrides.TryGetValue(info.id);
+
+    // See if there is an override
+    if (pSeverityOverride)
+    {
+        // Override the current severity, but don't allow lowering it if it's Error or Fatal
+        if (effectiveSeverity < Severity::Error || *pSeverityOverride >= effectiveSeverity)
+            effectiveSeverity = *pSeverityOverride;
+    }
+    
+    if (isFlagSet(Flag::TreatWarningsAsErrors) && info.severity == Severity::Warning)
+        effectiveSeverity = Severity::Error;
+
+    return effectiveSeverity;
+}
+
+void DiagnosticSink::diagnoseImpl(SourceLoc const& pos, DiagnosticInfo info, int argCount, DiagnosticArg const* const* args)
+{
+    // Override the severity in the 'info' structure to pass it further into formatDiagnostics
+    info.severity = getEffectiveMessageSeverity(info);
+
+    if (info.severity == Severity::Disable)
+        return;
+
     StringBuilder messageBuilder;
     {
         StringBuilder sb;

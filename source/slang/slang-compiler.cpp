@@ -143,6 +143,28 @@ void printDiagnosticArg(StringBuilder& sb, CodeGenTarget val)
         return SLANG_OK;
     }
 
+    SlangResult CompileResult::isParameterLocationUsed(SlangParameterCategory category, UInt spaceIndex, UInt registerIndex, bool& outUsed)
+    {
+        if (!postEmitMetadata)
+            return SLANG_E_NOT_AVAILABLE;
+
+        if (!ShaderBindingRange::isUsageTracked((slang::ParameterCategory)category))
+            return SLANG_E_NOT_AVAILABLE;
+
+        // TODO: optimize this with a binary search through a sorted list
+        for (const auto& range : postEmitMetadata->usedBindings)
+        {
+            if (range.containsBinding((slang::ParameterCategory)category, spaceIndex, registerIndex))
+            {
+                outUsed = true;
+                return SLANG_OK;
+            }
+        }
+        
+        outUsed = false;
+        return SLANG_OK;
+    }
+
     //
     // FrontEndEntryPointRequest
     //
@@ -662,7 +684,8 @@ void printDiagnosticArg(StringBuilder& sb, CodeGenTarget val)
     }
 
     SlangResult CodeGenContext::emitEntryPointsSource(
-        String&                 outSource)
+        String&                 outSource,
+        RefPtr<PostEmitMetadata>& outMetadata)
     {
         outSource = String();
 
@@ -714,7 +737,7 @@ void printDiagnosticArg(StringBuilder& sb, CodeGenTarget val)
         else
         {
             return emitEntryPointsSourceFromIR(
-                outSource);
+                outSource, outMetadata);
         }
     }
 
@@ -985,7 +1008,8 @@ void printDiagnosticArg(StringBuilder& sb, CodeGenTarget val)
     }
 
     SlangResult CodeGenContext::emitWithDownstreamForEntryPoints(
-        RefPtr<DownstreamCompileResult>& outResult)
+        RefPtr<DownstreamCompileResult>& outResult,
+        RefPtr<PostEmitMetadata>& outMetadata)
     {
         outResult.setNull();
 
@@ -1127,7 +1151,7 @@ void printDiagnosticArg(StringBuilder& sb, CodeGenTarget val)
                 options.sourceContentsPath = calcSourcePathForEntryPoints();
 
                 CodeGenContext sourceCodeGenContext(this, sourceTarget, extensionTracker);
-                SLANG_RETURN_ON_FAIL(sourceCodeGenContext.emitEntryPointsSource(options.sourceContents));
+                SLANG_RETURN_ON_FAIL(sourceCodeGenContext.emitEntryPointsSource(options.sourceContents, outMetadata));
             }
             else
             {
@@ -1144,7 +1168,7 @@ void printDiagnosticArg(StringBuilder& sb, CodeGenTarget val)
         else
         {
             CodeGenContext sourceCodeGenContext(this, sourceTarget, extensionTracker);
-            SLANG_RETURN_ON_FAIL(sourceCodeGenContext.emitEntryPointsSource(options.sourceContents));
+            SLANG_RETURN_ON_FAIL(sourceCodeGenContext.emitEntryPointsSource(options.sourceContents, outMetadata));
             sourceCodeGenContext.maybeDumpIntermediate(options.sourceContents.getBuffer());
 
             sourceLanguage = (SourceLanguage)TypeConvertUtil::getSourceLanguageFromTarget((SlangCompileTarget)sourceTarget);
@@ -1504,7 +1528,8 @@ void printDiagnosticArg(StringBuilder& sb, CodeGenTarget val)
 
     SlangResult emitSPIRVForEntryPointsDirectly(
         CodeGenContext* codeGenContext,
-        List<uint8_t>&  spirvOut);
+        List<uint8_t>&  spirvOut,
+        RefPtr<PostEmitMetadata>& outMetadata);
 
     static CodeGenTarget _getIntermediateTarget(CodeGenTarget target)
     {
@@ -1519,7 +1544,8 @@ void printDiagnosticArg(StringBuilder& sb, CodeGenTarget val)
 
         /// Function to simplify the logic around emitting, and dissassembling
     SlangResult CodeGenContext::_emitEntryPoints(
-        RefPtr<DownstreamCompileResult>& outDownstreamResult)
+        RefPtr<DownstreamCompileResult>& outDownstreamResult,
+        RefPtr<PostEmitMetadata>& outMetadata)
     {
         auto target = getTargetFormat();
         switch (target)
@@ -1533,7 +1559,7 @@ void printDiagnosticArg(StringBuilder& sb, CodeGenTarget val)
                 CodeGenContext intermediateContext(this, intermediateTarget);
 
                 RefPtr<DownstreamCompileResult> code;
-                SLANG_RETURN_ON_FAIL(intermediateContext._emitEntryPoints(code));
+                SLANG_RETURN_ON_FAIL(intermediateContext._emitEntryPoints(code, outMetadata));
                 intermediateContext.maybeDumpIntermediate(code);
 
                 // Then disassemble the intermediate binary result to get the desired output
@@ -1548,7 +1574,7 @@ void printDiagnosticArg(StringBuilder& sb, CodeGenTarget val)
                 if (getTargetReq()->shouldEmitSPIRVDirectly())
                 {
                     List<uint8_t> spirv;
-                    SLANG_RETURN_ON_FAIL(emitSPIRVForEntryPointsDirectly(this, spirv));
+                    SLANG_RETURN_ON_FAIL(emitSPIRVForEntryPointsDirectly(this, spirv, outMetadata));
                     auto spirvBlob = ListBlob::moveCreate(spirv);
                     outDownstreamResult = new BlobDownstreamCompileResult(DownstreamDiagnostics(), spirvBlob);
                     return SLANG_OK;
@@ -1560,7 +1586,7 @@ void printDiagnosticArg(StringBuilder& sb, CodeGenTarget val)
             case CodeGenTarget::ShaderHostCallable:
             case CodeGenTarget::ShaderSharedLibrary:
             case CodeGenTarget::HostExecutable:
-                SLANG_RETURN_ON_FAIL(emitWithDownstreamForEntryPoints(outDownstreamResult));
+                SLANG_RETURN_ON_FAIL(emitWithDownstreamForEntryPoints(outDownstreamResult, outMetadata));
                 return SLANG_OK;
 
             default: break;
@@ -1590,11 +1616,12 @@ void printDiagnosticArg(StringBuilder& sb, CodeGenTarget val)
         case CodeGenTarget::HostExecutable:
             {
                 RefPtr<DownstreamCompileResult> downstreamResult;
+                RefPtr<PostEmitMetadata> metadata;
 
-                if (SLANG_SUCCEEDED(_emitEntryPoints(downstreamResult)))
+                if (SLANG_SUCCEEDED(_emitEntryPoints(downstreamResult, metadata)))
                 {
                     maybeDumpIntermediate(downstreamResult);
-                    result = CompileResult(downstreamResult);
+                    result = CompileResult(downstreamResult, metadata);
                 }
             }
             break;
@@ -1606,17 +1633,18 @@ void printDiagnosticArg(StringBuilder& sb, CodeGenTarget val)
         case CodeGenTarget::CSource:
             {
                 RefPtr<ExtensionTracker> extensionTracker = _newExtensionTracker(target);
+                RefPtr<PostEmitMetadata> metadata;
 
                 CodeGenContext subContext(this, target, extensionTracker);
 
                 String code;
-                if (SLANG_FAILED(subContext.emitEntryPointsSource(code)))
+                if (SLANG_FAILED(subContext.emitEntryPointsSource(code, metadata)))
                 {
                     return result;
                 }
 
                 subContext.maybeDumpIntermediate(code.getBuffer());
-                result = CompileResult(code);
+                result = CompileResult(code, metadata);
             }
             break;
 

@@ -1,4 +1,4 @@
-//TEST:REFLECTION:-stage compute -entry computeMain -target hlsl
+//TEST:REFLECTION:-stage compute -entry computeMain -target hlsl -no-codegen
 
 import string_literal_module;
 

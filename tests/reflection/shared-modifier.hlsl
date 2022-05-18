@@ -1,5 +1,5 @@
 // shared-modifier.hlsl
-//TEST:REFLECTION:-profile ps_5_0 -target hlsl
+//TEST:REFLECTION:-profile ps_5_0 -target hlsl -no-codegen
 
 // Confirm that we expose the `shared` modifier in reflection data.
 

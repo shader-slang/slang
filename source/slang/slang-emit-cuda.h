@@ -65,7 +65,9 @@ protected:
     virtual void emitLayoutSemanticsImpl(IRInst* inst, char const* uniformSemanticSpelling) SLANG_OVERRIDE;
     virtual void emitParameterGroupImpl(IRGlobalParam* varDecl, IRUniformParameterGroupType* type) SLANG_OVERRIDE;
     virtual void emitEntryPointAttributesImpl(IRFunc* irFunc, IREntryPointDecoration* entryPointDecor) SLANG_OVERRIDE;
-    virtual void emitLayoutDirectivesImpl(TargetRequest* targetReq) SLANG_OVERRIDE;
+    
+    virtual void emitPreModuleImpl() SLANG_OVERRIDE;
+
     virtual void emitRateQualifiersImpl(IRRate* rate) SLANG_OVERRIDE;
     virtual void emitSemanticsImpl(IRInst* inst) SLANG_OVERRIDE;
     virtual void emitSimpleFuncImpl(IRFunc* func) SLANG_OVERRIDE;
@@ -91,8 +93,7 @@ protected:
     virtual bool tryEmitGlobalParamImpl(IRGlobalParam* varDecl, IRType* varType) SLANG_OVERRIDE;
     virtual bool tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOuterPrec) SLANG_OVERRIDE;
 
-    virtual void emitPreprocessorDirectivesImpl() SLANG_OVERRIDE;
-
+    
     virtual void emitModuleImpl(IRModule* module, DiagnosticSink* sink) SLANG_OVERRIDE;
 
     // CPPSourceEmitter overrides 

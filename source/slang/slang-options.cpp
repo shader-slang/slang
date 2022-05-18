@@ -21,6 +21,7 @@
 
 #include "../compiler-core/slang-command-line-args.h"
 #include "../compiler-core/slang-artifact-info.h"
+#include "../compiler-core/slang-core-diagnostics.h"
 
 #include <assert.h>
 
@@ -550,6 +551,9 @@ struct OptionsParser
             "      glsl, hlsl, spirv, spirv-assembly, dxbc,\n"
             "      dxbc-assembly, dxil, dxil-assembly\n"
             "  -v, -version: Display the build version.\n"
+            "  -warnings-as-errors all: Treat all warnings as errors.\n"
+            "  -warnings-as-errors <id>[,<id>...]: Treat specific warning ids as errors.\n"
+            "  -warnings-disable <id>[,<id>...]: Disable specific warning ids.\n"
             "  --: Treat the rest of the command line as input files.\n"
             "\n"
             "Target code generation options:\n"
@@ -702,6 +706,25 @@ struct OptionsParser
             "\n";
 
 #undef EXECUTABLE_EXTENSION
+    }
+
+    SlangResult overrideDiagnosticSeverity(String const& identifierList, Severity overrideSeverity)
+    {
+        List<UnownedStringSlice> slices;
+        StringUtil::split(identifierList.getUnownedSlice(), ',', slices);
+        Index sliceCount = slices.getCount();
+
+        for (Index i = 0; i < sliceCount; ++i)
+        {
+            UnownedStringSlice warningIdentifier = slices[i];
+
+            Int warningIndex = -1;
+            SLANG_RETURN_ON_FAIL(StringUtil::parseInt(warningIdentifier, warningIndex));
+
+            requestImpl->getSink()->overrideDiagnosticSeverity(int(warningIndex), overrideSeverity);
+        }
+
+        return SLANG_OK;
     }
 
     SlangResult parse(
@@ -1008,6 +1031,33 @@ struct OptionsParser
                 else if (argValue == "-verbose-paths")
                 {
                     requestImpl->getSink()->setFlag(DiagnosticSink::Flag::VerbosePath);
+                }
+                else if (argValue == "-warnings-as-errors")
+                {
+                    CommandLineArg operand;
+                    SLANG_RETURN_ON_FAIL(reader.expectArg(operand));
+
+                    if (operand.value == "all")
+                        requestImpl->getSink()->setFlag(DiagnosticSink::Flag::TreatWarningsAsErrors);
+                    else
+                    {
+                        if (SLANG_FAILED(overrideDiagnosticSeverity(operand.value, Severity::Error)))
+                        {
+                            sink->diagnose(operand.loc, MiscDiagnostics::invalidArgumentForOption, "-warnings-as-errors");
+                            return SLANG_FAIL;
+                        }
+                    }
+                }
+                else if (argValue == "-warnings-disable")
+                {
+                    CommandLineArg operand;
+                    SLANG_RETURN_ON_FAIL(reader.expectArg(operand));
+
+                    if (SLANG_FAILED(overrideDiagnosticSeverity(operand.value, Severity::Disable)))
+                    {
+                        sink->diagnose(operand.loc, MiscDiagnostics::invalidArgumentForOption, "-warnings-disable");
+                        return SLANG_FAIL;
+                    }
                 }
                 else if (argValue == "-verify-debug-serial-ir")
                 {
