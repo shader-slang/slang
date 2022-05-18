@@ -831,3 +831,29 @@ SLANG_API SlangResult spLoadReproAsFileSystem(
     return SLANG_OK;
 }
 
+SLANG_API void spOverrideDiagnosticSeverity(
+    slang::ICompileRequest* request,
+    SlangInt messageID,
+    SlangSeverity overrideSeverity)
+{
+    if (!request)
+        return;
+
+    request->overrideDiagnosticSeverity(messageID, overrideSeverity);
+}
+
+SLANG_API SlangDiagnosticFlags spGetDiagnosticFlags(slang::ICompileRequest* request)
+{
+    if (!request)
+        return 0;
+
+    return request->getDiagnosticFlags();
+}
+
+SLANG_API void spSetDiagnosticFlags(slang::ICompileRequest* request, SlangDiagnosticFlags flags)
+{
+    if (!request)
+        return;
+
+    request->setDiagnosticFlags(flags);
+}

@@ -734,33 +734,54 @@ Result linkAndOptimizeIR(
     lowerBitCast(targetRequest, irModule);
     simplifyIR(irModule);
 
-    //
-    // Downstream targets may benefit from having live-range information for
-    // local variables, and our IR currently encodes a reasonably good version
-    // of that information. At this point we will insert live-range markers
-    // for local variables, on when such markers are requested.
-    //
-    // After this point in optimization, any passes that introduce new
-    // temporary variables into the IR module should take responsibility for
-    // producing their own live-range information.
-    //
-    if (codeGenContext->shouldTrackLiveness())
     {
-        addLivenessTrackingToModule(irModule);
+        // Storage for liveness information
+        List<LivenessLocation> livenessLocations;
+        const bool shouldTrackLiveness = codeGenContext->shouldTrackLiveness();
 
-        dumpIRIfEnabled(codeGenContext, irModule, "LIVENESS");
-    }
+        //
+        // Downstream targets may benefit from having live-range information for
+        // local variables, and our IR currently encodes a reasonably good version
+        // of that information. At this point we will insert live-range markers
+        // for local variables, on when such markers are requested.
+        //
+        // After this point in optimization, any passes that introduce new
+        // temporary variables into the IR module should take responsibility for
+        // producing their own live-range information.
+        //
+        if (shouldTrackLiveness)
+        {
+            LivenessUtil::locateVariables(irModule, livenessLocations);
+        }
 
-    // As a late step, we need to take the SSA-form IR and move things *out*
-    // of SSA form, by eliminating all "phi nodes" (block parameters) and
-    // introducing explicit temporaries instead. Doing this at the IR level
-    // means that subsequent emit logic doesn't need to contend with the
-    // complexities of blocks with parameters.
-    //
-    eliminatePhis(codeGenContext, irModule);
+        // As a late step, we need to take the SSA-form IR and move things *out*
+        // of SSA form, by eliminating all "phi nodes" (block parameters) and
+        // introducing explicit temporaries instead. Doing this at the IR level
+        // means that subsequent emit logic doesn't need to contend with the
+        // complexities of blocks with parameters.
+        //
+
+        {
+            // We only want to accumulate locations if liveness tracking is enabled.
+            List<LivenessLocation>* locsPtr = shouldTrackLiveness ? &livenessLocations : nullptr;
+
+            eliminatePhis(codeGenContext, locsPtr, irModule);
 #if 0
-    dumpIRIfEnabled(codeGenContext, irModule, "PHIS ELIMINATED");
+            dumpIRIfEnabled(codeGenContext, irModule, "PHIS ELIMINATED");
 #endif
+        }
+
+        // If liveness is enabled add liveness ranges based on the accumulated liveness locations
+
+        if (shouldTrackLiveness)
+        {
+            LivenessUtil::addLivenessRanges(irModule, livenessLocations);
+
+#if 0
+            dumpIRIfEnabled(codeGenContext, irModule, "LIVENESS");
+#endif
+        }
+    }
 
     // TODO: We need to insert the logic that fixes variable scoping issues
     // here (rather than doing it very late in the emit process), because
@@ -800,16 +821,11 @@ Result linkAndOptimizeIR(
     return SLANG_OK;
 }
 
-void trackGLSLTargetCaps(
-    GLSLExtensionTracker*   extensionTracker,
-    CapabilitySet const&    caps);
-
 SlangResult CodeGenContext::emitEntryPointsSourceFromIR(
     String&                 outSource)
 {
     outSource = String();
 
-    auto extensionTracker = getExtensionTracker();
     auto session = getSession();
     auto sink = getSink();
     auto sourceManager = getSourceManager();
@@ -929,51 +945,57 @@ SlangResult CodeGenContext::emitEntryPointsSourceFromIR(
     // Now that we've emitted the code for all the declarations in the file,
     // it is time to stitch together the final output.
 
-    sourceEmitter->emitPreludeDirectives();
-
-    if (isHeterogeneousTarget(target))
-    {
-        sourceWriter.emit(get_slang_cpp_host_prelude());
-    }
-    else
-    {
-        // If there is a prelude emit it
-        const auto& prelude = session->getPreludeForLanguage(sourceLanguage);
-        if (prelude.getLength() > 0)
-        {
-            sourceWriter.emit(prelude.getUnownedSlice());
-        }
-    }
-
     // There may be global-scope modifiers that we should emit now
     // Supress emitting line directives when emitting preprocessor directives since
     // these preprocessor directives may be required to appear in the first line
     // of the output. An example is that the "#version" line in a GLSL source must
     // appear before anything else.
     sourceWriter.supressLineDirective();
-    sourceEmitter->emitPreprocessorDirectives();
-    sourceWriter.resumeLineDirective();
+    
+    // When emitting front matter we can emit the target-language-specific directives
+    // needed to get the default matrix layout to match what was requested
+    // for the given target.
+    //
+    // Note: we do not rely on the defaults for the target language,
+    // because a user could take the HLSL/GLSL generated by Slang and pass
+    // it to another compiler with non-default options specified on
+    // the command line, leading to all kinds of trouble.
+    //
+    // TODO: We need an approach to "global" layout directives that will work
+    // in the presence of multiple modules. If modules A and B were each
+    // compiled with different assumptions about how layout is performed,
+    // then types/variables defined in those modules should be emitted in
+    // a way that is consistent with that layout...
 
-    if (auto glslExtensionTracker = as<GLSLExtensionTracker>(extensionTracker))
+    // Emit any front matter
+    sourceEmitter->emitFrontMatter(targetRequest);
+
+    // If heterogeneous we output the prelude before everything else 
+    if (isHeterogeneousTarget(target))
     {
-        trackGLSLTargetCaps(glslExtensionTracker, targetRequest->getTargetCaps());
-
-        StringBuilder builder;
-        glslExtensionTracker->appendExtensionRequireLines(builder);
-        sourceWriter.emit(builder.getUnownedSlice());
+        sourceWriter.emit(get_slang_cpp_host_prelude());
+    }
+    else
+    {
+        // Get the prelude
+        String prelude = session->getPreludeForLanguage(sourceLanguage);
+        sourceWriter.emit(prelude);
     }
 
-    sourceEmitter->emitLayoutDirectives(targetRequest);
+    // Emit anything that goes before the contents of the code generated for the module
+    sourceEmitter->emitPreModule();
 
-    String prefix = sourceWriter.getContent();
-    
-    StringBuilder finalResultBuilder;
-    finalResultBuilder << prefix;
+    sourceWriter.resumeLineDirective();
 
-    finalResultBuilder << code;
+    // Get the content built so far from the front matter/prelude/preModule
+    // By getting in this way, the content is no longer referenced by the sourceWriter.
+    String finalResult = sourceWriter.getContentAndClear();
+
+    // Append the modules output code
+    finalResult.append(code);
 
     // Write out the result
-    outSource = finalResultBuilder.ProduceString();
+    outSource = finalResult;
     return SLANG_OK;
 }
 

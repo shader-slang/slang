@@ -29,8 +29,8 @@ protected:
     
     virtual void emitTextureOrTextureSamplerTypeImpl(IRTextureTypeBase*  type, char const* baseName) SLANG_OVERRIDE { _emitGLSLTextureOrTextureSamplerType(type, baseName); }
 
-    virtual void emitPreprocessorDirectivesImpl() SLANG_OVERRIDE;
-    virtual void emitLayoutDirectivesImpl(TargetRequest* targetReq) SLANG_OVERRIDE;
+    virtual void emitFrontMatterImpl(TargetRequest* targetReq) SLANG_OVERRIDE;
+
     virtual void emitRateQualifiersImpl(IRRate* rate) SLANG_OVERRIDE;
     virtual void emitInterpolationModifiersImpl(IRInst* varInst, IRType* valueType, IRVarLayout* layout) SLANG_OVERRIDE;
     virtual void emitSimpleTypeImpl(IRType* type) SLANG_OVERRIDE;

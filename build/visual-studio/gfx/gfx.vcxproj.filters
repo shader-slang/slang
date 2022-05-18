@@ -33,13 +33,10 @@
     <ClInclude Include="..\..\..\tools\gfx\d3d11\render-d3d11.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\tools\gfx\d3d12\descriptor-heap-d3d12.h">
+    <ClInclude Include="..\..\..\tools\gfx\d3d12\d3d12-descriptor-heap.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\tools\gfx\d3d12\render-d3d12.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\tools\gfx\d3d12\resource-d3d12.h">
+    <ClInclude Include="..\..\..\tools\gfx\d3d12\d3d12-resource.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\tools\gfx\debug-layer.h">
@@ -99,6 +96,75 @@
     <ClInclude Include="..\..\..\tools\gfx\vulkan\vk-util.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\tools\gfx\d3d12\d3d12-buffer.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\tools\gfx\d3d12\d3d12-texture.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\tools\gfx\d3d12\d3d12-sampler.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\tools\gfx\d3d12\d3d12-resource-views.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\tools\gfx\d3d12\d3d12-framebuffer.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\tools\gfx\d3d12\d3d12-render-pass.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\tools\gfx\d3d12\d3d12-vertex-layout.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\tools\gfx\d3d12\d3d12-pipeline-state.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\tools\gfx\d3d12\d3d12-device.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\tools\gfx\d3d12\d3d12-query.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\tools\gfx\d3d12\d3d12-transient-heap.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\tools\gfx\d3d12\d3d12-command-encoder.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\tools\gfx\d3d12\d3d12-submitter.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\tools\gfx\d3d12\d3d12-shader-object.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\tools\gfx\d3d12\d3d12-shader-object-layout.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\tools\gfx\d3d12\d3d12-shader-program.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\tools\gfx\d3d12\d3d12-shader-table.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\tools\gfx\d3d12\d3d12-command-buffer.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\tools\gfx\d3d12\d3d12-fence.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\tools\gfx\d3d12\d3d12-command-queue.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\tools\gfx\d3d12\d3d12-swap-chain.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\tools\gfx\d3d12\d3d12-helper-functions.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\tools\gfx\d3d12\d3d12-base.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\tools\gfx\cpu\render-cpu.cpp">
@@ -116,13 +182,10 @@
     <ClCompile Include="..\..\..\tools\gfx\d3d11\render-d3d11.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\tools\gfx\d3d12\descriptor-heap-d3d12.cpp">
+    <ClCompile Include="..\..\..\tools\gfx\d3d12\d3d12-descriptor-heap.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\tools\gfx\d3d12\render-d3d12.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\tools\gfx\d3d12\resource-d3d12.cpp">
+    <ClCompile Include="..\..\..\tools\gfx\d3d12\d3d12-resource.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\tools\gfx\debug-layer.cpp">
@@ -168,6 +231,66 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\tools\gfx\vulkan\vk-util.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\tools\gfx\d3d12\d3d12-buffer.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\tools\gfx\d3d12\d3d12-texture.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\tools\gfx\d3d12\d3d12-sampler.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\tools\gfx\d3d12\d3d12-resource-views.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\tools\gfx\d3d12\d3d12-render-pass.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\tools\gfx\d3d12\d3d12-pipeline-state.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\tools\gfx\d3d12\d3d12-device.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\tools\gfx\d3d12\d3d12-query.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\tools\gfx\d3d12\d3d12-transient-heap.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\tools\gfx\d3d12\d3d12-command-encoder.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\tools\gfx\d3d12\d3d12-shader-object.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\tools\gfx\d3d12\d3d12-shader-object-layout.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\tools\gfx\d3d12\d3d12-shader-program.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\tools\gfx\d3d12\d3d12-shader-table.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\tools\gfx\d3d12\d3d12-command-buffer.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\tools\gfx\d3d12\d3d12-fence.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\tools\gfx\d3d12\d3d12-command-queue.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\tools\gfx\d3d12\d3d12-swap-chain.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\tools\gfx\d3d12\d3d12-helper-functions.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\tools\gfx\d3d12\d3d12-submitter.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
