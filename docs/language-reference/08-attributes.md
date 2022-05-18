@@ -14,7 +14,7 @@ The attibute allows access to SPIR-V intrinsics, by supplying a function declara
 In the example below the add function, uses the mechanism to directly use the SPIR-V integer add 'op' which is 128 in this case.
 
 ```HLSL
-// 128 is SpvOpIAdd
+// 128 is OpIAdd in SPIR-V
 [[vk::spirv_instruction(128)]]
 uint add(uint a, uint b);
 
