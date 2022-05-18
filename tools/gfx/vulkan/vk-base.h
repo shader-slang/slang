@@ -38,6 +38,18 @@ namespace vk
     class ShaderProgramImpl;
     class PipelineCommandEncoder;
     class ShaderObjectImpl;
+    class MutableShaderObjectImpl;
+    class RootShaderObjectImpl;
+    class ShaderTableImpl;
+    class ResourceCommandEncoder;
+    class RenderCommandEncoder;
+    class ComputeCommandEncoder;
+    class RayTracingCommandEncoder;
+    class CommandBufferImpl;
+    class CommandQueueImpl;
+    class TransientResourceHeapImpl;
+    class QueryPoolImpl;
+    class SwapchainImpl;
 
 } // namespace vk
 } // namespace gfx
