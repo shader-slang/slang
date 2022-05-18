@@ -671,6 +671,11 @@ class GLSLIndexAttribute : public GLSLSimpleIntegerLayoutAttribute
     SLANG_AST_CLASS(GLSLIndexAttribute)
 };
 
+// [[vk_spirv_instruction]]
+class SPIRVInstructionOpAttribute : public Attribute
+{
+    SLANG_AST_CLASS(SPIRVInstructionOpAttribute)
+};
 
 // TODO: for attributes that take arguments, the syntax node
 // classes should provide accessors for the values of those arguments.

@@ -7517,6 +7517,12 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             getBuilder()->addDecoration(irFunc, kIROp_OutputControlPointsDecoration, intLit);
         }
 
+        if (auto attr = decl->findModifier<SPIRVInstructionOpAttribute>())
+        {
+            IRIntLit* intLit = _getIntLitFromAttribute(getBuilder(), attr);
+            getBuilder()->addDecoration(irFunc, kIROp_SPIRVOpDecoration, intLit);
+        }
+
         if(decl->findModifier<UnsafeForceInlineEarlyAttribute>())
         {
             getBuilder()->addDecoration(irFunc, kIROp_UnsafeForceInlineEarlyDecoration);

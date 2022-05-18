@@ -60,7 +60,6 @@ struct GLSLLivenessContext
 
     Entry m_entries[Index(Kind::CountOf)];          /// Entry for each kind of function
 
-    IRStringLit* m_extensionStringLiteral = nullptr;        ///< The string literal holding the SPIR-V extension needed 
     IRInst* m_zeroIntLiteral = nullptr;                     ///< Zero value literal
     IRType* m_spirvIntLiteralType = nullptr;                ///< Int type that emits as `spirv_literal`
 
@@ -92,9 +91,8 @@ void GLSLLivenessContext::_addDecorations(Kind kind, IRFunc* func)
     //
     // m_builder.addTargetDecoration();
 
-    // We need the spirv extension
-    m_builder.addDecoration(func, kIROp_RequireGLSLExtensionDecoration, m_extensionStringLiteral);
-
+    // We don't need to explictly add the "GL_EXT_spirv_intrinsics"
+    // as it will be added on the GLSL emit, with the SPIRVOpDecoration is hit
     const auto& entry = m_entries[Index(kind)];
     if (entry.m_nameHintLiteral)
     {
@@ -207,8 +205,10 @@ void GLSLLivenessContext::processModule()
     // Zero value literal
     m_zeroIntLiteral = m_builder.getIntValue(m_builder.getIntType(), 0);
 
+    // We don't need to explicitly add this decoration because it will be added as needed on GLSL emit
+    // m_extensionStringLiteral = m_builder.getStringValue(UnownedStringSlice::fromLiteral("GL_EXT_spirv_intrinsics"));
+
     // Set up some values that will be needed on instructions
-    m_extensionStringLiteral = m_builder.getStringValue(UnownedStringSlice::fromLiteral("GL_EXT_spirv_intrinsics"));
 
     // The op values are from the SPIR-V spec
     // https://www.khronos.org/registry/SPIR-V/specs/unified1/SPIRV.html#OpLifetimeStart
