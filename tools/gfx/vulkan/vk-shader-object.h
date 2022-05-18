@@ -5,7 +5,6 @@
 #include "vk-resource-views.h"
 #include "vk-sampler.h"
 #include "vk-shader-object-layout.h"
-#include "vk-texture.h"
 #include "vk-helper-functions.h"
 
 namespace gfx

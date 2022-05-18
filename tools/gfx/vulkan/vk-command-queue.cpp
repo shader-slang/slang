@@ -3,6 +3,7 @@
 
 #include "vk-command-buffer.h"
 #include "vk-fence.h"
+#include "vk-transient-heap.h"
 
 namespace gfx
 {

@@ -13,6 +13,7 @@
 #include "vk-shader-program.h"
 #include "vk-shader-table.h"
 #include "vk-swap-chain.h"
+#include "vk-transient-heap.h"
 #include "vk-vertex-layout.h"
 
 #include "vk-helper-functions.h"

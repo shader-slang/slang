@@ -108,7 +108,7 @@ void PipelineCommandEncoder::uploadBufferDataImpl(
 Result PipelineCommandEncoder::bindRootShaderObjectImpl(VkPipelineBindPoint bindPoint)
 {
     // Obtain specialized root layout.
-    auto rootObjectImpl = m_commandBuffer->m_rootObject;
+    auto rootObjectImpl = &m_commandBuffer->m_rootObject;
 
     auto specializedLayout = rootObjectImpl->getSpecializedLayout();
     if (!specializedLayout)
@@ -171,10 +171,10 @@ Result PipelineCommandEncoder::setPipelineStateImpl(
     IPipelineState* state, IShaderObject** outRootObject)
 {
     m_currentPipeline = static_cast<PipelineStateImpl*>(state);
-    SLANG_RETURN_ON_FAIL(m_commandBuffer->m_rootObject->init(
+    SLANG_RETURN_ON_FAIL(m_commandBuffer->m_rootObject.init(
         m_commandBuffer->m_renderer,
         m_currentPipeline->getProgram<ShaderProgramImpl>()->m_rootObjectLayout));
-    *outRootObject = m_commandBuffer->m_rootObject;
+    *outRootObject = &m_commandBuffer->m_rootObject;
     return SLANG_OK;
 }
 
@@ -196,7 +196,7 @@ void PipelineCommandEncoder::bindRenderState(VkPipelineBindPoint pipelineBindPoi
     //
     RefPtr<PipelineStateBase> newPipeline;
     m_device->maybeSpecializePipeline(
-        m_currentPipeline, m_commandBuffer->m_rootObject, newPipeline);
+        m_currentPipeline, &m_commandBuffer->m_rootObject, newPipeline);
     PipelineStateImpl* newPipelineImpl = static_cast<PipelineStateImpl*>(newPipeline.Ptr());
 
     newPipelineImpl->ensureAPIPipelineStateCreated();

@@ -1,9 +1,8 @@
 // vk-device.h
 #pragma once
 
-#include "vk-command-encoder.h"
+#include "vk-base.h"
 #include "vk-framebuffer.h"
-#include "vk-transient-heap.h"
 
 namespace gfx
 {
