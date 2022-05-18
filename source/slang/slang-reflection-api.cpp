@@ -2580,6 +2580,20 @@ SLANG_API unsigned spReflectionParameter_GetBindingSpace(SlangReflectionParamete
             spReflectionVariableLayout_GetTypeLayout(varLayout)));
 }
 
+SLANG_API SlangResult spIsParameterLocationUsed(
+    SlangCompileRequest* request,
+    SlangInt entryPointIndex,
+    SlangInt targetIndex,
+    SlangParameterCategory category,
+    SlangUInt spaceIndex,
+    SlangUInt registerIndex,
+    bool& outUsed)
+{    
+    if (!request)
+        return SLANG_E_INVALID_ARG;
+        
+    return request->isParameterLocationUsed(entryPointIndex, targetIndex, category, spaceIndex, registerIndex, outUsed);
+}
 
 
 // Entry Point Reflection

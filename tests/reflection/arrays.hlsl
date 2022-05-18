@@ -1,4 +1,4 @@
-//TEST:REFLECTION:-profile ps_4_0 -target hlsl
+//TEST:REFLECTION:-profile ps_4_0 -target hlsl -no-codegen
 
 // Confirm that we can generate reflection info for arrays
 //

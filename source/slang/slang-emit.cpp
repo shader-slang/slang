@@ -25,6 +25,7 @@
 #include "slang-ir-lower-tuple-types.h"
 #include "slang-ir-lower-bit-cast.h"
 #include "slang-ir-lower-reinterpret.h"
+#include "slang-ir-metadata.h"
 #include "slang-ir-optix-entry-point-uniforms.h"
 #include "slang-ir-restructure.h"
 #include "slang-ir-restructure-scoping.h"
@@ -818,11 +819,15 @@ Result linkAndOptimizeIR(
 #endif
     validateIRModuleIfEnabled(codeGenContext, irModule);
 
+    outLinkedIR.metadata = new PostEmitMetadata();
+    collectMetadata(irModule, *outLinkedIR.metadata);
+
     return SLANG_OK;
 }
 
 SlangResult CodeGenContext::emitEntryPointsSourceFromIR(
-    String&                 outSource)
+    String&                 outSource,
+    RefPtr<PostEmitMetadata>& outMetadata)
 {
     outSource = String();
 
@@ -927,6 +932,8 @@ SlangResult CodeGenContext::emitEntryPointsSourceFromIR(
 
         auto irModule = linkedIR.module;
 
+        outMetadata = linkedIR.metadata;
+
         // After all of the required optimization and legalization
         // passes have been performed, we can emit target code from
         // the IR module.
@@ -1007,7 +1014,8 @@ SlangResult emitSPIRVFromIR(
 
 SlangResult emitSPIRVForEntryPointsDirectly(
     CodeGenContext* codeGenContext,
-    List<uint8_t>&  spirvOut)
+    List<uint8_t>&  spirvOut,
+    RefPtr<PostEmitMetadata>& outMetadata)
 {
     // Outside because we want to keep IR in scope whilst we are processing emits
     LinkedIR linkedIR;
@@ -1021,6 +1029,8 @@ SlangResult emitSPIRVForEntryPointsDirectly(
     auto irEntryPoints = linkedIR.entryPoints;
 
     emitSPIRVFromIR(codeGenContext, irModule, irEntryPoints, spirvOut);
+
+    outMetadata = linkedIR.metadata;
 
     return SLANG_OK;
 }

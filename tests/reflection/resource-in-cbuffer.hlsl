@@ -1,4 +1,4 @@
-//TEST(smoke):REFLECTION:-profile ps_4_0 -target hlsl
+//TEST(smoke):REFLECTION:-profile ps_4_0 -target hlsl -no-codegen
 
 // Confirm that we can generate reflection
 // information for resources nested inside

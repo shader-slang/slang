@@ -4147,6 +4147,11 @@ void EndToEndCompileRequest::setCompileFlags(SlangCompileFlags flags)
     getFrontEndReq()->compileFlags = flags;
 }
 
+SlangCompileFlags EndToEndCompileRequest::getCompileFlags()
+{
+    return getFrontEndReq()->compileFlags;
+}
+
 void EndToEndCompileRequest::setDumpIntermediates(int enable)
 {
     shouldDumpIntermediates = (enable != 0);
@@ -4908,5 +4913,15 @@ SlangResult EndToEndCompileRequest::getEntryPoint(SlangInt entryPointIndex, slan
     *outEntryPoint = Slang::ComPtr<slang::IComponentType>(entryPoint).detach();
     return SLANG_OK;
 }
+
+SlangResult EndToEndCompileRequest::isParameterLocationUsed(Int entryPointIndex, Int targetIndex, SlangParameterCategory category, UInt spaceIndex, UInt registerIndex, bool& outUsed)
+{
+    CompileResult* compileResult = nullptr;
+    if (_getEntryPointResult(this, static_cast<int>(entryPointIndex), static_cast<int>(targetIndex), &compileResult) != SLANG_OK)
+        return SLANG_E_INVALID_ARG;
+
+    return compileResult->isParameterLocationUsed(category, spaceIndex, registerIndex, outUsed);
+}
+
 
 } // namespace Slang

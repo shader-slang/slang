@@ -1,4 +1,4 @@
-//TEST:REFLECTION:-profile ps_5_0 -target hlsl
+//TEST:REFLECTION:-profile ps_5_0 -target hlsl -no-codegen
 
 // Confirm that we register a shader as sample-rate when
 // it declares (not necessarly *uses*) a `sample` qualified input

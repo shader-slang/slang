@@ -1,5 +1,5 @@
 // explicit-register-space.slang
-//TEST:REFLECTION:-profile ps_5_1 -target hlsl
+//TEST:REFLECTION:-profile ps_5_1 -target hlsl -no-codegen
 
 // Confirm that we handle explicit register spaces
 // on global shader parameters.

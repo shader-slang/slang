@@ -273,7 +273,9 @@ static void emitReflectionVarBindingInfoJSON(
 
 static void emitReflectionVarBindingInfoJSON(
     PrettyWriter&                       writer,
-    slang::VariableLayoutReflection*    var)
+    slang::VariableLayoutReflection*    var,
+    SlangCompileRequest*                request = nullptr,
+    int                                 entryPointIndex = -1)
 {
     auto stage = var->getStage();
     if (stage != SLANG_STAGE_NONE)
@@ -321,15 +323,28 @@ static void emitReflectionVarBindingInfoJSON(
             auto space = var->getBindingSpace(category);
             auto count = typeLayout->getSize(category);
 
+            // Query the paramater usage for the specified entry point.
+            // Note: both `request` and `entryPointIndex` may be invalid here, but that should just make the function return a failure.
+            bool used = false;
+            bool usedAvailable = spIsParameterLocationUsed(request, entryPointIndex, 0, category, space, index, used) == SLANG_OK;
+
             if (cc != 0) write(writer, ",\n");
 
             write(writer,"{");
+            
             emitReflectionVarBindingInfoJSON(
                 writer,
                 category,
                 index,
                 count,
                 space);
+                
+            if (usedAvailable)
+            {
+                write(writer, ", \"used\": ");
+                write(writer, used);
+            }
+
             write(writer,"}");
         }
 
@@ -1030,6 +1045,27 @@ static void emitReflectionParamJSON(
     write(writer, "\n}");
 }
 
+
+static void emitEntryPointParamJSON(
+    PrettyWriter&                       writer,
+    slang::VariableLayoutReflection*    param,
+    SlangCompileRequest*                request,
+    int                                 entryPointIndex)
+{
+    write(writer, "{\n");
+    indent(writer);
+
+    if( auto name = param->getName() )
+    {
+        emitReflectionNameInfoJSON(writer, name);
+    }
+
+    emitReflectionVarBindingInfoJSON(writer, param, request, entryPointIndex);
+
+    dedent(writer);
+    write(writer, "\n}");
+}
+
 template<typename T>
 struct Range
 {
@@ -1110,8 +1146,12 @@ static void emitReflectionTypeParamJSON(
 
 static void emitReflectionEntryPointJSON(
     PrettyWriter&                   writer,
-    slang::EntryPointReflection*    entryPoint)
+    SlangCompileRequest*            request,
+    slang::ShaderReflection*        programReflection,
+    int                             entryPointIndex)
 {
+    slang::EntryPointReflection* entryPoint = programReflection->getEntryPointByIndex(entryPointIndex);
+
     write(writer, "{\n");
     indent(writer);
 
@@ -1170,12 +1210,32 @@ static void emitReflectionEntryPointJSON(
         write(writer, "]");
     }
 
+    // If code generation has been performed, print out the parameter usage by this entry point.
+    if ((request->getCompileFlags() & SLANG_COMPILE_FLAG_NO_CODEGEN) == 0)
+    {
+        write(writer, ",\n\"bindings\": [\n");
+        indent(writer);
+
+        auto parameterCount = programReflection->getParameterCount();
+        for( auto pp : range(parameterCount) )
+        {
+            if(pp != 0) write(writer, ",\n");
+
+            auto parameter = programReflection->getParameterByIndex(pp);
+            emitEntryPointParamJSON(writer, parameter, request, entryPointIndex);
+        }
+
+        dedent(writer);
+        write(writer, "\n]");
+    }
+
     dedent(writer);
     write(writer, "\n}");
 }
 
 static void emitReflectionJSON(
     PrettyWriter&               writer,
+    SlangCompileRequest*        request,
     slang::ShaderReflection*    programReflection)
 {
     write(writer, "{\n");
@@ -1200,13 +1260,12 @@ static void emitReflectionJSON(
     {
         write(writer, ",\n\"entryPoints\": [\n");
         indent(writer);
-
+    
         for (auto ee : range(entryPointCount))
         {
             if (ee != 0) write(writer, ",\n");
 
-            auto entryPoint = programReflection->getEntryPointByIndex(ee);
-            emitReflectionEntryPointJSON(writer, entryPoint);
+            emitReflectionEntryPointJSON(writer, request, programReflection, (int)ee);
         }
 
         dedent(writer);
@@ -1264,13 +1323,14 @@ static void emitReflectionJSON(
 }
 
 void emitReflectionJSON(
+    SlangCompileRequest* request,
     SlangReflection*    reflection)
 {
     auto programReflection = (slang::ShaderReflection*) reflection;
 
     PrettyWriter writer;
     
-    emitReflectionJSON(writer, programReflection);
+    emitReflectionJSON(writer, request, programReflection);
 }
 
 static SlangResult maybeDumpDiagnostic(SlangResult res, SlangCompileRequest* request)
@@ -1285,15 +1345,6 @@ static SlangResult maybeDumpDiagnostic(SlangResult res, SlangCompileRequest* req
 
 SlangResult performCompilationAndReflection(SlangCompileRequest* request, int argc, const char*const* argv)
 {
-    // We don't actually need codegen to get reflection.
-    // 
-    // Ideally perhaps this would use a call to
-    // request->setCompileFlags(flags);
-    // But that relies on knowing what flags are set, and there isn't a way to get that, so do it arg way
-
-    const char* noCodeGenArgs[] = { "-no-codegen" };
-    SLANG_RETURN_ON_FAIL(maybeDumpDiagnostic(spProcessCommandLineArguments(request, noCodeGenArgs, SLANG_COUNT_OF(noCodeGenArgs)), request));
-
     SLANG_RETURN_ON_FAIL(maybeDumpDiagnostic(spProcessCommandLineArguments(request, &argv[1], argc - 1), request));
     SLANG_RETURN_ON_FAIL(maybeDumpDiagnostic(spCompile(request), request));
 
@@ -1301,7 +1352,7 @@ SlangResult performCompilationAndReflection(SlangCompileRequest* request, int ar
     // we have.
 
     SlangReflection* reflection = spGetReflection(request);
-    emitReflectionJSON(reflection);
+    emitReflectionJSON(request, reflection);
 
     return SLANG_OK;
 }

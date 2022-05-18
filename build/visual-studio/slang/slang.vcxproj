@@ -335,6 +335,7 @@ IF EXIST ..\..\..\external\slang-binaries\bin\windows-aarch64\slang-glslang.dll\
     <ClInclude Include="..\..\..\source\slang\slang-emit-hlsl.h" />
     <ClInclude Include="..\..\..\source\slang\slang-emit-precedence.h" />
     <ClInclude Include="..\..\..\source\slang\slang-emit-source-writer.h" />
+    <ClInclude Include="..\..\..\source\slang\slang-emit.h" />
     <ClInclude Include="..\..\..\source\slang\slang-glsl-extension-tracker.h" />
     <ClInclude Include="..\..\..\source\slang\slang-hlsl-intrinsic-set.h" />
     <ClInclude Include="..\..\..\source\slang\slang-image-format-defs.h" />
@@ -376,6 +377,7 @@ IF EXIST ..\..\..\external\slang-binaries\bin\windows-aarch64\slang-glslang.dll\
     <ClInclude Include="..\..\..\source\slang\slang-ir-lower-generics.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-lower-reinterpret.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-lower-tuple-types.h" />
+    <ClInclude Include="..\..\..\source\slang\slang-ir-metadata.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-missing-return.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-optix-entry-point-uniforms.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-restructure-scoping.h" />
@@ -517,6 +519,7 @@ IF EXIST ..\..\..\external\slang-binaries\bin\windows-aarch64\slang-glslang.dll\
     <ClCompile Include="..\..\..\source\slang\slang-ir-lower-generics.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-lower-reinterpret.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-lower-tuple-types.cpp" />
+    <ClCompile Include="..\..\..\source\slang\slang-ir-metadata.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-missing-return.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-optix-entry-point-uniforms.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-restructure-scoping.cpp" />
