@@ -398,7 +398,8 @@ namespace Slang
                 getSink()->diagnose(attr, Diagnostics::expectedSingleStringArg, attr->keywordName);
             }
         }
-        else if (as<OutputControlPointsAttribute>(attr))
+        else if (as<OutputControlPointsAttribute>(attr) ||
+                    as<SPIRVInstructionOpAttribute>(attr))
         {
             // Let it go thru iff single integral attribute
             if (!hasIntArgs(attr, 1))
