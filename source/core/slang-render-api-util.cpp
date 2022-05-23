@@ -245,7 +245,7 @@ static Token nextToken(Slang::UnownedStringSlice& textInOut, Slang::UnownedStrin
     return RenderApiType::Unknown;
 }
 
-#if SLANG_WINDOWS_FAMILY
+#if (SLANG_WINDOWS_FAMILY) || (SLANG_UNIX_FAMILY)
 static bool _canLoadSharedLibrary(const char* libName)
 {
     SharedLibrary::Handle handle;
