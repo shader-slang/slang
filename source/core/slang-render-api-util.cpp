@@ -280,8 +280,8 @@ static bool _canLoadSharedLibrary(const char* libName)
     // Assume on unix target we have Opengl and Vulkan for now
     switch (type)
     {
+        case RenderApiType::Vulkan: return _canLoadSharedLibrary("libvulkan.so.1") || _canLoadSharedLibrary("vk_swiftshader");
         case RenderApiType::OpenGl:
-        case RenderApiType::Vulkan:
         {
             return true;
         }
