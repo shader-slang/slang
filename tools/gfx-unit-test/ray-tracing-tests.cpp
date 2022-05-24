@@ -8,11 +8,29 @@
 
 #include <chrono>
 
+#include <stdlib.h>
+#include <stdio.h>
+
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#include "external/stb/stb_image_write.h"
+
 using namespace gfx;
 using namespace Slang;
 
 namespace gfx_test
 {
+    Slang::Result writeImage(
+        const char* filename,
+        ISlangBlob* pixels,
+        uint32_t width,
+        uint32_t height)
+    {
+        int stbResult =
+            stbi_write_hdr(filename, width, height, 4, (float*)pixels->getBufferPointer());
+
+        return stbResult ? SLANG_OK : SLANG_FAIL;
+    }
+
     struct Uniforms
     {
         float screenWidth, screenHeight;
@@ -227,7 +245,7 @@ namespace gfx_test
             resultTextureDesc.size.height = windowHeight;
             resultTextureDesc.size.depth = 1;
             resultTextureDesc.defaultState = ResourceState::UnorderedAccess;
-            resultTextureDesc.format = Format::R16G16B16A16_FLOAT;
+            resultTextureDesc.format = Format::R32G32B32A32_FLOAT;
             gResultTexture = device->createTextureResource(resultTextureDesc);
             IResourceView::Desc resultUAVDesc = {};
             resultUAVDesc.format = resultTextureDesc.format;
@@ -589,35 +607,26 @@ namespace gfx_test
                 renderEncoder->endEncoding();
                 renderCommandBuffer->close();
                 gQueue->executeCommandBuffer(renderCommandBuffer);
+                gQueue->waitOnHost();
             }
+        }
 
-            {
-                ComPtr<ICommandBuffer> presentCommandBuffer =
-                    gTransientHeap->createCommandBuffer();
-                auto presentEncoder = presentCommandBuffer->encodeRenderCommands(
-                    gRenderPass, gFramebuffer);
-                gfx::Viewport viewport = {};
-                viewport.maxZ = 1.0f;
-                viewport.extentX = (float)windowWidth;
-                viewport.extentY = (float)windowHeight;
-                presentEncoder->setViewportAndScissor(viewport);
-                auto rootObject = presentEncoder->bindPipeline(gPresentPipelineState);
-                auto cursor = ShaderCursor(rootObject->getEntryPoint(1));
-                cursor["t"].setResource(gResultTextureUAV);
-                presentEncoder->setVertexBuffer(
-                    0, gFullScreenVertexBuffer);
-                presentEncoder->setPrimitiveTopology(PrimitiveTopology::TriangleList);
-                presentEncoder->draw(3);
-                presentEncoder->endEncoding();
-                presentCommandBuffer->close();
-                gQueue->executeCommandBuffer(presentCommandBuffer);
-            }
+        void checkTestResults()
+        {
+            ComPtr<ISlangBlob> resultBlob;
+            size_t rowPitch = 0;
+            size_t pixelSize = 0;
+            GFX_CHECK_CALL_ABORT(device->readTextureResource(
+                gResultTexture, ResourceState::CopySource, resultBlob.writeRef(), &rowPitch, &pixelSize));
+
+            writeImage("C:/Users/lucchen/Documents/test.hdr", resultBlob, windowWidth, windowHeight);
         }
 
         void run()
         {
             createRequiredResources();
             renderFrame();
+            checkTestResults();
         }
     };
 
