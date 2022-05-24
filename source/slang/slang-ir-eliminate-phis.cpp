@@ -68,14 +68,14 @@ struct PhiEliminationContext
     IRModule* m_module = nullptr;
     SharedIRBuilder m_sharedBuilder;
     IRBuilder m_builder;
-    LivenessOptions m_livenessOptions;
+    LivenessMode m_livenessMode;
 
-    PhiEliminationContext(CodeGenContext* codeGenContext, const LivenessOptions& livenessOptions, IRModule* module)
+    PhiEliminationContext(CodeGenContext* codeGenContext, LivenessMode livenessMode, IRModule* module)
         : m_codeGenContext(codeGenContext)
         , m_module(module)
         , m_sharedBuilder(module)
         , m_builder(m_sharedBuilder)
-        , m_livenessOptions(livenessOptions)
+        , m_livenessMode(livenessMode)
     {}
 
     // We start with the top-down logic of the pass, which is to process
@@ -790,7 +790,7 @@ struct PhiEliminationContext
             auto& srcArg = assignment.arg;
 
             // If we have liveness tracking add the start location.
-            if (m_livenessOptions.enabled)
+            if (isEnabled(m_livenessMode))
             {
                 // A store could (perhaps?) consist of multiple instructions
                 // If we make liveness *after* the store, then it implies anything stored 
@@ -900,9 +900,9 @@ struct PhiEliminationContext
     }
 };
 
-void eliminatePhis(CodeGenContext* codeGenContext, const LivenessOptions& livenessOptions, IRModule* module)
+void eliminatePhis(CodeGenContext* codeGenContext, LivenessMode livenessMode, IRModule* module)
 {
-    PhiEliminationContext context(codeGenContext, livenessOptions, module);
+    PhiEliminationContext context(codeGenContext, livenessMode, module);
     context.eliminatePhisInModule();
 }
 

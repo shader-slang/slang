@@ -14,6 +14,6 @@ namespace Slang
         /// so that it is more suitable for emission on targets that
         /// are not themselves based on an SSA representation.
         ///
-        /// If liveness information is needed LivenessOptions must be enabled. If it is LiveRangeStarts will be inserted
-    void eliminatePhis(CodeGenContext* context, const LivenessOptions& options, IRModule* module);
+        /// If livenessMode is enabled LiveRangeStarts will be inserted into the module.
+    void eliminatePhis(CodeGenContext* context, LivenessMode livenessMode, IRModule* module);
 }

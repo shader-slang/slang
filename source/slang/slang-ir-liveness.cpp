@@ -178,9 +178,9 @@ struct LivenessContext
         /// Process the module
     void process();
     
-    LivenessContext(IRModule* module, const LivenessOptions& options):
+    LivenessContext(IRModule* module, LivenessMode mode):
         m_module(module),
-        m_options(options)
+        m_livenessMode(mode)
     {
         // Disable warning if not used
         SLANG_UNUSED(&LivenessContext::_isAnyRunInst);
@@ -308,7 +308,7 @@ struct LivenessContext
     SharedIRBuilder m_sharedBuilder;
     IRBuilder m_builder;
 
-    LivenessOptions m_options;
+    LivenessMode m_livenessMode;
 };
 
 static void _findLiveStarts(IRFunc* funcInst, List<IRLiveRangeStart*>& ioStarts)
@@ -1194,9 +1194,9 @@ static void _processFunction(IRFunc* funcInst, List<IRVar*>& ioVars)
     }
 }
 
-/* static */void LivenessUtil::addVariableRangeStarts(IRModule* module, const Options& options)
+/* static */void LivenessUtil::addVariableRangeStarts(IRModule* module, LivenessMode livenessMode)
 {
-    if (!options.enabled)
+    if (!isEnabled(livenessMode))
     {
         return;
     }
@@ -1234,11 +1234,11 @@ static void _processFunction(IRFunc* funcInst, List<IRVar*>& ioVars)
     }
 }
 
-/* static */void LivenessUtil::addRangeEnds(IRModule* module, const Options& options)
+/* static */void LivenessUtil::addRangeEnds(IRModule* module, LivenessMode livenessMode)
 {
-    if (options.enabled)
+    if (isEnabled(livenessMode))
     {
-        LivenessContext context(module, options);
+        LivenessContext context(module, livenessMode);
         context.process();
     }
 }

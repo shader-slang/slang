@@ -163,22 +163,25 @@ Similarly calling into a function could return a struct that contains fields whi
 fully specialized.
 */
 
+/* The mode for liveness tracking. 
 
-/* Options for controlling liveness generation */
-struct LivenessOptions
+Currently just controls enabling/disabling, but could be used to control other aspects. */
+enum class LivenessMode
 {
-	bool enabled = false;
+	Disabled,
+	Enabled,
 };
+
+// Helper for testing if liveness is enabled.
+SLANG_FORCE_INLINE bool isEnabled(LivenessMode mode) { return mode != LivenessMode::Disabled; }
 
 struct LivenessUtil
 {
-	typedef LivenessOptions Options;
-
 		/// Locate all of the variables across the module and add live range starts.
-	static void addVariableRangeStarts(IRModule* module, const Options& options);
+	static void addVariableRangeStarts(IRModule* module, LivenessMode mode);
 
 		/// Adds LiveRangeEnd instructions to demark the end of all of the liveness starts in the module
-	static void addRangeEnds(IRModule* module, const Options& options);
+	static void addRangeEnds(IRModule* module, LivenessMode mode);
 };
 
 }
