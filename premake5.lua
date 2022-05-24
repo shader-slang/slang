@@ -1363,7 +1363,7 @@ standardProject("slang-rt", "source/slang-rt")
      uuid "092DAB9F-1DA5-4538-ADD7-1A8D1DBFD519"
      includedirs { "." }
      addSourceDir "tools/unit-test"
-     links {  "core", "slang", "gfx", "gfx-util" }
+     links {  "core", "slang", "gfx", "gfx-util", "platform" }
  
  toolSharedLibrary "slang-unit-test"
      uuid "0162864E-7651-4B5E-9105-C571105276EA"
