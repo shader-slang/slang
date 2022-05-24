@@ -163,22 +163,22 @@ Similarly calling into a function could return a struct that contains fields whi
 fully specialized.
 */
 
-struct LivenessLocation
+
+/* Options for controlling liveness generation */
+struct LivenessOptions
 {
-	IRGlobalValueWithCode* function;	///< The function the associated with this location
-	IRInst* root;						///< The root variable that is being liveness tracked
-	IRInsertLoc startLocation;			///< The location to insert start
+	bool enabled = false;
 };
 
 struct LivenessUtil
 {
-	typedef LivenessLocation Location;
+	typedef LivenessOptions Options;
 
-		/// Locate all of the variables across the module and append their locations into ioLocations
-	static void locateVariables(IRModule* module, List<Location>& ioLocations);
+		/// Locate all of the variables across the module and add live range starts.
+	static void addVariableRangeStarts(IRModule* module, const Options& options);
 
-		/// Adds LiveRangeStart and LiveRangeEnd instructions to demark the start and end of the liveness of a variable, based on tlocations
-	static void addLivenessRanges(IRModule* module, const List<Location>& locations);
+		/// Adds LiveRangeEnd instructions to demark the end of all of the liveness starts in the module
+	static void addRangeEnds(IRModule* module, const Options& options);
 };
 
 }

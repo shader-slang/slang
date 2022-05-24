@@ -14,7 +14,6 @@ namespace Slang
         /// so that it is more suitable for emission on targets that
         /// are not themselves based on an SSA representation.
         ///
-        /// ioLocations is optional - pass nullptr if not required. 
-        /// If set, will have liveness location information appended to the list
-    void eliminatePhis(CodeGenContext* context, List<LivenessLocation>* ioLocations, IRModule* module);
+        /// If liveness information is needed LivenessOptions must be enabled. If it is LiveRangeStarts will be inserted
+    void eliminatePhis(CodeGenContext* context, const LivenessOptions& options, IRModule* module);
 }
