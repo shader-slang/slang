@@ -324,7 +324,7 @@ static void _findLiveStarts(IRFunc* funcInst, List<IRLiveRangeStart*>& ioStarts)
     {
         for (auto inst = block->getFirstChild(); inst; inst = inst->getNextInst())
         {
-            // We look for var declarations.
+            // We look for LiveRangeStarts
             if (auto rangeStartInst = as<IRLiveRangeStart>(inst))
             {
                 ioStarts.add(rangeStartInst);
@@ -338,7 +338,7 @@ static void _findFuncs(IRModule* module, List<IRFunc*>& ioFuncs)
     IRModuleInst* moduleInst = module->getModuleInst();
     for (IRInst* child : moduleInst->getChildren())
     {
-        // We want to find all of the functions, and process them
+        // If we find a function add it to the list
         if (auto funcInst = as<IRFunc>(child))
         {
             ioFuncs.add(funcInst);
@@ -1062,7 +1062,6 @@ void LivenessContext::_processFunction(IRFunc* func)
 {
     SLANG_ASSERT(m_rangeStarts.getCount() > 0);
 
-    
     // Create the dominator tree, for the function
     m_dominatorTree = computeDominatorTree(func);
 
@@ -1130,7 +1129,6 @@ void LivenessContext::_processFunction(IRFunc* func)
         {
             // Get the root at the start of this span
             const auto root = m_rangeStarts[start]->getReferenced();
-
             
             // Look for the end of the run of locations with the same root
             Index end = start + 1;
