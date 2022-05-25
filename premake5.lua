@@ -780,6 +780,11 @@ standardProject("slang-rt", "source/slang-rt")
      includedirs { "." }
  
      links { "compiler-core", "core", "slang" }
+     
+tool "slangd"
+     uuid "B2D63B45-92B0-40F7-B242-CCA4DFD64341"
+     includedirs { "." }
+     links { "compiler-core", "core", "slang" }
  
  --
  -- `slang-generate` is a tool we use for source code generation on
