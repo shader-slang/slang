@@ -30,6 +30,6 @@ namespace Slang
 
     private:
         SlangResult _executeSingle();
-        slang::IGlobalSession* LanguageServer::getOrCreateGlobalSession();
+        slang::IGlobalSession* getOrCreateGlobalSession();
     };
 }

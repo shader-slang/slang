@@ -7,6 +7,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <thread>
 
 #include "../../source/core/slang-secure-crt.h"
 #include "../../slang-com-helper.h"
