@@ -68,14 +68,14 @@ struct PhiEliminationContext
     IRModule* m_module = nullptr;
     SharedIRBuilder m_sharedBuilder;
     IRBuilder m_builder;
-    List<LivenessLocation>* m_livenessLocations;
+    LivenessMode m_livenessMode;
 
-    PhiEliminationContext(CodeGenContext* codeGenContext, List<LivenessLocation>* ioLivenessLocations, IRModule* module)
+    PhiEliminationContext(CodeGenContext* codeGenContext, LivenessMode livenessMode, IRModule* module)
         : m_codeGenContext(codeGenContext)
         , m_module(module)
         , m_sharedBuilder(module)
         , m_builder(m_sharedBuilder)
-        , m_livenessLocations(ioLivenessLocations)
+        , m_livenessMode(livenessMode)
     {}
 
     // We start with the top-down logic of the pass, which is to process
@@ -786,6 +786,20 @@ struct PhiEliminationContext
                 return;
             }
 
+            auto& dstParam = assignment.param;
+            auto& srcArg = assignment.arg;
+
+            // If we have liveness tracking add the start location.
+            if (isEnabled(m_livenessMode))
+            {
+                // A store could (perhaps?) consist of multiple instructions
+                // If we make liveness *after* the store, then it implies anything stored 
+                // into the location might be lost.
+                //
+                // Therefore is seems appropriate to say the variable is *live* *before* the store instruction.
+                m_builder.emitLiveRangeStart(dstParam.temp);
+            }
+
             // When we have an assignment that is ready to perform,
             // we do so by storing the value of the corresponding
             // argument into the temporary for the coresponding
@@ -795,26 +809,7 @@ struct PhiEliminationContext
             // so that any logic that might have moved another parameter
             // into a temporary will influence our result.
             //
-            auto& dstParam = assignment.param;
-            auto& srcArg = assignment.arg;
-            auto storeInst = m_builder.emitStore(dstParam.temp, *srcArg.currentValPtr);
-
-            // If we have liveness tracking add the location
-            if (m_livenessLocations)
-            {
-                LivenessLocation location;
-                location.root = dstParam.temp;
-
-                // A store could (perhaps?) consist of multiple instructions
-                // If we make liveness *after* the store, then it implies anything stored 
-                // into the location might be lost.
-                //
-                // Therefore is seems appropriate to say the variable is *live* *before* the store instruction.
-                location.startLocation = IRInsertLoc::before(storeInst);
-                location.function = m_func;
-
-                m_livenessLocations->add(location);
-            }
+            m_builder.emitStore(dstParam.temp, *srcArg.currentValPtr);
 
             //
             // Once the store is emitted, the assignment has been performed,
@@ -905,9 +900,9 @@ struct PhiEliminationContext
     }
 };
 
-void eliminatePhis(CodeGenContext* codeGenContext, List<LivenessLocation>* ioLocations, IRModule* module)
+void eliminatePhis(CodeGenContext* codeGenContext, LivenessMode livenessMode, IRModule* module)
 {
-    PhiEliminationContext context(codeGenContext, ioLocations, module);
+    PhiEliminationContext context(codeGenContext, livenessMode, module);
     context.eliminatePhisInModule();
 }
 
