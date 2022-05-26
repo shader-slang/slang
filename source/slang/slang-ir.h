@@ -786,7 +786,13 @@ struct IRBoolType : IRBasicType
     IR_LEAF_ISA(BoolType)
 };
 
-SIMPLE_IR_TYPE(StringType, Type)
+struct IRStringTypeBase : IRType
+{
+    IR_PARENT_ISA(StringTypeBase)
+};
+
+SIMPLE_IR_TYPE(StringType, StringTypeBase)
+SIMPLE_IR_TYPE(NativeStringType, StringTypeBase)
 
 SIMPLE_IR_TYPE(DynamicType, Type)
 

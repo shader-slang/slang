@@ -378,6 +378,11 @@ __intrinsic_type($(kIROp_StringType))
 struct String
 {};
 
+__magic_type(NativeStringType)
+__intrinsic_type($(kIROp_NativeStringType))
+struct NativeString
+{};
+
 __magic_type(DynamicType)
 __intrinsic_type($(kIROp_DynamicType))
 struct __Dynamic

@@ -2508,6 +2508,12 @@ namespace Slang
         return (IRStringType*)getType(kIROp_StringType);
     }
 
+    IRNativeStringType* IRBuilder::getNativeStringType()
+    {
+        return (IRNativeStringType*)getType(kIROp_NativeStringType);
+    }
+
+
     IRType* IRBuilder::getCapabilitySetType()
     {
         return getType(kIROp_CapabilitySetType);

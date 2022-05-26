@@ -177,7 +177,6 @@ static char _getCppUnescapedChar(char c)
     }
 }
 
-
 bool CppStringEscapeHandler::isUnescapingNeeeded(const UnownedStringSlice& slice)
 {
     return slice.indexOf('\\') >= 0;
@@ -220,10 +219,16 @@ SlangResult CppStringEscapeHandler::appendEscaped(const UnownedStringSlice& slic
     const char* cur = start;
     const char*const end = slice.end();
 
+    // TODO(JS): A cleverer implementation might support U and u prefixing for unicode characters.
+    // For now we just stick with hex if it's not 'regular' ascii.
+
     for (; cur < end; ++cur)
     {
         const char c = *cur;
         const char escapedChar = _getCppEscapedChar(c);
+
+        // We never output as octal, so we don't need special handing for 0, as it is output as 
+        // "\x00"
 
         if (escapedChar)
         {
@@ -245,10 +250,10 @@ SlangResult CppStringEscapeHandler::appendEscaped(const UnownedStringSlice& slic
                 out.append(start, cur);
             }
 
-            char buf[5] = "\\0x0";
+            char buf[5] = "\\x";
 
-            buf[3] = _getHexChar((int(c) >> 4) & 0xf);
-            buf[4] = _getHexChar(c & 0xf);
+            buf[2] = _getHexChar((int(c) >> 4) & 0xf);
+            buf[3] = _getHexChar(c & 0xf);
 
             out.append(buf, buf + 4);
 
@@ -340,19 +345,28 @@ SlangResult CppStringEscapeHandler::appendUnescaped(const UnownedStringSlice& sl
                 }
                 case 'x':
                 {
+                    /// In the C++ standard we consume hex digits until we hit a non hex digit
                     uint32_t value = 0;
                     for (++cur; cur < end && CharUtil::isHexDigit(*cur); ++cur)
                     {
-                        value = value << 4 | _getHexDigit(*cur);
+                        value = (value << 4) | _getHexDigit(*cur);
                     }
 
-                    // It's arguable what is appropriate. We only decode/encode 4, which the current spec has,
-                    // but 6 are possible, so lets go large.
-                    const Index maxUtf8EncodeCount = 6;
+                    // If it's ascii, just output it
+                    if (value < 0x80)
+                    {
+                        out.appendChar(char(value));
+                    }
+                    else
+                    {
+                        // It's arguable what is appropriate. We only decode/encode 4, which the current spec has,
+                        // but 6 are possible, so lets go large.
+                        const Index maxUtf8EncodeCount = 6;
 
-                    char* chars = out.prepareForAppend(maxUtf8EncodeCount);
-                    int numChars = encodeUnicodePointToUTF8(Char32(value), chars);
-                    out.appendInPlace(chars, numChars);
+                        char* chars = out.prepareForAppend(maxUtf8EncodeCount);
+                        int numChars = encodeUnicodePointToUTF8(Char32(value), chars);
+                        out.appendInPlace(chars, numChars);
+                    }
 
                     start = cur;
                     break;

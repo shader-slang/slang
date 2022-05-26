@@ -532,6 +532,11 @@ SlangResult CPPSourceEmitter::calcTypeName(IRType* type, CodeGenTarget target, S
             out << "TypeInfo*";
             return SLANG_OK;
         }
+        case kIROp_NativeStringType:
+        {
+            out << "const char*";
+            return SLANG_OK;
+        }
         case kIROp_StringType:
         {
             out << "String";
@@ -2412,7 +2417,14 @@ bool CPPSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOut
         case kIROp_StringLit:
         {
             m_writer->emit("toTerminatedSlice(");
-            m_writer->emit(Slang::Misc::EscapeStringLiteral(as<IRStringLit>(inst)->getStringSlice()));
+
+            auto handler = StringEscapeUtil::getHandler(StringEscapeUtil::Style::Cpp);
+            
+            StringBuilder buf;
+            const auto slice = as<IRStringLit>(inst)->getStringSlice();
+            StringEscapeUtil::appendQuoted(handler, slice, buf);
+            m_writer->emit(buf);
+
             m_writer->emit(")");
             return true;
         }

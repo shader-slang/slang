@@ -68,7 +68,7 @@ static const CompileTargetInfo s_compileTargetInfos[] =
     { SLANG_SPIRV_ASM,      "spv.asm",                                          "spirv-asm,spirv-assembly" },
     { SLANG_C_SOURCE,       "c",                                                "c" },
     { SLANG_CPP_SOURCE,     "cpp,c++,cxx",                                      "cpp,c++,cxx" },
-    { SLANG_HOST_CPP_SOURCE, "cpp,c++,cxx",                                     "cpp,c++,cxx"},
+    { SLANG_HOST_CPP_SOURCE, "cpp,c++,cxx",                                     "host-cpp,host-c++,host-cxx"},
     { SLANG_HOST_EXECUTABLE,"exe",                                              "exe,executable" },
     { SLANG_SHADER_SHARED_LIBRARY, "dll,so",                                    "sharedlib,sharedlibrary,dll" },
     { SLANG_CUDA_SOURCE,    "cu",                                               "cuda,cu"  },

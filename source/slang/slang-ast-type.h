@@ -460,10 +460,22 @@ private:
     Type* rowType = nullptr;
 };
 
-// The built-in `String` type
-class StringType : public BuiltinType 
+// Base class for built in string types
+class StringTypeBase : public BuiltinType
+{
+    SLANG_AST_CLASS(StringTypeBase)
+};
+
+// The regular built-in `String` type
+class StringType : public StringTypeBase
 {
     SLANG_AST_CLASS(StringType)
+};
+
+// The string type native to the target
+class NativeStringType : public StringTypeBase
+{
+    SLANG_AST_CLASS(NativeStringType)
 };
 
 // The built-in `__Dynamic` type
