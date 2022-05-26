@@ -2411,7 +2411,7 @@ bool CPPSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOut
         }
         case kIROp_StringLit:
         {
-            m_writer->emit("String(");
+            m_writer->emit("toTerminatedSlice(");
             m_writer->emit(Slang::Misc::EscapeStringLiteral(as<IRStringLit>(inst)->getStringSlice()));
             m_writer->emit(")");
             return true;
