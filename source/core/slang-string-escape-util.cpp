@@ -120,27 +120,6 @@ static char _getHexChar(int v)
     return (v <= 9) ? char(v + '0') : char(v - 10 + 'A');
 }
 
-static int _getHexDigit(char c)
-{
-    if (c >= '0' && c <= '9')
-    {
-        return c - '0';
-    }
-    else if (c >= 'a' && c <= 'f')
-    {
-        return c - 'a' + 10;
-    }
-    else if (c >= 'A' && c <= 'F')
-    {
-        return c - 'A' + 10;
-    }
-    else
-    {
-        SLANG_ASSERT(!"Not a hex digit");
-        return 0;
-    }
-}
-
 static char _getCppEscapedChar(char c)
 {
     switch (c)
@@ -250,12 +229,41 @@ SlangResult CppStringEscapeHandler::appendEscaped(const UnownedStringSlice& slic
                 out.append(start, cur);
             }
 
-            char buf[5] = "\\x";
+            char buf[6];
+            char* dst = buf;
 
-            buf[2] = _getHexChar((int(c) >> 4) & 0xf);
-            buf[3] = _getHexChar(c & 0xf);
+            // NOTE! There is a possible flaw around this. If a string is constructed 
+            // appended in parts, the next character is not available so the problem below can still
+            // occur.
 
-            out.append(buf, buf + 4);
+            // C++ greedily consumes hex digits. This is a problem if we have bytes
+            // 0, '1' as by default this will output as
+            // "\x001" which is the single character byte 1.
+            // To work around here we check if the next digit is a hex character in that case 
+            // we used the C++11 \u style which does have a fixed length
+
+            // Another solution to this problem would be to output "", but that makes some other assumptions
+
+            // Note this claims \x is followed with up to 3 hex digits
+            // https://msdn.microsoft.com/en-us/library/69ze775t.aspx
+            // But the following claims otherwise
+            // https://en.cppreference.com/w/cpp/language/string_literal
+
+            if (cur + 1 < end && CharUtil::isHexDigit(cur[1]))
+            {
+                ::memcpy(buf, "\\u00", 4);
+                dst += 4;
+            }
+            else
+            {
+                ::memcpy(buf, "\\x", 2);
+                dst += 2;
+            }
+
+            dst[0] = _getHexChar((int(c) >> 4) & 0xf);
+            dst[1] = _getHexChar(c & 0xf);
+
+            out.append(buf, dst + 2);
 
             start = cur + 1;
         }
@@ -294,8 +302,10 @@ SlangResult CppStringEscapeHandler::appendUnescaped(const UnownedStringSlice& sl
                 return SLANG_FAIL;
             }
 
+            const char nextC = *cur++;
+
             // Need to handle various escape sequence cases
-            switch (*cur)
+            switch (nextC)
             {
                 case '\'':
                 case '\"':
@@ -309,7 +319,7 @@ SlangResult CppStringEscapeHandler::appendUnescaped(const UnownedStringSlice& sl
                 case 't':
                 case 'v':
                 {
-                    const char unescapedChar = _getCppUnescapedChar(*cur);
+                    const char unescapedChar = _getCppUnescapedChar(nextC);
                     if (unescapedChar == 0)
                     {
                         // Don't know how to unescape that char
@@ -317,14 +327,13 @@ SlangResult CppStringEscapeHandler::appendUnescaped(const UnownedStringSlice& sl
                     }
                     out.appendChar(unescapedChar);
 
-                    start = cur + 1;
+                    start = cur;
                     break;
                 }
                 case '0': case '1': case '2': case '3': case '4':
                 case '5': case '6': case '7':
                 {
                     // octal escape: up to 3 characters
-                    ++cur;
                     int value = 0;
 
                     const char* octEnd = cur + 3;
@@ -347,11 +356,64 @@ SlangResult CppStringEscapeHandler::appendUnescaped(const UnownedStringSlice& sl
                 {
                     /// In the C++ standard we consume hex digits until we hit a non hex digit
                     uint32_t value = 0;
-                    for (++cur; cur < end && CharUtil::isHexDigit(*cur); ++cur)
+                    for (; cur < end && CharUtil::isHexDigit(*cur); ++cur)
                     {
-                        value = (value << 4) | _getHexDigit(*cur);
+                        const int digitValue = CharUtil::getHexDigitValue(*cur);
+                        if (digitValue < 0)
+                        {
+                            return SLANG_FAIL;
+                        }
+
+                        value = (value << 4) | digitValue;
                     }
 
+                    // If it's ascii, just output it
+                    if (value < 0x80)
+                    {
+                        out.appendChar(char(value));
+                    }
+                    else
+                    {
+                        // It's arguable what is appropriate. We only decode/encode 4, which the current spec has,
+                        // but 6 are possible, so lets go large.
+                        const Index maxUtf8EncodeCount = 6;
+
+                        char* chars = out.prepareForAppend(maxUtf8EncodeCount);
+                        int numChars = encodeUnicodePointToUTF8(Char32(value), chars);
+                        out.appendInPlace(chars, numChars);
+                    }
+
+                    start = cur;
+                    break;
+                }
+                case 'u':
+                case 'U':
+                {
+                    // u implies 4 hex digits
+                    // U implies 6.
+
+                    // Work out how many digits we need
+                    const Count digitCount = (nextC == 'u') ? 4 : 6;
+
+                    // Do we have enough?
+                    if (end - cur < digitCount)
+                    {
+                        return SLANG_FAIL;
+                    }
+
+                    uint32_t value = 0;
+                    for (Index i = 0; i < digitCount; ++i)
+                    {
+                        const int digitValue = CharUtil::getHexDigitValue(cur[i]);
+                        if (digitValue < 0)
+                        {
+                            return SLANG_FAIL;
+                        }
+                        value = (value << 4) | digitValue;
+                    }
+                    cur += digitCount;
+
+                    // Encode to Utf8
                     // If it's ascii, just output it
                     if (value < 0x80)
                     {
@@ -864,6 +926,9 @@ StringEscapeUtil::Handler* StringEscapeUtil::getHandler(Style style)
         case Style::Cpp:    return &g_cppHandler;
         case Style::Space:  return &g_spaceHandler;
         case Style::JSON:   return &g_jsonHandler;
+        // TODO(JS): For now we make Slang language string encoding/decoding the same as C++
+        // That may not be desirable because C++ has a variety of surprising edge cases (for example around \x)
+        case Style::Slang:  return &g_cppHandler;
         default:            return nullptr;
     }
 }

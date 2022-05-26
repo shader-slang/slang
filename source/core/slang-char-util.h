@@ -41,7 +41,10 @@ struct CharUtil
         /// Given a character return the upper case equivalent
     SLANG_FORCE_INLINE static char toUpper(char c) { return (c >= 'a' && c <= 'z') ? (c -'a' + 'A') : c; }
 
-
+        /// Returns the hex value of c
+        /// If c is not a valid hex value returns -1
+    inline static int getHexDigitValue(char c);
+    
     struct CharFlagMap
     {
         Flags flags[0x100];
@@ -57,6 +60,24 @@ struct CharUtil
     static const CharFlagMap g_charFlagMap;
 };
     
+// ------------------------------------------------------------------------------------
+inline /* static */int CharUtil::getHexDigitValue(char c)
+{
+    if (c >= '0' && c <= '9')
+    {
+        return c - '0';
+    }
+    else if (c >= 'a' && c <= 'f')
+    {
+        return c - 'a' + 10;
+    }
+    else if (c >= 'A' && c <= 'F')
+    {
+        return c - 'A' + 10;
+    }
+    return -1;
+}
+
 } // namespace Slang
 
 #endif // SLANG_CHAR_UTIL_H

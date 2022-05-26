@@ -12,7 +12,7 @@ block %1(
 		param %tid	: UInt):
 	return_void
 }
-global_hashed_string_literals("Hello \t\n\0x083 World")
+global_hashed_string_literals("Hello \t\n\x00x083 World")
 ###
 }
 standard output = {
