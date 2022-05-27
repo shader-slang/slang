@@ -549,7 +549,11 @@ void FuncType::_toTextOverride(StringBuilder& out)
         out << getParamType(pp);
     }
     out << toSlice(") -> ") << getResultType();
-    out << " throws " << getErrorType();
+
+    if (!getErrorType()->equals(getASTBuilder()->getVoidType()))
+    {
+        out << " throws " << getErrorType();
+    }
 }
 
 bool FuncType::_equalsImplOverride(Type * type)
