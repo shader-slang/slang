@@ -31,7 +31,11 @@ struct CharUtil
         /// True if it's alpha
     SLANG_FORCE_INLINE static bool isAlpha(char c) { return (getFlags(c) & (Flag::Upper | Flag::Lower)) != 0; }
 
+        /// True if the character is a valid hex character
     SLANG_FORCE_INLINE static bool isHexDigit(char c) { return (getFlags(c) & Flag::HexDigit) != 0; }
+
+        /// True if the character is an octal digit
+    SLANG_FORCE_INLINE static bool isOctalDigit(char c) { return c >= '0' && c <= '7'; }
 
         /// For a given character get the associated flags
     SLANG_FORCE_INLINE static Flags getFlags(char c) { return g_charFlagMap.flags[size_t(c)]; }
@@ -41,7 +45,14 @@ struct CharUtil
         /// Given a character return the upper case equivalent
     SLANG_FORCE_INLINE static char toUpper(char c) { return (c >= 'a' && c <= 'z') ? (c -'a' + 'A') : c; }
 
-
+        /// Returns the value if c interpretted as a hex digit
+        /// If c is not a valid hex returns -1
+    inline static int getHexDigitValue(char c);
+    
+        /// Returns the value if c interpretted as a octal digit
+        /// If c is not a valid octal returns -1
+    inline static int getOctalDigitValue(char c) { return isOctalDigit(c) ? (c - '0') : -1; }
+    
     struct CharFlagMap
     {
         Flags flags[0x100];
@@ -57,6 +68,24 @@ struct CharUtil
     static const CharFlagMap g_charFlagMap;
 };
     
+// ------------------------------------------------------------------------------------
+inline /* static */int CharUtil::getHexDigitValue(char c)
+{
+    if (c >= '0' && c <= '9')
+    {
+        return c - '0';
+    }
+    else if (c >= 'a' && c <= 'f')
+    {
+        return c - 'a' + 10;
+    }
+    else if (c >= 'A' && c <= 'F')
+    {
+        return c - 'A' + 10;
+    }
+    return -1;
+}
+
 } // namespace Slang
 
 #endif // SLANG_CHAR_UTIL_H

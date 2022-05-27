@@ -639,6 +639,16 @@ namespace Slang
             return true;
         }
 
+        // If both are string types we assume they are convertable in both directions
+        if (as<StringTypeBase>(fromType) && as<StringTypeBase>(toType))
+        {
+            if (outToExpr)
+                *outToExpr = fromExpr;
+            if (outCost)
+                *outCost = kConversionCost_None;
+            return true;
+        }
+
         // Another important case is when either the "to" or "from" type
         // represents an error. In such a case we must have already
         // reporeted the error, so it is better to allow the conversion

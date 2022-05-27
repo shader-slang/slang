@@ -115,32 +115,6 @@ public:
     CppStringEscapeHandler() : Super('"') {}
 };
 
-static char _getHexChar(int v)
-{
-    return (v <= 9) ? char(v + '0') : char(v - 10 + 'A');
-}
-
-static int _getHexDigit(char c)
-{
-    if (c >= '0' && c <= '9')
-    {
-        return c - '0';
-    }
-    else if (c >= 'a' && c <= 'f')
-    {
-        return c - 'a' + 10;
-    }
-    else if (c >= 'A' && c <= 'F')
-    {
-        return c - 'A' + 10;
-    }
-    else
-    {
-        SLANG_ASSERT(!"Not a hex digit");
-        return 0;
-    }
-}
-
 static char _getCppEscapedChar(char c)
 {
     switch (c)
@@ -176,7 +150,6 @@ static char _getCppUnescapedChar(char c)
         default:        return 0;
     }
 }
-
 
 bool CppStringEscapeHandler::isUnescapingNeeeded(const UnownedStringSlice& slice)
 {
@@ -220,6 +193,9 @@ SlangResult CppStringEscapeHandler::appendEscaped(const UnownedStringSlice& slic
     const char* cur = start;
     const char*const end = slice.end();
 
+    // TODO(JS): A cleverer implementation might support U and u prefixing for unicode characters.
+    // For now we just stick with hex if it's not 'regular' ascii.
+
     for (; cur < end; ++cur)
     {
         const char c = *cur;
@@ -232,6 +208,7 @@ SlangResult CppStringEscapeHandler::appendEscaped(const UnownedStringSlice& slic
             {
                 out.append(start, cur);
             }
+
             out.appendChar('\\');
             out.appendChar(escapedChar);
 
@@ -245,17 +222,56 @@ SlangResult CppStringEscapeHandler::appendEscaped(const UnownedStringSlice& slic
                 out.append(start, cur);
             }
 
-            char buf[5] = "\\0x0";
+            // NOTE! There is a possible flaw around checking 'next' character (used for outputting oct and hex)
+            // If a string is constructed appended in parts, the next character is not available so the problem below can still
+            // occur.
 
-            buf[3] = _getHexChar((int(c) >> 4) & 0xf);
-            buf[4] = _getHexChar(c & 0xf);
+            // Another solution to this problem would be to output "", but that makes some other assumptions
+            // For example Slang doesn't support that style.
 
-            out.append(buf, buf + 4);
+            // C++ greedily consumes hex/octal digits. This is a problem if we have bytes
+            // 0, '1' as by default this will output as
+            // "\x001" which is the single character byte 1.
+
+            // Note this claims \x is followed with up to 3 hex digits
+            // https://msdn.microsoft.com/en-us/library/69ze775t.aspx
+            // But the following claims otherwise
+            // https://en.cppreference.com/w/cpp/language/string_literal
+
+            // On testing in Visual Studio hex can indeed be more than 3 digits
+
+            // There is a problem outputting values in hex, because C++ allows *any* amount of hex digits. 
+            // We could work around with \u \U but they are later extensions (C++11) and have other issue
+
+            // The solution taken here is to always output as octal, because octal can be at most 3 digits.
+
+            // Special case handling of 0
+            if (c == 0 && !(cur + 1 < end && CharUtil::isOctalDigit(cur[1])))
+            {
+                // We can just output as (octal) "\0"
+                out.append("\\0");
+            }
+            else
+            {
+                // A slightly more sophisticated implementation could output less digits if needed, if not followed by an octal 
+                // digit, but for now we go simple and output all 3 digits
+
+                const uint32_t v = uint32_t(c);
+
+                char buf[4];
+                buf[0] = '\\';
+                buf[1] = ((v >> 6) & 3) + '0';
+                buf[2] = ((v >> 3) & 7) + '0';
+                buf[3] = ((v >> 0) & 7) + '0';
+
+                out.append(buf, buf + 4);
+            }
 
             start = cur + 1;
         }
     }
 
+    // Flush anything remaining
     if (start < end)
     {
         out.append(start, end);
@@ -269,16 +285,16 @@ SlangResult CppStringEscapeHandler::appendUnescaped(const UnownedStringSlice& sl
     const char* cur = start;
     const char*const end = slice.end();
 
-    for (; cur < end; ++cur)
+    while (cur < end)
     {
         const char c = *cur;
 
         if (c == '\\')
         {
             // Flush
-            if (start < end)
+            if (start < cur)
             {
-                out.append(start, end);
+                out.append(start, cur);
             }
 
             /// Next 
@@ -286,11 +302,14 @@ SlangResult CppStringEscapeHandler::appendUnescaped(const UnownedStringSlice& sl
 
             if (cur >= end)
             {
+                // Missing character following '\'
                 return SLANG_FAIL;
             }
 
+            const char nextC = *cur++;
+
             // Need to handle various escape sequence cases
-            switch (*cur)
+            switch (nextC)
             {
                 case '\'':
                 case '\"':
@@ -304,7 +323,7 @@ SlangResult CppStringEscapeHandler::appendUnescaped(const UnownedStringSlice& sl
                 case 't':
                 case 'v':
                 {
-                    const char unescapedChar = _getCppUnescapedChar(*cur);
+                    const char unescapedChar = _getCppUnescapedChar(nextC);
                     if (unescapedChar == 0)
                     {
                         // Don't know how to unescape that char
@@ -312,14 +331,18 @@ SlangResult CppStringEscapeHandler::appendUnescaped(const UnownedStringSlice& sl
                     }
                     out.appendChar(unescapedChar);
 
-                    start = cur + 1;
+                    start = cur;
                     break;
                 }
                 case '0': case '1': case '2': case '3': case '4':
                 case '5': case '6': case '7':
                 {
+                    // Rewind back a character, as first digit is the 'nextC'
+                    --cur;
+
+                    // Don't need to check for enough characters, because there must be 1 - the nextC
+
                     // octal escape: up to 3 characters
-                    ++cur;
                     int value = 0;
 
                     const char* octEnd = cur + 3;
@@ -327,33 +350,99 @@ SlangResult CppStringEscapeHandler::appendUnescaped(const UnownedStringSlice& sl
 
                     for (; cur < octEnd; ++cur)
                     {
-                        const char d = *cur;
-                        if (d >= '0' && d <= '7')
+                        const int digitValue = CharUtil::getOctalDigitValue(*cur);
+                        if (digitValue < 0)
                         {
-                            value = (value << 3) | (d - '0');
+                            break;
                         }
+                        value = (value << 3) | digitValue; 
                     }
                     out.appendChar(char(value));
 
+                    // Reset start
                     start = cur;
                     break;
                 }
                 case 'x':
                 {
+                    /// In the C++ standard we consume hex digits until we hit a non hex digit
                     uint32_t value = 0;
-                    for (++cur; cur < end && CharUtil::isHexDigit(*cur); ++cur)
+                    for (; cur < end && CharUtil::isHexDigit(*cur); ++cur)
                     {
-                        value = value << 4 | _getHexDigit(*cur);
+                        const int digitValue = CharUtil::getHexDigitValue(*cur);
+                        if (digitValue < 0)
+                        {
+                            return SLANG_FAIL;
+                        }
+
+                        value = (value << 4) | digitValue;
                     }
 
-                    // It's arguable what is appropriate. We only decode/encode 4, which the current spec has,
-                    // but 6 are possible, so lets go large.
-                    const Index maxUtf8EncodeCount = 6;
+                    // If it's ascii, just output it
+                    if (value < 0x80)
+                    {
+                        out.appendChar(char(value));
+                    }
+                    else
+                    {
+                        // It's arguable what is appropriate. We only decode/encode 4, which the current spec has,
+                        // but 6 are possible, so lets go large.
+                        const Index maxUtf8EncodeCount = 6;
 
-                    char* chars = out.prepareForAppend(maxUtf8EncodeCount);
-                    int numChars = encodeUnicodePointToUTF8(Char32(value), chars);
-                    out.appendInPlace(chars, numChars);
+                        char* chars = out.prepareForAppend(maxUtf8EncodeCount);
+                        int numChars = encodeUnicodePointToUTF8(Char32(value), chars);
+                        out.appendInPlace(chars, numChars);
+                    }
 
+                    // Reset start
+                    start = cur;
+                    break;
+                }
+                case 'u':
+                case 'U':
+                {
+                    // u implies 4 hex digits
+                    // U implies 6.
+
+                    // Work out how many digits we need
+                    const Count digitCount = (nextC == 'u') ? 4 : 6;
+
+                    // Do we have enough?
+                    if (end - cur < digitCount)
+                    {
+                        return SLANG_FAIL;
+                    }
+
+                    uint32_t value = 0;
+                    for (Index i = 0; i < digitCount; ++i)
+                    {
+                        const int digitValue = CharUtil::getHexDigitValue(cur[i]);
+                        if (digitValue < 0)
+                        {
+                            return SLANG_FAIL;
+                        }
+                        value = (value << 4) | digitValue;
+                    }
+                    cur += digitCount;
+
+                    // Encode to Utf8
+                    // If it's ascii, just output it
+                    if (value < 0x80)
+                    {
+                        out.appendChar(char(value));
+                    }
+                    else
+                    {
+                        // It's arguable what is appropriate. We only decode/encode 4, which the current spec has,
+                        // but 6 are possible, so lets go large.
+                        const Index maxUtf8EncodeCount = 6;
+
+                        char* chars = out.prepareForAppend(maxUtf8EncodeCount);
+                        int numChars = encodeUnicodePointToUTF8(Char32(value), chars);
+                        out.appendInPlace(chars, numChars);
+                    }
+
+                    // Reset start
                     start = cur;
                     break;
                 }
@@ -362,6 +451,11 @@ SlangResult CppStringEscapeHandler::appendUnescaped(const UnownedStringSlice& sl
                     return SLANG_FAIL;
                 }
             }
+        }
+        else
+        {
+            // Next char
+            ++cur;
         }
     }
 
@@ -850,6 +944,9 @@ StringEscapeUtil::Handler* StringEscapeUtil::getHandler(Style style)
         case Style::Cpp:    return &g_cppHandler;
         case Style::Space:  return &g_spaceHandler;
         case Style::JSON:   return &g_jsonHandler;
+        // TODO(JS): For now we make Slang language string encoding/decoding the same as C++
+        // That may not be desirable because C++ has a variety of surprising edge cases (for example around \x)
+        case Style::Slang:  return &g_cppHandler;
         default:            return nullptr;
     }
 }

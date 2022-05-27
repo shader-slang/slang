@@ -14,9 +14,6 @@
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\..\tools\slang-unit-test\unit-offset-container.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\..\tools\slang-unit-test\unit-test-byte-encode.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -44,6 +41,9 @@
     <ClCompile Include="..\..\..\tools\slang-unit-test\unit-test-memory-arena.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\tools\slang-unit-test\unit-test-offset-container.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\..\tools\slang-unit-test\unit-test-path.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -57,6 +57,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\tools\slang-unit-test\unit-test-short-list.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\tools\slang-unit-test\unit-test-string-escape.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\tools\slang-unit-test\unit-test-string.cpp">
