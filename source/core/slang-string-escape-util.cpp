@@ -115,11 +115,6 @@ public:
     CppStringEscapeHandler() : Super('"') {}
 };
 
-static char _getHexChar(int v)
-{
-    return (v <= 9) ? char(v + '0') : char(v - 10 + 'A');
-}
-
 static char _getCppEscapedChar(char c)
 {
     switch (c)
@@ -213,6 +208,7 @@ SlangResult CppStringEscapeHandler::appendEscaped(const UnownedStringSlice& slic
             {
                 out.append(start, cur);
             }
+
             out.appendChar('\\');
             out.appendChar(escapedChar);
 
@@ -231,7 +227,7 @@ SlangResult CppStringEscapeHandler::appendEscaped(const UnownedStringSlice& slic
             // occur.
 
             // Another solution to this problem would be to output "", but that makes some other assumptions
-            // For example Slang doesn't support that style
+            // For example Slang doesn't support that style.
 
             // C++ greedily consumes hex/octal digits. This is a problem if we have bytes
             // 0, '1' as by default this will output as
@@ -244,6 +240,11 @@ SlangResult CppStringEscapeHandler::appendEscaped(const UnownedStringSlice& slic
 
             // On testing in Visual Studio hex can indeed be more than 3 digits
 
+            // There is a problem outputting values in hex, because C++ allows *any* amount of hex digits. 
+            // We could work around with \u \U but they are later extensions (C++11) and have other issue
+
+            // The solution taken here is to always output as octal, because octal can be at most 3 digits.
+
             // Special case handling of 0
             if (c == 0 && !(cur + 1 < end && CharUtil::isOctalDigit(cur[1])))
             {
@@ -252,27 +253,18 @@ SlangResult CppStringEscapeHandler::appendEscaped(const UnownedStringSlice& slic
             }
             else
             {
-                char buf[6];
-                char* dst = buf;
+                // A slightly more sophisticated implementation could output less digits if needed, if not followed by an octal 
+                // digit, but for now we go simple and output all 3 digits
 
-                // To work around here we check if the next digit is a hex character in that case 
-                // we used the C++11 \u style which does have a fixed length
+                const uint32_t v = uint32_t(c);
 
-                if (cur + 1 < end && CharUtil::isHexDigit(cur[1]))
-                {
-                    ::memcpy(dst, "\\u00", 4);
-                    dst += 4;
-                }
-                else
-                {
-                    ::memcpy(dst, "\\x", 2);
-                    dst += 2;
-                }
+                char buf[4];
+                buf[0] = '\\';
+                buf[1] = ((v >> 6) & 3) + '0';
+                buf[2] = ((v >> 3) & 7) + '0';
+                buf[3] = ((v >> 0) & 7) + '0';
 
-                dst[0] = _getHexChar((int(c) >> 4) & 0xf);
-                dst[1] = _getHexChar(c & 0xf);
-
-                out.append(buf, dst + 2);
+                out.append(buf, buf + 4);
             }
 
             start = cur + 1;
