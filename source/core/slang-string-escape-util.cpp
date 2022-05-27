@@ -206,9 +206,6 @@ SlangResult CppStringEscapeHandler::appendEscaped(const UnownedStringSlice& slic
         const char c = *cur;
         const char escapedChar = _getCppEscapedChar(c);
 
-        // We never output as octal, so we don't need special handing for 0, as it is output as 
-        // "\x00"
-
         if (escapedChar)
         {
             // Flush
@@ -229,46 +226,60 @@ SlangResult CppStringEscapeHandler::appendEscaped(const UnownedStringSlice& slic
                 out.append(start, cur);
             }
 
-            char buf[6];
-            char* dst = buf;
-
-            // NOTE! There is a possible flaw around this. If a string is constructed 
-            // appended in parts, the next character is not available so the problem below can still
+            // NOTE! There is a possible flaw around checking 'next' character (used for outputting oct and hex)
+            // If a string is constructed appended in parts, the next character is not available so the problem below can still
             // occur.
 
-            // C++ greedily consumes hex digits. This is a problem if we have bytes
+            // Another solution to this problem would be to output "", but that makes some other assumptions
+            // For example Slang doesn't support that style
+
+            // C++ greedily consumes hex/octal digits. This is a problem if we have bytes
             // 0, '1' as by default this will output as
             // "\x001" which is the single character byte 1.
-            // To work around here we check if the next digit is a hex character in that case 
-            // we used the C++11 \u style which does have a fixed length
-
-            // Another solution to this problem would be to output "", but that makes some other assumptions
 
             // Note this claims \x is followed with up to 3 hex digits
             // https://msdn.microsoft.com/en-us/library/69ze775t.aspx
             // But the following claims otherwise
             // https://en.cppreference.com/w/cpp/language/string_literal
 
-            if (cur + 1 < end && CharUtil::isHexDigit(cur[1]))
+            // On testing in Visual Studio hex can indeed be more than 3 digits
+
+            // Special case handling of 0
+            if (c == 0 && !(cur + 1 < end && CharUtil::isOctalDigit(cur[1])))
             {
-                ::memcpy(buf, "\\u00", 4);
-                dst += 4;
+                // We can just output as (octal) "\0"
+                out.append("\\0");
             }
             else
             {
-                ::memcpy(buf, "\\x", 2);
-                dst += 2;
+                char buf[6];
+                char* dst = buf;
+
+                // To work around here we check if the next digit is a hex character in that case 
+                // we used the C++11 \u style which does have a fixed length
+
+                if (cur + 1 < end && CharUtil::isHexDigit(cur[1]))
+                {
+                    ::memcpy(dst, "\\u00", 4);
+                    dst += 4;
+                }
+                else
+                {
+                    ::memcpy(dst, "\\x", 2);
+                    dst += 2;
+                }
+
+                dst[0] = _getHexChar((int(c) >> 4) & 0xf);
+                dst[1] = _getHexChar(c & 0xf);
+
+                out.append(buf, dst + 2);
             }
-
-            dst[0] = _getHexChar((int(c) >> 4) & 0xf);
-            dst[1] = _getHexChar(c & 0xf);
-
-            out.append(buf, dst + 2);
 
             start = cur + 1;
         }
     }
 
+    // Flush anything remaining
     if (start < end)
     {
         out.append(start, end);
@@ -282,16 +293,16 @@ SlangResult CppStringEscapeHandler::appendUnescaped(const UnownedStringSlice& sl
     const char* cur = start;
     const char*const end = slice.end();
 
-    for (; cur < end; ++cur)
+    while (cur < end)
     {
         const char c = *cur;
 
         if (c == '\\')
         {
             // Flush
-            if (start < end)
+            if (start < cur)
             {
-                out.append(start, end);
+                out.append(start, cur);
             }
 
             /// Next 
@@ -299,6 +310,7 @@ SlangResult CppStringEscapeHandler::appendUnescaped(const UnownedStringSlice& sl
 
             if (cur >= end)
             {
+                // Missing character following '\'
                 return SLANG_FAIL;
             }
 
@@ -333,6 +345,11 @@ SlangResult CppStringEscapeHandler::appendUnescaped(const UnownedStringSlice& sl
                 case '0': case '1': case '2': case '3': case '4':
                 case '5': case '6': case '7':
                 {
+                    // Rewind back a character, as first digit is the 'nextC'
+                    --cur;
+
+                    // Don't need to check for enough characters, because there must be 1 - the nextC
+
                     // octal escape: up to 3 characters
                     int value = 0;
 
@@ -341,14 +358,16 @@ SlangResult CppStringEscapeHandler::appendUnescaped(const UnownedStringSlice& sl
 
                     for (; cur < octEnd; ++cur)
                     {
-                        const char d = *cur;
-                        if (d >= '0' && d <= '7')
+                        const int digitValue = CharUtil::getOctalDigitValue(*cur);
+                        if (digitValue < 0)
                         {
-                            value = (value << 3) | (d - '0');
+                            break;
                         }
+                        value = (value << 3) | digitValue; 
                     }
                     out.appendChar(char(value));
 
+                    // Reset start
                     start = cur;
                     break;
                 }
@@ -383,6 +402,7 @@ SlangResult CppStringEscapeHandler::appendUnescaped(const UnownedStringSlice& sl
                         out.appendInPlace(chars, numChars);
                     }
 
+                    // Reset start
                     start = cur;
                     break;
                 }
@@ -430,6 +450,7 @@ SlangResult CppStringEscapeHandler::appendUnescaped(const UnownedStringSlice& sl
                         out.appendInPlace(chars, numChars);
                     }
 
+                    // Reset start
                     start = cur;
                     break;
                 }
@@ -438,6 +459,11 @@ SlangResult CppStringEscapeHandler::appendUnescaped(const UnownedStringSlice& sl
                     return SLANG_FAIL;
                 }
             }
+        }
+        else
+        {
+            // Next char
+            ++cur;
         }
     }
 
