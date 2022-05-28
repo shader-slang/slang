@@ -144,9 +144,7 @@ namespace gfx_test
         Uniforms gUniforms = {};
 
         ComPtr<IFramebufferLayout> gFramebufferLayout;
-        ComPtr<IFramebuffer> gFramebuffer;
         ComPtr<ITransientResourceHeap> gTransientHeap;
-        ComPtr<IRenderPassLayout> gRenderPass;
         ComPtr<ICommandQueue> gQueue;
 
         ComPtr<IPipelineState> gPresentPipelineState;
@@ -154,9 +152,7 @@ namespace gfx_test
         ComPtr<IBufferResource> gFullScreenVertexBuffer;
         ComPtr<IBufferResource> gVertexBuffer;
         ComPtr<IBufferResource> gIndexBuffer;
-        ComPtr<IBufferResource> gPrimitiveBuffer;
         ComPtr<IBufferResource> gTransformBuffer;
-        ComPtr<IResourceView> gPrimitiveBufferSRV;
         ComPtr<IBufferResource> gInstanceBuffer;
         ComPtr<IBufferResource> gBLASBuffer;
         ComPtr<IAccelerationStructure> gBLAS;
@@ -166,15 +162,8 @@ namespace gfx_test
         ComPtr<IResourceView> gResultTextureUAV;
         ComPtr<IShaderTable> gShaderTable;
 
-        uint64_t lastTime = 0;
-        uint32_t windowWidth = 1024;
-        uint32_t windowHeight = 768;
-
-        glm::vec3 cameraPosition = glm::vec3(-2.53f, 2.72f, 4.3f);
-        float cameraOrientationAngles[2] = { -0.475f, -0.35f }; // Spherical angles (theta, phi).
-
-        float translationScale = 0.5f;
-        float rotationScale = 0.01f;
+        uint32_t width = 2;
+        uint32_t height = 2;
 
         void init(IDevice* device, UnitTestContext* context)
         {
@@ -183,8 +172,7 @@ namespace gfx_test
         }
 
         // Load and compile shader code from source.
-        gfx::Result loadShaderProgram(
-            gfx::IDevice* device, bool isRayTracingPipeline, gfx::IShaderProgram** outProgram)
+        gfx::Result loadShaderProgram(gfx::IDevice* device, gfx::IShaderProgram** outProgram)
         {
             ComPtr<slang::ISession> slangSession;
             slangSession = device->getSlangSession();
@@ -197,28 +185,14 @@ namespace gfx_test
 
             Slang::List<slang::IComponentType*> componentTypes;
             componentTypes.add(module);
-            if (isRayTracingPipeline)
-            {
-                ComPtr<slang::IEntryPoint> entryPoint;
-                SLANG_RETURN_ON_FAIL(module->findEntryPointByName("rayGenShader", entryPoint.writeRef()));
-                componentTypes.add(entryPoint);
-                SLANG_RETURN_ON_FAIL(module->findEntryPointByName("missShader", entryPoint.writeRef()));
-                componentTypes.add(entryPoint);
-                SLANG_RETURN_ON_FAIL(
-                    module->findEntryPointByName("closestHitShader", entryPoint.writeRef()));
-                componentTypes.add(entryPoint);
-                SLANG_RETURN_ON_FAIL(
-                    module->findEntryPointByName("shadowRayHitShader", entryPoint.writeRef()));
-                componentTypes.add(entryPoint);
-            }
-            else
-            {
-                ComPtr<slang::IEntryPoint> entryPoint;
-                SLANG_RETURN_ON_FAIL(module->findEntryPointByName("vertexMain", entryPoint.writeRef()));
-                componentTypes.add(entryPoint);
-                SLANG_RETURN_ON_FAIL(module->findEntryPointByName("fragmentMain", entryPoint.writeRef()));
-                componentTypes.add(entryPoint);
-            }
+            ComPtr<slang::IEntryPoint> entryPoint;
+            SLANG_RETURN_ON_FAIL(module->findEntryPointByName("rayGenShader", entryPoint.writeRef()));
+            componentTypes.add(entryPoint);
+            SLANG_RETURN_ON_FAIL(module->findEntryPointByName("missShader", entryPoint.writeRef()));
+            componentTypes.add(entryPoint);
+            SLANG_RETURN_ON_FAIL(
+                module->findEntryPointByName("closestHitShader", entryPoint.writeRef()));
+            componentTypes.add(entryPoint);
 
             ComPtr<slang::IComponentType> linkedProgram;
             SlangResult result = slangSession->createCompositeComponentType(
@@ -241,8 +215,8 @@ namespace gfx_test
             ITextureResource::Desc resultTextureDesc = {};
             resultTextureDesc.type = IResource::Type::Texture2D;
             resultTextureDesc.numMipLevels = 1;
-            resultTextureDesc.size.width = windowWidth;
-            resultTextureDesc.size.height = windowHeight;
+            resultTextureDesc.size.width = width;
+            resultTextureDesc.size.height = height;
             resultTextureDesc.size.depth = 1;
             resultTextureDesc.defaultState = ResourceState::UnorderedAccess;
             resultTextureDesc.format = Format::R32G32B32A32_FLOAT;
@@ -273,19 +247,6 @@ namespace gfx_test
             gIndexBuffer = device->createBufferResource(indexBufferDesc, &kIndexData[0]);
             SLANG_CHECK_ABORT(gIndexBuffer != nullptr);
 
-            IBufferResource::Desc primitiveBufferDesc;
-            primitiveBufferDesc.type = IResource::Type::Buffer;
-            primitiveBufferDesc.sizeInBytes = kPrimitiveCount * sizeof(Primitive);
-            primitiveBufferDesc.defaultState = ResourceState::ShaderResource;
-            gPrimitiveBuffer = device->createBufferResource(primitiveBufferDesc, &kPrimitiveData[0]);
-            SLANG_CHECK_ABORT(gPrimitiveBuffer != nullptr);
-
-            IResourceView::Desc primitiveSRVDesc = {};
-            primitiveSRVDesc.format = Format::Unknown;
-            primitiveSRVDesc.type = IResourceView::Type::ShaderResource;
-            primitiveSRVDesc.bufferElementSize = sizeof(Primitive);
-            gPrimitiveBufferSRV = device->createBufferView(gPrimitiveBuffer, nullptr, primitiveSRVDesc);
-
             IBufferResource::Desc transformBufferDesc;
             transformBufferDesc.type = IResource::Type::Buffer;
             transformBufferDesc.sizeInBytes = sizeof(float) * 12;
@@ -306,34 +267,10 @@ namespace gfx_test
             GFX_CHECK_CALL_ABORT(
                 device->createFramebufferLayout(framebufferLayoutDesc, gFramebufferLayout.writeRef()));
 
-            gfx::IFramebuffer::Desc framebufferDesc;
-            framebufferDesc.renderTargetCount = 1;
-            framebufferDesc.depthStencilView = nullptr;
-            framebufferDesc.renderTargetViews = gResultTextureUAV.readRef();
-            framebufferDesc.layout = gFramebufferLayout;
-            GFX_CHECK_CALL_ABORT(device->createFramebuffer(framebufferDesc, gFramebuffer.writeRef()));
-
             ITransientResourceHeap::Desc transientHeapDesc = {};
             transientHeapDesc.constantBufferSize = 4096 * 1024;
             GFX_CHECK_CALL_ABORT(
                 device->createTransientResourceHeap(transientHeapDesc, gTransientHeap.writeRef()));
-
-            gfx::IRenderPassLayout::Desc renderPassDesc = {};
-            renderPassDesc.framebufferLayout = gFramebufferLayout;
-            renderPassDesc.renderTargetCount = 1;
-            IRenderPassLayout::TargetAccessDesc renderTargetAccess = {};
-            IRenderPassLayout::TargetAccessDesc depthStencilAccess = {};
-            renderTargetAccess.loadOp = IRenderPassLayout::TargetLoadOp::Clear;
-            renderTargetAccess.storeOp = IRenderPassLayout::TargetStoreOp::Store;
-            renderTargetAccess.initialState = ResourceState::Undefined;
-            renderTargetAccess.finalState = ResourceState::Present;
-            depthStencilAccess.loadOp = IRenderPassLayout::TargetLoadOp::Clear;
-            depthStencilAccess.storeOp = IRenderPassLayout::TargetStoreOp::Store;
-            depthStencilAccess.initialState = ResourceState::Undefined;
-            depthStencilAccess.finalState = ResourceState::DepthWrite;
-            renderPassDesc.renderTargetAccess = &renderTargetAccess;
-            renderPassDesc.depthStencilAccess = &depthStencilAccess;
-            gRenderPass = device->createRenderPassLayout(renderPassDesc);
 
             // Build bottom level acceleration structure.
             {
@@ -507,7 +444,7 @@ namespace gfx_test
             SLANG_CHECK_ABORT(inputLayout != nullptr);
 
             ComPtr<IShaderProgram> shaderProgram;
-            GFX_CHECK_CALL_ABORT(loadShaderProgram(device, false, shaderProgram.writeRef()));
+            GFX_CHECK_CALL_ABORT(loadShaderProgram(device, shaderProgram.writeRef()));
             GraphicsPipelineStateDesc desc;
             desc.inputLayout = inputLayout;
             desc.program = shaderProgram;
@@ -515,19 +452,17 @@ namespace gfx_test
             gPresentPipelineState = device->createGraphicsPipelineState(desc);
             SLANG_CHECK_ABORT(gPresentPipelineState != nullptr);
 
-            const char* hitgroupNames[] = { "hitgroup0", "hitgroup1" };
+            const char* hitgroupNames[] = { "hitgroup" };
 
             ComPtr<IShaderProgram> rayTracingProgram;
             GFX_CHECK_CALL_ABORT(
-                loadShaderProgram(device, true, rayTracingProgram.writeRef()));
+                loadShaderProgram(device, rayTracingProgram.writeRef()));
             RayTracingPipelineStateDesc rtpDesc = {};
             rtpDesc.program = rayTracingProgram;
-            rtpDesc.hitGroupCount = 2;
-            HitGroupDesc hitGroups[2];
+            rtpDesc.hitGroupCount = 1;
+            HitGroupDesc hitGroups[1];
             hitGroups[0].closestHitEntryPoint = "closestHitShader";
             hitGroups[0].hitGroupName = hitgroupNames[0];
-            hitGroups[1].closestHitEntryPoint = "shadowRayHitShader";
-            hitGroups[1].hitGroupName = hitgroupNames[1];
             rtpDesc.hitGroups = hitGroups;
             rtpDesc.maxRayPayloadSize = 64;
             rtpDesc.maxRecursion = 2;
@@ -539,7 +474,7 @@ namespace gfx_test
             const char* raygenName = "rayGenShader";
             const char* missName = "missShader";
             shaderTableDesc.program = rayTracingProgram;
-            shaderTableDesc.hitGroupCount = 2;
+            shaderTableDesc.hitGroupCount = 1;
             shaderTableDesc.hitGroupNames = hitgroupNames;
             shaderTableDesc.rayGenShaderCount = 1;
             shaderTableDesc.rayGenShaderEntryPointNames = &raygenName;
@@ -548,50 +483,8 @@ namespace gfx_test
             GFX_CHECK_CALL_ABORT(device->createShaderTable(shaderTableDesc, gShaderTable.writeRef()));
         }
 
-        glm::vec3 getVectorFromSphericalAngles(float theta, float phi)
-        {
-            auto sinTheta = sin(theta);
-            auto cosTheta = cos(theta);
-            auto sinPhi = sin(phi);
-            auto cosPhi = cos(phi);
-            return glm::vec3(-sinTheta * cosPhi, sinPhi, -cosTheta * cosPhi);
-        }
-
-        int64_t getCurrentTime() { return std::chrono::high_resolution_clock::now().time_since_epoch().count(); }
-
-        int64_t getTimerFrequency() { return std::chrono::high_resolution_clock::period::den; }
-
-        void updateUniforms()
-        {
-            gUniforms.screenWidth = (float)windowWidth;
-            gUniforms.screenHeight = (float)windowHeight;
-            if (!lastTime)
-                lastTime = getCurrentTime();
-            uint64_t currentTime = getCurrentTime();
-            float deltaTime = float(double(currentTime - lastTime) / double(getTimerFrequency()));
-            lastTime = currentTime;
-
-            auto camDir =
-                getVectorFromSphericalAngles(cameraOrientationAngles[0], cameraOrientationAngles[1]);
-            auto camUp = getVectorFromSphericalAngles(
-                cameraOrientationAngles[0], cameraOrientationAngles[1] + glm::pi<float>() * 0.5f);
-            auto camRight = glm::cross(camDir, camUp);
-
-            glm::vec3 movement = glm::vec3(0);
-
-            cameraPosition += deltaTime * translationScale * movement;
-
-            memcpy(gUniforms.cameraDir, &camDir, sizeof(float) * 3);
-            memcpy(gUniforms.cameraUp, &camUp, sizeof(float) * 3);
-            memcpy(gUniforms.cameraRight, &camRight, sizeof(float) * 3);
-            memcpy(gUniforms.cameraPosition, &cameraPosition, sizeof(float) * 3);
-            auto lightDir = glm::normalize(glm::vec3(1.0f, 3.0f, 2.0f));
-            memcpy(gUniforms.lightDir, &lightDir, sizeof(float) * 3);
-        }
-
         void renderFrame()
         {
-            updateUniforms();
             {
                 ComPtr<ICommandBuffer> renderCommandBuffer =
                     gTransientHeap->createCommandBuffer();
@@ -600,10 +493,8 @@ namespace gfx_test
                 renderEncoder->bindPipeline(gRenderPipelineState, &rootObject);
                 auto cursor = ShaderCursor(rootObject);
                 cursor["resultTexture"].setResource(gResultTextureUAV);
-                cursor["uniforms"].setData(&gUniforms, sizeof(Uniforms));
                 cursor["sceneBVH"].setResource(gTLAS);
-                cursor["primitiveBuffer"].setResource(gPrimitiveBufferSRV);
-                renderEncoder->dispatchRays(0, gShaderTable, windowWidth, windowHeight, 1);
+                renderEncoder->dispatchRays(0, gShaderTable, width, height, 1);
                 renderEncoder->endEncoding();
                 renderCommandBuffer->close();
                 gQueue->executeCommandBuffer(renderCommandBuffer);
@@ -619,7 +510,7 @@ namespace gfx_test
             GFX_CHECK_CALL_ABORT(device->readTextureResource(
                 gResultTexture, ResourceState::CopySource, resultBlob.writeRef(), &rowPitch, &pixelSize));
 
-            writeImage("C:/Users/lucchen/Documents/test.hdr", resultBlob, windowWidth, windowHeight);
+            writeImage("C:/Users/lucchen/Documents/test.hdr", resultBlob, width, height);
         }
 
         void run()
