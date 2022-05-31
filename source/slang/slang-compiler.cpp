@@ -13,6 +13,7 @@
 #include "slang-compiler.h"
 
 #include "../compiler-core/slang-lexer.h"
+#include "../compiler-core/slang-artifact.h"
 
 #include "slang-lower-to-ir.h"
 #include "slang-mangle.h"
@@ -56,14 +57,7 @@ namespace Slang
 
 bool isHeterogeneousTarget(CodeGenTarget target)
 {
-    switch (target)
-    {
-    case CodeGenTarget::HostCPPSource:
-    case CodeGenTarget::HostExecutable:
-        return true;
-    default:
-        return false;
-    }
+    return ArtifactDesc::makeFromCompileTarget(asExternal(target)).style == ArtifactStyle::Host;
 }
 
 void printDiagnosticArg(StringBuilder& sb, CodeGenTarget val)
@@ -592,6 +586,7 @@ void printDiagnosticArg(StringBuilder& sb, CodeGenTarget val)
             case CodeGenTarget::ShaderHostCallable:
             case CodeGenTarget::ShaderSharedLibrary:
             case CodeGenTarget::HostExecutable:
+            case CodeGenTarget::HostHostCallable:
             {
                 // We need some C/C++ compiler
                 return PassThroughMode::GenericCCpp;
@@ -983,9 +978,14 @@ void printDiagnosticArg(StringBuilder& sb, CodeGenTarget val)
         {
             case CodeGenTarget::ShaderHostCallable:
             case CodeGenTarget::ShaderSharedLibrary:
+            {
                 return CodeGenTarget::CPPSource;
+            }
+            case CodeGenTarget::HostHostCallable:
             case CodeGenTarget::HostExecutable:
+            {
                 return CodeGenTarget::HostCPPSource;
+            }
             case CodeGenTarget::PTX:                return CodeGenTarget::CUDASource;
             case CodeGenTarget::DXBytecode:         return CodeGenTarget::HLSL;
             case CodeGenTarget::DXIL:               return CodeGenTarget::HLSL;
@@ -997,14 +997,8 @@ void printDiagnosticArg(StringBuilder& sb, CodeGenTarget val)
 
     static bool _isCPUHostTarget(CodeGenTarget target)
     {
-        switch (target)
-        {
-        case CodeGenTarget::HostCPPSource:
-        case CodeGenTarget::HostExecutable:
-            return true;
-        default:
-            return false;
-        }
+        auto desc = ArtifactDesc::makeFromCompileTarget(asExternal(target));
+        return desc.style == ArtifactStyle::Host;
     }
 
     SlangResult CodeGenContext::emitWithDownstreamForEntryPoints(
@@ -1299,7 +1293,8 @@ void printDiagnosticArg(StringBuilder& sb, CodeGenTarget val)
         }
 
         // If we aren't using LLVM 'host callable', we want downstream compile to produce a shared library
-        if (compilerType != PassThroughMode::LLVM && target == CodeGenTarget::ShaderHostCallable)
+        if (compilerType != PassThroughMode::LLVM && 
+            ArtifactDesc::makeFromCompileTarget(asExternal(target)).kind == ArtifactKind::Callable)
         {
             target = CodeGenTarget::ShaderSharedLibrary;
         }
@@ -1586,6 +1581,7 @@ void printDiagnosticArg(StringBuilder& sb, CodeGenTarget val)
             case CodeGenTarget::ShaderHostCallable:
             case CodeGenTarget::ShaderSharedLibrary:
             case CodeGenTarget::HostExecutable:
+            case CodeGenTarget::HostHostCallable:
                 SLANG_RETURN_ON_FAIL(emitWithDownstreamForEntryPoints(outDownstreamResult, outMetadata));
                 return SLANG_OK;
 
@@ -1611,6 +1607,7 @@ void printDiagnosticArg(StringBuilder& sb, CodeGenTarget val)
         case CodeGenTarget::DXIL:
         case CodeGenTarget::DXBytecode:
         case CodeGenTarget::PTX:
+        case CodeGenTarget::HostHostCallable:
         case CodeGenTarget::ShaderHostCallable:
         case CodeGenTarget::ShaderSharedLibrary:
         case CodeGenTarget::HostExecutable:
@@ -1794,7 +1791,7 @@ void printDiagnosticArg(StringBuilder& sb, CodeGenTarget val)
                 ComPtr<ISlangBlob> blob;
                 if (SLANG_FAILED(result.getBlob(blob)))
                 {
-                    if (targetReq->getTarget() == CodeGenTarget::ShaderHostCallable)
+                    if (ArtifactDesc::makeFromCompileTarget(asExternal(targetReq->getTarget())).kind == ArtifactKind::Callable)
                     {
                         // Some HostCallable are not directly representable as a 'binary'.
                         // So here, we just ignore if that appears the case, and don't output an unexpected error.
@@ -1838,6 +1835,7 @@ void printDiagnosticArg(StringBuilder& sb, CodeGenTarget val)
                     case CodeGenTarget::PTX:
                         // For now we just dump PTX out as hex
 
+                    case CodeGenTarget::HostHostCallable:
                     case CodeGenTarget::ShaderHostCallable:
                     case CodeGenTarget::ShaderSharedLibrary:
                     case CodeGenTarget::HostExecutable:
@@ -2411,11 +2409,19 @@ void printDiagnosticArg(StringBuilder& sb, CodeGenTarget val)
             case CodeGenTarget::CUDASource:         return ".cu";
             case CodeGenTarget::CPPSource:          return ".cpp";
             case CodeGenTarget::HostCPPSource:      return ".cpp";
-                // What these should be called is target specific, but just use these exts to make clear for now
-                // for now
-            case CodeGenTarget::HostExecutable:      return ".exe";
+
+            // What these should be called is target specific, but just use these exts to make clear for now
+            // for now
+            case CodeGenTarget::HostExecutable:      
+            {
+                return ".exe";
+            }
+            case CodeGenTarget::HostHostCallable:
             case CodeGenTarget::ShaderHostCallable:
-            case CodeGenTarget::ShaderSharedLibrary: return ".shared-lib";
+            case CodeGenTarget::ShaderSharedLibrary: 
+            {
+                return ".shared-lib";
+            }
             default: break;
         }
         return nullptr;
@@ -2429,22 +2435,16 @@ void printDiagnosticArg(StringBuilder& sb, CodeGenTarget val)
             return;
 
         auto target = getTargetFormat();
-        switch (target)
-        {    
-            case CodeGenTarget::CPPSource:
-            case CodeGenTarget::HostCPPSource:
-            case CodeGenTarget::CUDASource:
-            case CodeGenTarget::CSource:
-            case CodeGenTarget::DXILAssembly:
-            case CodeGenTarget::DXBytecodeAssembly:
-            case CodeGenTarget::SPIRVAssembly:
-            case CodeGenTarget::GLSL:
-            case CodeGenTarget::HLSL:
-            {
-                dumpIntermediateText(data, size, _getTargetExtension(target));
-                break;
-            }
+        const auto desc = ArtifactDesc::makeFromCompileTarget(asExternal(target));
 
+        if (desc.kind == ArtifactKind::Text)
+        {
+            dumpIntermediateText(data, size, _getTargetExtension(target));
+            return;
+        }
+        
+        switch (target)
+        {
 #if 0
             case CodeGenTarget::SlangIRAssembly:
             {
@@ -2452,7 +2452,6 @@ void printDiagnosticArg(StringBuilder& sb, CodeGenTarget val)
                 break;
             }
 #endif
-
             case CodeGenTarget::DXIL:
             case CodeGenTarget::DXBytecode:
             case CodeGenTarget::SPIRV:
@@ -2471,6 +2470,7 @@ void printDiagnosticArg(StringBuilder& sb, CodeGenTarget val)
                 break;
             }
 
+            case CodeGenTarget::HostHostCallable:
             case CodeGenTarget::ShaderHostCallable:
             case CodeGenTarget::ShaderSharedLibrary:
             case CodeGenTarget::HostExecutable:

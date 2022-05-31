@@ -2083,6 +2083,8 @@ struct OptionsParser
                     case CodeGenTarget::CPPSource:
                     case CodeGenTarget::PTX:
                     case CodeGenTarget::CUDASource:
+
+                    case CodeGenTarget::HostHostCallable:
                     case CodeGenTarget::ShaderHostCallable:
                     case CodeGenTarget::HostExecutable:
                     case CodeGenTarget::ShaderSharedLibrary:

@@ -670,17 +670,17 @@ SlangPassThrough Session::getDownstreamCompilerForTransition(SlangCompileTarget 
         return (SlangPassThrough)m_codeGenTransitionMap.getTransition(source, target);
     }
 
+    const auto desc = ArtifactDesc::makeFromCompileTarget(inTarget);
+
     // Special case host-callable
-    if (target == CodeGenTarget::ShaderHostCallable)
+    if ((desc.kind == ArtifactKind::Callable) && 
+        (source == CodeGenTarget::CSource || source == CodeGenTarget::CPPSource))
     {
-        if (source == CodeGenTarget::CSource || source == CodeGenTarget::CPPSource)
+        // We prefer LLVM if it's available
+        DownstreamCompiler* llvm = getOrLoadDownstreamCompiler(PassThroughMode::LLVM, nullptr);
+        if (llvm)
         {
-            // We prefer LLVM if it's available
-            DownstreamCompiler* llvm = getOrLoadDownstreamCompiler(PassThroughMode::LLVM, nullptr);
-            if (llvm)
-            {
-                return SLANG_PASS_THROUGH_LLVM;
-            }
+            return SLANG_PASS_THROUGH_LLVM;
         }
     }
 
@@ -1334,6 +1334,7 @@ CapabilitySet TargetRequest::getTargetCaps()
     case CodeGenTarget::CPPSource:
     case CodeGenTarget::HostExecutable:
     case CodeGenTarget::ShaderSharedLibrary:
+    case CodeGenTarget::HostHostCallable:
     case CodeGenTarget::ShaderHostCallable:
         atoms.add(CapabilityAtom::CPP);
         break;

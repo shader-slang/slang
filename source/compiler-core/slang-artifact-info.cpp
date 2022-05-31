@@ -152,6 +152,12 @@ static const KindExtension g_cpuKindExts[] =
     return info.isSet(ArtifactPayloadInfo::Flag::IsGpuNative) && info.flavor == ArtifactPayloadInfo::Flavor::Binary;
 }
 
+/* static */bool ArtifactInfoUtil::isPayloadCpuTarget(Payload payload)
+{
+    return isPayloadCpuBinary(payload) ||
+        (payload == Payload::C || payload == Payload::CPP);
+}
+
 /* static */UnownedStringSlice ArtifactInfoUtil::getDefaultExtensionForPayload(Payload payload)
 {
     switch (payload)
