@@ -74,7 +74,8 @@ protected:
     virtual bool tryEmitGlobalParamImpl(IRGlobalParam* varDecl, IRType* varType) SLANG_OVERRIDE;
     virtual void emitIntrinsicCallExprImpl(IRCall* inst, IRTargetIntrinsicDecoration* targetIntrinsic, EmitOpInfo const& inOuterPrec) SLANG_OVERRIDE;
     virtual void emitLoopControlDecorationImpl(IRLoopControlDecoration* decl) SLANG_OVERRIDE;
-
+    virtual void emitFuncDecorationsImpl(IRFunc* func) SLANG_OVERRIDE;
+   
     virtual const UnownedStringSlice* getVectorElementNames(BaseType elemType, Index elemCount);
     
     // Replaceable for classes derived from CPPSourceEmitter
