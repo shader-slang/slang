@@ -2032,6 +2032,18 @@ struct OptionsParser
             }
         }
 
+        // If we don't have any raw outputs but do have a raw target,
+        // and output type is callable, add an empty' rawOutput.
+        if (rawOutputs.getCount() == 0 && 
+            rawTargets.getCount() == 1 && 
+            ArtifactDesc::makeFromCompileTarget(asExternal(rawTargets[0].format)).kind == ArtifactKind::Callable)
+        {
+            RawOutput rawOutput;
+            rawOutput.impliedFormat = rawTargets[0].format;
+            rawOutput.targetIndex = 0;
+            rawOutputs.add(rawOutput);
+        }
+
         // Consider the output files specified via `-o` and try to figure
         // out how to deal with them.
         //
@@ -2100,6 +2112,7 @@ struct OptionsParser
                 }
             }
         }
+
 
         // Now that we've diagnosed the output paths, we can add them
         // to the compile request at the appropriate locations.
