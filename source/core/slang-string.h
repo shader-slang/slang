@@ -4,6 +4,7 @@
 #include <string.h>
 #include <cstdlib>
 #include <stdio.h>
+#include <iostream>
 
 #include "slang-smart-pointer.h"
 #include "slang-common.h"
@@ -1038,6 +1039,7 @@ namespace Slang
             length -= actualDelLength;
         }
 #endif
+        friend std::ostream& operator<< (std::ostream& stream, const String& s);
 
         void Clear()
         {
@@ -1050,5 +1052,7 @@ namespace Slang
     double StringToDouble(const String & str);
     float StringToFloat(const String & str);
 }
+
+std::ostream& operator<< (std::ostream& stream, const Slang::String& s);
 
 #endif
