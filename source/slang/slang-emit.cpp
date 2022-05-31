@@ -691,12 +691,22 @@ Result linkAndOptimizeIR(
 
     switch (target)
     {
-    default:
-        break;
-    case CodeGenTarget::HostCPPSource:
-        lowerComInterfaces(irModule, sink);
-        generateDllImportFuncs(irModule, sink);
-        break;
+        default:
+            break;
+     
+        case CodeGenTarget::CPPSource:
+        {
+            // TODO(JS):
+            // We want the interface transformation to take place for 'regular' CPPSource for now too.
+            lowerComInterfaces(irModule, sink);
+            break;
+        }
+        case CodeGenTarget::HostCPPSource:
+        {
+            lowerComInterfaces(irModule, sink);
+            generateDllImportFuncs(irModule, sink);
+            break;
+        }
     }
 
     // TODO: our current dynamic dispatch pass will remove all uses of witness tables.

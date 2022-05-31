@@ -544,11 +544,20 @@ SlangResult CPPSourceEmitter::calcTypeName(IRType* type, CodeGenTarget target, S
         }
         case kIROp_ComPtrType:
         {
-            out << "ComPtr<";
             auto comPtrType = static_cast<IRComPtrType*>(type);
             auto baseType = cast<IRType>(comPtrType->getOperand(0));
-            SLANG_RETURN_ON_FAIL(calcTypeName(baseType, target, out));
-            out << ">";
+
+            if (m_hasComPtr)
+            {
+                out << "ComPtr<";
+                SLANG_RETURN_ON_FAIL(calcTypeName(baseType, target, out));
+                out << ">";
+            }
+            else
+            {
+                SLANG_RETURN_ON_FAIL(calcTypeName(baseType, target, out));
+                out << "* ";
+            }
             return SLANG_OK;
         }
         default:
@@ -1635,6 +1644,19 @@ CPPSourceEmitter::CPPSourceEmitter(const Desc& desc):
 {
     m_semanticUsedFlags = 0;
     //m_semanticUsedFlags = SemanticUsedFlag::GroupID | SemanticUsedFlag::GroupThreadID | SemanticUsedFlag::DispatchThreadID;
+
+    
+    const auto artifactDesc = ArtifactDesc::makeFromCompileTarget(asExternal(getTarget()));
+
+    m_hasString = false;
+    m_hasComPtr = false;
+
+    // If we have runtime library we can convert to a terminated string slice/use ComPtr
+    if (artifactDesc.style == ArtifactStyle::Host)
+    {
+        m_hasString = true;
+        m_hasComPtr = true;
+    }
 }
 
 void CPPSourceEmitter::emitParamTypeImpl(IRType* type, String const& name)
@@ -2424,10 +2446,7 @@ bool CPPSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOut
             const auto slice = as<IRStringLit>(inst)->getStringSlice();
             StringEscapeUtil::appendQuoted(handler, slice, buf);
             
-            const auto desc = ArtifactDesc::makeFromCompileTarget(asExternal(getTarget()));
-
-            // If we have runtime library we can convert to a terminated string slice
-            if (desc.style == ArtifactStyle::Host)
+            if (m_hasString)
             {
                 m_writer->emit("toTerminatedSlice(");
                 m_writer->emit(buf);

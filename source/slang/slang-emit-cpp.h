@@ -154,6 +154,9 @@ protected:
     // They must be emitted last, after the entire `Context` class so those member functions defined
     // in `Context` may be referenced.
     List<IRWitnessTable*> pendingWitnessTableDefinitions;
+
+    bool m_hasComPtr = false;
+    bool m_hasString = false;
 };
 
 }
