@@ -4712,6 +4712,11 @@ static SlangResult _getWholeProgramResult(
     auto linkage = req->getLinkage();
     auto program = req->getSpecializedGlobalAndEntryPointsComponentType();
 
+    if (!program)
+    {
+        return SLANG_FAIL;
+    }
+
     Index targetCount = linkage->targets.getCount();
     if ((targetIndex < 0) || (targetIndex >= targetCount))
     {
