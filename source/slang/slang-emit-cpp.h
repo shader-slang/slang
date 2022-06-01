@@ -155,7 +155,6 @@ protected:
     // in `Context` may be referenced.
     List<IRWitnessTable*> pendingWitnessTableDefinitions;
 
-    bool m_hasComPtr = false;
     bool m_hasString = false;
 };
 

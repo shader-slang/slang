@@ -547,17 +547,9 @@ SlangResult CPPSourceEmitter::calcTypeName(IRType* type, CodeGenTarget target, S
             auto comPtrType = static_cast<IRComPtrType*>(type);
             auto baseType = cast<IRType>(comPtrType->getOperand(0));
 
-            if (m_hasComPtr)
-            {
-                out << "ComPtr<";
-                SLANG_RETURN_ON_FAIL(calcTypeName(baseType, target, out));
-                out << ">";
-            }
-            else
-            {
-                SLANG_RETURN_ON_FAIL(calcTypeName(baseType, target, out));
-                out << "* ";
-            }
+            out << "ComPtr<";
+            SLANG_RETURN_ON_FAIL(calcTypeName(baseType, target, out));
+            out << ">";
             return SLANG_OK;
         }
         default:
@@ -1648,15 +1640,8 @@ CPPSourceEmitter::CPPSourceEmitter(const Desc& desc):
     
     const auto artifactDesc = ArtifactDesc::makeFromCompileTarget(asExternal(getTarget()));
 
-    m_hasString = false;
-    m_hasComPtr = false;
-
-    // If we have runtime library we can convert to a terminated string slice/use ComPtr
-    if (artifactDesc.style == ArtifactStyle::Host)
-    {
-        m_hasString = true;
-        m_hasComPtr = true;
-    }
+    // If we have runtime library we can convert to a terminated string slice    
+    m_hasString = (artifactDesc.style == ArtifactStyle::Host);
 }
 
 void CPPSourceEmitter::emitParamTypeImpl(IRType* type, String const& name)
