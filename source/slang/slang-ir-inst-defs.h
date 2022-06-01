@@ -24,7 +24,10 @@ INST(Nop, nop, 0, 0)
 
     INST_RANGE(BasicType, VoidType, AfterBaseType)
 
-    INST(StringType, String, 0, 0)
+    /* StringTypeBase */
+        INST(StringType, String, 0, 0)
+        INST(NativeStringType, NativeString, 0, 0)
+    INST_RANGE(StringTypeBase, StringType, NativeStringType)
 
     INST(CapabilitySetType, CapabilitySet, 0, 0)
 

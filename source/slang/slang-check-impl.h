@@ -272,26 +272,51 @@ namespace Slang
         void _addCandidateExtensionsFromModule(ModuleDecl* moduleDecl);
     };
 
-    struct SemanticsVisitor
+        /// Local/scoped state of the semantic-checking system
+        ///
+        /// This type is kept distinct from `SharedSemanticsContext` so that we
+        /// can avoid unncessary mutable state being propagated through the
+        /// checking process.
+        ///
+        /// Semantic-checking code should make a new local `SemanticsContext`
+        /// in cases where it want to check a sub-entity (expression, statement,
+        /// declaration, etc.) in a modified or extended context.
+        ///
+    struct SemanticsContext
     {
-        SemanticsVisitor(
+    public:
+        explicit SemanticsContext(
             SharedSemanticsContext* shared)
-            : m_shared(shared),
-            m_astBuilder(shared->getLinkage()->getASTBuilder())
+            : m_shared(shared)
+            , m_sink(shared->getSink())
+            , m_astBuilder(shared->getLinkage()->getASTBuilder())
         {}
 
-        SharedSemanticsContext* m_shared = nullptr;
-        ASTBuilder* m_astBuilder = nullptr;
-
         SharedSemanticsContext* getShared() { return m_shared; }
-        ASTBuilder* getASTBuilder() { return m_astBuilder;}
+        ASTBuilder* getASTBuilder() { return m_astBuilder; }
 
-        DiagnosticSink* getSink() { return m_shared->getSink(); }
+        DiagnosticSink* getSink() { return m_sink; }
 
         Session* getSession() { return m_shared->getSession(); }
 
         Linkage* getLinkage() { return m_shared->m_linkage; }
         NamePool* getNamePool() { return getLinkage()->getNamePool(); }
+        SourceManager* getSourceManager() { return getLinkage()->getSourceManager(); }
+
+        SemanticsContext withSink(DiagnosticSink* sink)
+        {
+            SemanticsContext result(*this);
+            result.m_sink = sink;
+            return result;
+        }
+
+        SemanticsContext withParentFunc(FunctionDeclBase* parentFunc)
+        {
+            SemanticsContext result(*this);
+            result.m_parentFunc = parentFunc;
+            result.m_outerStmts = nullptr;
+            return result;
+        }
 
             /// Information for tracking one or more outer statements.
             ///
@@ -307,9 +332,80 @@ namespace Slang
             ///
         struct OuterStmtInfo
         {
-            Stmt*           stmt = nullptr;
-            OuterStmtInfo*  next;
+            Stmt* stmt = nullptr;
+            OuterStmtInfo* next;
         };
+
+        OuterStmtInfo* getOuterStmts() { return m_outerStmts; }
+
+        SemanticsContext withOuterStmts(OuterStmtInfo* outerStmts)
+        {
+            SemanticsContext result(*this);
+            result.m_outerStmts = outerStmts;
+            return result;
+        }
+
+            /// A scope that is local to a particular expression, and
+            /// that can be used to allocate temporary bindings that
+            /// might be needed by that expression or its sub-expressions.
+            ///
+            /// The scope is represented as a sequence of nested `LetExpr`s
+            /// that introduce the bindings needed in the scope.
+            ///
+        struct ExprLocalScope
+        {
+        public:
+            void addBinding(LetExpr* binding);
+
+            LetExpr* getOuterMostBinding() const { return m_outerMostBinding; }
+
+        private:
+            LetExpr* m_outerMostBinding = nullptr;
+            LetExpr* m_innerMostBinding = nullptr;
+        };
+
+        ExprLocalScope* getExprLocalScope() { return m_exprLocalScope; }
+
+        SemanticsContext withExprLocalScope(ExprLocalScope* exprLocalScope)
+        {
+            SemanticsContext result(*this);
+            result.m_exprLocalScope = exprLocalScope;
+            return result;
+        }
+
+    private:
+        SharedSemanticsContext* m_shared = nullptr;
+
+        DiagnosticSink* m_sink = nullptr;
+
+        ExprLocalScope* m_exprLocalScope = nullptr;
+
+    protected:
+        // TODO: consider making more of this state `private`...
+
+            /// The parent function (if any) that surrounds the statement being checked.
+        FunctionDeclBase* m_parentFunc = nullptr;
+
+            /// The linked list of lexically surrounding statements.
+        OuterStmtInfo* m_outerStmts = nullptr;
+
+        ASTBuilder* m_astBuilder = nullptr;
+    };
+
+    struct SemanticsVisitor : public SemanticsContext
+    {
+        typedef SemanticsContext Super;
+
+        explicit SemanticsVisitor(
+            SharedSemanticsContext* shared)
+            : Super(shared)
+        {}
+
+        SemanticsVisitor(
+            SemanticsContext const& context)
+            : Super(context)
+        {}
+
 
     public:
         // Translate Types
@@ -449,8 +545,8 @@ namespace Slang
         // so that we can add some quality-of-life features for users
         // in cases where the compiler crashes
         //
-        void dispatchStmt(Stmt* stmt, FunctionDeclBase* parentFunc, OuterStmtInfo* outerStmts);
-        void dispatchExpr(Expr* expr);
+        void dispatchStmt(Stmt* stmt, SemanticsContext const& context);
+        Expr* dispatchExpr(Expr* expr, SemanticsContext const& context);
 
             /// Ensure that a declaration has been checked up to some state
             /// (aka, a phase of semantic checking) so that we can safely
@@ -899,7 +995,7 @@ namespace Slang
         // as the tag type for an `enum`
         void validateEnumTagType(Type* type, SourceLoc const& loc);
 
-        void checkStmt(Stmt* stmt, FunctionDeclBase* outerFunction, OuterStmtInfo* outerStmts);
+        void checkStmt(Stmt* stmt, SemanticsContext const& context);
 
         void getGenericParams(
             GenericDecl*                        decl,
@@ -1536,8 +1632,8 @@ namespace Slang
         , ExprVisitor<SemanticsExprVisitor, Expr*>
     {
     public:
-        SemanticsExprVisitor(SharedSemanticsContext* shared)
-            : SemanticsVisitor(shared)
+        SemanticsExprVisitor(SemanticsContext const& outer)
+            : SemanticsVisitor(outer)
         {}
 
         Expr* visitBoolLiteralExpr(BoolLiteralExpr* expr);
@@ -1610,17 +1706,9 @@ namespace Slang
         : public SemanticsVisitor
         , StmtVisitor<SemanticsStmtVisitor>
     {
-        SemanticsStmtVisitor(SharedSemanticsContext* shared, FunctionDeclBase* parentFunc, OuterStmtInfo* outerStmts)
-            : SemanticsVisitor(shared)
-            , m_parentFunc(parentFunc)
-            , m_outerStmts(outerStmts)
+        SemanticsStmtVisitor(SemanticsContext const& outer)
+            : SemanticsVisitor(outer)
         {}
-
-            /// The parent function (if any) that surrounds the statement being checked.
-        FunctionDeclBase* m_parentFunc = nullptr;
-
-            /// The linked list of lexically surrounding statements.
-        OuterStmtInfo* m_outerStmts = nullptr;
 
         FunctionDeclBase* getParentFunc() { return m_parentFunc; }
 
@@ -1671,13 +1759,13 @@ namespace Slang
     struct SemanticsDeclVisitorBase
         : public SemanticsVisitor
     {
-        SemanticsDeclVisitorBase(SharedSemanticsContext* shared)
-            : SemanticsVisitor(shared)
+        SemanticsDeclVisitorBase(SemanticsContext const& outer)
+            : SemanticsVisitor(outer)
         {}
 
         void checkBodyStmt(Stmt* stmt, FunctionDeclBase* parentDecl)
         {
-            checkStmt(stmt, parentDecl, nullptr);
+            checkStmt(stmt, withParentFunc(parentDecl));
         }
 
         void checkModule(ModuleDecl* programNode);

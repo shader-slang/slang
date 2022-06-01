@@ -147,10 +147,22 @@
     <ClInclude Include="..\..\..\tools\gfx\transient-resource-heap-base.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\tools\gfx\vulkan\render-vk.h">
+    <ClInclude Include="..\..\..\tools\gfx\vulkan\vk-api.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\tools\gfx\vulkan\vk-api.h">
+    <ClInclude Include="..\..\..\tools\gfx\vulkan\vk-base.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\tools\gfx\vulkan\vk-buffer.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\tools\gfx\vulkan\vk-command-buffer.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\tools\gfx\vulkan\vk-command-encoder.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\tools\gfx\vulkan\vk-command-queue.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\tools\gfx\vulkan\vk-descriptor-allocator.h">
@@ -159,10 +171,61 @@
     <ClInclude Include="..\..\..\tools\gfx\vulkan\vk-device-queue.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\tools\gfx\vulkan\vk-device.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\tools\gfx\vulkan\vk-fence.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\tools\gfx\vulkan\vk-framebuffer.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\tools\gfx\vulkan\vk-helper-functions.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\..\tools\gfx\vulkan\vk-module.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\tools\gfx\vulkan\vk-pipeline-state.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\tools\gfx\vulkan\vk-query.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\tools\gfx\vulkan\vk-render-pass.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\tools\gfx\vulkan\vk-resource-views.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\tools\gfx\vulkan\vk-sampler.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\tools\gfx\vulkan\vk-shader-object-layout.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\tools\gfx\vulkan\vk-shader-object.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\tools\gfx\vulkan\vk-shader-program.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\tools\gfx\vulkan\vk-shader-table.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\tools\gfx\vulkan\vk-swap-chain.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\tools\gfx\vulkan\vk-texture.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\tools\gfx\vulkan\vk-transient-heap.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\..\tools\gfx\vulkan\vk-util.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\tools\gfx\vulkan\vk-vertex-layout.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
@@ -275,10 +338,19 @@
     <ClCompile Include="..\..\..\tools\gfx\simple-render-pass-layout.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\tools\gfx\vulkan\render-vk.cpp">
+    <ClCompile Include="..\..\..\tools\gfx\vulkan\vk-api.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\tools\gfx\vulkan\vk-api.cpp">
+    <ClCompile Include="..\..\..\tools\gfx\vulkan\vk-buffer.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\tools\gfx\vulkan\vk-command-buffer.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\tools\gfx\vulkan\vk-command-encoder.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\tools\gfx\vulkan\vk-command-queue.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\tools\gfx\vulkan\vk-descriptor-allocator.cpp">
@@ -287,7 +359,55 @@
     <ClCompile Include="..\..\..\tools\gfx\vulkan\vk-device-queue.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\tools\gfx\vulkan\vk-device.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\tools\gfx\vulkan\vk-fence.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\tools\gfx\vulkan\vk-framebuffer.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\tools\gfx\vulkan\vk-helper-functions.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\..\tools\gfx\vulkan\vk-module.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\tools\gfx\vulkan\vk-pipeline-state.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\tools\gfx\vulkan\vk-query.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\tools\gfx\vulkan\vk-render-pass.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\tools\gfx\vulkan\vk-resource-views.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\tools\gfx\vulkan\vk-sampler.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\tools\gfx\vulkan\vk-shader-object-layout.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\tools\gfx\vulkan\vk-shader-object.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\tools\gfx\vulkan\vk-shader-program.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\tools\gfx\vulkan\vk-shader-table.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\tools\gfx\vulkan\vk-swap-chain.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\tools\gfx\vulkan\vk-texture.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\tools\gfx\vulkan\vk-transient-heap.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\tools\gfx\vulkan\vk-util.cpp">

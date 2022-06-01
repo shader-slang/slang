@@ -2,7 +2,6 @@
 #pragma once
 
 #include "d3d12-base.h"
-#include "d3d12-buffer.h"
 
 namespace gfx
 {
