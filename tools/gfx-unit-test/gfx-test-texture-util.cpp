@@ -4,6 +4,12 @@
 
 #include <slang-com-ptr.h>
 
+#include <stdlib.h>
+#include <stdio.h>
+
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#include "external/stb/stb_image_write.h"
+
 #define GFX_ENABLE_RENDERDOC_INTEGRATION 0
 
 #if GFX_ENABLE_RENDERDOC_INTEGRATION
@@ -195,5 +201,50 @@ namespace gfx_test
                 texture->subresourceDatas.add(subData);
             }
         }
+    }
+
+    List<uint8_t> removePadding(ISlangBlob* pixels, GfxCount width, GfxCount height, Size rowPitch, Size pixelSize)
+    {
+        List<uint8_t> buffer;
+        buffer.setCount(height * rowPitch);
+        for (GfxIndex i = 0; i < height; ++i)
+        {
+            Offset srcOffset = i * rowPitch;
+            Offset dstOffset = i * width * pixelSize;
+            memcpy(buffer.getBuffer() + dstOffset, (char*)pixels->getBufferPointer() + srcOffset, width * pixelSize);
+        }
+
+        return buffer;
+    }
+
+    Slang::Result writeImage(
+        const char* filename,
+        ISlangBlob* pixels,
+        uint32_t width,
+        uint32_t height)
+    {
+        int stbResult =
+            stbi_write_hdr(filename, width, height, 4, (float*)pixels->getBufferPointer());
+
+        return stbResult ? SLANG_OK : SLANG_FAIL;
+    }
+
+    Slang::Result writeImage(
+        const char* filename,
+        ISlangBlob* pixels,
+        uint32_t width,
+        uint32_t height,
+        uint32_t rowPitch,
+        uint32_t pixelSize)
+    {
+        if (rowPitch == width * pixelSize)
+            return writeImage(filename, pixels, width, height);
+
+        List<uint8_t> buffer = removePadding(pixels, width, height, rowPitch, pixelSize);
+
+        int stbResult =
+            stbi_write_hdr(filename, width, height, 4, (float*)buffer.getBuffer());
+
+        return stbResult ? SLANG_OK : SLANG_FAIL;
     }
 }

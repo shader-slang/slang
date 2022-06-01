@@ -2,138 +2,47 @@
 
 #include "slang-gfx.h"
 #include "gfx-test-util.h"
+#include "gfx-test-texture-util.h"
 #include "tools/gfx-util/shader-cursor.h"
 #include "tools/platform/vector-math.h"
 #include "source/core/slang-basic.h"
 
 #include <chrono>
 
-#include <stdlib.h>
-#include <stdio.h>
-
-#define STB_IMAGE_WRITE_IMPLEMENTATION
-#include "external/stb/stb_image_write.h"
-
 using namespace gfx;
 using namespace Slang;
 
 namespace gfx_test
 {
-    Slang::Result writeImage(
-        const char* filename,
-        ISlangBlob* pixels,
-        uint32_t width,
-        uint32_t height)
-    {
-        int stbResult =
-            stbi_write_hdr(filename, width, height, 4, (float*)pixels->getBufferPointer());
-
-        return stbResult ? SLANG_OK : SLANG_FAIL;
-    }
-
-    struct Uniforms
-    {
-        float screenWidth, screenHeight;
-        float focalLength = 24.0f, frameHeight = 24.0f;
-        float cameraDir[4];
-        float cameraUp[4];
-        float cameraRight[4];
-        float cameraPosition[4];
-        float lightDir[4];
-    };
-
     struct Vertex
     {
         float position[3];
     };
 
-    // Define geometry data for our test scene.
-    // The scene contains a floor plane, and a cube placed on top of it at the center.
-    static const int kVertexCount = 24;
+    static const int kVertexCount = 9;
     static const Vertex kVertexData[kVertexCount] =
     {
-        // Floor plane
-        {{-100.0f, 0, 100.0f}},
-        {{100.0f, 0, 100.0f}},
-        {{100.0f, 0, -100.0f}},
-        {{-100.0f, 0, -100.0f}},
-        // Cube face (+y).
-        {{-1.0f, 2.0, 1.0f}},
-        {{1.0f, 2.0, 1.0f}},
-        {{1.0f, 2.0, -1.0f}},
-        {{-1.0f, 2.0, -1.0f}},
-        // Cube face (+z).
-        {{-1.0f, 0.0, 1.0f}},
-        {{1.0f, 0.0, 1.0f}},
-        {{1.0f, 2.0, 1.0f}},
-        {{-1.0f, 2.0, 1.0f}},
-        // Cube face (-z).
-        {{-1.0f, 0.0, -1.0f}},
-        {{-1.0f, 2.0, -1.0f}},
-        {{1.0f, 2.0, -1.0f}},
-        {{1.0f, 0.0, -1.0f}},
-        // Cube face (-x).
-        {{-1.0f, 0.0, -1.0f}},
-        {{-1.0f, 0.0, 1.0f}},
-        {{-1.0f, 2.0, 1.0f}},
-        {{-1.0f, 2.0, -1.0f}},
-        // Cube face (+x).
-        {{1.0f, 2.0, -1.0f}},
-        {{1.0f, 2.0, 1.0f}},
-        {{1.0f, 0.0, 1.0f}},
-        {{1.0f, 0.0, -1.0f}},
-    };
-    static const int kIndexCount = 36;
-    static const int kIndexData[kIndexCount] =
-    {
-        0, 1, 2, 0, 2, 3,
-        4, 5, 6, 4, 6, 7,
-        8, 9, 10, 8, 10, 11,
-        12, 13, 14, 12, 14, 15,
-        16, 17, 18, 16, 18, 19,
-        20, 21, 22, 20, 22, 23
-    };
+        // Triangle 1
+        {  0,  0, 1 },
+        {  4,  0, 1 },
+        {  0,  4, 1 },
 
-    struct Primitive
-    {
-        float data[4];
-        float color[4];
-    };
-    static const int kPrimitiveCount = 12;
-    static const Primitive kPrimitiveData[kPrimitiveCount] =
-    {
-        {{0.0f, 1.0f, 0.0f, 0.0f}, {0.75f, 0.8f, 0.85f, 1.0f}},
-        {{0.0f, 1.0f, 0.0f, 0.0f}, {0.75f, 0.8f, 0.85f, 1.0f}},
-        {{0.0f, 1.0f, 0.0f, 0.0f}, {0.95f, 0.85f, 0.05f, 1.0f}},
-        {{0.0f, 1.0f, 0.0f, 0.0f}, {0.95f, 0.85f, 0.05f, 1.0f}},
-        {{0.0f, 0.0f, 1.0f, 0.0f}, {0.95f, 0.85f, 0.05f, 1.0f}},
-        {{0.0f, 0.0f, 1.0f, 0.0f}, {0.95f, 0.85f, 0.05f, 1.0f}},
-        {{0.0f, 0.0f, -1.0f, 0.0f}, {0.95f, 0.85f, 0.05f, 1.0f}},
-        {{0.0f, 0.0f, -1.0f, 0.0f}, {0.95f, 0.85f, 0.05f, 1.0f}},
-        {{-1.0f, 0.0f, 0.0f, 0.0f}, {0.95f, 0.85f, 0.05f, 1.0f}},
-        {{-1.0f, 0.0f, 0.0f, 0.0f}, {0.95f, 0.85f, 0.05f, 1.0f}},
-        {{1.0f, 0.0f, 0.0f, 0.0f}, {0.95f, 0.85f, 0.05f, 1.0f}},
-        {{1.0f, 0.0f, 0.0f, 0.0f}, {0.95f, 0.85f, 0.05f, 1.0f}},
-    };
+        // Triangle 2
+        { -4,  0, 1 },
+        {  0,  0, 1 },
+        {  0,  4, 1 },
 
-    struct FullScreenTriangle
-    {
-        struct Vertex
-        {
-            float position[2];
-        };
-
-        enum
-        {
-            kVertexCount = 3
-        };
-
-        static const Vertex kVertices[kVertexCount];
+        // Triangle 3
+        {  0,  0, 1 },
+        {  4,  0, 1 },
+        {  0, -4, 1 },
     };
-    const FullScreenTriangle::Vertex FullScreenTriangle::kVertices[FullScreenTriangle::kVertexCount] = {
-        {{-1, -1}},
-        {{-1, 3}},
-        {{3, -1}},
+    static const int kIndexCount = 9;
+    static const uint32_t kIndexData[kIndexCount] =
+    {
+        0, 1, 2,
+        3, 4, 5,
+        6, 7, 8,
     };
 
     struct BaseRayTracingTest
@@ -141,15 +50,11 @@ namespace gfx_test
         IDevice* device;
         UnitTestContext* context;
 
-        Uniforms gUniforms = {};
-
         ComPtr<IFramebufferLayout> gFramebufferLayout;
         ComPtr<ITransientResourceHeap> gTransientHeap;
         ComPtr<ICommandQueue> gQueue;
 
-        ComPtr<IPipelineState> gPresentPipelineState;
         ComPtr<IPipelineState> gRenderPipelineState;
-        ComPtr<IBufferResource> gFullScreenVertexBuffer;
         ComPtr<IBufferResource> gVertexBuffer;
         ComPtr<IBufferResource> gIndexBuffer;
         ComPtr<IBufferResource> gTransformBuffer;
@@ -428,30 +333,6 @@ namespace gfx_test
                 gQueue->waitOnHost();
             }
 
-            IBufferResource::Desc fullScreenVertexBufferDesc;
-            fullScreenVertexBufferDesc.type = IResource::Type::Buffer;
-            fullScreenVertexBufferDesc.sizeInBytes =
-                FullScreenTriangle::kVertexCount * sizeof(FullScreenTriangle::Vertex);
-            fullScreenVertexBufferDesc.defaultState = ResourceState::VertexBuffer;
-            gFullScreenVertexBuffer = device->createBufferResource(
-                fullScreenVertexBufferDesc, &FullScreenTriangle::kVertices[0]);
-            SLANG_CHECK_ABORT(gFullScreenVertexBuffer != nullptr);
-
-            InputElementDesc inputElements[] = {
-                {"POSITION", 0, Format::R32G32_FLOAT, offsetof(FullScreenTriangle::Vertex, position)},
-            };
-            auto inputLayout = device->createInputLayout(sizeof(FullScreenTriangle::Vertex), &inputElements[0], SLANG_COUNT_OF(inputElements));
-            SLANG_CHECK_ABORT(inputLayout != nullptr);
-
-            ComPtr<IShaderProgram> shaderProgram;
-            GFX_CHECK_CALL_ABORT(loadShaderProgram(device, shaderProgram.writeRef()));
-            GraphicsPipelineStateDesc desc;
-            desc.inputLayout = inputLayout;
-            desc.program = shaderProgram;
-            desc.framebufferLayout = gFramebufferLayout;
-            gPresentPipelineState = device->createGraphicsPipelineState(desc);
-            SLANG_CHECK_ABORT(gPresentPipelineState != nullptr);
-
             const char* hitgroupNames[] = { "hitgroup" };
 
             ComPtr<IShaderProgram> rayTracingProgram;
@@ -485,21 +366,19 @@ namespace gfx_test
 
         void renderFrame()
         {
-            {
-                ComPtr<ICommandBuffer> renderCommandBuffer =
-                    gTransientHeap->createCommandBuffer();
-                auto renderEncoder = renderCommandBuffer->encodeRayTracingCommands();
-                IShaderObject* rootObject = nullptr;
-                renderEncoder->bindPipeline(gRenderPipelineState, &rootObject);
-                auto cursor = ShaderCursor(rootObject);
-                cursor["resultTexture"].setResource(gResultTextureUAV);
-                cursor["sceneBVH"].setResource(gTLAS);
-                renderEncoder->dispatchRays(0, gShaderTable, width, height, 1);
-                renderEncoder->endEncoding();
-                renderCommandBuffer->close();
-                gQueue->executeCommandBuffer(renderCommandBuffer);
-                gQueue->waitOnHost();
-            }
+            ComPtr<ICommandBuffer> renderCommandBuffer =
+                gTransientHeap->createCommandBuffer();
+            auto renderEncoder = renderCommandBuffer->encodeRayTracingCommands();
+            IShaderObject* rootObject = nullptr;
+            renderEncoder->bindPipeline(gRenderPipelineState, &rootObject);
+            auto cursor = ShaderCursor(rootObject);
+            cursor["resultTexture"].setResource(gResultTextureUAV);
+            cursor["sceneBVH"].setResource(gTLAS);
+            renderEncoder->dispatchRays(0, gShaderTable, width, height, 1);
+            renderEncoder->endEncoding();
+            renderCommandBuffer->close();
+            gQueue->executeCommandBuffer(renderCommandBuffer);
+            gQueue->waitOnHost();
         }
 
         void checkTestResults()
@@ -510,7 +389,15 @@ namespace gfx_test
             GFX_CHECK_CALL_ABORT(device->readTextureResource(
                 gResultTexture, ResourceState::CopySource, resultBlob.writeRef(), &rowPitch, &pixelSize));
 
-            writeImage("C:/Users/lucchen/Documents/test.hdr", resultBlob, width, height);
+            //writeImage("C:/Users/lucchen/Documents/test.hdr", resultBlob, width, height, rowPitch, pixelSize);
+
+            auto buffer = removePadding(resultBlob, width, height, rowPitch, pixelSize);
+            float expectedResult[16] = { 1, 1, 1, 1,
+                                         0, 0, 1, 1,
+                                         0, 1, 0, 1,
+                                         1, 0, 0, 1 };
+            auto actualData = (float*)buffer.getBuffer();
+            SLANG_CHECK(memcmp(actualData, expectedResult, sizeof(expectedResult)) == 0)
         }
 
         void run()
