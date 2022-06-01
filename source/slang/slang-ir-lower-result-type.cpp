@@ -124,23 +124,19 @@ namespace Slang
             builder->setInsertBefore(inst);
 
             auto info = getLoweredResultType(builder, inst->getDataType());
-            List<IRInst*> operands;
-            operands.add(inst->getOperand(0));
-            operands.add(getSuccessErrorValue(info->errorType));
-            auto makeStruct = builder->emitMakeStruct(info->loweredType, operands);
-            inst->replaceUsesWith(makeStruct);
-            inst->removeAndDeallocate();
-        }
-
-        void processMakeResultValueVoid(IRMakeResultValueVoid* inst)
-        {
-            IRBuilder builderStorage(sharedBuilderStorage);
-            auto builder = &builderStorage;
-            builder->setInsertBefore(inst);
-
-            auto info = getLoweredResultType(builder, inst->getDataType());
-            auto errCode = getSuccessErrorValue(info->errorType);
-            inst->replaceUsesWith(errCode);
+            if (info->loweredType->getOp() == kIROp_VoidType)
+            {
+                List<IRInst*> operands;
+                operands.add(inst->getOperand(0));
+                operands.add(getSuccessErrorValue(info->errorType));
+                auto makeStruct = builder->emitMakeStruct(info->loweredType, operands);
+                inst->replaceUsesWith(makeStruct);
+            }
+            else
+            {
+                auto errCode = getSuccessErrorValue(info->errorType);
+                inst->replaceUsesWith(errCode);
+            }
             inst->removeAndDeallocate();
         }
 
@@ -250,9 +246,6 @@ namespace Slang
             {
             case kIROp_MakeResultValue:
                 processMakeResultValue((IRMakeResultValue*)inst);
-                break;
-            case kIROp_MakeResultValueVoid:
-                processMakeResultValueVoid((IRMakeResultValueVoid*)inst);
                 break;
             case kIROp_MakeResultError:
                 processMakeResultError((IRMakeResultError*)inst);

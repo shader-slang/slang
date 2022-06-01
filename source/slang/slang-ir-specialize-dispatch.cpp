@@ -32,8 +32,7 @@ IRFunc* specializeDispatchFunction(SharedGenericsLoweringContext* sharedContext,
         case kIROp_lookup_interface_method:
             lookupInst = cast<IRLookupWitnessMethod>(inst);
             break;
-        case kIROp_ReturnVal:
-        case kIROp_ReturnVoid:
+        case kIROp_Return:
             returnInst = cast<IRReturn>(inst);
             break;
         default:

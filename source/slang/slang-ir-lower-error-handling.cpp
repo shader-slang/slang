@@ -130,15 +130,8 @@ struct ErrorHandlingLoweringContext
         auto resultType =
             builder.getResultType(funcType->getResultType(), throwAttr->getErrorType());
         IRInst* resultVal = nullptr;
-        if (ret->getOp() == kIROp_ReturnVal)
-        {
-            auto val = cast<IRReturnVal>(ret)->getVal();
-            resultVal = builder.emitMakeResultValue(resultType, val);
-        }
-        else
-        {
-            resultVal = builder.emitMakeResultValueVoid(resultType);
-        }
+        auto val = cast<IRReturn>(ret)->getVal();
+        resultVal = builder.emitMakeResultValue(resultType, val);
         builder.emitReturn(resultVal);
         ret->removeAndDeallocate();
     }
@@ -169,8 +162,7 @@ struct ErrorHandlingLoweringContext
         case kIROp_TryCall:
             processTryCall(cast<IRTryCall>(inst));
             break;
-        case kIROp_ReturnVal:
-        case kIROp_ReturnVoid:
+        case kIROp_Return:
             processReturn(cast<IRReturn>(inst));
             break;
         case kIROp_Throw:
@@ -206,7 +198,7 @@ struct ErrorHandlingLoweringContext
         // Deduplicate equivalent types.
         sharedBuilder.deduplicateAndRebuildGlobalNumberingMap();   
 
-        // Translate all IRTryCall, IRThrow, IRReturn, IRReturnVal.
+        // Translate all IRTryCall, IRThrow, IRReturn.
         processInsts();
 
         // Lower all functypes.

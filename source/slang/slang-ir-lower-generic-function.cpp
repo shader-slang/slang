@@ -58,7 +58,7 @@ namespace Slang
             {
                 if (genericChild == func)
                     continue;
-                if (genericChild->getOp() == kIROp_ReturnVal)
+                if (genericChild->getOp() == kIROp_Return)
                     continue;
                 // Process all generic parameters and local type definitions.
                 auto clonedChild = cloneInst(&cloneEnv, &builder, genericChild);

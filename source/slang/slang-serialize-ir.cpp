@@ -232,6 +232,11 @@ Result IRSerialWriter::write(IRModule* module, SerialSourceLocWriter* sourceLocW
                         dstInst.m_payload.m_uint32 = irConst->value.intVal ? 1 : 0;
                         break;
                     }
+                    case kIROp_VoidLit:
+                    {
+                        dstInst.m_payloadType = PayloadType::Empty;
+                        break;
+                    }
                     default:
                     {
                         SLANG_RELEASE_ASSERT(!"Unhandled constant type");
@@ -793,6 +798,13 @@ Result IRSerialReader::read(const IRSerialData& data, Session* session, SerialSo
                     SLANG_ASSERT(srcInst.m_payloadType == PayloadType::Float64);
                     irConst = static_cast<IRConstant*>(module->_allocateInst(op, operandCount,  prefixSize + sizeof(IRFloatingPointValue)));
                     irConst->value.floatVal = srcInst.m_payload.m_float64;
+                    break;
+                }
+                case kIROp_VoidLit:
+                {
+                    SLANG_ASSERT(srcInst.m_payloadType == PayloadType::Empty);
+                    irConst = static_cast<IRConstant*>(module->_allocateInst(
+                        op, operandCount, prefixSize));
                     break;
                 }
                 case kIROp_StringLit:
