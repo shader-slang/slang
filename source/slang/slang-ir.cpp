@@ -3101,13 +3101,12 @@ namespace Slang
         IRBlock* successBlock,
         IRBlock* failureBlock,
         IRInst* func,
-        IRInst* errVar,
         UInt argCount,
         IRInst* const* args)
     {
-        IRInst* fixedArgs[] = {successBlock, failureBlock, func, errVar};
+        IRInst* fixedArgs[] = {successBlock, failureBlock, func};
         auto inst = createInstWithTrailingArgs<IRTryCall>(
-            this, kIROp_TryCall, type, 4, fixedArgs, argCount, args);
+            this, kIROp_TryCall, type, 3, fixedArgs, argCount, args);
         addInst(inst);
         return inst;
     }

@@ -649,13 +649,14 @@ LoweredValInfo emitCallToVal(
                 auto funcType = as<IRFuncType>(callee->getDataType());
                 auto throwAttr = funcType->findAttr<IRFuncThrowTypeAttr>();
                 assert(throwAttr);
-                auto errVar = builder->emitVar(throwAttr->getErrorType());
-                auto result = LoweredValInfo::simple(builder->emitTryCallInst(
-                    type, succBlock, failBlock, callee, errVar, argCount, args));
+                auto voidType = builder->getVoidType();
+                builder->emitTryCallInst(voidType, succBlock, failBlock, callee, argCount, args);
                 builder->insertBlock(failBlock);
-                builder->emitThrow(builder->emitLoad(errVar));
+                auto errParam = builder->emitParam(throwAttr->getErrorType());
+                builder->emitThrow(errParam);
                 builder->insertBlock(succBlock);
-                return result;
+                auto value = builder->emitParam(type);
+                return LoweredValInfo::simple(value);
             }
             break;
         default:

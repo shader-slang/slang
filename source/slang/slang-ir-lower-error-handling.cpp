@@ -51,12 +51,13 @@ struct ErrorHandlingLoweringContext
     {
         // If we see:
         // ```
-        //      value = tryCall(callee, errorVar, successBlock, failBlock, args) : returnType
+        //      value = tryCall(callee, successBlock, failBlock, args)
         //  successBlock:
-        //      ... (uses value) ...
+        //      resultParam = IRParam<resultType>
+        //      ... (uses resultParam) ...
         //  failBlock:
-        //      errorVal = load(errorVar);
-        //      (uses errorVal)
+        //      errorParam = IRParam<errorType>
+        //      (uses errorParam)
         // ```
         // We need to rewrite it as
         // ```
@@ -65,11 +66,10 @@ struct ErrorHandlingLoweringContext
         //      ifElse(isError, failBlock, successBlock)
         //  successBlock:
         //      value = getResultValue(result) : returnType
-        //      ...
+        //      ... (replaces resultParam with value)
         //  failBlock:
         //      error = getResultError(result) : errorType
-        //      store(errorVAR, error);
-        //      ...
+        //      ... (replaces errorParam with error)
         // ```
         IRFuncType* funcType = cast<IRFuncType>(tryCall->getCallee()->getDataType());
         auto resultValueType = funcType->getResultType();
@@ -91,22 +91,25 @@ struct ErrorHandlingLoweringContext
         }
         auto call = builder.emitCallInst(resultType, tryCall->getCallee(), args);
         auto isFail = builder.emitIsResultError(call);
-        builder.emitIf(isFail, tryCall->getFailureBlock(), tryCall->getSuccessBlock());
         auto failBlock = tryCall->getFailureBlock();
-        builder.setInsertBefore(failBlock->getFirstOrdinaryInst());
-
-        // The generated code in fail block will load error code from `tryCall->errorVar`.
-        // We need to store the actual error code at the begining of the fail block so the
-        // rest of it can successfully load the error code.
-        auto errorVar = tryCall->getError();
-        builder.emitStore(errorVar, builder.emitGetResultError(call));
         auto successBlock = tryCall->getSuccessBlock();
+
+        builder.emitIf(isFail, failBlock, successBlock);
+
+        // Replace the params in failBlock to `getResultError(call)`.
+        builder.setInsertBefore(failBlock->getFirstOrdinaryInst());
+        auto errorParam = failBlock->getFirstParam();
+        auto errVal = builder.emitGetResultError(call);
+        errorParam->replaceUsesWith(errVal);
+        errorParam->removeAndDeallocate();
+
+        // Replace the params in successBlock to `getResultValue(call)`.
         builder.setInsertBefore(successBlock->getFirstOrdinaryInst());
-        if (resultValueType->getOp() != kIROp_VoidType)
-        {
-            auto resultValue = builder.emitGetResultValue(call);
-            tryCall->replaceUsesWith(resultValue);
-        }
+        auto resultParam = successBlock->getFirstParam();
+        auto resultValue = builder.emitGetResultValue(call);
+        resultParam->replaceUsesWith(resultValue);
+        resultParam->removeAndDeallocate();
+
         tryCall->removeAndDeallocate();
     }
 

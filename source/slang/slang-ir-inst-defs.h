@@ -440,8 +440,8 @@ INST(SwizzledStore, swizzledStore, 2, 0)
     INST_RANGE(ConditionalBranch, conditionalBranch, ifElse)
 
     INST(Throw, throw, 1, 0)
-    // tryCall <successBlock> <failBlock> <callee> <err> <args>...
-    INST(TryCall, tryCall, 4, 0)
+    // tryCall <successBlock> <failBlock> <callee> <args>...
+    INST(TryCall, tryCall, 3, 0)
     // switch <val> <break> <default> <caseVal1> <caseBlock1> ...
     INST(Switch, switch, 3, 0)
 

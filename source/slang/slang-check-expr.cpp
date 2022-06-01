@@ -1549,19 +1549,18 @@ namespace Slang
             return expr;
         
         auto parentFunc = this->m_parentFunc;
-        // TODO: check if the try clause is catched.
-        // For now we assume all `try`s are not catched (because we don't have catch yet).
+        // TODO: check if the try clause is caught.
+        // For now we assume all `try`s are not caught (because we don't have catch yet).
         if (!parentFunc)
         {
-            getSink()->diagnose(expr, Diagnostics::uncachedTryCallInNonThrowFunc);
+            getSink()->diagnose(expr, Diagnostics::uncaughtTryCallInNonThrowFunc);
             return expr;
         }
         if (parentFunc->errorType->equals(m_astBuilder->getVoidType()))
         {
-            getSink()->diagnose(expr, Diagnostics::uncachedTryCallInNonThrowFunc);
+            getSink()->diagnose(expr, Diagnostics::uncaughtTryCallInNonThrowFunc);
             return expr;
         }
-
         if (!as<InvokeExpr>(expr->base))
         {
             getSink()->diagnose(expr, Diagnostics::tryClauseMustApplyToInvokeExpr);
@@ -1575,6 +1574,15 @@ namespace Slang
                 if (funcCallee->errorType->equals(m_astBuilder->getVoidType()))
                 {
                     getSink()->diagnose(expr, Diagnostics::tryInvokeCalleeShouldThrow, callee->declRef);
+                }
+                if (!parentFunc->errorType->equals(funcCallee->errorType))
+                {
+                    getSink()->diagnose(
+                        expr,
+                        Diagnostics::errorTypeOfCalleeIncompatibleWithCaller,
+                        callee->declRef,
+                        funcCallee->errorType,
+                        parentFunc->errorType);
                 }
                 return expr;
             }

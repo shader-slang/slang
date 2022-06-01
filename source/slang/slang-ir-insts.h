@@ -1569,10 +1569,9 @@ struct IRTryCall : IRTerminatorInst
     IRBlock* getSuccessBlock() { return cast<IRBlock>(getOperand(0)); }
     IRBlock* getFailureBlock() { return cast<IRBlock>(getOperand(1)); }
     IRInst* getCallee() { return getOperand(2); }
-    IRInst* getError() { return getOperand(3); }
-    UInt getArgCount() { return getOperandCount() - 4; }
-    IRUse* getArgs() { return getOperands() + 4; }
-    IRInst* getArg(UInt index) { return getOperand(index + 4); }
+    UInt getArgCount() { return getOperandCount() - 3; }
+    IRUse* getArgs() { return getOperands() + 3; }
+    IRInst* getArg(UInt index) { return getOperand(index + 3); }
 };
 
 struct IRSwizzle : IRInst
@@ -2367,7 +2366,6 @@ public:
         IRBlock* successBlock,
         IRBlock* failureBlock,
         IRInst* func,
-        IRInst* errVar,
         UInt argCount,
         IRInst* const* args);
 
