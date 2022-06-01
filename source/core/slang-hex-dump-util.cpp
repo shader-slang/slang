@@ -5,6 +5,8 @@
 #include "slang-string-util.h"
 #include "slang-writer.h"
 
+#include "slang-char-util.h"
+
 #include "../../slang-com-helper.h"
 #include "slang-hash.h"
 
@@ -152,23 +154,6 @@ SlangResult HexDumpUtil::dumpSourceBytes(const uint8_t* data, size_t dataCount, 
     return SLANG_OK;
 }
 
-static int _parseHexDigit(char c)
-{
-    if (c >= '0' && c <= '9')
-    {
-        return c -'0';
-    }
-    else if (c >= 'a' && c <= 'f')
-    {
-        return c - 'a' + 10;
-    }
-    else if (c >= 'A' && c <= 'F')
-    {
-        return c - 'A' + 10;
-    }
-    return -1;
-}
-
 /* static */SlangResult HexDumpUtil::parse(const UnownedStringSlice& lines, List<uint8_t>& outBytes)
 {
     outBytes.clear();
@@ -188,8 +173,8 @@ static int _parseHexDigit(char c)
                 break;
             }
 
-            const int hi = _parseHexDigit(c);
-            const int lo = _parseHexDigit(cur[1]);
+            const int hi = CharUtil::getHexDigitValue(c);
+            const int lo = CharUtil::getHexDigitValue(cur[1]);
             cur += 2;
 
             if (hi < 0 || lo < 0)

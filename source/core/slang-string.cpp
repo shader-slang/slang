@@ -690,5 +690,10 @@ namespace Slang
 
         return true;
     }
+}
 
+std::ostream& operator<< (std::ostream& stream, const Slang::String& s)
+{
+    stream << s.getBuffer();
+    return stream;
 }

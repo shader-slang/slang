@@ -1477,10 +1477,13 @@ LinkedIR linkIR(
     // need to operate on all the global parameters can do so.
     //
     IRVarLayout* irGlobalScopeVarLayout = nullptr;
-    if( auto irGlobalScopeLayoutDecoration = irModuleForLayout->getModuleInst()->findDecoration<IRLayoutDecoration>() )
+    if (irModuleForLayout)
     {
-        auto irOriginalGlobalScopeVarLayout = irGlobalScopeLayoutDecoration->getLayout();
-        irGlobalScopeVarLayout = cast<IRVarLayout>(cloneValue(context, irOriginalGlobalScopeVarLayout));
+        if( auto irGlobalScopeLayoutDecoration = irModuleForLayout->getModuleInst()->findDecoration<IRLayoutDecoration>() )
+        {
+            auto irOriginalGlobalScopeVarLayout = irGlobalScopeLayoutDecoration->getLayout();
+            irGlobalScopeVarLayout = cast<IRVarLayout>(cloneValue(context, irOriginalGlobalScopeVarLayout));
+        }
     }
 
     // Bindings for global generic parameters are currently represented

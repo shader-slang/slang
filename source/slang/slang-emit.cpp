@@ -736,10 +736,9 @@ Result linkAndOptimizeIR(
     simplifyIR(irModule);
 
     {
-        // Storage for liveness information
-        List<LivenessLocation> livenessLocations;
-        const bool shouldTrackLiveness = codeGenContext->shouldTrackLiveness();
-
+        // Get the liveness mode.
+        const LivenessMode livenessMode = codeGenContext->shouldTrackLiveness() ? LivenessMode::Enabled : LivenessMode::Disabled;
+        
         //
         // Downstream targets may benefit from having live-range information for
         // local variables, and our IR currently encodes a reasonably good version
@@ -750,9 +749,9 @@ Result linkAndOptimizeIR(
         // temporary variables into the IR module should take responsibility for
         // producing their own live-range information.
         //
-        if (shouldTrackLiveness)
+        if (isEnabled(livenessMode))
         {
-            LivenessUtil::locateVariables(irModule, livenessLocations);
+            LivenessUtil::addVariableRangeStarts(irModule, livenessMode);
         }
 
         // As a late step, we need to take the SSA-form IR and move things *out*
@@ -764,9 +763,7 @@ Result linkAndOptimizeIR(
 
         {
             // We only want to accumulate locations if liveness tracking is enabled.
-            List<LivenessLocation>* locsPtr = shouldTrackLiveness ? &livenessLocations : nullptr;
-
-            eliminatePhis(codeGenContext, locsPtr, irModule);
+            eliminatePhis(codeGenContext, livenessMode, irModule);
 #if 0
             dumpIRIfEnabled(codeGenContext, irModule, "PHIS ELIMINATED");
 #endif
@@ -774,9 +771,9 @@ Result linkAndOptimizeIR(
 
         // If liveness is enabled add liveness ranges based on the accumulated liveness locations
 
-        if (shouldTrackLiveness)
+        if (isEnabled(livenessMode))
         {
-            LivenessUtil::addLivenessRanges(irModule, livenessLocations);
+            LivenessUtil::addRangeEnds(irModule, livenessMode);
 
 #if 0
             dumpIRIfEnabled(codeGenContext, irModule, "LIVENESS");

@@ -23,6 +23,10 @@ public:
 
         /// Get the string type
     Type* getStringType();
+
+        /// Get the native string type
+    Type* getNativeStringType();
+
         /// Get the enum type type
     Type* getEnumTypeType();
         /// Get the __Dynamic type
@@ -65,6 +69,7 @@ protected:
     // TODO(tfoley): These should really belong to the compilation context!
     //
     Type* m_stringType = nullptr;
+    Type* m_nativeStringType = nullptr;
     Type* m_enumTypeType = nullptr;
     Type* m_dynamicType = nullptr;
     Type* m_nullPtrType = nullptr;
