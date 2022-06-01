@@ -1589,7 +1589,7 @@ Result DeviceImpl::createTextureView(
         return SLANG_OK;
     }
 
-    bool isArray = desc.subresourceRange.layerCount > 1;
+    bool isArray = resourceImpl->getDesc()->arraySize > 1;
     VkImageViewCreateInfo createInfo = {};
     createInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
     createInfo.flags = 0;
@@ -1625,9 +1625,15 @@ Result DeviceImpl::createTextureView(
 
     createInfo.subresourceRange.baseArrayLayer = desc.subresourceRange.baseArrayLayer;
     createInfo.subresourceRange.baseMipLevel = desc.subresourceRange.mipLevel;
-    createInfo.subresourceRange.layerCount = desc.subresourceRange.layerCount == 0
-        ? VK_REMAINING_ARRAY_LAYERS
-        : desc.subresourceRange.layerCount;
+    createInfo.subresourceRange.layerCount = desc.subresourceRange.layerCount;
+    if (createInfo.subresourceRange.layerCount == 0)
+    {
+        createInfo.subresourceRange.layerCount = isArray ? VK_REMAINING_ARRAY_LAYERS : 1;
+        if (createInfo.viewType == VK_IMAGE_VIEW_TYPE_CUBE)
+        {
+            createInfo.subresourceRange.layerCount = 6;
+        }
+    }
     createInfo.subresourceRange.levelCount = desc.subresourceRange.mipLevelCount == 0
         ? VK_REMAINING_MIP_LEVELS
         : desc.subresourceRange.mipLevelCount;
