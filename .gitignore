@@ -68,3 +68,4 @@ build/**/*.lastbuildstate
 build/**/*.recipe
 build/**/*.log
 *.dll
+*.dxil

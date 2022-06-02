@@ -16,6 +16,7 @@
 #include "slang-ir-validate.h"
 #include "slang-ir-string-hash.h"
 #include "slang-ir-clone.h"
+#include "slang-ir-lower-error-handling.h"
 
 #include "slang-mangle.h"
 #include "slang-type-layout.h"
@@ -612,6 +613,12 @@ int32_t getIntrinsicOp(
     return int32_t(irOp);
 }
 
+struct TryClauseEnvironment
+{
+    TryClauseType clauseType = TryClauseType::None;
+    IRBlock* catchBlock = nullptr;
+};
+
 // Given a `LoweredValInfo` for something callable, along with a
 // bunch of arguments, emit an appropriate call to it.
 LoweredValInfo emitCallToVal(
@@ -619,7 +626,8 @@ LoweredValInfo emitCallToVal(
     IRType*         type,
     LoweredValInfo  funcVal,
     UInt            argCount,
-    IRInst* const* args)
+    IRInst* const*  args,
+    const TryClauseEnvironment& tryEnv)
 {
     auto builder = context->irBuilder;
     switch (funcVal.flavor)
@@ -627,8 +635,33 @@ LoweredValInfo emitCallToVal(
     case LoweredValInfo::Flavor::None:
         SLANG_UNEXPECTED("null function");
     default:
-        return LoweredValInfo::simple(
-            builder->emitCallInst(type, getSimpleVal(context, funcVal), argCount, args));
+        switch (tryEnv.clauseType)
+        {
+        case TryClauseType::None:
+            return LoweredValInfo::simple(
+                builder->emitCallInst(type, getSimpleVal(context, funcVal), argCount, args));
+
+        case TryClauseType::Standard:
+            {
+                auto callee = getSimpleVal(context, funcVal);
+                auto succBlock = builder->createBlock();
+                auto failBlock = builder->createBlock();
+                auto funcType = as<IRFuncType>(callee->getDataType());
+                auto throwAttr = funcType->findAttr<IRFuncThrowTypeAttr>();
+                assert(throwAttr);
+                auto voidType = builder->getVoidType();
+                builder->emitTryCallInst(voidType, succBlock, failBlock, callee, argCount, args);
+                builder->insertBlock(failBlock);
+                auto errParam = builder->emitParam(throwAttr->getErrorType());
+                builder->emitThrow(errParam);
+                builder->insertBlock(succBlock);
+                auto value = builder->emitParam(type);
+                return LoweredValInfo::simple(value);
+            }
+            break;
+        default:
+            SLANG_UNIMPLEMENTED_X("emitCallToVal(tryClauseType)");
+        }
     }
 }
 
@@ -655,7 +688,8 @@ LoweredValInfo emitCallToDeclRef(
     DeclRef<Decl>   funcDeclRef,
     IRType*         funcType,
     UInt            argCount,
-    IRInst* const* args)
+    IRInst* const*  args,
+    const TryClauseEnvironment& tryEnv)
 {
     SLANG_ASSERT(funcType);
 
@@ -700,7 +734,7 @@ LoweredValInfo emitCallToDeclRef(
     // Fallback case is to emit an actual call.
     //
     LoweredValInfo funcVal = emitDeclRef(context, funcDeclRef, funcType);
-    return emitCallToVal(context, type, funcVal, argCount, args);
+    return emitCallToVal(context, type, funcVal, argCount, args, tryEnv);
 }
 
 LoweredValInfo emitCallToDeclRef(
@@ -708,9 +742,17 @@ LoweredValInfo emitCallToDeclRef(
     IRType*                 type,
     DeclRef<Decl>           funcDeclRef,
     IRType*                 funcType,
-    List<IRInst*> const&    args)
+    List<IRInst*> const&    args,
+    const TryClauseEnvironment& tryEnv)
 {
-    return emitCallToDeclRef(context, type, funcDeclRef, funcType, args.getCount(), args.getBuffer());
+    return emitCallToDeclRef(
+        context,
+        type,
+        funcDeclRef,
+        funcType,
+        args.getCount(),
+        args.getBuffer(),
+        tryEnv);
 }
 
     /// Represents the "direction" that a parameter is being passed (e.g., `in` or `out`
@@ -1580,10 +1622,21 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         {
             paramTypes.add(lowerType(context, type->getParamType(pp)));
         }
-        return getBuilder()->getFuncType(
-            paramCount,
-            paramTypes.getBuffer(),
-            resultType);
+        if (type->getErrorType()->equals(context->astBuilder->getBottomType()))
+        {
+            return getBuilder()->getFuncType(
+                paramCount,
+                paramTypes.getBuffer(),
+                resultType);
+        }
+        else
+        {
+            auto errorType = lowerType(context, type->getErrorType());
+            auto irThrowFuncTypeAttribute =
+                getBuilder()->getAttr(kIROp_FuncThrowTypeAttr, 1, (IRInst**)&errorType);
+            return getBuilder()->getFuncType(
+                paramCount, paramTypes.getBuffer(), resultType, irThrowFuncTypeAttribute);
+        }
     }
 
     IRType* visitPtrType(PtrType* type)
@@ -2784,11 +2837,20 @@ void _lowerFuncDeclBaseTypeInfo(
         // being accessed, rather than a simple value.
         irResultType = builder->getPtrType(irResultType);
     }
-
-    outInfo.type = builder->getFuncType(
-        paramTypes.getCount(),
-        paramTypes.getBuffer(),
-        irResultType);
+  
+    if (!getErrorCodeType(context->astBuilder, declRef)->equals(context->astBuilder->getBottomType()))
+    {
+        auto errorType = lowerType(context, getErrorCodeType(context->astBuilder, declRef));
+        IRAttr* throwTypeAttr = nullptr;
+        throwTypeAttr = builder->getAttr(kIROp_FuncThrowTypeAttr, 1, (IRInst**)&errorType);
+        outInfo.type = builder->getFuncType(
+            paramTypes.getCount(), paramTypes.getBuffer(), irResultType, throwTypeAttr);
+    }
+    else
+    {
+        outInfo.type =
+            builder->getFuncType(paramTypes.getCount(), paramTypes.getBuffer(), irResultType);
+    }
 }
 
 static LoweredValInfo _emitCallToAccessor(
@@ -2824,7 +2886,8 @@ static LoweredValInfo _emitCallToAccessor(
         accessorDeclRef,
         info.type,
         allArgs.getCount(),
-        allArgs.getBuffer());
+        allArgs.getBuffer(),
+        TryClauseEnvironment());
 
     applyOutArgumentFixups(context, fixups);
 
@@ -3524,6 +3587,11 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
 
     LoweredValInfo visitInvokeExpr(InvokeExpr* expr)
     {
+        return visitInvokeExprImpl(expr, TryClauseEnvironment());
+    }
+
+    LoweredValInfo visitInvokeExprImpl(InvokeExpr* expr, const TryClauseEnvironment& tryEnv)
+    {
         auto type = lowerType(context, expr->type);
 
         // We are going to look at the syntactic form of
@@ -3636,7 +3704,8 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
                 type,
                 funcDeclRef,
                 funcType,
-                irArgs);
+                irArgs,
+                tryEnv);
             applyOutArgumentFixups(context, argFixups);
             return result;
         }
@@ -3656,6 +3725,16 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
         //
         SLANG_UNEXPECTED("could not resolve target declaration for call");
         UNREACHABLE_RETURN(LoweredValInfo());
+    }
+
+        /// Emit code for a `try` invoke.
+    LoweredValInfo visitTryExpr(TryExpr* expr)
+    {
+        auto invokeExpr = as<InvokeExpr>(expr->base);
+        assert(invokeExpr);
+        TryClauseEnvironment tryEnv;
+        tryEnv.clauseType = expr->tryClauseType;
+        return visitInvokeExprImpl(invokeExpr, tryEnv);
     }
 
         /// Emit code to cast `value` to a concrete `superType` (e.g., a `struct`).
@@ -8338,7 +8417,13 @@ RefPtr<IRModule> generateIRForTranslationUnit(
 
     //      dumpIR(module);
 
-    // First, inline calls to any functions that have been
+    // First, lower error handling logic into normal control flow.
+    // This includes lowering throwing functions into functions that
+    // returns a `Result<T,E>` value, translating `tryCall` into
+    // normal `call` + `ifElse`, etc.
+    lowerErrorHandling(module, compileRequest->getSink());
+
+    // Next, inline calls to any functions that have been
     // marked for mandatory "early" inlining.
     //
     performMandatoryEarlyInlining(module);

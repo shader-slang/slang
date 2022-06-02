@@ -326,7 +326,7 @@ protected:
             IRBuilder builder(m_sharedBuilder);
             for( auto block : entryPointFunc->getBlocks() )
             {
-                auto returnValInst = as<IRReturnVal>(block->getTerminator());
+                auto returnValInst = as<IRReturn>(block->getTerminator());
                 if(!returnValInst)
                     continue;
 

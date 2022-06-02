@@ -37,7 +37,7 @@ struct SerialClass;
 struct SerialField;
 
 // Type used to implement mechanisms to convert to and from serial types.
-template <typename T>
+template <typename T, typename /*enumTypeSFINAE*/ = void>
 struct SerialTypeInfo;
 
 enum class SerialTypeKind : uint8_t

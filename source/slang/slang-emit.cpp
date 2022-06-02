@@ -23,6 +23,7 @@
 #include "slang-ir-com-interface.h"
 #include "slang-ir-lower-generics.h"
 #include "slang-ir-lower-tuple-types.h"
+#include "slang-ir-lower-result-type.h"
 #include "slang-ir-lower-bit-cast.h"
 #include "slang-ir-lower-reinterpret.h"
 #include "slang-ir-metadata.h"
@@ -201,6 +202,27 @@ Result linkAndOptimizeIR(
     // IR, then do it here, for the target-specific, but
     // un-specialized IR.
     dumpIRIfEnabled(codeGenContext, irModule);
+
+    switch (target)
+    {
+        case CodeGenTarget::CPPSource:
+        {
+            // TODO(JS):
+            // We want the interface transformation to take place for 'regular' CPPSource for now too.
+            lowerComInterfaces(irModule, artifactDesc.style, sink);
+            break;
+        }
+        case CodeGenTarget::HostCPPSource:
+        {
+            lowerComInterfaces(irModule, artifactDesc.style, sink);
+            generateDllImportFuncs(irModule, sink);
+            break;
+        }
+        default: break;
+    }
+
+    // Lower `Result<T,E>` types into ordinary struct types.
+    lowerResultType(irModule, sink);
 
     // Replace any global constants with their values.
     //
@@ -689,26 +711,6 @@ Result linkAndOptimizeIR(
     #endif
         validateIRModuleIfEnabled(codeGenContext, irModule);
         break;
-    }
-
-    switch (target)
-    {
-        default:
-            break;
-     
-        case CodeGenTarget::CPPSource:
-        {
-            // TODO(JS):
-            // We want the interface transformation to take place for 'regular' CPPSource for now too.
-            lowerComInterfaces(irModule, artifactDesc.style, sink);
-            break;
-        }
-        case CodeGenTarget::HostCPPSource:
-        {
-            lowerComInterfaces(irModule, artifactDesc.style, sink);
-            generateDllImportFuncs(irModule, sink);
-            break;
-        }
     }
 
     // TODO: our current dynamic dispatch pass will remove all uses of witness tables.

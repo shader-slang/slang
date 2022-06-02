@@ -225,6 +225,7 @@ namespace Slang
 
     String Session::getCoreLibraryCode()
     {
+#if !defined(SLANG_DISABLE_STDLIB_SOURCE)
         if (coreLibraryCode.getLength() > 0)
             return coreLibraryCode;
 
@@ -235,11 +236,14 @@ namespace Slang
         #include "core.meta.slang.h"
 
         coreLibraryCode = sb.ProduceString();
+#endif
+
         return coreLibraryCode;
     }
 
     String Session::getHLSLLibraryCode()
     {
+#if !defined(SLANG_DISABLE_STDLIB_SOURCE)
         if (hlslLibraryCode.getLength() > 0)
             return hlslLibraryCode;
 
@@ -250,6 +254,7 @@ namespace Slang
         #include "hlsl.meta.slang.h"
 
         hlslLibraryCode = sb.ProduceString();
+#endif
         return hlslLibraryCode;
     }
 }

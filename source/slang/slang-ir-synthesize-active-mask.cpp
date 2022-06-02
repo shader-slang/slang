@@ -1126,8 +1126,7 @@ struct SynthesizeActiveMaskForFunctionContext
             }
             break;
 
-        case kIROp_ReturnVal:
-        case kIROp_ReturnVoid:
+        case kIROp_Return:
             {
                 // A `return` instruction is akin to an unconditional branch,
                 // except that it is guaranteed to exit any structured control

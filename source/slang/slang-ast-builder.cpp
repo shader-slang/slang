@@ -31,6 +31,7 @@ void SharedASTBuilder::init(Session* session)
 
     // Create common shared types
     m_errorType = m_astBuilder->create<ErrorType>();
+    m_bottomType = m_astBuilder->create<BottomType>();
     m_initializerListType = m_astBuilder->create<InitializerListType>();
     m_overloadedType = m_astBuilder->create<OverloadGroupType>();
 

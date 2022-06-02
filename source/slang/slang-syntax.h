@@ -162,6 +162,18 @@ namespace Slang
         return declRef.substitute(astBuilder, declRef.getDecl()->returnType.type);
     }
 
+    inline Type* getErrorCodeType(ASTBuilder* astBuilder, DeclRef<CallableDecl> const& declRef)
+    {
+        if (declRef.getDecl()->errorType.type)
+        {
+            return declRef.substitute(astBuilder, declRef.getDecl()->errorType.type);
+        }
+        else
+        {
+            return astBuilder->getBottomType();
+        }
+    }
+
     inline FilteredMemberRefList<ParamDecl> getParameters(DeclRef<CallableDecl> const& declRef)
     {
         return getMembersOfType<ParamDecl>(declRef);

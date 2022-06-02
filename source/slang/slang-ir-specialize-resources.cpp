@@ -554,7 +554,7 @@ struct ResourceOutputSpecializationPass
         //
         for( auto block : func->getBlocks() )
         {
-            auto returnInst = as<IRReturnVal>(block->getTerminator());
+            auto returnInst = as<IRReturn>(block->getTerminator());
             if(!returnInst)
                 continue;
 

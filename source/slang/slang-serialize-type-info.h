@@ -142,6 +142,12 @@ struct SerialTypeInfo<bool>
     }
 };
 
+// Specialization for all enum types
+template<typename T>
+struct SerialTypeInfo<T, typename std::enable_if<std::is_enum<T>::value>::type>
+    : public SerialIdentityTypeInfo<T>
+{};
+
 // Pointer
 // Could handle different pointer base types with some more template magic here, but instead went with Pointer type to keep
 // things simpler.
