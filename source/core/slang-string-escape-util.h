@@ -55,6 +55,8 @@ struct StringEscapeUtil
         Cpp,            ///< Cpp style quoting and escape handling
         Space,          ///< Applies quotes if there are spaces. Does not escape.
         JSON,           ///< Json encoding
+        Slang,          ///< Slang style string encoding (For now same as Cpp but that may change in the future)
+        CountOf,
     };
 
         /// Given a style returns a handler

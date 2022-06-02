@@ -4,6 +4,7 @@
 #include <string.h>
 #include <cstdlib>
 #include <stdio.h>
+#include <iostream>
 
 #include "slang-smart-pointer.h"
 #include "slang-common.h"
@@ -62,6 +63,10 @@ namespace Slang
         return (((unsigned char)ch) & 0xC0) == 0x80;
     }
 
+    /* A string slice that doesn't own the contained characters.
+    It is the responsibility of code using the type to keep the memory backing 
+    the slice in scope.
+    A slice is generally *not* zero terminated. */
     struct SLANG_RT_API UnownedStringSlice
     {
     public:
@@ -85,15 +90,9 @@ namespace Slang
             , m_end(b + len)
         {}
 
-        char const* begin() const
-        {
-            return m_begin;
-        }
+        SLANG_FORCE_INLINE char const* begin() const { return m_begin; }
 
-        char const* end() const
-        {
-            return m_end;
-        }
+        SLANG_FORCE_INLINE char const* end() const { return m_end; }
 
             /// True if slice is strictly contained in memory.
         bool isMemoryContained(const UnownedStringSlice& slice) const
@@ -105,10 +104,8 @@ namespace Slang
             return pos >= m_begin && pos <= m_end;
         }
 
-        Index getLength() const
-        {
-            return Index(m_end - m_begin);
-        }
+            /// Get the length in *bytes*
+        Count getLength() const { return Index(m_end - m_begin); }
 
             /// Finds first index of char 'c'. If not found returns -1.
         Index indexOf(char c) const;
@@ -179,7 +176,7 @@ namespace Slang
         template <size_t SIZE> 
         SLANG_FORCE_INLINE static UnownedStringSlice fromLiteral(const char (&in)[SIZE]) { return UnownedStringSlice(in, SIZE - 1); }
 
-    private:
+    protected:
         char const* m_begin;
         char const* m_end;
     };
@@ -187,6 +184,40 @@ namespace Slang
     // A more convenient way to make slices from *string literals*
     template <size_t SIZE>
     SLANG_FORCE_INLINE UnownedStringSlice toSlice(const char (&in)[SIZE]) { return UnownedStringSlice(in, SIZE - 1); }
+
+    /// Same as UnownedStringSlice, but must be zero terminated. 
+    /// Zero termination is *not* included in the length.
+    struct SLANG_RT_API UnownedTerminatedStringSlice : public UnownedStringSlice
+    {
+    public:
+        typedef UnownedStringSlice Super;
+        typedef UnownedTerminatedStringSlice ThisType;
+
+            /// We can turn into a regular zero terminated string
+        SLANG_FORCE_INLINE operator const char*() const { return m_begin; }
+
+            /// Exists to match the equivalent function in String.
+        SLANG_FORCE_INLINE char const* getBuffer() const { return m_begin; }
+
+            /// Construct from a literal directly.
+        template <size_t SIZE>
+        SLANG_FORCE_INLINE static ThisType fromLiteral(const char(&in)[SIZE]) { return ThisType(in, SIZE - 1); }
+
+            /// Note, b cannot be null because if it were then the string would not be null terminated
+        UnownedTerminatedStringSlice(char const* b)
+            : Super(b, b + strlen(b))
+        {}
+        UnownedTerminatedStringSlice(char const* b, size_t len)
+            : Super(b, len)
+        {
+            // b must be valid and it must be null terminated
+            SLANG_ASSERT(b && b[len] == 0);
+        }
+    };
+
+    // A more convenient way to make terminated slices from *string literals*
+    template <size_t SIZE>
+    SLANG_FORCE_INLINE UnownedTerminatedStringSlice toTerminatedSlice(const char(&in)[SIZE]) { return UnownedTerminatedStringSlice(in, SIZE - 1); }
 
     // A `StringRepresentation` provides the backing storage for
     // all reference-counted string-related types.
@@ -283,16 +314,6 @@ namespace Slang
     };
 
     class String;
-
-
-
-    struct SLANG_RT_API UnownedTerminatedStringSlice : public UnownedStringSlice
-    {
-    public:
-        UnownedTerminatedStringSlice(char const* b)
-            : UnownedStringSlice(b, b + (b?strlen(b):0))
-        {}
-    };
 
     struct SLANG_RT_API StringSlice
     {
@@ -1018,6 +1039,7 @@ namespace Slang
             length -= actualDelLength;
         }
 #endif
+        friend std::ostream& operator<< (std::ostream& stream, const String& s);
 
         void Clear()
         {
@@ -1030,5 +1052,7 @@ namespace Slang
     double StringToDouble(const String & str);
     float StringToFloat(const String & str);
 }
+
+std::ostream& operator<< (std::ostream& stream, const Slang::String& s);
 
 #endif

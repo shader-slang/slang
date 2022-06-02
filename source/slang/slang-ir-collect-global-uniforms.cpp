@@ -69,6 +69,11 @@ struct CollectGlobalUniformParametersContext
     //
     void processModule()
     {
+        if (!globalScopeVarLayout)
+        {
+            return;
+        }
+
         // We start by looking at the layout that was computed for the global-scope
         // parameters to determine how the parameters are supposed to be pacakged.
         //
