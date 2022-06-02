@@ -72,6 +72,9 @@ namespace gfx_test
 
         void init(IDevice* device, UnitTestContext* context)
         {
+            if (!device->hasFeature("ray-tracing"))
+                SLANG_IGNORE_TEST;
+
             this->device = device;
             this->context = context;
         }
