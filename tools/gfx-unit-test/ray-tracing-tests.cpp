@@ -50,22 +50,22 @@ namespace gfx_test
         IDevice* device;
         UnitTestContext* context;
 
-        ComPtr<IFramebufferLayout> gFramebufferLayout;
-        ComPtr<ITransientResourceHeap> gTransientHeap;
-        ComPtr<ICommandQueue> gQueue;
+        ComPtr<IFramebufferLayout> framebufferLayout;
+        ComPtr<ITransientResourceHeap> transientHeap;
+        ComPtr<ICommandQueue> queue;
 
-        ComPtr<IPipelineState> gRenderPipelineState;
-        ComPtr<IBufferResource> gVertexBuffer;
-        ComPtr<IBufferResource> gIndexBuffer;
-        ComPtr<IBufferResource> gTransformBuffer;
-        ComPtr<IBufferResource> gInstanceBuffer;
-        ComPtr<IBufferResource> gBLASBuffer;
-        ComPtr<IAccelerationStructure> gBLAS;
-        ComPtr<IBufferResource> gTLASBuffer;
-        ComPtr<IAccelerationStructure> gTLAS;
-        ComPtr<ITextureResource> gResultTexture;
-        ComPtr<IResourceView> gResultTextureUAV;
-        ComPtr<IShaderTable> gShaderTable;
+        ComPtr<IPipelineState> renderPipelineState;
+        ComPtr<IBufferResource> vertexBuffer;
+        ComPtr<IBufferResource> indexBuffer;
+        ComPtr<IBufferResource> transformBuffer;
+        ComPtr<IBufferResource> instanceBuffer;
+        ComPtr<IBufferResource> BLASBuffer;
+        ComPtr<IAccelerationStructure> BLAS;
+        ComPtr<IBufferResource> TLASBuffer;
+        ComPtr<IAccelerationStructure> TLAS;
+        ComPtr<ITextureResource> resultTexture;
+        ComPtr<IResourceView> resultTextureUAV;
+        ComPtr<IShaderTable> shaderTable;
 
         uint32_t width = 2;
         uint32_t height = 2;
@@ -84,7 +84,6 @@ namespace gfx_test
 
             ComPtr<slang::IBlob> diagnosticsBlob;
             slang::IModule* module = slangSession->loadModule("ray-tracing-test-shader", diagnosticsBlob.writeRef());
-            //diagnoseIfNeeded(diagnosticsBlob);
             if (!module)
                 return SLANG_FAIL;
 
@@ -105,7 +104,6 @@ namespace gfx_test
                 componentTypes.getCount(),
                 linkedProgram.writeRef(),
                 diagnosticsBlob.writeRef());
-            //diagnoseIfNeeded(diagnosticsBlob);
             SLANG_RETURN_ON_FAIL(result);
 
             gfx::IShaderProgram::Desc programDesc = {};
@@ -125,32 +123,32 @@ namespace gfx_test
             resultTextureDesc.size.depth = 1;
             resultTextureDesc.defaultState = ResourceState::UnorderedAccess;
             resultTextureDesc.format = Format::R32G32B32A32_FLOAT;
-            gResultTexture = device->createTextureResource(resultTextureDesc);
+            resultTexture = device->createTextureResource(resultTextureDesc);
             IResourceView::Desc resultUAVDesc = {};
             resultUAVDesc.format = resultTextureDesc.format;
             resultUAVDesc.type = IResourceView::Type::UnorderedAccess;
-            gResultTextureUAV = device->createTextureView(gResultTexture, resultUAVDesc);
+            resultTextureUAV = device->createTextureView(resultTexture, resultUAVDesc);
         }
 
         void createRequiredResources()
         {
             ICommandQueue::Desc queueDesc = {};
             queueDesc.type = ICommandQueue::QueueType::Graphics;
-            gQueue = device->createCommandQueue(queueDesc);
+            queue = device->createCommandQueue(queueDesc);
 
             IBufferResource::Desc vertexBufferDesc;
             vertexBufferDesc.type = IResource::Type::Buffer;
             vertexBufferDesc.sizeInBytes = kVertexCount * sizeof(Vertex);
             vertexBufferDesc.defaultState = ResourceState::ShaderResource;
-            gVertexBuffer = device->createBufferResource(vertexBufferDesc, &kVertexData[0]);
-            SLANG_CHECK_ABORT(gVertexBuffer != nullptr);
+            vertexBuffer = device->createBufferResource(vertexBufferDesc, &kVertexData[0]);
+            SLANG_CHECK_ABORT(vertexBuffer != nullptr);
 
             IBufferResource::Desc indexBufferDesc;
             indexBufferDesc.type = IResource::Type::Buffer;
             indexBufferDesc.sizeInBytes = kIndexCount * sizeof(int32_t);
             indexBufferDesc.defaultState = ResourceState::ShaderResource;
-            gIndexBuffer = device->createBufferResource(indexBufferDesc, &kIndexData[0]);
-            SLANG_CHECK_ABORT(gIndexBuffer != nullptr);
+            indexBuffer = device->createBufferResource(indexBufferDesc, &kIndexData[0]);
+            SLANG_CHECK_ABORT(indexBuffer != nullptr);
 
             IBufferResource::Desc transformBufferDesc;
             transformBufferDesc.type = IResource::Type::Buffer;
@@ -158,8 +156,8 @@ namespace gfx_test
             transformBufferDesc.defaultState = ResourceState::ShaderResource;
             float transformData[12] = {
                 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f };
-            gTransformBuffer = device->createBufferResource(transformBufferDesc, &transformData);
-            SLANG_CHECK_ABORT(gTransformBuffer != nullptr);
+            transformBuffer = device->createBufferResource(transformBufferDesc, &transformData);
+            SLANG_CHECK_ABORT(transformBuffer != nullptr);
 
             createResultTexture();
 
@@ -170,12 +168,12 @@ namespace gfx_test
             framebufferLayoutDesc.renderTargets = &renderTargetLayout;
             framebufferLayoutDesc.depthStencil = &depthLayout;
             GFX_CHECK_CALL_ABORT(
-                device->createFramebufferLayout(framebufferLayoutDesc, gFramebufferLayout.writeRef()));
+                device->createFramebufferLayout(framebufferLayoutDesc, framebufferLayout.writeRef()));
 
             ITransientResourceHeap::Desc transientHeapDesc = {};
             transientHeapDesc.constantBufferSize = 4096 * 1024;
             GFX_CHECK_CALL_ABORT(
-                device->createTransientResourceHeap(transientHeapDesc, gTransientHeap.writeRef()));
+                device->createTransientResourceHeap(transientHeapDesc, transientHeap.writeRef()));
 
             // Build bottom level acceleration structure.
             {
@@ -189,13 +187,13 @@ namespace gfx_test
                 geomDesc.flags = IAccelerationStructure::GeometryFlags::Opaque;
                 geomDesc.type = IAccelerationStructure::GeometryType::Triangles;
                 geomDesc.content.triangles.indexCount = kIndexCount;
-                geomDesc.content.triangles.indexData = gIndexBuffer->getDeviceAddress();
+                geomDesc.content.triangles.indexData = indexBuffer->getDeviceAddress();
                 geomDesc.content.triangles.indexFormat = Format::R32_UINT;
                 geomDesc.content.triangles.vertexCount = kVertexCount;
-                geomDesc.content.triangles.vertexData = gVertexBuffer->getDeviceAddress();
+                geomDesc.content.triangles.vertexData = vertexBuffer->getDeviceAddress();
                 geomDesc.content.triangles.vertexFormat = Format::R32G32B32_FLOAT;
                 geomDesc.content.triangles.vertexStride = sizeof(Vertex);
-                geomDesc.content.triangles.transform3x4 = gTransformBuffer->getDeviceAddress();
+                geomDesc.content.triangles.transform3x4 = transformBuffer->getDeviceAddress();
                 accelerationStructureBuildInputs.geometryDescs = &geomDesc;
 
                 // Query buffer size for acceleration structure build.
@@ -232,7 +230,7 @@ namespace gfx_test
 
                 compactedSizeQuery->reset();
 
-                auto commandBuffer = gTransientHeap->createCommandBuffer();
+                auto commandBuffer = transientHeap->createCommandBuffer();
                 auto encoder = commandBuffer->encodeRayTracingCommands();
                 IAccelerationStructure::BuildDesc buildDesc = {};
                 buildDesc.dest = draftAS;
@@ -244,8 +242,8 @@ namespace gfx_test
                 encoder->buildAccelerationStructure(buildDesc, 1, &compactedSizeQueryDesc);
                 encoder->endEncoding();
                 commandBuffer->close();
-                gQueue->executeCommandBuffer(commandBuffer);
-                gQueue->waitOnHost();
+                queue->executeCommandBuffer(commandBuffer);
+                queue->waitOnHost();
 
                 uint64_t compactedSize = 0;
                 compactedSizeQuery->getResult(0, 1, &compactedSize);
@@ -253,28 +251,28 @@ namespace gfx_test
                 asBufferDesc.type = IResource::Type::Buffer;
                 asBufferDesc.defaultState = ResourceState::AccelerationStructure;
                 asBufferDesc.sizeInBytes = (size_t)compactedSize;
-                gBLASBuffer = device->createBufferResource(asBufferDesc);
+                BLASBuffer = device->createBufferResource(asBufferDesc);
                 IAccelerationStructure::CreateDesc createDesc;
-                createDesc.buffer = gBLASBuffer;
+                createDesc.buffer = BLASBuffer;
                 createDesc.kind = IAccelerationStructure::Kind::BottomLevel;
                 createDesc.offset = 0;
                 createDesc.size = (size_t)compactedSize;
-                device->createAccelerationStructure(createDesc, gBLAS.writeRef());
+                device->createAccelerationStructure(createDesc, BLAS.writeRef());
 
-                commandBuffer = gTransientHeap->createCommandBuffer();
+                commandBuffer = transientHeap->createCommandBuffer();
                 encoder = commandBuffer->encodeRayTracingCommands();
-                encoder->copyAccelerationStructure(gBLAS, draftAS, AccelerationStructureCopyMode::Compact);
+                encoder->copyAccelerationStructure(BLAS, draftAS, AccelerationStructureCopyMode::Compact);
                 encoder->endEncoding();
                 commandBuffer->close();
-                gQueue->executeCommandBuffer(commandBuffer);
-                gQueue->waitOnHost();
+                queue->executeCommandBuffer(commandBuffer);
+                queue->waitOnHost();
             }
 
             // Build top level acceleration structure.
             {
                 List<IAccelerationStructure::InstanceDesc> instanceDescs;
                 instanceDescs.setCount(1);
-                instanceDescs[0].accelerationStructure = gBLAS->getDeviceAddress();
+                instanceDescs[0].accelerationStructure = BLAS->getDeviceAddress();
                 instanceDescs[0].flags =
                     IAccelerationStructure::GeometryInstanceFlags::TriangleFacingCullDisable;
                 instanceDescs[0].instanceContributionToHitGroupIndex = 0;
@@ -288,14 +286,14 @@ namespace gfx_test
                 instanceBufferDesc.sizeInBytes =
                     instanceDescs.getCount() * sizeof(IAccelerationStructure::InstanceDesc);
                 instanceBufferDesc.defaultState = ResourceState::ShaderResource;
-                gInstanceBuffer = device->createBufferResource(instanceBufferDesc, instanceDescs.getBuffer());
-                SLANG_CHECK_ABORT(gInstanceBuffer != nullptr);
+                instanceBuffer = device->createBufferResource(instanceBufferDesc, instanceDescs.getBuffer());
+                SLANG_CHECK_ABORT(instanceBuffer != nullptr);
 
                 IAccelerationStructure::BuildInputs accelerationStructureBuildInputs = {};
                 IAccelerationStructure::PrebuildInfo accelerationStructurePrebuildInfo = {};
                 accelerationStructureBuildInputs.descCount = 1;
                 accelerationStructureBuildInputs.kind = IAccelerationStructure::Kind::TopLevel;
-                accelerationStructureBuildInputs.instanceDescs = gInstanceBuffer->getDeviceAddress();
+                accelerationStructureBuildInputs.instanceDescs = instanceBuffer->getDeviceAddress();
 
                 // Query buffer size for acceleration structure build.
                 GFX_CHECK_CALL_ABORT(device->getAccelerationStructurePrebuildInfo(
@@ -305,7 +303,7 @@ namespace gfx_test
                 asBufferDesc.type = IResource::Type::Buffer;
                 asBufferDesc.defaultState = ResourceState::AccelerationStructure;
                 asBufferDesc.sizeInBytes = (size_t)accelerationStructurePrebuildInfo.resultDataMaxSize;
-                gTLASBuffer = device->createBufferResource(asBufferDesc);
+                TLASBuffer = device->createBufferResource(asBufferDesc);
 
                 IBufferResource::Desc scratchBufferDesc;
                 scratchBufferDesc.type = IResource::Type::Buffer;
@@ -314,23 +312,23 @@ namespace gfx_test
                 ComPtr<IBufferResource> scratchBuffer = device->createBufferResource(scratchBufferDesc);
 
                 IAccelerationStructure::CreateDesc createDesc;
-                createDesc.buffer = gTLASBuffer;
+                createDesc.buffer = TLASBuffer;
                 createDesc.kind = IAccelerationStructure::Kind::TopLevel;
                 createDesc.offset = 0;
                 createDesc.size = (size_t)accelerationStructurePrebuildInfo.resultDataMaxSize;
-                GFX_CHECK_CALL_ABORT(device->createAccelerationStructure(createDesc, gTLAS.writeRef()));
+                GFX_CHECK_CALL_ABORT(device->createAccelerationStructure(createDesc, TLAS.writeRef()));
 
-                auto commandBuffer = gTransientHeap->createCommandBuffer();
+                auto commandBuffer = transientHeap->createCommandBuffer();
                 auto encoder = commandBuffer->encodeRayTracingCommands();
                 IAccelerationStructure::BuildDesc buildDesc = {};
-                buildDesc.dest = gTLAS;
+                buildDesc.dest = TLAS;
                 buildDesc.inputs = accelerationStructureBuildInputs;
                 buildDesc.scratchData = scratchBuffer->getDeviceAddress();
                 encoder->buildAccelerationStructure(buildDesc, 0, nullptr);
                 encoder->endEncoding();
                 commandBuffer->close();
-                gQueue->executeCommandBuffer(commandBuffer);
-                gQueue->waitOnHost();
+                queue->executeCommandBuffer(commandBuffer);
+                queue->waitOnHost();
             }
 
             const char* hitgroupNames[] = { "hitgroup" };
@@ -348,8 +346,8 @@ namespace gfx_test
             rtpDesc.maxRayPayloadSize = 64;
             rtpDesc.maxRecursion = 2;
             GFX_CHECK_CALL_ABORT(
-                device->createRayTracingPipelineState(rtpDesc, gRenderPipelineState.writeRef()));
-            SLANG_CHECK_ABORT(gRenderPipelineState != nullptr);
+                device->createRayTracingPipelineState(rtpDesc, renderPipelineState.writeRef()));
+            SLANG_CHECK_ABORT(renderPipelineState != nullptr);
 
             IShaderTable::Desc shaderTableDesc = {};
             const char* raygenName = "rayGenShader";
@@ -361,24 +359,24 @@ namespace gfx_test
             shaderTableDesc.rayGenShaderEntryPointNames = &raygenName;
             shaderTableDesc.missShaderCount = 1;
             shaderTableDesc.missShaderEntryPointNames = &missName;
-            GFX_CHECK_CALL_ABORT(device->createShaderTable(shaderTableDesc, gShaderTable.writeRef()));
+            GFX_CHECK_CALL_ABORT(device->createShaderTable(shaderTableDesc, shaderTable.writeRef()));
         }
 
         void renderFrame()
         {
             ComPtr<ICommandBuffer> renderCommandBuffer =
-                gTransientHeap->createCommandBuffer();
+                transientHeap->createCommandBuffer();
             auto renderEncoder = renderCommandBuffer->encodeRayTracingCommands();
             IShaderObject* rootObject = nullptr;
-            renderEncoder->bindPipeline(gRenderPipelineState, &rootObject);
+            renderEncoder->bindPipeline(renderPipelineState, &rootObject);
             auto cursor = ShaderCursor(rootObject);
-            cursor["resultTexture"].setResource(gResultTextureUAV);
-            cursor["sceneBVH"].setResource(gTLAS);
-            renderEncoder->dispatchRays(0, gShaderTable, width, height, 1);
+            cursor["resultTexture"].setResource(resultTextureUAV);
+            cursor["sceneBVH"].setResource(TLAS);
+            renderEncoder->dispatchRays(0, shaderTable, width, height, 1);
             renderEncoder->endEncoding();
             renderCommandBuffer->close();
-            gQueue->executeCommandBuffer(renderCommandBuffer);
-            gQueue->waitOnHost();
+            queue->executeCommandBuffer(renderCommandBuffer);
+            queue->waitOnHost();
         }
 
         void checkTestResults()
@@ -387,7 +385,7 @@ namespace gfx_test
             size_t rowPitch = 0;
             size_t pixelSize = 0;
             GFX_CHECK_CALL_ABORT(device->readTextureResource(
-                gResultTexture, ResourceState::CopySource, resultBlob.writeRef(), &rowPitch, &pixelSize));
+                resultTexture, ResourceState::CopySource, resultBlob.writeRef(), &rowPitch, &pixelSize));
 
             //writeImage("C:/Users/lucchen/Documents/test.hdr", resultBlob, width, height, rowPitch, pixelSize);
 
