@@ -266,6 +266,9 @@ class CallableDecl : public ContainerDecl
     }
 
     TypeExp returnType;
+        
+    // If this callable throws an error code, `errorType` is the type of the error code.
+    TypeExp errorType;
 
     // Fields related to redeclaration, so that we
     // can support multiple specialized variations

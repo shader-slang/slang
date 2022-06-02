@@ -2587,6 +2587,12 @@ namespace Slang
         return getTupleType(SLANG_COUNT_OF(operands), operands);
     }
 
+    IRResultType* IRBuilder::getResultType(IRType* valueType, IRType* errorType)
+    {
+        IRInst* operands[] = {valueType, errorType};
+        return (IRResultType*)getType(kIROp_ResultType, 2, operands);
+    }
+
     IRBasicBlockType*   IRBuilder::getBasicBlockType()
     {
         return (IRBasicBlockType*)getType(kIROp_BasicBlockType);
@@ -2715,6 +2721,14 @@ namespace Slang
             resultType,
             paramCount,
             (IRInst* const*) paramTypes);
+    }
+
+    IRFuncType* IRBuilder::getFuncType(
+        UInt paramCount, IRType* const* paramTypes, IRType* resultType, IRAttr* attribute)
+    {
+        UInt counts[3] = {1, paramCount, 1};
+        IRInst** lists[3] = {(IRInst**)&resultType, (IRInst**)paramTypes, (IRInst**)&attribute};
+        return (IRFuncType*)findOrEmitHoistableInst(nullptr, kIROp_FuncType, 3, counts, lists);
     }
 
     IRWitnessTableType* IRBuilder::getWitnessTableType(
@@ -3088,6 +3102,21 @@ namespace Slang
         return inst;
     }
 
+    IRInst* IRBuilder::emitTryCallInst(
+        IRType* type,
+        IRBlock* successBlock,
+        IRBlock* failureBlock,
+        IRInst* func,
+        UInt argCount,
+        IRInst* const* args)
+    {
+        IRInst* fixedArgs[] = {successBlock, failureBlock, func};
+        auto inst = createInstWithTrailingArgs<IRTryCall>(
+            this, kIROp_TryCall, type, 3, fixedArgs, argCount, args);
+        addInst(inst);
+        return inst;
+    }
+
     IRInst* IRBuilder::createIntrinsicInst(
         IRType*         type,
         IROp            op,
@@ -3181,6 +3210,46 @@ namespace Slang
 
         IRInst* args[] = { tuple, getIntValue(getIntType(), element) };
         return emitIntrinsicInst(type, kIROp_GetTupleElement, 2, args);
+    }
+
+    IRInst* IRBuilder::emitMakeResultError(IRType* resultType, IRInst* errorVal)
+    {
+        return emitIntrinsicInst(resultType, kIROp_MakeResultError, 1, &errorVal);
+    }
+
+    IRInst* IRBuilder::emitMakeResultValue(IRType* resultType, IRInst* value)
+    {
+        return emitIntrinsicInst(resultType, kIROp_MakeResultValue, 1, &value);
+    }
+
+    IRInst* IRBuilder::emitMakeResultValueVoid(IRType* resultType)
+    {
+        return emitIntrinsicInst(resultType, kIROp_MakeResultValueVoid, 0, nullptr);
+    }
+
+    IRInst* IRBuilder::emitIsResultError(IRInst* result)
+    {
+        return emitIntrinsicInst(getBoolType(), kIROp_IsResultError, 1, &result);
+    }
+
+    IRInst* IRBuilder::emitGetResultError(IRInst* result)
+    {
+        SLANG_ASSERT(result->getDataType());
+        return emitIntrinsicInst(
+            cast<IRResultType>(result->getDataType())->getErrorType(),
+            kIROp_GetResultError,
+            1,
+            &result);
+    }
+
+    IRInst* IRBuilder::emitGetResultValue(IRInst* result)
+    {
+        SLANG_ASSERT(result->getDataType());
+        return emitIntrinsicInst(
+            cast<IRResultType>(result->getDataType())->getValueType(),
+            kIROp_GetResultValue,
+            1,
+            &result);
     }
 
     IRInst* IRBuilder::emitMakeVector(
@@ -3880,6 +3949,13 @@ namespace Slang
         return inst;
     }
 
+    IRInst* IRBuilder::emitThrow(IRInst* val)
+    {
+        auto inst = createInst<IRThrow>(this, kIROp_Throw, nullptr, val);
+        addInst(inst);
+        return inst;
+    }
+
     IRInst* IRBuilder::emitUnreachable()
     {
         auto inst = createInst<IRUnreachable>(
@@ -4203,6 +4279,20 @@ namespace Slang
             type,
             left,
             right);
+        addInst(inst);
+        return inst;
+    }
+
+    IRInst* IRBuilder::emitEql(IRInst* left, IRInst* right)
+    {
+        auto inst = createInst<IRInst>(this, kIROp_Eql, getBoolType(), left, right);
+        addInst(inst);
+        return inst;
+    }
+
+    IRInst* IRBuilder::emitNeq(IRInst* left, IRInst* right)
+    {
+        auto inst = createInst<IRInst>(this, kIROp_Neq, getBoolType(), left, right);
         addInst(inst);
         return inst;
     }

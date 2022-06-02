@@ -153,7 +153,7 @@ namespace Slang
             if (isBuiltin(interfaceType))
                 return interfaceType;
             // Do not lower COM interfaces.
-            if (interfaceType->findDecoration<IRComInterfaceDecoration>())
+            if (isComInterfaceType(interfaceType))
                 return interfaceType;
 
             List<IRInterfaceRequirementEntry*> newEntries;

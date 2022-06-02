@@ -276,9 +276,7 @@ namespace Slang
             // all occurences of associatedtypes.
 
             // If `w` in `lookup_interface_method(w, ...)` is a COM interface, bail.
-            if (lookupInst->getWitnessTable()
-                    ->getDataType()
-                    ->findDecoration<IRComInterfaceDecoration>())
+            if (isComInterfaceType(lookupInst->getWitnessTable()->getDataType()))
             {
                 return;
             }
