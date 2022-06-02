@@ -628,7 +628,7 @@ newoption {
  -- build items needed for other dependencies
  ---
  
- function generatorProject(name, sourcePath)
+ function generatorProject(name, sourcePath, isSharedLib)
      -- We use the `group` command here to specify that the
      -- next project we create shold be placed into a group
      -- named "generator" in a generated IDE solution/workspace.
@@ -642,9 +642,13 @@ newoption {
      -- Set up the project, but do NOT add any source files.
      baseSlangProject(name, sourcePath)
  
-     -- For now we just use static lib to force something
+     -- By default, just use static lib to force something
      -- to build.
-     kind "StaticLib"
+     if isSharedLib then
+         kind "SharedLib"
+     else
+        kind "StaticLib"
+    end
  end
  
  --
@@ -779,6 +783,11 @@ standardProject("slang-rt", "source/slang-rt")
      uuid "23149706-C12F-4329-B6AA-8266407C32D3"
      includedirs { "." }
  
+     links { "compiler-core", "core", "slang" }
+     
+tool "slangd"
+     uuid "B2D63B45-92B0-40F7-B242-CCA4DFD64341"
+     includedirs { "." }
      links { "compiler-core", "core", "slang" }
  
  --
@@ -1222,7 +1231,7 @@ standardProject("slang-rt", "source/slang-rt")
  end
  
  if enableEmbedStdLib then
-     generatorProject("embed-stdlib-generator", nil)
+     generatorProject("embed-stdlib-generator", nil, true)
  
          -- We include these, even though they are not really part of the dummy
          -- build, so that the filters below can pick up the appropriate locations.

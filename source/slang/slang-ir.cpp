@@ -2508,6 +2508,12 @@ namespace Slang
         return (IRStringType*)getType(kIROp_StringType);
     }
 
+    IRNativeStringType* IRBuilder::getNativeStringType()
+    {
+        return (IRNativeStringType*)getType(kIROp_NativeStringType);
+    }
+
+
     IRType* IRBuilder::getCapabilitySetType()
     {
         return getType(kIROp_CapabilitySetType);
@@ -4766,106 +4772,13 @@ namespace Slang
         dumpDebugID(context, inst);
     }
     
-    struct StringEncoder
-    {
-        static char getHexChar(int v)
-        {
-            return (v <= 9) ? char(v + '0') : char(v - 10 + 'A');
-        }
-
-        void flush(const char* pos)
-        {
-            if (pos > m_runStart)
-            {
-                m_builder->append(m_runStart, pos);
-            }
-            m_runStart = pos + 1;
-        }
-
-        void appendEscapedChar(const char* pos, char encodeChar)
-        {
-            flush(pos);
-            const char chars[] = { '\\', encodeChar };
-            m_builder->Append(chars, 2);
-        }
-        
-        void appendAsHex(const char* pos)
-        {
-            flush(pos);
-
-            const int v = *(const uint8_t*)pos;
-
-            char buf[5];
-            buf[0] = '\\';
-            buf[1] = 'x';
-            buf[2] = '0';
-
-            buf[3] = getHexChar(v >> 4);
-            buf[4] = getHexChar(v & 0xf);
-
-            m_builder->Append(buf, 5);
-        }
-
-        StringEncoder(StringBuilder* builder, const char* start):
-            m_runStart(start),
-            m_builder(builder)
-        {}
-
-        StringBuilder* m_builder;
-        const char* m_runStart;
-    };
-
     static void dumpEncodeString(
         IRDumpContext*  context, 
         const UnownedStringSlice& slice)
     {
-        // https://msdn.microsoft.com/en-us/library/69ze775t.aspx
-
+        auto handler = StringEscapeUtil::getHandler(StringEscapeUtil::Style::Slang);
         StringBuilder& builder = *context->builder;
-        builder.Append('"');
-        
-        {
-            const char* cur = slice.begin();
-            StringEncoder encoder(&builder, cur);
-            const char* end = slice.end();
-
-            for (; cur < end; cur++)
-            {
-                const int8_t c = uint8_t(*cur);
-                switch (c)
-                {
-                    case '\\':
-                        encoder.appendEscapedChar(cur, '\\');
-                        break;
-                    case '"':
-                        encoder.appendEscapedChar(cur, '"');
-                        break;
-                    case '\n': 
-                        encoder.appendEscapedChar(cur, 'n');
-                        break;
-                    case '\t':
-                        encoder.appendEscapedChar(cur, 't');
-                        break;
-                    case '\r':
-                        encoder.appendEscapedChar(cur, 'r');
-                        break;
-                    case '\0':
-                        encoder.appendEscapedChar(cur, '0');
-                        break;
-                    default:
-                    {
-                        if (c < 32)
-                        {
-                            encoder.appendAsHex(cur);
-                        }
-                        break;
-                    }
-                }
-            }
-            encoder.flush(end);
-        }
-        
-        builder.Append('"');
+        StringEscapeUtil::appendQuoted(handler, slice, builder);
     }
 
     static void dumpType(

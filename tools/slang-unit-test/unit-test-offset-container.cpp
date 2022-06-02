@@ -1,4 +1,4 @@
-// unit-test-path.cpp
+// unit-test-offset-container.cpp
 
 #include "../../source/core/slang-offset-container.h"
 

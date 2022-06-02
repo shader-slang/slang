@@ -2158,6 +2158,7 @@ public:
     IRBasicType* getUInt64Type();
     IRBasicType* getCharType();
     IRStringType* getStringType();
+    IRNativeStringType* getNativeStringType();
 
     IRType* getCapabilitySetType();
 

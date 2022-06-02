@@ -90,6 +90,16 @@ Type* SharedASTBuilder::getStringType()
     return m_stringType;
 }
 
+Type* SharedASTBuilder::getNativeStringType()
+{
+    if (!m_nativeStringType)
+    {
+        auto nativeStringTypeDecl = findMagicDecl("NativeStringType");
+        m_nativeStringType = DeclRefType::create(m_astBuilder, makeDeclRef<Decl>(nativeStringTypeDecl));
+    }
+    return m_nativeStringType;
+}
+
 Type* SharedASTBuilder::getEnumTypeType()
 {
     if (!m_enumTypeType)

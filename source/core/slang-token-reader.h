@@ -295,8 +295,6 @@ namespace Misc {
         return result;
     }
 
-    String EscapeStringLiteral(String str);
-    String UnescapeStringLiteral(String str);
 } // namespace Misc
 } // namespace Slang
 
