@@ -89,6 +89,9 @@
     <ClCompile Include="..\..\..\tools\gfx-unit-test\shared-textures-tests.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\tools\gfx-unit-test\swap-chain-resize-test.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\..\tools\gfx-unit-test\texture-types-tests.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
