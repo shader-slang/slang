@@ -267,6 +267,9 @@ namespace Slang
         /// Is `decl` a global shader parameter declaration?
     bool isGlobalShaderParameter(VarDeclBase* decl)
     {
+        // If it's an *actual* global it is not a global shader parameter
+        if (decl->hasModifier<ActualGlobalModifier>()) { return false; }
+        
         // A global shader parameter must be declared at global or namespace
         // scope, so that it has a single definition across the module.
         //
