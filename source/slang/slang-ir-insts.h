@@ -2235,6 +2235,7 @@ public:
 
     IRConstExprRate* getConstExprRate();
     IRGroupSharedRate* getGroupSharedRate();
+    IRActualGlobalRate* getActualGlobalRate();
 
     IRRateQualifiedType* getRateQualifiedType(
         IRRate* rate,

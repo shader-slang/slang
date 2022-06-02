@@ -2034,6 +2034,12 @@ void maybeSetRate(
             builder->getGroupSharedRate(),
             inst->getFullType()));
     }
+    else if (decl->hasModifier<ActualGlobalModifier>())
+    {
+        inst->setFullType(builder->getRateQualifiedType(
+            builder->getActualGlobalRate(),
+            inst->getFullType()));
+    }
 }
 
 static String getNameForNameHint(

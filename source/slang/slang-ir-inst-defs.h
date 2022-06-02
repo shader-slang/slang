@@ -79,6 +79,7 @@ INST(Nop, nop, 0, 0)
     /* Rate */
         INST(ConstExprRate, ConstExpr, 0, 0)
         INST(GroupSharedRate, GroupShared, 0, 0)
+        INST(ActualGlobalRate, ActualGlobalRate, 0, 0)
     INST_RANGE(Rate, ConstExprRate, GroupSharedRate)
 
     INST(RateQualifiedType, RateQualified, 2, 0)

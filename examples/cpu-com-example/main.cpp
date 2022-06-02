@@ -7,7 +7,6 @@
 #include <slang-com-ptr.h>
 #include <slang-com-helper.h>
 
-
 // This includes a useful small function for setting up the prelude (described more further below).
 #include "../../source/core/slang-test-tool-util.h"
 
@@ -25,6 +24,12 @@ public:
     virtual int SLANG_MCALL calcHash(const char* in) = 0;
 };
 
+class ICountGood : public ISlangUnknown
+{
+public:
+    virtual int SLANG_MCALL nextCount() = 0;
+};
+
 static int _calcHash(const char* in)
 {
     int hash = 0;
@@ -36,7 +41,7 @@ static int _calcHash(const char* in)
     return hash;
 }
 
-class DoThings :public IDoThings
+class DoThings : public IDoThings
 {
 public:
     // We don't need queryInterface for this impl, or ref counting
@@ -47,6 +52,20 @@ public:
     // IDoThings
     virtual int SLANG_MCALL doThing(int a, int b) SLANG_OVERRIDE { return a + b + 1; }
     virtual int SLANG_MCALL calcHash(const char* in) SLANG_OVERRIDE { return (int)_calcHash(in); }
+};
+
+class CountGood : public ICountGood
+{
+public:
+    // We don't need queryInterface for this impl, or ref counting
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL queryInterface(SlangUUID const& uuid, void** outObject) SLANG_OVERRIDE { return SLANG_E_NOT_IMPLEMENTED; }
+    virtual SLANG_NO_THROW uint32_t SLANG_MCALL addRef() SLANG_OVERRIDE { return 1; }
+    virtual SLANG_NO_THROW uint32_t SLANG_MCALL release() SLANG_OVERRIDE { return 1; }
+
+    // ICountGood
+    virtual int SLANG_MCALL nextCount() SLANG_OVERRIDE { return m_count++; }
+
+    int m_count = 0;
 };
 
 static SlangResult _innerMain(int argc, char** argv)
@@ -125,7 +144,52 @@ static SlangResult _innerMain(int argc, char** argv)
         
         SLANG_ASSERT(hash == _calcHash(text.getBuffer()));
     }
+
+    // Check accessing a global
+    {
+        typedef void (*SetFunc)(int v);
+        typedef int (*GetFunc)();
+
+        const auto setGlobal = (SetFunc)sharedLibrary->findFuncByName("setGlobal");
+        const auto getGlobal = (GetFunc)sharedLibrary->findFuncByName("getGlobal");
+
+        if (setGlobal == nullptr || getGlobal == nullptr)
+        {
+            return SLANG_FAIL;
+        }
+
+        for (Index i = 0; i < 10; ++i)
+        {
+            setGlobal(int(i));
+            SLANG_ASSERT(getGlobal() == i);
+        }
+    }
     
+    // Check using a global interface
+    {
+        
+        typedef void (*SetCounterFunc)(ICountGood* counter);
+        typedef int (*NextCountFunc)();
+
+        const auto setCounter = (SetCounterFunc)sharedLibrary->findFuncByName("setCounter");
+        const auto nextCount = (NextCountFunc)sharedLibrary->findFuncByName("nextCount");
+
+        if (setCounter == nullptr || nextCount == nullptr)
+        {
+            return SLANG_FAIL;
+        }
+
+        CountGood counter;
+
+        setCounter(&counter);
+
+        for (Index i = 0; i < 10; ++i)
+        {
+            const auto v = nextCount();
+            SLANG_ASSERT(v == i);
+        }
+    }
+
     return SLANG_OK;
 }
 
