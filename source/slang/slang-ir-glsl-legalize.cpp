@@ -1726,8 +1726,7 @@ void legalizeEntryPointParameterForGLSL(
             default:
                 continue;
 
-            case kIROp_ReturnVal:
-            case kIROp_ReturnVoid:
+            case kIROp_Return:
                 break;
             }
 
@@ -1862,10 +1861,10 @@ void legalizeEntryPointForGLSL(
             // terminator...
             for( auto ii = bb->getFirstInst(); ii; ii = ii->getNextInst() )
             {
-                if(ii->getOp() != kIROp_ReturnVal)
+                if(ii->getOp() != kIROp_Return)
                     continue;
 
-                IRReturnVal* returnInst = (IRReturnVal*) ii;
+                IRReturn* returnInst = (IRReturn*) ii;
                 IRInst* returnValue = returnInst->getVal();
 
                 // Make sure we add these instructions to the right block
@@ -1874,7 +1873,7 @@ void legalizeEntryPointForGLSL(
                 // Write to our global variable(s) from the value being returned.
                 assign(&builder, resultGlobal, ScalarizedVal::value(returnValue));
 
-                // Emit a `returnVoid` to end the block
+                // Emit a `return void_val` to end the block
                 auto returnVoid = builder.emitReturn();
 
                 // Remove the old `returnVal` instruction.

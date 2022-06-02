@@ -5,6 +5,8 @@
 #include "slang-compiler.h"
 #include "slang-type-layout.h"
 
+#include "../compiler-core/slang-artifact-info.h"
+
 #include "slang-ir-string-hash.h"
 
 #include "../../slang.h"
@@ -3029,18 +3031,8 @@ static int _calcTotalNumUsedRegistersForLayoutResourceKind(ParameterBindingConte
 
 static bool _isCPUTarget(CodeGenTarget target)
 {
-    switch (target)
-    {
-        case CodeGenTarget::CPPSource:
-        case CodeGenTarget::CSource:
-        case CodeGenTarget::HostExecutable:
-        case CodeGenTarget::ShaderSharedLibrary:
-        case CodeGenTarget::ShaderHostCallable:
-        {
-            return true;
-        }
-        default: return false;
-    }
+    const auto desc = ArtifactDesc::makeFromCompileTarget(asExternal(target));
+    return ArtifactInfoUtil::isCpuTarget(desc);
 }
 
 static bool _isPTXTarget(CodeGenTarget target)

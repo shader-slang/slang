@@ -119,7 +119,7 @@ struct AssociatedTypeLookupSpecializationContext
 
     void processLookupInterfaceMethodInst(IRLookupWitnessMethod* inst)
     {
-        if (inst->getWitnessTable()->getDataType()->findDecoration<IRComInterfaceDecoration>())
+        if (isComInterfaceType(inst->getWitnessTable()->getDataType()))
         {
             return;
         }

@@ -349,7 +349,7 @@ struct InliningPassBase
         {
             for (auto inst : block->getChildren())
             {
-                if (inst->getOp() == kIROp_ReturnVal || inst->getOp() == kIROp_ReturnVoid)
+                if (inst->getOp() == kIROp_Return)
                 {
                     // If the return is not at the end of the block, we cannot handle it.
                     if (inst != block->getTerminator())
@@ -494,18 +494,10 @@ struct InliningPassBase
                     _cloneInstWithSourceLoc(callSite, env, builder, inst);
                     break;
 
-                case kIROp_ReturnVoid:
-                    // A return with no operand is replaced with a branch into `afterBlock`
+                case kIROp_Return:
+                    // A return is replaced with a branch into `afterBlock`
                     // to return the control flow to the location after the original `call`.
-                    {
-                        auto returnBranch = builder->emitBranch(afterBlock);
-                        _setSourceLoc(returnBranch, inst, callSite);
-                    }
-                    break;
-
-                case kIROp_ReturnVal:
-                    // A return with a value is similar to `returnVoid` except
-                    // that we need to note the (clone of the) value being
+                    // We also need to note the (clone of the) value being
                     // returned, so that we can use it to replace the value
                     // of the original call.
                     //

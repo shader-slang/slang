@@ -253,8 +253,7 @@ namespace Slang
                 ; // fall through to:
             case kIROp_Unreachable:
             case kIROp_MissingReturn:
-            case kIROp_ReturnVal:
-            case kIROp_ReturnVoid:
+            case kIROp_Return:
             case kIROp_discard:
                 // These cases are all simple terminators that can be handled as-is
                 // without needing to construct a separate `Region` to encapsulate them.

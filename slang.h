@@ -570,6 +570,7 @@ extern "C"
         SLANG_PTX,                  ///< PTX
         SLANG_OBJECT_CODE,          ///< Object code that can be used for later linking
         SLANG_HOST_CPP_SOURCE,      ///< C++ code for host library or executable.
+        SLANG_HOST_HOST_CALLABLE,   ///< 
         SLANG_TARGET_COUNT_OF,
     };
 

@@ -47,6 +47,19 @@ class ErrorType : public Type
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
 };
 
+// The bottom/empty type that has no values.
+class BottomType : public Type
+{
+    SLANG_AST_CLASS(BottomType)
+
+    // Overrides should be public so base classes can access
+    void _toTextOverride(StringBuilder& out);
+    Type* _createCanonicalTypeOverride();
+    bool _equalsImplOverride(Type* type);
+    HashCode _getHashCodeOverride();
+    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+};
+
 // A type that takes the form of a reference to some declaration
 class DeclRefType : public Type 
 {
@@ -575,10 +588,12 @@ class FuncType : public Type
 
     List<Type*> paramTypes;
     Type* resultType = nullptr;
+    Type* errorType = nullptr;
 
     UInt getParamCount() { return paramTypes.getCount(); }
     Type* getParamType(UInt index) { return paramTypes[index]; }
     Type* getResultType() { return resultType; }
+    Type* getErrorType() { return errorType; }
 
     // Overrides should be public so base classes can access
     void _toTextOverride(StringBuilder& out);

@@ -79,6 +79,7 @@ namespace Slang
         CUDASource          = SLANG_CUDA_SOURCE,
         PTX                 = SLANG_PTX,
         ObjectCode          = SLANG_OBJECT_CODE,
+        HostHostCallable    = SLANG_HOST_HOST_CALLABLE,
         CountOf             = SLANG_TARGET_COUNT_OF,
     };
 
@@ -3135,6 +3136,8 @@ SLANG_FORCE_INLINE EndToEndCompileRequest* asInternal(SlangCompileRequest* reque
     SLANG_ASSERT(endToEndRequest);
     return endToEndRequest;
 }
+
+SLANG_FORCE_INLINE SlangCompileTarget asExternal(CodeGenTarget target) { return (SlangCompileTarget)target; }
 
 }
 

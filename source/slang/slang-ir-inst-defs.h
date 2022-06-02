@@ -56,6 +56,7 @@ INST(Nop, nop, 0, 0)
 
     INST(ConjunctionType, Conjunction, 0, 0)
     INST(AttributedType, Attributed, 0, 0)
+    INST(ResultType, Result, 2, 0)
 
     /* BindExistentialsTypeBase */
 
@@ -247,7 +248,8 @@ INST(Block, block, 0, PARENT)
     INST(FloatLit, float_constant, 0, 0)
     INST(PtrLit, ptr_constant, 0, 0)
     INST(StringLit, string_constant, 0, 0)
-INST_RANGE(Constant, BoolLit, StringLit)
+    INST(VoidLit, void_constant, 0, 0)
+INST_RANGE(Constant, BoolLit, VoidLit)
 
 INST(CapabilitySet, capabilitySet, 0, 0)
 
@@ -274,6 +276,11 @@ INST(makeArray, makeArray, 0, 0)
 INST(makeStruct, makeStruct, 0, 0)
 INST(MakeTuple, makeTuple, 0, 0)
 INST(GetTupleElement, getTupleElement, 2, 0)
+INST(MakeResultValue, makeResultValue, 1, 0)
+INST(MakeResultError, makeResultError, 1, 0)
+INST(IsResultError, isResultError, 1, 0)
+INST(GetResultError, getResultError, 1, 0)
+INST(GetResultValue, getResultValue, 1, 0)
 
 INST(Call, call, 1, 0)
 
@@ -415,9 +422,7 @@ INST(SwizzledStore, swizzledStore, 2, 0)
 
 /* IRTerminatorInst */
 
-    INST(ReturnVal, return_val, 1, 0)
-    INST(ReturnVoid, return_void, 1, 0)
-
+    INST(Return, return_val, 1, 0)
     /* IRUnconditionalBranch */
         // unconditionalBranch <target>
         INST(unconditionalBranch, unconditionalBranch, 1, 0)
@@ -435,6 +440,9 @@ INST(SwizzledStore, swizzledStore, 2, 0)
         INST(ifElse, ifElse, 4, 0)
     INST_RANGE(ConditionalBranch, conditionalBranch, ifElse)
 
+    INST(Throw, throw, 1, 0)
+    // tryCall <successBlock> <failBlock> <callee> <args>...
+    INST(TryCall, tryCall, 3, 0)
     // switch <val> <break> <default> <caseVal1> <caseBlock1> ...
     INST(Switch, switch, 3, 0)
 
@@ -445,7 +453,7 @@ INST(SwizzledStore, swizzledStore, 2, 0)
         INST(Unreachable, unreachable, 0, 0)
     INST_RANGE(Unreachable, MissingReturn, Unreachable)
 
-INST_RANGE(TerminatorInst, ReturnVal, Unreachable)
+INST_RANGE(TerminatorInst, Return, Unreachable)
 
 // TODO: We should consider splitting the basic arithmetic/comparison
 // ops into cases for signed integers, unsigned integers, and floating-point
@@ -730,7 +738,8 @@ INST_RANGE(Layout, VarLayout, EntryPointLayout)
         INST(TypeSizeAttr, size, 2, 0)
         INST(VarOffsetAttr, offset, 2, 0)
     INST_RANGE(LayoutResourceInfoAttr, TypeSizeAttr, VarOffsetAttr)
-INST_RANGE(Attr, PendingLayoutAttr, VarOffsetAttr)
+    INST(FuncThrowTypeAttr, FuncThrowType, 1, 0)
+INST_RANGE(Attr, PendingLayoutAttr, FuncThrowTypeAttr)
 
 /* Liveness */
     INST(LiveRangeStart, liveRangeStart, 2, 0)

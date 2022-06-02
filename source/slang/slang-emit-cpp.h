@@ -74,7 +74,8 @@ protected:
     virtual bool tryEmitGlobalParamImpl(IRGlobalParam* varDecl, IRType* varType) SLANG_OVERRIDE;
     virtual void emitIntrinsicCallExprImpl(IRCall* inst, IRTargetIntrinsicDecoration* targetIntrinsic, EmitOpInfo const& inOuterPrec) SLANG_OVERRIDE;
     virtual void emitLoopControlDecorationImpl(IRLoopControlDecoration* decl) SLANG_OVERRIDE;
-
+    virtual void emitFuncDecorationsImpl(IRFunc* func) SLANG_OVERRIDE;
+   
     virtual const UnownedStringSlice* getVectorElementNames(BaseType elemType, Index elemCount);
     
     // Replaceable for classes derived from CPPSourceEmitter
@@ -153,6 +154,8 @@ protected:
     // They must be emitted last, after the entire `Context` class so those member functions defined
     // in `Context` may be referenced.
     List<IRWitnessTable*> pendingWitnessTableDefinitions;
+
+    bool m_hasString = false;
 };
 
 }

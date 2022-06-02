@@ -170,7 +170,7 @@ namespace Slang
             auto interfaceType = cast<IRInterfaceType>(witnessTable->getConformanceType());
             if (isBuiltin(interfaceType))
                 return;
-            if (interfaceType->findDecoration<IRComInterfaceDecoration>())
+            if (isComInterfaceType(interfaceType))
                 return;
 
             // We need to consider whether the concrete type that is conforming
