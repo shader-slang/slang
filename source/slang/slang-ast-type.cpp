@@ -148,6 +148,27 @@ HashCode ErrorType::_getHashCodeOverride()
     return HashCode(size_t(this));
 }
 
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! BottomType !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+void BottomType::_toTextOverride(StringBuilder& out) { out << toSlice("never"); }
+
+bool BottomType::_equalsImplOverride(Type* type)
+{
+    if (auto bottomType = as<BottomType>(type))
+        return true;
+    return false;
+}
+
+Type* BottomType::_createCanonicalTypeOverride() { return this; }
+
+Val* BottomType::_substituteImplOverride(
+    ASTBuilder* /* astBuilder */, SubstitutionSet /*subst*/, int* /*ioDiff*/)
+{
+    return this;
+}
+
+HashCode BottomType::_getHashCodeOverride() { return HashCode(size_t(this)); }
+
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! DeclRefType !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 void DeclRefType::_toTextOverride(StringBuilder& out)
@@ -550,7 +571,7 @@ void FuncType::_toTextOverride(StringBuilder& out)
     }
     out << toSlice(") -> ") << getResultType();
 
-    if (!getErrorType()->equals(getASTBuilder()->getVoidType()))
+    if (!getErrorType()->equals(getASTBuilder()->getBottomType()))
     {
         out << " throws " << getErrorType();
     }

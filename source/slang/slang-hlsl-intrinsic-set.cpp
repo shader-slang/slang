@@ -476,7 +476,7 @@ static IRInst* _getSpecializedValue(IRSpecialize* specInst)
     if (!lastBlock)
         return base;
 
-    auto returnInst = as<IRReturnVal>(lastBlock->getTerminator());
+    auto returnInst = as<IRReturn>(lastBlock->getTerminator());
     if (!returnInst)
         return base;
 

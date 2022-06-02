@@ -2104,13 +2104,13 @@ void CLikeSourceEmitter::_emitInst(IRInst* inst)
         // folded into use site(s)
         break;
 
-    case kIROp_ReturnVoid:
-        m_writer->emit("return;\n");
-        break;
-
-    case kIROp_ReturnVal:
-        m_writer->emit("return ");
-        emitOperand(((IRReturnVal*) inst)->getVal(), getInfo(EmitOp::General));
+    case kIROp_Return:
+        m_writer->emit("return");
+        if (((IRReturn*)inst)->getVal()->getOp() != kIROp_VoidLit)
+        {
+            m_writer->emit(" ");
+            emitOperand(((IRReturn*) inst)->getVal(), getInfo(EmitOp::General));
+        }
         m_writer->emit(";\n");
         break;
 
@@ -2268,8 +2268,7 @@ void CLikeSourceEmitter::emitRegion(Region* inRegion)
                     // its behavior has been folded into the next region.
                     break;
 
-                case kIROp_ReturnVal:
-                case kIROp_ReturnVoid:
+                case kIROp_Return:
                 case kIROp_discard:
                     // For extremely simple terminators, we just handle
                     // them here, so that we don't have to allocate

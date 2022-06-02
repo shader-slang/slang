@@ -886,10 +886,10 @@ bool LivenessContext::_isAccessTerminator(IRTerminatorInst* terminator)
     // 
     // We need to detect if the return value accesses the root
 
-    if (terminator->getOp() == kIROp_ReturnVal)
+    if (terminator->getOp() == kIROp_Return)
     {
         // We are going to special case return if it hits an alias
-        auto returnVal = static_cast<IRReturnVal*>(terminator);
+        auto returnVal = static_cast<IRReturn*>(terminator);
 
         auto val = returnVal->getVal();
         
@@ -1242,4 +1242,3 @@ static void _processFunction(IRFunc* funcInst, List<IRVar*>& ioVars)
 }
 
 } // namespace Slang
-    

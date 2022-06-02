@@ -4406,7 +4406,7 @@ namespace Slang
         }
         else
         {
-            errorType = TypeExp(m_astBuilder->getVoidType());
+            errorType = TypeExp(m_astBuilder->getBottomType());
         }
         decl->errorType = errorType;
     }

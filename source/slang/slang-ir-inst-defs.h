@@ -248,7 +248,8 @@ INST(Block, block, 0, PARENT)
     INST(FloatLit, float_constant, 0, 0)
     INST(PtrLit, ptr_constant, 0, 0)
     INST(StringLit, string_constant, 0, 0)
-INST_RANGE(Constant, BoolLit, StringLit)
+    INST(VoidLit, void_constant, 0, 0)
+INST_RANGE(Constant, BoolLit, VoidLit)
 
 INST(CapabilitySet, capabilitySet, 0, 0)
 
@@ -276,7 +277,6 @@ INST(makeStruct, makeStruct, 0, 0)
 INST(MakeTuple, makeTuple, 0, 0)
 INST(GetTupleElement, getTupleElement, 2, 0)
 INST(MakeResultValue, makeResultValue, 1, 0)
-INST(MakeResultValueVoid, makeResultValueVoid, 0, 0)
 INST(MakeResultError, makeResultError, 1, 0)
 INST(IsResultError, isResultError, 1, 0)
 INST(GetResultError, getResultError, 1, 0)
@@ -422,9 +422,7 @@ INST(SwizzledStore, swizzledStore, 2, 0)
 
 /* IRTerminatorInst */
 
-    INST(ReturnVal, return_val, 1, 0)
-    INST(ReturnVoid, return_void, 1, 0)
-
+    INST(Return, return_val, 1, 0)
     /* IRUnconditionalBranch */
         // unconditionalBranch <target>
         INST(unconditionalBranch, unconditionalBranch, 1, 0)
@@ -455,7 +453,7 @@ INST(SwizzledStore, swizzledStore, 2, 0)
         INST(Unreachable, unreachable, 0, 0)
     INST_RANGE(Unreachable, MissingReturn, Unreachable)
 
-INST_RANGE(TerminatorInst, ReturnVal, Unreachable)
+INST_RANGE(TerminatorInst, Return, Unreachable)
 
 // TODO: We should consider splitting the basic arithmetic/comparison
 // ops into cases for signed integers, unsigned integers, and floating-point

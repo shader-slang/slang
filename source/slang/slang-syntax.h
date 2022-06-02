@@ -170,7 +170,7 @@ namespace Slang
         }
         else
         {
-            return astBuilder->getVoidType();
+            return astBuilder->getBottomType();
         }
     }
 

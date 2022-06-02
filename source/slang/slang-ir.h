@@ -898,6 +898,11 @@ struct IRPtrLit : IRConstant
     void* getValue() { return value.ptrVal; }
 };
 
+struct IRVoidLit : IRConstant
+{
+    IR_LEAF_ISA(VoidLit);
+};
+
 // A instruction that ends a basic block (usually because of control flow)
 struct IRTerminatorInst : IRInst
 {

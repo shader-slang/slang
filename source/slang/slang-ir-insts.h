@@ -1427,17 +1427,11 @@ struct IRImageStore : IRInst
 // Terminators
 
 struct IRReturn : IRTerminatorInst
-{};
-
-struct IRReturnVal : IRReturn
 {
-    IRUse val;
+    IR_LEAF_ISA(Return);
 
-    IRInst* getVal() { return val.get(); }
+    IRInst* getVal() { return getOperand(0); }
 };
-
-struct IRReturnVoid : IRReturn
-{};
 
 struct IRDiscard : IRTerminatorInst
 {};
@@ -1801,12 +1795,6 @@ struct IRMakeResultValue : IRInst
     IRInst* getValue() { return getOperand(0); }
 };
 
-// Constructs an `Result<void,E>` value that represents success in a function that returns `void`.
-struct IRMakeResultValueVoid : IRInst
-{
-    IR_LEAF_ISA(MakeResultValueVoid)
-};
-
 // Determines if a `Result` value represents an error.
 struct IRIsResultError : IRInst
 {
@@ -2148,6 +2136,7 @@ public:
     IRInst* getFloatValue(IRType* type, IRFloatingPointValue value);
     IRStringLit* getStringValue(const UnownedStringSlice& slice);
     IRPtrLit* getPtrValue(void* value);
+    IRVoidLit* getVoidValue();
     IRInst* getCapabilityValue(CapabilitySet const& caps);
 
     IRBasicType* getBasicType(BaseType baseType);
@@ -2415,7 +2404,6 @@ public:
 
     IRInst* emitMakeResultError(IRType* resultType, IRInst* errorVal);
     IRInst* emitMakeResultValue(IRType* resultType, IRInst* val);
-    IRInst* emitMakeResultValueVoid(IRType* resultType);
     IRInst* emitIsResultError(IRInst* result);
     IRInst* emitGetResultError(IRInst* result);
     IRInst* emitGetResultValue(IRInst* result);

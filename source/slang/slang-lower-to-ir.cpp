@@ -1622,7 +1622,7 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         {
             paramTypes.add(lowerType(context, type->getParamType(pp)));
         }
-        if (type->errorType->equals(context->astBuilder->getVoidType()))
+        if (type->getErrorType()->equals(context->astBuilder->getBottomType()))
         {
             return getBuilder()->getFuncType(
                 paramCount,
@@ -2838,9 +2838,9 @@ void _lowerFuncDeclBaseTypeInfo(
         irResultType = builder->getPtrType(irResultType);
     }
   
-    auto errorType = lowerType(context, getErrorCodeType(context->astBuilder, declRef));
-    if (errorType->getOp() != kIROp_VoidType)
+    if (!getErrorCodeType(context->astBuilder, declRef)->equals(context->astBuilder->getBottomType()))
     {
+        auto errorType = lowerType(context, getErrorCodeType(context->astBuilder, declRef));
         IRAttr* throwTypeAttr = nullptr;
         throwTypeAttr = builder->getAttr(kIROp_FuncThrowTypeAttr, 1, (IRInst**)&errorType);
         outInfo.type = builder->getFuncType(

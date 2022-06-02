@@ -1337,7 +1337,7 @@ namespace Slang
             // if this is still an invoke expression, test arguments passed to inout/out parameter are LValues
             if(auto funcType = as<FuncType>(invoke->functionExpr->type))
             {
-                if (!funcType->errorType->equals(m_astBuilder->getVoidType()))
+                if (!funcType->errorType->equals(m_astBuilder->getBottomType()))
                 {
                     // If the callee throws, make sure we are inside a try clause.
                     if (m_enclosingTryClauseType == TryClauseType::None)
@@ -1556,7 +1556,7 @@ namespace Slang
             getSink()->diagnose(expr, Diagnostics::uncaughtTryCallInNonThrowFunc);
             return expr;
         }
-        if (parentFunc->errorType->equals(m_astBuilder->getVoidType()))
+        if (parentFunc->errorType->equals(m_astBuilder->getBottomType()))
         {
             getSink()->diagnose(expr, Diagnostics::uncaughtTryCallInNonThrowFunc);
             return expr;
@@ -1571,7 +1571,7 @@ namespace Slang
         {
             if (auto funcCallee = as<FuncDecl>(callee->declRef.getDecl()))
             {
-                if (funcCallee->errorType->equals(m_astBuilder->getVoidType()))
+                if (funcCallee->errorType->equals(m_astBuilder->getBottomType()))
                 {
                     getSink()->diagnose(expr, Diagnostics::tryInvokeCalleeShouldThrow, callee->declRef);
                 }
