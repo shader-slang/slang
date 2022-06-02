@@ -52,12 +52,14 @@ namespace gfx_test
             swapchainDesc.imageCount = kSwapchainImageCount;
             swapchainDesc.queue = queue;
             WindowHandle windowHandle = window->getNativeHandle().convert<WindowHandle>();
-            GFX_CHECK_CALL_ABORT(device->createSwapchain(swapchainDesc, windowHandle, swapchain.writeRef()));
+            if (SLANG_FAILED(device->createSwapchain(swapchainDesc, windowHandle, swapchain.writeRef())))
+                SLANG_IGNORE_TEST;
         }
 
         void run()
         {
             createRequiredResources();
+            // TODO: Extend test by drawing for a few frames before and after resize to ensure swapchain remains usable
             GFX_CHECK_CALL(swapchain->resize(700, 700));
         }
     };
