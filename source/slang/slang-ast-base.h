@@ -34,7 +34,8 @@ class NodeBase
         /// The actual type is set when constructed on the ASTBuilder. 
     ASTNodeType astNodeType = ASTNodeType(-1);
 
-    virtual ~NodeBase() {}
+    // Handy when debugging, shouldn't be checked in though!
+    // virtual ~NodeBase() {}
 };
 
 // Casting of NodeBase
