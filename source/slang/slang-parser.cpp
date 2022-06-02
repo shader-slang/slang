@@ -1485,6 +1485,12 @@ namespace Slang
             parser->PushScope(decl);
 
             parseParameterList(parser, decl);
+
+            if (AdvanceIf(parser, "throws"))
+            {
+                decl->errorType = parser->ParseTypeExp();
+            }
+
             _parseOptSemantics(parser, decl);
             decl->body = parseOptBody(parser);
 
@@ -3383,6 +3389,10 @@ namespace Slang
         {
             parser->PushScope(decl);
             parseModernParamList(parser, decl);
+            if (AdvanceIf(parser, "throws"))
+            {
+                decl->errorType = parser->ParseTypeExp();
+            }
             if(AdvanceIf(parser, TokenType::RightArrow))
             {
                 decl->returnType = parser->ParseTypeExp();
@@ -4860,6 +4870,15 @@ namespace Slang
         return parser->astBuilder->create<NullPtrLiteralExpr>();
     }
 
+    static NodeBase* parseTryExpr(Parser* parser, void* /*userData*/)
+    {
+        auto tryExpr = parser->astBuilder->create<TryExpr>();
+        tryExpr->tryClauseType = TryClauseType::Standard;
+        tryExpr->base = parser->ParseLeafExpression();
+        tryExpr->scope = parser->currentScope;
+        return tryExpr;
+    }
+
     static bool _isFinite(double value)
     {
         // Lets type pun double to uint64_t, so we can detect special double values
@@ -6263,7 +6282,7 @@ namespace Slang
         // keyword (no further tokens expected/allowed),
         // and which can be represented just by creating
         // a new AST node of the corresponding type.
-
+        
         _makeParseModifier("in",            InModifier::kReflectClassInfo),
         _makeParseModifier("input",         InputModifier::kReflectClassInfo),
         _makeParseModifier("out",           OutModifier::kReflectClassInfo),
@@ -6336,6 +6355,7 @@ namespace Slang
         _makeParseExpr("true",  parseTrueExpr),
         _makeParseExpr("false", parseFalseExpr),
         _makeParseExpr("nullptr", parseNullPtrExpr),
+        _makeParseExpr("try",     parseTryExpr),
         _makeParseExpr("__TaggedUnion", parseTaggedUnionType),
     };
 

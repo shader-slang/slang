@@ -1337,6 +1337,15 @@ namespace Slang
             // if this is still an invoke expression, test arguments passed to inout/out parameter are LValues
             if(auto funcType = as<FuncType>(invoke->functionExpr->type))
             {
+                if (!funcType->errorType->equals(m_astBuilder->getVoidType()))
+                {
+                    // If the callee throws, make sure we are inside a try clause.
+                    if (m_enclosingTryClauseType == TryClauseType::None)
+                    {
+                        getSink()->diagnose(invoke, Diagnostics::mustUseTryClauseToCallAThrowFunc);
+                    }
+                }
+
                 Index paramCount = funcType->getParamCount();
                 for (Index pp = 0; pp < paramCount; ++pp)
                 {
@@ -1527,6 +1536,59 @@ namespace Slang
         // Now process this like any other explicit call (so casts
         // and constructor calls are semantically equivalent).
         return CheckInvokeExprWithCheckedOperands(expr);
+    }
+
+    Expr* SemanticsExprVisitor::visitTryExpr(TryExpr* expr)
+    {
+        auto prevTryClauseType = expr->tryClauseType;
+        m_enclosingTryClauseType = expr->tryClauseType;
+        expr->base = CheckTerm(expr->base);
+        m_enclosingTryClauseType = prevTryClauseType;
+        expr->type = expr->base->type;
+        if (as<ErrorType>(expr->type))
+            return expr;
+        
+        auto parentFunc = this->m_parentFunc;
+        // TODO: check if the try clause is caught.
+        // For now we assume all `try`s are not caught (because we don't have catch yet).
+        if (!parentFunc)
+        {
+            getSink()->diagnose(expr, Diagnostics::uncaughtTryCallInNonThrowFunc);
+            return expr;
+        }
+        if (parentFunc->errorType->equals(m_astBuilder->getVoidType()))
+        {
+            getSink()->diagnose(expr, Diagnostics::uncaughtTryCallInNonThrowFunc);
+            return expr;
+        }
+        if (!as<InvokeExpr>(expr->base))
+        {
+            getSink()->diagnose(expr, Diagnostics::tryClauseMustApplyToInvokeExpr);
+            return expr;
+        }
+        auto base = as<InvokeExpr>(expr->base);
+        if (auto callee = as<DeclRefExpr>(base->functionExpr))
+        {
+            if (auto funcCallee = as<FuncDecl>(callee->declRef.getDecl()))
+            {
+                if (funcCallee->errorType->equals(m_astBuilder->getVoidType()))
+                {
+                    getSink()->diagnose(expr, Diagnostics::tryInvokeCalleeShouldThrow, callee->declRef);
+                }
+                if (!parentFunc->errorType->equals(funcCallee->errorType))
+                {
+                    getSink()->diagnose(
+                        expr,
+                        Diagnostics::errorTypeOfCalleeIncompatibleWithCaller,
+                        callee->declRef,
+                        funcCallee->errorType,
+                        parentFunc->errorType);
+                }
+                return expr;
+            }
+        }
+        getSink()->diagnose(expr, Diagnostics::calleeOfTryCallMustBeFunc);
+        return expr;
     }
 
     Expr* SemanticsVisitor::MaybeDereference(Expr* inExpr)

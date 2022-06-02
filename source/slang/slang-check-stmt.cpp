@@ -51,7 +51,7 @@ namespace Slang
         // local `struct` declaration, where it would have members
         // that need to be recursively checked.
         //
-        ensureDeclBase(stmt->decl, DeclCheckState::Checked);
+        ensureDeclBase(stmt->decl, DeclCheckState::Checked, this);
     }
 
     void SemanticsStmtVisitor::visitBlockStmt(BlockStmt* stmt)
@@ -289,7 +289,7 @@ namespace Slang
     {
         stmt->device = CheckExpr(stmt->device);
         stmt->gridDims = CheckExpr(stmt->gridDims);
-        ensureDeclBase(stmt->dispatchThreadID, DeclCheckState::Checked);
+        ensureDeclBase(stmt->dispatchThreadID, DeclCheckState::Checked, this);
         WithOuterStmt subContext(this, stmt);
         stmt->kernelCall = subContext.CheckExpr(stmt->kernelCall);
         return;
