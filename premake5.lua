@@ -692,6 +692,9 @@ newoption {
  example "shader-object"
      kind "ConsoleApp"
  
+ example "cpu-com-example"
+     kind "ConsoleApp"
+ 
  example "cpu-hello-world"
      kind "ConsoleApp"
  if enableExperimental then

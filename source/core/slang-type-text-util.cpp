@@ -75,6 +75,8 @@ static const CompileTargetInfo s_compileTargetInfos[] =
     { SLANG_PTX,            "ptx",                                              "ptx" },
     { SLANG_SHADER_HOST_CALLABLE,  "",                                          "host-callable,callable" },
     { SLANG_OBJECT_CODE,    "obj,o",                                            "object-code" },
+    { SLANG_HOST_HOST_CALLABLE, "",                                             "host-host-callable" },
+
 
 };
 

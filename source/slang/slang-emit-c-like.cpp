@@ -1540,11 +1540,15 @@ void CLikeSourceEmitter::emitCallExpr(IRCall* inst, EmitOpInfo outerPrec)
     handleRequiredCapabilities(funcValue);
 
     // Detect if this is a call into a COM interface method.
-    if (funcValue->getOp() == kIROp_lookup_interface_method &&
-        funcValue->getOperand(0)->getDataType()->getOp() == kIROp_ComPtrType)
+    if (funcValue->getOp() == kIROp_lookup_interface_method)
     {
-        emitComInterfaceCallExpr(inst, outerPrec);
-        return;
+        const auto operand0TypeOp = funcValue->getOperand(0)->getDataType()->getOp();
+
+        if (operand0TypeOp == kIROp_ComPtrType || operand0TypeOp == kIROp_PtrType)
+        {
+            emitComInterfaceCallExpr(inst, outerPrec);
+            return;
+        }
     }
 
     // We want to detect any call to an intrinsic operation,

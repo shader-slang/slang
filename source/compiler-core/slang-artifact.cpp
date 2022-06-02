@@ -38,6 +38,7 @@ namespace Slang {
         case SLANG_CUDA_SOURCE:             return make(Kind::Text, Payload::CUDA, Style::Kernel, 0);
         case SLANG_PTX:                     return make(Kind::Executable, Payload::PTX, Style::Kernel, 0);
         case SLANG_OBJECT_CODE:             return make(Kind::ObjectCode, Payload::HostCPU, Style::Kernel, 0);
+        case SLANG_HOST_HOST_CALLABLE:      return make(Kind::Callable, Payload::HostCPU, Style::Host, 0);
         default: break;
     }
 

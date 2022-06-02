@@ -177,6 +177,8 @@ Result linkAndOptimizeIR(
     auto target = codeGenContext->getTargetFormat();
     auto targetRequest = codeGenContext->getTargetReq();
 
+    // Get the artifact desc for the target 
+    const auto artifactDesc = ArtifactDesc::makeFromCompileTarget(asExternal(target));
 
     // We start out by performing "linking" at the level of the IR.
     // This step will create a fresh IR module to be used for
@@ -203,12 +205,20 @@ Result linkAndOptimizeIR(
 
     switch (target)
     {
-    default:
-        break;
-    case CodeGenTarget::HostCPPSource:
-        lowerComInterfaces(irModule, sink);
-        generateDllImportFuncs(irModule, sink);
-        break;
+        case CodeGenTarget::CPPSource:
+        {
+            // TODO(JS):
+            // We want the interface transformation to take place for 'regular' CPPSource for now too.
+            lowerComInterfaces(irModule, artifactDesc.style, sink);
+            break;
+        }
+        case CodeGenTarget::HostCPPSource:
+        {
+            lowerComInterfaces(irModule, artifactDesc.style, sink);
+            generateDllImportFuncs(irModule, sink);
+            break;
+        }
+        default: break;
     }
 
     // Lower `Result<T,E>` types into ordinary struct types.

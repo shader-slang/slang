@@ -120,6 +120,52 @@ Any compilers not detected by the above logic are now now explicitly zeroed out.
 #   define SLANG_OFFSET_OF(X, Y) offsetof(X, Y)
 #endif
 
+// If slang.h has been included we don't need any of these definitions
+#ifndef SLANG_H
+
+/* Macro for declaring if a method is no throw. Should be set before the return parameter. */
+#ifndef SLANG_NO_THROW
+#   if SLANG_WINDOWS_FAMILY && !defined(SLANG_DISABLE_EXCEPTIONS)
+#       define SLANG_NO_THROW __declspec(nothrow)
+#   endif
+#endif
+#ifndef SLANG_NO_THROW
+#   define SLANG_NO_THROW
+#endif
+
+/* The `SLANG_STDCALL` and `SLANG_MCALL` defines are used to set the calling
+convention for interface methods.
+*/
+#ifndef SLANG_STDCALL
+#   if SLANG_MICROSOFT_FAMILY
+#       define SLANG_STDCALL __stdcall
+#   else
+#       define SLANG_STDCALL
+#   endif
+#endif
+#ifndef SLANG_MCALL
+#   define SLANG_MCALL SLANG_STDCALL
+#endif
+
+struct SlangUUID
+{
+    uint32_t data1;
+    uint16_t data2;
+    uint16_t data3;
+    uint8_t  data4[8];
+};
+
+typedef int32_t SlangResult;
+
+struct ISlangUnknown
+{
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL queryInterface(SlangUUID const& uuid, void** outObject) = 0;
+    virtual SLANG_NO_THROW uint32_t SLANG_MCALL addRef() = 0;
+    virtual SLANG_NO_THROW uint32_t SLANG_MCALL release() = 0;
+};
+
+#endif // SLANG_H
+
 #include "slang-cpp-types.h"
 #include "slang-cpp-scalar-intrinsics.h"
 
