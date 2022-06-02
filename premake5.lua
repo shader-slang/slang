@@ -150,15 +150,23 @@ newoption {
      value       = "bool",
      default     = "true",
      allowed     = { { "true", "True"}, { "false", "False" } }
-  }
+ }
 
-  newoption {
+ newoption {
     trigger     = "enable-experimental-projects",
     description = "(Optional) If true include experimental projects in build.",
     value       = "bool",
     default     = "false",
     allowed     = { { "true", "True"}, { "false", "False" } }
-  }
+ }
+
+ newoption {
+    trigger     = "disable-stdlib-source",
+    description = "(Optional) If true stdlib source will not be included in binary.",
+    value       = "bool",
+    default     = "false",
+    allowed     = { { "true", "True"}, { "false", "False" } }
+ }
 
  buildLocation = _OPTIONS["build-location"]
  executeBinary = (_OPTIONS["execute-binary"] == "true")
@@ -171,6 +179,8 @@ newoption {
  enableEmbedStdLib = (_OPTIONS["enable-embed-stdlib"] == "true")
  enableXlib = (_OPTIONS["enable-xlib"] == "true")
  enableExperimental = (_OPTIONS["enable-experimental-projects"] == "true")
+ disableStdlibSource = (_OPTIONS["disable-stdlib-source"] == "true")
+ 
  -- Determine the target info
 
  targetInfo = slangUtil.getTargetInfo()
@@ -1303,6 +1313,10 @@ tool "slangd"
      -- we declare the Slang API functions for *export* and not *import*.
      --
      defines { "SLANG_DYNAMIC_EXPORT" }
+ 
+     if disableStdlibSource then
+        defines { "SLANG_DISABLE_STDLIB_SOURCE" }
+     end
  
      if enableEmbedStdLib then
          -- We only have this dependency if we are embedding stdlib
