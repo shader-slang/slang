@@ -228,7 +228,7 @@ struct ByteAddressBuffer
     T Load(size_t index) const
     {
         SLANG_BOUND_CHECK_BYTE_ADDRESS(index, sizeof(T), sizeInBytes);
-        return *(T const*)((char*)data + index);
+        return *(const T*)((const char*)data + index);
     }
     
     const uint32_t* data;
@@ -269,7 +269,7 @@ struct RWByteAddressBuffer
     T Load(size_t index) const
     {
         SLANG_BOUND_CHECK_BYTE_ADDRESS(index, sizeof(T), sizeInBytes);
-        return *(T const*)((char*)data + index);
+        return *(const T*)((const char*)data + index);
     }
 
     void Store(size_t index, uint32_t v) const 
@@ -305,7 +305,7 @@ struct RWByteAddressBuffer
     void Store(size_t index, T const& value) const
     {
         SLANG_BOUND_CHECK_BYTE_ADDRESS(index, sizeof(T), sizeInBytes);
-        *(T const*)((char*)data + index) = value;
+        *(T*)((char*)data + index) = value;
     }
 
     uint32_t* data;
