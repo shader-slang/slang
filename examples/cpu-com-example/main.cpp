@@ -158,6 +158,9 @@ static SlangResult _innerMain(int argc, char** argv)
             return SLANG_FAIL;
         }
 
+        // In the slang source it is set a default value
+        SLANG_ASSERT(getGlobal() == 10);
+
         for (Index i = 0; i < 10; ++i)
         {
             setGlobal(int(i));
