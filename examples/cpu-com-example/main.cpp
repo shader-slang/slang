@@ -188,6 +188,13 @@ static SlangResult _innerMain(int argc, char** argv)
             const auto v = nextCount();
             SLANG_ASSERT(v == i);
         }
+
+        auto counterPtr = (ICountGood**)sharedLibrary->findSymbolAddressByName("globalCounter");
+
+        if (counterPtr)
+        {
+            SLANG_ASSERT(*counterPtr == &counter);
+        }
     }
 
     return SLANG_OK;

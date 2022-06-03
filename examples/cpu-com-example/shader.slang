@@ -32,7 +32,7 @@ interface ICountGood
     int nextCount();
 }
 
-__global ICountGood globalCounter;
+public __extern_cpp __global ICountGood globalCounter;
 
 public __extern_cpp void setCounter(ICountGood counter)
 {
