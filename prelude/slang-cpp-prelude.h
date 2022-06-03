@@ -147,6 +147,13 @@ convention for interface methods.
 #   define SLANG_MCALL SLANG_STDCALL
 #endif
 
+#ifndef SLANG_FORCE_INLINE
+#    define SLANG_FORCE_INLINE inline
+#endif
+
+// TODO(JS): Should these be in slang-cpp-types.h? 
+// They are more likely to clash with slang.h
+
 struct SlangUUID
 {
     uint32_t data1;
@@ -165,6 +172,8 @@ struct ISlangUnknown
 };
 
 #endif // SLANG_H
+
+// Includes
 
 #include "slang-cpp-types.h"
 #include "slang-cpp-scalar-intrinsics.h"
