@@ -1863,7 +1863,7 @@ namespace Slang
     {
         GenericAppExpr* genericApp = parser->astBuilder->create<GenericAppExpr>();
 
-        parser->FillPosition(genericApp); // set up scope for lookup
+        genericApp->loc = base->loc;
         genericApp->functionExpr = base;
         parser->ReadToken(TokenType::OpLess);
         parser->genericDepth++;
@@ -1947,12 +1947,12 @@ namespace Slang
         }
         return base;
     }
-    static Expr* parseMemberType(Parser * parser, Expr* base)
+    static Expr* parseMemberType(Parser * parser, Expr* base, SourceLoc opLoc)
     {
         // When called the :: or . have been consumed, so don't need to consume here.
 
         MemberExpr* memberExpr = parser->astBuilder->create<MemberExpr>();
-
+        memberExpr->memberOperatorLoc = opLoc;
         parser->FillPosition(memberExpr);
         memberExpr->baseExpression = base;
         memberExpr->name = expectIdentifier(parser).name;
@@ -2258,13 +2258,17 @@ namespace Slang
                 typeExpr = parseGenericApp(parser, typeExpr);
                 break;
             case TokenType::Scope:
-                parser->ReadToken(TokenType::Scope);
-                typeExpr = parseMemberType(parser, typeExpr);
-                break;
+                {
+                    auto opToken = parser->ReadToken(TokenType::Scope);
+                    typeExpr = parseMemberType(parser, typeExpr, opToken.loc);
+                    break;
+                }
             case TokenType::Dot:
-                parser->ReadToken(TokenType::Dot);
-                typeExpr = parseMemberType(parser, typeExpr);
-                break;
+                {
+                    auto opToken = parser->ReadToken(TokenType::Dot);
+                    typeExpr = parseMemberType(parser, typeExpr, opToken.loc);
+                    break;
+                }
             default:
                 shouldLoop = false;
             }
@@ -3218,7 +3222,6 @@ namespace Slang
     static NodeBase* parsePropertyDecl(Parser* parser, void* /*userData*/)
     {
         PropertyDecl* decl = parser->astBuilder->create<PropertyDecl>();
-        parser->FillPosition(decl);
         parser->PushScope(decl);
 
         // We want to support property declarations with two
@@ -3244,6 +3247,7 @@ namespace Slang
         //
         if(_peekModernStyleVarDecl(parser))
         {
+            parser->FillPosition(decl);
             decl->nameAndLoc = expectIdentifier(parser);
             expect(parser, TokenType::Colon);
             decl->type = parser->ParseTypeExp();
@@ -3768,10 +3772,12 @@ namespace Slang
         ContainerDecl*      containerDecl,
         MatchedTokenType    matchType)
     {
-        while(!AdvanceIfMatch(parser, matchType))
+        Token closingBraceToken;
+        while (!AdvanceIfMatch(parser, matchType, &closingBraceToken))
         {
             ParseDecl(parser, containerDecl);
         }
+        containerDecl->closingSourceLoc = closingBraceToken.loc;
     }
 
     static void parseDeclBody(
@@ -3823,8 +3829,8 @@ namespace Slang
     Decl* Parser::ParseStruct()
     {
         StructDecl* rs = astBuilder->create<StructDecl>();
-        FillPosition(rs);
         ReadToken("struct");
+        FillPosition(rs);
 
         // The `struct` keyword may optionally be followed by
         // attributes that appertain to the struct declaration
@@ -3857,8 +3863,8 @@ namespace Slang
     ClassDecl* Parser::ParseClass()
     {
         ClassDecl* rs = astBuilder->create<ClassDecl>();
-        FillPosition(rs);
         ReadToken("class");
+        FillPosition(rs);
         rs->nameAndLoc = expectIdentifier(this);
 
         parseOptionalInheritanceClause(this, rs);
@@ -3885,7 +3891,6 @@ namespace Slang
     static Decl* parseEnumDecl(Parser* parser)
     {
         EnumDecl* decl = parser->astBuilder->create<EnumDecl>();
-        parser->FillPosition(decl);
 
         parser->ReadToken("enum");
 
@@ -3896,6 +3901,8 @@ namespace Slang
         // toward deprecating it.
         //
         AdvanceIf(parser, "class");
+
+        parser->FillPosition(decl);
 
         decl->nameAndLoc = expectIdentifier(parser);
 
@@ -5184,7 +5191,7 @@ namespace Slang
         default:
             // TODO: should this return an error expression instead of NULL?
             parser->sink->diagnose(parser->tokenReader.peekLoc(), Diagnostics::syntaxError);
-            return nullptr;
+            return parser->astBuilder->create<IncompleteExpr>();
 
         // Either:
         // - parenthesized expression `(exp)`
@@ -5589,7 +5596,8 @@ namespace Slang
                     InvokeExpr* invokeExpr = parser->astBuilder->create<InvokeExpr>();
                     invokeExpr->functionExpr = expr;
                     parser->FillPosition(invokeExpr);
-                    parser->ReadToken(TokenType::LParent);
+                    auto lParen = parser->ReadToken(TokenType::LParent);
+                    invokeExpr->argumentDelimeterLocs.add(lParen.loc);
                     while (!parser->tokenReader.isAtEnd())
                     {
                         if (!parser->LookAheadToken(TokenType::RParent))
@@ -5600,10 +5608,11 @@ namespace Slang
                         }
                         if (!parser->LookAheadToken(TokenType::Comma))
                             break;
-                        parser->ReadToken(TokenType::Comma);
+                        auto comma = parser->ReadToken(TokenType::Comma);
+                        invokeExpr->argumentDelimeterLocs.add(comma.loc);
                     }
-                    parser->ReadToken(TokenType::RParent);
-
+                    auto rParen = parser->ReadToken(TokenType::RParent);
+                    invokeExpr->argumentDelimeterLocs.add(rParen.loc);
                     expr = invokeExpr;
                 }
                 break;
@@ -5615,10 +5624,10 @@ namespace Slang
 
                 // TODO(tfoley): why would a member expression need this?
                 staticMemberExpr->scope = parser->currentScope;
-
-                parser->FillPosition(staticMemberExpr);
+                staticMemberExpr->memberOperatorLoc = parser->tokenReader.peekLoc();
                 staticMemberExpr->baseExpression = expr;
                 parser->ReadToken(TokenType::Scope);
+                parser->FillPosition(staticMemberExpr);
                 staticMemberExpr->name = expectIdentifier(parser).name;
 
                 if (peekTokenType(parser) == TokenType::OpLess)
@@ -5635,10 +5644,10 @@ namespace Slang
 
                     // TODO(tfoley): why would a member expression need this?
                     memberExpr->scope = parser->currentScope;
-
-                    parser->FillPosition(memberExpr);
+                    memberExpr->memberOperatorLoc = parser->tokenReader.peekLoc();
                     memberExpr->baseExpression = expr;
                     parser->ReadToken(TokenType::Dot);
+                    parser->FillPosition(memberExpr);
                     memberExpr->name = expectIdentifier(parser).name;
 
                     if (peekTokenType(parser) == TokenType::OpLess)

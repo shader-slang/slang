@@ -7,8 +7,13 @@
 namespace Slang {
 
 // Syntax class definitions for expressions.
-
-// Base class for expressions that will reference declarations
+// 
+    // A placeholder for where an Expr is expected but is missing from source.
+class IncompleteExpr : public Expr
+{
+    SLANG_AST_CLASS(IncompleteExpr)
+};
+    // Base class for expressions that will reference declarations
 class DeclRefExpr: public Expr
 {
     SLANG_ABSTRACT_AST_CLASS(DeclRefExpr)
@@ -19,6 +24,9 @@ class DeclRefExpr: public Expr
 
     // The name of the symbol being referenced
     Name* name = nullptr;
+
+    // The original expr before DeclRef resolution.
+    Expr* originalExpr = nullptr;
 
     SLANG_UNREFLECTED
     // The scope in which to perform lookup
@@ -137,6 +145,13 @@ class AppExprBase : public ExprWithArgsBase
     SLANG_ABSTRACT_AST_CLASS(AppExprBase)
 
     Expr* functionExpr = nullptr;
+
+    // The original function expr before overload resolution.
+    Expr* originalFunctionExpr = nullptr;
+
+    // The source location of `(`, `)`, and `,` that marks the start/end of the application op and
+    // each argument expr. This info is used by language server.
+    List<SourceLoc> argumentDelimeterLocs;
 };
 
 class InvokeExpr: public AppExprBase
@@ -196,6 +211,7 @@ class MemberExpr: public DeclRefExpr
 {
     SLANG_AST_CLASS(MemberExpr)
     Expr* baseExpression = nullptr;
+    SourceLoc memberOperatorLoc;
 };
 
 // Member looked up on a type, rather than a value
@@ -203,6 +219,7 @@ class StaticMemberExpr: public DeclRefExpr
 {
     SLANG_AST_CLASS(StaticMemberExpr)
     Expr* baseExpression = nullptr;
+    SourceLoc memberOperatorLoc;
 };
 
 struct MatrixCoord

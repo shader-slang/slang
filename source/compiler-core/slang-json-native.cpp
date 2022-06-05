@@ -136,7 +136,7 @@ SlangResult JSONToNativeConverter::convert(const JSONValue& in, const RttiInfo* 
             Index fieldCount = 0;
             SLANG_RETURN_ON_FAIL(_structToNative(pairs, structRttiInfo, out, fieldCount));
 
-            if (fieldCount != pairs.getCount())
+            if (fieldCount != pairs.getCount() && !structRttiInfo->m_ignoreUnknownFieldsInJson)
             {
                 // We want to find the fields not found in the type
 
@@ -176,6 +176,8 @@ SlangResult JSONToNativeConverter::convert(const JSONValue& in, const RttiInfo* 
         }
         case RttiInfo::Kind::List:
         {
+            if (in.getKind() == JSONValue::Kind::Null)
+                return SLANG_OK;
             if (in.getKind() != JSONValue::Kind::Array)
             {
                 return SLANG_FAIL;

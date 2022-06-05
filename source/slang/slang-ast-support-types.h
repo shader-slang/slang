@@ -761,6 +761,7 @@ namespace Slang
 
         // Convenience accessors for common properties of declarations
         Name* getName() const;
+        SourceLoc getNameLoc() const;
         SourceLoc getLoc() const;
         DeclRefBase getParent() const;
 

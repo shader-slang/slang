@@ -2922,6 +2922,12 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
         return d.dispatch(expr);
     }
 
+    LoweredValInfo visitIncompleteExpr(IncompleteExpr*)
+    {
+        SLANG_UNEXPECTED("a valid ast should not contain an IncompleteExpr.");
+        UNREACHABLE_RETURN(LoweredValInfo());
+    }
+
     LoweredValInfo visitVarExpr(VarExpr* expr)
     {
         LoweredValInfo info = emitDeclRef(

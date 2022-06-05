@@ -17,6 +17,8 @@ public:
         {
             ParamNames = 0x01,                  ///< If set will output parameter names
             ModuleName = 0x02,                  ///< Writes out module names
+            NoInternalKeywords = 0x04,          ///< Omits internal decoration keywords (e.g. __target_intrinsic).
+            SimplifiedBuiltinType = 0x08,       ///< Prints simplified builtin generic types (e.g. float3) instead of its generic form.
         };
     };
 
@@ -118,7 +120,7 @@ public:
 
         /// Add just the parameters from a declaration.
         /// Will output the generic parameters (if it's a generic) in <> before the parameters ()
-    void addDeclParams(const DeclRef<Decl>& declRef);
+    void addDeclParams(const DeclRef<Decl>& declRef, List<Array<Index, 2>>* outParamRange = nullptr);
 
         /// Add a prefix that describes the kind of declaration
     void addDeclKindPrefix(Decl* decl);
