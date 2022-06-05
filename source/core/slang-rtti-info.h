@@ -100,8 +100,6 @@ struct RttiInfo
     AlignmentType m_alignment;
     SizeType m_size;
 
-    bool m_ignoreUnknownFieldsInJson = false;
-
     void init(Kind kind, size_t alignment, size_t size) { m_kind = kind; m_alignment = AlignmentType(alignment); m_size = SizeType(size); }
 
     template <typename T>
@@ -172,6 +170,7 @@ struct StructRttiInfo : public NamedRttiInfo
 
     Index m_fieldCount;                 ///< Amount of fields
     const Field* m_fields;              ///< Fields
+    bool m_ignoreUnknownFieldsInJson = false;
 };
 
 struct EnumRttiInfo : public NamedRttiInfo

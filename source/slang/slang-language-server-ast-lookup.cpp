@@ -76,6 +76,7 @@ public:
             return false;
         return dispatch(expr);
     }
+    bool visitExpr(Expr*) { return false; }
     bool visitBoolLiteralExpr(BoolLiteralExpr*) { return false; }
     bool visitNullPtrLiteralExpr(NullPtrLiteralExpr*) { return false; }
     bool visitIntegerLiteralExpr(IntegerLiteralExpr*) { return false; }

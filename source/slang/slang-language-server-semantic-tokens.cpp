@@ -38,6 +38,7 @@ struct ASTIterator
                 return;
             dispatch(expr);
         }
+        bool visitExpr(Expr*) { return false; }
         void visitBoolLiteralExpr(BoolLiteralExpr* expr) { iterator->maybeDispatchCallback(expr); }
         void visitNullPtrLiteralExpr(NullPtrLiteralExpr* expr)
         {
