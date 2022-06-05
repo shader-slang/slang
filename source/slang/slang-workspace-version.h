@@ -117,9 +117,9 @@ namespace Slang
 
     public:
         // Inherited via ISlangFileSystem
-        virtual SlangResult queryInterface(const SlangUUID& uuid, void** outObject);
-        virtual uint32_t addRef();
-        virtual uint32_t release();
-        virtual SlangResult loadFile(const char* path, ISlangBlob** outBlob);
+        SLANG_COM_OBJECT_IUNKNOWN_ALL
+        void* getInterface(const Guid& uuid);
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL
+            loadFile(const char* path, ISlangBlob** outBlob) override;
     };
-    } // namespace LanguageServerProtocol
+} // namespace LanguageServerProtocol

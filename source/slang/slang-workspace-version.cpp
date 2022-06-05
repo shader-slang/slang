@@ -176,20 +176,6 @@ RefPtr<WorkspaceVersion> Workspace::createWorkspaceVersion()
     return version;
 }
 
-SlangResult Workspace::queryInterface(const SlangUUID& uuid, void** outObject)
-{
-    if (uuid == ISlangFileSystem::getTypeGuid())
-    {
-        *outObject = static_cast<ISlangFileSystem*>(this);
-        return SLANG_OK;
-    }
-    return SLANG_E_NO_INTERFACE;
-}
-
-uint32_t Workspace::addRef() { return this->addRefImpl(); }
-
-uint32_t Workspace::release() { return this->releaseImpl(); }
-
 SlangResult Workspace::loadFile(const char* path, ISlangBlob** outBlob)
 {
     String canonnicalPath;
@@ -208,6 +194,15 @@ WorkspaceVersion* Workspace::getCurrentVersion()
     if (!currentVersion)
         currentVersion = createWorkspaceVersion();
     return currentVersion.Ptr();
+}
+
+void* Workspace::getInterface(const Guid& uuid)
+{
+    if (uuid == ISlangUnknown::getTypeGuid() || uuid == ISlangFileSystem::getTypeGuid())
+    {
+        return static_cast<ISlangFileSystem*>(this);
+    }
+    return nullptr;
 }
 
 Int convertHexDigit(char c)
