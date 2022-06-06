@@ -20,9 +20,9 @@ using namespace Slang;
 class IDoThings : public ISlangUnknown
 {
 public:
-    virtual int SLANG_MCALL doThing(int a, int b) = 0;
-    virtual int SLANG_MCALL calcHash(const char* in) = 0;
-    virtual void SLANG_MCALL printMessage(const char* in) = 0;
+    virtual SLANG_NO_THROW int SLANG_MCALL doThing(int a, int b) = 0;
+    virtual SLANG_NO_THROW int SLANG_MCALL calcHash(const char* in) = 0;
+    virtual SLANG_NO_THROW void SLANG_MCALL printMessage(const char* in) = 0;
 };
 
 static int _calcHash(const char* in)
@@ -45,9 +45,9 @@ public:
     virtual SLANG_NO_THROW uint32_t SLANG_MCALL release() SLANG_OVERRIDE  { return 1; }
 
     // IDoThings
-    virtual int SLANG_MCALL doThing(int a, int b) SLANG_OVERRIDE { return a + b + 1; }
-    virtual int SLANG_MCALL calcHash(const char* in) SLANG_OVERRIDE { return (int)_calcHash(in); }
-    virtual void SLANG_MCALL printMessage(const char* in) SLANG_OVERRIDE { printf("%s\n", in); }
+    virtual SLANG_NO_THROW int SLANG_MCALL doThing(int a, int b) SLANG_OVERRIDE { return a + b + 1; }
+    virtual SLANG_NO_THROW int SLANG_MCALL calcHash(const char* in) SLANG_OVERRIDE { return (int)_calcHash(in); }
+    virtual SLANG_NO_THROW void SLANG_MCALL printMessage(const char* in) SLANG_OVERRIDE { printf("%s\n", in); }
 };
 
 static SlangResult _innerMain(int argc, char** argv)

@@ -293,6 +293,9 @@
     <ClCompile Include="..\..\..\tools\unit-test\slang-unit-test.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="..\..\..\tools\slang-unit-test\unit-test-com-host-callable.slang" />
+  </ItemGroup>
+  <ItemGroup>
     <ProjectReference Include="..\lz4\lz4.vcxproj">
       <Project>{E1EC8075-823E-46E5-BC38-C124CCCDF878}</Project>
     </ProjectReference>

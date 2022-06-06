@@ -75,4 +75,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
+  <ItemGroup>
+    <None Include="..\..\..\tools\slang-unit-test\unit-test-com-host-callable.slang">
+      <Filter>Source Files</Filter>
+    </None>
+  </ItemGroup>
 </Project>

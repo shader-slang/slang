@@ -99,7 +99,13 @@ Any compilers not detected by the above logic are now now explicitly zeroed out.
 #    endif
 #endif /* SLANG_COMPILER */
 
+/* Shorthands for "families" of compilers/platforms */
 #define SLANG_GCC_FAMILY (SLANG_CLANG || SLANG_SNC || SLANG_GHS || SLANG_GCC)
+#define SLANG_WINDOWS_FAMILY (SLANG_WINRT || SLANG_WIN32 || SLANG_WIN64)
+#define SLANG_MICROSOFT_FAMILY (SLANG_XBOXONE || SLANG_X360 || SLANG_WINDOWS_FAMILY)
+#define SLANG_LINUX_FAMILY (SLANG_LINUX || SLANG_ANDROID)
+#define SLANG_APPLE_FAMILY (SLANG_IOS || SLANG_OSX)                  /* equivalent to #if __APPLE__ */
+#define SLANG_UNIX_FAMILY (SLANG_LINUX_FAMILY || SLANG_APPLE_FAMILY) /* shortcut for unix/posix platforms */
 
 // GCC Specific
 #if SLANG_GCC_FAMILY
