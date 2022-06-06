@@ -84,6 +84,12 @@ void lowerComInterfaces(IRModule* module, ArtifactStyle artifactStyle, Diagnosti
                 continue;
             }
 
+            // NOTE! The following code relies on the fact that the builder
+            // *doesn't* dedup in general, and in particular doesn't ptr types. 
+            // This allows the creation a 'new'  pointer type, and subsequent replacment all old uses, 
+            // leading to a `IInterface*` becoming `IInterface**`. 
+            // 
+
             // TODO(JS): This is a temporary fix, in that whether kernel or not 
             // shouldn't control the ptr type in general
             // It's necessary here though because Kernel doesn't have ComPtr<>
