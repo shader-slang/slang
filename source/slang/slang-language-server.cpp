@@ -32,6 +32,7 @@ public:
     ComPtr<slang::IGlobalSession> m_session;
     RefPtr<Workspace> m_workspace;
     Dictionary<String, String> m_lastPublishedDiagnostics;
+    time_t m_lastDiagnosticUpdateTime = 0;
 
     bool m_quit = false;
     List<LanguageServerProtocol::WorkspaceFolder> m_workspaceFolders;
@@ -61,6 +62,7 @@ public:
 private:
     SlangResult _executeSingle();
     slang::IGlobalSession* getOrCreateGlobalSession();
+    void resetDiagnosticUpdateTime();
     void publishDiagnostics();
 };
 
@@ -92,6 +94,8 @@ slang::IGlobalSession* LanguageServer::getOrCreateGlobalSession()
 
     return m_session;
 }
+
+void LanguageServer::resetDiagnosticUpdateTime() { time(&m_lastDiagnosticUpdateTime); }
 
 String uriToCanonicalPath(const String& uri)
 {
@@ -894,15 +898,14 @@ List<LanguageServerProtocol::CompletionItem> LanguageServer::collectMembers(Work
 
 void LanguageServer::publishDiagnostics()
 {
-    static time_t lastUpdateTime = 0;
     time_t timeNow = 0;
     time(&timeNow);
 
-    if (timeNow - lastUpdateTime < 20)
+    if (timeNow - m_lastDiagnosticUpdateTime < 3)
     {
         return;
     }
-    lastUpdateTime = timeNow;
+    m_lastDiagnosticUpdateTime = timeNow;
 
     auto version = m_workspace->getCurrentVersion();
     // Send updates to clear diagnostics for files that no longer have any messages.
@@ -942,6 +945,7 @@ SlangResult LanguageServer::didCloseTextDocument(const DidCloseTextDocumentParam
     String canonicalPath = uriToCanonicalPath(args.textDocument.uri);
     m_workspace->openedDocuments.Remove(canonicalPath);
     m_workspace->invalidate();
+    resetDiagnosticUpdateTime();
     return SLANG_OK;
 }
 SlangResult LanguageServer::didChangeTextDocument(const DidChangeTextDocumentParams& args)
@@ -954,6 +958,7 @@ SlangResult LanguageServer::didChangeTextDocument(const DidChangeTextDocumentPar
         doc->setText(args.contentChanges[0].text.getUnownedSlice());
     }
     m_workspace->invalidate();
+    resetDiagnosticUpdateTime();
     return SLANG_OK;
 }
 
