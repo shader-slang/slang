@@ -264,6 +264,45 @@ String getDeclSignatureString(DeclRef<Decl> declRef, ASTBuilder* astBuilder)
     return printer.getString();
 }
 
+
+static String _formatDocumentation(String doc)
+{
+    // TODO: may want to use DocMarkdownWriter in the future to format the text.
+    // For now just insert line breaks before `\param` and `\returns` markups.
+    List<UnownedStringSlice> lines;
+    StringUtil::split(doc.getUnownedSlice(), '\n', lines);
+    StringBuilder result;
+    
+    for (Index i = 0; i < lines.getCount(); i++)
+    {
+        auto trimedLine = lines[i].trimStart();
+        if (i > 0)
+        {
+            if (trimedLine.startsWith("\\") && lines[i - 1].trim().getLength() != 0)
+            {
+                result << "  \n";
+            }
+            else
+            {
+                result << "\n";
+            }
+        }
+        if (trimedLine.startsWith("\\returns "))
+        {
+            trimedLine = trimedLine.subString(9, trimedLine.getLength());
+            result << "**returns** ";
+        }
+        else if (trimedLine.startsWith("\\return "))
+        {
+            trimedLine = trimedLine.subString(8, trimedLine.getLength());
+            result << "**Returns** ";
+        }
+        result << trimedLine;
+    }
+    result << "\n";
+    return result.ProduceString();
+}
+
 static void _tryGetDocumentation(StringBuilder& sb, WorkspaceVersion* workspace, Decl* decl)
 {
     auto definingModule = getModuleDecl(decl);
@@ -274,8 +313,7 @@ static void _tryGetDocumentation(StringBuilder& sb, WorkspaceVersion* workspace,
         if (markupEntry)
         {
             sb << "\n";
-            // TODO: may want to use DocMarkdownWriter in the future to format the text.
-            sb << markupEntry->m_markup;
+            sb << _formatDocumentation(markupEntry->m_markup);
             sb << "\n";
         }
     }
@@ -533,6 +571,14 @@ SlangResult LanguageServer::completion(
     {
         baseExpr = staticMemberExpr->baseExpression;
     }
+    else if (auto swizzleExpr = as<SwizzleExpr>(findResult[0].path.getLast()))
+    {
+        baseExpr = swizzleExpr->base;
+    }
+    else if (auto matSwizzleExpr = as<MatrixSwizzleExpr>(findResult[0].path.getLast()))
+    {
+        baseExpr = matSwizzleExpr->base;
+    }
     if (!baseExpr || !baseExpr->type.type || baseExpr->type.type->equals(version->linkage->getASTBuilder()->getErrorType()))
     {
         m_connection->sendResult(NullResponse::get(), responseId);
@@ -553,7 +599,7 @@ SlangResult LanguageServer::completionResolve(
     if (itemId >= 0 && itemId < version->currentCompletionItems.getCount())
     {
         auto decl = version->currentCompletionItems[itemId];
-        resolvedItem.detail = ASTPrinter::getDeclSignatureString(
+        resolvedItem.detail = getDeclSignatureString(
             DeclRef<Decl>(decl, nullptr), version->linkage->getASTBuilder());
         StringBuilder docSB;
         _tryGetDocumentation(docSB, version, decl);
@@ -726,71 +772,117 @@ List<LanguageServerProtocol::CompletionItem> LanguageServer::collectMembers(Work
     version->currentCompletionItems.clear();
     if (type)
     {
-        DiagnosticSink sink;
-        MemberCollectingContext context(linkage, module, &sink);
-        context.astBuilder = linkage->getASTBuilder();
-        collectMembersInType(&context, type);
-        HashSet<String> deduplicateSet;
-        for (auto member : context.members)
+        if (as<ArithmeticExpressionType>(type))
         {
-            CompletionItem item;
-            item.label = member->getName()->text;
-            item.kind = 0;
-            if (as<TypeConstraintDecl>(member)) { continue; }
-            if (as<ConstructorDecl>(member)) { continue; }
-            if (as<SubscriptDecl>(member))
+            // Hard code members for vector and matrix types.
+            result.clear();
+            version->currentCompletionItems.clear();
+            int elementCount = 0;
+            Type* elementType = nullptr;
+            const char* memberNames[4] = {"x", "y", "z", "w"};
+            if (auto vectorType = as<VectorExpressionType>(type))
             {
-                continue;
+                if (auto elementCountVal = as<ConstantIntVal>(vectorType->elementCount))
+                {
+                    elementCount = (int)elementCountVal->value;
+                    elementType = vectorType->elementType;
+                }
             }
-
-            if (item.label.startsWith("$"))
-                continue;
-            if (!deduplicateSet.Add(item.label))
-                continue;
-
-            if (as<StructDecl>(member))
+            else if (auto matrixType = as<MatrixExpressionType>(type))
             {
-                item.kind = LanguageServerProtocol::kCompletionItemKindStruct;
+                if (auto elementCountVal = as<ConstantIntVal>(matrixType->getRowCount()))
+                {
+                    elementCount = (int)elementCountVal->value;
+                    elementType = matrixType->getRowType();
+                }
             }
-            else if (as<ClassDecl>(member))
+            String typeStr;
+            if (elementType)
+                typeStr = elementType->toString();
+            for (int i = 0; i < elementCount; i++)
             {
-                item.kind = LanguageServerProtocol::kCompletionItemKindClass;
-            }
-            else if (as<InterfaceDecl>(member))
-            {
-                item.kind = LanguageServerProtocol::kCompletionItemKindInterface;
-            }
-            else if (as<SimpleTypeDecl>(member))
-            {
-                item.kind = LanguageServerProtocol::kCompletionItemKindClass;
-            }
-            else if (as<PropertyDecl>(member))
-            {
-                item.kind = LanguageServerProtocol::kCompletionItemKindProperty;
-            }
-            else if (as<EnumDecl>(member))
-            {
-                item.kind = LanguageServerProtocol::kCompletionItemKindEnum;
-            }
-            else if (as<VarDeclBase>(member))
-            {
+                CompletionItem item;
+                item.data = 0;
+                item.detail = typeStr;
                 item.kind = LanguageServerProtocol::kCompletionItemKindVariable;
+                item.label = memberNames[i];
+                result.add(item);
             }
-            else if (as<EnumCaseDecl>(member))
+        }
+        else
+        {
+            DiagnosticSink sink;
+            MemberCollectingContext context(linkage, module, &sink);
+            context.astBuilder = linkage->getASTBuilder();
+            collectMembersInType(&context, type);
+            HashSet<String> deduplicateSet;
+            for (auto member : context.members)
             {
-                item.kind = LanguageServerProtocol::kCompletionItemKindEnumMember;
+                CompletionItem item;
+                item.label = member->getName()->text;
+                item.kind = 0;
+                if (as<TypeConstraintDecl>(member))
+                {
+                    continue;
+                }
+                if (as<ConstructorDecl>(member))
+                {
+                    continue;
+                }
+                if (as<SubscriptDecl>(member))
+                {
+                    continue;
+                }
+
+                if (item.label.startsWith("$"))
+                    continue;
+                if (!deduplicateSet.Add(item.label))
+                    continue;
+
+                if (as<StructDecl>(member))
+                {
+                    item.kind = LanguageServerProtocol::kCompletionItemKindStruct;
+                }
+                else if (as<ClassDecl>(member))
+                {
+                    item.kind = LanguageServerProtocol::kCompletionItemKindClass;
+                }
+                else if (as<InterfaceDecl>(member))
+                {
+                    item.kind = LanguageServerProtocol::kCompletionItemKindInterface;
+                }
+                else if (as<SimpleTypeDecl>(member))
+                {
+                    item.kind = LanguageServerProtocol::kCompletionItemKindClass;
+                }
+                else if (as<PropertyDecl>(member))
+                {
+                    item.kind = LanguageServerProtocol::kCompletionItemKindProperty;
+                }
+                else if (as<EnumDecl>(member))
+                {
+                    item.kind = LanguageServerProtocol::kCompletionItemKindEnum;
+                }
+                else if (as<VarDeclBase>(member))
+                {
+                    item.kind = LanguageServerProtocol::kCompletionItemKindVariable;
+                }
+                else if (as<EnumCaseDecl>(member))
+                {
+                    item.kind = LanguageServerProtocol::kCompletionItemKindEnumMember;
+                }
+                else if (as<CallableDecl>(member))
+                {
+                    item.kind = LanguageServerProtocol::kCompletionItemKindMethod;
+                }
+                else if (as<AssocTypeDecl>(member))
+                {
+                    item.kind = LanguageServerProtocol::kCompletionItemKindClass;
+                }
+                item.data = String(version->currentCompletionItems.getCount());
+                result.add(item);
+                version->currentCompletionItems.add(member);
             }
-            else if (as<CallableDecl>(member))
-            {
-                item.kind = LanguageServerProtocol::kCompletionItemKindMethod;
-            }
-            else if (as<AssocTypeDecl>(member))
-            {
-                item.kind = LanguageServerProtocol::kCompletionItemKindClass;
-            }
-            item.data = String(version->currentCompletionItems.getCount());
-            result.add(item);
-            version->currentCompletionItems.add(member);
         }
     }
     return result;

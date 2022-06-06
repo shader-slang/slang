@@ -43,6 +43,22 @@ struct PushNode
     ~PushNode() { if (context) context->nodePath.removeLast(); }
 };
 
+static Index _getDeclNameLength(Name* name)
+{
+    if (!name)
+        return 0;
+    if (name->text.startsWith("$"))
+        return 0;
+    // HACK: our __subscript functions currently have a name "operator[]".
+    // Since this isn't the name that actually appears in user's code,
+    // we need to shorten its reported length to 1 for now.
+    if (name->text.startsWith("operator"))
+    {
+        return 1;
+    }
+    return name->text.getLength();
+}
+
 bool _isLocInRange(ASTLookupContext* context, SourceLoc loc, Int length)
 {
     auto humaneLoc = context->sourceManager->getHumaneLoc(loc, SourceLocType::Actual);
@@ -85,9 +101,9 @@ public:
     bool visitIncompleteExpr(IncompleteExpr*) { return false; }
     bool visitIndexExpr(IndexExpr* subscriptExpr)
     {
-        if (dispatchIfNotNull(subscriptExpr->baseExpression))
+        if (dispatchIfNotNull(subscriptExpr->indexExpression))
             return true;
-        return dispatchIfNotNull(subscriptExpr->indexExpression);
+        return dispatchIfNotNull(subscriptExpr->baseExpression);
     }
 
     bool visitParenExpr(ParenExpr* expr)
@@ -146,7 +162,7 @@ public:
     bool visitVarExpr(VarExpr* expr)
     {
         if (expr->name && expr->declRef.getDecl() &&
-            _isLocInRange(context, expr->loc, expr->name->text.getLength()))
+            _isLocInRange(context, expr->loc, _getDeclNameLength(expr->name)))
         {
             if (expr->declRef.getDecl()->hasModifier<ImplicitConversionModifier>())
                 return false;
@@ -170,13 +186,39 @@ public:
     }
 
     bool visitDerefExpr(DerefExpr* expr) { return dispatchIfNotNull(expr->base); }
-    bool visitMatrixSwizzleExpr(MatrixSwizzleExpr* expr) { return dispatchIfNotNull(expr->base); }
-    bool visitSwizzleExpr(SwizzleExpr* expr) { return dispatchIfNotNull(expr->base); }
+    bool visitMatrixSwizzleExpr(MatrixSwizzleExpr* expr)
+    {
+        if (_isLocInRange(context, expr->memberOpLoc, 0))
+        {
+            ASTLookupResult result;
+            result.path = context->nodePath;
+            result.path.add(expr);
+            context->results.add(result);
+            return true;
+        }
+        return dispatchIfNotNull(expr->base);
+    }
+    bool visitSwizzleExpr(SwizzleExpr* expr)
+    {
+        if (_isLocInRange(context, expr->memberOpLoc, 0))
+        {
+            ASTLookupResult result;
+            result.path = context->nodePath;
+            result.path.add(expr);
+            context->results.add(result);
+            return true;
+        }
+        return dispatchIfNotNull(expr->base);
+    }
     bool visitOverloadedExpr(OverloadedExpr* expr)
     {
         if (dispatchIfNotNull(expr->base))
             return true;
-        if (expr->lookupResult2.getName() && _isLocInRange(context, expr->loc, expr->lookupResult2.getName()->text.getLength()))
+        if (expr->lookupResult2.getName() &&
+            _isLocInRange(
+                context,
+                expr->loc,
+                _getDeclNameLength(expr->lookupResult2.getName())))
         {
             ASTLookupResult result;
             result.path = context->nodePath;
@@ -215,14 +257,15 @@ public:
     bool visitModifierCastExpr(ModifierCastExpr* expr) { return dispatchIfNotNull(expr->valueArg); }
     bool visitLetExpr(LetExpr* expr)
     {
-        if (_findAstNodeImpl(*context, expr->decl))
+        if (dispatchIfNotNull(expr->body))
             return true;
-        return dispatchIfNotNull(expr->body);
+        return _findAstNodeImpl(*context, expr->decl);
     }
     bool visitExtractExistentialValueExpr(ExtractExistentialValueExpr* expr)
     {
         if (expr->declRef.getDecl() && expr->declRef.getName() &&
-            _isLocInRange(context, expr->loc, expr->declRef.getName()->text.getLength()))
+            _isLocInRange(
+                context, expr->loc, _getDeclNameLength(expr->declRef.getName())))
         {
             ASTLookupResult result;
             result.path = context->nodePath;
@@ -236,7 +279,10 @@ public:
     bool visitDeclRefExpr(DeclRefExpr* expr)
     {
         if (expr->declRef.getDecl() && expr->declRef.getDecl()->getName() &&
-            _isLocInRange(context, expr->loc, expr->declRef.getDecl()->getName()->text.getLength()))
+            _isLocInRange(
+                context,
+                expr->loc,
+                _getDeclNameLength(expr->declRef.getDecl()->getName())))
         {
             if (expr->declRef.getDecl()->hasModifier<ImplicitConversionModifier>())
                 return false;
@@ -419,7 +465,10 @@ bool _findAstNodeImpl(ASTLookupContext& context, SyntaxNode* node)
     {
         if (decl->getName())
         {
-            if (_isLocInRange(&context, decl->nameAndLoc.loc, decl->getName()->text.getLength()))
+            if (_isLocInRange(
+                    &context,
+                    decl->nameAndLoc.loc,
+                    _getDeclNameLength(decl->getName())))
             {
                 ASTLookupResult result;
                 result.path = context.nodePath;

@@ -712,6 +712,9 @@ namespace Slang
 
         Expr* checkedTerm = dispatchExpr(term, withExprLocalScope(&exprLocalScope));
 
+        if (IsErrorExpr(checkedTerm))
+            return checkedTerm;
+
         LetExpr* outerMostBinding = exprLocalScope.getOuterMostBinding();
         if(!outerMostBinding)
         {
@@ -1661,6 +1664,7 @@ namespace Slang
         MatrixSwizzleExpr* swizExpr = m_astBuilder->create<MatrixSwizzleExpr>();
         swizExpr->loc = memberRefExpr->loc;
         swizExpr->base = memberRefExpr->baseExpression;
+        swizExpr->memberOpLoc = memberRefExpr->memberOperatorLoc;
 
         // We can have up to 4 swizzles of two elements each
         MatrixCoord elementCoords[4];
@@ -1818,7 +1822,7 @@ namespace Slang
         SwizzleExpr* swizExpr = m_astBuilder->create<SwizzleExpr>();
         swizExpr->loc = memberRefExpr->loc;
         swizExpr->base = memberRefExpr->baseExpression;
-
+        swizExpr->memberOpLoc = memberRefExpr->memberOperatorLoc;
         IntegerLiteralValue limitElement = baseElementCount;
 
         int elementIndices[4];

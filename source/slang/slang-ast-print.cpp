@@ -36,8 +36,8 @@ void ASTPrinter::addType(Type* type)
                 if (as<ConstantIntVal>(vectorType->elementCount))
                 {
                     m_builder << vectorType->elementCount;
+                    return;
                 }
-                return;
             }
         }
         else if (auto matrixType = as<MatrixExpressionType>(type))
@@ -50,9 +50,9 @@ void ASTPrinter::addType(Type* type)
                     as<ConstantIntVal>(matrixType->getColumnCount()))
                 {
                     m_builder << matrixType->getRowCount() << "x" << matrixType->getColumnCount();
+                    return;
                 }
             }
-            return;
         }
     }
     type->toText(m_builder);

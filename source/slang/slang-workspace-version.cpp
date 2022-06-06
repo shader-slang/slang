@@ -61,7 +61,7 @@ void Workspace::init(List<URI> rootDirURI, slang::IGlobalSession* globalSession)
                     }
                     else if (nameSlice.endsWithCaseInsensitive(".slang") || nameSlice.endsWithCaseInsensitive(".hlsl"))
                     {
-                        dirContext->addSearchPath(Path::getParentDirectory(nameSlice));
+                        dirContext->addSearchPath(dirContext->currentPath);
                     }
                 },
                 &context);
@@ -150,7 +150,6 @@ void parseDiagnostics(Dictionary<String, DocumentDiagnostics>& diagnostics, Stri
         pos = line.indexOf(' ');
         diagnostic.code = parseInt(line, pos);
         diagnostic.message = line.subString(colonIndex + 2, line.getLength());
-        diagnosticList.messages.Add(diagnostic);
         if (lineIndex + 1 < lines.getCount() && lines[lineIndex].startsWith("^+"))
         {
             lineIndex++;
@@ -158,6 +157,7 @@ void parseDiagnostics(Dictionary<String, DocumentDiagnostics>& diagnostics, Stri
             auto tokenLength = parseInt(lines[lineIndex], pos);
             diagnostic.range.end.character += tokenLength;
         }
+        diagnosticList.messages.Add(diagnostic);
     }
 }
 
@@ -344,11 +344,14 @@ Module* WorkspaceVersion::getOrLoadModule(String path)
     {
         modules[path] = static_cast<Module*>(parsedModule);
     }
-    auto diagnosticString = String((const char*)diagnosticBlob->getBufferPointer());
-    parseDiagnostics(diagnostics, diagnosticString);
-    auto docDiagnostic = diagnostics.TryGetValue(path);
-    if (docDiagnostic)
-        docDiagnostic->originalOutput = diagnosticString;
+    if (diagnosticBlob)
+    {
+        auto diagnosticString = String((const char*)diagnosticBlob->getBufferPointer());
+        parseDiagnostics(diagnostics, diagnosticString);
+        auto docDiagnostic = diagnostics.TryGetValue(path);
+        if (docDiagnostic)
+            docDiagnostic->originalOutput = diagnosticString;
+    }
     return static_cast<Module*>(parsedModule);
 }
 

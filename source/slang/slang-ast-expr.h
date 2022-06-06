@@ -237,6 +237,7 @@ class MatrixSwizzleExpr : public Expr
     Expr* base = nullptr;
     int elementCount;
     MatrixCoord elementCoords[4];
+    SourceLoc memberOpLoc;
 };
 
 class SwizzleExpr: public Expr
@@ -245,6 +246,7 @@ class SwizzleExpr: public Expr
     Expr* base = nullptr;
     int elementCount;
     int elementIndices[4];
+    SourceLoc memberOpLoc;
 };
 
 // A dereference of a pointer or pointer-like type

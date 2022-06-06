@@ -9,7 +9,7 @@
 
 int main(int argc, const char* const* argv)
 {
-    bool isDebug = true;
+    bool isDebug = false;
     for (auto i = 1; i < argc; i++)
     {
         if (Slang::UnownedStringSlice(argv[i]) == "--debug")

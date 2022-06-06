@@ -962,6 +962,11 @@ SLANG_NO_THROW slang::IModule* SLANG_MCALL Linkage::loadModuleFromSource(
     slang::IBlob** outDiagnostics)
 {
     DiagnosticSink sink(getSourceManager(), Lexer::sourceLocationLexer);
+    if (m_flag & slang::kSessionFlag_LanguageServer)
+    {
+        sink.setFlags(DiagnosticSink::Flag::HumaneLoc | DiagnosticSink::Flag::LanguageServer);
+    }
+
     try
     {
         auto name = getNamePool()->getName(moduleName);
