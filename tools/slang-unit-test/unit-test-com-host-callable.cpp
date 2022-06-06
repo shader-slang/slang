@@ -300,9 +300,10 @@ SlangResult ComTestContext::_runTest()
 
 SLANG_UNIT_TEST(comHostCallable)
 {
-#if SLANG_VC && SLANG_PTR_IS_32
+#if SLANG_PTR_IS_32
     // TODO(JS): 
-    // Currently this doesn't work on 32 bit visual studio. Looks like a calling convention issue.
+    // Currently this doesn't work on 32 bit visual studio/gcc. 
+    // Looks like a calling convention issue.
     return;
 #endif
 
