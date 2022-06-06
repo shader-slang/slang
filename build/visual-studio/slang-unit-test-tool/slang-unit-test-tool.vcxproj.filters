@@ -20,6 +20,9 @@
     <ClCompile Include="..\..\..\tools\slang-unit-test\unit-test-chunked-list.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\tools\slang-unit-test\unit-test-com-host-callable.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\..\tools\slang-unit-test\unit-test-command-line-args.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
