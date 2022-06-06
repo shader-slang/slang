@@ -489,6 +489,9 @@ struct CompletionItem
      */
     MarkupContent documentation;
 
+    // Additional data.
+    String data;
+
     static const StructRttiInfo g_rttiInfo;
 };
 

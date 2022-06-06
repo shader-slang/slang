@@ -388,15 +388,15 @@ const StructRttiInfo CompletionParams::g_rttiInfo = _makeCompletionParamsRtti();
 const UnownedStringSlice CompletionParams::methodName =
     UnownedStringSlice::fromLiteral("textDocument/completion");
 
-
 static const StructRttiInfo _makeCompletionItemRtti()
 {
     CompletionItem obj;
     StructRttiBuilder builder(&obj, "LanguageServerProtocol::CompletionItem", nullptr);
-    builder.addField("label", &obj.label);
-    builder.addField("detail", &obj.detail);
-    builder.addField("kind", &obj.kind);
-    builder.addField("documentation", &obj.documentation);
+    builder.addField("label", &obj.label, StructRttiInfo::Flag::Optional);
+    builder.addField("detail", &obj.detail, StructRttiInfo::Flag::Optional);
+    builder.addField("kind", &obj.kind, StructRttiInfo::Flag::Optional);
+    builder.addField("documentation", &obj.documentation, StructRttiInfo::Flag::Optional);
+    builder.addField("data", &obj.data, StructRttiInfo::Flag::Optional);
     builder.ignoreUnknownFields();
     return builder.make();
 }

@@ -86,16 +86,25 @@ namespace Slang
         }
     };
 
+    struct DocumentDiagnostics
+    {
+        OrderedHashSet<LanguageServerProtocol::Diagnostic> messages;
+        String originalOutput;
+    };
+
     class WorkspaceVersion : public RefObject
     {
+    private:
+        Dictionary<String, Module*> modules;
+        Dictionary<ModuleDecl*, RefPtr<ASTMarkup>> markupASTs;
     public:
         Workspace* workspace;
         RefPtr<Linkage> linkage;
-        Dictionary<String, OrderedHashSet<LanguageServerProtocol::Diagnostic>> diagnostics;
-        Dictionary<String, Module*> modules;
-        Dictionary<ModuleDecl*, RefPtr<ASTMarkup>> markupASTs;
-        String diagnosticOutput;
+        Dictionary<String, DocumentDiagnostics> diagnostics;
+        List<Decl*> currentCompletionItems;
         ASTMarkup* getOrCreateMarkupAST(ModuleDecl* module);
+
+        Module* getOrLoadModule(String path);
     };
     
     class Workspace
@@ -107,10 +116,11 @@ namespace Slang
         RefPtr<WorkspaceVersion> createWorkspaceVersion();
     public:
         List<String> rootDirectories;
-        List<String> searchPaths;
+        OrderedHashSet<String> searchPaths;
+
         slang::IGlobalSession* slangGlobalSession;
         Dictionary<String, RefPtr<DocumentVersion>> openedDocuments;
-
+        DocumentVersion* openDoc(String path, String text);
         void init(List<URI> rootDirURI, slang::IGlobalSession* globalSession);
         void invalidate();
         WorkspaceVersion* getCurrentVersion();

@@ -8,8 +8,34 @@ namespace Slang
 struct DirEnumerationContext
 {
     List<String> workList;
+    OrderedHashSet<String> paths;
     String currentPath;
+    String root;
+    void addSearchPath(String path)
+    {
+        while (path.getLength())
+        {
+            String canonicalPath;
+            Path::getCanonical(path, canonicalPath);
+            if (!paths.Add(canonicalPath))
+                break;
+            path = Path::getParentDirectory(path);
+            if (!path.startsWith(root))
+                break;
+        }
+    }
 };
+DocumentVersion* Workspace::openDoc(String path, String text)
+{
+    RefPtr<DocumentVersion> doc = new DocumentVersion();
+    doc->setText(text.getUnownedSlice());
+    doc->setURI(URI::fromLocalFilePath(path.getUnownedSlice()));
+    openedDocuments[path] = doc;
+    searchPaths.Add(Path::getParentDirectory(path));
+    invalidate();
+    return doc.Ptr();
+}
+
 void Workspace::init(List<URI> rootDirURI, slang::IGlobalSession* globalSession)
 {
     for (auto uri : rootDirURI)
@@ -18,6 +44,7 @@ void Workspace::init(List<URI> rootDirURI, slang::IGlobalSession* globalSession)
         rootDirectories.add(path);
         DirEnumerationContext context;
         context.workList.add(path);
+        context.root = path;
         auto fileSystem = Slang::OSFileSystem::getExtSingleton();
         for (int i = 0; i < context.workList.getCount(); i++)
         {
@@ -27,14 +54,19 @@ void Workspace::init(List<URI> rootDirURI, slang::IGlobalSession* globalSession)
                 [](SlangPathType pathType, const char* name, void* userData)
                 {
                     auto dirContext = (DirEnumerationContext*)userData;
+                    auto nameSlice = UnownedStringSlice(name);
                     if (pathType == SLANG_PATH_TYPE_DIRECTORY)
                     {
                         dirContext->workList.add(Path::combine(dirContext->currentPath, name));
                     }
+                    else if (nameSlice.endsWithCaseInsensitive(".slang") || nameSlice.endsWithCaseInsensitive(".hlsl"))
+                    {
+                        dirContext->addSearchPath(Path::getParentDirectory(nameSlice));
+                    }
                 },
                 &context);
         }
-        searchPaths = _Move(context.workList);
+        searchPaths = _Move(context.paths);
     }
     slangGlobalSession = globalSession;
 }
@@ -65,7 +97,7 @@ int parseInt(UnownedStringSlice text, Index& pos)
     return result;
 }
 
-void parseDiagnostics(Dictionary<String, OrderedHashSet<LanguageServerProtocol::Diagnostic>>& diagnostics, String compilerOutput)
+void parseDiagnostics(Dictionary<String, DocumentDiagnostics>& diagnostics, String compilerOutput)
 {
     List<UnownedStringSlice> lines;
     StringUtil::split(compilerOutput.getUnownedSlice(), '\n', lines);
@@ -80,8 +112,7 @@ void parseDiagnostics(Dictionary<String, OrderedHashSet<LanguageServerProtocol::
             continue;
         String fileName = line.subString(0, lparentIndex);
         Path::getCanonical(fileName, fileName);
-        auto& diagnosticList = diagnostics.GetOrAddValue(
-            fileName, OrderedHashSet<LanguageServerProtocol::Diagnostic>());
+        auto& diagnosticList = diagnostics.GetOrAddValue(fileName, DocumentDiagnostics());
 
         LanguageServerProtocol::Diagnostic diagnostic;
         Index pos = lparentIndex + 1;
@@ -119,7 +150,7 @@ void parseDiagnostics(Dictionary<String, OrderedHashSet<LanguageServerProtocol::
         pos = line.indexOf(' ');
         diagnostic.code = parseInt(line, pos);
         diagnostic.message = line.subString(colonIndex + 2, line.getLength());
-        diagnosticList.Add(diagnostic);
+        diagnosticList.messages.Add(diagnostic);
         if (lineIndex + 1 < lines.getCount() && lines[lineIndex].startsWith("^+"))
         {
             lineIndex++;
@@ -143,6 +174,7 @@ RefPtr<WorkspaceVersion> Workspace::createWorkspaceVersion()
     desc.targets = &targetDesc;
 
     List<const char*> searchPathsRaw;
+    
     for (auto path : searchPaths)
         searchPathsRaw.add(path.getBuffer());
     desc.searchPaths = searchPathsRaw.getBuffer();
@@ -151,28 +183,6 @@ RefPtr<WorkspaceVersion> Workspace::createWorkspaceVersion()
     ComPtr<slang::ISession> session;
     slangGlobalSession->createSession(desc, session.writeRef());
     version->linkage = static_cast<Linkage*>(session.get());
-
-    ComPtr<ISlangBlob> diagnosticBlob;
-    StringBuilder sb;
-    for (auto& doc : openedDocuments)
-    {
-        RefPtr<StringBlob> sourceBlob = new StringBlob(doc.Value->getText());
-        auto parsedModule = version->linkage->loadModuleFromSource(
-            Path::getFileNameWithoutExt(doc.Key).getBuffer(),
-            doc.Key.getBuffer(),
-            sourceBlob.Ptr(),
-            diagnosticBlob.writeRef());
-        if (diagnosticBlob)
-        {
-            sb << (char*)diagnosticBlob->getBufferPointer() << "\n";
-        }
-        if (parsedModule)
-        {
-            version->modules[doc.Key] = static_cast<Module*>(parsedModule);
-        }
-    }
-    version->diagnosticOutput = sb.ProduceString();
-    parseDiagnostics(version->diagnostics, version->diagnosticOutput);
     return version;
 }
 
@@ -312,4 +322,34 @@ ASTMarkup* WorkspaceVersion::getOrCreateMarkupAST(ModuleDecl* module)
     markupASTs[module] = astMarkup;
     return astMarkup.Ptr();
 }
+
+Module* WorkspaceVersion::getOrLoadModule(String path)
+{
+    Module* module;
+    if (modules.TryGetValue(path, module))
+    {
+        return module;
+    }
+    auto doc = workspace->openedDocuments.TryGetValue(path);
+    if (!doc)
+        return nullptr;
+    ComPtr<ISlangBlob> diagnosticBlob;
+    RefPtr<StringBlob> sourceBlob = new StringBlob((*doc)->getText());
+    auto parsedModule = linkage->loadModuleFromSource(
+        Path::getFileNameWithoutExt(path).getBuffer(),
+        path.getBuffer(),
+        sourceBlob.Ptr(),
+        diagnosticBlob.writeRef());
+    if (parsedModule)
+    {
+        modules[path] = static_cast<Module*>(parsedModule);
+    }
+    auto diagnosticString = String((const char*)diagnosticBlob->getBufferPointer());
+    parseDiagnostics(diagnostics, diagnosticString);
+    auto docDiagnostic = diagnostics.TryGetValue(path);
+    if (docDiagnostic)
+        docDiagnostic->originalOutput = diagnosticString;
+    return static_cast<Module*>(parsedModule);
+}
+
 } // namespace Slang

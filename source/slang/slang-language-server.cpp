@@ -31,8 +31,7 @@ public:
     RefPtr<JSONRPCConnection> m_connection;
     ComPtr<slang::IGlobalSession> m_session;
     RefPtr<Workspace> m_workspace;
-    String m_lastPublishedDiagnostics;
-    OrderedHashSet<String> m_lastPublishedDiagnosticFiles;
+    Dictionary<String, String> m_lastPublishedDiagnostics;
 
     bool m_quit = false;
     List<LanguageServerProtocol::WorkspaceFolder> m_workspaceFolders;
@@ -49,13 +48,15 @@ public:
     SlangResult gotoDefinition(const LanguageServerProtocol::DefinitionParams& args, const JSONValue& responseId);
     SlangResult completion(
         const LanguageServerProtocol::CompletionParams& args, const JSONValue& responseId);
+    SlangResult completionResolve(
+        const LanguageServerProtocol::CompletionItem& args, const JSONValue& responseId);
     SlangResult semanticTokens(
         const LanguageServerProtocol::SemanticTokensParams& args, const JSONValue& responseId);
     SlangResult signatureHelp(
         const LanguageServerProtocol::SignatureHelpParams& args, const JSONValue& responseId);
 
     List<LanguageServerProtocol::CompletionItem> collectMembers(
-        Linkage* linkage, Module* module, Expr* baseExpr);
+        WorkspaceVersion* wsVersion, Module* module, Expr* baseExpr);
 
 private:
     SlangResult _executeSingle();
@@ -149,7 +150,7 @@ SlangResult LanguageServer::_executeSingle()
                     result.capabilities.completionProvider.allCommitCharacters.add(ch);
                 result.capabilities.completionProvider.triggerCharacters.add(".");
                 result.capabilities.completionProvider.triggerCharacters.add(":");
-                result.capabilities.completionProvider.resolveProvider = false;
+                result.capabilities.completionProvider.resolveProvider = true;
                 result.capabilities.completionProvider.workDoneToken = "";
                 result.capabilities.semanticTokensProvider.full = true;
                 result.capabilities.semanticTokensProvider.range = false;
@@ -216,6 +217,14 @@ SlangResult LanguageServer::_executeSingle()
                     m_connection->toNativeArgsOrSendError(call.params, &args, call.id));
                 return signatureHelp(args, call.id);
             }
+            else if (call.method == "completionItem/resolve")
+            {
+                CompletionItem args;
+                SLANG_RETURN_ON_FAIL(
+                    m_connection->toNativeArgsOrSendError(call.params, &args, call.id));
+                return completionResolve(args, call.id);
+                
+            }
             else if (call.method == "initialized")
             {
                 return SLANG_OK;
@@ -241,12 +250,7 @@ SlangResult LanguageServer::_executeSingle()
 SlangResult LanguageServer::didOpenTextDocument(const DidOpenTextDocumentParams& args)
 {
     String canonicalPath = uriToCanonicalPath(args.textDocument.uri);
-
-    auto doc = new DocumentVersion();
-    doc->setText(args.textDocument.text.getUnownedSlice());
-    doc->setURI(URI::fromLocalFilePath(canonicalPath.getUnownedSlice()));
-    m_workspace->openedDocuments[canonicalPath] = doc;
-    m_workspace->invalidate();
+    m_workspace->openDoc(canonicalPath, args.textDocument.text);
     return SLANG_OK;
 }
 
@@ -282,8 +286,8 @@ SlangResult LanguageServer::hover(
 {
     String canonicalPath = uriToCanonicalPath(args.textDocument.uri);
     auto version = m_workspace->getCurrentVersion();
-    Module* parsedModule = nullptr;
-    if (!version->modules.TryGetValue(canonicalPath, parsedModule))
+    Module* parsedModule = version->getOrLoadModule(canonicalPath);
+    if (!parsedModule)
     {
         m_connection->sendResult(NullResponse::get(), responseId);
         return SLANG_OK;
@@ -361,8 +365,8 @@ SlangResult LanguageServer::gotoDefinition(
 {
     String canonicalPath = uriToCanonicalPath(args.textDocument.uri);
     auto version = m_workspace->getCurrentVersion();
-    Module* parsedModule = nullptr;
-    if (!version->modules.TryGetValue(canonicalPath, parsedModule))
+    Module* parsedModule = version->getOrLoadModule(canonicalPath);
+    if (!parsedModule)
     {
         m_connection->sendResult(NullResponse::get(), responseId);
         return SLANG_OK;
@@ -498,8 +502,8 @@ SlangResult LanguageServer::completion(
     Index col = 0;
     doc->offsetToLineCol(cursorOffset, line, col);
     auto version = m_workspace->getCurrentVersion();
-    Module* parsedModule = nullptr;
-    if (!version->modules.TryGetValue(canonicalPath, parsedModule))
+    Module* parsedModule = version->getOrLoadModule(canonicalPath);
+    if (!parsedModule)
     {
         m_connection->sendResult(NullResponse::get(), responseId);
         return SLANG_OK;
@@ -535,8 +539,28 @@ SlangResult LanguageServer::completion(
         return SLANG_OK;
     }
 
-    List<LanguageServerProtocol::CompletionItem> items = collectMembers(version->linkage, parsedModule, baseExpr);
+    List<LanguageServerProtocol::CompletionItem> items = collectMembers(version, parsedModule, baseExpr);
     m_connection->sendResult(&items, responseId);
+    return SLANG_OK;
+}
+
+SlangResult LanguageServer::completionResolve(
+    const LanguageServerProtocol::CompletionItem& args, const JSONValue& responseId)
+{
+    LanguageServerProtocol::CompletionItem resolvedItem = args;
+    int itemId = StringToInt(args.data);
+    auto version = m_workspace->getCurrentVersion();
+    if (itemId >= 0 && itemId < version->currentCompletionItems.getCount())
+    {
+        auto decl = version->currentCompletionItems[itemId];
+        resolvedItem.detail = ASTPrinter::getDeclSignatureString(
+            DeclRef<Decl>(decl, nullptr), version->linkage->getASTBuilder());
+        StringBuilder docSB;
+        _tryGetDocumentation(docSB, version, decl);
+        resolvedItem.documentation.value = docSB.ProduceString();
+        resolvedItem.documentation.kind = "markdown";
+    }
+    m_connection->sendResult(&resolvedItem, responseId);
     return SLANG_OK;
 }
 
@@ -546,8 +570,8 @@ SlangResult LanguageServer::semanticTokens(
     String canonicalPath = uriToCanonicalPath(args.textDocument.uri);
 
     auto version = m_workspace->getCurrentVersion();
-    Module* parsedModule = nullptr;
-    if (!version->modules.TryGetValue(canonicalPath, parsedModule))
+    Module* parsedModule = version->getOrLoadModule(canonicalPath);
+    if (!parsedModule)
     {
         m_connection->sendResult(NullResponse::get(), responseId);
         return SLANG_OK;
@@ -567,8 +591,8 @@ SlangResult LanguageServer::signatureHelp(
     String canonicalPath = uriToCanonicalPath(args.textDocument.uri);
 
     auto version = m_workspace->getCurrentVersion();
-    Module* parsedModule = nullptr;
-    if (!version->modules.TryGetValue(canonicalPath, parsedModule))
+    Module* parsedModule = version->getOrLoadModule(canonicalPath);
+    if (!parsedModule)
     {
         m_connection->sendResult(NullResponse::get(), responseId);
         return SLANG_OK;
@@ -645,6 +669,8 @@ SlangResult LanguageServer::signatureHelp(
 
         StringBuilder docSB;
         auto humaneLoc = version->linkage->getSourceManager()->getHumaneLoc(declRef.getLoc(), SourceLocType::Actual);
+        _tryGetDocumentation(docSB, version, declRef.getDecl());
+
         docSB << "Defined in " << humaneLoc.pathInfo.foundPath << "(" << humaneLoc.line << ")\n";
         sigInfo.documentation.value = docSB.ProduceString();
         sigInfo.documentation.kind = "markdown";
@@ -688,14 +714,16 @@ SlangResult LanguageServer::signatureHelp(
 }
 
 
-List<LanguageServerProtocol::CompletionItem> LanguageServer::collectMembers(Linkage* linkage, Module* module, Expr* baseExpr)
+List<LanguageServerProtocol::CompletionItem> LanguageServer::collectMembers(WorkspaceVersion* version, Module* module, Expr* baseExpr)
 {
     List<LanguageServerProtocol::CompletionItem> result;
+    auto linkage = version->linkage;
     Type* type = baseExpr->type.type;
     if (auto typeType = as<TypeType>(type))
     {
         type = typeType->type;
     }
+    version->currentCompletionItems.clear();
     if (type)
     {
         DiagnosticSink sink;
@@ -760,10 +788,9 @@ List<LanguageServerProtocol::CompletionItem> LanguageServer::collectMembers(Link
             {
                 item.kind = LanguageServerProtocol::kCompletionItemKindClass;
             }
-            
-            item.detail = ASTPrinter::getDeclSignatureString(
-                DeclRef<Decl>(member, nullptr), linkage->getASTBuilder());
+            item.data = String(version->currentCompletionItems.getCount());
             result.add(item);
+            version->currentCompletionItems.add(member);
         }
     }
     return result;
@@ -772,29 +799,34 @@ List<LanguageServerProtocol::CompletionItem> LanguageServer::collectMembers(Link
 void LanguageServer::publishDiagnostics()
 {
     auto version = m_workspace->getCurrentVersion();
-    if (version->diagnosticOutput != m_lastPublishedDiagnostics)
+    // Send updates to clear diagnostics for files that no longer have any messages.
+    List<String> filesToRemove;
+    for (auto& file : m_lastPublishedDiagnostics)
     {
-        m_lastPublishedDiagnostics = version->diagnosticOutput;
-        // Send updates to clear diagnostics for files that no longer have any messages.
-        for (auto& file : m_lastPublishedDiagnosticFiles)
+        if (!version->diagnostics.ContainsKey(file.Key))
         {
-            if (!version->diagnostics.ContainsKey(file))
-            {
-                PublishDiagnosticsParams args;
-                args.uri = URI::fromLocalFilePath(file.getUnownedSlice()).uri;
-                m_connection->sendCall(
-                    UnownedStringSlice("textDocument/publishDiagnostics"), &args);
-            }
+            PublishDiagnosticsParams args;
+            args.uri = URI::fromLocalFilePath(file.Key.getUnownedSlice()).uri;
+            m_connection->sendCall(UnownedStringSlice("textDocument/publishDiagnostics"), &args);
+            filesToRemove.add(file.Key);
         }
-        m_lastPublishedDiagnosticFiles.Clear();
-        for (auto& list : version->diagnostics)
+    }
+    for (auto& toRemove : filesToRemove)
+    {
+        m_lastPublishedDiagnostics.Remove(toRemove);
+    }
+    // Send updates for any files whose diagnostic messages has changed since last update.
+    for (auto& list : version->diagnostics)
+    {
+        auto lastPublished = m_lastPublishedDiagnostics.TryGetValue(list.Key);
+        if (!lastPublished || *lastPublished != list.Value.originalOutput)
         {
-            m_lastPublishedDiagnosticFiles.Add(list.Key);
             PublishDiagnosticsParams args;
             args.uri = URI::fromLocalFilePath(list.Key.getUnownedSlice()).uri;
-            for (auto& d : list.Value)
+            for (auto& d : list.Value.messages)
                 args.diagnostics.add(d);
             m_connection->sendCall(UnownedStringSlice("textDocument/publishDiagnostics"), &args);
+            m_lastPublishedDiagnostics[list.Key] = list.Value.originalOutput;
         }
     }
 }

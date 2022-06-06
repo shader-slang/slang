@@ -559,7 +559,7 @@ List<uint32_t> getEncodedTokens(List<SemanticToken>& tokens)
     // Encode the rest tokens as deltas.
     uint32_t prevLine = (uint32_t)tokens[0].line;
     uint32_t prevCol = (uint32_t)tokens[0].col;
-    for (uint32_t i = 1; i < tokens.getCount(); i++)
+    for (Index i = 1; i < tokens.getCount(); i++)
     {
         uint32_t thisLine = (uint32_t)tokens[i].line;
         uint32_t thisCol = (uint32_t)tokens[i].col;

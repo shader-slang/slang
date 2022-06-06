@@ -157,6 +157,9 @@ namespace Slang
         bool startsWith(UnownedStringSlice const& other) const;
         bool startsWith(char const* str) const;
 
+        bool endsWithCaseInsensitive(UnownedStringSlice const& other) const;
+        bool endsWithCaseInsensitive(char const* str) const;
+
         bool endsWith(UnownedStringSlice const& other) const;
         bool endsWith(char const* str) const;
 
