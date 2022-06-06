@@ -73,11 +73,97 @@ public:
     int m_count = 0;
 };
 
-static SlangResult _testComHostCallable(UnitTestContext* context)
+struct ComTestContext
 {
-    using namespace Slang;
+    ComTestContext(UnitTestContext* context):
+        m_unitTestContext(context)
+    {
+        slang::IGlobalSession* slangSession = m_unitTestContext->slangGlobalSession;
 
-    slang::IGlobalSession* slangSession = context->slangGlobalSession;
+        m_defaultCppCompiler = slangSession->getDefaultDownstreamCompiler(SLANG_SOURCE_LANGUAGE_CPP);
+
+        m_hostHostCallableCompiler = slangSession->getDownstreamCompilerForTransition(SLANG_CPP_SOURCE, SLANG_HOST_HOST_CALLABLE);
+        m_shaderHostCallableCompiler = slangSession->getDownstreamCompilerForTransition(SLANG_CPP_SOURCE, SLANG_SHADER_HOST_CALLABLE);
+
+    }
+
+    SlangResult runTests()
+    {
+        slang::IGlobalSession* slangSession = m_unitTestContext->slangGlobalSession;
+
+        const bool hasLlvm = SLANG_SUCCEEDED(slangSession->checkPassThroughSupport(SLANG_PASS_THROUGH_LLVM));
+
+        SlangPassThrough cppCompiler = SLANG_PASS_THROUGH_NONE;
+
+        {
+            const SlangPassThrough cppCompilers[] = 
+            {
+                SLANG_PASS_THROUGH_VISUAL_STUDIO,
+                SLANG_PASS_THROUGH_GCC,
+                SLANG_PASS_THROUGH_CLANG,
+            };
+            // Do we have a C++ compiler
+            for (const auto compiler : cppCompilers)
+            {
+                if (SLANG_SUCCEEDED(slangSession->checkPassThroughSupport(compiler)))
+                {
+                    cppCompiler = compiler;
+                    break;
+                }
+            }
+        }
+
+        // If we have an *actual* C++ compile rtest on that first
+        if (cppCompiler != SLANG_PASS_THROUGH_NONE)
+        {
+            slangSession->setDefaultDownstreamCompiler(SLANG_SOURCE_LANGUAGE_CPP, cppCompiler);
+            
+            slangSession->setDownstreamCompilerForTransition(SLANG_CPP_SOURCE, SLANG_SHADER_HOST_CALLABLE, cppCompiler);
+            slangSession->setDownstreamCompilerForTransition(SLANG_CPP_SOURCE, SLANG_HOST_HOST_CALLABLE, cppCompiler);
+
+            SLANG_RETURN_ON_FAIL(_runTest());
+        }
+
+        // Reset the compiler that's used for host-callable
+        _reset();
+
+        // If we have Llvm it is the default host callable compiler
+        if (hasLlvm)
+        {
+            // Should run via slang-llvm
+            SLANG_RETURN_ON_FAIL(_runTest());
+        }
+
+        return SLANG_OK;
+    }
+
+    void _reset()
+    {
+        slang::IGlobalSession* slangSession = m_unitTestContext->slangGlobalSession;
+        slangSession->setDefaultDownstreamCompiler(SLANG_SOURCE_LANGUAGE_CPP, m_defaultCppCompiler);
+
+        slangSession->setDownstreamCompilerForTransition(SLANG_CPP_SOURCE, SLANG_SHADER_HOST_CALLABLE, m_shaderHostCallableCompiler);
+        slangSession->setDownstreamCompilerForTransition(SLANG_CPP_SOURCE, SLANG_HOST_HOST_CALLABLE, m_hostHostCallableCompiler);
+    }
+
+    ~ComTestContext()
+    {
+        _reset();
+    }
+
+    SlangResult _runTest();
+
+    UnitTestContext* m_unitTestContext;
+
+    SlangPassThrough m_defaultCppCompiler;
+    SlangPassThrough m_hostHostCallableCompiler;
+    SlangPassThrough m_shaderHostCallableCompiler;
+};
+
+SlangResult ComTestContext::_runTest()
+{
+
+    slang::IGlobalSession* slangSession = m_unitTestContext->slangGlobalSession;
 
     // Create a compile request
     Slang::ComPtr<slang::ICompileRequest> request;
@@ -209,6 +295,9 @@ static SlangResult _testComHostCallable(UnitTestContext* context)
 
 SLANG_UNIT_TEST(comHostCallable)
 {
-    auto testResult = _testComHostCallable(unitTestContext);
-    SLANG_CHECK(SLANG_SUCCEEDED(testResult));
+    ComTestContext context(unitTestContext);
+
+    const auto result = context.runTests();
+    
+    SLANG_CHECK(SLANG_SUCCEEDED(result));
 }
