@@ -7,8 +7,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 #include <thread>
-
 #include "../core/slang-secure-crt.h"
 #include "../../slang-com-helper.h"
 #include "../compiler-core/slang-json-rpc-connection.h"
@@ -334,6 +334,7 @@ SlangResult LanguageServer::hover(
         version->linkage->getSourceManager(),
         parsedModule->getModuleDecl(),
         ASTLookupType::Decl,
+        canonicalPath.getUnownedSlice(),
         args.position.line + 1,
         args.position.character + 1);
     if (findResult.getCount() == 0 || findResult[0].path.getCount() == 0)
@@ -413,6 +414,7 @@ SlangResult LanguageServer::gotoDefinition(
         version->linkage->getSourceManager(),
         parsedModule->getModuleDecl(),
         ASTLookupType::Decl,
+        canonicalPath.getUnownedSlice(),
         args.position.line + 1,
         args.position.character + 1);
     if (findResult.getCount() == 0 || findResult[0].path.getCount() == 0)
@@ -550,6 +552,7 @@ SlangResult LanguageServer::completion(
         version->linkage->getSourceManager(),
         parsedModule->getModuleDecl(),
         ASTLookupType::Decl,
+        canonicalPath.getUnownedSlice(),
         line,
         col);
     if (findResult.getCount() != 1)
@@ -623,7 +626,7 @@ SlangResult LanguageServer::semanticTokens(
         return SLANG_OK;
     }
 
-    auto tokens = getSemanticTokens(version->linkage, parsedModule);
+    auto tokens = getSemanticTokens(version->linkage, parsedModule, canonicalPath.getUnownedSlice());
     SemanticTokens response;
     response.resultId = "";
     response.data = getEncodedTokens(tokens);
@@ -648,6 +651,7 @@ SlangResult LanguageServer::signatureHelp(
         version->linkage->getSourceManager(),
         parsedModule->getModuleDecl(),
         ASTLookupType::Invoke,
+        canonicalPath.getUnownedSlice(),
         args.position.line + 1,
         args.position.character + 1);
 
@@ -890,6 +894,16 @@ List<LanguageServerProtocol::CompletionItem> LanguageServer::collectMembers(Work
 
 void LanguageServer::publishDiagnostics()
 {
+    static time_t lastUpdateTime = 0;
+    time_t timeNow = 0;
+    time(&timeNow);
+
+    if (timeNow - lastUpdateTime < 20)
+    {
+        return;
+    }
+    lastUpdateTime = timeNow;
+
     auto version = m_workspace->getCurrentVersion();
     // Send updates to clear diagnostics for files that no longer have any messages.
     List<String> filesToRemove;

@@ -9,8 +9,12 @@ template<typename Callback>
 struct ASTIterator
 {
     const Callback& callback;
-    ASTIterator(const Callback& func)
+    UnownedStringSlice fileName;
+    SourceManager* sourceManager;
+    ASTIterator(const Callback& func, SourceManager* manager, UnownedStringSlice sourceFileName)
         : callback(func)
+        , fileName(sourceFileName)
+        , sourceManager(manager)
     {}
 
     void visitDecl(DeclBase* decl);
@@ -328,6 +332,13 @@ struct ASTIterator
 template <typename CallbackFunc>
 void ASTIterator<CallbackFunc>::visitDecl(DeclBase* decl)
 {
+    // Don't look at the decl if it is defined in a different file.
+    if (!as<ModuleDecl>(decl) &&
+        !sourceManager->getHumaneLoc(decl->loc, SourceLocType::Actual)
+             .pathInfo.foundPath.getUnownedSlice()
+             .endsWithCaseInsensitive(fileName))
+        return;
+
     maybeDispatchCallback(decl);
     if (auto funcDecl = as<FunctionDeclBase>(decl))
     {
@@ -377,9 +388,9 @@ void ASTIterator<CallbackFunc>::visitStmt(Stmt* stmt)
 }
 
 template <typename Func>
-void iterateAST(SyntaxNode* node, const Func& f)
+void iterateAST(UnownedStringSlice fileName, SourceManager* manager, SyntaxNode* node, const Func& f)
 {
-    ASTIterator<Func> iter(f);
+    ASTIterator<Func> iter(f, manager, fileName);
     if (auto decl = as<Decl>(node))
     {
         iter.visitDecl(decl);
@@ -411,7 +422,7 @@ SemanticToken _createSemanticToken(SourceManager* manager, SourceLoc loc, Name* 
     return token;
 }
 
-List<SemanticToken> getSemanticTokens(Linkage* linkage, Module* module)
+List<SemanticToken> getSemanticTokens(Linkage* linkage, Module* module, UnownedStringSlice fileName)
 {
     auto manager = linkage->getSourceManager();
 
@@ -424,6 +435,8 @@ List<SemanticToken> getSemanticTokens(Linkage* linkage, Module* module)
     };
 
     iterateAST(
+        fileName,
+        manager,
         module->getModuleDecl(),
         [&](SyntaxNode* node)
         {
@@ -431,7 +444,14 @@ List<SemanticToken> getSemanticTokens(Linkage* linkage, Module* module)
             {
                 if (declRef->name)
                 {
-                    SemanticToken token = _createSemanticToken(manager, declRef->loc, declRef->name);
+                    // Don't look at the expr if it is defined in a different file.
+                    if (!manager->getHumaneLoc(declRef->loc, SourceLocType::Actual)
+                             .pathInfo.foundPath.getUnownedSlice()
+                             .endsWithCaseInsensitive(fileName))
+                        return;
+
+                    SemanticToken token =
+                        _createSemanticToken(manager, declRef->loc, declRef->name);
                     auto target = declRef->declRef.decl;
                     if (as<AggTypeDecl>(target))
                     {
@@ -501,8 +521,8 @@ List<SemanticToken> getSemanticTokens(Linkage* linkage, Module* module)
             {
                 if (enumCase->getName())
                 {
-                    SemanticToken token =
-                        _createSemanticToken(manager, enumCase->getNameLoc(), enumCase->getName());
+                    SemanticToken token = _createSemanticToken(
+                        manager, enumCase->getNameLoc(), enumCase->getName());
                     token.type = SemanticTokenType::EnumMember;
                     maybeInsertToken(token);
                 }
@@ -511,8 +531,8 @@ List<SemanticToken> getSemanticTokens(Linkage* linkage, Module* module)
             {
                 if (propertyDecl->getName())
                 {
-                    SemanticToken token =
-                        _createSemanticToken(manager, propertyDecl->getNameLoc(), propertyDecl->getName());
+                    SemanticToken token = _createSemanticToken(
+                        manager, propertyDecl->getNameLoc(), propertyDecl->getName());
                     token.type = SemanticTokenType::Property;
                     maybeInsertToken(token);
                 }
@@ -521,8 +541,8 @@ List<SemanticToken> getSemanticTokens(Linkage* linkage, Module* module)
             {
                 if (funcDecl->getName())
                 {
-                    SemanticToken token =
-                        _createSemanticToken(manager, funcDecl->getNameLoc(), funcDecl->getName());
+                    SemanticToken token = _createSemanticToken(
+                        manager, funcDecl->getNameLoc(), funcDecl->getName());
                     token.type = SemanticTokenType::Function;
                     maybeInsertToken(token);
                 }
@@ -531,8 +551,8 @@ List<SemanticToken> getSemanticTokens(Linkage* linkage, Module* module)
             {
                 if (varDecl->getName())
                 {
-                    SemanticToken token =
-                        _createSemanticToken(manager, varDecl->getNameLoc(), varDecl->getName());
+                    SemanticToken token = _createSemanticToken(
+                        manager, varDecl->getNameLoc(), varDecl->getName());
                     token.type = SemanticTokenType::Variable;
                     maybeInsertToken(token);
                 }

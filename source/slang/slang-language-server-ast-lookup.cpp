@@ -24,6 +24,7 @@ struct ASTLookupContext
     Int line;
     Int col;
     Loc cursorLoc;
+    UnownedStringSlice sourceFileName;
     List<ASTLookupResult> results;
 
     Loc getLoc(SourceLoc loc)
@@ -63,7 +64,9 @@ bool _isLocInRange(ASTLookupContext* context, SourceLoc loc, Int length)
 {
     auto humaneLoc = context->sourceManager->getHumaneLoc(loc, SourceLocType::Actual);
     return humaneLoc.line == context->line && context->col >= humaneLoc.column &&
-           context->col <= humaneLoc.column + length;
+           context->col <= humaneLoc.column + length &&
+           humaneLoc.pathInfo.foundPath.getUnownedSlice().endsWithCaseInsensitive(
+               context->sourceFileName);
 }
 bool _isLocInRange(ASTLookupContext* context, SourceLoc start, SourceLoc end)
 {
@@ -542,7 +545,7 @@ bool _findAstNodeImpl(ASTLookupContext& context, SyntaxNode* node)
 }
 
 List<ASTLookupResult> findASTNodesAt(
-    SourceManager* sourceManager, ModuleDecl* moduleDecl, ASTLookupType findType, Int line, Int col)
+    SourceManager* sourceManager, ModuleDecl* moduleDecl, ASTLookupType findType, UnownedStringSlice fileName, Int line, Int col)
 {
     ASTLookupContext context;
     context.sourceManager = sourceManager;
@@ -550,6 +553,7 @@ List<ASTLookupResult> findASTNodesAt(
     context.col = col;
     context.cursorLoc = Loc{line, col};
     context.findType = findType;
+    context.sourceFileName = fileName;
     _findAstNodeImpl(context, moduleDecl);
     return context.results;
 }

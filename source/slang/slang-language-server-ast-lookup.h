@@ -14,6 +14,11 @@ enum class ASTLookupType
     Invoke,
 };
 List<ASTLookupResult> findASTNodesAt(
-    SourceManager* sourceManager, ModuleDecl* moduleDecl, ASTLookupType findType, Int line, Int col);
+    SourceManager* sourceManager,
+    ModuleDecl* moduleDecl,
+    ASTLookupType findType,
+    UnownedStringSlice fileName,
+    Int line,
+    Int col);
 
 } // namespace LanguageServerProtocol

@@ -29,7 +29,8 @@ struct SemanticToken
         return false;
     }
 };
-List<SemanticToken> getSemanticTokens(Linkage* linkage, Module* module);
+List<SemanticToken> getSemanticTokens(
+    Linkage* linkage, Module* module, UnownedStringSlice fileName);
 List<uint32_t> getEncodedTokens(List<SemanticToken>& tokens);
 
 } // namespace Slang
