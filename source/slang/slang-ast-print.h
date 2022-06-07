@@ -3,6 +3,7 @@
 #ifndef SLANG_AST_PRINT_H
 #define SLANG_AST_PRINT_H
 
+#include "../core/slang-range.h"
 #include "slang-ast-all.h"
 
 namespace Slang {
@@ -120,7 +121,7 @@ public:
 
         /// Add just the parameters from a declaration.
         /// Will output the generic parameters (if it's a generic) in <> before the parameters ()
-    void addDeclParams(const DeclRef<Decl>& declRef, List<Array<Index, 2>>* outParamRange = nullptr);
+    void addDeclParams(const DeclRef<Decl>& declRef, List<Range<Index>>* outParamRange = nullptr);
 
         /// Add a prefix that describes the kind of declaration
     void addDeclKindPrefix(Decl* decl);

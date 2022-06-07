@@ -10,6 +10,7 @@
 #include <time.h>
 #include <thread>
 #include "../core/slang-secure-crt.h"
+#include "../core/slang-range.h"
 #include "../../slang-com-helper.h"
 #include "../compiler-core/slang-json-rpc-connection.h"
 #include "slang-language-server-protocol.h"
@@ -712,7 +713,7 @@ SlangResult LanguageServer::signatureHelp(
 
         SignatureInformation sigInfo;
 
-        List<Array<Index, 2>> paramRanges;
+        List<Slang::Range<Index>> paramRanges;
         ASTPrinter printer(
             version->linkage->getASTBuilder(),
             ASTPrinter::OptionFlag::ParamNames | ASTPrinter::OptionFlag::NoInternalKeywords |
@@ -736,8 +737,8 @@ SlangResult LanguageServer::signatureHelp(
         for (auto& range : paramRanges)
         {
             ParameterInformation paramInfo;
-            paramInfo.label[0] = (uint32_t)range[0];
-            paramInfo.label[1] = (uint32_t)range[1];
+            paramInfo.label[0] = (uint32_t)range.begin;
+            paramInfo.label[1] = (uint32_t)range.end;
             sigInfo.parameters.add(paramInfo);
         }
         response.signatures.add(sigInfo);

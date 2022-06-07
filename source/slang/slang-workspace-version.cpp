@@ -1,6 +1,7 @@
 #include "slang-workspace-version.h"
 #include "../core/slang-io.h"
 #include "../core/slang-file-system.h"
+#include "../core/slang-char-util.h"
 #include "../compiler-core/slang-lexer.h"
 
 namespace Slang
@@ -73,34 +74,10 @@ void Workspace::init(List<URI> rootDirURI, slang::IGlobalSession* globalSession)
 
 void Workspace::invalidate() { currentVersion = nullptr; }
 
-int parseInt(UnownedStringSlice text, Index& pos)
-{
-    int result = 0;
-    while (text[pos] == ' ' && pos < text.getLength())
-    {
-        pos++;
-        continue;
-    }
-    while (pos < text.getLength())
-    {
-        if (text[pos] >= '0' && text[pos] <= '9')
-        {
-            result *= 10;
-            result += text[pos] - '0';
-            pos++;
-        }
-        else
-        {
-            break;
-        }
-    }
-    return result;
-}
-
 void parseDiagnostics(Dictionary<String, DocumentDiagnostics>& diagnostics, String compilerOutput)
 {
     List<UnownedStringSlice> lines;
-    StringUtil::split(compilerOutput.getUnownedSlice(), '\n', lines);
+    StringUtil::calcLines(compilerOutput.getUnownedSlice(), lines);
     for (Index lineIndex = 0; lineIndex < lines.getCount(); lineIndex++)
     {
         auto line = lines[lineIndex];
@@ -116,12 +93,12 @@ void parseDiagnostics(Dictionary<String, DocumentDiagnostics>& diagnostics, Stri
 
         LanguageServerProtocol::Diagnostic diagnostic;
         Index pos = lparentIndex + 1;
-        int lineLoc = parseInt(line, pos);
+        int lineLoc = StringUtil::parseInt(line, pos);
         if (lineLoc == 0)
             lineLoc = 1;
         diagnostic.range.end.line = diagnostic.range.start.line = lineLoc - 1;
         pos++;
-        int colLoc = parseInt(line, pos);
+        int colLoc = StringUtil::parseInt(line, pos);
         if (colLoc == 0)
             colLoc = 1;
         diagnostic.range.end.character = diagnostic.range.start.character = colLoc - 1;
@@ -148,13 +125,13 @@ void parseDiagnostics(Dictionary<String, DocumentDiagnostics>& diagnostics, Stri
             continue;
         }
         pos = line.indexOf(' ');
-        diagnostic.code = parseInt(line, pos);
+        diagnostic.code = StringUtil::parseInt(line, pos);
         diagnostic.message = line.subString(colonIndex + 2, line.getLength());
         if (lineIndex + 1 < lines.getCount() && lines[lineIndex].startsWith("^+"))
         {
             lineIndex++;
             pos = 2;
-            auto tokenLength = parseInt(lines[lineIndex], pos);
+            auto tokenLength = StringUtil::parseInt(lines[lineIndex], pos);
             diagnostic.range.end.character += tokenLength;
         }
         diagnosticList.messages.Add(diagnostic);
@@ -215,17 +192,6 @@ void* Workspace::getInterface(const Guid& uuid)
     return nullptr;
 }
 
-Int convertHexDigit(char c)
-{
-    if (c >= '0' && c <= '9')
-        return c - '0';
-    if (c >= 'A' && c <= 'F')
-        return c - 'A' + 10;
-    if (c >= 'a' && c <= 'f')
-        return c - 'a' + 10;
-    return 0;
-}
-
 String URI::getPath() const
 {
     Index startIndex = uri.indexOf("://");
@@ -244,7 +210,8 @@ String URI::getPath() const
         auto ch = uri[i];
         if (ch == '%')
         {
-            Int charVal = convertHexDigit(uri[i + 1]) * 16 + convertHexDigit(uri[i + 2]);
+            Int charVal = CharUtil::getHexDigitValue(uri[i + 1]) * 16 +
+                          CharUtil::getHexDigitValue(uri[i + 2]);
             sb.appendChar((char)charVal);
             i += 3;
         }
@@ -255,6 +222,14 @@ String URI::getPath() const
         }
     }
     return sb.ProduceString();
+}
+
+StringSlice URI::getProtocol() const
+{
+    Index separatorIndex = uri.indexOf("://");
+    if (separatorIndex != -1)
+        return uri.subString(0, separatorIndex);
+    return StringSlice();
 }
 
 bool URI::isSafeURIChar(char ch)
