@@ -1257,7 +1257,7 @@ namespace Slang
     // parent link is set up correctly.
     static void AddMember(ContainerDecl* container, Decl* member)
     {
-        if (container)
+        if (container && member)
         {
             member->parentDecl = container;
             container->members.add(member);
@@ -3215,6 +3215,10 @@ namespace Slang
         if( AdvanceIf(parser, TokenType::RightArrow) )
         {
             decl->returnType = parser->ParseTypeExp();
+        }
+        else
+        {
+            decl->returnType.exp = parser->astBuilder->create<IncompleteExpr>();
         }
 
         parseStorageDeclBody(parser, decl);
@@ -5613,6 +5617,10 @@ namespace Slang
                     if (!parser->LookAheadToken(TokenType::RBracket))
                     {
                         indexExpr->indexExpression = parser->ParseExpression();
+                    }
+                    else
+                    {
+                        indexExpr->indexExpression = parser->astBuilder->create<IncompleteExpr>();
                     }
                     parser->ReadToken(TokenType::RBracket);
 
