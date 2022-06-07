@@ -896,6 +896,42 @@ List<LanguageServerProtocol::CompletionItem> LanguageServer::collectMembers(Work
                 version->currentCompletionItems.add(member);
             }
         }
+
+        for (auto& item : result)
+        {
+            switch (item.kind)
+            {
+            case LanguageServerProtocol::kCompletionItemKindMethod:
+                item.commitCharacters.add("(");
+                item.commitCharacters.add("[");
+                item.commitCharacters.add(" ");
+                break;
+            default:
+                item.commitCharacters.add("(");
+                item.commitCharacters.add(")");
+                item.commitCharacters.add(".");
+                item.commitCharacters.add(";");
+                item.commitCharacters.add(":");
+                item.commitCharacters.add(",");
+                item.commitCharacters.add("<");
+                item.commitCharacters.add(">");
+                item.commitCharacters.add("[");
+                item.commitCharacters.add("]");
+                item.commitCharacters.add("{");
+                item.commitCharacters.add("}");
+                item.commitCharacters.add("-");
+                item.commitCharacters.add("*");
+                item.commitCharacters.add("/");
+                item.commitCharacters.add("%");
+                item.commitCharacters.add("+");
+                item.commitCharacters.add("=");
+                item.commitCharacters.add("&");
+                item.commitCharacters.add("|");
+                item.commitCharacters.add("!");
+                item.commitCharacters.add(" ");
+                break;
+            }
+        }
     }
     return result;
 }

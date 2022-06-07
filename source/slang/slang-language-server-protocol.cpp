@@ -397,6 +397,7 @@ static const StructRttiInfo _makeCompletionItemRtti()
     builder.addField("kind", &obj.kind, StructRttiInfo::Flag::Optional);
     builder.addField("documentation", &obj.documentation, StructRttiInfo::Flag::Optional);
     builder.addField("data", &obj.data, StructRttiInfo::Flag::Optional);
+    builder.addField("commitCharacters", &obj.commitCharacters, StructRttiInfo::Flag::Optional);
     builder.ignoreUnknownFields();
     return builder.make();
 }
