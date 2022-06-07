@@ -27,9 +27,11 @@ struct ASTLookupContext
     UnownedStringSlice sourceFileName;
     List<ASTLookupResult> results;
 
-    Loc getLoc(SourceLoc loc)
+    Loc getLoc(SourceLoc loc, String* outFileName)
     {
         auto humaneLoc = sourceManager->getHumaneLoc(loc, SourceLocType::Actual);
+        if (outFileName)
+            *outFileName = humaneLoc.pathInfo.foundPath;
         return Loc{humaneLoc.line, humaneLoc.column};
     }
 };
@@ -148,9 +150,11 @@ public:
                 return true;
         if (context->findType == ASTLookupType::Invoke && expr->argumentDelimeterLocs.getCount())
         {
-            Loc start = context->getLoc(expr->argumentDelimeterLocs.getFirst());
-            Loc end = context->getLoc(expr->argumentDelimeterLocs.getLast());
-            if (start < context->cursorLoc && context->cursorLoc <= end)
+            String fileName;
+            Loc start = context->getLoc(expr->argumentDelimeterLocs.getFirst(), &fileName);
+            Loc end = context->getLoc(expr->argumentDelimeterLocs.getLast(), nullptr);
+            if (fileName.getUnownedSlice().endsWithCaseInsensitive(context->sourceFileName) &&
+                start < context->cursorLoc && context->cursorLoc <= end)
             {
                 ASTLookupResult result;
                 result.path = context->nodePath;
