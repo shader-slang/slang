@@ -131,7 +131,6 @@ namespace Slang
             // assume that if it is overloaded, we want a type
             exp = resolveOverloadedExpr(overloadedExpr, LookupMask::type);
         }
-
         if (auto typeType = as<TypeType>(exp->type))
         {
             return typeType->type;
@@ -142,6 +141,10 @@ namespace Slang
         }
         else
         {
+            if (!exp->type.type)
+            {
+                CheckExpr(exp);
+            }
             return ExtractGenericArgInteger(exp);
         }
     }
@@ -269,7 +272,6 @@ namespace Slang
                     // ignore non-parameter members
                 }
             }
-
             if (outProperType)
             {
                 *outProperType = InstantiateGenericType(genericDeclRef, args);

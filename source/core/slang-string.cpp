@@ -155,12 +155,27 @@ namespace Slang
             end() - otherSize, end()) == other;
     }
 
+    bool UnownedStringSlice::endsWithCaseInsensitive(UnownedStringSlice const& other) const
+    {
+        UInt thisSize = getLength();
+        UInt otherSize = other.getLength();
+
+        if (otherSize > thisSize)
+            return false;
+
+        return UnownedStringSlice(end() - otherSize, end()).caseInsensitiveEquals(other);
+    }
+
     bool UnownedStringSlice::endsWith(char const* str) const
     {
         return endsWith(UnownedTerminatedStringSlice(str));
     }
 
-    
+    bool UnownedStringSlice::endsWithCaseInsensitive(char const* str) const
+    {
+        return endsWithCaseInsensitive(UnownedTerminatedStringSlice(str));
+    }
+
     UnownedStringSlice UnownedStringSlice::trim() const
     {
         const char* start = m_begin;

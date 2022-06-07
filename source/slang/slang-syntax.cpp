@@ -930,7 +930,10 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
     {
         return decl->nameAndLoc.name;
     }
-
+    SourceLoc DeclRefBase::getNameLoc() const
+    {
+        return decl->nameAndLoc.loc;
+    }
     SourceLoc DeclRefBase::getLoc() const
     {
         return decl->loc;

@@ -2416,7 +2416,9 @@ namespace Slang
                 requiredMemberDeclRef.getName(),
                 lookupResult,
                 synThis,
-                requiredMemberDeclRef.getLoc());
+                requiredMemberDeclRef.getLoc(),
+                nullptr);
+            synMemberRef->loc = requiredMemberDeclRef.getLoc();
 
             // The body of the accessor will depend on the class of the accessor
             // we are synthesizing (e.g., `get` vs. `set`).

@@ -1685,6 +1685,7 @@ namespace Slang
             slang::IBlob**     outDiagnostics = nullptr) override;
         SLANG_NO_THROW slang::IModule* SLANG_MCALL loadModuleFromSource(
             const char* moduleName,
+            const char* path,
             slang::IBlob* source,
             slang::IBlob** outDiagnostics = nullptr) override;
         SLANG_NO_THROW SlangResult SLANG_MCALL createCompositeComponentType(
@@ -1742,6 +1743,10 @@ namespace Slang
 
             /// Dtor
         ~Linkage();
+
+        slang::SessionFlags m_flag = 0;
+        void setFlags(slang::SessionFlags flags) { m_flag = flags; }
+        bool isInLanguageServer() { return (m_flag & slang::kSessionFlag_LanguageServer) != 0; }
 
             /// Get the parent session for this linkage
         Session* getSessionImpl() { return m_session; }
@@ -1900,6 +1905,8 @@ namespace Slang
         OptimizationLevel optimizationLevel = OptimizationLevel::Default;
 
         SerialCompressionType serialCompressionType = SerialCompressionType::VariableByteLite;
+
+        DiagnosticSink::Flags diagnosticSinkFlags = 0;
 
         bool m_requireCacheFileSystem = false;
         bool m_useFalcorCustomSharedKeywordSemantics = false;
