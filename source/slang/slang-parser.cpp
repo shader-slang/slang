@@ -547,7 +547,7 @@ namespace Slang
                 return tokenReader.advanceToken();
             }
 
-            return tokenReader.peekToken();
+            return tokenReader.advanceToken();
         }
     }
 
