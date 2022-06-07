@@ -18,7 +18,9 @@ namespace Slang
     template <typename T>
     Range<T> makeRange(T begin, T end)
     {
-        Range<T> result = {begin, end};
+        Range<T> result;
+        result.begin = begin;
+        result.end = end;
         return result;
     }
 
