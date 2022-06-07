@@ -7,93 +7,10 @@
 namespace Slang
 {
 
-struct ComInterfaceLoweringContext
+static bool _canReplace(IRUse* use)
 {
-    void processModule(IRModule* module, ArtifactStyle artifactStyle, DiagnosticSink* sink)
+    switch (use->getUser()->getOp())
     {
-        m_diagnosticSink = sink;
-      
-        for (auto child : module->getGlobalInsts())
-        {
-            switch (child->getOp())
-            {
-                case kIROp_InterfaceType:
-                {
-                    _addInterface(static_cast<IRInterfaceType*>(child));
-                    break;
-                }
-                case kIROp_ThisType:
-                {
-                    // TODO(JS): 
-                    // Not clear why this extra path is needed for ThisType. 
-                    // Surely it would be found, by just finding interfaces in global scope.
-                    // Left in to keep behavior the same as previously
-                    auto thisType = static_cast<IRThisType*>(child);
-                    _addInterface(as<IRInterfaceType>(thisType->getConstraintType()));
-                    break;
-                }
-                default: break;
-            }
-        }
-
-        // For all interfaces found replace uses
-        {
-            SharedIRBuilder sharedBuilder;
-            sharedBuilder.init(module);
-
-            IRBuilder builder(sharedBuilder);
-
-            builder.setInsertInto(module->getModuleInst());
-
-            List<IRUse*> uses;
-
-            for (auto comIntf : m_comInterfaces)
-            {   
-                uses.clear();
-
-                // Find all of the uses *before* doing any replacement
-                // Otherwise we end up replacing the replacement type leading 
-                // to it pointing to itself.
-                for (auto use = comIntf->firstUse; use; use = use->nextUse)
-                {
-                    uses.add(use);
-                }
-
-                // TODO(JS): This is a temporary fix, in that whether kernel or not 
-                // shouldn't control the ptr type in general
-                // It's necessary here though because Kernel doesn't have ComPtr<>
-                // so has to be a naked pointer
-                IRType* result = (artifactStyle == ArtifactStyle::Host) ?
-                    static_cast<IRType*>(builder.getComPtrType(comIntf)) :
-                    static_cast<IRType*>(builder.getPtrType(comIntf));
-
-                // Go through uses for the interface
-                for (auto use : uses)
-                {
-                    // Can we do a replacement in this use scenario?
-                    if (_canReplace(use))
-                    {
-                        // Do the replacement
-                        use->set(result);
-                    }
-                }
-            }
-        }
-    }
-
-protected:
-    void _addInterface(IRInterfaceType* intf)
-    {
-        if (intf && intf->findDecoration<IRComInterfaceDecoration>())
-        {
-            m_comInterfaces.Add(intf);
-        }
-    }
-
-    static bool _canReplace(IRUse* use)
-    {
-        switch (use->getUser()->getOp())
-        {
         case kIROp_WitnessTableIDType:
         case kIROp_WitnessTableType:
         case kIROp_RTTIPointerType:
@@ -103,6 +20,10 @@ protected:
             return false;
         }
         case kIROp_ThisType:
+        {
+            // Appears replacable.
+            break;
+        }
         case kIROp_ComPtrType:
         case kIROp_PtrType:
         {
@@ -110,20 +31,81 @@ protected:
             // If it's a pointer type it could be because it is a global.
             break;
         }
-        default:
-            break;
-        }
-        return true;
+        default: break;
     }
-
-    DiagnosticSink* m_diagnosticSink;
-    HashSet<IRInterfaceType*> m_comInterfaces;          ///< All of the unique found COM interfaces
-};
+    return true;
+}
 
 void lowerComInterfaces(IRModule* module, ArtifactStyle artifactStyle, DiagnosticSink* sink)
 {
-    ComInterfaceLoweringContext context;
-    return context.processModule(module, artifactStyle, sink);
+    SLANG_UNUSED(sink);
+
+    // Find all of the COM interfaces
+    List<IRInterfaceType*> comInterfaces;
+    for (auto child : module->getGlobalInsts())
+    {
+        auto intf = as<IRInterfaceType>(child);
+        if (intf && intf->findDecoration<IRComInterfaceDecoration>())
+        {
+            comInterfaces.add(intf);
+        }
+    }
+
+    // For all interfaces found replace uses
+    {
+        SharedIRBuilder sharedBuilder;
+        sharedBuilder.init(module);
+
+        IRBuilder builder(sharedBuilder);
+        builder.setInsertInto(module->getModuleInst());
+
+        List<IRUse*> uses;
+
+        for (auto comIntf : comInterfaces)
+        {
+            uses.clear();
+
+            // Find all of the uses *before* doing any replacement
+            // Otherwise we end up replacing the replacement leading 
+            // to it pointing to itself.
+            for (auto use = comIntf->firstUse; use; use = use->nextUse)
+            {
+                // Only store off uses where replacement can be made
+                if (_canReplace(use))
+                {
+                    uses.add(use);
+                }
+            }
+
+            // If there are no uses that can be replaced, then we don't need
+            // to create a replacement result
+            if (uses.getCount() <= 0)
+            {
+                continue;
+            }
+
+            // NOTE! The following code relies on the fact that the builder
+            // *doesn't* dedup in general, and in particular doesn't ptr types. 
+            // This allows the creation a 'new'  pointer type, and subsequent replacment all old uses, 
+            // leading to a `IInterface*` becoming `IInterface**`. 
+            // 
+
+            // TODO(JS): This is a temporary fix, in that whether kernel or not 
+            // shouldn't control the ptr type in general
+            // It's necessary here though because Kernel doesn't have ComPtr<>
+            // so has to be a raw pointer
+            IRType* result = (artifactStyle == ArtifactStyle::Host) ?
+                static_cast<IRType*>(builder.getComPtrType(comIntf)) :
+                static_cast<IRType*>(builder.getPtrType(comIntf));
+
+            // Go through replacing all of the replacable uses
+            for (auto use : uses)
+            {
+                // Do the replacement
+                use->set(result);
+            }
+        }
+    }
 }
 
 }

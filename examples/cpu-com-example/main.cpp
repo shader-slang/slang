@@ -20,14 +20,9 @@ using namespace Slang;
 class IDoThings : public ISlangUnknown
 {
 public:
-    virtual int SLANG_MCALL doThing(int a, int b) = 0;
-    virtual int SLANG_MCALL calcHash(const char* in) = 0;
-};
-
-class ICountGood : public ISlangUnknown
-{
-public:
-    virtual int SLANG_MCALL nextCount() = 0;
+    virtual SLANG_NO_THROW int SLANG_MCALL doThing(int a, int b) = 0;
+    virtual SLANG_NO_THROW int SLANG_MCALL calcHash(const char* in) = 0;
+    virtual SLANG_NO_THROW void SLANG_MCALL printMessage(const char* in) = 0;
 };
 
 static int _calcHash(const char* in)
@@ -50,31 +45,21 @@ public:
     virtual SLANG_NO_THROW uint32_t SLANG_MCALL release() SLANG_OVERRIDE  { return 1; }
 
     // IDoThings
-    virtual int SLANG_MCALL doThing(int a, int b) SLANG_OVERRIDE { return a + b + 1; }
-    virtual int SLANG_MCALL calcHash(const char* in) SLANG_OVERRIDE { return (int)_calcHash(in); }
-};
-
-class CountGood : public ICountGood
-{
-public:
-    // We don't need queryInterface for this impl, or ref counting
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL queryInterface(SlangUUID const& uuid, void** outObject) SLANG_OVERRIDE { return SLANG_E_NOT_IMPLEMENTED; }
-    virtual SLANG_NO_THROW uint32_t SLANG_MCALL addRef() SLANG_OVERRIDE { return 1; }
-    virtual SLANG_NO_THROW uint32_t SLANG_MCALL release() SLANG_OVERRIDE { return 1; }
-
-    // ICountGood
-    virtual int SLANG_MCALL nextCount() SLANG_OVERRIDE { return m_count++; }
-
-    int m_count = 0;
+    virtual SLANG_NO_THROW int SLANG_MCALL doThing(int a, int b) SLANG_OVERRIDE { return a + b + 1; }
+    virtual SLANG_NO_THROW int SLANG_MCALL calcHash(const char* in) SLANG_OVERRIDE { return (int)_calcHash(in); }
+    virtual SLANG_NO_THROW void SLANG_MCALL printMessage(const char* in) SLANG_OVERRIDE { printf("%s\n", in); }
 };
 
 static SlangResult _innerMain(int argc, char** argv)
 {
+    // NOTE! This example only works if `slang-llvm` or a C++ compiler that Slang supports is available.
+
     // Create the session
     ComPtr<slang::IGlobalSession> slangSession;
     slangSession.attach(spCreateSession(NULL));
 
     // Set up the prelude
+    // NOTE: This isn't strictly necessary, as preludes are embedded in the binary.
     TestToolUtil::setSessionDefaultPreludeFromExePath(argv[0], slangSession);
 
     // Create a compile request
@@ -112,6 +97,19 @@ static SlangResult _innerMain(int argc, char** argv)
     ComPtr<ISlangSharedLibrary> sharedLibrary;
     SLANG_RETURN_ON_FAIL(request->getTargetHostCallable(0, sharedLibrary.writeRef()));
 
+    DoThings doThings;
+
+    {
+        auto doThingsPtr = (IDoThings**)sharedLibrary->findSymbolAddressByName("globalDoThings");
+        if (!doThingsPtr)
+        {
+            return SLANG_FAIL;
+        }
+        // Set the global interface
+        *doThingsPtr = &doThings;
+    }
+
+    // Test a free function
     {
         typedef const char* (*Func)(const char*);
         Func func = (Func)sharedLibrary->findFuncByName("getString");
@@ -126,78 +124,32 @@ static SlangResult _innerMain(int argc, char** argv)
 
         SLANG_ASSERT(text == returnedText);
     }
+
+    // Test hash
     {
-        typedef int (*Func)(const char* text, IDoThings* doThings);
-
+        typedef int (*Func)(const char* text);
         Func func = (Func)sharedLibrary->findFuncByName("calcHash");
-
         if (!func)
         {
             return SLANG_FAIL;
         }
 
-        DoThings doThings;
-
         String text("Hello");
-
-        const int hash = func(text.getBuffer(), &doThings);
-        
+        const int hash = func(text.getBuffer());
         SLANG_ASSERT(hash == _calcHash(text.getBuffer()));
     }
 
-    // Check accessing a global
+    // Test printing
     {
-        typedef void (*SetFunc)(int v);
-        typedef int (*GetFunc)();
+        typedef void (*Func)(const char* text);
 
-        const auto setGlobal = (SetFunc)sharedLibrary->findFuncByName("setGlobal");
-        const auto getGlobal = (GetFunc)sharedLibrary->findFuncByName("getGlobal");
+        Func func = (Func)sharedLibrary->findFuncByName("printMessage");
 
-        if (setGlobal == nullptr || getGlobal == nullptr)
+        if (!func)
         {
             return SLANG_FAIL;
         }
-
-        // In the slang source it is set a default value
-        SLANG_ASSERT(getGlobal() == 10);
-
-        for (Index i = 0; i < 10; ++i)
-        {
-            setGlobal(int(i));
-            SLANG_ASSERT(getGlobal() == i);
-        }
-    }
-    
-    // Check using a global interface
-    {
-        
-        typedef void (*SetCounterFunc)(ICountGood* counter);
-        typedef int (*NextCountFunc)();
-
-        const auto setCounter = (SetCounterFunc)sharedLibrary->findFuncByName("setCounter");
-        const auto nextCount = (NextCountFunc)sharedLibrary->findFuncByName("nextCount");
-
-        if (setCounter == nullptr || nextCount == nullptr)
-        {
-            return SLANG_FAIL;
-        }
-
-        CountGood counter;
-
-        setCounter(&counter);
-
-        for (Index i = 0; i < 10; ++i)
-        {
-            const auto v = nextCount();
-            SLANG_ASSERT(v == i);
-        }
-
-        auto counterPtr = (ICountGood**)sharedLibrary->findSymbolAddressByName("globalCounter");
-
-        if (counterPtr)
-        {
-            SLANG_ASSERT(*counterPtr == &counter);
-        }
+        func("Hello World!");
     }
 
     return SLANG_OK;

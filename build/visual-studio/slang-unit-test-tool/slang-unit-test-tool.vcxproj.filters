@@ -20,6 +20,9 @@
     <ClCompile Include="..\..\..\tools\slang-unit-test\unit-test-chunked-list.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\tools\slang-unit-test\unit-test-com-host-callable.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\..\tools\slang-unit-test\unit-test-command-line-args.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -71,5 +74,10 @@
     <ClCompile Include="..\..\..\tools\unit-test\slang-unit-test.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\..\..\tools\slang-unit-test\unit-test-com-host-callable.slang">
+      <Filter>Source Files</Filter>
+    </None>
   </ItemGroup>
 </Project>
