@@ -4,14 +4,14 @@
         "dependencies" : [
             {
                 "name" : "slang-llvm",
-                "baseUrl" : "https://github.com/shader-slang/slang-llvm/releases/download/v13.x-27/",
+                "baseUrl" : "https://github.com/shader-slang/slang-llvm/releases/download/v13.x-28/",
                 "optional" : true,
                 "packages" : 
                 {
-                    "windows-x86_64" : { "type" : "url", "path" : "slang-llvm-13.x-27-win64.zip" },
-                    "windows-x86" : { "type": "url", "path" : "slang-llvm-13.x-27-win32.zip" },
-                    "linux-x86_64" : { "type": "url", "path" : "slang-llvm-v13.x-27-linux-x86_64-release.zip" },
-                    "macosx-x86_64" : { "type": "url", "path" : "slang-llvm-v13.x-27-macosx-x86_64-release.zip" }
+                    "windows-x86_64" : { "type" : "url", "path" : "slang-llvm-13.x-28-win64.zip" },
+                    "windows-x86" : { "type": "url", "path" : "slang-llvm-13.x-28-win32.zip" },
+                    "linux-x86_64" : { "type": "url", "path" : "slang-llvm-v13.x-28-linux-x86_64-release.zip" },
+                    "macosx-x86_64" : { "type": "url", "path" : "slang-llvm-v13.x-28-macosx-x86_64-release.zip" }
                 }
             },
             {

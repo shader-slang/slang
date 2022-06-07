@@ -31,6 +31,7 @@ void SharedASTBuilder::init(Session* session)
 
     // Create common shared types
     m_errorType = m_astBuilder->create<ErrorType>();
+    m_bottomType = m_astBuilder->create<BottomType>();
     m_initializerListType = m_astBuilder->create<InitializerListType>();
     m_overloadedType = m_astBuilder->create<OverloadGroupType>();
 
@@ -88,6 +89,16 @@ Type* SharedASTBuilder::getStringType()
         m_stringType = DeclRefType::create(m_astBuilder, makeDeclRef<Decl>(stringTypeDecl));
     }
     return m_stringType;
+}
+
+Type* SharedASTBuilder::getNativeStringType()
+{
+    if (!m_nativeStringType)
+    {
+        auto nativeStringTypeDecl = findMagicDecl("NativeStringType");
+        m_nativeStringType = DeclRefType::create(m_astBuilder, makeDeclRef<Decl>(nativeStringTypeDecl));
+    }
+    return m_nativeStringType;
 }
 
 Type* SharedASTBuilder::getEnumTypeType()

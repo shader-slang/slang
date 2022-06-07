@@ -58,7 +58,7 @@ namespace Slang
             {
                 if (genericChild == func)
                     continue;
-                if (genericChild->getOp() == kIROp_ReturnVal)
+                if (genericChild->getOp() == kIROp_Return)
                     continue;
                 // Process all generic parameters and local type definitions.
                 auto clonedChild = cloneInst(&cloneEnv, &builder, genericChild);
@@ -153,7 +153,7 @@ namespace Slang
             if (isBuiltin(interfaceType))
                 return interfaceType;
             // Do not lower COM interfaces.
-            if (interfaceType->findDecoration<IRComInterfaceDecoration>())
+            if (isComInterfaceType(interfaceType))
                 return interfaceType;
 
             List<IRInterfaceRequirementEntry*> newEntries;

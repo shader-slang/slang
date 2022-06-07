@@ -290,12 +290,14 @@
     <ClCompile Include="..\..\..\tools\gfx-unit-test\instanced-draw-tests.cpp" />
     <ClCompile Include="..\..\..\tools\gfx-unit-test\mutable-shader-object.cpp" />
     <ClCompile Include="..\..\..\tools\gfx-unit-test\nested-parameter-block.cpp" />
+    <ClCompile Include="..\..\..\tools\gfx-unit-test\ray-tracing-tests.cpp" />
     <ClCompile Include="..\..\..\tools\gfx-unit-test\resolve-resource-tests.cpp" />
     <ClCompile Include="..\..\..\tools\gfx-unit-test\root-mutable-shader-object.cpp" />
     <ClCompile Include="..\..\..\tools\gfx-unit-test\root-shader-parameter.cpp" />
     <ClCompile Include="..\..\..\tools\gfx-unit-test\sampler-array.cpp" />
     <ClCompile Include="..\..\..\tools\gfx-unit-test\shared-buffers-tests.cpp" />
     <ClCompile Include="..\..\..\tools\gfx-unit-test\shared-textures-tests.cpp" />
+    <ClCompile Include="..\..\..\tools\gfx-unit-test\swap-chain-resize-test.cpp" />
     <ClCompile Include="..\..\..\tools\gfx-unit-test\texture-types-tests.cpp" />
     <ClCompile Include="..\..\..\tools\unit-test\slang-unit-test.cpp" />
   </ItemGroup>
@@ -307,6 +309,7 @@
     <None Include="..\..\..\tools\gfx-unit-test\graphics-smoke.slang" />
     <None Include="..\..\..\tools\gfx-unit-test\mutable-shader-object.slang" />
     <None Include="..\..\..\tools\gfx-unit-test\nested-parameter-block.slang" />
+    <None Include="..\..\..\tools\gfx-unit-test\ray-tracing-test-shader.slang" />
     <None Include="..\..\..\tools\gfx-unit-test\resolve-resource-shader.slang" />
     <None Include="..\..\..\tools\gfx-unit-test\root-shader-parameter.slang" />
     <None Include="..\..\..\tools\gfx-unit-test\sampler-array.slang" />
@@ -325,6 +328,9 @@
     </ProjectReference>
     <ProjectReference Include="..\gfx-util\gfx-util.vcxproj">
       <Project>{F5ADB74E-02A7-44FB-AA3B-FC02F8AC7A4B}</Project>
+    </ProjectReference>
+    <ProjectReference Include="..\platform\platform.vcxproj">
+      <Project>{3565FE5E-4FA3-11EB-AE93-0242AC130002}</Project>
     </ProjectReference>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

@@ -67,6 +67,12 @@ struct ArtifactInfoUtil
         /// Returns true if the payload type is applicable to the GPU
     static bool isPayloadGpuBinary(Payload payload);
 
+        /// True if is a CPU target
+    static bool isPayloadCpuTarget(Payload payload);
+
+        /// True if is a CPU target - either
+    static bool isCpuTarget(const ArtifactDesc& desc) { return isPayloadCpuTarget(desc.payload); }
+
         /// True if is a CPU binary
     static bool isCpuBinary(const ArtifactDesc& desc) { return isPayloadCpuBinary(desc.payload); }
         /// True if is a GPU binary

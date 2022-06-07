@@ -18,6 +18,12 @@
 
 #include "d3d12-helper-functions.h"
 
+#ifdef _DEBUG
+#    define ENABLE_DEBUG_LAYER 1
+#else
+#    define ENABLE_DEBUG_LAYER 0
+#endif
+
 namespace gfx
 {
 namespace d3d12

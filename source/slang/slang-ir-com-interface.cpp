@@ -12,9 +12,9 @@ struct ComInterfaceLoweringContext
     IRModule* module;
     DiagnosticSink* diagnosticSink;
 
-    SharedIRBuilder sharedBuilder;
+    ArtifactStyle artifactStyle;
 
-    Dictionary<IRInterfaceType*, IRComPtrType*> comPtrTypes;
+    SharedIRBuilder sharedBuilder;
 
     void replaceTypeUses(IRInst* inst, IRInst* newValue)
     {
@@ -33,6 +33,7 @@ struct ComInterfaceLoweringContext
             case kIROp_RTTIPointerType:
             case kIROp_RTTIHandleType:
             case kIROp_ComPtrType:
+            case kIROp_PtrType:
                 continue;
             default:
                 break;
@@ -41,19 +42,17 @@ struct ComInterfaceLoweringContext
         }
     }
 
-    IRComPtrType* processInterfaceType(IRInterfaceType* type)
+    IRType* processInterfaceType(IRInterfaceType* type)
     {
         if (!type->findDecoration<IRComInterfaceDecoration>())
             return nullptr;
-
-        IRComPtrType* result = nullptr;
-
-        if (comPtrTypes.TryGetValue(type, result))
-            return result;
-
+     
         IRBuilder builder(sharedBuilder);
         builder.setInsertInto(module->getModuleInst());
-        result = builder.getComPtrType(type);
+
+        IRType* result = (artifactStyle == ArtifactStyle::Kernel) ?
+            static_cast<IRType*>(builder.getPtrType(type)) :
+            static_cast<IRType*>(builder.getComPtrType(type));
 
         replaceTypeUses(type, result);
         return result;
@@ -86,11 +85,12 @@ struct ComInterfaceLoweringContext
     }
 };
 
-void lowerComInterfaces(IRModule* module, DiagnosticSink* sink)
+void lowerComInterfaces(IRModule* module, ArtifactStyle artifactStyle, DiagnosticSink* sink)
 {
     ComInterfaceLoweringContext context;
     context.module = module;
     context.diagnosticSink = sink;
+    context.artifactStyle = artifactStyle;
     context.sharedBuilder.init(module);
     return context.processModule();
 }

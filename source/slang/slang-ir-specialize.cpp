@@ -2170,7 +2170,7 @@ IRInst* specializeGenericImpl(
             // We thus use that cloned value as the result of the
             // specialization step.
             //
-            if( auto returnValInst = as<IRReturnVal>(ii) )
+            if( auto returnValInst = as<IRReturn>(ii) )
             {
                 auto specializedVal = findCloneForOperand(&env, returnValInst->getVal());
 

@@ -21,13 +21,10 @@ namespace Slang
         {
         public:
             WithOuterStmt(SemanticsStmtVisitor* visitor, Stmt* outerStmt)
-                : SemanticsStmtVisitor(*visitor)
+                : SemanticsStmtVisitor(visitor->withOuterStmts(&m_outerStmt))
             {
-                m_parentFunc = visitor->m_parentFunc;
-
-                m_outerStmt.next = visitor->m_outerStmts;
+                m_outerStmt.next = visitor->getOuterStmts();
                 m_outerStmt.stmt = outerStmt;
-                m_outerStmts = &m_outerStmt;
             }
 
         private:
@@ -35,10 +32,10 @@ namespace Slang
         };
     }
 
-    void SemanticsVisitor::checkStmt(Stmt* stmt, FunctionDeclBase* parentDecl, OuterStmtInfo* outerStmts)
+    void SemanticsVisitor::checkStmt(Stmt* stmt, SemanticsContext const& context)
     {
         if (!stmt) return;
-        dispatchStmt(stmt, parentDecl, outerStmts);
+        dispatchStmt(stmt, context);
         checkModifiers(stmt);
     }
 
@@ -54,7 +51,7 @@ namespace Slang
         // local `struct` declaration, where it would have members
         // that need to be recursively checked.
         //
-        ensureDeclBase(stmt->decl, DeclCheckState::Checked);
+        ensureDeclBase(stmt->decl, DeclCheckState::Checked, this);
     }
 
     void SemanticsStmtVisitor::visitBlockStmt(BlockStmt* stmt)
@@ -72,7 +69,7 @@ namespace Slang
 
     void SemanticsStmtVisitor::checkStmt(Stmt* stmt)
     {
-        SemanticsVisitor::checkStmt(stmt, m_parentFunc, m_outerStmts);
+        SemanticsVisitor::checkStmt(stmt, *this);
     }
 
     template<typename T>
@@ -292,7 +289,7 @@ namespace Slang
     {
         stmt->device = CheckExpr(stmt->device);
         stmt->gridDims = CheckExpr(stmt->gridDims);
-        ensureDeclBase(stmt->dispatchThreadID, DeclCheckState::Checked);
+        ensureDeclBase(stmt->dispatchThreadID, DeclCheckState::Checked, this);
         WithOuterStmt subContext(this, stmt);
         stmt->kernelCall = subContext.CheckExpr(stmt->kernelCall);
         return;

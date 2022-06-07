@@ -10,7 +10,7 @@ func %main	: Func(Void, UInt)
 block %1(
 		[nameHint("tid")]
 		param %tid	: UInt):
-	return_void
+	return_val(void_constant)
 }
 global_hashed_string_literals("Hello \t\n\0x083 World")
 ###

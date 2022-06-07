@@ -23,6 +23,10 @@ public:
 
         /// Get the string type
     Type* getStringType();
+
+        /// Get the native string type
+    Type* getNativeStringType();
+
         /// Get the enum type type
     Type* getEnumTypeType();
         /// Get the __Dynamic type
@@ -53,6 +57,7 @@ protected:
     // State shared between ASTBuilders
 
     Type* m_errorType = nullptr;
+    Type* m_bottomType = nullptr;
     Type* m_initializerListType = nullptr;
     Type* m_overloadedType = nullptr;
 
@@ -65,6 +70,7 @@ protected:
     // TODO(tfoley): These should really belong to the compilation context!
     //
     Type* m_stringType = nullptr;
+    Type* m_nativeStringType = nullptr;
     Type* m_enumTypeType = nullptr;
     Type* m_dynamicType = nullptr;
     Type* m_nullPtrType = nullptr;
@@ -128,6 +134,7 @@ public:
     Type* getInitializerListType() { return m_sharedASTBuilder->m_initializerListType; }
     Type* getOverloadedType() { return m_sharedASTBuilder->m_overloadedType; }
     Type* getErrorType() { return m_sharedASTBuilder->m_errorType; }
+    Type* getBottomType() { return m_sharedASTBuilder->m_bottomType; }
     Type* getStringType() { return m_sharedASTBuilder->getStringType(); }
     Type* getNullPtrType() { return m_sharedASTBuilder->getNullPtrType(); }
     Type* getEnumTypeType() { return m_sharedASTBuilder->getEnumTypeType(); }

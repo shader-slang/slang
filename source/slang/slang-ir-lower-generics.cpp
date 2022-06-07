@@ -137,7 +137,7 @@ namespace Slang
                 {
                     auto witnessTableType = lookupWitnessMethod->getWitnessTable()->getDataType();
                     auto interfaceType = cast<IRWitnessTableType>(witnessTableType)->getConformanceType();
-                    if (interfaceType->findDecoration<IRComInterfaceDecoration>())
+                    if (isComInterfaceType((IRType*)interfaceType))
                         return;
                     if (!implementedInterfaces.Contains(interfaceType))
                     {

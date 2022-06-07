@@ -16,6 +16,7 @@
 #include "slang-ir-validate.h"
 #include "slang-ir-string-hash.h"
 #include "slang-ir-clone.h"
+#include "slang-ir-lower-error-handling.h"
 
 #include "slang-mangle.h"
 #include "slang-type-layout.h"
@@ -80,7 +81,8 @@ struct SubscriptInfo : ExtendedValueInfo
 struct BoundStorageInfo;
 struct BoundMemberInfo;
 struct SwizzledLValueInfo;
-
+struct CopiedValInfo;
+struct ExtractedExistentialValInfo;
 
 // This type is our core representation of lowered values.
 // In the simple case, it just wraps an `IRInst*`.
@@ -113,6 +115,9 @@ struct LoweredValInfo
 
         // The result of applying swizzling to an l-value
         SwizzledLValue,
+
+        // The value extracted from an opened existential
+        ExtractedExistential,
     };
 
     union
@@ -184,6 +189,15 @@ struct LoweredValInfo
     {
         SLANG_ASSERT(flavor == Flavor::SwizzledLValue);
         return (SwizzledLValueInfo*)ext;
+    }
+
+    static LoweredValInfo extractedExistential(
+        ExtractedExistentialValInfo* extInfo);
+
+    ExtractedExistentialValInfo* getExtractedExistentialValInfo()
+    {
+        SLANG_ASSERT(flavor == Flavor::ExtractedExistential);
+        return (ExtractedExistentialValInfo*)ext;
     }
 };
 
@@ -272,6 +286,27 @@ struct SwizzledLValueInfo : ExtendedValueInfo
     UInt            elementIndices[4];
 };
 
+// Represents the results of extractng a value of
+// some (statically unknown) concrete type from
+// an existential, in an l-value context.
+//
+struct ExtractedExistentialValInfo : ExtendedValueInfo
+{
+    // The extracted value
+    IRInst* extractedVal;
+
+    // The original existential value
+    LoweredValInfo existentialVal;
+
+    // The type of `existentialVal`
+    IRType* existentialType;
+
+    // The IR witness table for the conformance of
+    // the type of `extractedVal` to `existentialType`
+    //
+    IRInst* witnessTable;
+};
+
 LoweredValInfo LoweredValInfo::boundMember(
     BoundMemberInfo*    boundMemberInfo)
 {
@@ -307,6 +342,16 @@ LoweredValInfo LoweredValInfo::swizzledLValue(
     info.ext = extInfo;
     return info;
 }
+
+LoweredValInfo LoweredValInfo::extractedExistential(
+    ExtractedExistentialValInfo* extInfo)
+{
+    LoweredValInfo info;
+    info.flavor = Flavor::ExtractedExistential;
+    info.ext = extInfo;
+    return info;
+}
+
 
 // An "environment" for mapping AST declarations to IR values.
 //
@@ -568,6 +613,12 @@ int32_t getIntrinsicOp(
     return int32_t(irOp);
 }
 
+struct TryClauseEnvironment
+{
+    TryClauseType clauseType = TryClauseType::None;
+    IRBlock* catchBlock = nullptr;
+};
+
 // Given a `LoweredValInfo` for something callable, along with a
 // bunch of arguments, emit an appropriate call to it.
 LoweredValInfo emitCallToVal(
@@ -575,7 +626,8 @@ LoweredValInfo emitCallToVal(
     IRType*         type,
     LoweredValInfo  funcVal,
     UInt            argCount,
-    IRInst* const* args)
+    IRInst* const*  args,
+    const TryClauseEnvironment& tryEnv)
 {
     auto builder = context->irBuilder;
     switch (funcVal.flavor)
@@ -583,8 +635,33 @@ LoweredValInfo emitCallToVal(
     case LoweredValInfo::Flavor::None:
         SLANG_UNEXPECTED("null function");
     default:
-        return LoweredValInfo::simple(
-            builder->emitCallInst(type, getSimpleVal(context, funcVal), argCount, args));
+        switch (tryEnv.clauseType)
+        {
+        case TryClauseType::None:
+            return LoweredValInfo::simple(
+                builder->emitCallInst(type, getSimpleVal(context, funcVal), argCount, args));
+
+        case TryClauseType::Standard:
+            {
+                auto callee = getSimpleVal(context, funcVal);
+                auto succBlock = builder->createBlock();
+                auto failBlock = builder->createBlock();
+                auto funcType = as<IRFuncType>(callee->getDataType());
+                auto throwAttr = funcType->findAttr<IRFuncThrowTypeAttr>();
+                assert(throwAttr);
+                auto voidType = builder->getVoidType();
+                builder->emitTryCallInst(voidType, succBlock, failBlock, callee, argCount, args);
+                builder->insertBlock(failBlock);
+                auto errParam = builder->emitParam(throwAttr->getErrorType());
+                builder->emitThrow(errParam);
+                builder->insertBlock(succBlock);
+                auto value = builder->emitParam(type);
+                return LoweredValInfo::simple(value);
+            }
+            break;
+        default:
+            SLANG_UNIMPLEMENTED_X("emitCallToVal(tryClauseType)");
+        }
     }
 }
 
@@ -611,7 +688,8 @@ LoweredValInfo emitCallToDeclRef(
     DeclRef<Decl>   funcDeclRef,
     IRType*         funcType,
     UInt            argCount,
-    IRInst* const* args)
+    IRInst* const*  args,
+    const TryClauseEnvironment& tryEnv)
 {
     SLANG_ASSERT(funcType);
 
@@ -656,7 +734,7 @@ LoweredValInfo emitCallToDeclRef(
     // Fallback case is to emit an actual call.
     //
     LoweredValInfo funcVal = emitDeclRef(context, funcDeclRef, funcType);
-    return emitCallToVal(context, type, funcVal, argCount, args);
+    return emitCallToVal(context, type, funcVal, argCount, args, tryEnv);
 }
 
 LoweredValInfo emitCallToDeclRef(
@@ -664,9 +742,17 @@ LoweredValInfo emitCallToDeclRef(
     IRType*                 type,
     DeclRef<Decl>           funcDeclRef,
     IRType*                 funcType,
-    List<IRInst*> const&    args)
+    List<IRInst*> const&    args,
+    const TryClauseEnvironment& tryEnv)
 {
-    return emitCallToDeclRef(context, type, funcDeclRef, funcType, args.getCount(), args.getBuffer());
+    return emitCallToDeclRef(
+        context,
+        type,
+        funcDeclRef,
+        funcType,
+        args.getCount(),
+        args.getBuffer(),
+        tryEnv);
 }
 
     /// Represents the "direction" that a parameter is being passed (e.g., `in` or `out`
@@ -933,6 +1019,13 @@ top:
                 getSimpleVal(context, swizzleInfo->base),
                 swizzleInfo->elementCount,
                 swizzleInfo->elementIndices));
+        }
+
+    case LoweredValInfo::Flavor::ExtractedExistential:
+        {
+            auto info = lowered.getExtractedExistentialValInfo();
+
+            return LoweredValInfo::simple(info->extractedVal);
         }
 
     default:
@@ -1529,10 +1622,21 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         {
             paramTypes.add(lowerType(context, type->getParamType(pp)));
         }
-        return getBuilder()->getFuncType(
-            paramCount,
-            paramTypes.getBuffer(),
-            resultType);
+        if (type->getErrorType()->equals(context->astBuilder->getBottomType()))
+        {
+            return getBuilder()->getFuncType(
+                paramCount,
+                paramTypes.getBuffer(),
+                resultType);
+        }
+        else
+        {
+            auto errorType = lowerType(context, type->getErrorType());
+            auto irThrowFuncTypeAttribute =
+                getBuilder()->getAttr(kIROp_FuncThrowTypeAttr, 1, (IRInst**)&errorType);
+            return getBuilder()->getFuncType(
+                paramCount, paramTypes.getBuffer(), resultType, irThrowFuncTypeAttribute);
+        }
     }
 
     IRType* visitPtrType(PtrType* type)
@@ -2108,6 +2212,7 @@ void addInArg(
     case LoweredValInfo::Flavor::SwizzledLValue:
     case LoweredValInfo::Flavor::BoundStorage:
     case LoweredValInfo::Flavor::BoundMember:
+    case LoweredValInfo::Flavor::ExtractedExistential:
         args.add(getSimpleVal(context, argVal));
         break;
 
@@ -2732,11 +2837,20 @@ void _lowerFuncDeclBaseTypeInfo(
         // being accessed, rather than a simple value.
         irResultType = builder->getPtrType(irResultType);
     }
-
-    outInfo.type = builder->getFuncType(
-        paramTypes.getCount(),
-        paramTypes.getBuffer(),
-        irResultType);
+  
+    if (!getErrorCodeType(context->astBuilder, declRef)->equals(context->astBuilder->getBottomType()))
+    {
+        auto errorType = lowerType(context, getErrorCodeType(context->astBuilder, declRef));
+        IRAttr* throwTypeAttr = nullptr;
+        throwTypeAttr = builder->getAttr(kIROp_FuncThrowTypeAttr, 1, (IRInst**)&errorType);
+        outInfo.type = builder->getFuncType(
+            paramTypes.getCount(), paramTypes.getBuffer(), irResultType, throwTypeAttr);
+    }
+    else
+    {
+        outInfo.type =
+            builder->getFuncType(paramTypes.getCount(), paramTypes.getBuffer(), irResultType);
+    }
 }
 
 static LoweredValInfo _emitCallToAccessor(
@@ -2772,7 +2886,8 @@ static LoweredValInfo _emitCallToAccessor(
         accessorDeclRef,
         info.type,
         allArgs.getCount(),
-        allArgs.getBuffer());
+        allArgs.getBuffer(),
+        TryClauseEnvironment());
 
     applyOutArgumentFixups(context, fixups);
 
@@ -2784,6 +2899,8 @@ static LoweredValInfo _emitCallToAccessor(
 template<typename Derived>
 struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
 {
+    static bool isLValueContext() { return Derived::_isLValueContext(); }
+
     IRGenContext* context;
 
     IRBuilder* getBuilder() { return context->irBuilder; }
@@ -2797,6 +2914,13 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
         return this->dispatch(expr);
     }
 
+    LoweredValInfo lowerSubExpr(Expr* expr, IRGenContext* subContext)
+    {
+        IRBuilderSourceLocRAII sourceLocInfo(getBuilder(), expr->loc);
+        Derived d;
+        d.context = subContext;
+        return d.dispatch(expr);
+    }
 
     LoweredValInfo visitVarExpr(VarExpr* expr)
     {
@@ -3463,6 +3587,11 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
 
     LoweredValInfo visitInvokeExpr(InvokeExpr* expr)
     {
+        return visitInvokeExprImpl(expr, TryClauseEnvironment());
+    }
+
+    LoweredValInfo visitInvokeExprImpl(InvokeExpr* expr, const TryClauseEnvironment& tryEnv)
+    {
         auto type = lowerType(context, expr->type);
 
         // We are going to look at the syntactic form of
@@ -3575,7 +3704,8 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
                 type,
                 funcDeclRef,
                 funcType,
-                irArgs);
+                irArgs,
+                tryEnv);
             applyOutArgumentFixups(context, argFixups);
             return result;
         }
@@ -3595,6 +3725,16 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
         //
         SLANG_UNEXPECTED("could not resolve target declaration for call");
         UNREACHABLE_RETURN(LoweredValInfo());
+    }
+
+        /// Emit code for a `try` invoke.
+    LoweredValInfo visitTryExpr(TryExpr* expr)
+    {
+        auto invokeExpr = as<InvokeExpr>(expr->base);
+        assert(invokeExpr);
+        TryClauseEnvironment tryEnv;
+        tryEnv.clauseType = expr->tryClauseType;
+        return visitInvokeExprImpl(invokeExpr, tryEnv);
     }
 
         /// Emit code to cast `value` to a concrete `superType` (e.g., a `struct`).
@@ -3802,8 +3942,20 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
 
     LoweredValInfo visitLetExpr(LetExpr* expr)
     {
-        // TODO: deal with the case where we might want to capture
-        // a reference to the bound value...
+        // Note: The semantics here are annoyingly subtle.
+        //
+        // If `expr->decl->initExpr` is an l-value, then we will set things up
+        // so that `expr->decl` is bound as an *alias* for that l-value.
+        //
+        // Otherwise, `expr->decl` will simply be bound to the r-value.
+        //
+        // The first case is necessary to make `maybeMoveTemp` operations that
+        // produce l-value results work correctly, but seems slippery.
+        //
+        // TODO: We should probably have two AST node types to cover the two
+        // different use cases of `LetExpr`: the definitely-immutable case that
+        // actually behaves like a `let`, and this other mutable-alias case that
+        // feels kind of messy and gross.
 
         auto initVal = lowerLValueExpr(context, expr->decl->initExpr);
         setGlobalValue(context, expr->decl, initVal);
@@ -3813,17 +3965,66 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
 
     LoweredValInfo visitExtractExistentialValueExpr(ExtractExistentialValueExpr* expr)
     {
+        // We are being asked to extract the value from an existential, which
+        // is itself a single IR op. However, we also need to handle the case
+        // where `expr` might be used as an l-value, in which case we need
+        // additional information to allow any mutations through the extracted
+        // value to be written back.
+
         auto existentialType = lowerType(context, getType(getASTBuilder(), expr->declRef));
-        auto existentialVal = getSimpleVal(context, emitDeclRef(context, expr->declRef, existentialType));
+        auto existentialVal = emitDeclRef(context, expr->declRef, existentialType);
+
+        // Note that we make a *copy* of the existential value that is definitely
+        // a simple r-value. This ensures that all the `extractExistential*()` operations
+        // below work on the same consistent IR value.
+        //
+        auto existentialValCopy = getSimpleVal(context, existentialVal);
 
         auto openedType = lowerType(context, expr->type);
 
-        return LoweredValInfo::simple(getBuilder()->emitExtractExistentialValue(openedType, existentialVal));
+        auto extractedVal = getBuilder()->emitExtractExistentialValue(
+            openedType, existentialValCopy);
+
+        if(!isLValueContext())
+        {
+            // If we are in an r-value context, we can directly use the `extractExistentialValue`
+            // instruction as the result, and life is simple.
+            //
+            return LoweredValInfo::simple(extractedVal);
+        }
+
+        // In an l-value context, we need to track the information necessary so that
+        // if a new/modified value of `openedType` was produced, we could write it
+        // back into the original `existentialVal`'s location.
+        //
+        // The write-back is actually pretty simple: it is just a `makeExisential` op.
+        // In order to be able to emit that op later, we need to track the operands
+        // that it would use. The first operand would be the new concrete value (which
+        // would implicitly encode the concrete type via its IR type) while the second
+        // is the witness table for the conformance to the existential.
+        //
+        // Note: We are assuming/requiring here that any value "written back" must have
+        // the exact same concrete type as `extractedVal`, so taht it can use the same
+        // IR witness table. The front-end should be enforcing that constraint, and we
+        // have no way to check or enforce it at this point.
+
+        auto witnessTable = getBuilder()->emitExtractExistentialWitnessTable(existentialValCopy);
+
+        RefPtr<ExtractedExistentialValInfo> info = new ExtractedExistentialValInfo();
+        info->extractedVal = extractedVal;
+        info->existentialVal = existentialVal;
+        info->existentialType = existentialType;
+        info->witnessTable = witnessTable;
+
+        context->shared->extValues.add(info);
+        return LoweredValInfo::extractedExistential(info);
     }
 };
 
 struct LValueExprLoweringVisitor : ExprLoweringVisitorBase<LValueExprLoweringVisitor>
 {
+    static bool _isLValueContext() { return true; }
+
     // When visiting a swizzle expression in an l-value context,
     // we need to construct a "swizzled l-value."
     LoweredValInfo visitMatrixSwizzleExpr(MatrixSwizzleExpr*)
@@ -3901,6 +4102,8 @@ struct LValueExprLoweringVisitor : ExprLoweringVisitorBase<LValueExprLoweringVis
 
 struct RValueExprLoweringVisitor : ExprLoweringVisitorBase<RValueExprLoweringVisitor>
 {
+    static bool _isLValueContext() { return false; }
+
     // A matrix swizzle in an r-value context can save time by just
     // emitting the matrix swizzle instructions directly.
     LoweredValInfo visitMatrixSwizzleExpr(MatrixSwizzleExpr* expr)
@@ -5286,6 +5489,32 @@ top:
                 SLANG_UNEXPECTED("handled member flavor");
             }
 
+        }
+        break;
+
+    case LoweredValInfo::Flavor::ExtractedExistential:
+        {
+            // The `left` value is the result of opening an existential.
+            //
+            auto leftInfo = left.getExtractedExistentialValInfo();
+            auto existentialVal = leftInfo->existentialVal;
+
+            // The actual desitnation we need to store into is the
+            // existential value itself.
+            //
+            left = existentialVal;
+
+            // The `right` value must be of the same concrete type as
+            // the opened value, but the new destination is of the
+            // original existential type, so we need to wrap it up
+            // appropriately.
+            //
+            right = LoweredValInfo::simple(builder->emitMakeExistential(
+                leftInfo->existentialType,
+                getSimpleVal(context, right),
+                leftInfo->witnessTable));
+
+            goto top;
         }
         break;
 
@@ -8188,7 +8417,13 @@ RefPtr<IRModule> generateIRForTranslationUnit(
 
     //      dumpIR(module);
 
-    // First, inline calls to any functions that have been
+    // First, lower error handling logic into normal control flow.
+    // This includes lowering throwing functions into functions that
+    // returns a `Result<T,E>` value, translating `tryCall` into
+    // normal `call` + `ifElse`, etc.
+    lowerErrorHandling(module, compileRequest->getSink());
+
+    // Next, inline calls to any functions that have been
     // marked for mandatory "early" inlining.
     //
     performMandatoryEarlyInlining(module);

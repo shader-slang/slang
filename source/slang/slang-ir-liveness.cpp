@@ -112,8 +112,6 @@ public:
 
 struct LivenessContext
 {
-    typedef LivenessLocation Location;
-
     enum class BlockIndex : Index;
 
     // NOTE! Care must be taken changing the order. 
@@ -177,11 +175,12 @@ struct LivenessContext
         Count successorsCount;
     };
 
-        /// Process all the locations
-    void processLocations(const List<Location>& locations);
+        /// Process the module
+    void process();
     
-    LivenessContext(IRModule* module):
-        m_module(module)
+    LivenessContext(IRModule* module, LivenessMode mode):
+        m_module(module),
+        m_livenessMode(mode)
     {
         // Disable warning if not used
         SLANG_UNUSED(&LivenessContext::_isAnyRunInst);
@@ -204,11 +203,11 @@ struct LivenessContext
 
         /// Process all the locations in the function 
         /// NOTE: All locations must be to the same function, and ordered by root. 
-    void _processLocationsInFunction(const Location* start, Count count);
+    void _processFunction(IRFunc* func);
 
         /// Process a root
-        /// NOTE: All locations must be to the same root
-    void _processRoot(const Location* locations, Count count);
+        /// NOTE: All starts must be to the same root/referenced item
+    void _processRoot(IRLiveRangeStart*const* starts, Count count);
 
         /// Find all the aliases and accesses to the root
         /// The information is stored in m_accessSet and m_aliases
@@ -303,12 +302,50 @@ struct LivenessContext
 
     List<IRInst*> m_instRuns;                       ///< Instructions of interest in order. Indexed into via BlockInfo [runStart, runStart + runCount)
 
-    List<IRLiveRangeStart*> m_liveRangeStarts;      ///< Live range starts for a root
+    List<IRLiveRangeStart*> m_rangeStarts;          ///< All the starts within a function, ordered by referenced
 
     IRModule* m_module;
     SharedIRBuilder m_sharedBuilder;
     IRBuilder m_builder;
+
+    LivenessMode m_livenessMode;
 };
+
+static void _findLiveStarts(IRFunc* funcInst, List<IRLiveRangeStart*>& ioStarts)
+{
+    // If it has no body, then we are done
+    if (funcInst->getFirstBlock() == nullptr)
+    {
+        return;
+    }
+
+    // Iterate through blocks looking for start
+    for (auto block = funcInst->getFirstBlock(); block; block = block->getNextBlock())
+    {
+        for (auto inst = block->getFirstChild(); inst; inst = inst->getNextInst())
+        {
+            // We look for LiveRangeStarts
+            if (auto rangeStartInst = as<IRLiveRangeStart>(inst))
+            {
+                ioStarts.add(rangeStartInst);
+            }
+        }
+    }
+}
+
+static void _findFuncs(IRModule* module, List<IRFunc*>& ioFuncs)
+{
+    IRModuleInst* moduleInst = module->getModuleInst();
+    for (IRInst* child : moduleInst->getChildren())
+    {
+        // If we find a function add it to the list
+        if (auto funcInst = as<IRFunc>(child))
+        {
+            ioFuncs.add(funcInst);
+        }
+    }
+}
+
 
 void LivenessContext::_maybeAddEndAtBlockStart(BlockIndex blockIndex)
 {
@@ -849,10 +886,10 @@ bool LivenessContext::_isAccessTerminator(IRTerminatorInst* terminator)
     // 
     // We need to detect if the return value accesses the root
 
-    if (terminator->getOp() == kIROp_ReturnVal)
+    if (terminator->getOp() == kIROp_Return)
     {
         // We are going to special case return if it hits an alias
-        auto returnVal = static_cast<IRReturnVal*>(terminator);
+        auto returnVal = static_cast<IRReturn*>(terminator);
 
         auto val = returnVal->getVal();
         
@@ -972,9 +1009,9 @@ void LivenessContext::_findInstRunsForBlocks()
     }
 }
 
-void LivenessContext::_processRoot(const Location* locations, Count locationsCount)
+void LivenessContext::_processRoot(IRLiveRangeStart* const* rangeStarts, Count rangeStartsCount)
 {
-    if (locationsCount <= 0)
+    if (rangeStartsCount <= 0)
     {
         return;
     }
@@ -986,28 +1023,21 @@ void LivenessContext::_processRoot(const Location* locations, Count locationsCou
     }
     m_instRuns.clear();
     
-    auto root = locations[0].root;
+    auto root = rangeStarts[0]->getReferenced();
 
     // Set the root
     m_root = root;
     m_rootBlock = as<IRBlock>(m_root->parent);
 
     // Add all the live starts
-    m_liveRangeStarts.setCount(locationsCount);
-    for (Index i = 0; i < locationsCount; ++i)
+    for (Index i = 0; i < rangeStartsCount; ++i)
     {
-        const auto& location = locations[i];
-        SLANG_ASSERT(location.root == root);
+        auto rangeStart = rangeStarts[i];
 
-        // Add the start location
-        m_builder.setInsertLoc(location.startLocation);
-        // Emit the range start
-        auto liveStart = m_builder.emitLiveRangeStart(location.root);
+        // Check it references the same root
+        SLANG_ASSERT(rangeStart->getReferenced() == root);
 
-        // Save the start
-        m_liveRangeStarts[i] = liveStart;
-
-        _addStartInst(liveStart);
+        _addStartInst(rangeStart);
     }
 
     // Find all of the aliases and access to this root
@@ -1017,10 +1047,10 @@ void LivenessContext::_processRoot(const Location* locations, Count locationsCou
     _findInstRunsForBlocks();
 
     // Now we want to find all of the ends for each start
-    for (auto liveStart : m_liveRangeStarts)
+    for (Index i = 0; i < rangeStartsCount; ++i)
     {
         // We want to process this RangeStart for the root, to find all of the ends
-        _findAndEmitRangeEnd(liveStart);
+        _findAndEmitRangeEnd(rangeStarts[i]);
     }
 
     // No root is active in processing
@@ -1028,16 +1058,10 @@ void LivenessContext::_processRoot(const Location* locations, Count locationsCou
     m_rootBlock = nullptr;
 }
 
-void LivenessContext::_processLocationsInFunction(const Location* locations, Count count)
+void LivenessContext::_processFunction(IRFunc* func)
 {
-    if (count <= 0)
-    {
-        return;
-    }
-    
-    const auto func = locations[0].function;
-    SLANG_UNUSED(func);
-    
+    SLANG_ASSERT(m_rangeStarts.getCount() > 0);
+
     // Create the dominator tree, for the function
     m_dominatorTree = computeDominatorTree(func);
 
@@ -1098,55 +1122,54 @@ void LivenessContext::_processLocationsInFunction(const Location* locations, Cou
     }
 
     // Find the run of locations that all access the same root
-    Index start = 0;
-    while (start < count)
     {
-        SLANG_ASSERT(locations[start].function == func);
+        Index start = 0;
+        const Count count = m_rangeStarts.getCount();
+        while (start < count)
+        {
+            // Get the root at the start of this span
+            const auto root = m_rangeStarts[start]->getReferenced();
+            
+            // Look for the end of the run of locations with the same root
+            Index end = start + 1;
+            for (; end < count && m_rangeStarts[end]->getReferenced() == root; ++end);
 
-        // Get the root at the start of this span
-        IRInst*const root = locations[start].root;
+            // Process the root 
+            _processRoot(m_rangeStarts.getBuffer() + start, end - start);       
 
-        // Look for the end of the run of locations with the same root
-        Index end = start + 1;
-        for (; end < count && locations[end].root == root; ++end);
-
-        // Process the root 
-        _processRoot(locations + start, end - start);       
-
-        // Set start to the beginning of the next run
-        start = end;
+            // Set start to the beginning of the next run
+            start = end;
+        }
     }
 }
 
-void LivenessContext::processLocations(const List<Location>& inLocations)
+void LivenessContext::process()
 {
-    // Make a copy of all the locations
-    List<Location> locations(inLocations);
+    // Find all of the funcs in the module
+    List<IRFunc*> funcs;
+    _findFuncs(m_module, funcs);
 
-    // Sort so we have in function order, and within a function in root order
-    locations.sort([&](const Location& a, const Location& b) -> bool { return a.function < b.function || (a.function == b.function && a.root < b.root); });
-
-    const auto locationCount = locations.getCount();
-
-    Index start = 0;
-    while (start < locationCount)
+    for (auto func : funcs)
     {
-        auto func = locations[start].function;
-        Index end = start + 1;
+        if (func->getFirstBlock() != nullptr)
+        {
+            m_rangeStarts.clear();
+            _findLiveStarts(func, m_rangeStarts);
 
-        for (;end < locationCount && locations[end].function == func; ++end);
+            if (m_rangeStarts.getCount() > 0)
+            {
+                // Sort into referenced/root start
+                m_rangeStarts.sort([&](IRLiveRangeStart* a, IRLiveRangeStart* b) -> bool { return a->getReferenced() < b->getReferenced(); });
 
-        // All of the locations from [start, end) are in the same function. Lets process all in one go...
-        _processLocationsInFunction(locations.getBuffer() + start, end - start);
-
-        // Look for next run
-        start = end;
+                _processFunction(func);
+            }
+        }
     }
 }
 
 } // anonymous
 
-static void _processFunction(IRFunc* funcInst, List<LivenessLocation>& ioLocations)
+static void _processFunction(IRFunc* funcInst, List<IRVar*>& ioVars)
 {
     // If it has no body, then we are done
     if (funcInst->getFirstBlock() == nullptr)
@@ -1162,43 +1185,60 @@ static void _processFunction(IRFunc* funcInst, List<LivenessLocation>& ioLocatio
             // We look for var declarations.
             if (auto varInst = as<IRVar>(inst))
             {
-                LivenessLocation location;
+                ioVars.add(varInst);
 
-                location.function = funcInst;
-                // Set the livness start to be after the var
-                location.startLocation = IRInsertLoc::after(varInst);
-                location.root = varInst;
-
-                ioLocations.add(location);
             }
         }
     }
 }
 
-/* static */void LivenessUtil::locateVariables(IRModule* module, List<Location>& ioLocations)
+/* static */void LivenessUtil::addVariableRangeStarts(IRModule* module, LivenessMode livenessMode)
 {
+    if (!isEnabled(livenessMode))
+    {
+        return;
+    }
+
     // When we process liveness, is prior to output for a target
     // So post specialization
 
-    IRModuleInst* moduleInst = module->getModuleInst();
+    SharedIRBuilder sharedBuilder;
+    IRBuilder builder;
 
-    for (IRInst* child : moduleInst->getChildren())
+    sharedBuilder.init(module);
+    builder.init(sharedBuilder);
+
+    // Storage for found vars
+    List<IRVar*> vars;
+
+    List<IRFunc*> funcs;
+    _findFuncs(module, funcs);
+
+    for (auto func : funcs)
     {
-        // We want to find all of the functions, and process them
-        if (auto funcInst = as<IRFunc>(child))
+        // Clear as we will reuse the vars storage
+        vars.clear();
+
+        // Find all the vars in the function
+        _processFunction(func, vars);
+
+        for (auto var : vars)
         {
-            // Then we want to look through their definition
-            // inserting instructions that mark the liveness start/end
-            _processFunction(funcInst, ioLocations);
+            // Set liveness after the variable is declared
+            builder.setInsertLoc(IRInsertLoc::after(var));
+            // Emit a range start
+            builder.emitLiveRangeStart(var);
         }
     }
 }
 
-/* static */void LivenessUtil::addLivenessRanges(IRModule* module, const List<Location>& inLocations)
+/* static */void LivenessUtil::addRangeEnds(IRModule* module, LivenessMode livenessMode)
 {
-    LivenessContext context(module);
-    context.processLocations(inLocations);
+    if (isEnabled(livenessMode))
+    {
+        LivenessContext context(module, livenessMode);
+        context.process();
+    }
 }
 
 } // namespace Slang
-    

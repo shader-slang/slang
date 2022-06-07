@@ -8,7 +8,7 @@
 #if defined(_WIN32)
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
-#elif defined(__linux__)
+#elif defined(__linux__) || defined(SLANG_OSX)
 #include <dlfcn.h>
 #endif
 #include <sys/stat.h>
@@ -125,7 +125,7 @@ String SharedLibraryUtils::getSharedLibraryFileName(void* symbolInLib)
     }
     return String::fromWString(filenameBuffer);
 
-#elif defined(__linux__)
+#elif defined(__linux__) || defined(SLANG_OSX)
     Dl_info dllInfo;
     if (!dladdr(symbolInLib, &dllInfo))
     {

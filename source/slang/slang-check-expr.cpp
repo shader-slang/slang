@@ -25,6 +25,31 @@ namespace Slang
             return as<DeclRefType>(expr->type);
     }
 
+    void SemanticsContext::ExprLocalScope::addBinding(LetExpr* binding)
+    {
+        if (!m_innerMostBinding)
+        {
+            SLANG_ASSERT(!m_outerMostBinding);
+
+            // If we haven't added any bindings, then `binding`
+            // becomes both the inner-most and outer most.
+            //
+            m_innerMostBinding = binding;
+            m_outerMostBinding = binding;
+        }
+        else
+        {
+            SLANG_ASSERT(m_outerMostBinding);
+
+            // If we already have bindings, then `binding`
+            // will become the new inner-most binding.
+            //
+            m_innerMostBinding->body = binding;
+            m_innerMostBinding = binding;
+        }
+    }
+
+
         /// Move `expr` into a temporary variable and execute `func` on that variable.
         ///
         /// Returns an expression that wraps both the creation and initialization of
@@ -46,11 +71,30 @@ namespace Slang
         letExpr->decl = varDecl;
 
         auto body = func(varDeclRef);
+        Expr* result = body;
+        if (auto exprLocalScope = getExprLocalScope())
+        {
+            // We want to add the `LetExpr` to the set of such expressions
+            // in the local scope, so that it can be emitted properly.
+            //
+            exprLocalScope->addBinding(letExpr);
+        }
+        else
+        {
+            // If we somehow got in here and there wasn't an expression-local
+            // scope established yet, it almost certainly represents an error.
+            //
+            SLANG_ASSERT(exprLocalScope);
 
-        letExpr->body = body;
-        letExpr->type = body->type;
+            // As a fallback, though, we will try to wire up the `letExpr`
+            // to surround the body directly and return that.
+            //
+            letExpr->body = body;
+            letExpr->type = body->type;
 
-        return letExpr;
+            result = letExpr;
+        }
+        return result;
     }
 
         /// Execute `func` on a variable with the value of `expr`.
@@ -62,6 +106,11 @@ namespace Slang
     template<typename F>
     Expr* SemanticsVisitor::maybeMoveTemp(Expr* const& expr, F const& func)
     {
+        // TODO: Eventually this operation could consider any case where the
+        // input `expr` names an immutable "path": one that starts at an
+        // immutable binding and follows a (possibly empty) chain of accesses
+        // to immutable members.
+
         if(auto varExpr = as<VarExpr>(expr))
         {
             auto declRef = varExpr->declRef;
@@ -113,6 +162,26 @@ namespace Slang
             ExtractExistentialValueExpr* openedValue = m_astBuilder->create<ExtractExistentialValueExpr>();
             openedValue->declRef = varDeclRef;
             openedValue->type = QualType(openedType);
+
+            // The result of opening an existential is an l-value
+            // if the original existential is an l-value.
+            //
+            if(expr->type.isLeftValue)
+            {
+                // Marking the opened value as an l-value is the easy part.
+                //
+                openedValue->type.isLeftValue = true;
+
+                // The more challenging bit is that in this case the `maybeMoveTemp()`
+                // operation will have copied the original existential value into
+                // a temporary.
+                //
+                // If this expression is used in an l-value context, then we need
+                // to be able to generate code to "write back" the modified value
+                // (which will be of `openedType`) to the original location named
+                // by `expr` (an existential for `interfaceDeclRef`).
+                //
+            }
 
             return openedValue;
         });
@@ -606,8 +675,47 @@ namespace Slang
     {
         if (!term) return nullptr;
 
-        SemanticsExprVisitor exprVisitor(getShared());
-        return exprVisitor.dispatch(term);
+        // The process of checking a term/expression can end up introducing
+        // temporaries that need to be added to an outer scope. When jumping
+        // into expression checking, we want to check if we already have such
+        // a scope in place. If we do, we will re-use it for any sub-expressions.
+        // If not, we need to create one.
+        //
+        if(getExprLocalScope())
+        {
+            return dispatchExpr(term, *this);
+        }
+
+        ExprLocalScope exprLocalScope;
+
+        Expr* checkedTerm = dispatchExpr(term, withExprLocalScope(&exprLocalScope));
+
+        LetExpr* outerMostBinding = exprLocalScope.getOuterMostBinding();
+        if(!outerMostBinding)
+        {
+            return checkedTerm;
+        }
+
+        LetExpr* binding = outerMostBinding;
+        auto type = checkedTerm->type;
+        while (binding)
+        {
+            binding->type = type;
+
+            if (auto body = binding->body)
+            {
+                binding = as<LetExpr>(binding->body);
+                SLANG_ASSERT(binding);
+                continue;
+            }
+            else
+            {
+                binding->body = checkedTerm;
+                break;
+            }
+        }
+
+        return outerMostBinding;
     }
 
     Expr* SemanticsVisitor::CreateErrorExpr(Expr* expr)
@@ -1229,6 +1337,15 @@ namespace Slang
             // if this is still an invoke expression, test arguments passed to inout/out parameter are LValues
             if(auto funcType = as<FuncType>(invoke->functionExpr->type))
             {
+                if (!funcType->errorType->equals(m_astBuilder->getBottomType()))
+                {
+                    // If the callee throws, make sure we are inside a try clause.
+                    if (m_enclosingTryClauseType == TryClauseType::None)
+                    {
+                        getSink()->diagnose(invoke, Diagnostics::mustUseTryClauseToCallAThrowFunc);
+                    }
+                }
+
                 Index paramCount = funcType->getParamCount();
                 for (Index pp = 0; pp < paramCount; ++pp)
                 {
@@ -1419,6 +1536,59 @@ namespace Slang
         // Now process this like any other explicit call (so casts
         // and constructor calls are semantically equivalent).
         return CheckInvokeExprWithCheckedOperands(expr);
+    }
+
+    Expr* SemanticsExprVisitor::visitTryExpr(TryExpr* expr)
+    {
+        auto prevTryClauseType = expr->tryClauseType;
+        m_enclosingTryClauseType = expr->tryClauseType;
+        expr->base = CheckTerm(expr->base);
+        m_enclosingTryClauseType = prevTryClauseType;
+        expr->type = expr->base->type;
+        if (as<ErrorType>(expr->type))
+            return expr;
+        
+        auto parentFunc = this->m_parentFunc;
+        // TODO: check if the try clause is caught.
+        // For now we assume all `try`s are not caught (because we don't have catch yet).
+        if (!parentFunc)
+        {
+            getSink()->diagnose(expr, Diagnostics::uncaughtTryCallInNonThrowFunc);
+            return expr;
+        }
+        if (parentFunc->errorType->equals(m_astBuilder->getBottomType()))
+        {
+            getSink()->diagnose(expr, Diagnostics::uncaughtTryCallInNonThrowFunc);
+            return expr;
+        }
+        if (!as<InvokeExpr>(expr->base))
+        {
+            getSink()->diagnose(expr, Diagnostics::tryClauseMustApplyToInvokeExpr);
+            return expr;
+        }
+        auto base = as<InvokeExpr>(expr->base);
+        if (auto callee = as<DeclRefExpr>(base->functionExpr))
+        {
+            if (auto funcCallee = as<FuncDecl>(callee->declRef.getDecl()))
+            {
+                if (funcCallee->errorType->equals(m_astBuilder->getBottomType()))
+                {
+                    getSink()->diagnose(expr, Diagnostics::tryInvokeCalleeShouldThrow, callee->declRef);
+                }
+                if (!parentFunc->errorType->equals(funcCallee->errorType))
+                {
+                    getSink()->diagnose(
+                        expr,
+                        Diagnostics::errorTypeOfCalleeIncompatibleWithCaller,
+                        callee->declRef,
+                        funcCallee->errorType,
+                        parentFunc->errorType);
+                }
+                return expr;
+            }
+        }
+        getSink()->diagnose(expr, Diagnostics::calleeOfTryCallMustBeFunc);
+        return expr;
     }
 
     Expr* SemanticsVisitor::MaybeDereference(Expr* inExpr)

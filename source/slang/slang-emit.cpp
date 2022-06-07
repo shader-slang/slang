@@ -23,6 +23,7 @@
 #include "slang-ir-com-interface.h"
 #include "slang-ir-lower-generics.h"
 #include "slang-ir-lower-tuple-types.h"
+#include "slang-ir-lower-result-type.h"
 #include "slang-ir-lower-bit-cast.h"
 #include "slang-ir-lower-reinterpret.h"
 #include "slang-ir-metadata.h"
@@ -176,6 +177,8 @@ Result linkAndOptimizeIR(
     auto target = codeGenContext->getTargetFormat();
     auto targetRequest = codeGenContext->getTargetReq();
 
+    // Get the artifact desc for the target 
+    const auto artifactDesc = ArtifactDesc::makeFromCompileTarget(asExternal(target));
 
     // We start out by performing "linking" at the level of the IR.
     // This step will create a fresh IR module to be used for
@@ -199,6 +202,27 @@ Result linkAndOptimizeIR(
     // IR, then do it here, for the target-specific, but
     // un-specialized IR.
     dumpIRIfEnabled(codeGenContext, irModule);
+
+    switch (target)
+    {
+        case CodeGenTarget::CPPSource:
+        {
+            // TODO(JS):
+            // We want the interface transformation to take place for 'regular' CPPSource for now too.
+            lowerComInterfaces(irModule, artifactDesc.style, sink);
+            break;
+        }
+        case CodeGenTarget::HostCPPSource:
+        {
+            lowerComInterfaces(irModule, artifactDesc.style, sink);
+            generateDllImportFuncs(irModule, sink);
+            break;
+        }
+        default: break;
+    }
+
+    // Lower `Result<T,E>` types into ordinary struct types.
+    lowerResultType(irModule, sink);
 
     // Replace any global constants with their values.
     //
@@ -689,16 +713,6 @@ Result linkAndOptimizeIR(
         break;
     }
 
-    switch (target)
-    {
-    default:
-        break;
-    case CodeGenTarget::HostCPPSource:
-        lowerComInterfaces(irModule, sink);
-        generateDllImportFuncs(irModule, sink);
-        break;
-    }
-
     // TODO: our current dynamic dispatch pass will remove all uses of witness tables.
     // If we are going to support function-pointer based, "real" modular dynamic dispatch,
     // we will need to disable this pass.
@@ -736,10 +750,9 @@ Result linkAndOptimizeIR(
     simplifyIR(irModule);
 
     {
-        // Storage for liveness information
-        List<LivenessLocation> livenessLocations;
-        const bool shouldTrackLiveness = codeGenContext->shouldTrackLiveness();
-
+        // Get the liveness mode.
+        const LivenessMode livenessMode = codeGenContext->shouldTrackLiveness() ? LivenessMode::Enabled : LivenessMode::Disabled;
+        
         //
         // Downstream targets may benefit from having live-range information for
         // local variables, and our IR currently encodes a reasonably good version
@@ -750,9 +763,9 @@ Result linkAndOptimizeIR(
         // temporary variables into the IR module should take responsibility for
         // producing their own live-range information.
         //
-        if (shouldTrackLiveness)
+        if (isEnabled(livenessMode))
         {
-            LivenessUtil::locateVariables(irModule, livenessLocations);
+            LivenessUtil::addVariableRangeStarts(irModule, livenessMode);
         }
 
         // As a late step, we need to take the SSA-form IR and move things *out*
@@ -764,9 +777,7 @@ Result linkAndOptimizeIR(
 
         {
             // We only want to accumulate locations if liveness tracking is enabled.
-            List<LivenessLocation>* locsPtr = shouldTrackLiveness ? &livenessLocations : nullptr;
-
-            eliminatePhis(codeGenContext, locsPtr, irModule);
+            eliminatePhis(codeGenContext, livenessMode, irModule);
 #if 0
             dumpIRIfEnabled(codeGenContext, irModule, "PHIS ELIMINATED");
 #endif
@@ -774,9 +785,9 @@ Result linkAndOptimizeIR(
 
         // If liveness is enabled add liveness ranges based on the accumulated liveness locations
 
-        if (shouldTrackLiveness)
+        if (isEnabled(livenessMode))
         {
-            LivenessUtil::addLivenessRanges(irModule, livenessLocations);
+            LivenessUtil::addRangeEnds(irModule, livenessMode);
 
 #if 0
             dumpIRIfEnabled(codeGenContext, irModule, "LIVENESS");

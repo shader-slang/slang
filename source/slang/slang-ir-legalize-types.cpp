@@ -548,7 +548,7 @@ struct LegalReturnBuilder
 
         default:
             // TODO: implement legalization of non-simple return types
-            SLANG_UNEXPECTED("unimplemented legalized return type for IRReturnVal.");
+            SLANG_UNEXPECTED("unimplemented legalized return type for IRReturn.");
         }
     }
 
@@ -683,7 +683,7 @@ private:
 
         default:
             // TODO: implement legalization of non-simple return types
-            SLANG_UNEXPECTED("unimplemented legalized return type for IRReturnVal.");
+            SLANG_UNEXPECTED("unimplemented legalized return type for IRReturn.");
         }
     }
 
@@ -697,7 +697,7 @@ private:
 static LegalVal legalizeRetVal(
     IRTypeLegalizationContext*  context,
     LegalVal                    retVal,
-    IRReturnVal*                returnInst)
+    IRReturn*                   returnInst)
 {
     LegalReturnBuilder builder(context, returnInst);
     builder.returnVal(retVal);
@@ -1655,8 +1655,8 @@ static LegalVal legalizeInst(
 
     case kIROp_Call:
         return legalizeCall(context, (IRCall*)inst);
-    case kIROp_ReturnVal:
-        return legalizeRetVal(context, args[0], (IRReturnVal*)inst);
+    case kIROp_Return:
+        return legalizeRetVal(context, args[0], (IRReturn*)inst);
     case kIROp_makeStruct:
         return legalizeMakeStruct(
             context,

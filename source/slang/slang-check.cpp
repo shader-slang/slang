@@ -170,7 +170,7 @@ namespace Slang
             translationUnit->compileRequest->getSink(),
             &loadedModules);
 
-        SemanticsDeclVisitorBase visitor(&sharedSemanticsContext);
+        SemanticsDeclVisitorBase visitor( (SemanticsContext(&sharedSemanticsContext)) );
 
         // Apply the visitor to do the main semantic
         // checking that is required on all declarations
@@ -181,9 +181,9 @@ namespace Slang
         translationUnit->getModule()->_collectShaderParams();
     }
 
-    void SemanticsVisitor::dispatchStmt(Stmt* stmt, FunctionDeclBase* parentFunc, OuterStmtInfo* outerStmts)
+    void SemanticsVisitor::dispatchStmt(Stmt* stmt, SemanticsContext const& context)
     {
-        SemanticsStmtVisitor visitor(getShared(), parentFunc, outerStmts);
+        SemanticsStmtVisitor visitor(context);
         try
         {
             visitor.dispatch(stmt);
@@ -196,12 +196,12 @@ namespace Slang
         }
     }
 
-    void SemanticsVisitor::dispatchExpr(Expr* expr)
+    Expr* SemanticsVisitor::dispatchExpr(Expr* expr, SemanticsContext const& context)
     {
-        SemanticsExprVisitor visitor(getShared());
+        SemanticsExprVisitor visitor(context);
         try
         {
-            visitor.dispatch(expr);
+            return visitor.dispatch(expr);
         }
         catch(const AbortCompilationException&) { throw; }
         catch(...)

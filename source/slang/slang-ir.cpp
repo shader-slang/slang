@@ -486,8 +486,7 @@ namespace Slang
         auto operands = terminator->getOperands();
         switch (terminator->getOp())
         {
-        case kIROp_ReturnVal:
-        case kIROp_ReturnVoid:
+        case kIROp_Return:
         case kIROp_Unreachable:
         case kIROp_MissingReturn:
         case kIROp_discard:
@@ -762,8 +761,7 @@ namespace Slang
         default:
             return false;
 
-        case kIROp_ReturnVal:
-        case kIROp_ReturnVoid:
+        case kIROp_Return:
         case kIROp_unconditionalBranch:
         case kIROp_conditionalBranch:
         case kIROp_loop:
@@ -1968,6 +1966,10 @@ namespace Slang
             {
                 return getStringSlice() == rhs->getStringSlice();
             }
+            case kIROp_VoidLit:
+            {
+                return true;
+            }
             default: break;
         }
 
@@ -2005,6 +2007,10 @@ namespace Slang
             {
                 const UnownedStringSlice slice = getStringSlice();
                 return combineHash(code, Slang::getHashCode(slice.begin(), slice.getLength()));
+            }
+            case kIROp_VoidLit:
+            {
+                return code;
             }
             default:
             {
@@ -2063,6 +2069,14 @@ namespace Slang
             {
                 const size_t instSize = prefixSize + sizeof(void*);
                 irValue = static_cast<IRConstant*>(_createInst(instSize, keyInst.getFullType(), keyInst.getOp()));
+                irValue->value.ptrVal = keyInst.value.ptrVal;
+                break;
+            }
+            case kIROp_VoidLit:
+            {
+                const size_t instSize = prefixSize;
+                irValue = static_cast<IRConstant*>(
+                    _createInst(instSize, keyInst.getFullType(), keyInst.getOp()));
                 irValue->value.ptrVal = keyInst.value.ptrVal;
                 break;
             }
@@ -2196,6 +2210,18 @@ namespace Slang
         keyInst.typeUse.usedValue = type;
         keyInst.value.ptrVal = value;
         return (IRPtrLit*) _findOrEmitConstant(keyInst);
+    }
+
+    IRVoidLit* IRBuilder::getVoidValue()
+    {
+        IRType* type = getVoidType();
+
+        IRConstant keyInst;
+        memset(&keyInst, 0, sizeof(keyInst));
+        keyInst.m_op = kIROp_VoidLit;
+        keyInst.typeUse.usedValue = type;
+        keyInst.value.intVal= 0;
+        return (IRVoidLit*)_findOrEmitConstant(keyInst);
     }
 
     IRInst* IRBuilder::getCapabilityValue(CapabilitySet const& caps)
@@ -2508,6 +2534,12 @@ namespace Slang
         return (IRStringType*)getType(kIROp_StringType);
     }
 
+    IRNativeStringType* IRBuilder::getNativeStringType()
+    {
+        return (IRNativeStringType*)getType(kIROp_NativeStringType);
+    }
+
+
     IRType* IRBuilder::getCapabilitySetType()
     {
         return getType(kIROp_CapabilitySetType);
@@ -2579,6 +2611,12 @@ namespace Slang
     {
         IRType* operands[] = { type0, type1, type2, type3 };
         return getTupleType(SLANG_COUNT_OF(operands), operands);
+    }
+
+    IRResultType* IRBuilder::getResultType(IRType* valueType, IRType* errorType)
+    {
+        IRInst* operands[] = {valueType, errorType};
+        return (IRResultType*)getType(kIROp_ResultType, 2, operands);
     }
 
     IRBasicBlockType*   IRBuilder::getBasicBlockType()
@@ -2709,6 +2747,14 @@ namespace Slang
             resultType,
             paramCount,
             (IRInst* const*) paramTypes);
+    }
+
+    IRFuncType* IRBuilder::getFuncType(
+        UInt paramCount, IRType* const* paramTypes, IRType* resultType, IRAttr* attribute)
+    {
+        UInt counts[3] = {1, paramCount, 1};
+        IRInst** lists[3] = {(IRInst**)&resultType, (IRInst**)paramTypes, (IRInst**)&attribute};
+        return (IRFuncType*)findOrEmitHoistableInst(nullptr, kIROp_FuncType, 3, counts, lists);
     }
 
     IRWitnessTableType* IRBuilder::getWitnessTableType(
@@ -3082,6 +3128,21 @@ namespace Slang
         return inst;
     }
 
+    IRInst* IRBuilder::emitTryCallInst(
+        IRType* type,
+        IRBlock* successBlock,
+        IRBlock* failureBlock,
+        IRInst* func,
+        UInt argCount,
+        IRInst* const* args)
+    {
+        IRInst* fixedArgs[] = {successBlock, failureBlock, func};
+        auto inst = createInstWithTrailingArgs<IRTryCall>(
+            this, kIROp_TryCall, type, 3, fixedArgs, argCount, args);
+        addInst(inst);
+        return inst;
+    }
+
     IRInst* IRBuilder::createIntrinsicInst(
         IRType*         type,
         IROp            op,
@@ -3175,6 +3236,41 @@ namespace Slang
 
         IRInst* args[] = { tuple, getIntValue(getIntType(), element) };
         return emitIntrinsicInst(type, kIROp_GetTupleElement, 2, args);
+    }
+
+    IRInst* IRBuilder::emitMakeResultError(IRType* resultType, IRInst* errorVal)
+    {
+        return emitIntrinsicInst(resultType, kIROp_MakeResultError, 1, &errorVal);
+    }
+
+    IRInst* IRBuilder::emitMakeResultValue(IRType* resultType, IRInst* value)
+    {
+        return emitIntrinsicInst(resultType, kIROp_MakeResultValue, 1, &value);
+    }
+
+    IRInst* IRBuilder::emitIsResultError(IRInst* result)
+    {
+        return emitIntrinsicInst(getBoolType(), kIROp_IsResultError, 1, &result);
+    }
+
+    IRInst* IRBuilder::emitGetResultError(IRInst* result)
+    {
+        SLANG_ASSERT(result->getDataType());
+        return emitIntrinsicInst(
+            cast<IRResultType>(result->getDataType())->getErrorType(),
+            kIROp_GetResultError,
+            1,
+            &result);
+    }
+
+    IRInst* IRBuilder::emitGetResultValue(IRInst* result)
+    {
+        SLANG_ASSERT(result->getDataType());
+        return emitIntrinsicInst(
+            cast<IRResultType>(result->getDataType())->getValueType(),
+            kIROp_GetResultValue,
+            1,
+            &result);
     }
 
     IRInst* IRBuilder::emitMakeVector(
@@ -3855,9 +3951,9 @@ namespace Slang
     IRInst* IRBuilder::emitReturn(
         IRInst*    val)
     {
-        auto inst = createInst<IRReturnVal>(
+        auto inst = createInst<IRReturn>(
             this,
-            kIROp_ReturnVal,
+            kIROp_Return,
             nullptr,
             val);
         addInst(inst);
@@ -3866,10 +3962,15 @@ namespace Slang
 
     IRInst* IRBuilder::emitReturn()
     {
-        auto inst = createInst<IRReturnVoid>(
-            this,
-            kIROp_ReturnVoid,
-            nullptr);
+        auto voidVal = getVoidValue();
+        auto inst = createInst<IRReturn>(this, kIROp_Return, nullptr, voidVal);
+        addInst(inst);
+        return inst;
+    }
+
+    IRInst* IRBuilder::emitThrow(IRInst* val)
+    {
+        auto inst = createInst<IRThrow>(this, kIROp_Throw, nullptr, val);
         addInst(inst);
         return inst;
     }
@@ -4197,6 +4298,20 @@ namespace Slang
             type,
             left,
             right);
+        addInst(inst);
+        return inst;
+    }
+
+    IRInst* IRBuilder::emitEql(IRInst* left, IRInst* right)
+    {
+        auto inst = createInst<IRInst>(this, kIROp_Eql, getBoolType(), left, right);
+        addInst(inst);
+        return inst;
+    }
+
+    IRInst* IRBuilder::emitNeq(IRInst* left, IRInst* right)
+    {
+        auto inst = createInst<IRInst>(this, kIROp_Neq, getBoolType(), left, right);
         addInst(inst);
         return inst;
     }
@@ -4676,106 +4791,13 @@ namespace Slang
         dumpDebugID(context, inst);
     }
     
-    struct StringEncoder
-    {
-        static char getHexChar(int v)
-        {
-            return (v <= 9) ? char(v + '0') : char(v - 10 + 'A');
-        }
-
-        void flush(const char* pos)
-        {
-            if (pos > m_runStart)
-            {
-                m_builder->append(m_runStart, pos);
-            }
-            m_runStart = pos + 1;
-        }
-
-        void appendEscapedChar(const char* pos, char encodeChar)
-        {
-            flush(pos);
-            const char chars[] = { '\\', encodeChar };
-            m_builder->Append(chars, 2);
-        }
-        
-        void appendAsHex(const char* pos)
-        {
-            flush(pos);
-
-            const int v = *(const uint8_t*)pos;
-
-            char buf[5];
-            buf[0] = '\\';
-            buf[1] = 'x';
-            buf[2] = '0';
-
-            buf[3] = getHexChar(v >> 4);
-            buf[4] = getHexChar(v & 0xf);
-
-            m_builder->Append(buf, 5);
-        }
-
-        StringEncoder(StringBuilder* builder, const char* start):
-            m_runStart(start),
-            m_builder(builder)
-        {}
-
-        StringBuilder* m_builder;
-        const char* m_runStart;
-    };
-
     static void dumpEncodeString(
         IRDumpContext*  context, 
         const UnownedStringSlice& slice)
     {
-        // https://msdn.microsoft.com/en-us/library/69ze775t.aspx
-
+        auto handler = StringEscapeUtil::getHandler(StringEscapeUtil::Style::Slang);
         StringBuilder& builder = *context->builder;
-        builder.Append('"');
-        
-        {
-            const char* cur = slice.begin();
-            StringEncoder encoder(&builder, cur);
-            const char* end = slice.end();
-
-            for (; cur < end; cur++)
-            {
-                const int8_t c = uint8_t(*cur);
-                switch (c)
-                {
-                    case '\\':
-                        encoder.appendEscapedChar(cur, '\\');
-                        break;
-                    case '"':
-                        encoder.appendEscapedChar(cur, '"');
-                        break;
-                    case '\n': 
-                        encoder.appendEscapedChar(cur, 'n');
-                        break;
-                    case '\t':
-                        encoder.appendEscapedChar(cur, 't');
-                        break;
-                    case '\r':
-                        encoder.appendEscapedChar(cur, 'r');
-                        break;
-                    case '\0':
-                        encoder.appendEscapedChar(cur, '0');
-                        break;
-                    default:
-                    {
-                        if (c < 32)
-                        {
-                            encoder.appendAsHex(cur);
-                        }
-                        break;
-                    }
-                }
-            }
-            encoder.flush(end);
-        }
-        
-        builder.Append('"');
+        StringEscapeUtil::appendQuoted(handler, slice, builder);
     }
 
     static void dumpType(
@@ -5998,7 +6020,7 @@ namespace Slang
         if (!lastBlock)
             return nullptr;
 
-        auto returnInst = as<IRReturnVal>(lastBlock->getTerminator());
+        auto returnInst = as<IRReturn>(lastBlock->getTerminator());
         if (!returnInst)
             return nullptr;
 

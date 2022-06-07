@@ -341,7 +341,10 @@ struct ASTDumpContext
     {
         m_writer->emit(getGLSLNameForImageFormat(imageFormat));
     }
-
+    void dump(TryClauseType clauseType)
+    {
+        m_writer->emit(getTryClauseTypeName(clauseType));
+    }
     void dump(const String& string)
     {
         dump(string.getUnownedSlice());

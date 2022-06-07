@@ -4,6 +4,8 @@
 #include "slang-syntax.h"
 #include "slang-ir-insts.h"
 
+#include "../compiler-core/slang-artifact-info.h"
+
 #include <assert.h>
 
 namespace Slang {
@@ -1403,6 +1405,7 @@ LayoutRulesFamilyImpl* getDefaultLayoutRulesFamilyForTarget(TargetRequest* targe
     case CodeGenTarget::SPIRVAssembly:
         return &kGLSLLayoutRulesFamilyImpl;
 
+    case CodeGenTarget::HostHostCallable:
     case CodeGenTarget::ShaderHostCallable:
     case CodeGenTarget::HostExecutable:
     case CodeGenTarget::ShaderSharedLibrary:
@@ -1603,18 +1606,7 @@ bool isKhronosTarget(TargetRequest* targetReq)
 
 bool isCPUTarget(TargetRequest* targetReq)
 {
-    switch( targetReq->getTarget() )
-    {
-    default:
-        return false;
-
-    case CodeGenTarget::CPPSource:
-    case CodeGenTarget::CSource:
-    case CodeGenTarget::ShaderHostCallable:
-    case CodeGenTarget::HostExecutable:
-    case CodeGenTarget::ShaderSharedLibrary:
-        return true;
-    }
+    return ArtifactInfoUtil::isCpuTarget(ArtifactDesc::makeFromCompileTarget(asExternal(targetReq->getTarget())));
 }
 
 bool isCUDATarget(TargetRequest* targetReq)

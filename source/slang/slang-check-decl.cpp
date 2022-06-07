@@ -21,8 +21,8 @@ namespace Slang
         : public SemanticsDeclVisitorBase
         , public DeclVisitor<SemanticsDeclModifiersVisitor>
     {
-        SemanticsDeclModifiersVisitor(SharedSemanticsContext* shared)
-            : SemanticsDeclVisitorBase(shared)
+        SemanticsDeclModifiersVisitor(SemanticsContext const& outer)
+            : SemanticsDeclVisitorBase(outer)
         {}
 
         void visitDeclGroup(DeclGroup*) {}
@@ -37,8 +37,8 @@ namespace Slang
         : public SemanticsDeclVisitorBase
         , public DeclVisitor<SemanticsDeclHeaderVisitor>
     {
-        SemanticsDeclHeaderVisitor(SharedSemanticsContext* shared)
-            : SemanticsDeclVisitorBase(shared)
+        SemanticsDeclHeaderVisitor(SemanticsContext const& outer)
+            : SemanticsDeclVisitorBase(outer)
         {}
 
         void visitDecl(Decl*) {}
@@ -106,8 +106,8 @@ namespace Slang
         : public SemanticsDeclVisitorBase
         , public DeclVisitor<SemanticsDeclRedeclarationVisitor>
     {
-        SemanticsDeclRedeclarationVisitor(SharedSemanticsContext* shared)
-            : SemanticsDeclVisitorBase(shared)
+        SemanticsDeclRedeclarationVisitor(SemanticsContext const& outer)
+            : SemanticsDeclVisitorBase(outer)
         {}
 
         void visitDecl(Decl*) {}
@@ -127,8 +127,8 @@ namespace Slang
         : public SemanticsDeclVisitorBase
         , public DeclVisitor<SemanticsDeclBasesVisitor>
     {
-        SemanticsDeclBasesVisitor(SharedSemanticsContext* shared)
-            : SemanticsDeclVisitorBase(shared)
+        SemanticsDeclBasesVisitor(SemanticsContext const& outer)
+            : SemanticsDeclVisitorBase(outer)
         {}
 
         void visitDecl(Decl*) {}
@@ -161,8 +161,8 @@ namespace Slang
         : public SemanticsDeclVisitorBase
         , public DeclVisitor<SemanticsDeclBodyVisitor>
     {
-        SemanticsDeclBodyVisitor(SharedSemanticsContext* shared)
-            : SemanticsDeclVisitorBase(shared)
+        SemanticsDeclBodyVisitor(SemanticsContext const& outer)
+            : SemanticsDeclVisitorBase(outer)
         {}
 
         void visitDecl(Decl*) {}
@@ -668,12 +668,12 @@ namespace Slang
         /// This call does *not* handle updating the state of `decl`; the
         /// caller takes responsibility for doing so.
         ///
-    static void _dispatchDeclCheckingVisitor(Decl* decl, DeclCheckState state, SharedSemanticsContext* shared);
+    static void _dispatchDeclCheckingVisitor(Decl* decl, DeclCheckState state, SemanticsContext const& shared);
 
     // Make sure a declaration has been checked, so we can refer to it.
     // Note that this may lead to us recursively invoking checking,
     // so this may not be the best way to handle things.
-    void SemanticsVisitor::ensureDecl(Decl* decl, DeclCheckState state)
+    void SemanticsVisitor::ensureDecl(Decl* decl, DeclCheckState state, SemanticsContext* baseContext)
     {
         // If the `decl` has already been checked up to or beyond `state`
         // then there is nothing for us to do.
@@ -729,7 +729,12 @@ namespace Slang
 
             // We now dispatch an appropriate visitor based on `nextState`.
             //
-            _dispatchDeclCheckingVisitor(decl, nextState, getShared());
+            // Note that we always dispatch the visitor in a "fresh" semantic-checking
+            // context, so that the state at the point where a declaration is *referenced*
+            // cannot affect the state in which the declaration is *checked*.
+            //
+            SemanticsContext subContext = baseContext ? SemanticsContext(*baseContext) : SemanticsContext(getShared());
+            _dispatchDeclCheckingVisitor(decl, nextState, subContext);
 
             // In the common case, the visitor will have done the necessary
             // checking, but will *not* have updated the `checkState` on
@@ -1177,8 +1182,8 @@ namespace Slang
         : public SemanticsDeclVisitorBase
         , public DeclVisitor<SemanticsDeclConformancesVisitor>
     {
-        SemanticsDeclConformancesVisitor(SharedSemanticsContext* shared)
-            : SemanticsDeclVisitorBase(shared)
+        SemanticsDeclConformancesVisitor(SemanticsContext const& outer)
+            : SemanticsDeclVisitorBase(outer)
         {}
 
         void visitDecl(Decl*) {}
@@ -2088,31 +2093,24 @@ namespace Slang
         // to the user as some kind of overload-resolution failure.
         //
         // In order to protect the user from whatever errors might
-        // occur, we will swap out the current diagnostic sink for
-        // a temporary one.
+        // occur, we will perform the checking in the context of
+        // a temporary diagnostic sink.
         //
-        DiagnosticSink* savedSink = m_shared->m_sink;
-        DiagnosticSink tempSink(savedSink->getSourceManager(), nullptr);
-        m_shared->m_sink = &tempSink;
+        DiagnosticSink tempSink(getSourceManager(), nullptr);
+        SemanticsVisitor subVisitor(withSink(&tempSink));
 
         // With our temporary diagnostic sink soaking up any messages
         // from overload resolution, we can now try to resolve
         // the call to see what happens.
         //
-        auto checkedCall = ResolveInvoke(synCall);
+        auto checkedCall = subVisitor.ResolveInvoke(synCall);
 
         // Of course, it is possible that the call went through fine,
         // but the result isn't of the type we expect/require,
         // so we also need to coerce the result of the call to
         // the expected type.
         //
-        auto coercedCall = coerce(resultType, checkedCall);
-
-        // Once we are done making our semantic checks, we can
-        // restore the original sink, so that subsequent operations
-        // report diagnostics as usual.
-        //
-        m_shared->m_sink = savedSink;
+        auto coercedCall = subVisitor.coerce(resultType, checkedCall);
 
         // If our overload resolution or type coercion failed,
         // then we have not been able to synthesize a witness
@@ -2380,9 +2378,8 @@ namespace Slang
             // `SemanticsVisitor` so that code can push/pop the emission
             // of diagnostics more easily.
             //
-            DiagnosticSink* savedSink = m_shared->m_sink;
-            DiagnosticSink tempSink(savedSink->getSourceManager(), nullptr);
-            m_shared->m_sink = &tempSink;
+            DiagnosticSink tempSink(getSourceManager(), nullptr);
+            SemanticsVisitor subVisitor(withSink(&tempSink));
 
             // We start by constructing an expression that represents
             // `this.name` where `name` is the name of the required
@@ -2415,7 +2412,7 @@ namespace Slang
             // general-purpose language features is unlikely to be as efficient
             // as special-case logic.
             //
-            auto synMemberRef = createLookupResultExpr(
+            auto synMemberRef = subVisitor.createLookupResultExpr(
                 requiredMemberDeclRef.getName(),
                 lookupResult,
                 synThis,
@@ -2434,7 +2431,7 @@ namespace Slang
                 // which involves coercing the member access `this.name` to
                 // the expected type of the property.
                 //
-                auto coercedMemberRef = coerce(propertyType, synMemberRef);
+                auto coercedMemberRef = subVisitor.coerce(propertyType, synMemberRef);
                 auto synReturn = m_astBuilder->create<ReturnStmt>();
                 synReturn->expression = coercedMemberRef;
 
@@ -2461,7 +2458,7 @@ namespace Slang
                 synAssign->left = synMemberRef;
                 synAssign->right = synArgs[0];
 
-                auto synCheckedAssign = checkAssignWithCheckedOperands(synAssign);
+                auto synCheckedAssign = subVisitor.checkAssignWithCheckedOperands(synAssign);
 
                 auto synExprStmt = m_astBuilder->create<ExpressionStmt>();
                 synExprStmt->expression = synCheckedAssign;
@@ -2477,10 +2474,8 @@ namespace Slang
                 return false;
             }
 
-            // We restore the semantic checking state that was in place before
-            // we checked the synthesized accessor body, and then bail out
-            // if we ran into any errors (meaning that the synthesized accessor
-            // is not usable).
+            // We bail out if we ran into any errors (meaning that the synthesized
+            // accessor is not usable).
             //
             // TODO: If there were *warnings* emitted to the sink, it would probably
             // be good to show those warnings to the user, since they might indicate
@@ -2488,7 +2483,6 @@ namespace Slang
             // satisfying an `int` property requirement, but the user would probably
             // want to be warned when they do such a thing.
             //
-            m_shared->m_sink = savedSink;
             if(tempSink.getErrorCount() != 0)
                 return false;
 
@@ -3615,17 +3609,17 @@ namespace Slang
         }
     }
 
-    void SemanticsVisitor::ensureDeclBase(DeclBase* declBase, DeclCheckState state)
+    void SemanticsVisitor::ensureDeclBase(DeclBase* declBase, DeclCheckState state, SemanticsContext* baseContext)
     {
         if(auto decl = as<Decl>(declBase))
         {
-            ensureDecl(decl, state);
+            ensureDecl(decl, state, baseContext);
         }
         else if(auto declGroup = as<DeclGroup>(declBase))
         {
             for(auto dd : declGroup->decls)
             {
-                ensureDecl(dd, state);
+                ensureDecl(dd, state, baseContext);
             }
         }
         else
@@ -4404,6 +4398,17 @@ namespace Slang
         {
             ensureDecl(paramDecl, DeclCheckState::ReadyForReference);
         }
+
+        auto errorType = decl->errorType;
+        if (errorType.exp)
+        {
+            errorType = CheckProperType(errorType);
+        }
+        else
+        {
+            errorType = TypeExp(m_astBuilder->getBottomType());
+        }
+        decl->errorType = errorType;
     }
 
     void SemanticsDeclHeaderVisitor::visitFuncDecl(FuncDecl* funcDecl)
@@ -5046,7 +5051,7 @@ namespace Slang
             name,
             decl->moduleNameAndLoc.loc,
             getSink(),
-            m_shared->m_environmentModules);
+            getShared()->m_environmentModules);
 
         // If we didn't find a matching module, then bail out
         if (!importedModule)
@@ -5324,7 +5329,7 @@ namespace Slang
     }
 
 
-    static void _dispatchDeclCheckingVisitor(Decl* decl, DeclCheckState state, SharedSemanticsContext* shared)
+    static void _dispatchDeclCheckingVisitor(Decl* decl, DeclCheckState state, SemanticsContext const& shared)
     {
         switch(state)
         {
