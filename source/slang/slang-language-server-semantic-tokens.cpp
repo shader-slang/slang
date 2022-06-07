@@ -414,7 +414,7 @@ void iterateAST(UnownedStringSlice fileName, SourceManager* manager, SyntaxNode*
 const char* kSemanticTokenTypes[] = {
     "type", "enumMember", "variable", "parameter", "function", "property", "namespace"};
 
-static_assert(SLANG_COUNT_OF(kSemanticTokenTypes) == (int)SemanticTokenType::_NormalText, "kSemanticTokenTypes must match SemanticTokenType");
+static_assert(SLANG_COUNT_OF(kSemanticTokenTypes) == (int)SemanticTokenType::NormalText, "kSemanticTokenTypes must match SemanticTokenType");
 
 SemanticToken _createSemanticToken(SourceManager* manager, SourceLoc loc, Name* name)
 {
@@ -424,7 +424,7 @@ SemanticToken _createSemanticToken(SourceManager* manager, SourceLoc loc, Name* 
     token.col = (int)(humaneLoc.column - 1);
     token.length =
         name ? (int)(name->text.getLength()) : 0;
-    token.type = SemanticTokenType::_NormalText;
+    token.type = SemanticTokenType::NormalText;
     return token;
 }
 
@@ -436,7 +436,7 @@ List<SemanticToken> getSemanticTokens(Linkage* linkage, Module* module, UnownedS
     auto maybeInsertToken = [&](const SemanticToken& token)
     {
         if (token.line >= 0 && token.col >= 0 && token.length > 0 &&
-            token.type != SemanticTokenType::_NormalText)
+            token.type != SemanticTokenType::NormalText)
             result.add(token);
     };
 

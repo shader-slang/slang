@@ -257,7 +257,7 @@ void ASTPrinter::addGenericParams(const DeclRef<GenericDecl>& genericDeclRef)
     sb << ">";
 }
 
-void ASTPrinter::addDeclParams(const DeclRef<Decl>& declRef, List<Array<Index, 2>>* outParamRange)
+void ASTPrinter::addDeclParams(const DeclRef<Decl>& declRef, List<Range<Index>>* outParamRange)
 {
     auto& sb = m_builder;
 
@@ -317,7 +317,7 @@ void ASTPrinter::addDeclParams(const DeclRef<Decl>& declRef, List<Array<Index, 2
             auto rangeEnd = sb.getLength();
 
             if (outParamRange)
-                outParamRange->add(makeArray<Index>(rangeStart, rangeEnd));
+                outParamRange->add(makeRange<Index>(rangeStart, rangeEnd));
 
             first = false;
         }

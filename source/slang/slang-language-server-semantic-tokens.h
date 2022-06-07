@@ -10,9 +10,9 @@ namespace Slang
 {
 enum class SemanticTokenType
 {
-    Type, EnumMember, Variable, Parameter, Function, Property, Namespace, _NormalText
+    Type, EnumMember, Variable, Parameter, Function, Property, Namespace, NormalText
 };
-extern const char* kSemanticTokenTypes[(int)SemanticTokenType::_NormalText];
+extern const char* kSemanticTokenTypes[(int)SemanticTokenType::NormalText];
 
 struct SemanticToken
 {

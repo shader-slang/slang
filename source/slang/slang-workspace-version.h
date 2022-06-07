@@ -24,7 +24,7 @@ namespace Slang
 
         bool isLocalFile() { return uri.startsWith("file://"); };
         String getPath() const;
-        StringSlice getProtocol() const { return uri.subString(0, uri.indexOf("://")); }
+        StringSlice getProtocol() const;
 
         static URI fromLocalFilePath(UnownedStringSlice path);
         static URI fromString(UnownedStringSlice uriString);
