@@ -91,7 +91,22 @@ struct ComTestContext
     {
         slang::IGlobalSession* slangSession = m_unitTestContext->slangGlobalSession;
 
-        const bool hasLlvm = SLANG_SUCCEEDED(slangSession->checkPassThroughSupport(SLANG_PASS_THROUGH_LLVM));
+        // TODO(JS): 
+        // Care is needed around this in normal testing. `slang-llvm` is whatever was asked for for when premake was built
+        // when the target is specified. Otherwise it is the `default` which is typically 64 bit during development.
+        //
+        // On CI we should be okay, because it should download the correct `slang-llvm` for the build (as it packages up with it).
+        // But for normal development, that can easily not be the case (for example changing to 32 bit build in VS is a problem).
+        //
+        // Make sure to run 
+        //
+        // ```
+        // premake --arch=x86 --deps=true
+        // ```
+        //
+        // for the actual target/arch(!)
+     
+        const bool hasLlvm = SLANG_SUCCEEDED(slangSession->checkPassThroughSupport(SLANG_PASS_THROUGH_LLVM)); 
 
         SlangPassThrough cppCompiler = SLANG_PASS_THROUGH_NONE;
 
@@ -162,7 +177,6 @@ struct ComTestContext
 
 SlangResult ComTestContext::_runTest()
 {
-
     slang::IGlobalSession* slangSession = m_unitTestContext->slangGlobalSession;
 
     // Create a compile request
@@ -279,17 +293,19 @@ SlangResult ComTestContext::_runTest()
 
         setCounter(counterIntf);
 
-        for (Index i = 0; i < 10; ++i)
+        auto counterPtr = (ICountGood**)sharedLibrary->findSymbolAddressByName("globalCounter");
+        SLANG_CHECK(counterPtr);
+        if (!counterPtr)
         {
-            const auto v = nextCount();
-            SLANG_CHECK(v == i);
+            return SLANG_FAIL;
         }
 
-        auto counterPtr = (ICountGood**)sharedLibrary->findSymbolAddressByName("globalCounter");
-
-        if (counterPtr)
+        for (Index i = 0; i < 10; ++i)
         {
             SLANG_CHECK(*counterPtr == &counter);
+            
+            const auto v = nextCount();
+            SLANG_CHECK(v == i);
         }
     }
 
@@ -300,10 +316,14 @@ SlangResult ComTestContext::_runTest()
 
 SLANG_UNIT_TEST(comHostCallable)
 {
-#if SLANG_PTR_IS_32
-    // TODO(JS): 
-    // Currently this doesn't work on 32 bit visual studio/gcc. 
-    // Looks like a calling convention issue.
+#if SLANG_PTR_IS_32 && !SLANG_MICROSOFT_FAMILY
+    // TODO(JS):
+    // We can't currently run this test reliably on targets other than windows
+    // Visual Studio DownstreamCompiler has support for 32 bit builds
+    // Other targets generally build for the native environment which is almost always 64 bit, 
+    // and it requires other features to build/test 32 bit binaries on such systems.
+    // 
+    // So we disable for any 32 bit non MS target for now
     return;
 #endif
 
