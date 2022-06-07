@@ -91,6 +91,10 @@ namespace Slang
 
         int anonymousCounter = 0;
 
+        // Numbers of times we are peeking the same token at `ReadToken` without advancing in
+        // recover mode.
+        int sameTokenPeekedTimes = 0;
+
         Scope* outerScope = nullptr;
         Scope* currentScope = nullptr;
 
@@ -530,6 +534,7 @@ namespace Slang
         if (tokenReader.peekTokenType() == expected)
         {
             isRecovering = false;
+            sameTokenPeekedTimes = 0;
             return tokenReader.advanceToken();
         }
 
@@ -546,8 +551,22 @@ namespace Slang
                 isRecovering = false;
                 return tokenReader.advanceToken();
             }
-
-            return tokenReader.advanceToken();
+            // This could be dangerous: if `ReadToken()` is being called
+            // in a loop we may never make forward progress, so we use
+            // a counter to limit the maximum amount of times we are allowed
+            // to peek the same token. If the outter parsing logic is
+            // correct, we will pop back to the right level. If there are
+            // erroneous parsing logic, this counter is to prevent us
+            // looping infinitely.
+            static const int kMaxTokenPeekCount = 64;
+            sameTokenPeekedTimes++;
+            if (sameTokenPeekedTimes < kMaxTokenPeekCount)
+                return tokenReader.peekToken();
+            else
+            {
+                sameTokenPeekedTimes = 0;
+                return tokenReader.advanceToken();
+            }
         }
     }
 
@@ -1325,12 +1344,19 @@ namespace Slang
                 break;
             }
 
+            auto currentCursor = parser->tokenReader.getCursor();
+
             AddMember(decl, ParseGenericParamDecl(parser, decl));
+
+            // Make sure we make forward progress.
+            if (parser->tokenReader.getCursor() == currentCursor)
+                advanceToken(parser);
 
             if (parser->LookAheadToken(TokenType::OpGreater))
                 break;
 
-            parser->ReadToken(TokenType::Comma);
+            if (!AdvanceIf(parser, TokenType::Comma))
+                break;
         }
         parser->genericDepth--;
         parser->ReadToken(TokenType::OpGreater);
@@ -4184,6 +4210,10 @@ namespace Slang
         else if (LookAheadToken(TokenType::Dollar))
         {
             statement = parseCompileTimeStmt(this);
+        }
+        else if (LookAheadToken("try"))
+        {
+            statement = ParseExpressionStatement();
         }
         else if (LookAheadToken(TokenType::Identifier))
         {

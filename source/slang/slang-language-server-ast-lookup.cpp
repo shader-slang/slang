@@ -346,6 +346,7 @@ public:
         return dispatchIfNotNull(expr->right.exp);
     }
     bool visitModifiedTypeExpr(ModifiedTypeExpr* expr) { return dispatchIfNotNull(expr->base.exp); }
+    bool visitTryExpr(TryExpr* expr) { return dispatchIfNotNull(expr->base); }
 
 };
 

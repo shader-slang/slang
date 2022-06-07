@@ -26,6 +26,11 @@ ASTPrinter::Part::Kind ASTPrinter::Part::getKind(ASTPrinter::Part::Type type)
 
 void ASTPrinter::addType(Type* type)
 {
+    if (!type)
+    {
+        m_builder << "<error>";
+        return;
+    }
     if (m_optionFlags & OptionFlag::SimplifiedBuiltinType)
     {
         if (auto vectorType = as<VectorExpressionType>(type))

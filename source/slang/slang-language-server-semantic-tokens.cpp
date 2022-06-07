@@ -113,6 +113,12 @@ struct ASTIterator
             dispatchIfNotNull(expr->originalExpr);
         }
 
+        void visitTryExpr(TryExpr* expr)
+        {
+            iterator->maybeDispatchCallback(expr);
+            dispatchIfNotNull(expr->base);
+        }
+
         void visitTypeCastExpr(TypeCastExpr* expr)
         {
             iterator->maybeDispatchCallback(expr);

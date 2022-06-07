@@ -260,12 +260,16 @@ SlangResult LanguageServer::didOpenTextDocument(const DidOpenTextDocumentParams&
 
 String getDeclSignatureString(DeclRef<Decl> declRef, ASTBuilder* astBuilder)
 {
-    ASTPrinter printer(
-        astBuilder,
-        ASTPrinter::OptionFlag::ParamNames | ASTPrinter::OptionFlag::NoInternalKeywords |
-            ASTPrinter::OptionFlag::SimplifiedBuiltinType);
-    printer.addDeclSignature(declRef);
-    return printer.getString();
+    if (declRef.getDecl())
+    {
+        ASTPrinter printer(
+            astBuilder,
+            ASTPrinter::OptionFlag::ParamNames | ASTPrinter::OptionFlag::NoInternalKeywords |
+                ASTPrinter::OptionFlag::SimplifiedBuiltinType);
+        printer.addDeclSignature(declRef);
+        return printer.getString();
+    }
+    return "unknown";
 }
 
 
