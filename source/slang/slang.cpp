@@ -2586,18 +2586,28 @@ void Linkage::loadParsedModule(
     int errorCountBefore = sink->getErrorCount();
     compileRequest->checkAllTranslationUnits();
     int errorCountAfter = sink->getErrorCount();
-
-    if (errorCountAfter != errorCountBefore)
+    if (isInLanguageServer())
     {
-        // There must have been an error in the loaded module.
+        // Don't generate IR as language server.
+        // This means that we currently cannot report errors that are detected during IR passes.
+        // Ideally we want to run those passes, but that is too risky for what it is worth right
+        // now.
     }
     else
     {
-        // If we didn't run into any errors, then try to generate
-        // IR code for the imported module.
-        if (errorCountAfter == 0)
+        if (errorCountAfter != errorCountBefore)
         {
-            loadedModule->setIRModule(generateIRForTranslationUnit(getASTBuilder(), translationUnit));
+            // There must have been an error in the loaded module.
+        }
+        else
+        {
+            // If we didn't run into any errors, then try to generate
+            // IR code for the imported module.
+            if (errorCountAfter == 0)
+            {
+                loadedModule->setIRModule(
+                    generateIRForTranslationUnit(getASTBuilder(), translationUnit));
+            }
         }
     }
     loadedModulesList.add(loadedModule);
