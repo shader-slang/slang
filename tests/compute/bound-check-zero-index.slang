@@ -3,7 +3,7 @@
 // Check 'zero indexing' bound check feature, supported by CPU and CUDA
 
 //DISABLE_TEST(compute):COMPARE_COMPUTE:-cuda -shaderobj -Xslang... -Xnvrtc... -DSLANG_ENABLE_BOUND_ZERO_INDEX -X. -X.
-//TEST(compute):COMPARE_COMPUTE:-cpu -shaderobj -Xslang... -Xllvm... -DSLANG_ENABLE_BOUND_ZERO_INDEX -X. -X.
+//DISABLE_TEST(compute):COMPARE_COMPUTE:-cpu -shaderobj -Xslang... -Xllvm... -DSLANG_ENABLE_BOUND_ZERO_INDEX -X. -X.
 
 //TEST_INPUT:ubuffer(data=[0 1 2 3 ]):name=byteAddressBuffer
 ByteAddressBuffer byteAddressBuffer;
