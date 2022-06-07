@@ -111,6 +111,9 @@
     <ClInclude Include="..\..\..\source\core\slang-random-generator.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\source\core\slang-range.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\..\source\core\slang-render-api-util.h">
       <Filter>Header Files</Filter>
     </ClInclude>
