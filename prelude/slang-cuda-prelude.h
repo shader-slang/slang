@@ -46,14 +46,19 @@
 #define SLANG_FORCE_INLINE inline
 #define SLANG_INLINE inline
 
+
+// Since we are using unsigned arithmatic care is need in this comparison.
+// It is *assumed* that sizeInBytes >= elemSize. Which means (sizeInBytes >= elemSize) >= 0
+// Which means only a single test is needed
+
 // Asserts for bounds checking.
 // It is assumed index/count are unsigned types.
 #define SLANG_BOUND_ASSERT(index, count)  SLANG_PRELUDE_ASSERT(index < count); 
-#define SLANG_BOUND_ASSERT_BYTE_ADDRESS(index, elemSize, sizeInBytes) SLANG_PRELUDE_ASSERT(index + elemSize <= sizeInBytes && (index & 3) == 0);
+#define SLANG_BOUND_ASSERT_BYTE_ADDRESS(index, elemSize, sizeInBytes) SLANG_PRELUDE_ASSERT(index <= (sizeInBytes - elemSize) && (index & 3) == 0);
 
 // Macros to zero index if an access is out of range
 #define SLANG_BOUND_ZERO_INDEX(index, count) index = (index < count) ? index : 0; 
-#define SLANG_BOUND_ZERO_INDEX_BYTE_ADDRESS(index, elemSize, sizeInBytes) index = (index + elemSize <= sizeInBytes) ? index : 0; 
+#define SLANG_BOUND_ZERO_INDEX_BYTE_ADDRESS(index, elemSize, sizeInBytes) index = (index <= (sizeInBytes - elemSize)) ? index : 0; 
 
 // The 'FIX' macro define how the index is fixed. The default is to do nothing. If SLANG_ENABLE_BOUND_ZERO_INDEX
 // the fix macro will zero the index, if out of range
@@ -795,7 +800,7 @@ struct ByteAddressBuffer
     SLANG_CUDA_CALL T Load(size_t index) const
     {
         SLANG_BOUND_CHECK_BYTE_ADDRESS(index, sizeof(T), sizeInBytes);
-        return *(const T*)((const char*)data + index);
+        return *(const T*)(((const char*)data) + index);
     }
     
     const uint32_t* data;
@@ -872,7 +877,7 @@ struct RWByteAddressBuffer
     SLANG_CUDA_CALL void Store(size_t index, T const& value) const
     {
         SLANG_BOUND_CHECK_BYTE_ADDRESS(index, sizeof(T), sizeInBytes);
-        *(T*)((char*)data + index) = value;
+        *(T*)(((char*)data) + index) = value;
     }
     
         /// Can be used in stdlib to gain access
