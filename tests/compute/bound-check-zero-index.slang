@@ -44,6 +44,13 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     total += rwStructuredBuffer[tid];
     total += rwStructuredBuffer[-tid];
     
-    outputBuffer[-tid] = total;
-    outputBuffer2[tid * 2 + 1] = total;
+    total += fixedArray[tid];
+    total += fixedArray[-tid];
+    
+    outputBuffer[tid] = total;
+    
+    // NOTE! Different threads could access this if being performed in parallel.
+    // So undeterministic if we write to same index (because out of range) when running in parallel
+    // By just adding one, all indices should be hit once
+    outputBuffer2[tid + 1] = total;
 }
