@@ -637,7 +637,7 @@ void LivenessContext::_addInst(IRInst* inst)
     auto block = as<IRBlock>(inst->getParent());
 
     // Get the index to get the info
-    auto blockIndex = m_blockIndexMap[block];
+    const BlockIndex blockIndex = m_blockIndexMap[block];
 
     auto blockInfo = _getBlockInfo(blockIndex);
 
@@ -653,6 +653,12 @@ void LivenessContext::_addInst(IRInst* inst)
 
 void LivenessContext::_addAccessInst(IRInst* inst)
 {
+    // If we already have it don't need to add again
+    if (m_accessSet.Contains(inst))
+    {
+        return;
+    }
+    
     // Add to the access set
     m_accessSet.Add(inst);
 
@@ -866,11 +872,10 @@ bool LivenessContext::_isNormalRunInst(IRInst* inst)
     }
 
     // NOTE!
-    // The ops in th elist above are the only ops *currently* that indicate an access.
+    // The ops in the list above are the only ops *currently* that indicate an access.
     // Has to be consistent with `_findAliasesAndAccesses`
     if (op == kIROp_Call || 
-        op == kIROp_Load || 
-        op == kIROp_Call)
+        op == kIROp_Load)
     {
         // Just because it's the right type *doesn't* mean it's an access, it has to also 
         // be in the access set
