@@ -836,7 +836,7 @@ struct RWByteAddressBuffer
     SLANG_CUDA_CALL T Load(size_t index) const
     {
         SLANG_BOUND_CHECK_BYTE_ADDRESS(index, sizeof(T), sizeInBytes);
-        return *(const T*)((const char*)data + index));
+        return *(const T*)((const char*)data + index);
     }
     
     SLANG_CUDA_CALL void Store(size_t index, uint32_t v) const 
