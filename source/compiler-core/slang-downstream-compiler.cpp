@@ -519,34 +519,32 @@ SlangResult CommandLineDownstreamCompiler::compile(const CompileOptions& inOptio
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!! DownstreamCompiler::Desc !!!!!!!!!!!!!!!!!!!!!!*/
 
-static DownstreamCompiler::Desc _calcCompiledWithDesc()
+static DownstreamCompilerMatchVersion _calcCompiledVersion()
 {
-    DownstreamCompiler::Desc desc;
+    DownstreamCompilerMatchVersion matchVersion;
 
 #if SLANG_VC
-    desc = WinVisualStudioUtil::getDesc(WinVisualStudioUtil::getCompiledVersion());
+    matchVersion = WinVisualStudioUtil::getCompiledVersion();
 #elif SLANG_CLANG
-    desc.type = SLANG_PASS_THROUGH_CLANG;
-    desc.majorVersion = Int(__clang_major__);
-    desc.minorVersion = Int(__clang_minor__);
+    matchVersion.type = SLANG_PASS_THROUGH_CLANG;
+    matchVersion.matchVersion.set(Index(__clang_major__), Index(__clang_minor__));
 #elif SLANG_GCC
-    desc.type = SLANG_PASS_THROUGH_GCC;
-    desc.majorVersion = Int(__GNUC__);
-    desc.minorVersion = Int(__GNUC_MINOR__);
+    matchVersion.type = SLANG_PASS_THROUGH_GCC;
+    matchVersion.matchVersion.set(Index(__GNUC__), Index(__GNUC_MINOR__));
 #else
     // TODO(JS): Hmmm None is not quite the same as unknown. It works for now, but we might want to have a distinct enum for unknown.
-    desc.type = SLANG_PASS_THROUGH_NONE;        
+    matchVersion.type = SLANG_PASS_THROUGH_NONE;
 #endif
 
-    return desc;
+    return matchVersion;
 }
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!! DownstreamCompilerUtil !!!!!!!!!!!!!!!!!!!!!!*/
 
-const DownstreamCompiler::Desc& DownstreamCompilerUtil::getCompiledWithDesc()
+DownstreamCompilerMatchVersion DownstreamCompilerUtil::getCompiledVersion()
 {
-    static DownstreamCompiler::Desc s_desc = _calcCompiledWithDesc();
-    return s_desc;
+    static DownstreamCompilerMatchVersion s_version = _calcCompiledVersion();
+    return s_version;
 }
 
 /* static */DownstreamCompiler* DownstreamCompilerUtil::findCompiler(const DownstreamCompilerSet* set, MatchType matchType, const DownstreamCompiler::Desc& desc)
@@ -626,22 +624,70 @@ const DownstreamCompiler::Desc& DownstreamCompilerUtil::getCompiledWithDesc()
     return (bestIndex >= 0) ? compilers[bestIndex] : nullptr;
 }
 
-/* static */DownstreamCompiler* DownstreamCompilerUtil::findClosestCompiler(const List<DownstreamCompiler*>& compilers, const DownstreamCompiler::Desc& desc)
+/* static */DownstreamCompiler* DownstreamCompilerUtil::findCompiler(const List<DownstreamCompiler*>& compilers, const DownstreamCompiler::Desc& desc)
 {
-    DownstreamCompiler* compiler;
-
-    compiler = findCompiler(compilers, MatchType::MinGreaterEqual, desc);
-    if (compiler)
+    for (auto compiler : compilers)
     {
-        return compiler;
+        if (compiler->getDesc() == desc)
+        {
+            return compiler;
+        }
     }
-    compiler = findCompiler(compilers, MatchType::MinAbsolute, desc);
-    if (compiler)
+    return nullptr;
+}
+
+/* static */DownstreamCompiler* DownstreamCompilerUtil::findCompiler(const List<DownstreamCompiler*>& compilers, SlangPassThrough type, const SemanticVersion& version)
+{
+    DownstreamCompiler::Desc desc;
+    desc.type = type;
+    desc.majorVersion = version.m_major;
+    desc.minorVersion = version.m_minor;
+    return findCompiler(compilers, desc);
+}
+
+/* static */void DownstreamCompilerUtil::findVersions(const List<DownstreamCompiler*>& compilers, SlangPassThrough type, List<SemanticVersion>& outVersions)
+{
+    for (auto compiler : compilers)
     {
-        return compiler;
+        auto desc = compiler->getDesc();
+
+        if (desc.type == type)
+        {
+            outVersions.add(SemanticVersion(int(desc.majorVersion), int(desc.minorVersion), 0));
+        }
+    }
+}
+
+/* static */DownstreamCompiler* DownstreamCompilerUtil::findClosestCompiler(const List<DownstreamCompiler*>& compilers, const DownstreamCompilerMatchVersion& matchVersion)
+{
+    List<SemanticVersion> versions;
+
+    findVersions(compilers, matchVersion.type, versions);
+
+    if (versions.getCount() > 0)
+    {
+        if (versions.getCount() == 1)
+        {
+            // Must be that one
+            return findCompiler(compilers, matchVersion.type, versions[0]);
+        }
+
+        // Okay lets find the best one
+        auto bestVersion = MatchSemanticVersion::findAnyBest(versions.getBuffer(), versions.getCount(), matchVersion.matchVersion);
+
+        // If one is found use it
+        if (bestVersion.isSet())
+        {
+            return findCompiler(compilers, matchVersion.type, bestVersion);
+        }
     }
 
     {
+        // TODO(JS):
+        // NOTE! This may not really be appropriate, because LLVM is *not* interchangable with 
+        // a 'normal' C++ compiler as cannot access standard libraries/headers.
+        // So `slang-llvm` can't be used for 'host' code.
+
         // These compilers should be usable interchangably. The order is important, as the first one that matches will
         // be used, so LLVM is used before CLANG or GCC if appropriate
         const SlangPassThrough compatiblePassThroughs[] =
@@ -651,31 +697,20 @@ const DownstreamCompiler::Desc& DownstreamCompilerUtil::getCompiledWithDesc()
             SLANG_PASS_THROUGH_GCC,
         };
 
-        bool isCompatible = false;
-        for (auto passThrough : compatiblePassThroughs)
+        // Check the version is one of the compatible types
+        if (makeConstArrayView(compatiblePassThroughs).indexOf(matchVersion.type) >= 0)
         {
-            if (desc.type == passThrough)
-            {
-                isCompatible = true;
-                break;
-            }
-        }
-
-        if (isCompatible)
-        {
+            // Try each compatible type in turn
             for (auto passThrough : compatiblePassThroughs)
             {
-                if (passThrough != desc.type)
+                versions.clear();
+                findVersions(compilers, passThrough, versions);
+
+                if (versions.getCount() > 0)
                 {
-                    DownstreamCompiler::Desc compatible;
-                    
-                    compatible.type = passThrough;
-                    // Find the latest version.
-                    compiler = findCompiler(compilers, MatchType::Newest, compatible);
-                    if (compiler)
-                    {
-                        return compiler;
-                    }
+                    // Get the latest version (as we have no way to really compare)
+                    auto latestVersion = SemanticVersion::getLatest(versions.getBuffer(), versions.getCount());
+                    return findCompiler(compilers, matchVersion.type, latestVersion);
                 }
             }
         }
@@ -684,16 +719,11 @@ const DownstreamCompiler::Desc& DownstreamCompilerUtil::getCompiledWithDesc()
     return nullptr;
 }
 
-/* static */DownstreamCompiler* DownstreamCompilerUtil::findClosestCompiler(const DownstreamCompilerSet* set, const DownstreamCompiler::Desc& desc)
+/* static */DownstreamCompiler* DownstreamCompilerUtil::findClosestCompiler(const DownstreamCompilerSet* set, const DownstreamCompilerMatchVersion& matchVersion)
 {
-    DownstreamCompiler* compiler = set->getCompiler(desc);
-    if (compiler)
-    {
-        return compiler;
-    }
     List<DownstreamCompiler*> compilers;
     set->getCompilers(compilers);
-    return findClosestCompiler(compilers, desc);
+    return findClosestCompiler(compilers, matchVersion);
 }
 
 /* static */void DownstreamCompilerUtil::updateDefault(DownstreamCompilerSet* set, SlangSourceLanguage sourceLanguage)
@@ -708,7 +738,7 @@ const DownstreamCompiler::Desc& DownstreamCompilerUtil::getCompiledWithDesc()
             // Find the compiler closest to the compiler this was compiled with
             if (!compiler)
             {
-                compiler = findClosestCompiler(set, getCompiledWithDesc());
+                compiler = findClosestCompiler(set, getCompiledVersion());
             }
             break;
         }
