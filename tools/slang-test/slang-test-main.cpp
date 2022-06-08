@@ -1558,6 +1558,7 @@ TestResult runLanguageServerTest(TestContext* context, TestInput& input)
     String expectedOutput;
 
     Slang::File::readAllText(expectedOutputPath, expectedOutput);
+    expectedOutput = expectedOutput.trim();
 
     TestResult result = TestResult::Pass;
 
@@ -1578,7 +1579,7 @@ TestResult runLanguageServerTest(TestContext* context, TestInput& input)
         redactedSB << "{REDACTED}" << line.tail(extIdx) << "\n";
     }
 
-    actualOutput = redactedSB.ProduceString();
+    actualOutput = redactedSB.ProduceString().trim();
 
     if (!_areResultsEqual(input.testOptions->type, expectedOutput, actualOutput))
     {
