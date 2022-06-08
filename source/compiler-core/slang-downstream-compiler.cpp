@@ -519,9 +519,9 @@ SlangResult CommandLineDownstreamCompiler::compile(const CompileOptions& inOptio
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!! DownstreamCompiler::Desc !!!!!!!!!!!!!!!!!!!!!!*/
 
-static DownstreamMatchVersion _calcCompiledVersion()
+static DownstreamCompilerMatchVersion _calcCompiledVersion()
 {
-    DownstreamMatchVersion matchVersion;
+    DownstreamCompilerMatchVersion matchVersion;
 
 #if SLANG_VC
     matchVersion = WinVisualStudioUtil::getCompiledVersion();
@@ -541,9 +541,9 @@ static DownstreamMatchVersion _calcCompiledVersion()
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!! DownstreamCompilerUtil !!!!!!!!!!!!!!!!!!!!!!*/
 
-DownstreamMatchVersion DownstreamCompilerUtil::getCompiledVersion()
+DownstreamCompilerMatchVersion DownstreamCompilerUtil::getCompiledVersion()
 {
-    static DownstreamMatchVersion s_version = _calcCompiledVersion();
+    static DownstreamCompilerMatchVersion s_version = _calcCompiledVersion();
     return s_version;
 }
 
@@ -653,12 +653,12 @@ DownstreamMatchVersion DownstreamCompilerUtil::getCompiledVersion()
 
         if (desc.type == type)
         {
-            outVersions.add(SemanticVersion(desc.majorVersion, desc.minorVersion, 0));
+            outVersions.add(SemanticVersion(int(desc.majorVersion), int(desc.minorVersion), 0));
         }
     }
 }
 
-/* static */DownstreamCompiler* DownstreamCompilerUtil::findClosestCompiler(const List<DownstreamCompiler*>& compilers, const DownstreamMatchVersion& matchVersion)
+/* static */DownstreamCompiler* DownstreamCompilerUtil::findClosestCompiler(const List<DownstreamCompiler*>& compilers, const DownstreamCompilerMatchVersion& matchVersion)
 {
     List<SemanticVersion> versions;
 
@@ -683,6 +683,11 @@ DownstreamMatchVersion DownstreamCompilerUtil::getCompiledVersion()
     }
 
     {
+        // TODO(JS):
+        // NOTE! This may not really be appropriate, because LLVM is *not* interchangable with 
+        // a 'normal' C++ compiler as cannot access standard libraries/headers.
+        // So `slang-llvm` can't be used for 'host' code.
+
         // These compilers should be usable interchangably. The order is important, as the first one that matches will
         // be used, so LLVM is used before CLANG or GCC if appropriate
         const SlangPassThrough compatiblePassThroughs[] =
@@ -692,18 +697,10 @@ DownstreamMatchVersion DownstreamCompilerUtil::getCompiledVersion()
             SLANG_PASS_THROUGH_GCC,
         };
 
-        bool isCompatible = false;
-        for (auto passThrough : compatiblePassThroughs)
+        // Check the version is one of the compatible types
+        if (makeConstArrayView(compatiblePassThroughs).indexOf(matchVersion.type) >= 0)
         {
-            if (matchVersion.type == passThrough)
-            {
-                isCompatible = true;
-                break;
-            }
-        }
-
-        if (isCompatible)
-        {
+            // Try each compatible type in turn
             for (auto passThrough : compatiblePassThroughs)
             {
                 versions.clear();
@@ -713,7 +710,6 @@ DownstreamMatchVersion DownstreamCompilerUtil::getCompiledVersion()
                 {
                     // Get the latest version (as we have no way to really compare)
                     auto latestVersion = SemanticVersion::getLatest(versions.getBuffer(), versions.getCount());
-
                     return findCompiler(compilers, matchVersion.type, latestVersion);
                 }
             }
@@ -723,7 +719,7 @@ DownstreamMatchVersion DownstreamCompilerUtil::getCompiledVersion()
     return nullptr;
 }
 
-/* static */DownstreamCompiler* DownstreamCompilerUtil::findClosestCompiler(const DownstreamCompilerSet* set, const DownstreamMatchVersion& matchVersion)
+/* static */DownstreamCompiler* DownstreamCompilerUtil::findClosestCompiler(const DownstreamCompilerSet* set, const DownstreamCompilerMatchVersion& matchVersion)
 {
     List<DownstreamCompiler*> compilers;
     set->getCompilers(compilers);

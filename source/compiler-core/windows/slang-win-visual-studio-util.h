@@ -31,7 +31,7 @@ struct WinVisualStudioUtil
     static SlangResult executeCompiler(const VersionPath& versionPath, const CommandLine& commandLine, ExecuteResult& outResult);
 
         /// Gets the msc compiler used to compile this version. 
-    static DownstreamMatchVersion getCompiledVersion();
+    static DownstreamCompilerMatchVersion getCompiledVersion();
 };
 
 } // namespace Slang

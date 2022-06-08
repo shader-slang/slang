@@ -156,14 +156,14 @@ protected:
 
 // Combination of a downstream compiler type (pass through) and 
 // a match version.
-struct DownstreamMatchVersion
+struct DownstreamCompilerMatchVersion
 {
-    DownstreamMatchVersion(SlangPassThrough inType, MatchSemanticVersion inMatchVersion):
+    DownstreamCompilerMatchVersion(SlangPassThrough inType, MatchSemanticVersion inMatchVersion):
         type(inType),
         matchVersion(inMatchVersion)
     {}
 
-    DownstreamMatchVersion():type(SLANG_PASS_THROUGH_NONE) {}
+    DownstreamCompilerMatchVersion():type(SLANG_PASS_THROUGH_NONE) {}
 
     SlangPassThrough type;                  ///< The type of the compiler
     MatchSemanticVersion matchVersion;      ///< The match version
@@ -557,11 +557,11 @@ struct DownstreamCompilerUtil: public DownstreamCompilerBaseUtil
 
     
         /// Find the compiler closest to the desc 
-    static DownstreamCompiler* findClosestCompiler(const List<DownstreamCompiler*>& compilers, const DownstreamMatchVersion& version);
-    static DownstreamCompiler* findClosestCompiler(const DownstreamCompilerSet* set, const DownstreamMatchVersion& version);
+    static DownstreamCompiler* findClosestCompiler(const List<DownstreamCompiler*>& compilers, const DownstreamCompilerMatchVersion& version);
+    static DownstreamCompiler* findClosestCompiler(const DownstreamCompilerSet* set, const DownstreamCompilerMatchVersion& version);
 
         /// Get the information on the compiler used to compile this source
-    static DownstreamMatchVersion getCompiledVersion();
+    static DownstreamCompilerMatchVersion getCompiledVersion();
 
     static void updateDefault(DownstreamCompilerSet* set, SlangSourceLanguage sourceLanguage);
     static void updateDefaults(DownstreamCompilerSet* set);

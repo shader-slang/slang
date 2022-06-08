@@ -74,17 +74,17 @@ static SlangResult _readRegistryKey(const char* path, const char* keyName, Strin
 
 // Make easier to set up the array
 
-static DownstreamMatchVersion _makeVersion(int main)
+static DownstreamCompilerMatchVersion _makeVersion(int main)
 {
-    DownstreamMatchVersion version;
+    DownstreamCompilerMatchVersion version;
     version.type = SLANG_PASS_THROUGH_VISUAL_STUDIO;
     version.matchVersion.set(main);
     return version;
 }
 
-static DownstreamMatchVersion _makeVersion(int main, int dot) 
+static DownstreamCompilerMatchVersion _makeVersion(int main, int dot) 
 { 
-    DownstreamMatchVersion version;
+    DownstreamCompilerMatchVersion version;
     version.type = SLANG_PASS_THROUGH_VISUAL_STUDIO;
     version.matchVersion.set(main, dot);
     return version;
@@ -154,7 +154,7 @@ static SlangResult _parseVersion(UnownedStringSlice versionString, SemanticVersi
 }
 
 
-/* static */DownstreamMatchVersion WinVisualStudioUtil::getCompiledVersion()
+/* static */DownstreamCompilerMatchVersion WinVisualStudioUtil::getCompiledVersion()
 {
     // Get the version of visual studio used to compile this source
     // Not const, because otherwise we get an warning/error about constant expression...
@@ -221,11 +221,11 @@ static SlangResult _parseVersion(UnownedStringSlice versionString, SemanticVersi
     else if (version >= 1940)
     {
         // Its an unknown newer version
-        return DownstreamMatchVersion(SLANG_PASS_THROUGH_VISUAL_STUDIO, MatchSemanticVersion::makeFuture());
+        return DownstreamCompilerMatchVersion(SLANG_PASS_THROUGH_VISUAL_STUDIO, MatchSemanticVersion::makeFuture());
     }
 
     // Unknown version
-    return DownstreamMatchVersion(SLANG_PASS_THROUGH_VISUAL_STUDIO, MatchSemanticVersion());
+    return DownstreamCompilerMatchVersion(SLANG_PASS_THROUGH_VISUAL_STUDIO, MatchSemanticVersion());
 }
 
 static SlangResult _parseJson(const String& contents, DiagnosticSink* sink, JSONContainer* container, JSONValue& outRoot)
