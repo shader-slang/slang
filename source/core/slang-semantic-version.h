@@ -47,6 +47,9 @@ struct SemanticVersion
     static SlangResult parse(const UnownedStringSlice& value, SemanticVersion& outVersion);
     static SlangResult parse(const UnownedStringSlice& value, char separatorChar, SemanticVersion& outVersion);
 
+    static ThisType getEarliest(const ThisType* versions, Count count);
+    static ThisType getLatest(const ThisType* versions, Count count);
+
     void append(StringBuilder& buf) const;
 
     bool operator>(const ThisType& rhs) const { return toInteger() > rhs.toInteger(); }
@@ -61,6 +64,49 @@ struct SemanticVersion
     uint32_t m_major;
     uint16_t m_minor;
     uint16_t m_patch;
+};
+
+/* Adds to the semantic versioning information for an incomplete version that can be matched */
+struct MatchSemanticVersion
+{
+    typedef MatchSemanticVersion ThisType;
+
+    enum class Kind
+    {
+        Unknown,          ///< Not known
+        Past,               ///< Some unknown past version
+        Future,             ///< Some future unknown version
+        Major,              ///< Major version is defined (minor is in effect undefined)
+        MajorMinor,         ///< Major and minor version are defined
+        MajorMinorPatch,    ///< All elements of semantic version are defined
+    };
+
+        /// True if has a complete version
+    bool hasCompleteVersion() const { return m_kind == Kind::MajorMinorPatch; }
+        /// True if has some version information
+    bool hasVersion() const { return Index(m_kind) >= Index(Kind::Major); }
+
+    void set(Index major) { m_kind = Kind::Major; m_version = SemanticVersion(int(major), 0, 0); }
+    void set(Index major, Index minor) { m_kind = Kind::MajorMinor; m_version = SemanticVersion(int(major), int(minor), 0); }
+    void set(Index major, Index minor, Index patch) { m_kind = Kind::MajorMinorPatch; m_version = SemanticVersion(int(major), int(minor), int(patch)); }
+
+    void append(StringBuilder& buf) const;
+
+    static MatchSemanticVersion makeFuture() { MatchSemanticVersion version; version.m_kind = Kind::Future; return version; }
+
+        /// Finds the 'best' version based on the versions passed. 
+        /// Doesn't follow strict semantic rules as will attempt to return the closest 'any' in past or future
+        /// If none can be found, returns an empty semantic version
+    static SemanticVersion findAnyBest(const SemanticVersion* versions, Count count, const ThisType& matchVersion);
+
+    MatchSemanticVersion():m_kind(Kind::Unknown) {}
+    MatchSemanticVersion(Kind kind, const SemanticVersion& version): 
+        m_kind(kind), 
+        m_version(version) 
+    {}
+
+    Kind m_kind;
+    SemanticVersion m_version;
 };
 
 }

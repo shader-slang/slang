@@ -544,9 +544,10 @@ SlangResult CPPSourceEmitter::calcTypeName(IRType* type, CodeGenTarget target, S
         }
         case kIROp_ComPtrType:
         {
-            out << "ComPtr<";
             auto comPtrType = static_cast<IRComPtrType*>(type);
             auto baseType = cast<IRType>(comPtrType->getOperand(0));
+
+            out << "ComPtr<";
             SLANG_RETURN_ON_FAIL(calcTypeName(baseType, target, out));
             out << ">";
             return SLANG_OK;
@@ -1635,6 +1636,12 @@ CPPSourceEmitter::CPPSourceEmitter(const Desc& desc):
 {
     m_semanticUsedFlags = 0;
     //m_semanticUsedFlags = SemanticUsedFlag::GroupID | SemanticUsedFlag::GroupThreadID | SemanticUsedFlag::DispatchThreadID;
+
+    
+    const auto artifactDesc = ArtifactDesc::makeFromCompileTarget(asExternal(getTarget()));
+
+    // If we have runtime library we can convert to a terminated string slice    
+    m_hasString = (artifactDesc.style == ArtifactStyle::Host);
 }
 
 void CPPSourceEmitter::emitParamTypeImpl(IRType* type, String const& name)
@@ -1945,13 +1952,15 @@ void CPPSourceEmitter::emitEntryPointAttributesImpl(IRFunc* irFunc, IREntryPoint
 
 void CPPSourceEmitter::emitSimpleFuncImpl(IRFunc* func)
 {
+    // Emit function decorations
+    emitFuncDecorations(func);
+
     auto resultType = func->getResultType();
 
     auto name = getName(func);
 
     // Deal with decorations that need
     // to be emitted as attributes
-
 
     // We start by emitting the result type and function name.
     //
@@ -2416,16 +2425,23 @@ bool CPPSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOut
         }
         case kIROp_StringLit:
         {
-            m_writer->emit("toTerminatedSlice(");
-
             auto handler = StringEscapeUtil::getHandler(StringEscapeUtil::Style::Cpp);
-            
+
             StringBuilder buf;
             const auto slice = as<IRStringLit>(inst)->getStringSlice();
             StringEscapeUtil::appendQuoted(handler, slice, buf);
-            m_writer->emit(buf);
+            
+            if (m_hasString)
+            {
+                m_writer->emit("toTerminatedSlice(");
+                m_writer->emit(buf);
+                m_writer->emit(")");
+            }
+            else
+            {
+                m_writer->emit(buf);
+            }
 
-            m_writer->emit(")");
             return true;
         }
         case kIROp_PtrLit:
@@ -2475,12 +2491,17 @@ void CPPSourceEmitter::emitPreModuleImpl()
 {
     if (m_target == CodeGenTarget::CPPSource)
     {
-        // NOTE, that this opens an anonymous scope. 
+        // TODO(JS): Previously this opened an anonymous scope for all generated functions
+        // Unfortunately this is a problem if we are just emitting code that is externally available
+        // and is not only accessible through entry points. So for now we disable
+
+        // that this opens an anonymous scope. 
         // The scope is closed in `emitModuleImpl`
+
+        //m_writer->emit("namespace { // anonymous \n\n");
 
         // When generating kernel code in C++, put all into an anonymous namespace
         // This includes any generated types, and generated intrinsics.
-        m_writer->emit("namespace { // anonymous \n\n");
         m_writer->emit("#ifdef SLANG_PRELUDE_NAMESPACE\n");
         m_writer->emit("using namespace SLANG_PRELUDE_NAMESPACE;\n");
         m_writer->emit("#endif\n\n");
@@ -2524,6 +2545,93 @@ void CPPSourceEmitter::emitPreModuleImpl()
             _maybeEmitSpecializedOperationDefinition(intrinsic);
         }
     }
+}
+
+
+void CPPSourceEmitter::emitGlobalInstImpl(IRInst* inst)
+{
+    if (as<IRGlobalVar>(inst) && inst->findDecoration<IRExternCppDecoration>())
+    {
+        // JS:
+        // Turns out just doing extern "C" means something different on a variable
+        // So we need to wrap in extern "C" { }
+        m_writer->emit("extern \"C\" {\n");
+        Super::emitGlobalInstImpl(inst);
+        m_writer->emit("\n}\n");
+    }
+    else
+    {
+        Super::emitGlobalInstImpl(inst);
+    }
+}
+
+static bool _isExported(IRInst* inst)
+{
+    for (auto decoration : inst->getDecorations())
+    {
+        const auto op = decoration->getOp();
+        if (op == kIROp_PublicDecoration ||
+            op == kIROp_HLSLExportDecoration)
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
+void CPPSourceEmitter::emitVarDecorationsImpl(IRInst* inst)
+{
+    if (as<IRGlobalVar>(inst) && _isExported(inst))
+    {
+        m_writer->emit("SLANG_PRELUDE_SHARED_LIB_EXPORT\n");
+    }
+
+    Super::emitVarDecorationsImpl(inst);
+}
+
+
+void CPPSourceEmitter::_maybeEmitExportLike(IRInst* inst)
+{
+    // Specially handle export, as we don't want to emit it multiple times
+    if (getTargetReq()->isWholeProgramRequest())
+    {
+        bool isExternC = false;
+        bool isExported = false;
+
+        // If public/export made it externally visible
+        for (auto decoration : inst->getDecorations())
+        {
+            const auto op = decoration->getOp();
+            if (op == kIROp_ExternCppDecoration)
+            {
+                isExternC = true;
+            }
+            else if (op == kIROp_PublicDecoration ||
+                op == kIROp_HLSLExportDecoration)
+            {
+                isExported = true;
+            }
+        }
+
+        // TODO(JS): Currently export *also* implies it's extern "C" and we can't list twice
+        if (isExported)
+        {
+            m_writer->emit("SLANG_PRELUDE_EXPORT\n");
+        }
+        else if (isExternC)
+        {
+            // It's name is not manged.
+            m_writer->emit("extern \"C\"\n");
+        }
+    }
+}
+
+/* virtual */void CPPSourceEmitter::emitFuncDecorationsImpl(IRFunc* func)
+{
+    _maybeEmitExportLike(func);
+
+    // Use the default for others
+    Super::emitFuncDecorationsImpl(func);
 }
 
 void CPPSourceEmitter::emitOperandImpl(IRInst* inst, EmitOpInfo const&  outerPrec)
@@ -2792,11 +2900,16 @@ void CPPSourceEmitter::emitModuleImpl(IRModule* module, DiagnosticSink* sink)
     // Emit all witness table definitions.
     _emitWitnessTableDefinitions();
 
-    if (m_target == CodeGenTarget::CPPSource)
-    {
+    // TODO(JS): 
+    // Previously output code was placed in an anonymous namespace
+    // Now that we can have any function available externally (not just entry points)
+    // this doesn't work. 
+
+    //if (m_target == CodeGenTarget::CPPSource)
+    //{
         // Need to close the anonymous namespace when outputting for C++ kernel.
-        m_writer->emit("} // anonymous\n\n");
-    }
+        //m_writer->emit("} // anonymous\n\n");
+    //}
 
      // Finally we need to output dll entry points
 

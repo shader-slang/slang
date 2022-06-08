@@ -1,6 +1,11 @@
 #ifndef SLANG_LLVM_H
 #define SLANG_LLVM_H
 
+// TODO(JS): 
+// Disable exception declspecs, as not supported on LLVM without some extra options.
+// We could enable with `-fms-extensions`
+#define SLANG_DISABLE_EXCEPTIONS 1
+
 #ifndef SLANG_PRELUDE_ASSERT
 #   ifdef DEBUG
 extern "C" void assertFailure(const char* msg);

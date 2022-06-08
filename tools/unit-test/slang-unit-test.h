@@ -67,7 +67,7 @@ typedef IUnitTestModule* (*UnitTestGetModuleFunc)();
 void _##name##_impl(UnitTestContext* unitTestContext); \
 void name(UnitTestContext* unitTestContext)\
 {\
-    try { _##name##_impl(unitTestContext); } catch (AbortTestException){} \
+    try { _##name##_impl(unitTestContext); } catch (AbortTestException&){} \
 }\
 UnitTestRegisterHelper _##name##RegisterHelper(#name, name); \
 void _##name##_impl(UnitTestContext* unitTestContext)

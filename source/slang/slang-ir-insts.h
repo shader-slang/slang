@@ -689,6 +689,14 @@ struct IRVarOffsetAttr : public IRLayoutResourceInfoAttr
     }
 };
 
+    /// An attribute that specifies the error type a function is throwing
+struct IRFuncThrowTypeAttr : IRAttr
+{
+    IR_LEAF_ISA(FuncThrowTypeAttr)
+
+    IRType* getErrorType() { return (IRType*)getOperand(0); }
+};
+
     /// An attribute that specifies size information for a single resource kind.
 struct IRTypeSizeAttr : public IRLayoutResourceInfoAttr
 {
@@ -1419,17 +1427,11 @@ struct IRImageStore : IRInst
 // Terminators
 
 struct IRReturn : IRTerminatorInst
-{};
-
-struct IRReturnVal : IRReturn
 {
-    IRUse val;
+    IR_LEAF_ISA(Return);
 
-    IRInst* getVal() { return val.get(); }
+    IRInst* getVal() { return getOperand(0); }
 };
-
-struct IRReturnVoid : IRReturn
-{};
 
 struct IRDiscard : IRTerminatorInst
 {};
@@ -1545,6 +1547,25 @@ struct IRSwitch : IRTerminatorInst
     UInt getCaseCount() { return (getOperandCount() - 3) / 2; }
     IRInst* getCaseValue(UInt index) { return            getOperand(3 + index*2 + 0); }
     IRBlock* getCaseLabel(UInt index) { return (IRBlock*) getOperand(3 + index*2 + 1); }
+};
+
+struct IRThrow : IRTerminatorInst
+{
+    IR_LEAF_ISA(Throw);
+
+    IRInst* getValue() { return getOperand(0); }
+};
+
+struct IRTryCall : IRTerminatorInst
+{
+    IR_LEAF_ISA(TryCall);
+
+    IRBlock* getSuccessBlock() { return cast<IRBlock>(getOperand(0)); }
+    IRBlock* getFailureBlock() { return cast<IRBlock>(getOperand(1)); }
+    IRInst* getCallee() { return getOperand(2); }
+    UInt getArgCount() { return getOperandCount() - 3; }
+    IRUse* getArgs() { return getOperands() + 3; }
+    IRInst* getArg(UInt index) { return getOperand(index + 3); }
 };
 
 struct IRSwizzle : IRInst
@@ -1758,6 +1779,46 @@ struct IRGetTupleElement : IRInst
     IRInst* getElementIndex() { return getOperand(1); }
 };
 
+// Constructs an `Result<T,E>` value from an error code.
+struct IRMakeResultError : IRInst
+{
+    IR_LEAF_ISA(MakeResultError)
+
+    IRInst* getErrorValue() { return getOperand(0); }
+};
+
+// Constructs an `Result<T,E>` value from an valid value.
+struct IRMakeResultValue : IRInst
+{
+    IR_LEAF_ISA(MakeResultValue)
+
+    IRInst* getValue() { return getOperand(0); }
+};
+
+// Determines if a `Result` value represents an error.
+struct IRIsResultError : IRInst
+{
+    IR_LEAF_ISA(IsResultError)
+
+    IRInst* getResultOperand() { return getOperand(0); }
+};
+
+// Extract the value from a `Result`.
+struct IRGetResultValue : IRInst
+{
+    IR_LEAF_ISA(GetResultValue)
+
+    IRInst* getResultOperand() { return getOperand(0); }
+};
+
+// Extract the error code from a `Result`.
+struct IRGetResultError : IRInst
+{
+    IR_LEAF_ISA(GetResultError)
+
+    IRInst* getResultOperand() { return getOperand(0); }
+};
+
     /// An instruction that packs a concrete value into an existential-type "box"
 struct IRMakeExistential : IRInst
 {
@@ -1908,11 +1969,16 @@ public:
     // keys are modified (thus its hash code is changed).
     void deduplicateAndRebuildGlobalNumberingMap();
 
+    // Replaces all uses of oldInst with newInst, and ensures the global numbering map is valid after the replacement.
+    void replaceGlobalInst(IRInst* oldInst, IRInst* newInst);
+
     typedef Dictionary<IRInstKey, IRInst*> GlobalValueNumberingMap;
     typedef Dictionary<IRConstantKey, IRConstant*> ConstantMap;
 
     GlobalValueNumberingMap& getGlobalValueNumberingMap() { return m_globalValueNumberingMap; }
     ConstantMap& getConstantMap() { return m_constantMap; }
+
+    bool isGloballyNumberedInst(IRInst* inst);
 
 private:
     // The module that will own all of the IR
@@ -2070,6 +2136,7 @@ public:
     IRInst* getFloatValue(IRType* type, IRFloatingPointValue value);
     IRStringLit* getStringValue(const UnownedStringSlice& slice);
     IRPtrLit* getPtrValue(void* value);
+    IRVoidLit* getVoidValue();
     IRInst* getCapabilityValue(CapabilitySet const& caps);
 
     IRBasicType* getBasicType(BaseType baseType);
@@ -2103,6 +2170,8 @@ public:
     IRTupleType* getTupleType(IRType* type0, IRType* type1);
     IRTupleType* getTupleType(IRType* type0, IRType* type1, IRType* type2);
     IRTupleType* getTupleType(IRType* type0, IRType* type1, IRType* type2, IRType* type3);
+
+    IRResultType* getResultType(IRType* valueType, IRType* errorType);
 
     IRBasicBlockType*   getBasicBlockType();
     IRWitnessTableType* getWitnessTableType(IRType* baseType);
@@ -2152,6 +2221,9 @@ public:
         IRType*         resultType);
 
     IRFuncType* getFuncType(
+        UInt paramCount, IRType* const* paramTypes, IRType* resultType, IRAttr* attribute);
+
+    IRFuncType* getFuncType(
         List<IRType*> const&    paramTypes,
         IRType*                 resultType)
     {
@@ -2163,6 +2235,7 @@ public:
 
     IRConstExprRate* getConstExprRate();
     IRGroupSharedRate* getGroupSharedRate();
+    IRActualGlobalRate* getActualGlobalRate();
 
     IRRateQualifiedType* getRateQualifiedType(
         IRRate* rate,
@@ -2279,6 +2352,14 @@ public:
         return emitCallInst(type, func, args.getCount(), args.getBuffer());
     }
 
+    IRInst* emitTryCallInst(
+        IRType* type,
+        IRBlock* successBlock,
+        IRBlock* failureBlock,
+        IRInst* func,
+        UInt argCount,
+        IRInst* const* args);
+
     IRInst* createIntrinsicInst(
         IRType*         type,
         IROp            op,
@@ -2321,6 +2402,12 @@ public:
     }
 
     IRInst* emitGetTupleElement(IRType* type, IRInst* tuple, UInt element);
+
+    IRInst* emitMakeResultError(IRType* resultType, IRInst* errorVal);
+    IRInst* emitMakeResultValue(IRType* resultType, IRInst* val);
+    IRInst* emitIsResultError(IRInst* result);
+    IRInst* emitGetResultError(IRInst* result);
+    IRInst* emitGetResultValue(IRInst* result);
 
     IRInst* emitMakeVector(
         IRType*         type,
@@ -2590,6 +2677,8 @@ public:
 
     IRInst* emitReturn();
 
+    IRInst* emitThrow(IRInst* val);
+
     IRInst* emitDiscard();
 
     IRInst* emitUnreachable();
@@ -2687,6 +2776,8 @@ public:
 
     IRInst* emitAdd(IRType* type, IRInst* left, IRInst* right);
     IRInst* emitMul(IRType* type, IRInst* left, IRInst* right);
+    IRInst* emitEql(IRInst* left, IRInst* right);
+    IRInst* emitNeq(IRInst* left, IRInst* right);
     IRInst* emitShr(IRType* type, IRInst* op0, IRInst* op1);
     IRInst* emitShl(IRType* type, IRInst* op0, IRInst* op1);
 

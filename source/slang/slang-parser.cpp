@@ -91,6 +91,10 @@ namespace Slang
 
         int anonymousCounter = 0;
 
+        // Numbers of times we are peeking the same token at `ReadToken` without advancing in
+        // recover mode.
+        int sameTokenPeekedTimes = 0;
+
         Scope* outerScope = nullptr;
         Scope* currentScope = nullptr;
 
@@ -530,6 +534,7 @@ namespace Slang
         if (tokenReader.peekTokenType() == expected)
         {
             isRecovering = false;
+            sameTokenPeekedTimes = 0;
             return tokenReader.advanceToken();
         }
 
@@ -546,8 +551,22 @@ namespace Slang
                 isRecovering = false;
                 return tokenReader.advanceToken();
             }
-
-            return tokenReader.peekToken();
+            // This could be dangerous: if `ReadToken()` is being called
+            // in a loop we may never make forward progress, so we use
+            // a counter to limit the maximum amount of times we are allowed
+            // to peek the same token. If the outter parsing logic is
+            // correct, we will pop back to the right level. If there are
+            // erroneous parsing logic, this counter is to prevent us
+            // looping infinitely.
+            static const int kMaxTokenPeekCount = 64;
+            sameTokenPeekedTimes++;
+            if (sameTokenPeekedTimes < kMaxTokenPeekCount)
+                return tokenReader.peekToken();
+            else
+            {
+                sameTokenPeekedTimes = 0;
+                return tokenReader.advanceToken();
+            }
         }
     }
 
@@ -1238,7 +1257,7 @@ namespace Slang
     // parent link is set up correctly.
     static void AddMember(ContainerDecl* container, Decl* member)
     {
-        if (container)
+        if (container && member)
         {
             member->parentDecl = container;
             container->members.add(member);
@@ -1325,12 +1344,19 @@ namespace Slang
                 break;
             }
 
+            auto currentCursor = parser->tokenReader.getCursor();
+
             AddMember(decl, ParseGenericParamDecl(parser, decl));
+
+            // Make sure we make forward progress.
+            if (parser->tokenReader.getCursor() == currentCursor)
+                advanceToken(parser);
 
             if (parser->LookAheadToken(TokenType::OpGreater))
                 break;
 
-            parser->ReadToken(TokenType::Comma);
+            if (!AdvanceIf(parser, TokenType::Comma))
+                break;
         }
         parser->genericDepth--;
         parser->ReadToken(TokenType::OpGreater);
@@ -1485,6 +1511,12 @@ namespace Slang
             parser->PushScope(decl);
 
             parseParameterList(parser, decl);
+
+            if (AdvanceIf(parser, "throws"))
+            {
+                decl->errorType = parser->ParseTypeExp();
+            }
+
             _parseOptSemantics(parser, decl);
             decl->body = parseOptBody(parser);
 
@@ -1857,7 +1889,7 @@ namespace Slang
     {
         GenericAppExpr* genericApp = parser->astBuilder->create<GenericAppExpr>();
 
-        parser->FillPosition(genericApp); // set up scope for lookup
+        genericApp->loc = base->loc;
         genericApp->functionExpr = base;
         parser->ReadToken(TokenType::OpLess);
         parser->genericDepth++;
@@ -1941,12 +1973,12 @@ namespace Slang
         }
         return base;
     }
-    static Expr* parseMemberType(Parser * parser, Expr* base)
+    static Expr* parseMemberType(Parser * parser, Expr* base, SourceLoc opLoc)
     {
         // When called the :: or . have been consumed, so don't need to consume here.
 
         MemberExpr* memberExpr = parser->astBuilder->create<MemberExpr>();
-
+        memberExpr->memberOperatorLoc = opLoc;
         parser->FillPosition(memberExpr);
         memberExpr->baseExpression = base;
         memberExpr->name = expectIdentifier(parser).name;
@@ -2252,13 +2284,17 @@ namespace Slang
                 typeExpr = parseGenericApp(parser, typeExpr);
                 break;
             case TokenType::Scope:
-                parser->ReadToken(TokenType::Scope);
-                typeExpr = parseMemberType(parser, typeExpr);
-                break;
+                {
+                    auto opToken = parser->ReadToken(TokenType::Scope);
+                    typeExpr = parseMemberType(parser, typeExpr, opToken.loc);
+                    break;
+                }
             case TokenType::Dot:
-                parser->ReadToken(TokenType::Dot);
-                typeExpr = parseMemberType(parser, typeExpr);
-                break;
+                {
+                    auto opToken = parser->ReadToken(TokenType::Dot);
+                    typeExpr = parseMemberType(parser, typeExpr, opToken.loc);
+                    break;
+                }
             default:
                 shouldLoop = false;
             }
@@ -3180,6 +3216,10 @@ namespace Slang
         {
             decl->returnType = parser->ParseTypeExp();
         }
+        else
+        {
+            decl->returnType.exp = parser->astBuilder->create<IncompleteExpr>();
+        }
 
         parseStorageDeclBody(parser, decl);
 
@@ -3212,7 +3252,6 @@ namespace Slang
     static NodeBase* parsePropertyDecl(Parser* parser, void* /*userData*/)
     {
         PropertyDecl* decl = parser->astBuilder->create<PropertyDecl>();
-        parser->FillPosition(decl);
         parser->PushScope(decl);
 
         // We want to support property declarations with two
@@ -3238,6 +3277,7 @@ namespace Slang
         //
         if(_peekModernStyleVarDecl(parser))
         {
+            parser->FillPosition(decl);
             decl->nameAndLoc = expectIdentifier(parser);
             expect(parser, TokenType::Colon);
             decl->type = parser->ParseTypeExp();
@@ -3383,6 +3423,10 @@ namespace Slang
         {
             parser->PushScope(decl);
             parseModernParamList(parser, decl);
+            if (AdvanceIf(parser, "throws"))
+            {
+                decl->errorType = parser->ParseTypeExp();
+            }
             if(AdvanceIf(parser, TokenType::RightArrow))
             {
                 decl->returnType = parser->ParseTypeExp();
@@ -3758,10 +3802,12 @@ namespace Slang
         ContainerDecl*      containerDecl,
         MatchedTokenType    matchType)
     {
-        while(!AdvanceIfMatch(parser, matchType))
+        Token closingBraceToken;
+        while (!AdvanceIfMatch(parser, matchType, &closingBraceToken))
         {
             ParseDecl(parser, containerDecl);
         }
+        containerDecl->closingSourceLoc = closingBraceToken.loc;
     }
 
     static void parseDeclBody(
@@ -3813,8 +3859,8 @@ namespace Slang
     Decl* Parser::ParseStruct()
     {
         StructDecl* rs = astBuilder->create<StructDecl>();
-        FillPosition(rs);
         ReadToken("struct");
+        FillPosition(rs);
 
         // The `struct` keyword may optionally be followed by
         // attributes that appertain to the struct declaration
@@ -3847,8 +3893,8 @@ namespace Slang
     ClassDecl* Parser::ParseClass()
     {
         ClassDecl* rs = astBuilder->create<ClassDecl>();
-        FillPosition(rs);
         ReadToken("class");
+        FillPosition(rs);
         rs->nameAndLoc = expectIdentifier(this);
 
         parseOptionalInheritanceClause(this, rs);
@@ -3875,7 +3921,6 @@ namespace Slang
     static Decl* parseEnumDecl(Parser* parser)
     {
         EnumDecl* decl = parser->astBuilder->create<EnumDecl>();
-        parser->FillPosition(decl);
 
         parser->ReadToken("enum");
 
@@ -3886,6 +3931,8 @@ namespace Slang
         // toward deprecating it.
         //
         AdvanceIf(parser, "class");
+
+        parser->FillPosition(decl);
 
         decl->nameAndLoc = expectIdentifier(parser);
 
@@ -4167,6 +4214,10 @@ namespace Slang
         else if (LookAheadToken(TokenType::Dollar))
         {
             statement = parseCompileTimeStmt(this);
+        }
+        else if (LookAheadToken("try"))
+        {
+            statement = ParseExpressionStatement();
         }
         else if (LookAheadToken(TokenType::Identifier))
         {
@@ -4860,6 +4911,15 @@ namespace Slang
         return parser->astBuilder->create<NullPtrLiteralExpr>();
     }
 
+    static NodeBase* parseTryExpr(Parser* parser, void* /*userData*/)
+    {
+        auto tryExpr = parser->astBuilder->create<TryExpr>();
+        tryExpr->tryClauseType = TryClauseType::Standard;
+        tryExpr->base = parser->ParseLeafExpression();
+        tryExpr->scope = parser->currentScope;
+        return tryExpr;
+    }
+
     static bool _isFinite(double value)
     {
         // Lets type pun double to uint64_t, so we can detect special double values
@@ -5165,7 +5225,7 @@ namespace Slang
         default:
             // TODO: should this return an error expression instead of NULL?
             parser->sink->diagnose(parser->tokenReader.peekLoc(), Diagnostics::syntaxError);
-            return nullptr;
+            return parser->astBuilder->create<IncompleteExpr>();
 
         // Either:
         // - parenthesized expression `(exp)`
@@ -5558,6 +5618,10 @@ namespace Slang
                     {
                         indexExpr->indexExpression = parser->ParseExpression();
                     }
+                    else
+                    {
+                        indexExpr->indexExpression = parser->astBuilder->create<IncompleteExpr>();
+                    }
                     parser->ReadToken(TokenType::RBracket);
 
                     expr = indexExpr;
@@ -5570,7 +5634,8 @@ namespace Slang
                     InvokeExpr* invokeExpr = parser->astBuilder->create<InvokeExpr>();
                     invokeExpr->functionExpr = expr;
                     parser->FillPosition(invokeExpr);
-                    parser->ReadToken(TokenType::LParent);
+                    auto lParen = parser->ReadToken(TokenType::LParent);
+                    invokeExpr->argumentDelimeterLocs.add(lParen.loc);
                     while (!parser->tokenReader.isAtEnd())
                     {
                         if (!parser->LookAheadToken(TokenType::RParent))
@@ -5581,10 +5646,11 @@ namespace Slang
                         }
                         if (!parser->LookAheadToken(TokenType::Comma))
                             break;
-                        parser->ReadToken(TokenType::Comma);
+                        auto comma = parser->ReadToken(TokenType::Comma);
+                        invokeExpr->argumentDelimeterLocs.add(comma.loc);
                     }
-                    parser->ReadToken(TokenType::RParent);
-
+                    auto rParen = parser->ReadToken(TokenType::RParent);
+                    invokeExpr->argumentDelimeterLocs.add(rParen.loc);
                     expr = invokeExpr;
                 }
                 break;
@@ -5596,10 +5662,10 @@ namespace Slang
 
                 // TODO(tfoley): why would a member expression need this?
                 staticMemberExpr->scope = parser->currentScope;
-
-                parser->FillPosition(staticMemberExpr);
+                staticMemberExpr->memberOperatorLoc = parser->tokenReader.peekLoc();
                 staticMemberExpr->baseExpression = expr;
                 parser->ReadToken(TokenType::Scope);
+                parser->FillPosition(staticMemberExpr);
                 staticMemberExpr->name = expectIdentifier(parser).name;
 
                 if (peekTokenType(parser) == TokenType::OpLess)
@@ -5616,10 +5682,10 @@ namespace Slang
 
                     // TODO(tfoley): why would a member expression need this?
                     memberExpr->scope = parser->currentScope;
-
-                    parser->FillPosition(memberExpr);
+                    memberExpr->memberOperatorLoc = parser->tokenReader.peekLoc();
                     memberExpr->baseExpression = expr;
                     parser->ReadToken(TokenType::Dot);
+                    parser->FillPosition(memberExpr);
                     memberExpr->name = expectIdentifier(parser).name;
 
                     if (peekTokenType(parser) == TokenType::OpLess)
@@ -6263,7 +6329,7 @@ namespace Slang
         // keyword (no further tokens expected/allowed),
         // and which can be represented just by creating
         // a new AST node of the corresponding type.
-
+        
         _makeParseModifier("in",            InModifier::kReflectClassInfo),
         _makeParseModifier("input",         InputModifier::kReflectClassInfo),
         _makeParseModifier("out",           OutModifier::kReflectClassInfo),
@@ -6272,6 +6338,8 @@ namespace Slang
         _makeParseModifier("const",         ConstModifier::kReflectClassInfo),
         _makeParseModifier("instance",      InstanceModifier::kReflectClassInfo),
         _makeParseModifier("__builtin",     BuiltinModifier::kReflectClassInfo),
+
+        _makeParseModifier("__global",      ActualGlobalModifier::kReflectClassInfo),
 
         _makeParseModifier("inline",        InlineModifier::kReflectClassInfo),
         _makeParseModifier("public",        PublicModifier::kReflectClassInfo),
@@ -6336,6 +6404,7 @@ namespace Slang
         _makeParseExpr("true",  parseTrueExpr),
         _makeParseExpr("false", parseFalseExpr),
         _makeParseExpr("nullptr", parseNullPtrExpr),
+        _makeParseExpr("try",     parseTryExpr),
         _makeParseExpr("__TaggedUnion", parseTaggedUnionType),
     };
 

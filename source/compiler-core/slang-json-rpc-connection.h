@@ -50,6 +50,7 @@ public:
 
         /// Convert value to dst. Will write response on fails
     SlangResult toNativeOrSendError(const JSONValue& value, const RttiInfo* info, void* dst, const JSONValue& id);
+
     template <typename T>
     SlangResult toNativeOrSendError(const JSONValue& value, T* data, const JSONValue& id) { return toNativeOrSendError(value, GetRttiInfo<T>::get(), data, id); }
 
@@ -59,6 +60,7 @@ public:
         /// toNativeOrSendError does not assume the thing being converted is args, and so doesn't allow such a transformation.
         /// Will write error response on failure.
     SlangResult toNativeArgsOrSendError(const JSONValue& srcArgs, const RttiInfo* dstArgsRttiInfo, void* dstArgs, const JSONValue& id);
+
     template <typename T>
     SlangResult toNativeArgsOrSendError(const JSONValue& srcArgs, T* dstArgs, const JSONValue& id) { return toNativeArgsOrSendError(srcArgs, GetRttiInfo<T>::get(), dstArgs, id); }
 

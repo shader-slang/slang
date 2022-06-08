@@ -179,4 +179,18 @@ namespace gfx_test
     GfxIndex getSubresourceIndex(GfxIndex mipLevel, GfxCount mipLevelCount, GfxIndex baseArrayLayer);
     RefPtr<ValidationTextureFormatBase> getValidationTextureFormat(Format format);
     void generateTextureData(RefPtr<TextureInfo> texture, ValidationTextureFormatBase* validationFormat);
+
+    List<uint8_t> removePadding(ISlangBlob* pixels, GfxCount width, GfxCount height, Size rowPitch, Size pixelSize);
+    Slang::Result writeImage(
+        const char* filename,
+        ISlangBlob* pixels,
+        uint32_t width,
+        uint32_t height);
+    Slang::Result writeImage(
+        const char* filename,
+        ISlangBlob* pixels,
+        uint32_t width,
+        uint32_t height,
+        uint32_t rowPitch,
+        uint32_t pixelSize);
 }

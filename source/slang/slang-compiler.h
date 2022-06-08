@@ -79,6 +79,7 @@ namespace Slang
         CUDASource          = SLANG_CUDA_SOURCE,
         PTX                 = SLANG_PTX,
         ObjectCode          = SLANG_OBJECT_CODE,
+        HostHostCallable    = SLANG_HOST_HOST_CALLABLE,
         CountOf             = SLANG_TARGET_COUNT_OF,
     };
 
@@ -1684,6 +1685,7 @@ namespace Slang
             slang::IBlob**     outDiagnostics = nullptr) override;
         SLANG_NO_THROW slang::IModule* SLANG_MCALL loadModuleFromSource(
             const char* moduleName,
+            const char* path,
             slang::IBlob* source,
             slang::IBlob** outDiagnostics = nullptr) override;
         SLANG_NO_THROW SlangResult SLANG_MCALL createCompositeComponentType(
@@ -1741,6 +1743,10 @@ namespace Slang
 
             /// Dtor
         ~Linkage();
+
+        slang::SessionFlags m_flag = 0;
+        void setFlags(slang::SessionFlags flags) { m_flag = flags; }
+        bool isInLanguageServer() { return (m_flag & slang::kSessionFlag_LanguageServer) != 0; }
 
             /// Get the parent session for this linkage
         Session* getSessionImpl() { return m_session; }
@@ -1899,6 +1905,8 @@ namespace Slang
         OptimizationLevel optimizationLevel = OptimizationLevel::Default;
 
         SerialCompressionType serialCompressionType = SerialCompressionType::VariableByteLite;
+
+        DiagnosticSink::Flags diagnosticSinkFlags = 0;
 
         bool m_requireCacheFileSystem = false;
         bool m_useFalcorCustomSharedKeywordSemantics = false;
@@ -2879,7 +2887,7 @@ namespace Slang
         void addTransition(CodeGenTarget source, CodeGenTarget target, PassThroughMode compiler)
         {
             SLANG_ASSERT(source != target);
-            m_map.Add(Pair{ source, target }, compiler);
+            m_map.Set(Pair{ source, target }, compiler);
         }
         bool hasTransition(CodeGenTarget source, CodeGenTarget target) const
         {
@@ -3135,6 +3143,8 @@ SLANG_FORCE_INLINE EndToEndCompileRequest* asInternal(SlangCompileRequest* reque
     SLANG_ASSERT(endToEndRequest);
     return endToEndRequest;
 }
+
+SLANG_FORCE_INLINE SlangCompileTarget asExternal(CodeGenTarget target) { return (SlangCompileTarget)target; }
 
 }
 

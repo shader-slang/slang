@@ -267,6 +267,9 @@ namespace Slang
         /// Is `decl` a global shader parameter declaration?
     bool isGlobalShaderParameter(VarDeclBase* decl)
     {
+        // If it's an *actual* global it is not a global shader parameter
+        if (decl->hasModifier<ActualGlobalModifier>()) { return false; }
+        
         // A global shader parameter must be declared at global or namespace
         // scope, so that it has a single definition across the module.
         //
@@ -673,7 +676,7 @@ namespace Slang
     // Make sure a declaration has been checked, so we can refer to it.
     // Note that this may lead to us recursively invoking checking,
     // so this may not be the best way to handle things.
-    void SemanticsVisitor::ensureDecl(Decl* decl, DeclCheckState state)
+    void SemanticsVisitor::ensureDecl(Decl* decl, DeclCheckState state, SemanticsContext* baseContext)
     {
         // If the `decl` has already been checked up to or beyond `state`
         // then there is nothing for us to do.
@@ -733,7 +736,7 @@ namespace Slang
             // context, so that the state at the point where a declaration is *referenced*
             // cannot affect the state in which the declaration is *checked*.
             //
-            SemanticsContext subContext(getShared());
+            SemanticsContext subContext = baseContext ? SemanticsContext(*baseContext) : SemanticsContext(getShared());
             _dispatchDeclCheckingVisitor(decl, nextState, subContext);
 
             // In the common case, the visitor will have done the necessary
@@ -2416,7 +2419,9 @@ namespace Slang
                 requiredMemberDeclRef.getName(),
                 lookupResult,
                 synThis,
-                requiredMemberDeclRef.getLoc());
+                requiredMemberDeclRef.getLoc(),
+                nullptr);
+            synMemberRef->loc = requiredMemberDeclRef.getLoc();
 
             // The body of the accessor will depend on the class of the accessor
             // we are synthesizing (e.g., `get` vs. `set`).
@@ -3609,17 +3614,17 @@ namespace Slang
         }
     }
 
-    void SemanticsVisitor::ensureDeclBase(DeclBase* declBase, DeclCheckState state)
+    void SemanticsVisitor::ensureDeclBase(DeclBase* declBase, DeclCheckState state, SemanticsContext* baseContext)
     {
         if(auto decl = as<Decl>(declBase))
         {
-            ensureDecl(decl, state);
+            ensureDecl(decl, state, baseContext);
         }
         else if(auto declGroup = as<DeclGroup>(declBase))
         {
             for(auto dd : declGroup->decls)
             {
-                ensureDecl(dd, state);
+                ensureDecl(dd, state, baseContext);
             }
         }
         else
@@ -4398,6 +4403,17 @@ namespace Slang
         {
             ensureDecl(paramDecl, DeclCheckState::ReadyForReference);
         }
+
+        auto errorType = decl->errorType;
+        if (errorType.exp)
+        {
+            errorType = CheckProperType(errorType);
+        }
+        else
+        {
+            errorType = TypeExp(m_astBuilder->getBottomType());
+        }
+        decl->errorType = errorType;
     }
 
     void SemanticsDeclHeaderVisitor::visitFuncDecl(FuncDecl* funcDecl)

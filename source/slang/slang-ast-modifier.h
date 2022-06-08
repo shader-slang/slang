@@ -31,6 +31,10 @@ class ConstExprModifier : public Modifier { SLANG_AST_CLASS(ConstExprModifier)};
 class GloballyCoherentModifier : public Modifier { SLANG_AST_CLASS(GloballyCoherentModifier)};
 class ExternCppModifier : public Modifier { SLANG_AST_CLASS(ExternCppModifier)};
 
+// An 'ActualGlobal' is a global that is output as a normal global in CPU code. 
+// Globals in HLSL/Slang are constant state passed into kernel execution 
+class ActualGlobalModifier : public Modifier { SLANG_AST_CLASS(ActualGlobalModifier)};
+
     /// A modifier that indicates an `InheritanceDecl` should be ignored during name lookup (and related checks).
 class IgnoreForLookupModifier : public Modifier { SLANG_AST_CLASS(IgnoreForLookupModifier) };
 

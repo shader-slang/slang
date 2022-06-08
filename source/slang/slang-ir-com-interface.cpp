@@ -7,92 +7,105 @@
 namespace Slang
 {
 
-struct ComInterfaceLoweringContext
+static bool _canReplace(IRUse* use)
 {
-    IRModule* module;
-    DiagnosticSink* diagnosticSink;
-
-    SharedIRBuilder sharedBuilder;
-
-    Dictionary<IRInterfaceType*, IRComPtrType*> comPtrTypes;
-
-    void replaceTypeUses(IRInst* inst, IRInst* newValue)
+    switch (use->getUser()->getOp())
     {
-        List<IRUse*> uses;
-        for (auto use = inst->firstUse; use; use = use->nextUse)
+        case kIROp_WitnessTableIDType:
+        case kIROp_WitnessTableType:
+        case kIROp_RTTIPointerType:
+        case kIROp_RTTIHandleType:
         {
-            uses.add(use);
+            // Don't replace
+            return false;
         }
-        for (auto use : uses)
+        case kIROp_ThisType:
         {
-            switch (use->getUser()->getOp())
-            {
-            case kIROp_WitnessTableIDType:
-            case kIROp_WitnessTableType:
-            case kIROp_ThisType:
-            case kIROp_RTTIPointerType:
-            case kIROp_RTTIHandleType:
-            case kIROp_ComPtrType:
-                continue;
-            default:
-                break;
-            }
-            use->set(newValue);
+            // Appears replacable.
+            break;
+        }
+        case kIROp_ComPtrType:
+        case kIROp_PtrType:
+        {
+            // We can have ** and ComPtr<T>*.
+            // If it's a pointer type it could be because it is a global.
+            break;
+        }
+        default: break;
+    }
+    return true;
+}
+
+void lowerComInterfaces(IRModule* module, ArtifactStyle artifactStyle, DiagnosticSink* sink)
+{
+    SLANG_UNUSED(sink);
+
+    // Find all of the COM interfaces
+    List<IRInterfaceType*> comInterfaces;
+    for (auto child : module->getGlobalInsts())
+    {
+        auto intf = as<IRInterfaceType>(child);
+        if (intf && intf->findDecoration<IRComInterfaceDecoration>())
+        {
+            comInterfaces.add(intf);
         }
     }
 
-    IRComPtrType* processInterfaceType(IRInterfaceType* type)
+    // For all interfaces found replace uses
     {
-        if (!type->findDecoration<IRComInterfaceDecoration>())
-            return nullptr;
-
-        IRComPtrType* result = nullptr;
-
-        if (comPtrTypes.TryGetValue(type, result))
-            return result;
+        SharedIRBuilder sharedBuilder;
+        sharedBuilder.init(module);
 
         IRBuilder builder(sharedBuilder);
         builder.setInsertInto(module->getModuleInst());
-        result = builder.getComPtrType(type);
 
-        replaceTypeUses(type, result);
-        return result;
-    }
+        List<IRUse*> uses;
 
-    void processThisType(IRThisType* type)
-    {
-        auto comPtrType = processInterfaceType(as<IRInterfaceType>(type->getConstraintType()));
-        if (!comPtrType)
-            return;
-        replaceTypeUses(type, comPtrType);
-    }
-
-    void processModule()
-    {
-        for (auto child : module->getGlobalInsts())
+        for (auto comIntf : comInterfaces)
         {
-            switch (child->getOp())
+            uses.clear();
+
+            // Find all of the uses *before* doing any replacement
+            // Otherwise we end up replacing the replacement leading 
+            // to it pointing to itself.
+            for (auto use = comIntf->firstUse; use; use = use->nextUse)
             {
-            case kIROp_InterfaceType:
-                processInterfaceType(as<IRInterfaceType>(child));
-                break;
-            case kIROp_ThisType:
-                processThisType(as<IRThisType>(child));
-                break;
-            default:
-                break;
+                // Only store off uses where replacement can be made
+                if (_canReplace(use))
+                {
+                    uses.add(use);
+                }
+            }
+
+            // If there are no uses that can be replaced, then we don't need
+            // to create a replacement result
+            if (uses.getCount() <= 0)
+            {
+                continue;
+            }
+
+            // NOTE! The following code relies on the fact that the builder
+            // *doesn't* dedup in general, and in particular doesn't ptr types. 
+            // This allows the creation a 'new'  pointer type, and subsequent replacment all old uses, 
+            // leading to a `IInterface*` becoming `IInterface**`. 
+            // 
+
+            // TODO(JS): This is a temporary fix, in that whether kernel or not 
+            // shouldn't control the ptr type in general
+            // It's necessary here though because Kernel doesn't have ComPtr<>
+            // so has to be a raw pointer
+            IRType* result = (artifactStyle == ArtifactStyle::Host) ?
+                static_cast<IRType*>(builder.getComPtrType(comIntf)) :
+                static_cast<IRType*>(builder.getPtrType(comIntf));
+
+            // Go through replacing all of the replacable uses
+            for (auto use : uses)
+            {
+                // Do the replacement
+                use->set(result);
             }
         }
     }
-};
-
-void lowerComInterfaces(IRModule* module, DiagnosticSink* sink)
-{
-    ComInterfaceLoweringContext context;
-    context.module = module;
-    context.diagnosticSink = sink;
-    context.sharedBuilder.init(module);
-    return context.processModule();
 }
 
 }

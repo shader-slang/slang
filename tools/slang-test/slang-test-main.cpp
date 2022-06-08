@@ -781,6 +781,8 @@ static PassThroughFlags _getPassThroughFlagsForTarget(SlangCompileTarget target)
         }
 
         case SLANG_SHADER_HOST_CALLABLE:
+        case SLANG_HOST_HOST_CALLABLE:
+
         case SLANG_HOST_EXECUTABLE:
         case SLANG_SHADER_SHARED_LIBRARY:
         {

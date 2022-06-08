@@ -1619,11 +1619,16 @@ struct SPIRVEmitContext
         case kIROp_Rsh:
         case kIROp_Lsh:
             return emitArithmetic(parent, inst);
-        case kIROp_ReturnVal:
-            return emitInst(
-                parent, inst, SpvOpReturnValue, as<IRReturnVal>(inst)->getVal());
-        case kIROp_ReturnVoid:
-            return emitInst(parent, inst, SpvOpReturn);
+        case kIROp_Return:
+            if (as<IRReturn>(inst)->getVal()->getOp() == kIROp_VoidLit)
+            {
+                return emitInst(parent, inst, SpvOpReturn);
+            }
+            else
+            {
+                return emitInst(
+                    parent, inst, SpvOpReturnValue, as<IRReturn>(inst)->getVal());
+            }
         case kIROp_discard:
             return emitInst(parent, inst, SpvOpKill);
         case kIROp_unconditionalBranch:

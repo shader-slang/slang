@@ -57,6 +57,7 @@ protected:
     // State shared between ASTBuilders
 
     Type* m_errorType = nullptr;
+    Type* m_bottomType = nullptr;
     Type* m_initializerListType = nullptr;
     Type* m_overloadedType = nullptr;
 
@@ -133,6 +134,7 @@ public:
     Type* getInitializerListType() { return m_sharedASTBuilder->m_initializerListType; }
     Type* getOverloadedType() { return m_sharedASTBuilder->m_overloadedType; }
     Type* getErrorType() { return m_sharedASTBuilder->m_errorType; }
+    Type* getBottomType() { return m_sharedASTBuilder->m_bottomType; }
     Type* getStringType() { return m_sharedASTBuilder->getStringType(); }
     Type* getNullPtrType() { return m_sharedASTBuilder->getNullPtrType(); }
     Type* getEnumTypeType() { return m_sharedASTBuilder->getEnumTypeType(); }

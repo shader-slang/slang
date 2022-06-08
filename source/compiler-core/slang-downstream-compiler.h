@@ -154,6 +154,21 @@ protected:
     ComPtr<ISlangBlob> m_blob;
 };
 
+// Combination of a downstream compiler type (pass through) and 
+// a match version.
+struct DownstreamCompilerMatchVersion
+{
+    DownstreamCompilerMatchVersion(SlangPassThrough inType, MatchSemanticVersion inMatchVersion):
+        type(inType),
+        matchVersion(inMatchVersion)
+    {}
+
+    DownstreamCompilerMatchVersion():type(SLANG_PASS_THROUGH_NONE) {}
+
+    SlangPassThrough type;                  ///< The type of the compiler
+    MatchSemanticVersion matchVersion;      ///< The match version
+};
+
 class DownstreamCompiler: public RefObject
 {
 public:
@@ -190,6 +205,8 @@ public:
         Info infos[int(SLANG_PASS_THROUGH_COUNT_OF)];
     };
 
+    
+    // Compiler description
     struct Desc
     {
         typedef Desc ThisType;
@@ -208,10 +225,16 @@ public:
             /// Ctor
         explicit Desc(SlangPassThrough inType = SLANG_PASS_THROUGH_NONE, Int inMajorVersion = 0, Int inMinorVersion = 0):type(inType), majorVersion(inMajorVersion), minorVersion(inMinorVersion) {}
 
+        explicit Desc(SlangPassThrough inType, const SemanticVersion& version):type(inType), majorVersion(version.m_major), minorVersion(version.m_minor) {}
+
         SlangPassThrough type;      ///< The type of the compiler
+
+        /// TODO(JS): Would probably be better if changed to SemanticVersion, but not trivial to change
+        // because this type is part of the DownstreamCompiler interface, which is used with `slang-llvm`.
         Int majorVersion;           ///< Major version (interpretation is type specific)
         Int minorVersion;           ///< Minor version (interpretation is type specific)
     };
+
 
     enum class OptimizationLevel
     {
@@ -526,12 +549,19 @@ struct DownstreamCompilerUtil: public DownstreamCompilerBaseUtil
     static DownstreamCompiler* findCompiler(const DownstreamCompilerSet* set, MatchType matchType, const DownstreamCompiler::Desc& desc);
     static DownstreamCompiler* findCompiler(const List<DownstreamCompiler*>& compilers, MatchType matchType, const DownstreamCompiler::Desc& desc);
 
+    static DownstreamCompiler* findCompiler(const List<DownstreamCompiler*>& compilers, SlangPassThrough type, const SemanticVersion& version);
+    static DownstreamCompiler* findCompiler(const List<DownstreamCompiler*>& compilers, const DownstreamCompiler::Desc& desc);
+
+        /// Find all the compilers with the version
+    static void findVersions(const List<DownstreamCompiler*>& compilers, SlangPassThrough compiler, List<SemanticVersion>& versions);
+
+    
         /// Find the compiler closest to the desc 
-    static DownstreamCompiler* findClosestCompiler(const List<DownstreamCompiler*>& compilers, const DownstreamCompiler::Desc& desc);
-    static DownstreamCompiler* findClosestCompiler(const DownstreamCompilerSet* set, const DownstreamCompiler::Desc& desc);
+    static DownstreamCompiler* findClosestCompiler(const List<DownstreamCompiler*>& compilers, const DownstreamCompilerMatchVersion& version);
+    static DownstreamCompiler* findClosestCompiler(const DownstreamCompilerSet* set, const DownstreamCompilerMatchVersion& version);
 
         /// Get the information on the compiler used to compile this source
-    static const DownstreamCompiler::Desc& getCompiledWithDesc();
+    static DownstreamCompilerMatchVersion getCompiledVersion();
 
     static void updateDefault(DownstreamCompilerSet* set, SlangSourceLanguage sourceLanguage);
     static void updateDefaults(DownstreamCompilerSet* set);

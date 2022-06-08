@@ -898,6 +898,11 @@ struct IRPtrLit : IRConstant
     void* getValue() { return value.ptrVal; }
 };
 
+struct IRVoidLit : IRConstant
+{
+    IR_LEAF_ISA(VoidLit);
+};
+
 // A instruction that ends a basic block (usually because of control flow)
 struct IRTerminatorInst : IRInst
 {
@@ -1221,6 +1226,7 @@ SIMPLE_IR_TYPE(UnsizedArrayType, ArrayTypeBase)
 SIMPLE_IR_PARENT_TYPE(Rate, Type)
 SIMPLE_IR_TYPE(ConstExprRate, Rate)
 SIMPLE_IR_TYPE(GroupSharedRate, Rate)
+SIMPLE_IR_TYPE(ActualGlobalRate, Rate)
 
 struct IRRateQualifiedType : IRType
 {
@@ -1456,6 +1462,15 @@ struct IRAttributedType : IRType
 struct IRTupleType : IRType
 {
     IR_LEAF_ISA(TupleType)
+};
+
+/// Represents an `Result<T,E>`, used by functions that throws error codes.
+struct IRResultType : IRType
+{
+    IR_LEAF_ISA(ResultType)
+
+    IRType* getValueType() { return (IRType*)getOperand(0); }
+    IRType* getErrorType() { return (IRType*)getOperand(1); }
 };
 
 struct IRTypeType : IRType

@@ -36,6 +36,25 @@ namespace Slang
         return false;
     }
 
+    bool isComInterfaceType(IRType* type)
+    {
+        if (type->findDecoration<IRComInterfaceDecoration>() || 
+            type->getOp() == kIROp_ComPtrType)
+        {
+            return true;
+        }
+
+        // TODO(JS): Perhaps it should do IRPtrTypeBase, or some more expansive set of 'PtrType's 
+        // but for now test for PtrType
+        if (auto ptrType = as<IRPtrType>(type))
+        {
+            auto valueType = ptrType->getValueType();
+            return valueType->findDecoration<IRComInterfaceDecoration>() != nullptr;
+        }
+
+        return false;
+    }
+
     bool isTypeValue(IRInst* typeInst)
     {
         if (typeInst)
@@ -175,7 +194,7 @@ namespace Slang
             if (isBuiltin(interfaceType))
                 return (IRType*)paramType;
 
-            if (interfaceType->findDecoration<IRComInterfaceDecoration>())
+            if (isComInterfaceType((IRType*)interfaceType))
                 return (IRType*)interfaceType;
 
             auto anyValueSize = getInterfaceAnyValueSize(
@@ -192,7 +211,7 @@ namespace Slang
             if (isBuiltin(paramType))
                 return (IRType*)paramType;
 
-            if (paramType->findDecoration<IRComInterfaceDecoration>())
+            if (isComInterfaceType((IRType*)paramType))
                 return (IRType*)paramType;
 
             // In the dynamic-dispatch case, a value of interface type

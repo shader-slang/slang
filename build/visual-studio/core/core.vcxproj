@@ -308,6 +308,7 @@
     <ClInclude Include="..\..\..\source\core\slang-process-util.h" />
     <ClInclude Include="..\..\..\source\core\slang-process.h" />
     <ClInclude Include="..\..\..\source\core\slang-random-generator.h" />
+    <ClInclude Include="..\..\..\source\core\slang-range.h" />
     <ClInclude Include="..\..\..\source\core\slang-render-api-util.h" />
     <ClInclude Include="..\..\..\source\core\slang-riff-file-system.h" />
     <ClInclude Include="..\..\..\source\core\slang-riff.h" />

@@ -345,6 +345,15 @@ namespace Slang
             return result;
         }
 
+        TryClauseType getEnclosingTryClauseType() { return m_enclosingTryClauseType; }
+
+        SemanticsContext withEnclosingTryClauseType(TryClauseType tryClauseType)
+        {
+            SemanticsContext result(*this);
+            result.m_enclosingTryClauseType = tryClauseType;
+            return result;
+        }
+
             /// A scope that is local to a particular expression, and
             /// that can be used to allocate temporary bindings that
             /// might be needed by that expression or its sub-expressions.
@@ -380,6 +389,7 @@ namespace Slang
 
         ExprLocalScope* m_exprLocalScope = nullptr;
 
+
     protected:
         // TODO: consider making more of this state `private`...
 
@@ -388,6 +398,9 @@ namespace Slang
 
             /// The linked list of lexically surrounding statements.
         OuterStmtInfo* m_outerStmts = nullptr;
+
+            /// The type of a try clause (if any) enclosing current expr.
+        TryClauseType m_enclosingTryClauseType = TryClauseType::None;
 
         ASTBuilder* m_astBuilder = nullptr;
     };
@@ -479,7 +492,8 @@ namespace Slang
         Expr* ConstructDeclRefExpr(
             DeclRef<Decl>   declRef,
             Expr*    baseExpr,
-            SourceLoc       loc);
+            SourceLoc loc,
+            Expr*    originalExpr);
 
         Expr* ConstructDerefExpr(
             Expr*    base,
@@ -488,13 +502,15 @@ namespace Slang
         Expr* ConstructLookupResultExpr(
             LookupResultItem const& item,
             Expr*            baseExpr,
-            SourceLoc               loc);
+            SourceLoc loc,
+            Expr* originalExpr);
 
         Expr* createLookupResultExpr(
             Name*                   name,
             LookupResult const&     lookupResult,
             Expr*            baseExpr,
-            SourceLoc               loc);
+            SourceLoc loc,
+            Expr*    originalExpr);
 
             /// Attempt to "resolve" an overloaded `LookupResult` to only include the "best" results
         LookupResult resolveOverloadedLookup(LookupResult const& lookupResult);
@@ -558,7 +574,7 @@ namespace Slang
             /// on this function to avoid blowing out the stack or (even worse
             /// creating a circular dependency).
             ///
-        void ensureDecl(Decl* decl, DeclCheckState state);
+        void ensureDecl(Decl* decl, DeclCheckState state, SemanticsContext* baseContext = nullptr);
 
             /// Helper routine allowing `ensureDecl` to be called on a `DeclRef`
         void ensureDecl(DeclRefBase const& declRef, DeclCheckState state)
@@ -572,7 +588,7 @@ namespace Slang
             /// called on a `DeclGroup` this function just calls `ensureDecl()`
             /// on each declaration in the group.
             ///
-        void ensureDeclBase(DeclBase* decl, DeclCheckState state);
+        void ensureDeclBase(DeclBase* decl, DeclCheckState state, SemanticsContext* baseContext);
 
         // A "proper" type is one that can be used as the type of an expression.
         // Put simply, it can be a concrete type like `int`, or a generic
@@ -1636,6 +1652,7 @@ namespace Slang
             : SemanticsVisitor(outer)
         {}
 
+        Expr* visitIncompleteExpr(IncompleteExpr* expr);
         Expr* visitBoolLiteralExpr(BoolLiteralExpr* expr);
         Expr* visitNullPtrLiteralExpr(NullPtrLiteralExpr* expr);
         Expr* visitIntegerLiteralExpr(IntegerLiteralExpr* expr);
@@ -1659,6 +1676,8 @@ namespace Slang
         Expr* visitVarExpr(VarExpr *expr);
 
         Expr* visitTypeCastExpr(TypeCastExpr * expr);
+
+        Expr* visitTryExpr(TryExpr* expr);
 
         //
         // Some syntax nodes should not occur in the concrete input syntax,

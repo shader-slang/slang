@@ -570,6 +570,7 @@ extern "C"
         SLANG_PTX,                  ///< PTX
         SLANG_OBJECT_CODE,          ///< Object code that can be used for later linking
         SLANG_HOST_CPP_SOURCE,      ///< C++ code for host library or executable.
+        SLANG_HOST_HOST_CALLABLE,   ///< 
         SLANG_TARGET_COUNT_OF,
     };
 
@@ -1002,10 +1003,8 @@ extern "C"
             @param name The name of the function 
             @return The function pointer related to the name or nullptr if not found 
             */
-        inline SlangFuncPtr SLANG_MCALL findFuncByName(char const* name)
-        {
-            return reinterpret_cast<SlangFuncPtr>(findSymbolAddressByName(name));
-        }
+        SLANG_FORCE_INLINE SlangFuncPtr findFuncByName(char const* name) { return (SlangFuncPtr)findSymbolAddressByName(name); }
+
             /** Get a symbol by name. If the library is unloaded will only return nullptr. 
             @param name The name of the symbol 
             @return The pointer related to the name or nullptr if not found 
@@ -1061,7 +1060,7 @@ extern "C"
         cache source contents internally. It is also used for #pragma once functionality.
 
         A *requirement* is for any implementation is that two paths can only return the same uniqueIdentity if the
-        contents of the two files are *identical*h. If an implementation breaks this constraint it can produce incorrect compilation.
+        contents of the two files are *identical*. If an implementation breaks this constraint it can produce incorrect compilation.
         If an implementation cannot *strictly* identify *the same* files, this will only have an effect on #pragma once behavior.
 
         The string for the uniqueIdentity is held zero terminated in the ISlangBlob of outUniqueIdentity.
@@ -4001,6 +4000,10 @@ namespace slang
         You have been warned.
         */
         kSessionFlag_FalcorCustomSharedKeywordSemantics = 1 << 0,
+
+        /** Indicates that this is a session created by language server.
+        */
+        kSessionFlag_LanguageServer = 1 << 1,
     };
 
     struct PreprocessorMacroDesc
@@ -4035,6 +4038,8 @@ namespace slang
 
         PreprocessorMacroDesc const*    preprocessorMacros = nullptr;
         SlangInt                        preprocessorMacroCount = 0;
+
+        ISlangFileSystem* fileSystem = nullptr;
     };
 
     enum class ContainerType
@@ -4085,6 +4090,7 @@ namespace slang
             */
         virtual SLANG_NO_THROW IModule* SLANG_MCALL loadModuleFromSource(
             const char* moduleName,
+            const char* path,
             slang::IBlob* source,
             slang::IBlob** outDiagnostics = nullptr) = 0;
 

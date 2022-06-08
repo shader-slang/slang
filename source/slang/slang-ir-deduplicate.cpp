@@ -76,4 +76,37 @@ namespace Slang
         for (auto inst : instToRemove)
             inst->removeAndDeallocate();
     }
+
+    void SharedIRBuilder::replaceGlobalInst(IRInst* oldInst, IRInst* newInst)
+    {
+        List<IRUse*> uses;
+        for (auto use = oldInst->firstUse; use; use = use->nextUse)
+        {
+            uses.add(use);
+        }
+
+        bool shouldUpdateGlobalNumberedCache = false;
+        for (auto use : uses)
+        {
+            use->set(newInst);
+            // depending on the type of the user inst, we may need to rebuild and update the global
+            // numbering cache.
+            if (isGloballyNumberedInst(use->getUser()))
+            {
+                shouldUpdateGlobalNumberedCache = true;
+            }
+        }
+        oldInst->removeAndDeallocate();
+        if (shouldUpdateGlobalNumberedCache)
+        {
+            deduplicateAndRebuildGlobalNumberingMap();
+        }
+    }
+
+    bool SharedIRBuilder::isGloballyNumberedInst(IRInst* inst)
+    {
+        if (!inst->getParent() || inst->getParent()->getOp() != kIROp_Module)
+            return false;
+        return m_globalValueNumberingMap.ContainsKey(IRInstKey{inst});
+    }
 }

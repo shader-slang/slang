@@ -930,7 +930,10 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
     {
         return decl->nameAndLoc.name;
     }
-
+    SourceLoc DeclRefBase::getNameLoc() const
+    {
+        return decl->nameAndLoc.loc;
+    }
     SourceLoc DeclRefBase::getLoc() const
     {
         return decl->loc;
@@ -1057,6 +1060,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         FuncType* funcType = astBuilder->create<FuncType>();
 
         funcType->resultType = getResultType(astBuilder, declRef);
+        funcType->errorType = getErrorCodeType(astBuilder, declRef);
         for (auto paramDeclRef : getParameters(declRef))
         {
             auto paramDecl = paramDeclRef.getDecl();
@@ -1269,9 +1273,27 @@ char const* getGLSLNameForImageFormat(ImageFormat format)
     return kImageFormatInfos[Index(format)].name.begin();
 }
 
- const ImageFormatInfo& getImageFormatInfo(ImageFormat format)
- {
-     return kImageFormatInfos[Index(format)];
- }
+
+const ImageFormatInfo& getImageFormatInfo(ImageFormat format)
+{
+    return kImageFormatInfos[Index(format)];
+}
+
+char const* getTryClauseTypeName(TryClauseType c)
+{
+    switch (c)
+    {
+    case TryClauseType::None:
+        return "None";
+    case TryClauseType::Standard:
+        return "Standard";
+    case TryClauseType::Optional:
+        return "Optional";
+    case TryClauseType::Assert:
+        return "Assert";
+    default:
+        return "Unknown";
+    }
+}
 
 } // namespace Slang

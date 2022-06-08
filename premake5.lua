@@ -150,15 +150,23 @@ newoption {
      value       = "bool",
      default     = "true",
      allowed     = { { "true", "True"}, { "false", "False" } }
-  }
+ }
 
-  newoption {
+ newoption {
     trigger     = "enable-experimental-projects",
     description = "(Optional) If true include experimental projects in build.",
     value       = "bool",
     default     = "false",
     allowed     = { { "true", "True"}, { "false", "False" } }
-  }
+ }
+
+ newoption {
+    trigger     = "disable-stdlib-source",
+    description = "(Optional) If true stdlib source will not be included in binary.",
+    value       = "bool",
+    default     = "false",
+    allowed     = { { "true", "True"}, { "false", "False" } }
+ }
 
  buildLocation = _OPTIONS["build-location"]
  executeBinary = (_OPTIONS["execute-binary"] == "true")
@@ -171,6 +179,8 @@ newoption {
  enableEmbedStdLib = (_OPTIONS["enable-embed-stdlib"] == "true")
  enableXlib = (_OPTIONS["enable-xlib"] == "true")
  enableExperimental = (_OPTIONS["enable-experimental-projects"] == "true")
+ disableStdlibSource = (_OPTIONS["disable-stdlib-source"] == "true")
+ 
  -- Determine the target info
 
  targetInfo = slangUtil.getTargetInfo()
@@ -682,6 +692,9 @@ newoption {
  example "shader-object"
      kind "ConsoleApp"
  
+ example "cpu-com-example"
+     kind "ConsoleApp"
+ 
  example "cpu-hello-world"
      kind "ConsoleApp"
  if enableExperimental then
@@ -783,6 +796,11 @@ standardProject("slang-rt", "source/slang-rt")
      uuid "23149706-C12F-4329-B6AA-8266407C32D3"
      includedirs { "." }
  
+     links { "compiler-core", "core", "slang" }
+     
+tool "slangd"
+     uuid "B2D63B45-92B0-40F7-B242-CCA4DFD64341"
+     includedirs { "." }
      links { "compiler-core", "core", "slang" }
  
  --
@@ -1299,6 +1317,10 @@ standardProject("slang-rt", "source/slang-rt")
      --
      defines { "SLANG_DYNAMIC_EXPORT" }
  
+     if disableStdlibSource then
+        defines { "SLANG_DISABLE_STDLIB_SOURCE" }
+     end
+ 
      if enableEmbedStdLib then
          -- We only have this dependency if we are embedding stdlib
          dependson { "embed-stdlib-generator" }
@@ -1367,7 +1389,7 @@ standardProject("slang-rt", "source/slang-rt")
      uuid "092DAB9F-1DA5-4538-ADD7-1A8D1DBFD519"
      includedirs { "." }
      addSourceDir "tools/unit-test"
-     links {  "core", "slang", "gfx", "gfx-util" }
+     links {  "core", "slang", "gfx", "gfx-util", "platform" }
  
  toolSharedLibrary "slang-unit-test"
      uuid "0162864E-7651-4B5E-9105-C571105276EA"

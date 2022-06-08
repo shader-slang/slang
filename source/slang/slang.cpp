@@ -509,6 +509,8 @@ SLANG_NO_THROW SlangResult SLANG_MCALL Session::createSession(
         targetDescPtr += targetDesc.structureSize;
     }
 
+    linkage->setFlags(desc.flags);
+
     if(desc.flags & slang::kSessionFlag_FalcorCustomSharedKeywordSemantics)
     {
         linkage->m_useFalcorCustomSharedKeywordSemantics = true;
@@ -529,6 +531,10 @@ SLANG_NO_THROW SlangResult SLANG_MCALL Session::createSession(
         linkage->addPreprocessorDefine(macro.name, macro.value);
     }
 
+    if (desc.fileSystem)
+    {
+        linkage->setFileSystem(desc.fileSystem);
+    }
     *outSession = asExternal(linkage.detach());
     return SLANG_OK;
 }
@@ -670,17 +676,17 @@ SlangPassThrough Session::getDownstreamCompilerForTransition(SlangCompileTarget 
         return (SlangPassThrough)m_codeGenTransitionMap.getTransition(source, target);
     }
 
+    const auto desc = ArtifactDesc::makeFromCompileTarget(inTarget);
+
     // Special case host-callable
-    if (target == CodeGenTarget::ShaderHostCallable)
+    if ((desc.kind == ArtifactKind::Callable) && 
+        (source == CodeGenTarget::CSource || source == CodeGenTarget::CPPSource))
     {
-        if (source == CodeGenTarget::CSource || source == CodeGenTarget::CPPSource)
+        // We prefer LLVM if it's available
+        DownstreamCompiler* llvm = getOrLoadDownstreamCompiler(PassThroughMode::LLVM, nullptr);
+        if (llvm)
         {
-            // We prefer LLVM if it's available
-            DownstreamCompiler* llvm = getOrLoadDownstreamCompiler(PassThroughMode::LLVM, nullptr);
-            if (llvm)
-            {
-                return SLANG_PASS_THROUGH_LLVM;
-            }
+            return SLANG_PASS_THROUGH_LLVM;
         }
     }
 
@@ -926,6 +932,12 @@ SLANG_NO_THROW slang::IModule* SLANG_MCALL Linkage::loadModule(
     slang::IBlob**  outDiagnostics)
 {
     DiagnosticSink sink(getSourceManager(), Lexer::sourceLocationLexer);
+
+    if (m_flag & slang::kSessionFlag_LanguageServer)
+    {
+        sink.setFlags(DiagnosticSink::Flag::HumaneLoc | DiagnosticSink::Flag::LanguageServer);
+    }
+
     try
     {
         auto name = getNamePool()->getName(moduleName);
@@ -945,9 +957,16 @@ SLANG_NO_THROW slang::IModule* SLANG_MCALL Linkage::loadModule(
 
 SLANG_NO_THROW slang::IModule* SLANG_MCALL Linkage::loadModuleFromSource(
     const char* moduleName,
+    const char* path,
     slang::IBlob* source,
     slang::IBlob** outDiagnostics)
 {
+    DiagnosticSink sink(getSourceManager(), Lexer::sourceLocationLexer);
+    if (m_flag & slang::kSessionFlag_LanguageServer)
+    {
+        sink.setFlags(DiagnosticSink::Flag::HumaneLoc | DiagnosticSink::Flag::LanguageServer);
+    }
+
     try
     {
         auto name = getNamePool()->getName(moduleName);
@@ -956,10 +975,9 @@ SLANG_NO_THROW slang::IModule* SLANG_MCALL Linkage::loadModuleFromSource(
         {
             return loadedModule;
         }
-        DiagnosticSink sink(getSourceManager(), Lexer::sourceLocationLexer);
         auto module = loadModule(
             name,
-            PathInfo::makeFromString(moduleName),
+            PathInfo::makeFromString(path),
             source,
             SourceLoc(),
             &sink,
@@ -970,6 +988,7 @@ SLANG_NO_THROW slang::IModule* SLANG_MCALL Linkage::loadModuleFromSource(
     }
     catch (const AbortCompilationException&)
     {
+        sink.getBlobIfNeeded(outDiagnostics);
         return nullptr;
     }
 }
@@ -1334,6 +1353,7 @@ CapabilitySet TargetRequest::getTargetCaps()
     case CodeGenTarget::CPPSource:
     case CodeGenTarget::HostExecutable:
     case CodeGenTarget::ShaderSharedLibrary:
+    case CodeGenTarget::HostHostCallable:
     case CodeGenTarget::ShaderHostCallable:
         atoms.add(CapabilityAtom::CPP);
         break;
@@ -2566,17 +2586,29 @@ void Linkage::loadParsedModule(
     int errorCountBefore = sink->getErrorCount();
     compileRequest->checkAllTranslationUnits();
     int errorCountAfter = sink->getErrorCount();
-
-    if (errorCountAfter != errorCountBefore)
+    if (isInLanguageServer())
     {
-        // There must have been an error in the loaded module.
+        // Don't generate IR as language server.
+        // This means that we currently cannot report errors that are detected during IR passes.
+        // Ideally we want to run those passes, but that is too risky for what it is worth right
+        // now.
     }
     else
     {
-        // If we didn't run into any errors, then try to generate
-        // IR code for the imported module.
-        SLANG_ASSERT(errorCountAfter == 0);
-        loadedModule->setIRModule(generateIRForTranslationUnit(getASTBuilder(), translationUnit));
+        if (errorCountAfter != errorCountBefore)
+        {
+            // There must have been an error in the loaded module.
+        }
+        else
+        {
+            // If we didn't run into any errors, then try to generate
+            // IR code for the imported module.
+            if (errorCountAfter == 0)
+            {
+                loadedModule->setIRModule(
+                    generateIRForTranslationUnit(getASTBuilder(), translationUnit));
+            }
+        }
     }
     loadedModulesList.add(loadedModule);
 }
@@ -2601,7 +2633,10 @@ void Linkage::_diagnoseErrorInImportedModule(
     {
             sink->diagnose(info->importLoc, Diagnostics::errorInImportedModule, info->name);
     }
-    sink->diagnose(SourceLoc(), Diagnostics::complationCeased);
+    if ((m_flag & slang::kSessionFlag_LanguageServer) == 0)
+    {
+        sink->diagnose(SourceLoc(), Diagnostics::complationCeased);
+    }
 }
 
 RefPtr<Module> Linkage::loadModule(
@@ -2640,11 +2675,11 @@ RefPtr<Module> Linkage::loadModule(
     frontEndReq->parseTranslationUnit(translationUnit);
     int errorCountAfter = sink->getErrorCount();
 
-    if( errorCountAfter != errorCountBefore )
+    if (errorCountAfter != errorCountBefore && !isInLanguageServer())
     {
         _diagnoseErrorInImportedModule(sink);
     }
-    if (errorCountAfter)
+    if (errorCountAfter && !isInLanguageServer())
     {
         // Something went wrong during the parsing, so we should bail out.
         return nullptr;
@@ -2658,7 +2693,7 @@ RefPtr<Module> Linkage::loadModule(
 
     errorCountAfter = sink->getErrorCount();
 
-    if (errorCountAfter != errorCountBefore)
+    if (errorCountAfter != errorCountBefore && !isInLanguageServer())
     {
         _diagnoseErrorInImportedModule(sink);
         // Something went wrong during the parsing, so we should bail out.
@@ -4710,6 +4745,11 @@ static SlangResult _getWholeProgramResult(
 {
     auto linkage = req->getLinkage();
     auto program = req->getSpecializedGlobalAndEntryPointsComponentType();
+
+    if (!program)
+    {
+        return SLANG_FAIL;
+    }
 
     Index targetCount = linkage->targets.getCount();
     if ((targetIndex < 0) || (targetIndex >= targetCount))
