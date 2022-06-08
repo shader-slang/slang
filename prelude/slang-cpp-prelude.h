@@ -127,13 +127,16 @@ Operating system defines, see http://sourceforge.net/p/predef/wiki/OperatingSyst
 #        define SLANG_ANDROID 1
 #    elif defined(__linux__) || defined(__CYGWIN__) /* note: __ANDROID__ implies __linux__ */
 #        define SLANG_LINUX 1
-#    elif defined(__APPLE__)
+#    elif defined(__APPLE__) && !defined(SLANG_LLVM)
 #        include "TargetConditionals.h"
 #        if TARGET_OS_MAC
 #            define SLANG_OSX 1
 #        else
 #            define SLANG_IOS 1
 #        endif
+#    elif defined(__APPLE__)
+// On `slang-llvm` we can't inclue "TargetConditionals.h" in general, so for now assume its OSX.
+#       define SLANG_OSX 1
 #    elif defined(__CELLOS_LV2__)
 #        define SLANG_PS3 1
 #    elif defined(__ORBIS__)
@@ -145,6 +148,8 @@ Operating system defines, see http://sourceforge.net/p/predef/wiki/OperatingSyst
 #    else
 #        error "unknown target platform"
 #    endif
+
+
 /*
 Any platforms not detected by the above logic are now now explicitly zeroed out.
 */
