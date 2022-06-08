@@ -190,6 +190,8 @@ public:
         Info infos[int(SLANG_PASS_THROUGH_COUNT_OF)];
     };
 
+    
+    // Compiler description
     struct Desc
     {
         typedef Desc ThisType;
@@ -205,12 +207,31 @@ public:
             /// true if has a version set
         bool hasVersion() const { return majorVersion || minorVersion; }
 
+
             /// Ctor
         explicit Desc(SlangPassThrough inType = SLANG_PASS_THROUGH_NONE, Int inMajorVersion = 0, Int inMinorVersion = 0):type(inType), majorVersion(inMajorVersion), minorVersion(inMinorVersion) {}
 
         SlangPassThrough type;      ///< The type of the compiler
+
+        /// TODO(JS): Would probably be better if changed to SemanticVersion, but not trivial to change
+        // because this type is part of the DownstreamCompiler interface, which is used with `slang-llvm`.
         Int majorVersion;           ///< Major version (interpretation is type specific)
         Int minorVersion;           ///< Minor version (interpretation is type specific)
+    };
+
+    struct MatchDesc
+    {
+        enum class Kind
+        {
+            Future,         ///< Some future unknown version
+            Major,          ///< Major version is defined (minor is in effect undefined)
+            MajorMinor      ///< Major and minor version are defined
+        };
+
+        bool hasCompleteVersion() const { return kind == Kind::MajorMinor; }
+
+        Kind kind;
+        Desc desc;
     };
 
     enum class OptimizationLevel
@@ -511,6 +532,8 @@ struct DownstreamCompilerBaseUtil
     typedef DownstreamCompiler::FloatingPointMode FloatingPointMode;
     typedef DownstreamCompiler::ProductFlag ProductFlag;
     typedef DownstreamCompiler::ProductFlags ProductFlags;
+
+    typedef DownstreamCompiler::MatchDesc MatchDesc;
 };
 
 struct DownstreamCompilerUtil: public DownstreamCompilerBaseUtil
@@ -527,8 +550,8 @@ struct DownstreamCompilerUtil: public DownstreamCompilerBaseUtil
     static DownstreamCompiler* findCompiler(const List<DownstreamCompiler*>& compilers, MatchType matchType, const DownstreamCompiler::Desc& desc);
 
         /// Find the compiler closest to the desc 
-    static DownstreamCompiler* findClosestCompiler(const List<DownstreamCompiler*>& compilers, const DownstreamCompiler::Desc& desc);
-    static DownstreamCompiler* findClosestCompiler(const DownstreamCompilerSet* set, const DownstreamCompiler::Desc& desc);
+    static DownstreamCompiler* findClosestCompiler(const List<DownstreamCompiler*>& compilers, const MatchDesc& desc);
+    static DownstreamCompiler* findClosestCompiler(const DownstreamCompilerSet* set, const MatchDesc& desc);
 
         /// Get the information on the compiler used to compile this source
     static const DownstreamCompiler::Desc& getCompiledWithDesc();

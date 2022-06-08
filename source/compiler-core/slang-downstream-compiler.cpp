@@ -626,19 +626,50 @@ const DownstreamCompiler::Desc& DownstreamCompilerUtil::getCompiledWithDesc()
     return (bestIndex >= 0) ? compilers[bestIndex] : nullptr;
 }
 
-/* static */DownstreamCompiler* DownstreamCompilerUtil::findClosestCompiler(const List<DownstreamCompiler*>& compilers, const DownstreamCompiler::Desc& desc)
+/* static */DownstreamCompiler* DownstreamCompilerUtil::findClosestCompiler(const List<DownstreamCompiler*>& compilers, const MatchDesc& matchDesc)
 {
     DownstreamCompiler* compiler;
-
-    compiler = findCompiler(compilers, MatchType::MinGreaterEqual, desc);
-    if (compiler)
+    
+    if (matchDesc.kind == MatchDesc::Kind::Future)
     {
-        return compiler;
+        compiler = findCompiler(compilers, MatchType::Newest, matchDesc.desc);
+        if (compiler)
+        {
+            return compiler;
+        }
     }
-    compiler = findCompiler(compilers, MatchType::MinAbsolute, desc);
-    if (compiler)
+    else if (matchDesc.kind == MatchDesc::Kind::Major)
     {
-        return compiler;
+        // Only has a major version. We need find all that match the major version
+        List<DownstreamCompiler*> matching;
+        for (auto compiler : compilers)
+        {
+            const auto& desc = compiler->getDesc();
+            if (desc.type == matchDesc.desc.type && desc.majorVersion == matchDesc.desc.majorVersion)
+            {
+                matching.add(compiler);
+            }
+        }
+        compiler = findCompiler(matching, MatchType::Newest, matchDesc.desc);
+        if (compiler)
+        {
+            return compiler;
+        }
+    }
+    else
+    {
+        SLANG_ASSERT(matchDesc.hasCompleteVersion());
+
+        compiler = findCompiler(compilers, MatchType::MinGreaterEqual, desc.desc);
+        if (compiler)
+        {
+            return compiler;
+        }
+        compiler = findCompiler(compilers, MatchType::MinAbsolute, desc.desc);
+        if (compiler)
+        {
+            return compiler;
+        }
     }
 
     {
@@ -684,12 +715,15 @@ const DownstreamCompiler::Desc& DownstreamCompilerUtil::getCompiledWithDesc()
     return nullptr;
 }
 
-/* static */DownstreamCompiler* DownstreamCompilerUtil::findClosestCompiler(const DownstreamCompilerSet* set, const DownstreamCompiler::Desc& desc)
+/* static */DownstreamCompiler* DownstreamCompilerUtil::findClosestCompiler(const DownstreamCompilerSet* set, const MatchDesc& desc)
 {
-    DownstreamCompiler* compiler = set->getCompiler(desc);
-    if (compiler)
+    if (desc.hasCompleteVersion())
     {
-        return compiler;
+        DownstreamCompiler* compiler = set->getCompiler(desc.desc);
+        if (compiler)
+        {
+            return compiler;
+        }
     }
     List<DownstreamCompiler*> compilers;
     set->getCompilers(compilers);
