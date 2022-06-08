@@ -4000,6 +4000,10 @@ namespace slang
         You have been warned.
         */
         kSessionFlag_FalcorCustomSharedKeywordSemantics = 1 << 0,
+
+        /** Indicates that this is a session created by language server.
+        */
+        kSessionFlag_LanguageServer = 1 << 1,
     };
 
     struct PreprocessorMacroDesc
@@ -4034,6 +4038,8 @@ namespace slang
 
         PreprocessorMacroDesc const*    preprocessorMacros = nullptr;
         SlangInt                        preprocessorMacroCount = 0;
+
+        ISlangFileSystem* fileSystem = nullptr;
     };
 
     enum class ContainerType
@@ -4084,6 +4090,7 @@ namespace slang
             */
         virtual SLANG_NO_THROW IModule* SLANG_MCALL loadModuleFromSource(
             const char* moduleName,
+            const char* path,
             slang::IBlob* source,
             slang::IBlob** outDiagnostics = nullptr) = 0;
 
