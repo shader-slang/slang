@@ -75,7 +75,9 @@ protected:
     virtual void emitIntrinsicCallExprImpl(IRCall* inst, IRTargetIntrinsicDecoration* targetIntrinsic, EmitOpInfo const& inOuterPrec) SLANG_OVERRIDE;
     virtual void emitLoopControlDecorationImpl(IRLoopControlDecoration* decl) SLANG_OVERRIDE;
     virtual void emitFuncDecorationsImpl(IRFunc* func) SLANG_OVERRIDE;
-   
+    virtual void emitVarDecorationsImpl(IRInst* var) SLANG_OVERRIDE;
+    virtual void emitGlobalInstImpl(IRInst* inst) SLANG_OVERRIDE;
+
     virtual const UnownedStringSlice* getVectorElementNames(BaseType elemType, Index elemCount);
     
     // Replaceable for classes derived from CPPSourceEmitter
@@ -130,13 +132,15 @@ protected:
         // of all the witness table objects in `pendingWitnessTableDefinitions`.
     void _emitWitnessTableDefinitions();
 
+        /// Maybe emits 'export' (such that visible outside binary/dll) and `extern "C"` naming
+    void _maybeEmitExportLike(IRInst* inst);
+
     HLSLIntrinsic* _addIntrinsic(HLSLIntrinsic::Op op, IRType* returnType, IRType*const* argTypes, Index argTypeCount);
 
     static bool _isVariable(IROp op);
 
     Dictionary<IRType*, StringSlicePool::Handle> m_typeNameMap;
     Dictionary<const HLSLIntrinsic*, StringSlicePool::Handle> m_intrinsicNameMap;
-
 
     IRTypeSet m_typeSet;
     RefPtr<HLSLIntrinsicOpLookup> m_opLookup;

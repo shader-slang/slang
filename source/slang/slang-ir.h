@@ -1226,6 +1226,7 @@ SIMPLE_IR_TYPE(UnsizedArrayType, ArrayTypeBase)
 SIMPLE_IR_PARENT_TYPE(Rate, Type)
 SIMPLE_IR_TYPE(ConstExprRate, Rate)
 SIMPLE_IR_TYPE(GroupSharedRate, Rate)
+SIMPLE_IR_TYPE(ActualGlobalRate, Rate)
 
 struct IRRateQualifiedType : IRType
 {

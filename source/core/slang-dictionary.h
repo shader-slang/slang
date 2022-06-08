@@ -381,6 +381,13 @@ namespace Slang
             else
                 SLANG_ASSERT_FAILURE("Inconsistent find result returned. This is a bug in Dictionary implementation.");
         }
+        void Set(const TKey& key, const TValue& value)
+		{
+			if (auto ptr = TryGetValueOrAdd(key, value))
+			{
+				*ptr = value;
+			}
+		}
 
         template<typename KeyType>
 		bool ContainsKey(const KeyType& key) const
