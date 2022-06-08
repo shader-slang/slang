@@ -308,7 +308,7 @@ SlangResult NativeToJSONConverter::_structToJSON(const StructRttiInfo* structRtt
     // Do the super class first
     if (structRttiInfo->m_super)
     {
-        SLANG_RETURN_ON_FAIL(_structToJSON(structRttiInfo, src, outPairs));
+        SLANG_RETURN_ON_FAIL(_structToJSON(structRttiInfo->m_super, src, outPairs));
     }
 
     const Byte* base = (const Byte*)src;
