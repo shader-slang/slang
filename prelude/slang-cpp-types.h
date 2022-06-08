@@ -2,7 +2,7 @@
 #define SLANG_PRELUDE_CPP_TYPES_H
 
 #ifndef SLANG_PRELUDE_ASSERT
-#   ifdef _DEBUG
+#   ifdef SLANG_PRELUDE_ENABLE_ASSERT
 #       define SLANG_PRELUDE_ASSERT(VALUE) assert(VALUE)
 #   else
 #       define SLANG_PRELUDE_ASSERT(VALUE) 

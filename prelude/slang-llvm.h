@@ -7,14 +7,14 @@
 #define SLANG_DISABLE_EXCEPTIONS 1
 
 #ifndef SLANG_PRELUDE_ASSERT
-#   ifdef DEBUG
+#   ifdef SLANG_PRELUDE_ENABLE_ASSERT
 extern "C" void assertFailure(const char* msg);
 #       define SLANG_PRELUDE_EXPECT(VALUE, MSG) if(VALUE) {} else assertFailure("assertion failed: '" MSG "'")
 #       define SLANG_PRELUDE_ASSERT(VALUE) SLANG_PRELUDE_EXPECT(VALUE, #VALUE)
-#   else // DEBUG
-
+#   else // SLANG_PRELUDE_ENABLE_ASSERT
+#       define SLANG_PRELUDE_EXPECT(VALUE, MSG)
 #       define SLANG_PRELUDE_ASSERT(x) 
-#   endif // DEBUG
+#   endif // SLANG_PRELUDE_ENABLE_ASSERT
 #endif
 
 /*
