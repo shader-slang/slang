@@ -1,7 +1,6 @@
 #include "slang-workspace-version.h"
 #include "../core/slang-io.h"
 #include "../core/slang-file-system.h"
-#include "../core/slang-char-util.h"
 #include "../compiler-core/slang-lexer.h"
 
 namespace Slang
@@ -93,18 +92,18 @@ void parseDiagnostics(Dictionary<String, DocumentDiagnostics>& diagnostics, Stri
 
         LanguageServerProtocol::Diagnostic diagnostic;
         Index pos = lparentIndex + 1;
-        int lineLoc = StringUtil::parseInt(line, pos);
+        int lineLoc = StringUtil::parseIntAndAdvancePos(line, pos);
         if (lineLoc == 0)
             lineLoc = 1;
         diagnostic.range.end.line = diagnostic.range.start.line = lineLoc - 1;
         pos++;
-        int colLoc = StringUtil::parseInt(line, pos);
+        int colLoc = StringUtil::parseIntAndAdvancePos(line, pos);
         if (colLoc == 0)
             colLoc = 1;
         diagnostic.range.end.character = diagnostic.range.start.character = colLoc - 1;
         if (pos >= line.getLength())
             continue;
-        line = line.subString(colonIndex + 3, line.getLength());
+        line = line.tail(colonIndex + 3);
         colonIndex = line.indexOf(':');
         if (colonIndex == -1)
             continue;
@@ -125,13 +124,13 @@ void parseDiagnostics(Dictionary<String, DocumentDiagnostics>& diagnostics, Stri
             continue;
         }
         pos = line.indexOf(' ');
-        diagnostic.code = StringUtil::parseInt(line, pos);
-        diagnostic.message = line.subString(colonIndex + 2, line.getLength());
+        diagnostic.code = StringUtil::parseIntAndAdvancePos(line, pos);
+        diagnostic.message = line.tail(colonIndex + 2);
         if (lineIndex + 1 < lines.getCount() && lines[lineIndex].startsWith("^+"))
         {
             lineIndex++;
             pos = 2;
-            auto tokenLength = StringUtil::parseInt(lines[lineIndex], pos);
+            auto tokenLength = StringUtil::parseIntAndAdvancePos(line, pos);
             diagnostic.range.end.character += tokenLength;
         }
         diagnosticList.messages.Add(diagnostic);
@@ -192,89 +191,6 @@ void* Workspace::getInterface(const Guid& uuid)
     return nullptr;
 }
 
-String URI::getPath() const
-{
-    Index startIndex = uri.indexOf("://");
-    if (startIndex == -1) return String();
-    startIndex += 3;
-    Index endIndex = uri.indexOf('?');
-    if (endIndex == -1)
-        endIndex = uri.getLength();
-    StringBuilder sb;
-#if SLANG_WINDOWS_FAMILY
-    if (uri[startIndex] == '/')
-        startIndex++;
-#endif
-    for (Index i = startIndex; i < endIndex;)
-    {
-        auto ch = uri[i];
-        if (ch == '%')
-        {
-            Int charVal = CharUtil::getHexDigitValue(uri[i + 1]) * 16 +
-                          CharUtil::getHexDigitValue(uri[i + 2]);
-            sb.appendChar((char)charVal);
-            i += 3;
-        }
-        else
-        {
-            sb.appendChar(uri[i]);
-            i++;
-        }
-    }
-    return sb.ProduceString();
-}
-
-StringSlice URI::getProtocol() const
-{
-    Index separatorIndex = uri.indexOf("://");
-    if (separatorIndex != -1)
-        return uri.subString(0, separatorIndex);
-    return StringSlice();
-}
-
-bool URI::isSafeURIChar(char ch)
-{
-    return (ch >= '0' && ch <= '9') || (ch >= 'A' && ch <= 'Z') || (ch >= 'a' && ch <= 'z') ||
-           ch == '-' || ch == '_' || ch == '/' || ch == '.';
-}
-
-URI URI::fromLocalFilePath(UnownedStringSlice path)
-{
-    URI uri;
-    StringBuilder sb;
-    sb << "file://";
-
-#if SLANG_WINDOWS_FAMILY
-    sb << "/";
-#endif
-
-    for (auto ch : path)
-    {
-        if (isSafeURIChar(ch))
-        {
-            sb.appendChar(ch);
-        }
-        else if (ch == '\\')
-        {
-            sb.appendChar('/');
-        }
-        else
-        {
-            char buffer[32];
-            int length = IntToAscii(buffer, (int)ch, 16);
-            ReverseInternalAscii(buffer, length);
-            sb << "%" << buffer;
-        }
-    }
-    return URI::fromString(sb.getUnownedSlice());
-}
-
-URI URI::fromString(UnownedStringSlice uriString)
-{
-    URI uri;
-    uri.uri = uriString;
-    return uri;
-}
 void DocumentVersion::setText(const String& newText)
 {
     text = newText;

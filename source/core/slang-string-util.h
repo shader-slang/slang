@@ -109,6 +109,11 @@ struct StringUtil
 
         /// Convert into int64_t. Returns SLANG_OK on success. 
     static SlangResult parseInt64(const UnownedStringSlice& text, int64_t& out);
+
+        /// Parse an integer from text starting at pos until the end or the first non-digit char.
+        /// Modifies pos to the position where parsing ends.
+        /// Returns parsed integer.
+    static int parseIntAndAdvancePos(UnownedStringSlice text, Index& pos);
 };
 
 /* A helper class that allows parsing of lines from text with iteration. Uses StringUtil::extractLine for the actual underlying implementation. */

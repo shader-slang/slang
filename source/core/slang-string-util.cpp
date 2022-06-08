@@ -645,4 +645,28 @@ ComPtr<ISlangBlob> StringUtil::createStringBlob(const String& string)
     return (cur == end) ? SLANG_OK : SLANG_FAIL;
 }
 
+int StringUtil::parseIntAndAdvancePos(UnownedStringSlice text, Index& pos)
+{
+    int result = 0;
+    while (text[pos] == ' ' && pos < text.getLength())
+    {
+        pos++;
+        continue;
+    }
+    while (pos < text.getLength())
+    {
+        if (text[pos] >= '0' && text[pos] <= '9')
+        {
+            result *= 10;
+            result += text[pos] - '0';
+            pos++;
+        }
+        else
+        {
+            break;
+        }
+    }
+    return result;
+}
+
 } // namespace Slang

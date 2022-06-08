@@ -5,32 +5,12 @@
 #include "../../slang.h"
 #include "../core/slang-basic.h"
 #include "../core/slang-com-object.h"
-#include "slang-language-server-protocol.h"
+#include "../compiler-core/slang-language-server-protocol.h"
 #include "slang-compiler.h"
 #include "slang-doc-ast.h"
 
 namespace Slang
 {
-    struct URI
-    {
-        String uri;
-        bool operator==(const URI& other) const
-        {
-            return uri == other.uri;
-        }
-        bool operator!=(const URI& other) const { return uri != other.uri; }
-
-        HashCode getHashCode() const { return uri.getHashCode(); }
-
-        bool isLocalFile() { return uri.startsWith("file://"); };
-        String getPath() const;
-        StringSlice getProtocol() const;
-
-        static URI fromLocalFilePath(UnownedStringSlice path);
-        static URI fromString(UnownedStringSlice uriString);
-        static bool isSafeURIChar(char ch);
-    };
-
     class Workspace;
 
     class DocumentVersion : public RefObject
