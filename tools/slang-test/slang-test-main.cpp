@@ -31,6 +31,7 @@
 
 #include "../../source/compiler-core/slang-downstream-compiler.h"
 #include "../../source/compiler-core/slang-nvrtc-compiler.h"
+#include "../../source/compiler-core/slang-language-server-protocol.h"
 
 #define STB_IMAGE_IMPLEMENTATION
 #include "external/stb/stb_image.h"
@@ -1326,6 +1327,275 @@ TestResult runDocTest(TestContext* context, TestInput& input)
         context->getTestReporter()->dumpOutputDifference(expectedOutput, actualOutput);
     }
 
+    return result;
+}
+
+TestResult runLanguageServerTest(TestContext* context, TestInput& input)
+{
+    RefPtr<JSONRPCConnection> connection;
+    if (SLANG_FAILED(context->createLanguageServerJSONRPCConnection(connection)))
+    {
+        return TestResult::Fail;
+    }
+    if (context->isCollectingRequirements())
+    {
+        connection->sendCall(LanguageServerProtocol::ExitParams::methodName, JSONValue::makeInt(0));
+        return TestResult::Pass;
+    }
+    LanguageServerProtocol::InitializeParams initParams;
+    LanguageServerProtocol::WorkspaceFolder wsFolder;
+    wsFolder.name = "test";
+    String fullPath;
+    Path::getCanonical(input.filePath, fullPath);
+    wsFolder.uri = URI::fromLocalFilePath(Path::getParentDirectory(fullPath).getUnownedSlice()).uri;
+    initParams.workspaceFolders.add(wsFolder);
+    if (SLANG_FAILED(connection->sendCall(
+            LanguageServerProtocol::InitializeParams::methodName, &initParams, JSONValue::makeInt(0))))
+    {
+        return TestResult::Fail;
+    }
+    if (SLANG_FAILED(connection->waitForResult(-1)))
+    {
+        return TestResult::Fail;
+    }
+
+    LanguageServerProtocol::InitializeResult initResult;
+    if (SLANG_FAILED(connection->getMessage(&initResult)))
+    {
+        return TestResult::Fail;
+    }
+
+    // Send open document call.
+    String testFileContent;
+
+    if (SLANG_FAILED(File::readAllText(input.filePath, testFileContent)))
+    {
+        return TestResult::Fail;
+    }
+
+    LanguageServerProtocol::DidOpenTextDocumentParams openDocParams;
+    openDocParams.textDocument.version = 0;
+    openDocParams.textDocument.uri = URI::fromLocalFilePath(fullPath.getUnownedSlice()).uri;
+    openDocParams.textDocument.text = testFileContent;
+    connection->sendCall(
+        LanguageServerProtocol::DidOpenTextDocumentParams::methodName,
+        &openDocParams,
+        JSONValue::makeInt(1));
+    List<LanguageServerProtocol::PublishDiagnosticsParams> diagnostics;
+    bool diagnosticsReceived = false;
+    auto waitForNonDiagnosticResponse = [&]() -> SlangResult
+    {
+        repeat:
+        if (SLANG_FAILED(connection->waitForResult(10000)))
+            return SLANG_FAIL;
+        if (connection->getMessageType() == JSONRPCMessageType::Call)
+        {
+            JSONRPCCall call;
+            connection->getRPC(&call);
+            if (call.method == "textDocument/publishDiagnostics")
+            {
+                diagnosticsReceived = true;
+                LanguageServerProtocol::PublishDiagnosticsParams arg;
+                if (SLANG_FAILED(connection->getMessage(&arg)))
+                    return SLANG_FAIL;
+                diagnostics.add(arg);
+                goto repeat;
+            }
+        }
+        return SLANG_OK;
+    };
+
+    List<UnownedStringSlice> lines;
+    StringUtil::calcLines(testFileContent.getUnownedSlice(), lines);
+
+    StringBuilder actualOutputSB;
+    auto parseLocation = [&](UnownedStringSlice text, Index startPos, Int& linePos, Int& colPos)
+    {
+        linePos = StringUtil::parseIntAndAdvancePos(text.trimStart(), startPos);
+        startPos++;
+        colPos = StringUtil::parseIntAndAdvancePos(text.trimStart(), startPos);
+        return startPos;
+    };
+    int callId = 2;
+    for (auto line : lines)
+    {
+        if (line.startsWith("//COMPLETE:"))
+        {
+            auto arg = line.tail(UnownedStringSlice("//COMPLETE:").getLength());
+            Int linePos, colPos;
+            parseLocation(arg, 0, linePos, colPos);
+
+            LanguageServerProtocol::CompletionParams params;
+            params.position.line = int(linePos - 1);
+            params.position.character = int(colPos - 1);
+            params.textDocument.uri = openDocParams.textDocument.uri;
+            if (SLANG_FAILED(connection->sendCall(
+                    LanguageServerProtocol::CompletionParams::methodName,
+                    &params,
+                    JSONValue::makeInt(callId++))))
+            {
+                return TestResult::Fail;
+            }
+            if (SLANG_FAILED(waitForNonDiagnosticResponse()))
+                return TestResult::Fail;
+            actualOutputSB << "--------\n";
+            LanguageServerProtocol::NullResponse nullResponse;
+            List<LanguageServerProtocol::CompletionItem> completionItems;
+            if (SLANG_SUCCEEDED(connection->getMessage(&nullResponse)))
+            {
+                actualOutputSB << "null\n";
+            }
+            else if (SLANG_SUCCEEDED(connection->getMessage(&completionItems)))
+            {
+                for (auto item : completionItems)
+                {
+                    actualOutputSB << item.label << ": " << item.kind << " " << item.detail << " ";
+                    for (auto ch : item.commitCharacters)
+                        actualOutputSB << ch;
+                    actualOutputSB << "\n";
+                }
+            }
+        }
+        else if (line.startsWith("//SIGNATURE:"))
+        {
+            auto arg = line.tail(UnownedStringSlice("//SIGNATURE:").getLength());
+            Int linePos, colPos;
+            parseLocation(arg, 0, linePos, colPos);
+
+            LanguageServerProtocol::SignatureHelpParams params;
+            params.position.line = int(linePos - 1);
+            params.position.character = int(colPos - 1);
+            params.textDocument.uri = openDocParams.textDocument.uri;
+            if (SLANG_FAILED(connection->sendCall(
+                    LanguageServerProtocol::SignatureHelpParams::methodName,
+                    &params,
+                    JSONValue::makeInt(callId++))))
+            {
+                return TestResult::Fail;
+            }
+            if (SLANG_FAILED(waitForNonDiagnosticResponse()))
+                return TestResult::Fail;
+            actualOutputSB << "--------\n";
+            LanguageServerProtocol::NullResponse nullResponse;
+            LanguageServerProtocol::SignatureHelp sigInfo;
+            if (SLANG_SUCCEEDED(connection->getMessage(&nullResponse)))
+            {
+                actualOutputSB << "null\n";
+            }
+            else if (SLANG_SUCCEEDED(connection->getMessage(&sigInfo)))
+            {
+                actualOutputSB << "activeParameter: " << sigInfo.activeParameter << "\n";
+                actualOutputSB << "activeSignature: " << sigInfo.activeSignature << "\n";
+                for (auto item : sigInfo.signatures)
+                {
+                    actualOutputSB << item.label << ":";
+                    for (auto param : item.parameters)
+                    {
+                        actualOutputSB << " (" << param.label[0] << "," << param.label[1] << ")";
+                    }
+                    actualOutputSB << "\n";
+                    actualOutputSB << item.documentation.value << "\n";
+                }
+            }
+        }
+        else if (line.startsWith("//HOVER:"))
+        {
+            auto arg = line.tail(UnownedStringSlice("//HOVER:").getLength());
+            Int linePos, colPos;
+            parseLocation(arg, 0, linePos, colPos);
+
+            LanguageServerProtocol::HoverParams params;
+            params.position.line = int(linePos - 1);
+            params.position.character = int(colPos - 1);
+            params.textDocument.uri = openDocParams.textDocument.uri;
+            if (SLANG_FAILED(connection->sendCall(
+                    LanguageServerProtocol::HoverParams::methodName,
+                    &params,
+                    JSONValue::makeInt(callId++))))
+            {
+                return TestResult::Fail;
+            }
+            if (SLANG_FAILED(waitForNonDiagnosticResponse()))
+                return TestResult::Fail;
+            actualOutputSB << "--------\n";
+            LanguageServerProtocol::NullResponse nullResponse;
+            LanguageServerProtocol::Hover hover;
+            if (SLANG_SUCCEEDED(connection->getMessage(&nullResponse)))
+            {
+                actualOutputSB << "null\n";
+            }
+            else if (SLANG_SUCCEEDED(connection->getMessage(&hover)))
+            {
+                actualOutputSB << "range: " << hover.range.start.line << ","
+                               << hover.range.start.character << " - " << hover.range.end.line
+                               << "," << hover.range.end.character;
+                actualOutputSB << "\ncontent:\n" << hover.contents.value << "\n";
+            }
+        }
+        else if (line.startsWith("//DIAGNOSTICS"))
+        {
+            if (!diagnosticsReceived)
+            {
+                waitForNonDiagnosticResponse();
+            }
+            actualOutputSB << "--------\n";
+            for (auto item : diagnostics)
+            {
+                actualOutputSB << item.uri << "\n";
+                for (auto msg : item.diagnostics)
+                {
+                    actualOutputSB << msg.range.start.line << "," << msg.range.start.character
+                                   << "-" << msg.range.end.line << "," << msg.range.end.character
+                                   << " " << msg.message;
+                }
+            }
+        }
+    }
+    connection->sendCall(LanguageServerProtocol::ExitParams::methodName, JSONValue::makeInt(0));
+
+    auto outputStem = input.outputStem;
+    String expectedOutputPath = outputStem + ".expected.txt";
+    String expectedOutput;
+
+    Slang::File::readAllText(expectedOutputPath, expectedOutput);
+
+    TestResult result = TestResult::Pass;
+
+    auto actualOutput = actualOutputSB.ProduceString();
+
+    // Redact absolute file names from actualOutput
+    List<UnownedStringSlice> outputLines;
+    StringUtil::calcLines(actualOutput.getUnownedSlice(), outputLines);
+    StringBuilder redactedSB;
+    for (auto line : outputLines)
+    {
+        Index extIdx = line.indexOf(UnownedStringSlice(".slang"));
+        if (extIdx == -1)
+        {
+            redactedSB << line << "\n";
+            continue;
+        }
+        redactedSB << "{REDACTED}" << line.tail(extIdx) << "\n";
+    }
+
+    actualOutput = redactedSB.ProduceString();
+
+    if (!_areResultsEqual(input.testOptions->type, expectedOutput, actualOutput))
+    {
+        context->getTestReporter()->dumpOutputDifference(expectedOutput, actualOutput);
+        result = TestResult::Fail;
+    }
+
+    // If the test failed, then we write the actual output to a file
+    // so that we can easily diff it from the command line and
+    // diagnose the problem.
+    if (result == TestResult::Fail)
+    {
+        String actualOutputPath = outputStem + ".actual";
+        Slang::File::writeAllText(actualOutputPath, actualOutput);
+
+        context->getTestReporter()->dumpOutputDifference(expectedOutput, actualOutput);
+    }
     return result;
 }
 
@@ -2985,6 +3255,8 @@ static const TestCommandInfo s_testCommandInfos[] =
     { "PERFORMANCE_PROFILE",                    &runPerformanceProfile,                     0 },
     { "COMPILE",                                &runCompile,                                0 },
     { "DOC",                                    &runDocTest,                                0 },
+    { "LANG_SERVER",                            &runLanguageServerTest,                     0},
+
 };
 
 const TestCommandInfo* _findTestCommandInfoByCommand(const UnownedStringSlice& name)

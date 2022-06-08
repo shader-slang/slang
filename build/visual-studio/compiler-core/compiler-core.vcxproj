@@ -294,6 +294,7 @@
     <ClInclude Include="..\..\..\source\compiler-core\slang-json-rpc-connection.h" />
     <ClInclude Include="..\..\..\source\compiler-core\slang-json-rpc.h" />
     <ClInclude Include="..\..\..\source\compiler-core\slang-json-value.h" />
+    <ClInclude Include="..\..\..\source\compiler-core\slang-language-server-protocol.h" />
     <ClInclude Include="..\..\..\source\compiler-core\slang-lexer-diagnostic-defs.h" />
     <ClInclude Include="..\..\..\source\compiler-core\slang-lexer.h" />
     <ClInclude Include="..\..\..\source\compiler-core\slang-llvm-compiler.h" />
@@ -328,6 +329,7 @@
     <ClCompile Include="..\..\..\source\compiler-core\slang-json-rpc-connection.cpp" />
     <ClCompile Include="..\..\..\source\compiler-core\slang-json-rpc.cpp" />
     <ClCompile Include="..\..\..\source\compiler-core\slang-json-value.cpp" />
+    <ClCompile Include="..\..\..\source\compiler-core\slang-language-server-protocol.cpp" />
     <ClCompile Include="..\..\..\source\compiler-core\slang-lexer.cpp" />
     <ClCompile Include="..\..\..\source\compiler-core\slang-llvm-compiler.cpp" />
     <ClCompile Include="..\..\..\source\compiler-core\slang-name-convention-util.cpp" />

@@ -13,7 +13,7 @@
 #include "../core/slang-range.h"
 #include "../../slang-com-helper.h"
 #include "../compiler-core/slang-json-rpc-connection.h"
-#include "slang-language-server-protocol.h"
+#include "../compiler-core/slang-language-server-protocol.h"
 #include "slang-language-server.h"
 #include "slang-workspace-version.h"
 #include "slang-language-server-ast-lookup.h"
