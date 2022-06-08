@@ -6128,6 +6128,9 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
         auto builder = getBuilder();
 
+        // TODO(JS): Do we create something derived from IRGlobalVar? Or do we use 
+        // a decoration to identify an *actual* global?
+
         IRGlobalValueWithCode* irGlobal = builder->createGlobalVar(varType);
         LoweredValInfo globalVal = LoweredValInfo::ptr(irGlobal);
 
