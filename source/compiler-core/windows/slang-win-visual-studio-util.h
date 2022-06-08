@@ -12,18 +12,14 @@ namespace Slang {
 
 struct WinVisualStudioUtil
 {
-    
     struct VersionPath
     {
         SemanticVersion version;    ///< The visual studio version
-        String vcvarsPath;          ///< The path to vcvars bat files, that need to be executed before executing the compiler
+        String vcvarsPath;          ///< The path to `vcvars.bat` files, that need to be executed before executing the compiler
     };
     
         ///  Find all the installations 
     static SlangResult find(List<VersionPath>& outVersionPaths);
-
-        /// Given a version find it's path
-    static SlangResult find(SemanticVersion version, VersionPath& outPath);
 
         /// Find and add to the set (if not already there)
     static SlangResult find(DownstreamCompilerSet* set);
@@ -34,22 +30,8 @@ struct WinVisualStudioUtil
         /// Run visual studio on specified path with the parameters specified on the command line. Output placed in outResult.
     static SlangResult executeCompiler(const VersionPath& versionPath, const CommandLine& commandLine, ExecuteResult& outResult);
 
-        /// Gets the msc compiler used to compile this version. Returning Version(0) means unknown
-    static SemanticVersion getCompiledVersion();
-
-        /// Convert a version number into a string
-    static void append(SemanticVersion version, StringBuilder& outBuilder);
-
-        /// Get version as desc
-    static DownstreamCompiler::Desc getDesc(const SemanticVersion& version)
-    {
-        DownstreamCompiler::Desc desc;
-        desc.type = SLANG_PASS_THROUGH_VISUAL_STUDIO;
-        desc.majorVersion = version.m_major;
-        desc.minorVersion = version.m_minor;
-        return desc;
-    }
-
+        /// Gets the msc compiler used to compile this version. 
+    static DownstreamMatchVersion getCompiledVersion();
 };
 
 } // namespace Slang

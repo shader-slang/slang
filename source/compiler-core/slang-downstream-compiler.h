@@ -154,6 +154,21 @@ protected:
     ComPtr<ISlangBlob> m_blob;
 };
 
+// Combination of a downstream compiler type (pass through) and 
+// a match version.
+struct DownstreamMatchVersion
+{
+    DownstreamMatchVersion(SlangPassThrough inType, MatchSemanticVersion inMatchVersion):
+        type(inType),
+        matchVersion(inMatchVersion)
+    {}
+
+    DownstreamMatchVersion():type(SLANG_PASS_THROUGH_NONE) {}
+
+    SlangPassThrough type;                  ///< The type of the compiler
+    MatchSemanticVersion matchVersion;      ///< The match version
+};
+
 class DownstreamCompiler: public RefObject
 {
 public:
@@ -207,9 +222,10 @@ public:
             /// true if has a version set
         bool hasVersion() const { return majorVersion || minorVersion; }
 
-
             /// Ctor
         explicit Desc(SlangPassThrough inType = SLANG_PASS_THROUGH_NONE, Int inMajorVersion = 0, Int inMinorVersion = 0):type(inType), majorVersion(inMajorVersion), minorVersion(inMinorVersion) {}
+
+        explicit Desc(SlangPassThrough inType, const SemanticVersion& version):type(inType), majorVersion(version.m_major), minorVersion(version.m_minor) {}
 
         SlangPassThrough type;      ///< The type of the compiler
 
@@ -219,20 +235,6 @@ public:
         Int minorVersion;           ///< Minor version (interpretation is type specific)
     };
 
-    struct MatchDesc
-    {
-        enum class Kind
-        {
-            Future,         ///< Some future unknown version
-            Major,          ///< Major version is defined (minor is in effect undefined)
-            MajorMinor      ///< Major and minor version are defined
-        };
-
-        bool hasCompleteVersion() const { return kind == Kind::MajorMinor; }
-
-        Kind kind;
-        Desc desc;
-    };
 
     enum class OptimizationLevel
     {
@@ -532,8 +534,6 @@ struct DownstreamCompilerBaseUtil
     typedef DownstreamCompiler::FloatingPointMode FloatingPointMode;
     typedef DownstreamCompiler::ProductFlag ProductFlag;
     typedef DownstreamCompiler::ProductFlags ProductFlags;
-
-    typedef DownstreamCompiler::MatchDesc MatchDesc;
 };
 
 struct DownstreamCompilerUtil: public DownstreamCompilerBaseUtil
@@ -549,12 +549,19 @@ struct DownstreamCompilerUtil: public DownstreamCompilerBaseUtil
     static DownstreamCompiler* findCompiler(const DownstreamCompilerSet* set, MatchType matchType, const DownstreamCompiler::Desc& desc);
     static DownstreamCompiler* findCompiler(const List<DownstreamCompiler*>& compilers, MatchType matchType, const DownstreamCompiler::Desc& desc);
 
+    static DownstreamCompiler* findCompiler(const List<DownstreamCompiler*>& compilers, SlangPassThrough type, const SemanticVersion& version);
+    static DownstreamCompiler* findCompiler(const List<DownstreamCompiler*>& compilers, const DownstreamCompiler::Desc& desc);
+
+        /// Find all the compilers with the version
+    static void findVersions(const List<DownstreamCompiler*>& compilers, SlangPassThrough compiler, List<SemanticVersion>& versions);
+
+    
         /// Find the compiler closest to the desc 
-    static DownstreamCompiler* findClosestCompiler(const List<DownstreamCompiler*>& compilers, const MatchDesc& desc);
-    static DownstreamCompiler* findClosestCompiler(const DownstreamCompilerSet* set, const MatchDesc& desc);
+    static DownstreamCompiler* findClosestCompiler(const List<DownstreamCompiler*>& compilers, const DownstreamMatchVersion& version);
+    static DownstreamCompiler* findClosestCompiler(const DownstreamCompilerSet* set, const DownstreamMatchVersion& version);
 
         /// Get the information on the compiler used to compile this source
-    static const DownstreamCompiler::Desc& getCompiledWithDesc();
+    static DownstreamMatchVersion getCompiledVersion();
 
     static void updateDefault(DownstreamCompilerSet* set, SlangSourceLanguage sourceLanguage);
     static void updateDefaults(DownstreamCompilerSet* set);

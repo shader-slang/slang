@@ -73,13 +73,28 @@ static SlangResult _readRegistryKey(const char* path, const char* keyName, Strin
 }
 
 // Make easier to set up the array
-static SemanticVersion _makeVersion(int main, int dot = 0) { return SemanticVersion(main, dot, 0); }
+
+static DownstreamMatchVersion _makeVersion(int main)
+{
+    DownstreamMatchVersion version;
+    version.type = SLANG_PASS_THROUGH_VISUAL_STUDIO;
+    version.matchVersion.set(main);
+    return version;
+}
+
+static DownstreamMatchVersion _makeVersion(int main, int dot) 
+{ 
+    DownstreamMatchVersion version;
+    version.type = SLANG_PASS_THROUGH_VISUAL_STUDIO;
+    version.matchVersion.set(main, dot);
+    return version;
+}
 
 VersionInfo _makeVersionInfo(const char* name, int high, int dot = 0)
 {
     VersionInfo info;
     info.name = name;
-    info.version = _makeVersion(high, dot);
+    info.version = SemanticVersion(high, dot);
     return info;
 }
 
@@ -139,9 +154,10 @@ static SlangResult _parseVersion(UnownedStringSlice versionString, SemanticVersi
 }
 
 
-/* static */SemanticVersion WinVisualStudioUtil::getCompiledVersion()
+/* static */DownstreamMatchVersion WinVisualStudioUtil::getCompiledVersion()
 {
     // Get the version of visual studio used to compile this source
+    // Not const, because otherwise we get an warning/error about constant expression...
     uint32_t version = _MSC_VER;
 
     switch (version)
@@ -205,11 +221,11 @@ static SlangResult _parseVersion(UnownedStringSlice versionString, SemanticVersi
     else if (version >= 1940)
     {
         // Its an unknown newer version
-        return SemanticVersion::makeFuture();
+        return DownstreamMatchVersion(SLANG_PASS_THROUGH_VISUAL_STUDIO, MatchSemanticVersion::makeFuture());
     }
 
     // Unknown version
-    return SemanticVersion();
+    return DownstreamMatchVersion(SLANG_PASS_THROUGH_VISUAL_STUDIO, MatchSemanticVersion());
 }
 
 static SlangResult _parseJson(const String& contents, DiagnosticSink* sink, JSONContainer* container, JSONValue& outRoot)
@@ -268,14 +284,8 @@ static SlangResult _findVersionsWithVSWhere(const VersionInfo* versionInfo, List
     SemanticVersion requiredVersion;
     if (versionInfo)
     {
-        auto version = versionInfo->version;
-
-        const auto desc = WinVisualStudioUtil::getDesc(version);
-
-        requiredVersion = SemanticVersion(desc.majorVersion, desc.minorVersion, 0);
-
         StringBuilder versionName;
-        WinVisualStudioUtil::append(version, versionName);
+        versionInfo->version.append(versionName);
 
         cmd.addArg("-version");
         cmd.addArg(versionName);
@@ -375,7 +385,7 @@ static SlangResult _findVersionsWithRegistery(List<WinVisualStudioUtil::VersionP
             const auto& keyInfo = s_regInfos[keyIndex];
 
             StringBuilder keyName;
-            WinVisualStudioUtil::append(versionInfo.version, keyName);
+            versionInfo.version.append(keyName);
 
             String value;
             if (SLANG_SUCCEEDED(_readRegistryKey(keyInfo.regName, keyName.getBuffer(), value)))
@@ -396,21 +406,6 @@ static SlangResult _findVersionsWithRegistery(List<WinVisualStudioUtil::VersionP
     }
 
     return SLANG_OK;
-}
-
-// Has to be the same version or later.
-// NOTE! Assumes the versions are sorted.
-static Index _findBestVersion(SemanticVersion requiredVersion, const List<WinVisualStudioUtil::VersionPath>& versions)
-{
-    for (Index i = 0; i < versions.getCount(); ++i)
-    {
-        const auto& entry = versions[i];
-        if (entry.version >= requiredVersion)
-        {
-            return i;
-        }
-    }
-    return -1;
 }
 
 /* static */SlangResult WinVisualStudioUtil::find(List<VersionPath>& outVersionPaths)
@@ -451,31 +446,6 @@ static Index _findBestVersion(SemanticVersion requiredVersion, const List<WinVis
     return SLANG_OK;
 }
 
-/* static */SlangResult WinVisualStudioUtil::find(SemanticVersion version, VersionPath& outPath)
-{
-    List<VersionPath> versionPaths;
-    SLANG_RETURN_ON_FAIL(find(versionPaths));
-    
-    Index bestIndex;
-
-    if (version.isFuture())
-    {
-        // Get the last (or invalid if empty)
-        bestIndex = versionPaths.getCount() - 1;
-    }
-    else
-    {
-        bestIndex = _findBestVersion(version, versionPaths);
-    }
-
-    if (bestIndex >= 0)
-    {
-        outPath = versionPaths[bestIndex];
-        return SLANG_OK;
-    }
-    return SLANG_E_NOT_FOUND;
-}
-
 /* static */SlangResult WinVisualStudioUtil::find(DownstreamCompilerSet* set)
 {
     List<VersionPath> versionPaths;
@@ -483,7 +453,8 @@ static Index _findBestVersion(SemanticVersion requiredVersion, const List<WinVis
 
     for (const auto& versionPath : versionPaths)
     {
-        auto desc = getDesc(versionPath.version);
+        // Turn into a desc
+        const DownstreamCompiler::Desc desc(SLANG_PASS_THROUGH_VISUAL_STUDIO, versionPath.version);
 
         // If not in set add it
         if (!set->getCompiler(desc))
@@ -536,22 +507,6 @@ static Index _findBestVersion(SemanticVersion requiredVersion, const List<WinVis
     // Append the command line options
     cmdLine.addArgs(commandLine.m_args.getBuffer(), commandLine.m_args.getCount());
     return ProcessUtil::execute(cmdLine, outResult);
-}
-
-/* static */void WinVisualStudioUtil::append(SemanticVersion version, StringBuilder& outBuilder)
-{
-    if (version.isFuture())
-    {
-        outBuilder << "future";
-    }
-    else if (version.isSet())
-    { 
-        outBuilder << version.m_major << "." << version.m_minor; 
-    }
-    else
-    {
-        outBuilder << "unknown";
-    }
 }
 
 } // namespace Slang

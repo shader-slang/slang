@@ -519,34 +519,32 @@ SlangResult CommandLineDownstreamCompiler::compile(const CompileOptions& inOptio
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!! DownstreamCompiler::Desc !!!!!!!!!!!!!!!!!!!!!!*/
 
-static DownstreamCompiler::Desc _calcCompiledWithDesc()
+static DownstreamMatchVersion _calcCompiledVersion()
 {
-    DownstreamCompiler::Desc desc;
+    DownstreamMatchVersion matchVersion;
 
 #if SLANG_VC
-    desc = WinVisualStudioUtil::getDesc(WinVisualStudioUtil::getCompiledVersion());
+    matchVersion = WinVisualStudioUtil::getCompiledVersion();
 #elif SLANG_CLANG
-    desc.type = SLANG_PASS_THROUGH_CLANG;
-    desc.majorVersion = Int(__clang_major__);
-    desc.minorVersion = Int(__clang_minor__);
+    matchVersion.type = SLANG_PASS_THROUGH_CLANG;
+    matchVersion.matchVersion.set(Index(__clang_major__), Index(__clang_minor__));
 #elif SLANG_GCC
-    desc.type = SLANG_PASS_THROUGH_GCC;
-    desc.majorVersion = Int(__GNUC__);
-    desc.minorVersion = Int(__GNUC_MINOR__);
+    matchVersion.type = SLANG_PASS_THROUGH_GCC;
+    matchVersion.matchVersion.set(Index(__GNUC__), Index(__GNUC_MINOR__));
 #else
     // TODO(JS): Hmmm None is not quite the same as unknown. It works for now, but we might want to have a distinct enum for unknown.
-    desc.type = SLANG_PASS_THROUGH_NONE;        
+    matchVersion.type = SLANG_PASS_THROUGH_NONE;
 #endif
 
-    return desc;
+    return matchVersion;
 }
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!! DownstreamCompilerUtil !!!!!!!!!!!!!!!!!!!!!!*/
 
-const DownstreamCompiler::Desc& DownstreamCompilerUtil::getCompiledWithDesc()
+DownstreamMatchVersion DownstreamCompilerUtil::getCompiledVersion()
 {
-    static DownstreamCompiler::Desc s_desc = _calcCompiledWithDesc();
-    return s_desc;
+    static DownstreamMatchVersion s_version = _calcCompiledVersion();
+    return s_version;
 }
 
 /* static */DownstreamCompiler* DownstreamCompilerUtil::findCompiler(const DownstreamCompilerSet* set, MatchType matchType, const DownstreamCompiler::Desc& desc)
@@ -626,49 +624,61 @@ const DownstreamCompiler::Desc& DownstreamCompilerUtil::getCompiledWithDesc()
     return (bestIndex >= 0) ? compilers[bestIndex] : nullptr;
 }
 
-/* static */DownstreamCompiler* DownstreamCompilerUtil::findClosestCompiler(const List<DownstreamCompiler*>& compilers, const MatchDesc& matchDesc)
+/* static */DownstreamCompiler* DownstreamCompilerUtil::findCompiler(const List<DownstreamCompiler*>& compilers, const DownstreamCompiler::Desc& desc)
 {
-    DownstreamCompiler* compiler;
-    
-    if (matchDesc.kind == MatchDesc::Kind::Future)
+    for (auto compiler : compilers)
     {
-        compiler = findCompiler(compilers, MatchType::Newest, matchDesc.desc);
-        if (compiler)
+        if (compiler->getDesc() == desc)
         {
             return compiler;
         }
     }
-    else if (matchDesc.kind == MatchDesc::Kind::Major)
-    {
-        // Only has a major version. We need find all that match the major version
-        List<DownstreamCompiler*> matching;
-        for (auto compiler : compilers)
-        {
-            const auto& desc = compiler->getDesc();
-            if (desc.type == matchDesc.desc.type && desc.majorVersion == matchDesc.desc.majorVersion)
-            {
-                matching.add(compiler);
-            }
-        }
-        compiler = findCompiler(matching, MatchType::Newest, matchDesc.desc);
-        if (compiler)
-        {
-            return compiler;
-        }
-    }
-    else
-    {
-        SLANG_ASSERT(matchDesc.hasCompleteVersion());
+    return nullptr;
+}
 
-        compiler = findCompiler(compilers, MatchType::MinGreaterEqual, desc.desc);
-        if (compiler)
+/* static */DownstreamCompiler* DownstreamCompilerUtil::findCompiler(const List<DownstreamCompiler*>& compilers, SlangPassThrough type, const SemanticVersion& version)
+{
+    DownstreamCompiler::Desc desc;
+    desc.type = type;
+    desc.majorVersion = version.m_major;
+    desc.minorVersion = version.m_minor;
+    return findCompiler(compilers, desc);
+}
+
+/* static */void DownstreamCompilerUtil::findVersions(const List<DownstreamCompiler*>& compilers, SlangPassThrough type, List<SemanticVersion>& outVersions)
+{
+    for (auto compiler : compilers)
+    {
+        auto desc = compiler->getDesc();
+
+        if (desc.type == type)
         {
-            return compiler;
+            outVersions.add(SemanticVersion(desc.majorVersion, desc.minorVersion, 0));
         }
-        compiler = findCompiler(compilers, MatchType::MinAbsolute, desc.desc);
-        if (compiler)
+    }
+}
+
+/* static */DownstreamCompiler* DownstreamCompilerUtil::findClosestCompiler(const List<DownstreamCompiler*>& compilers, const DownstreamMatchVersion& matchVersion)
+{
+    List<SemanticVersion> versions;
+
+    findVersions(compilers, matchVersion.type, versions);
+
+    if (versions.getCount() > 0)
+    {
+        if (versions.getCount() == 1)
         {
-            return compiler;
+            // Must be that one
+            return findCompiler(compilers, matchVersion.type, versions[0]);
+        }
+
+        // Okay lets find the best one
+        auto bestVersion = MatchSemanticVersion::findAnyBest(versions.getBuffer(), versions.getCount(), matchVersion.matchVersion);
+
+        // If one is found use it
+        if (bestVersion.isSet())
+        {
+            return findCompiler(compilers, matchVersion.type, bestVersion);
         }
     }
 
@@ -685,7 +695,7 @@ const DownstreamCompiler::Desc& DownstreamCompilerUtil::getCompiledWithDesc()
         bool isCompatible = false;
         for (auto passThrough : compatiblePassThroughs)
         {
-            if (desc.type == passThrough)
+            if (matchVersion.type == passThrough)
             {
                 isCompatible = true;
                 break;
@@ -696,17 +706,15 @@ const DownstreamCompiler::Desc& DownstreamCompilerUtil::getCompiledWithDesc()
         {
             for (auto passThrough : compatiblePassThroughs)
             {
-                if (passThrough != desc.type)
+                versions.clear();
+                findVersions(compilers, passThrough, versions);
+
+                if (versions.getCount() > 0)
                 {
-                    DownstreamCompiler::Desc compatible;
-                    
-                    compatible.type = passThrough;
-                    // Find the latest version.
-                    compiler = findCompiler(compilers, MatchType::Newest, compatible);
-                    if (compiler)
-                    {
-                        return compiler;
-                    }
+                    // Get the latest version (as we have no way to really compare)
+                    auto latestVersion = SemanticVersion::getLatest(versions.getBuffer(), versions.getCount());
+
+                    return findCompiler(compilers, matchVersion.type, latestVersion);
                 }
             }
         }
@@ -715,19 +723,11 @@ const DownstreamCompiler::Desc& DownstreamCompilerUtil::getCompiledWithDesc()
     return nullptr;
 }
 
-/* static */DownstreamCompiler* DownstreamCompilerUtil::findClosestCompiler(const DownstreamCompilerSet* set, const MatchDesc& desc)
+/* static */DownstreamCompiler* DownstreamCompilerUtil::findClosestCompiler(const DownstreamCompilerSet* set, const DownstreamMatchVersion& matchVersion)
 {
-    if (desc.hasCompleteVersion())
-    {
-        DownstreamCompiler* compiler = set->getCompiler(desc.desc);
-        if (compiler)
-        {
-            return compiler;
-        }
-    }
     List<DownstreamCompiler*> compilers;
     set->getCompilers(compilers);
-    return findClosestCompiler(compilers, desc);
+    return findClosestCompiler(compilers, matchVersion);
 }
 
 /* static */void DownstreamCompilerUtil::updateDefault(DownstreamCompilerSet* set, SlangSourceLanguage sourceLanguage)
@@ -742,7 +742,7 @@ const DownstreamCompiler::Desc& DownstreamCompilerUtil::getCompiledWithDesc()
             // Find the compiler closest to the compiler this was compiled with
             if (!compiler)
             {
-                compiler = findClosestCompiler(set, getCompiledWithDesc());
+                compiler = findClosestCompiler(set, getCompiledVersion());
             }
             break;
         }
