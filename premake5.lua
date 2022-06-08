@@ -180,10 +180,10 @@ newoption {
  enableXlib = (_OPTIONS["enable-xlib"] == "true")
  enableExperimental = (_OPTIONS["enable-experimental-projects"] == "true")
  
- -- Default to disable stdlib source
+ -- If stdlib embedding is enabled, disable stdlib source embedding by default
  disableStdlibSource = enableEmbedStdLib
  
- -- If embedding is enabled, and the setting is set use the setting
+ -- If embedding is enabled, and the setting `disable-stdlib-source` setting is set, use it's value
  if enableEmbedStdLib and _OPTIONS["disable-stdlib-source"] ~= nil then
     disableStdlibSource = (_OPTIONS["disable-stdlib-source"] == "true")   
  end
