@@ -184,7 +184,7 @@ newoption {
  disableStdlibSource = enableEmbedStdLib
  
  -- If embedding is enabled, and the setting is set use the setting
- if enableEmbedStdLib and set["disable-stdlib-source"] ~= nil then
+ if enableEmbedStdLib and _OPTIONS["disable-stdlib-source"] ~= nil then
     disableStdlibSource = (_OPTIONS["disable-stdlib-source"] == "true")   
  end
  
