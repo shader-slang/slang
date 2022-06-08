@@ -29,6 +29,15 @@ jobs:
     - name: build
       run:
         MSBuild.exe slang.sln -v:m -m -property:Configuration=${{matrix.configuration}} -property:Platform=${{matrix.platform}} -property:WindowsTargetPlatformVersion=10.0.19041.0
+    - uses: actions/upload-artifact@v3
+      with:
+        name: slang-build-${{matrix.configuration}}-${{matrix.platform}}-${{matrix.compiler}}
+        path: |
+          bin/**/*.dll
+          bin/**/*.exe
+          bin/**/*.so
+          bin/**/slangc
+          bin/**/slangd
     - name: test
       run: |
         if ("${{matrix.configuration}}" -eq "Debug") {
@@ -51,3 +60,4 @@ jobs:
         Invoke-WebRequest -uri "https://github.com/shader-slang/swiftshader/releases/download/v1.0/vk_swiftshader_windows_$testPlatform.zip" -Method "GET"  -Outfile "swiftshader.zip";
         Expand-Archive "swiftshader.zip" -DestinationPath $slangTestBinDir;
         & "$slangTestBinDir\slang-test.exe" -api all-dx12 -appveyor -bindir "$slangTestBinDir\" -platform $testPlatform -configuration ${{matrix.configuration}} -category $testCategory 2>&1;
+    

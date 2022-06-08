@@ -492,7 +492,8 @@ namespace Slang
         Expr* ConstructDeclRefExpr(
             DeclRef<Decl>   declRef,
             Expr*    baseExpr,
-            SourceLoc       loc);
+            SourceLoc loc,
+            Expr*    originalExpr);
 
         Expr* ConstructDerefExpr(
             Expr*    base,
@@ -501,13 +502,15 @@ namespace Slang
         Expr* ConstructLookupResultExpr(
             LookupResultItem const& item,
             Expr*            baseExpr,
-            SourceLoc               loc);
+            SourceLoc loc,
+            Expr* originalExpr);
 
         Expr* createLookupResultExpr(
             Name*                   name,
             LookupResult const&     lookupResult,
             Expr*            baseExpr,
-            SourceLoc               loc);
+            SourceLoc loc,
+            Expr*    originalExpr);
 
             /// Attempt to "resolve" an overloaded `LookupResult` to only include the "best" results
         LookupResult resolveOverloadedLookup(LookupResult const& lookupResult);
@@ -1649,6 +1652,7 @@ namespace Slang
             : SemanticsVisitor(outer)
         {}
 
+        Expr* visitIncompleteExpr(IncompleteExpr* expr);
         Expr* visitBoolLiteralExpr(BoolLiteralExpr* expr);
         Expr* visitNullPtrLiteralExpr(NullPtrLiteralExpr* expr);
         Expr* visitIntegerLiteralExpr(IntegerLiteralExpr* expr);

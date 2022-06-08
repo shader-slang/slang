@@ -794,6 +794,12 @@ namespace Slang
             }
         }
 
+        // Disallow converting to a ParameterGroupType.
+        if (auto toParameterGroupType = as<ParameterGroupType>(toType))
+        {
+            return _failedCoercion(toType, outToExpr, fromExpr);
+        }
+
         // We allow implicit conversion of a parameter group type like
         // `ConstantBuffer<X>` or `ParameterBlock<X>` to its element
         // type `X`.

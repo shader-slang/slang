@@ -26,6 +26,15 @@ jobs:
         CONFIGURATION=${{matrix.configuration}}
         ARCH=${{matrix.platform}}
         source ./github_build.sh
+    - uses: actions/upload-artifact@v3
+      with:
+        name: slang-build-${{matrix.configuration}}-${{matrix.platform}}-${{matrix.compiler}}
+        path: |
+          bin/**/*.dll
+          bin/**/*.exe
+          bin/**/*.so
+          bin/**/slangc
+          bin/**/slangd
     - name: test
       run: 
         CONFIGURATION=${{matrix.configuration}}

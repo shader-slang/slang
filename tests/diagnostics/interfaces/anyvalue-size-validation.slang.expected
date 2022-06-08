@@ -2,7 +2,7 @@ result code = -1
 standard error = {
 tests/diagnostics/interfaces/anyvalue-size-validation.slang(11): error 41011: type 'S' does not fit in the size required by its conforming interface.
 struct S : IInterface
-^~~~~~
+       ^
 }
 standard output = {
 }

@@ -176,7 +176,7 @@ HumaneSourceLoc SourceView::getHumaneLoc(SourceLoc loc, SourceLocType type)
 
     // We need the line index from the original source file
     const int lineIndex = m_sourceFile->calcLineIndexFromOffset(offset);
-    
+
     // TODO: we should really translate the byte index in the line
     // to deal with:
     //

@@ -157,7 +157,7 @@ SlangResult JSONRPCConnection::toNativeOrSendError(const JSONValue& value, const
     }
 
     return SLANG_OK;
-} 
+}
 
 SlangResult JSONRPCConnection::sendCall(const UnownedStringSlice& method, const JSONValue& id)
 {

@@ -55,10 +55,6 @@ static void _addDeclRec(Decl* decl, List<Decl*>& outDecls)
     {
         outDecls.add(decl);
     }
-    else
-    {
-        SLANG_ASSERT(!"Decl without a location!");
-    }
 
     if (GenericDecl* genericDecl = as<GenericDecl>(decl))
     {
