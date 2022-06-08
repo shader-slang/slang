@@ -16,7 +16,7 @@ jobs:
         fetch-depth: '1'
     - name: verify
       run: |
-        & .\premake.bat vs2019
+        & .\premake.bat vs2019 --deps=true
         $diff = & git diff
         if ($diff.length -ne 0)
         {

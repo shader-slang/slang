@@ -54,6 +54,7 @@ static const StructRttiInfo _makeJSONRPCCallResponseRtti()
     builder.addField("method", &obj.method);
     builder.addField("params", &obj.params, StructRttiInfo::Flag::Optional);
     builder.addField("id", &obj.id, StructRttiInfo::Flag::Optional);
+    builder.ignoreUnknownFields();
 
     return builder.make();
 }

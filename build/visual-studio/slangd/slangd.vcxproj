@@ -262,12 +262,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\..\tools\slangd\language-server-protocol.h" />
-    <ClInclude Include="..\..\..\tools\slangd\language-server.h" />
-  </ItemGroup>
-  <ItemGroup>
-    <ClCompile Include="..\..\..\tools\slangd\language-server-protocol.cpp" />
-    <ClCompile Include="..\..\..\tools\slangd\language-server.cpp" />
+    <ClCompile Include="..\..\..\tools\slangd\main.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\compiler-core\compiler-core.vcxproj">

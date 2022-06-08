@@ -26,6 +26,40 @@ ASTPrinter::Part::Kind ASTPrinter::Part::getKind(ASTPrinter::Part::Type type)
 
 void ASTPrinter::addType(Type* type)
 {
+    if (!type)
+    {
+        m_builder << "<error>";
+        return;
+    }
+    if (m_optionFlags & OptionFlag::SimplifiedBuiltinType)
+    {
+        if (auto vectorType = as<VectorExpressionType>(type))
+        {
+            if (as<BasicExpressionType>(vectorType->elementType))
+            {
+                vectorType->elementType->toText(m_builder);
+                if (as<ConstantIntVal>(vectorType->elementCount))
+                {
+                    m_builder << vectorType->elementCount;
+                    return;
+                }
+            }
+        }
+        else if (auto matrixType = as<MatrixExpressionType>(type))
+        {
+            auto elementType = matrixType->getElementType();
+            if (as<BasicExpressionType>(elementType))
+            {
+                matrixType->getElementType()->toText(m_builder);
+                if (as<ConstantIntVal>(matrixType->getRowCount()) &&
+                    as<ConstantIntVal>(matrixType->getColumnCount()))
+                {
+                    m_builder << matrixType->getRowCount() << "x" << matrixType->getColumnCount();
+                    return;
+                }
+            }
+        }
+    }
     type->toText(m_builder);
 }
 
@@ -223,7 +257,7 @@ void ASTPrinter::addGenericParams(const DeclRef<GenericDecl>& genericDeclRef)
     sb << ">";
 }
 
-void ASTPrinter::addDeclParams(const DeclRef<Decl>& declRef)
+void ASTPrinter::addDeclParams(const DeclRef<Decl>& declRef, List<Range<Index>>* outParamRange)
 {
     auto& sb = m_builder;
 
@@ -236,6 +270,8 @@ void ASTPrinter::addDeclParams(const DeclRef<Decl>& declRef)
         for (auto paramDeclRef : getParameters(funcDeclRef))
         {
             if (!first) sb << ", ";
+
+            auto rangeStart = sb.getLength();
 
             ParamDecl* paramDecl = paramDeclRef;
 
@@ -278,6 +314,11 @@ void ASTPrinter::addDeclParams(const DeclRef<Decl>& declRef)
                 }
             }
 
+            auto rangeEnd = sb.getLength();
+
+            if (outParamRange)
+                outParamRange->add(makeRange<Index>(rangeStart, rangeEnd));
+
             first = false;
         }
 
@@ -287,7 +328,7 @@ void ASTPrinter::addDeclParams(const DeclRef<Decl>& declRef)
     {
         addGenericParams(genericDeclRef);
 
-        addDeclParams(DeclRef<Decl>(getInner(genericDeclRef), genericDeclRef.substitutions));
+        addDeclParams(DeclRef<Decl>(getInner(genericDeclRef), genericDeclRef.substitutions), outParamRange);
     }
     else
     {
@@ -300,9 +341,84 @@ void ASTPrinter::addDeclKindPrefix(Decl* decl)
     {
         decl = genericDecl->inner;
     }
+    for (auto modifier : decl->modifiers)
+    {
+        if (modifier->getKeywordName())
+        {
+            if (m_optionFlags & OptionFlag::NoInternalKeywords)
+            {
+                if (as<TargetIntrinsicModifier>(modifier))
+                    continue;
+                if (as<MagicTypeModifier>(modifier))
+                    continue;
+                if (as<IntrinsicOpModifier>(modifier))
+                    continue;
+                if (as<IntrinsicTypeModifier>(modifier))
+                    continue;
+                if (as<BuiltinModifier>(modifier))
+                    continue;
+                if (as<BuiltinTypeModifier>(modifier))
+                    continue;
+            }
+            m_builder << modifier->getKeywordName()->text << " ";
+        }
+    }
     if (as<FuncDecl>(decl))
     {
         m_builder << "func ";
+    }
+    else if (as<StructDecl>(decl))
+    {
+        m_builder << "struct ";
+    }
+    else if (as<InterfaceDecl>(decl))
+    {
+        m_builder << "interface ";
+    }
+    else if (as<ClassDecl>(decl))
+    {
+        m_builder << "class ";
+    }
+    else if (auto typedefDecl = as<TypeDefDecl>(decl))
+    {
+        m_builder << "typedef ";
+        if (typedefDecl->type.type)
+        {
+            addType(typedefDecl->type.type);
+            m_builder << " ";
+        }
+    }
+    else if (auto propertyDecl = as<PropertyDecl>(decl))
+    {
+        m_builder << "property ";
+    }
+    else if (as<NamespaceDecl>(decl))
+    {
+        m_builder << "namespace ";
+    }
+    else if (auto varDecl = as<VarDeclBase>(decl))
+    {
+        if (varDecl->getType())
+        {
+            addType(varDecl->getType());
+            m_builder << " ";
+        }
+    }
+    else if (as<EnumDecl>(decl))
+    {
+        m_builder << "enum ";
+    }
+    else if (auto enumCase = as<EnumCaseDecl>(decl))
+    {
+        if (enumCase->getType())
+        {
+            addType(enumCase->getType());
+            m_builder << " ";
+        }
+    }
+    else if (auto assocType = as<AssocTypeDecl>(decl))
+    {
+        m_builder << "associatedtype ";
     }
 }
 
@@ -324,6 +440,14 @@ void ASTPrinter::addDeclResultType(const DeclRef<Decl>& inDeclRef)
         {
             ScopePart scopePart(this, Part::Type::ReturnType);
             addType(getResultType(m_astBuilder, callableDeclRef));
+        }
+    }
+    else if (auto propertyDecl = declRef.as<PropertyDecl>())
+    {
+        if (propertyDecl.getDecl()->type.type)
+        {
+            m_builder << " : ";
+            addType(declRef.substitute(m_astBuilder, propertyDecl.getDecl()->type.type));
         }
     }
 }

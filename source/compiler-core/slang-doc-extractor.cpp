@@ -731,7 +731,8 @@ SlangResult DocMarkupExtractor::extract(const SearchItemInput* inputs, Index inp
             {
                 // Find the new view
                 sourceView = sourceManager->findSourceView(loc);
-                SLANG_ASSERT(sourceView);
+                if (!sourceView)
+                    return SLANG_FAIL;
 
                 // We want only one view per SourceFile
                 SourceFile* sourceFile = sourceView->getSourceFile();

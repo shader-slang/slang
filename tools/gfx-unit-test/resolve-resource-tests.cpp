@@ -9,34 +9,12 @@
 #include <d3d12.h>
 #endif
 
-#if 0
-#include <stdlib.h>
-#include <stdio.h>
-
-#define STB_IMAGE_WRITE_IMPLEMENTATION
-#include "external/stb/stb_image_write.h"
-#endif
-
 using namespace Slang;
 using namespace gfx;
 
 namespace
 {
     using namespace gfx_test;
-
-#if 0
-    Slang::Result writeImage(
-        const char* filename,
-        ISlangBlob* pixels,
-        uint32_t width,
-        uint32_t height)
-    {
-        int stbResult =
-            stbi_write_hdr(filename, width, height, 4, (float*)pixels->getBufferPointer());
-
-        return stbResult ? SLANG_OK : SLANG_FAIL;
-    }
-#endif
 
     struct Vertex
     {

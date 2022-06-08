@@ -150,7 +150,8 @@ public:
             VerbosePath         = 0x1,           ///< Will display a more verbose path (if available) - such as a canonical or absolute path
             SourceLocationLine  = 0x2,           ///< If set will display the location line if source is available
             HumaneLoc           = 0x4,           ///< If set will display humane locs (filename/line number) information
-            TreatWarningsAsErrors = 0x8          ///< If set will turn all Warning type messages (after overrides) into Error type messages
+            TreatWarningsAsErrors = 0x8,         ///< If set will turn all Warning type messages (after overrides) into Error type messages
+            LanguageServer        = 0x10,        ///< If set will format message in a way that is suitable for language server
         };
     };
 
