@@ -273,6 +273,7 @@
   <ItemGroup>
     <ClCompile Include="..\..\..\tools\slang-unit-test\unit-test-byte-encode.cpp" />
     <ClCompile Include="..\..\..\tools\slang-unit-test\unit-test-chunked-list.cpp" />
+    <ClCompile Include="..\..\..\tools\slang-unit-test\unit-test-com-host-callable.cpp" />
     <ClCompile Include="..\..\..\tools\slang-unit-test\unit-test-command-line-args.cpp" />
     <ClCompile Include="..\..\..\tools\slang-unit-test\unit-test-compression.cpp" />
     <ClCompile Include="..\..\..\tools\slang-unit-test\unit-test-find-type-by-name.cpp" />
@@ -290,6 +291,9 @@
     <ClCompile Include="..\..\..\tools\slang-unit-test\unit-test-string.cpp" />
     <ClCompile Include="..\..\..\tools\slang-unit-test\unit-test-translation-unit-import.cpp" />
     <ClCompile Include="..\..\..\tools\unit-test\slang-unit-test.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\..\..\tools\slang-unit-test\unit-test-com-host-callable.slang" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\lz4\lz4.vcxproj">

@@ -6339,6 +6339,8 @@ namespace Slang
         _makeParseModifier("instance",      InstanceModifier::kReflectClassInfo),
         _makeParseModifier("__builtin",     BuiltinModifier::kReflectClassInfo),
 
+        _makeParseModifier("__global",      ActualGlobalModifier::kReflectClassInfo),
+
         _makeParseModifier("inline",        InlineModifier::kReflectClassInfo),
         _makeParseModifier("public",        PublicModifier::kReflectClassInfo),
         _makeParseModifier("require",       RequireModifier::kReflectClassInfo),

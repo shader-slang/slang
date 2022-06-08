@@ -87,6 +87,12 @@ struct MoveGlobalVarInitializationToEntryPointsPass
             if(!globalVar)
                 continue;
 
+            // If it's an `Actual Global` we don't want to move initialization
+            if (as<IRActualGlobalRate>(globalVar->getRate()))
+            {
+                continue;
+            }
+        
             auto firstBlock = globalVar->getFirstBlock();
             if(!firstBlock)
                 continue;

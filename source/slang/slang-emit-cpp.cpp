@@ -2547,7 +2547,50 @@ void CPPSourceEmitter::emitPreModuleImpl()
     }
 }
 
-/* virtual */void CPPSourceEmitter::emitFuncDecorationsImpl(IRFunc* func)
+
+void CPPSourceEmitter::emitGlobalInstImpl(IRInst* inst)
+{
+    if (as<IRGlobalVar>(inst) && inst->findDecoration<IRExternCppDecoration>())
+    {
+        // JS:
+        // Turns out just doing extern "C" means something different on a variable
+        // So we need to wrap in extern "C" { }
+        m_writer->emit("extern \"C\" {\n");
+        Super::emitGlobalInstImpl(inst);
+        m_writer->emit("\n}\n");
+    }
+    else
+    {
+        Super::emitGlobalInstImpl(inst);
+    }
+}
+
+static bool _isExported(IRInst* inst)
+{
+    for (auto decoration : inst->getDecorations())
+    {
+        const auto op = decoration->getOp();
+        if (op == kIROp_PublicDecoration ||
+            op == kIROp_HLSLExportDecoration)
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
+void CPPSourceEmitter::emitVarDecorationsImpl(IRInst* inst)
+{
+    if (as<IRGlobalVar>(inst) && _isExported(inst))
+    {
+        m_writer->emit("SLANG_PRELUDE_SHARED_LIB_EXPORT\n");
+    }
+
+    Super::emitVarDecorationsImpl(inst);
+}
+
+
+void CPPSourceEmitter::_maybeEmitExportLike(IRInst* inst)
 {
     // Specially handle export, as we don't want to emit it multiple times
     if (getTargetReq()->isWholeProgramRequest())
@@ -2556,7 +2599,7 @@ void CPPSourceEmitter::emitPreModuleImpl()
         bool isExported = false;
 
         // If public/export made it externally visible
-        for (auto decoration : func->getDecorations())
+        for (auto decoration : inst->getDecorations())
         {
             const auto op = decoration->getOp();
             if (op == kIROp_ExternCppDecoration)
@@ -2581,6 +2624,11 @@ void CPPSourceEmitter::emitPreModuleImpl()
             m_writer->emit("extern \"C\"\n");
         }
     }
+}
+
+/* virtual */void CPPSourceEmitter::emitFuncDecorationsImpl(IRFunc* func)
+{
+    _maybeEmitExportLike(func);
 
     // Use the default for others
     Super::emitFuncDecorationsImpl(func);

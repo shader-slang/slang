@@ -2887,7 +2887,7 @@ namespace Slang
         void addTransition(CodeGenTarget source, CodeGenTarget target, PassThroughMode compiler)
         {
             SLANG_ASSERT(source != target);
-            m_map.Add(Pair{ source, target }, compiler);
+            m_map.Set(Pair{ source, target }, compiler);
         }
         bool hasTransition(CodeGenTarget source, CodeGenTarget target) const
         {

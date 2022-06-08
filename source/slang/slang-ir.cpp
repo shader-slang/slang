@@ -2795,6 +2795,10 @@ namespace Slang
     {
         return (IRGroupSharedRate*)getType(kIROp_GroupSharedRate);
     }
+    IRActualGlobalRate* IRBuilder::getActualGlobalRate()
+    {
+        return (IRActualGlobalRate*)getType(kIROp_ActualGlobalRate);
+    }
 
     IRRateQualifiedType* IRBuilder::getRateQualifiedType(
         IRRate* rate,
