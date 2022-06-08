@@ -39,7 +39,7 @@
 #endif
 
 #ifndef SLANG_BOUND_CHECK_FIXED_ARRAY
-#   define SLANG_BOUND_CHECK_FIXED_ARRAY(index, count) SLANG_BOUND_ASSERT(index, count) SLANG_BOUND_FIX(index, count)
+#   define SLANG_BOUND_CHECK_FIXED_ARRAY(index, count) SLANG_BOUND_ASSERT(index, count) SLANG_BOUND_FIX_FIXED_ARRAY(index, count)
 #endif
 
 #ifdef SLANG_PRELUDE_NAMESPACE
