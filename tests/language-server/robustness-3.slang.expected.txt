@@ -1,0 +1,12 @@
+--------
+range: 6,20 - 6,25
+content:
+```
+int index
+```
+
+
+
+{REDACTED}.slang(7)
+
+
