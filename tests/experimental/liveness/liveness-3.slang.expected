@@ -104,9 +104,9 @@ int calcThing_0(int offset_0)
         if(_S13 == 4)
         {
             livenessEnd_0(_S5, 0);
+            livenessEnd_1(idx_0, 0);
             livenessEnd_0(_S2, 0);
             livenessEnd_0(k_0, 0);
-            livenessEnd_1(idx_0, 0);
             livenessEnd_2(another_0, 0);
             return total_0;
         }

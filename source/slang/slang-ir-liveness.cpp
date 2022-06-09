@@ -271,6 +271,9 @@ struct LivenessContext
         /// This allows us to elide a scope end if the root is returned 
     bool _isAccessTerminator(IRTerminatorInst* terminator);
 
+        /// Order the range starts in a deterministic manner
+    void _orderRangeStartsDeterministically();
+
         /// Gets the instructions of interest for this info, in the order they appear within the block
     ConstArrayView<IRInst*> _getRun(const BlockInfo* info) 
     {
@@ -1213,6 +1216,68 @@ void LivenessContext::_processFunction(IRFunc* func)
     }
 }
 
+
+void LivenessContext::_orderRangeStartsDeterministically()
+{
+    const Index rangeStartsCount = m_rangeStarts.getCount();
+    if (rangeStartsCount <= 1)
+    {
+        // One or less there is no reordering
+        return;
+    }
+
+    // The fast way is to just order by the roots pointers. 
+    // Unfortunately that is unstable, as it depends on the allocation location which varies.
+
+    // Sort into referenced/root start
+    //m_rangeStarts.sort([&](IRLiveRangeStart* a, IRLiveRangeStart* b) -> bool { return a->getReferenced() < b->getReferenced(); });
+
+    // The order that the starts is *found* is deterministic, so we'll use that as part of the key to sort.
+
+    struct Entry
+    {
+        IRLiveRangeStart* start;
+        Index foundIndex;               ///< The found index
+        Index rootIndex;                ///< Index for the root
+    };
+
+    Int orderCounter = 0;
+
+    Dictionary<IRInst*, Index> rootOrderMap;
+    List<Entry> entries;
+    entries.setCount(rangeStartsCount);
+    for (Index i = 0; i < rangeStartsCount; ++i)
+    {
+        auto start = m_rangeStarts[i];
+        auto root = start->getReferenced();
+
+        Index order = -1;
+
+        if (auto orderPtr = rootOrderMap.TryGetValueOrAdd(root, orderCounter + 1))
+        {
+            order = *orderPtr;
+        }
+        else
+        {
+            order = ++orderCounter;
+        }
+
+        Entry& entry = entries[i];
+        entry.start = start;
+        entry.foundIndex = i;
+        entry.rootIndex = order;
+    }
+
+    // Sort by the root indices and if equal sort by the found order
+    entries.sort([&](const Entry& a, const Entry& b) -> bool { return (a.rootIndex < b.rootIndex) || (a.rootIndex == b.rootIndex && a.foundIndex < b.foundIndex); });
+
+    // Copy back
+    for (Index i = 0; i < rangeStartsCount; ++i)
+    {
+        m_rangeStarts[i] = entries[i].start;
+    }
+}
+
 void LivenessContext::process()
 {
     // Find all of the funcs in the module
@@ -1228,9 +1293,10 @@ void LivenessContext::process()
 
             if (m_rangeStarts.getCount() > 0)
             {
-                // Sort into referenced/root start
-                m_rangeStarts.sort([&](IRLiveRangeStart* a, IRLiveRangeStart* b) -> bool { return a->getReferenced() < b->getReferenced(); });
+                // Order the range starts by root deterministically
+                _orderRangeStartsDeterministically();
 
+                // Process the function
                 _processFunction(func);
             }
         }
