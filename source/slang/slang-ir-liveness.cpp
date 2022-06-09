@@ -410,8 +410,8 @@ LivenessContext::BlockResult LivenessContext::_processSuccessor(BlockIndex block
             }
 
             // Lets see if this is going to the start block of a loop.
-            const auto& functionBlockInfo = m_functionBlockInfos[Index(blockIndex)];
-            if (functionBlockInfo.breakBlockIndex != BlockIndex::Invalid)
+            const auto breakBlockIndex = m_functionBlockInfos[Index(blockIndex)].breakBlockIndex;
+            if (breakBlockIndex != BlockIndex::Invalid)
             {
                 // TODO(JS): 
                 // If it is we *assume* that there is a jump break in the loop and see if there is any 
@@ -420,12 +420,30 @@ LivenessContext::BlockResult LivenessContext::_processSuccessor(BlockIndex block
                 // NOTE! This is too conservative! 
                 // One improvement might be to look if a jump to the break location can be found, if not then we can assume 
                 // its 'NotFound'.
-
-                result = _processSuccessor(functionBlockInfo.breakBlockIndex);
-                // If in the break is found, we assume it is reachable (because we assume there is a break in 
-                // the loop).
-                // Otherwise it's not found.
-                result = (result == BlockResult::Found) ? result : BlockResult::NotFound;
+             
+                result = _processSuccessor(breakBlockIndex);
+                if (result != BlockResult::Found)
+                {
+                    // This is definately too conservative. 
+                    // It says if we are in a loop and
+                    // 
+                    // * We get to a branch to loop start (ie we don't hit a start for the root)
+                    // * We didn't find any accesses *after* the loop
+                    // 
+                    // Then we assume the variable is live across the loop.
+                    // 
+                    // To determine this more accurately it would be necessary to know if there *could* be 
+                    // stores within the loop *and* there is an access after the loop. For now though since we 
+                    // don't track stores, that's not easy to determine.
+                    // If there are no stores or loads possible within a loop, and it's not live after the loop,
+                    // 
+                    // We could potentially do this when we hit a 'Loop' instruction. 
+                    // * If there is a 'Found' after the loop we can proceed as usual
+                    // * If NotFound, we need to find any path to a load/store within the loop (without hitting a start for the root)
+                    
+                    _maybeAddEndAtBlockStart(breakBlockIndex);
+                    result = _addBlockResult(breakBlockIndex, BlockResult::Found);
+                }
             }
 
             // Otherwise just return result

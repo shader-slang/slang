@@ -12,17 +12,17 @@ void livenessStart_0(spirv_by_reference int  _0[2], spirv_literal int _1);
 spirv_instruction(id = 256)
 void livenessStart_1(spirv_by_reference int _0, spirv_literal int _1);
 
-spirv_instruction(id = 257)
-void livenessEnd_0(spirv_by_reference int _0, spirv_literal int _1);
-
 spirv_instruction(id = 256)
 void livenessStart_2(spirv_by_reference int  _0[3], spirv_literal int _1);
 
 spirv_instruction(id = 257)
-void livenessEnd_1(spirv_by_reference int  _0[2], spirv_literal int _1);
+void livenessEnd_0(spirv_by_reference int _0, spirv_literal int _1);
 
 spirv_instruction(id = 257)
-void livenessEnd_2(spirv_by_reference int  _0[3], spirv_literal int _1);
+void livenessEnd_1(spirv_by_reference int  _0[3], spirv_literal int _1);
+
+spirv_instruction(id = 257)
+void livenessEnd_2(spirv_by_reference int  _0[2], spirv_literal int _1);
 
 int calcThing_0(int offset_0)
 {
@@ -32,19 +32,27 @@ int calcThing_0(int offset_0)
     another_0 = _S1;
     int k_0;
     int _S2;
+    int total_0;
     livenessStart_1(k_0, 0);
-    livenessEnd_0(k_0, 0);
     k_0 = 0;
     livenessStart_1(_S2, 0);
     _S2 = offset_0;
+    livenessStart_1(total_0, 0);
+    total_0 = 0;
     for(;;)
     {
+        if(k_0 < 20)
+        {
+        }
+        else
+        {
+            break;
+        }
         int  idx_0[3];
         livenessStart_2(idx_0, 0);
         const int  _S3[3] = { 0, 0, 0 };
         idx_0 = _S3;
         int _S4 = _S2;
-        livenessEnd_0(_S2, 0);
         int i_0;
         int _S5;
         livenessStart_1(i_0, 0);
@@ -61,64 +69,84 @@ int calcThing_0(int offset_0)
                 break;
             }
             int modRange_0 = i_0 % 3;
-            int _S6 = another_0[i_0 & 1];
-            livenessEnd_1(another_0, 0);
-            another_0[i_0 & 1] = _S6 + modRange_0;
-            int _S7 = i_0 % 3;
-            int _S8;
-            if(bool(_S7))
+            another_0[i_0 & 1] = another_0[i_0 & 1] + modRange_0;
+            int _S6 = i_0 % 3;
+            int _S7;
+            if(bool(_S6))
             {
-                int _S9 = _S5;
+                int _S8 = _S5;
                 livenessEnd_0(_S5, 0);
-                int _S10 = _S9 + 1;
-                livenessStart_1(_S8, 0);
-                _S8 = _S10;
+                int _S9 = _S8 + 1;
+                livenessStart_1(_S7, 0);
+                _S7 = _S9;
             }
             else
             {
-                int _S11 = _S5;
+                int _S10 = _S5;
                 livenessEnd_0(_S5, 0);
-                livenessStart_1(_S8, 0);
-                _S8 = _S11;
+                livenessStart_1(_S7, 0);
+                _S7 = _S10;
             }
-            idx_0[modRange_0] = idx_0[modRange_0] + (_S8 + i_0);
-            int _S12 = i_0;
+            idx_0[modRange_0] = idx_0[modRange_0] + (_S7 + i_0);
+            int _S11 = i_0;
             livenessEnd_0(i_0, 0);
-            int i_1 = _S12 + 1;
+            int i_1 = _S11 + 1;
             livenessStart_1(i_0, 0);
             i_0 = i_1;
             livenessStart_1(_S5, 0);
-            int _S13 = _S8;
-            livenessEnd_0(_S8, 0);
-            _S5 = _S13;
+            int _S12 = _S7;
+            livenessEnd_0(_S7, 0);
+            _S5 = _S12;
         }
-        livenessEnd_0(_S5, 0);
         livenessEnd_0(i_0, 0);
-        livenessEnd_1(another_0, 0);
-        const int _S14 = 0 % 3;
-        if(_S14 == 0)
+        livenessEnd_0(_S2, 0);
+        int _S13 = (k_0 + 7) % 5;
+        if(_S13 == 4)
         {
-            livenessEnd_2(idx_0, 0);
-            break;
+            livenessEnd_0(_S5, 0);
+            livenessEnd_0(_S2, 0);
+            livenessEnd_0(k_0, 0);
+            livenessEnd_1(idx_0, 0);
+            livenessEnd_2(another_0, 0);
+            return total_0;
         }
-        int _S15 = idx_0[0] + idx_0[1];
-        int _S16 = idx_0[2];
-        livenessEnd_2(idx_0, 0);
-        return _S15 + _S16;
+        int _S14 = idx_0[0] + idx_0[1];
+        int _S15 = idx_0[2];
+        livenessEnd_1(idx_0, 0);
+        int _S16 = _S14 + _S15;
+        int _S17 = total_0;
+        livenessEnd_0(total_0, 0);
+        int total_1 = _S17 + _S16;
+        int _S18 = k_0;
+        livenessEnd_0(k_0, 0);
+        int k_1 = _S18 + 1;
+        livenessStart_1(k_0, 0);
+        k_0 = k_1;
+        livenessStart_1(_S2, 0);
+        int _S19 = _S5;
+        livenessEnd_0(_S5, 0);
+        _S2 = _S19;
+        livenessStart_1(total_0, 0);
+        total_0 = total_1;
     }
-    return 7;
+    livenessEnd_0(_S2, 0);
+    livenessEnd_0(k_0, 0);
+    livenessEnd_2(another_0, 0);
+    int _S20 = total_0;
+    livenessEnd_0(total_0, 0);
+    return - _S20;
 }
 
-layout(std430, binding = 0) buffer _S17 {
+layout(std430, binding = 0) buffer _S21 {
     int _data[];
 } outputBuffer_0;
 layout(local_size_x = 4, local_size_y = 1, local_size_z = 1) in;
 void main()
 {
     int index_0 = int(gl_GlobalInvocationID.x);
-    uint _S18 = uint(index_0);
-    int _S19 = calcThing_0(index_0);
-    ((outputBuffer_0)._data[(_S18)]) = _S19;
+    uint _S22 = uint(index_0);
+    int _S23 = calcThing_0(index_0);
+    ((outputBuffer_0)._data[(_S22)]) = _S23;
     return;
 }
 
