@@ -409,13 +409,18 @@ LivenessContext::BlockResult LivenessContext::_processSuccessor(BlockIndex block
                 return _processBlock(blockIndex, run.head(startIndex));
             }
 
-            // Lets see if this is a continue
+            // Lets see if this is going to the start block of a loop.
             const auto& functionBlockInfo = m_functionBlockInfos[Index(blockIndex)];
             if (functionBlockInfo.breakBlockIndex != BlockIndex::Invalid)
             {
-                // TODO(JS): (This is too conservative!)
-                // If it is we *assume* that there is a break, and see if there is any 
+                // TODO(JS): 
+                // If it is we *assume* that there is a jump break in the loop and see if there is any 
                 // accesss from the break block
+                // 
+                // NOTE! This is too conservative! 
+                // One improvement might be to look if a jump to the break location can be found, if not then we can assume 
+                // its 'NotFound'.
+
                 result = _processSuccessor(functionBlockInfo.breakBlockIndex);
                 // If in the break is found, we assume it is reachable (because we assume there is a break in 
                 // the loop).
