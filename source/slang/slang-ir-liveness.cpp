@@ -112,7 +112,7 @@ public:
 
 struct LivenessContext
 {
-    enum class BlockIndex : Index;
+    enum class BlockIndex : Index { Invalid = -1 };
 
     // NOTE! Care must be taken changing the order. 
     // canPromote checks if a result can be 'promoted'.
@@ -168,11 +168,14 @@ struct LivenessContext
             block = inBlock;
             successorsStart = 0;
             successorsCount = 0;
+            breakBlockIndex = BlockIndex::Invalid;
         }
 
         IRBlock* block;
         Index successorsStart;      ///< Indexes into block successors
         Count successorsCount;
+        
+        BlockIndex breakBlockIndex;   ///< *Iff* this block is a continue from a loop, this will be the break block for the loop.
     };
 
         /// Process the module
@@ -346,7 +349,6 @@ static void _findFuncs(IRModule* module, List<IRFunc*>& ioFuncs)
     }
 }
 
-
 void LivenessContext::_maybeAddEndAtBlockStart(BlockIndex blockIndex)
 {
     auto block = _getBlock(blockIndex);
@@ -390,7 +392,6 @@ LivenessContext::BlockResult LivenessContext::_processSuccessor(BlockIndex block
             // Unless it is the start block (the block containing live start) *and* the root is 
             // in the block. 
             // The live start can only be after the var, because the var is only in scope then.
-            //
             
             // We need to check if we are in the live start block, as we then need to process 
             // up until the live start.
@@ -406,6 +407,20 @@ LivenessContext::BlockResult LivenessContext::_processSuccessor(BlockIndex block
 
                 // We want to run all the way up to the start
                 return _processBlock(blockIndex, run.head(startIndex));
+            }
+
+            // Lets see if this is a continue
+            const auto& functionBlockInfo = m_functionBlockInfos[Index(blockIndex)];
+            if (functionBlockInfo.breakBlockIndex != BlockIndex::Invalid)
+            {
+                // TODO(JS): (This is too conservative!)
+                // If it is we *assume* that there is a break, and see if there is any 
+                // accesss from the break block
+                result = _processSuccessor(functionBlockInfo.breakBlockIndex);
+                // If in the break is found, we assume it is reachable (because we assume there is a break in 
+                // the loop).
+                // Otherwise it's not found.
+                result = (result == BlockResult::Found) ? result : BlockResult::NotFound;
             }
 
             // Otherwise just return result
@@ -1105,6 +1120,33 @@ void LivenessContext::_processFunction(IRFunc* func)
         for (auto& info : m_functionBlockInfos)
         {
             auto block = info.block;
+
+            // Set up the break block indices if we have a loop
+            {
+                auto terminator = block->getTerminator();
+
+                if (terminator && terminator->getOp() == kIROp_loop)
+                {
+                    auto loop = static_cast<IRLoop*>(terminator);
+
+                    IRBlock* targetBlock = loop->getTargetBlock();
+                    IRBlock* continueBlock = loop->getContinueBlock();
+                    SLANG_UNUSED(continueBlock);
+
+                    IRBlock* breakBlock = loop->getBreakBlock();
+
+                    const BlockIndex targetBlockIndex = m_blockIndexMap[targetBlock];
+                    const BlockIndex breakBlockIndex = m_blockIndexMap[breakBlock];
+
+                    // NOTE! 
+                    // Assumes a continue block is only indexed by one loop
+                    auto& functionBlock = m_functionBlockInfos[Index(targetBlockIndex)];
+                    SLANG_ASSERT(functionBlock.breakBlockIndex == BlockIndex::Invalid);
+
+                    // Set the break block index
+                    functionBlock.breakBlockIndex = breakBlockIndex;
+                }
+            }
 
             // Add all the successors 
             auto successors = block->getSuccessors();
