@@ -113,6 +113,23 @@ void collectMembersInTypeDeclImpl(
         {
             if (member->getName())
             {
+                if (!context->includeInstanceMembers)
+                {
+                    // Skip non-static members.
+                    if (as<VarDeclBase>(member))
+                        continue;
+                    if (as<PropertyDecl>(member))
+                        continue;
+                    if (as<SubscriptDecl>(member))
+                        continue;
+                    if (auto funcDecl = as<FuncDecl>(member))
+                    {
+                        if (!funcDecl->findModifier<HLSLStaticModifier>())
+                        {
+                            continue;
+                        }
+                    }
+                }
                 context->members.add(member);
             }
         }

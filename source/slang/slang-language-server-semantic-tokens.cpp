@@ -412,7 +412,7 @@ void iterateAST(UnownedStringSlice fileName, SourceManager* manager, SyntaxNode*
 }
 
 const char* kSemanticTokenTypes[] = {
-    "type", "enumMember", "variable", "parameter", "function", "property", "namespace"};
+    "type", "enumMember", "variable", "parameter", "function", "property", "namespace", "keyword" };
 
 static_assert(SLANG_COUNT_OF(kSemanticTokenTypes) == (int)SemanticTokenType::NormalText, "kSemanticTokenTypes must match SemanticTokenType");
 
@@ -465,6 +465,10 @@ List<SemanticToken> getSemanticTokens(Linkage* linkage, Module* module, UnownedS
                             return;
                         token.type = SemanticTokenType::Type;
                     }
+                    else if (as<ConstructorDecl>(target))
+                    {
+                        token.type = SemanticTokenType::Type;
+                    }
                     else if (as<SimpleTypeDecl>(target))
                     {
                         token.type = SemanticTokenType::Type;
@@ -502,6 +506,13 @@ List<SemanticToken> getSemanticTokens(Linkage* linkage, Module* module, UnownedS
                     maybeInsertToken(token);
                 }
 
+            }
+            else if (auto accessorDecl = as<AccessorDecl>(node))
+            {
+                SemanticToken token = _createSemanticToken(
+                    manager, accessorDecl->loc, accessorDecl->getName());
+                token.type = SemanticTokenType::Keyword;
+                maybeInsertToken(token);
             }
             else if (auto typeDecl = as<SimpleTypeDecl>(node))
             {

@@ -3,19 +3,6 @@
 
 namespace Slang
 {
-struct Loc
-{
-    Int line;
-    Int col;
-    bool operator<(const Loc& other)
-    {
-        return line < other.line || line == other.line && col < other.col;
-    }
-    bool operator<=(const Loc& other)
-    {
-        return line < other.line || line == other.line && col <= other.col;
-    }
-};
 struct ASTLookupContext
 {
     SourceManager* sourceManager;
@@ -29,12 +16,18 @@ struct ASTLookupContext
 
     Loc getLoc(SourceLoc loc, String* outFileName)
     {
-        auto humaneLoc = sourceManager->getHumaneLoc(loc, SourceLocType::Actual);
-        if (outFileName)
-            *outFileName = humaneLoc.pathInfo.foundPath;
-        return Loc{humaneLoc.line, humaneLoc.column};
+        return Loc::fromSourceLoc(sourceManager, loc, outFileName);
     }
 };
+
+Loc Loc::fromSourceLoc(SourceManager* manager, SourceLoc loc, String* outFileName)
+{
+    auto humaneLoc = manager->getHumaneLoc(loc, SourceLocType::Actual);
+    if (outFileName)
+        *outFileName = humaneLoc.pathInfo.foundPath;
+    return Loc{humaneLoc.line, humaneLoc.column};
+}
+
 struct PushNode
 {
     ASTLookupContext* context;
@@ -46,12 +39,21 @@ struct PushNode
     ~PushNode() { if (context) context->nodePath.removeLast(); }
 };
 
-static Index _getDeclNameLength(Name* name)
+static Index _getDeclNameLength(Name* name, Decl* optionalDecl = nullptr)
 {
     if (!name)
         return 0;
     if (name->text.startsWith("$"))
+    {
+        if (auto ctorDecl = as<ConstructorDecl>(optionalDecl))
+        {
+            if (ctorDecl->parentDecl && optionalDecl->parentDecl->getName())
+            {
+                return optionalDecl->parentDecl->getName()->text.getLength();
+            }
+        }
         return 0;
+    }
     // HACK: our __subscript functions currently have a name "operator[]".
     // Since this isn't the name that actually appears in user's code,
     // we need to shorten its reported length to 1 for now.
@@ -169,7 +171,8 @@ public:
     bool visitVarExpr(VarExpr* expr)
     {
         if (expr->name && expr->declRef.getDecl() &&
-            _isLocInRange(context, expr->loc, _getDeclNameLength(expr->name)))
+            _isLocInRange(
+                context, expr->loc, _getDeclNameLength(expr->name, expr->declRef.getDecl())))
         {
             if (expr->declRef.getDecl()->hasModifier<ImplicitConversionModifier>())
                 return false;

@@ -12,6 +12,7 @@ struct MemberCollectingContext
 {
     ASTBuilder* astBuilder;
     List<Decl*> members;
+    bool includeInstanceMembers = true;
     SharedSemanticsContext semanticsContext;
     MemberCollectingContext(Linkage* linkage, Module* module, DiagnosticSink* sink)
         : semanticsContext(linkage, module, sink)

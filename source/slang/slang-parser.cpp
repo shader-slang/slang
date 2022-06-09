@@ -3132,6 +3132,7 @@ namespace Slang
 
         AccessorDecl* decl = nullptr;
         auto loc = peekToken(parser).loc;
+        auto name = peekToken(parser).getName();
         if( AdvanceIf(parser, "get") )
         {
             decl = parser->astBuilder->create<GetterDecl>();
@@ -3150,6 +3151,8 @@ namespace Slang
             return nullptr;
         }
         decl->loc = loc;
+        decl->nameAndLoc.name = name;
+        decl->nameAndLoc.loc = loc;
 
         _addModifiers(decl, modifiers);
 

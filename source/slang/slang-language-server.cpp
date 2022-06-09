@@ -672,6 +672,7 @@ SlangResult LanguageServer::signatureHelp(
 
     AppExprBase* appExpr = nullptr;
     auto& declPath = findResult[0].path;
+    Loc currentLoc = {args.position.line + 1, args.position.character + 1};
     for (Index i = declPath.getCount() - 1; i >= 0; i--)
     {
         if (auto expr = as<AppExprBase>(declPath[i]))
@@ -680,8 +681,14 @@ SlangResult LanguageServer::signatureHelp(
             // This allows us to skip the invoke expr nodes for operators/implcit casts.
             if (expr->argumentDelimeterLocs.getCount())
             {
-                appExpr = expr;
-                break;
+                auto start = Loc::fromSourceLoc(version->linkage->getSourceManager(), expr->argumentDelimeterLocs.getFirst());
+                auto end = Loc::fromSourceLoc(
+                    version->linkage->getSourceManager(), expr->argumentDelimeterLocs.getLast());
+                if (start < currentLoc && currentLoc <= end)
+                {
+                    appExpr = expr;
+                    break;
+                }
             }
         }
     }
@@ -745,7 +752,18 @@ SlangResult LanguageServer::signatureHelp(
     };
     if (auto declRefExpr = as<DeclRefExpr>(funcExpr))
     {
-        addDeclRef(declRefExpr->declRef);
+        if (auto aggDecl = as<AggTypeDecl>(declRefExpr->declRef.getDecl()))
+        {
+            // Look for initializers
+            for (auto member : aggDecl->getMembersOfType<ConstructorDecl>())
+            {
+                addDeclRef(DeclRef<Decl>(member, declRefExpr->declRef.substitutions));
+            }
+        }
+        else
+        {
+            addDeclRef(declRefExpr->declRef);
+        }
     }
     else if (auto overloadedExpr = as<OverloadedExpr>(funcExpr))
     {
@@ -778,14 +796,16 @@ List<LanguageServerProtocol::CompletionItem> LanguageServer::collectMembers(Work
     List<LanguageServerProtocol::CompletionItem> result;
     auto linkage = version->linkage;
     Type* type = baseExpr->type.type;
+    bool isInstance = true;
     if (auto typeType = as<TypeType>(type))
     {
         type = typeType->type;
+        isInstance = false;
     }
     version->currentCompletionItems.clear();
     if (type)
     {
-        if (as<ArithmeticExpressionType>(type))
+        if (isInstance && as<ArithmeticExpressionType>(type))
         {
             // Hard code members for vector and matrix types.
             result.clear();
@@ -827,6 +847,7 @@ List<LanguageServerProtocol::CompletionItem> LanguageServer::collectMembers(Work
             DiagnosticSink sink;
             MemberCollectingContext context(linkage, module, &sink);
             context.astBuilder = linkage->getASTBuilder();
+            context.includeInstanceMembers = isInstance;
             collectMembersInType(&context, type);
             HashSet<String> deduplicateSet;
             for (auto member : context.members)
