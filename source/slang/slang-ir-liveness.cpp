@@ -274,6 +274,9 @@ struct LivenessContext
         /// Order the range starts in a deterministic manner
     void _orderRangeStartsDeterministically();
 
+        /// Remove any end/start spands within a block, that aren't 'interesting.
+    void _tidyUninterestingSpans();
+
         /// Gets the instructions of interest for this info, in the order they appear within the block
     ConstArrayView<IRInst*> _getRun(const BlockInfo* info) 
     {
@@ -309,6 +312,7 @@ struct LivenessContext
     List<IRInst*> m_instRuns;                       ///< Instructions of interest in order. Indexed into via BlockInfo [runStart, runStart + runCount)
 
     List<IRLiveRangeStart*> m_rangeStarts;          ///< All the starts within a function, ordered by referenced
+    List<IRLiveRangeEnd*> m_rangeEnds;              ///< All of the ends added
 
     IRModule* m_module;
     SharedIRBuilder m_sharedBuilder;
@@ -545,7 +549,7 @@ void LivenessContext::_maybeAddEndAfterInst(IRInst* inst)
         // Just add end of scope after the inst 
         m_builder.setInsertLoc(IRInsertLoc::after(inst));
         // Add the live end inst
-        m_builder.emitLiveRangeEnd(m_root);
+        m_rangeEnds.add(m_builder.emitLiveRangeEnd(m_root));
     }
 }
 
@@ -556,7 +560,7 @@ void LivenessContext::_maybeAddEndBeforeInst(IRInst* inst)
         // Just add end of scope after the inst 
         m_builder.setInsertLoc(IRInsertLoc::before(inst));
         // Add the live end inst
-        m_builder.emitLiveRangeEnd(m_root);
+        m_rangeEnds.add(m_builder.emitLiveRangeEnd(m_root));
     }
 }
 
@@ -1121,6 +1125,7 @@ void LivenessContext::_processFunction(IRFunc* func)
     m_blockInfos.clear();
     m_functionBlockInfos.clear();
     m_blockSuccessors.clear();
+    m_rangeEnds.clear();
 
     {
         // First we find all the blocks in the function, we add to the map
@@ -1214,8 +1219,96 @@ void LivenessContext::_processFunction(IRFunc* func)
             start = end;
         }
     }
+
+    // Remove any end/start spands within a block, that aren't 'interesting.
+    _tidyUninterestingSpans();
 }
 
+void LivenessContext::_tidyUninterestingSpans()
+{
+    // We are looking for spans from an end to a start for a scalar variable. 
+    // Only scalar for now so even if the span is 'big' the cost is probably low.
+    // 
+    // A more sophisticated implementation could perhaps look in the span if there is only a full store 
+    // for a struct/large type. Would also need some concept of the 'amount of insts' to determine if worth it.
+ 
+    const Count count = m_rangeEnds.getCount();
+
+    for (Index i = 0; i < count; ++i)
+    {
+        auto end = m_rangeEnds[i];
+        auto root = end->getReferenced();
+
+        auto rootType = root->getDataType();
+
+        // Within the range start/end accesses are through pointers (so that we have load/store semantics), so strip 
+        // that
+        {
+            auto ptrType = as<IRPtrType>(rootType);
+
+            // Currently we only do this removal for scalar scenarios
+            if (ptrType == nullptr && as<IRBasicType>(ptrType->getValueType()) == nullptr)
+            {
+                continue;
+            }
+        }
+
+        // Look for a start to the same block (or block that is branched to unconditionally)
+        IRLiveRangeStart* start = nullptr;
+        {
+            auto cur = end->getNextInst();
+
+            while (cur)
+            {    
+                // If it's a start
+                if (auto foundStart = as<IRLiveRangeStart>(cur))
+                {
+                    // and a start to the same root
+                    if (foundStart->getReferenced() == root)
+                    {
+                        start = foundStart;
+                        break;
+                    }
+                }
+
+                // Save the current cur
+                const auto saveCur = cur;
+
+                // Get the next
+                cur = cur->getNextInst();
+
+                // If there is no next, check if we can follow an unconditional branch
+                if (cur == nullptr)
+                {
+                    // If it's an unconditional branch just follow it
+                    if (auto unconditionalBranch = as<IRUnconditionalBranch>(saveCur))
+                    {
+                        auto targetBlock = unconditionalBranch->getTargetBlock();
+
+                        // We only follow if we haven't hit the block is in (if so we'd have an infinite loop, as we would 
+                        // be following unconditional branches back to the start).
+                        cur = (targetBlock != end->getParent()) ? targetBlock->getFirstOrdinaryInst() : nullptr;
+                    }
+                }
+            }
+        }
+
+        // If we found a matching start, lets just remove the span
+        if (start)
+        {
+            m_rangeEnds[i] = nullptr;
+            const Index startIndex = m_rangeStarts.indexOf(start);
+            if (startIndex >= 0)
+            {
+                m_rangeStarts[startIndex] = nullptr;
+            }
+
+            // Delete the matching end -> start span
+            start->removeAndDeallocate();
+            end->removeAndDeallocate();
+        }
+    }
+}
 
 void LivenessContext::_orderRangeStartsDeterministically()
 {
