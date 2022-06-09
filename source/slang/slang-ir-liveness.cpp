@@ -804,7 +804,8 @@ void LivenessContext::_findAliasesAndAccesses(IRInst* root)
                 }
                 case kIROp_Store:
                 {
-                    // In terms of liveness, stores can be ignored
+                    // In terms of liveness, stores can be ignored (although in the future we will probably 
+                    // want to support to make loops work correctly)
                     break;
                 }
                 case kIROp_getElement:
@@ -1253,12 +1254,13 @@ void LivenessContext::_tidyUninterestingSpans()
             }
         }
 
-        // Look for a start to the same block (or block that is branched to unconditionally)
+        // Look for a start to the same root in the block
+        // A more sophisticated implementation might try to look across unconditional branches
+        // but since only *one* end is stored for potentially multiple starts, and that a block 
+        // might have multiple predecessors, we ignore for now.
         IRLiveRangeStart* start = nullptr;
         {
-            auto cur = end->getNextInst();
-
-            while (cur)
+            for (auto cur = end->getNextInst(); cur; cur = cur->getNextInst())
             {    
                 // If it's a start
                 if (auto foundStart = as<IRLiveRangeStart>(cur))
@@ -1270,26 +1272,6 @@ void LivenessContext::_tidyUninterestingSpans()
                         break;
                     }
                 }
-
-                // Save the current cur
-                const auto saveCur = cur;
-
-                // Get the next
-                cur = cur->getNextInst();
-
-                // If there is no next, check if we can follow an unconditional branch
-                if (cur == nullptr)
-                {
-                    // If it's an unconditional branch just follow it
-                    if (auto unconditionalBranch = as<IRUnconditionalBranch>(saveCur))
-                    {
-                        auto targetBlock = unconditionalBranch->getTargetBlock();
-
-                        // We only follow if we haven't hit the block is in (if so we'd have an infinite loop, as we would 
-                        // be following unconditional branches back to the start).
-                        cur = (targetBlock != end->getParent()) ? targetBlock->getFirstOrdinaryInst() : nullptr;
-                    }
-                }
             }
         }
 
@@ -1298,6 +1280,8 @@ void LivenessContext::_tidyUninterestingSpans()
         {
             m_rangeEnds[i] = nullptr;
             const Index startIndex = m_rangeStarts.indexOf(start);
+
+            SLANG_ASSERT(startIndex >= 0);
             if (startIndex >= 0)
             {
                 m_rangeStarts[startIndex] = nullptr;
