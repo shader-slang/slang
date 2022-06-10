@@ -86,7 +86,12 @@ namespace Slang
 
         Module* getOrLoadModule(String path);
     };
-    
+
+    struct OnwedPreprocessorMacroDefinition
+    {
+        String name;
+        String value;
+    };
     class Workspace
         : public ISlangFileSystem
         , public ComObject
@@ -97,10 +102,15 @@ namespace Slang
     public:
         List<String> rootDirectories;
         OrderedHashSet<String> searchPaths;
+        List<OnwedPreprocessorMacroDefinition> predefinedMacros;
 
         slang::IGlobalSession* slangGlobalSession;
         Dictionary<String, RefPtr<DocumentVersion>> openedDocuments;
         DocumentVersion* openDoc(String path, String text);
+
+        // Update predefined macro settings. Returns true if the new settings are different from existing ones.
+        bool updatePredefinedMacros(List<String> predefinedMacros);
+
         void init(List<URI> rootDirURI, slang::IGlobalSession* globalSession);
         void invalidate();
         WorkspaceVersion* getCurrentVersion();

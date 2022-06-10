@@ -12,6 +12,7 @@
 #include "../core/slang-secure-crt.h"
 #include "../core/slang-range.h"
 #include "../../slang-com-helper.h"
+#include "../compiler-core/slang-json-native.h"
 #include "../compiler-core/slang-json-rpc-connection.h"
 #include "../compiler-core/slang-language-server-protocol.h"
 #include "slang-language-server.h"
@@ -21,20 +22,20 @@
 #include "slang-language-server-semantic-tokens.h"
 #include "slang-ast-print.h"
 #include "slang-doc-markdown-writer.h"
-
 namespace Slang
 {
 using namespace LanguageServerProtocol;
 
 class LanguageServer
 {
+private:
+    static const int kConfigResponseId = 0x1213;
 public:
     RefPtr<JSONRPCConnection> m_connection;
     ComPtr<slang::IGlobalSession> m_session;
     RefPtr<Workspace> m_workspace;
     Dictionary<String, String> m_lastPublishedDiagnostics;
     time_t m_lastDiagnosticUpdateTime = 0;
-
     bool m_quit = false;
     List<LanguageServerProtocol::WorkspaceFolder> m_workspaceFolders;
 
@@ -46,6 +47,8 @@ public:
         const LanguageServerProtocol::DidCloseTextDocumentParams& args);
     SlangResult didChangeTextDocument(
         const LanguageServerProtocol::DidChangeTextDocumentParams& args);
+    SlangResult didChangeConfiguration(
+        const LanguageServerProtocol::DidChangeConfigurationParams& args);
     SlangResult hover(const LanguageServerProtocol::HoverParams& args, const JSONValue& responseId);
     SlangResult gotoDefinition(const LanguageServerProtocol::DefinitionParams& args, const JSONValue& responseId);
     SlangResult completion(
@@ -56,7 +59,6 @@ public:
         const LanguageServerProtocol::SemanticTokensParams& args, const JSONValue& responseId);
     SlangResult signatureHelp(
         const LanguageServerProtocol::SignatureHelpParams& args, const JSONValue& responseId);
-
     List<LanguageServerProtocol::CompletionItem> collectMembers(
         WorkspaceVersion* wsVersion, Module* module, Expr* baseExpr);
 
@@ -65,6 +67,9 @@ private:
     slang::IGlobalSession* getOrCreateGlobalSession();
     void resetDiagnosticUpdateTime();
     void publishDiagnostics();
+    void updatePredefinedMacros(const JSONValue& macros);
+    void sendConfigRequest();
+    void registerCapability(const char* methodName);
 };
 
 
@@ -146,6 +151,8 @@ SlangResult LanguageServer::_executeSingle()
                 result.capabilities.positionEncoding = "utf-8";
                 result.capabilities.textDocumentSync.openClose = true;
                 result.capabilities.textDocumentSync.change = (int)TextDocumentSyncKind::Full;
+                result.capabilities.workspace.workspaceFolders.supported = true;
+                result.capabilities.workspace.workspaceFolders.changeNotifications = false;
                 result.capabilities.hoverProvider = true;
                 result.capabilities.definitionProvider = true;
                 const char* commitChars[] = {",", ".", ";", ":", "(", ")", "[", "]",
@@ -230,8 +237,17 @@ SlangResult LanguageServer::_executeSingle()
                 return completionResolve(args, call.id);
                 
             }
+            else if (call.method == DidChangeConfigurationParams::methodName)
+            {
+                DidChangeConfigurationParams args;
+                SLANG_RETURN_ON_FAIL(
+                    m_connection->toNativeArgsOrSendError(call.params, &args, call.id));
+                return didChangeConfiguration(args);
+            }
             else if (call.method == "initialized")
             {
+                sendConfigRequest();
+                registerCapability("workspace/didChangeConfiguration");
                 return SLANG_OK;
             }
             else if (call.method.startsWith("$/"))
@@ -244,6 +260,35 @@ SlangResult LanguageServer::_executeSingle()
                 return m_connection->sendError(JSONRPC::ErrorCode::MethodNotFound, call.id);
             }
         }
+    case JSONRPCMessageType::Result:
+        {
+            JSONResultResponse response;
+            SLANG_RETURN_ON_FAIL(m_connection->getRPCOrSendError(&response));
+            auto responseId = (int)m_connection->getContainer()->asInteger(response.id);
+            switch (responseId)
+            {
+            case kConfigResponseId:
+                if (response.result.getKind() == JSONValue::Kind::Array)
+                {
+                    auto arr = m_connection->getContainer()->getArray(response.result);
+                    if (arr.getCount() > 0)
+                    {
+                        updatePredefinedMacros(arr[0]);
+                    }
+                }
+                break;
+            }
+            return SLANG_OK;
+        }
+    case JSONRPCMessageType::Error:
+        {
+#if 0 // Enable for debug only
+            JSONRPCErrorResponse error;
+            SLANG_RETURN_ON_FAIL(m_connection->getRPCOrSendError(&error));
+#endif
+            return SLANG_OK;
+        }
+        break;
     default:
         {
             return m_connection->sendError(
@@ -832,6 +877,7 @@ List<LanguageServerProtocol::CompletionItem> LanguageServer::collectMembers(Work
             String typeStr;
             if (elementType)
                 typeStr = elementType->toString();
+            elementCount = Math::Min(elementCount, 4);
             for (int i = 0; i < elementCount; i++)
             {
                 CompletionItem item;
@@ -1002,6 +1048,45 @@ void LanguageServer::publishDiagnostics()
     }
 }
 
+void LanguageServer::updatePredefinedMacros(const JSONValue& macros)
+{
+    if (macros.isValid())
+    {
+        auto container = m_connection->getContainer();
+        JSONToNativeConverter converter(container, m_connection->getSink());
+        List<String> predefinedMacros;
+        if (SLANG_SUCCEEDED(converter.convert(macros, &predefinedMacros)))
+        {
+            if (m_workspace->updatePredefinedMacros(predefinedMacros))
+            {
+                m_connection->sendCall(
+                    UnownedStringSlice("workspace/semanticTokens/refresh"), JSONValue::makeInt(0));
+            }
+        }
+    }
+}
+
+void LanguageServer::sendConfigRequest()
+{
+    ConfigurationParams args;
+    ConfigurationItem item;
+    item.section = "slang.predefinedMacros";
+    args.items.add(item);
+    m_connection->sendCall(
+        ConfigurationParams::methodName, &args, JSONValue::makeInt(kConfigResponseId));
+}
+
+void LanguageServer::registerCapability(const char* methodName)
+{
+    RegistrationParams args;
+    Registration reg;
+    reg.method = methodName;
+    reg.id = reg.method;
+    args.registrations.add(reg);
+    m_connection->sendCall(
+        UnownedStringSlice("client/registerCapability"), &args, JSONValue::makeInt(999));
+}
+
 SlangResult LanguageServer::didCloseTextDocument(const DidCloseTextDocumentParams& args)
 {
     String canonicalPath = uriToCanonicalPath(args.textDocument.uri);
@@ -1021,6 +1106,14 @@ SlangResult LanguageServer::didChangeTextDocument(const DidChangeTextDocumentPar
     }
     m_workspace->invalidate();
     resetDiagnosticUpdateTime();
+    return SLANG_OK;
+}
+
+SlangResult LanguageServer::didChangeConfiguration(
+    const LanguageServerProtocol::DidChangeConfigurationParams& args)
+{
+    SLANG_UNUSED(args);
+    sendConfigRequest();
     return SLANG_OK;
 }
 
@@ -1051,6 +1144,7 @@ SlangResult LanguageServer::execute()
 
         // Now we can use this time to reparse user's code, report diagnostics, etc.
         update();
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
 
     return SLANG_OK;

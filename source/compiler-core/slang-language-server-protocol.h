@@ -205,6 +205,33 @@ struct DidCloseTextDocumentParams
     static const UnownedStringSlice methodName;
 };
 
+struct WorkspaceFoldersServerCapabilities
+{
+    /**
+     * The server has support for workspace folders
+     */
+    bool supported;
+
+    /**
+     * Whether the server wants to receive workspace folder
+     * change notifications.
+     *
+     * If a string is provided, the string is treated as an ID
+     * under which the notification is registered on the client
+     * side. The ID can be used to unregister for these events
+     * using the `client/unregisterCapability` request.
+     */
+    bool changeNotifications;
+
+    static const StructRttiInfo g_rttiInfo;
+};
+
+struct WorkspaceCapabilities
+{
+    WorkspaceFoldersServerCapabilities workspaceFolders;
+    static const StructRttiInfo g_rttiInfo;
+};
+
 struct ServerCapabilities
 {
     String positionEncoding;
@@ -214,6 +241,7 @@ struct ServerCapabilities
     CompletionOptions completionProvider;
     SemanticTokensOptions semanticTokensProvider;
     SignatureHelpOptions signatureHelpProvider;
+    WorkspaceCapabilities workspace;
     static const StructRttiInfo g_rttiInfo;
 };
 
@@ -629,6 +657,60 @@ struct SignatureHelp
     static const StructRttiInfo g_rttiInfo;
 };
 
+
+struct DidChangeConfigurationParams
+{
+    /**
+     * The actual changed settings
+     */
+    JSONValue settings;
+
+    static const StructRttiInfo g_rttiInfo;
+
+    static const UnownedStringSlice methodName;
+};
+
+struct ConfigurationItem
+{
+    /**
+     * The configuration section asked for.
+     */
+    String section;
+
+    static const StructRttiInfo g_rttiInfo;
+};
+
+struct ConfigurationParams
+{
+    List<ConfigurationItem> items;
+
+    static const StructRttiInfo g_rttiInfo;
+
+    static const UnownedStringSlice methodName;
+};
+
+struct Registration
+{
+    /**
+    * The id used to register the request. The id can be used to deregister
+    * the request again.
+    */
+    String id;
+
+    /**
+    * The method / capability to register for.
+    */
+    String method;
+
+    static const StructRttiInfo g_rttiInfo;
+};
+
+struct RegistrationParams
+{
+    List<Registration> registrations;
+
+    static const StructRttiInfo g_rttiInfo;
+};
 
 } // namespace LanguageServerProtocol
 } // namespace Slang

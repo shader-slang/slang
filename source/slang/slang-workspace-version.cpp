@@ -36,6 +36,44 @@ DocumentVersion* Workspace::openDoc(String path, String text)
     return doc.Ptr();
 }
 
+bool Workspace::updatePredefinedMacros(List<String> macros)
+{
+    List<OnwedPreprocessorMacroDefinition> newDefs;
+    for (auto macro : macros)
+    {
+        auto index = macro.indexOf('=');
+        OnwedPreprocessorMacroDefinition def;
+        def.name = macro.getUnownedSlice().head(index).trim();
+        if (index != -1)
+        {
+            def.value = macro.getUnownedSlice().tail(index + 1).trim();
+        }
+        newDefs.add(def);
+    }
+    
+    bool changed = false;
+    if (newDefs.getCount() != predefinedMacros.getCount())
+        changed = true;
+    else
+    {
+        for (Index i = 0; i < newDefs.getCount(); i++)
+        {
+            if (newDefs[i].name != predefinedMacros[i].name ||
+                newDefs[i].value != predefinedMacros[i].value)
+            {
+                changed = true;
+                break;
+            }
+        }
+    }
+    if (changed)
+    {
+        predefinedMacros = _Move(newDefs);
+        invalidate();
+    }
+    return changed;
+}
+
 void Workspace::init(List<URI> rootDirURI, slang::IGlobalSession* globalSession)
 {
     for (auto uri : rootDirURI)
@@ -148,13 +186,22 @@ RefPtr<WorkspaceVersion> Workspace::createWorkspaceVersion()
     slang::TargetDesc targetDesc = {};
     targetDesc.profile = slangGlobalSession->findProfile("sm_6_6");
     desc.targets = &targetDesc;
-
     List<const char*> searchPathsRaw;
-    
     for (auto path : searchPaths)
         searchPathsRaw.add(path.getBuffer());
     desc.searchPaths = searchPathsRaw.getBuffer();
     desc.searchPathCount = searchPathsRaw.getCount();
+
+    desc.preprocessorMacroCount = predefinedMacros.getCount();
+    List<slang::PreprocessorMacroDesc> macroDescs;
+    for (auto& macro : predefinedMacros)
+    {
+        slang::PreprocessorMacroDesc macroDesc;
+        macroDesc.name = macro.name.getBuffer();
+        macroDesc.value = macro.value.getBuffer();
+        macroDescs.add(macroDesc);
+    }
+    desc.preprocessorMacros = macroDescs.getBuffer();
 
     ComPtr<slang::ISession> session;
     slangGlobalSession->createSession(desc, session.writeRef());
