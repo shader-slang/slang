@@ -30,14 +30,13 @@ jobs:
         CONFIGURATION=${{matrix.configuration}}
         ARCH=${{matrix.platform}}
         source ./github_macos_build.sh
-    - name: UploadBinary
-      uses: softprops/action-gh-release@v1
+    - uses: actions/upload-artifact@v3
       with:
-        files: |
-            ${{ steps.build.outputs.SLANG_BINARY_ARCHIVE }}
-            ${{ steps.build.outputs.SLANG_BINARY_ARCHIVE_TAR }}
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        name: slang-build-${{matrix.configuration}}-${{matrix.platform}}-${{matrix.compiler}}
+        path: |
+          bin/**/*.so
+          bin/**/slangc
+          bin/**/slangd
     - name: test
       run: 
         CONFIGURATION=${{matrix.configuration}}
