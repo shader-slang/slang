@@ -70,7 +70,6 @@ int calcThing_0(int offset_0)
         int _S6 = (k_0 + 7) % 5;
         if(_S6 == 4)
         {
-            livenessEnd_0(total_0, 0);
             livenessEnd_0(k_0, 0);
             livenessEnd_1(another_0, 0);
             return 1;
