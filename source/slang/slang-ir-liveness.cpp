@@ -176,14 +176,11 @@ struct LivenessContext
             block = inBlock;
             successorsStart = 0;
             successorsCount = 0;
-            //breakBlockIndex = BlockIndex::Invalid;
         }
 
         IRBlock* block;
         Index successorsStart;      ///< Indexes into block successors
         Count successorsCount;
-        
-        //BlockIndex breakBlockIndex;   ///< *Iff* this block is a continue from a loop, this will be the break block for the loop.
     };
 
         /// Process the module
@@ -1209,35 +1206,6 @@ void LivenessContext::_processFunction(IRFunc* func)
         for (auto& info : m_functionBlockInfos)
         {
             auto block = info.block;
-
-#if 0
-            // Set up the break block indices if we have a loop
-            {
-                auto terminator = block->getTerminator();
-
-                if (terminator && terminator->getOp() == kIROp_loop)
-                {
-                    auto loop = static_cast<IRLoop*>(terminator);
-
-                    IRBlock* targetBlock = loop->getTargetBlock();
-                    IRBlock* continueBlock = loop->getContinueBlock();
-                    SLANG_UNUSED(continueBlock);
-
-                    IRBlock* breakBlock = loop->getBreakBlock();
-
-                    const BlockIndex targetBlockIndex = m_blockIndexMap[targetBlock];
-                    const BlockIndex breakBlockIndex = m_blockIndexMap[breakBlock];
-
-                    // NOTE! 
-                    // Assumes a continue block is only indexed by one loop
-                    auto& functionBlock = m_functionBlockInfos[Index(targetBlockIndex)];
-                    SLANG_ASSERT(functionBlock.breakBlockIndex == BlockIndex::Invalid);
-
-                    // Set the break block index
-                    functionBlock.breakBlockIndex = breakBlockIndex;
-                }
-            }
-#endif
 
             // Add all the successors 
             auto successors = block->getSuccessors();
