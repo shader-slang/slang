@@ -419,10 +419,18 @@ SlangResult LanguageServer::hover(
             hover.range.start.line = int(nodeHumaneLoc.line - 1);
             hover.range.end.line = int(nodeHumaneLoc.line - 1);
             hover.range.start.character = int(nodeHumaneLoc.column - 1);
-            if (declRef.getName())
+            auto name = declRef.getName();
+            if (auto ctorDecl = declRef.as<ConstructorDecl>())
             {
-                hover.range.end.character =
-                    int(nodeHumaneLoc.column + declRef.getName()->text.getLength() - 1);
+                auto parent = ctorDecl.getDecl()->parentDecl;
+                if (parent)
+                {
+                    name = parent->getName();
+                }
+            }
+            if (name)
+            {
+                hover.range.end.character = int(nodeHumaneLoc.column + name->text.getLength() - 1);
             }
         }
     };
@@ -488,7 +496,9 @@ SlangResult LanguageServer::gotoDefinition(
         if (declRefExpr->declRef.getDecl())
         {
             auto location = version->linkage->getSourceManager()->getHumaneLoc(
-                declRefExpr->declRef.getNameLoc(), SourceLocType::Actual);
+                    declRefExpr->declRef.getNameLoc().isValid() ? declRefExpr->declRef.getNameLoc()
+                                                                : declRefExpr->declRef.getLoc(),
+                    SourceLocType::Actual);
             auto name = declRefExpr->declRef.getName();
             locations.add(LocationResult{location, name ? (int)name->text.getLength() : 0});
         }

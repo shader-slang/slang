@@ -468,6 +468,10 @@ List<SemanticToken> getSemanticTokens(Linkage* linkage, Module* module, UnownedS
                     else if (as<ConstructorDecl>(target))
                     {
                         token.type = SemanticTokenType::Type;
+                        if (target->parentDecl && target->parentDecl->getName())
+                        {
+                            token.length = (int)target->parentDecl->getName()->text.getLength();
+                        }
                     }
                     else if (as<SimpleTypeDecl>(target))
                     {
