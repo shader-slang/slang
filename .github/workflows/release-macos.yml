@@ -1,0 +1,55 @@
+on:
+  push:
+    # Sequence of patterns matched against refs/tags
+    tags:
+    - 'v*' # Push events to matching v*, i.e. v1.0, v20.15.10
+
+name: Upload Release Asset
+
+jobs:
+  build:
+    name: Upload Release Asset
+    runs-on: macos-latest
+    strategy:
+      matrix:
+        configuration: ['release'] # 'debug'
+        compiler: ['clang']
+        platform: ['x64'] 
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+        with:
+          submodules: 'true'
+          fetch-depth: '0'
+      - name: Build release project
+        id: build
+        run: |
+          echo "starting to build..."
+          export CC=${{matrix.compiler}}
+          export CONFIGURATION=${{matrix.configuration}}
+          export ARCH=${{matrix.platform}}
+          echo "building..."
+          source ./github_build.sh
+          echo "creating binary archieves..."
+          export SLANG_OS_NAME=macos
+          export SLANG_ARCH_NAME=`uname -p`
+          export TAG_NAME=`git describe --tags`
+          export SLANG_TAG=${TAG_NAME#v}
+          echo "tag:$TAG_NAME"
+          echo "slang-tag:$SLANG_TAG"
+          export SLANG_BINARY_ARCHIVE=slang-${SLANG_TAG}-${SLANG_OS_NAME}-${SLANG_ARCH_NAME}.zip
+          export SLANG_BINARY_ARCHIVE_TAR=slang-${SLANG_TAG}-${SLANG_OS_NAME}-${SLANG_ARCH_NAME}.tar.gz
+          echo "creating zip"
+          zip -r ${SLANG_BINARY_ARCHIVE} bin/*/*/slangc bin/*/*/slangd bin/*/*/libslang.so bin/*/*/libslang-glslang.so bin/*/*/libgfx.so bin/*/*/libslang-llvm.so docs/*.md README.md LICENSE slang.h slang-com-helper.h slang-com-ptr.h slang-tag-version.h slang-gfx.h prelude/*.h
+          echo "creating tar"
+          tar -czf ${SLANG_BINARY_ARCHIVE_TAR} bin/*/*/slangc bin/*/*/slangd bin/*/*/libslang.so bin/*/*/libslang-glslang.so bin/*/*/libgfx.so bin/*/*/libslang-llvm.so docs/*.md README.md LICENSE slang.h slang-com-helper.h slang-com-ptr.h slang-tag-version.h slang-gfx.h prelude/*.h
+          echo "::set-output name=SLANG_BINARY_ARCHIVE::${SLANG_BINARY_ARCHIVE}"
+          echo "::set-output name=SLANG_BINARY_ARCHIVE_TAR::${SLANG_BINARY_ARCHIVE_TAR}"
+      - name: UploadBinary
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            ${{ steps.build.outputs.SLANG_BINARY_ARCHIVE }}
+            ${{ steps.build.outputs.SLANG_BINARY_ARCHIVE_TAR }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
