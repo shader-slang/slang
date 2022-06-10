@@ -5,11 +5,6 @@ RWStructuredBuffer<int> outputBuffer;
 
 // Test loop handling, with more complex structure
 // Here to test anothers liveness.
-// NOTE! That another is load/stored but it's value is never used externally.
-// which leads to liveness ending in the loop, which seems odd and means another can contain 'rubbish'
-// but arguably that doesn't matter because it is not read from.
-//
-// This can lead for *multiple* livenessEnd through an execution path that can be hit.
 
 int calcThing(int offset)
 {
