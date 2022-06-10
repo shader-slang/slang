@@ -433,13 +433,21 @@ LivenessContext::BlockResult LivenessContext::_processSuccessor(BlockIndex block
                     // This block has been visisted, that means it has been traversed to get here
                     // meaning the root *must* be live on the looping.
 
-                    // TODO(JS): 
-                    // If it is we *assume* that there is a jump break in the loop and see if there is any 
-                    // accesss from the break block
+                    // TODO(JS):
+                    // The solution used here is somewhat conservative, it assumes if a branch back to the start of the loop can be reached that
+                    //
+                    // * There might be some path where the loop might exit
+                    // * There might be some path where the root(variable or alias) may be loaded/or stored
+                    //
+                    // If these assumptions are wrong it will lead to
+                    //
+                    // * Potentially a liveness end that is never hit(outside of the loop)
+                    // * Potentially liveness for a root that spans across the loop even if that is not actually necessary
                     // 
-                    // NOTE! This is too conservative! 
-                    // One improvement might be to look if a jump to the break location can be found, if not then we can assume 
-                    // its 'NotFound'.
+                    // This could be improved on but would probably need something like 'loop analysis' that specially determined 
+                    // those scenarios, such that the assumptions aren't needed. It would need to be 'separate analysis', because 
+                    // the liveness traversal is a kind of incremental depth first traversal. But for loop analysis it would require 
+                    // at loop start the result on all paths through the loop.
 
                     const auto breakBlockIndex = loopInfo.breakBlockIndex;
 
@@ -447,22 +455,8 @@ LivenessContext::BlockResult LivenessContext::_processSuccessor(BlockIndex block
                     result = _processSuccessor(breakBlockIndex, loopInfo.parentIndex);
                     if (result != BlockResult::Found)
                     {
-                        // This is definately too conservative. 
-                        // It says if we are in a loop and
-                        // 
-                        // * We get to a branch to loop start (ie we don't hit a start for the root)
-                        // * We didn't find any accesses *after* the loop
-                        // 
-                        // Then we assume the variable is live across the loop.
-                        // 
-                        // To determine this more accurately it would be necessary to know if there *could* be 
-                        // stores within the loop *and* there is an access after the loop. For now though since we 
-                        // don't track stores, that's not easy to determine.
-                        // If there are no stores or loads possible within a loop, and it's not live after the loop,
-                        // 
-                        // We could potentially do this when we hit a 'Loop' instruction. 
-                        // * If there is a 'Found' after the loop we can proceed as usual
-                        // * If NotFound, we need to find any path to a load/store within the loop (without hitting a start for the root)
+                        // If an end is not found from the break, 
+                        // we just insert an end at the start of the break block
 
                         _maybeAddEndAtBlockStart(breakBlockIndex);
                         result = _addBlockResult(breakBlockIndex, BlockResult::Found);
@@ -856,7 +850,7 @@ void LivenessContext::_findAliasesAndAccesses(IRInst* root)
                 case kIROp_Store:
                 {
                     // In terms of liveness, stores can be ignored (although in the future we will probably 
-                    // want to support to make loops work correctly)
+                    // want to support to make loops analysis work more accurately)
                     break;
                 }
                 case kIROp_getElement:
