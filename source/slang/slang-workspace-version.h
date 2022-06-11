@@ -18,7 +18,8 @@ namespace Slang
     private:
         URI uri;
         String text;
-        List<Int> lineBreaks;
+        List<UnownedStringSlice> lines;
+        List<List<Index>> utf16CharStarts;
     public:
         void setURI(URI newURI)
         {
@@ -27,42 +28,61 @@ namespace Slang
         URI getURI() { return uri; }
         const String& getText() { return text; }
         void setText(const String& newText);
+
+        ArrayView<Index> getUTF16Boundaries(Index line);
+
+        void oneBasedUTF8LocToZeroBasedUTF16Loc(
+            Index inLine, Index inCol, Index& outLine, Index& outCol);
+        void zeroBasedUTF16LocToOneBasedUTF8Loc(
+            Index inLine, Index inCol, Index& outLine, Index& outCol);
+
+        // Get starting offset of line.
+        Index getLineStart(UnownedStringSlice line) { return line.begin() - text.begin(); }
+
+        // Get offset from 1-based, utf-8 encoding location.
         Index getOffset(Index lineIndex, Index colIndex)
         {
             if(lineIndex < 0) return -1;
-            if (lineIndex - 1 >= lineBreaks.getCount())
+            if (lineIndex - 1 >= lines.getCount())
                 return -1;
-            if (lineBreaks.getCount() == 0)
+            if (lines.getCount() == 0)
                 return -1;
 
-            Index lineStart = lineIndex >= 2 ? lineBreaks[lineIndex - 2] : 0;
+            Index lineStart = lineIndex >= 1 ? getLineStart(lines[lineIndex - 1]) : 0;
             return lineStart + colIndex - 1;
         }
+
+        // Get 1-based, utf-8 encoding location from offset.
         void offsetToLineCol(Index offset, Index& line, Index& col)
         {
-            auto firstGreater = std::upper_bound(lineBreaks.begin(), lineBreaks.end(), offset);
-            line = Index(firstGreater - lineBreaks.begin() + 1);
-            if (firstGreater == lineBreaks.begin())
+            auto firstGreater = std::upper_bound(
+                lines.begin(),
+                lines.end(),
+                offset,
+                [this](Index first, UnownedStringSlice second)
+                { return first < getLineStart(second); });
+            line = Index(firstGreater - lines.begin());
+            if (firstGreater == lines.begin())
             {
                 col = offset + 1;
             }
             else
             {
-                col = Index(offset - *(firstGreater - 1));
+                col = Index(offset - getLineStart(lines[line-1])) + 1;
             }
         }
+
+        // Get line from 1-based index.
         UnownedStringSlice getLine(Index lineIndex)
         {
             if (lineIndex < 0)
                 return UnownedStringSlice();
-            if (lineIndex - 1 >= lineBreaks.getCount())
+            if (lineIndex - 1 >= lines.getCount())
                 return UnownedStringSlice();
-            if (lineBreaks.getCount() == 0)
+            if (lines.getCount() == 0)
                 return UnownedStringSlice();
 
-            Int lineStart = lineIndex >= 2 ? lineBreaks[lineIndex - 2] : 0;
-            Int lineEnd = lineBreaks[lineIndex - 1];
-            return text.getUnownedSlice().subString(lineStart, lineEnd);
+            return lineIndex > 0 ? lines[lineIndex - 1] : UnownedStringSlice();
         }
     };
 
@@ -70,6 +90,19 @@ namespace Slang
     {
         OrderedHashSet<LanguageServerProtocol::Diagnostic> messages;
         String originalOutput;
+    };
+
+    
+    class SerializedModuleCache
+        : public RefObject
+        , public IModuleCache
+    {
+    public:
+        Dictionary<String, List<uint8_t>> serializedModules;
+
+        void invalidate(const String& path) { serializedModules.Remove(path); }
+        virtual RefPtr<Module> tryLoadModule(Linkage* linkage, String filePath) override;
+        virtual void storeModule(Linkage* linkage, String filePath, RefPtr<Module> module) override;
     };
 
     class WorkspaceVersion : public RefObject
@@ -103,10 +136,13 @@ namespace Slang
         List<String> rootDirectories;
         OrderedHashSet<String> searchPaths;
         List<OnwedPreprocessorMacroDefinition> predefinedMacros;
+        SerializedModuleCache moduleCache;
 
         slang::IGlobalSession* slangGlobalSession;
         Dictionary<String, RefPtr<DocumentVersion>> openedDocuments;
         DocumentVersion* openDoc(String path, String text);
+        void changeDoc(const String& path, LanguageServerProtocol::Range range, const String& text);
+        void closeDoc(const String& path);
 
         // Update predefined macro settings. Returns true if the new settings are different from existing ones.
         bool updatePredefinedMacros(List<String> predefinedMacros);

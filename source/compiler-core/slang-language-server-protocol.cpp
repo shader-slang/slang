@@ -551,6 +551,28 @@ static const StructRttiInfo _makeRegistrationParamsRtti()
 }
 const StructRttiInfo RegistrationParams::g_rttiInfo = _makeRegistrationParamsRtti();
 
+static const StructRttiInfo _makeCancelParamsRtti()
+{
+    CancelParams obj;
+    StructRttiBuilder builder(&obj, "LanguageServerProtocol::CancelParams", nullptr);
+    builder.addField("id", &obj.id, StructRttiInfo::Flag::Optional);
+    builder.ignoreUnknownFields();
+    return builder.make();
+}
+const StructRttiInfo CancelParams::g_rttiInfo = _makeCancelParamsRtti();
+
+static const StructRttiInfo _makeLogMessageParamsRtti()
+{
+    LogMessageParams obj;
+    StructRttiBuilder builder(&obj, "LanguageServerProtocol::LogMessageParams", nullptr);
+    builder.addField("type", &obj.type, StructRttiInfo::Flag::Optional);
+    builder.addField("message", &obj.message, StructRttiInfo::Flag::Optional);
+    builder.ignoreUnknownFields();
+    return builder.make();
+}
+const StructRttiInfo LogMessageParams::g_rttiInfo = _makeLogMessageParamsRtti();
+const UnownedStringSlice LogMessageParams::methodName =
+    UnownedStringSlice::fromLiteral("window/logMessage");
 
 } // namespace LanguageServerProtocol
 

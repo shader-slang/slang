@@ -158,8 +158,14 @@ UnownedStringSlice MangledLexer::readSimpleName()
     }
 }
 
-UnownedStringSlice MangledLexer::readRawStringSegment()
+String MangledLexer::readRawStringSegment()
 {
+    bool escapeMode = false;
+    if (peekChar() == 'R')
+    {
+        escapeMode = true;
+        nextChar();
+    }
     // Read the length part
     UInt count = readCount();
     if (count > UInt(m_end - m_cursor))
@@ -170,7 +176,50 @@ UnownedStringSlice MangledLexer::readRawStringSegment()
 
     auto result = UnownedStringSlice(m_cursor, m_cursor + count);
     m_cursor += count;
+    if (escapeMode)
+        return unescapeString(result);
     return result;
+}
+
+String MangledLexer::unescapeString(UnownedStringSlice str)
+{
+    StringBuilder sb;
+    Index cursor = 0;
+    while (cursor < str.getLength())
+    {
+        auto ch = str[cursor];
+        auto nextCh = 0;
+        if (cursor + 1 < str.getLength())
+        {
+            nextCh = str[cursor + 1];
+        }
+        if (ch == '_' && nextCh == 'u')
+        {
+            sb.appendChar('_');
+            cursor += 2;
+        }
+        else if (ch == '_')
+        {
+            cursor++;
+            Int charValue = 0;
+            while (cursor < str.getLength())
+            {
+                auto current = str[cursor];
+                if (current == 'x')
+                    break;
+                charValue = charValue * 16 + CharUtil::getHexDigitValue(current);
+                cursor++;
+            }
+            sb.appendChar((char)charValue);
+            cursor++;
+        }
+        else
+        {
+            sb.appendChar(ch);
+            cursor++;
+        }
+    }
+    return sb.ProduceString();
 }
 
 UInt MangledLexer::readParamCount()
@@ -183,25 +232,24 @@ UInt MangledLexer::readParamCount()
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! MangledNameParser !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
-/* static */SlangResult MangledNameParser::parseModuleName(const UnownedStringSlice& in, UnownedStringSlice& outModuleName)
+/* static */SlangResult MangledNameParser::parseModuleName(const UnownedStringSlice& in, String& outModuleName)
 {
     MangledLexer lexer(in);
-
     {
         switch (lexer.peekChar())
         {
-            case 'T':
-            case 'G':
-            case 'V':
-            {
-                lexer.nextChar();
-                break;
-            }
-            default: break;
+        case 'T':
+        case 'G':
+        case 'V':
+        {
+            lexer.nextChar();
+            break;
+        }
+        default: break;
         }
     }
 
-    UnownedStringSlice name = lexer.readRawStringSegment();
+    auto name = lexer.readRawStringSegment();
     if (name.getLength() == 0)
     {
         return SLANG_FAIL;

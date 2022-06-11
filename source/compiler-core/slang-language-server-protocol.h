@@ -712,5 +712,31 @@ struct RegistrationParams
     static const StructRttiInfo g_rttiInfo;
 };
 
+struct CancelParams
+{
+    /**
+     * The request id to cancel.
+     */
+    int64_t id;
+
+    static const StructRttiInfo g_rttiInfo;
+};
+
+struct LogMessageParams
+{
+    /**
+     * The message type. See {@link MessageType}
+     */
+    int type;
+
+    /**
+     * The actual message
+     */
+    String message;
+
+    static const StructRttiInfo g_rttiInfo;
+    static const UnownedStringSlice methodName;
+};
+
 } // namespace LanguageServerProtocol
 } // namespace Slang

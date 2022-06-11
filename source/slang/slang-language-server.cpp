@@ -22,15 +22,75 @@
 #include "slang-language-server-semantic-tokens.h"
 #include "slang-ast-print.h"
 #include "slang-doc-markdown-writer.h"
+#include "../../tools/platform/performance-counter.h"
+
 namespace Slang
 {
 using namespace LanguageServerProtocol;
+
+struct Command
+{
+    PersistentJSONValue id;
+    String method;
+
+    template <typename T> struct Optional
+    {
+    public:
+        T* value = nullptr;
+        bool isValid() { return value != nullptr; }
+        T& operator=(const T& val)
+        {
+            delete value;
+            value = new T(val);
+            return *value;
+        }
+        T& operator=(Optional&& other)
+        {
+            if (other.isValid())
+                *this = (other.get());
+            other.value = nullptr;
+            return *value;
+        }
+        T& get()
+        {
+            SLANG_ASSERT(isValid());
+            return *value;
+        }
+        Optional() = default;
+        Optional(const Optional& other)
+        {
+            if (other.isValid())
+                *this = (other.get());
+        }
+        Optional(Optional&& other)
+        {
+            if (other.isValid())
+                *this = (other.get());
+            other.value = nullptr;
+        }
+        
+        ~Optional() { delete value; }
+    };
+
+    Optional<LanguageServerProtocol::CompletionParams> completionArgs;
+    Optional<LanguageServerProtocol::CompletionItem> completionResolveArgs;
+    Optional<LanguageServerProtocol::DidChangeConfigurationParams> changeConfigArgs;
+    Optional<LanguageServerProtocol::SignatureHelpParams> signatureHelpArgs;
+    Optional<LanguageServerProtocol::DefinitionParams> definitionArgs;
+    Optional<LanguageServerProtocol::SemanticTokensParams> semanticTokenArgs;
+    Optional<LanguageServerProtocol::HoverParams> hoverArgs;
+    Optional<LanguageServerProtocol::DidOpenTextDocumentParams> openDocArgs;
+    Optional<LanguageServerProtocol::DidChangeTextDocumentParams> changeDocArgs;
+    Optional<LanguageServerProtocol::DidCloseTextDocumentParams> closeDocArgs;
+    Optional<LanguageServerProtocol::CancelParams> cancelArgs;
+};
 
 class LanguageServer
 {
 private:
     static const int kConfigResponseId = 0x1213;
 public:
+    bool m_initialized = false;
     RefPtr<JSONRPCConnection> m_connection;
     ComPtr<slang::IGlobalSession> m_session;
     RefPtr<Workspace> m_workspace;
@@ -63,13 +123,19 @@ public:
         WorkspaceVersion* wsVersion, Module* module, Expr* baseExpr);
 
 private:
-    SlangResult _executeSingle();
+    SlangResult parseNextMessage();
     slang::IGlobalSession* getOrCreateGlobalSession();
     void resetDiagnosticUpdateTime();
     void publishDiagnostics();
     void updatePredefinedMacros(const JSONValue& macros);
     void sendConfigRequest();
     void registerCapability(const char* methodName);
+    void logMessage(int type, String message);
+
+    List<Command> commands;
+    SlangResult queueJSONCall(JSONRPCCall call);
+    SlangResult runCommand(Command& cmd);
+    void processCommands();
 };
 
 
@@ -110,14 +176,8 @@ String uriToCanonicalPath(const String& uri)
     return canonnicalPath;
 }
 
-SlangResult LanguageServer::_executeSingle()
+SlangResult LanguageServer::parseNextMessage()
 {
-    // If we don't have a message, we can quit for now
-    if (!m_connection->hasMessage())
-    {
-        return SLANG_OK;
-    }
-
     const JSONRPCMessageType msgType = m_connection->getMessageType();
 
     switch (msgType)
@@ -126,8 +186,6 @@ SlangResult LanguageServer::_executeSingle()
         {
             JSONRPCCall call;
             SLANG_RETURN_ON_FAIL(m_connection->getRPCOrSendError(&call));
-
-            // Do different things
             if (call.method == ExitParams::methodName)
             {
                 m_quit = true;
@@ -148,9 +206,9 @@ SlangResult LanguageServer::_executeSingle()
                 InitializeResult result = {};
                 result.serverInfo.name = "SlangLanguageServer";
                 result.serverInfo.version = "1.0";
-                result.capabilities.positionEncoding = "utf-8";
+                result.capabilities.positionEncoding = "utf-16";
                 result.capabilities.textDocumentSync.openClose = true;
-                result.capabilities.textDocumentSync.change = (int)TextDocumentSyncKind::Full;
+                result.capabilities.textDocumentSync.change = (int)TextDocumentSyncKind::Incremental;
                 result.capabilities.workspace.workspaceFolders.supported = true;
                 result.capabilities.workspace.workspaceFolders.changeNotifications = false;
                 result.capabilities.hoverProvider = true;
@@ -173,92 +231,19 @@ SlangResult LanguageServer::_executeSingle()
                 m_connection->sendResult(&result, call.id);
                 return SLANG_OK;
             }
-            else if (call.method == DidOpenTextDocumentParams::methodName)
-            {
-                DidOpenTextDocumentParams args;
-                SLANG_RETURN_ON_FAIL(
-                    m_connection->toNativeArgsOrSendError(call.params, &args, call.id));
-                return didOpenTextDocument(args);
-            }
-            else if (call.method == DidCloseTextDocumentParams::methodName)
-            {
-                DidCloseTextDocumentParams args;
-                SLANG_RETURN_ON_FAIL(
-                    m_connection->toNativeArgsOrSendError(call.params, &args, call.id));
-                return didCloseTextDocument(args);
-            }
-            else if (call.method == DidChangeTextDocumentParams::methodName)
-            {
-                DidChangeTextDocumentParams args;
-                SLANG_RETURN_ON_FAIL(
-                    m_connection->toNativeArgsOrSendError(call.params, &args, call.id));
-                return didChangeTextDocument(args);
-            }
-            else if (call.method == HoverParams::methodName)
-            {
-                HoverParams args;
-                SLANG_RETURN_ON_FAIL(
-                    m_connection->toNativeArgsOrSendError(call.params, &args, call.id));
-                return hover(args, call.id);
-            }
-            else if (call.method == DefinitionParams::methodName)
-            {
-                DefinitionParams args;
-                SLANG_RETURN_ON_FAIL(
-                    m_connection->toNativeArgsOrSendError(call.params, &args, call.id));
-                return gotoDefinition(args, call.id);
-            }
-            else if (call.method == CompletionParams::methodName)
-            {
-                CompletionParams args;
-                SLANG_RETURN_ON_FAIL(
-                    m_connection->toNativeArgsOrSendError(call.params, &args, call.id));
-                return completion(args, call.id);
-            }
-            else if (call.method == SemanticTokensParams::methodName)
-            {
-                SemanticTokensParams args;
-                SLANG_RETURN_ON_FAIL(
-                    m_connection->toNativeArgsOrSendError(call.params, &args, call.id));
-                return semanticTokens(args, call.id);
-            }
-            else if (call.method == SignatureHelpParams::methodName)
-            {
-                SignatureHelpParams args;
-                SLANG_RETURN_ON_FAIL(
-                    m_connection->toNativeArgsOrSendError(call.params, &args, call.id));
-                return signatureHelp(args, call.id);
-            }
-            else if (call.method == "completionItem/resolve")
-            {
-                CompletionItem args;
-                SLANG_RETURN_ON_FAIL(
-                    m_connection->toNativeArgsOrSendError(call.params, &args, call.id));
-                return completionResolve(args, call.id);
-                
-            }
-            else if (call.method == DidChangeConfigurationParams::methodName)
-            {
-                DidChangeConfigurationParams args;
-                SLANG_RETURN_ON_FAIL(
-                    m_connection->toNativeArgsOrSendError(call.params, &args, call.id));
-                return didChangeConfiguration(args);
-            }
             else if (call.method == "initialized")
             {
                 sendConfigRequest();
                 registerCapability("workspace/didChangeConfiguration");
-                return SLANG_OK;
-            }
-            else if (call.method.startsWith("$/"))
-            {
-                // Ignore.
+                m_initialized = true;
                 return SLANG_OK;
             }
             else
             {
-                return m_connection->sendError(JSONRPC::ErrorCode::MethodNotFound, call.id);
+                queueJSONCall(call);
+                return SLANG_OK;
             }
+
         }
     case JSONRPCMessageType::Result:
         {
@@ -377,6 +362,15 @@ SlangResult LanguageServer::hover(
     const LanguageServerProtocol::HoverParams& args, const JSONValue& responseId)
 {
     String canonicalPath = uriToCanonicalPath(args.textDocument.uri);
+    RefPtr<DocumentVersion> doc;
+    if (!m_workspace->openedDocuments.TryGetValue(canonicalPath, doc))
+    {
+        m_connection->sendResult(NullResponse::get(), responseId);
+        return SLANG_OK;
+    }
+    Index line, col;
+    doc->zeroBasedUTF16LocToOneBasedUTF8Loc(args.position.line, args.position.character, line, col);
+
     auto version = m_workspace->getCurrentVersion();
     Module* parsedModule = version->getOrLoadModule(canonicalPath);
     if (!parsedModule)
@@ -389,8 +383,8 @@ SlangResult LanguageServer::hover(
         parsedModule->getModuleDecl(),
         ASTLookupType::Decl,
         canonicalPath.getUnownedSlice(),
-        args.position.line + 1,
-        args.position.character + 1);
+        line,
+        col);
     if (findResult.getCount() == 0 || findResult[0].path.getCount() == 0)
     {
         m_connection->sendResult(NullResponse::get(), responseId);
@@ -465,6 +459,15 @@ SlangResult LanguageServer::gotoDefinition(
     const LanguageServerProtocol::DefinitionParams& args, const JSONValue& responseId)
 {
     String canonicalPath = uriToCanonicalPath(args.textDocument.uri);
+    RefPtr<DocumentVersion> doc;
+    if (!m_workspace->openedDocuments.TryGetValue(canonicalPath, doc))
+    {
+        m_connection->sendResult(NullResponse::get(), responseId);
+        return SLANG_OK;
+    }
+    Index line, col;
+    doc->zeroBasedUTF16LocToOneBasedUTF8Loc(args.position.line, args.position.character, line, col);
+
     auto version = m_workspace->getCurrentVersion();
     Module* parsedModule = version->getOrLoadModule(canonicalPath);
     if (!parsedModule)
@@ -477,8 +480,8 @@ SlangResult LanguageServer::gotoDefinition(
         parsedModule->getModuleDecl(),
         ASTLookupType::Decl,
         canonicalPath.getUnownedSlice(),
-        args.position.line + 1,
-        args.position.character + 1);
+        line,
+        col);
     if (findResult.getCount() == 0 || findResult[0].path.getCount() == 0)
     {
         m_connection->sendResult(NullResponse::get(), responseId);
@@ -572,8 +575,10 @@ SlangResult LanguageServer::completion(
         m_connection->sendResult(NullResponse::get(), responseId);
         return SLANG_OK;
     }
-    
-    auto cursorOffset = doc->getOffset(args.position.line + 1, args.position.character + 1);
+    Index utf8Line, utf8Col;
+    doc->zeroBasedUTF16LocToOneBasedUTF8Loc(
+        args.position.line, args.position.character, utf8Line, utf8Col);
+    auto cursorOffset = doc->getOffset(utf8Line, utf8Col);
     if (cursorOffset == -1 || doc->getText().getLength() == 0)
     {
         m_connection->sendResult(NullResponse::get(), responseId);
@@ -682,6 +687,13 @@ SlangResult LanguageServer::semanticTokens(
 {
     String canonicalPath = uriToCanonicalPath(args.textDocument.uri);
 
+    RefPtr<DocumentVersion> doc;
+    if (!m_workspace->openedDocuments.TryGetValue(canonicalPath, doc))
+    {
+        m_connection->sendResult(NullResponse::get(), responseId);
+        return SLANG_OK;
+    }
+
     auto version = m_workspace->getCurrentVersion();
     Module* parsedModule = version->getOrLoadModule(canonicalPath);
     if (!parsedModule)
@@ -691,6 +703,17 @@ SlangResult LanguageServer::semanticTokens(
     }
 
     auto tokens = getSemanticTokens(version->linkage, parsedModule, canonicalPath.getUnownedSlice());
+    for (auto& token : tokens)
+    {
+        Index line, col;
+        doc->oneBasedUTF8LocToZeroBasedUTF16Loc(token.line, token.col, line, col);
+        Index lineEnd, colEnd;
+        doc->oneBasedUTF8LocToZeroBasedUTF16Loc(
+            token.line, token.col + token.length, lineEnd, colEnd);
+        token.line = (int)line;
+        token.col = (int)col;
+        token.length = (int)(colEnd - col);
+    }
     SemanticTokens response;
     response.resultId = "";
     response.data = getEncodedTokens(tokens);
@@ -702,6 +725,14 @@ SlangResult LanguageServer::signatureHelp(
     const LanguageServerProtocol::SignatureHelpParams& args, const JSONValue& responseId)
 {
     String canonicalPath = uriToCanonicalPath(args.textDocument.uri);
+    RefPtr<DocumentVersion> doc;
+    if (!m_workspace->openedDocuments.TryGetValue(canonicalPath, doc))
+    {
+        m_connection->sendResult(NullResponse::get(), responseId);
+        return SLANG_OK;
+    }
+    Index line, col;
+    doc->zeroBasedUTF16LocToOneBasedUTF8Loc(args.position.line, args.position.character, line, col);
 
     auto version = m_workspace->getCurrentVersion();
     Module* parsedModule = version->getOrLoadModule(canonicalPath);
@@ -716,8 +747,8 @@ SlangResult LanguageServer::signatureHelp(
         parsedModule->getModuleDecl(),
         ASTLookupType::Invoke,
         canonicalPath.getUnownedSlice(),
-        args.position.line + 1,
-        args.position.character + 1);
+        line,
+        col);
 
     if (findResult.getCount() == 0)
     {
@@ -1097,24 +1128,185 @@ void LanguageServer::registerCapability(const char* methodName)
         UnownedStringSlice("client/registerCapability"), &args, JSONValue::makeInt(999));
 }
 
+void LanguageServer::logMessage(int type, String message)
+{
+    LanguageServerProtocol::LogMessageParams args;
+    args.type = type;
+    args.message = message;
+    m_connection->sendCall(LanguageServerProtocol::LogMessageParams::methodName, &args);
+}
+
+SlangResult LanguageServer::queueJSONCall(JSONRPCCall call)
+{
+    Command cmd;
+    cmd.id = PersistentJSONValue(call.id, m_connection->getContainer());
+    cmd.method = call.method;
+    if (call.method == DidOpenTextDocumentParams::methodName)
+    {
+        DidOpenTextDocumentParams args;
+        SLANG_RETURN_ON_FAIL(m_connection->toNativeArgsOrSendError(call.params, &args, call.id));
+        cmd.openDocArgs = args;
+    }
+    else if (call.method == DidCloseTextDocumentParams::methodName)
+    {
+        DidCloseTextDocumentParams args;
+        SLANG_RETURN_ON_FAIL(m_connection->toNativeArgsOrSendError(call.params, &args, call.id));
+        cmd.closeDocArgs = args;
+    }
+    else if (call.method == DidChangeTextDocumentParams::methodName)
+    {
+        DidChangeTextDocumentParams args;
+        SLANG_RETURN_ON_FAIL(m_connection->toNativeArgsOrSendError(call.params, &args, call.id));
+        cmd.changeDocArgs = args;
+    }
+    else if (call.method == HoverParams::methodName)
+    {
+        HoverParams args;
+        SLANG_RETURN_ON_FAIL(m_connection->toNativeArgsOrSendError(call.params, &args, call.id));
+        cmd.hoverArgs = args;
+    }
+    else if (call.method == DefinitionParams::methodName)
+    {
+        DefinitionParams args;
+        SLANG_RETURN_ON_FAIL(m_connection->toNativeArgsOrSendError(call.params, &args, call.id));
+        cmd.definitionArgs = args;
+    }
+    else if (call.method == CompletionParams::methodName)
+    {
+        CompletionParams args;
+        SLANG_RETURN_ON_FAIL(m_connection->toNativeArgsOrSendError(call.params, &args, call.id));
+        cmd.completionArgs = args;
+    }
+    else if (call.method == SemanticTokensParams::methodName)
+    {
+        SemanticTokensParams args;
+        SLANG_RETURN_ON_FAIL(m_connection->toNativeArgsOrSendError(call.params, &args, call.id));
+        cmd.semanticTokenArgs = args;
+    }
+    else if (call.method == SignatureHelpParams::methodName)
+    {
+        SignatureHelpParams args;
+        SLANG_RETURN_ON_FAIL(m_connection->toNativeArgsOrSendError(call.params, &args, call.id));
+        cmd.signatureHelpArgs = args;
+    }
+    else if (call.method == "completionItem/resolve")
+    {
+        CompletionItem args;
+        SLANG_RETURN_ON_FAIL(m_connection->toNativeArgsOrSendError(call.params, &args, call.id));
+        cmd.completionResolveArgs = args;
+    }
+    else if (call.method == DidChangeConfigurationParams::methodName)
+    {
+        DidChangeConfigurationParams args;
+        SLANG_RETURN_ON_FAIL(m_connection->toNativeArgsOrSendError(call.params, &args, call.id));
+        // We need to process it now instead of sending to queue.
+        // This is because there is reference to JSONValue that is only available here.
+        return didChangeConfiguration(args);
+    }
+    else if (call.method == "$/cancelRequest")
+    {
+        CancelParams args;
+        SLANG_RETURN_ON_FAIL(m_connection->toNativeArgsOrSendError(call.params, &args, call.id));
+        cmd.cancelArgs = args;
+    }
+    commands.add(_Move(cmd));
+    return SLANG_OK;
+}
+
+SlangResult LanguageServer::runCommand(Command& call)
+{
+    // Do different things
+    if (call.method == DidOpenTextDocumentParams::methodName)
+    {
+        return didOpenTextDocument(call.openDocArgs.get());
+    }
+    else if (call.method == DidCloseTextDocumentParams::methodName)
+    {
+        return didCloseTextDocument(call.closeDocArgs.get());
+    }
+    else if (call.method == DidChangeTextDocumentParams::methodName)
+    {
+        return didChangeTextDocument(call.changeDocArgs.get());
+    }
+    else if (call.method == HoverParams::methodName)
+    {
+        return hover(call.hoverArgs.get(), call.id);
+    }
+    else if (call.method == DefinitionParams::methodName)
+    {
+        return gotoDefinition(call.definitionArgs.get(), call.id);
+    }
+    else if (call.method == CompletionParams::methodName)
+    {
+        return completion(call.completionArgs.get(), call.id);
+    }
+    else if (call.method == SemanticTokensParams::methodName)
+    {
+        return semanticTokens(call.semanticTokenArgs.get(), call.id);
+    }
+    else if (call.method == SignatureHelpParams::methodName)
+    {
+        return signatureHelp(call.signatureHelpArgs.get(), call.id);
+    }
+    else if (call.method == "completionItem/resolve")
+    {
+        return completionResolve(call.completionResolveArgs.get(), call.id);
+    }
+    else if (call.method == DidChangeConfigurationParams::methodName)
+    {
+        return didChangeConfiguration(call.changeConfigArgs.get());
+    }
+    else if (call.method.startsWith("$/"))
+    {
+        // Ignore.
+        return SLANG_OK;
+    }
+    else
+    {
+        return m_connection->sendError(JSONRPC::ErrorCode::MethodNotFound, call.id);
+    }
+}
+
+void LanguageServer::processCommands()
+{
+    HashSet<int64_t> canceledIDs;
+    for (auto& cmd : commands)
+    {
+        if (cmd.method == "$/cancelRequest")
+        {
+            auto id = cmd.cancelArgs.get().id;
+            if (id > 0)
+            {
+                canceledIDs.Add(id);
+            }
+        }
+    }
+    const int kErrorRequestCanceled = -32800;
+    for (auto& cmd : commands)
+    {
+        if (cmd.id.getKind() == JSONValue::Kind::Integer && canceledIDs.Contains(cmd.id.asInteger()))
+        {
+            m_connection->sendError((JSONRPC::ErrorCode)kErrorRequestCanceled, cmd.id);
+        }
+        else
+        {
+            runCommand(cmd);
+        }
+    }
+}
+
 SlangResult LanguageServer::didCloseTextDocument(const DidCloseTextDocumentParams& args)
 {
     String canonicalPath = uriToCanonicalPath(args.textDocument.uri);
-    m_workspace->openedDocuments.Remove(canonicalPath);
-    m_workspace->invalidate();
+    m_workspace->closeDoc(canonicalPath);
     resetDiagnosticUpdateTime();
     return SLANG_OK;
 }
 SlangResult LanguageServer::didChangeTextDocument(const DidChangeTextDocumentParams& args)
 {
     String canonicalPath = uriToCanonicalPath(args.textDocument.uri);
-
-    RefPtr<DocumentVersion> doc;
-    if (m_workspace->openedDocuments.TryGetValue(canonicalPath, doc))
-    {
-        doc->setText(args.contentChanges[0].text.getUnownedSlice());
-    }
-    m_workspace->invalidate();
+    for (auto change : args.contentChanges)
+        m_workspace->changeDoc(canonicalPath, change.range, change.text);
     resetDiagnosticUpdateTime();
     return SLANG_OK;
 }
@@ -1136,24 +1328,37 @@ void LanguageServer::update()
 
 SlangResult LanguageServer::execute()
 {
-
     m_connection = new JSONRPCConnection();
     m_connection->initWithStdStreams();
     
     while (m_connection->isActive() && !m_quit)
     {
         // Consume all messages first.
+        commands.clear();
+        auto start = platform::PerformanceCounter::now();
         while (true)
         {
             m_connection->tryReadMessage();
             if (!m_connection->hasMessage())
                 break;
-            const SlangResult res = _executeSingle();
-
+            parseNextMessage();
         }
-
+        auto parseTime = platform::PerformanceCounter::getElapsedTimeInSeconds(start);
+        auto parseEnd = platform::PerformanceCounter::now();
+        processCommands();
         // Now we can use this time to reparse user's code, report diagnostics, etc.
         update();
+        auto workTime = platform::PerformanceCounter::getElapsedTimeInSeconds(parseEnd);
+
+        if (commands.getCount() > 0 && m_initialized)
+        {
+            StringBuilder msgBuilder;
+            msgBuilder << "Server processed " << commands.getCount() << " commands, parsed in "
+                       << String(int(parseTime * 1000)) << "ms, executed in "
+                       << String(int(workTime * 1000)) << "ms";
+            logMessage(3, msgBuilder.ProduceString());
+        }
+
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
 

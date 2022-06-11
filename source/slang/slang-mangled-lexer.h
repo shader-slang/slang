@@ -24,7 +24,7 @@ public:
 
     SLANG_INLINE void readSimpleIntVal();
 
-    UnownedStringSlice readRawStringSegment();
+    String readRawStringSegment();
 
     void readNamedType();
 
@@ -47,7 +47,8 @@ public:
         // Returns the current character and moves to next character.
     char nextChar() { return *m_cursor++; }
 
-    
+    static String unescapeString(UnownedStringSlice str);
+
         /// Ctor
     SLANG_FORCE_INLINE MangledLexer(const UnownedStringSlice& slice);
 
@@ -126,7 +127,7 @@ SLANG_INLINE void MangledLexer::_expect(char c)
 struct MangledNameParser
 {
         /// Tries to extract the module name from this mangled name. 
-    static SlangResult parseModuleName(const UnownedStringSlice& in, UnownedStringSlice& outModuleName);
+    static SlangResult parseModuleName(const UnownedStringSlice& in, String& outModuleName);
 };
 
 }

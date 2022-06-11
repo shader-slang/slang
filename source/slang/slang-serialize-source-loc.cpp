@@ -286,13 +286,13 @@ SlangResult SerialSourceLocReader::read(const SerialSourceLocData* serialData, S
                 const auto& lineInfo = lineInfos[lineInfoIndex];
 
                 const uint32_t offset = lineInfo.m_lineStartOffset;
-                SLANG_ASSERT(offset > 0);
                 const int finishIndex = int(lineInfo.m_lineIndex);
 
                 SLANG_ASSERT(finishIndex < numLines);
 
                 for (; lineIndex < finishIndex; ++lineIndex)
                 {
+                    SLANG_ASSERT(offset > 0);
                     lineBreakOffsets[lineIndex] = offset - 1;
                 }
                 lineBreakOffsets[lineIndex] = offset;

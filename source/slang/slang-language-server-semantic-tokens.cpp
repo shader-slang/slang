@@ -420,8 +420,8 @@ SemanticToken _createSemanticToken(SourceManager* manager, SourceLoc loc, Name* 
 {
     SemanticToken token;
     auto humaneLoc = manager->getHumaneLoc(loc, SourceLocType::Actual);
-    token.line = (int)(humaneLoc.line - 1);
-    token.col = (int)(humaneLoc.column - 1);
+    token.line = (int)(humaneLoc.line);
+    token.col = (int)(humaneLoc.column);
     token.length =
         name ? (int)(name->text.getLength()) : 0;
     token.type = SemanticTokenType::NormalText;
