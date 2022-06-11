@@ -140,20 +140,23 @@ struct LivenessContext
         /// Block info (indexed via BlockIndex), that is valid across analysing liveness of a root
     struct BlockInfo
     {
-        void reset() 
+
+            /// Reset any information for a start
+        void resetForStart()
         {
             result = BlockResult::NotVisited;
+            loopParentBlockIndex = BlockIndex::Invalid;
+        }
+
+            /// Reset any information needed for a new root
+        void resetForRoot() 
+        {
+            resetForStart();
+
             runStart = 0;
             runCount = 0;
             lastInst = nullptr;
             instCount = 0;
-            loopParentBlockIndex = BlockIndex::Invalid;
-        }
-
-        void resetResult()
-        {
-            result = BlockResult::NotVisited;
-            loopParentBlockIndex = BlockIndex::Invalid;
         }
 
         // These are reset for *each* liveness start
@@ -913,7 +916,7 @@ void LivenessContext::_findAndEmitRangeEnd(IRLiveRangeStart* liveRangeStart)
     // Reset the result
     for (auto& blockInfo : m_blockInfos)
     {
-        blockInfo.resetResult();
+        blockInfo.resetForStart();
     }
 
     // Store root information, so don't have to pass around methods
@@ -1137,7 +1140,7 @@ void LivenessContext::_processRoot(IRLiveRangeStart* const* rangeStarts, Count r
     // Reset the order range for all blocks
     for (auto& info : m_blockInfos)
     {
-        info.reset();
+        info.resetForRoot();
     }
     m_instRuns.clear();
     
@@ -1273,6 +1276,17 @@ void LivenessContext::_processFunction(IRFunc* func)
     _tidyUninterestingSpans();
 }
 
+static bool _isRootTypeScalar(IRType* type)
+{
+    // Liveness range start/end are through ptr type
+    if (auto ptrType = as<IRPtrType>(type))
+    {
+        // Strip the ptr
+        type = ptrType->getValueType();
+    }
+    return as<IRBasicType>(type) != nullptr;
+}
+
 void LivenessContext::_tidyUninterestingSpans()
 {
     // We are looking for spans from an end to a start for a scalar variable. 
@@ -1288,41 +1302,31 @@ void LivenessContext::_tidyUninterestingSpans()
         auto end = m_rangeEnds[i];
         auto root = end->getReferenced();
 
-        auto rootType = root->getDataType();
-
-        // Within the range start/end accesses are through pointers (so that we have load/store semantics), so strip 
-        // that
+        // If it's not scalar then we ignore
+        if (!_isRootTypeScalar(root->getDataType()))
         {
-            auto ptrType = as<IRPtrType>(rootType);
-
-            // Currently we only do this removal for scalar scenarios
-            if (ptrType == nullptr && as<IRBasicType>(ptrType->getValueType()) == nullptr)
-            {
-                continue;
-            }
+            continue;
         }
-
+        
         // Look for a start to the same root in the block
         // A more sophisticated implementation might try to look across unconditional branches
         // but since only *one* end is stored for potentially multiple starts, and that a block 
         // might have multiple predecessors, we ignore for now.
         IRLiveRangeStart* start = nullptr;
-        {
-            for (auto cur = end->getNextInst(); cur; cur = cur->getNextInst())
-            {    
-                // If it's a start
-                if (auto foundStart = as<IRLiveRangeStart>(cur))
+        for (auto cur = end->getNextInst(); cur; cur = cur->getNextInst())
+        {    
+            // If it's a start
+            if (auto foundStart = as<IRLiveRangeStart>(cur))
+            {
+                // and a start to the same root
+                if (foundStart->getReferenced() == root)
                 {
-                    // and a start to the same root
-                    if (foundStart->getReferenced() == root)
-                    {
-                        start = foundStart;
-                        break;
-                    }
+                    start = foundStart;
+                    break;
                 }
             }
         }
-
+        
         // If we found a matching start, lets just remove the span
         if (start)
         {
