@@ -156,9 +156,11 @@ struct LivenessContext
             loopParentBlockIndex = BlockIndex::Invalid;
         }
 
-        // Strictly speaking the parent loop is statically known so could be stored in FunctionBlockInfo, but it's easier to just calculate on the fly
+        // These are reset for *each* liveness start
         BlockIndex loopParentBlockIndex;    ///< Block index to block which is the parent for this block. Only valid for blocks that are loop starts.
         BlockResult result;                 ///< The result for this block
+
+        // These remain constant for all live starts to a root.
         Index runStart;                     ///< The start index in m_instRuns index. This defines a instruction of interest in order in a block.
         Count runCount;                     ///< The count of the amount insts in the run
         IRInst* lastInst;                   ///< Last inst seen
@@ -179,12 +181,13 @@ struct LivenessContext
 
         bool isLoopStart() const { return breakBlockIndex != BlockIndex::Invalid; }
 
-        BlockIndex breakBlockIndex;
-        BlockIndex targetBlockIndex;
+        IRBlock* block;                 ///< The block
 
-        IRBlock* block;
-        Index successorsStart;      ///< Indexes into block successors
-        Count successorsCount;
+        BlockIndex breakBlockIndex;     ///< If this block terminates in a loop holds the break block 
+        BlockIndex targetBlockIndex;    ///< If this block terminates in a loop holds the target block
+
+        Index successorsStart;          ///< Indexes into block successors
+        Count successorsCount;          ///< How many successors
     };
 
         /// Process the module
