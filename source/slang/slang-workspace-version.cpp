@@ -139,7 +139,7 @@ void Workspace::init(List<URI> rootDirURI, slang::IGlobalSession* globalSession)
 
 void Workspace::invalidate() { currentVersion = nullptr; }
 
-void parseDiagnostics(Dictionary<String, DocumentDiagnostics>& diagnostics, String compilerOutput)
+void WorkspaceVersion::parseDiagnostics(String compilerOutput)
 {
     List<UnownedStringSlice> lines;
     StringUtil::calcLines(compilerOutput.getUnownedSlice(), lines);
@@ -161,12 +161,12 @@ void parseDiagnostics(Dictionary<String, DocumentDiagnostics>& diagnostics, Stri
         int lineLoc = StringUtil::parseIntAndAdvancePos(line, pos);
         if (lineLoc == 0)
             lineLoc = 1;
-        diagnostic.range.end.line = diagnostic.range.start.line = lineLoc - 1;
+        diagnostic.range.end.line = diagnostic.range.start.line = lineLoc;
         pos++;
         int colLoc = StringUtil::parseIntAndAdvancePos(line, pos);
         if (colLoc == 0)
             colLoc = 1;
-        diagnostic.range.end.character = diagnostic.range.start.character = colLoc - 1;
+        diagnostic.range.end.character = diagnostic.range.start.character = colLoc;
         if (pos >= line.getLength())
             continue;
         line = line.tail(colonIndex + 3);
@@ -199,7 +199,31 @@ void parseDiagnostics(Dictionary<String, DocumentDiagnostics>& diagnostics, Stri
             auto tokenLength = StringUtil::parseIntAndAdvancePos(line, pos);
             diagnostic.range.end.character += tokenLength;
         }
+
+        if (auto doc = workspace->openedDocuments.TryGetValue(fileName))
+        {
+            // If the file is open, translate to UTF16 positions using the document.
+            Index lineUTF16, colUTF16;
+            doc->Ptr()->oneBasedUTF8LocToZeroBasedUTF16Loc(
+                diagnostic.range.start.line, diagnostic.range.start.character, lineUTF16, colUTF16);
+            diagnostic.range.start.line = (int)lineUTF16;
+            diagnostic.range.start.character = (int)colUTF16;
+            doc->Ptr()->oneBasedUTF8LocToZeroBasedUTF16Loc(
+                diagnostic.range.end.line, diagnostic.range.end.character, lineUTF16, colUTF16);
+            diagnostic.range.end.line = (int)lineUTF16;
+            diagnostic.range.end.character = (int)colUTF16;
+        }
+        else
+        {
+            // Otherwise, just return an 0-based position.
+            diagnostic.range.start.line--;
+            diagnostic.range.start.character--;
+            diagnostic.range.end.line--;
+            diagnostic.range.end.character--;
+        }
         diagnosticList.messages.Add(diagnostic);
+        if (diagnosticList.messages.Count() >= 1000)
+            break;
     }
 }
 
@@ -331,6 +355,24 @@ void DocumentVersion::zeroBasedUTF16LocToOneBasedUTF8Loc(
     outCol = inCol >=0 && inCol < bounds.getCount()? bounds[inCol] + 1 : 0;
 }
 
+static bool _isIdentifierChar(char ch)
+{
+    return ch >= 'a' && ch <= 'z' || ch >= 'A' && ch <= 'Z' || ch >= '0' && ch <= '9' || ch == '_';
+}
+
+int DocumentVersion::getTokenLength(Index line, Index col)
+{
+    auto offset = getOffset(line, col);
+    if (offset >= 0)
+    {
+        Index pos = offset;
+        for (; pos < text.getLength() && _isIdentifierChar(text[pos]); ++pos)
+        {}
+        return (int)(pos - offset);
+    }
+    return 0;
+}
+
 ASTMarkup* WorkspaceVersion::getOrCreateMarkupAST(ModuleDecl* module)
 {
     RefPtr<ASTMarkup> astMarkup;
@@ -368,7 +410,7 @@ Module* WorkspaceVersion::getOrLoadModule(String path)
     if (diagnosticBlob)
     {
         auto diagnosticString = String((const char*)diagnosticBlob->getBufferPointer());
-        parseDiagnostics(diagnostics, diagnosticString);
+        parseDiagnostics(diagnosticString);
         auto docDiagnostic = diagnostics.TryGetValue(path);
         if (docDiagnostic)
             docDiagnostic->originalOutput = diagnosticString;

@@ -3105,7 +3105,11 @@ namespace Slang
     static NodeBase* parseConstructorDecl(Parser* parser, void* /*userData*/)
     {
         ConstructorDecl* decl = parser->astBuilder->create<ConstructorDecl>();
-        parser->FillPosition(decl);
+
+        // Note: we leave the source location of this decl as invalid, to
+        // trigger the fallback logic that fills in the location of the
+        // `__init` keyword later.
+
         parser->PushScope(decl);
 
         // TODO: we need to make sure that all initializers have

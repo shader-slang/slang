@@ -5,6 +5,7 @@
 #include "slang-ast-all.h"
 #include "slang-syntax.h"
 #include "slang-compiler.h"
+#include "slang-workspace-version.h"
 
 namespace Slang
 {
@@ -30,7 +31,7 @@ struct SemanticToken
     }
 };
 List<SemanticToken> getSemanticTokens(
-    Linkage* linkage, Module* module, UnownedStringSlice fileName);
+    Linkage* linkage, Module* module, UnownedStringSlice fileName, DocumentVersion* doc);
 List<uint32_t> getEncodedTokens(List<SemanticToken>& tokens);
 
 } // namespace Slang

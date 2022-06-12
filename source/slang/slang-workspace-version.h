@@ -84,6 +84,9 @@ namespace Slang
 
             return lineIndex > 0 ? lines[lineIndex - 1] : UnownedStringSlice();
         }
+
+        // Get length of an identifier token starting at the specified position.
+        int getTokenLength(Index line, Index col);
     };
 
     struct DocumentDiagnostics
@@ -110,6 +113,7 @@ namespace Slang
     private:
         Dictionary<String, Module*> modules;
         Dictionary<ModuleDecl*, RefPtr<ASTMarkup>> markupASTs;
+        void parseDiagnostics(String compilerOutput);
     public:
         Workspace* workspace;
         RefPtr<Linkage> linkage;

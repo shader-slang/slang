@@ -1,10 +1,12 @@
 #include "slang-language-server-ast-lookup.h"
 #include "slang-visitor.h"
+#include "slang-workspace-version.h"
 
 namespace Slang
 {
 struct ASTLookupContext
 {
+    DocumentVersion* doc;
     SourceManager* sourceManager;
     List<SyntaxNode*> nodePath;
     ASTLookupType findType;
@@ -170,18 +172,31 @@ public:
 
     bool visitVarExpr(VarExpr* expr)
     {
-        if (expr->name && expr->declRef.getDecl() &&
-            _isLocInRange(
-                context, expr->loc, _getDeclNameLength(expr->name, expr->declRef.getDecl())))
+        if (expr->name && expr->declRef.getDecl())
         {
             if (expr->declRef.getDecl()->hasModifier<ImplicitConversionModifier>())
                 return false;
-            ASTLookupResult result;
-            result.path = context->nodePath;
-            result.path.add(expr);
-            context->results.add(result);
-            return true;
+            Int declLength = 0;
+            if (auto ctorDecl = as<ConstructorDecl>(expr->declRef.getDecl()))
+            {
+                auto humaneLoc = context->sourceManager->getHumaneLoc(expr->loc, SourceLocType::Actual);
+                declLength = context->doc->getTokenLength(humaneLoc.line, humaneLoc.column);
+            }
+            else
+            {
+                declLength = _getDeclNameLength(expr->name, expr->declRef.getDecl());
+            }
+            if (_isLocInRange(
+                    context, expr->loc, declLength))
+            {
+                ASTLookupResult result;
+                result.path = context->nodePath;
+                result.path.add(expr);
+                context->results.add(result);
+                return true;
+            }
         }
+        
         return dispatchIfNotNull(expr->originalExpr);
     }
 
@@ -553,7 +568,7 @@ bool _findAstNodeImpl(ASTLookupContext& context, SyntaxNode* node)
 }
 
 List<ASTLookupResult> findASTNodesAt(
-    SourceManager* sourceManager, ModuleDecl* moduleDecl, ASTLookupType findType, UnownedStringSlice fileName, Int line, Int col)
+    DocumentVersion* doc, SourceManager* sourceManager, ModuleDecl* moduleDecl, ASTLookupType findType, UnownedStringSlice fileName, Int line, Int col)
 {
     ASTLookupContext context;
     context.sourceManager = sourceManager;
@@ -562,6 +577,7 @@ List<ASTLookupResult> findASTNodesAt(
     context.cursorLoc = Loc{line, col};
     context.findType = findType;
     context.sourceFileName = fileName;
+    context.doc = doc;
     _findAstNodeImpl(context, moduleDecl);
     return context.results;
 }

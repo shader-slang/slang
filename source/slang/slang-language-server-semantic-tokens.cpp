@@ -1,6 +1,7 @@
 #include "slang-language-server-semantic-tokens.h"
 #include "slang-visitor.h"
 #include "slang-ast-support-types.h"
+#include "../core/slang-char-util.h"
 #include <algorithm>
 
 namespace Slang
@@ -428,7 +429,7 @@ SemanticToken _createSemanticToken(SourceManager* manager, SourceLoc loc, Name* 
     return token;
 }
 
-List<SemanticToken> getSemanticTokens(Linkage* linkage, Module* module, UnownedStringSlice fileName)
+List<SemanticToken> getSemanticTokens(Linkage* linkage, Module* module, UnownedStringSlice fileName, DocumentVersion* doc)
 {
     auto manager = linkage->getSourceManager();
 
@@ -439,7 +440,6 @@ List<SemanticToken> getSemanticTokens(Linkage* linkage, Module* module, UnownedS
             token.type != SemanticTokenType::NormalText)
             result.add(token);
     };
-
     iterateAST(
         fileName,
         manager,
@@ -468,10 +468,7 @@ List<SemanticToken> getSemanticTokens(Linkage* linkage, Module* module, UnownedS
                     else if (as<ConstructorDecl>(target))
                     {
                         token.type = SemanticTokenType::Type;
-                        if (target->parentDecl && target->parentDecl->getName())
-                        {
-                            token.length = (int)target->parentDecl->getName()->text.getLength();
-                        }
+                        token.length = doc->getTokenLength(token.line, token.col);
                     }
                     else if (as<SimpleTypeDecl>(target))
                     {
@@ -487,6 +484,11 @@ List<SemanticToken> getSemanticTokens(Linkage* linkage, Module* module, UnownedS
                     }
                     else if (as<VarDecl>(target))
                     {
+                        if (as<MemberExpr>(declRef->originalExpr) ||
+                            as<StaticMemberExpr>(declRef->originalExpr))
+                        {
+                            return;
+                        }
                         token.type = SemanticTokenType::Variable;
                     }
                     else if (as<FunctionDeclBase>(target))

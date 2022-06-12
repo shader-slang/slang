@@ -379,6 +379,7 @@ SlangResult LanguageServer::hover(
         return SLANG_OK;
     }
     auto findResult = findASTNodesAt(
+        doc.Ptr(),
         version->linkage->getSourceManager(),
         parsedModule->getModuleDecl(),
         ASTLookupType::Decl,
@@ -476,6 +477,7 @@ SlangResult LanguageServer::gotoDefinition(
         return SLANG_OK;
     }
     auto findResult = findASTNodesAt(
+        doc.Ptr(),
         version->linkage->getSourceManager(),
         parsedModule->getModuleDecl(),
         ASTLookupType::Decl,
@@ -542,12 +544,16 @@ SlangResult LanguageServer::gotoDefinition(
         for (auto loc : locations)
         {
             Location result;
-            result.uri = URI::fromLocalFilePath(loc.loc.pathInfo.foundPath.getUnownedSlice()).uri;
-            result.range.start.line = int(loc.loc.line - 1);
-            result.range.start.character = int(loc.loc.column - 1);
-            result.range.end = result.range.start;
-            result.range.end.character += loc.length;
-            results.add(result);
+            if (File::exists(loc.loc.pathInfo.foundPath))
+            {
+                result.uri =
+                    URI::fromLocalFilePath(loc.loc.pathInfo.foundPath.getUnownedSlice()).uri;
+                result.range.start.line = int(loc.loc.line - 1);
+                result.range.start.character = int(loc.loc.column - 1);
+                result.range.end = result.range.start;
+                result.range.end.character += loc.length;
+                results.add(result);
+            }
         }
         m_connection->sendResult(&results, responseId);
         return SLANG_OK;
@@ -618,6 +624,7 @@ SlangResult LanguageServer::completion(
         return SLANG_OK;
     }
     auto findResult = findASTNodesAt(
+        doc.Ptr(),
         version->linkage->getSourceManager(),
         parsedModule->getModuleDecl(),
         ASTLookupType::Decl,
@@ -702,7 +709,7 @@ SlangResult LanguageServer::semanticTokens(
         return SLANG_OK;
     }
 
-    auto tokens = getSemanticTokens(version->linkage, parsedModule, canonicalPath.getUnownedSlice());
+    auto tokens = getSemanticTokens(version->linkage, parsedModule, canonicalPath.getUnownedSlice(), doc.Ptr());
     for (auto& token : tokens)
     {
         Index line, col;
@@ -743,6 +750,7 @@ SlangResult LanguageServer::signatureHelp(
     }
 
     auto findResult = findASTNodesAt(
+        doc.Ptr(),
         version->linkage->getSourceManager(),
         parsedModule->getModuleDecl(),
         ASTLookupType::Invoke,
