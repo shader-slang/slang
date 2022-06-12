@@ -18,7 +18,7 @@
 #include "slang-language-server.h"
 #include "slang-workspace-version.h"
 #include "slang-language-server-ast-lookup.h"
-#include "slang-language-server-collect-member.h"
+#include "slang-language-server-completion.h"
 #include "slang-language-server-semantic-tokens.h"
 #include "slang-ast-print.h"
 #include "slang-doc-markdown-writer.h"
@@ -28,116 +28,13 @@ namespace Slang
 {
 using namespace LanguageServerProtocol;
 
-struct Command
+ArrayView<const char*> getCommitChars()
 {
-    PersistentJSONValue id;
-    String method;
-
-    template <typename T> struct Optional
-    {
-    public:
-        T* value = nullptr;
-        bool isValid() { return value != nullptr; }
-        T& operator=(const T& val)
-        {
-            delete value;
-            value = new T(val);
-            return *value;
-        }
-        T& operator=(Optional&& other)
-        {
-            if (other.isValid())
-                *this = (other.get());
-            other.value = nullptr;
-            return *value;
-        }
-        T& get()
-        {
-            SLANG_ASSERT(isValid());
-            return *value;
-        }
-        Optional() = default;
-        Optional(const Optional& other)
-        {
-            if (other.isValid())
-                *this = (other.get());
-        }
-        Optional(Optional&& other)
-        {
-            if (other.isValid())
-                *this = (other.get());
-            other.value = nullptr;
-        }
-        
-        ~Optional() { delete value; }
-    };
-
-    Optional<LanguageServerProtocol::CompletionParams> completionArgs;
-    Optional<LanguageServerProtocol::CompletionItem> completionResolveArgs;
-    Optional<LanguageServerProtocol::DidChangeConfigurationParams> changeConfigArgs;
-    Optional<LanguageServerProtocol::SignatureHelpParams> signatureHelpArgs;
-    Optional<LanguageServerProtocol::DefinitionParams> definitionArgs;
-    Optional<LanguageServerProtocol::SemanticTokensParams> semanticTokenArgs;
-    Optional<LanguageServerProtocol::HoverParams> hoverArgs;
-    Optional<LanguageServerProtocol::DidOpenTextDocumentParams> openDocArgs;
-    Optional<LanguageServerProtocol::DidChangeTextDocumentParams> changeDocArgs;
-    Optional<LanguageServerProtocol::DidCloseTextDocumentParams> closeDocArgs;
-    Optional<LanguageServerProtocol::CancelParams> cancelArgs;
-};
-
-class LanguageServer
-{
-private:
-    static const int kConfigResponseId = 0x1213;
-public:
-    bool m_initialized = false;
-    RefPtr<JSONRPCConnection> m_connection;
-    ComPtr<slang::IGlobalSession> m_session;
-    RefPtr<Workspace> m_workspace;
-    Dictionary<String, String> m_lastPublishedDiagnostics;
-    time_t m_lastDiagnosticUpdateTime = 0;
-    bool m_quit = false;
-    List<LanguageServerProtocol::WorkspaceFolder> m_workspaceFolders;
-
-    SlangResult init(const LanguageServerProtocol::InitializeParams& args);
-    SlangResult execute();
-    void update();
-    SlangResult didOpenTextDocument(const LanguageServerProtocol::DidOpenTextDocumentParams& args);
-    SlangResult didCloseTextDocument(
-        const LanguageServerProtocol::DidCloseTextDocumentParams& args);
-    SlangResult didChangeTextDocument(
-        const LanguageServerProtocol::DidChangeTextDocumentParams& args);
-    SlangResult didChangeConfiguration(
-        const LanguageServerProtocol::DidChangeConfigurationParams& args);
-    SlangResult hover(const LanguageServerProtocol::HoverParams& args, const JSONValue& responseId);
-    SlangResult gotoDefinition(const LanguageServerProtocol::DefinitionParams& args, const JSONValue& responseId);
-    SlangResult completion(
-        const LanguageServerProtocol::CompletionParams& args, const JSONValue& responseId);
-    SlangResult completionResolve(
-        const LanguageServerProtocol::CompletionItem& args, const JSONValue& responseId);
-    SlangResult semanticTokens(
-        const LanguageServerProtocol::SemanticTokensParams& args, const JSONValue& responseId);
-    SlangResult signatureHelp(
-        const LanguageServerProtocol::SignatureHelpParams& args, const JSONValue& responseId);
-    List<LanguageServerProtocol::CompletionItem> collectMembers(
-        WorkspaceVersion* wsVersion, Module* module, Expr* baseExpr);
-
-private:
-    SlangResult parseNextMessage();
-    slang::IGlobalSession* getOrCreateGlobalSession();
-    void resetDiagnosticUpdateTime();
-    void publishDiagnostics();
-    void updatePredefinedMacros(const JSONValue& macros);
-    void sendConfigRequest();
-    void registerCapability(const char* methodName);
-    void logMessage(int type, String message);
-
-    List<Command> commands;
-    SlangResult queueJSONCall(JSONRPCCall call);
-    SlangResult runCommand(Command& cmd);
-    void processCommands();
-};
-
+    static const char* _commitCharsArray[] = {",", ".", ";", ":", "(", ")", "[", "]",
+                                              "<", ">", "{", "}", "*", "&", "^", "%",
+                                              "!", "-", "=", "+", "|", "/", "?", " "};
+    return makeArrayView(_commitCharsArray, SLANG_COUNT_OF(_commitCharsArray));
+}
 
 SlangResult LanguageServer::init(const InitializeParams& args)
 {
@@ -213,10 +110,7 @@ SlangResult LanguageServer::parseNextMessage()
                 result.capabilities.workspace.workspaceFolders.changeNotifications = false;
                 result.capabilities.hoverProvider = true;
                 result.capabilities.definitionProvider = true;
-                const char* commitChars[] = {",", ".", ";", ":", "(", ")", "[", "]",
-                                             "<", ">", "{", "}", "*", "&", "^", "%",
-                                             "!", "-", "=", "+", "|", "/", "?"};
-                for (auto ch : commitChars)
+                for (auto ch : getCommitChars())
                     result.capabilities.completionProvider.allCommitCharacters.add(ch);
                 result.capabilities.completionProvider.triggerCharacters.add(".");
                 result.capabilities.completionProvider.triggerCharacters.add(":");
@@ -560,16 +454,6 @@ SlangResult LanguageServer::gotoDefinition(
     }
 }
 
-bool _isIdentifierChar(char ch)
-{
-    return ch >= '0' && ch <= '9' || ch >= 'a' && ch <= 'z' || ch >= 'A' && ch <= 'Z' || ch == '_';
-}
-
-bool _isWhitespaceChar(char ch)
-{
-    return ch == ' ' || ch == '\r' || ch == '\n' || ch == '\t';
-}
-
 SlangResult LanguageServer::completion(
     const LanguageServerProtocol::CompletionParams& args, const JSONValue& responseId)
 {
@@ -590,32 +474,7 @@ SlangResult LanguageServer::completion(
         m_connection->sendResult(NullResponse::get(), responseId);
         return SLANG_OK;
     }
-    // Scan backward until we locate a '.' or ':'.
-    if (cursorOffset == doc->getText().getLength())
-        cursorOffset--;
-    while (cursorOffset > 0 && _isWhitespaceChar(doc->getText()[cursorOffset]))
-    {
-        cursorOffset--;
-    }
-    while (cursorOffset > 0 && _isIdentifierChar(doc->getText()[cursorOffset]))
-    {
-        cursorOffset--;
-    }
-    while (cursorOffset > 0 && _isWhitespaceChar(doc->getText()[cursorOffset]))
-    {
-        cursorOffset--;
-    }
-    if (cursorOffset > 0 && doc->getText()[cursorOffset] == ':')
-        cursorOffset--;
-    if (cursorOffset <= 0 ||
-        (doc->getText()[cursorOffset] != '.' && doc->getText()[cursorOffset] != ':'))
-    {
-        m_connection->sendResult(NullResponse::get(), responseId);
-        return SLANG_OK;
-    }
-    Index line = 0;
-    Index col = 0;
-    doc->offsetToLineCol(cursorOffset, line, col);
+    
     auto version = m_workspace->getCurrentVersion();
     Module* parsedModule = version->getOrLoadModule(canonicalPath);
     if (!parsedModule)
@@ -623,49 +482,26 @@ SlangResult LanguageServer::completion(
         m_connection->sendResult(NullResponse::get(), responseId);
         return SLANG_OK;
     }
-    auto findResult = findASTNodesAt(
-        doc.Ptr(),
-        version->linkage->getSourceManager(),
-        parsedModule->getModuleDecl(),
-        ASTLookupType::Decl,
-        canonicalPath.getUnownedSlice(),
-        line,
-        col);
-    if (findResult.getCount() != 1)
-    {
-        m_connection->sendResult(NullResponse::get(), responseId);
-        return SLANG_OK;
-    }
-    if (findResult[0].path.getCount() == 0)
-    {
-        m_connection->sendResult(NullResponse::get(), responseId);
-        return SLANG_OK;
-    }
-    Expr* baseExpr = nullptr;
-    if (auto memberExpr = as<MemberExpr>(findResult[0].path.getLast()))
-    {
-        baseExpr = memberExpr->baseExpression;
-    }
-    else if (auto staticMemberExpr = as<StaticMemberExpr>(findResult[0].path.getLast()))
-    {
-        baseExpr = staticMemberExpr->baseExpression;
-    }
-    else if (auto swizzleExpr = as<SwizzleExpr>(findResult[0].path.getLast()))
-    {
-        baseExpr = swizzleExpr->base;
-    }
-    else if (auto matSwizzleExpr = as<MatrixSwizzleExpr>(findResult[0].path.getLast()))
-    {
-        baseExpr = matSwizzleExpr->base;
-    }
-    if (!baseExpr || !baseExpr->type.type || baseExpr->type.type->equals(version->linkage->getASTBuilder()->getErrorType()))
-    {
-        m_connection->sendResult(NullResponse::get(), responseId);
-        return SLANG_OK;
-    }
 
-    List<LanguageServerProtocol::CompletionItem> items = collectMembers(version, parsedModule, baseExpr);
-    m_connection->sendResult(&items, responseId);
+    CompletionContext context;
+    context.server = this;
+    context.cursorOffset = cursorOffset;
+    context.version = version;
+    context.doc = doc.Ptr();
+    context.parsedModule = parsedModule;
+    context.responseId = responseId;
+    context.canonicalPath = canonicalPath.getUnownedSlice();
+    context.line = utf8Line;
+    context.col = utf8Col;
+    if (SLANG_SUCCEEDED(context.tryCompleteMember()))
+    {
+        return SLANG_OK;
+    }
+    if (SLANG_SUCCEEDED(context.tryCompleteHLSLSemantic()))
+    {
+        return SLANG_OK;
+    }
+    m_connection->sendResult(NullResponse::get(), responseId);
     return SLANG_OK;
 }
 
@@ -882,175 +718,6 @@ SlangResult LanguageServer::signatureHelp(
 
     m_connection->sendResult(&response, responseId);
     return SLANG_OK;
-}
-
-
-List<LanguageServerProtocol::CompletionItem> LanguageServer::collectMembers(WorkspaceVersion* version, Module* module, Expr* baseExpr)
-{
-    List<LanguageServerProtocol::CompletionItem> result;
-    auto linkage = version->linkage;
-    Type* type = baseExpr->type.type;
-    bool isInstance = true;
-    if (auto typeType = as<TypeType>(type))
-    {
-        type = typeType->type;
-        isInstance = false;
-    }
-    version->currentCompletionItems.clear();
-    if (type)
-    {
-        if (isInstance && as<ArithmeticExpressionType>(type))
-        {
-            // Hard code members for vector and matrix types.
-            result.clear();
-            version->currentCompletionItems.clear();
-            int elementCount = 0;
-            Type* elementType = nullptr;
-            const char* memberNames[4] = {"x", "y", "z", "w"};
-            if (auto vectorType = as<VectorExpressionType>(type))
-            {
-                if (auto elementCountVal = as<ConstantIntVal>(vectorType->elementCount))
-                {
-                    elementCount = (int)elementCountVal->value;
-                    elementType = vectorType->elementType;
-                }
-            }
-            else if (auto matrixType = as<MatrixExpressionType>(type))
-            {
-                if (auto elementCountVal = as<ConstantIntVal>(matrixType->getRowCount()))
-                {
-                    elementCount = (int)elementCountVal->value;
-                    elementType = matrixType->getRowType();
-                }
-            }
-            String typeStr;
-            if (elementType)
-                typeStr = elementType->toString();
-            elementCount = Math::Min(elementCount, 4);
-            for (int i = 0; i < elementCount; i++)
-            {
-                CompletionItem item;
-                item.data = 0;
-                item.detail = typeStr;
-                item.kind = LanguageServerProtocol::kCompletionItemKindVariable;
-                item.label = memberNames[i];
-                result.add(item);
-            }
-        }
-        else
-        {
-            DiagnosticSink sink;
-            MemberCollectingContext context(linkage, module, &sink);
-            context.astBuilder = linkage->getASTBuilder();
-            context.includeInstanceMembers = isInstance;
-            collectMembersInType(&context, type);
-            HashSet<String> deduplicateSet;
-            for (auto member : context.members)
-            {
-                CompletionItem item;
-                item.label = member->getName()->text;
-                item.kind = 0;
-                if (as<TypeConstraintDecl>(member))
-                {
-                    continue;
-                }
-                if (as<ConstructorDecl>(member))
-                {
-                    continue;
-                }
-                if (as<SubscriptDecl>(member))
-                {
-                    continue;
-                }
-
-                if (item.label.startsWith("$"))
-                    continue;
-                if (!deduplicateSet.Add(item.label))
-                    continue;
-
-                if (as<StructDecl>(member))
-                {
-                    item.kind = LanguageServerProtocol::kCompletionItemKindStruct;
-                }
-                else if (as<ClassDecl>(member))
-                {
-                    item.kind = LanguageServerProtocol::kCompletionItemKindClass;
-                }
-                else if (as<InterfaceDecl>(member))
-                {
-                    item.kind = LanguageServerProtocol::kCompletionItemKindInterface;
-                }
-                else if (as<SimpleTypeDecl>(member))
-                {
-                    item.kind = LanguageServerProtocol::kCompletionItemKindClass;
-                }
-                else if (as<PropertyDecl>(member))
-                {
-                    item.kind = LanguageServerProtocol::kCompletionItemKindProperty;
-                }
-                else if (as<EnumDecl>(member))
-                {
-                    item.kind = LanguageServerProtocol::kCompletionItemKindEnum;
-                }
-                else if (as<VarDeclBase>(member))
-                {
-                    item.kind = LanguageServerProtocol::kCompletionItemKindVariable;
-                }
-                else if (as<EnumCaseDecl>(member))
-                {
-                    item.kind = LanguageServerProtocol::kCompletionItemKindEnumMember;
-                }
-                else if (as<CallableDecl>(member))
-                {
-                    item.kind = LanguageServerProtocol::kCompletionItemKindMethod;
-                }
-                else if (as<AssocTypeDecl>(member))
-                {
-                    item.kind = LanguageServerProtocol::kCompletionItemKindClass;
-                }
-                item.data = String(version->currentCompletionItems.getCount());
-                result.add(item);
-                version->currentCompletionItems.add(member);
-            }
-        }
-
-        for (auto& item : result)
-        {
-            switch (item.kind)
-            {
-            case LanguageServerProtocol::kCompletionItemKindMethod:
-                item.commitCharacters.add("(");
-                item.commitCharacters.add("[");
-                item.commitCharacters.add(" ");
-                break;
-            default:
-                item.commitCharacters.add("(");
-                item.commitCharacters.add(")");
-                item.commitCharacters.add(".");
-                item.commitCharacters.add(";");
-                item.commitCharacters.add(":");
-                item.commitCharacters.add(",");
-                item.commitCharacters.add("<");
-                item.commitCharacters.add(">");
-                item.commitCharacters.add("[");
-                item.commitCharacters.add("]");
-                item.commitCharacters.add("{");
-                item.commitCharacters.add("}");
-                item.commitCharacters.add("-");
-                item.commitCharacters.add("*");
-                item.commitCharacters.add("/");
-                item.commitCharacters.add("%");
-                item.commitCharacters.add("+");
-                item.commitCharacters.add("=");
-                item.commitCharacters.add("&");
-                item.commitCharacters.add("|");
-                item.commitCharacters.add("!");
-                item.commitCharacters.add(" ");
-                break;
-            }
-        }
-    }
-    return result;
 }
 
 void LanguageServer::publishDiagnostics()

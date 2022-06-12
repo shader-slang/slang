@@ -542,6 +542,21 @@ bool _findAstNodeImpl(ASTLookupContext& context, SyntaxNode* node)
             if (visitor.dispatchIfNotNull(typedefDecl->type.exp))
                 return true;
         }
+        for (auto modifier : decl->modifiers)
+        {
+            if (auto hlslSemantic = as<HLSLSemantic>(modifier))
+            {
+                if (_isLocInRange(
+                        &context, hlslSemantic->loc, hlslSemantic->name.getContentLength()))
+                {
+                    ASTLookupResult result;
+                    result.path = context.nodePath;
+                    result.path.add(hlslSemantic);
+                    context.results.add(result);
+                    return true;
+                }
+            }
+        }
         if (auto container = as<ContainerDecl>(node))
         {
             bool shouldInspectChildren = true;

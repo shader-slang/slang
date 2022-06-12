@@ -318,7 +318,7 @@
     <ClInclude Include="..\..\..\source\slang\slang-language-server-ast-lookup.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\source\slang\slang-language-server-collect-member.h">
+    <ClInclude Include="..\..\..\source\slang\slang-language-server-completion.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\source\slang\slang-language-server-semantic-tokens.h">
@@ -761,7 +761,7 @@
     <ClCompile Include="..\..\..\source\slang\slang-language-server-ast-lookup.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\source\slang\slang-language-server-collect-member.cpp">
+    <ClCompile Include="..\..\..\source\slang\slang-language-server-completion.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\source\slang\slang-language-server-semantic-tokens.cpp">
