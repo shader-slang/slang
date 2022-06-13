@@ -32,7 +32,7 @@ DocumentVersion* Workspace::openDoc(String path, String text)
     doc->setText(text.getUnownedSlice());
     doc->setURI(URI::fromLocalFilePath(path.getUnownedSlice()));
     openedDocuments[path] = doc;
-    searchPaths.Add(Path::getParentDirectory(path));
+    workspaceSearchPaths.Add(Path::getParentDirectory(path));
     moduleCache.invalidate(path);
     invalidate();
     return doc.Ptr();
@@ -66,11 +66,11 @@ void Workspace::closeDoc(const String& path)
 
 bool Workspace::updatePredefinedMacros(List<String> macros)
 {
-    List<OnwedPreprocessorMacroDefinition> newDefs;
+    List<OwnedPreprocessorMacroDefinition> newDefs;
     for (auto macro : macros)
     {
         auto index = macro.indexOf('=');
-        OnwedPreprocessorMacroDefinition def;
+        OwnedPreprocessorMacroDefinition def;
         def.name = macro.getUnownedSlice().head(index).trim();
         if (index != -1)
         {
@@ -97,6 +97,41 @@ bool Workspace::updatePredefinedMacros(List<String> macros)
     if (changed)
     {
         predefinedMacros = _Move(newDefs);
+        invalidate();
+    }
+    return changed;
+}
+
+bool Workspace::updateSearchPaths(List<String> paths)
+{
+    bool changed = false;
+    if (paths.getCount() != additionalSearchPaths.getCount())
+        changed = true;
+    else
+    {
+        for (Index i = 0; i < paths.getCount(); i++)
+        {
+            if (paths[i] != additionalSearchPaths[i])
+            {
+                changed = true;
+                break;
+            }
+        }
+    }
+    if (changed)
+    {
+        additionalSearchPaths = _Move(paths);
+        invalidate();
+    }
+    return changed;
+}
+
+bool Workspace::updateSearchInWorkspace(bool value)
+{
+    bool changed = searchInWorkspace != value;
+    searchInWorkspace = value;
+    if (changed)
+    {
         invalidate();
     }
     return changed;
@@ -132,7 +167,7 @@ void Workspace::init(List<URI> rootDirURI, slang::IGlobalSession* globalSession)
                 },
                 &context);
         }
-        searchPaths = _Move(context.paths);
+        workspaceSearchPaths = _Move(context.paths);
     }
     slangGlobalSession = globalSession;
 }
@@ -239,8 +274,23 @@ RefPtr<WorkspaceVersion> Workspace::createWorkspaceVersion()
     targetDesc.profile = slangGlobalSession->findProfile("sm_6_6");
     desc.targets = &targetDesc;
     List<const char*> searchPathsRaw;
-    for (auto path : searchPaths)
+    for (auto& path : additionalSearchPaths)
         searchPathsRaw.add(path.getBuffer());
+    if (searchInWorkspace)
+    {
+        for (auto& path : workspaceSearchPaths)
+            searchPathsRaw.add(path.getBuffer());
+    }
+    else
+    {
+        HashSet<String> set;
+        for (auto& p : openedDocuments)
+        {
+            auto dir = Path::getParentDirectory(p.Key.getBuffer());
+            if (set.Add(dir))
+                searchPathsRaw.add(dir.getBuffer());
+        }
+    }
     desc.searchPaths = searchPathsRaw.getBuffer();
     desc.searchPathCount = searchPathsRaw.getCount();
 
