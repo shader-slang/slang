@@ -196,7 +196,7 @@ struct LivenessContext
 
     struct Loop
     {
-        Loop* parentLoop;                   ///< The parent loop, which will be entered when this loop is left via a break
+        const Loop* parentLoop;             ///< The parent loop, which will be entered when this loop is left via a break
         BlockIndex targetBlockIndex;        ///< The target block for this loop
         BlockIndex breakBlockIndex;         ///< The break block for this loop
         BlockIndex loopBlockIndex;          ///< Block id that terminates with loop we are currently in
@@ -222,11 +222,11 @@ struct LivenessContext
 
         /// Process a successor to a block
         /// Can only be called after a call to _findAliasesAndAccesses for the root.
-    BlockResult _processSuccessor(BlockIndex blockIndex, Loop* loop);
+    BlockResult _processSuccessor(BlockIndex blockIndex, const Loop* loop);
 
         /// Process a block 
         /// Can only be called after a call to _findAliasesAndAccesses for the root.
-    BlockResult _processBlock(BlockIndex blockIndex, const ConstArrayView<IRInst*>& run, Loop* loop);
+    BlockResult _processBlock(BlockIndex blockIndex, const ConstArrayView<IRInst*>& run, const Loop* loop);
 
         /// Process all the locations in the function 
         /// NOTE: All locations must be to the same function, and ordered by root. 
@@ -407,7 +407,7 @@ LivenessContext::BlockResult LivenessContext::_addBlockResult(BlockIndex blockIn
     return result;
 }
 
-LivenessContext::BlockResult LivenessContext::_processSuccessor(BlockIndex blockIndex, Loop* loop)
+LivenessContext::BlockResult LivenessContext::_processSuccessor(BlockIndex blockIndex, const Loop* loop)
 {
     auto blockInfo = _getBlockInfo(blockIndex);
     
@@ -635,7 +635,7 @@ static IRLoop* _getLoopTerminator(IRBlock* block)
     return nullptr;
 }
 
-LivenessContext::BlockResult LivenessContext::_processBlock(BlockIndex blockIndex, const ConstArrayView<IRInst*>& run, Loop* loop)
+LivenessContext::BlockResult LivenessContext::_processBlock(BlockIndex blockIndex, const ConstArrayView<IRInst*>& run, const Loop* loop)
 {
     // Note that the run must be some part of the run for the block indicated by blockIndex. One of
     // 
