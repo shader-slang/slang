@@ -210,7 +210,7 @@ struct WorkspaceFoldersServerCapabilities
     /**
      * The server has support for workspace folders
      */
-    bool supported;
+    bool supported = false;
 
     /**
      * Whether the server wants to receive workspace folder
@@ -221,7 +221,7 @@ struct WorkspaceFoldersServerCapabilities
      * side. The ID can be used to unregister for these events
      * using the `client/unregisterCapability` request.
      */
-    bool changeNotifications;
+    bool changeNotifications = false;
 
     static const StructRttiInfo g_rttiInfo;
 };
@@ -273,11 +273,13 @@ struct InitializeResult
     static const StructRttiInfo g_rttiInfo;
 };
 
-struct ShutdownParams {
+struct ShutdownParams
+{
     static const UnownedStringSlice methodName;
 };
 
-struct ExitParams {
+struct ExitParams
+{
     static const UnownedStringSlice methodName;
 };
 
@@ -663,7 +665,7 @@ struct DidChangeConfigurationParams
     /**
      * The actual changed settings
      */
-    JSONValue settings;
+    JSONValue settings = JSONValue::makeInvalid();
 
     static const StructRttiInfo g_rttiInfo;
 
@@ -717,7 +719,7 @@ struct CancelParams
     /**
      * The request id to cancel.
      */
-    int64_t id;
+    int64_t id = 0;
 
     static const StructRttiInfo g_rttiInfo;
 };
@@ -727,7 +729,7 @@ struct LogMessageParams
     /**
      * The message type. See {@link MessageType}
      */
-    int type;
+    int type = 0;
 
     /**
      * The actual message

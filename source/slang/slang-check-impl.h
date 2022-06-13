@@ -255,6 +255,12 @@ namespace Slang
             return m_module;
         }
 
+        bool isInLanguageServer()
+        {
+            if (m_linkage)
+                return m_linkage->isInLanguageServer();
+            return false;
+        }
             /// Get the list of extension declarations that appear to apply to `decl` in this context
         List<ExtensionDecl*> const& getCandidateExtensionsForTypeDecl(AggTypeDecl* decl);
 
@@ -1685,13 +1691,13 @@ namespace Slang
         // deal with this cases here, even if they are no-ops.
         //
 
-    #define CASE(NAME)                                  \
-        Expr* visit##NAME(NAME* expr)            \
-        {                                               \
-            SLANG_DIAGNOSE_UNEXPECTED(getSink(), expr,  \
-                "should not appear in input syntax");   \
-            expr->type = m_astBuilder->getErrorType();  \
-            return expr;                                \
+    #define CASE(NAME)                                                                           \
+        Expr* visit##NAME(NAME* expr)                                                            \
+        {                                                                                        \
+            if (!getShared()->isInLanguageServer())                                              \
+                SLANG_DIAGNOSE_UNEXPECTED(getSink(), expr, "should not appear in input syntax"); \
+            expr->type = m_astBuilder->getErrorType();                                           \
+            return expr;                                                                         \
         }
 
         CASE(DerefExpr)
