@@ -178,6 +178,7 @@ struct LivenessContext
             successorsCount = 0;
             breakBlockIndex = BlockIndex::Invalid;
             targetBlockIndex = BlockIndex::Invalid;
+            owningLoopBlockIndex = BlockIndex::Invalid;
         }
 
         bool isLoopStart() const { return breakBlockIndex != BlockIndex::Invalid; }
@@ -186,6 +187,8 @@ struct LivenessContext
 
         BlockIndex breakBlockIndex;     ///< If this block terminates in a loop holds the break block 
         BlockIndex targetBlockIndex;    ///< If this block terminates in a loop holds the target block
+
+        BlockIndex owningLoopBlockIndex;///< The loop this block 'belongs' to (or Invalid if doesn't belong to a loop)
 
         Index successorsStart;          ///< Indexes into block successors
         Count successorsCount;          ///< How many successors
@@ -313,6 +316,10 @@ struct LivenessContext
         const auto& info = m_fixedBlockInfos[Index(blockIndex)];
         return makeConstArrayView(m_blockSuccessors.getBuffer() + info.successorsStart, info.successorsCount);
     }
+
+        /// Determine which loops blocks 'belong' to. The owning block is the block that *contains* the 
+        /// loop instruction as it's terminator. 
+    void _calcLoopOwnership();
 
     RefPtr<IRDominatorTree> m_dominatorTree;        ///< The dominator tree for the current function
 
@@ -1175,6 +1182,92 @@ void LivenessContext::_processRoot(IRLiveRangeStart* const* rangeStarts, Count r
     m_rootBlock = nullptr;
 }
 
+void LivenessContext::_calcLoopOwnership()
+{
+    // Should all be set to invalid initially
+    for (const auto& fixedInfo : m_fixedBlockInfos)
+    {
+        SLANG_ASSERT(fixedInfo.owningLoopBlockIndex == BlockIndex::Invalid);
+    }
+
+    const Count blocksCount = m_fixedBlockInfos.getCount();
+
+    List<BlockIndex> work;
+
+    for (Index i = 0; i < blocksCount; ++i)
+    {
+        const BlockIndex outerBlockIndex = BlockIndex(i);
+        const auto& loopInfo = _getFixedBlockInfo(outerBlockIndex);
+        if (loopInfo.isLoopStart())
+        {
+            const BlockIndex loopBlockIndex = outerBlockIndex;
+
+            work.clear();
+
+            BlockIndex blockIndex = loopInfo.targetBlockIndex;
+
+            while (true)
+            {
+                // If it's already set we are done
+                auto& curOwner = m_fixedBlockInfos[Index(blockIndex)].owningLoopBlockIndex;
+                if (curOwner != BlockIndex::Invalid)
+                {
+                    SLANG_ASSERT(curOwner == loopBlockIndex);
+                    continue;
+                }
+
+                // Set that it belongs to this loop
+                curOwner = loopBlockIndex;
+
+                BlockIndex successorStorage[1];
+                ConstArrayView<BlockIndex> successors;
+
+                const auto& info = _getFixedBlockInfo(blockIndex);
+                if (info.isLoopStart())
+                {
+                    // The 'successor' is what comes after the loop
+                    const BlockIndex breakIndex = info.breakBlockIndex;
+                    successorStorage[0] = breakIndex;
+                    successors = makeConstArrayView(successorStorage, 1);
+                }
+                else
+                {
+                    successors = _getSuccessors(blockIndex);
+                }
+
+                // Add any successors that aren't visited or terminators
+                for (const auto successorBlockIndex : successors)
+                {
+                    // If it loops or repeats, we don't need to add
+                    if (successorBlockIndex == loopInfo.breakBlockIndex ||
+                        successorBlockIndex == loopInfo.targetBlockIndex)
+                    {
+                        continue;
+                    }
+                    // Check if already owned (must be by this loop)
+                    const auto successorOwner = _getFixedBlockInfo(successorBlockIndex).owningLoopBlockIndex;
+                    if (successorOwner != BlockIndex::Invalid)
+                    {
+                        SLANG_ASSERT(successorOwner == loopBlockIndex);
+                        continue;
+                    }
+
+                    work.add(successorBlockIndex);
+                }
+
+                // If nothing left we are done
+                if (work.getCount() == 0)
+                {
+                    break;
+                }
+
+                blockIndex = work.getLast();
+                work.removeLast();
+            }
+        }
+    }
+}
+
 void LivenessContext::_processFunction(IRFunc* func)
 {
     SLANG_ASSERT(m_rangeStarts.getCount() > 0);
@@ -1245,6 +1338,10 @@ void LivenessContext::_processFunction(IRFunc* func)
                 *dst++ = m_blockIndexMap[successor];
             }
         }
+
+        // Once we have the successors set up we can determine which loops each block belongs to.
+        // This can be useful for doing loop analysis
+        _calcLoopOwnership();
     }
 
     // Find the run of locations that all access the same root
