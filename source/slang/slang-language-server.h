@@ -110,6 +110,9 @@ private:
     void resetDiagnosticUpdateTime();
     void publishDiagnostics();
     void updatePredefinedMacros(const JSONValue& macros);
+    void updateSearchPaths(const JSONValue& macros);
+    void updateSearchInWorkspace(const JSONValue& macros);
+
     void sendConfigRequest();
     void registerCapability(const char* methodName);
     void logMessage(int type, String message);

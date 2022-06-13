@@ -100,6 +100,8 @@ namespace Slang
 
         TokenReader tokenReader;
         DiagnosticSink* sink;
+        SourceLoc lastErrorLoc;
+
         int genericDepth = 0;
 
         // Have we seen any `import` declarations? If so, we need
@@ -192,6 +194,18 @@ namespace Slang
         TypeExp										ParseTypeExp();
 
         Parser & operator = (const Parser &) = delete;
+
+        // Helper to issue diagnose message that filters out errors for the same token.
+        template <typename P, typename... Args>
+        void diagnose(P const& pos, DiagnosticInfo const& info, Args const&... args)
+        {
+            auto loc = getDiagnosticPos(pos);
+            if (loc != lastErrorLoc)
+            {
+                sink->diagnose(pos, info, args...);
+                lastErrorLoc = loc;
+            }
+        }
     };
 
     // Forward Declarations
@@ -248,7 +262,7 @@ namespace Slang
         // Don't emit "unexpected token" errors if we are in recovering mode
         if (!parser->isRecovering)
         {
-            parser->sink->diagnose(parser->tokenReader.peekLoc(), Diagnostics::unexpectedToken,
+            parser->diagnose(parser->tokenReader.peekLoc(), Diagnostics::unexpectedToken,
                 parser->tokenReader.peekTokenType());
 
             // Switch into recovery mode, to suppress additional errors
@@ -279,10 +293,15 @@ namespace Slang
         // Don't emit "unexpected token" errors if we are in recovering mode
         if (!parser->isRecovering)
         {
-            parser->sink->diagnose(parser->tokenReader.peekLoc(), Diagnostics::unexpectedTokenExpectedTokenType,
-                parser->tokenReader.peekTokenType(),
-                expected);
-
+            if (parser->lastErrorLoc != parser->tokenReader.peekLoc())
+            {
+                parser->sink->diagnose(
+                    parser->tokenReader.peekLoc(),
+                    Diagnostics::unexpectedTokenExpectedTokenType,
+                    parser->tokenReader.peekTokenType(),
+                    expected);
+                parser->lastErrorLoc = parser->tokenReader.peekLoc();
+            }
             // Switch into recovery mode, to suppress additional errors
             parser->isRecovering = true;
         }
@@ -5234,7 +5253,7 @@ namespace Slang
         {
         default:
             // TODO: should this return an error expression instead of NULL?
-            parser->sink->diagnose(parser->tokenReader.peekLoc(), Diagnostics::syntaxError);
+            parser->diagnose(parser->tokenReader.peekLoc(), Diagnostics::syntaxError);
             return parser->astBuilder->create<IncompleteExpr>();
 
         // Either:
