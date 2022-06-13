@@ -112,7 +112,7 @@ public:
 
 struct LivenessContext
 {
-    enum class BlockIndex : Index;
+    enum class BlockIndex : Index { Invalid = -1 };
 
     // NOTE! Care must be taken changing the order. 
     // canPromote checks if a result can be 'promoted'.
@@ -140,39 +140,57 @@ struct LivenessContext
         /// Block info (indexed via BlockIndex), that is valid across analysing liveness of a root
     struct BlockInfo
     {
-        void reset() 
+
+            /// Reset any information for a start
+        void resetForStart()
         {
             result = BlockResult::NotVisited;
+            loopParentBlockIndex = BlockIndex::Invalid;
+        }
+
+            /// Reset any information needed for a new root
+        void resetForRoot() 
+        {
+            resetForStart();
+
             runStart = 0;
             runCount = 0;
             lastInst = nullptr;
             instCount = 0;
         }
-        void resetResult()
-        {
-            result = BlockResult::NotVisited;
-        }
 
-        BlockResult result;         ///< The result for this block
-        Index runStart;             ///< The start index in m_instRuns index. This defines a instruction of interest in order in a block.
-        Count runCount;             ///< The count of the amount insts in the run
-        IRInst* lastInst;           ///< Last inst seen
-        Count instCount;            ///< The total amount of start/access instruction seen in the block
+        // These are reset for *each* liveness start
+        BlockIndex loopParentBlockIndex;    ///< Block index to block which is the parent for this block. Only valid for blocks that are loop starts.
+        BlockResult result;                 ///< The result for this block
+
+        // These remain constant for all live starts to a root.
+        Index runStart;                     ///< The start index in m_instRuns index. This defines a instruction of interest in order in a block.
+        Count runCount;                     ///< The count of the amount insts in the run
+        IRInst* lastInst;                   ///< Last inst seen
+        Count instCount;                    ///< The total amount of start/access instruction seen in the block
     };
 
-        /// Block info (indexed via BlockIndex), that is valid across a function
-    struct FunctionBlockInfo
+        /// Block info (indexed via BlockIndex), that is fixed across a function
+    struct FixedBlockInfo
     {
         void init(IRBlock* inBlock)
         {
             block = inBlock;
             successorsStart = 0;
             successorsCount = 0;
+            breakBlockIndex = BlockIndex::Invalid;
+            targetBlockIndex = BlockIndex::Invalid;
         }
 
-        IRBlock* block;
-        Index successorsStart;      ///< Indexes into block successors
-        Count successorsCount;
+        bool isLoopStart() const { return breakBlockIndex != BlockIndex::Invalid; }
+
+        IRBlock* block;                 ///< The block
+
+        BlockIndex breakBlockIndex;     ///< If this block terminates in a loop holds the break block 
+        BlockIndex targetBlockIndex;    ///< If this block terminates in a loop holds the target block
+
+        Index successorsStart;          ///< Indexes into block successors
+        Count successorsCount;          ///< How many successors
     };
 
         /// Process the module
@@ -195,11 +213,11 @@ struct LivenessContext
 
         /// Process a successor to a block
         /// Can only be called after a call to _findAliasesAndAccesses for the root.
-    BlockResult _processSuccessor(BlockIndex blockIndex);
+    BlockResult _processSuccessor(BlockIndex blockIndex, BlockIndex loopBlockIndex);
 
         /// Process a block 
         /// Can only be called after a call to _findAliasesAndAccesses for the root.
-    BlockResult _processBlock(BlockIndex blockIndex, const ConstArrayView<IRInst*>& run);
+    BlockResult _processBlock(BlockIndex blockIndex, const ConstArrayView<IRInst*>& run, BlockIndex loopBlockIndex);
 
         /// Process all the locations in the function 
         /// NOTE: All locations must be to the same function, and ordered by root. 
@@ -261,12 +279,21 @@ struct LivenessContext
         /// Get block info
     BlockInfo* _getBlockInfo(BlockIndex blockIndex) { return &m_blockInfos[Index(blockIndex)]; }
 
+        /// Get block info fixed across a function being analyzed. 
+    const FixedBlockInfo& _getFixedBlockInfo(BlockIndex blockIndex) const { return m_fixedBlockInfos[Index(blockIndex)]; }
+
         /// Get the block from the index
-    IRBlock* _getBlock(BlockIndex blockIndex) const { return m_functionBlockInfos[Index(blockIndex)].block; }
+    IRBlock* _getBlock(BlockIndex blockIndex) const { return m_fixedBlockInfos[Index(blockIndex)].block; }
 
         /// True if the terminator can be considered an access
         /// This allows us to elide a scope end if the root is returned 
     bool _isAccessTerminator(IRTerminatorInst* terminator);
+
+        /// Order the range starts in a deterministic manner
+    void _orderRangeStartsDeterministically();
+
+        /// Remove any end/start spands within a block, that aren't 'interesting.
+    void _tidyUninterestingSpans();
 
         /// Gets the instructions of interest for this info, in the order they appear within the block
     ConstArrayView<IRInst*> _getRun(const BlockInfo* info) 
@@ -277,7 +304,7 @@ struct LivenessContext
         /// Gets all of the successors for the blockIdnex
     ConstArrayView<BlockIndex> _getSuccessors(BlockIndex blockIndex)
     {
-        const auto& info = m_functionBlockInfos[Index(blockIndex)];
+        const auto& info = m_fixedBlockInfos[Index(blockIndex)];
         return makeConstArrayView(m_blockSuccessors.getBuffer() + info.successorsStart, info.successorsCount);
     }
 
@@ -297,12 +324,13 @@ struct LivenessContext
 
     Dictionary<IRBlock*, BlockIndex> m_blockIndexMap;   ///< Map from a block to a block index
     List<BlockInfo> m_blockInfos;                       ///< Information about blocks, for the current root
-    List<FunctionBlockInfo> m_functionBlockInfos;       ///< Information about blocks across the current function
-    List<BlockIndex> m_blockSuccessors;                 ///< Successors for a blocks, accessed via 
+    List<FixedBlockInfo> m_fixedBlockInfos;         ///< Information about blocks across the current function
+    List<BlockIndex> m_blockSuccessors;             ///< Successors for a blocks, accessed via FixedBlockInfo 
 
     List<IRInst*> m_instRuns;                       ///< Instructions of interest in order. Indexed into via BlockInfo [runStart, runStart + runCount)
 
     List<IRLiveRangeStart*> m_rangeStarts;          ///< All the starts within a function, ordered by referenced
+    List<IRLiveRangeEnd*> m_rangeEnds;              ///< All of the ends added
 
     IRModule* m_module;
     SharedIRBuilder m_sharedBuilder;
@@ -346,7 +374,6 @@ static void _findFuncs(IRModule* module, List<IRFunc*>& ioFuncs)
     }
 }
 
-
 void LivenessContext::_maybeAddEndAtBlockStart(BlockIndex blockIndex)
 {
     auto block = _getBlock(blockIndex);
@@ -367,7 +394,7 @@ LivenessContext::BlockResult LivenessContext::_addBlockResult(BlockIndex blockIn
     return result;
 }
 
-LivenessContext::BlockResult LivenessContext::_processSuccessor(BlockIndex blockIndex)
+LivenessContext::BlockResult LivenessContext::_processSuccessor(BlockIndex blockIndex, BlockIndex loopBlockIndex)
 {
     auto blockInfo = _getBlockInfo(blockIndex);
     
@@ -390,7 +417,6 @@ LivenessContext::BlockResult LivenessContext::_processSuccessor(BlockIndex block
             // Unless it is the start block (the block containing live start) *and* the root is 
             // in the block. 
             // The live start can only be after the var, because the var is only in scope then.
-            //
             
             // We need to check if we are in the live start block, as we then need to process 
             // up until the live start.
@@ -405,7 +431,52 @@ LivenessContext::BlockResult LivenessContext::_processSuccessor(BlockIndex block
                 SLANG_ASSERT(startIndex >= 0);
 
                 // We want to run all the way up to the start
-                return _processBlock(blockIndex, run.head(startIndex));
+                return _processBlock(blockIndex, run.head(startIndex), loopBlockIndex);
+            }
+
+            // If we are looping
+            if (loopBlockIndex != BlockIndex::Invalid)
+            {
+                // And what we are branching too is the start of the current loop
+                const auto& loopInfo = _getFixedBlockInfo(loopBlockIndex);
+                if (loopInfo.targetBlockIndex == blockIndex)
+                {
+                    // This block has been visisted, that means it has been traversed to get here
+                    // meaning the root *must* be live on the looping.
+
+                    // TODO(JS):
+                    // The solution used here is somewhat conservative, it assumes if a branch back to the start of the loop can be reached that
+                    //
+                    // * There might be some path where the loop might exit
+                    // * There might be some path where the root(variable or alias) may be loaded/or stored
+                    //
+                    // If these assumptions are wrong it will lead to
+                    //
+                    // * Potentially a liveness end that is never hit(outside of the loop)
+                    // * Potentially liveness for a root that spans across the loop even if that is not actually necessary
+                    // 
+                    // This could be improved on but would probably need something like 'loop analysis' that specially determined 
+                    // those scenarios, such that the assumptions aren't needed. It would need to be 'separate analysis', because 
+                    // the liveness traversal is a kind of incremental depth first traversal. But for loop analysis it would require 
+                    // at loop start the result on all paths through the loop.
+
+                    const auto breakBlockIndex = loopInfo.breakBlockIndex;
+
+                    const auto parentLoop = _getBlockInfo(loopBlockIndex)->loopParentBlockIndex;
+
+                    // Process what comes after the loop (in the scope of the parent loop if any)
+                    result = _processSuccessor(breakBlockIndex, parentLoop);
+                    if (result != BlockResult::Found)
+                    {
+                        // If an end is not found from the break, 
+                        // we just insert an end at the start of the break block
+
+                        _maybeAddEndAtBlockStart(breakBlockIndex);
+                        result = _addBlockResult(breakBlockIndex, BlockResult::Found);
+                    }
+
+                    return result;
+                }
             }
 
             // Otherwise just return result
@@ -431,8 +502,21 @@ LivenessContext::BlockResult LivenessContext::_processSuccessor(BlockIndex block
     // Mark that it is visited
     _addBlockResult(blockIndex, BlockResult::Visited);
 
+    // Special case leaving the loop. 
+    // If we are in a loop
+    if (loopBlockIndex != BlockIndex::Invalid)
+    {
+        auto& loopInfo = m_fixedBlockInfos[Index(loopBlockIndex)];
+        // And the block we are going to is the break block then we are no longer in this loop
+        if (loopInfo.breakBlockIndex == blockIndex)
+        {
+            // So the loop we are currently in must be the parent
+            loopBlockIndex = _getBlockInfo(loopBlockIndex)->loopParentBlockIndex;
+        }
+    }
+
     // Else process the block to try and find the last used instruction
-    return _processBlock(blockIndex, _getRun(blockInfo));
+    return _processBlock(blockIndex, _getRun(blockInfo), loopBlockIndex);
 }
 
 Index LivenessContext::_indexOfRootStart(const ConstArrayView<IRInst*>& run)
@@ -504,7 +588,7 @@ void LivenessContext::_maybeAddEndAfterInst(IRInst* inst)
         // Just add end of scope after the inst 
         m_builder.setInsertLoc(IRInsertLoc::after(inst));
         // Add the live end inst
-        m_builder.emitLiveRangeEnd(m_root);
+        m_rangeEnds.add(m_builder.emitLiveRangeEnd(m_root));
     }
 }
 
@@ -515,7 +599,7 @@ void LivenessContext::_maybeAddEndBeforeInst(IRInst* inst)
         // Just add end of scope after the inst 
         m_builder.setInsertLoc(IRInsertLoc::before(inst));
         // Add the live end inst
-        m_builder.emitLiveRangeEnd(m_root);
+        m_rangeEnds.add(m_builder.emitLiveRangeEnd(m_root));
     }
 }
 
@@ -540,7 +624,17 @@ LivenessContext::BlockResult LivenessContext::_completeBlock(BlockIndex blockInd
     return _addBlockResult(blockIndex, BlockResult::NotFound);
 }
 
-LivenessContext::BlockResult LivenessContext::_processBlock(BlockIndex blockIndex, const ConstArrayView<IRInst*>& run)
+static IRLoop* _getLoopTerminator(IRBlock* block)
+{
+    auto terminator = block->getTerminator();
+    if (terminator->getOp() == kIROp_loop)
+    {
+        return static_cast<IRLoop*>(terminator);
+    }
+    return nullptr;
+}
+
+LivenessContext::BlockResult LivenessContext::_processBlock(BlockIndex blockIndex, const ConstArrayView<IRInst*>& run, BlockIndex loopBlockIndex)
 {
     // Note that the run must be some part of the run for the block indicated by blockIndex. One of
     // 
@@ -565,6 +659,27 @@ LivenessContext::BlockResult LivenessContext::_processBlock(BlockIndex blockInde
         }
     }
 
+    // If we hit a loop add the information and make this the current loop info
+    {
+        const auto& fixedInfo = _getFixedBlockInfo(blockIndex);
+        if (fixedInfo.isLoopStart())
+        {
+            SLANG_ASSERT(_getLoopTerminator(fixedInfo.block));
+
+            // Get the varaying block info
+            auto blockInfo = _getBlockInfo(blockIndex);
+
+            // Its either not set or set to the same value 
+            SLANG_ASSERT(blockInfo->loopParentBlockIndex == BlockIndex::Invalid || blockInfo->loopParentBlockIndex == loopBlockIndex);
+
+            // Set the parent loop block index
+            blockInfo->loopParentBlockIndex = loopBlockIndex;
+
+            // This block is the current loop block
+            loopBlockIndex = blockIndex;
+        }
+    }
+
     // Zero initialize all the counts
     Index foundCounts[Index(BlockResult::CountOf)] = { 0 };
 
@@ -586,7 +701,7 @@ LivenessContext::BlockResult LivenessContext::_processBlock(BlockIndex blockInde
         // If we always access through successorResults (ie RAIIStackArray type), things will be fine though.
             
         // Process the successor
-        const auto successorResult = _processSuccessor(successorBlockIndex);
+        const auto successorResult = _processSuccessor(successorBlockIndex, loopBlockIndex);
 
         successorResults[i] = successorResult;
 
@@ -637,7 +752,7 @@ void LivenessContext::_addInst(IRInst* inst)
     auto block = as<IRBlock>(inst->getParent());
 
     // Get the index to get the info
-    auto blockIndex = m_blockIndexMap[block];
+    const BlockIndex blockIndex = m_blockIndexMap[block];
 
     auto blockInfo = _getBlockInfo(blockIndex);
 
@@ -653,6 +768,12 @@ void LivenessContext::_addInst(IRInst* inst)
 
 void LivenessContext::_addAccessInst(IRInst* inst)
 {
+    // If we already have it don't need to add again
+    if (m_accessSet.Contains(inst))
+    {
+        return;
+    }
+    
     // Add to the access set
     m_accessSet.Add(inst);
 
@@ -753,7 +874,8 @@ void LivenessContext::_findAliasesAndAccesses(IRInst* root)
                 }
                 case kIROp_Store:
                 {
-                    // In terms of liveness, stores can be ignored
+                    // In terms of liveness, stores can be ignored (although in the future we will probably 
+                    // want to support to make loops analysis work more accurately)
                     break;
                 }
                 case kIROp_getElement:
@@ -794,7 +916,7 @@ void LivenessContext::_findAndEmitRangeEnd(IRLiveRangeStart* liveRangeStart)
     // Reset the result
     for (auto& blockInfo : m_blockInfos)
     {
-        blockInfo.resetResult();
+        blockInfo.resetForStart();
     }
 
     // Store root information, so don't have to pass around methods
@@ -839,7 +961,7 @@ void LivenessContext::_findAndEmitRangeEnd(IRLiveRangeStart* liveRangeStart)
         _addBlockResult(rootStartBlockIndex, BlockResult::Visited);
 
         // Recursively find results
-        auto foundResult = _processBlock(rootStartBlockIndex, run);
+        auto foundResult = _processBlock(rootStartBlockIndex, run, BlockIndex::Invalid);
 
         if (foundResult == BlockResult::NotFound)
         {
@@ -866,11 +988,10 @@ bool LivenessContext::_isNormalRunInst(IRInst* inst)
     }
 
     // NOTE!
-    // The ops in th elist above are the only ops *currently* that indicate an access.
+    // The ops in the list above are the only ops *currently* that indicate an access.
     // Has to be consistent with `_findAliasesAndAccesses`
     if (op == kIROp_Call || 
-        op == kIROp_Load || 
-        op == kIROp_Call)
+        op == kIROp_Load)
     {
         // Just because it's the right type *doesn't* mean it's an access, it has to also 
         // be in the access set
@@ -1019,7 +1140,7 @@ void LivenessContext::_processRoot(IRLiveRangeStart* const* rangeStarts, Count r
     // Reset the order range for all blocks
     for (auto& info : m_blockInfos)
     {
-        info.reset();
+        info.resetForRoot();
     }
     m_instRuns.clear();
     
@@ -1073,8 +1194,9 @@ void LivenessContext::_processFunction(IRFunc* func)
     m_blockIndexMap.Clear();
 
     m_blockInfos.clear();
-    m_functionBlockInfos.clear();
+    m_fixedBlockInfos.clear();
     m_blockSuccessors.clear();
+    m_rangeEnds.clear();
 
     {
         // First we find all the blocks in the function, we add to the map
@@ -1086,10 +1208,10 @@ void LivenessContext::_processFunction(IRFunc* func)
             IRBlock* blockInst = as<IRBlock>(block);
             m_blockIndexMap.Add(blockInst, BlockIndex(index++));
 
-            FunctionBlockInfo functionBlockInfo;
-            functionBlockInfo.init(blockInst);
+            FixedBlockInfo fixedBlockInfo;
+            fixedBlockInfo.init(blockInst);
 
-            m_functionBlockInfos.add(functionBlockInfo);
+            m_fixedBlockInfos.add(fixedBlockInfo);
         }
 
         // Allocate space for the root block infos
@@ -1097,9 +1219,17 @@ void LivenessContext::_processFunction(IRFunc* func)
 
         // Now we have the map, work out the successors as BlockIndex for each block
         // and add those to m_blockSuccessors. They are indexed via successorsIndex/Count in the FunctionBlockInfos
-        for (auto& info : m_functionBlockInfos)
+        for (auto& fixedInfo : m_fixedBlockInfos)
         {
-            auto block = info.block;
+            auto block = fixedInfo.block;
+
+            // Set up the break block indices if we have a loop
+            if (auto loop = _getLoopTerminator(block))
+            {
+                // Set the break/continue block indices
+                fixedInfo.breakBlockIndex = m_blockIndexMap[loop->getBreakBlock()];
+                fixedInfo.targetBlockIndex = m_blockIndexMap[loop->getTargetBlock()];
+            }
 
             // Add all the successors 
             auto successors = block->getSuccessors();
@@ -1107,8 +1237,8 @@ void LivenessContext::_processFunction(IRFunc* func)
             const Index successorsStart = m_blockSuccessors.getCount();
             const Count successorsCount = successors.getCount();
 
-            info.successorsStart = successorsStart;
-            info.successorsCount = successorsCount;
+            fixedInfo.successorsStart = successorsStart;
+            fixedInfo.successorsCount = successorsCount;
 
             m_blockSuccessors.setCount(successorsStart + successorsCount);
 
@@ -1141,6 +1271,140 @@ void LivenessContext::_processFunction(IRFunc* func)
             start = end;
         }
     }
+
+    // Remove any end/start spands within a block, that aren't 'interesting.
+    _tidyUninterestingSpans();
+}
+
+static bool _isRootTypeScalar(IRType* type)
+{
+    // Liveness range start/end are through ptr type
+    if (auto ptrType = as<IRPtrType>(type))
+    {
+        // Strip the ptr
+        type = ptrType->getValueType();
+    }
+    return as<IRBasicType>(type) != nullptr;
+}
+
+void LivenessContext::_tidyUninterestingSpans()
+{
+    // We are looking for spans from an end to a start for a scalar variable. 
+    // Only scalar for now so even if the span is 'big' the cost is probably low.
+    // 
+    // A more sophisticated implementation could perhaps look in the span if there is only a full store 
+    // for a struct/large type. Would also need some concept of the 'amount of insts' to determine if worth it.
+ 
+    const Count count = m_rangeEnds.getCount();
+
+    for (Index i = 0; i < count; ++i)
+    {
+        auto end = m_rangeEnds[i];
+        auto root = end->getReferenced();
+
+        // If it's not scalar then we ignore
+        if (!_isRootTypeScalar(root->getDataType()))
+        {
+            continue;
+        }
+        
+        // Look for a start to the same root in the block
+        // A more sophisticated implementation might try to look across unconditional branches
+        // but since only *one* end is stored for potentially multiple starts, and that a block 
+        // might have multiple predecessors, we ignore for now.
+        IRLiveRangeStart* start = nullptr;
+        for (auto cur = end->getNextInst(); cur; cur = cur->getNextInst())
+        {    
+            // If it's a start
+            if (auto foundStart = as<IRLiveRangeStart>(cur))
+            {
+                // and a start to the same root
+                if (foundStart->getReferenced() == root)
+                {
+                    start = foundStart;
+                    break;
+                }
+            }
+        }
+        
+        // If we found a matching start, lets just remove the span
+        if (start)
+        {
+            m_rangeEnds[i] = nullptr;
+            const Index startIndex = m_rangeStarts.indexOf(start);
+
+            SLANG_ASSERT(startIndex >= 0);
+            if (startIndex >= 0)
+            {
+                m_rangeStarts[startIndex] = nullptr;
+            }
+
+            // Delete the matching end -> start span
+            start->removeAndDeallocate();
+            end->removeAndDeallocate();
+        }
+    }
+}
+
+void LivenessContext::_orderRangeStartsDeterministically()
+{
+    const Index rangeStartsCount = m_rangeStarts.getCount();
+    if (rangeStartsCount <= 1)
+    {
+        // One or less there is no reordering
+        return;
+    }
+
+    // The fast way is to just order by the roots pointers. 
+    // Unfortunately that is unstable, as it depends on the allocation location which varies.
+
+    // Sort into referenced/root start
+    //m_rangeStarts.sort([&](IRLiveRangeStart* a, IRLiveRangeStart* b) -> bool { return a->getReferenced() < b->getReferenced(); });
+
+    // The order that the starts is *found* is deterministic, so we'll use that as part of the key to sort.
+
+    struct Entry
+    {
+        IRLiveRangeStart* start;
+        Index foundIndex;               ///< The found index
+        Index rootIndex;                ///< Index for the root
+    };
+
+    Int orderCounter = 0;
+
+    Dictionary<IRInst*, Index> rootOrderMap;
+    List<Entry> entries;
+    entries.setCount(rangeStartsCount);
+    for (Index i = 0; i < rangeStartsCount; ++i)
+    {
+        auto start = m_rangeStarts[i];
+        auto root = start->getReferenced();
+
+        Index order = -1;
+
+        if (auto orderPtr = rootOrderMap.TryGetValueOrAdd(root, orderCounter + 1))
+        {
+            order = *orderPtr;
+        }
+        else
+        {
+            order = ++orderCounter;
+        }
+
+        Entry& entry = entries[i];
+        entry.start = start;
+        entry.foundIndex = i;
+        entry.rootIndex = order;
+    }
+
+    // Sort by the root indices and if equal sort by the found order
+    entries.sort([&](const Entry& a, const Entry& b) -> bool { return (a.rootIndex < b.rootIndex) || (a.rootIndex == b.rootIndex && a.foundIndex < b.foundIndex); });
+
+    // Copy back
+    for (Index i = 0; i < rangeStartsCount; ++i)
+    {
+        m_rangeStarts[i] = entries[i].start;
+    }
 }
 
 void LivenessContext::process()
@@ -1158,9 +1422,10 @@ void LivenessContext::process()
 
             if (m_rangeStarts.getCount() > 0)
             {
-                // Sort into referenced/root start
-                m_rangeStarts.sort([&](IRLiveRangeStart* a, IRLiveRangeStart* b) -> bool { return a->getReferenced() < b->getReferenced(); });
+                // Order the range starts by root deterministically
+                _orderRangeStartsDeterministically();
 
+                // Process the function
                 _processFunction(func);
             }
         }
