@@ -192,6 +192,14 @@ String getDeclSignatureString(DeclRef<Decl> declRef, ASTBuilder* astBuilder)
             ASTPrinter::OptionFlag::ParamNames | ASTPrinter::OptionFlag::NoInternalKeywords |
                 ASTPrinter::OptionFlag::SimplifiedBuiltinType);
         printer.addDeclSignature(declRef);
+        if (auto varDecl = as<VarDeclBase>(declRef.getDecl()))
+        {
+            auto& sb = printer.getStringBuilder();
+            if (auto litExpr = as<LiteralExpr>(varDecl->initExpr))
+            {
+                sb << " = " << litExpr->token.getContent();
+            }
+        }
         return printer.getString();
     }
     return "unknown";
