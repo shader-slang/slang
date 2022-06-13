@@ -80,6 +80,8 @@ namespace Slang
 
     AttributeDecl* SemanticsVisitor::lookUpAttributeDecl(Name* attributeName, Scope* scope)
     {
+        if (!attributeName)
+            return nullptr;
         // We start by looking for an existing attribute matching
         // the name `attributeName`.
         //

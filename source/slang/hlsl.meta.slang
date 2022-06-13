@@ -331,7 +331,7 @@ ${{{{
 
     __target_intrinsic(hlsl, "($3 = NvInterlockedAddFp32($0, $1, $2))")
     __cuda_sm_version(2.0)
-    __target_intrinsic(cuda, "(*$3 = atomicAdd((float*)$0._getPtrAt($1), $2))")
+    __target_intrinsic(cuda, "(*$3 = atomicAdd($0._getPtrAt<float>($1), $2))")
     [__requiresNVAPI]
     void InterlockedAddF32(uint byteAddress, float valueToAdd, out float originalValue);
 
@@ -347,7 +347,7 @@ ${{{{
     __target_intrinsic(hlsl, "(NvInterlockedAddFp32($0, $1, $2))")
     [__requiresNVAPI]
     __cuda_sm_version(2.0)
-    __target_intrinsic(cuda, "atomicAdd((float*)$0._getPtrAt($1), $2)")
+    __target_intrinsic(cuda, "atomicAdd($0._getPtrAt<float>($1), $2)")
     void InterlockedAddF32(uint byteAddress, float valueToAdd);
 
     __specialized_for_target(glsl)
@@ -359,7 +359,7 @@ ${{{{
 
     // Int64 Add
     __cuda_sm_version(6.0)
-    __target_intrinsic(cuda, "(*$3 = atomicAdd((uint64_t*)$0._getPtrAt($1), $2))")
+    __target_intrinsic(cuda, "(*$3 = atomicAdd($0._getPtrAt<uint64_t>($1), $2))")
     void InterlockedAddI64(uint byteAddress, int64_t valueToAdd, out int64_t originalValue);
 
     __specialized_for_target(hlsl)
@@ -377,7 +377,7 @@ ${{{{
 
     // Without returning original value
     __cuda_sm_version(6.0)
-    __target_intrinsic(cuda, "atomicAdd((uint64_t*)$0._getPtrAt($1), $2)")
+    __target_intrinsic(cuda, "atomicAdd($0._getPtrAt<uint64_t>($1), $2)")
     void InterlockedAddI64(uint byteAddress, int64_t valueToAdd);
 
     __specialized_for_target(hlsl)
@@ -395,7 +395,7 @@ ${{{{
 
     // Cas uint64_t
 
-    __target_intrinsic(cuda, "(*$4 = atomicCAS((uint64_t*)$0._getPtrAt($1), $2, $3))")
+    __target_intrinsic(cuda, "(*$4 = atomicCAS($0._getPtrAt<uint64_t>($1), $2, $3))")
     void InterlockedCompareExchangeU64(uint byteAddress, uint64_t compareValue, uint64_t value, out uint64_t outOriginalValue);
 
     __specialized_for_target(hlsl)
@@ -414,7 +414,7 @@ ${{{{
     // Max
 
     __cuda_sm_version(3.5)
-    __target_intrinsic(cuda, "atomicMax((uint64_t*)$0._getPtrAt($1), $2)")
+    __target_intrinsic(cuda, "atomicMax($0._getPtrAt<uint64_t>($1), $2)")
     uint64_t InterlockedMaxU64(uint byteAddress, uint64_t value);
 
     __specialized_for_target(hlsl)
@@ -430,7 +430,7 @@ ${{{{
     // Min
     
     __cuda_sm_version(3.5)
-    __target_intrinsic(cuda, "atomicMin((uint64_t*)$0._getPtrAt($1), $2)")
+    __target_intrinsic(cuda, "atomicMin($0._getPtrAt<uint64_t>($1), $2)")
     uint64_t InterlockedMinU64(uint byteAddress, uint64_t value);
 
     __specialized_for_target(hlsl)
@@ -445,7 +445,7 @@ ${{{{
 
     // And
 
-    __target_intrinsic(cuda, "atomicAnd((uint64_t*)$0._getPtrAt($1), $2)")
+    __target_intrinsic(cuda, "atomicAnd($0._getPtrAt<uint64_t>($1), $2)")
     uint64_t InterlockedAndU64(uint byteAddress, uint64_t value);
 
     __specialized_for_target(hlsl)
@@ -460,7 +460,7 @@ ${{{{
 
     // Or
 
-    __target_intrinsic(cuda, "atomicOr((uint64_t*)$0._getPtrAt($1), $2)")
+    __target_intrinsic(cuda, "atomicOr($0._getPtrAt<uint64_t>($1), $2)")
     uint64_t InterlockedOrU64(uint byteAddress, uint64_t value);
 
     __specialized_for_target(hlsl)
@@ -475,7 +475,7 @@ ${{{{
 
     // Xor
 
-    __target_intrinsic(cuda, "atomicXor((uint64_t*)$0._getPtrAt($1), $2)")
+    __target_intrinsic(cuda, "atomicXor($0._getPtrAt<uint64_t>($1), $2)")
     uint64_t InterlockedXorU64(uint byteAddress, uint64_t value);
 
     __specialized_for_target(hlsl)
@@ -490,7 +490,7 @@ ${{{{
 
     // Exchange
 
-    __target_intrinsic(cuda, "atomicExch((uint64_t*)$0._getPtrAt($1), $2)")
+    __target_intrinsic(cuda, "atomicExch($0._getPtrAt<uint64_t>($1), $2)")
     uint64_t InterlockedExchangeU64(uint byteAddress, uint64_t value);
 
     __specialized_for_target(hlsl)

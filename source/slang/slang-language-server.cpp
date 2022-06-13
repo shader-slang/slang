@@ -13,7 +13,7 @@
 #include "../core/slang-range.h"
 #include "../../slang-com-helper.h"
 #include "../compiler-core/slang-json-rpc-connection.h"
-#include "slang-language-server-protocol.h"
+#include "../compiler-core/slang-language-server-protocol.h"
 #include "slang-language-server.h"
 #include "slang-workspace-version.h"
 #include "slang-language-server-ast-lookup.h"
@@ -352,7 +352,8 @@ SlangResult LanguageServer::hover(
         return SLANG_OK;
     }
     StringBuilder sb;
-    Hover hover = {};
+
+    Hover hover;
     auto leafNode = findResult[0].path.getLast();
     auto fillDeclRefHoverInfo = [&](DeclRef<Decl> declRef)
     {

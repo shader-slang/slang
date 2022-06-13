@@ -15,14 +15,23 @@ static const StructRttiInfo _makeTextDocumentSyncOptionsRtti()
 }
 const StructRttiInfo TextDocumentSyncOptions::g_rttiInfo = _makeTextDocumentSyncOptionsRtti();
 
+static const StructRttiInfo _makeWorkDoneProgressParamsRtti()
+{
+    WorkDoneProgressParams obj;
+    StructRttiBuilder builder(&obj, "LanguageServerProtocol::WorkDoneProgressParams", nullptr);
+    builder.addField("workDoneToken", &obj.workDoneToken, StructRttiInfo::Flag::Optional);
+    builder.ignoreUnknownFields();
+    return builder.make();
+}
+const StructRttiInfo WorkDoneProgressParams::g_rttiInfo = _makeWorkDoneProgressParamsRtti();
+
 static const StructRttiInfo _makeCompletionOptionsRtti()
 {
     CompletionOptions obj;
-    StructRttiBuilder builder(&obj, "LanguageServerProtocol::CompletionOptions", nullptr);
+    StructRttiBuilder builder(&obj, "LanguageServerProtocol::CompletionOptions", &WorkDoneProgressParams::g_rttiInfo);
     builder.addField("triggerCharacters", &obj.triggerCharacters);
     builder.addField("resolveProvider", &obj.resolveProvider);
     builder.addField("allCommitCharacters", &obj.allCommitCharacters);
-    builder.addField("workDoneToken", &obj.workDoneToken);
     builder.ignoreUnknownFields();
     return builder.make();
 }
@@ -314,23 +323,12 @@ static const StructRttiInfo _makeTextDocumentPositionParamsRtti()
 }
 const StructRttiInfo TextDocumentPositionParams::g_rttiInfo = _makeTextDocumentPositionParamsRtti();
 
-static const StructRttiInfo _makeWorkDoneProgressParamsRtti()
-{
-    WorkDoneProgressParams obj;
-    StructRttiBuilder builder(&obj, "LanguageServerProtocol::WorkDoneProgressParams", nullptr);
-    builder.addField("workDoneToken", &obj.workDoneToken, StructRttiInfo::Flag::Optional);
-    builder.ignoreUnknownFields();
-    return builder.make();
-}
-const StructRttiInfo WorkDoneProgressParams::g_rttiInfo = _makeWorkDoneProgressParamsRtti();
-
 static const StructRttiInfo _makeHoverParamsRtti()
 {
     HoverParams obj;
-    StructRttiBuilder builder(&obj, "LanguageServerProtocol::HoverParams", nullptr);
+    StructRttiBuilder builder(&obj, "LanguageServerProtocol::HoverParams", &WorkDoneProgressParams::g_rttiInfo);
     builder.addField("textDocument", &obj.textDocument);
     builder.addField("position", &obj.position);
-    builder.addField("workDoneToken", &obj, StructRttiInfo::Flag::Optional);
     builder.ignoreUnknownFields();
     return builder.make();
 }
@@ -363,10 +361,9 @@ const StructRttiInfo Hover::g_rttiInfo = _makeHoverRtti();
 static const StructRttiInfo _makeDefinitionParamsRtti()
 {
     DefinitionParams obj;
-    StructRttiBuilder builder(&obj, "LanguageServerProtocol::DefinitionParams", nullptr);
+    StructRttiBuilder builder(&obj, "LanguageServerProtocol::DefinitionParams", &WorkDoneProgressParams::g_rttiInfo);
     builder.addField("textDocument", &obj.textDocument);
     builder.addField("position", &obj.position);
-    builder.addField("workDoneToken", &obj, StructRttiInfo::Flag::Optional);
     builder.ignoreUnknownFields();
     return builder.make();
 }
@@ -377,10 +374,9 @@ const UnownedStringSlice DefinitionParams::methodName =
 static const StructRttiInfo _makeCompletionParamsRtti()
 {
     CompletionParams obj;
-    StructRttiBuilder builder(&obj, "LanguageServerProtocol::CompletionParams", nullptr);
+    StructRttiBuilder builder(&obj, "LanguageServerProtocol::CompletionParams", &WorkDoneProgressParams::g_rttiInfo);
     builder.addField("textDocument", &obj.textDocument);
     builder.addField("position", &obj.position);
-    builder.addField("workDoneToken", &obj, StructRttiInfo::Flag::Optional);
     builder.ignoreUnknownFields();
     return builder.make();
 }
@@ -406,9 +402,8 @@ const StructRttiInfo CompletionItem::g_rttiInfo = _makeCompletionItemRtti();
 static const StructRttiInfo _makeSemanticTokensParamsRtti()
 {
     SemanticTokensParams obj;
-    StructRttiBuilder builder(&obj, "LanguageServerProtocol::SemanticTokensParams", nullptr);
+    StructRttiBuilder builder(&obj, "LanguageServerProtocol::SemanticTokensParams", &WorkDoneProgressParams::g_rttiInfo);
     builder.addField("textDocument", &obj.textDocument);
-    builder.addField("workDoneToken", &obj.workDoneToken, StructRttiInfo::Flag::Optional);
     builder.ignoreUnknownFields();
     return builder.make();
 }
@@ -430,10 +425,9 @@ const StructRttiInfo SemanticTokens::g_rttiInfo = _makeSemanticTokensRtti();
 static const StructRttiInfo _makeSignatureHelpParamsRtti()
 {
     SignatureHelpParams obj;
-    StructRttiBuilder builder(&obj, "LanguageServerProtocol::SignatureHelpParams", nullptr);
+    StructRttiBuilder builder(&obj, "LanguageServerProtocol::SignatureHelpParams", &WorkDoneProgressParams::g_rttiInfo);
     builder.addField("textDocument", &obj.textDocument);
     builder.addField("position", &obj.position);
-    builder.addField("workDoneToken", &obj.workDoneToken, StructRttiInfo::Flag::Optional);
     builder.ignoreUnknownFields();
     return builder.make();
 }

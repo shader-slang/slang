@@ -46,24 +46,44 @@
 #define SLANG_FORCE_INLINE inline
 #define SLANG_INLINE inline
 
-// Bound checks. Can be replaced by defining before including header. 
-// NOTE! 
-// The default behaviour, if out of bounds is to index 0. This is of course quite wrong - and different 
-// behavior to hlsl typically. The problem here though is more around a write reference. That unless 
-// some kind of proxy is used it is hard and/or slow to emulate the typical GPU behavior.
 
-#ifndef SLANG_CUDA_BOUND_CHECK
-#   define SLANG_CUDA_BOUND_CHECK(index, count) SLANG_PRELUDE_ASSERT(index < count); index = (index < count) ? index : 0; 
+// Since we are using unsigned arithmatic care is need in this comparison.
+// It is *assumed* that sizeInBytes >= elemSize. Which means (sizeInBytes >= elemSize) >= 0
+// Which means only a single test is needed
+
+// Asserts for bounds checking.
+// It is assumed index/count are unsigned types.
+#define SLANG_BOUND_ASSERT(index, count)  SLANG_PRELUDE_ASSERT(index < count); 
+#define SLANG_BOUND_ASSERT_BYTE_ADDRESS(index, elemSize, sizeInBytes) SLANG_PRELUDE_ASSERT(index <= (sizeInBytes - elemSize) && (index & 3) == 0);
+
+// Macros to zero index if an access is out of range
+#define SLANG_BOUND_ZERO_INDEX(index, count) index = (index < count) ? index : 0; 
+#define SLANG_BOUND_ZERO_INDEX_BYTE_ADDRESS(index, elemSize, sizeInBytes) index = (index <= (sizeInBytes - elemSize)) ? index : 0; 
+
+// The 'FIX' macro define how the index is fixed. The default is to do nothing. If SLANG_ENABLE_BOUND_ZERO_INDEX
+// the fix macro will zero the index, if out of range
+#ifdef  SLANG_ENABLE_BOUND_ZERO_INDEX
+#   define SLANG_BOUND_FIX(index, count) SLANG_BOUND_ZERO_INDEX(index, count)
+#   define SLANG_BOUND_FIX_BYTE_ADDRESS(index, elemSize, sizeInBytes) SLANG_BOUND_ZERO_INDEX_BYTE_ADDRESS(index, elemSize, sizeInBytes)
+#   define SLANG_BOUND_FIX_FIXED_ARRAY(index, count) SLANG_BOUND_ZERO_INDEX(index, count) SLANG_BOUND_ZERO_INDEX(index, count)
+#else
+#   define SLANG_BOUND_FIX(index, count) 
+#   define SLANG_BOUND_FIX_BYTE_ADDRESS(index, elemSize, sizeInBytes) 
+#   define SLANG_BOUND_FIX_FIXED_ARRAY(index, count) 
 #endif
 
-#ifndef SLANG_CUDA_BYTE_ADDRESS_BOUND_CHECK
-#   define SLANG_CUDA_BYTE_ADDRESS_BOUND_CHECK(index, size, count) SLANG_PRELUDE_ASSERT(index + 4 <= sizeInBytes && (index & 3) == 0); index = (index + 4 <= sizeInBytes) ? index : 0; 
-#endif    
-
-// Here we don't have the index zeroing behavior, as such bounds checks are generally not on GPU targets either. 
-#ifndef SLANG_CUDA_FIXED_ARRAY_BOUND_CHECK
-#   define SLANG_CUDA_FIXED_ARRAY_BOUND_CHECK(index, count) SLANG_PRELUDE_ASSERT(index < count); 
+#ifndef SLANG_BOUND_CHECK
+#   define SLANG_BOUND_CHECK(index, count) SLANG_BOUND_ASSERT(index, count) SLANG_BOUND_FIX(index, count)
 #endif
+
+#ifndef SLANG_BOUND_CHECK_BYTE_ADDRESS
+#   define SLANG_BOUND_CHECK_BYTE_ADDRESS(index, elemSize, sizeInBytes) SLANG_BOUND_ASSERT_BYTE_ADDRESS(index, elemSize, sizeInBytes) SLANG_BOUND_FIX_BYTE_ADDRESS(index, elemSize, sizeInBytes)
+#endif
+
+#ifndef SLANG_BOUND_CHECK_FIXED_ARRAY
+#   define SLANG_BOUND_CHECK_FIXED_ARRAY(index, count) SLANG_BOUND_ASSERT(index, count) SLANG_BOUND_FIX_FIXED_ARRAY(index, count)
+#endif
+
  // This macro handles how out-of-range surface coordinates are handled; 
  // I can equal
  // cudaBoundaryModeClamp, in which case out-of-range coordinates are clamped to the valid range
@@ -91,8 +111,8 @@ struct TypeInfo
 template <typename T, size_t SIZE>
 struct FixedArray
 {
-    SLANG_CUDA_CALL const T& operator[](size_t index) const { SLANG_CUDA_FIXED_ARRAY_BOUND_CHECK(index, SIZE); return m_data[index]; }
-    SLANG_CUDA_CALL T& operator[](size_t index) { SLANG_CUDA_FIXED_ARRAY_BOUND_CHECK(index, SIZE); return m_data[index]; }
+    SLANG_CUDA_CALL const T& operator[](size_t index) const { SLANG_BOUND_CHECK_FIXED_ARRAY(index, SIZE); return m_data[index]; }
+    SLANG_CUDA_CALL T& operator[](size_t index) { SLANG_BOUND_CHECK_FIXED_ARRAY(index, SIZE); return m_data[index]; }
     
     T m_data[SIZE];
 };
@@ -102,8 +122,8 @@ struct FixedArray
 template <typename T>
 struct Array
 {
-    SLANG_CUDA_CALL const T& operator[](size_t index) const { SLANG_CUDA_BOUND_CHECK(index, count); return data[index]; }
-    SLANG_CUDA_CALL T& operator[](size_t index) { SLANG_CUDA_BOUND_CHECK(index, count); return data[index]; }
+    SLANG_CUDA_CALL const T& operator[](size_t index) const { SLANG_BOUND_CHECK(index, count); return data[index]; }
+    SLANG_CUDA_CALL T& operator[](size_t index) { SLANG_BOUND_CHECK(index, count); return data[index]; }
     
     T* data;
     size_t count;
@@ -714,7 +734,7 @@ struct StructuredBuffer
     SLANG_CUDA_CALL const T& operator[](size_t index) const
     {
 #ifndef SLANG_CUDA_STRUCTURED_BUFFER_NO_COUNT
-        SLANG_CUDA_BOUND_CHECK(index, count);
+        SLANG_BOUND_CHECK(index, count);
 #endif
         return data[index];
     }
@@ -722,7 +742,7 @@ struct StructuredBuffer
     SLANG_CUDA_CALL const T& Load(size_t index) const
     {
 #ifndef SLANG_CUDA_STRUCTURED_BUFFER_NO_COUNT
-        SLANG_CUDA_BOUND_CHECK(index, count);
+        SLANG_BOUND_CHECK(index, count);
 #endif
         return data[index];
     }
@@ -743,46 +763,44 @@ struct RWStructuredBuffer : StructuredBuffer<T>
     SLANG_CUDA_CALL T& operator[](size_t index) const
     {
 #ifndef SLANG_CUDA_STRUCTURED_BUFFER_NO_COUNT
-        SLANG_CUDA_BOUND_CHECK(index, this->count);
+        SLANG_BOUND_CHECK(index, this->count);
 #endif
         return this->data[index];
     }
 };
 
-
-    
 // Missing  Load(_In_  int  Location, _Out_ uint Status);
 struct ByteAddressBuffer
 {
     SLANG_CUDA_CALL void GetDimensions(uint32_t* outDim) const { *outDim = uint32_t(sizeInBytes); }
     SLANG_CUDA_CALL uint32_t Load(size_t index) const 
     { 
-        SLANG_CUDA_BYTE_ADDRESS_BOUND_CHECK(index, 4, sizeInBytes);
+        SLANG_BOUND_CHECK_BYTE_ADDRESS(index, 4, sizeInBytes);
         return data[index >> 2]; 
     }
     SLANG_CUDA_CALL uint2 Load2(size_t index) const 
     { 
-        SLANG_CUDA_BYTE_ADDRESS_BOUND_CHECK(index, 8, sizeInBytes); 
+        SLANG_BOUND_CHECK_BYTE_ADDRESS(index, 8, sizeInBytes); 
         const size_t dataIdx = index >> 2; 
         return uint2{data[dataIdx], data[dataIdx + 1]}; 
     }
     SLANG_CUDA_CALL uint3 Load3(size_t index) const 
     { 
-        SLANG_CUDA_BYTE_ADDRESS_BOUND_CHECK(index, 12, sizeInBytes);
+        SLANG_BOUND_CHECK_BYTE_ADDRESS(index, 12, sizeInBytes);
         const size_t dataIdx = index >> 2; 
         return uint3{data[dataIdx], data[dataIdx + 1], data[dataIdx + 2]}; 
     }
     SLANG_CUDA_CALL uint4 Load4(size_t index) const 
     { 
-        SLANG_CUDA_BYTE_ADDRESS_BOUND_CHECK(index, 16, sizeInBytes);
+        SLANG_BOUND_CHECK_BYTE_ADDRESS(index, 16, sizeInBytes);
         const size_t dataIdx = index >> 2; 
         return uint4{data[dataIdx], data[dataIdx + 1], data[dataIdx + 2], data[dataIdx + 3]}; 
     }
     template<typename T>
-    SLANG_CUDA_CALL T Load(size_t offset) const
+    SLANG_CUDA_CALL T Load(size_t index) const
     {
-        SLANG_PRELUDE_ASSERT(offset + sizeof(T) <= sizeInBytes && (offset & (alignof(T)-1)) == 0); 
-        return *(T const*)((char*)data + offset);
+        SLANG_BOUND_CHECK_BYTE_ADDRESS(index, sizeof(T), sizeInBytes);
+        return *(const T*)(((const char*)data) + index);
     }
     
     const uint32_t* data;
@@ -798,49 +816,49 @@ struct RWByteAddressBuffer
     
     SLANG_CUDA_CALL uint32_t Load(size_t index) const 
     { 
-        SLANG_CUDA_BYTE_ADDRESS_BOUND_CHECK(index, 4, sizeInBytes);
+        SLANG_BOUND_CHECK_BYTE_ADDRESS(index, 4, sizeInBytes);
         return data[index >> 2]; 
     }
     SLANG_CUDA_CALL uint2 Load2(size_t index) const 
     { 
-        SLANG_CUDA_BYTE_ADDRESS_BOUND_CHECK(index, 8, sizeInBytes);
+        SLANG_BOUND_CHECK_BYTE_ADDRESS(index, 8, sizeInBytes);
         const size_t dataIdx = index >> 2; 
         return uint2{data[dataIdx], data[dataIdx + 1]}; 
     }
     SLANG_CUDA_CALL uint3 Load3(size_t index) const 
     { 
-        SLANG_CUDA_BYTE_ADDRESS_BOUND_CHECK(index, 12, sizeInBytes);
+        SLANG_BOUND_CHECK_BYTE_ADDRESS(index, 12, sizeInBytes);
         const size_t dataIdx = index >> 2; 
         return uint3{data[dataIdx], data[dataIdx + 1], data[dataIdx + 2]}; 
     }
     SLANG_CUDA_CALL uint4 Load4(size_t index) const 
     { 
-        SLANG_CUDA_BYTE_ADDRESS_BOUND_CHECK(index, 16, sizeInBytes);
+        SLANG_BOUND_CHECK_BYTE_ADDRESS(index, 16, sizeInBytes);
         const size_t dataIdx = index >> 2; 
         return uint4{data[dataIdx], data[dataIdx + 1], data[dataIdx + 2], data[dataIdx + 3]}; 
     }
     template<typename T>
-    SLANG_CUDA_CALL T Load(size_t offset) const
+    SLANG_CUDA_CALL T Load(size_t index) const
     {
-        SLANG_PRELUDE_ASSERT(offset + sizeof(T) <= sizeInBytes && (offset & (alignof(T)-1)) == 0); 
-        return *(T const*)((char*)data + offset);
+        SLANG_BOUND_CHECK_BYTE_ADDRESS(index, sizeof(T), sizeInBytes);
+        return *(const T*)((const char*)data + index);
     }
     
     SLANG_CUDA_CALL void Store(size_t index, uint32_t v) const 
     { 
-        SLANG_CUDA_BYTE_ADDRESS_BOUND_CHECK(index, 4, sizeInBytes);
+        SLANG_BOUND_CHECK_BYTE_ADDRESS(index, 4, sizeInBytes);
         data[index >> 2] = v; 
     }
     SLANG_CUDA_CALL void Store2(size_t index, uint2 v) const 
     { 
-        SLANG_CUDA_BYTE_ADDRESS_BOUND_CHECK(index, 8, sizeInBytes);
+        SLANG_BOUND_CHECK_BYTE_ADDRESS(index, 8, sizeInBytes);
         const size_t dataIdx = index >> 2; 
         data[dataIdx + 0] = v.x;
         data[dataIdx + 1] = v.y;
     }
     SLANG_CUDA_CALL void Store3(size_t index, uint3 v) const 
     { 
-        SLANG_CUDA_BYTE_ADDRESS_BOUND_CHECK(index, 12, sizeInBytes);
+        SLANG_BOUND_CHECK_BYTE_ADDRESS(index, 12, sizeInBytes);
         const size_t dataIdx = index >> 2; 
         data[dataIdx + 0] = v.x;
         data[dataIdx + 1] = v.y;
@@ -848,7 +866,7 @@ struct RWByteAddressBuffer
     }
     SLANG_CUDA_CALL void Store4(size_t index, uint4 v) const 
     { 
-        SLANG_CUDA_BYTE_ADDRESS_BOUND_CHECK(index, 16, sizeInBytes);
+        SLANG_BOUND_CHECK_BYTE_ADDRESS(index, 16, sizeInBytes);
         const size_t dataIdx = index >> 2; 
         data[dataIdx + 0] = v.x;
         data[dataIdx + 1] = v.y;
@@ -856,17 +874,18 @@ struct RWByteAddressBuffer
         data[dataIdx + 3] = v.w;
     }
     template<typename T>
-    SLANG_CUDA_CALL void Store(size_t offset, T const& value) const
+    SLANG_CUDA_CALL void Store(size_t index, T const& value) const
     {
-        SLANG_PRELUDE_ASSERT(offset + sizeof(T) <= sizeInBytes && (offset & (alignof(T)-1)) == 0); 
-        *(T*)((char*)data + offset) = value;
+        SLANG_BOUND_CHECK_BYTE_ADDRESS(index, sizeof(T), sizeInBytes);
+        *(T*)(((char*)data) + index) = value;
     }
     
         /// Can be used in stdlib to gain access
-    SLANG_CUDA_CALL uint* _getPtrAt(size_t offset)
+    template <typename T>
+    SLANG_CUDA_CALL T* _getPtrAt(size_t index)
     {
-        SLANG_PRELUDE_ASSERT(offset + sizeof(T) <= sizeInBytes && (offset & (alignof(T)-1)) == 0); 
-        return (uint*)(((char*)data) + offset);
+        SLANG_BOUND_CHECK_BYTE_ADDRESS(index, sizeof(T), sizeInBytes);
+        return (T*)(((char*)data) + index);
     }
     
     uint32_t* data;
