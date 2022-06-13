@@ -2034,6 +2034,12 @@ void maybeSetRate(
             builder->getGroupSharedRate(),
             inst->getFullType()));
     }
+    else if (decl->hasModifier<ActualGlobalModifier>())
+    {
+        inst->setFullType(builder->getRateQualifiedType(
+            builder->getActualGlobalRate(),
+            inst->getFullType()));
+    }
 }
 
 static String getNameForNameHint(
@@ -2920,6 +2926,12 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
         Derived d;
         d.context = subContext;
         return d.dispatch(expr);
+    }
+
+    LoweredValInfo visitIncompleteExpr(IncompleteExpr*)
+    {
+        SLANG_UNEXPECTED("a valid ast should not contain an IncompleteExpr.");
+        UNREACHABLE_RETURN(LoweredValInfo());
     }
 
     LoweredValInfo visitVarExpr(VarExpr* expr)
@@ -6115,6 +6127,9 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         IRType* varType = lowerType(context, decl->getType());
 
         auto builder = getBuilder();
+
+        // TODO(JS): Do we create something derived from IRGlobalVar? Or do we use 
+        // a decoration to identify an *actual* global?
 
         IRGlobalValueWithCode* irGlobal = builder->createGlobalVar(varType);
         LoweredValInfo globalVal = LoweredValInfo::ptr(irGlobal);

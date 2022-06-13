@@ -1103,14 +1103,7 @@ void printDiagnosticArg(StringBuilder& sb, CodeGenTarget val)
             {
                 preprocessorDefinitions.Add(define.Key, define.Value);
             }
-            {
-                auto linkage = getLinkage();
-                for (auto& define : linkage->preprocessorDefinitions)
-                {
-                    preprocessorDefinitions.Add(define.Key, define.Value);
-                }
-            }
-
+            
             {
                 /* TODO(JS): Not totally clear what options should be set here. If we are using the pass through - then using say the defines/includes
                 all makes total sense. If we are generating C++ code from slang, then should we really be using these values -> aren't they what is
@@ -1166,6 +1159,22 @@ void printDiagnosticArg(StringBuilder& sb, CodeGenTarget val)
             sourceCodeGenContext.maybeDumpIntermediate(options.sourceContents.getBuffer());
 
             sourceLanguage = (SourceLanguage)TypeConvertUtil::getSourceLanguageFromTarget((SlangCompileTarget)sourceTarget);
+        }
+
+        // Add any preprocessor definitions associated with the linkage
+        {
+            // TODO(JS): This is somewhat arguable - should defines passed to Slang really be
+            // passed to downstream compilers? It does appear consistent with the behavior if 
+            // there is an endToEndReq.
+            // 
+            // That said it's very convenient and provides way to control aspects 
+            // of downstream compilation. 
+            
+            auto linkage = getLinkage();
+            for (auto& define : linkage->preprocessorDefinitions)
+            {
+                preprocessorDefinitions.Add(define.Key, define.Value);
+            }
         }
 
         // If we have an extension tracker, we may need to set options such as SPIR-V version

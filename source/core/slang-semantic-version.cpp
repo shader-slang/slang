@@ -7,6 +7,8 @@
 
 namespace Slang {
 
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! SemanticVersion !!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
 SlangResult SemanticVersion::parse(const UnownedStringSlice& value, char separatorChar, SemanticVersion& outVersion)
 {
     outVersion.reset();
@@ -49,6 +51,157 @@ void SemanticVersion::append(StringBuilder& buf) const
     if (m_patch != 0)
     {
         buf << "." << Int32(m_patch);
+    }
+}
+
+/* static */SemanticVersion SemanticVersion::getEarliest(const ThisType* versions, Count count)
+{
+    if (count <= 0)
+    {
+        return SemanticVersion();
+    }
+
+    SemanticVersion bestVersion = versions[0];
+    for (const auto version : makeConstArrayView(versions + 1, count - 1))
+    {
+        if (version < bestVersion)
+        {
+            bestVersion = version;
+        }
+    }
+    return bestVersion;
+}
+
+/* static */SemanticVersion SemanticVersion::getLatest(const ThisType* versions, Count count)
+{
+    if (count <= 0)
+    {
+        return SemanticVersion();
+    }
+
+    SemanticVersion bestVersion = versions[0];
+    for (const auto version : makeConstArrayView(versions + 1, count - 1))
+    {
+        if (version > bestVersion)
+        {
+            bestVersion = version;
+        }
+    }
+    return bestVersion;
+}
+
+
+
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! MatchSemanticVersion !!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+/* static */SemanticVersion MatchSemanticVersion::findAnyBest(const SemanticVersion* versions, Count count, const ThisType& matchVersion)
+{
+    // If there aren't any we are done
+    if (count <= 0)
+    {
+        return SemanticVersion();
+    }
+
+    // If there is only one it must be the best
+    if (count == 1)
+    {
+        return versions[0];
+    }
+
+    // Define a version range [start, end)
+    SemanticVersion start, end;
+
+    switch (matchVersion.m_kind)
+    {
+        case Kind::Past:      
+        {
+            return SemanticVersion::getEarliest(versions, count);
+        }
+        case Kind::Unknown:
+        case Kind::Future:    
+        {
+            // If it's unknown, we just get the latest
+            return SemanticVersion::getLatest(versions, count);
+        }
+        case Kind::Major:
+        {
+            start = SemanticVersion(matchVersion.m_version.m_major, 0, 0);
+            end = SemanticVersion(matchVersion.m_version.m_major + 1, 0, 0);
+            break;
+        }
+        case Kind::MajorMinor:
+        {
+            start = SemanticVersion(matchVersion.m_version.m_major, matchVersion.m_version.m_minor, 0);
+            end = SemanticVersion(matchVersion.m_version.m_major, matchVersion.m_version.m_minor + 1, 0);
+            break;
+        }
+        case Kind::MajorMinorPatch:
+        {
+            start = SemanticVersion(matchVersion.m_version);
+            end = SemanticVersion(matchVersion.m_version.m_major, matchVersion.m_version.m_minor, matchVersion.m_version.m_patch + 1);
+            break;
+        }
+        default: break;
+    }
+
+    List<SemanticVersion> sortedVersions;
+    sortedVersions.addRange(versions, count);
+
+    // Sort into increasing values
+    sortedVersions.sort([&](const SemanticVersion& a, const SemanticVersion& b) -> bool { return a < b; });
+
+    Index startIndex = 0;
+    for (; startIndex < count && sortedVersions[startIndex] < start; ++startIndex);
+
+    Index endIndex = startIndex;
+    for (; endIndex < count && sortedVersions[endIndex] < end; ++endIndex);
+
+    // If we have a span of versions, get the last in the span
+    if (startIndex < endIndex)
+    {
+        // Get the last one
+        return sortedVersions[endIndex - 1];
+    }
+
+    // Get the next greatest if there is one
+    if (endIndex < count)
+    {
+        return sortedVersions[endIndex];
+    }
+
+    // Get the prior prior to the start
+    if (startIndex > 0)
+    {
+        return sortedVersions[startIndex - 1];
+    }
+
+    // All cases should be covered, but return the last one 
+    return sortedVersions[count - 1];
+}
+
+void MatchSemanticVersion::append(StringBuilder& buf) const
+{
+    switch (m_kind)
+    {
+        default:
+        case Kind::Unknown:     buf << "unknown"; break;
+        case Kind::Past:        buf << "past";  break;
+        case Kind::Future:      buf << "future"; break;
+        case Kind::Major:
+        {
+            buf << m_version.m_major;
+            break;
+        }
+        case Kind::MajorMinor:
+        {
+            buf << m_version.m_major << "." << m_version.m_minor;
+            break;
+        }
+        case Kind::MajorMinorPatch:
+        {
+            m_version.append(buf);
+            break;
+        }
     }
 }
 

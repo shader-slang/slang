@@ -7,7 +7,6 @@
 #include <slang-com-ptr.h>
 #include <slang-com-helper.h>
 
-
 // This includes a useful small function for setting up the prelude (described more further below).
 #include "../../source/core/slang-test-tool-util.h"
 
@@ -21,8 +20,9 @@ using namespace Slang;
 class IDoThings : public ISlangUnknown
 {
 public:
-    virtual int SLANG_MCALL doThing(int a, int b) = 0;
-    virtual int SLANG_MCALL calcHash(const char* in) = 0;
+    virtual SLANG_NO_THROW int SLANG_MCALL doThing(int a, int b) = 0;
+    virtual SLANG_NO_THROW int SLANG_MCALL calcHash(const char* in) = 0;
+    virtual SLANG_NO_THROW void SLANG_MCALL printMessage(const char* in) = 0;
 };
 
 static int _calcHash(const char* in)
@@ -36,7 +36,7 @@ static int _calcHash(const char* in)
     return hash;
 }
 
-class DoThings :public IDoThings
+class DoThings : public IDoThings
 {
 public:
     // We don't need queryInterface for this impl, or ref counting
@@ -45,17 +45,21 @@ public:
     virtual SLANG_NO_THROW uint32_t SLANG_MCALL release() SLANG_OVERRIDE  { return 1; }
 
     // IDoThings
-    virtual int SLANG_MCALL doThing(int a, int b) SLANG_OVERRIDE { return a + b + 1; }
-    virtual int SLANG_MCALL calcHash(const char* in) SLANG_OVERRIDE { return (int)_calcHash(in); }
+    virtual SLANG_NO_THROW int SLANG_MCALL doThing(int a, int b) SLANG_OVERRIDE { return a + b + 1; }
+    virtual SLANG_NO_THROW int SLANG_MCALL calcHash(const char* in) SLANG_OVERRIDE { return (int)_calcHash(in); }
+    virtual SLANG_NO_THROW void SLANG_MCALL printMessage(const char* in) SLANG_OVERRIDE { printf("%s\n", in); }
 };
 
 static SlangResult _innerMain(int argc, char** argv)
 {
+    // NOTE! This example only works if `slang-llvm` or a C++ compiler that Slang supports is available.
+
     // Create the session
     ComPtr<slang::IGlobalSession> slangSession;
     slangSession.attach(spCreateSession(NULL));
 
     // Set up the prelude
+    // NOTE: This isn't strictly necessary, as preludes are embedded in the binary.
     TestToolUtil::setSessionDefaultPreludeFromExePath(argv[0], slangSession);
 
     // Create a compile request
@@ -93,6 +97,19 @@ static SlangResult _innerMain(int argc, char** argv)
     ComPtr<ISlangSharedLibrary> sharedLibrary;
     SLANG_RETURN_ON_FAIL(request->getTargetHostCallable(0, sharedLibrary.writeRef()));
 
+    DoThings doThings;
+
+    {
+        auto doThingsPtr = (IDoThings**)sharedLibrary->findSymbolAddressByName("globalDoThings");
+        if (!doThingsPtr)
+        {
+            return SLANG_FAIL;
+        }
+        // Set the global interface
+        *doThingsPtr = &doThings;
+    }
+
+    // Test a free function
     {
         typedef const char* (*Func)(const char*);
         Func func = (Func)sharedLibrary->findFuncByName("getString");
@@ -107,25 +124,34 @@ static SlangResult _innerMain(int argc, char** argv)
 
         SLANG_ASSERT(text == returnedText);
     }
+
+    // Test hash
     {
-        typedef int (*Func)(const char* text, IDoThings* doThings);
-
+        typedef int (*Func)(const char* text);
         Func func = (Func)sharedLibrary->findFuncByName("calcHash");
-
         if (!func)
         {
             return SLANG_FAIL;
         }
 
-        DoThings doThings;
-
         String text("Hello");
-
-        const int hash = func(text.getBuffer(), &doThings);
-        
+        const int hash = func(text.getBuffer());
         SLANG_ASSERT(hash == _calcHash(text.getBuffer()));
     }
-    
+
+    // Test printing
+    {
+        typedef void (*Func)(const char* text);
+
+        Func func = (Func)sharedLibrary->findFuncByName("printMessage");
+
+        if (!func)
+        {
+            return SLANG_FAIL;
+        }
+        func("Hello World!");
+    }
+
     return SLANG_OK;
 }
 

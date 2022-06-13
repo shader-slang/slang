@@ -171,6 +171,30 @@ SlangResult TestContext::_createJSONRPCConnection(RefPtr<JSONRPCConnection>& out
     return SLANG_OK;
 }
 
+SlangResult TestContext::createLanguageServerJSONRPCConnection(RefPtr<JSONRPCConnection>& out)
+{
+    RefPtr<Process> process;
+
+    {
+        CommandLine cmdLine;
+        cmdLine.setExecutableLocation(ExecutableLocation(exeDirectoryPath, "slangd"));
+        SLANG_RETURN_ON_FAIL(Process::create(cmdLine, Process::Flag::AttachDebugger, process));
+    }
+
+    Stream* writeStream = process->getStream(StdStreamType::In);
+    RefPtr<BufferedReadStream> readStream(
+        new BufferedReadStream(process->getStream(StdStreamType::Out)));
+
+    RefPtr<HTTPPacketConnection> connection = new HTTPPacketConnection(readStream, writeStream);
+    RefPtr<JSONRPCConnection> rpcConnection = new JSONRPCConnection;
+
+    SLANG_RETURN_ON_FAIL(
+        rpcConnection->init(connection, JSONRPCConnection::CallStyle::Object, process));
+
+    out = rpcConnection;
+
+    return SLANG_OK;
+}
 
 void TestContext::destroyRPCConnection()
 {

@@ -19,8 +19,8 @@ tests/diagnostics/variable-redeclaration.slang(20): note: see previous declarati
 tests/diagnostics/variable-redeclaration.slang(53): error 39999: ambiguous reference to 'size'
     return size;
            ^~~~
-tests/diagnostics/variable-redeclaration.slang(51): note 39999: candidate: size
-tests/diagnostics/variable-redeclaration.slang(50): note 39999: candidate: size
+tests/diagnostics/variable-redeclaration.slang(51): note 39999: candidate: float size
+tests/diagnostics/variable-redeclaration.slang(50): note 39999: candidate: int size
 }
 standard output = {
 }

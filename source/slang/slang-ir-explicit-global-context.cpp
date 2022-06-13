@@ -50,6 +50,12 @@ struct IntroduceExplicitGlobalContextPass
                     //
                     auto globalVar = cast<IRGlobalVar>(inst);
 
+                    // Actual globals don't need to be moved to the context
+                    if (as<IRActualGlobalRate>(globalVar->getRate()))
+                    {
+                        continue;
+                    }
+
                     // One important exception is that CUDA *does* support
                     // global variables with the `__shared__` qualifer, with
                     // semantics that exactly match HLSL/Slang `groupshared`.

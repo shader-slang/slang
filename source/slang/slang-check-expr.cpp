@@ -231,10 +231,20 @@ namespace Slang
         return expr;
     }
 
+    static SourceLoc _getMemberOpLoc(Expr* expr)
+    {
+        if (auto m = as<MemberExpr>(expr))
+            return m->memberOperatorLoc;
+        if (auto m = as<StaticMemberExpr>(expr))
+            return m->memberOperatorLoc;
+        return SourceLoc();
+    }
+
     Expr* SemanticsVisitor::ConstructDeclRefExpr(
         DeclRef<Decl>   declRef,
         Expr*    baseExpr,
-        SourceLoc       loc)
+        SourceLoc loc,
+        Expr*    originalExpr)
     {
         // Compute the type that this declaration reference will have in context.
         //
@@ -285,6 +295,7 @@ namespace Slang
                 expr->baseExpression = baseExpr;
                 expr->name = declRef.getName();
                 expr->declRef = declRef;
+                expr->memberOperatorLoc = _getMemberOpLoc(originalExpr);
                 return expr;
             }
             else if(isEffectivelyStatic(declRef.getDecl()))
@@ -301,6 +312,7 @@ namespace Slang
                 expr->baseExpression = baseTypeExpr;
                 expr->name = declRef.getName();
                 expr->declRef = declRef;
+                expr->memberOperatorLoc = _getMemberOpLoc(originalExpr);
                 return expr;
             }
             else
@@ -314,6 +326,7 @@ namespace Slang
                 expr->baseExpression = baseExpr;
                 expr->name = declRef.getName();
                 expr->declRef = declRef;
+                expr->memberOperatorLoc = _getMemberOpLoc(originalExpr);
 
                 // When referring to a member through an expression,
                 // the result is only an l-value if both the base
@@ -340,6 +353,12 @@ namespace Slang
             expr->name = declRef.getName();
             expr->type = type;
             expr->declRef = declRef;
+            // Keep a reference to the original expr if it was a genericApp/member.
+            // This is needed by the language server to locate the original tokens.
+            if (as<GenericAppExpr>(originalExpr) || as<MemberExpr>(originalExpr) || as<StaticMemberExpr>(originalExpr))
+            {
+                expr->originalExpr = originalExpr;
+            }
             return expr;
         }
     }
@@ -364,7 +383,8 @@ namespace Slang
     Expr* SemanticsVisitor::ConstructLookupResultExpr(
         LookupResultItem const& item,
         Expr*            baseExpr,
-        SourceLoc               loc)
+        SourceLoc loc,
+        Expr* originalExpr)
     {
         // If we collected any breadcrumbs, then these represent
         // additional segments of the lookup path that we need
@@ -375,7 +395,7 @@ namespace Slang
             switch (breadcrumb->kind)
             {
             case LookupResultItem::Breadcrumb::Kind::Member:
-                bb = ConstructDeclRefExpr(breadcrumb->declRef, bb, loc);
+                bb = ConstructDeclRefExpr(breadcrumb->declRef, bb, loc, originalExpr);
                 break;
 
             case LookupResultItem::Breadcrumb::Kind::Deref:
@@ -491,14 +511,15 @@ namespace Slang
             }
         }
 
-        return ConstructDeclRefExpr(item.declRef, bb, loc);
+        return ConstructDeclRefExpr(item.declRef, bb, loc, originalExpr);
     }
 
     Expr* SemanticsVisitor::createLookupResultExpr(
         Name*                   name,
         LookupResult const&     lookupResult,
         Expr*            baseExpr,
-        SourceLoc               loc)
+        SourceLoc loc,
+        Expr* originalExpr)
     {
         if (lookupResult.isOverloaded())
         {
@@ -513,7 +534,7 @@ namespace Slang
         }
         else
         {
-            return ConstructLookupResultExpr(lookupResult.item, baseExpr, loc);
+            return ConstructLookupResultExpr(lookupResult.item, baseExpr, loc, originalExpr);
         }
     }
 
@@ -624,7 +645,8 @@ namespace Slang
             // then we can proceed to use that item alone as the resolved
             // expression.
             //
-            return ConstructLookupResultExpr(lookupResult.item, overloadedExpr->base, overloadedExpr->loc);
+            return ConstructLookupResultExpr(
+                lookupResult.item, overloadedExpr->base, overloadedExpr->loc, overloadedExpr);
         }
 
         // Otherwise, we weren't able to resolve the overloading given
@@ -690,6 +712,9 @@ namespace Slang
 
         Expr* checkedTerm = dispatchExpr(term, withExprLocalScope(&exprLocalScope));
 
+        if (IsErrorExpr(checkedTerm))
+            return checkedTerm;
+
         LetExpr* outerMostBinding = exprLocalScope.getOuterMostBinding();
         if(!outerMostBinding)
         {
@@ -720,6 +745,10 @@ namespace Slang
 
     Expr* SemanticsVisitor::CreateErrorExpr(Expr* expr)
     {
+        if (!expr)
+        {
+            expr = m_astBuilder->create<IncompleteExpr>();
+        }
         expr->type = QualType(m_astBuilder->getErrorType());
         return expr;
     }
@@ -745,6 +774,12 @@ namespace Slang
             return overloadedExpr->base;
         }
         return nullptr;
+    }
+
+    Expr* SemanticsExprVisitor::visitIncompleteExpr(IncompleteExpr* expr)
+    {
+        expr->type = m_astBuilder->getErrorType();
+        return expr;
     }
 
     Expr* SemanticsExprVisitor::visitBoolLiteralExpr(BoolLiteralExpr* expr)
@@ -1208,7 +1243,11 @@ namespace Slang
             // case the attempt to call it will trigger overload
             // resolution.
             Expr* subscriptFuncExpr = createLookupResultExpr(
-                name, lookupResult, subscriptExpr->baseExpression, subscriptExpr->loc);
+                name,
+                lookupResult,
+                subscriptExpr->baseExpression,
+                subscriptExpr->loc,
+                subscriptExpr);
 
             InvokeExpr* subscriptCallExpr = m_astBuilder->create<InvokeExpr>();
             subscriptCallExpr->loc = subscriptExpr->loc;
@@ -1439,7 +1478,8 @@ namespace Slang
                 expr->name,
                 lookupResult,
                 nullptr,
-                expr->loc);
+                expr->loc,
+                expr);
         }
 
         getSink()->diagnose(expr, Diagnostics::undefinedIdentifier2, expr->name);
@@ -1624,6 +1664,7 @@ namespace Slang
         MatrixSwizzleExpr* swizExpr = m_astBuilder->create<MatrixSwizzleExpr>();
         swizExpr->loc = memberRefExpr->loc;
         swizExpr->base = memberRefExpr->baseExpression;
+        swizExpr->memberOpLoc = memberRefExpr->memberOperatorLoc;
 
         // We can have up to 4 swizzles of two elements each
         MatrixCoord elementCoords[4];
@@ -1781,7 +1822,7 @@ namespace Slang
         SwizzleExpr* swizExpr = m_astBuilder->create<SwizzleExpr>();
         swizExpr->loc = memberRefExpr->loc;
         swizExpr->base = memberRefExpr->baseExpression;
-
+        swizExpr->memberOpLoc = memberRefExpr->memberOperatorLoc;
         IntegerLiteralValue limitElement = baseElementCount;
 
         int elementIndices[4];
@@ -1915,7 +1956,8 @@ namespace Slang
                 expr->name,
                 lookupResult,
                 nullptr,
-                expr->loc);
+                expr->loc,
+                expr);
         }
         else if (auto typeType = as<TypeType>(baseType))
         {
@@ -2020,7 +2062,8 @@ namespace Slang
                 expr->name,
                 lookupResult,
                 baseExpression,
-                expr->loc);
+                expr->loc,
+                expr);
         }
         else if (as<ErrorType>(baseType))
         {
@@ -2106,7 +2149,8 @@ namespace Slang
                     overloadedExpr->name,
                     filteredLookupResult,
                     overloadedExpr->base,
-                    overloadedExpr->loc);
+                    overloadedExpr->loc,
+                    overloadedExpr);
             }
             // TODO: handle other cases of OverloadedExpr that need filtering.
         }
@@ -2178,7 +2222,8 @@ namespace Slang
                 expr->name,
                 lookupResult,
                 expr->baseExpression,
-                expr->loc);
+                expr->loc,
+                expr);
         }
     }
 

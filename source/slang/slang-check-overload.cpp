@@ -517,7 +517,8 @@ namespace Slang
         return ConstructDeclRefExpr(
             innerDeclRef,
             base,
-            originalExpr->loc);
+            originalExpr->loc,
+            originalExpr);
     }
 
     Expr* SemanticsVisitor::CompleteOverloadCandidate(
@@ -556,8 +557,12 @@ namespace Slang
             goto error;
 
         {
+            auto originalAppExpr = as<AppExprBase>(context.originalExpr);
             auto baseExpr = ConstructLookupResultExpr(
-                candidate.item, context.baseExpr, context.funcLoc);
+                candidate.item,
+                context.baseExpr,
+                context.funcLoc,
+                originalAppExpr ? originalAppExpr->functionExpr : nullptr);
 
             switch(candidate.flavor)
             {
@@ -568,12 +573,11 @@ namespace Slang
                     {
                         callExpr = m_astBuilder->create<InvokeExpr>();
                         callExpr->loc = context.loc;
-
                         for(Index aa = 0; aa < context.argCount; ++aa)
                             callExpr->arguments.add(context.getArg(aa));
                     }
 
-
+                    callExpr->originalFunctionExpr = callExpr->functionExpr;
                     callExpr->functionExpr = baseExpr;
                     callExpr->type = QualType(candidate.resultType);
 

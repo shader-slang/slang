@@ -4,6 +4,9 @@
 #include "../../core/slang-process-util.h"
 #include "../../core/slang-string-util.h"
 
+#include "../slang-json-parser.h"
+#include "../slang-json-value.h"
+
 #include "../slang-visual-studio-compiler-util.h"
 
 #ifdef _WIN32
@@ -29,8 +32,6 @@ namespace Slang {
 
 namespace { // anonymous
 
-typedef WinVisualStudioUtil::Version Version;
-
 struct RegistryInfo
 {
     const char* regName;            ///< The name of the entry in the registry
@@ -39,7 +40,7 @@ struct RegistryInfo
 
 struct VersionInfo
 {
-    Version version;                ///< The version
+    SemanticVersion version;  ///< The version
     const char* name;         ///< The name of the registry key 
 };
 
@@ -72,16 +73,32 @@ static SlangResult _readRegistryKey(const char* path, const char* keyName, Strin
 }
 
 // Make easier to set up the array
-static Version _makeVersion(int main, int dot = 0) { return WinVisualStudioUtil::makeVersion(main, dot); }
+
+static DownstreamCompilerMatchVersion _makeVersion(int main)
+{
+    DownstreamCompilerMatchVersion version;
+    version.type = SLANG_PASS_THROUGH_VISUAL_STUDIO;
+    version.matchVersion.set(main);
+    return version;
+}
+
+static DownstreamCompilerMatchVersion _makeVersion(int main, int dot) 
+{ 
+    DownstreamCompilerMatchVersion version;
+    version.type = SLANG_PASS_THROUGH_VISUAL_STUDIO;
+    version.matchVersion.set(main, dot);
+    return version;
+}
 
 VersionInfo _makeVersionInfo(const char* name, int high, int dot = 0)
 {
     VersionInfo info;
     info.name = name;
-    info.version = WinVisualStudioUtil::makeVersion(high, dot);
+    info.version = SemanticVersion(high, dot);
     return info;
 }
 
+// https://en.wikipedia.org/wiki/Microsoft_Visual_Studio
 static const VersionInfo s_versionInfos[] = 
 {
     _makeVersionInfo("VS 2005", 8),
@@ -92,6 +109,7 @@ static const VersionInfo s_versionInfos[] =
     _makeVersionInfo("VS 2015", 14),
     _makeVersionInfo("VS 2017", 15),
     _makeVersionInfo("VS 2019", 16),
+    _makeVersionInfo("VS 2022", 17),
 };
 
 // When trying to figure out how this stuff works by running regedit - care is needed, 
@@ -105,37 +123,42 @@ static const RegistryInfo s_regInfos[] =
     {"SOFTWARE\\Microsoft\\VisualStudio\\SxS\\VS7", "VC\\Auxiliary\\Build\\" },
 };
 
-static bool _canUseVSWhere(Version version)
+static bool _canUseVSWhere(SemanticVersion version)
 {
     // If greater than 15.0 we can use vswhere tool
-    return (int(version) >= int(_makeVersion(15)));
+    return version.m_major >= 15;
 }
 
-static int _getRegistryKeyIndex(Version version)
+static int _getRegistryKeyIndex(const SemanticVersion& version)
 {
-    if (int(version) >= int(_makeVersion(15)))
+    if (version.m_major >= 15)
     {
         return 1;
     }
     return 0;
 }
 
-/* static */void WinVisualStudioUtil::getVersions(List<Version>& outVersions)
+static SlangResult _parseVersion(UnownedStringSlice versionString, SemanticVersion& outVersion)
 {
-    const int count = SLANG_COUNT_OF(s_versionInfos);
-    outVersions.setCount(count);
-
-    Version* dst = outVersions.begin();
-    for (int i = 0; i < count; ++i)
+    // We only want the first 2 semantic numbers as 3rd looks like a build number, and too large
+    List<UnownedStringSlice> slices;
+    StringUtil::split(versionString, '.', slices);
+    if (slices.getCount() >= 2)
     {
-        dst[i] = s_versionInfos[i].version;
+        versionString = UnownedStringSlice(versionString.begin(), slices[1].end());
     }
+
+    // Extract the version
+    SemanticVersion semanticVersion;
+    return SemanticVersion::parse(versionString, outVersion);
 }
 
-/* static */WinVisualStudioUtil::Version WinVisualStudioUtil::getCompiledVersion()
+
+/* static */DownstreamCompilerMatchVersion WinVisualStudioUtil::getCompiledVersion()
 {
     // Get the version of visual studio used to compile this source
-    const uint32_t version = _MSC_VER;
+    // Not const, because otherwise we get an warning/error about constant expression...
+    uint32_t version = _MSC_VER;
 
     switch (version)
     {
@@ -144,152 +167,297 @@ static int _getRegistryKeyIndex(Version version)
         case 1600:	    return _makeVersion(10);
         case 1700:	    return _makeVersion(11);
         case 1800:	    return _makeVersion(12);
-        case 1900:
+        default: break;
+    }
+
+    // Seems like versions go in runs of 10 at this point
+    // https://docs.microsoft.com/en-us/cpp/preprocessor/predefined-macros?view=msvc-170
+    // https://docs.microsoft.com/en-us/cpp/preprocessor/predefined-macros?redirectedfrom=MSDN&view=msvc-170
+    if (version >= 1900 && version < 1910)
+    {
+        return _makeVersion(14);
+    }
+    else if (version >= 1910 && version < 1920)
+    {
+        switch (version)
         {
-            return _makeVersion(14);
+            case 1910: return _makeVersion(15, 0);
+            case 1911: return _makeVersion(15, 3);
+            case 1912: return _makeVersion(15, 5);
+            case 1913: return _makeVersion(15, 6);
+            case 1914: return _makeVersion(15, 7);
+            case 1915: return _makeVersion(15, 8);
+            case 1916: return _makeVersion(15, 9);
+            default:   return _makeVersion(15);
         }
-        case 1911:
-        case 1912:
-        case 1913:
-        case 1914:
-        case 1915:
-        case 1916:
+    }
+    else if (version >= 1920 && version < 1930)
+    {
+        switch (version)
         {
-            return _makeVersion(15);
+            case 1920: return _makeVersion(16, 0);
+            case 1921: return _makeVersion(16, 1);
+            case 1922: return _makeVersion(16, 2);
+            case 1923: return _makeVersion(16, 3);
+            case 1924: return _makeVersion(16, 4);
+            case 1925: return _makeVersion(16, 5);
+            case 1926: return _makeVersion(16, 6);
+            case 1927: return _makeVersion(16, 7);
+            case 1928: return _makeVersion(16, 9);
+            case 1929: return _makeVersion(16, 11);
+            default:   return _makeVersion(16);
         }
-        case 1920:
+    }
+    else if (version >= 1930 && version < 1940)
+    {
+        switch (version)
         {
-            return _makeVersion(16);
+            case 1930: return _makeVersion(17, 0);
+            case 1931: return _makeVersion(17, 1);
+            case 1932: return _makeVersion(17, 2);
+            default: return _makeVersion(17);
         }
-        default:
-        {
-            int lastKnownVersion = 1920;
-            if (version > lastKnownVersion)
-            {
-                // Its an unknown newer version
-                return Version::Future;
-            }
-            break;
-        }
+    }
+    else if (version >= 1940)
+    {
+        // Its an unknown newer version
+        return DownstreamCompilerMatchVersion(SLANG_PASS_THROUGH_VISUAL_STUDIO, MatchSemanticVersion::makeFuture());
     }
 
     // Unknown version
-    return Version::Unknown;
+    return DownstreamCompilerMatchVersion(SLANG_PASS_THROUGH_VISUAL_STUDIO, MatchSemanticVersion());
 }
 
-static SlangResult _find(int versionIndex, WinVisualStudioUtil::VersionPath& outPath)
+static SlangResult _parseJson(const String& contents, DiagnosticSink* sink, JSONContainer* container, JSONValue& outRoot)
 {
-    const auto& versionInfo = s_versionInfos[versionIndex];
+    auto sourceManager = sink->getSourceManager();
 
-    auto version = versionInfo.version;
+    SourceFile* sourceFile = sourceManager->createSourceFileWithString(PathInfo::makeUnknown(), contents);
+    SourceView* sourceView = sourceManager->createSourceView(sourceFile, nullptr, SourceLoc());
 
-    outPath.version = version;
-    outPath.vcvarsPath = String();
+    JSONLexer lexer;
+    lexer.init(sourceView, sink);
 
-    if (_canUseVSWhere(version))
+    JSONBuilder builder(container);
+
+    JSONParser parser;
+    SLANG_RETURN_ON_FAIL(parser.parse(&lexer, sourceView, &builder, sink));
+
+    outRoot = builder.getRootValue();
+    return SLANG_OK;
+}
+
+static void _orderVersions(List<WinVisualStudioUtil::VersionPath>& ioVersions)
+{
+    typedef WinVisualStudioUtil::VersionPath VersionPath;
+    // Put into increasing version order, from oldest to newest
+    ioVersions.sort([&](const VersionPath& a, const VersionPath& b) -> bool { return a.version < b.version; });
+}
+
+static SlangResult _findVersionsWithVSWhere(const VersionInfo* versionInfo, List<WinVisualStudioUtil::VersionPath>& outVersions)
+{
+    typedef WinVisualStudioUtil::VersionPath VersionPath;
+
+    CommandLine cmd;
+
+    // Lookup directly %ProgramFiles(x86)% path
+    // https://docs.microsoft.com/en-us/windows/desktop/api/shlobj_core/nf-shlobj_core-shgetfolderpatha
+    HWND hwnd = GetConsoleWindow();
+
+    char programFilesPath[_MAX_PATH];
+    SHGetFolderPathA(hwnd, CSIDL_PROGRAM_FILESX86, NULL, 0, programFilesPath);
+
+    String vswherePath = programFilesPath;
+    vswherePath.append("\\Microsoft Visual Studio\\Installer\\vswhere");
+
+    cmd.setExecutableLocation(ExecutableLocation(vswherePath));
+
+    // Using -? we can find out vswhere options.
+
+    // Previous args - works but returns multiple versions, without listing what version is associated with which path
+    // or the order.
+    //String args[] = { "-version", versionName, "-requires", "Microsoft.VisualStudio.Component.VC.Tools.x86.x64", ""-property", "installationPath" };
+
+    // Use JSON parsing, we can verify the versions for a path, otherwise multiple versions are returned
+    // not just the version specified. The ordering isn't defined (and -sort doesn't appear to work)
+
+    SemanticVersion requiredVersion;
+    if (versionInfo)
     {
-        CommandLine cmd;
-
-        // Lookup directly %ProgramFiles(x86)% path
-        // https://docs.microsoft.com/en-us/windows/desktop/api/shlobj_core/nf-shlobj_core-shgetfolderpatha
-        HWND hwnd = GetConsoleWindow();
-
-        char programFilesPath[_MAX_PATH];
-        SHGetFolderPathA(hwnd, CSIDL_PROGRAM_FILESX86, NULL, 0, programFilesPath);
-
-        String vswherePath = programFilesPath;
-        vswherePath.append("\\Microsoft Visual Studio\\Installer\\vswhere");
-
-        cmd.setExecutableLocation(ExecutableLocation(vswherePath));
-
         StringBuilder versionName;
-        WinVisualStudioUtil::append(version, versionName);
+        versionInfo->version.append(versionName);
 
-        String args[] = { "-version", versionName, "-requires", "Microsoft.VisualStudio.Component.VC.Tools.x86.x64", "-property", "installationPath" };
+        cmd.addArg("-version");
+        cmd.addArg(versionName);
+    }
+
+    // Add other args
+    {
+        // TODO(JS): 
+        // For arm targets will probably need something different for tooling
+        String args[] = { "-format", "json", "-utf8", "-requires", "Microsoft.VisualStudio.Component.VC.Tools.x86.x64" };
         cmd.addArgs(args, SLANG_COUNT_OF(args));
+    }
 
-        ExecuteResult exeRes;
-        if (SLANG_SUCCEEDED(ProcessUtil::execute(cmd, exeRes)))
+    // We are going to use JSON parser to extract the info
+    SourceManager sourceManager;
+    sourceManager.initialize(nullptr, nullptr);
+    DiagnosticSink sink(&sourceManager, nullptr);
+
+    RefPtr<JSONContainer> container = new JSONContainer(&sourceManager);
+
+    ExecuteResult exeRes;
+    SLANG_RETURN_ON_FAIL(ProcessUtil::execute(cmd, exeRes));
+
+    JSONValue jsonRoot;
+    SLANG_RETURN_ON_FAIL(_parseJson(exeRes.standardOutput, &sink, container, jsonRoot));
+
+    // Search through the array...
+    if (jsonRoot.getKind() != JSONValue::Kind::Array)
+    {
+        return SLANG_FAIL;
+    }
+
+    auto arr = container->getArray(jsonRoot);
+
+    const auto pathKey = container->getKey(UnownedStringSlice::fromLiteral("installationPath"));
+    const auto versionKey = container->getKey(UnownedStringSlice::fromLiteral("installationVersion"));
+
+    // Find all the versions, that match
+    for (auto elem : arr)
+    {
+        // Get the path and the name 
+        if (elem.getKind() != JSONValue::Kind::Object)
         {
-            // We need to chopoff CR/LF if there is one
-            List<UnownedStringSlice> lines;
-            StringUtil::calcLines(exeRes.standardOutput.getUnownedSlice(), lines);
+            continue;
+        }
 
-            if (lines.getCount())
+        auto pathJsonValue = container->findObjectValue(elem, pathKey);
+        auto versionJsonValue = container->findObjectValue(elem, versionKey);
+
+        if (!pathJsonValue.isValid() || !versionJsonValue.isValid())
+        {
+            continue;
+        }
+
+        auto pathString = container->getString(pathJsonValue);
+        auto versionString = container->getString(versionJsonValue).trim();
+
+        // Extract the version
+        SemanticVersion semanticVersion;
+        if (SLANG_SUCCEEDED(_parseVersion(versionString, semanticVersion)))
+        {
+            if (!requiredVersion.isSet() || requiredVersion.m_major == semanticVersion.m_major)
             {
-                outPath.vcvarsPath = lines[0];
-                outPath.vcvarsPath.append("\\VC\\Auxiliary\\Build\\");
-                return SLANG_OK;
+                WinVisualStudioUtil::VersionPath versionPath;
+
+                versionPath.vcvarsPath = pathString;
+                versionPath.vcvarsPath.append("\\VC\\Auxiliary\\Build\\");
+                versionPath.version = semanticVersion;
+
+                outVersions.add(versionPath);
             }
-        }
-    }
-
-    const Int keyIndex = _getRegistryKeyIndex(version);
-    if (keyIndex >= 0)
-    {
-        SLANG_ASSERT(keyIndex < SLANG_COUNT_OF(s_regInfos));
-
-        // Try reading the key
-        const auto& keyInfo = s_regInfos[keyIndex];
-
-        StringBuilder keyName;
-        WinVisualStudioUtil::append(versionInfo.version, keyName);
-
-        String value;
-        if (SLANG_SUCCEEDED(_readRegistryKey(keyInfo.regName, keyName.getBuffer(), value)))
-        {
-            outPath.vcvarsPath = value;
-            return SLANG_OK;
-        }
-    }
-
-    return SLANG_FAIL;
-}
-
-/* static */SlangResult WinVisualStudioUtil::find(List<VersionPath>& outVersionPaths)
-{
-    outVersionPaths.clear();
-
-    const int versionCount = SLANG_COUNT_OF(s_versionInfos);
-
-    for (int i = versionCount - 1; i >= 0; --i)
-    {
-        VersionPath versionPath;
-        if (SLANG_SUCCEEDED(_find(i, versionPath)))
-        {
-            outVersionPaths.add(versionPath);
         }
     }
 
     return SLANG_OK;
 }
 
-/* static */SlangResult WinVisualStudioUtil::find(Version version, VersionPath& outPath)
+static SlangResult _findVersionsWithRegistery(List<WinVisualStudioUtil::VersionPath>& outVersions)
 {
-    const int versionCount = SLANG_COUNT_OF(s_versionInfos);
+    typedef WinVisualStudioUtil::VersionPath VersionPath;
 
-    for (int i = 0; i < versionCount; ++i)
-    {
-        const auto& versionInfo = s_versionInfos[i];
-        if (versionInfo.version == version)
-        {
-            return _find(i, outPath);
-        }
-    }
-    return SLANG_FAIL;
-}
-
-/* static */SlangResult WinVisualStudioUtil::find(DownstreamCompilerSet* set)
-{
     const int versionCount = SLANG_COUNT_OF(s_versionInfos);
 
     for (int i = versionCount - 1; i >= 0; --i)
     {
-        const auto& versionInfo = s_versionInfos[i];
-        auto desc = getDesc(versionInfo.version);
+        const auto versionInfo = s_versionInfos[i];
 
-        VersionPath versionPath;
-        if (!set->getCompiler(desc) && SLANG_SUCCEEDED(_find(i, versionPath)))
+        auto version = versionInfo.version;
+
+        // Try locating via the registry
+        const Int keyIndex = _getRegistryKeyIndex(version);
+        if (keyIndex >= 0)
+        {
+            SLANG_ASSERT(keyIndex < SLANG_COUNT_OF(s_regInfos));
+
+            // Try reading the key
+            const auto& keyInfo = s_regInfos[keyIndex];
+
+            StringBuilder keyName;
+            versionInfo.version.append(keyName);
+
+            String value;
+            if (SLANG_SUCCEEDED(_readRegistryKey(keyInfo.regName, keyName.getBuffer(), value)))
+            {
+                VersionPath versionPath;
+                versionPath.version = versionInfo.version;
+                versionPath.vcvarsPath = value;
+
+                // Append 
+                if (keyInfo.pathFix && keyInfo.pathFix[0] != 0)
+                {
+                    versionPath.vcvarsPath.append(keyInfo.pathFix);
+                }
+
+                outVersions.add(versionPath);
+            }
+        }
+    }
+
+    return SLANG_OK;
+}
+
+/* static */SlangResult WinVisualStudioUtil::find(List<VersionPath>& outVersionPaths)
+{
+    outVersionPaths.clear();
+
+    List<VersionPath> regVersions;
+
+    // Find all versions with vswhere
+    _findVersionsWithVSWhere(nullptr, outVersionPaths);
+    // Find all with the registry
+    _findVersionsWithRegistery(regVersions);
+
+    // Merge
+    for (const auto& regVersion : regVersions)
+    {
+        Index foundIndex = -1;
+        if (_canUseVSWhere(regVersion.version))
+        {
+            // If there is a major version already from vswhere, we don't need to merge
+            const auto majorVersion = regVersion.version.m_major;
+            foundIndex = outVersionPaths.findFirstIndex([&](const VersionPath& cur) -> bool { return cur.version.m_major == majorVersion; });            
+        }
+        else
+        {
+            // See if we can find the exact version
+            foundIndex = outVersionPaths.findFirstIndex([&](const VersionPath& cur) -> bool { return cur.version == regVersion.version; });
+        }
+
+        // If it wasn't found add it.
+        if (foundIndex < 0)
+        {
+            outVersionPaths.add(regVersion);
+        }
+    }
+    // Sort
+    _orderVersions(outVersionPaths);
+    return SLANG_OK;
+}
+
+/* static */SlangResult WinVisualStudioUtil::find(DownstreamCompilerSet* set)
+{
+    List<VersionPath> versionPaths;
+    SLANG_RETURN_ON_FAIL(find(versionPaths));
+
+    for (const auto& versionPath : versionPaths)
+    {
+        // Turn into a desc
+        const DownstreamCompiler::Desc desc(SLANG_PASS_THROUGH_VISUAL_STUDIO, versionPath.version);
+
+        // If not in set add it
+        if (!set->getCompiler(desc))
         {
             RefPtr<CommandLineDownstreamCompiler> compiler = new VisualStudioDownstreamCompiler(desc);
             calcExecuteCompilerArgs(versionPath, compiler->m_cmdLine);
@@ -339,27 +507,6 @@ static SlangResult _find(int versionIndex, WinVisualStudioUtil::VersionPath& out
     // Append the command line options
     cmdLine.addArgs(commandLine.m_args.getBuffer(), commandLine.m_args.getCount());
     return ProcessUtil::execute(cmdLine, outResult);
-}
-
-/* static */void WinVisualStudioUtil::append(Version version, StringBuilder& outBuilder)
-{
-    switch (version)
-    {
-        case Version::Unknown:
-        {
-            outBuilder << "unknown";
-        }
-        case Version::Future:
-        {
-            outBuilder << "future";
-            break;
-        }
-        default:
-        {
-            outBuilder << (int(version) / 10) << "." << (int(version) % 10);
-            break;
-        }
-    }
 }
 
 } // namespace Slang

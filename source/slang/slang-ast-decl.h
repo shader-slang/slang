@@ -23,6 +23,7 @@ class ContainerDecl: public Decl
     SLANG_ABSTRACT_AST_CLASS(ContainerDecl)
 
     List<Decl*> members;
+    SourceLoc closingSourceLoc;
 
     template<typename T>
     FilteredMemberList<T> getMembersOfType()

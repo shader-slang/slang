@@ -170,6 +170,7 @@ struct StructRttiInfo : public NamedRttiInfo
 
     Index m_fieldCount;                 ///< Amount of fields
     const Field* m_fields;              ///< Fields
+    bool m_ignoreUnknownFieldsInJson = false;
 };
 
 struct EnumRttiInfo : public NamedRttiInfo
@@ -329,6 +330,8 @@ struct StructRttiBuilder
         field.m_flags = flags;
         m_fields.add(field);
     }
+
+    void ignoreUnknownFields() { m_rttiInfo.m_ignoreUnknownFieldsInJson = true; }
 
     StructRttiInfo make();
 
