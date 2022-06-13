@@ -936,6 +936,7 @@ SLANG_NO_THROW slang::IModule* SLANG_MCALL Linkage::loadModule(
     if (m_flag & slang::kSessionFlag_LanguageServer)
     {
         sink.setFlags(DiagnosticSink::Flag::HumaneLoc | DiagnosticSink::Flag::LanguageServer);
+        sink.overrideDiagnosticSeverity(39999, Severity::Error);
     }
 
     try
@@ -965,6 +966,7 @@ SLANG_NO_THROW slang::IModule* SLANG_MCALL Linkage::loadModuleFromSource(
     if (m_flag & slang::kSessionFlag_LanguageServer)
     {
         sink.setFlags(DiagnosticSink::Flag::HumaneLoc | DiagnosticSink::Flag::LanguageServer);
+        sink.overrideDiagnosticSeverity(39999, Severity::Error);
     }
 
     try

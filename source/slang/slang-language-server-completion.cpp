@@ -86,7 +86,7 @@ SlangResult CompletionContext::tryCompleteHLSLSemantic()
 SlangResult CompletionContext::tryCompleteMember()
 {
     // Scan backward until we locate a '.' or ':'.
-    if (cursorOffset == doc->getText().getLength())
+    if (cursorOffset > 0)
         cursorOffset--;
     while (cursorOffset > 0 && _isWhitespaceChar(doc->getText()[cursorOffset]))
     {

@@ -1690,6 +1690,7 @@ namespace Slang
         {                                               \
             SLANG_DIAGNOSE_UNEXPECTED(getSink(), expr,  \
                 "should not appear in input syntax");   \
+            expr->type = m_astBuilder->getErrorType();  \
             return expr;                                \
         }
 
