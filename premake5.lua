@@ -164,7 +164,6 @@ newoption {
     trigger     = "disable-stdlib-source",
     description = "(Optional) If true stdlib source will not be included in binary.",
     value       = "bool",
-    default     = "false",
     allowed     = { { "true", "True"}, { "false", "False" } }
  }
 
