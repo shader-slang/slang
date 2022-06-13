@@ -100,6 +100,7 @@ public:
         m_startIndex(list->getCount()),
         m_list(list)
     {
+        SLANG_ASSERT(list);
     }
     ~RAIIStackArray()
     {
@@ -107,7 +108,7 @@ public:
     }
 
     const Index m_startIndex;
-    List<T>*const m_list;
+    List<T>* m_list;
 };
 
 struct LivenessContext
@@ -140,7 +141,6 @@ struct LivenessContext
         /// Block info (indexed via BlockIndex), that is valid across analysing liveness of a root
     struct BlockInfo
     {
-
             /// Reset any information for a start
         void resetForStart()
         {
@@ -265,8 +265,8 @@ struct LivenessContext
         // Returns the index in the run of a start for the current root, else -1
     Index _indexOfRootStart(const ConstArrayView<IRInst*>& run);
 
-        /// Returns the last index within the run which is an access, else -1
-    Index _findLastAccess(const ConstArrayView<IRInst*>& run);
+        /// Returns the last index within the run which is a load-like access, else -1
+    Index _findLastLoadLike(const ConstArrayView<IRInst*>& run);
 
         /// Adds an LiveRangeEnd for the root after `inst` if there isn't one there already
     void _maybeAddEndAfterInst(IRInst* inst);
@@ -536,15 +536,16 @@ Index LivenessContext::_indexOfRootStart(const ConstArrayView<IRInst*>& run)
     return -1;
 }
 
-Index LivenessContext::_findLastAccess(const ConstArrayView<IRInst*>& run)
+Index LivenessContext::_findLastLoadLike(const ConstArrayView<IRInst*>& run)
 {
     for (Index i = run.getCount() - 1; i >= 0; --i)
     {
         auto inst = run[i];
-        // If it's not a live start, it must be an access
-        if (as<IRLiveRangeStart>(inst) == nullptr)
+
+        const auto op = inst->getOp();
+        if (op != kIROp_LiveRangeStart && op != kIROp_Store)
         {
-            // Check it really is an access inst..
+            // Must be 'load like then'
             SLANG_ASSERT(_isAnyRunInst(inst));
             return i;
         }
@@ -609,13 +610,13 @@ LivenessContext::BlockResult LivenessContext::_completeBlock(BlockIndex blockInd
     // We can't have a root start in the run!
     SLANG_ASSERT(_indexOfRootStart(run) < 0);
 
-    // Look for the last access
-    const auto lastAccessIndex = _findLastAccess(run);
+    // Look for the last load like access
+    const auto lastLoadLikeIndex = _findLastLoadLike(run);
 
     // If we found one, that is the end of the range
-    if (lastAccessIndex >= 0)
+    if (lastLoadLikeIndex >= 0)
     {
-        _maybeAddEndAfterRunIndex(blockIndex, run, lastAccessIndex);
+        _maybeAddEndAfterRunIndex(blockIndex, run, lastLoadLikeIndex);
         
         // Add the result
         return _addBlockResult(blockIndex, BlockResult::Found);
@@ -688,14 +689,16 @@ LivenessContext::BlockResult LivenessContext::_processBlock(BlockIndex blockInde
 
             for (Index i = 0; i < successorCount; ++i)
             {
-                successorResults[i] = _processSuccessor(successors[i], &nextLoop);
+                const auto result = _processSuccessor(successors[i], &nextLoop);
+                successorResults[i] = result; 
             }
         }
         else
         {
             for (Index i = 0; i < successorCount; ++i)
             {
-                successorResults[i] = _processSuccessor(successors[i], loop);
+                const auto result = _processSuccessor(successors[i], loop);
+                successorResults[i] = result;
             }
         }
     }
@@ -866,15 +869,17 @@ void LivenessContext::_findAliasesAndAccesses(IRInst* root)
                 }
                 case kIROp_Load:
                 {
-                    // We only care about loads in terms of identifying liveness
+                    // We normally only care about loads in terms of identifying liveness within a block
+                    // the last load being the last necessay live point.
                     base = static_cast<IRLoad*>(cur)->getPtr();
                     accessType = AccessType::Access;
                     break;
                 }
                 case kIROp_Store:
                 {
-                    // In terms of liveness, stores can be ignored (although in the future we will probably 
-                    // want to support to make loops analysis work more accurately)
+                    // We need stores for loop analysis
+                    base = static_cast<IRStore*>(cur)->getPtr();
+                    accessType = AccessType::Access;
                     break;
                 }
                 case kIROp_getElement:
@@ -990,7 +995,8 @@ bool LivenessContext::_isNormalRunInst(IRInst* inst)
     // The ops in the list above are the only ops *currently* that indicate an access.
     // Has to be consistent with `_findAliasesAndAccesses`
     if (op == kIROp_Call || 
-        op == kIROp_Load)
+        op == kIROp_Load ||
+        op == kIROp_Store)
     {
         // Just because it's the right type *doesn't* mean it's an access, it has to also 
         // be in the access set
