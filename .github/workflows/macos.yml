@@ -34,8 +34,11 @@ jobs:
       with:
         name: slang-build-${{matrix.configuration}}-${{matrix.platform}}-${{matrix.compiler}}
         path: |
-          bin/**/*
-          bin/**/*.*
+          bin/**/slangc
+          bin/**/slangd
+          bin/**/libslang.dylib
+          bin/**/libslang-llvm.dylib
+          bin/**/libslang-glslang.dylib
     - name: test
       run: 
         CONFIGURATION=${{matrix.configuration}}
