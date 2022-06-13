@@ -570,7 +570,7 @@ void DiagnosticSink::diagnoseImpl(DiagnosticInfo const& info, const UnownedStrin
         m_parentSink->diagnoseImpl(info, formattedMessage);
     }
 
-    if (info.severity >= Severity::Fatal)
+    if (getEffectiveMessageSeverity(info) >= Severity::Fatal)
     {
         // TODO: figure out a better policy for aborting compilation
         SLANG_ABORT_COMPILATION("");

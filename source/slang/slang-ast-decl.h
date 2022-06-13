@@ -16,6 +16,10 @@ class DeclGroup: public DeclBase
     List<Decl*> decls;
 };
 
+class UnresolvedDecl : public Decl
+{
+    SLANG_AST_CLASS(UnresolvedDecl)
+};
 
 // A "container" decl is a parent to other declarations
 class ContainerDecl: public Decl
