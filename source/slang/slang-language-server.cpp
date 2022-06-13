@@ -150,9 +150,11 @@ SlangResult LanguageServer::parseNextMessage()
                 if (response.result.getKind() == JSONValue::Kind::Array)
                 {
                     auto arr = m_connection->getContainer()->getArray(response.result);
-                    if (arr.getCount() > 0)
+                    if (arr.getCount() == 3)
                     {
                         updatePredefinedMacros(arr[0]);
+                        updateSearchPaths(arr[1]);
+                        updateSearchInWorkspace(arr[2]);
                     }
                 }
                 break;
@@ -791,14 +793,56 @@ void LanguageServer::updatePredefinedMacros(const JSONValue& macros)
     }
 }
 
+void LanguageServer::updateSearchPaths(const JSONValue& macros)
+{
+    if (macros.isValid())
+    {
+        auto container = m_connection->getContainer();
+        JSONToNativeConverter converter(container, m_connection->getSink());
+        List<String> searchPaths;
+        if (SLANG_SUCCEEDED(converter.convert(macros, &searchPaths)))
+        {
+            if (m_workspace->updateSearchPaths(searchPaths))
+            {
+                m_connection->sendCall(
+                    UnownedStringSlice("workspace/semanticTokens/refresh"), JSONValue::makeInt(0));
+            }
+        }
+    }
+}
+
+void LanguageServer::updateSearchInWorkspace(const JSONValue& macros)
+{
+    if (macros.isValid())
+    {
+        auto container = m_connection->getContainer();
+        JSONToNativeConverter converter(container, m_connection->getSink());
+        bool searchPaths;
+        if (SLANG_SUCCEEDED(converter.convert(macros, &searchPaths)))
+        {
+            if (m_workspace->updateSearchInWorkspace(searchPaths))
+            {
+                m_connection->sendCall(
+                    UnownedStringSlice("workspace/semanticTokens/refresh"), JSONValue::makeInt(0));
+            }
+        }
+    }
+}
+
 void LanguageServer::sendConfigRequest()
 {
     ConfigurationParams args;
     ConfigurationItem item;
     item.section = "slang.predefinedMacros";
     args.items.add(item);
+    item.section = "slang.additionalSearchPaths";
+    args.items.add(item);
+    item.section = "slang.searchInAllWorkspaceDirectories";
+    args.items.add(item);
     m_connection->sendCall(
-        ConfigurationParams::methodName, &args, JSONValue::makeInt(kConfigResponseId));
+        ConfigurationParams::methodName,
+        &args,
+        JSONValue::makeInt(kConfigResponseId));
 }
 
 void LanguageServer::registerCapability(const char* methodName)
