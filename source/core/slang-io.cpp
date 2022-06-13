@@ -4,6 +4,7 @@
 #include "../../slang-com-helper.h"
 
 #include "slang-string-util.h"
+#include "slang-char-util.h"
 
 #ifndef __STDC__
 #   define __STDC__ 1
@@ -918,7 +919,90 @@ namespace Slang
 
         return SLANG_OK;
     }
+    
+    String URI::getPath() const
+    {
+        Index startIndex = uri.indexOf("://");
+        if (startIndex == -1)
+            return String();
+        startIndex += 3;
+        Index endIndex = uri.indexOf('?');
+        if (endIndex == -1)
+            endIndex = uri.getLength();
+        StringBuilder sb;
+#if SLANG_WINDOWS_FAMILY
+        if (uri[startIndex] == '/')
+            startIndex++;
+#endif
+        for (Index i = startIndex; i < endIndex;)
+        {
+            auto ch = uri[i];
+            if (ch == '%')
+            {
+                Int charVal = CharUtil::getHexDigitValue(uri[i + 1]) * 16 +
+                              CharUtil::getHexDigitValue(uri[i + 2]);
+                sb.appendChar((char)charVal);
+                i += 3;
+            }
+            else
+            {
+                sb.appendChar(uri[i]);
+                i++;
+            }
+        }
+        return sb.ProduceString();
+    }
 
+    StringSlice URI::getProtocol() const
+    {
+        Index separatorIndex = uri.indexOf("://");
+        if (separatorIndex != -1)
+            return uri.subString(0, separatorIndex);
+        return StringSlice();
+    }
+
+    bool URI::isSafeURIChar(char ch)
+    {
+        return (ch >= '0' && ch <= '9') || (ch >= 'A' && ch <= 'Z') || (ch >= 'a' && ch <= 'z') ||
+               ch == '-' || ch == '_' || ch == '/' || ch == '.';
+    }
+
+    URI URI::fromLocalFilePath(UnownedStringSlice path)
+    {
+        URI uri;
+        StringBuilder sb;
+        sb << "file://";
+
+#if SLANG_WINDOWS_FAMILY
+        sb << "/";
+#endif
+
+        for (auto ch : path)
+        {
+            if (isSafeURIChar(ch))
+            {
+                sb.appendChar(ch);
+            }
+            else if (ch == '\\')
+            {
+                sb.appendChar('/');
+            }
+            else
+            {
+                char buffer[32];
+                int length = IntToAscii(buffer, (int)ch, 16);
+                ReverseInternalAscii(buffer, length);
+                sb << "%" << buffer;
+            }
+        }
+        return URI::fromString(sb.getUnownedSlice());
+    }
+
+    URI URI::fromString(UnownedStringSlice uriString)
+    {
+        URI uri;
+        uri.uri = uriString;
+        return uri;
+    }
 
 }
-

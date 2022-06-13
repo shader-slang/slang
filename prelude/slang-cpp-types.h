@@ -2,15 +2,48 @@
 #define SLANG_PRELUDE_CPP_TYPES_H
 
 #ifndef SLANG_PRELUDE_ASSERT
-#   ifdef _DEBUG
+#   ifdef SLANG_PRELUDE_ENABLE_ASSERT
 #       define SLANG_PRELUDE_ASSERT(VALUE) assert(VALUE)
 #   else
 #       define SLANG_PRELUDE_ASSERT(VALUE) 
 #   endif
 #endif
 
-#ifndef SLANG_FORCE_INLINE
-#    define SLANG_FORCE_INLINE inline
+// Since we are using unsigned arithmatic care is need in this comparison.
+// It is *assumed* that sizeInBytes >= elemSize. Which means (sizeInBytes >= elemSize) >= 0
+// Which means only a single test is needed
+
+// Asserts for bounds checking.
+// It is assumed index/count are unsigned types.
+#define SLANG_BOUND_ASSERT(index, count)  SLANG_PRELUDE_ASSERT(index < count); 
+#define SLANG_BOUND_ASSERT_BYTE_ADDRESS(index, elemSize, sizeInBytes) SLANG_PRELUDE_ASSERT(index <= (sizeInBytes - elemSize) && (index & 3) == 0);
+
+// Macros to zero index if an access is out of range
+#define SLANG_BOUND_ZERO_INDEX(index, count) index = (index < count) ? index : 0; 
+#define SLANG_BOUND_ZERO_INDEX_BYTE_ADDRESS(index, elemSize, sizeInBytes) index = (index <= (sizeInBytes - elemSize)) ? index : 0; 
+
+// The 'FIX' macro define how the index is fixed. The default is to do nothing. If SLANG_ENABLE_BOUND_ZERO_INDEX
+// the fix macro will zero the index, if out of range
+#ifdef  SLANG_ENABLE_BOUND_ZERO_INDEX
+#   define SLANG_BOUND_FIX(index, count) SLANG_BOUND_ZERO_INDEX(index, count)
+#   define SLANG_BOUND_FIX_BYTE_ADDRESS(index, elemSize, sizeInBytes) SLANG_BOUND_ZERO_INDEX_BYTE_ADDRESS(index, elemSize, sizeInBytes)
+#   define SLANG_BOUND_FIX_FIXED_ARRAY(index, count) SLANG_BOUND_ZERO_INDEX(index, count)
+#else
+#   define SLANG_BOUND_FIX(index, count) 
+#   define SLANG_BOUND_FIX_BYTE_ADDRESS(index, elemSize, sizeInBytes) 
+#   define SLANG_BOUND_FIX_FIXED_ARRAY(index, count) 
+#endif
+
+#ifndef SLANG_BOUND_CHECK
+#   define SLANG_BOUND_CHECK(index, count) SLANG_BOUND_ASSERT(index, count) SLANG_BOUND_FIX(index, count)
+#endif
+
+#ifndef SLANG_BOUND_CHECK_BYTE_ADDRESS
+#   define SLANG_BOUND_CHECK_BYTE_ADDRESS(index, elemSize, sizeInBytes) SLANG_BOUND_ASSERT_BYTE_ADDRESS(index, elemSize, sizeInBytes) SLANG_BOUND_FIX_BYTE_ADDRESS(index, elemSize, sizeInBytes)
+#endif
+
+#ifndef SLANG_BOUND_CHECK_FIXED_ARRAY
+#   define SLANG_BOUND_CHECK_FIXED_ARRAY(index, count) SLANG_BOUND_ASSERT(index, count) SLANG_BOUND_FIX_FIXED_ARRAY(index, count)
 #endif
 
 #ifdef SLANG_PRELUDE_NAMESPACE
@@ -25,8 +58,8 @@ struct TypeInfo
 template <typename T, size_t SIZE>
 struct FixedArray
 {
-    const T& operator[](size_t index) const { SLANG_PRELUDE_ASSERT(index < SIZE); return m_data[index]; }
-    T& operator[](size_t index) { SLANG_PRELUDE_ASSERT(index < SIZE); return m_data[index]; }
+    const T& operator[](size_t index) const { SLANG_BOUND_CHECK_FIXED_ARRAY(index, SIZE); return m_data[index]; }
+    T& operator[](size_t index) { SLANG_BOUND_CHECK_FIXED_ARRAY(index, SIZE); return m_data[index]; }
 
     T m_data[SIZE];
 };
@@ -36,8 +69,8 @@ struct FixedArray
 template <typename T>
 struct Array
 {
-    const T& operator[](size_t index) const { SLANG_PRELUDE_ASSERT(index < count); return data[index]; }
-    T& operator[](size_t index) { SLANG_PRELUDE_ASSERT(index < count); return data[index]; }
+    const T& operator[](size_t index) const { SLANG_BOUND_CHECK(index, count); return data[index]; }
+    T& operator[](size_t index) { SLANG_BOUND_CHECK(index, count); return data[index]; }
 
     T* data;
     size_t count;
@@ -126,8 +159,8 @@ typedef size_t NonUniformResourceIndex;
 template <typename T>
 struct RWStructuredBuffer
 {
-    SLANG_FORCE_INLINE T& operator[](size_t index) const { SLANG_PRELUDE_ASSERT(index < count); return data[index]; }
-    const T& Load(size_t index) const { SLANG_PRELUDE_ASSERT(index < count); return data[index]; }  
+    SLANG_FORCE_INLINE T& operator[](size_t index) const { SLANG_BOUND_CHECK(index, count); return data[index]; }
+    const T& Load(size_t index) const { SLANG_BOUND_CHECK(index, count); return data[index]; }  
     void GetDimensions(uint32_t* outNumStructs, uint32_t* outStride) { *outNumStructs = uint32_t(count); *outStride = uint32_t(sizeof(T)); }
   
     T* data;
@@ -137,8 +170,8 @@ struct RWStructuredBuffer
 template <typename T>
 struct StructuredBuffer
 {
-    SLANG_FORCE_INLINE const T& operator[](size_t index) const { SLANG_PRELUDE_ASSERT(index < count); return data[index]; }
-    const T& Load(size_t index) const { SLANG_PRELUDE_ASSERT(index < count); return data[index]; }
+    SLANG_FORCE_INLINE const T& operator[](size_t index) const { SLANG_BOUND_CHECK(index, count); return data[index]; }
+    const T& Load(size_t index) const { SLANG_BOUND_CHECK(index, count); return data[index]; }
     void GetDimensions(uint32_t* outNumStructs, uint32_t* outStride) { *outNumStructs = uint32_t(count); *outStride = uint32_t(sizeof(T)); }
     
     T* data;
@@ -149,8 +182,8 @@ struct StructuredBuffer
 template <typename T>
 struct RWBuffer
 {
-    SLANG_FORCE_INLINE T& operator[](size_t index) const { SLANG_PRELUDE_ASSERT(index < count); return data[index]; }
-    const T& Load(size_t index) const { SLANG_PRELUDE_ASSERT(index < count); return data[index]; }
+    SLANG_FORCE_INLINE T& operator[](size_t index) const { SLANG_BOUND_CHECK(index, count); return data[index]; }
+    const T& Load(size_t index) const { SLANG_BOUND_CHECK(index, count); return data[index]; }
     void GetDimensions(uint32_t* outCount) { *outCount = uint32_t(count); }
     
     T* data;
@@ -160,8 +193,8 @@ struct RWBuffer
 template <typename T>
 struct Buffer
 {
-    SLANG_FORCE_INLINE const T& operator[](size_t index) const { SLANG_PRELUDE_ASSERT(index < count); return data[index]; }
-    const T& Load(size_t index) const { SLANG_PRELUDE_ASSERT(index < count); return data[index]; }
+    SLANG_FORCE_INLINE const T& operator[](size_t index) const { SLANG_BOUND_CHECK(index, count); return data[index]; }
+    const T& Load(size_t index) const { SLANG_BOUND_CHECK(index, count); return data[index]; }
     void GetDimensions(uint32_t* outCount) { *outCount = uint32_t(count); }
     
     T* data;
@@ -174,32 +207,32 @@ struct ByteAddressBuffer
     void GetDimensions(uint32_t* outDim) const { *outDim = uint32_t(sizeInBytes); }
     uint32_t Load(size_t index) const 
     { 
-        SLANG_PRELUDE_ASSERT(index + 4 <= sizeInBytes && (index & 3) == 0); 
+        SLANG_BOUND_CHECK_BYTE_ADDRESS(index, 4, sizeInBytes);
         return data[index >> 2]; 
     }
     uint2 Load2(size_t index) const 
     { 
-        SLANG_PRELUDE_ASSERT(index + 8 <= sizeInBytes && (index & 3) == 0); 
+        SLANG_BOUND_CHECK_BYTE_ADDRESS(index, 8, sizeInBytes);
         const size_t dataIdx = index >> 2; 
         return uint2{data[dataIdx], data[dataIdx + 1]}; 
     }
     uint3 Load3(size_t index) const 
     { 
-        SLANG_PRELUDE_ASSERT(index + 12 <= sizeInBytes && (index & 3) == 0); 
+        SLANG_BOUND_CHECK_BYTE_ADDRESS(index, 12, sizeInBytes);
         const size_t dataIdx = index >> 2; 
         return uint3{data[dataIdx], data[dataIdx + 1], data[dataIdx + 2]}; 
     }
     uint4 Load4(size_t index) const 
     { 
-        SLANG_PRELUDE_ASSERT(index + 16 <= sizeInBytes && (index & 3) == 0); 
+        SLANG_BOUND_CHECK_BYTE_ADDRESS(index, 16, sizeInBytes);
         const size_t dataIdx = index >> 2; 
         return uint4{data[dataIdx], data[dataIdx + 1], data[dataIdx + 2], data[dataIdx + 3]}; 
     }
     template<typename T>
-    T Load(size_t offset) const
+    T Load(size_t index) const
     {
-        SLANG_PRELUDE_ASSERT(offset + sizeof(T) <= sizeInBytes && (offset & (alignof(T)-1)) == 0); 
-        return *(T const*)((char*)data + offset);
+        SLANG_BOUND_CHECK_BYTE_ADDRESS(index, sizeof(T), sizeInBytes);
+        return *(const T*)(((const char*)data) + index);
     }
     
     const uint32_t* data;
@@ -215,49 +248,49 @@ struct RWByteAddressBuffer
     
     uint32_t Load(size_t index) const 
     { 
-        SLANG_PRELUDE_ASSERT(index + 4 <= sizeInBytes && (index & 3) == 0); 
+        SLANG_BOUND_CHECK_BYTE_ADDRESS(index, 4, sizeInBytes);
         return data[index >> 2]; 
     }
     uint2 Load2(size_t index) const 
     { 
-        SLANG_PRELUDE_ASSERT(index + 8 <= sizeInBytes && (index & 3) == 0); 
+        SLANG_BOUND_CHECK_BYTE_ADDRESS(index, 8, sizeInBytes);
         const size_t dataIdx = index >> 2; 
         return uint2{data[dataIdx], data[dataIdx + 1]}; 
     }
     uint3 Load3(size_t index) const 
     { 
-        SLANG_PRELUDE_ASSERT(index + 12 <= sizeInBytes && (index & 3) == 0); 
+        SLANG_BOUND_CHECK_BYTE_ADDRESS(index, 12, sizeInBytes);
         const size_t dataIdx = index >> 2; 
         return uint3{data[dataIdx], data[dataIdx + 1], data[dataIdx + 2]}; 
     }
     uint4 Load4(size_t index) const 
     { 
-        SLANG_PRELUDE_ASSERT(index + 16 <= sizeInBytes && (index & 3) == 0); 
+        SLANG_BOUND_CHECK_BYTE_ADDRESS(index, 16, sizeInBytes);
         const size_t dataIdx = index >> 2; 
         return uint4{data[dataIdx], data[dataIdx + 1], data[dataIdx + 2], data[dataIdx + 3]}; 
     }
     template<typename T>
-    T Load(size_t offset) const
+    T Load(size_t index) const
     {
-        SLANG_PRELUDE_ASSERT(offset + sizeof(T) <= sizeInBytes && (offset & (alignof(T)-1)) == 0); 
-        return *(T const*)((char*)data + offset);
+        SLANG_BOUND_CHECK_BYTE_ADDRESS(index, sizeof(T), sizeInBytes);
+        return *(const T*)(((const char*)data) + index);
     }
 
     void Store(size_t index, uint32_t v) const 
     { 
-        SLANG_PRELUDE_ASSERT(index + 4 <= sizeInBytes && (index & 3) == 0); 
+        SLANG_BOUND_CHECK_BYTE_ADDRESS(index, 4, sizeInBytes);
         data[index >> 2] = v; 
     }
     void Store2(size_t index, uint2 v) const 
     { 
-        SLANG_PRELUDE_ASSERT(index + 8 <= sizeInBytes && (index & 3) == 0); 
+        SLANG_BOUND_CHECK_BYTE_ADDRESS(index, 8, sizeInBytes);
         const size_t dataIdx = index >> 2; 
         data[dataIdx + 0] = v.x;
         data[dataIdx + 1] = v.y;
     }
     void Store3(size_t index, uint3 v) const 
-    { 
-        SLANG_PRELUDE_ASSERT(index + 12 <= sizeInBytes && (index & 3) == 0); 
+    {  
+        SLANG_BOUND_CHECK_BYTE_ADDRESS(index, 12, sizeInBytes);
         const size_t dataIdx = index >> 2; 
         data[dataIdx + 0] = v.x;
         data[dataIdx + 1] = v.y;
@@ -265,7 +298,7 @@ struct RWByteAddressBuffer
     }
     void Store4(size_t index, uint4 v) const 
     { 
-        SLANG_PRELUDE_ASSERT(index + 16 <= sizeInBytes && (index & 3) == 0); 
+        SLANG_BOUND_CHECK_BYTE_ADDRESS(index, 16, sizeInBytes);
         const size_t dataIdx = index >> 2; 
         data[dataIdx + 0] = v.x;
         data[dataIdx + 1] = v.y;
@@ -273,10 +306,10 @@ struct RWByteAddressBuffer
         data[dataIdx + 3] = v.w;
     }
     template<typename T>
-    void Store(size_t offset, T const& value) const
+    void Store(size_t index, T const& value) const
     {
-        SLANG_PRELUDE_ASSERT(offset + sizeof(T) <= sizeInBytes && (offset & (alignof(T)-1)) == 0); 
-        *(T*)((char*)data + offset) = value;
+        SLANG_BOUND_CHECK_BYTE_ADDRESS(index, sizeof(T), sizeInBytes);
+        *(T*)(((char*)data) + index) = value;
     }
 
     uint32_t* data;

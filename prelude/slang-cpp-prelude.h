@@ -194,7 +194,6 @@ Any platforms not detected by the above logic are now now explicitly zeroed out.
 #    endif
 #endif /* SLANG_PLATFORM */
 
-
 /* Shorthands for "families" of compilers/platforms */
 #define SLANG_GCC_FAMILY (SLANG_CLANG || SLANG_SNC || SLANG_GHS || SLANG_GCC)
 #define SLANG_WINDOWS_FAMILY (SLANG_WINRT || SLANG_WIN32 || SLANG_WIN64)
@@ -249,8 +248,12 @@ convention for interface methods.
 #   define SLANG_MCALL SLANG_STDCALL
 #endif
 
+#ifndef SLANG_FORCE_INLINE
+#    define SLANG_FORCE_INLINE inline
+#endif
 
-
+// TODO(JS): Should these be in slang-cpp-types.h? 
+// They are more likely to clash with slang.h
 
 struct SlangUUID
 {
@@ -270,6 +273,8 @@ struct ISlangUnknown
 };
 
 #endif // SLANG_H
+
+// Includes
 
 #include "slang-cpp-types.h"
 #include "slang-cpp-scalar-intrinsics.h"

@@ -245,13 +245,11 @@ struct InitializeResult
     static const StructRttiInfo g_rttiInfo;
 };
 
-struct ShutdownParams
-{
+struct ShutdownParams {
     static const UnownedStringSlice methodName;
 };
 
-struct ExitParams
-{
+struct ExitParams {
     static const UnownedStringSlice methodName;
 };
 
@@ -377,16 +375,16 @@ struct TextDocumentPositionParams
 };
 
 struct HoverParams
-    : TextDocumentPositionParams
-    , WorkDoneProgressParams
+    : WorkDoneProgressParams
+    ,TextDocumentPositionParams 
 {
     static const StructRttiInfo g_rttiInfo;
     static const UnownedStringSlice methodName;
 };
 
 struct DefinitionParams
-    : TextDocumentPositionParams
-    , WorkDoneProgressParams
+    : WorkDoneProgressParams
+    , TextDocumentPositionParams
 {
     static const StructRttiInfo g_rttiInfo;
     static const UnownedStringSlice methodName;
@@ -424,8 +422,8 @@ struct Hover
 };
 
 struct CompletionParams
-    : TextDocumentPositionParams
-    , WorkDoneProgressParams
+    : WorkDoneProgressParams
+    , TextDocumentPositionParams
 {
     static const StructRttiInfo g_rttiInfo;
     static const UnownedStringSlice methodName;
@@ -532,8 +530,8 @@ struct SemanticTokens
 };
 
 struct SignatureHelpParams
-    : TextDocumentPositionParams
-    , WorkDoneProgressParams
+    : WorkDoneProgressParams
+    , TextDocumentPositionParams
 {
     static const UnownedStringSlice methodName;
 
