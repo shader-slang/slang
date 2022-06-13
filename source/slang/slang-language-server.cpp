@@ -135,12 +135,12 @@ SlangResult LanguageServer::_executeSingle()
             }
             else if (call.method == InitializeParams::methodName)
             {
-                InitializeParams args = {};
+                InitializeParams args;
                 m_connection->toNativeArgsOrSendError(call.params, &args, call.id);
 
                 init(args);
 
-                InitializeResult result = {};
+                InitializeResult result;
                 result.serverInfo.name = "SlangLanguageServer";
                 result.serverInfo.version = "1.0";
                 result.capabilities.positionEncoding = "utf-8";
