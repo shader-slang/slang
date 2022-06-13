@@ -2515,6 +2515,9 @@ namespace Slang
             if (!AdvanceIf(parser, TokenType::Comma))
             {
                 parser->ReadToken(TokenType::Semicolon);
+                // We don't need to enter recovering mode if next token isn't semicolon.
+                // In this case we just continue parsing the token as the next decl.
+                parser->isRecovering = false;
                 return declGroupBuilder.getResult();
             }
 

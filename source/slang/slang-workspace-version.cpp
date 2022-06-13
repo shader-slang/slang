@@ -66,11 +66,11 @@ void Workspace::closeDoc(const String& path)
 
 bool Workspace::updatePredefinedMacros(List<String> macros)
 {
-    List<OnwedPreprocessorMacroDefinition> newDefs;
+    List<OwnedPreprocessorMacroDefinition> newDefs;
     for (auto macro : macros)
     {
         auto index = macro.indexOf('=');
-        OnwedPreprocessorMacroDefinition def;
+        OwnedPreprocessorMacroDefinition def;
         def.name = macro.getUnownedSlice().head(index).trim();
         if (index != -1)
         {

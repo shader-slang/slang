@@ -124,7 +124,7 @@ namespace Slang
         Module* getOrLoadModule(String path);
     };
 
-    struct OnwedPreprocessorMacroDefinition
+    struct OwnedPreprocessorMacroDefinition
     {
         String name;
         String value;
@@ -139,7 +139,7 @@ namespace Slang
     public:
         List<String> rootDirectories;
         OrderedHashSet<String> searchPaths;
-        List<OnwedPreprocessorMacroDefinition> predefinedMacros;
+        List<OwnedPreprocessorMacroDefinition> predefinedMacros;
         SerializedModuleCache moduleCache;
 
         slang::IGlobalSession* slangGlobalSession;
