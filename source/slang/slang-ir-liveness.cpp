@@ -509,15 +509,11 @@ LivenessContext::BlockResult LivenessContext::_processSuccessor(BlockIndex block
     _addBlockResult(blockIndex, BlockResult::Visited);
 
     // Special case leaving the loop. 
-    // If we are in a loop
-    if (loop)
+    // If we are in a loop, and the block we are going to is the break block then we are no longer in this loop
+    if (loop && loop->breakBlockIndex == blockIndex)
     {
-        // And the block we are going to is the break block then we are no longer in this loop
-        if (loop->breakBlockIndex == blockIndex)
-        {
-            // So the loop we are currently in must be the parent
-            loop = loop->parentLoop;
-        }
+        // We are in the parent loop
+        loop = loop->parentLoop;
     }
 
     // Else process the block to try and find the last used instruction
