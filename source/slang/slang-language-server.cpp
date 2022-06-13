@@ -12,61 +12,29 @@
 #include "../core/slang-secure-crt.h"
 #include "../core/slang-range.h"
 #include "../../slang-com-helper.h"
+#include "../compiler-core/slang-json-native.h"
 #include "../compiler-core/slang-json-rpc-connection.h"
 #include "../compiler-core/slang-language-server-protocol.h"
 #include "slang-language-server.h"
 #include "slang-workspace-version.h"
 #include "slang-language-server-ast-lookup.h"
-#include "slang-language-server-collect-member.h"
+#include "slang-language-server-completion.h"
 #include "slang-language-server-semantic-tokens.h"
 #include "slang-ast-print.h"
 #include "slang-doc-markdown-writer.h"
+#include "../../tools/platform/performance-counter.h"
 
 namespace Slang
 {
 using namespace LanguageServerProtocol;
 
-class LanguageServer
+ArrayView<const char*> getCommitChars()
 {
-public:
-    RefPtr<JSONRPCConnection> m_connection;
-    ComPtr<slang::IGlobalSession> m_session;
-    RefPtr<Workspace> m_workspace;
-    Dictionary<String, String> m_lastPublishedDiagnostics;
-    time_t m_lastDiagnosticUpdateTime = 0;
-
-    bool m_quit = false;
-    List<LanguageServerProtocol::WorkspaceFolder> m_workspaceFolders;
-
-    SlangResult init(const LanguageServerProtocol::InitializeParams& args);
-    SlangResult execute();
-    void update();
-    SlangResult didOpenTextDocument(const LanguageServerProtocol::DidOpenTextDocumentParams& args);
-    SlangResult didCloseTextDocument(
-        const LanguageServerProtocol::DidCloseTextDocumentParams& args);
-    SlangResult didChangeTextDocument(
-        const LanguageServerProtocol::DidChangeTextDocumentParams& args);
-    SlangResult hover(const LanguageServerProtocol::HoverParams& args, const JSONValue& responseId);
-    SlangResult gotoDefinition(const LanguageServerProtocol::DefinitionParams& args, const JSONValue& responseId);
-    SlangResult completion(
-        const LanguageServerProtocol::CompletionParams& args, const JSONValue& responseId);
-    SlangResult completionResolve(
-        const LanguageServerProtocol::CompletionItem& args, const JSONValue& responseId);
-    SlangResult semanticTokens(
-        const LanguageServerProtocol::SemanticTokensParams& args, const JSONValue& responseId);
-    SlangResult signatureHelp(
-        const LanguageServerProtocol::SignatureHelpParams& args, const JSONValue& responseId);
-
-    List<LanguageServerProtocol::CompletionItem> collectMembers(
-        WorkspaceVersion* wsVersion, Module* module, Expr* baseExpr);
-
-private:
-    SlangResult _executeSingle();
-    slang::IGlobalSession* getOrCreateGlobalSession();
-    void resetDiagnosticUpdateTime();
-    void publishDiagnostics();
-};
-
+    static const char* _commitCharsArray[] = {",", ".", ";", ":", "(", ")", "[", "]",
+                                              "<", ">", "{", "}", "*", "&", "^", "%",
+                                              "!", "-", "=", "+", "|", "/", "?", " "};
+    return makeArrayView(_commitCharsArray, SLANG_COUNT_OF(_commitCharsArray));
+}
 
 SlangResult LanguageServer::init(const InitializeParams& args)
 {
@@ -105,14 +73,8 @@ String uriToCanonicalPath(const String& uri)
     return canonnicalPath;
 }
 
-SlangResult LanguageServer::_executeSingle()
+SlangResult LanguageServer::parseNextMessage()
 {
-    // If we don't have a message, we can quit for now
-    if (!m_connection->hasMessage())
-    {
-        return SLANG_OK;
-    }
-
     const JSONRPCMessageType msgType = m_connection->getMessageType();
 
     switch (msgType)
@@ -121,8 +83,6 @@ SlangResult LanguageServer::_executeSingle()
         {
             JSONRPCCall call;
             SLANG_RETURN_ON_FAIL(m_connection->getRPCOrSendError(&call));
-
-            // Do different things
             if (call.method == ExitParams::methodName)
             {
                 m_quit = true;
@@ -143,15 +103,14 @@ SlangResult LanguageServer::_executeSingle()
                 InitializeResult result;
                 result.serverInfo.name = "SlangLanguageServer";
                 result.serverInfo.version = "1.0";
-                result.capabilities.positionEncoding = "utf-8";
+                result.capabilities.positionEncoding = "utf-16";
                 result.capabilities.textDocumentSync.openClose = true;
-                result.capabilities.textDocumentSync.change = (int)TextDocumentSyncKind::Full;
+                result.capabilities.textDocumentSync.change = (int)TextDocumentSyncKind::Incremental;
+                result.capabilities.workspace.workspaceFolders.supported = true;
+                result.capabilities.workspace.workspaceFolders.changeNotifications = false;
                 result.capabilities.hoverProvider = true;
                 result.capabilities.definitionProvider = true;
-                const char* commitChars[] = {",", ".", ";", ":", "(", ")", "[", "]",
-                                             "<", ">", "{", "}", "*", "&", "^", "%",
-                                             "!", "-", "=", "+", "|", "/", "?"};
-                for (auto ch : commitChars)
+                for (auto ch : getCommitChars())
                     result.capabilities.completionProvider.allCommitCharacters.add(ch);
                 result.capabilities.completionProvider.triggerCharacters.add(".");
                 result.capabilities.completionProvider.triggerCharacters.add(":");
@@ -166,84 +125,49 @@ SlangResult LanguageServer::_executeSingle()
                 m_connection->sendResult(&result, call.id);
                 return SLANG_OK;
             }
-            else if (call.method == DidOpenTextDocumentParams::methodName)
-            {
-                DidOpenTextDocumentParams args;
-                SLANG_RETURN_ON_FAIL(
-                    m_connection->toNativeArgsOrSendError(call.params, &args, call.id));
-                return didOpenTextDocument(args);
-            }
-            else if (call.method == DidCloseTextDocumentParams::methodName)
-            {
-                DidCloseTextDocumentParams args;
-                SLANG_RETURN_ON_FAIL(
-                    m_connection->toNativeArgsOrSendError(call.params, &args, call.id));
-                return didCloseTextDocument(args);
-            }
-            else if (call.method == DidChangeTextDocumentParams::methodName)
-            {
-                DidChangeTextDocumentParams args;
-                SLANG_RETURN_ON_FAIL(
-                    m_connection->toNativeArgsOrSendError(call.params, &args, call.id));
-                return didChangeTextDocument(args);
-            }
-            else if (call.method == HoverParams::methodName)
-            {
-                HoverParams args;
-                SLANG_RETURN_ON_FAIL(
-                    m_connection->toNativeArgsOrSendError(call.params, &args, call.id));
-                return hover(args, call.id);
-            }
-            else if (call.method == DefinitionParams::methodName)
-            {
-                DefinitionParams args;
-                SLANG_RETURN_ON_FAIL(
-                    m_connection->toNativeArgsOrSendError(call.params, &args, call.id));
-                return gotoDefinition(args, call.id);
-            }
-            else if (call.method == CompletionParams::methodName)
-            {
-                CompletionParams args;
-                SLANG_RETURN_ON_FAIL(
-                    m_connection->toNativeArgsOrSendError(call.params, &args, call.id));
-                return completion(args, call.id);
-            }
-            else if (call.method == SemanticTokensParams::methodName)
-            {
-                SemanticTokensParams args;
-                SLANG_RETURN_ON_FAIL(
-                    m_connection->toNativeArgsOrSendError(call.params, &args, call.id));
-                return semanticTokens(args, call.id);
-            }
-            else if (call.method == SignatureHelpParams::methodName)
-            {
-                SignatureHelpParams args;
-                SLANG_RETURN_ON_FAIL(
-                    m_connection->toNativeArgsOrSendError(call.params, &args, call.id));
-                return signatureHelp(args, call.id);
-            }
-            else if (call.method == "completionItem/resolve")
-            {
-                CompletionItem args;
-                SLANG_RETURN_ON_FAIL(
-                    m_connection->toNativeArgsOrSendError(call.params, &args, call.id));
-                return completionResolve(args, call.id);
-                
-            }
             else if (call.method == "initialized")
             {
-                return SLANG_OK;
-            }
-            else if (call.method.startsWith("$/"))
-            {
-                // Ignore.
+                sendConfigRequest();
+                registerCapability("workspace/didChangeConfiguration");
+                m_initialized = true;
                 return SLANG_OK;
             }
             else
             {
-                return m_connection->sendError(JSONRPC::ErrorCode::MethodNotFound, call.id);
+                queueJSONCall(call);
+                return SLANG_OK;
             }
+
         }
+    case JSONRPCMessageType::Result:
+        {
+            JSONResultResponse response;
+            SLANG_RETURN_ON_FAIL(m_connection->getRPCOrSendError(&response));
+            auto responseId = (int)m_connection->getContainer()->asInteger(response.id);
+            switch (responseId)
+            {
+            case kConfigResponseId:
+                if (response.result.getKind() == JSONValue::Kind::Array)
+                {
+                    auto arr = m_connection->getContainer()->getArray(response.result);
+                    if (arr.getCount() > 0)
+                    {
+                        updatePredefinedMacros(arr[0]);
+                    }
+                }
+                break;
+            }
+            return SLANG_OK;
+        }
+    case JSONRPCMessageType::Error:
+        {
+#if 0 // Enable for debug only
+            JSONRPCErrorResponse error;
+            SLANG_RETURN_ON_FAIL(m_connection->getRPCOrSendError(&error));
+#endif
+            return SLANG_OK;
+        }
+        break;
     default:
         {
             return m_connection->sendError(
@@ -268,6 +192,14 @@ String getDeclSignatureString(DeclRef<Decl> declRef, ASTBuilder* astBuilder)
             ASTPrinter::OptionFlag::ParamNames | ASTPrinter::OptionFlag::NoInternalKeywords |
                 ASTPrinter::OptionFlag::SimplifiedBuiltinType);
         printer.addDeclSignature(declRef);
+        if (auto varDecl = as<VarDeclBase>(declRef.getDecl()))
+        {
+            auto& sb = printer.getStringBuilder();
+            if (auto litExpr = as<LiteralExpr>(varDecl->initExpr))
+            {
+                sb << " = " << litExpr->token.getContent();
+            }
+        }
         return printer.getString();
     }
     return "unknown";
@@ -332,6 +264,15 @@ SlangResult LanguageServer::hover(
     const LanguageServerProtocol::HoverParams& args, const JSONValue& responseId)
 {
     String canonicalPath = uriToCanonicalPath(args.textDocument.uri);
+    RefPtr<DocumentVersion> doc;
+    if (!m_workspace->openedDocuments.TryGetValue(canonicalPath, doc))
+    {
+        m_connection->sendResult(NullResponse::get(), responseId);
+        return SLANG_OK;
+    }
+    Index line, col;
+    doc->zeroBasedUTF16LocToOneBasedUTF8Loc(args.position.line, args.position.character, line, col);
+
     auto version = m_workspace->getCurrentVersion();
     Module* parsedModule = version->getOrLoadModule(canonicalPath);
     if (!parsedModule)
@@ -340,12 +281,13 @@ SlangResult LanguageServer::hover(
         return SLANG_OK;
     }
     auto findResult = findASTNodesAt(
+        doc.Ptr(),
         version->linkage->getSourceManager(),
         parsedModule->getModuleDecl(),
         ASTLookupType::Decl,
         canonicalPath.getUnownedSlice(),
-        args.position.line + 1,
-        args.position.character + 1);
+        line,
+        col);
     if (findResult.getCount() == 0 || findResult[0].path.getCount() == 0)
     {
         m_connection->sendResult(NullResponse::get(), responseId);
@@ -375,10 +317,18 @@ SlangResult LanguageServer::hover(
             hover.range.start.line = int(nodeHumaneLoc.line - 1);
             hover.range.end.line = int(nodeHumaneLoc.line - 1);
             hover.range.start.character = int(nodeHumaneLoc.column - 1);
-            if (declRef.getName())
+            auto name = declRef.getName();
+            if (auto ctorDecl = declRef.as<ConstructorDecl>())
             {
-                hover.range.end.character =
-                    int(nodeHumaneLoc.column + declRef.getName()->text.getLength() - 1);
+                auto parent = ctorDecl.getDecl()->parentDecl;
+                if (parent)
+                {
+                    name = parent->getName();
+                }
+            }
+            if (name)
+            {
+                hover.range.end.character = int(nodeHumaneLoc.column + name->text.getLength() - 1);
             }
         }
     };
@@ -413,6 +363,15 @@ SlangResult LanguageServer::gotoDefinition(
     const LanguageServerProtocol::DefinitionParams& args, const JSONValue& responseId)
 {
     String canonicalPath = uriToCanonicalPath(args.textDocument.uri);
+    RefPtr<DocumentVersion> doc;
+    if (!m_workspace->openedDocuments.TryGetValue(canonicalPath, doc))
+    {
+        m_connection->sendResult(NullResponse::get(), responseId);
+        return SLANG_OK;
+    }
+    Index line, col;
+    doc->zeroBasedUTF16LocToOneBasedUTF8Loc(args.position.line, args.position.character, line, col);
+
     auto version = m_workspace->getCurrentVersion();
     Module* parsedModule = version->getOrLoadModule(canonicalPath);
     if (!parsedModule)
@@ -421,12 +380,13 @@ SlangResult LanguageServer::gotoDefinition(
         return SLANG_OK;
     }
     auto findResult = findASTNodesAt(
+        doc.Ptr(),
         version->linkage->getSourceManager(),
         parsedModule->getModuleDecl(),
         ASTLookupType::Decl,
         canonicalPath.getUnownedSlice(),
-        args.position.line + 1,
-        args.position.character + 1);
+        line,
+        col);
     if (findResult.getCount() == 0 || findResult[0].path.getCount() == 0)
     {
         m_connection->sendResult(NullResponse::get(), responseId);
@@ -444,7 +404,9 @@ SlangResult LanguageServer::gotoDefinition(
         if (declRefExpr->declRef.getDecl())
         {
             auto location = version->linkage->getSourceManager()->getHumaneLoc(
-                declRefExpr->declRef.getNameLoc(), SourceLocType::Actual);
+                    declRefExpr->declRef.getNameLoc().isValid() ? declRefExpr->declRef.getNameLoc()
+                                                                : declRefExpr->declRef.getLoc(),
+                    SourceLocType::Actual);
             auto name = declRefExpr->declRef.getName();
             locations.add(LocationResult{location, name ? (int)name->text.getLength() : 0});
         }
@@ -485,26 +447,20 @@ SlangResult LanguageServer::gotoDefinition(
         for (auto loc : locations)
         {
             Location result;
-            result.uri = URI::fromLocalFilePath(loc.loc.pathInfo.foundPath.getUnownedSlice()).uri;
-            result.range.start.line = int(loc.loc.line - 1);
-            result.range.start.character = int(loc.loc.column - 1);
-            result.range.end = result.range.start;
-            result.range.end.character += loc.length;
-            results.add(result);
+            if (File::exists(loc.loc.pathInfo.foundPath))
+            {
+                result.uri =
+                    URI::fromLocalFilePath(loc.loc.pathInfo.foundPath.getUnownedSlice()).uri;
+                result.range.start.line = int(loc.loc.line - 1);
+                result.range.start.character = int(loc.loc.column - 1);
+                result.range.end = result.range.start;
+                result.range.end.character += loc.length;
+                results.add(result);
+            }
         }
         m_connection->sendResult(&results, responseId);
         return SLANG_OK;
     }
-}
-
-bool _isIdentifierChar(char ch)
-{
-    return ch >= '0' && ch <= '9' || ch >= 'a' && ch <= 'z' || ch >= 'A' && ch <= 'Z' || ch == '_';
-}
-
-bool _isWhitespaceChar(char ch)
-{
-    return ch == ' ' || ch == '\r' || ch == '\n' || ch == '\t';
 }
 
 SlangResult LanguageServer::completion(
@@ -518,39 +474,16 @@ SlangResult LanguageServer::completion(
         m_connection->sendResult(NullResponse::get(), responseId);
         return SLANG_OK;
     }
-    
-    auto cursorOffset = doc->getOffset(args.position.line + 1, args.position.character + 1);
+    Index utf8Line, utf8Col;
+    doc->zeroBasedUTF16LocToOneBasedUTF8Loc(
+        args.position.line, args.position.character, utf8Line, utf8Col);
+    auto cursorOffset = doc->getOffset(utf8Line, utf8Col);
     if (cursorOffset == -1 || doc->getText().getLength() == 0)
     {
         m_connection->sendResult(NullResponse::get(), responseId);
         return SLANG_OK;
     }
-    // Scan backward until we locate a '.' or ':'.
-    if (cursorOffset == doc->getText().getLength())
-        cursorOffset--;
-    while (cursorOffset > 0 && _isWhitespaceChar(doc->getText()[cursorOffset]))
-    {
-        cursorOffset--;
-    }
-    while (cursorOffset > 0 && _isIdentifierChar(doc->getText()[cursorOffset]))
-    {
-        cursorOffset--;
-    }
-    while (cursorOffset > 0 && _isWhitespaceChar(doc->getText()[cursorOffset]))
-    {
-        cursorOffset--;
-    }
-    if (cursorOffset > 0 && doc->getText()[cursorOffset] == ':')
-        cursorOffset--;
-    if (cursorOffset <= 0 ||
-        (doc->getText()[cursorOffset] != '.' && doc->getText()[cursorOffset] != ':'))
-    {
-        m_connection->sendResult(NullResponse::get(), responseId);
-        return SLANG_OK;
-    }
-    Index line = 0;
-    Index col = 0;
-    doc->offsetToLineCol(cursorOffset, line, col);
+    
     auto version = m_workspace->getCurrentVersion();
     Module* parsedModule = version->getOrLoadModule(canonicalPath);
     if (!parsedModule)
@@ -558,48 +491,26 @@ SlangResult LanguageServer::completion(
         m_connection->sendResult(NullResponse::get(), responseId);
         return SLANG_OK;
     }
-    auto findResult = findASTNodesAt(
-        version->linkage->getSourceManager(),
-        parsedModule->getModuleDecl(),
-        ASTLookupType::Decl,
-        canonicalPath.getUnownedSlice(),
-        line,
-        col);
-    if (findResult.getCount() != 1)
-    {
-        m_connection->sendResult(NullResponse::get(), responseId);
-        return SLANG_OK;
-    }
-    if (findResult[0].path.getCount() == 0)
-    {
-        m_connection->sendResult(NullResponse::get(), responseId);
-        return SLANG_OK;
-    }
-    Expr* baseExpr = nullptr;
-    if (auto memberExpr = as<MemberExpr>(findResult[0].path.getLast()))
-    {
-        baseExpr = memberExpr->baseExpression;
-    }
-    else if (auto staticMemberExpr = as<StaticMemberExpr>(findResult[0].path.getLast()))
-    {
-        baseExpr = staticMemberExpr->baseExpression;
-    }
-    else if (auto swizzleExpr = as<SwizzleExpr>(findResult[0].path.getLast()))
-    {
-        baseExpr = swizzleExpr->base;
-    }
-    else if (auto matSwizzleExpr = as<MatrixSwizzleExpr>(findResult[0].path.getLast()))
-    {
-        baseExpr = matSwizzleExpr->base;
-    }
-    if (!baseExpr || !baseExpr->type.type || baseExpr->type.type->equals(version->linkage->getASTBuilder()->getErrorType()))
-    {
-        m_connection->sendResult(NullResponse::get(), responseId);
-        return SLANG_OK;
-    }
 
-    List<LanguageServerProtocol::CompletionItem> items = collectMembers(version, parsedModule, baseExpr);
-    m_connection->sendResult(&items, responseId);
+    CompletionContext context;
+    context.server = this;
+    context.cursorOffset = cursorOffset;
+    context.version = version;
+    context.doc = doc.Ptr();
+    context.parsedModule = parsedModule;
+    context.responseId = responseId;
+    context.canonicalPath = canonicalPath.getUnownedSlice();
+    context.line = utf8Line;
+    context.col = utf8Col;
+    if (SLANG_SUCCEEDED(context.tryCompleteMember()))
+    {
+        return SLANG_OK;
+    }
+    if (SLANG_SUCCEEDED(context.tryCompleteHLSLSemantic()))
+    {
+        return SLANG_OK;
+    }
+    m_connection->sendResult(NullResponse::get(), responseId);
     return SLANG_OK;
 }
 
@@ -628,6 +539,13 @@ SlangResult LanguageServer::semanticTokens(
 {
     String canonicalPath = uriToCanonicalPath(args.textDocument.uri);
 
+    RefPtr<DocumentVersion> doc;
+    if (!m_workspace->openedDocuments.TryGetValue(canonicalPath, doc))
+    {
+        m_connection->sendResult(NullResponse::get(), responseId);
+        return SLANG_OK;
+    }
+
     auto version = m_workspace->getCurrentVersion();
     Module* parsedModule = version->getOrLoadModule(canonicalPath);
     if (!parsedModule)
@@ -636,7 +554,18 @@ SlangResult LanguageServer::semanticTokens(
         return SLANG_OK;
     }
 
-    auto tokens = getSemanticTokens(version->linkage, parsedModule, canonicalPath.getUnownedSlice());
+    auto tokens = getSemanticTokens(version->linkage, parsedModule, canonicalPath.getUnownedSlice(), doc.Ptr());
+    for (auto& token : tokens)
+    {
+        Index line, col;
+        doc->oneBasedUTF8LocToZeroBasedUTF16Loc(token.line, token.col, line, col);
+        Index lineEnd, colEnd;
+        doc->oneBasedUTF8LocToZeroBasedUTF16Loc(
+            token.line, token.col + token.length, lineEnd, colEnd);
+        token.line = (int)line;
+        token.col = (int)col;
+        token.length = (int)(colEnd - col);
+    }
     SemanticTokens response;
     response.resultId = "";
     response.data = getEncodedTokens(tokens);
@@ -648,6 +577,14 @@ SlangResult LanguageServer::signatureHelp(
     const LanguageServerProtocol::SignatureHelpParams& args, const JSONValue& responseId)
 {
     String canonicalPath = uriToCanonicalPath(args.textDocument.uri);
+    RefPtr<DocumentVersion> doc;
+    if (!m_workspace->openedDocuments.TryGetValue(canonicalPath, doc))
+    {
+        m_connection->sendResult(NullResponse::get(), responseId);
+        return SLANG_OK;
+    }
+    Index line, col;
+    doc->zeroBasedUTF16LocToOneBasedUTF8Loc(args.position.line, args.position.character, line, col);
 
     auto version = m_workspace->getCurrentVersion();
     Module* parsedModule = version->getOrLoadModule(canonicalPath);
@@ -658,12 +595,13 @@ SlangResult LanguageServer::signatureHelp(
     }
 
     auto findResult = findASTNodesAt(
+        doc.Ptr(),
         version->linkage->getSourceManager(),
         parsedModule->getModuleDecl(),
         ASTLookupType::Invoke,
         canonicalPath.getUnownedSlice(),
-        args.position.line + 1,
-        args.position.character + 1);
+        line,
+        col);
 
     if (findResult.getCount() == 0)
     {
@@ -673,6 +611,7 @@ SlangResult LanguageServer::signatureHelp(
 
     AppExprBase* appExpr = nullptr;
     auto& declPath = findResult[0].path;
+    Loc currentLoc = {args.position.line + 1, args.position.character + 1};
     for (Index i = declPath.getCount() - 1; i >= 0; i--)
     {
         if (auto expr = as<AppExprBase>(declPath[i]))
@@ -681,8 +620,14 @@ SlangResult LanguageServer::signatureHelp(
             // This allows us to skip the invoke expr nodes for operators/implcit casts.
             if (expr->argumentDelimeterLocs.getCount())
             {
-                appExpr = expr;
-                break;
+                auto start = Loc::fromSourceLoc(version->linkage->getSourceManager(), expr->argumentDelimeterLocs.getFirst());
+                auto end = Loc::fromSourceLoc(
+                    version->linkage->getSourceManager(), expr->argumentDelimeterLocs.getLast());
+                if (start < currentLoc && currentLoc <= end)
+                {
+                    appExpr = expr;
+                    break;
+                }
             }
         }
     }
@@ -746,7 +691,18 @@ SlangResult LanguageServer::signatureHelp(
     };
     if (auto declRefExpr = as<DeclRefExpr>(funcExpr))
     {
-        addDeclRef(declRefExpr->declRef);
+        if (auto aggDecl = as<AggTypeDecl>(declRefExpr->declRef.getDecl()))
+        {
+            // Look for initializers
+            for (auto member : aggDecl->getMembersOfType<ConstructorDecl>())
+            {
+                addDeclRef(DeclRef<Decl>(member, declRefExpr->declRef.substitutions));
+            }
+        }
+        else
+        {
+            addDeclRef(declRefExpr->declRef);
+        }
     }
     else if (auto overloadedExpr = as<OverloadedExpr>(funcExpr))
     {
@@ -771,171 +727,6 @@ SlangResult LanguageServer::signatureHelp(
 
     m_connection->sendResult(&response, responseId);
     return SLANG_OK;
-}
-
-
-List<LanguageServerProtocol::CompletionItem> LanguageServer::collectMembers(WorkspaceVersion* version, Module* module, Expr* baseExpr)
-{
-    List<LanguageServerProtocol::CompletionItem> result;
-    auto linkage = version->linkage;
-    Type* type = baseExpr->type.type;
-    if (auto typeType = as<TypeType>(type))
-    {
-        type = typeType->type;
-    }
-    version->currentCompletionItems.clear();
-    if (type)
-    {
-        if (as<ArithmeticExpressionType>(type))
-        {
-            // Hard code members for vector and matrix types.
-            result.clear();
-            version->currentCompletionItems.clear();
-            int elementCount = 0;
-            Type* elementType = nullptr;
-            const char* memberNames[4] = {"x", "y", "z", "w"};
-            if (auto vectorType = as<VectorExpressionType>(type))
-            {
-                if (auto elementCountVal = as<ConstantIntVal>(vectorType->elementCount))
-                {
-                    elementCount = (int)elementCountVal->value;
-                    elementType = vectorType->elementType;
-                }
-            }
-            else if (auto matrixType = as<MatrixExpressionType>(type))
-            {
-                if (auto elementCountVal = as<ConstantIntVal>(matrixType->getRowCount()))
-                {
-                    elementCount = (int)elementCountVal->value;
-                    elementType = matrixType->getRowType();
-                }
-            }
-            String typeStr;
-            if (elementType)
-                typeStr = elementType->toString();
-            for (int i = 0; i < elementCount; i++)
-            {
-                CompletionItem item;
-                item.data = 0;
-                item.detail = typeStr;
-                item.kind = LanguageServerProtocol::kCompletionItemKindVariable;
-                item.label = memberNames[i];
-                result.add(item);
-            }
-        }
-        else
-        {
-            DiagnosticSink sink;
-            MemberCollectingContext context(linkage, module, &sink);
-            context.astBuilder = linkage->getASTBuilder();
-            collectMembersInType(&context, type);
-            HashSet<String> deduplicateSet;
-            for (auto member : context.members)
-            {
-                CompletionItem item;
-                item.label = member->getName()->text;
-                item.kind = 0;
-                if (as<TypeConstraintDecl>(member))
-                {
-                    continue;
-                }
-                if (as<ConstructorDecl>(member))
-                {
-                    continue;
-                }
-                if (as<SubscriptDecl>(member))
-                {
-                    continue;
-                }
-
-                if (item.label.startsWith("$"))
-                    continue;
-                if (!deduplicateSet.Add(item.label))
-                    continue;
-
-                if (as<StructDecl>(member))
-                {
-                    item.kind = LanguageServerProtocol::kCompletionItemKindStruct;
-                }
-                else if (as<ClassDecl>(member))
-                {
-                    item.kind = LanguageServerProtocol::kCompletionItemKindClass;
-                }
-                else if (as<InterfaceDecl>(member))
-                {
-                    item.kind = LanguageServerProtocol::kCompletionItemKindInterface;
-                }
-                else if (as<SimpleTypeDecl>(member))
-                {
-                    item.kind = LanguageServerProtocol::kCompletionItemKindClass;
-                }
-                else if (as<PropertyDecl>(member))
-                {
-                    item.kind = LanguageServerProtocol::kCompletionItemKindProperty;
-                }
-                else if (as<EnumDecl>(member))
-                {
-                    item.kind = LanguageServerProtocol::kCompletionItemKindEnum;
-                }
-                else if (as<VarDeclBase>(member))
-                {
-                    item.kind = LanguageServerProtocol::kCompletionItemKindVariable;
-                }
-                else if (as<EnumCaseDecl>(member))
-                {
-                    item.kind = LanguageServerProtocol::kCompletionItemKindEnumMember;
-                }
-                else if (as<CallableDecl>(member))
-                {
-                    item.kind = LanguageServerProtocol::kCompletionItemKindMethod;
-                }
-                else if (as<AssocTypeDecl>(member))
-                {
-                    item.kind = LanguageServerProtocol::kCompletionItemKindClass;
-                }
-                item.data = String(version->currentCompletionItems.getCount());
-                result.add(item);
-                version->currentCompletionItems.add(member);
-            }
-        }
-
-        for (auto& item : result)
-        {
-            switch (item.kind)
-            {
-            case LanguageServerProtocol::kCompletionItemKindMethod:
-                item.commitCharacters.add("(");
-                item.commitCharacters.add("[");
-                item.commitCharacters.add(" ");
-                break;
-            default:
-                item.commitCharacters.add("(");
-                item.commitCharacters.add(")");
-                item.commitCharacters.add(".");
-                item.commitCharacters.add(";");
-                item.commitCharacters.add(":");
-                item.commitCharacters.add(",");
-                item.commitCharacters.add("<");
-                item.commitCharacters.add(">");
-                item.commitCharacters.add("[");
-                item.commitCharacters.add("]");
-                item.commitCharacters.add("{");
-                item.commitCharacters.add("}");
-                item.commitCharacters.add("-");
-                item.commitCharacters.add("*");
-                item.commitCharacters.add("/");
-                item.commitCharacters.add("%");
-                item.commitCharacters.add("+");
-                item.commitCharacters.add("=");
-                item.commitCharacters.add("&");
-                item.commitCharacters.add("|");
-                item.commitCharacters.add("!");
-                item.commitCharacters.add(" ");
-                break;
-            }
-        }
-    }
-    return result;
 }
 
 void LanguageServer::publishDiagnostics()
@@ -982,25 +773,233 @@ void LanguageServer::publishDiagnostics()
     }
 }
 
+void LanguageServer::updatePredefinedMacros(const JSONValue& macros)
+{
+    if (macros.isValid())
+    {
+        auto container = m_connection->getContainer();
+        JSONToNativeConverter converter(container, m_connection->getSink());
+        List<String> predefinedMacros;
+        if (SLANG_SUCCEEDED(converter.convert(macros, &predefinedMacros)))
+        {
+            if (m_workspace->updatePredefinedMacros(predefinedMacros))
+            {
+                m_connection->sendCall(
+                    UnownedStringSlice("workspace/semanticTokens/refresh"), JSONValue::makeInt(0));
+            }
+        }
+    }
+}
+
+void LanguageServer::sendConfigRequest()
+{
+    ConfigurationParams args;
+    ConfigurationItem item;
+    item.section = "slang.predefinedMacros";
+    args.items.add(item);
+    m_connection->sendCall(
+        ConfigurationParams::methodName, &args, JSONValue::makeInt(kConfigResponseId));
+}
+
+void LanguageServer::registerCapability(const char* methodName)
+{
+    RegistrationParams args;
+    Registration reg;
+    reg.method = methodName;
+    reg.id = reg.method;
+    args.registrations.add(reg);
+    m_connection->sendCall(
+        UnownedStringSlice("client/registerCapability"), &args, JSONValue::makeInt(999));
+}
+
+void LanguageServer::logMessage(int type, String message)
+{
+    LanguageServerProtocol::LogMessageParams args;
+    args.type = type;
+    args.message = message;
+    m_connection->sendCall(LanguageServerProtocol::LogMessageParams::methodName, &args);
+}
+
+SlangResult LanguageServer::queueJSONCall(JSONRPCCall call)
+{
+    Command cmd;
+    cmd.id = PersistentJSONValue(call.id, m_connection->getContainer());
+    cmd.method = call.method;
+    if (call.method == DidOpenTextDocumentParams::methodName)
+    {
+        DidOpenTextDocumentParams args;
+        SLANG_RETURN_ON_FAIL(m_connection->toNativeArgsOrSendError(call.params, &args, call.id));
+        cmd.openDocArgs = args;
+    }
+    else if (call.method == DidCloseTextDocumentParams::methodName)
+    {
+        DidCloseTextDocumentParams args;
+        SLANG_RETURN_ON_FAIL(m_connection->toNativeArgsOrSendError(call.params, &args, call.id));
+        cmd.closeDocArgs = args;
+    }
+    else if (call.method == DidChangeTextDocumentParams::methodName)
+    {
+        DidChangeTextDocumentParams args;
+        SLANG_RETURN_ON_FAIL(m_connection->toNativeArgsOrSendError(call.params, &args, call.id));
+        cmd.changeDocArgs = args;
+    }
+    else if (call.method == HoverParams::methodName)
+    {
+        HoverParams args;
+        SLANG_RETURN_ON_FAIL(m_connection->toNativeArgsOrSendError(call.params, &args, call.id));
+        cmd.hoverArgs = args;
+    }
+    else if (call.method == DefinitionParams::methodName)
+    {
+        DefinitionParams args;
+        SLANG_RETURN_ON_FAIL(m_connection->toNativeArgsOrSendError(call.params, &args, call.id));
+        cmd.definitionArgs = args;
+    }
+    else if (call.method == CompletionParams::methodName)
+    {
+        CompletionParams args;
+        SLANG_RETURN_ON_FAIL(m_connection->toNativeArgsOrSendError(call.params, &args, call.id));
+        cmd.completionArgs = args;
+    }
+    else if (call.method == SemanticTokensParams::methodName)
+    {
+        SemanticTokensParams args;
+        SLANG_RETURN_ON_FAIL(m_connection->toNativeArgsOrSendError(call.params, &args, call.id));
+        cmd.semanticTokenArgs = args;
+    }
+    else if (call.method == SignatureHelpParams::methodName)
+    {
+        SignatureHelpParams args;
+        SLANG_RETURN_ON_FAIL(m_connection->toNativeArgsOrSendError(call.params, &args, call.id));
+        cmd.signatureHelpArgs = args;
+    }
+    else if (call.method == "completionItem/resolve")
+    {
+        CompletionItem args;
+        SLANG_RETURN_ON_FAIL(m_connection->toNativeArgsOrSendError(call.params, &args, call.id));
+        cmd.completionResolveArgs = args;
+    }
+    else if (call.method == DidChangeConfigurationParams::methodName)
+    {
+        DidChangeConfigurationParams args;
+        SLANG_RETURN_ON_FAIL(m_connection->toNativeArgsOrSendError(call.params, &args, call.id));
+        // We need to process it now instead of sending to queue.
+        // This is because there is reference to JSONValue that is only available here.
+        return didChangeConfiguration(args);
+    }
+    else if (call.method == "$/cancelRequest")
+    {
+        CancelParams args;
+        SLANG_RETURN_ON_FAIL(m_connection->toNativeArgsOrSendError(call.params, &args, call.id));
+        cmd.cancelArgs = args;
+    }
+    commands.add(_Move(cmd));
+    return SLANG_OK;
+}
+
+SlangResult LanguageServer::runCommand(Command& call)
+{
+    // Do different things
+    if (call.method == DidOpenTextDocumentParams::methodName)
+    {
+        return didOpenTextDocument(call.openDocArgs.get());
+    }
+    else if (call.method == DidCloseTextDocumentParams::methodName)
+    {
+        return didCloseTextDocument(call.closeDocArgs.get());
+    }
+    else if (call.method == DidChangeTextDocumentParams::methodName)
+    {
+        return didChangeTextDocument(call.changeDocArgs.get());
+    }
+    else if (call.method == HoverParams::methodName)
+    {
+        return hover(call.hoverArgs.get(), call.id);
+    }
+    else if (call.method == DefinitionParams::methodName)
+    {
+        return gotoDefinition(call.definitionArgs.get(), call.id);
+    }
+    else if (call.method == CompletionParams::methodName)
+    {
+        return completion(call.completionArgs.get(), call.id);
+    }
+    else if (call.method == SemanticTokensParams::methodName)
+    {
+        return semanticTokens(call.semanticTokenArgs.get(), call.id);
+    }
+    else if (call.method == SignatureHelpParams::methodName)
+    {
+        return signatureHelp(call.signatureHelpArgs.get(), call.id);
+    }
+    else if (call.method == "completionItem/resolve")
+    {
+        return completionResolve(call.completionResolveArgs.get(), call.id);
+    }
+    else if (call.method == DidChangeConfigurationParams::methodName)
+    {
+        return didChangeConfiguration(call.changeConfigArgs.get());
+    }
+    else if (call.method.startsWith("$/"))
+    {
+        // Ignore.
+        return SLANG_OK;
+    }
+    else
+    {
+        return m_connection->sendError(JSONRPC::ErrorCode::MethodNotFound, call.id);
+    }
+}
+
+void LanguageServer::processCommands()
+{
+    HashSet<int64_t> canceledIDs;
+    for (auto& cmd : commands)
+    {
+        if (cmd.method == "$/cancelRequest")
+        {
+            auto id = cmd.cancelArgs.get().id;
+            if (id > 0)
+            {
+                canceledIDs.Add(id);
+            }
+        }
+    }
+    const int kErrorRequestCanceled = -32800;
+    for (auto& cmd : commands)
+    {
+        if (cmd.id.getKind() == JSONValue::Kind::Integer && canceledIDs.Contains(cmd.id.asInteger()))
+        {
+            m_connection->sendError((JSONRPC::ErrorCode)kErrorRequestCanceled, cmd.id);
+        }
+        else
+        {
+            runCommand(cmd);
+        }
+    }
+}
+
 SlangResult LanguageServer::didCloseTextDocument(const DidCloseTextDocumentParams& args)
 {
     String canonicalPath = uriToCanonicalPath(args.textDocument.uri);
-    m_workspace->openedDocuments.Remove(canonicalPath);
-    m_workspace->invalidate();
+    m_workspace->closeDoc(canonicalPath);
     resetDiagnosticUpdateTime();
     return SLANG_OK;
 }
 SlangResult LanguageServer::didChangeTextDocument(const DidChangeTextDocumentParams& args)
 {
     String canonicalPath = uriToCanonicalPath(args.textDocument.uri);
-
-    RefPtr<DocumentVersion> doc;
-    if (m_workspace->openedDocuments.TryGetValue(canonicalPath, doc))
-    {
-        doc->setText(args.contentChanges[0].text.getUnownedSlice());
-    }
-    m_workspace->invalidate();
+    for (auto change : args.contentChanges)
+        m_workspace->changeDoc(canonicalPath, change.range, change.text);
     resetDiagnosticUpdateTime();
+    return SLANG_OK;
+}
+
+SlangResult LanguageServer::didChangeConfiguration(
+    const LanguageServerProtocol::DidChangeConfigurationParams& args)
+{
+    SLANG_UNUSED(args);
+    sendConfigRequest();
     return SLANG_OK;
 }
 
@@ -1013,24 +1012,38 @@ void LanguageServer::update()
 
 SlangResult LanguageServer::execute()
 {
-
     m_connection = new JSONRPCConnection();
     m_connection->initWithStdStreams();
     
     while (m_connection->isActive() && !m_quit)
     {
         // Consume all messages first.
+        commands.clear();
+        auto start = platform::PerformanceCounter::now();
         while (true)
         {
             m_connection->tryReadMessage();
             if (!m_connection->hasMessage())
                 break;
-            const SlangResult res = _executeSingle();
-
+            parseNextMessage();
         }
-
+        auto parseTime = platform::PerformanceCounter::getElapsedTimeInSeconds(start);
+        auto parseEnd = platform::PerformanceCounter::now();
+        processCommands();
         // Now we can use this time to reparse user's code, report diagnostics, etc.
         update();
+        auto workTime = platform::PerformanceCounter::getElapsedTimeInSeconds(parseEnd);
+
+        if (commands.getCount() > 0 && m_initialized)
+        {
+            StringBuilder msgBuilder;
+            msgBuilder << "Server processed " << commands.getCount() << " commands, parsed in "
+                       << String(int(parseTime * 1000)) << "ms, executed in "
+                       << String(int(workTime * 1000)) << "ms";
+            logMessage(3, msgBuilder.ProduceString());
+        }
+
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
 
     return SLANG_OK;

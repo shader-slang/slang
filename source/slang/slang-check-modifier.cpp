@@ -594,7 +594,7 @@ namespace Slang
             return uncheckedAttr;
         }
 
-        if(!attrDecl->syntaxClass.isSubClassOf<Attribute>())
+        if (!attrDecl->syntaxClass.isSubClassOf<Attribute>())
         {
             SLANG_DIAGNOSE_UNEXPECTED(getSink(), attrDecl, "attribute declaration does not reference an attribute class");
             return uncheckedAttr;

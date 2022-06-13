@@ -517,7 +517,10 @@ namespace Slang
             return cf(astBuilder);
         }
 
-        SLANG_FORCE_INLINE bool isSubClassOfImpl(SyntaxClassBase const& super) const { return classInfo->isSubClassOf(*super.classInfo); }
+        SLANG_FORCE_INLINE bool isSubClassOfImpl(SyntaxClassBase const& super) const
+        {
+            return classInfo ? classInfo->isSubClassOf(*super.classInfo) : false;
+        }
 
         ReflectClassInfo const* classInfo = nullptr;
     };

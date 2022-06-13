@@ -181,12 +181,35 @@ const StructRttiInfo DidCloseTextDocumentParams::g_rttiInfo = _makeDidCloseTextD
 const UnownedStringSlice DidCloseTextDocumentParams::methodName =
     UnownedStringSlice::fromLiteral("textDocument/didClose");
 
+static const StructRttiInfo _makeWorkspaceFoldersServerCapabilitiesRtti()
+{
+    WorkspaceFoldersServerCapabilities obj;
+    StructRttiBuilder builder(&obj, "LanguageServerProtocol::WorkspaceFoldersServerCapabilities", nullptr);
+    builder.addField("supported", &obj.supported);
+    builder.addField("changeNotifications", &obj.changeNotifications);
+    builder.ignoreUnknownFields();
+    return builder.make();
+}
+const StructRttiInfo WorkspaceFoldersServerCapabilities::g_rttiInfo =
+    _makeWorkspaceFoldersServerCapabilitiesRtti();
+
+static const StructRttiInfo _makeWorkspaceCapabilitiesRtti()
+{
+    WorkspaceCapabilities obj;
+    StructRttiBuilder builder(&obj, "LanguageServerProtocol::WorkspaceCapabilities", nullptr);
+    builder.addField("workspaceFolders", &obj.workspaceFolders);
+    builder.ignoreUnknownFields();
+    return builder.make();
+}
+const StructRttiInfo WorkspaceCapabilities::g_rttiInfo = _makeWorkspaceCapabilitiesRtti();
+
 static const StructRttiInfo _makeServerCapabilitiesRtti()
 {
     ServerCapabilities obj;
     StructRttiBuilder builder(&obj, "LanguageServerProtocol::ServerCapabilities", nullptr);
     builder.addField("positionEncoding", &obj.positionEncoding);
     builder.addField("textDocumentSync", &obj.textDocumentSync);
+    builder.addField("workspace", &obj.workspace);
     builder.addField("hoverProvider", &obj.hoverProvider);
     builder.addField("definitionProvider", &obj.definitionProvider);
     builder.addField("completionProvider", &obj.completionProvider);
@@ -469,6 +492,87 @@ static const StructRttiInfo _makeSignatureHelpRtti()
     return builder.make();
 }
 const StructRttiInfo SignatureHelp::g_rttiInfo = _makeSignatureHelpRtti();
+
+static const StructRttiInfo _makeDidChangeConfigurationParamsRtti()
+{
+    DidChangeConfigurationParams obj;
+    StructRttiBuilder builder(&obj, "LanguageServerProtocol::DidChangeConfigurationParams", nullptr);
+    builder.addField("settings", &obj.settings, StructRttiInfo::Flag::Optional);
+    builder.ignoreUnknownFields();
+    return builder.make();
+}
+const StructRttiInfo DidChangeConfigurationParams::g_rttiInfo =
+    _makeDidChangeConfigurationParamsRtti();
+const UnownedStringSlice DidChangeConfigurationParams::methodName =
+    UnownedStringSlice::fromLiteral("workspace/didChangeConfiguration");
+
+static const StructRttiInfo _makeConfigurationItemRtti()
+{
+    ConfigurationItem obj;
+    StructRttiBuilder builder(
+        &obj, "LanguageServerProtocol::ConfigurationItem", nullptr);
+    builder.addField("section", &obj.section, StructRttiInfo::Flag::Optional);
+    builder.ignoreUnknownFields();
+    return builder.make();
+}
+const StructRttiInfo ConfigurationItem::g_rttiInfo = _makeConfigurationItemRtti();
+
+static const StructRttiInfo _makeConfigurationParamsRtti()
+{
+    ConfigurationParams obj;
+    StructRttiBuilder builder(
+        &obj, "LanguageServerProtocol::ConfigurationParams", nullptr);
+    builder.addField("items", &obj.items, StructRttiInfo::Flag::Optional);
+    builder.ignoreUnknownFields();
+    return builder.make();
+}
+const StructRttiInfo ConfigurationParams::g_rttiInfo = _makeConfigurationParamsRtti();
+const UnownedStringSlice ConfigurationParams::methodName =
+    UnownedStringSlice::fromLiteral("workspace/configuration");
+
+static const StructRttiInfo _makeRegistrationRtti()
+{
+    Registration obj;
+    StructRttiBuilder builder(&obj, "LanguageServerProtocol::Registration", nullptr);
+    builder.addField("id", &obj.id, StructRttiInfo::Flag::Optional);
+    builder.addField("method", &obj.method, StructRttiInfo::Flag::Optional);
+    builder.ignoreUnknownFields();
+    return builder.make();
+}
+const StructRttiInfo Registration::g_rttiInfo = _makeRegistrationRtti();
+
+static const StructRttiInfo _makeRegistrationParamsRtti()
+{
+    RegistrationParams obj;
+    StructRttiBuilder builder(&obj, "LanguageServerProtocol::RegistrationParams", nullptr);
+    builder.addField("registrations", &obj.registrations, StructRttiInfo::Flag::Optional);
+    builder.ignoreUnknownFields();
+    return builder.make();
+}
+const StructRttiInfo RegistrationParams::g_rttiInfo = _makeRegistrationParamsRtti();
+
+static const StructRttiInfo _makeCancelParamsRtti()
+{
+    CancelParams obj;
+    StructRttiBuilder builder(&obj, "LanguageServerProtocol::CancelParams", nullptr);
+    builder.addField("id", &obj.id, StructRttiInfo::Flag::Optional);
+    builder.ignoreUnknownFields();
+    return builder.make();
+}
+const StructRttiInfo CancelParams::g_rttiInfo = _makeCancelParamsRtti();
+
+static const StructRttiInfo _makeLogMessageParamsRtti()
+{
+    LogMessageParams obj;
+    StructRttiBuilder builder(&obj, "LanguageServerProtocol::LogMessageParams", nullptr);
+    builder.addField("type", &obj.type, StructRttiInfo::Flag::Optional);
+    builder.addField("message", &obj.message, StructRttiInfo::Flag::Optional);
+    builder.ignoreUnknownFields();
+    return builder.make();
+}
+const StructRttiInfo LogMessageParams::g_rttiInfo = _makeLogMessageParamsRtti();
+const UnownedStringSlice LogMessageParams::methodName =
+    UnownedStringSlice::fromLiteral("window/logMessage");
 
 } // namespace LanguageServerProtocol
 
