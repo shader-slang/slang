@@ -1183,6 +1183,8 @@ void LivenessContext::_calcLoopOwnership()
     // Should all be set to invalid initially
     for (const auto& fixedInfo : m_fixedBlockInfos)
     {
+        // To stop an error when assert isn't defined...
+        SLANG_UNUSED(fixedInfo);
         SLANG_ASSERT(fixedInfo.owningLoopBlockIndex == BlockIndex::Invalid);
     }
 
