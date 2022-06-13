@@ -145,7 +145,6 @@ struct LivenessContext
         void resetForStart()
         {
             result = BlockResult::NotVisited;
-            loopParentBlockIndex = BlockIndex::Invalid;
         }
 
             /// Reset any information needed for a new root
@@ -160,7 +159,6 @@ struct LivenessContext
         }
 
         // These are reset for *each* liveness start
-        BlockIndex loopParentBlockIndex;    ///< Block index to block which is the parent for this block. Only valid for blocks that are loop starts.
         BlockResult result;                 ///< The result for this block
 
         // These remain constant for all live starts to a root.
@@ -193,6 +191,14 @@ struct LivenessContext
         Count successorsCount;          ///< How many successors
     };
 
+    struct Loop
+    {
+        Loop* parentLoop;                   ///< The parent loop, which will be entered when this loop is left via a break
+        BlockIndex targetBlockIndex;        ///< The target block for this loop
+        BlockIndex breakBlockIndex;         ///< The break block for this loop
+        BlockIndex loopBlockIndex;          ///< Block id that terminates with loop we are currently in
+    };
+
         /// Process the module
     void process();
     
@@ -213,11 +219,11 @@ struct LivenessContext
 
         /// Process a successor to a block
         /// Can only be called after a call to _findAliasesAndAccesses for the root.
-    BlockResult _processSuccessor(BlockIndex blockIndex, BlockIndex loopBlockIndex);
+    BlockResult _processSuccessor(BlockIndex blockIndex, Loop* loop);
 
         /// Process a block 
         /// Can only be called after a call to _findAliasesAndAccesses for the root.
-    BlockResult _processBlock(BlockIndex blockIndex, const ConstArrayView<IRInst*>& run, BlockIndex loopBlockIndex);
+    BlockResult _processBlock(BlockIndex blockIndex, const ConstArrayView<IRInst*>& run, Loop* loop);
 
         /// Process all the locations in the function 
         /// NOTE: All locations must be to the same function, and ordered by root. 
@@ -394,7 +400,7 @@ LivenessContext::BlockResult LivenessContext::_addBlockResult(BlockIndex blockIn
     return result;
 }
 
-LivenessContext::BlockResult LivenessContext::_processSuccessor(BlockIndex blockIndex, BlockIndex loopBlockIndex)
+LivenessContext::BlockResult LivenessContext::_processSuccessor(BlockIndex blockIndex, Loop* loop)
 {
     auto blockInfo = _getBlockInfo(blockIndex);
     
@@ -431,52 +437,45 @@ LivenessContext::BlockResult LivenessContext::_processSuccessor(BlockIndex block
                 SLANG_ASSERT(startIndex >= 0);
 
                 // We want to run all the way up to the start
-                return _processBlock(blockIndex, run.head(startIndex), loopBlockIndex);
+                return _processBlock(blockIndex, run.head(startIndex), loop);
             }
 
-            // If we are looping
-            if (loopBlockIndex != BlockIndex::Invalid)
+            // If we are looping and branching to the start of the current loop
+            if (loop && loop->targetBlockIndex == blockIndex)
             {
-                // And what we are branching too is the start of the current loop
-                const auto& loopInfo = _getFixedBlockInfo(loopBlockIndex);
-                if (loopInfo.targetBlockIndex == blockIndex)
+                // This block has been visisted, that means it has been traversed to get here
+                // meaning the root *must* be live on the looping.
+
+                // TODO(JS):
+                // The solution used here is somewhat conservative, it assumes if a branch back to the start of the loop can be reached that
+                //
+                // * There might be some path where the loop might exit
+                // * There might be some path where the root(variable or alias) may be loaded/or stored
+                //
+                // If these assumptions are wrong it will lead to
+                //
+                // * Potentially a liveness end that is never hit(outside of the loop)
+                // * Potentially liveness for a root that spans across the loop even if that is not actually necessary
+                // 
+                // This could be improved on but would probably need something like 'loop analysis' that specially determined 
+                // those scenarios, such that the assumptions aren't needed. It would need to be 'separate analysis', because 
+                // the liveness traversal is a kind of incremental depth first traversal. But for loop analysis it would require 
+                // at loop start the result on all paths through the loop.
+
+                const auto breakBlockIndex = loop->breakBlockIndex;
+
+                // Process what comes after the loop (in the scope of the parent loop if any)
+                result = _processSuccessor(breakBlockIndex, loop->parentLoop);
+                if (result != BlockResult::Found)
                 {
-                    // This block has been visisted, that means it has been traversed to get here
-                    // meaning the root *must* be live on the looping.
+                    // If an end is not found from the break, 
+                    // we just insert an end at the start of the break block
 
-                    // TODO(JS):
-                    // The solution used here is somewhat conservative, it assumes if a branch back to the start of the loop can be reached that
-                    //
-                    // * There might be some path where the loop might exit
-                    // * There might be some path where the root(variable or alias) may be loaded/or stored
-                    //
-                    // If these assumptions are wrong it will lead to
-                    //
-                    // * Potentially a liveness end that is never hit(outside of the loop)
-                    // * Potentially liveness for a root that spans across the loop even if that is not actually necessary
-                    // 
-                    // This could be improved on but would probably need something like 'loop analysis' that specially determined 
-                    // those scenarios, such that the assumptions aren't needed. It would need to be 'separate analysis', because 
-                    // the liveness traversal is a kind of incremental depth first traversal. But for loop analysis it would require 
-                    // at loop start the result on all paths through the loop.
-
-                    const auto breakBlockIndex = loopInfo.breakBlockIndex;
-
-                    const auto parentLoop = _getBlockInfo(loopBlockIndex)->loopParentBlockIndex;
-
-                    // Process what comes after the loop (in the scope of the parent loop if any)
-                    result = _processSuccessor(breakBlockIndex, parentLoop);
-                    if (result != BlockResult::Found)
-                    {
-                        // If an end is not found from the break, 
-                        // we just insert an end at the start of the break block
-
-                        _maybeAddEndAtBlockStart(breakBlockIndex);
-                        result = _addBlockResult(breakBlockIndex, BlockResult::Found);
-                    }
-
-                    return result;
+                    _maybeAddEndAtBlockStart(breakBlockIndex);
+                    result = _addBlockResult(breakBlockIndex, BlockResult::Found);
                 }
+
+                return result;
             }
 
             // Otherwise just return result
@@ -504,19 +503,18 @@ LivenessContext::BlockResult LivenessContext::_processSuccessor(BlockIndex block
 
     // Special case leaving the loop. 
     // If we are in a loop
-    if (loopBlockIndex != BlockIndex::Invalid)
+    if (loop)
     {
-        auto& loopInfo = m_fixedBlockInfos[Index(loopBlockIndex)];
         // And the block we are going to is the break block then we are no longer in this loop
-        if (loopInfo.breakBlockIndex == blockIndex)
+        if (loop->breakBlockIndex == blockIndex)
         {
             // So the loop we are currently in must be the parent
-            loopBlockIndex = _getBlockInfo(loopBlockIndex)->loopParentBlockIndex;
+            loop = loop->parentLoop;
         }
     }
 
     // Else process the block to try and find the last used instruction
-    return _processBlock(blockIndex, _getRun(blockInfo), loopBlockIndex);
+    return _processBlock(blockIndex, _getRun(blockInfo), loop);
 }
 
 Index LivenessContext::_indexOfRootStart(const ConstArrayView<IRInst*>& run)
@@ -634,7 +632,7 @@ static IRLoop* _getLoopTerminator(IRBlock* block)
     return nullptr;
 }
 
-LivenessContext::BlockResult LivenessContext::_processBlock(BlockIndex blockIndex, const ConstArrayView<IRInst*>& run, BlockIndex loopBlockIndex)
+LivenessContext::BlockResult LivenessContext::_processBlock(BlockIndex blockIndex, const ConstArrayView<IRInst*>& run, Loop* loop)
 {
     // Note that the run must be some part of the run for the block indicated by blockIndex. One of
     // 
@@ -659,6 +657,19 @@ LivenessContext::BlockResult LivenessContext::_processBlock(BlockIndex blockInde
         }
     }
 
+    // Find all the successors for this block
+    auto successors = _getSuccessors(blockIndex);
+
+    const Index successorCount = successors.getCount();
+
+    // NOTE! Care is needed around successorResults, because _processorSuccessor may cause the underlying list 
+    // to be reallocated. 
+    // If we always access through successorResults (ie RAIIStackArray type), things will be fine though.
+
+    // Set up space to store successor results
+    RAIIStackArray<BlockResult> successorResults(&m_successorResults);
+    successorResults.setCount(successorCount);
+
     // If we hit a loop add the information and make this the current loop info
     {
         const auto& fixedInfo = _getFixedBlockInfo(blockIndex);
@@ -666,45 +677,30 @@ LivenessContext::BlockResult LivenessContext::_processBlock(BlockIndex blockInde
         {
             SLANG_ASSERT(_getLoopTerminator(fixedInfo.block));
 
-            // Get the varaying block info
-            auto blockInfo = _getBlockInfo(blockIndex);
+            Loop nextLoop;
+            nextLoop.parentLoop = loop;
+            nextLoop.breakBlockIndex = fixedInfo.breakBlockIndex;
+            nextLoop.targetBlockIndex = fixedInfo.targetBlockIndex;
+            nextLoop.loopBlockIndex = blockIndex;
 
-            // Its either not set or set to the same value 
-            SLANG_ASSERT(blockInfo->loopParentBlockIndex == BlockIndex::Invalid || blockInfo->loopParentBlockIndex == loopBlockIndex);
-
-            // Set the parent loop block index
-            blockInfo->loopParentBlockIndex = loopBlockIndex;
-
-            // This block is the current loop block
-            loopBlockIndex = blockIndex;
+            for (Index i = 0; i < successorCount; ++i)
+            {
+                successorResults[i] = _processSuccessor(successors[i], &nextLoop);
+            }
+        }
+        else
+        {
+            for (Index i = 0; i < successorCount; ++i)
+            {
+                successorResults[i] = _processSuccessor(successors[i], loop);
+            }
         }
     }
 
     // Zero initialize all the counts
     Index foundCounts[Index(BlockResult::CountOf)] = { 0 };
-
-    // Find all the successors for this block
-    auto successors = _getSuccessors(blockIndex);
-
-    const Index successorCount = successors.getCount();
-
-    // Set up space to store successor results
-    RAIIStackArray<BlockResult> successorResults(&m_successorResults);
-    successorResults.setCount(successorCount);
-
-    for (Index i = 0; i < successorCount; ++i)
+    for (const auto successorResult : successorResults.getConstView())
     {
-        const auto successorBlockIndex = successors[i];
-
-        // NOTE! Care is needed around successorResults, because _processorSuccessor may cause the underlying list 
-        // to be reallocated. 
-        // If we always access through successorResults (ie RAIIStackArray type), things will be fine though.
-            
-        // Process the successor
-        const auto successorResult = _processSuccessor(successorBlockIndex, loopBlockIndex);
-
-        successorResults[i] = successorResult;
-
         // Change counts depending on the result
         foundCounts[Index(successorResult)]++;
     }
@@ -961,7 +957,7 @@ void LivenessContext::_findAndEmitRangeEnd(IRLiveRangeStart* liveRangeStart)
         _addBlockResult(rootStartBlockIndex, BlockResult::Visited);
 
         // Recursively find results
-        auto foundResult = _processBlock(rootStartBlockIndex, run, BlockIndex::Invalid);
+        auto foundResult = _processBlock(rootStartBlockIndex, run, nullptr);
 
         if (foundResult == BlockResult::NotFound)
         {
