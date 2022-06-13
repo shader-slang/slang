@@ -28,8 +28,8 @@ enum class TextDocumentSyncKind
 
 struct TextDocumentSyncOptions
 {
-    bool openClose;
-    int32_t change; // TextDocumentSyncKind
+    bool openClose = false;
+    int32_t change = int32_t(TextDocumentSyncKind::None); // TextDocumentSyncKind
     static const StructRttiInfo g_rttiInfo;
 };
 
@@ -76,7 +76,7 @@ struct CompletionOptions : public WorkDoneProgressParams
      * The server provides support to resolve additional
      * information for a completion item.
      */
-    bool resolveProvider;
+    bool resolveProvider = false;
 
     static const StructRttiInfo g_rttiInfo;
 };
@@ -108,12 +108,12 @@ struct SemanticTokensOptions
      * Server supports providing semantic tokens for a specific range
      * of a document.
      */
-    bool range;
+    bool range = false;
 
     /**
      * Server supports providing semantic tokens for a full document.
      */
-    bool full;
+    bool full = false;
 
     static const StructRttiInfo g_rttiInfo;
 };
@@ -144,7 +144,7 @@ struct TextDocumentItem
 {
     String uri;
     String languageId;
-    int version;
+    int version = 0;
     String text;
     static const StructRttiInfo g_rttiInfo;
 };
@@ -158,7 +158,7 @@ struct TextDocumentIdentifier
 struct VersionedTextDocumentIdentifier
 {
     String uri;
-    int version;
+    int version = 0;
     static const StructRttiInfo g_rttiInfo;
 };
 
@@ -209,8 +209,8 @@ struct ServerCapabilities
 {
     String positionEncoding;
     TextDocumentSyncOptions textDocumentSync;
-    bool hoverProvider;
-    bool definitionProvider;
+    bool hoverProvider = false;
+    bool definitionProvider = false;
     CompletionOptions completionProvider;
     SemanticTokensOptions semanticTokensProvider;
     SignatureHelpOptions signatureHelpProvider;
@@ -310,7 +310,7 @@ struct Diagnostic
     /**
      * The diagnostic's code, which might appear in the user interface.
      */
-    int32_t code;
+    int32_t code = 0;
 
     /**
      * A human-readable string describing the source of this
@@ -474,7 +474,7 @@ struct CompletionItem
      * an icon is chosen by the editor. The standardized set
      * of available values is defined in `CompletionItemKind`.
      */
-    CompletionItemKind kind;
+    CompletionItemKind kind = CompletionItemKind(0);
 
     /**
      * A human-readable string with additional information
@@ -556,7 +556,7 @@ struct ParameterInformation
      * signature label. Its intended use case is to highlight the parameter
      * label part in the `SignatureInformation.label`.
      */
-    uint32_t label[2];
+    uint32_t label[2] = { 0, 0 };
 
     /**
      * The human-readable doc-comment of this parameter. Will be shown
@@ -613,7 +613,7 @@ struct SignatureHelp
      * In future version of the protocol this property might become
      * mandatory to better express this.
      */
-    uint32_t activeSignature;
+    uint32_t activeSignature = 0;
 
     /**
      * The active parameter of the active signature. If omitted or the value
@@ -624,7 +624,7 @@ struct SignatureHelp
      * mandatory to better express the active parameter if the
      * active signature does have any.
      */
-    uint32_t activeParameter;
+    uint32_t activeParameter = 0;
 
     static const StructRttiInfo g_rttiInfo;
 };
