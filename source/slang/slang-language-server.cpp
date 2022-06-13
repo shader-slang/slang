@@ -352,7 +352,8 @@ SlangResult LanguageServer::hover(
         return SLANG_OK;
     }
     StringBuilder sb;
-    Hover hover = {};
+
+    Hover hover;
     auto leafNode = findResult[0].path.getLast();
     auto fillDeclRefHoverInfo = [&](DeclRef<Decl> declRef)
     {
