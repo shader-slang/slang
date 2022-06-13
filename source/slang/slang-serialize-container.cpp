@@ -350,7 +350,7 @@ static List<ExtensionDecl*>& _getCandidateExtensionList(
         {
             auto startChunk = chunk;
 
-            RefPtr<ASTBuilder> astBuilder;
+            RefPtr<ASTBuilder> astBuilder = options.astBuilder;
             NodeBase* astRootNode = nullptr;
             RefPtr<IRModule> irModule;
 
@@ -385,8 +385,10 @@ static List<ExtensionDecl*>& _getCandidateExtensionList(
 
                     StringBuilder buf;
                     buf << "tu" << out.modules.getCount();
-
-                    astBuilder = new ASTBuilder(options.sharedASTBuilder, buf.ProduceString());
+                    if (!astBuilder)
+                    {
+                        astBuilder = new ASTBuilder(options.sharedASTBuilder, buf.ProduceString());
+                    }
 
                     DefaultSerialObjectFactory objectFactory(astBuilder);
 
@@ -419,7 +421,7 @@ static List<ExtensionDecl*>& _getCandidateExtensionList(
                             {
                                 UnownedStringSlice mangledName = reader.getStringSlice(SerialIndex(i));
 
-                                UnownedStringSlice moduleName;
+                                String moduleName;
                                 SLANG_RETURN_ON_FAIL(MangledNameParser::parseModuleName(mangledName, moduleName));
 
                                 // If we already have looked up this module and it has the same name just use what we have
@@ -457,8 +459,11 @@ static List<ExtensionDecl*>& _getCandidateExtensionList(
                                         options.sink->diagnose(SourceLoc::fromRaw(0), Diagnostics::unableToFindSymbolInModule, mangledName, moduleName);
                                     }
 
-                                    // If didn't find the export then we are done
-                                    return SLANG_FAIL;
+                                    // If didn't find the export then we create an UnresolvedDecl node to represent the error.
+                                    auto unresolved = astBuilder->create<UnresolvedDecl>();
+                                    unresolved->nameAndLoc.name =
+                                        options.linkage->getNamePool()->getName(mangledName);
+                                    nodeBase = unresolved;
                                 }
 
                                 // set the result

@@ -1,0 +1,115 @@
+result code = 0
+standard error = {
+}
+standard output = {
+#version 450
+#extension GL_EXT_spirv_intrinsics : require
+layout(row_major) uniform;
+layout(row_major) buffer;
+spirv_instruction(id = 256)
+void livenessStart_0(spirv_by_reference int  _0[2], spirv_literal int _1);
+
+spirv_instruction(id = 256)
+void livenessStart_1(spirv_by_reference int _0, spirv_literal int _1);
+
+spirv_instruction(id = 257)
+void livenessEnd_0(spirv_by_reference int _0, spirv_literal int _1);
+
+spirv_instruction(id = 257)
+void livenessEnd_1(spirv_by_reference int  _0[2], spirv_literal int _1);
+
+int calcThing_0(int offset_0)
+{
+    int  another_0[2];
+    livenessStart_0(another_0, 0);
+    const int  _S1[2] = { 1, 2 };
+    another_0 = _S1;
+    int k_0;
+    int total_0;
+    livenessStart_1(k_0, 0);
+    k_0 = 0;
+    livenessStart_1(total_0, 0);
+    total_0 = 0;
+    for(;;)
+    {
+        if(k_0 < 20)
+        {
+        }
+        else
+        {
+            break;
+        }
+        int  arr_0[2];
+        livenessStart_0(arr_0, 0);
+        const int  _S2[2] = { 2, 3 };
+        arr_0 = _S2;
+        int i_0;
+        livenessStart_1(i_0, 0);
+        i_0 = 0;
+        for(;;)
+        {
+            if(i_0 < 17)
+            {
+            }
+            else
+            {
+                break;
+            }
+            another_0[i_0 & 1] = another_0[i_0 & 1] + (k_0 + i_0);
+            arr_0[k_0 & 1] = arr_0[k_0 & 1] + i_0;
+            i_0 = i_0 + 1;
+        }
+        livenessEnd_0(i_0, 0);
+        int _S3 = another_0[k_0 & 1];
+        int _S4 = total_0;
+        livenessEnd_0(total_0, 0);
+        int total_1 = _S4 + _S3;
+        int _S5 = arr_0[k_0 & 1];
+        livenessEnd_1(arr_0, 0);
+        int total_2 = total_1 + _S5;
+        int _S6 = (k_0 + 7) % 5;
+        if(_S6 == 4)
+        {
+            livenessEnd_0(k_0, 0);
+            livenessEnd_1(another_0, 0);
+            return 1;
+        }
+        k_0 = k_0 + 1;
+        livenessStart_1(total_0, 0);
+        total_0 = total_2;
+    }
+    livenessEnd_0(k_0, 0);
+    livenessEnd_1(another_0, 0);
+    int total_3;
+    if(total_0 > 4)
+    {
+        int _S7 = total_0;
+        livenessEnd_0(total_0, 0);
+        int _S8 = - _S7;
+        livenessStart_1(total_3, 0);
+        total_3 = _S8;
+    }
+    else
+    {
+        int _S9 = total_0;
+        livenessEnd_0(total_0, 0);
+        livenessStart_1(total_3, 0);
+        total_3 = _S9;
+    }
+    return total_3;
+}
+
+layout(std430, binding = 0) buffer _S10 {
+    int _data[];
+} outputBuffer_0;
+layout(local_size_x = 4, local_size_y = 1, local_size_z = 1) in;
+void main()
+{
+    int index_0 = int(gl_GlobalInvocationID.x);
+    uint _S11 = uint(index_0);
+    int _S12 = calcThing_0(index_0);
+    ((outputBuffer_0)._data[(_S11)]) = _S12;
+    return;
+}
+
+}

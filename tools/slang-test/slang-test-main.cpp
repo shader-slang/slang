@@ -1386,7 +1386,7 @@ TestResult runLanguageServerTest(TestContext* context, TestInput& input)
     auto waitForNonDiagnosticResponse = [&]() -> SlangResult
     {
         repeat:
-        if (SLANG_FAILED(connection->waitForResult(10000)))
+        if (SLANG_FAILED(connection->waitForResult(-1)))
             return SLANG_FAIL;
         if (connection->getMessageType() == JSONRPCMessageType::Call)
         {

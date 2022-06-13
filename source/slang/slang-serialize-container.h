@@ -89,6 +89,7 @@ struct SerialContainerUtil
         SourceManager* sourceManager = nullptr;
         NamePool* namePool = nullptr;
         SharedASTBuilder* sharedASTBuilder = nullptr;
+        ASTBuilder* astBuilder = nullptr; // Optional. If not provided will create one in SerialContainerData.
         Linkage* linkage = nullptr;
         DiagnosticSink* sink = nullptr;
     };

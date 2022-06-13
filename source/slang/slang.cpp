@@ -2611,6 +2611,11 @@ void Linkage::loadParsedModule(
         }
     }
     loadedModulesList.add(loadedModule);
+
+    if (m_moduleCache)
+    {
+        m_moduleCache->storeModule(this, pathInfo.foundPath, loadedModule);
+    }
 }
 
 Module* Linkage::loadModule(String const& name)
@@ -2794,6 +2799,19 @@ RefPtr<Module> Linkage::findOrImportModule(
     if (mapPathToLoadedModule.TryGetValue(filePathInfo.getMostUniqueIdentity(), loadedModule))
         return loadedModule;
 
+    // Is this module in user provided cache?
+    // (yong): module cache is intended to speed up language server reparsing.
+    // currently it is *not* enabled in language server.
+    if (m_moduleCache)
+    {
+        loadedModule = m_moduleCache->tryLoadModule(this, filePathInfo.foundPath);
+        if (loadedModule)
+        {
+            mapPathToLoadedModule[filePathInfo.getMostUniqueIdentity()] = loadedModule;
+            return loadedModule;
+        }
+    }
+
     // Try to load it
     ComPtr<ISlangBlob> fileContents;
     if(SLANG_FAILED(includeSystem.loadFile(filePathInfo, fileContents)))
@@ -2945,9 +2963,7 @@ static bool _canExportDeclSymbol(ASTNodeType type)
 {
     switch (type)
     {
-        case ASTNodeType::ModuleDecl:
         case ASTNodeType::EmptyDecl:
-        case ASTNodeType::NamespaceDecl:
         {
             return false;
         }

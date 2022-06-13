@@ -75,14 +75,12 @@ SerialIndex ModuleSerialFilter::writePointer(SerialWriter* writer, const NodeBas
     if (Decl* decl = as<Decl>(ptr))
     {
         ModuleDecl* moduleDecl = findModuleForDecl(decl);
-        SLANG_ASSERT(moduleDecl);
         if (moduleDecl && moduleDecl != m_moduleDecl)
         {
             ASTBuilder* astBuilder = m_moduleDecl->module->getASTBuilder();
 
             // It's a reference to a declaration in another module, so first get the symbol name. 
             String mangledName = getMangledName(astBuilder, decl);
-
             // Add as an import symbol
             return writer->addImportSymbol(mangledName);
         }
@@ -110,6 +108,8 @@ SerialIndex ModuleSerialFilter::writePointer(SerialWriter* writer, const NodeBas
     //
     // For now we just ignore all stmts
 
+    // TODO(yong): We should by default serialize everything. The logic to skip bodies need to be
+    // behind a option flag.
     if (Stmt* stmt = as<Stmt>(ptr))
     {
         //

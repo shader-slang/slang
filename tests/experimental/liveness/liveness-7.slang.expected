@@ -1,0 +1,66 @@
+result code = 0
+standard error = {
+}
+standard output = {
+#version 450
+#extension GL_EXT_spirv_intrinsics : require
+layout(row_major) uniform;
+layout(row_major) buffer;
+spirv_instruction(id = 256)
+void livenessStart_0(spirv_by_reference int _0, spirv_literal int _1);
+
+spirv_instruction(id = 257)
+void livenessEnd_0(spirv_by_reference int _0, spirv_literal int _1);
+
+spirv_instruction(id = 256)
+void livenessStart_1(spirv_by_reference int  _0[2], spirv_literal int _1);
+
+spirv_instruction(id = 257)
+void livenessEnd_1(spirv_by_reference int  _0[2], spirv_literal int _1);
+
+int calcThing_0(int offset_0)
+{
+    const int  _S1[2] = { 2, 3 };
+    int k_0;
+    int _S2;
+    int  arr_0[2];
+    livenessStart_0(k_0, 0);
+    livenessEnd_0(k_0, 0);
+    k_0 = 0;
+    livenessStart_0(_S2, 0);
+    _S2 = offset_0;
+    livenessStart_1(arr_0, 0);
+    arr_0 = _S1;
+    for(;;)
+    {
+        int _S3 = _S2;
+        livenessEnd_0(_S2, 0);
+        if(bool(0 + _S3 & 1))
+        {
+            int  _S4[2] = arr_0;
+            livenessEnd_1(arr_0, 0);
+            return _S4[0];
+        }
+        else
+        {
+            int  _S5[2] = arr_0;
+            livenessEnd_1(arr_0, 0);
+            return _S5[1];
+        }
+    }
+}
+
+layout(std430, binding = 0) buffer _S6 {
+    int _data[];
+} outputBuffer_0;
+layout(local_size_x = 4, local_size_y = 1, local_size_z = 1) in;
+void main()
+{
+    int index_0 = int(gl_GlobalInvocationID.x);
+    uint _S7 = uint(index_0);
+    int _S8 = calcThing_0(index_0);
+    ((outputBuffer_0)._data[(_S7)]) = _S8;
+    return;
+}
+
+}

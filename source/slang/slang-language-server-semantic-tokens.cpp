@@ -1,6 +1,7 @@
 #include "slang-language-server-semantic-tokens.h"
 #include "slang-visitor.h"
 #include "slang-ast-support-types.h"
+#include "../core/slang-char-util.h"
 #include <algorithm>
 
 namespace Slang
@@ -412,7 +413,7 @@ void iterateAST(UnownedStringSlice fileName, SourceManager* manager, SyntaxNode*
 }
 
 const char* kSemanticTokenTypes[] = {
-    "type", "enumMember", "variable", "parameter", "function", "property", "namespace"};
+    "type", "enumMember", "variable", "parameter", "function", "property", "namespace", "keyword" };
 
 static_assert(SLANG_COUNT_OF(kSemanticTokenTypes) == (int)SemanticTokenType::NormalText, "kSemanticTokenTypes must match SemanticTokenType");
 
@@ -420,15 +421,15 @@ SemanticToken _createSemanticToken(SourceManager* manager, SourceLoc loc, Name* 
 {
     SemanticToken token;
     auto humaneLoc = manager->getHumaneLoc(loc, SourceLocType::Actual);
-    token.line = (int)(humaneLoc.line - 1);
-    token.col = (int)(humaneLoc.column - 1);
+    token.line = (int)(humaneLoc.line);
+    token.col = (int)(humaneLoc.column);
     token.length =
         name ? (int)(name->text.getLength()) : 0;
     token.type = SemanticTokenType::NormalText;
     return token;
 }
 
-List<SemanticToken> getSemanticTokens(Linkage* linkage, Module* module, UnownedStringSlice fileName)
+List<SemanticToken> getSemanticTokens(Linkage* linkage, Module* module, UnownedStringSlice fileName, DocumentVersion* doc)
 {
     auto manager = linkage->getSourceManager();
 
@@ -439,7 +440,6 @@ List<SemanticToken> getSemanticTokens(Linkage* linkage, Module* module, UnownedS
             token.type != SemanticTokenType::NormalText)
             result.add(token);
     };
-
     iterateAST(
         fileName,
         manager,
@@ -465,6 +465,11 @@ List<SemanticToken> getSemanticTokens(Linkage* linkage, Module* module, UnownedS
                             return;
                         token.type = SemanticTokenType::Type;
                     }
+                    else if (as<ConstructorDecl>(target))
+                    {
+                        token.type = SemanticTokenType::Type;
+                        token.length = doc->getTokenLength(token.line, token.col);
+                    }
                     else if (as<SimpleTypeDecl>(target))
                     {
                         token.type = SemanticTokenType::Type;
@@ -479,6 +484,11 @@ List<SemanticToken> getSemanticTokens(Linkage* linkage, Module* module, UnownedS
                     }
                     else if (as<VarDecl>(target))
                     {
+                        if (as<MemberExpr>(declRef->originalExpr) ||
+                            as<StaticMemberExpr>(declRef->originalExpr))
+                        {
+                            return;
+                        }
                         token.type = SemanticTokenType::Variable;
                     }
                     else if (as<FunctionDeclBase>(target))
@@ -502,6 +512,13 @@ List<SemanticToken> getSemanticTokens(Linkage* linkage, Module* module, UnownedS
                     maybeInsertToken(token);
                 }
 
+            }
+            else if (auto accessorDecl = as<AccessorDecl>(node))
+            {
+                SemanticToken token = _createSemanticToken(
+                    manager, accessorDecl->loc, accessorDecl->getName());
+                token.type = SemanticTokenType::Keyword;
+                maybeInsertToken(token);
             }
             else if (auto typeDecl = as<SimpleTypeDecl>(node))
             {

@@ -1671,6 +1671,14 @@ namespace Slang
         /// lookup additional loaded modules.
     typedef Dictionary<Name*, Module*> LoadedModuleDictionary;
 
+    class Linkage;
+    class IModuleCache
+    {
+    public:
+        virtual RefPtr<Module> tryLoadModule(Linkage* linkage, String filePath) = 0;
+        virtual void storeModule(Linkage* linkage, String filePath, RefPtr<Module> module) = 0;
+    };
+
         /// A context for loading and re-using code modules.
     class Linkage : public RefObject, public slang::ISession
     {
@@ -1790,6 +1798,8 @@ namespace Slang
         void destroyTypeCheckingCache();
 
         TypeCheckingCache* m_typeCheckingCache = nullptr;
+
+        void setModuleCache(IModuleCache* cache) { m_moduleCache = cache; }
 
         // Modules that have been dynamically loaded via `import`
         //
@@ -1925,7 +1935,7 @@ namespace Slang
 
         RefPtr<Session> m_retainedSession;
 
-
+        IModuleCache* m_moduleCache = nullptr;
 
             /// Tracks state of modules currently being loaded.
             ///
