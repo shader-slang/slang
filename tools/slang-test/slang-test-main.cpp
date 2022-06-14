@@ -1422,6 +1422,8 @@ TestResult runExecutableTest(TestContext* context, TestInput& input)
 
         cmdLine.setExecutableLocation(exe);
 
+        File::makeExecutable(moduleExePath);
+
         ExecuteResult exeRes;
         if (SLANG_FAILED(ProcessUtil::execute(cmdLine, exeRes)))
         {
