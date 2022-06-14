@@ -308,6 +308,12 @@ INST(getElement, getElement, 2, 0)
 INST(getElementPtr, getElementPtr, 2, 0)
 INST(getAddr, getAddr, 1, 0)
 
+// Get an unowned NativeString from a String.
+INST(getNativeStr, getNativeStr, 1, 0)
+
+// Make String from a NativeString.
+INST(makeString, makeString, 1, 0)
+
 // "Subscript" an image at a pixel coordinate to get pointer
 INST(ImageSubscript, imageSubscript, 2, 0)
 
