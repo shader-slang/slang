@@ -436,7 +436,7 @@ List<SemanticToken> getSemanticTokens(Linkage* linkage, Module* module, UnownedS
     List<SemanticToken> result;
     auto maybeInsertToken = [&](const SemanticToken& token)
     {
-        if (token.line >= 0 && token.col >= 0 && token.length > 0 &&
+        if (token.line > 0 && token.col > 0 && token.length > 0 &&
             token.type != SemanticTokenType::NormalText)
             result.add(token);
     };

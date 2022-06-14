@@ -1269,6 +1269,15 @@ static bool _areResultsEqual(TestOptions::Type type, const String& a, const Stri
     }
 }
 
+static String _calcModulePath(const TestInput& input)
+{
+    // Make the module name the same as the source file
+    auto filePath = input.filePath;
+    String directory = Path::getParentDirectory(input.outputStem);
+    String moduleName = Path::getFileNameWithoutExt(filePath);
+    return Path::combine(directory, moduleName);
+}
+
 TestResult runDocTest(TestContext* context, TestInput& input)
 {
     // need to execute the stand-alone Slang compiler on the file, and compare its output to what we expect
@@ -1328,6 +1337,122 @@ TestResult runDocTest(TestContext* context, TestInput& input)
     }
 
     return result;
+}
+
+TestResult runExecutableTest(TestContext* context, TestInput& input)
+{
+    DownstreamCompiler* compiler = context->getDefaultCompiler(SLANG_SOURCE_LANGUAGE_CPP);
+    if (!compiler)
+    {
+        return TestResult::Ignored;
+    }
+
+    // If we are just collecting requirements, say it passed
+    if (context->isCollectingRequirements())
+    {
+        std::lock_guard<std::mutex> lock(context->mutex);
+        context->getTestRequirements()->addUsedBackEnd(SLANG_PASS_THROUGH_GENERIC_C_CPP);
+        return TestResult::Pass;
+    }
+
+    auto filePath = input.filePath;
+    auto outputStem = input.outputStem;
+
+    String actualOutputPath = outputStem + ".actual";
+    File::remove(actualOutputPath);
+
+    // Make the module name the same as the source file
+    String ext = Path::getPathExt(filePath);
+    String modulePath = _calcModulePath(input);
+
+    // Remove the binary..
+    String moduleExePath;
+    {
+        StringBuilder buf;
+        buf << modulePath;
+        buf << Process::getExecutableSuffix();
+        moduleExePath = buf;
+    }
+
+    // Remove the exe if it exists
+    File::remove(moduleExePath);
+
+    CommandLine cmdLine;
+    _initSlangCompiler(context, cmdLine);
+
+    StringEscapeHandler* escapeHandler = StringEscapeUtil::getHandler(StringEscapeUtil::Style::Space);
+
+    List<String> args;
+    args.add(filePath);
+    args.add("-o");
+    args.add(moduleExePath);
+    args.add("-target");
+    args.add("exe");
+    for (auto arg : args)
+    {
+        // If unescaping is needed, do it
+        if (StringEscapeUtil::isUnescapeShellLikeNeeded(escapeHandler, arg.getUnownedSlice()))
+        {
+            StringBuilder buf;
+            StringEscapeUtil::unescapeShellLike(escapeHandler, arg.getUnownedSlice(), buf);
+            cmdLine.addArg(buf.ProduceString());
+        }
+        else
+        {
+            cmdLine.addArg(arg);
+        }
+    }
+    ExecuteResult exeRes;
+    TEST_RETURN_ON_DONE(spawnAndWait(context, outputStem, input.spawnType, cmdLine, exeRes));
+
+    String actualOutput;
+
+    // If the actual compilation failed, then the output will be the summary
+    if (exeRes.resultCode != 0)
+    {
+        actualOutput = getOutput(exeRes);
+    }
+    else
+    {
+        // Execute the binary and see what we get
+        CommandLine cmdLine;
+
+        ExecutableLocation exe;
+        exe.setPath(moduleExePath);
+
+        cmdLine.setExecutableLocation(exe);
+
+        ExecuteResult exeRes;
+        if (SLANG_FAILED(ProcessUtil::execute(cmdLine, exeRes)))
+        {
+            return TestResult::Fail;
+        }
+
+        // Write the output, and compare to expected
+        actualOutput = getOutput(exeRes);
+    }
+
+    // Write the output
+    Slang::File::writeAllText(actualOutputPath, actualOutput);
+
+    // Check that they are the same
+    {
+        // Read the expected
+        String expectedOutput;
+
+        String expectedOutputPath = outputStem + ".expected";
+        Slang::File::readAllText(expectedOutputPath, expectedOutput);
+
+        // Compare if they are the same
+        if (!StringUtil::areLinesEqual(
+                actualOutput.getUnownedSlice(), expectedOutput.getUnownedSlice()))
+        {
+            context->getTestReporter()->dumpOutputDifference(expectedOutput, actualOutput);
+            return TestResult::Fail;
+        }
+    }
+
+    return TestResult::Pass;
 }
 
 TestResult runLanguageServerTest(TestContext* context, TestInput& input)
@@ -1982,15 +2107,6 @@ static String _calcSummary(const DownstreamDiagnostics& inOutput)
 
     output.appendSimplifiedSummary(builder);
     return builder;
-}
-
-static String _calcModulePath(const TestInput& input)
-{
-    // Make the module name the same as the source file
-    auto filePath = input.filePath;
-    String directory = Path::getParentDirectory(input.outputStem);
-    String moduleName = Path::getFileNameWithoutExt(filePath);
-    return Path::combine(directory, moduleName);
 }
 
 static TestResult runCPPCompilerCompile(TestContext* context, TestInput& input)
@@ -3257,7 +3373,7 @@ static const TestCommandInfo s_testCommandInfos[] =
     { "COMPILE",                                &runCompile,                                0 },
     { "DOC",                                    &runDocTest,                                0 },
     { "LANG_SERVER",                            &runLanguageServerTest,                     0},
-
+    { "EXECUTABLE",                             &runExecutableTest,                         RenderApiFlag::CPU}
 };
 
 const TestCommandInfo* _findTestCommandInfoByCommand(const UnownedStringSlice& name)

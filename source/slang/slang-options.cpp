@@ -686,7 +686,7 @@ struct OptionsParser
             "      .spv.asm          -> spirv-assembly\n"
             "      .c                -> c\n"
             "      .cpp, .c++, .cxx  -> c++\n"
-            "      .exe              -> executable\n"
+            "      .exe, (empty)     -> executable\n"
             "      .dll, .so         -> sharedlibrary\n"
             "      .cu               -> cuda\n"
             "      .ptx              -> ptx\n"
