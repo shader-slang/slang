@@ -2887,7 +2887,6 @@ namespace Slang
         ExtensionDecl* decl = parser->astBuilder->create<ExtensionDecl>();
         parser->FillPosition(decl);
         decl->targetType = parser->ParseTypeExp();
-        decl->originalTargetExpr = decl->targetType.exp;
         parseOptionalInheritanceClause(parser, decl);
         parseDeclBody(parser, decl);
         return decl;

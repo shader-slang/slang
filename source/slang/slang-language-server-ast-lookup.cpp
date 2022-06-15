@@ -542,6 +542,12 @@ bool _findAstNodeImpl(ASTLookupContext& context, SyntaxNode* node)
             if (visitor.dispatchIfNotNull(typedefDecl->type.exp))
                 return true;
         }
+        else if (auto extDecl = as<ExtensionDecl>(node))
+        {
+            ASTLookupExprVisitor visitor(&context);
+            if (visitor.dispatchIfNotNull(extDecl->targetType.exp))
+                return true;
+        }
         for (auto modifier : decl->modifiers)
         {
             if (auto hlslSemantic = as<HLSLSemantic>(modifier))

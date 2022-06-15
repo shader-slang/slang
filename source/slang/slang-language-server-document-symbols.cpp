@@ -118,7 +118,7 @@ namespace Slang
     {
         if (auto extDecl = as<ExtensionDecl>(decl))
         {
-            return _getDeclRefExprNameLoc(extDecl->originalTargetExpr);
+            return _getDeclRefExprNameLoc(extDecl->targetType.exp);
         }
         return decl->nameAndLoc;
     }

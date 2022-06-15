@@ -101,8 +101,6 @@ class ExtensionDecl : public AggTypeDeclBase
     SLANG_AST_CLASS(ExtensionDecl)
 
     TypeExp targetType;
-
-    Expr* originalTargetExpr = nullptr;
 };
 
 // Declaration of a type that represents some sort of aggregate
