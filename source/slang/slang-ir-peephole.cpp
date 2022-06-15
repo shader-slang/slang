@@ -52,7 +52,7 @@ struct PeepholeContext : InstPassBase
                 auto element = inst->getOperand(1);
                 if (auto intLit = as<IRIntLit>(element))
                 {
-                    inst->replaceUsesWith(inst->getOperand(0)->getOperand(intLit->value.intVal));
+                    inst->replaceUsesWith(inst->getOperand(0)->getOperand((UInt)intLit->value.intVal));
                     inst->removeAndDeallocate();
                     changed = true;
                 }
@@ -78,7 +78,7 @@ struct PeepholeContext : InstPassBase
                     }
                     if (fieldIndex != -1 && fieldIndex < (Index)inst->getOperand(0)->getOperandCount())
                     {
-                        inst->replaceUsesWith(inst->getOperand(0)->getOperand(fieldIndex));
+                        inst->replaceUsesWith(inst->getOperand(0)->getOperand((UInt)fieldIndex));
                         inst->removeAndDeallocate();
                         changed = true;
                     }
