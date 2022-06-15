@@ -3,7 +3,6 @@
 
 namespace Slang
 {
-
 struct PeepholeContext : InstPassBase
 {
     PeepholeContext(IRModule* inModule)

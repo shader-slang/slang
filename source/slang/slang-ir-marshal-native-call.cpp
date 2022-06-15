@@ -1,6 +1,4 @@
 // slang-ir-marshal-native-call.h
-#pragma once
-
 #include "slang-ir-marshal-native-call.h"
 #include "slang-ir.h"
 #include "slang-ir-insts.h"
