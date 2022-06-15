@@ -136,6 +136,9 @@
     <None Include="..\..\..\tools\gfx-unit-test\sampler-array.slang">
       <Filter>Source Files</Filter>
     </None>
+    <None Include="..\..\..\tools\gfx-unit-test\swapchain-shader.slang">
+      <Filter>Source Files</Filter>
+    </None>
     <None Include="..\..\..\tools\gfx-unit-test\trivial-copy-textures.slang">
       <Filter>Source Files</Filter>
     </None>
