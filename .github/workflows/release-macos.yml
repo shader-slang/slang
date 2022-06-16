@@ -43,9 +43,13 @@ jobs:
           source ./github_macos_build.sh
       - name: Sign binaries
         env:
-          AC_PASSWORD: ${{secrets.APPLE_ID_PASSWORD}}
+          KEY_PASSWORD: "${{ secrets.KEYCHAIN_PASSWORD }}"
+          IDENTITY_ID: d6ada82a113e4204aaad914e1013e9548ffd30d0
         run: |
-          gon ./extras/macos-sign.json
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k ${KEY_PASSWORD} build.keychain
+          /usr/bin/codesign --force -s ${IDENTITY_ID} ./bin/macosx-x64/release/libslang.dylib -v
+          /usr/bin/codesign --force -s ${IDENTITY_ID} ./bin/macosx-x64/release/slangd -v
+          /usr/bin/codesign --force -s ${IDENTITY_ID} ./bin/macosx-x64/release/slangc -v
       - name: Package
         id: package
         run: |
