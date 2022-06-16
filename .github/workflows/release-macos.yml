@@ -16,13 +16,31 @@ jobs:
         compiler: ['clang']
         platform: ['x64'] 
     steps:
-      - name: "Import Certificate"
-        uses: devbotsxyz/xcode-import-certificate@master
-        with:
-          certificate-data: "${{ secrets.BUILD_CERTIFICATE_BASE64 }}"
-          certificate-passphrase: "${{ secrets.P12_PASSWORD }}"
-          keychain-password: "${{ secrets.KEYCHAIN_PASSWORD }}"
-      - name: Install the signing tools
+      - name: "Import signing certificate"
+        env:
+          BUILD_CERTIFICATE_BASE64: ${{ secrets.BUILD_CERTIFICATE_BASE64 }}
+          P12_PASSWORD: ${{ secrets.P12_PASSWORD }}
+          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+        run: |
+          # create variables
+          CERTIFICATE_PATH=$RUNNER_TEMP/build_certificate.p12
+          KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
+
+          # import certificate and provisioning profile from secrets
+          echo -n "$BUILD_CERTIFICATE_BASE64" | base64 --decode --output $CERTIFICATE_PATH
+
+          # create temporary keychain
+          security create-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+          security set-keychain-settings -lut 21600 $KEYCHAIN_PATH
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+
+          # import certificate to keychain
+          security import $CERTIFICATE_PATH -P "$P12_PASSWORD" -A -t cert -f pkcs12 -k $KEYCHAIN_PATH
+          security list-keychain -d user -s $KEYCHAIN_PATH
+
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k ${KEYCHAIN_PASSWORD} $KEYCHAIN_PATH
+
+      - name: Install nortarize tools
         run: |
           brew install mitchellh/gon/gon
           security find-identity -v
@@ -43,9 +61,11 @@ jobs:
           source ./github_macos_build.sh
       - name: Sign binaries
         env:
-          AC_PASSWORD: ${{secrets.APPLE_ID_PASSWORD}}
+          IDENTITY_ID: d6ada82a113e4204aaad914e1013e9548ffd30d0
         run: |
-          gon ./extras/macos-sign.json
+          /usr/bin/codesign --force --options runtime -s ${IDENTITY_ID} ./bin/macosx-x64/release/libslang.dylib -v
+          /usr/bin/codesign --force --options runtime -s ${IDENTITY_ID} ./bin/macosx-x64/release/slangd -v
+          /usr/bin/codesign --force --options runtime -s ${IDENTITY_ID} ./bin/macosx-x64/release/slangc -v
       - name: Package
         id: package
         run: |
@@ -67,16 +87,25 @@ jobs:
           7z a ${SLANG_BINARY_ARCHIVE} bin/*/*/slangd
           7z a ${SLANG_BINARY_ARCHIVE} docs/*.md
           echo "::set-output name=SLANG_BINARY_ARCHIVE::${SLANG_BINARY_ARCHIVE}"
+      - name: Package for notarization
+        run: |
+          cp ./bin/macosx-x64/release/libslang.dylib libslang.dylib
+          cp ./bin/macosx-x64/release/slangd slangd
+          cp ./bin/macosx-x64/release/slangc slangc
+          7z a slang-macos-dist.zip libslang.dylib
+          7z a slang-macos-dist.zip slangd
+          7z a slang-macos-dist.zip slangc
       - name: UploadBinary
         uses: softprops/action-gh-release@v1
         with:
           files: |
             ${{ steps.package.outputs.SLANG_BINARY_ARCHIVE }}
+            slang-macos-dist.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Notarize
         env:
           AC_PASSWORD: ${{secrets.APPLE_ID_PASSWORD}}
-          BINARY_PATH: ${{ steps.package.outputs.SLANG_BINARY_ARCHIVE }}
         run: |
           timeout 1000 gon ./extras/macos-notarize.json
+      
