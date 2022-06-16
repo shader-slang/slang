@@ -21,7 +21,7 @@ jobs:
     steps:
     - uses: actions/checkout@v2.3.4
       with:
-        submodules: 'true'
+        submodules: 'false'
         fetch-depth: '0'
     - name: Install the signing tools
       run: |
@@ -36,7 +36,7 @@ jobs:
       uses: dawidd6/action-download-artifact@v2
       with:
         workflow: macos.yml
-        branch: lsp
+        pr: 2282
         name: slang-build-release-x64-clang
         path: artifacts/
         repo: shader-slang/slang
