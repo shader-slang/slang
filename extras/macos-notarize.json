@@ -1,0 +1,11 @@
+{
+    "apple_id": {
+        "username" : "yongh@outlook.com",
+        "password":  "@env:AC_PASSWORD"
+    },
+    "notarize" :{
+        "path": "@env:BINARY_PATH",
+        "bundle_id": "shader-slang.slang",
+        "staple": false
+    }
+}
