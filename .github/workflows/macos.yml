@@ -20,8 +20,8 @@ jobs:
     steps:
     - uses: actions/checkout@v2.3.4
       with:
-        submodules: 'false'
-        fetch-depth: '0'
+        submodules: 'true'
+        fetch-depth: '1'
     - name: Install the signing tools
       run: |
         brew install mitchellh/gon/gon
