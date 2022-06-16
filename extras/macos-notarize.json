@@ -4,7 +4,7 @@
         "password":  "@env:AC_PASSWORD"
     },
     "notarize" :{
-        "path": "@env:BINARY_PATH",
+        "path": "slang-bin.zip",
         "bundle_id": "shader-slang.slang",
         "staple": false
     }
