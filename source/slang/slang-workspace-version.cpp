@@ -390,6 +390,12 @@ ArrayView<Index> DocumentVersion::getUTF16Boundaries(Index line)
 void DocumentVersion::oneBasedUTF8LocToZeroBasedUTF16Loc(
     Index inLine, Index inCol, Index& outLine, Index& outCol)
 {
+    if (inLine <= 0)
+    {
+        outLine = 0;
+        outCol = 0;
+    }
+
     Index rsLine = inLine - 1;
     auto line = lines[rsLine];
     auto bounds = getUTF16Boundaries(inLine);

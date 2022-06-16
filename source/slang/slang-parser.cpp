@@ -2889,7 +2889,6 @@ namespace Slang
         decl->targetType = parser->ParseTypeExp();
         parseOptionalInheritanceClause(parser, decl);
         parseDeclBody(parser, decl);
-
         return decl;
     }
 
@@ -3199,9 +3198,14 @@ namespace Slang
         if( parser->tokenReader.peekTokenType() == TokenType::LBrace )
         {
             decl->body = parser->parseBlockStatement();
+            if (auto block = as<BlockStmt>(decl->body))
+            {
+                decl->closingSourceLoc = block->closingSourceLoc;
+            }
         }
         else
         {
+            decl->closingSourceLoc = parser->tokenReader.peekLoc();
             parser->ReadToken(TokenType::Semicolon);
         }
 
@@ -3216,14 +3220,18 @@ namespace Slang
         if( AdvanceIf(parser, TokenType::LBrace) )
         {
             // We want to parse nested "accessor" declarations
-            while( !AdvanceIfMatch(parser, MatchedTokenType::CurlyBraces) )
+            Token closingToken;
+            while (!AdvanceIfMatch(parser, MatchedTokenType::CurlyBraces, &closingToken))
             {
                 auto accessor = parseAccessorDecl(parser);
                 AddMember(decl, accessor);
             }
+            decl->closingSourceLoc = closingToken.loc;
         }
         else
         {
+            decl->closingSourceLoc = parser->tokenReader.peekLoc();
+
             parser->ReadToken(TokenType::Semicolon);
 
             // empty body should be treated like `{ get; }`
@@ -3970,8 +3978,8 @@ namespace Slang
         {
             parseOptionalInheritanceClause(parser, decl);
             parser->ReadToken(TokenType::LBrace);
-
-            while(!AdvanceIfMatch(parser, MatchedTokenType::CurlyBraces))
+            Token closingToken;
+            while (!AdvanceIfMatch(parser, MatchedTokenType::CurlyBraces, &closingToken))
             {
                 EnumCaseDecl* caseDecl = parseEnumCaseDecl(parser);
                 AddMember(decl, caseDecl);
@@ -3981,6 +3989,7 @@ namespace Slang
 
                 parser->ReadToken(TokenType::Comma);
             }
+            decl->closingSourceLoc = closingToken.loc;
             return decl;
         });
     }
