@@ -28,7 +28,7 @@ jobs:
       with:
         certificate-data: ${{ secrets.BUILD_CERTIFICATE_BASE64 }}
         certificate-passphrase: ${{ secrets.P12_PASSWORD }}
-        keychain-password: ${{ secrets.KEYCHAIN_PASSWORD }
+        keychain-password: ${{ secrets.KEYCHAIN_PASSWORD }}
     - name: Install the signing tools
       run: |
         brew install mitchellh/gon/gon
