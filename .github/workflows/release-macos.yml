@@ -87,16 +87,7 @@ jobs:
           7z a ${SLANG_BINARY_ARCHIVE} bin/*/*/slangd
           7z a ${SLANG_BINARY_ARCHIVE} docs/*.md
           echo "::set-output name=SLANG_BINARY_ARCHIVE::${SLANG_BINARY_ARCHIVE}"
-      - name: UploadBinary
-        uses: softprops/action-gh-release@v1
-        with:
-          files: |
-            ${{ steps.package.outputs.SLANG_BINARY_ARCHIVE }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - name: Notarize
-        env:
-          AC_PASSWORD: ${{secrets.APPLE_ID_PASSWORD}}
+      - name: Package for notarization
         run: |
           cp ./bin/macosx-x64/release/libslang.dylib libslang.dylib
           cp ./bin/macosx-x64/release/slangd slangd
@@ -104,11 +95,17 @@ jobs:
           7z a slang-macos-dist.zip libslang.dylib
           7z a slang-macos-dist.zip slangd
           7z a slang-macos-dist.zip slangc
-          timeout 1000 gon ./extras/macos-notarize.json
-      - name: UploadNotarizedBinary
+      - name: UploadBinary
         uses: softprops/action-gh-release@v1
         with:
           files: |
+            ${{ steps.package.outputs.SLANG_BINARY_ARCHIVE }}
             slang-macos-dist.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Notarize
+        env:
+          AC_PASSWORD: ${{secrets.APPLE_ID_PASSWORD}}
+        run: |
+          timeout 1000 gon ./extras/macos-notarize.json
+      
