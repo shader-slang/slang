@@ -10,6 +10,6 @@
         "password":  "@env:AC_PASSWORD"
     },
     "sign" :{
-        "application_identity" : "ef894cc5ad746416414799d541927b84492a2387"
+        "application_identity" : "d6ada82a113e4204aaad914e1013e9548ffd30d0"
     }
 }

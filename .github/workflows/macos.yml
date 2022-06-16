@@ -26,14 +26,27 @@ jobs:
     - name: Install the signing tools
       run: |
         brew install mitchellh/gon/gon
-    - name: build
-      run: |
-        CC=${{matrix.compiler}}
-        CONFIGURATION=${{matrix.configuration}}
-        ARCH=${{matrix.platform}}
-        source ./github_macos_build.sh
+    #- name: build
+     # run: |
+      #   CC=${{matrix.compiler}}
+      #   CONFIGURATION=${{matrix.configuration}}
+      #   ARCH=${{matrix.platform}}
+      #   source ./github_macos_build.sh
+    - name: Download artifact
+      uses: dawidd6/action-download-artifact@v2
+      with:
+        workflow: macos.yml
+        branch: lsp
+        name: slang-build-release-x64-clang
+        path: artifacts/
+        repo: shader-slang/slang
+        search_artifacts: true
     - name: Sign and notarize binaries
       run: |
+        mkdir -p ./bin/macosx-x64/release/
+        cp ./artifacts/macosx-x64/release/slangc ./bin/macosx-x64/release/slangc
+        cp ./artifacts/macosx-x64/release/slangd ./bin/macosx-x64/release/slangd
+        cp ./artifacts/macosx-x64/release/libslang.dylib ./bin/macosx-x64/release/libslang.dylib
         gon ./extras/macos-sign.json
     - uses: actions/upload-artifact@v3
       with:
