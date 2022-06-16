@@ -4,10 +4,10 @@ on:
     tags:
     - 'v*' # Push events to matching v*, i.e. v1.0, v20.15.10
 
-name: Upload Release Asset
+name: MacOS Release
 
 jobs:
-  build:
+  build_with_signing:
     name: Upload Release Asset
     runs-on: macos-latest
     strategy:
@@ -16,6 +16,17 @@ jobs:
         compiler: ['clang']
         platform: ['x64'] 
     steps:
+      - name: "Import Certificate"
+        uses: devbotsxyz/xcode-import-certificate@master
+        with:
+          certificate-data: "${{ secrets.BUILD_CERTIFICATE_BASE64 }}"
+          certificate-passphrase: "${{ secrets.P12_PASSWORD }}"
+          keychain-password: "${{ secrets.KEYCHAIN_PASSWORD }}"
+      - name: Install the signing tools
+        run: |
+          brew install mitchellh/gon/gon
+          security find-identity -v
+          brew install coreutils
       - name: Checkout code
         uses: actions/checkout@v2
         with:
@@ -30,7 +41,14 @@ jobs:
           export ARCH=${{matrix.platform}}
           echo "building..."
           source ./github_macos_build.sh
-          echo "creating binary archieves..."
+      - name: Sign binaries
+        env:
+          AC_PASSWORD: ${{secrets.APPLE_ID_PASSWORD}}
+        run: |
+          gon ./extras/macos-sign.json
+      - name: Package
+        id: package
+        run: |
           export SLANG_OS_NAME=macos
           export SLANG_ARCH_NAME=`uname -p`
           export TAG_NAME=`git describe --tags`
@@ -38,18 +56,27 @@ jobs:
           echo "tag:$TAG_NAME"
           echo "slang-tag:$SLANG_TAG"
           export SLANG_BINARY_ARCHIVE=slang-${SLANG_TAG}-${SLANG_OS_NAME}-${SLANG_ARCH_NAME}.zip
-          export SLANG_BINARY_ARCHIVE_TAR=slang-${SLANG_TAG}-${SLANG_OS_NAME}-${SLANG_ARCH_NAME}.tar.gz
           echo "creating zip"
-          zip -r ${SLANG_BINARY_ARCHIVE} bin/*/*/slangc bin/*/*/slangd bin/*/*/libslang.dylib bin/*/*/libslang-glslang.dylib bin/*/*/libgfx.dylib bin/*/*/libslang-llvm.dylib docs/*.md README.md LICENSE slang.h slang-com-helper.h slang-com-ptr.h slang-tag-version.h slang-gfx.h prelude/*.h
-          echo "creating tar"
-          tar -czf ${SLANG_BINARY_ARCHIVE_TAR} bin/*/*/slangc bin/*/*/slangd bin/*/*/libslang.dylib bin/*/*/libslang-glslang.dylib bin/*/*/libgfx.dylib bin/*/*/libslang-llvm.dylib docs/*.md README.md LICENSE slang.h slang-com-helper.h slang-com-ptr.h slang-tag-version.h slang-gfx.h prelude/*.h
+          7z a ${SLANG_BINARY_ARCHIVE} slang.h
+          7z a ${SLANG_BINARY_ARCHIVE} slang-com-helper.h
+          7z a ${SLANG_BINARY_ARCHIVE} slang-com-ptr.h
+          7z a ${SLANG_BINARY_ARCHIVE} slang-tag-version.h
+          7z a ${SLANG_BINARY_ARCHIVE} prelude/*.h
+          7z a ${SLANG_BINARY_ARCHIVE} bin/*/*/libslang.dylib
+          7z a ${SLANG_BINARY_ARCHIVE} bin/*/*/slangc
+          7z a ${SLANG_BINARY_ARCHIVE} bin/*/*/slangd
+          7z a ${SLANG_BINARY_ARCHIVE} docs/*.md
           echo "::set-output name=SLANG_BINARY_ARCHIVE::${SLANG_BINARY_ARCHIVE}"
-          echo "::set-output name=SLANG_BINARY_ARCHIVE_TAR::${SLANG_BINARY_ARCHIVE_TAR}"
       - name: UploadBinary
         uses: softprops/action-gh-release@v1
         with:
           files: |
-            ${{ steps.build.outputs.SLANG_BINARY_ARCHIVE }}
-            ${{ steps.build.outputs.SLANG_BINARY_ARCHIVE_TAR }}
+            ${{ steps.package.outputs.SLANG_BINARY_ARCHIVE }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Notarize
+        env:
+          AC_PASSWORD: ${{secrets.APPLE_ID_PASSWORD}}
+          BINARY_PATH: ${{ steps.package.outputs.SLANG_BINARY_ARCHIVE }}
+        run: |
+          timeout 1000 gon ./extras/macos-notarize.json
