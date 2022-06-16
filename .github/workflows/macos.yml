@@ -19,16 +19,16 @@ jobs:
         platform: ['x64'] 
         
     steps:
-    - uses: actions/checkout@v2.3.4
-      with:
-        submodules: 'false'
-        fetch-depth: '0'
     - name: "Import Certificate"
       uses: devbotsxyz/xcode-import-certificate@master
       with:
         certificate-data: "${{ secrets.BUILD_CERTIFICATE_BASE64 }}"
         certificate-passphrase: "${{ secrets.P12_PASSWORD }}"
-        keychain-password: "${{ secrets.KEYCHAIN_PASSWORD }}"
+        keychain-password: "randomkeychainpassword"
+    - uses: actions/checkout@v2.3.4
+      with:
+        submodules: 'false'
+        fetch-depth: '0'
     - name: Install the signing tools
       run: |
         brew install mitchellh/gon/gon
