@@ -26,9 +26,9 @@ jobs:
     - name: "Import Certificate"
       uses: devbotsxyz/xcode-import-certificate@master
       with:
-        certificate-data: ${{ secrets.BUILD_CERTIFICATE_BASE64 }}
-        certificate-passphrase: ${{ secrets.P12_PASSWORD }}
-        keychain-password: ${{ secrets.KEYCHAIN_PASSWORD }}
+        certificate-data: "${{ secrets.BUILD_CERTIFICATE_BASE64 }}"
+        certificate-passphrase: "${{ secrets.P12_PASSWORD }}"
+        keychain-password: "${{ secrets.KEYCHAIN_PASSWORD }}"
     - name: Install the signing tools
       run: |
         brew install mitchellh/gon/gon
