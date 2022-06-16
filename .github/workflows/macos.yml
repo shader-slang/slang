@@ -23,9 +23,17 @@ jobs:
       with:
         submodules: 'false'
         fetch-depth: '0'
+    - name: "Import Certificate"
+      uses: devbotsxyz/xcode-import-certificate@master
+      with:
+        certificate-data: ${{ secrets.BUILD_CERTIFICATE_BASE64 }}
+        certificate-passphrase: ${{ secrets.P12_PASSWORD }}
+        keychain-password: ${{ secrets.KEYCHAIN_PASSWORD }
     - name: Install the signing tools
       run: |
         brew install mitchellh/gon/gon
+        security find-identity -v
+
     #- name: build
      # run: |
       #   CC=${{matrix.compiler}}
