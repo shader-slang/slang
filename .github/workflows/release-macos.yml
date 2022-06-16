@@ -63,9 +63,9 @@ jobs:
         env:
           IDENTITY_ID: d6ada82a113e4204aaad914e1013e9548ffd30d0
         run: |
-          /usr/bin/codesign --force -s ${IDENTITY_ID} ./bin/macosx-x64/release/libslang.dylib -v
-          /usr/bin/codesign --force -s ${IDENTITY_ID} ./bin/macosx-x64/release/slangd -v
-          /usr/bin/codesign --force -s ${IDENTITY_ID} ./bin/macosx-x64/release/slangc -v
+          /usr/bin/codesign --force --options runtime -s ${IDENTITY_ID} ./bin/macosx-x64/release/libslang.dylib -v
+          /usr/bin/codesign --force --options runtime -s ${IDENTITY_ID} ./bin/macosx-x64/release/slangd -v
+          /usr/bin/codesign --force --options runtime -s ${IDENTITY_ID} ./bin/macosx-x64/release/slangc -v
       - name: Package
         id: package
         run: |
@@ -98,6 +98,13 @@ jobs:
           7z a slang-bin.zip slangd
           7z a slang-bin.zip slangc
           timeout 1000 gon ./extras/macos-notarize.json
+      - name: UploadBinary
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            slang-bin.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: UploadBinary
         uses: softprops/action-gh-release@v1
         with:
