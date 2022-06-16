@@ -17,7 +17,7 @@ jobs:
         compiler: ['clang']
         platform: ['x64'] 
     steps:
-      - name: "Import Certificate"
+      - name: "Import signing certificate"
         env:
           BUILD_CERTIFICATE_BASE64: ${{ secrets.BUILD_CERTIFICATE_BASE64 }}
           P12_PASSWORD: ${{ secrets.P12_PASSWORD }}
@@ -41,7 +41,7 @@ jobs:
 
           security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k ${KEYCHAIN_PASSWORD} $KEYCHAIN_PATH
 
-      - name: Install the signing tools
+      - name: Install nortarize tools
         run: |
           brew install mitchellh/gon/gon
           security find-identity -v
@@ -62,7 +62,6 @@ jobs:
           source ./github_macos_build.sh
       - name: Sign binaries
         env:
-          KEY_PASSWORD: "${{ secrets.KEYCHAIN_PASSWORD }}"
           IDENTITY_ID: d6ada82a113e4204aaad914e1013e9548ffd30d0
         run: |
           /usr/bin/codesign --force -s ${IDENTITY_ID} ./bin/macosx-x64/release/libslang.dylib -v
