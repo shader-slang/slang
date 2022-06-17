@@ -124,7 +124,7 @@
     <None Include="..\..\..\tools\gfx-unit-test\nested-parameter-block.slang">
       <Filter>Source Files</Filter>
     </None>
-    <None Include="..\..\..\tools\gfx-unit-test\ray-tracing-test-shader.slang">
+    <None Include="..\..\..\tools\gfx-unit-test\ray-tracing-test-shaders.slang">
       <Filter>Source Files</Filter>
     </None>
     <None Include="..\..\..\tools\gfx-unit-test\resolve-resource-shader.slang">
