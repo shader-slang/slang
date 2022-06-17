@@ -514,6 +514,18 @@ namespace Slang
         return ConstructDeclRefExpr(item.declRef, bb, loc, originalExpr);
     }
 
+    void SemanticsVisitor::suggestCompletionItems(LookupResult const& lookupResult)
+    {
+        auto& suggestions = getLinkage()->contentAssistInfo.completionSuggestions;
+        suggestions.clear();
+        suggestions.scopeKind = CompletionSuggestions::ScopeKind::Member;
+        for (auto item : lookupResult)
+        {
+            suggestions.candidateItems.add(item);
+        }
+    }
+
+
     Expr* SemanticsVisitor::createLookupResultExpr(
         Name*                   name,
         LookupResult const&     lookupResult,
@@ -1673,6 +1685,17 @@ namespace Slang
         bool anyDuplicates = false;
         int zeroIndexOffset = -1;
 
+        if (memberRefExpr->name == getSession()->getCompletionRequestTokenName())
+        {
+            auto& suggestions = getLinkage()->contentAssistInfo.completionSuggestions;
+            suggestions.clear();
+            suggestions.scopeKind = CompletionSuggestions::ScopeKind::Swizzle;
+            suggestions.swizzleBaseType =
+                memberRefExpr->baseExpression ? memberRefExpr->baseExpression->type : nullptr;
+            suggestions.elementCount[0] = baseElementRowCount;
+            suggestions.elementCount[1] = baseElementColCount;
+        }
+
         String swizzleText = getText(memberRefExpr->name);
         auto cursor = swizzleText.begin();
 
@@ -1831,7 +1854,16 @@ namespace Slang
         bool elementUsed[4] = { false, false, false, false };
         bool anyDuplicates = false;
         bool anyError = false;
-
+        if (memberRefExpr->name == getSession()->getCompletionRequestTokenName())
+        {
+            auto& suggestions = getLinkage()->contentAssistInfo.completionSuggestions;
+            suggestions.clear();
+            suggestions.scopeKind = CompletionSuggestions::ScopeKind::Swizzle;
+            suggestions.swizzleBaseType =
+                memberRefExpr->baseExpression ? memberRefExpr->baseExpression->type : nullptr;
+            suggestions.elementCount[0] = baseElementCount;
+            suggestions.elementCount[1] = 0;
+        }
         auto swizzleText = getText(memberRefExpr->name);
 
         for (Index i = 0; i < swizzleText.getLength(); i++)
@@ -1952,6 +1984,10 @@ namespace Slang
                 return lookupMemberResultFailure(expr, baseType);
             }
 
+            if (expr->name == getSession()->getCompletionRequestTokenName())
+            {
+                suggestCompletionItems(lookupResult);
+            }
             return createLookupResultExpr(
                 expr->name,
                 lookupResult,
@@ -2007,11 +2043,11 @@ namespace Slang
             // For now let's just be expedient and disallow all of that, because
             // we can always add it back in later.
 
-            // If the lookup result is overloaded, then we want to filter
+            // If the lookup result is valid, then we want to filter
             // it to just those candidates that can be referenced statically,
             // and ignore any that would only be allowed as instance members.
             //
-            if(lookupResult.isOverloaded())
+            if(lookupResult.isValid())
             {
                 // We track both the usable items, and whether or
                 // not there were any non-static items that need
@@ -2019,7 +2055,7 @@ namespace Slang
                 //
                 bool anyNonStatic = false;
                 List<LookupResultItem> staticItems;
-                for (auto item : lookupResult.items)
+                for (auto item : lookupResult)
                 {
                     // Is this item usable as a static member?
                     if (isUsableAsStaticMember(item))
@@ -2042,6 +2078,7 @@ namespace Slang
                     if (staticItems.getCount())
                     {
                         lookupResult.items = staticItems;
+                        lookupResult.item = staticItems[0];
                     }
                     else
                     {
@@ -2057,7 +2094,10 @@ namespace Slang
                 // If there were no non-static items, then the `items`
                 // array already represents what we'd get by filtering...
             }
-
+            if (expr->name == getSession()->getCompletionRequestTokenName())
+            {
+                suggestCompletionItems(lookupResult);
+            }
             return createLookupResultExpr(
                 expr->name,
                 lookupResult,
@@ -2217,7 +2257,10 @@ namespace Slang
             {
                 return lookupMemberResultFailure(expr, baseType);
             }
-
+            if (expr->name == getSession()->getCompletionRequestTokenName())
+            {
+                suggestCompletionItems(lookupResult);
+            }
             return createLookupResultExpr(
                 expr->name,
                 lookupResult,

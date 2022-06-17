@@ -854,6 +854,8 @@ namespace Slang
         {
             parser->ReadToken(TokenType::Scope); 
         }
+        if (parser->LookAheadToken(TokenType::CompletionRequest))
+            return parser->ReadToken();
 
         const Token firstIdentifier = parser->ReadToken(TokenType::Identifier);
         if (initialTokenType != TokenType::Scope && parser->tokenReader.peekTokenType() != TokenType::Scope)
@@ -942,6 +944,7 @@ namespace Slang
                 break;
 
             parser->ReadToken(TokenType::Comma);
+            
         }
 
         if (hasDoubleBracket)
@@ -1133,6 +1136,7 @@ namespace Slang
 
         auto decl = parser->astBuilder->create<ImportDecl>();
         decl->scope = parser->currentScope;
+        decl->startLoc = parser->tokenReader.peekLoc();
 
         if (peekTokenType(parser) == TokenType::StringLiteral)
         {
@@ -1162,7 +1166,7 @@ namespace Slang
 
             decl->moduleNameAndLoc = moduleNameAndLoc;
         }
-
+        decl->endLoc = parser->tokenReader.peekLoc();
         parser->ReadToken(TokenType::Semicolon);
 
         return decl;
@@ -1538,7 +1542,10 @@ namespace Slang
 
             _parseOptSemantics(parser, decl);
             decl->body = parseOptBody(parser);
-
+            if (auto block = as<BlockStmt>(decl->body))
+            {
+                decl->closingSourceLoc = block->closingSourceLoc;
+            }
             parser->PopScope();
 
             return decl;
@@ -2686,6 +2693,13 @@ namespace Slang
             semantic->name = parser->ReadToken(TokenType::Identifier);
             return semantic;
         }
+        else if (parser->LookAheadToken(TokenType::CompletionRequest))
+        {
+            HLSLSimpleSemantic* semantic = parser->astBuilder->create<HLSLSimpleSemantic>();
+            parser->FillPosition(semantic);
+            semantic->name = parser->ReadToken();
+            return semantic;
+        }
         else
         {
             // expect an identifier, just to produce an error message
@@ -3147,6 +3161,9 @@ namespace Slang
 
         decl->body = parseOptBody(parser);
 
+        if (auto block = as<BlockStmt>(decl->body))
+            decl->closingSourceLoc = block->closingSourceLoc;
+
         parser->PopScope();
         return decl;
     }
@@ -3469,6 +3486,8 @@ namespace Slang
                 decl->returnType = parser->ParseTypeExp();
             }
             decl->body = parseOptBody(parser);
+            if (auto blockStmt = as<BlockStmt>(decl->body))
+                decl->closingSourceLoc = blockStmt->closingSourceLoc;
             parser->PopScope();
             return decl;
         });

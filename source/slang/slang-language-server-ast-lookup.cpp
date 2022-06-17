@@ -78,11 +78,13 @@ bool _isLocInRange(ASTLookupContext* context, SourceLoc start, SourceLoc end)
 {
     auto startLoc = context->sourceManager->getHumaneLoc(start, SourceLocType::Actual);
     auto endLoc = context->sourceManager->getHumaneLoc(end, SourceLocType::Actual);
-    
+
     Loc s{startLoc.line, startLoc.column};
     Loc e{endLoc.line, endLoc.column};
     Loc c{context->line, context->col};
-    return s <= c && c <= e;
+    return s <= c && c <= e &&
+           startLoc.pathInfo.foundPath.getUnownedSlice().endsWithCaseInsensitive(
+               context->sourceFileName);
 }
 
 bool _findAstNodeImpl(ASTLookupContext& context, SyntaxNode* node);
@@ -548,6 +550,16 @@ bool _findAstNodeImpl(ASTLookupContext& context, SyntaxNode* node)
             if (visitor.dispatchIfNotNull(extDecl->targetType.exp))
                 return true;
         }
+        else if (auto importDecl = as<ImportDecl>(node))
+        {
+            if (_isLocInRange(&context, importDecl->startLoc, importDecl->endLoc))
+            {
+                ASTLookupResult result;
+                result.path = context.nodePath;
+                context.results.add(_Move(result));
+                return true;
+            }
+        }
         for (auto modifier : decl->modifiers)
         {
             if (auto hlslSemantic = as<HLSLSemantic>(modifier))
@@ -558,6 +570,21 @@ bool _findAstNodeImpl(ASTLookupContext& context, SyntaxNode* node)
                     ASTLookupResult result;
                     result.path = context.nodePath;
                     result.path.add(hlslSemantic);
+                    context.results.add(result);
+                    return true;
+                }
+            }
+            else if (auto attribute = as<AttributeBase>(modifier))
+            {
+                if (attribute->getKeywordName() &&
+                    _isLocInRange(
+                        &context,
+                        attribute->getKeywordNameAndLoc().loc,
+                        attribute->getKeywordName()->text.getLength()))
+                {
+                    ASTLookupResult result;
+                    result.path = context.nodePath;
+                    result.path.add(attribute);
                     context.results.add(result);
                     return true;
                 }

@@ -2,6 +2,7 @@
 #pragma once
 
 #include "slang-workspace-version.h"
+#include "slang-language-server-ast-lookup.h"
 
 namespace Slang
 {
@@ -21,7 +22,11 @@ struct CompletionContext
 
     SlangResult tryCompleteMember();
     SlangResult tryCompleteHLSLSemantic();
-    List<LanguageServerProtocol::CompletionItem> collectMembers(Expr* baseExpr);
+    SlangResult tryCompleteAttributes();
+    List<LanguageServerProtocol::CompletionItem> collectMembers();
+    List<LanguageServerProtocol::CompletionItem> createSwizzleCandidates(
+        Type* baseType, IntegerLiteralValue elementCount[2]);
+    List<LanguageServerProtocol::CompletionItem> collectAttributes();
 };
 
 } // namespace Slang

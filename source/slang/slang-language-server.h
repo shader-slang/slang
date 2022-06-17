@@ -120,6 +120,23 @@ private:
     void registerCapability(const char* methodName);
     void logMessage(int type, String message);
 
+    SlangResult tryGetMacroHoverInfo(
+        WorkspaceVersion* version,
+        DocumentVersion* doc,
+        Index line,
+        Index col,
+        JSONValue responseId);
+    SlangResult tryGotoMacroDefinition(
+        WorkspaceVersion* version,
+        DocumentVersion* doc,
+        Index line,
+        Index col,
+        JSONValue responseId);
+    SlangResult tryGotoFileInclude(
+        WorkspaceVersion* version,
+        DocumentVersion* doc,
+        Index line,
+        JSONValue responseId);
     List<Command> commands;
     SlangResult queueJSONCall(JSONRPCCall call);
     SlangResult runCommand(Command& cmd);

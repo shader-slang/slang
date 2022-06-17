@@ -698,6 +698,17 @@ namespace Slang
             return;
         }
 
+        // If we should skip the checking, return now.
+        // A common case to skip checking is for the function bodies when we are in
+        // the language server. In that case we only care about the function bodies in a
+        // specific module and can skip checking the reference modules until they
+        // are being opened/edited later.
+        if (shouldSkipChecking(decl, state))
+        {
+            decl->setCheckState(state);
+            return;
+        }
+
         // Set the flag that indicates we are checking this declaration,
         // so that the cycle check above will catch us before we go
         // into any infinite loops.
@@ -833,6 +844,48 @@ namespace Slang
         if (elementCount) return true;
 
         return true;
+    }
+
+    bool SemanticsVisitor::shouldSkipChecking(Decl* decl, DeclCheckState state)
+    {
+        if (state != DeclCheckState::Checked)
+            return false;
+        // If we are in language server, we should skip checking all the function bodies
+        // except for the module or function that the user cared about.
+        // This optimization helps reduce the response time.
+        if (!getLinkage()->isInLanguageServer())
+        {
+            return false;
+        }
+        if (auto funcDecl = as<FunctionDeclBase>(decl))
+        {
+            auto& assistInfo = getLinkage()->contentAssistInfo;
+            // If this func is not defined in the primary module, skip checking its body.
+            auto moduleDecl = getModuleDecl(decl);
+            if (moduleDecl && moduleDecl->getName() != assistInfo.primaryModuleName)
+                return true;
+            if (funcDecl->body)
+            {
+                auto humaneLoc = getLinkage()->getSourceManager()->getHumaneLoc(
+                    decl->loc, SourceLocType::Actual);
+                if (humaneLoc.pathInfo.foundPath != assistInfo.primaryModulePath)
+                {
+                    return true;
+                }
+                if (assistInfo.checkingMode == ContentAssistCheckingMode::Completion)
+                {
+                    // For completion requests, we skip all funtion bodies except for the one
+                    // that the current cursor is in.
+                    auto closingLoc = getLinkage()->getSourceManager()->getHumaneLoc(
+                        funcDecl->closingSourceLoc, SourceLocType::Actual);
+
+                    if (assistInfo.cursorLine < humaneLoc.line ||
+                        assistInfo.cursorCol > closingLoc.line)
+                        return true;
+                }
+            }
+        }
+        return false;
     }
 
     void SemanticsVisitor::_validateCircularVarDefinition(VarDeclBase* varDecl)

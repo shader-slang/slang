@@ -17,15 +17,18 @@ namespace Slang
     {
     private:
         URI uri;
+        String path;
         String text;
         List<UnownedStringSlice> lines;
         List<List<Index>> utf16CharStarts;
     public:
-        void setURI(URI newURI)
+        void setPath(String filePath)
         {
-            uri = newURI;
+            path = filePath;
+            uri = URI::fromLocalFilePath(path.getUnownedSlice());
         }
         URI getURI() { return uri; }
+        String getPath() { return path; }
         const String& getText() { return text; }
         void setText(const String& newText);
 
@@ -38,6 +41,14 @@ namespace Slang
 
         // Get starting offset of line.
         Index getLineStart(UnownedStringSlice line) { return line.begin() - text.begin(); }
+
+        UnownedStringSlice peekIdentifier(Index line, Index col, Index& offset)
+        {
+            offset = getOffset(line, col);
+            return peekIdentifier(offset);
+        }
+
+        UnownedStringSlice peekIdentifier(Index& offset);
 
         // Get offset from 1-based, utf-8 encoding location.
         Index getOffset(Index lineIndex, Index colIndex)
@@ -95,33 +106,20 @@ namespace Slang
         String originalOutput;
     };
 
-    
-    class SerializedModuleCache
-        : public RefObject
-        , public IModuleCache
-    {
-    public:
-        Dictionary<String, List<uint8_t>> serializedModules;
-
-        void invalidate(const String& path) { serializedModules.Remove(path); }
-        virtual RefPtr<Module> tryLoadModule(Linkage* linkage, String filePath) override;
-        virtual void storeModule(Linkage* linkage, String filePath, RefPtr<Module> module) override;
-    };
-
     class WorkspaceVersion : public RefObject
     {
     private:
         Dictionary<String, Module*> modules;
         Dictionary<ModuleDecl*, RefPtr<ASTMarkup>> markupASTs;
+        Dictionary<Name*, MacroDefinitionContentAssistInfo*> macroDefinitions;
         void parseDiagnostics(String compilerOutput);
     public:
         Workspace* workspace;
         RefPtr<Linkage> linkage;
         Dictionary<String, DocumentDiagnostics> diagnostics;
-        List<Decl*> currentCompletionItems;
         ASTMarkup* getOrCreateMarkupAST(ModuleDecl* module);
-
         Module* getOrLoadModule(String path);
+        MacroDefinitionContentAssistInfo* tryGetMacroDefinition(UnownedStringSlice name);
     };
 
     struct OwnedPreprocessorMacroDefinition
@@ -135,19 +133,21 @@ namespace Slang
     {
     private:
         RefPtr<WorkspaceVersion> currentVersion;
+        RefPtr<WorkspaceVersion> currentCompletionVersion;
         RefPtr<WorkspaceVersion> createWorkspaceVersion();
     public:
         List<String> rootDirectories;
         List<String> additionalSearchPaths;
         OrderedHashSet<String> workspaceSearchPaths;
         List<OwnedPreprocessorMacroDefinition> predefinedMacros;
-        SerializedModuleCache moduleCache;
         bool searchInWorkspace = true;
 
         slang::IGlobalSession* slangGlobalSession;
         Dictionary<String, RefPtr<DocumentVersion>> openedDocuments;
         DocumentVersion* openDoc(String path, String text);
         void changeDoc(const String& path, LanguageServerProtocol::Range range, const String& text);
+        void changeDoc(DocumentVersion* doc, const String& newText);
+
         void closeDoc(const String& path);
 
         // Update predefined macro settings. Returns true if the new settings are different from existing ones.
@@ -158,7 +158,8 @@ namespace Slang
         void init(List<URI> rootDirURI, slang::IGlobalSession* globalSession);
         void invalidate();
         WorkspaceVersion* getCurrentVersion();
-
+        WorkspaceVersion* getCurrentCompletionVersion() { return currentCompletionVersion.Ptr(); }
+        WorkspaceVersion* createVersionForCompletion();
     public:
         // Inherited via ISlangFileSystem
         SLANG_COM_OBJECT_IUNKNOWN_ALL
