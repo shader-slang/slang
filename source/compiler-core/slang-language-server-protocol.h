@@ -238,6 +238,7 @@ struct ServerCapabilities
     TextDocumentSyncOptions textDocumentSync;
     bool hoverProvider = false;
     bool definitionProvider = false;
+    bool documentSymbolProvider = false;
     CompletionOptions completionProvider;
     SemanticTokensOptions semanticTokensProvider;
     SignatureHelpOptions signatureHelpProvider;
@@ -738,6 +739,92 @@ struct LogMessageParams
 
     static const StructRttiInfo g_rttiInfo;
     static const UnownedStringSlice methodName;
+};
+
+struct DocumentSymbolParams : WorkDoneProgressParams
+{
+    /**
+     * The text document.
+     */
+    TextDocumentIdentifier textDocument;
+
+    static const StructRttiInfo g_rttiInfo;
+    static const UnownedStringSlice methodName;
+};
+
+typedef int SymbolKind;
+const int kSymbolKindFile = 1;
+const int kSymbolKindModule = 2;
+const int kSymbolKindNamespace = 3;
+const int kSymbolKindPackage = 4;
+const int kSymbolKindClass = 5;
+const int kSymbolKindMethod = 6;
+const int kSymbolKindProperty = 7;
+const int kSymbolKindField = 8;
+const int kSymbolKindConstructor = 9;
+const int kSymbolKindEnum = 10;
+const int kSymbolKindInterface = 11;
+const int kSymbolKindFunction = 12;
+const int kSymbolKindVariable = 13;
+const int kSymbolKindConstant = 14;
+const int kSymbolKindString = 15;
+const int kSymbolKindNumber = 16;
+const int kSymbolKindBoolean = 17;
+const int kSymbolKindArray = 18;
+const int kSymbolKindObject = 19;
+const int kSymbolKindKey = 20;
+const int kSymbolKindNull = 21;
+const int kSymbolKindEnumMember = 22;
+const int kSymbolKindStruct = 23;
+const int kSymbolKindEvent = 24;
+const int kSymbolKindOperator = 25;
+const int kSymbolKindTypeParameter = 26;
+
+/**
+ * Represents programming constructs like variables, classes, interfaces etc.
+ * that appear in a document. Document symbols can be hierarchical and they
+ * have two ranges: one that encloses its definition and one that points to its
+ * most interesting range, e.g. the range of an identifier.
+ */
+struct DocumentSymbol {
+
+    /**
+     * The name of this symbol. Will be displayed in the user interface and
+     * therefore must not be an empty string or a string only consisting of
+     * white spaces.
+     */
+    String name;
+
+    /**
+     * More detail for this symbol, e.g the signature of a function.
+     */
+    String detail;
+
+    /**
+     * The kind of this symbol.
+     */
+    SymbolKind kind;
+
+    /**
+     * The range enclosing this symbol not including leading/trailing whitespace
+     * but everything else like comments. This information is typically used to
+     * determine if the clients cursor is inside the symbol to reveal in the
+     * symbol in the UI.
+     */
+    Range range;
+
+    /**
+     * The range that should be selected and revealed when this symbol is being
+     * picked, e.g. the name of a function. Must be contained by the `range`.
+     */
+    Range selectionRange;
+
+    /**
+     * Children of this symbol, e.g. properties of a class.
+     */
+    List<DocumentSymbol> children;
+
+    static const StructRttiInfo g_rttiInfo;
 };
 
 } // namespace LanguageServerProtocol

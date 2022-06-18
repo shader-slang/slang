@@ -373,6 +373,10 @@ void ASTIterator<CallbackFunc>::visitDecl(DeclBase* decl)
     {
         visitExpr(typedefDecl->type.exp);
     }
+    else if (auto extDecl = as<ExtensionDecl>(decl))
+    {
+        visitExpr(extDecl->targetType.exp);
+    }
     if (auto container = as<ContainerDecl>(decl))
     {
         for (auto member : container->members)

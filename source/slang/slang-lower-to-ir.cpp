@@ -1149,6 +1149,10 @@ static void addLinkageDecoration(
     {
         builder->addExternCppDecoration(inst, mangledName);
     }
+    if (decl->findModifier<JVPDerivativeModifier>())
+    {
+        builder->addJVPDerivativeDecoration(inst, mangledName);
+    }
     if (as<InterfaceDecl>(decl->parentDecl) &&
         decl->parentDecl->hasModifier<ComInterfaceAttribute>())
     {
