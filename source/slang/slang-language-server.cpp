@@ -8,7 +8,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
-#include <thread>
 #include "../core/slang-secure-crt.h"
 #include "../core/slang-range.h"
 #include "../../slang-com-helper.h"
@@ -25,6 +24,7 @@
 #include "slang-doc-markdown-writer.h"
 #include "slang-mangle.h"
 #include "../../tools/platform/performance-counter.h"
+
 namespace Slang
 {
 using namespace LanguageServerProtocol;
@@ -493,11 +493,6 @@ SlangResult LanguageServer::gotoDefinition(
     }
 }
 
-static bool _isIdentifierChar(char ch)
-{
-    return ch >= '0' && ch <= '9' || ch >= 'a' && ch <= 'z' || ch >= 'A' && ch <= 'Z' || ch == '_';
-}
-
 template <typename Func> struct Deferred
 {
     Func f;
@@ -575,7 +570,7 @@ SlangResult LanguageServer::completion(
     {
         return SLANG_OK;
     }
-    if (SLANG_SUCCEEDED(context.tryCompleteMember()))
+    if (SLANG_SUCCEEDED(context.tryCompleteMemberAndSymbol()))
     {
         return SLANG_OK;
     }
@@ -1275,23 +1270,23 @@ SlangResult LanguageServer::execute()
                 break;
             parseNextMessage();
         }
-        auto parseTime = platform::PerformanceCounter::getElapsedTimeInSeconds(start);
         auto parseEnd = platform::PerformanceCounter::now();
         processCommands();
-        // Now we can use this time to reparse user's code, report diagnostics, etc.
+
+        // Report diagnostics if it hasn't been updated for a while.
         update();
+
         auto workTime = platform::PerformanceCounter::getElapsedTimeInSeconds(parseEnd);
 
         if (commands.getCount() > 0 && m_initialized)
         {
             StringBuilder msgBuilder;
-            msgBuilder << "Server processed " << commands.getCount() << " commands, parsed in "
-                       << String(int(parseTime * 1000)) << "ms, executed in "
+            msgBuilder << "Server processed " << commands.getCount() << " commands, executed in "
                        << String(int(workTime * 1000)) << "ms";
             logMessage(3, msgBuilder.ProduceString());
         }
 
-        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        m_connection->getUnderlyingConnection()->waitForResult(1000);
     }
 
     return SLANG_OK;

@@ -5,11 +5,21 @@
 #include "slang-language-server.h"
 
 #include "slang-ast-all.h"
-#include "slang-syntax.h"
 #include "slang-check-impl.h"
+#include "slang-syntax.h"
 
 namespace Slang
 {
+static const char* kKeywords[] = {
+    "if",        "else",           "switch",    "case",      "default", "return",
+    "try",       "throw",          "throws",    "catch",     "while",   "for",
+    "do",        "static",         "const",     "in",        "out",     "inout",
+    "ref",       "__subscript",    "__init",    "property",  "get",     "set",
+    "class",     "struct",         "interface", "public",    "private", "internal",
+    "protected", "typedef",        "typealias", "uniform",   "export",  "groupshared",
+    "extension", "associatedtype", "this",      "namespace", "This",    "using",
+    "__generic", "__exported",     "import",    "enum",      "break",   "continue",
+    "discard",   "defer",          "cbuffer",   "tbuffer",   "func"};
 
 static const char* hlslSemanticNames[] = {
     "register",
@@ -47,7 +57,8 @@ static const char* hlslSemanticNames[] = {
 
 SlangResult CompletionContext::tryCompleteHLSLSemantic()
 {
-    if (version->linkage->contentAssistInfo.completionSuggestions.scopeKind != CompletionSuggestions::ScopeKind::HLSLSemantics)
+    if (version->linkage->contentAssistInfo.completionSuggestions.scopeKind !=
+        CompletionSuggestions::ScopeKind::HLSLSemantics)
     {
         return SLANG_FAIL;
     }
@@ -75,14 +86,14 @@ SlangResult CompletionContext::tryCompleteAttributes()
     return SLANG_OK;
 }
 
-SlangResult CompletionContext::tryCompleteMember()
+SlangResult CompletionContext::tryCompleteMemberAndSymbol()
 {
-    List<LanguageServerProtocol::CompletionItem> items = collectMembers();
+    List<LanguageServerProtocol::CompletionItem> items = collectMembersAndSymbols();
     server->m_connection->sendResult(&items, responseId);
     return SLANG_OK;
 }
 
-List<LanguageServerProtocol::CompletionItem> CompletionContext::collectMembers()
+List<LanguageServerProtocol::CompletionItem> CompletionContext::collectMembersAndSymbols()
 {
     auto linkage = version->linkage;
     if (linkage->contentAssistInfo.completionSuggestions.scopeKind ==
@@ -93,9 +104,19 @@ List<LanguageServerProtocol::CompletionItem> CompletionContext::collectMembers()
             linkage->contentAssistInfo.completionSuggestions.elementCount);
     }
     List<LanguageServerProtocol::CompletionItem> result;
-    if (linkage->contentAssistInfo.completionSuggestions.scopeKind !=
-        CompletionSuggestions::ScopeKind::Member)
+    bool useCommitChars = false;
+    bool addKeywords = false;
+    switch (linkage->contentAssistInfo.completionSuggestions.scopeKind)
     {
+    case CompletionSuggestions::ScopeKind::Member:
+        useCommitChars = true;
+        break;
+    case CompletionSuggestions::ScopeKind::Expr:
+    case CompletionSuggestions::ScopeKind::Decl:
+    case CompletionSuggestions::ScopeKind::Stmt:
+        addKeywords = true;
+        break;
+    default:
         return result;
     }
     HashSet<String> deduplicateSet;
@@ -105,11 +126,15 @@ List<LanguageServerProtocol::CompletionItem> CompletionContext::collectMembers()
     {
         auto& suggestedItem = linkage->contentAssistInfo.completionSuggestions.candidateItems[i];
         auto member = suggestedItem.declRef.getDecl();
+        if (auto genericDecl = as<GenericDecl>(member))
+            member = genericDecl->inner;
+        if (!member)
+            continue;
         if (!member->getName())
             continue;
         LanguageServerProtocol::CompletionItem item;
         item.label = member->getName()->text;
-        item.kind = 0;
+        item.kind = LanguageServerProtocol::kCompletionItemKindKeyword;
         if (as<TypeConstraintDecl>(member))
         {
             continue;
@@ -122,7 +147,10 @@ List<LanguageServerProtocol::CompletionItem> CompletionContext::collectMembers()
         {
             continue;
         }
-
+        if (item.label.getLength() == 0)
+            continue;
+        if (!_isIdentifierChar(item.label[0]))
+            continue;
         if (item.label.startsWith("$"))
             continue;
         if (!deduplicateSet.Add(item.label))
@@ -171,11 +199,39 @@ List<LanguageServerProtocol::CompletionItem> CompletionContext::collectMembers()
         item.data = String(i);
         result.add(item);
     }
-
-    for (auto& item : result)
+    if (addKeywords)
     {
-        for (auto ch : getCommitChars())
-            item.commitCharacters.add(ch);
+        for (auto keyword : kKeywords)
+        {
+            if (!deduplicateSet.Add(keyword))
+                continue;
+            LanguageServerProtocol::CompletionItem item;
+            item.label = keyword;
+            item.kind = LanguageServerProtocol::kCompletionItemKindKeyword;
+            item.data = "-1";
+            result.add(item);
+        }
+        for (auto& def : linkage->contentAssistInfo.preprocessorInfo.macroDefinitions)
+        {
+            if (!def.name)
+                continue;
+            auto& text = def.name->text;
+            if (!deduplicateSet.Add(text))
+                continue;
+            LanguageServerProtocol::CompletionItem item;
+            item.label = text;
+            item.kind = LanguageServerProtocol::kCompletionItemKindKeyword;
+            item.data = "-1";
+            result.add(item);
+        }
+    }
+    if (useCommitChars)
+    {
+        for (auto& item : result)
+        {
+            for (auto ch : getCommitChars())
+                item.commitCharacters.add(ch);
+        }
     }
     return result;
 }
@@ -230,7 +286,7 @@ List<LanguageServerProtocol::CompletionItem> CompletionContext::createSwizzleCan
                 item.label = nameSB.ToString();
                 result.add(item);
                 nameSB.Clear();
-                nameSB << "_" << i + 1<< j + 1;
+                nameSB << "_" << i + 1 << j + 1;
                 item.label = nameSB.ToString();
                 result.add(item);
             }

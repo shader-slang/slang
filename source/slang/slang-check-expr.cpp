@@ -514,11 +514,12 @@ namespace Slang
         return ConstructDeclRefExpr(item.declRef, bb, loc, originalExpr);
     }
 
-    void SemanticsVisitor::suggestCompletionItems(LookupResult const& lookupResult)
+    void SemanticsVisitor::suggestCompletionItems(
+        CompletionSuggestions::ScopeKind scopeKind, LookupResult const& lookupResult)
     {
         auto& suggestions = getLinkage()->contentAssistInfo.completionSuggestions;
         suggestions.clear();
-        suggestions.scopeKind = CompletionSuggestions::ScopeKind::Member;
+        suggestions.scopeKind = scopeKind;
         for (auto item : lookupResult)
         {
             suggestions.candidateItems.add(item);
@@ -1484,6 +1485,12 @@ namespace Slang
         auto lookupResult = lookUp(
             m_astBuilder,
             this, expr->name, expr->scope);
+        if (expr->name == getSession()->getCompletionRequestTokenName())
+        {
+            suggestCompletionItems(CompletionSuggestions::ScopeKind::Expr, lookupResult);
+            return expr;
+        }
+
         if (lookupResult.isValid())
         {
             return createLookupResultExpr(
@@ -1986,7 +1993,7 @@ namespace Slang
 
             if (expr->name == getSession()->getCompletionRequestTokenName())
             {
-                suggestCompletionItems(lookupResult);
+                suggestCompletionItems(CompletionSuggestions::ScopeKind::Member, lookupResult);
             }
             return createLookupResultExpr(
                 expr->name,
@@ -2096,7 +2103,7 @@ namespace Slang
             }
             if (expr->name == getSession()->getCompletionRequestTokenName())
             {
-                suggestCompletionItems(lookupResult);
+                suggestCompletionItems(CompletionSuggestions::ScopeKind::Member, lookupResult);
             }
             return createLookupResultExpr(
                 expr->name,
@@ -2259,7 +2266,7 @@ namespace Slang
             }
             if (expr->name == getSession()->getCompletionRequestTokenName())
             {
-                suggestCompletionItems(lookupResult);
+                suggestCompletionItems(CompletionSuggestions::ScopeKind::Member, lookupResult);
             }
             return createLookupResultExpr(
                 expr->name,

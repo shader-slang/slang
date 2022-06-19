@@ -20,10 +20,10 @@ struct CompletionContext
     Int line;
     Int col;
 
-    SlangResult tryCompleteMember();
+    SlangResult tryCompleteMemberAndSymbol();
     SlangResult tryCompleteHLSLSemantic();
     SlangResult tryCompleteAttributes();
-    List<LanguageServerProtocol::CompletionItem> collectMembers();
+    List<LanguageServerProtocol::CompletionItem> collectMembersAndSymbols();
     List<LanguageServerProtocol::CompletionItem> createSwizzleCandidates(
         Type* baseType, IntegerLiteralValue elementCount[2]);
     List<LanguageServerProtocol::CompletionItem> collectAttributes();

@@ -143,5 +143,10 @@ private:
     void processCommands();
 };
 
+inline bool _isIdentifierChar(char ch)
+{
+    return ch >= '0' && ch <= '9' || ch >= 'a' && ch <= 'z' || ch >= 'A' && ch <= 'Z' || ch == '_';
+}
+
 SLANG_API SlangResult runLanguageServer();
 } // namespace Slang

@@ -5605,7 +5605,7 @@ namespace Slang
 
                 return constExpr;
             }
-
+        case TokenType::CompletionRequest:
         case TokenType::Identifier:
             {
                 // We will perform name lookup here so that we can find syntax
@@ -5627,7 +5627,7 @@ namespace Slang
                 varExpr->scope = parser->currentScope;
                 parser->FillPosition(varExpr);
 
-                auto nameAndLoc = expectIdentifier(parser);
+                auto nameAndLoc = NameLoc(parser->ReadToken());
                 varExpr->name = nameAndLoc.name;
 
                 if(peekTokenType(parser) == TokenType::OpLess)

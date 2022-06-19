@@ -1649,7 +1649,8 @@ namespace Slang
 
         void importModuleIntoScope(Scope* scope, ModuleDecl* moduleDecl);
 
-        void suggestCompletionItems(LookupResult const& lookupResult);
+        void suggestCompletionItems(
+            CompletionSuggestions::ScopeKind scopeKind, LookupResult const& lookupResult);
     };
 
     struct SemanticsExprVisitor
