@@ -5,6 +5,7 @@
 #include "../compiler-core/slang-json-rpc-connection.h"
 
 #include "slang-workspace-version.h"
+#include "slang-language-server-completion.h"
 
 namespace Slang
 {
@@ -75,6 +76,7 @@ private:
 
 public:
     bool m_initialized = false;
+    CommitCharacterBehavior m_commitCharacterBehavior = CommitCharacterBehavior::MembersOnly;
     RefPtr<JSONRPCConnection> m_connection;
     ComPtr<slang::IGlobalSession> m_session;
     RefPtr<Workspace> m_workspace;
@@ -113,8 +115,9 @@ private:
     void resetDiagnosticUpdateTime();
     void publishDiagnostics();
     void updatePredefinedMacros(const JSONValue& macros);
-    void updateSearchPaths(const JSONValue& macros);
-    void updateSearchInWorkspace(const JSONValue& macros);
+    void updateSearchPaths(const JSONValue& value);
+    void updateSearchInWorkspace(const JSONValue& value);
+    void updateCommitCharacters(const JSONValue& value);
 
     void sendConfigRequest();
     void registerCapability(const char* methodName);

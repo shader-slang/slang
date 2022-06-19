@@ -8,6 +8,13 @@ namespace Slang
 {
 class LanguageServer;
 
+enum class CommitCharacterBehavior
+{
+    Disabled,
+    MembersOnly,
+    All
+};
+
 struct CompletionContext
 {
     LanguageServer* server;
@@ -17,6 +24,7 @@ struct CompletionContext
     Module* parsedModule;
     JSONValue responseId;
     UnownedStringSlice canonicalPath;
+    CommitCharacterBehavior commitCharacterBehavior;
     Int line;
     Int col;
 

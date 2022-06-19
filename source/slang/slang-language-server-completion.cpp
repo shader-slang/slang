@@ -10,7 +10,15 @@
 
 namespace Slang
 {
-static const char* kKeywords[] = {
+
+static const char* kDeclKeywords[] = {
+    "throws",    "static",         "const",     "in",        "out",     "inout",
+    "ref",       "__subscript",    "__init",    "property",  "get",     "set",
+    "class",     "struct",         "interface", "public",    "private", "internal",
+    "protected", "typedef",        "typealias", "uniform",   "export",  "groupshared",
+    "extension", "associatedtype", "namespace", "This",    "using",
+    "__generic", "__exported",     "import",    "enum",      "cbuffer",   "tbuffer",   "func"};
+static const char* kStmtKeywords[] = {
     "if",        "else",           "switch",    "case",      "default", "return",
     "try",       "throw",          "throws",    "catch",     "while",   "for",
     "do",        "static",         "const",     "in",        "out",     "inout",
@@ -104,16 +112,17 @@ List<LanguageServerProtocol::CompletionItem> CompletionContext::collectMembersAn
             linkage->contentAssistInfo.completionSuggestions.elementCount);
     }
     List<LanguageServerProtocol::CompletionItem> result;
-    bool useCommitChars = false;
+    bool useCommitChars = true;
     bool addKeywords = false;
     switch (linkage->contentAssistInfo.completionSuggestions.scopeKind)
     {
     case CompletionSuggestions::ScopeKind::Member:
-        useCommitChars = true;
+        useCommitChars = (commitCharacterBehavior == CommitCharacterBehavior::MembersOnly || commitCharacterBehavior == CommitCharacterBehavior::All);
         break;
     case CompletionSuggestions::ScopeKind::Expr:
     case CompletionSuggestions::ScopeKind::Decl:
     case CompletionSuggestions::ScopeKind::Stmt:
+        useCommitChars = (commitCharacterBehavior == CommitCharacterBehavior::All);
         addKeywords = true;
         break;
     default:
@@ -201,16 +210,34 @@ List<LanguageServerProtocol::CompletionItem> CompletionContext::collectMembersAn
     }
     if (addKeywords)
     {
-        for (auto keyword : kKeywords)
+        if (linkage->contentAssistInfo.completionSuggestions.scopeKind ==
+            CompletionSuggestions::ScopeKind::Decl)
         {
-            if (!deduplicateSet.Add(keyword))
-                continue;
-            LanguageServerProtocol::CompletionItem item;
-            item.label = keyword;
-            item.kind = LanguageServerProtocol::kCompletionItemKindKeyword;
-            item.data = "-1";
-            result.add(item);
+            for (auto keyword : kDeclKeywords)
+            {
+                if (!deduplicateSet.Add(keyword))
+                    continue;
+                LanguageServerProtocol::CompletionItem item;
+                item.label = keyword;
+                item.kind = LanguageServerProtocol::kCompletionItemKindKeyword;
+                item.data = "-1";
+                result.add(item);
+            }
         }
+        else
+        {
+            for (auto keyword : kStmtKeywords)
+            {
+                if (!deduplicateSet.Add(keyword))
+                    continue;
+                LanguageServerProtocol::CompletionItem item;
+                item.label = keyword;
+                item.kind = LanguageServerProtocol::kCompletionItemKindKeyword;
+                item.data = "-1";
+                result.add(item);
+            }
+        }
+        
         for (auto& def : linkage->contentAssistInfo.preprocessorInfo.macroDefinitions)
         {
             if (!def.name)

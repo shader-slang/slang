@@ -153,11 +153,12 @@ SlangResult LanguageServer::parseNextMessage()
                 if (response.result.getKind() == JSONValue::Kind::Array)
                 {
                     auto arr = m_connection->getContainer()->getArray(response.result);
-                    if (arr.getCount() == 3)
+                    if (arr.getCount() == 4)
                     {
                         updatePredefinedMacros(arr[0]);
                         updateSearchPaths(arr[1]);
                         updateSearchInWorkspace(arr[2]);
+                        updateCommitCharacters(arr[3]);
                     }
                 }
                 break;
@@ -562,6 +563,7 @@ SlangResult LanguageServer::completion(
     context.canonicalPath = canonicalPath.getUnownedSlice();
     context.line = utf8Line;
     context.col = utf8Col;
+    context.commitCharacterBehavior = m_commitCharacterBehavior;
     if (SLANG_SUCCEEDED(context.tryCompleteAttributes()))
     {
         return SLANG_OK;
@@ -882,14 +884,14 @@ void LanguageServer::updatePredefinedMacros(const JSONValue& macros)
     }
 }
 
-void LanguageServer::updateSearchPaths(const JSONValue& macros)
+void LanguageServer::updateSearchPaths(const JSONValue& value)
 {
-    if (macros.isValid())
+    if (value.isValid())
     {
         auto container = m_connection->getContainer();
         JSONToNativeConverter converter(container, m_connection->getSink());
         List<String> searchPaths;
-        if (SLANG_SUCCEEDED(converter.convert(macros, &searchPaths)))
+        if (SLANG_SUCCEEDED(converter.convert(value, &searchPaths)))
         {
             if (m_workspace->updateSearchPaths(searchPaths))
             {
@@ -900,14 +902,14 @@ void LanguageServer::updateSearchPaths(const JSONValue& macros)
     }
 }
 
-void LanguageServer::updateSearchInWorkspace(const JSONValue& macros)
+void LanguageServer::updateSearchInWorkspace(const JSONValue& value)
 {
-    if (macros.isValid())
+    if (value.isValid())
     {
         auto container = m_connection->getContainer();
         JSONToNativeConverter converter(container, m_connection->getSink());
         bool searchPaths;
-        if (SLANG_SUCCEEDED(converter.convert(macros, &searchPaths)))
+        if (SLANG_SUCCEEDED(converter.convert(value, &searchPaths)))
         {
             if (m_workspace->updateSearchInWorkspace(searchPaths))
             {
@@ -918,6 +920,32 @@ void LanguageServer::updateSearchInWorkspace(const JSONValue& macros)
     }
 }
 
+void LanguageServer::updateCommitCharacters(const JSONValue& jsonValue)
+{
+    if (jsonValue.isValid())
+    {
+        auto container = m_connection->getContainer();
+        JSONToNativeConverter converter(container, m_connection->getSink());
+        String value;
+        if (SLANG_SUCCEEDED(converter.convert(jsonValue, &value)))
+        {
+            if (value == "on")
+            {
+                m_commitCharacterBehavior = CommitCharacterBehavior::All;
+            }
+            else if (value == "off")
+            {
+                m_commitCharacterBehavior = CommitCharacterBehavior::Disabled;
+            }
+            else
+            {
+                m_commitCharacterBehavior = CommitCharacterBehavior::MembersOnly;
+            }
+        }
+    }
+}
+
+
 void LanguageServer::sendConfigRequest()
 {
     ConfigurationParams args;
@@ -927,6 +955,8 @@ void LanguageServer::sendConfigRequest()
     item.section = "slang.additionalSearchPaths";
     args.items.add(item);
     item.section = "slang.searchInAllWorkspaceDirectories";
+    args.items.add(item);
+    item.section = "slang.enableCommitCharactersInAutoCompletion";
     args.items.add(item);
     m_connection->sendCall(
         ConfigurationParams::methodName,

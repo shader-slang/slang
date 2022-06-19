@@ -1487,7 +1487,10 @@ namespace Slang
             this, expr->name, expr->scope);
         if (expr->name == getSession()->getCompletionRequestTokenName())
         {
-            suggestCompletionItems(CompletionSuggestions::ScopeKind::Expr, lookupResult);
+            auto scopeKind = CompletionSuggestions::ScopeKind::Expr;
+            if (!m_parentFunc)
+                scopeKind = CompletionSuggestions::ScopeKind::Decl;
+            suggestCompletionItems(scopeKind, lookupResult);
             return expr;
         }
 

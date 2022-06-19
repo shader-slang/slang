@@ -880,7 +880,7 @@ namespace Slang
                         funcDecl->closingSourceLoc, SourceLocType::Actual);
 
                     if (assistInfo.cursorLine < humaneLoc.line ||
-                        assistInfo.cursorCol > closingLoc.line)
+                        assistInfo.cursorLine > closingLoc.line)
                         return true;
                 }
             }
