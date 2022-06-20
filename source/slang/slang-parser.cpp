@@ -1126,8 +1126,6 @@ namespace Slang
 
     static NameLoc expectIdentifier(Parser* parser)
     {
-        if (parser->LookAheadToken(TokenType::CompletionRequest))
-            return NameLoc(parser->ReadToken());
         return NameLoc(parser->ReadToken(TokenType::Identifier));
     }
 
@@ -5756,7 +5754,7 @@ namespace Slang
                     parser->ReadToken(TokenType::Dot);
                     parser->FillPosition(memberExpr);
                     memberExpr->name = expectIdentifier(parser).name;
-
+                    
                     if (peekTokenType(parser) == TokenType::OpLess)
                         expr = maybeParseGenericApp(parser, memberExpr);
                     else
