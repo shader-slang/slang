@@ -1126,6 +1126,8 @@ namespace Slang
 
     static NameLoc expectIdentifier(Parser* parser)
     {
+        if (parser->LookAheadToken(TokenType::CompletionRequest))
+            return NameLoc(parser->ReadToken());
         return NameLoc(parser->ReadToken(TokenType::Identifier));
     }
 
@@ -2980,6 +2982,9 @@ namespace Slang
     {
         InterfaceDecl* decl = parser->astBuilder->create<InterfaceDecl>();
         parser->FillPosition(decl);
+
+        AdvanceIf(parser, TokenType::CompletionRequest);
+
         decl->nameAndLoc = NameLoc(parser->ReadToken(TokenType::Identifier));
 
         parseOptionalInheritanceClause(parser, decl);
@@ -3933,9 +3938,11 @@ namespace Slang
             ParseSquareBracketAttributes(this, &modifierLink);
         }
 
+        // Skip completion request token to prevent producing a type named completion request.
+        AdvanceIf(this, TokenType::CompletionRequest);
+
         // TODO: support `struct` declaration without tag
         rs->nameAndLoc = expectIdentifier(this);
-
         return parseOptGenericDecl(this, [&](GenericDecl*)
         {
             // We allow for an inheritance clause on a `struct`
@@ -3950,6 +3957,9 @@ namespace Slang
     {
         ClassDecl* rs = astBuilder->create<ClassDecl>();
         ReadToken("class");
+
+        AdvanceIf(this, TokenType::CompletionRequest);
+
         FillPosition(rs);
         rs->nameAndLoc = expectIdentifier(this);
 
@@ -3987,6 +3997,8 @@ namespace Slang
         // toward deprecating it.
         //
         AdvanceIf(parser, "class");
+
+        AdvanceIf(parser, TokenType::CompletionRequest);
 
         parser->FillPosition(decl);
 
