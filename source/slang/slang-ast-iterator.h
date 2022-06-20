@@ -104,6 +104,8 @@ struct ASTIterator
             iterator->maybeDispatchCallback(expr);
 
             dispatchIfNotNull(expr->functionExpr);
+            dispatchIfNotNull(expr->originalFunctionExpr);
+
             for (auto arg : expr->arguments)
                 dispatchIfNotNull(arg);
         }
@@ -188,7 +190,11 @@ struct ASTIterator
             iterator->maybeDispatchCallback(expr);
         }
 
-        void visitDeclRefExpr(DeclRefExpr* expr) { iterator->maybeDispatchCallback(expr); }
+        void visitDeclRefExpr(DeclRefExpr* expr)
+        {
+            iterator->maybeDispatchCallback(expr);
+            dispatchIfNotNull(expr->originalExpr);
+        }
 
         void visitStaticMemberExpr(StaticMemberExpr* expr)
         {

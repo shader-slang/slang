@@ -151,6 +151,8 @@ public:
         PushNode pushNodeRAII(context, expr);
         if (dispatchIfNotNull(expr->functionExpr))
             return true;
+        if (dispatchIfNotNull(expr->originalFunctionExpr))
+            return true;
         for (auto arg : expr->arguments)
             if (dispatchIfNotNull(arg))
                 return true;
@@ -319,7 +321,7 @@ public:
             context->results.add(result);
             return true;
         }
-        return false;
+        return dispatchIfNotNull(expr->originalExpr);
     }
 
     bool visitStaticMemberExpr(StaticMemberExpr* expr)
