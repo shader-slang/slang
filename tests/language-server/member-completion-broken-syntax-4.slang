@@ -1,5 +1,5 @@
 //TEST:LANG_SERVER:
-//COMPLETE:11,7
+//COMPLETE:12,7
 struct MyType
 {
     int member = 0;
