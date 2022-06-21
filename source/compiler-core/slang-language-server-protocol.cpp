@@ -215,6 +215,7 @@ static const StructRttiInfo _makeServerCapabilitiesRtti()
     builder.addField("completionProvider", &obj.completionProvider);
     builder.addField("semanticTokensProvider", &obj.semanticTokensProvider);
     builder.addField("signatureHelpProvider", &obj.signatureHelpProvider);
+    builder.addField("documentSymbolProvider", &obj.documentSymbolProvider);
     builder.ignoreUnknownFields();
     return builder.make();
 }
@@ -573,6 +574,35 @@ static const StructRttiInfo _makeLogMessageParamsRtti()
 const StructRttiInfo LogMessageParams::g_rttiInfo = _makeLogMessageParamsRtti();
 const UnownedStringSlice LogMessageParams::methodName =
     UnownedStringSlice::fromLiteral("window/logMessage");
+
+static const StructRttiInfo _makeDocumentSymbolParamsRtti()
+{
+    DocumentSymbolParams obj;
+    StructRttiBuilder builder(
+        &obj, "LanguageServerProtocol::DocumentSymbolParams", &WorkDoneProgressParams::g_rttiInfo);
+    builder.addField("textDocument", &obj.textDocument);
+    builder.ignoreUnknownFields();
+    return builder.make();
+}
+const StructRttiInfo DocumentSymbolParams::g_rttiInfo = _makeDocumentSymbolParamsRtti();
+const UnownedStringSlice DocumentSymbolParams::methodName =
+    UnownedStringSlice::fromLiteral("textDocument/documentSymbol");
+
+static const StructRttiInfo _makeDocumentSymbolRtti()
+{
+    DocumentSymbol obj;
+    StructRttiBuilder builder(
+        &obj, "LanguageServerProtocol::DocumentSymbol", nullptr);
+    builder.addField("name", &obj.name);
+    builder.addField("detail", &obj.detail);
+    builder.addField("kind", &obj.kind);
+    builder.addField("range", &obj.range);
+    builder.addField("selectionRange", &obj.selectionRange);
+    builder.addField("children", &obj.children);
+    builder.ignoreUnknownFields();
+    return builder.make();
+}
+const StructRttiInfo DocumentSymbol::g_rttiInfo = _makeDocumentSymbolRtti();
 
 } // namespace LanguageServerProtocol
 

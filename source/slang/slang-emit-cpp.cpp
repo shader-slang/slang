@@ -2595,6 +2595,15 @@ void CPPSourceEmitter::_maybeEmitExportLike(IRInst* inst)
     // Specially handle export, as we don't want to emit it multiple times
     if (getTargetReq()->isWholeProgramRequest())
     {
+        if (auto nameHint = inst->findDecoration<IRNameHintDecoration>())
+        {
+            if (nameHint->getName() == "main")
+            {
+                // Don't output any decorations on main function.
+                return;
+            }
+        }
+
         bool isExternC = false;
         bool isExported = false;
 

@@ -373,6 +373,10 @@ void ASTIterator<CallbackFunc>::visitDecl(DeclBase* decl)
     {
         visitExpr(typedefDecl->type.exp);
     }
+    else if (auto extDecl = as<ExtensionDecl>(decl))
+    {
+        visitExpr(extDecl->targetType.exp);
+    }
     if (auto container = as<ContainerDecl>(decl))
     {
         for (auto member : container->members)
@@ -436,7 +440,7 @@ List<SemanticToken> getSemanticTokens(Linkage* linkage, Module* module, UnownedS
     List<SemanticToken> result;
     auto maybeInsertToken = [&](const SemanticToken& token)
     {
-        if (token.line >= 0 && token.col >= 0 && token.length > 0 &&
+        if (token.line > 0 && token.col > 0 && token.length > 0 &&
             token.type != SemanticTokenType::NormalText)
             result.add(token);
     };

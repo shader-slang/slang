@@ -309,7 +309,7 @@
     <None Include="..\..\..\tools\gfx-unit-test\graphics-smoke.slang" />
     <None Include="..\..\..\tools\gfx-unit-test\mutable-shader-object.slang" />
     <None Include="..\..\..\tools\gfx-unit-test\nested-parameter-block.slang" />
-    <None Include="..\..\..\tools\gfx-unit-test\ray-tracing-test-shader.slang" />
+    <None Include="..\..\..\tools\gfx-unit-test\ray-tracing-test-shaders.slang" />
     <None Include="..\..\..\tools\gfx-unit-test\resolve-resource-shader.slang" />
     <None Include="..\..\..\tools\gfx-unit-test\root-shader-parameter.slang" />
     <None Include="..\..\..\tools\gfx-unit-test\sampler-array.slang" />

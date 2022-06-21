@@ -1,0 +1,15 @@
+{
+    "source" : [
+        "./bin/macosx-x64/release/libslang.dylib",
+        "./bin/macosx-x64/release/slangc", 
+        "./bin/macosx-x64/release/slangd"
+        ],
+    "bundle_id" : "shader-slang.slang",
+    "apple_id": {
+        "username" : "yongh@outlook.com",
+        "password":  "@env:AC_PASSWORD"
+    },
+    "sign" :{
+        "application_identity" : "d6ada82a113e4204aaad914e1013e9548ffd30d0"
+    }
+}
