@@ -160,6 +160,7 @@ namespace Slang
             Func,
             Generic,
             UnspecializedGeneric,
+            Expr,
         };
         Flavor flavor;
 
@@ -177,6 +178,9 @@ namespace Slang
 
         // Reference to the declaration being applied
         LookupResultItem item;
+
+        // Type of function being applied (for cases where `item` is not used)
+        FuncType* funcType = nullptr;
 
         // The type of the result expression if this candidate is selected
         Type*	resultType = nullptr;
