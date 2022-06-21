@@ -3,6 +3,7 @@
 
 #include "slang-ir.h"
 #include "slang-ir-insts.h"
+#include "slang-ir-marshal-native-call.h"
 
 namespace Slang
 {
@@ -83,82 +84,15 @@ struct DllImportContext
         return stringGetBufferFunc;
     }
 
-    IRType* getNativeType(IRBuilder& builder, IRType* type)
-    {
-        switch (type->getOp())
-        {
-        case kIROp_StringType:
-            return builder.getPtrType(builder.getCharType());
-        default:
-            return type;
-        }
-    }
-
-    IRType* getNativeFuncType(IRBuilder& builder, IRFunc* func)
-    {
-        List<IRInst*> nativeParamTypes;
-        auto declaredFuncType = func->getDataType();
-        assert(declaredFuncType->getOp() == kIROp_FuncType);
-        for (UInt i = 0; i < declaredFuncType->getParamCount(); ++i)
-        {
-            auto paramType = declaredFuncType->getParamType(i);
-            nativeParamTypes.add(getNativeType(builder, as<IRType>(paramType)));
-        }
-        IRType* returnType = getNativeType(builder, func->getResultType());
-        auto funcType = builder.getFuncType(
-            nativeParamTypes.getCount(), (IRType**)nativeParamTypes.getBuffer(), returnType);
-
-        return funcType;
-    }
-
-    void marshalImportRefParameter(IRBuilder& builder, IRParam* param, List<IRInst*>& args)
-    {
-        SLANG_UNUSED(builder);
-
-        auto innerType = as<IRPtrTypeBase>(param->getDataType())->getValueType();
-        switch (innerType->getOp())
-        {
-        case kIROp_StringType:
-            {
-                diagnosticSink->diagnose(
-                    param->sourceLoc,
-                    Diagnostics::invalidTypeMarshallingForImportedDLLSymbol,
-                    param->getParent()->getParent());
-            }
-            break;
-        default:
-            args.add(param);
-            break;
-        }
-    }
-
-    void marshalImportParameter(IRBuilder& builder, IRParam* param, List<IRInst*>& args)
-    {
-        switch (param->getDataType()->getOp())
-        {
-        case kIROp_InOutType:
-        case kIROp_RefType:
-            return marshalImportRefParameter(builder, param, args);
-        case kIROp_StringType:
-            {
-                auto getStringBufferFunc = getStringGetBufferFunc();
-                args.add(builder.emitCallInst(
-                    builder.getPtrType(builder.getCharType()), getStringBufferFunc, 1, (IRInst**)&param));
-            }
-            break;
-        default:
-            args.add(param);
-            break;
-        }
-    }
 
     void processFunc(IRFunc* func, IRDllImportDecoration* dllImportDecoration)
     {
         assert(func->getFirstBlock() == nullptr);
 
         IRBuilder builder(sharedBuilder);
+        NativeCallMarshallingContext marshalContext;
 
-        auto nativeType = getNativeFuncType(builder, func);
+        auto nativeType = marshalContext.getNativeFuncType(builder, func->getDataType());
         builder.setInsertInto(module->getModuleInst());
         auto funcPtr = builder.createGlobalVar(nativeType);
         builder.setInsertInto(funcPtr);
@@ -178,12 +112,6 @@ struct DllImportContext
             params.add(builder.emitParam((IRType*)paramType));
         }
 
-        // Marshal parameters to arguments into native func.
-        List<IRInst*> args;
-        for (auto param : params)
-        {
-            marshalImportParameter(builder, param, args);
-        }
         IRInst* cmpArgs[] = {builder.emitLoad(nativeType, funcPtr), builder.getPtrValue(nullptr)};
         auto isUninitialized =
             builder.emitIntrinsicInst(builder.getBoolType(), kIROp_Eql, 2, cmpArgs);
@@ -209,17 +137,15 @@ struct DllImportContext
         builder.emitBranch(afterBlock);
         builder.setInsertInto(afterBlock);
 
-        IRType* nativeReturnType = getNativeType(builder, func->getResultType());
-        auto nativeFunc = builder.emitLoad(funcPtr);
-        auto call = builder.emitCallInst(nativeReturnType, nativeFunc, args);
-        if (declaredFuncType->getResultType()->getOp() != kIROp_VoidType)
-        {
-            builder.emitReturn(call);
-        }
-        else
-        {
-            builder.emitReturn();
-        }
+        marshalContext.diagnosticSink = diagnosticSink;
+        auto callResult = marshalContext.marshalNativeCall(
+            builder,
+            declaredFuncType,
+            nativeType,
+            builder.emitLoad(funcPtr),
+            params.getCount(),
+            (IRInst**)params.getBuffer());
+        builder.emitReturn(callResult);
     }
 
     void processModule()
