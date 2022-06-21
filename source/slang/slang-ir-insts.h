@@ -2985,6 +2985,11 @@ public:
         addDecoration(value, kIROp_ExternCppDecoration, getStringValue(mangledName));
     }
 
+    void addJVPDerivativeDecoration(IRInst* value, UnownedStringSlice const& mangledName)
+    {
+        addDecoration(value, kIROp_JVPDerivativeDecoration, getStringValue(mangledName));
+    }
+
     void addDllImportDecoration(IRInst* value, UnownedStringSlice const& libraryName, UnownedStringSlice const& functionName)
     {
         addDecoration(value, kIROp_DllImportDecoration, getStringValue(libraryName), getStringValue(functionName));
