@@ -3483,7 +3483,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
         List<OutArgumentFixup>* ioFixups)
     {
         Count argCount = expr->arguments.getCount();
-        SLANG_ASSERT(argCount == funcType->getParamCount());
+        SLANG_ASSERT(argCount == static_cast<Count>(funcType->getParamCount()));
 
         for(Index i = 0; i < argCount; ++i)
         {

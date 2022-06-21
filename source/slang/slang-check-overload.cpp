@@ -589,11 +589,24 @@ namespace Slang
 
         {
             auto originalAppExpr = as<AppExprBase>(context.originalExpr);
-            auto baseExpr = ConstructLookupResultExpr(
-                candidate.item,
-                context.baseExpr,
-                context.funcLoc,
-                originalAppExpr ? originalAppExpr->functionExpr : nullptr);
+
+
+            Expr* baseExpr;
+            switch(candidate.flavor)
+            {
+            case OverloadCandidate::Flavor::Func:
+            case OverloadCandidate::Flavor::Generic:
+                baseExpr = ConstructLookupResultExpr(
+                    candidate.item,
+                    context.baseExpr,
+                    context.funcLoc,
+                    originalAppExpr ? originalAppExpr->functionExpr : nullptr);
+                break;
+            case OverloadCandidate::Flavor::Expr:
+            default:
+                baseExpr = nullptr;
+                break;
+            }
 
             switch(candidate.flavor)
             {
