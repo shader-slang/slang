@@ -633,7 +633,7 @@ struct SpecializationContext
             IRSimpleSpecializationKey key;
             for (UInt i = 1; i < item->getOperandCount(); i++)
                 key.vals.add(item->getOperand(i));
-            auto value = as<std::remove_pointer<TDict::ValueType>::type>(item->getOperand(0));
+            auto value = as<typename std::remove_pointer<TDict::ValueType>::type>(item->getOperand(0));
             SLANG_ASSERT(value);
             dict[key] = value;
         }
