@@ -2049,6 +2049,25 @@ namespace Slang
     {
         return parseTaggedUnionType(parser);
     }
+        /// Parse an expression of the form __jvp(fn) where fn is an 
+        /// identifier pointing to a function.
+    static Expr* parseJVPDerivativeOf(Parser* parser)
+    {
+        JVPDerivativeOfExpr* jvpExpr = parser->astBuilder->create<JVPDerivativeOfExpr>();
+
+        parser->ReadToken(TokenType::LParent);
+
+        jvpExpr->baseFn = parser->ParseExpression();
+
+        parser->ReadToken(TokenType::RParent);
+
+        return jvpExpr;
+    }
+
+    static NodeBase* parseJVPDerivativeOf(Parser* parser, void* /* unused */)
+    {
+        return parseJVPDerivativeOf(parser);
+    }
 
         /// Parse a `This` type expression
     static Expr* parseThisTypeExpr(Parser* parser)
@@ -6435,6 +6454,7 @@ namespace Slang
         _makeParseExpr("nullptr", parseNullPtrExpr),
         _makeParseExpr("try",     parseTryExpr),
         _makeParseExpr("__TaggedUnion", parseTaggedUnionType),
+        _makeParseExpr("__jvp", parseJVPDerivativeOf)
     };
 
     ConstArrayView<SyntaxParseInfo> getSyntaxParseInfos()

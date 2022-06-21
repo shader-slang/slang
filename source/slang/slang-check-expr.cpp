@@ -1487,6 +1487,27 @@ namespace Slang
         return expr;
     }
 
+    Expr* SemanticsExprVisitor::visitJVPDerivativeOfExpr(JVPDerivativeOfExpr* expr)
+    {
+        // Check/Resolve inner function declaration.
+        expr->baseFn = CheckTerm(expr->baseFn);
+        
+        if(auto funcType = as<FuncType>(expr->baseFn->type))
+        {
+            // Resolve JVP type.
+            // expr->type = primalToJVPType(expr->type);
+            expr->type = expr->baseFn->type; // Temporary.. 
+        }
+        else
+        {
+            // Error on diagnosis.
+            // getSink()->diagnose(expr, Diagnostics::expectedFunction, expr->baseFn->name);
+            UNREACHABLE_RETURN(nullptr);
+        }
+
+        return expr;
+    }
+
     Expr* SemanticsExprVisitor::visitTypeCastExpr(TypeCastExpr * expr)
     {
         // Check the term we are applying first

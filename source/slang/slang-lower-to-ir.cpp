@@ -2947,6 +2947,16 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
         return info;
     }
 
+    LoweredValInfo visitJVPDerivativeOfExpr(JVPDerivativeOfExpr* expr)
+    {
+        // Dummy expr.. just emit the decl-ref of the inner function.
+        LoweredValInfo info = emitDeclRef(
+            context,
+            as<DeclRefExpr>(expr->baseFn)->declRef,
+            lowerType(context, expr->baseFn->type));
+        return info;
+    }
+
     LoweredValInfo visitOverloadedExpr(OverloadedExpr* /*expr*/)
     {
         SLANG_UNEXPECTED("overloaded expressions should not occur in checked AST");

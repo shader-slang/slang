@@ -369,6 +369,15 @@ class ExtractExistentialValueExpr: public Expr
     DeclRef<VarDeclBase> declRef;
 };
 
+    /// An expression of the form `__jvp(fn)` to access the 
+    /// forward-mode derivative version of the function `fn`
+    ///
+class JVPDerivativeOfExpr: public Expr
+{
+    SLANG_AST_CLASS(JVPDerivativeOfExpr)
+    Expr* baseFn;
+};
+
     /// A type expression of the form `__TaggedUnion(A, ...)`.
     ///
     /// An expression of this form will resolve to a `TaggedUnionType`
