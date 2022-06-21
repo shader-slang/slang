@@ -1460,14 +1460,15 @@ void RayTracingCommandEncoder::dispatchRays(
         m_currentPipeline,
         m_commandBuffer->m_transientHeap,
         static_cast<ResourceCommandEncoder*>(this));
+    auto shaderTableAddr = shaderTableBuffer->getDeviceAddress();
 
     VkStridedDeviceAddressRegionKHR raygenSBT;
-    raygenSBT.deviceAddress = shaderTableBuffer->getDeviceAddress();
     raygenSBT.stride = VulkanUtil::calcAligned(alignedHandleSize, rtProps.shaderGroupBaseAlignment);
+    raygenSBT.deviceAddress = shaderTableAddr + raygenShaderIndex * raygenSBT.stride;
     raygenSBT.size = raygenSBT.stride;
 
     VkStridedDeviceAddressRegionKHR missSBT;
-    missSBT.deviceAddress = raygenSBT.deviceAddress + raygenSBT.size;
+    missSBT.deviceAddress = shaderTableAddr + shaderTableImpl->m_raygenTableSize;
     missSBT.stride = alignedHandleSize;
     missSBT.size = shaderTableImpl->m_missTableSize;
 
