@@ -5,6 +5,7 @@
 #include "slang-ir-sccp.h"
 #include "slang-ir-dce.h"
 #include "slang-ir-simplify-cfg.h"
+#include "slang-ir-peephole.h"
 
 namespace Slang
 {
@@ -21,6 +22,7 @@ namespace Slang
         {
             changed = false;
             changed |= applySparseConditionalConstantPropagation(module);
+            changed |= peepholeOptimize(module);
             changed |= simplifyCFG(module);
 
             // Note: we disregard the `changed` state from dead code elimination pass since

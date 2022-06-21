@@ -124,7 +124,7 @@ namespace Slang
             builder->setInsertBefore(inst);
 
             auto info = getLoweredResultType(builder, inst->getDataType());
-            if (info->loweredType->getOp() == kIROp_VoidType)
+            if (info->loweredType->getOp() == kIROp_StructType)
             {
                 List<IRInst*> operands;
                 operands.add(inst->getOperand(0));

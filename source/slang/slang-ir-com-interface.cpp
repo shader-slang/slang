@@ -3,6 +3,7 @@
 
 #include "slang-ir.h"
 #include "slang-ir-insts.h"
+#include "slang-ir-lower-com-methods.h"
 
 namespace Slang
 {
@@ -38,7 +39,8 @@ static bool _canReplace(IRUse* use)
 
 void lowerComInterfaces(IRModule* module, ArtifactStyle artifactStyle, DiagnosticSink* sink)
 {
-    SLANG_UNUSED(sink);
+    // First, lower all COM methods and their call sites out of `Result` and other managed types.
+    lowerComMethods(module, sink);
 
     // Find all of the COM interfaces
     List<IRInterfaceType*> comInterfaces;

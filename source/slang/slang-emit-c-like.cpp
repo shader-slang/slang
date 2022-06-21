@@ -1810,6 +1810,22 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
         m_writer->emit("GroupMemoryBarrierWithGroupSync()");
         break;
 
+    case kIROp_getNativeStr:
+        {
+            auto prec = getInfo(EmitOp::Postfix);
+            needClose = maybeEmitParens(outerPrec, prec);
+            emitOperand(inst->getOperand(0), leftSide(outerPrec, prec));
+            m_writer->emit("->getBuffer()");
+            break;
+        }
+    case kIROp_makeString:
+        {
+            m_writer->emit("String(");
+            emitOperand(inst->getOperand(0), EmitOpInfo());
+            m_writer->emit(")");
+            break;
+        }
+
     case kIROp_getElement:
     case kIROp_getElementPtr:
     case kIROp_ImageSubscript:
