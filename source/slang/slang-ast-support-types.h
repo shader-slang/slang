@@ -1474,6 +1474,15 @@ namespace Slang
         List<ExtensionDecl*> candidateExtensions;
     };
 
+        /// Represents the "direction" that a parameter is being passed (e.g., `in` or `out`
+    enum ParameterDirection
+    {
+        kParameterDirection_In,     ///< Copy in
+        kParameterDirection_Out,    ///< Copy out
+        kParameterDirection_InOut,  ///< Copy in, copy out
+        kParameterDirection_Ref,    ///< By-reference
+    };
+
 } // namespace Slang
 
 #endif
