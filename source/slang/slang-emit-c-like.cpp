@@ -1589,6 +1589,11 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
     bool needClose = false;
     switch(inst->getOp())
     {
+    case kIROp_GenericSpecializationDictionary:
+    case kIROp_ExistentialFuncSpecializationDictionary:
+    case kIROp_ExistentialTypeSpecializationDictionary:
+        // We can safely ignore all insts they are used as a cache across pass invocations.
+        break;
     case kIROp_GlobalHashedStringLiterals:
         /* Don't need to to output anything for this instruction - it's used for reflecting string literals that
         are hashed with 'getStringHash' */
