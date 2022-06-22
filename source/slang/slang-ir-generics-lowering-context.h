@@ -139,6 +139,9 @@ namespace Slang
         sharedBuilder->init(sharedContext->module);
 
         sharedContext->addToWorkList(sharedContext->module->getModuleInst());
+        IRDeadCodeEliminationOptions dceOptions;
+        dceOptions.keepExportsAlive = true;
+        dceOptions.keepLayoutsAlive = true;
 
         while (sharedContext->workList.getCount() != 0)
         {
@@ -164,7 +167,7 @@ namespace Slang
 
             for (auto child = inst->getLastChild(); child; child = child->getPrevInst())
             {
-                if (shouldInstBeLiveIfParentIsLive(child))
+                if (shouldInstBeLiveIfParentIsLive(child, dceOptions))
                     sharedContext->addToWorkList(child);
             }
         }
