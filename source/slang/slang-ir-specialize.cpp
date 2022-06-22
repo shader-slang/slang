@@ -4,6 +4,7 @@
 #include "slang-ir.h"
 #include "slang-ir-clone.h"
 #include "slang-ir-insts.h"
+#include "slang-ir-ssa-simplification.h"
 
 namespace Slang
 {
@@ -631,8 +632,18 @@ struct SpecializationContext
             auto item = as<IRSpecializationDictionaryItem>(child);
             if (!item) continue;
             IRSimpleSpecializationKey key;
+            bool shouldSkip = false;
             for (UInt i = 1; i < item->getOperandCount(); i++)
+            {
+                if (item->getOperand(i) == nullptr)
+                {
+                    shouldSkip = true;
+                    break;
+                }
                 key.vals.add(item->getOperand(i));
+            }
+            if (shouldSkip)
+                continue;
             auto value = as<typename std::remove_pointer<TDict::ValueType>::type>(item->getOperand(0));
             SLANG_ASSERT(value);
             dict[key] = value;
@@ -798,12 +809,14 @@ struct SpecializationContext
 
         // Once the work list has gone dry, we should have the invariant
         // that there are no `specialize` instructions inside of non-generic
-        // functions that in turn reference a generic type/function, *except*
-        // in the case where that generic is for a builtin type/function, in
-        // which case we wouldn't want to specialize it anyway.
+        // functions that in turn reference a generic type/function unless the generic is for a
+        // builtin type/function, or some of the type arguments are unknown at compile time, in
+        // which case we will rely on a follow up pass the translate it into a dynamic dispatch
+        // function.
 
-        // Preserve the specialization dictionary in resulting IR so they can
-        // be reconstructed when this specialization pass gets invoked again.
+        // For functions that still have `specialize` uses left, we need to preserve the
+        // its specializations in resulting IR so they can be reconstructed when this
+        // specialization pass gets invoked again.
         writeSpecializationDictionaries();
     }
 

@@ -136,6 +136,8 @@ namespace Slang
                 if (auto lookupWitnessMethod = as<IRLookupWitnessMethod>(inst))
                 {
                     auto witnessTableType = lookupWitnessMethod->getWitnessTable()->getDataType();
+                    if (!witnessTableType)
+                        return;
                     auto interfaceType = cast<IRWitnessTableType>(witnessTableType)->getConformanceType();
                     if (isComInterfaceType((IRType*)interfaceType))
                         return;
