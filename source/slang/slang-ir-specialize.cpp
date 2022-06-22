@@ -4,7 +4,6 @@
 #include "slang-ir.h"
 #include "slang-ir-clone.h"
 #include "slang-ir-insts.h"
-#include "slang-ir-ssa-simplification.h"
 
 namespace Slang
 {
@@ -644,7 +643,7 @@ struct SpecializationContext
             }
             if (shouldSkip)
                 continue;
-            auto value = as<typename std::remove_pointer<TDict::ValueType>::type>(item->getOperand(0));
+            auto value = as<typename std::remove_pointer<typename TDict::ValueType>::type>(item->getOperand(0));
             SLANG_ASSERT(value);
             dict[key] = value;
         }
