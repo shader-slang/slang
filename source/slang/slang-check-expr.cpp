@@ -1494,14 +1494,13 @@ namespace Slang
         
         if(auto funcType = as<FuncType>(expr->baseFn->type))
         {
-            // Resolve JVP type.
-            // expr->type = primalToJVPType(expr->type);
-            expr->type = expr->baseFn->type; // Temporary.. 
+            // Resolve JVP type here. 
+            // Temporarily resolving to the same type as the original function. 
+            expr->type = expr->baseFn->type;
         }
         else
         {
-            // Error on diagnosis.
-            // getSink()->diagnose(expr, Diagnostics::expectedFunction, expr->baseFn->name);
+            // Error
             UNREACHABLE_RETURN(nullptr);
         }
 

@@ -515,6 +515,33 @@ struct IRSequentialIDDecoration : IRDecoration
     IRIntegerValue getSequentialID() { return getSequentialIDOperand()->getValue(); }
 };
 
+struct IRJVPDerivativeReferenceDecoration : IRDecoration
+{
+    enum
+    {
+        kOp = kIROp_JVPDerivativeReferenceDecoration
+    };
+    IR_LEAF_ISA(JVPDerivativeReferenceDecoration)
+
+    IRFunc* getJVPFunc() { return as<IRFunc>(getOperand(0)); }
+};
+
+
+// An instruction that replaces the function symbol
+// with it's derivative function.
+struct IRJVPDerivativeOf : IRInst
+{
+    enum
+    {
+        kOp = kIROp_JVPDerivativeOf
+    };
+    // The base function for the call.
+    IRUse base;
+    IRInst* getBaseFn() { return getOperand(0); }
+
+    IR_LEAF_ISA(JVPDerivativeOf)
+};
+
 // An instruction that specializes another IR value
 // (representing a generic) to a particular set of generic arguments 
 // (instructions representing types, witness tables, etc.)
@@ -2319,6 +2346,8 @@ public:
     IRInst* emitExtractExistentialWitnessTable(
         IRInst* existentialValue);
 
+    IRInst* emitJVPDerivativeOfInst(IRType* type, IRInst* baseFn);
+
     IRInst* emitSpecializeInst(
         IRType*         type,
         IRInst*         genericVal,
@@ -2967,9 +2996,14 @@ public:
         addDecoration(value, kIROp_ExternCppDecoration, getStringValue(mangledName));
     }
 
-    void addJVPDerivativeDecoration(IRInst* value, UnownedStringSlice const& mangledName)
+    void addJVPDerivativeMarkerDecoration(IRInst* value)
     {
-        addDecoration(value, kIROp_JVPDerivativeDecoration, getStringValue(mangledName));
+        addDecoration(value, kIROp_JVPDerivativeMarkerDecoration);
+    }
+
+    void addJVPDerivativeReferenceDecoration(IRInst* value, IRInst* jvpFn)
+    {
+        addDecoration(value, kIROp_JVPDerivativeReferenceDecoration, jvpFn);
     }
 
     void addDllImportDecoration(IRInst* value, UnownedStringSlice const& libraryName, UnownedStringSlice const& functionName)

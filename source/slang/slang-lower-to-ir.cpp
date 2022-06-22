@@ -7,6 +7,8 @@
 #include "slang-ir.h"
 #include "slang-ir-constexpr.h"
 #include "slang-ir-dce.h"
+#include "slang-ir-diff-call.h"
+#include "slang-ir-diff-jvp.h"
 #include "slang-ir-inline.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-missing-return.h"
@@ -1141,7 +1143,7 @@ static void addLinkageDecoration(
     }
     if (decl->findModifier<JVPDerivativeModifier>())
     {
-        builder->addJVPDerivativeDecoration(inst, mangledName);
+        builder->addJVPDerivativeMarkerDecoration(inst);
     }
     if (as<InterfaceDecl>(decl->parentDecl) &&
         decl->parentDecl->hasModifier<ComInterfaceAttribute>())
@@ -2937,14 +2939,19 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
         return info;
     }
 
+    // Emit IR to denote the forward-mode derivative
+    // of the inner func-expr. This will be resolved 
+    // to a concrete function during the derivative 
+    // pass.
     LoweredValInfo visitJVPDerivativeOfExpr(JVPDerivativeOfExpr* expr)
     {
-        // Dummy expr.. just emit the decl-ref of the inner function.
-        LoweredValInfo info = emitDeclRef(
-            context,
-            as<DeclRefExpr>(expr->baseFn)->declRef,
-            lowerType(context, expr->baseFn->type));
-        return info;
+        auto baseVal = lowerSubExpr(expr->baseFn);
+        SLANG_ASSERT(baseVal.flavor == LoweredValInfo::Flavor::Simple);
+
+        return LoweredValInfo::simple(
+            getBuilder()->emitJVPDerivativeOfInst(
+                lowerType(context, expr->type),
+                baseVal.val));
     }
 
     LoweredValInfo visitOverloadedExpr(OverloadedExpr* /*expr*/)
@@ -8466,6 +8473,16 @@ RefPtr<IRModule> generateIRForTranslationUnit(
 #endif
 
     validateIRModuleIfEnabled(compileRequest, module);
+    
+    // Process higher-order-function calls before any optimization passes
+    // to allow the optimizations to affect the generated funcitons.
+    // 1. Process JVP derivative functions.
+    processJVPDerivativeMarkers(module);
+    // 2. Process VJP derivative functions.
+    // processVJPDerivativeMarkers(module); // Disabled currently. No impl yet.
+    // 3. Replace JVP & VJP calls.
+    processDerivativeCalls(module);
+
 
     // We will perform certain "mandatory" optimization passes now.
     // These passes serve two purposes:
