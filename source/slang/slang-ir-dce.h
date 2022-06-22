@@ -1,6 +1,8 @@
 // slang-ir-dce.h
 #pragma once
 
+#include "slang-ir-insts.h"
+
 namespace Slang
 {
     struct IRModule;
@@ -21,4 +23,8 @@ namespace Slang
     bool eliminateDeadCode(
         IRModule*                           module,
         IRDeadCodeEliminationOptions const& options = IRDeadCodeEliminationOptions());
+
+    bool shouldInstBeLiveIfParentIsLive(IRInst* inst, IRDeadCodeEliminationOptions options);
+
+    bool isWeakReferenceOperand(IRInst* inst, UInt operandIndex);
 }
