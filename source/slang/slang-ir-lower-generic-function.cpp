@@ -315,6 +315,7 @@ namespace Slang
             }
             // Update hash keys of globalNumberingMap, since the types are modified.
             sharedContext->sharedBuilderStorage.deduplicateAndRebuildGlobalNumberingMap();
+            sharedContext->mapInterfaceRequirementKeyValue.Clear();
         }
 
         void processModule()
