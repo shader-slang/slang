@@ -20,6 +20,7 @@
 #include "slang-language-server-ast-lookup.h"
 #include "slang-language-server-completion.h"
 #include "slang-language-server-semantic-tokens.h"
+#include "slang-language-server-document-symbols.h"
 #include "slang-ast-print.h"
 #include "slang-doc-markdown-writer.h"
 #include "../../tools/platform/performance-counter.h"
@@ -110,12 +111,13 @@ SlangResult LanguageServer::parseNextMessage()
                 result.capabilities.workspace.workspaceFolders.changeNotifications = false;
                 result.capabilities.hoverProvider = true;
                 result.capabilities.definitionProvider = true;
-                for (auto ch : getCommitChars())
-                    result.capabilities.completionProvider.allCommitCharacters.add(ch);
+                result.capabilities.documentSymbolProvider = true;
                 result.capabilities.completionProvider.triggerCharacters.add(".");
                 result.capabilities.completionProvider.triggerCharacters.add(":");
                 result.capabilities.completionProvider.resolveProvider = true;
                 result.capabilities.completionProvider.workDoneToken = "";
+                for (auto ch : getCommitChars())
+                    result.capabilities.completionProvider.allCommitCharacters.add(ch);
                 result.capabilities.semanticTokensProvider.full = true;
                 result.capabilities.semanticTokensProvider.range = false;
                 result.capabilities.signatureHelpProvider.triggerCharacters.add("(");
@@ -150,9 +152,11 @@ SlangResult LanguageServer::parseNextMessage()
                 if (response.result.getKind() == JSONValue::Kind::Array)
                 {
                     auto arr = m_connection->getContainer()->getArray(response.result);
-                    if (arr.getCount() > 0)
+                    if (arr.getCount() == 3)
                     {
                         updatePredefinedMacros(arr[0]);
+                        updateSearchPaths(arr[1]);
+                        updateSearchInWorkspace(arr[2]);
                     }
                 }
                 break;
@@ -729,6 +733,28 @@ SlangResult LanguageServer::signatureHelp(
     return SLANG_OK;
 }
 
+SlangResult LanguageServer::documentSymbol(
+    const LanguageServerProtocol::DocumentSymbolParams& args, const JSONValue& responseId)
+{
+    String canonicalPath = uriToCanonicalPath(args.textDocument.uri);
+    RefPtr<DocumentVersion> doc;
+    if (!m_workspace->openedDocuments.TryGetValue(canonicalPath, doc))
+    {
+        m_connection->sendResult(NullResponse::get(), responseId);
+        return SLANG_OK;
+    }
+    auto version = m_workspace->getCurrentVersion();
+    Module* parsedModule = version->getOrLoadModule(canonicalPath);
+    if (!parsedModule)
+    {
+        m_connection->sendResult(NullResponse::get(), responseId);
+        return SLANG_OK;
+    }
+    List<DocumentSymbol> symbols = getDocumentSymbols(version->linkage, parsedModule, canonicalPath.getUnownedSlice(), doc.Ptr());
+    m_connection->sendResult(&symbols, responseId);
+    return SLANG_OK;
+}
+
 void LanguageServer::publishDiagnostics()
 {
     time_t timeNow = 0;
@@ -791,14 +817,56 @@ void LanguageServer::updatePredefinedMacros(const JSONValue& macros)
     }
 }
 
+void LanguageServer::updateSearchPaths(const JSONValue& macros)
+{
+    if (macros.isValid())
+    {
+        auto container = m_connection->getContainer();
+        JSONToNativeConverter converter(container, m_connection->getSink());
+        List<String> searchPaths;
+        if (SLANG_SUCCEEDED(converter.convert(macros, &searchPaths)))
+        {
+            if (m_workspace->updateSearchPaths(searchPaths))
+            {
+                m_connection->sendCall(
+                    UnownedStringSlice("workspace/semanticTokens/refresh"), JSONValue::makeInt(0));
+            }
+        }
+    }
+}
+
+void LanguageServer::updateSearchInWorkspace(const JSONValue& macros)
+{
+    if (macros.isValid())
+    {
+        auto container = m_connection->getContainer();
+        JSONToNativeConverter converter(container, m_connection->getSink());
+        bool searchPaths;
+        if (SLANG_SUCCEEDED(converter.convert(macros, &searchPaths)))
+        {
+            if (m_workspace->updateSearchInWorkspace(searchPaths))
+            {
+                m_connection->sendCall(
+                    UnownedStringSlice("workspace/semanticTokens/refresh"), JSONValue::makeInt(0));
+            }
+        }
+    }
+}
+
 void LanguageServer::sendConfigRequest()
 {
     ConfigurationParams args;
     ConfigurationItem item;
     item.section = "slang.predefinedMacros";
     args.items.add(item);
+    item.section = "slang.additionalSearchPaths";
+    args.items.add(item);
+    item.section = "slang.searchInAllWorkspaceDirectories";
+    args.items.add(item);
     m_connection->sendCall(
-        ConfigurationParams::methodName, &args, JSONValue::makeInt(kConfigResponseId));
+        ConfigurationParams::methodName,
+        &args,
+        JSONValue::makeInt(kConfigResponseId));
 }
 
 void LanguageServer::registerCapability(const char* methodName)
@@ -879,6 +947,12 @@ SlangResult LanguageServer::queueJSONCall(JSONRPCCall call)
         SLANG_RETURN_ON_FAIL(m_connection->toNativeArgsOrSendError(call.params, &args, call.id));
         cmd.completionResolveArgs = args;
     }
+    else if (call.method == DocumentSymbolParams::methodName)
+    {
+        DocumentSymbolParams args;
+        SLANG_RETURN_ON_FAIL(m_connection->toNativeArgsOrSendError(call.params, &args, call.id));
+        cmd.documentSymbolArgs = args;
+    }
     else if (call.method == DidChangeConfigurationParams::methodName)
     {
         DidChangeConfigurationParams args;
@@ -935,6 +1009,10 @@ SlangResult LanguageServer::runCommand(Command& call)
     else if (call.method == "completionItem/resolve")
     {
         return completionResolve(call.completionResolveArgs.get(), call.id);
+    }
+    else if (call.method == DocumentSymbolParams::methodName)
+    {
+        return documentSymbol(call.documentSymbolArgs.get(), call.id);
     }
     else if (call.method == DidChangeConfigurationParams::methodName)
     {

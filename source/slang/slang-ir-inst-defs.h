@@ -308,6 +308,12 @@ INST(getElement, getElement, 2, 0)
 INST(getElementPtr, getElementPtr, 2, 0)
 INST(getAddr, getAddr, 1, 0)
 
+// Get an unowned NativeString from a String.
+INST(getNativeStr, getNativeStr, 1, 0)
+
+// Make String from a NativeString.
+INST(makeString, makeString, 1, 0)
+
 // "Subscript" an image at a pixel coordinate to get pointer
 INST(ImageSubscript, imageSubscript, 2, 0)
 
@@ -660,6 +666,9 @@ INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
     INST(SemanticDecoration, semantic, 2, 0)
 
     INST(SPIRVOpDecoration, spirvOpDecoration, 1, 0)
+
+        /// Decorated function is marked for the forward-mode differentiation pass.
+    INST(JVPDerivativeDecoration, differentiateJvp, 0, 0)
 
         /// Marks a struct type as being used as a structured buffer block.
         /// Recognized by SPIRV-emit pass so we can emit a SPIRV `BufferBlock` decoration.

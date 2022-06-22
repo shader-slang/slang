@@ -124,7 +124,7 @@ namespace Slang
         Module* getOrLoadModule(String path);
     };
 
-    struct OnwedPreprocessorMacroDefinition
+    struct OwnedPreprocessorMacroDefinition
     {
         String name;
         String value;
@@ -138,9 +138,11 @@ namespace Slang
         RefPtr<WorkspaceVersion> createWorkspaceVersion();
     public:
         List<String> rootDirectories;
-        OrderedHashSet<String> searchPaths;
-        List<OnwedPreprocessorMacroDefinition> predefinedMacros;
+        List<String> additionalSearchPaths;
+        OrderedHashSet<String> workspaceSearchPaths;
+        List<OwnedPreprocessorMacroDefinition> predefinedMacros;
         SerializedModuleCache moduleCache;
+        bool searchInWorkspace = true;
 
         slang::IGlobalSession* slangGlobalSession;
         Dictionary<String, RefPtr<DocumentVersion>> openedDocuments;
@@ -150,6 +152,8 @@ namespace Slang
 
         // Update predefined macro settings. Returns true if the new settings are different from existing ones.
         bool updatePredefinedMacros(List<String> predefinedMacros);
+        bool updateSearchPaths(List<String> searchPaths);
+        bool updateSearchInWorkspace(bool value);
 
         void init(List<URI> rootDirURI, slang::IGlobalSession* globalSession);
         void invalidate();

@@ -9,7 +9,6 @@ on:
 jobs:
   build: 
     name: MacOS Build CI
-
     runs-on: macos-latest
     
     strategy:
@@ -23,17 +22,41 @@ jobs:
       with:
         submodules: 'true'
         fetch-depth: '0'
-        
     - name: build
-      run: 
+      run: |
         CC=${{matrix.compiler}}
         CONFIGURATION=${{matrix.configuration}}
         ARCH=${{matrix.platform}}
         source ./github_macos_build.sh
+    - name: Package
+      id: package
+      run: |
+        export SLANG_OS_NAME=macos
+        export SLANG_ARCH_NAME=`uname -p`
+        export TAG_NAME=`git describe --tags`
+        export SLANG_TAG=${TAG_NAME#v}
+        echo "tag:$TAG_NAME"
+        echo "slang-tag:$SLANG_TAG"
+        export SLANG_BINARY_ARCHIVE=slang-${SLANG_TAG}-${SLANG_OS_NAME}-${SLANG_ARCH_NAME}.zip
+        echo "creating zip"
+        7z a ${SLANG_BINARY_ARCHIVE} slang.h
+        7z a ${SLANG_BINARY_ARCHIVE} slang-com-helper.h
+        7z a ${SLANG_BINARY_ARCHIVE} slang-com-ptr.h
+        7z a ${SLANG_BINARY_ARCHIVE} slang-tag-version.h
+        7z a ${SLANG_BINARY_ARCHIVE} prelude/*.h
+        7z a ${SLANG_BINARY_ARCHIVE} bin/*/*/libslang.dylib
+        7z a ${SLANG_BINARY_ARCHIVE} bin/*/*/slangc
+        7z a ${SLANG_BINARY_ARCHIVE} bin/*/*/slangd
+        7z a ${SLANG_BINARY_ARCHIVE} docs/*.md
+        echo "::set-output name=SLANG_BINARY_ARCHIVE::${SLANG_BINARY_ARCHIVE}"
+    - uses: actions/upload-artifact@v3
+      with:
+        name: slang-build-${{matrix.configuration}}-${{matrix.platform}}-${{matrix.compiler}}
+        path: |
+          ${{ steps.package.outputs.SLANG_BINARY_ARCHIVE }}
     - name: test
       run: 
         CONFIGURATION=${{matrix.configuration}}
         CC=${{matrix.compiler}}
         ARCH=${{matrix.platform}}
         source ./github_test.sh       
-    

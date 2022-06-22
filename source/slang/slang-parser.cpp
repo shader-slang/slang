@@ -100,6 +100,8 @@ namespace Slang
 
         TokenReader tokenReader;
         DiagnosticSink* sink;
+        SourceLoc lastErrorLoc;
+
         int genericDepth = 0;
 
         // Have we seen any `import` declarations? If so, we need
@@ -192,6 +194,18 @@ namespace Slang
         TypeExp										ParseTypeExp();
 
         Parser & operator = (const Parser &) = delete;
+
+        // Helper to issue diagnose message that filters out errors for the same token.
+        template <typename P, typename... Args>
+        void diagnose(P const& pos, DiagnosticInfo const& info, Args const&... args)
+        {
+            auto loc = getDiagnosticPos(pos);
+            if (loc != lastErrorLoc)
+            {
+                sink->diagnose(pos, info, args...);
+                lastErrorLoc = loc;
+            }
+        }
     };
 
     // Forward Declarations
@@ -248,7 +262,7 @@ namespace Slang
         // Don't emit "unexpected token" errors if we are in recovering mode
         if (!parser->isRecovering)
         {
-            parser->sink->diagnose(parser->tokenReader.peekLoc(), Diagnostics::unexpectedToken,
+            parser->diagnose(parser->tokenReader.peekLoc(), Diagnostics::unexpectedToken,
                 parser->tokenReader.peekTokenType());
 
             // Switch into recovery mode, to suppress additional errors
@@ -279,10 +293,15 @@ namespace Slang
         // Don't emit "unexpected token" errors if we are in recovering mode
         if (!parser->isRecovering)
         {
-            parser->sink->diagnose(parser->tokenReader.peekLoc(), Diagnostics::unexpectedTokenExpectedTokenType,
-                parser->tokenReader.peekTokenType(),
-                expected);
-
+            if (parser->lastErrorLoc != parser->tokenReader.peekLoc())
+            {
+                parser->sink->diagnose(
+                    parser->tokenReader.peekLoc(),
+                    Diagnostics::unexpectedTokenExpectedTokenType,
+                    parser->tokenReader.peekTokenType(),
+                    expected);
+                parser->lastErrorLoc = parser->tokenReader.peekLoc();
+            }
             // Switch into recovery mode, to suppress additional errors
             parser->isRecovering = true;
         }
@@ -2515,6 +2534,9 @@ namespace Slang
             if (!AdvanceIf(parser, TokenType::Comma))
             {
                 parser->ReadToken(TokenType::Semicolon);
+                // We don't need to enter recovering mode if next token isn't semicolon.
+                // In this case we just continue parsing the token as the next decl.
+                parser->isRecovering = false;
                 return declGroupBuilder.getResult();
             }
 
@@ -2867,7 +2889,6 @@ namespace Slang
         decl->targetType = parser->ParseTypeExp();
         parseOptionalInheritanceClause(parser, decl);
         parseDeclBody(parser, decl);
-
         return decl;
     }
 
@@ -3177,9 +3198,14 @@ namespace Slang
         if( parser->tokenReader.peekTokenType() == TokenType::LBrace )
         {
             decl->body = parser->parseBlockStatement();
+            if (auto block = as<BlockStmt>(decl->body))
+            {
+                decl->closingSourceLoc = block->closingSourceLoc;
+            }
         }
         else
         {
+            decl->closingSourceLoc = parser->tokenReader.peekLoc();
             parser->ReadToken(TokenType::Semicolon);
         }
 
@@ -3194,14 +3220,18 @@ namespace Slang
         if( AdvanceIf(parser, TokenType::LBrace) )
         {
             // We want to parse nested "accessor" declarations
-            while( !AdvanceIfMatch(parser, MatchedTokenType::CurlyBraces) )
+            Token closingToken;
+            while (!AdvanceIfMatch(parser, MatchedTokenType::CurlyBraces, &closingToken))
             {
                 auto accessor = parseAccessorDecl(parser);
                 AddMember(decl, accessor);
             }
+            decl->closingSourceLoc = closingToken.loc;
         }
         else
         {
+            decl->closingSourceLoc = parser->tokenReader.peekLoc();
+
             parser->ReadToken(TokenType::Semicolon);
 
             // empty body should be treated like `{ get; }`
@@ -3948,8 +3978,8 @@ namespace Slang
         {
             parseOptionalInheritanceClause(parser, decl);
             parser->ReadToken(TokenType::LBrace);
-
-            while(!AdvanceIfMatch(parser, MatchedTokenType::CurlyBraces))
+            Token closingToken;
+            while (!AdvanceIfMatch(parser, MatchedTokenType::CurlyBraces, &closingToken))
             {
                 EnumCaseDecl* caseDecl = parseEnumCaseDecl(parser);
                 AddMember(decl, caseDecl);
@@ -3959,6 +3989,7 @@ namespace Slang
 
                 parser->ReadToken(TokenType::Comma);
             }
+            decl->closingSourceLoc = closingToken.loc;
             return decl;
         });
     }
@@ -5231,7 +5262,7 @@ namespace Slang
         {
         default:
             // TODO: should this return an error expression instead of NULL?
-            parser->sink->diagnose(parser->tokenReader.peekLoc(), Diagnostics::syntaxError);
+            parser->diagnose(parser->tokenReader.peekLoc(), Diagnostics::syntaxError);
             return parser->astBuilder->create<IncompleteExpr>();
 
         // Either:

@@ -56,6 +56,7 @@ struct Command
 
     Optional<LanguageServerProtocol::CompletionParams> completionArgs;
     Optional<LanguageServerProtocol::CompletionItem> completionResolveArgs;
+    Optional<LanguageServerProtocol::DocumentSymbolParams> documentSymbolArgs;
     Optional<LanguageServerProtocol::DidChangeConfigurationParams> changeConfigArgs;
     Optional<LanguageServerProtocol::SignatureHelpParams> signatureHelpArgs;
     Optional<LanguageServerProtocol::DefinitionParams> definitionArgs;
@@ -103,6 +104,8 @@ public:
         const LanguageServerProtocol::SemanticTokensParams& args, const JSONValue& responseId);
     SlangResult signatureHelp(
         const LanguageServerProtocol::SignatureHelpParams& args, const JSONValue& responseId);
+    SlangResult documentSymbol(
+        const LanguageServerProtocol::DocumentSymbolParams& args, const JSONValue& responseId);
 
 private:
     SlangResult parseNextMessage();
@@ -110,6 +113,9 @@ private:
     void resetDiagnosticUpdateTime();
     void publishDiagnostics();
     void updatePredefinedMacros(const JSONValue& macros);
+    void updateSearchPaths(const JSONValue& macros);
+    void updateSearchInWorkspace(const JSONValue& macros);
+
     void sendConfigRequest();
     void registerCapability(const char* methodName);
     void logMessage(int type, String message);
