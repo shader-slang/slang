@@ -443,7 +443,9 @@ SlangResult CommandLineDownstreamCompiler::compile(const CompileOptions& inOptio
             SLANG_RETURN_ON_FAIL(File::generateTemporary(UnownedStringSlice::fromLiteral("slang-generated"), temporaryLockPath));
             productFileSet->add(temporaryLockPath);
 
-            options.modulePath = temporaryLockPath;
+            modulePath = temporaryLockPath;
+
+            options.modulePath = modulePath;
         }
 
         if (_isContentsInFile(options))
