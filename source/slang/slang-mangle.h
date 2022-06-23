@@ -13,6 +13,7 @@ namespace Slang
     String getMangledName(ASTBuilder* astBuilder, Decl* decl);
     String getMangledName(ASTBuilder* astBuilder, DeclRef<Decl> const & declRef);
     String getMangledName(ASTBuilder* astBuilder, DeclRefBase const & declRef);
+    String getMangledNameFromNameString(const UnownedStringSlice& name);
 
     String getHashedName(const UnownedStringSlice& mangledName);
 

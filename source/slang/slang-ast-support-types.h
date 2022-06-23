@@ -1120,6 +1120,7 @@ namespace Slang
     {
         None = 0,
         IgnoreBaseInterfaces = 1 << 0,
+        Completion = 1 << 1, ///< Lookup all applicable decls for code completion suggestions
     };
 
     class SerialRefObject;
@@ -1323,26 +1324,26 @@ namespace Slang
         {
             return items.getCount() > 1 ? items[0].declRef.getName() : item.declRef.getName();
         }
-        LookupResultItem* begin()
+        LookupResultItem* begin() const
         {
             if (isValid())
             {
                 if (isOverloaded())
-                    return items.begin();
+                    return const_cast<LookupResultItem*>(items.begin());
                 else
-                    return &item;
+                    return const_cast<LookupResultItem*>(&item);
             }
             else
                 return nullptr;
         }
-        LookupResultItem* end()
+        LookupResultItem* end() const
         {
             if (isValid())
             {
                 if (isOverloaded())
-                    return items.end();
+                    return const_cast<LookupResultItem*>(items.end());
                 else
-                    return &item + 1;
+                    return const_cast<LookupResultItem*>(&item + 1);
             }
             else
                 return nullptr;
@@ -1359,6 +1360,8 @@ namespace Slang
 
         LookupMask          mask        = LookupMask::Default;
         LookupOptions       options     = LookupOptions::None;
+
+        bool isCompletionRequest() const { return ((int)options & (int)LookupOptions::Completion) != 0; }
     };
 
     struct WitnessTable;

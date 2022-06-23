@@ -664,6 +664,7 @@ namespace Slang
             ///
         void _validateCircularVarDefinition(VarDeclBase* varDecl);
 
+        bool shouldSkipChecking(Decl* decl, DeclCheckState state);
     public:
 
         bool ValuesAreEqual(
@@ -1651,6 +1652,9 @@ namespace Slang
         //
 
         void importModuleIntoScope(Scope* scope, ModuleDecl* moduleDecl);
+
+        void suggestCompletionItems(
+            CompletionSuggestions::ScopeKind scopeKind, LookupResult const& lookupResult);
     };
 
     struct SemanticsExprVisitor

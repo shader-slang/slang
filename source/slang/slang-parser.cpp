@@ -854,6 +854,8 @@ namespace Slang
         {
             parser->ReadToken(TokenType::Scope); 
         }
+        if (parser->LookAheadToken(TokenType::CompletionRequest))
+            return parser->ReadToken();
 
         const Token firstIdentifier = parser->ReadToken(TokenType::Identifier);
         if (initialTokenType != TokenType::Scope && parser->tokenReader.peekTokenType() != TokenType::Scope)
@@ -942,6 +944,7 @@ namespace Slang
                 break;
 
             parser->ReadToken(TokenType::Comma);
+            
         }
 
         if (hasDoubleBracket)
@@ -1133,6 +1136,7 @@ namespace Slang
 
         auto decl = parser->astBuilder->create<ImportDecl>();
         decl->scope = parser->currentScope;
+        decl->startLoc = parser->tokenReader.peekLoc();
 
         if (peekTokenType(parser) == TokenType::StringLiteral)
         {
@@ -1162,7 +1166,7 @@ namespace Slang
 
             decl->moduleNameAndLoc = moduleNameAndLoc;
         }
-
+        decl->endLoc = parser->tokenReader.peekLoc();
         parser->ReadToken(TokenType::Semicolon);
 
         return decl;
@@ -1538,7 +1542,10 @@ namespace Slang
 
             _parseOptSemantics(parser, decl);
             decl->body = parseOptBody(parser);
-
+            if (auto block = as<BlockStmt>(decl->body))
+            {
+                decl->closingSourceLoc = block->closingSourceLoc;
+            }
             parser->PopScope();
 
             return decl;
@@ -2705,6 +2712,13 @@ namespace Slang
             semantic->name = parser->ReadToken(TokenType::Identifier);
             return semantic;
         }
+        else if (parser->LookAheadToken(TokenType::CompletionRequest))
+        {
+            HLSLSimpleSemantic* semantic = parser->astBuilder->create<HLSLSimpleSemantic>();
+            parser->FillPosition(semantic);
+            semantic->name = parser->ReadToken();
+            return semantic;
+        }
         else
         {
             // expect an identifier, just to produce an error message
@@ -2985,6 +2999,9 @@ namespace Slang
     {
         InterfaceDecl* decl = parser->astBuilder->create<InterfaceDecl>();
         parser->FillPosition(decl);
+
+        AdvanceIf(parser, TokenType::CompletionRequest);
+
         decl->nameAndLoc = NameLoc(parser->ReadToken(TokenType::Identifier));
 
         parseOptionalInheritanceClause(parser, decl);
@@ -3165,6 +3182,9 @@ namespace Slang
         parseParameterList(parser, decl);
 
         decl->body = parseOptBody(parser);
+
+        if (auto block = as<BlockStmt>(decl->body))
+            decl->closingSourceLoc = block->closingSourceLoc;
 
         parser->PopScope();
         return decl;
@@ -3488,6 +3508,8 @@ namespace Slang
                 decl->returnType = parser->ParseTypeExp();
             }
             decl->body = parseOptBody(parser);
+            if (auto blockStmt = as<BlockStmt>(decl->body))
+                decl->closingSourceLoc = blockStmt->closingSourceLoc;
             parser->PopScope();
             return decl;
         });
@@ -3933,9 +3955,11 @@ namespace Slang
             ParseSquareBracketAttributes(this, &modifierLink);
         }
 
+        // Skip completion request token to prevent producing a type named completion request.
+        AdvanceIf(this, TokenType::CompletionRequest);
+
         // TODO: support `struct` declaration without tag
         rs->nameAndLoc = expectIdentifier(this);
-
         return parseOptGenericDecl(this, [&](GenericDecl*)
         {
             // We allow for an inheritance clause on a `struct`
@@ -3950,6 +3974,9 @@ namespace Slang
     {
         ClassDecl* rs = astBuilder->create<ClassDecl>();
         ReadToken("class");
+
+        AdvanceIf(this, TokenType::CompletionRequest);
+
         FillPosition(rs);
         rs->nameAndLoc = expectIdentifier(this);
 
@@ -3987,6 +4014,8 @@ namespace Slang
         // toward deprecating it.
         //
         AdvanceIf(parser, "class");
+
+        AdvanceIf(parser, TokenType::CompletionRequest);
 
         parser->FillPosition(decl);
 
@@ -5605,7 +5634,7 @@ namespace Slang
 
                 return constExpr;
             }
-
+        case TokenType::CompletionRequest:
         case TokenType::Identifier:
             {
                 // We will perform name lookup here so that we can find syntax
@@ -5627,7 +5656,7 @@ namespace Slang
                 varExpr->scope = parser->currentScope;
                 parser->FillPosition(varExpr);
 
-                auto nameAndLoc = expectIdentifier(parser);
+                auto nameAndLoc = NameLoc(parser->ReadToken());
                 varExpr->name = nameAndLoc.name;
 
                 if(peekTokenType(parser) == TokenType::OpLess)
@@ -5744,7 +5773,7 @@ namespace Slang
                     parser->ReadToken(TokenType::Dot);
                     parser->FillPosition(memberExpr);
                     memberExpr->name = expectIdentifier(parser).name;
-
+                    
                     if (peekTokenType(parser) == TokenType::OpLess)
                         expr = maybeParseGenericApp(parser, memberExpr);
                     else

@@ -5,18 +5,29 @@
 #include "slang-language-server.h"
 
 #include "slang-ast-all.h"
-#include "slang-syntax.h"
 #include "slang-check-impl.h"
+#include "slang-syntax.h"
 
 namespace Slang
 {
 
-static bool _isIdentifierChar(char ch)
-{
-    return ch >= '0' && ch <= '9' || ch >= 'a' && ch <= 'z' || ch >= 'A' && ch <= 'Z' || ch == '_';
-}
-
-static bool _isWhitespaceChar(char ch) { return ch == ' ' || ch == '\r' || ch == '\n' || ch == '\t'; }
+static const char* kDeclKeywords[] = {
+    "throws",    "static",         "const",     "in",        "out",     "inout",
+    "ref",       "__subscript",    "__init",    "property",  "get",     "set",
+    "class",     "struct",         "interface", "public",    "private", "internal",
+    "protected", "typedef",        "typealias", "uniform",   "export",  "groupshared",
+    "extension", "associatedtype", "namespace", "This",    "using",
+    "__generic", "__exported",     "import",    "enum",      "cbuffer",   "tbuffer",   "func"};
+static const char* kStmtKeywords[] = {
+    "if",        "else",           "switch",    "case",      "default", "return",
+    "try",       "throw",          "throws",    "catch",     "while",   "for",
+    "do",        "static",         "const",     "in",        "out",     "inout",
+    "ref",       "__subscript",    "__init",    "property",  "get",     "set",
+    "class",     "struct",         "interface", "public",    "private", "internal",
+    "protected", "typedef",        "typealias", "uniform",   "export",  "groupshared",
+    "extension", "associatedtype", "this",      "namespace", "This",    "using",
+    "__generic", "__exported",     "import",    "enum",      "break",   "continue",
+    "discard",   "defer",          "cbuffer",   "tbuffer",   "func"};
 
 static const char* hlslSemanticNames[] = {
     "register",
@@ -54,416 +65,294 @@ static const char* hlslSemanticNames[] = {
 
 SlangResult CompletionContext::tryCompleteHLSLSemantic()
 {
-    auto findResult = findASTNodesAt(
-        doc,
-        version->linkage->getSourceManager(),
-        parsedModule->getModuleDecl(),
-        ASTLookupType::Decl,
-        canonicalPath,
-        line,
-        col);
-    if (findResult.getCount() == 1 && findResult[0].path.getCount() != 0)
-    {
-        if (auto semantic = as<HLSLSemantic>(findResult[0].path.getLast()))
-        {
-            List<LanguageServerProtocol::CompletionItem> items;
-            for (auto name : hlslSemanticNames)
-            {
-                LanguageServerProtocol::CompletionItem item;
-                item.label = name;
-                item.kind = LanguageServerProtocol::kCompletionItemKindKeyword;
-                for (auto ch : getCommitChars())
-                    item.commitCharacters.add(ch);
-                items.add(item);
-            }
-            server->m_connection->sendResult(&items, responseId);
-            return SLANG_OK;
-        }
-    }
-    return SLANG_FAIL;
-}
-
-SlangResult CompletionContext::tryCompleteMember()
-{
-    // Scan backward until we locate a '.' or ':'.
-    if (cursorOffset > 0)
-        cursorOffset--;
-    while (cursorOffset > 0 && _isWhitespaceChar(doc->getText()[cursorOffset]))
-    {
-        cursorOffset--;
-    }
-    while (cursorOffset > 0 && _isIdentifierChar(doc->getText()[cursorOffset]))
-    {
-        cursorOffset--;
-    }
-    while (cursorOffset > 0 && _isWhitespaceChar(doc->getText()[cursorOffset]))
-    {
-        cursorOffset--;
-    }
-    if (cursorOffset > 0 && doc->getText()[cursorOffset] == ':')
-        cursorOffset--;
-    if (cursorOffset <= 0 ||
-        (doc->getText()[cursorOffset] != '.' && doc->getText()[cursorOffset] != ':'))
+    if (version->linkage->contentAssistInfo.completionSuggestions.scopeKind !=
+        CompletionSuggestions::ScopeKind::HLSLSemantics)
     {
         return SLANG_FAIL;
     }
-    doc->offsetToLineCol(cursorOffset, line, col);
-    auto findResult = findASTNodesAt(
-        doc,
-        version->linkage->getSourceManager(),
-        parsedModule->getModuleDecl(),
-        ASTLookupType::Decl,
-        canonicalPath,
-        line,
-        col);
-    if (findResult.getCount() != 1)
+    List<LanguageServerProtocol::CompletionItem> items;
+    for (auto name : hlslSemanticNames)
     {
-        return SLANG_FAIL;
+        LanguageServerProtocol::CompletionItem item;
+        item.label = name;
+        item.kind = LanguageServerProtocol::kCompletionItemKindKeyword;
+        items.add(item);
     }
-    if (findResult[0].path.getCount() == 0)
-    {
-        return SLANG_FAIL;
-    }
-    Expr* baseExpr = nullptr;
-    if (auto memberExpr = as<MemberExpr>(findResult[0].path.getLast()))
-    {
-        baseExpr = memberExpr->baseExpression;
-    }
-    else if (auto staticMemberExpr = as<StaticMemberExpr>(findResult[0].path.getLast()))
-    {
-        baseExpr = staticMemberExpr->baseExpression;
-    }
-    else if (auto swizzleExpr = as<SwizzleExpr>(findResult[0].path.getLast()))
-    {
-        baseExpr = swizzleExpr->base;
-    }
-    else if (auto matSwizzleExpr = as<MatrixSwizzleExpr>(findResult[0].path.getLast()))
-    {
-        baseExpr = matSwizzleExpr->base;
-    }
-    if (!baseExpr || !baseExpr->type.type ||
-        baseExpr->type.type->equals(version->linkage->getASTBuilder()->getErrorType()))
-    {
-        return SLANG_FAIL;
-    }
-
-    List<LanguageServerProtocol::CompletionItem> items = collectMembers(baseExpr);
     server->m_connection->sendResult(&items, responseId);
     return SLANG_OK;
 }
 
-// The following collectMember* functions implement the logic to collect all members from a parsed type.]
-// The flow is mostly the same as `lookupMemberInType`, but instead of looking for a specific name,
-// we collect all members we see.
-
-struct MemberCollectingContext
+SlangResult CompletionContext::tryCompleteAttributes()
 {
-    ASTBuilder* astBuilder;
-    List<Decl*> members;
-    bool includeInstanceMembers = true;
-    SharedSemanticsContext semanticsContext;
-    MemberCollectingContext(Linkage* linkage, Module* module, DiagnosticSink* sink)
-        : semanticsContext(linkage, module, sink)
-    {}
-};
-
-void collectMembersInTypeDeclImpl(MemberCollectingContext* context, DeclRef<Decl> declRef);
-
-void collectMembersInType(MemberCollectingContext* context, Type* type);
-
-void collectMembersInType(MemberCollectingContext* context, Type* type)
-{
-    if (auto pointerLikeType = as<PointerLikeType>(type))
+    if (version->linkage->contentAssistInfo.completionSuggestions.scopeKind !=
+        CompletionSuggestions::ScopeKind::Attribute)
     {
-        collectMembersInType(context, pointerLikeType->elementType);
-        return;
+        return SLANG_FAIL;
     }
-
-    if (auto declRefType = as<DeclRefType>(type))
-    {
-        auto declRef = declRefType->declRef;
-
-        collectMembersInTypeDeclImpl(
-            context,
-            declRef);
-    }
-    else if (auto nsType = as<NamespaceType>(type))
-    {
-        auto declRef = nsType->declRef;
-
-        collectMembersInTypeDeclImpl(context, declRef);
-    }
-    else if (auto extractExistentialType = as<ExtractExistentialType>(type))
-    {
-        // We want lookup to be performed on the underlying interface type of the existential,
-        // but we need to have a this-type substitution applied to ensure that the result of
-        // lookup will have a comparable substitution applied (allowing things like associated
-        // types, etc. used in the signature of a method to resolve correctly).
-        //
-        auto interfaceDeclRef = extractExistentialType->getSpecializedInterfaceDeclRef();
-        collectMembersInTypeDeclImpl(context, interfaceDeclRef);
-    }
-    else if (auto thisType = as<ThisType>(type))
-    {
-        auto interfaceType = DeclRefType::create(context->astBuilder, thisType->interfaceDeclRef);
-        collectMembersInType(context, interfaceType);
-    }
-    else if (auto andType = as<AndType>(type))
-    {
-        auto leftType = andType->left;
-        auto rightType = andType->right;
-        collectMembersInType(context, leftType);
-        collectMembersInType(context, rightType);
-    }
+    List<LanguageServerProtocol::CompletionItem> items = collectAttributes();
+    server->m_connection->sendResult(&items, responseId);
+    return SLANG_OK;
 }
 
-void collectMembersInTypeDeclImpl(
-    MemberCollectingContext* context,
-    DeclRef<Decl> declRef)
+SlangResult CompletionContext::tryCompleteMemberAndSymbol()
 {
-    if (declRef.getDecl()->checkState.getState() < DeclCheckState::ReadyForLookup)
-        return;
-
-    if (auto genericTypeParamDeclRef = declRef.as<GenericTypeParamDecl>())
-    {
-        // If the type we are doing lookup in is a generic type parameter,
-        // then the members it provides can only be discovered by looking
-        // at the constraints that are placed on that type.
-        auto genericDeclRef = genericTypeParamDeclRef.getParent().as<GenericDecl>();
-        assert(genericDeclRef);
-
-        for (auto constraintDeclRef : getMembersOfType<GenericTypeConstraintDecl>(genericDeclRef))
-        {
-            if (constraintDeclRef.decl->checkState.getState() < DeclCheckState::ReadyForLookup)
-            {
-                continue;
-            }
-
-            collectMembersInType(
-                context,
-                getSup(context->astBuilder, constraintDeclRef));
-        }
-    }
-    else if (declRef.as<AssocTypeDecl>() || declRef.as<GlobalGenericParamDecl>())
-    {
-        for (auto constraintDeclRef :
-             getMembersOfType<TypeConstraintDecl>(declRef.as<ContainerDecl>()))
-        {
-            if (constraintDeclRef.decl->checkState.getState() < DeclCheckState::ReadyForLookup)
-            {
-                continue;
-            }
-            collectMembersInType(context, getSup(context->astBuilder, constraintDeclRef));
-        }
-    }
-    else if (auto namespaceDecl = declRef.as<NamespaceDecl>())
-    {
-        for (auto member : namespaceDecl.getDecl()->members)
-        {
-            if (member->getName())
-            {
-                context->members.add(member);
-            }
-        }
-    }
-    else if (auto aggTypeDeclBaseRef = declRef.as<AggTypeDeclBase>())
-    {
-        // In this case we are peforming lookup in the context of an aggregate
-        // type or an `extension`, so the first thing to do is to look for
-        // matching members declared directly in the body of the type/`extension`.
-        //
-        for (auto member : aggTypeDeclBaseRef.getDecl()->members)
-        {
-            if (member->getName())
-            {
-                if (!context->includeInstanceMembers)
-                {
-                    // Skip non-static members.
-                    if (as<PropertyDecl>(member))
-                        continue;
-                    if (as<SubscriptDecl>(member))
-                        continue;
-                    if (as<VarDeclBase>(member) || as<FuncDecl>(member))
-                    {
-                        if (!member->findModifier<HLSLStaticModifier>())
-                        {
-                            continue;
-                        }
-                    }
-                }
-                context->members.add(member);
-            }
-        }
-        
-        if (auto aggTypeDeclRef = aggTypeDeclBaseRef.as<AggTypeDecl>())
-        {
-            auto extensions =
-                context->semanticsContext.getCandidateExtensionsForTypeDecl(aggTypeDeclRef);
-            for (auto extDecl : extensions)
-            {
-                // TODO: check if the extension can be applied before including its members.
-                // TODO: eventually we need to insert a breadcrumb here so that
-                // the constructed result can somehow indicate that a member
-                // was found through an extension.
-                //
-                collectMembersInTypeDeclImpl(
-                    context,
-                    DeclRef<Decl>(extDecl, nullptr));
-            }
-        }
-
-        // For both aggregate types and their `extension`s, we want lookup to follow
-        // through the declared inheritance relationships on each declaration.
-        //
-        for (auto inheritanceDeclRef : getMembersOfType<InheritanceDecl>(aggTypeDeclBaseRef))
-        {
-            // Some things that are syntactically `InheritanceDecl`s don't actually
-            // represent a subtype/supertype relationship, and thus we shouldn't
-            // include members from the base type when doing lookup in the
-            // derived type.
-            //
-            if (inheritanceDeclRef.getDecl()->hasModifier<IgnoreForLookupModifier>())
-                continue;
-
-            collectMembersInType(
-                context, getSup(context->astBuilder, inheritanceDeclRef));
-        }
-    }
+    List<LanguageServerProtocol::CompletionItem> items = collectMembersAndSymbols();
+    server->m_connection->sendResult(&items, responseId);
+    return SLANG_OK;
 }
 
-List<LanguageServerProtocol::CompletionItem> CompletionContext::collectMembers(Expr* baseExpr)
+List<LanguageServerProtocol::CompletionItem> CompletionContext::collectMembersAndSymbols()
 {
-    List<LanguageServerProtocol::CompletionItem> result;
     auto linkage = version->linkage;
-    Type* type = baseExpr->type.type;
-    bool isInstance = true;
-    if (auto typeType = as<TypeType>(type))
+    if (linkage->contentAssistInfo.completionSuggestions.scopeKind ==
+        CompletionSuggestions::ScopeKind::Swizzle)
     {
-        type = typeType->type;
-        isInstance = false;
+        return createSwizzleCandidates(
+            linkage->contentAssistInfo.completionSuggestions.swizzleBaseType,
+            linkage->contentAssistInfo.completionSuggestions.elementCount);
     }
-    version->currentCompletionItems.clear();
-    if (type)
+    List<LanguageServerProtocol::CompletionItem> result;
+    bool useCommitChars = true;
+    bool addKeywords = false;
+    switch (linkage->contentAssistInfo.completionSuggestions.scopeKind)
     {
-        if (isInstance && as<ArithmeticExpressionType>(type))
+    case CompletionSuggestions::ScopeKind::Member:
+        useCommitChars = (commitCharacterBehavior == CommitCharacterBehavior::MembersOnly || commitCharacterBehavior == CommitCharacterBehavior::All);
+        break;
+    case CompletionSuggestions::ScopeKind::Expr:
+    case CompletionSuggestions::ScopeKind::Decl:
+    case CompletionSuggestions::ScopeKind::Stmt:
+        useCommitChars = (commitCharacterBehavior == CommitCharacterBehavior::All);
+        addKeywords = true;
+        break;
+    default:
+        return result;
+    }
+    HashSet<String> deduplicateSet;
+    for (Index i = 0;
+         i < linkage->contentAssistInfo.completionSuggestions.candidateItems.getCount();
+         i++)
+    {
+        auto& suggestedItem = linkage->contentAssistInfo.completionSuggestions.candidateItems[i];
+        auto member = suggestedItem.declRef.getDecl();
+        if (auto genericDecl = as<GenericDecl>(member))
+            member = genericDecl->inner;
+        if (!member)
+            continue;
+        if (!member->getName())
+            continue;
+        LanguageServerProtocol::CompletionItem item;
+        item.label = member->getName()->text;
+        item.kind = LanguageServerProtocol::kCompletionItemKindKeyword;
+        if (as<TypeConstraintDecl>(member))
         {
-            // Hard code members for vector and matrix types.
-            result.clear();
-            version->currentCompletionItems.clear();
-            int elementCount = 0;
-            Type* elementType = nullptr;
-            const char* memberNames[4] = {"x", "y", "z", "w"};
-            if (auto vectorType = as<VectorExpressionType>(type))
+            continue;
+        }
+        if (as<ConstructorDecl>(member))
+        {
+            continue;
+        }
+        if (as<SubscriptDecl>(member))
+        {
+            continue;
+        }
+        if (item.label.getLength() == 0)
+            continue;
+        if (!_isIdentifierChar(item.label[0]))
+            continue;
+        if (item.label.startsWith("$"))
+            continue;
+        if (!deduplicateSet.Add(item.label))
+            continue;
+
+        if (as<StructDecl>(member))
+        {
+            item.kind = LanguageServerProtocol::kCompletionItemKindStruct;
+        }
+        else if (as<ClassDecl>(member))
+        {
+            item.kind = LanguageServerProtocol::kCompletionItemKindClass;
+        }
+        else if (as<InterfaceDecl>(member))
+        {
+            item.kind = LanguageServerProtocol::kCompletionItemKindInterface;
+        }
+        else if (as<SimpleTypeDecl>(member))
+        {
+            item.kind = LanguageServerProtocol::kCompletionItemKindClass;
+        }
+        else if (as<PropertyDecl>(member))
+        {
+            item.kind = LanguageServerProtocol::kCompletionItemKindProperty;
+        }
+        else if (as<EnumDecl>(member))
+        {
+            item.kind = LanguageServerProtocol::kCompletionItemKindEnum;
+        }
+        else if (as<VarDeclBase>(member))
+        {
+            item.kind = LanguageServerProtocol::kCompletionItemKindVariable;
+        }
+        else if (as<EnumCaseDecl>(member))
+        {
+            item.kind = LanguageServerProtocol::kCompletionItemKindEnumMember;
+        }
+        else if (as<CallableDecl>(member))
+        {
+            item.kind = LanguageServerProtocol::kCompletionItemKindMethod;
+        }
+        else if (as<AssocTypeDecl>(member))
+        {
+            item.kind = LanguageServerProtocol::kCompletionItemKindClass;
+        }
+        item.data = String(i);
+        result.add(item);
+    }
+    if (addKeywords)
+    {
+        if (linkage->contentAssistInfo.completionSuggestions.scopeKind ==
+            CompletionSuggestions::ScopeKind::Decl)
+        {
+            for (auto keyword : kDeclKeywords)
             {
-                if (auto elementCountVal = as<ConstantIntVal>(vectorType->elementCount))
-                {
-                    elementCount = (int)elementCountVal->value;
-                    elementType = vectorType->elementType;
-                }
-            }
-            else if (auto matrixType = as<MatrixExpressionType>(type))
-            {
-                if (auto elementCountVal = as<ConstantIntVal>(matrixType->getRowCount()))
-                {
-                    elementCount = (int)elementCountVal->value;
-                    elementType = matrixType->getRowType();
-                }
-            }
-            String typeStr;
-            if (elementType)
-                typeStr = elementType->toString();
-            elementCount = Math::Min(elementCount, 4);
-            for (int i = 0; i < elementCount; i++)
-            {
+                if (!deduplicateSet.Add(keyword))
+                    continue;
                 LanguageServerProtocol::CompletionItem item;
-                item.data = 0;
-                item.detail = typeStr;
-                item.kind = LanguageServerProtocol::kCompletionItemKindVariable;
-                item.label = memberNames[i];
+                item.label = keyword;
+                item.kind = LanguageServerProtocol::kCompletionItemKindKeyword;
+                item.data = "-1";
                 result.add(item);
             }
         }
         else
         {
-            DiagnosticSink sink;
-            MemberCollectingContext context(linkage, parsedModule, &sink);
-            context.astBuilder = linkage->getASTBuilder();
-            context.includeInstanceMembers = isInstance;
-            collectMembersInType(&context, type);
-            HashSet<String> deduplicateSet;
-            for (auto member : context.members)
+            for (auto keyword : kStmtKeywords)
             {
+                if (!deduplicateSet.Add(keyword))
+                    continue;
                 LanguageServerProtocol::CompletionItem item;
-                item.label = member->getName()->text;
-                item.kind = 0;
-                if (as<TypeConstraintDecl>(member))
-                {
-                    continue;
-                }
-                if (as<ConstructorDecl>(member))
-                {
-                    continue;
-                }
-                if (as<SubscriptDecl>(member))
-                {
-                    continue;
-                }
-
-                if (item.label.startsWith("$"))
-                    continue;
-                if (!deduplicateSet.Add(item.label))
-                    continue;
-
-                if (as<StructDecl>(member))
-                {
-                    item.kind = LanguageServerProtocol::kCompletionItemKindStruct;
-                }
-                else if (as<ClassDecl>(member))
-                {
-                    item.kind = LanguageServerProtocol::kCompletionItemKindClass;
-                }
-                else if (as<InterfaceDecl>(member))
-                {
-                    item.kind = LanguageServerProtocol::kCompletionItemKindInterface;
-                }
-                else if (as<SimpleTypeDecl>(member))
-                {
-                    item.kind = LanguageServerProtocol::kCompletionItemKindClass;
-                }
-                else if (as<PropertyDecl>(member))
-                {
-                    item.kind = LanguageServerProtocol::kCompletionItemKindProperty;
-                }
-                else if (as<EnumDecl>(member))
-                {
-                    item.kind = LanguageServerProtocol::kCompletionItemKindEnum;
-                }
-                else if (as<VarDeclBase>(member))
-                {
-                    item.kind = LanguageServerProtocol::kCompletionItemKindVariable;
-                }
-                else if (as<EnumCaseDecl>(member))
-                {
-                    item.kind = LanguageServerProtocol::kCompletionItemKindEnumMember;
-                }
-                else if (as<CallableDecl>(member))
-                {
-                    item.kind = LanguageServerProtocol::kCompletionItemKindMethod;
-                }
-                else if (as<AssocTypeDecl>(member))
-                {
-                    item.kind = LanguageServerProtocol::kCompletionItemKindClass;
-                }
-                item.data = String(version->currentCompletionItems.getCount());
+                item.label = keyword;
+                item.kind = LanguageServerProtocol::kCompletionItemKindKeyword;
+                item.data = "-1";
                 result.add(item);
-                version->currentCompletionItems.add(member);
             }
         }
-
+        
+        for (auto& def : linkage->contentAssistInfo.preprocessorInfo.macroDefinitions)
+        {
+            if (!def.name)
+                continue;
+            auto& text = def.name->text;
+            if (!deduplicateSet.Add(text))
+                continue;
+            LanguageServerProtocol::CompletionItem item;
+            item.label = text;
+            item.kind = LanguageServerProtocol::kCompletionItemKindKeyword;
+            item.data = "-1";
+            result.add(item);
+        }
+    }
+    if (useCommitChars)
+    {
         for (auto& item : result)
         {
             for (auto ch : getCommitChars())
                 item.commitCharacters.add(ch);
+        }
+    }
+    return result;
+}
+
+List<LanguageServerProtocol::CompletionItem> CompletionContext::createSwizzleCandidates(
+    Type* type, IntegerLiteralValue elementCount[2])
+{
+    List<LanguageServerProtocol::CompletionItem> result;
+    // Hard code members for vector and matrix types.
+    result.clear();
+    if (auto vectorType = as<VectorExpressionType>(type))
+    {
+        const char* memberNames[4] = {"x", "y", "z", "w"};
+        Type* elementType = nullptr;
+        elementType = vectorType->elementType;
+        String typeStr;
+        if (elementType)
+            typeStr = elementType->toString();
+        auto count = Math::Min((int)elementCount[0], 4);
+        for (int i = 0; i < count; i++)
+        {
+            LanguageServerProtocol::CompletionItem item;
+            item.data = 0;
+            item.detail = typeStr;
+            item.kind = LanguageServerProtocol::kCompletionItemKindVariable;
+            item.label = memberNames[i];
+            result.add(item);
+        }
+    }
+    else if (auto matrixType = as<MatrixExpressionType>(type))
+    {
+        Type* elementType = nullptr;
+        elementType = matrixType->getElementType();
+        String typeStr;
+        if (elementType)
+        {
+            typeStr = elementType->toString();
+        }
+        int rowCount = Math::Min((int)elementCount[0], 4);
+        int colCount = Math::Min((int)elementCount[1], 4);
+        StringBuilder nameSB;
+        for (int i = 0; i < rowCount; i++)
+        {
+            for (int j = 0; j < colCount; j++)
+            {
+                LanguageServerProtocol::CompletionItem item;
+                item.data = 0;
+                item.detail = typeStr;
+                item.kind = LanguageServerProtocol::kCompletionItemKindVariable;
+                nameSB.Clear();
+                nameSB << "_m" << i << j;
+                item.label = nameSB.ToString();
+                result.add(item);
+                nameSB.Clear();
+                nameSB << "_" << i + 1 << j + 1;
+                item.label = nameSB.ToString();
+                result.add(item);
+            }
+        }
+    }
+    for (auto& item : result)
+    {
+        for (auto ch : getCommitChars())
+            item.commitCharacters.add(ch);
+    }
+    return result;
+}
+
+List<LanguageServerProtocol::CompletionItem> CompletionContext::collectAttributes()
+{
+    List<LanguageServerProtocol::CompletionItem> result;
+    for (auto& item : version->linkage->contentAssistInfo.completionSuggestions.candidateItems)
+    {
+        if (auto attrDecl = as<AttributeDecl>(item.declRef.getDecl()))
+        {
+            if (attrDecl->getName())
+            {
+                LanguageServerProtocol::CompletionItem resultItem;
+                resultItem.kind = LanguageServerProtocol::kCompletionItemKindKeyword;
+                resultItem.label = attrDecl->getName()->text;
+                result.add(resultItem);
+            }
+        }
+        else if (auto decl = as<AggTypeDecl>(item.declRef.getDecl()))
+        {
+            if (decl->getName())
+            {
+                LanguageServerProtocol::CompletionItem resultItem;
+                resultItem.kind = LanguageServerProtocol::kCompletionItemKindStruct;
+                resultItem.label = decl->getName()->text;
+                if (resultItem.label.endsWith("Attribute"))
+                    resultItem.label.reduceLength(resultItem.label.getLength() - 9);
+                result.add(resultItem);
+            }
         }
     }
     return result;

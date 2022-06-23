@@ -90,6 +90,8 @@ PUNCTUATION(PoundPound,     "##")
 
 PUNCTUATION(Scope,          "::")
 
+PUNCTUATION(CompletionRequest, "#?")
+
 #undef PUNCTUATION
 
 // Un-define the `TOKEN` macro so that client doesn't have to
