@@ -68,6 +68,17 @@ struct JVPDerivativeContext
         return false;
     }
 
+    List<IRParam*> emitFuncParameters(IRBuilder* builder, IRFuncType* dataType)
+    {
+        List<IRParam*> params;
+        for(UIndex i = 0; i < dataType->getParamCount(); i++)
+        {
+            params.add(
+                builder->emitParam(dataType->getParamType(i)));
+        }
+        return params;
+    }
+
     // Perform forward-mode automatic differentiation on 
     // the intstructions.
     IRFunc* emitJVPFunction(IRBuilder* builder,
@@ -77,7 +88,8 @@ struct JVPDerivativeContext
         builder->setInsertBefore(primalFn->getNextInst()); 
 
         auto jvpFn = builder->createFunc();
-        jvpFn->setFullType(primalTypeToJVPType(primalFn->getFullType()));
+        IRType* jvpFuncType = primalTypeToJVPType(primalFn->getFullType());
+        jvpFn->setFullType(jvpFuncType);
         if (auto jvpName = getJVPFuncName(builder, primalFn))
             builder->addNameHintDecoration(jvpFn, jvpName);
 
@@ -85,9 +97,17 @@ struct JVPDerivativeContext
 
         // Start with _extremely_ basic functions
         SLANG_ASSERT(primalFn->getFirstBlock() == primalFn->getLastBlock());
-
-        // TODO: Need to emit parameters if it's the first block.
-        emitJVPBlock(builder, primalFn->getFirstBlock());
+        
+        for (auto block = primalFn->getFirstBlock(); block; block = block->getNextBlock())
+        {
+            IRBlock* newJVPBlock = nullptr;
+            if (block == primalFn->getFirstBlock())
+            {
+                newJVPBlock = builder->emitBlock();
+                emitFuncParameters(builder, as<IRFuncType>(jvpFuncType));
+            }
+            newJVPBlock = emitJVPBlock(builder, primalFn->getFirstBlock(), newJVPBlock);
+        }
 
         return jvpFn;
     }
@@ -115,10 +135,14 @@ struct JVPDerivativeContext
 
 
     IRBlock* emitJVPBlock(IRBuilder*    builder, 
-                          IRBlock*      primalBlock)
-    {
-        // Create and insert into new block.
-        auto jvpBlock = builder->emitBlock();
+                          IRBlock*      primalBlock,
+                          IRBlock*      jvpBlock = nullptr)
+    {   
+        // Create if not already provided, and insert into new block.
+        if (!jvpBlock)
+            jvpBlock = builder->emitBlock();
+        else
+            builder->setInsertInto(jvpBlock);
 
         // Temporarily, we're going to just emit a single return 0 instruction.
         for(auto child = primalBlock->getFirstInst(); child; child = child->getNextInst())
