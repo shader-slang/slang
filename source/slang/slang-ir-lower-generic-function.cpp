@@ -264,7 +264,8 @@ namespace Slang
             // If the requirement is a function, interfaceRequirementVal will be the lowered function type.
             // If the requirement is an associatedtype, interfaceRequirementVal will be Ptr<RTTIObject>.
             IRInst* interfaceRequirementVal = nullptr;
-            auto witnessTableType = cast<IRWitnessTableType>(lookupInst->getWitnessTable()->getDataType());
+            auto witnessTableType = as<IRWitnessTableType>(lookupInst->getWitnessTable()->getDataType());
+            if (!witnessTableType) return;
             auto interfaceType = maybeLowerInterfaceType(cast<IRInterfaceType>(witnessTableType->getConformanceType()));
             interfaceRequirementVal = sharedContext->findInterfaceRequirementVal(interfaceType, lookupInst->getRequirementKey());
             lookupInst->setFullType((IRType*)interfaceRequirementVal);

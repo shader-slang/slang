@@ -2,10 +2,18 @@
 #pragma once
 
 #include "slang-workspace-version.h"
+#include "slang-language-server-ast-lookup.h"
 
 namespace Slang
 {
 class LanguageServer;
+
+enum class CommitCharacterBehavior
+{
+    Disabled,
+    MembersOnly,
+    All
+};
 
 struct CompletionContext
 {
@@ -16,12 +24,17 @@ struct CompletionContext
     Module* parsedModule;
     JSONValue responseId;
     UnownedStringSlice canonicalPath;
+    CommitCharacterBehavior commitCharacterBehavior;
     Int line;
     Int col;
 
-    SlangResult tryCompleteMember();
+    SlangResult tryCompleteMemberAndSymbol();
     SlangResult tryCompleteHLSLSemantic();
-    List<LanguageServerProtocol::CompletionItem> collectMembers(Expr* baseExpr);
+    SlangResult tryCompleteAttributes();
+    List<LanguageServerProtocol::CompletionItem> collectMembersAndSymbols();
+    List<LanguageServerProtocol::CompletionItem> createSwizzleCandidates(
+        Type* baseType, IntegerLiteralValue elementCount[2]);
+    List<LanguageServerProtocol::CompletionItem> collectAttributes();
 };
 
 } // namespace Slang

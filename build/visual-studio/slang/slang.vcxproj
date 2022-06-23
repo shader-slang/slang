@@ -311,6 +311,7 @@ IF EXIST ..\..\..\external\slang-binaries\bin\windows-aarch64\slang-glslang.dll\
     <ClInclude Include="..\..\..\source\slang\slang-ast-decl.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ast-dump.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ast-expr.h" />
+    <ClInclude Include="..\..\..\source\slang\slang-ast-iterator.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ast-modifier.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ast-print.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ast-reflect.h" />
@@ -323,6 +324,7 @@ IF EXIST ..\..\..\external\slang-binaries\bin\windows-aarch64\slang-glslang.dll\
     <ClInclude Include="..\..\..\source\slang\slang-check-impl.h" />
     <ClInclude Include="..\..\..\source\slang\slang-check.h" />
     <ClInclude Include="..\..\..\source\slang\slang-compiler.h" />
+    <ClInclude Include="..\..\..\source\slang\slang-content-assist-info.h" />
     <ClInclude Include="..\..\..\source\slang\slang-diagnostic-defs.h" />
     <ClInclude Include="..\..\..\source\slang\slang-diagnostics.h" />
     <ClInclude Include="..\..\..\source\slang\slang-doc-ast.h" />
@@ -401,6 +403,7 @@ IF EXIST ..\..\..\external\slang-binaries\bin\windows-aarch64\slang-glslang.dll\
     <ClInclude Include="..\..\..\source\slang\slang-ir-ssa-simplification.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-ssa.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-string-hash.h" />
+    <ClInclude Include="..\..\..\source\slang\slang-ir-strip-cached-dict.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-strip-witness-tables.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-strip.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-synthesize-active-mask.h" />
@@ -554,6 +557,7 @@ IF EXIST ..\..\..\external\slang-binaries\bin\windows-aarch64\slang-glslang.dll\
     <ClCompile Include="..\..\..\source\slang\slang-ir-ssa-simplification.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-ssa.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-string-hash.cpp" />
+    <ClCompile Include="..\..\..\source\slang\slang-ir-strip-cached-dict.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-strip-witness-tables.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-strip.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-synthesize-active-mask.cpp" />

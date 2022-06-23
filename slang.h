@@ -4000,10 +4000,6 @@ namespace slang
         You have been warned.
         */
         kSessionFlag_FalcorCustomSharedKeywordSemantics = 1 << 0,
-
-        /** Indicates that this is a session created by language server.
-        */
-        kSessionFlag_LanguageServer = 1 << 1,
     };
 
     struct PreprocessorMacroDesc

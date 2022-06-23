@@ -406,6 +406,9 @@ class ImportDecl : public Decl
     // The module that actually got imported
     ModuleDecl* importedModuleDecl = nullptr;
 
+    SourceLoc startLoc;
+    SourceLoc endLoc;
+
     SLANG_UNREFLECTED
     // The scope that we want to import into
     Scope* scope = nullptr;
