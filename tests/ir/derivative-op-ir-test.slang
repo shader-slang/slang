@@ -15,7 +15,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
      {
         float a = 1.0;
         float b = -2.0;
-        outputBuffer[0] = __jvp(f)(a);
-        outputBuffer[1] = __jvp(f)(b);
+        outputBuffer[0] = __jvp(f)();
+        outputBuffer[1] = __jvp(f)();
     }
 }

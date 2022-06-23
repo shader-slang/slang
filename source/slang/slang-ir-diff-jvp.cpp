@@ -86,6 +86,7 @@ struct JVPDerivativeContext
         // Start with _extremely_ basic functions
         SLANG_ASSERT(primalFn->getFirstBlock() == primalFn->getLastBlock());
 
+        // TODO: Need to emit parameters if it's the first block.
         emitJVPBlock(builder, primalFn->getFirstBlock());
 
         return jvpFn;
@@ -111,6 +112,7 @@ struct JVPDerivativeContext
 
         return name;
     }
+
 
     IRBlock* emitJVPBlock(IRBuilder*    builder, 
                           IRBlock*      primalBlock)
