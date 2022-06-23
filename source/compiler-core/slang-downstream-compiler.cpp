@@ -436,6 +436,17 @@ SlangResult CommandLineDownstreamCompiler::compile(const CompileOptions& inOptio
         if (modulePath.getLength() == 0)
         {
             SLANG_RETURN_ON_FAIL(File::generateTemporary(UnownedStringSlice::fromLiteral("slang-generated"), modulePath));
+
+#if SLANG_WINDOWS_FAMILY
+            // We need to create the temporary file with this name, as it's existance *can* stop clashes 
+            // via multiple threads/processes on windows. 
+            // Note that no windows based product has no extension (unlike on linux/unix) so this should be ok.
+            SLANG_RETURN_ON_FAIL(File::writeAllText(modulePath, "slang-temporary-lock"));
+
+            // Add to the set, so it will be deleted when no longer needed
+            productFileSet->add(modulePath);
+#endif
+
             options.modulePath = modulePath;
         }
 
