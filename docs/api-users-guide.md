@@ -442,7 +442,7 @@ If you don't like the way that Slang adds `#line` directives to generated source
 spSetLineDirectiveMode(request, SLANG_LINE_DIRECTIVE_MODE_NONE);
 ```
 
-### <a id="multithreading"/></a>Multithreading
+### <a id="multithreading"></a>Multithreading
 
 A Slang compile request/s (`slang::ICompileRequest` or `SlangCompileRequest`) can be thought of belonging to the Slang global session (`slang::IGlobalSession` or `SlangSession`) it was created from. The combination of a global session and associated requests can only be used on via a *single* thread at *any one time*. 
 
