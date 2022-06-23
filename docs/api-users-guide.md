@@ -43,7 +43,7 @@ When you are done with a session, you'll want to destroy it to free up these res
 spDestroySession(session);
 ```
 
-**Warning**: The Slang library currently isn't reentrant, and Bad Things will happen if you try to create more than one session at a time.
+**Warning**: The Slang library currently isn't reentrant in general, but can be multithreaded with care. See the section on [multithreading](#multhreading) for more details. 
 
 ### Create a Compile Request
 
@@ -442,7 +442,15 @@ If you don't like the way that Slang adds `#line` directives to generated source
 spSetLineDirectiveMode(request, SLANG_LINE_DIRECTIVE_MODE_NONE);
 ```
 
+### <a id="multithreading"/></a>Multithreading
 
+A Slang compile request/s (`slang::ICompileRequest` or `SlangCompileRequest`) can be thought of belonging to the Slang global session (`slang::IGlobalSession` or `SlangSession`) it was created from. The combination of a global session and associated requests can only be used on via a *single* thread at *any one time*. 
 
+Slang sessions can be created on one thread and destroyed on another. When a session is destroyed all of it's associated requests (ie any request *created* from the session) must also be destroyed. Not doing so will likely lead to undefined behavior. It's probably worth pointing out that *creating* a global session is currently a fairly costly process. The cost of creating and destroying a request is comparitively small. 
 
+The *simplest* way to multi-thread would be for a thread to create a global session, request/s from that session and then destroy the request/s and global session. This works, but typically isn't very efficient with many compilations because the cost of creating the session is required for each compilation. 
+
+A significant improvement is to limit the global session cost via a global session pool. When a compilation on a thread is required it takes a global session from the global session pool, creates the request/s, compiles, destroys the request and then returns the global session to the pool. Care is needed with the pool because the global session holds state, so it is either important to have a condition that all global sessions hold the same state, or all state is setup on the session when it's removed from the pool for use.
+
+More nuance is possible in so far as the use of global session/requests *can* move between threads as long as use is only ever on one thread at any one time. 
 
