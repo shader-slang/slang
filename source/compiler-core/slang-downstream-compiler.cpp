@@ -428,6 +428,7 @@ SlangResult CommandLineDownstreamCompiler::compile(const CompileOptions& inOptio
     // Find all the files that will be produced
     RefPtr<TemporaryFileSet> productFileSet(new TemporaryFileSet);
     
+    
     if (options.modulePath.getLength() == 0 || options.sourceContents.getLength() != 0)
     {
         String modulePath = options.modulePath;
@@ -435,19 +436,14 @@ SlangResult CommandLineDownstreamCompiler::compile(const CompileOptions& inOptio
         // If there is no module path, generate one.
         if (modulePath.getLength() == 0)
         {
-            SLANG_RETURN_ON_FAIL(File::generateTemporary(UnownedStringSlice::fromLiteral("slang-generated"), modulePath));
+            // Holds the temporary lock path, if a temporary path is used
+            String temporaryLockPath;
 
-#if SLANG_WINDOWS_FAMILY
-            // We need to create the temporary file with this name, as it's existance *can* stop clashes 
-            // via multiple threads/processes on windows. 
-            // Note that no windows based product has no extension (unlike on linux/unix) so this should be ok.
-            SLANG_RETURN_ON_FAIL(File::writeAllText(modulePath, "slang-temporary-lock"));
+            // Generate a unique module path name
+            SLANG_RETURN_ON_FAIL(File::generateTemporary(UnownedStringSlice::fromLiteral("slang-generated"), temporaryLockPath));
+            productFileSet->add(temporaryLockPath);
 
-            // Add to the set, so it will be deleted when no longer needed
-            productFileSet->add(modulePath);
-#endif
-
-            options.modulePath = modulePath;
+            options.modulePath = temporaryLockPath;
         }
 
         if (_isContentsInFile(options))
@@ -522,7 +518,6 @@ SlangResult CommandLineDownstreamCompiler::compile(const CompileOptions& inOptio
     DownstreamDiagnostics diagnostics;
     SLANG_RETURN_ON_FAIL(parseOutput(exeRes, diagnostics));
 
-    
     out = new CommandLineDownstreamCompileResult(diagnostics, moduleFilePath, productFileSet);
     
     return SLANG_OK;
