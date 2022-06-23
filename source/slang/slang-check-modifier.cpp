@@ -78,6 +78,19 @@ namespace Slang
         // Do nothing with modifiers for now
     }
 
+    static bool _isDeclAllowedAsAttribute(DeclRef<Decl> declRef)
+    {
+        if (as<AttributeDecl>(declRef.getDecl()))
+            return true;
+        auto structDecl = as<StructDecl>(declRef.getDecl());
+        if (!structDecl)
+            return false;
+        auto attrUsageAttr = structDecl->findModifier<AttributeUsageAttribute>();
+        if (!attrUsageAttr)
+            return false;
+        return true;
+    }
+
     AttributeDecl* SemanticsVisitor::lookUpAttributeDecl(Name* attributeName, Scope* scope)
     {
         if (!attributeName)
@@ -88,7 +101,29 @@ namespace Slang
         {
             // Look up the name and see what attributes we find.
             //
-            auto lookupResult = lookUp(m_astBuilder, this, attributeName, scope, LookupMask::Attribute);
+            LookupMask lookupMask = LookupMask::Attribute;
+            if (attributeName == getSession()->getCompletionRequestTokenName())
+            {
+                lookupMask =
+                    LookupMask((uint32_t)LookupMask::Attribute | (uint32_t)LookupMask::type);
+            }
+
+            auto lookupResult = lookUp(m_astBuilder, this, attributeName, scope, lookupMask);
+
+            if (attributeName == getSession()->getCompletionRequestTokenName())
+            {
+                // If this is a completion request, add the lookup result to linkage.
+                auto& suggestions = getLinkage()->contentAssistInfo.completionSuggestions;
+                suggestions.clear();
+                suggestions.scopeKind = CompletionSuggestions::ScopeKind::Attribute;
+                for (auto& item : lookupResult)
+                {
+                    if (_isDeclAllowedAsAttribute(item.declRef))
+                    {
+                        suggestions.candidateItems.add(item);
+                    }
+                }
+            }
 
             // If the result was overloaded, then that means there
             // are multiple attributes matching the name, and we
@@ -709,6 +744,16 @@ namespace Slang
 
             return checkAttribute(hlslUncheckedAttribute, syntaxNode);
         }
+
+        if (auto hlslSemantic = as<HLSLSimpleSemantic>(m))
+        {
+            if (hlslSemantic->name.getName() == getSession()->getCompletionRequestTokenName())
+            {
+                getLinkage()->contentAssistInfo.completionSuggestions.scopeKind =
+                    CompletionSuggestions::ScopeKind::HLSLSemantics;
+            }
+        }
+        
         // Default behavior is to leave things as they are,
         // and assume that modifiers are mostly already checked.
         //

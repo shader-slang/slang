@@ -21,7 +21,7 @@
 #include "slang-preprocessor.h"
 #include "slang-profile.h"
 #include "slang-syntax.h"
-
+#include "slang-content-assist-info.h"
 
 #include "slang-serialize-ir-types.h"
 
@@ -1671,14 +1671,6 @@ namespace Slang
         /// lookup additional loaded modules.
     typedef Dictionary<Name*, Module*> LoadedModuleDictionary;
 
-    class Linkage;
-    class IModuleCache
-    {
-    public:
-        virtual RefPtr<Module> tryLoadModule(Linkage* linkage, String filePath) = 0;
-        virtual void storeModule(Linkage* linkage, String filePath, RefPtr<Module> module) = 0;
-    };
-
         /// A context for loading and re-using code modules.
     class Linkage : public RefObject, public slang::ISession
     {
@@ -1754,7 +1746,7 @@ namespace Slang
 
         slang::SessionFlags m_flag = 0;
         void setFlags(slang::SessionFlags flags) { m_flag = flags; }
-        bool isInLanguageServer() { return (m_flag & slang::kSessionFlag_LanguageServer) != 0; }
+        bool isInLanguageServer() { return contentAssistInfo.checkingMode != ContentAssistCheckingMode::None; }
 
             /// Get the parent session for this linkage
         Session* getSessionImpl() { return m_session; }
@@ -1799,8 +1791,6 @@ namespace Slang
 
         TypeCheckingCache* m_typeCheckingCache = nullptr;
 
-        void setModuleCache(IModuleCache* cache) { m_moduleCache = cache; }
-
         // Modules that have been dynamically loaded via `import`
         //
         // This is a list of unique modules loaded, in the order they were encountered.
@@ -1822,6 +1812,8 @@ namespace Slang
         // The resulting specialized IR module for each entry point request
         List<RefPtr<IRModule>> compiledModules;
 
+        ContentAssistInfo contentAssistInfo;
+        
         /// File system implementation to use when loading files from disk.
         ///
         /// If this member is `null`, a default implementation that tries
@@ -1934,8 +1926,6 @@ namespace Slang
         Session* m_session = nullptr;
 
         RefPtr<Session> m_retainedSession;
-
-        IModuleCache* m_moduleCache = nullptr;
 
             /// Tracks state of modules currently being loaded.
             ///
@@ -3017,6 +3007,8 @@ namespace Slang
             /// Get the built in linkage -> handy to get the stdlibs from
         Linkage* getBuiltinLinkage() const { return m_builtinLinkage; }
 
+        Name* getCompletionRequestTokenName() const { return m_completionTokenName; }
+
         void init();
 
         void addBuiltinSource(
@@ -3034,6 +3026,7 @@ namespace Slang
         RefPtr<DownstreamCompilerSet> m_downstreamCompilerSet;                                  ///< Information about all available downstream compilers.
         RefPtr<DownstreamCompiler> m_downstreamCompilers[int(PassThroughMode::CountOf)];        ///< A downstream compiler for a pass through
         DownstreamCompilerLocatorFunc m_downstreamCompilerLocators[int(PassThroughMode::CountOf)];
+        Name* m_completionTokenName = nullptr; ///< The name of a completion request token.
 
     private:
 

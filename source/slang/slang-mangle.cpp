@@ -37,11 +37,8 @@ namespace Slang
         context->sb.append(value);
     }
 
-    void emitName(
-        ManglingContext*    context,
-        Name*               name)
+    void emitNameImpl(ManglingContext* context, UnownedStringSlice str)
     {
-        String str = getText(name);
         Index length = str.getLength();
 
         // If the name consists of only traditional "identifer characters"
@@ -50,10 +47,14 @@ namespace Slang
         bool allAllowed = true;
         for (auto c : str)
         {
-            if (('a' <= c) && (c <= 'z'))   continue;
-            if (('A' <= c) && (c <= 'Z'))   continue;
-            if (('0' <= c) && (c <= '9'))   continue;
-            if (c == '_')                   continue;
+            if (('a' <= c) && (c <= 'z'))
+                continue;
+            if (('A' <= c) && (c <= 'Z'))
+                continue;
+            if (('0' <= c) && (c <= '9'))
+                continue;
+            if (c == '_')
+                continue;
 
             allAllowed = false;
             break;
@@ -84,9 +85,8 @@ namespace Slang
             //
             for (auto c : str)
             {
-                if (('a' <= c) && (c <= 'z')
-                    || ('A' <= c) && (c <= 'Z')
-                    || ('0' <= c) && (c <= '9'))
+                if (('a' <= c) && (c <= 'z') || ('A' <= c) && (c <= 'Z') ||
+                    ('0' <= c) && (c <= '9'))
                 {
                     encoded.append(c);
                 }
@@ -117,6 +117,14 @@ namespace Slang
         //
         // Realistically, that is best dealt with as a quirk of tha particular
         // target, rather than adding complexity here.
+    }
+
+    void emitName(
+        ManglingContext*    context,
+        Name*               name)
+    {
+        String str = getText(name);
+        emitNameImpl(context, str.getUnownedSlice());
     }
 
     void emitVal(
@@ -590,6 +598,13 @@ namespace Slang
     {
         ManglingContext context(astBuilder);
         emitType(&context, type);
+        return context.sb.ProduceString();
+    }
+
+    String getMangledNameFromNameString(const UnownedStringSlice& name)
+    {
+        ManglingContext context(nullptr);
+        emitNameImpl(&context, name);
         return context.sb.ProduceString();
     }
 
