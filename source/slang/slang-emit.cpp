@@ -37,6 +37,7 @@
 #include "slang-ir-specialize-resources.h"
 #include "slang-ir-ssa.h"
 #include "slang-ir-ssa-simplification.h"
+#include "slang-ir-strip-cached-dict.h"
 #include "slang-ir-strip-witness-tables.h"
 #include "slang-ir-synthesize-active-mask.h"
 #include "slang-ir-union.h"
@@ -706,6 +707,8 @@ Result linkAndOptimizeIR(
         validateIRModuleIfEnabled(codeGenContext, irModule);
         break;
     }
+
+    stripCachedDictionaries(irModule);
 
     // TODO: our current dynamic dispatch pass will remove all uses of witness tables.
     // If we are going to support function-pointer based, "real" modular dynamic dispatch,

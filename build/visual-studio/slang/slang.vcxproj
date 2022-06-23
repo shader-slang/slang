@@ -403,6 +403,7 @@ IF EXIST ..\..\..\external\slang-binaries\bin\windows-aarch64\slang-glslang.dll\
     <ClInclude Include="..\..\..\source\slang\slang-ir-ssa-simplification.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-ssa.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-string-hash.h" />
+    <ClInclude Include="..\..\..\source\slang\slang-ir-strip-cached-dict.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-strip-witness-tables.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-strip.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-synthesize-active-mask.h" />
@@ -556,6 +557,7 @@ IF EXIST ..\..\..\external\slang-binaries\bin\windows-aarch64\slang-glslang.dll\
     <ClCompile Include="..\..\..\source\slang\slang-ir-ssa-simplification.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-ssa.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-string-hash.cpp" />
+    <ClCompile Include="..\..\..\source\slang\slang-ir-strip-cached-dict.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-strip-witness-tables.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-strip.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-synthesize-active-mask.cpp" />

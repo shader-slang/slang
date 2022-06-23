@@ -38,6 +38,7 @@ namespace Slang
 
     bool isComInterfaceType(IRType* type)
     {
+        if (!type) return false;
         if (type->findDecoration<IRComInterfaceDecoration>() || 
             type->getOp() == kIROp_ComPtrType)
         {
@@ -309,9 +310,12 @@ namespace Slang
         case kIROp_lookup_interface_method:
         {
             auto lookupInterface = static_cast<IRLookupWitnessMethod*>(paramType);
-            auto interfaceType = cast<IRInterfaceType>(cast<IRWitnessTableType>(
-                lookupInterface->getWitnessTable()->getDataType())->getConformanceType());
-            if (isBuiltin(interfaceType))
+            auto witnessTableType = as<IRWitnessTableType>(
+                lookupInterface->getWitnessTable()->getDataType());
+            if (!witnessTableType)
+                return (IRType*)paramType;
+            auto interfaceType = as<IRInterfaceType>(witnessTableType->getConformanceType());
+            if (!interfaceType || isBuiltin(interfaceType))
                 return (IRType*)paramType;
             // Make sure we are looking up inside the original interface type (prior to lowering).
             // Only in the original interface type will an associated type entry have an IRAssociatedType value.

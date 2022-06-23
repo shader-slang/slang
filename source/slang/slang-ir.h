@@ -1728,6 +1728,10 @@ private:
     MemoryArena m_memoryArena;
 };
 
+struct IRSpecializationDictionaryItem : public IRInst
+{
+    IR_LEAF_ISA(SpecializationDictionaryItem)
+};
 
 struct IRDumpOptions
 {
