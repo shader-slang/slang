@@ -7,6 +7,8 @@
 #include "slang-ir.h"
 #include "slang-ir-constexpr.h"
 #include "slang-ir-dce.h"
+#include "slang-ir-diff-call.h"
+#include "slang-ir-diff-jvp.h"
 #include "slang-ir-inline.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-missing-return.h"
@@ -755,16 +757,6 @@ LoweredValInfo emitCallToDeclRef(
         tryEnv);
 }
 
-    /// Represents the "direction" that a parameter is being passed (e.g., `in` or `out`
-enum ParameterDirection
-{
-    kParameterDirection_In,     ///< Copy in
-    kParameterDirection_Out,    ///< Copy out
-    kParameterDirection_InOut,  ///< Copy in, copy out
-    kParameterDirection_Ref,    ///< By-reference
-};
-
-
     /// Emit a call to the given `accessorDeclRef`.
     ///
     /// The `base` value represents the object on which the accessor is being invoked.
@@ -1151,7 +1143,7 @@ static void addLinkageDecoration(
     }
     if (decl->findModifier<JVPDerivativeModifier>())
     {
-        builder->addJVPDerivativeDecoration(inst, mangledName);
+        builder->addJVPDerivativeMarkerDecoration(inst);
     }
     if (as<InterfaceDecl>(decl->parentDecl) &&
         decl->parentDecl->hasModifier<ComInterfaceAttribute>())
@@ -2947,6 +2939,21 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
         return info;
     }
 
+    // Emit IR to denote the forward-mode derivative
+    // of the inner func-expr. This will be resolved 
+    // to a concrete function during the derivative 
+    // pass.
+    LoweredValInfo visitJVPDerivativeOfExpr(JVPDerivativeOfExpr* expr)
+    {
+        auto baseVal = lowerSubExpr(expr->baseFn);
+        SLANG_ASSERT(baseVal.flavor == LoweredValInfo::Flavor::Simple);
+
+        return LoweredValInfo::simple(
+            getBuilder()->emitJVPDerivativeOfInst(
+                lowerType(context, expr->type),
+                baseVal.val));
+    }
+
     LoweredValInfo visitOverloadedExpr(OverloadedExpr* /*expr*/)
     {
         SLANG_UNEXPECTED("overloaded expressions should not occur in checked AST");
@@ -3403,74 +3410,112 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
         // TODO: also need to handle this-type substitution here?
     }
 
+        /// Create IR instructions for an argument at a call site, based on
+        /// AST-level expressions plus function signature information.
+        ///
+        /// The `funcType` parameter is always required, and specifies the types
+        /// of all the parameters. The `funcDeclRef` parameter is only required
+        /// if there are parameter positions for which the matching argument is
+        /// absent.
+        ///
+    void addDirectCallArgs(
+        InvokeExpr*             expr,
+        Index                   argIndex,
+        IRType*                 paramType,
+        ParameterDirection      paramDirection,
+        DeclRef<ParamDecl>      paramDeclRef,
+        List<IRInst*>*          ioArgs,
+        List<OutArgumentFixup>* ioFixups)
+    {
+        Count argCount = expr->arguments.getCount();
+        if (argIndex < argCount)
+        {
+            auto argExpr = expr->arguments[argIndex];
+            addCallArgsForParam(context, paramType, paramDirection, argExpr, ioArgs, ioFixups);
+        }
+        else
+        {
+            // We have run out of arguments supplied at the call site,
+            // but there are still parameters remaining. This must mean
+            // that these parameters have default argument expressions
+            // associated with them.
+            //
+            // Currently we simply extract the initial-value expression
+            // from the parameter declaration and then lower it in
+            // the context of the caller.
+            //
+            // Note that the expression could involve subsitutions because
+            // in the general case it could depend on the generic parameters
+            // used the specialize the callee. For now we do not handle that
+            // case, and simply ignore generic arguments.
+            //
+            SubstExpr<Expr> argExpr = getInitExpr(getASTBuilder(), paramDeclRef);
+            SLANG_ASSERT(argExpr);
+
+            IRGenEnv subEnvStorage;
+            IRGenEnv* subEnv = &subEnvStorage;
+            subEnv->outer = context->env;
+
+            IRGenContext subContextStorage = *context;
+            IRGenContext* subContext = &subContextStorage;
+            subContext->env = subEnv;
+
+            _lowerSubstitutionEnv(subContext, argExpr.getSubsts());
+
+            addCallArgsForParam(subContext, paramType, paramDirection, argExpr.getExpr(), ioArgs, ioFixups);
+
+            // TODO: The approach we are taking here to default arguments
+            // is simplistic, and has consequences for the front-end as
+            // well as binary serialization of modules.
+            //
+            // We could consider some more refined approaches where, e.g.,
+            // functions with default arguments generate multiple IR-level
+            // functions, that compute and provide the default values.
+            //
+            // Alternatively, each parameter with defaults could be generated
+            // into its own callable function that provides the default value,
+            // so that calling modules can call into a pre-generated function.
+            //
+            // Each of these options involves trade-offs, and we need to
+            // make a conscious decision at some point.
+
+            // Assert that such an expression must have been present.
+        }
+    }
+
+    void addDirectCallArgs(
+        InvokeExpr*             expr,
+        FuncType*               funcType,
+        List<IRInst*>*          ioArgs,
+        List<OutArgumentFixup>* ioFixups)
+    {
+        Count argCount = expr->arguments.getCount();
+        SLANG_ASSERT(argCount == static_cast<Count>(funcType->getParamCount()));
+
+        for(Index i = 0; i < argCount; ++i)
+        {
+            IRType* paramType = lowerType(context, funcType->getParamType(i));
+            ParameterDirection paramDirection = funcType->getParamDirection(i);
+            addDirectCallArgs(expr, i, paramType, paramDirection, DeclRef<ParamDecl>(), ioArgs, ioFixups);
+        }
+    }
+
+
     void addDirectCallArgs(
         InvokeExpr*             expr,
         DeclRef<CallableDecl>   funcDeclRef,
-        List<IRInst*>*         ioArgs,
+        List<IRInst*>*          ioArgs,
         List<OutArgumentFixup>* ioFixups)
     {
-        UInt argCount = expr->arguments.getCount();
-        UInt argCounter = 0;
+        Count argCounter = 0;
         for (auto paramDeclRef : getMembersOfType<ParamDecl>(funcDeclRef))
         {
             auto paramDecl = paramDeclRef.getDecl();
             IRType* paramType = lowerType(context, getType(getASTBuilder(), paramDeclRef));
             auto paramDirection = getParameterDirection(paramDecl);
 
-            UInt argIndex = argCounter++;
-            if(argIndex < argCount)
-            {
-                auto argExpr = expr->arguments[argIndex];
-                addCallArgsForParam(context, paramType, paramDirection, argExpr, ioArgs, ioFixups);
-            }
-            else
-            {
-                // We have run out of arguments supplied at the call site,
-                // but there are still parameters remaining. This must mean
-                // that these parameters have default argument expressions
-                // associated with them.
-                //
-                // Currently we simply extract the initial-value expression
-                // from the parameter declaration and then lower it in
-                // the context of the caller.
-                //
-                // Note that the expression could involve subsitutions because
-                // in the general case it could depend on the generic parameters
-                // used the specialize the callee. For now we do not handle that
-                // case, and simply ignore generic arguments.
-                //
-                SubstExpr<Expr> argExpr = getInitExpr(getASTBuilder(), paramDeclRef);
-                SLANG_ASSERT(argExpr);
-
-                IRGenEnv subEnvStorage;
-                IRGenEnv* subEnv = &subEnvStorage;
-                subEnv->outer = context->env;
-
-                IRGenContext subContextStorage = *context;
-                IRGenContext* subContext = &subContextStorage;
-                subContext->env = subEnv;
-
-                _lowerSubstitutionEnv(subContext, argExpr.getSubsts());
-
-                addCallArgsForParam(subContext, paramType, paramDirection, argExpr.getExpr(), ioArgs, ioFixups);
-
-                // TODO: The approach we are taking here to default arguments
-                // is simplistic, and has consequences for the front-end as
-                // well as binary serialization of modules.
-                //
-                // We could consider some more refined approaches where, e.g.,
-                // functions with default arguments generate multiple IR-level
-                // functions, that compute and provide the default values.
-                //
-                // Alternatively, each parameter with defaults could be generated
-                // into its own callable function that provides the default value,
-                // so that calling modules can call into a pre-generated function.
-                //
-                // Each of these options involves trade-offs, and we need to
-                // make a conscious decision at some point.
-
-                // Assert that such an expression must have been present.
-            }
+            Index argIndex = argCounter++;
+            addDirectCallArgs(expr, argIndex, paramType, paramDirection, paramDeclRef, ioArgs, ioFixups);
         }
     }
 
@@ -3636,7 +3681,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
 
         auto funcExpr = expr->functionExpr;
         ResolvedCallInfo resolvedInfo;
-        if( tryResolveDeclRefForCall(funcExpr, &resolvedInfo) )
+        if (tryResolveDeclRefForCall(funcExpr, &resolvedInfo))
         {
             // In this case we know exactly what declaration we
             // are going to call, and so we can resolve things
@@ -3690,7 +3735,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
 
             // First comes the `this` argument if we are calling
             // a member function:
-            if( baseExpr )
+            if (baseExpr)
             {
                 // The base expression might be an "upcast" to a base interface, in
                 // which case we don't want to emit the result of the cast, but instead
@@ -3725,6 +3770,17 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
             applyOutArgumentFixups(context, argFixups);
             return result;
         }
+        else if(auto funcType = as<FuncType>(expr->functionExpr->type))
+        {
+            auto funcVal = lowerRValueExpr(context, expr->functionExpr);
+            addDirectCallArgs(expr, funcType, &irArgs, &argFixups);
+
+            auto result = emitCallToVal(context, type, funcVal, irArgs.getCount(), irArgs.getBuffer(), tryEnv);
+
+            applyOutArgumentFixups(context, argFixups);
+            return result;
+        }
+        
 
         // TODO: In this case we should be emitting code for the callee as
         // an ordinary expression, then emitting the arguments according
@@ -8417,6 +8473,16 @@ RefPtr<IRModule> generateIRForTranslationUnit(
 #endif
 
     validateIRModuleIfEnabled(compileRequest, module);
+    
+    // Process higher-order-function calls before any optimization passes
+    // to allow the optimizations to affect the generated funcitons.
+    // 1. Process JVP derivative functions.
+    processJVPDerivativeMarkers(module);
+    // 2. Process VJP derivative functions.
+    // processVJPDerivativeMarkers(module); // Disabled currently. No impl yet.
+    // 3. Replace JVP & VJP calls.
+    processDerivativeCalls(module);
+
 
     // We will perform certain "mandatory" optimization passes now.
     // These passes serve two purposes:

@@ -668,7 +668,11 @@ INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
     INST(SPIRVOpDecoration, spirvOpDecoration, 1, 0)
 
         /// Decorated function is marked for the forward-mode differentiation pass.
-    INST(JVPDerivativeDecoration, differentiateJvp, 0, 0)
+    INST(JVPDerivativeMarkerDecoration, differentiateJvp, 0, 0)
+
+        /// Used by the auto-diff pass to hold a reference to the
+        /// generated derivative function.
+    INST(JVPDerivativeReferenceDecoration, jvpFnReference, 1, 0)
 
         /// Marks a struct type as being used as a structured buffer block.
         /// Recognized by SPIRV-emit pass so we can emit a SPIRV `BufferBlock` decoration.
@@ -712,6 +716,8 @@ INST(ExtractTaggedUnionPayload,         extractTaggedUnionPayload,  1, 0)
 
 INST(BitCast,                           bitCast,                    1, 0)
 INST(Reinterpret,                       reinterpret,                1, 0)
+
+INST(JVPDerivativeOf,                   jvpDerivativeOf,            1, 0)
 
 // Converts other resources (such as ByteAddressBuffer) to the equivalent StructuredBuffer
 INST(GetEquivalentStructuredBuffer,     getEquivalentStructuredBuffer, 1, 0)
