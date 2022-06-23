@@ -762,6 +762,12 @@ INST_RANGE(Attr, PendingLayoutAttr, FuncThrowTypeAttr)
     INST(LiveRangeEnd, liveRangeEnd, 0, 0)
 INST_RANGE(LiveRangeMarker, LiveRangeStart, LiveRangeEnd)
 
+/* IRSpecialization */
+INST(SpecializationDictionaryItem, SpecializationDictionaryItem, 0, 0)
+INST(GenericSpecializationDictionary, GenericSpecializationDictionary, 0, PARENT)
+INST(ExistentialFuncSpecializationDictionary, ExistentialFuncSpecializationDictionary, 0, PARENT)
+INST(ExistentialTypeSpecializationDictionary, ExistentialTypeSpecializationDictionary, 0, PARENT)
+
 #undef PARENT
 #undef USE_OTHER
 #undef INST_RANGE

@@ -80,6 +80,9 @@ namespace Slang
 	{
 		friend class Iterator;
 		friend class ItemProxy;
+    public:
+        typedef TValue ValueType;
+        typedef TKey KeyType;
 	private:
 		inline int GetProbeOffset(int /*probeId*/) const
 		{

@@ -19,6 +19,10 @@ struct DeadCodeEliminationContext
     IRModule*                       module;
     IRDeadCodeEliminationOptions    options;
 
+    // If we removed an inst, there may be still "weak references" to the inst.
+    // These uses will be replaced with `undefInst`.
+    IRInst* undefInst = nullptr;
+
     // Our overall process is going to be to determine
     // which instructions in the module are "live"
     // and then eliminate anything that wasn't found to
@@ -77,6 +81,29 @@ struct DeadCodeEliminationContext
         workList.add(inst);
     }
 
+    IRInst* getUndefInst()
+    {
+        if (!undefInst)
+        {
+            for (auto inst : module->getModuleInst()->getChildren())
+            {
+                if (inst->getOp() == kIROp_undefined && inst->getDataType() && inst->getDataType()->getOp() == kIROp_VoidType)
+                {
+                    undefInst = inst;
+                    break;
+                }
+            }
+            if (!undefInst)
+            {
+                SharedIRBuilder builderStorage(module);
+                IRBuilder builder(&builderStorage);
+                builder.setInsertInto(module->getModuleInst());
+                undefInst = builder.emitUndefined(builder.getVoidType());
+            }
+        }
+        return undefInst;
+    }
+
     // Given the basic infrastructrure above, let's
     // dive into the task of actually finding all
     // the live code in a module.
@@ -89,6 +116,13 @@ struct DeadCodeEliminationContext
         // good place to start.
         //
         markInstAsLive(module->getModuleInst());
+
+        // Ensure there is a global undef inst that is always alive.
+        // This undef inst will be used to fill in weak-referencing uses
+        // whose used value is marked as dead and eliminated.
+        // We always make sure this undef inst is available to prevent
+        // infiniate oscilating loops.
+        markInstAsLive(getUndefInst());
 
         // Marking the module as live should have
         // seeded our work list, so we can now start
@@ -120,12 +154,20 @@ struct DeadCodeEliminationContext
             UInt operandCount = inst->getOperandCount();
             for( UInt ii = 0; ii < operandCount; ++ii )
             {
+                // There are some type of operands that needs to be treated as
+                // "weak" references -- they can never hold things alive, and
+                // whenever we delete the referenced value, these operands needs
+                // to be replaced with `undef`.
                 switch (inst->getOp())
                 {
                 case kIROp_BoundInterfaceType:
                     if (inst->getOperand(ii)->getOp() == kIROp_WitnessTable)
                         continue;
                     break;
+                case kIROp_SpecializationDictionaryItem:
+                    // Ignore all operands of SpecializationDictionaryItem.
+                    // This inst is used as a cache and shouldn't hold anything alive.
+                    continue;
                 default:
                     break;
                 }
@@ -192,6 +234,10 @@ struct DeadCodeEliminationContext
             // because they must have been dead too (since we always
             // mark the parent of a live instruction as live).
             //
+            if (inst->hasUses())
+            {
+                inst->replaceUsesWith(getUndefInst());
+            }
             inst->removeAndDeallocate();
             changed = true;
         }
