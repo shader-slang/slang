@@ -556,7 +556,6 @@ private:
 // and a macro *invocation*, similar to how we distinguish a function definition
 // from a call to that function.
 
-
     /// A definition of a macro
 struct MacroDefinition
 {
@@ -720,6 +719,10 @@ struct MacroInvocation : InputStream
     static bool isBusy(MacroDefinition* macro, MacroInvocation* duringMacroInvocation);
 
     Index getArgCount() { return m_args.getCount(); }
+
+    SourceLoc getInvocationLoc() { return m_macroInvocationLoc; }
+
+    MacroDefinition* getMacroDefinition() { return m_macro; }
 
 private:
     // Macro invocations are created as part of applying macro expansion
@@ -944,6 +947,8 @@ struct InputFile
 
     ExpansionInputStream* getExpansionStream() { return m_expansionStream; }
 
+    bool isIncludedFile() { return m_parent != nullptr; }
+
 private:
     friend struct Preprocessor;
 
@@ -1010,6 +1015,9 @@ struct Preprocessor
         /// Stores the initiating macro source location.
     SourceLoc                               initiatingMacroSourceLoc;
 
+        /// Stores macro definition and invocation info for language server.
+    PreprocessorContentAssistInfo* contentAssistInfo = nullptr;
+
     NamePool* getNamePool() { return namePool; }
     SourceManager* getSourceManager() { return sourceManager; }
 
@@ -1020,7 +1028,51 @@ struct Preprocessor
     void popInputFile();
 };
 
+static void reportMacroDefinitionForContentAssist(Preprocessor* preprocessor, MacroDefinition* def)
+{
+    if (!preprocessor->contentAssistInfo)
+        return;
+    
+    MacroDefinitionContentAssistInfo info;
+    info.name = def->getName();
+    info.loc = def->getLoc();
+    info.tokenList = def->tokens.m_tokens;
+    for (auto param : def->params)
+    {
+        MacroDefinitionContentAssistInfo::Param p;
+        p.isVariadic = param.isVariadic;
+        p.name = param.nameLoc.name;
+        info.params.add(p);
+    }
+    preprocessor->contentAssistInfo->macroDefinitions.add(info);
+}
 
+static void reportMacroInvocationForContentAssist(
+    Preprocessor* preprocessor, MacroInvocation* invocation)
+{
+    if (!preprocessor->contentAssistInfo)
+        return;
+    if (preprocessor->m_currentInputFile && preprocessor->m_currentInputFile->isIncludedFile())
+        return;
+    MacroInvocationContentAssistInfo info;
+    info.name = invocation->getMacroDefinition()->getName();
+    info.loc = invocation->getInvocationLoc();
+
+    preprocessor->contentAssistInfo->macroInvocations.add(info);
+}
+
+static void reportIncludeFileForContentAssist(Preprocessor* preprocessor, Token token, String path)
+{
+    if (!preprocessor->contentAssistInfo)
+        return;
+    if (preprocessor->m_currentInputFile && preprocessor->m_currentInputFile->isIncludedFile())
+        return;
+    FileIncludeContentAssistInfo info;
+    info.loc = token.loc;
+    info.length = (int)token.getContentLength();
+    info.path = path;
+    preprocessor->contentAssistInfo->fileIncludes.add(info);
+}
 
 //static Token AdvanceToken(Preprocessor* preprocessor);
 
@@ -1127,6 +1179,8 @@ void MacroInvocation::prime(MacroInvocation* nextBusyMacroInvocation)
 
     _initCurrentOpStream();
     m_lookaheadToken = _readTokenImpl();
+
+    reportMacroInvocationForContentAssist(m_preprocessor, this);
 }
 
 void ExpansionInputStream::_pushMacroInvocation(
@@ -2969,6 +3023,8 @@ static void HandleIncludeDirective(PreprocessorDirectiveContext* context)
         return;
     }
 
+    reportIncludeFileForContentAssist(context->m_preprocessor, pathToken, filePathInfo.foundPath);
+
     // Do all checking related to the end of this directive before we push a new stream,
     // just to avoid complications where that check would need to deal with
     // a switch of input stream
@@ -3318,6 +3374,8 @@ static void HandleDefineDirective(PreprocessorDirectiveContext* context)
     }
 
     _parseMacroOps(context->m_preprocessor, macro, mapParamNameToIndex);
+
+    reportMacroDefinitionForContentAssist(context->m_preprocessor, macro);
 }
 
 // Handle a `#undef` directive
@@ -3848,6 +3906,7 @@ static void DefineMacro(
     }
 
     preprocessor->globalEnv.macros[keyName] = macro;
+    reportMacroDefinitionForContentAssist(preprocessor, macro);
 }
 
 // read the entire input into tokens
@@ -3945,6 +4004,10 @@ TokenList preprocessSource(
     desc.namePool       = linkage->getNamePool();
     desc.sourceManager  = linkage->getSourceManager();
 
+    if (linkage->isInLanguageServer())
+    {
+        desc.contentAssistInfo = &linkage->contentAssistInfo.preprocessorInfo;
+    }
     return preprocessSource(file, desc);
 }
 
@@ -3963,6 +4026,7 @@ TokenList preprocessSource(
 
     preprocessor.endOfFileToken.type = TokenType::EndOfFile;
     preprocessor.endOfFileToken.flags = TokenFlag::AtStartOfLine;
+    preprocessor.contentAssistInfo = desc.contentAssistInfo;
 
     // Add builtin macros
     {

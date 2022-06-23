@@ -11,6 +11,7 @@ namespace Slang {
 
 class DiagnosticSink;
 class Linkage;
+struct PreprocessorContentAssistInfo;
 
 namespace preprocessor
 {
@@ -53,6 +54,9 @@ struct PreprocessorDesc
 
         /// Optional: handler for callbacks invoked during preprocessing
     PreprocessorHandler* handler = nullptr;
+
+        /// Optional: additional information for code assist.
+    PreprocessorContentAssistInfo* contentAssistInfo = nullptr;
 };
 
     /// Take a source `file` and preprocess it into a list of tokens.

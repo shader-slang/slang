@@ -2,6 +2,7 @@
 #include "slang-lookup.h"
 
 #include "../compiler-core/slang-name.h"
+#include "slang-check-impl.h"
 
 namespace Slang {
 
@@ -199,27 +200,45 @@ static void _lookUpDirectAndTransparentMembers(
 {
     ContainerDecl* containerDecl = containerDeclRef.getDecl();
 
-    // Ensure that the lookup dictionary in the container is up to date
-    if (!containerDecl->isMemberDictionaryValid())
+
+    if (request.isCompletionRequest())
     {
-        buildMemberDictionary(containerDecl);
+        // If we are looking up for completion suggestions,
+        // return all the members that are available.
+        for (auto member : containerDecl->members)
+        {
+            if (!DeclPassesLookupMask(member, request.mask))
+                continue;
+            AddToLookupResult(
+                result,
+                CreateLookupResultItem(
+                    DeclRef<Decl>(member, containerDeclRef.substitutions), inBreadcrumbs));
+        }
     }
-
-    // Look up the declarations with the chosen name in the container.
-    Decl* firstDecl = nullptr;
-    containerDecl->memberDictionary.TryGetValue(name, firstDecl);
-
-    // Now iterate over those declarations (if any) and see if
-    // we find any that meet our filtering criteria.
-    // For example, we might be filtering so that we only consider
-    // type declarations.
-    for (auto m = firstDecl; m; m = m->nextInContainerWithSameName)
+    else
     {
-        if (!DeclPassesLookupMask(m, request.mask))
-            continue;
+        // Ensure that the lookup dictionary in the container is up to date
+        if (!containerDecl->isMemberDictionaryValid())
+        {
+            buildMemberDictionary(containerDecl);
+        }
 
-        // The declaration passed the test, so add it!
-        AddToLookupResult(result, CreateLookupResultItem(DeclRef<Decl>(m, containerDeclRef.substitutions), inBreadcrumbs));
+        // Look up the declarations with the chosen name in the container.
+        Decl* firstDecl = nullptr;
+        containerDecl->memberDictionary.TryGetValue(name, firstDecl);
+
+        // Now iterate over those declarations (if any) and see if
+        // we find any that meet our filtering criteria.
+        // For example, we might be filtering so that we only consider
+        // type declarations.
+        for (auto m = firstDecl; m; m = m->nextInContainerWithSameName)
+        {
+            if (!DeclPassesLookupMask(m, request.mask))
+                continue;
+
+            // The declaration passed the test, so add it!
+            AddToLookupResult(result, CreateLookupResultItem(DeclRef<Decl>(m, containerDeclRef.substitutions), inBreadcrumbs));
+        }
     }
 
     // TODO(tfoley): should we look up in the transparent decls
@@ -937,9 +956,11 @@ static void _lookUpInScopes(
 
         if (result.isValid())
         {
-            // If it's overloaded or the decl we have is of an overloadable type then we just keep going
+            // If it's overloaded or the decl we have is of an overloadable type, or if we are
+            // looking up for completion suggestions then we just keep going
             if (result.isOverloaded() || 
-                _isDeclOverloadable(result.item.declRef.getDecl()))
+                _isDeclOverloadable(result.item.declRef.getDecl()) ||
+                ((int32_t)request.options & (int32_t)LookupOptions::Completion) != 0)
             {
                 continue;
             }
@@ -964,20 +985,13 @@ LookupResult lookUp(
     request.semantics = semantics;
     request.scope = scope;
     request.mask = mask;
-
+    if (semantics && semantics->getSession() &&
+        name == semantics->getSession()->getCompletionRequestTokenName())
+        request.options = (LookupOptions)((int)request.options | (int)LookupOptions::Completion);
     LookupResult result;
     _lookUpInScopes(astBuilder, name, request, result);
     return result;
 }
-
-void lookUpMemberImpl(
-    ASTBuilder*         astBuilder, 
-    SemanticsVisitor*   semantics,
-    Name*               name,
-    Type*               type,
-    LookupResult&       ioResult,
-    BreadcrumbInfo*     inBreadcrumbs,
-    LookupMask          mask);
 
 LookupResult lookUpMember(
     ASTBuilder*         astBuilder, 
@@ -991,6 +1005,9 @@ LookupResult lookUpMember(
     request.semantics = semantics;
     request.mask = mask;
     request.options = options;
+    if (semantics && semantics->getSession() &&
+        name == semantics->getSession()->getCompletionRequestTokenName())
+        request.options = (LookupOptions)((int)request.options | (int)LookupOptions::Completion);
 
     LookupResult result;
     _lookUpMembersInType(astBuilder, name, type, request, result, nullptr);

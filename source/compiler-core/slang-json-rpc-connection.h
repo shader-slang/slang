@@ -148,6 +148,8 @@ public:
         /// it will become invalid in most usage scenarios. 
     PersistentJSONValue getPersistentValue(const JSONValue& value) { return PersistentJSONValue(value, &m_container, SourceLoc()); }
 
+    HTTPPacketConnection* getUnderlyingConnection() { return m_connection.Ptr(); }
+
         /// Dtor
     ~JSONRPCConnection() { disconnect(); }
 

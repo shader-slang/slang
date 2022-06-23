@@ -133,6 +133,7 @@ void Session::init()
 
     // Initialize name pool
     getNamePool()->setRootNamePool(getRootNamePool());
+    m_completionTokenName = getNamePool()->getName("#?");
 
     m_sharedLibraryLoader = DefaultSharedLibraryLoader::getSingleton();
     
@@ -933,7 +934,7 @@ SLANG_NO_THROW slang::IModule* SLANG_MCALL Linkage::loadModule(
 {
     DiagnosticSink sink(getSourceManager(), Lexer::sourceLocationLexer);
 
-    if (m_flag & slang::kSessionFlag_LanguageServer)
+    if (isInLanguageServer())
     {
         sink.setFlags(DiagnosticSink::Flag::HumaneLoc | DiagnosticSink::Flag::LanguageServer);
     }
@@ -962,7 +963,7 @@ SLANG_NO_THROW slang::IModule* SLANG_MCALL Linkage::loadModuleFromSource(
     slang::IBlob** outDiagnostics)
 {
     DiagnosticSink sink(getSourceManager(), Lexer::sourceLocationLexer);
-    if (m_flag & slang::kSessionFlag_LanguageServer)
+    if (isInLanguageServer())
     {
         sink.setFlags(DiagnosticSink::Flag::HumaneLoc | DiagnosticSink::Flag::LanguageServer);
     }
@@ -2611,11 +2612,6 @@ void Linkage::loadParsedModule(
         }
     }
     loadedModulesList.add(loadedModule);
-
-    if (m_moduleCache)
-    {
-        m_moduleCache->storeModule(this, pathInfo.foundPath, loadedModule);
-    }
 }
 
 Module* Linkage::loadModule(String const& name)
@@ -2638,7 +2634,7 @@ void Linkage::_diagnoseErrorInImportedModule(
     {
             sink->diagnose(info->importLoc, Diagnostics::errorInImportedModule, info->name);
     }
-    if ((m_flag & slang::kSessionFlag_LanguageServer) == 0)
+    if (!isInLanguageServer())
     {
         sink->diagnose(SourceLoc(), Diagnostics::complationCeased);
     }
@@ -2798,19 +2794,6 @@ RefPtr<Module> Linkage::findOrImportModule(
     // Maybe this was loaded previously at a different relative name?
     if (mapPathToLoadedModule.TryGetValue(filePathInfo.getMostUniqueIdentity(), loadedModule))
         return loadedModule;
-
-    // Is this module in user provided cache?
-    // (yong): module cache is intended to speed up language server reparsing.
-    // currently it is *not* enabled in language server.
-    if (m_moduleCache)
-    {
-        loadedModule = m_moduleCache->tryLoadModule(this, filePathInfo.foundPath);
-        if (loadedModule)
-        {
-            mapPathToLoadedModule[filePathInfo.getMostUniqueIdentity()] = loadedModule;
-            return loadedModule;
-        }
-    }
 
     // Try to load it
     ComPtr<ISlangBlob> fileContents;
