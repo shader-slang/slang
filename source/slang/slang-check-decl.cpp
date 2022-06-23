@@ -3039,8 +3039,13 @@ namespace Slang
                 return true;
             }
         }
-
-        getSink()->diagnose(inheritanceDecl, Diagnostics::unimplemented, "type not supported for inheritance");
+        if (!as<ErrorType>(superType))
+        {
+            getSink()->diagnose(
+                inheritanceDecl,
+                Diagnostics::invalidTypeForInheritance,
+                superType);
+        }
         return false;
     }
 
@@ -4566,7 +4571,10 @@ namespace Slang
                 return;
             }
         }
-        getSink()->diagnose(decl->targetType.exp, Diagnostics::unimplemented, "an 'extension' can only extend a nominal type");
+        if (!as<ErrorType>(decl->targetType.type))
+        {
+            getSink()->diagnose(decl->targetType.exp, Diagnostics::invalidExtensionOnType, decl->targetType);
+        }
     }
 
     void SemanticsDeclBasesVisitor::visitExtensionDecl(ExtensionDecl* decl)

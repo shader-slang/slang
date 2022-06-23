@@ -364,6 +364,9 @@ DIAGNOSTIC(30821, Error, tagTypeMustBeListedFirst, "an unum type may only have a
 
 DIAGNOSTIC(30820, Error, cannotInheritFromExplicitlySealedDeclarationInAnotherModule, "cannot inherit from type '$0' marked 'sealed' in module '$1'")
 DIAGNOSTIC(30821, Error, cannotInheritFromImplicitlySealedDeclarationInAnotherModule, "cannot inherit from type '$0' in module '$1' because it is implicitly 'sealed'; mark the base type 'open' to allow inheritance across modules")
+DIAGNOSTIC(30822, Error, invalidTypeForInheritance, "type '$0' cannot be used for inheritance")
+
+DIAGNOSTIC(30850, Error, invalidExtensionOnType, "type '$0' cannot be extended. `extension` can only be used to extend a nominal type.")
 
 // 309xx: subscripts
 
