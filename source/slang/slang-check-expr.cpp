@@ -1509,6 +1509,26 @@ namespace Slang
         return expr;
     }
 
+    Expr* SemanticsExprVisitor::visitJVPDerivativeOfExpr(JVPDerivativeOfExpr* expr)
+    {
+        // Check/Resolve inner function declaration.
+        expr->baseFn = CheckTerm(expr->baseFn);
+        
+        if(auto funcType = as<FuncType>(expr->baseFn->type))
+        {
+            // Resolve JVP type here. 
+            // Temporarily resolving to the same type as the original function. 
+            expr->type = expr->baseFn->type;
+        }
+        else
+        {
+            // Error
+            UNREACHABLE_RETURN(nullptr);
+        }
+
+        return expr;
+    }
+
     Expr* SemanticsExprVisitor::visitTypeCastExpr(TypeCastExpr * expr)
     {
         // Check the term we are applying first
