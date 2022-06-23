@@ -2430,6 +2430,10 @@ public:
         return emitMakeTuple(SLANG_COUNT_OF(args), args);
     }
 
+    IRInst* emitMakeString(IRInst* nativeStr);
+
+    IRInst* emitGetNativeString(IRInst* str);
+
     IRInst* emitGetTupleElement(IRType* type, IRInst* tuple, UInt element);
 
     IRInst* emitMakeResultError(IRType* resultType, IRInst* errorVal);
@@ -2716,6 +2720,8 @@ public:
     IRInst* emitBranch(
         IRBlock*    block);
 
+   IRInst* emitBranch(IRBlock* block, Int argCount, IRInst*const* args);
+
     IRInst* emitBreak(
         IRBlock*    target);
 
@@ -2742,6 +2748,16 @@ public:
         IRBlock*    trueBlock,
         IRBlock*    falseBlock,
         IRBlock*    afterBlock);
+
+    // Create basic blocks and insert an `IfElse` inst at current position that jumps into the blocks.
+    // The current insert position is changed to inside `outTrueBlock` after the call.
+    IRInst* emitIfElseWithBlocks(
+        IRInst* val, IRBlock*& outTrueBlock, IRBlock*& outFalseBlock, IRBlock*& outAfterBlock);
+
+    // Create basic blocks and insert an `If` inst at current position that jumps into the blocks.
+    // The current insert position is changed to inside `outTrueBlock` after the call.
+    IRInst* emitIfWithBlocks(
+        IRInst* val, IRBlock*& outTrueBlock, IRBlock*& outAfterBlock);
 
     IRInst* emitLoopTest(
         IRInst*    val,
@@ -2807,6 +2823,8 @@ public:
     IRInst* emitMul(IRType* type, IRInst* left, IRInst* right);
     IRInst* emitEql(IRInst* left, IRInst* right);
     IRInst* emitNeq(IRInst* left, IRInst* right);
+    IRInst* emitLess(IRInst* left, IRInst* right);
+
     IRInst* emitShr(IRType* type, IRInst* op0, IRInst* op1);
     IRInst* emitShl(IRType* type, IRInst* op0, IRInst* op1);
 

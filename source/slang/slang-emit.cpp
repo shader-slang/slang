@@ -206,12 +206,6 @@ Result linkAndOptimizeIR(
     switch (target)
     {
         case CodeGenTarget::CPPSource:
-        {
-            // TODO(JS):
-            // We want the interface transformation to take place for 'regular' CPPSource for now too.
-            lowerComInterfaces(irModule, artifactDesc.style, sink);
-            break;
-        }
         case CodeGenTarget::HostCPPSource:
         {
             lowerComInterfaces(irModule, artifactDesc.style, sink);

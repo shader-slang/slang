@@ -3235,6 +3235,16 @@ namespace Slang
         return emitMakeTuple(type, count, args);
     }
 
+    IRInst* IRBuilder::emitMakeString(IRInst* nativeStr)
+    {
+        return emitIntrinsicInst(getStringType(), kIROp_makeString, 1, &nativeStr);
+    }
+
+    IRInst* IRBuilder::emitGetNativeString(IRInst* str)
+    {
+        return emitIntrinsicInst(getNativeStringType(), kIROp_getNativeStr, 1, &str);
+    }
+
     IRInst* IRBuilder::emitGetTupleElement(IRType* type, IRInst* tuple, UInt element)
     {
         // As a quick simplification/optimization, if the user requests
@@ -4033,6 +4043,18 @@ namespace Slang
         return inst;
     }
 
+    IRInst* IRBuilder::emitBranch(IRBlock* block, Int argCount, IRInst* const* args)
+    {
+        List<IRInst*> argList;
+        argList.add(block);
+        for (Int i = 0; i < argCount; ++i)
+            argList.add(args[i]);
+        auto inst =
+            createInst<IRUnconditionalBranch>(this, kIROp_unconditionalBranch, nullptr, argList.getCount(), argList.getBuffer());
+        addInst(inst);
+        return inst;
+    }
+
     IRInst* IRBuilder::emitBreak(
         IRBlock*    target)
     {
@@ -4100,12 +4122,43 @@ namespace Slang
         return inst;
     }
 
+    IRInst* IRBuilder::emitIfElseWithBlocks(
+        IRInst* val, IRBlock*& outTrueBlock, IRBlock*& outFalseBlock, IRBlock*& outAfterBlock)
+    {
+        outTrueBlock = createBlock();
+        outAfterBlock = createBlock();
+        outFalseBlock = createBlock();
+        auto f = getFunc();
+        SLANG_ASSERT(f);
+        if (f)
+        {
+            f->addBlock(outTrueBlock);
+            f->addBlock(outAfterBlock);
+            f->addBlock(outFalseBlock);
+        }
+        auto result = emitIfElse(val, outTrueBlock, outFalseBlock, outAfterBlock);
+        setInsertInto(outTrueBlock);
+        return result;
+    }
+
     IRInst* IRBuilder::emitIf(
         IRInst*    val,
         IRBlock*    trueBlock,
         IRBlock*    afterBlock)
     {
         return emitIfElse(val, trueBlock, afterBlock, afterBlock);
+    }
+
+    IRInst* IRBuilder::emitIfWithBlocks(
+        IRInst* val, IRBlock*& outTrueBlock, IRBlock*& outAfterBlock)
+    {
+        outTrueBlock = createBlock();
+        outAfterBlock = createBlock();
+        auto result = emitIf(val, outTrueBlock, outAfterBlock);
+        insertBlock(outTrueBlock);
+        insertBlock(outAfterBlock);
+        setInsertInto(outTrueBlock);
+        return result;
     }
 
     IRInst* IRBuilder::emitLoopTest(
@@ -4327,6 +4380,13 @@ namespace Slang
     IRInst* IRBuilder::emitNeq(IRInst* left, IRInst* right)
     {
         auto inst = createInst<IRInst>(this, kIROp_Neq, getBoolType(), left, right);
+        addInst(inst);
+        return inst;
+    }
+
+    IRInst* IRBuilder::emitLess(IRInst* left, IRInst* right)
+    {
+        auto inst = createInst<IRInst>(this, kIROp_Less, getBoolType(), left, right);
         addInst(inst);
         return inst;
     }
@@ -5897,6 +5957,13 @@ namespace Slang
         case kIROp_MakeMatrix:
         case kIROp_makeArray:
         case kIROp_makeStruct:
+        case kIROp_makeString:
+        case kIROp_getNativeStr:
+        case kIROp_MakeResultError:
+        case kIROp_MakeResultValue:
+        case kIROp_GetResultError:
+        case kIROp_GetResultValue:
+        case kIROp_IsResultError:
         case kIROp_Load:    // We are ignoring the possibility of loads from bad addresses, or `volatile` loads
         case kIROp_ImageSubscript:
         case kIROp_FieldExtract:
