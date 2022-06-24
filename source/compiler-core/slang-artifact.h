@@ -176,8 +176,8 @@ SLANG_INLINE ArtifactKeep getIntermediateKeep(ArtifactKeep keep) { return (keep 
 enum ArtifactPathType
 {
     None,
-    Temporary,
-    Existing,
+    Temporary,                  ///< Is a temporary file
+    Existing,                   ///< Is an existing file
 };
 
 /* The IArtifactInstance interface represents a single instance of a type that can be part of an artifact. It's special in so far 
@@ -383,6 +383,7 @@ protected:
 
     PathType m_pathType = PathType::None;       ///< What the path indicates
     String m_path;                              ///< The path 
+    String m_temporaryLockPath;                 ///< The temporary lock path
 
     ComPtr<ISlangBlob> m_blob;                  ///< Blob to store result in memory
 
