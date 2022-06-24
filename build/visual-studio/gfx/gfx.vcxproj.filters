@@ -228,6 +228,35 @@
     <ClInclude Include="..\..\..\tools\gfx\vulkan\vk-vertex-layout.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\tools\gfx\d3d11\d3d11-base.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\tools\gfx\d3d11\d3d11-device.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\tools\gfx\d3d11\d3d11-helper-functions.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\tools\gfx\d3d11\d3d11-scopeNVAPI.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\tools\gfx\d3d11\d3d11-shader-program.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\tools\gfx\d3d11\d3d11-buffer.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\tools\gfx\d3d11\d3d11-swap-chain.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\tools\gfx\d3d11\d3d11-framebuffer.h" />
+    <ClInclude Include="..\..\..\tools\gfx\d3d11\d3d11-pipeline-state.h" />
+    <ClInclude Include="..\..\..\tools\gfx\d3d11\d3d11-query.h" />
+    <ClInclude Include="..\..\..\tools\gfx\d3d11\d3d11-resource-views.h" />
+    <ClInclude Include="..\..\..\tools\gfx\d3d11\d3d11-sampler.h" />
+    <ClInclude Include="..\..\..\tools\gfx\d3d11\d3d11-shader-object-layout.h" />
+    <ClInclude Include="..\..\..\tools\gfx\d3d11\d3d11-texture.h" />
+    <ClInclude Include="..\..\..\tools\gfx\d3d11\d3d11-vertex-layout.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\tools\gfx\cpu\render-cpu.cpp">
@@ -411,6 +440,29 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\tools\gfx\vulkan\vk-util.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\tools\gfx\d3d11\d3d11-device.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\tools\gfx\d3d11\d3d11-helper-functions.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\tools\gfx\d3d11\d3d11-scopeNVAPI.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\tools\gfx\d3d11\d3d11-buffer.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\tools\gfx\d3d11\d3d11-swap-chain.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\tools\gfx\d3d11\d3d11-query.cpp" />
+    <ClCompile Include="..\..\..\tools\gfx\d3d11\d3d11-shader-object-layout.cpp" />
+    <ClCompile Include="..\..\..\tools\gfx\d3d11\d3d11-pipeline-state.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\tools\gfx\d3d11\d3d11-shader-program.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

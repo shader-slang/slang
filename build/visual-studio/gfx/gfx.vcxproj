@@ -304,6 +304,21 @@
     <ClInclude Include="..\..\..\tools\gfx\command-writer.h" />
     <ClInclude Include="..\..\..\tools\gfx\cpu\render-cpu.h" />
     <ClInclude Include="..\..\..\tools\gfx\cuda\render-cuda.h" />
+    <ClInclude Include="..\..\..\tools\gfx\d3d11\d3d11-base.h" />
+    <ClInclude Include="..\..\..\tools\gfx\d3d11\d3d11-buffer.h" />
+    <ClInclude Include="..\..\..\tools\gfx\d3d11\d3d11-device.h" />
+    <ClInclude Include="..\..\..\tools\gfx\d3d11\d3d11-framebuffer.h" />
+    <ClInclude Include="..\..\..\tools\gfx\d3d11\d3d11-helper-functions.h" />
+    <ClInclude Include="..\..\..\tools\gfx\d3d11\d3d11-pipeline-state.h" />
+    <ClInclude Include="..\..\..\tools\gfx\d3d11\d3d11-query.h" />
+    <ClInclude Include="..\..\..\tools\gfx\d3d11\d3d11-resource-views.h" />
+    <ClInclude Include="..\..\..\tools\gfx\d3d11\d3d11-sampler.h" />
+    <ClInclude Include="..\..\..\tools\gfx\d3d11\d3d11-scopeNVAPI.h" />
+    <ClInclude Include="..\..\..\tools\gfx\d3d11\d3d11-shader-object-layout.h" />
+    <ClInclude Include="..\..\..\tools\gfx\d3d11\d3d11-shader-program.h" />
+    <ClInclude Include="..\..\..\tools\gfx\d3d11\d3d11-swap-chain.h" />
+    <ClInclude Include="..\..\..\tools\gfx\d3d11\d3d11-texture.h" />
+    <ClInclude Include="..\..\..\tools\gfx\d3d11\d3d11-vertex-layout.h" />
     <ClInclude Include="..\..\..\tools\gfx\d3d\d3d-swapchain.h" />
     <ClInclude Include="..\..\..\tools\gfx\d3d\d3d-util.h" />
     <ClInclude Include="..\..\..\tools\gfx\d3d11\render-d3d11.h" />
@@ -376,6 +391,15 @@
   <ItemGroup>
     <ClCompile Include="..\..\..\tools\gfx\cpu\render-cpu.cpp" />
     <ClCompile Include="..\..\..\tools\gfx\cuda\render-cuda.cpp" />
+    <ClCompile Include="..\..\..\tools\gfx\d3d11\d3d11-buffer.cpp" />
+    <ClCompile Include="..\..\..\tools\gfx\d3d11\d3d11-device.cpp" />
+    <ClCompile Include="..\..\..\tools\gfx\d3d11\d3d11-helper-functions.cpp" />
+    <ClCompile Include="..\..\..\tools\gfx\d3d11\d3d11-pipeline-state.cpp" />
+    <ClCompile Include="..\..\..\tools\gfx\d3d11\d3d11-query.cpp" />
+    <ClCompile Include="..\..\..\tools\gfx\d3d11\d3d11-scopeNVAPI.cpp" />
+    <ClCompile Include="..\..\..\tools\gfx\d3d11\d3d11-shader-object-layout.cpp" />
+    <ClCompile Include="..\..\..\tools\gfx\d3d11\d3d11-shader-program.cpp" />
+    <ClCompile Include="..\..\..\tools\gfx\d3d11\d3d11-swap-chain.cpp" />
     <ClCompile Include="..\..\..\tools\gfx\d3d\d3d-swapchain.cpp" />
     <ClCompile Include="..\..\..\tools\gfx\d3d\d3d-util.cpp" />
     <ClCompile Include="..\..\..\tools\gfx\d3d11\render-d3d11.cpp" />
