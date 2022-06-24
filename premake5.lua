@@ -246,10 +246,30 @@ newoption {
          buildoptions { "-D_GNU_SOURCE" }
  end
  
+ function getPlatforms(targetInfo)
+    if _ACTION == "xcode4" then
+        local arch = targetInfo.arch
+        local valueMap = 
+        {
+            x86_64 = "x64",
+            arm = "aarch64",
+        }
+        
+        local value = valueMap[arch:lower()]
+        if value == nil then
+            return { arch }
+        else
+            return { value }
+        end       
+    else
+        return { "x86", "x64", "aarch64" }
+    end
+ end
+ 
  workspace "slang"
      -- We will support debug/release configuration and x86/x64 builds.
      configurations { "Debug", "Release" }
-     platforms { "x86", "x64", "aarch64" }
+     platforms(getPlatforms(targetInfo))
  
      if buildLocation then
          location(buildLocation)
