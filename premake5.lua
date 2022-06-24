@@ -301,13 +301,15 @@ newoption {
  
      -- Our `x64` platform should (obviously) target the x64
      -- architecture and similarly for x86.
+     --
+     -- https://premake.github.io/docs/architecture/
+     -- 
      filter { "platforms:x64" }
          architecture "x64"
      filter { "platforms:x86" }
          architecture "x86"
      filter { "platforms:aarch64"}
-         architecture "ARM"
- 
+         architecture "ARM64"
  
      filter { "toolset:clang or gcc*" }
          -- Makes all symbols hidden by default unless explicitly 'exported'
