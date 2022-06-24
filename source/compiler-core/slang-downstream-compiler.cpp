@@ -428,6 +428,7 @@ SlangResult CommandLineDownstreamCompiler::compile(const CompileOptions& inOptio
     // Find all the files that will be produced
     RefPtr<TemporaryFileSet> productFileSet(new TemporaryFileSet);
     
+    
     if (options.modulePath.getLength() == 0 || options.sourceContents.getLength() != 0)
     {
         String modulePath = options.modulePath;
@@ -435,7 +436,15 @@ SlangResult CommandLineDownstreamCompiler::compile(const CompileOptions& inOptio
         // If there is no module path, generate one.
         if (modulePath.getLength() == 0)
         {
-            SLANG_RETURN_ON_FAIL(File::generateTemporary(UnownedStringSlice::fromLiteral("slang-generated"), modulePath));
+            // Holds the temporary lock path, if a temporary path is used
+            String temporaryLockPath;
+
+            // Generate a unique module path name
+            SLANG_RETURN_ON_FAIL(File::generateTemporary(UnownedStringSlice::fromLiteral("slang-generated"), temporaryLockPath));
+            productFileSet->add(temporaryLockPath);
+
+            modulePath = temporaryLockPath;
+
             options.modulePath = modulePath;
         }
 
@@ -511,7 +520,6 @@ SlangResult CommandLineDownstreamCompiler::compile(const CompileOptions& inOptio
     DownstreamDiagnostics diagnostics;
     SLANG_RETURN_ON_FAIL(parseOutput(exeRes, diagnostics));
 
-    
     out = new CommandLineDownstreamCompileResult(diagnostics, moduleFilePath, productFileSet);
     
     return SLANG_OK;
