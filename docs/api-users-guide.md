@@ -43,7 +43,7 @@ When you are done with a session, you'll want to destroy it to free up these res
 spDestroySession(session);
 ```
 
-**Warning**: The Slang library currently isn't reentrant in general, but can be multithreaded with care. See the section on [multithreading](#multhreading) for more details. 
+**Warning**: The majority of the Slang API is *not* currently thread safe. It is possible to use Slang across multiple threads but requires care. See the section on [multithreading](#multithreading) for more details. 
 
 ### Create a Compile Request
 
@@ -442,15 +442,46 @@ If you don't like the way that Slang adds `#line` directives to generated source
 spSetLineDirectiveMode(request, SLANG_LINE_DIRECTIVE_MODE_NONE);
 ```
 
-### <a id="multithreading"></a>Multithreading
+### <a id="multithreading"/>Multithreading
 
-A Slang compile request/s (`slang::ICompileRequest` or `SlangCompileRequest`) can be thought of belonging to the Slang global session (`slang::IGlobalSession` or `SlangSession`) it was created from. The combination of a global session and associated requests can only be used on via a *single* thread at *any one time*. 
+The only functions which are currently thread safe are 
 
-Slang sessions can be created on one thread and destroyed on another. When a session is destroyed all of it's associated requests (ie any request *created* from the session) must also be destroyed. Not doing so will likely lead to undefined behavior. It's probably worth pointing out that *creating* a global session is currently a fairly costly process. The cost of creating and destroying a request is comparitively small. 
+```C++
+SlangSession* spCreateSession(const char* deprecated);
+SlangResult slang_createGlobalSession(SlangInt apiVersion, slang::IGlobalSession** outGlobalSession);
+SlangResult slang_createGlobalSessionWithoutStdLib(SlangInt apiVersion, slang::IGlobalSession** outGlobalSession);
+ISlangBlob* slang_getEmbeddedStdLib();
+SlangResult slang::createGlobalSession(slang::IGlobalSession** outGlobalSession);
+const char* spGetBuildTagString();
+```
 
-The *simplest* way to multi-thread would be for a thread to create a global session, request/s from that session and then destroy the request/s and global session. This works, but typically isn't very efficient with many compilations because the cost of creating the session is required for each compilation. 
+This assumes Slang has been built with the C++ multi-threaded runtime, as is the default.
 
-A significant improvement is to limit the global session cost via a global session pool. When a compilation on a thread is required it takes a global session from the global session pool, creates the request/s, compiles, destroys the request and then returns the global session to the pool. Care is needed with the pool because the global session holds state, so it is either important to have a condition that all global sessions hold the same state, or all state is setup on the session when it's removed from the pool for use.
+All other functions and methods are not [reentrant](https://en.wikipedia.org/wiki/Reentrancy_(computing)) and can only execute on a single thread. More precisely function and methods can only be called on a *single* thread at *any one time*. This means for example a global session can be used across multiple threads, as long as some synchronisation enforces that only one thread can be in a Slang call at any one time.
 
-More nuance is possible in so far as the use of global session/requests *can* move between threads as long as use is only ever on one thread at any one time. 
+A Slang compile request/s (`slang::ICompileRequest` or `SlangCompileRequest`) can be thought of belonging to the Slang global session (`slang::IGlobalSession` or `SlangSession`) it was created from.  Note that *creating* a global session is currently a fairly costly process, whereas the cost of creating and destroying a request is relatively small. 
 
+The *simplest* way to multi-thread would be for a thread to 
+
+* Create a global session
+* Create request/s from that session 
+* Compile
+* Destroy request/s
+* Destroy the global session 
+
+This works, but typically isn't very efficient with multiple compilations because of the cost of creating the global session each time. 
+
+A significant improvement is to limit the global session cost via a pool. 
+
+* Get a global session from a global session pool 
+* *Optionally* set any state on the global session
+* Create request/s from the global session 
+* Compile
+* Destroy request/s
+* Return the global session to the global session pool
+
+Care is needed with the pool because the global session holds state, so it is either important to have a condition that all global sessions hold the same state, or all state is setup on the session when it's removed from the pool for use. Global sessions use a significant amount of memory, so an implementation may want to limit how many global sessions are available and their lifetimes.
+
+More nuance is possible in so far as the use of global session/requests *can* move between threads as long as use is only ever on one thread at any one time. Another style of implementation could use a thread pool, and associate global sessions with threads in the pool for example.
+
+Slang can hold references to user implemented functions and interfaces such as `ISlangFileSystem` and `SlangDiagnosticCallback`. If Slang is used in a multi-threaded manner such implementations typically must also be thread safe.
