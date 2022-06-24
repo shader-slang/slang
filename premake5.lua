@@ -309,7 +309,7 @@ newoption {
      filter { "platforms:x86" }
          architecture "x86"
      filter { "platforms:aarch64"}
-         architecture "ARM64"
+         architecture "ARM"
  
      filter { "toolset:clang or gcc*" }
          -- Makes all symbols hidden by default unless explicitly 'exported'
