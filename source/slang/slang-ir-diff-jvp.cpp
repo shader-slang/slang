@@ -82,6 +82,27 @@ struct JVPTranscriber
         return nullptr;
     }
 
+    List<IRParam*> transcribeParams(IRBuilder* builder, IRInstList<IRParam> paramListP)
+    {
+        // Clone (and emit) all the primal parameters.
+        List<IRParam*> newParamListP;
+        for (auto paramP : paramListP)
+        {
+            newParamListP.add(as<IRParam>(cloneInst(&cloneEnv, builder, paramP)));
+        }
+
+        // Now emit differentials.
+        List<IRParam*> newParamListD;
+        for (auto paramP : newParamListP)
+        {
+            IRParam* paramD = as<IRParam>(differentiateParam(builder, paramP));
+            mapDifferentialInst(paramP, paramD);
+            newParamListD.add(paramD);
+        }
+
+        return newParamListD;
+    }
+
     IRInst* differentiateVar(IRBuilder* builder, IRVar* varP)
     {
         if (IRType* typeD = differentiateType(builder, varP->getDataType()->getValueType()))
@@ -90,6 +111,55 @@ struct JVPTranscriber
             SLANG_ASSERT(varD);
             return varD;
         }
+        return nullptr;
+    }
+
+    IRInst* differentiateBinaryArith(IRBuilder* builder, IRInst* arith)
+    {
+        SLANG_ASSERT(arith->getOperandCount() == 2);
+        
+        auto leftP = arith->getOperand(0);
+        auto rightP = arith->getOperand(1);
+
+        auto leftD = getDifferentialInst(leftP);
+        auto rightD = getDifferentialInst(rightP);
+
+        auto leftZero = builder->getFloatValue(leftP->getDataType(), 0.0);
+        auto rightZero = builder->getFloatValue(rightP->getDataType(), 0.0);
+
+        if (leftD || rightD)
+        {
+            leftD = leftD ? leftD : leftZero;
+            rightD = rightD ? rightD : rightZero;
+
+            // Might have to do special-case handling for non-scalar types,
+            // like float3 or float3x3
+            // 
+            auto resultType = arith->getDataType();
+            switch(arith->getOp())
+            {
+            case kIROp_Add:
+                return builder->emitAdd(resultType, leftD, rightD);
+            case kIROp_Mul:
+                return builder->emitAdd(resultType,
+                    builder->emitMul(resultType, leftD, rightP),
+                    builder->emitMul(resultType, leftP, rightD));
+            case kIROp_Sub:
+                return builder->emitSub(resultType, leftD, rightD);
+            case kIROp_Div:
+                return builder->emitDiv(resultType, 
+                    builder->emitSub(
+                        resultType,
+                        builder->emitMul(resultType, leftD, rightP),
+                        builder->emitMul(resultType, leftP, rightD)),
+                    builder->emitMul(
+                        rightP->getDataType(), rightP, rightP
+                    ));
+            default:
+                SLANG_UNEXPECTED("Attempting to differentiate unsupported arithmetic");
+            }
+        }
+
         return nullptr;
     }
 
@@ -150,6 +220,20 @@ struct JVPTranscriber
         return nullptr;
     }
 
+    // Since int/float literals are sometimes nested inside an IRConstructor
+    // instruction, we check to make sure that the nested instr is a constant
+    // and then return nullptr. Literals do not need to be differentiated.
+    //
+    IRInst* differentiateConstruct(IRBuilder*, IRInst* consP)
+    {   
+    
+        if (as<IRConstant>(consP->getOperand(0)) && consP->getOperandCount() == 1)
+        {
+            return nullptr;
+        }
+        SLANG_UNEXPECTED("Attempting to differentiate unsupported constructor");
+    }
+
     // Logic for whether a primal instruction needs to be replicated
     // in the differential function. For puerly functional blocks with
     // no side-effects, it's safe to replicate everything except the
@@ -190,29 +274,28 @@ struct JVPTranscriber
     {
         switch (instP->getOp())
         {
-        case kIROp_Param:
-            return differentiateParam(builder, as<IRParam>(instP));
-            break;
-
         case kIROp_Var:
             return differentiateVar(builder, as<IRVar>(instP));
-            break;
 
         case kIROp_Load:
             return differentiateLoad(builder, as<IRLoad>(instP));
-            break;
 
         case kIROp_Store:
             return differentiateStore(builder, as<IRStore>(instP));
-            break;
 
         case kIROp_Return:
             return differentiateReturn(builder, as<IRReturn>(instP));
-            break;
+
+        case kIROp_Add:
+        case kIROp_Mul:
+        case kIROp_Sub:
+            return differentiateBinaryArith(builder, instP);
+
+        case kIROp_Construct:
+            return differentiateConstruct(builder, instP);
 
         default:
-            SLANG_UNREACHABLE("Attempting to differentiate unrecognized instruction");
-            break;
+            SLANG_UNEXPECTED("Attempting to differentiate unrecognized instruction");
         }
     }
 };
@@ -371,17 +454,26 @@ struct JVPDerivativeContext
                           IRBlock*      primalBlock,
                           IRBlock*      jvpBlock = nullptr)
     {   
+        JVPTranscriber* transcriber = &(transcriberStorage);
+
         // Create if not already created, and then insert into new block.
         if (!jvpBlock)
             jvpBlock = builder->emitBlock();
         else
             builder->setInsertInto(jvpBlock);
 
+        // First transcribe the parameter list. This is done separately because we
+        // want all the derivative parameters emitted after the primal parameters
+        // rather than interleaved with one another.
+        //
+        transcriber->transcribeParams(builder, primalBlock->getParams());
+
         // Run through every instruction and use the transcriber to generate the appropriate
         // derivative code.
-        for(auto child = primalBlock->getFirstInst(); child; child = child->getNextInst())
+        //
+        for(auto child = primalBlock->getFirstOrdinaryInst(); child; child = child->getNextInst())
         {
-            transcriberStorage.transcribe(builder, child);
+            transcriber->transcribe(builder, child);
         }
 
         return jvpBlock;

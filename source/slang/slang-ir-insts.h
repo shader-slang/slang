@@ -2820,7 +2820,9 @@ public:
     IRInst* emitBitNot(IRType* type, IRInst* value);
 
     IRInst* emitAdd(IRType* type, IRInst* left, IRInst* right);
+    IRInst* emitSub(IRType* type, IRInst* left, IRInst* right);
     IRInst* emitMul(IRType* type, IRInst* left, IRInst* right);
+    IRInst* emitDiv(IRType* type, IRInst* numerator, IRInst* denominator);
     IRInst* emitEql(IRInst* left, IRInst* right);
     IRInst* emitNeq(IRInst* left, IRInst* right);
     IRInst* emitLess(IRInst* left, IRInst* right);
