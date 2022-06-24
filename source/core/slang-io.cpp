@@ -137,9 +137,9 @@ namespace Slang
         // Close the handle..
         close(handle);
 
+        outFileName = buffer.getBuffer();
         SLANG_ASSERT(File::exists(outFileName));
 
-        outFileName = buffer.getBuffer();
         return SLANG_OK;
     }
 #endif
