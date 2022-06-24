@@ -3027,11 +3027,11 @@ namespace Slang
         return inst;
     }
 
-    IRInst* IRBuilder::emitJVPDerivativeOfInst(IRType* type, IRInst* baseFn)
+    IRInst* IRBuilder::emitJVPDifferentiateInst(IRType* type, IRInst* baseFn)
     {
-        auto inst = createInst<IRJVPDerivativeOf>(
+        auto inst = createInst<IRJVPDifferentiate>(
             this,
-            kIROp_JVPDerivativeOf,
+            kIROp_JVPDifferentiate,
             type,
             baseFn);
         addInst(inst);

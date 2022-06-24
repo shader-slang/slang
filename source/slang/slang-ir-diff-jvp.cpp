@@ -140,7 +140,7 @@ struct JVPTranscriber
 
     IRInst* differentiateReturn(IRBuilder* builder, IRReturn* returnP)
     {
-        IRInst* returnVal = returnP->getVal();
+        IRInst* returnVal = findCloneForOperand(&cloneEnv, returnP->getVal());
         if (auto returnValD = getDifferentialInst(returnVal))
         {   
             IRReturn* returnD = as<IRReturn>(builder->emitReturn(returnValD));
@@ -155,7 +155,7 @@ struct JVPTranscriber
     // no side-effects, it's safe to replicate everything except the
     // return instruction.
     //
-    bool requiresPrimalClone(IRBuilder* builder, IRInst* instP)
+    bool requiresPrimalClone(IRBuilder*, IRInst* instP)
     {
         if (as<IRReturn>(instP))
         {
