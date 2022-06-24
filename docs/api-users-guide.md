@@ -455,13 +455,13 @@ SlangResult slang::createGlobalSession(slang::IGlobalSession** outGlobalSession)
 const char* spGetBuildTagString();
 ```
 
-This assumes Slang has been built with the C++ multi-threaded runtime, as is the default.
+This assumes Slang has been built with the C++ multithreaded runtime, as is the default.
 
 All other functions and methods are not [reentrant](https://en.wikipedia.org/wiki/Reentrancy_(computing)) and can only execute on a single thread. More precisely function and methods can only be called on a *single* thread at *any one time*. This means for example a global session can be used across multiple threads, as long as some synchronisation enforces that only one thread can be in a Slang call at any one time.
 
 A Slang compile request/s (`slang::ICompileRequest` or `SlangCompileRequest`) can be thought of belonging to the Slang global session (`slang::IGlobalSession` or `SlangSession`) it was created from.  Note that *creating* a global session is currently a fairly costly process, whereas the cost of creating and destroying a request is relatively small. 
 
-The *simplest* way to multi-thread would be for a thread to 
+The *simplest* way to multithread would be for a thread to 
 
 * Create a global session
 * Create request/s from that session 
@@ -484,4 +484,4 @@ Care is needed with the pool because the global session holds state, so it is ei
 
 More nuance is possible in so far as the use of global session/requests *can* move between threads as long as use is only ever on one thread at any one time. Another style of implementation could use a thread pool, and associate global sessions with threads in the pool for example.
 
-Slang can hold references to user implemented functions and interfaces such as `ISlangFileSystem` and `SlangDiagnosticCallback`. If Slang is used in a multi-threaded manner such implementations typically must also be thread safe.
+Slang can hold references to user implemented functions and interfaces such as `ISlangFileSystem` and `SlangDiagnosticCallback`. If Slang is used in a multithreaded manner such implementations typically must also be thread safe.
