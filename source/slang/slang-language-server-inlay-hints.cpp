@@ -92,7 +92,7 @@ List<LanguageServerProtocol::InlayHint> getInlayHints(
                 doc->oneBasedUTF8LocToZeroBasedUTF16Loc(posLine, posCol, utf16line, utf16col);
                 hint.position.line = (int)utf16line;
                 hint.position.character = (int)utf16col;
-                hint.kind = LanguageServerProtocol::kInlayHintKindParameter;
+                hint.kind = LanguageServerProtocol::kInlayHintKindType;
                 StringBuilder lblSb;
                 lblSb << ": " << varDecl->type.type->toString();
                 hint.label = lblSb.ProduceString();
