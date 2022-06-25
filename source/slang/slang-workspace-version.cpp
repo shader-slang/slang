@@ -75,10 +75,14 @@ bool Workspace::updatePredefinedMacros(List<String> macros)
     {
         auto index = macro.indexOf('=');
         OwnedPreprocessorMacroDefinition def;
-        def.name = macro.getUnownedSlice().head(index).trim();
         if (index != -1)
         {
+            def.name = macro.getUnownedSlice().head(index).trim();
             def.value = macro.getUnownedSlice().tail(index + 1).trim();
+        }
+        else
+        {
+            def.name = macro.trim();
         }
         newDefs.add(def);
     }
