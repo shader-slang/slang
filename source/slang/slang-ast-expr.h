@@ -372,10 +372,10 @@ class ExtractExistentialValueExpr: public Expr
     /// An expression of the form `__jvp(fn)` to access the 
     /// forward-mode derivative version of the function `fn`
     ///
-class JVPDerivativeOfExpr: public Expr
+class JVPDifferentiateExpr: public Expr
 {
-    SLANG_AST_CLASS(JVPDerivativeOfExpr)
-    Expr* baseFn;
+    SLANG_AST_CLASS(JVPDifferentiateExpr)
+    Expr* baseFunction;
 };
 
     /// A type expression of the form `__TaggedUnion(A, ...)`.

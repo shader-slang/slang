@@ -529,17 +529,17 @@ struct IRJVPDerivativeReferenceDecoration : IRDecoration
 
 // An instruction that replaces the function symbol
 // with it's derivative function.
-struct IRJVPDerivativeOf : IRInst
+struct IRJVPDifferentiate : IRInst
 {
     enum
     {
-        kOp = kIROp_JVPDerivativeOf
+        kOp = kIROp_JVPDifferentiate
     };
     // The base function for the call.
     IRUse base;
     IRInst* getBaseFn() { return getOperand(0); }
 
-    IR_LEAF_ISA(JVPDerivativeOf)
+    IR_LEAF_ISA(JVPDifferentiate)
 };
 
 // An instruction that specializes another IR value
@@ -2346,7 +2346,7 @@ public:
     IRInst* emitExtractExistentialWitnessTable(
         IRInst* existentialValue);
 
-    IRInst* emitJVPDerivativeOfInst(IRType* type, IRInst* baseFn);
+    IRInst* emitJVPDifferentiateInst(IRType* type, IRInst* baseFn);
 
     IRInst* emitSpecializeInst(
         IRType*         type,
@@ -2820,7 +2820,9 @@ public:
     IRInst* emitBitNot(IRType* type, IRInst* value);
 
     IRInst* emitAdd(IRType* type, IRInst* left, IRInst* right);
+    IRInst* emitSub(IRType* type, IRInst* left, IRInst* right);
     IRInst* emitMul(IRType* type, IRInst* left, IRInst* right);
+    IRInst* emitDiv(IRType* type, IRInst* numerator, IRInst* denominator);
     IRInst* emitEql(IRInst* left, IRInst* right);
     IRInst* emitNeq(IRInst* left, IRInst* right);
     IRInst* emitLess(IRInst* left, IRInst* right);
