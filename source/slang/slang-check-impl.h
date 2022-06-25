@@ -1732,7 +1732,7 @@ namespace Slang
         Expr* visitAndTypeExpr(AndTypeExpr* expr);
         Expr* visitModifiedTypeExpr(ModifiedTypeExpr* expr);
 
-        Expr* visitJVPDerivativeOfExpr(JVPDerivativeOfExpr* expr);
+        Expr* visitJVPDifferentiateExpr(JVPDifferentiateExpr* expr);
 
             /// Perform semantic checking on a `modifier` that is being applied to the given `type`
         Val* checkTypeModifier(Modifier* modifier, Type* type);
