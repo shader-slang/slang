@@ -25,6 +25,17 @@ static const StructRttiInfo _makeWorkDoneProgressParamsRtti()
 }
 const StructRttiInfo WorkDoneProgressParams::g_rttiInfo = _makeWorkDoneProgressParamsRtti();
 
+static const StructRttiInfo _makeInlayHintOptionsRtti()
+{
+    InlayHintOptions obj;
+    StructRttiBuilder builder(&obj, "LanguageServerProtocol::InlayHintOptions", nullptr);
+    builder.addField("resolveProvider", &obj.resolveProvider);
+    builder.ignoreUnknownFields();
+    return builder.make();
+}
+const StructRttiInfo InlayHintOptions::g_rttiInfo = _makeInlayHintOptionsRtti();
+
+
 static const StructRttiInfo _makeCompletionOptionsRtti()
 {
     CompletionOptions obj;
@@ -211,6 +222,7 @@ static const StructRttiInfo _makeServerCapabilitiesRtti()
     builder.addField("textDocumentSync", &obj.textDocumentSync);
     builder.addField("workspace", &obj.workspace);
     builder.addField("hoverProvider", &obj.hoverProvider);
+    builder.addField("inlayHintProvider", &obj.inlayHintProvider);
     builder.addField("definitionProvider", &obj.definitionProvider);
     builder.addField("completionProvider", &obj.completionProvider);
     builder.addField("semanticTokensProvider", &obj.semanticTokensProvider);
@@ -603,6 +615,48 @@ static const StructRttiInfo _makeDocumentSymbolRtti()
     return builder.make();
 }
 const StructRttiInfo DocumentSymbol::g_rttiInfo = _makeDocumentSymbolRtti();
+
+static const StructRttiInfo _makeTextEditRtti()
+{
+    TextEdit obj;
+    StructRttiBuilder builder(&obj, "LanguageServerProtocol::TextEdit", nullptr);
+    builder.addField("range", &obj.range);
+    builder.addField("newText", &obj.newText);
+    builder.ignoreUnknownFields();
+    return builder.make();
+}
+const StructRttiInfo TextEdit::g_rttiInfo = _makeTextEditRtti();
+
+static const StructRttiInfo _makeInlayHintParamsRtti()
+{
+    InlayHintParams obj;
+    StructRttiBuilder builder(
+        &obj, "LanguageServerProtocol::InlayHintParams", nullptr);
+    builder.addField("range", &obj.range);
+    builder.addField("textDocument", &obj.textDocument);
+    builder.ignoreUnknownFields();
+    return builder.make();
+}
+const StructRttiInfo InlayHintParams::g_rttiInfo = _makeInlayHintParamsRtti();
+const UnownedStringSlice InlayHintParams::methodName =
+    UnownedStringSlice::fromLiteral("textDocument/inlayHint");
+
+static const StructRttiInfo _makeInlayHintRtti()
+{
+    InlayHint obj;
+    StructRttiBuilder builder(
+        &obj, "LanguageServerProtocol::InlayHint", nullptr);
+    builder.addField("position", &obj.position);
+    builder.addField("label", &obj.label);
+    builder.addField("kind", &obj.kind);
+    builder.addField("paddingLeft", &obj.paddingLeft);
+    builder.addField("paddingRight", &obj.paddingRight);
+    builder.addField("textEdits", &obj.textEdits);
+
+    builder.ignoreUnknownFields();
+    return builder.make();
+}
+const StructRttiInfo InlayHint::g_rttiInfo = _makeInlayHintRtti();
 
 } // namespace LanguageServerProtocol
 
