@@ -246,10 +246,30 @@ newoption {
          buildoptions { "-D_GNU_SOURCE" }
  end
  
+ function getPlatforms(targetInfo)
+    if _ACTION == "xcode4" then
+        local arch = targetInfo.arch
+        local valueMap = 
+        {
+            x86_64 = "x64",
+            arm = "aarch64",
+        }
+        
+        local value = valueMap[arch:lower()]
+        if value == nil then
+            return { arch }
+        else
+            return { value }
+        end       
+    else
+        return { "x86", "x64", "aarch64" }
+    end
+ end
+ 
  workspace "slang"
      -- We will support debug/release configuration and x86/x64 builds.
      configurations { "Debug", "Release" }
-     platforms { "x86", "x64", "aarch64" }
+     platforms(getPlatforms(targetInfo))
  
      if buildLocation then
          location(buildLocation)
@@ -281,13 +301,15 @@ newoption {
  
      -- Our `x64` platform should (obviously) target the x64
      -- architecture and similarly for x86.
+     --
+     -- https://premake.github.io/docs/architecture/
+     -- 
      filter { "platforms:x64" }
          architecture "x64"
      filter { "platforms:x86" }
          architecture "x86"
      filter { "platforms:aarch64"}
          architecture "ARM"
- 
  
      filter { "toolset:clang or gcc*" }
          -- Makes all symbols hidden by default unless explicitly 'exported'

@@ -557,6 +557,27 @@ HashCode NamedExpressionType::_getHashCodeOverride()
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! FuncType !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
+ParameterDirection FuncType::getParamDirection(Index index)
+{
+    auto paramType = getParamType(index);
+    if (as<RefType>(paramType))
+    {
+        return kParameterDirection_Ref;
+    }
+    else if (as<InOutType>(paramType))
+    {
+        return kParameterDirection_InOut;
+    }
+    else if (as<OutType>(paramType))
+    {
+        return kParameterDirection_Out;
+    }
+    else
+    {
+        return kParameterDirection_In;
+    }
+}
+
 void FuncType::_toTextOverride(StringBuilder& out)
 {
     out << toSlice("(");

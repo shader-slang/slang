@@ -58,9 +58,15 @@ void* Artifact::getInterface(const Guid& uuid)
 
 Artifact::~Artifact()
 {
+    // Remove the temporary
     if (m_pathType == PathType::Temporary)
     {
         File::remove(m_path);
+    }
+    // If there is a temporary lock path, remove that
+    if (m_temporaryLockPath.getLength())
+    {
+        File::remove(m_temporaryLockPath);
     }
 }
 
@@ -192,8 +198,10 @@ SlangResult Artifact::requireFile(Keep keep)
     // TODO(JS): NOTE! This isn't strictly correct, as the generated filename is not guarenteed to be unique
     // if we change it with an extension (or prefix).
     // This doesn't change the previous behavior though.
-    String path;
-    SLANG_RETURN_ON_FAIL(File::generateTemporary(nameBase, path));
+    String temporaryLockPath;
+    SLANG_RETURN_ON_FAIL(File::generateTemporary(nameBase, temporaryLockPath));
+
+    String path = temporaryLockPath;
 
     if (ArtifactInfoUtil::isCpuBinary(m_desc) && 
         (m_desc.kind == ArtifactKind::SharedLibrary ||
@@ -221,7 +229,6 @@ SlangResult Artifact::requireFile(Keep keep)
     }
 
     // If there is an extension append it
-
     const UnownedStringSlice ext = ArtifactInfoUtil::getDefaultExtension(m_desc);
 
     if (ext.getLength())
@@ -230,6 +237,13 @@ SlangResult Artifact::requireFile(Keep keep)
         path.append(ext);
     }
 
+    // If the final path is different from the lock path save that path
+    if (path != temporaryLockPath)
+    {
+        m_temporaryLockPath = temporaryLockPath;
+    }
+
+    // Write the contents
     SLANG_RETURN_ON_FAIL(File::writeAllBytes(path, blob->getBufferPointer(), blob->getBufferSize()));
 
     // Okay we can now add this as temporary path too
@@ -244,9 +258,6 @@ SlangResult Artifact::loadBlob(Keep keep, ISlangBlob** outBlob)
 
     if (!blob)
     {
-        // TODO(JS): 
-        // Strictly speaking we could *potentially* convert some other representation into
-        // a blob by serializing it, but we don't worry about any of that here
         if (m_pathType != PathType::None)
         {
             // Read into a blob
@@ -258,6 +269,7 @@ SlangResult Artifact::loadBlob(Keep keep, ISlangBlob** outBlob)
         }
         else
         {
+            // Look for a representation that we can serialize into a blob
             for (const auto& element : m_elements)
             {
                 ISlangUnknown* intf = element.value;
@@ -275,7 +287,6 @@ SlangResult Artifact::loadBlob(Keep keep, ISlangBlob** outBlob)
         }
 
         // Wasn't able to construct
-
         if (!blob)
         {
             return SLANG_E_NOT_FOUND;
