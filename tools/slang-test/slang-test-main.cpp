@@ -1203,15 +1203,21 @@ static SlangResult _executeBinary(const UnownedStringSlice& hexDump, ExecuteResu
     List<uint8_t> data;
     SLANG_RETURN_ON_FAIL(HexDumpUtil::parseWithMarkers(hexDump, data));
 
+    TemporaryFileSet temporaryFileSet;
+
     // Need to write this off to a temporary file
-    String fileName;
-    SLANG_RETURN_ON_FAIL(File::generateTemporary(UnownedStringSlice("slang-test"), fileName));
+
+    String temporaryLockPath;
+
+    SLANG_RETURN_ON_FAIL(File::generateTemporary(UnownedStringSlice("slang-test"), temporaryLockPath));
+    String fileName = temporaryLockPath;
+    // And the temporary lock path
+    temporaryFileSet.add(temporaryLockPath);
 
     fileName.append(Process::getExecutableSuffix());
 
-    TemporaryFileSet temporaryFileSet;
     temporaryFileSet.add(fileName);
-
+    
     {
         ComPtr<ISlangWriter> writer;
         SLANG_RETURN_ON_FAIL(FileWriter::createBinary(fileName.getBuffer(), 0, writer));
@@ -1979,8 +1985,12 @@ static SlangResult _loadAsSharedLibrary(const UnownedStringSlice& hexDump, Tempo
     SLANG_RETURN_ON_FAIL(HexDumpUtil::parseWithMarkers(hexDump, data));
 
     // Need to write this off to a temporary file
-    String fileName;
-    SLANG_RETURN_ON_FAIL(File::generateTemporary(UnownedStringSlice("slang-test"), fileName));
+    
+    String temporaryLockPath;
+    SLANG_RETURN_ON_FAIL(File::generateTemporary(UnownedStringSlice("slang-test"), temporaryLockPath));
+    inOutTemporaryFileSet.add(temporaryLockPath);
+
+    String fileName = temporaryLockPath;
 
     // Need to work out the dll name
     String sharedLibraryName = SharedLibrary::calcPlatformPath(fileName.getUnownedSlice());
