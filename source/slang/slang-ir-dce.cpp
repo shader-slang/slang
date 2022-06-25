@@ -6,7 +6,6 @@
 
 namespace Slang
 {
-
 struct DeadCodeEliminationContext
 {
     // This type implements a simple global DCE pass over
@@ -158,20 +157,8 @@ struct DeadCodeEliminationContext
                 // "weak" references -- they can never hold things alive, and
                 // whenever we delete the referenced value, these operands needs
                 // to be replaced with `undef`.
-                switch (inst->getOp())
-                {
-                case kIROp_BoundInterfaceType:
-                    if (inst->getOperand(ii)->getOp() == kIROp_WitnessTable)
-                        continue;
-                    break;
-                case kIROp_SpecializationDictionaryItem:
-                    // Ignore all operands of SpecializationDictionaryItem.
-                    // This inst is used as a cache and shouldn't hold anything alive.
-                    continue;
-                default:
-                    break;
-                }
-                markInstAsLive(inst->getOperand(ii));
+                if (!isWeakReferenceOperand(inst, ii))
+                    markInstAsLive(inst->getOperand(ii));
             }
 
             // Finally, we need to consider the children
@@ -267,119 +254,146 @@ struct DeadCodeEliminationContext
     //
     bool shouldInstBeLiveIfParentIsLive(IRInst* inst)
     {
-        // The main source of confusion/complexity here is that
-        // we are using the same routine to decide:
-        //
-        // * Should some ordinary instruction in a basic block be kept around?
-        // * Should a basic block in some function be kept around?
-        // * Should a function/type/variable in a module be kept around?
-        //
-        // Still, there are a few basic patterns we can observe.
-        // First, if `inst` is an instruction that might have some effects
-        // when it is executed, then we should keep it around.
-        //
-        if(inst->mightHaveSideEffects())
-            return true;
-        //
-        // The `mightHaveSideEffects` query is conservative, and will
-        // return `true` as its default mode, so once we are past that
-        // query we know that `inst` is either something "structural"
-        // (that makes up the program) rather than executable, or it
-        // is executable but was on an allow-list of things that are
-        // safe to eliminate.
-
-        // Most top-level objects (functions, types, etc.) obviously
-        // do *not* have side effects. That creates the risk that
-        // we'll just go ahead and eliminate every single function/type
-        // in a module. There needs to be a way to identify the
-        // functions we want to keep around, and for right now
-        // that is handled with the `[keepAlive]` decoration.
-        //
-        if(inst->findDecorationImpl(kIROp_KeepAliveDecoration))
-            return true;
-        //
-        // We also consider anything with an `[export(...)]` as live,
-        // when the appropriate option has been set.
-        //
-        // Note: our current approach to linking for back-end compilation
-        // leaves many linakge decorations in place that we seemingly
-        // don't need/want, so this option currently can't be enabled
-        // unconditionally.
-        //
-        if( options.keepExportsAlive )
-        {
-            if( inst->findDecoration<IRExportDecoration>() )
-            {
-                return true;
-            }
-        }
-
-        if (options.keepLayoutsAlive && inst->findDecoration<IRLayoutDecoration>())
-        {
-            return true;
-        }
-
-        // A basic block is an interesting case. Knowing that a function
-        // is live means that its entry block is live, but the liveness
-        // of any other blocks is determined by whether they are referenced
-        // by other instructions (e.g., a branch from one block to
-        // another).
-        //
-        if( auto block = as<IRBlock>(inst) )
-        {
-            // To determine whether this is the first block in its
-            // parent function (or what-have-you) we can simply
-            // check if there is a previous block before it.
-            //
-            auto prevBlock = block->getPrevBlock();
-            return prevBlock == nullptr;
-        }
-
-        // There are a few special cases of "structural" instructions
-        // that we don't want to eliminate, so we'll check for those next.
-        //
-        switch( inst->getOp() )
-        {
-            // Function parameters obviously shouldn't get eliminated,
-            // even if nothing references them, and block parameters
-            // (phi nodes) will be considered live when their block is,
-            // just so that we don't have to deal with any complications
-            // around re-writing the relevant inter-block argument passing.
-            //
-            // TODO: A smarter DCE pass could deal with this case more
-            // carefully, or we could improve the interprocedural SCCP
-            // pass to deal with block parameters instead.
-            //
-        case kIROp_Param:
-            return true;
-
-            // IR struct types and witness tables are currently kludged
-            // so that they have child instructions that represent their
-            // entries (effectively `(key,value)` pairs), and those child
-            // instructions are never directly referenced (e.g., an access
-            // to a struct field references the *key* but not the `(key,value)`
-            // pair that is the `IRField` instruction.
-            //
-            // TODO: at some point the IR should use a different representation
-            // for struct types and witness tables that does away with
-            // this problem.
-            //
-        case kIROp_StructField:
-        case kIROp_WitnessTableEntry:
-            return true;
-
-        default:
-            break;
-        }
-
-        // If none of the explicit cases above matched, then we will consider
-        // the instruction to not be live just because its parent is. Further
-        // analysis could still lead to a change in the status of `inst`, if
-        // an instruction that uses it as an operand is marked live.
-        //
-        return false;
+        return Slang::shouldInstBeLiveIfParentIsLive(inst, options);
     }
 };
+
+bool shouldInstBeLiveIfParentIsLive(IRInst* inst, IRDeadCodeEliminationOptions options)
+{
+    // The main source of confusion/complexity here is that
+    // we are using the same routine to decide:
+    //
+    // * Should some ordinary instruction in a basic block be kept around?
+    // * Should a basic block in some function be kept around?
+    // * Should a function/type/variable in a module be kept around?
+    //
+    // Still, there are a few basic patterns we can observe.
+    // First, if `inst` is an instruction that might have some effects
+    // when it is executed, then we should keep it around.
+    //
+    if (inst->mightHaveSideEffects())
+        return true;
+    //
+    // The `mightHaveSideEffects` query is conservative, and will
+    // return `true` as its default mode, so once we are past that
+    // query we know that `inst` is either something "structural"
+    // (that makes up the program) rather than executable, or it
+    // is executable but was on an allow-list of things that are
+    // safe to eliminate.
+
+    // Most top-level objects (functions, types, etc.) obviously
+    // do *not* have side effects. That creates the risk that
+    // we'll just go ahead and eliminate every single function/type
+    // in a module. There needs to be a way to identify the
+    // functions we want to keep around, and for right now
+    // that is handled with the `[keepAlive]` decoration.
+    //
+    if (inst->findDecorationImpl(kIROp_KeepAliveDecoration))
+        return true;
+    //
+    // We also consider anything with an `[export(...)]` as live,
+    // when the appropriate option has been set.
+    //
+    // Note: our current approach to linking for back-end compilation
+    // leaves many linakge decorations in place that we seemingly
+    // don't need/want, so this option currently can't be enabled
+    // unconditionally.
+    //
+    if (options.keepExportsAlive)
+    {
+        if (inst->findDecoration<IRExportDecoration>())
+        {
+            return true;
+        }
+    }
+
+    if (options.keepLayoutsAlive && inst->findDecoration<IRLayoutDecoration>())
+    {
+        return true;
+    }
+
+    // A basic block is an interesting case. Knowing that a function
+    // is live means that its entry block is live, but the liveness
+    // of any other blocks is determined by whether they are referenced
+    // by other instructions (e.g., a branch from one block to
+    // another).
+    //
+    if (auto block = as<IRBlock>(inst))
+    {
+        // To determine whether this is the first block in its
+        // parent function (or what-have-you) we can simply
+        // check if there is a previous block before it.
+        //
+        auto prevBlock = block->getPrevBlock();
+        return prevBlock == nullptr;
+    }
+
+    // There are a few special cases of "structural" instructions
+    // that we don't want to eliminate, so we'll check for those next.
+    //
+    switch (inst->getOp())
+    {
+        // Function parameters obviously shouldn't get eliminated,
+        // even if nothing references them, and block parameters
+        // (phi nodes) will be considered live when their block is,
+        // just so that we don't have to deal with any complications
+        // around re-writing the relevant inter-block argument passing.
+        //
+        // TODO: A smarter DCE pass could deal with this case more
+        // carefully, or we could improve the interprocedural SCCP
+        // pass to deal with block parameters instead.
+        //
+    case kIROp_Param:
+        return true;
+
+        // IR struct types and witness tables are currently kludged
+        // so that they have child instructions that represent their
+        // entries (effectively `(key,value)` pairs), and those child
+        // instructions are never directly referenced (e.g., an access
+        // to a struct field references the *key* but not the `(key,value)`
+        // pair that is the `IRField` instruction.
+        //
+        // TODO: at some point the IR should use a different representation
+        // for struct types and witness tables that does away with
+        // this problem.
+        //
+    case kIROp_StructField:
+    case kIROp_WitnessTableEntry:
+        return true;
+
+    default:
+        break;
+    }
+
+    // If none of the explicit cases above matched, then we will consider
+    // the instruction to not be live just because its parent is. Further
+    // analysis could still lead to a change in the status of `inst`, if
+    // an instruction that uses it as an operand is marked live.
+    //
+    return false;
+}
+
+bool isWeakReferenceOperand(IRInst* inst, UInt operandIndex)
+{
+    // There are some type of operands that needs to be treated as
+    // "weak" references -- they can never hold things alive, and
+    // whenever we delete the referenced value, these operands needs
+    // to be replaced with `undef`.
+    switch (inst->getOp())
+    {
+    case kIROp_BoundInterfaceType:
+        if (inst->getOperand(operandIndex)->getOp() == kIROp_WitnessTable)
+            return true;
+        break;
+    case kIROp_SpecializationDictionaryItem:
+        // Ignore all operands of SpecializationDictionaryItem.
+        // This inst is used as a cache and shouldn't hold anything alive.
+        return true;
+    default:
+        break;
+    }
+    return false;
+}
 
 // The top-level function for invoking the DCE pass
 // is straighforward. We set up the context object

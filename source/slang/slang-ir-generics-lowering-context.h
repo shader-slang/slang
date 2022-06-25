@@ -3,6 +3,7 @@
 
 #include "slang-ir.h"
 #include "slang-ir-insts.h"
+#include "slang-ir-dce.h"
 
 #include "slang-ir-lower-generics.h"
 
@@ -49,6 +50,8 @@ namespace Slang
         void addToWorkList(
             IRInst* inst)
         {
+            if (!inst) return;
+
             for (auto ii = inst->getParent(); ii; ii = ii->getParent())
             {
                 if (as<IRGeneric>(ii))
@@ -125,6 +128,47 @@ namespace Slang
             for (auto child = inst->getLastChild(); child; child = child->getPrevInst())
             {
                 sharedContext->addToWorkList(child);
+            }
+        }
+    }
+
+    template<typename TFunc>
+    void workOnCallGraph(SharedGenericsLoweringContext* sharedContext, const TFunc& func)
+    {
+        SharedIRBuilder* sharedBuilder = &sharedContext->sharedBuilderStorage;
+        sharedBuilder->init(sharedContext->module);
+
+        sharedContext->addToWorkList(sharedContext->module->getModuleInst());
+        IRDeadCodeEliminationOptions dceOptions;
+        dceOptions.keepExportsAlive = true;
+        dceOptions.keepLayoutsAlive = true;
+
+        while (sharedContext->workList.getCount() != 0)
+        {
+            IRInst* inst = sharedContext->workList.getLast();
+
+            sharedContext->workList.removeLast();
+
+            sharedContext->addToWorkList(inst->parent);
+            sharedContext->addToWorkList(inst->getFullType());
+
+            UInt operandCount = inst->getOperandCount();
+            for (UInt ii = 0; ii < operandCount; ++ii)
+            {
+                if (!isWeakReferenceOperand(inst, ii))
+                    sharedContext->addToWorkList(inst->getOperand(ii));
+            }
+
+            if (auto call = as<IRCall>(inst))
+            {
+                if (func(call))
+                    return;
+            }
+
+            for (auto child = inst->getLastChild(); child; child = child->getPrevInst())
+            {
+                if (shouldInstBeLiveIfParentIsLive(child, dceOptions))
+                    sharedContext->addToWorkList(child);
             }
         }
     }

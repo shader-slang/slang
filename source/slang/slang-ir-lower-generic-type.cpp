@@ -79,6 +79,7 @@ namespace Slang
                 }
             }
             sharedContext->sharedBuilderStorage.deduplicateAndRebuildGlobalNumberingMap();
+            sharedContext->mapInterfaceRequirementKeyValue.Clear();
         }
     };
 
