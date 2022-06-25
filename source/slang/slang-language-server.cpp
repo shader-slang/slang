@@ -762,6 +762,43 @@ SlangResult LanguageServer::signatureHelp(
         }
         response.signatures.add(sigInfo);
     };
+
+    auto addFuncType = [&](FuncType* funcType)
+    {
+        SignatureInformation sigInfo;
+
+        List<Slang::Range<Index>> paramRanges;
+        ASTPrinter printer(
+            version->linkage->getASTBuilder(),
+            ASTPrinter::OptionFlag::ParamNames | ASTPrinter::OptionFlag::NoInternalKeywords |
+            ASTPrinter::OptionFlag::SimplifiedBuiltinType);
+
+        printer.getStringBuilder() << "func (";
+        bool isFirst = false;
+        for (auto param : funcType->paramTypes)
+        {
+            if (!isFirst)
+                printer.getStringBuilder() << ", ";
+            Slang::Range<Index> range;
+            range.begin = printer.getStringBuilder().getLength();
+            printer.addType(param);
+            range.end = printer.getStringBuilder().getLength();
+            paramRanges.add(range);
+            isFirst = false;
+        }
+        printer.getStringBuilder() << ") -> ";
+        printer.addType(funcType->getResultType());
+        sigInfo.label = printer.getString();
+        for (auto& range : paramRanges)
+        {
+            ParameterInformation paramInfo;
+            paramInfo.label[0] = (uint32_t)range.begin;
+            paramInfo.label[1] = (uint32_t)range.end;
+            sigInfo.parameters.add(paramInfo);
+        }
+        response.signatures.add(sigInfo);
+    };
+
     if (auto declRefExpr = as<DeclRefExpr>(funcExpr))
     {
         if (auto aggDecl = as<AggTypeDecl>(declRefExpr->declRef.getDecl()))
@@ -783,6 +820,10 @@ SlangResult LanguageServer::signatureHelp(
         {
             addDeclRef(item.declRef);
         }
+    }
+    else if (auto funcType = as<FuncType>(funcExpr->type.type))
+    {
+        addFuncType(funcType);
     }
     response.activeSignature = 0;
     response.activeParameter = 0;
