@@ -774,7 +774,7 @@ SlangResult LanguageServer::signatureHelp(
             ASTPrinter::OptionFlag::SimplifiedBuiltinType);
 
         printer.getStringBuilder() << "func (";
-        bool isFirst = false;
+        bool isFirst = true;
         for (auto param : funcType->paramTypes)
         {
             if (!isFirst)
