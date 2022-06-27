@@ -8,7 +8,12 @@
 namespace Slang
 {
 List<LanguageServerProtocol::InlayHint> getInlayHints(
-    Linkage* linkage, Module* module, UnownedStringSlice fileName, DocumentVersion* doc, LanguageServerProtocol::Range range)
+    Linkage* linkage,
+    Module* module,
+    UnownedStringSlice fileName,
+    DocumentVersion* doc,
+    LanguageServerProtocol::Range range,
+    const InlayHintOptions& options)
 {
     List<LanguageServerProtocol::InlayHint> result;
     auto manager = linkage->getSourceManager();
@@ -17,6 +22,8 @@ List<LanguageServerProtocol::InlayHint> getInlayHints(
         {
             if (auto invokeExpr = as<InvokeExpr>(node))
             {
+                if (!options.showParameterNames)
+                    return;
                 auto humaneLoc = manager->getHumaneLoc(node->loc);
                 if (humaneLoc.line - 1 < range.start.line || humaneLoc.line - 1 > range.end.line)
                     return;
@@ -66,6 +73,8 @@ List<LanguageServerProtocol::InlayHint> getInlayHints(
             }
             else if (auto varDecl = as<VarDeclBase>(node))
             {
+                if (!options.showDeducedType)
+                    return;
                 auto humaneLoc = manager->getHumaneLoc(node->loc);
                 if (humaneLoc.line - 1 < range.start.line || humaneLoc.line - 1 > range.end.line)
                     return;

@@ -7,6 +7,7 @@
 #include "slang-workspace-version.h"
 #include "slang-language-server-completion.h"
 #include "slang-language-server-auto-format.h"
+#include "slang-language-server-inlay-hints.h"
 
 namespace Slang
 {
@@ -88,6 +89,7 @@ public:
     Dictionary<String, String> m_lastPublishedDiagnostics;
     time_t m_lastDiagnosticUpdateTime = 0;
     FormatOptions m_formatOptions;
+    Slang::InlayHintOptions m_inlayHintOptions;
     bool m_quit = false;
     List<LanguageServerProtocol::WorkspaceFolder> m_workspaceFolders;
 
@@ -133,6 +135,7 @@ private:
     void updateSearchInWorkspace(const JSONValue& value);
     void updateCommitCharacters(const JSONValue& value);
     void updateFormattingOptions(const JSONValue& clangFormatLoc, const JSONValue& clangFormatStyle);
+    void updateInlayHintOptions(const JSONValue& deducedTypes, const JSONValue& parameterNames);
 
     void sendConfigRequest();
     void registerCapability(const char* methodName);

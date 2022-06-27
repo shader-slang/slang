@@ -10,6 +10,7 @@
 #include <time.h>
 #include "../core/slang-secure-crt.h"
 #include "../core/slang-range.h"
+#include "../core/slang-char-util.h"
 #include "../../slang-com-helper.h"
 #include "../compiler-core/slang-json-native.h"
 #include "../compiler-core/slang-json-rpc-connection.h"
@@ -124,8 +125,6 @@ SlangResult LanguageServer::parseNextMessage()
                 result.capabilities.completionProvider.triggerCharacters.add("[");
                 result.capabilities.completionProvider.resolveProvider = true;
                 result.capabilities.completionProvider.workDoneToken = "";
-                for (auto ch : getCommitChars())
-                    result.capabilities.completionProvider.allCommitCharacters.add(ch);
                 result.capabilities.semanticTokensProvider.full = true;
                 result.capabilities.semanticTokensProvider.range = false;
                 result.capabilities.signatureHelpProvider.triggerCharacters.add("(");
@@ -137,8 +136,8 @@ SlangResult LanguageServer::parseNextMessage()
             }
             else if (call.method == "initialized")
             {
-                sendConfigRequest();
                 registerCapability("workspace/didChangeConfiguration");
+                sendConfigRequest();
                 m_initialized = true;
                 return SLANG_OK;
             }
@@ -160,13 +159,14 @@ SlangResult LanguageServer::parseNextMessage()
                 if (response.result.getKind() == JSONValue::Kind::Array)
                 {
                     auto arr = m_connection->getContainer()->getArray(response.result);
-                    if (arr.getCount() == 6)
+                    if (arr.getCount() == 8)
                     {
                         updatePredefinedMacros(arr[0]);
                         updateSearchPaths(arr[1]);
                         updateSearchInWorkspace(arr[2]);
                         updateCommitCharacters(arr[3]);
                         updateFormattingOptions(arr[4], arr[5]);
+                        updateInlayHintOptions(arr[6], arr[7]);
                     }
                 }
                 break;
@@ -555,6 +555,13 @@ SlangResult LanguageServer::completion(
         cursorOffset--;
     }
 
+    // Never show suggestions when the user is typing a number.
+    if (cursorOffset + 1 >= 0 && cursorOffset + 1 < doc->getText().getLength() && CharUtil::isDigit(doc->getText()[cursorOffset + 1]))
+    {
+        m_connection->sendResult(NullResponse::get(), responseId);
+        return SLANG_OK;
+    }
+
     // Insert a completion request token at cursor position.
     auto originalText = doc->getText();
     StringBuilder newText;
@@ -591,6 +598,16 @@ SlangResult LanguageServer::completion(
     {
         return SLANG_OK;
     }
+
+    // Don't general completion suggestions after typing '['.
+    if (args.context.triggerKind ==
+        LanguageServerProtocol::kCompletionTriggerKindTriggerCharacter &&
+        args.context.triggerCharacter == "[")
+    {
+        m_connection->sendResult(NullResponse::get(), responseId);
+        return SLANG_OK;
+    }
+
     if (SLANG_SUCCEEDED(context.tryCompleteHLSLSemantic()))
     {
         return SLANG_OK;
@@ -902,7 +919,13 @@ SlangResult LanguageServer::inlayHint(const LanguageServerProtocol::InlayHintPar
         m_connection->sendResult(NullResponse::get(), responseId);
         return SLANG_OK;
     }
-    List<InlayHint> hints = getInlayHints(version->linkage, parsedModule, canonicalPath.getUnownedSlice(), doc.Ptr(), args.range);
+    List<InlayHint> hints = getInlayHints(
+        version->linkage,
+        parsedModule,
+        canonicalPath.getUnownedSlice(),
+        doc.Ptr(),
+        args.range,
+        m_inlayHintOptions);
     m_connection->sendResult(&hints, responseId);
     return SLANG_OK;
 }
@@ -1122,6 +1145,25 @@ void LanguageServer::updateFormattingOptions(const JSONValue& clangFormatLoc, co
     JSONToNativeConverter converter(container, m_connection->getSink());
     converter.convert(clangFormatLoc, &m_formatOptions.clangFormatLocation);
     converter.convert(clangFormatStyle, &m_formatOptions.style);
+    if (m_formatOptions.style.getLength() == 0)
+        m_formatOptions.style = Slang::FormatOptions().style;
+}
+
+void LanguageServer::updateInlayHintOptions(const JSONValue& deducedTypes, const JSONValue& parameterNames)
+{
+    auto container = m_connection->getContainer();
+    JSONToNativeConverter converter(container, m_connection->getSink());
+    bool showDeducedType = false;
+    bool showParameterNames = false;
+    converter.convert(deducedTypes, &showDeducedType);
+    converter.convert(parameterNames, &showParameterNames);
+    if (showDeducedType != m_inlayHintOptions.showDeducedType || showParameterNames != m_inlayHintOptions.showParameterNames)
+    {
+        m_connection->sendCall(
+            UnownedStringSlice("workspace/inlayHint/refresh"), JSONValue::makeInt(0));
+    }
+    m_inlayHintOptions.showDeducedType = showDeducedType;
+    m_inlayHintOptions.showParameterNames = showParameterNames;
 }
 
 void LanguageServer::sendConfigRequest()
@@ -1139,6 +1181,10 @@ void LanguageServer::sendConfigRequest()
     item.section = "slang.format.clangFormatLocation";
     args.items.add(item);
     item.section = "slang.format.clangFormatStyle";
+    args.items.add(item);
+    item.section = "slang.inlayHints.deducedTypes";
+    args.items.add(item);
+    item.section = "slang.inlayHints.parameterNames";
     args.items.add(item);
     m_connection->sendCall(
         ConfigurationParams::methodName,

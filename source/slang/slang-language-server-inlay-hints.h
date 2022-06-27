@@ -9,6 +9,13 @@
 
 namespace Slang
 {
+
+struct InlayHintOptions
+{
+    bool showDeducedType = false;
+    bool showParameterNames = false;
+};
+
 List<LanguageServerProtocol::InlayHint> getInlayHints(
-    Linkage* linkage, Module* module, UnownedStringSlice fileName, DocumentVersion* doc, LanguageServerProtocol::Range range);
+    Linkage* linkage, Module* module, UnownedStringSlice fileName, DocumentVersion* doc, LanguageServerProtocol::Range range, const InlayHintOptions& options);
 } // namespace Slang
