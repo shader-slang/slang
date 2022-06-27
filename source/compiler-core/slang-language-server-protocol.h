@@ -371,7 +371,7 @@ struct Diagnostic
      * The diagnostic's severity. Can be omitted. If omitted it is up to the
      * client to interpret diagnostics as error, warning, info or hint.
      */
-    DiagnosticSeverity severity;
+    DiagnosticSeverity severity = 1;
 
     /**
      * The diagnostic's code, which might appear in the user interface.
@@ -487,10 +487,48 @@ struct Hover
     static const StructRttiInfo g_rttiInfo;
 };
 
+typedef int CompletionTriggerKind;
+const CompletionTriggerKind kCompletionTriggerKindInvoked = 1;
+
+/**
+ * Completion was triggered by a trigger character specified by
+ * the `triggerCharacters` properties of the
+ * `CompletionRegistrationOptions`.
+ */
+const CompletionTriggerKind kCompletionTriggerKindTriggerCharacter = 2;
+
+/**
+ * Completion was re-triggered as the current completion list is incomplete.
+ */
+const CompletionTriggerKind kCompletionTriggerKindTriggerForIncompleteCompletions = 3;
+
+/**
+ * Contains additional information about the context in which a completion
+ * request is triggered.
+ */
+struct CompletionContext
+{
+    /**
+     * How the completion was triggered.
+     */
+    CompletionTriggerKind triggerKind = 1;
+
+    /**
+     * The trigger character (a single character) that has trigger code
+     * complete. Is undefined if
+     * `triggerKind !== CompletionTriggerKind.TriggerCharacter`
+     */
+    String triggerCharacter;
+
+    static const StructRttiInfo g_rttiInfo;
+};
+
 struct CompletionParams
     : WorkDoneProgressParams
     , TextDocumentPositionParams
 {
+    CompletionContext context;
+
     static const StructRttiInfo g_rttiInfo;
     static const UnownedStringSlice methodName;
 };
@@ -838,7 +876,7 @@ struct DocumentSymbol
     /**
      * The kind of this symbol.
      */
-    SymbolKind kind;
+    SymbolKind kind = 0;
 
     /**
      * The range enclosing this symbol not including leading/trailing whitespace

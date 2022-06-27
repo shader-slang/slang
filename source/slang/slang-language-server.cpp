@@ -523,6 +523,21 @@ SlangResult LanguageServer::completion(
         m_connection->sendResult(NullResponse::get(), responseId);
         return SLANG_OK;
     }
+
+    // Don't show completion at case label.
+    if (args.context.triggerKind ==
+            LanguageServerProtocol::kCompletionTriggerKindTriggerCharacter &&
+        args.context.triggerCharacter == ":")
+    {
+        auto line = doc->getLine((Int)args.position.line + 1);
+        auto prevCharPos = args.position.character - 2;
+        if (prevCharPos >= 0 && prevCharPos < line.getLength() && line[prevCharPos] != ':')
+        {
+            m_connection->sendResult(NullResponse::get(), responseId);
+            return SLANG_OK;
+        }
+    }
+
     Index utf8Line, utf8Col;
     doc->zeroBasedUTF16LocToOneBasedUTF8Loc(
         args.position.line, args.position.character, utf8Line, utf8Col);
@@ -561,7 +576,7 @@ SlangResult LanguageServer::completion(
         return SLANG_OK;
     }
 
-    CompletionContext context;
+    Slang::CompletionContext context;
     context.server = this;
     context.cursorOffset = cursorOffset;
     context.version = version;
@@ -953,6 +968,11 @@ SlangResult LanguageServer::onTypeFormatting(const LanguageServerProtocol::Docum
     String canonicalPath = uriToCanonicalPath(args.textDocument.uri);
     RefPtr<DocumentVersion> doc;
     if (!m_workspace->openedDocuments.TryGetValue(canonicalPath, doc))
+    {
+        m_connection->sendResult(NullResponse::get(), responseId);
+        return SLANG_OK;
+    }
+    if (args.ch == ":" && !doc->getLine((Int)args.position.line + 1).trim().startsWith("case "))
     {
         m_connection->sendResult(NullResponse::get(), responseId);
         return SLANG_OK;

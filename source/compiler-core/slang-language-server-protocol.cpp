@@ -407,6 +407,17 @@ static const StructRttiInfo _makeHoverRtti()
 }
 const StructRttiInfo Hover::g_rttiInfo = _makeHoverRtti();
 
+static const StructRttiInfo _makeCompletionContextRtti()
+{
+    CompletionContext obj;
+    StructRttiBuilder builder(&obj, "LanguageServerProtocol::CompletionContext", nullptr);
+    builder.addField("triggerKind", &obj.triggerKind);
+    builder.addField("triggerCharacter", &obj.triggerCharacter, StructRttiInfo::Flag::Optional);
+    builder.ignoreUnknownFields();
+    return builder.make();
+}
+const StructRttiInfo CompletionContext::g_rttiInfo = _makeCompletionContextRtti();
+
 static const StructRttiInfo _makeDefinitionParamsRtti()
 {
     DefinitionParams obj;
@@ -426,6 +437,7 @@ static const StructRttiInfo _makeCompletionParamsRtti()
     StructRttiBuilder builder(&obj, "LanguageServerProtocol::CompletionParams", &WorkDoneProgressParams::g_rttiInfo);
     builder.addField("textDocument", &obj.textDocument);
     builder.addField("position", &obj.position);
+    builder.addField("context", &obj.context, StructRttiInfo::Flag::Optional);
     builder.ignoreUnknownFields();
     return builder.make();
 }

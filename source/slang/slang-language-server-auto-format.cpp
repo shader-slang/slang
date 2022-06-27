@@ -10,6 +10,16 @@ String findClangFormatTool()
     String processName = String("clang-format") + String(Process::getExecutableSuffix());
     if (File::exists(processName))
         return processName;
+    RefPtr<Process> proc;
+    CommandLine cmdLine;
+    cmdLine.setExecutableLocation(ExecutableLocation(processName));
+    if (Process::create(cmdLine, 0, proc) == SLANG_OK)
+    {
+        auto inStream = proc->getStream(StdStreamType::In);
+        if (inStream) inStream->close();
+        proc->kill(0);
+        return processName;
+    }
     auto fileName =
         Slang::SharedLibraryUtils::getSharedLibraryFileName((void*)slang_createGlobalSession);
     auto dirName = Slang::Path::getParentDirectory(fileName);
