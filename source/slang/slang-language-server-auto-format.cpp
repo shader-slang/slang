@@ -162,7 +162,7 @@ List<Edit> formatSource(UnownedStringSlice text, Index lineStart, Index lineEnd,
     // Adhoc parsing of clang-format's result.
     List<UnownedStringSlice> lines;
     auto offsetStr = UnownedStringSlice("offset=");
-    auto legnthStr = UnownedStringSlice("length=");
+    auto lengthStr = UnownedStringSlice("length=");
     auto endStr = UnownedStringSlice("</replacement>");
     auto replacementStr = UnownedStringSlice("<replacement ");
     StringUtil::calcLines(result.standardOutput.getUnownedSlice(), lines);
@@ -180,10 +180,10 @@ List<Edit> formatSource(UnownedStringSlice text, Index lineStart, Index lineEnd,
             pos++;
         Edit edt;
         edt.offset = StringUtil::parseIntAndAdvancePos(line, pos);
-        pos = line.indexOf(legnthStr);
+        pos = line.indexOf(lengthStr);
         if (pos == -1)
             continue;
-        pos += legnthStr.getLength();
+        pos += lengthStr.getLength();
         if (pos < line.getLength() && line[pos] == '\'')
             pos++;
         edt.length = StringUtil::parseIntAndAdvancePos(line, pos);
