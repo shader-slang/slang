@@ -22,6 +22,7 @@ String findClangFormatTool()
     {
         // If we still cannot find clang-format, try to use the clang-format bundled with VSCode's C++ extension.
         String vsCodeExtDir = dirName.subString(0, vsCodeLoc + 7);
+        vsCodeExtDir = Path::combine(vsCodeExtDir, "extensions");
         struct CallbackContext
         {
             String foundPath;
