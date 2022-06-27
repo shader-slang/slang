@@ -248,6 +248,21 @@ struct InlayHintOptions
 
 };
 
+struct DocumentOnTypeFormattingOptions
+{
+    /**
+     * A character on which formatting should be triggered, like `{`.
+     */
+    String firstTriggerCharacter;
+
+    /**
+     * More trigger characters.
+     */
+    List<String> moreTriggerCharacter;
+
+    static const StructRttiInfo g_rttiInfo;
+};
+
 struct ServerCapabilities
 {
     String positionEncoding;
@@ -255,6 +270,9 @@ struct ServerCapabilities
     bool hoverProvider = false;
     bool definitionProvider = false;
     bool documentSymbolProvider = false;
+    bool documentFormattingProvider = false;
+    bool documentRangeFormattingProvider = false;
+    DocumentOnTypeFormattingOptions documentOnTypeFormattingProvider;
     InlayHintOptions inlayHintProvider;
     CompletionOptions completionProvider;
     SemanticTokensOptions semanticTokensProvider;
@@ -935,6 +953,74 @@ struct InlayHint
 
     static const StructRttiInfo g_rttiInfo;
 
+};
+
+struct DocumentOnTypeFormattingParams
+{
+    /**
+     * The document to format.
+     */
+    TextDocumentIdentifier textDocument;
+
+    /**
+     * The position around which the on type formatting should happen.
+     * This is not necessarily the exact position where the character denoted
+     * by the property `ch` got typed.
+     */
+    Position position;
+
+    /**
+     * The character that has been typed that triggered the formatting
+     * on type request. That is not necessarily the last character that
+     * got inserted into the document since the client could auto insert
+     * characters as well (e.g. like automatic brace completion).
+     */
+    String ch;
+
+    /**
+     * The formatting options.
+     */
+    //FormattingOptions options;
+
+    static const StructRttiInfo g_rttiInfo;
+    static const UnownedStringSlice methodName;
+};
+
+struct DocumentRangeFormattingParams
+{
+    /**
+     * The document to format.
+     */
+    TextDocumentIdentifier textDocument;
+
+    /**
+     * The range to format
+     */
+    Range range;
+
+    /**
+     * The format options
+     */
+    //FormattingOptions options;
+
+    static const StructRttiInfo g_rttiInfo;
+    static const UnownedStringSlice methodName;
+};
+
+struct DocumentFormattingParams
+{
+    /**
+     * The document to format.
+     */
+    TextDocumentIdentifier textDocument;
+
+    /**
+     * The format options
+     */
+    //FormattingOptions options;
+
+    static const StructRttiInfo g_rttiInfo;
+    static const UnownedStringSlice methodName;
 };
 
 } // namespace LanguageServerProtocol

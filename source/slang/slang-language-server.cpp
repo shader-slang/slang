@@ -104,7 +104,7 @@ SlangResult LanguageServer::parseNextMessage()
 
                 InitializeResult result;
                 result.serverInfo.name = "SlangLanguageServer";
-                result.serverInfo.version = "1.0";
+                result.serverInfo.version = "1.3";
                 result.capabilities.positionEncoding = "utf-16";
                 result.capabilities.textDocumentSync.openClose = true;
                 result.capabilities.textDocumentSync.change = (int)TextDocumentSyncKind::Incremental;
@@ -114,6 +114,11 @@ SlangResult LanguageServer::parseNextMessage()
                 result.capabilities.definitionProvider = true;
                 result.capabilities.documentSymbolProvider = true;
                 result.capabilities.inlayHintProvider.resolveProvider = false;
+                result.capabilities.documentFormattingProvider = true;
+                result.capabilities.documentOnTypeFormattingProvider.firstTriggerCharacter = "}";
+                result.capabilities.documentOnTypeFormattingProvider.moreTriggerCharacter.add(";");
+                result.capabilities.documentOnTypeFormattingProvider.moreTriggerCharacter.add(":");
+                result.capabilities.documentRangeFormattingProvider = true;
                 result.capabilities.completionProvider.triggerCharacters.add(".");
                 result.capabilities.completionProvider.triggerCharacters.add(":");
                 result.capabilities.completionProvider.triggerCharacters.add("[");
@@ -155,12 +160,13 @@ SlangResult LanguageServer::parseNextMessage()
                 if (response.result.getKind() == JSONValue::Kind::Array)
                 {
                     auto arr = m_connection->getContainer()->getArray(response.result);
-                    if (arr.getCount() == 4)
+                    if (arr.getCount() == 6)
                     {
                         updatePredefinedMacros(arr[0]);
                         updateSearchPaths(arr[1]);
                         updateSearchInWorkspace(arr[2]);
                         updateCommitCharacters(arr[3]);
+                        updateFormattingOptions(arr[4], arr[5]);
                     }
                 }
                 break;
@@ -886,6 +892,82 @@ SlangResult LanguageServer::inlayHint(const LanguageServerProtocol::InlayHintPar
     return SLANG_OK;
 }
 
+List<LanguageServerProtocol::TextEdit> translateTextEdits(DocumentVersion* doc, List<Edit>& edits)
+{
+    List<LanguageServerProtocol::TextEdit> result;
+    for (auto& edit : edits)
+    {
+        LanguageServerProtocol::TextEdit tedit;
+        Index line, col;
+        Index zeroBasedLine, zeroBasedCol;
+        doc->offsetToLineCol(edit.offset, line, col);
+        doc->oneBasedUTF8LocToZeroBasedUTF16Loc(line, col, zeroBasedLine, zeroBasedCol);
+        tedit.range.start.line = (int)zeroBasedLine;
+        tedit.range.start.character = (int)zeroBasedCol;
+        doc->offsetToLineCol(edit.offset + edit.length, line, col);
+        doc->oneBasedUTF8LocToZeroBasedUTF16Loc(line, col, zeroBasedLine, zeroBasedCol);
+        tedit.range.end.line = (int)zeroBasedLine;
+        tedit.range.end.character = (int)zeroBasedCol;
+        tedit.newText = edit.text;
+        result.add(_Move(tedit));
+    }
+    return result;
+}
+
+SlangResult LanguageServer::formatting(const LanguageServerProtocol::DocumentFormattingParams& args, const JSONValue& responseId)
+{
+    String canonicalPath = uriToCanonicalPath(args.textDocument.uri);
+    RefPtr<DocumentVersion> doc;
+    if (!m_workspace->openedDocuments.TryGetValue(canonicalPath, doc))
+    {
+        m_connection->sendResult(NullResponse::get(), responseId);
+        return SLANG_OK;
+    }
+    if (m_formatOptions.clangFormatLocation.getLength() == 0)
+        m_formatOptions.clangFormatLocation = findClangFormatTool();
+    auto edits = formatSource(doc->getText().getUnownedSlice(), -1, -1, -1, m_formatOptions);
+    auto textEdits = translateTextEdits(doc, edits);
+    m_connection->sendResult(&textEdits, responseId);
+    return SLANG_OK;
+}
+
+SlangResult LanguageServer::rangeFormatting(const LanguageServerProtocol::DocumentRangeFormattingParams& args, const JSONValue& responseId)
+{
+    String canonicalPath = uriToCanonicalPath(args.textDocument.uri);
+    RefPtr<DocumentVersion> doc;
+    if (!m_workspace->openedDocuments.TryGetValue(canonicalPath, doc))
+    {
+        m_connection->sendResult(NullResponse::get(), responseId);
+        return SLANG_OK;
+    }
+    if (m_formatOptions.clangFormatLocation.getLength() == 0)
+        m_formatOptions.clangFormatLocation = findClangFormatTool();
+    auto edits = formatSource(doc->getText().getUnownedSlice(), args.range.start.line, args.range.end.line, -1, m_formatOptions);
+    auto textEdits = translateTextEdits(doc, edits);
+    m_connection->sendResult(&textEdits, responseId);
+    return SLANG_OK;
+}
+
+SlangResult LanguageServer::onTypeFormatting(const LanguageServerProtocol::DocumentOnTypeFormattingParams& args, const JSONValue& responseId)
+{
+    String canonicalPath = uriToCanonicalPath(args.textDocument.uri);
+    RefPtr<DocumentVersion> doc;
+    if (!m_workspace->openedDocuments.TryGetValue(canonicalPath, doc))
+    {
+        m_connection->sendResult(NullResponse::get(), responseId);
+        return SLANG_OK;
+    }
+    if (m_formatOptions.clangFormatLocation.getLength() == 0)
+        m_formatOptions.clangFormatLocation = findClangFormatTool();
+    Index line, col;
+    doc->zeroBasedUTF16LocToOneBasedUTF8Loc(args.position.line, args.position.character, line, col);
+    auto cursorOffset = doc->getOffset(line, col);
+    auto edits = formatSource(doc->getText().getUnownedSlice(), args.position.line, args.position.line, cursorOffset, m_formatOptions);
+    auto textEdits = translateTextEdits(doc, edits);
+    m_connection->sendResult(&textEdits, responseId);
+    return SLANG_OK;
+}
+
 void LanguageServer::publishDiagnostics()
 {
     time_t timeNow = 0;
@@ -1014,6 +1096,13 @@ void LanguageServer::updateCommitCharacters(const JSONValue& jsonValue)
     }
 }
 
+void LanguageServer::updateFormattingOptions(const JSONValue& clangFormatLoc, const JSONValue& clangFormatStyle)
+{
+    auto container = m_connection->getContainer();
+    JSONToNativeConverter converter(container, m_connection->getSink());
+    converter.convert(clangFormatLoc, &m_formatOptions.clangFormatLocation);
+    converter.convert(clangFormatStyle, &m_formatOptions.style);
+}
 
 void LanguageServer::sendConfigRequest()
 {
@@ -1026,6 +1115,10 @@ void LanguageServer::sendConfigRequest()
     item.section = "slang.searchInAllWorkspaceDirectories";
     args.items.add(item);
     item.section = "slang.enableCommitCharactersInAutoCompletion";
+    args.items.add(item);
+    item.section = "slang.format.clangFormatLocation";
+    args.items.add(item);
+    item.section = "slang.format.clangFormatStyle";
     args.items.add(item);
     m_connection->sendCall(
         ConfigurationParams::methodName,
@@ -1217,6 +1310,24 @@ SlangResult LanguageServer::queueJSONCall(JSONRPCCall call)
         SLANG_RETURN_ON_FAIL(m_connection->toNativeArgsOrSendError(call.params, &args, call.id));
         cmd.documentSymbolArgs = args;
     }
+    else if (call.method == DocumentFormattingParams::methodName)
+    {
+        DocumentFormattingParams args;
+        SLANG_RETURN_ON_FAIL(m_connection->toNativeArgsOrSendError(call.params, &args, call.id));
+        cmd.formattingArgs = args;
+    }
+    else if (call.method == DocumentRangeFormattingParams::methodName)
+    {
+        DocumentRangeFormattingParams args;
+        SLANG_RETURN_ON_FAIL(m_connection->toNativeArgsOrSendError(call.params, &args, call.id));
+        cmd.rangeFormattingArgs = args;
+    }
+    else if (call.method == DocumentOnTypeFormattingParams::methodName)
+    {
+        DocumentOnTypeFormattingParams args;
+        SLANG_RETURN_ON_FAIL(m_connection->toNativeArgsOrSendError(call.params, &args, call.id));
+        cmd.onTypeFormattingArgs = args;
+    }
     else if (call.method == DidChangeConfigurationParams::methodName)
     {
         DidChangeConfigurationParams args;
@@ -1291,6 +1402,18 @@ SlangResult LanguageServer::runCommand(Command& call)
     else if (call.method == InlayHintParams::methodName)
     {
         return inlayHint(call.inlayHintArgs.get(), call.id);
+    }
+    else if (call.method == DocumentOnTypeFormattingParams::methodName)
+    {
+        return onTypeFormatting(call.onTypeFormattingArgs.get(), call.id);
+    }
+    else if (call.method == DocumentRangeFormattingParams::methodName)
+    {
+        return rangeFormatting(call.rangeFormattingArgs.get(), call.id);
+    }
+    else if (call.method == DocumentFormattingParams::methodName)
+    {
+        return formatting(call.formattingArgs.get(), call.id);
     }
     else if (call.method.startsWith("$/"))
     {
