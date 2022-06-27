@@ -7,7 +7,7 @@ namespace Slang
 
 String findClangFormatTool()
 {
-    String processName = "clang-format" + Process::getExecutableSuffix();
+    String processName = String("clang-format") + String(Process::getExecutableSuffix());
     if (File::exists(processName))
         return processName;
     auto fileName =
