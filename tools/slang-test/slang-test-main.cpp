@@ -1716,6 +1716,23 @@ TestResult runLanguageServerTest(TestContext* context, TestInput& input)
 
     if (!_areResultsEqual(input.testOptions->type, expectedOutput, actualOutput))
     {
+        if (expectedOutput.startsWith("CONTAINS"))
+        {
+            List<UnownedStringSlice> words;
+            List<UnownedStringSlice> expectedLines;
+            StringUtil::calcLines(expectedOutput.getUnownedSlice(), expectedLines);
+            if (expectedLines.getCount() >= 1)
+            {
+                StringUtil::split(expectedLines[0], ' ', words);
+                if (words.getCount() >= 2)
+                {
+                    if (actualOutput.contains(words[1].trim()))
+                    {
+                        return result;
+                    }
+                }
+            }
+        }
         context->getTestReporter()->dumpOutputDifference(expectedOutput, actualOutput);
         result = TestResult::Fail;
     }
