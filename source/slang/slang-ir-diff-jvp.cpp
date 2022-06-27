@@ -317,6 +317,44 @@ struct JVPTranscriber
     }
 };
 
+struct IRWorkQueue
+{
+    // Work list to hold the active set of insts whose children
+    // need to be looked at.
+    //
+    List<IRInst*> workList;
+    HashSet<IRInst*> workListSet;
+
+    void push(IRInst* inst)
+    {
+        if(!inst) return;
+        if(workListSet.Contains(inst)) return;
+        
+        workList.add(inst);
+        workListSet.Add(inst);
+    }
+
+    IRInst* pop()
+    {
+        if (workList.getCount() != 0)
+        {
+            IRInst* topItem = workList.getFirst();
+            // TODO: Repeatedly calling removeAt() can be really slow.
+            // Consider a specialized data structure or using removeLast()
+            // 
+            workList.removeAt(0);
+            workListSet.Remove(topItem);
+            return topItem;
+        }
+        return nullptr;
+    }
+
+    IRInst* peek()
+    {
+        return workList.getFirst();
+    }
+};
+
 struct JVPDerivativeContext
 {
     // This type passes over the module and generates
@@ -337,6 +375,15 @@ struct JVPDerivativeContext
     // error messages.
     DiagnosticSink*                 sink;
 
+    // Work queue to hold a stream of instructions that need
+    // to be checked for references to derivative functions.
+    IRWorkQueue                    workQueueStorage;
+
+    DiagnosticSink* getSink()
+    {
+        return sink;
+    }
+
     bool processModule()
     {
         // We start by initializing our shared IR building state,
@@ -349,7 +396,68 @@ struct JVPDerivativeContext
         IRBuilder builderStorage(sharedBuilderStorage);
         IRBuilder* builder = &builderStorage;
 
-        return processMarkedGlobalFunctions(builder);
+        // processMarkedGlobalFunctions(builder);
+        return processReferencedFunctions(builder);
+    }
+
+    IRInst* lookupJVPReference(IRInst* primalFunction)
+    {
+        if(auto jvpDefinition = primalFunction->findDecoration<IRJVPDerivativeReferenceDecoration>())
+            return jvpDefinition->getJVPFunc();
+        
+        return nullptr;
+    }
+
+    // Recursively process instructions looking for JVP calls (kIROp_JVPDifferentiate),
+    // then check that the referenced function is marked correctly for differentiation.
+    //
+    bool processReferencedFunctions(IRBuilder* builder)
+    {
+        IRWorkQueue* workQueue = &(workQueueStorage);
+
+        // Put the top-level inst into the queue.
+        workQueue->push(module->getModuleInst());
+        
+        // Keep processing items until the queue is complete.
+        while (IRInst* workItem = workQueue->pop())
+        {
+            for(auto child = workItem->getFirstChild(); child; child = child->getNextInst())
+            {
+                // Either the child instruction has more children (func/block etc..)
+                // and we add it to the work list for further processing, or 
+                // it's an ordinary inst in which case we check if it's a JVPDifferentiate
+                // instruction.
+                //
+                if (child->getFirstChild() != nullptr)
+                    workQueue->push(child);
+                
+                if (auto jvpDiffInst = as<IRJVPDifferentiate>(child))
+                {
+                    auto baseFunction = jvpDiffInst->getBaseFn();
+                    if (isFunctionMarkedForJVP(as<IRGlobalValueWithCode>(baseFunction)))
+                    {
+                        // If the JVP Reference already exists, no need to
+                        // differentiate again.
+                        //
+                        if(lookupJVPReference(baseFunction)) continue;
+
+                        IRFunc* jvpFunction = emitJVPFunction(builder, as<IRFunc>(baseFunction));
+                        builder->addJVPDerivativeReferenceDecoration(baseFunction, jvpFunction);
+                        workQueue->push(jvpFunction);
+                    }
+                    else
+                    {
+                        // TODO: This would probably be better with a more specific
+                        // error code.
+                        getSink()->diagnose(jvpDiffInst->sourceLoc,
+                            Diagnostics::internalCompilerError,
+                            "Cannot differentiate functions not marked for differentiation");
+                    }
+                }
+            }
+        }
+
+        return true;
     }
 
     // Run through all the global-level instructions, 
