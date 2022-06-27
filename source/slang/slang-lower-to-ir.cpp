@@ -8477,7 +8477,7 @@ RefPtr<IRModule> generateIRForTranslationUnit(
     // Process higher-order-function calls before any optimization passes
     // to allow the optimizations to affect the generated funcitons.
     // 1. Process JVP derivative functions.
-    processJVPDerivativeMarkers(module);
+    processJVPDerivativeMarkers(module, compileRequest->getSink());
     // 2. Process VJP derivative functions.
     // processVJPDerivativeMarkers(module); // Disabled currently. No impl yet.
     // 3. Replace JVP & VJP calls.
