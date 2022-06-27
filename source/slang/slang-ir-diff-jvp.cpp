@@ -339,7 +339,7 @@ struct IRWorkQueue
         if (workList.getCount() != 0)
         {
             IRInst* topItem = workList.getFirst();
-            // TODO: Repeatedly calling removeAt() can be really slow.
+            // TODO(Sai): Repeatedly calling removeAt() can be really slow.
             // Consider a specialized data structure or using removeLast()
             // 
             workList.removeAt(0);
@@ -447,7 +447,7 @@ struct JVPDerivativeContext
                     }
                     else
                     {
-                        // TODO: This would probably be better with a more specific
+                        // TODO(Sai): This would probably be better with a more specific
                         // error code.
                         getSink()->diagnose(jvpDiffInst->sourceLoc,
                             Diagnostics::internalCompilerError,
