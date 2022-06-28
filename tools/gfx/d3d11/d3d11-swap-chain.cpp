@@ -1,6 +1,9 @@
 // d3d11-swap-chain.cpp
 #include "d3d11-swap-chain.h"
 
+#include "d3d11-device.h"
+#include "d3d11-texture.h"
+
 namespace gfx
 {
 

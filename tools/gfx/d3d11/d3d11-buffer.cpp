@@ -9,20 +9,20 @@ using namespace Slang;
 namespace d3d11
 {
 
-SLANG_NO_THROW DeviceAddress SLANG_MCALL getDeviceAddress()
+SLANG_NO_THROW DeviceAddress SLANG_MCALL BufferResourceImpl::getDeviceAddress()
 {
     return 0;
 }
 
 SLANG_NO_THROW Result SLANG_MCALL
-    map(MemoryRange* rangeToRead, void** outPointer)
+    BufferResourceImpl::map(MemoryRange* rangeToRead, void** outPointer)
 {
     SLANG_UNUSED(rangeToRead);
     SLANG_UNUSED(outPointer);
     return SLANG_FAIL;
 }
 
-SLANG_NO_THROW Result SLANG_MCALL unmap(MemoryRange* writtenRange)
+SLANG_NO_THROW Result SLANG_MCALL BufferResourceImpl::unmap(MemoryRange* writtenRange)
 {
     SLANG_UNUSED(writtenRange);
     return SLANG_FAIL;

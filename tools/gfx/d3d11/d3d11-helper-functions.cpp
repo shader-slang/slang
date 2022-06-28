@@ -1,6 +1,8 @@
 // d3d11-helper-functions.cpp
 #include "d3d11-helper-functions.h"
 
+#include "d3d11-device.h"
+
 namespace gfx
 {
 

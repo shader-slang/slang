@@ -1,6 +1,8 @@
 // d3d11-scopeNVAPI.cpp
 #include "d3d11-scopeNVAPI.h"
 
+#include "d3d11-device.h"
+
 namespace gfx
 {
 

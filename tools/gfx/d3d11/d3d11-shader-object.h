@@ -1,7 +1,12 @@
 // d3d11-shader-object.h
 #pragma once
-
 #include "d3d11-base.h"
+
+#include "d3d11-buffer.h"
+#include "d3d11-resource-views.h"
+#include "d3d11-sampler.h"
+#include "d3d11-shader-object-layout.h"
+
 #include "d3d11-helper-functions.h"
 
 namespace gfx

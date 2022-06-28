@@ -1,7 +1,8 @@
 // d3d11-query.h
 #pragma once
-
 #include "d3d11-base.h"
+
+#include "d3d11-device.h"
 
 namespace gfx
 {

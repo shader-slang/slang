@@ -1,6 +1,7 @@
 // d3d11-device.h
 #pragma once
-#include "d3d11-base.h"
+#include "d3d11-framebuffer.h"
+#include "d3d11-pipeline-state.h"
 
 namespace gfx
 {
@@ -123,27 +124,11 @@ public:
     {
         return m_info;
     }
-    virtual void beginCommandBuffer(const CommandBufferInfo& info) override
-    {
-        if (info.hasWriteTimestamps)
-        {
-            m_immediateContext->Begin(m_disjointQuery);
-        }
-    }
-    virtual void endCommandBuffer(const CommandBufferInfo& info) override
-    {
-        if (info.hasWriteTimestamps)
-        {
-            m_immediateContext->End(m_disjointQuery);
-        }
-    }
-    virtual void writeTimestamp(IQueryPool* pool, GfxIndex index) override
-    {
-        auto poolImpl = static_cast<QueryPoolImpl*>(pool);
-        m_immediateContext->End(poolImpl->getQuery(index));
-    }
+    virtual void beginCommandBuffer(const CommandBufferInfo& info) override;
+    virtual void endCommandBuffer(const CommandBufferInfo& info) override;
+    virtual void writeTimestamp(IQueryPool* pool, GfxIndex index) override;
 
-protected:
+public:
     void _flushGraphicsState();
 
     // D3D11Device members.

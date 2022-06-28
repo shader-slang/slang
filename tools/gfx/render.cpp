@@ -1,7 +1,7 @@
 // render.cpp
 #include "renderer-shared.h"
 #include "../../source/core/slang-math.h"
-#include "d3d11/render-d3d11.h"
+#include "d3d11/d3d11-helper-functions.h"
 #include "open-gl/render-gl.h"
 #include "cuda/render-cuda.h"
 #include "cpu/render-cpu.h"
