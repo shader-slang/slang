@@ -232,6 +232,37 @@ struct WorkspaceCapabilities
     static const StructRttiInfo g_rttiInfo;
 };
 
+/**
+ * Inlay hint options used during static registration.
+ *
+ * @since 3.17.0
+ */
+struct InlayHintOptions
+{
+    /**
+     * The server provides support to resolve additional
+     * information for an inlay hint item.
+     */
+    bool resolveProvider = false;
+    static const StructRttiInfo g_rttiInfo;
+
+};
+
+struct DocumentOnTypeFormattingOptions
+{
+    /**
+     * A character on which formatting should be triggered, like `{`.
+     */
+    String firstTriggerCharacter;
+
+    /**
+     * More trigger characters.
+     */
+    List<String> moreTriggerCharacter;
+
+    static const StructRttiInfo g_rttiInfo;
+};
+
 struct ServerCapabilities
 {
     String positionEncoding;
@@ -239,6 +270,10 @@ struct ServerCapabilities
     bool hoverProvider = false;
     bool definitionProvider = false;
     bool documentSymbolProvider = false;
+    bool documentFormattingProvider = false;
+    bool documentRangeFormattingProvider = false;
+    DocumentOnTypeFormattingOptions documentOnTypeFormattingProvider;
+    InlayHintOptions inlayHintProvider;
     CompletionOptions completionProvider;
     SemanticTokensOptions semanticTokensProvider;
     SignatureHelpOptions signatureHelpProvider;
@@ -336,7 +371,7 @@ struct Diagnostic
      * The diagnostic's severity. Can be omitted. If omitted it is up to the
      * client to interpret diagnostics as error, warning, info or hint.
      */
-    DiagnosticSeverity severity;
+    DiagnosticSeverity severity = 1;
 
     /**
      * The diagnostic's code, which might appear in the user interface.
@@ -452,10 +487,48 @@ struct Hover
     static const StructRttiInfo g_rttiInfo;
 };
 
+typedef int CompletionTriggerKind;
+const CompletionTriggerKind kCompletionTriggerKindInvoked = 1;
+
+/**
+ * Completion was triggered by a trigger character specified by
+ * the `triggerCharacters` properties of the
+ * `CompletionRegistrationOptions`.
+ */
+const CompletionTriggerKind kCompletionTriggerKindTriggerCharacter = 2;
+
+/**
+ * Completion was re-triggered as the current completion list is incomplete.
+ */
+const CompletionTriggerKind kCompletionTriggerKindTriggerForIncompleteCompletions = 3;
+
+/**
+ * Contains additional information about the context in which a completion
+ * request is triggered.
+ */
+struct CompletionContext
+{
+    /**
+     * How the completion was triggered.
+     */
+    CompletionTriggerKind triggerKind = 1;
+
+    /**
+     * The trigger character (a single character) that has trigger code
+     * complete. Is undefined if
+     * `triggerKind !== CompletionTriggerKind.TriggerCharacter`
+     */
+    String triggerCharacter;
+
+    static const StructRttiInfo g_rttiInfo;
+};
+
 struct CompletionParams
     : WorkDoneProgressParams
     , TextDocumentPositionParams
 {
+    CompletionContext context;
+
     static const StructRttiInfo g_rttiInfo;
     static const UnownedStringSlice methodName;
 };
@@ -786,8 +859,8 @@ const int kSymbolKindTypeParameter = 26;
  * have two ranges: one that encloses its definition and one that points to its
  * most interesting range, e.g. the range of an identifier.
  */
-struct DocumentSymbol {
-
+struct DocumentSymbol
+{
     /**
      * The name of this symbol. Will be displayed in the user interface and
      * therefore must not be an empty string or a string only consisting of
@@ -803,7 +876,7 @@ struct DocumentSymbol {
     /**
      * The kind of this symbol.
      */
-    SymbolKind kind;
+    SymbolKind kind = 0;
 
     /**
      * The range enclosing this symbol not including leading/trailing whitespace
@@ -825,6 +898,167 @@ struct DocumentSymbol {
     List<DocumentSymbol> children;
 
     static const StructRttiInfo g_rttiInfo;
+};
+
+/**
+ * A parameter literal used in inlay hint requests.
+ *
+ * @since 3.17.0
+ */
+struct InlayHintParams
+{
+    /**
+     * The text document.
+     */
+    TextDocumentIdentifier textDocument;
+
+    /**
+     * The visible document range for which inlay hints should be computed.
+     */
+    Range range;
+
+    static const StructRttiInfo g_rttiInfo;
+    static const UnownedStringSlice methodName;
+};
+
+struct TextEdit
+{
+    /**
+     * The range of the text document to be manipulated. To insert
+     * text into a document create a range where start === end.
+     */
+    Range range;
+
+    /**
+     * The string to be inserted. For delete operations use an
+     * empty string.
+     */
+    String newText;
+
+    static const StructRttiInfo g_rttiInfo;
+
+};
+
+typedef int InlayHintKind;
+const int kInlayHintKindType = 1;
+const int kInlayHintKindParameter = 2;
+
+/**
+ * Inlay hint information.
+ *
+ * @since 3.17.0
+ */
+struct InlayHint
+{
+    /**
+     * The position of this hint.
+     */
+    Position position;
+
+    /**
+     * The label of this hint. A human readable string or an array of
+     * InlayHintLabelPart label parts.
+     *
+     * *Note* that neither the string nor the label part can be empty.
+     */
+    String label;
+
+    /**
+     * The kind of this hint. Can be omitted in which case the client
+     * should fall back to a reasonable default.
+     */
+    InlayHintKind kind = 1;
+
+    List<TextEdit> textEdits;
+
+    /**
+     * Render padding before the hint.
+     *
+     * Note: Padding should use the editor's background color, not the
+     * background color of the hint itself. That means padding can be used
+     * to visually align/separate an inlay hint.
+     */
+    bool paddingLeft = false;
+
+    /**
+     * Render padding after the hint.
+     *
+     * Note: Padding should use the editor's background color, not the
+     * background color of the hint itself. That means padding can be used
+     * to visually align/separate an inlay hint.
+     */
+    bool paddingRight = false;
+
+    static const StructRttiInfo g_rttiInfo;
+
+};
+
+struct DocumentOnTypeFormattingParams
+{
+    /**
+     * The document to format.
+     */
+    TextDocumentIdentifier textDocument;
+
+    /**
+     * The position around which the on type formatting should happen.
+     * This is not necessarily the exact position where the character denoted
+     * by the property `ch` got typed.
+     */
+    Position position;
+
+    /**
+     * The character that has been typed that triggered the formatting
+     * on type request. That is not necessarily the last character that
+     * got inserted into the document since the client could auto insert
+     * characters as well (e.g. like automatic brace completion).
+     */
+    String ch;
+
+    /**
+     * The formatting options.
+     */
+    //FormattingOptions options;
+
+    static const StructRttiInfo g_rttiInfo;
+    static const UnownedStringSlice methodName;
+};
+
+struct DocumentRangeFormattingParams
+{
+    /**
+     * The document to format.
+     */
+    TextDocumentIdentifier textDocument;
+
+    /**
+     * The range to format
+     */
+    Range range;
+
+    /**
+     * The format options
+     */
+    //FormattingOptions options;
+
+    static const StructRttiInfo g_rttiInfo;
+    static const UnownedStringSlice methodName;
+};
+
+struct DocumentFormattingParams
+{
+    /**
+     * The document to format.
+     */
+    TextDocumentIdentifier textDocument;
+
+    /**
+     * The format options
+     */
+    //FormattingOptions options;
+
+    static const StructRttiInfo g_rttiInfo;
+    static const UnownedStringSlice methodName;
 };
 
 } // namespace LanguageServerProtocol

@@ -1203,15 +1203,21 @@ static SlangResult _executeBinary(const UnownedStringSlice& hexDump, ExecuteResu
     List<uint8_t> data;
     SLANG_RETURN_ON_FAIL(HexDumpUtil::parseWithMarkers(hexDump, data));
 
+    TemporaryFileSet temporaryFileSet;
+
     // Need to write this off to a temporary file
-    String fileName;
-    SLANG_RETURN_ON_FAIL(File::generateTemporary(UnownedStringSlice("slang-test"), fileName));
+
+    String temporaryLockPath;
+
+    SLANG_RETURN_ON_FAIL(File::generateTemporary(UnownedStringSlice("slang-test"), temporaryLockPath));
+    String fileName = temporaryLockPath;
+    // And the temporary lock path
+    temporaryFileSet.add(temporaryLockPath);
 
     fileName.append(Process::getExecutableSuffix());
 
-    TemporaryFileSet temporaryFileSet;
     temporaryFileSet.add(fileName);
-
+    
     {
         ComPtr<ISlangWriter> writer;
         SLANG_RETURN_ON_FAIL(FileWriter::createBinary(fileName.getBuffer(), 0, writer));
@@ -1710,6 +1716,23 @@ TestResult runLanguageServerTest(TestContext* context, TestInput& input)
 
     if (!_areResultsEqual(input.testOptions->type, expectedOutput, actualOutput))
     {
+        if (expectedOutput.startsWith("CONTAINS"))
+        {
+            List<UnownedStringSlice> words;
+            List<UnownedStringSlice> expectedLines;
+            StringUtil::calcLines(expectedOutput.getUnownedSlice(), expectedLines);
+            if (expectedLines.getCount() >= 1)
+            {
+                StringUtil::split(expectedLines[0], ' ', words);
+                if (words.getCount() >= 2)
+                {
+                    if (actualOutput.contains(words[1].trim()))
+                    {
+                        return result;
+                    }
+                }
+            }
+        }
         context->getTestReporter()->dumpOutputDifference(expectedOutput, actualOutput);
         result = TestResult::Fail;
     }
@@ -1979,8 +2002,12 @@ static SlangResult _loadAsSharedLibrary(const UnownedStringSlice& hexDump, Tempo
     SLANG_RETURN_ON_FAIL(HexDumpUtil::parseWithMarkers(hexDump, data));
 
     // Need to write this off to a temporary file
-    String fileName;
-    SLANG_RETURN_ON_FAIL(File::generateTemporary(UnownedStringSlice("slang-test"), fileName));
+    
+    String temporaryLockPath;
+    SLANG_RETURN_ON_FAIL(File::generateTemporary(UnownedStringSlice("slang-test"), temporaryLockPath));
+    inOutTemporaryFileSet.add(temporaryLockPath);
+
+    String fileName = temporaryLockPath;
 
     // Need to work out the dll name
     String sharedLibraryName = SharedLibrary::calcPlatformPath(fileName.getUnownedSlice());

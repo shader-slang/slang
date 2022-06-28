@@ -109,6 +109,7 @@ namespace Slang
             return;
 
         sharedContext->sharedBuilderStorage.deduplicateAndRebuildGlobalNumberingMap();
+        sharedContext->mapInterfaceRequirementKeyValue.Clear();
 
         specializeRTTIObjectReferences(sharedContext);
 

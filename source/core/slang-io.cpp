@@ -101,7 +101,8 @@ namespace Slang
             char* chars = tempFileName.prepareForAppend(count);
 
             // https://docs.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-gettempfilenamea
-            //  Generates a temporary file name. 
+            // Generates a temporary file name.
+            // Will create a file with this name.
             DWORD ret = ::GetTempFileNameA(tempPath.getBuffer(), prefix.getBuffer(), 0, chars);
 
             if (ret == 0)
@@ -110,6 +111,8 @@ namespace Slang
             }
             tempFileName.appendInPlace(chars, ::strlen(chars));
         }
+
+        SLANG_ASSERT(File::exists(tempFileName));
 
         outFileName = tempFileName;
         return SLANG_OK;
@@ -135,6 +138,8 @@ namespace Slang
         close(handle);
 
         outFileName = buffer.getBuffer();
+        SLANG_ASSERT(File::exists(outFileName));
+
         return SLANG_OK;
     }
 #endif

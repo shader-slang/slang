@@ -34,10 +34,10 @@ struct DerivativeCallProcessContext
                     do 
                     {
                         auto nextChild = child->getNextInst();
-                        // Look for IRJVPDerivativeOf
-                        if (auto derivOf = as<IRJVPDerivativeOf>(child))
+                        // Look for IRJVPDifferentiate
+                        if (auto derivOf = as<IRJVPDifferentiate>(child))
                         {
-                            processDerivativeOf(derivOf);
+                            processDifferentiate(derivOf);
                         }
                         child = nextChild;
                     } 
@@ -50,7 +50,7 @@ struct DerivativeCallProcessContext
 
     // Perform forward-mode automatic differentiation on 
     // the intstructions.
-    void processDerivativeOf(IRJVPDerivativeOf* derivOfInst)
+    void processDifferentiate(IRJVPDifferentiate* derivOfInst)
     {
         IRFunc* jvpFunc = nullptr;
 

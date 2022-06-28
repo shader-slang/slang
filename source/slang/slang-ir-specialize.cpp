@@ -79,6 +79,17 @@ struct SpecializationContext
         if(inst->getOp() == kIROp_InterfaceRequirementEntry)
             return true;
 
+        // A generic parameter is never specialized.
+        switch (inst->getOp())
+        {
+        case kIROp_GlobalGenericParam:
+            return false;
+        case kIROp_Param:
+            if (inst->getParent() && inst->getParent()->getOp() == kIROp_Block &&
+                inst->getParent()->getParent() &&
+                inst->getParent()->getParent()->getOp() == kIROp_Generic)
+                return false;
+        }
         return fullySpecializedInsts.Contains(inst);
     }
 
@@ -113,6 +124,14 @@ struct SpecializationContext
     void addToWorkList(
         IRInst* inst)
     {
+#if 0
+        // Note(Yong): we should no longer ignore generic functions
+        // because they maybe called via dynamic dispatch.
+        // We still want to specialize calls inside a generic function
+        // if we can derive its type at compile time. The following
+        // skipping logic is disabled and we should consider remove it.
+        //
+        // 
         // We will ignore any code that is nested under a generic,
         // because it doesn't make sense to perform specialization
         // on such code.
@@ -122,6 +141,7 @@ struct SpecializationContext
             if(as<IRGeneric>(ii))
                 return;
         }
+#endif
 
         if (workList.Add(inst))
         {
@@ -1203,6 +1223,7 @@ struct SpecializationContext
             case kIROp_Call:
             case kIROp_ExtractExistentialType:
             case kIROp_CreateExistentialObject:
+            case kIROp_Param:
                 return false;
             default:
                 break;

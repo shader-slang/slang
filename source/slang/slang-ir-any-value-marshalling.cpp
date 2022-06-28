@@ -636,6 +636,7 @@ namespace Slang
             // will become duplicates with new types we introduced (e.g. PtrType(AnyValueStruct)), and therefore
             // invalidates our `globalValueNumberingMap` hash map. We need to rebuild it.
             sharedContext->sharedBuilderStorage.deduplicateAndRebuildGlobalNumberingMap();
+            sharedContext->mapInterfaceRequirementKeyValue.Clear();
         }
     };
 

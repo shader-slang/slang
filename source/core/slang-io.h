@@ -27,6 +27,9 @@ namespace Slang
 
         static SlangResult makeExecutable(const String& fileName);
 
+            /// Creates a temporary file typically in some way based on the prefix
+            /// The file will be *created* with the outFileName, on success.
+            /// It's creation in necessary to lock that particular name.  
         static SlangResult generateTemporary(const UnownedStringSlice& prefix, String& outFileName);
     };
 

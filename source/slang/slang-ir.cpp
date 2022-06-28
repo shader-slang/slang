@@ -3027,11 +3027,11 @@ namespace Slang
         return inst;
     }
 
-    IRInst* IRBuilder::emitJVPDerivativeOfInst(IRType* type, IRInst* baseFn)
+    IRInst* IRBuilder::emitJVPDifferentiateInst(IRType* type, IRInst* baseFn)
     {
-        auto inst = createInst<IRJVPDerivativeOf>(
+        auto inst = createInst<IRJVPDifferentiate>(
             this,
-            kIROp_JVPDerivativeOf,
+            kIROp_JVPDifferentiate,
             type,
             baseFn);
         addInst(inst);
@@ -4370,6 +4370,18 @@ namespace Slang
         return inst;
     }
 
+    IRInst* IRBuilder::emitSub(IRType* type, IRInst* left, IRInst* right)
+    {
+        auto inst = createInst<IRInst>(
+            this,
+            kIROp_Sub,
+            type,
+            left,
+            right);
+        addInst(inst);
+        return inst;
+    }
+
     IRInst* IRBuilder::emitEql(IRInst* left, IRInst* right)
     {
         auto inst = createInst<IRInst>(this, kIROp_Eql, getBoolType(), left, right);
@@ -4399,6 +4411,18 @@ namespace Slang
             type,
             left,
             right);
+        addInst(inst);
+        return inst;
+    }
+
+    IRInst* IRBuilder::emitDiv(IRType* type, IRInst* numerator, IRInst* denominator)
+    {
+        auto inst = createInst<IRInst>(
+            this,
+            kIROp_Div,
+            type,
+            numerator,
+            denominator);
         addInst(inst);
         return inst;
     }
