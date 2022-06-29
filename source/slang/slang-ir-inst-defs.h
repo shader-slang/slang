@@ -198,6 +198,7 @@ INST(Nop, nop, 0, 0)
 // `field` instructions.
 //
 INST(StructType, struct, 0, PARENT)
+INST(ClassType, class, 0, PARENT)
 INST(InterfaceType, interface, 0, 0)
 INST(AssociatedType, associated_type, 0, 0)
 INST(ThisType, this_type, 0, 0)
@@ -271,6 +272,7 @@ INST(lookup_witness_table, lookup_witness_table, 2, 0)
 INST(BindGlobalGenericParam, bind_global_generic_param, 2, 0)
 
 INST(Construct, construct, 0, 0)
+INST(AllocObj, allocObj, 0, 0)
 
 INST(makeUInt64, makeUInt64, 2, 0)
 INST(makeVector, makeVector, 0, 0)

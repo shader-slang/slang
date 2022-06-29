@@ -277,6 +277,9 @@ DIAGNOSTIC(30043, Error, getStringHashRequiresStringLiteral, "getStringHash para
 DIAGNOSTIC(30060, Error, expectedAType, "expected a type, got a '$0'")
 DIAGNOSTIC(30061, Error, expectedANamespace, "expected a namespace, got a '$0'")
 
+DIAGNOSTIC(30065, Error, newCanOnlyBeUsedToInitializeAClass, "`new` can only be used to initialize a class")
+DIAGNOSTIC(30066, Error, classCanOnlyBeInitializedWithNew, "a class can only be initialize by a `new` clause")
+
 DIAGNOSTIC(30100, Error, staticRefToNonStaticMember, "type '$0' cannot be used to refer to non-static member '$1'")
 
 DIAGNOSTIC(30200, Error, redeclaration, "declaration of '$0' conflicts with existing declaration")
@@ -357,14 +360,16 @@ DIAGNOSTIC(30700, Error, outputParameterCannotHaveDefaultValue, "an 'out' or 'in
 DIAGNOSTIC(30810, Error, baseOfInterfaceMustBeInterface, "interface '$0' cannot inherit from non-interface type '$1'")
 DIAGNOSTIC(30811, Error, baseOfStructMustBeStructOrInterface, "struct '$0' cannot inherit from type '$1' that is neither a struct nor an interface")
 DIAGNOSTIC(30812, Error, baseOfEnumMustBeIntegerOrInterface, "enum '$0' cannot inherit from type '$1' that is neither an interface not a builtin integer type")
-DIAGNOSTIC(30810, Error, baseOfExtensionMustBeInterface, "extension cannot inherit from non-interface type '$1'")
+DIAGNOSTIC(30813, Error, baseOfExtensionMustBeInterface, "extension cannot inherit from non-interface type '$1'")
+DIAGNOSTIC(30814, Error, baseOfClassMustBeClassOrInterface, "class '$0' cannot inherit from type '$1' that is neither a class nor an interface")
 
 DIAGNOSTIC(30820, Error, baseStructMustBeListedFirst, "a struct type may only inherit from one other struct type, and that type must appear first in the list of bases")
 DIAGNOSTIC(30821, Error, tagTypeMustBeListedFirst, "an unum type may only have a single tag type, and that type must be listed first in the list of bases")
+DIAGNOSTIC(30822, Error, baseClassMustBeListedFirst, "a class type may only inherit from one other class type, and that type must appear first in the list of bases")
 
-DIAGNOSTIC(30820, Error, cannotInheritFromExplicitlySealedDeclarationInAnotherModule, "cannot inherit from type '$0' marked 'sealed' in module '$1'")
-DIAGNOSTIC(30821, Error, cannotInheritFromImplicitlySealedDeclarationInAnotherModule, "cannot inherit from type '$0' in module '$1' because it is implicitly 'sealed'; mark the base type 'open' to allow inheritance across modules")
-DIAGNOSTIC(30822, Error, invalidTypeForInheritance, "type '$0' cannot be used for inheritance")
+DIAGNOSTIC(30830, Error, cannotInheritFromExplicitlySealedDeclarationInAnotherModule, "cannot inherit from type '$0' marked 'sealed' in module '$1'")
+DIAGNOSTIC(30831, Error, cannotInheritFromImplicitlySealedDeclarationInAnotherModule, "cannot inherit from type '$0' in module '$1' because it is implicitly 'sealed'; mark the base type 'open' to allow inheritance across modules")
+DIAGNOSTIC(30832, Error, invalidTypeForInheritance, "type '$0' cannot be used for inheritance")
 
 DIAGNOSTIC(30850, Error, invalidExtensionOnType, "type '$0' cannot be extended. `extension` can only be used to extend a nominal type.")
 

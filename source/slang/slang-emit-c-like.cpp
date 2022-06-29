@@ -1586,6 +1586,15 @@ void CLikeSourceEmitter::diagnoseUnhandledInst(IRInst* inst)
     getSink()->diagnose(inst, Diagnostics::unimplemented, "unexpected IR opcode during code emit");
 }
 
+bool isPtrToClassType(IRInst* type)
+{
+    if (auto ptrType = as<IRPtrTypeBase>(type))
+    {
+        return ptrType->getValueType()->getOp() == kIROp_ClassType;
+    }
+    return false;
+}
+
 void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inOuterPrec)
 {
     EmitOpInfo outerPrec = inOuterPrec;
@@ -1616,6 +1625,11 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
         // Simple constructor call
         emitType(inst->getDataType());
         emitArgs(inst);
+        break;
+    case kIROp_AllocObj:
+        m_writer->emit("new ");
+        m_writer->emit(getName(inst->getDataType()));
+        m_writer->emit("()");
         break;
     case kIROp_makeUInt64:
         m_writer->emit("((");
@@ -1649,7 +1663,10 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
 
         auto base = fieldExtract->getBase();
         emitOperand(base, leftSide(outerPrec, prec));
-        m_writer->emit(".");
+        if (base->getDataType()->getOp() == kIROp_ClassType)
+            m_writer->emit("->");
+        else
+            m_writer->emit(".");
         if(getSourceLanguage() == SourceLanguage::GLSL
             && as<IRUniformParameterGroupType>(base->getDataType()))
         {
@@ -1673,7 +1690,10 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
             auto innerPrec = getInfo(EmitOp::Postfix);
             bool innerNeedClose = maybeEmitParens(outerPrec, innerPrec);
             auto base = ii->getBase();
-            emitOperand(base, leftSide(outerPrec, innerPrec));
+            if (isPtrToClassType(base->getDataType()))
+                emitDereferenceOperand(base, leftSide(outerPrec, innerPrec));
+            else
+                emitOperand(base, leftSide(outerPrec, innerPrec));
             m_writer->emit("->");
             m_writer->emit(getName(ii->getField()));
             maybeCloseParens(innerNeedClose);
@@ -2771,6 +2791,46 @@ void CLikeSourceEmitter::emitStruct(IRStructType* structType)
     m_writer->emit("};\n\n");
 }
 
+void CLikeSourceEmitter::emitClass(IRClassType* classType)
+{
+    // If the selected `class` type is actually an intrinsic
+    // on our target, then we don't want to emit anything at all.
+    if (auto intrinsicDecoration = findBestTargetIntrinsicDecoration(classType))
+    {
+        return;
+    }
+
+    m_writer->emit("class ");
+
+    emitPostKeywordTypeAttributes(classType);
+
+    m_writer->emit(getName(classType));
+    m_writer->emit(" : public RefObject");
+    m_writer->emit("\n{\n");
+    m_writer->emit("public:\n");
+    m_writer->indent();
+
+    for (auto ff : classType->getFields())
+    {
+        auto fieldKey = ff->getKey();
+        auto fieldType = ff->getFieldType();
+
+        // Filter out fields with `void` type that might
+        // have been introduced by legalization.
+        if (as<IRVoidType>(fieldType))
+            continue;
+
+        emitInterpolationModifiers(fieldKey, fieldType, nullptr);
+
+        emitType(fieldType, getName(fieldKey));
+        emitSemantics(fieldKey);
+        m_writer->emit(";\n");
+    }
+
+    m_writer->dedent();
+    m_writer->emit("};\n\n");
+}
+
 void CLikeSourceEmitter::emitInterpolationModifiers(IRInst* varInst, IRType* valueType, IRVarLayout* layout)
 {
     emitInterpolationModifiersImpl(varInst, valueType, layout);
@@ -3119,7 +3179,9 @@ void CLikeSourceEmitter::emitGlobalInstImpl(IRInst* inst)
     case kIROp_StructType:
         emitStruct(cast<IRStructType>(inst));
         break;
-
+    case kIROp_ClassType:
+        emitClass(cast<IRClassType>(inst));
+        break;
     case kIROp_InterfaceType:
         emitInterface(cast<IRInterfaceType>(inst));
         break;

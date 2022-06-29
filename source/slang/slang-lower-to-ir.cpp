@@ -5868,7 +5868,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
         if(auto superDeclRefType = as<DeclRefType>(superType))
         {
-            if( auto superStructDeclRef = superDeclRefType->declRef.as<StructDecl>() )
+            if( superDeclRefType->declRef.as<StructDecl>() || superDeclRefType->declRef.as<ClassDecl>() )
             {
                 // TODO: the witness that a type inherits from a `struct`
                 // type should probably be a key that will be used for
@@ -6697,16 +6697,30 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // Emit any generics that should wrap the actual type.
         auto outerGeneric = emitOuterGenerics(subContext, decl, decl);
 
-        IRStructType* irStruct = subBuilder->createStructType();
-        addNameHint(context, irStruct, decl);
-        addLinkageDecoration(context, irStruct, decl);
+        IRType* irAggType = nullptr;
+        if (as<StructDecl>(decl))
+        {
+            irAggType = subBuilder->createStructType();
+        }
+        else if (as<ClassDecl>(decl))
+        {
+            irAggType = subBuilder->createClassType();
+        }
+        else
+        {
+            getSink()->diagnose(decl->loc, Diagnostics::unimplemented, "lower unknown AggType to IR");
+            return LoweredValInfo::simple(subBuilder->getVoidType());
+        }
+
+        addNameHint(context, irAggType, decl);
+        addLinkageDecoration(context, irAggType, decl);
 
         if( auto payloadAttribute = decl->findModifier<PayloadAttribute>() )
         {
-            subBuilder->addDecoration(irStruct, kIROp_PayloadDecoration);
+            subBuilder->addDecoration(irAggType, kIROp_PayloadDecoration);
         }
 
-        subBuilder->setInsertInto(irStruct);
+        subBuilder->setInsertInto(irAggType);
 
         // A `struct` that inherits from another `struct` must start
         // with a member for the direct base type.
@@ -6718,12 +6732,13 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             auto superType = inheritanceDecl->base;
             if(auto superDeclRefType = as<DeclRefType>(superType))
             {
-                if(auto superStructDeclRef = superDeclRefType->declRef.as<StructDecl>())
+                if (superDeclRefType->declRef.as<StructDecl>() ||
+                    superDeclRefType->declRef.as<ClassDecl>())
                 {
                     auto superKey = (IRStructKey*) getSimpleVal(context, ensureDecl(context, inheritanceDecl));
                     auto irSuperType = lowerType(context, superType.type);
                     subBuilder->createStructField(
-                        irStruct,
+                        irAggType,
                         superKey,
                         irSuperType);
                 }
@@ -6758,7 +6773,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             // Then, the parent `struct` instruction itself will have
             // a "field" instruction.
             subBuilder->createStructField(
-                irStruct,
+                irAggType,
                 fieldKey,
                 fieldType);
         }
@@ -6770,10 +6785,10 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // Instead we will force emission of all children of aggregate
         // type declarations later, from the top-level emit logic.
 
-        irStruct->moveToEnd();
-        addTargetIntrinsicDecorations(irStruct, decl);
+        irAggType->moveToEnd();
+        addTargetIntrinsicDecorations(irAggType, decl);
 
-        return LoweredValInfo::simple(finishOuterGenerics(subBuilder, irStruct, outerGeneric));
+        return LoweredValInfo::simple(finishOuterGenerics(subBuilder, irAggType, outerGeneric));
     }
 
     void lowerRayPayloadAccessModifier(IRInst* inst, RayPayloadAccessSemantic* semantic, IROp op)
@@ -7443,6 +7458,19 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         return finishOuterGenerics(funcTypeBuilder, irFuncType, outerGenerics);
     }
 
+    bool isClassType(IRType* type)
+    {
+        if (auto specialize = as<IRSpecialize>(type))
+        {
+            return findSpecializeReturnVal(specialize)->getOp() == kIROp_ClassType;
+        }
+        else if (auto genericInst = as<IRGeneric>(type))
+        {
+            return findGenericReturnVal(genericInst)->getOp() == kIROp_ClassType;
+        }
+        return type->getOp() == kIROp_ClassType;
+    }
+
     LoweredValInfo lowerFuncDecl(FunctionDeclBase* decl)
     {
         // We are going to use a nested builder, because we will
@@ -7654,6 +7682,13 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             {
                 auto thisVar = subContext->irBuilder->emitVar(irResultType);
                 subContext->thisVal = LoweredValInfo::ptr(thisVar);
+
+                // For class-typed objects, we need to allocate it from heap.
+                if (isClassType(irResultType))
+                {
+                    auto allocatedObj = subContext->irBuilder->emitAllocObj(irResultType);
+                    subContext->irBuilder->emitStore(thisVar, allocatedObj);
+                }
             }
 
             // We lower whatever statement was stored on the declaration

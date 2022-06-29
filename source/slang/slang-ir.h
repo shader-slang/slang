@@ -1408,6 +1408,13 @@ struct IRStructType : IRType
     IR_LEAF_ISA(StructType)
 };
 
+struct IRClassType : IRType
+{
+    IRInstList<IRStructField> getFields() { return IRInstList<IRStructField>(getChildren()); }
+
+    IR_LEAF_ISA(ClassType)
+};
+
 struct IRAssociatedType : IRType
 {
     IR_LEAF_ISA(AssociatedType)
