@@ -11,6 +11,7 @@ namespace d3d11
 
 ShaderObjectLayoutImpl::SubObjectRangeOffset::SubObjectRangeOffset(
     slang::VariableLayoutReflection* varLayout)
+    : BindingOffset(varLayout)
 {
     if (auto pendingLayout = varLayout->getPendingDataLayout())
     {
@@ -20,6 +21,7 @@ ShaderObjectLayoutImpl::SubObjectRangeOffset::SubObjectRangeOffset(
 
 ShaderObjectLayoutImpl::SubObjectRangeStride::SubObjectRangeStride(
     slang::TypeLayoutReflection* typeLayout)
+    : BindingOffset(typeLayout)
 {
     if (auto pendingLayout = typeLayout->getPendingDataTypeLayout())
     {
