@@ -281,6 +281,6 @@ namespace d3d11
         D3D11_SHADER_RESOURCE_VIEW_DESC& descOut);
 } // namespace d3d11
 
-SlangResult SLANG_MCALL createD3D11Device(const IDevice::Desc* desc, IDevice** outDevice);
+Result SLANG_MCALL createD3D11Device(const IDevice::Desc* desc, IDevice** outDevice);
 
 } // namespace gfx
