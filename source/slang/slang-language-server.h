@@ -1,9 +1,8 @@
 #pragma once
-
+#include <chrono>
 #include "../../slang.h"
 #include "../compiler-core/slang-json-rpc.h"
 #include "../compiler-core/slang-json-rpc-connection.h"
-
 #include "slang-workspace-version.h"
 #include "slang-language-server-completion.h"
 #include "slang-language-server-auto-format.h"
@@ -79,15 +78,22 @@ class LanguageServer
 {
 private:
     static const int kConfigResponseId = 0x1213;
-
+    
 public:
+    enum class TraceOptions
+    {
+        Off,
+        Messages,
+        Verbose
+    };
     bool m_initialized = false;
+    TraceOptions m_traceOptions = TraceOptions::Messages;
     CommitCharacterBehavior m_commitCharacterBehavior = CommitCharacterBehavior::MembersOnly;
     RefPtr<JSONRPCConnection> m_connection;
     ComPtr<slang::IGlobalSession> m_session;
     RefPtr<Workspace> m_workspace;
     Dictionary<String, String> m_lastPublishedDiagnostics;
-    time_t m_lastDiagnosticUpdateTime = 0;
+    std::chrono::time_point<std::chrono::system_clock> m_lastDiagnosticUpdateTime;
     FormatOptions m_formatOptions;
     Slang::InlayHintOptions m_inlayHintOptions;
     bool m_quit = false;
@@ -136,6 +142,7 @@ private:
     void updateCommitCharacters(const JSONValue& value);
     void updateFormattingOptions(const JSONValue& clangFormatLoc, const JSONValue& clangFormatStyle);
     void updateInlayHintOptions(const JSONValue& deducedTypes, const JSONValue& parameterNames);
+    void updateTraceOptions(const JSONValue& value);
 
     void sendConfigRequest();
     void registerCapability(const char* methodName);

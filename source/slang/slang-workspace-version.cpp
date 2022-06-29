@@ -150,6 +150,7 @@ void Workspace::init(List<URI> rootDirURI, slang::IGlobalSession* globalSession)
     for (auto uri : rootDirURI)
     {
         auto path = uri.getPath();
+        Path::getCanonical(path, path);
         rootDirectories.add(path);
         DirEnumerationContext context;
         context.workList.add(path);
