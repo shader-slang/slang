@@ -434,13 +434,13 @@ struct JVPDerivativeContext
                 if (auto jvpDiffInst = as<IRJVPDifferentiate>(child))
                 {
                     auto baseFunction = jvpDiffInst->getBaseFn();
+                    // If the JVP Reference already exists, no need to
+                    // differentiate again.
+                    //
+                    if(lookupJVPReference(baseFunction)) continue;
+
                     if (isFunctionMarkedForJVP(as<IRGlobalValueWithCode>(baseFunction)))
                     {
-                        // If the JVP Reference already exists, no need to
-                        // differentiate again.
-                        //
-                        if(lookupJVPReference(baseFunction)) continue;
-
                         IRFunc* jvpFunction = emitJVPFunction(builder, as<IRFunc>(baseFunction));
                         builder->addJVPDerivativeReferenceDecoration(baseFunction, jvpFunction);
                         workQueue->push(jvpFunction);

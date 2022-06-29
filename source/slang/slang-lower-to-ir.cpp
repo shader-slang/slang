@@ -7832,6 +7832,14 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             getBuilder()->addDecoration(irFunc, kIROp_UnsafeForceInlineEarlyDecoration);
         }
 
+        if (auto attr = decl->findModifier<CustomJVPAttribute>())
+        {
+            auto loweredVal = lowerLValueExpr(this->context, attr->funcDeclRef);
+            SLANG_ASSERT(loweredVal.flavor == LoweredValInfo::Flavor::Simple);
+            IRFunc* jvpFunc = as<IRFunc>(loweredVal.val);
+            getBuilder()->addDecoration(irFunc, kIROp_JVPDerivativeReferenceDecoration, jvpFunc);
+        }
+
         // For convenience, ensure that any additional global
         // values that were emitted while outputting the function
         // body appear before the function itself in the list
