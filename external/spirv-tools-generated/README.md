@@ -1,7 +1,7 @@
 Slang SPIR-V Tools
 ==================
 
-The spir-v tools are needed in the Slang project in order to be able to build glslang. We don't necessarily want/neet to build all the spir-v tools - but we do need the files that are generated as part of this process. Those files are then stored in this folder, so that they can just be used without needing to be created as part of the Slang build process.
+The spir-v tools are needed in the Slang project in order to be able to build glslang. We don't necessarily want/need to build all the spir-v tools - but we do need the files that are generated as part of this process. Those files are then stored in this folder, so that they can just be used without needing to be created as part of the Slang build process.
 
 To build spirv-tools we need [cmake](https://cmake.org/download/). On windows we can use cmake with the gui interface. 
 
