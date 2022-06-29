@@ -1300,6 +1300,7 @@ SIMPLE_IR_TYPE(OutType, OutTypeBase)
 SIMPLE_IR_TYPE(InOutType, OutTypeBase)
 
 SIMPLE_IR_TYPE(ComPtrType, Type)
+SIMPLE_IR_TYPE(NativePtrType, Type)
 
 struct IRPseudoPtrType : public IRPtrTypeBase
 {

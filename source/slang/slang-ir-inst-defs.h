@@ -112,6 +112,8 @@ INST(Nop, nop, 0, 0)
 
     // A ComPtr<T> type is treated as a opaque type that represents a reference-counted handle to a COM object.
     INST(ComPtrType, ComPtr, 1, 0)
+    // A NativePtr<T> type represents a native pointer to a managed resource.
+    INST(NativePtrType, NativePtr, 1, 0)
 
     /* SamplerStateTypeBase */
         INST(SamplerStateType, SamplerState, 0, 0)
@@ -313,6 +315,18 @@ INST(getNativeStr, getNativeStr, 1, 0)
 
 // Make String from a NativeString.
 INST(makeString, makeString, 1, 0)
+
+// Get a native ptr from a ComPtr or RefPtr
+INST(GetNativePtr, getNativePtr, 1, 0)
+
+// Get a write reference to a managed ptr var (operand must be Ptr<ComPtr<T>> or Ptr<RefPtr<T>>).
+INST(GetManagedPtrWriteRef, getManagedPtrWriteRef, 1, 0)
+
+// Attach a managedPtr var to a NativePtr without changing its ref count.
+INST(ManagedPtrAttach, ManagedPtrAttach, 1, 0)
+
+// Attach a managedPtr var to a NativePtr without changing its ref count.
+INST(ManagedPtrDetach, ManagedPtrDetach, 1, 0)
 
 // "Subscript" an image at a pixel coordinate to get pointer
 INST(ImageSubscript, imageSubscript, 2, 0)

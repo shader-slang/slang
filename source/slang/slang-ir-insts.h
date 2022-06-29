@@ -1425,6 +1425,18 @@ struct IRGetElementPtr : IRInst
     IRInst* getIndex() { return getOperand(1); }
 };
 
+struct IRGetNativePtr : IRInst
+{
+    IR_LEAF_ISA(GetNativePtr);
+    IRInst* getElementType() { return getOperand(0); }
+};
+
+struct IRGetManagedPtrWriteRef : IRInst
+{
+    IR_LEAF_ISA(GetManagedPtrWriteRef);
+    IRInst* getPtrToManagedPtr() { return getOperand(0); }
+};
+
 struct IRGetAddress : IRInst
 {
     IR_LEAF_ISA(getAddr);
@@ -2175,6 +2187,7 @@ public:
     IRBasicType* getCharType();
     IRStringType* getStringType();
     IRNativeStringType* getNativeStringType();
+    IRNativePtrType* getNativePtrType(IRType* valueType);
 
     IRType* getCapabilitySetType();
 
@@ -2505,6 +2518,14 @@ public:
 
         return emitWrapExistential(type, value, slotArgCount, slotArgVals.getBuffer());
     }
+
+    IRInst* emitManagedPtrAttach(IRInst* managedPtrVar, IRInst* value);
+
+    IRInst* emitManagedPtrDetach(IRInst* managedPtrVar);
+
+    IRInst* emitGetNativePtr(IRInst* value);
+
+    IRInst* emitGetManagedPtrWriteRef(IRInst* ptrToManagedPtr);
 
     IRInst* emitGpuForeach(List<IRInst*> args);
 

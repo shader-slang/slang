@@ -12,6 +12,10 @@ namespace Slang
         {
         case kIROp_StringType:
             return builder.getNativeStringType();
+        case kIROp_InterfaceType:
+            return builder.getNativePtrType(type);
+        case kIROp_ComPtrType:
+            return builder.getNativePtrType((IRType*)as<IRComPtrType>(type)->getOperand(0));
         default:
             return type;
         }
@@ -30,10 +34,14 @@ namespace Slang
         IRType* returnType = declaredFuncType->getResultType();
         if (auto resultType = as<IRResultType>(declaredFuncType->getResultType()))
         {
-            nativeParamTypes.add(builder.getPtrType(resultType->getValueType()));
+            auto nativeResultType = getNativeType(builder, resultType->getValueType());
+            nativeParamTypes.add(builder.getPtrType(nativeResultType));
             returnType = resultType->getErrorType();
         }
-        getNativeType(builder, declaredFuncType->getResultType());
+        else
+        {
+            returnType = getNativeType(builder, returnType);
+        }
         auto funcType = builder.getFuncType(
             nativeParamTypes.getCount(), (IRType**)nativeParamTypes.getBuffer(), returnType);
 
@@ -43,9 +51,18 @@ namespace Slang
     void NativeCallMarshallingContext::marshalRefManagedValueToNativeValue(
         IRBuilder& builder, IRInst* originalArg, List<IRInst*>& args)
     {
-        SLANG_UNUSED(builder);
-        SLANG_UNUSED(originalArg);
-        args.add(originalArg);
+        auto ptrTypeBase = as<IRPtrTypeBase>(originalArg->getDataType());
+        SLANG_RELEASE_ASSERT(ptrTypeBase);
+        switch (ptrTypeBase->getValueType()->getOp())
+        {
+        case kIROp_InterfaceType:
+        case kIROp_ComPtrType:
+            args.add(builder.emitGetManagedPtrWriteRef(originalArg));
+            break;
+        default:
+            args.add(originalArg);
+            break;
+        }
     }
 
     void NativeCallMarshallingContext::marshalManagedValueToNativeValue(
@@ -63,6 +80,12 @@ namespace Slang
                 args.add(nativeStr);
             }
             break;
+        case kIROp_InterfaceType:
+            {
+                auto nativePtr = builder.emitGetNativePtr(originalArg);
+                args.add(nativePtr);
+            }
+            break;
         default:
             args.add(originalArg);
             break;
@@ -77,6 +100,21 @@ namespace Slang
         case kIROp_NativeStringType:
             {
                 return builder.emitMakeString(nativeVal);
+            }
+            break;
+        case kIROp_NativePtrType:
+            {
+                SLANG_RELEASE_ASSERT(nativeVal->getDataType()->getOperand(0)->getOp() == kIROp_InterfaceType);
+                auto comPtrVar = builder.emitVar(builder.getComPtrType((IRType*)nativeVal->getDataType()->getOperand(0)));
+                builder.emitManagedPtrAttach(comPtrVar, nativeVal);
+                return builder.emitLoad(comPtrVar);
+            }
+            break;
+        case kIROp_InterfaceType:
+            {
+                auto comPtrVar = builder.emitVar(nativeVal->getDataType());
+                builder.emitManagedPtrAttach(comPtrVar, nativeVal);
+                return builder.emitLoad(comPtrVar);
             }
             break;
         default:
