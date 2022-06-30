@@ -2539,6 +2539,11 @@ namespace Slang
         return (IRNativeStringType*)getType(kIROp_NativeStringType);
     }
 
+    IRNativePtrType* IRBuilder::getNativePtrType(IRType* valueType)
+    {
+        return (IRNativePtrType*)getType(kIROp_NativePtrType, (IRInst*)valueType);
+    }
+
 
     IRType* IRBuilder::getCapabilitySetType()
     {
@@ -4439,6 +4444,56 @@ namespace Slang
         auto inst = createInst<IRInst>(this, kIROp_Lsh, type, left, right);
         addInst(inst);
         return inst;
+    }
+
+    IRInst* IRBuilder::emitGetNativePtr(IRInst* value)
+    {
+        auto valueType = value->getDataType();
+        SLANG_RELEASE_ASSERT(valueType);
+        switch (valueType->getOp())
+        {
+        case kIROp_InterfaceType:
+            return emitIntrinsicInst(
+                getNativePtrType((IRType*)valueType), kIROp_GetNativePtr, 1, &value);
+            break;
+        case kIROp_ComPtrType:
+            return emitIntrinsicInst(
+                getNativePtrType((IRType*)valueType->getOperand(0)), kIROp_GetNativePtr, 1, &value);
+            break;
+        default:
+            SLANG_UNEXPECTED("invalid operand type for `getNativePtr`.");
+            UNREACHABLE_RETURN(nullptr);
+        }
+    }
+
+    IRInst* IRBuilder::emitManagedPtrAttach(IRInst* managedPtrVar, IRInst* value)
+    {
+        IRInst* args[] = { managedPtrVar, value };
+        return emitIntrinsicInst(getVoidType(), kIROp_ManagedPtrAttach, 2, args);
+    }
+
+    IRInst* IRBuilder::emitManagedPtrDetach(IRInst* managedPtrVar)
+    {
+        return emitIntrinsicInst(getVoidType(), kIROp_ManagedPtrDetach, 1, &managedPtrVar);
+    }
+
+    IRInst* IRBuilder::emitGetManagedPtrWriteRef(IRInst* ptrToManagedPtr)
+    {
+        auto type = ptrToManagedPtr->getDataType();
+        auto ptrType = as<IRPtrTypeBase>(type);
+        SLANG_RELEASE_ASSERT(ptrType);
+        auto managedPtrType = ptrType->getValueType();
+        switch (managedPtrType->getOp())
+        {
+        case kIROp_InterfaceType:
+        case kIROp_ComPtrType:
+            return emitIntrinsicInst(
+                getPtrType(getNativePtrType((IRType*)managedPtrType->getOperand(0))), kIROp_GetManagedPtrWriteRef, 1, &ptrToManagedPtr);
+            break;
+        default:
+            SLANG_UNEXPECTED("invalid operand type for `getNativePtr`.");
+            UNREACHABLE_RETURN(nullptr);
+        }
     }
 
     IRInst* IRBuilder::emitGpuForeach(List<IRInst*> args)
