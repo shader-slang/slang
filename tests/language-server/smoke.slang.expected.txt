@@ -10,7 +10,6 @@ Pair.T Pair<Pair.T, Pair.U>.first
 ```
 
 
-
 {REDACTED}.slang(20)
 
 --------
@@ -18,7 +17,7 @@ activeParameter: 0
 activeSignature: 0
 func IFoo.getSum() -> int:
 
-Returns the sum of the contents.
+Returns the sum of the contents.  
 
 {REDACTED}.slang(10)
 

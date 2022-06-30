@@ -67,7 +67,7 @@ slang::IGlobalSession* LanguageServer::getOrCreateGlobalSession()
     return m_session;
 }
 
-void LanguageServer::resetDiagnosticUpdateTime() { time(&m_lastDiagnosticUpdateTime); }
+void LanguageServer::resetDiagnosticUpdateTime() { m_lastDiagnosticUpdateTime = std::chrono::system_clock::now(); }
 
 String uriToCanonicalPath(const String& uri)
 {
@@ -159,7 +159,7 @@ SlangResult LanguageServer::parseNextMessage()
                 if (response.result.getKind() == JSONValue::Kind::Array)
                 {
                     auto arr = m_connection->getContainer()->getArray(response.result);
-                    if (arr.getCount() == 8)
+                    if (arr.getCount() == 9)
                     {
                         updatePredefinedMacros(arr[0]);
                         updateSearchPaths(arr[1]);
@@ -167,6 +167,7 @@ SlangResult LanguageServer::parseNextMessage()
                         updateCommitCharacters(arr[3]);
                         updateFormattingOptions(arr[4], arr[5]);
                         updateInlayHintOptions(arr[6], arr[7]);
+                        updateTraceOptions(arr[8]);
                     }
                 }
                 break;
@@ -222,43 +223,90 @@ String getDeclSignatureString(DeclRef<Decl> declRef, ASTBuilder* astBuilder)
 
 static String _formatDocumentation(String doc)
 {
+    bool hasDoxygen = false;
     // TODO: may want to use DocMarkdownWriter in the future to format the text.
     // For now just insert line breaks before `\param` and `\returns` markups.
     List<UnownedStringSlice> lines;
     StringUtil::split(doc.getUnownedSlice(), '\n', lines);
     StringBuilder result;
-    
+    StringBuilder returnDocSB;
+    StringBuilder parameterDocSB;
+    StringBuilder* currentSection = &result;
+    bool isFirstParam = true;
     for (Index i = 0; i < lines.getCount(); i++)
     {
         auto trimedLine = lines[i].trimStart();
-        if (i > 0)
-        {
-            if ((trimedLine.startsWith("\\") || trimedLine.startsWith("@")) && lines[i - 1].trim().getLength() != 0)
-            {
-                result << "  \n";
-            }
-            else
-            {
-                result << "\n";
-            }
-        }
         if (trimedLine.startsWith("\\") || trimedLine.startsWith("@"))
         {
+            hasDoxygen = true;
             trimedLine = trimedLine.tail(1);
             if (trimedLine.startsWith("returns "))
             {
-                trimedLine = trimedLine.subString(8, trimedLine.getLength());
-                result << "**returns** ";
+                trimedLine = trimedLine.tail(8);
+                currentSection = &returnDocSB;
+                (*currentSection) << trimedLine << "  \n";
             }
             else if (trimedLine.startsWith("return "))
             {
-                trimedLine = trimedLine.subString(7, trimedLine.getLength());
-                result << "**Returns** ";
+                trimedLine = trimedLine.tail(7);
+                currentSection = &returnDocSB;
+                (*currentSection) << trimedLine << "  \n";
+            }
+            else if (trimedLine.startsWith("param"))
+            {
+                trimedLine = trimedLine.tail(5).trimStart();
+                Index endOfParamName = 0;
+                if (trimedLine.getLength() > 0 && trimedLine[0] == '[')
+                {
+                    endOfParamName = trimedLine.indexOf(']') + 1;
+                    while (endOfParamName < trimedLine.getLength() && CharUtil::isWhitespace(trimedLine[endOfParamName]))
+                        endOfParamName++;
+                }
+                while (endOfParamName < trimedLine.getLength() && !CharUtil::isWhitespace(trimedLine[endOfParamName]))
+                    endOfParamName++;
+                if (isFirstParam)
+                {
+                    isFirstParam = false;
+                }
+                else
+                {
+                    (*currentSection) << "  \n";
+                }
+                if (endOfParamName < trimedLine.getLength())
+                {
+                    parameterDocSB << "`" << trimedLine.head(endOfParamName) << "`";
+                    trimedLine = trimedLine.tail(endOfParamName);
+                }
+                currentSection = &parameterDocSB;
+                (*currentSection) << trimedLine;
             }
         }
-        result << trimedLine;
+        else
+        {
+            (*currentSection) << trimedLine << "\n";
+        }
     }
     result << "\n";
+    if (parameterDocSB.getLength())
+    {
+        result << "**Parameters**  \n";
+        result << parameterDocSB.ProduceString() << "\n\n";
+    }
+    if (returnDocSB.getLength())
+    {
+        result << "**Returns**  \n";
+        result << returnDocSB.ProduceString();
+    }
+
+    if (!hasDoxygen)
+    {
+        // For ordinary comments, we want to preserve line breaks in the original comment.
+        result.Clear();
+        for (Index i = 0; i < lines.getCount(); i++)
+        {
+            result << lines[i] << "  \n";
+        }
+    }
     return result.ProduceString();
 }
 
@@ -276,6 +324,27 @@ static void _tryGetDocumentation(StringBuilder& sb, WorkspaceVersion* workspace,
             sb << "\n";
         }
     }
+}
+
+void appendDefinitionLocation(StringBuilder& sb, Workspace* workspace, const HumaneSourceLoc& loc)
+{
+    auto path = loc.pathInfo.foundPath;
+    Path::getCanonical(path, path);
+    UnownedStringSlice pathSlice = path.getUnownedSlice();
+    if (workspace)
+    {
+        for (auto& root : workspace->rootDirectories)
+        {
+            if (pathSlice.startsWith(root.getUnownedSlice()))
+            {
+                pathSlice = pathSlice.tail(root.getLength());
+                if (pathSlice.startsWith("\\") || pathSlice.startsWith("/"))
+                    pathSlice = pathSlice.tail(1);
+                break;
+            }
+        }
+    }
+    sb << "Defined in " << pathSlice << "(" << loc.line << ")\n";
 }
 
 SlangResult LanguageServer::hover(
@@ -329,8 +398,7 @@ SlangResult LanguageServer::hover(
 
             auto humaneLoc = version->linkage->getSourceManager()->getHumaneLoc(
                 declRef.getLoc(), SourceLocType::Actual);
-            sb << "Defined in " << humaneLoc.pathInfo.foundPath << "(" << humaneLoc.line
-                << ")\n";
+            appendDefinitionLocation(sb, m_workspace, humaneLoc);
 
             auto nodeHumaneLoc =
                 version->linkage->getSourceManager()->getHumaneLoc(leafNode->loc);
@@ -786,8 +854,7 @@ SlangResult LanguageServer::signatureHelp(
         StringBuilder docSB;
         auto humaneLoc = version->linkage->getSourceManager()->getHumaneLoc(declRef.getLoc(), SourceLocType::Actual);
         _tryGetDocumentation(docSB, version, declRef.getDecl());
-
-        docSB << "Defined in " << humaneLoc.pathInfo.foundPath << "(" << humaneLoc.line << ")\n";
+        appendDefinitionLocation(docSB, m_workspace, humaneLoc);
         sigInfo.documentation.value = docSB.ProduceString();
         sigInfo.documentation.kind = "markdown";
 
@@ -1013,14 +1080,12 @@ SlangResult LanguageServer::onTypeFormatting(const LanguageServerProtocol::Docum
 
 void LanguageServer::publishDiagnostics()
 {
-    time_t timeNow = 0;
-    time(&timeNow);
 
-    if (timeNow - m_lastDiagnosticUpdateTime < 3)
+    if (std::chrono::system_clock::now() - m_lastDiagnosticUpdateTime < std::chrono::milliseconds(1000))
     {
         return;
     }
-    m_lastDiagnosticUpdateTime = timeNow;
+    m_lastDiagnosticUpdateTime = std::chrono::system_clock::now();
 
     auto version = m_workspace->getCurrentVersion();
     // Send updates to clear diagnostics for files that no longer have any messages.
@@ -1166,6 +1231,25 @@ void LanguageServer::updateInlayHintOptions(const JSONValue& deducedTypes, const
     m_inlayHintOptions.showParameterNames = showParameterNames;
 }
 
+void LanguageServer::updateTraceOptions(const JSONValue& value)
+{
+    if (value.isValid())
+    {
+        auto container = m_connection->getContainer();
+        JSONToNativeConverter converter(container, m_connection->getSink());
+        String str;
+        if (SLANG_SUCCEEDED(converter.convert(value, &str)))
+        {
+            if (str == "messages")
+                m_traceOptions = TraceOptions::Messages;
+            else if (str == "verbose")
+                m_traceOptions = TraceOptions::Verbose;
+            else
+                m_traceOptions = TraceOptions::Off;
+        }
+    }
+}
+
 void LanguageServer::sendConfigRequest()
 {
     ConfigurationParams args;
@@ -1185,6 +1269,8 @@ void LanguageServer::sendConfigRequest()
     item.section = "slang.inlayHints.deducedTypes";
     args.items.add(item);
     item.section = "slang.inlayHints.parameterNames";
+    args.items.add(item);
+    item.section = "slangLanguageServer.trace.server";
     args.items.add(item);
     m_connection->sendCall(
         ConfigurationParams::methodName,
@@ -1255,7 +1341,7 @@ SlangResult LanguageServer::tryGetMacroHoverInfo(
     sb << "\n```\n\n";
     auto humaneLoc =
         version->linkage->getSourceManager()->getHumaneLoc(def->loc, SourceLocType::Actual);
-    sb << "Defined in " << humaneLoc.pathInfo.foundPath << "(" << humaneLoc.line << ")\n";
+    appendDefinitionLocation(sb, m_workspace, humaneLoc);
     hover.contents.kind = "markdown";
     hover.contents.value = sb.ProduceString();
     m_connection->sendResult(&hover, responseId);
@@ -1576,7 +1662,7 @@ SlangResult LanguageServer::execute()
 
         auto workTime = platform::PerformanceCounter::getElapsedTimeInSeconds(parseEnd);
 
-        if (commands.getCount() > 0 && m_initialized)
+        if (commands.getCount() > 0 && m_initialized && m_traceOptions != TraceOptions::Off)
         {
             StringBuilder msgBuilder;
             msgBuilder << "Server processed " << commands.getCount() << " commands, executed in "
