@@ -15,6 +15,9 @@ public:
     ISlangWriter* getWriter(SlangWriterChannel chan) const { return m_writers[chan]; }
     void setWriter(SlangWriterChannel chan, ISlangWriter* writer) { m_writers[chan] = writer; }
 
+        /// Flush all the set writers
+    void flushWriters();
+
         /// Ctor
     StdWriters() {}
 
@@ -35,6 +38,19 @@ protected:
     
     static StdWriters* s_singleton;
 };
+
+// --------------------------------------------------------------------------
+inline void StdWriters::flushWriters()
+{
+    for (Index i = 0; i < Count(SLANG_WRITER_CHANNEL_COUNT_OF); ++i)
+    {
+        auto writer = m_writers[i];
+        if (writer)
+        {
+            writer->flush();
+        }
+    }
+}
 
 }
 

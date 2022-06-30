@@ -1440,26 +1440,23 @@ void TranslationUnitRequest::addSourceFile(SourceFile* sourceFile)
     }
 }
 
-
-//
-
-static ISlangWriter* _getDefaultWriter(WriterChannel chan)
+EndToEndCompileRequest::~EndToEndCompileRequest()
 {
-    static FileWriter stdOut(stdout, WriterFlag::IsStatic | WriterFlag::IsUnowned);
-    static FileWriter stdError(stderr, WriterFlag::IsStatic | WriterFlag::IsUnowned);
-    static NullWriter nullWriter(WriterFlag::IsStatic | WriterFlag::IsConsole);
+    m_linkage = nullptr;
+    m_frontEndReq = nullptr;
+}
 
-    switch (chan)
-    {
-        case WriterChannel::StdError:    return &stdError;
-        case WriterChannel::StdOutput:   return &stdOut;
-        case WriterChannel::Diagnostic:  return &nullWriter;
-        default:
-        {
-            SLANG_ASSERT(!"Unknown type");
-            return &stdError;
-        }
+ISlangWriter* EndToEndCompileRequest::_getDefaultWriter(WriterChannel chan)
+{
+    if (!m_defaultWriters)
+    {    
+        m_defaultWriters = new StdWriters;
+        m_defaultWriters->setWriter(SLANG_WRITER_CHANNEL_DIAGNOSTIC, new NullWriter(WriterFlag::IsConsole));
+        m_defaultWriters->setWriter(SLANG_WRITER_CHANNEL_STD_ERROR, new FileWriter(stderr, WriterFlag::IsUnowned));
+        m_defaultWriters->setWriter(SLANG_WRITER_CHANNEL_STD_OUTPUT, new FileWriter(stdout, WriterFlag::IsUnowned));
     }
+    
+    return m_defaultWriters->getWriter(SlangWriterChannel(chan));
 }
 
 void EndToEndCompileRequest::setWriter(WriterChannel chan, ISlangWriter* writer)
