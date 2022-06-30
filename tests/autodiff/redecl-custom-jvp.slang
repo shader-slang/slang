@@ -22,7 +22,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
         float da = 1.0;
         float dn = 0;
 
-        outputBuffer[0] = __jvp(_pow)(a, n, da, dn);        // Expect: 1
-        outputBuffer[1] = __jvp(_pow)(a, n, 0.0, 1.0);      // Expect: 1
+        outputBuffer[0] = __jvp(_pow)(a, n, da, dn);        // Expect: 10.0
+        outputBuffer[1] = __jvp(_pow)(a, n, 0.0, 1.0);      // Expect: 40.23595
     }
 }
