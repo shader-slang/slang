@@ -232,6 +232,7 @@ static String _formatDocumentation(String doc)
     StringBuilder returnDocSB;
     StringBuilder parameterDocSB;
     StringBuilder* currentSection = &result;
+    bool isFirstParam = true;
     for (Index i = 0; i < lines.getCount(); i++)
     {
         auto trimedLine = lines[i].trimStart();
@@ -263,13 +264,21 @@ static String _formatDocumentation(String doc)
                 }
                 while (endOfParamName < trimedLine.getLength() && !CharUtil::isWhitespace(trimedLine[endOfParamName]))
                     endOfParamName++;
+                if (isFirstParam)
+                {
+                    isFirstParam = false;
+                }
+                else
+                {
+                    (*currentSection) << "  \n";
+                }
                 if (endOfParamName < trimedLine.getLength())
                 {
                     parameterDocSB << "`" << trimedLine.head(endOfParamName) << "`";
                     trimedLine = trimedLine.tail(endOfParamName);
                 }
                 currentSection = &parameterDocSB;
-                (*currentSection) << trimedLine << "  \n";
+                (*currentSection) << trimedLine;
             }
         }
         else
@@ -281,7 +290,7 @@ static String _formatDocumentation(String doc)
     if (parameterDocSB.getLength())
     {
         result << "**Parameters**  \n";
-        result << parameterDocSB.ProduceString() << "\n";
+        result << parameterDocSB.ProduceString() << "\n\n";
     }
     if (returnDocSB.getLength())
     {
