@@ -1,19 +1,16 @@
 --------
-range: 6,4 - 6,9
+range: 7,4 - 7,9
 content:
 ```
 int value
 ```
 
-HOVER:7,7  
-HOVER:12,7  
-HOVER:19,6  
- #1: Ordindary comment for `value`.  
+#1: Ordindary comment for `value`.  
 
-{REDACTED}.slang(7)
+{REDACTED}.slang(8)
 
 --------
-range: 11,5 - 11,9
+range: 12,5 - 12,9
 content:
 ```
 func main() -> void
@@ -22,10 +19,10 @@ func main() -> void
  #2: Ordinary block comment for main func.  
    #3: This func doesn't return anything.  
 
-{REDACTED}.slang(12)
+{REDACTED}.slang(13)
 
 --------
-range: 18,3 - 18,8
+range: 19,3 - 19,8
 content:
 ```
 E E.Green
@@ -33,6 +30,6 @@ E E.Green
 
 #5 green color  
 
-{REDACTED}.slang(19)
+{REDACTED}.slang(20)
 
 

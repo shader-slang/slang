@@ -1,7 +1,8 @@
 //TEST:LANG_SERVER:
-//HOVER:7,7
-//HOVER:12,7
-//HOVER:19,6
+//HOVER:8,7
+//HOVER:13,7
+//HOVER:20,6
+
 // #1: Ordindary comment for `value`.
 //
 int value;

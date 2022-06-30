@@ -488,7 +488,7 @@ SlangResult DocMarkupExtractor::_findMarkup(const FindInfo& info, Location locat
     SourceFile* sourceFile = sourceView->getSourceFile();
 
     // Let's lookup the line index where this occurred
-    const int startOffset = sourceView->getRange().getOffset(toks[startIndex - 1].loc);
+    const int startOffset = sourceView->getRange().getOffset(toks[startIndex].loc);
 
     // The line index that the markoff starts from 
     Index lineIndex = sourceFile->calcLineIndexFromOffset(startOffset);
@@ -546,7 +546,7 @@ SlangResult DocMarkupExtractor::_findMarkup(const FindInfo& info, Location locat
             }
 
             // Is it on the right line?
-            if (_isTokenOnLineIndex(info.sourceView, type, toks[startIndex], expectedLineIndex))
+            if (!_isTokenOnLineIndex(info.sourceView, type, toks[endIndex], expectedLineIndex))
             {
                 break;
             }
