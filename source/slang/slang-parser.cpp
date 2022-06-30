@@ -98,6 +98,8 @@ namespace Slang
         Scope* outerScope = nullptr;
         Scope* currentScope = nullptr;
 
+        bool hasSeenCompletionToken = false;
+
         TokenReader tokenReader;
         DiagnosticSink* sink;
         SourceLoc lastErrorLoc;
@@ -1126,6 +1128,8 @@ namespace Slang
 
     static NameLoc expectIdentifier(Parser* parser)
     {
+        if (!parser->hasSeenCompletionToken && parser->LookAheadToken(TokenType::CompletionRequest))
+            parser->hasSeenCompletionToken = true;
         return NameLoc(parser->ReadToken(TokenType::Identifier));
     }
 
@@ -4335,6 +4339,24 @@ namespace Slang
             //
             Expr* type = ParseType();
 
+            if (type && hasSeenCompletionToken)
+            {
+                // If we encountered a completion token, just return the parsed expr
+                // as an ExprStmt.
+                for (auto tokenPos = startPos.tokenReaderCursor;
+                    tokenPos && tokenPos < tokenReader.getCursor().tokenReaderCursor;
+                    ++tokenPos)
+                {
+                    if (tokenPos && tokenPos->type == TokenType::CompletionRequest)
+                    {
+                        auto exprStmt = astBuilder->create<ExpressionStmt>();
+                        exprStmt->loc = type->loc;
+                        exprStmt->expression = type;
+                        return exprStmt;
+                    }
+                }
+            }
+
             // We don't actually care about the type, though, so
             // don't retain it
             //
@@ -5635,6 +5657,17 @@ namespace Slang
                 return constExpr;
             }
         case TokenType::CompletionRequest:
+            {
+                VarExpr* varExpr = parser->astBuilder->create<VarExpr>();
+                varExpr->scope = parser->currentScope;
+                parser->FillPosition(varExpr);
+                auto nameAndLoc = NameLoc(peekToken(parser));
+                varExpr->name = nameAndLoc.name;
+                parser->hasSeenCompletionToken = true;
+                // Don't consume the token, instead we skip directly.
+                parser->ReadToken(TokenType::Identifier);
+                return varExpr;
+            }
         case TokenType::Identifier:
             {
                 // We will perform name lookup here so that we can find syntax

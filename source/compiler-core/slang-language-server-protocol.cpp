@@ -25,6 +25,27 @@ static const StructRttiInfo _makeWorkDoneProgressParamsRtti()
 }
 const StructRttiInfo WorkDoneProgressParams::g_rttiInfo = _makeWorkDoneProgressParamsRtti();
 
+static const StructRttiInfo _makeInlayHintOptionsRtti()
+{
+    InlayHintOptions obj;
+    StructRttiBuilder builder(&obj, "LanguageServerProtocol::InlayHintOptions", nullptr);
+    builder.addField("resolveProvider", &obj.resolveProvider);
+    builder.ignoreUnknownFields();
+    return builder.make();
+}
+const StructRttiInfo InlayHintOptions::g_rttiInfo = _makeInlayHintOptionsRtti();
+
+static const StructRttiInfo _makeDocumentOnTypeFormattingOptionsRtti()
+{
+    DocumentOnTypeFormattingOptions obj;
+    StructRttiBuilder builder(&obj, "LanguageServerProtocol::DocumentOnTypeFormattingOptions", nullptr);
+    builder.addField("firstTriggerCharacter", &obj.firstTriggerCharacter);
+    builder.addField("moreTriggerCharacter", &obj.moreTriggerCharacter);
+    builder.ignoreUnknownFields();
+    return builder.make();
+}
+const StructRttiInfo DocumentOnTypeFormattingOptions::g_rttiInfo = _makeDocumentOnTypeFormattingOptionsRtti();
+
 static const StructRttiInfo _makeCompletionOptionsRtti()
 {
     CompletionOptions obj;
@@ -211,6 +232,10 @@ static const StructRttiInfo _makeServerCapabilitiesRtti()
     builder.addField("textDocumentSync", &obj.textDocumentSync);
     builder.addField("workspace", &obj.workspace);
     builder.addField("hoverProvider", &obj.hoverProvider);
+    builder.addField("inlayHintProvider", &obj.inlayHintProvider);
+    builder.addField("documentOnTypeFormattingProvider", &obj.documentOnTypeFormattingProvider);
+    builder.addField("documentFormattingProvider", &obj.documentFormattingProvider);
+    builder.addField("documentRangeFormattingProvider", &obj.documentRangeFormattingProvider);
     builder.addField("definitionProvider", &obj.definitionProvider);
     builder.addField("completionProvider", &obj.completionProvider);
     builder.addField("semanticTokensProvider", &obj.semanticTokensProvider);
@@ -382,6 +407,17 @@ static const StructRttiInfo _makeHoverRtti()
 }
 const StructRttiInfo Hover::g_rttiInfo = _makeHoverRtti();
 
+static const StructRttiInfo _makeCompletionContextRtti()
+{
+    CompletionContext obj;
+    StructRttiBuilder builder(&obj, "LanguageServerProtocol::CompletionContext", nullptr);
+    builder.addField("triggerKind", &obj.triggerKind);
+    builder.addField("triggerCharacter", &obj.triggerCharacter, StructRttiInfo::Flag::Optional);
+    builder.ignoreUnknownFields();
+    return builder.make();
+}
+const StructRttiInfo CompletionContext::g_rttiInfo = _makeCompletionContextRtti();
+
 static const StructRttiInfo _makeDefinitionParamsRtti()
 {
     DefinitionParams obj;
@@ -401,6 +437,7 @@ static const StructRttiInfo _makeCompletionParamsRtti()
     StructRttiBuilder builder(&obj, "LanguageServerProtocol::CompletionParams", &WorkDoneProgressParams::g_rttiInfo);
     builder.addField("textDocument", &obj.textDocument);
     builder.addField("position", &obj.position);
+    builder.addField("context", &obj.context, StructRttiInfo::Flag::Optional);
     builder.ignoreUnknownFields();
     return builder.make();
 }
@@ -603,6 +640,87 @@ static const StructRttiInfo _makeDocumentSymbolRtti()
     return builder.make();
 }
 const StructRttiInfo DocumentSymbol::g_rttiInfo = _makeDocumentSymbolRtti();
+
+static const StructRttiInfo _makeTextEditRtti()
+{
+    TextEdit obj;
+    StructRttiBuilder builder(&obj, "LanguageServerProtocol::TextEdit", nullptr);
+    builder.addField("range", &obj.range);
+    builder.addField("newText", &obj.newText);
+    builder.ignoreUnknownFields();
+    return builder.make();
+}
+const StructRttiInfo TextEdit::g_rttiInfo = _makeTextEditRtti();
+
+static const StructRttiInfo _makeInlayHintParamsRtti()
+{
+    InlayHintParams obj;
+    StructRttiBuilder builder(
+        &obj, "LanguageServerProtocol::InlayHintParams", nullptr);
+    builder.addField("range", &obj.range);
+    builder.addField("textDocument", &obj.textDocument);
+    builder.ignoreUnknownFields();
+    return builder.make();
+}
+const StructRttiInfo InlayHintParams::g_rttiInfo = _makeInlayHintParamsRtti();
+const UnownedStringSlice InlayHintParams::methodName =
+    UnownedStringSlice::fromLiteral("textDocument/inlayHint");
+
+static const StructRttiInfo _makeInlayHintRtti()
+{
+    InlayHint obj;
+    StructRttiBuilder builder(
+        &obj, "LanguageServerProtocol::InlayHint", nullptr);
+    builder.addField("position", &obj.position);
+    builder.addField("label", &obj.label);
+    builder.addField("kind", &obj.kind);
+    builder.addField("paddingLeft", &obj.paddingLeft);
+    builder.addField("paddingRight", &obj.paddingRight);
+    builder.addField("textEdits", &obj.textEdits);
+
+    builder.ignoreUnknownFields();
+    return builder.make();
+}
+const StructRttiInfo InlayHint::g_rttiInfo = _makeInlayHintRtti();
+
+static const StructRttiInfo _makeDocumentFormattingParamsRtti()
+{
+    DocumentFormattingParams obj;
+    StructRttiBuilder builder(&obj, "LanguageServerProtocol::DocumentFormattingParams", nullptr);
+    builder.addField("textDocument", &obj.textDocument);
+    builder.ignoreUnknownFields();
+    return builder.make();
+}
+const StructRttiInfo DocumentFormattingParams::g_rttiInfo = _makeDocumentFormattingParamsRtti();
+const UnownedStringSlice DocumentFormattingParams::methodName =
+    UnownedStringSlice::fromLiteral("textDocument/formatting");
+
+static const StructRttiInfo _makeDocumentRangeFormattingParamsRtti()
+{
+    DocumentRangeFormattingParams obj;
+    StructRttiBuilder builder(&obj, "LanguageServerProtocol::DocumentRangeFormattingParams", nullptr);
+    builder.addField("textDocument", &obj.textDocument);
+    builder.addField("range", &obj.range);
+    builder.ignoreUnknownFields();
+    return builder.make();
+}
+const StructRttiInfo DocumentRangeFormattingParams::g_rttiInfo = _makeDocumentRangeFormattingParamsRtti();
+const UnownedStringSlice DocumentRangeFormattingParams::methodName =
+    UnownedStringSlice::fromLiteral("textDocument/rangeFormatting");
+
+static const StructRttiInfo _makeDocumentOnTypeFormattingParamsRtti()
+{
+    DocumentOnTypeFormattingParams obj;
+    StructRttiBuilder builder(&obj, "LanguageServerProtocol::DocumentOnTypeFormattingParams", nullptr);
+    builder.addField("textDocument", &obj.textDocument);
+    builder.addField("position", &obj.position);
+    builder.addField("ch", &obj.ch);
+    builder.ignoreUnknownFields();
+    return builder.make();
+}
+const StructRttiInfo DocumentOnTypeFormattingParams::g_rttiInfo = _makeDocumentOnTypeFormattingParamsRtti();
+const UnownedStringSlice DocumentOnTypeFormattingParams::methodName =
+    UnownedStringSlice::fromLiteral("textDocument/onTypeFormatting");
 
 } // namespace LanguageServerProtocol
 

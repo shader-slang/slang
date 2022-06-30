@@ -1514,13 +1514,14 @@ namespace Slang
         // Check/Resolve inner function declaration.
         expr->baseFunction = CheckTerm(expr->baseFunction);
         
+        auto astBuilder = this->getASTBuilder();
+
         if(auto primalType = as<FuncType>(expr->baseFunction->type))
         {
             // Resolve JVP type here. 
             // Note that this type checking needs to be in sync with
             // the auto-generation logic in slang-ir-jvp-diff.cpp
             
-            auto astBuilder = this->getASTBuilder();
             FuncType* jvpType = astBuilder->create<FuncType>();
 
             // Only float types can be differentiated for now.
@@ -1529,9 +1530,12 @@ namespace Slang
             // void otherwise.
             //
             if (primalType->resultType->equals(astBuilder->getFloatType()))
-                    jvpType->resultType = astBuilder->getFloatType();
-                else
-                    jvpType->resultType = astBuilder->getVoidType();
+                jvpType->resultType = astBuilder->getFloatType();
+            else
+            {
+                //TODO(yong): issue proper diagnostic here.
+                jvpType->resultType = astBuilder->getVoidType();
+            }
             
             // No support for differentiating function that throw errors, for now.
             SLANG_ASSERT(primalType->errorType->equals(astBuilder->getBottomType()));
@@ -1553,7 +1557,11 @@ namespace Slang
         else
         {
             // Error
-            UNREACHABLE_RETURN(nullptr);
+            expr->type = astBuilder->getErrorType();
+            if (!as<ErrorType>(expr->baseFunction->type))
+            {
+                getSink()->diagnose(expr->baseFunction->loc, Diagnostics::expectedFunction, expr->baseFunction->type);
+            }
         }
 
         return expr;
