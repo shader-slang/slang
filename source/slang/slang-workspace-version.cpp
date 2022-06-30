@@ -460,7 +460,7 @@ ASTMarkup* WorkspaceVersion::getOrCreateMarkupAST(ModuleDecl* module)
     DiagnosticSink sink;
     astMarkup = new ASTMarkup();
     sink.setSourceManager(linkage->getSourceManager());
-    ASTMarkupUtil::extract(module, linkage->getSourceManager(), &sink, astMarkup.Ptr());
+    ASTMarkupUtil::extract(module, linkage->getSourceManager(), &sink, astMarkup.Ptr(), true);
     markupASTs[module] = astMarkup;
     return astMarkup.Ptr();
 }

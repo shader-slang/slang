@@ -223,6 +223,7 @@ String getDeclSignatureString(DeclRef<Decl> declRef, ASTBuilder* astBuilder)
 
 static String _formatDocumentation(String doc)
 {
+    bool hasDoxygen = false;
     // TODO: may want to use DocMarkdownWriter in the future to format the text.
     // For now just insert line breaks before `\param` and `\returns` markups.
     List<UnownedStringSlice> lines;
@@ -236,6 +237,7 @@ static String _formatDocumentation(String doc)
         auto trimedLine = lines[i].trimStart();
         if (trimedLine.startsWith("\\") || trimedLine.startsWith("@"))
         {
+            hasDoxygen = true;
             trimedLine = trimedLine.tail(1);
             if (trimedLine.startsWith("returns "))
             {
@@ -285,6 +287,16 @@ static String _formatDocumentation(String doc)
     {
         result << "**Returns**  \n";
         result << returnDocSB.ProduceString();
+    }
+
+    if (!hasDoxygen)
+    {
+        // For ordinary comments, we want to preserve line breaks in the original comment.
+        result.Clear();
+        for (Index i = 0; i < lines.getCount(); i++)
+        {
+            result << lines[i] << "  \n";
+        }
     }
     return result.ProduceString();
 }
