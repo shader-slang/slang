@@ -40,7 +40,15 @@ namespace Slang {
             }
             return comment;
         }
-
+        case MarkupType::OrdinaryBlockBefore:
+        {
+            if (comment.startsWith(UnownedStringSlice::fromLiteral("/*")))
+            {
+                /// ordinary /* */ block.
+                return comment.tail(2);
+            }
+            return comment;
+        }
         case MarkupType::LineBangBefore:
         {
             return comment.startsWith(UnownedStringSlice::fromLiteral("//!")) ? comment.tail(3) : comment;
@@ -49,7 +57,11 @@ namespace Slang {
         {
             return comment.startsWith(UnownedStringSlice::fromLiteral("///")) ? comment.tail(3) : comment;
         }
-
+        case MarkupType::OrdinaryLineBefore:
+        case MarkupType::OrdinaryLineAfter:
+        {
+            return comment.startsWith(UnownedStringSlice::fromLiteral("//")) ? comment.tail(2) : comment;
+        }
         case MarkupType::LineBangAfter:
         {
             /// //!< Can be multiple lines
@@ -102,12 +114,16 @@ static Index _findTokenIndex(SourceLoc loc, const Token* toks, Index numToks)
         case MarkupType::None:              return 0;
         case MarkupType::BlockBefore:      return MarkupFlag::Before | MarkupFlag::IsBlock; 
         case MarkupType::BlockAfter:       return MarkupFlag::After  | MarkupFlag::IsBlock;
+        case MarkupType::OrdinaryBlockBefore: return MarkupFlag::Before | MarkupFlag::IsBlock;
 
         case MarkupType::LineBangBefore:     return MarkupFlag::Before | MarkupFlag::IsMultiToken; 
         case MarkupType::LineSlashBefore:    return MarkupFlag::Before | MarkupFlag::IsMultiToken; 
+        case MarkupType::OrdinaryLineBefore: return MarkupFlag::Before | MarkupFlag::IsMultiToken;
 
         case MarkupType::LineBangAfter:      return MarkupFlag::After | MarkupFlag::IsMultiToken; 
         case MarkupType::LineSlashAfter:     return MarkupFlag::After | MarkupFlag::IsMultiToken;
+        case MarkupType::OrdinaryLineAfter: return MarkupFlag::After | MarkupFlag::IsMultiToken;
+
     }
 }
 
@@ -121,6 +137,10 @@ static Index _findTokenIndex(SourceLoc loc, const Token* toks, Index numToks)
             if (slice.getLength() >= 3 && (slice[2] == '!' || slice[2] == '*'))
             {
                 return (slice.getLength() >= 4 && slice[3] == '<') ? MarkupType::BlockAfter : MarkupType::BlockBefore;
+            }
+            else
+            {
+                return MarkupType::OrdinaryBlockBefore;
             }
             break;
         }
@@ -138,6 +158,8 @@ static Index _findTokenIndex(SourceLoc loc, const Token* toks, Index numToks)
                     return (slice.getLength() >= 4 && slice[3] == '<') ? MarkupType::LineSlashAfter : MarkupType::LineSlashBefore;
                 }
             }
+            return (tok.flags & TokenFlag::AtStartOfLine) != 0 ? MarkupType::OrdinaryLineBefore
+                                                               : MarkupType::OrdinaryLineAfter;
             break;
         }
         default: break;
@@ -186,6 +208,7 @@ SlangResult DocMarkupExtractor::_extractMarkup(const FindInfo& info, const Found
     {
         case MarkupType::BlockBefore:
         case MarkupType::BlockAfter:
+        case MarkupType::OrdinaryBlockBefore:
         {
             // We should only have a single line
             SLANG_ASSERT(foundMarkup.range.getCount() == 1);
@@ -253,6 +276,8 @@ SlangResult DocMarkupExtractor::_extractMarkup(const FindInfo& info, const Found
 
             break;
         }
+        case MarkupType::OrdinaryLineBefore:
+        case MarkupType::OrdinaryLineAfter:
         case MarkupType::LineBangBefore:      
         case MarkupType::LineSlashBefore:
         case MarkupType::LineBangAfter:
@@ -373,6 +398,10 @@ Index DocMarkupExtractor::_findStartIndex(const FindInfo& info, Location locatio
                 {
                     // Determine the markup type
                     const MarkupType markupType = findMarkupType(tok);
+                    if (!m_searchInOrindaryComments &&
+                        (markupType == MarkupType::OrdinaryBlockBefore ||
+                         markupType == MarkupType::OrdinaryLineBefore))
+                        break;
                     // If the location wanted is before and the markup is, we'll assume this is it
                     if (isBefore(location) && isBefore(markupType))
                     {
@@ -459,7 +488,7 @@ SlangResult DocMarkupExtractor::_findMarkup(const FindInfo& info, Location locat
     SourceFile* sourceFile = sourceView->getSourceFile();
 
     // Let's lookup the line index where this occurred
-    const int startOffset = sourceView->getRange().getOffset(toks[startIndex - 1].loc);
+    const int startOffset = sourceView->getRange().getOffset(toks[startIndex].loc);
 
     // The line index that the markoff starts from 
     Index lineIndex = sourceFile->calcLineIndexFromOffset(startOffset);
@@ -503,7 +532,8 @@ SlangResult DocMarkupExtractor::_findMarkup(const FindInfo& info, Location locat
         {
             endIndex += searchDirection;
             expectedLineIndex += searchDirection;
-
+            if (expectedLineIndex < 0)
+                break;
             if (endIndex < 0 || endIndex >= toks.getCount())
             {
                 break;
@@ -516,7 +546,7 @@ SlangResult DocMarkupExtractor::_findMarkup(const FindInfo& info, Location locat
             }
 
             // Is it on the right line?
-            if (_isTokenOnLineIndex(info.sourceView, type, toks[startIndex], expectedLineIndex))
+            if (!_isTokenOnLineIndex(info.sourceView, type, toks[endIndex], expectedLineIndex))
             {
                 break;
             }

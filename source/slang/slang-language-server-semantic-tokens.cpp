@@ -175,6 +175,16 @@ List<SemanticToken> getSemanticTokens(Linkage* linkage, Module* module, UnownedS
                     maybeInsertToken(token);
                 }
             }
+            else if (auto paramDecl = as<ParamDecl>(node))
+            {
+                if (paramDecl->getName())
+                {
+                    SemanticToken token = _createSemanticToken(
+                        manager, paramDecl->getNameLoc(), paramDecl->getName());
+                    token.type = SemanticTokenType::Parameter;
+                    maybeInsertToken(token);
+                }
+            }
             else if (auto varDecl = as<VarDeclBase>(node))
             {
                 if (varDecl->getName())
