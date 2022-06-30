@@ -5,9 +5,9 @@ content:
 int value
 ```
 
-TEST:LANG_SERVER:  
 HOVER:7,7  
 HOVER:12,7  
+HOVER:19,6  
  #1: Ordindary comment for `value`.  
 
 {REDACTED}.slang(7)
@@ -23,5 +23,16 @@ func main() -> void
    #3: This func doesn't return anything.  
 
 {REDACTED}.slang(12)
+
+--------
+range: 18,3 - 18,8
+content:
+```
+E E.Green
+```
+
+#5 green color  
+
+{REDACTED}.slang(19)
 
 

@@ -48,6 +48,8 @@ public:
         BlockAfter,         /// /*!< */ or /**< */
         LineBangAfter,       /// //!< Can be multiple lines
         LineSlashAfter,      /// ///< Can be multiple lines
+        OrdinaryLineAfter,
+
     };
 
     static bool isBefore(MarkupType type) { return Index(type) >= Index(MarkupType::BlockBefore) && Index(type) <= Index(MarkupType::OrdinaryLineBefore); }

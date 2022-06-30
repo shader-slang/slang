@@ -58,6 +58,7 @@ namespace Slang {
             return comment.startsWith(UnownedStringSlice::fromLiteral("///")) ? comment.tail(3) : comment;
         }
         case MarkupType::OrdinaryLineBefore:
+        case MarkupType::OrdinaryLineAfter:
         {
             return comment.startsWith(UnownedStringSlice::fromLiteral("//")) ? comment.tail(2) : comment;
         }
@@ -121,6 +122,8 @@ static Index _findTokenIndex(SourceLoc loc, const Token* toks, Index numToks)
 
         case MarkupType::LineBangAfter:      return MarkupFlag::After | MarkupFlag::IsMultiToken; 
         case MarkupType::LineSlashAfter:     return MarkupFlag::After | MarkupFlag::IsMultiToken;
+        case MarkupType::OrdinaryLineAfter: return MarkupFlag::After | MarkupFlag::IsMultiToken;
+
     }
 }
 
@@ -155,7 +158,8 @@ static Index _findTokenIndex(SourceLoc loc, const Token* toks, Index numToks)
                     return (slice.getLength() >= 4 && slice[3] == '<') ? MarkupType::LineSlashAfter : MarkupType::LineSlashBefore;
                 }
             }
-            return MarkupType::OrdinaryLineBefore;
+            return (tok.flags & TokenFlag::AtStartOfLine) != 0 ? MarkupType::OrdinaryLineBefore
+                                                               : MarkupType::OrdinaryLineAfter;
             break;
         }
         default: break;
@@ -273,6 +277,7 @@ SlangResult DocMarkupExtractor::_extractMarkup(const FindInfo& info, const Found
             break;
         }
         case MarkupType::OrdinaryLineBefore:
+        case MarkupType::OrdinaryLineAfter:
         case MarkupType::LineBangBefore:      
         case MarkupType::LineSlashBefore:
         case MarkupType::LineBangAfter:
