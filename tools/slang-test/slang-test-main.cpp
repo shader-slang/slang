@@ -1465,16 +1465,18 @@ TestResult runExecutableTest(TestContext* context, TestInput& input)
 
 TestResult runLanguageServerTest(TestContext* context, TestInput& input)
 {
-    RefPtr<JSONRPCConnection> connection;
-    if (SLANG_FAILED(context->createLanguageServerJSONRPCConnection(connection)))
+    if (!context->m_languageServerConnection)
     {
-        return TestResult::Fail;
+        if (SLANG_FAILED(context->createLanguageServerJSONRPCConnection(context->m_languageServerConnection)))
+        {
+            return TestResult::Fail;
+        }
     }
     if (context->isCollectingRequirements())
     {
-        connection->sendCall(LanguageServerProtocol::ExitParams::methodName, JSONValue::makeInt(0));
         return TestResult::Pass;
     }
+    auto connection = context->m_languageServerConnection.Ptr();
     LanguageServerProtocol::InitializeParams initParams;
     LanguageServerProtocol::WorkspaceFolder wsFolder;
     wsFolder.name = "test";
@@ -1684,7 +1686,12 @@ TestResult runLanguageServerTest(TestContext* context, TestInput& input)
             }
         }
     }
-    connection->sendCall(LanguageServerProtocol::ExitParams::methodName, JSONValue::makeInt(0));
+    LanguageServerProtocol::DidCloseTextDocumentParams closeDocParams;
+    closeDocParams.textDocument.uri = URI::fromLocalFilePath(fullPath.getUnownedSlice()).uri;
+    connection->sendCall(
+        LanguageServerProtocol::DidCloseTextDocumentParams::methodName,
+        &closeDocParams,
+        JSONValue::makeInt(1));
 
     auto outputStem = input.outputStem;
     String expectedOutputPath = outputStem + ".expected.txt";

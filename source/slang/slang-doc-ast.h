@@ -74,7 +74,7 @@ struct ASTMarkupUtil
 
         /// Extracts documentation from the nodes held in the module using the source manager. Found documentation is placed
         /// in outMarkup
-    static SlangResult extract(ModuleDecl* moduleDecl, SourceManager* sourceManager, DiagnosticSink* sink, ASTMarkup* outMarkup);
+    static SlangResult extract(ModuleDecl* moduleDecl, SourceManager* sourceManager, DiagnosticSink* sink, ASTMarkup* outMarkup, bool searchOrindaryComments = false);
 };
 
 } // namespace Slang
