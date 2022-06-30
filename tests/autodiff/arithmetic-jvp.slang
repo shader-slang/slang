@@ -9,7 +9,13 @@ __differentiate_jvp float f(float x)
     return x;
 }
 
-__differentiate_jvp float g(float x)
+float g_jvp_(float x, float dx)
+{
+    return 2 * dx;
+}
+
+[__custom_jvp(g_jvp_)]
+float g(float x)
 {
     return x + x;
 }
