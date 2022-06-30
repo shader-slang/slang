@@ -1544,8 +1544,11 @@ void CLikeSourceEmitter::emitCallExpr(IRCall* inst, EmitOpInfo outerPrec)
     {
         const auto operand0TypeOp = funcValue->getOperand(0)->getDataType()->getOp();
 
-        if (operand0TypeOp == kIROp_ComPtrType || operand0TypeOp == kIROp_PtrType)
+        switch (operand0TypeOp)
         {
+        case kIROp_ComPtrType:
+        case kIROp_PtrType:
+        case kIROp_NativePtrType:
             emitComInterfaceCallExpr(inst, outerPrec);
             return;
         }
@@ -1825,7 +1828,40 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
             m_writer->emit(")");
             break;
         }
-
+    case kIROp_GetNativePtr:
+    {
+        auto prec = getInfo(EmitOp::Postfix);
+        needClose = maybeEmitParens(outerPrec, prec);
+        emitOperand(inst->getOperand(0), leftSide(outerPrec, prec));
+        m_writer->emit(".get()");
+        break;
+    }
+    case kIROp_GetManagedPtrWriteRef:
+    {
+        auto prec = getInfo(EmitOp::Postfix);
+        needClose = maybeEmitParens(outerPrec, prec);
+        emitDereferenceOperand(inst->getOperand(0), leftSide(outerPrec, prec));
+        m_writer->emit(".writeRef()");
+        break;
+    }
+    case kIROp_ManagedPtrAttach:
+    {
+        auto prec = getInfo(EmitOp::Postfix);
+        needClose = maybeEmitParens(outerPrec, prec);
+        emitDereferenceOperand(inst->getOperand(0), leftSide(outerPrec, prec));
+        m_writer->emit(".attach(");
+        emitOperand(inst->getOperand(1), EmitOpInfo());
+        m_writer->emit(")");
+        break;
+    }
+    case kIROp_ManagedPtrDetach:
+    {
+        auto prec = getInfo(EmitOp::Postfix);
+        needClose = maybeEmitParens(outerPrec, prec);
+        emitDereferenceOperand(inst->getOperand(0), leftSide(outerPrec, prec));
+        m_writer->emit(".detach()");
+        break;
+    }
     case kIROp_getElement:
     case kIROp_getElementPtr:
     case kIROp_ImageSubscript:

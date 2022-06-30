@@ -106,6 +106,7 @@ jobs:
           7z a slang-macos-dist.zip slangc
           timeout 1000 gon ./extras/macos-notarize.json
       - name: UploadNotarizedBinary
+        if: always()
         uses: softprops/action-gh-release@v1
         with:
           files: |

@@ -6,6 +6,8 @@
 
 #include "slang-workspace-version.h"
 #include "slang-language-server-completion.h"
+#include "slang-language-server-auto-format.h"
+#include "slang-language-server-inlay-hints.h"
 
 namespace Slang
 {
@@ -58,6 +60,10 @@ struct Command
     Optional<LanguageServerProtocol::CompletionParams> completionArgs;
     Optional<LanguageServerProtocol::CompletionItem> completionResolveArgs;
     Optional<LanguageServerProtocol::DocumentSymbolParams> documentSymbolArgs;
+    Optional<LanguageServerProtocol::InlayHintParams> inlayHintArgs;
+    Optional<LanguageServerProtocol::DocumentFormattingParams> formattingArgs;
+    Optional<LanguageServerProtocol::DocumentRangeFormattingParams> rangeFormattingArgs;
+    Optional<LanguageServerProtocol::DocumentOnTypeFormattingParams> onTypeFormattingArgs;
     Optional<LanguageServerProtocol::DidChangeConfigurationParams> changeConfigArgs;
     Optional<LanguageServerProtocol::SignatureHelpParams> signatureHelpArgs;
     Optional<LanguageServerProtocol::DefinitionParams> definitionArgs;
@@ -82,6 +88,8 @@ public:
     RefPtr<Workspace> m_workspace;
     Dictionary<String, String> m_lastPublishedDiagnostics;
     time_t m_lastDiagnosticUpdateTime = 0;
+    FormatOptions m_formatOptions;
+    Slang::InlayHintOptions m_inlayHintOptions;
     bool m_quit = false;
     List<LanguageServerProtocol::WorkspaceFolder> m_workspaceFolders;
 
@@ -108,6 +116,14 @@ public:
         const LanguageServerProtocol::SignatureHelpParams& args, const JSONValue& responseId);
     SlangResult documentSymbol(
         const LanguageServerProtocol::DocumentSymbolParams& args, const JSONValue& responseId);
+    SlangResult inlayHint(
+        const LanguageServerProtocol::InlayHintParams& args, const JSONValue& responseId);
+    SlangResult formatting(
+        const LanguageServerProtocol::DocumentFormattingParams& args, const JSONValue& responseId);
+    SlangResult rangeFormatting(
+        const LanguageServerProtocol::DocumentRangeFormattingParams& args, const JSONValue& responseId);
+    SlangResult onTypeFormatting(
+        const LanguageServerProtocol::DocumentOnTypeFormattingParams& args, const JSONValue& responseId);
 
 private:
     SlangResult parseNextMessage();
@@ -118,6 +134,8 @@ private:
     void updateSearchPaths(const JSONValue& value);
     void updateSearchInWorkspace(const JSONValue& value);
     void updateCommitCharacters(const JSONValue& value);
+    void updateFormattingOptions(const JSONValue& clangFormatLoc, const JSONValue& clangFormatStyle);
+    void updateInlayHintOptions(const JSONValue& deducedTypes, const JSONValue& parameterNames);
 
     void sendConfigRequest();
     void registerCapability(const char* methodName);

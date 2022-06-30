@@ -633,7 +633,7 @@ namespace Slang
         const char* chars = m_begin;
         const char firstChar = inChars[0];
 
-        for (Int i = 0; i < len - inLen; ++i)
+        for (Int i = 0; i <= len - inLen; ++i)
         {
             if (chars[i] == firstChar && in == UnownedStringSlice(chars + i, inLen))
             {
