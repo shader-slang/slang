@@ -44,7 +44,7 @@ namespace Slang {
         {
             if (comment.startsWith(UnownedStringSlice::fromLiteral("/*")))
             {
-                /// /*!< */ or /**< */
+                /// ordinary /* */ block.
                 return comment.tail(2);
             }
             return comment;
