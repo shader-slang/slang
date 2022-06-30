@@ -527,7 +527,8 @@ SlangResult DocMarkupExtractor::_findMarkup(const FindInfo& info, Location locat
         {
             endIndex += searchDirection;
             expectedLineIndex += searchDirection;
-
+            if (expectedLineIndex < 0)
+                break;
             if (endIndex < 0 || endIndex >= toks.getCount())
             {
                 break;
