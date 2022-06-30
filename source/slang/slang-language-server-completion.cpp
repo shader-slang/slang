@@ -94,6 +94,139 @@ SlangResult CompletionContext::tryCompleteAttributes()
     return SLANG_OK;
 }
 
+List<LanguageServerProtocol::CompletionItem> CompletionContext::gatherFileAndModuleCompletionItems(const String& prefixPath)
+{
+    struct FileEnumerationContext
+    {
+        List<LanguageServerProtocol::CompletionItem> items;
+        HashSet<String> itemSet;
+        CompletionContext* completionContext;
+        String path;
+        String workspaceRoot;
+    } context;
+    context.completionContext = this;
+    if (version->workspace->rootDirectories.getCount())
+        context.workspaceRoot = version->workspace->rootDirectories[0];
+    if (context.workspaceRoot.getLength() &&
+        context.workspaceRoot[context.workspaceRoot.getLength() - 1] !=
+            Path::kOSCanonicalPathDelimiter)
+    {
+        context.workspaceRoot = context.workspaceRoot + String(Path::kOSCanonicalPathDelimiter);
+    }
+
+    auto addCandidate = [&](const String& path)
+    {
+        context.path = path;
+        if (path.getUnownedSlice().endsWithCaseInsensitive(prefixPath.getUnownedSlice()))
+        {
+            OSFileSystem::getExtSingleton()->enumeratePathContents(
+                path.getBuffer(),
+                [](SlangPathType pathType, const char* name, void* userData)
+                {
+                    FileEnumerationContext* context = (FileEnumerationContext*)userData;
+                    LanguageServerProtocol::CompletionItem item;
+                    if (pathType == SLANG_PATH_TYPE_DIRECTORY)
+                    {
+                        item.label = name;
+                        item.kind = LanguageServerProtocol::kCompletionItemKindFolder;
+                        if (item.label.indexOf('.') != -1)
+                            return;
+                    }
+                    else
+                    {
+                        auto nameSlice = UnownedStringSlice(name);
+                        if (nameSlice.endsWithCaseInsensitive(".slang"))
+                        {
+                            StringBuilder nameSB;
+                            for (auto ch : UnownedStringSlice(name).head(nameSlice.getLength() - 6))
+                            {
+                                switch (ch)
+                                {
+                                case '-':
+                                    nameSB.appendChar('_');
+                                    break;
+                                case '.':
+                                    // Ignore any file items that contains a "."
+                                    return;
+                                default:
+                                    nameSB.appendChar(ch);
+                                    break;
+                                }
+                            }
+                            item.label = nameSB.ProduceString();
+                            item.kind = LanguageServerProtocol::kCompletionItemKindFile;
+                        }
+                    }
+                    if (item.label.getLength())
+                    {
+                        if (context->itemSet.Add(item.label))
+                        {
+                            item.detail = Path::combine(context->path, String(name));
+                            Path::getCanonical(item.detail, item.detail);
+
+                            if (item.detail.getUnownedSlice().startsWithCaseInsensitive(context->workspaceRoot.getUnownedSlice()))
+                            {
+                                item.detail = item.detail.getUnownedSlice().tail(context->workspaceRoot.getLength());
+                            }
+                            context->items.add(item);
+                        }
+                    }
+                },
+                &context);
+        }
+    };
+
+    for (auto& searchPath : this->version->workspace->additionalSearchPaths)
+    {
+        addCandidate(searchPath);
+    }
+    if (this->version->workspace->searchInWorkspace)
+    {
+        for (auto& searchPath : this->version->workspace->workspaceSearchPaths)
+        {
+            addCandidate(searchPath);
+        }
+    }
+    return context.items;
+}
+
+SlangResult CompletionContext::tryCompleteImport()
+{
+    static auto importStr = UnownedStringSlice("import ");
+    auto lineContent = doc->getLine(line);
+    Index pos = lineContent.indexOf(importStr);
+    if (pos == -1)
+        return SLANG_FAIL;
+    pos += importStr.getLength();
+    StringBuilder prefixSB;
+    Index lastPos = col - 1;
+    while (lastPos > 0 && lineContent[lastPos] != '.') lastPos--;
+    UnownedStringSlice prefixSlice;
+    if (lastPos > pos)
+        prefixSlice = lineContent.subString(pos, lastPos - pos);
+    for (auto ch : prefixSlice)
+    {
+        if (ch == '.')
+            prefixSB.appendChar(Path::kOSCanonicalPathDelimiter);
+        else if (ch == '_')
+            prefixSB.appendChar('-');
+        else
+            prefixSB.appendChar(ch);
+    }
+    auto prefix = prefixSB.ProduceString();
+    auto items = gatherFileAndModuleCompletionItems(prefix);
+    if (commitCharacterBehavior != CommitCharacterBehavior::Disabled)
+    {
+        for (auto& item : items)
+        {
+            for (auto ch : getCommitChars())
+                item.commitCharacters.add(ch);
+        }
+    }
+    server->m_connection->sendResult(&items, responseId);
+    return SLANG_OK;
+}
+
 SlangResult CompletionContext::tryCompleteMemberAndSymbol()
 {
     List<LanguageServerProtocol::CompletionItem> items = collectMembersAndSymbols();

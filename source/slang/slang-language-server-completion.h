@@ -31,10 +31,13 @@ struct CompletionContext
     SlangResult tryCompleteMemberAndSymbol();
     SlangResult tryCompleteHLSLSemantic();
     SlangResult tryCompleteAttributes();
+    SlangResult tryCompleteImport();
+
     List<LanguageServerProtocol::CompletionItem> collectMembersAndSymbols();
     List<LanguageServerProtocol::CompletionItem> createSwizzleCandidates(
         Type* baseType, IntegerLiteralValue elementCount[2]);
     List<LanguageServerProtocol::CompletionItem> collectAttributes();
+    List<LanguageServerProtocol::CompletionItem> gatherFileAndModuleCompletionItems(const String& prefixPath);
 };
 
 } // namespace Slang

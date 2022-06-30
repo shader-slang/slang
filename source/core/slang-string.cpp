@@ -142,6 +142,17 @@ namespace Slang
         return startsWith(UnownedTerminatedStringSlice(str));
     }
 
+    bool UnownedStringSlice::startsWithCaseInsensitive(UnownedStringSlice const& other) const
+    {
+        UInt thisSize = getLength();
+        UInt otherSize = other.getLength();
+
+        if (otherSize > thisSize)
+            return false;
+
+        return UnownedStringSlice(begin(), begin() + otherSize).caseInsensitiveEquals(other);
+    }
+
 
     bool UnownedStringSlice::endsWith(UnownedStringSlice const& other) const
     {

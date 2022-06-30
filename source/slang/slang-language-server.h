@@ -87,7 +87,7 @@ public:
         Verbose
     };
     bool m_initialized = false;
-    TraceOptions m_traceOptions = TraceOptions::Messages;
+    TraceOptions m_traceOptions = TraceOptions::Off;
     CommitCharacterBehavior m_commitCharacterBehavior = CommitCharacterBehavior::MembersOnly;
     RefPtr<JSONRPCConnection> m_connection;
     ComPtr<slang::IGlobalSession> m_session;

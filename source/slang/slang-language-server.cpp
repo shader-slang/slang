@@ -347,6 +347,26 @@ void appendDefinitionLocation(StringBuilder& sb, Workspace* workspace, const Hum
     sb << "Defined in " << pathSlice << "(" << loc.line << ")\n";
 }
 
+HumaneSourceLoc getModuleLoc(SourceManager* manager, ModuleDecl* moduleDecl)
+{
+    if (moduleDecl)
+    {
+        if (moduleDecl->members.getCount() &&
+            moduleDecl->members[0])
+        {
+            auto loc = moduleDecl->members[0]->loc;
+            if (loc.isValid())
+            {
+                auto location = manager->getHumaneLoc(loc, SourceLocType::Actual);
+                location.line = 1;
+                location.column = 1;
+                return location;
+            }
+        }
+    }
+    return HumaneSourceLoc();
+}
+
 SlangResult LanguageServer::hover(
     const LanguageServerProtocol::HoverParams& args, const JSONValue& responseId)
 {
@@ -428,6 +448,27 @@ SlangResult LanguageServer::hover(
     {
         LookupResultItem& item = overloadedExpr->lookupResult2.item;
         fillDeclRefHoverInfo(item.declRef);
+    }
+    else if (auto importDecl = as<ImportDecl>(leafNode))
+    {
+        auto moduleLoc = getModuleLoc(version->linkage->getSourceManager(), importDecl->importedModuleDecl);
+        if (moduleLoc.pathInfo.hasFoundPath())
+        {
+            String path = moduleLoc.pathInfo.foundPath;
+            Path::getCanonical(path, path);
+            sb << path;
+            auto humaneLoc = version->linkage->getSourceManager()->getHumaneLoc(
+                importDecl->startLoc, SourceLocType::Actual);
+            Index utf16Line, utf16Col;
+            doc->oneBasedUTF8LocToZeroBasedUTF16Loc(humaneLoc.line, humaneLoc.column, utf16Line, utf16Col);
+            hover.range.start.line = (int)utf16Line;
+            hover.range.start.character = (int)utf16Col;
+            humaneLoc = version->linkage->getSourceManager()->getHumaneLoc(
+                importDecl->endLoc, SourceLocType::Actual);
+            doc->oneBasedUTF8LocToZeroBasedUTF16Loc(humaneLoc.line, humaneLoc.column, utf16Line, utf16Col);
+            hover.range.end.line = (int)utf16Line;
+            hover.range.end.character = (int)utf16Col;
+        }
     }
     else if (auto decl = as<Decl>(leafNode))
     {
@@ -529,18 +570,10 @@ SlangResult LanguageServer::gotoDefinition(
     }
     else if (auto importDecl = as<ImportDecl>(leafNode))
     {
-        if (importDecl->importedModuleDecl)
+        auto location = getModuleLoc(version->linkage->getSourceManager(), importDecl->importedModuleDecl);
+        if (location.pathInfo.hasFoundPath())
         {
-            if (importDecl->importedModuleDecl->members.getCount() &&
-                importDecl->importedModuleDecl->members[0])
-            {
-                auto loc = importDecl->importedModuleDecl->members[0]->loc;
-                if (loc.isValid())
-                {
-                    auto location = version->linkage->getSourceManager()->getHumaneLoc(loc, SourceLocType::Actual);
-                    locations.add(LocationResult{location, 0});
-                }
-            }
+            locations.add(LocationResult{ location, 0 });
         }
     }
     if (locations.getCount() == 0)
@@ -662,6 +695,10 @@ SlangResult LanguageServer::completion(
     context.line = utf8Line;
     context.col = utf8Col;
     context.commitCharacterBehavior = m_commitCharacterBehavior;
+    if (SLANG_SUCCEEDED(context.tryCompleteImport()))
+    {
+        return SLANG_OK;
+    }
     if (SLANG_SUCCEEDED(context.tryCompleteAttributes()))
     {
         return SLANG_OK;
