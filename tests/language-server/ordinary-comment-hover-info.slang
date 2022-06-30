@@ -1,13 +1,13 @@
-// TEST:LANG_SERVER:
-// HOVER:7,7
-// HOVER:12,7
+//TEST:LANG_SERVER:
+//HOVER:7,7
+//HOVER:12,7
 
-// Orindary comment for `value`.
+// #1: Ordindary comment for `value`.
 //
 int value;
 
-/* Ordinary block comment for main func.
-   This func doesn't return anything.
+/* #2: Ordinary block comment for main func.
+   #3: This func doesn't return anything.
 */
 void main()
 {

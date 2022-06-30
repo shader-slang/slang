@@ -1,0 +1,27 @@
+--------
+range: 6,4 - 6,9
+content:
+```
+int value
+```
+
+TEST:LANG_SERVER:  
+HOVER:7,7  
+HOVER:12,7  
+ #1: Ordindary comment for `value`.  
+
+{REDACTED}.slang(7)
+
+--------
+range: 11,5 - 11,9
+content:
+```
+func main() -> void
+```
+
+ #2: Ordinary block comment for main func.  
+   #3: This func doesn't return anything.  
+
+{REDACTED}.slang(12)
+
+
