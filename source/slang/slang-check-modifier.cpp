@@ -595,6 +595,17 @@ namespace Slang
 
             callablePayloadAttr->location = (int32_t)val->value;
         }
+        else if (auto customJVPAttr = as<CustomJVPAttribute>(attr))
+        {
+            SLANG_ASSERT(attr->args.getCount() == 1);
+            
+            // Ensure that the argument is a reference to a function definition or declaration.
+            auto funcExpr = as<DeclRefExpr>(CheckTerm(attr->args[0]));
+            if (!as<FuncType>(funcExpr->type))
+                return false;
+
+            customJVPAttr->funcDeclRef = funcExpr;
+        }
         else
         {
             if(attr->args.getCount() == 0)

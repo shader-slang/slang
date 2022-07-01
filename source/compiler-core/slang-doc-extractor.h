@@ -42,13 +42,17 @@ public:
         BlockBefore,        /// /**  */ or /*!  */.
         LineBangBefore,      /// //! Can be multiple lines
         LineSlashBefore,     /// /// Can be multiple lines
+        OrdinaryBlockBefore,
+        OrdinaryLineBefore,
 
         BlockAfter,         /// /*!< */ or /**< */
         LineBangAfter,       /// //!< Can be multiple lines
         LineSlashAfter,      /// ///< Can be multiple lines
+        OrdinaryLineAfter,
+
     };
 
-    static bool isBefore(MarkupType type) { return Index(type) >= Index(MarkupType::BlockBefore) && Index(type) <= Index(MarkupType::LineSlashBefore); }
+    static bool isBefore(MarkupType type) { return Index(type) >= Index(MarkupType::BlockBefore) && Index(type) <= Index(MarkupType::OrdinaryLineBefore); }
     static bool isAfter(MarkupType type) { return Index(type) >= Index(MarkupType::BlockAfter); }
 
     struct IndexRange
@@ -121,6 +125,10 @@ public:
         Index lineIndex;                ///< The line number for the decl
     };
 
+    void setSearchInOrdinaryComments(bool val)
+    {
+        m_searchInOrindaryComments = val;
+    }
     
         /// Extracts 'markup' doc information for the specified input items
         /// The output is placed in out - with the items now in the source order *not* the order of the input items
@@ -156,6 +164,8 @@ protected:
     static bool _isTokenOnLineIndex(SourceView* sourceView, MarkupType type, const Token& tok, Index lineIndex);
 
     DiagnosticSink* m_sink;
+
+    bool m_searchInOrindaryComments = false;
 };
 
 } // namespace Slang

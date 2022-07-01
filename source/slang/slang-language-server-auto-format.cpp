@@ -26,13 +26,12 @@ String findClangFormatTool()
     auto localProcess = Path::combine(dirName, processName);
     if (File::exists(localProcess))
         return localProcess;
-
-    Index vsCodeLoc = dirName.indexOf(".vscode");
+    auto extensionsStr = UnownedStringSlice("extensions");
+    Index vsCodeLoc = dirName.indexOf(extensionsStr);
     if (vsCodeLoc != -1)
     {
         // If we still cannot find clang-format, try to use the clang-format bundled with VSCode's C++ extension.
-        String vsCodeExtDir = dirName.subString(0, vsCodeLoc + 7);
-        vsCodeExtDir = Path::combine(vsCodeExtDir, "extensions");
+        String vsCodeExtDir = dirName.subString(0, vsCodeLoc + extensionsStr.getLength());
         struct CallbackContext
         {
             String foundPath;
