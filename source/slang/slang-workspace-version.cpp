@@ -167,6 +167,9 @@ void Workspace::init(List<URI> rootDirURI, slang::IGlobalSession* globalSession)
                     auto nameSlice = UnownedStringSlice(name);
                     if (pathType == SLANG_PATH_TYPE_DIRECTORY)
                     {
+                        // Ignore directories starting with '.'
+                        if (nameSlice.getLength() && nameSlice[0] == '.')
+                            return;
                         dirContext->workList.add(Path::combine(dirContext->currentPath, name));
                     }
                     else if (nameSlice.endsWithCaseInsensitive(".slang") || nameSlice.endsWithCaseInsensitive(".hlsl"))

@@ -150,6 +150,17 @@ static const StructRttiInfo _makeRangeRtti()
 }
 const StructRttiInfo Range::g_rttiInfo = _makeRangeRtti();
 
+static const StructRttiInfo _makeTextEditRtti()
+{
+    TextEdit obj;
+    StructRttiBuilder builder(&obj, "LanguageServerProtocol::TextEdit", nullptr);
+    builder.addField("range", &obj.range);
+    builder.addField("newText", &obj.newText);
+    builder.ignoreUnknownFields();
+    return builder.make();
+}
+const StructRttiInfo TextEdit::g_rttiInfo = _makeTextEditRtti();
+
 static const StructRttiInfo _makeDidOpenTextDocumentRtti()
 {
     DidOpenTextDocumentParams obj;
@@ -460,6 +471,22 @@ static const StructRttiInfo _makeCompletionItemRtti()
 }
 const StructRttiInfo CompletionItem::g_rttiInfo = _makeCompletionItemRtti();
 
+static const StructRttiInfo _makeTextEditCompletionItemRtti()
+{
+    TextEditCompletionItem obj;
+    StructRttiBuilder builder(&obj, "LanguageServerProtocol::TextEditCompletionItem", nullptr);
+    builder.addField("label", &obj.label, StructRttiInfo::Flag::Optional);
+    builder.addField("detail", &obj.detail, StructRttiInfo::Flag::Optional);
+    builder.addField("kind", &obj.kind, StructRttiInfo::Flag::Optional);
+    builder.addField("documentation", &obj.documentation, StructRttiInfo::Flag::Optional);
+    builder.addField("data", &obj.data, StructRttiInfo::Flag::Optional);
+    builder.addField("textEdit", &obj.textEdit, StructRttiInfo::Flag::Optional);
+    builder.addField("commitCharacters", &obj.commitCharacters, StructRttiInfo::Flag::Optional);
+    builder.ignoreUnknownFields();
+    return builder.make();
+}
+const StructRttiInfo TextEditCompletionItem::g_rttiInfo = _makeTextEditCompletionItemRtti();
+
 static const StructRttiInfo _makeSemanticTokensParamsRtti()
 {
     SemanticTokensParams obj;
@@ -640,17 +667,6 @@ static const StructRttiInfo _makeDocumentSymbolRtti()
     return builder.make();
 }
 const StructRttiInfo DocumentSymbol::g_rttiInfo = _makeDocumentSymbolRtti();
-
-static const StructRttiInfo _makeTextEditRtti()
-{
-    TextEdit obj;
-    StructRttiBuilder builder(&obj, "LanguageServerProtocol::TextEdit", nullptr);
-    builder.addField("range", &obj.range);
-    builder.addField("newText", &obj.newText);
-    builder.ignoreUnknownFields();
-    return builder.make();
-}
-const StructRttiInfo TextEdit::g_rttiInfo = _makeTextEditRtti();
 
 static const StructRttiInfo _makeInlayHintParamsRtti()
 {

@@ -58,6 +58,7 @@ struct Command
 
     Optional<LanguageServerProtocol::CompletionParams> completionArgs;
     Optional<LanguageServerProtocol::CompletionItem> completionResolveArgs;
+    Optional<LanguageServerProtocol::TextEditCompletionItem> textEditCompletionResolveArgs;
     Optional<LanguageServerProtocol::DocumentSymbolParams> documentSymbolArgs;
     Optional<LanguageServerProtocol::InlayHintParams> inlayHintArgs;
     Optional<LanguageServerProtocol::DocumentFormattingParams> formattingArgs;
@@ -87,7 +88,7 @@ public:
         Verbose
     };
     bool m_initialized = false;
-    TraceOptions m_traceOptions = TraceOptions::Messages;
+    TraceOptions m_traceOptions = TraceOptions::Off;
     CommitCharacterBehavior m_commitCharacterBehavior = CommitCharacterBehavior::MembersOnly;
     RefPtr<JSONRPCConnection> m_connection;
     ComPtr<slang::IGlobalSession> m_session;
@@ -115,7 +116,7 @@ public:
     SlangResult completion(
         const LanguageServerProtocol::CompletionParams& args, const JSONValue& responseId);
     SlangResult completionResolve(
-        const LanguageServerProtocol::CompletionItem& args, const JSONValue& responseId);
+        const LanguageServerProtocol::CompletionItem& args, const LanguageServerProtocol::TextEditCompletionItem& editItem, const JSONValue& responseId);
     SlangResult semanticTokens(
         const LanguageServerProtocol::SemanticTokensParams& args, const JSONValue& responseId);
     SlangResult signatureHelp(
