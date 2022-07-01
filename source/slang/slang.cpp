@@ -1442,21 +1442,30 @@ void TranslationUnitRequest::addSourceFile(SourceFile* sourceFile)
 
 EndToEndCompileRequest::~EndToEndCompileRequest()
 {
-    m_linkage = nullptr;
-    m_frontEndReq = nullptr;
+    // Flush any writers associated with the request
+    m_writers->flushWriters();
+
+    m_linkage.setNull();
+    m_frontEndReq.setNull();
 }
 
-ISlangWriter* EndToEndCompileRequest::_getDefaultWriter(WriterChannel chan)
+static ISlangWriter* _getDefaultWriter(WriterChannel chan)
 {
-    if (!m_defaultWriters)
-    {    
-        m_defaultWriters = new StdWriters;
-        m_defaultWriters->setWriter(SLANG_WRITER_CHANNEL_DIAGNOSTIC, new NullWriter(WriterFlag::IsConsole));
-        m_defaultWriters->setWriter(SLANG_WRITER_CHANNEL_STD_ERROR, new FileWriter(stderr, WriterFlag::IsUnowned));
-        m_defaultWriters->setWriter(SLANG_WRITER_CHANNEL_STD_OUTPUT, new FileWriter(stdout, WriterFlag::IsUnowned));
+    static FileWriter stdOut(stdout, WriterFlag::IsStatic | WriterFlag::IsUnowned);
+    static FileWriter stdError(stderr, WriterFlag::IsStatic | WriterFlag::IsUnowned);
+    static NullWriter nullWriter(WriterFlag::IsStatic | WriterFlag::IsConsole);
+
+    switch (chan)
+    {
+        case WriterChannel::StdError:    return &stdError;
+        case WriterChannel::StdOutput:   return &stdOut;
+        case WriterChannel::Diagnostic:  return &nullWriter;
+        default:
+        {
+            SLANG_ASSERT(!"Unknown type");
+            return &stdError;
+        }
     }
-    
-    return m_defaultWriters->getWriter(SlangWriterChannel(chan));
 }
 
 void EndToEndCompileRequest::setWriter(WriterChannel chan, ISlangWriter* writer)
@@ -1464,7 +1473,7 @@ void EndToEndCompileRequest::setWriter(WriterChannel chan, ISlangWriter* writer)
     // If the user passed in null, we will use the default writer on that channel
     m_writers->setWriter(SlangWriterChannel(chan), writer ? writer : _getDefaultWriter(chan));
 
-    // For diagnostic output, if the user passes in nullptr, we set on mSink.writer as that enables buffering on DiagnosticSink
+    // For diagnostic output, if the user passes in nullptr, we set on m_sink.writer as that enables buffering on DiagnosticSink
     if (chan == WriterChannel::Diagnostic)
     {
         m_sink.writer = writer; 

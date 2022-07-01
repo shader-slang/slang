@@ -2658,8 +2658,6 @@ namespace Slang
 
         ~EndToEndCompileRequest();
 
-        ISlangWriter* _getDefaultWriter(WriterChannel chan);
-
             // What container format are we being asked to generate?
             // If it's set to a format, the container blob will be calculated during compile
         ContainerFormat m_containerFormat = ContainerFormat::None;
@@ -2824,7 +2822,6 @@ namespace Slang
         // For output
 
         RefPtr<StdWriters> m_writers;
-        RefPtr<StdWriters> m_defaultWriters;
     };
 
     /* Returns SLANG_OK if pass through support is available */
