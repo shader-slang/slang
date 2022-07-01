@@ -2656,6 +2656,8 @@ namespace Slang
         EndToEndCompileRequest(
             Linkage* linkage);
 
+        ~EndToEndCompileRequest();
+
             // What container format are we being asked to generate?
             // If it's set to a format, the container blob will be calculated during compile
         ContainerFormat m_containerFormat = ContainerFormat::None;
@@ -2761,11 +2763,7 @@ namespace Slang
         {
             return m_specializedEntryPoints[index];
         }
-        ~EndToEndCompileRequest()
-        {
-            m_linkage = nullptr;
-            m_frontEndReq = nullptr;
-        }
+        
 
         void generateOutput();
 

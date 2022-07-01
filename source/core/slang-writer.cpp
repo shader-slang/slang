@@ -127,9 +127,14 @@ SlangResult CallbackWriter::write(const char* chars, size_t numChars)
 
 FileWriter::~FileWriter()
 {
-    if ((m_flags & WriterFlag::IsUnowned) == 0)
+    if (m_file)
     {
-        fclose(m_file);
+        ::fflush(m_file);
+
+        if ((m_flags & WriterFlag::IsUnowned) == 0)
+        {
+            ::fclose(m_file);
+        }
     }
 }
 
