@@ -955,6 +955,15 @@ class RequiresNVAPIAttribute : public Attribute
     SLANG_AST_CLASS(RequiresNVAPIAttribute)
 };
 
+    /// The `[__custom_jvp(function)]` attribute specifies a custom function that should
+    /// be used as the derivative for the decorated function.
+class CustomJVPAttribute : public Attribute 
+{
+    SLANG_AST_CLASS(CustomJVPAttribute)
+
+    DeclRefExpr* funcDeclRef;
+};
+
     /// Indicates that the modified declaration is one of the "magic" declarations
     /// that NVAPI uses to communicate extended operations. When NVAPI is being included
     /// via the prelude for downstream compilation, declarations with this modifier
@@ -1051,5 +1060,7 @@ class SNormModifier : public ResourceElementFormatModifier
 {
     SLANG_AST_CLASS(SNormModifier)
 };
+
+
 
 } // namespace Slang

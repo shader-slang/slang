@@ -2212,3 +2212,6 @@ attribute_syntax [noinline] : NoInlineAttribute;
 __attributeTarget(StructDecl)
 attribute_syntax [payload] : PayloadAttribute;
 
+// Custom JVP Function reference
+__attributeTarget(FuncDecl)
+attribute_syntax [__custom_jvp(function)]   : CustomJVPAttribute;
