@@ -9,6 +9,7 @@
 #include "slang-syntax.h"
 
 #include "../core/slang-char-util.h"
+#include <chrono>
 
 namespace Slang
 {
@@ -185,7 +186,8 @@ List<LanguageServerProtocol::TextEditCompletionItem> CompletionContext::gatherFi
                     }
                     if (item.label.getLength())
                     {
-                        if (context->itemSet.Add(item.label))
+                        auto key = String(item.kind) + item.label;
+                        if (context->itemSet.Add(key))
                         {
                             item.detail = Path::combine(context->path, String(name));
                             Path::getCanonical(item.detail, item.detail);
@@ -202,14 +204,32 @@ List<LanguageServerProtocol::TextEditCompletionItem> CompletionContext::gatherFi
         }
     };
 
+    // A big workspace may take a long time to enumerate, thus we limit the amount
+    // of time allowed to scan the file directory.
+
+    auto startTime = std::chrono::high_resolution_clock::now();
+    bool isIncomplete = false;
+
     for (auto& searchPath : this->version->workspace->additionalSearchPaths)
     {
+        auto elapsedTime = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - startTime).count();
+        if (elapsedTime > 200)
+        {
+            isIncomplete = true;
+            break;
+        }
         addCandidate(searchPath);
     }
     if (this->version->workspace->searchInWorkspace)
     {
         for (auto& searchPath : this->version->workspace->workspaceSearchPaths)
         {
+            auto elapsedTime = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - startTime).count();
+            if (elapsedTime > 200)
+            {
+                isIncomplete = true;
+                break;
+            }
             addCandidate(searchPath);
         }
     }
@@ -232,6 +252,15 @@ List<LanguageServerProtocol::TextEditCompletionItem> CompletionContext::gatherFi
             item.textEdit.range.end.character = (int)sectionEnd;
         }
     }
+
+    if (commitCharacterBehavior != CommitCharacterBehavior::Disabled && !isIncomplete)
+    {
+        for (auto& item : context.items)
+        {
+            for (auto ch : getCommitChars())
+                item.commitCharacters.add(ch);
+        }
+    }
     return context.items;
 }
 
@@ -242,6 +271,10 @@ SlangResult CompletionContext::tryCompleteImport()
     Index pos = lineContent.indexOf(importStr);
     if (pos == -1)
         return SLANG_FAIL;
+    auto lineBeforeImportKeyword = lineContent.head(pos).trim();
+    if (lineBeforeImportKeyword.getLength() != 0 && lineBeforeImportKeyword != "__exported")
+        return SLANG_FAIL;
+
     pos += importStr.getLength();
     while (pos < lineContent.getLength() && pos < col - 1 && CharUtil::isWhitespace(lineContent[pos]))
         pos++;
@@ -281,14 +314,6 @@ SlangResult CompletionContext::tryCompleteImport()
     auto prefix = prefixSB.ProduceString();
     auto items = gatherFileAndModuleCompletionItems(
         prefix, true, false, line - 1, fileNameEnd, lastPos + 1, sectionEnd, 0);
-    if (commitCharacterBehavior != CommitCharacterBehavior::Disabled)
-    {
-        for (auto& item : items)
-        {
-            for (auto ch : getCommitChars())
-                item.commitCharacters.add(ch);
-        }
-    }
     server->m_connection->sendResult(&items, responseId);
     return SLANG_OK;
 }
@@ -320,6 +345,9 @@ SlangResult CompletionContext::tryCompleteRawFileName(UnownedStringSlice lineCon
     {
         sectionEnd++;
     }
+    Index fileNameEnd = sectionEnd;
+    while (fileNameEnd < lineContent.getLength() && lineContent[fileNameEnd] != ';')
+        fileNameEnd++;
     UnownedStringSlice prefixSlice;
     if (lastPos > pos)
         prefixSlice = lineContent.subString(pos, lastPos - pos);
@@ -336,18 +364,10 @@ SlangResult CompletionContext::tryCompleteRawFileName(UnownedStringSlice lineCon
         false,
         isImportString,
         line - 1,
-        lineContent.getLength(),
+        fileNameEnd,
         lastPos + 1,
         sectionEnd,
         closingChar);
-    if (commitCharacterBehavior != CommitCharacterBehavior::Disabled)
-    {
-        for (auto& item : items)
-        {
-            for (auto ch : getCommitChars())
-                item.commitCharacters.add(ch);
-        }
-    }
     server->m_connection->sendResult(&items, responseId);
     return SLANG_OK;
 }

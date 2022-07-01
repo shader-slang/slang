@@ -134,7 +134,7 @@ namespace Slang
         if (otherSize > thisSize)
             return false;
 
-        return UnownedStringSlice(begin(), begin() + otherSize) == other;
+        return head(otherSize) == other;
     }
 
     bool UnownedStringSlice::startsWith(char const* str) const
@@ -150,7 +150,7 @@ namespace Slang
         if (otherSize > thisSize)
             return false;
 
-        return UnownedStringSlice(begin(), begin() + otherSize).caseInsensitiveEquals(other);
+        return head(otherSize).caseInsensitiveEquals(other);
     }
 
 
