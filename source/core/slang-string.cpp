@@ -485,6 +485,8 @@ namespace Slang
     {
         auto oldLength = getLength();
         auto textLength = textEnd - textBegin;
+        if (textLength <= 0)
+            return;
 
         auto newLength = oldLength + textLength;
 

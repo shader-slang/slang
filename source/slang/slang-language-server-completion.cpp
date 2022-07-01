@@ -8,6 +8,8 @@
 #include "slang-check-impl.h"
 #include "slang-syntax.h"
 
+#include "../core/slang-char-util.h"
+
 namespace Slang
 {
 
@@ -94,17 +96,29 @@ SlangResult CompletionContext::tryCompleteAttributes()
     return SLANG_OK;
 }
 
-List<LanguageServerProtocol::CompletionItem> CompletionContext::gatherFileAndModuleCompletionItems(const String& prefixPath)
+List<LanguageServerProtocol::TextEditCompletionItem> CompletionContext::gatherFileAndModuleCompletionItems(
+    const String& prefixPath,
+    bool translateModuleName,
+    bool isImportString,
+    Index lineIndex,
+    Index fileNameEnd,
+    Index sectionStart,
+    Index sectionEnd,
+    char closingChar)
 {
     struct FileEnumerationContext
     {
-        List<LanguageServerProtocol::CompletionItem> items;
+        List<LanguageServerProtocol::TextEditCompletionItem> items;
         HashSet<String> itemSet;
         CompletionContext* completionContext;
         String path;
         String workspaceRoot;
+        bool translateModuleName;
+        bool isImportString;
     } context;
     context.completionContext = this;
+    context.translateModuleName = translateModuleName;
+    context.isImportString = isImportString;
     if (version->workspace->rootDirectories.getCount())
         context.workspaceRoot = version->workspace->rootDirectories[0];
     if (context.workspaceRoot.getLength() &&
@@ -124,7 +138,7 @@ List<LanguageServerProtocol::CompletionItem> CompletionContext::gatherFileAndMod
                 [](SlangPathType pathType, const char* name, void* userData)
                 {
                     FileEnumerationContext* context = (FileEnumerationContext*)userData;
-                    LanguageServerProtocol::CompletionItem item;
+                    LanguageServerProtocol::TextEditCompletionItem item;
                     if (pathType == SLANG_PATH_TYPE_DIRECTORY)
                     {
                         item.label = name;
@@ -135,10 +149,18 @@ List<LanguageServerProtocol::CompletionItem> CompletionContext::gatherFileAndMod
                     else
                     {
                         auto nameSlice = UnownedStringSlice(name);
-                        if (nameSlice.endsWithCaseInsensitive(".slang"))
+                        if (context->isImportString || context->translateModuleName)
                         {
-                            StringBuilder nameSB;
-                            for (auto ch : UnownedStringSlice(name).head(nameSlice.getLength() - 6))
+                            if (!nameSlice.endsWithCaseInsensitive(".slang"))
+                                return;
+                        }
+                        StringBuilder nameSB;
+                        auto fileName = UnownedStringSlice(name);
+                        if (context->translateModuleName || context->isImportString)
+                            fileName = fileName.head(nameSlice.getLength() - 6);
+                        for (auto ch : fileName)
+                        {
+                            if (context->translateModuleName)
                             {
                                 switch (ch)
                                 {
@@ -153,9 +175,13 @@ List<LanguageServerProtocol::CompletionItem> CompletionContext::gatherFileAndMod
                                     break;
                                 }
                             }
-                            item.label = nameSB.ProduceString();
-                            item.kind = LanguageServerProtocol::kCompletionItemKindFile;
+                            else
+                            {
+                                nameSB.appendChar(ch);
+                            }
                         }
+                        item.label = nameSB.ProduceString();
+                        item.kind = LanguageServerProtocol::kCompletionItemKindFile;
                     }
                     if (item.label.getLength())
                     {
@@ -187,6 +213,25 @@ List<LanguageServerProtocol::CompletionItem> CompletionContext::gatherFileAndMod
             addCandidate(searchPath);
         }
     }
+    for (auto& item : context.items)
+    {
+        item.textEdit.range.start.line = (int)lineIndex;
+        item.textEdit.range.end.line = (int)lineIndex;
+        if (!translateModuleName && item.kind == LanguageServerProtocol::kCompletionItemKindFile)
+        {
+            item.textEdit.range.start.character = (int)sectionStart;
+            item.textEdit.range.end.character = (int)fileNameEnd;
+            item.textEdit.newText = item.label;
+            if (closingChar)
+                item.textEdit.newText.appendChar(closingChar);
+        }
+        else
+        {
+            item.textEdit.newText = item.label;
+            item.textEdit.range.start.character = (int)sectionStart;
+            item.textEdit.range.end.character = (int)sectionEnd;
+        }
+    }
     return context.items;
 }
 
@@ -198,12 +243,32 @@ SlangResult CompletionContext::tryCompleteImport()
     if (pos == -1)
         return SLANG_FAIL;
     pos += importStr.getLength();
+    while (pos < lineContent.getLength() && pos < col - 1 && CharUtil::isWhitespace(lineContent[pos]))
+        pos++;
+    if (pos < lineContent.getLength() && lineContent[pos] == '"')
+    {
+        return tryCompleteRawFileName(lineContent, pos, true);
+    }
+
     StringBuilder prefixSB;
-    Index lastPos = col - 1;
-    while (lastPos > 0 && lineContent[lastPos] != '.') lastPos--;
+    Index lastPos = col - 2;
+    if (lastPos < 0)
+        return SLANG_FAIL;
+    while (lastPos >= pos && lineContent[lastPos] != '.')
+    {
+        if (lineContent[lastPos] == ';')
+            return SLANG_FAIL;
+        lastPos--;
+    }
     UnownedStringSlice prefixSlice;
     if (lastPos > pos)
         prefixSlice = lineContent.subString(pos, lastPos - pos);
+    Index sectionEnd = col - 1;
+    while (sectionEnd < lineContent.getLength() && (lineContent[sectionEnd] != '.' && lineContent[sectionEnd] != ';'))
+        sectionEnd++;
+    Index fileNameEnd = sectionEnd;
+    while (fileNameEnd < lineContent.getLength() && lineContent[fileNameEnd] != ';')
+        fileNameEnd++;
     for (auto ch : prefixSlice)
     {
         if (ch == '.')
@@ -214,7 +279,8 @@ SlangResult CompletionContext::tryCompleteImport()
             prefixSB.appendChar(ch);
     }
     auto prefix = prefixSB.ProduceString();
-    auto items = gatherFileAndModuleCompletionItems(prefix);
+    auto items = gatherFileAndModuleCompletionItems(
+        prefix, true, false, line - 1, fileNameEnd, lastPos + 1, sectionEnd, 0);
     if (commitCharacterBehavior != CommitCharacterBehavior::Disabled)
     {
         for (auto& item : items)
@@ -225,6 +291,84 @@ SlangResult CompletionContext::tryCompleteImport()
     }
     server->m_connection->sendResult(&items, responseId);
     return SLANG_OK;
+}
+
+SlangResult CompletionContext::tryCompleteRawFileName(UnownedStringSlice lineContent, Index pos, bool isImportString)
+{
+    while (pos < lineContent.getLength() && (lineContent[pos] != '\"' && lineContent[pos] != '<'))
+        pos++;
+    char closingChar = '"';
+    if (pos < lineContent.getLength() && lineContent[pos] == '<')
+        closingChar = '>';
+    pos++;
+    StringBuilder prefixSB;
+    Index lastPos = col - 2;
+    if (lastPos < 0)
+        return SLANG_FAIL;
+    while (lastPos >= pos && (lineContent[lastPos] != '/' && lineContent[lastPos] != '\\'))
+    {
+        if (lineContent[lastPos] == '\"' || lineContent[lastPos] == '>')
+            return SLANG_FAIL;
+        lastPos--;
+    }
+    Index sectionEnd = col - 1;
+    if (sectionEnd < 0)
+        return SLANG_FAIL;
+    while (sectionEnd < lineContent.getLength() &&
+        (lineContent[sectionEnd] != '\"' && lineContent[sectionEnd] != '>' &&
+            lineContent[sectionEnd] != '/' && lineContent[sectionEnd] != '\\'))
+    {
+        sectionEnd++;
+    }
+    UnownedStringSlice prefixSlice;
+    if (lastPos > pos)
+        prefixSlice = lineContent.subString(pos, lastPos - pos);
+    for (auto ch : prefixSlice)
+    {
+        if (ch == '/' || ch == '\\')
+            prefixSB.appendChar(Path::kOSCanonicalPathDelimiter);
+        else
+            prefixSB.appendChar(ch);
+    }
+    auto prefix = prefixSB.ProduceString();
+    auto items = gatherFileAndModuleCompletionItems(
+        prefix,
+        false,
+        isImportString,
+        line - 1,
+        lineContent.getLength(),
+        lastPos + 1,
+        sectionEnd,
+        closingChar);
+    if (commitCharacterBehavior != CommitCharacterBehavior::Disabled)
+    {
+        for (auto& item : items)
+        {
+            for (auto ch : getCommitChars())
+                item.commitCharacters.add(ch);
+        }
+    }
+    server->m_connection->sendResult(&items, responseId);
+    return SLANG_OK;
+}
+
+SlangResult CompletionContext::tryCompleteInclude()
+{
+    auto lineContent = doc->getLine(line);
+    if (!lineContent.startsWith("#"))
+        return SLANG_FAIL;
+
+    static auto includeStr = UnownedStringSlice("include ");
+    Index pos = lineContent.indexOf(includeStr);
+    if (pos == -1)
+        return SLANG_FAIL;
+    for (Index i = 1; i < pos; i++)
+    {
+        if (!CharUtil::isWhitespace(lineContent[i]))
+            return SLANG_FAIL;
+    }
+    pos += includeStr.getLength();
+    return tryCompleteRawFileName(lineContent, pos, false);
 }
 
 SlangResult CompletionContext::tryCompleteMemberAndSymbol()

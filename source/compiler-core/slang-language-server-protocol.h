@@ -176,6 +176,24 @@ struct Range
     static const StructRttiInfo g_rttiInfo;
 };
 
+struct TextEdit
+{
+    /**
+     * The range of the text document to be manipulated. To insert
+     * text into a document create a range where start === end.
+     */
+    Range range;
+
+    /**
+     * The string to be inserted. For delete operations use an
+     * empty string.
+     */
+    String newText;
+
+    static const StructRttiInfo g_rttiInfo;
+
+};
+
 struct DidOpenTextDocumentParams
 {
     TextDocumentItem textDocument;
@@ -605,6 +623,53 @@ struct CompletionItem
     static const StructRttiInfo g_rttiInfo;
 };
 
+struct TextEditCompletionItem
+{
+    /**
+     * The label of this completion item.
+     *
+     * The label property is also by default the text that
+     * is inserted when selecting this completion.
+     *
+     * If label details are provided the label itself should
+     * be an unqualified name of the completion item.
+     */
+    String label;
+
+    /**
+     * The kind of this completion item. Based of the kind
+     * an icon is chosen by the editor. The standardized set
+     * of available values is defined in `CompletionItemKind`.
+     */
+    CompletionItemKind kind = CompletionItemKind(0);
+
+    /**
+     * A human-readable string with additional information
+     * about this item, like type or symbol information.
+     */
+    String detail;
+
+    /**
+     * A human-readable string that represents a doc-comment.
+     */
+    MarkupContent documentation;
+
+    TextEdit textEdit;
+
+    /**
+     * An optional set of characters that when pressed while this completion is
+     * active will accept it first and then type that character. *Note* that all
+     * commit characters should have `length=1` and that superfluous characters
+     * will be ignored.
+     */
+    List<String> commitCharacters;
+
+    // Additional data.
+    String data;
+
+    static const StructRttiInfo g_rttiInfo;
+};
+
 struct SemanticTokensParams : WorkDoneProgressParams
 {
     TextDocumentIdentifier textDocument;
@@ -919,24 +984,6 @@ struct InlayHintParams
 
     static const StructRttiInfo g_rttiInfo;
     static const UnownedStringSlice methodName;
-};
-
-struct TextEdit
-{
-    /**
-     * The range of the text document to be manipulated. To insert
-     * text into a document create a range where start === end.
-     */
-    Range range;
-
-    /**
-     * The string to be inserted. For delete operations use an
-     * empty string.
-     */
-    String newText;
-
-    static const StructRttiInfo g_rttiInfo;
-
 };
 
 typedef int InlayHintKind;

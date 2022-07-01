@@ -58,6 +58,7 @@ struct Command
 
     Optional<LanguageServerProtocol::CompletionParams> completionArgs;
     Optional<LanguageServerProtocol::CompletionItem> completionResolveArgs;
+    Optional<LanguageServerProtocol::TextEditCompletionItem> textEditCompletionResolveArgs;
     Optional<LanguageServerProtocol::DocumentSymbolParams> documentSymbolArgs;
     Optional<LanguageServerProtocol::InlayHintParams> inlayHintArgs;
     Optional<LanguageServerProtocol::DocumentFormattingParams> formattingArgs;
@@ -115,7 +116,7 @@ public:
     SlangResult completion(
         const LanguageServerProtocol::CompletionParams& args, const JSONValue& responseId);
     SlangResult completionResolve(
-        const LanguageServerProtocol::CompletionItem& args, const JSONValue& responseId);
+        const LanguageServerProtocol::CompletionItem& args, const LanguageServerProtocol::TextEditCompletionItem& editItem, const JSONValue& responseId);
     SlangResult semanticTokens(
         const LanguageServerProtocol::SemanticTokensParams& args, const JSONValue& responseId);
     SlangResult signatureHelp(

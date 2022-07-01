@@ -123,6 +123,8 @@ SlangResult LanguageServer::parseNextMessage()
                 result.capabilities.completionProvider.triggerCharacters.add(".");
                 result.capabilities.completionProvider.triggerCharacters.add(":");
                 result.capabilities.completionProvider.triggerCharacters.add("[");
+                result.capabilities.completionProvider.triggerCharacters.add("\"");
+                result.capabilities.completionProvider.triggerCharacters.add("/");
                 result.capabilities.completionProvider.resolveProvider = true;
                 result.capabilities.completionProvider.workDoneToken = "";
                 result.capabilities.semanticTokensProvider.full = true;
@@ -663,20 +665,50 @@ SlangResult LanguageServer::completion(
         return SLANG_OK;
     }
 
-    // Insert a completion request token at cursor position.
-    auto originalText = doc->getText();
-    StringBuilder newText;
-    newText << originalText.getUnownedSlice().head(cursorOffset + 1) << "#?"
-            << originalText.getUnownedSlice().tail(cursorOffset + 1);
-    doc->setText(newText.ProduceString());
-    auto restoreDocText = makeDeferred([&]() { doc->setText(originalText); });
-
     // Always create a new workspace version for the completion request since we
     // will use a modified source.
     auto version = m_workspace->createVersionForCompletion();
     auto moduleName = getMangledNameFromNameString(canonicalPath.getUnownedSlice());
     version->linkage->contentAssistInfo.cursorLine = utf8Line;
     version->linkage->contentAssistInfo.cursorCol = utf8Col;
+    Slang::CompletionContext context;
+    context.server = this;
+    context.cursorOffset = cursorOffset;
+    context.version = version;
+    context.doc = doc.Ptr();
+    context.responseId = responseId;
+    context.canonicalPath = canonicalPath.getUnownedSlice();
+    context.line = utf8Line;
+    context.col = utf8Col;
+    context.commitCharacterBehavior = m_commitCharacterBehavior;
+
+    if (SLANG_SUCCEEDED(context.tryCompleteInclude()))
+    {
+        return SLANG_OK;
+    }
+    if (SLANG_SUCCEEDED(context.tryCompleteImport()))
+    {
+        return SLANG_OK;
+    }
+
+    if (args.context.triggerKind ==
+        LanguageServerProtocol::kCompletionTriggerKindTriggerCharacter &&
+        (args.context.triggerCharacter == "\"" || args.context.triggerCharacter == "/"))
+    {
+        // Trigger characters '"' and '/' are for include only.
+        m_connection->sendResult(NullResponse::get(), responseId);
+        return SLANG_OK;
+    }
+
+
+    // Insert a completion request token at cursor position.
+    auto originalText = doc->getText();
+    StringBuilder newText;
+    newText << originalText.getUnownedSlice().head(cursorOffset + 1) << "#?"
+        << originalText.getUnownedSlice().tail(cursorOffset + 1);
+    doc->setText(newText.ProduceString());
+    auto restoreDocText = makeDeferred([&]() { doc->setText(originalText); });
+
     Module* parsedModule = version->getOrLoadModule(canonicalPath);
     if (!parsedModule)
     {
@@ -684,21 +716,7 @@ SlangResult LanguageServer::completion(
         return SLANG_OK;
     }
 
-    Slang::CompletionContext context;
-    context.server = this;
-    context.cursorOffset = cursorOffset;
-    context.version = version;
-    context.doc = doc.Ptr();
     context.parsedModule = parsedModule;
-    context.responseId = responseId;
-    context.canonicalPath = canonicalPath.getUnownedSlice();
-    context.line = utf8Line;
-    context.col = utf8Col;
-    context.commitCharacterBehavior = m_commitCharacterBehavior;
-    if (SLANG_SUCCEEDED(context.tryCompleteImport()))
-    {
-        return SLANG_OK;
-    }
     if (SLANG_SUCCEEDED(context.tryCompleteAttributes()))
     {
         return SLANG_OK;
@@ -726,8 +744,19 @@ SlangResult LanguageServer::completion(
 }
 
 SlangResult LanguageServer::completionResolve(
-    const LanguageServerProtocol::CompletionItem& args, const JSONValue& responseId)
+    const LanguageServerProtocol::CompletionItem& args, const LanguageServerProtocol::TextEditCompletionItem& editItem, const JSONValue& responseId)
 {
+    if (args.data.getLength() == 0)
+    {
+        if (editItem.textEdit.newText.getLength())
+        {
+            m_connection->sendResult(&editItem, responseId);
+            return SLANG_OK;
+        }
+        m_connection->sendResult(&args, responseId);
+        return SLANG_OK;
+    }
+
     LanguageServerProtocol::CompletionItem resolvedItem = args;
     int itemId = StringToInt(args.data);
     auto version = m_workspace->getCurrentCompletionVersion();
@@ -1492,6 +1521,9 @@ SlangResult LanguageServer::queueJSONCall(JSONRPCCall call)
         Slang::LanguageServerProtocol::CompletionItem args;
         SLANG_RETURN_ON_FAIL(m_connection->toNativeArgsOrSendError(call.params, &args, call.id));
         cmd.completionResolveArgs = args;
+        Slang::LanguageServerProtocol::TextEditCompletionItem editArgs;
+        SLANG_RETURN_ON_FAIL(m_connection->toNativeArgsOrSendError(call.params, &editArgs, call.id));
+        cmd.textEditCompletionResolveArgs = editArgs;
     }
     else if (call.method == DocumentSymbolParams::methodName)
     {
@@ -1578,7 +1610,7 @@ SlangResult LanguageServer::runCommand(Command& call)
     }
     else if (call.method == "completionItem/resolve")
     {
-        return completionResolve(call.completionResolveArgs.get(), call.id);
+        return completionResolve(call.completionResolveArgs.get(), call.textEditCompletionResolveArgs.get(), call.id);
     }
     else if (call.method == DocumentSymbolParams::methodName)
     {
