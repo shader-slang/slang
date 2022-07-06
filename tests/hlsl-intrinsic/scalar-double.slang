@@ -1,6 +1,9 @@
 // It doesn't look like fxc, dxc, vk support double versions of many of the intrinsics, so they are disabled here.
 
-//TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute 
+// TODO(JS):
+// NOTE! war-double-host-callable category is a work around for issues with x86 & host-callable
+
+//TEST(compute, war-double-host-callable):COMPARE_COMPUTE_EX:-cpu -compute 
 //DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute
 //DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12
 //DISABLE_TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -render-feature double
