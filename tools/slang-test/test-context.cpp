@@ -6,6 +6,7 @@
 #include "../../source/core/slang-shared-library.h"
 
 #include "../../source/core/slang-test-tool-util.h"
+#include "../../source/compiler-core/slang-language-server-protocol.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -71,6 +72,12 @@ Result TestContext::init(const char* exePath)
 
 TestContext::~TestContext()
 {
+    if (m_languageServerConnection)
+    {
+        m_languageServerConnection->sendCall(
+            LanguageServerProtocol::ExitParams::methodName,
+            JSONValue::makeInt(0));
+    }
     if (m_session)
     {
         spDestroySession(m_session);

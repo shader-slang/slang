@@ -5,7 +5,7 @@ content:
 Kind Kind.Foo
 ```
 
-
+HOVER:15,6  
 
 {REDACTED}.slang(15)
 

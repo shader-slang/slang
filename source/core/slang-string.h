@@ -154,6 +154,7 @@ namespace Slang
             /// True if contents is a single char of c
         SLANG_FORCE_INLINE bool isChar(char c) const { return getLength() == 1 && m_begin[0] == c; }
 
+        bool startsWithCaseInsensitive(UnownedStringSlice const& other) const;
         bool startsWith(UnownedStringSlice const& other) const;
         bool startsWith(char const* str) const;
 

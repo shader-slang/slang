@@ -8,6 +8,9 @@
 #include "slang-check-impl.h"
 #include "slang-syntax.h"
 
+#include "../core/slang-char-util.h"
+#include <chrono>
+
 namespace Slang
 {
 
@@ -92,6 +95,300 @@ SlangResult CompletionContext::tryCompleteAttributes()
     List<LanguageServerProtocol::CompletionItem> items = collectAttributes();
     server->m_connection->sendResult(&items, responseId);
     return SLANG_OK;
+}
+
+List<LanguageServerProtocol::TextEditCompletionItem> CompletionContext::gatherFileAndModuleCompletionItems(
+    const String& prefixPath,
+    bool translateModuleName,
+    bool isImportString,
+    Index lineIndex,
+    Index fileNameEnd,
+    Index sectionStart,
+    Index sectionEnd,
+    char closingChar)
+{
+    struct FileEnumerationContext
+    {
+        List<LanguageServerProtocol::TextEditCompletionItem> items;
+        HashSet<String> itemSet;
+        CompletionContext* completionContext;
+        String path;
+        String workspaceRoot;
+        bool translateModuleName;
+        bool isImportString;
+    } context;
+    context.completionContext = this;
+    context.translateModuleName = translateModuleName;
+    context.isImportString = isImportString;
+    if (version->workspace->rootDirectories.getCount())
+        context.workspaceRoot = version->workspace->rootDirectories[0];
+    if (context.workspaceRoot.getLength() &&
+        context.workspaceRoot[context.workspaceRoot.getLength() - 1] !=
+            Path::kOSCanonicalPathDelimiter)
+    {
+        context.workspaceRoot = context.workspaceRoot + String(Path::kOSCanonicalPathDelimiter);
+    }
+
+    auto addCandidate = [&](const String& path)
+    {
+        context.path = path;
+        if (path.getUnownedSlice().endsWithCaseInsensitive(prefixPath.getUnownedSlice()))
+        {
+            OSFileSystem::getExtSingleton()->enumeratePathContents(
+                path.getBuffer(),
+                [](SlangPathType pathType, const char* name, void* userData)
+                {
+                    FileEnumerationContext* context = (FileEnumerationContext*)userData;
+                    LanguageServerProtocol::TextEditCompletionItem item;
+                    if (pathType == SLANG_PATH_TYPE_DIRECTORY)
+                    {
+                        item.label = name;
+                        item.kind = LanguageServerProtocol::kCompletionItemKindFolder;
+                        if (item.label.indexOf('.') != -1)
+                            return;
+                    }
+                    else
+                    {
+                        auto nameSlice = UnownedStringSlice(name);
+                        if (context->isImportString || context->translateModuleName)
+                        {
+                            if (!nameSlice.endsWithCaseInsensitive(".slang"))
+                                return;
+                        }
+                        StringBuilder nameSB;
+                        auto fileName = UnownedStringSlice(name);
+                        if (context->translateModuleName || context->isImportString)
+                            fileName = fileName.head(nameSlice.getLength() - 6);
+                        for (auto ch : fileName)
+                        {
+                            if (context->translateModuleName)
+                            {
+                                switch (ch)
+                                {
+                                case '-':
+                                    nameSB.appendChar('_');
+                                    break;
+                                case '.':
+                                    // Ignore any file items that contains a "."
+                                    return;
+                                default:
+                                    nameSB.appendChar(ch);
+                                    break;
+                                }
+                            }
+                            else
+                            {
+                                nameSB.appendChar(ch);
+                            }
+                        }
+                        item.label = nameSB.ProduceString();
+                        item.kind = LanguageServerProtocol::kCompletionItemKindFile;
+                    }
+                    if (item.label.getLength())
+                    {
+                        auto key = String(item.kind) + item.label;
+                        if (context->itemSet.Add(key))
+                        {
+                            item.detail = Path::combine(context->path, String(name));
+                            Path::getCanonical(item.detail, item.detail);
+
+                            if (item.detail.getUnownedSlice().startsWithCaseInsensitive(context->workspaceRoot.getUnownedSlice()))
+                            {
+                                item.detail = item.detail.getUnownedSlice().tail(context->workspaceRoot.getLength());
+                            }
+                            context->items.add(item);
+                        }
+                    }
+                },
+                &context);
+        }
+    };
+
+    // A big workspace may take a long time to enumerate, thus we limit the amount
+    // of time allowed to scan the file directory.
+
+    auto startTime = std::chrono::high_resolution_clock::now();
+    bool isIncomplete = false;
+
+    for (auto& searchPath : this->version->workspace->additionalSearchPaths)
+    {
+        auto elapsedTime = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - startTime).count();
+        if (elapsedTime > 200)
+        {
+            isIncomplete = true;
+            break;
+        }
+        addCandidate(searchPath);
+    }
+    if (this->version->workspace->searchInWorkspace)
+    {
+        for (auto& searchPath : this->version->workspace->workspaceSearchPaths)
+        {
+            auto elapsedTime = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - startTime).count();
+            if (elapsedTime > 200)
+            {
+                isIncomplete = true;
+                break;
+            }
+            addCandidate(searchPath);
+        }
+    }
+    for (auto& item : context.items)
+    {
+        item.textEdit.range.start.line = (int)lineIndex;
+        item.textEdit.range.end.line = (int)lineIndex;
+        if (!translateModuleName && item.kind == LanguageServerProtocol::kCompletionItemKindFile)
+        {
+            item.textEdit.range.start.character = (int)sectionStart;
+            item.textEdit.range.end.character = (int)fileNameEnd;
+            item.textEdit.newText = item.label;
+            if (closingChar)
+                item.textEdit.newText.appendChar(closingChar);
+        }
+        else
+        {
+            item.textEdit.newText = item.label;
+            item.textEdit.range.start.character = (int)sectionStart;
+            item.textEdit.range.end.character = (int)sectionEnd;
+        }
+    }
+
+    if (commitCharacterBehavior != CommitCharacterBehavior::Disabled && !isIncomplete)
+    {
+        for (auto& item : context.items)
+        {
+            for (auto ch : getCommitChars())
+                item.commitCharacters.add(ch);
+        }
+    }
+    return context.items;
+}
+
+SlangResult CompletionContext::tryCompleteImport()
+{
+    static auto importStr = UnownedStringSlice("import ");
+    auto lineContent = doc->getLine(line);
+    Index pos = lineContent.indexOf(importStr);
+    if (pos == -1)
+        return SLANG_FAIL;
+    auto lineBeforeImportKeyword = lineContent.head(pos).trim();
+    if (lineBeforeImportKeyword.getLength() != 0 && lineBeforeImportKeyword != "__exported")
+        return SLANG_FAIL;
+
+    pos += importStr.getLength();
+    while (pos < lineContent.getLength() && pos < col - 1 && CharUtil::isWhitespace(lineContent[pos]))
+        pos++;
+    if (pos < lineContent.getLength() && lineContent[pos] == '"')
+    {
+        return tryCompleteRawFileName(lineContent, pos, true);
+    }
+
+    StringBuilder prefixSB;
+    Index lastPos = col - 2;
+    if (lastPos < 0)
+        return SLANG_FAIL;
+    while (lastPos >= pos && lineContent[lastPos] != '.')
+    {
+        if (lineContent[lastPos] == ';')
+            return SLANG_FAIL;
+        lastPos--;
+    }
+    UnownedStringSlice prefixSlice;
+    if (lastPos > pos)
+        prefixSlice = lineContent.subString(pos, lastPos - pos);
+    Index sectionEnd = col - 1;
+    while (sectionEnd < lineContent.getLength() && (lineContent[sectionEnd] != '.' && lineContent[sectionEnd] != ';'))
+        sectionEnd++;
+    Index fileNameEnd = sectionEnd;
+    while (fileNameEnd < lineContent.getLength() && lineContent[fileNameEnd] != ';')
+        fileNameEnd++;
+    for (auto ch : prefixSlice)
+    {
+        if (ch == '.')
+            prefixSB.appendChar(Path::kOSCanonicalPathDelimiter);
+        else if (ch == '_')
+            prefixSB.appendChar('-');
+        else
+            prefixSB.appendChar(ch);
+    }
+    auto prefix = prefixSB.ProduceString();
+    auto items = gatherFileAndModuleCompletionItems(
+        prefix, true, false, line - 1, fileNameEnd, lastPos + 1, sectionEnd, 0);
+    server->m_connection->sendResult(&items, responseId);
+    return SLANG_OK;
+}
+
+SlangResult CompletionContext::tryCompleteRawFileName(UnownedStringSlice lineContent, Index pos, bool isImportString)
+{
+    while (pos < lineContent.getLength() && (lineContent[pos] != '\"' && lineContent[pos] != '<'))
+        pos++;
+    char closingChar = '"';
+    if (pos < lineContent.getLength() && lineContent[pos] == '<')
+        closingChar = '>';
+    pos++;
+    StringBuilder prefixSB;
+    Index lastPos = col - 2;
+    if (lastPos < 0)
+        return SLANG_FAIL;
+    while (lastPos >= pos && (lineContent[lastPos] != '/' && lineContent[lastPos] != '\\'))
+    {
+        if (lineContent[lastPos] == '\"' || lineContent[lastPos] == '>')
+            return SLANG_FAIL;
+        lastPos--;
+    }
+    Index sectionEnd = col - 1;
+    if (sectionEnd < 0)
+        return SLANG_FAIL;
+    while (sectionEnd < lineContent.getLength() &&
+        (lineContent[sectionEnd] != '\"' && lineContent[sectionEnd] != '>' &&
+            lineContent[sectionEnd] != '/' && lineContent[sectionEnd] != '\\'))
+    {
+        sectionEnd++;
+    }
+    Index fileNameEnd = sectionEnd;
+    while (fileNameEnd < lineContent.getLength() && lineContent[fileNameEnd] != ';')
+        fileNameEnd++;
+    UnownedStringSlice prefixSlice;
+    if (lastPos > pos)
+        prefixSlice = lineContent.subString(pos, lastPos - pos);
+    for (auto ch : prefixSlice)
+    {
+        if (ch == '/' || ch == '\\')
+            prefixSB.appendChar(Path::kOSCanonicalPathDelimiter);
+        else
+            prefixSB.appendChar(ch);
+    }
+    auto prefix = prefixSB.ProduceString();
+    auto items = gatherFileAndModuleCompletionItems(
+        prefix,
+        false,
+        isImportString,
+        line - 1,
+        fileNameEnd,
+        lastPos + 1,
+        sectionEnd,
+        closingChar);
+    server->m_connection->sendResult(&items, responseId);
+    return SLANG_OK;
+}
+
+SlangResult CompletionContext::tryCompleteInclude()
+{
+    auto lineContent = doc->getLine(line);
+    if (!lineContent.startsWith("#"))
+        return SLANG_FAIL;
+
+    static auto includeStr = UnownedStringSlice("include ");
+    Index pos = lineContent.indexOf(includeStr);
+    if (pos == -1)
+        return SLANG_FAIL;
+    for (Index i = 1; i < pos; i++)
+    {
+        if (!CharUtil::isWhitespace(lineContent[i]))
+            return SLANG_FAIL;
+    }
+    pos += includeStr.getLength();
+    return tryCompleteRawFileName(lineContent, pos, false);
 }
 
 SlangResult CompletionContext::tryCompleteMemberAndSymbol()

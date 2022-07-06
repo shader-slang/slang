@@ -134,12 +134,23 @@ namespace Slang
         if (otherSize > thisSize)
             return false;
 
-        return UnownedStringSlice(begin(), begin() + otherSize) == other;
+        return head(otherSize) == other;
     }
 
     bool UnownedStringSlice::startsWith(char const* str) const
     {
         return startsWith(UnownedTerminatedStringSlice(str));
+    }
+
+    bool UnownedStringSlice::startsWithCaseInsensitive(UnownedStringSlice const& other) const
+    {
+        UInt thisSize = getLength();
+        UInt otherSize = other.getLength();
+
+        if (otherSize > thisSize)
+            return false;
+
+        return head(otherSize).caseInsensitiveEquals(other);
     }
 
 
@@ -474,6 +485,8 @@ namespace Slang
     {
         auto oldLength = getLength();
         auto textLength = textEnd - textBegin;
+        if (textLength <= 0)
+            return;
 
         auto newLength = oldLength + textLength;
 

@@ -6,7 +6,6 @@ struct MyType
 ```
 
 
-
 {REDACTED}.slang(2)
 
 

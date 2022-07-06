@@ -80,7 +80,7 @@ static void _addDeclRec(Decl* decl, List<Decl*>& outDecls)
     }
 }
 
-SlangResult ASTMarkupUtil::extract(ModuleDecl* moduleDecl, SourceManager* sourceManager, DiagnosticSink* sink, ASTMarkup* outDoc)
+SlangResult ASTMarkupUtil::extract(ModuleDecl* moduleDecl, SourceManager* sourceManager, DiagnosticSink* sink, ASTMarkup* outDoc, bool searchOrindaryComments)
 {
     List<Decl*> decls;
     findDecls(moduleDecl, decls);
@@ -106,6 +106,7 @@ SlangResult ASTMarkupUtil::extract(ModuleDecl* moduleDecl, SourceManager* source
         }
 
         DocMarkupExtractor extractor;
+        extractor.setSearchInOrdinaryComments(searchOrindaryComments);
 
         List<SourceView*> views;
         SLANG_RETURN_ON_FAIL(extractor.extract(inputItems.getBuffer(), declsCount, sourceManager, sink, views, outItems));

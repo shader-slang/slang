@@ -1,9 +1,8 @@
 #pragma once
-
+#include <chrono>
 #include "../../slang.h"
 #include "../compiler-core/slang-json-rpc.h"
 #include "../compiler-core/slang-json-rpc-connection.h"
-
 #include "slang-workspace-version.h"
 #include "slang-language-server-completion.h"
 #include "slang-language-server-auto-format.h"
@@ -59,6 +58,7 @@ struct Command
 
     Optional<LanguageServerProtocol::CompletionParams> completionArgs;
     Optional<LanguageServerProtocol::CompletionItem> completionResolveArgs;
+    Optional<LanguageServerProtocol::TextEditCompletionItem> textEditCompletionResolveArgs;
     Optional<LanguageServerProtocol::DocumentSymbolParams> documentSymbolArgs;
     Optional<LanguageServerProtocol::InlayHintParams> inlayHintArgs;
     Optional<LanguageServerProtocol::DocumentFormattingParams> formattingArgs;
@@ -79,15 +79,22 @@ class LanguageServer
 {
 private:
     static const int kConfigResponseId = 0x1213;
-
+    
 public:
+    enum class TraceOptions
+    {
+        Off,
+        Messages,
+        Verbose
+    };
     bool m_initialized = false;
+    TraceOptions m_traceOptions = TraceOptions::Off;
     CommitCharacterBehavior m_commitCharacterBehavior = CommitCharacterBehavior::MembersOnly;
     RefPtr<JSONRPCConnection> m_connection;
     ComPtr<slang::IGlobalSession> m_session;
     RefPtr<Workspace> m_workspace;
     Dictionary<String, String> m_lastPublishedDiagnostics;
-    time_t m_lastDiagnosticUpdateTime = 0;
+    std::chrono::time_point<std::chrono::system_clock> m_lastDiagnosticUpdateTime;
     FormatOptions m_formatOptions;
     Slang::InlayHintOptions m_inlayHintOptions;
     bool m_quit = false;
@@ -109,7 +116,7 @@ public:
     SlangResult completion(
         const LanguageServerProtocol::CompletionParams& args, const JSONValue& responseId);
     SlangResult completionResolve(
-        const LanguageServerProtocol::CompletionItem& args, const JSONValue& responseId);
+        const LanguageServerProtocol::CompletionItem& args, const LanguageServerProtocol::TextEditCompletionItem& editItem, const JSONValue& responseId);
     SlangResult semanticTokens(
         const LanguageServerProtocol::SemanticTokensParams& args, const JSONValue& responseId);
     SlangResult signatureHelp(
@@ -136,6 +143,7 @@ private:
     void updateCommitCharacters(const JSONValue& value);
     void updateFormattingOptions(const JSONValue& clangFormatLoc, const JSONValue& clangFormatStyle);
     void updateInlayHintOptions(const JSONValue& deducedTypes, const JSONValue& parameterNames);
+    void updateTraceOptions(const JSONValue& value);
 
     void sendConfigRequest();
     void registerCapability(const char* methodName);
