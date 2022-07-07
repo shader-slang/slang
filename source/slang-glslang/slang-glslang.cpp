@@ -494,12 +494,13 @@ static spv_target_env _getUniversalTargetEnv(glslang::EShTargetLanguageVersion i
         case 0x103:     return SPV_ENV_UNIVERSAL_1_3;
         case 0x104:     return SPV_ENV_UNIVERSAL_1_4;
         case 0x105:     return SPV_ENV_UNIVERSAL_1_5;
+        case 0x106:     return SPV_ENV_UNIVERSAL_1_6;
         default:
         {            
-            if (ver > 0x105)
+            if (ver > 0x106)
             {
                 // This is the highest we known for now..., so try that
-                return SPV_ENV_UNIVERSAL_1_5;
+                return SPV_ENV_UNIVERSAL_1_6;
             }
             break;
         }

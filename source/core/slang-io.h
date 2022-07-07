@@ -63,6 +63,12 @@ namespace Slang
 
         static const char kPathDelimiter = '/';
 
+#if SLANG_WINDOWS_FAMILY
+        static const char kOSCanonicalPathDelimiter = '\\';
+#else
+        static const char kOSCanonicalPathDelimiter = '/';
+#endif
+
             /// Finds all all the items in the specified directory, that matches the pattern.
             ///
             /// @param directoryPath The directory to do the search in. If the directory is not found, SLANG_E_NOT_FOUND is returned

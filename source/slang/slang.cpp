@@ -1440,8 +1440,14 @@ void TranslationUnitRequest::addSourceFile(SourceFile* sourceFile)
     }
 }
 
+EndToEndCompileRequest::~EndToEndCompileRequest()
+{
+    // Flush any writers associated with the request
+    m_writers->flushWriters();
 
-//
+    m_linkage.setNull();
+    m_frontEndReq.setNull();
+}
 
 static ISlangWriter* _getDefaultWriter(WriterChannel chan)
 {
@@ -1467,7 +1473,7 @@ void EndToEndCompileRequest::setWriter(WriterChannel chan, ISlangWriter* writer)
     // If the user passed in null, we will use the default writer on that channel
     m_writers->setWriter(SlangWriterChannel(chan), writer ? writer : _getDefaultWriter(chan));
 
-    // For diagnostic output, if the user passes in nullptr, we set on mSink.writer as that enables buffering on DiagnosticSink
+    // For diagnostic output, if the user passes in nullptr, we set on m_sink.writer as that enables buffering on DiagnosticSink
     if (chan == WriterChannel::Diagnostic)
     {
         m_sink.writer = writer; 
