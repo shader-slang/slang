@@ -1512,7 +1512,7 @@ namespace Slang
     // This function proceses primal arguments that need to be carried over to the function
     // signature for the JVP function. (eg. out types can be discarded)
     //
-    Type* primalToInputType(ASTBuilder* builder, Type* primalType)
+    Type* primalToInputType(ASTBuilder*, Type* primalType)
     {
         if (auto primalOutType = as<OutType>(primalType))
         {
