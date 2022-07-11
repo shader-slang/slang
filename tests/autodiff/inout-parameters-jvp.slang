@@ -8,7 +8,7 @@ __differentiate_jvp void h(float x, float y, inout float z)
 {
     float m = x + y;
     float n = x - y;
-    z += m * n + 2 * x * y;
+    z = z + m * n + 2 * x * y;
 }
 
 
