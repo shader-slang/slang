@@ -56,7 +56,9 @@ struct JVPTranscriber
         // Add all primal parameters to the list.
         for (UIndex i = 0; i < funcType->getParamCount(); i++)
         {   
-            parameterTypesD.add(funcType->getParamType(i));
+            // TODO(sai): Move this check to a separate function.
+            if (!as<IROutType>(funcType->getParamType(i)))
+                parameterTypesD.add(funcType->getParamType(i));
         }
 
         // Add differential versions for the types we support.
@@ -85,7 +87,12 @@ struct JVPTranscriber
             case kIROp_DoubleType:
                 return builder->getType(typeP->getOp());
             case kIROp_VectorType:
+                // TODO(sai): Call differentiateType() on typeP.
                 return as<IRVectorType>(typeP);
+            case kIROp_OutType:
+                return builder->getOutType(differentiateType(builder, as<IROutType>(typeP)->getValueType()));
+            case kIROp_InOutType:
+                return builder->getInOutType(differentiateType(builder, as<IRInOutType>(typeP)->getValueType()));
             default:
                 return nullptr;
         }
@@ -108,15 +115,16 @@ struct JVPTranscriber
         List<IRParam*> newParamListP;
         for (auto paramP : paramListP)
         {
-            newParamListP.add(as<IRParam>(cloneInst(&cloneEnv, builder, paramP)));
+            if(requiresPrimalClone(builder, paramP))
+                newParamListP.add(as<IRParam>(cloneInst(&cloneEnv, builder, paramP)));
         }
 
         // Now emit differentials.
         List<IRParam*> newParamListD;
-        for (auto paramP : newParamListP)
+        for (auto paramP : paramListP)
         {
             IRParam* paramD = as<IRParam>(differentiateParam(builder, paramP));
-            mapDifferentialInst(paramP, paramD);
+            mapDifferentialInst(findCloneForOperand(&cloneEnv, paramP), paramD);
             newParamListD.add(paramD);
         }
 
@@ -212,14 +220,14 @@ struct JVPTranscriber
     {
         IRInst* storeLocation = storeP->getPtr();
         IRInst* storeVal = storeP->getVal();
-        if (auto destParam = as<IRVar>(storeLocation))
+        if (as<IRVar>(storeLocation) || as<IRParam>(storeLocation))
         {   
             // If the stored value has a differential version, 
             // emit a store instruction for the differential parameter.
             // Otherwise, emit nothing since there's nothing to load.
             // 
             IRInst* storeValD = getDifferentialInst(storeVal);
-            IRVar*  storeLocationD = as<IRVar>(getDifferentialInst(destParam));
+            IRVar*  storeLocationD = as<IRVar>(getDifferentialInst(storeLocation));
             if (storeValD && storeLocationD)
             {
                 IRStore* storeD = as<IRStore>(
@@ -352,16 +360,34 @@ struct JVPTranscriber
     }
 
     // Logic for whether a primal instruction needs to be replicated
-    // in the differential function. For puerly functional blocks with
-    // no side-effects, it's safe to replicate everything except the
-    // return instruction.
-    //
+    // in the differential function. We detect and avoid replicating 
+    // side-effect instructions.
+    // 
     bool requiresPrimalClone(IRBuilder*, IRInst* instP)
     {
         if (as<IRReturn>(instP))
             return false;
-        else
-            return true;
+        else if (auto paramP = as<IRParam>(instP))
+        {
+            // Out-type parameters are discarded from the parameter list,
+            // since pure JVP functions to not write to primal outputs.
+            // 
+            if (as<IROutType>(paramP->getDataType()))
+                return false;
+        }
+        else if (auto storeP = as<IRStore>(instP))
+        {
+            IRInst* storeLocation = storeP->getPtr();
+
+            // If attempting to store to a location without a clone, 
+            // then this instruction has side-effects external to the
+            // current function.
+            // 
+            if(!lookUp(&cloneEnv, storeLocation))
+                return false;
+        }
+        
+        return true;
     }
 
     IRInst* transcribe(IRBuilder* builder, IRInst* oldInstP)
@@ -374,6 +400,11 @@ struct JVPTranscriber
         //
         if (requiresPrimalClone(builder, oldInstP))
             instP = cloneInst(&cloneEnv, builder, oldInstP);
+        else
+        {
+            // TODO: INCOMPLETE: Replace all operands with clones.
+            instP = findCloneForOperands();
+        }
         SLANG_ASSERT(instP);
 
         IRInst* instD = differentiateInst(builder, instP);

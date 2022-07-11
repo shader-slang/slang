@@ -1509,17 +1509,42 @@ namespace Slang
         return expr;
     }
 
+    // This function proceses primal arguments that need to be carried over to the function
+    // signature for the JVP function. (eg. out types can be discarded)
+    //
+    Type* primalToInputType(ASTBuilder* builder, Type* primalType)
+    {
+        if (auto primalOutType = as<OutType>(primalType))
+        {
+            // TODO(sai): are we sure it's not possible to run into OutType<InOutType<T>>?
+            return nullptr;
+        }
+        else if (auto primalInOutType = as<InOutType>(primalType))
+        {
+            return primalInOutType->getValueType();
+        }
+        return primalType;
+    }
+
     Type* primalToJVPParamType(ASTBuilder* builder, Type* primalType)
     {
         // Only float and float3 types can be differentiated for now.
         
-        if(primalType->equals(builder->getFloatType()))
+        if (primalType->equals(builder->getFloatType()))
             return primalType;
-        else if(auto primalVectorType = as<VectorExpressionType>(primalType))
+        else if (auto primalVectorType = as<VectorExpressionType>(primalType))
         {
             // TODO(sai): There's probably a more elegant way to check if a type is a float3?
             if (getIntVal(primalVectorType->elementCount) == 3 && primalVectorType->elementType->equals(builder->getFloatType()))
                 return primalVectorType;
+        }
+        else if (auto primalOutType = as<OutType>(primalType))
+        {
+            return builder->getOutType(primalToJVPParamType(builder, primalOutType->getValueType()));
+        }
+        else if (auto primalInOutType = as<InOutType>(primalType))
+        {
+            return builder->getInOutType(primalToJVPParamType(builder, primalInOutType->getValueType()));
         }
         return nullptr;
     }
@@ -1558,7 +1583,8 @@ namespace Slang
 
             for (UInt i = 0; i < primalType->getParamCount(); i++)
             {
-                jvpType->paramTypes.add(primalType->getParamType(i));
+                if(auto primalInputType = primalToInputType(astBuilder, primalType->getParamType(i)))
+                    jvpType->paramTypes.add(primalInputType);
             }
 
             for (UInt i = 0; i < primalType->getParamCount(); i++)
