@@ -109,6 +109,29 @@ struct JVPTranscriber
         return nullptr;
     }
 
+    IRInst* emitInputParam(IRBuilder* builder, IRParam* paramP)
+    {
+        // Convert primal 'inout' types into pure input types, because a
+        // JVP transformed function must never have primal side-effects.
+        // 
+        if (auto inoutTypeP = as<IRInOutType>(paramP->getDataType()))
+        {   
+            auto newParamP = builder->emitParam(inoutTypeP->getValueType());
+            cloneEnv.mapOldValToNew.Add(paramP, newParamP);
+
+            return newParamP;
+        }
+        else if (as<IROutType>(paramP->getDataType()))
+        {
+            getSink()->diagnose(paramP->sourceLoc,
+                    Diagnostics::unexpected,
+                    "encountered unexpected output parameter");
+            return nullptr;
+        }
+        else
+            return as<IRParam>(cloneInst(&cloneEnv, builder, paramP));
+    }
+
     List<IRParam*> transcribeParams(IRBuilder* builder, IRInstList<IRParam> paramListP)
     {
         // Clone (and emit) all the primal parameters.
@@ -116,7 +139,7 @@ struct JVPTranscriber
         for (auto paramP : paramListP)
         {
             if(requiresPrimalClone(builder, paramP))
-                newParamListP.add(as<IRParam>(cloneInst(&cloneEnv, builder, paramP)));
+                newParamListP.add(as<IRParam>(emitInputParam(builder, paramP)));
         }
 
         // Now emit differentials.
@@ -195,15 +218,16 @@ struct JVPTranscriber
 
     IRInst* differentiateLoad(IRBuilder* builder, IRLoad* loadP)
     {
-        if (auto varP = as<IRVar>(loadP->getPtr()))
+        auto ptrP = loadP->getPtr();
+        if (as<IRVar>(ptrP) || as<IRParam>(ptrP))
         {   
             // If the loaded parameter has a differential version, 
             // emit a load instruction for the differential parameter.
             // Otherwise, emit nothing since there's nothing to load.
             // 
-            if (auto varD = as<IRVar>(getDifferentialInst(varP)))
+            if (auto ptrD = getDifferentialInst(ptrP, nullptr))
             {
-                IRLoad* loadD = as<IRLoad>(builder->emitLoad(varD));
+                IRLoad* loadD = as<IRLoad>(builder->emitLoad(ptrD));
                 SLANG_ASSERT(loadD);
                 return loadD;
             }
@@ -227,7 +251,7 @@ struct JVPTranscriber
             // Otherwise, emit nothing since there's nothing to load.
             // 
             IRInst* storeValD = getDifferentialInst(storeVal);
-            IRVar*  storeLocationD = as<IRVar>(getDifferentialInst(storeLocation));
+            IRInst* storeLocationD = getDifferentialInst(storeLocation);
             if (storeValD && storeLocationD)
             {
                 IRStore* storeD = as<IRStore>(
@@ -247,13 +271,18 @@ struct JVPTranscriber
     IRInst* differentiateReturn(IRBuilder* builder, IRReturn* returnP)
     {
         IRInst* returnVal = findCloneForOperand(&cloneEnv, returnP->getVal());
-        if (auto returnValD = getDifferentialInst(returnVal))
+        if (auto returnValD = getDifferentialInst(returnVal, nullptr))
         {   
             IRReturn* returnD = as<IRReturn>(builder->emitReturn(returnValD));
             SLANG_ASSERT(returnD);
             return returnD;
         }
-        return nullptr;
+        else
+        {
+            // If the differential return value is not available, emit a 
+            // void return.
+            return builder->emitReturn();
+        }
     }
 
     // Since int/float literals are sometimes nested inside an IRConstructor
@@ -379,8 +408,12 @@ struct JVPTranscriber
         {
             IRInst* storeLocation = storeP->getPtr();
 
+            // Writing to a parameter is a side-effect that should be avoided.
+            if(as<IRParam>(storeLocation))
+                return false;
+
             // If attempting to store to a location without a clone, 
-            // then this instruction has side-effects external to the
+            // then this instruction likely has side-effects external to the
             // current function.
             // 
             if(!lookUp(&cloneEnv, storeLocation))
@@ -402,8 +435,16 @@ struct JVPTranscriber
             instP = cloneInst(&cloneEnv, builder, oldInstP);
         else
         {
-            // TODO: INCOMPLETE: Replace all operands with clones.
-            instP = findCloneForOperands();
+            // We replace the operands of the old instruction with their clones,
+            // if available.
+            // 
+            for(UInt ii = 0; ii < oldInstP->getOperandCount(); ++ii)
+            {
+                auto oldOperand = oldInstP->getOperand(ii);
+                auto newOperand = findCloneForOperand(&cloneEnv, oldOperand);
+
+                instP->getOperands()[ii].init(instP, newOperand);
+            }
         }
         SLANG_ASSERT(instP);
 
