@@ -390,6 +390,28 @@ struct JVPTranscriber
         return nullptr;
     }
 
+    IRInst* differentiateSwizzle(IRBuilder* builder, IRSwizzle* swizzleP)
+    {
+        if (auto baseD = getDifferentialInst(swizzleP->getBase(), nullptr))
+        {
+            List<IRInst*> swizzleIndices;
+
+            // TODO(sai): Is this really needed?
+            for (UIndex ii = 0; ii < swizzleP->getElementCount(); ii++)
+            {
+                auto swizzleIndex = swizzleP->getElementIndex(ii);
+                SLANG_ASSERT(as<IRIntLit>(swizzleIndex));
+                swizzleIndices.add(builder->getIntValue(swizzleIndex->getDataType(), as<IRIntLit>(swizzleIndex)->getValue()));
+            }
+            
+            return builder->emitSwizzle(differentiateType(builder, swizzleP->getDataType()),
+                                        baseD,
+                                        swizzleP->getElementCount(),
+                                        swizzleIndices.getBuffer());
+        }
+        return nullptr;
+    }
+
     // In differential computation, the 'default' differential value is always zero.
     // This is a consequence of differential computing being inherently linear. As a 
     // result, it's useful to have a method to generate zero literals of any (arithmetic) type.
@@ -505,6 +527,9 @@ struct JVPTranscriber
         
         case kIROp_Call:
             return differentiateCall(builder, as<IRCall>(instP));
+        
+        case kIROp_swizzle:
+            return differentiateSwizzle(builder, as<IRSwizzle>(instP));
 
         default:
             getSink()->diagnose(instP->sourceLoc,
