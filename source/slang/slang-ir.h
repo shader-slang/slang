@@ -1794,12 +1794,6 @@ void dumpIR(IRModule* module, const IRDumpOptions& options, char const* label, S
     /// True if the op type can be handled 'nominally' meaning that pointer identity is applicable. 
 bool isNominalOp(IROp op);
 
-    // True if ptrType is a pointer type to elementType
-bool isPointerOfType(IRInst* ptrType, IRInst* elementType);
-
-    // True if ptrType is a pointer type to a type of opCode
-bool isPointerOfType(IRInst* ptrType, IROp opCode);
-
     // True if the IR inst represents a builtin object (e.g. __BuiltinFloatingPointType).
 bool isBuiltin(IRInst* inst);
 

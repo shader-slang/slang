@@ -15,6 +15,7 @@
 #include "slang-ir-specialize-resources.h"
 #include "slang-ir-ssa.h"
 #include "slang-ir-union.h"
+#include "slang-ir-util.h"
 #include "slang-ir-validate.h"
 #include "slang-legalize-types.h"
 #include "slang-lower-to-ir.h"
@@ -28,7 +29,6 @@
 
 #include "slang-emit-source-writer.h"
 #include "slang-mangled-lexer.h"
-
 #include <assert.h>
 
 namespace Slang {
@@ -1584,15 +1584,6 @@ void CLikeSourceEmitter::emitInstExpr(IRInst* inst, const EmitOpInfo& inOuterPre
 void CLikeSourceEmitter::diagnoseUnhandledInst(IRInst* inst)
 {
     getSink()->diagnose(inst, Diagnostics::unimplemented, "unexpected IR opcode during code emit");
-}
-
-bool isPtrToClassType(IRInst* type)
-{
-    if (auto ptrType = as<IRPtrTypeBase>(type))
-    {
-        return ptrType->getValueType()->getOp() == kIROp_ClassType;
-    }
-    return false;
 }
 
 void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inOuterPrec)

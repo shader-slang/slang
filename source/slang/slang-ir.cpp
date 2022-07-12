@@ -6330,16 +6330,6 @@ namespace Slang
                 irValue->getDataType()));
     }
 
-    bool isPointerOfType(IRInst* ptrType, IRInst* elementType)
-    {
-        return ptrType && ptrType->getOp() == kIROp_PtrType && ptrType->getOperand(0) == elementType;
-    }
-
-    bool isPointerOfType(IRInst* ptrType, IROp opCode)
-    {
-        return ptrType && ptrType->getOp() == kIROp_PtrType && ptrType->getOperand(0) &&
-            ptrType->getOperand(0)->getOp() == opCode;
-    }
     bool isBuiltin(IRInst* inst)
     {
         return inst->findDecoration<IRBuiltinDecoration>() != nullptr;

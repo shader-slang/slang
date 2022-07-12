@@ -278,7 +278,7 @@ DIAGNOSTIC(30060, Error, expectedAType, "expected a type, got a '$0'")
 DIAGNOSTIC(30061, Error, expectedANamespace, "expected a namespace, got a '$0'")
 
 DIAGNOSTIC(30065, Error, newCanOnlyBeUsedToInitializeAClass, "`new` can only be used to initialize a class")
-DIAGNOSTIC(30066, Error, classCanOnlyBeInitializedWithNew, "a class can only be initialize by a `new` clause")
+DIAGNOSTIC(30066, Error, classCanOnlyBeInitializedWithNew, "a class can only be initialized by a `new` clause")
 
 DIAGNOSTIC(30100, Error, staticRefToNonStaticMember, "type '$0' cannot be used to refer to non-static member '$1'")
 
