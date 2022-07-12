@@ -642,13 +642,13 @@ void DiagnosticSink::diagnoseRaw(
     // Did the client supply a callback for us to use?
     if(writer)
     {
-        // If so, pass the error string along to them
+        // If so, pass the error string along to them.
         writer->write(message.begin(), message.getLength());
     }
     else
     {
         // If the user doesn't have a callback, then just
-        // collect our diagnostic messages into a buffer
+        // collect our diagnostic messages into a buffer.
         outputBuffer.append(message);
     }
 
