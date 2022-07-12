@@ -168,6 +168,8 @@ Result DeviceImpl::initVulkanInstanceAndDevice(
         instanceCreateInfo.enabledExtensionCount = (uint32_t)instanceExtensions.getCount();
         instanceCreateInfo.ppEnabledExtensionNames = &instanceExtensions[0];
 
+        const char* layerNames[] = { nullptr };
+        
         if (useValidationLayer)
         {
             // Depending on driver version, validation layer may or may not exist.
@@ -183,7 +185,6 @@ Result DeviceImpl::initVulkanInstanceAndDevice(
             availableLayers.setCount(layerCount);
             m_api.vkEnumerateInstanceLayerProperties(&layerCount, availableLayers.getBuffer());
 
-            const char* layerNames[] = { nullptr };
             for (auto& layer : availableLayers)
             {
                 if (strncmp(
