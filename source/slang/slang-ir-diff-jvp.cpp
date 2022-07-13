@@ -396,7 +396,7 @@ struct JVPTranscriber
         {
             List<IRInst*> swizzleIndices;
 
-            // TODO(sai): Is this really needed?
+            // TODO(sai): Is this copy really needed?
             for (UIndex ii = 0; ii < swizzleP->getElementCount(); ii++)
             {
                 auto swizzleIndex = swizzleP->getElementIndex(ii);
