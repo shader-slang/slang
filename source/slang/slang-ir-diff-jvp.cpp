@@ -38,6 +38,16 @@ struct JVPTranscriber
         return instMapD[instP];
     }
 
+    IRInst* getDifferentialInst(IRInst* instP, IRInst* defaultInst)
+    {
+        return (hasDifferentialInst(instP)) ? instMapD[instP] : defaultInst;
+    }
+
+    bool hasDifferentialInst(IRInst* instP)
+    {
+        return instMapD.ContainsKey(instP);
+    }
+
     IRFuncType* differentiateFunctionType(IRBuilder* builder, IRFuncType* funcType)
     {
         List<IRType*> parameterTypesD;
@@ -74,7 +84,8 @@ struct JVPTranscriber
             case kIROp_FloatType:
             case kIROp_DoubleType:
                 return builder->getType(typeP->getOp());
-            
+            case kIROp_VectorType:
+                return as<IRVectorType>(typeP);
             default:
                 return nullptr;
         }
@@ -252,6 +263,94 @@ struct JVPTranscriber
         return nullptr;
     }
 
+    // Differentiating a call instruction here is primarily about generating
+    // an appropriate call list based on whichever parameters have differentials 
+    // in the current transcription context.
+    // Note(sai): Currently we don't look at modifiers (in, out, const etc..) in the function
+    // type, and so only support 'plain' parameters. We need to validte this somewhere to
+    // avoid weird behaviour
+    // 
+    IRInst* differentiateCall(IRBuilder* builder, IRCall* callP)
+    {   
+        if (auto calleeP = as<IRFunc>(callP->getCallee()))
+        {
+            
+            // Build the differential callee
+            IRInst* calleeD = builder->emitJVPDifferentiateInst(
+                differentiateFunctionType(builder, as<IRFuncType>(calleeP->getFullType())),
+                calleeP);
+            
+            List<IRInst*> args;
+            // Go over the parameter list and all primal arguments.
+            for (UIndex ii = 0; ii < callP->getArgCount(); ii++)
+            {
+                args.add(callP->getArg(ii));
+            }
+
+            {
+                IRParam* param = calleeP->getFirstParam();
+                // Go over the parameter list again and arguments for types that need differentials.
+                for (UIndex ii = 0; ii < callP->getArgCount(); ii++)
+                {
+                    // Look the parameter up in the callee's signature. If it requires a derivative, proceed.
+                    // Otherwise, continue.
+                    //
+                    if (differentiateType(builder, param->getDataType()))
+                    {
+                        // If the corresponding argument does not have a differential, create and place a
+                        // 0 argument.
+                        //
+                        auto argP = callP->getArg(ii);
+                        if (auto argD = getDifferentialInst(argP, nullptr))
+                            args.add(argD);
+                        else
+                            args.add(getZeroOfType(builder, argP->getDataType()));
+                    }
+
+                    param = param->getNextParam();
+                }
+            }
+            
+            return builder->emitCallInst(differentiateType(builder, callP->getFullType()),
+                                         calleeD,
+                                         args);
+        }
+        else
+        {
+            // Note that this can only happen if the callee is a result
+            // of a higher-order operation. For now, we assume that we cannot
+            // differentiate such calls safely.
+            // TODO(sai): Should probably get checked in the front-end.
+            //
+            getSink()->diagnose(callP->sourceLoc,
+                Diagnostics::internalCompilerError,
+                "attempting to differentiate unresolved callee");
+        }
+        return nullptr;
+    }
+
+    // In differential computation, the 'default' differential value is always zero.
+    // This is a consequence of differential computing being inherently linear. As a 
+    // result, it's useful to have a method to generate zero literals of any (arithmetic) type.
+    // 
+    IRInst* getZeroOfType(IRBuilder* builder, IRType* type)
+    {
+        switch (type->getOp())
+        {
+            case kIROp_FloatType:
+            case kIROp_HalfType:
+            case kIROp_DoubleType:
+                return builder->getFloatValue(type, 0.0);
+            case kIROp_IntType:
+                return builder->getIntValue(type, 0);
+            default:
+                getSink()->diagnose(type->sourceLoc,
+                    Diagnostics::internalCompilerError,
+                    "could not generate zero value for given type");
+                return nullptr;       
+        }
+    }
+
     // Logic for whether a primal instruction needs to be replicated
     // in the differential function. For puerly functional blocks with
     // no side-effects, it's safe to replicate everything except the
@@ -307,6 +406,9 @@ struct JVPTranscriber
 
         case kIROp_Construct:
             return differentiateConstruct(builder, instP);
+        
+        case kIROp_Call:
+            return differentiateCall(builder, as<IRCall>(instP));
 
         default:
             getSink()->diagnose(instP->sourceLoc,

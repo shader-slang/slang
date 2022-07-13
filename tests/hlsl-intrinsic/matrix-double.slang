@@ -4,7 +4,10 @@
 // More complicated functions (like say sin) can also be written, if not available on a target, but requires significant
 // care.
 
-//TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute -output-using-type
+// TODO(JS):
+// NOTE! war-double-host-callable category is a work around for issues with x86 & host-callable
+
+//TEST(compute, war-double-host-callable):COMPARE_COMPUTE_EX:-cpu -compute -output-using-type
 //DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -output-using-type
 //DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -output-using-type
 //DISABLE_TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -output-using-type -render-feature double

@@ -4152,6 +4152,24 @@ SlangResult innerMain(int argc, char** argv)
         out.print("\n");
     }
 
+    {
+        SlangSession* session = context.getSession();
+        
+        const bool hasLlvm = SLANG_SUCCEEDED(session->checkPassThroughSupport(SLANG_PASS_THROUGH_LLVM));
+        const auto hostCallableCompiler = session->getDownstreamCompilerForTransition(SLANG_CPP_SOURCE, SLANG_SHADER_HOST_CALLABLE);
+
+        if (hasLlvm && hostCallableCompiler == SLANG_PASS_THROUGH_LLVM && SLANG_PROCESSOR_X86)
+        {
+            // TODO(JS)
+            // For some reason host-callable with llvm/double produces different results on x86
+        }
+        else
+        {
+            // Special category to mark a test only works for targets that work correctly with double (ie not x86/llvm)
+            categorySet.add("war-double-host-callable", fullTestCategory);
+        }
+    }
+
     // Working out what renderApis is worked on on demand through
     // _getAvailableRenderApiFlags()
 

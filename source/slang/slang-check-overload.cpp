@@ -60,6 +60,40 @@ namespace Slang
         return counts;
     }
 
+    bool SemanticsVisitor::TryCheckOverloadCandidateClassNewMatchUp(OverloadResolveContext& context, OverloadCandidate const& candidate)
+    {
+        // Check that a constructor call to a class type must be in a `new` expr, and a `new` expr
+        // is only used to construct a class.
+        bool isClassType = false;
+        bool isNewExpr = false;
+        if (auto ctorDeclRef = candidate.item.declRef.as<ConstructorDecl>())
+        {
+            if (auto resultType = as<DeclRefType>(candidate.resultType))
+            {
+                if (resultType->declRef.as<ClassDecl>())
+                {
+                    isClassType = true;
+                }
+            }
+        }
+        if (as<NewExpr>(context.originalExpr))
+        {
+            isNewExpr = true;
+        }
+
+        if (isNewExpr && !isClassType)
+        {
+            getSink()->diagnose(context.originalExpr, Diagnostics::newCanOnlyBeUsedToInitializeAClass);
+            return false;
+        }
+        if (!isNewExpr && isClassType)
+        {
+            getSink()->diagnose(context.originalExpr, Diagnostics::classCanOnlyBeInitializedWithNew);
+            return false;
+        }
+        return true;
+    }
+
     bool SemanticsVisitor::TryCheckOverloadCandidateArity(
         OverloadResolveContext&		context,
         OverloadCandidate const&	candidate)
@@ -571,6 +605,9 @@ namespace Slang
         }
 
         context.mode = OverloadResolveContext::Mode::ForReal;
+
+        if (!TryCheckOverloadCandidateClassNewMatchUp(context, candidate))
+            goto error;
 
         if (!TryCheckOverloadCandidateArity(context, candidate))
             goto error;

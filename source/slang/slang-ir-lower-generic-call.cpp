@@ -39,7 +39,7 @@ namespace Slang
             if (auto ptrType = as<IRPtrTypeBase>(paramType))
             {
                 paramValType = ptrType->getValueType();
-            }
+            } 
             auto argType = arg->getDataType();
             if (auto argPtrType = as<IRPtrTypeBase>(argType))
             {

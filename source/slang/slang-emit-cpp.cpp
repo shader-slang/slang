@@ -560,6 +560,13 @@ SlangResult CPPSourceEmitter::calcTypeName(IRType* type, CodeGenTarget target, S
             out << ">";
             return SLANG_OK;
         }
+        case kIROp_ClassType:
+        {
+            out << "RefPtr<";
+            out << getName(type);
+            out << ">";
+            return SLANG_OK;
+        }
         default:
         {
             if (isNominalOp(type->getOp()))
