@@ -202,7 +202,24 @@ List<Edit> formatSource(UnownedStringSlice text, Index lineStart, Index lineEnd,
         // Never allow clang-format to put the semicolon after `}` in its own line.
         if (edt.offset < text.getLength() && edt.length == 0 && text[edt.offset] == ';' && edt.offset >0 && text[edt.offset - 1] == '}')
             continue;
-
+        // If need to preserve line break, turn all edits with a line break into a space.
+        if (options.behavior == FormatBehavior::PreserveLineBreak)
+        {
+            auto originalText = text.subString(edt.offset, edt.length);
+            bool originalHasLineBreak = originalText.indexOf('\n') != -1;
+            bool newHasLineBreak = edt.text.indexOf('\n') != -1;
+            if (originalHasLineBreak == newHasLineBreak)
+            {
+            }
+            else if (!originalHasLineBreak && newHasLineBreak)
+            {
+                edt.text = " ";
+            }
+            else
+            {
+                continue;
+            }
+        }
         edits.add(edt);
     }
     return edits;
