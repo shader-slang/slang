@@ -107,18 +107,15 @@ List<LanguageServerProtocol::TextEditCompletionItem> CompletionContext::gatherFi
     Index sectionEnd,
     char closingChar)
 {
-    Index parentUpLevel = 0;
     auto realPrefix = prefixPath.getUnownedSlice();
     while (realPrefix.startsWith(".."))
     {
         realPrefix = realPrefix.tail(2);
-        if (realPrefix.startsWith("."))
+        if (realPrefix.startsWith("/") || realPrefix.startsWith("\\"))
         {
             realPrefix = realPrefix.tail(1);
         }
-        parentUpLevel++;
     }
-    auto parentPrefix = prefixPath.getUnownedSlice().head(parentUpLevel * 3);
 
     struct FileEnumerationContext
     {
