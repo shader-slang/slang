@@ -2578,6 +2578,9 @@ public:
     // Create an initially empty `struct` type.
     IRStructType*   createStructType();
 
+    // Create an initially empty `class` type.
+    IRClassType* createClassType();
+
     // Create an empty `interface` type.
     IRInterfaceType* createInterfaceType(UInt operandCount, IRInst* const* operands);
 
@@ -2587,7 +2590,7 @@ public:
     // Create a field nested in a struct type, declaring that
     // the specified field key maps to a field with the specified type.
     IRStructField*  createStructField(
-        IRStructType*   structType,
+        IRType*         aggType,
         IRStructKey*    fieldKey,
         IRType*         fieldType);
 
@@ -2636,6 +2639,8 @@ public:
         IRType* type);
     IRParam* emitParamAtHead(
         IRType* type);
+
+    IRInst* emitAllocObj(IRType* type);
 
     IRVar* emitVar(
         IRType* type);

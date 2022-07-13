@@ -49,6 +49,12 @@ These tests are disabled due to other limitations of gfx layer.
 * compute/half-rw-texture-convert.slang
 * compute/half-rw-texture-simple.slang
 
+### Temporary Language Limitation
+
+This test is disabled due to temporary compiler implementation limitations.
+Should re-enable once the new checks for `class` usage is complete.
+
+* diagnostics/class-keyword.slang
 
 ### Uncategorized
 

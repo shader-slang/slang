@@ -2260,36 +2260,10 @@ namespace Slang
         }
         else if( parser->LookAheadToken("class") )
         {
-            // TODO(JS): Class type doesn't currently have the correct semantics. This is covered here
-            // https://github.com/shader-slang/slang/issues/2206
-            // 
-            // For now the use of `class` is disabled. 
-            // The remaining code around `class` left intact as likely will be the basis for the future
-            // implementation.
-
-            const bool disableClass = true;
-
-            if (disableClass)
-            {
-                parser->sink->diagnose(parser->tokenReader.peekLoc(), Diagnostics::classIsReservedKeyword);
-
-                // Consume `class`
-                advanceToken(parser);
-
-                // Indicate in recovering state.
-                parser->isRecovering = true;
-
-                // Check to confirm the result is invalid
-                SLANG_ASSERT(typeSpec.decl == nullptr && typeSpec.expr == nullptr);
-                return typeSpec;
-            }
-            else
-            {
-                auto decl = parser->ParseClass();
-                typeSpec.decl = decl;
-                typeSpec.expr = createDeclRefType(parser, decl);
-                return typeSpec;
-            }
+            auto decl = parser->ParseClass();
+            typeSpec.decl = decl;
+            typeSpec.expr = createDeclRefType(parser, decl);
+            return typeSpec;
         }
         else if(parser->LookAheadToken("enum"))
         {
@@ -5852,8 +5826,30 @@ namespace Slang
         switch( tokenType )
         {
         default:
+            if (parser->LookAheadToken("new"))
+            {
+                NewExpr* newExpr = parser->astBuilder->create<NewExpr>();
+                parser->FillPosition(newExpr);
+                parser->ReadToken();
+                auto subExpr = parsePostfixExpr(parser);
+                if (as<VarExpr>(subExpr) || as<GenericAppExpr>(subExpr))
+                {
+                    newExpr->functionExpr = subExpr;
+                }
+                else if (auto invokeExpr = as<InvokeExpr>(subExpr))
+                {
+                    newExpr->functionExpr = invokeExpr->functionExpr;
+                    newExpr->arguments = invokeExpr->arguments;
+                    newExpr->argumentDelimeterLocs = invokeExpr->argumentDelimeterLocs;
+                }
+                else
+                {
+                    parser->diagnose(newExpr->loc, Diagnostics::syntaxError);
+                    newExpr->functionExpr = parser->astBuilder->create<IncompleteExpr>();
+                }
+                return newExpr;
+            }
             return parsePostfixExpr(parser);
-
         case TokenType::OpNot:
         case TokenType::OpInc:
         case TokenType::OpDec:
