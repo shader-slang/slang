@@ -294,7 +294,7 @@ struct JVPTranscriber
 
     IRInst* differentiateReturn(IRBuilder* builder, IRReturn* returnP)
     {
-        IRInst* returnVal = findCloneForOperand(&cloneEnv, returnP->getVal());
+        IRInst* returnVal = returnP->getVal();
         if (auto returnValD = getDifferentialInst(returnVal, nullptr))
         {   
             IRReturn* returnD = as<IRReturn>(builder->emitReturn(returnValD));
@@ -471,32 +471,31 @@ struct JVPTranscriber
 
     IRInst* transcribe(IRBuilder* builder, IRInst* oldInstP)
     {
-        IRInst* instP = oldInstP;
+        // IRInst* instP = oldInstP;
 
-        // Clone the old instruction, but only if it's safe to do so.
+        // Clone the old instruction into the new differential function.
+        // 
+        IRInst* instP = cloneInst(&cloneEnv, builder, oldInstP);
+
+        SLANG_ASSERT(instP);
+
+        IRInst* instD = differentiateInst(builder, instP);
+        
+        // In case it's not safe to clone the old instruction, 
+        // remove it from the graph.
         // For instance, instructions that handle control flow 
         // (return statements) shouldn't be replicated.
         //
         if (requiresPrimalClone(builder, oldInstP))
-            instP = cloneInst(&cloneEnv, builder, oldInstP);
+            mapDifferentialInst(instP, instD);
         else
         {
-            // We replace the operands of the old instruction with their clones,
-            // if available.
-            // 
-            for(UInt ii = 0; ii < oldInstP->getOperandCount(); ++ii)
-            {
-                auto oldOperand = oldInstP->getOperand(ii);
-                auto newOperand = findCloneForOperand(&cloneEnv, oldOperand);
+            // This inst should never have been used.
+            SLANG_ASSERT(instP->firstUse == nullptr);
 
-                instP->getOperands()[ii].init(instP, newOperand);
-            }
+            instP->removeAndDeallocate();
+            mapDifferentialInst(oldInstP, instD);
         }
-        SLANG_ASSERT(instP);
-
-        IRInst* instD = differentiateInst(builder, instP);
-
-        mapDifferentialInst(instP, instD);
 
         return instD;
     }

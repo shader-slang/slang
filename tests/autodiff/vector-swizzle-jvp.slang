@@ -11,10 +11,9 @@ __differentiate_jvp float2 f(float3 x)
 
 __differentiate_jvp float2 g(float3 x, float4 y)
 {
-    //float3 a = x + y.zyx;
-    //float2 b = x.zx - y.yw;
-    //return a.yz * b + 2 * x.xy * y.yz;
-    return x.yz;
+    float3 a = x + y.zyx;
+    float2 b = x.zx - y.yw;
+    return a.yz * b + 2 * x.xy * y.yz;
 }
 
 [numthreads(1, 1, 1)]
@@ -31,10 +30,9 @@ void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
         float4 y = float4(-1.5, 1.0, 4.0, 2.0);
         float3 dx = float3(1.0, 0.0, -1.0);
         float4 dy = float4(0.0, 0.5, -0.25, 1.0);
+
+        outputBuffer[2] = __jvp(g)(x, y, dx, dy).x; // Expect: -2.25
+        outputBuffer[3] = __jvp(g)(x, y, dx, dy).y; // Expect: 0.5
         
-        outputBuffer[2] = __jvp(g)(y, dy).x;
-        //outputBuffer[2] = __jvp(g)(x, y, dx, dy).x;  // Expect: 1
-        //outputBuffer[3] = (g(x + dx * 1e-3, y + dy * 1e-3).x - g(x - dx * 1e-3, y - dy * 1e-3).x) / (2e-3);
-        //outputBuffer[3] = __jvp(g)(x, y, dx, dy).y;  // Expect: 0.5
     }
 }
