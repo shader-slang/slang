@@ -500,7 +500,10 @@ static size_t _getStructureSize(const uint8_t* src)
 template <typename T>
 static T makeFromSizeVersioned(const uint8_t* src)
 {
+    // The structure size must be size_t
     SLANG_COMPILE_TIME_ASSERT(sizeof(((T*)src)->structureSize) == sizeof(size_t));
+    // The structureSize field *must* be the first element of T
+    SLANG_COMPILE_TIME_ASSERT(SLANG_OFFSET_OF(T, structureSize) == 0);
 
     // The source size is held in the first element of T, and will be in the first bytes of src.
     const size_t srcSize = _getStructureSize(src);
