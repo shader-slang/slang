@@ -90,6 +90,8 @@ namespace Slang
 
         void visitStructDecl(StructDecl* decl);
 
+        void visitClassDecl(ClassDecl* decl);
+
             /// Get the type of the storage accessed by an accessor.
             ///
             /// The type of storage is determined by the parent declaration.
@@ -148,6 +150,8 @@ namespace Slang
         void visitInterfaceDecl(InterfaceDecl* decl);
 
         void visitStructDecl(StructDecl* decl);
+
+        void visitClassDecl(ClassDecl* decl);
 
         void visitEnumDecl(EnumDecl* decl);
 
@@ -1063,6 +1067,11 @@ namespace Slang
         {
             addModifier(structDecl, m_astBuilder->create<NVAPIMagicModifier>());
         }
+    }
+
+    void SemanticsDeclHeaderVisitor::visitClassDecl(ClassDecl* classDecl)
+    {
+        SLANG_UNUSED(classDecl);
     }
 
     void SemanticsDeclBodyVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
@@ -3354,6 +3363,75 @@ namespace Slang
             else
             {
                 getSink()->diagnose(inheritanceDecl, Diagnostics::baseOfStructMustBeStructOrInterface, decl, baseType);
+                continue;
+            }
+
+            // TODO: At this point we have the `baseDeclRef`
+            // and could use it to perform further validity checks,
+            // and/or to build up a more refined representation of
+            // the inheritance graph for this type (e.g., a "class
+            // precedence list").
+            //
+            // E.g., we can/should check that we aren't introducing
+            // a circular inheritance relationship.
+
+            _validateCrossModuleInheritance(decl, inheritanceDecl);
+        }
+    }
+
+    void SemanticsDeclBasesVisitor::visitClassDecl(ClassDecl* decl)
+    {
+        // A `class` type can only inherit from `class` or `interface` types.
+        //
+        // Furthermore, only the first inheritance clause (in source
+        // order) is allowed to declare a base `class` type.
+        //
+        Index inheritanceClauseCounter = 0;
+        for (auto inheritanceDecl : decl->getMembersOfType<InheritanceDecl>())
+        {
+            Index inheritanceClauseIndex = inheritanceClauseCounter++;
+
+            ensureDecl(inheritanceDecl, DeclCheckState::CanUseBaseOfInheritanceDecl);
+            auto baseType = inheritanceDecl->base.type;
+
+            // It is possible that there was an error in checking the base type
+            // expression, and in such a case we shouldn't emit a cascading error.
+            //
+            if (auto baseErrorType = as<ErrorType>(baseType))
+            {
+                continue;
+            }
+
+            auto baseDeclRefType = as<DeclRefType>(baseType);
+            if (!baseDeclRefType)
+            {
+                getSink()->diagnose(inheritanceDecl, Diagnostics::baseOfClassMustBeClassOrInterface, decl, baseType);
+                continue;
+            }
+
+            auto baseDeclRef = baseDeclRefType->declRef;
+            if (auto baseInterfaceDeclRef = baseDeclRef.as<InterfaceDecl>())
+            {
+            }
+            else if (auto baseStructDeclRef = baseDeclRef.as<ClassDecl>())
+            {
+                // To simplify the task of reading and maintaining code,
+                // we require that when a `class` inherits from another
+                // `class`, the base `class` is the first item in
+                // the list of bases (before any interfaces).
+                //
+                // This constraint also has the secondary effect of restricting
+                // it so that a `struct` cannot multiply inherit from other
+                // `struct` types.
+                //
+                if (inheritanceClauseIndex != 0)
+                {
+                    getSink()->diagnose(inheritanceDecl, Diagnostics::baseClassMustBeListedFirst, decl, baseType);
+                }
+            }
+            else
+            {
+                getSink()->diagnose(inheritanceDecl, Diagnostics::baseOfClassMustBeClassOrInterface, decl, baseType);
                 continue;
             }
 

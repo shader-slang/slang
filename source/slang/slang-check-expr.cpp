@@ -1698,7 +1698,7 @@ namespace Slang
 
     Expr* SemanticsExprVisitor::visitTryExpr(TryExpr* expr)
     {
-        auto prevTryClauseType = expr->tryClauseType;
+        auto prevTryClauseType = m_enclosingTryClauseType;
         m_enclosingTryClauseType = expr->tryClauseType;
         expr->base = CheckTerm(expr->base);
         m_enclosingTryClauseType = prevTryClauseType;

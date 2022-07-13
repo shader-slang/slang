@@ -411,6 +411,7 @@ IF EXIST ..\..\..\external\slang-binaries\bin\windows-aarch64\slang-glslang.dll\
     <ClInclude Include="..\..\..\source\slang\slang-ir-synthesize-active-mask.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-type-set.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-union.h" />
+    <ClInclude Include="..\..\..\source\slang\slang-ir-util.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-validate.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-witness-table-wrapper.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-wrap-structured-buffers.h" />
@@ -569,6 +570,7 @@ IF EXIST ..\..\..\external\slang-binaries\bin\windows-aarch64\slang-glslang.dll\
     <ClCompile Include="..\..\..\source\slang\slang-ir-synthesize-active-mask.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-type-set.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-union.cpp" />
+    <ClCompile Include="..\..\..\source\slang\slang-ir-util.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-validate.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-witness-table-wrapper.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-wrap-structured-buffers.cpp" />

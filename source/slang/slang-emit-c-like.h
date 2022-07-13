@@ -353,6 +353,8 @@ public:
     void emitFuncDecorations(IRFunc* func) { emitFuncDecorationsImpl(func); }
 
     void emitStruct(IRStructType* structType);
+    void emitClass(IRClassType* structType);
+
 
 
         /// Emit type attributes that should appear after, e.g., a `struct` keyword

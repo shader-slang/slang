@@ -3560,6 +3560,16 @@ namespace Slang
         return structType;
     }
 
+    IRClassType* IRBuilder::createClassType()
+    {
+        IRClassType* classType = createInst<IRClassType>(
+            this,
+            kIROp_ClassType,
+            getTypeKind());
+        addGlobalValue(this, classType);
+        return classType;
+    }
+
     IRInterfaceType* IRBuilder::createInterfaceType(UInt operandCount, IRInst* const* operands)
     {
         IRInterfaceType* interfaceType = createInst<IRInterfaceType>(
@@ -3585,7 +3595,7 @@ namespace Slang
     // Create a field nested in a struct type, declaring that
     // the specified field key maps to a field with the specified type.
     IRStructField*  IRBuilder::createStructField(
-        IRStructType*   structType,
+        IRType*         aggType,
         IRStructKey*    fieldKey,
         IRType*         fieldType)
     {
@@ -3599,9 +3609,9 @@ namespace Slang
             2,
             operands);
 
-        if (structType)
+        if (aggType)
         {
-            field->insertAtEnd(structType);
+            field->insertAtEnd(aggType);
         }
 
         return field;
@@ -3694,6 +3704,11 @@ namespace Slang
             bb->insertParamAtHead(param);
         }
         return param;
+    }
+
+    IRInst* IRBuilder::emitAllocObj(IRType* type)
+    {
+        return emitIntrinsicInst(type, kIROp_AllocObj, 0, nullptr);
     }
 
     IRVar* IRBuilder::emitVar(
@@ -5527,6 +5542,7 @@ namespace Slang
         switch (op)
         {
             case kIROp_StructType:
+            case kIROp_ClassType:
             case kIROp_InterfaceType:
             case kIROp_Generic:
             case kIROp_Param:
@@ -6081,6 +6097,7 @@ namespace Slang
         case kIROp_ExtractExistentialWitnessTable:
         case kIROp_WrapExistential:
         case kIROp_BitCast:
+        case kIROp_AllocObj:
             return false;
         }
     }
@@ -6313,16 +6330,6 @@ namespace Slang
                 irValue->getDataType()));
     }
 
-    bool isPointerOfType(IRInst* ptrType, IRInst* elementType)
-    {
-        return ptrType && ptrType->getOp() == kIROp_PtrType && ptrType->getOperand(0) == elementType;
-    }
-
-    bool isPointerOfType(IRInst* ptrType, IROp opCode)
-    {
-        return ptrType && ptrType->getOp() == kIROp_PtrType && ptrType->getOperand(0) &&
-            ptrType->getOperand(0)->getOp() == opCode;
-    }
     bool isBuiltin(IRInst* inst)
     {
         return inst->findDecoration<IRBuiltinDecoration>() != nullptr;
