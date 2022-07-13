@@ -1509,20 +1509,17 @@ namespace Slang
         return expr;
     }
 
-    // This function proceses primal arguments that need to be carried over to the function
-    // signature for the JVP function. (eg. out types can be discarded)
+    // This function proceses primal params (i.e params of the inner function that is being 
+    // differentiated) that need to be carried over to the function signature for the JVP 
+    // function. (eg. out types can be discarded)
     //
     Type* primalToInputType(ASTBuilder*, Type* primalType)
     {
         if (auto primalOutType = as<OutType>(primalType))
-        {
-            // TODO(sai): are we sure it's not possible to run into OutType<InOutType<T>>?
             return nullptr;
-        }
         else if (auto primalInOutType = as<InOutType>(primalType))
-        {
             return primalInOutType->getValueType();
-        }
+
         return primalType;
     }
 
