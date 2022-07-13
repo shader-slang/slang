@@ -20,7 +20,7 @@ float max_(float x, float y)
 
 float pow_jvp(float x, float n, float dx, float dn)
 {
-    return dx * n * pow(x, n-1) + dn * pow(x, n) * log(x);
+    return dx * n * pow(x, n-1) + ((dn != 0.0) ? (dn * pow(x, n) * log(x)) : 0.0);
 }
 
 
@@ -36,6 +36,10 @@ __differentiate_jvp float3 fresnel(float3 f0, float3 f90, float cosTheta)
     return f0 + (f90 - f0) * pow_(max_(1 - cosTheta, 0.0), 5);
 }
 
+__differentiate_jvp float g(float a, float b, float c)
+{
+    return fresnel(float3(a), float3(b), 2 * c * c).y;
+}
 
 [numthreads(1, 1, 1)]
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
@@ -50,5 +54,17 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
         float d_cosTheta = 1.0;
 
         outputBuffer[0] = __jvp(fresnel)(f0, f90, cosTheta, d_f0, d_f90, d_cosTheta).y; // Expect: -0.031250
+
+        float a = 1.0;
+        float b = -0.4;
+        float c = 0.5;
+
+        float da = -0.4;
+        float db = -1.0;
+        float dc = 0.2;
+
+        outputBuffer[1] = __jvp(g)(a, b, c, da, db, dc); // Expect: -0.24375
+        outputBuffer[2] = g(a, b, c); // Expect: ?
+        outputBuffer[3] = __jvp(g)(a, b, 3.0, da, db, dc); // Expect: -0.4;
     }
 }

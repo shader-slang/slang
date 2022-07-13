@@ -412,6 +412,31 @@ struct JVPTranscriber
         return nullptr;
     }
 
+    IRInst* differentiateByPassthrough(IRBuilder* builder, IRInst* origInst)
+    {
+        UCount operandCount = origInst->getOperandCount();
+
+        List<IRInst*> diffOperands;
+        for (UIndex ii = 0; ii < operandCount; ii++)
+        {
+            // If the operand has a differential version, replace the original with the 
+            // differential.
+            // Otherwise, abandon the differentiation attempt and assume that origInst 
+            // cannot (or does not need to) be differentiated.
+            // 
+            if (auto diffInst = getDifferentialInst(origInst->getOperand(ii), nullptr))
+                diffOperands.add(diffInst);
+            else
+                return nullptr;
+        }
+        
+        return builder->emitIntrinsicInst(
+                    differentiateType(builder, origInst->getDataType()),
+                    origInst->getOp(),
+                    operandCount,
+                    diffOperands.getBuffer());
+    }
+
     // In differential computation, the 'default' differential value is always zero.
     // This is a consequence of differential computing being inherently linear. As a 
     // result, it's useful to have a method to generate zero literals of any (arithmetic) type.
@@ -529,6 +554,9 @@ struct JVPTranscriber
         
         case kIROp_swizzle:
             return differentiateSwizzle(builder, as<IRSwizzle>(instP));
+        
+        case kIROp_constructVectorFromScalar:
+            return differentiateByPassthrough(builder, instP);
 
         default:
             getSink()->diagnose(instP->sourceLoc,
