@@ -490,13 +490,20 @@ ISlangUnknown* Session::getInterface(const Guid& guid)
     return nullptr;
 }
 
+static size_t _getStructureSize(const uint8_t* src)
+{
+    size_t size = 0;
+    ::memcpy(&size, src, sizeof(size_t));
+    return size;
+}
+
 template <typename T>
 static T makeFromSizeVersioned(const uint8_t* src)
 {
     SLANG_COMPILE_TIME_ASSERT(sizeof(((T*)src)->structureSize) == sizeof(size_t));
 
     // The source size is held in the first element of T, and will be in the first bytes of src.
-    const size_t srcSize = *(const size_t*)src;
+    const size_t srcSize = _getStructureSize(src);
     const size_t dstSize = sizeof(T);
 
     // If they are the same size, and appropriate alignment we can just cast and return
@@ -532,13 +539,10 @@ SLANG_NO_THROW SlangResult SLANG_MCALL Session::createSession(
     {
         const Int targetCount = desc.targetCount;
         const uint8_t* targetDescPtr = reinterpret_cast<const uint8_t*>(desc.targets);
-        for (Int ii = 0; ii < targetCount; ++ii)
+        for (Int ii = 0; ii < targetCount; ++ii, targetDescPtr += _getStructureSize(targetDescPtr))
         {
             const auto targetDesc = makeFromSizeVersioned<slang::TargetDesc>(targetDescPtr);
             linkage->addTarget(targetDesc);
-            // Get the size from the first bytes. 
-            // Assumes the size is size_t (this is checked in makeSizeFromVersioned).
-            targetDescPtr += *(const size_t*)targetDescPtr;
         }
     }
 
