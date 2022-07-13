@@ -490,6 +490,38 @@ ISlangUnknown* Session::getInterface(const Guid& guid)
     return nullptr;
 }
 
+template <typename T>
+static T makeFromSizeVersioned(const uint8_t* src)
+{
+    SLANG_COMPILE_TIME_ASSERT(sizeof(((T*)src)->structureSize) == sizeof(size_t));
+
+    // The source size is held in the first element of T, and will be in the first bytes of src.
+    const size_t srcSize = *(const size_t*)src;
+    const size_t dstSize = sizeof(T);
+
+    // If they are the same size, and appropriate alignment we can just cast and return
+    if (srcSize == dstSize && 
+        (size_t(src) & (SLANG_ALIGN_OF(T) - 1)) == 0)
+    {
+        return *(const T*)src;
+    }
+
+    // Assumes T can default constructed sensibly
+    T dst;
+
+    // It's structure size should be setup and should be dstSize
+    SLANG_ASSERT(dst.structureSize == dstSize);
+
+    // The size to copy is the minimum on the two sizes
+    const auto copySize = std::min(srcSize, dstSize);
+    ::memcpy(&dst, &src, copySize);
+
+    // The final struct size is the destination size
+    dst.structureSize = dstSize;
+
+    return dst;
+}
+
 SLANG_NO_THROW SlangResult SLANG_MCALL Session::createSession(
     slang::SessionDesc const&  desc,
     slang::ISession**          outSession)
@@ -497,17 +529,17 @@ SLANG_NO_THROW SlangResult SLANG_MCALL Session::createSession(
     RefPtr<ASTBuilder> astBuilder(new ASTBuilder(m_sharedASTBuilder, "Session::astBuilder"));
     RefPtr<Linkage> linkage = new Linkage(this, astBuilder, getBuiltinLinkage());
 
-    Int targetCount = desc.targetCount;
-    const uint8_t* targetDescPtr = reinterpret_cast<const uint8_t*>(desc.targets);
-    for (Int ii = 0; ii < targetCount; ++ii)
     {
-        slang::TargetDesc targetDesc;
-        // Copy the size field first.
-        memcpy(&targetDesc.structureSize, targetDescPtr, sizeof(size_t));
-        // Copy the entire desc structure.
-        memcpy(&targetDesc, targetDescPtr, targetDesc.structureSize);
-        linkage->addTarget(targetDesc);
-        targetDescPtr += targetDesc.structureSize;
+        const Int targetCount = desc.targetCount;
+        const uint8_t* targetDescPtr = reinterpret_cast<const uint8_t*>(desc.targets);
+        for (Int ii = 0; ii < targetCount; ++ii)
+        {
+            const auto targetDesc = makeFromSizeVersioned<slang::TargetDesc>(targetDescPtr);
+            linkage->addTarget(targetDesc);
+            // Get the size from the first bytes. 
+            // Assumes the size is size_t (this is checked in makeSizeFromVersioned).
+            targetDescPtr += *(const size_t*)targetDescPtr;
+        }
     }
 
     linkage->setFlags(desc.flags);
