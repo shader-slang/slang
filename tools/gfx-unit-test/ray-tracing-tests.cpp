@@ -385,7 +385,7 @@ namespace gfx_test
             GFX_CHECK_CALL_ABORT(device->readTextureResource(
                 resultTexture, ResourceState::CopySource, resultBlob.writeRef(), &rowPitch, &pixelSize));
 
-            writeImage("C:/Users/lucchen/Documents/test.hdr", resultBlob, width, height, rowPitch, pixelSize);
+            writeImage("test.hdr", resultBlob, width, height, (uint32_t)rowPitch, (uint32_t)pixelSize);
 
             auto buffer = removePadding(resultBlob, width, height, rowPitch, pixelSize);
             auto actualData = (float*)buffer.getBuffer();

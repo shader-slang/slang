@@ -7,8 +7,15 @@
 #include <stdlib.h>
 #include <stdio.h>
 
+#ifdef _MSC_VER
+#pragma warning(push)
+#pragma warning(disable: 4996)
+#endif
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "external/stb/stb_image_write.h"
+#ifdef _MSC_VER
+#pragma warning(pop)
+#endif
 
 #define GFX_ENABLE_RENDERDOC_INTEGRATION 0
 

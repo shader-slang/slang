@@ -1509,6 +1509,51 @@ namespace Slang
         return expr;
     }
 
+    // This function proceses primal params (i.e params of the inner function that is being 
+    // differentiated) that need to be carried over to the function signature for the JVP 
+    // function. (eg. out types can be discarded)
+    //
+    Type* primalToInputType(ASTBuilder*, Type* primalType)
+    {
+        if (auto primalOutType = as<OutType>(primalType))
+            return nullptr;
+        else if (auto primalInOutType = as<InOutType>(primalType))
+            return primalInOutType->getValueType();
+
+        return primalType;
+    }
+
+    Type* primalToJVPParamType(ASTBuilder* builder, Type* primalType)
+    {
+        // Only float and float3 types can be differentiated for now.
+        
+        if (primalType->equals(builder->getFloatType()))
+            return primalType;
+        else if (auto primalVectorType = as<VectorExpressionType>(primalType))
+        {
+            // TODO(sai): There's probably a more elegant way to check if a type is a float3?
+            if (getIntVal(primalVectorType->elementCount) == 3 && primalVectorType->elementType->equals(builder->getFloatType()))
+                return primalVectorType;
+        }
+        else if (auto primalOutType = as<OutType>(primalType))
+        {
+            return builder->getOutType(primalToJVPParamType(builder, primalOutType->getValueType()));
+        }
+        else if (auto primalInOutType = as<InOutType>(primalType))
+        {
+            return builder->getInOutType(primalToJVPParamType(builder, primalInOutType->getValueType()));
+        }
+        return nullptr;
+    }
+
+    Type* primalToJVPReturnType(ASTBuilder* builder, Type* primalType)
+    {
+        if(auto jvpType = primalToJVPParamType(builder, primalType))
+            return jvpType;
+        else
+            return builder->getVoidType();
+    }
+
     Expr* SemanticsExprVisitor::visitJVPDifferentiateExpr(JVPDifferentiateExpr* expr)
     {
         // Check/Resolve inner function declaration.
@@ -1524,18 +1569,10 @@ namespace Slang
             
             FuncType* jvpType = astBuilder->create<FuncType>();
 
-            // Only float types can be differentiated for now.
-
             // The JVP return type is float if primal return type is float
             // void otherwise.
             //
-            if (primalType->resultType->equals(astBuilder->getFloatType()))
-                jvpType->resultType = astBuilder->getFloatType();
-            else
-            {
-                //TODO(yong): issue proper diagnostic here.
-                jvpType->resultType = astBuilder->getVoidType();
-            }
+            jvpType->resultType = primalToJVPReturnType(astBuilder, primalType->getResultType());
             
             // No support for differentiating function that throw errors, for now.
             SLANG_ASSERT(primalType->errorType->equals(astBuilder->getBottomType()));
@@ -1543,13 +1580,14 @@ namespace Slang
 
             for (UInt i = 0; i < primalType->getParamCount(); i++)
             {
-                jvpType->paramTypes.add(primalType->getParamType(i));
+                if(auto primalInputType = primalToInputType(astBuilder, primalType->getParamType(i)))
+                    jvpType->paramTypes.add(primalInputType);
             }
 
             for (UInt i = 0; i < primalType->getParamCount(); i++)
             {
-                if(primalType->getParamType(i)->equals(astBuilder->getFloatType()))
-                    jvpType->paramTypes.add(astBuilder->getFloatType());
+                if(auto jvpParamType = primalToJVPParamType(astBuilder, primalType->getParamType(i)))
+                    jvpType->paramTypes.add(jvpParamType);
             }
 
             expr->type = jvpType;
@@ -1660,7 +1698,7 @@ namespace Slang
 
     Expr* SemanticsExprVisitor::visitTryExpr(TryExpr* expr)
     {
-        auto prevTryClauseType = expr->tryClauseType;
+        auto prevTryClauseType = m_enclosingTryClauseType;
         m_enclosingTryClauseType = expr->tryClauseType;
         expr->base = CheckTerm(expr->base);
         m_enclosingTryClauseType = prevTryClauseType;

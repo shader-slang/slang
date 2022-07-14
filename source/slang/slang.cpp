@@ -490,6 +490,56 @@ ISlangUnknown* Session::getInterface(const Guid& guid)
     return nullptr;
 }
 
+static size_t _getStructureSize(const uint8_t* src)
+{
+    size_t size = 0;
+    ::memcpy(&size, src, sizeof(size_t));
+    return size;
+}
+
+template <typename T>
+static T makeFromSizeVersioned(const uint8_t* src)
+{
+    // The structure size must be size_t
+    SLANG_COMPILE_TIME_ASSERT(sizeof(((T*)src)->structureSize) == sizeof(size_t));
+
+    // The structureSize field *must* be the first element of T
+    // Ideally would use SLANG_COMPILE_TIME_ASSERT, but that doesn't work on gcc. 
+    // Can't just assert, because determined to be a constant expression
+    {
+        auto offset = SLANG_OFFSET_OF(T, structureSize);
+        SLANG_ASSERT(offset == 0);
+        // Needed because offset is only 'used' by an assert
+        SLANG_UNUSED(offset);
+    }
+
+    // The source size is held in the first element of T, and will be in the first bytes of src.
+    const size_t srcSize = _getStructureSize(src);
+    const size_t dstSize = sizeof(T);
+
+    // If they are the same size, and appropriate alignment we can just cast and return
+    if (srcSize == dstSize && 
+        (size_t(src) & (SLANG_ALIGN_OF(T) - 1)) == 0)
+    {
+        return *(const T*)src;
+    }
+
+    // Assumes T can default constructed sensibly
+    T dst;
+
+    // It's structure size should be setup and should be dstSize
+    SLANG_ASSERT(dst.structureSize == dstSize);
+
+    // The size to copy is the minimum on the two sizes
+    const auto copySize = std::min(srcSize, dstSize);
+    ::memcpy(&dst, &src, copySize);
+
+    // The final struct size is the destination size
+    dst.structureSize = dstSize;
+
+    return dst;
+}
+
 SLANG_NO_THROW SlangResult SLANG_MCALL Session::createSession(
     slang::SessionDesc const&  desc,
     slang::ISession**          outSession)
@@ -497,17 +547,14 @@ SLANG_NO_THROW SlangResult SLANG_MCALL Session::createSession(
     RefPtr<ASTBuilder> astBuilder(new ASTBuilder(m_sharedASTBuilder, "Session::astBuilder"));
     RefPtr<Linkage> linkage = new Linkage(this, astBuilder, getBuiltinLinkage());
 
-    Int targetCount = desc.targetCount;
-    const uint8_t* targetDescPtr = reinterpret_cast<const uint8_t*>(desc.targets);
-    for (Int ii = 0; ii < targetCount; ++ii)
     {
-        slang::TargetDesc targetDesc;
-        // Copy the size field first.
-        memcpy(&targetDesc.structureSize, targetDescPtr, sizeof(size_t));
-        // Copy the entire desc structure.
-        memcpy(&targetDesc, targetDescPtr, targetDesc.structureSize);
-        linkage->addTarget(targetDesc);
-        targetDescPtr += targetDesc.structureSize;
+        const Int targetCount = desc.targetCount;
+        const uint8_t* targetDescPtr = reinterpret_cast<const uint8_t*>(desc.targets);
+        for (Int ii = 0; ii < targetCount; ++ii, targetDescPtr += _getStructureSize(targetDescPtr))
+        {
+            const auto targetDesc = makeFromSizeVersioned<slang::TargetDesc>(targetDescPtr);
+            linkage->addTarget(targetDesc);
+        }
     }
 
     linkage->setFlags(desc.flags);

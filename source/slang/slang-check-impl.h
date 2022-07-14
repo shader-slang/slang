@@ -1387,6 +1387,10 @@ namespace Slang
         // count the number of parameters required/allowed for a generic
         ParamCounts CountParameters(DeclRef<GenericDecl> genericRef);
 
+        bool TryCheckOverloadCandidateClassNewMatchUp(
+            OverloadResolveContext& context,
+            OverloadCandidate const& candidate);
+
         bool TryCheckOverloadCandidateArity(
             OverloadResolveContext&		context,
             OverloadCandidate const&	candidate);
