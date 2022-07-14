@@ -10,6 +10,7 @@ Slang has preliminary support for producing CPU source and binaries.
 * Supports compute style shaders 
 * C/C++ backend abstracts the command line options, and parses the compiler errors/out such that all supported compilers output available in same format 
 * Once compilation is complete can optionally access and run CPU code directly
+* Does *not* require a C/C++ be installed if `slang-llvm` is available (as distributed with slang binary distributions)
 
 # Limitations
 
@@ -19,6 +20,7 @@ These limitations apply to Slang transpiling to C++.
 * Atomics are not supported
 * Complex resource types (such as Texture2d) are work in progress
 * Out of bounds access to resources has undefined behavior 
+* Entry point/s cannot be named `main` (this can confuse downstream C++ compiler expecting a regular `main`)
 
 For current C++ source output, the compiler needs to support partial specialization. 
 
@@ -30,8 +32,11 @@ The initial version works by adding 'back end' compiler support for C/C++ compil
 SLANG_PASS_THROUGH_CLANG,                   ///< Clang C/C++ compiler 
 SLANG_PASS_THROUGH_VISUAL_STUDIO,           ///< Visual studio C/C++ compiler
 SLANG_PASS_THROUGH_GCC,                     ///< GCC C/C++ compiler
+SLANG_PASS_THROUGH_LLVM,                    ///< LLVM 'compiler' - includes LLVM and Clang
 SLANG_PASS_THROUGH_GENERIC_C_CPP,           ///< Generic C or C++ compiler, which is decided by the source type
 ```
+
+The `slang-llvm` (`SLANG_PASS_THROUGH_LLVM` pass-through) specifies a special slang version of LLVM. It's current main usage is allowing compiling C/C++ and allowing direct execution using the LLVM JIT feature. If `slang-llvm` is available it is the default downstream compiler for `host-callable`. This is because it allows faster compilation, avoiding the file system, and additionally can execute the compiled code directly. Regular C/C++ compilers require writing source files, and creating shared-libraries/dlls to make the `host-callable` function work.
 
 Sometimes it is not important which C/C++ compiler is used, and this can be specified via the 'Generic C/C++' option. This will aim to use the compiler that is most likely binary compatible with the compiler that was used to build the Slang binary being used. 
 
@@ -49,12 +54,13 @@ SLANG_CPP_SOURCE           ///< The C++ language
 If a CPU binary is required this can be specified as a `SlangCompileTarget` of 
    
 ```   
-SLANG_EXECUTABLE           ///< Executable (for hosting CPU/OS)
-SLANG_SHARED_LIBRARY       ///< A shared library/Dll (for hosting CPU/OS)
-SLANG_HOST_CALLABLE        ///< A CPU target that makes the compiled code available to be run immediately
+SLANG_EXECUTABLE            ///< Executable (for hosting CPU/OS)
+SLANG_SHARED_LIBRARY        ///< A shared library/Dll (for hosting CPU/OS)
+SLANG_SHADER_HOST_CALLABLE  ///< A CPU target that makes `compute kernel` compiled code available to be run immediately 
+SLANG_HOST_HOST_CALLABLE    ///< A CPU target that makes `scalar` compiled code available to be run immediately
 ```
 
-These can also be specified on the Slang command line as `-target exe` and `-target dll` or `-target sharedlib`. `-target callable` or `-target host-callable` is also possible, but is typically not very useful from the command line, other than to test such code can be loaded for host execution.
+These can also be specified on the Slang command line as `-target exe` and `-target dll` or `-target sharedlib`. `-target callable`, `-target host-callable` and `-target host-host-callable` is also possible, but is typically not very useful from the command line, other than to test such code can be loaded for host execution.
 
 In order to be able to use the Slang code on CPU, there needs to be binding via values passed to a function that the C/C++ code will produce and export. How this works is described in the ABI section. 
 
