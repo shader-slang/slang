@@ -608,27 +608,6 @@ struct IRWorkQueue
 
 struct JVPDerivativeContext
 {
-    // This type passes over the module and generates
-    // forward-mode derivative versions of functions 
-    // that are explicitly marked for it.
-    //
-    IRModule*                       module;
-
-    // Shared builder state for our derivative passes.
-    SharedIRBuilder                 sharedBuilderStorage;
-
-    // A transcriber object that handles the main job of 
-    // processing instructions while maintaining state.
-    //
-    JVPTranscriber                  transcriberStorage;
-    
-    // Diagnostic object from the compile request for
-    // error messages.
-    DiagnosticSink*                 sink;
-
-    // Work queue to hold a stream of instructions that need
-    // to be checked for references to derivative functions.
-    IRWorkQueue                    workQueueStorage;
 
     DiagnosticSink* getSink()
     {
@@ -865,6 +844,35 @@ struct JVPDerivativeContext
         return jvpBlock;
     }
 
+    JVPDerivativeContext(IRModule* module, DiagnosticSink* sink) : module(module), sink(sink)
+    {
+        transcriberStorage.sink = sink;
+    }
+
+    protected:
+
+    // This type passes over the module and generates
+    // forward-mode derivative versions of functions 
+    // that are explicitly marked for it.
+    //
+    IRModule*                       module;
+
+    // Shared builder state for our derivative passes.
+    SharedIRBuilder                 sharedBuilderStorage;
+
+    // A transcriber object that handles the main job of 
+    // processing instructions while maintaining state.
+    //
+    JVPTranscriber                  transcriberStorage;
+    
+    // Diagnostic object from the compile request for
+    // error messages.
+    DiagnosticSink*                 sink;
+
+    // Work queue to hold a stream of instructions that need
+    // to be checked for references to derivative functions.
+    IRWorkQueue                    workQueueStorage;
+
 };
 
 // Set up context and call main process method.
@@ -874,10 +882,7 @@ bool processJVPDerivativeMarkers(
         DiagnosticSink*                     sink,
         IRJVPDerivativePassOptions const&)
 {
-    JVPDerivativeContext context;
-    context.module = module;
-    context.sink = sink;
-
+    JVPDerivativeContext context(module, sink);
     return context.processModule();
 }
 
