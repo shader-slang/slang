@@ -63,8 +63,8 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
         float db = -1.0;
         float dc = 0.2;
 
-        outputBuffer[1] = __jvp(g)(a, b, c, da, db, dc); // Expect: -0.24375
-        outputBuffer[2] = g(a, b, c); // Expect: ?
-        outputBuffer[3] = __jvp(g)(a, b, 3.0, da, db, dc); // Expect: -0.4;
+        outputBuffer[1] = __jvp(g)(a, b, c, da, db, dc);    // Expect: -0.24375
+        outputBuffer[2] = g(a, b, c);                       // Expect: 0.95625
+        outputBuffer[3] = __jvp(g)(a, b, 3.0, da, db, dc);  // Expect: -0.4;
     }
 }
