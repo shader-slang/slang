@@ -544,6 +544,7 @@ struct JVPTranscriber
         case kIROp_Add:
         case kIROp_Mul:
         case kIROp_Sub:
+        case kIROp_Div:
             return differentiateBinaryArith(builder, instP);
 
         case kIROp_Construct:
