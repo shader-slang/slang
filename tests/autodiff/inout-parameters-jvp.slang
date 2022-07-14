@@ -4,6 +4,14 @@
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
 
+
+__differentiate_jvp void g(float x, float y, inout float z)
+{
+    float m = x + y;
+    float n = x - y;
+    z += m * n + 2 * x * y;
+}
+
 __differentiate_jvp void h(float x, float y, inout float z)
 {
     float m = x + y;
@@ -25,6 +33,11 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     __jvp(h)(x, y, z, dx, dy, dz);
 
     outputBuffer[0] = dz; // Expect: 12.0
+    outputBuffer[1] = z;  // Expect: 1.0
+
+    __jvp(g)(x, y, z, dx, dy, dz);
+
+    outputBuffer[0] = dz; // Expect: 21.5
     outputBuffer[1] = z;  // Expect: 1.0
 
 }

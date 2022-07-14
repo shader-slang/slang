@@ -144,7 +144,7 @@ struct JVPTranscriber
         List<IRParam*> newParamListP;
         for (auto paramP : paramListP)
         {
-            if(requiresPrimalClone(builder, paramP))
+            if(hasNoSideEffects(builder, paramP))
                 newParamListP.add(as<IRParam>(emitInputParam(builder, paramP)));
         }
 
@@ -463,7 +463,7 @@ struct JVPTranscriber
     // in the differential function. We detect and avoid replicating 
     // side-effect instructions.
     // 
-    bool requiresPrimalClone(IRBuilder*, IRInst* instP)
+    bool hasNoSideEffects(IRBuilder*, IRInst* instP)
     {
         if (as<IRReturn>(instP))
             return false;
@@ -496,13 +496,19 @@ struct JVPTranscriber
 
     IRInst* transcribe(IRBuilder* builder, IRInst* oldInstP)
     {
-        // IRInst* instP = oldInstP;
 
         // Clone the old instruction into the new differential function.
         // 
         IRInst* instP = cloneInst(&cloneEnv, builder, oldInstP);
 
         SLANG_ASSERT(instP);
+
+        // If an instruction is neither a side-effect nor is it used by 
+        // any other instruction, then it can be skipped.
+        // This is to provide some resilience to dead-code / hold-over instructions
+        // from other passes.
+        if (hasNoSideEffects(builder, oldInstP) && !oldInstP->hasUses())
+            return nullptr;
 
         IRInst* instD = differentiateInst(builder, instP);
         
@@ -511,7 +517,7 @@ struct JVPTranscriber
         // For instance, instructions that handle control flow 
         // (return statements) shouldn't be replicated.
         //
-        if (requiresPrimalClone(builder, oldInstP))
+        if (hasNoSideEffects(builder, oldInstP))
             mapDifferentialInst(instP, instD);
         else
         {
@@ -784,7 +790,7 @@ struct JVPDerivativeContext
         builder->setInsertInto(jvpFn);
 
         // Start with _extremely_ basic functions
-        SLANG_ASSERT(primalFn->getFirstBlock() == primalFn->getLastBlock());
+        // SLANG_ASSERT(primalFn->getFirstBlock() == primalFn->getLastBlock());
         
         for (auto block = primalFn->getFirstBlock(); block; block = block->getNextBlock())
         {
