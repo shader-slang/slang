@@ -119,6 +119,7 @@ SlangResult LanguageServer::parseNextMessage()
                 result.capabilities.documentOnTypeFormattingProvider.firstTriggerCharacter = "}";
                 result.capabilities.documentOnTypeFormattingProvider.moreTriggerCharacter.add(";");
                 result.capabilities.documentOnTypeFormattingProvider.moreTriggerCharacter.add(":");
+                result.capabilities.documentOnTypeFormattingProvider.moreTriggerCharacter.add("{");
                 result.capabilities.documentRangeFormattingProvider = true;
                 result.capabilities.completionProvider.triggerCharacters.add(".");
                 result.capabilities.completionProvider.triggerCharacters.add(":");
@@ -161,15 +162,15 @@ SlangResult LanguageServer::parseNextMessage()
                 if (response.result.getKind() == JSONValue::Kind::Array)
                 {
                     auto arr = m_connection->getContainer()->getArray(response.result);
-                    if (arr.getCount() == 9)
+                    if (arr.getCount() == 11)
                     {
                         updatePredefinedMacros(arr[0]);
                         updateSearchPaths(arr[1]);
                         updateSearchInWorkspace(arr[2]);
                         updateCommitCharacters(arr[3]);
-                        updateFormattingOptions(arr[4], arr[5]);
-                        updateInlayHintOptions(arr[6], arr[7]);
-                        updateTraceOptions(arr[8]);
+                        updateFormattingOptions(arr[4], arr[5], arr[6], arr[7]);
+                        updateInlayHintOptions(arr[8], arr[9]);
+                        updateTraceOptions(arr[10]);
                     }
                 }
                 break;
@@ -1111,9 +1112,15 @@ SlangResult LanguageServer::rangeFormatting(const LanguageServerProtocol::Docume
         m_connection->sendResult(NullResponse::get(), responseId);
         return SLANG_OK;
     }
+    Index endLine, endCol;
+    doc->zeroBasedUTF16LocToOneBasedUTF8Loc(args.range.end.line, args.range.end.character, endLine, endCol);
+    Index endOffset = doc->getOffset(endLine, endCol);
     if (m_formatOptions.clangFormatLocation.getLength() == 0)
         m_formatOptions.clangFormatLocation = findClangFormatTool();
-    auto edits = formatSource(doc->getText().getUnownedSlice(), args.range.start.line, args.range.end.line, -1, m_formatOptions);
+    auto options = m_formatOptions;
+    if (!m_formatOptions.allowLineBreakInRangeFormatting)
+        options.behavior = FormatBehavior::PreserveLineBreak;
+    auto edits = formatSource(doc->getText().getUnownedSlice(), args.range.start.line, args.range.end.line, endOffset, options);
     auto textEdits = translateTextEdits(doc, edits);
     m_connection->sendResult(&textEdits, responseId);
     return SLANG_OK;
@@ -1138,7 +1145,10 @@ SlangResult LanguageServer::onTypeFormatting(const LanguageServerProtocol::Docum
     Index line, col;
     doc->zeroBasedUTF16LocToOneBasedUTF8Loc(args.position.line, args.position.character, line, col);
     auto cursorOffset = doc->getOffset(line, col);
-    auto edits = formatSource(doc->getText().getUnownedSlice(), args.position.line, args.position.line, cursorOffset, m_formatOptions);
+    auto options = m_formatOptions;
+    if (!m_formatOptions.allowLineBreakInOnTypeFormatting)
+        options.behavior = FormatBehavior::PreserveLineBreak;
+    auto edits = formatSource(doc->getText().getUnownedSlice(), args.position.line, args.position.line, cursorOffset, options);
     auto textEdits = translateTextEdits(doc, edits);
     m_connection->sendResult(&textEdits, responseId);
     return SLANG_OK;
@@ -1270,12 +1280,14 @@ void LanguageServer::updateCommitCharacters(const JSONValue& jsonValue)
     }
 }
 
-void LanguageServer::updateFormattingOptions(const JSONValue& clangFormatLoc, const JSONValue& clangFormatStyle)
+void LanguageServer::updateFormattingOptions(const JSONValue& clangFormatLoc, const JSONValue& clangFormatStyle, const JSONValue& allowLineBreakOnType, const JSONValue& allowLineBreakInRange)
 {
     auto container = m_connection->getContainer();
     JSONToNativeConverter converter(container, m_connection->getSink());
     converter.convert(clangFormatLoc, &m_formatOptions.clangFormatLocation);
     converter.convert(clangFormatStyle, &m_formatOptions.style);
+    converter.convert(allowLineBreakOnType, &m_formatOptions.allowLineBreakInOnTypeFormatting);
+    converter.convert(allowLineBreakInRange, &m_formatOptions.allowLineBreakInRangeFormatting);
     if (m_formatOptions.style.getLength() == 0)
         m_formatOptions.style = Slang::FormatOptions().style;
 }
@@ -1331,6 +1343,10 @@ void LanguageServer::sendConfigRequest()
     item.section = "slang.format.clangFormatLocation";
     args.items.add(item);
     item.section = "slang.format.clangFormatStyle";
+    args.items.add(item);
+    item.section = "slang.format.allowLineBreakChangesInOnTypeFormatting";
+    args.items.add(item);
+    item.section = "slang.format.allowLineBreakChangesInRangeFormatting";
     args.items.add(item);
     item.section = "slang.inlayHints.deducedTypes";
     args.items.add(item);

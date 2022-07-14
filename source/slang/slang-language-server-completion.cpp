@@ -107,6 +107,16 @@ List<LanguageServerProtocol::TextEditCompletionItem> CompletionContext::gatherFi
     Index sectionEnd,
     char closingChar)
 {
+    auto realPrefix = prefixPath.getUnownedSlice();
+    while (realPrefix.startsWith(".."))
+    {
+        realPrefix = realPrefix.tail(2);
+        if (realPrefix.startsWith("/") || realPrefix.startsWith("\\"))
+        {
+            realPrefix = realPrefix.tail(1);
+        }
+    }
+
     struct FileEnumerationContext
     {
         List<LanguageServerProtocol::TextEditCompletionItem> items;
@@ -132,7 +142,8 @@ List<LanguageServerProtocol::TextEditCompletionItem> CompletionContext::gatherFi
     auto addCandidate = [&](const String& path)
     {
         context.path = path;
-        if (path.getUnownedSlice().endsWithCaseInsensitive(prefixPath.getUnownedSlice()))
+        Path::getCanonical(context.path, context.path);
+        if (path.getUnownedSlice().endsWithCaseInsensitive(realPrefix))
         {
             OSFileSystem::getExtSingleton()->enumeratePathContents(
                 path.getBuffer(),
@@ -253,12 +264,21 @@ List<LanguageServerProtocol::TextEditCompletionItem> CompletionContext::gatherFi
         }
     }
 
-    if (commitCharacterBehavior != CommitCharacterBehavior::Disabled && !isIncomplete)
+    if (!isIncomplete)
     {
-        for (auto& item : context.items)
+        bool useCommitChars = translateModuleName && (commitCharacterBehavior != CommitCharacterBehavior::Disabled);
+        if (useCommitChars)
         {
-            for (auto ch : getCommitChars())
-                item.commitCharacters.add(ch);
+            if (translateModuleName)
+            {
+                for (auto& item : context.items)
+                {
+                    for (auto ch : getCommitChars())
+                    {
+                        item.commitCharacters.add(ch);
+                    }
+                }
+            }
         }
     }
     return context.items;
