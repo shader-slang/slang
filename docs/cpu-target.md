@@ -266,8 +266,7 @@ Doing so means
 * `myGlobal` will not be defined in the constant buffer
 * It can be used in functions that do not have access to the [constant buffer](#context-threading)
 * It can be modified in the kernel 
-
-On GPU based targets `__global` produces variables that *are* stored in the constant buffer, as that is all that is available for those targets. Therefore on GPU targets `__global` are just constant values.
+* Can only be used on CPU targets (currently `__global` is not supported on the GPU targets)
 
 One disadvantage of using `__global` is in multi-threaded environments, with multiple launches on multiple CPU threads, there is only one global and will likely cause problems unless the global value is the same across all threads.
 
@@ -294,8 +293,7 @@ The global can now be set from host code via
     }
 ```
 
-
-TODO(JS): What does `__global` mean for reflection on CPU targets? 
+In terms of reflection `__global` variables are not visibile. 
 
 ## NativeString
 
