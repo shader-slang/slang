@@ -5,12 +5,10 @@ Slang has preliminary support for producing CPU source and binaries.
 
 # Features
 
-* Can compile C/C++/Slang to binaries (executables, shared libraries or directly executable)
+* Can compile C/C++/Slang source to binaries (executables, shared libraries or [directly executable](#host-callable))
 * Does *not* require a C/C++ be installed if [slang-llvm](#slang-llvm) is available (as distributed with slang binary distributions)
 * Can compile Slang source into C++ source code
 * Supports compute style shaders 
-* C/C++ backend abstracts the command line options, and parses the compiler errors/out such that all supported compilers output available in same format 
-* Using [host-callable](#host-callable) can execute compiled code directly
 
 # Limitations
 
@@ -20,7 +18,7 @@ These limitations apply to Slang transpiling to C++.
 * Atomics are not currently supported
 * Limited support for [out of bounds](#out-of-bounds) accesses handling
 * Entry point/s cannot be named `main` (this is because downstream C++ compiler/s expecting a regular `main`)
-* `float16_t` type is not supported
+* `float16_t` type is not currently supported
 
 For current C++ source output, the compiler needs to support partial specialization. 
 
@@ -64,7 +62,7 @@ SLANG_OBJECT_CODE,              ///< Object code that can be used for later link
 
 These can also be specified on the Slang command line as `-target exe` and `-target dll` or `-target sharedlib`. `-target callable`, `-target host-callable` and `-target host-host-callable` are also possible, but is typically not very useful from the command line, other than to test such code can be loaded for host execution.
 
-In order to be able to use the Slang code on CPU, there needs to be binding via values passed to a function that the C/C++ code will produce and export. How this works is described in the [ABI section](#abi). 
+In order to be able to execute the Slang code on the CPU, there typically needs to be binding via values passed to a function that the C/C++ code will produce and export. How this works is described in the [ABI section](#abi). 
 
 If a binary target is requested, the binary contents can be returned in a ISlangBlob just like for other targets. When using a [regular C/C++ compiler](#regular-cpp) the CPU binary typically must be saved as a file and then potentially marked for execution by the OS before executing. It may be possible to load shared libraries or dlls from memory - but doing so is a non standard feature, that requires unusual work arounds. If possible it is typically fastest and easiest to use [slang-llvm](#slang-llvm) to directly execute slang or C/C++ code.
 
@@ -138,7 +136,6 @@ Please look at the [ABI](#abi) section for more specifics around ABI usage espec
         if (func)
         {
             // Let's add!
-            
             int c = func(10, 20):
         }
     }
@@ -146,18 +143,18 @@ Please look at the [ABI](#abi) section for more specifics around ABI usage espec
 
 ## <a id="slang-llvm"/>slang-llvm
 
-`slang-llvm` is a special Slang version of [LLVM](https://llvm.org/). It's current main purpose is to allow compiling C/C++ such that it is directly available for execution using the LLVM JIT feature. If `slang-llvm` is available it is the default downstream compiler for [host-callable](#host-callable). This is because it allows for faster compilation, avoids the file system, and can execute the compiled code directly. [Regular C/C++ compilers](#regular-cpp) can be used for [host-callable](#host-callable) but requires writing source files to the file system and creating/loading shared-libraries/dlls to make the feature work.  Additionally using `slang-llvm` avoids needing a C/C++ compiler installed on the target system.   
+`slang-llvm` is a special Slang version of [LLVM](https://llvm.org/). It's current main purpose is to allow compiling C/C++ such that it is [directly available](#host-callable) for execution using the LLVM JIT feature. If `slang-llvm` is available it is the default downstream compiler for [host-callable](#host-callable). This is because it allows for faster compilation, avoids the file system, and can execute the compiled code directly. [Regular C/C++ compilers](#regular-cpp) can be used for [host-callable](#host-callable) but requires writing source files to the file system and creating/loading shared-libraries/dlls to make the feature work.  Additionally using `slang-llvm` avoids the need for a C/C++ compiler installed on a target system.   
  
-`slang-llvm` is in effect the full Clang C++ compiler, so it is possible to also compile and execute C/C++ code in the `host-callable` style. 
+`slang-llvm` contains the Clang C++ compiler, so it is possible to also compile and execute C/C++ code in the [host-callable](#host-callable) style. 
 
-Limitations of using the `slang-llvm`
+Limitations of using `slang-llvm`
  
 * Can only currently be used for `host-callable` 
-  * Cannot produce object files, libraries, binaries 
-* Is a *limited* C/C++ compiler in that it cannot access stdlib and other libraries
-* Cannot use the `host` [compilation style](#compile-style), because of the requirement of `slang-rt` runtime which is unavailable to `slang-llvm`.
+  * Cannot produce object files, libraries, OS executables or binaries 
+* Is *limited* because it is not possible to directly access libraries such as the c standard library (see [COM interface](#com-interface) for a work-around)
+* Cannot use the `host` [compilation style](#compile-style), because of the requirement of `slang-rt` runtime library which is unavailable to `slang-llvm`.
 * It's not possible to source debug into `slang-llvm` compiled code running on the JIT (see [debugging](#debugging) for a work-around)
-* Not possible to return a ISlangBlob representation currently
+* Not currently possible to return as a ISlangBlob representation 
 
 You can detect if `slang-llvm` is available via
 
@@ -172,7 +169,7 @@ Slang can work with regular C/C++ 'downstream' compilers. It has been tested to 
 
 Under the covers when Slang is used to generate a binary via a C/C++ compiler, it must do so through the file system. Currently this means the source (say generated by Slang) and the binary (produced by the C/C++ compiler) must all be files. To make this work Slang uses temporary files. The reasoning for hiding this mechanism, other than simplicity, is that it allows using with [slang-llvm](#slang-llvm) without any changes. 
 
-## COM interface support
+## <a id="com-interface"/>COM interface support
 
 Slang has preliminary support for Common Object Model (COM) interfaces in CPU code. 
 
@@ -186,27 +183,42 @@ interface IDoThings
 }
 ```
 
-Please look at the "examples/cpu-com-example".
+This support provides a way for an application to provide access to functionality in the application runtime - essentially it allows Slang code to call into application code. To do this a COM interface can be created that exposes the desired functionality. The interface/s can be made available through any of the normal mechanisms - such as through a constant buffer variable. Additionally [`__global`](#actual-global) provides a way to make functions available to Slang code without the need for [context threading](#context-threading).
 
-## Global support
+The example "examples/cpu-com-example" shows this at work.
 
-The Slang language is based on the HLSL language. This heritage means that globals have slightly different meaning to typical C/C++ usage. Writing
+## <a href="actual-global"/>Global support
+
+The Slang language is based on the HLSL language. This heritage means that globals have slightly different meaning to typical C/C++ usage. 
 
 ```
-int myGlobal;
+int myGlobal;                           ///< A constant value stored in a constant buffer
+static int staticMyGlobal;              ///< A global that cannot be seen by the application 
+static const int staticConstMyGlobal;   ///< A fixed value
 ``` 
 
-Will add `myGlobal` to a constant buffer - meaning it's value can only change via bindings and not during execution. 
+The variable `myGlobal` will be a member of a constant buffer, meaning it's value can only change via bindings and not during execution. For some uses having `myGlobal` in the constant buffer might be appropriate, for example
 
-In Slang a variable can be declared as global in the normal C/C++ sense via the `__global` modifier. For example
+* It's use is reached from a [shader style](#compile-style) entry point 
+* It's value is constant across the launch 
+
+In Slang a variable can be declared as global C/C++ sense via the `__global` modifier. For example
 
 ```
 __global int myGlobal;
 ```
 
+Doing so means
+
+* `myGlobal will not be defined in the constant buffer
+* Can be used in functions that do not have access to the [constant buffer](#context-threading)
+* Can be modified in the kernel 
+
 A variable can only be defined this way for targets that support `__global` which are currently only CPU targets. 
 
-It may be useful to set a global directly via host code, without having to write a function to enable access. This is possible by using `public` and `__extern_cpp`. For example 
+One disadvantage of using `__global` is in multi-threaded environments, with multiple launches on multiple CPU threads, there is only one global and will likely cause problems unless the global value is the same across all threads.
+
+It may be useful to set a global directly via host code, without having to write a function to enable the access. This is possible by using `public` and `__extern_cpp` modifiers. For example 
 
 ```
 __global public __extern_cpp int myGlobal;
@@ -228,6 +240,10 @@ The global can now be set from host code via
         *myGlobalPtr = 20;
     }
 ```
+
+On `__global` on GPU based targets produces variables that *are* stored in the constant buffer, as that is all that is available for those targets. Therefore on GPU targets `__global` are just constant values.
+
+TODO(JS): What does `__global` mean for reflection on CPU targets? 
 
 ## NativeString
 
@@ -429,9 +445,48 @@ In practice this means if you want to access the `count` in shader code it will 
 
 It is perhaps worth noting that the CPU allows us to have an indirection (a pointer to the unsized arrays contents) which has the potential for more flexibility than is possible on GPU targets. GPU target typically require the elements to be placed 'contiguously' from their location in their `container` - be that registers or in memory. This means on GPU targets there may be other restrictions on where unsized arrays can be placed in a structure for example, such as only at the end. If code needs to work across targets this means these restrictions will need to be followed across targets. 
 
+## <a href="context-threading/>Context threading
+
+The [shader compile style](#compile-style) brings some extra issues to bare. In the HLSL compute kernel launch model application visible variables and resource are bound. As described in the [ABI](#abi) section these bindings and additional information identifying a compute thread are passed into the launch as a context. Take for example the code snippet below
+
+```
+int myGlobal;
+
+int myFunc(int v)
+{
+    return myGlobal + v;
+}
+
+int anotherFunc(int a, int b)
+{
+    return a + b;
+}
+
+[numthreads(4, 1, 1)]
+void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+{    
+    outputBuffer[dispatchThreadID.x] = myFunc(dispatchThreadID.x) + anotherFunc(1, dispatchThreadID.y);
+}
+```
+
+The function `myFunc` accesses a variable `myGlobal` that is held within a constant buffer. The function cannot be meaningfully be executed without access to the context, and the context is available as a parameter passed through `computeMain` launch. This means the *actual* signiture of this function in output code will be something like
+
+```
+int32_t myFunc_0(KernelContext_0 * kernelContext_0)
+{
+    return *(&(*(&kernelContext_0->globalParams_0))->myGlobal_0) + int(1);
+}
+```
+
+The context parameter has been *threaded* into this function. This *threading* will happen to any function that accesses any state that is held in the context. This behavior also happens transitively - if a function *could* call *any* another function that requires the context, the context will be threaded through it also.
+
+If application code assumed `myFunc` could be called with no parameters a crash would likely ensue. Note that `anotherFunc` does not have the issue because it doesn't access perform an access that needs the context. 
+
+If a global is desired in a function that wants to be called from the application, the [`__global`](#actual-global) can be used.
+
 ## Prelude
 
-For C++ targets, the code to support the code generated by Slang must be defined within the 'prelude'. The prelude is inserted text placed before the generated C++ source code. For the Slang command line tools as well as the test infrastructure, the prelude functionality is achieved through a `#include` in the prelude text of the `prelude/slang-cpp-prelude.h` specified with an absolute path. Doing so means other files the `slang-cpp-prelude.h` might need can be specified relatively, and include paths for the backend C/C++ compiler do not need to be modified. 
+For C++ targets, there is code to support the Slang generated source defined within the 'prelude'. The prelude is inserted text placed before the Slang generated C++ source. For the Slang command line tools as well as the test infrastructure, the prelude functionality is achieved through a `#include` in the prelude text of the `prelude/slang-cpp-prelude.h` specified with an absolute path. Doing so means other files the `slang-cpp-prelude.h` might need can be specified relatively, and include paths for the backend C/C++ compiler do not need to be modified. 
 
 The prelude needs to define 
 
