@@ -437,6 +437,30 @@ struct JVPTranscriber
                     diffOperands.getBuffer());
     }
 
+    IRInst* handleControlFlow(IRBuilder* builder, IRInst* origInst)
+    {
+        switch(origInst->getOp())
+        {
+            case kIROp_unconditionalBranch:
+                auto origBranch = as<IRUnconditionalBranch>(origInst);
+
+                // Branches with extra operands not handled currently.
+                if (origBranch->getOperandCount() > 1)
+                    break;
+
+                if (auto diffBlock = getDifferentialInst(origBranch->getTargetBlock(), nullptr))
+                    return builder->emitBranch(as<IRBlock>(diffBlock));
+                else
+                    return nullptr;
+        }
+
+        getSink()->diagnose(
+            origInst->sourceLoc,
+            Diagnostics::unimplemented,
+            "attempting to differentiate unhandled control flow");
+        return nullptr;
+    }
+
     // In differential computation, the 'default' differential value is always zero.
     // This is a consequence of differential computing being inherently linear. As a 
     // result, it's useful to have a method to generate zero literals of any (arithmetic) type.
@@ -503,14 +527,7 @@ struct JVPTranscriber
 
         SLANG_ASSERT(instP);
 
-        // If an instruction is neither a side-effect nor is it used by 
-        // any other instruction, then it can be skipped.
-        // This is to provide some resilience to dead-code / hold-over instructions
-        // from other passes.
-        if (hasNoSideEffects(builder, oldInstP) && !oldInstP->hasUses())
-            return nullptr;
-
-        IRInst* instD = differentiateInst(builder, instP);
+        IRInst* instD = differentiateInst(builder, instP, oldInstP);
         
         // In case it's not safe to clone the old instruction, 
         // remove it from the graph.
@@ -531,8 +548,9 @@ struct JVPTranscriber
         return instD;
     }
 
-    IRInst* differentiateInst(IRBuilder* builder, IRInst* instP)
+    IRInst* differentiateInst(IRBuilder* builder, IRInst* instP, IRInst* oldInstP)
     {
+        // Handle common operations
         switch (instP->getOp())
         {
         case kIROp_Var:
@@ -564,13 +582,40 @@ struct JVPTranscriber
         
         case kIROp_constructVectorFromScalar:
             return differentiateByPassthrough(builder, instP);
-
-        default:
-            getSink()->diagnose(instP->sourceLoc,
+        
+        case kIROp_Specialize:
+            // The implementation is still incomplete, but we sometimes encounter 
+            // *unused* specialize instructions. So, we're only going to handle that case.
+            if (!oldInstP->hasUses())
+                return nullptr;
+            else
+            {
+                getSink()->diagnose(instP->sourceLoc,
                     Diagnostics::unimplemented,
                     "this instruction cannot be differentiated");
-            return nullptr;
+                return nullptr;
+            }
+
+        case kIROp_unconditionalBranch:
+        case kIROp_conditionalBranch:
+            return handleControlFlow(builder, instP);
+
         }
+    
+        // If none of the cases have been hit, check if the instruction is a
+        // type.
+        // For now we don't have logic to differentiate types that appear in blocks.
+        // So, we ignore them.
+        //
+        if (as<IRType>(instP))
+            return nullptr;
+        
+        
+        // If we reach this statement, the instruction type is likely unhandled.
+        getSink()->diagnose(instP->sourceLoc,
+                    Diagnostics::unimplemented,
+                    "this instruction cannot be differentiated");
+        return nullptr;
     }
 };
 
@@ -794,7 +839,10 @@ struct JVPDerivativeContext
         
         for (auto block = primalFn->getFirstBlock(); block; block = block->getNextBlock())
         {
-            emitJVPBlock(builder, primalFn->getFirstBlock());
+            auto jvpBlock = emitJVPBlock(builder, block);
+            // TODO: Need to go back and replace all occurences of block with jvpBlock.
+            // Plan: Emit the block before emiJVPBlock, map it and *then* pass it into emitJVPBlock
+            transcriberStorage.mapDifferentialInst(block, jvpBlock);
         }
 
         return jvpFn;
