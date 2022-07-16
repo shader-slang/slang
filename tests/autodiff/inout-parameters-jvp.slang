@@ -37,7 +37,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 
     __jvp(g)(x, y, z, dx, dy, dz);
 
-    outputBuffer[0] = dz; // Expect: 21.5
-    outputBuffer[1] = z;  // Expect: 1.0
+    outputBuffer[2] = dz; // Expect: 21.5
+    outputBuffer[3] = z;  // Expect: 1.0
 
 }

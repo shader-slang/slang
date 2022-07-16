@@ -513,6 +513,9 @@ struct JVPTranscriber
             // 
             if(!lookUp(&cloneEnv, storeLocation))
                 return false;
+        } else if (as<IRTerminatorInst>(instP))
+        {
+            return false;
         }
         
         return true;
@@ -833,16 +836,22 @@ struct JVPDerivativeContext
             builder->addNameHintDecoration(jvpFn, jvpName);
 
         builder->setInsertInto(jvpFn);
-
-        // Start with _extremely_ basic functions
-        // SLANG_ASSERT(primalFn->getFirstBlock() == primalFn->getLastBlock());
         
+        // Emit a block instruction for every block in the function, and map it as the 
+        // corresponding differential.
+        //
         for (auto block = primalFn->getFirstBlock(); block; block = block->getNextBlock())
         {
-            auto jvpBlock = emitJVPBlock(builder, block);
-            // TODO: Need to go back and replace all occurences of block with jvpBlock.
-            // Plan: Emit the block before emiJVPBlock, map it and *then* pass it into emitJVPBlock
+            auto jvpBlock = builder->emitBlock();
             transcriberStorage.mapDifferentialInst(block, jvpBlock);
+        }
+
+        // Go back over the blocks, and process the children of each block.
+        for (auto block = primalFn->getFirstBlock(); block; block = block->getNextBlock())
+        {
+            auto jvpBlock = as<IRBlock>(transcriberStorage.getDifferentialInst(block, block));
+            SLANG_ASSERT(jvpBlock);
+            emitJVPBlock(builder, block, jvpBlock);
         }
 
         return jvpFn;
