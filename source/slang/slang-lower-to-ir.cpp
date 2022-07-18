@@ -8546,7 +8546,11 @@ RefPtr<IRModule> generateIRForTranslationUnit(
     // marked for mandatory "early" inlining.
     //
     performMandatoryEarlyInlining(module);
-    
+
+    // Next, attempt to promote local variables to SSA
+    // temporaries whenever possible.
+    constructSSA(module);
+
     // Process higher-order-function calls before any optimization passes
     // to allow the optimizations to affect the generated funcitons.
     // 1. Process JVP derivative functions.
@@ -8555,10 +8559,6 @@ RefPtr<IRModule> generateIRForTranslationUnit(
     // processVJPDerivativeMarkers(module); // Disabled currently. No impl yet.
     // 3. Replace JVP & VJP calls.
     processDerivativeCalls(module);
-    
-    // Next, attempt to promote local variables to SSA
-    // temporaries whenever possible.
-    constructSSA(module);
 
     // Do basic constant folding and dead code elimination
     // using Sparse Conditional Constant Propagation (SCCP)

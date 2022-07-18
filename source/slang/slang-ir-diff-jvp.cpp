@@ -4,6 +4,7 @@
 #include "slang-ir.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-clone.h"
+#include "slang-ir-dce.h"
 
 namespace Slang
 {
@@ -395,14 +396,8 @@ struct JVPTranscriber
         if (auto baseD = getDifferentialInst(swizzleP->getBase(), nullptr))
         {
             List<IRInst*> swizzleIndices;
-
-            // TODO(sai): Is this copy really needed?
             for (UIndex ii = 0; ii < swizzleP->getElementCount(); ii++)
-            {
-                auto swizzleIndex = swizzleP->getElementIndex(ii);
-                SLANG_ASSERT(as<IRIntLit>(swizzleIndex));
-                swizzleIndices.add(builder->getIntValue(swizzleIndex->getDataType(), as<IRIntLit>(swizzleIndex)->getValue()));
-            }
+                swizzleIndices.add(swizzleP->getElementIndex(ii));
             
             return builder->emitSwizzle(differentiateType(builder, swizzleP->getDataType()),
                                         baseD,
@@ -489,7 +484,7 @@ struct JVPTranscriber
     // 
     bool hasNoSideEffects(IRBuilder*, IRInst* instP)
     {
-        if (as<IRReturn>(instP))
+        if (as<IRTerminatorInst>(instP))
             return false;
         else if (auto paramP = as<IRParam>(instP))
         {
@@ -513,9 +508,6 @@ struct JVPTranscriber
             // 
             if(!lookUp(&cloneEnv, storeLocation))
                 return false;
-        } else if (as<IRTerminatorInst>(instP))
-        {
-            return false;
         }
         
         return true;
@@ -530,7 +522,7 @@ struct JVPTranscriber
 
         SLANG_ASSERT(instP);
 
-        IRInst* instD = differentiateInst(builder, instP, oldInstP);
+        IRInst* instD = differentiateInst(builder, instP);
         
         // In case it's not safe to clone the old instruction, 
         // remove it from the graph.
@@ -551,7 +543,7 @@ struct JVPTranscriber
         return instD;
     }
 
-    IRInst* differentiateInst(IRBuilder* builder, IRInst* instP, IRInst* oldInstP)
+    IRInst* differentiateInst(IRBuilder* builder, IRInst* instP)
     {
         // Handle common operations
         switch (instP->getOp())
@@ -585,19 +577,6 @@ struct JVPTranscriber
         
         case kIROp_constructVectorFromScalar:
             return differentiateByPassthrough(builder, instP);
-        
-        case kIROp_Specialize:
-            // The implementation is still incomplete, but we sometimes encounter 
-            // *unused* specialize instructions. So, we're only going to handle that case.
-            if (!oldInstP->hasUses())
-                return nullptr;
-            else
-            {
-                getSink()->diagnose(instP->sourceLoc,
-                    Diagnostics::unimplemented,
-                    "this instruction cannot be differentiated");
-                return nullptr;
-            }
 
         case kIROp_unconditionalBranch:
         case kIROp_conditionalBranch:
@@ -946,6 +925,13 @@ bool processJVPDerivativeMarkers(
         IRJVPDerivativePassOptions const&)
 {
     JVPDerivativeContext context(module, sink);
+    
+    // Simplify module to remove dead code.
+    IRDeadCodeEliminationOptions options;
+    options.keepExportsAlive = true;
+    options.keepLayoutsAlive = true;
+    eliminateDeadCode(module, options);
+
     return context.processModule();
 }
 
