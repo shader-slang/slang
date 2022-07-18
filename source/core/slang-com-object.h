@@ -41,7 +41,7 @@ protected:
 inline uint32_t ComBaseObject::_releaseImpl()
 {
     // Check there is a ref count to avoid underflow
-    SLANG_ASSERT(m_refCount == 0);
+    SLANG_ASSERT(m_refCount != 0);
     const uint32_t count = --m_refCount;
     if (count == 0)
     {
