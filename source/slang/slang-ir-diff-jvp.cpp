@@ -145,7 +145,7 @@ struct JVPTranscriber
         List<IRParam*> newParamListP;
         for (auto paramP : paramListP)
         {
-            if(hasNoSideEffects(builder, paramP))
+            if(isPurelyFunctional(builder, paramP))
                 newParamListP.add(as<IRParam>(emitInputParam(builder, paramP)));
         }
 
@@ -480,9 +480,9 @@ struct JVPTranscriber
 
     // Logic for whether a primal instruction needs to be replicated
     // in the differential function. We detect and avoid replicating 
-    // side-effect instructions.
+    // 'side-effect' instructions.
     // 
-    bool hasNoSideEffects(IRBuilder*, IRInst* instP)
+    bool isPurelyFunctional(IRBuilder*, IRInst* instP)
     {
         if (as<IRTerminatorInst>(instP))
             return false;
@@ -529,7 +529,7 @@ struct JVPTranscriber
         // For instance, instructions that handle control flow 
         // (return statements) shouldn't be replicated.
         //
-        if (hasNoSideEffects(builder, oldInstP))
+        if (isPurelyFunctional(builder, oldInstP))
             mapDifferentialInst(instP, instD);
         else
         {
