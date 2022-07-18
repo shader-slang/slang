@@ -52,7 +52,7 @@ class DefaultSharedLibrary : public ISlangSharedLibrary, public ComBaseObject
     SLANG_CLASS_GUID(0xe7f2597b, 0xf803, 0x4b6e, { 0xaf, 0x8b, 0xcb, 0xe3, 0xa2, 0x21, 0xfd, 0x5a })
 
     // ISlangUnknown
-    SLANG_NO_THROW SlangResult SLANG_MCALL queryInterface(SlangUUID const& uuid, void** outObject);
+    SLANG_NO_THROW SlangResult SLANG_MCALL queryInterface(SlangUUID const& uuid, void** outObject) SLANG_OVERRIDE;
     SLANG_COM_BASE_IUNKNOWN_ADD_REF
     SLANG_COM_BASE_IUNKNOWN_RELEASE
 
