@@ -13,10 +13,19 @@ struct Edit
     String text;
 };
 
+enum class FormatBehavior
+{
+    Standard,
+    PreserveLineBreak,
+};
+
 struct FormatOptions
 {
     String clangFormatLocation;
     String style = "{BasedOnStyle: Microsoft}";
+    bool allowLineBreakInOnTypeFormatting = false;
+    bool allowLineBreakInRangeFormatting = false;
+    FormatBehavior behavior = FormatBehavior::Standard;
 };
 
 String findClangFormatTool();
