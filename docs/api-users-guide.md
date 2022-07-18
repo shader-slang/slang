@@ -459,6 +459,8 @@ This assumes Slang has been built with the C++ multithreaded runtime, as is the 
 
 All other functions and methods are not [reentrant](https://en.wikipedia.org/wiki/Reentrancy_(computing)) and can only execute on a single thread. More precisely function and methods can only be called on a *single* thread at *any one time*. This means for example a global session can be used across multiple threads, as long as some synchronisation enforces that only one thread can be in a Slang call at any one time.
 
+Much of the Slang API is available through [COM interfaces](https://en.wikipedia.org/wiki/Component_Object_Model). To strictly conform to COM interfaces should be atomically reference counted. Currently *MOST* Slang API COM interfaces are *NOT* atomic reference counted. One exception is `ISlangSharedLibrary` interface produced from [host-callable](cpu-target.md#host-callable) which *is* atomically reference counted, allowing it to be persist and be used beyond the original compilation and freed on a different thread. 
+
 A Slang compile request/s (`slang::ICompileRequest` or `SlangCompileRequest`) can be thought of belonging to the Slang global session (`slang::IGlobalSession` or `SlangSession`) it was created from.  Note that *creating* a global session is currently a fairly costly process, whereas the cost of creating and destroying a request is relatively small. 
 
 The *simplest* way to multithread would be for a thread to 
