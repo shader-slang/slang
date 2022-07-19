@@ -265,7 +265,7 @@ VectorExpressionType* ASTBuilder::getVectorType(
     IntVal*  elementCount)
 {
     auto vectorGenericDecl = as<GenericDecl>(m_sharedASTBuilder->findMagicDecl("Vector"));
-        
+    
     auto vectorTypeDecl = vectorGenericDecl->inner;
 
     auto substitutions = create<GenericSubstitution>();

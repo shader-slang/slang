@@ -58,6 +58,8 @@ INST(Nop, nop, 0, 0)
     INST(AttributedType, Attributed, 0, 0)
     INST(ResultType, Result, 2, 0)
 
+    INST(DifferentialPairType, DiffPair, 1, 0)
+
     /* BindExistentialsTypeBase */
 
         // A `BindExistentials<B, T0,w0, T1,w1, ...>` represents
