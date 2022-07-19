@@ -4,6 +4,7 @@
 #include "slang-ir.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-clone.h"
+#include "slang-ir-dce.h"
 
 namespace Slang
 {
@@ -103,6 +104,11 @@ struct JVPTranscriber
         if (IRType* typeD = differentiateType(builder, paramP->getFullType()))
         {
             IRParam* paramD = builder->emitParam(typeD);
+
+            auto nameHintD = getJVPVarName(paramP);
+            if (nameHintD.getLength() > 0)
+                builder->addNameHintDecoration(paramD, nameHintD.getUnownedSlice());
+
             SLANG_ASSERT(paramD);
             return paramD;
         }
@@ -118,6 +124,7 @@ struct JVPTranscriber
         {   
             auto newParamP = builder->emitParam(inoutTypeP->getValueType());
             cloneEnv.mapOldValToNew.Add(paramP, newParamP);
+            cloneInstDecorationsAndChildren(&cloneEnv, builder->getSharedBuilder(), paramP, newParamP);
 
             return newParamP;
         }
@@ -138,7 +145,7 @@ struct JVPTranscriber
         List<IRParam*> newParamListP;
         for (auto paramP : paramListP)
         {
-            if(requiresPrimalClone(builder, paramP))
+            if(isPurelyFunctional(builder, paramP))
                 newParamListP.add(as<IRParam>(emitInputParam(builder, paramP)));
         }
 
@@ -154,12 +161,30 @@ struct JVPTranscriber
         return newParamListD;
     }
 
+    // Returns "d<var-name>" to use as a name hint for variables and parameters.
+    // If no primal name is available, returns a blank string.
+    // 
+    String getJVPVarName(IRInst* varP)
+    {
+        if (auto namehintDecoration = varP->findDecoration<IRNameHintDecoration>())
+        {
+            return ("d" + String(namehintDecoration->getName()));
+        }
+
+        return String("");
+    }
+
     IRInst* differentiateVar(IRBuilder* builder, IRVar* varP)
     {
         if (IRType* typeD = differentiateType(builder, varP->getDataType()->getValueType()))
         {
             IRVar* varD = builder->emitVar(typeD);
             SLANG_ASSERT(varD);
+
+            auto nameHintD = getJVPVarName(varP);
+            if (nameHintD.getLength() > 0)
+                builder->addNameHintDecoration(varD, nameHintD.getUnownedSlice());
+
             return varD;
         }
         return nullptr;
@@ -270,7 +295,7 @@ struct JVPTranscriber
 
     IRInst* differentiateReturn(IRBuilder* builder, IRReturn* returnP)
     {
-        IRInst* returnVal = findCloneForOperand(&cloneEnv, returnP->getVal());
+        IRInst* returnVal = returnP->getVal();
         if (auto returnValD = getDifferentialInst(returnVal, nullptr))
         {   
             IRReturn* returnD = as<IRReturn>(builder->emitReturn(returnValD));
@@ -366,6 +391,71 @@ struct JVPTranscriber
         return nullptr;
     }
 
+    IRInst* differentiateSwizzle(IRBuilder* builder, IRSwizzle* swizzleP)
+    {
+        if (auto baseD = getDifferentialInst(swizzleP->getBase(), nullptr))
+        {
+            List<IRInst*> swizzleIndices;
+            for (UIndex ii = 0; ii < swizzleP->getElementCount(); ii++)
+                swizzleIndices.add(swizzleP->getElementIndex(ii));
+            
+            return builder->emitSwizzle(differentiateType(builder, swizzleP->getDataType()),
+                                        baseD,
+                                        swizzleP->getElementCount(),
+                                        swizzleIndices.getBuffer());
+        }
+        return nullptr;
+    }
+
+    IRInst* differentiateByPassthrough(IRBuilder* builder, IRInst* origInst)
+    {
+        UCount operandCount = origInst->getOperandCount();
+
+        List<IRInst*> diffOperands;
+        for (UIndex ii = 0; ii < operandCount; ii++)
+        {
+            // If the operand has a differential version, replace the original with the 
+            // differential.
+            // Otherwise, abandon the differentiation attempt and assume that origInst 
+            // cannot (or does not need to) be differentiated.
+            // 
+            if (auto diffInst = getDifferentialInst(origInst->getOperand(ii), nullptr))
+                diffOperands.add(diffInst);
+            else
+                return nullptr;
+        }
+        
+        return builder->emitIntrinsicInst(
+                    differentiateType(builder, origInst->getDataType()),
+                    origInst->getOp(),
+                    operandCount,
+                    diffOperands.getBuffer());
+    }
+
+    IRInst* handleControlFlow(IRBuilder* builder, IRInst* origInst)
+    {
+        switch(origInst->getOp())
+        {
+            case kIROp_unconditionalBranch:
+                auto origBranch = as<IRUnconditionalBranch>(origInst);
+
+                // Branches with extra operands not handled currently.
+                if (origBranch->getOperandCount() > 1)
+                    break;
+
+                if (auto diffBlock = getDifferentialInst(origBranch->getTargetBlock(), nullptr))
+                    return builder->emitBranch(as<IRBlock>(diffBlock));
+                else
+                    return nullptr;
+        }
+
+        getSink()->diagnose(
+            origInst->sourceLoc,
+            Diagnostics::unimplemented,
+            "attempting to differentiate unhandled control flow");
+        return nullptr;
+    }
+
     // In differential computation, the 'default' differential value is always zero.
     // This is a consequence of differential computing being inherently linear. As a 
     // result, it's useful to have a method to generate zero literals of any (arithmetic) type.
@@ -390,11 +480,11 @@ struct JVPTranscriber
 
     // Logic for whether a primal instruction needs to be replicated
     // in the differential function. We detect and avoid replicating 
-    // side-effect instructions.
+    // 'side-effect' instructions.
     // 
-    bool requiresPrimalClone(IRBuilder*, IRInst* instP)
+    bool isPurelyFunctional(IRBuilder*, IRInst* instP)
     {
-        if (as<IRReturn>(instP))
+        if (as<IRTerminatorInst>(instP))
             return false;
         else if (auto paramP = as<IRParam>(instP))
         {
@@ -425,38 +515,37 @@ struct JVPTranscriber
 
     IRInst* transcribe(IRBuilder* builder, IRInst* oldInstP)
     {
-        IRInst* instP = oldInstP;
 
-        // Clone the old instruction, but only if it's safe to do so.
-        // For instance, instructions that handle control flow 
-        // (return statements) shouldn't be replicated.
-        //
-        if (requiresPrimalClone(builder, oldInstP))
-            instP = cloneInst(&cloneEnv, builder, oldInstP);
-        else
-        {
-            // We replace the operands of the old instruction with their clones,
-            // if available.
-            // 
-            for(UInt ii = 0; ii < oldInstP->getOperandCount(); ++ii)
-            {
-                auto oldOperand = oldInstP->getOperand(ii);
-                auto newOperand = findCloneForOperand(&cloneEnv, oldOperand);
+        // Clone the old instruction into the new differential function.
+        // 
+        IRInst* instP = cloneInst(&cloneEnv, builder, oldInstP);
 
-                instP->getOperands()[ii].init(instP, newOperand);
-            }
-        }
         SLANG_ASSERT(instP);
 
         IRInst* instD = differentiateInst(builder, instP);
+        
+        // In case it's not safe to clone the old instruction, 
+        // remove it from the graph.
+        // For instance, instructions that handle control flow 
+        // (return statements) shouldn't be replicated.
+        //
+        if (isPurelyFunctional(builder, oldInstP))
+            mapDifferentialInst(instP, instD);
+        else
+        {
+            // This inst should never have been used.
+            SLANG_ASSERT(instP->firstUse == nullptr);
 
-        mapDifferentialInst(instP, instD);
+            instP->removeAndDeallocate();
+            mapDifferentialInst(oldInstP, instD);
+        }
 
         return instD;
     }
 
     IRInst* differentiateInst(IRBuilder* builder, IRInst* instP)
     {
+        // Handle common operations
         switch (instP->getOp())
         {
         case kIROp_Var:
@@ -474,6 +563,7 @@ struct JVPTranscriber
         case kIROp_Add:
         case kIROp_Mul:
         case kIROp_Sub:
+        case kIROp_Div:
             return differentiateBinaryArith(builder, instP);
 
         case kIROp_Construct:
@@ -481,13 +571,33 @@ struct JVPTranscriber
         
         case kIROp_Call:
             return differentiateCall(builder, as<IRCall>(instP));
+        
+        case kIROp_swizzle:
+            return differentiateSwizzle(builder, as<IRSwizzle>(instP));
+        
+        case kIROp_constructVectorFromScalar:
+            return differentiateByPassthrough(builder, instP);
 
-        default:
-            getSink()->diagnose(instP->sourceLoc,
+        case kIROp_unconditionalBranch:
+        case kIROp_conditionalBranch:
+            return handleControlFlow(builder, instP);
+
+        }
+    
+        // If none of the cases have been hit, check if the instruction is a
+        // type.
+        // For now we don't have logic to differentiate types that appear in blocks.
+        // So, we ignore them.
+        //
+        if (as<IRType>(instP))
+            return nullptr;
+        
+        
+        // If we reach this statement, the instruction type is likely unhandled.
+        getSink()->diagnose(instP->sourceLoc,
                     Diagnostics::unimplemented,
                     "this instruction cannot be differentiated");
-            return nullptr;
-        }
+        return nullptr;
     }
 };
 
@@ -531,27 +641,6 @@ struct IRWorkQueue
 
 struct JVPDerivativeContext
 {
-    // This type passes over the module and generates
-    // forward-mode derivative versions of functions 
-    // that are explicitly marked for it.
-    //
-    IRModule*                       module;
-
-    // Shared builder state for our derivative passes.
-    SharedIRBuilder                 sharedBuilderStorage;
-
-    // A transcriber object that handles the main job of 
-    // processing instructions while maintaining state.
-    //
-    JVPTranscriber                  transcriberStorage;
-    
-    // Diagnostic object from the compile request for
-    // error messages.
-    DiagnosticSink*                 sink;
-
-    // Work queue to hold a stream of instructions that need
-    // to be checked for references to derivative functions.
-    IRWorkQueue                    workQueueStorage;
 
     DiagnosticSink* getSink()
     {
@@ -726,13 +815,22 @@ struct JVPDerivativeContext
             builder->addNameHintDecoration(jvpFn, jvpName);
 
         builder->setInsertInto(jvpFn);
-
-        // Start with _extremely_ basic functions
-        SLANG_ASSERT(primalFn->getFirstBlock() == primalFn->getLastBlock());
         
+        // Emit a block instruction for every block in the function, and map it as the 
+        // corresponding differential.
+        //
         for (auto block = primalFn->getFirstBlock(); block; block = block->getNextBlock())
         {
-            emitJVPBlock(builder, primalFn->getFirstBlock());
+            auto jvpBlock = builder->emitBlock();
+            transcriberStorage.mapDifferentialInst(block, jvpBlock);
+        }
+
+        // Go back over the blocks, and process the children of each block.
+        for (auto block = primalFn->getFirstBlock(); block; block = block->getNextBlock())
+        {
+            auto jvpBlock = as<IRBlock>(transcriberStorage.getDifferentialInst(block, block));
+            SLANG_ASSERT(jvpBlock);
+            emitJVPBlock(builder, block, jvpBlock);
         }
 
         return jvpFn;
@@ -758,7 +856,6 @@ struct JVPDerivativeContext
 
         return name;
     }
-
 
     IRBlock* emitJVPBlock(IRBuilder*    builder, 
                           IRBlock*      primalBlock,
@@ -789,6 +886,35 @@ struct JVPDerivativeContext
         return jvpBlock;
     }
 
+    JVPDerivativeContext(IRModule* module, DiagnosticSink* sink) : module(module), sink(sink)
+    {
+        transcriberStorage.sink = sink;
+    }
+
+    protected:
+
+    // This type passes over the module and generates
+    // forward-mode derivative versions of functions 
+    // that are explicitly marked for it.
+    //
+    IRModule*                       module;
+
+    // Shared builder state for our derivative passes.
+    SharedIRBuilder                 sharedBuilderStorage;
+
+    // A transcriber object that handles the main job of 
+    // processing instructions while maintaining state.
+    //
+    JVPTranscriber                  transcriberStorage;
+    
+    // Diagnostic object from the compile request for
+    // error messages.
+    DiagnosticSink*                 sink;
+
+    // Work queue to hold a stream of instructions that need
+    // to be checked for references to derivative functions.
+    IRWorkQueue                    workQueueStorage;
+
 };
 
 // Set up context and call main process method.
@@ -798,9 +924,13 @@ bool processJVPDerivativeMarkers(
         DiagnosticSink*                     sink,
         IRJVPDerivativePassOptions const&)
 {
-    JVPDerivativeContext context;
-    context.module = module;
-    context.sink = sink;
+    JVPDerivativeContext context(module, sink);
+    
+    // Simplify module to remove dead code.
+    IRDeadCodeEliminationOptions options;
+    options.keepExportsAlive = true;
+    options.keepLayoutsAlive = true;
+    eliminateDeadCode(module, options);
 
     return context.processModule();
 }
