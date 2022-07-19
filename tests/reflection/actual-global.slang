@@ -1,4 +1,4 @@
-//TEST:REFLECTION:-stage compute  -no-codegen -target host-callable -entry computeMain
+//TEST(64-bit):REFLECTION:-stage compute  -no-codegen -target host-callable -entry computeMain
 
 __global int actualGlobal;
 int regularGlobal;

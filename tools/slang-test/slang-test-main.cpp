@@ -4108,7 +4108,13 @@ SlangResult innerMain(int argc, char** argv)
 #endif
 
 #if SLANG_UNIX_FAMILY
-    auto unixCatagory = categorySet.add("unix", fullTestCategory);
+    auto unixCategory = categorySet.add("unix", fullTestCategory);
+#endif
+
+#if SLANG_PTR_IS_64
+    auto ptr64Category = categorySet.add("64-bit", fullTestCategory);
+#else
+    auto ptr32Category = categorySet.add("32-bit", fullTestCategory);
 #endif
 
     // An un-categorized test will always belong to the `full` category
