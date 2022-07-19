@@ -437,6 +437,16 @@ protected:
     
 };
 
+// A differential pair type, e.g., `__DifferentialPair<T>`
+class DifferentialPairType : public ArithmeticExpressionType 
+{
+    SLANG_AST_CLASS(DifferentialPairType)
+
+    // The type of vector elements.
+    // As an invariant, this should be a basic type or an alias.
+    Type* baseType = nullptr;
+};
+
 // A vector type, e.g., `vector<T,N>`
 class VectorExpressionType : public ArithmeticExpressionType 
 {

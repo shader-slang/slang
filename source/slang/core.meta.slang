@@ -615,6 +615,59 @@ ${{{{
 }
 }}}}
 
+//@ public:
+
+    /// Interface to denote types as differentiable.
+    /// Allows for user-specified differential types as
+    /// well as automatic generation, for when the associated type
+    /// hasn't been declared explicitly.
+[builtin]
+__magic_type(DifferentiableType)
+interface IDifferentiable
+{
+    associatedtype Differential;
+};
+
+    /// Pair type that serves to wrap the primal and
+    /// differential types of an arbitrary type T.
+__generic<T : IDifferentiable>
+__magic_type(DifferentialPairType)
+__intrinsic_type($(kIROp_DifferentialPairType))
+struct __DifferentialPair
+{
+    T primal;
+    T.Differential differential;
+
+    __init(T primal) : primal(primal)
+
+    __init(T primal, T.Differential differential) : primal(primal), differential(differential);
+
+    T.Differential d()
+    {
+        return differential;
+    }
+
+    T.Differential getDifferential()
+    {
+        return differential;
+    }
+
+    T p()
+    {
+        return primal;
+    }
+
+    T getPrimal()
+    {
+        return primal;
+    }
+};
+
+// Add extensions for the standard types
+extension float : IDifferentiable
+{
+    typedef Differential float;
+}
 
 //@ public:
 
