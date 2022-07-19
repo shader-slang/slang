@@ -88,7 +88,7 @@ There are currently two styles of *compilation style* supported - `host` and `sh
 
 The `shader` style implies 
 
-* The code *can* be executed in a GPU-kernel like execution model, launched across multiple threads (as desribed in the [ABI](#abi)) 
+* The code *can* be executed in a GPU-kernel like execution model, launched across multiple threads (as described in the [ABI](#abi)) 
 * Currently no reference counting
 * Only functionality from the Slang stdlib, built in HLSL or anything supplied by a [COM interfaces](#com-interface) is available
 * Currently [slang-llvm](#slang-llvm) only supports the `shader` style
@@ -96,7 +96,7 @@ The `shader` style implies
 The `host` style implies 
 
 * Execution style is akin to more regular CPU scalar code
-* Typically requires linking with `slang-rt` and use `slang-rt` types such as `Slang::String` 
+* Typically requires linking with `slang-rt` and use of `slang-rt` types such as `Slang::String` 
 * Allows use of `new` 
 * Allows the use of `class` for reference counted types
 * COM interfaces are reference counted
@@ -526,7 +526,7 @@ If application code assumed `myFunc` could be called with no parameters a crash 
 
 If a global is desired in a function that wants to be called from the application, the [`__global`](#actual-global) modifier can be used.
 
-## <a id="prelude"/a>Prelude
+## <a id="prelude"/>Prelude
 
 For C++ targets, there is code to support the Slang generated source defined within the 'prelude'. The prelude is inserted text placed before the Slang generated C++ source. For the Slang command line tools as well as the test infrastructure, the prelude functionality is achieved through a `#include` in the prelude text of the `prelude/slang-cpp-prelude.h` specified with an absolute path. Doing so means other files the `slang-cpp-prelude.h` might need can be specified relatively, and include paths for the backend C/C++ compiler do not need to be modified. 
 
