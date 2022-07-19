@@ -1525,15 +1525,14 @@ namespace Slang
 
     Type* primalToJVPParamType(ASTBuilder* builder, Type* primalType)
     {
-        // Only float and float3 types can be differentiated for now.
+        // Only float and vector<float> types can be differentiated for now.
         
         if (primalType->equals(builder->getFloatType()))
             return primalType;
         else if (auto primalVectorType = as<VectorExpressionType>(primalType))
         {
-            // TODO(sai): There's probably a more elegant way to check if a type is a float3?
-            if (getIntVal(primalVectorType->elementCount) == 3 && primalVectorType->elementType->equals(builder->getFloatType()))
-                return primalVectorType;
+            if (auto jvpElementType = primalToJVPParamType(builder, primalVectorType->elementType))
+                return builder->getVectorType(jvpElementType, primalVectorType->elementCount);
         }
         else if (auto primalOutType = as<OutType>(primalType))
         {
