@@ -638,9 +638,16 @@ struct __DifferentialPair
     T primal;
     T.Differential differential;
 
-    __init(T primal) : primal(primal)
+    __init(T _primal)
+    {
+        primal = primal;
+    }
 
-    __init(T primal, T.Differential differential) : primal(primal), differential(differential);
+    __init(T _primal, T.Differential _differential)
+    {
+        primal = _primal;
+        differential = _differential;
+    }
 
     T.Differential d()
     {
@@ -666,7 +673,7 @@ struct __DifferentialPair
 // Add extensions for the standard types
 extension float : IDifferentiable
 {
-    typedef Differential float;
+    typedef float Differential;
 }
 
 //@ public:

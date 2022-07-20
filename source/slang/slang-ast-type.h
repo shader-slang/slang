@@ -447,6 +447,11 @@ class DifferentialPairType : public ArithmeticExpressionType
     Type* baseType = nullptr;
 };
 
+class DifferentiableType : public BuiltinType
+{
+    SLANG_AST_CLASS(DifferentiableType)
+};
+
 // A vector type, e.g., `vector<T,N>`
 class VectorExpressionType : public ArithmeticExpressionType 
 {
