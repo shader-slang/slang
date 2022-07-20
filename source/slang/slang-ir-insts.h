@@ -186,6 +186,17 @@ struct IRComInterfaceDecoration : IRDecoration
     IR_LEAF_ISA(ComInterfaceDecoration)
 };
 
+struct IRCOMWitnessDecoration : IRDecoration
+{
+    enum
+    {
+        kOp = kIROp_COMWitnessDecoration
+    };
+    IR_LEAF_ISA(COMWitnessDecoration)
+
+    IRInst* getWitnessTable() { return getOperand(0); }
+};
+
 /// A decoration on `IRParam`s that represent generic parameters,
 /// marking the interface type that the generic parameter conforms to.
 /// A generic parameter can have more than one `IRTypeConstraintDecoration`s
@@ -454,6 +465,18 @@ struct IRDllImportDecoration : IRDecoration
     UnownedStringSlice getLibraryName() { return getLibraryNameOperand()->getStringSlice(); }
 
     IRStringLit* getFunctionNameOperand() { return cast<IRStringLit>(getOperand(1)); }
+    UnownedStringSlice getFunctionName() { return getFunctionNameOperand()->getStringSlice(); }
+};
+
+struct IRDllExportDecoration : IRDecoration
+{
+    enum
+    {
+        kOp = kIROp_DllExportDecoration
+    };
+    IR_LEAF_ISA(DllExportDecoration)
+
+    IRStringLit* getFunctionNameOperand() { return cast<IRStringLit>(getOperand(0)); }
     UnownedStringSlice getFunctionName() { return getFunctionNameOperand()->getStringSlice(); }
 };
 
@@ -2521,7 +2544,7 @@ public:
 
     IRInst* emitManagedPtrAttach(IRInst* managedPtrVar, IRInst* value);
 
-    IRInst* emitManagedPtrDetach(IRInst* managedPtrVar);
+    IRInst* emitManagedPtrDetach(IRType* type, IRInst* managedPtrVal);
 
     IRInst* emitGetNativePtr(IRInst* value);
 
@@ -3052,9 +3075,19 @@ public:
         addDecoration(value, kIROp_JVPDerivativeReferenceDecoration, jvpFn);
     }
 
+    void addCOMWitnessDecoration(IRInst* value, IRInst* witnessTable)
+    {
+        addDecoration(value, kIROp_COMWitnessDecoration, &witnessTable, 1);
+    }
+
     void addDllImportDecoration(IRInst* value, UnownedStringSlice const& libraryName, UnownedStringSlice const& functionName)
     {
         addDecoration(value, kIROp_DllImportDecoration, getStringValue(libraryName), getStringValue(functionName));
+    }
+
+    void addDllExportDecoration(IRInst* value, UnownedStringSlice const& functionName)
+    {
+        addDecoration(value, kIROp_DllExportDecoration, getStringValue(functionName));
     }
 
     void addEntryPointDecoration(IRInst* value, Profile profile, UnownedStringSlice const& name, UnownedStringSlice const& moduleName)
@@ -3117,9 +3150,9 @@ public:
         addDecoration(inst, kIROp_AnyValueSizeDecoration, getIntValue(getIntType(), value));
     }
 
-    void addComInterfaceDecoration(IRInst* inst)
+    void addComInterfaceDecoration(IRInst* inst, UnownedStringSlice guid)
     {
-        addDecoration(inst, kIROp_ComInterfaceDecoration);
+        addDecoration(inst, kIROp_ComInterfaceDecoration, getStringValue(guid));
     }
 
     void addTypeConstraintDecoration(IRInst* inst, IRInst* constraintType)

@@ -339,6 +339,8 @@ public:
     void emitParamType(IRType* type, String const& name) { emitParamTypeImpl(type, name); }
 
     void emitFuncDecl(IRFunc* func);
+    void emitFuncDecl(IRFunc* func, const String& name);
+
 
     IREntryPointLayout* getEntryPointLayout(IRFunc* func);
 
@@ -472,6 +474,8 @@ public:
     virtual void emitVectorTypeNameImpl(IRType* elementType, IRIntegerValue elementCount) = 0;
 
     virtual void emitWitnessTable(IRWitnessTable* witnessTable);
+    void emitComWitnessTable(IRWitnessTable* witnessTable);
+
     virtual void emitInterface(IRInterfaceType* interfaceType);
     virtual void emitRTTIObject(IRRTTIObject* rttiObject);
 

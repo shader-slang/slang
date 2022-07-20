@@ -1153,7 +1153,15 @@ static void addLinkageDecoration(
     if (auto dllImportModifier = decl->findModifier<DllImportAttribute>())
     {
         auto libraryName = dllImportModifier->modulePath;
-        builder->addDllImportDecoration(inst, libraryName.getUnownedSlice(), decl->getName()->text.getUnownedSlice());
+        auto functionName = dllImportModifier->functionName.getLength()
+            ? dllImportModifier->functionName.getUnownedSlice()
+            : decl->getName()->text.getUnownedSlice();
+        builder->addDllImportDecoration(inst, libraryName.getUnownedSlice(), functionName);
+    }
+    if (decl->findModifier<DllExportAttribute>())
+    {
+        builder->addDllExportDecoration(inst, decl->getName()->text.getUnownedSlice());
+        builder->addPublicDecoration(inst);
     }
 }
 
@@ -2409,6 +2417,12 @@ ParameterDirection getParameterDirection(VarDeclBase* paramDecl)
     ///
 ParameterDirection getThisParamDirection(Decl* parentDecl, ParameterDirection defaultDirection)
 {
+    // The `this` parameter for a `class` is always `in`.
+    if (as<ClassDecl>(parentDecl->parentDecl))
+    {
+        return kParameterDirection_In;
+    }
+
     // Applications can opt in to a mutable `this` parameter,
     // by applying the `[mutating]` attribute to their
     // declaration.
@@ -5917,6 +5931,12 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
         addLinkageDecoration(context, irWitnessTable, inheritanceDecl, mangledName.getUnownedSlice());
 
+        // If the witness table is for a COM interface, always keep it alive.
+        if (irWitnessTableBaseType->findDecoration<IRComInterfaceDecoration>())
+        {
+            subBuilder->addPublicDecoration(irWitnessTable);
+        }
+
         // TODO(JS):
         // Not clear what to do here around HLSLExportModifier. 
         // In HLSL it only (currently) applies to functions, so perhaps do nothing is reasonable.
@@ -6596,7 +6616,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         }
         if (auto comInterfaceAttr = decl->findModifier<ComInterfaceAttribute>())
         {
-            subBuilder->addComInterfaceDecoration(irInterface);
+            subBuilder->addComInterfaceDecoration(irInterface, comInterfaceAttr->guid.getUnownedSlice());
         }
         if (auto builtinAttr = decl->findModifier<BuiltinAttribute>())
         {

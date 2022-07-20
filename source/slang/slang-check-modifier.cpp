@@ -1,5 +1,6 @@
 // slang-check-modifier.cpp
 #include "slang-check-impl.h"
+#include "../core/slang-char-util.h"
 
 // This file implements semantic checking behavior for
 // modifiers.
@@ -568,7 +569,7 @@ namespace Slang
         }
         else if (auto dllImportAttr = as<DllImportAttribute>(attr))
         {
-            SLANG_ASSERT(attr->args.getCount() == 1);
+            SLANG_ASSERT(attr->args.getCount() == 1 || attr->args.getCount() == 2);
 
             String libraryName;
             if (!checkLiteralStringVal(dllImportAttr->args[0], &libraryName))
@@ -576,6 +577,13 @@ namespace Slang
                 return false;
             }
             dllImportAttr->modulePath = libraryName;
+
+            String functionName;
+            if (dllImportAttr->args.getCount() == 2 && !checkLiteralStringVal(dllImportAttr->args[1], &functionName))
+            {
+                return false;
+            }
+            dllImportAttr->functionName = functionName;
         }
         else if (auto rayPayloadAttr = as<VulkanRayPayloadAttribute>(attr))
         {
@@ -606,6 +614,38 @@ namespace Slang
 
             customJVPAttr->funcDeclRef = funcExpr;
         }
+        else if (auto comInterfaceAttr = as<ComInterfaceAttribute>(attr))
+        {
+            SLANG_ASSERT(attr->args.getCount() == 1);
+            String guid;
+            if (!checkLiteralStringVal(comInterfaceAttr->args[0], &guid))
+            {
+                return false;
+            }
+            StringBuilder resultGUID;
+            for (auto ch : guid)
+            {
+                if (CharUtil::isHexDigit(ch))
+                {
+                    resultGUID.appendChar(ch);
+                }
+                else if (ch == '-')
+                {
+                    continue;
+                }
+                else
+                {
+                    getSink()->diagnose(attr, Diagnostics::invalidGUID, guid);
+                    return false;
+                }
+            }
+            comInterfaceAttr->guid = resultGUID.ToString();
+            if (comInterfaceAttr->guid.getLength() != 32)
+            {
+                getSink()->diagnose(attr, Diagnostics::invalidGUID, guid);
+                return false;
+            }
+        }
         else
         {
             if(attr->args.getCount() == 0)
@@ -617,7 +657,7 @@ namespace Slang
             {
                 // We should be special-casing the checking of any attribute
                 // with a non-zero number of arguments.
-                SLANG_DIAGNOSE_UNEXPECTED(getSink(), attr, "unhandled attribute");
+                getSink()->diagnose(attr, Diagnostics::tooManyArguments, attr->args.getCount(), 0);
                 return false;
             }
         }

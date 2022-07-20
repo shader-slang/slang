@@ -208,9 +208,12 @@ struct AssociatedTypeLookupSpecializationContext
                 auto seqId = inst->findDecoration<IRSequentialIDDecoration>();
                 SLANG_ASSERT(seqId);
                 // Insert code to pack sequential ID into an uint2 at all use sites.
-                for (auto use = inst->firstUse; use; )
+                IRUse* nextUse = nullptr;
+                for (auto use = inst->firstUse; use; use = nextUse)
                 {
-                    auto nextUse = use->nextUse;
+                    nextUse = use->nextUse;
+                    if (as<IRCOMWitnessDecoration>(use->getUser()))
+                        continue;
                     IRBuilder builder(sharedContext->sharedBuilderStorage);
                     builder.setInsertBefore(use->getUser());
                     auto uint2Type = builder.getVectorType(
@@ -222,7 +225,6 @@ struct AssociatedTypeLookupSpecializationContext
                     use->set(uint2seqID);
                     use = nextUse;
                 }
-                inst->replaceUsesWith(seqId->getSequentialIDOperand());
             }
         });
 
