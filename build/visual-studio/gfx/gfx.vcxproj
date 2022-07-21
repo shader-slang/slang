@@ -318,7 +318,6 @@
     <ClInclude Include="..\..\..\tools\gfx\cuda\cuda-shader-object.h" />
     <ClInclude Include="..\..\..\tools\gfx\cuda\cuda-shader-program.h" />
     <ClInclude Include="..\..\..\tools\gfx\cuda\cuda-texture.h" />
-    <ClInclude Include="..\..\..\tools\gfx\cuda\render-cuda.h" />
     <ClInclude Include="..\..\..\tools\gfx\d3d\d3d-swapchain.h" />
     <ClInclude Include="..\..\..\tools\gfx\d3d\d3d-util.h" />
     <ClInclude Include="..\..\..\tools\gfx\d3d11\d3d11-base.h" />
@@ -417,7 +416,6 @@
     <ClCompile Include="..\..\..\tools\gfx\cuda\cuda-shader-object.cpp" />
     <ClCompile Include="..\..\..\tools\gfx\cuda\cuda-shader-program.cpp" />
     <ClCompile Include="..\..\..\tools\gfx\cuda\cuda-texture.cpp" />
-    <ClCompile Include="..\..\..\tools\gfx\cuda\render-cuda.cpp" />
     <ClCompile Include="..\..\..\tools\gfx\d3d\d3d-swapchain.cpp" />
     <ClCompile Include="..\..\..\tools\gfx\d3d\d3d-util.cpp" />
     <ClCompile Include="..\..\..\tools\gfx\d3d11\d3d11-buffer.cpp" />
