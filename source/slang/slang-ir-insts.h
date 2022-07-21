@@ -2278,6 +2278,10 @@ public:
         IRInst* rowCount,
         IRInst* columnCount);
 
+    IRDifferentialPairType* getDifferentialPairType(
+        IRType* valueType,
+        IRWitnessTable* witnessTable);
+
     IRFuncType* getFuncType(
         UInt            paramCount,
         IRType* const*  paramTypes,
