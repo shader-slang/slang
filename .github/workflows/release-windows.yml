@@ -26,7 +26,7 @@ jobs:
       - name: msbuild (x64 tools)
         if: ${{ matrix.platform == 'aarch64' }}
         run: |
-          .\premake.bat vs2017 --arch=x64 --ignore-deps=slang-llvm
+          .\premake.bat vs2017 --arch=x64 --ignore-deps=slang-llvm,slang-glslang --no-progress=true
           MSBuild.exe slang.sln -v:m -m -property:Configuration=Release -property:Platform=x64 -property:WindowsTargetPlatformVersion=10.0.19041.0
           
       # Do the premake for the actual target, downloading dependencies if necessary    
