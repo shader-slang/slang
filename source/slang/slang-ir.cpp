@@ -2741,6 +2741,17 @@ namespace Slang
             operands);
     }
 
+    IRDifferentialPairType* IRBuilder::getDifferentialPairType(
+        IRType* valueType,
+        IRWitnessTable* witnessTable)
+    {
+        IRInst* operands[] = { valueType, witnessTable };
+        return (IRDifferentialPairType*)getType(
+            kIROp_DifferentialPairType,
+            sizeof(operands) / sizeof(operands[0]),
+            operands);
+    }
+
     IRFuncType* IRBuilder::getFuncType(
         UInt            paramCount,
         IRType* const*  paramTypes,

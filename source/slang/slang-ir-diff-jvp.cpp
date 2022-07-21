@@ -9,6 +9,142 @@
 namespace Slang
 {
 
+struct DifferentiableTypeConformanceContext
+{
+    Dictionary<IRType*, IRWitnessTable*> witnessTableMap;
+
+    IRModule* module;
+
+    // A reference to the builtin IDifferentiable interface type.
+    // We use this to look up all the other types (and type exprs)
+    // that conform to a base type.
+    // 
+    IRInterfaceType* differentiableInterfaceType;
+
+    // The struct key for the 'Differential' associated type
+    // defined inside IDifferential. We use this to lookup the differential
+    // type in the conformance table associated with the concrete type.
+    // 
+    IRStructKey* differentialAssocTypeStructKey;
+    
+    // Modules that don't use differentiable types
+    // won't have the IDifferentiable interface type available. 
+    // Set to false to indicate that we are uninitialized.
+    // 
+    bool isInterfaceAvailable = false;
+
+    // Default unused constructor (TODO: remove)
+    DifferentiableTypeConformanceContext()
+    {}
+
+    DifferentiableTypeConformanceContext(IRModule* module) : module(module)
+    {
+        // Load all witness tables corresponding to the IDifferentiable interface.
+        differentiableInterfaceType = as<IRInterfaceType>(findDifferentiableInterface());
+        if (differentiableInterfaceType)
+        {
+            for (auto table : getWitnessTablesFromInterface(differentiableInterfaceType))
+            {
+                // TODO: Can we have multiple conformances for the same pair of types?
+                // TODO: Can type instrs be duplicated (i.e. two different float types)? And if they are duplicated, can
+                // we supply the dictionary with a custom equality rule that uses 'type1->equals(type2)'
+                witnessTableMap.Add(table->getConcreteType(), table);
+            }
+
+            differentialAssocTypeStructKey = findDifferentialTypeStructKey();
+
+            if (differentialAssocTypeStructKey)
+                isInterfaceAvailable = true;
+        }
+    }
+
+    // Lookup a witness table for the concreteType. One should exist if concreteType
+    // inherits (successfully) from IDifferentiable.
+    // 
+    IRWitnessTable* lookUpConformanceForType(IRType* concreteType)
+    {
+        SLANG_ASSERT(isInterfaceAvailable);
+
+        return *witnessTableMap.TryGetValue(concreteType);
+    }
+    
+    // Lookup and return the 'Differential' type declared in the concrete type
+    // in order to conform to the IDifferentiable interface.
+    // 
+    IRType* lookUpDifferentialForType(IRType* origType)
+    {
+        SLANG_ASSERT(isInterfaceAvailable);
+
+        if (!differentialAssocTypeStructKey)
+            differentialAssocTypeStructKey = findDifferentialTypeStructKey();
+
+        if (auto witnessTable = lookUpConformanceForType(origType))
+        {
+            for (auto entry : witnessTable->getEntries())
+            {
+                if (entry->getRequirementKey() == differentialAssocTypeStructKey)
+                    return as<IRType>(entry->getSatisfyingVal());
+            }
+        }
+
+        return nullptr;
+    }
+
+    private:
+
+    IRInst* findDifferentiableInterface()
+    {
+        for (auto globalInst : module->getGlobalInsts())
+        {
+            // TODO: This seems like a particularly dangerous way to look for an interface.
+            // See if we can lower IDifferentiable to a separate IR inst.
+            //
+            if (globalInst->getOp() == kIROp_InterfaceType && 
+                as<IRInterfaceType>(globalInst)->findDecoration<IRNameHintDecoration>()->getName() == "IDifferentiable")
+            {
+                return globalInst;
+            }
+        }
+        return nullptr;
+    }
+
+    IRStructKey* findDifferentialTypeStructKey()
+    {
+        if (!differentiableInterfaceType)
+            differentiableInterfaceType = as<IRInterfaceType>(findDifferentiableInterface());
+        
+        if (differentiableInterfaceType)
+        {
+            // Assume for now that IDifferentiable has exactly one field: the 'Differential' associated type.
+            SLANG_ASSERT(differentiableInterfaceType->getOperandCount() == 1);
+            if (auto entry = as<IRInterfaceRequirementEntry>(differentiableInterfaceType->getOperand(0)))
+                return as<IRStructKey>(entry->getRequirementKey());
+            else
+            {
+                SLANG_UNEXPECTED("IDifferentiable interface entry unexpected type");
+            }
+        }
+
+        return nullptr;
+    }
+
+    List<IRWitnessTable*> getWitnessTablesFromInterface(IRInst* interfaceType)
+    {
+        List<IRWitnessTable*> witnessTables;
+        for (auto globalInst : module->getGlobalInsts())
+        {
+            if (globalInst->getOp() == kIROp_WitnessTable &&
+                cast<IRWitnessTableType>(globalInst->getDataType())->getConformanceType() ==
+                    interfaceType)
+            {
+                witnessTables.add(cast<IRWitnessTable>(globalInst));
+            }
+        }
+        return witnessTables;
+    }
+
+};
+
 struct JVPTranscriber
 {
 
@@ -22,6 +158,9 @@ struct JVPTranscriber
 
     // Diagnostic sink for error messages.
     DiagnosticSink*                 sink;
+
+    // Type conformance information.
+    DifferentiableTypeConformanceContext diffConformanceContext;
 
     DiagnosticSink* getSink()
     {
@@ -51,32 +190,31 @@ struct JVPTranscriber
 
     IRFuncType* differentiateFunctionType(IRBuilder* builder, IRFuncType* funcType)
     {
-        List<IRType*> diffParameterTypes;
+        List<IRType*> newParameterTypes;
         IRType* diffReturnType;
 
-        // Add all primal parameters to the list.
         for (UIndex i = 0; i < funcType->getParamCount(); i++)
-        {   
-            // TODO(sai): Move this check to a separate function.
-            if (!as<IROutType>(funcType->getParamType(i)))
-                diffParameterTypes.add(funcType->getParamType(i));
-        }
-
-        // Add differential versions for the types we support.
-        for (UIndex i = 0; i < funcType->getParamCount(); i++)
-        {   
-            if (auto diffType = differentiateType(builder, funcType->getParamType(i)))
-                diffParameterTypes.add(diffType);
+        {
+            auto origType = funcType->getParamType(i);
+            if (auto diffPairType = tryCreateDifferentialPairFromType(builder, origType))
+                newParameterTypes.add(diffPairType);
+            else
+                newParameterTypes.add(origType);
         }
 
         // Transcribe return type. 
         // This will be void if the primal return type is non-differentiable.
         //
-        diffReturnType = differentiateType(builder, funcType->getResultType());
-        if (!diffReturnType)
+        if (tryCreateDifferentialPairFromType(builder, funcType->getResultType()))
+        {
+            diffReturnType = diffConformanceContext.lookUpDifferentialForType(funcType->getResultType());
+        }
+        else
+        {
             diffReturnType = builder->getVoidType();
+        }
 
-        return builder->getFuncType(diffParameterTypes, diffReturnType);
+        return builder->getFuncType(newParameterTypes, diffReturnType);
     }
 
     IRType* differentiateType(IRBuilder* builder, IRType* origType)
@@ -86,10 +224,8 @@ struct JVPTranscriber
             case kIROp_HalfType:
             case kIROp_FloatType:
             case kIROp_DoubleType:
-                return builder->getType(origType->getOp());
             case kIROp_VectorType:
-                // TODO(sai): Call differentiateType() on origType.
-                return as<IRVectorType>(origType);
+                return diffConformanceContext.lookUpDifferentialForType(origType);
             case kIROp_OutType:
                 return builder->getOutType(differentiateType(builder, as<IROutType>(origType)->getValueType()));
             case kIROp_InOutType:
@@ -99,15 +235,35 @@ struct JVPTranscriber
         }
     }
     
+    IRType* tryCreateDifferentialPairFromType(IRBuilder* builder, IRType* origType)
+    {
+        // If this is a PtrType (out, inout, etc..), then create diff pair from
+        // value type and re-apply the appropropriate PtrType wrapper.
+        // 
+        if (auto origPtrType = as<IRPtrType>(origType))
+        {   
+            if (auto diffPairValueType = tryCreateDifferentialPairFromType(builder, origPtrType->getValueType()))
+                return builder->getPtrType(origType->getOp(), diffPairValueType);
+            else 
+                return nullptr;
+        }
+
+        if (auto confWitness = diffConformanceContext.lookUpConformanceForType(origType))
+            return builder->getDifferentialPairType(origType, confWitness);
+        else
+            return nullptr;
+    }
+    
     IRInst* differentiateParam(IRBuilder* builder, IRParam* origParam)
     {
-        if (IRType* diffType = differentiateType(builder, origParam->getFullType()))
+        // Try to get a differential pair, if the original type implements IDifferentiable
+        if (auto diffPairType = tryCreateDifferentialPairFromType(builder, origParam->getFullType()))
         {
-            IRParam* diffParam = builder->emitParam(diffType);
+            IRParam* diffParam = builder->emitParam(diffPairType);
 
-            auto diffNameHint = getJVPVarName(origParam);
-            if (diffNameHint.getLength() > 0)
-                builder->addNameHintDecoration(diffParam, diffNameHint.getUnownedSlice());
+            // auto diffNameHint = getDiffPairVarName(origParam);
+            // if (diffNameHint.getLength() > 0)
+            //     builder->addNameHintDecoration(diffParam, diffNameHint.getUnownedSlice());
 
             SLANG_ASSERT(diffParam);
             return diffParam;
@@ -141,24 +297,74 @@ struct JVPTranscriber
 
     List<IRParam*> transcribeParams(IRBuilder* builder, IRInstList<IRParam> origParamList)
     {
-        // Clone (and emit) all the primal parameters.
-        List<IRParam*> origParamListNew;
+        List<IRParam*> origParams;
+        List<IRParam*> newParamList;
+        List<bool> isDiffPairList;
+
+        // Go through all parameters and generate derivative versions.
+        // Note that this is one place where the primal (original) inst needs special
+        // handling. Instead of adding a new inst for the differential and cloning the 
+        // primal one, we have a single param inst for both, with a pair type. 
+        // Therefore, we emit a member access instruction for the primal and differential.
+        // 
+
+        // First emit all the parameters 
         for (auto origParam : origParamList)
         {
-            if(isPurelyFunctional(builder, origParam))
-                origParamListNew.add(as<IRParam>(emitInputParam(builder, origParam)));
+            origParams.add(origParam);
+            if (IRInst* diffParam = differentiateParam(builder, origParam))
+            {
+                newParamList.add(as<IRParam>(diffParam));
+                isDiffPairList.add(true);
+            }
+            else
+            {
+                newParamList.add(as<IRParam>(cloneInst(&cloneEnv, builder, origParam)));
+                isDiffPairList.add(false);
+            }
         }
 
-        // Now emit differentials.
-        List<IRParam*> diffParamListNew;
-        for (auto origParam : origParamList)
+        for (Index ii = 0; ii < newParamList.getCount(); ii++)
         {
-            IRParam* diffParam = as<IRParam>(differentiateParam(builder, origParam));
-            mapDifferentialInst(findCloneForOperand(&cloneEnv, origParam), diffParam);
-            diffParamListNew.add(diffParam);
+            IRInst* newInst = nullptr;
+            IRInst* diffInst = nullptr;
+
+            if (isDiffPairList[ii])
+            {
+                auto diffPairParam = newParamList[ii];
+                // Create a keys for the primal and differential fields.
+                IRStructKey* origKey = builder->createStructKey();
+                builder->addNameHintDecoration(origKey, UnownedTerminatedStringSlice("primal"));
+
+                IRStructKey* diffKey = builder->createStructKey();
+                builder->addNameHintDecoration(diffKey, UnownedTerminatedStringSlice("differential"));
+
+                // Emit field access instructions for primal and differential.
+                newInst = builder->emitFieldExtract(
+                    origParams[ii]->getFullType(),
+                    diffPairParam,
+                    origKey
+                );
+
+                diffInst = builder->emitFieldExtract(
+                    diffConformanceContext.lookUpDifferentialForType(origParams[ii]->getFullType()),
+                    diffPairParam,
+                    diffKey
+                );
+
+            }
+            else
+            {
+                newInst = newParamList[ii];
+                diffInst = nullptr;
+            }
+
+            cloneEnv.mapOldValToNew[origParams[ii]] = newInst;
+            mapDifferentialInst(newInst, diffInst);
         }
 
-        return diffParamListNew;
+        return newParamList;
+
     }
 
     // Returns "d<var-name>" to use as a name hint for variables and parameters.
@@ -889,6 +1095,7 @@ struct JVPDerivativeContext
     JVPDerivativeContext(IRModule* module, DiagnosticSink* sink) : module(module), sink(sink)
     {
         transcriberStorage.sink = sink;
+        transcriberStorage.diffConformanceContext = DifferentiableTypeConformanceContext(module);
     }
 
     protected:
