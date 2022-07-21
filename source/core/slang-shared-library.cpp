@@ -78,6 +78,8 @@ TemporarySharedLibrary::~TemporarySharedLibrary()
 
 SLANG_NO_THROW SlangResult SLANG_MCALL DefaultSharedLibrary::queryInterface(SlangUUID const& uuid, void** outObject)
 {
+    // Mechanism to cast to underlying type. 
+    // NOTE! Purposefully does not ref count
     if (uuid == DefaultSharedLibrary::getTypeGuid())
     {
         *outObject = this;
@@ -86,7 +88,7 @@ SLANG_NO_THROW SlangResult SLANG_MCALL DefaultSharedLibrary::queryInterface(Slan
 
     if (uuid == ISlangUnknown::getTypeGuid() || uuid == ISlangSharedLibrary::getTypeGuid()) 
     {
-        addReference();
+        ++m_refCount;
         *outObject = static_cast<ISlangSharedLibrary*>(this);
         return SLANG_OK;
     }
@@ -105,7 +107,6 @@ void* DefaultSharedLibrary::findSymbolAddressByName(char const* name)
 {
     return SharedLibrary::findSymbolAddressByName(m_sharedLibraryHandle, name);
 }
-
 
 String SharedLibraryUtils::getSharedLibraryFileName(void* symbolInLib)
 {

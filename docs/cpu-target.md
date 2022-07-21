@@ -50,6 +50,14 @@ SLANG_CPP_SOURCE           ///< The C++ language
 SLANG_HOST_CPP_SOURCE,     ///< C++ code for `host` style 
 ```        
    
+Using the `-target` command line option
+
+* C_SOURCE: c
+* CPP_SOURCE: cpp,c++,cxx
+* HOST_CPP_SOURCE: host-cpp,host-c++,host-cxx
+
+Note! Output of C source is not currently supported.
+
 If a CPU binary is required this can be specified as a `SlangCompileTarget` of 
    
 ```   
@@ -60,11 +68,19 @@ SLANG_HOST_HOST_CALLABLE        ///< A CPU target that makes `scalar` compiled c
 SLANG_OBJECT_CODE,              ///< Object code that can be used for later linking
 ```
 
-These can also be specified on the Slang command line as `-target exe` and `-target dll` or `-target sharedlib`. `-target callable`, `-target host-callable` and `-target host-host-callable` are also possible, but is typically not very useful from the command line, other than to test such code can be loaded for host execution.
+Using the `-target` command line option
 
-For launching a [shader like](#compile-style] Slang code on the CPU, there typically needs to be binding of values passed to a function that the C/C++ code will produce and export. How this works is described in the [ABI section](#abi). Functions *can* be executed directly but care must be taken to [export](#visibility) them and such that there isn't an issue with [context threading](#context-threading).
+* EXECUTABLE: exe, executable
+* SHADER_SHARED_LIBRARY: sharedlib, sharedlibrary, dll
+* SHADER_HOST_CALLABLE: callable, host-callable
+* OBJECT_CODE: object-conde
+* HOST_HOST_CALLABLE: host-host-callable
+    
+Using `host-callable` types from the the command line, other than to test such code compile and can be loaded for host execution.
 
-If a binary target is requested, the binary contents can be returned in a ISlangBlob just like for other targets. When using a [regular C/C++ compiler](#regular-cpp) the CPU binary typically must be saved as a file and then potentially marked for execution by the OS before executing. It may be possible to load shared libraries or dlls from memory - but doing so is a non standard feature, that requires unusual work arounds. If possible it is typically fastest and easiest to use [slang-llvm](#slang-llvm) to directly execute slang or C/C++ code.
+For launching a [shader like](#compile-style) Slang code on the CPU, there typically needs to be binding of values passed the entry point function. How this works is described in the [ABI section](#abi). Functions *can* be executed directly but care must be taken to [export](#visibility) them and such that there isn't an issue with [context threading](#context-threading).
+
+If a binary target is requested, the binary contents can be returned in a ISlangBlob just like for other targets. When using a [regular C/C++ compiler](#regular-cpp) the CPU binary typically must be saved as a file and then potentially marked for execution by the OS. It may be possible to load shared libraries or dlls from memory - but doing so is a non standard feature, that requires unusual work arounds. If possible it is typically fastest and easiest to use [slang-llvm](#slang-llvm) to directly execute slang or C/C++ code.
 
 ## <a id="compile-style"/>Compilation Styles
 
@@ -72,15 +88,15 @@ There are currently two styles of *compilation style* supported - `host` and `sh
 
 The `shader` style implies 
 
-* The code *can* be executed in a GPU-kernel like execution model, launched across multiple threads (as desribed in the [ABI](#abi)) 
+* The code *can* be executed in a GPU-kernel like execution model, launched across multiple threads (as described in the [ABI](#abi)) 
 * Currently no reference counting
-* Only functionality from slang stdlib, built in HLSL or anything supplied by a [COM interfaces](#com-interface) is available
+* Only functionality from the Slang stdlib, built in HLSL or anything supplied by a [COM interfaces](#com-interface) is available
 * Currently [slang-llvm](#slang-llvm) only supports the `shader` style
 
 The `host` style implies 
 
 * Execution style is akin to more regular CPU scalar code
-* Typically requires linking with `slang-rt` and use `slang-rt` types such as `Slang::String` 
+* Typically requires linking with `slang-rt` and use of `slang-rt` types such as `Slang::String` 
 * Allows use of `new` 
 * Allows the use of `class` for reference counted types
 * COM interfaces are reference counted
@@ -101,9 +117,9 @@ For an example of the `host` style please look at "examples/cpu-hello-world".
 
 ## <a id="host-callable"/>Host callable
 
-Slang supports `host-callable` compilation targets. Such a target allows for the direct execution of the compiled code on the CPU. Currently this style of execution is supported if [slang-llvm](#slang-llvm) or a [regular C/C++ compiler](#regular-cpp) is available.
+Slang supports `host-callable` compilation targets which allow for the direct execution of the compiled code on the CPU. Currently this style of execution is supported if [slang-llvm](#slang-llvm) or a [regular C/C++ compiler](#regular-cpp) are available.
 
-There are currently two styles of [compile style](#compile-style) supported. 
+There are currently two [compilation styles](#compile-style) supported. 
 
 In order to call into `host-callable` code after compilation it's necessary to access the result via the `ISlangSharedLibrary` interface. 
 
@@ -141,7 +157,7 @@ Please look at the [ABI](#abi) section for more specifics around ABI usage espec
     
     // To get a function 
     // 
-    // int add(int a, int b);
+    // public __extern_cpp int add(int a, int b);
     
     // Test a free function
     {
@@ -164,10 +180,9 @@ Please look at the [ABI](#abi) section for more specifics around ABI usage espec
 
 Limitations of using `slang-llvm`
  
-* Can only currently be used for `host-callable` 
+* Can only currently be used for [shader style](#compile-style) 
   * Cannot produce object files, libraries, OS executables or binaries 
-* Is *limited* because it is not possible to directly access libraries such as the c standard library (see [COM interface](#com-interface) for a work-around)
-* Cannot use the `host` [compilation style](#compile-style), because of the requirement of `slang-rt` runtime library which is unavailable to `slang-llvm`.
+* Is *limited* because it is not possible to directly access libraries such as the C or C++ standard libraries (see [COM interface](#com-interface) for a work-around)
 * It's not possible to source debug into `slang-llvm` compiled code running on the JIT (see [debugging](#debugging) for a work-around)
 * Not currently possible to return as a ISlangBlob representation 
 
@@ -186,17 +201,21 @@ Under the covers when Slang is used to generate a binary via a C/C++ compiler, i
 
 ## <a id="visibility"/>Visibility
 
-Functionality is typically made available with [shader like](#compile-style) via entry points. It can be desirable to just be able to call Slang functions from application code directly. By default non entry point functions are *removed* if they are not reachable by the specified entry point. Additionally for non entry point functions Slang typically generates function names that differ from the original name. 
+In a typical Slang [shader like](#compile-style) scenario, functionality is exposed via entry points. It can be convenient and desirable to be able to call Slang functions directly from application code, and not just via entry points. By default non entry point functions are *removed* if they are not reachable by the specified entry point. Additionally for non entry point functions Slang typically generates function names that differ from the original name. 
 
 To work around these two issues the `public` and `__extern_cpp` modifiers can be used.
 
-`public` makes the variable or function visible outside of the module even if it isn't used within the module. For the function to work it will also keep around any function or variable it accesses. Note! Some care is needed here around [context threading](#context-threading) - if a function or any function an function accesses requires state held in the context, the signiture of the function will be altered to include the context.
+`public` makes the variable or function visible outside of the module even if it isn't used within the module. For the function to work it will also keep around any function or variable it accesses. 
 
-Making a function or variable `public` does not mean that the name remains the same. To indicate the name should not be changed use the `__extern_cpp` modifier. For example
+Note! Some care is needed here around [context threading](#context-threading) - if a function or any function a function accesses requires state held in the context, the signature of the function will be altered to include the context as the first parameter.
+
+Making a function or variable `public` does not mean that the name remains the same. To indicate that the name should not be altered use the `__extern_cpp` modifier. For example
 
 ```
+// myGlobal will be visible to the application (note the __global modifier additionally means it has C++ global behavior)
 __global public __extern_cpp int myGlobal;
 
+// myFunc is available to the application
 public __extern_cpp myFunc(int a) 
 {
     return a * a;
@@ -205,7 +224,7 @@ public __extern_cpp myFunc(int a)
 
 ## <a id="com-interface"/>COM interface support
 
-Slang has preliminary support for Common Object Model (COM) interfaces in CPU code. 
+Slang has preliminary support for [Component Object Model (COM)](https://en.wikipedia.org/wiki/Component_Object_Model) interfaces in CPU code. 
 
 ```
 [COM]
@@ -221,7 +240,7 @@ This support provides a way for an application to provide access to functionalit
 
 The example "examples/cpu-com-example" shows this at work.
 
-## <a href="actual-global"/>Global support
+## <a id="actual-global"/>Global support
 
 The Slang language is based on the HLSL language. This heritage means that globals have slightly different meaning to typical C/C++ usage. 
 
@@ -236,7 +255,7 @@ The variable `myGlobal` will be a member of a constant buffer, meaning it's valu
 * It's use is reached from a [shader style](#compile-style) entry point 
 * It's value is constant across the launch 
 
-In Slang a variable can be declared as global C/C++ sense via the `__global` modifier. For example
+In Slang a variable can be declared as global in the C/C++ sense via the `__global` modifier. For example
 
 ```
 __global int myGlobal;
@@ -244,11 +263,10 @@ __global int myGlobal;
 
 Doing so means
 
-* `myGlobal will not be defined in the constant buffer
-* Can be used in functions that do not have access to the [constant buffer](#context-threading)
-* Can be modified in the kernel 
-
-A variable can only be defined this way for targets that support `__global` which are currently only CPU targets. 
+* `myGlobal` will not be defined in the constant buffer
+* It can be used in functions that do not have access to the [constant buffer](#context-threading)
+* It can be modified in the kernel 
+* Can only be used on CPU targets (currently `__global` is not supported on the GPU targets)
 
 One disadvantage of using `__global` is in multi-threaded environments, with multiple launches on multiple CPU threads, there is only one global and will likely cause problems unless the global value is the same across all threads.
 
@@ -275,13 +293,11 @@ The global can now be set from host code via
     }
 ```
 
-On `__global` on GPU based targets produces variables that *are* stored in the constant buffer, as that is all that is available for those targets. Therefore on GPU targets `__global` are just constant values.
-
-TODO(JS): What does `__global` mean for reflection on CPU targets? 
+In terms of reflection `__global` variables are not visibile. 
 
 ## NativeString
 
-Slang supports a rich 'String' type, which for C++ targets is implemented as the `Slang::String` C++ type. The type is only available on CPU targets that support `slang-rt`. 
+Slang supports a rich 'String' type when using the [host style](#compile-style), which for C++ targets is implemented as the `Slang::String` C++ type. The type is only available on CPU targets that support `slang-rt`. 
 
 Some limited String-like support is available via `NativeString` type which for C/C++ CPU targets is equivalent to `const char*`. For GPU targets this will use the same hash mechanism as normally available. 
 
@@ -291,7 +307,9 @@ TODO(JS): What happens with String with shader compile style on CPU? Shouldn't i
 
 ## Debugging
 
-It is currently not possible to step into LLVM-JIT code when using [slang-llvm](#slang-llvm). Fortunately it is possible to step into code compiled via a [regular C/C++ compiler](#regular-cpp). It is possible to switch what backend is used via the Slang runtime. 
+It is currently not possible to step into LLVM-JIT code when using [slang-llvm](#slang-llvm). Fortunately it is possible to step into code compiled via a [regular C/C++ compiler](#regular-cpp). 
+
+Below is a code snippet showing how to swich to a [regular C/C++ compiler](#regular-cpp) at runtime. 
 
 ```C++
     SlangPassThrough findRegularCppCompiler(slang::IGlobalSession* slangSession)
@@ -334,25 +352,13 @@ Executing CPU Code
 
 In typical Slang operation when code is compiled it produces either source or a binary that can then be loaded by another API such as a rendering API. With CPU code the binary produced could be saved to a file and then executed as an exe or a shared library/dll. In practice though it is common to want to be able to execute compiled code immediately. Having to save off to a file and then load again can be awkward. It is also not necessarily the case that code needs to be saved to a file to be executed. 
 
-To handle being able call code directly, code can be compiled using the `SLANG_HOST_CALLABLE` code target type. To access the code that has been produced use the function
+To handle being able call code directly, code can be compiled using the [host-callable](#host-callable).
 
-```
-    SLANG_API SlangResult spGetEntryPointHostCallable(
-        SlangCompileRequest*    request,
-        int                     entryPointIndex,
-        int                     targetIndex,
-        ISlangSharedLibrary**   outSharedLibrary);
-```        
+For pass through compilation of C/C++ this mechanism allows any functions marked for export to be directly queried. Marking for export is a C/C++ compiler specific feature. Look at the definition of `SLANG_PRELUDE_EXPORT` in the [C++ prelude](#prelude).
 
-This outputs a `ISlangSharedLibrary` which whilst in scope, any contained functions remain available (even if the request or session go out of scope). The contained functions can then be accessed via the `findFuncByName` method on the `ISlangSharedLibrary` interface. Finding the entry point names, can be achieved using reflection, if not directly known to the client.
+For a complete example on how to execute CPU code using `spGetEntryPointHostCallable`/`getEntryPointHostCallable` look at code in `example/cpu-hello-world`. 
 
-The returned function pointer should be cast to the appropriate function signature before calling. For entry points - the function will appear under the same name as the entry point name. See the [ABI section](#abi) for what is the appropriate signature for entry points. 
-
-For pass through compilation of C/C++ this mechanism allows any functions marked for export to be directly queried. 
-
-For a complete example on how to execute CPU code using `spGetEntryPointHostCallable` look at code in `example/cpu-hello-world`. 
-
-<a id="abi"/>ABI
+<a id="abi"/>Application Binary Interface (ABI)
 ===
 
 Say we have some Slang source like the following:
@@ -375,13 +381,13 @@ void computeMain(
 }
 ```
 
-When compiled into a `shader` [compile style](#compile-style) shared library/dll/host-callable - how is it invoked? An entry point in the slang source code produces several exported functions. The 'default' exported function has the same name as the entry point in the original source. It has the signature  
-
-NOTE! Using `main` as an entry point name should be avoided if CPU is a target because it typically causes compilation errors due it's normal C/C++ usage.
+When compiled into a [shader compile style](#compile-style) shared library/dll/host-callable - how is it invoked? An entry point in the Slang source code produces several exported functions. The 'default' exported function has the same name as the entry point in the original source. It has the signature  
 
 ```
 void computeMain(ComputeVaryingInput* varyingInput, UniformEntryPointParams* uniformParams, UniformState* uniformState);
 ```
+
+NOTE! Using `main` as an entry point name should be avoided if CPU is a target because it typically causes compilation errors due it's normal C/C++ usage.
 
 ComputeVaryingInput is defined in the prelude as 
 
@@ -397,7 +403,7 @@ struct ComputeVaryingInput
 
 There are two other functions that consist of the entry point name postfixed with `_Thread` and `_Group`. For the entry point 'computeMain' these functions would be accessable from the shared library interface as `computeMain_Group` and `computeMain_Thread`. `_Group` has the same signature as the listed for computeMain, but it doesn't execute a range, only the single group specified by startGroupID (endGroupID is ignored). That is all of the threads within the group (as specified by `[numthreads]`) will be executed in a single call. 
 
-It may be desirable to have even finer control of how execution takes place down to the level of individual 'thread's and this can be achieved with the `_Thread` style. The signiture looks as follows
+It may be desirable to have even finer control of how execution takes place down to the level of individual 'thread's and this can be achieved with the `_Thread` style. The signature looks as follows
 
 ```
 struct ComputeThreadVaryingInput
@@ -481,7 +487,7 @@ In practice this means if you want to access the `count` in shader code it will 
 
 It is perhaps worth noting that the CPU allows us to have an indirection (a pointer to the unsized arrays contents) which has the potential for more flexibility than is possible on GPU targets. GPU target typically require the elements to be placed 'contiguously' from their location in their `container` - be that registers or in memory. This means on GPU targets there may be other restrictions on where unsized arrays can be placed in a structure for example, such as only at the end. If code needs to work across targets this means these restrictions will need to be followed across targets. 
 
-## <a href="context-threading/>Context threading
+## <a id="context-threading"/>Context Threading
 
 The [shader compile style](#compile-style) brings some extra issues to bare. In the HLSL compute kernel launch model application visible variables and resource are bound. As described in the [ABI](#abi) section these bindings and additional information identifying a compute thread are passed into the launch as a context. Take for example the code snippet below
 
@@ -505,7 +511,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 }
 ```
 
-The function `myFunc` accesses a variable `myGlobal` that is held within a constant buffer. The function cannot be meaningfully be executed without access to the context, and the context is available as a parameter passed through `computeMain` launch. This means the *actual* signiture of this function in output code will be something like
+The function `myFunc` accesses a variable `myGlobal` that is held within a constant buffer. The function cannot be meaningfully executed without access to the context, and the context is available as a parameter passed through `computeMain` entry point at launch. This means the *actual* signature of this function in output code will be something like
 
 ```
 int32_t myFunc_0(KernelContext_0 * kernelContext_0)
@@ -514,13 +520,13 @@ int32_t myFunc_0(KernelContext_0 * kernelContext_0)
 }
 ```
 
-The context parameter has been *threaded* into this function. This *threading* will happen to any function that accesses any state that is held in the context. This behavior also happens transitively - if a function *could* call *any* another function that requires the context, the context will be threaded through it also.
+The context parameter has been *threaded* into this function. This *threading* will happen to any function that accesses any state that is held in the context. This behavior also happens transitively - if a function *could* call *any* another function that requires the context, the context will be threaded through to it also.
 
-If application code assumed `myFunc` could be called with no parameters a crash would likely ensue. Note that `anotherFunc` does not have the issue because it doesn't access perform an access that needs the context. 
+If application code assumed `myFunc` could be called with no parameters a crash would likely ensue. Note that `anotherFunc` does not have the issue because it doesn't perform an access that needs the context, and so no context threading is added.
 
-If a global is desired in a function that wants to be called from the application, the [`__global`](#actual-global) can be used.
+If a global is desired in a function that wants to be called from the application, the [`__global`](#actual-global) modifier can be used.
 
-## Prelude
+## <a id="prelude"/>Prelude
 
 For C++ targets, there is code to support the Slang generated source defined within the 'prelude'. The prelude is inserted text placed before the Slang generated C++ source. For the Slang command line tools as well as the test infrastructure, the prelude functionality is achieved through a `#include` in the prelude text of the `prelude/slang-cpp-prelude.h` specified with an absolute path. Doing so means other files the `slang-cpp-prelude.h` might need can be specified relatively, and include paths for the backend C/C++ compiler do not need to be modified. 
 
@@ -562,6 +568,8 @@ Would wrap all the Slang prelude types in the namespace `CPPPrelude`, such that 
 
 The code that sets up the prelude for the test infrastucture and command line usage can be found in ```TestToolUtil::setSessionDefaultPrelude```. Essentially this determines what the absolute path is to `slang-cpp-prelude.h` is and then just makes the prelude `#include "the absolute path"`.
 
+The *default* prelude is set to the contents of the files for C++ held in the prelude directory and is held within the Slang shared library. It is therefore typically not necessary to distribute Slang with prelude files.
+
 Language aspects
 ================
 
@@ -578,9 +586,9 @@ Limitations
 
 In HLSL code if an access is made out of bounds of a StructuredBuffer, execution proceceeds. If an out of bounds read is performed, a zeroed value is returned. If an out of bounds write is performed it's effectively a noop, as the value is discarded. On the CPU target this behavior is *not* supported by default. 
 
-For a debug CPU build an out of bounds access will assert, for a release build the behaviour is undefined. 
+For a debug CPU build an out of bounds access will assert, for a release build the behaviour is by default undefined. A limited Limited [zero index](#zero-index) out of bounds mechanism is supported, but must be enabled.
 
-The reason for this is that such an access is difficult and/or slow to implement the identical behavior on the CPU. The underlying reason is that `operator[]` typically returns a reference to the contained value. If this is out of bounds - it's not clear what to return, in particular because the value may be read or written and moreover elements of the type might be written. In practice this means a global zeroed value cannot be returned. 
+The reason for this is that such an access is difficult and/or slow to implement the identical GPU behavior on the CPU. The underlying problem is `operator[]` typically returns a reference to the contained value. If this is out of bounds - it's not clear what to return, in particular because the value may be read or written and moreover elements of the type might be written. In practice this means a global zeroed value cannot be returned. 
 
 This could be somewhat supported if code gen worked as followed for say
 
@@ -610,15 +618,15 @@ values.at(3).x = 10;
 
 Note that '[] 'would be turned into the `at` function, which takes the default value as a paramter provided by the caller. If this is then written to then only the defValue is corrupted.  Even this mechanism not be quite right, because if we write and then read again from the out of bounds reference in HLSL we may expect that 0 is returned, whereas here we get the value that was last written.
 
-## Zero index bound checking
+## <a id="zero-index"/>Zero index bound checking
 
-If bounds checking is wanted in order to avoid undefined behavior and limit how memory is accessed `zero indexed` bounds checking might be appropriate. When enabled if an access out of bounds the value at the zero index is returned. This is quite different behavior than the typical GPU behavior, but is fairly efficient and simple to implement. Importantly it means behavior is well defined and always in range assuming it has an element.
+If bounds checking is wanted in order to avoid undefined behavior and limit how memory is accessed `zero indexed` bounds checking might be appropriate. When enabled if an access is out of bounds the value at the zero index is returned. This is quite different behavior than the typical GPU behavior, but is fairly efficient and simple to implement. Importantly it means behavior is well defined and always 'in range' assuming there is an element.
 
 To enable zero indexing bounds checking pass in the define `SLANG_ENABLE_BOUND_ZERO_INDEX` to a Slang compilation. This define is passed down to C++ and CUDA compilations, and the code in the CUDA and C++ preludes implement the feature. Note that zero indexed bounds checking will slow down accesses that are checked.
 
 The C++ implementation of the feature can be seen by looking at the file "prelude/slang-cpp-types.h". For CUDA "prelude/slang-cuda-prelude.h".
 
-Macros are guarded such if a different definition is supplied it can replace the definition in the prelude. 
+The bounds checking macros are guarded such it is possible to replace the implementations, without directly altering the prelude.
 
 TODO
 ====

@@ -8516,15 +8516,6 @@ RefPtr<IRModule> generateIRForTranslationUnit(
 #endif
 
     validateIRModuleIfEnabled(compileRequest, module);
-    
-    // Process higher-order-function calls before any optimization passes
-    // to allow the optimizations to affect the generated funcitons.
-    // 1. Process JVP derivative functions.
-    processJVPDerivativeMarkers(module, compileRequest->getSink());
-    // 2. Process VJP derivative functions.
-    // processVJPDerivativeMarkers(module); // Disabled currently. No impl yet.
-    // 3. Replace JVP & VJP calls.
-    processDerivativeCalls(module);
 
 
     // We will perform certain "mandatory" optimization passes now.
@@ -8559,6 +8550,15 @@ RefPtr<IRModule> generateIRForTranslationUnit(
     // Next, attempt to promote local variables to SSA
     // temporaries whenever possible.
     constructSSA(module);
+
+    // Process higher-order-function calls before any optimization passes
+    // to allow the optimizations to affect the generated funcitons.
+    // 1. Process JVP derivative functions.
+    processJVPDerivativeMarkers(module, compileRequest->getSink());
+    // 2. Process VJP derivative functions.
+    // processVJPDerivativeMarkers(module); // Disabled currently. No impl yet.
+    // 3. Replace JVP & VJP calls.
+    processDerivativeCalls(module);
 
     // Do basic constant folding and dead code elimination
     // using Sparse Conditional Constant Propagation (SCCP)

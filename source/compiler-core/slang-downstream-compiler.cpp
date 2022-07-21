@@ -360,11 +360,16 @@ SlangResult CommandLineDownstreamCompileResult::getHostCallableSharedLibrary(Com
     {
         return SLANG_FAIL;
     }
-    // The shared library needs to keep temp files in scope
-    RefPtr<TemporarySharedLibrary> sharedLib(new TemporarySharedLibrary(handle, m_moduleFilePath));
-    sharedLib->m_temporaryFileSet = m_temporaryFiles;
+    
+    {
+        // The shared library needs to keep temp files in scope
+        auto temporarySharedLibrary = new TemporarySharedLibrary(handle, m_moduleFilePath);
+        // Make sure it gets a ref count
+        m_hostCallableSharedLibrary = temporarySharedLibrary;
+        // Set any additional info on the non COM pointer
+        temporarySharedLibrary->m_temporaryFileSet = m_temporaryFiles;
+    }
 
-    m_hostCallableSharedLibrary = sharedLib;
     outLibrary = m_hostCallableSharedLibrary;
     return SLANG_OK;
 }
