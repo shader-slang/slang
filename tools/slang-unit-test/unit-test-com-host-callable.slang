@@ -19,14 +19,14 @@ public __extern_cpp int getGlobal()
     return intGlobal;
 }
 
-[COM]
+[COM("9E0FCAF0-DE40-4CF1-A6A4-FF24814D32F2")]
 interface IDoThings
 {
     int doThing(int a, int b);
     int calcHash(NativeString in);
 }
 
-[COM]
+[COM("4CEA3168-819E-4E79-987B-8C4FDE6C697D")]
 interface ICountGood
 {
     int nextCount();

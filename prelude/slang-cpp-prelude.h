@@ -274,6 +274,13 @@ struct ISlangUnknown
     virtual SLANG_NO_THROW uint32_t SLANG_MCALL release() = 0;
 };
 
+#define SLANG_COM_INTERFACE(a, b, c, d0, d1, d2, d3, d4, d5, d6, d7) \
+    public: \
+    SLANG_FORCE_INLINE static const SlangUUID& getTypeGuid() \
+    { \
+        static const SlangUUID guid = { a, b, c, d0, d1, d2, d3, d4, d5, d6, d7 }; \
+        return guid; \
+    }
 #endif // SLANG_H
 
 // Includes
