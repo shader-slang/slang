@@ -13,6 +13,7 @@ namespace Slang
 
     constexpr IRIntegerValue kInvalidAnyValueSize = 0xFFFFFFFF;
     constexpr IRIntegerValue kDefaultAnyValueSize = 16;
+    constexpr SlangInt kRTTIHeaderSize = 16;
 
     struct SharedGenericsLoweringContext
     {

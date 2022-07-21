@@ -759,8 +759,8 @@ namespace Slang
         {
             auto interfaceType = cast<IRInterfaceType>(type);
             auto size = SharedGenericsLoweringContext::getInterfaceAnyValueSize(interfaceType, interfaceType->sourceLoc);
-            size += 16;
-            return alignUp(offset, 4) + (SlangInt)alignUp(size, 4);
+            size += kRTTIHeaderSize;
+            return alignUp(offset, 4) + alignUp((SlangInt)size, 4);
         }
         default:
             if (as<IRTextureTypeBase>(type) || as<IRSamplerStateTypeBase>(type))

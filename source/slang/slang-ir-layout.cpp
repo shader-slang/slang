@@ -233,7 +233,7 @@ static Result _calcNaturalSizeAndAlignment(
         {
             auto interfaceType = cast<IRInterfaceType>(type);
             auto size = SharedGenericsLoweringContext::getInterfaceAnyValueSize(interfaceType, interfaceType->sourceLoc);
-            size += 16;
+            size += kRTTIHeaderSize;
             size = align(size, 4);
             IRSizeAndAlignment resultLayout;
             resultLayout.size = size;
