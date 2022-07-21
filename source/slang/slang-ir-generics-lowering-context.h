@@ -73,7 +73,7 @@ namespace Slang
         // Emits an IRRTTIObject containing type information for a given type.
         IRInst* maybeEmitRTTIObject(IRInst* typeInst);
 
-        IRIntegerValue getInterfaceAnyValueSize(IRInst* type, SourceLoc usageLocation);
+        static IRIntegerValue getInterfaceAnyValueSize(IRInst* type, SourceLoc usageLoc);
         IRType* lowerAssociatedType(IRBuilder* builder, IRInst* type);
 
         IRType* lowerType(IRBuilder* builder, IRInst* paramType, const Dictionary<IRInst*, IRInst*>& typeMapping, IRType* concreteType);

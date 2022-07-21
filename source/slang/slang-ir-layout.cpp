@@ -3,6 +3,8 @@
 
 #include "slang-ir-insts.h"
 
+#include "slang-ir-generics-lowering-context.h"
+
 // This file implements facilities for computing and caching layout
 // information on IR types.
 //
@@ -194,7 +196,52 @@ static Result _calcNaturalSizeAndAlignment(
                 outSizeAndAlignment);
         }
         break;
-
+    case kIROp_AnyValueType:
+        {
+            auto anyValType = cast<IRAnyValueType>(type);
+            outSizeAndAlignment->size = getIntVal(anyValType->getSize());
+            outSizeAndAlignment->alignment = 4;
+            return SLANG_OK;
+        }
+        break;
+    case kIROp_TupleType:
+        {
+            auto tupleType = cast<IRTupleType>(type);
+            IRSizeAndAlignment resultLayout;
+            for (UInt i = 0; i < tupleType->getOperandCount(); i++)
+            {
+                auto elementType = tupleType->getOperand(i);
+                IRSizeAndAlignment fieldTypeLayout;
+                SLANG_RETURN_ON_FAIL(getNaturalSizeAndAlignment(target, (IRType*)elementType, &fieldTypeLayout));
+                resultLayout.size = align(resultLayout.size, fieldTypeLayout.alignment);
+                resultLayout.alignment = std::max(resultLayout.alignment, fieldTypeLayout.alignment);
+            }
+            *outSizeAndAlignment = resultLayout;
+            return SLANG_OK;
+        }
+        break;
+    case kIROp_WitnessTableType:
+    case kIROp_WitnessTableIDType:
+    case kIROp_RTTIHandleType:
+        {
+            outSizeAndAlignment->size = 8;
+            outSizeAndAlignment->alignment = 4;
+            return SLANG_OK;
+        }
+        break;
+    case kIROp_InterfaceType:
+        {
+            auto interfaceType = cast<IRInterfaceType>(type);
+            auto size = SharedGenericsLoweringContext::getInterfaceAnyValueSize(interfaceType, interfaceType->sourceLoc);
+            size += 16;
+            size = align(size, 4);
+            IRSizeAndAlignment resultLayout;
+            resultLayout.size = size;
+            resultLayout.alignment = 4;
+            *outSizeAndAlignment = resultLayout;
+            return SLANG_OK;
+        }
+        break;
     case kIROp_MatrixType:
         {
             auto matType = cast<IRMatrixType>(type);

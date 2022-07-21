@@ -215,6 +215,20 @@ namespace Slang
                 }
                 break;
             }
+            case kIROp_AnyValueType:
+            {
+                auto anyValType = cast<IRAnyValueType>(dataType);
+                auto info = ensureAnyValueType(anyValType);
+                for (auto field : info->fieldKeys)
+                {
+                    auto fieldAddr = builder->emitFieldAddress(
+                        builder->getPtrType(builder->getUIntType()),
+                        concreteTypedVar,
+                        field);
+                    emitMarshallingCode(builder, context, fieldAddr);
+                }
+                break;
+            }
             default:
                 if (as<IRTextureTypeBase>(dataType) || as<IRSamplerStateTypeBase>(dataType))
                 {
@@ -719,10 +733,34 @@ namespace Slang
             }
             return offset;
         }
+        case kIROp_AnyValueType:
+        {
+            auto anyValueType = cast<IRAnyValueType>(type);
+            return alignUp(offset, 4) + getIntVal(anyValueType->getSize());
+        }
+        case kIROp_TupleType:
+        {
+            auto tupleType = cast<IRTupleType>(type);
+            for (UInt i = 0; i < tupleType->getOperandCount(); i++)
+            {
+                auto elementType = tupleType->getOperand(i);
+                offset = _getAnyValueSizeRaw((IRType*)elementType, offset);
+                if (offset < 0) return offset;
+            }
+            return offset;
+        }
+        case kIROp_WitnessTableType:
+        case kIROp_WitnessTableIDType:
+        case kIROp_RTTIHandleType:
+        {
+            return alignUp(offset, 4) + 8;
+        }
         case kIROp_InterfaceType:
         {
-            // TODO: implement anyValue packing for interface types.
-            return -1;
+            auto interfaceType = cast<IRInterfaceType>(type);
+            auto size = SharedGenericsLoweringContext::getInterfaceAnyValueSize(interfaceType, interfaceType->sourceLoc);
+            size += 16;
+            return alignUp(offset, 4) + alignUp(size, 4);
         }
         default:
             if (as<IRTextureTypeBase>(type) || as<IRSamplerStateTypeBase>(type))

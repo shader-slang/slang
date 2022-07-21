@@ -5,6 +5,7 @@
 #include "slang-ir-augment-make-existential.h"
 #include "slang-ir-generics-lowering-context.h"
 #include "slang-ir-lower-existential.h"
+#include "slang-ir-lower-tuple-types.h"
 #include "slang-ir-lower-generic-function.h"
 #include "slang-ir-lower-generic-call.h"
 #include "slang-ir-lower-generic-type.h"
@@ -194,14 +195,18 @@ namespace Slang
         if (sink->getErrorCount() != 0)
             return;
 
-        generateAnyValueMarshallingFunctions(&sharedContext);
-        if (sink->getErrorCount() != 0)
-            return;
-
         // This optional step replaces all uses of witness tables and RTTI objects with
         // sequential IDs. Without this step, we will emit code that uses function pointers and
         // real RTTI objects and witness tables.
         specializeRTTIObjects(&sharedContext, sink);
+
+        lowerTuples(module, sink);
+        if (sink->getErrorCount() != 0)
+            return;
+
+        generateAnyValueMarshallingFunctions(&sharedContext);
+        if (sink->getErrorCount() != 0)
+            return;
 
         // We might have generated new temporary variables during lowering.
         // An SSA pass can clean up unnecessary load/stores.
