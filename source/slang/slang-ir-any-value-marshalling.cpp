@@ -753,7 +753,7 @@ namespace Slang
         case kIROp_WitnessTableIDType:
         case kIROp_RTTIHandleType:
         {
-            return alignUp(offset, 4) + 8;
+            return alignUp(offset, 4) + kRTTIHandleSize;
         }
         case kIROp_InterfaceType:
         {

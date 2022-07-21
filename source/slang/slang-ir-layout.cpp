@@ -224,7 +224,7 @@ static Result _calcNaturalSizeAndAlignment(
     case kIROp_WitnessTableIDType:
     case kIROp_RTTIHandleType:
         {
-            outSizeAndAlignment->size = 8;
+            outSizeAndAlignment->size = kRTTIHandleSize;
             outSizeAndAlignment->alignment = 4;
             return SLANG_OK;
         }
