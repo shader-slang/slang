@@ -72,7 +72,7 @@ void _optixLogCallback(unsigned int level, const char* tag, const char* message,
 #    endif
 } // namespace cuda
 
-SlangResult SLANG_MCALL createCUDADevice(const IDevice::Desc* desc, IDevice** outDevice)
+Result SLANG_MCALL createCUDADevice(const IDevice::Desc* desc, IDevice** outDevice)
 {
 RefPtr<cuda::DeviceImpl> result = new cuda::DeviceImpl();
 SLANG_RETURN_ON_FAIL(result->initialize(*desc));
@@ -80,7 +80,7 @@ returnComPtr(outDevice, result);
 return SLANG_OK;
 }
 #else
-SlangResult SLANG_MCALL createCUDADevice(const IDevice::Desc* desc, IDevice** outDevice)
+Result SLANG_MCALL createCUDADevice(const IDevice::Desc* desc, IDevice** outDevice)
 {
 SLANG_UNUSED(desc);
 *outDevice = nullptr;

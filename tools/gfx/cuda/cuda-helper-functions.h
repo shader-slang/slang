@@ -99,8 +99,8 @@ void _optixLogCallback(unsigned int level, const char* tag, const char* message,
 #    endif
 
 } // namespace cuda
-
-SlangResult SLANG_MCALL createCUDADevice(const IDevice::Desc* desc, IDevice** outDevice);
 #endif
+
+Result SLANG_MCALL createCUDADevice(const IDevice::Desc* desc, IDevice** outDevice);
 
 } // namespace gfx
