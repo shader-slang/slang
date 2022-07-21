@@ -1399,13 +1399,15 @@ tool "slangd"
              }
      end
  
+    local slangGlslangPath = deps:getProjectRelativePath("slang-glslang", "../../..")
+ 
      -- If we are not building glslang from source, then be
      -- sure to copy a binary copy over to the output directory
      if not buildGlslang then
          filter { "system:linux or macosx or windows" }
              local sharedLibName = slangUtil.getSharedLibraryFileName(targetInfo, "slang-glslang")            
              postbuildcommands {
-                 "{COPY} ../../../external/slang-binaries/bin/" .. targetName .. "/" .. sharedLibName .. " %{cfg.targetdir}"
+                 "{COPY} " .. slangGlslangPath .. "/bin/" .. targetName .. "/release/" .. sharedLibName .. " %{cfg.targetdir}"
              }        
      end
  
