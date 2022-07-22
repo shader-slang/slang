@@ -13,78 +13,103 @@ namespace Slang
 
 struct DifferentiableTypeConformanceContext
 {
-    Dictionary<IRType*, IRWitnessTable*> witnessTableMap;
+    Dictionary<IRInst*, IRInst*>    witnessTableMap;
 
-    IRModule* module;
+    IRInst*                                 inst = nullptr;
 
     // A reference to the builtin IDifferentiable interface type.
     // We use this to look up all the other types (and type exprs)
     // that conform to a base type.
     // 
-    IRInterfaceType* differentiableInterfaceType;
+    IRInterfaceType*                        differentiableInterfaceType = nullptr;
 
     // The struct key for the 'Differential' associated type
     // defined inside IDifferential. We use this to lookup the differential
     // type in the conformance table associated with the concrete type.
     // 
-    IRStructKey* differentialAssocTypeStructKey;
+    IRStructKey*                            differentialAssocTypeStructKey = nullptr;
     
     // Modules that don't use differentiable types
     // won't have the IDifferentiable interface type available. 
     // Set to false to indicate that we are uninitialized.
     // 
-    bool isInterfaceAvailable = false;
+    bool                                    isInterfaceAvailable = false;
 
-    // For when 
+    // For handling generic blocks, we use a parent pointer to allow
+    // looking up types in all relevant scopes.
+    DifferentiableTypeConformanceContext*   parent = nullptr;
 
-    // Default unused constructor (TODO: remove)
-    DifferentiableTypeConformanceContext()
-    {}
-
-    DifferentiableTypeConformanceContext(IRModule* module) : module(module)
+    DifferentiableTypeConformanceContext(DifferentiableTypeConformanceContext* parent, IRInst* inst) : parent(parent), inst(inst)
     {
-        // Load all witness tables corresponding to the IDifferentiable interface.
-        differentiableInterfaceType = as<IRInterfaceType>(findDifferentiableInterface());
-        if (differentiableInterfaceType)
+        if (parent)
         {
-            for (auto table : getWitnessTablesFromInterface(differentiableInterfaceType))
+            differentiableInterfaceType = parent->differentiableInterfaceType;
+            differentialAssocTypeStructKey = parent->differentialAssocTypeStructKey;
+            isInterfaceAvailable = parent->isInterfaceAvailable;
+        }
+        else
+        {
+            differentiableInterfaceType = as<IRInterfaceType>(findDifferentiableInterface());
+            if (differentiableInterfaceType)
             {
-                // TODO: Can we have multiple conformances for the same pair of types?
-                // TODO: Can type instrs be duplicated (i.e. two different float types)? And if they are duplicated, can
-                // we supply the dictionary with a custom equality rule that uses 'type1->equals(type2)'
-                witnessTableMap.Add(table->getConcreteType(), table);
+                differentialAssocTypeStructKey = findDifferentialTypeStructKey();
+
+                if (differentialAssocTypeStructKey)
+                    isInterfaceAvailable = true;
             }
+        }
 
-            differentialAssocTypeStructKey = findDifferentialTypeStructKey();
-
-            if (differentialAssocTypeStructKey)
-                isInterfaceAvailable = true;
+        if (isInterfaceAvailable)
+        {
+            // Load all witness tables corresponding to the IDifferentiable interface.
+            loadWitnessTablesForInterface(differentiableInterfaceType);
         }
     }
+
+    DifferentiableTypeConformanceContext(IRInst* inst) :
+        DifferentiableTypeConformanceContext(nullptr, inst)
+    {}
 
     // Lookup a witness table for the concreteType. One should exist if concreteType
     // inherits (successfully) from IDifferentiable.
     // 
-    IRWitnessTable* lookUpConformanceForType(IRType* concreteType)
+    IRInst* lookUpConformanceForType(IRInst* type)
     {
         SLANG_ASSERT(isInterfaceAvailable);
 
-        return *witnessTableMap.TryGetValue(concreteType);
+        auto conformance = *witnessTableMap.TryGetValue(type);
+        if (!conformance && parent)
+        {
+            return parent->lookUpConformanceForType(type);
+        }
+        return conformance;
     }
     
     // Lookup and return the 'Differential' type declared in the concrete type
     // in order to conform to the IDifferentiable interface.
+    // Note that inside a generic block, this will be a witness table lookup instruction
+    // that gets resolved during the specialization pass.
     // 
-    IRType* lookUpDifferentialForType(IRType* origType)
+    IRInst* getDifferentialForType(IRBuilder* builder, IRType* origType)
     {
         SLANG_ASSERT(isInterfaceAvailable);
 
-        if (auto witnessTable = lookUpConformanceForType(origType))
+        if (auto conformance = lookUpConformanceForType(origType))
         {
-            for (auto entry : witnessTable->getEntries())
+            if (auto witnessTable = as<IRWitnessTable>(conformance))
             {
-                if (entry->getRequirementKey() == differentialAssocTypeStructKey)
-                    return as<IRType>(entry->getSatisfyingVal());
+                for (auto entry : witnessTable->getEntries())
+                {
+                    if (entry->getRequirementKey() == differentialAssocTypeStructKey)
+                        return as<IRType>(entry->getSatisfyingVal());
+                }
+            }
+            else if (auto witnessTableParam = as<IRParam>(conformance))
+            {
+                return builder->emitLookupInterfaceMethodInst(
+                    builder->getTypeKind(),
+                    witnessTableParam,
+                    differentialAssocTypeStructKey);
             }
         }
 
@@ -95,15 +120,18 @@ struct DifferentiableTypeConformanceContext
 
     IRInst* findDifferentiableInterface()
     {
-        for (auto globalInst : module->getGlobalInsts())
+        if (auto module = as<IRModuleInst>(inst))
         {
-            // TODO: This seems like a particularly dangerous way to look for an interface.
-            // See if we can lower IDifferentiable to a separate IR inst.
-            //
-            if (globalInst->getOp() == kIROp_InterfaceType && 
-                as<IRInterfaceType>(globalInst)->findDecoration<IRNameHintDecoration>()->getName() == "IDifferentiable")
+            for (auto globalInst : module->getGlobalInsts())
             {
-                return globalInst;
+                // TODO: This seems like a particularly dangerous way to look for an interface.
+                // See if we can lower IDifferentiable to a separate IR inst.
+                //
+                if (globalInst->getOp() == kIROp_InterfaceType && 
+                    as<IRInterfaceType>(globalInst)->findDecoration<IRNameHintDecoration>()->getName() == "IDifferentiable")
+                {
+                    return globalInst;
+                }
             }
         }
         return nullptr;
@@ -111,10 +139,7 @@ struct DifferentiableTypeConformanceContext
 
     IRStructKey* findDifferentialTypeStructKey()
     {
-        if (!differentiableInterfaceType)
-            differentiableInterfaceType = as<IRInterfaceType>(findDifferentiableInterface());
-        
-        if (differentiableInterfaceType)
+        if (as<IRModuleInst>(inst) && differentiableInterfaceType)
         {
             // Assume for now that IDifferentiable has exactly one field: the 'Differential' associated type.
             SLANG_ASSERT(differentiableInterfaceType->getOperandCount() == 1);
@@ -129,19 +154,52 @@ struct DifferentiableTypeConformanceContext
         return nullptr;
     }
 
-    List<IRWitnessTable*> getWitnessTablesFromInterface(IRInst* interfaceType)
+    void loadWitnessTablesForInterface(IRInst* interfaceType)
     {
-        List<IRWitnessTable*> witnessTables;
-        for (auto globalInst : module->getGlobalInsts())
+        
+        if (auto module = as<IRModuleInst>(inst))
         {
-            if (globalInst->getOp() == kIROp_WitnessTable &&
-                cast<IRWitnessTableType>(globalInst->getDataType())->getConformanceType() ==
-                    interfaceType)
+            for (auto globalInst : module->getGlobalInsts())
             {
-                witnessTables.add(cast<IRWitnessTable>(globalInst));
+                if (globalInst->getOp() == kIROp_WitnessTable &&
+                    cast<IRWitnessTableType>(globalInst->getDataType())->getConformanceType() ==
+                        interfaceType)
+                {
+                    // TODO: Can we have multiple conformances for the same pair of types?
+                    // TODO: Can type instrs be duplicated (i.e. two different float types)? And if they are duplicated, can
+                    // we supply the dictionary with a custom equality rule that uses 'type1->equals(type2)'
+                    witnessTableMap.Add(as<IRWitnessTable>(globalInst)->getConcreteType(), globalInst);
+                }
             }
         }
-        return witnessTables;
+        else if (auto generic = as<IRGeneric>(inst))
+        {
+            IRInst* currGenericTypeParam = nullptr;
+            for (auto genericParam : generic->getParams())
+            {
+                if ((genericParam->getDataType()->getOp() == kIROp_WitnessTableType))
+                {
+                    if (cast<IRWitnessTableType>(genericParam->getDataType())->getConformanceType() ==
+                        interfaceType)
+                    SLANG_ASSERT(currGenericTypeParam);
+                    SLANG_ASSERT(!witnessTableMap.ContainsKey(currGenericTypeParam));
+                    witnessTableMap.Add(currGenericTypeParam, genericParam);
+                }
+                else if (as<IRTypeType>(genericParam->getDataType()))
+                {
+                    currGenericTypeParam = genericParam;
+                }
+                else if (genericParam->getDataType()->getOp() == kIROp_IntType)
+                {
+                    currGenericTypeParam = nullptr;
+                }
+                else
+                {
+                    SLANG_UNEXPECTED("Unhandled generic param type");
+                }
+            }
+        }
+
     }
 
 };
@@ -193,7 +251,7 @@ struct DifferentialPairTypeBuilder
     
     IRStructType* createDiffPairType(IRBuilder* builder, IRType* origBaseType)
     {
-        if (auto diffBaseType = diffConformanceContext->lookUpDifferentialForType(origBaseType))
+        if (auto diffBaseType = diffConformanceContext->getDifferentialForType(builder, origBaseType))
         {
             auto diffPairType = builder->createStructType();
 
@@ -204,7 +262,7 @@ struct DifferentialPairTypeBuilder
 
             IRStructKey* diffKey = builder->createStructKey();
             builder->addNameHintDecoration(diffKey, UnownedTerminatedStringSlice("differential"));
-            builder->createStructField(diffPairType, diffKey, diffBaseType);
+            builder->createStructField(diffPairType, diffKey, cast<IRType>(diffBaseType));
 
             return diffPairType;
         }
@@ -293,7 +351,7 @@ struct JVPTranscriber
         //
         if (tryCreateDifferentialPairFromType(builder, funcType->getResultType()))
         {
-            diffReturnType = diffConformanceContext->lookUpDifferentialForType(funcType->getResultType());
+            diffReturnType = cast<IRType>(diffConformanceContext->getDifferentialForType(builder, funcType->getResultType()));
         }
         else
         {
@@ -311,7 +369,7 @@ struct JVPTranscriber
             case kIROp_FloatType:
             case kIROp_DoubleType:
             case kIROp_VectorType:
-                return diffConformanceContext->lookUpDifferentialForType(origType);
+                return cast<IRType>(diffConformanceContext->getDifferentialForType(builder, origType));
             case kIROp_OutType:
                 return builder->getOutType(differentiateType(builder, as<IROutType>(origType)->getValueType()));
             case kIROp_InOutType:
@@ -910,13 +968,13 @@ struct JVPDerivativeContext
         // Process all JVPDifferentiate instructions (kIROp_JVPDifferentiate), by 
         // generating derivative code for the referenced function.
         //
-        bool modified = processReferencedFunctions(builder);
-
-        // Replace any uses of DifferentialPair<T> with an auto-generated struct type.
+        // Temporarily, this also replaces any uses of DifferentialPair<T> with an auto-generated struct type.
         // This is mainly for user-defined derivative code, since auto-generated code
         // uses the struct type by default.
         //
-        modified |= processDiffPairTypes(builder);
+        bool modified = processReferencedFunctions(builder);
+
+        modified |= processPairTypes(builder, module->getModuleInst(), (&diffConformanceContextStorage));
 
         return modified;
     }
@@ -941,7 +999,7 @@ struct JVPDerivativeContext
         
         // Keep processing items until the queue is complete.
         while (IRInst* workItem = workQueue->pop())
-        {
+        {   
             for(auto child = workItem->getFirstChild(); child; child = child->getNextInst())
             {
                 // Either the child instruction has more children (func/block etc..)
@@ -1005,6 +1063,47 @@ struct JVPDerivativeContext
             }
         }
         return true;
+    }
+
+    bool processPairTypes(IRBuilder* builder, IRInst* instWithChildren, DifferentiableTypeConformanceContext* diffContext)
+    {
+        bool modified = false;
+
+        // Create a new sub-context to scan witness tables inside workItem 
+        // (mainly relevant if instWithChildren is a generic scope)
+        // 
+        auto subContext = DifferentiableTypeConformanceContext(diffContext, instWithChildren);
+        (&pairBuilderStorage)->diffConformanceContext = (&subContext);
+
+        for (auto child = instWithChildren->getFirstChild(); child; )
+        {
+            auto nextChild = child->getNextInst();
+
+            if (auto diffPairType = as<IRDifferentialPairType>(child))
+            {
+                if (subContext.isInterfaceAvailable)
+                {
+                    
+                    auto diffPairStructType = (&pairBuilderStorage)->createDiffPairType(builder, diffPairType->getValueType());
+
+                    diffPairType->replaceUsesWith(diffPairStructType);
+                    diffPairType->removeAndDeallocate();
+
+                    modified = true;
+                }
+            }
+            else if (child->getFirstChild())
+            {
+                return modified | processPairTypes(builder, child, (&subContext));
+            }
+            
+            child = nextChild;
+        }
+
+        // Reset the context back to the parent.
+        (&pairBuilderStorage)->diffConformanceContext = diffContext;
+
+        return modified;
     }
 
     // Checks decorators to see if the function should
@@ -1144,33 +1243,10 @@ struct JVPDerivativeContext
         return jvpBlock;
     }
 
-    bool processDiffPairTypes(IRBuilder* builder)
-    {
-        bool modified = false;
-
-        // Look for any kIROp_DifferentialPairType and replace them
-        // with a custom generated struct type.
-        //
-        for (auto globalInst : module->getGlobalInsts())
-        {
-            if (globalInst->getOp() == kIROp_DifferentialPairType)
-            {
-                auto diffPairType = as<IRDifferentialPairType>(globalInst);
-
-                auto diffPairStructType = (&pairBuilderStorage)->createDiffPairType(builder, diffPairType->getValueType());
-
-                diffPairType->replaceUsesWith(diffPairStructType);
-                diffPairType->removeAndDeallocate();
-
-                modified = true;
-            }
-        }
-
-        return modified;
-    }
-
     JVPDerivativeContext(IRModule* module, DiagnosticSink* sink) :
-        module(module), sink(sink), diffConformanceContextStorage(module), pairBuilderStorage(&diffConformanceContextStorage)
+        module(module), sink(sink),
+        diffConformanceContextStorage(module->getModuleInst()),
+        pairBuilderStorage(&diffConformanceContextStorage)
     {
         transcriberStorage.sink = sink;
         transcriberStorage.diffConformanceContext = &(diffConformanceContextStorage);
@@ -1216,14 +1292,14 @@ bool processJVPDerivativeMarkers(
         IRModule*                           module,
         DiagnosticSink*                     sink,
         IRJVPDerivativePassOptions const&)
-{
-    JVPDerivativeContext context(module, sink);
-    
+{   
     // Simplify module to remove dead code.
     IRDeadCodeEliminationOptions options;
     options.keepExportsAlive = true;
     options.keepLayoutsAlive = true;
     eliminateDeadCode(module, options);
+
+    JVPDerivativeContext context(module, sink);
 
     return context.processModule();
 }
