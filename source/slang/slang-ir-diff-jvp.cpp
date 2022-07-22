@@ -1094,9 +1094,9 @@ struct JVPDerivativeContext
             }
             else if (child->getFirstChild())
             {
-                return modified | processPairTypes(builder, child, (&subContext));
+                modified = processPairTypes(builder, child, (&subContext)) | modified;
             }
-            
+
             child = nextChild;
         }
 
