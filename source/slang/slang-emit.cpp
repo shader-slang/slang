@@ -367,10 +367,6 @@ Result linkAndOptimizeIR(
     if (sink->getErrorCount() != 0)
         return SLANG_FAIL;
 
-    lowerTuples(irModule, sink);
-    if (sink->getErrorCount() != 0)
-        return SLANG_FAIL;
-
     // TODO(DG): There are multiple DCE steps here, which need to be changed
     //   so that they don't just throw out any non-entry point code
     // Debugging code for IR transformations...
