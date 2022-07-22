@@ -13,6 +13,8 @@ namespace Slang
 
     constexpr IRIntegerValue kInvalidAnyValueSize = 0xFFFFFFFF;
     constexpr IRIntegerValue kDefaultAnyValueSize = 16;
+    constexpr SlangInt kRTTIHeaderSize = 16;
+    constexpr SlangInt kRTTIHandleSize = 8;
 
     struct SharedGenericsLoweringContext
     {
@@ -73,7 +75,7 @@ namespace Slang
         // Emits an IRRTTIObject containing type information for a given type.
         IRInst* maybeEmitRTTIObject(IRInst* typeInst);
 
-        IRIntegerValue getInterfaceAnyValueSize(IRInst* type, SourceLoc usageLocation);
+        static IRIntegerValue getInterfaceAnyValueSize(IRInst* type, SourceLoc usageLoc);
         IRType* lowerAssociatedType(IRBuilder* builder, IRInst* type);
 
         IRType* lowerType(IRBuilder* builder, IRInst* paramType, const Dictionary<IRInst*, IRInst*>& typeMapping, IRType* concreteType);
