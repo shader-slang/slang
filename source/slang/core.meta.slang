@@ -640,7 +640,7 @@ struct __DifferentialPair
 
     __init(T _primal)
     {
-        primal = primal;
+        primal = _primal;
     }
 
     __init(T _primal, T.Differential _differential)

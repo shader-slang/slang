@@ -9,6 +9,8 @@
 namespace Slang
 {
 
+
+
 struct DifferentiableTypeConformanceContext
 {
     Dictionary<IRType*, IRWitnessTable*> witnessTableMap;
@@ -32,6 +34,8 @@ struct DifferentiableTypeConformanceContext
     // Set to false to indicate that we are uninitialized.
     // 
     bool isInterfaceAvailable = false;
+
+    // For when 
 
     // Default unused constructor (TODO: remove)
     DifferentiableTypeConformanceContext()
@@ -74,9 +78,6 @@ struct DifferentiableTypeConformanceContext
     IRType* lookUpDifferentialForType(IRType* origType)
     {
         SLANG_ASSERT(isInterfaceAvailable);
-
-        if (!differentialAssocTypeStructKey)
-            differentialAssocTypeStructKey = findDifferentialTypeStructKey();
 
         if (auto witnessTable = lookUpConformanceForType(origType))
         {
@@ -145,22 +146,107 @@ struct DifferentiableTypeConformanceContext
 
 };
 
+struct DifferentialPairTypeBuilder
+{
+    
+    DifferentialPairTypeBuilder(DifferentiableTypeConformanceContext* diffConformanceContext) :
+        diffConformanceContext(diffConformanceContext)
+    {}
+
+    IRFieldExtract* emitPrimalFieldExtract(IRBuilder* builder, IRInst* baseInst)
+    {
+        if (auto basePairStructType = as<IRStructType>(baseInst->getDataType()))
+        {
+            auto primalField = as<IRStructField>(basePairStructType->getFirstChild());
+            SLANG_ASSERT(primalField);
+
+            return as<IRFieldExtract>(builder->emitFieldExtract(
+                    primalField->getFieldType(),
+                    baseInst,
+                    primalField->getKey()
+                ));
+        }
+        else
+        {
+            SLANG_UNREACHABLE("basePairType must be an IRStructType");
+        }
+    }
+
+    IRFieldExtract* emitDiffFieldExtract(IRBuilder* builder, IRInst* baseInst)
+    {
+        if (auto basePairStructType = as<IRStructType>(baseInst->getDataType()))
+        {
+            auto diffField = as<IRStructField>(basePairStructType->getFirstChild()->getNextInst());
+            SLANG_ASSERT(diffField);
+            
+            return as<IRFieldExtract>(builder->emitFieldExtract(
+                    diffField->getFieldType(),
+                    baseInst,
+                    diffField->getKey()
+                ));
+        }
+        else
+        {
+            SLANG_UNREACHABLE("basePairType must be an IRStructType");
+        }
+    }
+    
+    IRStructType* createDiffPairType(IRBuilder* builder, IRType* origBaseType)
+    {
+        if (auto diffBaseType = diffConformanceContext->lookUpDifferentialForType(origBaseType))
+        {
+            auto diffPairType = builder->createStructType();
+
+            // Create a keys for the primal and differential fields.
+            IRStructKey* origKey = builder->createStructKey();
+            builder->addNameHintDecoration(origKey, UnownedTerminatedStringSlice("primal"));
+            builder->createStructField(diffPairType, origKey, origBaseType);
+
+            IRStructKey* diffKey = builder->createStructKey();
+            builder->addNameHintDecoration(diffKey, UnownedTerminatedStringSlice("differential"));
+            builder->createStructField(diffPairType, diffKey, diffBaseType);
+
+            return diffPairType;
+        }
+        return nullptr;
+    }
+
+    IRStructType* getOrCreateDiffPairType(IRBuilder* builder, IRType* origBaseType)
+    {
+        if (pairTypeCache.ContainsKey(origBaseType))
+            return pairTypeCache[origBaseType];
+
+        auto pairType = createDiffPairType(builder, origBaseType);
+        pairTypeCache.Add(origBaseType, pairType);
+
+        return pairType;
+    }
+
+    Dictionary<IRType*, IRStructType*> pairTypeCache;
+
+    DifferentiableTypeConformanceContext* diffConformanceContext;
+
+};
+
 struct JVPTranscriber
 {
 
     // Stores the mapping of arbitrary 'R-value' instructions to instructions that represent
     // their differential values.
-    Dictionary<IRInst*, IRInst*>    instMapD;
+    Dictionary<IRInst*, IRInst*>            instMapD;
 
     // Cloning environment to hold mapping from old to new copies for the primal
     // instructions.
-    IRCloneEnv                      cloneEnv;
+    IRCloneEnv                              cloneEnv;
 
     // Diagnostic sink for error messages.
-    DiagnosticSink*                 sink;
+    DiagnosticSink*                         sink;
 
     // Type conformance information.
-    DifferentiableTypeConformanceContext diffConformanceContext;
+    DifferentiableTypeConformanceContext*   diffConformanceContext;
+
+    // Builder to help with creating and accessing the 'DifferentiablePair<T>' struct
+    DifferentialPairTypeBuilder*            pairBuilder;
 
     DiagnosticSink* getSink()
     {
@@ -207,7 +293,7 @@ struct JVPTranscriber
         //
         if (tryCreateDifferentialPairFromType(builder, funcType->getResultType()))
         {
-            diffReturnType = diffConformanceContext.lookUpDifferentialForType(funcType->getResultType());
+            diffReturnType = diffConformanceContext->lookUpDifferentialForType(funcType->getResultType());
         }
         else
         {
@@ -225,7 +311,7 @@ struct JVPTranscriber
             case kIROp_FloatType:
             case kIROp_DoubleType:
             case kIROp_VectorType:
-                return diffConformanceContext.lookUpDifferentialForType(origType);
+                return diffConformanceContext->lookUpDifferentialForType(origType);
             case kIROp_OutType:
                 return builder->getOutType(differentiateType(builder, as<IROutType>(origType)->getValueType()));
             case kIROp_InOutType:
@@ -248,10 +334,7 @@ struct JVPTranscriber
                 return nullptr;
         }
 
-        if (auto confWitness = diffConformanceContext.lookUpConformanceForType(origType))
-            return builder->getDifferentialPairType(origType, confWitness);
-        else
-            return nullptr;
+        return pairBuilder->getOrCreateDiffPairType(builder, origType);
     }
     
     IRInst* differentiateParam(IRBuilder* builder, IRParam* origParam)
@@ -271,35 +354,11 @@ struct JVPTranscriber
         return nullptr;
     }
 
-    IRInst* emitInputParam(IRBuilder* builder, IRParam* origParam)
-    {
-        // Convert primal 'inout' types into pure input types, because a
-        // JVP transformed function must never have primal side-effects.
-        // 
-        if (auto diffInoutType = as<IRInOutType>(origParam->getDataType()))
-        {   
-            auto origParamNew = builder->emitParam(diffInoutType->getValueType());
-            cloneEnv.mapOldValToNew.Add(origParam, origParamNew);
-            cloneInstDecorationsAndChildren(&cloneEnv, builder->getSharedBuilder(), origParam, origParamNew);
-
-            return origParamNew;
-        }
-        else if (as<IROutType>(origParam->getDataType()))
-        {
-            getSink()->diagnose(origParam->sourceLoc,
-                    Diagnostics::unexpected,
-                    "encountered unexpected output parameter");
-            return nullptr;
-        }
-        else
-            return as<IRParam>(cloneInst(&cloneEnv, builder, origParam));
-    }
-
     List<IRParam*> transcribeParams(IRBuilder* builder, IRInstList<IRParam> origParamList)
     {
         List<IRParam*> origParams;
         List<IRParam*> newParamList;
-        List<bool> isDiffPairList;
+        List<bool> isDiff;
 
         // Go through all parameters and generate derivative versions.
         // Note that this is one place where the primal (original) inst needs special
@@ -315,43 +374,26 @@ struct JVPTranscriber
             if (IRInst* diffParam = differentiateParam(builder, origParam))
             {
                 newParamList.add(as<IRParam>(diffParam));
-                isDiffPairList.add(true);
+                isDiff.add(true);
             }
             else
             {
                 newParamList.add(as<IRParam>(cloneInst(&cloneEnv, builder, origParam)));
-                isDiffPairList.add(false);
+                isDiff.add(false);
             }
         }
 
+        // Go back over them and emit accessors.
         for (Index ii = 0; ii < newParamList.getCount(); ii++)
         {
             IRInst* newInst = nullptr;
             IRInst* diffInst = nullptr;
 
-            if (isDiffPairList[ii])
+            if (isDiff[ii])
             {
                 auto diffPairParam = newParamList[ii];
-                // Create a keys for the primal and differential fields.
-                IRStructKey* origKey = builder->createStructKey();
-                builder->addNameHintDecoration(origKey, UnownedTerminatedStringSlice("primal"));
-
-                IRStructKey* diffKey = builder->createStructKey();
-                builder->addNameHintDecoration(diffKey, UnownedTerminatedStringSlice("differential"));
-
-                // Emit field access instructions for primal and differential.
-                newInst = builder->emitFieldExtract(
-                    origParams[ii]->getFullType(),
-                    diffPairParam,
-                    origKey
-                );
-
-                diffInst = builder->emitFieldExtract(
-                    diffConformanceContext.lookUpDifferentialForType(origParams[ii]->getFullType()),
-                    diffPairParam,
-                    diffKey
-                );
-
+                newInst = pairBuilder->emitPrimalFieldExtract(builder, diffPairParam);
+                diffInst = pairBuilder->emitDiffFieldExtract(builder, diffPairParam);
             }
             else
             {
@@ -865,8 +907,18 @@ struct JVPDerivativeContext
         IRBuilder builderStorage(sharedBuilderStorage);
         IRBuilder* builder = &builderStorage;
 
-        // processMarkedGlobalFunctions(builder);
-        return processReferencedFunctions(builder);
+        // Process all JVPDifferentiate instructions (kIROp_JVPDifferentiate), by 
+        // generating derivative code for the referenced function.
+        //
+        bool modified = processReferencedFunctions(builder);
+
+        // Replace any uses of DifferentialPair<T> with an auto-generated struct type.
+        // This is mainly for user-defined derivative code, since auto-generated code
+        // uses the struct type by default.
+        //
+        modified |= processDiffPairTypes(builder);
+
+        return modified;
     }
 
     IRInst* lookupJVPReference(IRInst* primalFunction)
@@ -1092,10 +1144,37 @@ struct JVPDerivativeContext
         return jvpBlock;
     }
 
-    JVPDerivativeContext(IRModule* module, DiagnosticSink* sink) : module(module), sink(sink)
+    bool processDiffPairTypes(IRBuilder* builder)
+    {
+        bool modified = false;
+
+        // Look for any kIROp_DifferentialPairType and replace them
+        // with a custom generated struct type.
+        //
+        for (auto globalInst : module->getGlobalInsts())
+        {
+            if (globalInst->getOp() == kIROp_DifferentialPairType)
+            {
+                auto diffPairType = as<IRDifferentialPairType>(globalInst);
+
+                auto diffPairStructType = (&pairBuilderStorage)->createDiffPairType(builder, diffPairType->getValueType());
+
+                diffPairType->replaceUsesWith(diffPairStructType);
+                diffPairType->removeAndDeallocate();
+
+                modified = true;
+            }
+        }
+
+        return modified;
+    }
+
+    JVPDerivativeContext(IRModule* module, DiagnosticSink* sink) :
+        module(module), sink(sink), diffConformanceContextStorage(module), pairBuilderStorage(&diffConformanceContextStorage)
     {
         transcriberStorage.sink = sink;
-        transcriberStorage.diffConformanceContext = DifferentiableTypeConformanceContext(module);
+        transcriberStorage.diffConformanceContext = &(diffConformanceContextStorage);
+        transcriberStorage.pairBuilder = &(pairBuilderStorage);
     }
 
     protected:
@@ -1120,7 +1199,14 @@ struct JVPDerivativeContext
 
     // Work queue to hold a stream of instructions that need
     // to be checked for references to derivative functions.
-    IRWorkQueue                    workQueueStorage;
+    IRWorkQueue                     workQueueStorage;
+
+    // Context to find and manage the witness tables for types 
+    // implementing `IDifferentiable`
+    DifferentiableTypeConformanceContext diffConformanceContextStorage;
+
+    // Builder for dealing with differential pair types.
+    DifferentialPairTypeBuilder     pairBuilderStorage;
 
 };
 
