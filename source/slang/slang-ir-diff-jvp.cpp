@@ -77,12 +77,12 @@ struct DifferentiableTypeConformanceContext
     {
         SLANG_ASSERT(isInterfaceAvailable);
 
-        auto conformance = *witnessTableMap.TryGetValue(type);
-        if (!conformance && parent)
-        {
+        if (witnessTableMap.ContainsKey(type))
+            return witnessTableMap[type];
+        else if (parent)
             return parent->lookUpConformanceForType(type);
-        }
-        return conformance;
+        else
+            return nullptr;
     }
     
     // Lookup and return the 'Differential' type declared in the concrete type
@@ -174,6 +174,11 @@ struct DifferentiableTypeConformanceContext
         }
         else if (auto generic = as<IRGeneric>(inst))
         {
+            // TODO (Big change required: The layout of the generic args goes T1, T2, T3 ..., WT1, WT2, WT3)
+            // Right now, we're accepting: T1, WT1, T2, WT2, ...
+            // 
+            SLANG_ASSERT(false);
+
             IRInst* currGenericTypeParam = nullptr;
             for (auto genericParam : generic->getParams())
             {
@@ -262,7 +267,7 @@ struct DifferentialPairTypeBuilder
 
             IRStructKey* diffKey = builder->createStructKey();
             builder->addNameHintDecoration(diffKey, UnownedTerminatedStringSlice("differential"));
-            builder->createStructField(diffPairType, diffKey, cast<IRType>(diffBaseType));
+            builder->createStructField(diffPairType, diffKey, (IRType*)(diffBaseType));
 
             return diffPairType;
         }
@@ -351,7 +356,7 @@ struct JVPTranscriber
         //
         if (tryCreateDifferentialPairFromType(builder, funcType->getResultType()))
         {
-            diffReturnType = cast<IRType>(diffConformanceContext->getDifferentialForType(builder, funcType->getResultType()));
+            diffReturnType = (IRType*)(diffConformanceContext->getDifferentialForType(builder, funcType->getResultType()));
         }
         else
         {
@@ -369,7 +374,7 @@ struct JVPTranscriber
             case kIROp_FloatType:
             case kIROp_DoubleType:
             case kIROp_VectorType:
-                return cast<IRType>(diffConformanceContext->getDifferentialForType(builder, origType));
+                return (IRType*)(diffConformanceContext->getDifferentialForType(builder, origType));
             case kIROp_OutType:
                 return builder->getOutType(differentiateType(builder, as<IROutType>(origType)->getValueType()));
             case kIROp_InOutType:
