@@ -940,12 +940,21 @@ class DllImportAttribute : public Attribute
     SLANG_AST_CLASS(DllImportAttribute)
 
     String modulePath;
+
+    String functionName;
+};
+
+class DllExportAttribute : public Attribute
+{
+    SLANG_AST_CLASS(DllExportAttribute)
 };
 
     /// An attribute that marks an interface type as a COM interface declaration.
 class ComInterfaceAttribute : public Attribute
 {
     SLANG_AST_CLASS(ComInterfaceAttribute)
+
+    String guid;
 };
 
     /// A `[__requiresNVAPI]` attribute indicates that the declaration being modifed

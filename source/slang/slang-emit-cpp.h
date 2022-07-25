@@ -133,6 +133,7 @@ protected:
     void _emitWitnessTableDefinitions();
 
         /// Maybe emits 'export' (such that visible outside binary/dll) and `extern "C"` naming
+    void _getExportStyle(IRInst* inst, bool& outIsExport, bool& outIsExternC);
     void _maybeEmitExportLike(IRInst* inst);
 
     HLSLIntrinsic* _addIntrinsic(HLSLIntrinsic::Op op, IRType* returnType, IRType*const* argTypes, Index argTypeCount);

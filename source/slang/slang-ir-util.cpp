@@ -12,6 +12,18 @@ bool isPointerOfType(IRInst* type, IROp opCode)
     return false;
 }
 
+Dictionary<IRInst*, IRInst*> buildInterfaceRequirementDict(IRInterfaceType* interfaceType)
+{
+    Dictionary<IRInst*, IRInst*> result;
+    for (UInt i = 0; i < interfaceType->getOperandCount(); i++)
+    {
+        auto entry = as<IRInterfaceRequirementEntry>(interfaceType->getOperand(i));
+        if (!entry) continue;
+        result[entry->getRequirementKey()] = entry->getRequirementVal();
+    }
+    return result;
+}
+
 bool isPointerOfType(IRInst* type, IRInst* elementType)
 {
     if (auto ptrType = as<IRPtrTypeBase>(type))

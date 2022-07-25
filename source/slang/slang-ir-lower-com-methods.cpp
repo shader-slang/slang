@@ -6,6 +6,7 @@
 #include "slang-ir-insts.h"
 #include "slang-ir-marshal-native-call.h"
 #include "slang-ir-inst-pass-base.h"
+#include "slang-ir-util.h"
 
 namespace Slang
 {
@@ -102,6 +103,37 @@ struct ComMethodLoweringContext : public InstPassBase
         }
     }
 
+    void processWitnessTable(IRWitnessTable* witnessTable)
+    {
+        auto interfaceType = as<IRInterfaceType>(witnessTable->getConformanceType());
+        if (!interfaceType) return;
+        if (!interfaceType->findDecoration<IRComInterfaceDecoration>())
+            return;
+        auto interfaceReqDict = buildInterfaceRequirementDict(interfaceType);
+
+        IRBuilder builder(&sharedBuilderStorage);
+        NativeCallMarshallingContext marshalContext;
+        marshalContext.diagnosticSink = diagnosticSink;
+        for (auto entry : witnessTable->getEntries())
+        {
+            IRInst* interfaceRequirement = nullptr;
+            if (!interfaceReqDict.TryGetValue(entry->getRequirementKey(), interfaceRequirement))
+                continue;
+            auto implFunc = as<IRFunc>(entry->getSatisfyingVal());
+            if (!implFunc) continue;
+            // If the function already has the same signature as the lowered COM interface method,
+            // we don't need to do anything.
+            if (isTypeEqual(entry->getSatisfyingVal()->getDataType(), (IRType*)interfaceRequirement))
+                continue;
+            // Now we need to generate a wrapper function that calls into the original one.
+            auto nativeFunc = marshalContext.generateDLLExportWrapperFunc(builder, implFunc);
+            entry->setOperand(1, nativeFunc);
+        }
+
+        auto classType = witnessTable->getConcreteType();
+        builder.addCOMWitnessDecoration(classType, witnessTable);
+    }
+
     void processModule()
     {
         sharedBuilderStorage.init(module);
@@ -124,6 +156,9 @@ struct ComMethodLoweringContext : public InstPassBase
         // Update func types of COM interfaces.
         processInstsOfType<IRInterfaceType>(kIROp_InterfaceType, [this](IRInterfaceType* inst) { processInterfaceType(inst); });
 
+        // Update witness tables of classes that implement COM interfaces.
+        // Generate native-to-managed wrappers for each witness table entry.
+        processInstsOfType<IRWitnessTable>(kIROp_WitnessTable, [this](IRWitnessTable* table) { processWitnessTable(table); });
     }
 };
 

@@ -86,7 +86,7 @@ namespace Slang
             getSink()->diagnose(context.originalExpr, Diagnostics::newCanOnlyBeUsedToInitializeAClass);
             return false;
         }
-        if (!isNewExpr && isClassType)
+        if (!isNewExpr && isClassType && context.originalExpr)
         {
             getSink()->diagnose(context.originalExpr, Diagnostics::classCanOnlyBeInitializedWithNew);
             return false;
