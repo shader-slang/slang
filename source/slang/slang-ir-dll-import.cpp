@@ -123,11 +123,19 @@ struct DllImportContext
         builder.emitIf(isUninitialized, trueBlock, afterBlock);
 
         builder.setInsertInto(trueBlock);
-        auto modulePtr = builder.emitCallInst(
-            builder.getPtrType(builder.getVoidType()),
-            getLoadDllFunc(),
-            builder.getStringValue(dllImportDecoration->getLibraryName()));
+        IRInst* modulePtr;
 
+        if (dllImportDecoration->getLibraryName() == "")
+        {
+            modulePtr = builder.getIntValue(builder.getIntType(), 0);
+        }
+        else
+        {
+            modulePtr = builder.emitCallInst(
+                builder.getPtrType(builder.getVoidType()),
+                getLoadDllFunc(),
+                builder.getStringValue(dllImportDecoration->getLibraryName()));
+        }
         IRInst* loadDllFuncArgs[] = {
             modulePtr, builder.getStringValue(dllImportDecoration->getFunctionName())};
         auto loadedNativeFuncPtr = builder.emitCallInst(

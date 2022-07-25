@@ -25,6 +25,9 @@ void stripWitnessTables(IRModule* module)
         auto witnessTable = as<IRWitnessTable>(inst);
         if(!witnessTable)
             continue;
+        auto conformanceType = witnessTable->getConformanceType();
+        if (conformanceType && conformanceType->findDecoration<IRComInterfaceDecoration>())
+            continue;
 
         witnessTable->removeAndDeallocateAllDecorationsAndChildren();
     }

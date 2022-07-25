@@ -9,7 +9,7 @@ public __extern_cpp NativeString getString(NativeString in)
     return in;
 }
 
-[COM]
+[COM("007E2DAF-3A1F-4BC3-B08B-A9DB233D38CE")]
 interface IDoThings
 {
     int doThing(int a, int b);
