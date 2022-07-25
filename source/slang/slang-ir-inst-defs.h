@@ -267,6 +267,10 @@ INST(undefined, undefined, 0, 0)
 //
 INST(DefaultConstruct, defaultConstruct, 0, 0)
 
+INST(MakeDifferentialPair, MakeDiffPair, 2, 0)
+INST(DifferentialPairGetDifferential, GetDifferential, 1, 0)
+INST(DifferentialPairGetPrimal, GetPrimal, 1, 0)
+
 INST(Specialize, specialize, 2, 0)
 INST(lookup_interface_method, lookup_interface_method, 2, 0)
 INST(GetSequentialID, GetSequentialID, 1, 0)

@@ -23,6 +23,12 @@ float g(float x)
     return x + x;
 }
 
+__generic<T:IDifferentiable>
+__differentiate_jvp T h(T x, T y)
+{
+    return x + x * y;
+}
+
 [numthreads(1, 1, 1)]
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
@@ -30,10 +36,10 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
         dpfloat dpa = dpfloat(2.0, 1.0);
         dpfloat dpb = dpfloat(1.5, 0.0);
 
-        outputBuffer[0] = f(dpa.primal); // Expect: 1
+        outputBuffer[0] = f(dpa.p()); // Expect: 1
         outputBuffer[1] = __jvp(f)(dpfloat(2.0, 0.0));     // Expect: 0
         outputBuffer[2] = __jvp(g)(dpa);        // Expect: 2
-        //outputBuffer[3] = __jvp(h)(dpa, dpb); // Expect: 8
+        outputBuffer[3] = __jvp(h)(dpa, dpb); // Expect: 8
         //outputBuffer[4] = __jvp(j)(dpa, dpb); // Expect: 1
     }
 }

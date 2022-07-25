@@ -621,7 +621,6 @@ ${{{{
     /// Allows for user-specified differential types as
     /// well as automatic generation, for when the associated type
     /// hasn't been declared explicitly.
-[builtin]
 __magic_type(DifferentiableType)
 interface IDifferentiable
 {
@@ -635,38 +634,24 @@ __magic_type(DifferentialPairType)
 __intrinsic_type($(kIROp_DifferentialPairType))
 struct __DifferentialPair
 {
-    T primal;
-    T.Differential differential;
 
-    __init(T _primal)
-    {
-        primal = _primal;
-    }
+    __intrinsic_op($(kIROp_MakeDifferentialPair))
+    __init(T _primal, T.Differential _differential);
 
-    __init(T _primal, T.Differential _differential)
-    {
-        primal = _primal;
-        differential = _differential;
-    }
-
-    T.Differential d()
-    {
-        return differential;
-    }
+    __intrinsic_op($(kIROp_DifferentialPairGetDifferential))
+    T.Differential d();
 
     T.Differential getDifferential()
     {
-        return differential;
+        return d();
     }
 
-    T p()
-    {
-        return primal;
-    }
+    __intrinsic_op($(kIROp_DifferentialPairGetPrimal))
+    T p();
 
     T getPrimal()
     {
-        return primal;
+        return p();
     }
 };
 
