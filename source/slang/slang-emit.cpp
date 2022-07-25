@@ -9,6 +9,7 @@
 #include "slang-ir-byte-address-legalize.h"
 #include "slang-ir-collect-global-uniforms.h"
 #include "slang-ir-dce.h"
+#include "slang-ir-dll-export.h"
 #include "slang-ir-dll-import.h"
 #include "slang-ir-eliminate-phis.h"
 #include "slang-ir-entry-point-uniforms.h"
@@ -211,6 +212,7 @@ Result linkAndOptimizeIR(
         {
             lowerComInterfaces(irModule, artifactDesc.style, sink);
             generateDllImportFuncs(irModule, sink);
+            generateDllExportFuncs(irModule, sink);
             break;
         }
         default: break;
@@ -362,10 +364,6 @@ Result linkAndOptimizeIR(
     lowerGenerics(targetRequest, irModule, sink);
     dumpIRIfEnabled(codeGenContext, irModule, "AFTER-LOWER-GENERICS");
 
-    if (sink->getErrorCount() != 0)
-        return SLANG_FAIL;
-
-    lowerTuples(irModule, sink);
     if (sink->getErrorCount() != 0)
         return SLANG_FAIL;
 

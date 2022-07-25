@@ -41,10 +41,19 @@ namespace Slang
         void marshalRefManagedValueToNativeValue(
             IRBuilder& builder, IRInst* originalArg, List<IRInst*>& args);
 
+        // Marshal a managed value to a native value for input into a native functions.
         void marshalManagedValueToNativeValue(
+            IRBuilder& builder, IRInst* originalArg, List<IRInst*>& args);
+
+        // Marshal a managed value to a native value for the return value of a native function.
+        void marshalManagedValueToNativeResultValue(
             IRBuilder& builder, IRInst* originalArg, List<IRInst*>& args);
 
         IRInst* marshalNativeValueToManagedValue(
             IRBuilder& builder, IRInst* nativeValue);
+
+        IRInst* marshalNativeArgToManagedArg(IRBuilder& builder, const List<IRInst*>& args, Index& consumeIndex, IRType* expectedManagedType);
+
+        IRFunc* generateDLLExportWrapperFunc(IRBuilder& builder, IRFunc* originalFunc);
     };
 }

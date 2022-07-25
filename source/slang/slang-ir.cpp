@@ -4487,9 +4487,9 @@ namespace Slang
         return emitIntrinsicInst(getVoidType(), kIROp_ManagedPtrAttach, 2, args);
     }
 
-    IRInst* IRBuilder::emitManagedPtrDetach(IRInst* managedPtrVar)
+    IRInst* IRBuilder::emitManagedPtrDetach(IRType* type, IRInst* managedPtrVal)
     {
-        return emitIntrinsicInst(getVoidType(), kIROp_ManagedPtrDetach, 1, &managedPtrVar);
+        return emitIntrinsicInst(type, kIROp_ManagedPtrDetach, 1, &managedPtrVal);
     }
 
     IRInst* IRBuilder::emitGetManagedPtrWriteRef(IRInst* ptrToManagedPtr)

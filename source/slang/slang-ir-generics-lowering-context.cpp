@@ -373,9 +373,9 @@ namespace Slang
         return witnessTables;
     }
 
-    IRIntegerValue SharedGenericsLoweringContext::getInterfaceAnyValueSize(IRInst* type, SourceLoc usageLocation)
+    IRIntegerValue SharedGenericsLoweringContext::getInterfaceAnyValueSize(IRInst* type, SourceLoc usageLoc)
     {
-        SLANG_UNUSED(usageLocation);
+        SLANG_UNUSED(usageLoc);
 
         if (auto decor = type->findDecoration<IRAnyValueSizeDecoration>())
         {

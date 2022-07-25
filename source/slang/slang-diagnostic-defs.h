@@ -322,6 +322,7 @@ DIAGNOSTIC(31120, Error, invalidAttributeTarget, "invalid syntax target for user
 DIAGNOSTIC(31121, Error, anyValueSizeExceedsLimit, "'anyValueSize' cannot exceed $0")
 
 DIAGNOSTIC(31122, Error, associatedTypeNotAllowInComInterface, "associatedtype not allowed in a [COM] interface")
+DIAGNOSTIC(31123, Error, invalidGUID, "'$0' is not a valid GUID")
 
 // Enums
 

@@ -344,6 +344,50 @@ void CLikeSourceEmitter::emitWitnessTable(IRWitnessTable* witnessTable)
     SLANG_UNUSED(witnessTable);
 }
 
+void CLikeSourceEmitter::emitComWitnessTable(IRWitnessTable* witnessTable)
+{
+    auto classType = witnessTable->getConcreteType();
+    for (auto ent : witnessTable->getEntries())
+    {
+        auto req = ent->getRequirementKey();
+        auto func = as<IRFunc>(ent->getSatisfyingVal());
+        if (!func)
+            continue;
+
+        auto resultType = func->getResultType();
+
+        auto name = getName(classType) + "::" + getName(req);
+
+        emitFuncDecorations(func);
+
+        emitType(resultType, name);
+        m_writer->emit("(");
+        // Skip declaration of `this` parameter.
+        auto firstParam = func->getFirstParam()->getNextParam();
+        for (auto pp = firstParam; pp; pp = pp->getNextParam())
+        {
+            if (pp != firstParam)
+                m_writer->emit(", ");
+
+            emitSimpleFuncParamImpl(pp);
+        }
+        m_writer->emit(")");
+        m_writer->emit("\n{\n");
+        m_writer->indent();
+
+        // emit definition for `this` param.
+        m_writer->emit("auto ");
+        m_writer->emit(getName(func->getFirstParam()));
+        m_writer->emit(" = this;\n");
+
+        // Need to emit the operations in the blocks of the function
+        emitFunctionBody(func);
+
+        m_writer->dedent();
+        m_writer->emit("}\n\n");
+    }
+}
+
 void CLikeSourceEmitter::emitInterface(IRInterfaceType* interfaceType)
 {
     SLANG_UNUSED(interfaceType);
@@ -1869,7 +1913,7 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
     {
         auto prec = getInfo(EmitOp::Postfix);
         needClose = maybeEmitParens(outerPrec, prec);
-        emitDereferenceOperand(inst->getOperand(0), leftSide(outerPrec, prec));
+        emitOperand(inst->getOperand(0), leftSide(outerPrec, prec));
         m_writer->emit(".detach()");
         break;
     }
@@ -2630,6 +2674,12 @@ void CLikeSourceEmitter::emitParamTypeImpl(IRType* type, String const& name)
 
 void CLikeSourceEmitter::emitFuncDecl(IRFunc* func)
 {
+    auto name = getName(func);
+    emitFuncDecl(func, name);
+}
+
+void CLikeSourceEmitter::emitFuncDecl(IRFunc* func, const String& name)
+{
     // We don't want to emit declarations for operations
     // that only appear in the IR as stand-ins for built-in
     // operations on that target.
@@ -2651,8 +2701,6 @@ void CLikeSourceEmitter::emitFuncDecl(IRFunc* func)
 
     auto funcType = func->getDataType();
     auto resultType = func->getResultType();
-
-    auto name = getName(func);
 
     emitFuncDecorations(func);
     emitType(resultType, name);
@@ -2790,16 +2838,58 @@ void CLikeSourceEmitter::emitClass(IRClassType* classType)
     {
         return;
     }
-
+    List<IRWitnessTable*> comWitnessTables;
+    for (auto child : classType->getDecorations())
+    {
+        if (auto decoration = as<IRCOMWitnessDecoration>(child))
+        {
+            comWitnessTables.add(cast<IRWitnessTable>(decoration->getWitnessTable()));
+        }
+    }
     m_writer->emit("class ");
 
     emitPostKeywordTypeAttributes(classType);
 
     m_writer->emit(getName(classType));
-    m_writer->emit(" : public RefObject");
+    if (comWitnessTables.getCount() == 0)
+    {
+        m_writer->emit(" : public RefObject");
+    }
+    else
+    {
+        m_writer->emit(" : public ComObject");
+        for (auto wt : comWitnessTables)
+        {
+            m_writer->emit(", public ");
+            m_writer->emit(getName(wt->getConformanceType()));
+        }
+    }
     m_writer->emit("\n{\n");
     m_writer->emit("public:\n");
     m_writer->indent();
+
+    if (comWitnessTables.getCount())
+    {
+        m_writer->emit("SLANG_COM_OBJECT_IUNKNOWN_ALL\n");
+        m_writer->emit("void* getInterface(const Guid & uuid)\n{\n");
+        m_writer->indent();
+        m_writer->emit("if (uuid == ISlangUnknown::getTypeGuid()) return static_cast<ISlangUnknown*>(this);\n");
+        for (auto wt : comWitnessTables)
+        {
+            auto interfaceName = getName(wt->getConformanceType());
+            m_writer->emit("if (uuid == ");
+            m_writer->emit(interfaceName);
+            m_writer->emit("::getTypeGuid())\n");
+            m_writer->indent();
+            m_writer->emit("return static_cast<");
+            m_writer->emit(interfaceName);
+            m_writer->emit("*>(this);\n");
+            m_writer->dedent();
+        }
+        m_writer->emit("return nullptr;\n");
+        m_writer->dedent();
+        m_writer->emit("}\n");
+    }
 
     for (auto ff : classType->getFields())
     {
@@ -2816,6 +2906,28 @@ void CLikeSourceEmitter::emitClass(IRClassType* classType)
         emitType(fieldType, getName(fieldKey));
         emitSemantics(fieldKey);
         m_writer->emit(";\n");
+    }
+
+    // Emit COM method declarations.
+    for (auto wt : comWitnessTables)
+    {
+        for (auto wtEntry : wt->getChildren())
+        {
+            auto req = as<IRWitnessTableEntry>(wtEntry);
+            if (!req) continue;
+            auto func = as<IRFunc>(req->getSatisfyingVal());
+            if (!func) continue;
+            m_writer->emit("virtual SLANG_NO_THROW ");
+            emitType(func->getResultType(), "SLANG_MCALL " + getName(req->getRequirementKey()));
+            m_writer->emit("(");
+            auto param = func->getFirstParam();
+            param = param->getNextParam();
+            for (; param; param = param->getNextParam())
+            {
+                emitParamType(param->getFullType(), getName(param));
+            }
+            m_writer->emit(") override;\n");
+        }
     }
 
     m_writer->dedent();
@@ -3135,6 +3247,32 @@ void CLikeSourceEmitter::emitGlobalInst(IRInst* inst)
     emitGlobalInstImpl(inst);
 }
 
+static bool _shouldSkipFuncEmit(IRInst* func)
+{
+    // Skip emitting a func if it is a COM interface wrapper implementation and used
+    // only by the witness table. We will emit this func differently than normal funcs
+    // and this is handled by `emitComWitnessTable`.
+
+    if (func->hasMoreThanOneUse()) return false;
+    if (func->firstUse)
+    {
+        if (auto entry = as<IRWitnessTableEntry>(func->firstUse->getUser()))
+        {
+            if (auto table = as<IRWitnessTable>(entry->getParent()))
+            {
+                if (auto interfaceType = table->getConformanceType())
+                {
+                    if (interfaceType->findDecoration<IRComInterfaceDecoration>())
+                    {
+                        return true;
+                    }
+                }
+            }
+        }
+    }
+    return false;
+}
+
 void CLikeSourceEmitter::emitGlobalInstImpl(IRInst* inst)
 {
     m_writer->advanceToSourceLocation(inst->sourceLoc);
@@ -3152,7 +3290,10 @@ void CLikeSourceEmitter::emitGlobalInstImpl(IRInst* inst)
         break;
 
     case kIROp_Func:
-        emitFunc((IRFunc*) inst);
+        if (!_shouldSkipFuncEmit(inst))
+        {
+            emitFunc((IRFunc*) inst);
+        }
         break;
 
     case kIROp_GlobalVar:
@@ -3217,6 +3358,9 @@ void CLikeSourceEmitter::ensureInstOperandsRec(ComputeEmitActionsContext* ctx, I
     switch (inst->getOp())
     {
     case kIROp_InterfaceType:
+        requiredLevel = EmitAction::ForwardDeclaration;
+        break;
+    case kIROp_COMWitnessDecoration:
         requiredLevel = EmitAction::ForwardDeclaration;
         break;
     default:

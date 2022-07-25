@@ -7,5 +7,4 @@ namespace Slang
     class DiagnosticSink;
         /// Generate implementations for functions marked as [DllImport].
     void generateDllImportFuncs(IRModule* module, DiagnosticSink* sink);
-
 }
