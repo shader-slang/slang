@@ -174,35 +174,37 @@ struct DifferentiableTypeConformanceContext
         }
         else if (auto generic = as<IRGeneric>(inst))
         {
-            // TODO (Big change required: The layout of the generic args goes T1, T2, T3 ..., WT1, WT2, WT3)
-            // Right now, we're accepting: T1, WT1, T2, WT2, ...
-            // 
-            SLANG_ASSERT(false);
+            List<IRParam*> typeParams;
 
-            IRInst* currGenericTypeParam = nullptr;
-            for (auto genericParam : generic->getParams())
+            auto genericParam = generic->getFirstParam();
+            while (genericParam)
             {
-                if ((genericParam->getDataType()->getOp() == kIROp_WitnessTableType))
+                if (as<IRTypeType>(genericParam->getDataType()))
                 {
-                    if (cast<IRWitnessTableType>(genericParam->getDataType())->getConformanceType() ==
-                        interfaceType)
-                    SLANG_ASSERT(currGenericTypeParam);
-                    SLANG_ASSERT(!witnessTableMap.ContainsKey(currGenericTypeParam));
-                    witnessTableMap.Add(currGenericTypeParam, genericParam);
-                }
-                else if (as<IRTypeType>(genericParam->getDataType()))
-                {
-                    currGenericTypeParam = genericParam;
-                }
-                else if (genericParam->getDataType()->getOp() == kIROp_IntType)
-                {
-                    currGenericTypeParam = nullptr;
+                    typeParams.add(genericParam);
                 }
                 else
-                {
-                    SLANG_UNEXPECTED("Unhandled generic param type");
-                }
+                    break;
+                
+                genericParam = genericParam->getNextParam();
             }
+            
+            UCount tableIndex = 0;
+            while (genericParam)
+            {
+                SLANG_ASSERT(!as<IRTypeType>(genericParam->getDataType()));
+                if (auto witnessTableType = as<IRWitnessTableType>(genericParam->getDataType()))
+                {
+                    if (witnessTableType->getConformanceType() == differentiableInterfaceType)
+                        witnessTableMap.Add(typeParams[tableIndex], genericParam);
+                }
+                else
+                    break;
+
+                tableIndex += 1;
+                genericParam = genericParam->getNextParam();
+            }
+            
         }
 
     }
@@ -254,7 +256,7 @@ struct DifferentialPairTypeBuilder
         }
     }
     
-    IRStructType* createDiffPairType(IRBuilder* builder, IRType* origBaseType)
+    IRStructType* _createDiffPairType(IRBuilder* builder, IRType* origBaseType)
     {
         if (auto diffBaseType = diffConformanceContext->getDifferentialForType(builder, origBaseType))
         {
@@ -279,7 +281,7 @@ struct DifferentialPairTypeBuilder
         if (pairTypeCache.ContainsKey(origBaseType))
             return pairTypeCache[origBaseType];
 
-        auto pairType = createDiffPairType(builder, origBaseType);
+        auto pairType = _createDiffPairType(builder, origBaseType);
         pairTypeCache.Add(origBaseType, pairType);
 
         return pairType;
@@ -1070,6 +1072,86 @@ struct JVPDerivativeContext
         return true;
     }
 
+    IRInst* lowerPairType(IRBuilder* builder, IRType* type, DifferentiableTypeConformanceContext* diffContext)
+    {
+        if (diffContext->isInterfaceAvailable)
+        {
+            if (auto pairType = as<IRDifferentialPairType>(type))
+            {
+                builder->setInsertBefore(pairType);
+                
+                auto diffPairStructType = (&pairBuilderStorage)->getOrCreateDiffPairType(
+                    builder,
+                    pairType->getValueType());
+
+                pairType->replaceUsesWith(diffPairStructType);
+                pairType->removeAndDeallocate();
+
+                return diffPairStructType;
+            }
+            else if (auto loweredStructType = as<IRStructType>(type))
+            {
+                // Already lowered to struct.
+                return loweredStructType;
+            }
+        }
+        return nullptr;
+    }
+
+    IRInst* lowerMakePair(IRBuilder* builder, IRInst* inst, DifferentiableTypeConformanceContext* diffContext)
+    {
+        
+        if (auto makePairInst = as<IRMakeDifferentialPair>(inst))
+        {
+            auto diffPairStructType = lowerPairType(builder, makePairInst->getDataType(), diffContext);
+            
+            builder->setInsertBefore(makePairInst);
+            
+            List<IRInst*> operands;
+            operands.add(makePairInst->getPrimalValue());
+            operands.add(makePairInst->getDifferentialValue());
+
+            auto makeStructInst = builder->emitMakeStruct(as<IRStructType>(diffPairStructType), operands);
+            makePairInst->replaceUsesWith(makeStructInst);
+            makePairInst->removeAndDeallocate();
+
+            return makeStructInst;
+        }
+        
+        return nullptr;
+    }
+
+    IRInst* lowerPairAccess(IRBuilder* builder, IRInst* inst, DifferentiableTypeConformanceContext* diffContext)
+    {
+        
+        if (auto getDiffInst = as<IRDifferentialPairGetDifferential>(inst))
+        {
+            lowerPairType(builder, getDiffInst->getBase()->getDataType(), diffContext);
+
+            builder->setInsertBefore(getDiffInst);
+            
+            auto diffFieldExtract = (&pairBuilderStorage)->emitDiffFieldExtract(builder, getDiffInst->getBase());
+            getDiffInst->replaceUsesWith(diffFieldExtract);
+            getDiffInst->removeAndDeallocate();
+
+            return diffFieldExtract;
+        }
+        else if (auto getPrimalInst = as<IRDifferentialPairGetPrimal>(inst))
+        {
+            lowerPairType(builder, getPrimalInst->getBase()->getDataType(), diffContext);
+
+            builder->setInsertBefore(getPrimalInst);
+
+            auto primalFieldExtract = (&pairBuilderStorage)->emitPrimalFieldExtract(builder, getPrimalInst->getBase());
+            getPrimalInst->replaceUsesWith(primalFieldExtract);
+            getPrimalInst->removeAndDeallocate();
+
+            return primalFieldExtract;
+        }
+        
+        return nullptr;
+    }
+
     bool processPairTypes(IRBuilder* builder, IRInst* instWithChildren, DifferentiableTypeConformanceContext* diffContext)
     {
         bool modified = false;
@@ -1082,24 +1164,29 @@ struct JVPDerivativeContext
 
         for (auto child = instWithChildren->getFirstChild(); child; )
         {
+            // Make sure the builder is at the right level.
+            builder->setInsertInto(instWithChildren);
+
             auto nextChild = child->getNextInst();
 
-            if (auto diffPairType = as<IRDifferentialPairType>(child))
+            switch (child->getOp())
             {
-                if (subContext.isInterfaceAvailable)
-                {
-                    
-                    auto diffPairStructType = (&pairBuilderStorage)->createDiffPairType(builder, diffPairType->getValueType());
-
-                    diffPairType->replaceUsesWith(diffPairStructType);
-                    diffPairType->removeAndDeallocate();
-
-                    modified = true;
-                }
-            }
-            else if (child->getFirstChild())
-            {
-                modified = processPairTypes(builder, child, (&subContext)) | modified;
+                case kIROp_DifferentialPairType:
+                    lowerPairType(builder, as<IRType>(child), &subContext);
+                    break;
+                
+                case kIROp_DifferentialPairGetDifferential:
+                case kIROp_DifferentialPairGetPrimal:
+                    lowerPairAccess(builder, child, &subContext);
+                    break;
+                
+                case kIROp_MakeDifferentialPair:
+                    lowerMakePair(builder, child, &subContext);
+                    break;
+                
+                default:
+                    if (child->getFirstChild())
+                        modified = processPairTypes(builder, child, (&subContext)) | modified;
             }
 
             child = nextChild;
