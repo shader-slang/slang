@@ -4,12 +4,22 @@
 
 #include "../core/slang-string.h"
 #include "../core/slang-smart-pointer.h"
+#include "../core/slang-com-object.h"
 
 #ifdef SLANG_RT_DYNAMIC_EXPORT
 #    define SLANG_RT_API SLANG_DLL_EXPORT
 #else
 #    define SLANG_RT_API
 #endif
+
+#if defined(_MSC_VER)
+#   define SLANG_PRELUDE_SHARED_LIB_EXPORT __declspec(dllexport)
+#else
+#   define SLANG_PRELUDE_SHARED_LIB_EXPORT __attribute__((__visibility__("default")))
+//#   define SLANG_PRELUDE_SHARED_LIB_EXPORT __attribute__ ((dllexport)) __attribute__((__visibility__("default")))
+#endif    
+
+#define SLANG_PRELUDE_EXPORT extern "C" SLANG_PRELUDE_SHARED_LIB_EXPORT
 
 extern "C"
 {

@@ -123,6 +123,123 @@ namespace Slang
         }
     }
 
+    void NativeCallMarshallingContext::marshalManagedValueToNativeResultValue(
+        IRBuilder& builder, IRInst* originalArg, List<IRInst*>& args)
+    {
+        switch (originalArg->getDataType()->getOp())
+        {
+        case kIROp_InOutType:
+        case kIROp_RefType:
+            SLANG_UNREACHABLE("out and ref types should be handled before reaching here.");
+            break;
+        case kIROp_StringType:
+        {
+            diagnosticSink->diagnose(originalArg, Diagnostics::unimplemented, "marshal string to native return value");
+        }
+        break;
+        case kIROp_ClassType:
+        {
+            diagnosticSink->diagnose(originalArg, Diagnostics::unimplemented, "marshal class to native return value");
+        }
+        break;
+        case kIROp_InterfaceType:
+        {
+            auto nativePtr = builder.emitManagedPtrDetach(builder.getNativePtrType(originalArg->getDataType()), originalArg);
+            args.add(nativePtr);
+        }
+        break;
+        case kIROp_ComPtrType:
+        {
+            auto nativePtr = builder.emitManagedPtrDetach(
+                builder.getNativePtrType(
+                    (IRType*)cast<IRComPtrType>(originalArg->getDataType())->getOperand(0)),
+                originalArg);
+            args.add(nativePtr);
+        }
+        break;
+        default:
+            args.add(originalArg);
+            break;
+        }
+    }
+
+    IRInst* NativeCallMarshallingContext::marshalNativeArgToManagedArg(
+        IRBuilder& builder, const List<IRInst*>& args, Index& consumeIndex, IRType* expectedManagedType)
+    {
+        // For now, all managed values maps to one native value, so we just call `marshalNativeValueToManagedValue`.
+        // This function can be extended in the future to support things like `List` that maps to more than one
+        // native args.
+        SLANG_UNUSED(expectedManagedType);
+        auto managedVal = marshalNativeValueToManagedValue(builder, args[consumeIndex]);
+        consumeIndex++;
+        return managedVal;
+    }
+
+    IRFunc* NativeCallMarshallingContext::generateDLLExportWrapperFunc(IRBuilder& builder, IRFunc* originalFunc)
+    {
+        builder.setInsertBefore(originalFunc);
+        auto funcType = getNativeFuncType(builder, originalFunc->getDataType());
+        auto newFunc = builder.createFunc();
+        newFunc->setFullType(funcType);
+        builder.setInsertInto(newFunc);
+        builder.emitBlock();
+        List<IRInst*> params;
+        for (UInt i = 0; i < funcType->getParamCount(); i++)
+        {
+            auto paramType = funcType->getParamType(i);
+            params.add(builder.emitParam(paramType));
+        }
+        List<IRInst*> args;
+        Index nativeParamConsumeIndex = 0;
+        for (UInt i = 0; i < originalFunc->getParamCount(); i++)
+        {
+            auto managedParamType = originalFunc->getParamType(i);
+            auto managedArg = marshalNativeArgToManagedArg(builder, params, nativeParamConsumeIndex, managedParamType);
+            args.add(managedArg);
+        }
+        auto originalReturnType = originalFunc->getResultType();
+        auto callInst = builder.emitCallInst(originalReturnType, originalFunc, args);
+        if (auto resultType = as<IRResultType>(originalReturnType))
+        {
+            auto isResultError = builder.emitIsResultError(callInst);
+            IRBlock* trueBlock = nullptr;
+            IRBlock* falseBlock = nullptr;
+            IRBlock* afterBlock = nullptr;
+            builder.emitIfElseWithBlocks(isResultError, trueBlock, falseBlock, afterBlock);
+
+            builder.setInsertInto(trueBlock);
+            builder.emitReturn(builder.emitGetResultError(callInst));
+
+            builder.setInsertInto(falseBlock);
+            auto resultVal = builder.emitGetResultValue(callInst);
+            List<IRInst*> nativeVals;
+            marshalManagedValueToNativeResultValue(builder, resultVal, nativeVals);
+            for (Index i = 0; i < nativeVals.getCount(); i++)
+            {
+                SLANG_RELEASE_ASSERT(nativeParamConsumeIndex < params.getCount());
+                builder.emitStore(params[nativeParamConsumeIndex], nativeVals[i]);
+                nativeParamConsumeIndex++;
+            }
+            builder.emitReturn(builder.getIntValue(builder.getIntType(), 0));
+
+            builder.setInsertInto(afterBlock);
+            builder.emitUnreachable();
+        }
+        else
+        {
+            List<IRInst*> nativeVals;
+            marshalManagedValueToNativeResultValue(builder, callInst, nativeVals);
+            for (Index i = 1; i < nativeVals.getCount(); i++)
+            {
+                SLANG_RELEASE_ASSERT(nativeParamConsumeIndex < params.getCount());
+                builder.emitStore(params[nativeParamConsumeIndex], nativeVals[i]);
+                nativeParamConsumeIndex++;
+            }
+            builder.emitReturn(nativeVals[0]);
+        }
+        return newFunc;
+    }
+
     IRInst* NativeCallMarshallingContext::marshalNativeCall(
         IRBuilder& builder,
         IRFuncType* originalFuncType,

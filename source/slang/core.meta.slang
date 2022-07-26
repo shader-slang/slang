@@ -2187,8 +2187,11 @@ attribute_syntax [__unsafeForceInlineEarly] : UnsafeForceInlineEarlyAttribute;
 __attributeTarget(FuncDecl)
 attribute_syntax [DllImport(modulePath: String)] : DllImportAttribute;
 
+__attributeTarget(FuncDecl)
+attribute_syntax [DllExport] : DllExportAttribute;
+
 __attributeTarget(InterfaceDecl)
-attribute_syntax [COM] : ComInterfaceAttribute;
+attribute_syntax [COM(guid: String)] : ComInterfaceAttribute;
 
 // Inheritance Control
 __attributeTarget(AggTypeDecl)
