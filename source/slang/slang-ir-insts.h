@@ -2386,6 +2386,8 @@ public:
 
     IRInst* emitJVPDifferentiateInst(IRType* type, IRInst* baseFn);
 
+    IRInst* emitMakeDifferentialPair(IRType* type, IRInst* primal, IRInst* differential);
+
     IRInst* emitSpecializeInst(
         IRType*         type,
         IRInst*         genericVal,

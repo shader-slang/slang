@@ -218,7 +218,7 @@ struct DifferentialPairTypeBuilder
         diffConformanceContext(diffConformanceContext)
     {}
 
-    IRFieldExtract* emitPrimalFieldExtract(IRBuilder* builder, IRInst* baseInst)
+    IRInst* emitPrimalFieldAccess(IRBuilder* builder, IRInst* baseInst)
     {
         if (auto basePairStructType = as<IRStructType>(baseInst->getDataType()))
         {
@@ -231,29 +231,59 @@ struct DifferentialPairTypeBuilder
                     primalField->getKey()
                 ));
         }
+        else if (auto ptrType = as<IRPtrTypeBase>(baseInst->getDataType()))
+        {
+            if (auto pairStructType = as<IRStructType>(ptrType->getValueType()))
+            {
+                auto primalField = as<IRStructField>(pairStructType->getFirstChild());
+                SLANG_ASSERT(primalField);
+                
+                return as<IRFieldAddress>(builder->emitFieldAddress(
+                        builder->getPtrType(primalField->getFieldType()),
+                        baseInst,
+                        primalField->getKey()
+                    ));
+            }
+        }
         else
         {
-            SLANG_UNREACHABLE("basePairType must be an IRStructType");
+            SLANG_UNREACHABLE("basePairType must be an IRStructType or PtrType<IRStructType>");
         }
+        return nullptr;
     }
 
-    IRFieldExtract* emitDiffFieldExtract(IRBuilder* builder, IRInst* baseInst)
+    IRInst* emitDiffFieldAccess(IRBuilder* builder, IRInst* baseInst)
     {
         if (auto basePairStructType = as<IRStructType>(baseInst->getDataType()))
         {
             auto diffField = as<IRStructField>(basePairStructType->getFirstChild()->getNextInst());
             SLANG_ASSERT(diffField);
-            
+
             return as<IRFieldExtract>(builder->emitFieldExtract(
                     diffField->getFieldType(),
                     baseInst,
                     diffField->getKey()
                 ));
         }
+        else if (auto ptrType = as<IRPtrTypeBase>(baseInst->getDataType()))
+        {
+            if (auto pairStructType = as<IRStructType>(ptrType->getValueType()))
+            {
+                auto diffField = as<IRStructField>(pairStructType->getFirstChild()->getNextInst());
+                SLANG_ASSERT(diffField);
+                
+                return as<IRFieldAddress>(builder->emitFieldAddress(
+                        builder->getPtrType(diffField->getFieldType()),
+                        baseInst,
+                        diffField->getKey()
+                    ));
+            }
+        }
         else
         {
-            SLANG_UNREACHABLE("basePairType must be an IRStructType");
+            SLANG_UNREACHABLE("basePairType must be an IRStructType or PtrType<IRStructType>");
         }
+        return nullptr;
     }
     
     IRStructType* _createDiffPairType(IRBuilder* builder, IRType* origBaseType)
@@ -391,7 +421,7 @@ struct JVPTranscriber
         // If this is a PtrType (out, inout, etc..), then create diff pair from
         // value type and re-apply the appropropriate PtrType wrapper.
         // 
-        if (auto origPtrType = as<IRPtrType>(origType))
+        if (auto origPtrType = as<IRPtrTypeBase>(origType))
         {   
             if (auto diffPairValueType = tryCreateDifferentialPairFromType(builder, origPtrType->getValueType()))
                 return builder->getPtrType(origType->getOp(), diffPairValueType);
@@ -457,8 +487,8 @@ struct JVPTranscriber
             if (isDiff[ii])
             {
                 auto diffPairParam = newParamList[ii];
-                newInst = pairBuilder->emitPrimalFieldExtract(builder, diffPairParam);
-                diffInst = pairBuilder->emitDiffFieldExtract(builder, diffPairParam);
+                newInst = pairBuilder->emitPrimalFieldAccess(builder, diffPairParam);
+                diffInst = pairBuilder->emitDiffFieldAccess(builder, diffPairParam);
             }
             else
             {
@@ -557,7 +587,7 @@ struct JVPTranscriber
     IRInst* differentiateLoad(IRBuilder* builder, IRLoad* origLoad)
     {
         auto origPtr = origLoad->getPtr();
-        if (as<IRVar>(origPtr) || as<IRParam>(origPtr))
+        if (as<IRVar>(origPtr) || as<IRParam>(origPtr) || as<IRFieldAddress>(origPtr))
         {   
             // If the loaded parameter has a differential version, 
             // emit a load instruction for the differential parameter.
@@ -582,7 +612,7 @@ struct JVPTranscriber
     {
         IRInst* storeLocation = origStore->getPtr();
         IRInst* storeVal = origStore->getVal();
-        if (as<IRVar>(storeLocation) || as<IRParam>(storeLocation))
+        if (as<IRVar>(storeLocation) || as<IRParam>(storeLocation) || as<IRFieldAddress>(storeLocation))
         {   
             // If the stored value has a differential version, 
             // emit a store instruction for the differential parameter.
@@ -656,33 +686,29 @@ struct JVPTranscriber
                 origCallee);
             
             List<IRInst*> args;
-            // Go over the parameter list and all primal arguments.
+            // Go over the parameter list and create pairs for each input (if required)
             for (UIndex ii = 0; ii < origCall->getArgCount(); ii++)
             {
-                args.add(origCall->getArg(ii));
-            }
+                auto origArg = origCall->getArg(ii);
 
-            {
-                IRParam* param = origCallee->getFirstParam();
-                // Go over the parameter list again and arguments for types that need differentials.
-                for (UIndex ii = 0; ii < origCall->getArgCount(); ii++)
+                auto origType = origArg->getDataType();
+                if (auto pairType = tryCreateDifferentialPairFromType(builder, origType))
                 {
-                    // Look the parameter up in the callee's signature. If it requires a derivative, proceed.
-                    // Otherwise, continue.
-                    //
-                    if (differentiateType(builder, param->getDataType()))
-                    {
-                        // If the corresponding argument does not have a differential, create and place a
-                        // 0 argument.
-                        //
-                        auto origArg = origCall->getArg(ii);
-                        if (auto diffArg = getDifferentialInst(origArg, nullptr))
-                            args.add(diffArg);
-                        else
-                            args.add(getZeroOfType(builder, origArg->getDataType()));
-                    }
+                    auto diffArg = getDifferentialInst(origArg, nullptr);
 
-                    param = param->getNextParam();
+                    // TODO(sai): This part is flawed. Replace with a call to the 
+                    // 'zero()' interface method.
+                    if (!diffArg)
+                        diffArg = getZeroOfType(builder, origType);
+                    
+                    auto diffPair = builder->emitMakeDifferentialPair(pairType, origArg, diffArg);
+
+                    args.add(diffPair);
+                }
+                else
+                {
+                    // Add original/primal argument.
+                    args.add(origCall->getArg(ii));
                 }
             }
             
@@ -1079,7 +1105,7 @@ struct JVPDerivativeContext
             if (auto pairType = as<IRDifferentialPairType>(type))
             {
                 builder->setInsertBefore(pairType);
-                
+
                 auto diffPairStructType = (&pairBuilderStorage)->getOrCreateDiffPairType(
                     builder,
                     pairType->getValueType());
@@ -1130,7 +1156,7 @@ struct JVPDerivativeContext
 
             builder->setInsertBefore(getDiffInst);
             
-            auto diffFieldExtract = (&pairBuilderStorage)->emitDiffFieldExtract(builder, getDiffInst->getBase());
+            auto diffFieldExtract = (&pairBuilderStorage)->emitDiffFieldAccess(builder, getDiffInst->getBase());
             getDiffInst->replaceUsesWith(diffFieldExtract);
             getDiffInst->removeAndDeallocate();
 
@@ -1142,7 +1168,7 @@ struct JVPDerivativeContext
 
             builder->setInsertBefore(getPrimalInst);
 
-            auto primalFieldExtract = (&pairBuilderStorage)->emitPrimalFieldExtract(builder, getPrimalInst->getBase());
+            auto primalFieldExtract = (&pairBuilderStorage)->emitPrimalFieldAccess(builder, getPrimalInst->getBase());
             getPrimalInst->replaceUsesWith(primalFieldExtract);
             getPrimalInst->removeAndDeallocate();
 

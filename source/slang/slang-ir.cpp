@@ -3054,6 +3054,15 @@ namespace Slang
         return inst;
     }
 
+    IRInst* IRBuilder::emitMakeDifferentialPair(IRType* type, IRInst* primal, IRInst* differential)
+    {
+        IRInst* args[] = {primal, differential};
+        auto inst = createInstWithTrailingArgs<IRMakeDifferentialPair>(
+            this, kIROp_MakeDifferentialPair, type, 2, args);
+        addInst(inst);
+        return inst;
+    }
+
     IRInst* IRBuilder::emitSpecializeInst(
         IRType*         type,
         IRInst*         genericVal,

@@ -7,7 +7,7 @@ RWStructuredBuffer<float> outputBuffer;
 typedef __DifferentialPair<float> dpfloat;
 typedef float.Differential dfloat;
 
-__differentiate_jvp float f(float x)
+__differentiate_jvp float.Differential f(float x)
 {
     return x;
 }
@@ -23,11 +23,6 @@ float g(float x)
     return x + x;
 }
 
-__generic<T:IDifferentiable>
-__differentiate_jvp T h(T x, T y)
-{
-    return x + x * y;
-}
 
 [numthreads(1, 1, 1)]
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
@@ -39,7 +34,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
         outputBuffer[0] = f(dpa.p()); // Expect: 1
         outputBuffer[1] = __jvp(f)(dpfloat(2.0, 0.0));     // Expect: 0
         outputBuffer[2] = __jvp(g)(dpa);        // Expect: 2
-        outputBuffer[3] = __jvp(h)(dpa, dpb); // Expect: 8
+        // outputBuffer[3] = __jvp(h)(dpa, dpb); // Expect: 8
         //outputBuffer[4] = __jvp(j)(dpa, dpb); // Expect: 1
     }
 }

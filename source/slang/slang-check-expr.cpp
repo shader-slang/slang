@@ -1538,13 +1538,35 @@ namespace Slang
 
     Type* SemanticsVisitor::_toJVPReturnType(ASTBuilder* builder, Type* primalType)
     {
-        // Temporarily return float if original type is float
-        // otherwise void.
-        // TODO: revise this to return 'T.Differential' (currently have no idea how to do this)
-        if(primalType->equals(builder->getFloatType()))
-            return builder->getFloatType();
+        if (as<Witness>(tryGetInterfaceConformanceWitness(primalType, builder->getDifferentiableInterface())))
+        {
+            auto diffFieldName = getName("Differential");
+            auto lookupResult = lookUpMember(builder, this, diffFieldName, primalType);
+            
+            if (!lookupResult.isValid())
+                return builder->getErrorType();
+            
+            auto lookupExpr = createLookupResultExpr(diffFieldName,
+                lookupResult,
+                nullptr,
+                SourceLoc(),
+                nullptr);
+
+            lookupExpr = maybeResolveOverloadedExpr(lookupExpr, LookupMask::type, nullptr);
+
+            if (as<OverloadedExpr>(lookupExpr))
+                return builder->getErrorType();
+            
+            auto declRefType = GetTypeForDeclRef(as<DeclRefExpr>(lookupExpr)->declRef, SourceLoc());
+            if (auto typeType = as<TypeType>(declRefType))
+                return typeType->type;
+            else
+                return builder->getErrorType();
+        }
         else
+        {
             return builder->getVoidType();
+        }
     }
 
     Expr* SemanticsExprVisitor::visitJVPDifferentiateExpr(JVPDifferentiateExpr* expr)

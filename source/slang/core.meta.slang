@@ -661,6 +661,21 @@ extension float : IDifferentiable
     typedef float Differential;
 }
 
+extension vector<float, 3> : IDifferentiable
+{
+    typedef vector<float, 3> Differential;
+}
+
+extension vector<float, 2> : IDifferentiable
+{
+    typedef vector<float, 2> Differential;
+}
+
+extension vector<float, 4> : IDifferentiable
+{
+    typedef vector<float, 4> Differential;
+}
+
 //@ public:
 
     /// Sampling state for filtered texture fetches.
