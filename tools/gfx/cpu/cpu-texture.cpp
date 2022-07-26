@@ -227,20 +227,5 @@ Result TextureResourceImpl::init(ITextureResource::SubresourceData const* initDa
     return SLANG_OK;
 }
 
-Desc const& TextureResourceImpl::_getDesc()
-{
-    return m_desc;
-}
-
-Format TextureResourceImpl::getFormat()
-{
-    return m_desc.format;
-}
-
-int32_t TextureResourceImpl::getRank()
-{
-    return m_baseShape->rank;
-}
-
 } // namespace cpu
 } // namespace gfx

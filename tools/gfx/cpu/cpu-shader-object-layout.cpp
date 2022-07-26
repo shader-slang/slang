@@ -8,7 +8,7 @@ using namespace Slang;
 namespace cpu
 {
 
-ShaderObjectLayoutImpl(RendererBase* renderer, slang::TypeLayoutReflection* layout)
+ShaderObjectLayoutImpl::ShaderObjectLayoutImpl(RendererBase* renderer, slang::TypeLayoutReflection* layout)
 {
     initBase(renderer, layout);
 
@@ -129,7 +129,7 @@ const char* EntryPointLayoutImpl::getEntryPointName()
     return m_entryPointLayout->getName();
 }
 
-RootShaderObjectLayoutImpl(RendererBase* renderer, slang::ProgramLayout* programLayout)
+RootShaderObjectLayoutImpl::RootShaderObjectLayoutImpl(RendererBase* renderer, slang::ProgramLayout* programLayout)
     : ShaderObjectLayoutImpl(renderer, programLayout->getGlobalParamsTypeLayout())
     , m_programLayout(programLayout)
 {

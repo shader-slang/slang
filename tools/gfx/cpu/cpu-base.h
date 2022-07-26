@@ -11,7 +11,6 @@
 #include "core/slang-blob.h"
 
 #include "../immediate-renderer-base.h"
-#include "../renderer-shared.h"
 #include "../slang-context.h"
 #include "../mutable-shader-object.h"
 #define SLANG_PRELUDE_NAMESPACE slang_prelude

@@ -2,6 +2,9 @@
 #pragma once
 #include "cpu-base.h"
 
+#include "cpu-buffer.h"
+#include "cpu-texture.h"
+
 namespace gfx
 {
 using namespace Slang;
@@ -17,8 +20,8 @@ public:
         Buffer,
         Texture,
     };
-    Kind getViewKind() const;
-    Desc const& getDesc() const;
+    Kind getViewKind() const { return m_kind; }
+    Desc const& getDesc() const { return m_desc; }
 
 protected:
     ResourceViewImpl(Kind kind, Desc const& desc);
@@ -44,12 +47,12 @@ private:
 class TextureResourceViewImpl : public ResourceViewImpl, public slang_prelude::IRWTexture
 {
 public:
-    TextureResourceViewImpl(Desc const& desc, TextureResourceViewImpl* texture)
+    TextureResourceViewImpl(Desc const& desc, TextureResourceImpl* texture)
         : ResourceViewImpl(Kind::Texture, desc)
         , m_texture(texture)
     {}
 
-    TextureResourceViewImpl* getTexture() const;
+    TextureResourceImpl* getTexture() const;
 
     //
     // ITexture interface
@@ -70,7 +73,7 @@ public:
     void* refAt(const uint32_t* texelCoords) SLANG_OVERRIDE;
 
 private:
-    RefPtr<TextureResourceViewImpl> m_texture;
+    RefPtr<TextureResourceImpl> m_texture;
 
     void* _getTexelPtr(int32_t const* texelCoords);
 };

@@ -8,17 +8,7 @@ using namespace Slang;
 namespace cpu
 {
 
-Kind ResourceViewImpl::getViewKind() const
-{
-    return m_kind;
-}
-
-Desc const& ResourceViewImpl::getDesc() const
-{
-    return m_desc;
-}
-
-ResourceViewImpl(Kind kind, Desc const& desc)
+ResourceViewImpl::ResourceViewImpl(Kind kind, Desc const& desc)
     : m_kind(kind)
 {
     m_desc = desc;
@@ -29,16 +19,16 @@ BufferResourceImpl* BufferResourceViewImpl::getBuffer() const
     return m_buffer;
 }
 
-TextureResourceViewImpl* TextureResourceViewImpl::getTexture() const
+TextureResourceImpl* TextureResourceViewImpl::getTexture() const
 {
     return m_texture;
 }
 
-slang_prelude::TextureDimensions TextureResourceViewImpl::GetDimensions(int mipLevel = -1) SLANG_OVERRIDE
+slang_prelude::TextureDimensions TextureResourceViewImpl::GetDimensions(int mipLevel)
 {
     slang_prelude::TextureDimensions dimensions = {};
 
-    TextureResourceViewImpl* texture = m_texture;
+    TextureResourceImpl* texture = m_texture;
     auto& desc = texture->_getDesc();
     auto baseShape = texture->m_baseShape;
 
@@ -52,7 +42,7 @@ slang_prelude::TextureDimensions TextureResourceViewImpl::GetDimensions(int mipL
     return dimensions;
 }
 
-void TextureResourceViewImpl::Load(const int32_t* texelCoords, void* outData, size_t dataSize) SLANG_OVERRIDE
+void TextureResourceViewImpl::Load(const int32_t* texelCoords, void* outData, size_t dataSize)
 {
     void* texelPtr = _getTexelPtr(texelCoords);
 
@@ -63,7 +53,7 @@ void TextureResourceViewImpl::Sample(
     slang_prelude::SamplerState samplerState,
     const float* coords,
     void* outData,
-    size_t dataSize) SLANG_OVERRIDE
+    size_t dataSize)
 {
     // We have no access to information from fragment quads, so we cannot
     // compute the finite-difference derivatives needed from `coords`.
@@ -78,9 +68,9 @@ void TextureResourceViewImpl::SampleLevel(
     const float* coords,
     float level,
     void* outData,
-    size_t dataSize) SLANG_OVERRIDE
+    size_t dataSize)
 {
-    TextureResourceViewImpl* texture = m_texture;
+    TextureResourceImpl* texture = m_texture;
     auto baseShape = texture->m_baseShape;
     auto& desc = texture->_getDesc();
     int32_t rank = baseShape->rank;
@@ -128,14 +118,14 @@ void TextureResourceViewImpl::SampleLevel(
     m_texture->m_formatInfo->unpackFunc(texelPtr, outData, dataSize);
 }
 
-void* TextureResourceViewImpl::refAt(const uint32_t* texelCoords) SLANG_OVERRIDE
+void* TextureResourceViewImpl::refAt(const uint32_t* texelCoords)
 {
     return _getTexelPtr((int32_t const*)texelCoords);
 }
 
 void* TextureResourceViewImpl::_getTexelPtr(int32_t const* texelCoords)
 {
-    TextureResourceViewImpl* texture = m_texture;
+    TextureResourceImpl* texture = m_texture;
     auto baseShape = texture->m_baseShape;
     auto& desc = texture->_getDesc();
 

@@ -1,6 +1,8 @@
 // cpu-pipeline-state.cpp
 #include "cpu-pipeline-state.h"
 
+#include "cpu-shader-program.h"
+
 namespace gfx
 {
 using namespace Slang;

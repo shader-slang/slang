@@ -107,9 +107,9 @@ public:
 
     Result init(ITextureResource::SubresourceData const* initData);
 
-    Desc const& _getDesc();
-    Format getFormat();
-    int32_t getRank();
+    Desc const& _getDesc() { return m_desc; }
+    Format getFormat() { return m_desc.format; }
+    int32_t getRank() { return m_baseShape->rank; }
 
     CPUTextureBaseShapeInfo const* m_baseShape;
     CPUTextureFormatInfo const* m_formatInfo;

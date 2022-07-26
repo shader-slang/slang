@@ -16,7 +16,7 @@ class ShaderProgramImpl : public ShaderProgramBase
 public:
     RefPtr<RootShaderObjectLayoutImpl> layout;
 
-    ~CPUShaderProgram()
+    ~ShaderProgramImpl()
     {
     }
 };

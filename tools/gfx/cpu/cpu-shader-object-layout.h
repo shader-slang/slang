@@ -9,6 +9,35 @@ using namespace Slang;
 namespace cpu
 {
 
+struct BindingRangeInfo
+{
+    slang::BindingType bindingType;
+    Index count;
+    Index baseIndex; // Flat index for sub-objects
+    Index subObjectIndex;
+
+    // TODO: The `uniformOffset` field should be removed,
+    // since it cannot be supported by the Slang reflection
+    // API once we fix some design issues.
+    //
+    // It is only being used today for pre-allocation of sub-objects
+    // for constant buffers and parameter blocks (which should be
+    // deprecated/removed anyway).
+    //
+    // Note: We would need to bring this field back, plus
+    // a lot of other complexity, if we ever want to support
+    // setting of resources/buffers directly by a binding
+    // range index and array index.
+    //
+    Index uniformOffset; // Uniform offset for a resource typed field.
+};
+
+struct SubObjectRangeInfo
+{
+    RefPtr<ShaderObjectLayoutImpl> layout;
+    Index bindingRangeIndex;
+};
+
 class ShaderObjectLayoutImpl : public ShaderObjectLayoutBase
 {
 public:
@@ -16,35 +45,6 @@ public:
     // TODO: Once memory lifetime stuff is handled, there is
     // no specific need to even track binding or sub-object
     // ranges for CPU.
-
-    struct BindingRangeInfo
-    {
-        slang::BindingType bindingType;
-        Index count;
-        Index baseIndex; // Flat index for sub-objects
-        Index subObjectIndex;
-
-        // TODO: The `uniformOffset` field should be removed,
-        // since it cannot be supported by the Slang reflection
-        // API once we fix some design issues.
-        //
-        // It is only being used today for pre-allocation of sub-objects
-        // for constant buffers and parameter blocks (which should be
-        // deprecated/removed anyway).
-        //
-        // Note: We would need to bring this field back, plus
-        // a lot of other complexity, if we ever want to support
-        // setting of resources/buffers directly by a binding
-        // range index and array index.
-        //
-        Index uniformOffset; // Uniform offset for a resource typed field.
-    };
-
-    struct SubObjectRangeInfo
-    {
-        RefPtr<ShaderObjectLayoutImpl> layout;
-        Index bindingRangeIndex;
-    };
 
     size_t m_size = 0;
     List<SubObjectRangeInfo> subObjectRanges;
@@ -91,6 +91,7 @@ public:
     void getKernelThreadGroupSize(int kernelIndex, UInt* threadGroupSizes);
 
     EntryPointLayoutImpl* getEntryPoint(Index index);
+};
 
 } // namespace cpu
 } // namespace gfx
