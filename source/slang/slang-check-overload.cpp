@@ -1438,6 +1438,11 @@ namespace Slang
 
         for (auto& arg : expr->arguments)
         {
+            arg = maybeOpenRef(arg);
+        }
+
+        for (auto& arg : expr->arguments)
+        {
             arg = maybeOpenExistential(arg);
         }
 
