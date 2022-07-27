@@ -18,7 +18,11 @@ namespace debug
     {
     public:
         uint64_t uid;
-        DebugObjectBase();
+        DebugObjectBase()
+        {
+            static uint64_t uidCounter = 0;
+            uid = ++uidCounter;
+        }
     };
 
     template<typename TInterface>
