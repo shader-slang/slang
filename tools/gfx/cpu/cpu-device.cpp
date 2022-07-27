@@ -15,6 +15,11 @@ using namespace Slang;
 
 namespace cpu
 {
+    DeviceImpl::~DeviceImpl()
+    {
+        m_currentPipeline = nullptr;
+        m_currentRootObject = nullptr;
+    }
 
     SLANG_NO_THROW Result SLANG_MCALL DeviceImpl::initialize(const Desc& desc)
     {
