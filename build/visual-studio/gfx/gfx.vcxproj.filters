@@ -225,9 +225,6 @@
     <ClInclude Include="..\..\..\tools\gfx\d3d12\d3d12-vertex-layout.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\tools\gfx\debug-layer.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\..\tools\gfx\flag-combiner.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -343,6 +340,63 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\tools\gfx\vulkan\vk-vertex-layout.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\tools\gfx\debug-layer\debug-base.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\tools\gfx\debug-layer\debug-buffer.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\tools\gfx\debug-layer\debug-command-buffer.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\tools\gfx\debug-layer\debug-command-encoder.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\tools\gfx\debug-layer\debug-command-queue.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\tools\gfx\debug-layer\debug-device.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\tools\gfx\debug-layer\debug-fence.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\tools\gfx\debug-layer\debug-framebuffer.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\tools\gfx\debug-layer\debug-pipeline-state.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\tools\gfx\debug-layer\debug-render-pass.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\tools\gfx\debug-layer\debug-resource-views.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\tools\gfx\debug-layer\debug-sampler-state.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\tools\gfx\debug-layer\debug-shader-object.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\tools\gfx\debug-layer\debug-shader-program.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\tools\gfx\debug-layer\debug-shader-table.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\tools\gfx\debug-layer\debug-swap-chain.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\tools\gfx\debug-layer\debug-texture.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\tools\gfx\debug-layer\debug-transient-heap.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\tools\gfx\debug-layer\debug-vertex-layout.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
