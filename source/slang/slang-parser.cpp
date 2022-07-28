@@ -5185,6 +5185,10 @@ namespace Slang
 
     static bool _isCast(Parser* parser, Expr* expr)
     {
+        if (as<PointerTypeExpr>(expr))
+        {
+            return true;
+        }
 
         // We can't just look at expr and look up if it's a type, because we allow
         // out-of-order declarations. So to a first approximation we'll try and
@@ -5320,10 +5324,16 @@ namespace Slang
     {
         auto cursor = parser->tokenReader.getCursor();
         auto isRecovering = parser->isRecovering;
+        auto oldSink = parser->sink;
+        DiagnosticSink newSink(parser->sink->getSourceManager(), nullptr);
+        parser->sink = &newSink;
         outExpr = parser->ParseType();
-        if (outExpr && !parser->isRecovering && parser->LookAheadToken(tokenTypeAfter))
-            return true;
+        parser->sink = oldSink;
         parser->isRecovering = isRecovering;
+        if (outExpr && newSink.getErrorCount() == 0 && parser->LookAheadToken(tokenTypeAfter))
+        {
+            return true;
+        }
         parser->tokenReader.setCursor(cursor);
         return false;
     }
@@ -5348,7 +5358,7 @@ namespace Slang
             {
                 Token openParen = parser->ReadToken(TokenType::LParent);
                 Expr* typeExpr = nullptr;
-                if (peekTypeName(parser) && lookAheadAfterTypeExp(parser, typeExpr, TokenType::RParent))
+                if (peekTypeName(parser) && parser->LookAheadToken(TokenType::RParent))
                 {
                     TypeCastExpr* tcexpr = parser->astBuilder->create<ExplicitCastExpr>();
                     parser->FillPosition(tcexpr);
@@ -5367,7 +5377,11 @@ namespace Slang
                     // branch will be taken. This is okay in so far as SomeScope::Thing will parse
                     // as an expression.
                     
-                    Expr* base = parser->ParseExpression();
+                    Expr* base = nullptr;
+                    if (!lookAheadAfterTypeExp(parser, base, TokenType::RParent))
+                    {
+                        base = parser->ParseExpression();
+                    }
 
                     parser->ReadToken(TokenType::RParent);
 
