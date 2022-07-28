@@ -1,6 +1,11 @@
 // debug-shader-object.cpp
 #include "debug-shader-object.h"
 
+#include "debug-resource-views.h"
+#include "debug-sampler-state.h"
+
+#include "debug-helper-functions.h"
+
 namespace gfx
 {
 using namespace Slang;

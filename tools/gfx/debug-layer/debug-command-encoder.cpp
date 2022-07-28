@@ -1,6 +1,15 @@
 // debug-command-encoder.cpp
 #include "debug-command-encoder.h"
 
+#include "debug-buffer.h"
+#include "debug-command-buffer.h"
+#include "debug-pipeline-state.h"
+#include "debug-query.h"
+#include "debug-resource-views.h"
+#include "debug-texture.h"
+
+#include "debug-helper-functions.h"
+
 namespace gfx
 {
 using namespace Slang;

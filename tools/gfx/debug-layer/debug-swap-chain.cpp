@@ -1,6 +1,11 @@
 // debug-swap-chain.cpp
 #include "debug-swap-chain.h"
 
+#include "debug-command-queue.h"
+#include "debug-texture.h"
+
+#include "debug-helper-functions.h"
+
 namespace gfx
 {
 using namespace Slang;

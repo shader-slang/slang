@@ -1,6 +1,8 @@
 // debug-fence.cpp
 #include "debug-fence.h"
 
+#include "debug-helper-functions.h"
+
 namespace gfx
 {
 using namespace Slang;

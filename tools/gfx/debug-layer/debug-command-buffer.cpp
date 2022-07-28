@@ -1,6 +1,11 @@
 // debug-command-buffer.cpp
 #include "debug-command-buffer.h"
 
+#include "debug-framebuffer.h"
+#include "debug-render-pass.h"
+
+#include "debug-helper-functions.h"
+
 namespace gfx
 {
 using namespace Slang;

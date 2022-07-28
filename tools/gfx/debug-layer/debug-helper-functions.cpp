@@ -25,7 +25,7 @@ String _gfxGetFuncName(const char* input)
 }
 
 template <typename... TArgs>
-static char* _gfxDiagnoseFormat(
+char* _gfxDiagnoseFormat(
     char* buffer, // Initial buffer to output formatted string.
     size_t shortBufferSize, // Size of the initial buffer.
     List<char>& bufferArray, // A list for allocating a large buffer if needed.
@@ -45,7 +45,7 @@ static char* _gfxDiagnoseFormat(
 }
 
 template <typename... TArgs>
-static void _gfxDiagnoseImpl(DebugMessageType type, const char* format, TArgs... args)
+void _gfxDiagnoseImpl(DebugMessageType type, const char* format, TArgs... args)
 {
     char shortBuffer[256];
     List<char> bufferArray;

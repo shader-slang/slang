@@ -1,6 +1,8 @@
 // debug-pipeline-state.cpp
 #include "debug-pipeline-state.h"
 
+#include "debug-helper-functions.h"
+
 namespace gfx
 {
 using namespace Slang;

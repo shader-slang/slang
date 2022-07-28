@@ -1,6 +1,8 @@
 // debug-resource-views.cpp
 #include "debug-resource-views.h"
 
+#include "debug-helper-functions.h"
+
 namespace gfx
 {
 using namespace Slang;

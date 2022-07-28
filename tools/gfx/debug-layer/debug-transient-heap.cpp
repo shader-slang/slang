@@ -1,6 +1,10 @@
 // debug-transient-heap.cpp
 #include "debug-transient-heap.h"
 
+#include "debug-command-buffer.h"
+
+#include "debug-helper-functions.h"
+
 namespace gfx
 {
 using namespace Slang;

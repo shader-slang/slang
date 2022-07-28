@@ -1,6 +1,10 @@
 // debug-command-queue.cpp
 #include "debug-command-queue.h"
 
+#include "debug-command-buffer.h"
+
+#include "debug-helper-functions.h"
+
 namespace gfx
 {
 using namespace Slang;

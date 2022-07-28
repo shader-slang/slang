@@ -1,6 +1,8 @@
 // debug-texture.cpp
 #include "debug-texture.h"
 
+#include "debug-helper-functions.h"
+
 namespace gfx
 {
 using namespace Slang;

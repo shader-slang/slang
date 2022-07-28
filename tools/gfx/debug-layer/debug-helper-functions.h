@@ -2,6 +2,25 @@
 #pragma once
 #include "debug-base.h"
 
+#include "debug-buffer.h"
+#include "debug-command-buffer.h"
+#include "debug-command-queue.h"
+#include "debug-device.h"
+#include "debug-fence.h"
+#include "debug-framebuffer.h"
+#include "debug-pipeline-state.h"
+#include "debug-query.h"
+#include "debug-render-pass.h"
+#include "debug-resource-views.h"
+#include "debug-sampler-state.h"
+#include "debug-shader-object.h"
+#include "debug-shader-program.h"
+#include "debug-shader-table.h"
+#include "debug-swap-chain.h"
+#include "debug-texture.h"
+#include "debug-transient-heap.h"
+#include "debug-vertex-layout.h"
+
 namespace gfx
 {
 using namespace Slang;
@@ -32,7 +51,7 @@ struct SetCurrentFuncRAII
 String _gfxGetFuncName(const char* input);
 
 template <typename... TArgs>
-static char* _gfxDiagnoseFormat(
+char* _gfxDiagnoseFormat(
     char* buffer, // Initial buffer to output formatted string.
     size_t shortBufferSize, // Size of the initial buffer.
     List<char>& bufferArray, // A list for allocating a large buffer if needed.
@@ -40,7 +59,7 @@ static char* _gfxDiagnoseFormat(
     TArgs... args);
 
 template <typename... TArgs>
-static void _gfxDiagnoseImpl(DebugMessageType type, const char* format, TArgs... args);
+void _gfxDiagnoseImpl(DebugMessageType type, const char* format, TArgs... args);
 
 #define GFX_DIAGNOSE_ERROR(message)                                                                \
     _gfxDiagnoseImpl(                                                                              \

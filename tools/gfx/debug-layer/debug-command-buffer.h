@@ -2,6 +2,9 @@
 #pragma once
 #include "debug-base.h"
 
+#include "debug-command-encoder.h"
+#include "debug-shader-object.h"
+
 namespace gfx
 {
 using namespace Slang;

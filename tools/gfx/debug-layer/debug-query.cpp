@@ -1,6 +1,8 @@
 // debug-query.cpp
 #include "debug-query.h"
 
+#include "debug-helper-functions.h"
+
 namespace gfx
 {
 using namespace Slang;
