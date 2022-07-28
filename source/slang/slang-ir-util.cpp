@@ -38,4 +38,9 @@ bool isPtrToClassType(IRInst* type)
     return isPointerOfType(type, kIROp_ClassType);
 }
 
+bool isPtrToArrayType(IRInst* type)
+{
+    return isPointerOfType(type, kIROp_ArrayType) || isPointerOfType(type, kIROp_UnsizedArrayType);
+}
+
 }

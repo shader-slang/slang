@@ -2015,6 +2015,17 @@ namespace Slang
         memberExpr->name = expectIdentifier(parser).name;
         return memberExpr;
     }
+    static Expr* parseStaticMemberType(Parser* parser, Expr* base, SourceLoc opLoc)
+    {
+        // When called the :: or . have been consumed, so don't need to consume here.
+
+        StaticMemberExpr* memberExpr = parser->astBuilder->create<StaticMemberExpr>();
+        memberExpr->memberOperatorLoc = opLoc;
+        parser->FillPosition(memberExpr);
+        memberExpr->baseExpression = base;
+        memberExpr->name = expectIdentifier(parser).name;
+        return memberExpr;
+    }
 
     // Parse option `[]` braces after a type expression, that indicate an array type
     static Expr* parsePostfixTypeSuffix(
@@ -2323,7 +2334,7 @@ namespace Slang
             case TokenType::Scope:
                 {
                     auto opToken = parser->ReadToken(TokenType::Scope);
-                    typeExpr = parseMemberType(parser, typeExpr, opToken.loc);
+                    typeExpr = parseStaticMemberType(parser, typeExpr, opToken.loc);
                     break;
                 }
             case TokenType::Dot:
