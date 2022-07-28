@@ -178,8 +178,11 @@ void Session::init()
     coreLanguageScope = builtinAstBuilder->create<Scope>();
     coreLanguageScope->nextSibling = baseLanguageScope;
 
+    autodiffLanguageScope = builtinAstBuilder->create<Scope>();
+    autodiffLanguageScope->nextSibling = coreLanguageScope;
+
     hlslLanguageScope = builtinAstBuilder->create<Scope>();
-    hlslLanguageScope->nextSibling = coreLanguageScope;
+    hlslLanguageScope->nextSibling = autodiffLanguageScope;
 
     slangLanguageScope = builtinAstBuilder->create<Scope>();
     slangLanguageScope->nextSibling = hlslLanguageScope;
@@ -290,6 +293,7 @@ SlangResult Session::compileStdLib(slang::CompileStdLibFlags compileFlags)
     // TODO(JS): Could make this return a SlangResult as opposed to exception
     addBuiltinSource(coreLanguageScope, "core", getCoreLibraryCode());
     addBuiltinSource(hlslLanguageScope, "hlsl", getHLSLLibraryCode());
+    addBuiltinSource(autodiffLanguageScope, "diff", getAutodiffLibraryCode());
 
     if (compileFlags & slang::CompileStdLibFlag::WriteDocumentation)
     {
@@ -348,6 +352,7 @@ SlangResult Session::loadStdLib(const void* stdLib, size_t stdLibSizeInBytes)
     // Let's try loading serialized modules and adding them
     SLANG_RETURN_ON_FAIL(_readBuiltinModule(fileSystem, coreLanguageScope, "core"));
     SLANG_RETURN_ON_FAIL(_readBuiltinModule(fileSystem, hlslLanguageScope, "hlsl"));
+    SLANG_RETURN_ON_FAIL(_readBuiltinModule(fileSystem, autodiffLanguageScope, "diff"));
     return SLANG_OK;
 }
 

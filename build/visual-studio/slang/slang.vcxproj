@@ -616,6 +616,7 @@ IF EXIST ..\..\..\external\slang-binaries\bin\windows-aarch64\slang-glslang.dll\
   </ItemGroup>
   <ItemGroup>
     <None Include="..\..\..\source\slang\core.meta.slang" />
+    <None Include="..\..\..\source\slang\diff.meta.slang" />
     <None Include="..\..\..\source\slang\hlsl.meta.slang" />
   </ItemGroup>
   <ItemGroup>
