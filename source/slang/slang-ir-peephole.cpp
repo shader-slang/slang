@@ -90,7 +90,7 @@ struct PeepholeContext : InstPassBase
                 auto ptr = inst->getOperand(0);
                 IRBuilder builder(&sharedBuilderStorage);
                 builder.setInsertBefore(inst);
-                auto neq = builder.emitNeq(ptr, builder.getIntValue(builder.getIntType(), 0));
+                auto neq = builder.emitNeq(ptr, builder.getPtrValue(nullptr));
                 inst->replaceUsesWith(neq);
                 inst->removeAndDeallocate();
                 changed = true;

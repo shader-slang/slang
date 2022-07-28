@@ -5331,14 +5331,14 @@ namespace Slang
         return false;
     }
 
-    static bool lookAheadAfterTypeExp(Parser* parser, Expr* &outExpr, TokenType tokenTypeAfter)
+    static bool tryParseExpression(Parser* parser, Expr* &outExpr, TokenType tokenTypeAfter)
     {
         auto cursor = parser->tokenReader.getCursor();
         auto isRecovering = parser->isRecovering;
         auto oldSink = parser->sink;
         DiagnosticSink newSink(parser->sink->getSourceManager(), nullptr);
         parser->sink = &newSink;
-        outExpr = parser->ParseType();
+        outExpr = parser->ParseExpression();
         parser->sink = oldSink;
         parser->isRecovering = isRecovering;
         if (outExpr && newSink.getErrorCount() == 0 && parser->LookAheadToken(tokenTypeAfter))
@@ -5389,9 +5389,9 @@ namespace Slang
                     // as an expression.
                     
                     Expr* base = nullptr;
-                    if (!lookAheadAfterTypeExp(parser, base, TokenType::RParent))
+                    if (!tryParseExpression(parser, base, TokenType::RParent))
                     {
-                        base = parser->ParseExpression();
+                        base = parser->ParseType();
                     }
 
                     parser->ReadToken(TokenType::RParent);
