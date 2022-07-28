@@ -1521,7 +1521,7 @@ namespace Slang
         }
         else if (auto primalInOutType = as<InOutType>(primalType))
         {
-            return builder->getInOutType(_toDifferentialParamType(builder, primalOutType->getValueType()));
+            return builder->getInOutType(_toDifferentialParamType(builder, primalInOutType->getValueType()));
         }
 
         // Get a reference to the builtin 'IDifferentiable' interface
@@ -1538,35 +1538,13 @@ namespace Slang
 
     Type* SemanticsVisitor::_toJVPReturnType(ASTBuilder* builder, Type* primalType)
     {
-        if (as<Witness>(tryGetInterfaceConformanceWitness(primalType, builder->getDifferentiableInterface())))
-        {
-            auto diffFieldName = getName("Differential");
-            auto lookupResult = lookUpMember(builder, this, diffFieldName, primalType);
-            
-            if (!lookupResult.isValid())
-                return builder->getErrorType();
-            
-            auto lookupExpr = createLookupResultExpr(diffFieldName,
-                lookupResult,
-                nullptr,
-                SourceLoc(),
-                nullptr);
-
-            lookupExpr = maybeResolveOverloadedExpr(lookupExpr, LookupMask::type, nullptr);
-
-            if (as<OverloadedExpr>(lookupExpr))
-                return builder->getErrorType();
-            
-            auto declRefType = GetTypeForDeclRef(as<DeclRefExpr>(lookupExpr)->declRef, SourceLoc());
-            if (auto typeType = as<TypeType>(declRefType))
-                return typeType->type;
-            else
-                return builder->getErrorType();
-        }
+        if (auto conformanceWitness = 
+            as<Witness>(tryGetInterfaceConformanceWitness(
+                primalType,
+                builder->getDifferentiableInterface())))
+            return builder->getDifferentialPairType(primalType, conformanceWitness);
         else
-        {
-            return builder->getVoidType();
-        }
+            return primalType;
     }
 
     Expr* SemanticsExprVisitor::visitJVPDifferentiateExpr(JVPDifferentiateExpr* expr)

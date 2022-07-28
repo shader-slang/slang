@@ -8,9 +8,11 @@ typedef float.Differential dfloat;
 
 import test_intrinsics;
 
-dfloat my_pow_jvp(dpfloat x, dpfloat n)
+dpfloat my_pow_jvp(dpfloat x, dpfloat n)
 {
-    return x.d() * n.p() * pow(x.p(), n.p()-1) + n.d() * pow(x.p(), n.p()) * log(x.p());
+    return dpfloat(
+        pow(x.p(), n.p()),
+        x.d() * n.p() * pow(x.p(), n.p()-1) + n.d() * pow(x.p(), n.p()) * log(x.p()));
 }
 
 [__custom_jvp(my_pow_jvp)]
@@ -23,9 +25,9 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
         dpfloat dpa = dpfloat(5.0, 1.0);
         dpfloat dpn = dpfloat(2, 0.0);
 
-        outputBuffer[0] = __jvp(_pow)(dpa, dpn);        // Expect: 10.0
+        outputBuffer[0] = __jvp(_pow)(dpa, dpn).d();        // Expect: 10.0
         outputBuffer[1] = __jvp(_pow)(
             dpfloat(dpa.p(), 0.0),
-            dpfloat(dpn.p(), 1.0));                     // Expect: 40.23595
+            dpfloat(dpn.p(), 1.0)).d();                     // Expect: 40.23595
     }
 }

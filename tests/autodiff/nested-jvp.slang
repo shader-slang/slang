@@ -6,7 +6,6 @@ RWStructuredBuffer<float> outputBuffer;
 
 typedef __DifferentialPair<float> dpfloat;
 typedef __DifferentialPair<float3> dpfloat3;
-typedef float.Differential dfloat;
 
 [__custom_jvp(pow_jvp)]
 float pow_(float x, float n)
@@ -14,23 +13,25 @@ float pow_(float x, float n)
     return pow<float>(x, n);
 }
 
-
 [__custom_jvp(max_jvp)]
 float max_(float x, float y)
 {
     return max<float>(x, y);
 }
 
-
-dfloat pow_jvp(dpfloat x, dpfloat n)
+dpfloat pow_jvp(dpfloat x, dpfloat n)
 {
-    return x.d() * n.p() * pow(x.p(), n.p()-1) + ((n.d() != 0.0) ? (n.d() * pow(x.p(), n.p()) * log(x.p())) : 0.0);
+    return dpfloat(
+        pow(x.p(), n.p()),
+        x.d() * n.p() * pow(x.p(), n.p()-1) + 
+            ((n.d() != 0.0) ? (n.d() * pow(x.p(), n.p()) * log(x.p())) : 0.0));
 }
 
-
-dfloat max_jvp(dpfloat x, dpfloat y)
+dpfloat max_jvp(dpfloat x, dpfloat y)
 {
-    return (x.p() > y.p()) ? x.d() : y.d();
+    return dpfloat(
+        max(x.p(), y.p()),
+        (x.p() > y.p()) ? x.d() : y.d());
 }
 
 
@@ -60,7 +61,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
         outputBuffer[0] = __jvp(fresnel)(
             dpfloat3(f0, d_f0),
             dpfloat3(f90, d_f90),
-            dpfloat(cosTheta, d_cosTheta)).y; // Expect: -0.031250
+            dpfloat(cosTheta, d_cosTheta)).d().y; // Expect: -0.031250
 
         float a = 1.0;
         float b = -0.4;
@@ -73,13 +74,13 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
         outputBuffer[1] = __jvp(g)(
             dpfloat(a, da),
             dpfloat(b, db),
-            dpfloat(c, dc));                 // Expect: -0.24375
+            dpfloat(c, dc)).d();                 // Expect: -0.24375
 
         outputBuffer[2] = g(a, b, c);       // Expect: 0.95625
 
         outputBuffer[3] = __jvp(g)(
             dpfloat(a, da),
             dpfloat(b, db),
-            dpfloat(3.0, dc));               // Expect: -0.4;
+            dpfloat(3.0, dc)).d();               // Expect: -0.4;
     }
 }
