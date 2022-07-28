@@ -377,23 +377,19 @@ struct JVPTranscriber
         for (UIndex i = 0; i < funcType->getParamCount(); i++)
         {
             auto origType = funcType->getParamType(i);
-            if (auto diffPairType = tryCreateDifferentialPairFromType(builder, origType))
+            if (auto diffPairType = tryGetDiffPairType(builder, origType))
                 newParameterTypes.add(diffPairType);
             else
                 newParameterTypes.add(origType);
         }
 
-        // Transcribe return type. 
+        // Transcribe return type to a pair.
         // This will be void if the primal return type is non-differentiable.
         //
-        if (tryCreateDifferentialPairFromType(builder, funcType->getResultType()))
-        {
-            diffReturnType = (IRType*)(diffConformanceContext->getDifferentialForType(builder, funcType->getResultType()));
-        }
+        if (auto returnPairType = tryGetDiffPairType(builder, funcType->getResultType()))
+            diffReturnType = returnPairType;
         else
-        {
             diffReturnType = builder->getVoidType();
-        }
 
         return builder->getFuncType(newParameterTypes, diffReturnType);
     }
@@ -416,14 +412,14 @@ struct JVPTranscriber
         }
     }
     
-    IRType* tryCreateDifferentialPairFromType(IRBuilder* builder, IRType* origType)
+    IRType* tryGetDiffPairType(IRBuilder* builder, IRType* origType)
     {
         // If this is a PtrType (out, inout, etc..), then create diff pair from
         // value type and re-apply the appropropriate PtrType wrapper.
         // 
         if (auto origPtrType = as<IRPtrTypeBase>(origType))
         {   
-            if (auto diffPairValueType = tryCreateDifferentialPairFromType(builder, origPtrType->getValueType()))
+            if (auto diffPairValueType = tryGetDiffPairType(builder, origPtrType->getValueType()))
                 return builder->getPtrType(origType->getOp(), diffPairValueType);
             else 
                 return nullptr;
@@ -435,7 +431,7 @@ struct JVPTranscriber
     IRInst* differentiateParam(IRBuilder* builder, IRParam* origParam)
     {
         // Try to get a differential pair, if the original type implements IDifferentiable
-        if (auto diffPairType = tryCreateDifferentialPairFromType(builder, origParam->getFullType()))
+        if (auto diffPairType = tryGetDiffPairType(builder, origParam->getFullType()))
         {
             IRParam* diffParam = builder->emitParam(diffPairType);
 
@@ -641,8 +637,12 @@ struct JVPTranscriber
         IRInst* returnVal = origReturn->getVal();
         if (auto diffReturnVal = getDifferentialInst(returnVal, nullptr))
         {   
-            IRReturn* diffReturn = as<IRReturn>(builder->emitReturn(diffReturnVal));
+            auto pairType = pairBuilder->getOrCreateDiffPairType(builder, returnVal->getDataType());
+            auto diffPair = builder->emitMakeDifferentialPair(pairType, returnVal, diffReturnVal);
+
+            IRReturn* diffReturn = as<IRReturn>(builder->emitReturn(diffPair));
             SLANG_ASSERT(diffReturn);
+
             return diffReturn;
         }
         else
@@ -671,9 +671,6 @@ struct JVPTranscriber
     // Differentiating a call instruction here is primarily about generating
     // an appropriate call list based on whichever parameters have differentials 
     // in the current transcription context.
-    // Note(sai): Currently we don't look at modifiers (in, out, const etc..) in the function
-    // type, and so only support 'plain' parameters. We need to validte this somewhere to
-    // avoid weird behaviour
     // 
     IRInst* differentiateCall(IRBuilder* builder, IRCall* origCall)
     {   
@@ -692,7 +689,7 @@ struct JVPTranscriber
                 auto origArg = origCall->getArg(ii);
 
                 auto origType = origArg->getDataType();
-                if (auto pairType = tryCreateDifferentialPairFromType(builder, origType))
+                if (auto pairType = tryGetDiffPairType(builder, origType))
                 {
                     auto diffArg = getDifferentialInst(origArg, nullptr);
 
@@ -712,9 +709,16 @@ struct JVPTranscriber
                 }
             }
             
-            return builder->emitCallInst(differentiateType(builder, origCall->getFullType()),
-                                         diffCall,
-                                         args);
+            auto callInst = builder->emitCallInst(
+                tryGetDiffPairType(builder, origCall->getFullType()),
+                diffCall,
+                args);
+
+            // TODO: remove the oldCallInst <-> callInst mapping and replace with
+            // primal access. Also map the primal acess to the 
+            // origCall->
+            
+            return callInst;
         }
         else
         {
@@ -833,21 +837,6 @@ struct JVPTranscriber
             if (as<IROutType>(origParam->getDataType()))
                 return false;
         }
-        else if (auto origStore = as<IRStore>(origInst))
-        {
-            IRInst* storeLocation = origStore->getPtr();
-
-            // Writing to a parameter is a side-effect that should be avoided.
-            if(as<IRParam>(storeLocation))
-                return false;
-
-            // If attempting to store to a location without a clone, 
-            // then this instruction likely has side-effects external to the
-            // current function.
-            // 
-            if(!lookUp(&cloneEnv, storeLocation))
-                return false;
-        }
         
         return true;
     }
@@ -862,7 +851,8 @@ struct JVPTranscriber
         SLANG_ASSERT(origInst);
 
         IRInst* diffInst = differentiateInst(builder, origInst);
-        
+
+
         // In case it's not safe to clone the old instruction, 
         // remove it from the graph.
         // For instance, instructions that handle control flow 
@@ -877,6 +867,23 @@ struct JVPTranscriber
 
             origInst->removeAndDeallocate();
             mapDifferentialInst(origInstOld, diffInst);
+        }
+
+        // TODO(sai): Very temporary hack for IRCall, while we rearrange
+        // the derivative logic slightly.
+        // 
+        if (auto oldCall = as<IRCall>(origInstOld))
+        {
+            auto primalFieldAccess = pairBuilder->emitPrimalFieldAccess(builder, diffInst);
+            auto diffFieldAccess = pairBuilder->emitDiffFieldAccess(builder, diffInst);
+            // Overwrite the cloned call with a field access.
+            cloneEnv.mapOldValToNew[oldCall] = primalFieldAccess;
+
+            // Erase old mapping
+            this->instMapD.Remove(origInst);
+
+            // Map diff field as the derivative for the primal field.
+            mapDifferentialInst(primalFieldAccess, diffFieldAccess);
         }
 
         return diffInst;
@@ -1001,12 +1008,13 @@ struct JVPDerivativeContext
         // Process all JVPDifferentiate instructions (kIROp_JVPDifferentiate), by 
         // generating derivative code for the referenced function.
         //
-        // Temporarily, this also replaces any uses of DifferentialPair<T> with an auto-generated struct type.
-        // This is mainly for user-defined derivative code, since auto-generated code
-        // uses the struct type by default.
-        //
         bool modified = processReferencedFunctions(builder);
 
+        // Replaces IRDifferentialPairType with an auto-generated struct,
+        // IRDifferentialPairGetDifferential with 'differential' field access,
+        // IRDifferentialPairGetPrimal with 'primal' field access, and
+        // IRMakeDifferentialPair with an IRMakeStruct.
+        // 
         modified |= processPairTypes(builder, module->getModuleInst(), (&diffConformanceContextStorage));
 
         return modified;

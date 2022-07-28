@@ -6,18 +6,6 @@ RWStructuredBuffer<float> outputBuffer;
 
 typedef __DifferentialPair<float> dpfloat;
 
-struct Foo
-{
-    float p;
-    float d;
-};
-
-void h_jvp(Foo x, Foo y, out Foo result)
-{
-    result.p = x.d + y.p;
-}
-
-
 __differentiate_jvp void h(float x, float y, out float result)
 {
     float m = x + y;
