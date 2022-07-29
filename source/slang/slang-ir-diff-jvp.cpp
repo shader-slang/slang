@@ -9,7 +9,17 @@
 namespace Slang
 {
 
+template<typename P, typename D>
+struct Pair
+{
+    P primal;
+    D differential;
 
+    Pair(P primal, D differential) : primal(primal), differential(differential)
+    {}
+};
+
+typedef Pair<IRInst*, IRInst*> InstPair;
 
 struct DifferentiableTypeConformanceContext
 {
@@ -354,12 +364,26 @@ struct JVPTranscriber
         instMapD.Add(origInst, diffInst);
     }
 
-    IRInst* getDifferentialInst(IRInst* origInst)
+    void mapPrimalInst(IRInst* origInst, IRInst* primalInst)
+    {
+        if (cloneEnv.mapOldValToNew.ContainsKey(origInst) && cloneEnv.mapOldValToNew[origInst] != primalInst)
+        {
+            getSink()->diagnose(origInst->sourceLoc,
+                Diagnostics::internalCompilerError,
+                "inconsistent primal instruction for original");
+        }
+        else
+        {
+            cloneEnv.mapOldValToNew[origInst] = primalInst;
+        }
+    }
+
+    IRInst* lookupDiffInst(IRInst* origInst)
     {
         return instMapD[origInst];
     }
 
-    IRInst* getDifferentialInst(IRInst* origInst, IRInst* defaultInst)
+    IRInst* lookupDiffInst(IRInst* origInst, IRInst* defaultInst)
     {
         return (hasDifferentialInst(origInst)) ? instMapD[origInst] : defaultInst;
     }
@@ -367,6 +391,43 @@ struct JVPTranscriber
     bool hasDifferentialInst(IRInst* origInst)
     {
         return instMapD.ContainsKey(origInst);
+    }
+
+    IRInst* lookupPrimalInst(IRInst* origInst)
+    {
+        return cloneEnv.mapOldValToNew[origInst];
+    }
+
+    IRInst* lookupPrimalInst(IRInst* origInst, IRInst* defaultInst)
+    {
+        return (hasPrimalInst(origInst)) ? lookupPrimalInst(origInst) : defaultInst;
+    }
+
+    bool hasPrimalInst(IRInst* origInst)
+    {
+        return cloneEnv.mapOldValToNew.ContainsKey(origInst);
+    }
+    
+    IRInst* findOrTranscribeDiffInst(IRBuilder* builder, IRInst* origInst)
+    {
+        if (!hasDifferentialInst(origInst))
+        {
+            transcribe(builder, origInst);
+            SLANG_ASSERT(hasDifferentialInst(origInst));
+        }
+
+        return lookupDiffInst(origInst);
+    }
+
+    IRInst* findOrTranscribePrimalInst(IRBuilder* builder, IRInst* origInst)
+    {
+        if (!hasPrimalInst(origInst))
+        {
+            transcribe(builder, origInst);
+            SLANG_ASSERT(hasPrimalInst(origInst));
+        }
+
+        return lookupPrimalInst(origInst);
     }
 
     IRFuncType* differentiateFunctionType(IRBuilder* builder, IRFuncType* funcType)
@@ -427,77 +488,27 @@ struct JVPTranscriber
 
         return pairBuilder->getOrCreateDiffPairType(builder, origType);
     }
-    
-    IRInst* differentiateParam(IRBuilder* builder, IRParam* origParam)
+
+    InstPair transcribeParam(IRBuilder* builder, IRParam* origParam)
     {
-        // Try to get a differential pair, if the original type implements IDifferentiable
         if (auto diffPairType = tryGetDiffPairType(builder, origParam->getFullType()))
         {
-            IRParam* diffParam = builder->emitParam(diffPairType);
+            IRParam* diffPairParam = builder->emitParam(diffPairType);
 
-            // auto diffNameHint = getDiffPairVarName(origParam);
-            // if (diffNameHint.getLength() > 0)
-            //     builder->addNameHintDecoration(diffParam, diffNameHint.getUnownedSlice());
+            auto diffPairVarName = makeDiffPairName(origParam);
+            if (diffPairVarName.getLength() > 0)
+                builder->addNameHintDecoration(diffPairParam, diffPairVarName.getUnownedSlice());
 
-            SLANG_ASSERT(diffParam);
-            return diffParam;
+            SLANG_ASSERT(diffPairParam);
+
+            return InstPair(
+                pairBuilder->emitPrimalFieldAccess(builder, diffPairParam),
+                pairBuilder->emitDiffFieldAccess(builder, diffPairParam));
         }
-        return nullptr;
-    }
-
-    List<IRParam*> transcribeParams(IRBuilder* builder, IRInstList<IRParam> origParamList)
-    {
-        List<IRParam*> origParams;
-        List<IRParam*> newParamList;
-        List<bool> isDiff;
-
-        // Go through all parameters and generate derivative versions.
-        // Note that this is one place where the primal (original) inst needs special
-        // handling. Instead of adding a new inst for the differential and cloning the 
-        // primal one, we have a single param inst for both, with a pair type. 
-        // Therefore, we emit a member access instruction for the primal and differential.
-        // 
-
-        // First emit all the parameters 
-        for (auto origParam : origParamList)
-        {
-            origParams.add(origParam);
-            if (IRInst* diffParam = differentiateParam(builder, origParam))
-            {
-                newParamList.add(as<IRParam>(diffParam));
-                isDiff.add(true);
-            }
-            else
-            {
-                newParamList.add(as<IRParam>(cloneInst(&cloneEnv, builder, origParam)));
-                isDiff.add(false);
-            }
-        }
-
-        // Go back over them and emit accessors.
-        for (Index ii = 0; ii < newParamList.getCount(); ii++)
-        {
-            IRInst* newInst = nullptr;
-            IRInst* diffInst = nullptr;
-
-            if (isDiff[ii])
-            {
-                auto diffPairParam = newParamList[ii];
-                newInst = pairBuilder->emitPrimalFieldAccess(builder, diffPairParam);
-                diffInst = pairBuilder->emitDiffFieldAccess(builder, diffPairParam);
-            }
-            else
-            {
-                newInst = newParamList[ii];
-                diffInst = nullptr;
-            }
-
-            cloneEnv.mapOldValToNew[origParams[ii]] = newInst;
-            mapDifferentialInst(newInst, diffInst);
-        }
-
-        return newParamList;
-
+        
+        return InstPair(
+            cloneInst(&cloneEnv, builder, origParam),
+            nullptr);
     }
 
     // Returns "d<var-name>" to use as a name hint for variables and parameters.
@@ -513,7 +524,20 @@ struct JVPTranscriber
         return String("");
     }
 
-    IRInst* differentiateVar(IRBuilder* builder, IRVar* origVar)
+    // Returns "dp<var-name>" to use as a name hint for parameters.
+    // If no primal name is available, returns a blank string.
+    // 
+    String makeDiffPairName(IRInst* origVar)
+    {
+        if (auto namehintDecoration = origVar->findDecoration<IRNameHintDecoration>())
+        {
+            return ("dp" + String(namehintDecoration->getName()));
+        }
+
+        return String("");
+    }
+
+    InstPair transcribeVar(IRBuilder* builder, IRVar* origVar)
     {
         if (IRType* diffType = differentiateType(builder, origVar->getDataType()->getValueType()))
         {
@@ -524,20 +548,26 @@ struct JVPTranscriber
             if (diffNameHint.getLength() > 0)
                 builder->addNameHintDecoration(diffVar, diffNameHint.getUnownedSlice());
 
-            return diffVar;
+            return InstPair(cloneInst(&cloneEnv, builder, origVar), diffVar);
         }
-        return nullptr;
+
+        return InstPair(cloneInst(&cloneEnv, builder, origVar), nullptr);
     }
 
-    IRInst* differentiateBinaryArith(IRBuilder* builder, IRInst* origArith)
+    InstPair transcribeBinaryArith(IRBuilder* builder, IRInst* origArith)
     {
         SLANG_ASSERT(origArith->getOperandCount() == 2);
+
+        IRInst* primalArith = cloneInst(&cloneEnv, builder, origArith);
         
         auto origLeft = origArith->getOperand(0);
         auto origRight = origArith->getOperand(1);
 
-        auto diffLeft = getDifferentialInst(origLeft);
-        auto diffRight = getDifferentialInst(origRight);
+        auto primalLeft = findOrTranscribePrimalInst(builder, origLeft);
+        auto primalRight = findOrTranscribePrimalInst(builder, origRight);
+    
+        auto diffLeft = findOrTranscribeDiffInst(builder, origLeft);
+        auto diffRight = findOrTranscribeDiffInst(builder, origRight);
 
         auto leftZero = builder->getFloatValue(origLeft->getDataType(), 0.0);
         auto rightZero = builder->getFloatValue(origRight->getDataType(), 0.0);
@@ -547,29 +577,26 @@ struct JVPTranscriber
             diffLeft = diffLeft ? diffLeft : leftZero;
             diffRight = diffRight ? diffRight : rightZero;
 
-            // Might have to do special-case handling for non-scalar types,
-            // like float3 or float3x3
-            // 
             auto resultType = origArith->getDataType();
             switch(origArith->getOp())
             {
             case kIROp_Add:
-                return builder->emitAdd(resultType, diffLeft, diffRight);
+                return InstPair(primalArith, builder->emitAdd(resultType, diffLeft, diffRight));
             case kIROp_Mul:
-                return builder->emitAdd(resultType,
-                    builder->emitMul(resultType, diffLeft, origRight),
-                    builder->emitMul(resultType, origLeft, diffRight));
+                return InstPair(primalArith, builder->emitAdd(resultType,
+                    builder->emitMul(resultType, diffLeft, primalRight),
+                    builder->emitMul(resultType, primalLeft, diffRight)));
             case kIROp_Sub:
-                return builder->emitSub(resultType, diffLeft, diffRight);
+                return InstPair(primalArith, builder->emitSub(resultType, diffLeft, diffRight));
             case kIROp_Div:
-                return builder->emitDiv(resultType, 
+                return InstPair(primalArith, builder->emitDiv(resultType, 
                     builder->emitSub(
                         resultType,
-                        builder->emitMul(resultType, diffLeft, origRight),
-                        builder->emitMul(resultType, origLeft, diffRight)),
+                        builder->emitMul(resultType, diffLeft, primalRight),
+                        builder->emitMul(resultType, primalLeft, diffRight)),
                     builder->emitMul(
-                        origRight->getDataType(), origRight, origRight
-                    ));
+                        primalRight->getDataType(), primalRight, primalRight
+                    )));
             default:
                 getSink()->diagnose(origArith->sourceLoc,
                     Diagnostics::unimplemented,
@@ -577,79 +604,73 @@ struct JVPTranscriber
             }
         }
 
-        return nullptr;
+        return InstPair(primalArith, nullptr);
     }
 
-    IRInst* differentiateLoad(IRBuilder* builder, IRLoad* origLoad)
+    InstPair transcribeLoad(IRBuilder* builder, IRLoad* origLoad)
     {
         auto origPtr = origLoad->getPtr();
-        if (as<IRVar>(origPtr) || as<IRParam>(origPtr) || as<IRFieldAddress>(origPtr))
-        {   
-            // If the loaded parameter has a differential version, 
-            // emit a load instruction for the differential parameter.
-            // Otherwise, emit nothing since there's nothing to load.
-            // 
-            if (auto diffPtr = getDifferentialInst(origPtr, nullptr))
-            {
-                IRLoad* diffLoad = as<IRLoad>(builder->emitLoad(diffPtr));
-                SLANG_ASSERT(diffLoad);
-                return diffLoad;
-            }
-            return nullptr;
+        
+        auto primalLoad = cloneInst(&cloneEnv, builder, origLoad);
+
+        if (auto diffPtr = lookupDiffInst(origPtr, nullptr))
+        {
+            IRLoad* diffLoad = as<IRLoad>(builder->emitLoad(diffPtr));
+            SLANG_ASSERT(diffLoad);
+
+            return InstPair(primalLoad, diffLoad);
         }
-        else
-            getSink()->diagnose(origLoad->sourceLoc,
-                    Diagnostics::unimplemented,
-                    "this load instruction cannot be differentiated");
-        return nullptr;
+        return InstPair(primalLoad, nullptr);
     }
 
-    IRInst* differentiateStore(IRBuilder* builder, IRStore* origStore)
+    InstPair transcribeStore(IRBuilder* builder, IRStore* origStore)
     {
-        IRInst* storeLocation = origStore->getPtr();
-        IRInst* storeVal = origStore->getVal();
-        if (as<IRVar>(storeLocation) || as<IRParam>(storeLocation) || as<IRFieldAddress>(storeLocation))
-        {   
-            // If the stored value has a differential version, 
-            // emit a store instruction for the differential parameter.
-            // Otherwise, emit nothing since there's nothing to load.
-            // 
-            IRInst* diffStoreVal = getDifferentialInst(storeVal);
-            IRInst* diffStoreLocation = getDifferentialInst(storeLocation);
-            if (diffStoreVal && diffStoreLocation)
-            {
-                IRStore* diffStore = as<IRStore>(
+        IRInst* origStoreLocation = origStore->getPtr();
+        IRInst* origStoreVal = origStore->getVal();
+        
+        auto primalStore = cloneInst(&cloneEnv, builder, origStore);
+
+        auto diffStoreLocation = lookupDiffInst(origStoreLocation, nullptr);
+        auto diffStoreVal = lookupDiffInst(origStoreVal, nullptr);
+
+        // If the stored value has a differential version, 
+        // emit a store instruction for the differential parameter.
+        // Otherwise, emit nothing since there's nothing to load.
+        // 
+        if (diffStoreLocation && diffStoreVal)
+        {
+            IRStore* diffStore = as<IRStore>(
                     builder->emitStore(diffStoreLocation, diffStoreVal));
-                SLANG_ASSERT(diffStore);
-                return diffStore;
-            }
-            return nullptr;
+            SLANG_ASSERT(diffStore);
+            
+            return InstPair(primalStore, diffStore);
         }
-        else
-            getSink()->diagnose(origStore->sourceLoc,
-                    Diagnostics::unimplemented,
-                    "this store instruction cannot be differentiated");
-        return nullptr;
+
+        return InstPair(primalStore, nullptr);
     }
 
-    IRInst* differentiateReturn(IRBuilder* builder, IRReturn* origReturn)
+    InstPair transcribeReturn(IRBuilder* builder, IRReturn* origReturn)
     {
-        IRInst* returnVal = origReturn->getVal();
-        if (auto diffReturnVal = getDifferentialInst(returnVal, nullptr))
+        IRInst* origReturnVal = origReturn->getVal();
+        
+        if (auto pairType = tryGetDiffPairType(builder, origReturnVal->getDataType()))
         {   
-            auto pairType = pairBuilder->getOrCreateDiffPairType(builder, returnVal->getDataType());
-            auto diffPair = builder->emitMakeDifferentialPair(pairType, returnVal, diffReturnVal);
+            IRInst* primalReturnVal = findOrTranscribePrimalInst(builder, origReturnVal);
+        
+            IRInst* diffReturnVal = findOrTranscribeDiffInst(builder, origReturnVal);
+            if(!diffReturnVal)
+                diffReturnVal = getZeroOfType(builder, origReturnVal->getDataType());
 
-            IRReturn* diffReturn = as<IRReturn>(builder->emitReturn(diffPair));
-            SLANG_ASSERT(diffReturn);
-
-            return diffReturn;
+            auto diffPair = builder->emitMakeDifferentialPair(pairType, primalReturnVal, diffReturnVal);
+            IRReturn* pairReturn = as<IRReturn>(builder->emitReturn(diffPair));
+            return InstPair(pairReturn, pairReturn);
         }
         else
         {
             // If the differential return value is not available, emit a 
             // void return.
-            return builder->emitReturn();
+            IRInst* voidReturn = builder->emitReturn();
+            return InstPair(voidReturn, voidReturn);
         }
     }
 
@@ -657,22 +678,25 @@ struct JVPTranscriber
     // instruction, we check to make sure that the nested instr is a constant
     // and then return nullptr. Literals do not need to be differentiated.
     //
-    IRInst* differentiateConstruct(IRBuilder*, IRInst* origConstruct)
+    InstPair transcribeConstruct(IRBuilder* builder, IRInst* origConstruct)
     {   
+        IRInst* primalConstruct = cloneInst(&cloneEnv, builder, origConstruct);
+
         if (as<IRConstant>(origConstruct->getOperand(0)) && origConstruct->getOperandCount() == 1)
-            return nullptr;
+            return InstPair(primalConstruct, nullptr);
         else
             getSink()->diagnose(origConstruct->sourceLoc,
                     Diagnostics::unimplemented,
                     "this construct instruction cannot be differentiated");
-        return nullptr;
+
+        return InstPair(primalConstruct, nullptr);
     }
 
     // Differentiating a call instruction here is primarily about generating
     // an appropriate call list based on whichever parameters have differentials 
     // in the current transcription context.
     // 
-    IRInst* differentiateCall(IRBuilder* builder, IRCall* origCall)
+    InstPair transcribeCall(IRBuilder* builder, IRCall* origCall)
     {   
         if (auto origCallee = as<IRFunc>(origCall->getCallee()))
         {
@@ -687,25 +711,28 @@ struct JVPTranscriber
             for (UIndex ii = 0; ii < origCall->getArgCount(); ii++)
             {
                 auto origArg = origCall->getArg(ii);
+                auto primalArg = findOrTranscribePrimalInst(builder, origArg);
+                SLANG_ASSERT(primalArg);
 
                 auto origType = origArg->getDataType();
                 if (auto pairType = tryGetDiffPairType(builder, origType))
                 {
-                    auto diffArg = getDifferentialInst(origArg, nullptr);
+                    
+                    auto diffArg = findOrTranscribeDiffInst(builder, origArg);
 
                     // TODO(sai): This part is flawed. Replace with a call to the 
                     // 'zero()' interface method.
                     if (!diffArg)
                         diffArg = getZeroOfType(builder, origType);
                     
-                    auto diffPair = builder->emitMakeDifferentialPair(pairType, origArg, diffArg);
+                    auto diffPair = builder->emitMakeDifferentialPair(pairType, primalArg, diffArg);
 
                     args.add(diffPair);
                 }
                 else
                 {
                     // Add original/primal argument.
-                    args.add(origCall->getArg(ii));
+                    args.add(primalArg);
                 }
             }
             
@@ -713,12 +740,10 @@ struct JVPTranscriber
                 tryGetDiffPairType(builder, origCall->getFullType()),
                 diffCall,
                 args);
-
-            // TODO: remove the oldCallInst <-> callInst mapping and replace with
-            // primal access. Also map the primal acess to the 
-            // origCall->
             
-            return callInst;
+            return InstPair(
+                pairBuilder->emitPrimalFieldAccess(builder, callInst),
+                pairBuilder->emitDiffFieldAccess(builder, callInst));
         }
         else
         {
@@ -731,27 +756,36 @@ struct JVPTranscriber
                 Diagnostics::internalCompilerError,
                 "attempting to differentiate unresolved callee");
         }
-        return nullptr;
+
+        return InstPair(nullptr, nullptr);
     }
 
-    IRInst* differentiateSwizzle(IRBuilder* builder, IRSwizzle* origSwizzle)
+    InstPair transcribeSwizzle(IRBuilder* builder, IRSwizzle* origSwizzle)
     {
-        if (auto diffBase = getDifferentialInst(origSwizzle->getBase(), nullptr))
+        IRInst* primalSwizzle = cloneInst(&cloneEnv, builder, origSwizzle);
+
+        if (auto diffBase = lookupDiffInst(origSwizzle->getBase(), nullptr))
         {
             List<IRInst*> swizzleIndices;
             for (UIndex ii = 0; ii < origSwizzle->getElementCount(); ii++)
                 swizzleIndices.add(origSwizzle->getElementIndex(ii));
             
-            return builder->emitSwizzle(differentiateType(builder, origSwizzle->getDataType()),
-                                        diffBase,
-                                        origSwizzle->getElementCount(),
-                                        swizzleIndices.getBuffer());
+            return InstPair(
+                primalSwizzle,
+                builder->emitSwizzle(
+                    differentiateType(builder, origSwizzle->getDataType()),
+                    diffBase,
+                    origSwizzle->getElementCount(),
+                    swizzleIndices.getBuffer()));
         }
-        return nullptr;
+
+        return InstPair(primalSwizzle, nullptr);
     }
 
-    IRInst* differentiateByPassthrough(IRBuilder* builder, IRInst* origInst)
+    InstPair transcribeByPassthrough(IRBuilder* builder, IRInst* origInst)
     {
+        IRInst* primalInst = cloneInst(&cloneEnv, builder, origInst);
+
         UCount operandCount = origInst->getOperandCount();
 
         List<IRInst*> diffOperands;
@@ -762,20 +796,22 @@ struct JVPTranscriber
             // Otherwise, abandon the differentiation attempt and assume that origInst 
             // cannot (or does not need to) be differentiated.
             // 
-            if (auto diffInst = getDifferentialInst(origInst->getOperand(ii), nullptr))
+            if (auto diffInst = lookupDiffInst(origInst->getOperand(ii), nullptr))
                 diffOperands.add(diffInst);
             else
-                return nullptr;
+                return InstPair(primalInst, nullptr);
         }
         
-        return builder->emitIntrinsicInst(
-                    differentiateType(builder, origInst->getDataType()),
-                    origInst->getOp(),
-                    operandCount,
-                    diffOperands.getBuffer());
+        return InstPair(
+            primalInst, 
+            builder->emitIntrinsicInst(
+                differentiateType(builder, origInst->getDataType()),
+                origInst->getOp(),
+                operandCount,
+                diffOperands.getBuffer()));
     }
 
-    IRInst* handleControlFlow(IRBuilder* builder, IRInst* origInst)
+    InstPair transcribeControlFlow(IRBuilder* builder, IRInst* origInst)
     {
         switch(origInst->getOp())
         {
@@ -786,17 +822,41 @@ struct JVPTranscriber
                 if (origBranch->getOperandCount() > 1)
                     break;
 
-                if (auto diffBlock = getDifferentialInst(origBranch->getTargetBlock(), nullptr))
-                    return builder->emitBranch(as<IRBlock>(diffBlock));
-                else
-                    return nullptr;
+                IRInst* diffBranch = nullptr;
+
+                if (auto diffBlock = lookupDiffInst(origBranch->getTargetBlock(), nullptr))
+                    diffBranch = builder->emitBranch(as<IRBlock>(diffBlock));
+
+                // For now, every block in the original fn must have a corresponding
+                // block to compute both primals and derivatives.
+                SLANG_ASSERT(diffBranch);
+
+                return InstPair(diffBranch, diffBranch);
         }
 
         getSink()->diagnose(
             origInst->sourceLoc,
             Diagnostics::unimplemented,
             "attempting to differentiate unhandled control flow");
-        return nullptr;
+
+        return InstPair(nullptr, nullptr);
+    }
+
+    
+    InstPair transcribeConst(IRBuilder*, IRInst* origInst)
+    {
+        switch(origInst->getOp())
+        {
+            case kIROp_FloatLit:
+                return InstPair(origInst, nullptr);
+        }
+
+        getSink()->diagnose(
+            origInst->sourceLoc,
+            Diagnostics::unimplemented,
+            "attempting to differentiate unhandled const type");
+
+        return InstPair(nullptr, nullptr);
     }
 
     // In differential computation, the 'default' differential value is always zero.
@@ -813,6 +873,15 @@ struct JVPTranscriber
                 return builder->getFloatValue(type, 0.0);
             case kIROp_IntType:
                 return builder->getIntValue(type, 0);
+            case kIROp_VectorType:
+            {
+                IRInst* args[] = {getZeroOfType(builder, as<IRVectorType>(type)->getElementType())};
+                return builder->emitIntrinsicInst(
+                    type,
+                    kIROp_constructVectorFromScalar,
+                    1,
+                    args);
+            }
             default:
                 getSink()->diagnose(type->sourceLoc,
                     Diagnostics::internalCompilerError,
@@ -821,129 +890,85 @@ struct JVPTranscriber
         }
     }
 
-    // Logic for whether a primal instruction needs to be replicated
-    // in the differential function. We detect and avoid replicating 
-    // 'side-effect' instructions.
-    // 
-    bool isPurelyFunctional(IRBuilder*, IRInst* origInst)
+    IRInst* transcribe(IRBuilder* builder, IRInst* origInst)
     {
-        if (as<IRTerminatorInst>(origInst))
-            return false;
-        else if (auto origParam = as<IRParam>(origInst))
+        InstPair pair = transcribeInst(builder, origInst);
+
+        if (auto primalInst = pair.primal)
         {
-            // Out-type parameters are discarded from the parameter list,
-            // since pure JVP functions to not write to primal outputs.
-            // 
-            if (as<IROutType>(origParam->getDataType()))
-                return false;
+            mapPrimalInst(origInst, pair.primal);
+
+            mapDifferentialInst(origInst, pair.differential);
+            return pair.differential;
         }
-        
-        return true;
+
+        getSink()->diagnose(origInst->sourceLoc,
+                    Diagnostics::internalCompilerError,
+                    "failed to transcibe instruction");
+        return nullptr;
     }
 
-    IRInst* transcribe(IRBuilder* builder, IRInst* origInstOld)
-    {
-
-        // Clone the old instruction into the new differential function.
-        // 
-        IRInst* origInst = cloneInst(&cloneEnv, builder, origInstOld);
-
-        SLANG_ASSERT(origInst);
-
-        IRInst* diffInst = differentiateInst(builder, origInst);
-
-
-        // In case it's not safe to clone the old instruction, 
-        // remove it from the graph.
-        // For instance, instructions that handle control flow 
-        // (return statements) shouldn't be replicated.
-        //
-        if (isPurelyFunctional(builder, origInstOld))
-            mapDifferentialInst(origInst, diffInst);
-        else
-        {
-            // This inst should never have been used.
-            SLANG_ASSERT(origInst->firstUse == nullptr);
-
-            origInst->removeAndDeallocate();
-            mapDifferentialInst(origInstOld, diffInst);
-        }
-
-        // TODO(sai): Very temporary hack for IRCall, while we rearrange
-        // the derivative logic slightly.
-        // 
-        if (auto oldCall = as<IRCall>(origInstOld))
-        {
-            auto primalFieldAccess = pairBuilder->emitPrimalFieldAccess(builder, diffInst);
-            auto diffFieldAccess = pairBuilder->emitDiffFieldAccess(builder, diffInst);
-            // Overwrite the cloned call with a field access.
-            cloneEnv.mapOldValToNew[oldCall] = primalFieldAccess;
-
-            // Erase old mapping
-            this->instMapD.Remove(origInst);
-
-            // Map diff field as the derivative for the primal field.
-            mapDifferentialInst(primalFieldAccess, diffFieldAccess);
-        }
-
-        return diffInst;
-    }
-
-    IRInst* differentiateInst(IRBuilder* builder, IRInst* origInst)
+    InstPair transcribeInst(IRBuilder* builder, IRInst* origInst)
     {
         // Handle common operations
         switch (origInst->getOp())
         {
+        case kIROp_Param:
+            return transcribeParam(builder, as<IRParam>(origInst));
+
         case kIROp_Var:
-            return differentiateVar(builder, as<IRVar>(origInst));
+            return transcribeVar(builder, as<IRVar>(origInst));
 
         case kIROp_Load:
-            return differentiateLoad(builder, as<IRLoad>(origInst));
+            return transcribeLoad(builder, as<IRLoad>(origInst));
 
         case kIROp_Store:
-            return differentiateStore(builder, as<IRStore>(origInst));
+            return transcribeStore(builder, as<IRStore>(origInst));
 
         case kIROp_Return:
-            return differentiateReturn(builder, as<IRReturn>(origInst));
+            return transcribeReturn(builder, as<IRReturn>(origInst));
 
         case kIROp_Add:
         case kIROp_Mul:
         case kIROp_Sub:
         case kIROp_Div:
-            return differentiateBinaryArith(builder, origInst);
+            return transcribeBinaryArith(builder, origInst);
 
         case kIROp_Construct:
-            return differentiateConstruct(builder, origInst);
+            return transcribeConstruct(builder, origInst);
         
         case kIROp_Call:
-            return differentiateCall(builder, as<IRCall>(origInst));
+            return transcribeCall(builder, as<IRCall>(origInst));
         
         case kIROp_swizzle:
-            return differentiateSwizzle(builder, as<IRSwizzle>(origInst));
+            return transcribeSwizzle(builder, as<IRSwizzle>(origInst));
         
         case kIROp_constructVectorFromScalar:
-            return differentiateByPassthrough(builder, origInst);
+            return transcribeByPassthrough(builder, origInst);
 
         case kIROp_unconditionalBranch:
         case kIROp_conditionalBranch:
-            return handleControlFlow(builder, origInst);
+            return transcribeControlFlow(builder, origInst);
+
+        case kIROp_FloatLit:
+            return transcribeConst(builder, origInst);
 
         }
     
         // If none of the cases have been hit, check if the instruction is a
         // type.
         // For now we don't have logic to differentiate types that appear in blocks.
-        // So, we ignore them.
+        // So, we clone and avoid differentiating them.
         //
-        if (as<IRType>(origInst))
-            return nullptr;
-        
+        if (auto origType = as<IRType>(origInst))
+            return InstPair(cloneInst(&cloneEnv, builder, origType), nullptr);
         
         // If we reach this statement, the instruction type is likely unhandled.
         getSink()->diagnose(origInst->sourceLoc,
                     Diagnostics::unimplemented,
                     "this instruction cannot be differentiated");
-        return nullptr;
+
+        return InstPair(nullptr, nullptr);
     }
 };
 
@@ -1306,12 +1331,13 @@ struct JVPDerivativeContext
         {
             auto jvpBlock = builder->emitBlock();
             transcriberStorage.mapDifferentialInst(block, jvpBlock);
+            transcriberStorage.mapPrimalInst(block, jvpBlock);
         }
 
         // Go back over the blocks, and process the children of each block.
         for (auto block = primalFn->getFirstBlock(); block; block = block->getNextBlock())
         {
-            auto jvpBlock = as<IRBlock>(transcriberStorage.getDifferentialInst(block, block));
+            auto jvpBlock = as<IRBlock>(transcriberStorage.lookupDiffInst(block, block));
             SLANG_ASSERT(jvpBlock);
             emitJVPBlock(builder, block, jvpBlock);
         }
@@ -1341,7 +1367,7 @@ struct JVPDerivativeContext
     }
 
     IRBlock* emitJVPBlock(IRBuilder*    builder, 
-                          IRBlock*      primalBlock,
+                          IRBlock*      origBlock,
                           IRBlock*      jvpBlock = nullptr)
     {   
         JVPTranscriber* transcriber = &(transcriberStorage);
@@ -1352,16 +1378,17 @@ struct JVPDerivativeContext
         else
             builder->setInsertInto(jvpBlock);
 
-        // First transcribe the parameter list. This is done separately because we
-        // want all the derivative parameters emitted after the primal parameters
-        // rather than interleaved with one another.
-        //
-        transcriber->transcribeParams(builder, primalBlock->getParams());
+        
+        // First transcribe every parameter in the block.
+        for (auto param = origBlock->getFirstParam(); param; param = param->getNextParam())
+        {
+            transcriber->transcribe(builder, param);
+        }
 
-        // Run through every instruction and use the transcriber to generate the appropriate
+        // Then, run through every instruction and use the transcriber to generate the appropriate
         // derivative code.
         //
-        for(auto child = primalBlock->getFirstOrdinaryInst(); child; child = child->getNextInst())
+        for (auto child = origBlock->getFirstOrdinaryInst(); child; child = child->getNextInst())
         {
             transcriber->transcribe(builder, child);
         }

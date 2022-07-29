@@ -25,6 +25,6 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
         outputBuffer[0] = f(dpa.p());                               // Expect: 1
         outputBuffer[1] = __jvp(f)(dpfloat(2.0, 0.0)).d();          // Expect: 0
         outputBuffer[2] = (float)__jvp(f)(dpb).d();                 // Expect: 2
-        outputBuffer[3] = (float)__jvp(f)(dpf3).d().y;              // Expect: 1.5
+        outputBuffer[3] = __jvp(f)(dpf3).d().y;              // Expect: 1.5
     }
 }
