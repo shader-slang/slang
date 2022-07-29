@@ -193,6 +193,10 @@ SLANG_HIERARCHICAL_ENUM(ArtifactStyle, SLANG_ARTIFACT_STYLE, SLANG_ARTIFACT_STYL
         case SLANG_SHADER_SHARED_LIBRARY:   return make(Kind::SharedLibrary, Payload::HostCPU, Style::Kernel, 0);
         case SLANG_SHADER_HOST_CALLABLE:    return make(Kind::HostCallable, Payload::HostCPU, Style::Kernel, 0);
         case SLANG_CUDA_SOURCE:             return make(Kind::Source, Payload::CUDA, Style::Kernel, 0);
+        // TODO(JS):
+        // Not entirely clear how best to represent PTX here. We could mark as 'Assembly'. Saying it is 
+        // 'Executable' implies it is Binary (which PTX isn't). Executable also implies 'complete for executation', 
+        // irrespective of it being text.
         case SLANG_PTX:                     return make(Kind::Executable, Payload::PTX, Style::Kernel, 0);
         case SLANG_OBJECT_CODE:             return make(Kind::ObjectCode, Payload::HostCPU, Style::Kernel, 0);
         case SLANG_HOST_HOST_CALLABLE:      return make(Kind::HostCallable, Payload::HostCPU, Style::Host, 0);

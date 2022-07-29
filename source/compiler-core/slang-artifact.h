@@ -78,6 +78,11 @@ bool isDerivedFrom(ArtifactKind kind, ArtifactKind base);
 UnownedStringSlice getName(ArtifactKind kind);
 
 // Payload. 
+// 
+// SPIR-V could be considered an 'IR', but an IR focused on GPU.
+// MetalIR is under Kernel as is IR focused on GPU.
+// 
+// SlangIR and LLVMIR can be GPU or CPU orientated, so put in own category.
 #define SLANG_ARTIFACT_PAYLOAD(x) \
     x(Invalid, Invalid) \
     x(Base, Invalid) \
@@ -96,6 +101,7 @@ UnownedStringSlice getName(ArtifactKind kind);
             x(DXBC, Kernel) \
             x(SPIRV, Kernel) \
             x(PTX, Kernel) \
+            x(MetalIR, Kernel) \
         x(CPU, Base) \
             x(UnknownCPU, CPU) \
             x(X86, CPU) \
@@ -107,7 +113,6 @@ UnownedStringSlice getName(ArtifactKind kind);
         x(IR, Base) \
             x(SlangIR, IR) \
             x(LLVMIR, IR) \
-            x(MetalIR, IR) \
         x(AST, Base) \
             x(SlangAST, AST)
 
@@ -129,22 +134,23 @@ enum class ArtifactPayload : uint8_t
             DXIL                = 13,           ///< DXIL 
             DXBC                = 14,           ///< DXBC
             SPIRV               = 15,           ///< SPIR-V
-            PTX                 = 16,           ///< PTX
-        CPU                     = 17,           ///< CPU code
-            UnknownCPU          = 18,           ///< CPU code for unknown/undetermined type
-            X86                 = 19,           ///< X86
-            X86_64              = 20,           ///< X86_64
-            Aarch               = 21,           ///< 32 bit arm
-            Aarch64             = 22,           ///< Aarch64
-            HostCPU             = 23,           ///< HostCPU
-            UniversalCPU        = 24,           ///< CPU code for multiple CPU types 
-        IR                      = 25,           ///< Intermediate representation (IR)
-            SlangIR             = 26,           ///< Slang IR
-            LLVMIR              = 27,           ///< LLVM IR
-            MetalIR             = 28,           ///< Metal IR
-        AST                     = 29,           ///< Abstract syntax tree (AST)
-            SlangAST            = 30,           ///< Slang AST
-    CountOf                     = 31,
+            PTX                 = 16,           ///< PTX. NOTE! PTX is a text format, but is handable to CUDA API.
+            MetalIR             = 17,           ///< Metal IR (targetted toward GPU)
+            CuBin               = 18,           ///< CUDA binary
+        CPU                     = 19,           ///< CPU code
+            UnknownCPU          = 20,           ///< CPU code for unknown/undetermined type
+            X86                 = 21,           ///< X86
+            X86_64              = 22,           ///< X86_64
+            Aarch               = 23,           ///< 32 bit arm
+            Aarch64             = 24,           ///< Aarch64
+            HostCPU             = 25,           ///< HostCPU
+            UniversalCPU        = 26,           ///< CPU code for multiple CPU types 
+        IR                      = 27,           ///< Intermediate representation (IR)
+            SlangIR             = 28,           ///< Slang IR
+            LLVMIR              = 29,           ///< LLVM IR
+        AST                     = 30,           ///< Abstract syntax tree (AST)
+            SlangAST            = 31,           ///< Slang AST
+    CountOf                     = 32,
 };
 
 /// Get the parent payload

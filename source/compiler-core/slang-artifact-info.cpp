@@ -42,6 +42,25 @@ static const KindExtension g_cpuKindExts[] =
 #endif
 };
 
+
+
+/* static */ bool ArtifactInfoUtil::isCpuBinary(const ArtifactDesc& desc) 
+{ 
+    return isDerivedFrom(desc.kind, ArtifactKind::Binary) && isDerivedFrom(desc.payload, ArtifactPayload::CPU); 
+}
+
+/* static */bool ArtifactInfoUtil::isGpuUsable(const ArtifactDesc& desc) 
+{ 
+    if (isDerivedFrom(desc.kind, ArtifactKind::Binary))
+    {
+        return isDerivedFrom(desc.payload, ArtifactPayload::Kernel);
+    }
+
+    // PTX is a kind of special case, it's an 'assembly' (low level text represention) that can be passed 
+    // to CUDA runtime
+    return desc.kind == ArtifactKind::Assembly && desc.payload == ArtifactPayload::PTX;
+}
+
 /* static */bool ArtifactInfoUtil::isKindBinaryLinkable(Kind kind)
 {
     switch (kind)

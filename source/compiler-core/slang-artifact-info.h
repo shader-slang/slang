@@ -19,18 +19,15 @@ struct ArtifactInfoUtil
     static bool isCpuTarget(const ArtifactDesc& desc);
     
         /// True if is a CPU binary
-    static bool isCpuBinary(const ArtifactDesc& desc) { return isDerivedFrom(desc.kind, ArtifactKind::Binary) && isDerivedFrom(desc.payload, ArtifactPayload::CPU); }
-        /// True if is a GPU binary
-    static bool isGpuBinary(const ArtifactDesc& desc) { return isDerivedFrom(desc.kind, ArtifactKind::Binary) && isDerivedFrom(desc.payload, ArtifactPayload::Kernel); }
+    static bool isCpuBinary(const ArtifactDesc& desc);
+        /// True if is a GPU usable (can be passed to a driver/API and be used 
+    static bool isGpuUsable(const ArtifactDesc& desc);
 
         /// Given an assembly type returns it's extension from the payload type
     static UnownedStringSlice getAssemblyExtensionForPayload(ArtifactPayload payload);
 
         /// True if artifact  appears to be binary linkable
     static bool isBinaryLinkable(const ArtifactDesc& desc);
-
-        /// Get the default extension type for a payload type
-    //static UnownedStringSlice getDefaultExtensionForPayload(Payload payload);
 
         /// Try to determine the desc from just a file extension (passed without .)
     static ArtifactDesc getDescFromExtension(const UnownedStringSlice& slice);

@@ -1467,7 +1467,7 @@ struct OptionsParser
                     }
 
                     // If it's a GPU binary, then we'll assume it's a library
-                    if (ArtifactInfoUtil::isGpuBinary(desc))
+                    if (ArtifactInfoUtil::isGpuUsable(desc))
                     {
                         desc.kind = ArtifactKind::Library;
                     }
