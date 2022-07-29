@@ -1303,7 +1303,7 @@ void printDiagnosticArg(StringBuilder& sb, CodeGenTarget val)
 
         // If we aren't using LLVM 'host callable', we want downstream compile to produce a shared library
         if (compilerType != PassThroughMode::LLVM && 
-            ArtifactDesc::makeFromCompileTarget(asExternal(target)).kind == ArtifactKind::Callable)
+            ArtifactDesc::makeFromCompileTarget(asExternal(target)).kind == ArtifactKind::HostCallable)
         {
             target = CodeGenTarget::ShaderSharedLibrary;
         }
@@ -1800,7 +1800,7 @@ void printDiagnosticArg(StringBuilder& sb, CodeGenTarget val)
                 ComPtr<ISlangBlob> blob;
                 if (SLANG_FAILED(result.getBlob(blob)))
                 {
-                    if (ArtifactDesc::makeFromCompileTarget(asExternal(targetReq->getTarget())).kind == ArtifactKind::Callable)
+                    if (ArtifactDesc::makeFromCompileTarget(asExternal(targetReq->getTarget())).kind == ArtifactKind::HostCallable)
                     {
                         // Some HostCallable are not directly representable as a 'binary'.
                         // So here, we just ignore if that appears the case, and don't output an unexpected error.

@@ -727,7 +727,7 @@ SlangPassThrough Session::getDownstreamCompilerForTransition(SlangCompileTarget 
     const auto desc = ArtifactDesc::makeFromCompileTarget(inTarget);
 
     // Special case host-callable
-    if ((desc.kind == ArtifactKind::Callable) && 
+    if ((desc.kind == ArtifactKind::HostCallable) && 
         (source == CodeGenTarget::CSource || source == CodeGenTarget::CPPSource))
     {
         // We prefer LLVM if it's available

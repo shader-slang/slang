@@ -65,8 +65,7 @@ struct HierarchicalEnumTable
 {
     HierarchicalEnumTable(ConstArrayView<HierarchicalEnumEntry> entries)
     {
-        SLANG_COMPILE_TIME_ASSERT(Index(T::Invalid) == 0);
-        SLANG_COMPILE_TIME_ASSERT(Index(T::Base) == 1);
+        SLANG_COMPILE_TIME_ASSERT(Index(T::Invalid) < Index(T::Base));
         SLANG_ASSERT(entries.getCount() == Count(T::CountOf));
 
         SLANG_ASSERT(_isHierarchicalEnumOk(entries, Count(T::CountOf)));
@@ -76,10 +75,17 @@ struct HierarchicalEnumTable
         for (const auto& entry : entries)
         {
             const auto value = entry.value;
-
             m_parents[value] = T(entry.parent);
             m_names[value] = UnownedStringSlice(entry.name);
         }
+
+        // TODO(JS): NOTE! If we wanted to use parent to indicate if a value was *invalid* 
+        // we would want the Parent of Base to be Base.
+        //
+        // Base parent should be invalid
+        SLANG_ASSERT(getParent(T::Base) == T::Invalid);
+        // Invalids parent should be invalid
+        SLANG_ASSERT(getParent(T::Invalid) == T::Invalid);
     }
 
     T getParent(T kind) const
@@ -109,7 +115,7 @@ struct HierarchicalEnumTable
                 return true;
             }
             type = m_parents[Index(type)];
-        } while (Index(type) < Index(T::Base));
+        } while (Index(type) > Index(T::Base));
 
         return false;
     }
@@ -171,22 +177,22 @@ SLANG_HIERARCHICAL_ENUM(ArtifactStyle, SLANG_ARTIFACT_STYLE, SLANG_ARTIFACT_STYL
         {
             // For the moment we make all just map to GLSL, but we could use flags
             // or some other mechanism to distinguish the types
-            return make(Kind::GLSL, Payload::Base, Style::Kernel, 0);
+            return make(Kind::Source, Payload::GLSL, Style::Kernel, 0);
         }
-        case SLANG_HLSL:                    return make(Kind::HLSL, Payload::Base, Style::Kernel, 0);
+        case SLANG_HLSL:                    return make(Kind::Source, Payload::HLSL, Style::Kernel, 0);
         case SLANG_SPIRV:                   return make(Kind::Executable, Payload::SPIRV, Style::Kernel, 0);
         case SLANG_SPIRV_ASM:               return make(Kind::Assembly, Payload::SPIRV, Style::Kernel, 0);
         case SLANG_DXBC:                    return make(Kind::Executable, Payload::DXBC, Style::Kernel, 0);
         case SLANG_DXBC_ASM:                return make(Kind::Assembly, Payload::DXBC, Style::Kernel, 0);
         case SLANG_DXIL:                    return make(Kind::Executable, Payload::DXIL, Style::Kernel, 0);
         case SLANG_DXIL_ASM:                return make(Kind::Assembly, Payload::DXIL, Style::Kernel, 0);
-        case SLANG_C_SOURCE:                return make(Kind::C, Payload::Base, Style::Kernel, 0);
-        case SLANG_CPP_SOURCE:              return make(Kind::Cpp, Payload::Base, Style::Kernel, 0);
-        case SLANG_HOST_CPP_SOURCE:         return make(Kind::Cpp, Payload::Base, Style::Host, 0);
+        case SLANG_C_SOURCE:                return make(Kind::Source, Payload::C, Style::Kernel, 0);
+        case SLANG_CPP_SOURCE:              return make(Kind::Source, Payload::Cpp, Style::Kernel, 0);
+        case SLANG_HOST_CPP_SOURCE:         return make(Kind::Source, Payload::Cpp, Style::Host, 0);
         case SLANG_HOST_EXECUTABLE:         return make(Kind::Executable, Payload::HostCPU, Style::Host, 0);
         case SLANG_SHADER_SHARED_LIBRARY:   return make(Kind::SharedLibrary, Payload::HostCPU, Style::Kernel, 0);
         case SLANG_SHADER_HOST_CALLABLE:    return make(Kind::HostCallable, Payload::HostCPU, Style::Kernel, 0);
-        case SLANG_CUDA_SOURCE:             return make(Kind::CUDA, Payload::Base, Style::Kernel, 0);
+        case SLANG_CUDA_SOURCE:             return make(Kind::Source, Payload::CUDA, Style::Kernel, 0);
         case SLANG_PTX:                     return make(Kind::Executable, Payload::PTX, Style::Kernel, 0);
         case SLANG_OBJECT_CODE:             return make(Kind::ObjectCode, Payload::HostCPU, Style::Kernel, 0);
         case SLANG_HOST_HOST_CALLABLE:      return make(Kind::HostCallable, Payload::HostCPU, Style::Host, 0);

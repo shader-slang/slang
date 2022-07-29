@@ -6,85 +6,7 @@
 
 namespace Slang {
 
-static ArtifactPayloadInfo::Lookup _makePayloadInfoLookup()
-{
-    ArtifactPayloadInfo::Lookup values;
-    memset(&values, 0, sizeof(values));
-    
-    
-    typedef ArtifactPayload Payload;
-    typedef ArtifactPayloadInfo::Flag Flag;
-    typedef ArtifactPayloadInfo::Flags Flags;
-    typedef ArtifactPayloadInfo::Flavor Flavor;
-
-    struct Info
-    {
-        Payload payload;
-        Flavor flavor;
-        Flags flags;
-    };
-
-    const Info infos[] =
-    {
-        {Payload::None,             Flavor::None,         0},
-        {Payload::Unknown,          Flavor::Unknown,      0},
-
-        // It seems as if DXBC is potentially linkable from
-        // https://docs.microsoft.com/en-us/windows/win32/direct3dhlsl/dx-graphics-hlsl-appendix-keywords#export
-
-        // We can't *actually* link PTX or SPIR-V currently but it is in principal possible
-        // so let's say we accept for now
-
-        {Payload::DXIL,             Flavor::Binary,       Flag::IsGpuNative | Flag::IsLinkable},
-        {Payload::DXBC,             Flavor::Binary,       Flag::IsGpuNative | Flag::IsLinkable}, 
-        {Payload::SPIRV,            Flavor::Binary,       Flag::IsGpuNative | Flag::IsLinkable }, 
-        {Payload::PTX,              Flavor::Binary,       Flag::IsGpuNative | Flag::IsLinkable },
-
-        {Payload::DXILAssembly,     Flavor::Assembly,     0},
-        {Payload::DXBCAssembly,     Flavor::Assembly,     0},
-        {Payload::SPIRVAssembly,    Flavor::Assembly,     0},
-        {Payload::PTXAssembly,      Flavor::Assembly,     0},
-
-        {Payload::HostCPU,          Flavor::Binary,       Flag::IsCpuNative | Flag::IsLinkable},
-
-        // Do we want some other Flavor for these?
-        {Payload::SlangIR,          Flavor::Binary,       Flag::IsLinkable},
-        {Payload::LLVMIR,           Flavor::Binary,       0},
-        {Payload::SlangAST,         Flavor::Binary,       0},
-
-        {Payload::X86,              Flavor::Binary,       Flag::IsCpuNative | Flag::IsLinkable},
-        {Payload::X86_64,           Flavor::Binary,       Flag::IsCpuNative | Flag::IsLinkable},
-        {Payload::AARCH,            Flavor::Binary,       Flag::IsCpuNative | Flag::IsLinkable},
-        {Payload::AARCH64,          Flavor::Binary,       Flag::IsCpuNative | Flag::IsLinkable},
-
-        {Payload::HLSL,             Flavor::Source,       0},
-        {Payload::GLSL,             Flavor::Source,       0},
-        {Payload::CPP,              Flavor::Source,       0},
-        {Payload::C,                Flavor::Source,       0},
-        {Payload::CUDA,             Flavor::Source,       0},
-        {Payload::Slang,            Flavor::Source,       0},
-
-        {Payload::DebugInfo,        Flavor::Unknown,      0},
-
-        {Payload::Diagnostics,      Flavor::Unknown,      0},
-
-        {Payload::Zip,              Flavor::Container,    0},
-    };
-
-    for (auto info : infos)
-    {
-        auto& v = values.values[Index(info.payload)];
-        v.flavor = info.flavor;
-        v.flags = info.flags;
-    }
-
-    return values;
-}
-
-/* static */const ArtifactPayloadInfo::Lookup ArtifactPayloadInfo::Lookup::g_values = _makePayloadInfoLookup();
-
 /* !!!!!!!!!!!!!!!!!!!!!!!!!! ArtifactInfoUtil !!!!!!!!!!!!!!!!!!!!!!!!!!!! */
-
 
 namespace { // anonymous
 struct KindExtension
@@ -95,7 +17,7 @@ struct KindExtension
 } // anonymous
 
 #define SLANG_KIND_EXTENSION(kind, ext) \
-    { ArtifactKind::kind, UnownedStringSlice::fromLiteral(ext) },
+    { ArtifactKind::kind, toSlice(ext) },
 
 static const KindExtension g_cpuKindExts[] =
 {
@@ -136,70 +58,53 @@ static const KindExtension g_cpuKindExts[] =
 
 /* static */bool ArtifactInfoUtil::isBinaryLinkable(const ArtifactDesc& desc)
 {
-    return isKindBinaryLinkable(desc.kind) &&
-        getInfo(desc.payload).isSet(ArtifactPayloadInfo::Flag::IsLinkable);
-}
-
-/* static */bool ArtifactInfoUtil::isPayloadCpuBinary(Payload payload)
-{
-    auto info = getInfo(payload);
-    return info.isSet(ArtifactPayloadInfo::Flag::IsCpuNative) && info.flavor == ArtifactPayloadInfo::Flavor::Binary;
-}
-
-/* static */bool ArtifactInfoUtil::isPayloadGpuBinary(Payload payload)
-{
-    auto info = getInfo(payload);
-    return info.isSet(ArtifactPayloadInfo::Flag::IsGpuNative) && info.flavor == ArtifactPayloadInfo::Flavor::Binary;
-}
-
-/* static */bool ArtifactInfoUtil::isPayloadCpuTarget(Payload payload)
-{
-    return isPayloadCpuBinary(payload) ||
-        (payload == Payload::C || payload == Payload::CPP);
-}
-
-/* static */UnownedStringSlice ArtifactInfoUtil::getDefaultExtensionForPayload(Payload payload)
-{
-    switch (payload)
+    if (isDerivedFrom(desc.kind, ArtifactKind::Binary))
     {
-    case Payload::None:         return UnownedStringSlice();
-    case Payload::Unknown:      return UnownedStringSlice::fromLiteral("unknown");
+        if (isDerivedFrom(desc.payload, ArtifactPayload::Kernel))
+        {
+            // It seems as if DXBC is potentially linkable from
+            // https://docs.microsoft.com/en-us/windows/win32/direct3dhlsl/dx-graphics-hlsl-appendix-keywords#export
 
-    case Payload::DXIL:         return UnownedStringSlice::fromLiteral("dxil");
-    case Payload::DXBC:         return UnownedStringSlice::fromLiteral("dxbc");
-    case Payload::SPIRV:        return UnownedStringSlice::fromLiteral("spirv");
+            // We can't *actually* link PTX or SPIR-V currently but it is in principal possible
+            // so let's say we accept for now
 
-    case Payload::PTX:          return UnownedStringSlice::fromLiteral("ptx");
+            return true;
+        }
+        else if (isDerivedFrom(desc.payload, ArtifactPayload::CPU))
+        {
+            // If kind is exe or shared library, linking will arguably not work
+            if (desc.kind == ArtifactKind::SharedLibrary ||
+                desc.kind == ArtifactKind::Executable)
+            {
+                return false;
+            }
 
-    case Payload::X86:
-    case Payload::X86_64:
-    case Payload::AARCH:
-    case Payload::AARCH64:
-    case Payload::HostCPU:
+            return true;
+        }
+        else if (isDerivedFrom(desc.payload, ArtifactPayload::IR))
+        {
+            // We'll *assume* IR is linkable
+            return true;
+        }
+    }
+    return false;
+}
+
+/* static */bool ArtifactInfoUtil::isCpuTarget(const ArtifactDesc& desc)
+{
+    if (isDerivedFrom(desc.kind, ArtifactKind::Binary))
     {
-        return UnownedStringSlice();
+        return isDerivedFrom(desc.payload, ArtifactPayload::CPU);
+    }
+    else if (isDerivedFrom(desc.kind, ArtifactKind::Source))
+    {
+        // We'll assume C/C++ are targetting CPU, although that is perhaps somewhat arguable.
+        return desc.payload == Payload::C || desc.payload == Payload::Cpp;
     }
 
-    case Payload::SlangIR:      return UnownedStringSlice::fromLiteral("slang-ir");
-    case Payload::LLVMIR:       return UnownedStringSlice::fromLiteral("llvm-ir");
-
-    case Payload::HLSL:         return UnownedStringSlice::fromLiteral("hlsl");
-    case Payload::GLSL:         return UnownedStringSlice::fromLiteral("glsl");
-
-    case Payload::CPP:          return UnownedStringSlice::fromLiteral("cpp");
-    case Payload::C:            return UnownedStringSlice::fromLiteral("c");
-
-    case Payload::CUDA:         return UnownedStringSlice::fromLiteral("cu");
-
-    case Payload::Slang:        return UnownedStringSlice::fromLiteral("slang");
-
-    case Payload::Zip:          return UnownedStringSlice::fromLiteral("zip");
-
-    default: break;
-    }
-
-    SLANG_UNEXPECTED("Unknown content type");
+    return false;
 }
+
 
 /* static */ArtifactDesc ArtifactInfoUtil::getDescFromExtension(const UnownedStringSlice& slice)
 {
@@ -207,6 +112,32 @@ static const KindExtension g_cpuKindExts[] =
         slice == "slang-lib")
     {
         return ArtifactDesc::make(ArtifactKind::Library, ArtifactPayload::SlangIR);
+    }
+
+    // Metal
+    // https://developer.apple.com/documentation/metal/shader_libraries/building_a_library_with_metal_s_command-line_tools
+    if (slice == toSlice("air"))
+    {
+        return ArtifactDesc::make(ArtifactKind::ObjectCode, ArtifactPayload::MetalIR);
+    }
+    else if (slice == toSlice("metallib") || slice == toSlice("metalar"))
+    {
+        return ArtifactDesc::make(ArtifactKind::Library, ArtifactPayload::MetalIR);
+    }
+
+    if (slice == toSlice("zip"))
+    {
+        return ArtifactDesc::make(ArtifactKind::Zip, ArtifactPayload::Unknown);
+    }
+    else if (slice == toSlice("riff"))
+    {
+        return ArtifactDesc::make(ArtifactKind::Riff, ArtifactPayload::Unknown);
+    }
+
+    if (slice == toSlice("asm"))
+    {
+        // We'll assume asm means current CPU assembler..
+        return ArtifactDesc::make(ArtifactKind::Assembly, ArtifactPayload::HostCPU);
     }
 
     for (const auto& kindExt : g_cpuKindExts)
@@ -241,16 +172,105 @@ static const KindExtension g_cpuKindExts[] =
     return UnownedStringSlice();
 }
 
+UnownedStringSlice ArtifactInfoUtil::getAssemblyExtensionForPayload(ArtifactPayload payload)
+{
+    switch (payload)
+    {
+        case ArtifactPayload::DXIL:     return toSlice("dxil-asm");
+        case ArtifactPayload::DXBC:     return toSlice("dxbc-asm");
+        case ArtifactPayload::SPIRV:    return toSlice("spv-asm");
+        case ArtifactPayload::PTX:     return toSlice("ptx");
+
+        // TODO(JS):
+        // Not sure what to do for metal - does it have an assembly name?
+
+        default: break;
+    }
+
+    // We'll just use asm for all CPU assembly type
+    if (isDerivedFrom(payload, ArtifactPayload::CPU))
+    {
+        return toSlice("asm");
+    }
+
+    if (isDerivedFrom(payload, ArtifactPayload::IR))
+    {
+        switch (payload)
+        {
+            case ArtifactPayload::SlangIR:     return toSlice("slang-ir-asm");
+            case ArtifactPayload::LLVMIR:     return toSlice("llvm-ir-asm");
+            break;
+        }
+    }
+
+    return UnownedStringSlice();
+}
+
 UnownedStringSlice ArtifactInfoUtil::getDefaultExtension(const ArtifactDesc& desc)
 {
-    if (ArtifactInfoUtil::isPayloadCpuBinary(desc.payload))
+    switch (desc.kind)
+    {
+        case ArtifactKind::Zip:          return toSlice("zip");
+        case ArtifactKind::Riff:         return toSlice("riff");
+        case ArtifactKind::Assembly:     
+        {
+            return getAssemblyExtensionForPayload(desc.payload);
+        }
+        case ArtifactKind::Source:
+        {
+            switch (desc.payload)
+            {
+                case Payload::HLSL:         return toSlice("hlsl");
+                case Payload::GLSL:         return toSlice("glsl");
+
+                case Payload::Cpp:          return toSlice("cpp");
+                case Payload::C:            return toSlice("c");
+
+                case Payload::Metal:        return toSlice("metal");
+
+                case Payload::CUDA:         return toSlice("cu");
+
+                case Payload::Slang:        return toSlice("slang");
+                default: break;
+            }
+        }
+        default: break;
+    }
+
+    if (ArtifactInfoUtil::isCpuTarget(desc))
     {
         return getCpuExtensionForKind(desc.kind);
     }
-    else
+
+    if (isDerivedFrom(desc.kind, ArtifactKind::Binary))
     {
-        return getDefaultExtensionForPayload(desc.payload);
+        switch (desc.payload)
+        {
+            case Payload::None:         return UnownedStringSlice();
+            case Payload::Unknown:      return toSlice("unknown");
+
+            case Payload::DXIL:         return toSlice("dxil");
+            case Payload::DXBC:         return toSlice("dxbc");
+            case Payload::SPIRV:        return toSlice("spv");
+
+            case Payload::PTX:          return toSlice("ptx");
+
+            case Payload::LLVMIR:       return toSlice("llvm-ir");
+
+            case Payload::SlangIR:      
+            {
+                return (desc.kind == ArtifactKind::Library) ? toSlice("slang-module") : toSlice("slang-ir");
+            }
+            case Payload::MetalIR:      
+            {
+                // https://developer.apple.com/documentation/metal/shader_libraries/building_a_library_with_metal_s_command-line_tools
+                return (desc.kind == ArtifactKind::Library) ? toSlice("metallib") : toSlice("air");
+            }
+            default: break;
+        }
     }
+
+    return UnownedStringSlice();
 }
 
 /* static */String ArtifactInfoUtil::getBaseNameFromPath(const ArtifactDesc& desc, const UnownedStringSlice& path)

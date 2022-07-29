@@ -2036,7 +2036,7 @@ struct OptionsParser
         // and output type is callable, add an empty' rawOutput.
         if (rawOutputs.getCount() == 0 && 
             rawTargets.getCount() == 1 && 
-            ArtifactDesc::makeFromCompileTarget(asExternal(rawTargets[0].format)).kind == ArtifactKind::Callable)
+            ArtifactDesc::makeFromCompileTarget(asExternal(rawTargets[0].format)).kind == ArtifactKind::HostCallable)
         {
             RawOutput rawOutput;
             rawOutput.impliedFormat = rawTargets[0].format;

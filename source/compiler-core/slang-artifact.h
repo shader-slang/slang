@@ -30,12 +30,6 @@ CPU architectures are not, because they can apply to ObjectCode, Libarary and so
         x(Text, Base) \
             x(HumanText, Text) \
             x(Source, Text) \
-                x(C, Source) \
-                x(Cpp, Source) \
-                x(HLSL, Source) \
-                x(GLSL, Source) \
-                x(CUDA, Source) \
-                x(Slang, Source) \
             x(Assembly, Text) \
         x(Binary, Base) \
             x(ObjectCode, Binary) \
@@ -44,8 +38,7 @@ CPU architectures are not, because they can apply to ObjectCode, Libarary and so
             x(SharedLibrary, Binary) \
             x(HostCallable, Binary) \
             x(DebugInfo, Binary) \
-        x(Object, Base) \
-            x(Diagnostics, Object)
+        x(Diagnostics, Base)
         
 // The SLANG_ARTIFACT_KIND defines the structure. New Kinds must be added at the end. Values can be depreciated, or disabled
 // but never removed.
@@ -59,29 +52,22 @@ enum class ArtifactKind : uint8_t
     Base                    = 1,
         None                = 2,            
         Unknown             = 3,
-            Container       = 4,
-                Zip         = 5,
-                Riff        = 6,
-        Text                = 7,                        ///< Represented as text
-            HumanText       = 8,                        ///< Text for human consumumption
-            Source          = 9,                        ///< High level source code
-                C           = 10,
-                Cpp         = 11,
-                HLSL        = 12,
-                GLSL        = 13,
-                CUDA        = 14,
-                Slang       = 15,
-            Assembly        = 16,                       ///< Assembly, kind is represented in the payload
-        Binary              = 17,                       ///< Binary data
-            ObjectCode      = 18, 
-            Library         = 19,
-            Executable      = 20,
-            SharedLibrary   = 21,
-            HostCallable    = 22,
-            DebugInfo       = 23,
-        Object              = 24,                       ///< Accessible
-            Diagnostics     = 25,
-    CountOf                 = 26,
+        Container           = 4,                        ///< Container like types
+            Zip             = 5,                        ///< Zip container
+            Riff            = 6,                        ///< Riff format
+        Text                = 7,                        ///< Representation is text. Encoding is utf8, unless prefixed with 'encoding'.
+            Source          = 8,                        ///< Source (Source type is in payload)
+            Assembly        = 9,                        ///< Assembly (Type is in payload)
+            HumanText       = 10,                       ///< Text for human consumption
+        Binary              = 11,                       ///< Binary data
+            ObjectCode      = 12,                       ///< Object file
+            Library         = 13,                       ///< Library (collection of object code)
+            Executable      = 14,                       ///< Executable
+            SharedLibrary   = 15,                       ///< Shared library - can be dynamically linked
+            HostCallable    = 16,                       ///< Code can be executed directly on the host
+            DebugInfo       = 17,                       ///< Debugging information
+        Diagnostics         = 18,                       ///< Diagnostics information
+    CountOf                 = 19,
 };
    
 /// Get the parent kind
@@ -92,12 +78,19 @@ bool isDerivedFrom(ArtifactKind kind, ArtifactKind base);
 UnownedStringSlice getName(ArtifactKind kind);
 
 // Payload. 
-
 #define SLANG_ARTIFACT_PAYLOAD(x) \
     x(Invalid, Invalid) \
     x(Base, Invalid) \
         x(None, Base) \
         x(Unknown, Base) \
+        x(Source, Base) \
+            x(C, Source) \
+            x(Cpp, Source) \
+            x(HLSL, Source) \
+            x(GLSL, Source) \
+            x(CUDA, Source) \
+            x(Metal, Source) \
+            x(Slang, Source) \
         x(Kernel, Base) \
             x(DXIL, Kernel) \
             x(DXBC, Kernel) \
@@ -114,6 +107,7 @@ UnownedStringSlice getName(ArtifactKind kind);
         x(IR, Base) \
             x(SlangIR, IR) \
             x(LLVMIR, IR) \
+            x(MetalIR, IR) \
         x(AST, Base) \
             x(SlangAST, AST)
 
@@ -123,25 +117,34 @@ enum class ArtifactPayload : uint8_t
     Base                        = 1,            ///< The base of the hierarchy
         None                    = 2,            ///< Doesn't have a payload
         Unknown                 = 3,            ///< Unknown but probably valid
-        Kernel                  = 4,            ///< CPU Kernel
-            DXIL                = 5,            ///< DXIL 
-            DXBC                = 6,            ///< DXBC
-            SPIRV               = 7,            ///< SPIR-V
-            PTX                 = 8,            ///< PTX
-        CPU                     = 9,            ///< CPU code
-            UnknownCPU          = 10,            ///< CPU code for unknown/undetermined type
-            X86                 = 11,           ///< X86
-            X86_64              = 12,           ///< X86_64
-            Aarch               = 13,           ///< 32 bit arm
-            Aarch64             = 14,           ///< Aarch64
-            HostCPU             = 15,           ///< HostCPU
-            UniversalCPU        = 16,           ///< CPU code for multiple CPU types 
-        IR                      = 17,           ///< Intermediate representation (IR)
-            SlangIR             = 18,           ///< Slang IR
-            LLVMIR              = 19,           ///< LLVM IR
-        AST                     = 20,           ///< Abstract syntax tree (AST)
-            SlangAST            = 21,           ///< Slang AST
-    CountOf                     = 22,
+        Source                  = 4,            ///< Source code
+            C                   = 5,            ///< C source
+            Cpp                 = 6,            ///< C++ source
+            HLSL                = 7,            ///< HLSL source
+            GLSL                = 8,            ///< GLSL source
+            CUDA                = 9,            ///< CUDA source
+            Metal               = 10,           ///< Metal source
+            Slang               = 11,           ///< Slang source
+        Kernel                  = 12,           ///< CPU Kernel
+            DXIL                = 13,           ///< DXIL 
+            DXBC                = 14,           ///< DXBC
+            SPIRV               = 15,           ///< SPIR-V
+            PTX                 = 16,           ///< PTX
+        CPU                     = 17,           ///< CPU code
+            UnknownCPU          = 18,           ///< CPU code for unknown/undetermined type
+            X86                 = 19,           ///< X86
+            X86_64              = 20,           ///< X86_64
+            Aarch               = 21,           ///< 32 bit arm
+            Aarch64             = 22,           ///< Aarch64
+            HostCPU             = 23,           ///< HostCPU
+            UniversalCPU        = 24,           ///< CPU code for multiple CPU types 
+        IR                      = 25,           ///< Intermediate representation (IR)
+            SlangIR             = 26,           ///< Slang IR
+            LLVMIR              = 27,           ///< LLVM IR
+            MetalIR             = 28,           ///< Metal IR
+        AST                     = 29,           ///< Abstract syntax tree (AST)
+            SlangAST            = 30,           ///< Slang AST
+    CountOf                     = 31,
 };
 
 /// Get the parent payload
