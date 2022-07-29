@@ -27,9 +27,6 @@
     <ClInclude Include="..\..\..\tools\gfx\cpu\cpu-device.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\tools\gfx\cpu\cpu-helper-functions.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\..\tools\gfx\cpu\cpu-pipeline-state.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -411,9 +408,6 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\tools\gfx\cpu\cpu-device.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\tools\gfx\cpu\cpu-helper-functions.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\tools\gfx\cpu\cpu-pipeline-state.cpp">

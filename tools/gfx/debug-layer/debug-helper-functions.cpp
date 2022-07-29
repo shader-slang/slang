@@ -8,6 +8,29 @@ using namespace Slang;
 namespace debug
 {
 
+thread_local const char* _currentFunctionName = nullptr;
+
+SLANG_GFX_DEBUG_GET_INTERFACE_IMPL(Device)
+SLANG_GFX_DEBUG_GET_INTERFACE_IMPL_PARENT(BufferResource, Resource)
+SLANG_GFX_DEBUG_GET_INTERFACE_IMPL_PARENT(TextureResource, Resource)
+SLANG_GFX_DEBUG_GET_INTERFACE_IMPL(CommandBuffer)
+SLANG_GFX_DEBUG_GET_INTERFACE_IMPL(CommandQueue)
+SLANG_GFX_DEBUG_GET_INTERFACE_IMPL(Framebuffer)
+SLANG_GFX_DEBUG_GET_INTERFACE_IMPL(FramebufferLayout)
+SLANG_GFX_DEBUG_GET_INTERFACE_IMPL(InputLayout)
+SLANG_GFX_DEBUG_GET_INTERFACE_IMPL(RenderPassLayout)
+SLANG_GFX_DEBUG_GET_INTERFACE_IMPL(PipelineState)
+SLANG_GFX_DEBUG_GET_INTERFACE_IMPL(ResourceView)
+SLANG_GFX_DEBUG_GET_INTERFACE_IMPL(SamplerState)
+SLANG_GFX_DEBUG_GET_INTERFACE_IMPL(ShaderObject)
+SLANG_GFX_DEBUG_GET_INTERFACE_IMPL(ShaderProgram)
+SLANG_GFX_DEBUG_GET_INTERFACE_IMPL(Swapchain)
+SLANG_GFX_DEBUG_GET_INTERFACE_IMPL(TransientResourceHeap)
+SLANG_GFX_DEBUG_GET_INTERFACE_IMPL(QueryPool)
+SLANG_GFX_DEBUG_GET_INTERFACE_IMPL_PARENT(AccelerationStructure, ResourceView)
+SLANG_GFX_DEBUG_GET_INTERFACE_IMPL(Fence)
+SLANG_GFX_DEBUG_GET_INTERFACE_IMPL(ShaderTable)
+
 String _gfxGetFuncName(const char* input)
 {
     UnownedStringSlice str(input);
@@ -22,36 +45,6 @@ String _gfxGetFuncName(const char* input)
     sb.appendChar('I');
     sb.append(str.subString(startIndex, endIndex - startIndex));
     return sb.ProduceString();
-}
-
-template <typename... TArgs>
-char* _gfxDiagnoseFormat(
-    char* buffer, // Initial buffer to output formatted string.
-    size_t shortBufferSize, // Size of the initial buffer.
-    List<char>& bufferArray, // A list for allocating a large buffer if needed.
-    const char* format, // The format string.
-    TArgs... args)
-{
-    int length = sprintf_s(buffer, shortBufferSize, format, args...);
-    if (length < 0)
-        return buffer;
-    if (length > 255)
-    {
-        bufferArray.setCount(length + 1);
-        buffer = bufferArray.getBuffer();
-        sprintf_s(buffer, bufferArray.getCount(), format, args...);
-    }
-    return buffer;
-}
-
-template <typename... TArgs>
-void _gfxDiagnoseImpl(DebugMessageType type, const char* format, TArgs... args)
-{
-    char shortBuffer[256];
-    List<char> bufferArray;
-    auto buffer =
-        _gfxDiagnoseFormat(shortBuffer, sizeof(shortBuffer), bufferArray, format, args...);
-    getDebugCallback()->handleMessage(type, DebugMessageSource::Layer, buffer);
 }
 
 void validateAccelerationStructureBuildInputs(

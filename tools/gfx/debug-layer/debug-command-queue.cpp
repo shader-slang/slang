@@ -2,6 +2,8 @@
 #include "debug-command-queue.h"
 
 #include "debug-command-buffer.h"
+#include "debug-fence.h"
+#include "debug-transient-heap.h"
 
 #include "debug-helper-functions.h"
 
