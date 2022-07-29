@@ -8,6 +8,100 @@
 
 namespace Slang {
 
+namespace { // anonymous
+
+template <typename T>
+struct HierarchicalEnumTable
+{
+    typedef void (*InitFunc)(T* parents, UnownedStringSlice* names);
+    HierarchicalEnumTable(InitFunc init)
+    {
+        ::memset(&m_parents, 0, sizeof(m_parents));
+        init(m_parents, m_names);
+    }
+
+    T getParent(T kind) const
+    {
+        return (kind >= T::CountOf) ?
+            T::Invalid :
+            m_parents[Index(kind)];
+    }
+    UnownedStringSlice getName(T kind) const
+    {
+        return (kind >= T::CountOf) ?
+            UnownedStringSlice() :
+            m_names[Index(kind)];
+    }
+
+    bool isDerivedFrom(T type, T base) const
+    {
+        if (Index(type) >= Index(T::CountOf))
+        {
+            return false;
+        }
+
+        do
+        {
+            if (type == base)
+            {
+                return true;
+            }
+            type = m_parents[Index(type)];
+        } while (type != T::Base);
+
+        return false;
+    }
+
+protected:
+    T m_parents[Count(T::CountOf)];
+    UnownedStringSlice m_names[Count(T::CountOf)];
+};
+
+} // anonymous
+
+// Macro utils to create "enum hierarchy" tables
+
+#define SLANG_HIERARCHICAL_ENUM_INIT(ENUM_TYPE, ENUM_TYPE_MACRO, ENUM_SET_MACRO) \
+static void _init##ENUM_TYPE(ENUM_TYPE* parents, UnownedStringSlice* names) \
+{ \
+    ENUM_TYPE_MACRO(ENUM_SET_MACRO) \
+} 
+
+#define SLANG_HIERARCHICAL_ENUM(ENUM_TYPE, ENUM_TYPE_MACRO, ENUM_SET_MACRO) \
+SLANG_HIERARCHICAL_ENUM_INIT(ENUM_TYPE, ENUM_TYPE_MACRO, ENUM_SET_MACRO) \
+\
+static const HierarchicalEnumTable<ENUM_TYPE> g_table##ENUM_TYPE(_init##ENUM_TYPE); \
+\
+ENUM_TYPE getParent(ENUM_TYPE kind) { return g_table##ENUM_TYPE.getParent(kind); } \
+UnownedStringSlice getName(ENUM_TYPE kind) { return g_table##ENUM_TYPE.getName(kind); } \
+bool isDerivedFrom(ENUM_TYPE kind, ENUM_TYPE base) { return g_table##ENUM_TYPE.isDerivedFrom(kind, base); }
+
+/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!! ArtifactKind !!!!!!!!!!!!!!!!!!!!!!! */
+
+#define SLANG_ARTIFACT_KIND_SET(TYPE, PARENT) \
+    parents[Index(ArtifactKind::TYPE)] = ArtifactKind::PARENT; \
+    names[Index(ArtifactKind::TYPE)] = toSlice(#TYPE);
+
+SLANG_HIERARCHICAL_ENUM(ArtifactKind, SLANG_ARTIFACT_KIND, SLANG_ARTIFACT_KIND_SET)
+
+/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!! ArtifactPayload !!!!!!!!!!!!!!!!!!!!!!! */
+
+#define SLANG_ARTIFACT_PAYLOAD_SET(TYPE, PARENT) \
+    parents[Index(ArtifactPayload::TYPE)] = ArtifactPayload::PARENT; \
+    names[Index(ArtifactPayload::TYPE)] = toSlice(#TYPE);
+
+SLANG_HIERARCHICAL_ENUM(ArtifactPayload, SLANG_ARTIFACT_PAYLOAD, SLANG_ARTIFACT_PAYLOAD_SET)
+
+/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!! ArtifactStyle !!!!!!!!!!!!!!!!!!!!!!! */
+
+#define SLANG_ARTIFACT_STYLE_SET(TYPE, PARENT) \
+    parents[Index(ArtifactStyle::TYPE)] = ArtifactStyle::PARENT; \
+    names[Index(ArtifactStyle::TYPE)] = toSlice(#TYPE);
+
+SLANG_HIERARCHICAL_ENUM(ArtifactStyle, SLANG_ARTIFACT_STYLE, SLANG_ARTIFACT_STYLE_SET)
+
+/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!! ArtifactDesc !!!!!!!!!!!!!!!!!!!!!!! */
+
 /* static */ArtifactDesc ArtifactDesc::makeFromCompileTarget(SlangCompileTarget target)
 {
     switch (target)
@@ -20,25 +114,25 @@ namespace Slang {
         {
             // For the moment we make all just map to GLSL, but we could use flags
             // or some other mechanism to distinguish the types
-            return make(Kind::Text, Payload::GLSL, Style::Kernel, 0);
+            return make(Kind::GLSL, Payload::Base, Style::Kernel, 0);
         }
-        case SLANG_HLSL:                    return make(Kind::Text, Payload::HLSL, Style::Kernel, 0);
+        case SLANG_HLSL:                    return make(Kind::HLSL, Payload::Base, Style::Kernel, 0);
         case SLANG_SPIRV:                   return make(Kind::Executable, Payload::SPIRV, Style::Kernel, 0);
-        case SLANG_SPIRV_ASM:               return make(Kind::Text, Payload::SPIRVAssembly, Style::Kernel, 0);
+        case SLANG_SPIRV_ASM:               return make(Kind::Assembly, Payload::SPIRV, Style::Kernel, 0);
         case SLANG_DXBC:                    return make(Kind::Executable, Payload::DXBC, Style::Kernel, 0);
-        case SLANG_DXBC_ASM:                return make(Kind::Text, Payload::DXBCAssembly, Style::Kernel, 0);
+        case SLANG_DXBC_ASM:                return make(Kind::Assembly, Payload::DXBC, Style::Kernel, 0);
         case SLANG_DXIL:                    return make(Kind::Executable, Payload::DXIL, Style::Kernel, 0);
-        case SLANG_DXIL_ASM:                return make(Kind::Text, Payload::DXILAssembly, Style::Kernel, 0);
-        case SLANG_C_SOURCE:                return make(Kind::Text, Payload::C, Style::Kernel, 0);
-        case SLANG_CPP_SOURCE:              return make(Kind::Text, Payload::CPP, Style::Kernel, 0);
-        case SLANG_HOST_CPP_SOURCE:         return make(Kind::Text, Payload::CPP, Style::Host, 0);
+        case SLANG_DXIL_ASM:                return make(Kind::Assembly, Payload::DXIL, Style::Kernel, 0);
+        case SLANG_C_SOURCE:                return make(Kind::C, Payload::Base, Style::Kernel, 0);
+        case SLANG_CPP_SOURCE:              return make(Kind::Cpp, Payload::Base, Style::Kernel, 0);
+        case SLANG_HOST_CPP_SOURCE:         return make(Kind::Cpp, Payload::Base, Style::Host, 0);
         case SLANG_HOST_EXECUTABLE:         return make(Kind::Executable, Payload::HostCPU, Style::Host, 0);
         case SLANG_SHADER_SHARED_LIBRARY:   return make(Kind::SharedLibrary, Payload::HostCPU, Style::Kernel, 0);
-        case SLANG_SHADER_HOST_CALLABLE:    return make(Kind::Callable, Payload::HostCPU, Style::Kernel, 0);
-        case SLANG_CUDA_SOURCE:             return make(Kind::Text, Payload::CUDA, Style::Kernel, 0);
+        case SLANG_SHADER_HOST_CALLABLE:    return make(Kind::HostCallable, Payload::HostCPU, Style::Kernel, 0);
+        case SLANG_CUDA_SOURCE:             return make(Kind::CUDA, Payload::Base, Style::Kernel, 0);
         case SLANG_PTX:                     return make(Kind::Executable, Payload::PTX, Style::Kernel, 0);
         case SLANG_OBJECT_CODE:             return make(Kind::ObjectCode, Payload::HostCPU, Style::Kernel, 0);
-        case SLANG_HOST_HOST_CALLABLE:      return make(Kind::Callable, Payload::HostCPU, Style::Host, 0);
+        case SLANG_HOST_HOST_CALLABLE:      return make(Kind::HostCallable, Payload::HostCPU, Style::Host, 0);
         default: break;
     }
 
