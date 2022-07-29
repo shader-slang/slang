@@ -12,79 +12,170 @@
 namespace Slang
 {
 
+/* As a rule of thumb, if we can define some aspect in a hierarchy then we should do so at the highest level. 
+If some aspect can apply to multiple items identically we move that to a separate enum. 
+
+For example Source and types of Source are fine in Kind. 
+CPU architectures are not, because they can apply to ObjectCode, Libarary and so forth
+*/
+
+#define SLANG_ARTIFACT_KIND(x) \
+    x(Invalid, Invalid) \
+    x(Base, Invalid) \
+        x(None, Base) \
+        x(Unknown, Base) \
+        x(Container, Base) \
+            x(Zip, Container) \
+            x(Riff, Container) \
+        x(Text, Base) \
+            x(HumanText, Text) \
+            x(Source, Text) \
+                x(C, Source) \
+                x(Cpp, Source) \
+                x(HLSL, Source) \
+                x(GLSL, Source) \
+                x(CUDA, Source) \
+                x(Slang, Source) \
+            x(Assembly, Text) \
+        x(Binary, Base) \
+            x(ObjectCode, Binary) \
+            x(Library, Binary) \
+            x(Executable, Binary) \
+            x(SharedLibrary, Binary) \
+            x(HostCallable, Binary) \
+            x(DebugInfo, Binary) \
+        x(Object, Base) \
+            x(Diagnostics, Object)
+        
+// The SLANG_ARTIFACT_KIND defines the structure. New Kinds must be added at the end. Values can be depreciated, or disabled
+// but never removed.
+//
+// By *convention* and to make slightly more readable we make leaf types indentended and inner types not. We don't put in hierarchy structure
+// because we can't when we add new items without explicitly giving ids, which is kind of dull to do in practice.
+
 enum class ArtifactKind : uint8_t
-{
-    None,                       ///< There is no container
-
-    Unknown,                    ///< There is a container of unknown type
-
-    Library,                    ///< Library of object code (typically made up multiple ObjectCode)
-    ObjectCode,                 ///< Object code (for CPU typically .o or .obj file types)
-
-    Executable,                 ///< Self contained such it can exectuted. On GPU this would be a kernel.
-    SharedLibrary,              ///< Shared library/dll 
-    Callable,                   ///< Callable directly (can mean there isn't a binary artifact)
-
-    Text,                       ///< Text
-
-    Container,                  ///< A container holding other things
-
-    CountOf,
+{ 
+    Invalid                 = 0,
+    Base                    = 1,
+        None                = 2,            
+        Unknown             = 3,
+            Container       = 4,
+                Zip         = 5,
+                Riff        = 6,
+        Text                = 7,                        ///< Represented as text
+            HumanText       = 8,                        ///< Text for human consumumption
+            Source          = 9,                        ///< High level source code
+                C           = 10,
+                Cpp         = 11,
+                HLSL        = 12,
+                GLSL        = 13,
+                CUDA        = 14,
+                Slang       = 15,
+            Assembly        = 16,                       ///< Assembly, kind is represented in the payload
+        Binary              = 17,                       ///< Binary data
+            ObjectCode      = 18, 
+            Library         = 19,
+            Executable      = 20,
+            SharedLibrary   = 21,
+            HostCallable    = 22,
+            DebugInfo       = 23,
+        Object              = 24,                       ///< Accessible
+            Diagnostics     = 25,
+    CountOf                 = 26,
 };
+   
+/// Get the parent kind
+ArtifactKind getParent(ArtifactKind kind);
+/// Returns true if kind is derived from base
+bool isDerivedFrom(ArtifactKind kind, ArtifactKind base);
+/// Get the name for the kind
+UnownedStringSlice getName(ArtifactKind kind);
+
+// Payload. 
+
+#define SLANG_ARTIFACT_PAYLOAD(x) \
+    x(Invalid, Invalid) \
+    x(Base, Invalid) \
+        x(None, Base) \
+        x(Unknown, Base) \
+        x(Kernel, Base) \
+            x(DXIL, Kernel) \
+            x(DXBC, Kernel) \
+            x(SPIRV, Kernel) \
+            x(PTX, Kernel) \
+        x(CPU, Base) \
+            x(UnknownCPU, CPU) \
+            x(X86, CPU) \
+            x(X86_64, CPU) \
+            x(Aarch, CPU) \
+            x(Aarch64, CPU) \
+            x(HostCPU, CPU) \
+            x(UniversalCPU, CPU) \
+        x(IR, Base) \
+            x(SlangIR, IR) \
+            x(LLVMIR, IR) \
+        x(AST, Base) \
+            x(SlangAST, AST)
 
 enum class ArtifactPayload : uint8_t
 {
-    None,           ///< There is no payload
-
-    Unknown,        ///< Has payload but its unknown variety
-
-    DXIL,
-    DXBC,
-    SPIRV,
-    PTX,
-
-    DXILAssembly,
-    DXBCAssembly,
-    SPIRVAssembly,
-    PTXAssembly,
-
-    HostCPU,        ///< The host CPU architecture
-
-    SlangIR,        ///< Slang IR
-    LLVMIR,         ///< LLVM IR
-
-    SlangAST,       ///< Slang AST
-
-    X86,
-    X86_64,
-    AARCH,
-    AARCH64,
-
-    HLSL,           ///< HLSL
-    GLSL,           ///< GLSL
-    CPP,            ///< C++
-    C,              ///< C Language
-    CUDA,           ///< CUDA
-    Slang,          ///< Slang
-
-    DebugInfo,      ///< Debug information 
-
-    Diagnostics,    ///< Diagnostics
-
-    Zip,            ///< It's a zip 
-
-    CountOf,
+    Invalid                     = 0,            ///< Is invalid - indicates some kind of problem
+    Base                        = 1,            ///< The base of the hierarchy
+        None                    = 2,            ///< Doesn't have a payload
+        Unknown                 = 3,            ///< Unknown but probably valid
+        Kernel                  = 4,            ///< CPU Kernel
+            DXIL                = 5,            ///< DXIL 
+            DXBC                = 6,            ///< DXBC
+            SPIRV               = 7,            ///< SPIR-V
+            PTX                 = 8,            ///< PTX
+        CPU                     = 9,            ///< CPU code
+            UnknownCPU          = 10,            ///< CPU code for unknown/undetermined type
+            X86                 = 11,           ///< X86
+            X86_64              = 12,           ///< X86_64
+            Aarch               = 13,           ///< 32 bit arm
+            Aarch64             = 14,           ///< Aarch64
+            HostCPU             = 15,           ///< HostCPU
+            UniversalCPU        = 16,           ///< CPU code for multiple CPU types 
+        IR                      = 17,           ///< Intermediate representation (IR)
+            SlangIR             = 18,           ///< Slang IR
+            LLVMIR              = 19,           ///< LLVM IR
+        AST                     = 20,           ///< Abstract syntax tree (AST)
+            SlangAST            = 21,           ///< Slang AST
+    CountOf                     = 22,
 };
+
+/// Get the parent payload
+ArtifactPayload getParent(ArtifactPayload payload);
+/// Returns true if payload is derived from base
+bool isDerivedFrom(ArtifactPayload payload, ArtifactPayload base);
+/// Get the name for the payload
+UnownedStringSlice getName(ArtifactPayload payload);
+
+#define SLANG_ARTIFACT_STYLE(x) \
+    x(Invalid, Invalid) \
+    x(Base, Invalid) \
+        x(Unknown, Base) \
+        x(Kernel, Base) \
+        x(Host, Base) 
 
 enum class ArtifactStyle : uint8_t
 {
-    Unknown,                ///< Unknown
+    Invalid                 = 0,                    ///< Invalid style (indicating an error)
+    Base                    = 1,
+        Unknown             = 2,                    ///< Unknown
 
-    Kernel,                 ///< Compiled as `GPU kernel` style.        
-    Host,                   ///< Compiled in `host` style
+        Kernel              = 3,                    ///< Compiled as `GPU kernel` style.        
+        Host                = 4,                    ///< Compiled in `host` style
 
-    CountOf,
+    CountOf                 = 5,
 };
+
+/// Get the parent style
+ArtifactStyle getParent(ArtifactStyle style);
+/// Returns true if style is derived from base
+bool isDerivedFrom(ArtifactStyle style, ArtifactStyle base);
+/// Get the name for the style
+UnownedStringSlice getName(ArtifactStyle style);
 
 typedef uint8_t ArtifactFlags;
 struct ArtifactFlag

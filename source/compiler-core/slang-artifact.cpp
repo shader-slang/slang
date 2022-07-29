@@ -16,6 +16,9 @@ struct HierarchicalEnumTable
     typedef void (*InitFunc)(T* parents, UnownedStringSlice* names);
     HierarchicalEnumTable(InitFunc init)
     {
+        SLANG_COMPILE_ASSERT(Index(T::Invalid) == 0);
+        SLANG_COMPILE_ASSERT(Index(T::Base) == 1);
+
         ::memset(&m_parents, 0, sizeof(m_parents));
         init(m_parents, m_names);
     }
@@ -47,7 +50,7 @@ struct HierarchicalEnumTable
                 return true;
             }
             type = m_parents[Index(type)];
-        } while (type != T::Base);
+        } while (Index(type) < Index(T::Base));
 
         return false;
     }
