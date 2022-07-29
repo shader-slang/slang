@@ -18,7 +18,7 @@ struct HierarchicalEnumEntry
     const char* name;
 };
 
-bool _isHierarchicalEnumOk(ConstArrayView<HierarchicalEnumEntry> entries, Count countOf)
+static bool _isHierarchicalEnumOk(ConstArrayView<HierarchicalEnumEntry> entries, Count countOf)
 {
     // All values should be set
     if (entries.getCount() != countOf)
@@ -60,11 +60,18 @@ bool _isHierarchicalEnumOk(ConstArrayView<HierarchicalEnumEntry> entries, Count 
     return true;
 }
 
+
 template <typename T>
 struct HierarchicalEnumTable
 {
     HierarchicalEnumTable(ConstArrayView<HierarchicalEnumEntry> entries)
     {
+        // Remove warnings around this not being used.
+        {
+            const auto unused = _isHierarchicalEnumOk;
+            SLANG_UNUSED(unused);
+        }
+
         SLANG_COMPILE_TIME_ASSERT(Index(T::Invalid) < Index(T::Base));
         SLANG_ASSERT(entries.getCount() == Count(T::CountOf));
 
