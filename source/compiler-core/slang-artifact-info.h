@@ -23,6 +23,9 @@ struct ArtifactInfoUtil
         /// True if is a GPU usable (can be passed to a driver/API and be used 
     static bool isGpuUsable(const ArtifactDesc& desc);
 
+        /// True if the desc holds textual information
+    static bool isText(const ArtifactDesc& desc);
+
         /// Given an assembly type returns it's extension from the payload type
     static UnownedStringSlice getAssemblyExtensionForPayload(ArtifactPayload payload);
 

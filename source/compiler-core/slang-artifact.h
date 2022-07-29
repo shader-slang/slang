@@ -101,6 +101,7 @@ UnownedStringSlice getName(ArtifactKind kind);
             x(DXBC, Kernel) \
             x(SPIRV, Kernel) \
             x(PTX, Kernel) \
+            x(CuBin, Kernel) \
             x(MetalIR, Kernel) \
         x(CPU, Base) \
             x(UnknownCPU, CPU) \

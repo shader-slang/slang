@@ -42,11 +42,27 @@ static const KindExtension g_cpuKindExts[] =
 #endif
 };
 
-
-
 /* static */ bool ArtifactInfoUtil::isCpuBinary(const ArtifactDesc& desc) 
 { 
     return isDerivedFrom(desc.kind, ArtifactKind::Binary) && isDerivedFrom(desc.payload, ArtifactPayload::CPU); 
+}
+
+/* static */bool ArtifactInfoUtil::isText(const ArtifactDesc& desc)
+{
+    // If it's derived from text...
+    if (isDerivedFrom(desc.kind, ArtifactKind::Text))
+    {
+        return true;
+    }
+
+    // Special case PTX...
+    if (isDerivedFrom(desc.kind, ArtifactKind::Binary))
+    {
+        return desc.payload == ArtifactPayload::PTX;
+    }
+
+    // Not text
+    return false;
 }
 
 /* static */bool ArtifactInfoUtil::isGpuUsable(const ArtifactDesc& desc) 
