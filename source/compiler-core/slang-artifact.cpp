@@ -5,22 +5,81 @@
 
 #include "../core/slang-type-text-util.h"
 #include "../core/slang-io.h"
+#include "../core/slang-array-view.h"
 
 namespace Slang {
 
 namespace { // anonymous
 
+struct HierarchicalEnumEntry
+{
+    Index value;
+    Index parent;
+    const char* name;
+};
+
+bool _isHierarchicalEnumOk(ConstArrayView<HierarchicalEnumEntry> entries, Count countOf)
+{
+    // All values should be set
+    if (entries.getCount() != countOf)
+    {
+        return false;
+    }
+
+    List<uint8_t> isUsed;
+    isUsed.setCount(countOf);
+    ::memset(isUsed.getBuffer(), 0, countOf);
+
+    for (const auto& entry : entries)
+    {
+        const auto value = entry.value;
+        // Must be in range
+        if (value < 0 || value >= countOf)
+        {
+            return false;
+        }
+
+        if (isUsed[value] != 0)
+        {
+            return false;
+        }
+        // Mark as used
+        isUsed[value]++;
+    }
+   
+    // There can't be any gaps
+    for (auto v : isUsed)
+    {
+        if (v == 0)
+        {
+            return false;
+        }
+    }
+
+    // Okay, looks reasonable..
+    return true;
+}
+
 template <typename T>
 struct HierarchicalEnumTable
 {
-    typedef void (*InitFunc)(T* parents, UnownedStringSlice* names);
-    HierarchicalEnumTable(InitFunc init)
+    HierarchicalEnumTable(ConstArrayView<HierarchicalEnumEntry> entries)
     {
-        SLANG_COMPILE_ASSERT(Index(T::Invalid) == 0);
-        SLANG_COMPILE_ASSERT(Index(T::Base) == 1);
+        SLANG_COMPILE_TIME_ASSERT(Index(T::Invalid) == 0);
+        SLANG_COMPILE_TIME_ASSERT(Index(T::Base) == 1);
+        SLANG_ASSERT(entries.getCount() == Count(T::CountOf));
+
+        SLANG_ASSERT(_isHierarchicalEnumOk(entries, Count(T::CountOf)));
 
         ::memset(&m_parents, 0, sizeof(m_parents));
-        init(m_parents, m_names);
+
+        for (const auto& entry : entries)
+        {
+            const auto value = entry.value;
+
+            m_parents[value] = T(entry.parent);
+            m_names[value] = UnownedStringSlice(entry.name);
+        }
     }
 
     T getParent(T kind) const
@@ -64,16 +123,17 @@ protected:
 
 // Macro utils to create "enum hierarchy" tables
 
-#define SLANG_HIERARCHICAL_ENUM_INIT(ENUM_TYPE, ENUM_TYPE_MACRO, ENUM_SET_MACRO) \
-static void _init##ENUM_TYPE(ENUM_TYPE* parents, UnownedStringSlice* names) \
+#define SLANG_HIERARCHICAL_ENUM_GET_VALUES(ENUM_TYPE, ENUM_TYPE_MACRO, ENUM_ENTRY_MACRO) \
+static ConstArrayView<HierarchicalEnumEntry> _getEntries##ENUM_TYPE() \
 { \
-    ENUM_TYPE_MACRO(ENUM_SET_MACRO) \
-} 
+    static const HierarchicalEnumEntry values[] = { ENUM_TYPE_MACRO(ENUM_ENTRY_MACRO) }; \
+    return makeConstArrayView(values); \
+}
 
-#define SLANG_HIERARCHICAL_ENUM(ENUM_TYPE, ENUM_TYPE_MACRO, ENUM_SET_MACRO) \
-SLANG_HIERARCHICAL_ENUM_INIT(ENUM_TYPE, ENUM_TYPE_MACRO, ENUM_SET_MACRO) \
+#define SLANG_HIERARCHICAL_ENUM(ENUM_TYPE, ENUM_TYPE_MACRO, ENUM_VALUE_MACRO) \
+SLANG_HIERARCHICAL_ENUM_GET_VALUES(ENUM_TYPE, ENUM_TYPE_MACRO, ENUM_VALUE_MACRO) \
 \
-static const HierarchicalEnumTable<ENUM_TYPE> g_table##ENUM_TYPE(_init##ENUM_TYPE); \
+static const HierarchicalEnumTable<ENUM_TYPE> g_table##ENUM_TYPE(_getEntries##ENUM_TYPE()); \
 \
 ENUM_TYPE getParent(ENUM_TYPE kind) { return g_table##ENUM_TYPE.getParent(kind); } \
 UnownedStringSlice getName(ENUM_TYPE kind) { return g_table##ENUM_TYPE.getName(kind); } \
@@ -81,27 +141,21 @@ bool isDerivedFrom(ENUM_TYPE kind, ENUM_TYPE base) { return g_table##ENUM_TYPE.i
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!! ArtifactKind !!!!!!!!!!!!!!!!!!!!!!! */
 
-#define SLANG_ARTIFACT_KIND_SET(TYPE, PARENT) \
-    parents[Index(ArtifactKind::TYPE)] = ArtifactKind::PARENT; \
-    names[Index(ArtifactKind::TYPE)] = toSlice(#TYPE);
+#define SLANG_ARTIFACT_KIND_ENTRY(TYPE, PARENT) { Index(ArtifactKind::TYPE), Index(ArtifactKind::PARENT), #TYPE },
 
-SLANG_HIERARCHICAL_ENUM(ArtifactKind, SLANG_ARTIFACT_KIND, SLANG_ARTIFACT_KIND_SET)
+SLANG_HIERARCHICAL_ENUM(ArtifactKind, SLANG_ARTIFACT_KIND, SLANG_ARTIFACT_KIND_ENTRY)
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!! ArtifactPayload !!!!!!!!!!!!!!!!!!!!!!! */
 
-#define SLANG_ARTIFACT_PAYLOAD_SET(TYPE, PARENT) \
-    parents[Index(ArtifactPayload::TYPE)] = ArtifactPayload::PARENT; \
-    names[Index(ArtifactPayload::TYPE)] = toSlice(#TYPE);
+#define SLANG_ARTIFACT_PAYLOAD_ENTRY(TYPE, PARENT) { Index(ArtifactPayload::TYPE), Index(ArtifactPayload::PARENT), #TYPE },
 
-SLANG_HIERARCHICAL_ENUM(ArtifactPayload, SLANG_ARTIFACT_PAYLOAD, SLANG_ARTIFACT_PAYLOAD_SET)
+SLANG_HIERARCHICAL_ENUM(ArtifactPayload, SLANG_ARTIFACT_PAYLOAD, SLANG_ARTIFACT_PAYLOAD_ENTRY)
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!! ArtifactStyle !!!!!!!!!!!!!!!!!!!!!!! */
 
-#define SLANG_ARTIFACT_STYLE_SET(TYPE, PARENT) \
-    parents[Index(ArtifactStyle::TYPE)] = ArtifactStyle::PARENT; \
-    names[Index(ArtifactStyle::TYPE)] = toSlice(#TYPE);
+#define SLANG_ARTIFACT_STYLE_ENTRY(TYPE, PARENT) { Index(ArtifactStyle::TYPE), Index(ArtifactStyle::PARENT), #TYPE },
 
-SLANG_HIERARCHICAL_ENUM(ArtifactStyle, SLANG_ARTIFACT_STYLE, SLANG_ARTIFACT_STYLE_SET)
+SLANG_HIERARCHICAL_ENUM(ArtifactStyle, SLANG_ARTIFACT_STYLE, SLANG_ARTIFACT_STYLE_ENTRY)
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!! ArtifactDesc !!!!!!!!!!!!!!!!!!!!!!! */
 
