@@ -391,15 +391,15 @@ class IArtifactList : public ICastable
     virtual SLANG_NO_THROW void SLANG_MCALL setParent(IArtifact* artifact) = 0;
 
         /// Get the artifact at the specified index
-    virtual IArtifact* SLANG_MCALL getAt(Index index) = 0;
+    virtual SLANG_NO_THROW IArtifact* SLANG_MCALL getAt(Index index) = 0;
         /// Get the count of all the artifacts
-    virtual Count SLANG_MCALL getCount() = 0;
+    virtual SLANG_NO_THROW Count SLANG_MCALL getCount() = 0;
         /// Add the artifact to the list
-    virtual void SLANG_MCALL add(IArtifact* artifact) = 0;
+    virtual SLANG_NO_THROW void SLANG_MCALL add(IArtifact* artifact) = 0;
         /// Removes at index, keeps other artifacts in the same order
-    virtual void SLANG_MCALL removeAt(Index index) = 0;
+    virtual SLANG_NO_THROW void SLANG_MCALL removeAt(Index index) = 0;
         /// Clear the list
-    virtual void SLANG_MCALL clear() = 0;
+    virtual SLANG_NO_THROW void SLANG_MCALL clear() = 0;
 };
 
 class ArtifactList : public ComObject, public IArtifactList
@@ -408,17 +408,17 @@ public:
     SLANG_COM_OBJECT_IUNKNOWN_ALL
 
     // ICastable
-    void* castAs(const Guid& guid) SLANG_OVERRIDE;
+    SLANG_NO_THROW void* SLANG_MCALL castAs(const Guid& guid) SLANG_OVERRIDE;
 
     // IArtifactList
-    IArtifact* getParent() SLANG_OVERRIDE { return m_parent; }
-    void setParent(IArtifact* parent) SLANG_OVERRIDE { _setParent(parent); }
+    SLANG_NO_THROW IArtifact* SLANG_MCALL getParent() SLANG_OVERRIDE { return m_parent; }
+    SLANG_NO_THROW void SLANG_MCALL setParent(IArtifact* parent) SLANG_OVERRIDE { _setParent(parent); }
 
-    IArtifact* getAt(Index index) SLANG_OVERRIDE { return m_artifacts[index]; }
-    Count getCount() SLANG_OVERRIDE { return m_artifacts.getCount(); }
-    void add(IArtifact* artifact) SLANG_OVERRIDE;
-    void removeAt(Index index) SLANG_OVERRIDE;
-    void clear() SLANG_OVERRIDE;
+    SLANG_NO_THROW IArtifact* SLANG_MCALL getAt(Index index) SLANG_OVERRIDE { return m_artifacts[index]; }
+    SLANG_NO_THROW Count SLANG_MCALL getCount() SLANG_OVERRIDE { return m_artifacts.getCount(); }
+    SLANG_NO_THROW void SLANG_MCALL add(IArtifact* artifact) SLANG_OVERRIDE;
+    SLANG_NO_THROW void SLANG_MCALL removeAt(Index index) SLANG_OVERRIDE;
+    SLANG_NO_THROW void SLANG_MCALL clear() SLANG_OVERRIDE;
 
         // NOTE! The parent is a weak reference. 
     ArtifactList(IArtifact* parent):
