@@ -46,7 +46,7 @@ static bool _isHierarchicalEnumOk(ConstArrayView<HierarchicalEnumEntry> entries,
         // Mark as used
         isUsed[value]++;
     }
-   
+
     // There can't be any gaps
     for (auto v : isUsed)
     {
@@ -59,7 +59,6 @@ static bool _isHierarchicalEnumOk(ConstArrayView<HierarchicalEnumEntry> entries,
     // Okay, looks reasonable..
     return true;
 }
-
 
 template <typename T>
 struct HierarchicalEnumTable
@@ -154,11 +153,67 @@ bool isDerivedFrom(ENUM_TYPE kind, ENUM_TYPE base) { return g_table##ENUM_TYPE.i
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!! ArtifactKind !!!!!!!!!!!!!!!!!!!!!!! */
 
+#define SLANG_ARTIFACT_KIND(x) \
+    x(Invalid, Invalid) \
+    x(Base, Invalid) \
+        x(None, Base) \
+        x(Unknown, Base) \
+        x(Container, Base) \
+            x(Zip, Container) \
+            x(Riff, Container) \
+        x(Text, Base) \
+            x(HumanText, Text) \
+            x(Source, Text) \
+            x(Assembly, Text) \
+        x(Binary, Base) \
+            x(ObjectCode, Binary) \
+            x(Library, Binary) \
+            x(Executable, Binary) \
+            x(SharedLibrary, Binary) \
+            x(HostCallable, Binary) \
+        \
+        x(DebugInfo, Binary) \
+        x(Diagnostics, Base)
+
 #define SLANG_ARTIFACT_KIND_ENTRY(TYPE, PARENT) { Index(ArtifactKind::TYPE), Index(ArtifactKind::PARENT), #TYPE },
 
 SLANG_HIERARCHICAL_ENUM(ArtifactKind, SLANG_ARTIFACT_KIND, SLANG_ARTIFACT_KIND_ENTRY)
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!! ArtifactPayload !!!!!!!!!!!!!!!!!!!!!!! */
+
+#define SLANG_ARTIFACT_PAYLOAD(x) \
+    x(Invalid, Invalid) \
+    x(Base, Invalid) \
+        x(None, Base) \
+        x(Unknown, Base) \
+        x(Source, Base) \
+            x(C, Source) \
+            x(Cpp, Source) \
+            x(HLSL, Source) \
+            x(GLSL, Source) \
+            x(CUDA, Source) \
+            x(Metal, Source) \
+            x(Slang, Source) \
+        x(Kernel, Base) \
+            x(DXIL, Kernel) \
+            x(DXBC, Kernel) \
+            x(SPIRV, Kernel) \
+            x(PTX, Kernel) \
+            x(CuBin, Kernel) \
+            x(MetalAIR, Kernel) \
+        x(CPU, Base) \
+            x(UnknownCPU, CPU) \
+            x(X86, CPU) \
+            x(X86_64, CPU) \
+            x(Aarch, CPU) \
+            x(Aarch64, CPU) \
+            x(HostCPU, CPU) \
+            x(UniversalCPU, CPU) \
+        x(GeneralIR, Base) \
+            x(SlangIR, GeneralIR) \
+            x(LLVMIR, GeneralIR) \
+        x(AST, Base) \
+            x(SlangAST, AST)
 
 #define SLANG_ARTIFACT_PAYLOAD_ENTRY(TYPE, PARENT) { Index(ArtifactPayload::TYPE), Index(ArtifactPayload::PARENT), #TYPE },
 
@@ -166,9 +221,17 @@ SLANG_HIERARCHICAL_ENUM(ArtifactPayload, SLANG_ARTIFACT_PAYLOAD, SLANG_ARTIFACT_
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!! ArtifactStyle !!!!!!!!!!!!!!!!!!!!!!! */
 
+#define SLANG_ARTIFACT_STYLE(x) \
+    x(Invalid, Invalid) \
+    x(Base, Invalid) \
+        x(Unknown, Base) \
+        x(Kernel, Base) \
+        x(Host, Base) 
+
 #define SLANG_ARTIFACT_STYLE_ENTRY(TYPE, PARENT) { Index(ArtifactStyle::TYPE), Index(ArtifactStyle::PARENT), #TYPE },
 
 SLANG_HIERARCHICAL_ENUM(ArtifactStyle, SLANG_ARTIFACT_STYLE, SLANG_ARTIFACT_STYLE_ENTRY)
+
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!! ArtifactDesc !!!!!!!!!!!!!!!!!!!!!!! */
 

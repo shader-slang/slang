@@ -15,59 +15,41 @@ namespace Slang
 /* As a rule of thumb, if we can define some aspect in a hierarchy then we should do so at the highest level. 
 If some aspect can apply to multiple items identically we move that to a separate enum. 
 
-For example Source and types of Source are fine in Kind. 
-CPU architectures are not, because they can apply to ObjectCode, Libarary and so forth
+NOTE!
+New Kinds must be added at the end. Values can be depreciated, or disabled
+but never removed, without breaking binary compatability.
+
+Any change requires a change to SLANG_ARTIFACT_KIND
 */
-
-#define SLANG_ARTIFACT_KIND(x) \
-    x(Invalid, Invalid) \
-    x(Base, Invalid) \
-        x(None, Base) \
-        x(Unknown, Base) \
-        x(Container, Base) \
-            x(Zip, Container) \
-            x(Riff, Container) \
-        x(Text, Base) \
-            x(HumanText, Text) \
-            x(Source, Text) \
-            x(Assembly, Text) \
-        x(Binary, Base) \
-            x(ObjectCode, Binary) \
-            x(Library, Binary) \
-            x(Executable, Binary) \
-            x(SharedLibrary, Binary) \
-            x(HostCallable, Binary) \
-            x(DebugInfo, Binary) \
-        x(Diagnostics, Base)
-        
-// The SLANG_ARTIFACT_KIND defines the structure. New Kinds must be added at the end. Values can be depreciated, or disabled
-// but never removed.
-//
-// By *convention* and to make slightly more readable we make leaf types indentended and inner types not. We don't put in hierarchy structure
-// because we can't when we add new items without explicitly giving ids, which is kind of dull to do in practice.
-
 enum class ArtifactKind : uint8_t
 { 
-    Invalid                 = 0,
-    Base                    = 1,
-        None                = 2,            
-        Unknown             = 3,
-        Container           = 4,                        ///< Container like types
-            Zip             = 5,                        ///< Zip container
-            Riff            = 6,                        ///< Riff format
-        Text                = 7,                        ///< Representation is text. Encoding is utf8, unless prefixed with 'encoding'.
-            Source          = 8,                        ///< Source (Source type is in payload)
-            Assembly        = 9,                        ///< Assembly (Type is in payload)
-            HumanText       = 10,                       ///< Text for human consumption
-        Binary              = 11,                       ///< Binary data
-            ObjectCode      = 12,                       ///< Object file
-            Library         = 13,                       ///< Library (collection of object code)
-            Executable      = 14,                       ///< Executable
-            SharedLibrary   = 15,                       ///< Shared library - can be dynamically linked
-            HostCallable    = 16,                       ///< Code can be executed directly on the host
-            DebugInfo       = 17,                       ///< Debugging information
-        Diagnostics         = 18,                       ///< Diagnostics information
-    CountOf                 = 19,
+    Invalid,
+    Base,
+
+    None,            
+    Unknown,
+
+    Container,                  ///< Container like types
+    Zip,                        ///< Zip container
+    Riff,                       ///< Riff format
+
+    Text,                       ///< Representation is text. Encoding is utf8, unless prefixed with 'encoding'.
+    
+    Source,                     ///< Source (Source type is in payload)
+    Assembly,                   ///< Assembly (Type is in payload)
+    HumanText,                  ///< Text for human consumption
+
+    Binary,                     ///< Binary data
+    
+    ObjectCode,                 ///< Object file
+    Library,                    ///< Library (collection of object code)
+    Executable,                 ///< Executable
+    SharedLibrary,              ///< Shared library - can be dynamically linked
+    HostCallable,               ///< Code can be executed directly on the host
+
+    DebugInfo,                   ///< Debugging information
+    Diagnostics,                 ///< Diagnostics information
+    CountOf,
 };
    
 /// Get the parent kind
@@ -77,81 +59,63 @@ bool isDerivedFrom(ArtifactKind kind, ArtifactKind base);
 /// Get the name for the kind
 UnownedStringSlice getName(ArtifactKind kind);
 
-// Payload. 
-// 
-// SPIR-V could be considered an 'IR', but an IR focused on GPU.
-// MetalIR is under Kernel as is IR focused on GPU.
-// 
-// SlangIR and LLVMIR can be GPU or CPU orientated, so put in own category.
-#define SLANG_ARTIFACT_PAYLOAD(x) \
-    x(Invalid, Invalid) \
-    x(Base, Invalid) \
-        x(None, Base) \
-        x(Unknown, Base) \
-        x(Source, Base) \
-            x(C, Source) \
-            x(Cpp, Source) \
-            x(HLSL, Source) \
-            x(GLSL, Source) \
-            x(CUDA, Source) \
-            x(Metal, Source) \
-            x(Slang, Source) \
-        x(Kernel, Base) \
-            x(DXIL, Kernel) \
-            x(DXBC, Kernel) \
-            x(SPIRV, Kernel) \
-            x(PTX, Kernel) \
-            x(CuBin, Kernel) \
-            x(MetalIR, Kernel) \
-        x(CPU, Base) \
-            x(UnknownCPU, CPU) \
-            x(X86, CPU) \
-            x(X86_64, CPU) \
-            x(Aarch, CPU) \
-            x(Aarch64, CPU) \
-            x(HostCPU, CPU) \
-            x(UniversalCPU, CPU) \
-        x(IR, Base) \
-            x(SlangIR, IR) \
-            x(LLVMIR, IR) \
-        x(AST, Base) \
-            x(SlangAST, AST)
+/* Payload. 
 
+SlangIR and LLVMIR can be GPU or CPU orientated, so put in own category.
+
+NOTE!
+New Payloads must be added at the end. Values can be depreciated, or disabled
+but never removed, without breaking binary compatability.
+
+Any change requires a change to SLANG_ARTIFACT_PAYLOAD
+*/
 enum class ArtifactPayload : uint8_t
 {
-    Invalid                     = 0,            ///< Is invalid - indicates some kind of problem
-    Base                        = 1,            ///< The base of the hierarchy
-        None                    = 2,            ///< Doesn't have a payload
-        Unknown                 = 3,            ///< Unknown but probably valid
-        Source                  = 4,            ///< Source code
-            C                   = 5,            ///< C source
-            Cpp                 = 6,            ///< C++ source
-            HLSL                = 7,            ///< HLSL source
-            GLSL                = 8,            ///< GLSL source
-            CUDA                = 9,            ///< CUDA source
-            Metal               = 10,           ///< Metal source
-            Slang               = 11,           ///< Slang source
-        Kernel                  = 12,           ///< CPU Kernel
-            DXIL                = 13,           ///< DXIL 
-            DXBC                = 14,           ///< DXBC
-            SPIRV               = 15,           ///< SPIR-V
-            PTX                 = 16,           ///< PTX. NOTE! PTX is a text format, but is handable to CUDA API.
-            MetalIR             = 17,           ///< Metal IR (targetted toward GPU)
-            CuBin               = 18,           ///< CUDA binary
-        CPU                     = 19,           ///< CPU code
-            UnknownCPU          = 20,           ///< CPU code for unknown/undetermined type
-            X86                 = 21,           ///< X86
-            X86_64              = 22,           ///< X86_64
-            Aarch               = 23,           ///< 32 bit arm
-            Aarch64             = 24,           ///< Aarch64
-            HostCPU             = 25,           ///< HostCPU
-            UniversalCPU        = 26,           ///< CPU code for multiple CPU types 
-        IR                      = 27,           ///< Intermediate representation (IR)
-            SlangIR             = 28,           ///< Slang IR
-            LLVMIR              = 29,           ///< LLVM IR
-        AST                     = 30,           ///< Abstract syntax tree (AST)
-            SlangAST            = 31,           ///< Slang AST
-    CountOf                     = 32,
+    Invalid,               ///< Is invalid - indicates some kind of problem
+    Base,            ///< The base of the hierarchy
+
+    None,            ///< Doesn't have a payload
+    Unknown,            ///< Unknown but probably valid
+    
+    Source,            ///< Source code
+    
+    C,              ///< C source
+    Cpp,            ///< C++ source
+    HLSL,           ///< HLSL source
+    GLSL,           ///< GLSL source
+    CUDA,           ///< CUDA source
+    Metal,          ///< Metal source
+    Slang,          ///< Slang source
+
+    Kernel,         ///< GPU Kernel like
+
+    DXIL,           ///< DXIL 
+    DXBC,           ///< DXBC
+    SPIRV,          ///< SPIR-V
+    PTX,            ///< PTX. NOTE! PTX is a text format, but is handable to CUDA API.
+    MetalAIR,       ///< Metal AIR 
+    CuBin,          ///< CUDA binary
+
+    CPU,            ///< CPU code
+    
+    UnknownCPU,     ///< CPU code for unknown/undetermined type
+    X86,            ///< X86
+    X86_64,         ///< X86_64
+    Aarch,          ///< 32 bit arm
+    Aarch64,        ///< Aarch64
+    HostCPU,        ///< HostCPU
+    UniversalCPU,   ///< CPU code for multiple CPU types 
+
+    GeneralIR,      ///< General purpose IR representation (IR)
+
+    SlangIR,        ///< Slang IR
+    LLVMIR,         ///< LLVM IR
+
+    AST,            ///< Abstract syntax tree (AST)
+
+    SlangAST,       ///< Slang AST
+
+    CountOf,
 };
 
 /// Get the parent payload
@@ -161,23 +125,25 @@ bool isDerivedFrom(ArtifactPayload payload, ArtifactPayload base);
 /// Get the name for the payload
 UnownedStringSlice getName(ArtifactPayload payload);
 
-#define SLANG_ARTIFACT_STYLE(x) \
-    x(Invalid, Invalid) \
-    x(Base, Invalid) \
-        x(Unknown, Base) \
-        x(Kernel, Base) \
-        x(Host, Base) 
+/* Style.
 
+NOTE!
+New Styles must be added at the end. Values can be depreciated, or disabled
+but never removed, without breaking binary compatability.
+
+Any change requires a change to SLANG_ARTIFACT_STYLE
+*/
 enum class ArtifactStyle : uint8_t
 {
-    Invalid                 = 0,                    ///< Invalid style (indicating an error)
-    Base                    = 1,
-        Unknown             = 2,                    ///< Unknown
+    Invalid,            ///< Invalid style (indicating an error)
+    Base,
+        
+    Unknown,            ///< Unknown
 
-        Kernel              = 3,                    ///< Compiled as `GPU kernel` style.        
-        Host                = 4,                    ///< Compiled in `host` style
+    Kernel,             ///< Compiled as `GPU kernel` style.        
+    Host,               ///< Compiled in `host` style
 
-    CountOf                 = 5,
+    CountOf,
 };
 
 /// Get the parent style
@@ -195,7 +161,6 @@ struct ArtifactFlag
         // Don't currently have any flags
     };
 };
-
 
 /**
 A value type to describe aspects of the contents of an Artifact.
