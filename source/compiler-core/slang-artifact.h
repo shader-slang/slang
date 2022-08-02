@@ -408,7 +408,7 @@ public:
     SLANG_COM_OBJECT_IUNKNOWN_ALL
 
     // ICastable
-    void* castAs(const Guid& guid);
+    void* castAs(const Guid& guid) SLANG_OVERRIDE;
 
     // IArtifactList
     IArtifact* getParent() SLANG_OVERRIDE { return m_parent; }
