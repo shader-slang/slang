@@ -1472,7 +1472,7 @@ struct OptionsParser
                         desc.kind = ArtifactKind::Library;
                     }
 
-                    if (!ArtifactInfoUtil::isBinaryLinkable(desc))
+                    if (!ArtifactInfoUtil::isLinkable(desc))
                     {
                         sink->diagnose(referenceModuleName.loc, Diagnostics::kindNotLinkable, Path::getPathExt(path));
                         return SLANG_FAIL;

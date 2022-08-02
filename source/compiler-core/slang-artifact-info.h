@@ -16,7 +16,7 @@ struct ArtifactInfoUtil
     static bool isKindBinaryLinkable(Kind kind);
 
         /// True if is a CPU target - either
-    static bool isCpuTarget(const ArtifactDesc& desc);
+    static bool isCpuLikeTarget(const ArtifactDesc& desc);
     
         /// True if is a CPU binary
     static bool isCpuBinary(const ArtifactDesc& desc);
@@ -29,8 +29,8 @@ struct ArtifactInfoUtil
         /// Given an assembly type returns it's extension from the payload type
     static UnownedStringSlice getAssemblyExtensionForPayload(ArtifactPayload payload);
 
-        /// True if artifact  appears to be binary linkable
-    static bool isBinaryLinkable(const ArtifactDesc& desc);
+        /// True if artifact  appears to be linkable
+    static bool isLinkable(const ArtifactDesc& desc);
 
         /// Try to determine the desc from just a file extension (passed without .)
     static ArtifactDesc getDescFromExtension(const UnownedStringSlice& slice);

@@ -91,7 +91,7 @@ static const KindExtension g_cpuKindExts[] =
     return false;
 }
 
-/* static */bool ArtifactInfoUtil::isBinaryLinkable(const ArtifactDesc& desc)
+/* static */bool ArtifactInfoUtil::isLinkable(const ArtifactDesc& desc)
 {
     if (isDerivedFrom(desc.kind, ArtifactKind::BinaryLike))
     {
@@ -125,7 +125,7 @@ static const KindExtension g_cpuKindExts[] =
     return false;
 }
 
-/* static */bool ArtifactInfoUtil::isCpuTarget(const ArtifactDesc& desc)
+/* static */bool ArtifactInfoUtil::isCpuLikeTarget(const ArtifactDesc& desc)
 {
     if (isDerivedFrom(desc.kind, ArtifactKind::BinaryLike))
     {
@@ -139,7 +139,6 @@ static const KindExtension g_cpuKindExts[] =
 
     return false;
 }
-
 
 /* static */ArtifactDesc ArtifactInfoUtil::getDescFromExtension(const UnownedStringSlice& slice)
 {
@@ -272,7 +271,7 @@ UnownedStringSlice ArtifactInfoUtil::getDefaultExtension(const ArtifactDesc& des
         default: break;
     }
 
-    if (ArtifactInfoUtil::isCpuTarget(desc))
+    if (ArtifactInfoUtil::isCpuLikeTarget(desc))
     {
         return getCpuExtensionForKind(desc.kind);
     }
