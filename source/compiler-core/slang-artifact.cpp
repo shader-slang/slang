@@ -436,7 +436,7 @@ void* Artifact::findElementObject(const Guid& classGuid)
 
         if (SLANG_SUCCEEDED(value->queryInterface(IArtifactInstance::getTypeGuid(), (void**)instance.writeRef())) && instance)
         {
-            void* classInstance = instance->queryObject(classGuid);
+            void* classInstance = instance->castAs(classGuid);
             if (classInstance)
             {
                 return classInstance;

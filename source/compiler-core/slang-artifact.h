@@ -254,21 +254,13 @@ as
 * IArtifactInstance can be queried for it's underlying object class
 * Can optionally serialize into a blob
 */
-class IArtifactInstance : public ISlangUnknown
+class IArtifactInstance : public ICastable
 {
     SLANG_COM_INTERFACE(0x311457a8, 0x1796, 0x4ebb, { 0x9a, 0xfc, 0x46, 0xa5, 0x44, 0xc7, 0x6e, 0xa9 })
 
         /// Convert the instance into a serializable blob. 
         /// Returns SLANG_E_NOT_IMPLEMENTED if an implementation doesn't implement
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL writeToBlob(ISlangBlob** blob) = 0;
-
-        /// Queries for the backing object type. The type is represented by a guid. 
-        /// If the object doesn't derive from the type guid the function returns nullptr. 
-        /// Unlike the analagous queryInterface method the ref count remains unchanged. 
-        /// NOTE! 
-        /// Whilst this method *could) be used across an ABI boundary (whereas using something like dynamic_cast would not),
-        /// it is generally dangerous to do so.
-    virtual SLANG_NO_THROW void* SLANG_MCALL queryObject(const Guid& classGuid) = 0;
 };
 
 /* The IArtifact interface is designed to represent some Artifact of compilation. It could be input to or output from a compilation.

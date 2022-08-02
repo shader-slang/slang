@@ -15,11 +15,25 @@ namespace Slang {
 
 void* ModuleLibrary::getInterface(const Guid& uuid)
 {
-    if (uuid == ISlangUnknown::getTypeGuid() || uuid == IArtifactInstance::getTypeGuid())
+    if (uuid == ISlangUnknown::getTypeGuid() || uuid == ICastable::getTypeGuid() || uuid == IArtifactInstance::getTypeGuid())
     {
         return static_cast<IArtifactInstance*>(this);
     }
     return nullptr;
+}
+
+void* ModuleLibrary::getObject(const Guid& uuid)
+{
+    return uuid == getTypeGuid() ? this : nullptr;
+}
+
+void* ModuleLibrary::castAs(const Guid& guid)
+{
+    if (auto intf = getInterface(guid))
+    {
+        return intf;
+    }
+    return getObject(guid);
 }
 
 SlangResult loadModuleLibrary(const Byte* inBytes, size_t bytesCount, EndToEndCompileRequest* req, RefPtr<ModuleLibrary>& outLibrary)
