@@ -248,19 +248,29 @@ enum ArtifactPathType
     Existing,                   ///< Is an existing file
 };
 
-/* The IArtifactInstance interface represents a single instance of a type that can be part of an artifact. It's special in so far 
+/* The IArtifactRepresentation interface represents a single representation that can be part of an artifact. It's special in so far 
 as 
 
-* IArtifactInstance can be queried for it's underlying object class
+* IArtifactRepresentation can be queried for it's underlying object class
 * Can optionally serialize into a blob
 */
-class IArtifactInstance : public ICastable
+class IArtifactRepresentation : public ICastable
 {
     SLANG_COM_INTERFACE(0x311457a8, 0x1796, 0x4ebb, { 0x9a, 0xfc, 0x46, 0xa5, 0x44, 0xc7, 0x6e, 0xa9 })
 
         /// Convert the instance into a serializable blob. 
         /// Returns SLANG_E_NOT_IMPLEMENTED if an implementation doesn't implement
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL writeToBlob(ISlangBlob** blob) = 0;
+
+        /// Returns true if this representation exists and is available for use.
+    virtual SLANG_NO_THROW bool SLANG_MCALL exists() = 0;
+};
+
+/* Interface for types that are associated with an artifact, but aren't a representation, or are 
+only part of a representation. */
+class IArtifactAssociated : public ICastable
+{
+    SLANG_COM_INTERFACE(0xafc0e4db, 0x16d4, 0x4d7a, { 0x93, 0x5f, 0x3e, 0x47, 0x7a, 0x23, 0x2a, 0x7f })
 };
 
 /* The IArtifact interface is designed to represent some Artifact of compilation. It could be input to or output from a compilation.
@@ -340,12 +350,6 @@ public:
         /// artifact name needs to be correct.
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL requireFileLike(Keep keep) = 0;
     
-        /// Finds an instance of that has the the interface guid
-    virtual SLANG_NO_THROW ISlangUnknown* SLANG_MCALL findElement(const Guid& guid) = 0;
-
-        /// Find an element that derives from IArtifactInstance, and which queryObject works with the classGuid
-    virtual SLANG_NO_THROW void* SLANG_MCALL findElementObject(const Guid& classGuid) = 0;
-
         /// Add items
     virtual SLANG_NO_THROW void SLANG_MCALL setPath(PathType pathType, const char* filePath) = 0;
 
@@ -360,19 +364,19 @@ public:
         /// Get the name of the artifact. This can be empty.
     virtual SLANG_NO_THROW const char* SLANG_MCALL getName() = 0;
 
-        /// Add an interface
-    virtual SLANG_NO_THROW void SLANG_MCALL addElement(const Desc& desc, ISlangUnknown* intf) = 0;
-    
+        /// Find an item by casting it's interface
+    virtual SLANG_NO_THROW void* SLANG_MCALL findItemInterface(const Guid& uuid) = 0;
+        /// Only works on ICastable derived items. Can find interfaces or objects.
+    virtual SLANG_NO_THROW void* SLANG_MCALL findItemObject(const Guid& classGuid) = 0;
+
+        /// Add a representation
+    virtual SLANG_NO_THROW void SLANG_MCALL addItem(ISlangUnknown* item) = 0;
         /// Get the item at the index
-    virtual SLANG_NO_THROW ISlangUnknown* SLANG_MCALL getElementAt(Index i) = 0;
-        /// Get the desc associated with an element
-    virtual SLANG_NO_THROW Desc SLANG_MCALL getElementDescAt(Index i) = 0;
-
+    virtual SLANG_NO_THROW ISlangUnknown* SLANG_MCALL getItemAt(Index i) = 0;
         /// Remove the element at the specified index. 
-    virtual SLANG_NO_THROW void SLANG_MCALL removeElementAt(Index i) = 0;
-
+    virtual SLANG_NO_THROW void SLANG_MCALL removeItemAt(Index i) = 0;
         /// Get the amount of elements
-    virtual SLANG_NO_THROW Index SLANG_MCALL getElementCount() = 0;
+    virtual SLANG_NO_THROW Index SLANG_MCALL getItemCount() = 0;
 };
 
 /* A list of artifacts. */
@@ -472,18 +476,17 @@ public:
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL loadBlob(Keep keep, ISlangBlob** outBlob) SLANG_OVERRIDE;
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL requireFile(Keep keep) SLANG_OVERRIDE;
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL requireFileLike(Keep keep) SLANG_OVERRIDE;
-    virtual SLANG_NO_THROW ISlangUnknown* SLANG_MCALL findElement(const Guid& guid) SLANG_OVERRIDE;
-    virtual SLANG_NO_THROW void* SLANG_MCALL findElementObject(const Guid& classGuid) SLANG_OVERRIDE;
     virtual SLANG_NO_THROW void SLANG_MCALL setPath(PathType pathType, const char* path) SLANG_OVERRIDE { _setPath(pathType, path); }
     virtual SLANG_NO_THROW void SLANG_MCALL setBlob(ISlangBlob* blob) SLANG_OVERRIDE { m_blob = blob; }
     virtual SLANG_NO_THROW PathType SLANG_MCALL getPathType() SLANG_OVERRIDE { return m_pathType; }
     virtual SLANG_NO_THROW const char* SLANG_MCALL getPath() SLANG_OVERRIDE { return m_path.getBuffer(); }
     virtual SLANG_NO_THROW const char* SLANG_MCALL getName() SLANG_OVERRIDE { return m_name.getBuffer(); }
-    virtual SLANG_NO_THROW void SLANG_MCALL addElement(const Desc& desc, ISlangUnknown* intf) SLANG_OVERRIDE;
-    virtual SLANG_NO_THROW ISlangUnknown* SLANG_MCALL getElementAt(Index i) SLANG_OVERRIDE { return m_elements[i].value; }
-    virtual SLANG_NO_THROW Desc SLANG_MCALL getElementDescAt(Index i) SLANG_OVERRIDE { return m_elements[i].desc; }
-    virtual SLANG_NO_THROW void SLANG_MCALL removeElementAt(Index i) SLANG_OVERRIDE;
-    virtual SLANG_NO_THROW Index SLANG_MCALL getElementCount() SLANG_OVERRIDE { return m_elements.getCount(); }
+    virtual SLANG_NO_THROW void* SLANG_MCALL findItemInterface(const Guid& uuid) SLANG_OVERRIDE;
+    virtual SLANG_NO_THROW void* SLANG_MCALL findItemObject(const Guid& classGuid) SLANG_OVERRIDE;
+    virtual SLANG_NO_THROW void SLANG_MCALL addItem(ISlangUnknown* intf) SLANG_OVERRIDE;
+    virtual SLANG_NO_THROW ISlangUnknown* SLANG_MCALL getItemAt(Index i) SLANG_OVERRIDE { return m_items[i]; }
+    virtual SLANG_NO_THROW void SLANG_MCALL removeItemAt(Index i) SLANG_OVERRIDE;
+    virtual SLANG_NO_THROW Index SLANG_MCALL getItemCount() SLANG_OVERRIDE { return m_items.getCount(); }
 
     /// Ctor
     Artifact(const Desc& desc, const String& name) :
@@ -499,12 +502,6 @@ protected:
 
     void _setPath(PathType pathType, const String& path) { m_pathType = pathType; m_path = path; }
 
-    struct Element
-    {
-        ArtifactDesc desc;
-        ComPtr<ISlangUnknown> value;
-    };
-
     Desc m_desc;                                ///< Description of the artifact
     IArtifact* m_parent;                        ///< Artifact this artifact belongs to
 
@@ -516,7 +513,7 @@ protected:
 
     ComPtr<ISlangBlob> m_blob;                  ///< Blob to store result in memory
 
-    List<Element> m_elements;                   ///< Associated elements
+    List<ComPtr<ISlangUnknown>> m_items;        ///< Associated items
 };
 
 } // namespace Slang

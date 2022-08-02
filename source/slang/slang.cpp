@@ -4507,9 +4507,9 @@ SlangResult EndToEndCompileRequest::addLibraryReference(const void* libData, siz
     const auto desc = ArtifactDesc::make(ArtifactKind::Library, ArtifactPayload::SlangIR);
 
     // Create an artifact without any name (as one is not provided)
-    RefPtr<Artifact> artifact = new Artifact(desc, String());
+    ComPtr<IArtifact> artifact(new Artifact(desc, String()));
 
-    artifact->addElement(desc, library);
+    artifact->addItem(library);
 
     return _addLibraryReference(this, artifact);
 }

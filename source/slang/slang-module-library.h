@@ -10,7 +10,7 @@ namespace Slang
 {
 
 // Class to hold information serialized in from a -r slang-lib/slang-module
-class ModuleLibrary : public ComObject, public IArtifactInstance
+class ModuleLibrary : public ComObject, public IArtifactRepresentation
 {
 public:
 
@@ -21,9 +21,10 @@ public:
     // ICastable
     virtual SLANG_NO_THROW void* SLANG_MCALL castAs(const Guid& guid) SLANG_OVERRIDE;
 
-    // IArtifactInstance
+    // IArtifactRepresentation
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL writeToBlob(ISlangBlob** blob) SLANG_OVERRIDE { SLANG_UNUSED(blob); return SLANG_E_NOT_IMPLEMENTED; }
-    
+    virtual SLANG_NO_THROW bool SLANG_MCALL exists() { return m_modules.getCount() > 0; }
+
     List<FrontEndCompileRequest::ExtraEntryPointInfo> m_entryPoints;
     List<RefPtr<IRModule>> m_modules;
 

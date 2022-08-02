@@ -15,9 +15,9 @@ namespace Slang {
 
 void* ModuleLibrary::getInterface(const Guid& uuid)
 {
-    if (uuid == ISlangUnknown::getTypeGuid() || uuid == ICastable::getTypeGuid() || uuid == IArtifactInstance::getTypeGuid())
+    if (uuid == ISlangUnknown::getTypeGuid() || uuid == ICastable::getTypeGuid() || uuid == IArtifactRepresentation::getTypeGuid())
     {
-        return static_cast<IArtifactInstance*>(this);
+        return static_cast<IArtifactRepresentation*>(this);
     }
     return nullptr;
 }
@@ -91,7 +91,7 @@ SlangResult loadModuleLibrary(const Byte* inBytes, size_t bytesCount, EndToEndCo
 
 SlangResult loadModuleLibrary(ArtifactKeep keep, IArtifact* artifact, EndToEndCompileRequest* req, RefPtr<ModuleLibrary>& outLibrary)
 {
-    if (auto foundLibrary = (ModuleLibrary*)artifact->findElementObject(ModuleLibrary::getTypeGuid()))
+    if (auto foundLibrary = (ModuleLibrary*)artifact->findItemObject(ModuleLibrary::getTypeGuid()))
     {
         outLibrary = foundLibrary;
         return SLANG_OK;
@@ -107,7 +107,7 @@ SlangResult loadModuleLibrary(ArtifactKeep keep, IArtifact* artifact, EndToEndCo
     
     if (canKeep(keep))
     {
-        artifact->addElement(artifact->getDesc(), library);
+        artifact->addItem(library);
     }
 
     outLibrary = library;

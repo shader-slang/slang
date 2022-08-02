@@ -380,9 +380,30 @@ bool Artifact::exists()
         return true;
     }
 
-    // If we have an associated entry that represents the artifact it exists
-    if (findElement(IArtifactInstance::getTypeGuid()))
+    for (ISlangUnknown* item : m_items)
     {
+        ComPtr<ICastable> castable;
+
+        if (SLANG_SUCCEEDED(item->queryInterface(ICastable::getTypeGuid(), (void**)castable.writeRef())) && castable)
+        {
+            auto rep = (IArtifactRepresentation*)castable->castAs(IArtifactRepresentation::getTypeGuid());
+            if (rep)
+            {
+                // It is a rep and it exists
+                if (rep->exists())
+                {
+                    return true;
+                }
+                continue;
+            }
+            // Associated types don't encapsulate an artifact representation, so don't signal existance
+            if (castable->castAs(IArtifactAssociated::getTypeGuid()))
+            {
+                continue;
+            }
+        }
+        
+        // It can't be IArtifactRepresentation or IArtifactAssociated, so we assume means it exists
         return true;
     }
 
@@ -396,54 +417,57 @@ bool Artifact::exists()
     return File::exists(m_path);
 }
 
-ISlangUnknown* Artifact::findElement(const Guid& guid)
-{
-    for (auto const& element : m_elements)
-    {
-        ISlangUnknown* value = element.value;
 
-        ISlangUnknown* intf = nullptr;
-        if (SLANG_SUCCEEDED(value->queryInterface(guid, (void**)&intf)) && intf)
+void Artifact::addItem(ISlangUnknown* intf) 
+{ 
+    SLANG_ASSERT(intf);
+    // Can't already be in there
+    SLANG_ASSERT(m_items.indexOf(intf) < 0);
+    // Add it
+    m_items.add(ComPtr<ISlangUnknown>(intf));
+}
+
+void Artifact::removeItemAt(Index i)
+{
+    m_items.removeAt(i);
+}
+
+
+void* Artifact::findItemInterface(const Guid& guid)
+{
+    for (ISlangUnknown* intf : m_items)
+    {
+        ISlangUnknown* cast = nullptr;
+        if (SLANG_SUCCEEDED(intf->queryInterface(guid, (void**)&cast)) && cast)
         {
             // NOTE! This assumes we *DONT* need to ref count to keep an interface in scope
             // (as strict COM requires so as to allow on demand interfaces).
-            intf->release();
-            return intf;
+            cast->release();
+            return cast;
         }
     }
-
     return nullptr;
 }
 
-void Artifact::addElement(const Desc& desc, ISlangUnknown* intf) 
-{ 
-    SLANG_ASSERT(intf); 
-    Element element{ desc, ComPtr<ISlangUnknown>(intf) };
-    m_elements.add(element); 
-}
-
-void Artifact::removeElementAt(Index i)
+void* Artifact::findItemObject(const Guid& classGuid)
 {
-    m_elements.removeAt(i);
-}
-
-void* Artifact::findElementObject(const Guid& classGuid)
-{
-    ComPtr<IArtifactInstance> instance;
-    for (const auto& element : m_elements)
+    for (ISlangUnknown* intf : m_items)
     {
-        ISlangUnknown* value = element.value;
-
-        if (SLANG_SUCCEEDED(value->queryInterface(IArtifactInstance::getTypeGuid(), (void**)instance.writeRef())) && instance)
+        ComPtr<ICastable> castable;
+        if (SLANG_SUCCEEDED(intf->queryInterface(ICastable::getTypeGuid(), (void**)castable.writeRef())) && castable)
         {
-            void* classInstance = instance->castAs(classGuid);
-            if (classInstance)
+            void* obj = castable->castAs(classGuid);
+
+            // NOTE! This assumes we *DONT* need to ref count to keep an interface in scope
+            // (as strict COM requires so as to allow on demand interfaces).
+            
+            // If could cast return the result
+            if (obj)
             {
-                return classInstance;
+                return obj;
             }
         }
     }
-
     return nullptr;
 }
 
@@ -572,14 +596,13 @@ SlangResult Artifact::loadBlob(Keep keep, ISlangBlob** outBlob)
         else
         {
             // Look for a representation that we can serialize into a blob
-            for (const auto& element : m_elements)
+            for (ISlangUnknown* intf : m_items)
             {
-                ISlangUnknown* intf = element.value;
-
-                ComPtr<IArtifactInstance> inst;
-                if (SLANG_SUCCEEDED(intf->queryInterface(IArtifactInstance::getTypeGuid(), (void**)inst.writeRef())) && inst)
+                
+                ComPtr<IArtifactRepresentation> rep;
+                if (SLANG_SUCCEEDED(intf->queryInterface(IArtifactRepresentation::getTypeGuid(), (void**)rep.writeRef())) && rep)
                 {
-                    SlangResult res = inst->writeToBlob(blob.writeRef());
+                    SlangResult res = rep->writeToBlob(blob.writeRef());
                     if (SLANG_SUCCEEDED(res) && blob)
                     {
                         break;
