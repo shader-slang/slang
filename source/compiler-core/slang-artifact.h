@@ -408,6 +408,7 @@ class IArtifactList : public ICastable
 
 class ArtifactList : public ComObject, public IArtifactList
 {
+public:
     SLANG_COM_OBJECT_IUNKNOWN_ALL
 
     // ICastable
@@ -431,6 +432,7 @@ class ArtifactList : public ComObject, public IArtifactList
 
     virtual ~ArtifactList() { _setParent(nullptr); }
 
+protected:
     void* getInterface(const Guid& guid);
     void* getObject(const Guid& guid);
 
