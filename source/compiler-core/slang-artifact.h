@@ -23,11 +23,11 @@ Any change requires a change to SLANG_ARTIFACT_KIND
 */
 enum class ArtifactKind : uint8_t
 { 
-    Invalid,
-    Base,
+    Invalid,                    ///< Invalid
+    Base,                       ///< Base kind of all valid kinds
 
-    None,            
-    Unknown,
+    None,                       ///< Doesn't contain anything
+    Unknown,                    ///< Unknown
 
     Container,                  ///< Container like types
     Zip,                        ///< Zip container
@@ -39,7 +39,7 @@ enum class ArtifactKind : uint8_t
     Assembly,                   ///< Assembly (Type is in payload)
     HumanText,                  ///< Text for human consumption
 
-    Binary,                     ///< Binary data
+    BinaryLike,                 ///< Kinds which are 'binary like' - can be executed, linked with and so forth. 
     
     ObjectCode,                 ///< Object file
     Library,                    ///< Library (collection of object code)
@@ -49,6 +49,7 @@ enum class ArtifactKind : uint8_t
 
     DebugInfo,                   ///< Debugging information
     Diagnostics,                 ///< Diagnostics information
+
     CountOf,
 };
    
@@ -71,13 +72,13 @@ Any change requires a change to SLANG_ARTIFACT_PAYLOAD
 */
 enum class ArtifactPayload : uint8_t
 {
-    Invalid,               ///< Is invalid - indicates some kind of problem
-    Base,            ///< The base of the hierarchy
+    Invalid,        ///< Is invalid - indicates some kind of problem
+    Base,           ///< The base of the hierarchy
 
-    None,            ///< Doesn't have a payload
-    Unknown,            ///< Unknown but probably valid
+    None,           ///< Doesn't have a payload
+    Unknown,        ///< Unknown but probably valid
     
-    Source,            ///< Source code
+    Source,         ///< Source code
     
     C,              ///< C source
     Cpp,            ///< C++ source
@@ -87,7 +88,7 @@ enum class ArtifactPayload : uint8_t
     Metal,          ///< Metal source
     Slang,          ///< Slang source
 
-    Kernel,         ///< GPU Kernel like
+    KernelLike,     ///< GPU Kernel like
 
     DXIL,           ///< DXIL 
     DXBC,           ///< DXBC
@@ -96,7 +97,7 @@ enum class ArtifactPayload : uint8_t
     MetalAIR,       ///< Metal AIR 
     CuBin,          ///< CUDA binary
 
-    CPU,            ///< CPU code
+    CPULike,        ///< CPU code
     
     UnknownCPU,     ///< CPU code for unknown/undetermined type
     X86,            ///< X86

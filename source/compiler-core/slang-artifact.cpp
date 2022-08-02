@@ -165,14 +165,14 @@ bool isDerivedFrom(ENUM_TYPE kind, ENUM_TYPE base) { return g_table##ENUM_TYPE.i
             x(HumanText, Text) \
             x(Source, Text) \
             x(Assembly, Text) \
-        x(Binary, Base) \
-            x(ObjectCode, Binary) \
-            x(Library, Binary) \
-            x(Executable, Binary) \
-            x(SharedLibrary, Binary) \
-            x(HostCallable, Binary) \
+        x(BinaryLike, Base) \
+            x(ObjectCode, BinaryLike) \
+            x(Library, BinaryLike) \
+            x(Executable, BinaryLike) \
+            x(SharedLibrary, BinaryLike) \
+            x(HostCallable, BinaryLike) \
         \
-        x(DebugInfo, Binary) \
+        x(DebugInfo, Base) \
         x(Diagnostics, Base)
 
 #define SLANG_ARTIFACT_KIND_ENTRY(TYPE, PARENT) { Index(ArtifactKind::TYPE), Index(ArtifactKind::PARENT), #TYPE },
@@ -194,21 +194,21 @@ SLANG_HIERARCHICAL_ENUM(ArtifactKind, SLANG_ARTIFACT_KIND, SLANG_ARTIFACT_KIND_E
             x(CUDA, Source) \
             x(Metal, Source) \
             x(Slang, Source) \
-        x(Kernel, Base) \
-            x(DXIL, Kernel) \
-            x(DXBC, Kernel) \
-            x(SPIRV, Kernel) \
-            x(PTX, Kernel) \
-            x(CuBin, Kernel) \
-            x(MetalAIR, Kernel) \
-        x(CPU, Base) \
-            x(UnknownCPU, CPU) \
-            x(X86, CPU) \
-            x(X86_64, CPU) \
-            x(Aarch, CPU) \
-            x(Aarch64, CPU) \
-            x(HostCPU, CPU) \
-            x(UniversalCPU, CPU) \
+        x(KernelLike, Base) \
+            x(DXIL, KernelLike) \
+            x(DXBC, KernelLike) \
+            x(SPIRV, KernelLike) \
+            x(PTX, KernelLike) \
+            x(CuBin, KernelLike) \
+            x(MetalAIR, KernelLike) \
+        x(CPULike, Base) \
+            x(UnknownCPU, CPULike) \
+            x(X86, CPULike) \
+            x(X86_64, CPULike) \
+            x(Aarch, CPULike) \
+            x(Aarch64, CPULike) \
+            x(HostCPU, CPULike) \
+            x(UniversalCPU, CPULike) \
         x(GeneralIR, Base) \
             x(SlangIR, GeneralIR) \
             x(LLVMIR, GeneralIR) \

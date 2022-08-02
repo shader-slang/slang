@@ -44,7 +44,7 @@ static const KindExtension g_cpuKindExts[] =
 
 /* static */ bool ArtifactInfoUtil::isCpuBinary(const ArtifactDesc& desc) 
 { 
-    return isDerivedFrom(desc.kind, ArtifactKind::Binary) && isDerivedFrom(desc.payload, ArtifactPayload::CPU); 
+    return isDerivedFrom(desc.kind, ArtifactKind::BinaryLike) && isDerivedFrom(desc.payload, ArtifactPayload::CPULike); 
 }
 
 /* static */bool ArtifactInfoUtil::isText(const ArtifactDesc& desc)
@@ -56,7 +56,7 @@ static const KindExtension g_cpuKindExts[] =
     }
 
     // Special case PTX...
-    if (isDerivedFrom(desc.kind, ArtifactKind::Binary))
+    if (isDerivedFrom(desc.kind, ArtifactKind::BinaryLike))
     {
         return desc.payload == ArtifactPayload::PTX;
     }
@@ -67,9 +67,9 @@ static const KindExtension g_cpuKindExts[] =
 
 /* static */bool ArtifactInfoUtil::isGpuUsable(const ArtifactDesc& desc) 
 { 
-    if (isDerivedFrom(desc.kind, ArtifactKind::Binary))
+    if (isDerivedFrom(desc.kind, ArtifactKind::BinaryLike))
     {
-        return isDerivedFrom(desc.payload, ArtifactPayload::Kernel);
+        return isDerivedFrom(desc.payload, ArtifactPayload::KernelLike);
     }
 
     // PTX is a kind of special case, it's an 'assembly' (low level text represention) that can be passed 
@@ -93,9 +93,9 @@ static const KindExtension g_cpuKindExts[] =
 
 /* static */bool ArtifactInfoUtil::isBinaryLinkable(const ArtifactDesc& desc)
 {
-    if (isDerivedFrom(desc.kind, ArtifactKind::Binary))
+    if (isDerivedFrom(desc.kind, ArtifactKind::BinaryLike))
     {
-        if (isDerivedFrom(desc.payload, ArtifactPayload::Kernel))
+        if (isDerivedFrom(desc.payload, ArtifactPayload::KernelLike))
         {
             // It seems as if DXBC is potentially linkable from
             // https://docs.microsoft.com/en-us/windows/win32/direct3dhlsl/dx-graphics-hlsl-appendix-keywords#export
@@ -105,7 +105,7 @@ static const KindExtension g_cpuKindExts[] =
 
             return true;
         }
-        else if (isDerivedFrom(desc.payload, ArtifactPayload::CPU))
+        else if (isDerivedFrom(desc.payload, ArtifactPayload::CPULike))
         {
             // If kind is exe or shared library, linking will arguably not work
             if (desc.kind == ArtifactKind::SharedLibrary ||
@@ -116,7 +116,7 @@ static const KindExtension g_cpuKindExts[] =
 
             return true;
         }
-        else if (isDerivedFrom(desc.payload, ArtifactPayload::IR))
+        else if (isDerivedFrom(desc.payload, ArtifactPayload::GeneralIR))
         {
             // We'll *assume* IR is linkable
             return true;
@@ -127,9 +127,9 @@ static const KindExtension g_cpuKindExts[] =
 
 /* static */bool ArtifactInfoUtil::isCpuTarget(const ArtifactDesc& desc)
 {
-    if (isDerivedFrom(desc.kind, ArtifactKind::Binary))
+    if (isDerivedFrom(desc.kind, ArtifactKind::BinaryLike))
     {
-        return isDerivedFrom(desc.payload, ArtifactPayload::CPU);
+        return isDerivedFrom(desc.payload, ArtifactPayload::CPULike);
     }
     else if (isDerivedFrom(desc.kind, ArtifactKind::Source))
     {
@@ -153,11 +153,11 @@ static const KindExtension g_cpuKindExts[] =
     // https://developer.apple.com/documentation/metal/shader_libraries/building_a_library_with_metal_s_command-line_tools
     if (slice == toSlice("air"))
     {
-        return ArtifactDesc::make(ArtifactKind::ObjectCode, ArtifactPayload::MetalIR);
+        return ArtifactDesc::make(ArtifactKind::ObjectCode, ArtifactPayload::MetalAIR);
     }
     else if (slice == toSlice("metallib") || slice == toSlice("metalar"))
     {
-        return ArtifactDesc::make(ArtifactKind::Library, ArtifactPayload::MetalIR);
+        return ArtifactDesc::make(ArtifactKind::Library, ArtifactPayload::MetalAIR);
     }
 
     if (slice == toSlice("zip"))
@@ -223,12 +223,12 @@ UnownedStringSlice ArtifactInfoUtil::getAssemblyExtensionForPayload(ArtifactPayl
     }
 
     // We'll just use asm for all CPU assembly type
-    if (isDerivedFrom(payload, ArtifactPayload::CPU))
+    if (isDerivedFrom(payload, ArtifactPayload::CPULike))
     {
         return toSlice("asm");
     }
 
-    if (isDerivedFrom(payload, ArtifactPayload::IR))
+    if (isDerivedFrom(payload, ArtifactPayload::GeneralIR))
     {
         switch (payload)
         {
@@ -277,7 +277,7 @@ UnownedStringSlice ArtifactInfoUtil::getDefaultExtension(const ArtifactDesc& des
         return getCpuExtensionForKind(desc.kind);
     }
 
-    if (isDerivedFrom(desc.kind, ArtifactKind::Binary))
+    if (isDerivedFrom(desc.kind, ArtifactKind::BinaryLike))
     {
         switch (desc.payload)
         {
@@ -296,7 +296,7 @@ UnownedStringSlice ArtifactInfoUtil::getDefaultExtension(const ArtifactDesc& des
             {
                 return (desc.kind == ArtifactKind::Library) ? toSlice("slang-module") : toSlice("slang-ir");
             }
-            case Payload::MetalIR:      
+            case Payload::MetalAIR:      
             {
                 // https://developer.apple.com/documentation/metal/shader_libraries/building_a_library_with_metal_s_command-line_tools
                 return (desc.kind == ArtifactKind::Library) ? toSlice("metallib") : toSlice("air");
