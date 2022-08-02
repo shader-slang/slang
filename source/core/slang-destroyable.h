@@ -11,7 +11,7 @@ namespace Slang
 
 /* An interface to provide a mechanism to cast, that doesn't require ref counting 
 and doesn't have to return a pointer to a ISlangUnknown derived class */
-class ICastable : ISlangUnknown
+class ICastable : public ISlangUnknown
 {
     SLANG_COM_INTERFACE(0x87ede0e1, 0x4852, 0x44b0, { 0x8b, 0xf2, 0xcb, 0x31, 0x87, 0x4d, 0xe2, 0x39 } );
 
@@ -26,7 +26,7 @@ interface/object should release any other contained references.
 Behavior of an interface that is IDestroyed should be defined on the interface. Typically 
 it will produce an assert on debug builds. 
 Calling destroy/isDestroyed can always be performed. */
-class IDestroyable : ICastable
+class IDestroyable : public ICastable
 {
     SLANG_COM_INTERFACE(0x99c6228e, 0xa82, 0x43eb, { 0x8f, 0xd1, 0xf3, 0x54, 0x3e, 0x2e, 0x86, 0xc0 } );
 

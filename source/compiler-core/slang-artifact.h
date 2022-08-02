@@ -8,6 +8,7 @@
 #include "../../slang-com-ptr.h"
 
 #include "../core/slang-com-object.h"
+#include "../core/slang-destroyable.h"
 
 namespace Slang
 {
@@ -322,6 +323,11 @@ public:
         /// Get the Desc defining the contents of the artifact
     virtual SLANG_NO_THROW Desc SLANG_MCALL getDesc() = 0;
 
+        /// Get the artifact (if any) that this artifact belongs to
+    virtual SLANG_NO_THROW IArtifact* SLANG_MCALL getParent() = 0;
+        /// Set the parent that 'owns' this artifact. The parent is *not* reference counted (ie weak reference)
+    virtual SLANG_NO_THROW void SLANG_MCALL setParent(IArtifact* parent) = 0;
+
         /// Returns true if the artifact in principal exists
     virtual SLANG_NO_THROW bool SLANG_MCALL exists() = 0;
 
@@ -377,6 +383,63 @@ public:
     virtual SLANG_NO_THROW Index SLANG_MCALL getElementCount() = 0;
 };
 
+/* A list of artifacts. */
+class IArtifactList : public ICastable
+{
+    SLANG_COM_INTERFACE(0x5ef6ace5, 0xc928, 0x4c7b, { 0xbc, 0xba, 0x83, 0xa9, 0xd9, 0x66, 0x64, 0x27 })
+
+        /// Get the artifact this list belongs to. Can be nullptr.
+        /// Note this is a *weak* reference.
+    virtual SLANG_NO_THROW IArtifact* SLANG_MCALL getParent() = 0;
+        /// The parent is no longer accessible
+    virtual SLANG_NO_THROW void SLANG_MCALL setParent(IArtifact* artifact) = 0;
+
+        /// Get the artifact at the specified index
+    virtual IArtifact* SLANG_MCALL getAt(Index index) = 0;
+        /// Get the count of all the artifacts
+    virtual Count SLANG_MCALL getCount() = 0;
+        /// Add the artifact to the list
+    virtual void SLANG_MCALL add(IArtifact* artifact) = 0;
+        /// Removes at index, keeps other artifacts in the same order
+    virtual void SLANG_MCALL removeAt(Index index) = 0;
+        /// Clear the list
+    virtual void SLANG_MCALL clear() = 0;
+};
+
+class ArtifactList : public ComObject, public IArtifactList
+{
+    SLANG_COM_OBJECT_IUNKNOWN_ALL
+
+    // ICastable
+    void* castAs(const Guid& guid);
+
+    // IArtifactList
+    IArtifact* getParent() SLANG_OVERRIDE { return m_parent; }
+    void setParent(IArtifact* parent) SLANG_OVERRIDE { _setParent(parent); }
+
+    IArtifact* getAt(Index index) SLANG_OVERRIDE { return m_artifacts[index]; }
+    Count getCount() SLANG_OVERRIDE { return m_artifacts.getCount(); }
+    void add(IArtifact* artifact) SLANG_OVERRIDE;
+    void removeAt(Index index) SLANG_OVERRIDE;
+    void clear() SLANG_OVERRIDE;
+
+        // NOTE! The parent is a weak reference. 
+    ArtifactList(IArtifact* parent):
+        m_parent(parent)
+    {
+    }
+
+    virtual ~ArtifactList() { _setParent(nullptr); }
+
+    void* getInterface(const Guid& guid);
+    void* getObject(const Guid& guid);
+
+    void _setParent(IArtifact* artifact);
+    
+    IArtifact* m_parent;
+    List<ComPtr<IArtifact>> m_artifacts;
+};
+
 /*
 Discussion:
 
@@ -409,6 +472,8 @@ public:
     
         /// IArtifact impl
     virtual SLANG_NO_THROW Desc SLANG_MCALL getDesc() SLANG_OVERRIDE { return m_desc; }
+    virtual SLANG_NO_THROW IArtifact* SLANG_MCALL getParent() SLANG_OVERRIDE { return m_parent; }
+    virtual SLANG_NO_THROW void SLANG_MCALL setParent(IArtifact* parent) SLANG_OVERRIDE { m_parent = parent; }
     virtual SLANG_NO_THROW bool SLANG_MCALL exists() SLANG_OVERRIDE;
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL loadBlob(Keep keep, ISlangBlob** outBlob) SLANG_OVERRIDE;
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL requireFile(Keep keep) SLANG_OVERRIDE;
@@ -429,7 +494,8 @@ public:
     /// Ctor
     Artifact(const Desc& desc, const String& name) :
         m_desc(desc),
-        m_name(name)
+        m_name(name),
+        m_parent(nullptr)
     {}
     /// Dtor
     ~Artifact();
@@ -446,6 +512,8 @@ protected:
     };
 
     Desc m_desc;                                ///< Description of the artifact
+    IArtifact* m_parent;                        ///< Artifact this artifact belongs to
+
     String m_name;                              ///< Name of this artifact
 
     PathType m_pathType = PathType::None;       ///< What the path indicates

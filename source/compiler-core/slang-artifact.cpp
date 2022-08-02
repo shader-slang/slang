@@ -276,6 +276,77 @@ SLANG_HIERARCHICAL_ENUM(ArtifactStyle, SLANG_ARTIFACT_STYLE, SLANG_ARTIFACT_STYL
     SLANG_UNEXPECTED("Unhandled type");
 }
 
+/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ArtifactList !!!!!!!!!!!!!!!!!!!!!!!!!!! */
+
+void* ArtifactList::getInterface(const Guid& guid)
+{
+    if (guid == ISlangUnknown::getTypeGuid() ||
+        guid == ICastable::getTypeGuid() ||
+        guid == IArtifactList::getTypeGuid())
+    {
+        return static_cast<IArtifactList*>(this);
+    }
+    return nullptr;
+}
+
+void* ArtifactList::getObject(const Guid& guid)
+{
+    // For now we can't cast to an object
+    SLANG_UNUSED(guid);
+    return nullptr;
+}
+
+void* ArtifactList::castAs(const Guid& guid)
+{
+    if (auto intf = getInterface(guid))
+    {
+        return intf;
+    }
+    return getObject(guid);
+}
+
+void ArtifactList::add(IArtifact* artifact)
+{
+    // Must be set
+    SLANG_ASSERT(artifact);
+    // Can't already be in the list
+    SLANG_ASSERT(m_artifacts.indexOf(artifact) < 0);
+    // Can't have another owner
+    SLANG_ASSERT(artifact->getParent() == nullptr);
+
+    // Set the parent
+    artifact->setParent(m_parent);
+
+    // Add
+    m_artifacts.add(ComPtr<IArtifact>(artifact));
+}
+
+void ArtifactList::removeAt(Index index) 
+{
+   IArtifact* artifact = m_artifacts[index];
+   artifact->setParent(nullptr);
+   m_artifacts.removeAt(index); 
+}
+
+void ArtifactList::clear()
+{
+    _setParent(nullptr);
+    m_artifacts.clear();
+}
+
+void ArtifactList::_setParent(IArtifact* parent)
+{
+    if (m_parent == parent)
+    {
+        return;
+    }
+
+    for (IArtifact* artifact : m_artifacts)
+    {
+        artifact->setParent(artifact);
+    }
+}
+
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! Artifact !!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
 void* Artifact::getInterface(const Guid& uuid)
