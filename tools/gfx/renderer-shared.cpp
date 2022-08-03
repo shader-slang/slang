@@ -325,6 +325,16 @@ void PipelineStateBase::initializeBase(const PipelineStateDesc& inDesc)
     }
 }
 
+Result RendererBase::getEntryPointCodeFromShaderCache(
+    slang::IComponentType* program,
+    SlangInt entryPointIndex,
+    SlangInt targetIndex,
+    slang::IBlob** outCode,
+    slang::IBlob** outDiagnostics)
+{
+    return program->getEntryPointCode(entryPointIndex, targetIndex, outCode, outDiagnostics);
+}
+
 IDevice* gfx::RendererBase::getInterface(const Guid& guid)
 {
     return (guid == GfxGUID::IID_ISlangUnknown || guid == GfxGUID::IID_IDevice)
@@ -908,7 +918,7 @@ void ShaderProgramBase::init(const IShaderProgram::Desc& inDesc)
     }
 }
 
-Result ShaderProgramBase::compileShaders()
+Result ShaderProgramBase::compileShaders(RendererBase* device)
 {
     // For a fully specialized program, read and store its kernel code in `shaderProgram`.
     auto compileShader = [&](slang::EntryPointReflection* entryPointInfo,
@@ -918,7 +928,7 @@ Result ShaderProgramBase::compileShaders()
         auto stage = entryPointInfo->getStage();
         ComPtr<ISlangBlob> kernelCode;
         ComPtr<ISlangBlob> diagnostics;
-        auto compileResult = entryPointComponent->getEntryPointCode(
+        auto compileResult = device->getEntryPointCodeFromShaderCache(entryPointComponent,
             entryPointIndex, 0, kernelCode.writeRef(), diagnostics.writeRef());
         if (diagnostics)
         {

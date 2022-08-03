@@ -1239,7 +1239,7 @@ Result DeviceImpl::createProgram(
         ComPtr<ISlangBlob> kernelCode;
         ComPtr<ISlangBlob> diagnostics;
 
-        auto compileResult = slangGlobalScope->getEntryPointCode(
+        auto compileResult = getEntryPointCodeFromShaderCache(slangGlobalScope,
             (SlangInt)i, 0, kernelCode.writeRef(), diagnostics.writeRef());
 
         if (diagnostics)

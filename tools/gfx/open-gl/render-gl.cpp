@@ -2791,7 +2791,7 @@ Result GLDevice::createProgram(
     {
         ComPtr<ISlangBlob> kernelCode;
         ComPtr<ISlangBlob> diagnostics;
-        auto compileResult = desc.slangGlobalScope->getEntryPointCode(
+        auto compileResult = getEntryPointCodeFromShaderCache(desc.slangGlobalScope,
             i, 0, kernelCode.writeRef(), diagnostics.writeRef());
         if (diagnostics)
         {

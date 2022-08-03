@@ -857,7 +857,7 @@ public:
         return false;
     }
 
-    Slang::Result compileShaders();
+    Slang::Result compileShaders(RendererBase* device);
     virtual Slang::Result createShaderModule(
         slang::EntryPointReflection* entryPointInfo, Slang::ComPtr<ISlangBlob> kernelCode);
 
@@ -1216,6 +1216,13 @@ class RendererBase : public IDevice, public Slang::ComObject
     friend class ShaderObjectBase;
 public:
     SLANG_COM_OBJECT_IUNKNOWN_ALL
+
+    Result getEntryPointCodeFromShaderCache(
+        slang::IComponentType* program,
+        SlangInt entryPointIndex,
+        SlangInt targetIndex,
+        slang::IBlob** outCode,
+        slang::IBlob** outDiagnostics = nullptr);
 
     virtual SLANG_NO_THROW Result SLANG_MCALL getNativeDeviceHandles(InteropHandles* outHandles) SLANG_OVERRIDE;
     virtual SLANG_NO_THROW Result SLANG_MCALL getFeatures(
