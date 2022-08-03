@@ -3,6 +3,9 @@
 
 #include "slang-artifact-info.h"
 
+#include "../core/slang-file-system.h"
+#include "../core/slang-io.h"
+
 namespace Slang {
 
 /* static */ArtifactUtilImpl ArtifactUtilImpl::g_singleton;
@@ -59,5 +62,28 @@ bool ArtifactUtilImpl::isPayloadDerivedFrom(ArtifactPayload payload, ArtifactPay
 ArtifactStyle ArtifactUtilImpl::getStyleParent(ArtifactStyle style) { return getParent(style); }
 UnownedStringSlice ArtifactUtilImpl::getStyleName(ArtifactStyle style) { return getName(style); }
 bool ArtifactUtilImpl::isStyleDerivedFrom(ArtifactStyle style, ArtifactStyle base) { return isDerivedFrom(style, base); }
+
+SlangResult ArtifactUtilImpl::createLockFile(const char* inNameBase, ISlangMutableFileSystem* fileSystem, ILockFile** outLockFile)
+{
+	if (fileSystem)
+	{
+		if (fileSystem != OSFileSystem::getMutableSingleton())
+		{
+			// We can only create lock files, on the global OS file system
+			return SLANG_E_NOT_AVAILABLE;
+		}
+		fileSystem = nullptr;
+	}
+
+	const UnownedStringSlice nameBase = inNameBase ? UnownedStringSlice(inNameBase) : UnownedStringSlice("unknown");
+
+	String lockPath;
+	SLANG_RETURN_ON_FAIL(File::generateTemporary(nameBase, lockPath));
+
+	ComPtr<ILockFile> lockFile(new LockFile(lockPath, fileSystem));
+
+	*outLockFile = lockFile.detach();
+	return SLANG_OK;
+}
 
 } // namespace Slang
