@@ -8,6 +8,8 @@
 
 namespace Slang {
 
+/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!! ArtifactUtilImpl !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
+
 /* static */ArtifactUtilImpl ArtifactUtilImpl::g_singleton;
 
 SlangResult ArtifactUtilImpl::queryInterface(SlangUUID const& uuid, void** outObject)
@@ -75,7 +77,7 @@ SlangResult ArtifactUtilImpl::createLockFile(const char* inNameBase, ISlangMutab
 		fileSystem = nullptr;
 	}
 
-	const UnownedStringSlice nameBase = inNameBase ? UnownedStringSlice(inNameBase) : UnownedStringSlice("unknown");
+	const UnownedStringSlice nameBase = (inNameBase && inNameBase[0] != 0) ? UnownedStringSlice(inNameBase) : UnownedStringSlice("unknown");
 
 	String lockPath;
 	SLANG_RETURN_ON_FAIL(File::generateTemporary(nameBase, lockPath));
@@ -85,5 +87,66 @@ SlangResult ArtifactUtilImpl::createLockFile(const char* inNameBase, ISlangMutab
 	*outLockFile = lockFile.detach();
 	return SLANG_OK;
 }
+
+SlangResult ArtifactUtilImpl::calcArtifactPath(const ArtifactDesc& desc, const char* inBasePath, ISlangBlob** outPath)
+{
+	UnownedStringSlice basePath(inBasePath);
+
+	StringBuilder path;
+	SLANG_RETURN_ON_FAIL(ArtifactInfoUtil::calcPathForDesc(desc, basePath, path));
+
+	auto blob = new StringBlob(path);
+	blob->addRef();
+	*outPath = blob;
+	return SLANG_OK;
+}
+
+SlangResult ArtifactUtilImpl::requireFile(ArtifactKeep keep, IArtifact* artifact, IFileArtifactRepresentation** outFile)
+{
+	// See if we already have it
+	{
+		auto fileRep = (IFileArtifactRepresentation*)artifact->findItemObject(IFileArtifactRepresentation::getTypeGuid());
+		if (fileRep)
+		{
+			fileRep->addRef();
+			*outFile = fileRep;
+			return SLANG_OK;
+		}
+	}
+
+	// If we are going to access as a file we need to be able to write it, and to do that we need a blob
+	ComPtr<ISlangBlob> blob;
+	SLANG_RETURN_ON_FAIL(artifact->loadBlob(keep, blob.writeRef()));
+
+	// Okay we need to store as a temporary. Get a lock file.
+	ComPtr<ILockFile> lockFile;
+	SLANG_RETURN_ON_FAIL(createLockFile(artifact->getName(), nullptr, lockFile.writeRef()));
+
+	// Now we need the appropriate name for this item
+	ComPtr<ISlangBlob> pathBlob;
+	SLANG_RETURN_ON_FAIL(calcArtifactPath(artifact->getDesc(), lockFile->getPath(), pathBlob.writeRef()));
+
+	const auto path = StringUtil::getString(pathBlob);
+
+	// Write the contents
+	SLANG_RETURN_ON_FAIL(File::writeAllBytes(path, blob->getBufferPointer(), blob->getBufferSize()));
+
+	// If the paths are identical we don't need a lock file
+	if (UnownedStringSlice(lockFile->getPath()) == path.getUnownedSlice())
+	{
+		// Make the lockFile no longer own the file 
+		lockFile->disown();
+		// We no longer need the lock file
+		lockFile.setNull();
+	}
+	
+	// Create the rep
+	IFileArtifactRepresentation* fileRep = new FileArtifactRepresentation(IFileArtifactRepresentation::Kind::Owned, path, lockFile, nullptr);
+	fileRep->addRef();
+	// Return it
+	*outFile = fileRep;
+	return SLANG_OK;
+}
+
 
 } // namespace Slang

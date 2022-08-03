@@ -314,12 +314,27 @@ void* FileArtifactRepresentation::castAs(const Guid& guid)
 
 SlangResult FileArtifactRepresentation::writeToBlob(ISlangBlob** blob)
 {
+    if (m_kind == Kind::NameOnly)
+    {
+        // If it's referenced by a name only, it's a file that *can't* be loaded as a blob in general.
+        return SLANG_E_NOT_AVAILABLE;
+    }
+
     auto fileSystem = _getFileSystem();
     return fileSystem->loadFile(m_path.getBuffer(), blob);
 }
 
 bool FileArtifactRepresentation::exists()
 {
+    // TODO(JS):
+    // If it's a name only it's hard to know what exists should do. It can't *check* because it relies on the 'system' doing 
+    // the actual location. We could ask the IArtifactUtil, and that could change the behavior.
+    // For now we just assume it does.
+    if (m_kind == Kind::NameOnly)
+    {
+        return true;
+    }
+
     auto fileSystem = _getFileSystem();
 
     SlangPathType pathType;
@@ -373,7 +388,7 @@ void* LockFile::castAs(const Guid& guid)
 
 const char* LockFile::getPath()
 {
-    return m_path.getBuffer();
+    return (m_path.getLength() > 0) ? m_path.getBuffer() : nullptr;
 }
 
 ISlangMutableFileSystem* LockFile::getFileSystem()
@@ -383,8 +398,17 @@ ISlangMutableFileSystem* LockFile::getFileSystem()
 
 LockFile::~LockFile()
 {
-    auto fileSystem = _getFileSystem();
-    fileSystem->remove(m_path.getBuffer());
+    if (m_path.getLength() > 0)
+    {
+        auto fileSystem = _getFileSystem();
+        fileSystem->remove(m_path.getBuffer());
+    }
+}
+
+void LockFile::disown()
+{
+    m_path = String();
+    m_fileSystem.setNull();
 }
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ArtifactList !!!!!!!!!!!!!!!!!!!!!!!!!!! */

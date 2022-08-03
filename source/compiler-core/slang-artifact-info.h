@@ -55,6 +55,10 @@ struct ArtifactInfoUtil
 
         /// Get the parent path (empty if there isn't one)
     static String getParentPath(IArtifact* artifact);
+
+        /// Given a desc, and a basePath returns a suitable path for a entity of specified desc
+    static SlangResult calcPathForDesc(const ArtifactDesc& desc, const UnownedStringSlice& basePath, StringBuilder& outPath);
+
 };
 
 } // namespace Slang

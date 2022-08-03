@@ -269,10 +269,15 @@ class IArtifactRepresentation : public ICastable
 /* A lock file */
 class ILockFile : public ICastable
 {
+    SLANG_COM_INTERFACE(0x9177ea36, 0xa608, 0x4490, { 0x87, 0xf0, 0xf3, 0x93, 0x9, 0x7d, 0x36, 0xce })
+
         /// The path to a lock file. 
     virtual SLANG_NO_THROW const char* SLANG_MCALL getPath() = 0;
         /// Optional, the file system it's on. If nullptr its on 'regular' OS file system.
     virtual SLANG_NO_THROW ISlangMutableFileSystem* SLANG_MCALL getFileSystem() = 0;
+
+        /// Makes the lock file no longer owned. Doing so will make the path nullptr, and getFileSystem nullptr. 
+    virtual SLANG_NO_THROW void SLANG_MCALL disown() = 0;
 };
 
 /* 
@@ -287,6 +292,7 @@ struct IFileArtifactRepresentation : public IArtifactRepresentation
     {
         Reference,          ///< References a file on the file system
         Owned,              ///< File is *owned* by this instance and will be deleted when goes out of scope
+        NameOnly,           ///< Typically used for items that can be found by the 'system'. The path is just a name, and cannot typically be loaded as a blob.
     };
 
         /// The the kind of file. 
@@ -561,6 +567,7 @@ public:
     // ILockFile
     SLANG_NO_THROW const char* SLANG_MCALL getPath() SLANG_OVERRIDE;
     SLANG_NO_THROW ISlangMutableFileSystem* SLANG_MCALL getFileSystem() SLANG_OVERRIDE;
+    SLANG_NO_THROW void SLANG_MCALL disown() SLANG_OVERRIDE;
 
         /// Ctor
     LockFile(String path, ISlangMutableFileSystem* fileSystem):

@@ -371,4 +371,49 @@ UnownedStringSlice ArtifactInfoUtil::getDefaultExtension(const ArtifactDesc& des
     return String();
 }
 
+/* static */SlangResult ArtifactInfoUtil::calcPathForDesc(const ArtifactDesc& desc, const UnownedStringSlice& basePath, StringBuilder& outPath)
+{
+    outPath.Clear();
+
+    UnownedStringSlice baseName;
+
+    // Append the directory
+    Index pos = Path::findLastSeparatorIndex(basePath);
+    if (pos >= 0)
+    {
+        outPath.append(basePath.head(pos));
+        outPath.append(Path::kPathDelimiter);
+
+        baseName = basePath.tail(pos + 1);
+    }
+
+    if (baseName.getLength() == 0)
+    {
+        baseName = toSlice("unknown");
+    }
+    
+    if (ArtifactInfoUtil::isCpuBinary(desc) &&
+        (desc.kind == ArtifactKind::SharedLibrary ||
+         desc.kind == ArtifactKind::Library))
+    {
+        const bool isSharedLibraryPrefixPlatform = SLANG_LINUX_FAMILY || SLANG_APPLE_FAMILY;
+        if (isSharedLibraryPrefixPlatform)
+        {
+            outPath << "lib";
+            outPath << baseName; 
+        }
+    }
+
+    // If there is an extension append it
+    const UnownedStringSlice ext = ArtifactInfoUtil::getDefaultExtension(desc);
+
+    if (ext.getLength())
+    {
+        outPath.appendChar('.');
+        outPath.append(ext);
+    }
+
+    return SLANG_OK;
+}
+
 } // namespace Slang
