@@ -607,7 +607,7 @@ static void _lookUpMembersInSuperTypeImpl(
 {
     // If the type was pointer-like, then dereference it
     // automatically here.
-    if (auto pointerLikeType = as<PointerLikeType>(superType))
+    if (auto pointerElementType = getPointedToTypeIfCanImplicitDeref(superType))
     {
         // Need to leave a breadcrumb to indicate that we
         // did an implicit dereference here
@@ -618,7 +618,7 @@ static void _lookUpMembersInSuperTypeImpl(
         // Recursively perform lookup on the result of deref
         _lookUpMembersInType(
             astBuilder, 
-            name, pointerLikeType->elementType, request, ioResult, &derefBreacrumb);
+            name, pointerElementType, request, ioResult, &derefBreacrumb);
         return;
     }
 

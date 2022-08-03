@@ -382,15 +382,15 @@ namespace Slang
         Expr*    base,
         SourceLoc       loc)
     {
-        auto ptrLikeType = as<PointerLikeType>(base->type);
-        SLANG_ASSERT(ptrLikeType);
+        auto elementType = getPointedToTypeIfCanImplicitDeref(base->type);
+        SLANG_ASSERT(elementType);
 
         auto derefExpr = m_astBuilder->create<DerefExpr>();
         derefExpr->loc = loc;
         derefExpr->base = base;
-        derefExpr->type = QualType(ptrLikeType->elementType);
+        derefExpr->type = QualType(elementType);
 
-        // TODO(tfoley): handle l-value status here
+        derefExpr->type.isLeftValue = base->type.isLeftValue;
 
         return derefExpr;
     }
