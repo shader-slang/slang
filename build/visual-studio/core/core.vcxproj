@@ -289,6 +289,7 @@
     <ClInclude Include="..\..\..\source\core\slang-common.h" />
     <ClInclude Include="..\..\..\source\core\slang-compression-system.h" />
     <ClInclude Include="..\..\..\source\core\slang-deflate-compression-system.h" />
+    <ClInclude Include="..\..\..\source\core\slang-destroyable.h" />
     <ClInclude Include="..\..\..\source\core\slang-dictionary.h" />
     <ClInclude Include="..\..\..\source\core\slang-exception.h" />
     <ClInclude Include="..\..\..\source\core\slang-file-system.h" />

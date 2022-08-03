@@ -54,6 +54,9 @@
     <ClInclude Include="..\..\..\source\core\slang-deflate-compression-system.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\source\core\slang-destroyable.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\..\source\core\slang-dictionary.h">
       <Filter>Header Files</Filter>
     </ClInclude>
