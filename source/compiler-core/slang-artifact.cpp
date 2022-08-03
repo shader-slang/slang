@@ -3,6 +3,8 @@
 
 #include "slang-artifact-info.h"
 
+#include "../core/slang-file-system.h"
+
 #include "../core/slang-type-text-util.h"
 #include "../core/slang-io.h"
 #include "../core/slang-array-view.h"
@@ -274,6 +276,115 @@ SLANG_HIERARCHICAL_ENUM(ArtifactStyle, SLANG_ARTIFACT_STYLE, SLANG_ARTIFACT_STYL
     }
 
     SLANG_UNEXPECTED("Unhandled type");
+}
+
+/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!! FileArtifactRepresentation !!!!!!!!!!!!!!!!!!!!!!!!!!! */
+
+void* FileArtifactRepresentation::getInterface(const Guid& guid)
+{
+    if (guid == ISlangUnknown::getTypeGuid() ||
+        guid == ICastable::getTypeGuid() ||
+        guid == IArtifactRepresentation::getTypeGuid() ||
+        guid == IFileArtifactRepresentation::getTypeGuid())
+    {
+        return static_cast<IFileArtifactRepresentation*>(this);
+    }
+    return nullptr;
+}
+
+void* FileArtifactRepresentation::getObject(const Guid& guid)
+{
+    SLANG_UNUSED(guid);
+    return nullptr;
+}
+
+ISlangMutableFileSystem* FileArtifactRepresentation::_getFileSystem()
+{
+    return m_fileSystem ? m_fileSystem : OSFileSystem::getMutableSingleton();
+}
+
+void* FileArtifactRepresentation::castAs(const Guid& guid)
+{
+    if (auto intf = getInterface(guid))
+    {
+        return intf;
+    }
+    return getObject(guid);
+}
+
+SlangResult FileArtifactRepresentation::writeToBlob(ISlangBlob** blob)
+{
+    auto fileSystem = _getFileSystem();
+    return fileSystem->loadFile(m_path.getBuffer(), blob);
+}
+
+bool FileArtifactRepresentation::exists()
+{
+    auto fileSystem = _getFileSystem();
+
+    SlangPathType pathType;
+    const auto res = fileSystem->getPathType(m_path.getBuffer(), &pathType);
+
+    // It exists if it is a file
+    return SLANG_SUCCEEDED(res) && pathType == SLANG_PATH_TYPE_FILE;
+}
+
+FileArtifactRepresentation::~FileArtifactRepresentation()
+{
+    if (m_kind == Kind::Owned)
+    {
+        auto fileSystem = _getFileSystem();
+        fileSystem->remove(m_path.getBuffer());
+    }
+}
+
+/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!! LockFile !!!!!!!!!!!!!!!!!!!!!!!!!!! */
+
+void* LockFile::getInterface(const Guid& guid)
+{
+    if (guid == ISlangUnknown::getTypeGuid() ||
+        guid == ICastable::getTypeGuid() ||
+        guid == ILockFile::getTypeGuid())
+    {
+        return static_cast<ILockFile*>(this);
+    }
+    return nullptr;
+}
+
+void* LockFile::getObject(const Guid& guid)
+{
+    SLANG_UNUSED(guid);
+    return nullptr;
+}
+
+ISlangMutableFileSystem* LockFile::_getFileSystem()
+{
+    return m_fileSystem ? m_fileSystem : OSFileSystem::getMutableSingleton();
+}
+
+void* LockFile::castAs(const Guid& guid)
+{
+    if (auto intf = getInterface(guid))
+    {
+        return intf;
+    }
+    return getObject(guid);
+}
+
+const char* LockFile::getPath()
+{
+    return m_path.getBuffer();
+}
+
+ISlangMutableFileSystem* LockFile::getFileSystem()
+{
+    return m_fileSystem;
+}
+
+LockFile::~LockFile()
+{
+    auto fileSystem = _getFileSystem();
+    fileSystem->remove(m_path.getBuffer());
 }
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ArtifactList !!!!!!!!!!!!!!!!!!!!!!!!!!! */

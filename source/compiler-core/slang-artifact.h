@@ -266,6 +266,39 @@ class IArtifactRepresentation : public ICastable
     virtual SLANG_NO_THROW bool SLANG_MCALL exists() = 0;
 };
 
+/* A lock file */
+class ILockFile : public ICastable
+{
+        /// The path to a lock file. 
+    virtual SLANG_NO_THROW const char* SLANG_MCALL getPath() = 0;
+        /// Optional, the file system it's on. If nullptr its on 'regular' OS file system.
+    virtual SLANG_NO_THROW ISlangMutableFileSystem* SLANG_MCALL getFileSystem() = 0;
+};
+
+/* 
+A representation as a file. If it is a temporary file, it will likely disappear.
+A file representation does not have to be a representation of a file on the file system.
+That is indicated by getFileSystem returning nullptr. Then the path is the path on the *actual* OS file system.
+This distinction is important as it is sometimes necessary to have an artifact stored on the OS file system
+to be usable. */
+struct IFileArtifactRepresentation : public IArtifactRepresentation
+{
+    enum class Kind
+    {
+        Reference,          ///< References a file on the file system
+        Owned,              ///< File is *owned* by this instance and will be deleted when goes out of scope
+    };
+
+        /// The the kind of file. 
+    virtual SLANG_NO_THROW Kind SLANG_MCALL getKind() = 0;                     
+        /// The path (on the file system)
+    virtual SLANG_NO_THROW const char* SLANG_MCALL getPath() = 0;              
+        /// Get the lock file. Return nullptr if there is no lock file.
+    virtual SLANG_NO_THROW ILockFile* SLANG_MCALL getLockFile() = 0;
+        /// Optional, the file system it's on. If nullptr its on 'regular' OS file system.
+    virtual SLANG_NO_THROW ISlangMutableFileSystem* SLANG_MCALL getFileSystem() = 0;       
+};
+
 /* Interface for types that are associated with an artifact, but aren't a representation, or are 
 only part of a representation. */
 class IArtifactAssociated : public ICastable
@@ -402,10 +435,10 @@ class IArtifactList : public ICastable
     virtual SLANG_NO_THROW void SLANG_MCALL clear() = 0;
 };
 
-class ArtifactList : public ComObject, public IArtifactList
+class ArtifactList : public ComBaseObject, public IArtifactList
 {
 public:
-    SLANG_COM_OBJECT_IUNKNOWN_ALL
+    SLANG_COM_BASE_IUNKNOWN_ALL
 
     // ICastable
     SLANG_NO_THROW void* SLANG_MCALL castAs(const Guid& guid) SLANG_OVERRIDE;
@@ -462,11 +495,11 @@ that handles this detail, such that we search for that first. That interface is 
 */
 
 /* Implementation of the IArtifact interface */
-class Artifact : public ComObject, public IArtifact
+class Artifact : public ComBaseObject, public IArtifact
 {
 public:
     
-    SLANG_COM_OBJECT_IUNKNOWN_ALL
+    SLANG_COM_BASE_IUNKNOWN_ALL
     
         /// IArtifact impl
     virtual SLANG_NO_THROW Desc SLANG_MCALL getDesc() SLANG_OVERRIDE { return m_desc; }
@@ -514,6 +547,80 @@ protected:
     ComPtr<ISlangBlob> m_blob;                  ///< Blob to store result in memory
 
     List<ComPtr<ISlangUnknown>> m_items;        ///< Associated items
+};
+
+/* An implementation of ILockFile */
+class LockFile : public ComBaseObject, public ILockFile
+{
+public:
+    SLANG_COM_BASE_IUNKNOWN_ALL
+
+    // ICastable
+    SLANG_NO_THROW void* SLANG_MCALL castAs(const Guid& guid) SLANG_OVERRIDE;
+
+    // ILockFile
+    SLANG_NO_THROW const char* SLANG_MCALL getPath() SLANG_OVERRIDE;
+    SLANG_NO_THROW ISlangMutableFileSystem* SLANG_MCALL getFileSystem() SLANG_OVERRIDE;
+
+        /// Ctor
+    LockFile(String path, ISlangMutableFileSystem* fileSystem):
+        m_path(path),
+        m_fileSystem(fileSystem)
+    {
+    }
+
+    ~LockFile();
+
+protected:
+    void* getInterface(const Guid& uuid);
+    void* getObject(const Guid& uuid);
+
+    ISlangMutableFileSystem* _getFileSystem();
+
+    String m_path;
+    ComPtr<ISlangMutableFileSystem> m_fileSystem;
+};
+
+/*
+A representation of an artifact that is held in a file */
+class FileArtifactRepresentation : public ComBaseObject, public IFileArtifactRepresentation
+{
+public:
+    SLANG_COM_BASE_IUNKNOWN_ALL
+
+    // ICastable
+    SLANG_NO_THROW void* SLANG_MCALL castAs(const Guid& guid) SLANG_OVERRIDE;
+
+    // IArtifactRepresentation
+    SLANG_NO_THROW SlangResult SLANG_MCALL writeToBlob(ISlangBlob** blob) SLANG_OVERRIDE;
+    SLANG_NO_THROW bool SLANG_MCALL exists() SLANG_OVERRIDE;
+
+    // IFileArtifactRepresentation
+    virtual SLANG_NO_THROW Kind SLANG_MCALL getKind() SLANG_OVERRIDE { return m_kind; }
+    virtual SLANG_NO_THROW const char* SLANG_MCALL getPath() SLANG_OVERRIDE { return m_path.getBuffer(); }
+    virtual SLANG_NO_THROW ILockFile* SLANG_MCALL getLockFile() SLANG_OVERRIDE { return m_lockFile; }
+    virtual SLANG_NO_THROW ISlangMutableFileSystem* SLANG_MCALL getFileSystem() SLANG_OVERRIDE { return m_fileSystem; }
+
+    FileArtifactRepresentation(IFileArtifactRepresentation::Kind kind, String path, ILockFile* lockFile, ISlangMutableFileSystem* fileSystem):
+        m_kind(kind),
+        m_path(path),
+        m_lockFile(lockFile),
+        m_fileSystem(fileSystem)
+    {
+    }
+
+    ~FileArtifactRepresentation();
+
+protected:
+    void* getInterface(const Guid& uuid);
+    void* getObject(const Guid& uuid);
+
+    ISlangMutableFileSystem* _getFileSystem();
+
+    IFileArtifactRepresentation::Kind m_kind;
+    String m_path;
+    ComPtr<ILockFile> m_lockFile;
+    ComPtr<ISlangMutableFileSystem> m_fileSystem;
 };
 
 } // namespace Slang
