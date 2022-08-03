@@ -1943,7 +1943,10 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
                 auto rightSidePrec = rightSide(outerPrec, info);
                 auto postfixInfo = getInfo(EmitOp::Postfix);
                 bool rightSideNeedClose = maybeEmitParens(rightSidePrec, postfixInfo);
-                emitDereferenceOperand(inst->getOperand(0), leftSide(rightSidePrec, postfixInfo));
+                if (isPtrToArrayType(inst->getOperand(0)->getDataType()))
+                    emitDereferenceOperand(inst->getOperand(0), leftSide(rightSidePrec, postfixInfo));
+                else
+                    emitOperand(inst->getOperand(0), leftSide(rightSidePrec, postfixInfo));
                 m_writer->emit("[");
                 emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
                 m_writer->emit("]");
@@ -2061,7 +2064,6 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
             m_writer->emit(")");
         }
         break;
-
     case kIROp_GlobalConstant:
     case kIROp_GetValueFromBoundInterface:
         emitOperand(inst->getOperand(0), outerPrec);

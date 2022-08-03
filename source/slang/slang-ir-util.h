@@ -11,6 +11,8 @@ namespace Slang
 
 bool isPtrToClassType(IRInst* type);
 
+bool isPtrToArrayType(IRInst* type);
+
 // True if ptrType is a pointer type to elementType
 bool isPointerOfType(IRInst* ptrType, IRInst* elementType);
 
