@@ -342,26 +342,33 @@ UnownedStringSlice ArtifactInfoUtil::getDefaultExtension(const ArtifactDesc& des
     return name;
 }
 
+/* static */String ArtifactInfoUtil::getBaseName(const ArtifactDesc& desc, IFileArtifactRepresentation* fileRep)
+{
+    UnownedStringSlice path(fileRep->getPath());
+    return getBaseNameFromPath(desc, path);
+}
+
 /* static */String ArtifactInfoUtil::getBaseName(IArtifact* artifact)
 {
     if (auto fileRep = findItem<IFileArtifactRepresentation>(artifact))
     {
-        UnownedStringSlice path(fileRep->getPath());
-        const auto desc = artifact->getDesc();
-
-        return getBaseNameFromPath(desc, path);
+        return getBaseName(artifact->getDesc(), fileRep);
     }
-
     // Else use the name
     return artifact->getName();
+}
+
+/* static */String ArtifactInfoUtil::getParentPath(IFileArtifactRepresentation* fileRep)
+{
+    UnownedStringSlice path(fileRep->getPath());
+    return Path::getParentDirectory(path);
 }
 
 /* static */String ArtifactInfoUtil::getParentPath(IArtifact* artifact)
 {
     if (auto fileRep = findItem<IFileArtifactRepresentation>(artifact))
     {
-        UnownedStringSlice path(fileRep->getPath());
-        return Path::getParentDirectory(path);
+        return getParentPath(fileRep);
     }
     return String();
 }

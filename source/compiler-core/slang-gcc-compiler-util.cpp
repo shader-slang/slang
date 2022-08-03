@@ -642,8 +642,8 @@ static SlangResult _parseGCCFamilyLine(const UnownedStringSlice& line, LineParse
             // Get the name and path (can be empty) to the library
             SLANG_RETURN_ON_FAIL(artifact->requireFile(ArtifactKeep::No, fileRep.writeRef()));
 
-            libPathPool.add(ArtifactInfoUtil::getParentPath(artifact));
-            cmdLine.addPrefixPathArg("-l", ArtifactInfoUtil::getBaseName(artifact));
+            libPathPool.add(ArtifactInfoUtil::getParentPath(fileRep));
+            cmdLine.addPrefixPathArg("-l", ArtifactInfoUtil::getBaseName(artifact->getDesc(), fileRep));
         }
     }
 

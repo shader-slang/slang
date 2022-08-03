@@ -582,7 +582,7 @@ void* Artifact::findItemObject(const Guid& classGuid)
 SlangResult Artifact::requireFile(Keep keep, IFileArtifactRepresentation** outFileRep)
 {
     auto util = ArtifactUtilImpl::getSingleton();
-    return util->requireFile(this, keep, outFileRep);
+    return util->requireFileDefaultImpl(this, keep, outFileRep);
 }
 
 SlangResult Artifact::loadBlob(Keep keep, ISlangBlob** outBlob)

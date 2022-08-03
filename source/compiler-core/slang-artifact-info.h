@@ -52,9 +52,11 @@ struct ArtifactInfoUtil
         /// Else if there is an explicit name set, this is returned.
         /// Else returns the empty string
     static String getBaseName(IArtifact* artifact);
+    static String getBaseName(const ArtifactDesc& desc, IFileArtifactRepresentation* fileRep);
 
         /// Get the parent path (empty if there isn't one)
     static String getParentPath(IArtifact* artifact);
+    static String getParentPath(IFileArtifactRepresentation* fileRep);
 
         /// Given a desc, and a basePath returns a suitable path for a entity of specified desc
     static SlangResult calcPathForDesc(const ArtifactDesc& desc, const UnownedStringSlice& basePath, StringBuilder& outPath);

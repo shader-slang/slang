@@ -29,9 +29,6 @@ class IArtifactUtil : public ISlangUnknown
 
 	virtual SLANG_NO_THROW SlangResult SLANG_MCALL createLockFile(const char* nameBase, ISlangMutableFileSystem* fileSystem, ILockFile** outLockFile) = 0;
 
-		/// Get the artifact in the form of a file 
-	virtual SLANG_NO_THROW SlangResult SLANG_MCALL requireFile(IArtifact* artifact, ArtifactKeep keep, IFileArtifactRepresentation** outFile) = 0;
-
 		/// Given a desc and a basePath returns a suitable name
 	virtual SLANG_NO_THROW SlangResult SLANG_MCALL calcArtifactPath(const ArtifactDesc& desc, const char* basePath, ISlangBlob** outPath) = 0;
 
@@ -65,8 +62,6 @@ public:
 	virtual SLANG_NO_THROW bool SLANG_MCALL isStyleDerivedFrom(ArtifactStyle style, ArtifactStyle base) SLANG_OVERRIDE;
 
 	virtual SLANG_NO_THROW SlangResult SLANG_MCALL createLockFile(const char* nameBase, ISlangMutableFileSystem* fileSystem, ILockFile** outLockFile) SLANG_OVERRIDE;
-
-	virtual SLANG_NO_THROW SlangResult SLANG_MCALL requireFile(IArtifact* artifact, ArtifactKeep keep, IFileArtifactRepresentation** outFile) SLANG_OVERRIDE;
 
 	virtual SLANG_NO_THROW SlangResult SLANG_MCALL calcArtifactPath(const ArtifactDesc& desc, const char* basePath, ISlangBlob** outPath) SLANG_OVERRIDE;
 

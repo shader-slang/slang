@@ -150,9 +150,4 @@ SlangResult ArtifactUtilImpl::requireFileDefaultImpl(IArtifact* artifact, Artifa
 	return SLANG_OK;
 }
 
-SlangResult ArtifactUtilImpl::requireFile(IArtifact* artifact, ArtifactKeep keep, IFileArtifactRepresentation** outFileRep)
-{
-	return requireFileDefaultImpl(artifact, keep, outFileRep);
-}
-
 } // namespace Slang
