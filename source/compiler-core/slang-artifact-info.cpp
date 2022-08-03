@@ -344,12 +344,9 @@ UnownedStringSlice ArtifactInfoUtil::getDefaultExtension(const ArtifactDesc& des
 
 /* static */String ArtifactInfoUtil::getBaseName(IArtifact* artifact)
 {
-    const auto pathType = artifact->getPathType();
-
-    // If we have a path, get the base name from that
-    if (pathType != ArtifactPathType::None)
+    if (auto fileRep = findItem<IFileArtifactRepresentation>(artifact))
     {
-        UnownedStringSlice path(artifact->getPath());
+        UnownedStringSlice path(fileRep->getPath());
         const auto desc = artifact->getDesc();
 
         return getBaseNameFromPath(desc, path);
@@ -361,11 +358,9 @@ UnownedStringSlice ArtifactInfoUtil::getDefaultExtension(const ArtifactDesc& des
 
 /* static */String ArtifactInfoUtil::getParentPath(IArtifact* artifact)
 {
-    const auto pathType = artifact->getPathType();
-    const auto path = artifact->getPath();
-    
-    if (pathType != ArtifactPathType::None && *path != 0)
+    if (auto fileRep = findItem<IFileArtifactRepresentation>(artifact))
     {
+        UnownedStringSlice path(fileRep->getPath());
         return Path::getParentDirectory(path);
     }
     return String();

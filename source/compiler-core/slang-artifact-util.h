@@ -30,10 +30,13 @@ class IArtifactUtil : public ISlangUnknown
 	virtual SLANG_NO_THROW SlangResult SLANG_MCALL createLockFile(const char* nameBase, ISlangMutableFileSystem* fileSystem, ILockFile** outLockFile) = 0;
 
 		/// Get the artifact in the form of a file 
-	virtual SLANG_NO_THROW SlangResult SLANG_MCALL requireFile(ArtifactKeep keep, IArtifact* artifact, IFileArtifactRepresentation** outFile) = 0;
+	virtual SLANG_NO_THROW SlangResult SLANG_MCALL requireFile(IArtifact* artifact, ArtifactKeep keep, IFileArtifactRepresentation** outFile) = 0;
 
 		/// Given a desc and a basePath returns a suitable name
-	virtual SLANG_NO_THROW SlangResult calcArtifactPath(const ArtifactDesc& desc, const char* basePath, ISlangBlob** outPath) = 0;
+	virtual SLANG_NO_THROW SlangResult SLANG_MCALL calcArtifactPath(const ArtifactDesc& desc, const char* basePath, ISlangBlob** outPath) = 0;
+
+		/// Default implementation of getting 
+	virtual SLANG_NO_THROW SlangResult SLANG_MCALL requireFileDefaultImpl(IArtifact* artifact, ArtifactKeep keep, IFileArtifactRepresentation** outFileRep) = 0;
 };
 
 class ArtifactUtilImpl : public IArtifactUtil
@@ -63,9 +66,11 @@ public:
 
 	virtual SLANG_NO_THROW SlangResult SLANG_MCALL createLockFile(const char* nameBase, ISlangMutableFileSystem* fileSystem, ILockFile** outLockFile) SLANG_OVERRIDE;
 
-	virtual SLANG_NO_THROW SlangResult SLANG_MCALL requireFile(ArtifactKeep keep, IArtifact* artifact, IFileArtifactRepresentation** outFile) SLANG_OVERRIDE;
+	virtual SLANG_NO_THROW SlangResult SLANG_MCALL requireFile(IArtifact* artifact, ArtifactKeep keep, IFileArtifactRepresentation** outFile) SLANG_OVERRIDE;
 
-	virtual SLANG_NO_THROW SlangResult calcArtifactPath(const ArtifactDesc& desc, const char* basePath, ISlangBlob** outPath) SLANG_OVERRIDE;
+	virtual SLANG_NO_THROW SlangResult SLANG_MCALL calcArtifactPath(const ArtifactDesc& desc, const char* basePath, ISlangBlob** outPath) SLANG_OVERRIDE;
+
+	virtual SLANG_NO_THROW SlangResult SLANG_MCALL requireFileDefaultImpl(IArtifact* artifact, ArtifactKeep keep, IFileArtifactRepresentation** outFileRep) SLANG_OVERRIDE;
 
 	static IArtifactUtil* getSingleton() { return &g_singleton; }
 

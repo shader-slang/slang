@@ -377,28 +377,7 @@ public:
     
         /// Require artifact is available as a file.
         /// NOTE! May need to serialize and write as a temporary file.
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL requireFile(Keep keep) = 0;
-
-        /// Require artifact is available in file-like scenarion.
-        ///
-        /// This is similar to requireFile, but for some special cases doesn't actually require a
-        /// *explicit* path/file.
-        ///
-        /// For example when system libraries are specified - the library paths may be known to
-        /// a downstream compiler (or the path is passed in explicitly), in that case only the
-        /// artifact name needs to be correct.
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL requireFileLike(Keep keep) = 0;
-    
-        /// Add items
-    virtual SLANG_NO_THROW void SLANG_MCALL setPath(PathType pathType, const char* filePath) = 0;
-
-        /// Set the blob representing the contents of the asset
-    virtual SLANG_NO_THROW void SLANG_MCALL setBlob(ISlangBlob* blob) = 0;
-
-        /// Get the path type
-    virtual SLANG_NO_THROW PathType SLANG_MCALL getPathType() = 0;
-        /// Get the path
-    virtual SLANG_NO_THROW const char* SLANG_MCALL getPath() = 0;
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL requireFile(Keep keep, IFileArtifactRepresentation** outFileRep) = 0;
 
         /// Get the name of the artifact. This can be empty.
     virtual SLANG_NO_THROW const char* SLANG_MCALL getName() = 0;
@@ -513,12 +492,7 @@ public:
     virtual SLANG_NO_THROW void SLANG_MCALL setParent(IArtifact* parent) SLANG_OVERRIDE { m_parent = parent; }
     virtual SLANG_NO_THROW bool SLANG_MCALL exists() SLANG_OVERRIDE;
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL loadBlob(Keep keep, ISlangBlob** outBlob) SLANG_OVERRIDE;
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL requireFile(Keep keep) SLANG_OVERRIDE;
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL requireFileLike(Keep keep) SLANG_OVERRIDE;
-    virtual SLANG_NO_THROW void SLANG_MCALL setPath(PathType pathType, const char* path) SLANG_OVERRIDE { _setPath(pathType, path); }
-    virtual SLANG_NO_THROW void SLANG_MCALL setBlob(ISlangBlob* blob) SLANG_OVERRIDE { m_blob = blob; }
-    virtual SLANG_NO_THROW PathType SLANG_MCALL getPathType() SLANG_OVERRIDE { return m_pathType; }
-    virtual SLANG_NO_THROW const char* SLANG_MCALL getPath() SLANG_OVERRIDE { return m_path.getBuffer(); }
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL requireFile(Keep keep, IFileArtifactRepresentation** outFileRep) SLANG_OVERRIDE;
     virtual SLANG_NO_THROW const char* SLANG_MCALL getName() SLANG_OVERRIDE { return m_name.getBuffer(); }
     virtual SLANG_NO_THROW void* SLANG_MCALL findItemInterface(const Guid& uuid) SLANG_OVERRIDE;
     virtual SLANG_NO_THROW void* SLANG_MCALL findItemObject(const Guid& classGuid) SLANG_OVERRIDE;
@@ -533,24 +507,14 @@ public:
         m_name(name),
         m_parent(nullptr)
     {}
-    /// Dtor
-    ~Artifact();
 
 protected:
     void* getInterface(const Guid& uuid);
-
-    void _setPath(PathType pathType, const String& path) { m_pathType = pathType; m_path = path; }
 
     Desc m_desc;                                ///< Description of the artifact
     IArtifact* m_parent;                        ///< Artifact this artifact belongs to
 
     String m_name;                              ///< Name of this artifact
-
-    PathType m_pathType = PathType::None;       ///< What the path indicates
-    String m_path;                              ///< The path 
-    String m_temporaryLockPath;                 ///< The temporary lock path
-
-    ComPtr<ISlangBlob> m_blob;                  ///< Blob to store result in memory
 
     List<ComPtr<ISlangUnknown>> m_items;        ///< Associated items
 };

@@ -101,7 +101,7 @@ SlangResult ArtifactUtilImpl::calcArtifactPath(const ArtifactDesc& desc, const c
 	return SLANG_OK;
 }
 
-SlangResult ArtifactUtilImpl::requireFile(ArtifactKeep keep, IArtifact* artifact, IFileArtifactRepresentation** outFile)
+SlangResult ArtifactUtilImpl::requireFileDefaultImpl(IArtifact* artifact, ArtifactKeep keep, IFileArtifactRepresentation** outFile)
 {
 	// See if we already have it
 	if (auto fileRep = findItem<IFileArtifactRepresentation>(artifact))
@@ -139,12 +139,20 @@ SlangResult ArtifactUtilImpl::requireFile(ArtifactKeep keep, IArtifact* artifact
 	
 	// Create the rep
 	IFileArtifactRepresentation* fileRep = new FileArtifactRepresentation(IFileArtifactRepresentation::Kind::Owned, path, lockFile, nullptr);
-	artifact->addItem(fileRep);
+	if (canKeep(keep))
+	{
+		artifact->addItem(fileRep);
+	}
 
 	// Return it
 	fileRep->addRef();
 	*outFile = fileRep;
 	return SLANG_OK;
+}
+
+SlangResult ArtifactUtilImpl::requireFile(IArtifact* artifact, ArtifactKeep keep, IFileArtifactRepresentation** outFileRep)
+{
+	return requireFileDefaultImpl(artifact, keep, outFileRep);
 }
 
 } // namespace Slang

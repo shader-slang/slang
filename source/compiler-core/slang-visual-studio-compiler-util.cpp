@@ -267,7 +267,8 @@ namespace Slang
         if (ArtifactInfoUtil::isCpuBinary(desc) && desc.kind == ArtifactKind::Library)
         {
             // Get the libray name and path
-            SLANG_RETURN_ON_FAIL(artifact->requireFileLike(ArtifactKeep::No));
+            ComPtr<IFileArtifactRepresentation> fileRep;
+            SLANG_RETURN_ON_FAIL(artifact->requireFile(ArtifactKeep::No, fileRep.writeRef()));
 
             libPathPool.add(ArtifactInfoUtil::getParentPath(artifact));
             // We need the extension for windows

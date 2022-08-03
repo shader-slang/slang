@@ -495,28 +495,8 @@ void* Artifact::getInterface(const Guid& uuid)
     return nullptr;
 }
 
-Artifact::~Artifact()
-{
-    // Remove the temporary
-    if (m_pathType == PathType::Temporary)
-    {
-        File::remove(m_path);
-    }
-    // If there is a temporary lock path, remove that
-    if (m_temporaryLockPath.getLength())
-    {
-        File::remove(m_temporaryLockPath);
-    }
-}
-
 bool Artifact::exists()
 {
-    // If we have a blob it exists
-    if (m_blob)
-    {
-        return true;
-    }
-
     for (ISlangUnknown* item : m_items)
     {
         ComPtr<ICastable> castable;
@@ -544,14 +524,7 @@ bool Artifact::exists()
         return true;
     }
 
-    // If we don't have a path then it can't exist
-    if (m_pathType == PathType::None)
-    {
-        return false;
-    }
-
-    // If the file exists we assume it exists
-    return File::exists(m_path);
+    return false;
 }
 
 void Artifact::addItem(ISlangUnknown* intf) 
@@ -606,157 +579,48 @@ void* Artifact::findItemObject(const Guid& classGuid)
     return nullptr;
 }
 
-SlangResult Artifact::requireFileLike(Keep keep)
+SlangResult Artifact::requireFile(Keep keep, IFileArtifactRepresentation** outFileRep)
 {
-    // If there is no path set and no blob we still need a name. 
-    // If the artifact is a library we can assume it's a system level library, 
-    // or it can be found by appropriate search paths. 
-    if (m_pathType == PathType::None && 
-        m_blob == nullptr && 
-        (m_desc.kind == ArtifactKind::Library || 
-         m_desc.kind == ArtifactKind::SharedLibrary))
-    {
-        if (m_name.getLength() > 0)
-        {
-            return SLANG_OK;
-        }
-
-        // TODO(JS): If we could serialize, we could turn some other representation into a file, and therefore 
-        // a name, but currently that's not supported
-        return SLANG_E_NOT_FOUND;
-    }
-
-    // Will turn into a file if necessary
-    SLANG_RETURN_ON_FAIL(requireFile(keep));
-    return SLANG_OK;
+    auto util = ArtifactUtilImpl::getSingleton();
+    return util->requireFile(this, keep, outFileRep);
 }
 
-SlangResult Artifact::requireFile(Keep keep)
+SlangResult Artifact::loadBlob(Keep keep, ISlangBlob** outBlob)
 {
-    if (m_pathType != PathType::None)
+    // If we have a blob just return it
+    if (auto blob = findItem<ISlangBlob>(this))
     {
+        blob->addRef();
+        *outBlob = blob;
         return SLANG_OK;
     }
 
     ComPtr<ISlangBlob> blob;
 
-    // Get the contents as a blob. If we can't do that, then we can't write anything...
-    SLANG_RETURN_ON_FAIL(loadBlob(getIntermediateKeep(keep), blob.writeRef()));
-
-    // If we have a name, make the generated name based on that name
-    // Else just use 'slang-generated' the basis
-
-    UnownedStringSlice nameBase;
-    if (m_name.getLength() > 0)
+    // Look for a representation that we can serialize into a blob
+    for (ISlangUnknown* intf : m_items)
     {
-        nameBase = m_name.getUnownedSlice();
-    }
-    else
-    {
-        nameBase = UnownedStringSlice::fromLiteral("slang-generated");
-    }
-
-    // TODO(JS): NOTE! This isn't strictly correct, as the generated filename is not guarenteed to be unique
-    // if we change it with an extension (or prefix).
-    // This doesn't change the previous behavior though.
-    String temporaryLockPath;
-    SLANG_RETURN_ON_FAIL(File::generateTemporary(nameBase, temporaryLockPath));
-
-    String path = temporaryLockPath;
-
-    if (ArtifactInfoUtil::isCpuBinary(m_desc) && 
-        (m_desc.kind == ArtifactKind::SharedLibrary ||
-         m_desc.kind == ArtifactKind::Library))
-    {
-        const bool isSharedLibraryPrefixPlatform = SLANG_LINUX_FAMILY || SLANG_APPLE_FAMILY;
-        if (isSharedLibraryPrefixPlatform)
+        ComPtr<IArtifactRepresentation> rep;
+        if (SLANG_SUCCEEDED(intf->queryInterface(IArtifactRepresentation::getTypeGuid(), (void**)rep.writeRef())) && rep)
         {
-            StringBuilder buf;
-            buf << "lib";
-            buf << Path::getFileName(path);
-
-            auto parentDir = Path::getParentDirectory(path);
-            if (parentDir.getLength())
+            SlangResult res = rep->writeToBlob(blob.writeRef());
+            if (SLANG_SUCCEEDED(res) && blob)
             {
-                // Combine the name with path if their is a parent 
-                path = Path::combine(parentDir, buf);
-            }
-            else
-            {
-                // Just use the name as is
-                path = buf;
+                break;
             }
         }
     }
-
-    // If there is an extension append it
-    const UnownedStringSlice ext = ArtifactInfoUtil::getDefaultExtension(m_desc);
-
-    if (ext.getLength())
-    {
-        path.appendChar('.');
-        path.append(ext);
-    }
-
-    // If the final path is different from the lock path save that path
-    if (path != temporaryLockPath)
-    {
-        m_temporaryLockPath = temporaryLockPath;
-    }
-
-    // Write the contents
-    SLANG_RETURN_ON_FAIL(File::writeAllBytes(path, blob->getBufferPointer(), blob->getBufferSize()));
-
-    // Okay we can now add this as temporary path too
-    _setPath(PathType::Temporary, path);
-
-    return SLANG_OK;
-}
-
-SlangResult Artifact::loadBlob(Keep keep, ISlangBlob** outBlob)
-{
-    ComPtr<ISlangBlob> blob(m_blob);
-
+     
+    // Wasn't able to construct
     if (!blob)
     {
-        if (m_pathType != PathType::None)
-        {
-            // Read into a blob
-            ScopedAllocation alloc;
-            SLANG_RETURN_ON_FAIL(File::readAllBytes(m_path, alloc));
+        return SLANG_E_NOT_FOUND;
+    }
 
-            // Create as a blob
-            blob = RawBlob::moveCreate(alloc);
-        }
-        else
-        {
-            // Look for a representation that we can serialize into a blob
-            for (ISlangUnknown* intf : m_items)
-            {
-                
-                ComPtr<IArtifactRepresentation> rep;
-                if (SLANG_SUCCEEDED(intf->queryInterface(IArtifactRepresentation::getTypeGuid(), (void**)rep.writeRef())) && rep)
-                {
-                    SlangResult res = rep->writeToBlob(blob.writeRef());
-                    if (SLANG_SUCCEEDED(res) && blob)
-                    {
-                        break;
-                    }
-                }
-            }
-        }
-
-        // Wasn't able to construct
-        if (!blob)
-        {
-            return SLANG_E_NOT_FOUND;
-        }
-
-        // Put in cache 
-        if (canKeep(keep))
-        {
-            setBlob(blob);
-        }
+    // Put in cache 
+    if (canKeep(keep))
+    {
+        addItem(blob);
     }
 
     *outBlob = blob.detach();

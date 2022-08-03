@@ -1491,7 +1491,8 @@ struct OptionsParser
                     if (Path::getPathExt(path).getLength() > 0)
                     {
                         // Set the path
-                        artifact->setPath(Artifact::PathType::Existing, path.getBuffer());
+                        auto fileRep = new FileArtifactRepresentation(IFileArtifactRepresentation::Kind::NameOnly, path, nullptr, nullptr);
+                        artifact->addItem(fileRep);
                     }
 
                     // TODO(JS): We might want to check if the artifact exists.

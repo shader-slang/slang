@@ -637,8 +637,10 @@ static SlangResult _parseGCCFamilyLine(const UnownedStringSlice& line, LineParse
         // If it's a library for CPU types, try and use it
         if (ArtifactInfoUtil::isCpuBinary(desc) && desc.kind == ArtifactKind::Library)
         {
+            ComPtr<IFileArtifactRepresentation> fileRep;
+
             // Get the name and path (can be empty) to the library
-            SLANG_RETURN_ON_FAIL(artifact->requireFileLike(ArtifactKeep::No));
+            SLANG_RETURN_ON_FAIL(artifact->requireFile(ArtifactKeep::No, fileRep.writeRef()));
 
             libPathPool.add(ArtifactInfoUtil::getParentPath(artifact));
             cmdLine.addPrefixPathArg("-l", ArtifactInfoUtil::getBaseName(artifact));
