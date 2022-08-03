@@ -38,6 +38,7 @@ class IArtifactUtil : public ISlangUnknown
 
 class ArtifactUtilImpl : public IArtifactUtil
 {
+public:
 	// ISlangUnknown
 	SLANG_NO_THROW uint32_t SLANG_MCALL addRef() SLANG_OVERRIDE { return 1; }
 	SLANG_NO_THROW uint32_t SLANG_MCALL release() SLANG_OVERRIDE { return 1; }

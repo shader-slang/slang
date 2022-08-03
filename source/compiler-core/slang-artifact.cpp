@@ -9,6 +9,8 @@
 #include "../core/slang-io.h"
 #include "../core/slang-array-view.h"
 
+#include "slang-artifact-util.h"
+
 namespace Slang {
 
 namespace { // anonymous
@@ -521,7 +523,7 @@ bool Artifact::exists()
 
         if (SLANG_SUCCEEDED(item->queryInterface(ICastable::getTypeGuid(), (void**)castable.writeRef())) && castable)
         {
-            auto rep = (IArtifactRepresentation*)castable->castAs(IArtifactRepresentation::getTypeGuid());
+            auto rep = as<IArtifactRepresentation>(castable);
             if (rep)
             {
                 // It is a rep and it exists
@@ -532,7 +534,7 @@ bool Artifact::exists()
                 continue;
             }
             // Associated types don't encapsulate an artifact representation, so don't signal existance
-            if (castable->castAs(IArtifactAssociated::getTypeGuid()))
+            if (as<IArtifactAssociated>(castable))
             {
                 continue;
             }
@@ -552,7 +554,6 @@ bool Artifact::exists()
     return File::exists(m_path);
 }
 
-
 void Artifact::addItem(ISlangUnknown* intf) 
 { 
     SLANG_ASSERT(intf);
@@ -566,7 +567,6 @@ void Artifact::removeItemAt(Index i)
 {
     m_items.removeAt(i);
 }
-
 
 void* Artifact::findItemInterface(const Guid& guid)
 {

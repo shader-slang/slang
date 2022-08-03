@@ -630,6 +630,32 @@ protected:
     ComPtr<ISlangMutableFileSystem> m_fileSystem;
 };
 
+// Helper template to make finding an item more simple
+// There isn't a problem if we only have a forward declaration, because in that case T::getTypeGuid can't work.
+SLANG_FORCE_INLINE void* _findItemImpl(IArtifact* artifact, const Guid& guid, const ISlangUnknown* intf)
+{
+    SLANG_UNUSED(intf);
+    return artifact->findItemInterface(guid);
+}
+
+SLANG_FORCE_INLINE void* _findItemImpl(IArtifact* artifact, const Guid& guid, const ICastable* castable)
+{
+    SLANG_UNUSED(castable);
+    return artifact->findItemObject(guid);
+}
+
+SLANG_FORCE_INLINE void* _findItemImpl(IArtifact* artifact, const Guid& guid, const void* other)
+{
+    SLANG_UNUSED(other);
+    return artifact->findItemObject(guid);
+}
+
+template <typename T>
+SLANG_FORCE_INLINE T* findItem(IArtifact* artifact)
+{
+    return (T*)_findItemImpl(artifact, T::getTypeGuid(), (T*)nullptr);
+}
+
 } // namespace Slang
 
 #endif

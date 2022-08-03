@@ -104,14 +104,11 @@ SlangResult ArtifactUtilImpl::calcArtifactPath(const ArtifactDesc& desc, const c
 SlangResult ArtifactUtilImpl::requireFile(ArtifactKeep keep, IArtifact* artifact, IFileArtifactRepresentation** outFile)
 {
 	// See if we already have it
+	if (auto fileRep = findItem<IFileArtifactRepresentation>(artifact))
 	{
-		auto fileRep = (IFileArtifactRepresentation*)artifact->findItemObject(IFileArtifactRepresentation::getTypeGuid());
-		if (fileRep)
-		{
-			fileRep->addRef();
-			*outFile = fileRep;
-			return SLANG_OK;
-		}
+		fileRep->addRef();
+		*outFile = fileRep;
+		return SLANG_OK;
 	}
 
 	// If we are going to access as a file we need to be able to write it, and to do that we need a blob
@@ -142,11 +139,12 @@ SlangResult ArtifactUtilImpl::requireFile(ArtifactKeep keep, IArtifact* artifact
 	
 	// Create the rep
 	IFileArtifactRepresentation* fileRep = new FileArtifactRepresentation(IFileArtifactRepresentation::Kind::Owned, path, lockFile, nullptr);
-	fileRep->addRef();
+	artifact->addItem(fileRep);
+
 	// Return it
+	fileRep->addRef();
 	*outFile = fileRep;
 	return SLANG_OK;
 }
-
 
 } // namespace Slang
