@@ -85,6 +85,17 @@ struct PeepholeContext : InstPassBase
                 }
             }
             break;
+        case kIROp_CastPtrToBool:
+            {
+                auto ptr = inst->getOperand(0);
+                IRBuilder builder(&sharedBuilderStorage);
+                builder.setInsertBefore(inst);
+                auto neq = builder.emitNeq(ptr, builder.getPtrValue(nullptr));
+                inst->replaceUsesWith(neq);
+                inst->removeAndDeallocate();
+                changed = true;
+            }
+            break;
         default:
             break;
         }

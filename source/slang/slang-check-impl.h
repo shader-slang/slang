@@ -499,6 +499,10 @@ namespace Slang
             ///
         Expr* maybeOpenExistential(Expr* expr);
 
+            /// If `expr` has Ref<T> Type, convert it into an l-value expr that has T type.
+        Expr* maybeOpenRef(Expr* expr);
+
+
         Expr* ConstructDeclRefExpr(
             DeclRef<Decl>   declRef,
             Expr*    baseExpr,
@@ -1722,6 +1726,7 @@ namespace Slang
         CASE(ModifierCastExpr)
         CASE(LetExpr)
         CASE(ExtractExistentialValueExpr)
+        CASE(OpenRefExpr)
 
     #undef CASE
 
@@ -1734,12 +1739,14 @@ namespace Slang
         Expr* visitThisExpr(ThisExpr* expr);
         Expr* visitThisTypeExpr(ThisTypeExpr* expr);
         Expr* visitAndTypeExpr(AndTypeExpr* expr);
+        Expr* visitPointerTypeExpr(PointerTypeExpr* expr);
         Expr* visitModifiedTypeExpr(ModifiedTypeExpr* expr);
 
         Expr* visitJVPDifferentiateExpr(JVPDifferentiateExpr* expr);
 
             /// Perform semantic checking on a `modifier` that is being applied to the given `type`
         Val* checkTypeModifier(Modifier* modifier, Type* type);
+
     };
 
     struct SemanticsStmtVisitor

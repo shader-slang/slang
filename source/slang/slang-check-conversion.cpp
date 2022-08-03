@@ -639,6 +639,11 @@ namespace Slang
             return true;
         }
 
+        if (auto refType = as<RefType>(toType))
+        {
+            return _coerce(refType->getValueType(), outToExpr, fromType, fromExpr, outCost);
+        }
+
         // If both are string types we assume they are convertable in both directions
         if (as<StringTypeBase>(fromType) && as<StringTypeBase>(toType))
         {
