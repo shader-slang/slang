@@ -66,34 +66,8 @@ namespace Slang
     void printDiagnosticArg(StringBuilder& sb, CodeGenTarget val)
     {
         UnownedStringSlice name = TypeTextUtil::getCompileTargetName(asExternal(val));
-        if (name.getLength() == 0)
-        {
-            name = toSlice("<unknown>");
-        }
+        name = name.getLength() ? name : toSlice("<unknown>");
         sb << name;
-
-#if 0
-
-        switch (val)
-        {
-            default:
-                sb << "<unknown>";
-                break;
-
-#define CASE(TAG, STR) case CodeGenTarget::TAG: sb << STR; break
-            CASE(GLSL, "glsl");
-            CASE(HLSL, "hlsl");
-            CASE(SPIRV, "spirv");
-            CASE(SPIRVAssembly, "spriv-assembly");
-            CASE(DXBytecode, "dxbc");
-            CASE(DXBytecodeAssembly, "dxbc-assembly");
-            CASE(DXIL, "dxil");
-            CASE(DXILAssembly, "dxil-assembly");
-#undef CASE
-
-        }
-#endif
-
     }
 
     void printDiagnosticArg(StringBuilder& sb, PassThroughMode val)
