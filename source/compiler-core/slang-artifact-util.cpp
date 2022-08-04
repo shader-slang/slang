@@ -1,7 +1,7 @@
 // slang-artifact.cpp
 #include "slang-artifact-util.h"
 
-#include "slang-artifact-info.h"
+#include "slang-artifact-desc-util.h"
 
 #include "../core/slang-file-system.h"
 #include "../core/slang-io.h"
@@ -93,7 +93,7 @@ SlangResult ArtifactUtilImpl::calcArtifactPath(const ArtifactDesc& desc, const c
 	UnownedStringSlice basePath(inBasePath);
 
 	StringBuilder path;
-	SLANG_RETURN_ON_FAIL(ArtifactInfoUtil::calcPathForDesc(desc, basePath, path));
+	SLANG_RETURN_ON_FAIL(ArtifactDescUtil::calcPathForDesc(desc, basePath, path));
 
 	auto blob = new StringBlob(path);
 	blob->addRef();
@@ -148,6 +148,11 @@ SlangResult ArtifactUtilImpl::requireFileDefaultImpl(IArtifact* artifact, Artifa
 	fileRep->addRef();
 	*outFile = fileRep;
 	return SLANG_OK;
+}
+
+ArtifactDesc ArtifactUtilImpl::makeDescFromCompileTarget(SlangCompileTarget target)
+{
+	return ArtifactDescUtil::makeDescFromCompileTarget(target);
 }
 
 } // namespace Slang

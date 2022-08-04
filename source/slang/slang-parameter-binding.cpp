@@ -5,7 +5,7 @@
 #include "slang-compiler.h"
 #include "slang-type-layout.h"
 
-#include "../compiler-core/slang-artifact-info.h"
+#include "../compiler-core/slang-artifact-desc-util.h"
 
 #include "slang-ir-string-hash.h"
 
@@ -3031,8 +3031,8 @@ static int _calcTotalNumUsedRegistersForLayoutResourceKind(ParameterBindingConte
 
 static bool _isCPUTarget(CodeGenTarget target)
 {
-    const auto desc = ArtifactDesc::makeFromCompileTarget(asExternal(target));
-    return ArtifactInfoUtil::isCpuLikeTarget(desc);
+    const auto desc = ArtifactDescUtil::makeDescFromCompileTarget(asExternal(target));
+    return ArtifactDescUtil::isCpuLikeTarget(desc);
 }
 
 static bool _isPTXTarget(CodeGenTarget target)

@@ -11,6 +11,7 @@
 #include "slang-profile.h"
 
 #include "../compiler-core/slang-artifact.h"
+#include "../compiler-core/slang-artifact-desc-util.h"
 #include "../compiler-core/slang-artifact-representation.h"
 
 #include "slang-repro.h"
@@ -21,7 +22,7 @@
 #include "../core/slang-hex-dump-util.h"
 
 #include "../compiler-core/slang-command-line-args.h"
-#include "../compiler-core/slang-artifact-info.h"
+#include "../compiler-core/slang-artifact-desc-util.h"
 #include "../compiler-core/slang-core-diagnostics.h"
 
 #include <assert.h>
@@ -1459,7 +1460,7 @@ struct OptionsParser
 
                     const auto path = referenceModuleName.value;
 
-                    auto desc = ArtifactInfoUtil::getDescFromPath(path.getUnownedSlice());
+                    auto desc = ArtifactDescUtil::getDescFromPath(path.getUnownedSlice());
 
                     if (desc.kind == ArtifactKind::Unknown)
                     {
@@ -1468,18 +1469,18 @@ struct OptionsParser
                     }
 
                     // If it's a GPU binary, then we'll assume it's a library
-                    if (ArtifactInfoUtil::isGpuUsable(desc))
+                    if (ArtifactDescUtil::isGpuUsable(desc))
                     {
                         desc.kind = ArtifactKind::Library;
                     }
 
-                    if (!ArtifactInfoUtil::isLinkable(desc))
+                    if (!ArtifactDescUtil::isLinkable(desc))
                     {
                         sink->diagnose(referenceModuleName.loc, Diagnostics::kindNotLinkable, Path::getPathExt(path));
                         return SLANG_FAIL;
                     }
 
-                    const String name = ArtifactInfoUtil::getBaseNameFromPath(desc, path.getUnownedSlice());
+                    const String name = ArtifactDescUtil::getBaseNameFromPath(desc, path.getUnownedSlice());
 
                     // Create the artifact
                     ComPtr<IArtifact> artifact(new Artifact(desc, name)); 
@@ -2043,7 +2044,7 @@ struct OptionsParser
         // and output type is callable, add an empty' rawOutput.
         if (rawOutputs.getCount() == 0 && 
             rawTargets.getCount() == 1 && 
-            ArtifactDesc::makeFromCompileTarget(asExternal(rawTargets[0].format)).kind == ArtifactKind::HostCallable)
+            ArtifactDescUtil::makeDescFromCompileTarget(asExternal(rawTargets[0].format)).kind == ArtifactKind::HostCallable)
         {
             RawOutput rawOutput;
             rawOutput.impliedFormat = rawTargets[0].format;

@@ -10,7 +10,7 @@
 #include "../core/slang-char-util.h"
 #include "../core/slang-string-slice-pool.h"
 
-#include "slang-artifact-info.h"
+#include "slang-artifact-desc-util.h"
 
 namespace Slang
 {
@@ -635,15 +635,15 @@ static SlangResult _parseGCCFamilyLine(const UnownedStringSlice& line, LineParse
     {
         const auto desc = artifact->getDesc();
         // If it's a library for CPU types, try and use it
-        if (ArtifactInfoUtil::isCpuBinary(desc) && desc.kind == ArtifactKind::Library)
+        if (ArtifactDescUtil::isCpuBinary(desc) && desc.kind == ArtifactKind::Library)
         {
             ComPtr<IFileArtifactRepresentation> fileRep;
 
             // Get the name and path (can be empty) to the library
             SLANG_RETURN_ON_FAIL(artifact->requireFile(ArtifactKeep::No, fileRep.writeRef()));
 
-            libPathPool.add(ArtifactInfoUtil::getParentPath(fileRep));
-            cmdLine.addPrefixPathArg("-l", ArtifactInfoUtil::getBaseName(artifact->getDesc(), fileRep));
+            libPathPool.add(ArtifactDescUtil::getParentPath(fileRep));
+            cmdLine.addPrefixPathArg("-l", ArtifactDescUtil::getBaseName(artifact->getDesc(), fileRep));
         }
     }
 

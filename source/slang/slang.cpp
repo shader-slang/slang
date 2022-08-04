@@ -8,6 +8,7 @@
 #include "../core/slang-type-convert-util.h"
 
 #include "../compiler-core/slang-artifact.h"
+#include "../compiler-core/slang-artifact-desc-util.h"
 
 #include "slang-module-library.h"
 
@@ -724,7 +725,7 @@ SlangPassThrough Session::getDownstreamCompilerForTransition(SlangCompileTarget 
         return (SlangPassThrough)m_codeGenTransitionMap.getTransition(source, target);
     }
 
-    const auto desc = ArtifactDesc::makeFromCompileTarget(inTarget);
+    const auto desc = ArtifactDescUtil::makeDescFromCompileTarget(inTarget);
 
     // Special case host-callable
     if ((desc.kind == ArtifactKind::HostCallable) && 

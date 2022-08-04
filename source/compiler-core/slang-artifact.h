@@ -53,13 +53,6 @@ enum class ArtifactKind : uint8_t
 
     CountOf,
 };
-   
-/// Get the parent kind
-ArtifactKind getParent(ArtifactKind kind);
-/// Returns true if kind is derived from base
-bool isDerivedFrom(ArtifactKind kind, ArtifactKind base);
-/// Get the name for the kind
-UnownedStringSlice getName(ArtifactKind kind);
 
 /* Payload. 
 
@@ -120,13 +113,6 @@ enum class ArtifactPayload : uint8_t
     CountOf,
 };
 
-/// Get the parent payload
-ArtifactPayload getParent(ArtifactPayload payload);
-/// Returns true if payload is derived from base
-bool isDerivedFrom(ArtifactPayload payload, ArtifactPayload base);
-/// Get the name for the payload
-UnownedStringSlice getName(ArtifactPayload payload);
-
 /* Style.
 
 NOTE!
@@ -147,13 +133,6 @@ enum class ArtifactStyle : uint8_t
 
     CountOf,
 };
-
-/// Get the parent style
-ArtifactStyle getParent(ArtifactStyle style);
-/// Returns true if style is derived from base
-bool isDerivedFrom(ArtifactStyle style, ArtifactStyle base);
-/// Get the name for the style
-UnownedStringSlice getName(ArtifactStyle style);
 
 typedef uint8_t ArtifactFlags;
 struct ArtifactFlag
@@ -185,9 +164,6 @@ public:
 
     bool operator==(const This& rhs) const { return kind == rhs.kind && payload == rhs.payload && style == rhs.style && flags == rhs.flags;  }
     bool operator!=(const This& rhs) const { return !(*this == rhs); }
-
-        /// Given a code gen target, get the equivalent ArtifactDesc
-    static This makeFromCompileTarget(SlangCompileTarget target);
 
         /// Construct from the elements
     static This make(Kind inKind, Payload inPayload, Style inStyle = Style::Unknown, Flags flags = 0) { return This{ inKind, inPayload, inStyle, flags }; }

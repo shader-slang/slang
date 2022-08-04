@@ -274,7 +274,7 @@
     </Lib>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\..\source\compiler-core\slang-artifact-info.h" />
+    <ClInclude Include="..\..\..\source\compiler-core\slang-artifact-desc-util.h" />
     <ClInclude Include="..\..\..\source\compiler-core\slang-artifact-representation.h" />
     <ClInclude Include="..\..\..\source\compiler-core\slang-artifact-util.h" />
     <ClInclude Include="..\..\..\source\compiler-core\slang-artifact.h" />
@@ -312,7 +312,7 @@
     <ClInclude Include="..\..\..\source\compiler-core\windows\slang-win-visual-studio-util.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\..\source\compiler-core\slang-artifact-info.cpp" />
+    <ClCompile Include="..\..\..\source\compiler-core\slang-artifact-desc-util.cpp" />
     <ClCompile Include="..\..\..\source\compiler-core\slang-artifact-representation.cpp" />
     <ClCompile Include="..\..\..\source\compiler-core\slang-artifact-util.cpp" />
     <ClCompile Include="..\..\..\source\compiler-core\slang-artifact.cpp" />
