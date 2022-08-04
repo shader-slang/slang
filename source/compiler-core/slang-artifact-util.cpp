@@ -1,6 +1,9 @@
 // slang-artifact.cpp
 #include "slang-artifact-util.h"
 
+#include "slang-artifact-impl.h"
+#include "slang-artifact-representation-impl.h"
+
 #include "slang-artifact-desc-util.h"
 
 #include "../core/slang-file-system.h"
@@ -30,7 +33,6 @@ void* ArtifactUtilImpl::getInterface(const Guid& guid)
 	}
 	return nullptr;
 }
-
 
 SlangResult ArtifactUtilImpl::createArtifact(const ArtifactDesc& desc, const char* inName, IArtifact** outArtifact)
 {

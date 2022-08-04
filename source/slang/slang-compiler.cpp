@@ -14,8 +14,10 @@
 
 #include "../compiler-core/slang-lexer.h"
 
+// Artifact
 #include "../compiler-core/slang-artifact-desc-util.h"
-#include "../compiler-core/slang-artifact-representation.h"
+#include "../compiler-core/slang-artifact-representation-impl.h"
+#include "../compiler-core/slang-artifact-impl.h"
 
 #include "slang-lower-to-ir.h"
 #include "slang-mangle.h"
@@ -54,39 +56,50 @@
 namespace Slang
 {
 
-    // !!!!!!!!!!!!!!!!!!!!!! free functions for DiagnosicSink !!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+// !!!!!!!!!!!!!!!!!!!!!! free functions for DiagnosicSink !!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-bool isHeterogeneousTarget(CodeGenTarget target)
-{
-    return ArtifactDescUtil::makeDescFromCompileTarget(asExternal(target)).style == ArtifactStyle::Host;
-}
-
-void printDiagnosticArg(StringBuilder& sb, CodeGenTarget val)
+    bool isHeterogeneousTarget(CodeGenTarget target)
     {
+        return ArtifactDescUtil::makeDescFromCompileTarget(asExternal(target)).style == ArtifactStyle::Host;
+    }
+
+    void printDiagnosticArg(StringBuilder& sb, CodeGenTarget val)
+    {
+        UnownedStringSlice name = TypeTextUtil::getCompileTargetName(asExternal(val));
+        if (name.getLength() == 0)
+        {
+            name = toSlice("<unknown>");
+        }
+        sb << name;
+
+#if 0
+
         switch (val)
         {
             default:
                 sb << "<unknown>";
                 break;
 
-    #define CASE(TAG, STR) case CodeGenTarget::TAG: sb << STR; break
-                CASE(GLSL, "glsl");
-                CASE(HLSL, "hlsl");
-                CASE(SPIRV, "spirv");
-                CASE(SPIRVAssembly, "spriv-assembly");
-                CASE(DXBytecode, "dxbc");
-                CASE(DXBytecodeAssembly, "dxbc-assembly");
-                CASE(DXIL, "dxil");
-                CASE(DXILAssembly, "dxil-assembly");
-    #undef CASE
+#define CASE(TAG, STR) case CodeGenTarget::TAG: sb << STR; break
+            CASE(GLSL, "glsl");
+            CASE(HLSL, "hlsl");
+            CASE(SPIRV, "spirv");
+            CASE(SPIRVAssembly, "spriv-assembly");
+            CASE(DXBytecode, "dxbc");
+            CASE(DXBytecodeAssembly, "dxbc-assembly");
+            CASE(DXIL, "dxil");
+            CASE(DXILAssembly, "dxil-assembly");
+#undef CASE
+
         }
+#endif
+
     }
 
     void printDiagnosticArg(StringBuilder& sb, PassThroughMode val)
     {
         sb << TypeTextUtil::getPassThroughName(SlangPassThrough(val));
     }
-
 
     // !!!!!!!!!!!!!!!!!!!!!!!!!!!! CompileResult !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 

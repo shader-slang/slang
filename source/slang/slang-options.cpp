@@ -10,9 +10,10 @@
 #include "slang-compiler.h"
 #include "slang-profile.h"
 
-#include "../compiler-core/slang-artifact.h"
 #include "../compiler-core/slang-artifact-desc-util.h"
-#include "../compiler-core/slang-artifact-representation.h"
+
+#include "../compiler-core/slang-artifact-impl.h"
+#include "../compiler-core/slang-artifact-representation-impl.h"
 
 #include "slang-repro.h"
 #include "slang-serialize-ir.h"
