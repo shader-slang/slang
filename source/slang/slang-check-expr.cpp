@@ -1258,7 +1258,9 @@ namespace Slang
                 m_astBuilder,
                 this,
                 name,
-                baseType);
+                baseType,
+                LookupMask::Default,
+                LookupOptions::NoDeref);
             if (!lookupResult.isValid())
             {
                 goto fail;

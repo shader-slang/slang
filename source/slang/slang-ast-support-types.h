@@ -1121,6 +1121,7 @@ namespace Slang
         None = 0,
         IgnoreBaseInterfaces = 1 << 0,
         Completion = 1 << 1, ///< Lookup all applicable decls for code completion suggestions
+        NoDeref = 1 << 2,
     };
 
     class SerialRefObject;
