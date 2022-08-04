@@ -358,23 +358,6 @@ __magic_type(PtrType)
 __intrinsic_type($(kIROp_PtrType))
 struct Ptr
 {
-    __intrinsic_op($(kIROp_Load))
-    static T __load(Ptr<T> ptr);
-
-    __intrinsic_op($(kIROp_Store))
-    static void __store(Ptr<T> ptr, T val);
-
-    __intrinsic_op($(kIROp_getElementPtr))
-    static Ptr<T> __getElementPtr(Ptr<T> ptr, int index);
-
-    __intrinsic_op($(kIROp_Neq))
-    __generic<U:__BuiltinArithmeticType>
-    static bool __neq(Ptr<T> ptr, U val);
-
-    __intrinsic_op($(kIROp_Eql))
-    __generic<U:__BuiltinArithmeticType>
-    static bool __eql(Ptr<T> ptr, U val);
-
     __generic<U>
     __intrinsic_op($(kIROp_BitCast))
     __init(Ptr<U> ptr);
@@ -403,6 +386,15 @@ struct Ptr
         ref;
     }
 };
+
+__intrinsic_op($(kIROp_Load))
+T __load<T>(Ptr<T> ptr);
+
+__intrinsic_op($(kIROp_Store))
+void __store<T>(Ptr<T> ptr, T val);
+
+__intrinsic_op($(kIROp_getElementPtr))
+Ptr<T> __getElementPtr<T>(Ptr<T> ptr, int index);
 
 __generic<T>
 __intrinsic_op($(kIROp_Less))
@@ -1726,7 +1718,7 @@ __generic<T>
 [__unsafeForceInlineEarly]
 Ptr<T> operator-(Ptr<T> value, int64_t offset)
 {
-    return Ptr<T>.__getElementPtr(value, -offset);
+    return __getElementPtr(value, -offset);
 }
 
 __generic<T : __BuiltinArithmeticType>
