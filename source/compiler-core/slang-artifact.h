@@ -217,6 +217,34 @@ SLANG_INLINE bool canKeep(ArtifactKeep keep) { return Index(keep) >= Index(Artif
 /// Returns the keep type for an intermediate
 SLANG_INLINE ArtifactKeep getIntermediateKeep(ArtifactKeep keep) { return (keep == ArtifactKeep::All) ? ArtifactKeep::All : ArtifactKeep::No; }
 
+/* A useful interface for handling lists of castable interfaces. */
+class ICastableList : public ICastable
+{
+    SLANG_COM_INTERFACE(0x335f3d40, 0x934c, 0x40dc, { 0xb5, 0xe1, 0xf7, 0x6e, 0x40, 0x3, 0x62, 0x5 })
+            
+        /// Get the count of all interfaces held in the list
+    virtual Count SLANG_MCALL getCount() = 0;
+        /// Get the interface at the specified index
+    virtual ICastable* SLANG_MCALL getAt(Index i) = 0;
+        /// Add an item to the list
+    virtual void SLANG_MCALL add(ICastable* unk) = 0;
+        /// Remove item at index, remaining items stay in the same order
+    virtual void SLANG_MCALL removeAt(Index i) = 0;
+        /// Clear the list
+    virtual void SLANG_MCALL clear() = 0;
+        /// Find the first index of castable, or -1 if not found
+    virtual Index SLANG_MCALL indexOf(ICastable* castable) = 0;
+        /// Find the first item that casts to non null
+    virtual void* SLANG_MCALL find(const Guid& guid) = 0;
+};
+
+// Simply finding things in a ICastableList
+template <typename T>
+SLANG_FORCE_INLINE T* find(ICastableList* list)
+{
+    return reinterpret_cast<T*>(list->find(T::getTypeGuid())); 
+}
+
 /* The IArtifact interface is designed to represent some Artifact of compilation. It could be input to or output from a compilation.
 
 An abstraction is desirable here, because depending on the compiler the artifact/s could be
@@ -286,6 +314,14 @@ public:
         /// Get the name of the artifact. This can be empty.
     virtual SLANG_NO_THROW const char* SLANG_MCALL getName() = 0;
 
+        /// Add data associated with this artifact
+    virtual SLANG_NO_THROW void SLANG_MCALL addAssociated(ICastable* castable) = 0;
+        /// Find an associated item
+    virtual void* SLANG_MCALL SLANG_MCALL findAssociated(const Guid& unk) = 0;
+        /// TODO(JS): We may want this to return nullptr if it's empty.
+        /// Get the list of associated items
+    virtual ICastableList* SLANG_MCALL getAssociated() = 0;
+
         /// Find an item by casting it's interface
     virtual SLANG_NO_THROW void* SLANG_MCALL findItemInterface(const Guid& uuid) = 0;
         /// Only works on ICastable derived items. Can find interfaces or objects.
@@ -336,19 +372,11 @@ class IArtifactRepresentation : public ICastable
 
         /// Convert the instance into a serializable blob. 
         /// Returns SLANG_E_NOT_IMPLEMENTED if an implementation doesn't implement
-        virtual SLANG_NO_THROW SlangResult SLANG_MCALL writeToBlob(ISlangBlob** blob) = 0;
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL writeToBlob(ISlangBlob** blob) = 0;
 
-    /// Returns true if this representation exists and is available for use.
+        /// Returns true if this representation exists and is available for use.
     virtual SLANG_NO_THROW bool SLANG_MCALL exists() = 0;
 };
-
-/* Interface for types that are associated with an artifact, but aren't a representation, or are
-only part of a representation. */
-class IArtifactAssociated : public ICastable
-{
-    SLANG_COM_INTERFACE(0xafc0e4db, 0x16d4, 0x4d7a, { 0x93, 0x5f, 0x3e, 0x47, 0x7a, 0x23, 0x2a, 0x7f })
-};
-
 
 // Helper template to make finding an item more simple
 // There isn't a problem if we only have a forward declaration, because in that case T::getTypeGuid can't work.

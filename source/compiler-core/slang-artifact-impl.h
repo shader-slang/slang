@@ -12,6 +12,30 @@
 namespace Slang
 {
 
+class CastableList : public ComBaseObject, public ICastableList
+{
+public:
+    SLANG_COM_BASE_IUNKNOWN_ALL
+
+    // ICastable
+    SLANG_NO_THROW void* SLANG_MCALL castAs(const Guid& guid) SLANG_OVERRIDE;
+
+    // IInterfaceList
+    virtual Count SLANG_MCALL getCount() SLANG_OVERRIDE { return m_list.getCount(); }
+    virtual ICastable* SLANG_MCALL getAt(Index i) SLANG_OVERRIDE { return m_list[i]; }
+    virtual void SLANG_MCALL add(ICastable* castable) SLANG_OVERRIDE { m_list.add(ComPtr<ICastable>(castable)); }
+    virtual void SLANG_MCALL removeAt(Index i) SLANG_OVERRIDE { m_list.removeAt(i); }
+    virtual void SLANG_MCALL clear() SLANG_OVERRIDE { m_list.clear(); }
+    virtual Index SLANG_MCALL indexOf(ICastable* castable) SLANG_OVERRIDE;
+    virtual void* SLANG_MCALL find(const Guid& guid) SLANG_OVERRIDE;
+
+protected:
+    void* getInterface(const Guid& guid);
+    void* getObject(const Guid& guid);
+
+    List<ComPtr<ICastable>> m_list;
+};
+
 class ArtifactList : public ComBaseObject, public IArtifactList
 {
 public:
@@ -92,6 +116,9 @@ public:
     virtual SLANG_NO_THROW ISlangUnknown* SLANG_MCALL getItemAt(Index i) SLANG_OVERRIDE { return m_items[i]; }
     virtual SLANG_NO_THROW void SLANG_MCALL removeItemAt(Index i) SLANG_OVERRIDE;
     virtual SLANG_NO_THROW Index SLANG_MCALL getItemCount() SLANG_OVERRIDE { return m_items.getCount(); }
+    virtual SLANG_NO_THROW void SLANG_MCALL addAssociated(ICastable* castable) SLANG_OVERRIDE;
+    virtual void* SLANG_MCALL SLANG_MCALL findAssociated(const Guid& unk) SLANG_OVERRIDE;
+    virtual ICastableList* SLANG_MCALL getAssociated() SLANG_OVERRIDE;
 
     /// Ctor
     Artifact(const Desc& desc, const String& name) :
@@ -108,6 +135,8 @@ protected:
 
     String m_name;                              ///< Name of this artifact
 
+    ComPtr<ICastable> m_associated;             ///< Any associated items
+    ComPtr<IArtifactList> m_children;           ///< The children to this artifact
     List<ComPtr<ISlangUnknown>> m_items;        ///< Associated items
 };
 

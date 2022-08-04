@@ -7,6 +7,63 @@
 
 namespace Slang {
 
+/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! CastableList !!!!!!!!!!!!!!!!!!!!!!!!!!! */
+
+void* CastableList::castAs(const Guid& guid)
+{
+    if (auto intf = getInterface(guid))
+    {
+        return intf;
+    }
+    return getObject(guid);
+}
+
+void* CastableList::getInterface(const Guid& guid)
+{
+    if (guid == ISlangUnknown::getTypeGuid() ||
+        guid == ICastable::getTypeGuid() ||
+        guid == ICastableList::getTypeGuid())
+    {
+        return static_cast<ICastableList*>(this);
+    }
+    return nullptr;
+}
+
+void* CastableList::getObject(const Guid& guid)
+{
+    SLANG_UNUSED(guid);
+    return nullptr;
+}
+
+void* CastableList::find(const Guid& guid)
+{
+    for (ICastable* castable : m_list)
+    {
+        if (castable)
+        {
+            if (auto ptr = castable->castAs(guid))
+            {
+                return ptr;
+            }
+        }
+    }
+    return nullptr;
+}
+
+Index CastableList::indexOf(ICastable* castable)
+{
+    const Count count = m_list.getCount();
+    for (Index i = 0; i < count; ++i)
+    {
+        ICastable* cur = m_list[i];
+        if (cur == castable)
+        {
+            return i;
+        }
+    }
+    return -1;
+}
+
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ArtifactList !!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
 void* ArtifactList::getInterface(const Guid& guid)
@@ -93,28 +150,20 @@ bool Artifact::exists()
 {
     for (ISlangUnknown* item : m_items)
     {
-        ComPtr<ICastable> castable;
-
-        if (SLANG_SUCCEEDED(item->queryInterface(ICastable::getTypeGuid(), (void**)castable.writeRef())) && castable)
+        ComPtr<IArtifactRepresentation> rep;
+        if (SLANG_SUCCEEDED(item->queryInterface(IArtifactRepresentation::getTypeGuid(), (void**)rep.writeRef())) && rep)
         {
-            auto rep = as<IArtifactRepresentation>(castable);
-            if (rep)
+            // It is a rep and it exists
+            if (rep->exists())
             {
-                // It is a rep and it exists
-                if (rep->exists())
-                {
-                    return true;
-                }
-                continue;
+                return true;
             }
-            // Associated types don't encapsulate an artifact representation, so don't signal existance
-            if (as<IArtifactAssociated>(castable))
-            {
-                continue;
-            }
+            // Might be another rep that exists
+            continue;
         }
-        
-        // It can't be IArtifactRepresentation or IArtifactAssociated, so we assume means it exists
+
+        // Must be not derived from IArtifactRepresentation, so we assume it's existance is it is a representation
+        // so it exists
         return true;
     }
 
@@ -219,6 +268,75 @@ SlangResult Artifact::loadBlob(Keep keep, ISlangBlob** outBlob)
 
     *outBlob = blob.detach();
     return SLANG_OK;
+}
+
+void Artifact::addAssociated(ICastable* castable)
+{
+    SLANG_ASSERT(castable);
+    SLANG_ASSERT(castable != m_associated);
+
+    if (m_associated)
+    {
+        if (auto list = as<ICastableList>(m_associated))
+        {
+            // Shouldn't be in the list
+            SLANG_ASSERT(list->indexOf(castable) < 0);
+            list->add(castable);
+        }
+        else
+        {
+            list = new CastableList;
+            list->add(m_associated);
+            m_associated = list;
+            list->add(castable);
+        }
+    }
+    else
+    {
+        m_associated = castable;
+    }
+}
+
+void* Artifact::findAssociated(const Guid& guid)
+{
+    if (!m_associated)
+    {
+        return nullptr;
+    }
+    if (auto list = as<ICastableList>(m_associated))
+    {
+        return list->find(guid);
+    }
+    else
+    {
+        return m_associated->castAs(guid);
+    }
+}
+
+ICastableList* Artifact::getAssociated()
+{
+    if (m_associated)
+    {
+        if (auto list = as<ICastableList>(m_associated))
+        {
+            return list;
+        }
+        else
+        {
+            // Promote to a list with the element in it
+            list = new CastableList;
+            list->add(m_associated);
+            m_associated = list;
+            return list;
+        }
+    }
+    else
+    {
+        // Create an empty list
+        ICastableList* list = new CastableList;
+        m_associated = list;
+        return list;
+    }
 }
 
 } // namespace Slang
