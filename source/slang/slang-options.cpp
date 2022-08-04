@@ -1467,12 +1467,12 @@ struct OptionsParser
                     }
 
                     // If it's a GPU binary, then we'll assume it's a library
-                    if (ArtifactInfoUtil::isGpuBinary(desc))
+                    if (ArtifactInfoUtil::isGpuUsable(desc))
                     {
                         desc.kind = ArtifactKind::Library;
                     }
 
-                    if (!ArtifactInfoUtil::isBinaryLinkable(desc))
+                    if (!ArtifactInfoUtil::isLinkable(desc))
                     {
                         sink->diagnose(referenceModuleName.loc, Diagnostics::kindNotLinkable, Path::getPathExt(path));
                         return SLANG_FAIL;
@@ -2036,7 +2036,7 @@ struct OptionsParser
         // and output type is callable, add an empty' rawOutput.
         if (rawOutputs.getCount() == 0 && 
             rawTargets.getCount() == 1 && 
-            ArtifactDesc::makeFromCompileTarget(asExternal(rawTargets[0].format)).kind == ArtifactKind::Callable)
+            ArtifactDesc::makeFromCompileTarget(asExternal(rawTargets[0].format)).kind == ArtifactKind::HostCallable)
         {
             RawOutput rawOutput;
             rawOutput.impliedFormat = rawTargets[0].format;

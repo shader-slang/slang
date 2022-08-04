@@ -374,6 +374,13 @@ class ExtractExistentialValueExpr: public Expr
     DeclRef<VarDeclBase> declRef;
 };
 
+class OpenRefExpr : public Expr
+{
+    SLANG_AST_CLASS(OpenRefExpr)
+
+    Expr* innerExpr = nullptr;
+};
+
     /// An expression of the form `__jvp(fn)` to access the 
     /// forward-mode derivative version of the function `fn`
     ///
@@ -421,6 +428,14 @@ class ModifiedTypeExpr : public Expr
     SLANG_AST_CLASS(ModifiedTypeExpr);
 
     Modifiers modifiers;
+    TypeExp base;
+};
+
+    /// A type expression that rrepresents a pointer type, e.g. T*
+class PointerTypeExpr : public Expr
+{
+    SLANG_AST_CLASS(PointerTypeExpr)
+
     TypeExp base;
 };
 

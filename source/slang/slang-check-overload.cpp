@@ -1242,7 +1242,9 @@ namespace Slang
             m_astBuilder,
             this,
             getName("$init"),
-            type);
+            type,
+            LookupMask::Default,
+            LookupOptions::NoDeref);
 
         AddOverloadCandidates(initializers, context);
     }
@@ -1434,6 +1436,11 @@ namespace Slang
         {
             if (IsErrorExpr(arg))
                 return CreateErrorExpr(expr);
+        }
+
+        for (auto& arg : expr->arguments)
+        {
+            arg = maybeOpenRef(arg);
         }
 
         for (auto& arg : expr->arguments)

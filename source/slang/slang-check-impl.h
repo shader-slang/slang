@@ -21,6 +21,10 @@ namespace Slang
         TypeExp         typeExp,
         DiagnosticSink* sink);
 
+        /// Get the element type if `type` is Ptr or PtrLike type, otherwise returns null.
+        /// Note: this currently does not include PtrTypeBase.
+    Type* getPointedToTypeIfCanImplicitDeref(Type* type);
+
     // A flat representation of basic types (scalars, vectors and matrices)
     // that can be used as lookup key in caches
     enum class BasicTypeKey : uint16_t
@@ -498,6 +502,10 @@ namespace Slang
             /// existential-type value means.
             ///
         Expr* maybeOpenExistential(Expr* expr);
+
+            /// If `expr` has Ref<T> Type, convert it into an l-value expr that has T type.
+        Expr* maybeOpenRef(Expr* expr);
+
 
         Expr* ConstructDeclRefExpr(
             DeclRef<Decl>   declRef,
@@ -1722,6 +1730,7 @@ namespace Slang
         CASE(ModifierCastExpr)
         CASE(LetExpr)
         CASE(ExtractExistentialValueExpr)
+        CASE(OpenRefExpr)
 
     #undef CASE
 
@@ -1734,12 +1743,14 @@ namespace Slang
         Expr* visitThisExpr(ThisExpr* expr);
         Expr* visitThisTypeExpr(ThisTypeExpr* expr);
         Expr* visitAndTypeExpr(AndTypeExpr* expr);
+        Expr* visitPointerTypeExpr(PointerTypeExpr* expr);
         Expr* visitModifiedTypeExpr(ModifiedTypeExpr* expr);
 
         Expr* visitJVPDifferentiateExpr(JVPDifferentiateExpr* expr);
 
             /// Perform semantic checking on a `modifier` that is being applied to the given `type`
         Val* checkTypeModifier(Modifier* modifier, Type* type);
+
     };
 
     struct SemanticsStmtVisitor

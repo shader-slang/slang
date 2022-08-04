@@ -358,7 +358,89 @@ __magic_type(PtrType)
 __intrinsic_type($(kIROp_PtrType))
 struct Ptr
 {
+    __generic<U>
+    __intrinsic_op($(kIROp_BitCast))
+    __init(Ptr<U> ptr);
+
+    __intrinsic_op($(kIROp_BitCast))
+    __init(uint64_t val);
+
+    __intrinsic_op($(kIROp_BitCast))
+    __init(int64_t val);
+
+    __subscript(int index) -> T
+    {
+        [__unsafeForceInlineEarly]
+        get
+        {
+            return __load(__getElementPtr(this, index));
+        }
+
+        [__unsafeForceInlineEarly]
+        set(T newValue)
+        {
+            __store(__getElementPtr(this, index), newValue);
+        }
+
+        __intrinsic_op($(kIROp_getElementPtr))
+        ref;
+    }
 };
+
+__intrinsic_op($(kIROp_Load))
+T __load<T>(Ptr<T> ptr);
+
+__intrinsic_op($(kIROp_Store))
+void __store<T>(Ptr<T> ptr, T val);
+
+__intrinsic_op($(kIROp_getElementPtr))
+Ptr<T> __getElementPtr<T>(Ptr<T> ptr, int index);
+
+__generic<T>
+__intrinsic_op($(kIROp_Less))
+bool operator<(Ptr<T> p1, Ptr<T> p2);
+
+__generic<T>
+__intrinsic_op($(kIROp_Leq))
+bool operator<=(Ptr<T> p1, Ptr<T> p2);
+
+__generic<T>
+__intrinsic_op($(kIROp_Greater))
+bool operator>(Ptr<T> p1, Ptr<T> p2);
+
+__generic<T>
+__intrinsic_op($(kIROp_Geq))
+bool operator>=(Ptr<T> p1, Ptr<T> p2);
+
+__generic<T>
+__intrinsic_op($(kIROp_Neq))
+bool operator!=(Ptr<T> p1, Ptr<T> p2);
+
+__generic<T>
+__intrinsic_op($(kIROp_Eql))
+bool operator==(Ptr<T> p1, Ptr<T> p2);
+
+extension bool
+{
+    __generic<T>
+    __implicit_conversion($(kConversionCost_PtrToBool))
+    __intrinsic_op($(kIROp_CastPtrToBool))
+    __init(Ptr<T> ptr);
+}
+
+extension uint64_t
+{
+    __generic<T>
+    __intrinsic_op($(kIROp_Construct))
+    __init(Ptr<T> ptr);
+}
+
+extension int64_t
+{
+    __generic<T>
+    __intrinsic_op($(kIROp_Construct))
+    __init(Ptr<T> ptr);
+}
 
 __generic<T>
 __magic_type(OutType)
@@ -1620,6 +1702,25 @@ for (auto op : intrinsicUnaryOps)
 
 }}}}
 
+__generic<T>
+__intrinsic_op(0)
+__prefix Ref<T> operator*(Ptr<T> value);
+
+__generic<T>
+__intrinsic_op(0)
+__prefix Ptr<T> operator&(__ref T value);
+
+__generic<T>
+__intrinsic_op($(kIROp_getElementPtr))
+Ptr<T> operator+(Ptr<T> value, int64_t offset);
+
+__generic<T>
+[__unsafeForceInlineEarly]
+Ptr<T> operator-(Ptr<T> value, int64_t offset)
+{
+    return __getElementPtr(value, -offset);
+}
+
 __generic<T : __BuiltinArithmeticType>
 [__unsafeForceInlineEarly]
 __prefix T operator+(T value)
@@ -1678,6 +1779,12 @@ __generic<T : __BuiltinArithmeticType, let R : int, let C : int>
 [__unsafeForceInlineEarly]
 matrix<T,R,C> operator$(op.name)(in out matrix<T,R,C> value)
 {$(fixity.bodyPrefix) value = value $(op.binOp) T(1); return $(fixity.returnVal); }
+
+$(fixity.qual)
+__generic<T>
+[__unsafeForceInlineEarly]
+Ptr<T> operator$(op.name)(in out Ptr<T> value)
+{$(fixity.bodyPrefix) value = value $(op.binOp) 1; return $(fixity.returnVal); }
 
 ${{{{
 }

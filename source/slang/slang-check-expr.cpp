@@ -231,6 +231,21 @@ namespace Slang
         return expr;
     }
 
+    Expr* SemanticsVisitor::maybeOpenRef(Expr* expr)
+    {
+        auto exprType = expr->type.type;
+
+        if (auto refType = as<RefType>(exprType))
+        {
+            auto openRef = m_astBuilder->create<OpenRefExpr>();
+            openRef->innerExpr = expr;
+            openRef->type.isLeftValue = true;
+            openRef->type.type = refType->getValueType();
+            return openRef;
+        }
+        return expr;
+    }
+
     static SourceLoc _getMemberOpLoc(Expr* expr)
     {
         if (auto m = as<MemberExpr>(expr))
@@ -367,15 +382,15 @@ namespace Slang
         Expr*    base,
         SourceLoc       loc)
     {
-        auto ptrLikeType = as<PointerLikeType>(base->type);
-        SLANG_ASSERT(ptrLikeType);
+        auto elementType = getPointedToTypeIfCanImplicitDeref(base->type);
+        SLANG_ASSERT(elementType);
 
         auto derefExpr = m_astBuilder->create<DerefExpr>();
         derefExpr->loc = loc;
         derefExpr->base = base;
-        derefExpr->type = QualType(ptrLikeType->elementType);
+        derefExpr->type = QualType(elementType);
 
-        // TODO(tfoley): handle l-value status here
+        derefExpr->type.isLeftValue = base->type.isLeftValue;
 
         return derefExpr;
     }
@@ -1243,7 +1258,9 @@ namespace Slang
                 m_astBuilder,
                 this,
                 name,
-                baseType);
+                baseType,
+                LookupMask::Default,
+                LookupOptions::NoDeref);
             if (!lookupResult.isValid())
             {
                 goto fail;
@@ -1329,8 +1346,8 @@ namespace Slang
     Expr* SemanticsVisitor::checkAssignWithCheckedOperands(AssignExpr* expr)
     {
         auto type = expr->left->type;
-
-        expr->right = coerce(type, expr->right);
+        auto right = maybeOpenRef(expr->right);
+        expr->right = coerce(type, right);
 
         if (!type.isLeftValue)
         {
@@ -2511,6 +2528,16 @@ namespace Slang
         auto andType = m_astBuilder->getAndType(expr->left.type, expr->right.type);
         expr->type = m_astBuilder->getTypeType(andType);
 
+        return expr;
+    }
+
+    Expr* SemanticsExprVisitor::visitPointerTypeExpr(PointerTypeExpr* expr)
+    {
+        expr->base = CheckProperType(expr->base);
+        if (as<ErrorType>(expr->base.type))
+            expr->type = expr->base.type;
+        auto ptrType = m_astBuilder->getPtrType(expr->base.type);
+        expr->type = m_astBuilder->getTypeType(ptrType);
         return expr;
     }
 
