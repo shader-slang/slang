@@ -14,6 +14,7 @@
 
 #include "../compiler-core/slang-lexer.h"
 #include "../compiler-core/slang-artifact.h"
+#include "../compiler-core/slang-artifact-representation.h"
 
 #include "slang-lower-to-ir.h"
 #include "slang-mangle.h"
@@ -27,7 +28,6 @@
 
 #include "slang-serialize-container.h"
 //
-
 
 // Includes to allow us to control console
 // output when writing assembly dumps.

@@ -11,6 +11,7 @@
 #include "slang-profile.h"
 
 #include "../compiler-core/slang-artifact.h"
+#include "../compiler-core/slang-artifact-representation.h"
 
 #include "slang-repro.h"
 #include "slang-serialize-ir.h"

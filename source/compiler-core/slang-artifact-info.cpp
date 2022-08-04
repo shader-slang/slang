@@ -4,6 +4,8 @@
 #include "../core/slang-type-text-util.h"
 #include "../core/slang-io.h"
 
+#include "slang-artifact-representation.h"
+
 namespace Slang {
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!! ArtifactInfoUtil !!!!!!!!!!!!!!!!!!!!!!!!!!!! */

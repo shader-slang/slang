@@ -3,6 +3,7 @@
 #define SLANG_ARTIFACT_UTIL_H
 
 #include "slang-artifact.h"
+#include "slang-artifact-representation.h"
 
 namespace Slang
 {
