@@ -936,6 +936,7 @@ tool "slangd"
      addSourceDir "tools/gfx/cpu"
      addSourceDir "tools/gfx/nvapi"
      addSourceDir "tools/gfx/cuda"
+	 addSourceDir "tools/gfx/debug-layer"
  
      -- To special case that we may be building using cygwin on windows. If 'true windows' we build for dx12/vk and run the script
      -- If not we assume it's a cygwin/mingw type situation and remove files that aren't appropriate

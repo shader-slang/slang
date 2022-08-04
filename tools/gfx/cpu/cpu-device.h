@@ -95,4 +95,7 @@ private:
 };
 
 } // namespace cpu
+
+Result SLANG_MCALL createCPUDevice(const IDevice::Desc* desc, IDevice** outDevice);
+
 } // namespace gfx
