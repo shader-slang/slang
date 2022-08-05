@@ -107,6 +107,13 @@ SLANG_COMPILE_TIME_ASSERT(E_OUTOFMEMORY == SLANG_E_OUT_OF_MEMORY);
 /* static */SlangResult SharedLibrary::loadWithPlatformPath(char const* platformFileName, SharedLibrary::Handle& handleOut)
 {
     handleOut = nullptr;
+    if (!platformFileName || strlen(platformFileName) == 0)
+    {
+        if (!GetModuleHandleExA(0, nullptr, (HMODULE*)&handleOut))
+            return SLANG_FAIL;
+        return SLANG_OK;
+    }
+
     // https://docs.microsoft.com/en-us/windows/desktop/api/libloaderapi/nf-libloaderapi-loadlibrarya
     const HMODULE h = LoadLibraryA(platformFileName);
     if (!h)
