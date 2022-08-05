@@ -4,9 +4,10 @@
 
 #include "../core/slang-basic.h"
 
-#include "../../slang-com-helper.h"
+//#include "../../slang-com-helper.h"
+//#include "../core/slang-destroyable.h"
 
-#include "../core/slang-destroyable.h"
+#include "../core/slang-castable-list.h"
 
 namespace Slang
 {
@@ -218,40 +219,6 @@ SLANG_INLINE bool canKeep(ArtifactKeep keep) { return Index(keep) >= Index(Artif
 /// Returns the keep type for an intermediate
 SLANG_INLINE ArtifactKeep getIntermediateKeep(ArtifactKeep keep) { return (keep == ArtifactKeep::All) ? ArtifactKeep::All : ArtifactKeep::No; }
 
-/* A useful interface for handling lists of castable interfaces. Cannot hold nullptr */
-class ICastableList : public ICastable
-{
-    SLANG_COM_INTERFACE(0x335f3d40, 0x934c, 0x40dc, { 0xb5, 0xe1, 0xf7, 0x6e, 0x40, 0x3, 0x62, 0x5 })
-            
-        /// Get the count of all interfaces held in the list
-    virtual Count SLANG_MCALL getCount() = 0;
-        /// Get the interface at the specified index
-    virtual ICastable* SLANG_MCALL getAt(Index i) = 0;
-        /// Add an item to the list
-    virtual void SLANG_MCALL add(ICastable* unk) = 0;
-        /// Add IUnknown, will cast to ICastable and if that's not possible will wrap
-    virtual void SLANG_MCALL addUnknown(ISlangUnknown* unk) = 0;
-        /// Remove item at index, remaining items stay in the same order
-    virtual void SLANG_MCALL removeAt(Index i) = 0;
-        /// Clear the list
-    virtual void SLANG_MCALL clear() = 0;
-        /// Find the first index of castable, or -1 if not found
-    virtual Index SLANG_MCALL indexOf(ICastable* castable) = 0;
-        /// Find the index interface (handling wrapping if necessary)
-    virtual Index SLANG_MCALL indexOfUnknown(ISlangUnknown* unk) = 0;
-        /// Find the first item that casts to non null
-    virtual void* SLANG_MCALL find(const Guid& guid) = 0;
-        /// Access the internal buffer (any mutation can invalidate this value)
-    virtual ICastable*const* SLANG_MCALL getBuffer() = 0;
-};
-
-// Simply finding things in a ICastableList
-template <typename T>
-SLANG_FORCE_INLINE T* find(ICastableList* list)
-{
-    return reinterpret_cast<T*>(list->find(T::getTypeGuid())); 
-}
-
 /* The IArtifact interface is designed to represent some Artifact of compilation. It could be input to or output from a compilation.
 
 An abstraction is desirable here, because depending on the compiler the artifact/s could be
@@ -339,6 +306,12 @@ public:
     virtual ICastableList* SLANG_MCALL getRepresentations() = 0;
 };
 
+template <typename T>
+SLANG_FORCE_INLINE T* findRepresentation(IArtifact* artifact)
+{
+    return reinterpret_cast<T*>(artifact->findRepresentation(T::getTypeGuid()));
+}
+
 /* A list of artifacts. */
 class IArtifactList : public ICastable
 {
@@ -380,11 +353,6 @@ class IArtifactRepresentation : public ICastable
     virtual SLANG_NO_THROW bool SLANG_MCALL exists() = 0;
 };
 
-template <typename T>
-SLANG_FORCE_INLINE T* findRepresentation(IArtifact* artifact)
-{
-    return reinterpret_cast<T*>(artifact->findRepresentation(T::getTypeGuid()));
-}
 
 } // namespace Slang
 
