@@ -744,7 +744,7 @@ INST(ExtractTaggedUnionPayload,         extractTaggedUnionPayload,  1, 0)
 
 INST(BitCast,                           bitCast,                    1, 0)
 INST(Reinterpret,                       reinterpret,                1, 0)
-
+INST(CastPtrToBool, CastPtrToBool, 1, 0)
 INST(JVPDifferentiate,                   jvpDifferentiate,            1, 0)
 
 // Converts other resources (such as ByteAddressBuffer) to the equivalent StructuredBuffer

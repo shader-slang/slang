@@ -8,83 +8,152 @@
 #include "../../slang-com-ptr.h"
 
 #include "../core/slang-com-object.h"
+#include "../core/slang-destroyable.h"
 
 namespace Slang
 {
 
+/* As a rule of thumb, if we can define some aspect in a hierarchy then we should do so at the highest level. 
+If some aspect can apply to multiple items identically we move that to a separate enum. 
+
+NOTE!
+New Kinds must be added at the end. Values can be depreciated, or disabled
+but never removed, without breaking binary compatability.
+
+Any change requires a change to SLANG_ARTIFACT_KIND
+*/
 enum class ArtifactKind : uint8_t
-{
-    None,                       ///< There is no container
+{ 
+    Invalid,                    ///< Invalid
+    Base,                       ///< Base kind of all valid kinds
 
-    Unknown,                    ///< There is a container of unknown type
+    None,                       ///< Doesn't contain anything
+    Unknown,                    ///< Unknown
 
-    Library,                    ///< Library of object code (typically made up multiple ObjectCode)
-    ObjectCode,                 ///< Object code (for CPU typically .o or .obj file types)
+    Container,                  ///< Container like types
+    Zip,                        ///< Zip container
+    Riff,                       ///< Riff format
 
-    Executable,                 ///< Self contained such it can exectuted. On GPU this would be a kernel.
-    SharedLibrary,              ///< Shared library/dll 
-    Callable,                   ///< Callable directly (can mean there isn't a binary artifact)
+    Text,                       ///< Representation is text. Encoding is utf8, unless prefixed with 'encoding'.
+    
+    Source,                     ///< Source (Source type is in payload)
+    Assembly,                   ///< Assembly (Type is in payload)
+    HumanText,                  ///< Text for human consumption
 
-    Text,                       ///< Text
+    BinaryLike,                 ///< Kinds which are 'binary like' - can be executed, linked with and so forth. 
+    
+    ObjectCode,                 ///< Object file
+    Library,                    ///< Library (collection of object code)
+    Executable,                 ///< Executable
+    SharedLibrary,              ///< Shared library - can be dynamically linked
+    HostCallable,               ///< Code can be executed directly on the host
 
-    Container,                  ///< A container holding other things
+    DebugInfo,                   ///< Debugging information
+    Diagnostics,                 ///< Diagnostics information
 
     CountOf,
 };
+   
+/// Get the parent kind
+ArtifactKind getParent(ArtifactKind kind);
+/// Returns true if kind is derived from base
+bool isDerivedFrom(ArtifactKind kind, ArtifactKind base);
+/// Get the name for the kind
+UnownedStringSlice getName(ArtifactKind kind);
 
+/* Payload. 
+
+SlangIR and LLVMIR can be GPU or CPU orientated, so put in own category.
+
+NOTE!
+New Payloads must be added at the end. Values can be depreciated, or disabled
+but never removed, without breaking binary compatability.
+
+Any change requires a change to SLANG_ARTIFACT_PAYLOAD
+*/
 enum class ArtifactPayload : uint8_t
 {
-    None,           ///< There is no payload
+    Invalid,        ///< Is invalid - indicates some kind of problem
+    Base,           ///< The base of the hierarchy
 
-    Unknown,        ///< Has payload but its unknown variety
+    None,           ///< Doesn't have a payload
+    Unknown,        ///< Unknown but probably valid
+    
+    Source,         ///< Source code
+    
+    C,              ///< C source
+    Cpp,            ///< C++ source
+    HLSL,           ///< HLSL source
+    GLSL,           ///< GLSL source
+    CUDA,           ///< CUDA source
+    Metal,          ///< Metal source
+    Slang,          ///< Slang source
 
-    DXIL,
-    DXBC,
-    SPIRV,
-    PTX,
+    KernelLike,     ///< GPU Kernel like
 
-    DXILAssembly,
-    DXBCAssembly,
-    SPIRVAssembly,
-    PTXAssembly,
+    DXIL,           ///< DXIL 
+    DXBC,           ///< DXBC
+    SPIRV,          ///< SPIR-V
+    PTX,            ///< PTX. NOTE! PTX is a text format, but is handable to CUDA API.
+    MetalAIR,       ///< Metal AIR 
+    CuBin,          ///< CUDA binary
 
-    HostCPU,        ///< The host CPU architecture
+    CPULike,        ///< CPU code
+    
+    UnknownCPU,     ///< CPU code for unknown/undetermined type
+    X86,            ///< X86
+    X86_64,         ///< X86_64
+    Aarch,          ///< 32 bit arm
+    Aarch64,        ///< Aarch64
+    HostCPU,        ///< HostCPU
+    UniversalCPU,   ///< CPU code for multiple CPU types 
+
+    GeneralIR,      ///< General purpose IR representation (IR)
 
     SlangIR,        ///< Slang IR
     LLVMIR,         ///< LLVM IR
 
+    AST,            ///< Abstract syntax tree (AST)
+
     SlangAST,       ///< Slang AST
 
-    X86,
-    X86_64,
-    AARCH,
-    AARCH64,
-
-    HLSL,           ///< HLSL
-    GLSL,           ///< GLSL
-    CPP,            ///< C++
-    C,              ///< C Language
-    CUDA,           ///< CUDA
-    Slang,          ///< Slang
-
-    DebugInfo,      ///< Debug information 
-
-    Diagnostics,    ///< Diagnostics
-
-    Zip,            ///< It's a zip 
-
     CountOf,
 };
 
+/// Get the parent payload
+ArtifactPayload getParent(ArtifactPayload payload);
+/// Returns true if payload is derived from base
+bool isDerivedFrom(ArtifactPayload payload, ArtifactPayload base);
+/// Get the name for the payload
+UnownedStringSlice getName(ArtifactPayload payload);
+
+/* Style.
+
+NOTE!
+New Styles must be added at the end. Values can be depreciated, or disabled
+but never removed, without breaking binary compatability.
+
+Any change requires a change to SLANG_ARTIFACT_STYLE
+*/
 enum class ArtifactStyle : uint8_t
 {
-    Unknown,                ///< Unknown
+    Invalid,            ///< Invalid style (indicating an error)
+    Base,
+        
+    Unknown,            ///< Unknown
 
-    Kernel,                 ///< Compiled as `GPU kernel` style.        
-    Host,                   ///< Compiled in `host` style
+    Kernel,             ///< Compiled as `GPU kernel` style.        
+    Host,               ///< Compiled in `host` style
 
     CountOf,
 };
+
+/// Get the parent style
+ArtifactStyle getParent(ArtifactStyle style);
+/// Returns true if style is derived from base
+bool isDerivedFrom(ArtifactStyle style, ArtifactStyle base);
+/// Get the name for the style
+UnownedStringSlice getName(ArtifactStyle style);
 
 typedef uint8_t ArtifactFlags;
 struct ArtifactFlag
@@ -94,7 +163,6 @@ struct ArtifactFlag
         // Don't currently have any flags
     };
 };
-
 
 /**
 A value type to describe aspects of the contents of an Artifact.
@@ -180,13 +248,13 @@ enum ArtifactPathType
     Existing,                   ///< Is an existing file
 };
 
-/* The IArtifactInstance interface represents a single instance of a type that can be part of an artifact. It's special in so far 
+/* The IArtifactRepresentation interface represents a single representation that can be part of an artifact. It's special in so far 
 as 
 
-* IArtifactInstance can be queried for it's underlying object class
+* IArtifactRepresentation can be queried for it's underlying object class
 * Can optionally serialize into a blob
 */
-class IArtifactInstance : public ISlangUnknown
+class IArtifactRepresentation : public ICastable
 {
     SLANG_COM_INTERFACE(0x311457a8, 0x1796, 0x4ebb, { 0x9a, 0xfc, 0x46, 0xa5, 0x44, 0xc7, 0x6e, 0xa9 })
 
@@ -194,13 +262,15 @@ class IArtifactInstance : public ISlangUnknown
         /// Returns SLANG_E_NOT_IMPLEMENTED if an implementation doesn't implement
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL writeToBlob(ISlangBlob** blob) = 0;
 
-        /// Queries for the backing object type. The type is represented by a guid. 
-        /// If the object doesn't derive from the type guid the function returns nullptr. 
-        /// Unlike the analagous queryInterface method the ref count remains unchanged. 
-        /// NOTE! 
-        /// Whilst this method *could) be used across an ABI boundary (whereas using something like dynamic_cast would not),
-        /// it is generally dangerous to do so.
-    virtual SLANG_NO_THROW void* SLANG_MCALL queryObject(const Guid& classGuid) = 0;
+        /// Returns true if this representation exists and is available for use.
+    virtual SLANG_NO_THROW bool SLANG_MCALL exists() = 0;
+};
+
+/* Interface for types that are associated with an artifact, but aren't a representation, or are 
+only part of a representation. */
+class IArtifactAssociated : public ICastable
+{
+    SLANG_COM_INTERFACE(0xafc0e4db, 0x16d4, 0x4d7a, { 0x93, 0x5f, 0x3e, 0x47, 0x7a, 0x23, 0x2a, 0x7f })
 };
 
 /* The IArtifact interface is designed to represent some Artifact of compilation. It could be input to or output from a compilation.
@@ -255,6 +325,11 @@ public:
         /// Get the Desc defining the contents of the artifact
     virtual SLANG_NO_THROW Desc SLANG_MCALL getDesc() = 0;
 
+        /// Get the artifact (if any) that this artifact belongs to
+    virtual SLANG_NO_THROW IArtifact* SLANG_MCALL getParent() = 0;
+        /// Set the parent that 'owns' this artifact. The parent is *not* reference counted (ie weak reference)
+    virtual SLANG_NO_THROW void SLANG_MCALL setParent(IArtifact* parent) = 0;
+
         /// Returns true if the artifact in principal exists
     virtual SLANG_NO_THROW bool SLANG_MCALL exists() = 0;
 
@@ -275,12 +350,6 @@ public:
         /// artifact name needs to be correct.
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL requireFileLike(Keep keep) = 0;
     
-        /// Finds an instance of that has the the interface guid
-    virtual SLANG_NO_THROW ISlangUnknown* SLANG_MCALL findElement(const Guid& guid) = 0;
-
-        /// Find an element that derives from IArtifactInstance, and which queryObject works with the classGuid
-    virtual SLANG_NO_THROW void* SLANG_MCALL findElementObject(const Guid& classGuid) = 0;
-
         /// Add items
     virtual SLANG_NO_THROW void SLANG_MCALL setPath(PathType pathType, const char* filePath) = 0;
 
@@ -295,19 +364,78 @@ public:
         /// Get the name of the artifact. This can be empty.
     virtual SLANG_NO_THROW const char* SLANG_MCALL getName() = 0;
 
-        /// Add an interface
-    virtual SLANG_NO_THROW void SLANG_MCALL addElement(const Desc& desc, ISlangUnknown* intf) = 0;
-    
+        /// Find an item by casting it's interface
+    virtual SLANG_NO_THROW void* SLANG_MCALL findItemInterface(const Guid& uuid) = 0;
+        /// Only works on ICastable derived items. Can find interfaces or objects.
+    virtual SLANG_NO_THROW void* SLANG_MCALL findItemObject(const Guid& classGuid) = 0;
+
+        /// Add a representation
+    virtual SLANG_NO_THROW void SLANG_MCALL addItem(ISlangUnknown* item) = 0;
         /// Get the item at the index
-    virtual SLANG_NO_THROW ISlangUnknown* SLANG_MCALL getElementAt(Index i) = 0;
-        /// Get the desc associated with an element
-    virtual SLANG_NO_THROW Desc SLANG_MCALL getElementDescAt(Index i) = 0;
-
+    virtual SLANG_NO_THROW ISlangUnknown* SLANG_MCALL getItemAt(Index i) = 0;
         /// Remove the element at the specified index. 
-    virtual SLANG_NO_THROW void SLANG_MCALL removeElementAt(Index i) = 0;
-
+    virtual SLANG_NO_THROW void SLANG_MCALL removeItemAt(Index i) = 0;
         /// Get the amount of elements
-    virtual SLANG_NO_THROW Index SLANG_MCALL getElementCount() = 0;
+    virtual SLANG_NO_THROW Index SLANG_MCALL getItemCount() = 0;
+};
+
+/* A list of artifacts. */
+class IArtifactList : public ICastable
+{
+    SLANG_COM_INTERFACE(0x5ef6ace5, 0xc928, 0x4c7b, { 0xbc, 0xba, 0x83, 0xa9, 0xd9, 0x66, 0x64, 0x27 })
+
+        /// Get the artifact this list belongs to. Can be nullptr.
+        /// Note this is a *weak* reference.
+    virtual SLANG_NO_THROW IArtifact* SLANG_MCALL getParent() = 0;
+        /// The parent is no longer accessible
+    virtual SLANG_NO_THROW void SLANG_MCALL setParent(IArtifact* artifact) = 0;
+
+        /// Get the artifact at the specified index
+    virtual SLANG_NO_THROW IArtifact* SLANG_MCALL getAt(Index index) = 0;
+        /// Get the count of all the artifacts
+    virtual SLANG_NO_THROW Count SLANG_MCALL getCount() = 0;
+        /// Add the artifact to the list
+    virtual SLANG_NO_THROW void SLANG_MCALL add(IArtifact* artifact) = 0;
+        /// Removes at index, keeps other artifacts in the same order
+    virtual SLANG_NO_THROW void SLANG_MCALL removeAt(Index index) = 0;
+        /// Clear the list
+    virtual SLANG_NO_THROW void SLANG_MCALL clear() = 0;
+};
+
+class ArtifactList : public ComObject, public IArtifactList
+{
+public:
+    SLANG_COM_OBJECT_IUNKNOWN_ALL
+
+    // ICastable
+    SLANG_NO_THROW void* SLANG_MCALL castAs(const Guid& guid) SLANG_OVERRIDE;
+
+    // IArtifactList
+    SLANG_NO_THROW IArtifact* SLANG_MCALL getParent() SLANG_OVERRIDE { return m_parent; }
+    SLANG_NO_THROW void SLANG_MCALL setParent(IArtifact* parent) SLANG_OVERRIDE { _setParent(parent); }
+
+    SLANG_NO_THROW IArtifact* SLANG_MCALL getAt(Index index) SLANG_OVERRIDE { return m_artifacts[index]; }
+    SLANG_NO_THROW Count SLANG_MCALL getCount() SLANG_OVERRIDE { return m_artifacts.getCount(); }
+    SLANG_NO_THROW void SLANG_MCALL add(IArtifact* artifact) SLANG_OVERRIDE;
+    SLANG_NO_THROW void SLANG_MCALL removeAt(Index index) SLANG_OVERRIDE;
+    SLANG_NO_THROW void SLANG_MCALL clear() SLANG_OVERRIDE;
+
+        // NOTE! The parent is a weak reference. 
+    ArtifactList(IArtifact* parent):
+        m_parent(parent)
+    {
+    }
+
+    virtual ~ArtifactList() { _setParent(nullptr); }
+
+protected:
+    void* getInterface(const Guid& guid);
+    void* getObject(const Guid& guid);
+
+    void _setParent(IArtifact* artifact);
+    
+    IArtifact* m_parent;
+    List<ComPtr<IArtifact>> m_artifacts;
 };
 
 /*
@@ -342,27 +470,29 @@ public:
     
         /// IArtifact impl
     virtual SLANG_NO_THROW Desc SLANG_MCALL getDesc() SLANG_OVERRIDE { return m_desc; }
+    virtual SLANG_NO_THROW IArtifact* SLANG_MCALL getParent() SLANG_OVERRIDE { return m_parent; }
+    virtual SLANG_NO_THROW void SLANG_MCALL setParent(IArtifact* parent) SLANG_OVERRIDE { m_parent = parent; }
     virtual SLANG_NO_THROW bool SLANG_MCALL exists() SLANG_OVERRIDE;
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL loadBlob(Keep keep, ISlangBlob** outBlob) SLANG_OVERRIDE;
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL requireFile(Keep keep) SLANG_OVERRIDE;
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL requireFileLike(Keep keep) SLANG_OVERRIDE;
-    virtual SLANG_NO_THROW ISlangUnknown* SLANG_MCALL findElement(const Guid& guid) SLANG_OVERRIDE;
-    virtual SLANG_NO_THROW void* SLANG_MCALL findElementObject(const Guid& classGuid) SLANG_OVERRIDE;
     virtual SLANG_NO_THROW void SLANG_MCALL setPath(PathType pathType, const char* path) SLANG_OVERRIDE { _setPath(pathType, path); }
     virtual SLANG_NO_THROW void SLANG_MCALL setBlob(ISlangBlob* blob) SLANG_OVERRIDE { m_blob = blob; }
     virtual SLANG_NO_THROW PathType SLANG_MCALL getPathType() SLANG_OVERRIDE { return m_pathType; }
     virtual SLANG_NO_THROW const char* SLANG_MCALL getPath() SLANG_OVERRIDE { return m_path.getBuffer(); }
     virtual SLANG_NO_THROW const char* SLANG_MCALL getName() SLANG_OVERRIDE { return m_name.getBuffer(); }
-    virtual SLANG_NO_THROW void SLANG_MCALL addElement(const Desc& desc, ISlangUnknown* intf) SLANG_OVERRIDE;
-    virtual SLANG_NO_THROW ISlangUnknown* SLANG_MCALL getElementAt(Index i) SLANG_OVERRIDE { return m_elements[i].value; }
-    virtual SLANG_NO_THROW Desc SLANG_MCALL getElementDescAt(Index i) SLANG_OVERRIDE { return m_elements[i].desc; }
-    virtual SLANG_NO_THROW void SLANG_MCALL removeElementAt(Index i) SLANG_OVERRIDE;
-    virtual SLANG_NO_THROW Index SLANG_MCALL getElementCount() SLANG_OVERRIDE { return m_elements.getCount(); }
+    virtual SLANG_NO_THROW void* SLANG_MCALL findItemInterface(const Guid& uuid) SLANG_OVERRIDE;
+    virtual SLANG_NO_THROW void* SLANG_MCALL findItemObject(const Guid& classGuid) SLANG_OVERRIDE;
+    virtual SLANG_NO_THROW void SLANG_MCALL addItem(ISlangUnknown* intf) SLANG_OVERRIDE;
+    virtual SLANG_NO_THROW ISlangUnknown* SLANG_MCALL getItemAt(Index i) SLANG_OVERRIDE { return m_items[i]; }
+    virtual SLANG_NO_THROW void SLANG_MCALL removeItemAt(Index i) SLANG_OVERRIDE;
+    virtual SLANG_NO_THROW Index SLANG_MCALL getItemCount() SLANG_OVERRIDE { return m_items.getCount(); }
 
     /// Ctor
     Artifact(const Desc& desc, const String& name) :
         m_desc(desc),
-        m_name(name)
+        m_name(name),
+        m_parent(nullptr)
     {}
     /// Dtor
     ~Artifact();
@@ -372,13 +502,9 @@ protected:
 
     void _setPath(PathType pathType, const String& path) { m_pathType = pathType; m_path = path; }
 
-    struct Element
-    {
-        ArtifactDesc desc;
-        ComPtr<ISlangUnknown> value;
-    };
-
     Desc m_desc;                                ///< Description of the artifact
+    IArtifact* m_parent;                        ///< Artifact this artifact belongs to
+
     String m_name;                              ///< Name of this artifact
 
     PathType m_pathType = PathType::None;       ///< What the path indicates
@@ -387,7 +513,7 @@ protected:
 
     ComPtr<ISlangBlob> m_blob;                  ///< Blob to store result in memory
 
-    List<Element> m_elements;                   ///< Associated elements
+    List<ComPtr<ISlangUnknown>> m_items;        ///< Associated items
 };
 
 } // namespace Slang

@@ -471,6 +471,7 @@ IF EXIST ..\..\..\external\slang-glslang\bin\windows-aarch64\release\slang-glsla
     <ClCompile Include="..\..\..\source\slang\slang-ast-print.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ast-reflect.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ast-substitutions.cpp" />
+    <ClCompile Include="..\..\..\source\slang\slang-ast-support-types.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ast-type.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ast-val.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-capability.cpp" />

@@ -704,6 +704,11 @@ LoweredValInfo emitCallToDeclRef(
         // so we will emit an instruction with the chosen
         // opcode, and the arguments to the call as its operands.
         //
+        if (intrinsicOpModifier->op == 0) // Identity, just pass operand 0 through.
+        {
+            SLANG_RELEASE_ASSERT(argCount == 1);
+            return LoweredValInfo::simple(args[0]);
+        }
         auto intrinsicOp = getIntrinsicOp(funcDecl, intrinsicOpModifier);
         return LoweredValInfo::simple(builder->emitIntrinsicInst(
             type,
@@ -4002,6 +4007,12 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
         UNREACHABLE_RETURN(LoweredValInfo());
     }
 
+    LoweredValInfo visitPointerTypeExpr(PointerTypeExpr* /*expr*/)
+    {
+        SLANG_UNIMPLEMENTED_X("'*' type expression during code generation");
+        UNREACHABLE_RETURN(LoweredValInfo());
+    }
+
     LoweredValInfo visitAssocTypeDecl(AssocTypeDecl* decl)
     {
         SLANG_UNIMPLEMENTED_X("associatedtype expression during code generation");
@@ -4104,6 +4115,11 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
 
         context->shared->extValues.add(info);
         return LoweredValInfo::extractedExistential(info);
+    }
+
+    LoweredValInfo visitOpenRefExpr(OpenRefExpr* expr)
+    {
+        return lowerLValueExpr(context, expr->innerExpr);
     }
 };
 
@@ -4264,6 +4280,14 @@ struct RValueExprLoweringVisitor : ExprLoweringVisitorBase<RValueExprLoweringVis
 
         return LoweredValInfo::simple(irSwizzle);
     }
+
+    LoweredValInfo visitOpenRefExpr(OpenRefExpr* expr)
+    {
+        auto inner = lowerLValueExpr(context, expr->innerExpr);
+        auto builder = getBuilder();
+        auto irLoad = builder->emitLoad(inner.val);
+        return LoweredValInfo::simple(irLoad);
+    }
 };
 
 LoweredValInfo lowerLValueExpr(
@@ -4274,7 +4298,12 @@ LoweredValInfo lowerLValueExpr(
 
     LValueExprLoweringVisitor visitor;
     visitor.context = context;
-    return visitor.dispatch(expr);
+    auto info = visitor.dispatch(expr);
+    if (as<RefType>(expr->type))
+    {
+        info.flavor = LoweredValInfo::Flavor::Ptr;
+    }
+    return info;
 }
 
 LoweredValInfo lowerRValueExpr(
@@ -4285,7 +4314,12 @@ LoweredValInfo lowerRValueExpr(
 
     RValueExprLoweringVisitor visitor;
     visitor.context = context;
-    return visitor.dispatch(expr);
+    auto info = visitor.dispatch(expr);
+    if (as<RefType>(expr->type))
+    {
+        info.val = context->irBuilder->emitLoad(info.val);
+    }
+    return info;
 }
 
 struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
