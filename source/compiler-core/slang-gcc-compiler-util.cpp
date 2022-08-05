@@ -564,7 +564,6 @@ static SlangResult _parseGCCFamilyLine(const UnownedStringSlice& line, LineParse
         }
         case SLANG_HOST_EXECUTABLE:
         {
-            cmdLine.addArg("-rpath \\$ORIGIN");
             break;
         }
         case SLANG_OBJECT_CODE:
@@ -624,6 +623,12 @@ static SlangResult _parseGCCFamilyLine(const UnownedStringSlice& line, LineParse
     }
 
     // Add the library paths
+
+    if (options.targetType == SLANG_HOST_EXECUTABLE)
+    {
+        cmdLine.addArg("-rpath,'$$ORIGIN'");
+    }
+
     StringSlicePool libPathPool(StringSlicePool::Style::Default);
 
     for (const auto& libPath : options.libraryPaths)
