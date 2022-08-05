@@ -2,7 +2,7 @@
 #include "renderer-shared.h"
 #include "../../source/core/slang-math.h"
 #include "open-gl/render-gl.h"
-#include "debug-layer.h"
+#include "debug-layer/debug-device.h"
 
 #include <cstring>
 
@@ -309,7 +309,7 @@ extern "C"
             returnComPtr(outDevice, innerDevice);
             return resultCode;
         }
-        RefPtr<DebugDevice> debugDevice = new DebugDevice();
+        RefPtr<debug::DebugDevice> debugDevice = new debug::DebugDevice();
         debugDevice->baseObject = innerDevice;
         returnComPtr(outDevice, debugDevice);
         return resultCode;
