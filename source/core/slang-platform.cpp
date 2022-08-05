@@ -43,7 +43,7 @@ namespace Slang
 
         Path::combineIntoBuilder(parent.getUnownedSlice(), platformFileNameBuilder.getUnownedSlice(), outPath);
     }
-    else
+    else if (filename.getLength() > 0)
     {     
         appendPlatformFileName(filename.getUnownedSlice(), outPath);
     }
@@ -170,10 +170,11 @@ SLANG_COMPILE_TIME_ASSERT(E_OUTOFMEMORY == SLANG_E_OUT_OF_MEMORY);
 /* static */SlangResult SharedLibrary::loadWithPlatformPath(char const* platformFileName, Handle& handleOut)
 {
     handleOut = nullptr;
-
-	void* h = dlopen(platformFileName, RTLD_NOW | RTLD_GLOBAL);
-	if(!h)
-	{
+    if (strlen(platformFileName) == 0)
+        platformFileName = nullptr;
+    void *h = dlopen(platformFileName, RTLD_NOW | RTLD_GLOBAL);
+    if (!h)
+    {
 #if 0
         // We can't output the error message here, because it will cause output when testing what code gen is available
 		if(auto msg = dlerror())
@@ -195,7 +196,6 @@ SLANG_COMPILE_TIME_ASSERT(E_OUTOFMEMORY == SLANG_E_OUT_OF_MEMORY);
 
 /* static */void* SharedLibrary::findSymbolAddressByName(Handle handle, char const* name)
 {
-    SLANG_ASSERT(handle);
 	return dlsym((void*)handle, name);
 }
 

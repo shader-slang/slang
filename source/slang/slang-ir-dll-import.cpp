@@ -127,7 +127,7 @@ struct DllImportContext
 
         if (dllImportDecoration->getLibraryName() == "")
         {
-            modulePtr = builder.getIntValue(builder.getIntType(), 0);
+            modulePtr = builder.getPtrValue(nullptr);
         }
         else
         {
