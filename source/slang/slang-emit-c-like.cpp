@@ -1291,20 +1291,39 @@ bool CLikeSourceEmitter::shouldFoldInstIntoUseSites(IRInst* inst)
 
 void CLikeSourceEmitter::emitDereferenceOperand(IRInst* inst, EmitOpInfo const& outerPrec)
 {
+    EmitOpInfo newOuterPrec = outerPrec;
+
     if (doesTargetSupportPtrTypes())
     {
-        // If `inst` is a variable, dereferencing it is equivalent to just
-        // emit its name. i.e. *&var ==> var.
-        // We apply this peep hole optimization here to reduce the clutter of
-        // resulting code.
-        if (inst->getOp() == kIROp_Var)
+        switch (inst->getOp())
         {
+        case kIROp_Var:
+            // If `inst` is a variable, dereferencing it is equivalent to just
+            // emit its name. i.e. *&var ==> var.
+            // We apply this peep hole optimization here to reduce the clutter of
+            // resulting code.
             m_writer->emit(getName(inst));
             return;
+        case kIROp_FieldAddress:
+        {
+            auto innerPrec = getInfo(EmitOp::Postfix);
+            bool innerNeedClose = maybeEmitParens(newOuterPrec, innerPrec);
+            auto ii = as<IRFieldAddress>(inst);
+            auto base = ii->getBase();
+            if (isPtrToClassType(base->getDataType()))
+                emitDereferenceOperand(base, leftSide(newOuterPrec, innerPrec));
+            else
+                emitOperand(base, leftSide(newOuterPrec, innerPrec));
+            m_writer->emit("->");
+            m_writer->emit(getName(ii->getField()));
+            maybeCloseParens(innerNeedClose);
+            return;
+        }
+        default:
+            break;
         }
 
         auto dereferencePrec = EmitOpInfo::get(EmitOp::Prefix);
-        EmitOpInfo newOuterPrec = outerPrec;
         bool needClose = maybeEmitParens(newOuterPrec, dereferencePrec);
         m_writer->emit("*");
         emitOperand(inst, rightSide(newOuterPrec, dereferencePrec));

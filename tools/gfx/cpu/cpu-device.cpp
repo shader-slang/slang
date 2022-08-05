@@ -1,6 +1,8 @@
 // cpu-device.cpp
 #include "cpu-device.h"
 
+#include <chrono>
+
 #include "cpu-buffer.h"
 #include "cpu-pipeline-state.h"
 #include "cpu-query.h"
@@ -290,4 +292,13 @@ namespace cpu
     }
 
 } // namespace cpu
+
+Result SLANG_MCALL createCPUDevice(const IDevice::Desc* desc, IDevice** outDevice)
+{
+    RefPtr<cpu::DeviceImpl> result = new cpu::DeviceImpl();
+    SLANG_RETURN_ON_FAIL(result->initialize(*desc));
+    returnComPtr(outDevice, result);
+    return SLANG_OK;
+}
+
 } // namespace gfx

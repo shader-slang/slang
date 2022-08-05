@@ -1242,7 +1242,9 @@ namespace Slang
             m_astBuilder,
             this,
             getName("$init"),
-            type);
+            type,
+            LookupMask::Default,
+            LookupOptions::NoDeref);
 
         AddOverloadCandidates(initializers, context);
     }

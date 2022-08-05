@@ -21,6 +21,10 @@ namespace Slang
         TypeExp         typeExp,
         DiagnosticSink* sink);
 
+        /// Get the element type if `type` is Ptr or PtrLike type, otherwise returns null.
+        /// Note: this currently does not include PtrTypeBase.
+    Type* getPointedToTypeIfCanImplicitDeref(Type* type);
+
     // A flat representation of basic types (scalars, vectors and matrices)
     // that can be used as lookup key in caches
     enum class BasicTypeKey : uint16_t
