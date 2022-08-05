@@ -24,7 +24,6 @@ kludge is only needed for types that really do require adaption. For Blob we'll 
 
 void LazyCastableList::removeAt(Index index)
 {
-    SLANG_ASSERT(castable);
     SLANG_ASSERT(index >= 0 && index < getCount());
 
     if (auto list = as<ICastableList>(m_castable))
