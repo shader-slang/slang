@@ -43,7 +43,7 @@ SLANG_FORCE_INLINE T* find(ICastableList* list)
     return reinterpret_cast<T*>(list->find(T::getTypeGuid())); 
 }
 
-/* Adapter interface to make a non castable type work as ICastable */
+/* Adapter interface to make a non castable types work as ICastable */
 class IUnknownCastableAdapter : public ICastable
 {
     SLANG_COM_INTERFACE(0x8b4aad81, 0x4934, 0x4a67, { 0xb2, 0xe2, 0xe9, 0x17, 0xfc, 0x29, 0x12, 0x54 });

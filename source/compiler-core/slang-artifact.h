@@ -220,8 +220,6 @@ SLANG_INLINE bool canKeep(ArtifactKeep keep) { return Index(keep) >= Index(Artif
 /// Returns the keep type for an intermediate
 SLANG_INLINE ArtifactKeep getIntermediateKeep(ArtifactKeep keep) { return (keep == ArtifactKeep::All) ? ArtifactKeep::All : ArtifactKeep::No; }
 
-
-
 /* The IArtifact interface is designed to represent some Artifact of compilation. It could be input to or output from a compilation.
 
 An abstraction is desirable here, because depending on the compiler the artifact/s could be
@@ -247,13 +245,13 @@ files could be a Container containing artifacts for
 * Files that contain known types
 * Callable interface (an ISlangSharedLibrary)
 
-There are several types of ways to associate data with an artifact it can be
+There are several types of ways to associate data with an artifact:
 
 * A representation
 * Associated data
 * A child artifact
 
-A `representation` has to wholey represent the artifact. That representation could be a blob, a file on the file system,
+A `representation` has to wholly represent the artifact. That representation could be a blob, a file on the file system,
 an in memory representation. There are two classes of `Representation` - ones that can be turned into blobs (and therefore 
 derive from IArtifactRepresentation) and ones that are in of themselves a representation (such as a blob or or ISlangSharedLibrary).
 

@@ -53,15 +53,6 @@ protected:
 /*
 Discussion:
 
-It could make sense to remove the explicit variables of a ISlangBlob, and the file backing from this interface, as they could 
-all be implemented as element types presumably deriving from IArtifactInstance. Doing so would mean how a 'file' is turned into
-a blob is abstracted. 
-
-It may be helpful to be able to add temporary files to the artifact (such that they will be deleted when the artifact goes out of 
-scope). Using an implementation of the File backed IArtifactInstance, with a suitable desc would sort of work, but it breaks the idea 
-that any IArtifactInstance *represents* the contents of Artifact that contains it. Of course there could be types *not* deriving 
-from IArtifactInstance that handle temporary file existance. This is probably the simplest answer to the problem.
-
 Another issue occurs around wanting to hold multiple kernels within a container. The problem here is that although through the desc
 we can identify what target a kernel is for, there is no way of telling what stage it is for.
 

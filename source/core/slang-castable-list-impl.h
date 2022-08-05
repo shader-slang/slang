@@ -16,7 +16,7 @@ namespace Slang
 
 With the following caveats.
 * the interfaces/objects of the adapter are checked *first*, so IUnknown will always be for the adapter
-* assumes when doing a queryInterface on the contained item 
+* assumes when doing a queryInterface on the contained item, it will remain in scope when released (this is *not* strict COM)
 */
 class UnknownCastableAdapter : public ComBaseObject, public IUnknownCastableAdapter
 {
@@ -46,6 +46,8 @@ protected:
     Guid m_foundGuid;
 };
 
+/* Implementation of the ICastableList interface. 
+Is atomic reference counted*/
 class CastableList : public ComBaseObject, public ICastableList
 {
 public:
@@ -64,8 +66,9 @@ public:
     virtual Index SLANG_MCALL indexOf(ICastable* castable) SLANG_OVERRIDE;
     virtual Index SLANG_MCALL indexOfUnknown(ISlangUnknown* unk) SLANG_OVERRIDE;
     virtual void* SLANG_MCALL find(const Guid& guid) SLANG_OVERRIDE;
-    virtual ICastable* const* SLANG_MCALL getBuffer() SLANG_OVERRIDE { return m_list.getBuffer(); }
+    virtual ICastable*const* SLANG_MCALL getBuffer() SLANG_OVERRIDE { return m_list.getBuffer(); }
 
+        /// Dtor
     virtual ~CastableList();
 
 protected:

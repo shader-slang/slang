@@ -58,6 +58,7 @@ Count LazyCastableList::getCount() const
 
 void LazyCastableList::add(ICastable* castable)
 {
+    SLANG_ASSERT(as<ICastableList>(castable) == nullptr);
     SLANG_ASSERT(castable);
     SLANG_ASSERT(castable != m_castable);
 
