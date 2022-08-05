@@ -3,11 +3,16 @@
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
 
+typedef __DifferentialPair<float> dpfloat;
+typedef float.Differential dfloat;
+
 import test_intrinsics;
 
-float my_pow_jvp(float x, float n, float dx, float dn)
+dpfloat my_pow_jvp(dpfloat x, dpfloat n)
 {
-    return dx * n * pow(x, n-1) + dn * pow(x, n) * log(x);
+    return dpfloat(
+        pow(x.p(), n.p()),
+        x.d() * n.p() * pow(x.p(), n.p()-1) + n.d() * pow(x.p(), n.p()) * log(x.p()));
 }
 
 [__custom_jvp(my_pow_jvp)]
@@ -17,12 +22,12 @@ float _pow(float, float);
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
      {
-        float a = 5.0;
-        float n = 2;
-        float da = 1.0;
-        float dn = 0;
+        dpfloat dpa = dpfloat(5.0, 1.0);
+        dpfloat dpn = dpfloat(2, 0.0);
 
-        outputBuffer[0] = __jvp(_pow)(a, n, da, dn);        // Expect: 10.0
-        outputBuffer[1] = __jvp(_pow)(a, n, 0.0, 1.0);      // Expect: 40.23595
+        outputBuffer[0] = __jvp(_pow)(dpa, dpn).d();        // Expect: 10.0
+        outputBuffer[1] = __jvp(_pow)(
+            dpfloat(dpa.p(), 0.0),
+            dpfloat(dpn.p(), 1.0)).d();                     // Expect: 40.23595
     }
 }

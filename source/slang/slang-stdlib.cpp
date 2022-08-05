@@ -257,4 +257,21 @@ namespace Slang
 #endif
         return hlslLibraryCode;
     }
+
+    String Session::getAutodiffLibraryCode()
+    {
+#if !defined(SLANG_DISABLE_STDLIB_SOURCE)
+        if (autodiffLibraryCode.getLength() > 0)
+            return autodiffLibraryCode;
+
+        const String path = getStdlibPath();
+
+        StringBuilder sb;
+
+        #include "diff.meta.slang.h"
+
+        autodiffLibraryCode = sb.ProduceString();
+#endif
+        return autodiffLibraryCode;
+    }
 }

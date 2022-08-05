@@ -673,6 +673,15 @@ namespace Slang
         void _validateCircularVarDefinition(VarDeclBase* varDecl);
 
         bool shouldSkipChecking(Decl* decl, DeclCheckState state);
+
+        // Auto-diff convenience functions for translating primal types to differential types.
+        Type* _toDifferentialParamType(ASTBuilder* builder, Type* primalType);
+
+        // Translate a return type to the return type of a forward-mode differentiated
+        // function.
+        //
+        Type* _toJVPReturnType(ASTBuilder* builder, Type* primalType);
+        
     public:
 
         bool ValuesAreEqual(

@@ -58,6 +58,8 @@ INST(Nop, nop, 0, 0)
     INST(AttributedType, Attributed, 0, 0)
     INST(ResultType, Result, 2, 0)
 
+    INST(DifferentialPairType, DiffPair, 1, 0)
+
     /* BindExistentialsTypeBase */
 
         // A `BindExistentials<B, T0,w0, T1,w1, ...>` represents
@@ -264,6 +266,10 @@ INST(undefined, undefined, 0, 0)
 // where default construction is a meaningful thing to do.
 //
 INST(DefaultConstruct, defaultConstruct, 0, 0)
+
+INST(MakeDifferentialPair, MakeDiffPair, 2, 0)
+INST(DifferentialPairGetDifferential, GetDifferential, 1, 0)
+INST(DifferentialPairGetPrimal, GetPrimal, 1, 0)
 
 INST(Specialize, specialize, 2, 0)
 INST(lookup_interface_method, lookup_interface_method, 2, 0)
