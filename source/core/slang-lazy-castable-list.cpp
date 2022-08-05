@@ -9,7 +9,6 @@ namespace Slang {
 
 void LazyCastableList::removeAt(Index index)
 {
-    SLANG_ASSERT(castable);
     SLANG_ASSERT(index >= 0 && index < getCount());
 
     if (auto list = as<ICastableList>(m_castable))
