@@ -607,19 +607,22 @@ static void _lookUpMembersInSuperTypeImpl(
 {
     // If the type was pointer-like, then dereference it
     // automatically here.
-    if (auto pointerLikeType = as<PointerLikeType>(superType))
+    if (((uint32_t)request.options & (uint32_t)LookupOptions::NoDeref) == 0)
     {
-        // Need to leave a breadcrumb to indicate that we
-        // did an implicit dereference here
-        BreadcrumbInfo derefBreacrumb;
-        derefBreacrumb.kind = LookupResultItem::Breadcrumb::Kind::Deref;
-        derefBreacrumb.prev = inBreadcrumbs;
+        if (auto pointerElementType = getPointedToTypeIfCanImplicitDeref(superType))
+        {
+            // Need to leave a breadcrumb to indicate that we
+            // did an implicit dereference here
+            BreadcrumbInfo derefBreacrumb;
+            derefBreacrumb.kind = LookupResultItem::Breadcrumb::Kind::Deref;
+            derefBreacrumb.prev = inBreadcrumbs;
 
-        // Recursively perform lookup on the result of deref
-        _lookUpMembersInType(
-            astBuilder, 
-            name, pointerLikeType->elementType, request, ioResult, &derefBreacrumb);
-        return;
+            // Recursively perform lookup on the result of deref
+            _lookUpMembersInType(
+                astBuilder,
+                name, pointerElementType, request, ioResult, &derefBreacrumb);
+            return;
+        }
     }
 
     // Default case: no dereference needed

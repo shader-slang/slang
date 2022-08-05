@@ -2,8 +2,6 @@
 // Shared header file for CPU implementation
 #pragma once
 
-#include <chrono>
-
 #include "slang.h"
 #include "slang-com-ptr.h"
 #include "slang-com-helper.h"
