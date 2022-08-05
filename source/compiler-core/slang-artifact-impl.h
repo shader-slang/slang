@@ -12,6 +12,40 @@
 namespace Slang
 {
 
+/* An adapter such that types which aren't derived from ICastable, can be used as such. 
+
+With the following caveats.
+* the interfaces/objects of the adapter are checked *first*, so IUnknown will always be for the adapter
+* assumes when doing a queryInterface on the contained item 
+*/
+class UnknownCastableAdapter : public ComBaseObject, public IUnknownCastableAdapter
+{
+public:
+    SLANG_COM_BASE_IUNKNOWN_ALL
+
+    // ICastable
+    SLANG_NO_THROW void* SLANG_MCALL castAs(const Guid& guid) SLANG_OVERRIDE;
+
+    // IUnknownCastableAdapter
+    virtual SLANG_NO_THROW ISlangUnknown* SLANG_MCALL getContainer() SLANG_OVERRIDE { return m_contained; }
+
+    UnknownCastableAdapter(ISlangUnknown* unk):
+        m_contained(unk)
+    {
+        SLANG_ASSERT(unk);
+    }
+
+protected:
+    void* getInterface(const Guid& guid);
+    void* getObject(const Guid& guid);
+
+    ComPtr<ISlangUnknown> m_contained;
+
+    // We hold a cache for a single lookup to make things a little faster
+    void* m_found = nullptr;
+    Guid m_foundGuid;
+};
+
 class CastableList : public ComBaseObject, public ICastableList
 {
 public:
@@ -28,12 +62,31 @@ public:
     virtual void SLANG_MCALL clear() SLANG_OVERRIDE { m_list.clear(); }
     virtual Index SLANG_MCALL indexOf(ICastable* castable) SLANG_OVERRIDE;
     virtual void* SLANG_MCALL find(const Guid& guid) SLANG_OVERRIDE;
+    virtual ICastable* const* SLANG_MCALL getBuffer() SLANG_OVERRIDE { return (ICastable**)m_list.getBuffer(); }
 
 protected:
     void* getInterface(const Guid& guid);
     void* getObject(const Guid& guid);
 
     List<ComPtr<ICastable>> m_list;
+};
+
+class LazyCastableList
+{
+public:
+    void add(ICastable* castable);
+    Count getCount() const;
+    void removeAt(Index index);
+    void clear();
+    void clearAndDeallocate();
+    void* find(const Guid& guid);
+    ConstArrayView<ICastable*> getView() const;
+
+    ICastableList* requireList();
+    ICastableList* getList();
+
+protected:
+    ComPtr<ICastable> m_castable;
 };
 
 class ArtifactList : public ComBaseObject, public IArtifactList
@@ -135,7 +188,8 @@ protected:
 
     String m_name;                              ///< Name of this artifact
 
-    ComPtr<ICastable> m_associated;             ///< Any associated items
+    LazyCastableList m_associated;
+
     ComPtr<IArtifactList> m_children;           ///< The children to this artifact
     List<ComPtr<ISlangUnknown>> m_items;        ///< Associated items
 };

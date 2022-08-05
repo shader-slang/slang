@@ -7,6 +7,211 @@
 
 namespace Slang {
 
+/*
+If we use LazyCastableList for Items, it means we'll have to use the
+UnknownCastableAdapter for ISharedLibrary, IBlob etc. 
+
+That means when we look for an item in the list, we will always do a query interface on those types, 
+although it will always fail (so no atomic ref count). 
+
+That doesn't seem wholey unreasonable. 
+
+Note that we *can* derive from ICastable for *our* implementations of ISlangBlob, ISharedLibrary. So the 
+kludge is only needed for types that really do require adaption. For Blob we'll require multiple interface inheritance.
+*/
+
+/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! LazyCastableList !!!!!!!!!!!!!!!!!!!!!!!!!!! */
+
+void LazyCastableList::removeAt(Index index)
+{
+    SLANG_ASSERT(castable);
+    SLANG_ASSERT(index >= 0 && index < getCount());
+
+    if (auto list = as<ICastableList>(m_castable))
+    {
+        list->removeAt(index);
+    }
+    else
+    {
+        SLANG_ASSERT(index == 0);
+        m_castable.setNull();
+    }
+}
+
+void LazyCastableList::clear()
+{
+    if (m_castable)
+    {
+        if (auto list = as<ICastableList>(m_castable))
+        {
+            list->clear();
+        }
+        else
+        {
+            m_castable.setNull();
+        }
+    }
+}
+
+void LazyCastableList::clearAndDeallocate()
+{
+    m_castable.setNull();
+}
+
+Count LazyCastableList::getCount() const
+{
+    if (m_castable)
+    {
+        if (auto list = as<ICastableList>(m_castable))
+        {
+            return list->getCount();
+        }
+        return 1;
+    }
+    return 0;
+}
+
+void LazyCastableList::add(ICastable* castable)
+{
+    SLANG_ASSERT(castable);
+    SLANG_ASSERT(castable != m_castable);
+
+    if (m_castable)
+    {
+        if (auto list = as<ICastableList>(m_castable))
+        {
+            // Shouldn't be in the list
+            SLANG_ASSERT(list->indexOf(castable) < 0);
+            list->add(castable);
+        }
+        else
+        {
+            list = new CastableList;
+            list->add(m_castable);
+            m_castable = list;
+            list->add(castable);
+        }
+    }
+    else
+    {
+        m_castable = castable;
+    }
+}
+
+ICastableList* LazyCastableList::requireList()
+{
+    if (m_castable)
+    {
+        if (auto list = as<ICastableList>(m_castable))
+        {
+            return list;
+        }
+        else
+        {
+            // Promote to a list with the element in it
+            list = new CastableList;
+            list->add(m_castable);
+            m_castable = list;
+            return list;
+        }
+    }
+    else
+    {
+        // Create an empty list
+        ICastableList* list = new CastableList;
+        m_castable = list;
+        return list;
+    }
+}
+
+ICastableList* LazyCastableList::getList()
+{
+    return (m_castable == nullptr) ? nullptr : requireList();
+}
+
+void* LazyCastableList::find(const Guid& guid)
+{
+    if (!m_castable)
+    {
+        return nullptr;
+    }
+    if (auto list = as<ICastableList>(m_castable))
+    {
+        return list->find(guid);
+    }
+    else
+    {
+        return m_castable->castAs(guid);
+    }
+}
+
+ConstArrayView<ICastable*> LazyCastableList::getView() const
+{
+    if (!m_castable)
+    {
+        // Empty
+        return ConstArrayView<ICastable*>();
+    }
+
+    if (auto list = as<ICastableList>(m_castable))
+    {
+        const auto count = list->getCount();
+        const auto buffer = list->getBuffer();
+
+        return ConstArrayView<ICastable*>(buffer, count);
+    }
+    else
+    {
+        return ConstArrayView<ICastable*>((ICastable*const*)&m_castable, 1);
+    }
+}
+
+/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! UnknownCastableAdapter !!!!!!!!!!!!!!!!!!!!!!!!!!! */
+
+void* UnknownCastableAdapter::castAs(const Guid& guid)
+{
+    if (auto intf = getInterface(guid))
+    {
+        return intf;
+    }
+    if (auto obj = getObject(guid))
+    {
+        return obj;
+    }
+
+    if (m_found && guid == m_foundGuid)
+    {
+        return m_found;
+    }
+
+    ComPtr<ISlangUnknown> cast;
+    if (SLANG_SUCCEEDED(m_contained->queryInterface(guid, (void**)cast.writeRef())) && cast)
+    {
+        // Save the interface in the cache
+        m_found = cast;
+        m_foundGuid = guid;
+
+        return cast;
+    }
+    return nullptr;
+}
+
+void* UnknownCastableAdapter::getInterface(const Guid& guid)
+{
+    if (guid == ISlangUnknown::getTypeGuid() ||
+        guid == ICastable::getTypeGuid())
+    {
+        return static_cast<ICastable*>(this);
+    }
+    return nullptr;
+}
+
+void* UnknownCastableAdapter::getObject(const Guid& guid)
+{
+    SLANG_UNUSED(guid);
+    return nullptr;
+}
+
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! CastableList !!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
 void* CastableList::castAs(const Guid& guid)
@@ -273,70 +478,17 @@ SlangResult Artifact::loadBlob(Keep keep, ISlangBlob** outBlob)
 void Artifact::addAssociated(ICastable* castable)
 {
     SLANG_ASSERT(castable);
-    SLANG_ASSERT(castable != m_associated);
-
-    if (m_associated)
-    {
-        if (auto list = as<ICastableList>(m_associated))
-        {
-            // Shouldn't be in the list
-            SLANG_ASSERT(list->indexOf(castable) < 0);
-            list->add(castable);
-        }
-        else
-        {
-            list = new CastableList;
-            list->add(m_associated);
-            m_associated = list;
-            list->add(castable);
-        }
-    }
-    else
-    {
-        m_associated = castable;
-    }
+    m_associated.add(castable);
 }
-
+ 
 void* Artifact::findAssociated(const Guid& guid)
 {
-    if (!m_associated)
-    {
-        return nullptr;
-    }
-    if (auto list = as<ICastableList>(m_associated))
-    {
-        return list->find(guid);
-    }
-    else
-    {
-        return m_associated->castAs(guid);
-    }
+    return m_associated.find(guid);
 }
 
 ICastableList* Artifact::getAssociated()
 {
-    if (m_associated)
-    {
-        if (auto list = as<ICastableList>(m_associated))
-        {
-            return list;
-        }
-        else
-        {
-            // Promote to a list with the element in it
-            list = new CastableList;
-            list->add(m_associated);
-            m_associated = list;
-            return list;
-        }
-    }
-    else
-    {
-        // Create an empty list
-        ICastableList* list = new CastableList;
-        m_associated = list;
-        return list;
-    }
+    return m_associated.requireList();
 }
 
 } // namespace Slang

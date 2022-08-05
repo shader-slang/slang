@@ -236,6 +236,8 @@ class ICastableList : public ICastable
     virtual Index SLANG_MCALL indexOf(ICastable* castable) = 0;
         /// Find the first item that casts to non null
     virtual void* SLANG_MCALL find(const Guid& guid) = 0;
+        /// Access the internal buffer (any mutation can invalidate this value)
+    virtual ICastable*const* SLANG_MCALL getBuffer() = 0;
 };
 
 // Simply finding things in a ICastableList
