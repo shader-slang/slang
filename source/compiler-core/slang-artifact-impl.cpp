@@ -176,15 +176,15 @@ ICastableList* Artifact::getAssociated()
     return m_associated.requireList();
 }
 
-void Artifact::addRepresentation(IArtifactRepresentation* rep)
+void Artifact::addRepresentation(ICastable* castable)
 {
-    SLANG_ASSERT(rep);
-    if (m_representations.indexOf(rep) >= 0)
+    SLANG_ASSERT(castable);
+    if (m_representations.indexOf(castable) >= 0)
     {
         SLANG_ASSERT_FAILURE("Already have this representation");
         return;
     }
-    m_representations.add(rep);
+    m_representations.add(castable);
 }
 
 void Artifact::addRepresentationUnknown(ISlangUnknown* unk)
@@ -222,5 +222,20 @@ ICastableList* Artifact::getRepresentations()
 {
     return m_representations.requireList();
 }
+
+IArtifactList* Artifact::getChildren()
+{
+    // If it has already evaluated, return it.
+    if (m_children)
+    {
+        return m_children;
+    }
+
+    auto util = ArtifactUtilImpl::getSingleton();
+    util->getChildrenDefaultImpl(this, m_children.writeRef());
+
+    return m_children;
+}
+
 
 } // namespace Slang

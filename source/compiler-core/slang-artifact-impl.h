@@ -93,10 +93,12 @@ public:
     virtual void* SLANG_MCALL SLANG_MCALL findAssociated(const Guid& unk) SLANG_OVERRIDE;
     virtual ICastableList* SLANG_MCALL getAssociated() SLANG_OVERRIDE;
 
-    virtual SLANG_NO_THROW void SLANG_MCALL addRepresentation(IArtifactRepresentation* rep) SLANG_OVERRIDE;
+    virtual SLANG_NO_THROW void SLANG_MCALL addRepresentation(ICastable* castable) SLANG_OVERRIDE;
     virtual SLANG_NO_THROW void SLANG_MCALL addRepresentationUnknown(ISlangUnknown* rep) SLANG_OVERRIDE;
     virtual void* SLANG_MCALL SLANG_MCALL findRepresentation(const Guid& guid) SLANG_OVERRIDE;
     virtual ICastableList* SLANG_MCALL getRepresentations() SLANG_OVERRIDE;
+
+    virtual IArtifactList* SLANG_MCALL getChildren() SLANG_OVERRIDE;
 
     /// Ctor
     Artifact(const Desc& desc, const String& name) :

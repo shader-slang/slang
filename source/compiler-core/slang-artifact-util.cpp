@@ -153,4 +153,19 @@ ArtifactDesc ArtifactUtilImpl::makeDescFromCompileTarget(SlangCompileTarget targ
 	return ArtifactDescUtil::makeDescFromCompileTarget(target);
 }
 
+SlangResult ArtifactUtilImpl::getChildrenDefaultImpl(IArtifact* artifact, IArtifactList** outList)
+{
+	auto desc = artifact->getDesc();
+
+	// If it's a container type for now, just create empty list of children
+	if (isDerivedFrom(desc.kind, ArtifactKind::Container))
+	{
+		*outList = ComPtr<IArtifactList>(new ArtifactList(artifact)).detach();
+		return SLANG_OK;
+	}
+
+	return SLANG_E_NOT_AVAILABLE;
+}
+
+
 } // namespace Slang

@@ -203,6 +203,7 @@ inline /* static */ArtifactDesc ArtifactDesc::make(Packed inPacked)
 // Forward declare
 class IFileArtifactRepresentation;
 class IArtifactRepresentation;
+class IArtifactList;
 
 // Controls what items can be kept. 
 enum class ArtifactKeep
@@ -218,6 +219,8 @@ SLANG_INLINE  bool canKeepIntermediate(ArtifactKeep keep) { return keep == Artif
 SLANG_INLINE bool canKeep(ArtifactKeep keep) { return Index(keep) >= Index(ArtifactKeep::Yes); }
 /// Returns the keep type for an intermediate
 SLANG_INLINE ArtifactKeep getIntermediateKeep(ArtifactKeep keep) { return (keep == ArtifactKeep::All) ? ArtifactKeep::All : ArtifactKeep::No; }
+
+
 
 /* The IArtifact interface is designed to represent some Artifact of compilation. It could be input to or output from a compilation.
 
@@ -244,12 +247,23 @@ files could be a Container containing artifacts for
 * Files that contain known types
 * Callable interface (an ISlangSharedLibrary)
 
-Each one of these additions is an 'Element'. An Element is an interface pointer and a Desc that describes what the 
-inteface represents. Having the associated desc provides more detail about what the interface pointer actually is
-without having to make the interface know what it is being used for. This allows an interface to be used in multiple 
-ways - for example the ISlangBlob interface could be used to represent some text, or a compiled kernel. 
+There are several types of ways to associate data with an artifact it can be
 
-A more long term goals would be to
+* A representation
+* Associated data
+* A child artifact
+
+A `representation` has to wholey represent the artifact. That representation could be a blob, a file on the file system,
+an in memory representation. There are two classes of `Representation` - ones that can be turned into blobs (and therefore 
+derive from IArtifactRepresentation) and ones that are in of themselves a representation (such as a blob or or ISlangSharedLibrary).
+
+`Associated data` is information that is associated with the artifact, but isn't a (whole) representation. It could be part 
+of the representation, or useful for the implementation of a representation. Could also be considered as a kind of side channel
+to associate arbitrary temporary data with an artifact.
+
+A `child artifact` belongs to the artifact, within the hierarchy of artifacts. Child artifacts are held in an IArtifactList.
+
+More long term goals would be to
 
 * Make Diagnostics into an interface (such it can be added to a Artifact result)
 * Use Artifact and related types for downstream compiler
@@ -296,14 +310,19 @@ public:
         /// Get the list of associated items
     virtual ICastableList* SLANG_MCALL getAssociated() = 0;
 
-        /// Add a representation that derives from IArtifactRepresentation
-    virtual SLANG_NO_THROW void SLANG_MCALL addRepresentation(IArtifactRepresentation* rep) = 0;
+        /// Add a representation 
+    virtual SLANG_NO_THROW void SLANG_MCALL addRepresentation(ICastable* castable) = 0;
         /// Add a representation that doesn't derive from IArtifactRepresentation
     virtual SLANG_NO_THROW void SLANG_MCALL addRepresentationUnknown(ISlangUnknown* rep) = 0;
         /// Find representation
     virtual void* SLANG_MCALL SLANG_MCALL findRepresentation(const Guid& guid) = 0;
         /// Get the list of all representations
     virtual ICastableList* SLANG_MCALL getRepresentations() = 0;
+
+        /// Get the children. This may be evaluated lazily. 
+        /// Only artifacts with a ArtifactKind that derives from Container generally produce childen.
+        /// If an artifact doesn't support children, it can return nullptr.
+    virtual IArtifactList* SLANG_MCALL getChildren() = 0;
 };
 
 template <typename T>

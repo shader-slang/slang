@@ -37,6 +37,8 @@ class IArtifactUtil : public ISlangUnknown
 	virtual SLANG_NO_THROW SlangResult SLANG_MCALL requireFileDefaultImpl(IArtifact* artifact, ArtifactKeep keep, IFileArtifactRepresentation** outFileRep) = 0;
 
 	virtual SLANG_NO_THROW ArtifactDesc SLANG_MCALL makeDescFromCompileTarget(SlangCompileTarget target) = 0;
+
+	virtual SLANG_NO_THROW SlangResult SLANG_MCALL getChildrenDefaultImpl(IArtifact* artifact, IArtifactList** outList) = 0;
 };
 
 class ArtifactUtilImpl : public IArtifactUtil
@@ -71,6 +73,8 @@ public:
 	virtual SLANG_NO_THROW SlangResult SLANG_MCALL requireFileDefaultImpl(IArtifact* artifact, ArtifactKeep keep, IFileArtifactRepresentation** outFileRep) SLANG_OVERRIDE;
 
 	virtual SLANG_NO_THROW ArtifactDesc SLANG_MCALL makeDescFromCompileTarget(SlangCompileTarget target) SLANG_OVERRIDE;
+
+	virtual SLANG_NO_THROW SlangResult SLANG_MCALL getChildrenDefaultImpl(IArtifact* artifact, IArtifactList** outList) SLANG_OVERRIDE;
 
 	static IArtifactUtil* getSingleton() { return &g_singleton; }
 
