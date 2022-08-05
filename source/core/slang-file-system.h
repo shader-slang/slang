@@ -113,10 +113,9 @@ class CacheFileSystem: public ISlangFileSystemExt, public RefObject
 
     struct PathInfo
     {
-        PathInfo(const String& uniqueIdentity)
+        PathInfo(const String& uniqueIdentity):
+            m_uniqueIdentity(uniqueIdentity)
         {
-            m_uniqueIdentity = new StringBlob(uniqueIdentity);
-
             m_loadFileResult = CompressedResult::Uninitialized;
             m_getPathTypeResult = CompressedResult::Uninitialized;
             m_getCanonicalPathResult = CompressedResult::Uninitialized;
@@ -125,16 +124,16 @@ class CacheFileSystem: public ISlangFileSystemExt, public RefObject
         }
 
         /// Get the unique identity path as a string
-        const String& getUniqueIdentity() const { SLANG_ASSERT(m_uniqueIdentity); return m_uniqueIdentity->getString(); }
+        const String& getUniqueIdentity() const { return m_uniqueIdentity; }
 
-        RefPtr<StringBlob> m_uniqueIdentity;
+        String m_uniqueIdentity;
         CompressedResult m_loadFileResult;
         CompressedResult m_getPathTypeResult;
         CompressedResult m_getCanonicalPathResult;
 
         SlangPathType m_pathType;
         ComPtr<ISlangBlob> m_fileBlob;
-        RefPtr<StringBlob> m_canonicalPath;
+        String m_canonicalPath;
     };
 
     Dictionary<String, PathInfo*>& getPathMap() { return m_pathMap; }

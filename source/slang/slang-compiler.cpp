@@ -2186,10 +2186,10 @@ namespace Slang
                 }
 
                 // Need to turn into a blob
-                RefPtr<ListBlob> blob(new ListBlob);
-                // Swap the streams contents into the blob
-                stream.swapContents(blob->m_data);
-                m_containerBlob = blob;
+                List<uint8_t> blobData;
+                stream.swapContents(blobData);
+
+                m_containerBlob = ListBlob::moveCreate(blobData);
 
                 return res;
             }

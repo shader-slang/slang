@@ -93,13 +93,9 @@ SlangResult ArtifactUtilImpl::createLockFile(const char* inNameBase, ISlangMutab
 SlangResult ArtifactUtilImpl::calcArtifactPath(const ArtifactDesc& desc, const char* inBasePath, ISlangBlob** outPath)
 {
 	UnownedStringSlice basePath(inBasePath);
-
 	StringBuilder path;
 	SLANG_RETURN_ON_FAIL(ArtifactDescUtil::calcPathForDesc(desc, basePath, path));
-
-	auto blob = new StringBlob(path);
-	blob->addRef();
-	*outPath = blob;
+	*outPath = StringBlob::create(path).detach();
 	return SLANG_OK;
 }
 

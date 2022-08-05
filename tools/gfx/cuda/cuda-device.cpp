@@ -1061,7 +1061,8 @@ SLANG_NO_THROW SlangResult SLANG_MCALL DeviceImpl::readTextureResource(
     size_t* outPixelSize)
 {
     auto textureImpl = static_cast<TextureResourceImpl*>(texture);
-    RefPtr<ListBlob> blob = new ListBlob();
+
+    List<uint8_t> blobData;
 
     auto desc = textureImpl->getDesc();
     auto width = desc->size.width;
@@ -1071,7 +1072,7 @@ SLANG_NO_THROW SlangResult SLANG_MCALL DeviceImpl::readTextureResource(
     size_t pixelSize = sizeInfo.blockSizeInBytes / sizeInfo.pixelsPerBlock;
     size_t rowPitch = width * pixelSize;
     size_t size = height * rowPitch;
-    blob->m_data.setCount((Index)size);
+    blobData.setCount((Index)size);
 
     CUDA_MEMCPY2D copyParam;
     memset(&copyParam, 0, sizeof(copyParam));
@@ -1080,7 +1081,7 @@ SLANG_NO_THROW SlangResult SLANG_MCALL DeviceImpl::readTextureResource(
     copyParam.srcArray = textureImpl->m_cudaArray;
 
     copyParam.dstMemoryType = CU_MEMORYTYPE_HOST;
-    copyParam.dstHost = blob->m_data.getBuffer();
+    copyParam.dstHost = blobData.getBuffer();
     copyParam.dstPitch = rowPitch;
     copyParam.WidthInBytes = copyParam.dstPitch;
     copyParam.Height = height;
@@ -1088,6 +1089,9 @@ SLANG_NO_THROW SlangResult SLANG_MCALL DeviceImpl::readTextureResource(
 
     *outRowPitch = rowPitch;
     *outPixelSize = pixelSize;
+
+    auto blob = ListBlob::moveCreate(blobData);
+
     returnComPtr(outBlob, blob);
     return SLANG_OK;
 }
@@ -1099,13 +1103,18 @@ SLANG_NO_THROW Result SLANG_MCALL DeviceImpl::readBufferResource(
     ISlangBlob** outBlob)
 {
     auto bufferImpl = static_cast<BufferResourceImpl*>(buffer);
-    RefPtr<ListBlob> blob = new ListBlob();
-    blob->m_data.setCount((Index)size);
+    
+    List<uint8_t> blobData;
+
+    blobData.setCount((Index)size);
     cudaMemcpy(
-        blob->m_data.getBuffer(),
+        blobData.getBuffer(),
         (uint8_t*)bufferImpl->m_cudaMemory + offset,
         size,
         cudaMemcpyDefault);
+
+    auto blob = ListBlob::moveCreate(blobData);
+
     returnComPtr(outBlob, blob);
     return SLANG_OK;
 }

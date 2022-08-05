@@ -833,7 +833,7 @@ SlangResult NVRTCDownstreamCompiler::compile(const CompileOptions& options, RefP
 
     res  = m_nvrtcCompileProgram(program, int(dstOptions.getCount()), dstOptions.getBuffer());
 
-    RefPtr<ListBlob> blob;
+    ComPtr<ISlangBlob> blob;
     DownstreamDiagnostics diagnostics;
 
     diagnostics.result = _asResult(res);

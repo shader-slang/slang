@@ -205,7 +205,7 @@ SlangResult GlslangDownstreamCompiler::compile(const CompileOptions& options, Re
         return SLANG_OK;
     }
 
-    RefPtr<ListBlob> spirvBlob = ListBlob::moveCreate(spirv);
+    ComPtr<ISlangBlob> spirvBlob = ListBlob::moveCreate(spirv);
     outResult = new BlobDownstreamCompileResult(diagnostics, spirvBlob);
 
     return SLANG_OK;

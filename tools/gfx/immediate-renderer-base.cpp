@@ -711,13 +711,17 @@ SLANG_NO_THROW SlangResult SLANG_MCALL ImmediateRendererBase::readBufferResource
     size_t size,
     ISlangBlob** outBlob)
 {
-    RefPtr<ListBlob> blob = new ListBlob();
-    blob->m_data.setCount((Index)size);
+    List<uint8_t> blobData;
+
+    blobData.setCount((Index)size);
     auto content = (uint8_t*)map(buffer, gfx::MapFlavor::HostRead);
     if (!content)
         return SLANG_FAIL;
-    memcpy(blob->m_data.getBuffer(), content + offset, size);
+    memcpy(blobData.getBuffer(), content + offset, size);
     unmap(buffer, offset, size);
+
+    auto blob = ListBlob::moveCreate(blobData);
+
     returnComPtr(outBlob, blob);
     return SLANG_OK;
 }

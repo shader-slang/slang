@@ -4923,12 +4923,12 @@ SlangResult EndToEndCompileRequest::saveRepro(ISlangBlob** outBlob)
 
     SLANG_RETURN_ON_FAIL(ReproUtil::saveState(this, &stream));
 
-    RefPtr<ListBlob> listBlob(new ListBlob);
-
     // Put the content of the stream in the blob
-    stream.swapContents(listBlob->m_data);
 
-    *outBlob = listBlob.detach();
+    List<uint8_t> data;
+    stream.swapContents(data);
+
+    *outBlob = ListBlob::moveCreate(data).detach();
     return SLANG_OK;
 }
 
