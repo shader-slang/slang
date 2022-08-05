@@ -62,7 +62,7 @@ SlangResult DefaultSharedLibraryLoader::loadPlatformSharedLibrary(const char* pa
     }
 }
 
-/* !!!!!!!!!!!!!!!!!!!!!!!!!! DefaultSharedLibrary !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!*/
+/* !!!!!!!!!!!!!!!!!!!!!!!!!! TemporarySharedLibrary !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!*/
 
 TemporarySharedLibrary::~TemporarySharedLibrary()
 {
@@ -76,25 +76,6 @@ TemporarySharedLibrary::~TemporarySharedLibrary()
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!! DefaultSharedLibrary !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!*/
 
-SLANG_NO_THROW SlangResult SLANG_MCALL DefaultSharedLibrary::queryInterface(SlangUUID const& uuid, void** outObject)
-{
-    // Mechanism to cast to underlying type. 
-    // NOTE! Purposefully does not ref count
-    if (uuid == DefaultSharedLibrary::getTypeGuid())
-    {
-        *outObject = this;
-        return SLANG_OK;
-    }
-
-    if (uuid == ISlangUnknown::getTypeGuid() || uuid == ISlangSharedLibrary::getTypeGuid()) 
-    {
-        ++m_refCount;
-        *outObject = static_cast<ISlangSharedLibrary*>(this);
-        return SLANG_OK;
-    }
-    return SLANG_E_NO_INTERFACE;
-}
-
 DefaultSharedLibrary::~DefaultSharedLibrary()
 {
     if (m_sharedLibraryHandle)
@@ -107,6 +88,37 @@ void* DefaultSharedLibrary::findSymbolAddressByName(char const* name)
 {
     return SharedLibrary::findSymbolAddressByName(m_sharedLibraryHandle, name);
 }
+
+void* DefaultSharedLibrary::castAs(const SlangUUID& guid)
+{
+    if (auto intf = getInterface(guid))
+    {
+        return intf;
+    }
+    return getObject(guid);
+}
+
+void* DefaultSharedLibrary::getInterface(const Guid& guid)
+{
+    if (guid == ISlangUnknown::getTypeGuid() ||
+        guid == ICastable::getTypeGuid() ||
+        guid == ISlangSharedLibrary::getTypeGuid())
+    {
+        return static_cast<ISlangSharedLibrary*>(this);
+    }
+    return nullptr;
+}
+
+void* DefaultSharedLibrary::getObject(const Guid& guid)
+{
+    if (guid == DefaultSharedLibrary::getTypeGuid())
+    {
+        return this;
+    }
+    return nullptr;
+}
+
+/* !!!!!!!!!!!!!!!!!!!!!!!!!! SharedLibraryUtils !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!*/
 
 String SharedLibraryUtils::getSharedLibraryFileName(void* symbolInLib)
 {
