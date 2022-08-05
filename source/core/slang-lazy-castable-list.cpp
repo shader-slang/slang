@@ -57,12 +57,12 @@ Count LazyCastableList::getCount() const
 
 void LazyCastableList::add(ICastable* castable)
 {
-    SLANG_ASSERT(as<ICastableList>(castable) == nullptr);
     SLANG_ASSERT(castable);
-    SLANG_ASSERT(castable != m_castable);
-
+    
     if (m_castable)
     {
+        SLANG_ASSERT(castable != m_castable);
+
         if (auto list = as<ICastableList>(m_castable))
         {
             // Shouldn't be in the list
@@ -79,7 +79,21 @@ void LazyCastableList::add(ICastable* castable)
     }
     else
     {
-        m_castable = castable;
+        // If there is nothing set, we need to special cast if a list is being passed in
+        if (as<ICastableList>(castable))
+        {
+            // Create a new list
+            ICastableList* list = new CastableList;
+            m_castable = list;
+            // Add the item to that
+            list->add(castable);
+        }
+        else
+        {
+            // Just set the item
+            // We know it's not an ICastableList, so there will be no confusion.
+            m_castable = castable;
+        }
     }
 }
 

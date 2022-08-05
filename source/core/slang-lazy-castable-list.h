@@ -20,16 +20,11 @@ It does this by having a single m_castable member, which might be
 * pointing to a ICastableList, then the lists contents is the contents of the list
 
 The methods will automatically convert the backing representation to something appropriate. 
-
-Note! This means adding a ICastableList can cause problems, this is asserted for in add. 
-
-If adding a ICastableList to the list is required, this can be achieved via calling `requireList` and adding the list.
 */
 class LazyCastableList
 {
 public:
         /// Add a castable to the lsit
-        /// Note! Do not use this to add a ICastableList, read the description
     void add(ICastable* castable);
         /// Return the amount of items in the list
     Count getCount() const;
