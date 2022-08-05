@@ -4510,8 +4510,7 @@ SlangResult EndToEndCompileRequest::addLibraryReference(const void* libData, siz
 
     // Create an artifact without any name (as one is not provided)
     ComPtr<IArtifact> artifact(new Artifact(desc, String()));
-
-    artifact->addItem(library);
+    artifact->addRepresentation(library);
 
     return _addLibraryReference(this, artifact);
 }

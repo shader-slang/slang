@@ -15,7 +15,7 @@ class IUnknownCastableAdapter : public ICastable
     SLANG_COM_INTERFACE(0x8b4aad81, 0x4934, 0x4a67, { 0xb2, 0xe2, 0xe9, 0x17, 0xfc, 0x29, 0x12, 0x54 } );
 
         /// When using the adapter, this provides a way to directly get the internal no ICastable type
-    virtual SLANG_NO_THROW ISlangUnknown* SLANG_MCALL getContainer() = 0;
+    virtual SLANG_NO_THROW ISlangUnknown* SLANG_MCALL getContained() = 0;
 };
 
 /* An interface that allows for an object to implement 'destruction'. A destroyed 

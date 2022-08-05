@@ -618,7 +618,7 @@ UnownedStringSlice ArtifactDescUtil::getDefaultExtension(const ArtifactDesc& des
 
 /* static */String ArtifactDescUtil::getBaseName(IArtifact* artifact)
 {
-    if (auto fileRep = findItem<IFileArtifactRepresentation>(artifact))
+    if (auto fileRep = findRepresentation<IFileArtifactRepresentation>(artifact))
     {
         return getBaseName(artifact->getDesc(), fileRep);
     }
@@ -634,7 +634,7 @@ UnownedStringSlice ArtifactDescUtil::getDefaultExtension(const ArtifactDesc& des
 
 /* static */String ArtifactDescUtil::getParentPath(IArtifact* artifact)
 {
-    if (auto fileRep = findItem<IFileArtifactRepresentation>(artifact))
+    if (auto fileRep = findRepresentation<IFileArtifactRepresentation>(artifact))
     {
         return getParentPath(fileRep);
     }

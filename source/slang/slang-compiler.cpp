@@ -1367,8 +1367,9 @@ namespace Slang
 
                 // Set up the library artifact
                 ComPtr<IArtifact> artifact(new Artifact(ArtifactDesc::make(ArtifactKind::Library, Artifact::Payload::HostCPU), "slang-rt"));
+
                 ComPtr<IFileArtifactRepresentation> fileRep(new FileArtifactRepresentation(IFileArtifactRepresentation::Kind::NameOnly, "slang-rt", nullptr, nullptr));
-                artifact->addItem(fileRep);
+                artifact->addRepresentation(fileRep);
 
                 options.libraries.add(artifact);
             }

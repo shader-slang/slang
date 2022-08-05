@@ -106,7 +106,7 @@ SlangResult ArtifactUtilImpl::calcArtifactPath(const ArtifactDesc& desc, const c
 SlangResult ArtifactUtilImpl::requireFileDefaultImpl(IArtifact* artifact, ArtifactKeep keep, IFileArtifactRepresentation** outFile)
 {
 	// See if we already have it
-	if (auto fileRep = findItem<IFileArtifactRepresentation>(artifact))
+	if (auto fileRep = findRepresentation<IFileArtifactRepresentation>(artifact))
 	{
 		fileRep->addRef();
 		*outFile = fileRep;
@@ -143,7 +143,7 @@ SlangResult ArtifactUtilImpl::requireFileDefaultImpl(IArtifact* artifact, Artifa
 	IFileArtifactRepresentation* fileRep = new FileArtifactRepresentation(IFileArtifactRepresentation::Kind::Owned, path, lockFile, nullptr);
 	if (canKeep(keep))
 	{
-		artifact->addItem(fileRep);
+		artifact->addRepresentation(fileRep);
 	}
 
 	// Return it

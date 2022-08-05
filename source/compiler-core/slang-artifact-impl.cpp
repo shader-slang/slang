@@ -166,6 +166,37 @@ ConstArrayView<ICastable*> LazyCastableList::getView() const
     }
 }
 
+Index LazyCastableList::indexOf(ICastable* castable) const
+{
+    return getView().indexOf(castable);
+}
+
+Index LazyCastableList::indexOfUnknown(ISlangUnknown* unk) const
+{
+    {
+        ComPtr<ICastable> castable;
+        if (SLANG_SUCCEEDED(unk->queryInterface(ICastable::getTypeGuid(), (void**)castable.writeRef())) && castable)
+        {
+            return indexOf(castable);
+        }
+    }
+
+    // It's not derived from ICastable, so can only be in list via an adapter
+    const auto view = getView();
+
+    const Count count = view.getCount();
+    for (Index i = 0; i < count; ++i)
+    {
+        auto adapter = as<IUnknownCastableAdapter>(view[i]);
+        if (adapter && adapter->getContained() == unk)
+        {
+            return i;
+        }
+    }
+
+    return -1;
+}
+
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! UnknownCastableAdapter !!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
 void* UnknownCastableAdapter::castAs(const Guid& guid)
@@ -214,6 +245,14 @@ void* UnknownCastableAdapter::getObject(const Guid& guid)
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! CastableList !!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
+CastableList::~CastableList()
+{
+    for (auto castable : m_list)
+    {
+        castable->release();
+    }
+}
+
 void* CastableList::castAs(const Guid& guid)
 {
     if (auto intf = getInterface(guid))
@@ -244,12 +283,9 @@ void* CastableList::find(const Guid& guid)
 {
     for (ICastable* castable : m_list)
     {
-        if (castable)
+        if (auto ptr = castable->castAs(guid))
         {
-            if (auto ptr = castable->castAs(guid))
-            {
-                return ptr;
-            }
+            return ptr;
         }
     }
     return nullptr;
@@ -262,6 +298,70 @@ Index CastableList::indexOf(ICastable* castable)
     {
         ICastable* cur = m_list[i];
         if (cur == castable)
+        {
+            return i;
+        }
+    }
+    return -1;
+}
+
+void CastableList::add(ICastable* castable) 
+{ 
+    SLANG_ASSERT(castable);
+    castable->addRef();
+    m_list.add(castable);
+}
+
+void CastableList::removeAt(Index i) 
+{ 
+    auto castable = m_list[i];
+    m_list.removeAt(i);
+    castable->release();
+}
+
+void CastableList::clear() 
+{ 
+    for (auto castable : m_list)
+    {
+        castable->release();
+    }
+    m_list.clear(); 
+}
+
+void CastableList::addUnknown(ISlangUnknown* unk)
+{
+    // If it has ICastable interface we can just add as that
+    {
+        ComPtr<ICastable> castable;
+        if (SLANG_SUCCEEDED(unk->queryInterface(ICastable::getTypeGuid(), (void**)castable.writeRef())) && castable)
+        {
+            return add(castable);
+        }
+    }
+
+    // Wrap it in an adapter
+    IUnknownCastableAdapter* adapter = new UnknownCastableAdapter(unk);
+    add(adapter);
+}
+
+Index CastableList::indexOfUnknown(ISlangUnknown* unk)
+{
+    SLANG_ASSERT(unk);
+    // If it has a castable interface we can just look for that
+    {
+        ComPtr<ICastable> castable;
+        if (SLANG_SUCCEEDED(unk->queryInterface(ICastable::getTypeGuid(), (void**)castable.writeRef())) && castable)
+        {
+            return indexOf(castable);
+        }
+    }
+
+    // It's not derived from ICastable, so can only be in list via an adapter
+    const Count count = m_list.getCount();
+    for (Index i = 0; i < count; ++i)
+    {
+        auto adapter = as<IUnknownCastableAdapter>(m_list[i]);
+        if (adapter && adapter->getContained() == unk)
         {
             return i;
         }
@@ -353,78 +453,24 @@ void* Artifact::getInterface(const Guid& uuid)
 
 bool Artifact::exists()
 {
-    for (ISlangUnknown* item : m_items)
+    for (auto rep : m_representations.getView())
     {
-        ComPtr<IArtifactRepresentation> rep;
-        if (SLANG_SUCCEEDED(item->queryInterface(IArtifactRepresentation::getTypeGuid(), (void**)rep.writeRef())) && rep)
+        if (auto artifactRep = as<IArtifactRepresentation>(rep))
         {
-            // It is a rep and it exists
-            if (rep->exists())
+            // It is an artifact rep and it exists, we are done
+            if (artifactRep->exists())
             {
                 return true;
             }
-            // Might be another rep that exists
-            continue;
         }
-
-        // Must be not derived from IArtifactRepresentation, so we assume it's existance is it is a representation
-        // so it exists
-        return true;
+        else
+        {
+            // If it's *not* IArtifactRepresentation derived, it's existance *is* a representation
+            return true;
+        }
     }
 
     return false;
-}
-
-void Artifact::addItem(ISlangUnknown* intf) 
-{ 
-    SLANG_ASSERT(intf);
-    // Can't already be in there
-    SLANG_ASSERT(m_items.indexOf(intf) < 0);
-    // Add it
-    m_items.add(ComPtr<ISlangUnknown>(intf));
-}
-
-void Artifact::removeItemAt(Index i)
-{
-    m_items.removeAt(i);
-}
-
-void* Artifact::findItemInterface(const Guid& guid)
-{
-    for (ISlangUnknown* intf : m_items)
-    {
-        ISlangUnknown* cast = nullptr;
-        if (SLANG_SUCCEEDED(intf->queryInterface(guid, (void**)&cast)) && cast)
-        {
-            // NOTE! This assumes we *DONT* need to ref count to keep an interface in scope
-            // (as strict COM requires so as to allow on demand interfaces).
-            cast->release();
-            return cast;
-        }
-    }
-    return nullptr;
-}
-
-void* Artifact::findItemObject(const Guid& classGuid)
-{
-    for (ISlangUnknown* intf : m_items)
-    {
-        ComPtr<ICastable> castable;
-        if (SLANG_SUCCEEDED(intf->queryInterface(ICastable::getTypeGuid(), (void**)castable.writeRef())) && castable)
-        {
-            void* obj = castable->castAs(classGuid);
-
-            // NOTE! This assumes we *DONT* need to ref count to keep an interface in scope
-            // (as strict COM requires so as to allow on demand interfaces).
-            
-            // If could cast return the result
-            if (obj)
-            {
-                return obj;
-            }
-        }
-    }
-    return nullptr;
 }
 
 SlangResult Artifact::requireFile(Keep keep, IFileArtifactRepresentation** outFileRep)
@@ -436,7 +482,7 @@ SlangResult Artifact::requireFile(Keep keep, IFileArtifactRepresentation** outFi
 SlangResult Artifact::loadBlob(Keep keep, ISlangBlob** outBlob)
 {
     // If we have a blob just return it
-    if (auto blob = findItem<ISlangBlob>(this))
+    if (auto blob = (ISlangBlob*)findRepresentation(ISlangBlob::getTypeGuid()))
     {
         blob->addRef();
         *outBlob = blob;
@@ -446,12 +492,11 @@ SlangResult Artifact::loadBlob(Keep keep, ISlangBlob** outBlob)
     ComPtr<ISlangBlob> blob;
 
     // Look for a representation that we can serialize into a blob
-    for (ISlangUnknown* intf : m_items)
+    for (auto rep : m_representations.getView())
     {
-        ComPtr<IArtifactRepresentation> rep;
-        if (SLANG_SUCCEEDED(intf->queryInterface(IArtifactRepresentation::getTypeGuid(), (void**)rep.writeRef())) && rep)
+        if (auto artifactRep = as<IArtifactRepresentation>(rep))
         {
-            SlangResult res = rep->writeToBlob(blob.writeRef());
+            SlangResult res = artifactRep->writeToBlob(blob.writeRef());
             if (SLANG_SUCCEEDED(res) && blob)
             {
                 break;
@@ -468,7 +513,7 @@ SlangResult Artifact::loadBlob(Keep keep, ISlangBlob** outBlob)
     // Put in cache 
     if (canKeep(keep))
     {
-        addItem(blob);
+        addRepresentationUnknown(blob);
     }
 
     *outBlob = blob.detach();
@@ -489,6 +534,53 @@ void* Artifact::findAssociated(const Guid& guid)
 ICastableList* Artifact::getAssociated()
 {
     return m_associated.requireList();
+}
+
+void Artifact::addRepresentation(IArtifactRepresentation* rep)
+{
+    SLANG_ASSERT(rep);
+    if (m_representations.indexOf(rep) >= 0)
+    {
+        SLANG_ASSERT_FAILURE("Already have this representation");
+        return;
+    }
+    m_representations.add(rep);
+}
+
+void Artifact::addRepresentationUnknown(ISlangUnknown* unk)
+{
+    SLANG_ASSERT(unk);
+    if (m_representations.indexOfUnknown(unk) >= 0)
+    {
+        SLANG_ASSERT_FAILURE("Already have this representation");
+        return;
+    }
+
+    ComPtr<ICastable> castable;
+    if (SLANG_SUCCEEDED(unk->queryInterface(ICastable::getTypeGuid(), (void**)castable.writeRef())) && castable)
+    {
+        if (m_representations.indexOf(castable) >= 0)
+        {
+            SLANG_ASSERT_FAILURE("Already have this representation");
+            return;
+        }
+        m_representations.add(castable);
+    }
+    else
+    {
+        UnknownCastableAdapter* adapter = new UnknownCastableAdapter(unk);
+        m_representations.add(adapter);
+    }
+}
+
+void* Artifact::findRepresentation(const Guid& guid)
+{
+    return m_representations.find(guid);
+}
+
+ICastableList* Artifact::getRepresentations()
+{
+    return m_representations.requireList();
 }
 
 } // namespace Slang

@@ -201,6 +201,7 @@ inline /* static */ArtifactDesc ArtifactDesc::make(Packed inPacked)
 
 // Forward declare
 class IFileArtifactRepresentation;
+class IArtifactRepresentation;
 
 // Controls what items can be kept. 
 enum class ArtifactKeep
@@ -217,7 +218,7 @@ SLANG_INLINE bool canKeep(ArtifactKeep keep) { return Index(keep) >= Index(Artif
 /// Returns the keep type for an intermediate
 SLANG_INLINE ArtifactKeep getIntermediateKeep(ArtifactKeep keep) { return (keep == ArtifactKeep::All) ? ArtifactKeep::All : ArtifactKeep::No; }
 
-/* A useful interface for handling lists of castable interfaces. */
+/* A useful interface for handling lists of castable interfaces. Cannot hold nullptr */
 class ICastableList : public ICastable
 {
     SLANG_COM_INTERFACE(0x335f3d40, 0x934c, 0x40dc, { 0xb5, 0xe1, 0xf7, 0x6e, 0x40, 0x3, 0x62, 0x5 })
@@ -228,12 +229,16 @@ class ICastableList : public ICastable
     virtual ICastable* SLANG_MCALL getAt(Index i) = 0;
         /// Add an item to the list
     virtual void SLANG_MCALL add(ICastable* unk) = 0;
+        /// Add IUnknown, will cast to ICastable and if that's not possible will wrap
+    virtual void SLANG_MCALL addUnknown(ISlangUnknown* unk) = 0;
         /// Remove item at index, remaining items stay in the same order
     virtual void SLANG_MCALL removeAt(Index i) = 0;
         /// Clear the list
     virtual void SLANG_MCALL clear() = 0;
         /// Find the first index of castable, or -1 if not found
     virtual Index SLANG_MCALL indexOf(ICastable* castable) = 0;
+        /// Find the index interface (handling wrapping if necessary)
+    virtual Index SLANG_MCALL indexOfUnknown(ISlangUnknown* unk) = 0;
         /// Find the first item that casts to non null
     virtual void* SLANG_MCALL find(const Guid& guid) = 0;
         /// Access the internal buffer (any mutation can invalidate this value)
@@ -324,19 +329,14 @@ public:
         /// Get the list of associated items
     virtual ICastableList* SLANG_MCALL getAssociated() = 0;
 
-        /// Find an item by casting it's interface
-    virtual SLANG_NO_THROW void* SLANG_MCALL findItemInterface(const Guid& uuid) = 0;
-        /// Only works on ICastable derived items. Can find interfaces or objects.
-    virtual SLANG_NO_THROW void* SLANG_MCALL findItemObject(const Guid& classGuid) = 0;
-
-        /// Add a representation
-    virtual SLANG_NO_THROW void SLANG_MCALL addItem(ISlangUnknown* item) = 0;
-        /// Get the item at the index
-    virtual SLANG_NO_THROW ISlangUnknown* SLANG_MCALL getItemAt(Index i) = 0;
-        /// Remove the element at the specified index. 
-    virtual SLANG_NO_THROW void SLANG_MCALL removeItemAt(Index i) = 0;
-        /// Get the amount of elements
-    virtual SLANG_NO_THROW Index SLANG_MCALL getItemCount() = 0;
+        /// Add a representation that derives from IArtifactRepresentation
+    virtual SLANG_NO_THROW void SLANG_MCALL addRepresentation(IArtifactRepresentation* rep) = 0;
+        /// Add a representation that doesn't derive from IArtifactRepresentation
+    virtual SLANG_NO_THROW void SLANG_MCALL addRepresentationUnknown(ISlangUnknown* rep) = 0;
+        /// Find representation
+    virtual void* SLANG_MCALL SLANG_MCALL findRepresentation(const Guid& guid) = 0;
+        /// Get the list of all representations
+    virtual ICastableList* SLANG_MCALL getRepresentations() = 0;
 };
 
 /* A list of artifacts. */
@@ -380,30 +380,10 @@ class IArtifactRepresentation : public ICastable
     virtual SLANG_NO_THROW bool SLANG_MCALL exists() = 0;
 };
 
-// Helper template to make finding an item more simple
-// There isn't a problem if we only have a forward declaration, because in that case T::getTypeGuid can't work.
-SLANG_FORCE_INLINE void* _findItemImpl(IArtifact* artifact, const Guid& guid, const ISlangUnknown* intf)
-{
-    SLANG_UNUSED(intf);
-    return artifact->findItemInterface(guid);
-}
-
-SLANG_FORCE_INLINE void* _findItemImpl(IArtifact* artifact, const Guid& guid, const ICastable* castable)
-{
-    SLANG_UNUSED(castable);
-    return artifact->findItemObject(guid);
-}
-
-SLANG_FORCE_INLINE void* _findItemImpl(IArtifact* artifact, const Guid& guid, const void* other)
-{
-    SLANG_UNUSED(other);
-    return artifact->findItemObject(guid);
-}
-
 template <typename T>
-SLANG_FORCE_INLINE T* findItem(IArtifact* artifact)
+SLANG_FORCE_INLINE T* findRepresentation(IArtifact* artifact)
 {
-    return (T*)_findItemImpl(artifact, T::getTypeGuid(), (T*)nullptr);
+    return reinterpret_cast<T*>(artifact->findRepresentation(T::getTypeGuid()));
 }
 
 } // namespace Slang

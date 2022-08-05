@@ -27,7 +27,7 @@ public:
     SLANG_NO_THROW void* SLANG_MCALL castAs(const Guid& guid) SLANG_OVERRIDE;
 
     // IUnknownCastableAdapter
-    virtual SLANG_NO_THROW ISlangUnknown* SLANG_MCALL getContainer() SLANG_OVERRIDE { return m_contained; }
+    virtual SLANG_NO_THROW ISlangUnknown* SLANG_MCALL getContained() SLANG_OVERRIDE { return m_contained; }
 
     UnknownCastableAdapter(ISlangUnknown* unk):
         m_contained(unk)
@@ -54,21 +54,25 @@ public:
     // ICastable
     SLANG_NO_THROW void* SLANG_MCALL castAs(const Guid& guid) SLANG_OVERRIDE;
 
-    // IInterfaceList
+    // ICastableList
     virtual Count SLANG_MCALL getCount() SLANG_OVERRIDE { return m_list.getCount(); }
     virtual ICastable* SLANG_MCALL getAt(Index i) SLANG_OVERRIDE { return m_list[i]; }
-    virtual void SLANG_MCALL add(ICastable* castable) SLANG_OVERRIDE { m_list.add(ComPtr<ICastable>(castable)); }
-    virtual void SLANG_MCALL removeAt(Index i) SLANG_OVERRIDE { m_list.removeAt(i); }
-    virtual void SLANG_MCALL clear() SLANG_OVERRIDE { m_list.clear(); }
+    virtual void SLANG_MCALL add(ICastable* castable) SLANG_OVERRIDE;
+    virtual void SLANG_MCALL addUnknown(ISlangUnknown* unk) SLANG_OVERRIDE;
+    virtual void SLANG_MCALL removeAt(Index i) SLANG_OVERRIDE;
+    virtual void SLANG_MCALL clear() SLANG_OVERRIDE;
     virtual Index SLANG_MCALL indexOf(ICastable* castable) SLANG_OVERRIDE;
+    virtual Index SLANG_MCALL indexOfUnknown(ISlangUnknown* unk) SLANG_OVERRIDE;
     virtual void* SLANG_MCALL find(const Guid& guid) SLANG_OVERRIDE;
-    virtual ICastable* const* SLANG_MCALL getBuffer() SLANG_OVERRIDE { return (ICastable**)m_list.getBuffer(); }
+    virtual ICastable* const* SLANG_MCALL getBuffer() SLANG_OVERRIDE { return m_list.getBuffer(); }
+
+    virtual ~CastableList();
 
 protected:
     void* getInterface(const Guid& guid);
     void* getObject(const Guid& guid);
 
-    List<ComPtr<ICastable>> m_list;
+    List<ICastable*> m_list;
 };
 
 class LazyCastableList
@@ -81,6 +85,8 @@ public:
     void clearAndDeallocate();
     void* find(const Guid& guid);
     ConstArrayView<ICastable*> getView() const;
+    Index indexOf(ICastable* castable) const;
+    Index indexOfUnknown(ISlangUnknown* unk) const;
 
     ICastableList* requireList();
     ICastableList* getList();
@@ -163,15 +169,15 @@ public:
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL loadBlob(Keep keep, ISlangBlob** outBlob) SLANG_OVERRIDE;
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL requireFile(Keep keep, IFileArtifactRepresentation** outFileRep) SLANG_OVERRIDE;
     virtual SLANG_NO_THROW const char* SLANG_MCALL getName() SLANG_OVERRIDE { return m_name.getBuffer(); }
-    virtual SLANG_NO_THROW void* SLANG_MCALL findItemInterface(const Guid& uuid) SLANG_OVERRIDE;
-    virtual SLANG_NO_THROW void* SLANG_MCALL findItemObject(const Guid& classGuid) SLANG_OVERRIDE;
-    virtual SLANG_NO_THROW void SLANG_MCALL addItem(ISlangUnknown* intf) SLANG_OVERRIDE;
-    virtual SLANG_NO_THROW ISlangUnknown* SLANG_MCALL getItemAt(Index i) SLANG_OVERRIDE { return m_items[i]; }
-    virtual SLANG_NO_THROW void SLANG_MCALL removeItemAt(Index i) SLANG_OVERRIDE;
-    virtual SLANG_NO_THROW Index SLANG_MCALL getItemCount() SLANG_OVERRIDE { return m_items.getCount(); }
+    
     virtual SLANG_NO_THROW void SLANG_MCALL addAssociated(ICastable* castable) SLANG_OVERRIDE;
     virtual void* SLANG_MCALL SLANG_MCALL findAssociated(const Guid& unk) SLANG_OVERRIDE;
     virtual ICastableList* SLANG_MCALL getAssociated() SLANG_OVERRIDE;
+
+    virtual SLANG_NO_THROW void SLANG_MCALL addRepresentation(IArtifactRepresentation* rep) SLANG_OVERRIDE;
+    virtual SLANG_NO_THROW void SLANG_MCALL addRepresentationUnknown(ISlangUnknown* rep) SLANG_OVERRIDE;
+    virtual void* SLANG_MCALL SLANG_MCALL findRepresentation(const Guid& guid) SLANG_OVERRIDE;
+    virtual ICastableList* SLANG_MCALL getRepresentations() SLANG_OVERRIDE;
 
     /// Ctor
     Artifact(const Desc& desc, const String& name) :
@@ -188,10 +194,10 @@ protected:
 
     String m_name;                              ///< Name of this artifact
 
-    LazyCastableList m_associated;
+    LazyCastableList m_associated;              ///< Associated items
+    LazyCastableList m_representations;         ///< Representations
 
     ComPtr<IArtifactList> m_children;           ///< The children to this artifact
-    List<ComPtr<ISlangUnknown>> m_items;        ///< Associated items
 };
 
 } // namespace Slang
