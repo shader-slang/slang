@@ -35,6 +35,6 @@ IFoo createFooImported();
 
 public __extern_cpp int main()
 {
-    var obj = createFoo();
+    var obj = createFooImported();
     return obj.method();
 }

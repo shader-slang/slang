@@ -1367,11 +1367,11 @@ TestResult runExecutableTest(TestContext* context, TestInput& input)
     String actualOutputPath = outputStem + ".actual";
     File::remove(actualOutputPath);
 
-    // Make the module name the same as the source file
-    String ext = Path::getPathExt(filePath);
-    String modulePath = _calcModulePath(input);
+    // Make the module name the same as the current executable path, so it can discover
+    // the slang-rt library if needed.
+    String modulePath = Path::combine(
+        Path::getParentDirectory(Path::getExecutablePath()), Path::getFileNameWithoutExt(filePath));
 
-    // Remove the binary..
     String moduleExePath;
     {
         StringBuilder buf;

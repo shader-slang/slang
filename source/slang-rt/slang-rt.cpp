@@ -38,6 +38,10 @@ extern "C"
     SLANG_RT_API void* SLANG_MCALL
         _slang_rt_load_dll_func(void* moduleHandle, Slang::String funcName)
     {
+        if (moduleHandle == nullptr)
+        {
+            moduleHandle = _slang_rt_load_dll("");
+        }
         auto lib = static_cast<ISlangSharedLibrary*>(moduleHandle);
         auto funcPtr = lib->findFuncByName(funcName.getBuffer());
         if (!funcPtr)
