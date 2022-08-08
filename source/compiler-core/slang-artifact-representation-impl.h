@@ -103,6 +103,100 @@ protected:
     ZeroTerminatedCharSlice m_raw;
 };
 
+/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!! PostEmitMetadataArtifactRepresentation !!!!!!!!!!!!!!!!!!!!!!!!!! */
+
+struct ShaderBindingRange
+{
+    slang::ParameterCategory category = slang::ParameterCategory::None;
+    UInt spaceIndex = 0;
+    UInt registerIndex = 0;
+    UInt registerCount = 0; // 0 for unsized
+
+    bool isInfinite() const
+    {
+        return registerCount == 0;
+    }
+
+    bool containsBinding(slang::ParameterCategory _category, UInt _spaceIndex, UInt _registerIndex) const
+    {
+        return category == _category
+            && spaceIndex == _spaceIndex
+            && registerIndex <= _registerIndex
+            && (isInfinite() || registerCount + registerIndex > _registerIndex);
+    }
+
+    bool intersectsWith(const ShaderBindingRange& other) const
+    {
+        if (category != other.category || spaceIndex != other.spaceIndex)
+            return false;
+
+        const bool leftIntersection = (registerIndex < other.registerIndex + other.registerCount) || other.isInfinite();
+        const bool rightIntersection = (other.registerIndex < registerIndex + registerCount) || isInfinite();
+
+        return leftIntersection && rightIntersection;
+    }
+
+    bool adjacentTo(const ShaderBindingRange& other) const
+    {
+        if (category != other.category || spaceIndex != other.spaceIndex)
+            return false;
+
+        const bool leftIntersection = (registerIndex <= other.registerIndex + other.registerCount) || other.isInfinite();
+        const bool rightIntersection = (other.registerIndex <= registerIndex + registerCount) || isInfinite();
+
+        return leftIntersection && rightIntersection;
+    }
+
+    void mergeWith(const ShaderBindingRange other)
+    {
+        UInt newRegisterIndex = Math::Min(registerIndex, other.registerIndex);
+
+        if (other.isInfinite())
+            registerCount = 0;
+        else if (!isInfinite())
+            registerCount = Math::Max(registerIndex + registerCount, other.registerIndex + other.registerCount) - newRegisterIndex;
+
+        registerIndex = newRegisterIndex;
+    }
+
+    static bool isUsageTracked(slang::ParameterCategory category)
+    {
+        switch (category)
+        {
+        case slang::ConstantBuffer:
+        case slang::ShaderResource:
+        case slang::UnorderedAccess:
+        case slang::SamplerState:
+            return true;
+        default:
+            return false;
+        }
+    }
+};
+
+typedef List<ShaderBindingRange> ShaderBindingRanges;
+
+class PostEmitMetadataArtifactRepresentation : public ComBaseObject, public IPostEmitMetadataArtifactRepresentation
+{
+public:
+    SLANG_CLASS_GUID(0x6f82509f, 0xe48b, 0x4b83, { 0xa3, 0x84, 0x5d, 0x70, 0x83, 0x19, 0x83, 0xcc })
+
+    SLANG_COM_BASE_IUNKNOWN_ALL
+
+    // ICastable
+    SLANG_NO_THROW void* SLANG_MCALL castAs(const Guid& guid) SLANG_OVERRIDE;
+    // IArtifactRepresentation
+    SLANG_NO_THROW SlangResult SLANG_MCALL writeToBlob(ISlangBlob** blob) SLANG_OVERRIDE;
+    SLANG_NO_THROW bool SLANG_MCALL exists() SLANG_OVERRIDE;
+    // IPostEmitMetadataArtifactRepresentation
+    SLANG_NO_THROW virtual Slice<ShaderBindingRange> SLANG_MCALL getBindingRanges() SLANG_OVERRIDE;
+    
+    void* getInterface(const Guid& uuid);
+    void* getObject(const Guid& uuid);
+
+    ShaderBindingRanges m_usedBindings;
+};
+
 } // namespace Slang
 
 #endif

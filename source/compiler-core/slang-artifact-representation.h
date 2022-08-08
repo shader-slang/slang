@@ -41,6 +41,8 @@ to be usable. */
 class IFileArtifactRepresentation : public IArtifactRepresentation
 {
 public:
+    SLANG_COM_INTERFACE(0xc7d7d3a4, 0x8683, 0x44b5, { 0x87, 0x96, 0xdf, 0xba, 0x9b, 0xc3, 0xf1, 0x7b });
+
         // NOTE! 
     enum class Kind
     {
@@ -66,6 +68,8 @@ public:
 class IDiagnosticsArtifactRepresentation : public IArtifactRepresentation
 {
 public:
+    SLANG_COM_INTERFACE(0x91f9b857, 0xcd6b, 0x45ca, { 0x8e, 0x3, 0x8f, 0xa3, 0x3c, 0x5c, 0xf0, 0x1a });
+
     enum class Severity
     {
         Unknown,
@@ -115,6 +119,18 @@ public:
         /// Set the result
     SLANG_NO_THROW virtual void SLANG_MCALL setResult(SlangResult res) = 0;
 };
+
+struct ShaderBindingRange;
+
+class IPostEmitMetadataArtifactRepresentation : public IArtifactRepresentation
+{
+public:
+    SLANG_COM_INTERFACE(0x5d03bce9, 0xafb1, 0x4fc8, { 0xa4, 0x6f, 0x3c, 0xe0, 0x7b, 0x6, 0x1b, 0x1b });
+    
+        /// Get the binding ranges
+    SLANG_NO_THROW virtual Slice<ShaderBindingRange> SLANG_MCALL getBindingRanges() = 0;
+};
+
 
 } // namespace Slang
 

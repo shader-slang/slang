@@ -154,5 +154,34 @@ void DiagnosticsArtifactRepresentation::add(const Diagnostic& inDiagnostic)
 
     m_diagnostics.add(diagnostic);
 }
+
+/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!! PostEmitMetadataArtifactRepresentation !!!!!!!!!!!!!!!!!!!!!!!!!!! */
+
+void* PostEmitMetadataArtifactRepresentation::getInterface(const Guid& guid)
+{
+    if (guid == ISlangUnknown::getTypeGuid() ||
+        guid == ICastable::getTypeGuid() ||
+        guid == IArtifactRepresentation::getTypeGuid() ||
+        guid == IPostEmitMetadataArtifactRepresentation::getTypeGuid())
+    {
+        return static_cast<IPostEmitMetadataArtifactRepresentation*>(this);
+    }
+    return nullptr;
+}
+
+void* PostEmitMetadataArtifactRepresentation::getObject(const Guid& uuid)
+{
+    if (uuid == getTypeGuid())
+    {
+        return this;
+    }
+    return nullptr;
+}
+
+Slice<ShaderBindingRange> PostEmitMetadataArtifactRepresentation::getBindingRanges() 
+{ 
+    return Slice<ShaderBindingRange>(m_usedBindings.getBuffer(), m_usedBindings.getCount()); 
+}
+
  
 } // namespace Slang
