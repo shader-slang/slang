@@ -12,14 +12,13 @@ namespace Slang
 /* Sometimes the overhead around having a potential list of items that might often be 
 empty or only contain a single element is considerable. 
 
-The `LazyCastableList` provides functionality around ICastableList to minimize allocation.
-It does this by having a single m_castable member, which might be
+The `LazyCastableList` provides functionality around ICastableList to minimize allocation, or the 
+need to allocate an ICastableList. It does this by tracking state in m_state, and varying the 
+meaning of m_castable. 
 
-* nullptr - means the list is empty
-* pointing to something that *isn't* a ICastable list - then the list contains a single element that is that value
-* pointing to a ICastableList, then the lists contents is the contents of the list
-
-The methods will automatically convert the backing representation to something appropriate. 
+* State::None - there is no list 
+* State::One - there is a single entry, that is held in m_castable
+* State::List - m_castable is actually ICastableList, and holds the contents
 */
 class LazyCastableList
 {
@@ -49,6 +48,16 @@ public:
     ICastableList* getList();
 
 protected:
+    enum class State
+    {
+        None,
+        One,
+        List,
+    };
+    // A state is not *strictly* necessary, because we can always determine what m_castable is
+    // with a castAs. But doing so is not exactly fast, and using the state makes some code simpler
+    // additionally.
+    State m_state = State::None;
     ComPtr<ICastable> m_castable;
 };
 

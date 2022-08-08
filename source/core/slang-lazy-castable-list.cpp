@@ -5,163 +5,126 @@
 
 namespace Slang {
 
-/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! LazyCastableList !!!!!!!!!!!!!!!!!!!!!!!!!!! */
-
 void LazyCastableList::removeAt(Index index)
 {
     SLANG_ASSERT(index >= 0 && index < getCount());
 
-    if (auto list = as<ICastableList>(m_castable))
+    switch (m_state)
     {
-        list->removeAt(index);
-    }
-    else
-    {
-        SLANG_ASSERT(index == 0);
-        m_castable.setNull();
+        case State::None:   break;
+        case State::One:    
+        {
+            m_state = State::None;
+            m_castable.setNull();
+            break;
+        }
+        case State::List:   
+        {
+            static_cast<ICastableList*>(m_castable.get())->removeAt(index);
+            break;
+        }
     }
 }
 
 void LazyCastableList::clear()
 {
-    if (m_castable)
+    if (m_state == State::List)
     {
-        if (auto list = as<ICastableList>(m_castable))
-        {
-            list->clear();
-        }
-        else
-        {
-            m_castable.setNull();
-        }
+        auto list = static_cast<ICastableList*>(m_castable.get());
+        list->clear();
+    }
+    else
+    {
+        m_state = State::None;
+        m_castable.setNull();
     }
 }
 
 void LazyCastableList::clearAndDeallocate()
 {
+    m_state = State::None;
     m_castable.setNull();
 }
 
 Count LazyCastableList::getCount() const
 {
-    if (m_castable)
+    switch (m_state)
     {
-        if (auto list = as<ICastableList>(m_castable))
-        {
-            return list->getCount();
-        }
-        return 1;
+        case State::None:   return 0;
+        case State::One:    return 1;
+        default:
+        case State::List:   return static_cast<ICastableList*>(m_castable.get())->getCount();
     }
-    return 0;
 }
 
 void LazyCastableList::add(ICastable* castable)
 {
     SLANG_ASSERT(castable);
-    
-    if (m_castable)
+    if (m_state == State::None)
     {
-        SLANG_ASSERT(castable != m_castable);
-
-        if (auto list = as<ICastableList>(m_castable))
-        {
-            // Shouldn't be in the list
-            SLANG_ASSERT(list->indexOf(castable) < 0);
-            list->add(castable);
-        }
-        else
-        {
-            list = new CastableList;
-            list->add(m_castable);
-            m_castable = list;
-            list->add(castable);
-        }
+        m_castable = castable;
+        m_state = State::One;
     }
     else
     {
-        // If there is nothing set, we need to special cast if a list is being passed in
-        if (as<ICastableList>(castable))
-        {
-            // Create a new list
-            ICastableList* list = new CastableList;
-            m_castable = list;
-            // Add the item to that
-            list->add(castable);
-        }
-        else
-        {
-            // Just set the item
-            // We know it's not an ICastableList, so there will be no confusion.
-            m_castable = castable;
-        }
+        requireList()->add(castable);
     }
 }
 
 ICastableList* LazyCastableList::requireList()
 {
-    if (m_castable)
+    switch (m_state)
     {
-        if (auto list = as<ICastableList>(m_castable))
+        case State::None:
         {
-            return list;
+            m_castable = new CastableList;
+            m_state = State::List;
+            break;
         }
-        else
+        case State::One:
         {
-            // Promote to a list with the element in it
-            list = new CastableList;
+            // Turn into a list
+            auto list = new CastableList;
             list->add(m_castable);
             m_castable = list;
-            return list;
+            m_state = State::List;
+            break;
         }
+        default: break;
     }
-    else
-    {
-        // Create an empty list
-        ICastableList* list = new CastableList;
-        m_castable = list;
-        return list;
-    }
+    SLANG_ASSERT(m_state == State::List);
+    return static_cast<ICastableList*>(m_castable.get());
 }
 
 ICastableList* LazyCastableList::getList()
 {
-    return (m_castable == nullptr) ? nullptr : requireList();
+    return (m_state == State::None) ? nullptr : requireList();
 }
 
 void* LazyCastableList::find(const Guid& guid)
 {
-    if (!m_castable)
+    for (auto castable : getView())
     {
-        return nullptr;
+        if (auto ptr = castable->castAs(guid))
+        {
+            return ptr;
+        }
     }
-    if (auto list = as<ICastableList>(m_castable))
-    {
-        return list->find(guid);
-    }
-    else
-    {
-        return m_castable->castAs(guid);
-    }
+    return nullptr;
 }
-
+ 
 ConstArrayView<ICastable*> LazyCastableList::getView() const
 {
-    if (!m_castable)
+    switch (m_state)
     {
-        // Empty
-        return ConstArrayView<ICastable*>();
-    }
-
-    if (auto list = as<ICastableList>(m_castable))
-    {
-        const auto count = list->getCount();
-        const auto buffer = list->getBuffer();
-
-        return ConstArrayView<ICastable*>(buffer, count);
-    }
-    else
-    {
-        return ConstArrayView<ICastable*>((ICastable*const*)&m_castable, 1);
+        case State::None: return ConstArrayView<ICastable*>();
+        case State::One:  return ConstArrayView<ICastable*>((ICastable*const*)&m_castable, 1);
+        default:
+        case State::List:
+        {
+            auto list = static_cast<ICastableList*>(m_castable.get());
+            return ConstArrayView<ICastable*>(list->getBuffer(), list->getCount());
+        }
     }
 }
 
@@ -172,6 +135,7 @@ Index LazyCastableList::indexOf(ICastable* castable) const
 
 Index LazyCastableList::indexOfUnknown(ISlangUnknown* unk) const
 {
+    // Try as a ICastable first
     {
         ComPtr<ICastable> castable;
         if (SLANG_SUCCEEDED(unk->queryInterface(ICastable::getTypeGuid(), (void**)castable.writeRef())) && castable)
