@@ -295,7 +295,10 @@ public:
     
         /// Require artifact is available as a file.
         /// NOTE! May need to serialize and write as a temporary file.
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL requireFile(Keep keep, IFileArtifactRepresentation** outFileRep) = 0;
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL requireFile(Keep keep, ISlangMutableFileSystem* fileSystem, IFileArtifactRepresentation** outFileRep) = 0;
+
+        /// Load the artifact as a shared library
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL loadSharedLibrary(ArtifactKeep keep, ISlangSharedLibrary** outSharedLibrary) = 0;
 
         /// Get the name of the artifact. This can be empty.
     virtual SLANG_NO_THROW const char* SLANG_MCALL getName() = 0;
@@ -307,13 +310,18 @@ public:
         /// TODO(JS): We may want this to return nullptr if it's empty.
         /// Get the list of associated items
     virtual ICastableList* SLANG_MCALL getAssociated() = 0;
+        /// Find first associated that matches the predicate
+    virtual ICastable* SLANG_MCALL findAssociatedWithPredicate(ICastableList::FindFunc findFunc, void* data) = 0;
 
         /// Add a representation 
     virtual SLANG_NO_THROW void SLANG_MCALL addRepresentation(ICastable* castable) = 0;
         /// Add a representation that doesn't derive from IArtifactRepresentation
     virtual SLANG_NO_THROW void SLANG_MCALL addRepresentationUnknown(ISlangUnknown* rep) = 0;
         /// Find representation
-    virtual void* SLANG_MCALL SLANG_MCALL findRepresentation(const Guid& guid) = 0;
+    virtual void* SLANG_MCALL findRepresentation(const Guid& guid) = 0;
+        /// Find first representation that matches the predicate 
+    virtual ICastable* SLANG_MCALL findRepresentationWithPredicate(ICastableList::FindFunc findFunc, void* data) = 0;
+
         /// Get the list of all representations
     virtual ICastableList* SLANG_MCALL getRepresentations() = 0;
 

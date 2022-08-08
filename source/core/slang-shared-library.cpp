@@ -74,6 +74,18 @@ TemporarySharedLibrary::~TemporarySharedLibrary()
     }
 }
 
+/* !!!!!!!!!!!!!!!!!!!!!!!!!! ScopeSharedLibrary !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!*/
+
+ScopeSharedLibrary::~ScopeSharedLibrary()
+{
+    if (m_sharedLibraryHandle)
+    {
+        // We have to unload if we want to be able to remove
+        SharedLibrary::unload(m_sharedLibraryHandle);
+        m_sharedLibraryHandle = nullptr;
+    }
+}
+
 /* !!!!!!!!!!!!!!!!!!!!!!!!!! DefaultSharedLibrary !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!*/
 
 DefaultSharedLibrary::~DefaultSharedLibrary()

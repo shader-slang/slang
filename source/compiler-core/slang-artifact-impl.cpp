@@ -113,10 +113,16 @@ bool Artifact::exists()
     return false;
 }
 
-SlangResult Artifact::requireFile(Keep keep, IFileArtifactRepresentation** outFileRep)
+SlangResult Artifact::requireFile(Keep keep, ISlangMutableFileSystem* fileSystem, IFileArtifactRepresentation** outFileRep)
 {
     auto util = ArtifactUtilImpl::getSingleton();
-    return util->requireFileDefaultImpl(this, keep, outFileRep);
+    return util->requireFileDefaultImpl(this, keep, fileSystem, outFileRep);
+}
+
+SlangResult Artifact::loadSharedLibrary(ArtifactKeep keep, ISlangSharedLibrary** outSharedLibrary)
+{
+    auto util = ArtifactUtilImpl::getSingleton();
+    return util->loadSharedLibraryDefaultImpl(this, keep, outSharedLibrary);
 }
 
 SlangResult Artifact::loadBlob(Keep keep, ISlangBlob** outBlob)
@@ -171,6 +177,12 @@ void* Artifact::findAssociated(const Guid& guid)
     return m_associated.find(guid);
 }
 
+
+ICastable* Artifact::findAssociatedWithPredicate(ICastableList::FindFunc findFunc, void* data)
+{
+    return m_associated.findWithPredicate(findFunc, data);
+}
+
 ICastableList* Artifact::getAssociated()
 {
     return m_associated.requireList();
@@ -216,6 +228,11 @@ void Artifact::addRepresentationUnknown(ISlangUnknown* unk)
 void* Artifact::findRepresentation(const Guid& guid)
 {
     return m_representations.find(guid);
+}
+
+ICastable* Artifact::findRepresentationWithPredicate(ICastableList::FindFunc findFunc, void* data)
+{
+    return m_representations.findWithPredicate(findFunc, data);
 }
 
 ICastableList* Artifact::getRepresentations()

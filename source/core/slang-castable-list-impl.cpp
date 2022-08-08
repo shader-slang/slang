@@ -97,6 +97,18 @@ void* CastableList::find(const Guid& guid)
     return nullptr;
 }
 
+ICastable* SLANG_MCALL CastableList::findWithPredicate(FindFunc func, void* data)
+{
+    for (ICastable* castable : m_list)
+    {
+        if (func(castable, data))
+        {
+            return castable;
+        }
+    }
+    return nullptr;
+}
+
 Index CastableList::indexOf(ICastable* castable)
 {
     const Count count = m_list.getCount();

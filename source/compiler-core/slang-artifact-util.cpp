@@ -8,6 +8,7 @@
 
 #include "../core/slang-file-system.h"
 #include "../core/slang-io.h"
+#include "../core/slang-shared-library.h"
 
 namespace Slang {
 
@@ -99,10 +100,23 @@ SlangResult ArtifactUtilImpl::calcArtifactPath(const ArtifactDesc& desc, const c
 	return SLANG_OK;
 }
 
-SlangResult ArtifactUtilImpl::requireFileDefaultImpl(IArtifact* artifact, ArtifactKeep keep, IFileArtifactRepresentation** outFile)
+static bool _isFileSystemFile(ICastable* castable, void* data)
+{
+	if (auto fileRep = as<IFileArtifactRepresentation>(castable))
+	{
+		ISlangMutableFileSystem* fileSystem = (ISlangMutableFileSystem*)data;
+		if (fileRep->getFileSystem() == fileSystem)
+		{
+			return true;
+		}
+	}
+	return false;
+}
+
+SlangResult ArtifactUtilImpl::requireFileDefaultImpl(IArtifact* artifact, ArtifactKeep keep, ISlangMutableFileSystem* fileSystem, IFileArtifactRepresentation** outFile)
 {
 	// See if we already have it
-	if (auto fileRep = findRepresentation<IFileArtifactRepresentation>(artifact))
+	if (auto fileRep = as<IFileArtifactRepresentation>(artifact->findRepresentationWithPredicate(&_isFileSystemFile, fileSystem)))
 	{
 		fileRep->addRef();
 		*outFile = fileRep;
@@ -111,11 +125,11 @@ SlangResult ArtifactUtilImpl::requireFileDefaultImpl(IArtifact* artifact, Artifa
 
 	// If we are going to access as a file we need to be able to write it, and to do that we need a blob
 	ComPtr<ISlangBlob> blob;
-	SLANG_RETURN_ON_FAIL(artifact->loadBlob(keep, blob.writeRef()));
+	SLANG_RETURN_ON_FAIL(artifact->loadBlob(getIntermediateKeep(keep), blob.writeRef()));
 
 	// Okay we need to store as a temporary. Get a lock file.
 	ComPtr<IFileArtifactRepresentation> lockFile;
-	SLANG_RETURN_ON_FAIL(createLockFile(artifact->getName(), nullptr, lockFile.writeRef()));
+	SLANG_RETURN_ON_FAIL(createLockFile(artifact->getName(), fileSystem, lockFile.writeRef()));
 
 	// Now we need the appropriate name for this item
 	ComPtr<ISlangBlob> pathBlob;
@@ -141,7 +155,7 @@ SlangResult ArtifactUtilImpl::requireFileDefaultImpl(IArtifact* artifact, Artifa
 	else
 	{
 		// Create a new rep that references the lock file
-		fileRep = new FileArtifactRepresentation(IFileArtifactRepresentation::Kind::Owned, path, lockFile, nullptr);
+		fileRep = new FileArtifactRepresentation(IFileArtifactRepresentation::Kind::Owned, path, lockFile, lockFile->getFileSystem());
 	}
 
 	// Create the rep
@@ -174,5 +188,54 @@ SlangResult ArtifactUtilImpl::getChildrenDefaultImpl(IArtifact* artifact, IArtif
 	return SLANG_E_NOT_AVAILABLE;
 }
 
+SlangResult ArtifactUtilImpl::loadSharedLibraryDefaultImpl(IArtifact* artifact, ArtifactKeep keep, ISlangSharedLibrary** outSharedLibrary)
+{
+	if (auto sharedLibrary = findRepresentation<ISlangSharedLibrary>(artifact))
+	{
+		sharedLibrary->addRef();
+		*outSharedLibrary = sharedLibrary;
+		return SLANG_OK;
+	}
+
+	// If it is 'shared library' for a CPU like thing, we can try and load it
+	const auto desc = artifact->getDesc();
+	if ((isDerivedFrom(desc.kind,ArtifactKind::HostCallable) || 
+		isDerivedFrom(desc.kind, ArtifactKind::SharedLibrary)) &&
+		isDerivedFrom(desc.payload, ArtifactPayload::CPULike))
+	{
+		// Get as a file represenation on the OS file system
+		ComPtr<IFileArtifactRepresentation> fileRep;
+		SLANG_RETURN_ON_FAIL(artifact->requireFile(ArtifactKeep::No, nullptr, fileRep.writeRef()));
+
+		// We requested on the OS file system, just check that's what we got...
+		SLANG_ASSERT(fileRep->getFileSystem() == nullptr);
+
+		// Try loading the shared library
+		SharedLibrary::Handle handle;
+		if (SLANG_FAILED(SharedLibrary::loadWithPlatformPath(fileRep->getPath(), handle)))
+		{
+			return SLANG_FAIL;
+		}
+
+		// The ScopeSharedLibrary will keep the fileRep in scope as long as is needed
+		auto sharedLibrary = new ScopeSharedLibrary(handle, fileRep);
+
+		if (canKeep(keep))
+		{
+			// We want to keep the fileRep, as that is necessary for the sharedLibrary to even work
+			artifact->addRepresentation(fileRep);
+			// Keep the shared library
+			artifact->addRepresentation(sharedLibrary);
+		}
+
+		// Output
+		sharedLibrary->addRef();
+		*outSharedLibrary = sharedLibrary;
+		
+		return SLANG_OK;
+	}
+
+	return SLANG_FAIL;
+}
 
 } // namespace Slang

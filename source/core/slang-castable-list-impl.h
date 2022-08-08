@@ -66,6 +66,7 @@ public:
     virtual Index SLANG_MCALL indexOf(ICastable* castable) SLANG_OVERRIDE;
     virtual Index SLANG_MCALL indexOfUnknown(ISlangUnknown* unk) SLANG_OVERRIDE;
     virtual void* SLANG_MCALL find(const Guid& guid) SLANG_OVERRIDE;
+    virtual ICastable* SLANG_MCALL findWithPredicate(FindFunc func, void* data) SLANG_OVERRIDE;
     virtual ICastable*const* SLANG_MCALL getBuffer() SLANG_OVERRIDE { return m_list.getBuffer(); }
 
         /// Dtor

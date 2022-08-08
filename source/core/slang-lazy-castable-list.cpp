@@ -112,7 +112,19 @@ void* LazyCastableList::find(const Guid& guid)
     }
     return nullptr;
 }
- 
+
+ICastable* LazyCastableList::findWithPredicate(ICastableList::FindFunc func, void* data)
+{
+    for (auto castable : getView())
+    {
+        if (func(castable, data))
+        {
+            return castable;
+        }
+    }
+    return nullptr;
+}
+
 ConstArrayView<ICastable*> LazyCastableList::getView() const
 {
     switch (m_state)

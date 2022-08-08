@@ -35,6 +35,8 @@ public:
     void clearAndDeallocate();
         /// Find the first item that castAs(guid) produces a result
     void* find(const Guid& guid);
+        /// Find first match using predicate function
+    ICastable* findWithPredicate(ICastableList::FindFunc func, void* data);
         /// Get the contents of the list as a view
     ConstArrayView<ICastable*> getView() const;
         /// Get the index of castable in the list. Returns -1 if not found

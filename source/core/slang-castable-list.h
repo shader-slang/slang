@@ -9,11 +9,14 @@
 namespace Slang
 {
 
+
 /* A useful interface for handling lists of castable interfaces. Cannot hold nullptr */
 class ICastableList : public ICastable
 {
     SLANG_COM_INTERFACE(0x335f3d40, 0x934c, 0x40dc, { 0xb5, 0xe1, 0xf7, 0x6e, 0x40, 0x3, 0x62, 0x5 })
-            
+
+    typedef bool (*FindFunc)(ICastable* castable, void* data);
+
         /// Get the count of all interfaces held in the list
     virtual Count SLANG_MCALL getCount() = 0;
         /// Get the interface at the specified index
@@ -32,6 +35,8 @@ class ICastableList : public ICastable
     virtual Index SLANG_MCALL indexOfUnknown(ISlangUnknown* unk) = 0;
         /// Find the first item that casts to non null
     virtual void* SLANG_MCALL find(const Guid& guid) = 0;
+        /// Find the fast castable that matches the predicate
+    virtual ICastable* SLANG_MCALL findWithPredicate(FindFunc func, void* data) = 0;
         /// Access the internal buffer (any mutation can invalidate this value)
     virtual ICastable*const* SLANG_MCALL getBuffer() = 0;
 };
@@ -41,6 +46,12 @@ template <typename T>
 SLANG_FORCE_INLINE T* find(ICastableList* list)
 {
     return reinterpret_cast<T*>(list->find(T::getTypeGuid())); 
+}
+
+template <typename T>
+SLANG_FORCE_INLINE T* find(ICastableList* list, ICastableList::FindFunc func, void* data)
+{
+    return reinterpret_cast<T*>(list->findWithPredicate(T::getTypeGuid(), func, data));
 }
 
 /* Adapter interface to make a non castable types work as ICastable */
