@@ -8,6 +8,9 @@
 #include "../../slang-com-ptr.h"
 
 #include "../core/slang-com-object.h"
+#include "../core/slang-memory-arena.h"
+
+//#include "../core/slang-string-slice-pool.h"
 
 namespace Slang
 {
@@ -57,6 +60,47 @@ protected:
     String m_path;
     ComPtr<IFileArtifactRepresentation> m_lockFile;
     ComPtr<ISlangMutableFileSystem> m_fileSystem;
+};
+
+class DiagnosticsArtifactRepresentation : public ComBaseObject, public IDiagnosticsArtifactRepresentation
+{
+public:
+    SLANG_COM_BASE_IUNKNOWN_ALL
+
+    // ICastable
+    SLANG_NO_THROW void* SLANG_MCALL castAs(const Guid& guid) SLANG_OVERRIDE;
+    // IArtifactRepresentation
+    SLANG_NO_THROW SlangResult SLANG_MCALL writeToBlob(ISlangBlob** blob) SLANG_OVERRIDE;
+    SLANG_NO_THROW bool SLANG_MCALL exists() SLANG_OVERRIDE;
+    // IDiagnosticArtifactRepresentation
+    SLANG_NO_THROW virtual const Diagnostic* SLANG_MCALL getAt(Index i) SLANG_OVERRIDE { return &m_diagnostics[i]; }
+    SLANG_NO_THROW virtual Count SLANG_MCALL getCount() SLANG_OVERRIDE { return m_diagnostics.getCount(); }
+    SLANG_NO_THROW virtual void SLANG_MCALL add(const Diagnostic& diagnostic) SLANG_OVERRIDE; 
+    SLANG_NO_THROW virtual void SLANG_MCALL removeAt(Index i) SLANG_OVERRIDE { m_diagnostics.removeAt(i); }
+    SLANG_NO_THROW virtual SlangResult SLANG_MCALL getResult() SLANG_OVERRIDE { return m_result; }
+    SLANG_NO_THROW virtual void SLANG_MCALL setRaw(const Slice<char>& in) { m_raw = _allocateSlice(in); }
+    SLANG_NO_THROW virtual ZeroTerminatedCharSlice SLANG_MCALL getRaw() SLANG_OVERRIDE { return m_raw; }
+    SLANG_NO_THROW virtual void SLANG_MCALL setResult(SlangResult res) SLANG_OVERRIDE { m_result = res; }
+
+    DiagnosticsArtifactRepresentation():
+        m_arena(1024)
+    {
+    }
+
+protected:
+    void* getInterface(const Guid& uuid);
+    void* getObject(const Guid& uuid);
+
+    ZeroTerminatedCharSlice _allocateSlice(const Slice<char>& in);
+
+    // We could consider storing paths, codes in StringSlicePool, but for now we just allocate all 'string type things'
+    // in the arena.
+    MemoryArena m_arena;
+
+    List<Diagnostic> m_diagnostics;
+    SlangResult m_result = SLANG_OK;
+    
+    ZeroTerminatedCharSlice m_raw;
 };
 
 } // namespace Slang

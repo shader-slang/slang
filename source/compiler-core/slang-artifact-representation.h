@@ -7,6 +7,31 @@
 namespace Slang
 {
 
+/* Simplest slice types. We can't use UnownedStringSlice etc, because they implement functionality in libraries, 
+and we want to use these types in headers. 
+If we wanted a C implementation it would be easy to use a macro to generate the functionality */
+
+template <typename T>
+struct Slice
+{
+    Slice():count(0), data(nullptr) {}
+    Slice(const T* inData, Count inCount): 
+        data(inData), 
+        count(inCount) 
+    {}
+
+    const T* data;
+    Count count;
+};
+
+struct ZeroTerminatedCharSlice : Slice<char>
+{
+    typedef Slice<char> Super;
+    explicit ZeroTerminatedCharSlice(const char* in):Super(in, ::strlen(in)) {}
+    ZeroTerminatedCharSlice(const char* in, Count inCount):Super(in, inCount) { SLANG_ASSERT(in[inCount] == 0); }
+    ZeroTerminatedCharSlice():Super("", 0) {}
+};
+
 /* 
 A representation as a file. If it is a temporary file, it will likely disappear.
 A file representation does not have to be a representation of a file on the file system.
@@ -36,6 +61,59 @@ public:
     virtual SLANG_NO_THROW void SLANG_MCALL disown() = 0;
         /// Gets the 'lock file' if any associated with this file. Returns nullptr if there isn't one.
     virtual SLANG_NO_THROW IFileArtifactRepresentation* SLANG_MCALL getLockFile() = 0;
+};
+
+class IDiagnosticsArtifactRepresentation : public IArtifactRepresentation
+{
+public:
+    enum class Severity
+    {
+        Unknown,
+        Info,
+        Warning,
+        Error,
+        CountOf,
+    };
+    enum class Stage
+    {
+        Compile,
+        Link,
+    };
+
+    struct Location
+    {
+        Int line = 0;                   ///< One indexed line number. 0 if not defined
+        Int column = 0;                 ///< One indexed *character (not byte)* column number. 0 if not defined
+    };
+
+    struct Diagnostic
+    {
+        Severity severity = Severity::Unknown;          ///< The severity of error
+        Stage stage = Stage::Compile;                   ///< The stage the error came from
+        ZeroTerminatedCharSlice text;                   ///< The text of the error
+        ZeroTerminatedCharSlice code;                   ///< The compiler specific error code
+        ZeroTerminatedCharSlice filePath;               ///< The path the error originated from
+        Location location;
+    };
+
+        /// Get the diagnostic at the index
+    SLANG_NO_THROW virtual const Diagnostic* SLANG_MCALL getAt(Index i) = 0;
+        /// Get the amount of diangostics
+    SLANG_NO_THROW virtual Count SLANG_MCALL getCount() = 0;
+        /// Add a diagnostic
+    SLANG_NO_THROW virtual void SLANG_MCALL add(const Diagnostic& diagnostic) = 0;
+        /// Remove the diagnostic at the index
+    SLANG_NO_THROW virtual void SLANG_MCALL removeAt(Index i) = 0;
+
+        /// Set the raw diagnostics
+    SLANG_NO_THROW virtual void SLANG_MCALL setRaw(const Slice<char>& in) = 0;
+        /// Get raw diagnostice
+    SLANG_NO_THROW virtual ZeroTerminatedCharSlice SLANG_MCALL getRaw() = 0; 
+
+        /// Get the result for a compilation
+    SLANG_NO_THROW virtual SlangResult SLANG_MCALL getResult() = 0;
+        /// Set the result
+    SLANG_NO_THROW virtual void SLANG_MCALL setResult(SlangResult res) = 0;
 };
 
 } // namespace Slang
