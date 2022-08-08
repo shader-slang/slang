@@ -7,20 +7,6 @@
 namespace Slang
 {
 
-/* A lock file */
-class ILockFile : public ICastable
-{
-    SLANG_COM_INTERFACE(0x9177ea36, 0xa608, 0x4490, { 0x87, 0xf0, 0xf3, 0x93, 0x9, 0x7d, 0x36, 0xce })
-
-        /// The path to a lock file. 
-    virtual SLANG_NO_THROW const char* SLANG_MCALL getPath() = 0;
-        /// Optional, the file system it's on. If nullptr its on 'regular' OS file system.
-    virtual SLANG_NO_THROW ISlangMutableFileSystem* SLANG_MCALL getFileSystem() = 0;
-
-        /// Makes the lock file no longer owned. Doing so will make the path nullptr, and getFileSystem nullptr. 
-    virtual SLANG_NO_THROW void SLANG_MCALL disown() = 0;
-};
-
 /* 
 A representation as a file. If it is a temporary file, it will likely disappear.
 A file representation does not have to be a representation of a file on the file system.
@@ -30,21 +16,26 @@ to be usable. */
 class IFileArtifactRepresentation : public IArtifactRepresentation
 {
 public:
+        // NOTE! 
     enum class Kind
     {
         Reference,          ///< References a file on the file system
-        Owned,              ///< File is *owned* by this instance and will be deleted when goes out of scope
         NameOnly,           ///< Typically used for items that can be found by the 'system'. The path is just a name, and cannot typically be loaded as a blob.
+        Owned,              ///< File is *owned* by this instance and will be deleted when goes out of scope
+        Lock,               ///< An owned type, indicates potentially in part may only exist to 'lock' a path for a temporary file
+        CountOf,
     };
-
+    
         /// The the kind of file. 
     virtual SLANG_NO_THROW Kind SLANG_MCALL getKind() = 0;                     
         /// The path (on the file system)
     virtual SLANG_NO_THROW const char* SLANG_MCALL getPath() = 0;              
-        /// Get the lock file. Return nullptr if there is no lock file.
-    virtual SLANG_NO_THROW ILockFile* SLANG_MCALL getLockFile() = 0;
         /// Optional, the file system it's on. If nullptr its on 'regular' OS file system.
     virtual SLANG_NO_THROW ISlangMutableFileSystem* SLANG_MCALL getFileSystem() = 0;       
+        /// Makes the file no longer owned. Only applicable for Owned/Lock and they will become 'Reference'
+    virtual SLANG_NO_THROW void SLANG_MCALL disown() = 0;
+        /// Gets the 'lock file' if any associated with this file. Returns nullptr if there isn't one.
+    virtual SLANG_NO_THROW IFileArtifactRepresentation* SLANG_MCALL getLockFile() = 0;
 };
 
 } // namespace Slang

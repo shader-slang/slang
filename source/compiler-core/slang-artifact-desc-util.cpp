@@ -651,9 +651,9 @@ UnownedStringSlice ArtifactDescUtil::getDefaultExtension(const ArtifactDesc& des
     Index pos = Path::findLastSeparatorIndex(basePath);
     if (pos >= 0)
     {
-        outPath.append(basePath.head(pos));
-        outPath.append(Path::kPathDelimiter);
-
+        // Keep the stem including the delimiter
+        outPath.append(basePath.head(pos + 1));
+        // Get the baseName
         baseName = basePath.tail(pos + 1);
     }
 
