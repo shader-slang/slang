@@ -265,7 +265,7 @@ VectorExpressionType* ASTBuilder::getVectorType(
     IntVal*  elementCount)
 {
     auto vectorGenericDecl = as<GenericDecl>(m_sharedASTBuilder->findMagicDecl("Vector"));
-        
+    
     auto vectorTypeDecl = vectorGenericDecl->inner;
 
     auto substitutions = create<GenericSubstitution>();
@@ -276,6 +276,30 @@ VectorExpressionType* ASTBuilder::getVectorType(
     auto declRef = DeclRef<Decl>(vectorTypeDecl, substitutions);
 
     return as<VectorExpressionType>(DeclRefType::create(this, declRef));
+}
+
+DifferentialPairType* ASTBuilder::getDifferentialPairType(Type* valueType, Witness* conformanceWitness)
+{
+    auto genericDecl = dynamicCast<GenericDecl>(m_sharedASTBuilder->findMagicDecl("DifferentialPairType"));
+
+    auto typeDecl = genericDecl->inner;
+
+    auto substitutions = create<GenericSubstitution>();
+    substitutions->genericDecl = genericDecl;
+    substitutions->args.add(valueType);
+    substitutions->args.add(conformanceWitness);
+
+    auto declRef = DeclRef<Decl>(typeDecl, substitutions);
+    auto rsType = DeclRefType::create(this, declRef);
+
+    return as<DifferentialPairType>(rsType);
+}
+
+DeclRef<InterfaceDecl> ASTBuilder::getDifferentiableInterface()
+{
+    DeclRef<InterfaceDecl> declRef;
+    declRef.decl = dynamicCast<InterfaceDecl>(m_sharedASTBuilder->findMagicDecl("DifferentiableType"));
+    return declRef;
 }
 
 DeclRef<Decl> ASTBuilder::getBuiltinDeclRef(const char* builtinMagicTypeName, ConstArrayView<Val*> genericArgs)

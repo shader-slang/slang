@@ -2,7 +2,7 @@
 #ifndef SLANG_MODULE_LIBRARY_H
 #define SLANG_MODULE_LIBRARY_H
 
-#include "../compiler-core/slang-artifact.h"
+#include "../compiler-core/slang-artifact-representation.h"
 
 #include "slang-compiler.h" 
 
@@ -13,7 +13,6 @@ namespace Slang
 class ModuleLibrary : public ComObject, public IArtifactRepresentation
 {
 public:
-
     SLANG_COM_OBJECT_IUNKNOWN_ALL
 
     SLANG_CLASS_GUID(0x2f7412bd, 0x6154, 0x40a9, { 0x89, 0xb3, 0x62, 0xe0, 0x24, 0x17, 0x24, 0xa1 });

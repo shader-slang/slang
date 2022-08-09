@@ -19,7 +19,7 @@
 
 #include "../core/slang-shared-library.h"
 
-#include "../compiler-core/slang-artifact-info.h"
+#include "../compiler-core/slang-artifact-desc-util.h"
 
 // Enable calling through to  `dxc` to
 // generate code on Windows.
@@ -83,7 +83,7 @@ static UnownedStringSlice _addName(const UnownedStringSlice& inSlice, StringSlic
 
 static UnownedStringSlice _addName(IArtifact* artifact, StringSlicePool& pool)
 {
-    return _addName(ArtifactInfoUtil::getBaseName(artifact).getUnownedSlice(), pool);
+    return _addName(ArtifactDescUtil::getBaseName(artifact).getUnownedSlice(), pool);
 }
 
 class DxcIncludeHandler : public IDxcIncludeHandler

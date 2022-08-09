@@ -36,6 +36,30 @@ class IDestroyable : public ICastable
     virtual SLANG_NO_THROW bool SLANG_MCALL isDestroyed() = 0;
 };
 
+// Dynamic cast of ICastable derived types
+template <typename T>
+SLANG_FORCE_INLINE T* dynamicCast(ICastable* castable)
+{
+    if (castable)
+    {
+        void* obj = castable->castAs(T::getTypeGuid());
+        return obj ? reinterpret_cast<T*>(obj) : ((T*)nullptr);
+    }
+    return nullptr;
+}
+
+// as style cast
+template <typename T>
+SLANG_FORCE_INLINE T* as(ICastable* castable)
+{
+    if (castable)
+    {
+        void* obj = castable->castAs(T::getTypeGuid());
+        return obj ? reinterpret_cast<T*>(obj) : ((T*)nullptr);
+    }
+    return nullptr;
+}
+
 }
 
 #endif // SLANG_CORE_DESTROYABLE_H

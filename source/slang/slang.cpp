@@ -7,7 +7,9 @@
 #include "../core/slang-type-text-util.h"
 #include "../core/slang-type-convert-util.h"
 
-#include "../compiler-core/slang-artifact.h"
+// Artifact
+#include "../compiler-core/slang-artifact-impl.h"
+#include "../compiler-core/slang-artifact-desc-util.h"
 
 #include "slang-module-library.h"
 
@@ -178,8 +180,11 @@ void Session::init()
     coreLanguageScope = builtinAstBuilder->create<Scope>();
     coreLanguageScope->nextSibling = baseLanguageScope;
 
+    autodiffLanguageScope = builtinAstBuilder->create<Scope>();
+    autodiffLanguageScope->nextSibling = coreLanguageScope;
+
     hlslLanguageScope = builtinAstBuilder->create<Scope>();
-    hlslLanguageScope->nextSibling = coreLanguageScope;
+    hlslLanguageScope->nextSibling = autodiffLanguageScope;
 
     slangLanguageScope = builtinAstBuilder->create<Scope>();
     slangLanguageScope->nextSibling = hlslLanguageScope;
@@ -290,6 +295,7 @@ SlangResult Session::compileStdLib(slang::CompileStdLibFlags compileFlags)
     // TODO(JS): Could make this return a SlangResult as opposed to exception
     addBuiltinSource(coreLanguageScope, "core", getCoreLibraryCode());
     addBuiltinSource(hlslLanguageScope, "hlsl", getHLSLLibraryCode());
+    addBuiltinSource(autodiffLanguageScope, "diff", getAutodiffLibraryCode());
 
     if (compileFlags & slang::CompileStdLibFlag::WriteDocumentation)
     {
@@ -348,6 +354,7 @@ SlangResult Session::loadStdLib(const void* stdLib, size_t stdLibSizeInBytes)
     // Let's try loading serialized modules and adding them
     SLANG_RETURN_ON_FAIL(_readBuiltinModule(fileSystem, coreLanguageScope, "core"));
     SLANG_RETURN_ON_FAIL(_readBuiltinModule(fileSystem, hlslLanguageScope, "hlsl"));
+    SLANG_RETURN_ON_FAIL(_readBuiltinModule(fileSystem, autodiffLanguageScope, "diff"));
     return SLANG_OK;
 }
 
@@ -724,7 +731,7 @@ SlangPassThrough Session::getDownstreamCompilerForTransition(SlangCompileTarget 
         return (SlangPassThrough)m_codeGenTransitionMap.getTransition(source, target);
     }
 
-    const auto desc = ArtifactDesc::makeFromCompileTarget(inTarget);
+    const auto desc = ArtifactDescUtil::makeDescFromCompileTarget(inTarget);
 
     // Special case host-callable
     if ((desc.kind == ArtifactKind::HostCallable) && 

@@ -1841,6 +1841,27 @@ struct IRGetTupleElement : IRInst
     IRInst* getElementIndex() { return getOperand(1); }
 };
 
+// An Instruction that creates a differential pair value from a
+// primal and differential.
+struct IRMakeDifferentialPair : IRInst
+{
+    IR_LEAF_ISA(MakeDifferentialPair)
+    IRInst* getPrimalValue() { return getOperand(0); }
+    IRInst* getDifferentialValue() { return getOperand(1); }
+};
+
+struct IRDifferentialPairGetDifferential : IRInst
+{
+    IR_LEAF_ISA(DifferentialPairGetDifferential)
+    IRInst* getBase() { return getOperand(0); }
+};
+
+struct IRDifferentialPairGetPrimal : IRInst
+{
+    IR_LEAF_ISA(DifferentialPairGetPrimal)
+    IRInst* getBase() { return getOperand(0); }
+};
+
 // Constructs an `Result<T,E>` value from an error code.
 struct IRMakeResultError : IRInst
 {
@@ -2278,6 +2299,10 @@ public:
         IRInst* rowCount,
         IRInst* columnCount);
 
+    IRDifferentialPairType* getDifferentialPairType(
+        IRType* valueType,
+        IRWitnessTable* witnessTable);
+
     IRFuncType* getFuncType(
         UInt            paramCount,
         IRType* const*  paramTypes,
@@ -2383,6 +2408,8 @@ public:
         IRInst* existentialValue);
 
     IRInst* emitJVPDifferentiateInst(IRType* type, IRInst* baseFn);
+
+    IRInst* emitMakeDifferentialPair(IRType* type, IRInst* primal, IRInst* differential);
 
     IRInst* emitSpecializeInst(
         IRType*         type,
