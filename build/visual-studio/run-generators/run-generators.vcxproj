@@ -343,6 +343,23 @@
       <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">../../../bin/windows-x64/release/slang-generate.exe</AdditionalInputs>
       <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release aarch64|ARM'">../../../bin/windows-x64/release/slang-generate.exe</AdditionalInputs>
     </CustomBuild>
+    <CustomBuild Include="..\..\..\source\slang\diff.meta.slang">
+      <FileType>Document</FileType>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">"../../../bin/windows-x86/debug/slang-generate" %(Identity)</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">"../../../bin/windows-x64/debug/slang-generate" %(Identity)</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug aarch64|ARM'">"$(SolutionDir)/bin/windows-x64/debug/slang-generate" %(Identity)</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">"../../../bin/windows-x86/release/slang-generate" %(Identity)</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">"../../../bin/windows-x64/release/slang-generate" %(Identity)</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release aarch64|ARM'">"$(SolutionDir)/bin/windows-x64/release/slang-generate" %(Identity)</Command>
+      <Outputs>../../../source/slang/diff.meta.slang.h</Outputs>
+      <Message>slang-generate %(Identity)</Message>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">../../../bin/windows-x86/debug/slang-generate.exe</AdditionalInputs>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">../../../bin/windows-x64/debug/slang-generate.exe</AdditionalInputs>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug aarch64|ARM'">../../../bin/windows-x64/debug/slang-generate.exe</AdditionalInputs>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">../../../bin/windows-x86/release/slang-generate.exe</AdditionalInputs>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">../../../bin/windows-x64/release/slang-generate.exe</AdditionalInputs>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release aarch64|ARM'">../../../bin/windows-x64/release/slang-generate.exe</AdditionalInputs>
+    </CustomBuild>
     <CustomBuild Include="..\..\..\source\slang\hlsl.meta.slang">
       <FileType>Document</FileType>
       <Command Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">"../../../bin/windows-x86/debug/slang-generate" %(Identity)</Command>

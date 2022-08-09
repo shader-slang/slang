@@ -71,10 +71,6 @@ syntax snorm : SNormModifier;
 ///
 syntax __extern_cpp : ExternCppModifier;
 
-/// Modifer to mark a function for forward-mode differentiation.
-/// i.e. the compiler will automatically generate a new function
-/// that computes the jacobian-vector product of the original.
-syntax __differentiate_jvp : JVPDerivativeModifier;
 
 /// A type that can be used as an operand for builtins
 [sealed]
@@ -696,7 +692,6 @@ ${{{{
 ${{{{
 }
 }}}}
-
 
 //@ public:
 
@@ -2321,7 +2316,3 @@ attribute_syntax [noinline] : NoInlineAttribute;
 
 __attributeTarget(StructDecl)
 attribute_syntax [payload] : PayloadAttribute;
-
-// Custom JVP Function reference
-__attributeTarget(FuncDecl)
-attribute_syntax [__custom_jvp(function)]   : CustomJVPAttribute;

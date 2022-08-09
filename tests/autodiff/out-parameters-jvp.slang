@@ -4,6 +4,8 @@
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
 
+typedef __DifferentialPair<float> dpfloat;
+
 __differentiate_jvp void h(float x, float y, out float result)
 {
     float m = x + y;
@@ -20,9 +22,9 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     float dx = 1.0;
     float dy = 0.5;
 
-    float dresult = 0.0f;
-    __jvp(h)(x, y, dx, dy, dresult);
+    dpfloat dresult;
+    __jvp(h)(dpfloat(x, dx), dpfloat(y, dy), dresult);
 
-    outputBuffer[0] = dresult; // Expect: 9.5
+    outputBuffer[0] = dresult.d(); // Expect: 9.5
 
 }
