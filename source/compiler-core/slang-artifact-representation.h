@@ -65,6 +65,9 @@ public:
     virtual SLANG_NO_THROW IFileArtifactRepresentation* SLANG_MCALL getLockFile() = 0;
 };
 
+/* Diagnostics.
+
+If there are raw diagnostics they can be associated to an artifact as (Kind::Text, Payload::Diagnostics) artifact */
 class IDiagnosticsArtifactRepresentation : public IArtifactRepresentation
 {
 public:
@@ -108,11 +111,6 @@ public:
     SLANG_NO_THROW virtual void SLANG_MCALL add(const Diagnostic& diagnostic) = 0;
         /// Remove the diagnostic at the index
     SLANG_NO_THROW virtual void SLANG_MCALL removeAt(Index i) = 0;
-
-        /// Set the raw diagnostics
-    SLANG_NO_THROW virtual void SLANG_MCALL setRaw(const Slice<char>& in) = 0;
-        /// Get raw diagnostice
-    SLANG_NO_THROW virtual ZeroTerminatedCharSlice SLANG_MCALL getRaw() = 0; 
 
         /// Get the result for a compilation
     SLANG_NO_THROW virtual SlangResult SLANG_MCALL getResult() = 0;

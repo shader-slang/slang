@@ -170,7 +170,7 @@ bool isDerivedFrom(ENUM_TYPE kind, ENUM_TYPE base) { return g_table##ENUM_TYPE.i
             x(Executable, BinaryLike) \
             x(SharedLibrary, BinaryLike) \
             x(HostCallable, BinaryLike) \
-        x(MetaData, Base)
+        x(Instance, Base)
 
 #define SLANG_ARTIFACT_KIND_ENTRY(TYPE, PARENT) { Index(ArtifactKind::TYPE), Index(ArtifactKind::PARENT), #TYPE },
 

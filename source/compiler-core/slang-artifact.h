@@ -47,7 +47,7 @@ enum class ArtifactKind : uint8_t
     SharedLibrary,              ///< Shared library - can be dynamically linked
     HostCallable,               ///< Code can be executed directly on the host
 
-    MetaData,                   ///< For information typically associated with results - for example Debug/Diagnostics
+    Instance,                   ///< Primary representation is an interface/class instance 
     
     CountOf,
 };

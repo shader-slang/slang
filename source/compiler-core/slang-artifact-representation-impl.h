@@ -78,8 +78,6 @@ public:
     SLANG_NO_THROW virtual void SLANG_MCALL add(const Diagnostic& diagnostic) SLANG_OVERRIDE; 
     SLANG_NO_THROW virtual void SLANG_MCALL removeAt(Index i) SLANG_OVERRIDE { m_diagnostics.removeAt(i); }
     SLANG_NO_THROW virtual SlangResult SLANG_MCALL getResult() SLANG_OVERRIDE { return m_result; }
-    SLANG_NO_THROW virtual void SLANG_MCALL setRaw(const Slice<char>& in) SLANG_OVERRIDE { m_raw = _allocateSlice(in); }
-    SLANG_NO_THROW virtual ZeroTerminatedCharSlice SLANG_MCALL getRaw() SLANG_OVERRIDE { return m_raw; }
     SLANG_NO_THROW virtual void SLANG_MCALL setResult(SlangResult res) SLANG_OVERRIDE { m_result = res; }
 
     DiagnosticsArtifactRepresentation():
