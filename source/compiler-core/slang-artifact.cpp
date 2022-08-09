@@ -3,9 +3,13 @@
 
 #include "slang-artifact-info.h"
 
+#include "../core/slang-file-system.h"
+
 #include "../core/slang-type-text-util.h"
 #include "../core/slang-io.h"
 #include "../core/slang-array-view.h"
+
+#include "slang-artifact-util.h"
 
 namespace Slang {
 
@@ -276,6 +280,139 @@ SLANG_HIERARCHICAL_ENUM(ArtifactStyle, SLANG_ARTIFACT_STYLE, SLANG_ARTIFACT_STYL
     SLANG_UNEXPECTED("Unhandled type");
 }
 
+/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!! FileArtifactRepresentation !!!!!!!!!!!!!!!!!!!!!!!!!!! */
+
+void* FileArtifactRepresentation::getInterface(const Guid& guid)
+{
+    if (guid == ISlangUnknown::getTypeGuid() ||
+        guid == ICastable::getTypeGuid() ||
+        guid == IArtifactRepresentation::getTypeGuid() ||
+        guid == IFileArtifactRepresentation::getTypeGuid())
+    {
+        return static_cast<IFileArtifactRepresentation*>(this);
+    }
+    return nullptr;
+}
+
+void* FileArtifactRepresentation::getObject(const Guid& guid)
+{
+    SLANG_UNUSED(guid);
+    return nullptr;
+}
+
+ISlangMutableFileSystem* FileArtifactRepresentation::_getFileSystem()
+{
+    return m_fileSystem ? m_fileSystem : OSFileSystem::getMutableSingleton();
+}
+
+void* FileArtifactRepresentation::castAs(const Guid& guid)
+{
+    if (auto intf = getInterface(guid))
+    {
+        return intf;
+    }
+    return getObject(guid);
+}
+
+SlangResult FileArtifactRepresentation::writeToBlob(ISlangBlob** blob)
+{
+    if (m_kind == Kind::NameOnly)
+    {
+        // If it's referenced by a name only, it's a file that *can't* be loaded as a blob in general.
+        return SLANG_E_NOT_AVAILABLE;
+    }
+
+    auto fileSystem = _getFileSystem();
+    return fileSystem->loadFile(m_path.getBuffer(), blob);
+}
+
+bool FileArtifactRepresentation::exists()
+{
+    // TODO(JS):
+    // If it's a name only it's hard to know what exists should do. It can't *check* because it relies on the 'system' doing 
+    // the actual location. We could ask the IArtifactUtil, and that could change the behavior.
+    // For now we just assume it does.
+    if (m_kind == Kind::NameOnly)
+    {
+        return true;
+    }
+
+    auto fileSystem = _getFileSystem();
+
+    SlangPathType pathType;
+    const auto res = fileSystem->getPathType(m_path.getBuffer(), &pathType);
+
+    // It exists if it is a file
+    return SLANG_SUCCEEDED(res) && pathType == SLANG_PATH_TYPE_FILE;
+}
+
+FileArtifactRepresentation::~FileArtifactRepresentation()
+{
+    if (m_kind == Kind::Owned)
+    {
+        auto fileSystem = _getFileSystem();
+        fileSystem->remove(m_path.getBuffer());
+    }
+}
+
+/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!! LockFile !!!!!!!!!!!!!!!!!!!!!!!!!!! */
+
+void* LockFile::getInterface(const Guid& guid)
+{
+    if (guid == ISlangUnknown::getTypeGuid() ||
+        guid == ICastable::getTypeGuid() ||
+        guid == ILockFile::getTypeGuid())
+    {
+        return static_cast<ILockFile*>(this);
+    }
+    return nullptr;
+}
+
+void* LockFile::getObject(const Guid& guid)
+{
+    SLANG_UNUSED(guid);
+    return nullptr;
+}
+
+ISlangMutableFileSystem* LockFile::_getFileSystem()
+{
+    return m_fileSystem ? m_fileSystem : OSFileSystem::getMutableSingleton();
+}
+
+void* LockFile::castAs(const Guid& guid)
+{
+    if (auto intf = getInterface(guid))
+    {
+        return intf;
+    }
+    return getObject(guid);
+}
+
+const char* LockFile::getPath()
+{
+    return (m_path.getLength() > 0) ? m_path.getBuffer() : nullptr;
+}
+
+ISlangMutableFileSystem* LockFile::getFileSystem()
+{
+    return m_fileSystem;
+}
+
+LockFile::~LockFile()
+{
+    if (m_path.getLength() > 0)
+    {
+        auto fileSystem = _getFileSystem();
+        fileSystem->remove(m_path.getBuffer());
+    }
+}
+
+void LockFile::disown()
+{
+    m_path = String();
+    m_fileSystem.setNull();
+}
+
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ArtifactList !!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
 void* ArtifactList::getInterface(const Guid& guid)
@@ -358,35 +495,15 @@ void* Artifact::getInterface(const Guid& uuid)
     return nullptr;
 }
 
-Artifact::~Artifact()
-{
-    // Remove the temporary
-    if (m_pathType == PathType::Temporary)
-    {
-        File::remove(m_path);
-    }
-    // If there is a temporary lock path, remove that
-    if (m_temporaryLockPath.getLength())
-    {
-        File::remove(m_temporaryLockPath);
-    }
-}
-
 bool Artifact::exists()
 {
-    // If we have a blob it exists
-    if (m_blob)
-    {
-        return true;
-    }
-
     for (ISlangUnknown* item : m_items)
     {
         ComPtr<ICastable> castable;
 
         if (SLANG_SUCCEEDED(item->queryInterface(ICastable::getTypeGuid(), (void**)castable.writeRef())) && castable)
         {
-            auto rep = (IArtifactRepresentation*)castable->castAs(IArtifactRepresentation::getTypeGuid());
+            auto rep = as<IArtifactRepresentation>(castable);
             if (rep)
             {
                 // It is a rep and it exists
@@ -397,7 +514,7 @@ bool Artifact::exists()
                 continue;
             }
             // Associated types don't encapsulate an artifact representation, so don't signal existance
-            if (castable->castAs(IArtifactAssociated::getTypeGuid()))
+            if (as<IArtifactAssociated>(castable))
             {
                 continue;
             }
@@ -407,16 +524,8 @@ bool Artifact::exists()
         return true;
     }
 
-    // If we don't have a path then it can't exist
-    if (m_pathType == PathType::None)
-    {
-        return false;
-    }
-
-    // If the file exists we assume it exists
-    return File::exists(m_path);
+    return false;
 }
-
 
 void Artifact::addItem(ISlangUnknown* intf) 
 { 
@@ -431,7 +540,6 @@ void Artifact::removeItemAt(Index i)
 {
     m_items.removeAt(i);
 }
-
 
 void* Artifact::findItemInterface(const Guid& guid)
 {
@@ -471,157 +579,48 @@ void* Artifact::findItemObject(const Guid& classGuid)
     return nullptr;
 }
 
-SlangResult Artifact::requireFileLike(Keep keep)
+SlangResult Artifact::requireFile(Keep keep, IFileArtifactRepresentation** outFileRep)
 {
-    // If there is no path set and no blob we still need a name. 
-    // If the artifact is a library we can assume it's a system level library, 
-    // or it can be found by appropriate search paths. 
-    if (m_pathType == PathType::None && 
-        m_blob == nullptr && 
-        (m_desc.kind == ArtifactKind::Library || 
-         m_desc.kind == ArtifactKind::SharedLibrary))
-    {
-        if (m_name.getLength() > 0)
-        {
-            return SLANG_OK;
-        }
-
-        // TODO(JS): If we could serialize, we could turn some other representation into a file, and therefore 
-        // a name, but currently that's not supported
-        return SLANG_E_NOT_FOUND;
-    }
-
-    // Will turn into a file if necessary
-    SLANG_RETURN_ON_FAIL(requireFile(keep));
-    return SLANG_OK;
+    auto util = ArtifactUtilImpl::getSingleton();
+    return util->requireFileDefaultImpl(this, keep, outFileRep);
 }
 
-SlangResult Artifact::requireFile(Keep keep)
+SlangResult Artifact::loadBlob(Keep keep, ISlangBlob** outBlob)
 {
-    if (m_pathType != PathType::None)
+    // If we have a blob just return it
+    if (auto blob = findItem<ISlangBlob>(this))
     {
+        blob->addRef();
+        *outBlob = blob;
         return SLANG_OK;
     }
 
     ComPtr<ISlangBlob> blob;
 
-    // Get the contents as a blob. If we can't do that, then we can't write anything...
-    SLANG_RETURN_ON_FAIL(loadBlob(getIntermediateKeep(keep), blob.writeRef()));
-
-    // If we have a name, make the generated name based on that name
-    // Else just use 'slang-generated' the basis
-
-    UnownedStringSlice nameBase;
-    if (m_name.getLength() > 0)
+    // Look for a representation that we can serialize into a blob
+    for (ISlangUnknown* intf : m_items)
     {
-        nameBase = m_name.getUnownedSlice();
-    }
-    else
-    {
-        nameBase = UnownedStringSlice::fromLiteral("slang-generated");
-    }
-
-    // TODO(JS): NOTE! This isn't strictly correct, as the generated filename is not guarenteed to be unique
-    // if we change it with an extension (or prefix).
-    // This doesn't change the previous behavior though.
-    String temporaryLockPath;
-    SLANG_RETURN_ON_FAIL(File::generateTemporary(nameBase, temporaryLockPath));
-
-    String path = temporaryLockPath;
-
-    if (ArtifactInfoUtil::isCpuBinary(m_desc) && 
-        (m_desc.kind == ArtifactKind::SharedLibrary ||
-         m_desc.kind == ArtifactKind::Library))
-    {
-        const bool isSharedLibraryPrefixPlatform = SLANG_LINUX_FAMILY || SLANG_APPLE_FAMILY;
-        if (isSharedLibraryPrefixPlatform)
+        ComPtr<IArtifactRepresentation> rep;
+        if (SLANG_SUCCEEDED(intf->queryInterface(IArtifactRepresentation::getTypeGuid(), (void**)rep.writeRef())) && rep)
         {
-            StringBuilder buf;
-            buf << "lib";
-            buf << Path::getFileName(path);
-
-            auto parentDir = Path::getParentDirectory(path);
-            if (parentDir.getLength())
+            SlangResult res = rep->writeToBlob(blob.writeRef());
+            if (SLANG_SUCCEEDED(res) && blob)
             {
-                // Combine the name with path if their is a parent 
-                path = Path::combine(parentDir, buf);
-            }
-            else
-            {
-                // Just use the name as is
-                path = buf;
+                break;
             }
         }
     }
-
-    // If there is an extension append it
-    const UnownedStringSlice ext = ArtifactInfoUtil::getDefaultExtension(m_desc);
-
-    if (ext.getLength())
-    {
-        path.appendChar('.');
-        path.append(ext);
-    }
-
-    // If the final path is different from the lock path save that path
-    if (path != temporaryLockPath)
-    {
-        m_temporaryLockPath = temporaryLockPath;
-    }
-
-    // Write the contents
-    SLANG_RETURN_ON_FAIL(File::writeAllBytes(path, blob->getBufferPointer(), blob->getBufferSize()));
-
-    // Okay we can now add this as temporary path too
-    _setPath(PathType::Temporary, path);
-
-    return SLANG_OK;
-}
-
-SlangResult Artifact::loadBlob(Keep keep, ISlangBlob** outBlob)
-{
-    ComPtr<ISlangBlob> blob(m_blob);
-
+     
+    // Wasn't able to construct
     if (!blob)
     {
-        if (m_pathType != PathType::None)
-        {
-            // Read into a blob
-            ScopedAllocation alloc;
-            SLANG_RETURN_ON_FAIL(File::readAllBytes(m_path, alloc));
+        return SLANG_E_NOT_FOUND;
+    }
 
-            // Create as a blob
-            blob = RawBlob::moveCreate(alloc);
-        }
-        else
-        {
-            // Look for a representation that we can serialize into a blob
-            for (ISlangUnknown* intf : m_items)
-            {
-                
-                ComPtr<IArtifactRepresentation> rep;
-                if (SLANG_SUCCEEDED(intf->queryInterface(IArtifactRepresentation::getTypeGuid(), (void**)rep.writeRef())) && rep)
-                {
-                    SlangResult res = rep->writeToBlob(blob.writeRef());
-                    if (SLANG_SUCCEEDED(res) && blob)
-                    {
-                        break;
-                    }
-                }
-            }
-        }
-
-        // Wasn't able to construct
-        if (!blob)
-        {
-            return SLANG_E_NOT_FOUND;
-        }
-
-        // Put in cache 
-        if (canKeep(keep))
-        {
-            setBlob(blob);
-        }
+    // Put in cache 
+    if (canKeep(keep))
+    {
+        addItem(blob);
     }
 
     *outBlob = blob.detach();

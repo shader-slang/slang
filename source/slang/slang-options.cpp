@@ -1488,17 +1488,23 @@ struct OptionsParser
                     // Seeing as on all targets the baseName doesn't have an extension, and all library types do
                     // if the name doesn't have an extension we can assume there is no path to it.
                     
-                    if (Path::getPathExt(path).getLength() > 0)
+                    ComPtr<IFileArtifactRepresentation> fileRep;
+                    if (Path::getPathExt(path).getLength() <= 0)
                     {
-                        // Set the path
-                        artifact->setPath(Artifact::PathType::Existing, path.getBuffer());
+                        // If there is no extension *assume* it is the name of a system level library
+                        fileRep = new FileArtifactRepresentation(IFileArtifactRepresentation::Kind::NameOnly, path, nullptr, nullptr);
                     }
+                    else
+                    {
+                        fileRep = new FileArtifactRepresentation(IFileArtifactRepresentation::Kind::Reference, path, nullptr, nullptr);
+                        if (!fileRep->exists())
+                        {
+                            sink->diagnose(referenceModuleName.loc, Diagnostics::libraryDoesNotExist, path);
+                            return SLANG_FAIL;
+                        }
+                    }
+                    artifact->addItem(fileRep);
 
-                    // TODO(JS): We might want to check if the artifact exists.
-                    // If the artifact is a CPU (or downstream compiler) library
-                    // it may be findable by some other mechanism, so we probably don't want to check existance and just let the
-                    // downstream compiler handle.
-                    
                     SLANG_RETURN_ON_FAIL(_addLibraryReference(requestImpl, artifact));
                 }
                 else if (argValue == "-v" || argValue == "-version")

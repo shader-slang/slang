@@ -266,6 +266,45 @@ class IArtifactRepresentation : public ICastable
     virtual SLANG_NO_THROW bool SLANG_MCALL exists() = 0;
 };
 
+/* A lock file */
+class ILockFile : public ICastable
+{
+    SLANG_COM_INTERFACE(0x9177ea36, 0xa608, 0x4490, { 0x87, 0xf0, 0xf3, 0x93, 0x9, 0x7d, 0x36, 0xce })
+
+        /// The path to a lock file. 
+    virtual SLANG_NO_THROW const char* SLANG_MCALL getPath() = 0;
+        /// Optional, the file system it's on. If nullptr its on 'regular' OS file system.
+    virtual SLANG_NO_THROW ISlangMutableFileSystem* SLANG_MCALL getFileSystem() = 0;
+
+        /// Makes the lock file no longer owned. Doing so will make the path nullptr, and getFileSystem nullptr. 
+    virtual SLANG_NO_THROW void SLANG_MCALL disown() = 0;
+};
+
+/* 
+A representation as a file. If it is a temporary file, it will likely disappear.
+A file representation does not have to be a representation of a file on the file system.
+That is indicated by getFileSystem returning nullptr. Then the path is the path on the *actual* OS file system.
+This distinction is important as it is sometimes necessary to have an artifact stored on the OS file system
+to be usable. */
+struct IFileArtifactRepresentation : public IArtifactRepresentation
+{
+    enum class Kind
+    {
+        Reference,          ///< References a file on the file system
+        Owned,              ///< File is *owned* by this instance and will be deleted when goes out of scope
+        NameOnly,           ///< Typically used for items that can be found by the 'system'. The path is just a name, and cannot typically be loaded as a blob.
+    };
+
+        /// The the kind of file. 
+    virtual SLANG_NO_THROW Kind SLANG_MCALL getKind() = 0;                     
+        /// The path (on the file system)
+    virtual SLANG_NO_THROW const char* SLANG_MCALL getPath() = 0;              
+        /// Get the lock file. Return nullptr if there is no lock file.
+    virtual SLANG_NO_THROW ILockFile* SLANG_MCALL getLockFile() = 0;
+        /// Optional, the file system it's on. If nullptr its on 'regular' OS file system.
+    virtual SLANG_NO_THROW ISlangMutableFileSystem* SLANG_MCALL getFileSystem() = 0;       
+};
+
 /* Interface for types that are associated with an artifact, but aren't a representation, or are 
 only part of a representation. */
 class IArtifactAssociated : public ICastable
@@ -338,28 +377,7 @@ public:
     
         /// Require artifact is available as a file.
         /// NOTE! May need to serialize and write as a temporary file.
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL requireFile(Keep keep) = 0;
-
-        /// Require artifact is available in file-like scenarion.
-        ///
-        /// This is similar to requireFile, but for some special cases doesn't actually require a
-        /// *explicit* path/file.
-        ///
-        /// For example when system libraries are specified - the library paths may be known to
-        /// a downstream compiler (or the path is passed in explicitly), in that case only the
-        /// artifact name needs to be correct.
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL requireFileLike(Keep keep) = 0;
-    
-        /// Add items
-    virtual SLANG_NO_THROW void SLANG_MCALL setPath(PathType pathType, const char* filePath) = 0;
-
-        /// Set the blob representing the contents of the asset
-    virtual SLANG_NO_THROW void SLANG_MCALL setBlob(ISlangBlob* blob) = 0;
-
-        /// Get the path type
-    virtual SLANG_NO_THROW PathType SLANG_MCALL getPathType() = 0;
-        /// Get the path
-    virtual SLANG_NO_THROW const char* SLANG_MCALL getPath() = 0;
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL requireFile(Keep keep, IFileArtifactRepresentation** outFileRep) = 0;
 
         /// Get the name of the artifact. This can be empty.
     virtual SLANG_NO_THROW const char* SLANG_MCALL getName() = 0;
@@ -402,10 +420,10 @@ class IArtifactList : public ICastable
     virtual SLANG_NO_THROW void SLANG_MCALL clear() = 0;
 };
 
-class ArtifactList : public ComObject, public IArtifactList
+class ArtifactList : public ComBaseObject, public IArtifactList
 {
 public:
-    SLANG_COM_OBJECT_IUNKNOWN_ALL
+    SLANG_COM_BASE_IUNKNOWN_ALL
 
     // ICastable
     SLANG_NO_THROW void* SLANG_MCALL castAs(const Guid& guid) SLANG_OVERRIDE;
@@ -462,11 +480,11 @@ that handles this detail, such that we search for that first. That interface is 
 */
 
 /* Implementation of the IArtifact interface */
-class Artifact : public ComObject, public IArtifact
+class Artifact : public ComBaseObject, public IArtifact
 {
 public:
     
-    SLANG_COM_OBJECT_IUNKNOWN_ALL
+    SLANG_COM_BASE_IUNKNOWN_ALL
     
         /// IArtifact impl
     virtual SLANG_NO_THROW Desc SLANG_MCALL getDesc() SLANG_OVERRIDE { return m_desc; }
@@ -474,12 +492,7 @@ public:
     virtual SLANG_NO_THROW void SLANG_MCALL setParent(IArtifact* parent) SLANG_OVERRIDE { m_parent = parent; }
     virtual SLANG_NO_THROW bool SLANG_MCALL exists() SLANG_OVERRIDE;
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL loadBlob(Keep keep, ISlangBlob** outBlob) SLANG_OVERRIDE;
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL requireFile(Keep keep) SLANG_OVERRIDE;
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL requireFileLike(Keep keep) SLANG_OVERRIDE;
-    virtual SLANG_NO_THROW void SLANG_MCALL setPath(PathType pathType, const char* path) SLANG_OVERRIDE { _setPath(pathType, path); }
-    virtual SLANG_NO_THROW void SLANG_MCALL setBlob(ISlangBlob* blob) SLANG_OVERRIDE { m_blob = blob; }
-    virtual SLANG_NO_THROW PathType SLANG_MCALL getPathType() SLANG_OVERRIDE { return m_pathType; }
-    virtual SLANG_NO_THROW const char* SLANG_MCALL getPath() SLANG_OVERRIDE { return m_path.getBuffer(); }
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL requireFile(Keep keep, IFileArtifactRepresentation** outFileRep) SLANG_OVERRIDE;
     virtual SLANG_NO_THROW const char* SLANG_MCALL getName() SLANG_OVERRIDE { return m_name.getBuffer(); }
     virtual SLANG_NO_THROW void* SLANG_MCALL findItemInterface(const Guid& uuid) SLANG_OVERRIDE;
     virtual SLANG_NO_THROW void* SLANG_MCALL findItemObject(const Guid& classGuid) SLANG_OVERRIDE;
@@ -494,27 +507,118 @@ public:
         m_name(name),
         m_parent(nullptr)
     {}
-    /// Dtor
-    ~Artifact();
 
 protected:
     void* getInterface(const Guid& uuid);
-
-    void _setPath(PathType pathType, const String& path) { m_pathType = pathType; m_path = path; }
 
     Desc m_desc;                                ///< Description of the artifact
     IArtifact* m_parent;                        ///< Artifact this artifact belongs to
 
     String m_name;                              ///< Name of this artifact
 
-    PathType m_pathType = PathType::None;       ///< What the path indicates
-    String m_path;                              ///< The path 
-    String m_temporaryLockPath;                 ///< The temporary lock path
-
-    ComPtr<ISlangBlob> m_blob;                  ///< Blob to store result in memory
-
     List<ComPtr<ISlangUnknown>> m_items;        ///< Associated items
 };
+
+/* An implementation of ILockFile */
+class LockFile : public ComBaseObject, public ILockFile
+{
+public:
+    SLANG_COM_BASE_IUNKNOWN_ALL
+
+    // ICastable
+    SLANG_NO_THROW void* SLANG_MCALL castAs(const Guid& guid) SLANG_OVERRIDE;
+
+    // ILockFile
+    SLANG_NO_THROW const char* SLANG_MCALL getPath() SLANG_OVERRIDE;
+    SLANG_NO_THROW ISlangMutableFileSystem* SLANG_MCALL getFileSystem() SLANG_OVERRIDE;
+    SLANG_NO_THROW void SLANG_MCALL disown() SLANG_OVERRIDE;
+
+        /// Ctor
+    LockFile(String path, ISlangMutableFileSystem* fileSystem):
+        m_path(path),
+        m_fileSystem(fileSystem)
+    {
+    }
+
+    ~LockFile();
+
+protected:
+    void* getInterface(const Guid& uuid);
+    void* getObject(const Guid& uuid);
+
+    ISlangMutableFileSystem* _getFileSystem();
+
+    String m_path;
+    ComPtr<ISlangMutableFileSystem> m_fileSystem;
+};
+
+/*
+A representation of an artifact that is held in a file */
+class FileArtifactRepresentation : public ComBaseObject, public IFileArtifactRepresentation
+{
+public:
+    SLANG_COM_BASE_IUNKNOWN_ALL
+
+    // ICastable
+    SLANG_NO_THROW void* SLANG_MCALL castAs(const Guid& guid) SLANG_OVERRIDE;
+
+    // IArtifactRepresentation
+    SLANG_NO_THROW SlangResult SLANG_MCALL writeToBlob(ISlangBlob** blob) SLANG_OVERRIDE;
+    SLANG_NO_THROW bool SLANG_MCALL exists() SLANG_OVERRIDE;
+
+    // IFileArtifactRepresentation
+    virtual SLANG_NO_THROW Kind SLANG_MCALL getKind() SLANG_OVERRIDE { return m_kind; }
+    virtual SLANG_NO_THROW const char* SLANG_MCALL getPath() SLANG_OVERRIDE { return m_path.getBuffer(); }
+    virtual SLANG_NO_THROW ILockFile* SLANG_MCALL getLockFile() SLANG_OVERRIDE { return m_lockFile; }
+    virtual SLANG_NO_THROW ISlangMutableFileSystem* SLANG_MCALL getFileSystem() SLANG_OVERRIDE { return m_fileSystem; }
+
+    FileArtifactRepresentation(IFileArtifactRepresentation::Kind kind, String path, ILockFile* lockFile, ISlangMutableFileSystem* fileSystem):
+        m_kind(kind),
+        m_path(path),
+        m_lockFile(lockFile),
+        m_fileSystem(fileSystem)
+    {
+    }
+
+    ~FileArtifactRepresentation();
+
+protected:
+    void* getInterface(const Guid& uuid);
+    void* getObject(const Guid& uuid);
+
+    ISlangMutableFileSystem* _getFileSystem();
+
+    IFileArtifactRepresentation::Kind m_kind;
+    String m_path;
+    ComPtr<ILockFile> m_lockFile;
+    ComPtr<ISlangMutableFileSystem> m_fileSystem;
+};
+
+// Helper template to make finding an item more simple
+// There isn't a problem if we only have a forward declaration, because in that case T::getTypeGuid can't work.
+SLANG_FORCE_INLINE void* _findItemImpl(IArtifact* artifact, const Guid& guid, const ISlangUnknown* intf)
+{
+    SLANG_UNUSED(intf);
+    return artifact->findItemInterface(guid);
+}
+
+SLANG_FORCE_INLINE void* _findItemImpl(IArtifact* artifact, const Guid& guid, const ICastable* castable)
+{
+    SLANG_UNUSED(castable);
+    return artifact->findItemObject(guid);
+}
+
+SLANG_FORCE_INLINE void* _findItemImpl(IArtifact* artifact, const Guid& guid, const void* other)
+{
+    SLANG_UNUSED(other);
+    return artifact->findItemObject(guid);
+}
+
+template <typename T>
+SLANG_FORCE_INLINE T* findItem(IArtifact* artifact)
+{
+    return (T*)_findItemImpl(artifact, T::getTypeGuid(), (T*)nullptr);
+}
 
 } // namespace Slang
 

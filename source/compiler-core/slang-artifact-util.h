@@ -26,10 +26,19 @@ class IArtifactUtil : public ISlangUnknown
 	virtual SLANG_NO_THROW ArtifactStyle SLANG_MCALL getStyleParent(ArtifactStyle style) = 0;
 	virtual SLANG_NO_THROW UnownedStringSlice SLANG_MCALL getStyleName(ArtifactStyle style) = 0;
 	virtual SLANG_NO_THROW bool SLANG_MCALL isStyleDerivedFrom(ArtifactStyle style, ArtifactStyle base) = 0;
+
+	virtual SLANG_NO_THROW SlangResult SLANG_MCALL createLockFile(const char* nameBase, ISlangMutableFileSystem* fileSystem, ILockFile** outLockFile) = 0;
+
+		/// Given a desc and a basePath returns a suitable name
+	virtual SLANG_NO_THROW SlangResult SLANG_MCALL calcArtifactPath(const ArtifactDesc& desc, const char* basePath, ISlangBlob** outPath) = 0;
+
+		/// Default implementation of getting 
+	virtual SLANG_NO_THROW SlangResult SLANG_MCALL requireFileDefaultImpl(IArtifact* artifact, ArtifactKeep keep, IFileArtifactRepresentation** outFileRep) = 0;
 };
 
 class ArtifactUtilImpl : public IArtifactUtil
 {
+public:
 	// ISlangUnknown
 	SLANG_NO_THROW uint32_t SLANG_MCALL addRef() SLANG_OVERRIDE { return 1; }
 	SLANG_NO_THROW uint32_t SLANG_MCALL release() SLANG_OVERRIDE { return 1; }
@@ -51,6 +60,12 @@ class ArtifactUtilImpl : public IArtifactUtil
 	virtual SLANG_NO_THROW ArtifactStyle SLANG_MCALL getStyleParent(ArtifactStyle style) SLANG_OVERRIDE;
 	virtual SLANG_NO_THROW UnownedStringSlice SLANG_MCALL getStyleName(ArtifactStyle style) SLANG_OVERRIDE;
 	virtual SLANG_NO_THROW bool SLANG_MCALL isStyleDerivedFrom(ArtifactStyle style, ArtifactStyle base) SLANG_OVERRIDE;
+
+	virtual SLANG_NO_THROW SlangResult SLANG_MCALL createLockFile(const char* nameBase, ISlangMutableFileSystem* fileSystem, ILockFile** outLockFile) SLANG_OVERRIDE;
+
+	virtual SLANG_NO_THROW SlangResult SLANG_MCALL calcArtifactPath(const ArtifactDesc& desc, const char* basePath, ISlangBlob** outPath) SLANG_OVERRIDE;
+
+	virtual SLANG_NO_THROW SlangResult SLANG_MCALL requireFileDefaultImpl(IArtifact* artifact, ArtifactKeep keep, IFileArtifactRepresentation** outFileRep) SLANG_OVERRIDE;
 
 	static IArtifactUtil* getSingleton() { return &g_singleton; }
 

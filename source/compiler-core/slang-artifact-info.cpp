@@ -342,33 +342,80 @@ UnownedStringSlice ArtifactInfoUtil::getDefaultExtension(const ArtifactDesc& des
     return name;
 }
 
+/* static */String ArtifactInfoUtil::getBaseName(const ArtifactDesc& desc, IFileArtifactRepresentation* fileRep)
+{
+    UnownedStringSlice path(fileRep->getPath());
+    return getBaseNameFromPath(desc, path);
+}
+
 /* static */String ArtifactInfoUtil::getBaseName(IArtifact* artifact)
 {
-    const auto pathType = artifact->getPathType();
-
-    // If we have a path, get the base name from that
-    if (pathType != ArtifactPathType::None)
+    if (auto fileRep = findItem<IFileArtifactRepresentation>(artifact))
     {
-        UnownedStringSlice path(artifact->getPath());
-        const auto desc = artifact->getDesc();
-
-        return getBaseNameFromPath(desc, path);
+        return getBaseName(artifact->getDesc(), fileRep);
     }
-
     // Else use the name
     return artifact->getName();
 }
 
+/* static */String ArtifactInfoUtil::getParentPath(IFileArtifactRepresentation* fileRep)
+{
+    UnownedStringSlice path(fileRep->getPath());
+    return Path::getParentDirectory(path);
+}
+
 /* static */String ArtifactInfoUtil::getParentPath(IArtifact* artifact)
 {
-    const auto pathType = artifact->getPathType();
-    const auto path = artifact->getPath();
-    
-    if (pathType != ArtifactPathType::None && *path != 0)
+    if (auto fileRep = findItem<IFileArtifactRepresentation>(artifact))
     {
-        return Path::getParentDirectory(path);
+        return getParentPath(fileRep);
     }
     return String();
+}
+
+/* static */SlangResult ArtifactInfoUtil::calcPathForDesc(const ArtifactDesc& desc, const UnownedStringSlice& basePath, StringBuilder& outPath)
+{
+    outPath.Clear();
+
+    UnownedStringSlice baseName;
+
+    // Append the directory
+    Index pos = Path::findLastSeparatorIndex(basePath);
+    if (pos >= 0)
+    {
+        outPath.append(basePath.head(pos));
+        outPath.append(Path::kPathDelimiter);
+
+        baseName = basePath.tail(pos + 1);
+    }
+
+    if (baseName.getLength() == 0)
+    {
+        baseName = toSlice("unknown");
+    }
+    
+    if (ArtifactInfoUtil::isCpuBinary(desc) &&
+        (desc.kind == ArtifactKind::SharedLibrary ||
+         desc.kind == ArtifactKind::Library))
+    {
+        const bool isSharedLibraryPrefixPlatform = SLANG_LINUX_FAMILY || SLANG_APPLE_FAMILY;
+        if (isSharedLibraryPrefixPlatform)
+        {
+            outPath << "lib";
+            outPath << baseName; 
+        }
+    }
+
+    // If there is an extension append it
+    const UnownedStringSlice ext = ArtifactInfoUtil::getDefaultExtension(desc);
+
+    if (ext.getLength())
+    {
+        outPath.appendChar('.');
+        outPath.append(ext);
+    }
+
+    return SLANG_OK;
 }
 
 } // namespace Slang
