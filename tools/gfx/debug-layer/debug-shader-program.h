@@ -16,9 +16,7 @@ public:
 
 public:
     IShaderProgram* getInterface(const Slang::Guid& guid);
-
-    DebugShaderProgram(const IShaderProgram::Desc& desc);
-
+    virtual SLANG_NO_THROW slang::TypeReflection* SLANG_MCALL findTypeByName(const char* name) override;
 public:
     Slang::ComPtr<slang::IComponentType> m_slangProgram;
 };

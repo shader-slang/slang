@@ -12,7 +12,7 @@ using namespace Slang;
 namespace vk
 {
 
-class PipelineCommandEncoder : public RefObject
+class PipelineCommandEncoder : public ComObject
 {
 public:
     CommandBufferImpl* m_commandBuffer;
@@ -54,6 +54,16 @@ class ResourceCommandEncoder
     , public PipelineCommandEncoder
 {
 public:
+    virtual void* getInterface(SlangUUID const&) { return this; }
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL
+        queryInterface(SlangUUID const& uuid, void** outObject)
+    {
+        *outObject = getInterface(uuid);
+        return SLANG_OK;
+    }
+    virtual SLANG_NO_THROW uint32_t SLANG_MCALL addRef() { return 1; }
+    virtual SLANG_NO_THROW uint32_t SLANG_MCALL release() { return 1; }
+
     virtual SLANG_NO_THROW void SLANG_MCALL copyBuffer(
         IBufferResource* dst,
         Offset dstOffset,
@@ -150,8 +160,9 @@ class RenderCommandEncoder
     : public IRenderCommandEncoder
     , public ResourceCommandEncoder
 {
-public:
     SLANG_GFX_FORWARD_RESOURCE_COMMAND_ENCODER_IMPL(ResourceCommandEncoder)
+    virtual void* getInterface(SlangUUID const&) override { return this; }
+
 public:
     List<VkViewport> m_viewports;
     List<VkRect2D> m_scissorRects;
@@ -233,7 +244,8 @@ class ComputeCommandEncoder
 {
 public:
     SLANG_GFX_FORWARD_RESOURCE_COMMAND_ENCODER_IMPL(ResourceCommandEncoder)
-public:
+    virtual void* getInterface(SlangUUID const&) override { return this; }
+
     virtual SLANG_NO_THROW void SLANG_MCALL endEncoding() override;
 
     virtual SLANG_NO_THROW Result SLANG_MCALL
@@ -254,7 +266,9 @@ class RayTracingCommandEncoder
 {
 public:
     SLANG_GFX_FORWARD_RESOURCE_COMMAND_ENCODER_IMPL(ResourceCommandEncoder)
+    virtual void* getInterface(SlangUUID const&) override { return this; }
 public:
+
     void _memoryBarrier(
         int count,
         IAccelerationStructure* const* structures,

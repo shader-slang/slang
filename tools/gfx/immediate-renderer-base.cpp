@@ -60,6 +60,15 @@ public:
             m_commandBuffer = cmdBuffer;
         }
 
+        virtual void* getInterface(SlangUUID const& uuid) { return this; }
+        SlangResult queryInterface(SlangUUID const& uuid, void** outObject)
+        {
+            *outObject = getInterface(uuid);
+            return SLANG_OK;
+        }
+        uint32_t addRef() { return 1; }
+        uint32_t release() { return 1; }
+
         virtual SLANG_NO_THROW void SLANG_MCALL endEncoding() override {}
         virtual SLANG_NO_THROW void SLANG_MCALL copyBuffer(
             IBufferResource* dst,
@@ -242,6 +251,7 @@ public:
     {
     public:
         SLANG_GFX_FORWARD_RESOURCE_COMMAND_ENCODER_IMPL(ResourceCommandEncoderImpl)
+        virtual void* getInterface(SlangUUID const& uuid) override { return this; }
     public:
         virtual SLANG_NO_THROW void SLANG_MCALL endEncoding() override {}
 
@@ -432,6 +442,7 @@ public:
     {
     public:
         SLANG_GFX_FORWARD_RESOURCE_COMMAND_ENCODER_IMPL(ResourceCommandEncoderImpl)
+        virtual void* getInterface(SlangUUID const& uuid) override { return this; }
     public:
         virtual SLANG_NO_THROW void SLANG_MCALL endEncoding() override
         {

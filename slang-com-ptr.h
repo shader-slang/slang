@@ -111,7 +111,9 @@ public:
 protected:
 	/// Gets the address of the dumb pointer.
     // Disabled: use writeRef and readRef to get a reference based on usage.
+#ifndef SLANG_COM_PTR_ENABLE_REF_OPERATOR
 	SLANG_FORCE_INLINE T** operator&() = delete;
+#endif
 
 	T* m_ptr;
 };

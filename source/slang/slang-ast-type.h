@@ -583,6 +583,13 @@ class OptionalType : public BuiltinType
     Type* getValueType();
 };
 
+// A raw-pointer reference to an managed value.
+class NativeRefType : public BuiltinType
+{
+    SLANG_AST_CLASS(NativeRefType)
+    Type* getValueType();
+};
+
 // A type alias of some kind (e.g., via `typedef`)
 class NamedExpressionType : public Type 
 {

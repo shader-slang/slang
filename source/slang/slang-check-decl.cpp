@@ -3063,9 +3063,36 @@ namespace Slang
         InheritanceDecl*            inheritanceDecl,
         ContainerDecl*              parentDecl)
     {
+        auto superType = inheritanceDecl->base.type;
+
         if( auto declRefType = as<DeclRefType>(subType) )
         {
             auto declRef = declRefType->declRef;
+
+            if (auto superDeclRefType = as<DeclRefType>(superType))
+            {
+                auto superTypeDecl = superDeclRefType->declRef.getDecl();
+                if (superTypeDecl->findModifier<ComInterfaceAttribute>())
+                {
+                    // A struct cannot implement a COM Interface.
+                    if (auto classDecl = as<ClassDecl>(superTypeDecl))
+                    {
+                        // OK.
+                        SLANG_UNUSED(classDecl);
+                    }
+                    else if (auto subInterfaceDecl = as<InterfaceDecl>(superTypeDecl))
+                    {
+                        if (!subInterfaceDecl->findModifier<ComInterfaceAttribute>())
+                        {
+                            getSink()->diagnose(inheritanceDecl, Diagnostics::interfaceInheritingComMustBeCom);
+                        }
+                    }
+                    else if (auto structDecl = as<StructDecl>(superTypeDecl))
+                    {
+                        getSink()->diagnose(inheritanceDecl, Diagnostics::structCannotImplementComInterface);
+                    }
+                }
+            }
 
             // Don't check conformances for abstract types that
             // are being used to express *required* conformances.
@@ -3089,11 +3116,12 @@ namespace Slang
                 // code to work.
                 return true;
             }
+
+            
         }
 
         // Look at the type being inherited from, and validate
         // appropriately.
-        auto superType = inheritanceDecl->base.type;
 
         DeclaredSubtypeWitness* subIsSuperWitness = m_astBuilder->create<DeclaredSubtypeWitness>();
         subIsSuperWitness->declRef = makeDeclRef(inheritanceDecl);
