@@ -7,31 +7,6 @@
 namespace Slang
 {
 
-/* Simplest slice types. We can't use UnownedStringSlice etc, because they implement functionality in libraries, 
-and we want to use these types in headers. 
-If we wanted a C implementation it would be easy to use a macro to generate the functionality */
-
-template <typename T>
-struct Slice
-{
-    Slice():count(0), data(nullptr) {}
-    Slice(const T* inData, Count inCount): 
-        data(inData), 
-        count(inCount) 
-    {}
-
-    const T* data;
-    Count count;
-};
-
-struct ZeroTerminatedCharSlice : Slice<char>
-{
-    typedef Slice<char> Super;
-    explicit ZeroTerminatedCharSlice(const char* in):Super(in, ::strlen(in)) {}
-    ZeroTerminatedCharSlice(const char* in, Count inCount):Super(in, inCount) { SLANG_ASSERT(in[inCount] == 0); }
-    ZeroTerminatedCharSlice():Super("", 0) {}
-};
-
 /* 
 A representation as a file. If it is a temporary file, it will likely disappear.
 A file representation does not have to be a representation of a file on the file system.

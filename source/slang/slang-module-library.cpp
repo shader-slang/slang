@@ -15,9 +15,12 @@ namespace Slang {
 
 void* ModuleLibrary::getInterface(const Guid& uuid)
 {
-    if (uuid == ISlangUnknown::getTypeGuid() || uuid == ICastable::getTypeGuid() || uuid == IArtifactRepresentation::getTypeGuid())
+    if (uuid == ISlangUnknown::getTypeGuid() || 
+        uuid == ICastable::getTypeGuid() || 
+        uuid == IArtifactRepresentation::getTypeGuid() ||
+        uuid == IModuleLibrary::getTypeGuid())
     {
-        return static_cast<IArtifactRepresentation*>(this);
+        return static_cast<IModuleLibrary*>(this);
     }
     return nullptr;
 }
@@ -36,9 +39,10 @@ void* ModuleLibrary::castAs(const Guid& guid)
     return getObject(guid);
 }
 
-SlangResult loadModuleLibrary(const Byte* inBytes, size_t bytesCount, EndToEndCompileRequest* req, RefPtr<ModuleLibrary>& outLibrary)
+SlangResult loadModuleLibrary(const Byte* inBytes, size_t bytesCount, EndToEndCompileRequest* req, ComPtr<IModuleLibrary>& outLibrary)
 {
-    RefPtr<ModuleLibrary> library = new ModuleLibrary;
+    auto library = new ModuleLibrary;
+    ComPtr<IModuleLibrary> scopeLibrary(library);
 
     // Load up the module
     MemoryStreamBase memoryStream(FileAccess::Read, inBytes, bytesCount);
@@ -85,13 +89,13 @@ SlangResult loadModuleLibrary(const Byte* inBytes, size_t bytesCount, EndToEndCo
         }
     }
 
-    outLibrary = library;
+    outLibrary.swap(scopeLibrary);
     return SLANG_OK;
 }
 
-SlangResult loadModuleLibrary(ArtifactKeep keep, IArtifact* artifact, EndToEndCompileRequest* req, RefPtr<ModuleLibrary>& outLibrary)
+SlangResult loadModuleLibrary(ArtifactKeep keep, IArtifact* artifact, EndToEndCompileRequest* req, ComPtr<IModuleLibrary>& outLibrary)
 {
-    if (auto foundLibrary = findRepresentation<ModuleLibrary>(artifact))
+    if (auto foundLibrary = findRepresentation<IModuleLibrary>(artifact))
     {
         outLibrary = foundLibrary;
         return SLANG_OK;
@@ -102,7 +106,7 @@ SlangResult loadModuleLibrary(ArtifactKeep keep, IArtifact* artifact, EndToEndCo
     SLANG_RETURN_ON_FAIL(artifact->loadBlob(getIntermediateKeep(keep), blob.writeRef()));
 
     // Load the module
-    RefPtr<ModuleLibrary> library;
+    ComPtr<IModuleLibrary> library;
     SLANG_RETURN_ON_FAIL(loadModuleLibrary((const Byte*)blob->getBufferPointer(), blob->getBufferSize(), req, library));
     
     if (canKeep(keep))
@@ -110,7 +114,7 @@ SlangResult loadModuleLibrary(ArtifactKeep keep, IArtifact* artifact, EndToEndCo
         artifact->addRepresentation(library);
     }
 
-    outLibrary = library;
+    outLibrary.swap(library);
     return SLANG_OK;
 }
 

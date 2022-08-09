@@ -45,11 +45,18 @@ public:
     SLANG_NO_THROW size_t SLANG_MCALL getBufferSize() SLANG_OVERRIDE { return m_string.getLength(); }
 
     static ComPtr<ISlangBlob> create(const String& in) { return ComPtr<ISlangBlob>(new StringBlob(in)); }
+    static ComPtr<ISlangBlob> moveCreate(String& in)
+    {
+        auto blob = new StringBlob;
+        blob->m_string.swapWith(in);
+        return ComPtr<ISlangBlob>(blob);
+    }
 
 protected:
     explicit StringBlob(String const& string)
         : m_string(string)
     {}
+    StringBlob() {}
 
         /// Get the contained string
     SLANG_FORCE_INLINE const String& getString() const { return m_string; }

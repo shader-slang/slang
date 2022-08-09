@@ -10,141 +10,32 @@
 
 namespace Slang {
 
-/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ArtifactList !!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
-void* ArtifactList::getInterface(const Guid& guid)
+/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! Artifact !!!!!!!!!!!!!!!!!!!!!!!!!!! */
+
+void* Artifact::castAs(const Guid& guid)
 {
-    if (guid == ISlangUnknown::getTypeGuid() ||
-        guid == ICastable::getTypeGuid() ||
-        guid == IArtifactList::getTypeGuid())
+    if (auto ptr = getInterface(guid))
     {
-        return static_cast<IArtifactList*>(this);
-    }
-    return nullptr;
-}
-
-void* ArtifactList::getObject(const Guid& guid)
-{
-    // For now we can't cast to an object
-    SLANG_UNUSED(guid);
-    return nullptr;
-}
-
-void* ArtifactList::castAs(const Guid& guid)
-{
-    if (auto intf = getInterface(guid))
-    {
-        return intf;
+        return ptr;
     }
     return getObject(guid);
 }
 
-void ArtifactList::add(IArtifact* artifact)
-{
-    // Must be set
-    SLANG_ASSERT(artifact);
-    // Can't already be in the list
-    SLANG_ASSERT(m_artifacts.indexOf(artifact) < 0);
-    // Can't have another owner
-    SLANG_ASSERT(artifact->getParent() == nullptr);
-
-    // Set the parent
-    artifact->setParent(m_parent);
-
-    // Add
-    m_artifacts.add(ComPtr<IArtifact>(artifact));
-}
-
-void ArtifactList::removeAt(Index index) 
-{
-   IArtifact* artifact = m_artifacts[index];
-   artifact->setParent(nullptr);
-   m_artifacts.removeAt(index); 
-}
-
-void ArtifactList::clear()
-{
-    _setParent(nullptr);
-    m_artifacts.clear();
-}
-
-IArtifact* SLANG_MCALL ArtifactList::findByDesc(const ArtifactDesc& desc)
-{
-    for (IArtifact* artifact : m_artifacts)
-    {
-        if (artifact->getDesc() == desc)
-        {
-            return artifact;
-        }
-    }
-    return nullptr;
-}
-
-IArtifact* SLANG_MCALL ArtifactList::findByDerivedDesc(const ArtifactDesc& desc)
-{
-    for (IArtifact* artifact : m_artifacts)
-    {
-        const ArtifactDesc artifactDesc = artifact->getDesc();
-        // TODO(JS): Currently this ignores flags in desc. That may or may not be right 
-        // long term.
-        if (isDerivedFrom(artifactDesc.kind, desc.kind) &&
-            isDerivedFrom(artifactDesc.payload, desc.payload) && 
-            isDerivedFrom(artifactDesc.style, desc.style))
-        {
-            return artifact;
-        }
-    }
-    return nullptr;
-}
-
-IArtifact* SLANG_MCALL ArtifactList::findByName(const char* name)
-{
-    for (IArtifact* artifact : m_artifacts)
-    {
-        const char* artifactName = artifact->getName();
-
-        if (artifactName == name ||
-            ::strcmp(artifactName, name) == 0)
-        {
-            return artifact;
-        }
-    }
-    return nullptr;
-}
-
-IArtifact* ArtifactList::findByPredicate(FindFunc func, void* data)
-{
-    for (IArtifact* artifact : m_artifacts)
-    {
-        if (func(artifact, data))
-        {
-            return artifact;
-        }
-    }
-    return nullptr;
-}
-
-void ArtifactList::_setParent(IArtifact* parent)
-{
-    if (m_parent == parent)
-    {
-        return;
-    }
-
-    for (IArtifact* artifact : m_artifacts)
-    {
-        artifact->setParent(artifact);
-    }
-}
-
-/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! Artifact !!!!!!!!!!!!!!!!!!!!!!!!!!! */
-
 void* Artifact::getInterface(const Guid& uuid)
 {
-    if (uuid == ISlangUnknown::getTypeGuid() || uuid == IArtifact::getTypeGuid())
+    if (uuid == ISlangUnknown::getTypeGuid() || 
+        uuid == ICastable::getTypeGuid() ||
+        uuid == IArtifact::getTypeGuid())
     {
         return static_cast<IArtifact*>(this);
     }
+    return nullptr;
+}
+
+void* Artifact::getObject(const Guid& uuid)
+{
+    SLANG_UNUSED(uuid);
     return nullptr;
 }
 
@@ -297,19 +188,137 @@ ICastableList* Artifact::getRepresentations()
     return m_representations.requireList();
 }
 
-IArtifactList* Artifact::getChildren()
+/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ArtifactContainer !!!!!!!!!!!!!!!!!!!!!!!!!!! */
+
+void* ArtifactContainer::getInterface(const Guid& guid)
 {
-    // If it has already evaluated, return it.
-    if (m_children)
+    if (guid == ISlangUnknown::getTypeGuid() ||
+        guid == ICastable::getTypeGuid() ||
+        guid == IArtifact::getTypeGuid() ||
+        guid == IArtifactContainer::getTypeGuid())
     {
-        return m_children;
+        return static_cast<IArtifactContainer*>(this);
     }
-
-    auto util = ArtifactUtilImpl::getSingleton();
-    util->getChildrenDefaultImpl(this, m_children.writeRef());
-
-    return m_children;
+    return nullptr;
 }
 
+void* ArtifactContainer::getObject(const Guid& guid)
+{
+    SLANG_UNUSED(guid);
+    return nullptr;
+}
+
+void* ArtifactContainer::castAs(const Guid& guid)
+{
+    if (auto ptr = getInterface(guid))
+    {
+        return ptr;
+    }
+    return getObject(guid);
+}
+
+void ArtifactContainer::setChildren(IArtifact** children, Count count)
+{
+    m_expandResult = SLANG_OK;
+
+    m_children.clearAndDeallocate();
+    m_children.setCount(count);
+
+    ComPtr<IArtifact>* dst = m_children.getBuffer();
+    for (Index i = 0; i < count; ++i)
+    {
+        dst[i] = children[i];
+    }
+}
+
+SlangResult ArtifactContainer::expandChildren()
+{
+    if (m_expandResult == SLANG_E_UNINITIALIZED)
+    {
+        auto util = ArtifactUtilImpl::getSingleton();
+        m_expandResult = util->expandChildrenDefaultImpl(this);
+
+        SLANG_ASSERT(m_expandResult != SLANG_E_UNINITIALIZED);
+    }
+    return m_expandResult;
+}
+
+Slice<IArtifact*> ArtifactContainer::getChildren()
+{
+    _requireChildren();
+    return Slice<IArtifact*>((IArtifact**)m_children.getBuffer(), m_children.getCount());
+}
+
+void ArtifactContainer::addChild(IArtifact* artifact)
+{
+    SLANG_ASSERT(artifact);
+    SLANG_ASSERT(m_children.indexOf(artifact) < 0);
+    m_children.add(ComPtr<IArtifact>(artifact));
+}
+
+void ArtifactContainer::removeChildAt(Index index)
+{
+    m_children.removeAt(index);
+}
+
+void ArtifactContainer::clearChildren()
+{
+    m_children.clearAndDeallocate();
+}
+IArtifact* ArtifactContainer::findChildByDesc(const ArtifactDesc& desc)
+{
+    for (IArtifact* artifact : m_children)
+    {
+        if (artifact->getDesc() == desc)
+        {
+            return artifact;
+        }
+    }
+    return nullptr;
+}
+
+IArtifact* ArtifactContainer::findChildByDerivedDesc(const ArtifactDesc& desc)
+{
+    for (IArtifact* artifact : m_children)
+    {
+        const ArtifactDesc artifactDesc = artifact->getDesc();
+        // TODO(JS): Currently this ignores flags in desc. That may or may not be right 
+        // long term.
+        if (isDerivedFrom(artifactDesc.kind, desc.kind) &&
+            isDerivedFrom(artifactDesc.payload, desc.payload) &&
+            isDerivedFrom(artifactDesc.style, desc.style))
+        {
+            return artifact;
+        }
+    }
+    return nullptr;
+}
+
+IArtifact* ArtifactContainer::findChildByName(const char* name)
+{
+    for (IArtifact* artifact : m_children)
+    {
+        const char* artifactName = artifact->getName();
+
+        if (artifactName == name ||
+            ::strcmp(artifactName, name) == 0)
+        {
+            return artifact;
+        }
+    }
+    return nullptr;
+}
+
+IArtifact* ArtifactContainer::findChildByPredicate(FindFunc func, void* data)
+{
+    for (IArtifact* artifact : m_children)
+    {
+        if (func(artifact, data))
+        {
+            return artifact;
+        }
+    }
+    return nullptr;
+}
 
 } // namespace Slang

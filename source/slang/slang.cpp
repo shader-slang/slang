@@ -4485,9 +4485,15 @@ SlangResult _addLibraryReference(EndToEndCompileRequest* req, IArtifact* artifac
 
     if (desc.kind == ArtifactKind::Library && desc.payload == ArtifactPayload::SlangIR)
     {
-        RefPtr<ModuleLibrary> library;
+        ComPtr<IModuleLibrary> libraryIntf;
 
-        SLANG_RETURN_ON_FAIL(loadModuleLibrary(ArtifactKeep::Yes, artifact, req, library));
+        SLANG_RETURN_ON_FAIL(loadModuleLibrary(ArtifactKeep::Yes, artifact, req, libraryIntf));
+
+        auto library = as<ModuleLibrary>(libraryIntf);
+        if (!library)
+        {
+            return SLANG_FAIL;
+        }
 
         FrontEndCompileRequest* frontEndRequest = req->getFrontEndReq();
         frontEndRequest->m_extraEntryPoints.addRange(library->m_entryPoints.getBuffer(), library->m_entryPoints.getCount());
@@ -4508,13 +4514,12 @@ SlangResult _addLibraryReference(EndToEndCompileRequest* req, IArtifact* artifac
 SlangResult EndToEndCompileRequest::addLibraryReference(const void* libData, size_t libDataSize)
 {
     // We need to deserialize and add the modules
-    RefPtr<ModuleLibrary> library;
+    ComPtr<IModuleLibrary> library;
+
     SLANG_RETURN_ON_FAIL(loadModuleLibrary((const Byte*)libData, libDataSize, this, library));
 
-    const auto desc = ArtifactDesc::make(ArtifactKind::Library, ArtifactPayload::SlangIR);
-
     // Create an artifact without any name (as one is not provided)
-    ComPtr<IArtifact> artifact(new Artifact(desc, String()));
+    auto artifact = Artifact::create(ArtifactDesc::make(ArtifactKind::Library, ArtifactPayload::SlangIR));
     artifact->addRepresentation(library);
 
     return _addLibraryReference(this, artifact);

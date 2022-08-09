@@ -37,22 +37,19 @@ void* ArtifactUtilImpl::getInterface(const Guid& guid)
 
 SlangResult ArtifactUtilImpl::createArtifact(const ArtifactDesc& desc, const char* inName, IArtifact** outArtifact)
 {
-	String name;
-	if (inName)
-	{
-		name = inName;
-	}
+	*outArtifact = inName ?
+		Artifact::create(desc, inName).detach() : 
+		Artifact::create(desc).detach();
 
-	ComPtr<IArtifact> artifact(new Artifact(desc, name));
-
-	*outArtifact = artifact.detach();
 	return SLANG_OK;
 }
 
-SlangResult ArtifactUtilImpl::createArtifactList(IArtifact* parent, IArtifactList** outArtifactList)
+SlangResult ArtifactUtilImpl::createArtifactContainer(const ArtifactDesc& desc, const char* inName, IArtifactContainer** outArtifactContainer)
 {
-	ComPtr<IArtifactList> artifactList(new ArtifactList(parent));
-	*outArtifactList = artifactList.detach();
+	*outArtifactContainer = inName ?
+		ArtifactContainer::create(desc, inName).detach() :
+		ArtifactContainer::create(desc).detach();
+
 	return SLANG_OK;
 }
 
@@ -174,18 +171,12 @@ ArtifactDesc ArtifactUtilImpl::makeDescFromCompileTarget(SlangCompileTarget targ
 	return ArtifactDescUtil::makeDescFromCompileTarget(target);
 }
 
-SlangResult ArtifactUtilImpl::getChildrenDefaultImpl(IArtifact* artifact, IArtifactList** outList)
+SlangResult ArtifactUtilImpl::expandChildrenDefaultImpl(IArtifactContainer* container)
 {
-	auto desc = artifact->getDesc();
-
-	// If it's a container type for now, just create empty list of children
-	if (isDerivedFrom(desc.kind, ArtifactKind::Container))
-	{
-		*outList = ComPtr<IArtifactList>(new ArtifactList(artifact)).detach();
-		return SLANG_OK;
-	}
-
-	return SLANG_E_NOT_AVAILABLE;
+	// TODO(JS):
+	// Proper implementation should (for example) be able to expand a Zip file etc.
+	container->setChildren(nullptr, 0);
+	return SLANG_OK;
 }
 
 SlangResult ArtifactUtilImpl::loadSharedLibraryDefaultImpl(IArtifact* artifact, ArtifactKeep keep, ISlangSharedLibrary** outSharedLibrary)

@@ -1366,7 +1366,7 @@ namespace Slang
                 options.libraryPaths.add(Path::getParentDirectory(Path::getExecutablePath()));
 
                 // Set up the library artifact
-                ComPtr<IArtifact> artifact(new Artifact(ArtifactDesc::make(ArtifactKind::Library, Artifact::Payload::HostCPU), "slang-rt"));
+                auto artifact = Artifact::create(ArtifactDesc::make(ArtifactKind::Library, Artifact::Payload::HostCPU), "slang-rt");
 
                 ComPtr<IFileArtifactRepresentation> fileRep(new FileArtifactRepresentation(IFileArtifactRepresentation::Kind::NameOnly, "slang-rt", nullptr, nullptr));
                 artifact->addRepresentation(fileRep);

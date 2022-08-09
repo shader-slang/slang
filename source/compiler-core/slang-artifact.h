@@ -4,13 +4,39 @@
 
 #include "../core/slang-basic.h"
 
-//#include "../../slang-com-helper.h"
-//#include "../core/slang-destroyable.h"
-
 #include "../core/slang-castable-list.h"
 
 namespace Slang
 {
+
+
+/* Simplest slice types. We can't use UnownedStringSlice etc, because they implement functionality in libraries,
+and we want to use these types in headers.
+If we wanted a C implementation it would be easy to use a macro to generate the functionality */
+
+template <typename T>
+struct Slice
+{
+    const T* begin() const { return data; }
+    const T* end() const { return data + count; }
+
+    Slice() :count(0), data(nullptr) {}
+    Slice(const T* inData, Count inCount) :
+        data(inData),
+        count(inCount)
+    {}
+
+    const T* data;
+    Count count;
+};
+
+struct ZeroTerminatedCharSlice : Slice<char>
+{
+    typedef Slice<char> Super;
+    explicit ZeroTerminatedCharSlice(const char* in) :Super(in, ::strlen(in)) {}
+    ZeroTerminatedCharSlice(const char* in, Count inCount) :Super(in, inCount) { SLANG_ASSERT(in[inCount] == 0); }
+    ZeroTerminatedCharSlice() :Super("", 0) {}
+};
 
 /* As a rule of thumb, if we can define some aspect in a hierarchy then we should do so at the highest level. 
 If some aspect can apply to multiple items identically we move that to a separate enum. 
@@ -273,7 +299,7 @@ More long term goals would be to
 * Make Diagnostics into an interface (such it can be added to a Artifact result)
 * Use Artifact and related types for downstream compiler
 */
-class IArtifact : public ISlangUnknown
+class IArtifact : public ICastable
 {
 public:
     SLANG_COM_INTERFACE(0x57375e20, 0xbed, 0x42b6, { 0x9f, 0x5e, 0x59, 0x4f, 0x6, 0x2b, 0xe6, 0x90 })
@@ -288,11 +314,6 @@ public:
     
         /// Get the Desc defining the contents of the artifact
     virtual SLANG_NO_THROW Desc SLANG_MCALL getDesc() = 0;
-
-        /// Get the artifact (if any) that this artifact belongs to
-    virtual SLANG_NO_THROW IArtifact* SLANG_MCALL getParent() = 0;
-        /// Set the parent that 'owns' this artifact. The parent is *not* reference counted (ie weak reference)
-    virtual SLANG_NO_THROW void SLANG_MCALL setParent(IArtifact* parent) = 0;
 
         /// Returns true if the artifact in principal exists
     virtual SLANG_NO_THROW bool SLANG_MCALL exists() = 0;
@@ -331,11 +352,35 @@ public:
 
         /// Get the list of all representations
     virtual SLANG_NO_THROW ICastableList* SLANG_MCALL getRepresentations() = 0;
+};
 
-        /// Get the children. This may be evaluated lazily. 
-        /// Only artifacts with a ArtifactKind that derives from Container generally produce childen.
-        /// If an artifact doesn't support children, it can return nullptr.
-    virtual SLANG_NO_THROW IArtifactList* SLANG_MCALL getChildren() = 0;
+class IArtifactContainer : public IArtifact
+{
+public:
+    SLANG_COM_INTERFACE(0xa96e29bd, 0xb546, 0x4e79, { 0xa0, 0xdc, 0x67, 0x49, 0x22, 0x2c, 0x39, 0xad })
+
+    typedef bool (*FindFunc)(IArtifact* artifact, void* data);
+
+        /// Sets all of the children, will set the expansion state to SLANG_OK
+    virtual SLANG_NO_THROW void SLANG_MCALL setChildren(IArtifact**children, Count count) = 0;
+        /// Will be called implicitly on access to children
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL expandChildren() = 0;
+        /// Get the children, will only remain valid if no mutation of children list
+    virtual SLANG_NO_THROW Slice<IArtifact*> SLANG_MCALL getChildren() = 0;
+        /// Add the artifact to the list
+    virtual SLANG_NO_THROW void SLANG_MCALL addChild(IArtifact* artifact) = 0;
+        /// Removes the child at index, keeps other artifacts in the same order
+    virtual SLANG_NO_THROW void SLANG_MCALL removeChildAt(Index index) = 0;
+        /// Clear the list
+    virtual SLANG_NO_THROW void SLANG_MCALL clearChildren() = 0;
+        /// Find an artifact which is an exact match for the desc
+    virtual SLANG_NO_THROW IArtifact* SLANG_MCALL findChildByDesc(const ArtifactDesc& desc) = 0;
+        /// Find an artifact that matches desc allowing derivations. Flags is ignored
+    virtual SLANG_NO_THROW IArtifact* SLANG_MCALL findChildByDerivedDesc(const ArtifactDesc& desc) = 0;
+        /// Find by name
+    virtual SLANG_NO_THROW IArtifact* SLANG_MCALL findChildByName(const char* name) = 0;
+        /// Find via predicate function
+    virtual SLANG_NO_THROW IArtifact* SLANG_MCALL findChildByPredicate(FindFunc func, void* data) = 0;
 };
 
 template <typename T>
@@ -343,39 +388,6 @@ SLANG_FORCE_INLINE T* findRepresentation(IArtifact* artifact)
 {
     return reinterpret_cast<T*>(artifact->findRepresentation(T::getTypeGuid()));
 }
-
-/* A list of artifacts. */
-class IArtifactList : public ICastable
-{
-    SLANG_COM_INTERFACE(0x5ef6ace5, 0xc928, 0x4c7b, { 0xbc, 0xba, 0x83, 0xa9, 0xd9, 0x66, 0x64, 0x27 })
-
-    typedef bool (*FindFunc)(IArtifact* artifact, void* data);
-
-        /// Get the artifact this list belongs to. Can be nullptr.
-        /// Note this is a *weak* reference.
-    virtual SLANG_NO_THROW IArtifact* SLANG_MCALL getParent() = 0;
-        /// The parent is no longer accessible
-    virtual SLANG_NO_THROW void SLANG_MCALL setParent(IArtifact* artifact) = 0;
-
-        /// Get the artifact at the specified index
-    virtual SLANG_NO_THROW IArtifact* SLANG_MCALL getAt(Index index) = 0;
-        /// Get the count of all the artifacts
-    virtual SLANG_NO_THROW Count SLANG_MCALL getCount() = 0;
-        /// Add the artifact to the list
-    virtual SLANG_NO_THROW void SLANG_MCALL add(IArtifact* artifact) = 0;
-        /// Removes at index, keeps other artifacts in the same order
-    virtual SLANG_NO_THROW void SLANG_MCALL removeAt(Index index) = 0;
-        /// Clear the list
-    virtual SLANG_NO_THROW void SLANG_MCALL clear() = 0;
-        /// Find an artifact which is an exact match for the desc
-    virtual SLANG_NO_THROW IArtifact* SLANG_MCALL findByDesc(const ArtifactDesc& desc) = 0;
-        /// Find an artifact that matches desc allowing derivations. Flags is ignored
-    virtual SLANG_NO_THROW IArtifact* SLANG_MCALL findByDerivedDesc(const ArtifactDesc& desc) = 0;
-        /// Find by name
-    virtual SLANG_NO_THROW IArtifact* SLANG_MCALL findByName(const char* name) = 0;
-        /// Find via predicate function
-    virtual SLANG_NO_THROW IArtifact* SLANG_MCALL findByPredicate(FindFunc func, void* data) = 0;
-};
 
 /* The IArtifactRepresentation interface represents a single representation that can be part of an artifact. It's special in so far
 as

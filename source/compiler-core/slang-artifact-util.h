@@ -13,8 +13,7 @@ class IArtifactUtil : public ISlangUnknown
 	SLANG_COM_INTERFACE(0x882b25d7, 0xe300, 0x4b20, { 0xbe, 0xb, 0x26, 0xd2, 0x52, 0x3e, 0x70, 0x20 })
 
 	virtual SLANG_NO_THROW SlangResult SLANG_MCALL createArtifact(const ArtifactDesc& desc, const char* name, IArtifact** outArtifact) = 0;
-
-	virtual SLANG_NO_THROW SlangResult SLANG_MCALL createArtifactList(IArtifact* parent, IArtifactList** outArtifactList) = 0;
+	virtual SLANG_NO_THROW SlangResult SLANG_MCALL createArtifactContainer(const ArtifactDesc& desc, const char* name, IArtifactContainer** outArtifactContainer) = 0;
 
 	virtual SLANG_NO_THROW ArtifactKind SLANG_MCALL getKindParent(ArtifactKind kind) = 0;
 	virtual SLANG_NO_THROW UnownedStringSlice SLANG_MCALL getKindName(ArtifactKind kind) = 0;
@@ -40,7 +39,7 @@ class IArtifactUtil : public ISlangUnknown
 
 	virtual SLANG_NO_THROW ArtifactDesc SLANG_MCALL makeDescFromCompileTarget(SlangCompileTarget target) = 0;
 
-	virtual SLANG_NO_THROW SlangResult SLANG_MCALL getChildrenDefaultImpl(IArtifact* artifact, IArtifactList** outList) = 0;
+	virtual SLANG_NO_THROW SlangResult SLANG_MCALL expandChildrenDefaultImpl(IArtifactContainer* container) = 0;
 };
 
 class ArtifactUtilImpl : public IArtifactUtil
@@ -53,8 +52,7 @@ public:
 
 	// IArtifactInterface
 	virtual SLANG_NO_THROW SlangResult SLANG_MCALL createArtifact(const ArtifactDesc& desc, const char* name, IArtifact** outArtifact) SLANG_OVERRIDE;
-
-	virtual SLANG_NO_THROW SlangResult SLANG_MCALL createArtifactList(IArtifact* parent, IArtifactList** outArtifactList) SLANG_OVERRIDE;
+	virtual SLANG_NO_THROW SlangResult SLANG_MCALL createArtifactContainer(const ArtifactDesc& desc, const char* name, IArtifactContainer** outArtifactContainer) SLANG_OVERRIDE;
 
 	virtual SLANG_NO_THROW ArtifactKind SLANG_MCALL getKindParent(ArtifactKind kind) SLANG_OVERRIDE;
 	virtual SLANG_NO_THROW UnownedStringSlice SLANG_MCALL getKindName(ArtifactKind kind) SLANG_OVERRIDE;
@@ -78,7 +76,7 @@ public:
 
 	virtual SLANG_NO_THROW ArtifactDesc SLANG_MCALL makeDescFromCompileTarget(SlangCompileTarget target) SLANG_OVERRIDE;
 
-	virtual SLANG_NO_THROW SlangResult SLANG_MCALL getChildrenDefaultImpl(IArtifact* artifact, IArtifactList** outList) SLANG_OVERRIDE;
+	virtual SLANG_NO_THROW SlangResult SLANG_MCALL expandChildrenDefaultImpl(IArtifactContainer* artifact) SLANG_OVERRIDE;
 
 	static IArtifactUtil* getSingleton() { return &g_singleton; }
 

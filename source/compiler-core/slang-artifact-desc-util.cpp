@@ -3,6 +3,8 @@
 
 #include "slang-artifact-representation.h"
 
+#include "slang-artifact-impl.h"
+
 #include "../core/slang-type-text-util.h"
 #include "../core/slang-io.h"
 
@@ -686,6 +688,12 @@ UnownedStringSlice ArtifactDescUtil::getDefaultExtension(const ArtifactDesc& des
     }
 
     return SLANG_OK;
+}
+
+/* static */ComPtr<IArtifactContainer> ArtifactDescUtil::createContainer(const ArtifactDesc& desc)
+{
+    const auto containerDesc = ArtifactDesc::make(ArtifactKind::Container, ArtifactPayload::CompileResults, desc.style);
+    return ArtifactContainer::create(containerDesc);
 }
 
 } // namespace Slang
