@@ -2883,6 +2883,7 @@ namespace Slang
         Scope* coreLanguageScope = nullptr;
         Scope* hlslLanguageScope = nullptr;
         Scope* slangLanguageScope = nullptr;
+        Scope* autodiffLanguageScope = nullptr;
 
         ModuleDecl* baseModuleDecl = nullptr;
         List<RefPtr<Module>> stdlibModules;
@@ -2914,10 +2915,12 @@ namespace Slang
         String slangLibraryCode;
         String hlslLibraryCode;
         String glslLibraryCode;
+        String autodiffLibraryCode;
 
         String getStdlibPath();
         String getCoreLibraryCode();
         String getHLSLLibraryCode();
+        String getAutodiffLibraryCode();
 
      
         RefPtr<SharedASTBuilder> m_sharedASTBuilder;
