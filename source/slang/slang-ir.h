@@ -1255,6 +1255,13 @@ SIMPLE_IR_TYPE(TypeKind, Kind);
 //
 SIMPLE_IR_TYPE(GenericKind, Kind)
 
+struct IRDifferentialPairType : IRType
+{
+    IRType* getValueType() { return (IRType*)getOperand(0); }
+
+    IR_LEAF_ISA(DifferentialPairType)
+};
+
 struct IRVectorType : IRType
 {
     IRType* getElementType() { return (IRType*)getOperand(0); }

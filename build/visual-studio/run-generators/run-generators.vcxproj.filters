@@ -40,6 +40,9 @@
     <CustomBuild Include="..\..\..\source\slang\core.meta.slang">
       <Filter>Source Files</Filter>
     </CustomBuild>
+    <CustomBuild Include="..\..\..\source\slang\diff.meta.slang">
+      <Filter>Source Files</Filter>
+    </CustomBuild>
     <CustomBuild Include="..\..\..\source\slang\hlsl.meta.slang">
       <Filter>Source Files</Filter>
     </CustomBuild>
