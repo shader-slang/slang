@@ -211,9 +211,11 @@ SLANG_HIERARCHICAL_ENUM(ArtifactKind, SLANG_ARTIFACT_KIND, SLANG_ARTIFACT_KIND_E
             x(LLVMIR, GeneralIR) \
         x(AST, Base) \
             x(SlangAST, AST) \
-        x(DebugInfo, Base) \
-        x(Diagnostics, Base) \
-        x(CompileResults, Base)
+        x(CompileResults, Base) \
+        x(MetaData, Base) \
+            x(PostEmitMetadata, MetaData) \
+            x(DebugInfo, MetaData) \
+            x(Diagnostics, MetaData)
 
 #define SLANG_ARTIFACT_PAYLOAD_ENTRY(TYPE, PARENT) { Index(ArtifactPayload::TYPE), Index(ArtifactPayload::PARENT), #TYPE },
 

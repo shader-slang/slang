@@ -108,11 +108,13 @@ enum class ArtifactPayload : uint8_t
 
     SlangAST,       ///< Slang AST
 
+    CompileResults, ///< Payload is a collection of compilation results
+
+    MetaData,       ///< Meta data
+
     DebugInfo,      ///< Debugging information
-
     Diagnostics,    ///< Diagnostics information
-
-    CompileResults,  ///< Payload is a collection of compilation results
+    PostEmitMetadata, ///< Post emit meta data
 
     CountOf,
 };
