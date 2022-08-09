@@ -246,6 +246,7 @@ SlangResult ArtifactContainer::expandChildren()
 Slice<IArtifact*> ArtifactContainer::getChildren()
 {
     _requireChildren();
+
     return Slice<IArtifact*>((IArtifact**)m_children.getBuffer(), m_children.getCount());
 }
 
@@ -253,20 +254,30 @@ void ArtifactContainer::addChild(IArtifact* artifact)
 {
     SLANG_ASSERT(artifact);
     SLANG_ASSERT(m_children.indexOf(artifact) < 0);
+
+    _requireChildren();
+
     m_children.add(ComPtr<IArtifact>(artifact));
 }
 
 void ArtifactContainer::removeChildAt(Index index)
 {
+    _requireChildren();
+
     m_children.removeAt(index);
 }
 
 void ArtifactContainer::clearChildren()
 {
+    _requireChildren();
+
     m_children.clearAndDeallocate();
 }
+
 IArtifact* ArtifactContainer::findChildByDesc(const ArtifactDesc& desc)
 {
+    _requireChildren();
+
     for (IArtifact* artifact : m_children)
     {
         if (artifact->getDesc() == desc)
@@ -279,6 +290,8 @@ IArtifact* ArtifactContainer::findChildByDesc(const ArtifactDesc& desc)
 
 IArtifact* ArtifactContainer::findChildByDerivedDesc(const ArtifactDesc& desc)
 {
+    _requireChildren();
+
     for (IArtifact* artifact : m_children)
     {
         const ArtifactDesc artifactDesc = artifact->getDesc();
@@ -296,6 +309,8 @@ IArtifact* ArtifactContainer::findChildByDerivedDesc(const ArtifactDesc& desc)
 
 IArtifact* ArtifactContainer::findChildByName(const char* name)
 {
+    _requireChildren();
+
     for (IArtifact* artifact : m_children)
     {
         const char* artifactName = artifact->getName();
@@ -311,6 +326,8 @@ IArtifact* ArtifactContainer::findChildByName(const char* name)
 
 IArtifact* ArtifactContainer::findChildByPredicate(FindFunc func, void* data)
 {
+    _requireChildren();
+
     for (IArtifact* artifact : m_children)
     {
         if (func(artifact, data))

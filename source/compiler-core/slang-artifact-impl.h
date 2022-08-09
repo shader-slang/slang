@@ -136,7 +136,9 @@ protected:
     {
         if (m_expandResult == SLANG_E_UNINITIALIZED)
         {
-            expandChildren();
+            const auto res = expandChildren();
+            SLANG_UNUSED(res);
+            SLANG_ASSERT(SLANG_SUCCEEDED(res));
         }
     }
 
