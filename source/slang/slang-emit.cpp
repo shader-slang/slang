@@ -66,6 +66,8 @@
 #include "slang-emit-cpp.h"
 #include "slang-emit-cuda.h"
 
+#include "../compiler-core/slang-artifact-desc-util.h"
+
 #include <assert.h>
 
 Slang::String get_slang_cpp_host_prelude();
@@ -180,7 +182,7 @@ Result linkAndOptimizeIR(
     auto targetRequest = codeGenContext->getTargetReq();
 
     // Get the artifact desc for the target 
-    const auto artifactDesc = ArtifactDesc::makeFromCompileTarget(asExternal(target));
+    const auto artifactDesc = ArtifactDescUtil::makeDescFromCompileTarget(asExternal(target));
 
     // We start out by performing "linking" at the level of the IR.
     // This step will create a fresh IR module to be used for

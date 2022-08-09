@@ -13,7 +13,11 @@
 #include "slang-compiler.h"
 
 #include "../compiler-core/slang-lexer.h"
-#include "../compiler-core/slang-artifact.h"
+
+// Artifact
+#include "../compiler-core/slang-artifact-desc-util.h"
+#include "../compiler-core/slang-artifact-representation-impl.h"
+#include "../compiler-core/slang-artifact-impl.h"
 
 #include "slang-lower-to-ir.h"
 #include "slang-mangle.h"
@@ -27,7 +31,6 @@
 
 #include "slang-serialize-container.h"
 //
-
 
 // Includes to allow us to control console
 // output when writing assembly dumps.
@@ -53,39 +56,24 @@
 namespace Slang
 {
 
-    // !!!!!!!!!!!!!!!!!!!!!! free functions for DiagnosicSink !!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+// !!!!!!!!!!!!!!!!!!!!!! free functions for DiagnosicSink !!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-bool isHeterogeneousTarget(CodeGenTarget target)
-{
-    return ArtifactDesc::makeFromCompileTarget(asExternal(target)).style == ArtifactStyle::Host;
-}
-
-void printDiagnosticArg(StringBuilder& sb, CodeGenTarget val)
+    bool isHeterogeneousTarget(CodeGenTarget target)
     {
-        switch (val)
-        {
-            default:
-                sb << "<unknown>";
-                break;
+        return ArtifactDescUtil::makeDescFromCompileTarget(asExternal(target)).style == ArtifactStyle::Host;
+    }
 
-    #define CASE(TAG, STR) case CodeGenTarget::TAG: sb << STR; break
-                CASE(GLSL, "glsl");
-                CASE(HLSL, "hlsl");
-                CASE(SPIRV, "spirv");
-                CASE(SPIRVAssembly, "spriv-assembly");
-                CASE(DXBytecode, "dxbc");
-                CASE(DXBytecodeAssembly, "dxbc-assembly");
-                CASE(DXIL, "dxil");
-                CASE(DXILAssembly, "dxil-assembly");
-    #undef CASE
-        }
+    void printDiagnosticArg(StringBuilder& sb, CodeGenTarget val)
+    {
+        UnownedStringSlice name = TypeTextUtil::getCompileTargetName(asExternal(val));
+        name = name.getLength() ? name : toSlice("<unknown>");
+        sb << name;
     }
 
     void printDiagnosticArg(StringBuilder& sb, PassThroughMode val)
     {
         sb << TypeTextUtil::getPassThroughName(SlangPassThrough(val));
     }
-
 
     // !!!!!!!!!!!!!!!!!!!!!!!!!!!! CompileResult !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
@@ -997,7 +985,7 @@ void printDiagnosticArg(StringBuilder& sb, CodeGenTarget val)
 
     static bool _isCPUHostTarget(CodeGenTarget target)
     {
-        auto desc = ArtifactDesc::makeFromCompileTarget(asExternal(target));
+        auto desc = ArtifactDescUtil::makeDescFromCompileTarget(asExternal(target));
         return desc.style == ArtifactStyle::Host;
     }
 
@@ -1303,7 +1291,7 @@ void printDiagnosticArg(StringBuilder& sb, CodeGenTarget val)
 
         // If we aren't using LLVM 'host callable', we want downstream compile to produce a shared library
         if (compilerType != PassThroughMode::LLVM && 
-            ArtifactDesc::makeFromCompileTarget(asExternal(target)).kind == ArtifactKind::HostCallable)
+            ArtifactDescUtil::makeDescFromCompileTarget(asExternal(target)).kind == ArtifactKind::HostCallable)
         {
             target = CodeGenTarget::ShaderSharedLibrary;
         }
@@ -1804,7 +1792,7 @@ void printDiagnosticArg(StringBuilder& sb, CodeGenTarget val)
                 ComPtr<ISlangBlob> blob;
                 if (SLANG_FAILED(result.getBlob(blob)))
                 {
-                    if (ArtifactDesc::makeFromCompileTarget(asExternal(targetReq->getTarget())).kind == ArtifactKind::HostCallable)
+                    if (ArtifactDescUtil::makeDescFromCompileTarget(asExternal(targetReq->getTarget())).kind == ArtifactKind::HostCallable)
                     {
                         // Some HostCallable are not directly representable as a 'binary'.
                         // So here, we just ignore if that appears the case, and don't output an unexpected error.
@@ -2448,7 +2436,7 @@ void printDiagnosticArg(StringBuilder& sb, CodeGenTarget val)
             return;
 
         auto target = getTargetFormat();
-        const auto desc = ArtifactDesc::makeFromCompileTarget(asExternal(target));
+        const auto desc = ArtifactDescUtil::makeDescFromCompileTarget(asExternal(target));
 
         if (desc.kind == ArtifactKind::Text)
         {

@@ -1,23 +1,47 @@
-// slang-artifact-info.h
-#ifndef SLANG_ARTIFACT_INFO_H
-#define SLANG_ARTIFACT_INFO_H
+// slang-artifact-desc.h
+
+#ifndef SLANG_ARTIFACT_DESC_UTIL_H
+#define SLANG_ARTIFACT_DESC_UTIL_H
 
 #include "slang-artifact.h"
 
 namespace Slang
 {
 
-struct ArtifactInfoUtil
+    /// Get the parent kind
+ArtifactKind getParent(ArtifactKind kind);
+    /// Returns true if kind is derived from base
+bool isDerivedFrom(ArtifactKind kind, ArtifactKind base);
+    /// Get the name for the kind
+UnownedStringSlice getName(ArtifactKind kind);
+
+    /// Get the parent payload
+ArtifactPayload getParent(ArtifactPayload payload); 
+    /// Returns true if payload is derived from base
+bool isDerivedFrom(ArtifactPayload payload, ArtifactPayload base);
+    /// Get the name for the payload
+UnownedStringSlice getName(ArtifactPayload payload);
+
+    /// Get the parent style
+ArtifactStyle getParent(ArtifactStyle style);
+    /// Returns true if style is derived from base
+bool isDerivedFrom(ArtifactStyle style, ArtifactStyle base);
+    /// Get the name for the style
+UnownedStringSlice getName(ArtifactStyle style);
+
+struct ArtifactDescUtil
 {
     typedef ArtifactPayload Payload;
     typedef ArtifactKind Kind;
-
+    typedef ArtifactStyle Style;
+    typedef ArtifactDesc Desc;
+    
         /// Returns true if the kind is binary linkable 
     static bool isKindBinaryLinkable(Kind kind);
 
         /// True if is a CPU target - either
     static bool isCpuLikeTarget(const ArtifactDesc& desc);
-    
+
         /// True if is a CPU binary
     static bool isCpuBinary(const ArtifactDesc& desc);
         /// True if is a GPU usable (can be passed to a driver/API and be used 
@@ -61,6 +85,8 @@ struct ArtifactInfoUtil
         /// Given a desc, and a basePath returns a suitable path for a entity of specified desc
     static SlangResult calcPathForDesc(const ArtifactDesc& desc, const UnownedStringSlice& basePath, StringBuilder& outPath);
 
+        /// Make ArtifactDesc from target
+    static ArtifactDesc makeDescFromCompileTarget(SlangCompileTarget target);
 };
 
 } // namespace Slang

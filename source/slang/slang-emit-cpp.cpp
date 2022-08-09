@@ -8,6 +8,8 @@
 
 #include "slang-ir-clone.h"
 
+#include "../compiler-core/slang-artifact-desc-util.h"
+
 #include <assert.h>
 
 /*
@@ -1653,7 +1655,7 @@ CPPSourceEmitter::CPPSourceEmitter(const Desc& desc):
     //m_semanticUsedFlags = SemanticUsedFlag::GroupID | SemanticUsedFlag::GroupThreadID | SemanticUsedFlag::DispatchThreadID;
 
     
-    const auto artifactDesc = ArtifactDesc::makeFromCompileTarget(asExternal(getTarget()));
+    const auto artifactDesc = ArtifactDescUtil::makeDescFromCompileTarget(asExternal(getTarget()));
 
     // If we have runtime library we can convert to a terminated string slice    
     m_hasString = (artifactDesc.style == ArtifactStyle::Host);
