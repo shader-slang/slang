@@ -306,29 +306,29 @@ public:
         /// Add data associated with this artifact
     virtual SLANG_NO_THROW void SLANG_MCALL addAssociated(ICastable* castable) = 0;
         /// Find an associated item
-    virtual void* SLANG_MCALL SLANG_MCALL findAssociated(const Guid& unk) = 0;
+    virtual SLANG_NO_THROW void* SLANG_MCALL SLANG_MCALL findAssociated(const Guid& unk) = 0;
         /// TODO(JS): We may want this to return nullptr if it's empty.
         /// Get the list of associated items
-    virtual ICastableList* SLANG_MCALL getAssociated() = 0;
+    virtual SLANG_NO_THROW ICastableList* SLANG_MCALL getAssociated() = 0;
         /// Find first associated that matches the predicate
-    virtual ICastable* SLANG_MCALL findAssociatedWithPredicate(ICastableList::FindFunc findFunc, void* data) = 0;
+    virtual SLANG_NO_THROW ICastable* SLANG_MCALL findAssociatedWithPredicate(ICastableList::FindFunc findFunc, void* data) = 0;
 
         /// Add a representation 
     virtual SLANG_NO_THROW void SLANG_MCALL addRepresentation(ICastable* castable) = 0;
         /// Add a representation that doesn't derive from IArtifactRepresentation
     virtual SLANG_NO_THROW void SLANG_MCALL addRepresentationUnknown(ISlangUnknown* rep) = 0;
         /// Find representation
-    virtual void* SLANG_MCALL findRepresentation(const Guid& guid) = 0;
+    virtual SLANG_NO_THROW void* SLANG_MCALL findRepresentation(const Guid& guid) = 0;
         /// Find first representation that matches the predicate 
-    virtual ICastable* SLANG_MCALL findRepresentationWithPredicate(ICastableList::FindFunc findFunc, void* data) = 0;
+    virtual SLANG_NO_THROW ICastable* SLANG_MCALL findRepresentationWithPredicate(ICastableList::FindFunc findFunc, void* data) = 0;
 
         /// Get the list of all representations
-    virtual ICastableList* SLANG_MCALL getRepresentations() = 0;
+    virtual SLANG_NO_THROW ICastableList* SLANG_MCALL getRepresentations() = 0;
 
         /// Get the children. This may be evaluated lazily. 
         /// Only artifacts with a ArtifactKind that derives from Container generally produce childen.
         /// If an artifact doesn't support children, it can return nullptr.
-    virtual IArtifactList* SLANG_MCALL getChildren() = 0;
+    virtual SLANG_NO_THROW IArtifactList* SLANG_MCALL getChildren() = 0;
 };
 
 template <typename T>
@@ -341,6 +341,8 @@ SLANG_FORCE_INLINE T* findRepresentation(IArtifact* artifact)
 class IArtifactList : public ICastable
 {
     SLANG_COM_INTERFACE(0x5ef6ace5, 0xc928, 0x4c7b, { 0xbc, 0xba, 0x83, 0xa9, 0xd9, 0x66, 0x64, 0x27 })
+
+    typedef bool (*FindFunc)(IArtifact* artifact, void* data);
 
         /// Get the artifact this list belongs to. Can be nullptr.
         /// Note this is a *weak* reference.
@@ -358,6 +360,14 @@ class IArtifactList : public ICastable
     virtual SLANG_NO_THROW void SLANG_MCALL removeAt(Index index) = 0;
         /// Clear the list
     virtual SLANG_NO_THROW void SLANG_MCALL clear() = 0;
+        /// Find an artifact which is an exact match for the desc
+    virtual SLANG_NO_THROW IArtifact* SLANG_MCALL findByDesc(const ArtifactDesc& desc) = 0;
+        /// Find an artifact that matches desc allowing derivations. Flags is ignored
+    virtual SLANG_NO_THROW IArtifact* SLANG_MCALL findByDerivedDesc(const ArtifactDesc& desc) = 0;
+        /// Find by name
+    virtual SLANG_NO_THROW IArtifact* SLANG_MCALL findByName(const char* name) = 0;
+        /// Find via predicate function
+    virtual SLANG_NO_THROW IArtifact* SLANG_MCALL findByPredicate(FindFunc func, void* data) = 0;
 };
 
 /* The IArtifactRepresentation interface represents a single representation that can be part of an artifact. It's special in so far

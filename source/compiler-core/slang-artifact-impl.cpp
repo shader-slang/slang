@@ -4,6 +4,7 @@
 #include "slang-artifact-representation.h"
 
 #include "slang-artifact-util.h"
+#include "slang-artifact-desc-util.h"
 
 #include "../core/slang-castable-list-impl.h"
 
@@ -65,6 +66,62 @@ void ArtifactList::clear()
 {
     _setParent(nullptr);
     m_artifacts.clear();
+}
+
+IArtifact* SLANG_MCALL ArtifactList::findByDesc(const ArtifactDesc& desc)
+{
+    for (IArtifact* artifact : m_artifacts)
+    {
+        if (artifact->getDesc() == desc)
+        {
+            return artifact;
+        }
+    }
+    return nullptr;
+}
+
+IArtifact* SLANG_MCALL ArtifactList::findByDerivedDesc(const ArtifactDesc& desc)
+{
+    for (IArtifact* artifact : m_artifacts)
+    {
+        const ArtifactDesc artifactDesc = artifact->getDesc();
+        // TODO(JS): Currently this ignores flags in desc. That may or may not be right 
+        // long term.
+        if (isDerivedFrom(artifactDesc.kind, desc.kind) &&
+            isDerivedFrom(artifactDesc.payload, desc.payload) && 
+            isDerivedFrom(artifactDesc.style, desc.style))
+        {
+            return artifact;
+        }
+    }
+    return nullptr;
+}
+
+IArtifact* SLANG_MCALL ArtifactList::findByName(const char* name)
+{
+    for (IArtifact* artifact : m_artifacts)
+    {
+        const char* artifactName = artifact->getName();
+
+        if (artifactName == name ||
+            ::strcmp(artifactName, name) == 0)
+        {
+            return artifact;
+        }
+    }
+    return nullptr;
+}
+
+IArtifact* ArtifactList::findByPredicate(FindFunc func, void* data)
+{
+    for (IArtifact* artifact : m_artifacts)
+    {
+        if (func(artifact, data))
+        {
+            return artifact;
+        }
+    }
+    return nullptr;
 }
 
 void ArtifactList::_setParent(IArtifact* parent)

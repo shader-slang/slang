@@ -31,6 +31,10 @@ public:
     SLANG_NO_THROW void SLANG_MCALL add(IArtifact* artifact) SLANG_OVERRIDE;
     SLANG_NO_THROW void SLANG_MCALL removeAt(Index index) SLANG_OVERRIDE;
     SLANG_NO_THROW void SLANG_MCALL clear() SLANG_OVERRIDE;
+    SLANG_NO_THROW IArtifact* SLANG_MCALL findByDesc(const ArtifactDesc& desc) SLANG_OVERRIDE;
+    SLANG_NO_THROW IArtifact* SLANG_MCALL findByDerivedDesc(const ArtifactDesc& desc) SLANG_OVERRIDE;
+    SLANG_NO_THROW IArtifact* SLANG_MCALL findByName(const char* name) SLANG_OVERRIDE;
+    SLANG_NO_THROW IArtifact* SLANG_MCALL findByPredicate(FindFunc func, void* data) SLANG_OVERRIDE;
 
         // NOTE! The parent is a weak reference. 
     ArtifactList(IArtifact* parent):
