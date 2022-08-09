@@ -706,6 +706,7 @@ List<LanguageServerProtocol::CompletionItem> CompletionContext::collectAttribute
 
     // Add a suggestion for `[COM]` attribute with generated GUID.
     auto guidItem = generateGUIDCompletionItem();
+    result.add(guidItem);
     return result;
 }
 
