@@ -2741,6 +2741,17 @@ namespace Slang
             operands);
     }
 
+    IRDifferentialPairType* IRBuilder::getDifferentialPairType(
+        IRType* valueType,
+        IRWitnessTable* witnessTable)
+    {
+        IRInst* operands[] = { valueType, witnessTable };
+        return (IRDifferentialPairType*)getType(
+            kIROp_DifferentialPairType,
+            sizeof(operands) / sizeof(operands[0]),
+            operands);
+    }
+
     IRFuncType* IRBuilder::getFuncType(
         UInt            paramCount,
         IRType* const*  paramTypes,
@@ -3039,6 +3050,15 @@ namespace Slang
             kIROp_JVPDifferentiate,
             type,
             baseFn);
+        addInst(inst);
+        return inst;
+    }
+
+    IRInst* IRBuilder::emitMakeDifferentialPair(IRType* type, IRInst* primal, IRInst* differential)
+    {
+        IRInst* args[] = {primal, differential};
+        auto inst = createInstWithTrailingArgs<IRMakeDifferentialPair>(
+            this, kIROp_MakeDifferentialPair, type, 2, args);
         addInst(inst);
         return inst;
     }
