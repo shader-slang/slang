@@ -164,6 +164,10 @@ public:
 
     VectorExpressionType* getVectorType(Type* elementType, IntVal* elementCount);
 
+    DifferentialPairType* getDifferentialPairType(Type* valueType, Witness* conformanceWitness);
+
+    DeclRef<InterfaceDecl> getDifferentiableInterface();
+
     DeclRef<Decl> getBuiltinDeclRef(const char* builtinMagicTypeName, ConstArrayView<Val*> genericArgs);
 
     Type* getAndType(Type* left, Type* right);

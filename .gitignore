@@ -46,6 +46,7 @@ tests/**/*.slang-module
 /source/slang/slang-generated-*.h
 /source/slang/hlsl.meta.slang.h
 /source/slang/core.meta.slang.h
+/source/slang/diff.meta.slang.h
 prelude/*.h.cpp
 /source/slang/cpp.hint
 /source/slang/slang-value-generated.h
