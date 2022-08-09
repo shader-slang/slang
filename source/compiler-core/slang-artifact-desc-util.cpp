@@ -170,9 +170,7 @@ bool isDerivedFrom(ENUM_TYPE kind, ENUM_TYPE base) { return g_table##ENUM_TYPE.i
             x(Executable, BinaryLike) \
             x(SharedLibrary, BinaryLike) \
             x(HostCallable, BinaryLike) \
-        \
-        x(DebugInfo, Base) \
-        x(Diagnostics, Base)
+        x(MetaData, Base)
 
 #define SLANG_ARTIFACT_KIND_ENTRY(TYPE, PARENT) { Index(ArtifactKind::TYPE), Index(ArtifactKind::PARENT), #TYPE },
 
@@ -212,7 +210,10 @@ SLANG_HIERARCHICAL_ENUM(ArtifactKind, SLANG_ARTIFACT_KIND, SLANG_ARTIFACT_KIND_E
             x(SlangIR, GeneralIR) \
             x(LLVMIR, GeneralIR) \
         x(AST, Base) \
-            x(SlangAST, AST)
+            x(SlangAST, AST) \
+        x(DebugInfo, Base) \
+        x(Diagnostics, Base) \
+        x(CompileResults, Base)
 
 #define SLANG_ARTIFACT_PAYLOAD_ENTRY(TYPE, PARENT) { Index(ArtifactPayload::TYPE), Index(ArtifactPayload::PARENT), #TYPE },
 
@@ -308,7 +309,6 @@ static const KindExtension g_cpuKindExts[] =
 
 #endif
 };
-
 
 /* static */ bool ArtifactDescUtil::isCpuBinary(const ArtifactDesc& desc)
 {

@@ -47,9 +47,8 @@ enum class ArtifactKind : uint8_t
     SharedLibrary,              ///< Shared library - can be dynamically linked
     HostCallable,               ///< Code can be executed directly on the host
 
-    DebugInfo,                   ///< Debugging information
-    Diagnostics,                 ///< Diagnostics information
-
+    MetaData,                   ///< For information typically associated with results - for example Debug/Diagnostics
+    
     CountOf,
 };
 
@@ -108,6 +107,12 @@ enum class ArtifactPayload : uint8_t
     AST,            ///< Abstract syntax tree (AST)
 
     SlangAST,       ///< Slang AST
+
+    DebugInfo,      ///< Debugging information
+
+    Diagnostics,    ///< Diagnostics information
+
+    CompileResults,  ///< Payload is a collection of compilation results
 
     CountOf,
 };
