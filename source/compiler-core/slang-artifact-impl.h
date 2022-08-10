@@ -36,7 +36,7 @@ public:
     SLANG_COM_BASE_IUNKNOWN_ALL
     
     /// ICastable
-    virtual SLANG_NO_THROW void* castAs(const Guid& guid) SLANG_OVERRIDE;
+    virtual SLANG_NO_THROW void* SLANG_MCALL castAs(const Guid& guid) SLANG_OVERRIDE;
 
     /// IArtifact impl
     virtual SLANG_NO_THROW Desc SLANG_MCALL getDesc() SLANG_OVERRIDE { return m_desc; }
@@ -108,7 +108,7 @@ public:
     SLANG_COM_BASE_IUNKNOWN_QUERY_INTERFACE
 
     /// ICastable
-    virtual SLANG_NO_THROW void* castAs(const Guid& guid) SLANG_OVERRIDE;
+    virtual SLANG_NO_THROW void* SLANG_MCALL castAs(const Guid& guid) SLANG_OVERRIDE;
 
     // IArtifactCollection
     virtual SLANG_NO_THROW void SLANG_MCALL setChildren(IArtifact** children, Count count) SLANG_OVERRIDE;
