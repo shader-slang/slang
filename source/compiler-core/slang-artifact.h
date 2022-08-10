@@ -4,9 +4,10 @@
 
 #include "../core/slang-basic.h"
 
-#include "../../slang-com-helper.h"
+//#include "../../slang-com-helper.h"
+//#include "../core/slang-destroyable.h"
 
-#include "../core/slang-destroyable.h"
+#include "../core/slang-castable-list.h"
 
 namespace Slang
 {
@@ -202,6 +203,7 @@ inline /* static */ArtifactDesc ArtifactDesc::make(Packed inPacked)
 // Forward declare
 class IFileArtifactRepresentation;
 class IArtifactRepresentation;
+class IArtifactList;
 
 // Controls what items can be kept. 
 enum class ArtifactKeep
@@ -217,40 +219,6 @@ SLANG_INLINE  bool canKeepIntermediate(ArtifactKeep keep) { return keep == Artif
 SLANG_INLINE bool canKeep(ArtifactKeep keep) { return Index(keep) >= Index(ArtifactKeep::Yes); }
 /// Returns the keep type for an intermediate
 SLANG_INLINE ArtifactKeep getIntermediateKeep(ArtifactKeep keep) { return (keep == ArtifactKeep::All) ? ArtifactKeep::All : ArtifactKeep::No; }
-
-/* A useful interface for handling lists of castable interfaces. Cannot hold nullptr */
-class ICastableList : public ICastable
-{
-    SLANG_COM_INTERFACE(0x335f3d40, 0x934c, 0x40dc, { 0xb5, 0xe1, 0xf7, 0x6e, 0x40, 0x3, 0x62, 0x5 })
-            
-        /// Get the count of all interfaces held in the list
-    virtual Count SLANG_MCALL getCount() = 0;
-        /// Get the interface at the specified index
-    virtual ICastable* SLANG_MCALL getAt(Index i) = 0;
-        /// Add an item to the list
-    virtual void SLANG_MCALL add(ICastable* unk) = 0;
-        /// Add IUnknown, will cast to ICastable and if that's not possible will wrap
-    virtual void SLANG_MCALL addUnknown(ISlangUnknown* unk) = 0;
-        /// Remove item at index, remaining items stay in the same order
-    virtual void SLANG_MCALL removeAt(Index i) = 0;
-        /// Clear the list
-    virtual void SLANG_MCALL clear() = 0;
-        /// Find the first index of castable, or -1 if not found
-    virtual Index SLANG_MCALL indexOf(ICastable* castable) = 0;
-        /// Find the index interface (handling wrapping if necessary)
-    virtual Index SLANG_MCALL indexOfUnknown(ISlangUnknown* unk) = 0;
-        /// Find the first item that casts to non null
-    virtual void* SLANG_MCALL find(const Guid& guid) = 0;
-        /// Access the internal buffer (any mutation can invalidate this value)
-    virtual ICastable*const* SLANG_MCALL getBuffer() = 0;
-};
-
-// Simply finding things in a ICastableList
-template <typename T>
-SLANG_FORCE_INLINE T* find(ICastableList* list)
-{
-    return reinterpret_cast<T*>(list->find(T::getTypeGuid())); 
-}
 
 /* The IArtifact interface is designed to represent some Artifact of compilation. It could be input to or output from a compilation.
 
@@ -277,12 +245,23 @@ files could be a Container containing artifacts for
 * Files that contain known types
 * Callable interface (an ISlangSharedLibrary)
 
-Each one of these additions is an 'Element'. An Element is an interface pointer and a Desc that describes what the 
-inteface represents. Having the associated desc provides more detail about what the interface pointer actually is
-without having to make the interface know what it is being used for. This allows an interface to be used in multiple 
-ways - for example the ISlangBlob interface could be used to represent some text, or a compiled kernel. 
+There are several types of ways to associate data with an artifact:
 
-A more long term goals would be to
+* A representation
+* Associated data
+* A child artifact
+
+A `representation` has to wholly represent the artifact. That representation could be a blob, a file on the file system,
+an in memory representation. There are two classes of `Representation` - ones that can be turned into blobs (and therefore 
+derive from IArtifactRepresentation) and ones that are in of themselves a representation (such as a blob or or ISlangSharedLibrary).
+
+`Associated data` is information that is associated with the artifact, but isn't a (whole) representation. It could be part 
+of the representation, or useful for the implementation of a representation. Could also be considered as a kind of side channel
+to associate arbitrary temporary data with an artifact.
+
+A `child artifact` belongs to the artifact, within the hierarchy of artifacts. Child artifacts are held in an IArtifactList.
+
+More long term goals would be to
 
 * Make Diagnostics into an interface (such it can be added to a Artifact result)
 * Use Artifact and related types for downstream compiler
@@ -329,15 +308,26 @@ public:
         /// Get the list of associated items
     virtual ICastableList* SLANG_MCALL getAssociated() = 0;
 
-        /// Add a representation that derives from IArtifactRepresentation
-    virtual SLANG_NO_THROW void SLANG_MCALL addRepresentation(IArtifactRepresentation* rep) = 0;
+        /// Add a representation 
+    virtual SLANG_NO_THROW void SLANG_MCALL addRepresentation(ICastable* castable) = 0;
         /// Add a representation that doesn't derive from IArtifactRepresentation
     virtual SLANG_NO_THROW void SLANG_MCALL addRepresentationUnknown(ISlangUnknown* rep) = 0;
         /// Find representation
     virtual void* SLANG_MCALL SLANG_MCALL findRepresentation(const Guid& guid) = 0;
         /// Get the list of all representations
     virtual ICastableList* SLANG_MCALL getRepresentations() = 0;
+
+        /// Get the children. This may be evaluated lazily. 
+        /// Only artifacts with a ArtifactKind that derives from Container generally produce childen.
+        /// If an artifact doesn't support children, it can return nullptr.
+    virtual IArtifactList* SLANG_MCALL getChildren() = 0;
 };
+
+template <typename T>
+SLANG_FORCE_INLINE T* findRepresentation(IArtifact* artifact)
+{
+    return reinterpret_cast<T*>(artifact->findRepresentation(T::getTypeGuid()));
+}
 
 /* A list of artifacts. */
 class IArtifactList : public ICastable
@@ -380,11 +370,6 @@ class IArtifactRepresentation : public ICastable
     virtual SLANG_NO_THROW bool SLANG_MCALL exists() = 0;
 };
 
-template <typename T>
-SLANG_FORCE_INLINE T* findRepresentation(IArtifact* artifact)
-{
-    return reinterpret_cast<T*>(artifact->findRepresentation(T::getTypeGuid()));
-}
 
 } // namespace Slang
 
