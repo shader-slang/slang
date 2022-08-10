@@ -485,21 +485,25 @@ struct Optional
 };
 
 __generic<T>
+[__unsafeForceInlineEarly]
 bool operator==(Optional<T> val, __none_t noneVal)
 {
     return !val.hasValue;
 }
 __generic<T>
+[__unsafeForceInlineEarly]
 bool operator!=(Optional<T> val, __none_t noneVal)
 {
     return val.hasValue;
 }
 __generic<T>
+[__unsafeForceInlineEarly]
 bool operator==(__none_t noneVal, Optional<T> val)
 {
     return !val.hasValue;
 }
 __generic<T>
+[__unsafeForceInlineEarly]
 bool operator!=(__none_t noneVal, Optional<T> val)
 {
     return val.hasValue;
