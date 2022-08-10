@@ -117,8 +117,8 @@ public:
     virtual SLANG_NO_THROW void SLANG_MCALL addChild(IArtifact* artifact) SLANG_OVERRIDE;
     virtual SLANG_NO_THROW void SLANG_MCALL removeChildAt(Index index) SLANG_OVERRIDE;
     virtual SLANG_NO_THROW void SLANG_MCALL clearChildren() SLANG_OVERRIDE;
-    virtual SLANG_NO_THROW IArtifact* SLANG_MCALL findChildByDesc(const ArtifactDesc& desc);
-    virtual SLANG_NO_THROW IArtifact* SLANG_MCALL findChildByDerivedDesc(const ArtifactDesc& desc);
+    virtual SLANG_NO_THROW IArtifact* SLANG_MCALL findChildByDesc(const ArtifactDesc& desc) SLANG_OVERRIDE;
+    virtual SLANG_NO_THROW IArtifact* SLANG_MCALL findChildByDerivedDesc(const ArtifactDesc& desc) SLANG_OVERRIDE;
     virtual SLANG_NO_THROW IArtifact* SLANG_MCALL findChildByName(const char* name) SLANG_OVERRIDE;
     virtual SLANG_NO_THROW IArtifact* SLANG_MCALL findChildByPredicate(FindFunc func, void* data) SLANG_OVERRIDE;
 
