@@ -33,7 +33,7 @@ SlangResult DefaultSharedLibraryLoader::loadSharedLibrary(const char* path, ISla
 {
     *outSharedLibrary = nullptr;
     // Try loading
-    SharedLibrary::Handle handle;
+    SharedLibrary::Handle handle = nullptr;
     SLANG_RETURN_ON_FAIL(SharedLibrary::load(path, handle));
     *outSharedLibrary = ComPtr<ISlangSharedLibrary>(new DefaultSharedLibrary(handle)).detach();
     return SLANG_OK;
