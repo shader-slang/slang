@@ -350,6 +350,7 @@ struct NullPtr
 };
 
 __magic_type(NoneType)
+__intrinsic_type($(kIROp_VoidType))
 struct __none_t
 {
 };

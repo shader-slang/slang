@@ -1,8 +1,10 @@
-// is-as-dynamic.slang
+// optional.slang
 
-// Test that `is` and `as` operators works as intended in dynamic dispatch.
+// Test that `Optional` construction and conversion works.
 
-//TEST(compute):COMPARE_COMPUTE: -shaderobj
+//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute
+//TEST(compute):COMPARE_COMPUTE_EX:-slang -vk -compute
+//TEST(compute):COMPARE_COMPUTE_EX:-slang -cpu -compute
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<int> outputBuffer;
