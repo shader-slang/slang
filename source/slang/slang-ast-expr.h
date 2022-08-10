@@ -101,6 +101,11 @@ class NullPtrLiteralExpr : public LiteralExpr
     SLANG_AST_CLASS(NullPtrLiteralExpr)
 };
 
+class NoneLiteralExpr : public LiteralExpr
+{
+    SLANG_AST_CLASS(NoneLiteralExpr)
+};
+
 class StringLiteralExpr : public LiteralExpr
 {
     SLANG_AST_CLASS(StringLiteralExpr)

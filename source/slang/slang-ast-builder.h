@@ -33,6 +33,8 @@ public:
     Type* getDynamicType();
         /// Get the NullPtr type
     Type* getNullPtrType();
+        /// Get the NullPtr type
+    Type* getNoneType();
 
     const ReflectClassInfo* findClassInfo(Name* name);
     SyntaxClass<NodeBase> findSyntaxClass(Name* name);
@@ -74,6 +76,7 @@ protected:
     Type* m_enumTypeType = nullptr;
     Type* m_dynamicType = nullptr;
     Type* m_nullPtrType = nullptr;
+    Type* m_noneType = nullptr;
 
     Type* m_builtinTypes[Index(BaseType::CountOf)];
 
@@ -139,6 +142,7 @@ public:
     Type* getBottomType() { return m_sharedASTBuilder->m_bottomType; }
     Type* getStringType() { return m_sharedASTBuilder->getStringType(); }
     Type* getNullPtrType() { return m_sharedASTBuilder->getNullPtrType(); }
+    Type* getNoneType() { return m_sharedASTBuilder->getNoneType(); }
     Type* getEnumTypeType() { return m_sharedASTBuilder->getEnumTypeType(); }
 
         // Construct the type `Ptr<valueType>`, where `Ptr`

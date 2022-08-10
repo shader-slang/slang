@@ -349,6 +349,11 @@ struct NullPtr
 {
 };
 
+__magic_type(NoneType)
+struct __none_t
+{
+};
+
 __generic<T>
 __magic_type(PtrType)
 __intrinsic_type($(kIROp_PtrType))
@@ -472,8 +477,32 @@ struct Optional
         __intrinsic_op($(kIROp_GetOptionalValue))
         get;
     }
+
+    __implicit_conversion($(kConversionCost_ValToOptional))
+    __intrinsic_op($(kIROp_MakeOptionalValue))
+    __init(T val);
 };
 
+__generic<T>
+bool operator==(Optional<T> val, __none_t noneVal)
+{
+    return !val.hasValue;
+}
+__generic<T>
+bool operator!=(Optional<T> val, __none_t noneVal)
+{
+    return val.hasValue;
+}
+__generic<T>
+bool operator==(__none_t noneVal, Optional<T> val)
+{
+    return !val.hasValue;
+}
+__generic<T>
+bool operator!=(__none_t noneVal, Optional<T> val)
+{
+    return val.hasValue;
+}
 
 __magic_type(StringType)
 __intrinsic_type($(kIROp_StringType))

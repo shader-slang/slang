@@ -131,6 +131,16 @@ Type* SharedASTBuilder::getNullPtrType()
     return m_nullPtrType;
 }
 
+Type* SharedASTBuilder::getNoneType()
+{
+    if (!m_noneType)
+    {
+        auto noneTypeDecl = findMagicDecl("NoneType");
+        m_noneType = DeclRefType::create(m_astBuilder, makeDeclRef<Decl>(noneTypeDecl));
+    }
+    return m_noneType;
+}
+
 SharedASTBuilder::~SharedASTBuilder()
 {
     // Release built in types..

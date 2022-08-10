@@ -822,6 +822,12 @@ namespace Slang
         return expr;
     }
 
+    Expr* SemanticsExprVisitor::visitNoneLiteralExpr(NoneLiteralExpr* expr)
+    {
+        expr->type = m_astBuilder->getNoneType();
+        return expr;
+    }
+
     Expr* SemanticsExprVisitor::visitIntegerLiteralExpr(IntegerLiteralExpr* expr)
     {
         // The expression might already have a type, determined by its suffix.
