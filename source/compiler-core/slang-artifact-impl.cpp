@@ -13,6 +13,12 @@ namespace Slang {
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! Artifact !!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
+IArtifactHandler* Artifact::_getHandler()
+{
+    // TODO(JS): For now we just use the default handler, but in the future this should probably be a member
+    return DefaultArtifactHandler::getSingleton();
+}
+
 void* Artifact::castAs(const Guid& guid)
 {
     if (auto ptr = getInterface(guid))
@@ -63,55 +69,26 @@ bool Artifact::exists()
 
 SlangResult Artifact::requireFile(Keep keep, ISlangMutableFileSystem* fileSystem, IFileArtifactRepresentation** outFileRep)
 {
-    auto util = ArtifactUtilImpl::getSingleton();
-    return util->requireFileDefaultImpl(this, keep, fileSystem, outFileRep);
+    auto handler = _getHandler();
+    return handler->getOrCreateFileRepresentation(this, keep, fileSystem, outFileRep);
 }
 
 SlangResult Artifact::loadSharedLibrary(ArtifactKeep keep, ISlangSharedLibrary** outSharedLibrary)
 {
-    auto util = ArtifactUtilImpl::getSingleton();
-    return util->loadSharedLibraryDefaultImpl(this, keep, outSharedLibrary);
+    auto handler = _getHandler();
+    return handler->getOrCreateRepresentation(this, ISlangSharedLibrary::getTypeGuid(), keep, (ISlangUnknown**)outSharedLibrary, nullptr);
+}
+
+SlangResult Artifact::getOrCreateRepresentation(const Guid& typeGuid, ArtifactKeep keep, ISlangUnknown** outScope, void** outRep)
+{
+    auto handler = _getHandler();
+    return handler->getOrCreateRepresentation(this, typeGuid, keep, outScope, outRep);
 }
 
 SlangResult Artifact::loadBlob(Keep keep, ISlangBlob** outBlob)
 {
-    // If we have a blob just return it
-    if (auto blob = (ISlangBlob*)findRepresentation(ISlangBlob::getTypeGuid()))
-    {
-        blob->addRef();
-        *outBlob = blob;
-        return SLANG_OK;
-    }
-
-    ComPtr<ISlangBlob> blob;
-
-    // Look for a representation that we can serialize into a blob
-    for (auto rep : m_representations.getView())
-    {
-        if (auto artifactRep = as<IArtifactRepresentation>(rep))
-        {
-            SlangResult res = artifactRep->writeToBlob(blob.writeRef());
-            if (SLANG_SUCCEEDED(res) && blob)
-            {
-                break;
-            }
-        }
-    }
-     
-    // Wasn't able to construct
-    if (!blob)
-    {
-        return SLANG_E_NOT_FOUND;
-    }
-
-    // Put in cache 
-    if (canKeep(keep))
-    {
-        addRepresentationUnknown(blob);
-    }
-
-    *outBlob = blob.detach();
-    return SLANG_OK;
+    auto handler = _getHandler();
+    return handler->getOrCreateRepresentation(this, ISlangBlob::getTypeGuid(), keep, (ISlangUnknown**)outBlob, nullptr);
 }
 
 void Artifact::addAssociated(ICastable* castable)
@@ -183,7 +160,13 @@ ICastable* Artifact::findRepresentationWithPredicate(ICastableList::FindFunc fin
     return m_representations.findWithPredicate(findFunc, data);
 }
 
-ICastableList* Artifact::getRepresentations()
+Slice<ICastable*> Artifact::getRepresentations()
+{
+    const auto view = m_representations.getView();
+    return Slice<ICastable*>(view.getBuffer(), view.getCount());
+}
+
+ICastableList* Artifact::getRepresentationList()
 {
     return m_representations.requireList();
 }
@@ -233,14 +216,8 @@ void ArtifactContainer::setChildren(IArtifact** children, Count count)
 
 SlangResult ArtifactContainer::expandChildren()
 {
-    if (m_expandResult == SLANG_E_UNINITIALIZED)
-    {
-        auto util = ArtifactUtilImpl::getSingleton();
-        m_expandResult = util->expandChildrenDefaultImpl(this);
-
-        SLANG_ASSERT(m_expandResult != SLANG_E_UNINITIALIZED);
-    }
-    return m_expandResult;
+    auto handler = _getHandler();
+    return handler->expandChildren(this);
 }
 
 Slice<IArtifact*> ArtifactContainer::getChildren()

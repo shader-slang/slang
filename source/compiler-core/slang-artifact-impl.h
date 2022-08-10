@@ -49,17 +49,20 @@ public:
     virtual SLANG_NO_THROW const char* SLANG_MCALL getName() SLANG_OVERRIDE { return m_name.getBuffer(); }
     
     virtual SLANG_NO_THROW void SLANG_MCALL addAssociated(ICastable* castable) SLANG_OVERRIDE;
-    virtual void* SLANG_MCALL SLANG_MCALL findAssociated(const Guid& unk) SLANG_OVERRIDE;
-    virtual ICastableList* SLANG_MCALL getAssociated() SLANG_OVERRIDE;
-    virtual ICastable* SLANG_MCALL findAssociatedWithPredicate(ICastableList::FindFunc findFunc, void* data) SLANG_OVERRIDE;
+    virtual SLANG_NO_THROW void* SLANG_MCALL findAssociated(const Guid& unk) SLANG_OVERRIDE;
+    virtual SLANG_NO_THROW ICastableList* SLANG_MCALL getAssociated() SLANG_OVERRIDE;
+    virtual SLANG_NO_THROW ICastable* SLANG_MCALL findAssociatedWithPredicate(ICastableList::FindFunc findFunc, void* data) SLANG_OVERRIDE;
 
     virtual SLANG_NO_THROW void SLANG_MCALL addRepresentation(ICastable* castable) SLANG_OVERRIDE;
     virtual SLANG_NO_THROW void SLANG_MCALL addRepresentationUnknown(ISlangUnknown* rep) SLANG_OVERRIDE;
-    virtual void* SLANG_MCALL findRepresentation(const Guid& guid) SLANG_OVERRIDE;
-    virtual ICastableList* SLANG_MCALL getRepresentations() SLANG_OVERRIDE;
-    virtual ICastable* SLANG_MCALL findRepresentationWithPredicate(ICastableList::FindFunc findFunc, void* data) SLANG_OVERRIDE;
+    virtual SLANG_NO_THROW void* SLANG_MCALL findRepresentation(const Guid& guid) SLANG_OVERRIDE;
+    virtual SLANG_NO_THROW Slice<ICastable*> SLANG_MCALL getRepresentations() SLANG_OVERRIDE;
+    virtual SLANG_NO_THROW ICastableList* SLANG_MCALL getRepresentationList() SLANG_OVERRIDE;
+    virtual SLANG_NO_THROW ICastable* SLANG_MCALL findRepresentationWithPredicate(ICastableList::FindFunc findFunc, void* data) SLANG_OVERRIDE;
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL getOrCreateRepresentation(const Guid& typeGuid, ArtifactKeep keep, ISlangUnknown** outScope, void** outRep) SLANG_OVERRIDE;
 
     // IArtifactCollection (Not implemented)
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL getExpandChildrenResult() SLANG_OVERRIDE { SLANG_UNREACHABLE("Not implemented"); }
     virtual SLANG_NO_THROW void SLANG_MCALL setChildren(IArtifact** children, Count count) SLANG_OVERRIDE { SLANG_UNUSED(children); SLANG_UNUSED(count); SLANG_UNREACHABLE("Not implemented"); }
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL expandChildren() SLANG_OVERRIDE { SLANG_UNREACHABLE("Not implemented"); }
     virtual SLANG_NO_THROW Slice<IArtifact*> SLANG_MCALL getChildren() SLANG_OVERRIDE { SLANG_UNREACHABLE("Not implemented"); }
@@ -87,6 +90,8 @@ protected:
         m_parent(nullptr)
     {}
 
+    IArtifactHandler* _getHandler();
+
     void* getInterface(const Guid& uuid);
     void* getObject(const Guid& uuid);
 
@@ -111,6 +116,7 @@ public:
     virtual SLANG_NO_THROW void* SLANG_MCALL castAs(const Guid& guid) SLANG_OVERRIDE;
 
     // IArtifactCollection
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL getExpandChildrenResult() SLANG_OVERRIDE { return m_expandResult; }
     virtual SLANG_NO_THROW void SLANG_MCALL setChildren(IArtifact** children, Count count) SLANG_OVERRIDE;
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL expandChildren() SLANG_OVERRIDE;
     virtual SLANG_NO_THROW Slice<IArtifact*> SLANG_MCALL getChildren() SLANG_OVERRIDE;
