@@ -22,7 +22,7 @@ public:
 
 	// IArtifactHandler
 	SLANG_NO_THROW SlangResult SLANG_MCALL expandChildren(IArtifactContainer* container) SLANG_OVERRIDE;
-	SLANG_NO_THROW SlangResult SLANG_MCALL getOrCreateRepresentation(IArtifact* artifact, const Guid& guid, ArtifactKeep keep, ISlangUnknown** outScope, void** outRep) SLANG_OVERRIDE;
+	SLANG_NO_THROW SlangResult SLANG_MCALL getOrCreateRepresentation(IArtifact* artifact, const Guid& guid, ArtifactKeep keep, ICastable** outCastable) SLANG_OVERRIDE;
 	SLANG_NO_THROW SlangResult SLANG_MCALL getOrCreateFileRepresentation(IArtifact* artifact, ArtifactKeep keep, ISlangMutableFileSystem* fileSystem, IFileArtifactRepresentation** outFileRep) SLANG_OVERRIDE;
 
 	static IArtifactHandler* getSingleton() { return &g_singleton; }
@@ -34,8 +34,8 @@ protected:
 	void* getInterface(const Guid& uuid);
 	void* getObject(const Guid& uuid);
 
-	void _addRepresentation(IArtifact* artifact, ArtifactKeep keep, ISlangUnknown* rep);
-	void _addRepresentation(IArtifact* artifact, ArtifactKeep keep, ICastable* castable);
+	SlangResult _addRepresentation(IArtifact* artifact, ArtifactKeep keep, ISlangUnknown* rep, ICastable** outCastable);
+	SlangResult _addRepresentation(IArtifact* artifact, ArtifactKeep keep, ICastable* castable, ICastable** outCastable);
 	
 	static DefaultArtifactHandler g_singleton;
 };

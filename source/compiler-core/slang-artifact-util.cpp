@@ -6,6 +6,8 @@
 
 #include "slang-artifact-desc-util.h"
 
+#include "../core/slang-castable-list-impl.h"
+
 #include "../core/slang-file-system.h"
 #include "../core/slang-io.h"
 #include "../core/slang-shared-library.h"
@@ -54,20 +56,36 @@ void* DefaultArtifactHandler::getObject(const Guid& uuid)
 	return nullptr;
 }
 
-void DefaultArtifactHandler::_addRepresentation(IArtifact* artifact, ArtifactKeep keep, ISlangUnknown* rep)
+SlangResult DefaultArtifactHandler::_addRepresentation(IArtifact* artifact, ArtifactKeep keep, ISlangUnknown* rep, ICastable** outCastable)
 {
-	if (canKeep(keep))
+	SLANG_ASSERT(rep);
+
+	// See if it implements ICastable
 	{
-		artifact->addRepresentationUnknown(rep);
+		ComPtr<ICastable> castable;
+		if (SLANG_SUCCEEDED(rep->queryInterface(ICastable::getTypeGuid(), (void**)castable.writeRef())) && castable)
+		{
+			return _addRepresentation(artifact, keep, castable, outCastable);
+		}
 	}
+
+	// We have to wrap 
+	ComPtr<IUnknownCastableAdapter> adapter(new UnknownCastableAdapter(rep));
+	return _addRepresentation(artifact, keep, adapter, outCastable);
 }
 
-void DefaultArtifactHandler::_addRepresentation(IArtifact* artifact, ArtifactKeep keep, ICastable* castable)
+SlangResult DefaultArtifactHandler::_addRepresentation(IArtifact* artifact, ArtifactKeep keep, ICastable* castable, ICastable** outCastable)
 {
+	SLANG_ASSERT(castable);
+
 	if (canKeep(keep))
 	{
 		artifact->addRepresentation(castable);
 	}
+
+	castable->addRef();
+	*outCastable = castable;
+	return SLANG_OK;
 }
 
 SlangResult DefaultArtifactHandler::expandChildren(IArtifactContainer* container)
@@ -91,23 +109,17 @@ SlangResult DefaultArtifactHandler::expandChildren(IArtifactContainer* container
 	return SLANG_E_NOT_IMPLEMENTED;
 }
 
-SlangResult DefaultArtifactHandler::getOrCreateRepresentation(IArtifact* artifact, const Guid& guid, ArtifactKeep keep, ISlangUnknown** outScope, void** outRep)
+SlangResult DefaultArtifactHandler::getOrCreateRepresentation(IArtifact* artifact, const Guid& guid, ArtifactKeep keep, ICastable** outCastable)
 {
-	void* ignoreRep;
-	if (outRep == nullptr)
-	{
-		outRep = &ignoreRep;
-	}
-
+	
 	// See if we already have a rep of this type
 	{
 		for (ICastable* rep : artifact->getRepresentations())
 		{
-			if (auto ptr = rep->castAs(guid))
+			if (rep->castAs(guid))
 			{
 				rep->addRef();
-				*outScope = rep;
-				*outRep = ptr;
+				*outCastable = rep;
 				return SLANG_OK;
 			}
 		}
@@ -117,19 +129,13 @@ SlangResult DefaultArtifactHandler::getOrCreateRepresentation(IArtifact* artifac
 	{
 		ComPtr<ISlangBlob> blob;
 		SLANG_RETURN_ON_FAIL(_loadBlob(artifact, keep, blob.writeRef()));
-		_addRepresentation(artifact, keep, blob);
-		*outRep = blob;
-		*outScope = blob.detach();
-		return SLANG_OK;
+		return _addRepresentation(artifact, keep, blob, outCastable);
 	}
 	else if (guid == ISlangSharedLibrary::getTypeGuid())
 	{
 		ComPtr<ISlangSharedLibrary> sharedLib;
 		SLANG_RETURN_ON_FAIL(_loadSharedLibrary(artifact, keep, sharedLib.writeRef()));
-		_addRepresentation(artifact, keep, sharedLib);
-		*outRep = sharedLib;
-		*outScope = sharedLib.detach();
-		return SLANG_OK;
+		return _addRepresentation(artifact, keep, sharedLib, outCastable);
 	}
 
 	return SLANG_E_NOT_AVAILABLE;

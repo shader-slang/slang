@@ -76,19 +76,35 @@ SlangResult Artifact::requireFile(Keep keep, ISlangMutableFileSystem* fileSystem
 SlangResult Artifact::loadSharedLibrary(ArtifactKeep keep, ISlangSharedLibrary** outSharedLibrary)
 {
     auto handler = _getHandler();
-    return handler->getOrCreateRepresentation(this, ISlangSharedLibrary::getTypeGuid(), keep, (ISlangUnknown**)outSharedLibrary, nullptr);
+
+    ComPtr<ICastable> castable;
+    SLANG_RETURN_ON_FAIL(handler->getOrCreateRepresentation(this, ISlangSharedLibrary::getTypeGuid(), keep, castable.writeRef()));
+   
+    ISlangSharedLibrary* lib = as<ISlangSharedLibrary>(castable);
+    lib->addRef();
+
+    *outSharedLibrary = lib;
+    return SLANG_OK;
 }
 
-SlangResult Artifact::getOrCreateRepresentation(const Guid& typeGuid, ArtifactKeep keep, ISlangUnknown** outScope, void** outRep)
+SlangResult Artifact::getOrCreateRepresentation(const Guid& typeGuid, ArtifactKeep keep, ICastable** outCastable)
 {
     auto handler = _getHandler();
-    return handler->getOrCreateRepresentation(this, typeGuid, keep, outScope, outRep);
+    return handler->getOrCreateRepresentation(this, typeGuid, keep, outCastable);
 }
 
 SlangResult Artifact::loadBlob(Keep keep, ISlangBlob** outBlob)
 {
     auto handler = _getHandler();
-    return handler->getOrCreateRepresentation(this, ISlangBlob::getTypeGuid(), keep, (ISlangUnknown**)outBlob, nullptr);
+
+    ComPtr<ICastable> castable;
+    SLANG_RETURN_ON_FAIL(handler->getOrCreateRepresentation(this, ISlangBlob::getTypeGuid(), keep, castable.writeRef()));
+
+    ISlangBlob* blob = as<ISlangBlob>(castable);
+    blob->addRef();
+
+    *outBlob = blob;
+    return SLANG_OK;
 }
 
 void Artifact::addAssociated(ICastable* castable)

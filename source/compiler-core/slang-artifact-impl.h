@@ -59,7 +59,7 @@ public:
     virtual SLANG_NO_THROW Slice<ICastable*> SLANG_MCALL getRepresentations() SLANG_OVERRIDE;
     virtual SLANG_NO_THROW ICastableList* SLANG_MCALL getRepresentationList() SLANG_OVERRIDE;
     virtual SLANG_NO_THROW ICastable* SLANG_MCALL findRepresentationWithPredicate(ICastableList::FindFunc findFunc, void* data) SLANG_OVERRIDE;
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL getOrCreateRepresentation(const Guid& typeGuid, ArtifactKeep keep, ISlangUnknown** outScope, void** outRep) SLANG_OVERRIDE;
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL getOrCreateRepresentation(const Guid& typeGuid, ArtifactKeep keep, ICastable** outCastable) SLANG_OVERRIDE;
 
     // IArtifactCollection (Not implemented)
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL getExpandChildrenResult() SLANG_OVERRIDE { SLANG_UNREACHABLE("Not implemented"); }

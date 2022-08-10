@@ -359,8 +359,8 @@ public:
     virtual SLANG_NO_THROW ICastableList* SLANG_MCALL getRepresentationList() = 0;
 
         /// Given a typeGuid representing the desired type get or create the representation.
-        /// If found outScope keeps outRep (which doesn't have to be an interface) in scope. outRep is a pointer of the type indicated by `typeGuid`
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL getOrCreateRepresentation(const Guid& typeGuid, ArtifactKeep keep, ISlangUnknown** outScope, void** outRep) = 0;
+        /// If found outCastable holds an entity that *must* be castable to typeGuid
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL getOrCreateRepresentation(const Guid& typeGuid, ArtifactKeep keep, ICastable** outCastable) = 0;
 };
 
 class IArtifactContainer : public IArtifact
@@ -426,7 +426,7 @@ class IArtifactHandler : public ICastable
         /// Given an artifact expands children
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL expandChildren(IArtifactContainer* container) = 0;
         /// Given an artifact gets or creates a representation. 
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL getOrCreateRepresentation(IArtifact* artifact, const Guid& guid, ArtifactKeep keep, ISlangUnknown** outScope, void** outRep) = 0;
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL getOrCreateRepresentation(IArtifact* artifact, const Guid& guid, ArtifactKeep keep, ICastable** outCastable) = 0;
         /// Given an artifact gets a represenation of it on the file system. 
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL getOrCreateFileRepresentation(IArtifact* artifact, ArtifactKeep keep, ISlangMutableFileSystem* fileSystem, IFileArtifactRepresentation** outFileRep) = 0;
 };

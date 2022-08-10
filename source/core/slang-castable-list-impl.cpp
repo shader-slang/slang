@@ -36,9 +36,10 @@ void* UnknownCastableAdapter::castAs(const Guid& guid)
 void* UnknownCastableAdapter::getInterface(const Guid& guid)
 {
     if (guid == ISlangUnknown::getTypeGuid() ||
-        guid == ICastable::getTypeGuid())
+        guid == ICastable::getTypeGuid() ||
+        guid == IUnknownCastableAdapter::getTypeGuid())
     {
-        return static_cast<ICastable*>(this);
+        return static_cast<IUnknownCastableAdapter*>(this);
     }
     return nullptr;
 }
