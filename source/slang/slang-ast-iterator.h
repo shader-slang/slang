@@ -235,6 +235,24 @@ struct ASTIterator
             iterator->maybeDispatchCallback(expr);
             dispatchIfNotNull(expr->base.exp);
         }
+        void visitAsTypeExpr(AsTypeExpr* expr)
+        {
+            iterator->maybeDispatchCallback(expr);
+            dispatchIfNotNull(expr->value);
+            dispatchIfNotNull(expr->typeExpr);
+        }
+        void visitIsTypeExpr(IsTypeExpr* expr)
+        {
+            iterator->maybeDispatchCallback(expr);
+            dispatchIfNotNull(expr->value);
+            dispatchIfNotNull(expr->typeExpr.exp);
+        }
+        void visitMakeOptionalExpr(MakeOptionalExpr* expr)
+        {
+            iterator->maybeDispatchCallback(expr);
+            dispatchIfNotNull(expr->value);
+            dispatchIfNotNull(expr->typeExpr);
+        }
     };
 
     struct ASTIteratorStmtVisitor : public StmtVisitor<ASTIteratorStmtVisitor>

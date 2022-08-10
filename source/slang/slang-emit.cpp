@@ -25,6 +25,7 @@
 #include "slang-ir-lower-generics.h"
 #include "slang-ir-lower-tuple-types.h"
 #include "slang-ir-lower-result-type.h"
+#include "slang-ir-lower-optional-type.h"
 #include "slang-ir-lower-bit-cast.h"
 #include "slang-ir-lower-reinterpret.h"
 #include "slang-ir-metadata.h"
@@ -387,6 +388,9 @@ Result linkAndOptimizeIR(
     // will run a DCE pass to clean up after the specialization.
     //
     simplifyIR(irModule);
+
+    lowerOptionalType(irModule, sink);
+
 #if 0
     dumpIRIfEnabled(codeGenContext, irModule, "AFTER DCE");
 #endif

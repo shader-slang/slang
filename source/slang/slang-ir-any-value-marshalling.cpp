@@ -762,6 +762,13 @@ namespace Slang
             size += kRTTIHeaderSize;
             return alignUp(offset, 4) + alignUp((SlangInt)size, 4);
         }
+        case kIROp_ExtractExistentialType:
+        {
+            auto existentialValue = type->getOperand(0);
+            auto interfaceType = cast<IRInterfaceType>(existentialValue->getDataType());
+            auto size = SharedGenericsLoweringContext::getInterfaceAnyValueSize(interfaceType, interfaceType->sourceLoc);
+            return alignUp(offset, 4) + alignUp((SlangInt)size, 4);
+        }
         default:
             if (as<IRTextureTypeBase>(type) || as<IRSamplerStateTypeBase>(type))
             {

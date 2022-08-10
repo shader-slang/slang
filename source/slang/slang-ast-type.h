@@ -572,6 +572,12 @@ class RefType : public ParamDirectionType
     SLANG_AST_CLASS(RefType)
 };
 
+class OptionalType : public BuiltinType
+{
+    SLANG_AST_CLASS(OptionalType)
+    Type* getValueType();
+};
+
 // A type alias of some kind (e.g., via `typedef`)
 class NamedExpressionType : public Type 
 {

@@ -539,6 +539,10 @@
     <ClCompile Include="..\..\..\tools\gfx\vulkan\vk-util.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="..\..\..\tools\gfx\gfx.slang" />
+    <None Include="..\..\..\tools\gfx\slang.slang" />
+  </ItemGroup>
+  <ItemGroup>
     <ProjectReference Include="..\core\core.vcxproj">
       <Project>{F9BE7957-8399-899E-0C49-E714FDDD4B65}</Project>
     </ProjectReference>

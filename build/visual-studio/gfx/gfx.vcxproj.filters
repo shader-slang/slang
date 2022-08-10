@@ -720,4 +720,12 @@
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
+  <ItemGroup>
+    <None Include="..\..\..\tools\gfx\gfx.slang">
+      <Filter>Source Files</Filter>
+    </None>
+    <None Include="..\..\..\tools\gfx\slang.slang">
+      <Filter>Source Files</Filter>
+    </None>
+  </ItemGroup>
 </Project>

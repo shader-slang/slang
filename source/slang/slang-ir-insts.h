@@ -1902,6 +1902,33 @@ struct IRGetResultError : IRInst
     IRInst* getResultOperand() { return getOperand(0); }
 };
 
+struct IROptionalHasValue : IRInst
+{
+    IR_LEAF_ISA(OptionalHasValue)
+
+    IRInst* getOptionalOperand() { return getOperand(0); }
+};
+
+struct IRGetOptionalValue : IRInst
+{
+    IR_LEAF_ISA(GetOptionalValue)
+
+    IRInst* getOptionalOperand() { return getOperand(0); }
+};
+
+struct IRMakeOptionalValue : IRInst
+{
+    IR_LEAF_ISA(MakeOptionalValue)
+
+    IRInst* getValue() { return getOperand(0); }
+};
+
+struct IRMakeOptionalNone : IRInst
+{
+    IR_LEAF_ISA(MakeOptionalNone)
+    IRInst* getDefaultValue() { return getOperand(0); }
+};
+
     /// An instruction that packs a concrete value into an existential-type "box"
 struct IRMakeExistential : IRInst
 {
@@ -1983,6 +2010,17 @@ struct IRLiveRangeMarker : IRInst
 struct IRLiveRangeStart : IRLiveRangeMarker
 {
     IR_LEAF_ISA(LiveRangeStart);        
+};
+
+struct IRIsType : IRInst
+{
+    IR_LEAF_ISA(IsType);
+
+    IRInst* getValue() { return getOperand(0); }
+    IRInst* getValueWitness() { return getOperand(1); }
+
+    IRInst* getTypeOperand() { return getOperand(2); }
+    IRInst* getTargetWitness() { return getOperand(3); }
 };
 
 /// Demarks where the referenced item is no longer live, optimimally (although not
@@ -2256,6 +2294,7 @@ public:
     IRTupleType* getTupleType(IRType* type0, IRType* type1, IRType* type2, IRType* type3);
 
     IRResultType* getResultType(IRType* valueType, IRType* errorType);
+    IROptionalType* getOptionalType(IRType* valueType);
 
     IRBasicBlockType*   getBasicBlockType();
     IRWitnessTableType* getWitnessTableType(IRType* baseType);
@@ -2504,7 +2543,10 @@ public:
     IRInst* emitIsResultError(IRInst* result);
     IRInst* emitGetResultError(IRInst* result);
     IRInst* emitGetResultValue(IRInst* result);
-
+    IRInst* emitOptionalHasValue(IRInst* optValue);
+    IRInst* emitGetOptionalValue(IRInst* optValue);
+    IRInst* emitMakeOptionalValue(IRInst* optType, IRInst* value);
+    IRInst* emitMakeOptionalNone(IRInst* optType, IRInst* defaultValue);
     IRInst* emitMakeVector(
         IRType*         type,
         UInt            argCount,
@@ -2580,6 +2622,8 @@ public:
     IRInst* emitGpuForeach(List<IRInst*> args);
 
     IRUndefined* emitUndefined(IRType* type);
+
+    IRInst* emitReinterpret(IRInst* type, IRInst* value);
 
     IRInst* findOrAddInst(
          IRType*                 type,
@@ -2716,6 +2760,8 @@ public:
         IRInst* image,
         IRInst* coord,
         IRInst* value);
+
+    IRInst* emitIsType(IRInst* value, IRInst* witness, IRInst* typeOperand, IRInst* targetWitness);
 
     IRInst* emitFieldExtract(
         IRType*         type,
