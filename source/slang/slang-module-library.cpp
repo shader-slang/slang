@@ -91,7 +91,7 @@ SlangResult loadModuleLibrary(const Byte* inBytes, size_t bytesCount, EndToEndCo
 
 SlangResult loadModuleLibrary(ArtifactKeep keep, IArtifact* artifact, EndToEndCompileRequest* req, RefPtr<ModuleLibrary>& outLibrary)
 {
-    if (auto foundLibrary = (ModuleLibrary*)artifact->findItemObject(ModuleLibrary::getTypeGuid()))
+    if (auto foundLibrary = findRepresentation<ModuleLibrary>(artifact))
     {
         outLibrary = foundLibrary;
         return SLANG_OK;
@@ -107,7 +107,7 @@ SlangResult loadModuleLibrary(ArtifactKeep keep, IArtifact* artifact, EndToEndCo
     
     if (canKeep(keep))
     {
-        artifact->addItem(library);
+        artifact->addRepresentation(library);
     }
 
     outLibrary = library;

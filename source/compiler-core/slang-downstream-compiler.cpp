@@ -387,7 +387,7 @@ SlangResult CommandLineDownstreamCompileResult::getBinary(ComPtr<ISlangBlob>& ou
         // Read the contents of the binary
     SLANG_RETURN_ON_FAIL(File::readAllBytes(m_moduleFilePath, contents));
 
-    m_binaryBlob = new ScopeRefObjectBlob(ListBlob::moveCreate(contents), m_temporaryFiles);
+    m_binaryBlob = ScopeRefObjectBlob::create(ListBlob::moveCreate(contents), m_temporaryFiles);
     outBlob = m_binaryBlob;
     return SLANG_OK;
 }

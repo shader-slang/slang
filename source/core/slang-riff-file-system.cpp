@@ -215,7 +215,7 @@ SlangResult RiffFileSystem::saveFile(const char* path, const void* data, size_t 
     else
     {
         // Just store the data directly.
-        contents = new RawBlob(data, size);
+        contents = RawBlob::create(data, size);
     }
 
     Entry* entry = _getEntryFromCanonicalPath(canonicalPath);
@@ -376,7 +376,7 @@ SlangResult RiffFileSystem::loadArchive(const void* archive, size_t archiveSizeI
                     }
 
                     // Get the compressed data
-                    dstEntry->m_contents = new RawBlob(srcData, srcEntry->compressedSize);
+                    dstEntry->m_contents = RawBlob::create(srcData, srcEntry->compressedSize);
                     break;
                 }
                 case SLANG_PATH_TYPE_DIRECTORY: break;
@@ -444,10 +444,10 @@ SlangResult RiffFileSystem::storeArchive(bool blobOwnsContent, ISlangBlob** outB
     // We now write the RiffContainer to the stream
     SLANG_RETURN_ON_FAIL(RiffUtil::write(container.getRoot(), true, &stream));
 
-    RefPtr<ListBlob> blob = new ListBlob;
-    stream.swapContents(blob->m_data);
+    List<uint8_t> data;
+    stream.swapContents(data);
 
-    *outBlob = blob.detach();
+    *outBlob = ListBlob::moveCreate(data).detach();
     return SLANG_OK;
 }
 

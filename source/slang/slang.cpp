@@ -4515,8 +4515,7 @@ SlangResult EndToEndCompileRequest::addLibraryReference(const void* libData, siz
 
     // Create an artifact without any name (as one is not provided)
     ComPtr<IArtifact> artifact(new Artifact(desc, String()));
-
-    artifact->addItem(library);
+    artifact->addRepresentation(library);
 
     return _addLibraryReference(this, artifact);
 }
@@ -4929,12 +4928,12 @@ SlangResult EndToEndCompileRequest::saveRepro(ISlangBlob** outBlob)
 
     SLANG_RETURN_ON_FAIL(ReproUtil::saveState(this, &stream));
 
-    RefPtr<ListBlob> listBlob(new ListBlob);
-
     // Put the content of the stream in the blob
-    stream.swapContents(listBlob->m_data);
 
-    *outBlob = listBlob.detach();
+    List<uint8_t> data;
+    stream.swapContents(data);
+
+    *outBlob = ListBlob::moveCreate(data).detach();
     return SLANG_OK;
 }
 

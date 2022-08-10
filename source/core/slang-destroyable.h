@@ -9,16 +9,13 @@
 namespace Slang
 {
 
-/* An interface to provide a mechanism to cast, that doesn't require ref counting 
-and doesn't have to return a pointer to a ISlangUnknown derived class */
-class ICastable : public ISlangUnknown
+/* Adapter interface to make a non castable type work as ICastable */
+class IUnknownCastableAdapter : public ICastable
 {
-    SLANG_COM_INTERFACE(0x87ede0e1, 0x4852, 0x44b0, { 0x8b, 0xf2, 0xcb, 0x31, 0x87, 0x4d, 0xe2, 0x39 } );
+    SLANG_COM_INTERFACE(0x8b4aad81, 0x4934, 0x4a67, { 0xb2, 0xe2, 0xe9, 0x17, 0xfc, 0x29, 0x12, 0x54 } );
 
-        /// Can be used to cast to interfaces without reference counting. 
-        /// Also provides access to internal implementations, when they provide a guid
-        /// Can simulate a 'generated' interface as long as kept in scope by cast from. 
-    virtual SLANG_NO_THROW void* SLANG_MCALL castAs(const Guid& guid) = 0;
+        /// When using the adapter, this provides a way to directly get the internal no ICastable type
+    virtual SLANG_NO_THROW ISlangUnknown* SLANG_MCALL getContained() = 0;
 };
 
 /* An interface that allows for an object to implement 'destruction'. A destroyed 

@@ -1506,7 +1506,7 @@ struct OptionsParser
                             return SLANG_FAIL;
                         }
                     }
-                    artifact->addItem(fileRep);
+                    artifact->addRepresentation(fileRep);
 
                     SLANG_RETURN_ON_FAIL(_addLibraryReference(requestImpl, artifact));
                 }
