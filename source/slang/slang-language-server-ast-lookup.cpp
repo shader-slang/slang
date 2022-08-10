@@ -371,6 +371,18 @@ public:
             return true;
         return dispatchIfNotNull(expr->right.exp);
     }
+    bool visitPointerTypeExpr(PointerTypeExpr* expr)
+    {
+        if (_isLocInRange(context, expr->loc, 0))
+        {
+            ASTLookupResult result;
+            result.path = context->nodePath;
+            result.path.add(expr);
+            context->results.add(result);
+            return true;
+        }
+        return dispatchIfNotNull(expr->base.exp);
+    }
     bool visitModifiedTypeExpr(ModifiedTypeExpr* expr) { return dispatchIfNotNull(expr->base.exp); }
     bool visitTryExpr(TryExpr* expr) { return dispatchIfNotNull(expr->base); }
 
