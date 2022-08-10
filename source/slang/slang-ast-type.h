@@ -529,6 +529,11 @@ class PtrTypeBase : public BuiltinType
     Type* getValueType();
 };
 
+class NoneType : public BuiltinType
+{
+    SLANG_AST_CLASS(NoneType)
+};
+
 class NullPtrType : public BuiltinType
 {
     SLANG_AST_CLASS(NullPtrType)

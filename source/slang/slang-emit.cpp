@@ -8,6 +8,7 @@
 #include "slang-ir-bind-existentials.h"
 #include "slang-ir-byte-address-legalize.h"
 #include "slang-ir-collect-global-uniforms.h"
+#include "slang-ir-cleanup-void.h"
 #include "slang-ir-dce.h"
 #include "slang-ir-dll-export.h"
 #include "slang-ir-dll-import.h"
@@ -744,6 +745,8 @@ Result linkAndOptimizeIR(
     dumpIRIfEnabled(codeGenContext, irModule, "AFTER DCE");
 #endif
     validateIRModuleIfEnabled(codeGenContext, irModule);
+
+    cleanUpVoidType(irModule);
 
     // Lower all bit_cast operations on complex types into leaf-level
     // bit_cast on basic types.

@@ -3365,6 +3365,11 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
         return LoweredValInfo::simple(context->irBuilder->getPtrValue(nullptr));
     }
 
+    LoweredValInfo visitNoneLiteralExpr(NoneLiteralExpr*)
+    {
+        return LoweredValInfo::simple(context->irBuilder->getVoidValue());
+    }
+
     LoweredValInfo visitIntegerLiteralExpr(IntegerLiteralExpr* expr)
     {
         auto type = lowerType(context, expr->type);

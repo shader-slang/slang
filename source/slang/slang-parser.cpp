@@ -5031,6 +5031,11 @@ namespace Slang
         return parser->astBuilder->create<NullPtrLiteralExpr>();
     }
 
+    static NodeBase* parseNoneExpr(Parser* parser, void* /*userData*/)
+    {
+        return parser->astBuilder->create<NoneLiteralExpr>();
+    }
+
     static NodeBase* parseTryExpr(Parser* parser, void* /*userData*/)
     {
         auto tryExpr = parser->astBuilder->create<TryExpr>();
@@ -6587,6 +6592,7 @@ namespace Slang
         _makeParseExpr("true",  parseTrueExpr),
         _makeParseExpr("false", parseFalseExpr),
         _makeParseExpr("nullptr", parseNullPtrExpr),
+        _makeParseExpr("none", parseNoneExpr),
         _makeParseExpr("try",     parseTryExpr),
         _makeParseExpr("__TaggedUnion", parseTaggedUnionType),
         _makeParseExpr("__jvp", parseJVPDifferentiate)
