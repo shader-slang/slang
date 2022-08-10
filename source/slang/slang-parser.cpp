@@ -4336,25 +4336,8 @@ namespace Slang
             // isn't a keyword should we fall back to the approach
             // here.
             //
+            bool prevHasSeenCompletionToken = hasSeenCompletionToken;
             Expr* type = ParseType();
-
-            if (type && hasSeenCompletionToken)
-            {
-                // If we encountered a completion token, just return the parsed expr
-                // as an ExprStmt.
-                for (auto tokenPos = startPos.tokenReaderCursor;
-                    tokenPos && tokenPos < tokenReader.getCursor().tokenReaderCursor;
-                    ++tokenPos)
-                {
-                    if (tokenPos && tokenPos->type == TokenType::CompletionRequest)
-                    {
-                        auto exprStmt = astBuilder->create<ExpressionStmt>();
-                        exprStmt->loc = type->loc;
-                        exprStmt->expression = type;
-                        return exprStmt;
-                    }
-                }
-            }
 
             // We don't actually care about the type, though, so
             // don't retain it
@@ -4385,15 +4368,17 @@ namespace Slang
             // general kinds of declarators (notably pointer declarators),
             // so we'll need to be careful about this.
             //
-            // If the lookahead token is `*`, then we have to decide
-            // whether to parse a pointer declarator or a multiply
-            // expression. In this context it makes sense to disambiguate
+            // If the line being parsed token is `Something* ...`, then the `*`
+            // is already consumed by `ParseType` above and the current logic
+            // will continue to parse as var declaration instead of a mul expr.
+            // In this context it makes sense to disambiguate
             // in favor of a pointer over a multiply, since a multiply
             // expression can't appear at the start of a statement
             // with any side effects.
             //
             //
-            if (LookAheadToken(TokenType::Identifier) || LookAheadToken(TokenType::OpMul))
+            if (!hasSeenCompletionToken && (LookAheadToken(TokenType::Identifier) ||
+                                            LookAheadToken(TokenType::CompletionRequest)))
             {
                 // Reset the cursor and try to parse a declaration now.
                 // Note: the declaration will consume any modifiers
@@ -4404,6 +4389,7 @@ namespace Slang
             }
 
             // Fallback: reset and parse an expression
+            hasSeenCompletionToken = prevHasSeenCompletionToken;
             tokenReader.setCursor(startPos);
             statement = ParseExpressionStatement();
         }
