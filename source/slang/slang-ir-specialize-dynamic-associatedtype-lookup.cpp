@@ -168,25 +168,15 @@ struct AssociatedTypeLookupSpecializationContext
 
     void processGetSequentialIDInst(IRGetSequentialID* inst)
     {
-        if (inst->getRTTIOperand()->getDataType()->getOp() == kIROp_WitnessTableIDType)
-        {
-            // If the operand is a witness table id, just return the operand.
-            inst->replaceUsesWith(inst->getRTTIOperand());
-            inst->removeAndDeallocate();
-        }
-        else if (inst->getRTTIOperand()->getDataType()->getOp() == kIROp_VectorType)
-        {
-            // If the operand is a witness table, it is already replaced with a uint2
-            // at this point, where the first element in the uint2 is the id of the
-            // witness table.
-            auto vectorType = inst->getRTTIOperand()->getDataType();
-            IRBuilder builder(sharedContext->sharedBuilderStorage);
-            builder.setInsertBefore(inst);
-            UInt index = 0;
-            auto id = builder.emitSwizzle(as<IRVectorType>(vectorType)->getElementType(), inst->getRTTIOperand(), 1, &index);
-            inst->replaceUsesWith(id);
-            inst->removeAndDeallocate();
-        }
+        // If the operand is a witness table, it is already replaced with a uint2
+        // at this point, where the first element in the uint2 is the id of the
+        // witness table.
+        IRBuilder builder(sharedContext->sharedBuilderStorage);
+        builder.setInsertBefore(inst);
+        UInt index = 0;
+        auto id = builder.emitSwizzle(builder.getUIntType(), inst->getRTTIOperand(), 1, &index);
+        inst->replaceUsesWith(id);
+        inst->removeAndDeallocate();
     }
 
     void processModule()

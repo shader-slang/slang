@@ -456,6 +456,25 @@ __intrinsic_type($(kIROp_RefType))
 struct Ref
 {};
 
+__generic<T>
+__magic_type(OptionalType)
+__intrinsic_type($(kIROp_OptionalType))
+struct Optional
+{
+    property bool hasValue
+    {
+        __intrinsic_op($(kIROp_OptionalHasValue))
+        get;
+    }
+
+    property T value
+    {
+        __intrinsic_op($(kIROp_GetOptionalValue))
+        get;
+    }
+};
+
+
 __magic_type(StringType)
 __intrinsic_type($(kIROp_StringType))
 struct String

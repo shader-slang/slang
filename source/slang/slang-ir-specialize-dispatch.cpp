@@ -253,8 +253,6 @@ void fixupDispatchFuncCall(SharedGenericsLoweringContext* sharedContext, IRFunc*
             }
             if (as<IRWitnessTable>(args[0]->getDataType()))
                 continue;
-            auto seqIdArg = builder.emitGetSequentialIDInst(args[0]);
-            args[0] = seqIdArg;
             auto newCall = builder.emitCallInst(call->getFullType(), newDispatchFunc, args);
             call->replaceUsesWith(newCall);
             call->removeAndDeallocate();

@@ -131,6 +131,8 @@ public:
         /// Get a builtin type by the BaseType
     SLANG_FORCE_INLINE Type* getBuiltinType(BaseType flavor) { return m_sharedASTBuilder->m_builtinTypes[Index(flavor)]; }
 
+    Type* getSpecializedBuiltinType(Type* typeParam, const char* magicTypeName);
+
     Type* getInitializerListType() { return m_sharedASTBuilder->m_initializerListType; }
     Type* getOverloadedType() { return m_sharedASTBuilder->m_overloadedType; }
     Type* getErrorType() { return m_sharedASTBuilder->m_errorType; }
@@ -152,13 +154,12 @@ public:
         // Construct the type `Ref<valueType>`
     RefType* getRefType(Type* valueType);
 
+        // Construct the type `Optional<valueType>`
+    OptionalType* getOptionalType(Type* valueType);
+
         // Construct a pointer type like `Ptr<valueType>`, but where
         // the actual type name for the pointer type is given by `ptrTypeName`
     PtrTypeBase* getPtrType(Type* valueType, char const* ptrTypeName);
-
-        // Construct a pointer type like `Ptr<valueType>`, but where
-        // the generic declaration for the pointer type is `genericDecl`
-    PtrTypeBase* getPtrType(Type* valueType, GenericDecl* genericDecl);
 
     ArrayExpressionType* getArrayType(Type* elementType, IntVal* elementCount);
 
