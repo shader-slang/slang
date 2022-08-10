@@ -319,7 +319,7 @@ UnownedStringSlice StringUtil::getAtInSplit(const UnownedStringSlice& in, char s
 
 ComPtr<ISlangBlob> StringUtil::createStringBlob(const String& string)
 {
-    return ComPtr<ISlangBlob>(new StringBlob(string));
+    return StringBlob::create(string);
 }
 
 /* static */String StringUtil::calcCharReplaced(const UnownedStringSlice& slice, char fromChar, char toChar)

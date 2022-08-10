@@ -618,7 +618,7 @@ UnownedStringSlice ArtifactDescUtil::getDefaultExtension(const ArtifactDesc& des
 
 /* static */String ArtifactDescUtil::getBaseName(IArtifact* artifact)
 {
-    if (auto fileRep = findItem<IFileArtifactRepresentation>(artifact))
+    if (auto fileRep = findRepresentation<IFileArtifactRepresentation>(artifact))
     {
         return getBaseName(artifact->getDesc(), fileRep);
     }
@@ -634,7 +634,7 @@ UnownedStringSlice ArtifactDescUtil::getDefaultExtension(const ArtifactDesc& des
 
 /* static */String ArtifactDescUtil::getParentPath(IArtifact* artifact)
 {
-    if (auto fileRep = findItem<IFileArtifactRepresentation>(artifact))
+    if (auto fileRep = findRepresentation<IFileArtifactRepresentation>(artifact))
     {
         return getParentPath(fileRep);
     }
@@ -651,9 +651,9 @@ UnownedStringSlice ArtifactDescUtil::getDefaultExtension(const ArtifactDesc& des
     Index pos = Path::findLastSeparatorIndex(basePath);
     if (pos >= 0)
     {
-        outPath.append(basePath.head(pos));
-        outPath.append(Path::kPathDelimiter);
-
+        // Keep the stem including the delimiter
+        outPath.append(basePath.head(pos + 1));
+        // Get the baseName
         baseName = basePath.tail(pos + 1);
     }
 

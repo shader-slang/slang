@@ -608,13 +608,14 @@ SlangResult CacheFileSystem::loadFile(char const* pathIn, ISlangBlob** blobOut)
 
 SlangResult CacheFileSystem::getFileUniqueIdentity(const char* path, ISlangBlob** outUniqueIdentity)
 {
+    *outUniqueIdentity = nullptr;
     PathInfo* info = _resolvePathCacheInfo(path);
-    if (!info)
+    if (!info || info->m_uniqueIdentity.getLength() <= 0)
     {
         return SLANG_E_NOT_FOUND;
     }
-    info->m_uniqueIdentity->addRef();
-    *outUniqueIdentity = info->m_uniqueIdentity;
+
+    *outUniqueIdentity = StringBlob::create(info->m_uniqueIdentity).detach();
     return SLANG_OK;
 }
 
@@ -694,6 +695,8 @@ SlangResult CacheFileSystem::getSimplifiedPath(const char* path, ISlangBlob** ou
 
 SlangResult CacheFileSystem::getCanonicalPath(const char* path, ISlangBlob** outCanonicalPath)
 {
+    *outCanonicalPath = nullptr;
+
     // A file must exist to get a canonical path... 
     PathInfo* info = _resolvePathCacheInfo(path);
     if (!info)
@@ -716,12 +719,8 @@ SlangResult CacheFileSystem::getCanonicalPath(const char* path, ISlangBlob** out
         if (SLANG_SUCCEEDED(res))
         {
             // Get the path as a string
-            String canonicalPath = StringUtil::getString(canonicalPathBlob);
-            if (canonicalPath.getLength() > 0)
-            {
-                info->m_canonicalPath = new StringBlob(canonicalPath);
-            }
-            else
+            info->m_canonicalPath = StringUtil::getString(canonicalPathBlob);
+            if (info->m_canonicalPath.getLength() <= 0)
             {
                 res = SLANG_FAIL;
             }
@@ -731,11 +730,12 @@ SlangResult CacheFileSystem::getCanonicalPath(const char* path, ISlangBlob** out
         info->m_getCanonicalPathResult = toCompressedResult(res);
     }
 
-    if (info->m_canonicalPath)
+    // Create the blob
+    if (info->m_canonicalPath.getLength())
     {
-        info->m_canonicalPath->addRef();
+        *outCanonicalPath = StringBlob::create(info->m_canonicalPath).detach();
     }
-    *outCanonicalPath = info->m_canonicalPath;
+
     return SLANG_OK;
 }
 

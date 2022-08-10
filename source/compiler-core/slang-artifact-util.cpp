@@ -67,7 +67,7 @@ ArtifactStyle ArtifactUtilImpl::getStyleParent(ArtifactStyle style) { return get
 UnownedStringSlice ArtifactUtilImpl::getStyleName(ArtifactStyle style) { return getName(style); }
 bool ArtifactUtilImpl::isStyleDerivedFrom(ArtifactStyle style, ArtifactStyle base) { return isDerivedFrom(style, base); }
 
-SlangResult ArtifactUtilImpl::createLockFile(const char* inNameBase, ISlangMutableFileSystem* fileSystem, ILockFile** outLockFile)
+SlangResult ArtifactUtilImpl::createLockFile(const char* inNameBase, ISlangMutableFileSystem* fileSystem, IFileArtifactRepresentation** outLockFile)
 {
 	if (fileSystem)
 	{
@@ -84,7 +84,7 @@ SlangResult ArtifactUtilImpl::createLockFile(const char* inNameBase, ISlangMutab
 	String lockPath;
 	SLANG_RETURN_ON_FAIL(File::generateTemporary(nameBase, lockPath));
 
-	ComPtr<ILockFile> lockFile(new LockFile(lockPath, fileSystem));
+	ComPtr<IFileArtifactRepresentation> lockFile(new FileArtifactRepresentation(IFileArtifactRepresentation::Kind::Lock, lockPath, nullptr, fileSystem));
 
 	*outLockFile = lockFile.detach();
 	return SLANG_OK;
@@ -93,20 +93,16 @@ SlangResult ArtifactUtilImpl::createLockFile(const char* inNameBase, ISlangMutab
 SlangResult ArtifactUtilImpl::calcArtifactPath(const ArtifactDesc& desc, const char* inBasePath, ISlangBlob** outPath)
 {
 	UnownedStringSlice basePath(inBasePath);
-
 	StringBuilder path;
 	SLANG_RETURN_ON_FAIL(ArtifactDescUtil::calcPathForDesc(desc, basePath, path));
-
-	auto blob = new StringBlob(path);
-	blob->addRef();
-	*outPath = blob;
+	*outPath = StringBlob::create(path).detach();
 	return SLANG_OK;
 }
 
 SlangResult ArtifactUtilImpl::requireFileDefaultImpl(IArtifact* artifact, ArtifactKeep keep, IFileArtifactRepresentation** outFile)
 {
 	// See if we already have it
-	if (auto fileRep = findItem<IFileArtifactRepresentation>(artifact))
+	if (auto fileRep = findRepresentation<IFileArtifactRepresentation>(artifact))
 	{
 		fileRep->addRef();
 		*outFile = fileRep;
@@ -118,7 +114,7 @@ SlangResult ArtifactUtilImpl::requireFileDefaultImpl(IArtifact* artifact, Artifa
 	SLANG_RETURN_ON_FAIL(artifact->loadBlob(keep, blob.writeRef()));
 
 	// Okay we need to store as a temporary. Get a lock file.
-	ComPtr<ILockFile> lockFile;
+	ComPtr<IFileArtifactRepresentation> lockFile;
 	SLANG_RETURN_ON_FAIL(createLockFile(artifact->getName(), nullptr, lockFile.writeRef()));
 
 	// Now we need the appropriate name for this item
@@ -130,25 +126,32 @@ SlangResult ArtifactUtilImpl::requireFileDefaultImpl(IArtifact* artifact, Artifa
 	// Write the contents
 	SLANG_RETURN_ON_FAIL(File::writeAllBytes(path, blob->getBufferPointer(), blob->getBufferSize()));
 
-	// If the paths are identical we don't need a lock file
+	ComPtr<IFileArtifactRepresentation> fileRep;
+
+	// TODO(JS): This path comparison is perhaps not perfect, in that it assumes the path is not changed
+	// in any way. For example an impl of calcArtifactPath that changed slashes or used a canonical path
+	// might mean the lock file and the rep have the same path. 
+	// As it stands calcArtifactPath impl doesn't do that, but that is perhaps somewhatfragile
+
+	// If the paths are identical, we can just use the lock file for the rep
 	if (UnownedStringSlice(lockFile->getPath()) == path.getUnownedSlice())
 	{
-		// Make the lockFile no longer own the file 
-		lockFile->disown();
-		// We no longer need the lock file
-		lockFile.setNull();
+		fileRep.swap(lockFile);
 	}
-	
-	// Create the rep
-	IFileArtifactRepresentation* fileRep = new FileArtifactRepresentation(IFileArtifactRepresentation::Kind::Owned, path, lockFile, nullptr);
-	if (canKeep(keep))
+	else
 	{
-		artifact->addItem(fileRep);
+		// Create a new rep that references the lock file
+		fileRep = new FileArtifactRepresentation(IFileArtifactRepresentation::Kind::Owned, path, lockFile, nullptr);
 	}
 
-	// Return it
-	fileRep->addRef();
-	*outFile = fileRep;
+	// Create the rep
+	if (canKeep(keep))
+	{
+		artifact->addRepresentation(fileRep);
+	}
+
+	// Return the file
+	*outFile = fileRep.detach();
 	return SLANG_OK;
 }
 
@@ -156,5 +159,20 @@ ArtifactDesc ArtifactUtilImpl::makeDescFromCompileTarget(SlangCompileTarget targ
 {
 	return ArtifactDescUtil::makeDescFromCompileTarget(target);
 }
+
+SlangResult ArtifactUtilImpl::getChildrenDefaultImpl(IArtifact* artifact, IArtifactList** outList)
+{
+	auto desc = artifact->getDesc();
+
+	// If it's a container type for now, just create empty list of children
+	if (isDerivedFrom(desc.kind, ArtifactKind::Container))
+	{
+		*outList = ComPtr<IArtifactList>(new ArtifactList(artifact)).detach();
+		return SLANG_OK;
+	}
+
+	return SLANG_E_NOT_AVAILABLE;
+}
+
 
 } // namespace Slang

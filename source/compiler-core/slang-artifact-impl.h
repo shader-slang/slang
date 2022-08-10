@@ -4,6 +4,8 @@
 
 #include "slang-artifact.h"
 
+#include "../core/slang-lazy-castable-list.h"
+
 #include "../../slang-com-helper.h"
 #include "../../slang-com-ptr.h"
 
@@ -51,15 +53,6 @@ protected:
 /*
 Discussion:
 
-It could make sense to remove the explicit variables of a ISlangBlob, and the file backing from this interface, as they could 
-all be implemented as element types presumably deriving from IArtifactInstance. Doing so would mean how a 'file' is turned into
-a blob is abstracted. 
-
-It may be helpful to be able to add temporary files to the artifact (such that they will be deleted when the artifact goes out of 
-scope). Using an implementation of the File backed IArtifactInstance, with a suitable desc would sort of work, but it breaks the idea 
-that any IArtifactInstance *represents* the contents of Artifact that contains it. Of course there could be types *not* deriving 
-from IArtifactInstance that handle temporary file existance. This is probably the simplest answer to the problem.
-
 Another issue occurs around wanting to hold multiple kernels within a container. The problem here is that although through the desc
 we can identify what target a kernel is for, there is no way of telling what stage it is for.
 
@@ -86,12 +79,17 @@ public:
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL loadBlob(Keep keep, ISlangBlob** outBlob) SLANG_OVERRIDE;
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL requireFile(Keep keep, IFileArtifactRepresentation** outFileRep) SLANG_OVERRIDE;
     virtual SLANG_NO_THROW const char* SLANG_MCALL getName() SLANG_OVERRIDE { return m_name.getBuffer(); }
-    virtual SLANG_NO_THROW void* SLANG_MCALL findItemInterface(const Guid& uuid) SLANG_OVERRIDE;
-    virtual SLANG_NO_THROW void* SLANG_MCALL findItemObject(const Guid& classGuid) SLANG_OVERRIDE;
-    virtual SLANG_NO_THROW void SLANG_MCALL addItem(ISlangUnknown* intf) SLANG_OVERRIDE;
-    virtual SLANG_NO_THROW ISlangUnknown* SLANG_MCALL getItemAt(Index i) SLANG_OVERRIDE { return m_items[i]; }
-    virtual SLANG_NO_THROW void SLANG_MCALL removeItemAt(Index i) SLANG_OVERRIDE;
-    virtual SLANG_NO_THROW Index SLANG_MCALL getItemCount() SLANG_OVERRIDE { return m_items.getCount(); }
+    
+    virtual SLANG_NO_THROW void SLANG_MCALL addAssociated(ICastable* castable) SLANG_OVERRIDE;
+    virtual void* SLANG_MCALL SLANG_MCALL findAssociated(const Guid& unk) SLANG_OVERRIDE;
+    virtual ICastableList* SLANG_MCALL getAssociated() SLANG_OVERRIDE;
+
+    virtual SLANG_NO_THROW void SLANG_MCALL addRepresentation(ICastable* castable) SLANG_OVERRIDE;
+    virtual SLANG_NO_THROW void SLANG_MCALL addRepresentationUnknown(ISlangUnknown* rep) SLANG_OVERRIDE;
+    virtual void* SLANG_MCALL SLANG_MCALL findRepresentation(const Guid& guid) SLANG_OVERRIDE;
+    virtual ICastableList* SLANG_MCALL getRepresentations() SLANG_OVERRIDE;
+
+    virtual IArtifactList* SLANG_MCALL getChildren() SLANG_OVERRIDE;
 
     /// Ctor
     Artifact(const Desc& desc, const String& name) :
@@ -108,7 +106,10 @@ protected:
 
     String m_name;                              ///< Name of this artifact
 
-    List<ComPtr<ISlangUnknown>> m_items;        ///< Associated items
+    LazyCastableList m_associated;              ///< Associated items
+    LazyCastableList m_representations;         ///< Representations
+
+    ComPtr<IArtifactList> m_children;           ///< The children to this artifact
 };
 
 } // namespace Slang

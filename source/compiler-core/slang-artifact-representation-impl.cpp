@@ -77,71 +77,21 @@ bool FileArtifactRepresentation::exists()
     return SLANG_SUCCEEDED(res) && pathType == SLANG_PATH_TYPE_FILE;
 }
 
+void FileArtifactRepresentation::disown()
+{
+    if (_isOwned())
+    {
+        m_kind = Kind::Reference;
+    }
+}
+
 FileArtifactRepresentation::~FileArtifactRepresentation()
 {
-    if (m_kind == Kind::Owned)
+    if (_isOwned())
     {
         auto fileSystem = _getFileSystem();
         fileSystem->remove(m_path.getBuffer());
     }
-}
-
-/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!! LockFile !!!!!!!!!!!!!!!!!!!!!!!!!!! */
-
-void* LockFile::getInterface(const Guid& guid)
-{
-    if (guid == ISlangUnknown::getTypeGuid() ||
-        guid == ICastable::getTypeGuid() ||
-        guid == ILockFile::getTypeGuid())
-    {
-        return static_cast<ILockFile*>(this);
-    }
-    return nullptr;
-}
-
-void* LockFile::getObject(const Guid& guid)
-{
-    SLANG_UNUSED(guid);
-    return nullptr;
-}
-
-ISlangMutableFileSystem* LockFile::_getFileSystem()
-{
-    return m_fileSystem ? m_fileSystem : OSFileSystem::getMutableSingleton();
-}
-
-void* LockFile::castAs(const Guid& guid)
-{
-    if (auto intf = getInterface(guid))
-    {
-        return intf;
-    }
-    return getObject(guid);
-}
-
-const char* LockFile::getPath()
-{
-    return (m_path.getLength() > 0) ? m_path.getBuffer() : nullptr;
-}
-
-ISlangMutableFileSystem* LockFile::getFileSystem()
-{
-    return m_fileSystem;
-}
-
-LockFile::~LockFile()
-{
-    if (m_path.getLength() > 0)
-    {
-        auto fileSystem = _getFileSystem();
-        fileSystem->remove(m_path.getBuffer());
-    }
-}
-
-void LockFile::disown()
-{
-    m_path = String();
-    m_fileSystem.setNull();
 }
 
 } // namespace Slang

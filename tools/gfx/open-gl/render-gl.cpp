@@ -2246,9 +2246,10 @@ SLANG_NO_THROW Result SLANG_MCALL GLDevice::readTextureResource(
     if (outPixelSize)
         *outPixelSize = sizeof(uint32_t);
 
-    RefPtr<ListBlob> blob = new ListBlob();
-    blob->m_data.setCount(requiredSize);
-    auto buffer = blob->m_data.begin();
+    List<uint8_t> blobData;
+
+    blobData.setCount(requiredSize);
+    auto buffer = blobData.begin();
     glBindTexture(resource->m_target, resource->m_handle);
     glGetTexImage(resource->m_target, 0, GL_RGBA, GL_UNSIGNED_BYTE, buffer);
 
@@ -2263,8 +2264,8 @@ SLANG_NO_THROW Result SLANG_MCALL GLDevice::readTextureResource(
         }
     }
 
+    auto blob = ListBlob::moveCreate(blobData);
     returnComPtr(outBlob, blob);
-
     return SLANG_OK;
 }
 

@@ -330,8 +330,7 @@ SlangResult Workspace::loadFile(const char* path, ISlangBlob** outBlob)
     RefPtr<DocumentVersion> doc;
     if (openedDocuments.TryGetValue(canonnicalPath, doc))
     {
-        RefPtr<StringBlob> stringBlob = new StringBlob(doc->getText());
-        *outBlob = stringBlob.detach();
+        *outBlob = StringBlob::create(doc->getText()).detach();
         return SLANG_OK;
     }
     return Slang::OSFileSystem::getExtSingleton()->loadFile(path, outBlob);
@@ -479,7 +478,8 @@ Module* WorkspaceVersion::getOrLoadModule(String path)
     if (!doc)
         return nullptr;
     ComPtr<ISlangBlob> diagnosticBlob;
-    RefPtr<StringBlob> sourceBlob = new StringBlob((*doc)->getText());
+    auto sourceBlob = StringBlob::create((*doc)->getText());
+
     auto moduleName = getMangledNameFromNameString(path.getUnownedSlice());
     linkage->contentAssistInfo.primaryModuleName = linkage->getNamePool()->getName(moduleName);
     linkage->contentAssistInfo.primaryModulePath = path;
@@ -494,7 +494,7 @@ Module* WorkspaceVersion::getOrLoadModule(String path)
     auto parsedModule = linkage->loadModuleFromSource(
         moduleName.getBuffer(),
         path.getBuffer(),
-        sourceBlob.Ptr(),
+        sourceBlob,
         diagnosticBlob.writeRef());
     if (parsedModule)
     {

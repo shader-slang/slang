@@ -55,6 +55,52 @@
 
 namespace Slang
 {
+    // A temporary class that adapts `ISlangSharedLibrary_Dep1` to ISlangSharedLibrary
+
+    class SharedLibraryDep1Adapter : public ComBaseObject, public ISlangSharedLibrary
+    {
+    public:
+        SLANG_COM_BASE_IUNKNOWN_ALL
+
+        // ICastable
+        virtual SLANG_NO_THROW void* SLANG_MCALL castAs(const SlangUUID& guid) SLANG_OVERRIDE;
+
+        // ISlangSharedLibrary
+        virtual SLANG_NO_THROW void* SLANG_MCALL findSymbolAddressByName(char const* name) SLANG_OVERRIDE { return m_contained->findSymbolAddressByName(name); }
+
+        SharedLibraryDep1Adapter(ISlangSharedLibrary_Dep1* dep1):
+            m_contained(dep1)
+        {
+        }
+
+    protected:
+        void* getInterface(const Guid& guid)
+        {
+            if (guid == ISlangUnknown::getTypeGuid() ||
+                guid == ICastable::getTypeGuid() ||
+                guid == ISlangSharedLibrary::getTypeGuid())
+            {
+                return static_cast<ISlangSharedLibrary*>(this);
+            }
+            return nullptr;
+        }
+        void* getObject(const Guid& guid)
+        {
+            SLANG_UNUSED(guid);
+            return nullptr;
+        }
+
+        ComPtr<ISlangSharedLibrary_Dep1> m_contained;
+    };
+
+    void* SharedLibraryDep1Adapter::castAs(const SlangUUID& guid)
+    {
+        if (auto intf = getInterface(guid))
+        {
+            return intf;
+        }
+        return getObject(guid);
+    }
 
 // !!!!!!!!!!!!!!!!!!!!!! free functions for DiagnosicSink !!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
@@ -81,7 +127,24 @@ namespace Slang
     {
         if (downstreamResult)
         {
-            return downstreamResult->getHostCallableSharedLibrary(outSharedLibrary);
+            // TODO(JS): Work around for not knowing actual interface this is returning, 
+            // and needing to support deps interface
+
+            ComPtr<ISlangSharedLibrary> lib;
+            SLANG_RETURN_ON_FAIL(downstreamResult->getHostCallableSharedLibrary(lib));
+
+            if (SLANG_SUCCEEDED(lib->queryInterface(ISlangSharedLibrary::getTypeGuid(), (void**)outSharedLibrary.writeRef())))
+            {
+                return SLANG_OK;
+            }
+            
+            ComPtr<ISlangSharedLibrary_Dep1> libDep1;
+            if (SLANG_SUCCEEDED(lib->queryInterface(ISlangSharedLibrary_Dep1::getTypeGuid(), (void**)libDep1.writeRef())))
+            {
+                // Okay, we need to adapt for now
+                outSharedLibrary = new SharedLibraryDep1Adapter(libDep1);
+                return SLANG_OK;
+            }
         }
         return SLANG_FAIL;
     }
@@ -1304,8 +1367,9 @@ namespace Slang
 
                 // Set up the library artifact
                 ComPtr<IArtifact> artifact(new Artifact(ArtifactDesc::make(ArtifactKind::Library, Artifact::Payload::HostCPU), "slang-rt"));
+
                 ComPtr<IFileArtifactRepresentation> fileRep(new FileArtifactRepresentation(IFileArtifactRepresentation::Kind::NameOnly, "slang-rt", nullptr, nullptr));
-                artifact->addItem(fileRep);
+                artifact->addRepresentation(fileRep);
 
                 options.libraries.add(artifact);
             }
@@ -2122,10 +2186,10 @@ namespace Slang
                 }
 
                 // Need to turn into a blob
-                RefPtr<ListBlob> blob(new ListBlob);
-                // Swap the streams contents into the blob
-                stream.swapContents(blob->m_data);
-                m_containerBlob = blob;
+                List<uint8_t> blobData;
+                stream.swapContents(blobData);
+
+                m_containerBlob = ListBlob::moveCreate(blobData);
 
                 return res;
             }

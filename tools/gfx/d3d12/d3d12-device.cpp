@@ -231,10 +231,14 @@ Result DeviceImpl::captureTextureToSurface(
 
         SLANG_RETURN_ON_FAIL(dxResource->Map(0, &readRange, reinterpret_cast<void**>(&data)));
 
-        RefPtr<Slang::ListBlob> resultBlob = new Slang::ListBlob();
-        resultBlob->m_data.setCount(bufferSize);
-        memcpy(resultBlob->m_data.getBuffer(), data, bufferSize);
+        List<uint8_t> blobData;
+
+        blobData.setCount(bufferSize);
+        memcpy(blobData.getBuffer(), data, bufferSize);
         dxResource->Unmap(0, nullptr);
+
+        auto resultBlob = Slang::ListBlob::moveCreate(blobData);
+
         returnComPtr(outBlob, resultBlob);
         return SLANG_OK;
     }
@@ -1748,7 +1752,7 @@ Result DeviceImpl::readBufferResource(
         buffer->getDesc()->memoryType != MemoryType::ReadBack ? stageBuf : resource;
 
     // Map and copy
-    RefPtr<ListBlob> blob = new ListBlob();
+    List<uint8_t> blobData;
     {
         UINT8* data;
         D3D12_RANGE readRange = { 0, size };
@@ -1757,11 +1761,12 @@ Result DeviceImpl::readBufferResource(
             stageBufRef.getResource()->Map(0, &readRange, reinterpret_cast<void**>(&data)));
 
         // Copy to memory buffer
-        blob->m_data.setCount(size);
-        ::memcpy(blob->m_data.getBuffer(), data, size);
+        blobData.setCount(size);
+        ::memcpy(blobData.getBuffer(), data, size);
 
         stageBufRef.getResource()->Unmap(0, nullptr);
     }
+    auto blob = ListBlob::moveCreate(blobData);
     returnComPtr(outBlob, blob);
     return SLANG_OK;
 }
@@ -1782,8 +1787,9 @@ Result DeviceImpl::createProgram(
     {
         if (outDiagnosticBlob && d3dDiagnosticBlob)
         {
-            RefPtr<StringBlob> diagnosticBlob =
-                new StringBlob(String((const char*)d3dDiagnosticBlob->GetBufferPointer()));
+            String diagnostic((const char*)d3dDiagnosticBlob->GetBufferPointer());
+            auto diagnosticBlob = StringBlob::create(diagnostic);
+
             returnComPtr(outDiagnosticBlob, diagnosticBlob);
         }
         return rootShaderLayoutResult;
