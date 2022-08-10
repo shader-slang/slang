@@ -40,6 +40,7 @@ struct CompletionContext
     List<LanguageServerProtocol::CompletionItem> createSwizzleCandidates(
         Type* baseType, IntegerLiteralValue elementCount[2]);
     List<LanguageServerProtocol::CompletionItem> collectAttributes();
+    LanguageServerProtocol::CompletionItem generateGUIDCompletionItem();
     List<LanguageServerProtocol::TextEditCompletionItem> gatherFileAndModuleCompletionItems(
         const String& prefixPath,
         bool translateModuleName,
