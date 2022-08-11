@@ -3,6 +3,8 @@
 
 #include "slang-artifact-representation.h"
 
+#include "slang-artifact-impl.h"
+
 #include "../core/slang-type-text-util.h"
 #include "../core/slang-io.h"
 
@@ -170,9 +172,7 @@ bool isDerivedFrom(ENUM_TYPE kind, ENUM_TYPE base) { return g_table##ENUM_TYPE.i
             x(Executable, BinaryLike) \
             x(SharedLibrary, BinaryLike) \
             x(HostCallable, BinaryLike) \
-        \
-        x(DebugInfo, Base) \
-        x(Diagnostics, Base)
+        x(Instance, Base)
 
 #define SLANG_ARTIFACT_KIND_ENTRY(TYPE, PARENT) { Index(ArtifactKind::TYPE), Index(ArtifactKind::PARENT), #TYPE },
 
@@ -212,7 +212,12 @@ SLANG_HIERARCHICAL_ENUM(ArtifactKind, SLANG_ARTIFACT_KIND, SLANG_ARTIFACT_KIND_E
             x(SlangIR, GeneralIR) \
             x(LLVMIR, GeneralIR) \
         x(AST, Base) \
-            x(SlangAST, AST)
+            x(SlangAST, AST) \
+        x(CompileResults, Base) \
+        x(MetaData, Base) \
+            x(PostEmitMetadata, MetaData) \
+            x(DebugInfo, MetaData) \
+            x(Diagnostics, MetaData)
 
 #define SLANG_ARTIFACT_PAYLOAD_ENTRY(TYPE, PARENT) { Index(ArtifactPayload::TYPE), Index(ArtifactPayload::PARENT), #TYPE },
 
@@ -308,7 +313,6 @@ static const KindExtension g_cpuKindExts[] =
 
 #endif
 };
-
 
 /* static */ bool ArtifactDescUtil::isCpuBinary(const ArtifactDesc& desc)
 {
@@ -684,6 +688,12 @@ UnownedStringSlice ArtifactDescUtil::getDefaultExtension(const ArtifactDesc& des
     }
 
     return SLANG_OK;
+}
+
+/* static */ComPtr<IArtifactContainer> ArtifactDescUtil::createContainer(const ArtifactDesc& desc)
+{
+    const auto containerDesc = ArtifactDesc::make(ArtifactKind::Container, ArtifactPayload::CompileResults, desc.style);
+    return ArtifactContainer::create(containerDesc);
 }
 
 } // namespace Slang

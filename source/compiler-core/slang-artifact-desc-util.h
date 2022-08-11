@@ -87,6 +87,9 @@ struct ArtifactDescUtil
 
         /// Make ArtifactDesc from target
     static ArtifactDesc makeDescFromCompileTarget(SlangCompileTarget target);
+
+        /// Create an empty container which is compatible with the desc
+    static ComPtr<IArtifactContainer> createContainer(const ArtifactDesc& desc);
 };
 
 } // namespace Slang

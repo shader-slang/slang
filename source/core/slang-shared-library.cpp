@@ -33,7 +33,7 @@ SlangResult DefaultSharedLibraryLoader::loadSharedLibrary(const char* path, ISla
 {
     *outSharedLibrary = nullptr;
     // Try loading
-    SharedLibrary::Handle handle = nullptr;
+    SharedLibrary::Handle handle;
     SLANG_RETURN_ON_FAIL(SharedLibrary::load(path, handle));
     *outSharedLibrary = ComPtr<ISlangSharedLibrary>(new DefaultSharedLibrary(handle)).detach();
     return SLANG_OK;
@@ -65,6 +65,18 @@ SlangResult DefaultSharedLibraryLoader::loadPlatformSharedLibrary(const char* pa
 /* !!!!!!!!!!!!!!!!!!!!!!!!!! TemporarySharedLibrary !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!*/
 
 TemporarySharedLibrary::~TemporarySharedLibrary()
+{
+    if (m_sharedLibraryHandle)
+    {
+        // We have to unload if we want to be able to remove
+        SharedLibrary::unload(m_sharedLibraryHandle);
+        m_sharedLibraryHandle = nullptr;
+    }
+}
+
+/* !!!!!!!!!!!!!!!!!!!!!!!!!! ScopeSharedLibrary !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!*/
+
+ScopeSharedLibrary::~ScopeSharedLibrary()
 {
     if (m_sharedLibraryHandle)
     {

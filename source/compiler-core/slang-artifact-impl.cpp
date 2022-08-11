@@ -4,90 +4,44 @@
 #include "slang-artifact-representation.h"
 
 #include "slang-artifact-util.h"
+#include "slang-artifact-desc-util.h"
 
 #include "../core/slang-castable-list-impl.h"
 
 namespace Slang {
 
-/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ArtifactList !!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
-void* ArtifactList::getInterface(const Guid& guid)
+/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! Artifact !!!!!!!!!!!!!!!!!!!!!!!!!!! */
+
+IArtifactHandler* Artifact::_getHandler()
 {
-    if (guid == ISlangUnknown::getTypeGuid() ||
-        guid == ICastable::getTypeGuid() ||
-        guid == IArtifactList::getTypeGuid())
-    {
-        return static_cast<IArtifactList*>(this);
-    }
-    return nullptr;
+    // TODO(JS): For now we just use the default handler, but in the future this should probably be a member
+    return DefaultArtifactHandler::getSingleton();
 }
 
-void* ArtifactList::getObject(const Guid& guid)
+void* Artifact::castAs(const Guid& guid)
 {
-    // For now we can't cast to an object
-    SLANG_UNUSED(guid);
-    return nullptr;
-}
-
-void* ArtifactList::castAs(const Guid& guid)
-{
-    if (auto intf = getInterface(guid))
+    if (auto ptr = getInterface(guid))
     {
-        return intf;
+        return ptr;
     }
     return getObject(guid);
 }
 
-void ArtifactList::add(IArtifact* artifact)
-{
-    // Must be set
-    SLANG_ASSERT(artifact);
-    // Can't already be in the list
-    SLANG_ASSERT(m_artifacts.indexOf(artifact) < 0);
-    // Can't have another owner
-    SLANG_ASSERT(artifact->getParent() == nullptr);
-
-    // Set the parent
-    artifact->setParent(m_parent);
-
-    // Add
-    m_artifacts.add(ComPtr<IArtifact>(artifact));
-}
-
-void ArtifactList::removeAt(Index index) 
-{
-   IArtifact* artifact = m_artifacts[index];
-   artifact->setParent(nullptr);
-   m_artifacts.removeAt(index); 
-}
-
-void ArtifactList::clear()
-{
-    _setParent(nullptr);
-    m_artifacts.clear();
-}
-
-void ArtifactList::_setParent(IArtifact* parent)
-{
-    if (m_parent == parent)
-    {
-        return;
-    }
-
-    for (IArtifact* artifact : m_artifacts)
-    {
-        artifact->setParent(artifact);
-    }
-}
-
-/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! Artifact !!!!!!!!!!!!!!!!!!!!!!!!!!! */
-
 void* Artifact::getInterface(const Guid& uuid)
 {
-    if (uuid == ISlangUnknown::getTypeGuid() || uuid == IArtifact::getTypeGuid())
+    if (uuid == ISlangUnknown::getTypeGuid() || 
+        uuid == ICastable::getTypeGuid() ||
+        uuid == IArtifact::getTypeGuid())
     {
         return static_cast<IArtifact*>(this);
     }
+    return nullptr;
+}
+
+void* Artifact::getObject(const Guid& uuid)
+{
+    SLANG_UNUSED(uuid);
     return nullptr;
 }
 
@@ -113,50 +67,43 @@ bool Artifact::exists()
     return false;
 }
 
-SlangResult Artifact::requireFile(Keep keep, IFileArtifactRepresentation** outFileRep)
+SlangResult Artifact::requireFile(Keep keep, ISlangMutableFileSystem* fileSystem, IFileArtifactRepresentation** outFileRep)
 {
-    auto util = ArtifactUtilImpl::getSingleton();
-    return util->requireFileDefaultImpl(this, keep, outFileRep);
+    auto handler = _getHandler();
+    return handler->getOrCreateFileRepresentation(this, keep, fileSystem, outFileRep);
+}
+
+SlangResult Artifact::loadSharedLibrary(ArtifactKeep keep, ISlangSharedLibrary** outSharedLibrary)
+{
+    auto handler = _getHandler();
+
+    ComPtr<ICastable> castable;
+    SLANG_RETURN_ON_FAIL(handler->getOrCreateRepresentation(this, ISlangSharedLibrary::getTypeGuid(), keep, castable.writeRef()));
+   
+    ISlangSharedLibrary* lib = as<ISlangSharedLibrary>(castable);
+    lib->addRef();
+
+    *outSharedLibrary = lib;
+    return SLANG_OK;
+}
+
+SlangResult Artifact::getOrCreateRepresentation(const Guid& typeGuid, ArtifactKeep keep, ICastable** outCastable)
+{
+    auto handler = _getHandler();
+    return handler->getOrCreateRepresentation(this, typeGuid, keep, outCastable);
 }
 
 SlangResult Artifact::loadBlob(Keep keep, ISlangBlob** outBlob)
 {
-    // If we have a blob just return it
-    if (auto blob = (ISlangBlob*)findRepresentation(ISlangBlob::getTypeGuid()))
-    {
-        blob->addRef();
-        *outBlob = blob;
-        return SLANG_OK;
-    }
+    auto handler = _getHandler();
 
-    ComPtr<ISlangBlob> blob;
+    ComPtr<ICastable> castable;
+    SLANG_RETURN_ON_FAIL(handler->getOrCreateRepresentation(this, ISlangBlob::getTypeGuid(), keep, castable.writeRef()));
 
-    // Look for a representation that we can serialize into a blob
-    for (auto rep : m_representations.getView())
-    {
-        if (auto artifactRep = as<IArtifactRepresentation>(rep))
-        {
-            SlangResult res = artifactRep->writeToBlob(blob.writeRef());
-            if (SLANG_SUCCEEDED(res) && blob)
-            {
-                break;
-            }
-        }
-    }
-     
-    // Wasn't able to construct
-    if (!blob)
-    {
-        return SLANG_E_NOT_FOUND;
-    }
+    ISlangBlob* blob = as<ISlangBlob>(castable);
+    blob->addRef();
 
-    // Put in cache 
-    if (canKeep(keep))
-    {
-        addRepresentationUnknown(blob);
-    }
-
-    *outBlob = blob.detach();
+    *outBlob = blob;
     return SLANG_OK;
 }
 
@@ -169,6 +116,12 @@ void Artifact::addAssociated(ICastable* castable)
 void* Artifact::findAssociated(const Guid& guid)
 {
     return m_associated.find(guid);
+}
+
+
+ICastable* Artifact::findAssociatedWithPredicate(ICastableList::FindFunc findFunc, void* data)
+{
+    return m_associated.findWithPredicate(findFunc, data);
 }
 
 ICastableList* Artifact::getAssociated()
@@ -218,24 +171,164 @@ void* Artifact::findRepresentation(const Guid& guid)
     return m_representations.find(guid);
 }
 
-ICastableList* Artifact::getRepresentations()
+ICastable* Artifact::findRepresentationWithPredicate(ICastableList::FindFunc findFunc, void* data)
+{
+    return m_representations.findWithPredicate(findFunc, data);
+}
+
+Slice<ICastable*> Artifact::getRepresentations()
+{
+    const auto view = m_representations.getView();
+    return Slice<ICastable*>(view.getBuffer(), view.getCount());
+}
+
+ICastableList* Artifact::getRepresentationList()
 {
     return m_representations.requireList();
 }
 
-IArtifactList* Artifact::getChildren()
+/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ArtifactContainer !!!!!!!!!!!!!!!!!!!!!!!!!!! */
+
+void* ArtifactContainer::getInterface(const Guid& guid)
 {
-    // If it has already evaluated, return it.
-    if (m_children)
+    if (guid == ISlangUnknown::getTypeGuid() ||
+        guid == ICastable::getTypeGuid() ||
+        guid == IArtifact::getTypeGuid() ||
+        guid == IArtifactContainer::getTypeGuid())
     {
-        return m_children;
+        return static_cast<IArtifactContainer*>(this);
     }
-
-    auto util = ArtifactUtilImpl::getSingleton();
-    util->getChildrenDefaultImpl(this, m_children.writeRef());
-
-    return m_children;
+    return nullptr;
 }
 
+void* ArtifactContainer::getObject(const Guid& guid)
+{
+    SLANG_UNUSED(guid);
+    return nullptr;
+}
+
+void* ArtifactContainer::castAs(const Guid& guid)
+{
+    if (auto ptr = getInterface(guid))
+    {
+        return ptr;
+    }
+    return getObject(guid);
+}
+
+void ArtifactContainer::setChildren(IArtifact** children, Count count)
+{
+    m_expandResult = SLANG_OK;
+
+    m_children.clearAndDeallocate();
+    m_children.setCount(count);
+
+    ComPtr<IArtifact>* dst = m_children.getBuffer();
+    for (Index i = 0; i < count; ++i)
+    {
+        dst[i] = children[i];
+    }
+}
+
+SlangResult ArtifactContainer::expandChildren()
+{
+    auto handler = _getHandler();
+    return handler->expandChildren(this);
+}
+
+Slice<IArtifact*> ArtifactContainer::getChildren()
+{
+    _requireChildren();
+
+    return Slice<IArtifact*>((IArtifact**)m_children.getBuffer(), m_children.getCount());
+}
+
+void ArtifactContainer::addChild(IArtifact* artifact)
+{
+    SLANG_ASSERT(artifact);
+    SLANG_ASSERT(m_children.indexOf(artifact) < 0);
+
+    _requireChildren();
+
+    m_children.add(ComPtr<IArtifact>(artifact));
+}
+
+void ArtifactContainer::removeChildAt(Index index)
+{
+    _requireChildren();
+
+    m_children.removeAt(index);
+}
+
+void ArtifactContainer::clearChildren()
+{
+    _requireChildren();
+
+    m_children.clearAndDeallocate();
+}
+
+IArtifact* ArtifactContainer::findChildByDesc(const ArtifactDesc& desc)
+{
+    _requireChildren();
+
+    for (IArtifact* artifact : m_children)
+    {
+        if (artifact->getDesc() == desc)
+        {
+            return artifact;
+        }
+    }
+    return nullptr;
+}
+
+IArtifact* ArtifactContainer::findChildByDerivedDesc(const ArtifactDesc& desc)
+{
+    _requireChildren();
+
+    for (IArtifact* artifact : m_children)
+    {
+        const ArtifactDesc artifactDesc = artifact->getDesc();
+        // TODO(JS): Currently this ignores flags in desc. That may or may not be right 
+        // long term.
+        if (isDerivedFrom(artifactDesc.kind, desc.kind) &&
+            isDerivedFrom(artifactDesc.payload, desc.payload) &&
+            isDerivedFrom(artifactDesc.style, desc.style))
+        {
+            return artifact;
+        }
+    }
+    return nullptr;
+}
+
+IArtifact* ArtifactContainer::findChildByName(const char* name)
+{
+    _requireChildren();
+
+    for (IArtifact* artifact : m_children)
+    {
+        const char* artifactName = artifact->getName();
+
+        if (artifactName == name ||
+            ::strcmp(artifactName, name) == 0)
+        {
+            return artifact;
+        }
+    }
+    return nullptr;
+}
+
+IArtifact* ArtifactContainer::findChildByPredicate(FindFunc func, void* data)
+{
+    _requireChildren();
+
+    for (IArtifact* artifact : m_children)
+    {
+        if (func(artifact, data))
+        {
+            return artifact;
+        }
+    }
+    return nullptr;
+}
 
 } // namespace Slang

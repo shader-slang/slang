@@ -100,6 +100,24 @@ protected:
     String m_path;
 };
 
+class ScopeSharedLibrary : public DefaultSharedLibrary
+{
+public: 
+    typedef DefaultSharedLibrary Super;
+
+    /// Ctor
+    ScopeSharedLibrary(const SharedLibrary::Handle sharedLibraryHandle, ISlangUnknown* scope) :
+        Super(sharedLibraryHandle),
+        m_scope(scope)
+    {
+    }
+
+    virtual ~ScopeSharedLibrary();
+
+protected:
+    ComPtr<ISlangUnknown> m_scope;
+};
+
 class SharedLibraryUtils
 {
 public:

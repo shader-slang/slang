@@ -268,7 +268,7 @@ namespace Slang
         {
             // Get the libray name and path
             ComPtr<IFileArtifactRepresentation> fileRep;
-            SLANG_RETURN_ON_FAIL(artifact->requireFile(ArtifactKeep::No, fileRep.writeRef()));
+            SLANG_RETURN_ON_FAIL(artifact->requireFile(ArtifactKeep::Yes, nullptr, fileRep.writeRef()));
 
             libPathPool.add(ArtifactDescUtil::getParentPath(fileRep));
             // We need the extension for windows

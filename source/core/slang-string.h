@@ -765,6 +765,11 @@ namespace Slang
             return indexOf(str.begin(), 0);
         }
 
+        void swapWith(String& other)
+        {
+            m_buffer.swapWith(other.m_buffer);
+        }
+
         Index indexOf(char ch, Index id) const
         {
             const Index length = getLength();

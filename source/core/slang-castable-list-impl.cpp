@@ -36,9 +36,10 @@ void* UnknownCastableAdapter::castAs(const Guid& guid)
 void* UnknownCastableAdapter::getInterface(const Guid& guid)
 {
     if (guid == ISlangUnknown::getTypeGuid() ||
-        guid == ICastable::getTypeGuid())
+        guid == ICastable::getTypeGuid() ||
+        guid == IUnknownCastableAdapter::getTypeGuid())
     {
-        return static_cast<ICastable*>(this);
+        return static_cast<IUnknownCastableAdapter*>(this);
     }
     return nullptr;
 }
@@ -92,6 +93,18 @@ void* CastableList::find(const Guid& guid)
         if (auto ptr = castable->castAs(guid))
         {
             return ptr;
+        }
+    }
+    return nullptr;
+}
+
+ICastable* SLANG_MCALL CastableList::findWithPredicate(FindFunc func, void* data)
+{
+    for (ICastable* castable : m_list)
+    {
+        if (func(castable, data))
+        {
+            return castable;
         }
     }
     return nullptr;

@@ -9,11 +9,16 @@
 namespace Slang
 {
 
+class IModuleLibrary : public IArtifactRepresentation
+{
+    SLANG_COM_INTERFACE(0x8f630911, 0xea96, 0x4075, { 0xbf, 0x6b, 0xd2, 0xae, 0x96, 0xbe, 0xb6, 0xde });
+};
+
 // Class to hold information serialized in from a -r slang-lib/slang-module
-class ModuleLibrary : public ComObject, public IArtifactRepresentation
+class ModuleLibrary : public ComBaseObject, public IModuleLibrary
 {
 public:
-    SLANG_COM_OBJECT_IUNKNOWN_ALL
+    SLANG_COM_BASE_IUNKNOWN_ALL
 
     SLANG_CLASS_GUID(0x2f7412bd, 0x6154, 0x40a9, { 0x89, 0xb3, 0x62, 0xe0, 0x24, 0x17, 0x24, 0xa1 });
 
@@ -31,10 +36,10 @@ public:
     void* getObject(const Guid& uuid);
 };
 
-SlangResult loadModuleLibrary(const Byte* inBytes, size_t bytesCount, EndToEndCompileRequest* req, RefPtr<ModuleLibrary>& module);
+SlangResult loadModuleLibrary(const Byte* inBytes, size_t bytesCount, EndToEndCompileRequest* req, ComPtr<IModuleLibrary>& outModule);
 
 // Given a product make available as a module
-SlangResult loadModuleLibrary(ArtifactKeep keep, IArtifact* artifact, EndToEndCompileRequest* req, RefPtr<ModuleLibrary>& module);
+SlangResult loadModuleLibrary(ArtifactKeep keep, IArtifact* artifact, EndToEndCompileRequest* req, ComPtr<IModuleLibrary>& outModule);
 
 } // namespace Slang
 

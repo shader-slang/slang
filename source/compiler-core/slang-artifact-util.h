@@ -5,16 +5,47 @@
 #include "slang-artifact.h"
 #include "slang-artifact-representation.h"
 
+#include "../core/slang-com-object.h"
+
 namespace Slang
 {
+
+class DefaultArtifactHandler : public ComBaseObject, public IArtifactHandler
+{
+public:
+	SLANG_NO_THROW uint32_t SLANG_MCALL addRef() SLANG_OVERRIDE { return 1; }
+	SLANG_NO_THROW uint32_t SLANG_MCALL release() SLANG_OVERRIDE { return 1; }
+	SLANG_NO_THROW SlangResult SLANG_MCALL queryInterface(SlangUUID const& uuid, void** outObject) SLANG_OVERRIDE;
+
+	// ICastable
+	SLANG_NO_THROW void* SLANG_MCALL castAs(const Guid& guid) SLANG_OVERRIDE;
+
+	// IArtifactHandler
+	SLANG_NO_THROW SlangResult SLANG_MCALL expandChildren(IArtifactContainer* container) SLANG_OVERRIDE;
+	SLANG_NO_THROW SlangResult SLANG_MCALL getOrCreateRepresentation(IArtifact* artifact, const Guid& guid, ArtifactKeep keep, ICastable** outCastable) SLANG_OVERRIDE;
+	SLANG_NO_THROW SlangResult SLANG_MCALL getOrCreateFileRepresentation(IArtifact* artifact, ArtifactKeep keep, ISlangMutableFileSystem* fileSystem, IFileArtifactRepresentation** outFileRep) SLANG_OVERRIDE;
+
+	static IArtifactHandler* getSingleton() { return &g_singleton; }
+protected:
+
+	SlangResult _loadSharedLibrary(IArtifact* artifact, ArtifactKeep keep, ISlangSharedLibrary** outSharedLibrary);
+	SlangResult _loadBlob(IArtifact* artifact, ArtifactKeep keep, ISlangBlob** outBlob);
+
+	void* getInterface(const Guid& uuid);
+	void* getObject(const Guid& uuid);
+
+	SlangResult _addRepresentation(IArtifact* artifact, ArtifactKeep keep, ISlangUnknown* rep, ICastable** outCastable);
+	SlangResult _addRepresentation(IArtifact* artifact, ArtifactKeep keep, ICastable* castable, ICastable** outCastable);
+	
+	static DefaultArtifactHandler g_singleton;
+};
 
 class IArtifactUtil : public ISlangUnknown
 {
 	SLANG_COM_INTERFACE(0x882b25d7, 0xe300, 0x4b20, { 0xbe, 0xb, 0x26, 0xd2, 0x52, 0x3e, 0x70, 0x20 })
 
 	virtual SLANG_NO_THROW SlangResult SLANG_MCALL createArtifact(const ArtifactDesc& desc, const char* name, IArtifact** outArtifact) = 0;
-
-	virtual SLANG_NO_THROW SlangResult SLANG_MCALL createArtifactList(IArtifact* parent, IArtifactList** outArtifactList) = 0;
+	virtual SLANG_NO_THROW SlangResult SLANG_MCALL createArtifactContainer(const ArtifactDesc& desc, const char* name, IArtifactContainer** outArtifactContainer) = 0;
 
 	virtual SLANG_NO_THROW ArtifactKind SLANG_MCALL getKindParent(ArtifactKind kind) = 0;
 	virtual SLANG_NO_THROW UnownedStringSlice SLANG_MCALL getKindName(ArtifactKind kind) = 0;
@@ -33,12 +64,7 @@ class IArtifactUtil : public ISlangUnknown
 		/// Given a desc and a basePath returns a suitable name
 	virtual SLANG_NO_THROW SlangResult SLANG_MCALL calcArtifactPath(const ArtifactDesc& desc, const char* basePath, ISlangBlob** outPath) = 0;
 
-		/// Default implementation of getting 
-	virtual SLANG_NO_THROW SlangResult SLANG_MCALL requireFileDefaultImpl(IArtifact* artifact, ArtifactKeep keep, IFileArtifactRepresentation** outFileRep) = 0;
-
 	virtual SLANG_NO_THROW ArtifactDesc SLANG_MCALL makeDescFromCompileTarget(SlangCompileTarget target) = 0;
-
-	virtual SLANG_NO_THROW SlangResult SLANG_MCALL getChildrenDefaultImpl(IArtifact* artifact, IArtifactList** outList) = 0;
 };
 
 class ArtifactUtilImpl : public IArtifactUtil
@@ -51,8 +77,7 @@ public:
 
 	// IArtifactInterface
 	virtual SLANG_NO_THROW SlangResult SLANG_MCALL createArtifact(const ArtifactDesc& desc, const char* name, IArtifact** outArtifact) SLANG_OVERRIDE;
-
-	virtual SLANG_NO_THROW SlangResult SLANG_MCALL createArtifactList(IArtifact* parent, IArtifactList** outArtifactList) SLANG_OVERRIDE;
+	virtual SLANG_NO_THROW SlangResult SLANG_MCALL createArtifactContainer(const ArtifactDesc& desc, const char* name, IArtifactContainer** outArtifactContainer) SLANG_OVERRIDE;
 
 	virtual SLANG_NO_THROW ArtifactKind SLANG_MCALL getKindParent(ArtifactKind kind) SLANG_OVERRIDE;
 	virtual SLANG_NO_THROW UnownedStringSlice SLANG_MCALL getKindName(ArtifactKind kind) SLANG_OVERRIDE;
@@ -70,11 +95,7 @@ public:
 
 	virtual SLANG_NO_THROW SlangResult SLANG_MCALL calcArtifactPath(const ArtifactDesc& desc, const char* basePath, ISlangBlob** outPath) SLANG_OVERRIDE;
 
-	virtual SLANG_NO_THROW SlangResult SLANG_MCALL requireFileDefaultImpl(IArtifact* artifact, ArtifactKeep keep, IFileArtifactRepresentation** outFileRep) SLANG_OVERRIDE;
-
 	virtual SLANG_NO_THROW ArtifactDesc SLANG_MCALL makeDescFromCompileTarget(SlangCompileTarget target) SLANG_OVERRIDE;
-
-	virtual SLANG_NO_THROW SlangResult SLANG_MCALL getChildrenDefaultImpl(IArtifact* artifact, IArtifactList** outList) SLANG_OVERRIDE;
 
 	static IArtifactUtil* getSingleton() { return &g_singleton; }
 
