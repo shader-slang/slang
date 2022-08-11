@@ -2459,7 +2459,7 @@ namespace Slang
                 {
                     ComPtr<ISlangBlob> disassemblyBlob;
 
-                    if (SUCCEEDED(dissassembleWithDownstream(blob->getBufferPointer(), blob->getBufferSize(), disassemblyBlob.writeRef())))
+                    if (SLANG_SUCCEEDED(dissassembleWithDownstream(blob->getBufferPointer(), blob->getBufferSize(), disassemblyBlob.writeRef())))
                     {
                         ArtifactDesc assemblyDesc(desc);
                         assemblyDesc.kind = ArtifactKind::Assembly;
