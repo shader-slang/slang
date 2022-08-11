@@ -19,6 +19,7 @@
 #include "../compiler-core/slang-artifact-representation-impl.h"
 #include "../compiler-core/slang-artifact-impl.h"
 #include "../compiler-core/slang-artifact-util.h"
+#include "../compiler-core/slang-artifact-associated.h"
 
 #include "slang-lower-to-ir.h"
 #include "slang-mangle.h"
@@ -1072,7 +1073,7 @@ namespace Slang
             }
         }
 
-        ComPtr<IArtifact> sourceContainerArtifact;
+        ComPtr<IArtifact> sourceArtifact;
 
         /* This is more convoluted than the other scenarios, because when we invoke C/C++ compiler we would ideally like
         to use the original file. We want to do this because we want includes relative to the source file to work, and
@@ -1141,9 +1142,9 @@ namespace Slang
 
                 CodeGenContext sourceCodeGenContext(this, sourceTarget, extensionTracker);
 
-                SLANG_RETURN_ON_FAIL(sourceCodeGenContext.emitEntryPointsSource(sourceContainerArtifact));
+                SLANG_RETURN_ON_FAIL(sourceCodeGenContext.emitEntryPointsSource(sourceArtifact));
 
-                sourceCodeGenContext.maybeDumpIntermediate(sourceContainerArtifact);
+                sourceCodeGenContext.maybeDumpIntermediate(sourceArtifact);
             }
             else
             {
@@ -1161,25 +1162,17 @@ namespace Slang
         {
             CodeGenContext sourceCodeGenContext(this, sourceTarget, extensionTracker);
 
-            SLANG_RETURN_ON_FAIL(sourceCodeGenContext.emitEntryPointsSource(sourceContainerArtifact));
-            sourceCodeGenContext.maybeDumpIntermediate(sourceContainerArtifact);
+            SLANG_RETURN_ON_FAIL(sourceCodeGenContext.emitEntryPointsSource(sourceArtifact));
+            sourceCodeGenContext.maybeDumpIntermediate(sourceArtifact);
 
             sourceLanguage = (SourceLanguage)TypeConvertUtil::getSourceLanguageFromTarget((SlangCompileTarget)sourceTarget);
         }
 
-        ComPtr<IArtifact> metadata;
-        if (sourceContainerArtifact)
+        ComPtr<IPostEmitMetadata> metadata;
+        if (sourceArtifact)
         {
-            auto sourceArtifact = sourceContainerArtifact->findArtifactByDerivedDesc(IArtifact::FindStyle::SelfOrChildren, 
-                    ArtifactDesc::make(ArtifactKind::Source, ArtifactPayload::Base, ArtifactStyle::Base));
-            if (!sourceArtifact)
-            {
-                return SLANG_FAIL;
-            }
-
-            metadata = sourceContainerArtifact->findArtifactByDerivedDesc(IArtifact::FindStyle::SelfOrChildren, 
-                ArtifactDesc::make(ArtifactKind::Base, ArtifactPayload::PostEmitMetadata, ArtifactStyle::Base));
-
+            metadata = findAssociated<IPostEmitMetadata>(sourceArtifact);
+            
             ComPtr<ISlangBlob> blob;
             SLANG_RETURN_ON_FAIL(sourceArtifact->loadBlob(ArtifactKeep::No, blob.writeRef()));
 
@@ -1513,19 +1506,17 @@ namespace Slang
             return SLANG_FAIL;
         }
 
-        auto artifactContainer = ArtifactUtil::createResultsContainer();
-
-        if (metadata)
-        {
-            artifactContainer->addChild(metadata);
-        }
-
         // Create the artifact that  encapsulates the result
         auto artifact = ArtifactUtil::createArtifactForCompileTarget(asExternal(target));
 
         // Wrap the downstream compile result 
         auto objRep = new ObjectArtifactRepresentation(DownstreamCompileResult::getTypeGuid(), downstreamCompileResult);
         artifact->addRepresentation(objRep);
+
+        if (metadata)
+        {
+            artifact->addAssociated(metadata);
+        }
 
         // Set the artifact
         outArtifact.swap(artifact);
@@ -1780,15 +1771,8 @@ namespace Slang
     static void writeCompileResultToFile(
         CodeGenContext* context,
         String const& outputPath,
-        IArtifact* inArtifact)
+        IArtifact* artifact)
     {
-        // The artifact can contain multiple things, we want to find something like 'source' or binary like
-        IArtifact* artifact = ArtifactUtil::findSignificant(inArtifact);
-        if (!artifact)
-        {
-            return;
-        }
-
         ComPtr<ISlangBlob> blob;
         if (SLANG_FAILED(artifact->loadBlob(ArtifactKeep::No, blob.writeRef())))
         {
@@ -1817,16 +1801,9 @@ namespace Slang
     static void writeCompileResultToStandardOutput(
         CodeGenContext*         codeGenContext,
         EndToEndCompileRequest* endToEndReq,
-        IArtifact* inArtifact)
+        IArtifact* artifact)
     {
         ISlangWriter* writer = endToEndReq->getWriter(WriterChannel::StdOutput);
-
-        // The artifact can contain multiple things, we want to find something like 'source' or binary like
-        IArtifact* artifact = ArtifactUtil::findSignificant(inArtifact);
-        if (!artifact)
-        {
-            return;
-        }
 
         ComPtr<ISlangBlob> blob;
         if (SLANG_FAILED(artifact->loadBlob(ArtifactKeep::No, blob.writeRef())))
@@ -2434,16 +2411,10 @@ namespace Slang
         return nullptr;
     }
 
-    void CodeGenContext::maybeDumpIntermediate(IArtifact* inArtifact)
+    void CodeGenContext::maybeDumpIntermediate(IArtifact* artifact)
     {
         if (!shouldDumpIntermediates())
             return;
-
-        IArtifact* artifact = ArtifactUtil::findSignificant(inArtifact);
-        if (!artifact)
-        {
-            return;
-        }
 
         ComPtr<ISlangBlob> blob;
         if (SLANG_FAILED(artifact->loadBlob(ArtifactKeep::No, blob.writeRef())))

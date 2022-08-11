@@ -33,7 +33,7 @@ struct ArtifactUtil
         /// Returns true if an artifact is 'significant'
     static bool isSignificant(IArtifact* artifact, void* data = nullptr);
         /// Find a significant artifact
-    static IArtifact* findSignificant(IArtifact* artifact) { return artifact->findArtifactByPredicate(IArtifact::FindStyle::SelfOrChildren, &isSignificant, nullptr); }
+    static IArtifact* findSignificant(IArtifact* artifact);
 };
 
 } // namespace Slang

@@ -411,6 +411,12 @@ SLANG_FORCE_INLINE T* findRepresentation(IArtifact* artifact)
     return reinterpret_cast<T*>(artifact->findRepresentation(T::getTypeGuid()));
 }
 
+template <typename T>
+SLANG_FORCE_INLINE T* findAssociated(IArtifact* artifact)
+{
+    return reinterpret_cast<T*>(artifact->findAssociated(T::getTypeGuid()));
+}
+
 /* The IArtifactRepresentation interface represents a single representation that can be part of an artifact. It's special in so far
 as
 

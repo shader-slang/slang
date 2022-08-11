@@ -79,6 +79,11 @@ namespace Slang {
     return true;
 }
 
+/* static */IArtifact* ArtifactUtil::findSignificant(IArtifact* artifact) 
+{ 
+    return artifact->findArtifactByPredicate(IArtifact::FindStyle::SelfOrChildren, &ArtifactUtil::isSignificant, nullptr);
+}
+
 /* static */String ArtifactUtil::getBaseName(IArtifact* artifact)
 {
     if (auto fileRep = findRepresentation<IFileArtifactRepresentation>(artifact))
