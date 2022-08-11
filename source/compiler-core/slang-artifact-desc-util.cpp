@@ -215,7 +215,6 @@ SLANG_HIERARCHICAL_ENUM(ArtifactKind, SLANG_ARTIFACT_KIND, SLANG_ARTIFACT_KIND_E
             x(SlangAST, AST) \
         x(CompileResults, Base) \
         x(MetaData, Base) \
-            x(PostEmitMetadata, MetaData) \
             x(DebugInfo, MetaData) \
             x(Diagnostics, MetaData)
 

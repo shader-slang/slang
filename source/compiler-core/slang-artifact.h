@@ -140,7 +140,6 @@ enum class ArtifactPayload : uint8_t
 
     DebugInfo,      ///< Debugging information
     Diagnostics,    ///< Diagnostics information
-    PostEmitMetadata, ///< Post emit meta data
 
     CountOf,
 };
