@@ -18,6 +18,7 @@
 #include "../compiler-core/slang-artifact-desc-util.h"
 #include "../compiler-core/slang-artifact-representation-impl.h"
 #include "../compiler-core/slang-artifact-impl.h"
+#include "../compiler-core/slang-artifact-util.h"
 
 #include "slang-lower-to-ir.h"
 #include "slang-mangle.h"
@@ -717,7 +718,7 @@ namespace Slang
                     }
                 }
 
-                auto artifact = ArtifactDescUtil::createArtifactForCompileTarget(asExternal(getTargetFormat()));
+                auto artifact = ArtifactUtil::createArtifactForCompileTarget(asExternal(getTargetFormat()));
                 artifact->addRepresentationUnknown(StringBlob::moveCreate(codeBuilder));
 
                 outArtifact.swap(artifact);
@@ -1504,7 +1505,7 @@ namespace Slang
             return SLANG_FAIL;
         }
 
-        auto artifactContainer = ArtifactDescUtil::createResultsContainer();
+        auto artifactContainer = ArtifactUtil::createResultsContainer();
 
         if (metadata)
         {
@@ -1512,7 +1513,7 @@ namespace Slang
         }
 
         // Create the artifact that  encapsulates the result
-        auto artifact = ArtifactDescUtil::createArtifactForCompileTarget(asExternal(target));
+        auto artifact = ArtifactUtil::createArtifactForCompileTarget(asExternal(target));
 
         // Wrap the downstream compile result 
         auto objRep = new ObjectArtifactRepresentation(DownstreamCompileResult::getTypeGuid(), downstreamCompileResult);
@@ -1614,7 +1615,7 @@ namespace Slang
                 ComPtr<ISlangBlob> disassemblyBlob;
                 SLANG_RETURN_ON_FAIL(intermediateContext.dissassembleWithDownstream(binaryBlob->getBufferPointer(), binaryBlob->getBufferSize(), disassemblyBlob.writeRef()));
 
-                auto artifact = ArtifactDescUtil::createArtifactForCompileTarget(asExternal(target));
+                auto artifact = ArtifactUtil::createArtifactForCompileTarget(asExternal(target));
                 artifact->addRepresentationUnknown(disassemblyBlob);
 
                 outArtifact.swap(artifact);
@@ -1773,7 +1774,7 @@ namespace Slang
         IArtifact* inArtifact)
     {
         // The artifact can contain multiple things, we want to find something like 'source' or binary like
-        IArtifact* artifact = ArtifactDescUtil::findSignificant(inArtifact);
+        IArtifact* artifact = ArtifactUtil::findSignificant(inArtifact);
         if (!artifact)
         {
             return;
@@ -1812,7 +1813,7 @@ namespace Slang
         ISlangWriter* writer = endToEndReq->getWriter(WriterChannel::StdOutput);
 
         // The artifact can contain multiple things, we want to find something like 'source' or binary like
-        IArtifact* artifact = ArtifactDescUtil::findSignificant(inArtifact);
+        IArtifact* artifact = ArtifactUtil::findSignificant(inArtifact);
         if (!artifact)
         {
             return;
@@ -2429,7 +2430,7 @@ namespace Slang
         if (!shouldDumpIntermediates())
             return;
 
-        IArtifact* artifact = ArtifactDescUtil::findSignificant(inArtifact);
+        IArtifact* artifact = ArtifactUtil::findSignificant(inArtifact);
         if (!artifact)
         {
             return;

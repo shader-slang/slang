@@ -69,6 +69,7 @@
 #include "slang-emit-cuda.h"
 
 #include "../compiler-core/slang-artifact-desc-util.h"
+#include "../compiler-core/slang-artifact-util.h"
 #include "../compiler-core/slang-artifact-impl.h"
 
 #include <assert.h>
@@ -856,7 +857,7 @@ SlangResult CodeGenContext::emitEntryPointsSourceFromIR(ComPtr<IArtifact>& outAr
     auto target = getTargetFormat();
     auto targetRequest = getTargetReq();
 
-    auto artifactContainer = ArtifactDescUtil::createResultsContainer();
+    auto artifactContainer = ArtifactUtil::createResultsContainer();
 
     auto lineDirectiveMode = targetRequest->getLineDirectiveMode();
     // To try to make the default behavior reasonable, we will
@@ -1028,7 +1029,7 @@ SlangResult CodeGenContext::emitEntryPointsSourceFromIR(ComPtr<IArtifact>& outAr
 
     // Write out the result
 
-    auto targetArtifact = ArtifactDescUtil::createArtifactForCompileTarget(asExternal(target));
+    auto targetArtifact = ArtifactUtil::createArtifactForCompileTarget(asExternal(target));
     targetArtifact->addRepresentationUnknown(StringBlob::moveCreate(finalResult));
 
     artifactContainer->addChild(targetArtifact);
@@ -1047,7 +1048,7 @@ SlangResult emitSPIRVForEntryPointsDirectly(
     CodeGenContext* codeGenContext,
     ComPtr<IArtifact>& outArtifact)
 {
-    auto artifactContainer = ArtifactDescUtil::createResultsContainer();
+    auto artifactContainer = ArtifactUtil::createResultsContainer();
 
     // Outside because we want to keep IR in scope whilst we are processing emits
     LinkedIR linkedIR;
@@ -1063,7 +1064,7 @@ SlangResult emitSPIRVForEntryPointsDirectly(
     List<uint8_t> spirv;
     emitSPIRVFromIR(codeGenContext, irModule, irEntryPoints, spirv);
 
-    auto targetArtifact = ArtifactDescUtil::createArtifactForCompileTarget(asExternal(codeGenContext->getTargetFormat()));
+    auto targetArtifact = ArtifactUtil::createArtifactForCompileTarget(asExternal(codeGenContext->getTargetFormat()));
     targetArtifact->addRepresentationUnknown(ListBlob::moveCreate(spirv));
 
     artifactContainer->addChild(targetArtifact);

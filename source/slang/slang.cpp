@@ -10,6 +10,7 @@
 // Artifact
 #include "../compiler-core/slang-artifact-impl.h"
 #include "../compiler-core/slang-artifact-desc-util.h"
+#include "../compiler-core/slang-artifact-util.h"
 
 #include "slang-module-library.h"
 
@@ -3158,7 +3159,7 @@ SLANG_NO_THROW SlangResult SLANG_MCALL ComponentType::getEntryPointCode(
     if(entryPointResult == nullptr)
         return SLANG_FAIL;
 
-    IArtifact* significantBlob = ArtifactDescUtil::findSignificant(entryPointResult);
+    IArtifact* significantBlob = ArtifactUtil::findSignificant(entryPointResult);
     if (!significantBlob)
     {
         return SLANG_FAIL;
@@ -4837,7 +4838,7 @@ SlangResult EndToEndCompileRequest::getEntryPointCodeBlob(int entryPointIndex, i
     if (!outBlob) return SLANG_E_INVALID_ARG;
     ComPtr<IArtifact> artifact;
     SLANG_RETURN_ON_FAIL(_getEntryPointResult(this, entryPointIndex, targetIndex, artifact));
-    if (auto significant = ArtifactDescUtil::findSignificant(artifact))
+    if (auto significant = ArtifactUtil::findSignificant(artifact))
     {
         SLANG_RETURN_ON_FAIL(significant->loadBlob(ArtifactKeep::Yes, outBlob));
         return SLANG_OK;
@@ -4850,7 +4851,7 @@ SlangResult EndToEndCompileRequest::getEntryPointHostCallable(int entryPointInde
     if (!outSharedLibrary) return SLANG_E_INVALID_ARG;
     ComPtr<IArtifact> artifact;
     SLANG_RETURN_ON_FAIL(_getEntryPointResult(this, entryPointIndex, targetIndex, artifact));
-    if (auto significant = ArtifactDescUtil::findSignificant(artifact))
+    if (auto significant = ArtifactUtil::findSignificant(artifact))
     {
         SLANG_RETURN_ON_FAIL(significant->loadSharedLibrary(ArtifactKeep::Yes, outSharedLibrary));
         return SLANG_OK;
@@ -4866,7 +4867,7 @@ SlangResult EndToEndCompileRequest::getTargetCodeBlob(int targetIndex, ISlangBlo
     ComPtr<IArtifact> artifact;
     SLANG_RETURN_ON_FAIL(_getWholeProgramResult(this, targetIndex, artifact));
 
-    if (auto significant = ArtifactDescUtil::findSignificant(artifact))
+    if (auto significant = ArtifactUtil::findSignificant(artifact))
     {
         SLANG_RETURN_ON_FAIL(significant->loadBlob(ArtifactKeep::Yes, outBlob));
         return SLANG_OK;
