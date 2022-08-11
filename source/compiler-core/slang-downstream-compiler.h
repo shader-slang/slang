@@ -120,7 +120,8 @@ struct DownstreamDiagnostics
 class DownstreamCompileResult : public RefObject
 {
 public:
-
+    SLANG_CLASS_GUID(0xdfc5d318, 0x8675, 0x40ef, { 0xbd, 0x7b, 0x4, 0xa4, 0xff, 0x66, 0x11, 0x30 })
+    
     virtual SlangResult getHostCallableSharedLibrary(ComPtr<ISlangSharedLibrary>& outLibrary) = 0;
     virtual SlangResult getBinary(ComPtr<ISlangBlob>& outBlob) = 0;
 

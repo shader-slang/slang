@@ -144,11 +144,7 @@ namespace Slang
     class Module;
     class TranslationUnitRequest;
 
-    struct PostEmitMetadata : public RefObject
-    {
-        List<ShaderBindingRange> usedBindings;
-    };
-
+#if 0
     // Result of compiling an entry point.
     // Should only ever be string, binary or shared library
     class CompileResult
@@ -187,6 +183,7 @@ namespace Slang
 
         RefPtr<PostEmitMetadata> postEmitMetadata;
     };
+#endif
 
         /// Information collected about global or entry-point shader parameters
     struct ShaderParamInfo
@@ -2171,11 +2168,10 @@ namespace Slang
             /// been requested, report any errors that arise during
             /// code generation to the given `sink`.
             ///
-        CompileResult& getOrCreateEntryPointResult(Int entryPointIndex, DiagnosticSink* sink);
-        CompileResult& getOrCreateWholeProgramResult(DiagnosticSink* sink);
+        IArtifact* getOrCreateEntryPointResult(Int entryPointIndex, DiagnosticSink* sink);
+        IArtifact* getOrCreateWholeProgramResult(DiagnosticSink* sink);
 
-
-        CompileResult& getExistingWholeProgramResult()
+        IArtifact* getExistingWholeProgramResult()
         {
             return m_wholeProgramResult;
         }
@@ -2184,12 +2180,12 @@ namespace Slang
             /// This routine assumes that `getOrCreateEntryPointResult`
             /// has already been called previously.
             ///
-        CompileResult& getExistingEntryPointResult(Int entryPointIndex)
+        IArtifact* getExistingEntryPointResult(Int entryPointIndex)
         {
             return m_entryPointResults[entryPointIndex];
         }
 
-        CompileResult& _createWholeProgramResult(
+        IArtifact* _createWholeProgramResult(
             DiagnosticSink*         sink,
             EndToEndCompileRequest* endToEndReq = nullptr);
 
@@ -2200,7 +2196,7 @@ namespace Slang
             ///
             /// Shouldn't be called directly by most code.
             ///
-        CompileResult& _createEntryPointResult(
+        IArtifact* _createEntryPointResult(
             Int                     entryPointIndex,
             DiagnosticSink*         sink,
             EndToEndCompileRequest* endToEndReq = nullptr);
@@ -2227,8 +2223,8 @@ namespace Slang
         // Generated compile results for each entry point
         // in the parent `Program` (indexing matches
         // the order they are given in the `Program`)
-        CompileResult m_wholeProgramResult;
-        List<CompileResult> m_entryPointResults;
+        ComPtr<IArtifact> m_wholeProgramResult;
+        List<ComPtr<IArtifact>> m_entryPointResults;
 
         RefPtr<IRModule> m_irModuleForLayout;
     };
@@ -2416,7 +2412,7 @@ namespace Slang
 
         //
 
-        CompileResult emitEntryPoints();
+        SlangResult emitEntryPoints(ComPtr<IArtifact>& outArtifact);
 
         SlangResult dissassembleWithDownstream(
             const void* data,
@@ -2430,6 +2426,8 @@ namespace Slang
     protected:
         CodeGenTarget m_targetFormat = CodeGenTarget::Unknown;
         ExtensionTracker* m_extensionTracker = nullptr;
+
+        void maybeDumpIntermediate(IArtifact* artifact);
 
         // Helper to dump intermediate output when debugging
         void maybeDumpIntermediate(
@@ -2459,17 +2457,11 @@ namespace Slang
 
         /* Emits entry point source taking into account if a pass-through or not. Uses 'targetFormat' to determine
         the target (not targetReq) */
-        SlangResult emitEntryPointsSource(
-            String& outSource,
-            RefPtr<PostEmitMetadata>& outMetadata);
+        SlangResult emitEntryPointsSource(ComPtr<IArtifact>& outArtifact);
 
-        SlangResult emitEntryPointsSourceFromIR(
-            String& outSource,
-            RefPtr<PostEmitMetadata>& outMetadata);
-
-        SlangResult emitWithDownstreamForEntryPoints(
-            RefPtr<DownstreamCompileResult>& outResult,
-            RefPtr<PostEmitMetadata>& outMetadata);
+        SlangResult emitEntryPointsSourceFromIR(ComPtr<IArtifact>& outArtifact);
+            
+        SlangResult emitWithDownstreamForEntryPoints(ComPtr<IArtifact>& outArtifact);
 
         /* Determines a suitable filename to identify the input for a given entry point being compiled.
         If the end-to-end compile is a pass-through case, will attempt to find the (unique) source file
@@ -2484,9 +2476,7 @@ namespace Slang
             Int                     entryPointIndex);
 
 
-        SlangResult _emitEntryPoints(
-            RefPtr<DownstreamCompileResult>& outDownstreamResult,
-            RefPtr<PostEmitMetadata>& outMetadata);
+        SlangResult _emitEntryPoints(ComPtr<IArtifact>& outArtifact);
 
     private:
         Shared* m_shared = nullptr;

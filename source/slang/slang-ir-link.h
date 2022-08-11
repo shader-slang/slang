@@ -12,7 +12,7 @@ namespace Slang
         RefPtr<IRModule>    module;
         IRVarLayout*        globalScopeVarLayout;
         List<IRFunc*>       entryPoints;
-        RefPtr<PostEmitMetadata> metadata;
+        ComPtr<IArtifact>   metadata;
     };
 
 

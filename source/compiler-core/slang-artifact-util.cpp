@@ -12,6 +12,9 @@
 #include "../core/slang-io.h"
 #include "../core/slang-shared-library.h"
 
+// For workaround for DownstreamResult
+#include "slang-downstream-compiler.h"
+
 namespace Slang {
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!! DefaultArtifactHandler !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
@@ -111,7 +114,6 @@ SlangResult DefaultArtifactHandler::expandChildren(IArtifactContainer* container
 
 SlangResult DefaultArtifactHandler::getOrCreateRepresentation(IArtifact* artifact, const Guid& guid, ArtifactKeep keep, ICastable** outCastable)
 {
-	
 	// See if we already have a rep of this type
 	{
 		for (ICastable* rep : artifact->getRepresentations())
@@ -125,6 +127,25 @@ SlangResult DefaultArtifactHandler::getOrCreateRepresentation(IArtifact* artifac
 		}
 	}
 
+	// TODO(JS): Temporary whilst DownstreamCompileResult is 
+	// Special handling for DownstreamCompileResult
+	if (auto downstreamResult = findRepresentation<DownstreamCompileResult>(artifact))
+	{
+		if (guid == ISlangBlob::getTypeGuid())
+		{
+			ComPtr<ISlangBlob> blob;
+			SLANG_RETURN_ON_FAIL(downstreamResult->getBinary(blob));
+			return _addRepresentation(artifact, keep, blob, outCastable);
+		}
+		else if (guid == ISlangSharedLibrary::getTypeGuid())
+		{
+			ComPtr<ISlangSharedLibrary> lib;
+			SLANG_RETURN_ON_FAIL(downstreamResult->getHostCallableSharedLibrary(lib));
+			return _addRepresentation(artifact, keep, lib, outCastable);
+		}
+	}
+
+	// Normal construction
 	if (guid == ISlangBlob::getTypeGuid())
 	{
 		ComPtr<ISlangBlob> blob;
