@@ -3158,7 +3158,13 @@ SLANG_NO_THROW SlangResult SLANG_MCALL ComponentType::getEntryPointCode(
     if(entryPointResult == nullptr)
         return SLANG_FAIL;
 
-    return entryPointResult->loadBlob(ArtifactKeep::Yes, outCode);
+    IArtifact* significantBlob = ArtifactDescUtil::findSignificant(entryPointResult);
+    if (!significantBlob)
+    {
+        return SLANG_FAIL;
+    }
+
+    return significantBlob->loadBlob(ArtifactKeep::Yes, outCode);
 }
 
 SLANG_NO_THROW SlangResult SLANG_MCALL ComponentType::getEntryPointHostCallable(
@@ -4831,8 +4837,12 @@ SlangResult EndToEndCompileRequest::getEntryPointCodeBlob(int entryPointIndex, i
     if (!outBlob) return SLANG_E_INVALID_ARG;
     ComPtr<IArtifact> artifact;
     SLANG_RETURN_ON_FAIL(_getEntryPointResult(this, entryPointIndex, targetIndex, artifact));
-    SLANG_RETURN_ON_FAIL(artifact->loadBlob(ArtifactKeep::Yes, outBlob));
-    return SLANG_OK;
+    if (auto significant = ArtifactDescUtil::findSignificant(artifact))
+    {
+        SLANG_RETURN_ON_FAIL(significant->loadBlob(ArtifactKeep::Yes, outBlob));
+        return SLANG_OK;
+    }
+    return SLANG_E_NOT_AVAILABLE;
 }
 
 SlangResult EndToEndCompileRequest::getEntryPointHostCallable(int entryPointIndex, int targetIndex, ISlangSharedLibrary** outSharedLibrary)
@@ -4840,8 +4850,12 @@ SlangResult EndToEndCompileRequest::getEntryPointHostCallable(int entryPointInde
     if (!outSharedLibrary) return SLANG_E_INVALID_ARG;
     ComPtr<IArtifact> artifact;
     SLANG_RETURN_ON_FAIL(_getEntryPointResult(this, entryPointIndex, targetIndex, artifact));
-    SLANG_RETURN_ON_FAIL(artifact->loadSharedLibrary(ArtifactKeep::Yes, outSharedLibrary));
-    return SLANG_OK;
+    if (auto significant = ArtifactDescUtil::findSignificant(artifact))
+    {
+        SLANG_RETURN_ON_FAIL(significant->loadSharedLibrary(ArtifactKeep::Yes, outSharedLibrary));
+        return SLANG_OK;
+    }
+    return SLANG_E_NOT_AVAILABLE;
 }
 
 SlangResult EndToEndCompileRequest::getTargetCodeBlob(int targetIndex, ISlangBlob** outBlob)
@@ -4851,9 +4865,13 @@ SlangResult EndToEndCompileRequest::getTargetCodeBlob(int targetIndex, ISlangBlo
 
     ComPtr<IArtifact> artifact;
     SLANG_RETURN_ON_FAIL(_getWholeProgramResult(this, targetIndex, artifact));
-    SLANG_RETURN_ON_FAIL(artifact->loadBlob(ArtifactKeep::Yes, outBlob));
 
-    return SLANG_OK;
+    if (auto significant = ArtifactDescUtil::findSignificant(artifact))
+    {
+        SLANG_RETURN_ON_FAIL(significant->loadBlob(ArtifactKeep::Yes, outBlob));
+        return SLANG_OK;
+    }
+    return SLANG_E_NOT_AVAILABLE;
 }
 
 SlangResult EndToEndCompileRequest::getTargetHostCallable(int targetIndex,ISlangSharedLibrary** outSharedLibrary)
