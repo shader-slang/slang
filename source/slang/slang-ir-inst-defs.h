@@ -57,6 +57,7 @@ INST(Nop, nop, 0, 0)
     INST(ConjunctionType, Conjunction, 0, 0)
     INST(AttributedType, Attributed, 0, 0)
     INST(ResultType, Result, 2, 0)
+    INST(OptionalType, Optional, 1, 0)
 
     INST(DifferentialPairType, DiffPair, 1, 0)
 
@@ -292,7 +293,10 @@ INST(MakeResultError, makeResultError, 1, 0)
 INST(IsResultError, isResultError, 1, 0)
 INST(GetResultError, getResultError, 1, 0)
 INST(GetResultValue, getResultValue, 1, 0)
-
+INST(GetOptionalValue, getOptionalValue, 1, 0)
+INST(OptionalHasValue, optionalHasValue, 1, 0)
+INST(MakeOptionalValue, makeOptionalValue, 1, 0)
+INST(MakeOptionalNone, makeOptionalNone, 1, 0)
 INST(Call, call, 1, 0)
 
 INST(RTTIObject, rtti_object, 0, 0)
@@ -745,6 +749,7 @@ INST(ExtractTaggedUnionPayload,         extractTaggedUnionPayload,  1, 0)
 INST(BitCast,                           bitCast,                    1, 0)
 INST(Reinterpret,                       reinterpret,                1, 0)
 INST(CastPtrToBool, CastPtrToBool, 1, 0)
+INST(IsType, IsType, 3, 0)
 INST(JVPDifferentiate,                   jvpDifferentiate,            1, 0)
 
 // Converts other resources (such as ByteAddressBuffer) to the equivalent StructuredBuffer

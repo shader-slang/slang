@@ -390,6 +390,28 @@ namespace Slang
         return _isDeclaredSubtype(subType, subType, superTypeDeclRef, nullptr, nullptr);
     }
 
+    bool SemanticsVisitor::isDeclaredSubtype(
+        Type* subType,
+        Type* superType)
+    {
+        if (auto declRefType = as<DeclRefType>(superType))
+        {
+            if (auto aggTypeDeclRef = declRefType->declRef.as<AggTypeDecl>())
+                return _isDeclaredSubtype(subType, subType, aggTypeDeclRef, nullptr, nullptr);
+        }
+        return false;
+    }
+
+    bool SemanticsVisitor::isInterfaceType(Type* type)
+    {
+        if (auto declRefType = as<DeclRefType>(type))
+        {
+            if (auto interfaceDeclRef = declRefType->declRef.as<InterfaceDecl>())
+                return true;
+        }
+        return false;
+    }
+
     Val* SemanticsVisitor::tryGetSubtypeWitness(
         Type*            subType,
         DeclRef<AggTypeDecl>    superTypeDeclRef)

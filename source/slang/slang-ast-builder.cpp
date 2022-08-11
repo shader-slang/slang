@@ -131,6 +131,16 @@ Type* SharedASTBuilder::getNullPtrType()
     return m_nullPtrType;
 }
 
+Type* SharedASTBuilder::getNoneType()
+{
+    if (!m_noneType)
+    {
+        auto noneTypeDecl = findMagicDecl("NoneType");
+        m_noneType = DeclRefType::create(m_astBuilder, makeDeclRef<Decl>(noneTypeDecl));
+    }
+    return m_noneType;
+}
+
 SharedASTBuilder::~SharedASTBuilder()
 {
     // Release built in types..
@@ -212,6 +222,13 @@ NodeBase* ASTBuilder::createByNodeType(ASTNodeType nodeType)
     return (NodeBase*)createFunc(this);
 }
 
+Type* ASTBuilder::getSpecializedBuiltinType(Type* typeParam, char const* magicTypeName)
+{
+    auto declRef = getBuiltinDeclRef(magicTypeName, makeConstArrayViewSingle<Val*>(typeParam));
+    auto rsType = DeclRefType::create(this, declRef);
+    return rsType;
+}
+
 PtrType* ASTBuilder::getPtrType(Type* valueType)
 {
     return dynamicCast<PtrType>(getPtrType(valueType, "PtrType"));
@@ -233,23 +250,15 @@ RefType* ASTBuilder::getRefType(Type* valueType)
     return dynamicCast<RefType>(getPtrType(valueType, "RefType"));
 }
 
-PtrTypeBase* ASTBuilder::getPtrType(Type* valueType, char const* ptrTypeName)
+OptionalType* ASTBuilder::getOptionalType(Type* valueType)
 {
-    auto genericDecl = dynamicCast<GenericDecl>(m_sharedASTBuilder->findMagicDecl(ptrTypeName));
-    return getPtrType(valueType, genericDecl);
+    auto rsType = getSpecializedBuiltinType(valueType, "OptionalType");
+    return as<OptionalType>(rsType);
 }
 
-PtrTypeBase* ASTBuilder::getPtrType(Type* valueType, GenericDecl* genericDecl)
+PtrTypeBase* ASTBuilder::getPtrType(Type* valueType, char const* ptrTypeName)
 {
-    auto typeDecl = genericDecl->inner;
-
-    auto substitutions = create<GenericSubstitution>();
-    substitutions->genericDecl = genericDecl;
-    substitutions->args.add(valueType);
-
-    auto declRef = DeclRef<Decl>(typeDecl, substitutions);
-    auto rsType = DeclRefType::create(this, declRef);
-    return as<PtrTypeBase>(rsType);
+    return as<PtrTypeBase>(getSpecializedBuiltinType(valueType, ptrTypeName));
 }
 
 ArrayExpressionType* ASTBuilder::getArrayType(Type* elementType, IntVal* elementCount)

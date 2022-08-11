@@ -822,6 +822,12 @@ namespace Slang
         return expr;
     }
 
+    Expr* SemanticsExprVisitor::visitNoneLiteralExpr(NoneLiteralExpr* expr)
+    {
+        expr->type = m_astBuilder->getNoneType();
+        return expr;
+    }
+
     Expr* SemanticsExprVisitor::visitIntegerLiteralExpr(IntegerLiteralExpr* expr)
     {
         // The expression might already have a type, determined by its suffix.
@@ -1750,6 +1756,90 @@ namespace Slang
             }
         }
         getSink()->diagnose(expr, Diagnostics::calleeOfTryCallMustBeFunc);
+        return expr;
+    }
+
+    Expr* SemanticsExprVisitor::visitIsTypeExpr(IsTypeExpr* expr)
+    {
+        expr->typeExpr = CheckProperType(expr->typeExpr);
+        auto originalVal = CheckTerm(expr->value);
+        expr->type = m_astBuilder->getBoolType();
+        expr->value = originalVal;
+
+        // If value is a subtype of `type`, then this expr is always true.
+        if (isDeclaredSubtype(expr->value->type.type, expr->typeExpr.type))
+        {
+            // Instead of returning a BoolLiteralExpr, we use a field to indicate this scenario,
+            // so that the language server can still see the original syntax tree.
+            expr->isAlwaysTrue = true;
+            return expr;
+        }
+
+        // Otherwise, we need to ensure the target type is a subtype of value->type.
+        // For now we can only support the scenario where `expr->value` is an interface type.
+        if (!isInterfaceType(originalVal->type))
+        {
+            getSink()->diagnose(expr, Diagnostics::isOperatorValueMustBeInterfaceType);
+        }
+
+        expr->value = maybeOpenExistential(originalVal);
+        expr->witnessArg = tryGetSubtypeWitness(expr->typeExpr.type, originalVal->type.type);
+        if (expr->witnessArg)
+        {
+            return expr;
+        }
+
+        if (!as<ErrorType>(expr->typeExpr.type) && !as<ErrorType>(expr->value->type.type))
+        {
+            getSink()->diagnose(expr, Diagnostics::typeNotInTheSameHierarchy, expr->value->type.type, expr->typeExpr.type);
+        }
+
+        expr->type = m_astBuilder->getErrorType();
+        return expr;
+    }
+
+    Expr* SemanticsExprVisitor::visitAsTypeExpr(AsTypeExpr* expr)
+    {
+        TypeExp typeExpr;
+        typeExpr.exp = expr->typeExpr;
+        typeExpr = CheckProperType(typeExpr);
+        expr->value = CheckTerm(expr->value);
+        auto optType = m_astBuilder->getOptionalType(typeExpr.type);
+        expr->type = optType;
+
+        // If value is a subtype of `type`, then this expr is equivalent to a CastToSuperTypeExpr.
+        if (auto witness = tryGetSubtypeWitness(expr->value->type.type, typeExpr.type))
+        {
+            auto castToSuperType = createCastToSuperTypeExpr(typeExpr.type, expr->value, witness);
+            auto makeOptional = m_astBuilder->create<MakeOptionalExpr>();
+            makeOptional->loc = expr->loc;
+            makeOptional->type = optType;
+            makeOptional->value = castToSuperType;
+            makeOptional->typeExpr = typeExpr.exp;
+            return makeOptional;
+        }
+
+        // For now we can only support the scenario where `expr->value` is an interface type.
+        if (!isInterfaceType(expr->value->type))
+        {
+            getSink()->diagnose(expr, Diagnostics::isOperatorValueMustBeInterfaceType);
+        }
+
+        expr->typeExpr = typeExpr.exp;
+        expr->witnessArg = tryGetSubtypeWitness(typeExpr.type, expr->value->type.type);
+        if (expr->witnessArg)
+        {
+            expr->value = maybeOpenExistential(expr->value);
+            return expr;
+        }
+
+        if (!as<ErrorType>(typeExpr.type) && !as<ErrorType>(expr->value->type.type))
+        {
+            getSink()->diagnose(expr, Diagnostics::typeNotInTheSameHierarchy, expr->value->type.type, typeExpr.type);
+        }
+
+        expr->type = m_astBuilder->getErrorType();
+        
         return expr;
     }
 

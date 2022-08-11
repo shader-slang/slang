@@ -529,6 +529,11 @@ class PtrTypeBase : public BuiltinType
     Type* getValueType();
 };
 
+class NoneType : public BuiltinType
+{
+    SLANG_AST_CLASS(NoneType)
+};
+
 class NullPtrType : public BuiltinType
 {
     SLANG_AST_CLASS(NullPtrType)
@@ -570,6 +575,12 @@ class InOutType : public OutTypeBase
 class RefType : public ParamDirectionType
 {
     SLANG_AST_CLASS(RefType)
+};
+
+class OptionalType : public BuiltinType
+{
+    SLANG_AST_CLASS(OptionalType)
+    Type* getValueType();
 };
 
 // A type alias of some kind (e.g., via `typedef`)

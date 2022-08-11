@@ -383,6 +383,24 @@ public:
         }
         return dispatchIfNotNull(expr->base.exp);
     }
+    bool visitAsTypeExpr(AsTypeExpr* expr)
+    {
+        if (dispatchIfNotNull(expr->value))
+            return true;
+        return dispatchIfNotNull(expr->typeExpr);
+    }
+    bool visitIsTypeExpr(IsTypeExpr* expr)
+    {
+        if (dispatchIfNotNull(expr->value))
+            return true;
+        return dispatchIfNotNull(expr->typeExpr.exp);
+    }
+    bool visitMakeOptionalExpr(MakeOptionalExpr* expr)
+    {
+        if (dispatchIfNotNull(expr->typeExpr))
+            return true;
+        return dispatchIfNotNull(expr->value);
+    }
     bool visitModifiedTypeExpr(ModifiedTypeExpr* expr) { return dispatchIfNotNull(expr->base.exp); }
     bool visitTryExpr(TryExpr* expr) { return dispatchIfNotNull(expr->base); }
 

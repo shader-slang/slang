@@ -9,11 +9,12 @@
 #include "slang-ir-lower-generic-function.h"
 #include "slang-ir-lower-generic-call.h"
 #include "slang-ir-lower-generic-type.h"
+#include "slang-ir-inst-pass-base.h"
 #include "slang-ir-specialize-dispatch.h"
 #include "slang-ir-specialize-dynamic-associatedtype-lookup.h"
 #include "slang-ir-witness-table-wrapper.h"
-#include "slang-ir-ssa.h"
-#include "slang-ir-dce.h"
+#include "slang-ir-ssa-simplification.h"
+
 
 namespace Slang
 {
@@ -93,6 +94,23 @@ namespace Slang
             inst->removeAndDeallocate();
         }
     }
+    
+    void lowerIsTypeInsts(SharedGenericsLoweringContext* sharedContext)
+    {
+        InstPassBase pass(sharedContext->module);
+        pass.processInstsOfType<IRIsType>(kIROp_IsType, [&](IRIsType* inst)
+            {
+                auto witnessTableType = as<IRWitnessTableTypeBase>(inst->getValueWitness()->getDataType());
+                if (witnessTableType && isComInterfaceType((IRType*)witnessTableType->getConformanceType()))
+                    return;
+                IRBuilder builder(sharedContext->sharedBuilderStorage);
+                builder.setInsertBefore(inst);
+                auto eqlInst = builder.emitEql(builder.emitGetSequentialIDInst(inst->getValueWitness()),
+                    builder.emitGetSequentialIDInst(inst->getTargetWitness()));
+                inst->replaceUsesWith(eqlInst);
+                inst->removeAndDeallocate();
+            });
+    }
 
     // Turn all references of witness table or RTTI objects into integer IDs, generate
     // specialized `switch` based dispatch functions based on witness table IDs, and remove
@@ -105,12 +123,15 @@ namespace Slang
         if (sink->getErrorCount() != 0)
             return;
 
+        lowerIsTypeInsts(sharedContext);
+
         specializeDynamicAssociatedTypeLookup(sharedContext);
         if (sink->getErrorCount() != 0)
             return;
 
         sharedContext->sharedBuilderStorage.deduplicateAndRebuildGlobalNumberingMap();
         sharedContext->mapInterfaceRequirementKeyValue.Clear();
+
 
         specializeRTTIObjectReferences(sharedContext);
 
@@ -175,6 +196,7 @@ namespace Slang
         // and used to create a tuple representing the existential value.
         augmentMakeExistentialInsts(module);
 
+
         lowerGenericFunctions(&sharedContext);
         if (sink->getErrorCount() != 0)
             return;
@@ -200,6 +222,8 @@ namespace Slang
         // real RTTI objects and witness tables.
         specializeRTTIObjects(&sharedContext, sink);
 
+        simplifyIR(module);
+
         lowerTuples(module, sink);
         if (sink->getErrorCount() != 0)
             return;
@@ -210,7 +234,6 @@ namespace Slang
 
         // We might have generated new temporary variables during lowering.
         // An SSA pass can clean up unnecessary load/stores.
-        constructSSA(module);
-        eliminateDeadCode(module);
+        simplifyIR(module);
     }
 } // namespace Slang
