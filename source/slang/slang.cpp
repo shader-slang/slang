@@ -5031,7 +5031,8 @@ SlangResult EndToEndCompileRequest::isParameterLocationUsed(Int entryPointIndex,
         return SLANG_E_INVALID_ARG;
 
     // We need to find the meta data
-    IArtifact* metadataArtifact = artifact->findRecursivelyByDerivedDesc(ArtifactDesc::make(ArtifactKind::Base, ArtifactPayload::PostEmitMetadata, ArtifactStyle::Base));
+    IArtifact* metadataArtifact = artifact->findArtifactByDerivedDesc(IArtifact::FindStyle::SelfOrChildren,
+        ArtifactDesc::make(ArtifactKind::Base, ArtifactPayload::PostEmitMetadata, ArtifactStyle::Base));
     if (!metadataArtifact)
     {
         return SLANG_E_NOT_AVAILABLE;

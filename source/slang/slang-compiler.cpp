@@ -1170,13 +1170,15 @@ namespace Slang
         ComPtr<IArtifact> metadata;
         if (sourceContainerArtifact)
         {
-            auto sourceArtifact = sourceContainerArtifact->findRecursivelyByDerivedDesc(ArtifactDesc::make(ArtifactKind::Source, ArtifactPayload::Base, ArtifactStyle::Base));
+            auto sourceArtifact = sourceContainerArtifact->findArtifactByDerivedDesc(IArtifact::FindStyle::SelfOrChildren, 
+                    ArtifactDesc::make(ArtifactKind::Source, ArtifactPayload::Base, ArtifactStyle::Base));
             if (!sourceArtifact)
             {
                 return SLANG_FAIL;
             }
 
-            metadata = sourceContainerArtifact->findRecursivelyByDerivedDesc(ArtifactDesc::make(ArtifactKind::Base, ArtifactPayload::PostEmitMetadata, ArtifactStyle::Base));
+            metadata = sourceContainerArtifact->findArtifactByDerivedDesc(IArtifact::FindStyle::SelfOrChildren, 
+                ArtifactDesc::make(ArtifactKind::Base, ArtifactPayload::PostEmitMetadata, ArtifactStyle::Base));
 
             ComPtr<ISlangBlob> blob;
             SLANG_RETURN_ON_FAIL(sourceArtifact->loadBlob(ArtifactKeep::No, blob.writeRef()));
@@ -1607,7 +1609,8 @@ namespace Slang
                 SLANG_RETURN_ON_FAIL(intermediateContext._emitEntryPoints(intermediateArtifact));
                 intermediateContext.maybeDumpIntermediate(intermediateArtifact);
 
-                IArtifact* binaryArtifact = intermediateArtifact->findRecursivelyByDerivedDesc(ArtifactDesc::make(ArtifactKind::BinaryLike, ArtifactPayload::Base, ArtifactStyle::Base));
+                IArtifact* binaryArtifact = intermediateArtifact->findArtifactByDerivedDesc(IArtifact::FindStyle::SelfOrChildren,
+                    ArtifactDesc::make(ArtifactKind::BinaryLike, ArtifactPayload::Base, ArtifactStyle::Base));
                 if (!binaryArtifact)
                 {
                     return SLANG_FAIL;
