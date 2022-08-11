@@ -517,6 +517,11 @@ Type* PtrTypeBase::getValueType()
     return as<Type>(findInnerMostGenericSubstitution(declRef.substitutions)->args[0]);
 }
 
+Type* OptionalType::getValueType()
+{
+    return as<Type>(findInnerMostGenericSubstitution(declRef.substitutions)->args[0]);
+}
+
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! NamedExpressionType !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 void NamedExpressionType::_toTextOverride(StringBuilder& out)

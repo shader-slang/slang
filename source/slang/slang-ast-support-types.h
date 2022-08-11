@@ -88,6 +88,9 @@ namespace Slang
 
         // Conversion that is lossless and keeps the "kind" of the value the same
         kConversionCost_RankPromotion = 150,
+        kConversionCost_NoneToOptional = 150,
+        kConversionCost_ValToOptional = 150,
+        kConversionCost_NullPtrToPtr = 150,
 
         // Conversions that are lossless, but change "kind"
         kConversionCost_UnsignedToSignedPromotion = 200,

@@ -30,7 +30,8 @@ static const char* kStmtKeywords[] = {
     "protected", "typedef",        "typealias", "uniform",   "export",  "groupshared",
     "extension", "associatedtype", "this",      "namespace", "This",    "using",
     "__generic", "__exported",     "import",    "enum",      "break",   "continue",
-    "discard",   "defer",          "cbuffer",   "tbuffer",   "func"};
+    "discard",   "defer",          "cbuffer",   "tbuffer",   "func",    "is",
+    "as",        "nullptr",        "none",      "true",      "false"};
 
 static const char* hlslSemanticNames[] = {
     "register",

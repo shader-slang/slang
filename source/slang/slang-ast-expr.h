@@ -101,6 +101,11 @@ class NullPtrLiteralExpr : public LiteralExpr
     SLANG_AST_CLASS(NullPtrLiteralExpr)
 };
 
+class NoneLiteralExpr : public LiteralExpr
+{
+    SLANG_AST_CLASS(NoneLiteralExpr)
+};
+
 class StringLiteralExpr : public LiteralExpr
 {
     SLANG_AST_CLASS(StringLiteralExpr)
@@ -297,6 +302,44 @@ class CastToSuperTypeExpr: public Expr
 
     /// A witness showing that `valueArg`'s type is a sub-type of this expression's `type`   
     Val* witnessArg = nullptr;
+};
+
+    /// A `value is Type` expression that evaluates to `true` if type of `value` is a sub-type of
+    /// `Type`.
+class IsTypeExpr : public Expr
+{
+    SLANG_AST_CLASS(IsTypeExpr)
+
+    Expr* value = nullptr;
+    TypeExp typeExpr;
+
+    // A witness showing that `typeExpr.type` is a subtype of `typeof(value)`.
+    Val* witnessArg = nullptr;
+
+    bool isAlwaysTrue = false;
+};
+
+    /// A `value as Type` expression that casts `value` to `Type` within type hierarchy.
+    /// The result is undefined if `value` is not `Type`.
+class AsTypeExpr : public Expr
+{
+    SLANG_AST_CLASS(AsTypeExpr)
+
+    Expr* value = nullptr;
+    Expr* typeExpr = nullptr;
+
+    // A witness showing that `typeExpr` is a subtype of `typeof(value)`.
+    Val* witnessArg = nullptr;
+
+};
+
+class MakeOptionalExpr : public Expr
+{
+    SLANG_AST_CLASS(MakeOptionalExpr)
+
+        // If `value` is null, this constructs an `Optional<T>` that doesn't have a value.
+    Expr* value = nullptr;
+    Expr* typeExpr = nullptr;
 };
 
     /// A cast of a value to the same type, with different modifiers.

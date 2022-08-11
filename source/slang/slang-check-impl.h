@@ -1278,6 +1278,13 @@ namespace Slang
             Type*            subType,
             DeclRef<AggTypeDecl>    superTypeDeclRef);
 
+        /// Check whether `subType` is a sub-type of `supType`.
+        bool isDeclaredSubtype(
+            Type* subType,
+            Type* supType);
+
+        bool isInterfaceType(Type* type);
+
             /// Check whether `subType` is a sub-type of `superTypeDeclRef`,
             /// and return a witness to the sub-type relationship if it holds
             /// (return null otherwise).
@@ -1690,6 +1697,7 @@ namespace Slang
         Expr* visitIncompleteExpr(IncompleteExpr* expr);
         Expr* visitBoolLiteralExpr(BoolLiteralExpr* expr);
         Expr* visitNullPtrLiteralExpr(NullPtrLiteralExpr* expr);
+        Expr* visitNoneLiteralExpr(NoneLiteralExpr* expr);
         Expr* visitIntegerLiteralExpr(IntegerLiteralExpr* expr);
         Expr* visitFloatingPointLiteralExpr(FloatingPointLiteralExpr* expr);
         Expr* visitStringLiteralExpr(StringLiteralExpr* expr);
@@ -1713,6 +1721,10 @@ namespace Slang
         Expr* visitTypeCastExpr(TypeCastExpr * expr);
 
         Expr* visitTryExpr(TryExpr* expr);
+
+        Expr* visitIsTypeExpr(IsTypeExpr* expr);
+
+        Expr* visitAsTypeExpr(AsTypeExpr* expr);
 
         //
         // Some syntax nodes should not occur in the concrete input syntax,
@@ -1740,6 +1752,7 @@ namespace Slang
         CASE(LetExpr)
         CASE(ExtractExistentialValueExpr)
         CASE(OpenRefExpr)
+        CASE(MakeOptionalExpr)
 
     #undef CASE
 

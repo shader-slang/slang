@@ -4735,9 +4735,9 @@ namespace Slang
 
 
 
-    Precedence GetOpLevel(Parser* parser, TokenType type)
+    Precedence GetOpLevel(Parser* parser, const Token& token)
     {
-        switch(type)
+        switch(token.type)
         {
         case TokenType::QuestionMark:
             return Precedence::TernaryConditional;
@@ -4790,6 +4790,10 @@ namespace Slang
         case TokenType::OpMod:
             return Precedence::Multiplicative;
         default:
+            if (token.getContent() == "is" || token.getContent() == "as")
+            {
+                return Precedence::RelationalComparison;
+            }
             return Precedence::Invalid;
         }
     }
@@ -4840,16 +4844,39 @@ namespace Slang
         auto expr = inExpr;
         for(;;)
         {
-            auto opTokenType = parser->tokenReader.peekTokenType();
-            auto opPrec = GetOpLevel(parser, opTokenType);
+            auto opToken = parser->tokenReader.peekToken();
+            auto opPrec = GetOpLevel(parser, opToken);
             if(opPrec < prec)
                 break;
+
+            // Special case the "is" and "as" operators.
+            if (opToken.type == TokenType::Identifier)
+            {
+                if (opToken.getContent() == "is")
+                {
+                    auto isExpr = parser->astBuilder->create<IsTypeExpr>();
+                    isExpr->value = expr;
+                    parser->ReadToken();
+                    isExpr->typeExpr = parser->ParseTypeExp();
+                    expr = isExpr;
+                    continue;
+                }
+                else if (opToken.getContent() == "as")
+                {
+                    auto asExpr = parser->astBuilder->create<AsTypeExpr>();
+                    asExpr->value = expr;
+                    parser->ReadToken();
+                    asExpr->typeExpr = parser->ParseType();
+                    expr = asExpr;
+                    continue;
+                }
+            }
 
             auto op = parseOperator(parser);
 
             // Special case the `?:` operator since it is the
             // one non-binary case we need to deal with.
-            if(opTokenType == TokenType::QuestionMark)
+            if(opToken.type == TokenType::QuestionMark)
             {
                 SelectExpr* select = parser->astBuilder->create<SelectExpr>();
                 select->loc = op->loc;
@@ -4869,7 +4896,7 @@ namespace Slang
 
             for(;;)
             {
-                auto nextOpPrec = GetOpLevel(parser, parser->tokenReader.peekTokenType());
+                auto nextOpPrec = GetOpLevel(parser, parser->tokenReader.peekToken());
 
                 if((GetAssociativityFromLevel(nextOpPrec) == Associativity::Right) ? (nextOpPrec < opPrec) : (nextOpPrec <= opPrec))
                     break;
@@ -4877,7 +4904,7 @@ namespace Slang
                 right = parseInfixExprWithPrecedence(parser, right, nextOpPrec);
             }
 
-            if (opTokenType == TokenType::OpAssign)
+            if (opToken.type == TokenType::OpAssign)
             {
                 AssignExpr* assignExpr = parser->astBuilder->create<AssignExpr>();
                 assignExpr->loc = op->loc;
@@ -5002,6 +5029,11 @@ namespace Slang
     static NodeBase* parseNullPtrExpr(Parser* parser, void* /*userData*/)
     {
         return parser->astBuilder->create<NullPtrLiteralExpr>();
+    }
+
+    static NodeBase* parseNoneExpr(Parser* parser, void* /*userData*/)
+    {
+        return parser->astBuilder->create<NoneLiteralExpr>();
     }
 
     static NodeBase* parseTryExpr(Parser* parser, void* /*userData*/)
@@ -6560,6 +6592,7 @@ namespace Slang
         _makeParseExpr("true",  parseTrueExpr),
         _makeParseExpr("false", parseFalseExpr),
         _makeParseExpr("nullptr", parseNullPtrExpr),
+        _makeParseExpr("none", parseNoneExpr),
         _makeParseExpr("try",     parseTryExpr),
         _makeParseExpr("__TaggedUnion", parseTaggedUnionType),
         _makeParseExpr("__jvp", parseJVPDifferentiate)

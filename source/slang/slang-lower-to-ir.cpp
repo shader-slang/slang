@@ -3365,6 +3365,11 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
         return LoweredValInfo::simple(context->irBuilder->getPtrValue(nullptr));
     }
 
+    LoweredValInfo visitNoneLiteralExpr(NoneLiteralExpr*)
+    {
+        return LoweredValInfo::simple(context->irBuilder->getVoidValue());
+    }
+
     LoweredValInfo visitIntegerLiteralExpr(IntegerLiteralExpr* expr)
     {
         auto type = lowerType(context, expr->type);
@@ -3382,6 +3387,24 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
         auto irLit = context->irBuilder->getStringValue(expr->value.getUnownedSlice());
         context->shared->m_stringLiterals.add(irLit);
         return LoweredValInfo::simple(irLit);
+    }
+
+    LoweredValInfo visitMakeOptionalExpr(MakeOptionalExpr* expr)
+    {
+        if (expr->value)
+        {
+            auto val = lowerRValueExpr(context, expr->value);
+            auto optType = lowerType(context, expr->type);
+            auto irVal = context->irBuilder->emitMakeOptionalValue(optType, val.val);
+            return LoweredValInfo::simple(irVal);
+        }
+        else
+        {
+            auto optType = lowerType(context, expr->type);
+            auto defaultVal = getDefaultVal(as<OptionalType>(expr->type)->getValueType());
+            auto irVal = context->irBuilder->emitMakeOptionalNone(optType, defaultVal.val);
+            return LoweredValInfo::simple(irVal);
+        }
     }
 
     LoweredValInfo visitAggTypeCtorExpr(AggTypeCtorExpr* /*expr*/)
@@ -3909,6 +3932,50 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
 
         SLANG_UNEXPECTED("unexpected case of subtype relationship");
         UNREACHABLE_RETURN(LoweredValInfo());
+    }
+
+    LoweredValInfo visitAsTypeExpr(AsTypeExpr* expr)
+    {
+        auto value = lowerLValueExpr(context, expr->value);
+        auto existentialInfo = value.getExtractedExistentialValInfo();
+        auto optType = lowerType(context, expr->type);
+        SLANG_RELEASE_ASSERT(optType->getOp() == kIROp_OptionalType);
+        auto targetType = optType->getOperand(0);
+        auto witness = lowerSimpleVal(context, expr->witnessArg);
+        auto builder = getBuilder();
+        auto var = builder->emitVar(optType);
+        auto isType = builder->emitIsType(existentialInfo->extractedVal, existentialInfo->witnessTable, targetType, witness);
+        IRBlock* trueBlock;
+        IRBlock* falseBlock;
+        IRBlock* afterBlock;
+        builder->emitIfElseWithBlocks(isType, trueBlock, falseBlock, afterBlock);
+        builder->setInsertInto(trueBlock);
+        auto irVal = builder->emitReinterpret(targetType, existentialInfo->extractedVal);
+        auto optionalVal = builder->emitMakeOptionalValue(optType, irVal);
+        builder->emitStore(var, optionalVal);
+        builder->emitBranch(afterBlock);
+        builder->setInsertInto(falseBlock);
+        auto defaultVal = getDefaultVal(as<OptionalType>(expr->type)->getValueType());
+        auto noneVal = builder->emitMakeOptionalNone(optType, defaultVal.val);
+        builder->emitStore(var, noneVal);
+        builder->emitBranch(afterBlock);
+        builder->setInsertInto(afterBlock);
+        auto result = builder->emitLoad(var);
+        return LoweredValInfo::simple(result);
+    }
+
+    LoweredValInfo visitIsTypeExpr(IsTypeExpr* expr)
+    {
+        if (expr->isAlwaysTrue)
+        {
+            return LoweredValInfo::simple(getBuilder()->getBoolValue(true));
+        }
+        auto value = lowerLValueExpr(context, expr->value);
+        auto type = lowerType(context, expr->type);
+        auto witness = lowerSimpleVal(context, expr->witnessArg);
+        auto existentialInfo = value.getExtractedExistentialValInfo();
+        auto irVal = getBuilder()->emitIsType(existentialInfo->extractedVal, existentialInfo->witnessTable, type, witness);
+        return LoweredValInfo::simple(irVal);
     }
 
     LoweredValInfo visitModifierCastExpr(

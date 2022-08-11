@@ -1488,6 +1488,14 @@ struct IRResultType : IRType
     IRType* getErrorType() { return (IRType*)getOperand(1); }
 };
 
+/// Represents an `Optional<T>`.
+struct IROptionalType : IRType
+{
+    IR_LEAF_ISA(OptionalType)
+
+    IRType* getValueType() { return (IRType*)getOperand(0); }
+};
+
 struct IRTypeType : IRType
 {
     IR_LEAF_ISA(TypeType);
