@@ -26,7 +26,19 @@ namespace Slang {
 /* static */ComPtr<IArtifact> ArtifactUtil::createArtifactForCompileTarget(SlangCompileTarget target)
 {
     auto desc = ArtifactDescUtil::makeDescFromCompileTarget(target);
-    return Artifact::create(desc);
+
+    if (isDerivedFrom(desc.kind, ArtifactKind::Container))
+    {
+        auto container = ArtifactContainer::create(desc);
+
+        ComPtr<IArtifact> artifact;
+        artifact.attach(container.detach());
+        return artifact;
+    }
+    else
+    {
+        return Artifact::create(desc);
+    }
 }
 
 /* static */bool ArtifactUtil::isSignificant(IArtifact* artifact, void* data)
@@ -55,7 +67,6 @@ namespace Slang {
     {
         return true;
     }
-
 
     /* Hmm, we might want to have a base class for 'signifiant' payloads,
     where signifiance here means somewhat approximately 'the meat' of a compilation result,
@@ -92,6 +103,5 @@ namespace Slang {
     }
     return String();
 }
-
 
 } // namespace Slang

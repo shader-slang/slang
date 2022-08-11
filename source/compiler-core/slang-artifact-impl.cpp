@@ -12,6 +12,15 @@
 
 namespace Slang {
 
+static bool _checkSelf(IArtifact::FindStyle findStyle)
+{
+    return Index(findStyle) <= Index(IArtifact::FindStyle::SelfOrChildren);
+}
+
+static bool _checkChildren(IArtifact::FindStyle findStyle)
+{
+    return Index(findStyle) >= Index(IArtifact::FindStyle::SelfOrChildren);
+}
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! Artifact !!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
@@ -189,22 +198,24 @@ ICastableList* Artifact::getRepresentationList()
     return m_representations.requireList();
 }
 
-IArtifact* Artifact::findRecursivelyByDerivedDesc(const ArtifactDesc& from)
+IArtifact* Artifact::findArtifactByDerivedDesc(FindStyle findStyle, const ArtifactDesc& from)
 {
-    if (ArtifactDescUtil::isDescDerivedFrom(m_desc, from))
-    {
-        return this;
-    }
-    return nullptr;
+    return (_checkSelf(findStyle) && ArtifactDescUtil::isDescDerivedFrom(m_desc, from)) ? this : nullptr;
 }
 
-IArtifact* Artifact::findRecursivelyByPredicate(FindFunc func, void* data)
+IArtifact* Artifact::findArtifactByPredicate(FindStyle findStyle, FindFunc func, void* data)
 {
-    if (func(this, data))
-    {
-        return this;
-    }
-    return nullptr;
+    return (_checkSelf(findStyle) && func(this, data)) ? this : nullptr;
+}
+
+IArtifact* Artifact::findArtifactByName(FindStyle findStyle, const char* name)
+{
+    return (_checkSelf(findStyle) && m_name == name) ? this : nullptr;
+}
+
+IArtifact* Artifact::findArtifactByDesc(FindStyle findStyle, const ArtifactDesc& desc)
+{
+    return (_checkSelf(findStyle) && m_desc == desc) ? this : nullptr;
 }
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ArtifactContainer !!!!!!!!!!!!!!!!!!!!!!!!!!! */
@@ -287,99 +298,76 @@ void ArtifactContainer::clearChildren()
     m_children.clearAndDeallocate();
 }
 
-IArtifact* ArtifactContainer::findChildByDesc(const ArtifactDesc& desc)
+static bool _isDerivedDesc(IArtifact* artifact, void* data)
 {
-    _requireChildren();
-
-    for (IArtifact* artifact : m_children)
-    {
-        if (artifact->getDesc() == desc)
-        {
-            return artifact;
-        }
-    }
-    return nullptr;
+    const ArtifactDesc& from = *(const ArtifactDesc*)data;
+    return ArtifactDescUtil::isDescDerivedFrom(artifact->getDesc(), from);
 }
 
-IArtifact* ArtifactContainer::findChildByDerivedDesc(const ArtifactDesc& from)
+static bool _isDesc(IArtifact* artifact, void* data)
 {
-    _requireChildren();
-
-    for (IArtifact* artifact : m_children)
-    {
-        if (ArtifactDescUtil::isDescDerivedFrom(artifact->getDesc(), from))
-        {
-            return artifact;
-        }
-    }
-    return nullptr;
+    const ArtifactDesc& desc = *(const ArtifactDesc*)data;
+    return desc == artifact->getDesc();
 }
 
-IArtifact* ArtifactContainer::findChildByName(const char* name)
+static bool _isName(IArtifact* artifact, void* data)
 {
-    _requireChildren();
-
-    for (IArtifact* artifact : m_children)
+    const char* name = (const char*)data;
+    const char* artifactName = artifact->getName();
+    if (artifactName == nullptr)
     {
-        const char* artifactName = artifact->getName();
-
-        if (artifactName == name ||
-            ::strcmp(artifactName, name) == 0)
-        {
-            return artifact;
-        }
+        return false;
     }
-    return nullptr;
+    return ::strcmp(name, artifactName) == 0;
 }
 
-IArtifact* ArtifactContainer::findChildByPredicate(FindFunc func, void* data)
-{
-    _requireChildren();
 
-    for (IArtifact* artifact : m_children)
-    {
-        if (func(artifact, data))
-        {
-            return artifact;
-        }
-    }
-    return nullptr;
+IArtifact* ArtifactContainer::findArtifactByDerivedDesc(FindStyle findStyle, const ArtifactDesc& from)
+{
+    return findArtifactByPredicate(findStyle, _isDerivedDesc, const_cast<ArtifactDesc*>(&from));
 }
 
-IArtifact* ArtifactContainer::findRecursivelyByDerivedDesc(const ArtifactDesc& from)
+IArtifact* ArtifactContainer::findArtifactByName(FindStyle findStyle, const char* name)
 {
-    if (auto artifact = Super::findRecursivelyByDerivedDesc(from))
-    {
-        return artifact;
-    }
-
-    _requireChildren();
-
-    for (IArtifact* artifact : m_children)
-    {
-        if (IArtifact* found = artifact->findRecursivelyByDerivedDesc(from))
-        {
-            return found;
-        }
-    }
-
-    return nullptr;
+    return findArtifactByPredicate(findStyle, _isName, const_cast<char*>(name));
 }
 
-IArtifact* ArtifactContainer::findRecursivelyByPredicate(FindFunc func, void* data)
+IArtifact* ArtifactContainer::findArtifactByDesc(FindStyle findStyle, const ArtifactDesc& desc)
 {
-    if (func(this, data))
+    return findArtifactByPredicate(findStyle, _isDesc, const_cast<ArtifactDesc*>(&desc));
+}
+
+IArtifact* ArtifactContainer::findArtifactByPredicate(FindStyle findStyle, FindFunc func, void* data)
+{
+    if (_checkSelf(findStyle) && func(this, data))
     {
         return this;
     }
 
-    _requireChildren();
-
-    for (IArtifact* artifact : m_children)
+    if (_checkChildren(findStyle))
     {
-        if (IArtifact* found = artifact->findRecursivelyByPredicate(func, data))
+        auto children = getChildren();
+
+        // First search the children
+        for (auto child : children)
         {
-            return found;
+            if (func(child, data))
+            {
+                return child;
+            }
+        }
+
+        // Then the childrens recursively
+        if (findStyle == FindStyle::Recursive ||
+            findStyle == FindStyle::ChildrenRecursive)
+        {
+            for (auto child : children)
+            {
+                if (auto found = child->findArtifactByPredicate(FindStyle::ChildrenRecursive, func, data))
+                {
+                    return found;
+                }
+            }
         }
     }
 
