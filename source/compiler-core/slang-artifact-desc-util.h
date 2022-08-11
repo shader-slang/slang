@@ -85,12 +85,36 @@ struct ArtifactDescUtil
         /// Given a desc, and a basePath returns a suitable path for a entity of specified desc
     static SlangResult calcPathForDesc(const ArtifactDesc& desc, const UnownedStringSlice& basePath, StringBuilder& outPath);
 
-        /// Make ArtifactDesc from target
+        /// Given a target returns the ArtifactDesc
     static ArtifactDesc makeDescFromCompileTarget(SlangCompileTarget target);
+
+        /// Make ArtifactDesc from target
+    static bool isDescDerivedFrom(const ArtifactDesc& desc, const ArtifactDesc& from);
 
         /// Create an empty container which is compatible with the desc
     static ComPtr<IArtifactContainer> createContainer(const ArtifactDesc& desc);
+
+        /// Create a generic container
+    static ComPtr<IArtifactContainer> createResultsContainer();
+
+        /// Creates an empty artifact for a type
+    static ComPtr<IArtifact> createArtifactForCompileTarget(SlangCompileTarget target);
+
+        /// Returns true if an artifact is 'significant'
+    static bool isSignificant(IArtifact* artifact, void* data = nullptr);
+        /// Find a significant artifact
+    static IArtifact* findSignificant(IArtifact* artifact) { return artifact->findRecursivelyByPredicate(&isSignificant, nullptr); }
 };
+
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+inline /* static */bool ArtifactDescUtil::isDescDerivedFrom(const ArtifactDesc& desc, const ArtifactDesc& from)
+{
+    // TODO(JS): Currently this ignores flags in desc. That may or may not be right 
+    // long term.
+    return isDerivedFrom(desc.kind, from.kind) &&
+        isDerivedFrom(desc.payload, from.payload) &&
+        isDerivedFrom(desc.style, from.style);
+}
 
 } // namespace Slang
 

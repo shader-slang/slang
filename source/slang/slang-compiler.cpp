@@ -1807,9 +1807,16 @@ namespace Slang
     static void writeCompileResultToStandardOutput(
         CodeGenContext*         codeGenContext,
         EndToEndCompileRequest* endToEndReq,
-        IArtifact* artifact)
+        IArtifact* inArtifact)
     {
         ISlangWriter* writer = endToEndReq->getWriter(WriterChannel::StdOutput);
+
+        // The artifact can contain multiple things, we want to find something like 'source' or binary like
+        IArtifact* artifact = ArtifactDescUtil::findSignificant(inArtifact);
+        if (!artifact)
+        {
+            return;
+        }
 
         ComPtr<ISlangBlob> blob;
         if (SLANG_FAILED(artifact->loadBlob(ArtifactKeep::No, blob.writeRef())))

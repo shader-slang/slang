@@ -122,7 +122,7 @@ struct HierarchicalEnumTable
                 return true;
             }
             type = m_parents[Index(type)];
-        } while (Index(type) > Index(T::Base));
+        } while (Index(type) >= Index(T::Base));
 
         return false;
     }
@@ -694,6 +694,56 @@ UnownedStringSlice ArtifactDescUtil::getDefaultExtension(const ArtifactDesc& des
 {
     const auto containerDesc = ArtifactDesc::make(ArtifactKind::Container, ArtifactPayload::CompileResults, desc.style);
     return ArtifactContainer::create(containerDesc);
+}
+
+/* static */ComPtr<IArtifactContainer> ArtifactDescUtil::createResultsContainer()
+{
+    return ArtifactContainer::create(ArtifactDesc::make(ArtifactKind::Container, ArtifactPayload::CompileResults));
+}
+
+/* static */ComPtr<IArtifact> ArtifactDescUtil::createArtifactForCompileTarget(SlangCompileTarget target)
+{
+    auto desc = makeDescFromCompileTarget(target);
+    return Artifact::create(desc);
+}
+
+/* static */bool ArtifactDescUtil::isSignificant(IArtifact* artifact, void* data)
+{
+    SLANG_UNUSED(data);
+
+    const auto desc = artifact->getDesc();
+
+    // Containers are not significant as of themselves, they may contain something tho
+    if (isDerivedFrom(desc.kind, ArtifactKind::Container))
+    {
+        return false;
+    }
+
+    // If it has no payload.. we are done
+    if (desc.payload == ArtifactPayload::None ||
+        desc.payload == ArtifactPayload::Invalid)
+    {
+        return false;
+    }
+
+    // If it's binary like or assembly/source we it's significant
+    if (isDerivedFrom(desc.kind, ArtifactKind::BinaryLike) ||
+        desc.kind == ArtifactKind::Assembly ||
+        desc.kind == ArtifactKind::Source)
+    {
+        return true;
+    }
+
+    
+    /* Hmm, we might want to have a base class for 'signifiant' payloads, 
+    where signifiance here means somewhat approximately 'the meat' of a compilation result, 
+    as contrasted with 'meta data', 'diagnostics etc'*/
+    if (isDerivedFrom(desc.payload, ArtifactPayload::MetaData))
+    {
+        return false;
+    }
+
+    return true;
 }
 
 } // namespace Slang

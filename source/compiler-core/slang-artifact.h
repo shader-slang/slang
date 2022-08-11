@@ -307,6 +307,8 @@ class IArtifact : public ICastable
 public:
     SLANG_COM_INTERFACE(0x57375e20, 0xbed, 0x42b6, { 0x9f, 0x5e, 0x59, 0x4f, 0x6, 0x2b, 0xe6, 0x90 })
 
+    typedef bool (*FindFunc)(IArtifact* artifact, void* data);
+
     typedef ArtifactDesc Desc;
 
     typedef ArtifactKind Kind;
@@ -361,14 +363,17 @@ public:
         /// Given a typeGuid representing the desired type get or create the representation.
         /// If found outCastable holds an entity that *must* be castable to typeGuid
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL getOrCreateRepresentation(const Guid& typeGuid, ArtifactKeep keep, ICastable** outCastable) = 0;
+
+        /// Find an artifact that matches desc allowing derivations. Flags is ignored
+    virtual SLANG_NO_THROW IArtifact* SLANG_MCALL findRecursivelyByDerivedDesc(const ArtifactDesc& desc) = 0;
+        /// Find an artifact that predicate matches
+    virtual SLANG_NO_THROW IArtifact* SLANG_MCALL findRecursivelyByPredicate(FindFunc func, void* data) = 0;
 };
 
 class IArtifactContainer : public IArtifact
 {
 public:
     SLANG_COM_INTERFACE(0xa96e29bd, 0xb546, 0x4e79, { 0xa0, 0xdc, 0x67, 0x49, 0x22, 0x2c, 0x39, 0xad })
-
-    typedef bool (*FindFunc)(IArtifact* artifact, void* data);
 
         /// Returns the result of expansion. Will return SLANG_E_UNINITIALIZED if expansion hasn't happened
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL getExpandChildrenResult() = 0;

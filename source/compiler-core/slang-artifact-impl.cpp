@@ -187,6 +187,24 @@ ICastableList* Artifact::getRepresentationList()
     return m_representations.requireList();
 }
 
+IArtifact* Artifact::findRecursivelyByDerivedDesc(const ArtifactDesc& from)
+{
+    if (ArtifactDescUtil::isDescDerivedFrom(m_desc, from))
+    {
+        return this;
+    }
+    return nullptr;
+}
+
+IArtifact* Artifact::findRecursivelyByPredicate(FindFunc func, void* data)
+{
+    if (func(this, data))
+    {
+        return this;
+    }
+    return nullptr;
+}
+
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ArtifactContainer !!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
 void* ArtifactContainer::getInterface(const Guid& guid)
@@ -281,18 +299,13 @@ IArtifact* ArtifactContainer::findChildByDesc(const ArtifactDesc& desc)
     return nullptr;
 }
 
-IArtifact* ArtifactContainer::findChildByDerivedDesc(const ArtifactDesc& desc)
+IArtifact* ArtifactContainer::findChildByDerivedDesc(const ArtifactDesc& from)
 {
     _requireChildren();
 
     for (IArtifact* artifact : m_children)
     {
-        const ArtifactDesc artifactDesc = artifact->getDesc();
-        // TODO(JS): Currently this ignores flags in desc. That may or may not be right 
-        // long term.
-        if (isDerivedFrom(artifactDesc.kind, desc.kind) &&
-            isDerivedFrom(artifactDesc.payload, desc.payload) &&
-            isDerivedFrom(artifactDesc.style, desc.style))
+        if (ArtifactDescUtil::isDescDerivedFrom(artifact->getDesc(), from))
         {
             return artifact;
         }
@@ -328,6 +341,46 @@ IArtifact* ArtifactContainer::findChildByPredicate(FindFunc func, void* data)
             return artifact;
         }
     }
+    return nullptr;
+}
+
+IArtifact* ArtifactContainer::findRecursivelyByDerivedDesc(const ArtifactDesc& from)
+{
+    if (auto artifact = Super::findRecursivelyByDerivedDesc(from))
+    {
+        return artifact;
+    }
+
+    _requireChildren();
+
+    for (IArtifact* artifact : m_children)
+    {
+        if (IArtifact* found = artifact->findRecursivelyByDerivedDesc(from))
+        {
+            return found;
+        }
+    }
+
+    return nullptr;
+}
+
+IArtifact* ArtifactContainer::findRecursivelyByPredicate(FindFunc func, void* data)
+{
+    if (func(this, data))
+    {
+        return this;
+    }
+
+    _requireChildren();
+
+    for (IArtifact* artifact : m_children)
+    {
+        if (IArtifact* found = artifact->findRecursivelyByPredicate(func, data))
+        {
+            return found;
+        }
+    }
+
     return nullptr;
 }
 
