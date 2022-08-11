@@ -667,6 +667,14 @@ namespace Slang
         }
     }
 
+#if SLANG_VC
+// TODO(JS): This is a workaround 
+// In debug VS builds there is a warning on line about it being unreachable.
+// for (auto entryPointIndex : getEntryPointIndices())
+// It's not clear how that could possibly be unreachable
+#   pragma warning(push)
+#   pragma warning(disable:4702)
+#endif
     SlangResult CodeGenContext::emitEntryPointsSource(ComPtr<IArtifact>& outArtifact)
     {
         outArtifact.setNull();
@@ -674,11 +682,6 @@ namespace Slang
         auto endToEndReq = isPassThroughEnabled();
         if(endToEndReq)
         {
-//#pragma warning(push)
-// warning C4702: unreachable code
-//#pragma warning(disable:2220)
-//#pragma warning(disable:4702)
-
             for (auto entryPointIndex : getEntryPointIndices())
             {
                 auto translationUnit = getPassThroughTranslationUnit(endToEndReq, entryPointIndex);
@@ -731,6 +734,9 @@ namespace Slang
             return emitEntryPointsSourceFromIR(outArtifact);
         }
     }
+#if SLANG_VC
+#   pragma warning(pop)
+#endif
 
     String GetHLSLProfileName(Profile profile)
     {
