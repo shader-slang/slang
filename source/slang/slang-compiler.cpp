@@ -55,52 +55,7 @@
 
 namespace Slang
 {
-    // A temporary class that adapts `ISlangSharedLibrary_Dep1` to ISlangSharedLibrary
 
-    class SharedLibraryDep1Adapter : public ComBaseObject, public ISlangSharedLibrary
-    {
-    public:
-        SLANG_COM_BASE_IUNKNOWN_ALL
-
-        // ICastable
-        virtual SLANG_NO_THROW void* SLANG_MCALL castAs(const SlangUUID& guid) SLANG_OVERRIDE;
-
-        // ISlangSharedLibrary
-        virtual SLANG_NO_THROW void* SLANG_MCALL findSymbolAddressByName(char const* name) SLANG_OVERRIDE { return m_contained->findSymbolAddressByName(name); }
-
-        SharedLibraryDep1Adapter(ISlangSharedLibrary_Dep1* dep1):
-            m_contained(dep1)
-        {
-        }
-
-    protected:
-        void* getInterface(const Guid& guid)
-        {
-            if (guid == ISlangUnknown::getTypeGuid() ||
-                guid == ICastable::getTypeGuid() ||
-                guid == ISlangSharedLibrary::getTypeGuid())
-            {
-                return static_cast<ISlangSharedLibrary*>(this);
-            }
-            return nullptr;
-        }
-        void* getObject(const Guid& guid)
-        {
-            SLANG_UNUSED(guid);
-            return nullptr;
-        }
-
-        ComPtr<ISlangSharedLibrary_Dep1> m_contained;
-    };
-
-    void* SharedLibraryDep1Adapter::castAs(const SlangUUID& guid)
-    {
-        if (auto intf = getInterface(guid))
-        {
-            return intf;
-        }
-        return getObject(guid);
-    }
 
 // !!!!!!!!!!!!!!!!!!!!!! free functions for DiagnosicSink !!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
@@ -718,8 +673,6 @@ namespace Slang
         auto endToEndReq = isPassThroughEnabled();
         if(endToEndReq)
         {
-
-
 //#pragma warning(push)
 // warning C4702: unreachable code
 //#pragma warning(disable:2220)
