@@ -217,6 +217,13 @@ String getDeclSignatureString(DeclRef<Decl> declRef, ASTBuilder* astBuilder)
             {
                 sb << " = " << litExpr->token.getContent();
             }
+            else if (auto isTypeDecl = as<IsTypeExpr>(varDecl->initExpr))
+            {
+                if (isTypeDecl->constantVal)
+                {
+                    sb << " = " << (isTypeDecl->constantVal->value ? "true" : "false");
+                }
+            }
         }
         return printer.getString();
     }
