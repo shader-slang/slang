@@ -2423,8 +2423,10 @@ namespace Slang
         }
 
         const auto desc = artifact->getDesc();
-        String ext = ArtifactDescUtil::getDefaultExtension(desc);
 
+        // The extension needs to include .
+        StringBuilder ext;
+        ext << "." << ArtifactDescUtil::getDefaultExtension(desc);
 
         if (ArtifactDescUtil::isText(artifact->getDesc()))
         {
@@ -2445,7 +2447,8 @@ namespace Slang
                         ArtifactDesc assemblyDesc(desc);
                         assemblyDesc.kind = ArtifactKind::Assembly;
 
-                        ext = ArtifactDescUtil::getDefaultExtension(assemblyDesc);
+                        ext.Clear();
+                        ext << "." << ArtifactDescUtil::getDefaultExtension(assemblyDesc);
 
                         dumpIntermediateText(disassemblyBlob->getBufferPointer(), disassemblyBlob->getBufferSize(), ext.getBuffer());
                         return;
