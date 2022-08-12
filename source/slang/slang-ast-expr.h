@@ -316,7 +316,8 @@ class IsTypeExpr : public Expr
     // A witness showing that `typeExpr.type` is a subtype of `typeof(value)`.
     Val* witnessArg = nullptr;
 
-    bool isAlwaysTrue = false;
+    // non-null if evaluates to a constant.
+    BoolLiteralExpr* constantVal = nullptr;
 };
 
     /// A `value as Type` expression that casts `value` to `Type` within type hierarchy.

@@ -4858,6 +4858,7 @@ namespace Slang
                     isExpr->value = expr;
                     parser->ReadToken();
                     isExpr->typeExpr = parser->ParseTypeExp();
+                    isExpr->loc = opToken.loc;
                     expr = isExpr;
                     continue;
                 }
@@ -4867,6 +4868,7 @@ namespace Slang
                     asExpr->value = expr;
                     parser->ReadToken();
                     asExpr->typeExpr = parser->ParseType();
+                    asExpr->loc = opToken.loc;
                     expr = asExpr;
                     continue;
                 }
