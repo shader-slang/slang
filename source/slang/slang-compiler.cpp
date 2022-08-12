@@ -2040,7 +2040,7 @@ namespace Slang
         // This is primarily a debugging aid, so we don't
         // really need/want to do anything too elaborate
 
-        static std::atomic<uint32_t> counter = 0;
+        static std::atomic<uint32_t> counter(0);
 
         uint32_t id = ++counter;
 
