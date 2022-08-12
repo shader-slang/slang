@@ -78,77 +78,6 @@ namespace Slang
         sb << TypeTextUtil::getPassThroughName(SlangPassThrough(val));
     }
 
-    // !!!!!!!!!!!!!!!!!!!!!!!!!!!! CompileResult !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
-#if 0
-    SlangResult CompileResult::getSharedLibrary(ComPtr<ISlangSharedLibrary>& outSharedLibrary)
-    {
-        if (downstreamResult)
-        {
-            // TODO(JS): Work around for not knowing actual interface this is returning, 
-            // and needing to support deps interface
-
-            ComPtr<ISlangSharedLibrary> lib;
-            SLANG_RETURN_ON_FAIL(downstreamResult->getHostCallableSharedLibrary(lib));
-
-            if (SLANG_SUCCEEDED(lib->queryInterface(ISlangSharedLibrary::getTypeGuid(), (void**)outSharedLibrary.writeRef())))
-            {
-                return SLANG_OK;
-            }
-            
-            ComPtr<ISlangSharedLibrary_Dep1> libDep1;
-            if (SLANG_SUCCEEDED(lib->queryInterface(ISlangSharedLibrary_Dep1::getTypeGuid(), (void**)libDep1.writeRef())))
-            {
-                // Okay, we need to adapt for now
-                outSharedLibrary = new SharedLibraryDep1Adapter(libDep1);
-                return SLANG_OK;
-            }
-        }
-        return SLANG_FAIL;
-    }
-
-    SlangResult CompileResult::getBlob(ComPtr<ISlangBlob>& outBlob) const
-    {
-        if(!blob)
-        {
-            switch(format)
-            {
-                default:
-                case ResultFormat::None:
-                {
-                    // If no blob is returned, it's an error
-                    return SLANG_FAIL;
-                }
-                case ResultFormat::Text:
-                {
-                    blob = StringUtil::createStringBlob(outputString);
-                    break;
-                }
-                case ResultFormat::Binary:
-                {
-                    if (downstreamResult)
-                    {
-                        // TODO(JS): 
-                        // This seems a little questionable. As it stands downstreamResult, if it doesn't have a blob
-                        // can try and read a file. How this currently works is that every getBlob will potentially try to read that file.
-                        // Setting result to None would stop this, but is that reasonable as the state.
-                        // Perhaps downstreamResult should hold some state that the read failed.
-                        // For now we don't worry though.
-
-                        SLANG_RETURN_ON_FAIL(downstreamResult->getBinary(blob));
-                    }
-                    break;
-                }
-            }
-        }
-
-        outBlob = blob;
-        return SLANG_OK;
-    }
-
-
-#endif
-
     //
     // FrontEndEntryPointRequest
     //
@@ -2362,19 +2291,6 @@ namespace Slang
         char const*     ext)
     {
         dumpIntermediate(data, size, ext, true);
-    }
-
-    void CodeGenContext::maybeDumpIntermediate(
-        DownstreamCompileResult* compileResult)
-    {
-        if (!shouldDumpIntermediates())
-            return;
-
-        ComPtr<ISlangBlob> blob;
-        if (SLANG_SUCCEEDED(compileResult->getBinary(blob)))
-        {
-            maybeDumpIntermediate(blob->getBufferPointer(), blob->getBufferSize());
-        }
     }
 
     static const char* _getTargetExtension(CodeGenTarget target)

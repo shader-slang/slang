@@ -144,47 +144,6 @@ namespace Slang
     class Module;
     class TranslationUnitRequest;
 
-#if 0
-    // Result of compiling an entry point.
-    // Should only ever be string, binary or shared library
-    class CompileResult
-    {
-    public:
-        CompileResult() = default;
-        explicit CompileResult(String const& str, RefPtr<PostEmitMetadata> metadata)
-            : format(ResultFormat::Text)
-            , outputString(str)
-            , postEmitMetadata(metadata) {}
-
-        explicit CompileResult(ISlangBlob* inBlob)
-            : format(ResultFormat::Binary)
-            , blob(inBlob) {}
-
-        explicit CompileResult(DownstreamCompileResult* inDownstreamResult, RefPtr<PostEmitMetadata> metadata)
-            : format(ResultFormat::Binary)
-            , downstreamResult(inDownstreamResult)
-            , postEmitMetadata(metadata) {}
-
-        explicit CompileResult(const UnownedStringSlice& slice )
-            : format(ResultFormat::Text)
-            , outputString(slice) {}
-
-        SlangResult getBlob(ComPtr<ISlangBlob>& outBlob) const;
-        SlangResult getSharedLibrary(ComPtr<ISlangSharedLibrary>& outSharedLibrary);
-
-        SlangResult isParameterLocationUsed(SlangParameterCategory category, UInt spaceIndex, UInt registerIndex, bool& outUsed);
-                
-        ResultFormat format = ResultFormat::None;
-        String outputString;                    ///< Only set if result type is ResultFormat::Text
-
-        mutable ComPtr<ISlangBlob> blob;
-
-        RefPtr<DownstreamCompileResult> downstreamResult;
-
-        RefPtr<PostEmitMetadata> postEmitMetadata;
-    };
-#endif
-
         /// Information collected about global or entry-point shader parameters
     struct ShaderParamInfo
     {
@@ -2435,9 +2394,6 @@ namespace Slang
             size_t      size);
         void maybeDumpIntermediate(
             char const* text);
-
-        void maybeDumpIntermediate(
-            DownstreamCompileResult* compileResult);
 
         void dumpIntermediate(
             void const* data,
