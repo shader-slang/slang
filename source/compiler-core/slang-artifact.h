@@ -342,6 +342,8 @@ public:
 
         /// Get the name of the artifact. This can be empty.
     virtual SLANG_NO_THROW const char* SLANG_MCALL getName() = 0;
+        /// Set the name associated with the artifact
+    virtual SLANG_NO_THROW void SLANG_MCALL setName(const char* name) = 0;
 
         /// Add data associated with this artifact
     virtual SLANG_NO_THROW void SLANG_MCALL addAssociated(ICastable* castable) = 0;
@@ -426,9 +428,10 @@ class IArtifactRepresentation : public ICastable
 {
     SLANG_COM_INTERFACE(0x311457a8, 0x1796, 0x4ebb, { 0x9a, 0xfc, 0x46, 0xa5, 0x44, 0xc7, 0x6e, 0xa9 })
 
-        /// Convert the instance into a serializable blob. 
+        /// Create a representation of the specified typeGuid interface. 
+        /// Calling castAs on the castable will return the specific type
         /// Returns SLANG_E_NOT_IMPLEMENTED if an implementation doesn't implement
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL writeToBlob(ISlangBlob** blob) = 0;
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL createRepresentation(const Guid& typeGuid, ICastable** outCastable) = 0;
 
         /// Returns true if this representation exists and is available for use.
     virtual SLANG_NO_THROW bool SLANG_MCALL exists() = 0;

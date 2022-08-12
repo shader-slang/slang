@@ -23,10 +23,15 @@ namespace Slang {
     return ArtifactContainer::create(ArtifactDesc::make(ArtifactKind::Container, ArtifactPayload::CompileResults));
 }
 
-/* static */ComPtr<IArtifact> ArtifactUtil::createArtifactForCompileTarget(SlangCompileTarget target)
+/* static */ComPtr<IArtifact> ArtifactUtil::createArtifact(const ArtifactDesc& desc, const char* name)
 {
-    auto desc = ArtifactDescUtil::makeDescFromCompileTarget(target);
+    auto artifact = createArtifact(desc);
+    artifact->setName(name);
+    return artifact;
+}
 
+/* static */ComPtr<IArtifact> ArtifactUtil::createArtifact(const ArtifactDesc& desc)
+{
     if (isDerivedFrom(desc.kind, ArtifactKind::Container))
     {
         auto container = ArtifactContainer::create(desc);
@@ -39,6 +44,12 @@ namespace Slang {
     {
         return Artifact::create(desc);
     }
+}
+
+/* static */ComPtr<IArtifact> ArtifactUtil::createArtifactForCompileTarget(SlangCompileTarget target)
+{
+    auto desc = ArtifactDescUtil::makeDescFromCompileTarget(target);
+    return createArtifact(desc);
 }
 
 /* static */bool ArtifactUtil::isSignificant(IArtifact* artifact, void* data)

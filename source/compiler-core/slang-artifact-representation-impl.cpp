@@ -9,6 +9,8 @@
 
 #include "slang-artifact-util.h"
 
+#include "../core/slang-castable-list-impl.h"
+
 namespace Slang {
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!! FileArtifactRepresentation !!!!!!!!!!!!!!!!!!!!!!!!!!! */
@@ -45,16 +47,23 @@ void* FileArtifactRepresentation::castAs(const Guid& guid)
     return getObject(guid);
 }
 
-SlangResult FileArtifactRepresentation::writeToBlob(ISlangBlob** blob)
+SlangResult FileArtifactRepresentation::createRepresentation(const Guid& typeGuid, ICastable** outCastable)
 {
-    if (m_kind == Kind::NameOnly)
+    // We can convert into a blob only, and only if we have a path
+    // If it's referenced by a name only, it's a file that *can't* be loaded as a blob in general.
+    if (typeGuid != ISlangBlob::getTypeGuid() ||
+        m_kind == Kind::NameOnly)
     {
-        // If it's referenced by a name only, it's a file that *can't* be loaded as a blob in general.
         return SLANG_E_NOT_AVAILABLE;
     }
 
+    ComPtr<ISlangBlob> blob;
+
     auto fileSystem = _getFileSystem();
-    return fileSystem->loadFile(m_path.getBuffer(), blob);
+    SLANG_RETURN_ON_FAIL(fileSystem->loadFile(m_path.getBuffer(), blob.writeRef()));
+
+    *outCastable = CastableUtil::getCastable(blob).detach();
+    return SLANG_OK;
 }
 
 bool FileArtifactRepresentation::exists()

@@ -30,6 +30,10 @@ struct ArtifactUtil
         /// Creates an empty artifact for a type
     static ComPtr<IArtifact> createArtifactForCompileTarget(SlangCompileTarget target);
 
+        /// Create an artifact 
+    static ComPtr<IArtifact> createArtifact(const ArtifactDesc& desc, const char* name);
+    static ComPtr<IArtifact> createArtifact(const ArtifactDesc& desc);
+
         /// Returns true if an artifact is 'significant'
     static bool isSignificant(IArtifact* artifact, void* data = nullptr);
         /// Find a significant artifact

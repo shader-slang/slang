@@ -25,7 +25,7 @@ public:
     SLANG_NO_THROW void* SLANG_MCALL castAs(const Guid& guid) SLANG_OVERRIDE;
 
     // IArtifactRepresentation
-    SLANG_NO_THROW SlangResult SLANG_MCALL writeToBlob(ISlangBlob** blob) SLANG_OVERRIDE;
+    SLANG_NO_THROW SlangResult SLANG_MCALL createRepresentation(const Guid& typeGuid, ICastable** outCastable) SLANG_OVERRIDE;
     SLANG_NO_THROW bool SLANG_MCALL exists() SLANG_OVERRIDE;
 
     // IFileArtifactRepresentation
@@ -74,7 +74,7 @@ public:
     // ICastable
     SLANG_NO_THROW void* SLANG_MCALL castAs(const Guid& guid) SLANG_OVERRIDE;
     // IArtifactRepresentation
-    SLANG_NO_THROW SlangResult SLANG_MCALL writeToBlob(ISlangBlob** outBlob) SLANG_OVERRIDE { SLANG_UNUSED(outBlob); return SLANG_E_NOT_AVAILABLE; }
+    SLANG_NO_THROW SlangResult SLANG_MCALL createRepresentation(const Guid& guid, ICastable** outCastable) SLANG_OVERRIDE { SLANG_UNUSED(guid); SLANG_UNUSED(outCastable); return SLANG_E_NOT_AVAILABLE; }
     SLANG_NO_THROW bool SLANG_MCALL exists() SLANG_OVERRIDE { return m_object; }
 
     ObjectArtifactRepresentation(const Guid& typeGuid, RefObject* obj):

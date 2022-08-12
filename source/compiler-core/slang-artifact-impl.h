@@ -47,7 +47,8 @@ public:
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL loadSharedLibrary(ArtifactKeep keep, ISlangSharedLibrary** outSharedLibrary) SLANG_OVERRIDE;
 
     virtual SLANG_NO_THROW const char* SLANG_MCALL getName() SLANG_OVERRIDE { return m_name.getBuffer(); }
-    
+    virtual SLANG_NO_THROW void SLANG_MCALL setName(const char* name) SLANG_OVERRIDE { m_name = name; }
+
     virtual SLANG_NO_THROW void SLANG_MCALL addAssociated(ICastable* castable) SLANG_OVERRIDE;
     virtual SLANG_NO_THROW void* SLANG_MCALL findAssociated(const Guid& unk) SLANG_OVERRIDE;
     virtual SLANG_NO_THROW ICastableList* SLANG_MCALL getAssociated() SLANG_OVERRIDE;
