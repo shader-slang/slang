@@ -81,6 +81,8 @@ struct ArtifactDescUtil
         /// Given a desc, and a basePath returns a suitable path for a entity of specified desc
     static SlangResult calcPathForDesc(const ArtifactDesc& desc, const UnownedStringSlice& basePath, StringBuilder& outPath);
 
+    static SlangResult calcNameForDesc(const ArtifactDesc& desc, const UnownedStringSlice& basePath, StringBuilder& outPath);
+
         /// Given a target returns the ArtifactDesc
     static ArtifactDesc makeDescFromCompileTarget(SlangCompileTarget target);
 

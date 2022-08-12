@@ -2373,43 +2373,16 @@ namespace Slang
 
         SlangResult emitEntryPoints(ComPtr<IArtifact>& outArtifact);
 
-        SlangResult dissassembleWithDownstream(
-            const void* data,
-            size_t          dataSizeInBytes,
-            ISlangBlob** outBlob);
-
-        SlangResult dissassembleWithDownstream(
-            DownstreamCompileResult* downstreamResult,
-            ISlangBlob** outBlob);
+        void maybeDumpIntermediate(IArtifact* artifact);
 
     protected:
         CodeGenTarget m_targetFormat = CodeGenTarget::Unknown;
         ExtensionTracker* m_extensionTracker = nullptr;
 
-        void maybeDumpIntermediate(IArtifact* artifact);
-
-        // Helper to dump intermediate output when debugging
-        void maybeDumpIntermediate(
+        void dumpIntermediate(
+            const ArtifactDesc& desc,
             void const* data,
             size_t      size);
-        void maybeDumpIntermediate(
-            char const* text);
-
-        void dumpIntermediate(
-            void const* data,
-            size_t      size,
-            char const* ext,
-            bool        isBinary);
-
-        void dumpIntermediateText(
-            void const* data,
-            size_t      size,
-            char const* ext);
-
-        void dumpIntermediateBinary(
-            void const* data,
-            size_t      size,
-            char const* ext);
 
         /* Emits entry point source taking into account if a pass-through or not. Uses 'targetFormat' to determine
         the target (not targetReq) */
@@ -2643,6 +2616,7 @@ namespace Slang
             return m_specializedEntryPoints[index];
         }
         
+        void writeArtifactToStandardOutput(IArtifact* artifact, DiagnosticSink* sink);
 
         void generateOutput();
 
@@ -2821,7 +2795,7 @@ namespace Slang
         {
             return m_downstreamCompileTime;
         }
-
+        
             /// Get the downstream compiler for a transition
         DownstreamCompiler* getDownstreamCompiler(CodeGenTarget source, CodeGenTarget target);
         

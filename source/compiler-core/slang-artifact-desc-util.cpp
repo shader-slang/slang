@@ -619,27 +619,17 @@ UnownedStringSlice ArtifactDescUtil::getDefaultExtension(const ArtifactDesc& des
     return getBaseNameFromPath(desc, path);
 }
 
-/* static */SlangResult ArtifactDescUtil::calcPathForDesc(const ArtifactDesc& desc, const UnownedStringSlice& basePath, StringBuilder& outPath)
+/* static */SlangResult ArtifactDescUtil::calcNameForDesc(const ArtifactDesc& desc, const UnownedStringSlice& inBaseName, StringBuilder& outName)
 {
-    outPath.Clear();
+    UnownedStringSlice baseName(inBaseName);
 
-    UnownedStringSlice baseName;
-
-    // Append the directory
-    Index pos = Path::findLastSeparatorIndex(basePath);
-    if (pos >= 0)
-    {
-        // Keep the stem including the delimiter
-        outPath.append(basePath.head(pos + 1));
-        // Get the baseName
-        baseName = basePath.tail(pos + 1);
-    }
-
+    // If there is no basename, set one
     if (baseName.getLength() == 0)
     {
         baseName = toSlice("unknown");
     }
 
+    // Prefix
     if (isCpuBinary(desc) &&
         (desc.kind == ArtifactKind::SharedLibrary ||
             desc.kind == ArtifactKind::Library))
@@ -647,21 +637,48 @@ UnownedStringSlice ArtifactDescUtil::getDefaultExtension(const ArtifactDesc& des
         const bool isSharedLibraryPrefixPlatform = SLANG_LINUX_FAMILY || SLANG_APPLE_FAMILY;
         if (isSharedLibraryPrefixPlatform)
         {
-            outPath << "lib";
-            outPath << baseName;
+            outName << "lib";
         }
     }
+
+    // Output the basename
+    outName << baseName;
 
     // If there is an extension append it
     const UnownedStringSlice ext = getDefaultExtension(desc);
 
     if (ext.getLength())
     {
-        outPath.appendChar('.');
-        outPath.append(ext);
+        outName.appendChar('.');
+        outName.append(ext);
     }
 
     return SLANG_OK;
+}
+
+/* static */SlangResult ArtifactDescUtil::calcPathForDesc(const ArtifactDesc& desc, const UnownedStringSlice& basePath, StringBuilder& outPath)
+{
+    outPath.Clear();
+
+    // Append the directory
+    Index pos = Path::findLastSeparatorIndex(basePath);
+    if (pos >= 0)
+    {
+        // Keep the stem including the delimiter
+        outPath.append(basePath.head(pos + 1));
+
+        StringBuilder buf;
+        const auto baseName = basePath.tail(pos + 1);
+
+        SLANG_RETURN_ON_FAIL(calcNameForDesc(desc, baseName, buf));
+        outPath.append(buf);
+
+        return SLANG_OK;
+    }
+    else
+    {
+        return calcNameForDesc(desc, basePath, outPath);
+    }
 }
 
 } // namespace Slang
