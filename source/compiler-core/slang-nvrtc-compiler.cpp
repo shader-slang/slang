@@ -97,9 +97,9 @@ class NVRTCDownstreamCompiler : public DownstreamCompilerBase
 public:
     typedef DownstreamCompilerBase Super;
 
-    // DownstreamCompiler
-    virtual SlangResult compile(const CompileOptions& options, RefPtr<DownstreamCompileResult>& outResult) SLANG_OVERRIDE;
-    virtual bool isFileBased() SLANG_OVERRIDE { return false; }
+    // IDownstreamCompiler
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL compile(const CompileOptions& options, RefPtr<DownstreamCompileResult>& outResult) SLANG_OVERRIDE;
+    virtual SLANG_NO_THROW bool SLANG_MCALL isFileBased() SLANG_OVERRIDE { return false; }
 
         /// Must be called before use
     SlangResult init(ISlangSharedLibrary* library);
