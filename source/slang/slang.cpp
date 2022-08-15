@@ -740,8 +740,7 @@ SlangPassThrough Session::getDownstreamCompilerForTransition(SlangCompileTarget 
         (source == CodeGenTarget::CSource || source == CodeGenTarget::CPPSource))
     {
         // We prefer LLVM if it's available
-        DownstreamCompiler* llvm = getOrLoadDownstreamCompiler(PassThroughMode::LLVM, nullptr);
-        if (llvm)
+        if (auto llvm = getOrLoadDownstreamCompiler(PassThroughMode::LLVM, nullptr))
         {
             return SLANG_PASS_THROUGH_LLVM;
         }
@@ -760,7 +759,7 @@ SlangPassThrough Session::getDownstreamCompilerForTransition(SlangCompileTarget 
     return SLANG_PASS_THROUGH_NONE;
 }
 
-DownstreamCompiler* Session::getDownstreamCompiler(CodeGenTarget source, CodeGenTarget target)
+IDownstreamCompiler* Session::getDownstreamCompiler(CodeGenTarget source, CodeGenTarget target)
 {
     PassThroughMode compilerType = (PassThroughMode)getDownstreamCompilerForTransition(SlangCompileTarget(source), SlangCompileTarget(target));
     return getOrLoadDownstreamCompiler(compilerType, nullptr);

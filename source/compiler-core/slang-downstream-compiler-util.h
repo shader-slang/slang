@@ -1,0 +1,70 @@
+#ifndef SLANG_DOWNSTREAM_COMPILER_UTIL_H
+#define SLANG_DOWNSTREAM_COMPILER_UTIL_H
+
+#include "slang-downstream-compiler.h"
+#include "slang-downstream-compiler-set.h"
+
+namespace Slang
+{
+
+typedef SlangResult (*DownstreamCompilerLocatorFunc)(const String& path, ISlangSharedLibraryLoader* loader, DownstreamCompilerSet* set);
+
+// Combination of a downstream compiler type (pass through) and 
+// a match version.
+struct DownstreamCompilerMatchVersion
+{
+    DownstreamCompilerMatchVersion(SlangPassThrough inType, MatchSemanticVersion inMatchVersion) :
+        type(inType),
+        matchVersion(inMatchVersion)
+    {}
+
+    DownstreamCompilerMatchVersion() :type(SLANG_PASS_THROUGH_NONE) {}
+
+    SlangPassThrough type;                  ///< The type of the compiler
+    MatchSemanticVersion matchVersion;      ///< The match version
+};
+
+
+struct DownstreamCompilerUtil: public DownstreamCompilerBaseUtil
+{
+    enum class MatchType
+    {
+        MinGreaterEqual,
+        MinAbsolute,
+        Newest,
+    };
+
+        /// Find a compiler
+    static IDownstreamCompiler* findCompiler(const DownstreamCompilerSet* set, MatchType matchType, const DownstreamCompilerDesc& desc);
+    static IDownstreamCompiler* findCompiler(const List<IDownstreamCompiler*>& compilers, MatchType matchType, const DownstreamCompilerDesc& desc);
+
+    static IDownstreamCompiler* findCompiler(const List<IDownstreamCompiler*>& compilers, SlangPassThrough type, const SemanticVersion& version);
+    static IDownstreamCompiler* findCompiler(const List<IDownstreamCompiler*>& compilers, const DownstreamCompilerDesc& desc);
+
+        /// Find all the compilers with the version
+    static void findVersions(const List<IDownstreamCompiler*>& compilers, SlangPassThrough compiler, List<SemanticVersion>& versions);
+
+    
+        /// Find the compiler closest to the desc 
+    static IDownstreamCompiler* findClosestCompiler(const List<IDownstreamCompiler*>& compilers, const DownstreamCompilerMatchVersion& version);
+    static IDownstreamCompiler* findClosestCompiler(const DownstreamCompilerSet* set, const DownstreamCompilerMatchVersion& version);
+
+        /// Get the information on the compiler used to compile this source
+    static DownstreamCompilerMatchVersion getCompiledVersion();
+
+    static void updateDefault(DownstreamCompilerSet* set, SlangSourceLanguage sourceLanguage);
+    static void updateDefaults(DownstreamCompilerSet* set);
+
+    static void setDefaultLocators(DownstreamCompilerLocatorFunc outFuncs[int(SLANG_PASS_THROUGH_COUNT_OF)]);
+
+        /// Attempts to determine what 'path' is and load appropriately. Is it a path to a shared library? Is it a directory holding the libraries?
+        /// Some downstream shared libraries need other shared libraries to be loaded before the main shared library, such that they are in the same directory
+        /// otherwise the shared library could come from some unwanted location.
+        /// dependentNames names shared libraries which should be attempted to be loaded in the path of the main shared library.
+        /// The list is optional (nullptr can be passed in), and the list is terminated by nullptr.
+    static SlangResult loadSharedLibrary(const String& path, ISlangSharedLibraryLoader* loader, const char*const* dependantNames, const char* libraryName, ComPtr<ISlangSharedLibrary>& outSharedLib);
+};
+
+}
+
+#endif

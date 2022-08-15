@@ -92,10 +92,10 @@ static SlangResult _asResult(nvrtcResult res)
     }
 }
 
-class NVRTCDownstreamCompiler : public DownstreamCompiler
+class NVRTCDownstreamCompiler : public DownstreamCompilerBase
 {
 public:
-    typedef DownstreamCompiler Super;
+    typedef DownstreamCompilerBase Super;
 
     // DownstreamCompiler
     virtual SlangResult compile(const CompileOptions& options, RefPtr<DownstreamCompileResult>& outResult) SLANG_OVERRIDE;
@@ -593,9 +593,9 @@ SlangResult NVRTCDownstreamCompiler::_findIncludePath(String& outPath)
     return SLANG_E_NOT_FOUND;
 }
 
-SlangResult NVRTCDownstreamCompiler::_maybeAddHalfSupport(const CompileOptions& options, CommandLine& ioCmdLine)
+SlangResult NVRTCDownstreamCompiler::_maybeAddHalfSupport(const DownstreamCompileOptions& options, CommandLine& ioCmdLine)
 {
-    if ((options.flags & CompileOptions::Flag::EnableFloat16) == 0)
+    if ((options.flags & DownstreamCompileOptions::Flag::EnableFloat16) == 0)
     {
         return SLANG_OK;
     }
@@ -637,7 +637,7 @@ SlangResult NVRTCDownstreamCompiler::_maybeAddHalfSupport(const CompileOptions& 
     return SLANG_OK;
 }
 
-SlangResult NVRTCDownstreamCompiler::compile(const CompileOptions& options, RefPtr<DownstreamCompileResult>& outResult)
+SlangResult NVRTCDownstreamCompiler::compile(const DownstreamCompileOptions& options, RefPtr<DownstreamCompileResult>& outResult)
 {
     // This compiler doesn't read files, they should be read externally and stored in sourceContents/sourceContentsPath
     if (options.sourceFiles.getCount() > 0)
@@ -742,7 +742,7 @@ SlangResult NVRTCDownstreamCompiler::compile(const CompileOptions& options, RefP
         //
         for (const auto& capabilityVersion : options.requiredCapabilityVersions)
         {
-            if (capabilityVersion.kind == DownstreamCompiler::CapabilityVersion::Kind::CUDASM)
+            if (capabilityVersion.kind == DownstreamCompileOptions::CapabilityVersion::Kind::CUDASM)
             {
                 if (capabilityVersion.version > version)
                 {
@@ -967,10 +967,11 @@ static SlangResult _findAndLoadNVRTC(ISlangSharedLibraryLoader* loader, ComPtr<I
         return SLANG_FAIL;
     }
 
-    RefPtr<NVRTCDownstreamCompiler> compiler(new NVRTCDownstreamCompiler);
+    auto compiler = new NVRTCDownstreamCompiler;
+    ComPtr<IDownstreamCompiler> compilerIntf(compiler);
     SLANG_RETURN_ON_FAIL(compiler->init(library));
 
-    set->addCompiler(compiler);
+    set->addCompiler(compilerIntf);
     return SLANG_OK;
 }
 

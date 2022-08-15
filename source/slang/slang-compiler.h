@@ -7,6 +7,8 @@
 #include "../core/slang-file-system.h"
 
 #include "../compiler-core/slang-downstream-compiler.h"
+#include "../compiler-core/slang-downstream-compiler-util.h"
+
 #include "../compiler-core/slang-name.h"
 #include "../compiler-core/slang-include-system.h"
 #include "../compiler-core/slang-command-line-args.h"
@@ -2797,7 +2799,7 @@ namespace Slang
         }
         
             /// Get the downstream compiler for a transition
-        DownstreamCompiler* getDownstreamCompiler(CodeGenTarget source, CodeGenTarget target);
+        IDownstreamCompiler* getDownstreamCompiler(CodeGenTarget source, CodeGenTarget target);
         
         Scope* baseLanguageScope = nullptr;
         Scope* coreLanguageScope = nullptr;
@@ -2851,7 +2853,7 @@ namespace Slang
         void _setSharedLibraryLoader(ISlangSharedLibraryLoader* loader);
 
             /// Will try to load the library by specified name (using the set loader), if not one already available.
-        DownstreamCompiler* getOrLoadDownstreamCompiler(PassThroughMode type, DiagnosticSink* sink);
+        IDownstreamCompiler* getOrLoadDownstreamCompiler(PassThroughMode type, DiagnosticSink* sink);
             /// Will unload the specified shared library if it's currently loaded 
         void resetDownstreamCompiler(PassThroughMode type);
 
@@ -2878,7 +2880,7 @@ namespace Slang
         int m_downstreamCompilerInitialized = 0;                                        
 
         RefPtr<DownstreamCompilerSet> m_downstreamCompilerSet;                                  ///< Information about all available downstream compilers.
-        RefPtr<DownstreamCompiler> m_downstreamCompilers[int(PassThroughMode::CountOf)];        ///< A downstream compiler for a pass through
+        ComPtr<IDownstreamCompiler> m_downstreamCompilers[int(PassThroughMode::CountOf)];        ///< A downstream compiler for a pass through
         DownstreamCompilerLocatorFunc m_downstreamCompilerLocators[int(PassThroughMode::CountOf)];
         Name* m_completionTokenName = nullptr; ///< The name of a completion request token.
 

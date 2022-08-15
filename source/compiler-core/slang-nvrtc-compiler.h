@@ -1,7 +1,7 @@
 #ifndef SLANG_NVRTC_COMPILER_UTIL_H
 #define SLANG_NVRTC_COMPILER_UTIL_H
 
-#include "slang-downstream-compiler.h"
+#include "slang-downstream-compiler-util.h"
 
 #include "../core/slang-platform.h"
 

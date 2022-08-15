@@ -34,10 +34,10 @@ namespace Slang
 
 #if SLANG_ENABLE_GLSLANG_SUPPORT
 
-class GlslangDownstreamCompiler : public DownstreamCompiler
+class GlslangDownstreamCompiler : public DownstreamCompilerBase
 {
 public:
-    typedef DownstreamCompiler Super;
+    typedef DownstreamCompilerBase Super;
 
     // DownstreamCompiler
     virtual SlangResult compile(const CompileOptions& options, RefPtr<DownstreamCompileResult>& outResult) SLANG_OVERRIDE;
@@ -163,7 +163,7 @@ SlangResult GlslangDownstreamCompiler::compile(const CompileOptions& options, Re
     SemanticVersion spirvVersion;
     for (const auto& capabilityVersion : options.requiredCapabilityVersions)
     {
-        if (capabilityVersion.kind == DownstreamCompiler::CapabilityVersion::Kind::SPIRV)
+        if (capabilityVersion.kind == DownstreamCompileOptions::CapabilityVersion::Kind::SPIRV)
         {
             if (capabilityVersion.version > spirvVersion)
             {
@@ -275,10 +275,11 @@ SlangResult GlslangDownstreamCompiler::disassemble(SlangCompileTarget sourceBlob
         return SLANG_FAIL;
     }
 
-    RefPtr<GlslangDownstreamCompiler> compiler(new GlslangDownstreamCompiler);
+    auto compiler = new GlslangDownstreamCompiler;
+    ComPtr<IDownstreamCompiler> compilerIntf(compiler);
     SLANG_RETURN_ON_FAIL(compiler->init(library));
 
-    set->addCompiler(compiler);
+    set->addCompiler(compilerIntf);
     return SLANG_OK;
 }
 

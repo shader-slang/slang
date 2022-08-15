@@ -1,7 +1,7 @@
 #ifndef SLANG_VISUAL_STUDIO_COMPILER_UTIL_H
 #define SLANG_VISUAL_STUDIO_COMPILER_UTIL_H
 
-#include "slang-downstream-compiler.h"
+#include "slang-downstream-compiler-util.h"
 
 namespace Slang
 {

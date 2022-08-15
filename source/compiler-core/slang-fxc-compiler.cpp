@@ -107,10 +107,10 @@ struct FxcIncludeHandler : ID3DInclude
     IncludeSystem m_system;
 };
 
-class FXCDownstreamCompiler : public DownstreamCompiler
+class FXCDownstreamCompiler : public DownstreamCompilerBase
 {
 public:
-    typedef DownstreamCompiler Super;
+    typedef DownstreamCompilerBase Super;
 
     // DownstreamCompiler
     virtual SlangResult compile(const CompileOptions& options, RefPtr<DownstreamCompileResult>& outResult) SLANG_OVERRIDE;
@@ -340,10 +340,12 @@ SlangResult FXCDownstreamCompiler::disassemble(SlangCompileTarget sourceBlobTarg
         return SLANG_FAIL;
     }
 
-    RefPtr<FXCDownstreamCompiler> compiler(new FXCDownstreamCompiler);
+    auto compiler = new FXCDownstreamCompiler;
+    ComPtr<IDownstreamCompiler> compilerInft(compiler);
+
     SLANG_RETURN_ON_FAIL(compiler->init(library));
 
-    set->addCompiler(compiler);
+    set->addCompiler(compilerInft);
     return SLANG_OK;
 }
 

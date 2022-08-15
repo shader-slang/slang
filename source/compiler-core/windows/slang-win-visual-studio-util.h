@@ -6,7 +6,7 @@
 
 #include "../../core/slang-process-util.h"
 
-#include "../slang-downstream-compiler.h"
+#include "../slang-downstream-compiler-util.h"
 
 namespace Slang {
 
