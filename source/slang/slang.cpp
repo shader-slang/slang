@@ -1962,6 +1962,9 @@ void FrontEndCompileRequest::parseTranslationUnit(
         break;
     }
 
+    // TODO(JS):
+    // Note! that a adding a define twice will cause an exception in debug builds
+    // that may be desirable or not...
     Dictionary<String, String> combinedPreprocessorDefinitions;
     for(auto& def : getLinkage()->preprocessorDefinitions)
         combinedPreprocessorDefinitions.Add(def.Key, def.Value);
@@ -1970,11 +1973,47 @@ void FrontEndCompileRequest::parseTranslationUnit(
     for(auto& def : translationUnit->preprocessorDefinitions)
         combinedPreprocessorDefinitions.Add(def.Key, def.Value);
 
+    // Define standard macros, if not already defined.
+    // 
+    // How useful not replacing a defininition is perhaps arguable, because setting to 0 will not generally work
+    // If the `#if` style is used it will work but produce a warning when not defined.
+    // ```
+    // #if __SLANG_COMPILER__
+    // ```
+    // Using #ifdef/#if defined will not work with 0, because it would be defined....
+    // ```
+    // #ifdef __SLANG_COMPILER__ 
+    // #if defined(__SLANG_COMPILER__)
+    // ```
+    // 
+    // We are only defining to 1 if the property is set. 
+    // C++ preprocessor allows this style of thing by making 'not defined' equal 0. Slang supports this but produces
+    // a warning.
+    {
+        // Used to identify level of HLSL compatibility
+        combinedPreprocessorDefinitions.AddIfNotExists("__HLSL_VERSION", "2020");
+
+        // Indicates this is being compiled by the slang *compiler*
+        combinedPreprocessorDefinitions.AddIfNotExists("__SLANG_COMPILER__", "1");
+
+        // Set macro depending on source type
+        switch (translationUnit->sourceLanguage)
+        {
+            case SourceLanguage::HLSL:
+                // Used to indicated compiled as HLSL language
+                combinedPreprocessorDefinitions.AddIfNotExists("__HLSL__", "1");
+                break;
+            case SourceLanguage::Slang:
+                // Used to indicate compiled as Slang language
+                combinedPreprocessorDefinitions.AddIfNotExists("__SLANG__", "1");
+                break;
+            default: break;
+        }
+    }
+
     auto module = translationUnit->getModule();
 
     ASTBuilder* astBuilder = module->getASTBuilder();
-
-    //ASTBuilder* astBuilder = linkage->getASTBuilder();
 
     ModuleDecl* translationUnitSyntax = astBuilder->create<ModuleDecl>();
 
@@ -2057,8 +2096,6 @@ void FrontEndCompileRequest::parseTranslationUnit(
                 File::writeAllText(fileName, writer.getContent());
             }
         }
-
-
 
 #if 0
         // Test serialization
