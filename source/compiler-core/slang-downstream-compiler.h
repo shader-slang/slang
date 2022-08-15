@@ -170,72 +170,48 @@ struct DownstreamCompilerMatchVersion
     MatchSemanticVersion matchVersion;      ///< The match version
 };
 
-class DownstreamCompiler: public RefObject
+// Compiler description
+struct DownstreamCompilerDesc
 {
-public:
-    typedef RefObject Super;
+    typedef DownstreamCompilerDesc ThisType;
 
-    typedef DownstreamCompileResult CompileResult;
+    HashCode getHashCode() const { return combineHash(HashCode(type), combineHash(HashCode(majorVersion), HashCode(minorVersion))); }
+    bool operator==(const ThisType& rhs) const { return type == rhs.type && majorVersion == rhs.majorVersion && minorVersion == rhs.minorVersion; }
+    bool operator!=(const ThisType& rhs) const { return !(*this == rhs); }
 
-    typedef uint32_t SourceLanguageFlags;
-    struct SourceLanguageFlag
+        /// Get the version as a value
+    Int getVersionValue() const { return majorVersion * 100 + minorVersion; }
+
+    void appendAsText(StringBuilder& out) const;
+        /// true if has a version set
+    bool hasVersion() const { return majorVersion || minorVersion; }
+
+    /// Ctor
+    explicit DownstreamCompilerDesc(SlangPassThrough inType = SLANG_PASS_THROUGH_NONE, Int inMajorVersion = 0, Int inMinorVersion = 0) :type(inType), majorVersion(inMajorVersion), minorVersion(inMinorVersion) {}
+
+    explicit DownstreamCompilerDesc(SlangPassThrough inType, const SemanticVersion& version) :type(inType), majorVersion(version.m_major), minorVersion(version.m_minor) {}
+
+    SlangPassThrough type;      ///< The type of the compiler
+
+    /// TODO(JS): Would probably be better if changed to SemanticVersion, but not trivial to change
+    // because this type is part of the DownstreamCompiler interface, which is used with `slang-llvm`.
+    Int majorVersion;           ///< Major version (interpretation is type specific)
+    Int minorVersion;           ///< Minor version (interpretation is type specific)
+};
+
+struct DownstreamCompileOptions
+{
+    typedef uint32_t Flags;
+    struct Flag
     {
-        enum Enum : SourceLanguageFlags
+        enum Enum : Flags
         {
-            Unknown = SourceLanguageFlags(1) << SLANG_SOURCE_LANGUAGE_UNKNOWN,
-            Slang   = SourceLanguageFlags(1) << SLANG_SOURCE_LANGUAGE_SLANG,
-            HLSL    = SourceLanguageFlags(1) << SLANG_SOURCE_LANGUAGE_HLSL,
-            GLSL    = SourceLanguageFlags(1) << SLANG_SOURCE_LANGUAGE_GLSL,
-            C       = SourceLanguageFlags(1) << SLANG_SOURCE_LANGUAGE_C,
-            CPP     = SourceLanguageFlags(1) << SLANG_SOURCE_LANGUAGE_CPP,
-            CUDA    = SourceLanguageFlags(1) << SLANG_SOURCE_LANGUAGE_CUDA,
+            EnableExceptionHandling     = 0x01,             ///< Enables exception handling support (say as optionally supported by C++)
+            Verbose                     = 0x02,             ///< Give more verbose diagnostics
+            EnableSecurityChecks        = 0x04,             ///< Enable runtime security checks (such as for buffer overruns) - enabling typically decreases performance
+            EnableFloat16               = 0x08,             ///< If set compiles with support for float16/half
         };
     };
-
-    struct Info
-    {
-        Info():sourceLanguageFlags(0) {}
-
-        Info(SourceLanguageFlags inSourceLanguageFlags):
-            sourceLanguageFlags(inSourceLanguageFlags)
-        {}
-        SourceLanguageFlags sourceLanguageFlags;
-    };
-    struct Infos
-    {
-        Info infos[int(SLANG_PASS_THROUGH_COUNT_OF)];
-    };
-
-    
-    // Compiler description
-    struct Desc
-    {
-        typedef Desc ThisType;
-
-        HashCode getHashCode() const { return combineHash(HashCode(type), combineHash(HashCode(majorVersion), HashCode(minorVersion))); }
-        bool operator==(const ThisType& rhs) const { return type == rhs.type && majorVersion == rhs.majorVersion && minorVersion == rhs.minorVersion;  }
-        bool operator!=(const ThisType& rhs) const { return !(*this == rhs); }
-
-            /// Get the version as a value
-        Int getVersionValue() const { return majorVersion * 100 + minorVersion;  }
-
-        void appendAsText(StringBuilder& out) const;
-            /// true if has a version set
-        bool hasVersion() const { return majorVersion || minorVersion; }
-
-            /// Ctor
-        explicit Desc(SlangPassThrough inType = SLANG_PASS_THROUGH_NONE, Int inMajorVersion = 0, Int inMinorVersion = 0):type(inType), majorVersion(inMajorVersion), minorVersion(inMinorVersion) {}
-
-        explicit Desc(SlangPassThrough inType, const SemanticVersion& version):type(inType), majorVersion(version.m_major), minorVersion(version.m_minor) {}
-
-        SlangPassThrough type;      ///< The type of the compiler
-
-        /// TODO(JS): Would probably be better if changed to SemanticVersion, but not trivial to change
-        // because this type is part of the DownstreamCompiler interface, which is used with `slang-llvm`.
-        Int majorVersion;           ///< Major version (interpretation is type specific)
-        Int minorVersion;           ///< Minor version (interpretation is type specific)
-    };
-
 
     enum class OptimizationLevel
     {
@@ -254,7 +230,7 @@ public:
     };
     enum class FloatingPointMode
     {
-        Default, 
+        Default,
         Fast,
         Precise,
     };
@@ -284,95 +260,131 @@ public:
         SemanticVersion version;
     };
 
-    struct CompileOptions
+    OptimizationLevel optimizationLevel = OptimizationLevel::Default;
+    DebugInfoType debugInfoType = DebugInfoType::Standard;
+    SlangCompileTarget targetType = SLANG_HOST_EXECUTABLE;
+    SlangSourceLanguage sourceLanguage = SLANG_SOURCE_LANGUAGE_CPP;
+    FloatingPointMode floatingPointMode = FloatingPointMode::Default;
+    PipelineType pipelineType = PipelineType::Unknown;
+    SlangMatrixLayoutMode matrixLayout = SLANG_MATRIX_LAYOUT_MODE_UNKNOWN;
+
+    Flags flags = Flag::EnableExceptionHandling;
+
+    PlatformKind platform = PlatformKind::Unknown;
+
+    /// The path/name of the output module. Should not have the extension, as that will be added for each of the target types.
+    /// If not set a module path will be internally generated internally on a command line based compiler
+    String modulePath;
+
+    List<Define> defines;
+
+    /// The contents of the source to compile. This can be empty is sourceFiles is set.
+    /// If the compiler is a commandLine file this source will be written to a temporary file.
+    String sourceContents;
+    /// 'Path' that the contents originated from. NOTE! This is for reporting only and doesn't have to exist on file system
+    String sourceContentsPath;
+
+    /// The names/paths of source to compile. This can be empty if sourceContents is set.
+    List<String> sourceFiles;
+
+    List<String> includePaths;
+    List<String> libraryPaths;
+
+    /// Libraries to link against.
+    List<ComPtr<IArtifact>> libraries;
+
+    List<CapabilityVersion> requiredCapabilityVersions;
+
+    /// For compilers/compiles that require an entry point name, else can be empty
+    String entryPointName;
+    /// Profile name to use, only required for compiles that need to compile against a a specific profiles.
+    /// Profile names are tied to compilers and targets.
+    String profileName;
+
+    /// The stage being compiled for 
+    SlangStage stage = SLANG_STAGE_NONE;
+
+    /// Arguments that are specific to a particular compiler implementation.
+    List<String> compilerSpecificArguments;
+
+    /// NOTE! Not all downstream compilers can use the fileSystemExt/sourceManager. This option will be ignored in those scenarios.
+    ISlangFileSystemExt* fileSystemExt = nullptr;
+    SourceManager* sourceManager = nullptr;
+};
+
+/* Used to indicate what kind of products are expected to be produced for a compilation. */
+typedef uint32_t DownstreamProductFlags;
+struct DownstreamProductFlag
+{
+    enum Enum : DownstreamProductFlags
     {
-        typedef uint32_t Flags;
-        struct Flag 
+        Debug = 0x1,                    ///< Used by debugger during execution
+        Execution = 0x2,                ///< Required for execution
+        Compile = 0x4,                  ///< A product *required* for compilation
+        Miscellaneous = 0x8,            ///< Anything else    
+    };
+    enum Mask : DownstreamProductFlags
+    {
+        All = 0xf,                ///< All the flags
+    };
+};
+
+#if 0
+enum class DownstreamProduct
+{
+    DebugRun,
+    Run,
+    CompileTemporary,
+    All,
+};
+#endif
+
+struct DownstreamCompilerInfo
+{
+    typedef DownstreamCompilerInfo This;
+    typedef uint32_t SourceLanguageFlags;
+    struct SourceLanguageFlag
+    {
+        enum Enum : SourceLanguageFlags
         {
-            enum Enum : Flags
-            {
-                EnableExceptionHandling = 0x01,             ///< Enables exception handling support (say as optionally supported by C++)
-                Verbose                 = 0x02,             ///< Give more verbose diagnostics
-                EnableSecurityChecks    = 0x04,             ///< Enable runtime security checks (such as for buffer overruns) - enabling typically decreases performance
-                EnableFloat16           = 0x08,             ///< If set compiles with support for float16/half
-            };
+            Unknown = SourceLanguageFlags(1) << SLANG_SOURCE_LANGUAGE_UNKNOWN,
+            Slang = SourceLanguageFlags(1) << SLANG_SOURCE_LANGUAGE_SLANG,
+            HLSL = SourceLanguageFlags(1) << SLANG_SOURCE_LANGUAGE_HLSL,
+            GLSL = SourceLanguageFlags(1) << SLANG_SOURCE_LANGUAGE_GLSL,
+            C = SourceLanguageFlags(1) << SLANG_SOURCE_LANGUAGE_C,
+            CPP = SourceLanguageFlags(1) << SLANG_SOURCE_LANGUAGE_CPP,
+            CUDA = SourceLanguageFlags(1) << SLANG_SOURCE_LANGUAGE_CUDA,
         };
-
-        OptimizationLevel optimizationLevel = OptimizationLevel::Default;
-        DebugInfoType debugInfoType = DebugInfoType::Standard;
-        SlangCompileTarget targetType = SLANG_HOST_EXECUTABLE;
-        SlangSourceLanguage sourceLanguage = SLANG_SOURCE_LANGUAGE_CPP;
-        FloatingPointMode floatingPointMode = FloatingPointMode::Default;
-        PipelineType pipelineType = PipelineType::Unknown;
-        SlangMatrixLayoutMode matrixLayout = SLANG_MATRIX_LAYOUT_MODE_UNKNOWN;
-
-        Flags flags = Flag::EnableExceptionHandling;
-
-        PlatformKind platform = PlatformKind::Unknown;
-
-            /// The path/name of the output module. Should not have the extension, as that will be added for each of the target types.
-            /// If not set a module path will be internally generated internally on a command line based compiler
-        String modulePath;                  
-
-        List<Define> defines;
-
-            /// The contents of the source to compile. This can be empty is sourceFiles is set.
-            /// If the compiler is a commandLine file this source will be written to a temporary file.
-        String sourceContents;
-            /// 'Path' that the contents originated from. NOTE! This is for reporting only and doesn't have to exist on file system
-        String sourceContentsPath;
-
-            /// The names/paths of source to compile. This can be empty if sourceContents is set.
-        List<String> sourceFiles;           
-
-        List<String> includePaths;
-        List<String> libraryPaths;
-
-            /// Libraries to link against.
-        List<ComPtr<IArtifact>> libraries;
-
-        List<CapabilityVersion> requiredCapabilityVersions;
-
-            /// For compilers/compiles that require an entry point name, else can be empty
-        String entryPointName;
-            /// Profile name to use, only required for compiles that need to compile against a a specific profiles.
-            /// Profile names are tied to compilers and targets.
-        String profileName;
-
-            /// The stage being compiled for 
-        SlangStage stage = SLANG_STAGE_NONE;
-
-            /// Arguments that are specific to a particular compiler implementation.
-        List<String> compilerSpecificArguments;
-
-            /// NOTE! Not all downstream compilers can use the fileSystemExt/sourceManager. This option will be ignored in those scenarios.
-        ISlangFileSystemExt* fileSystemExt = nullptr;
-        SourceManager* sourceManager = nullptr;
     };
 
-    typedef uint32_t ProductFlags;
-    struct ProductFlag
-    {
-        enum Enum : ProductFlags
-        {
-            Debug               = 0x1,                ///< Used by debugger during execution
-            Execution           = 0x2,                ///< Required for execution
-            Compile             = 0x4,                ///< A product *required* for compilation
-            Miscellaneous       = 0x8,                ///< Anything else    
-        };
-        enum Mask : ProductFlags
-        {
-            All                 = 0xf,                ///< All the flags
-        };
-    };
+        /// Get info for a compiler type
+    static const This& getInfo(SlangPassThrough compiler);
+        /// True if this compiler can compile the specified language
+    static bool canCompile(SlangPassThrough compiler, SlangSourceLanguage sourceLanguage);
 
-    enum class Product
-    {
-        DebugRun,
-        Run,
-        CompileTemporary,
-        All,
-    };
+    DownstreamCompilerInfo() : sourceLanguageFlags(0) {}
+
+    DownstreamCompilerInfo(SourceLanguageFlags inSourceLanguageFlags) :
+        sourceLanguageFlags(inSourceLanguageFlags)
+    {}
+    SourceLanguageFlags sourceLanguageFlags;
+};
+
+class DownstreamCompiler: public RefObject
+{
+public:
+    typedef RefObject Super;
+
+    typedef DownstreamCompilerDesc Desc;
+    typedef DownstreamCompileOptions CompileOptions;
+    typedef DownstreamCompileResult CompileResult;
+
+    typedef CompileOptions::OptimizationLevel OptimizationLevel;
+    typedef CompileOptions::DebugInfoType DebugInfoType;
+    typedef CompileOptions::FloatingPointMode FloatingPointMode;
+    typedef CompileOptions::PipelineType PipelineType;
+    typedef CompileOptions::Define Define;
+    typedef CompileOptions::CapabilityVersion CapabilityVersion;
 
         /// Get the desc of this compiler
     const Desc& getDesc() const { return m_desc;  }
@@ -384,14 +396,7 @@ public:
         /// True if underlying compiler uses file system to communicate source
     virtual bool isFileBased() = 0;
 
-        /// Get info for a compiler type
-    static const Info& getInfo(SlangPassThrough compiler) { return s_infos.infos[int(compiler)]; }
-        /// True if this compiler can compile the specified language
-    static bool canCompile(SlangPassThrough compiler, SlangSourceLanguage sourceLanguage);
-
-    
 protected:
-    static Infos s_infos;
 
     DownstreamCompiler(const Desc& desc) :
         m_desc(desc)
@@ -443,7 +448,7 @@ public:
         /// Given options determines the paths to products produced (including the 'moduleFilePath').
         /// Note that does *not* guarentee all products were or should be produced. Just aims to include all that could
         /// be produced, such that can be removed on completion.
-    virtual SlangResult calcCompileProducts(const CompileOptions& options, ProductFlags flags, List<String>& outPaths) = 0;
+    virtual SlangResult calcCompileProducts(const CompileOptions& options, DownstreamProductFlags flags, List<String>& outPaths) = 0;
 
     virtual SlangResult calcArgs(const CompileOptions& options, CommandLine& cmdLine) = 0;
     virtual SlangResult parseOutput(const ExecuteResult& exeResult, DownstreamDiagnostics& output) = 0;
@@ -527,14 +532,16 @@ typedef SlangResult (*DownstreamCompilerLocatorFunc)(const String& path, ISlangS
 struct DownstreamCompilerBaseUtil
 {
     typedef DownstreamCompiler::CompileOptions CompileOptions;
-    typedef DownstreamCompiler::OptimizationLevel OptimizationLevel;
-    typedef DownstreamCompiler::DebugInfoType DebugInfoType;
-    
-    typedef DownstreamDiagnostics::Diagnostic Diagnostic;
 
-    typedef DownstreamCompiler::FloatingPointMode FloatingPointMode;
-    typedef DownstreamCompiler::ProductFlag ProductFlag;
-    typedef DownstreamCompiler::ProductFlags ProductFlags;
+    typedef CompileOptions::OptimizationLevel OptimizationLevel;
+    typedef CompileOptions::DebugInfoType DebugInfoType;
+
+    typedef CompileOptions::FloatingPointMode FloatingPointMode;
+
+    typedef DownstreamProductFlag ProductFlag;
+    typedef DownstreamProductFlags ProductFlags;
+
+    typedef DownstreamDiagnostic Diagnostic;
 };
 
 struct DownstreamCompilerUtil: public DownstreamCompilerBaseUtil

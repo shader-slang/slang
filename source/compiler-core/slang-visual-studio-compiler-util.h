@@ -31,7 +31,7 @@ public:
     virtual SlangResult calcArgs(const CompileOptions& options, CommandLine& cmdLine) SLANG_OVERRIDE { return Util::calcArgs(options, cmdLine); }
     virtual SlangResult parseOutput(const ExecuteResult& exeResult, DownstreamDiagnostics& output) SLANG_OVERRIDE { return Util::parseOutput(exeResult, output); }
     virtual SlangResult calcModuleFilePath(const CompileOptions& options, StringBuilder& outPath) SLANG_OVERRIDE { return Util::calcModuleFilePath(options, outPath); }
-    virtual SlangResult calcCompileProducts(const CompileOptions& options, ProductFlags productFlags, List<String>& outPaths) SLANG_OVERRIDE { return Util::calcCompileProducts(options, productFlags, outPaths); }
+    virtual SlangResult calcCompileProducts(const CompileOptions& options, DownstreamProductFlags productFlags, List<String>& outPaths) SLANG_OVERRIDE { return Util::calcCompileProducts(options, productFlags, outPaths); }
 
     VisualStudioDownstreamCompiler(const Desc& desc):Super(desc) {}
 };

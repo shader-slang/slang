@@ -27,13 +27,23 @@
 namespace Slang
 {
 
-static DownstreamCompiler::Infos _calcInfos()
-{
-    typedef DownstreamCompiler::Info Info;
-    typedef DownstreamCompiler::SourceLanguageFlag SourceLanguageFlag;
-    typedef DownstreamCompiler::SourceLanguageFlags SourceLanguageFlags;
+/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! DownstreamCompilerInfos !!!!!!!!!!!!!!!!!!!!!!*/
 
-    DownstreamCompiler::Infos infos;
+struct DownstreamCompilerInfos
+{
+    DownstreamCompilerInfo infos[int(SLANG_PASS_THROUGH_COUNT_OF)];
+
+    static DownstreamCompilerInfos _calcInfos();
+    static DownstreamCompilerInfos s_infos;
+};
+
+/* static */ DownstreamCompilerInfos DownstreamCompilerInfos::_calcInfos()
+{
+    typedef DownstreamCompilerInfo Info;
+    typedef Info::SourceLanguageFlag SourceLanguageFlag;
+    typedef Info::SourceLanguageFlags SourceLanguageFlags;
+
+    DownstreamCompilerInfos infos;
 
     infos.infos[int(SLANG_PASS_THROUGH_CLANG)] = Info(SourceLanguageFlag::CPP | SourceLanguageFlag::C);
     infos.infos[int(SLANG_PASS_THROUGH_VISUAL_STUDIO)] = Info(SourceLanguageFlag::CPP | SourceLanguageFlag::C);
@@ -49,11 +59,25 @@ static DownstreamCompiler::Infos _calcInfos()
     return infos;
 }
 
-/* static */DownstreamCompiler::Infos DownstreamCompiler::s_infos = _calcInfos();
+/* static */DownstreamCompilerInfos DownstreamCompilerInfos::s_infos = DownstreamCompilerInfos::_calcInfos();
 
-/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! DownstreamCompiler::Desc !!!!!!!!!!!!!!!!!!!!!!*/
 
-void DownstreamCompiler::Desc::appendAsText(StringBuilder& out) const
+/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! DownstreamCompilerInfo !!!!!!!!!!!!!!!!!!!!!!*/
+
+/* static */const DownstreamCompilerInfo& DownstreamCompilerInfo::getInfo(SlangPassThrough compiler)
+{
+    return DownstreamCompilerInfos::s_infos.infos[int(compiler)];
+}
+
+/* static */bool DownstreamCompilerInfo::canCompile(SlangPassThrough compiler, SlangSourceLanguage sourceLanguage)
+{
+    const auto& info = getInfo(compiler);
+    return (info.sourceLanguageFlags & (SourceLanguageFlags(1) << int(sourceLanguage))) != 0;
+}
+
+/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! DownstreamCompilerDesc !!!!!!!!!!!!!!!!!!!!!!*/
+
+void DownstreamCompilerDesc::appendAsText(StringBuilder& out) const
 {
     out << TypeTextUtil::getPassThroughAsHumanText(type);
 
@@ -176,13 +200,6 @@ SlangResult DownstreamCompiler::disassemble(SlangCompileTarget sourceBlobTarget,
     SLANG_UNUSED(out);
 
     return SLANG_E_NOT_AVAILABLE;
-}
-
-
-/* static */bool DownstreamCompiler::canCompile(SlangPassThrough compiler, SlangSourceLanguage sourceLanguage)
-{
-    const auto& info = getInfo(compiler);
-    return (info.sourceLanguageFlags & (SourceLanguageFlags(1) << int(sourceLanguage))) != 0;
 }
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! DownstreamDiagnostics !!!!!!!!!!!!!!!!!!!!!!*/
@@ -500,7 +517,7 @@ SlangResult CommandLineDownstreamCompiler::compile(const CompileOptions& inOptio
 
     {
         List<String> paths;
-        SLANG_RETURN_ON_FAIL(calcCompileProducts(options, DownstreamCompiler::ProductFlag::All, paths));
+        SLANG_RETURN_ON_FAIL(calcCompileProducts(options, DownstreamProductFlag::All, paths));
         productFileSet->add(paths);
     }
 
