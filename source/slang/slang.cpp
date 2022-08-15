@@ -695,7 +695,7 @@ SLANG_NO_THROW const char* SLANG_MCALL Session::getBuildTagString()
 
 SLANG_NO_THROW SlangResult SLANG_MCALL Session::setDefaultDownstreamCompiler(SlangSourceLanguage sourceLanguage, SlangPassThrough defaultCompiler)
 {
-    if (DownstreamCompiler::canCompile(defaultCompiler, sourceLanguage))
+    if (DownstreamCompilerInfo::canCompile(defaultCompiler, sourceLanguage))
     {
         m_defaultDownstreamCompilers[int(sourceLanguage)] = PassThroughMode(defaultCompiler);
         return SLANG_OK;
