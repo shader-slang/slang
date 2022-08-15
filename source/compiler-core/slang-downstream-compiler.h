@@ -378,7 +378,7 @@ public:
     SLANG_COM_BASE_IUNKNOWN_ALL 
 
     // ICastable
-    virtual SLANG_NO_THROW void* castAs(const Guid& guid) SLANG_OVERRIDE;
+    virtual SLANG_NO_THROW void* SLANG_MCALL castAs(const Guid& guid) SLANG_OVERRIDE;
 
     // IDownstreamCompiler
     virtual SLANG_NO_THROW const Desc& SLANG_MCALL getDesc() SLANG_OVERRIDE { return m_desc; }
