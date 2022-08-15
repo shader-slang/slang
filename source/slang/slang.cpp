@@ -7,7 +7,9 @@
 #include "../core/slang-type-text-util.h"
 #include "../core/slang-type-convert-util.h"
 
-#include "../compiler-core/slang-artifact.h"
+// Artifact
+#include "../compiler-core/slang-artifact-impl.h"
+#include "../compiler-core/slang-artifact-desc-util.h"
 
 #include "slang-module-library.h"
 
@@ -178,8 +180,11 @@ void Session::init()
     coreLanguageScope = builtinAstBuilder->create<Scope>();
     coreLanguageScope->nextSibling = baseLanguageScope;
 
+    autodiffLanguageScope = builtinAstBuilder->create<Scope>();
+    autodiffLanguageScope->nextSibling = coreLanguageScope;
+
     hlslLanguageScope = builtinAstBuilder->create<Scope>();
-    hlslLanguageScope->nextSibling = coreLanguageScope;
+    hlslLanguageScope->nextSibling = autodiffLanguageScope;
 
     slangLanguageScope = builtinAstBuilder->create<Scope>();
     slangLanguageScope->nextSibling = hlslLanguageScope;
@@ -290,6 +295,7 @@ SlangResult Session::compileStdLib(slang::CompileStdLibFlags compileFlags)
     // TODO(JS): Could make this return a SlangResult as opposed to exception
     addBuiltinSource(coreLanguageScope, "core", getCoreLibraryCode());
     addBuiltinSource(hlslLanguageScope, "hlsl", getHLSLLibraryCode());
+    addBuiltinSource(autodiffLanguageScope, "diff", getAutodiffLibraryCode());
 
     if (compileFlags & slang::CompileStdLibFlag::WriteDocumentation)
     {
@@ -348,6 +354,7 @@ SlangResult Session::loadStdLib(const void* stdLib, size_t stdLibSizeInBytes)
     // Let's try loading serialized modules and adding them
     SLANG_RETURN_ON_FAIL(_readBuiltinModule(fileSystem, coreLanguageScope, "core"));
     SLANG_RETURN_ON_FAIL(_readBuiltinModule(fileSystem, hlslLanguageScope, "hlsl"));
+    SLANG_RETURN_ON_FAIL(_readBuiltinModule(fileSystem, autodiffLanguageScope, "diff"));
     return SLANG_OK;
 }
 
@@ -724,10 +731,10 @@ SlangPassThrough Session::getDownstreamCompilerForTransition(SlangCompileTarget 
         return (SlangPassThrough)m_codeGenTransitionMap.getTransition(source, target);
     }
 
-    const auto desc = ArtifactDesc::makeFromCompileTarget(inTarget);
+    const auto desc = ArtifactDescUtil::makeDescFromCompileTarget(inTarget);
 
     // Special case host-callable
-    if ((desc.kind == ArtifactKind::Callable) && 
+    if ((desc.kind == ArtifactKind::HostCallable) && 
         (source == CodeGenTarget::CSource || source == CodeGenTarget::CPPSource))
     {
         // We prefer LLVM if it's available
@@ -4478,9 +4485,15 @@ SlangResult _addLibraryReference(EndToEndCompileRequest* req, IArtifact* artifac
 
     if (desc.kind == ArtifactKind::Library && desc.payload == ArtifactPayload::SlangIR)
     {
-        RefPtr<ModuleLibrary> library;
+        ComPtr<IModuleLibrary> libraryIntf;
 
-        SLANG_RETURN_ON_FAIL(loadModuleLibrary(ArtifactKeep::Yes, artifact, req, library));
+        SLANG_RETURN_ON_FAIL(loadModuleLibrary(ArtifactKeep::Yes, artifact, req, libraryIntf));
+
+        auto library = as<ModuleLibrary>(libraryIntf);
+        if (!library)
+        {
+            return SLANG_FAIL;
+        }
 
         FrontEndCompileRequest* frontEndRequest = req->getFrontEndReq();
         frontEndRequest->m_extraEntryPoints.addRange(library->m_entryPoints.getBuffer(), library->m_entryPoints.getCount());
@@ -4501,15 +4514,13 @@ SlangResult _addLibraryReference(EndToEndCompileRequest* req, IArtifact* artifac
 SlangResult EndToEndCompileRequest::addLibraryReference(const void* libData, size_t libDataSize)
 {
     // We need to deserialize and add the modules
-    RefPtr<ModuleLibrary> library;
+    ComPtr<IModuleLibrary> library;
+
     SLANG_RETURN_ON_FAIL(loadModuleLibrary((const Byte*)libData, libDataSize, this, library));
 
-    const auto desc = ArtifactDesc::make(ArtifactKind::Library, ArtifactPayload::SlangIR);
-
     // Create an artifact without any name (as one is not provided)
-    RefPtr<Artifact> artifact = new Artifact(desc, String());
-
-    artifact->addElement(desc, library);
+    auto artifact = Artifact::create(ArtifactDesc::make(ArtifactKind::Library, ArtifactPayload::SlangIR));
+    artifact->addRepresentation(library);
 
     return _addLibraryReference(this, artifact);
 }
@@ -4922,12 +4933,12 @@ SlangResult EndToEndCompileRequest::saveRepro(ISlangBlob** outBlob)
 
     SLANG_RETURN_ON_FAIL(ReproUtil::saveState(this, &stream));
 
-    RefPtr<ListBlob> listBlob(new ListBlob);
-
     // Put the content of the stream in the blob
-    stream.swapContents(listBlob->m_data);
 
-    *outBlob = listBlob.detach();
+    List<uint8_t> data;
+    stream.swapContents(data);
+
+    *outBlob = ListBlob::moveCreate(data).detach();
     return SLANG_OK;
 }
 

@@ -704,6 +704,11 @@ LoweredValInfo emitCallToDeclRef(
         // so we will emit an instruction with the chosen
         // opcode, and the arguments to the call as its operands.
         //
+        if (intrinsicOpModifier->op == 0) // Identity, just pass operand 0 through.
+        {
+            SLANG_RELEASE_ASSERT(argCount == 1);
+            return LoweredValInfo::simple(args[0]);
+        }
         auto intrinsicOp = getIntrinsicOp(funcDecl, intrinsicOpModifier);
         return LoweredValInfo::simple(builder->emitIntrinsicInst(
             type,
@@ -3360,6 +3365,11 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
         return LoweredValInfo::simple(context->irBuilder->getPtrValue(nullptr));
     }
 
+    LoweredValInfo visitNoneLiteralExpr(NoneLiteralExpr*)
+    {
+        return LoweredValInfo::simple(context->irBuilder->getVoidValue());
+    }
+
     LoweredValInfo visitIntegerLiteralExpr(IntegerLiteralExpr* expr)
     {
         auto type = lowerType(context, expr->type);
@@ -3377,6 +3387,24 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
         auto irLit = context->irBuilder->getStringValue(expr->value.getUnownedSlice());
         context->shared->m_stringLiterals.add(irLit);
         return LoweredValInfo::simple(irLit);
+    }
+
+    LoweredValInfo visitMakeOptionalExpr(MakeOptionalExpr* expr)
+    {
+        if (expr->value)
+        {
+            auto val = lowerRValueExpr(context, expr->value);
+            auto optType = lowerType(context, expr->type);
+            auto irVal = context->irBuilder->emitMakeOptionalValue(optType, val.val);
+            return LoweredValInfo::simple(irVal);
+        }
+        else
+        {
+            auto optType = lowerType(context, expr->type);
+            auto defaultVal = getDefaultVal(as<OptionalType>(expr->type)->getValueType());
+            auto irVal = context->irBuilder->emitMakeOptionalNone(optType, defaultVal.val);
+            return LoweredValInfo::simple(irVal);
+        }
     }
 
     LoweredValInfo visitAggTypeCtorExpr(AggTypeCtorExpr* /*expr*/)
@@ -3906,6 +3934,50 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
         UNREACHABLE_RETURN(LoweredValInfo());
     }
 
+    LoweredValInfo visitAsTypeExpr(AsTypeExpr* expr)
+    {
+        auto value = lowerLValueExpr(context, expr->value);
+        auto existentialInfo = value.getExtractedExistentialValInfo();
+        auto optType = lowerType(context, expr->type);
+        SLANG_RELEASE_ASSERT(optType->getOp() == kIROp_OptionalType);
+        auto targetType = optType->getOperand(0);
+        auto witness = lowerSimpleVal(context, expr->witnessArg);
+        auto builder = getBuilder();
+        auto var = builder->emitVar(optType);
+        auto isType = builder->emitIsType(existentialInfo->extractedVal, existentialInfo->witnessTable, targetType, witness);
+        IRBlock* trueBlock;
+        IRBlock* falseBlock;
+        IRBlock* afterBlock;
+        builder->emitIfElseWithBlocks(isType, trueBlock, falseBlock, afterBlock);
+        builder->setInsertInto(trueBlock);
+        auto irVal = builder->emitReinterpret(targetType, existentialInfo->extractedVal);
+        auto optionalVal = builder->emitMakeOptionalValue(optType, irVal);
+        builder->emitStore(var, optionalVal);
+        builder->emitBranch(afterBlock);
+        builder->setInsertInto(falseBlock);
+        auto defaultVal = getDefaultVal(as<OptionalType>(expr->type)->getValueType());
+        auto noneVal = builder->emitMakeOptionalNone(optType, defaultVal.val);
+        builder->emitStore(var, noneVal);
+        builder->emitBranch(afterBlock);
+        builder->setInsertInto(afterBlock);
+        auto result = builder->emitLoad(var);
+        return LoweredValInfo::simple(result);
+    }
+
+    LoweredValInfo visitIsTypeExpr(IsTypeExpr* expr)
+    {
+        if (expr->constantVal)
+        {
+            return LoweredValInfo::simple(getBuilder()->getBoolValue(expr->constantVal->value));
+        }
+        auto value = lowerLValueExpr(context, expr->value);
+        auto type = lowerType(context, expr->type);
+        auto witness = lowerSimpleVal(context, expr->witnessArg);
+        auto existentialInfo = value.getExtractedExistentialValInfo();
+        auto irVal = getBuilder()->emitIsType(existentialInfo->extractedVal, existentialInfo->witnessTable, type, witness);
+        return LoweredValInfo::simple(irVal);
+    }
+
     LoweredValInfo visitModifierCastExpr(
         ModifierCastExpr* expr)
     {
@@ -3999,6 +4071,12 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
     LoweredValInfo visitModifiedTypeExpr(ModifiedTypeExpr* /*expr*/)
     {
         SLANG_UNIMPLEMENTED_X("type expression during code generation");
+        UNREACHABLE_RETURN(LoweredValInfo());
+    }
+
+    LoweredValInfo visitPointerTypeExpr(PointerTypeExpr* /*expr*/)
+    {
+        SLANG_UNIMPLEMENTED_X("'*' type expression during code generation");
         UNREACHABLE_RETURN(LoweredValInfo());
     }
 
@@ -4104,6 +4182,11 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
 
         context->shared->extValues.add(info);
         return LoweredValInfo::extractedExistential(info);
+    }
+
+    LoweredValInfo visitOpenRefExpr(OpenRefExpr* expr)
+    {
+        return lowerLValueExpr(context, expr->innerExpr);
     }
 };
 
@@ -4264,6 +4347,14 @@ struct RValueExprLoweringVisitor : ExprLoweringVisitorBase<RValueExprLoweringVis
 
         return LoweredValInfo::simple(irSwizzle);
     }
+
+    LoweredValInfo visitOpenRefExpr(OpenRefExpr* expr)
+    {
+        auto inner = lowerLValueExpr(context, expr->innerExpr);
+        auto builder = getBuilder();
+        auto irLoad = builder->emitLoad(inner.val);
+        return LoweredValInfo::simple(irLoad);
+    }
 };
 
 LoweredValInfo lowerLValueExpr(
@@ -4274,7 +4365,12 @@ LoweredValInfo lowerLValueExpr(
 
     LValueExprLoweringVisitor visitor;
     visitor.context = context;
-    return visitor.dispatch(expr);
+    auto info = visitor.dispatch(expr);
+    if (as<RefType>(expr->type))
+    {
+        info.flavor = LoweredValInfo::Flavor::Ptr;
+    }
+    return info;
 }
 
 LoweredValInfo lowerRValueExpr(
@@ -4285,7 +4381,12 @@ LoweredValInfo lowerRValueExpr(
 
     RValueExprLoweringVisitor visitor;
     visitor.context = context;
-    return visitor.dispatch(expr);
+    auto info = visitor.dispatch(expr);
+    if (as<RefType>(expr->type))
+    {
+        info.val = context->irBuilder->emitLoad(info.val);
+    }
+    return info;
 }
 
 struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>

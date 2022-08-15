@@ -236,6 +236,13 @@ namespace Slang
             return rs;
         }
 
+        void swapWith(RefPtr<T>& rhs)
+        {
+            auto rhsPtr = rhs.pointer;
+            rhs.pointer = pointer;
+            pointer = rhsPtr;
+        }
+
         SLANG_FORCE_INLINE void setNull()
         {
             releaseReference(pointer);

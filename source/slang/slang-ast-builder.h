@@ -33,6 +33,8 @@ public:
     Type* getDynamicType();
         /// Get the NullPtr type
     Type* getNullPtrType();
+        /// Get the NullPtr type
+    Type* getNoneType();
 
     const ReflectClassInfo* findClassInfo(Name* name);
     SyntaxClass<NodeBase> findSyntaxClass(Name* name);
@@ -74,6 +76,7 @@ protected:
     Type* m_enumTypeType = nullptr;
     Type* m_dynamicType = nullptr;
     Type* m_nullPtrType = nullptr;
+    Type* m_noneType = nullptr;
 
     Type* m_builtinTypes[Index(BaseType::CountOf)];
 
@@ -131,12 +134,15 @@ public:
         /// Get a builtin type by the BaseType
     SLANG_FORCE_INLINE Type* getBuiltinType(BaseType flavor) { return m_sharedASTBuilder->m_builtinTypes[Index(flavor)]; }
 
+    Type* getSpecializedBuiltinType(Type* typeParam, const char* magicTypeName);
+
     Type* getInitializerListType() { return m_sharedASTBuilder->m_initializerListType; }
     Type* getOverloadedType() { return m_sharedASTBuilder->m_overloadedType; }
     Type* getErrorType() { return m_sharedASTBuilder->m_errorType; }
     Type* getBottomType() { return m_sharedASTBuilder->m_bottomType; }
     Type* getStringType() { return m_sharedASTBuilder->getStringType(); }
     Type* getNullPtrType() { return m_sharedASTBuilder->getNullPtrType(); }
+    Type* getNoneType() { return m_sharedASTBuilder->getNoneType(); }
     Type* getEnumTypeType() { return m_sharedASTBuilder->getEnumTypeType(); }
 
         // Construct the type `Ptr<valueType>`, where `Ptr`
@@ -152,17 +158,20 @@ public:
         // Construct the type `Ref<valueType>`
     RefType* getRefType(Type* valueType);
 
+        // Construct the type `Optional<valueType>`
+    OptionalType* getOptionalType(Type* valueType);
+
         // Construct a pointer type like `Ptr<valueType>`, but where
         // the actual type name for the pointer type is given by `ptrTypeName`
     PtrTypeBase* getPtrType(Type* valueType, char const* ptrTypeName);
 
-        // Construct a pointer type like `Ptr<valueType>`, but where
-        // the generic declaration for the pointer type is `genericDecl`
-    PtrTypeBase* getPtrType(Type* valueType, GenericDecl* genericDecl);
-
     ArrayExpressionType* getArrayType(Type* elementType, IntVal* elementCount);
 
     VectorExpressionType* getVectorType(Type* elementType, IntVal* elementCount);
+
+    DifferentialPairType* getDifferentialPairType(Type* valueType, Witness* conformanceWitness);
+
+    DeclRef<InterfaceDecl> getDifferentiableInterface();
 
     DeclRef<Decl> getBuiltinDeclRef(const char* builtinMagicTypeName, ConstArrayView<Val*> genericArgs);
 

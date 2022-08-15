@@ -1841,6 +1841,27 @@ struct IRGetTupleElement : IRInst
     IRInst* getElementIndex() { return getOperand(1); }
 };
 
+// An Instruction that creates a differential pair value from a
+// primal and differential.
+struct IRMakeDifferentialPair : IRInst
+{
+    IR_LEAF_ISA(MakeDifferentialPair)
+    IRInst* getPrimalValue() { return getOperand(0); }
+    IRInst* getDifferentialValue() { return getOperand(1); }
+};
+
+struct IRDifferentialPairGetDifferential : IRInst
+{
+    IR_LEAF_ISA(DifferentialPairGetDifferential)
+    IRInst* getBase() { return getOperand(0); }
+};
+
+struct IRDifferentialPairGetPrimal : IRInst
+{
+    IR_LEAF_ISA(DifferentialPairGetPrimal)
+    IRInst* getBase() { return getOperand(0); }
+};
+
 // Constructs an `Result<T,E>` value from an error code.
 struct IRMakeResultError : IRInst
 {
@@ -1879,6 +1900,33 @@ struct IRGetResultError : IRInst
     IR_LEAF_ISA(GetResultError)
 
     IRInst* getResultOperand() { return getOperand(0); }
+};
+
+struct IROptionalHasValue : IRInst
+{
+    IR_LEAF_ISA(OptionalHasValue)
+
+    IRInst* getOptionalOperand() { return getOperand(0); }
+};
+
+struct IRGetOptionalValue : IRInst
+{
+    IR_LEAF_ISA(GetOptionalValue)
+
+    IRInst* getOptionalOperand() { return getOperand(0); }
+};
+
+struct IRMakeOptionalValue : IRInst
+{
+    IR_LEAF_ISA(MakeOptionalValue)
+
+    IRInst* getValue() { return getOperand(0); }
+};
+
+struct IRMakeOptionalNone : IRInst
+{
+    IR_LEAF_ISA(MakeOptionalNone)
+    IRInst* getDefaultValue() { return getOperand(0); }
 };
 
     /// An instruction that packs a concrete value into an existential-type "box"
@@ -1962,6 +2010,17 @@ struct IRLiveRangeMarker : IRInst
 struct IRLiveRangeStart : IRLiveRangeMarker
 {
     IR_LEAF_ISA(LiveRangeStart);        
+};
+
+struct IRIsType : IRInst
+{
+    IR_LEAF_ISA(IsType);
+
+    IRInst* getValue() { return getOperand(0); }
+    IRInst* getValueWitness() { return getOperand(1); }
+
+    IRInst* getTypeOperand() { return getOperand(2); }
+    IRInst* getTargetWitness() { return getOperand(3); }
 };
 
 /// Demarks where the referenced item is no longer live, optimimally (although not
@@ -2235,6 +2294,7 @@ public:
     IRTupleType* getTupleType(IRType* type0, IRType* type1, IRType* type2, IRType* type3);
 
     IRResultType* getResultType(IRType* valueType, IRType* errorType);
+    IROptionalType* getOptionalType(IRType* valueType);
 
     IRBasicBlockType*   getBasicBlockType();
     IRWitnessTableType* getWitnessTableType(IRType* baseType);
@@ -2277,6 +2337,10 @@ public:
         IRType* elementType,
         IRInst* rowCount,
         IRInst* columnCount);
+
+    IRDifferentialPairType* getDifferentialPairType(
+        IRType* valueType,
+        IRWitnessTable* witnessTable);
 
     IRFuncType* getFuncType(
         UInt            paramCount,
@@ -2384,6 +2448,8 @@ public:
 
     IRInst* emitJVPDifferentiateInst(IRType* type, IRInst* baseFn);
 
+    IRInst* emitMakeDifferentialPair(IRType* type, IRInst* primal, IRInst* differential);
+
     IRInst* emitSpecializeInst(
         IRType*         type,
         IRInst*         genericVal,
@@ -2477,7 +2543,10 @@ public:
     IRInst* emitIsResultError(IRInst* result);
     IRInst* emitGetResultError(IRInst* result);
     IRInst* emitGetResultValue(IRInst* result);
-
+    IRInst* emitOptionalHasValue(IRInst* optValue);
+    IRInst* emitGetOptionalValue(IRInst* optValue);
+    IRInst* emitMakeOptionalValue(IRInst* optType, IRInst* value);
+    IRInst* emitMakeOptionalNone(IRInst* optType, IRInst* defaultValue);
     IRInst* emitMakeVector(
         IRType*         type,
         UInt            argCount,
@@ -2553,6 +2622,8 @@ public:
     IRInst* emitGpuForeach(List<IRInst*> args);
 
     IRUndefined* emitUndefined(IRType* type);
+
+    IRInst* emitReinterpret(IRInst* type, IRInst* value);
 
     IRInst* findOrAddInst(
          IRType*                 type,
@@ -2689,6 +2760,8 @@ public:
         IRInst* image,
         IRInst* coord,
         IRInst* value);
+
+    IRInst* emitIsType(IRInst* value, IRInst* witness, IRInst* typeOperand, IRInst* targetWitness);
 
     IRInst* emitFieldExtract(
         IRType*         type,

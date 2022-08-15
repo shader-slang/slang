@@ -131,6 +131,16 @@ Type* SharedASTBuilder::getNullPtrType()
     return m_nullPtrType;
 }
 
+Type* SharedASTBuilder::getNoneType()
+{
+    if (!m_noneType)
+    {
+        auto noneTypeDecl = findMagicDecl("NoneType");
+        m_noneType = DeclRefType::create(m_astBuilder, makeDeclRef<Decl>(noneTypeDecl));
+    }
+    return m_noneType;
+}
+
 SharedASTBuilder::~SharedASTBuilder()
 {
     // Release built in types..
@@ -212,6 +222,13 @@ NodeBase* ASTBuilder::createByNodeType(ASTNodeType nodeType)
     return (NodeBase*)createFunc(this);
 }
 
+Type* ASTBuilder::getSpecializedBuiltinType(Type* typeParam, char const* magicTypeName)
+{
+    auto declRef = getBuiltinDeclRef(magicTypeName, makeConstArrayViewSingle<Val*>(typeParam));
+    auto rsType = DeclRefType::create(this, declRef);
+    return rsType;
+}
+
 PtrType* ASTBuilder::getPtrType(Type* valueType)
 {
     return dynamicCast<PtrType>(getPtrType(valueType, "PtrType"));
@@ -233,23 +250,15 @@ RefType* ASTBuilder::getRefType(Type* valueType)
     return dynamicCast<RefType>(getPtrType(valueType, "RefType"));
 }
 
-PtrTypeBase* ASTBuilder::getPtrType(Type* valueType, char const* ptrTypeName)
+OptionalType* ASTBuilder::getOptionalType(Type* valueType)
 {
-    auto genericDecl = dynamicCast<GenericDecl>(m_sharedASTBuilder->findMagicDecl(ptrTypeName));
-    return getPtrType(valueType, genericDecl);
+    auto rsType = getSpecializedBuiltinType(valueType, "OptionalType");
+    return as<OptionalType>(rsType);
 }
 
-PtrTypeBase* ASTBuilder::getPtrType(Type* valueType, GenericDecl* genericDecl)
+PtrTypeBase* ASTBuilder::getPtrType(Type* valueType, char const* ptrTypeName)
 {
-    auto typeDecl = genericDecl->inner;
-
-    auto substitutions = create<GenericSubstitution>();
-    substitutions->genericDecl = genericDecl;
-    substitutions->args.add(valueType);
-
-    auto declRef = DeclRef<Decl>(typeDecl, substitutions);
-    auto rsType = DeclRefType::create(this, declRef);
-    return as<PtrTypeBase>(rsType);
+    return as<PtrTypeBase>(getSpecializedBuiltinType(valueType, ptrTypeName));
 }
 
 ArrayExpressionType* ASTBuilder::getArrayType(Type* elementType, IntVal* elementCount)
@@ -265,7 +274,7 @@ VectorExpressionType* ASTBuilder::getVectorType(
     IntVal*  elementCount)
 {
     auto vectorGenericDecl = as<GenericDecl>(m_sharedASTBuilder->findMagicDecl("Vector"));
-        
+    
     auto vectorTypeDecl = vectorGenericDecl->inner;
 
     auto substitutions = create<GenericSubstitution>();
@@ -276,6 +285,30 @@ VectorExpressionType* ASTBuilder::getVectorType(
     auto declRef = DeclRef<Decl>(vectorTypeDecl, substitutions);
 
     return as<VectorExpressionType>(DeclRefType::create(this, declRef));
+}
+
+DifferentialPairType* ASTBuilder::getDifferentialPairType(Type* valueType, Witness* conformanceWitness)
+{
+    auto genericDecl = dynamicCast<GenericDecl>(m_sharedASTBuilder->findMagicDecl("DifferentialPairType"));
+
+    auto typeDecl = genericDecl->inner;
+
+    auto substitutions = create<GenericSubstitution>();
+    substitutions->genericDecl = genericDecl;
+    substitutions->args.add(valueType);
+    substitutions->args.add(conformanceWitness);
+
+    auto declRef = DeclRef<Decl>(typeDecl, substitutions);
+    auto rsType = DeclRefType::create(this, declRef);
+
+    return as<DifferentialPairType>(rsType);
+}
+
+DeclRef<InterfaceDecl> ASTBuilder::getDifferentiableInterface()
+{
+    DeclRef<InterfaceDecl> declRef;
+    declRef.decl = dynamicCast<InterfaceDecl>(m_sharedASTBuilder->findMagicDecl("DifferentiableType"));
+    return declRef;
 }
 
 DeclRef<Decl> ASTBuilder::getBuiltinDeclRef(const char* builtinMagicTypeName, ConstArrayView<Val*> genericArgs)

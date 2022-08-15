@@ -9,7 +9,19 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\..\source\compiler-core\slang-artifact-info.h">
+    <ClInclude Include="..\..\..\source\compiler-core\slang-artifact-desc-util.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\source\compiler-core\slang-artifact-impl.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\source\compiler-core\slang-artifact-representation-impl.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\source\compiler-core\slang-artifact-representation.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\source\compiler-core\slang-artifact-util.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\source\compiler-core\slang-artifact.h">
@@ -113,10 +125,16 @@
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\..\source\compiler-core\slang-artifact-info.cpp">
+    <ClCompile Include="..\..\..\source\compiler-core\slang-artifact-desc-util.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\source\compiler-core\slang-artifact.cpp">
+    <ClCompile Include="..\..\..\source\compiler-core\slang-artifact-impl.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\source\compiler-core\slang-artifact-representation-impl.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\source\compiler-core\slang-artifact-util.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\source\compiler-core\slang-command-line-args.cpp">

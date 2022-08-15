@@ -231,6 +231,21 @@ namespace Slang
         return expr;
     }
 
+    Expr* SemanticsVisitor::maybeOpenRef(Expr* expr)
+    {
+        auto exprType = expr->type.type;
+
+        if (auto refType = as<RefType>(exprType))
+        {
+            auto openRef = m_astBuilder->create<OpenRefExpr>();
+            openRef->innerExpr = expr;
+            openRef->type.isLeftValue = true;
+            openRef->type.type = refType->getValueType();
+            return openRef;
+        }
+        return expr;
+    }
+
     static SourceLoc _getMemberOpLoc(Expr* expr)
     {
         if (auto m = as<MemberExpr>(expr))
@@ -367,15 +382,15 @@ namespace Slang
         Expr*    base,
         SourceLoc       loc)
     {
-        auto ptrLikeType = as<PointerLikeType>(base->type);
-        SLANG_ASSERT(ptrLikeType);
+        auto elementType = getPointedToTypeIfCanImplicitDeref(base->type);
+        SLANG_ASSERT(elementType);
 
         auto derefExpr = m_astBuilder->create<DerefExpr>();
         derefExpr->loc = loc;
         derefExpr->base = base;
-        derefExpr->type = QualType(ptrLikeType->elementType);
+        derefExpr->type = QualType(elementType);
 
-        // TODO(tfoley): handle l-value status here
+        derefExpr->type.isLeftValue = base->type.isLeftValue;
 
         return derefExpr;
     }
@@ -804,6 +819,12 @@ namespace Slang
     Expr* SemanticsExprVisitor::visitNullPtrLiteralExpr(NullPtrLiteralExpr* expr)
     {
         expr->type = m_astBuilder->getNullPtrType();
+        return expr;
+    }
+
+    Expr* SemanticsExprVisitor::visitNoneLiteralExpr(NoneLiteralExpr* expr)
+    {
+        expr->type = m_astBuilder->getNoneType();
         return expr;
     }
 
@@ -1243,7 +1264,9 @@ namespace Slang
                 m_astBuilder,
                 this,
                 name,
-                baseType);
+                baseType,
+                LookupMask::Default,
+                LookupOptions::NoDeref);
             if (!lookupResult.isValid())
             {
                 goto fail;
@@ -1329,8 +1352,8 @@ namespace Slang
     Expr* SemanticsVisitor::checkAssignWithCheckedOperands(AssignExpr* expr)
     {
         auto type = expr->left->type;
-
-        expr->right = coerce(type, expr->right);
+        auto right = maybeOpenRef(expr->right);
+        expr->right = coerce(type, right);
 
         if (!type.isLeftValue)
         {
@@ -1509,48 +1532,42 @@ namespace Slang
         return expr;
     }
 
-    // This function proceses primal params (i.e params of the inner function that is being 
-    // differentiated) that need to be carried over to the function signature for the JVP 
-    // function. (eg. out types can be discarded)
-    //
-    Type* primalToInputType(ASTBuilder*, Type* primalType)
+
+    Type* SemanticsVisitor::_toDifferentialParamType(ASTBuilder* builder, Type* primalType)
     {
+        // Check for type modifiers like 'out' and 'inout'. We need to differentiate the
+        // nested type.
+        //
         if (auto primalOutType = as<OutType>(primalType))
-            return nullptr;
-        else if (auto primalInOutType = as<InOutType>(primalType))
-            return primalInOutType->getValueType();
-
-        return primalType;
-    }
-
-    Type* primalToJVPParamType(ASTBuilder* builder, Type* primalType)
-    {
-        // Only float and vector<float> types can be differentiated for now.
-        
-        if (primalType->equals(builder->getFloatType()))
-            return primalType;
-        else if (auto primalVectorType = as<VectorExpressionType>(primalType))
         {
-            if (auto jvpElementType = primalToJVPParamType(builder, primalVectorType->elementType))
-                return builder->getVectorType(jvpElementType, primalVectorType->elementCount);
-        }
-        else if (auto primalOutType = as<OutType>(primalType))
-        {
-            return builder->getOutType(primalToJVPParamType(builder, primalOutType->getValueType()));
+            return builder->getOutType(_toDifferentialParamType(builder, primalOutType->getValueType()));
         }
         else if (auto primalInOutType = as<InOutType>(primalType))
         {
-            return builder->getInOutType(primalToJVPParamType(builder, primalInOutType->getValueType()));
+            return builder->getInOutType(_toDifferentialParamType(builder, primalInOutType->getValueType()));
         }
-        return nullptr;
-    }
 
-    Type* primalToJVPReturnType(ASTBuilder* builder, Type* primalType)
-    {
-        if(auto jvpType = primalToJVPParamType(builder, primalType))
-            return jvpType;
+        // Get a reference to the builtin 'IDifferentiable' interface
+        auto differentiableInterface = builder->getDifferentiableInterface();
+
+        // Check if the provided type inherits from IDifferentiable.
+        // If not, return the original type.
+        if (auto conformanceWitness = as<Witness>(tryGetInterfaceConformanceWitness(primalType, differentiableInterface)))
+            return builder->getDifferentialPairType(primalType, conformanceWitness);
         else
-            return builder->getVoidType();
+            return primalType;
+        
+    }
+
+    Type* SemanticsVisitor::_toJVPReturnType(ASTBuilder* builder, Type* primalType)
+    {
+        if (auto conformanceWitness = 
+            as<Witness>(tryGetInterfaceConformanceWitness(
+                primalType,
+                builder->getDifferentiableInterface())))
+            return builder->getDifferentialPairType(primalType, conformanceWitness);
+        else
+            return primalType;
     }
 
     Expr* SemanticsExprVisitor::visitJVPDifferentiateExpr(JVPDifferentiateExpr* expr)
@@ -1571,7 +1588,7 @@ namespace Slang
             // The JVP return type is float if primal return type is float
             // void otherwise.
             //
-            jvpType->resultType = primalToJVPReturnType(astBuilder, primalType->getResultType());
+            jvpType->resultType = _toJVPReturnType(astBuilder, primalType->getResultType());
             
             // No support for differentiating function that throw errors, for now.
             SLANG_ASSERT(primalType->errorType->equals(astBuilder->getBottomType()));
@@ -1579,13 +1596,7 @@ namespace Slang
 
             for (UInt i = 0; i < primalType->getParamCount(); i++)
             {
-                if(auto primalInputType = primalToInputType(astBuilder, primalType->getParamType(i)))
-                    jvpType->paramTypes.add(primalInputType);
-            }
-
-            for (UInt i = 0; i < primalType->getParamCount(); i++)
-            {
-                if(auto jvpParamType = primalToJVPParamType(astBuilder, primalType->getParamType(i)))
+                if(auto jvpParamType = _toDifferentialParamType(astBuilder, primalType->getParamType(i)))
                     jvpType->paramTypes.add(jvpParamType);
             }
 
@@ -1745,6 +1756,95 @@ namespace Slang
             }
         }
         getSink()->diagnose(expr, Diagnostics::calleeOfTryCallMustBeFunc);
+        return expr;
+    }
+
+    Expr* SemanticsExprVisitor::visitIsTypeExpr(IsTypeExpr* expr)
+    {
+        expr->typeExpr = CheckProperType(expr->typeExpr);
+        auto originalVal = CheckTerm(expr->value);
+        expr->type = m_astBuilder->getBoolType();
+        expr->value = originalVal;
+
+        // If value is a subtype of `type`, then this expr is always true.
+        if (isDeclaredSubtype(expr->value->type.type, expr->typeExpr.type))
+        {
+            // Instead of returning a BoolLiteralExpr, we use a field to indicate this scenario,
+            // so that the language server can still see the original syntax tree.
+            expr->constantVal = m_astBuilder->create<BoolLiteralExpr>();
+            expr->constantVal->type = m_astBuilder->getBoolType();
+            expr->constantVal->value = true;
+            expr->constantVal->loc = expr->loc;
+            return expr;
+        }
+
+        // Otherwise, we need to ensure the target type is a subtype of value->type.
+
+        expr->value = maybeOpenExistential(originalVal);
+        expr->witnessArg = tryGetSubtypeWitness(expr->typeExpr.type, originalVal->type.type);
+        if (expr->witnessArg)
+        {
+            // For now we can only support the scenario where `expr->value` is an interface type.
+            if (!isInterfaceType(originalVal->type))
+            {
+                getSink()->diagnose(expr, Diagnostics::isOperatorValueMustBeInterfaceType);
+            }
+            return expr;
+        }
+
+        if (!as<ErrorType>(expr->typeExpr.type) && !as<ErrorType>(expr->value->type.type))
+        {
+            // The type is not in the same hierarchy, so we evaluate to false.
+            expr->constantVal = m_astBuilder->create<BoolLiteralExpr>();
+            expr->constantVal->type = m_astBuilder->getBoolType();
+            expr->constantVal->value = false;
+            expr->constantVal->loc = expr->loc;
+        }
+        return expr;
+    }
+
+    Expr* SemanticsExprVisitor::visitAsTypeExpr(AsTypeExpr* expr)
+    {
+        TypeExp typeExpr;
+        typeExpr.exp = expr->typeExpr;
+        typeExpr = CheckProperType(typeExpr);
+        expr->value = CheckTerm(expr->value);
+        auto optType = m_astBuilder->getOptionalType(typeExpr.type);
+        expr->type = optType;
+
+        // If value is a subtype of `type`, then this expr is equivalent to a CastToSuperTypeExpr.
+        if (auto witness = tryGetSubtypeWitness(expr->value->type.type, typeExpr.type))
+        {
+            auto castToSuperType = createCastToSuperTypeExpr(typeExpr.type, expr->value, witness);
+            auto makeOptional = m_astBuilder->create<MakeOptionalExpr>();
+            makeOptional->loc = expr->loc;
+            makeOptional->type = optType;
+            makeOptional->value = castToSuperType;
+            makeOptional->typeExpr = typeExpr.exp;
+            return makeOptional;
+        }
+
+        // For now we can only support the scenario where `expr->value` is an interface type.
+        if (!isInterfaceType(expr->value->type))
+        {
+            getSink()->diagnose(expr, Diagnostics::isOperatorValueMustBeInterfaceType);
+        }
+
+        expr->typeExpr = typeExpr.exp;
+        expr->witnessArg = tryGetSubtypeWitness(typeExpr.type, expr->value->type.type);
+        if (expr->witnessArg)
+        {
+            expr->value = maybeOpenExistential(expr->value);
+            return expr;
+        }
+
+        if (!as<ErrorType>(typeExpr.type) && !as<ErrorType>(expr->value->type.type))
+        {
+            getSink()->diagnose(expr, Diagnostics::typeNotInTheSameHierarchy, expr->value->type.type, typeExpr.type);
+        }
+
+        expr->type = m_astBuilder->getErrorType();
+        
         return expr;
     }
 
@@ -2511,6 +2611,16 @@ namespace Slang
         auto andType = m_astBuilder->getAndType(expr->left.type, expr->right.type);
         expr->type = m_astBuilder->getTypeType(andType);
 
+        return expr;
+    }
+
+    Expr* SemanticsExprVisitor::visitPointerTypeExpr(PointerTypeExpr* expr)
+    {
+        expr->base = CheckProperType(expr->base);
+        if (as<ErrorType>(expr->base.type))
+            expr->type = expr->base.type;
+        auto ptrType = m_astBuilder->getPtrType(expr->base.type);
+        expr->type = m_astBuilder->getTypeType(ptrType);
         return expr;
     }
 

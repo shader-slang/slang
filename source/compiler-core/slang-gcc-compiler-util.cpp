@@ -10,7 +10,7 @@
 #include "../core/slang-char-util.h"
 #include "../core/slang-string-slice-pool.h"
 
-#include "slang-artifact-info.h"
+#include "slang-artifact-desc-util.h"
 
 namespace Slang
 {
@@ -564,6 +564,7 @@ static SlangResult _parseGCCFamilyLine(const UnownedStringSlice& line, LineParse
         }
         case SLANG_HOST_EXECUTABLE:
         {
+            cmdLine.addArg("-rdynamic");
             break;
         }
         case SLANG_OBJECT_CODE:
@@ -623,6 +624,12 @@ static SlangResult _parseGCCFamilyLine(const UnownedStringSlice& line, LineParse
     }
 
     // Add the library paths
+
+    if (options.libraryPaths.getCount() && options.targetType == SLANG_HOST_EXECUTABLE)
+    {
+        cmdLine.addArg("-Wl,-rpath,$ORIGIN");
+    }
+
     StringSlicePool libPathPool(StringSlicePool::Style::Default);
 
     for (const auto& libPath : options.libraryPaths)
@@ -635,13 +642,15 @@ static SlangResult _parseGCCFamilyLine(const UnownedStringSlice& line, LineParse
     {
         const auto desc = artifact->getDesc();
         // If it's a library for CPU types, try and use it
-        if (ArtifactInfoUtil::isCpuBinary(desc) && desc.kind == ArtifactKind::Library)
+        if (ArtifactDescUtil::isCpuBinary(desc) && desc.kind == ArtifactKind::Library)
         {
-            // Get the name and path (can be empty) to the library
-            SLANG_RETURN_ON_FAIL(artifact->requireFileLike(ArtifactKeep::No));
+            ComPtr<IFileArtifactRepresentation> fileRep;
 
-            libPathPool.add(ArtifactInfoUtil::getParentPath(artifact));
-            cmdLine.addPrefixPathArg("-l", ArtifactInfoUtil::getBaseName(artifact));
+            // Get the name and path (can be empty) to the library
+            SLANG_RETURN_ON_FAIL(artifact->requireFile(ArtifactKeep::Yes, nullptr, fileRep.writeRef()));
+
+            libPathPool.add(ArtifactDescUtil::getParentPath(fileRep));
+            cmdLine.addPrefixPathArg("-l", ArtifactDescUtil::getBaseName(artifact->getDesc(), fileRep));
         }
     }
 

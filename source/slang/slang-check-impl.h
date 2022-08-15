@@ -21,6 +21,10 @@ namespace Slang
         TypeExp         typeExp,
         DiagnosticSink* sink);
 
+        /// Get the element type if `type` is Ptr or PtrLike type, otherwise returns null.
+        /// Note: this currently does not include PtrTypeBase.
+    Type* getPointedToTypeIfCanImplicitDeref(Type* type);
+
     // A flat representation of basic types (scalars, vectors and matrices)
     // that can be used as lookup key in caches
     enum class BasicTypeKey : uint16_t
@@ -499,6 +503,10 @@ namespace Slang
             ///
         Expr* maybeOpenExistential(Expr* expr);
 
+            /// If `expr` has Ref<T> Type, convert it into an l-value expr that has T type.
+        Expr* maybeOpenRef(Expr* expr);
+
+
         Expr* ConstructDeclRefExpr(
             DeclRef<Decl>   declRef,
             Expr*    baseExpr,
@@ -665,6 +673,15 @@ namespace Slang
         void _validateCircularVarDefinition(VarDeclBase* varDecl);
 
         bool shouldSkipChecking(Decl* decl, DeclCheckState state);
+
+        // Auto-diff convenience functions for translating primal types to differential types.
+        Type* _toDifferentialParamType(ASTBuilder* builder, Type* primalType);
+
+        // Translate a return type to the return type of a forward-mode differentiated
+        // function.
+        //
+        Type* _toJVPReturnType(ASTBuilder* builder, Type* primalType);
+        
     public:
 
         bool ValuesAreEqual(
@@ -1261,6 +1278,13 @@ namespace Slang
             Type*            subType,
             DeclRef<AggTypeDecl>    superTypeDeclRef);
 
+        /// Check whether `subType` is a sub-type of `supType`.
+        bool isDeclaredSubtype(
+            Type* subType,
+            Type* supType);
+
+        bool isInterfaceType(Type* type);
+
             /// Check whether `subType` is a sub-type of `superTypeDeclRef`,
             /// and return a witness to the sub-type relationship if it holds
             /// (return null otherwise).
@@ -1673,6 +1697,7 @@ namespace Slang
         Expr* visitIncompleteExpr(IncompleteExpr* expr);
         Expr* visitBoolLiteralExpr(BoolLiteralExpr* expr);
         Expr* visitNullPtrLiteralExpr(NullPtrLiteralExpr* expr);
+        Expr* visitNoneLiteralExpr(NoneLiteralExpr* expr);
         Expr* visitIntegerLiteralExpr(IntegerLiteralExpr* expr);
         Expr* visitFloatingPointLiteralExpr(FloatingPointLiteralExpr* expr);
         Expr* visitStringLiteralExpr(StringLiteralExpr* expr);
@@ -1696,6 +1721,10 @@ namespace Slang
         Expr* visitTypeCastExpr(TypeCastExpr * expr);
 
         Expr* visitTryExpr(TryExpr* expr);
+
+        Expr* visitIsTypeExpr(IsTypeExpr* expr);
+
+        Expr* visitAsTypeExpr(AsTypeExpr* expr);
 
         //
         // Some syntax nodes should not occur in the concrete input syntax,
@@ -1722,6 +1751,8 @@ namespace Slang
         CASE(ModifierCastExpr)
         CASE(LetExpr)
         CASE(ExtractExistentialValueExpr)
+        CASE(OpenRefExpr)
+        CASE(MakeOptionalExpr)
 
     #undef CASE
 
@@ -1734,12 +1765,14 @@ namespace Slang
         Expr* visitThisExpr(ThisExpr* expr);
         Expr* visitThisTypeExpr(ThisTypeExpr* expr);
         Expr* visitAndTypeExpr(AndTypeExpr* expr);
+        Expr* visitPointerTypeExpr(PointerTypeExpr* expr);
         Expr* visitModifiedTypeExpr(ModifiedTypeExpr* expr);
 
         Expr* visitJVPDifferentiateExpr(JVPDifferentiateExpr* expr);
 
             /// Perform semantic checking on a `modifier` that is being applied to the given `type`
         Val* checkTypeModifier(Modifier* modifier, Type* type);
+
     };
 
     struct SemanticsStmtVisitor

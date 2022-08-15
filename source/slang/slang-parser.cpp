@@ -1807,9 +1807,10 @@ namespace Slang
             case Declarator::Flavor::Pointer:
                 {
                     auto ptrDeclarator = (PointerDeclarator*) declarator.Ptr();
-
-                    // TODO(tfoley): we don't support pointers for now
-                    // ioInfo->typeSpec = new PointerTypeExpr(ioInfo->typeSpec);
+                    auto ptrTypeExpr = astBuilder->create<PointerTypeExpr>();
+                    ptrTypeExpr->loc = ptrDeclarator->starLoc;
+                    ptrTypeExpr->base.exp = ioInfo->typeSpec;
+                    ioInfo->typeSpec = ptrTypeExpr;
 
                     declarator = ptrDeclarator->inner;
                 }
@@ -2014,6 +2015,17 @@ namespace Slang
         memberExpr->name = expectIdentifier(parser).name;
         return memberExpr;
     }
+    static Expr* parseStaticMemberType(Parser* parser, Expr* base, SourceLoc opLoc)
+    {
+        // When called the :: or . have been consumed, so don't need to consume here.
+
+        StaticMemberExpr* memberExpr = parser->astBuilder->create<StaticMemberExpr>();
+        memberExpr->memberOperatorLoc = opLoc;
+        parser->FillPosition(memberExpr);
+        memberExpr->baseExpression = base;
+        memberExpr->name = expectIdentifier(parser).name;
+        return memberExpr;
+    }
 
     // Parse option `[]` braces after a type expression, that indicate an array type
     static Expr* parsePostfixTypeSuffix(
@@ -2021,18 +2033,31 @@ namespace Slang
         Expr* inTypeExpr)
     {
         auto typeExpr = inTypeExpr;
-        while (parser->LookAheadToken(TokenType::LBracket))
+        for (;;)
         {
-            IndexExpr* arrType = parser->astBuilder->create<IndexExpr>();
-            arrType->loc = typeExpr->loc;
-            arrType->baseExpression = typeExpr;
-            parser->ReadToken(TokenType::LBracket);
-            if (!parser->LookAheadToken(TokenType::RBracket))
+            Token token;
+            if (parser->LookAheadToken(TokenType::LBracket))
             {
-                arrType->indexExpression = parser->ParseExpression();
+                IndexExpr* arrType = parser->astBuilder->create<IndexExpr>();
+                arrType->loc = typeExpr->loc;
+                arrType->baseExpression = typeExpr;
+                parser->ReadToken(TokenType::LBracket);
+                if (!parser->LookAheadToken(TokenType::RBracket))
+                {
+                    arrType->indexExpression = parser->ParseExpression();
+                }
+                parser->ReadToken(TokenType::RBracket);
+                typeExpr = arrType;
             }
-            parser->ReadToken(TokenType::RBracket);
-            typeExpr = arrType;
+            else if (AdvanceIf(parser, TokenType::OpMul, &token))
+            {
+                PointerTypeExpr* ptrType = parser->astBuilder->create<PointerTypeExpr>();
+                ptrType->loc = token.loc;
+                ptrType->base.exp = typeExpr;
+                typeExpr = ptrType;
+            }
+            else
+                break;
         }
         return typeExpr;
     }
@@ -2309,7 +2334,7 @@ namespace Slang
             case TokenType::Scope:
                 {
                     auto opToken = parser->ReadToken(TokenType::Scope);
-                    typeExpr = parseMemberType(parser, typeExpr, opToken.loc);
+                    typeExpr = parseStaticMemberType(parser, typeExpr, opToken.loc);
                     break;
                 }
             case TokenType::Dot:
@@ -4311,25 +4336,8 @@ namespace Slang
             // isn't a keyword should we fall back to the approach
             // here.
             //
+            bool prevHasSeenCompletionToken = hasSeenCompletionToken;
             Expr* type = ParseType();
-
-            if (type && hasSeenCompletionToken)
-            {
-                // If we encountered a completion token, just return the parsed expr
-                // as an ExprStmt.
-                for (auto tokenPos = startPos.tokenReaderCursor;
-                    tokenPos && tokenPos < tokenReader.getCursor().tokenReaderCursor;
-                    ++tokenPos)
-                {
-                    if (tokenPos && tokenPos->type == TokenType::CompletionRequest)
-                    {
-                        auto exprStmt = astBuilder->create<ExpressionStmt>();
-                        exprStmt->loc = type->loc;
-                        exprStmt->expression = type;
-                        return exprStmt;
-                    }
-                }
-            }
 
             // We don't actually care about the type, though, so
             // don't retain it
@@ -4360,15 +4368,17 @@ namespace Slang
             // general kinds of declarators (notably pointer declarators),
             // so we'll need to be careful about this.
             //
-            // If the lookahead token is `*`, then we have to decide
-            // whether to parse a pointer declarator or a multiply
-            // expression. In this context it makes sense to disambiguate
+            // If the line being parsed token is `Something* ...`, then the `*`
+            // is already consumed by `ParseType` above and the current logic
+            // will continue to parse as var declaration instead of a mul expr.
+            // In this context it makes sense to disambiguate
             // in favor of a pointer over a multiply, since a multiply
             // expression can't appear at the start of a statement
             // with any side effects.
             //
             //
-            if (LookAheadToken(TokenType::Identifier))
+            if (!hasSeenCompletionToken && (LookAheadToken(TokenType::Identifier) ||
+                                            LookAheadToken(TokenType::CompletionRequest)))
             {
                 // Reset the cursor and try to parse a declaration now.
                 // Note: the declaration will consume any modifiers
@@ -4379,6 +4389,7 @@ namespace Slang
             }
 
             // Fallback: reset and parse an expression
+            hasSeenCompletionToken = prevHasSeenCompletionToken;
             tokenReader.setCursor(startPos);
             statement = ParseExpressionStatement();
         }
@@ -4724,9 +4735,9 @@ namespace Slang
 
 
 
-    Precedence GetOpLevel(Parser* parser, TokenType type)
+    Precedence GetOpLevel(Parser* parser, const Token& token)
     {
-        switch(type)
+        switch(token.type)
         {
         case TokenType::QuestionMark:
             return Precedence::TernaryConditional;
@@ -4779,6 +4790,10 @@ namespace Slang
         case TokenType::OpMod:
             return Precedence::Multiplicative;
         default:
+            if (token.getContent() == "is" || token.getContent() == "as")
+            {
+                return Precedence::RelationalComparison;
+            }
             return Precedence::Invalid;
         }
     }
@@ -4829,16 +4844,41 @@ namespace Slang
         auto expr = inExpr;
         for(;;)
         {
-            auto opTokenType = parser->tokenReader.peekTokenType();
-            auto opPrec = GetOpLevel(parser, opTokenType);
+            auto opToken = parser->tokenReader.peekToken();
+            auto opPrec = GetOpLevel(parser, opToken);
             if(opPrec < prec)
                 break;
+
+            // Special case the "is" and "as" operators.
+            if (opToken.type == TokenType::Identifier)
+            {
+                if (opToken.getContent() == "is")
+                {
+                    auto isExpr = parser->astBuilder->create<IsTypeExpr>();
+                    isExpr->value = expr;
+                    parser->ReadToken();
+                    isExpr->typeExpr = parser->ParseTypeExp();
+                    isExpr->loc = opToken.loc;
+                    expr = isExpr;
+                    continue;
+                }
+                else if (opToken.getContent() == "as")
+                {
+                    auto asExpr = parser->astBuilder->create<AsTypeExpr>();
+                    asExpr->value = expr;
+                    parser->ReadToken();
+                    asExpr->typeExpr = parser->ParseType();
+                    asExpr->loc = opToken.loc;
+                    expr = asExpr;
+                    continue;
+                }
+            }
 
             auto op = parseOperator(parser);
 
             // Special case the `?:` operator since it is the
             // one non-binary case we need to deal with.
-            if(opTokenType == TokenType::QuestionMark)
+            if(opToken.type == TokenType::QuestionMark)
             {
                 SelectExpr* select = parser->astBuilder->create<SelectExpr>();
                 select->loc = op->loc;
@@ -4858,7 +4898,7 @@ namespace Slang
 
             for(;;)
             {
-                auto nextOpPrec = GetOpLevel(parser, parser->tokenReader.peekTokenType());
+                auto nextOpPrec = GetOpLevel(parser, parser->tokenReader.peekToken());
 
                 if((GetAssociativityFromLevel(nextOpPrec) == Associativity::Right) ? (nextOpPrec < opPrec) : (nextOpPrec <= opPrec))
                     break;
@@ -4866,7 +4906,7 @@ namespace Slang
                 right = parseInfixExprWithPrecedence(parser, right, nextOpPrec);
             }
 
-            if (opTokenType == TokenType::OpAssign)
+            if (opToken.type == TokenType::OpAssign)
             {
                 AssignExpr* assignExpr = parser->astBuilder->create<AssignExpr>();
                 assignExpr->loc = op->loc;
@@ -4991,6 +5031,11 @@ namespace Slang
     static NodeBase* parseNullPtrExpr(Parser* parser, void* /*userData*/)
     {
         return parser->astBuilder->create<NullPtrLiteralExpr>();
+    }
+
+    static NodeBase* parseNoneExpr(Parser* parser, void* /*userData*/)
+    {
+        return parser->astBuilder->create<NoneLiteralExpr>();
     }
 
     static NodeBase* parseTryExpr(Parser* parser, void* /*userData*/)
@@ -5171,6 +5216,10 @@ namespace Slang
 
     static bool _isCast(Parser* parser, Expr* expr)
     {
+        if (as<PointerTypeExpr>(expr))
+        {
+            return true;
+        }
 
         // We can't just look at expr and look up if it's a type, because we allow
         // out-of-order declarations. So to a first approximation we'll try and
@@ -5231,6 +5280,8 @@ namespace Slang
             }
             case TokenType::OpAdd:
             case TokenType::OpSub:
+            case TokenType::OpMul:
+            case TokenType::OpBitAnd:
             {
                 // + - are ambiguous, it could be a binary + or - so -> expression, or unary -> cast
                 //
@@ -5300,6 +5351,24 @@ namespace Slang
         return false;
     }
 
+    static bool tryParseExpression(Parser* parser, Expr* &outExpr, TokenType tokenTypeAfter)
+    {
+        auto cursor = parser->tokenReader.getCursor();
+        auto isRecovering = parser->isRecovering;
+        auto oldSink = parser->sink;
+        DiagnosticSink newSink(parser->sink->getSourceManager(), nullptr);
+        parser->sink = &newSink;
+        outExpr = parser->ParseExpression();
+        parser->sink = oldSink;
+        parser->isRecovering = isRecovering;
+        if (outExpr && newSink.getErrorCount() == 0 && parser->LookAheadToken(tokenTypeAfter))
+        {
+            return true;
+        }
+        parser->tokenReader.setCursor(cursor);
+        return false;
+    }
+
     static Expr* parseAtomicExpr(Parser* parser)
     {
         switch( peekTokenType(parser) )
@@ -5319,12 +5388,12 @@ namespace Slang
         case TokenType::LParent:
             {
                 Token openParen = parser->ReadToken(TokenType::LParent);
-
-                if (peekTypeName(parser) && parser->LookAheadToken(TokenType::RParent, 1))
+                Expr* typeExpr = nullptr;
+                if (peekTypeName(parser) && parser->LookAheadToken(TokenType::RParent))
                 {
                     TypeCastExpr* tcexpr = parser->astBuilder->create<ExplicitCastExpr>();
                     parser->FillPosition(tcexpr);
-                    tcexpr->functionExpr = parser->ParseType();
+                    tcexpr->functionExpr = typeExpr;
                     parser->ReadToken(TokenType::RParent);
 
                     auto arg = parsePrefixExpr(parser);
@@ -5339,7 +5408,11 @@ namespace Slang
                     // branch will be taken. This is okay in so far as SomeScope::Thing will parse
                     // as an expression.
                     
-                    Expr* base = parser->ParseExpression();
+                    Expr* base = nullptr;
+                    if (!tryParseExpression(parser, base, TokenType::RParent))
+                    {
+                        base = parser->ParseType();
+                    }
 
                     parser->ReadToken(TokenType::RParent);
 
@@ -5853,6 +5926,8 @@ namespace Slang
         case TokenType::OpNot:
         case TokenType::OpInc:
         case TokenType::OpDec:
+        case TokenType::OpMul:
+        case TokenType::OpBitAnd:
         {
             PrefixExpr* prefixExpr = parser->astBuilder->create<PrefixExpr>();
             parser->FillPosition(prefixExpr);
@@ -6519,6 +6594,7 @@ namespace Slang
         _makeParseExpr("true",  parseTrueExpr),
         _makeParseExpr("false", parseFalseExpr),
         _makeParseExpr("nullptr", parseNullPtrExpr),
+        _makeParseExpr("none", parseNoneExpr),
         _makeParseExpr("try",     parseTryExpr),
         _makeParseExpr("__TaggedUnion", parseTaggedUnionType),
         _makeParseExpr("__jvp", parseJVPDifferentiate)

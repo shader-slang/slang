@@ -709,12 +709,12 @@ SlangResult ZipFileSystemImpl::storeArchive(bool blobOwnsContent, ISlangBlob** o
     if (blobOwnsContent)
     {
         // Takes a copy
-        blob = new RawBlob(m_data.getData(), Index(m_data.getSizeInBytes()));
+        blob = RawBlob::create(m_data.getData(), Index(m_data.getSizeInBytes()));
     }
     else
     {
         // Doesn't take a copy... Must use with care(!)
-        blob = new UnownedRawBlob(m_data.getData(), Index(m_data.getSizeInBytes()));
+        blob = UnownedRawBlob::create(m_data.getData(), Index(m_data.getSizeInBytes()));
     }
     *outBlob = blob.detach();
     return SLANG_OK;

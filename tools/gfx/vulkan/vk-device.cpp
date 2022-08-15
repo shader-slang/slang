@@ -797,8 +797,9 @@ SlangResult DeviceImpl::readTextureResource(
     Size* outPixelSize)
 {
     auto textureImpl = static_cast<TextureResourceImpl*>(texture);
-    RefPtr<ListBlob> blob = new ListBlob();
 
+    List<uint8_t> blobData;
+    
     auto desc = textureImpl->getDesc();
     auto width = desc->size.width;
     auto height = desc->size.height;
@@ -828,8 +829,8 @@ SlangResult DeviceImpl::readTextureResource(
     }
     // Calculate the total size taking into account the array
     bufferSize *= arraySize;
-    // TODO: Change Index to Count?
-    blob->m_data.setCount(Index(bufferSize));
+
+    blobData.setCount(Count(bufferSize));
 
     VKBufferHandleRAII staging;
     SLANG_RETURN_ON_FAIL(staging.init(
@@ -880,11 +881,14 @@ SlangResult DeviceImpl::readTextureResource(
     SLANG_RETURN_ON_FAIL(
         m_api.vkMapMemory(m_device, staging.m_memory, 0, bufferSize, 0, &mappedData));
 
-    ::memcpy(blob->m_data.getBuffer(), mappedData, bufferSize);
+    ::memcpy(blobData.getBuffer(), mappedData, bufferSize);
     m_api.vkUnmapMemory(m_device, staging.m_memory);
 
     *outPixelSize = pixelSize;
     *outRowPitch = rowPitch;
+
+    auto blob = ListBlob::moveCreate(blobData);
+
     returnComPtr(outBlob, blob);
     return SLANG_OK;
 }
@@ -894,8 +898,9 @@ SlangResult DeviceImpl::readBufferResource(
 {
     BufferResourceImpl* buffer = static_cast<BufferResourceImpl*>(inBuffer);
 
-    RefPtr<ListBlob> blob = new ListBlob();
-    blob->m_data.setCount(size);
+    List<uint8_t> blobData;
+
+    blobData.setCount(size);
 
     // create staging buffer
     VKBufferHandleRAII staging;
@@ -920,8 +925,10 @@ SlangResult DeviceImpl::readBufferResource(
     void* mappedData = nullptr;
     SLANG_RETURN_ON_FAIL(m_api.vkMapMemory(m_device, staging.m_memory, 0, size, 0, &mappedData));
 
-    ::memcpy(blob->m_data.getBuffer(), mappedData, size);
+    ::memcpy(blobData.getBuffer(), mappedData, size);
     m_api.vkUnmapMemory(m_device, staging.m_memory);
+
+    auto blob = ListBlob::moveCreate(blobData);
 
     returnComPtr(outBlob, blob);
     return SLANG_OK;

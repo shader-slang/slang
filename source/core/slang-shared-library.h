@@ -52,10 +52,9 @@ class DefaultSharedLibrary : public ISlangSharedLibrary, public ComBaseObject
     SLANG_CLASS_GUID(0xe7f2597b, 0xf803, 0x4b6e, { 0xaf, 0x8b, 0xcb, 0xe3, 0xa2, 0x21, 0xfd, 0x5a })
 
     // ISlangUnknown
-    SLANG_NO_THROW SlangResult SLANG_MCALL queryInterface(SlangUUID const& uuid, void** outObject) SLANG_OVERRIDE;
-    SLANG_COM_BASE_IUNKNOWN_ADD_REF
-    SLANG_COM_BASE_IUNKNOWN_RELEASE
-
+    SLANG_COM_BASE_IUNKNOWN_ALL
+    // ICastable
+    virtual SLANG_NO_THROW void* SLANG_MCALL castAs(const SlangUUID& guid) SLANG_OVERRIDE;
     // ISlangSharedLibrary
     virtual SLANG_NO_THROW void* SLANG_MCALL findSymbolAddressByName(char const* name) SLANG_OVERRIDE;
 
@@ -70,6 +69,9 @@ class DefaultSharedLibrary : public ISlangSharedLibrary, public ComBaseObject
     virtual ~DefaultSharedLibrary();
 
     protected:
+
+    void* getInterface(const Guid& guid);
+    void* getObject(const Guid& guid);
 
     SharedLibrary::Handle m_sharedLibraryHandle = nullptr;
 };
@@ -96,6 +98,24 @@ public:
 
 protected:
     String m_path;
+};
+
+class ScopeSharedLibrary : public DefaultSharedLibrary
+{
+public: 
+    typedef DefaultSharedLibrary Super;
+
+    /// Ctor
+    ScopeSharedLibrary(const SharedLibrary::Handle sharedLibraryHandle, ISlangUnknown* scope) :
+        Super(sharedLibraryHandle),
+        m_scope(scope)
+    {
+    }
+
+    virtual ~ScopeSharedLibrary();
+
+protected:
+    ComPtr<ISlangUnknown> m_scope;
 };
 
 class SharedLibraryUtils

@@ -250,9 +250,8 @@ DIAGNOSTIC(30012, Error, noOverloadFoundForBinOperatorOnTypes, "no overload foun
 DIAGNOSTIC(30013, Error, subscriptNonArray, "no subscript operation found for  type '$0'")
 DIAGNOSTIC(30014, Error, subscriptIndexNonInteger, "index expression must evaluate to int.")
 DIAGNOSTIC(30015, Error, undefinedIdentifier2, "undefined identifier '$0'.")
-DIAGNOSTIC(30017, Error, componentNotAccessibleFromShader, "component '$0' is not accessible from shader '$1'.")
+DIAGNOSTIC(30018, Error, typeNotInTheSameHierarchy, "invalid use of 'as' operator: expression evaluates to '$0', which is not in the same type hierarchy as target type '$1'.")
 DIAGNOSTIC(30019, Error, typeMismatch, "expected an expression of type '$0', got '$1'")
-DIAGNOSTIC(30020, Error, importOperatorReturnTypeMismatch, "import operator should return '$1', but the expression has type '$0''. do you forget 'project'?")
 DIAGNOSTIC(30021, Error, noApplicationFunction, "$0: no overload takes arguments ($1)")
 DIAGNOSTIC(30022, Error, invalidTypeCast, "invalid type cast between \"$0\" and \"$1\".")
 DIAGNOSTIC(30023, Error, typeHasNoPublicMemberOfName, "\"$0\" does not have public member \"$1\".")
@@ -286,6 +285,7 @@ DIAGNOSTIC(30200, Error, redeclaration, "declaration of '$0' conflicts with exis
 DIAGNOSTIC(30201, Error, functionRedefinition, "function '$0' already has a body")
 DIAGNOSTIC(30202, Error, functionRedeclarationWithDifferentReturnType, "function '$0' declared to return '$1' was previously declared to return '$2'")
 
+DIAGNOSTIC(30300, Error, isOperatorValueMustBeInterfaceType, "'is'/'as' operator requires an interface-typed expression.")
 
 DIAGNOSTIC(33070, Error, expectedFunction, "expected a function, got '$0'")
 DIAGNOSTIC(33071, Error, expectedAStringLiteral, "expected a string literal")

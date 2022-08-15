@@ -942,6 +942,19 @@ extern "C"
     };
     #define SLANG_UUID_ISlangUnknown ISlangUnknown::getTypeGuid()
 
+
+    /* An interface to provide a mechanism to cast, that doesn't require ref counting
+    and doesn't have to return a pointer to a ISlangUnknown derived class */
+    class ICastable : public ISlangUnknown
+    {
+        SLANG_COM_INTERFACE(0x87ede0e1, 0x4852, 0x44b0, { 0x8b, 0xf2, 0xcb, 0x31, 0x87, 0x4d, 0xe2, 0x39 });
+
+            /// Can be used to cast to interfaces without reference counting. 
+            /// Also provides access to internal implementations, when they provide a guid
+            /// Can simulate a 'generated' interface as long as kept in scope by cast from. 
+        virtual SLANG_NO_THROW void* SLANG_MCALL castAs(const SlangUUID& guid) = 0;
+    };
+
     /** A "blob" of binary data.
 
     This interface definition is compatible with the `ID3DBlob` and `ID3D10Blob` interfaces.
@@ -992,23 +1005,34 @@ extern "C"
 
     typedef void(*SlangFuncPtr)(void);
 
-    /** An interface that can be used to encapsulate access to a shared library. An implementation 
-    does not have to implement the library as a shared library. 
+    /** 
+    (DEPRECIATED) ISlangSharedLibrary
     */
-    struct ISlangSharedLibrary: public ISlangUnknown
+    struct ISlangSharedLibrary_Dep1: public ISlangUnknown
     {
         SLANG_COM_INTERFACE( 0x9c9d5bc5, 0xeb61, 0x496f,{ 0x80, 0xd7, 0xd1, 0x47, 0xc4, 0xa2, 0x37, 0x30 })
 
-            /** Get a function by name. If the library is unloaded will only return nullptr. 
-            @param name The name of the function 
-            @return The function pointer related to the name or nullptr if not found 
-            */
+        virtual SLANG_NO_THROW void* SLANG_MCALL findSymbolAddressByName(char const* name) = 0;
+    };
+    #define SLANG_UUID_ISlangSharedLibrary_Dep1 ISlangSharedLibrary_Dep1::getTypeGuid()
+
+    /** An interface that can be used to encapsulate access to a shared library. An implementation
+    does not have to implement the library as a shared library
+    */
+    struct ISlangSharedLibrary : public ICastable
+    {
+        SLANG_COM_INTERFACE(0x70dbc7c4, 0xdc3b, 0x4a07, { 0xae, 0x7e, 0x75, 0x2a, 0xf6, 0xa8, 0x15, 0x55 })
+
+        /** Get a function by name. If the library is unloaded will only return nullptr.
+        @param name The name of the function
+        @return The function pointer related to the name or nullptr if not found
+        */
         SLANG_FORCE_INLINE SlangFuncPtr findFuncByName(char const* name) { return (SlangFuncPtr)findSymbolAddressByName(name); }
 
-            /** Get a symbol by name. If the library is unloaded will only return nullptr. 
-            @param name The name of the symbol 
-            @return The pointer related to the name or nullptr if not found 
-            */
+        /** Get a symbol by name. If the library is unloaded will only return nullptr.
+        @param name The name of the symbol
+        @return The pointer related to the name or nullptr if not found
+        */
         virtual SLANG_NO_THROW void* SLANG_MCALL findSymbolAddressByName(char const* name) = 0;
     };
     #define SLANG_UUID_ISlangSharedLibrary ISlangSharedLibrary::getTypeGuid()

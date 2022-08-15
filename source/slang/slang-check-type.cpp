@@ -22,6 +22,19 @@ namespace Slang
         return typeOut.type;
     }
 
+    Type* getPointedToTypeIfCanImplicitDeref(Type* type)
+    {
+        if (auto ptrLike = as<PointerLikeType>(type))
+        {
+            return ptrLike->getElementType();
+        }
+        else if (auto ptrType = as<PtrType>(type))
+        {
+            return ptrType->getValueType();
+        }
+        return nullptr;
+    }
+
     Expr* SemanticsVisitor::TranslateTypeNodeImpl(Expr* node)
     {
         if (!node) return nullptr;

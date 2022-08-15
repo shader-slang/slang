@@ -4,7 +4,7 @@
 #include "slang-syntax.h"
 #include "slang-ir-insts.h"
 
-#include "../compiler-core/slang-artifact-info.h"
+#include "../compiler-core/slang-artifact-desc-util.h"
 
 #include <assert.h>
 
@@ -1606,7 +1606,7 @@ bool isKhronosTarget(TargetRequest* targetReq)
 
 bool isCPUTarget(TargetRequest* targetReq)
 {
-    return ArtifactInfoUtil::isCpuTarget(ArtifactDesc::makeFromCompileTarget(asExternal(targetReq->getTarget())));
+    return ArtifactDescUtil::isCpuLikeTarget(ArtifactDescUtil::makeDescFromCompileTarget(asExternal(targetReq->getTarget())));
 }
 
 bool isCUDATarget(TargetRequest* targetReq)

@@ -249,15 +249,15 @@ struct StoreContext
                 base[fileState]->contents = offsetContents;
             }
 
-            if (srcPathInfo->m_canonicalPath && base[fileState]->canonicalPath.isNull())
+            if (srcPathInfo->m_canonicalPath.getLength() && base[fileState]->canonicalPath.isNull())
             {
-                auto offsetCanonicalPath = fromString(srcPathInfo->m_canonicalPath->getString());
+                auto offsetCanonicalPath = fromString(srcPathInfo->m_canonicalPath);
                 base[fileState]->canonicalPath = offsetCanonicalPath;
             }
 
-            if (srcPathInfo->m_uniqueIdentity && base[fileState]->uniqueIdentity.isNull())
+            if (srcPathInfo->m_uniqueIdentity.getLength() && base[fileState]->uniqueIdentity.isNull())
             {
-                auto offsetUniqueIdentity = fromString(srcPathInfo->m_uniqueIdentity->getString());
+                auto offsetUniqueIdentity = fromString(srcPathInfo->m_uniqueIdentity);
                 base[fileState]->uniqueIdentity = offsetUniqueIdentity;
             }
         }
@@ -668,20 +668,19 @@ struct LoadContext
             // If wasn't loaded, and has contents, use that
             if (!blob && file->contents)
             {
-                blob = new StringBlob(m_base->asRaw(file->contents)->getSlice());
+                blob = StringBlob::create(m_base->asRaw(file->contents)->getSlice());
             }
 
             dstInfo = new CacheFileSystem::PathInfo(String());
 
             if (file->uniqueIdentity)
             {
-                String uniqueIdentity = m_base->asRaw(file->uniqueIdentity)->getSlice();
-                dstInfo->m_uniqueIdentity = new StringBlob(uniqueIdentity);
+                dstInfo->m_uniqueIdentity = m_base->asRaw(file->uniqueIdentity)->getSlice();
             }
 
             if (file->canonicalPath)
             {
-                dstInfo->m_canonicalPath = new StringBlob(m_base->asRaw(file->canonicalPath)->getSlice());
+                dstInfo->m_canonicalPath = m_base->asRaw(file->canonicalPath)->getSlice();
             }
 
             if (blob)
@@ -865,13 +864,13 @@ struct LoadContext
         for (const auto& pair : context.m_fileToPathInfoMap)
         {
             CacheFileSystem::PathInfo* pathInfo = pair.Value;
-            SLANG_ASSERT(pathInfo->m_uniqueIdentity);
-            dstUniqueMap.Add(pathInfo->m_uniqueIdentity->getString(), pathInfo);
+            SLANG_ASSERT(pathInfo->m_uniqueIdentity.getLength());
+            dstUniqueMap.Add(pathInfo->m_uniqueIdentity, pathInfo);
 
             // Add canonical paths too..
-            if (pathInfo->m_canonicalPath)
+            if (pathInfo->m_canonicalPath.getLength())
             {
-                String canonicalPath = pathInfo->m_canonicalPath->getString();
+                String canonicalPath = pathInfo->m_canonicalPath;
 
                 dstPathMap.AddIfNotExists(canonicalPath, pathInfo);
             }
@@ -1050,8 +1049,8 @@ struct LoadContext
             for (const auto& pair : context.m_fileToPathInfoMap)
             {
                 CacheFileSystem::PathInfo* pathInfo = pair.Value;
-                SLANG_ASSERT(pathInfo->m_uniqueIdentity);
-                dstUniqueMap.Add(pathInfo->m_uniqueIdentity->getString(), pathInfo);
+                SLANG_ASSERT(pathInfo->m_uniqueIdentity.getLength());
+                dstUniqueMap.Add(pathInfo->m_uniqueIdentity, pathInfo);
             }
         }
     

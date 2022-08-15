@@ -2587,7 +2587,7 @@ namespace Slang
     IRAnyValueType* IRBuilder::getAnyValueType(IRIntegerValue size)
     {
         return (IRAnyValueType*)getType(kIROp_AnyValueType,
-            getIntValue(getIntType(), size));
+            getIntValue(getUIntType(), size));
     }
 
     IRAnyValueType* IRBuilder::getAnyValueType(IRInst* size)
@@ -2622,6 +2622,11 @@ namespace Slang
     {
         IRInst* operands[] = {valueType, errorType};
         return (IRResultType*)getType(kIROp_ResultType, 2, operands);
+    }
+
+    IROptionalType* IRBuilder::getOptionalType(IRType* valueType)
+    {
+        return (IROptionalType*)getType(kIROp_OptionalType, valueType);
     }
 
     IRBasicBlockType*   IRBuilder::getBasicBlockType()
@@ -2737,6 +2742,17 @@ namespace Slang
         IRInst* operands[] = { elementType, rowCount, columnCount };
         return (IRMatrixType*)getType(
             kIROp_MatrixType,
+            sizeof(operands) / sizeof(operands[0]),
+            operands);
+    }
+
+    IRDifferentialPairType* IRBuilder::getDifferentialPairType(
+        IRType* valueType,
+        IRWitnessTable* witnessTable)
+    {
+        IRInst* operands[] = { valueType, witnessTable };
+        return (IRDifferentialPairType*)getType(
+            kIROp_DifferentialPairType,
             sizeof(operands) / sizeof(operands[0]),
             operands);
     }
@@ -2960,6 +2976,11 @@ namespace Slang
         return inst;
     }
 
+    IRInst* IRBuilder::emitReinterpret(IRInst* type, IRInst* value)
+    {
+        return emitIntrinsicInst((IRType*)type, kIROp_Reinterpret, 1, &value);
+    }
+
     IRLiveRangeStart* IRBuilder::emitLiveRangeStart(IRInst* referenced)
     {
         // This instruction doesn't produce any result, 
@@ -3039,6 +3060,15 @@ namespace Slang
             kIROp_JVPDifferentiate,
             type,
             baseFn);
+        addInst(inst);
+        return inst;
+    }
+
+    IRInst* IRBuilder::emitMakeDifferentialPair(IRType* type, IRInst* primal, IRInst* differential)
+    {
+        IRInst* args[] = {primal, differential};
+        auto inst = createInstWithTrailingArgs<IRMakeDifferentialPair>(
+            this, kIROp_MakeDifferentialPair, type, 2, args);
         addInst(inst);
         return inst;
     }
@@ -3301,6 +3331,42 @@ namespace Slang
             kIROp_GetResultValue,
             1,
             &result);
+    }
+
+    IRInst* IRBuilder::emitOptionalHasValue(IRInst* optValue)
+    {
+        return emitIntrinsicInst(
+            getBoolType(),
+            kIROp_OptionalHasValue,
+            1,
+            &optValue);
+    }
+
+    IRInst* IRBuilder::emitGetOptionalValue(IRInst* optValue)
+    {
+        return emitIntrinsicInst(
+            cast<IROptionalType>(optValue->getDataType())->getValueType(),
+            kIROp_GetOptionalValue,
+            1,
+            &optValue);
+    }
+
+    IRInst* IRBuilder::emitMakeOptionalValue(IRInst* optType, IRInst* value)
+    {
+        return emitIntrinsicInst(
+            (IRType*)optType,
+            kIROp_MakeOptionalValue,
+            1,
+            &value);
+    }
+
+    IRInst* IRBuilder::emitMakeOptionalNone(IRInst* optType, IRInst* defaultValue)
+    {
+        return emitIntrinsicInst(
+            (IRType*)optType,
+            kIROp_MakeOptionalNone,
+            1,
+            &defaultValue);
     }
 
     IRInst* IRBuilder::emitMakeVector(
@@ -3795,6 +3861,14 @@ namespace Slang
     {
         IRInst* args[] = {image, coord, value};
         auto inst = createInst<IRImageStore>(this, kIROp_ImageStore, type, 3, args);
+        addInst(inst);
+        return inst;
+    }
+
+    IRInst* IRBuilder::emitIsType(IRInst* value, IRInst* witness, IRInst* typeOperand, IRInst* targetWitness)
+    {
+        IRInst* args[] = { value, witness, typeOperand, targetWitness };
+        auto inst = createInst<IRIsType>(this, kIROp_IsType, getBoolType(), SLANG_COUNT_OF(args), args);
         addInst(inst);
         return inst;
     }
@@ -6059,6 +6133,10 @@ namespace Slang
         case kIROp_GetResultError:
         case kIROp_GetResultValue:
         case kIROp_IsResultError:
+        case kIROp_MakeOptionalValue:
+        case kIROp_MakeOptionalNone:
+        case kIROp_OptionalHasValue:
+        case kIROp_GetOptionalValue:
         case kIROp_Load:    // We are ignoring the possibility of loads from bad addresses, or `volatile` loads
         case kIROp_ImageSubscript:
         case kIROp_FieldExtract:
@@ -6098,6 +6176,9 @@ namespace Slang
         case kIROp_WrapExistential:
         case kIROp_BitCast:
         case kIROp_AllocObj:
+        case kIROp_PackAnyValue:
+        case kIROp_UnpackAnyValue:
+        case kIROp_Reinterpret:
             return false;
         }
     }

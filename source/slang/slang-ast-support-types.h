@@ -88,6 +88,9 @@ namespace Slang
 
         // Conversion that is lossless and keeps the "kind" of the value the same
         kConversionCost_RankPromotion = 150,
+        kConversionCost_NoneToOptional = 150,
+        kConversionCost_ValToOptional = 150,
+        kConversionCost_NullPtrToPtr = 150,
 
         // Conversions that are lossless, but change "kind"
         kConversionCost_UnsignedToSignedPromotion = 200,
@@ -97,6 +100,9 @@ namespace Slang
 
         // Cost of converting an integer to a floating-point type
         kConversionCost_IntegerToFloatConversion = 400,
+
+        // Cost of converting a pointer to bool
+        kConversionCost_PtrToBool = 400,
 
         // Default case (usable for user-defined conversions)
         kConversionCost_Default = 500,
@@ -472,10 +478,7 @@ namespace Slang
             : isLeftValue(false)
         {}
 
-        QualType(Type* type)
-            : type(type)
-            , isLeftValue(false)
-        {}
+        QualType(Type* type);
 
         Type* Ptr() { return type; }
 
@@ -1121,6 +1124,7 @@ namespace Slang
         None = 0,
         IgnoreBaseInterfaces = 1 << 0,
         Completion = 1 << 1, ///< Lookup all applicable decls for code completion suggestions
+        NoDeref = 1 << 2,
     };
 
     class SerialRefObject;

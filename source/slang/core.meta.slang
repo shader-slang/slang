@@ -71,10 +71,6 @@ syntax snorm : SNormModifier;
 ///
 syntax __extern_cpp : ExternCppModifier;
 
-/// Modifer to mark a function for forward-mode differentiation.
-/// i.e. the compiler will automatically generate a new function
-/// that computes the jacobian-vector product of the original.
-syntax __differentiate_jvp : JVPDerivativeModifier;
 
 /// A type that can be used as an operand for builtins
 [sealed]
@@ -353,12 +349,100 @@ struct NullPtr
 {
 };
 
+__magic_type(NoneType)
+__intrinsic_type($(kIROp_VoidType))
+struct __none_t
+{
+};
+
 __generic<T>
 __magic_type(PtrType)
 __intrinsic_type($(kIROp_PtrType))
 struct Ptr
 {
+    __generic<U>
+    __intrinsic_op($(kIROp_BitCast))
+    __init(Ptr<U> ptr);
+
+    __intrinsic_op($(kIROp_BitCast))
+    __init(uint64_t val);
+
+    __intrinsic_op($(kIROp_BitCast))
+    __init(int64_t val);
+
+    __subscript(int index) -> T
+    {
+        [__unsafeForceInlineEarly]
+        get
+        {
+            return __load(__getElementPtr(this, index));
+        }
+
+        [__unsafeForceInlineEarly]
+        set(T newValue)
+        {
+            __store(__getElementPtr(this, index), newValue);
+        }
+
+        __intrinsic_op($(kIROp_getElementPtr))
+        ref;
+    }
 };
+
+__intrinsic_op($(kIROp_Load))
+T __load<T>(Ptr<T> ptr);
+
+__intrinsic_op($(kIROp_Store))
+void __store<T>(Ptr<T> ptr, T val);
+
+__intrinsic_op($(kIROp_getElementPtr))
+Ptr<T> __getElementPtr<T>(Ptr<T> ptr, int index);
+
+__generic<T>
+__intrinsic_op($(kIROp_Less))
+bool operator<(Ptr<T> p1, Ptr<T> p2);
+
+__generic<T>
+__intrinsic_op($(kIROp_Leq))
+bool operator<=(Ptr<T> p1, Ptr<T> p2);
+
+__generic<T>
+__intrinsic_op($(kIROp_Greater))
+bool operator>(Ptr<T> p1, Ptr<T> p2);
+
+__generic<T>
+__intrinsic_op($(kIROp_Geq))
+bool operator>=(Ptr<T> p1, Ptr<T> p2);
+
+__generic<T>
+__intrinsic_op($(kIROp_Neq))
+bool operator!=(Ptr<T> p1, Ptr<T> p2);
+
+__generic<T>
+__intrinsic_op($(kIROp_Eql))
+bool operator==(Ptr<T> p1, Ptr<T> p2);
+
+extension bool
+{
+    __generic<T>
+    __implicit_conversion($(kConversionCost_PtrToBool))
+    __intrinsic_op($(kIROp_CastPtrToBool))
+    __init(Ptr<T> ptr);
+}
+
+extension uint64_t
+{
+    __generic<T>
+    __intrinsic_op($(kIROp_Construct))
+    __init(Ptr<T> ptr);
+}
+
+extension int64_t
+{
+    __generic<T>
+    __intrinsic_op($(kIROp_Construct))
+    __init(Ptr<T> ptr);
+}
 
 __generic<T>
 __magic_type(OutType)
@@ -377,6 +461,53 @@ __magic_type(RefType)
 __intrinsic_type($(kIROp_RefType))
 struct Ref
 {};
+
+__generic<T>
+__magic_type(OptionalType)
+__intrinsic_type($(kIROp_OptionalType))
+struct Optional
+{
+    property bool hasValue
+    {
+        __intrinsic_op($(kIROp_OptionalHasValue))
+        get;
+    }
+
+    property T value
+    {
+        __intrinsic_op($(kIROp_GetOptionalValue))
+        get;
+    }
+
+    __implicit_conversion($(kConversionCost_ValToOptional))
+    __intrinsic_op($(kIROp_MakeOptionalValue))
+    __init(T val);
+};
+
+__generic<T>
+[__unsafeForceInlineEarly]
+bool operator==(Optional<T> val, __none_t noneVal)
+{
+    return !val.hasValue;
+}
+__generic<T>
+[__unsafeForceInlineEarly]
+bool operator!=(Optional<T> val, __none_t noneVal)
+{
+    return val.hasValue;
+}
+__generic<T>
+[__unsafeForceInlineEarly]
+bool operator==(__none_t noneVal, Optional<T> val)
+{
+    return !val.hasValue;
+}
+__generic<T>
+[__unsafeForceInlineEarly]
+bool operator!=(__none_t noneVal, Optional<T> val)
+{
+    return val.hasValue;
+}
 
 __magic_type(StringType)
 __intrinsic_type($(kIROp_StringType))
@@ -614,7 +745,6 @@ ${{{{
 ${{{{
 }
 }}}}
-
 
 //@ public:
 
@@ -1620,6 +1750,25 @@ for (auto op : intrinsicUnaryOps)
 
 }}}}
 
+__generic<T>
+__intrinsic_op(0)
+__prefix Ref<T> operator*(Ptr<T> value);
+
+__generic<T>
+__intrinsic_op(0)
+__prefix Ptr<T> operator&(__ref T value);
+
+__generic<T>
+__intrinsic_op($(kIROp_getElementPtr))
+Ptr<T> operator+(Ptr<T> value, int64_t offset);
+
+__generic<T>
+[__unsafeForceInlineEarly]
+Ptr<T> operator-(Ptr<T> value, int64_t offset)
+{
+    return __getElementPtr(value, -offset);
+}
+
 __generic<T : __BuiltinArithmeticType>
 [__unsafeForceInlineEarly]
 __prefix T operator+(T value)
@@ -1678,6 +1827,12 @@ __generic<T : __BuiltinArithmeticType, let R : int, let C : int>
 [__unsafeForceInlineEarly]
 matrix<T,R,C> operator$(op.name)(in out matrix<T,R,C> value)
 {$(fixity.bodyPrefix) value = value $(op.binOp) T(1); return $(fixity.returnVal); }
+
+$(fixity.qual)
+__generic<T>
+[__unsafeForceInlineEarly]
+Ptr<T> operator$(op.name)(in out Ptr<T> value)
+{$(fixity.bodyPrefix) value = value $(op.binOp) 1; return $(fixity.returnVal); }
 
 ${{{{
 }
@@ -2214,7 +2369,3 @@ attribute_syntax [noinline] : NoInlineAttribute;
 
 __attributeTarget(StructDecl)
 attribute_syntax [payload] : PayloadAttribute;
-
-// Custom JVP Function reference
-__attributeTarget(FuncDecl)
-attribute_syntax [__custom_jvp(function)]   : CustomJVPAttribute;

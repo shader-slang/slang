@@ -267,6 +267,26 @@ static void _lookUpDirectAndTransparentMembers(
     }
 }
 
+LookupRequest initLookupRequest(
+    SemanticsVisitor* semantics,
+    Name* name,
+    LookupMask mask,
+    LookupOptions options,
+    Scope* scope)
+{
+    LookupRequest request;
+    request.semantics = semantics;
+    request.mask = mask;
+    request.options = options;
+    request.scope = scope;
+
+    if (semantics && semantics->getSession() &&
+        name == semantics->getSession()->getCompletionRequestTokenName())
+        request.options = (LookupOptions)((int)request.options | (int)LookupOptions::Completion);
+
+    return request;
+}
+
     /// Perform "direct" lookup in a container declaration
 LookupResult lookUpDirectAndTransparentMembers(
     ASTBuilder*             astBuilder,
@@ -275,9 +295,7 @@ LookupResult lookUpDirectAndTransparentMembers(
     DeclRef<ContainerDecl>  containerDeclRef,
     LookupMask              mask)
 {
-    LookupRequest request;
-    request.semantics = semantics;
-    request.mask = mask;
+    LookupRequest request = initLookupRequest(semantics, name, mask, LookupOptions::None, nullptr);
     LookupResult result;
     _lookUpDirectAndTransparentMembers(
         astBuilder,
@@ -607,19 +625,22 @@ static void _lookUpMembersInSuperTypeImpl(
 {
     // If the type was pointer-like, then dereference it
     // automatically here.
-    if (auto pointerLikeType = as<PointerLikeType>(superType))
+    if (((uint32_t)request.options & (uint32_t)LookupOptions::NoDeref) == 0)
     {
-        // Need to leave a breadcrumb to indicate that we
-        // did an implicit dereference here
-        BreadcrumbInfo derefBreacrumb;
-        derefBreacrumb.kind = LookupResultItem::Breadcrumb::Kind::Deref;
-        derefBreacrumb.prev = inBreadcrumbs;
+        if (auto pointerElementType = getPointedToTypeIfCanImplicitDeref(superType))
+        {
+            // Need to leave a breadcrumb to indicate that we
+            // did an implicit dereference here
+            BreadcrumbInfo derefBreacrumb;
+            derefBreacrumb.kind = LookupResultItem::Breadcrumb::Kind::Deref;
+            derefBreacrumb.prev = inBreadcrumbs;
 
-        // Recursively perform lookup on the result of deref
-        _lookUpMembersInType(
-            astBuilder, 
-            name, pointerLikeType->elementType, request, ioResult, &derefBreacrumb);
-        return;
+            // Recursively perform lookup on the result of deref
+            _lookUpMembersInType(
+                astBuilder,
+                name, pointerElementType, request, ioResult, &derefBreacrumb);
+            return;
+        }
     }
 
     // Default case: no dereference needed
@@ -981,13 +1002,7 @@ LookupResult lookUp(
     Scope*              scope,
     LookupMask          mask)
 {
-    LookupRequest request;
-    request.semantics = semantics;
-    request.scope = scope;
-    request.mask = mask;
-    if (semantics && semantics->getSession() &&
-        name == semantics->getSession()->getCompletionRequestTokenName())
-        request.options = (LookupOptions)((int)request.options | (int)LookupOptions::Completion);
+    LookupRequest request = initLookupRequest(semantics, name, mask, LookupOptions::None, scope);
     LookupResult result;
     _lookUpInScopes(astBuilder, name, request, result);
     return result;
@@ -1001,14 +1016,7 @@ LookupResult lookUpMember(
     LookupMask          mask,
     LookupOptions       options)
 {
-    LookupRequest request;
-    request.semantics = semantics;
-    request.mask = mask;
-    request.options = options;
-    if (semantics && semantics->getSession() &&
-        name == semantics->getSession()->getCompletionRequestTokenName())
-        request.options = (LookupOptions)((int)request.options | (int)LookupOptions::Completion);
-
+    LookupRequest request = initLookupRequest(semantics, name, mask, options, nullptr);
     LookupResult result;
     _lookUpMembersInType(astBuilder, name, type, request, result, nullptr);
     return result;

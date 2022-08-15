@@ -10,7 +10,10 @@
 #include "slang-compiler.h"
 #include "slang-profile.h"
 
-#include "../compiler-core/slang-artifact.h"
+#include "../compiler-core/slang-artifact-desc-util.h"
+
+#include "../compiler-core/slang-artifact-impl.h"
+#include "../compiler-core/slang-artifact-representation-impl.h"
 
 #include "slang-repro.h"
 #include "slang-serialize-ir.h"
@@ -20,7 +23,7 @@
 #include "../core/slang-hex-dump-util.h"
 
 #include "../compiler-core/slang-command-line-args.h"
-#include "../compiler-core/slang-artifact-info.h"
+#include "../compiler-core/slang-artifact-desc-util.h"
 #include "../compiler-core/slang-core-diagnostics.h"
 
 #include <assert.h>
@@ -1458,7 +1461,7 @@ struct OptionsParser
 
                     const auto path = referenceModuleName.value;
 
-                    auto desc = ArtifactInfoUtil::getDescFromPath(path.getUnownedSlice());
+                    auto desc = ArtifactDescUtil::getDescFromPath(path.getUnownedSlice());
 
                     if (desc.kind == ArtifactKind::Unknown)
                     {
@@ -1467,38 +1470,44 @@ struct OptionsParser
                     }
 
                     // If it's a GPU binary, then we'll assume it's a library
-                    if (ArtifactInfoUtil::isGpuBinary(desc))
+                    if (ArtifactDescUtil::isGpuUsable(desc))
                     {
                         desc.kind = ArtifactKind::Library;
                     }
 
-                    if (!ArtifactInfoUtil::isBinaryLinkable(desc))
+                    if (!ArtifactDescUtil::isLinkable(desc))
                     {
                         sink->diagnose(referenceModuleName.loc, Diagnostics::kindNotLinkable, Path::getPathExt(path));
                         return SLANG_FAIL;
                     }
 
-                    const String name = ArtifactInfoUtil::getBaseNameFromPath(desc, path.getUnownedSlice());
+                    const String name = ArtifactDescUtil::getBaseNameFromPath(desc, path.getUnownedSlice());
 
                     // Create the artifact
-                    ComPtr<IArtifact> artifact(new Artifact(desc, name)); 
+                    auto artifact = Artifact::create(desc, name); 
 
                     // There is a problem here if I want to reference a library that is a 'system' library or is not directly a file
                     // In that case the path shouldn't be set and the name should completely define the library.
                     // Seeing as on all targets the baseName doesn't have an extension, and all library types do
                     // if the name doesn't have an extension we can assume there is no path to it.
                     
-                    if (Path::getPathExt(path).getLength() > 0)
+                    ComPtr<IFileArtifactRepresentation> fileRep;
+                    if (Path::getPathExt(path).getLength() <= 0)
                     {
-                        // Set the path
-                        artifact->setPath(Artifact::PathType::Existing, path.getBuffer());
+                        // If there is no extension *assume* it is the name of a system level library
+                        fileRep = new FileArtifactRepresentation(IFileArtifactRepresentation::Kind::NameOnly, path, nullptr, nullptr);
                     }
+                    else
+                    {
+                        fileRep = new FileArtifactRepresentation(IFileArtifactRepresentation::Kind::Reference, path, nullptr, nullptr);
+                        if (!fileRep->exists())
+                        {
+                            sink->diagnose(referenceModuleName.loc, Diagnostics::libraryDoesNotExist, path);
+                            return SLANG_FAIL;
+                        }
+                    }
+                    artifact->addRepresentation(fileRep);
 
-                    // TODO(JS): We might want to check if the artifact exists.
-                    // If the artifact is a CPU (or downstream compiler) library
-                    // it may be findable by some other mechanism, so we probably don't want to check existance and just let the
-                    // downstream compiler handle.
-                    
                     SLANG_RETURN_ON_FAIL(_addLibraryReference(requestImpl, artifact));
                 }
                 else if (argValue == "-v" || argValue == "-version")
@@ -2036,7 +2045,7 @@ struct OptionsParser
         // and output type is callable, add an empty' rawOutput.
         if (rawOutputs.getCount() == 0 && 
             rawTargets.getCount() == 1 && 
-            ArtifactDesc::makeFromCompileTarget(asExternal(rawTargets[0].format)).kind == ArtifactKind::Callable)
+            ArtifactDescUtil::makeDescFromCompileTarget(asExternal(rawTargets[0].format)).kind == ArtifactKind::HostCallable)
         {
             RawOutput rawOutput;
             rawOutput.impliedFormat = rawTargets[0].format;

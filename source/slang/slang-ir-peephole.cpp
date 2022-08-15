@@ -85,6 +85,98 @@ struct PeepholeContext : InstPassBase
                 }
             }
             break;
+        case kIROp_CastPtrToBool:
+            {
+                auto ptr = inst->getOperand(0);
+                IRBuilder builder(&sharedBuilderStorage);
+                builder.setInsertBefore(inst);
+                auto neq = builder.emitNeq(ptr, builder.getPtrValue(nullptr));
+                inst->replaceUsesWith(neq);
+                inst->removeAndDeallocate();
+                changed = true;
+            }
+            break;
+        case kIROp_IsType:
+            {
+                auto isTypeInst = as<IRIsType>(inst);
+                auto actualType = isTypeInst->getValue()->getDataType();
+                if (isTypeEqual(actualType, (IRType*)isTypeInst->getTypeOperand()))
+                {
+                    IRBuilder builder(&sharedBuilderStorage);
+                    builder.setInsertBefore(inst);
+                    auto trueVal = builder.getBoolValue(true);
+                    inst->replaceUsesWith(trueVal);
+                    inst->removeAndDeallocate();
+                    changed = true;
+                }
+            }
+            break;
+        case kIROp_Reinterpret:
+            {
+                if (isTypeEqual(inst->getOperand(0)->getDataType(), inst->getDataType()))
+                {
+                    inst->replaceUsesWith(inst->getOperand(0));
+                    inst->removeAndDeallocate();
+                    changed = true;
+                }
+            }
+            break;
+        case kIROp_UnpackAnyValue:
+            {
+                if (inst->getOperand(0)->getOp() == kIROp_PackAnyValue)
+                {
+                    if (isTypeEqual(inst->getOperand(0)->getOperand(0)->getDataType(), inst->getDataType()))
+                    {
+                        inst->replaceUsesWith(inst->getOperand(0)->getOperand(0));
+                        inst->removeAndDeallocate();
+                        changed = true;
+                    }
+                }
+            }
+            break;
+        case kIROp_PackAnyValue:
+        {
+            // Pack(obj: anyValueN) : anyValueN --> obj
+            if (isTypeEqual(inst->getOperand(0)->getDataType(), inst->getDataType()))
+            {
+                inst->replaceUsesWith(inst->getOperand(0));
+                inst->removeAndDeallocate();
+                changed = true;
+            }
+        }
+        break;
+        case kIROp_GetOptionalValue:
+            {
+                if (inst->getOperand(0)->getOp() == kIROp_MakeOptionalValue)
+                {
+                    inst->replaceUsesWith(inst->getOperand(0)->getOperand(0));
+                    inst->removeAndDeallocate();
+                    changed = true;
+                }
+            }
+            break;
+        case kIROp_OptionalHasValue:
+            {
+                if (inst->getOperand(0)->getOp() == kIROp_MakeOptionalValue)
+                {
+                    IRBuilder builder(&sharedBuilderStorage);
+                    builder.setInsertBefore(inst);
+                    auto trueVal = builder.getBoolValue(true);
+                    inst->replaceUsesWith(trueVal);
+                    inst->removeAndDeallocate();
+                    changed = true;
+                }
+                else if (inst->getOperand(0)->getOp() == kIROp_MakeOptionalNone)
+                {
+                    IRBuilder builder(&sharedBuilderStorage);
+                    builder.setInsertBefore(inst);
+                    auto falseVal = builder.getBoolValue(false);
+                    inst->replaceUsesWith(falseVal);
+                    inst->removeAndDeallocate();
+                    changed = true;
+                }
+            }
+            break;
         default:
             break;
         }
@@ -94,6 +186,7 @@ struct PeepholeContext : InstPassBase
     {
         SharedIRBuilder* sharedBuilder = &sharedBuilderStorage;
         sharedBuilder->init(module);
+        sharedBuilderStorage.deduplicateAndRebuildGlobalNumberingMap();
 
         changed = false;
         processAllInsts([this](IRInst* inst) { processInst(inst); });

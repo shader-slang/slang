@@ -30,7 +30,8 @@ static const char* kStmtKeywords[] = {
     "protected", "typedef",        "typealias", "uniform",   "export",  "groupshared",
     "extension", "associatedtype", "this",      "namespace", "This",    "using",
     "__generic", "__exported",     "import",    "enum",      "break",   "continue",
-    "discard",   "defer",          "cbuffer",   "tbuffer",   "func"};
+    "discard",   "defer",          "cbuffer",   "tbuffer",   "func",    "is",
+    "as",        "nullptr",        "none",      "true",      "false"};
 
 static const char* hlslSemanticNames[] = {
     "register",
@@ -644,6 +645,37 @@ List<LanguageServerProtocol::CompletionItem> CompletionContext::createSwizzleCan
     return result;
 }
 
+LanguageServerProtocol::CompletionItem CompletionContext::generateGUIDCompletionItem()
+{
+    StringBuilder sb;
+    sb << "COM(\"";
+    auto docHash = doc->getURI().getHashCode() ^ doc->getText().getHashCode();
+    int sectionLengths[] = { 8,4,4,4,12 };
+    srand((unsigned int)std::chrono::high_resolution_clock::now().time_since_epoch().count());
+    auto hashStr = String(docHash, 16);
+    sectionLengths[0] -= (int)hashStr.getLength();
+    sb << hashStr;
+    for (int j = 0; j < SLANG_COUNT_OF(sectionLengths); j++)
+    {
+        auto len = sectionLengths[j];
+        if (j != 0)
+            sb << "-";
+        for (int i = 0; i < len; i++)
+        {
+            auto digit = rand() % 16;
+            if (digit < 10)
+                sb << digit;
+            else
+                sb.appendChar((char)('A' + digit - 10));
+        }
+    }
+    sb << "\")";
+    LanguageServerProtocol::CompletionItem resultItem;
+    resultItem.kind = LanguageServerProtocol::kCompletionItemKindKeyword;
+    resultItem.label = sb.ProduceString();
+    return resultItem;
+}
+
 List<LanguageServerProtocol::CompletionItem> CompletionContext::collectAttributes()
 {
     List<LanguageServerProtocol::CompletionItem> result;
@@ -672,6 +704,10 @@ List<LanguageServerProtocol::CompletionItem> CompletionContext::collectAttribute
             }
         }
     }
+
+    // Add a suggestion for `[COM]` attribute with generated GUID.
+    auto guidItem = generateGUIDCompletionItem();
+    result.add(guidItem);
     return result;
 }
 

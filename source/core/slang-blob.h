@@ -11,22 +11,31 @@
 #include "../../slang-com-helper.h"
 #include "../../slang-com-ptr.h"
 
+#include "../core/slang-com-object.h"
+
 namespace Slang {
 
 /** Base class for simple blobs.
 */
-class BlobBase : public ISlangBlob, public RefObject
+class BlobBase : public ISlangBlob, public ICastable, public ComBaseObject
 {
 public:
     // ISlangUnknown
-    SLANG_REF_OBJECT_IUNKNOWN_ALL
+    SLANG_COM_BASE_IUNKNOWN_ALL
+
+    // ICastable
+    virtual SLANG_NO_THROW void* SLANG_MCALL castAs(const SlangUUID& guid) SLANG_OVERRIDE;
 
 protected:
     ISlangUnknown* getInterface(const Guid& guid);
+    void* getObject(const Guid& guid);
 };
 
 /** A blob that uses a `String` for its storage.
 NOTE! Returns length *WITHOUT* terminating 0, even though there is one.
+
+NOTE! Whilst BobBase is atomic ref counted, the contained string *is not*. 
+There is a reasonable argument that StringBlob should contain it's own copy of the string contents.
 */
 class StringBlob : public BlobBase
 {
@@ -35,14 +44,23 @@ public:
     SLANG_NO_THROW void const* SLANG_MCALL getBufferPointer() SLANG_OVERRIDE { return m_string.getBuffer(); }
     SLANG_NO_THROW size_t SLANG_MCALL getBufferSize() SLANG_OVERRIDE { return m_string.getLength(); }
 
-        /// Get the contained string
-    SLANG_FORCE_INLINE const String& getString() const { return m_string; }
+    static ComPtr<ISlangBlob> create(const String& in) { return ComPtr<ISlangBlob>(new StringBlob(in)); }
+    static ComPtr<ISlangBlob> moveCreate(String& in)
+    {
+        auto blob = new StringBlob;
+        blob->m_string.swapWith(in);
+        return ComPtr<ISlangBlob>(blob);
+    }
 
+protected:
     explicit StringBlob(String const& string)
         : m_string(string)
     {}
+    StringBlob() {}
 
-protected:
+        /// Get the contained string
+    SLANG_FORCE_INLINE const String& getString() const { return m_string; }
+
     String m_string;
 };
 
@@ -56,20 +74,19 @@ public:
     SLANG_NO_THROW void const* SLANG_MCALL getBufferPointer() SLANG_OVERRIDE { return m_data.getBuffer(); }
     SLANG_NO_THROW size_t SLANG_MCALL getBufferSize() SLANG_OVERRIDE { return m_data.getCount(); }
 
-    ListBlob() {}
-
-    ListBlob(const List<uint8_t>& data): m_data(data) {}
-        // Move ctor
-    ListBlob(List<uint8_t>&& data): m_data(data) {}
-
-    static RefPtr<ListBlob> moveCreate(List<uint8_t>& data) { return new ListBlob(_Move(data)); } 
-
-    List<uint8_t> m_data;
+    static ComPtr<ISlangBlob> create(const List<uint8_t>& data) { return ComPtr<ISlangBlob>(new ListBlob(data)); }
+    
+    static ComPtr<ISlangBlob> moveCreate(List<uint8_t>& data) { return ComPtr<ISlangBlob>(new ListBlob(_Move(data))); } 
 
 protected:
-    void operator=(const ThisType& rhs) = delete;
-};
+    explicit ListBlob(const List<uint8_t>& data) : m_data(data) {}
+        // Move ctor
+    explicit ListBlob(List<uint8_t>&& data) : m_data(data) {}
 
+    void operator=(const ThisType& rhs) = delete;
+
+    List<uint8_t> m_data;
+};
 
 class ScopedAllocation
 {
@@ -172,29 +189,35 @@ public:
     SLANG_NO_THROW void const* SLANG_MCALL getBufferPointer() SLANG_OVERRIDE { return m_data.getData(); }
     SLANG_NO_THROW size_t SLANG_MCALL getBufferSize() SLANG_OVERRIDE { return m_data.getSizeInBytes(); }
 
-        // Ctor
-        // NOTE! Takes a copy of the input data
-    RawBlob(const void* data, size_t size) 
+        /// Moves ownership of data and dataCount to the blob
+        /// data must be a pointer returned by ::malloc.
+    static ComPtr<ISlangBlob> moveCreate(uint8_t* data, size_t dataCount)
+    {
+        RawBlob* blob = new RawBlob;
+        blob->m_data.attach(data, dataCount);
+        return ComPtr<ISlangBlob>(blob);
+    }
+    static ComPtr<ISlangBlob> moveCreate(ScopedAllocation& alloc)
+    {
+        RawBlob* blob = new RawBlob;
+        blob->m_data.swap(alloc);
+        return ComPtr<ISlangBlob>(blob);
+    }
+
+        /// Create a blob that will retain (a copy of) raw data.
+    static inline ComPtr<ISlangBlob> create(void const* inData, size_t size)
+    {
+        return ComPtr<ISlangBlob>(new RawBlob(inData, size));
+    }
+
+protected:
+    // Ctor
+    // NOTE! Takes a copy of the input data
+    RawBlob(const void* data, size_t size)
     {
         memcpy(m_data.allocate(size), data, size);
     }
 
-        /// Moves ownership of data and dataCount to the blob
-        /// data must be a pointer returned by ::malloc.
-    static RefPtr<RawBlob> moveCreate(uint8_t* data, size_t dataCount)
-    {
-        RawBlob* blob = new RawBlob;
-        blob->m_data.attach(data, dataCount);
-        return blob;
-    }
-    static RefPtr<RawBlob> moveCreate(ScopedAllocation& alloc)
-    {
-        RawBlob* blob = new RawBlob;
-        blob->m_data.swap(alloc);
-        return blob;
-    }
-
-protected:
     RawBlob() = default;
 
     ScopedAllocation m_data;
@@ -208,14 +231,19 @@ public:
     SLANG_NO_THROW void const* SLANG_MCALL getBufferPointer() SLANG_OVERRIDE { return m_data; }
     SLANG_NO_THROW size_t SLANG_MCALL getBufferSize() SLANG_OVERRIDE { return m_dataSizeInBytes; }
 
+    static inline ComPtr<ISlangBlob> create(void const* inData, size_t size)
+    {
+        return ComPtr<ISlangBlob>(new UnownedRawBlob(inData, size));
+    }
+
+protected:
     // Ctor
-    UnownedRawBlob(const void* data, size_t size):
+    UnownedRawBlob(const void* data, size_t size) :
         m_data(data),
         m_dataSizeInBytes(size)
     {
     }
 
-protected:
     UnownedRawBlob() = default;
 
     const void* m_data;
@@ -226,7 +254,7 @@ protected:
 The memory it references is *not* owned by the blob.
 This is useful when a Blob is useful to represent some global immutable chunk of memory.
 */
-class StaticBlob : public ISlangBlob
+class StaticBlob : public ISlangBlob, public ICastable
 {
 public:
 
@@ -234,6 +262,9 @@ public:
     SLANG_NO_THROW SlangResult SLANG_MCALL queryInterface(SlangUUID const& uuid, void** outObject) SLANG_OVERRIDE;
     SLANG_NO_THROW uint32_t SLANG_MCALL addRef() SLANG_OVERRIDE { return 1; }
     SLANG_NO_THROW uint32_t SLANG_MCALL release() SLANG_OVERRIDE { return 1; }
+
+    // ICastable
+    virtual SLANG_NO_THROW void* SLANG_MCALL castAs(const SlangUUID& guid) SLANG_OVERRIDE;
 
     // ISlangBlob
     SLANG_NO_THROW void const* SLANG_MCALL getBufferPointer() SLANG_OVERRIDE { return m_data; }
@@ -246,16 +277,12 @@ public:
     }
 
 protected:
+    ISlangUnknown* getInterface(const Guid& guid);
+    void* getObject(const Guid& guid);
+
     const void* m_data;
     size_t m_dataCount;
 };
-
-/// Create a blob that will retain (a copy of) raw data.
-///
-inline ComPtr<ISlangBlob> createRawBlob(void const* inData, size_t size)
-{
-    return ComPtr<ISlangBlob>(new RawBlob(inData, size));
-}
 
 class ScopeRefObjectBlob : public BlobBase
 {
@@ -264,14 +291,22 @@ public:
     SLANG_NO_THROW void const* SLANG_MCALL getBufferPointer() SLANG_OVERRIDE { return m_blob->getBufferPointer(); }
     SLANG_NO_THROW size_t SLANG_MCALL getBufferSize() SLANG_OVERRIDE { return m_blob->getBufferSize(); }
 
+    static inline ComPtr<ISlangBlob> create(ISlangBlob* blob, RefObject* scope)
+    {
+        return ComPtr<ISlangBlob>(new ScopeRefObjectBlob(blob, scope));
+    }
+
+protected:
+
     // Ctor
+
     ScopeRefObjectBlob(ISlangBlob* blob, RefObject* scope) :
         m_blob(blob),
         m_scope(scope)
     {
     }
 
-protected:
+
     RefPtr<RefObject> m_scope;
     ComPtr<ISlangBlob> m_blob;
 };

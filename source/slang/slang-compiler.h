@@ -25,6 +25,8 @@
 
 #include "slang-serialize-ir-types.h"
 
+#include "../compiler-core/slang-artifact-representation-impl.h"
+
 #include "../../slang.h"
 
 namespace Slang
@@ -141,75 +143,6 @@ namespace Slang
     class Linkage;
     class Module;
     class TranslationUnitRequest;
-
-    struct ShaderBindingRange
-    {
-        slang::ParameterCategory category = slang::ParameterCategory::None;
-        UInt spaceIndex = 0;
-        UInt registerIndex = 0;
-        UInt registerCount = 0; // 0 for unsized
-
-        bool isInfinite() const
-        {
-            return registerCount == 0;
-        }
-
-        bool containsBinding(slang::ParameterCategory _category, UInt _spaceIndex, UInt _registerIndex) const
-        {
-            return category == _category
-                && spaceIndex == _spaceIndex
-                && registerIndex <= _registerIndex
-                && (isInfinite() || registerCount + registerIndex > _registerIndex);
-        }
-
-        bool intersectsWith(const ShaderBindingRange& other) const
-        {
-            if (category != other.category || spaceIndex != other.spaceIndex)
-                return false;
-
-            const bool leftIntersection = (registerIndex < other.registerIndex + other.registerCount) || other.isInfinite();
-            const bool rightIntersection = (other.registerIndex < registerIndex + registerCount) || isInfinite();
-
-            return leftIntersection && rightIntersection;
-        }
-
-        bool adjacentTo(const ShaderBindingRange& other) const
-        {
-            if (category != other.category || spaceIndex != other.spaceIndex)
-                return false;
-
-            const bool leftIntersection = (registerIndex <= other.registerIndex + other.registerCount) || other.isInfinite();
-            const bool rightIntersection = (other.registerIndex <= registerIndex + registerCount) || isInfinite();
-
-            return leftIntersection && rightIntersection;
-        }
-
-        void mergeWith(const ShaderBindingRange other)
-        {
-            UInt newRegisterIndex = Math::Min(registerIndex, other.registerIndex);
-
-            if (other.isInfinite())
-                registerCount = 0;
-            else if (!isInfinite())
-                registerCount = Math::Max(registerIndex + registerCount, other.registerIndex + other.registerCount) - newRegisterIndex;
-
-            registerIndex = newRegisterIndex;
-        }
-
-        static bool isUsageTracked(slang::ParameterCategory category)
-        {
-            switch(category)
-            {
-            case slang::ConstantBuffer:
-            case slang::ShaderResource:
-            case slang::UnorderedAccess:
-            case slang::SamplerState:
-                return true;
-            default:
-                return false;
-            }
-        }
-    };
 
     struct PostEmitMetadata : public RefObject
     {
@@ -2950,6 +2883,7 @@ namespace Slang
         Scope* coreLanguageScope = nullptr;
         Scope* hlslLanguageScope = nullptr;
         Scope* slangLanguageScope = nullptr;
+        Scope* autodiffLanguageScope = nullptr;
 
         ModuleDecl* baseModuleDecl = nullptr;
         List<RefPtr<Module>> stdlibModules;
@@ -2981,10 +2915,12 @@ namespace Slang
         String slangLibraryCode;
         String hlslLibraryCode;
         String glslLibraryCode;
+        String autodiffLibraryCode;
 
         String getStdlibPath();
         String getCoreLibraryCode();
         String getHLSLLibraryCode();
+        String getAutodiffLibraryCode();
 
      
         RefPtr<SharedASTBuilder> m_sharedASTBuilder;
