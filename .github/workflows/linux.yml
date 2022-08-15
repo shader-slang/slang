@@ -25,6 +25,9 @@ jobs:
         CC=${{matrix.compiler}}
         CONFIGURATION=${{matrix.configuration}}
         ARCH=${{matrix.platform}}
+        CPPFLAGS=-Werror
+        CFLAGS=-Werror
+        CXXFLAGS=-Werror
         source ./github_build.sh
     - uses: actions/upload-artifact@v3
       with:

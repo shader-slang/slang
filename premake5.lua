@@ -756,7 +756,6 @@ newoption {
      -- keep our code free of warnings.
      --
      warnings "Extra"
-     flags { "FatalWarnings" }
  
      if targetInfo.isWindows then
          addSourceDir "source/core/windows"
@@ -778,7 +777,6 @@ newoption {
      -- keep our code free of warnings.
      --
      warnings "Extra"
-     flags { "FatalWarnings" }
  
      if targetInfo.isWindows then
          addSourceDir "source/compiler-core/windows"
@@ -792,7 +790,6 @@ standardProject("slang-rt", "source/slang-rt")
     pic "On"
     warnings "Extra"
     links {"miniz", "lz4"}
-    flags { "FatalWarnings" }
     defines { "SLANG_RT_DYNAMIC", "SLANG_RT_DYNAMIC_EXPORT" }
     addSourceDir "source/core"
     if targetInfo.isWindows then
@@ -1337,7 +1334,6 @@ tool "slangd"
      kind "SharedLib"
      links { "core", "compiler-core", "miniz", "lz4"}
      warnings "Extra"
-     flags { "FatalWarnings" }
      pic "On"
  
      -- The way that we currently configure things through `slang.h`,

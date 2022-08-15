@@ -57,6 +57,9 @@ jobs:
           export CC=${{matrix.compiler}}
           export CONFIGURATION=${{matrix.configuration}}
           export ARCH=${{matrix.platform}}
+          export CPPFLAGS=-Werror
+          export CFLAGS=-Werror
+          export CXXFLAGS=-Werror
           echo "building..."
           source ./github_macos_build.sh
       - name: Sign binaries
