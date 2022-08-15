@@ -94,6 +94,9 @@ struct DownstreamCompilerUtil: public DownstreamCompilerBaseUtil
         /// dependentNames names shared libraries which should be attempted to be loaded in the path of the main shared library.
         /// The list is optional (nullptr can be passed in), and the list is terminated by nullptr.
     static SlangResult loadSharedLibrary(const String& path, ISlangSharedLibraryLoader* loader, const char*const* dependantNames, const char* libraryName, ComPtr<ISlangSharedLibrary>& outSharedLib);
+
+        /// Append the desc as text
+    static void appendAsText(const DownstreamCompilerDesc& desc, StringBuilder& out);
 };
 
 }

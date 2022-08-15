@@ -167,7 +167,6 @@ struct DownstreamCompilerDesc
         /// Get the version as a value
     Int getVersionValue() const { return majorVersion * 100 + minorVersion; }
 
-    void appendAsText(StringBuilder& out) const;
         /// true if has a version set
     bool hasVersion() const { return majorVersion || minorVersion; }
 

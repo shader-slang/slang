@@ -450,4 +450,18 @@ static SlangResult _findPaths(const String& path, const char* libraryName, Strin
     }
 }
 
+/* static */void DownstreamCompilerUtil::appendAsText(const DownstreamCompilerDesc& desc, StringBuilder& out)
+{
+    out << TypeTextUtil::getPassThroughAsHumanText(desc.type);
+
+    // Append the version if there is a version
+    if (desc.majorVersion || desc.minorVersion)
+    {
+        out << " ";
+        out << desc.majorVersion;
+        out << ".";
+        out << desc.minorVersion;
+    }
+}
+
 }

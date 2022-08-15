@@ -16,22 +16,6 @@
 namespace Slang
 {
 
-/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! DownstreamCompilerDesc !!!!!!!!!!!!!!!!!!!!!!*/
-
-void DownstreamCompilerDesc::appendAsText(StringBuilder& out) const
-{
-    out << TypeTextUtil::getPassThroughAsHumanText(type);
-
-    // Append the version if there is a version
-    if (majorVersion || minorVersion)
-    {
-        out << " ";
-        out << majorVersion;
-        out << ".";
-        out << minorVersion;
-    }
-}
-
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! DownstreamDiagnostic !!!!!!!!!!!!!!!!!!!!!!!!*/
 
 /* static */UnownedStringSlice DownstreamDiagnostic::getSeverityText(Severity severity)
