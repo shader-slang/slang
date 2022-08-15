@@ -396,43 +396,6 @@ public:
     Desc m_desc;
 };
 
-// (DEPRECIATED)
-class DownstreamCompiler_Dep1: public RefObject
-{
-public:
-    typedef RefObject Super;
-
-    typedef DownstreamCompilerDesc Desc;
-    typedef DownstreamCompileOptions CompileOptions;
-    typedef DownstreamCompileResult CompileResult;
-
-    typedef CompileOptions::OptimizationLevel OptimizationLevel;
-    typedef CompileOptions::DebugInfoType DebugInfoType;
-    typedef CompileOptions::FloatingPointMode FloatingPointMode;
-    typedef CompileOptions::PipelineType PipelineType;
-    typedef CompileOptions::Define Define;
-    typedef CompileOptions::CapabilityVersion CapabilityVersion;
-
-        /// Get the desc of this compiler
-    const Desc& getDesc() const { return m_desc;  }
-        /// Compile using the specified options. The result is in resOut
-    virtual SlangResult compile(const CompileOptions& options, RefPtr<DownstreamCompileResult>& outResult) = 0;
-        /// Some compilers have support converting a binary blob into disassembly. Output disassembly is held in the output blob
-    virtual SlangResult disassemble(SlangCompileTarget sourceBlobTarget, const void* blob, size_t blobSize, ISlangBlob** out);
-
-        /// True if underlying compiler uses file system to communicate source
-    virtual bool isFileBased() = 0;
-
-protected:
-
-    DownstreamCompiler_Dep1(const Desc& desc) :
-        m_desc(desc)
-    {}
-    DownstreamCompiler_Dep1() {}
-
-    Desc m_desc;
-};
-
 class CommandLineDownstreamCompileResult : public DownstreamCompileResult
 {
 public:
