@@ -27,6 +27,53 @@
 namespace Slang
 {
 
+/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! DownstreamCompilerInfos !!!!!!!!!!!!!!!!!!!!!!*/
+
+struct DownstreamCompilerInfos
+{
+    DownstreamCompilerInfo infos[int(SLANG_PASS_THROUGH_COUNT_OF)];
+
+    static DownstreamCompilerInfos _calcInfos();
+    static DownstreamCompilerInfos s_infos;
+};
+
+/* static */ DownstreamCompilerInfos DownstreamCompilerInfos::_calcInfos()
+{
+    typedef DownstreamCompilerInfo Info;
+    typedef Info::SourceLanguageFlag SourceLanguageFlag;
+    typedef Info::SourceLanguageFlags SourceLanguageFlags;
+
+    DownstreamCompilerInfos infos;
+
+    infos.infos[int(SLANG_PASS_THROUGH_CLANG)] = Info(SourceLanguageFlag::CPP | SourceLanguageFlag::C);
+    infos.infos[int(SLANG_PASS_THROUGH_VISUAL_STUDIO)] = Info(SourceLanguageFlag::CPP | SourceLanguageFlag::C);
+    infos.infos[int(SLANG_PASS_THROUGH_GCC)] = Info(SourceLanguageFlag::CPP | SourceLanguageFlag::C);
+    infos.infos[int(SLANG_PASS_THROUGH_LLVM)] = Info(SourceLanguageFlag::CPP | SourceLanguageFlag::C);
+
+    infos.infos[int(SLANG_PASS_THROUGH_NVRTC)] = Info(SourceLanguageFlag::CUDA);
+
+    infos.infos[int(SLANG_PASS_THROUGH_DXC)] = Info(SourceLanguageFlag::HLSL);
+    infos.infos[int(SLANG_PASS_THROUGH_FXC)] = Info(SourceLanguageFlag::HLSL);
+    infos.infos[int(SLANG_PASS_THROUGH_GLSLANG)] = Info(SourceLanguageFlag::GLSL);
+
+    return infos;
+}
+
+/* static */DownstreamCompilerInfos DownstreamCompilerInfos::s_infos = DownstreamCompilerInfos::_calcInfos();
+
+/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! DownstreamCompilerInfo !!!!!!!!!!!!!!!!!!!!!!*/
+
+/* static */const DownstreamCompilerInfo& DownstreamCompilerInfo::getInfo(SlangPassThrough compiler)
+{
+    return DownstreamCompilerInfos::s_infos.infos[int(compiler)];
+}
+
+/* static */bool DownstreamCompilerInfo::canCompile(SlangPassThrough compiler, SlangSourceLanguage sourceLanguage)
+{
+    const auto& info = getInfo(compiler);
+    return (info.sourceLanguageFlags & (SourceLanguageFlags(1) << int(sourceLanguage))) != 0;
+}
+
 /* !!!!!!!!!!!!!!!!!!!!!!!!! DownstreamCompilerUtil !!!!!!!!!!!!!!!!!!!!!!*/
 
 static DownstreamCompilerMatchVersion _calcCompiledVersion()

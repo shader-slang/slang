@@ -9,6 +9,38 @@ namespace Slang
 
 typedef SlangResult (*DownstreamCompilerLocatorFunc)(const String& path, ISlangSharedLibraryLoader* loader, DownstreamCompilerSet* set);
 
+struct DownstreamCompilerInfo
+{
+    typedef DownstreamCompilerInfo This;
+    typedef uint32_t SourceLanguageFlags;
+    struct SourceLanguageFlag
+    {
+        enum Enum : SourceLanguageFlags
+        {
+            Unknown = SourceLanguageFlags(1) << SLANG_SOURCE_LANGUAGE_UNKNOWN,
+            Slang = SourceLanguageFlags(1) << SLANG_SOURCE_LANGUAGE_SLANG,
+            HLSL = SourceLanguageFlags(1) << SLANG_SOURCE_LANGUAGE_HLSL,
+            GLSL = SourceLanguageFlags(1) << SLANG_SOURCE_LANGUAGE_GLSL,
+            C = SourceLanguageFlags(1) << SLANG_SOURCE_LANGUAGE_C,
+            CPP = SourceLanguageFlags(1) << SLANG_SOURCE_LANGUAGE_CPP,
+            CUDA = SourceLanguageFlags(1) << SLANG_SOURCE_LANGUAGE_CUDA,
+        };
+    };
+
+    /// Get info for a compiler type
+    static const This& getInfo(SlangPassThrough compiler);
+    /// True if this compiler can compile the specified language
+    static bool canCompile(SlangPassThrough compiler, SlangSourceLanguage sourceLanguage);
+
+    DownstreamCompilerInfo() : sourceLanguageFlags(0) {}
+
+    DownstreamCompilerInfo(SourceLanguageFlags inSourceLanguageFlags) :
+        sourceLanguageFlags(inSourceLanguageFlags)
+    {}
+    SourceLanguageFlags sourceLanguageFlags;
+};
+
+
 // Combination of a downstream compiler type (pass through) and 
 // a match version.
 struct DownstreamCompilerMatchVersion
@@ -23,7 +55,6 @@ struct DownstreamCompilerMatchVersion
     SlangPassThrough type;                  ///< The type of the compiler
     MatchSemanticVersion matchVersion;      ///< The match version
 };
-
 
 struct DownstreamCompilerUtil: public DownstreamCompilerBaseUtil
 {
