@@ -39,7 +39,7 @@ static void _insertBinding(List<ShaderBindingRange>& ranges, LayoutResourceKind 
 }
 
 // Collects the metadata from the provided IR module, saves it in outMetadata.
-void collectMetadata(const IRModule* irModule, PostEmitMetadata& outMetadata)
+void collectMetadata(const IRModule* irModule, PostEmitMetadataImpl& outMetadata)
 {
     // Scan the instructions looking for global resource declarations
     for (const auto& inst : irModule->getGlobalInsts())

@@ -5019,7 +5019,7 @@ SlangResult EndToEndCompileRequest::isParameterLocationUsed(Int entryPointIndex,
 
     
     // TODO: optimize this with a binary search through a sorted list
-    for (const auto& range : metadata->getBindingRanges())
+    for (const auto& range : metadata->getUsedBindingRanges())
     {
         if (range.containsBinding((slang::ParameterCategory)category, spaceIndex, registerIndex))
         {

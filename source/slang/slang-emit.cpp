@@ -837,7 +837,7 @@ Result linkAndOptimizeIR(
 #endif
     validateIRModuleIfEnabled(codeGenContext, irModule);
 
-    auto metadata = new PostEmitMetadata;
+    auto metadata = new PostEmitMetadataImpl;
     outLinkedIR.metadata = metadata;
 
     collectMetadata(irModule, *metadata);

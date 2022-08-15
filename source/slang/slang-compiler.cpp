@@ -1366,7 +1366,7 @@ namespace Slang
         if (diagnostics.diagnostics.getCount())
         {
             StringBuilder compilerText;
-            compiler->getDesc().appendAsText(compilerText);
+            DownstreamCompilerUtil::appendAsText(compiler->getDesc(), compilerText);
 
             StringBuilder builder;
 
