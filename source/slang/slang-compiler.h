@@ -2381,7 +2381,12 @@ namespace Slang
         CodeGenTarget m_targetFormat = CodeGenTarget::Unknown;
         ExtensionTracker* m_extensionTracker = nullptr;
 
-        void dumpIntermediate(
+            /// Will output assembly as well as the artifact if appropriate for the artifact type for assembly output
+            /// and conversion is possible
+        void _dumpIntermediateMaybeWithAssembly(IArtifact* artifact);
+
+        void _dumpIntermediate(IArtifact* artifact);
+        void _dumpIntermediate(
             const ArtifactDesc& desc,
             void const* data,
             size_t      size);

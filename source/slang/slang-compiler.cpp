@@ -2026,9 +2026,31 @@ namespace Slang
 
     // Debug logic for dumping intermediate outputs
 
-    //
+    
+    void CodeGenContext::_dumpIntermediateMaybeWithAssembly(IArtifact* artifact)
+    {
+        _dumpIntermediate(artifact);
 
-    void CodeGenContext::dumpIntermediate(
+        ComPtr<IArtifact> assembly;
+        ArtifactOutputUtil::maybeDisassemble(getSession(), artifact, nullptr, assembly);
+
+        if (assembly)
+        {
+            _dumpIntermediate(assembly);
+        }
+    }
+
+    void CodeGenContext::_dumpIntermediate(IArtifact* artifact)
+    {
+        ComPtr<ISlangBlob> blob;
+        if (SLANG_FAILED(artifact->loadBlob(ArtifactKeep::No, blob.writeRef())))
+        {
+            return;
+        }
+        _dumpIntermediate(artifact->getDesc(), blob->getBufferPointer(), blob->getBufferSize());
+    }
+
+    void CodeGenContext::_dumpIntermediate(
         const ArtifactDesc& desc,
         void const*     data,
         size_t          size)
@@ -2046,16 +2068,22 @@ namespace Slang
 
         // Just use the counter for the 'base name'
         StringBuilder basename;
+
+        // Add the prefix
+        basename << getIntermediateDumpPrefix();
+
+        // Add the id
         basename << int(id);
 
         // Work out the filename based on the desc and the basename
         StringBuilder filename;
         ArtifactDescUtil::calcNameForDesc(desc, basename.getUnownedSlice(), filename);
 
-        // If didn't produce a filename, ues the counter value and ".unknown" extension
+        // If didn't produce a filename, use basename with .unknown extension
         if (filename.getLength() == 0)
         {
-            filename << basename << ".unknown";
+            filename = basename;
+            filename << ".unknown";
         }
         
         // Write to a file
@@ -2067,13 +2095,8 @@ namespace Slang
         if (!shouldDumpIntermediates())
             return;
 
-        ComPtr<ISlangBlob> blob;
-        if (SLANG_FAILED(artifact->loadBlob(ArtifactKeep::No, blob.writeRef())))
-        {
-            return;
-        }
-
-        dumpIntermediate(artifact->getDesc(), blob->getBufferPointer(), blob->getBufferSize());
+        
+        _dumpIntermediateMaybeWithAssembly(artifact);
     }
 
     IRDumpOptions CodeGenContext::getIRDumpOptions()

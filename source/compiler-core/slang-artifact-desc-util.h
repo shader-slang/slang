@@ -50,9 +50,6 @@ struct ArtifactDescUtil
         /// True if the desc holds textual information
     static bool isText(const ArtifactDesc& desc);
 
-        /// Given an assembly type returns it's extension from the payload type
-    static UnownedStringSlice getAssemblyExtensionForPayload(ArtifactPayload payload);
-
         /// True if artifact  appears to be linkable
     static bool isLinkable(const ArtifactDesc& desc);
 
@@ -62,11 +59,11 @@ struct ArtifactDescUtil
         /// Try to determine the desc from a path
     static ArtifactDesc getDescFromPath(const UnownedStringSlice& slice);
 
-        /// Gets the default file extension for the artifact type. Returns empty slice if not known
-    static UnownedStringSlice getDefaultExtension(const ArtifactDesc& desc);
+        /// Appends the default file extension for the artifact type. 
+    static SlangResult appendDefaultExtension(const ArtifactDesc& desc, StringBuilder& out);
 
         /// Get the extension for CPU/Host for a kind
-    static UnownedStringSlice getCpuExtensionForKind(Kind kind);
+    static SlangResult appendCpuExtensionForKind(Kind kind, StringBuilder& out);
 
         /// Given a desc and a path returns the base name (stripped of prefix and extension)
     static String getBaseNameFromPath(const ArtifactDesc& desc, const UnownedStringSlice& path);
