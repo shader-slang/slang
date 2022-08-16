@@ -122,7 +122,7 @@ struct HierarchicalEnumTable
                 return true;
             }
             type = m_parents[Index(type)];
-        } while (Index(type) > Index(T::Base));
+        } while (Index(type) >= Index(T::Base));
 
         return false;
     }
@@ -620,31 +620,6 @@ UnownedStringSlice ArtifactDescUtil::getDefaultExtension(const ArtifactDesc& des
     return getBaseNameFromPath(desc, path);
 }
 
-/* static */String ArtifactDescUtil::getBaseName(IArtifact* artifact)
-{
-    if (auto fileRep = findRepresentation<IFileArtifactRepresentation>(artifact))
-    {
-        return getBaseName(artifact->getDesc(), fileRep);
-    }
-    // Else use the name
-    return artifact->getName();
-}
-
-/* static */String ArtifactDescUtil::getParentPath(IFileArtifactRepresentation* fileRep)
-{
-    UnownedStringSlice path(fileRep->getPath());
-    return Path::getParentDirectory(path);
-}
-
-/* static */String ArtifactDescUtil::getParentPath(IArtifact* artifact)
-{
-    if (auto fileRep = findRepresentation<IFileArtifactRepresentation>(artifact))
-    {
-        return getParentPath(fileRep);
-    }
-    return String();
-}
-
 /* static */SlangResult ArtifactDescUtil::calcPathForDesc(const ArtifactDesc& desc, const UnownedStringSlice& basePath, StringBuilder& outPath)
 {
     outPath.Clear();
@@ -688,12 +663,6 @@ UnownedStringSlice ArtifactDescUtil::getDefaultExtension(const ArtifactDesc& des
     }
 
     return SLANG_OK;
-}
-
-/* static */ComPtr<IArtifactContainer> ArtifactDescUtil::createContainer(const ArtifactDesc& desc)
-{
-    const auto containerDesc = ArtifactDesc::make(ArtifactKind::Container, ArtifactPayload::CompileResults, desc.style);
-    return ArtifactContainer::create(containerDesc);
 }
 
 } // namespace Slang

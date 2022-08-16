@@ -10,8 +10,6 @@
 #include "../core/slang-com-object.h"
 #include "../core/slang-memory-arena.h"
 
-//#include "../core/slang-string-slice-pool.h"
-
 namespace Slang
 {
 
@@ -172,7 +170,10 @@ struct ShaderBindingRange
     }
 };
 
-typedef List<ShaderBindingRange> ShaderBindingRanges;
+struct PostEmitMetadata 
+{
+    List<ShaderBindingRange> usedBindings;
+};
 
 class PostEmitMetadataArtifactRepresentation : public ComBaseObject, public IPostEmitMetadataArtifactRepresentation
 {
@@ -184,15 +185,45 @@ public:
     // ICastable
     SLANG_NO_THROW void* SLANG_MCALL castAs(const Guid& guid) SLANG_OVERRIDE;
     // IArtifactRepresentation
-    SLANG_NO_THROW SlangResult SLANG_MCALL writeToBlob(ISlangBlob** blob) SLANG_OVERRIDE;
-    SLANG_NO_THROW bool SLANG_MCALL exists() SLANG_OVERRIDE;
+    SLANG_NO_THROW SlangResult SLANG_MCALL writeToBlob(ISlangBlob** outBlob) SLANG_OVERRIDE { SLANG_UNUSED(outBlob); return SLANG_E_NOT_AVAILABLE; }
+    SLANG_NO_THROW bool SLANG_MCALL exists() SLANG_OVERRIDE { return true; }
     // IPostEmitMetadataArtifactRepresentation
     SLANG_NO_THROW virtual Slice<ShaderBindingRange> SLANG_MCALL getBindingRanges() SLANG_OVERRIDE;
     
     void* getInterface(const Guid& uuid);
     void* getObject(const Guid& uuid);
 
-    ShaderBindingRanges m_usedBindings;
+    PostEmitMetadata m_metadata;
+};
+
+/* This allows wrapping any object to be an artifact representation. 
+
+NOTE! Only allows casting from a single guid. Passing a RefObject across an ABI bounday remains risky!
+*/
+class ObjectArtifactRepresentation : public ComBaseObject, public IArtifactRepresentation
+{
+public:
+    SLANG_CLASS_GUID(0xb9d5af57, 0x725b, 0x45f8, { 0xac, 0xed, 0x18, 0xf4, 0xa8, 0x4b, 0xf4, 0x73 })
+
+    SLANG_COM_BASE_IUNKNOWN_ALL
+
+    // ICastable
+    SLANG_NO_THROW void* SLANG_MCALL castAs(const Guid& guid) SLANG_OVERRIDE;
+    // IArtifactRepresentation
+    SLANG_NO_THROW SlangResult SLANG_MCALL writeToBlob(ISlangBlob** outBlob) SLANG_OVERRIDE { SLANG_UNUSED(outBlob); return SLANG_E_NOT_AVAILABLE; }
+    SLANG_NO_THROW bool SLANG_MCALL exists() SLANG_OVERRIDE { return m_object; }
+
+    ObjectArtifactRepresentation(const Guid& typeGuid, RefObject* obj):
+        m_typeGuid(typeGuid), 
+        m_object(obj)
+    {
+    }
+
+    void* getInterface(const Guid& uuid);
+    void* getObject(const Guid& uuid);
+ 
+    Guid m_typeGuid;                ///< Will return m_object if a cast to m_typeGuid is given
+    RefPtr<RefObject> m_object;     ///< The object
 };
 
 } // namespace Slang

@@ -75,22 +75,28 @@ struct ArtifactDescUtil
         /// If there is a path set, will extract the name from that (stripping prefix, extension as necessary).
         /// Else if there is an explicit name set, this is returned.
         /// Else returns the empty string
-    static String getBaseName(IArtifact* artifact);
+    
     static String getBaseName(const ArtifactDesc& desc, IFileArtifactRepresentation* fileRep);
-
-        /// Get the parent path (empty if there isn't one)
-    static String getParentPath(IArtifact* artifact);
-    static String getParentPath(IFileArtifactRepresentation* fileRep);
 
         /// Given a desc, and a basePath returns a suitable path for a entity of specified desc
     static SlangResult calcPathForDesc(const ArtifactDesc& desc, const UnownedStringSlice& basePath, StringBuilder& outPath);
 
-        /// Make ArtifactDesc from target
+        /// Given a target returns the ArtifactDesc
     static ArtifactDesc makeDescFromCompileTarget(SlangCompileTarget target);
 
-        /// Create an empty container which is compatible with the desc
-    static ComPtr<IArtifactContainer> createContainer(const ArtifactDesc& desc);
+        /// Make ArtifactDesc from target
+    static bool isDescDerivedFrom(const ArtifactDesc& desc, const ArtifactDesc& from);
 };
+
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+inline /* static */bool ArtifactDescUtil::isDescDerivedFrom(const ArtifactDesc& desc, const ArtifactDesc& from)
+{
+    // TODO(JS): Currently this ignores flags in desc. That may or may not be right 
+    // long term.
+    return isDerivedFrom(desc.kind, from.kind) &&
+        isDerivedFrom(desc.payload, from.payload) &&
+        isDerivedFrom(desc.style, from.style);
+}
 
 } // namespace Slang
 

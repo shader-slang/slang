@@ -178,10 +178,58 @@ void* PostEmitMetadataArtifactRepresentation::getObject(const Guid& uuid)
     return nullptr;
 }
 
-Slice<ShaderBindingRange> PostEmitMetadataArtifactRepresentation::getBindingRanges() 
-{ 
-    return Slice<ShaderBindingRange>(m_usedBindings.getBuffer(), m_usedBindings.getCount()); 
+void* PostEmitMetadataArtifactRepresentation::castAs(const Guid& guid)
+{
+    if (auto ptr = getInterface(guid))
+    {
+        return ptr;
+    }
+    return getObject(guid);
 }
 
- 
+
+Slice<ShaderBindingRange> PostEmitMetadataArtifactRepresentation::getBindingRanges() 
+{ 
+    return Slice<ShaderBindingRange>(m_metadata.usedBindings.getBuffer(), m_metadata.usedBindings.getCount()); 
+}
+
+/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!! PostEmitMetadataArtifactRepresentation !!!!!!!!!!!!!!!!!!!!!!!!!!! */
+
+void* ObjectArtifactRepresentation::castAs(const Guid& guid)
+{
+    
+    if (auto ptr = getInterface(guid))
+    {
+        return ptr;
+    }
+    return getObject(guid);
+}
+
+void* ObjectArtifactRepresentation::getInterface(const Guid& guid)
+{
+    if (guid == ISlangUnknown::getTypeGuid() ||
+        guid == ICastable::getTypeGuid() ||
+        guid == IArtifactRepresentation::getTypeGuid())
+    {
+        return static_cast<IArtifactRepresentation*>(this);
+    }
+    return nullptr;
+}
+
+void* ObjectArtifactRepresentation::getObject(const Guid& guid)
+{
+    if (guid == getTypeGuid())
+    {
+        return this;
+    }
+
+    // If matches the guid saved in the object, we return that
+    if (m_object && m_typeGuid == guid)
+    {
+        return m_object;
+    }
+
+    return nullptr;
+}
+
 } // namespace Slang

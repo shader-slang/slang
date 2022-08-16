@@ -11,6 +11,7 @@
 #include "../core/slang-string-slice-pool.h"
 
 #include "slang-artifact-desc-util.h"
+#include "slang-artifact-util.h"
 
 namespace Slang
 {
@@ -649,7 +650,7 @@ static SlangResult _parseGCCFamilyLine(const UnownedStringSlice& line, LineParse
             // Get the name and path (can be empty) to the library
             SLANG_RETURN_ON_FAIL(artifact->requireFile(ArtifactKeep::Yes, nullptr, fileRep.writeRef()));
 
-            libPathPool.add(ArtifactDescUtil::getParentPath(fileRep));
+            libPathPool.add(ArtifactUtil::getParentPath(fileRep));
             cmdLine.addPrefixPathArg("-l", ArtifactDescUtil::getBaseName(artifact->getDesc(), fileRep));
         }
     }

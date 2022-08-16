@@ -4,6 +4,8 @@
 #include "slang-ir.h"
 #include "slang-ir-insts.h"
 
+#include "../compiler-core/slang-artifact-representation-impl.h"
+
 namespace Slang
 {
 
