@@ -1037,8 +1037,10 @@ SLANG_NO_THROW slang::IModule* SLANG_MCALL Linkage::loadModuleFromSource(
         if (File::exists(pathStr))
         {
             String cannonicalPath;
-            Path::getCanonical(pathStr, cannonicalPath);
-            pathInfo = PathInfo::makeNormal(pathStr, cannonicalPath);
+            if (SLANG_SUCCEEDED(Path::getCanonical(pathStr, cannonicalPath)))
+            {
+                pathInfo = PathInfo::makeNormal(pathStr, cannonicalPath);
+            }
         }
         auto module = loadModule(
             name,
