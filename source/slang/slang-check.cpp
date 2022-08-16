@@ -83,7 +83,7 @@ namespace Slang
         m_downstreamCompilers[int(type)].setNull();
     }
 
-    DownstreamCompiler* Session::getOrLoadDownstreamCompiler(PassThroughMode type, DiagnosticSink* sink)
+    IDownstreamCompiler* Session::getOrLoadDownstreamCompiler(PassThroughMode type, DiagnosticSink* sink)
     {
         if (m_downstreamCompilerInitialized & (1 << int(type)))
         {
@@ -144,7 +144,7 @@ namespace Slang
             DownstreamCompilerUtil::updateDefaults(m_downstreamCompilerSet);
         }
 
-        DownstreamCompiler* compiler = nullptr;
+        IDownstreamCompiler* compiler = nullptr;
 
         if (type == PassThroughMode::GenericCCpp)
         {
@@ -152,7 +152,7 @@ namespace Slang
         }
         else
         {
-            DownstreamCompiler::Desc desc;
+            DownstreamCompilerDesc desc;
             desc.type = SlangPassThrough(type);
             compiler = DownstreamCompilerUtil::findCompiler(m_downstreamCompilerSet, DownstreamCompilerUtil::MatchType::Newest, desc);
         }

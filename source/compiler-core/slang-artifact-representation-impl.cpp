@@ -9,6 +9,8 @@
 
 #include "slang-artifact-util.h"
 
+#include "../core/slang-castable-list-impl.h"
+
 namespace Slang {
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!! FileArtifactRepresentation !!!!!!!!!!!!!!!!!!!!!!!!!!! */
@@ -45,16 +47,23 @@ void* FileArtifactRepresentation::castAs(const Guid& guid)
     return getObject(guid);
 }
 
-SlangResult FileArtifactRepresentation::writeToBlob(ISlangBlob** blob)
+SlangResult FileArtifactRepresentation::createRepresentation(const Guid& typeGuid, ICastable** outCastable)
 {
-    if (m_kind == Kind::NameOnly)
+    // We can convert into a blob only, and only if we have a path
+    // If it's referenced by a name only, it's a file that *can't* be loaded as a blob in general.
+    if (typeGuid != ISlangBlob::getTypeGuid() ||
+        m_kind == Kind::NameOnly)
     {
-        // If it's referenced by a name only, it's a file that *can't* be loaded as a blob in general.
         return SLANG_E_NOT_AVAILABLE;
     }
 
+    ComPtr<ISlangBlob> blob;
+
     auto fileSystem = _getFileSystem();
-    return fileSystem->loadFile(m_path.getBuffer(), blob);
+    SLANG_RETURN_ON_FAIL(fileSystem->loadFile(m_path.getBuffer(), blob.writeRef()));
+
+    *outCastable = CastableUtil::getCastable(blob).detach();
+    return SLANG_OK;
 }
 
 bool FileArtifactRepresentation::exists()
@@ -92,105 +101,6 @@ FileArtifactRepresentation::~FileArtifactRepresentation()
         auto fileSystem = _getFileSystem();
         fileSystem->remove(m_path.getBuffer());
     }
-}
-
-/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!! DiagnosticsArtifactRepresentation !!!!!!!!!!!!!!!!!!!!!!!!!!! */
-
-void* DiagnosticsArtifactRepresentation::getInterface(const Guid& guid)
-{
-    if (guid == ISlangUnknown::getTypeGuid() ||
-        guid == ICastable::getTypeGuid() ||
-        guid == IArtifactRepresentation::getTypeGuid() ||
-        guid == IDiagnosticsArtifactRepresentation::getTypeGuid())
-    {
-        return static_cast<DiagnosticsArtifactRepresentation*>(this);
-    }
-    return nullptr;
-}
-
-void* DiagnosticsArtifactRepresentation::getObject(const Guid& guid)
-{
-    SLANG_UNUSED(guid);
-    return nullptr;
-}
-
-void* DiagnosticsArtifactRepresentation::castAs(const Guid& guid)
-{
-    if (auto intf = getInterface(guid))
-    {
-        return intf;
-    }
-    return getObject(guid);
-}
-
-SlangResult DiagnosticsArtifactRepresentation::writeToBlob(ISlangBlob** outBlob)
-{
-    *outBlob = nullptr;
-    return SLANG_E_NOT_IMPLEMENTED;
-}
-
-bool DiagnosticsArtifactRepresentation::exists()
-{
-    return true;
-}
-
-ZeroTerminatedCharSlice DiagnosticsArtifactRepresentation::_allocateSlice(const Slice<char>& in)
-{
-    if (in.count == 0)
-    {
-        return ZeroTerminatedCharSlice("", 0);
-    }
-    const char* dst = m_arena.allocateString(in.data, in.count);
-    return ZeroTerminatedCharSlice(dst, in.count);
-}
-
-void DiagnosticsArtifactRepresentation::add(const Diagnostic& inDiagnostic)
-{
-    Diagnostic diagnostic(inDiagnostic);
-
-    diagnostic.text = _allocateSlice(inDiagnostic.text);
-    diagnostic.code = _allocateSlice(inDiagnostic.code);
-    diagnostic.filePath = _allocateSlice(inDiagnostic.filePath);
-
-    m_diagnostics.add(diagnostic);
-}
-
-/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!! PostEmitMetadataArtifactRepresentation !!!!!!!!!!!!!!!!!!!!!!!!!!! */
-
-void* PostEmitMetadataArtifactRepresentation::getInterface(const Guid& guid)
-{
-    if (guid == ISlangUnknown::getTypeGuid() ||
-        guid == ICastable::getTypeGuid() ||
-        guid == IArtifactRepresentation::getTypeGuid() ||
-        guid == IPostEmitMetadataArtifactRepresentation::getTypeGuid())
-    {
-        return static_cast<IPostEmitMetadataArtifactRepresentation*>(this);
-    }
-    return nullptr;
-}
-
-void* PostEmitMetadataArtifactRepresentation::getObject(const Guid& uuid)
-{
-    if (uuid == getTypeGuid())
-    {
-        return this;
-    }
-    return nullptr;
-}
-
-void* PostEmitMetadataArtifactRepresentation::castAs(const Guid& guid)
-{
-    if (auto ptr = getInterface(guid))
-    {
-        return ptr;
-    }
-    return getObject(guid);
-}
-
-
-Slice<ShaderBindingRange> PostEmitMetadataArtifactRepresentation::getBindingRanges() 
-{ 
-    return Slice<ShaderBindingRange>(m_metadata.usedBindings.getBuffer(), m_metadata.usedBindings.getCount()); 
 }
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!! PostEmitMetadataArtifactRepresentation !!!!!!!!!!!!!!!!!!!!!!!!!!! */

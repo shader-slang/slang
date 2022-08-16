@@ -274,6 +274,8 @@
     </Lib>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="..\..\..\source\compiler-core\slang-artifact-associated-impl.h" />
+    <ClInclude Include="..\..\..\source\compiler-core\slang-artifact-associated.h" />
     <ClInclude Include="..\..\..\source\compiler-core\slang-artifact-desc-util.h" />
     <ClInclude Include="..\..\..\source\compiler-core\slang-artifact-handler-impl.h" />
     <ClInclude Include="..\..\..\source\compiler-core\slang-artifact-helper.h" />
@@ -286,7 +288,10 @@
     <ClInclude Include="..\..\..\source\compiler-core\slang-core-diagnostics.h" />
     <ClInclude Include="..\..\..\source\compiler-core\slang-diagnostic-sink.h" />
     <ClInclude Include="..\..\..\source\compiler-core\slang-doc-extractor.h" />
+    <ClInclude Include="..\..\..\source\compiler-core\slang-downstream-compiler-set.h" />
+    <ClInclude Include="..\..\..\source\compiler-core\slang-downstream-compiler-util.h" />
     <ClInclude Include="..\..\..\source\compiler-core\slang-downstream-compiler.h" />
+    <ClInclude Include="..\..\..\source\compiler-core\slang-downstream-dep1.h" />
     <ClInclude Include="..\..\..\source\compiler-core\slang-dxc-compiler.h" />
     <ClInclude Include="..\..\..\source\compiler-core\slang-fxc-compiler.h" />
     <ClInclude Include="..\..\..\source\compiler-core\slang-gcc-compiler-util.h" />
@@ -316,6 +321,7 @@
     <ClInclude Include="..\..\..\source\compiler-core\windows\slang-win-visual-studio-util.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="..\..\..\source\compiler-core\slang-artifact-associated-impl.cpp" />
     <ClCompile Include="..\..\..\source\compiler-core\slang-artifact-desc-util.cpp" />
     <ClCompile Include="..\..\..\source\compiler-core\slang-artifact-handler-impl.cpp" />
     <ClCompile Include="..\..\..\source\compiler-core\slang-artifact-helper.cpp" />
@@ -326,7 +332,10 @@
     <ClCompile Include="..\..\..\source\compiler-core\slang-core-diagnostics.cpp" />
     <ClCompile Include="..\..\..\source\compiler-core\slang-diagnostic-sink.cpp" />
     <ClCompile Include="..\..\..\source\compiler-core\slang-doc-extractor.cpp" />
+    <ClCompile Include="..\..\..\source\compiler-core\slang-downstream-compiler-set.cpp" />
+    <ClCompile Include="..\..\..\source\compiler-core\slang-downstream-compiler-util.cpp" />
     <ClCompile Include="..\..\..\source\compiler-core\slang-downstream-compiler.cpp" />
+    <ClCompile Include="..\..\..\source\compiler-core\slang-downstream-dep1.cpp" />
     <ClCompile Include="..\..\..\source\compiler-core\slang-dxc-compiler.cpp" />
     <ClCompile Include="..\..\..\source\compiler-core\slang-fxc-compiler.cpp" />
     <ClCompile Include="..\..\..\source\compiler-core\slang-gcc-compiler-util.cpp" />

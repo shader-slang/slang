@@ -34,15 +34,15 @@ namespace Slang
 
 #if SLANG_ENABLE_GLSLANG_SUPPORT
 
-class GlslangDownstreamCompiler : public DownstreamCompiler
+class GlslangDownstreamCompiler : public DownstreamCompilerBase
 {
 public:
-    typedef DownstreamCompiler Super;
+    typedef DownstreamCompilerBase Super;
 
-    // DownstreamCompiler
-    virtual SlangResult compile(const CompileOptions& options, RefPtr<DownstreamCompileResult>& outResult) SLANG_OVERRIDE;
-    virtual SlangResult disassemble(SlangCompileTarget sourceBlobTarget, const void* blob, size_t blobSize, ISlangBlob** out) SLANG_OVERRIDE;
-    virtual bool isFileBased() SLANG_OVERRIDE { return false; }
+    // IDownstreamCompiler
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL compile(const CompileOptions& options, RefPtr<DownstreamCompileResult>& outResult) SLANG_OVERRIDE;
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL disassemble(SlangCompileTarget sourceBlobTarget, const void* blob, size_t blobSize, ISlangBlob** out) SLANG_OVERRIDE;
+    virtual SLANG_NO_THROW bool SLANG_MCALL isFileBased() SLANG_OVERRIDE { return false; }
 
         /// Must be called before use
     SlangResult init(ISlangSharedLibrary* library);
@@ -163,7 +163,7 @@ SlangResult GlslangDownstreamCompiler::compile(const CompileOptions& options, Re
     SemanticVersion spirvVersion;
     for (const auto& capabilityVersion : options.requiredCapabilityVersions)
     {
-        if (capabilityVersion.kind == DownstreamCompiler::CapabilityVersion::Kind::SPIRV)
+        if (capabilityVersion.kind == DownstreamCompileOptions::CapabilityVersion::Kind::SPIRV)
         {
             if (capabilityVersion.version > spirvVersion)
             {
@@ -275,10 +275,11 @@ SlangResult GlslangDownstreamCompiler::disassemble(SlangCompileTarget sourceBlob
         return SLANG_FAIL;
     }
 
-    RefPtr<GlslangDownstreamCompiler> compiler(new GlslangDownstreamCompiler);
+    auto compiler = new GlslangDownstreamCompiler;
+    ComPtr<IDownstreamCompiler> compilerIntf(compiler);
     SLANG_RETURN_ON_FAIL(compiler->init(library));
 
-    set->addCompiler(compiler);
+    set->addCompiler(compilerIntf);
     return SLANG_OK;
 }
 

@@ -454,14 +454,15 @@ static SlangResult _findVersionsWithRegistery(List<WinVisualStudioUtil::VersionP
     for (const auto& versionPath : versionPaths)
     {
         // Turn into a desc
-        const DownstreamCompiler::Desc desc(SLANG_PASS_THROUGH_VISUAL_STUDIO, versionPath.version);
+        const DownstreamCompilerDesc desc(SLANG_PASS_THROUGH_VISUAL_STUDIO, versionPath.version);
 
         // If not in set add it
         if (!set->getCompiler(desc))
         {
-            RefPtr<CommandLineDownstreamCompiler> compiler = new VisualStudioDownstreamCompiler(desc);
+            auto compiler = new VisualStudioDownstreamCompiler(desc);
+            ComPtr<IDownstreamCompiler> compilerIntf(compiler);
             calcExecuteCompilerArgs(versionPath, compiler->m_cmdLine);
-            set->addCompiler(compiler);
+            set->addCompiler(compilerIntf);
         }
     }
 

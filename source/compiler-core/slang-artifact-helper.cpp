@@ -5,6 +5,7 @@
 #include "slang-artifact-representation-impl.h"
 
 #include "slang-artifact-desc-util.h"
+#include "slang-artifact-util.h"
 
 #include "../core/slang-castable-list-impl.h"
 
@@ -13,7 +14,6 @@
 #include "../core/slang-shared-library.h"
 
 namespace Slang {
-
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!! DefaultArtifactHelper !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
@@ -119,6 +119,11 @@ SlangResult DefaultArtifactHelper::calcArtifactPath(const ArtifactDesc& desc, co
 ArtifactDesc DefaultArtifactHelper::makeDescFromCompileTarget(SlangCompileTarget target)
 {
 	return ArtifactDescUtil::makeDescFromCompileTarget(target);
+}
+
+void DefaultArtifactHelper::getCastable(ISlangUnknown* unk, ICastable** outCastable)
+{
+	*outCastable = CastableUtil::getCastable(unk).detach();
 }
 
 } // namespace Slang

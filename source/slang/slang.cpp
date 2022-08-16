@@ -11,6 +11,7 @@
 #include "../compiler-core/slang-artifact-impl.h"
 #include "../compiler-core/slang-artifact-desc-util.h"
 #include "../compiler-core/slang-artifact-util.h"
+#include "../compiler-core/slang-artifact-associated-impl.h"
 
 #include "slang-module-library.h"
 
@@ -694,7 +695,7 @@ SLANG_NO_THROW const char* SLANG_MCALL Session::getBuildTagString()
 
 SLANG_NO_THROW SlangResult SLANG_MCALL Session::setDefaultDownstreamCompiler(SlangSourceLanguage sourceLanguage, SlangPassThrough defaultCompiler)
 {
-    if (DownstreamCompiler::canCompile(defaultCompiler, sourceLanguage))
+    if (DownstreamCompilerInfo::canCompile(defaultCompiler, sourceLanguage))
     {
         m_defaultDownstreamCompilers[int(sourceLanguage)] = PassThroughMode(defaultCompiler);
         return SLANG_OK;
@@ -739,8 +740,7 @@ SlangPassThrough Session::getDownstreamCompilerForTransition(SlangCompileTarget 
         (source == CodeGenTarget::CSource || source == CodeGenTarget::CPPSource))
     {
         // We prefer LLVM if it's available
-        DownstreamCompiler* llvm = getOrLoadDownstreamCompiler(PassThroughMode::LLVM, nullptr);
-        if (llvm)
+        if (auto llvm = getOrLoadDownstreamCompiler(PassThroughMode::LLVM, nullptr))
         {
             return SLANG_PASS_THROUGH_LLVM;
         }
@@ -759,7 +759,7 @@ SlangPassThrough Session::getDownstreamCompilerForTransition(SlangCompileTarget 
     return SLANG_PASS_THROUGH_NONE;
 }
 
-DownstreamCompiler* Session::getDownstreamCompiler(CodeGenTarget source, CodeGenTarget target)
+IDownstreamCompiler* Session::getDownstreamCompiler(CodeGenTarget source, CodeGenTarget target)
 {
     PassThroughMode compilerType = (PassThroughMode)getDownstreamCompilerForTransition(SlangCompileTarget(source), SlangCompileTarget(target));
     return getOrLoadDownstreamCompiler(compilerType, nullptr);
@@ -1963,6 +1963,9 @@ void FrontEndCompileRequest::parseTranslationUnit(
         break;
     }
 
+    // TODO(JS):
+    // Note! that a adding a define twice will cause an exception in debug builds
+    // that may be desirable or not...
     Dictionary<String, String> combinedPreprocessorDefinitions;
     for(auto& def : getLinkage()->preprocessorDefinitions)
         combinedPreprocessorDefinitions.Add(def.Key, def.Value);
@@ -1971,11 +1974,44 @@ void FrontEndCompileRequest::parseTranslationUnit(
     for(auto& def : translationUnit->preprocessorDefinitions)
         combinedPreprocessorDefinitions.Add(def.Key, def.Value);
 
+    // Define standard macros, if not already defined. This style assumes using `#if __SOME_VAR` style, as in
+    // 
+    // ```
+    // #if __SLANG_COMPILER__
+    // ```
+    // 
+    // This choice is made because slang outputs a warning on using a variable in an #if if not defined
+    //
+    // Of course this means using #ifndef/#ifdef/defined() is probably not appropraite with thes variables.
+    {
+        // Used to identify level of HLSL language compatibility
+        combinedPreprocessorDefinitions.AddIfNotExists("__HLSL_VERSION", "2020");
+
+        // Indicates this is being compiled by the slang *compiler*
+        combinedPreprocessorDefinitions.AddIfNotExists("__SLANG_COMPILER__", "1");
+
+        // Set macro depending on source type
+        switch (translationUnit->sourceLanguage)
+        {
+            case SourceLanguage::HLSL:
+                // Used to indicate compiled as HLSL language
+                combinedPreprocessorDefinitions.AddIfNotExists("__HLSL__", "1");
+                break;
+            case SourceLanguage::Slang:
+                // Used to indicate compiled as Slang language
+                combinedPreprocessorDefinitions.AddIfNotExists("__SLANG__", "1");
+                break;
+            default: break;
+        }
+
+        // If not set, define as 0.
+        combinedPreprocessorDefinitions.AddIfNotExists("__HLSL__", "0");
+        combinedPreprocessorDefinitions.AddIfNotExists("__SLANG__", "0");
+    }
+
     auto module = translationUnit->getModule();
 
     ASTBuilder* astBuilder = module->getASTBuilder();
-
-    //ASTBuilder* astBuilder = linkage->getASTBuilder();
 
     ModuleDecl* translationUnitSyntax = astBuilder->create<ModuleDecl>();
 
@@ -2058,8 +2094,6 @@ void FrontEndCompileRequest::parseTranslationUnit(
                 File::writeAllText(fileName, writer.getContent());
             }
         }
-
-
 
 #if 0
         // Test serialization
@@ -3153,19 +3187,13 @@ SLANG_NO_THROW SlangResult SLANG_MCALL ComponentType::getEntryPointCode(
 
     DiagnosticSink sink(linkage->getSourceManager(), Lexer::sourceLocationLexer);
 
-    IArtifact* entryPointResult = targetProgram->getOrCreateEntryPointResult(entryPointIndex, &sink);
+    IArtifact* artifact = targetProgram->getOrCreateEntryPointResult(entryPointIndex, &sink);
     sink.getBlobIfNeeded(outDiagnostics);
 
-    if(entryPointResult == nullptr)
+    if(artifact == nullptr)
         return SLANG_FAIL;
 
-    IArtifact* significantBlob = ArtifactUtil::findSignificant(entryPointResult);
-    if (!significantBlob)
-    {
-        return SLANG_FAIL;
-    }
-
-    return significantBlob->loadBlob(ArtifactKeep::Yes, outCode);
+    return artifact->loadBlob(ArtifactKeep::Yes, outCode);
 }
 
 SLANG_NO_THROW SlangResult SLANG_MCALL ComponentType::getEntryPointHostCallable(
@@ -4838,11 +4866,8 @@ SlangResult EndToEndCompileRequest::getEntryPointCodeBlob(int entryPointIndex, i
     if (!outBlob) return SLANG_E_INVALID_ARG;
     ComPtr<IArtifact> artifact;
     SLANG_RETURN_ON_FAIL(_getEntryPointResult(this, entryPointIndex, targetIndex, artifact));
-    if (auto significant = ArtifactUtil::findSignificant(artifact))
-    {
-        SLANG_RETURN_ON_FAIL(significant->loadBlob(ArtifactKeep::Yes, outBlob));
-        return SLANG_OK;
-    }
+    SLANG_RETURN_ON_FAIL(artifact->loadBlob(ArtifactKeep::Yes, outBlob));
+
     return SLANG_E_NOT_AVAILABLE;
 }
 
@@ -4851,11 +4876,7 @@ SlangResult EndToEndCompileRequest::getEntryPointHostCallable(int entryPointInde
     if (!outSharedLibrary) return SLANG_E_INVALID_ARG;
     ComPtr<IArtifact> artifact;
     SLANG_RETURN_ON_FAIL(_getEntryPointResult(this, entryPointIndex, targetIndex, artifact));
-    if (auto significant = ArtifactUtil::findSignificant(artifact))
-    {
-        SLANG_RETURN_ON_FAIL(significant->loadSharedLibrary(ArtifactKeep::Yes, outSharedLibrary));
-        return SLANG_OK;
-    }
+    SLANG_RETURN_ON_FAIL(artifact->loadSharedLibrary(ArtifactKeep::Yes, outSharedLibrary));
     return SLANG_E_NOT_AVAILABLE;
 }
 
@@ -4866,13 +4887,8 @@ SlangResult EndToEndCompileRequest::getTargetCodeBlob(int targetIndex, ISlangBlo
 
     ComPtr<IArtifact> artifact;
     SLANG_RETURN_ON_FAIL(_getWholeProgramResult(this, targetIndex, artifact));
-
-    if (auto significant = ArtifactUtil::findSignificant(artifact))
-    {
-        SLANG_RETURN_ON_FAIL(significant->loadBlob(ArtifactKeep::Yes, outBlob));
-        return SLANG_OK;
-    }
-    return SLANG_E_NOT_AVAILABLE;
+    SLANG_RETURN_ON_FAIL(artifact->loadBlob(ArtifactKeep::Yes, outBlob));
+    return SLANG_OK;
 }
 
 SlangResult EndToEndCompileRequest::getTargetHostCallable(int targetIndex,ISlangSharedLibrary** outSharedLibrary)
@@ -5030,22 +5046,14 @@ SlangResult EndToEndCompileRequest::isParameterLocationUsed(Int entryPointIndex,
     if (SLANG_FAILED(_getEntryPointResult(this, static_cast<int>(entryPointIndex), static_cast<int>(targetIndex), artifact)))
         return SLANG_E_INVALID_ARG;
 
-    // We need to find the meta data
-    IArtifact* metadataArtifact = artifact->findArtifactByDerivedDesc(IArtifact::FindStyle::SelfOrChildren,
-        ArtifactDesc::make(ArtifactKind::Base, ArtifactPayload::PostEmitMetadata, ArtifactStyle::Base));
-    if (!metadataArtifact)
-    {
-        return SLANG_E_NOT_AVAILABLE;
-    }
-
     // Find a rep
-    auto metadataRep = findRepresentation<IPostEmitMetadataArtifactRepresentation>(metadataArtifact);
-    if (!metadataRep)
+    auto metadata = findAssociated<IPostEmitMetadata>(artifact);
+    if (!metadata)
         return SLANG_E_NOT_AVAILABLE;
 
     
     // TODO: optimize this with a binary search through a sorted list
-    for (const auto& range : metadataRep->getBindingRanges())
+    for (const auto& range : metadata->getUsedBindingRanges())
     {
         if (range.containsBinding((slang::ParameterCategory)category, spaceIndex, registerIndex))
         {
