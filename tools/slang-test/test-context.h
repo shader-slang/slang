@@ -11,6 +11,8 @@
 #include "../../source/core/slang-render-api-util.h"
 
 #include "../../source/compiler-core/slang-downstream-compiler.h"
+#include "../../source/compiler-core/slang-downstream-compiler-util.h"
+
 #include "../../source/compiler-core/slang-json-rpc-connection.h"
 
 #include "../../slang-com-ptr.h"
@@ -121,7 +123,7 @@ class TestContext
 
         /// Get compiler set
     Slang::DownstreamCompilerSet* getCompilerSet();
-    Slang::DownstreamCompiler* getDefaultCompiler(SlangSourceLanguage sourceLanguage);
+    Slang::IDownstreamCompiler* getDefaultCompiler(SlangSourceLanguage sourceLanguage);
 
     Slang::JSONRPCConnection* getOrCreateJSONRPCConnection();
     void destroyRPCConnection();

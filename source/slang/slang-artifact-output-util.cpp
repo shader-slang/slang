@@ -51,7 +51,7 @@ static CodeGenTarget _getDisassemblyCodeGenTarget(const ArtifactDesc& desc)
     auto downstreamCompiler = getDownstreamCompilerRequiredForTarget(target);
 
     // Get the required downstream compiler
-    DownstreamCompiler* compiler = session->getOrLoadDownstreamCompiler(downstreamCompiler, sink);
+    IDownstreamCompiler* compiler = session->getOrLoadDownstreamCompiler(downstreamCompiler, sink);
 
     if (!compiler)
     {

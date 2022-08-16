@@ -226,7 +226,7 @@ Slang::JSONRPCConnection* TestContext::getOrCreateJSONRPCConnection()
 }
 
 
-Slang::DownstreamCompiler* TestContext::getDefaultCompiler(SlangSourceLanguage sourceLanguage)
+Slang::IDownstreamCompiler* TestContext::getDefaultCompiler(SlangSourceLanguage sourceLanguage)
 {
     DownstreamCompilerSet* set = getCompilerSet();
     return set ? set->getDefaultCompiler(sourceLanguage) : nullptr;
