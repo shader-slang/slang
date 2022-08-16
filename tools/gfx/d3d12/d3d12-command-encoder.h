@@ -52,12 +52,21 @@ class ResourceCommandEncoderImpl
     , public PipelineCommandEncoder
 {
 public:
-    virtual void* getInterface(SlangUUID const&) { return this; }
+    virtual void* getInterface(SlangUUID const& uuid)
+    {
+        if (uuid == GfxGUID::IID_IResourceCommandEncoder || uuid == ISlangUnknown::getTypeGuid())
+            return this;
+        return nullptr;
+    }
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL
         queryInterface(SlangUUID const& uuid, void** outObject)
     {
-        *outObject = getInterface(uuid);
-        return SLANG_OK;
+        if (auto ptr = getInterface(uuid))
+        {
+            *outObject = ptr;
+            return SLANG_OK;
+        }
+        return SLANG_E_NO_INTERFACE;
     }
     virtual SLANG_NO_THROW uint32_t SLANG_MCALL addRef() { return 1; }
     virtual SLANG_NO_THROW uint32_t SLANG_MCALL release() { return 1; }
@@ -148,7 +157,12 @@ class ComputeCommandEncoderImpl
 {
 public:
     SLANG_GFX_FORWARD_RESOURCE_COMMAND_ENCODER_IMPL(ResourceCommandEncoderImpl)
-    virtual void* getInterface(SlangUUID const&) override { return this; }
+    virtual void* getInterface(SlangUUID const& uuid) override
+    {
+        if (uuid == GfxGUID::IID_IComputeCommandEncoder || uuid == GfxGUID::IID_IResourceCommandEncoder || uuid == ISlangUnknown::getTypeGuid())
+            return this;
+        return nullptr;
+    }
 
 public:
     virtual SLANG_NO_THROW void SLANG_MCALL endEncoding() override;
@@ -181,7 +195,12 @@ class RenderCommandEncoderImpl
 {
 public:
     SLANG_GFX_FORWARD_RESOURCE_COMMAND_ENCODER_IMPL(ResourceCommandEncoderImpl)
-    virtual void* getInterface(SlangUUID const&) override { return this; }
+    virtual void* getInterface(SlangUUID const& uuid) override
+    {
+        if (uuid == GfxGUID::IID_IRenderCommandEncoder || uuid == GfxGUID::IID_IResourceCommandEncoder || uuid == ISlangUnknown::getTypeGuid())
+            return this;
+        return nullptr;
+    }
 
 public:
     RefPtr<RenderPassLayoutImpl> m_renderPass;
@@ -280,7 +299,12 @@ class RayTracingCommandEncoderImpl
 {
 public:
     SLANG_GFX_FORWARD_RESOURCE_COMMAND_ENCODER_IMPL(ResourceCommandEncoderImpl)
-    virtual void* getInterface(SlangUUID const&) override { return this; }
+    virtual void* getInterface(SlangUUID const& uuid) override
+    {
+        if (uuid == GfxGUID::IID_IRayTracingCommandEncoder || uuid == GfxGUID::IID_IResourceCommandEncoder || uuid == ISlangUnknown::getTypeGuid())
+            return this;
+        return nullptr;
+    }
 
 public:
     virtual SLANG_NO_THROW void SLANG_MCALL buildAccelerationStructure(

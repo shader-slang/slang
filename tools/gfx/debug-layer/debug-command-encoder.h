@@ -18,8 +18,12 @@ public:
     virtual void* getInterface(SlangUUID const& uuid) = 0;
     SlangResult queryInterface(SlangUUID const& uuid, void** outObject)
     {
-        *outObject = getInterface(uuid);
-        return SLANG_OK;
+        if (auto ptr = getInterface(uuid))
+        {
+            *outObject = ptr;
+            return SLANG_OK;
+        }
+        return SLANG_E_NO_INTERFACE;
     }
     uint32_t addRef() { return 1; }
     uint32_t release() { return 1; }
@@ -106,7 +110,7 @@ public:
     virtual IResourceCommandEncoder* getBaseResourceEncoder() override { return baseObject; }
     virtual void* getInterface(SlangUUID const& uuid) override
     {
-        if (uuid == GfxGUID::IID_IResourceCommandEncoder || uuid == GfxGUID::IID_IComputeCommandEncoder)
+        if (uuid == GfxGUID::IID_IResourceCommandEncoder || uuid == GfxGUID::IID_IComputeCommandEncoder || uuid == ISlangUnknown::getTypeGuid())
         {
             return this;
         }
@@ -139,7 +143,7 @@ public:
     virtual IResourceCommandEncoder* getBaseResourceEncoder() override { return baseObject; }
     virtual void* getInterface(SlangUUID const& uuid) override
     {
-        if (uuid == GfxGUID::IID_IResourceCommandEncoder)
+        if (uuid == GfxGUID::IID_IResourceCommandEncoder || uuid == ISlangUnknown::getTypeGuid())
         {
             return this;
         }
@@ -168,7 +172,7 @@ public:
     virtual IResourceCommandEncoder* getBaseResourceEncoder() override { return baseObject; }
     virtual void* getInterface(SlangUUID const& uuid) override
     {
-        if (uuid == GfxGUID::IID_IResourceCommandEncoder || uuid == GfxGUID::IID_IRenderCommandEncoder)
+        if (uuid == GfxGUID::IID_IResourceCommandEncoder || uuid == GfxGUID::IID_IRenderCommandEncoder || uuid == ISlangUnknown::getTypeGuid())
         {
             return this;
         }
@@ -243,7 +247,7 @@ public:
     virtual IResourceCommandEncoder* getBaseResourceEncoder() override { return baseObject; }
     virtual void* getInterface(SlangUUID const& uuid) override
     {
-        if (uuid == GfxGUID::IID_IResourceCommandEncoder || uuid == GfxGUID::IID_IRayTracingCommandEncoder)
+        if (uuid == GfxGUID::IID_IResourceCommandEncoder || uuid == GfxGUID::IID_IRayTracingCommandEncoder || uuid == ISlangUnknown::getTypeGuid())
         {
             return this;
         }

@@ -234,218 +234,218 @@ enum SlangOptimizationLevel
     SLANG_OPTIMIZATION_LEVEL_HIGH,     /**< Optimize aggressively. */
     SLANG_OPTIMIZATION_LEVEL_MAXIMAL,  /**< Include optimizations that may take a very long time, or may involve severe space-vs-speed tradeoffs */
 };
-    enum SlangTypeKind
-    {
-        NONE,
-        STRUCT,
-        ARRAY,
-        MATRIX,
-        VECTOR,
-        SCALAR,
-        CONSTANT_BUFFER,
-        RESOURCE,
-        SAMPLER_STATE,
-        TEXTURE_BUFFER,
-        SHADER_STORAGE_BUFFER,
-        PARAMETER_BLOCK,
-        GENERIC_TYPE_PARAMETER,
-        INTERFACE,
-        OUTPUT_STREAM,
-        SPECIALIZED,
-        FEEDBACK,
-        COUNT,
-    };
-    
-    enum SlangScalarType
-    {
-        NONE,
-        VOID,
-        BOOL,
-        INT32,
-        UINT32,
-        INT64,
-        UINT64,
-        FLOAT16,
-        FLOAT32,
-        FLOAT64,
-        INT8,
-        UINT8,
-        INT16,
-        UINT16,
-    };
-    
-    struct TypeReflection
-    {
-    };
+enum SlangTypeKind
+{
+    NONE,
+    STRUCT,
+    ARRAY,
+    MATRIX,
+    VECTOR,
+    SCALAR,
+    CONSTANT_BUFFER,
+    RESOURCE,
+    SAMPLER_STATE,
+    TEXTURE_BUFFER,
+    SHADER_STORAGE_BUFFER,
+    PARAMETER_BLOCK,
+    GENERIC_TYPE_PARAMETER,
+    INTERFACE,
+    OUTPUT_STREAM,
+    SPECIALIZED,
+    FEEDBACK,
+    COUNT,
+};
 
-    enum CompileStdLibFlags
-    {
-        WriteDocumentation = 0x1,
-    };
+enum SlangScalarType
+{
+    NONE,
+    VOID,
+    BOOL,
+    INT32,
+    UINT32,
+    INT64,
+    UINT64,
+    FLOAT16,
+    FLOAT32,
+    FLOAT64,
+    INT8,
+    UINT8,
+    INT16,
+    UINT16,
+};
 
-    [COM("8BA5FB08-5195-40e2-AC58-0D-98-9C-3A-01-02")]
-    interface ISlangBlob
-    {
-        void* getBufferPointer();
-        Size getBufferSize();
-    };
+struct TypeReflection
+{
+};
 
-    /** Description of a code generation target.
+enum CompileStdLibFlags
+{
+    WriteDocumentation = 0x1,
+};
+
+[COM("8BA5FB08-5195-40e2-AC58-0D-98-9C-3A-01-02")]
+interface ISlangBlob
+{
+    void *getBufferPointer();
+    Size getBufferSize();
+};
+
+/** Description of a code generation target.
+ */
+struct TargetDesc
+{
+    /** The size of this structure, in bytes.
      */
-    struct TargetDesc
-    {
-        /** The size of this structure, in bytes.
-         */
-        Size structureSize = 40;
+    Size structureSize = 40;
 
-        /** The target format to generate code for (e.g., SPIR-V, DXIL, etc.)
-         */
-        SlangCompileTarget format = SlangCompileTarget.SLANG_TARGET_UNKNOWN;
+    /** The target format to generate code for (e.g., SPIR-V, DXIL, etc.)
+     */
+    SlangCompileTarget format = SlangCompileTarget.SLANG_TARGET_UNKNOWN;
 
-        /** The compilation profile supported by the target (e.g., "Shader Model 5.1")
-         */
-        SlangProfileID profile = SlangProfileID.SLANG_PROFILE_UNKNOWN;
+    /** The compilation profile supported by the target (e.g., "Shader Model 5.1")
+     */
+    SlangProfileID profile = SlangProfileID.SLANG_PROFILE_UNKNOWN;
 
-        /** Flags for the code generation target. Currently unused. */
-        SlangTargetFlags flags = SlangTargetFlags.None;
+    /** Flags for the code generation target. Currently unused. */
+    SlangTargetFlags flags = SlangTargetFlags.None;
 
-        /** Default mode to use for floating-point operations on the target.
-         */
-        SlangFloatingPointMode floatingPointMode = SlangFloatingPointMode.SLANG_FLOATING_POINT_MODE_DEFAULT;
+    /** Default mode to use for floating-point operations on the target.
+     */
+    SlangFloatingPointMode floatingPointMode = SlangFloatingPointMode.SLANG_FLOATING_POINT_MODE_DEFAULT;
 
-        /** Optimization level to use for the target.
-         */
-        SlangOptimizationLevel optimizationLevel = SlangOptimizationLevel.SLANG_OPTIMIZATION_LEVEL_DEFAULT;
+    /** Optimization level to use for the target.
+     */
+    SlangOptimizationLevel optimizationLevel = SlangOptimizationLevel.SLANG_OPTIMIZATION_LEVEL_DEFAULT;
 
-        /** The line directive mode for output source code.
-         */
-        SlangLineDirectiveMode lineDirectiveMode = SlangLineDirectiveMode.SLANG_LINE_DIRECTIVE_MODE_DEFAULT;
+    /** The line directive mode for output source code.
+     */
+    SlangLineDirectiveMode lineDirectiveMode = SlangLineDirectiveMode.SLANG_LINE_DIRECTIVE_MODE_DEFAULT;
 
-        /** Whether to force `scalar` layout for glsl shader storage buffers.
-         */
-        bool forceGLSLScalarBufferLayout = false;
-    };
+    /** Whether to force `scalar` layout for glsl shader storage buffers.
+     */
+    bool forceGLSLScalarBufferLayout = false;
+};
 
-    enum SessionFlags
-    {
-        kSessionFlags_None = 0,
+enum SessionFlags
+{
+    kSessionFlags_None = 0,
 
-        /** Use application-specific policy for semantics of the `shared` keyword.
+    /** Use application-specific policy for semantics of the `shared` keyword.
 
-        This is a legacy/compatibility flag to help an existing Slang client
-        migrate to new language features, and should *not* be used by other
-        clients. This feature may be removed in a future release without a
-        deprecation warning, and this bit may be re-used for another feature.
-        You have been warned.
-        */
-        kSessionFlag_FalcorCustomSharedKeywordSemantics = 1 << 0,
-    };
-
-    struct PreprocessorMacroDesc
-    {
-        NativeString name;
-        NativeString value;
-    };
-
-    struct SessionDesc
-    {
-        /** The size of this structure, in bytes.
-         */
-        Size structureSize = 72;
-
-        /** Code generation targets to include in the session.
-         */
-        TargetDesc* targets = nullptr;
-        Int targetCount = 0;
-
-        /** Flags to configure the session.
-         */
-        SessionFlags flags = SessionFlags.kSessionFlags_None;
-
-        /** Default layout to assume for variables with matrix types.
-         */
-        SlangMatrixLayoutMode defaultMatrixLayoutMode = SlangMatrixLayoutMode.SLANG_MATRIX_LAYOUT_ROW_MAJOR;
-
-        /** Paths to use when searching for `#include`d or `import`ed files.
-         */
-        NativeString *searchPaths = nullptr;
-        Int searchPathCount = 0;
-
-        PreprocessorMacroDesc* preprocessorMacros = nullptr;
-        Int preprocessorMacroCount = 0;
-
-        void* fileSystem = nullptr;
-    };
-
-    /** A global session for interaction with the Slang library.
-
-    An application may create and re-use a single global session across
-    multiple sessions, in order to amortize startups costs (in current
-    Slang this is mostly the cost of loading the Slang standard library).
-
-    The global session is currently *not* thread-safe and objects created from
-    a single global session should only be used from a single thread at
-    a time.
+    This is a legacy/compatibility flag to help an existing Slang client
+    migrate to new language features, and should *not* be used by other
+    clients. This feature may be removed in a future release without a
+    deprecation warning, and this bit may be re-used for another feature.
+    You have been warned.
     */
-    [COM("c140b5fd-0c78-452e-ba7c-1a-1e-70-c7-f7-1c")]
-    interface IGlobalSession
-    {
-    };
+    kSessionFlag_FalcorCustomSharedKeywordSemantics = 1 << 0,
+};
 
-    enum class ContainerType
-    {
-        None, UnsizedArray, StructuredBuffer, ConstantBuffer, ParameterBlock
-    };
+struct PreprocessorMacroDesc
+{
+    NativeString name;
+    NativeString value;
+};
 
-    /** A session provides a scope for code that is loaded.
+struct SessionDesc
+{
+    /** The size of this structure, in bytes.
+     */
+    Size structureSize = 72;
 
-    A session can be used to load modules of Slang source code,
-    and to request target-specific compiled binaries and layout
-    information.
+    /** Code generation targets to include in the session.
+     */
+    TargetDesc *targets = nullptr;
+    Int targetCount = 0;
 
-    In order to be able to load code, the session owns a set
-    of active "search paths" for resolving `#include` directives
-    and `import` declrations, as well as a set of global
-    preprocessor definitions that will be used for all code
-    that gets `import`ed in the session.
+    /** Flags to configure the session.
+     */
+    SessionFlags flags = SessionFlags.kSessionFlags_None;
 
-    If multiple user shaders are loaded in the same session,
-    and import the same module (e.g., two source files do `import X`)
-    then there will only be one copy of `X` loaded within the session.
+    /** Default layout to assume for variables with matrix types.
+     */
+    SlangMatrixLayoutMode defaultMatrixLayoutMode = SlangMatrixLayoutMode.SLANG_MATRIX_LAYOUT_ROW_MAJOR;
 
-    In order to be able to generate target code, the session
-    owns a list of available compilation targets, which specify
-    code generation options.
+    /** Paths to use when searching for `#include`d or `import`ed files.
+     */
+    NativeString *searchPaths = nullptr;
+    Int searchPathCount = 0;
 
-    Code loaded and compiled within a session is owned by the session
-    and will remain resident in memory until the session is released.
-    Applications wishing to control the memory usage for compiled
-    and loaded code should use multiple sessions.
-    */
-    [COM("67618701-d116-468f-ab3b-47-4b-ed-ce-0e-3d")]
-    interface ISession
-    {
-    };
+    PreprocessorMacroDesc *preprocessorMacros = nullptr;
+    Int preprocessorMacroCount = 0;
 
-    [COM("5bc42be8-5c50-4929-9e5e-d15e7c24015f")]
-    interface IComponentType
-    {
-    }
-    
-    struct TypeLayoutReflection { }
-    
-    /** The kind of specialization argument. */
-    enum class SpecializationArgKind : int32_t
-    {
-        Unknown, /**< An invalid specialization argument. */
-        Type,    /**< Specialize to a type. */
-    };
-    
-    struct SpecializationArg
-    {
-        SpecializationArgKind kind;
-        /** A type specialization argument, used for `Kind::Type`. */
-        TypeReflection *type;
-    }
-    
+    void *fileSystem = nullptr;
+};
+
+/** A global session for interaction with the Slang library.
+
+An application may create and re-use a single global session across
+multiple sessions, in order to amortize startups costs (in current
+Slang this is mostly the cost of loading the Slang standard library).
+
+The global session is currently *not* thread-safe and objects created from
+a single global session should only be used from a single thread at
+a time.
+*/
+[COM("c140b5fd-0c78-452e-ba7c-1a-1e-70-c7-f7-1c")]
+interface IGlobalSession
+{
+};
+
+enum class ContainerType
+{
+    None, UnsizedArray, StructuredBuffer, ConstantBuffer, ParameterBlock
+};
+
+/** A session provides a scope for code that is loaded.
+
+A session can be used to load modules of Slang source code,
+and to request target-specific compiled binaries and layout
+information.
+
+In order to be able to load code, the session owns a set
+of active "search paths" for resolving `#include` directives
+and `import` declrations, as well as a set of global
+preprocessor definitions that will be used for all code
+that gets `import`ed in the session.
+
+If multiple user shaders are loaded in the same session,
+and import the same module (e.g., two source files do `import X`)
+then there will only be one copy of `X` loaded within the session.
+
+In order to be able to generate target code, the session
+owns a list of available compilation targets, which specify
+code generation options.
+
+Code loaded and compiled within a session is owned by the session
+and will remain resident in memory until the session is released.
+Applications wishing to control the memory usage for compiled
+and loaded code should use multiple sessions.
+*/
+[COM("67618701-d116-468f-ab3b-47-4b-ed-ce-0e-3d")]
+interface ISession
+{
+};
+
+[COM("5bc42be8-5c50-4929-9e5e-d15e7c24015f")]
+interface IComponentType
+{
+}
+
+struct TypeLayoutReflection { }
+
+/** The kind of specialization argument. */
+enum class SpecializationArgKind : int32_t
+{
+    Unknown, /**< An invalid specialization argument. */
+    Type,    /**< Specialize to a type. */
+};
+
+struct SpecializationArg
+{
+    SpecializationArgKind kind;
+    /** A type specialization argument, used for `Kind::Type`. */
+    TypeReflection *type;
+}
+
 }
