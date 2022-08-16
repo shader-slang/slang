@@ -61,13 +61,14 @@ public:
         }
 
         virtual void* getInterface(SlangUUID const& uuid) { return this; }
-        SlangResult queryInterface(SlangUUID const& uuid, void** outObject)
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL
+            queryInterface(SlangUUID const& uuid, void** outObject) override
         {
             *outObject = getInterface(uuid);
             return SLANG_OK;
         }
-        uint32_t addRef() { return 1; }
-        uint32_t release() { return 1; }
+        virtual SLANG_NO_THROW uint32_t SLANG_MCALL addRef() { return 1; }
+        virtual SLANG_NO_THROW uint32_t SLANG_MCALL release() { return 1; }
 
         virtual SLANG_NO_THROW void SLANG_MCALL endEncoding() override {}
         virtual SLANG_NO_THROW void SLANG_MCALL copyBuffer(
