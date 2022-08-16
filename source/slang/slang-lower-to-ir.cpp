@@ -3966,9 +3966,9 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
 
     LoweredValInfo visitIsTypeExpr(IsTypeExpr* expr)
     {
-        if (expr->isAlwaysTrue)
+        if (expr->constantVal)
         {
-            return LoweredValInfo::simple(getBuilder()->getBoolValue(true));
+            return LoweredValInfo::simple(getBuilder()->getBoolValue(expr->constantVal->value));
         }
         auto value = lowerLValueExpr(context, expr->value);
         auto type = lowerType(context, expr->type);
