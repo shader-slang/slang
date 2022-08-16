@@ -26,7 +26,7 @@ public:
     virtual SLANG_NO_THROW void* SLANG_MCALL castAs(const Guid& guid) SLANG_OVERRIDE;
 
     // IArtifactRepresentation
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL writeToBlob(ISlangBlob** blob) SLANG_OVERRIDE { SLANG_UNUSED(blob); return SLANG_E_NOT_IMPLEMENTED; }
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL createRepresentation(const Guid& typeGuid, ICastable** outCastable) SLANG_OVERRIDE { SLANG_UNUSED(typeGuid); SLANG_UNUSED(outCastable); return SLANG_E_NOT_IMPLEMENTED; }
     virtual SLANG_NO_THROW bool SLANG_MCALL exists() SLANG_OVERRIDE { return true; }
 
     List<FrontEndCompileRequest::ExtraEntryPointInfo> m_entryPoints;

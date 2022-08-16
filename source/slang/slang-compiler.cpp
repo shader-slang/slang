@@ -18,6 +18,11 @@
 #include "../compiler-core/slang-artifact-desc-util.h"
 #include "../compiler-core/slang-artifact-representation-impl.h"
 #include "../compiler-core/slang-artifact-impl.h"
+#include "../compiler-core/slang-artifact-util.h"
+#include "../compiler-core/slang-artifact-associated.h"
+
+// Artifact output
+#include "slang-artifact-output-util.h"
 
 #include "slang-lower-to-ir.h"
 #include "slang-mangle.h"
@@ -30,77 +35,9 @@
 #include "slang-emit-cuda.h"
 
 #include "slang-serialize-container.h"
-//
-
-// Includes to allow us to control console
-// output when writing assembly dumps.
-#include <fcntl.h>
-#ifdef _WIN32
-#include <io.h>
-#else
-#include <unistd.h>
-#endif
-
-#ifdef _WIN32
-#define WIN32_LEAN_AND_MEAN
-#define NOMINMAX
-#include <Windows.h>
-#undef WIN32_LEAN_AND_MEAN
-#undef NOMINMAX
-#endif
-
-#ifdef _MSC_VER
-#pragma warning(disable: 4996)
-#endif
 
 namespace Slang
 {
-    // A temporary class that adapts `ISlangSharedLibrary_Dep1` to ISlangSharedLibrary
-
-    class SharedLibraryDep1Adapter : public ComBaseObject, public ISlangSharedLibrary
-    {
-    public:
-        SLANG_COM_BASE_IUNKNOWN_ALL
-
-        // ICastable
-        virtual SLANG_NO_THROW void* SLANG_MCALL castAs(const SlangUUID& guid) SLANG_OVERRIDE;
-
-        // ISlangSharedLibrary
-        virtual SLANG_NO_THROW void* SLANG_MCALL findSymbolAddressByName(char const* name) SLANG_OVERRIDE { return m_contained->findSymbolAddressByName(name); }
-
-        SharedLibraryDep1Adapter(ISlangSharedLibrary_Dep1* dep1):
-            m_contained(dep1)
-        {
-        }
-
-    protected:
-        void* getInterface(const Guid& guid)
-        {
-            if (guid == ISlangUnknown::getTypeGuid() ||
-                guid == ICastable::getTypeGuid() ||
-                guid == ISlangSharedLibrary::getTypeGuid())
-            {
-                return static_cast<ISlangSharedLibrary*>(this);
-            }
-            return nullptr;
-        }
-        void* getObject(const Guid& guid)
-        {
-            SLANG_UNUSED(guid);
-            return nullptr;
-        }
-
-        ComPtr<ISlangSharedLibrary_Dep1> m_contained;
-    };
-
-    void* SharedLibraryDep1Adapter::castAs(const SlangUUID& guid)
-    {
-        if (auto intf = getInterface(guid))
-        {
-            return intf;
-        }
-        return getObject(guid);
-    }
 
 // !!!!!!!!!!!!!!!!!!!!!! free functions for DiagnosicSink !!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
@@ -119,95 +56,6 @@ namespace Slang
     void printDiagnosticArg(StringBuilder& sb, PassThroughMode val)
     {
         sb << TypeTextUtil::getPassThroughName(SlangPassThrough(val));
-    }
-
-    // !!!!!!!!!!!!!!!!!!!!!!!!!!!! CompileResult !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
-    SlangResult CompileResult::getSharedLibrary(ComPtr<ISlangSharedLibrary>& outSharedLibrary)
-    {
-        if (downstreamResult)
-        {
-            // TODO(JS): Work around for not knowing actual interface this is returning, 
-            // and needing to support deps interface
-
-            ComPtr<ISlangSharedLibrary> lib;
-            SLANG_RETURN_ON_FAIL(downstreamResult->getHostCallableSharedLibrary(lib));
-
-            if (SLANG_SUCCEEDED(lib->queryInterface(ISlangSharedLibrary::getTypeGuid(), (void**)outSharedLibrary.writeRef())))
-            {
-                return SLANG_OK;
-            }
-            
-            ComPtr<ISlangSharedLibrary_Dep1> libDep1;
-            if (SLANG_SUCCEEDED(lib->queryInterface(ISlangSharedLibrary_Dep1::getTypeGuid(), (void**)libDep1.writeRef())))
-            {
-                // Okay, we need to adapt for now
-                outSharedLibrary = new SharedLibraryDep1Adapter(libDep1);
-                return SLANG_OK;
-            }
-        }
-        return SLANG_FAIL;
-    }
-
-    SlangResult CompileResult::getBlob(ComPtr<ISlangBlob>& outBlob) const
-    {
-        if(!blob)
-        {
-            switch(format)
-            {
-                default:
-                case ResultFormat::None:
-                {
-                    // If no blob is returned, it's an error
-                    return SLANG_FAIL;
-                }
-                case ResultFormat::Text:
-                {
-                    blob = StringUtil::createStringBlob(outputString);
-                    break;
-                }
-                case ResultFormat::Binary:
-                {
-                    if (downstreamResult)
-                    {
-                        // TODO(JS): 
-                        // This seems a little questionable. As it stands downstreamResult, if it doesn't have a blob
-                        // can try and read a file. How this currently works is that every getBlob will potentially try to read that file.
-                        // Setting result to None would stop this, but is that reasonable as the state.
-                        // Perhaps downstreamResult should hold some state that the read failed.
-                        // For now we don't worry though.
-
-                        SLANG_RETURN_ON_FAIL(downstreamResult->getBinary(blob));
-                    }
-                    break;
-                }
-            }
-        }
-
-        outBlob = blob;
-        return SLANG_OK;
-    }
-
-    SlangResult CompileResult::isParameterLocationUsed(SlangParameterCategory category, UInt spaceIndex, UInt registerIndex, bool& outUsed)
-    {
-        if (!postEmitMetadata)
-            return SLANG_E_NOT_AVAILABLE;
-
-        if (!ShaderBindingRange::isUsageTracked((slang::ParameterCategory)category))
-            return SLANG_E_NOT_AVAILABLE;
-
-        // TODO: optimize this with a binary search through a sorted list
-        for (const auto& range : postEmitMetadata->usedBindings)
-        {
-            if (range.containsBinding((slang::ParameterCategory)category, spaceIndex, registerIndex))
-            {
-                outUsed = true;
-                return SLANG_OK;
-            }
-        }
-        
-        outUsed = false;
-        return SLANG_OK;
     }
 
     //
@@ -729,13 +577,20 @@ namespace Slang
         }
     }
 
-    SlangResult CodeGenContext::emitEntryPointsSource(
-        String&                 outSource,
-        RefPtr<PostEmitMetadata>& outMetadata)
+#if SLANG_VC
+// TODO(JS): This is a workaround 
+// In debug VS builds there is a warning on line about it being unreachable.
+// for (auto entryPointIndex : getEntryPointIndices())
+// It's not clear how that could possibly be unreachable
+#   pragma warning(push)
+#   pragma warning(disable:4702)
+#endif
+    SlangResult CodeGenContext::emitEntryPointsSource(ComPtr<IArtifact>& outArtifact)
     {
-        outSource = String();
+        outArtifact.setNull();
 
-        if(auto endToEndReq = isPassThroughEnabled())
+        auto endToEndReq = isPassThroughEnabled();
+        if(endToEndReq)
         {
             for (auto entryPointIndex : getEntryPointIndices())
             {
@@ -776,16 +631,22 @@ namespace Slang
                     }
                 }
 
-                outSource = codeBuilder.ProduceString();
+                auto artifact = ArtifactUtil::createArtifactForCompileTarget(asExternal(getTargetFormat()));
+                artifact->addRepresentationUnknown(StringBlob::moveCreate(codeBuilder));
+
+                outArtifact.swap(artifact);
+                return SLANG_OK;
             }
             return SLANG_OK;
         }
         else
         {
-            return emitEntryPointsSourceFromIR(
-                outSource, outMetadata);
+            return emitEntryPointsSourceFromIR(outArtifact);
         }
     }
+#if SLANG_VC
+#   pragma warning(pop)
+#endif
 
     String GetHLSLProfileName(Profile profile)
     {
@@ -1052,11 +913,9 @@ namespace Slang
         return desc.style == ArtifactStyle::Host;
     }
 
-    SlangResult CodeGenContext::emitWithDownstreamForEntryPoints(
-        RefPtr<DownstreamCompileResult>& outResult,
-        RefPtr<PostEmitMetadata>& outMetadata)
+    SlangResult CodeGenContext::emitWithDownstreamForEntryPoints(ComPtr<IArtifact>& outArtifact)
     {
-        outResult.setNull();
+        outArtifact.setNull();
 
         auto sink = getSink();
         auto session = getSession();
@@ -1122,6 +981,8 @@ namespace Slang
                 }
             }
         }
+
+        ComPtr<IArtifact> sourceArtifact;
 
         /* This is more convoluted than the other scenarios, because when we invoke C/C++ compiler we would ideally like
         to use the original file. We want to do this because we want includes relative to the source file to work, and
@@ -1189,7 +1050,10 @@ namespace Slang
                 options.sourceContentsPath = calcSourcePathForEntryPoints();
 
                 CodeGenContext sourceCodeGenContext(this, sourceTarget, extensionTracker);
-                SLANG_RETURN_ON_FAIL(sourceCodeGenContext.emitEntryPointsSource(options.sourceContents, outMetadata));
+
+                SLANG_RETURN_ON_FAIL(sourceCodeGenContext.emitEntryPointsSource(sourceArtifact));
+
+                sourceCodeGenContext.maybeDumpIntermediate(sourceArtifact);
             }
             else
             {
@@ -1206,10 +1070,22 @@ namespace Slang
         else
         {
             CodeGenContext sourceCodeGenContext(this, sourceTarget, extensionTracker);
-            SLANG_RETURN_ON_FAIL(sourceCodeGenContext.emitEntryPointsSource(options.sourceContents, outMetadata));
-            sourceCodeGenContext.maybeDumpIntermediate(options.sourceContents.getBuffer());
+
+            SLANG_RETURN_ON_FAIL(sourceCodeGenContext.emitEntryPointsSource(sourceArtifact));
+            sourceCodeGenContext.maybeDumpIntermediate(sourceArtifact);
 
             sourceLanguage = (SourceLanguage)TypeConvertUtil::getSourceLanguageFromTarget((SlangCompileTarget)sourceTarget);
+        }
+
+        ComPtr<IPostEmitMetadata> metadata;
+        if (sourceArtifact)
+        {
+            metadata = findAssociated<IPostEmitMetadata>(sourceArtifact);
+            
+            ComPtr<ISlangBlob> blob;
+            SLANG_RETURN_ON_FAIL(sourceArtifact->loadBlob(ArtifactKeep::No, blob.writeRef()));
+
+            options.sourceContents = StringUtil::getString(blob);
         }
 
         // Add any preprocessor definitions associated with the linkage
@@ -1539,57 +1415,26 @@ namespace Slang
             return SLANG_FAIL;
         }
 
-        outResult = downstreamCompileResult;
-        return SLANG_OK;
-    }
+        // Create the artifact that  encapsulates the result
+        auto artifact = ArtifactUtil::createArtifactForCompileTarget(asExternal(target));
 
-    SlangResult CodeGenContext::dissassembleWithDownstream(
-        const void*                 data,
-        size_t                      dataSizeInBytes, 
-        ISlangBlob**                outBlob)
-    {
-        auto session = getSession();
-        auto sink = getSink();
-        auto target = getTargetFormat();
+        // Wrap the downstream compile result 
+        auto objRep = new ObjectArtifactRepresentation(DownstreamCompileResult::getTypeGuid(), downstreamCompileResult);
+        artifact->addRepresentation(objRep);
 
-        // Get the downstream compiler that can be used for this target
-
-        // TODO(JS):
-        // This could perhaps be performed in some other manner if there was more than one way to produce
-        // disassembly from a binary.
-        auto downstreamCompiler = getDownstreamCompilerRequiredForTarget(target);
-
-        // Get the required downstream compiler
-        DownstreamCompiler* compiler = session->getOrLoadDownstreamCompiler(downstreamCompiler, sink);
-
-        if (!compiler)
+        if (metadata)
         {
-            auto compilerName = TypeTextUtil::getPassThroughAsHumanText((SlangPassThrough)downstreamCompiler);
-            sink->diagnose(SourceLoc(), Diagnostics::passThroughCompilerNotFound, compilerName);
-            return SLANG_FAIL;
+            artifact->addAssociated(metadata);
         }
 
-        ComPtr<ISlangBlob> dissassemblyBlob;
-        SLANG_RETURN_ON_FAIL(compiler->disassemble(SlangCompileTarget(target), data, dataSizeInBytes, dissassemblyBlob.writeRef()));
-
-        *outBlob = dissassemblyBlob.detach();
+        // Set the artifact
+        outArtifact.swap(artifact);
         return SLANG_OK;
-    }
-
-    SlangResult CodeGenContext::dissassembleWithDownstream(
-        DownstreamCompileResult*    downstreamResult, 
-        ISlangBlob**                outBlob)
-    {
-        
-        ComPtr<ISlangBlob> codeBlob;
-        SLANG_RETURN_ON_FAIL(downstreamResult->getBinary(codeBlob));
-        return dissassembleWithDownstream(codeBlob->getBufferPointer(), codeBlob->getBufferSize(), outBlob);
     }
 
     SlangResult emitSPIRVForEntryPointsDirectly(
         CodeGenContext* codeGenContext,
-        List<uint8_t>&  spirvOut,
-        RefPtr<PostEmitMetadata>& outMetadata);
+        ComPtr<IArtifact>& outArtifact);
 
     static CodeGenTarget _getIntermediateTarget(CodeGenTarget target)
     {
@@ -1603,9 +1448,7 @@ namespace Slang
     }
 
         /// Function to simplify the logic around emitting, and dissassembling
-    SlangResult CodeGenContext::_emitEntryPoints(
-        RefPtr<DownstreamCompileResult>& outDownstreamResult,
-        RefPtr<PostEmitMetadata>& outMetadata)
+    SlangResult CodeGenContext::_emitEntryPoints(ComPtr<IArtifact>& outArtifact)
     {
         auto target = getTargetFormat();
         switch (target)
@@ -1618,25 +1461,23 @@ namespace Slang
                 const CodeGenTarget intermediateTarget = _getIntermediateTarget(target);
                 CodeGenContext intermediateContext(this, intermediateTarget);
 
-                RefPtr<DownstreamCompileResult> code;
-                SLANG_RETURN_ON_FAIL(intermediateContext._emitEntryPoints(code, outMetadata));
-                intermediateContext.maybeDumpIntermediate(code);
+                ComPtr<IArtifact> intermediateArtifact;
+
+                SLANG_RETURN_ON_FAIL(intermediateContext._emitEntryPoints(intermediateArtifact));
+                intermediateContext.maybeDumpIntermediate(intermediateArtifact);
 
                 // Then disassemble the intermediate binary result to get the desired output
-                // Output the disassembly
-                ComPtr<ISlangBlob> disassemblyBlob;
-                SLANG_RETURN_ON_FAIL(intermediateContext.dissassembleWithDownstream(code, disassemblyBlob.writeRef()));
+                // Output the disassemble
+                ComPtr<IArtifact> disassemblyArtifact;
+                SLANG_RETURN_ON_FAIL(ArtifactOutputUtil::dissassembleWithDownstream(getSession(), intermediateArtifact, getSink(), disassemblyArtifact.writeRef()));
 
-                outDownstreamResult = new BlobDownstreamCompileResult(DownstreamDiagnostics(), disassemblyBlob);
+                outArtifact.swap(disassemblyArtifact);
                 return SLANG_OK;
             }
             case CodeGenTarget::SPIRV:
                 if (getTargetReq()->shouldEmitSPIRVDirectly())
                 {
-                    List<uint8_t> spirv;
-                    SLANG_RETURN_ON_FAIL(emitSPIRVForEntryPointsDirectly(this, spirv, outMetadata));
-                    auto spirvBlob = ListBlob::moveCreate(spirv);
-                    outDownstreamResult = new BlobDownstreamCompileResult(DownstreamDiagnostics(), spirvBlob);
+                    SLANG_RETURN_ON_FAIL(emitSPIRVForEntryPointsDirectly(this, outArtifact));
                     return SLANG_OK;
                 }
                 /* fall through to: */
@@ -1647,7 +1488,7 @@ namespace Slang
             case CodeGenTarget::ShaderSharedLibrary:
             case CodeGenTarget::HostExecutable:
             case CodeGenTarget::HostHostCallable:
-                SLANG_RETURN_ON_FAIL(emitWithDownstreamForEntryPoints(outDownstreamResult, outMetadata));
+                SLANG_RETURN_ON_FAIL(emitWithDownstreamForEntryPoints(outArtifact));
                 return SLANG_OK;
 
             default: break;
@@ -1657,10 +1498,8 @@ namespace Slang
     }
 
     // Do emit logic for a zero or more entry points
-    CompileResult CodeGenContext::emitEntryPoints()
+    SlangResult CodeGenContext::emitEntryPoints(ComPtr<IArtifact>& outArtifact)
     {
-        CompileResult result;
-
         auto target = getTargetFormat();
 
         switch (target)
@@ -1677,14 +1516,10 @@ namespace Slang
         case CodeGenTarget::ShaderSharedLibrary:
         case CodeGenTarget::HostExecutable:
             {
-                RefPtr<DownstreamCompileResult> downstreamResult;
-                RefPtr<PostEmitMetadata> metadata;
+                SLANG_RETURN_ON_FAIL(_emitEntryPoints(outArtifact));
 
-                if (SLANG_SUCCEEDED(_emitEntryPoints(downstreamResult, metadata)))
-                {
-                    maybeDumpIntermediate(downstreamResult);
-                    result = CompileResult(downstreamResult, metadata);
-                }
+                maybeDumpIntermediate(outArtifact);
+                return SLANG_OK;
             }
             break;
         case CodeGenTarget::GLSL:
@@ -1695,244 +1530,43 @@ namespace Slang
         case CodeGenTarget::CSource:
             {
                 RefPtr<ExtensionTracker> extensionTracker = _newExtensionTracker(target);
-                RefPtr<PostEmitMetadata> metadata;
-
+                
                 CodeGenContext subContext(this, target, extensionTracker);
 
-                String code;
-                if (SLANG_FAILED(subContext.emitEntryPointsSource(code, metadata)))
-                {
-                    return result;
-                }
+                ComPtr<IArtifact> sourceArtifact;
 
-                subContext.maybeDumpIntermediate(code.getBuffer());
-                result = CompileResult(code, metadata);
+                SLANG_RETURN_ON_FAIL(subContext.emitEntryPointsSource(sourceArtifact));
+
+                subContext.maybeDumpIntermediate(sourceArtifact);
+                outArtifact = sourceArtifact;
+                return SLANG_OK;
             }
             break;
 
         case CodeGenTarget::None:
             // The user requested no output
-            break;
+            return SLANG_OK;
 
             // Note(tfoley): We currently hit this case when compiling the stdlib
         case CodeGenTarget::Unknown:
-            break;
+            return SLANG_OK;
 
         default:
             SLANG_UNEXPECTED("unhandled code generation target");
             break;
         }
-
-        return result;
     }
 
-    enum class OutputFileKind
+    void EndToEndCompileRequest::writeArtifactToStandardOutput(IArtifact* artifact, DiagnosticSink* sink)
     {
-        Text,
-        Binary,
-    };
-
-    static void writeOutputFile(
-        CodeGenContext*         context,
-        FILE*                   file,
-        String const&           path,
-        void const*             data,
-        size_t                  size)
-    {
-        size_t count = fwrite(data, size, 1, file);
-        if (count != 1)
+        // If it's host callable it's not available to write to output
+        if (isDerivedFrom(artifact->getDesc().kind, ArtifactKind::HostCallable))
         {
-            context->getSink()->diagnose(
-                SourceLoc(),
-                Diagnostics::cannotWriteOutputFile,
-                path);
-        }
-    }
-
-    static void writeOutputFile(
-        CodeGenContext*         context,
-        ISlangWriter*           writer,
-        String const&           path,
-        void const*             data,
-        size_t                  size)
-    {
-
-        if (SLANG_FAILED(writer->write((const char*)data, size)))
-        {
-            context->getSink()->diagnose(
-                SourceLoc(),
-                Diagnostics::cannotWriteOutputFile,
-                path);
-        }
-    }
-
-    static void writeOutputFile(
-        CodeGenContext*         context,
-        String const&           path,
-        void const*             data,
-        size_t                  size,
-        OutputFileKind          kind)
-    {
-        FILE* file = fopen(
-            path.getBuffer(),
-            kind == OutputFileKind::Binary ? "wb" : "w");
-        if (!file)
-        {
-            context->getSink()->diagnose(
-                SourceLoc(),
-                Diagnostics::cannotWriteOutputFile,
-                path);
             return;
         }
 
-        writeOutputFile(context, file, path, data, size);
-        fclose(file);
-    }
-
-    static void writeCompileResultToFile(
-        CodeGenContext* context,
-        String const& outputPath,
-        CompileResult const& result)
-    {
-        switch (result.format)
-        {
-        case ResultFormat::Text:
-            {
-                auto text = result.outputString;
-                writeOutputFile(context,
-                    outputPath,
-                    text.begin(),
-                    text.end() - text.begin(),
-                    OutputFileKind::Text);
-            }
-            break;
-
-        case ResultFormat::Binary:
-            {
-                ComPtr<ISlangBlob> blob;
-                if (SLANG_FAILED(result.getBlob(blob)))
-                {
-                    SLANG_UNEXPECTED("No blob to emit");
-                    return;
-                }
-                writeOutputFile(context,
-                    outputPath,
-                    blob->getBufferPointer(),
-                    blob->getBufferSize(),
-                    OutputFileKind::Binary);
-            }
-            break;
-
-        default:
-            SLANG_UNEXPECTED("unhandled output format");
-            break;
-        }
-
-    }
-
-    static void writeOutputToConsole(
-        ISlangWriter* writer,
-        String const&   text)
-    {
-        writer->write(text.getBuffer(), text.getLength());
-    }
-
-    static void writeCompileResultToStandardOutput(
-        CodeGenContext*         codeGenContext,
-        EndToEndCompileRequest* endToEndReq,
-        CompileResult const&    result)
-    {
-        auto targetReq = codeGenContext->getTargetReq();
-        ISlangWriter* writer = endToEndReq->getWriter(WriterChannel::StdOutput);
-
-        switch (result.format)
-        {
-        case ResultFormat::Text:
-            writeOutputToConsole(writer, result.outputString);
-            break;
-
-        case ResultFormat::Binary:
-            {
-                ComPtr<ISlangBlob> blob;
-                if (SLANG_FAILED(result.getBlob(blob)))
-                {
-                    if (ArtifactDescUtil::makeDescFromCompileTarget(asExternal(targetReq->getTarget())).kind == ArtifactKind::HostCallable)
-                    {
-                        // Some HostCallable are not directly representable as a 'binary'.
-                        // So here, we just ignore if that appears the case, and don't output an unexpected error.
-                        return;
-                    }
-
-                    SLANG_UNEXPECTED("No blob to emit");
-                    return;
-                }
-
-                const void* blobData = blob->getBufferPointer();
-                size_t blobSize = blob->getBufferSize();
-
-                if (writer->isConsole())
-                {
-                    // Writing to console, so we need to generate text output.
-
-                    switch (targetReq->getTarget())
-                    {
-                    case CodeGenTarget::SPIRVAssembly:
-                    case CodeGenTarget::DXBytecodeAssembly:
-                    case CodeGenTarget::DXILAssembly:
-                        {
-                            const UnownedStringSlice disassembly = StringUtil::getSlice(blob);
-                            writeOutputToConsole(writer, disassembly);
-                        }
-                        break;
-                    case CodeGenTarget::SPIRV:
-                    case CodeGenTarget::DXIL:
-                    case CodeGenTarget::DXBytecode:
-                        {
-                            ComPtr<ISlangBlob> disassemblyBlob;
-
-                            if (SLANG_SUCCEEDED(codeGenContext->dissassembleWithDownstream(blobData, blobSize,  disassemblyBlob.writeRef())))
-                            {
-                                const UnownedStringSlice disassembly = StringUtil::getSlice(disassemblyBlob);
-                                writeOutputToConsole(writer, disassembly);
-                            }
-                        }
-                        break;
-                    case CodeGenTarget::PTX:
-                        // For now we just dump PTX out as hex
-
-                    case CodeGenTarget::HostHostCallable:
-                    case CodeGenTarget::ShaderHostCallable:
-                    case CodeGenTarget::ShaderSharedLibrary:
-                    case CodeGenTarget::HostExecutable:
-                        HexDumpUtil::dumpWithMarkers((const uint8_t*)blobData, blobSize, 24, writer);
-                        break;
-
-
-                    default:
-                        SLANG_UNEXPECTED("unhandled output format");
-                        return;
-                        }
-                }
-            else
-            {
-                // Redirecting stdout to a file, so do the usual thing
-                writer->setMode(SLANG_WRITER_MODE_BINARY);
-
-                writeOutputFile(
-                    codeGenContext,
-                    writer,
-                    "stdout",
-                    blobData,
-                    blobSize);
-            }
-        }
-        break;
-
-        default:
-            SLANG_UNEXPECTED("unhandled output format");
-            break;
-        }
-
+        auto session = getSession();
+        ArtifactOutputUtil::maybeConvertAndWrite(session, artifact, sink, toSlice("stdout"), getWriter(WriterChannel::StdOutput));
     }
 
     void EndToEndCompileRequest::writeWholeProgramResult(
@@ -1941,10 +1575,10 @@ namespace Slang
         auto program = getSpecializedGlobalAndEntryPointsComponentType();
         auto targetProgram = program->getTargetProgram(targetReq);
 
-        auto& result = targetProgram->getExistingWholeProgramResult();
+        IArtifact* artifact = targetProgram->getExistingWholeProgramResult();
 
         // Skip the case with no output
-        if (result.format == ResultFormat::None)
+        if (artifact == nullptr)
             return;
 
         CodeGenContext::EntryPointIndices entryPointIndices;
@@ -1964,12 +1598,11 @@ namespace Slang
             String outputPath = targetInfo->wholeTargetOutputPath;
             if (outputPath != "")
             {
-                writeCompileResultToFile(&codeGenContext, outputPath, result);
+                ArtifactOutputUtil::writeToFile(artifact, codeGenContext.getSink(), outputPath);
                 return;
             }
         }
-
-        writeCompileResultToStandardOutput(&codeGenContext, this, result);
+        writeArtifactToStandardOutput(artifact, codeGenContext.getSink());
     }
 
     void EndToEndCompileRequest::writeEntryPointResult(
@@ -1979,10 +1612,10 @@ namespace Slang
         auto program = getSpecializedGlobalAndEntryPointsComponentType();
         auto targetProgram = program->getTargetProgram(targetReq);
 
-        auto& result = targetProgram->getExistingEntryPointResult(entryPointIndex);
+        IArtifact* artifact = targetProgram->getExistingEntryPointResult(entryPointIndex);
 
         // Skip the case with no output
-        if (result.format == ResultFormat::None)
+        if (artifact == nullptr)
             return;
 
         CodeGenContext::EntryPointIndices entryPointIndices;
@@ -2003,15 +1636,15 @@ namespace Slang
             String outputPath;
             if(targetInfo->entryPointOutputPaths.TryGetValue(entryPointIndex, outputPath))
             {
-                writeCompileResultToFile(&codeGenContext, outputPath, result);
+                ArtifactOutputUtil::writeToFile(artifact, codeGenContext.getSink(), outputPath);
                 return;
             }
         }
 
-        writeCompileResultToStandardOutput(&codeGenContext, this, result);
+        writeArtifactToStandardOutput(artifact, codeGenContext.getSink());
     }
 
-    CompileResult& TargetProgram::_createWholeProgramResult(
+    IArtifact* TargetProgram::_createWholeProgramResult(
         DiagnosticSink* sink,
         EndToEndCompileRequest* endToEndReq)
     {
@@ -2026,17 +1659,18 @@ namespace Slang
         for (Index i = 0; i < entryPointIndices.getCount(); i++)
             entryPointIndices[i] = i;
     
-        auto& result = m_wholeProgramResult;
-
         CodeGenContext::Shared sharedCodeGenContext(this, entryPointIndices, sink, endToEndReq);
         CodeGenContext codeGenContext(&sharedCodeGenContext);
 
-        result = codeGenContext.emitEntryPoints();
-
-        return result;
+        if (SLANG_FAILED(codeGenContext.emitEntryPoints(m_wholeProgramResult)))
+        {
+            return nullptr;
+        }
+        
+        return m_wholeProgramResult;
     }
 
-    CompileResult& TargetProgram::_createEntryPointResult(
+    IArtifact* TargetProgram::_createEntryPointResult(
         Int                     entryPointIndex,
         DiagnosticSink*         sink,
         EndToEndCompileRequest* endToEndReq)
@@ -2050,26 +1684,25 @@ namespace Slang
         // this problem.
         //
         if(entryPointIndex >= m_entryPointResults.getCount())
-            m_entryPointResults.setCount(entryPointIndex+1);
+            m_entryPointResults.setCount(entryPointIndex + 1);
 
-        auto& result = m_entryPointResults[entryPointIndex];
-
+        
         CodeGenContext::EntryPointIndices entryPointIndices;
         entryPointIndices.add(entryPointIndex);
 
         CodeGenContext::Shared sharedCodeGenContext(this, entryPointIndices, sink, endToEndReq);
         CodeGenContext codeGenContext(&sharedCodeGenContext);
-        result = codeGenContext.emitEntryPoints();
 
-        return result;
+        codeGenContext.emitEntryPoints(m_entryPointResults[entryPointIndex]);
+
+        return m_entryPointResults[entryPointIndex];
     }
 
-    CompileResult& TargetProgram::getOrCreateWholeProgramResult(
+    IArtifact* TargetProgram::getOrCreateWholeProgramResult(
         DiagnosticSink* sink)
     {
-        auto& result = m_wholeProgramResult;
-        if (result.format != ResultFormat::None)
-            return result;
+        if (m_wholeProgramResult)
+            return m_wholeProgramResult;
 
         // If we haven't yet computed a layout for this target
         // program, we need to make sure that is done before
@@ -2077,22 +1710,21 @@ namespace Slang
         //
         if (!getOrCreateIRModuleForLayout(sink))
         {
-            return result;
+            return nullptr;
         }
 
         return _createWholeProgramResult(sink);
     }
 
-    CompileResult& TargetProgram::getOrCreateEntryPointResult(
+    IArtifact* TargetProgram::getOrCreateEntryPointResult(
         Int entryPointIndex,
         DiagnosticSink* sink)
     {
         if(entryPointIndex >= m_entryPointResults.getCount())
-            m_entryPointResults.setCount(entryPointIndex+1);
+            m_entryPointResults.setCount(entryPointIndex + 1);
 
-        auto& result = m_entryPointResults[entryPointIndex];
-        if( result.format != ResultFormat::None )
-            return result;
+        if(IArtifact* artifact = m_entryPointResults[entryPointIndex])
+            return artifact;
 
         // If we haven't yet computed a layout for this target
         // program, we need to make sure that is done before
@@ -2100,7 +1732,7 @@ namespace Slang
         //
         if( !getOrCreateIRModuleForLayout(sink) )
         {
-            return result;
+            return nullptr;
         }
 
         return _createEntryPointResult(
@@ -2394,13 +2026,34 @@ namespace Slang
 
     // Debug logic for dumping intermediate outputs
 
-    //
+    
+    void CodeGenContext::_dumpIntermediateMaybeWithAssembly(IArtifact* artifact)
+    {
+        _dumpIntermediate(artifact);
 
-    void CodeGenContext::dumpIntermediate(
+        ComPtr<IArtifact> assembly;
+        ArtifactOutputUtil::maybeDisassemble(getSession(), artifact, nullptr, assembly);
+
+        if (assembly)
+        {
+            _dumpIntermediate(assembly);
+        }
+    }
+
+    void CodeGenContext::_dumpIntermediate(IArtifact* artifact)
+    {
+        ComPtr<ISlangBlob> blob;
+        if (SLANG_FAILED(artifact->loadBlob(ArtifactKeep::No, blob.writeRef())))
+        {
+            return;
+        }
+        _dumpIntermediate(artifact->getDesc(), blob->getBufferPointer(), blob->getBufferSize());
+    }
+
+    void CodeGenContext::_dumpIntermediate(
+        const ArtifactDesc& desc,
         void const*     data,
-        size_t          size,
-        char const*     ext,
-        bool            isBinary)
+        size_t          size)
     {
         // Try to generate a unique ID for the file to dump,
         // even in cases where there might be multiple threads
@@ -2409,151 +2062,41 @@ namespace Slang
         // This is primarily a debugging aid, so we don't
         // really need/want to do anything too elaborate
 
-        static uint32_t counter = 0;
-#ifdef _WIN32
-        uint32_t id = InterlockedIncrement(&counter);
-#else
-        // TODO: actually implement the case for other platforms
-        uint32_t id = counter++;
-#endif
+        static std::atomic<uint32_t> counter(0);
 
-        String path;
-        path.append(getIntermediateDumpPrefix());
-        path.append(id);
-        path.append(ext);
+        const uint32_t id = ++counter;
 
-        FILE* file = fopen(path.getBuffer(), isBinary ? "wb" : "w");
-        if (!file) return;
+        // Just use the counter for the 'base name'
+        StringBuilder basename;
 
-        fwrite(data, size, 1, file);
-        fclose(file);
-    }
+        // Add the prefix
+        basename << getIntermediateDumpPrefix();
 
-    void CodeGenContext::dumpIntermediateText(
-        void const*     data,
-        size_t          size,
-        char const*     ext)
-    {
-        dumpIntermediate(data, size, ext, false);
-    }
+        // Add the id
+        basename << int(id);
 
-    void CodeGenContext::dumpIntermediateBinary(
-        void const*     data,
-        size_t          size,
-        char const*     ext)
-    {
-        dumpIntermediate(data, size, ext, true);
-    }
+        // Work out the filename based on the desc and the basename
+        StringBuilder filename;
+        ArtifactDescUtil::calcNameForDesc(desc, basename.getUnownedSlice(), filename);
 
-    void CodeGenContext::maybeDumpIntermediate(
-        DownstreamCompileResult* compileResult)
-    {
-        if (!shouldDumpIntermediates())
-            return;
-
-        ComPtr<ISlangBlob> blob;
-        if (SLANG_SUCCEEDED(compileResult->getBinary(blob)))
+        // If didn't produce a filename, use basename with .unknown extension
+        if (filename.getLength() == 0)
         {
-            maybeDumpIntermediate(blob->getBufferPointer(), blob->getBufferSize());
-        }
-    }
-
-    static const char* _getTargetExtension(CodeGenTarget target)
-    {
-        switch (target)
-        {
-            case CodeGenTarget::HLSL:               return ".hlsl";
-            case CodeGenTarget::GLSL:               return ".glsl";
-            case CodeGenTarget::SPIRV:              return ".spv";
-            case CodeGenTarget::DXBytecode:         return ".dxbc";
-            case CodeGenTarget::DXIL:               return ".dxil";
-            case CodeGenTarget::SPIRVAssembly:      return ".spv.asm";
-            case CodeGenTarget::DXBytecodeAssembly: return ".dxbc.asm";
-            case CodeGenTarget::DXILAssembly:       return ".dxil.asm";
-            case CodeGenTarget::CSource:            return ".c";
-            case CodeGenTarget::CUDASource:         return ".cu";
-            case CodeGenTarget::CPPSource:          return ".cpp";
-            case CodeGenTarget::HostCPPSource:      return ".cpp";
-
-            // What these should be called is target specific, but just use these exts to make clear for now
-            // for now
-            case CodeGenTarget::HostExecutable:      
-            {
-                return ".exe";
-            }
-            case CodeGenTarget::HostHostCallable:
-            case CodeGenTarget::ShaderHostCallable:
-            case CodeGenTarget::ShaderSharedLibrary: 
-            {
-                return ".shared-lib";
-            }
-            default: break;
-        }
-        return nullptr;
-    }
-
-    void CodeGenContext::maybeDumpIntermediate(
-        void const*     data,
-        size_t          size)
-    {
-        if (!shouldDumpIntermediates())
-            return;
-
-        auto target = getTargetFormat();
-        const auto desc = ArtifactDescUtil::makeDescFromCompileTarget(asExternal(target));
-
-        if (desc.kind == ArtifactKind::Text)
-        {
-            dumpIntermediateText(data, size, _getTargetExtension(target));
-            return;
+            filename = basename;
+            filename << ".unknown";
         }
         
-        switch (target)
-        {
-#if 0
-            case CodeGenTarget::SlangIRAssembly:
-            {
-                dumpIntermediateText(compileRequest, data, size, ".slang-ir.asm");
-                break;
-            }
-#endif
-            case CodeGenTarget::DXIL:
-            case CodeGenTarget::DXBytecode:
-            case CodeGenTarget::SPIRV:
-            {
-                const char* ext = _getTargetExtension(target);
-                SLANG_ASSERT(ext);
-
-                dumpIntermediateBinary(data, size, ext);
-                ComPtr<ISlangBlob> disassemblyBlob;
-                if (SLANG_SUCCEEDED(dissassembleWithDownstream(data, size, disassemblyBlob.writeRef())))
-                {
-                    StringBuilder buf;
-                    buf << ext << ".asm";
-                    dumpIntermediateText(disassemblyBlob->getBufferPointer(), disassemblyBlob->getBufferSize(), buf.getBuffer());
-                }
-                break;
-            }
-
-            case CodeGenTarget::HostHostCallable:
-            case CodeGenTarget::ShaderHostCallable:
-            case CodeGenTarget::ShaderSharedLibrary:
-            case CodeGenTarget::HostExecutable:
-            {
-                dumpIntermediateBinary(data, size, _getTargetExtension(target));
-                break;
-            }
-            default:    break;
-        }
+        // Write to a file
+        ArtifactOutputUtil::writeToFile(desc, data, size, filename);
     }
 
-    void CodeGenContext::maybeDumpIntermediate(
-        char const*     text)
+    void CodeGenContext::maybeDumpIntermediate(IArtifact* artifact)
     {
         if (!shouldDumpIntermediates())
             return;
 
-        maybeDumpIntermediate(text, strlen(text));
+        
+        _dumpIntermediateMaybeWithAssembly(artifact);
     }
 
     IRDumpOptions CodeGenContext::getIRDumpOptions()

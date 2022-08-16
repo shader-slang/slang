@@ -4,7 +4,7 @@
 namespace Slang
 {
 
-struct PostEmitMetadata;
+class PostEmitMetadata;
 struct IRModule;
 
 void collectMetadata(const IRModule* irModule, PostEmitMetadata& outMetadata);

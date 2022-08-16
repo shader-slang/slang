@@ -10,6 +10,8 @@
 // Artifact
 #include "../compiler-core/slang-artifact-impl.h"
 #include "../compiler-core/slang-artifact-desc-util.h"
+#include "../compiler-core/slang-artifact-util.h"
+#include "../compiler-core/slang-artifact-associated-impl.h"
 
 #include "slang-module-library.h"
 
@@ -3185,16 +3187,14 @@ SLANG_NO_THROW SlangResult SLANG_MCALL ComponentType::getEntryPointCode(
     auto targetProgram = getTargetProgram(target);
 
     DiagnosticSink sink(linkage->getSourceManager(), Lexer::sourceLocationLexer);
-    auto& entryPointResult = targetProgram->getOrCreateEntryPointResult(entryPointIndex, &sink);
+
+    IArtifact* artifact = targetProgram->getOrCreateEntryPointResult(entryPointIndex, &sink);
     sink.getBlobIfNeeded(outDiagnostics);
 
-    if(entryPointResult.format == ResultFormat::None )
+    if(artifact == nullptr)
         return SLANG_FAIL;
 
-    ComPtr<ISlangBlob> blob;
-    SLANG_RETURN_ON_FAIL(entryPointResult.getBlob(blob));
-    *outCode = blob.detach();
-    return SLANG_OK;
+    return artifact->loadBlob(ArtifactKeep::Yes, outCode);
 }
 
 SLANG_NO_THROW SlangResult SLANG_MCALL ComponentType::getEntryPointHostCallable(
@@ -3211,17 +3211,13 @@ SLANG_NO_THROW SlangResult SLANG_MCALL ComponentType::getEntryPointHostCallable(
     auto targetProgram = getTargetProgram(target);
 
     DiagnosticSink sink(linkage->getSourceManager(), Lexer::sourceLocationLexer);
-    auto& entryPointResult = targetProgram->getOrCreateEntryPointResult(entryPointIndex, &sink);
+    IArtifact* artifact = targetProgram->getOrCreateEntryPointResult(entryPointIndex, &sink);
     sink.getBlobIfNeeded(outDiagnostics);
 
-    if(entryPointResult.format == ResultFormat::None )
+    if(artifact == nullptr)
         return SLANG_FAIL;
 
-    ComPtr<ISlangSharedLibrary> sharedLibrary;
-    SLANG_RETURN_ON_FAIL(entryPointResult.getSharedLibrary(sharedLibrary));
-
-    *outSharedLibrary = sharedLibrary.detach();
-    return SLANG_OK;
+    return artifact->loadSharedLibrary(ArtifactKeep::Yes, outSharedLibrary);
 }
 
 RefPtr<ComponentType> ComponentType::specialize(
@@ -4791,10 +4787,14 @@ void const* EndToEndCompileRequest::getEntryPointCode(int entryPointIndex, size_
     auto targetProgram = program->getTargetProgram(targetReq);
     if (!targetProgram)
         return nullptr;
-    CompileResult& result = targetProgram->getExistingEntryPointResult(entryPointIndex);
+    IArtifact* artifact = targetProgram->getExistingEntryPointResult(entryPointIndex);
+    if (!artifact)
+    {
+        return nullptr;
+    }
 
     ComPtr<ISlangBlob> blob;
-    SLANG_RETURN_NULL_ON_FAIL(result.getBlob(blob));
+    SLANG_RETURN_NULL_ON_FAIL(artifact->loadBlob(ArtifactKeep::Yes, blob.writeRef()));
 
     if (outSize)
     {
@@ -4808,7 +4808,7 @@ static SlangResult _getEntryPointResult(
     EndToEndCompileRequest* req,
     int                     entryPointIndex,
     int                     targetIndex,
-    Slang::CompileResult**  outCompileResult)
+    ComPtr<IArtifact>&      outArtifact)
 {
     auto linkage = req->getLinkage();
     auto program = req->getSpecializedGlobalAndEntryPointsComponentType();
@@ -4827,18 +4827,18 @@ static SlangResult _getEntryPointResult(
     }
     auto entryPointReq = program->getEntryPoint(entryPointIndex);
 
-
     auto targetProgram = program->getTargetProgram(targetReq);
     if (!targetProgram)
         return SLANG_FAIL;
-    *outCompileResult = &targetProgram->getExistingEntryPointResult(entryPointIndex);
+
+    outArtifact = targetProgram->getExistingEntryPointResult(entryPointIndex);
     return SLANG_OK;
 }
 
 static SlangResult _getWholeProgramResult(
     EndToEndCompileRequest* req,
     int targetIndex,
-    Slang::CompileResult** outCompileResult)
+    ComPtr<IArtifact>& outArtifact)
 {
     auto linkage = req->getLinkage();
     auto program = req->getSpecializedGlobalAndEntryPointsComponentType();
@@ -4858,34 +4858,27 @@ static SlangResult _getWholeProgramResult(
     auto targetProgram = program->getTargetProgram(targetReq);
     if (!targetProgram)
         return SLANG_FAIL;
-    *outCompileResult = &targetProgram->getExistingWholeProgramResult();
+    outArtifact = targetProgram->getExistingWholeProgramResult();
     return SLANG_OK;
 }
 
 SlangResult EndToEndCompileRequest::getEntryPointCodeBlob(int entryPointIndex, int targetIndex, ISlangBlob** outBlob)
 {
     if (!outBlob) return SLANG_E_INVALID_ARG;
+    ComPtr<IArtifact> artifact;
+    SLANG_RETURN_ON_FAIL(_getEntryPointResult(this, entryPointIndex, targetIndex, artifact));
+    SLANG_RETURN_ON_FAIL(artifact->loadBlob(ArtifactKeep::Yes, outBlob));
 
-    CompileResult* compileResult = nullptr;
-    SLANG_RETURN_ON_FAIL(_getEntryPointResult(this, entryPointIndex, targetIndex, &compileResult));
-
-    ComPtr<ISlangBlob> blob;
-    SLANG_RETURN_ON_FAIL(compileResult->getBlob(blob));
-    *outBlob = blob.detach();
-    return SLANG_OK;
+    return SLANG_E_NOT_AVAILABLE;
 }
 
 SlangResult EndToEndCompileRequest::getEntryPointHostCallable(int entryPointIndex, int targetIndex, ISlangSharedLibrary** outSharedLibrary)
 {
     if (!outSharedLibrary) return SLANG_E_INVALID_ARG;
-
-    CompileResult* compileResult = nullptr;
-    SLANG_RETURN_ON_FAIL(_getEntryPointResult(this, entryPointIndex, targetIndex, &compileResult));
-
-    ComPtr<ISlangSharedLibrary> sharedLibrary;
-    SLANG_RETURN_ON_FAIL(compileResult->getSharedLibrary(sharedLibrary));
-    *outSharedLibrary = sharedLibrary.detach();
-    return SLANG_OK;
+    ComPtr<IArtifact> artifact;
+    SLANG_RETURN_ON_FAIL(_getEntryPointResult(this, entryPointIndex, targetIndex, artifact));
+    SLANG_RETURN_ON_FAIL(artifact->loadSharedLibrary(ArtifactKeep::Yes, outSharedLibrary));
+    return SLANG_E_NOT_AVAILABLE;
 }
 
 SlangResult EndToEndCompileRequest::getTargetCodeBlob(int targetIndex, ISlangBlob** outBlob)
@@ -4893,12 +4886,9 @@ SlangResult EndToEndCompileRequest::getTargetCodeBlob(int targetIndex, ISlangBlo
     if (!outBlob)
         return SLANG_E_INVALID_ARG;
 
-    CompileResult* compileResult = nullptr;
-    SLANG_RETURN_ON_FAIL(_getWholeProgramResult(this, targetIndex, &compileResult));
-
-    ComPtr<ISlangBlob> blob;
-    SLANG_RETURN_ON_FAIL(compileResult->getBlob(blob));
-    *outBlob = blob.detach();
+    ComPtr<IArtifact> artifact;
+    SLANG_RETURN_ON_FAIL(_getWholeProgramResult(this, targetIndex, artifact));
+    SLANG_RETURN_ON_FAIL(artifact->loadBlob(ArtifactKeep::Yes, outBlob));
     return SLANG_OK;
 }
 
@@ -4907,12 +4897,9 @@ SlangResult EndToEndCompileRequest::getTargetHostCallable(int targetIndex,ISlang
     if (!outSharedLibrary)
         return SLANG_E_INVALID_ARG;
 
-    CompileResult* compileResult = nullptr;
-    SLANG_RETURN_ON_FAIL(_getWholeProgramResult(this, targetIndex, &compileResult));
-
-    ComPtr<ISlangSharedLibrary> sharedLibrary;
-    SLANG_RETURN_ON_FAIL(compileResult->getSharedLibrary(sharedLibrary));
-    *outSharedLibrary = sharedLibrary.detach();
+    ComPtr<IArtifact> artifact;
+    SLANG_RETURN_ON_FAIL(_getWholeProgramResult(this, targetIndex, artifact));
+    SLANG_RETURN_ON_FAIL(artifact->loadSharedLibrary(ArtifactKeep::Yes, outSharedLibrary));
     return SLANG_OK;
 }
 
@@ -5053,12 +5040,31 @@ SlangResult EndToEndCompileRequest::getEntryPoint(SlangInt entryPointIndex, slan
 
 SlangResult EndToEndCompileRequest::isParameterLocationUsed(Int entryPointIndex, Int targetIndex, SlangParameterCategory category, UInt spaceIndex, UInt registerIndex, bool& outUsed)
 {
-    CompileResult* compileResult = nullptr;
-    if (_getEntryPointResult(this, static_cast<int>(entryPointIndex), static_cast<int>(targetIndex), &compileResult) != SLANG_OK)
+    if (!ShaderBindingRange::isUsageTracked((slang::ParameterCategory)category))
+        return SLANG_E_NOT_AVAILABLE;
+
+    ComPtr<IArtifact> artifact;
+    if (SLANG_FAILED(_getEntryPointResult(this, static_cast<int>(entryPointIndex), static_cast<int>(targetIndex), artifact)))
         return SLANG_E_INVALID_ARG;
 
-    return compileResult->isParameterLocationUsed(category, spaceIndex, registerIndex, outUsed);
-}
+    // Find a rep
+    auto metadata = findAssociated<IPostEmitMetadata>(artifact);
+    if (!metadata)
+        return SLANG_E_NOT_AVAILABLE;
 
+    
+    // TODO: optimize this with a binary search through a sorted list
+    for (const auto& range : metadata->getBindingRanges())
+    {
+        if (range.containsBinding((slang::ParameterCategory)category, spaceIndex, registerIndex))
+        {
+            outUsed = true;
+            return SLANG_OK;
+        }
+    }
+
+    outUsed = false;
+    return SLANG_OK;
+}
 
 } // namespace Slang

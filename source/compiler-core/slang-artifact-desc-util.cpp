@@ -122,7 +122,7 @@ struct HierarchicalEnumTable
                 return true;
             }
             type = m_parents[Index(type)];
-        } while (Index(type) > Index(T::Base));
+        } while (Index(type) >= Index(T::Base));
 
         return false;
     }
@@ -215,7 +215,6 @@ SLANG_HIERARCHICAL_ENUM(ArtifactKind, SLANG_ARTIFACT_KIND, SLANG_ARTIFACT_KIND_E
             x(SlangAST, AST) \
         x(CompileResults, Base) \
         x(MetaData, Base) \
-            x(PostEmitMetadata, MetaData) \
             x(DebugInfo, MetaData) \
             x(Diagnostics, MetaData)
 
@@ -466,66 +465,28 @@ static const KindExtension g_cpuKindExts[] =
     return getDescFromExtension(extension);
 }
 
-/* static*/ UnownedStringSlice ArtifactDescUtil::getCpuExtensionForKind(Kind kind)
+/* static*/ SlangResult ArtifactDescUtil::appendCpuExtensionForKind(Kind kind, StringBuilder& out)
 {
     for (const auto& kindExt : g_cpuKindExts)
     {
         if (kind == kindExt.kind)
         {
-            return kindExt.ext;
+            out << kindExt.ext;
+            return SLANG_OK;
         }
     }
-    return UnownedStringSlice();
+    return SLANG_E_NOT_FOUND;
 }
 
-UnownedStringSlice ArtifactDescUtil::getAssemblyExtensionForPayload(ArtifactPayload payload)
+static UnownedStringSlice _getPayloadExtension(ArtifactPayload payload)
 {
+    typedef ArtifactPayload Payload;
     switch (payload)
     {
-        case ArtifactPayload::DXIL:     return toSlice("dxil-asm");
-        case ArtifactPayload::DXBC:     return toSlice("dxbc-asm");
-        case ArtifactPayload::SPIRV:    return toSlice("spv-asm");
-        case ArtifactPayload::PTX:     return toSlice("ptx");
+        /* Misc */
+        case Payload::Unknown:      return toSlice("unknown");
 
-            // TODO(JS):
-            // Not sure what to do for metal - does it have an assembly name?
-
-        default: break;
-    }
-
-    // We'll just use asm for all CPU assembly type
-    if (isDerivedFrom(payload, ArtifactPayload::CPULike))
-    {
-        return toSlice("asm");
-    }
-
-    if (isDerivedFrom(payload, ArtifactPayload::GeneralIR))
-    {
-        switch (payload)
-        {
-            case ArtifactPayload::SlangIR:     return toSlice("slang-ir-asm");
-            case ArtifactPayload::LLVMIR:     return toSlice("llvm-ir-asm");
-                break;
-        }
-    }
-
-    return UnownedStringSlice();
-}
-
-UnownedStringSlice ArtifactDescUtil::getDefaultExtension(const ArtifactDesc& desc)
-{
-    switch (desc.kind)
-    {
-    case ArtifactKind::Zip:          return toSlice("zip");
-    case ArtifactKind::Riff:         return toSlice("riff");
-    case ArtifactKind::Assembly:
-    {
-        return getAssemblyExtensionForPayload(desc.payload);
-    }
-    case ArtifactKind::Source:
-    {
-        switch (desc.payload)
-        {
+        /* Source types */
         case Payload::HLSL:         return toSlice("hlsl");
         case Payload::GLSL:         return toSlice("glsl");
 
@@ -537,24 +498,8 @@ UnownedStringSlice ArtifactDescUtil::getDefaultExtension(const ArtifactDesc& des
         case Payload::CUDA:         return toSlice("cu");
 
         case Payload::Slang:        return toSlice("slang");
-        default: break;
-        }
-    }
-    default: break;
-    }
 
-    if (ArtifactDescUtil::isCpuLikeTarget(desc))
-    {
-        return getCpuExtensionForKind(desc.kind);
-    }
-
-    if (isDerivedFrom(desc.kind, ArtifactKind::BinaryLike))
-    {
-        switch (desc.payload)
-        {
-        case Payload::None:         return UnownedStringSlice();
-        case Payload::Unknown:      return toSlice("unknown");
-
+        /* Binary types */
         case Payload::DXIL:         return toSlice("dxil");
         case Payload::DXBC:         return toSlice("dxbc");
         case Payload::SPIRV:        return toSlice("spv");
@@ -563,20 +508,90 @@ UnownedStringSlice ArtifactDescUtil::getDefaultExtension(const ArtifactDesc& des
 
         case Payload::LLVMIR:       return toSlice("llvm-ir");
 
-        case Payload::SlangIR:
+        case Payload::SlangIR:      return toSlice("slang-ir");
+        
+        case Payload::MetalAIR:     return toSlice("air");
+
+        default: break;
+    }
+    return UnownedStringSlice();
+}
+
+SlangResult ArtifactDescUtil::appendDefaultExtension(const ArtifactDesc& desc, StringBuilder& out)
+{
+    switch (desc.kind)
+    {
+        case ArtifactKind::Library:
         {
-            return (desc.kind == ArtifactKind::Library) ? toSlice("slang-module") : toSlice("slang-ir");
+            // Special cases
+            if (desc.payload == Payload::SlangIR)
+            {
+                out << toSlice("slang-module");
+                return SLANG_OK;
+            }
+            else if (desc.payload == Payload::MetalAIR)
+            {
+                // https://developer.apple.com/documentation/metal/shader_libraries/building_a_library_with_metal_s_command-line_tools
+                out << toSlice("metallib");
+                return SLANG_OK;
+            }
+            
+            break;
         }
-        case Payload::MetalAIR:
+        case ArtifactKind::Zip:         
         {
-            // https://developer.apple.com/documentation/metal/shader_libraries/building_a_library_with_metal_s_command-line_tools
-            return (desc.kind == ArtifactKind::Library) ? toSlice("metallib") : toSlice("air");
+            out << toSlice("zip");
+            return SLANG_OK;
+        }
+        case ArtifactKind::Riff:         
+        {
+            out << toSlice("riff");
+            return SLANG_OK;
+        }
+        case ArtifactKind::Assembly:
+        {
+            // Special case PTX, because it is assembly
+            if (desc.payload == Payload::PTX)
+            {
+                out << _getPayloadExtension(desc.payload);
+                return SLANG_OK;
+            }
+
+            // We'll just use asm for all CPU assembly type
+            if (isDerivedFrom(desc.payload, ArtifactPayload::CPULike))
+            {
+                out << toSlice("asm");
+                return SLANG_OK;
+            }
+
+            // Use the payload extension "-asm"
+            out << _getPayloadExtension(desc.payload);
+            out << toSlice("-asm");
+            return SLANG_OK;
+        }
+        case ArtifactKind::Source:
+        {
+            out << _getPayloadExtension(desc.payload);
+            return SLANG_OK;
         }
         default: break;
+    }
+
+    if (ArtifactDescUtil::isCpuLikeTarget(desc) && !isDerivedFrom(desc.payload, ArtifactPayload::Source))
+    {
+        return appendCpuExtensionForKind(desc.kind, out);
+    }
+    else
+    {
+        auto slice = _getPayloadExtension(desc.payload);
+        if (slice.getLength())
+        {
+            out << slice;
+            return SLANG_OK;
         }
     }
 
-    return UnownedStringSlice();
+    return SLANG_E_NOT_FOUND;
 }
 
 /* static */String ArtifactDescUtil::getBaseNameFromPath(const ArtifactDesc& desc, const UnownedStringSlice& path)
@@ -602,7 +617,10 @@ UnownedStringSlice ArtifactDescUtil::getDefaultExtension(const ArtifactDesc& des
 
     // Strip any extension 
     {
-        auto descExt = getDefaultExtension(desc);
+        StringBuilder descExt;
+
+        appendDefaultExtension(desc, descExt);
+
         // Strip the extension if it's a match
         if (descExt.getLength() &&
             Path::getPathExt(name) == descExt)
@@ -620,52 +638,17 @@ UnownedStringSlice ArtifactDescUtil::getDefaultExtension(const ArtifactDesc& des
     return getBaseNameFromPath(desc, path);
 }
 
-/* static */String ArtifactDescUtil::getBaseName(IArtifact* artifact)
+/* static */SlangResult ArtifactDescUtil::calcNameForDesc(const ArtifactDesc& desc, const UnownedStringSlice& inBaseName, StringBuilder& outName)
 {
-    if (auto fileRep = findRepresentation<IFileArtifactRepresentation>(artifact))
-    {
-        return getBaseName(artifact->getDesc(), fileRep);
-    }
-    // Else use the name
-    return artifact->getName();
-}
+    UnownedStringSlice baseName(inBaseName);
 
-/* static */String ArtifactDescUtil::getParentPath(IFileArtifactRepresentation* fileRep)
-{
-    UnownedStringSlice path(fileRep->getPath());
-    return Path::getParentDirectory(path);
-}
-
-/* static */String ArtifactDescUtil::getParentPath(IArtifact* artifact)
-{
-    if (auto fileRep = findRepresentation<IFileArtifactRepresentation>(artifact))
-    {
-        return getParentPath(fileRep);
-    }
-    return String();
-}
-
-/* static */SlangResult ArtifactDescUtil::calcPathForDesc(const ArtifactDesc& desc, const UnownedStringSlice& basePath, StringBuilder& outPath)
-{
-    outPath.Clear();
-
-    UnownedStringSlice baseName;
-
-    // Append the directory
-    Index pos = Path::findLastSeparatorIndex(basePath);
-    if (pos >= 0)
-    {
-        // Keep the stem including the delimiter
-        outPath.append(basePath.head(pos + 1));
-        // Get the baseName
-        baseName = basePath.tail(pos + 1);
-    }
-
+    // If there is no basename, set one
     if (baseName.getLength() == 0)
     {
         baseName = toSlice("unknown");
     }
 
+    // Prefix
     if (isCpuBinary(desc) &&
         (desc.kind == ArtifactKind::SharedLibrary ||
             desc.kind == ArtifactKind::Library))
@@ -673,27 +656,47 @@ UnownedStringSlice ArtifactDescUtil::getDefaultExtension(const ArtifactDesc& des
         const bool isSharedLibraryPrefixPlatform = SLANG_LINUX_FAMILY || SLANG_APPLE_FAMILY;
         if (isSharedLibraryPrefixPlatform)
         {
-            outPath << "lib";
-            outPath << baseName;
+            outName << "lib";
         }
     }
 
-    // If there is an extension append it
-    const UnownedStringSlice ext = getDefaultExtension(desc);
+    // Output the basename
+    outName << baseName;
 
-    if (ext.getLength())
+    // If there is an extension append it
+    StringBuilder ext;
+    if (SLANG_SUCCEEDED(appendDefaultExtension(desc, ext)) && ext.getLength() > 0)
     {
-        outPath.appendChar('.');
-        outPath.append(ext);
+        outName.appendChar('.');
+        outName.append(ext);
     }
 
     return SLANG_OK;
 }
 
-/* static */ComPtr<IArtifactContainer> ArtifactDescUtil::createContainer(const ArtifactDesc& desc)
+/* static */SlangResult ArtifactDescUtil::calcPathForDesc(const ArtifactDesc& desc, const UnownedStringSlice& basePath, StringBuilder& outPath)
 {
-    const auto containerDesc = ArtifactDesc::make(ArtifactKind::Container, ArtifactPayload::CompileResults, desc.style);
-    return ArtifactContainer::create(containerDesc);
+    outPath.Clear();
+
+    // Append the directory
+    Index pos = Path::findLastSeparatorIndex(basePath);
+    if (pos >= 0)
+    {
+        // Keep the stem including the delimiter
+        outPath.append(basePath.head(pos + 1));
+
+        StringBuilder buf;
+        const auto baseName = basePath.tail(pos + 1);
+
+        SLANG_RETURN_ON_FAIL(calcNameForDesc(desc, baseName, buf));
+        outPath.append(buf);
+
+        return SLANG_OK;
+    }
+    else
+    {
+        return calcNameForDesc(desc, basePath, outPath);
+    }
 }
 
 } // namespace Slang
