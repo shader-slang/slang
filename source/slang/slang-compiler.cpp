@@ -2046,16 +2046,22 @@ namespace Slang
 
         // Just use the counter for the 'base name'
         StringBuilder basename;
+
+        // Add the prefix
+        basename << getIntermediateDumpPrefix();
+
+        // Add the id
         basename << int(id);
 
         // Work out the filename based on the desc and the basename
         StringBuilder filename;
         ArtifactDescUtil::calcNameForDesc(desc, basename.getUnownedSlice(), filename);
 
-        // If didn't produce a filename, ues the counter value and ".unknown" extension
+        // If didn't produce a filename, use basename with .unknown extension
         if (filename.getLength() == 0)
         {
-            filename << basename << ".unknown";
+            filename = basename;
+            filename << ".unknown";
         }
         
         // Write to a file
