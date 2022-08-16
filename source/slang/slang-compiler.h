@@ -144,47 +144,6 @@ namespace Slang
     class Module;
     class TranslationUnitRequest;
 
-#if 0
-    // Result of compiling an entry point.
-    // Should only ever be string, binary or shared library
-    class CompileResult
-    {
-    public:
-        CompileResult() = default;
-        explicit CompileResult(String const& str, RefPtr<PostEmitMetadata> metadata)
-            : format(ResultFormat::Text)
-            , outputString(str)
-            , postEmitMetadata(metadata) {}
-
-        explicit CompileResult(ISlangBlob* inBlob)
-            : format(ResultFormat::Binary)
-            , blob(inBlob) {}
-
-        explicit CompileResult(DownstreamCompileResult* inDownstreamResult, RefPtr<PostEmitMetadata> metadata)
-            : format(ResultFormat::Binary)
-            , downstreamResult(inDownstreamResult)
-            , postEmitMetadata(metadata) {}
-
-        explicit CompileResult(const UnownedStringSlice& slice )
-            : format(ResultFormat::Text)
-            , outputString(slice) {}
-
-        SlangResult getBlob(ComPtr<ISlangBlob>& outBlob) const;
-        SlangResult getSharedLibrary(ComPtr<ISlangSharedLibrary>& outSharedLibrary);
-
-        SlangResult isParameterLocationUsed(SlangParameterCategory category, UInt spaceIndex, UInt registerIndex, bool& outUsed);
-                
-        ResultFormat format = ResultFormat::None;
-        String outputString;                    ///< Only set if result type is ResultFormat::Text
-
-        mutable ComPtr<ISlangBlob> blob;
-
-        RefPtr<DownstreamCompileResult> downstreamResult;
-
-        RefPtr<PostEmitMetadata> postEmitMetadata;
-    };
-#endif
-
         /// Information collected about global or entry-point shader parameters
     struct ShaderParamInfo
     {
@@ -2414,46 +2373,21 @@ namespace Slang
 
         SlangResult emitEntryPoints(ComPtr<IArtifact>& outArtifact);
 
-        SlangResult dissassembleWithDownstream(
-            const void* data,
-            size_t          dataSizeInBytes,
-            ISlangBlob** outBlob);
-
-        SlangResult dissassembleWithDownstream(
-            DownstreamCompileResult* downstreamResult,
-            ISlangBlob** outBlob);
+        void maybeDumpIntermediate(IArtifact* artifact);
 
     protected:
         CodeGenTarget m_targetFormat = CodeGenTarget::Unknown;
         ExtensionTracker* m_extensionTracker = nullptr;
 
-        void maybeDumpIntermediate(IArtifact* artifact);
+            /// Will output assembly as well as the artifact if appropriate for the artifact type for assembly output
+            /// and conversion is possible
+        void _dumpIntermediateMaybeWithAssembly(IArtifact* artifact);
 
-        // Helper to dump intermediate output when debugging
-        void maybeDumpIntermediate(
+        void _dumpIntermediate(IArtifact* artifact);
+        void _dumpIntermediate(
+            const ArtifactDesc& desc,
             void const* data,
             size_t      size);
-        void maybeDumpIntermediate(
-            char const* text);
-
-        void maybeDumpIntermediate(
-            DownstreamCompileResult* compileResult);
-
-        void dumpIntermediate(
-            void const* data,
-            size_t      size,
-            char const* ext,
-            bool        isBinary);
-
-        void dumpIntermediateText(
-            void const* data,
-            size_t      size,
-            char const* ext);
-
-        void dumpIntermediateBinary(
-            void const* data,
-            size_t      size,
-            char const* ext);
 
         /* Emits entry point source taking into account if a pass-through or not. Uses 'targetFormat' to determine
         the target (not targetReq) */
@@ -2687,6 +2621,7 @@ namespace Slang
             return m_specializedEntryPoints[index];
         }
         
+        void writeArtifactToStandardOutput(IArtifact* artifact, DiagnosticSink* sink);
 
         void generateOutput();
 
@@ -2865,7 +2800,7 @@ namespace Slang
         {
             return m_downstreamCompileTime;
         }
-
+        
             /// Get the downstream compiler for a transition
         DownstreamCompiler* getDownstreamCompiler(CodeGenTarget source, CodeGenTarget target);
         

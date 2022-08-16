@@ -71,6 +71,7 @@
 #include "../compiler-core/slang-artifact-desc-util.h"
 #include "../compiler-core/slang-artifact-util.h"
 #include "../compiler-core/slang-artifact-impl.h"
+#include "../compiler-core/slang-artifact-associated-impl.h"
 
 #include <assert.h>
 
@@ -836,11 +837,10 @@ Result linkAndOptimizeIR(
 #endif
     validateIRModuleIfEnabled(codeGenContext, irModule);
 
-    auto metadata = Artifact::create(ArtifactDesc::make(ArtifactKind::Instance, ArtifactPayload::PostEmitMetadata, artifactDesc.style));
-    auto postEmitMetaRep = new PostEmitMetadataArtifactRepresentation;
-    metadata->addRepresentation(postEmitMetaRep);
+    auto metadata = new PostEmitMetadata;
+    outLinkedIR.metadata = metadata;
 
-    collectMetadata(irModule, postEmitMetaRep->m_metadata);
+    collectMetadata(irModule, *metadata);
 
     outLinkedIR.metadata = metadata;
 
@@ -856,8 +856,6 @@ SlangResult CodeGenContext::emitEntryPointsSourceFromIR(ComPtr<IArtifact>& outAr
     auto sourceManager = getSourceManager();
     auto target = getTargetFormat();
     auto targetRequest = getTargetReq();
-
-    auto artifactContainer = ArtifactUtil::createResultsContainer();
 
     auto lineDirectiveMode = targetRequest->getLineDirectiveMode();
     // To try to make the default behavior reasonable, we will
@@ -930,7 +928,7 @@ SlangResult CodeGenContext::emitEntryPointsSourceFromIR(ComPtr<IArtifact>& outAr
 
     SLANG_RETURN_ON_FAIL(sourceEmitter->init());
 
-
+    ComPtr<IPostEmitMetadata> metadata;
     {
         LinkingAndOptimizationOptions linkingAndOptimizationOptions;
 
@@ -955,11 +953,8 @@ SlangResult CodeGenContext::emitEntryPointsSourceFromIR(ComPtr<IArtifact>& outAr
 
         auto irModule = linkedIR.module;
 
-        if (linkedIR.metadata)
-        {
-            artifactContainer->addChild(linkedIR.metadata);
-        }
-        
+        metadata = linkedIR.metadata;
+
         // After all of the required optimization and legalization
         // passes have been performed, we can emit target code from
         // the IR module.
@@ -1029,12 +1024,15 @@ SlangResult CodeGenContext::emitEntryPointsSourceFromIR(ComPtr<IArtifact>& outAr
 
     // Write out the result
 
-    auto targetArtifact = ArtifactUtil::createArtifactForCompileTarget(asExternal(target));
-    targetArtifact->addRepresentationUnknown(StringBlob::moveCreate(finalResult));
+    auto artifact = ArtifactUtil::createArtifactForCompileTarget(asExternal(target));
+    artifact->addRepresentationUnknown(StringBlob::moveCreate(finalResult));
 
-    artifactContainer->addChild(targetArtifact);
+    if (metadata)
+    {
+        artifact->addAssociated(metadata);
+    }
 
-    outArtifact = artifactContainer;
+    outArtifact.swap(artifact);
     return SLANG_OK;
 }
 
@@ -1048,8 +1046,6 @@ SlangResult emitSPIRVForEntryPointsDirectly(
     CodeGenContext* codeGenContext,
     ComPtr<IArtifact>& outArtifact)
 {
-    auto artifactContainer = ArtifactUtil::createResultsContainer();
-
     // Outside because we want to keep IR in scope whilst we are processing emits
     LinkedIR linkedIR;
     LinkingAndOptimizationOptions linkingAndOptimizationOptions;
@@ -1064,17 +1060,15 @@ SlangResult emitSPIRVForEntryPointsDirectly(
     List<uint8_t> spirv;
     emitSPIRVFromIR(codeGenContext, irModule, irEntryPoints, spirv);
 
-    auto targetArtifact = ArtifactUtil::createArtifactForCompileTarget(asExternal(codeGenContext->getTargetFormat()));
-    targetArtifact->addRepresentationUnknown(ListBlob::moveCreate(spirv));
-
-    artifactContainer->addChild(targetArtifact);
+    auto artifact = ArtifactUtil::createArtifactForCompileTarget(asExternal(codeGenContext->getTargetFormat()));
+    artifact->addRepresentationUnknown(ListBlob::moveCreate(spirv));
 
     if (linkedIR.metadata)
     {
-        artifactContainer->addChild(linkedIR.metadata);
+        artifact->addAssociated(linkedIR.metadata);
     }
 
-    outArtifact = artifactContainer;
+    outArtifact.swap(artifact);
 
     return SLANG_OK;
 }

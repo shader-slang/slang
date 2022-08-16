@@ -79,6 +79,12 @@ protected:
     List<ICastable*> m_list;
 };
 
+struct CastableUtil
+{
+        /// Given an unk return as an unk
+    static ComPtr<ICastable> getCastable(ISlangUnknown* unk);
+};
+
 } // namespace Slang
 
 #endif

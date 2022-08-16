@@ -182,23 +182,21 @@ SlangResult DefaultArtifactHandler::expandChildren(IArtifactContainer* container
 	return SLANG_E_NOT_IMPLEMENTED;
 }
 
-
-
 SlangResult DefaultArtifactHandler::getOrCreateRepresentation(IArtifact* artifact, const Guid& guid, ArtifactKeep keep, ICastable** outCastable)
 {
+	const auto reps = artifact->getRepresentations();
+	
 	// See if we already have a rep of this type
+	for (ICastable* rep : reps)
 	{
-		for (ICastable* rep : artifact->getRepresentations())
+		if (rep->castAs(guid))
 		{
-			if (rep->castAs(guid))
-			{
-				rep->addRef();
-				*outCastable = rep;
-				return SLANG_OK;
-			}
+			rep->addRef();
+			*outCastable = rep;
+			return SLANG_OK;
 		}
 	}
-
+	
 	// TODO(JS): Temporary whilst DownstreamCompileResult is 
 	// Special handling for DownstreamCompileResult
 	if (auto downstreamResult = findRepresentation<DownstreamCompileResult>(artifact))
@@ -217,14 +215,23 @@ SlangResult DefaultArtifactHandler::getOrCreateRepresentation(IArtifact* artifac
 		}
 	}
 
-	// Normal construction
-	if (guid == ISlangBlob::getTypeGuid())
+	// We can ask each representation if they can do the conversion to the type, if they can we just use that
+	for (ICastable* castable : reps)
 	{
-		ComPtr<ISlangBlob> blob;
-		SLANG_RETURN_ON_FAIL(_loadBlob(artifact, keep, blob.writeRef()));
-		return _addRepresentation(artifact, keep, blob, outCastable);
+		if (auto rep = as<IArtifactRepresentation>(castable))
+		{
+			ComPtr<ICastable> created;
+			if (SLANG_SUCCEEDED(rep->createRepresentation(guid, created.writeRef())))
+			{
+				SLANG_ASSERT(created);
+				// Add the rep
+				return _addRepresentation(artifact, keep, created, outCastable);
+			}
+		}
 	}
-	else if (guid == ISlangSharedLibrary::getTypeGuid())
+
+	// Special case shared library
+	if (guid == ISlangSharedLibrary::getTypeGuid())
 	{
 		ComPtr<ISlangSharedLibrary> sharedLib;
 		SLANG_RETURN_ON_FAIL(_loadSharedLibrary(artifact, keep, sharedLib.writeRef()));
@@ -346,35 +353,6 @@ SlangResult DefaultArtifactHandler::_loadSharedLibrary(IArtifact* artifact, Arti
 	}
 
 	return SLANG_FAIL;
-}
-
-SlangResult DefaultArtifactHandler::_loadBlob(IArtifact* artifact, ArtifactKeep keep, ISlangBlob** outBlob)
-{
-	SLANG_UNUSED(keep);
-
-	ComPtr<ISlangBlob> blob;
-
-	// Look for a representation that we can serialize into a blob
-	for (auto rep : artifact->getRepresentations())
-	{
-		if (auto artifactRep = as<IArtifactRepresentation>(rep))
-		{
-			SlangResult res = artifactRep->writeToBlob(blob.writeRef());
-			if (SLANG_SUCCEEDED(res) && blob)
-			{
-				break;
-			}
-		}
-	}
-
-	// Wasn't able to construct
-	if (!blob)
-	{
-		return SLANG_E_NOT_FOUND;
-	}
-
-	*outBlob = blob.detach();
-	return SLANG_OK;
 }
 
 } // namespace Slang

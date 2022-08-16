@@ -25,7 +25,7 @@ public:
     SLANG_NO_THROW void* SLANG_MCALL castAs(const Guid& guid) SLANG_OVERRIDE;
 
     // IArtifactRepresentation
-    SLANG_NO_THROW SlangResult SLANG_MCALL writeToBlob(ISlangBlob** blob) SLANG_OVERRIDE;
+    SLANG_NO_THROW SlangResult SLANG_MCALL createRepresentation(const Guid& typeGuid, ICastable** outCastable) SLANG_OVERRIDE;
     SLANG_NO_THROW bool SLANG_MCALL exists() SLANG_OVERRIDE;
 
     // IFileArtifactRepresentation
@@ -60,142 +60,6 @@ protected:
     ComPtr<ISlangMutableFileSystem> m_fileSystem;
 };
 
-class DiagnosticsArtifactRepresentation : public ComBaseObject, public IDiagnosticsArtifactRepresentation
-{
-public:
-    SLANG_COM_BASE_IUNKNOWN_ALL
-
-    // ICastable
-    SLANG_NO_THROW void* SLANG_MCALL castAs(const Guid& guid) SLANG_OVERRIDE;
-    // IArtifactRepresentation
-    SLANG_NO_THROW SlangResult SLANG_MCALL writeToBlob(ISlangBlob** blob) SLANG_OVERRIDE;
-    SLANG_NO_THROW bool SLANG_MCALL exists() SLANG_OVERRIDE;
-    // IDiagnosticArtifactRepresentation
-    SLANG_NO_THROW virtual const Diagnostic* SLANG_MCALL getAt(Index i) SLANG_OVERRIDE { return &m_diagnostics[i]; }
-    SLANG_NO_THROW virtual Count SLANG_MCALL getCount() SLANG_OVERRIDE { return m_diagnostics.getCount(); }
-    SLANG_NO_THROW virtual void SLANG_MCALL add(const Diagnostic& diagnostic) SLANG_OVERRIDE; 
-    SLANG_NO_THROW virtual void SLANG_MCALL removeAt(Index i) SLANG_OVERRIDE { m_diagnostics.removeAt(i); }
-    SLANG_NO_THROW virtual SlangResult SLANG_MCALL getResult() SLANG_OVERRIDE { return m_result; }
-    SLANG_NO_THROW virtual void SLANG_MCALL setResult(SlangResult res) SLANG_OVERRIDE { m_result = res; }
-
-    DiagnosticsArtifactRepresentation():
-        m_arena(1024)
-    {
-    }
-
-protected:
-    void* getInterface(const Guid& uuid);
-    void* getObject(const Guid& uuid);
-
-    ZeroTerminatedCharSlice _allocateSlice(const Slice<char>& in);
-
-    // We could consider storing paths, codes in StringSlicePool, but for now we just allocate all 'string type things'
-    // in the arena.
-    MemoryArena m_arena;
-
-    List<Diagnostic> m_diagnostics;
-    SlangResult m_result = SLANG_OK;
-    
-    ZeroTerminatedCharSlice m_raw;
-};
-
-/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!! PostEmitMetadataArtifactRepresentation !!!!!!!!!!!!!!!!!!!!!!!!!! */
-
-struct ShaderBindingRange
-{
-    slang::ParameterCategory category = slang::ParameterCategory::None;
-    UInt spaceIndex = 0;
-    UInt registerIndex = 0;
-    UInt registerCount = 0; // 0 for unsized
-
-    bool isInfinite() const
-    {
-        return registerCount == 0;
-    }
-
-    bool containsBinding(slang::ParameterCategory _category, UInt _spaceIndex, UInt _registerIndex) const
-    {
-        return category == _category
-            && spaceIndex == _spaceIndex
-            && registerIndex <= _registerIndex
-            && (isInfinite() || registerCount + registerIndex > _registerIndex);
-    }
-
-    bool intersectsWith(const ShaderBindingRange& other) const
-    {
-        if (category != other.category || spaceIndex != other.spaceIndex)
-            return false;
-
-        const bool leftIntersection = (registerIndex < other.registerIndex + other.registerCount) || other.isInfinite();
-        const bool rightIntersection = (other.registerIndex < registerIndex + registerCount) || isInfinite();
-
-        return leftIntersection && rightIntersection;
-    }
-
-    bool adjacentTo(const ShaderBindingRange& other) const
-    {
-        if (category != other.category || spaceIndex != other.spaceIndex)
-            return false;
-
-        const bool leftIntersection = (registerIndex <= other.registerIndex + other.registerCount) || other.isInfinite();
-        const bool rightIntersection = (other.registerIndex <= registerIndex + registerCount) || isInfinite();
-
-        return leftIntersection && rightIntersection;
-    }
-
-    void mergeWith(const ShaderBindingRange other)
-    {
-        UInt newRegisterIndex = Math::Min(registerIndex, other.registerIndex);
-
-        if (other.isInfinite())
-            registerCount = 0;
-        else if (!isInfinite())
-            registerCount = Math::Max(registerIndex + registerCount, other.registerIndex + other.registerCount) - newRegisterIndex;
-
-        registerIndex = newRegisterIndex;
-    }
-
-    static bool isUsageTracked(slang::ParameterCategory category)
-    {
-        switch (category)
-        {
-        case slang::ConstantBuffer:
-        case slang::ShaderResource:
-        case slang::UnorderedAccess:
-        case slang::SamplerState:
-            return true;
-        default:
-            return false;
-        }
-    }
-};
-
-struct PostEmitMetadata 
-{
-    List<ShaderBindingRange> usedBindings;
-};
-
-class PostEmitMetadataArtifactRepresentation : public ComBaseObject, public IPostEmitMetadataArtifactRepresentation
-{
-public:
-    SLANG_CLASS_GUID(0x6f82509f, 0xe48b, 0x4b83, { 0xa3, 0x84, 0x5d, 0x70, 0x83, 0x19, 0x83, 0xcc })
-
-    SLANG_COM_BASE_IUNKNOWN_ALL
-
-    // ICastable
-    SLANG_NO_THROW void* SLANG_MCALL castAs(const Guid& guid) SLANG_OVERRIDE;
-    // IArtifactRepresentation
-    SLANG_NO_THROW SlangResult SLANG_MCALL writeToBlob(ISlangBlob** outBlob) SLANG_OVERRIDE { SLANG_UNUSED(outBlob); return SLANG_E_NOT_AVAILABLE; }
-    SLANG_NO_THROW bool SLANG_MCALL exists() SLANG_OVERRIDE { return true; }
-    // IPostEmitMetadataArtifactRepresentation
-    SLANG_NO_THROW virtual Slice<ShaderBindingRange> SLANG_MCALL getBindingRanges() SLANG_OVERRIDE;
-    
-    void* getInterface(const Guid& uuid);
-    void* getObject(const Guid& uuid);
-
-    PostEmitMetadata m_metadata;
-};
-
 /* This allows wrapping any object to be an artifact representation. 
 
 NOTE! Only allows casting from a single guid. Passing a RefObject across an ABI bounday remains risky!
@@ -210,7 +74,7 @@ public:
     // ICastable
     SLANG_NO_THROW void* SLANG_MCALL castAs(const Guid& guid) SLANG_OVERRIDE;
     // IArtifactRepresentation
-    SLANG_NO_THROW SlangResult SLANG_MCALL writeToBlob(ISlangBlob** outBlob) SLANG_OVERRIDE { SLANG_UNUSED(outBlob); return SLANG_E_NOT_AVAILABLE; }
+    SLANG_NO_THROW SlangResult SLANG_MCALL createRepresentation(const Guid& guid, ICastable** outCastable) SLANG_OVERRIDE { SLANG_UNUSED(guid); SLANG_UNUSED(outCastable); return SLANG_E_NOT_AVAILABLE; }
     SLANG_NO_THROW bool SLANG_MCALL exists() SLANG_OVERRIDE { return m_object; }
 
     ObjectArtifactRepresentation(const Guid& typeGuid, RefObject* obj):

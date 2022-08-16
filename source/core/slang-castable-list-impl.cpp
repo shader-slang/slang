@@ -3,7 +3,24 @@
 
 namespace Slang {
 
-    /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! UnknownCastableAdapter !!!!!!!!!!!!!!!!!!!!!!!!!!! */
+/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! CastableUtil !!!!!!!!!!!!!!!!!!!!!!!!!!! */
+
+/* static */ComPtr<ICastable> CastableUtil::getCastable(ISlangUnknown* unk)
+{
+    SLANG_ASSERT(unk);
+    ComPtr<ICastable> castable;
+    if (SLANG_SUCCEEDED(unk->queryInterface(ICastable::getTypeGuid(), (void**)castable.writeRef())))
+    {
+        SLANG_ASSERT(castable);
+    }
+    else
+    {
+        castable = new UnknownCastableAdapter(unk);
+    }
+    return castable;
+}
+
+/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! UnknownCastableAdapter !!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
 void* UnknownCastableAdapter::castAs(const Guid& guid)
 {

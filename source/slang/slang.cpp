@@ -11,6 +11,7 @@
 #include "../compiler-core/slang-artifact-impl.h"
 #include "../compiler-core/slang-artifact-desc-util.h"
 #include "../compiler-core/slang-artifact-util.h"
+#include "../compiler-core/slang-artifact-associated-impl.h"
 
 #include "slang-module-library.h"
 
@@ -3153,19 +3154,13 @@ SLANG_NO_THROW SlangResult SLANG_MCALL ComponentType::getEntryPointCode(
 
     DiagnosticSink sink(linkage->getSourceManager(), Lexer::sourceLocationLexer);
 
-    IArtifact* entryPointResult = targetProgram->getOrCreateEntryPointResult(entryPointIndex, &sink);
+    IArtifact* artifact = targetProgram->getOrCreateEntryPointResult(entryPointIndex, &sink);
     sink.getBlobIfNeeded(outDiagnostics);
 
-    if(entryPointResult == nullptr)
+    if(artifact == nullptr)
         return SLANG_FAIL;
 
-    IArtifact* significantBlob = ArtifactUtil::findSignificant(entryPointResult);
-    if (!significantBlob)
-    {
-        return SLANG_FAIL;
-    }
-
-    return significantBlob->loadBlob(ArtifactKeep::Yes, outCode);
+    return artifact->loadBlob(ArtifactKeep::Yes, outCode);
 }
 
 SLANG_NO_THROW SlangResult SLANG_MCALL ComponentType::getEntryPointHostCallable(
@@ -4838,11 +4833,8 @@ SlangResult EndToEndCompileRequest::getEntryPointCodeBlob(int entryPointIndex, i
     if (!outBlob) return SLANG_E_INVALID_ARG;
     ComPtr<IArtifact> artifact;
     SLANG_RETURN_ON_FAIL(_getEntryPointResult(this, entryPointIndex, targetIndex, artifact));
-    if (auto significant = ArtifactUtil::findSignificant(artifact))
-    {
-        SLANG_RETURN_ON_FAIL(significant->loadBlob(ArtifactKeep::Yes, outBlob));
-        return SLANG_OK;
-    }
+    SLANG_RETURN_ON_FAIL(artifact->loadBlob(ArtifactKeep::Yes, outBlob));
+
     return SLANG_E_NOT_AVAILABLE;
 }
 
@@ -4851,11 +4843,7 @@ SlangResult EndToEndCompileRequest::getEntryPointHostCallable(int entryPointInde
     if (!outSharedLibrary) return SLANG_E_INVALID_ARG;
     ComPtr<IArtifact> artifact;
     SLANG_RETURN_ON_FAIL(_getEntryPointResult(this, entryPointIndex, targetIndex, artifact));
-    if (auto significant = ArtifactUtil::findSignificant(artifact))
-    {
-        SLANG_RETURN_ON_FAIL(significant->loadSharedLibrary(ArtifactKeep::Yes, outSharedLibrary));
-        return SLANG_OK;
-    }
+    SLANG_RETURN_ON_FAIL(artifact->loadSharedLibrary(ArtifactKeep::Yes, outSharedLibrary));
     return SLANG_E_NOT_AVAILABLE;
 }
 
@@ -4866,13 +4854,8 @@ SlangResult EndToEndCompileRequest::getTargetCodeBlob(int targetIndex, ISlangBlo
 
     ComPtr<IArtifact> artifact;
     SLANG_RETURN_ON_FAIL(_getWholeProgramResult(this, targetIndex, artifact));
-
-    if (auto significant = ArtifactUtil::findSignificant(artifact))
-    {
-        SLANG_RETURN_ON_FAIL(significant->loadBlob(ArtifactKeep::Yes, outBlob));
-        return SLANG_OK;
-    }
-    return SLANG_E_NOT_AVAILABLE;
+    SLANG_RETURN_ON_FAIL(artifact->loadBlob(ArtifactKeep::Yes, outBlob));
+    return SLANG_OK;
 }
 
 SlangResult EndToEndCompileRequest::getTargetHostCallable(int targetIndex,ISlangSharedLibrary** outSharedLibrary)
@@ -5030,22 +5013,14 @@ SlangResult EndToEndCompileRequest::isParameterLocationUsed(Int entryPointIndex,
     if (SLANG_FAILED(_getEntryPointResult(this, static_cast<int>(entryPointIndex), static_cast<int>(targetIndex), artifact)))
         return SLANG_E_INVALID_ARG;
 
-    // We need to find the meta data
-    IArtifact* metadataArtifact = artifact->findArtifactByDerivedDesc(IArtifact::FindStyle::SelfOrChildren,
-        ArtifactDesc::make(ArtifactKind::Base, ArtifactPayload::PostEmitMetadata, ArtifactStyle::Base));
-    if (!metadataArtifact)
-    {
-        return SLANG_E_NOT_AVAILABLE;
-    }
-
     // Find a rep
-    auto metadataRep = findRepresentation<IPostEmitMetadataArtifactRepresentation>(metadataArtifact);
-    if (!metadataRep)
+    auto metadata = findAssociated<IPostEmitMetadata>(artifact);
+    if (!metadata)
         return SLANG_E_NOT_AVAILABLE;
 
     
     // TODO: optimize this with a binary search through a sorted list
-    for (const auto& range : metadataRep->getBindingRanges())
+    for (const auto& range : metadata->getBindingRanges())
     {
         if (range.containsBinding((slang::ParameterCategory)category, spaceIndex, registerIndex))
         {

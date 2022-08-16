@@ -29,8 +29,7 @@ public:
 protected:
 
 	SlangResult _loadSharedLibrary(IArtifact* artifact, ArtifactKeep keep, ISlangSharedLibrary** outSharedLibrary);
-	SlangResult _loadBlob(IArtifact* artifact, ArtifactKeep keep, ISlangBlob** outBlob);
-
+	
 	void* getInterface(const Guid& uuid);
 	void* getObject(const Guid& uuid);
 
