@@ -1032,9 +1032,17 @@ SLANG_NO_THROW slang::IModule* SLANG_MCALL Linkage::loadModuleFromSource(
         {
             return loadedModule;
         }
+        String pathStr = path;
+        auto pathInfo = PathInfo::makeFromString(pathStr);
+        if (File::exists(pathStr))
+        {
+            String cannonicalPath;
+            Path::getCanonical(pathStr, cannonicalPath);
+            pathInfo = PathInfo::makeNormal(pathStr, cannonicalPath);
+        }
         auto module = loadModule(
             name,
-            PathInfo::makeFromString(path),
+            pathInfo,
             source,
             SourceLoc(),
             &sink,
