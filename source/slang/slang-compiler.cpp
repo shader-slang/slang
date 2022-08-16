@@ -2042,28 +2042,24 @@ namespace Slang
 
         static std::atomic<uint32_t> counter(0);
 
-        uint32_t id = ++counter;
+        const uint32_t id = ++counter;
 
+        // Just use the counter for the 'base name'
         StringBuilder basename;
         basename << int(id);
 
-        StringBuilder path;
-        ArtifactDescUtil::calcPathForDesc(desc, basename.getUnownedSlice(), path);
+        // Work out the filename based on the desc and the basename
+        StringBuilder filename;
+        ArtifactDescUtil::calcNameForDesc(desc, basename.getUnownedSlice(), filename);
 
-        if (path.getLength() == 0)
+        // If didn't produce a filename, ues the counter value and ".unknown" extension
+        if (filename.getLength() == 0)
         {
-            path.Clear();
-            path << basename << ".unknown";
+            filename << basename << ".unknown";
         }
         
-        if (ArtifactDescUtil::isText(desc))
-        {
-            File::writeAllBytes(path, data, size);
-        }
-        else
-        {
-            File::writeNativeText(path, data, size);
-        }
+        // Write to a file
+        ArtifactOutputUtil::writeToFile(desc, data, size, filename);
     }
 
     void CodeGenContext::maybeDumpIntermediate(IArtifact* artifact)

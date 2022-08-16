@@ -78,10 +78,11 @@ struct ArtifactDescUtil
     
     static String getBaseName(const ArtifactDesc& desc, IFileArtifactRepresentation* fileRep);
 
-        /// Given a desc, and a basePath returns a suitable path for a entity of specified desc
+        /// Given a desc and a basePath returns a suitable path for a entity of specified desc
     static SlangResult calcPathForDesc(const ArtifactDesc& desc, const UnownedStringSlice& basePath, StringBuilder& outPath);
 
-    static SlangResult calcNameForDesc(const ArtifactDesc& desc, const UnownedStringSlice& basePath, StringBuilder& outPath);
+        /// Given a desc and a baseName works out the the output file name
+    static SlangResult calcNameForDesc(const ArtifactDesc& desc, const UnownedStringSlice& baseName, StringBuilder& outName);
 
         /// Given a target returns the ArtifactDesc
     static ArtifactDesc makeDescFromCompileTarget(SlangCompileTarget target);

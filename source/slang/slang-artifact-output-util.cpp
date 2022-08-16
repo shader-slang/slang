@@ -17,7 +17,11 @@
 namespace Slang
 {
 
-static CodeGenTarget _getCodeGenTargetFromDesc(const ArtifactDesc& desc)
+// Given a desc returns a codegen target if it can be used for disassembly
+// Returns Unknown if cannot be used for generating disassembly
+//
+// NOTE! This returns the code gen target for the input binary, *not* the dissassembly output
+static CodeGenTarget _getDisassemblyCodeGenTarget(const ArtifactDesc& desc)
 {
     switch (desc.payload)
     {
@@ -38,7 +42,7 @@ static CodeGenTarget _getCodeGenTargetFromDesc(const ArtifactDesc& desc)
     // This could perhaps be performed in some other manner if there was more than one way to produce
     // disassembly from a binary.
 
-    const CodeGenTarget target = _getCodeGenTargetFromDesc(desc);
+    const CodeGenTarget target = _getDisassemblyCodeGenTarget(desc);
     if (target == CodeGenTarget::Unknown)
     {
         return SLANG_FAIL;
@@ -87,7 +91,7 @@ SlangResult ArtifactOutputUtil::maybeDisassemble(Session* session, IArtifact* ar
         return SLANG_OK;
     }
 
-    if (_getCodeGenTargetFromDesc(desc) != CodeGenTarget::Unknown)
+    if (_getDisassemblyCodeGenTarget(desc) != CodeGenTarget::Unknown)
     {
         // Get the blob
         ComPtr<ISlangBlob> blob;
@@ -185,11 +189,8 @@ static SlangResult _requireBlob(IArtifact* artifact, DiagnosticSink* sink, ComPt
     return write(artifact, sink, writerName, writer);
 }
 
-/* static */SlangResult ArtifactOutputUtil::writeToFile(const ArtifactDesc& desc, ISlangBlob* blob, const String& path)
+/* static */SlangResult ArtifactOutputUtil::writeToFile(const ArtifactDesc& desc, const void* data, size_t size, const String& path)
 {
-    const auto data = blob->getBufferPointer();
-    const auto size = blob->getBufferSize();
-
     if (ArtifactDescUtil::isText(desc))
     {
         return File::writeNativeText(path, data, size);
@@ -198,6 +199,12 @@ static SlangResult _requireBlob(IArtifact* artifact, DiagnosticSink* sink, ComPt
     {
         return File::writeAllBytes(path, data, size);
     }
+}
+
+/* static */SlangResult ArtifactOutputUtil::writeToFile(const ArtifactDesc& desc, ISlangBlob* blob, const String& path)
+{
+    SLANG_RETURN_ON_FAIL(writeToFile(desc, blob->getBufferPointer(), blob->getBufferSize(), path));
+    return SLANG_OK;
 }
 
 /* static */SlangResult ArtifactOutputUtil::writeToFile(IArtifact* artifact, const String& path)

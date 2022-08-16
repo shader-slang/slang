@@ -35,6 +35,7 @@ struct ArtifactOutputUtil
 	static SlangResult write(IArtifact* artifact, DiagnosticSink* sink, const UnownedStringSlice& writerName, ISlangWriter* writer);
 
 		/// Write to the specified path
+	static SlangResult writeToFile(const ArtifactDesc& desc, const void* data, size_t size, const String& path);
 	static SlangResult writeToFile(const ArtifactDesc& desc, ISlangBlob* blob, const String& path);
 	static SlangResult writeToFile(IArtifact* artifact, const String& path);
 	static SlangResult writeToFile(IArtifact* artifact, DiagnosticSink* sink, const String& path);

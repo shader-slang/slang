@@ -1771,30 +1771,35 @@ namespace Slang
         {
             // Instead of returning a BoolLiteralExpr, we use a field to indicate this scenario,
             // so that the language server can still see the original syntax tree.
-            expr->isAlwaysTrue = true;
+            expr->constantVal = m_astBuilder->create<BoolLiteralExpr>();
+            expr->constantVal->type = m_astBuilder->getBoolType();
+            expr->constantVal->value = true;
+            expr->constantVal->loc = expr->loc;
             return expr;
         }
 
         // Otherwise, we need to ensure the target type is a subtype of value->type.
-        // For now we can only support the scenario where `expr->value` is an interface type.
-        if (!isInterfaceType(originalVal->type))
-        {
-            getSink()->diagnose(expr, Diagnostics::isOperatorValueMustBeInterfaceType);
-        }
 
         expr->value = maybeOpenExistential(originalVal);
         expr->witnessArg = tryGetSubtypeWitness(expr->typeExpr.type, originalVal->type.type);
         if (expr->witnessArg)
         {
+            // For now we can only support the scenario where `expr->value` is an interface type.
+            if (!isInterfaceType(originalVal->type))
+            {
+                getSink()->diagnose(expr, Diagnostics::isOperatorValueMustBeInterfaceType);
+            }
             return expr;
         }
 
         if (!as<ErrorType>(expr->typeExpr.type) && !as<ErrorType>(expr->value->type.type))
         {
-            getSink()->diagnose(expr, Diagnostics::typeNotInTheSameHierarchy, expr->value->type.type, expr->typeExpr.type);
+            // The type is not in the same hierarchy, so we evaluate to false.
+            expr->constantVal = m_astBuilder->create<BoolLiteralExpr>();
+            expr->constantVal->type = m_astBuilder->getBoolType();
+            expr->constantVal->value = false;
+            expr->constantVal->loc = expr->loc;
         }
-
-        expr->type = m_astBuilder->getErrorType();
         return expr;
     }
 
