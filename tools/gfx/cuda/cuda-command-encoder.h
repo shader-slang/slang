@@ -15,6 +15,16 @@ class ResourceCommandEncoderImpl : public IResourceCommandEncoder
 public:
     CommandWriter* m_writer;
 
+    virtual void* getInterface(SlangUUID const& uuid) { return this; }
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL
+        queryInterface(SlangUUID const& uuid, void** outObject) override
+    {
+        *outObject = getInterface(uuid);
+        return SLANG_OK;
+    }
+    virtual SLANG_NO_THROW uint32_t SLANG_MCALL addRef() { return 1; }
+    virtual SLANG_NO_THROW uint32_t SLANG_MCALL release() { return 1; }
+
     void init(CommandBufferImpl* cmdBuffer);
 
     virtual SLANG_NO_THROW void SLANG_MCALL endEncoding() override {}
