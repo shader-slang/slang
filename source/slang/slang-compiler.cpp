@@ -2026,9 +2026,31 @@ namespace Slang
 
     // Debug logic for dumping intermediate outputs
 
-    //
+    
+    void CodeGenContext::_dumpIntermediateMaybeWithAssembly(IArtifact* artifact)
+    {
+        _dumpIntermediate(artifact);
 
-    void CodeGenContext::dumpIntermediate(
+        ComPtr<IArtifact> assembly;
+        ArtifactOutputUtil::maybeDisassemble(getSession(), artifact, nullptr, assembly);
+
+        if (assembly)
+        {
+            _dumpIntermediate(assembly);
+        }
+    }
+
+    void CodeGenContext::_dumpIntermediate(IArtifact* artifact)
+    {
+        ComPtr<ISlangBlob> blob;
+        if (SLANG_FAILED(artifact->loadBlob(ArtifactKeep::No, blob.writeRef())))
+        {
+            return;
+        }
+        _dumpIntermediate(artifact->getDesc(), blob->getBufferPointer(), blob->getBufferSize());
+    }
+
+    void CodeGenContext::_dumpIntermediate(
         const ArtifactDesc& desc,
         void const*     data,
         size_t          size)
@@ -2073,13 +2095,8 @@ namespace Slang
         if (!shouldDumpIntermediates())
             return;
 
-        ComPtr<ISlangBlob> blob;
-        if (SLANG_FAILED(artifact->loadBlob(ArtifactKeep::No, blob.writeRef())))
-        {
-            return;
-        }
-
-        dumpIntermediate(artifact->getDesc(), blob->getBufferPointer(), blob->getBufferSize());
+        
+        _dumpIntermediateMaybeWithAssembly(artifact);
     }
 
     IRDumpOptions CodeGenContext::getIRDumpOptions()
