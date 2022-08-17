@@ -955,15 +955,19 @@ namespace Slang
             // but then emit a diagnostic when actually reifying
             // the result expression.
             //
-            if( cost >= kConversionCost_Explicit )
+            if (outToExpr)
             {
-                if( outToExpr )
+                if (cost >= kConversionCost_Explicit)
                 {
                     getSink()->diagnose(fromExpr, Diagnostics::typeMismatch, toType, fromType);
-                    getSink()->diagnose(fromExpr, Diagnostics::noteExplicitConversionPossible, fromType, toType);
+                    getSink()->diagnose(
+                        fromExpr, Diagnostics::noteExplicitConversionPossible, fromType, toType);
+                }
+                else if (cost >= kConversionCost_Default)
+                {
+                    getSink()->diagnose(fromExpr, Diagnostics::potentiallyUnintendedImplicitConversion, fromType, toType);
                 }
             }
-
             if(outCost)
                 *outCost = cost;
 
