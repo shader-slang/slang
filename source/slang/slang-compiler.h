@@ -1210,6 +1210,21 @@ namespace Slang
             return SLANG_OK;
         }
 
+        virtual SlangInt32 SLANG_MCALL getDefinedEntryPointCount() override
+        {
+            return (SlangInt32)m_entryPoints.getCount();
+        }
+
+        virtual SlangResult SLANG_MCALL getDefinedEntryPoint(SlangInt32 index, slang::IEntryPoint** outEntryPoint) override
+        {
+            if (index < 0 || index >= m_entryPoints.getCount())
+                return SLANG_E_INVALID_ARG;
+
+            ComPtr<slang::IEntryPoint> entryPoint(m_entryPoints[index].Ptr());
+            *outEntryPoint = entryPoint.detach();
+            return SLANG_OK;
+        }
+
         //
 
             /// Create a module (initially empty).

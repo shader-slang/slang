@@ -324,6 +324,9 @@ DIAGNOSTIC(31121, Error, anyValueSizeExceedsLimit, "'anyValueSize' cannot exceed
 
 DIAGNOSTIC(31122, Error, associatedTypeNotAllowInComInterface, "associatedtype not allowed in a [COM] interface")
 DIAGNOSTIC(31123, Error, invalidGUID, "'$0' is not a valid GUID")
+DIAGNOSTIC(31124, Error, structCannotImplementComInterface, "a struct type cannot implement a [COM] interface")
+DIAGNOSTIC(31124, Error, interfaceInheritingComMustBeCom, "an interface type that inherits from a [COM] interface must itself be a [COM] interface")
+
 
 // Enums
 

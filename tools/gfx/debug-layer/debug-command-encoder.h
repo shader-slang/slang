@@ -15,7 +15,18 @@ public:
     virtual DebugCommandBuffer* getCommandBuffer() = 0;
     virtual bool getIsOpen() = 0;
     virtual IResourceCommandEncoder* getBaseResourceEncoder() = 0;
-
+    virtual void* getInterface(SlangUUID const& uuid) = 0;
+    SlangResult queryInterface(SlangUUID const& uuid, void** outObject)
+    {
+        if (auto ptr = getInterface(uuid))
+        {
+            *outObject = ptr;
+            return SLANG_OK;
+        }
+        return SLANG_E_NO_INTERFACE;
+    }
+    uint32_t addRef() { return 1; }
+    uint32_t release() { return 1; }
 public:
     virtual SLANG_NO_THROW void SLANG_MCALL copyBuffer(
         IBufferResource* dst,
@@ -97,6 +108,14 @@ public:
     virtual DebugCommandBuffer* getCommandBuffer() override { return commandBuffer; }
     virtual bool getIsOpen() override { return isOpen; }
     virtual IResourceCommandEncoder* getBaseResourceEncoder() override { return baseObject; }
+    virtual void* getInterface(SlangUUID const& uuid) override
+    {
+        if (uuid == GfxGUID::IID_IResourceCommandEncoder || uuid == GfxGUID::IID_IComputeCommandEncoder || uuid == ISlangUnknown::getTypeGuid())
+        {
+            return this;
+        }
+        return nullptr;
+    }
 
 public:
     virtual SLANG_NO_THROW void SLANG_MCALL endEncoding() override;
@@ -122,7 +141,14 @@ public:
     virtual DebugCommandBuffer* getCommandBuffer() override { return commandBuffer; }
     virtual bool getIsOpen() override { return isOpen; }
     virtual IResourceCommandEncoder* getBaseResourceEncoder() override { return baseObject; }
-
+    virtual void* getInterface(SlangUUID const& uuid) override
+    {
+        if (uuid == GfxGUID::IID_IResourceCommandEncoder || uuid == ISlangUnknown::getTypeGuid())
+        {
+            return this;
+        }
+        return nullptr;
+    }
 
 public:
     virtual SLANG_NO_THROW void SLANG_MCALL endEncoding() override;
@@ -144,7 +170,14 @@ public:
     }
     virtual bool getIsOpen() override { return isOpen; }
     virtual IResourceCommandEncoder* getBaseResourceEncoder() override { return baseObject; }
-
+    virtual void* getInterface(SlangUUID const& uuid) override
+    {
+        if (uuid == GfxGUID::IID_IResourceCommandEncoder || uuid == GfxGUID::IID_IRenderCommandEncoder || uuid == ISlangUnknown::getTypeGuid())
+        {
+            return this;
+        }
+        return nullptr;
+    }
 public:
     virtual SLANG_NO_THROW void SLANG_MCALL endEncoding() override;
     virtual SLANG_NO_THROW Result SLANG_MCALL
@@ -212,7 +245,14 @@ public:
     virtual DebugCommandBuffer* getCommandBuffer() override { return commandBuffer; }
     virtual bool getIsOpen() override { return isOpen; }
     virtual IResourceCommandEncoder* getBaseResourceEncoder() override { return baseObject; }
-
+    virtual void* getInterface(SlangUUID const& uuid) override
+    {
+        if (uuid == GfxGUID::IID_IResourceCommandEncoder || uuid == GfxGUID::IID_IRayTracingCommandEncoder || uuid == ISlangUnknown::getTypeGuid())
+        {
+            return this;
+        }
+        return nullptr;
+    }
 public:
     virtual SLANG_NO_THROW void SLANG_MCALL endEncoding() override;
     virtual SLANG_NO_THROW void SLANG_MCALL buildAccelerationStructure(

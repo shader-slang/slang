@@ -151,7 +151,7 @@ namespace gfx_test
 
     void compareComputeResultFuzzy(const float* result, float* expectedResult, size_t expectedBufferSize)
     {
-        for (int i = 0; i < expectedBufferSize / sizeof(float); ++i)
+        for (size_t i = 0; i < expectedBufferSize / sizeof(float); ++i)
         {
             SLANG_CHECK(abs(result[i] - expectedResult[i]) <= 0.01);
         }
