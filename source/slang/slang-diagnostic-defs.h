@@ -129,6 +129,7 @@ DIAGNOSTIC(    94, Error, unableToReadRiff, "unable to read as 'riff'/not a 'rif
 DIAGNOSTIC(    95, Error, unknownLibraryKind, "unknown library kind '$0'")
 DIAGNOSTIC(    96, Error, kindNotLinkable, "not a known linkable kind '$0'")
 DIAGNOSTIC(    97, Error, libraryDoesNotExist, "library '$0' does not exist")
+DIAGNOSTIC(    98, Error, cannotAccessAsBlob, "cannot access as a blob")
 
 //
 // 001xx - Downstream Compilers
@@ -323,6 +324,9 @@ DIAGNOSTIC(31121, Error, anyValueSizeExceedsLimit, "'anyValueSize' cannot exceed
 
 DIAGNOSTIC(31122, Error, associatedTypeNotAllowInComInterface, "associatedtype not allowed in a [COM] interface")
 DIAGNOSTIC(31123, Error, invalidGUID, "'$0' is not a valid GUID")
+DIAGNOSTIC(31124, Error, structCannotImplementComInterface, "a struct type cannot implement a [COM] interface")
+DIAGNOSTIC(31124, Error, interfaceInheritingComMustBeCom, "an interface type that inherits from a [COM] interface must itself be a [COM] interface")
+
 
 // Enums
 

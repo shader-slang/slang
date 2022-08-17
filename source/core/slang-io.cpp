@@ -1,3 +1,5 @@
+#define _CRT_SECURE_NO_WARNINGS 1
+
 #include "slang-io.h"
 #include "slang-exception.h"
 
@@ -925,6 +927,20 @@ namespace Slang
         return SLANG_OK;
     }
     
+    /* static */SlangResult File::writeNativeText(const String& path, const void* data, size_t size)
+    {
+        FILE* file = fopen(path.getBuffer(), "w");
+        if (!file)
+        {
+            return SLANG_FAIL;
+        }
+
+        const auto count = fwrite(data, size, 1, file);
+        fclose(file);
+
+        return (count == 1) ? SLANG_OK : SLANG_FAIL;
+    }
+
     String URI::getPath() const
     {
         Index startIndex = uri.indexOf("://");

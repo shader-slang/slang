@@ -1,7 +1,7 @@
 #ifndef SLANG_GCC_COMPILER_UTIL_H
 #define SLANG_GCC_COMPILER_UTIL_H
 
-#include "slang-downstream-compiler.h"
+#include "slang-downstream-compiler-util.h"
 
 namespace Slang
 {
@@ -10,10 +10,10 @@ namespace Slang
 struct GCCDownstreamCompilerUtil : public DownstreamCompilerBaseUtil
 {
         /// Extracts version number into desc from text (assumes gcc/clang -v layout with a line with version)
-    static SlangResult parseVersion(const UnownedStringSlice& text, const UnownedStringSlice& prefix, DownstreamCompiler::Desc& outDesc);
+    static SlangResult parseVersion(const UnownedStringSlice& text, const UnownedStringSlice& prefix, DownstreamCompilerDesc& outDesc);
 
         /// Runs the exe, and extracts the version info into outDesc
-    static SlangResult calcVersion(const ExecutableLocation& exe, DownstreamCompiler::Desc& outDesc);
+    static SlangResult calcVersion(const ExecutableLocation& exe, DownstreamCompilerDesc& outDesc);
 
         /// Calculate gcc family compilers (including clang) cmdLine arguments from options
     static SlangResult calcArgs(const CompileOptions& options, CommandLine& cmdLine);
@@ -29,7 +29,7 @@ struct GCCDownstreamCompilerUtil : public DownstreamCompilerBaseUtil
 
         /// Given the exe location, creates a DownstreamCompiler.
         /// Note! Invoke/s the compiler  to determine the compiler version number. 
-    static SlangResult createCompiler(const ExecutableLocation& exe, RefPtr<DownstreamCompiler>& outCompiler);
+    static SlangResult createCompiler(const ExecutableLocation& exe, ComPtr<IDownstreamCompiler>& outCompiler);
 
         /// Finds GCC compiler/s and adds them to the set
     static SlangResult locateGCCCompilers(const String& path, ISlangSharedLibraryLoader* loader, DownstreamCompilerSet* set);
@@ -48,7 +48,7 @@ public:
     virtual SlangResult calcArgs(const CompileOptions& options, CommandLine& cmdLine) SLANG_OVERRIDE { return Util::calcArgs(options, cmdLine); }
     virtual SlangResult parseOutput(const ExecuteResult& exeResult, DownstreamDiagnostics& output) SLANG_OVERRIDE { return Util::parseOutput(exeResult, output); }
     virtual SlangResult calcModuleFilePath(const CompileOptions& options, StringBuilder& outPath) SLANG_OVERRIDE { return Util::calcModuleFilePath(options, outPath); }
-    virtual SlangResult calcCompileProducts(const CompileOptions& options, ProductFlags flags,  List<String>& outPaths) SLANG_OVERRIDE { return Util::calcCompileProducts(options, flags, outPaths); }
+    virtual SlangResult calcCompileProducts(const CompileOptions& options, DownstreamProductFlags flags,  List<String>& outPaths) SLANG_OVERRIDE { return Util::calcCompileProducts(options, flags, outPaths); }
 
     GCCDownstreamCompiler(const Desc& desc):Super(desc) {}
 };

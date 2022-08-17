@@ -8180,16 +8180,16 @@ bool canDeclLowerToAGeneric(Decl* decl)
 
 static bool isInterfaceRequirement(Decl* decl)
 {
-   auto ancestor = decl->parentDecl;
-   for(; ancestor; ancestor = ancestor->parentDecl )
-   {
-       if(as<InterfaceDecl>(ancestor))
-           return true;
+    auto ancestor = decl->parentDecl;
+    for (; ancestor; ancestor = ancestor->parentDecl)
+    {
+        if (as<InterfaceDecl>(ancestor))
+            return true;
 
-       if(as<ExtensionDecl>(ancestor))
-           return false;
-   }
-   return false;
+        if (as<ExtensionDecl>(ancestor))
+            return false;
+    }
+    return false;
 }
 
     /// Add flattened "leaf" elements from `val` to the `ioArgs` list

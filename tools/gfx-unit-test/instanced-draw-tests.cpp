@@ -387,7 +387,7 @@ namespace gfx_test
             encoder->setPrimitiveTopology(PrimitiveTopology::TriangleList);
 
             uint32_t maxDrawCount = 1;
-            uint64_t argOffset = offsetof(IndirectArgData, args);
+            Offset argOffset = offsetof(IndirectArgData, args);
 
             encoder->drawIndirect(maxDrawCount, indirectBuffer, argOffset);
             encoder->endEncoding();
@@ -464,7 +464,7 @@ namespace gfx_test
             encoder->setPrimitiveTopology(PrimitiveTopology::TriangleList);
 
             uint32_t maxDrawCount = 1;
-            uint64_t argOffset = offsetof(IndexedIndirectArgData, args);
+            Offset argOffset = offsetof(IndexedIndirectArgData, args);
 
             encoder->drawIndexedIndirect(maxDrawCount, indirectBuffer, argOffset);
             encoder->endEncoding();

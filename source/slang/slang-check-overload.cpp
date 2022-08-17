@@ -1443,8 +1443,15 @@ namespace Slang
             arg = maybeOpenRef(arg);
         }
 
-        for (auto& arg : expr->arguments)
+        auto funcType = as<FuncType>(funcExprType);
+        for (Index i = 0; i < expr->arguments.getCount(); i++)
         {
+            auto& arg = expr->arguments[i];
+            if (funcType && i < (Index)funcType->getParamCount())
+            {
+                if (funcType->getParamDirection(i) == kParameterDirection_Out)
+                    continue;
+            }
             arg = maybeOpenExistential(arg);
         }
 

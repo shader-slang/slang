@@ -12,7 +12,9 @@
 #endif
 
 #include "../core/slang-io.h"
+
 #include "slang-artifact-desc-util.h"
+#include "slang-artifact-util.h"
 
 namespace Slang
 {
@@ -270,7 +272,7 @@ namespace Slang
             ComPtr<IFileArtifactRepresentation> fileRep;
             SLANG_RETURN_ON_FAIL(artifact->requireFile(ArtifactKeep::Yes, nullptr, fileRep.writeRef()));
 
-            libPathPool.add(ArtifactDescUtil::getParentPath(fileRep));
+            libPathPool.add(ArtifactUtil::getParentPath(fileRep));
             // We need the extension for windows
             cmdLine.addArg(ArtifactDescUtil::getBaseName(artifact->getDesc(), fileRep) + ".lib");
         }

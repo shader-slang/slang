@@ -3,16 +3,18 @@
 
 #include "slang-compiler.h"
 
+#include "../compiler-core/slang-artifact-associated.h"
+
 namespace Slang
 {
     struct IRVarLayout;
 
     struct LinkedIR
     {
-        RefPtr<IRModule>    module;
-        IRVarLayout*        globalScopeVarLayout;
-        List<IRFunc*>       entryPoints;
-        RefPtr<PostEmitMetadata> metadata;
+        RefPtr<IRModule>            module;
+        IRVarLayout*                globalScopeVarLayout;
+        List<IRFunc*>               entryPoints;
+        ComPtr<IPostEmitMetadata>   metadata;
     };
 
 
