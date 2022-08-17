@@ -5,6 +5,8 @@
 #include <cmath>
 #include <cstring>
 
+#define SLANG_COM_PTR_ENABLE_REF_OPERATOR 1
+
 #include "../source/slang-rt/slang-rt.h"
 #include "../slang-com-ptr.h"
 #include "slang-cpp-types.h"

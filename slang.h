@@ -4449,6 +4449,15 @@ namespace slang
         virtual SLANG_NO_THROW SlangResult SLANG_MCALL findEntryPointByName(
             char const*     name,
             IEntryPoint**   outEntryPoint) = 0;
+
+        /// Get number of entry points defined in the module. An entry point defined in a module
+        /// is by default not included in the linkage, so calls to `IComponentType::getEntryPointCount`
+        /// on an `IModule` instance will always return 0. However `IModule::getDefinedEntryPointCount`
+        /// will return the number of defined entry points.
+        virtual SLANG_NO_THROW SlangInt32 SLANG_MCALL getDefinedEntryPointCount() = 0;
+        /// Get the name of an entry point defined in the module.
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL
+            getDefinedEntryPoint(SlangInt32 index, IEntryPoint** outEntryPoint) = 0;
     };
     
     #define SLANG_UUID_IModule IModule::getTypeGuid()

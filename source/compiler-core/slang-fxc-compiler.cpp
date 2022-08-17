@@ -107,15 +107,15 @@ struct FxcIncludeHandler : ID3DInclude
     IncludeSystem m_system;
 };
 
-class FXCDownstreamCompiler : public DownstreamCompiler
+class FXCDownstreamCompiler : public DownstreamCompilerBase
 {
 public:
-    typedef DownstreamCompiler Super;
+    typedef DownstreamCompilerBase Super;
 
-    // DownstreamCompiler
-    virtual SlangResult compile(const CompileOptions& options, RefPtr<DownstreamCompileResult>& outResult) SLANG_OVERRIDE;
-    virtual SlangResult disassemble(SlangCompileTarget sourceBlobTarget, const void* blob, size_t blobSize, ISlangBlob** out) SLANG_OVERRIDE;
-    virtual bool isFileBased() SLANG_OVERRIDE { return false; }
+    // IDownstreamCompiler
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL compile(const CompileOptions& options, RefPtr<DownstreamCompileResult>& outResult) SLANG_OVERRIDE;
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL disassemble(SlangCompileTarget sourceBlobTarget, const void* blob, size_t blobSize, ISlangBlob** out) SLANG_OVERRIDE;
+    virtual SLANG_NO_THROW bool SLANG_MCALL isFileBased() SLANG_OVERRIDE { return false; }
 
         /// Must be called before use
     SlangResult init(ISlangSharedLibrary* library);
@@ -340,10 +340,12 @@ SlangResult FXCDownstreamCompiler::disassemble(SlangCompileTarget sourceBlobTarg
         return SLANG_FAIL;
     }
 
-    RefPtr<FXCDownstreamCompiler> compiler(new FXCDownstreamCompiler);
+    auto compiler = new FXCDownstreamCompiler;
+    ComPtr<IDownstreamCompiler> compilerInft(compiler);
+
     SLANG_RETURN_ON_FAIL(compiler->init(library));
 
-    set->addCompiler(compiler);
+    set->addCompiler(compilerInft);
     return SLANG_OK;
 }
 

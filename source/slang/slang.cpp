@@ -695,7 +695,7 @@ SLANG_NO_THROW const char* SLANG_MCALL Session::getBuildTagString()
 
 SLANG_NO_THROW SlangResult SLANG_MCALL Session::setDefaultDownstreamCompiler(SlangSourceLanguage sourceLanguage, SlangPassThrough defaultCompiler)
 {
-    if (DownstreamCompiler::canCompile(defaultCompiler, sourceLanguage))
+    if (DownstreamCompilerInfo::canCompile(defaultCompiler, sourceLanguage))
     {
         m_defaultDownstreamCompilers[int(sourceLanguage)] = PassThroughMode(defaultCompiler);
         return SLANG_OK;
@@ -740,8 +740,7 @@ SlangPassThrough Session::getDownstreamCompilerForTransition(SlangCompileTarget 
         (source == CodeGenTarget::CSource || source == CodeGenTarget::CPPSource))
     {
         // We prefer LLVM if it's available
-        DownstreamCompiler* llvm = getOrLoadDownstreamCompiler(PassThroughMode::LLVM, nullptr);
-        if (llvm)
+        if (auto llvm = getOrLoadDownstreamCompiler(PassThroughMode::LLVM, nullptr))
         {
             return SLANG_PASS_THROUGH_LLVM;
         }
@@ -760,7 +759,7 @@ SlangPassThrough Session::getDownstreamCompilerForTransition(SlangCompileTarget 
     return SLANG_PASS_THROUGH_NONE;
 }
 
-DownstreamCompiler* Session::getDownstreamCompiler(CodeGenTarget source, CodeGenTarget target)
+IDownstreamCompiler* Session::getDownstreamCompiler(CodeGenTarget source, CodeGenTarget target)
 {
     PassThroughMode compilerType = (PassThroughMode)getDownstreamCompilerForTransition(SlangCompileTarget(source), SlangCompileTarget(target));
     return getOrLoadDownstreamCompiler(compilerType, nullptr);
@@ -5064,7 +5063,7 @@ SlangResult EndToEndCompileRequest::isParameterLocationUsed(Int entryPointIndex,
 
     
     // TODO: optimize this with a binary search through a sorted list
-    for (const auto& range : metadata->getBindingRanges())
+    for (const auto& range : metadata->getUsedBindingRanges())
     {
         if (range.containsBinding((slang::ParameterCategory)category, spaceIndex, registerIndex))
         {

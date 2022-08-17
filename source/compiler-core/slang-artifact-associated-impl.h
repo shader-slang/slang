@@ -13,7 +13,7 @@
 namespace Slang
 {
 
-class ArtifactDiagnostics : public ComBaseObject, public IDiagnostics
+class DiagnosticsImpl : public ComBaseObject, public IDiagnostics
 {
 public:
     SLANG_COM_BASE_IUNKNOWN_ALL
@@ -27,8 +27,20 @@ public:
     SLANG_NO_THROW virtual void SLANG_MCALL removeAt(Index i) SLANG_OVERRIDE { m_diagnostics.removeAt(i); }
     SLANG_NO_THROW virtual SlangResult SLANG_MCALL getResult() SLANG_OVERRIDE { return m_result; }
     SLANG_NO_THROW virtual void SLANG_MCALL setResult(SlangResult res) SLANG_OVERRIDE { m_result = res; }
+    SLANG_NO_THROW virtual void SLANG_MCALL setRaw(const ZeroTerminatedCharSlice& slice) SLANG_OVERRIDE;
+    SLANG_NO_THROW virtual ZeroTerminatedCharSlice SLANG_MCALL getRaw() SLANG_OVERRIDE { return m_raw; }
+    SLANG_NO_THROW virtual void SLANG_MCALL reset() SLANG_OVERRIDE;
+    SLANG_NO_THROW virtual Count SLANG_MCALL getCountAtLeastSeverity(Severity severity) SLANG_OVERRIDE;
+    SLANG_NO_THROW virtual Count SLANG_MCALL getCountBySeverity(Severity severity) SLANG_OVERRIDE;
+    SLANG_NO_THROW virtual bool SLANG_MCALL hasOfAtLeastSeverity(Severity severity) SLANG_OVERRIDE;
+    SLANG_NO_THROW virtual Count SLANG_MCALL getCountByStage(Stage stage, Count outCounts[Int(Severity::CountOf)]) SLANG_OVERRIDE;
+    SLANG_NO_THROW virtual void SLANG_MCALL removeBySeverity(Severity severity) SLANG_OVERRIDE;
+    SLANG_NO_THROW virtual void SLANG_MCALL maybeAddNote(const ZeroTerminatedCharSlice& in) SLANG_OVERRIDE;
+    SLANG_NO_THROW virtual void SLANG_MCALL requireErrorDiagnostic() SLANG_OVERRIDE;
+    SLANG_NO_THROW virtual void SLANG_MCALL appendSummary(ISlangBlob** outBlob) SLANG_OVERRIDE;
+    SLANG_NO_THROW virtual void SLANG_MCALL appendSimplifiedSummary(ISlangBlob** outBlob) SLANG_OVERRIDE;
 
-    ArtifactDiagnostics():
+    DiagnosticsImpl():
         m_arena(1024)
     {
     }
@@ -46,10 +58,11 @@ protected:
     List<Diagnostic> m_diagnostics;
     SlangResult m_result = SLANG_OK;
     
+    // Raw diagnostics
     ZeroTerminatedCharSlice m_raw;
 };
 
-/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!! PostEmitMetadata !!!!!!!!!!!!!!!!!!!!!!!!!! */
+/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!! PostEmitMetadataImpl !!!!!!!!!!!!!!!!!!!!!!!!!! */
 
 struct ShaderBindingRange
 {
@@ -120,7 +133,7 @@ struct ShaderBindingRange
     }
 };
 
-class PostEmitMetadata : public ComBaseObject, public IPostEmitMetadata
+class PostEmitMetadataImpl : public ComBaseObject, public IPostEmitMetadata
 {
 public:
     SLANG_CLASS_GUID(0x6f82509f, 0xe48b, 0x4b83, { 0xa3, 0x84, 0x5d, 0x70, 0x83, 0x19, 0x83, 0xcc })
@@ -131,7 +144,7 @@ public:
     SLANG_NO_THROW void* SLANG_MCALL castAs(const Guid& guid) SLANG_OVERRIDE;
     
     // IPostEmitMetadata
-    SLANG_NO_THROW virtual Slice<ShaderBindingRange> SLANG_MCALL getBindingRanges() SLANG_OVERRIDE;
+    SLANG_NO_THROW virtual Slice<ShaderBindingRange> SLANG_MCALL getUsedBindingRanges() SLANG_OVERRIDE;
     
     void* getInterface(const Guid& uuid);
     void* getObject(const Guid& uuid);

@@ -155,15 +155,15 @@ protected:
     IncludeSystem m_system;
 };
 
-class DXCDownstreamCompiler : public DownstreamCompiler
+class DXCDownstreamCompiler : public DownstreamCompilerBase
 {
 public:
-    typedef DownstreamCompiler Super;
+    typedef DownstreamCompilerBase Super;
 
-    // DownstreamCompiler
-    virtual SlangResult compile(const CompileOptions& options, RefPtr<DownstreamCompileResult>& outResult) SLANG_OVERRIDE;
-    virtual SlangResult disassemble(SlangCompileTarget sourceBlobTarget, const void* blob, size_t blobSize, ISlangBlob** out) SLANG_OVERRIDE;
-    virtual bool isFileBased() SLANG_OVERRIDE { return false; }
+    // IDownstreamCompiler
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL compile(const CompileOptions& options, RefPtr<DownstreamCompileResult>& outResult) SLANG_OVERRIDE;
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL disassemble(SlangCompileTarget sourceBlobTarget, const void* blob, size_t blobSize, ISlangBlob** out) SLANG_OVERRIDE;
+    virtual SLANG_NO_THROW bool SLANG_MCALL isFileBased() SLANG_OVERRIDE { return false; }
 
     /// Must be called before use
     SlangResult init(ISlangSharedLibrary* library);
@@ -173,7 +173,6 @@ public:
 protected:
 
     DxcCreateInstanceProc m_createInstance = nullptr;
-
 
     ComPtr<ISlangSharedLibrary> m_sharedLibrary;
 };
@@ -560,10 +559,11 @@ SlangResult DXCDownstreamCompiler::disassemble(SlangCompileTarget sourceBlobTarg
         return SLANG_FAIL;
     }
 
-    RefPtr<DXCDownstreamCompiler> compiler(new DXCDownstreamCompiler);
+    auto compiler = new DXCDownstreamCompiler;
+    ComPtr<IDownstreamCompiler> compilerIntf(compiler);
     SLANG_RETURN_ON_FAIL(compiler->init(library));
 
-    set->addCompiler(compiler);
+    set->addCompiler(compilerIntf);
     return SLANG_OK;
 }
 

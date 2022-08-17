@@ -448,10 +448,26 @@ Result DebugDevice::createProgram(
 {
     SLANG_GFX_API_FUNC;
 
-    RefPtr<DebugShaderProgram> outObject = new DebugShaderProgram(desc);
+    RefPtr<DebugShaderProgram> outObject = new DebugShaderProgram();
     auto result = baseObject->createProgram(desc, outObject->baseObject.writeRef(), outDiagnostics);
     if (SLANG_FAILED(result))
         return result;
+    outObject->m_slangProgram = desc.slangGlobalScope;
+    returnComPtr(outProgram, outObject);
+    return result;
+}
+
+Result DebugDevice::createProgram2(
+    const IShaderProgram::CreateDesc2& desc, IShaderProgram** outProgram, ISlangBlob** outDiagnostics)
+{
+    SLANG_GFX_API_FUNC;
+    IShaderProgram::Desc desc1 = {};
+    RefPtr<DebugShaderProgram> outObject = new DebugShaderProgram();
+    auto result = baseObject->createProgram2(desc, outObject->baseObject.writeRef(), outDiagnostics);
+    if (SLANG_FAILED(result))
+        return result;
+    auto base = static_cast<ShaderProgramBase*>(outObject->baseObject.get());
+    outObject->m_slangProgram = base->desc.slangGlobalScope;
     returnComPtr(outProgram, outObject);
     return result;
 }

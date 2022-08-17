@@ -26,7 +26,11 @@ const Slang::Guid GfxGUID::IID_IDevice = SLANG_UUID_IDevice;
 const Slang::Guid GfxGUID::IID_IShaderObject = SLANG_UUID_IShaderObject;
 
 const Slang::Guid GfxGUID::IID_IRenderPassLayout = SLANG_UUID_IRenderPassLayout;
-const Slang::Guid GfxGUID::IID_IRayTracingCommandEncoder = SLANG_UUID_IRayTracingCommandEncoder;
+const Slang::Guid GfxGUID::IID_IRayTracingCommandEncoder = IRayTracingCommandEncoder::getTypeGuid();
+const Slang::Guid GfxGUID::IID_IResourceCommandEncoder = IResourceCommandEncoder::getTypeGuid();
+const Slang::Guid GfxGUID::IID_IComputeCommandEncoder = IComputeCommandEncoder::getTypeGuid();
+const Slang::Guid GfxGUID::IID_IRenderCommandEncoder = IRenderCommandEncoder::getTypeGuid();
+
 const Slang::Guid GfxGUID::IID_ICommandBuffer = SLANG_UUID_ICommandBuffer;
 const Slang::Guid GfxGUID::IID_ICommandBufferD3D12 = SLANG_UUID_ICommandBufferD3D12;
 
@@ -460,6 +464,62 @@ SLANG_NO_THROW Result SLANG_MCALL RendererBase::createMutableShaderObject(
     RefPtr<ShaderObjectLayoutBase> shaderObjectLayout;
     SLANG_RETURN_ON_FAIL(getShaderObjectLayout(type, containerType, shaderObjectLayout.writeRef()));
     return createMutableShaderObject(shaderObjectLayout, outObject);
+}
+
+Result RendererBase::createProgram2(
+    const IShaderProgram::CreateDesc2& desc,
+    IShaderProgram** outProgram,
+    ISlangBlob** outDiagnostic)
+{
+    auto slangSession = slangContext.session.get();
+
+    SLANG_RELEASE_ASSERT(desc.sourceType == ShaderModuleSourceType::SlangSourceFile);
+
+    auto fileName = (char*)desc.sourceData;
+    ComPtr<slang::IBlob> diagnosticsBlob;
+    slang::IModule* module = slangSession->loadModule(fileName, diagnosticsBlob.writeRef());
+    if (!module)
+        return SLANG_FAIL;
+
+    Slang::List<ComPtr<slang::IComponentType>> componentTypes;
+    componentTypes.add(ComPtr<slang::IComponentType>(module));
+
+    if (desc.entryPointCount == 0)
+    {
+        for (SlangInt32 i = 0; i < module->getDefinedEntryPointCount(); i++)
+        {
+            ComPtr<slang::IEntryPoint> entryPoint;
+            SLANG_RETURN_ON_FAIL(module->getDefinedEntryPoint(i, entryPoint.writeRef()));
+            componentTypes.add(ComPtr<slang::IComponentType>(entryPoint.get()));
+        }
+    }
+    else
+    {
+        for (GfxCount i = 0; i < desc.entryPointCount; i++)
+        {
+            ComPtr<slang::IEntryPoint> entryPoint;
+            SLANG_RETURN_ON_FAIL(module->findEntryPointByName(desc.entryPointNames[i], entryPoint.writeRef()));
+            componentTypes.add(ComPtr<slang::IComponentType>(entryPoint.get()));
+        }
+    }
+
+    Slang::List<slang::IComponentType*> rawComponentTypes;
+    for (auto& compType : componentTypes)
+        rawComponentTypes.add(compType.get());
+
+    ComPtr<slang::IComponentType> linkedProgram;
+    SlangResult result = slangSession->createCompositeComponentType(
+        rawComponentTypes.getBuffer(),
+        rawComponentTypes.getCount(),
+        linkedProgram.writeRef(),
+        diagnosticsBlob.writeRef());
+    SLANG_RETURN_ON_FAIL(result);
+
+    gfx::IShaderProgram::Desc programDesc = {};
+    programDesc.slangGlobalScope = linkedProgram;
+    SLANG_RETURN_ON_FAIL(createProgram(programDesc, outProgram, outDiagnostic));
+
+    return SLANG_OK;
 }
 
 SLANG_NO_THROW Result SLANG_MCALL RendererBase::createShaderObjectFromTypeLayout(

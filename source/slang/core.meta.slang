@@ -428,6 +428,9 @@ extension bool
     __implicit_conversion($(kConversionCost_PtrToBool))
     __intrinsic_op($(kIROp_CastPtrToBool))
     __init(Ptr<T> ptr);
+
+    static bool maxValue = true;
+    static bool minValue = false;
 }
 
 extension uint64_t
@@ -435,6 +438,9 @@ extension uint64_t
     __generic<T>
     __intrinsic_op($(kIROp_Construct))
     __init(Ptr<T> ptr);
+
+    static uint64_t maxValue = 0xFFFFFFFFFFFFFFFFULL;
+    static uint64_t minValue = 0;
 }
 
 extension int64_t
@@ -442,6 +448,9 @@ extension int64_t
     __generic<T>
     __intrinsic_op($(kIROp_Construct))
     __init(Ptr<T> ptr);
+
+    static int64_t maxValue =  0x7FFFFFFFFFFFFFFFLL;
+    static int64_t minValue = -0x8000000000000000LL;
 }
 
 __generic<T>
@@ -509,6 +518,28 @@ bool operator!=(__none_t noneVal, Optional<T> val)
     return val.hasValue;
 }
 
+__generic<T>
+__magic_type(NativeRefType)
+__intrinsic_type($(kIROp_NativePtrType))
+struct NativeRef
+{
+    __intrinsic_op($(kIROp_GetNativePtr))
+    __init(T val);
+};
+
+__generic<T>
+__intrinsic_op($(kIROp_ManagedPtrAttach))
+void __managed_ptr_attach(__ref T val, NativeRef<T> nativeVal);
+
+__generic<T>
+[__unsafeForceInlineEarly]
+T __attachToNativeRef(NativeRef<T> nativeVal)
+{
+    T result;
+    __managed_ptr_attach(result, nativeVal);
+    return result;
+}
+
 __magic_type(StringType)
 __intrinsic_type($(kIROp_StringType))
 struct String
@@ -523,6 +554,52 @@ __magic_type(DynamicType)
 __intrinsic_type($(kIROp_DynamicType))
 struct __Dynamic
 {};
+
+extension float
+{
+    static float maxValue = 340282346638528859811704183484516925440.0f;
+}
+
+extension double
+{
+    static double maxValue = 179769313486231570814527423731704356798070567525844996598917476803157260780028538760589558632766878171540458953514382464234321326889464182768467546703537516986049910576551282076245490090389328944075868508455133942304583236903222948165808559332123348274797826204144723168738177180919299881250404026184124858368.0;
+}
+
+extension int
+{
+    static int maxValue = 2147483647;
+    static int minValue = -2147483648;
+}
+
+extension uint
+{
+    static uint maxValue = 4294967295;
+    static uint minValue = 0;
+}
+
+extension int8_t
+{
+    static int8_t maxValue = 127;
+    static int8_t minValue = -128;
+}
+
+extension uint16_t
+{
+    static uint16_t maxValue = 255;
+    static uint16_t minValue = 0;
+}
+
+extension int16_t
+{
+    static int16_t maxValue = 32767;
+    static int16_t minValue = -32768;
+}
+
+extension uint16_t
+{
+    static uint16_t maxValue = 65535;
+    static uint16_t minValue = 0;
+}
 
     /// An `N` component vector with elements of type `T`.
 __generic<T = float, let N : int = 4>

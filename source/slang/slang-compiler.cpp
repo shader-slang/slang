@@ -828,7 +828,7 @@ namespace Slang
         /// and generally there will not be a match with emitted source.
         ///
         /// This test is only used for pass through mode. 
-    static bool _useEmittedSource(DownstreamCompiler* compiler, TranslationUnitRequest* translationUnit)
+    static bool _useEmittedSource(IDownstreamCompiler* compiler, TranslationUnitRequest* translationUnit)
     {
         // We only bother if it's a file based compiler.
         if (compiler->isFileBased())
@@ -952,7 +952,7 @@ namespace Slang
         SLANG_ASSERT(compilerType != PassThroughMode::None);
 
         // Get the required downstream compiler
-        DownstreamCompiler* compiler = session->getOrLoadDownstreamCompiler(compilerType, sink);
+        IDownstreamCompiler* compiler = session->getOrLoadDownstreamCompiler(compilerType, sink);
         if (!compiler)
         {
             auto compilerName = TypeTextUtil::getPassThroughAsHumanText((SlangPassThrough)compilerType);
@@ -963,7 +963,7 @@ namespace Slang
         Dictionary<String, String> preprocessorDefinitions;
         List<String> includePaths;
 
-        typedef DownstreamCompiler::CompileOptions CompileOptions;
+        typedef DownstreamCompileOptions CompileOptions;
         CompileOptions options;
 
         // Set compiler specific args
@@ -1115,8 +1115,8 @@ namespace Slang
 
                 if (cudaTracker->m_smVersion.isSet())
                 {
-                    DownstreamCompiler::CapabilityVersion version;
-                    version.kind = DownstreamCompiler::CapabilityVersion::Kind::CUDASM;
+                    DownstreamCompileOptions::CapabilityVersion version;
+                    version.kind = DownstreamCompileOptions::CapabilityVersion::Kind::CUDASM;
                     version.version = cudaTracker->m_smVersion;
 
                     options.requiredCapabilityVersions.add(version);
@@ -1129,8 +1129,8 @@ namespace Slang
             }
             else if (GLSLExtensionTracker* glslTracker = as<GLSLExtensionTracker>(extensionTracker))
             {
-                DownstreamCompiler::CapabilityVersion version;
-                version.kind = DownstreamCompiler::CapabilityVersion::Kind::SPIRV;
+                DownstreamCompileOptions::CapabilityVersion version;
+                version.kind = DownstreamCompileOptions::CapabilityVersion::Kind::SPIRV;
                 version.version = glslTracker->getSPIRVVersion();
 
                 options.requiredCapabilityVersions.add(version);
@@ -1260,28 +1260,28 @@ namespace Slang
 
             switch (linkage->optimizationLevel)
             {
-                case OptimizationLevel::None:       options.optimizationLevel = DownstreamCompiler::OptimizationLevel::None; break;
-                case OptimizationLevel::Default:    options.optimizationLevel = DownstreamCompiler::OptimizationLevel::Default;  break;
-                case OptimizationLevel::High:       options.optimizationLevel = DownstreamCompiler::OptimizationLevel::High;  break;
-                case OptimizationLevel::Maximal:    options.optimizationLevel = DownstreamCompiler::OptimizationLevel::Maximal;  break;
+                case OptimizationLevel::None:       options.optimizationLevel = DownstreamCompileOptions::OptimizationLevel::None; break;
+                case OptimizationLevel::Default:    options.optimizationLevel = DownstreamCompileOptions::OptimizationLevel::Default;  break;
+                case OptimizationLevel::High:       options.optimizationLevel = DownstreamCompileOptions::OptimizationLevel::High;  break;
+                case OptimizationLevel::Maximal:    options.optimizationLevel = DownstreamCompileOptions::OptimizationLevel::Maximal;  break;
                 default: SLANG_ASSERT(!"Unhandled optimization level"); break;
             }
 
             switch (linkage->debugInfoLevel)
             {
-                case DebugInfoLevel::None:          options.debugInfoType = DownstreamCompiler::DebugInfoType::None; break; 
-                case DebugInfoLevel::Minimal:       options.debugInfoType = DownstreamCompiler::DebugInfoType::Minimal; break; 
+                case DebugInfoLevel::None:          options.debugInfoType = DownstreamCompileOptions::DebugInfoType::None; break;
+                case DebugInfoLevel::Minimal:       options.debugInfoType = DownstreamCompileOptions::DebugInfoType::Minimal; break;
                 
-                case DebugInfoLevel::Standard:      options.debugInfoType = DownstreamCompiler::DebugInfoType::Standard; break; 
-                case DebugInfoLevel::Maximal:       options.debugInfoType = DownstreamCompiler::DebugInfoType::Maximal; break; 
+                case DebugInfoLevel::Standard:      options.debugInfoType = DownstreamCompileOptions::DebugInfoType::Standard; break;
+                case DebugInfoLevel::Maximal:       options.debugInfoType = DownstreamCompileOptions::DebugInfoType::Maximal; break;
                 default: SLANG_ASSERT(!"Unhandled debug level"); break;
             }
 
             switch( getTargetReq()->getFloatingPointMode())
             {
-                case FloatingPointMode::Default:    options.floatingPointMode = DownstreamCompiler::FloatingPointMode::Default; break;
-                case FloatingPointMode::Precise:    options.floatingPointMode = DownstreamCompiler::FloatingPointMode::Precise; break;
-                case FloatingPointMode::Fast:       options.floatingPointMode = DownstreamCompiler::FloatingPointMode::Fast; break;
+                case FloatingPointMode::Default:    options.floatingPointMode = DownstreamCompileOptions::FloatingPointMode::Default; break;
+                case FloatingPointMode::Precise:    options.floatingPointMode = DownstreamCompileOptions::FloatingPointMode::Precise; break;
+                case FloatingPointMode::Fast:       options.floatingPointMode = DownstreamCompileOptions::FloatingPointMode::Fast; break;
                 default: SLANG_ASSERT(!"Unhandled floating point mode");
             }
 
@@ -1311,7 +1311,7 @@ namespace Slang
                         break;
 
                     case Stage::Compute:
-                        options.pipelineType = DownstreamCompiler::PipelineType::Compute;
+                        options.pipelineType = DownstreamCompileOptions::PipelineType::Compute;
                         break;
 
                     case Stage::Vertex:
@@ -1319,7 +1319,7 @@ namespace Slang
                     case Stage::Domain:
                     case Stage::Geometry:
                     case Stage::Fragment:
-                        options.pipelineType = DownstreamCompiler::PipelineType::Rasterization;
+                        options.pipelineType = DownstreamCompileOptions::PipelineType::Rasterization;
                         break;
 
                     case Stage::RayGeneration:
@@ -1328,7 +1328,7 @@ namespace Slang
                     case Stage::ClosestHit:
                     case Stage::Miss:
                     case Stage::Callable:
-                        options.pipelineType = DownstreamCompiler::PipelineType::RayTracing;
+                        options.pipelineType = DownstreamCompileOptions::PipelineType::RayTracing;
                         break;
                     }
                 }   
@@ -1341,7 +1341,7 @@ namespace Slang
             {
                 for(auto& def : preprocessorDefinitions)
                 {
-                    DownstreamCompiler::Define define;
+                    DownstreamCompileOptions::Define define;
                     define.nameWithSig = def.Key;
                     define.value = def.Value;
 
@@ -1366,7 +1366,7 @@ namespace Slang
         if (diagnostics.diagnostics.getCount())
         {
             StringBuilder compilerText;
-            compiler->getDesc().appendAsText(compilerText);
+            DownstreamCompilerUtil::appendAsText(compiler->getDesc(), compilerText);
 
             StringBuilder builder;
 
