@@ -223,6 +223,9 @@ String getDeclSignatureString(DeclRef<Decl> declRef, WorkspaceVersion* version)
         if (auto varDecl = as<VarDeclBase>(declRef.getDecl()))
         {
             auto& sb = printer.getStringBuilder();
+            if (!varDecl->findModifier<ConstModifier>() && !as<LetDecl>(declRef.getDecl()))
+                return printer.getString();
+
             if (auto litExpr = as<LiteralExpr>(varDecl->initExpr))
             {
                 sb << " = " << litExpr->token.getContent();
