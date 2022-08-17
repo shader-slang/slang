@@ -6,5 +6,5 @@ Texture2DMS tex : register(t1);
 [numthreads(4, 4, 1)]
 void main(uint3 groupId : SV_GroupID)
 {
-    tex.Load(groupId.xy, 0);
+    tex.Load(int2(groupId.xy), 0);
 }

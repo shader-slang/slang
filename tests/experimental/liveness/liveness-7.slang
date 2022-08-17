@@ -12,7 +12,7 @@ int calcThing(int offset)
 
     for (int k = 0; k < 20; ++k)
     {       
-        if ((k + offset) & 1)
+        if (((k + offset) & 1) != 0)
         {
             return arr[0];
         }
@@ -26,7 +26,7 @@ int calcThing(int offset)
 [numthreads(4, 1, 1)]
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {    
-    int index = dispatchThreadID.x;
+    int index = int(dispatchThreadID.x);
 
     outputBuffer[index] = calcThing(index);
 }

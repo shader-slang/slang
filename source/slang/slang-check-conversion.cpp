@@ -965,7 +965,27 @@ namespace Slang
                 }
                 else if (cost >= kConversionCost_Default)
                 {
-                    getSink()->diagnose(fromExpr, Diagnostics::potentiallyUnintendedImplicitConversion, fromType, toType);
+                    // For general types of implicit conversions, we issue a warning, unless `fromExpr` is a known constant
+                    // and we know it won't cause a problem.
+                    bool shouldEmitGeneralWarning = true;
+                    if (isScalarIntegerType(toType))
+                    {
+                        if (auto intVal = tryFoldIntegerConstantExpression(fromExpr, nullptr))
+                        {
+                            if (auto val = as<ConstantIntVal>(intVal))
+                            {
+                                if (isIntValueInRangeOfType(val->value, toType))
+                                {
+                                    // OK.
+                                    shouldEmitGeneralWarning = false;
+                                }
+                            }
+                        }
+                    }
+                    if (shouldEmitGeneralWarning)
+                    {
+                        getSink()->diagnose(fromExpr, Diagnostics::unrecommendedImplicitConversion, fromType, toType);
+                    }
                 }
             }
             if(outCost)

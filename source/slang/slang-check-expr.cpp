@@ -1126,13 +1126,27 @@ namespace Slang
         return tryConstantFoldExpr(expr, circularityInfo);
     }
 
-    IntVal* SemanticsVisitor::CheckIntegerConstantExpression(Expr* inExpr, DiagnosticSink* sink)
+    IntVal* SemanticsVisitor::CheckIntegerConstantExpression(Expr* inExpr, IntegerConstantExpressionCoercionType coercionType, Type* expectedType, DiagnosticSink* sink)
     {
         // No need to issue further errors if the expression didn't even type-check.
         if(IsErrorExpr(inExpr)) return nullptr;
 
         // First coerce the expression to the expected type
-        auto expr = coerce(m_astBuilder->getIntType(),inExpr);
+        Expr* expr = nullptr;
+        switch (coercionType)
+        {
+        case IntegerConstantExpressionCoercionType::SpecificType:
+            expr = coerce(expectedType, inExpr);
+            break;
+        case IntegerConstantExpressionCoercionType::AnyInteger:
+            if (isScalarIntegerType(inExpr->type))
+                expr = inExpr;
+            else
+                expr = coerce(m_astBuilder->getIntType(), inExpr);
+            break;
+        default:
+            break;
+        }
 
         // No need to issue further errors if the type coercion failed.
         if(IsErrorExpr(expr)) return nullptr;
@@ -1145,9 +1159,9 @@ namespace Slang
         return result;
     }
 
-    IntVal* SemanticsVisitor::CheckIntegerConstantExpression(Expr* inExpr)
+    IntVal* SemanticsVisitor::CheckIntegerConstantExpression(Expr* inExpr, IntegerConstantExpressionCoercionType coercionType, Type* expectedType)
     {
-        return CheckIntegerConstantExpression(inExpr, getSink());
+        return CheckIntegerConstantExpression(inExpr, coercionType, expectedType, getSink());
     }
 
     IntVal* SemanticsVisitor::CheckEnumConstantExpression(Expr* expr)
@@ -1218,7 +1232,7 @@ namespace Slang
             IntVal* elementCount = nullptr;
             if (indexExpr)
             {
-                elementCount = CheckIntegerConstantExpression(indexExpr);
+                elementCount = CheckIntegerConstantExpression(indexExpr, IntegerConstantExpressionCoercionType::AnyInteger, nullptr);
             }
 
             auto elementType = CoerceToUsableType(TypeExp(baseExpr, baseTypeType->type));

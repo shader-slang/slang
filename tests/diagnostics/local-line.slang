@@ -22,21 +22,21 @@ int doThing(int a, int b)
 [numthreads(4, 1, 1)]
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
-    int a = dispatchThreadID.x;
-    int b = dispatchThreadID.y;
-    int c = dispatchThreadID.z;
+    int a = int(dispatchThreadID.x);
+    int b = int(dispatchThreadID.y);
+    int c = int(dispatchThreadID.z);
     int d = a + b * c;
     int e = d + c / 2;
     
     for (int i = 0; i < b; ++i)
     {
-        if (e > 10 && i & 2)
+        if (e > 10 && (i & 2) != 0)
         {
             a += b; b -= c; c += c; d = d + e + a; e = a;
         }
         else
         {
-            a = e; b = c + c; d += d + __SyntaxError(); e = doThing(e, dispatchThreadID.x);
+            a = e; b = c + c; d += d + __SyntaxError(); e = doThing(e, int(dispatchThreadID.x));
             
         }
     }

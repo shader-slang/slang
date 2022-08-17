@@ -15,5 +15,5 @@ ParameterBlock<Params> gParams;
 
 void main(uint3 tid : SV_DispatchThreadID)
 {
-	float f = gParams.tex.Load(int3(tid.xy, tid.z));
+	float f = gParams.tex.Load(int3(int2(tid.xy), int(tid.z)));
 }

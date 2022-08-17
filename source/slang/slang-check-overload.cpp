@@ -314,14 +314,10 @@ namespace Slang
                 // If we have an argument to work with, then we will
                 // try to extract its speicalization-time constant value.
                 //
-                // TODO: This is one of the places where we will need to
-                // generalize in order to support generic value parameters
-                // with types other than `int`.
-                //
                 Val* val = nullptr;
                 if( arg )
                 {
-                    val = ExtractGenericArgInteger(arg, context.mode == OverloadResolveContext::Mode::JustTrying ? nullptr : getSink());
+                    val = ExtractGenericArgInteger(arg, getType(m_astBuilder, valParamRef), context.mode == OverloadResolveContext::Mode::JustTrying ? nullptr : getSink());
                 }
 
                 // If any of the above checking steps fail and we don't

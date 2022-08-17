@@ -18,7 +18,7 @@ namespace Slang
         // First type-check the expression as normal
         expr = CheckExpr(expr);
 
-        auto intVal = CheckIntegerConstantExpression(expr);
+        auto intVal = CheckIntegerConstantExpression(expr, IntegerConstantExpressionCoercionType::AnyInteger, nullptr);
         if(!intVal)
             return nullptr;
 
