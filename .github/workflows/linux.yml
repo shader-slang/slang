@@ -25,12 +25,11 @@ jobs:
         CC=${{matrix.compiler}}
         CONFIGURATION=${{matrix.configuration}}
         ARCH=${{matrix.platform}}
-        if [ $CC = 'clang' ]
-        then
+        if [[ $CC == 'clang' ]] ; then
           CFLAGS=-Werror
+          CPPFLAGS=-Werror
+          CXXFLAGS=-Werror
         fi
-        CPPFLAGS=-Werror
-        CXXFLAGS=-Werror
         source ./github_build.sh
     - uses: actions/upload-artifact@v3
       with:
