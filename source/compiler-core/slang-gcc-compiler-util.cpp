@@ -11,6 +11,7 @@
 #include "../core/slang-string-slice-pool.h"
 
 #include "slang-artifact-desc-util.h"
+#include "slang-artifact-util.h"
 
 namespace Slang
 {
@@ -41,7 +42,7 @@ static Index _findVersionEnd(const UnownedStringSlice& in)
     return len;
 }
 
-/* static */SlangResult GCCDownstreamCompilerUtil::parseVersion(const UnownedStringSlice& text, const UnownedStringSlice& prefix, DownstreamCompiler::Desc& outDesc)
+/* static */SlangResult GCCDownstreamCompilerUtil::parseVersion(const UnownedStringSlice& text, const UnownedStringSlice& prefix, DownstreamCompilerDesc& outDesc)
 {
     List<UnownedStringSlice> lines;
     StringUtil::calcLines(text, lines);
@@ -89,7 +90,7 @@ static Index _findVersionEnd(const UnownedStringSlice& in)
     return SLANG_FAIL;
 }
 
-SlangResult GCCDownstreamCompilerUtil::calcVersion(const ExecutableLocation& exe, DownstreamCompiler::Desc& outDesc)
+SlangResult GCCDownstreamCompilerUtil::calcVersion(const ExecutableLocation& exe, DownstreamCompilerDesc& outDesc)
 {
     CommandLine cmdLine;
     cmdLine.setExecutableLocation(exe);
@@ -649,7 +650,7 @@ static SlangResult _parseGCCFamilyLine(const UnownedStringSlice& line, LineParse
             // Get the name and path (can be empty) to the library
             SLANG_RETURN_ON_FAIL(artifact->requireFile(ArtifactKeep::Yes, nullptr, fileRep.writeRef()));
 
-            libPathPool.add(ArtifactDescUtil::getParentPath(fileRep));
+            libPathPool.add(ArtifactUtil::getParentPath(fileRep));
             cmdLine.addPrefixPathArg("-l", ArtifactDescUtil::getBaseName(artifact->getDesc(), fileRep));
         }
     }
@@ -674,15 +675,16 @@ static SlangResult _parseGCCFamilyLine(const UnownedStringSlice& line, LineParse
     return SLANG_OK;
 }
 
-/* static */SlangResult GCCDownstreamCompilerUtil::createCompiler(const ExecutableLocation& exe, RefPtr<DownstreamCompiler>& outCompiler)
+/* static */SlangResult GCCDownstreamCompilerUtil::createCompiler(const ExecutableLocation& exe, ComPtr<IDownstreamCompiler>& outCompiler)
 {
-    DownstreamCompiler::Desc desc;
+    DownstreamCompilerDesc desc;
     SLANG_RETURN_ON_FAIL(GCCDownstreamCompilerUtil::calcVersion(exe, desc));
 
-    RefPtr<CommandLineDownstreamCompiler> compiler(new GCCDownstreamCompiler(desc));
+    auto compiler = new GCCDownstreamCompiler(desc);
+    ComPtr<IDownstreamCompiler> compilerIntf(compiler);
     compiler->m_cmdLine.setExecutableLocation(exe);
 
-    outCompiler = compiler;
+    outCompiler.swap(compilerIntf);
     return SLANG_OK;
 }
 
@@ -690,7 +692,7 @@ static SlangResult _parseGCCFamilyLine(const UnownedStringSlice& line, LineParse
 {
     SLANG_UNUSED(loader);
 
-    RefPtr<DownstreamCompiler> compiler;
+    ComPtr<IDownstreamCompiler> compiler;
     if (SLANG_SUCCEEDED(createCompiler(ExecutableLocation(path, "g++"), compiler)))
     {
         // A downstream compiler for Slang must currently support C++14 - such that
@@ -718,7 +720,7 @@ static SlangResult _parseGCCFamilyLine(const UnownedStringSlice& line, LineParse
 {
     SLANG_UNUSED(loader);
 
-    RefPtr<DownstreamCompiler> compiler;
+    ComPtr<IDownstreamCompiler> compiler;
     if (SLANG_SUCCEEDED(createCompiler(ExecutableLocation(path, "clang"), compiler)))
     {
         set->addCompiler(compiler);

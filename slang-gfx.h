@@ -130,6 +130,14 @@ const GfxCount kMaxRenderTargetCount = 8;
 
 class ITransientResourceHeap;
 
+enum class ShaderModuleSourceType
+{
+    SlangSource, // a slang source string in memory.
+    SlangModuleBinary, // a slang module binary code in memory.
+    SlangSourceFile, // a slang source from file.
+    SlangModuleBinaryFile, // a slang module binary code from file.
+};
+
 class IShaderProgram: public ISlangUnknown
 {
 public:
@@ -162,6 +170,22 @@ public:
         // Each element must define only 1 Slang EntryPoint.
         slang::IComponentType** slangEntryPoints = nullptr;
     };
+
+    struct CreateDesc2
+    {
+        ShaderModuleSourceType sourceType;
+        void* sourceData;
+        Size sourceDataSize;
+
+        // Number of entry points to include in the shader program. 0 means include all entry points
+        // defined in the module.
+        GfxCount entryPointCount = 0;
+        // Names of entry points to include in the shader program. The size of the array must be
+        // `entryPointCount`.
+        const char** entryPointNames = nullptr;
+    };
+
+    virtual SLANG_NO_THROW slang::TypeReflection* SLANG_MCALL findTypeByName(const char* name) = 0;
 };
 #define SLANG_UUID_IShaderProgram                                                       \
     {                                                                                  \
@@ -1516,8 +1540,9 @@ public:
     { 0xc2cc3784, 0x12da, 0x480a, { 0xa8, 0x74, 0x8b, 0x31, 0x96, 0x1c, 0xa4, 0x36 } }
 
 
-class ICommandEncoder
+class ICommandEncoder : public ISlangUnknown
 {
+    SLANG_COM_INTERFACE( 0x77ea6383, 0xbe3d, 0x40aa, { 0x8b, 0x45, 0xfd, 0xf0, 0xd7, 0x5b, 0xfa, 0x34 });
 public:
     virtual SLANG_NO_THROW void SLANG_MCALL endEncoding() = 0;
     virtual SLANG_NO_THROW void SLANG_MCALL writeTimestamp(IQueryPool* queryPool, GfxIndex queryIndex) = 0;
@@ -1566,6 +1591,9 @@ struct ClearResourceViewFlags
 
 class IResourceCommandEncoder : public ICommandEncoder
 {
+    // {F99A00E9-ED50-4088-8A0E-3B26755031EA}
+    SLANG_COM_INTERFACE(0xf99a00e9, 0xed50, 0x4088, { 0x8a, 0xe, 0x3b, 0x26, 0x75, 0x50, 0x31, 0xea });
+
 public:
     virtual SLANG_NO_THROW void SLANG_MCALL copyBuffer(
         IBufferResource* dst,
@@ -1646,6 +1674,8 @@ public:
 
 class IRenderCommandEncoder : public IResourceCommandEncoder
 {
+    // {7A8D56D0-53E6-4AD6-85F7-D14DC110FDCE}
+    SLANG_COM_INTERFACE(0x7a8d56d0, 0x53e6, 0x4ad6, { 0x85, 0xf7, 0xd1, 0x4d, 0xc1, 0x10, 0xfd, 0xce })
 public:
     // Sets the current pipeline state. This method returns a transient shader object for
     // writing shader parameters. This shader object will not retain any resources or
@@ -1728,6 +1758,9 @@ public:
 
 class IComputeCommandEncoder : public IResourceCommandEncoder
 {
+    // {88AA9322-82F7-4FE6-A68A-29C7FE798737}
+    SLANG_COM_INTERFACE(0x88aa9322, 0x82f7, 0x4fe6, { 0xa6, 0x8a, 0x29, 0xc7, 0xfe, 0x79, 0x87, 0x37 })
+
 public:
     // Sets the current pipeline state. This method returns a transient shader object for
     // writing shader parameters. This shader object will not retain any resources or
@@ -1765,6 +1798,7 @@ struct AccelerationStructureQueryDesc
 
 class IRayTracingCommandEncoder : public IResourceCommandEncoder
 {
+    SLANG_COM_INTERFACE(0x9a672b87, 0x5035, 0x45e3, { 0x96, 0x7c, 0x1f, 0x85, 0xcd, 0xb3, 0x63, 0x4f })
 public:
     virtual SLANG_NO_THROW void SLANG_MCALL buildAccelerationStructure(
         const IAccelerationStructure::BuildDesc& desc,
@@ -1799,10 +1833,6 @@ public:
         GfxCount height,
         GfxCount depth) = 0;
 };
-#define SLANG_UUID_IRayTracingCommandEncoder                                           \
-    {                                                                                  \
-        0x9a672b87, 0x5035, 0x45e3, { 0x96, 0x7c, 0x1f, 0x85, 0xcd, 0xb3, 0x63, 0x4f } \
-    }
 
 class ICommandBuffer : public ISlangUnknown
 {
@@ -2355,6 +2385,11 @@ public:
         SLANG_RETURN_NULL_ON_FAIL(createProgram(desc, program.writeRef()));
         return program;
     }
+
+    virtual SLANG_NO_THROW Result SLANG_MCALL createProgram2(
+        const IShaderProgram::CreateDesc2& createDesc,
+        IShaderProgram** outProgram,
+        ISlangBlob** outDiagnosticBlob = nullptr) = 0;
 
     virtual SLANG_NO_THROW Result SLANG_MCALL createGraphicsPipelineState(
         const GraphicsPipelineStateDesc&    desc,

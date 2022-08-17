@@ -766,13 +766,13 @@ void RenderTestApp::_initializeAccelerationStructure()
         IBufferResource::Desc asBufferDesc = {};
         asBufferDesc.type = IResource::Type::Buffer;
         asBufferDesc.defaultState = ResourceState::AccelerationStructure;
-        asBufferDesc.sizeInBytes = compactedSize;
+        asBufferDesc.sizeInBytes = (Size)compactedSize;
         m_blasBuffer = m_device->createBufferResource(asBufferDesc);
         IAccelerationStructure::CreateDesc createDesc;
         createDesc.buffer = m_blasBuffer;
         createDesc.kind = IAccelerationStructure::Kind::BottomLevel;
         createDesc.offset = 0;
-        createDesc.size = compactedSize;
+        createDesc.size = (Size)compactedSize;
         m_device->createAccelerationStructure(createDesc, m_bottomLevelAccelerationStructure.writeRef());
 
         commandBuffer = m_transientHeap->createCommandBuffer();

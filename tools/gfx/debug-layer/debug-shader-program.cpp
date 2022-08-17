@@ -8,9 +8,9 @@ using namespace Slang;
 namespace debug
 {
 
-DebugShaderProgram::DebugShaderProgram(const IShaderProgram::Desc& desc)
+slang::TypeReflection* DebugShaderProgram::findTypeByName(const char* name)
 {
-    m_slangProgram = desc.slangGlobalScope;
+    return baseObject->findTypeByName(name);
 }
 
 } // namespace debug

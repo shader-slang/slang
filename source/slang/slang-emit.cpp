@@ -69,6 +69,9 @@
 #include "slang-emit-cuda.h"
 
 #include "../compiler-core/slang-artifact-desc-util.h"
+#include "../compiler-core/slang-artifact-util.h"
+#include "../compiler-core/slang-artifact-impl.h"
+#include "../compiler-core/slang-artifact-associated-impl.h"
 
 #include <assert.h>
 
@@ -834,17 +837,19 @@ Result linkAndOptimizeIR(
 #endif
     validateIRModuleIfEnabled(codeGenContext, irModule);
 
-    outLinkedIR.metadata = new PostEmitMetadata();
-    collectMetadata(irModule, *outLinkedIR.metadata);
+    auto metadata = new PostEmitMetadataImpl;
+    outLinkedIR.metadata = metadata;
+
+    collectMetadata(irModule, *metadata);
+
+    outLinkedIR.metadata = metadata;
 
     return SLANG_OK;
 }
 
-SlangResult CodeGenContext::emitEntryPointsSourceFromIR(
-    String&                 outSource,
-    RefPtr<PostEmitMetadata>& outMetadata)
+SlangResult CodeGenContext::emitEntryPointsSourceFromIR(ComPtr<IArtifact>& outArtifact)
 {
-    outSource = String();
+    outArtifact.setNull();
 
     auto session = getSession();
     auto sink = getSink();
@@ -923,6 +928,7 @@ SlangResult CodeGenContext::emitEntryPointsSourceFromIR(
 
     SLANG_RETURN_ON_FAIL(sourceEmitter->init());
 
+    ComPtr<IPostEmitMetadata> metadata;
     {
         LinkingAndOptimizationOptions linkingAndOptimizationOptions;
 
@@ -947,7 +953,7 @@ SlangResult CodeGenContext::emitEntryPointsSourceFromIR(
 
         auto irModule = linkedIR.module;
 
-        outMetadata = linkedIR.metadata;
+        metadata = linkedIR.metadata;
 
         // After all of the required optimization and legalization
         // passes have been performed, we can emit target code from
@@ -1017,7 +1023,16 @@ SlangResult CodeGenContext::emitEntryPointsSourceFromIR(
     finalResult.append(code);
 
     // Write out the result
-    outSource = finalResult;
+
+    auto artifact = ArtifactUtil::createArtifactForCompileTarget(asExternal(target));
+    artifact->addRepresentationUnknown(StringBlob::moveCreate(finalResult));
+
+    if (metadata)
+    {
+        artifact->addAssociated(metadata);
+    }
+
+    outArtifact.swap(artifact);
     return SLANG_OK;
 }
 
@@ -1029,8 +1044,7 @@ SlangResult emitSPIRVFromIR(
 
 SlangResult emitSPIRVForEntryPointsDirectly(
     CodeGenContext* codeGenContext,
-    List<uint8_t>&  spirvOut,
-    RefPtr<PostEmitMetadata>& outMetadata)
+    ComPtr<IArtifact>& outArtifact)
 {
     // Outside because we want to keep IR in scope whilst we are processing emits
     LinkedIR linkedIR;
@@ -1043,13 +1057,20 @@ SlangResult emitSPIRVForEntryPointsDirectly(
     auto irModule = linkedIR.module;
     auto irEntryPoints = linkedIR.entryPoints;
 
-    emitSPIRVFromIR(codeGenContext, irModule, irEntryPoints, spirvOut);
+    List<uint8_t> spirv;
+    emitSPIRVFromIR(codeGenContext, irModule, irEntryPoints, spirv);
 
-    outMetadata = linkedIR.metadata;
+    auto artifact = ArtifactUtil::createArtifactForCompileTarget(asExternal(codeGenContext->getTargetFormat()));
+    artifact->addRepresentationUnknown(ListBlob::moveCreate(spirv));
+
+    if (linkedIR.metadata)
+    {
+        artifact->addAssociated(linkedIR.metadata);
+    }
+
+    outArtifact.swap(artifact);
 
     return SLANG_OK;
 }
-
-
 
 } // namespace Slang

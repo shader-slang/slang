@@ -1347,7 +1347,7 @@ TestResult runDocTest(TestContext* context, TestInput& input)
 
 TestResult runExecutableTest(TestContext* context, TestInput& input)
 {
-    DownstreamCompiler* compiler = context->getDefaultCompiler(SLANG_SOURCE_LANGUAGE_CPP);
+    IDownstreamCompiler* compiler = context->getDefaultCompiler(SLANG_SOURCE_LANGUAGE_CPP);
     if (!compiler)
     {
         return TestResult::Ignored;
@@ -2147,7 +2147,7 @@ static String _calcSummary(const DownstreamDiagnostics& inOutput)
 
 static TestResult runCPPCompilerCompile(TestContext* context, TestInput& input)
 {
-    DownstreamCompiler* compiler = context->getDefaultCompiler(SLANG_SOURCE_LANGUAGE_CPP);
+    IDownstreamCompiler* compiler = context->getDefaultCompiler(SLANG_SOURCE_LANGUAGE_CPP);
     if (!compiler)
     {
         return TestResult::Ignored;
@@ -2189,7 +2189,7 @@ static TestResult runCPPCompilerCompile(TestContext* context, TestInput& input)
 
 static TestResult runCPPCompilerSharedLibrary(TestContext* context, TestInput& input)
 {
-    DownstreamCompiler* compiler = context->getDefaultCompiler(SLANG_SOURCE_LANGUAGE_CPP);
+    IDownstreamCompiler* compiler = context->getDefaultCompiler(SLANG_SOURCE_LANGUAGE_CPP);
     if (!compiler)
     {
         std::lock_guard<std::mutex> lock(context->mutex);
@@ -2218,7 +2218,7 @@ static TestResult runCPPCompilerSharedLibrary(TestContext* context, TestInput& i
     File::remove(sharedLibraryPath);
 
     // Set up the compilation options
-    DownstreamCompiler::CompileOptions options;
+    DownstreamCompileOptions options;
 
     options.sourceLanguage = (ext == "c") ? SLANG_SOURCE_LANGUAGE_C : SLANG_SOURCE_LANGUAGE_CPP;
 
@@ -2303,7 +2303,7 @@ static TestResult runCPPCompilerSharedLibrary(TestContext* context, TestInput& i
 
 static TestResult runCPPCompilerExecute(TestContext* context, TestInput& input)
 {
-    DownstreamCompiler* compiler = context->getDefaultCompiler(SLANG_SOURCE_LANGUAGE_CPP);
+    IDownstreamCompiler* compiler = context->getDefaultCompiler(SLANG_SOURCE_LANGUAGE_CPP);
     if (!compiler)
     {
         return TestResult::Ignored;
@@ -2340,7 +2340,7 @@ static TestResult runCPPCompilerExecute(TestContext* context, TestInput& input)
     File::remove(moduleExePath);
 
     // Set up the compilation options
-    DownstreamCompiler::CompileOptions options;
+    DownstreamCompileOptions options;
 
     options.sourceLanguage = (ext == "c") ? SLANG_SOURCE_LANGUAGE_C : SLANG_SOURCE_LANGUAGE_CPP;
 

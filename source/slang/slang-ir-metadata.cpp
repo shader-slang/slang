@@ -4,6 +4,8 @@
 #include "slang-ir.h"
 #include "slang-ir-insts.h"
 
+#include "../compiler-core/slang-artifact-associated-impl.h"
+
 namespace Slang
 {
 
@@ -37,7 +39,7 @@ static void _insertBinding(List<ShaderBindingRange>& ranges, LayoutResourceKind 
 }
 
 // Collects the metadata from the provided IR module, saves it in outMetadata.
-void collectMetadata(const IRModule* irModule, PostEmitMetadata& outMetadata)
+void collectMetadata(const IRModule* irModule, PostEmitMetadataImpl& outMetadata)
 {
     // Scan the instructions looking for global resource declarations
     for (const auto& inst : irModule->getGlobalInsts())
@@ -67,11 +69,10 @@ void collectMetadata(const IRModule* irModule, PostEmitMetadata& outMetadata)
                 auto registerIndex = offsetAttr->getOffset();
                 auto size = sizeAttr->getSize();
                 auto count = size.isFinite() ? size.getFiniteValue() : 0;
-                _insertBinding(outMetadata.usedBindings, kind, spaceIndex, registerIndex, count);
+                _insertBinding(outMetadata.m_usedBindings, kind, spaceIndex, registerIndex, count);
             }
         }
     }
 }
-
 
 }
