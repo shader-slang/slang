@@ -884,7 +884,8 @@ namespace Slang
 
         auto funcDeclRef = getDeclRef(m_astBuilder, funcDeclRefExpr);
         auto intrinsicMod = funcDeclRef.getDecl()->findModifier<IntrinsicOpModifier>();
-        if (!intrinsicMod)
+        auto implicitCast = funcDeclRef.getDecl()->findModifier<ImplicitConversionModifier>();
+        if (!intrinsicMod && !implicitCast)
         {
             // We can't constant fold anything that doesn't map to a builtin
             // operation right now.
@@ -942,54 +943,91 @@ namespace Slang
 
         // At this point, all the operands had simple integer values, so we are golden.
         IntegerLiteralValue resultValue = 0;
-        auto opName = funcDeclRef.getName();
-
-        // handle binary operators
-        if (opName == getName("-"))
+        // If this is an implicit cast, we can try to fold.
+        if (implicitCast)
         {
-            if (argCount == 1)
+            auto targetBasicType = as<BasicExpressionType>(invokeExpr.getExpr()->type.type);
+            if (!targetBasicType)
+                return nullptr;
+            switch (targetBasicType->baseType)
             {
-                resultValue = -constArgVals[0];
-            }
-            else if (argCount == 2)
-            {
-                resultValue = constArgVals[0] - constArgVals[1];
+            case BaseType::Bool:
+                resultValue = constArgVals[0] != 0;
+                break;
+            case BaseType::Int:
+            case BaseType::UInt:
+            case BaseType::UInt16:
+            case BaseType::Int16:
+            case BaseType::UInt8:
+            case BaseType::Int8:
+                resultValue = constArgVals[0];
+                break;
+            default:
+                return nullptr;
             }
         }
-
-        // simple binary operators
-#define CASE(OP)                                                    \
-        else if(opName == getName(#OP)) do {                    \
-            if(argCount != 2) return nullptr;                   \
-            resultValue = constArgVals[0] OP constArgVals[1];   \
-        } while(0)
-
-        CASE(+); // TODO: this can also be unary...
-        CASE(*);
-        CASE(<<);
-        CASE(>>);
-        CASE(&);
-        CASE(|);
-        CASE(^);
-#undef CASE
-
-        // binary operators with chance of divide-by-zero
-        // TODO: issue a suitable error in that case
-#define CASE(OP)                                                    \
-        else if(opName == getName(#OP)) do {                    \
-            if(argCount != 2) return nullptr;                   \
-            if(!constArgVals[1]) return nullptr;                \
-            resultValue = constArgVals[0] OP constArgVals[1];   \
-        } while(0)
-
-        CASE(/);
-        CASE(%);
-#undef CASE
-
-        // TODO(tfoley): more cases
         else
         {
-            return nullptr;
+            auto opName = funcDeclRef.getName();
+
+            // handle binary operators
+            if (opName == getName("-"))
+            {
+                if (argCount == 1)
+                {
+                    resultValue = -constArgVals[0];
+                }
+                else if (argCount == 2)
+                {
+                    resultValue = constArgVals[0] - constArgVals[1];
+                }
+            }
+            else if (opName == getName("!"))
+            {
+                resultValue = constArgVals[0] != 0;
+            }
+            else if (opName == getName("~"))
+            {
+                resultValue = ~constArgVals[0];
+            }
+
+            // simple binary operators
+#define CASE(OP)                                                    \
+            else if(opName == getName(#OP)) do {                    \
+                if(argCount != 2) return nullptr;                   \
+                resultValue = constArgVals[0] OP constArgVals[1];   \
+            } while(0)
+
+            CASE(+); // TODO: this can also be unary...
+            CASE(*);
+            CASE(<<);
+            CASE(>>);
+            CASE(&);
+            CASE(|);
+            CASE(^);
+            CASE(!=);
+            CASE(==);
+            CASE(>=);
+            CASE(<=);
+            CASE(<);
+            CASE(>);
+#undef CASE
+            // binary operators with chance of divide-by-zero
+            // TODO: issue a suitable error in that case
+#define CASE(OP)                                                    \
+            else if(opName == getName(#OP)) do {                    \
+                if(argCount != 2) return nullptr;                   \
+                if(!constArgVals[1]) return nullptr;                \
+                resultValue = constArgVals[0] OP constArgVals[1];   \
+            } while(0)
+            CASE(/);
+            CASE(%);
+#undef CASE
+            // TODO(tfoley): more cases
+            else
+            {
+                return nullptr;
+            }
         }
 
         IntVal* result = m_astBuilder->create<ConstantIntVal>(resultValue);
