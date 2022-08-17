@@ -315,13 +315,15 @@ newoption {
          -- Makes all symbols hidden by default unless explicitly 'exported'
          buildoptions { "-fvisibility=hidden" } 
          -- Warnings
-         buildoptions { "-Wno-unused-but-set-variable", "-Wno-unused-parameter", "-Wno-type-limits", "-Wno-sign-compare", "-Wno-unused-variable", "-Wno-switch", "-Wno-return-type", "-Wno-unused-local-typedefs", "-Wno-parentheses", "-Wno-reorder"}
+         buildoptions { "-Wno-unused-but-set-variable", "-Wno-unused-parameter", "-Wno-type-limits", "-Wno-sign-compare", "-Wno-unused-variable", "-Wno-switch", "-Wno-return-type", "-Wno-unused-local-typedefs", "-Wno-parentheses"}
  
      filter { "toolset:gcc*"}
          buildoptions { "-Wno-implicit-fallthrough"  }
- 
+     filter { "toolset:gcc*", "language:C++"}
+         buildoptions { "-Wno-reorder"  }
+
      filter { "toolset:clang" }
-          buildoptions { "-Wno-deprecated-register", "-Wno-tautological-compare", "-Wno-missing-braces", "-Wno-undefined-var-template", "-Wno-unused-function", "-Wno-return-std-move", "-Wno-ignored-optimization-argument", "-Wno-unknown-warning-option", "-Wno-class-memaccess"}
+          buildoptions { "-Wno-deprecated-register", "-Wno-tautological-compare", "-Wno-missing-braces", "-Wno-undefined-var-template", "-Wno-unused-function", "-Wno-return-std-move", "-Wno-ignored-optimization-argument", "-Wno-unknown-warning-option", "-Wno-class-memaccess", "-Wno-reorder"}
  
      -- When compiling the debug configuration, we want to turn
      -- optimization off, make sure debug symbols are output,
