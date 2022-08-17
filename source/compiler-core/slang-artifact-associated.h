@@ -31,12 +31,28 @@ public:
 
     struct Location
     {
+        typedef Location ThisType;
+        bool operator==(const ThisType& rhs) const { return line == rhs.line && column == rhs.column; }
+        bool operator!=(const ThisType& rhs) const { return !(*this == rhs); }
+
         Int line = 0;                   ///< One indexed line number. 0 if not defined
         Int column = 0;                 ///< One indexed *character (not byte)* column number. 0 if not defined
     };
 
     struct Diagnostic
     {
+        typedef Diagnostic ThisType;
+
+        bool operator==(const ThisType& rhs) const
+        {
+            return severity == rhs.severity &&
+                stage == rhs.stage &&
+                text == rhs.text &&
+                code == rhs.code &&
+                location == rhs.location;
+        }
+        bool operator!=(const ThisType& rhs) const { return !(*this == rhs); }
+
         Severity severity = Severity::Unknown;          ///< The severity of error
         Stage stage = Stage::Compile;                   ///< The stage the error came from
         ZeroTerminatedCharSlice text;                   ///< The text of the error

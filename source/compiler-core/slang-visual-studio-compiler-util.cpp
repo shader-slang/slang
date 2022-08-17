@@ -288,21 +288,21 @@ namespace Slang
     return SLANG_OK;
 }
 
-static SlangResult _parseSeverity(const UnownedStringSlice& in, DownstreamDiagnostics::Diagnostic::Severity& outSeverity)
+static SlangResult _parseSeverity(const UnownedStringSlice& in, IDiagnostics::Severity& outSeverity)
 {
-    typedef DownstreamDiagnostics::Diagnostic::Severity Type;
+    typedef IDiagnostics::Severity Severity;
 
     if (in == "error" || in == "fatal error")
     {
-        outSeverity = Type::Error;
+        outSeverity = Severity::Error;
     }
     else if (in == "warning")
     {
-        outSeverity = Type::Warning;
+        outSeverity = Severity::Warning;
     }
     else if (in == "info")
     {
-        outSeverity = Type::Info;
+        outSeverity = Severity::Info;
     }
     else
     {
@@ -311,22 +311,22 @@ static SlangResult _parseSeverity(const UnownedStringSlice& in, DownstreamDiagno
     return SLANG_OK;
 }
 
-static SlangResult _parseVisualStudioLine(const UnownedStringSlice& line, DownstreamDiagnostics::Diagnostic& outDiagnostic)
+static SlangResult _parseVisualStudioLine(const UnownedStringSlice& line, IDiagnostics::Diagnostic& outDiagnostic)
 {
-    typedef DownstreamDiagnostics::Diagnostic Diagnostic;
+    typedef IDiagnostics::Diagnostic Diagnostic;
 
     UnownedStringSlice linkPrefix = UnownedStringSlice::fromLiteral("LINK :");
     if (line.startsWith(linkPrefix))
     {
-        outDiagnostic.stage = Diagnostic::Stage::Link;
-        outDiagnostic.severity = Diagnostic::Severity::Info;
+        outDiagnostic.stage = IDiagnostics::Stage::Link;
+        outDiagnostic.severity = IDiagnostics::Severity::Info;
 
         outDiagnostic.text = UnownedStringSlice(line.begin() + linkPrefix.getLength(), line.end());
 
         return SLANG_OK;
     }
 
-    outDiagnostic.stage = Diagnostic::Stage::Compile;
+    outDiagnostic.stage = IDiagnostics::Stage::Compile;
 
     const char*const start = line.begin();
     const char*const end = line.end();

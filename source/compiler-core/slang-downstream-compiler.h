@@ -14,146 +14,12 @@
 #include "../../slang-com-ptr.h"
 
 #include "slang-artifact.h"
+#include "slang-artifact-associated.h"
 
 namespace Slang
 {
 
 struct SourceManager;
-
-struct DownstreamDiagnostic
-{
-    typedef DownstreamDiagnostic ThisType;
-
-    enum class Severity
-    {
-        Unknown,
-        Info,
-        Warning,
-        Error,
-        CountOf,
-    };
-    enum class Stage
-    {
-        Compile,
-        Link,
-    };
-
-    void reset()
-    {
-        severity = Severity::Unknown;
-        stage = Stage::Compile;
-        fileLine = 0;
-    }
-
-    bool operator==(const ThisType& rhs) const
-    {
-        return severity == rhs.severity &&
-            stage == rhs.stage &&
-            text == rhs.text &&
-            code == rhs.code &&
-            filePath == rhs.filePath &&
-            fileLine == rhs.fileLine;
-    }
-    bool operator!=(const ThisType& rhs) const { return !(*this == rhs); }
-
-    static UnownedStringSlice getSeverityText(Severity severity);
-
-        /// Given a path, that holds line number and potentially column number in () after path, writes result into outDiagnostic
-    static SlangResult splitPathLocation(const UnownedStringSlice& pathLocation, DownstreamDiagnostic& outDiagnostic);
-
-        /// Split the line (separated by :), where a path is at pathIndex 
-    static SlangResult splitColonDelimitedLine(const UnownedStringSlice& line, Int pathIndex, List<UnownedStringSlice>& outSlices);
-
-    typedef SlangResult (*LineParser)(const UnownedStringSlice& line, List<UnownedStringSlice>& lineSlices, DownstreamDiagnostic& outDiagnostic);
-
-        /// Given diagnostics in inText that are colon delimited, use lineParser to do per line parsing.
-    static SlangResult parseColonDelimitedDiagnostics(const UnownedStringSlice& inText, Int pathIndex, LineParser lineParser, List<DownstreamDiagnostic>& outDiagnostics);
-
-    Severity severity = Severity::Unknown;          ///< The severity of error
-    Stage stage = Stage::Compile;                   ///< The stage the error came from
-    String text;                                    ///< The text of the error
-    String code;                                    ///< The compiler specific error code
-    String filePath;                                ///< The path the error originated from
-    Int fileLine = 0;                               ///< The line number the error came from
-};
-
-struct DownstreamDiagnostics
-{
-    typedef DownstreamDiagnostic Diagnostic;
-
-        /// Reset to an initial empty state
-    void reset() { diagnostics.clear(); rawDiagnostics = String(); result = SLANG_OK; }
-
-        /// Count the number of diagnostics which have 'severity' or greater 
-    Index getCountAtLeastSeverity(Diagnostic::Severity severity) const;
-
-        /// Get the number of diagnostics by severity
-    Index getCountBySeverity(Diagnostic::Severity severity) const;
-        /// True if there are any diagnostics  of severity
-    bool has(Diagnostic::Severity severity) const { return getCountBySeverity(severity) > 0; }
-
-        /// Stores in outCounts, the amount of diagnostics for the stage of each severity
-    Int countByStage(Diagnostic::Stage stage, Index outCounts[Int(Diagnostic::Severity::CountOf)]) const;
-
-        /// Append a summary to out
-    void appendSummary(StringBuilder& out) const;
-        /// Appends a summary that just identifies if there is an error of a type (not a count)
-    void appendSimplifiedSummary(StringBuilder& out) const;
-
-        /// Remove all diagnostics of the type
-    void removeBySeverity(Diagnostic::Severity severity);
-
-        /// Add a note
-    void addNote(const UnownedStringSlice& in);
-
-        /// If there are no error diagnostics, adds a generic error diagnostic
-    void requireErrorDiagnostic();
-
-    static void addNote(const UnownedStringSlice& in, List<DownstreamDiagnostic>& ioDiagnostics);
-
-    String rawDiagnostics;
-
-    SlangResult result = SLANG_OK;
-    List<Diagnostic> diagnostics;
-};
-
-class DownstreamCompileResult : public RefObject
-{
-public:
-    SLANG_CLASS_GUID(0xdfc5d318, 0x8675, 0x40ef, { 0xbd, 0x7b, 0x4, 0xa4, 0xff, 0x66, 0x11, 0x30 })
-    
-    virtual SlangResult getHostCallableSharedLibrary(ComPtr<ISlangSharedLibrary>& outLibrary) = 0;
-    virtual SlangResult getBinary(ComPtr<ISlangBlob>& outBlob) = 0;
-
-    const DownstreamDiagnostics& getDiagnostics() const { return m_diagnostics; }
-    
-        /// Ctor
-    DownstreamCompileResult(const DownstreamDiagnostics& diagnostics):
-        m_diagnostics(diagnostics)
-    {}
-
-protected:
-    DownstreamDiagnostics m_diagnostics;
-};
-
-
-class BlobDownstreamCompileResult : public DownstreamCompileResult
-{
-public:
-    typedef DownstreamCompileResult Super;
-
-    virtual SlangResult getHostCallableSharedLibrary(ComPtr<ISlangSharedLibrary>& outLibrary) SLANG_OVERRIDE { SLANG_UNUSED(outLibrary); return SLANG_FAIL; }
-    virtual SlangResult getBinary(ComPtr<ISlangBlob>& outBlob) SLANG_OVERRIDE { outBlob = m_blob; return m_blob ? SLANG_OK : SLANG_FAIL; }
-
-    BlobDownstreamCompileResult(const DownstreamDiagnostics& diags, ISlangBlob* blob):
-        Super(diags),
-        m_blob(blob)
-    {
-
-    }
-protected:
-    ComPtr<ISlangBlob> m_blob;
-};
 
 // Compiler description
 struct DownstreamCompilerDesc
@@ -320,8 +186,7 @@ public:
 
     typedef DownstreamCompilerDesc Desc;
     typedef DownstreamCompileOptions CompileOptions;
-    typedef DownstreamCompileResult CompileResult;
-
+    
     typedef CompileOptions::OptimizationLevel OptimizationLevel;
     typedef CompileOptions::DebugInfoType DebugInfoType;
     typedef CompileOptions::FloatingPointMode FloatingPointMode;
@@ -332,7 +197,7 @@ public:
         /// Get the desc of this compiler
     virtual SLANG_NO_THROW const Desc& SLANG_MCALL getDesc() = 0;
         /// Compile using the specified options. The result is in resOut
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL compile(const CompileOptions& options, RefPtr<DownstreamCompileResult>& outResult) = 0;
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL compile(const CompileOptions& options, IArtifact** outArtifact) = 0;
         /// Some compilers have support converting a binary blob into disassembly. Output disassembly is held in the output blob
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL disassemble(SlangCompileTarget sourceBlobTarget, const void* blob, size_t blobSize, ISlangBlob** out) = 0;
 
@@ -364,24 +229,29 @@ public:
     Desc m_desc;
 };
 
-class CommandLineDownstreamCompileResult : public DownstreamCompileResult
+class CommandLineDownstreamArtifactRepresentation : public ComBaseObject, public IArtifactRepresentation
 {
 public:
-    typedef DownstreamCompileResult Super;
+    SLANG_COM_BASE_IUNKNOWN_ALL
 
-    virtual SlangResult getHostCallableSharedLibrary(ComPtr<ISlangSharedLibrary>& outLibrary) SLANG_OVERRIDE;
-    virtual SlangResult getBinary(ComPtr<ISlangBlob>& outBlob) SLANG_OVERRIDE;
+    // ICastable
+    virtual SLANG_NO_THROW void* SLANG_MCALL castAs(const Guid& guid) SLANG_OVERRIDE;
+    // IArtifactRepresentation
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL createRepresentation(const Guid& typeGuid, ICastable** outCastable) SLANG_OVERRIDE;
+    virtual SLANG_NO_THROW bool SLANG_MCALL exists() SLANG_OVERRIDE;
 
-    CommandLineDownstreamCompileResult(const DownstreamDiagnostics& diagnostics, const String& moduleFilePath, TemporaryFileSet* temporaryFileSet) :
-        Super(diagnostics),
+    CommandLineDownstreamArtifactRepresentation(const String& moduleFilePath, TemporaryFileSet* temporaryFileSet) :
         m_moduleFilePath(moduleFilePath),
         m_temporaryFiles(temporaryFileSet)
     {
     }
-    
+
     RefPtr<TemporaryFileSet> m_temporaryFiles;
 
 protected:
+
+    void* getInterface(const Guid& guid);
+    void* getObject(const Guid& guid);
 
     String m_moduleFilePath;
     DownstreamCompileOptions m_options;
@@ -396,7 +266,7 @@ public:
     typedef DownstreamCompilerBase Super;
 
     // IDownstreamCompiler
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL compile(const CompileOptions& options, RefPtr<DownstreamCompileResult>& outResult) SLANG_OVERRIDE;
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL compile(const CompileOptions& options, IArtifact** outArtifact) SLANG_OVERRIDE;
     virtual SLANG_NO_THROW bool SLANG_MCALL isFileBased() SLANG_OVERRIDE { return true; }
 
     // Functions to be implemented for a specific CommandLine
@@ -409,7 +279,7 @@ public:
     virtual SlangResult calcCompileProducts(const CompileOptions& options, DownstreamProductFlags flags, List<String>& outPaths) = 0;
 
     virtual SlangResult calcArgs(const CompileOptions& options, CommandLine& cmdLine) = 0;
-    virtual SlangResult parseOutput(const ExecuteResult& exeResult, DownstreamDiagnostics& output) = 0;
+    virtual SlangResult parseOutput(const ExecuteResult& exeResult, IDiagnostics* diagnostics) = 0;
 
     CommandLineDownstreamCompiler(const Desc& desc, const ExecutableLocation& exe) :
         Super(desc)
@@ -439,8 +309,6 @@ struct DownstreamCompilerBaseUtil
 
     typedef DownstreamProductFlag ProductFlag;
     typedef DownstreamProductFlags ProductFlags;
-
-    typedef DownstreamDiagnostic Diagnostic;
 };
 
 }

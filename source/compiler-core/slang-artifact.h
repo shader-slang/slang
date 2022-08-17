@@ -9,7 +9,6 @@
 namespace Slang
 {
 
-
 /* Simplest slice types. We can't use UnownedStringSlice etc, because they implement functionality in libraries,
 and we want to use these types in headers.
 If we wanted a C implementation it would be easy to use a macro to generate the functionality */
@@ -32,7 +31,12 @@ struct Slice
 
 struct ZeroTerminatedCharSlice : Slice<char>
 {
+    typedef ZeroTerminatedCharSlice ThisType;
     typedef Slice<char> Super;
+
+    bool operator==(const ThisType& rhs) const { return count == rhs.count && (data == rhs.data || ::memcmp(data, rhs.data, count) == 0); }
+    bool operator!=(const ThisType& rhs) const { return !(*this == rhs); }
+
     explicit ZeroTerminatedCharSlice(const char* in) :Super(in, ::strlen(in)) {}
     ZeroTerminatedCharSlice(const char* in, Count inCount) :Super(in, inCount) { SLANG_ASSERT(in[inCount] == 0); }
     ZeroTerminatedCharSlice() :Super("", 0) {}

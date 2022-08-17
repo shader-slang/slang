@@ -10,6 +10,8 @@
 
 #include "slang-artifact-associated.h"
 
+#include "slang-artifact-util.h"
+
 namespace Slang
 {
 
@@ -40,20 +42,11 @@ public:
     SLANG_NO_THROW virtual void SLANG_MCALL appendSummary(ISlangBlob** outBlob) SLANG_OVERRIDE;
     SLANG_NO_THROW virtual void SLANG_MCALL appendSimplifiedSummary(ISlangBlob** outBlob) SLANG_OVERRIDE;
 
-    DiagnosticsImpl():
-        m_arena(1024)
-    {
-    }
-
 protected:
     void* getInterface(const Guid& uuid);
     void* getObject(const Guid& uuid);
 
-    ZeroTerminatedCharSlice _allocateSlice(const Slice<char>& in);
-
-    // We could consider storing paths, codes in StringSlicePool, but for now we just allocate all 'string type things'
-    // in the arena.
-    MemoryArena m_arena;
+    ArtifactSliceAllocator m_allocator;
 
     List<Diagnostic> m_diagnostics;
     SlangResult m_result = SLANG_OK;
@@ -150,6 +143,32 @@ public:
     void* getObject(const Guid& uuid);
 
     List<ShaderBindingRange> m_usedBindings;
+};
+
+/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ArtifactDiagnosticsUtil !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
+
+struct ArtifactDiagnosticsUtil
+{
+    typedef IDiagnostics::Severity Severity;
+    typedef IDiagnostics::Diagnostic ArtifactDiagnostic;
+
+        /// Given severity return as text
+    static UnownedStringSlice getSeverityText(Severity severity);
+
+        /// Given a path, that holds line number and potentially column number in () after path, writes result into outDiagnostic
+    static SlangResult splitPathLocation(ArtifactSliceAllocator& allocator, const UnownedStringSlice& pathLocation, ArtifactDiagnostic& outDiagnostic);
+
+        /// Split the line (separated by :), where a path is at pathIndex 
+    static SlangResult splitColonDelimitedLine(const UnownedStringSlice& line, Int pathIndex, List<UnownedStringSlice>& outSlices);
+
+    typedef SlangResult(*LineParser)(ArtifactSliceAllocator& allocator, const UnownedStringSlice& line, List<UnownedStringSlice>& lineSlices, ArtifactDiagnostic& outDiagnostic);
+
+        /// Given diagnostics in inText that are colon delimited, use lineParser to do per line parsing.
+    static SlangResult parseColonDelimitedDiagnostics(ArtifactSliceAllocator& allocator, const UnownedStringSlice& inText, Int pathIndex, LineParser lineParser, List<ArtifactDiagnostic>& outDiagnostics);
+
+        /// Maybe add a note
+    static void maybeAddNote(ArtifactSliceAllocator& allocator, const UnownedStringSlice& in, List<ArtifactDiagnostic>& ioDiagnostics);
+
 };
 
 } // namespace Slang
