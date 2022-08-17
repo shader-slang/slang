@@ -315,13 +315,15 @@ newoption {
          -- Makes all symbols hidden by default unless explicitly 'exported'
          buildoptions { "-fvisibility=hidden" } 
          -- Warnings
-         buildoptions { "-Wno-unused-but-set-variable", "-Wno-unused-parameter", "-Wno-type-limits", "-Wno-sign-compare", "-Wno-unused-variable", "-Wno-reorder", "-Wno-switch", "-Wno-return-type", "-Wno-unused-local-typedefs", "-Wno-parentheses",   "-Wno-ignored-optimization-argument", "-Wno-unknown-warning-option", "-Wno-class-memaccess"}
+         buildoptions { "-Wno-unused-but-set-variable", "-Wno-unused-parameter", "-Wno-type-limits", "-Wno-sign-compare", "-Wno-unused-variable", "-Wno-switch", "-Wno-return-type", "-Wno-unused-local-typedefs", "-Wno-parentheses"}
  
      filter { "toolset:gcc*"}
          buildoptions { "-Wno-implicit-fallthrough"  }
- 
+     filter { "toolset:gcc*", "language:C++"}
+         buildoptions { "-Wno-reorder"  }
+
      filter { "toolset:clang" }
-          buildoptions { "-Wno-deprecated-register", "-Wno-tautological-compare", "-Wno-missing-braces", "-Wno-undefined-var-template", "-Wno-unused-function", "-Wno-return-std-move"}
+          buildoptions { "-Wno-deprecated-register", "-Wno-tautological-compare", "-Wno-missing-braces", "-Wno-undefined-var-template", "-Wno-unused-function", "-Wno-return-std-move", "-Wno-ignored-optimization-argument", "-Wno-unknown-warning-option", "-Wno-class-memaccess", "-Wno-reorder"}
  
      -- When compiling the debug configuration, we want to turn
      -- optimization off, make sure debug symbols are output,
@@ -756,7 +758,6 @@ newoption {
      -- keep our code free of warnings.
      --
      warnings "Extra"
-     flags { "FatalWarnings" }
  
      if targetInfo.isWindows then
          addSourceDir "source/core/windows"
@@ -778,7 +779,6 @@ newoption {
      -- keep our code free of warnings.
      --
      warnings "Extra"
-     flags { "FatalWarnings" }
  
      if targetInfo.isWindows then
          addSourceDir "source/compiler-core/windows"
@@ -792,7 +792,6 @@ standardProject("slang-rt", "source/slang-rt")
     pic "On"
     warnings "Extra"
     links {"miniz", "lz4"}
-    flags { "FatalWarnings" }
     defines { "SLANG_RT_DYNAMIC", "SLANG_RT_DYNAMIC_EXPORT" }
     addSourceDir "source/core"
     if targetInfo.isWindows then
@@ -1337,7 +1336,6 @@ tool "slangd"
      kind "SharedLib"
      links { "core", "compiler-core", "miniz", "lz4"}
      warnings "Extra"
-     flags { "FatalWarnings" }
      pic "On"
  
      -- The way that we currently configure things through `slang.h`,
