@@ -44,6 +44,8 @@
 
 #include "slang-check-impl.h"
 
+#include "../core/slang-md5.h"
+
 #include "../../slang-tag-version.h"
 
 // Used to print exception type names in internal-compiler-error messages
@@ -1618,9 +1620,18 @@ void TranslationUnitRequest::_addSourceFile(SourceFile* sourceFile)
     // an associated path and/or wasn't from a file.
 
     auto pathInfo = sourceFile->getPathInfo();
-    if (pathInfo.hasFileFoundPath())
+    if (pathInfo.hasFoundPath())
     {
         getModule()->addFilePathDependency(pathInfo.foundPath);
+    }
+    else
+    {
+        // No path exists for this source, so we generate a new string to use as a
+        // fake path in the list of file path dependencies. This is needed to account
+        // for non-file-based dependencies later when shader files are being hashed for
+        // the shader cache.
+
+        // TODO: Add a file path dependency using a fake path string for this source
     }
 }
 
@@ -3178,6 +3189,39 @@ ISlangUnknown* Module::getInterface(const Guid& guid)
     return Super::getInterface(guid);
 }
 
+SlangResult Module::getDependencyBasedHashCode(uint32_t** outHashCode)
+{
+    auto fileDeps = getFilePathDependencyList();
+
+    unsigned char hashCode[16];
+    MD5HashGen hashGen;
+    MD5HashGen::MD5Context context;
+    hashGen.init(&context);
+    for (auto& file : fileDeps)
+    {
+        hashGen.update((void*)file.getBuffer(), (unsigned long)file.getLength());
+    }
+    hashGen.finalize(hashCode);
+
+    *outHashCode = (uint32_t*)hashCode;
+    return SLANG_OK;
+}
+
+SlangResult Module::getASTBasedHashCode(uint32_t* outHashCode)
+{
+    auto serializedAST = ASTSerialUtil::serializeAST(getModuleDecl());
+
+    unsigned char hashCode;
+    MD5HashGen hashGen;
+    MD5HashGen::MD5Context context;
+    hashGen.init(&context);
+    hashGen.update((void*)serializedAST.getBuffer(), (unsigned long)serializedAST.getCount());
+    hashGen.finalize((unsigned char*)&hashCode);
+
+    *outHashCode = (uint32_t)hashCode;
+    return SLANG_OK;
+}
+
 void Module::addModuleDependency(Module* module)
 {
     m_moduleDependencyList.addDependency(module);
@@ -3374,6 +3418,18 @@ SLANG_NO_THROW SlangResult SLANG_MCALL ComponentType::getEntryPointCode(
         return SLANG_FAIL;
 
     return artifact->loadBlob(ArtifactKeep::Yes, outCode);
+}
+
+SLANG_NO_THROW SlangResult SLANG_MCALL ComponentType::getDependencyBasedHashCode(uint32_t** outHashCode)
+{
+    SLANG_UNUSED(outHashCode);
+    return SLANG_E_NOT_AVAILABLE;
+}
+
+SLANG_NO_THROW SlangResult SLANG_MCALL ComponentType::getASTBasedHashCode(uint32_t* outHashCode)
+{
+    SLANG_UNUSED(outHashCode);
+    return SLANG_E_NOT_AVAILABLE;
 }
 
 SLANG_NO_THROW SlangResult SLANG_MCALL ComponentType::getEntryPointHostCallable(
@@ -3706,6 +3762,44 @@ CompositeComponentType::CompositeComponentType(
             }
         }
     }
+}
+
+SlangResult CompositeComponentType::getDependencyBasedHashCode(uint32_t** outHashCode)
+{
+    auto fileDeps = getFilePathDependencies();
+
+    unsigned char hashCode[16];
+    MD5HashGen hashGen;
+    MD5HashGen::MD5Context context;
+    hashGen.init(&context);
+    for (auto& file : fileDeps)
+    {
+        hashGen.update((void*)file.getBuffer(), (unsigned long)file.getLength());
+    }
+    hashGen.finalize(hashCode);
+
+    *outHashCode = (uint32_t*)hashCode;
+    return SLANG_OK;
+}
+
+SlangResult CompositeComponentType::getASTBasedHashCode(uint32_t* outHashCode)
+{
+    auto componentCount = getChildComponentCount();
+
+    unsigned char hashCode;
+    MD5HashGen hashGen;
+    MD5HashGen::MD5Context context;
+    hashGen.init(&context);
+    for (Index i = 0; i < componentCount; ++i)
+    {
+        unsigned char tempHash;
+        getChildComponent(i)->getASTBasedHashCode((uint32_t*)&tempHash);
+        hashGen.update((void*)&tempHash, sizeof(unsigned char));
+    }
+    hashGen.finalize((unsigned char*)&hashCode);
+
+    *outHashCode = (uint32_t)hashCode;
+    return SLANG_OK;
 }
 
 Index CompositeComponentType::getEntryPointCount()

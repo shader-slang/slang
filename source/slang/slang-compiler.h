@@ -272,7 +272,9 @@ namespace Slang
             SlangInt        entryPointIndex,
             SlangInt        targetIndex,
             slang::IBlob**  outCode,
-            slang::IBlob**  outDiagnostics) SLANG_OVERRIDE;
+            slang::IBlob** outDiagnostics) SLANG_OVERRIDE;
+        SLANG_NO_THROW SlangResult SLANG_MCALL getDependencyBasedHashCode(uint32_t** outHashCode) SLANG_OVERRIDE;
+        SLANG_NO_THROW SlangResult SLANG_MCALL getASTBasedHashCode(uint32_t* outHashCode) SLANG_OVERRIDE;
         SLANG_NO_THROW SlangResult SLANG_MCALL specialize(
             slang::SpecializationArg const* specializationArgs,
             SlangInt                        specializationArgCount,
@@ -494,6 +496,9 @@ namespace Slang
         static RefPtr<ComponentType> create(
             Linkage*                            linkage,
             List<RefPtr<ComponentType>> const&  childComponents);
+
+        SLANG_NO_THROW SlangResult SLANG_MCALL getDependencyBasedHashCode(uint32_t** outHashCode) SLANG_OVERRIDE;
+        SLANG_NO_THROW SlangResult SLANG_MCALL getASTBasedHashCode(uint32_t* outHashCode) SLANG_OVERRIDE;
 
         List<RefPtr<ComponentType>> const& getChildComponents() { return m_childComponents; };
         Index getChildComponentCount() { return m_childComponents.getCount(); }
@@ -846,6 +851,9 @@ namespace Slang
             return Super::getEntryPointHostCallable(entryPointIndex, targetIndex, outSharedLibrary, outDiagnostics);
         }
 
+        SLANG_NO_THROW SlangResult SLANG_MCALL getDependencyBasedHashCode(uint32_t** outHashCode) SLANG_OVERRIDE;
+        SLANG_NO_THROW SlangResult SLANG_MCALL getASTBasedHashCode(uint32_t* outHashCode) SLANG_OVERRIDE;
+
             /// Create an entry point that refers to the given function.
         static RefPtr<EntryPoint> create(
             Linkage*            linkage,
@@ -1051,6 +1059,16 @@ namespace Slang
                 entryPointIndex, targetIndex, outSharedLibrary, outDiagnostics);
         }
 
+        SLANG_NO_THROW SlangResult SLANG_MCALL getDependencyBasedHashCode(uint32_t** outHashCode) SLANG_OVERRIDE
+        {
+            return Super::getDependencyBasedHashCode(outHashCode);
+        }
+
+        SLANG_NO_THROW SlangResult SLANG_MCALL getASTBasedHashCode(uint32_t* outHashCode) SLANG_OVERRIDE
+        {
+            return Super::getASTBasedHashCode(outHashCode);
+        }
+
         List<Module*> const& getModuleDependencies() SLANG_OVERRIDE;
         List<String> const& getFilePathDependencies() SLANG_OVERRIDE;
 
@@ -1224,6 +1242,9 @@ namespace Slang
         }
 
         //
+
+        SLANG_NO_THROW SlangResult SLANG_MCALL getDependencyBasedHashCode(uint32_t** outHashCode) SLANG_OVERRIDE;
+        SLANG_NO_THROW SlangResult SLANG_MCALL getASTBasedHashCode(uint32_t* outHashCode) SLANG_OVERRIDE;
 
             /// Create a module (initially empty).
         Module(Linkage* linkage, ASTBuilder* astBuilder = nullptr);

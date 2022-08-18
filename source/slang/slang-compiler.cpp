@@ -8,6 +8,7 @@
 #include "../core/slang-riff.h"
 #include "../core/slang-type-text-util.h"
 #include "../core/slang-type-convert-util.h"
+#include "../core/slang-md5.h"
 
 #include "slang-check.h"
 #include "slang-compiler.h"
@@ -35,6 +36,7 @@
 #include "slang-glsl-extension-tracker.h"
 #include "slang-emit-cuda.h"
 
+#include "slang-serialize-ast.h"
 #include "slang-serialize-container.h"
 
 namespace Slang
@@ -220,6 +222,39 @@ namespace Slang
     void EntryPoint::acceptVisitor(ComponentTypeVisitor* visitor, SpecializationInfo* specializationInfo)
     {
         visitor->visitEntryPoint(this, as<EntryPointSpecializationInfo>(specializationInfo));
+    }
+
+    SlangResult EntryPoint::getDependencyBasedHashCode(uint32_t** outHashCode)
+    {
+        auto fileDeps = getFilePathDependencies();
+
+        unsigned char hashCode[16];
+        MD5HashGen hashGen;
+        MD5HashGen::MD5Context context;
+        hashGen.init(&context);
+        for (auto& file : fileDeps)
+        {
+            hashGen.update((void*)file.getBuffer(), (unsigned long)file.getLength());
+        }
+        hashGen.finalize(hashCode);
+
+        *outHashCode = (uint32_t*)hashCode;
+        return SLANG_OK;
+    }
+
+    SlangResult EntryPoint::getASTBasedHashCode(uint32_t* outHashCode)
+    {
+        auto serializedAST = ASTSerialUtil::serializeAST(getModule()->getModuleDecl());
+
+        unsigned char hashCode;
+        MD5HashGen hashGen;
+        MD5HashGen::MD5Context context;
+        hashGen.init(&context);
+        hashGen.update((void*)serializedAST.getBuffer(), (unsigned long)serializedAST.getCount());
+        hashGen.finalize((unsigned char*)&hashCode);
+
+        *outHashCode = (uint32_t)hashCode;
+        return SLANG_OK;
     }
 
     List<Module*> const& EntryPoint::getModuleDependencies()

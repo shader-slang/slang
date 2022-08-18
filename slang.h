@@ -4421,6 +4421,13 @@ namespace slang
             IBlob**     outCode,
             IBlob**     outDiagnostics = nullptr) = 0;
 
+            /** Get the name for the specified shader file containing code for the entry point at
+                'entryPointIndex' for the chosen 'targetIndex'
+            */
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL getDependencyBasedHashCode(uint32_t** outHashCode) = 0;
+
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL getASTBasedHashCode(uint32_t* outHashCode) = 0;
+
             /** Specialize the component by binding its specialization parameters to concrete arguments.
 
             The `specializationArgs` array must have `specializationArgCount` entries, and

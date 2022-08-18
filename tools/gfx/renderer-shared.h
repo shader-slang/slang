@@ -1217,13 +1217,6 @@ class RendererBase : public IDevice, public Slang::ComObject
 public:
     SLANG_COM_OBJECT_IUNKNOWN_ALL
 
-    Result getEntryPointCodeFromShaderCache(
-        slang::IComponentType* program,
-        SlangInt entryPointIndex,
-        SlangInt targetIndex,
-        slang::IBlob** outCode,
-        slang::IBlob** outDiagnostics = nullptr);
-
     virtual SLANG_NO_THROW Result SLANG_MCALL getNativeDeviceHandles(InteropHandles* outHandles) SLANG_OVERRIDE;
     virtual SLANG_NO_THROW Result SLANG_MCALL getFeatures(
         const char** outFeatures, Size bufferSize, GfxCount* outFeatureCount) SLANG_OVERRIDE;
@@ -1316,6 +1309,15 @@ public:
     // Provides a default implementation that returns SLANG_E_NOT_AVAILABLE.
     virtual SLANG_NO_THROW Result SLANG_MCALL getTextureRowAlignment(size_t* outAlignment) override;
 
+    const char* getShaderFilename(uint32_t* shaderHash);
+
+    Result getEntryPointCodeFromShaderCache(
+        slang::IComponentType* program,
+        SlangInt entryPointIndex,
+        SlangInt targetIndex,
+        slang::IBlob** outCode,
+        slang::IBlob** outDiagnostics = nullptr);
+
     Result getShaderObjectLayout(
         slang::TypeReflection*      type,
         ShaderObjectContainerType   container,
@@ -1356,6 +1358,8 @@ protected:
 public:
     SlangContext slangContext;
     ShaderCache shaderCache;
+
+    ISlangFileSystem* shaderCacheFileSystem = nullptr;
 
     Slang::Dictionary<slang::TypeLayoutReflection*, Slang::RefPtr<ShaderObjectLayoutBase>> m_shaderObjectLayoutCache;
     Slang::ComPtr<IPipelineCreationAPIDispatcher> m_pipelineCreationAPIDispatcher;
