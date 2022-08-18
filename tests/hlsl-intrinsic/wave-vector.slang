@@ -20,9 +20,9 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     
     int2 r0 = WaveActiveSum(v0);
     float2 r1 = WaveActiveSum(v1);
-    int2 r2 = WaveActiveBitXor(uv0);
-    int2 r3 = WaveActiveBitOr(uv0);
-    int2 r4 = WaveActiveBitAnd(uv0);
+    int2 r2 = int2(WaveActiveBitXor(uv0));
+    int2 r3 = int2(WaveActiveBitOr(uv0));
+    int2 r4 = int2(WaveActiveBitAnd(uv0));
     
     int2 r = r0 + int2(r1) + r2 + r3 + r4;
    

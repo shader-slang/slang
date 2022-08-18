@@ -42,7 +42,7 @@ rayPayloadInEXT ShadowRay_0 _S3;
 
 void main()
 {
-    if(bool(gParams_0._data.mode_0))
+    if(gParams_0._data.mode_0 != 0)
     {
         float val_0 = textureLod(
             sampler2D(gParams_alphaMap_0, gParams_sampler_0),

@@ -20,7 +20,7 @@ RWByteAddressBuffer outputBuffer;
 // With only 4 threads there is no contention - which makes for a simple test
 // but doesn't actually test for the exchange atomicity
 [numthreads(4, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
 {    
     int idx = dispatchThreadID.x;
     

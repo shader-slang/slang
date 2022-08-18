@@ -29,7 +29,7 @@ int test(int val)
 RWStructuredBuffer<int> gOutputBuffer;
 
 [numthreads(4, 1, 1)]
-void computeMain(uint3 tid : SV_DispatchThreadID)
+void computeMain(int3 tid : SV_DispatchThreadID)
 {
     int inVal = tid.x;
     int outVal = test(inVal);

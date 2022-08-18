@@ -30,7 +30,7 @@ void main(
     SphereHitAttributes attributes,
     in out ShadowRay    ioPayload)
 {
-    if(gParams.mode)
+    if(gParams.mode != 0)
     {
         float val = gParams.alphaMap.SampleLevel(
             gParams.sampler,

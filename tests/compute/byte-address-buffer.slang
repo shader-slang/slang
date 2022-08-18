@@ -20,12 +20,12 @@ void test(int val)
 {
 	uint tmp = val;
 
-	tmp = inputBuffer.Load(tmp * 4);
+	tmp = inputBuffer.Load(int(tmp * 4));
 
-	uint2 pair = inputBuffer.Load2(tmp * 4);
+	uint2 pair = inputBuffer.Load2(int(tmp * 4));
 	tmp = (pair.x + pair.y) & 0xF;
 
-	uint4 quad = inputBuffer.Load4(tmp * 4);
+	uint4 quad = inputBuffer.Load4(int(tmp * 4));
 	tmp = (quad.x + quad.y + quad.z + quad.w) & 0xF;
 
 	outputBuffer.Store(val * 4, tmp);

@@ -25,7 +25,7 @@ RWStructuredBuffer<float> anotherBuffer;
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
     uint tid = dispatchThreadID.x;
-    int idx = (tid & 3) ^ (tid >> 2); 
+    int idx = int((tid & 3) ^ (tid >> 2)); 
 
     //const float delta = anotherBuffer[idx & 3];
     
@@ -41,6 +41,6 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     
     if (tid < 4)
     {
-        outputBuffer[tid] = asfloat(workBuffer.Load(tid << 2));
+        outputBuffer[tid] = asfloat(workBuffer.Load(int(tid << 2)));
     }
 }

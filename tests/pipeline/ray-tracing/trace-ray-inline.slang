@@ -132,7 +132,7 @@ void main(uint3 tid : SV_DispatchThreadID)
 					{
 						query.CommitProceduralPrimitiveHit(tHit);
 						committedProceduralAttrs = candidateProceduralAttrs;
-						if(shouldStopAtFirstHit)
+						if(shouldStopAtFirstHit != 0)
 							query.Abort();
 					}
 				}
@@ -144,7 +144,7 @@ void main(uint3 tid : SV_DispatchThreadID)
 				if(myTriangleAnyHit(payload))
 				{
 					query.CommitNonOpaqueTriangleHit();
-					if(shouldStopAtFirstHit)
+					if(shouldStopAtFirstHit != 0)
 						query.Abort();
 				}
 			}

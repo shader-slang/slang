@@ -17,7 +17,7 @@ int test(int val)
     tempVector2 = worldMatrix._12_21;
 
     // return tempMatrix[0][0] + tempMatrix[0][1] = val + 0 + val + 1
-    return tempVector1.x + tempVector2.x;
+    return int(tempVector1.x + tempVector2.x);
 }
 
 
@@ -25,9 +25,9 @@ int test(int val)
 RWStructuredBuffer<int> outputBuffer;
 
 [numthreads(4, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
 {
-    uint tid = dispatchThreadID.x;
+    int tid = dispatchThreadID.x;
     int inVal = tid;
     int outVal = test(inVal);
     outputBuffer[tid] = outVal;

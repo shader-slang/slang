@@ -17,15 +17,15 @@ struct S
 S s[2];
 
 [numthreads(4, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
 {
-    uint i = dispatchThreadID.x;
+    int i = dispatchThreadID.x;
 
-    int val =
+    int val = int(
           s[0].a.Load(i * 4)
         + s[1].a.Load(i * 4)*16
         + s[0].b.Load(i * 4)*256
-        + s[1].b.Load(i * 4)*4096;
+        + s[1].b.Load(i * 4)*4096);
 
     outputBuffer[i] = val; 
 }

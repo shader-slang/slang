@@ -24,7 +24,7 @@ RWTexture2D<float4> rwt2D_4;
 RWStructuredBuffer<float> outputBuffer;
 
 [numthreads(4, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
 {
     int idx = dispatchThreadID.x;
     

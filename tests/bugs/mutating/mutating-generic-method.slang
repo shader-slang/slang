@@ -42,7 +42,7 @@ int test(int val)
 RWStructuredBuffer<int> outputBuffer;
 
 [numthreads(4, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
 {
     int tid = dispatchThreadID.x;
     int val = test(tid);

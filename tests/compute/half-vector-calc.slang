@@ -8,16 +8,16 @@
 RWStructuredBuffer<float> outputBuffer;
 
 [numthreads(4, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
 {
-    uint tid = dispatchThreadID.x;
+    int tid = dispatchThreadID.x;
     int x = tid.x;
     
     half2 v3 = half2(float(x));
     
-    half2 v0 = half2(x * 2.0f, x * 0.5f);
-    half3 v1 = half3(x * 2.0f, x * 0.5f, x - 1.0f);
-    half4 v2 = half4(x + 1, x - 1, x + 2 , x - 2);
+    half2 v0 = half2(float2(x * 2.0f, x * 0.5f));
+    half3 v1 = half3(half(x * 2.0f), half(x * 0.5f), half(x - 1.0f));
+    half4 v2 = half4(half(x + 1), half(x - 1), half(x + 2) , half(x - 2));
     
     v1 += v0.yxy;
     v1 += v2.wzy;

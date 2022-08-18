@@ -7,7 +7,7 @@ Sampler2D<float> t2D;
 RWStructuredBuffer<float> outputBuffer;
 
 [numthreads(4, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
 {
     int idx = dispatchThreadID.x;
     float u = idx * (1.0f / 4);

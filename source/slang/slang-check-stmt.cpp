@@ -140,7 +140,7 @@ namespace Slang
     Expr* SemanticsVisitor::checkExpressionAndExpectIntegerConstant(Expr* expr, IntVal** outIntVal)
     {
         expr = CheckExpr(expr);
-        auto intVal = CheckIntegerConstantExpression(expr);
+        auto intVal = CheckIntegerConstantExpression(expr, IntegerConstantExpressionCoercionType::AnyInteger, nullptr);
         if (outIntVal)
             *outIntVal = intVal;
         return expr;

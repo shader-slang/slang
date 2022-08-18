@@ -126,7 +126,7 @@ namespace Slang
             // If we are converting to a "larger" type, then
             // we are doing a lossless promotion, and otherwise
             // we are doing a demotion.
-            if( toInfo.conversionRank > fromInfo.conversionRank)
+            if (toInfo.conversionRank > fromInfo.conversionRank)
                 return kConversionCost_RankPromotion;
             else
                 return kConversionCost_GeneralConversion;
@@ -174,7 +174,8 @@ namespace Slang
         // types. This makes sense because we relaly want to prefer
         // conversion to `float` as the default.
         else if (toInfo.conversionKind == kBaseTypeConversionKind_Float
-            && toInfo.conversionRank >= kBaseTypeConversionRank_Int32)
+            && toInfo.conversionRank >= kBaseTypeConversionRank_Int32
+            && fromInfo.conversionRank >= kBaseTypeConversionRank_Int8)
         {
             return kConversionCost_IntegerToFloatConversion;
         }
