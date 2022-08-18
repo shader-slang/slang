@@ -72,7 +72,7 @@ int calcThing_0(int offset_0)
             another_0[i_0 & 1] = another_0[i_0 & 1] + modRange_0;
             int _S6 = i_0 % 3;
             int _S7;
-            if(bool(_S6))
+            if(_S6 != 0)
             {
                 int _S8 = _S5;
                 livenessEnd_0(_S5, 0);

@@ -13,5 +13,5 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
     int idx = int(dispatchThreadID.x);
     
-    outputBuffer[idx] = WaveActiveCountBits(idx & 5);
+    outputBuffer[idx] = int(WaveActiveCountBits(bool(idx & 5)));
 }

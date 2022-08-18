@@ -28,7 +28,7 @@ int someSlowFunc(int a)
     {
         v = ((v >> 1) | (v << 31)) * i;
     }
-    return v;
+    return int(v);
 }
 
 int somethingElse(inout SomeStruct s)
@@ -45,7 +45,7 @@ int doThing(SomeStruct s)
 [numthreads(4, 1, 1)]
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {    
-    int index = dispatchThreadID.x;
+    int index = int(dispatchThreadID.x);
 
     int res = index;
 
@@ -57,7 +57,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
         SomeStruct t = makeSomeStruct();
         SomeStruct u = {};
         
-        if (v & 0x100)
+        if ((v & 0x100) != 0)
         {
             s.x = anotherBuffer[v & 3];
             t.x = anotherBuffer[v & 3];

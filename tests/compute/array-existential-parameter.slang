@@ -28,7 +28,7 @@ void computeMain(uint3       dispatchThreadID : SV_DispatchThreadID)
 {
     let tid = dispatchThreadID.x;
 
-    let inputVal : int = tid;
+    let inputVal : int = int(tid);
     let outputVal = gCb.values[0].run(inputVal) + gCb2.values[0].run(inputVal);
 
     gOutputBuffer[tid] = outputVal;

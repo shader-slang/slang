@@ -29,9 +29,9 @@ void computeMain(
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
 	uniform RWStructuredBuffer<int> outputBuffer,
 
-	uint3 dispatchThreadID : SV_DispatchThreadID)
+	int3 dispatchThreadID : SV_DispatchThreadID)
 {
-    uint tid = dispatchThreadID.x;
+    int tid = dispatchThreadID.x;
     int inVal = tid;
     int outVal = test(inVal, d.a, d.b);
     outputBuffer[tid] = outVal;

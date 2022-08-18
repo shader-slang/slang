@@ -29,8 +29,8 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
     SomeStruct<true> a;
     SomeStruct<false> b;
-    SomeStruct<1> c;
-    SomeStruct<0> d;
+    SomeStruct<bool(1)> c;
+    SomeStruct<bool(0)> d;
     
     AnotherStruct<true> e;
     AnotherStruct<false> f;

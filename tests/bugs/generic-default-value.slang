@@ -14,10 +14,10 @@ struct Check<T>
 [numthreads(4, 1, 1)]
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
-    int index = dispatchThreadID.x;
+    int index = int(dispatchThreadID.x);
 
     Check<float> v = {};
     
-    outputBuffer[index] = index + v.v; 
+    outputBuffer[index] = index + int(v.v); 
 }
 

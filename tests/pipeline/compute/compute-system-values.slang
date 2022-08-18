@@ -19,10 +19,10 @@ void computeMain(
     value = value*16 + groupIndex;
     value = value*16 + groupID.x;
     value = value*16 + groupID.y;
-    value = value*16 + groupThreadID.x;
-    value = value*16 + groupThreadID.y;
-    value = value*16 + dispatchThreadID.x;
-    value = value*16 + dispatchThreadID.y;
+    value = value*16 + int(groupThreadID.x);
+    value = value*16 + int(groupThreadID.y);
+    value = value*16 + int(dispatchThreadID.x);
+    value = value*16 + int(dispatchThreadID.y);
 
     outputBuffer[tid] = value;
 }

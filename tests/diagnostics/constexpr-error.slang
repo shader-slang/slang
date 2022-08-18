@@ -21,7 +21,7 @@ float4 main() : SV_Target
     float4 result = 0.0f;
 
     // Okay, immediate constant
-    result += t.Sample(s, uv, uint2(0,0));
+    result += t.Sample(s, uv, int2(0,0));
 
     // Error: data passed through cbuffer isn't compile-time constant
     result += t.Sample(s, uv, offset);
@@ -32,13 +32,13 @@ float4 main() : SV_Target
     {
     	ii = 1;
     }
-    result += t.Sample(s, uv, uint2(ii));
+    result += t.Sample(s, uv, int2(ii));
 
     // Error: data computed in loop isn't compile-time constant
     // (and loop isn't unroll-able)
     for(uint jj = 0; jj < uv.y; jj++)
     {
-    	result += t.Sample(s, uv, uint2(jj));
+    	result += t.Sample(s, uv, int2(jj));
     }
 
     return result;

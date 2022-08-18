@@ -35,7 +35,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     if (index == 0)
     {
         buffer0.GetDimensions(count, stride);
-        last = buffer0.Load(count - 1);
+        last = buffer0.Load(int(count - 1));
     }
     else if (index == 1)
     {
@@ -45,13 +45,13 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     else if (index == 2)
     {
         buffer2.GetDimensions(count, stride);
-        last = int(buffer2.Load(count -1));
+        last = int(buffer2.Load(int(count - 1)));
     }
     else
     {
         buffer3.GetDimensions(count, stride);
         
-        last = buffer3.Load(count - 1).a;
+        last = buffer3.Load(int(count - 1)).a;
     }
  
 	outputBuffer[index * 2] = int(count);

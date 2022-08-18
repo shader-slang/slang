@@ -30,7 +30,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     matrix<uint, 2, 2> r4 = WaveActiveBitAnd(uv0);
     
     matrix<uint, 2, 2> r5 = r2 + r3 + r4;
-    matrix<int, 2, 2> r6 = matrix<int, 2, 2>(r5[0][0], r5[0][1], r5[1][0], r5[1][1]); 
+    matrix<int, 2, 2> r6 = matrix<int, 2, 2>(int(r5[0][0]), int(r5[0][1]), int(r5[1][0]), int(r5[1][1])); 
     
     matrix<int, 2, 2> r = r0 + matrix<int, 2, 2>(r1) + r6;
    

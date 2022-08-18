@@ -27,6 +27,6 @@ float4 main() : SV_Target
     return cb [index]       .f
          + sb1[index][index].f
          + sb2[index][index]
-         + float4(bb[index].Load(index*4));
+         + float4(bb[index].Load(int(index*4)));
 }
 

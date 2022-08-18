@@ -14,6 +14,8 @@
 
 #include "slang-syntax.h"
 
+#include <limits>
+
 namespace Slang
 {
         /// Visitor to transition declarations to `DeclCheckState::CheckedModifiers`
@@ -3487,7 +3489,36 @@ namespace Slang
         if(!basicType)
             return false;
 
-        return isIntegerBaseType(basicType->baseType);
+        return isIntegerBaseType(basicType->baseType) || basicType->baseType == BaseType::Bool;
+    }
+
+    bool SemanticsVisitor::isIntValueInRangeOfType(IntegerLiteralValue value, Type* type)
+    {
+        auto basicType = as<BasicExpressionType>(type);
+        if (!basicType)
+            return false;
+
+        switch (basicType->baseType)
+        {
+        case BaseType::UInt8:
+            return (value >= 0 && value <= std::numeric_limits<uint8_t>::max()) || (value == -1);
+        case BaseType::UInt16:
+            return (value >= 0 && value <= std::numeric_limits<uint16_t>::max()) || (value == -1);
+        case BaseType::UInt:
+            return (value >= 0 && value <= std::numeric_limits<uint32_t>::max()) || (value == -1);
+        case BaseType::UInt64:
+            return true;
+        case BaseType::Int8:
+            return value >= std::numeric_limits<int8_t>::min() && value <= std::numeric_limits<int8_t>::max();
+        case BaseType::Int16:
+            return value >= std::numeric_limits<int16_t>::min() && value <= std::numeric_limits<int16_t>::max();
+        case BaseType::Int:
+            return value >= std::numeric_limits<int32_t>::min() && value <= std::numeric_limits<int32_t>::max();
+        case BaseType::Int64:
+            return value >= std::numeric_limits<int64_t>::min() && value <= std::numeric_limits<int64_t>::max();
+        default:
+            return false;
+        }
     }
 
     void SemanticsVisitor::validateEnumTagType(Type* type, SourceLoc const& loc)
@@ -3772,7 +3803,7 @@ namespace Slang
             // We want to enforce that this is an integer constant
             // expression, but we don't actually care to retain
             // the value.
-            CheckIntegerConstantExpression(initExpr);
+            CheckIntegerConstantExpression(initExpr, IntegerConstantExpressionCoercionType::AnyInteger, nullptr);
 
             decl->tagExpr = initExpr;
         }

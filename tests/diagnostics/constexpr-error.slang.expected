@@ -1,14 +1,17 @@
 result code = -1
 standard error = {
+tests/diagnostics/constexpr-error.slang(27): warning 30081: implicit conversion from 'vector<uint,2>' to 'vector<int,2>' is not recommended
+    result += t.Sample(s, uv, offset);
+                              ^~~~~~
 tests/diagnostics/constexpr-error.slang(27): error 40006: expected a compile-time constant
     result += t.Sample(s, uv, offset);
                               ^~~~~~
 tests/diagnostics/constexpr-error.slang(35): error 40006: expected a compile-time constant
-    result += t.Sample(s, uv, uint2(ii));
-                                   ^
+    result += t.Sample(s, uv, int2(ii));
+                                  ^
 tests/diagnostics/constexpr-error.slang(41): error 40006: expected a compile-time constant
-        result += t.Sample(s, uv, uint2(jj));
-                                       ^
+        result += t.Sample(s, uv, int2(jj));
+                                      ^
 }
 standard output = {
 }

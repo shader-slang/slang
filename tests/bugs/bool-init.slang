@@ -16,7 +16,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     Thing thing = {};
     int index = int(dispatchThreadID.x);
     
-    if (index % 3)
+    if (index % 3 != 0)
     {
         thing.a = (index & 1) != 0;
     }

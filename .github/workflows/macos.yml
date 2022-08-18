@@ -27,6 +27,9 @@ jobs:
         CC=${{matrix.compiler}}
         CONFIGURATION=${{matrix.configuration}}
         ARCH=${{matrix.platform}}
+        CPPFLAGS=-Werror
+        CFLAGS=-Werror
+        CXXFLAGS=-Werror
         source ./github_macos_build.sh
     - name: Package
       id: package

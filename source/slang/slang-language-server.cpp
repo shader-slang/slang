@@ -15,6 +15,7 @@
 #include "../compiler-core/slang-json-native.h"
 #include "../compiler-core/slang-json-rpc-connection.h"
 #include "../compiler-core/slang-language-server-protocol.h"
+#include "slang-check-impl.h"
 #include "slang-language-server.h"
 #include "slang-workspace-version.h"
 #include "slang-language-server-ast-lookup.h"
@@ -131,6 +132,7 @@ SlangResult LanguageServer::parseNextMessage()
                 result.capabilities.semanticTokensProvider.full = true;
                 result.capabilities.semanticTokensProvider.range = false;
                 result.capabilities.signatureHelpProvider.triggerCharacters.add("(");
+                result.capabilities.signatureHelpProvider.triggerCharacters.add(",");
                 result.capabilities.signatureHelpProvider.retriggerCharacters.add(",");
                 for (auto tokenType : kSemanticTokenTypes)
                     result.capabilities.semanticTokensProvider.legend.tokenTypes.add(tokenType);
@@ -201,10 +203,19 @@ SlangResult LanguageServer::didOpenTextDocument(const DidOpenTextDocumentParams&
     return SLANG_OK;
 }
 
-String getDeclSignatureString(DeclRef<Decl> declRef, ASTBuilder* astBuilder)
+static bool isBoolType(Type* t)
+{
+    auto basicType = as<BasicExpressionType>(t);
+    if (!basicType)
+        return false;
+    return basicType->baseType == BaseType::Bool;
+}
+
+String getDeclSignatureString(DeclRef<Decl> declRef, WorkspaceVersion* version)
 {
     if (declRef.getDecl())
     {
+        auto astBuilder = version->linkage->getASTBuilder();
         ASTPrinter printer(
             astBuilder,
             ASTPrinter::OptionFlag::ParamNames | ASTPrinter::OptionFlag::NoInternalKeywords |
@@ -213,6 +224,9 @@ String getDeclSignatureString(DeclRef<Decl> declRef, ASTBuilder* astBuilder)
         if (auto varDecl = as<VarDeclBase>(declRef.getDecl()))
         {
             auto& sb = printer.getStringBuilder();
+            if (!varDecl->findModifier<ConstModifier>() && !as<LetDecl>(declRef.getDecl()))
+                return printer.getString();
+
             if (auto litExpr = as<LiteralExpr>(varDecl->initExpr))
             {
                 sb << " = " << litExpr->token.getContent();
@@ -222,6 +236,27 @@ String getDeclSignatureString(DeclRef<Decl> declRef, ASTBuilder* astBuilder)
                 if (isTypeDecl->constantVal)
                 {
                     sb << " = " << (isTypeDecl->constantVal->value ? "true" : "false");
+                }
+            }
+            else if (varDecl->initExpr)
+            {
+                DiagnosticSink sink;
+                SharedSemanticsContext semanticContext(version->linkage, getModule(varDecl), &sink);
+                SemanticsVisitor semanticsVisitor(&semanticContext);
+                if (auto intVal = semanticsVisitor.tryFoldIntegerConstantExpression(varDecl->initExpr, nullptr))
+                {
+                    if (auto constantInt = as<ConstantIntVal>(intVal))
+                    {
+                        sb << " = ";
+                        if (isBoolType(varDecl->getType()))
+                        {
+                            sb << (constantInt->value ? "true" : "false");
+                        }
+                        else
+                        {
+                            sb << constantInt->value;
+                        }
+                    }
                 }
             }
         }
@@ -421,7 +456,7 @@ SlangResult LanguageServer::hover(
         if (declRef.getDecl())
         {
             sb << "```\n"
-                << getDeclSignatureString(declRef, version->linkage->getASTBuilder())
+                << getDeclSignatureString(declRef, version)
                 << "\n```\n";
             
             _tryGetDocumentation(sb, version, declRef.getDecl());
@@ -777,7 +812,7 @@ SlangResult LanguageServer::completionResolve(
     if (itemId >= 0 && itemId < candidateItems.getCount())
     {
         auto declRef = candidateItems[itemId].declRef;
-        resolvedItem.detail = getDeclSignatureString(declRef, version->linkage->getASTBuilder());
+        resolvedItem.detail = getDeclSignatureString(declRef, version);
         StringBuilder docSB;
         _tryGetDocumentation(docSB, version, declRef.getDecl());
         resolvedItem.documentation.value = docSB.ProduceString();

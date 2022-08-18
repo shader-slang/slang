@@ -57,7 +57,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     WaveMask waveMask = ~WaveMask(0);
     
     int index = int(dispatchThreadID.x);
-    const int waveLaneId = WaveGetLaneIndex();
+    const int waveLaneId = int(WaveGetLaneIndex());
     
     const int value = inputBuffer[index];
     const int elementCount = 9;

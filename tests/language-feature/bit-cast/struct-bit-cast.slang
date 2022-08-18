@@ -32,7 +32,7 @@ int test0(int val)
     b.i.s = asuint(1.25);
     b.t = asuint(0.25);
     Foo f = bit_cast<Foo, Bar>(b);
-    return f.a + (int)f.b + int(float(f.fvec.x / f.fvec.y)); // val + 2 + 5
+    return int(f.a) + (int)f.b + int(float(f.fvec.x / f.fvec.y)); // val + 2 + 5
 }
 
 struct Smaller
@@ -59,9 +59,9 @@ int test1()
 RWStructuredBuffer<int> outputBuffer;
 
 [numthreads(4, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
 {
-    uint tid = dispatchThreadID.x;
+    int tid = dispatchThreadID.x;
     int inVal = tid;
     int outVal = test0(inVal) + test1();
     outputBuffer[tid] = outVal;
