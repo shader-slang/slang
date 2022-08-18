@@ -152,7 +152,7 @@ SlangResult FXCDownstreamCompiler::init(ISlangSharedLibrary* library)
     return SLANG_OK;
 }
 
-static SlangResult _parseDiagnosticLine(TerminatedCharSliceAllocator& allocator, const UnownedStringSlice& line, List<UnownedStringSlice>& lineSlices, ArtifactDiagnostic& outDiagnostic)
+static SlangResult _parseDiagnosticLine(CharSliceAllocator& allocator, const UnownedStringSlice& line, List<UnownedStringSlice>& lineSlices, ArtifactDiagnostic& outDiagnostic)
 {
     /* tests/diagnostics/syntax-error-intrinsic.slang(14,2): error X3000: syntax error: unexpected token '@' */
     if (lineSlices.getCount() < 3)
@@ -293,7 +293,7 @@ SlangResult FXCDownstreamCompiler::compile(const CompileOptions& options, IArtif
     // HRESULT is compatible with SlangResult
     diagnostics->setResult(hr);
 
-    TerminatedCharSliceAllocator allocator;
+    CharSliceAllocator allocator;
 
     if (diagnosticsBlob)
     {

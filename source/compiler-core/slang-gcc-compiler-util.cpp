@@ -166,7 +166,7 @@ enum class LineParseResult
     
 } // anonymous
     
-static SlangResult _parseGCCFamilyLine(TerminatedCharSliceAllocator& allocator, const UnownedStringSlice& line, LineParseResult& outLineParseResult, ArtifactDiagnostic& outDiagnostic)
+static SlangResult _parseGCCFamilyLine(CharSliceAllocator& allocator, const UnownedStringSlice& line, LineParseResult& outLineParseResult, ArtifactDiagnostic& outDiagnostic)
 {
     typedef ArtifactDiagnostic Diagnostic;
     typedef Diagnostic::Severity Severity;
@@ -353,7 +353,7 @@ static SlangResult _parseGCCFamilyLine(TerminatedCharSliceAllocator& allocator, 
 {
     LineParseResult prevLineResult = LineParseResult::Ignore;
     
-    TerminatedCharSliceAllocator allocator;
+    CharSliceAllocator allocator;
 
     diagnostics->reset();
     diagnostics->setRaw(CharSliceCaster::asCharSlice(exeRes.standardError));

@@ -47,9 +47,9 @@ struct ArtifactDiagnostic
 
     Severity severity = Severity::Unknown;          ///< The severity of error
     Stage stage = Stage::Compile;                   ///< The stage the error came from
-    ZeroTerminatedCharSlice text;                   ///< The text of the error
-    ZeroTerminatedCharSlice code;                   ///< The compiler specific error code
-    ZeroTerminatedCharSlice filePath;               ///< The path the error originated from
+    TerminatedCharSlice text;                   ///< The text of the error
+    TerminatedCharSlice code;                   ///< The compiler specific error code
+    TerminatedCharSlice filePath;               ///< The path the error originated from
     Location location;
 };
 
@@ -77,7 +77,7 @@ public:
     SLANG_NO_THROW virtual void SLANG_MCALL removeAt(Index i) = 0;
 
         /// Get raw diagnostics information
-    SLANG_NO_THROW virtual ZeroTerminatedCharSlice SLANG_MCALL getRaw() = 0;
+    SLANG_NO_THROW virtual TerminatedCharSlice SLANG_MCALL getRaw() = 0;
         /// Set the raw diagnostic info
     SLANG_NO_THROW virtual void SLANG_MCALL setRaw(const CharSlice& slice) = 0;
         /// Append to the raw diagnostic

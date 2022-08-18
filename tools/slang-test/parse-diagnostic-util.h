@@ -57,16 +57,16 @@ struct ParseDiagnosticUtil
         };
     };
 
-    typedef SlangResult (*LineParser)(Slang::TerminatedCharSliceAllocator& allocator, const Slang::UnownedStringSlice& line, Slang::List<Slang::UnownedStringSlice>& lineSlices, Slang::ArtifactDiagnostic& outDiagnostic);
+    typedef SlangResult (*LineParser)(Slang::CharSliceAllocator& allocator, const Slang::UnownedStringSlice& line, Slang::List<Slang::UnownedStringSlice>& lineSlices, Slang::ArtifactDiagnostic& outDiagnostic);
 
         /// Given a compiler identity returns a line parsing function.
     static LineParser getLineParser(const CompilerIdentity& compilerIdentity);
 
         /// For a 'generic' (as in uses DownstreamCompiler mechanism) line parsing
-    static SlangResult parseGenericLine(Slang::TerminatedCharSliceAllocator& allocator, const Slang::UnownedStringSlice& line, Slang::List<Slang::UnownedStringSlice>& lineSlices, Slang::ArtifactDiagnostic& outDiagnostic);
+    static SlangResult parseGenericLine(Slang::CharSliceAllocator& allocator, const Slang::UnownedStringSlice& line, Slang::List<Slang::UnownedStringSlice>& lineSlices, Slang::ArtifactDiagnostic& outDiagnostic);
 
         /// For parsing diagnostics from Slang
-    static SlangResult parseSlangLine(Slang::TerminatedCharSliceAllocator& allocator, const Slang::UnownedStringSlice& line, Slang::List<Slang::UnownedStringSlice>& lineSlices, Slang::ArtifactDiagnostic& outDiagnostic);
+    static SlangResult parseSlangLine(Slang::CharSliceAllocator& allocator, const Slang::UnownedStringSlice& line, Slang::List<Slang::UnownedStringSlice>& lineSlices, Slang::ArtifactDiagnostic& outDiagnostic);
 
         /// Parse diagnostics into output text
     static SlangResult parseDiagnostics(const Slang::UnownedStringSlice& inText, Slang::IArtifactDiagnostics* diagnostics);

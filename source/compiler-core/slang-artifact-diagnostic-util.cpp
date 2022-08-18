@@ -6,27 +6,27 @@
 
 namespace Slang {
 
-/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! TerminatedCharSliceAllocator !!!!!!!!!!!!!!!!!!!!!!!!!!! */
+/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! CharSliceAllocator !!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
-ZeroTerminatedCharSlice TerminatedCharSliceAllocator::allocate(const char* in)
+TerminatedCharSlice CharSliceAllocator::allocate(const char* in)
 {
     const size_t length = ::strlen(in);
     auto dst = m_arena.allocateString(in, length);
-    return ZeroTerminatedCharSlice(dst, length);
+    return TerminatedCharSlice(dst, length);
 }
 
-ZeroTerminatedCharSlice TerminatedCharSliceAllocator::allocate(const UnownedStringSlice& slice)
+TerminatedCharSlice CharSliceAllocator::allocate(const UnownedStringSlice& slice)
 {
     const auto length = slice.getLength();
     auto dst = m_arena.allocateString(slice.begin(), length);
-    return ZeroTerminatedCharSlice(dst, length);
+    return TerminatedCharSlice(dst, length);
 }
 
-ZeroTerminatedCharSlice TerminatedCharSliceAllocator::allocate(const Slice<char>& slice)
+TerminatedCharSlice CharSliceAllocator::allocate(const Slice<char>& slice)
 {
     const auto count = slice.count;
     auto dst = m_arena.allocateString(slice.begin(), count);
-    return ZeroTerminatedCharSlice(dst, count);
+    return TerminatedCharSlice(dst, count);
 }
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ArtifactDiagnosticsUtil !!!!!!!!!!!!!!!!!!!!!!!!!!! */
@@ -42,7 +42,7 @@ ZeroTerminatedCharSlice TerminatedCharSliceAllocator::allocate(const Slice<char>
     }
 }
 
-/* static */SlangResult ArtifactDiagnosticUtil::splitPathLocation(TerminatedCharSliceAllocator& allocator, const UnownedStringSlice& pathLocation, ArtifactDiagnostic& outDiagnostic)
+/* static */SlangResult ArtifactDiagnosticUtil::splitPathLocation(CharSliceAllocator& allocator, const UnownedStringSlice& pathLocation, ArtifactDiagnostic& outDiagnostic)
 {
     const Index lineStartIndex = pathLocation.lastIndexOf('(');
     if (lineStartIndex >= 0)
@@ -100,7 +100,7 @@ ZeroTerminatedCharSlice TerminatedCharSliceAllocator::allocate(const Slice<char>
     return SLANG_OK;
 }
 
-/* static */SlangResult ArtifactDiagnosticUtil::parseColonDelimitedDiagnostics(TerminatedCharSliceAllocator& allocator, const UnownedStringSlice& inText, Int pathIndex, LineParser lineParser, IArtifactDiagnostics* diagnostics)
+/* static */SlangResult ArtifactDiagnosticUtil::parseColonDelimitedDiagnostics(CharSliceAllocator& allocator, const UnownedStringSlice& inText, Int pathIndex, LineParser lineParser, IArtifactDiagnostics* diagnostics)
 {
     List<UnownedStringSlice> splitLine;
 

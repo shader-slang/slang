@@ -312,7 +312,7 @@ static SlangResult _parseSeverity(const UnownedStringSlice& in, ArtifactDiagnost
     return SLANG_OK;
 }
 
-static SlangResult _parseVisualStudioLine(TerminatedCharSliceAllocator& allocator, const UnownedStringSlice& line, ArtifactDiagnostic& outDiagnostic)
+static SlangResult _parseVisualStudioLine(CharSliceAllocator& allocator, const UnownedStringSlice& line, ArtifactDiagnostic& outDiagnostic)
 {
     typedef IArtifactDiagnostics::Diagnostic Diagnostic;
 
@@ -442,7 +442,7 @@ static SlangResult _parseVisualStudioLine(TerminatedCharSliceAllocator& allocato
 
     diagnostics->setRaw(CharSliceCaster::asTerminatedCharSlice(exeRes.standardOutput));
 
-    TerminatedCharSliceAllocator allocator;
+    CharSliceAllocator allocator;
 
     for (auto line : LineParser(exeRes.standardOutput.getUnownedSlice()))
     {

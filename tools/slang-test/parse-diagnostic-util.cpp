@@ -17,7 +17,7 @@
 
 using namespace Slang;
 
-/* static */SlangResult ParseDiagnosticUtil::parseGenericLine(TerminatedCharSliceAllocator& allocator, const UnownedStringSlice& line, List<UnownedStringSlice>& lineSlices, ArtifactDiagnostic& outDiagnostic)
+/* static */SlangResult ParseDiagnosticUtil::parseGenericLine(CharSliceAllocator& allocator, const UnownedStringSlice& line, List<UnownedStringSlice>& lineSlices, ArtifactDiagnostic& outDiagnostic)
 {
     /* e:\git\somewhere\tests\diagnostics\syntax-error-intrinsic.slang(13): error C2018:  unknown character '0x40' */
     if (lineSlices.getCount() < 3)
@@ -113,7 +113,7 @@ static bool _isSlangDiagnostic(const UnownedStringSlice& line)
     return SLANG_SUCCEEDED(_getSlangDiagnosticSeverity(typeSlice, type, code));
 }
 
-/* static */SlangResult ParseDiagnosticUtil::parseSlangLine(TerminatedCharSliceAllocator& allocator, const UnownedStringSlice& line, List<UnownedStringSlice>& lineSlices, ArtifactDiagnostic& outDiagnostic)
+/* static */SlangResult ParseDiagnosticUtil::parseSlangLine(CharSliceAllocator& allocator, const UnownedStringSlice& line, List<UnownedStringSlice>& lineSlices, ArtifactDiagnostic& outDiagnostic)
 {
     /*
     tests/diagnostics/accessors.slang(11): error 31101: accessors other than 'set' must not have parameters
@@ -286,7 +286,7 @@ static bool _isWhitespace(const UnownedStringSlice& slice)
 
     List<UnownedStringSlice> splitLine;
 
-    TerminatedCharSliceAllocator allocator;
+    CharSliceAllocator allocator;
 
     UnownedStringSlice text(inText), line;
     while (StringUtil::extractLine(text, line))

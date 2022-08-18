@@ -170,7 +170,7 @@ SlangResult NVRTCDownstreamCompiler::init(ISlangSharedLibrary* library)
     return SLANG_OK;
 }
 
-static SlangResult _parseLocation(TerminatedCharSliceAllocator& allocator, const UnownedStringSlice& in, ArtifactDiagnostic& outDiagnostic)
+static SlangResult _parseLocation(CharSliceAllocator& allocator, const UnownedStringSlice& in, ArtifactDiagnostic& outDiagnostic)
 {
     const Index startIndex = in.indexOf('(');
 
@@ -204,7 +204,7 @@ static bool _hasDriveLetter(const UnownedStringSlice& line)
     return line.getLength() > 2 && line[1] == ':' && _isDriveLetter(line[0]);
 }
 
-static SlangResult _parseNVRTCLine(TerminatedCharSliceAllocator& allocator, const UnownedStringSlice& line, ArtifactDiagnostic& outDiagnostic)
+static SlangResult _parseNVRTCLine(CharSliceAllocator& allocator, const UnownedStringSlice& line, ArtifactDiagnostic& outDiagnostic)
 {
     typedef ArtifactDiagnostic Diagnostic;
     typedef ArtifactDiagnostic::Severity Severity;
@@ -861,7 +861,7 @@ SlangResult NVRTCDownstreamCompiler::compile(const DownstreamCompileOptions& opt
             diagnostics->setRaw(CharSliceCaster::asCharSlice(rawDiagnostics));
         }
 
-        TerminatedCharSliceAllocator allocator;
+        CharSliceAllocator allocator;
 
         // Parse the diagnostics here
         for (auto line : LineParser(rawDiagnostics.getUnownedSlice()))
