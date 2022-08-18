@@ -15,6 +15,10 @@
 
 #include "../core/slang-shared-library.h"
 
+#include "slang-artifact-diagnostic-util.h"
+#include "slang-artifact-util.h"
+#include "slang-artifact-associated-impl.h"
+
 namespace nvrtc
 {
 
@@ -98,7 +102,7 @@ public:
     typedef DownstreamCompilerBase Super;
 
     // IDownstreamCompiler
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL compile(const CompileOptions& options, RefPtr<DownstreamCompileResult>& outResult) SLANG_OVERRIDE;
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL compile(const CompileOptions& options, IArtifact** outArtifact) SLANG_OVERRIDE;
     virtual SLANG_NO_THROW bool SLANG_MCALL isFileBased() SLANG_OVERRIDE { return false; }
 
         /// Must be called before use
@@ -166,13 +170,13 @@ SlangResult NVRTCDownstreamCompiler::init(ISlangSharedLibrary* library)
     return SLANG_OK;
 }
 
-static SlangResult _parseLocation(const UnownedStringSlice& in, DownstreamDiagnostic& outDiagnostic)
+static SlangResult _parseLocation(TerminatedCharSliceAllocator& allocator, const UnownedStringSlice& in, ArtifactDiagnostic& outDiagnostic)
 {
     const Index startIndex = in.indexOf('(');
 
     if (startIndex >= 0)
     {
-        outDiagnostic.filePath = UnownedStringSlice(in.begin(), in.begin() + startIndex);
+        outDiagnostic.filePath = allocator.allocate(in.begin(), in.begin() + startIndex);
         UnownedStringSlice remaining(in.begin() + startIndex + 1, in.end());
         const Int endIndex = remaining.indexOf(')');
 
@@ -180,12 +184,12 @@ static SlangResult _parseLocation(const UnownedStringSlice& in, DownstreamDiagno
 
         Int line;
         SLANG_RETURN_ON_FAIL(StringUtil::parseInt(lineText, line));
-        outDiagnostic.fileLine = line;
+        outDiagnostic.location.line = line;
     }
     else
     {
-        outDiagnostic.fileLine = 0;
-        outDiagnostic.filePath = in;
+        outDiagnostic.location.line = 0;
+        outDiagnostic.filePath = allocator.allocate(in);
     }
     return SLANG_OK;
 }
@@ -200,10 +204,10 @@ static bool _hasDriveLetter(const UnownedStringSlice& line)
     return line.getLength() > 2 && line[1] == ':' && _isDriveLetter(line[0]);
 }
 
-static SlangResult _parseNVRTCLine(const UnownedStringSlice& line, DownstreamDiagnostic& outDiagnostic)
+static SlangResult _parseNVRTCLine(TerminatedCharSliceAllocator& allocator, const UnownedStringSlice& line, ArtifactDiagnostic& outDiagnostic)
 {
-    typedef DownstreamDiagnostic Diagnostic;
-    typedef Diagnostic::Severity Severity;
+    typedef ArtifactDiagnostic Diagnostic;
+    typedef ArtifactDiagnostic::Severity Severity;
 
     outDiagnostic.stage = Diagnostic::Stage::Compile;
 
@@ -234,9 +238,9 @@ static SlangResult _parseNVRTCLine(const UnownedStringSlice& line, DownstreamDia
         {
             outDiagnostic.severity = Severity::Warning;
         }
-        outDiagnostic.text = split[2].trim();
+        outDiagnostic.text = allocator.allocate(split[2].trim());
 
-        SLANG_RETURN_ON_FAIL(_parseLocation(split[0], outDiagnostic));
+        SLANG_RETURN_ON_FAIL(_parseLocation(allocator, split[0], outDiagnostic));
         return SLANG_OK;
     }
    
@@ -637,7 +641,7 @@ SlangResult NVRTCDownstreamCompiler::_maybeAddHalfSupport(const DownstreamCompil
     return SLANG_OK;
 }
 
-SlangResult NVRTCDownstreamCompiler::compile(const DownstreamCompileOptions& options, RefPtr<DownstreamCompileResult>& outResult)
+SlangResult NVRTCDownstreamCompiler::compile(const DownstreamCompileOptions& options, IArtifact** outArtifact)
 {
     // This compiler doesn't read files, they should be read externally and stored in sourceContents/sourceContentsPath
     if (options.sourceFiles.getCount() > 0)
@@ -833,10 +837,14 @@ SlangResult NVRTCDownstreamCompiler::compile(const DownstreamCompileOptions& opt
 
     res  = m_nvrtcCompileProgram(program, int(dstOptions.getCount()), dstOptions.getBuffer());
 
-    ComPtr<ISlangBlob> blob;
-    DownstreamDiagnostics diagnostics;
+    auto artifact = ArtifactUtil::createArtifactForCompileTarget(options.targetType);
+    ComPtr<IArtifactDiagnostics> diagnostics(new ArtifactDiagnostics);
 
-    diagnostics.result = _asResult(res);
+    artifact->addAssociated(diagnostics);
+
+    ComPtr<ISlangBlob> blob;
+
+    diagnostics->setResult(_asResult(res));
 
     {
         String rawDiagnostics;
@@ -850,18 +858,20 @@ SlangResult NVRTCDownstreamCompiler::compile(const DownstreamCompileOptions& opt
             SLANG_NVRTC_RETURN_ON_FAIL(m_nvrtcGetProgramLog(program, dst));
             rawDiagnostics.appendInPlace(dst, Index(logSize));
 
-            diagnostics.rawDiagnostics = rawDiagnostics;
+            diagnostics->setRaw(CharSliceCaster::asCharSlice(rawDiagnostics));
         }
 
+        TerminatedCharSliceAllocator allocator;
+
         // Parse the diagnostics here
-        for (auto line : LineParser(diagnostics.rawDiagnostics.getUnownedSlice()))
+        for (auto line : LineParser(rawDiagnostics.getUnownedSlice()))
         {
-            DownstreamDiagnostic diagnostic;
-            SlangResult lineRes = _parseNVRTCLine(line, diagnostic);
+            ArtifactDiagnostic diagnostic;
+            SlangResult lineRes = _parseNVRTCLine(allocator, line, diagnostic);
 
             if (SLANG_SUCCEEDED(lineRes))
             {
-                diagnostics.diagnostics.add(diagnostic);
+                diagnostics->add(diagnostic);
             }
             else if (lineRes != SLANG_E_NOT_FOUND)
             {
@@ -870,9 +880,9 @@ SlangResult NVRTCDownstreamCompiler::compile(const DownstreamCompileOptions& opt
         }
 
         // if it has a compilation error.. set on output
-        if (diagnostics.has(DownstreamDiagnostic::Severity::Error))
+        if (diagnostics->hasOfAtLeastSeverity(ArtifactDiagnostic::Severity::Error))
         {
-            diagnostics.result = SLANG_FAIL;
+            diagnostics->setResult(SLANG_FAIL);
         }
     }
 
@@ -887,11 +897,10 @@ SlangResult NVRTCDownstreamCompiler::compile(const DownstreamCompileOptions& opt
 
         SLANG_NVRTC_RETURN_ON_FAIL(m_nvrtcGetPTX(program, (char*)ptx.getBuffer()));
 
-        blob = ListBlob::moveCreate(ptx);
+        artifact->addRepresentationUnknown(ListBlob::moveCreate(ptx));
     }
 
-    outResult = new BlobDownstreamCompileResult(diagnostics, blob);
-
+    *outArtifact = artifact.detach();
     return SLANG_OK;
 }
 

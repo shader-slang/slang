@@ -29,15 +29,28 @@ struct Slice
     Count count;
 };
 
-struct ZeroTerminatedCharSlice : Slice<char>
+struct CharSlice : public Slice<char>
 {
-    typedef ZeroTerminatedCharSlice ThisType;
+    typedef CharSlice ThisType;
     typedef Slice<char> Super;
 
     bool operator==(const ThisType& rhs) const { return count == rhs.count && (data == rhs.data || ::memcmp(data, rhs.data, count) == 0); }
     bool operator!=(const ThisType& rhs) const { return !(*this == rhs); }
 
-    explicit ZeroTerminatedCharSlice(const char* in) :Super(in, ::strlen(in)) {}
+    explicit CharSlice(const char* in) :Super(in, ::strlen(in)) {}
+    CharSlice(const char* in, Count inCount) :Super(in, inCount) {}
+    CharSlice() :Super(nullptr, 0) {}
+};
+
+struct ZeroTerminatedCharSlice : public CharSlice
+{
+    typedef ZeroTerminatedCharSlice ThisType;
+    typedef CharSlice Super;
+
+    SLANG_FORCE_INLINE bool operator==(const ThisType& rhs) const { return Super::operator==(rhs); }
+    SLANG_FORCE_INLINE bool operator!=(const ThisType& rhs) const { return !(*this == rhs); }
+
+    explicit ZeroTerminatedCharSlice(const char* in) :Super(in) {}
     ZeroTerminatedCharSlice(const char* in, Count inCount) :Super(in, inCount) { SLANG_ASSERT(in[inCount] == 0); }
     ZeroTerminatedCharSlice() :Super("", 0) {}
 };

@@ -7,13 +7,9 @@
 namespace Slang
 {
 
-/* Diagnostics.
-
-If there are raw diagnostics they can be associated to an artifact as (Kind::Text, Payload::Diagnostics) artifact */
-class IDiagnostics : public ICastable
+struct ArtifactDiagnostic
 {
-public:
-    SLANG_COM_INTERFACE(0x91f9b857, 0xcd6b, 0x45ca, { 0x8e, 0x3, 0x8f, 0xa3, 0x3c, 0x5c, 0xf0, 0x1a });
+    typedef ArtifactDiagnostic ThisType;
 
     enum class Severity
     {
@@ -39,27 +35,37 @@ public:
         Int column = 0;                 ///< One indexed *character (not byte)* column number. 0 if not defined
     };
 
-    struct Diagnostic
+    bool operator==(const ThisType& rhs) const
     {
-        typedef Diagnostic ThisType;
+        return severity == rhs.severity &&
+            stage == rhs.stage &&
+            text == rhs.text &&
+            code == rhs.code &&
+            location == rhs.location;
+    }
+    bool operator!=(const ThisType& rhs) const { return !(*this == rhs); }
 
-        bool operator==(const ThisType& rhs) const
-        {
-            return severity == rhs.severity &&
-                stage == rhs.stage &&
-                text == rhs.text &&
-                code == rhs.code &&
-                location == rhs.location;
-        }
-        bool operator!=(const ThisType& rhs) const { return !(*this == rhs); }
+    Severity severity = Severity::Unknown;          ///< The severity of error
+    Stage stage = Stage::Compile;                   ///< The stage the error came from
+    ZeroTerminatedCharSlice text;                   ///< The text of the error
+    ZeroTerminatedCharSlice code;                   ///< The compiler specific error code
+    ZeroTerminatedCharSlice filePath;               ///< The path the error originated from
+    Location location;
+};
 
-        Severity severity = Severity::Unknown;          ///< The severity of error
-        Stage stage = Stage::Compile;                   ///< The stage the error came from
-        ZeroTerminatedCharSlice text;                   ///< The text of the error
-        ZeroTerminatedCharSlice code;                   ///< The compiler specific error code
-        ZeroTerminatedCharSlice filePath;               ///< The path the error originated from
-        Location location;
-    };
+/* Diagnostics.
+
+If there are raw diagnostics they can be associated to an artifact as (Kind::Text, Payload::Diagnostics) artifact */
+class IArtifactDiagnostics : public ICastable
+{
+public:
+    SLANG_COM_INTERFACE(0x91f9b857, 0xcd6b, 0x45ca, { 0x8e, 0x3, 0x8f, 0xa3, 0x3c, 0x5c, 0xf0, 0x1a });
+
+    typedef ArtifactDiagnostic Diagnostic;
+
+        /// TODO(JS): Probably want to add a clonable interface
+        /// Note the use of guid is for the desired interface.
+    SLANG_NO_THROW virtual SlangResult SLANG_MCALL clone(const Guid& intf, void** outClone) = 0;
 
         /// Get the diagnostic at the index
     SLANG_NO_THROW virtual const Diagnostic* SLANG_MCALL getAt(Index i) = 0;
@@ -73,7 +79,9 @@ public:
         /// Get raw diagnostics information
     SLANG_NO_THROW virtual ZeroTerminatedCharSlice SLANG_MCALL getRaw() = 0;
         /// Set the raw diagnostic info
-    SLANG_NO_THROW virtual void SLANG_MCALL setRaw(const ZeroTerminatedCharSlice& slice) = 0;
+    SLANG_NO_THROW virtual void SLANG_MCALL setRaw(const CharSlice& slice) = 0;
+        /// Append to the raw diagnostic
+    SLANG_NO_THROW virtual void SLANG_MCALL appendRaw(const CharSlice& slice) = 0;
 
         /// Get the result for a compilation
     SLANG_NO_THROW virtual SlangResult SLANG_MCALL getResult() = 0;
@@ -84,35 +92,35 @@ public:
     SLANG_NO_THROW virtual void SLANG_MCALL reset() = 0;
 
         /// Count the number of diagnostics which have 'severity' or greater 
-    SLANG_NO_THROW virtual Count SLANG_MCALL getCountAtLeastSeverity(Severity severity) = 0;
+    SLANG_NO_THROW virtual Count SLANG_MCALL getCountAtLeastSeverity(Diagnostic::Severity severity) = 0;
 
         /// Get the number of diagnostics by severity
-    SLANG_NO_THROW virtual Count SLANG_MCALL getCountBySeverity(Severity severity) = 0;
+    SLANG_NO_THROW virtual Count SLANG_MCALL getCountBySeverity(Diagnostic::Severity severity) = 0;
 
         /// True if there are any diagnostics of severity or worse
-    SLANG_NO_THROW virtual bool SLANG_MCALL hasOfAtLeastSeverity(Severity severity) = 0;
+    SLANG_NO_THROW virtual bool SLANG_MCALL hasOfAtLeastSeverity(Diagnostic::Severity severity) = 0;
 
         /// Stores in outCounts, the amount of diagnostics for the stage of each severity
-    SLANG_NO_THROW virtual Count SLANG_MCALL getCountByStage(Stage stage, Count outCounts[Int(Severity::CountOf)]) = 0;
+    SLANG_NO_THROW virtual Count SLANG_MCALL getCountByStage(Diagnostic::Stage stage, Count outCounts[Int(Diagnostic::Severity::CountOf)]) = 0;
 
         /// Remove all diagnostics of the type
-    SLANG_NO_THROW virtual void SLANG_MCALL removeBySeverity(Severity severity) = 0;
+    SLANG_NO_THROW virtual void SLANG_MCALL removeBySeverity(Diagnostic::Severity severity) = 0;
 
         /// Add a note
-    SLANG_NO_THROW virtual void SLANG_MCALL maybeAddNote(const ZeroTerminatedCharSlice& in) = 0;
+    SLANG_NO_THROW virtual void SLANG_MCALL maybeAddNote(const CharSlice& in) = 0;
 
         /// If there are no error diagnostics, adds a generic error diagnostic
     SLANG_NO_THROW virtual void SLANG_MCALL requireErrorDiagnostic() = 0;
 
-        /// Append a summary to out
-    SLANG_NO_THROW virtual void SLANG_MCALL appendSummary(ISlangBlob** outBlob) = 0;
-        /// Appends a summary that just identifies if there is an error of a type (not a count)
-    SLANG_NO_THROW virtual void SLANG_MCALL appendSimplifiedSummary(ISlangBlob** outBlob) = 0;
+        /// Creates summary text and place in outBlob
+    SLANG_NO_THROW virtual void SLANG_MCALL calcSummary(ISlangBlob** outBlob) = 0;
+        /// Creates a simplified summary text and places it in out blob
+    SLANG_NO_THROW virtual void SLANG_MCALL calcSimplifiedSummary(ISlangBlob** outBlob) = 0;
 };
 
 struct ShaderBindingRange;
 
-class IPostEmitMetadata : public ICastable
+class IArtifactPostEmitMetadata : public ICastable
 {
 public:
     SLANG_COM_INTERFACE(0x5d03bce9, 0xafb1, 0x4fc8, { 0xa4, 0x6f, 0x3c, 0xe0, 0x7b, 0x6, 0x1b, 0x1b });

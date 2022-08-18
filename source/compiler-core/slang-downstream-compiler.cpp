@@ -61,6 +61,15 @@ void* DownstreamCompilerBase::getObject(const Guid& guid)
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! CommandLineDownstreamArtifactRepresentation !!!!!!!!!!!!!!!!!!!!!!*/
 
+void* CommandLineDownstreamArtifactRepresentation::castAs(const Guid& guid)
+{
+    if (auto ptr = getInterface(guid))
+    {
+        return ptr;
+    }
+    return getObject(guid);
+}
+
 void* CommandLineDownstreamArtifactRepresentation::getInterface(const Guid& guid)
 {
     if (guid == ISlangUnknown::getTypeGuid() ||
@@ -252,7 +261,7 @@ SlangResult CommandLineDownstreamCompiler::compile(const CompileOptions& inOptio
 
     auto artifact = ArtifactUtil::createArtifactForCompileTarget(options.targetType);
 
-    ComPtr<IDiagnostics> diagnostics(new DiagnosticsImpl);
+    ComPtr<IArtifactDiagnostics> diagnostics(new ArtifactDiagnostics);
 
     SLANG_RETURN_ON_FAIL(parseOutput(exeRes, diagnostics));
 

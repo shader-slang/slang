@@ -9,30 +9,62 @@
 
 #include "../core/slang-char-util.h"
 
-#include "slang-artifact-util.h"
+#include "slang-artifact-diagnostic-util.h"
 
 namespace Slang {
 
-/* !!!!!!!!!!!!!!!!!!!!!!!!!!! DiagnosticsImpl !!!!!!!!!!!!!!!!!!!!!!!!!!! */
+/* !!!!!!!!!!!!!!!!!!!!!!!!!!! ArtifactDiagnostics !!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
-void* DiagnosticsImpl::getInterface(const Guid& guid)
+ArtifactDiagnostics::ArtifactDiagnostics(const ThisType& rhs):
+    m_result(rhs.m_result),
+    m_diagnostics(rhs.m_diagnostics),
+    m_raw(rhs.m_raw.getLength() + 1)
+{
+    // We need to be careful with raw, we want a new *copy* not a non atomic ref counting
+    // In initialization we should have enough space
+    m_raw.append(rhs.m_raw.getUnownedSlice());
+    
+    // Reallocate all the strings
+    for (auto& diagnostic : m_diagnostics)
+    {
+        diagnostic.filePath = m_allocator.allocate(diagnostic.filePath);
+        diagnostic.code = m_allocator.allocate(diagnostic.code);
+        diagnostic.text = m_allocator.allocate(diagnostic.text);
+    }
+}
+
+SlangResult ArtifactDiagnostics::clone(const Guid& guid, void** outClone)
+{
+    ThisType* copy = new ThisType(*this);
+    if (auto ptr = copy->getInterface(guid))
+    {
+        copy->addRef();
+        *outClone = copy;
+        return SLANG_OK;
+    }
+
+    delete copy;
+    return SLANG_E_NO_INTERFACE;
+}
+
+void* ArtifactDiagnostics::getInterface(const Guid& guid)
 {
     if (guid == ISlangUnknown::getTypeGuid() ||
         guid == ICastable::getTypeGuid() ||
-        guid == IDiagnostics::getTypeGuid())
+        guid == IArtifactDiagnostics::getTypeGuid())
     {
-        return static_cast<IDiagnostics*>(this);
+        return static_cast<IArtifactDiagnostics*>(this);
     }
     return nullptr;
 }
 
-void* DiagnosticsImpl::getObject(const Guid& guid)
+void* ArtifactDiagnostics::getObject(const Guid& guid)
 {
     SLANG_UNUSED(guid);
     return nullptr;
 }
 
-void* DiagnosticsImpl::castAs(const Guid& guid)
+void* ArtifactDiagnostics::castAs(const Guid& guid)
 {
     if (auto intf = getInterface(guid))
     {
@@ -41,16 +73,16 @@ void* DiagnosticsImpl::castAs(const Guid& guid)
     return getObject(guid);
 }
 
-void DiagnosticsImpl::reset()
+void ArtifactDiagnostics::reset()
 {
     m_diagnostics.clear();
-    m_raw = ZeroTerminatedCharSlice();
+    m_raw.Clear();
     m_result = SLANG_OK;
 
     m_allocator.deallocateAll();
 }
 
-void DiagnosticsImpl::add(const Diagnostic& inDiagnostic)
+void ArtifactDiagnostics::add(const Diagnostic& inDiagnostic)
 {
     Diagnostic diagnostic(inDiagnostic);
 
@@ -61,12 +93,22 @@ void DiagnosticsImpl::add(const Diagnostic& inDiagnostic)
     m_diagnostics.add(diagnostic);
 }
 
-void DiagnosticsImpl::setRaw(const ZeroTerminatedCharSlice& slice)
+void ArtifactDiagnostics::setRaw(const CharSlice& slice)
 {
-    m_raw = m_allocator.allocate(slice);
+    m_raw.Clear();
+    m_raw << asStringSlice(slice);
 }
 
-Count DiagnosticsImpl::getCountAtLeastSeverity(Severity severity) 
+void ArtifactDiagnostics::appendRaw(const CharSlice& slice)
+{
+    if (m_raw.getLength() && m_raw[m_raw.getLength() - 1] != '\n')
+    {
+        m_raw.appendChar('\n');
+    }
+    m_raw << asStringSlice(slice);
+}
+
+Count ArtifactDiagnostics::getCountAtLeastSeverity(Diagnostic::Severity severity) 
 {
     Index count = 0;
     for (const auto& msg : m_diagnostics)
@@ -76,7 +118,7 @@ Count DiagnosticsImpl::getCountAtLeastSeverity(Severity severity)
     return count;
 }
 
-Count DiagnosticsImpl::getCountBySeverity(Severity severity) 
+Count ArtifactDiagnostics::getCountBySeverity(Diagnostic::Severity severity)
 {
     Index count = 0;
     for (const auto& msg : m_diagnostics)
@@ -86,7 +128,7 @@ Count DiagnosticsImpl::getCountBySeverity(Severity severity)
     return count;
 }
 
-bool DiagnosticsImpl::hasOfAtLeastSeverity(Severity severity)
+bool ArtifactDiagnostics::hasOfAtLeastSeverity(Diagnostic::Severity severity)
 {
     for (const auto& msg : m_diagnostics)
     {
@@ -98,10 +140,10 @@ bool DiagnosticsImpl::hasOfAtLeastSeverity(Severity severity)
     return false;
 }
 
-Count DiagnosticsImpl::getCountByStage(Stage stage, Count outCounts[Int(Severity::CountOf)]) 
+Count ArtifactDiagnostics::getCountByStage(Diagnostic::Stage stage, Count outCounts[Int(Diagnostic::Severity::CountOf)])
 {
     Int count = 0;
-    ::memset(outCounts, 0, sizeof(Index) * Int(Severity::CountOf));
+    ::memset(outCounts, 0, sizeof(Index) * Int(Diagnostic::Severity::CountOf));
     for (const auto& diagnostic : m_diagnostics)
     {
         if (diagnostic.stage == stage)
@@ -113,7 +155,7 @@ Count DiagnosticsImpl::getCountByStage(Stage stage, Count outCounts[Int(Severity
     return count++;
 }
 
-void DiagnosticsImpl::removeBySeverity(Severity severity) 
+void ArtifactDiagnostics::removeBySeverity(Diagnostic::Severity severity)
 {
     Index count = m_diagnostics.getCount();
     for (Index i = 0; i < count; ++i)
@@ -127,38 +169,33 @@ void DiagnosticsImpl::removeBySeverity(Severity severity)
     }
 }
 
-SLANG_FORCE_INLINE static UnownedStringSlice _toUnownedSlice(const ZeroTerminatedCharSlice& in)
+void ArtifactDiagnostics::maybeAddNote(const CharSlice& in)
 {
-    return UnownedStringSlice(in.data, in.count);
+    ArtifactDiagnosticUtil::maybeAddNote(asStringSlice(in), this);
 }
 
-void DiagnosticsImpl::maybeAddNote(const ZeroTerminatedCharSlice& in)
-{
-    ArtifactDiagnosticsUtil::maybeAddNote(m_allocator, _toUnownedSlice(in), m_diagnostics);
-}
-
-void DiagnosticsImpl::requireErrorDiagnostic() 
+void ArtifactDiagnostics::requireErrorDiagnostic() 
 {
     // If we find an error, we don't need to add a generic diagnostic
     for (const auto& msg : m_diagnostics)
     {
-        if (Index(msg.severity) >= Index(Severity::Error))
+        if (Index(msg.severity) >= Index(Diagnostic::Severity::Error))
         {
             return;
         }
     }
 
     Diagnostic diagnostic;
-    diagnostic.severity = Severity::Error;
-    diagnostic.text = m_raw;
+    diagnostic.severity = Diagnostic::Severity::Error;
+    diagnostic.text = m_allocator.allocate(m_raw);
 
     // Add the diagnostic
     m_diagnostics.add(diagnostic);
 }
 
-/* static */UnownedStringSlice _getSeverityText(IDiagnostics::Severity severity)
+/* static */UnownedStringSlice _getSeverityText(ArtifactDiagnostic::Severity severity)
 {
-    typedef IDiagnostics::Severity Severity;
+    typedef ArtifactDiagnostic::Severity Severity;
     switch (severity)
     {
         default:                return UnownedStringSlice::fromLiteral("Unknown");
@@ -168,9 +205,9 @@ void DiagnosticsImpl::requireErrorDiagnostic()
     }
 }
 
-static void _appendCounts(const Index counts[Int(IDiagnostics::Severity::CountOf)], StringBuilder& out)
+static void _appendCounts(const Index counts[Int(ArtifactDiagnostic::Severity::CountOf)], StringBuilder& out)
 {
-    typedef IDiagnostics::Severity Severity;
+    typedef ArtifactDiagnostic::Severity Severity;
 
     for (Index i = 0; i < Int(Severity::CountOf); i++)
     {
@@ -181,9 +218,9 @@ static void _appendCounts(const Index counts[Int(IDiagnostics::Severity::CountOf
     }
 }
 
-static void _appendSimplified(const Index counts[Int(IDiagnostics::Severity::CountOf)], StringBuilder& out)
+static void _appendSimplified(const Index counts[Int(ArtifactDiagnostic::Severity::CountOf)], StringBuilder& out)
 {
-    typedef IDiagnostics::Severity Severity;
+    typedef ArtifactDiagnostic::Severity Severity;
     for (Index i = 0; i < Int(Severity::CountOf); i++)
     {
         if (counts[i] > 0)
@@ -193,18 +230,18 @@ static void _appendSimplified(const Index counts[Int(IDiagnostics::Severity::Cou
     }
 }
 
-void DiagnosticsImpl::appendSummary(ISlangBlob** outBlob)
+void ArtifactDiagnostics::calcSummary(ISlangBlob** outBlob)
 {
     StringBuilder buf;
 
-    Index counts[Int(Severity::CountOf)];
-    if (getCountByStage(Stage::Compile, counts) > 0)
+    Index counts[Int(Diagnostic::Severity::CountOf)];
+    if (getCountByStage(Diagnostic::Stage::Compile, counts) > 0)
     {
         buf << "Compile: ";
         _appendCounts(counts, buf);
         buf << "\n";
     }
-    if (getCountByStage(Stage::Link, counts) > 0)
+    if (getCountByStage(Diagnostic::Stage::Link, counts) > 0)
     {
         buf << "Link: ";
         _appendCounts(counts, buf);
@@ -214,18 +251,18 @@ void DiagnosticsImpl::appendSummary(ISlangBlob** outBlob)
     *outBlob = StringBlob::moveCreate(buf).detach();
 }
 
-void DiagnosticsImpl::appendSimplifiedSummary(ISlangBlob** outBlob)
+void ArtifactDiagnostics::calcSimplifiedSummary(ISlangBlob** outBlob)
 {
     StringBuilder buf;
 
-    Index counts[Int(Severity::CountOf)];
-    if (getCountByStage(Stage::Compile, counts) > 0)
+    Index counts[Int(Diagnostic::Severity::CountOf)];
+    if (getCountByStage(Diagnostic::Stage::Compile, counts) > 0)
     {
         buf << "Compile: ";
         _appendSimplified(counts, buf);
         buf << "\n";
     }
-    if (getCountByStage(Stage::Link, counts) > 0)
+    if (getCountByStage(Diagnostic::Stage::Link, counts) > 0)
     {
         buf << "Link: ";
         _appendSimplified(counts, buf);
@@ -235,20 +272,20 @@ void DiagnosticsImpl::appendSimplifiedSummary(ISlangBlob** outBlob)
     *outBlob = StringBlob::moveCreate(buf).detach();
 }
 
-/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!! PostEmitMetadataImpl !!!!!!!!!!!!!!!!!!!!!!!!!!! */
+/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ArtifactPostEmitMetadata !!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
-void* PostEmitMetadataImpl::getInterface(const Guid& guid)
+void* ArtifactPostEmitMetadata::getInterface(const Guid& guid)
 {
     if (guid == ISlangUnknown::getTypeGuid() ||
         guid == ICastable::getTypeGuid() ||
-        guid == IPostEmitMetadata::getTypeGuid())
+        guid == IArtifactPostEmitMetadata::getTypeGuid())
     {
-        return static_cast<IPostEmitMetadata*>(this);
+        return static_cast<IArtifactPostEmitMetadata*>(this);
     }
     return nullptr;
 }
 
-void* PostEmitMetadataImpl::getObject(const Guid& uuid)
+void* ArtifactPostEmitMetadata::getObject(const Guid& uuid)
 {
     if (uuid == getTypeGuid())
     {
@@ -257,7 +294,7 @@ void* PostEmitMetadataImpl::getObject(const Guid& uuid)
     return nullptr;
 }
 
-void* PostEmitMetadataImpl::castAs(const Guid& guid)
+void* ArtifactPostEmitMetadata::castAs(const Guid& guid)
 {
     if (auto ptr = getInterface(guid))
     {
@@ -266,132 +303,9 @@ void* PostEmitMetadataImpl::castAs(const Guid& guid)
     return getObject(guid);
 }
 
-Slice<ShaderBindingRange> PostEmitMetadataImpl::getUsedBindingRanges()
+Slice<ShaderBindingRange> ArtifactPostEmitMetadata::getUsedBindingRanges()
 { 
     return Slice<ShaderBindingRange>(m_usedBindings.getBuffer(), m_usedBindings.getCount()); 
-}
-
-/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ArtifactDiagnosticsUtil !!!!!!!!!!!!!!!!!!!!!!!!!!! */
-
-/* static */UnownedStringSlice ArtifactDiagnosticsUtil::getSeverityText(Severity severity)
-{
-    switch (severity)
-    {
-        default:                return UnownedStringSlice::fromLiteral("Unknown");
-        case Severity::Info:    return UnownedStringSlice::fromLiteral("Info");
-        case Severity::Warning: return UnownedStringSlice::fromLiteral("Warning");
-        case Severity::Error:   return UnownedStringSlice::fromLiteral("Error");
-    }
-}
-
-/* static */SlangResult ArtifactDiagnosticsUtil::splitPathLocation(ArtifactSliceAllocator& allocator, const UnownedStringSlice& pathLocation, ArtifactDiagnostic& outDiagnostic)
-{
-    const Index lineStartIndex = pathLocation.lastIndexOf('(');
-    if (lineStartIndex >= 0)
-    {
-        outDiagnostic.filePath = allocator.allocate(pathLocation.head(lineStartIndex).trim());
-
-        const UnownedStringSlice tail = pathLocation.tail(lineStartIndex + 1);
-        const Index lineEndIndex = tail.indexOf(')');
-
-        if (lineEndIndex >= 0)
-        {
-            // Extract the location info
-            UnownedStringSlice locationSlice(tail.begin(), tail.begin() + lineEndIndex);
-
-            UnownedStringSlice slices[2];
-            const Index numSlices = StringUtil::split(locationSlice, ',', 2, slices);
-
-            // NOTE! FXC actually outputs a range of columns in the form of START-END in the column position
-            // We don't need to parse here, because we only care about the line number
-
-            Int lineNumber = 0;
-            if (numSlices > 0)
-            {
-                SLANG_RETURN_ON_FAIL(StringUtil::parseInt(slices[0], lineNumber));
-            }
-
-            // Store the line
-            outDiagnostic.location.line = lineNumber;
-        }
-    }
-    else
-    {
-        outDiagnostic.filePath = allocator.allocate(pathLocation);
-    }
-    return SLANG_OK;
-}
-
-/* static */SlangResult ArtifactDiagnosticsUtil::splitColonDelimitedLine(const UnownedStringSlice& line, Int pathIndex, List<UnownedStringSlice>& outSlices)
-{
-    StringUtil::split(line, ':', outSlices);
-
-    // Now we want to fix up a path as might have drive letter, and therefore :
-    // If this is the situation then we need to have a slice after the one at the index
-    if (outSlices.getCount() > pathIndex + 1)
-    {
-        const UnownedStringSlice pathStart = outSlices[pathIndex].trim();
-        if (pathStart.getLength() == 1 && CharUtil::isAlpha(pathStart[0]))
-        {
-            // Splice back together
-            outSlices[pathIndex] = UnownedStringSlice(outSlices[pathIndex].begin(), outSlices[pathIndex + 1].end());
-            outSlices.removeAt(pathIndex + 1);
-        }
-    }
-
-    return SLANG_OK;
-}
-
-/* static */SlangResult ArtifactDiagnosticsUtil::parseColonDelimitedDiagnostics(ArtifactSliceAllocator& allocator, const UnownedStringSlice& inText, Int pathIndex, LineParser lineParser, List<ArtifactDiagnostic>& outDiagnostics)
-{
-    List<UnownedStringSlice> splitLine;
-
-    UnownedStringSlice text(inText), line;
-    while (StringUtil::extractLine(text, line))
-    {
-        SLANG_RETURN_ON_FAIL(splitColonDelimitedLine(line, pathIndex, splitLine));
-
-        ArtifactDiagnostic diagnostic;
-        diagnostic.severity = Severity::Error;
-        diagnostic.stage = IDiagnostics::Stage::Compile;
-        diagnostic.location.line = 0;
-        diagnostic.location.column= 0;
-
-        if (SLANG_SUCCEEDED(lineParser(allocator, line, splitLine, diagnostic)))
-        {
-            outDiagnostics.add(diagnostic);
-        }
-        else
-        {
-            // If couldn't parse, just add as a note
-            maybeAddNote(allocator, line, outDiagnostics);
-        }
-    }
-
-    return SLANG_OK;
-}
-
-/* static */void ArtifactDiagnosticsUtil::maybeAddNote(ArtifactSliceAllocator& allocator, const UnownedStringSlice& in, List<ArtifactDiagnostic>& ioDiagnostics)
-{
-    // Don't bother adding an empty line
-    if (in.trim().getLength() == 0)
-    {
-        return;
-    }
-
-    // If there's nothing previous, we'll ignore too, as note should be in addition to
-    // a pre-existing error/warning
-    if (ioDiagnostics.getCount() == 0)
-    {
-        return;
-    }
-
-    // Make it a note on the output
-    ArtifactDiagnostic diagnostic;
-
-    diagnostic.severity = IDiagnostics::Severity::Info;
-    diagnostic.text = allocator.allocate(in);
-    ioDiagnostics.add(diagnostic);
 }
 
 } // namespace Slang

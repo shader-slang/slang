@@ -12,50 +12,62 @@
 
 #include "slang-artifact-util.h"
 
+#include "slang-artifact-diagnostic-util.h"
+
 namespace Slang
 {
 
-class DiagnosticsImpl : public ComBaseObject, public IDiagnostics
+class ArtifactDiagnostics : public ComBaseObject, public IArtifactDiagnostics
 {
 public:
+    typedef ArtifactDiagnostics ThisType;
+
     SLANG_COM_BASE_IUNKNOWN_ALL
 
     // ICastable
     SLANG_NO_THROW void* SLANG_MCALL castAs(const Guid& guid) SLANG_OVERRIDE;
     // IDiagnostic
+    SLANG_NO_THROW virtual SlangResult SLANG_MCALL clone(const Guid& intf, void** outClone) SLANG_OVERRIDE;
+
     SLANG_NO_THROW virtual const Diagnostic* SLANG_MCALL getAt(Index i) SLANG_OVERRIDE { return &m_diagnostics[i]; }
     SLANG_NO_THROW virtual Count SLANG_MCALL getCount() SLANG_OVERRIDE { return m_diagnostics.getCount(); }
     SLANG_NO_THROW virtual void SLANG_MCALL add(const Diagnostic& diagnostic) SLANG_OVERRIDE; 
     SLANG_NO_THROW virtual void SLANG_MCALL removeAt(Index i) SLANG_OVERRIDE { m_diagnostics.removeAt(i); }
     SLANG_NO_THROW virtual SlangResult SLANG_MCALL getResult() SLANG_OVERRIDE { return m_result; }
     SLANG_NO_THROW virtual void SLANG_MCALL setResult(SlangResult res) SLANG_OVERRIDE { m_result = res; }
-    SLANG_NO_THROW virtual void SLANG_MCALL setRaw(const ZeroTerminatedCharSlice& slice) SLANG_OVERRIDE;
-    SLANG_NO_THROW virtual ZeroTerminatedCharSlice SLANG_MCALL getRaw() SLANG_OVERRIDE { return m_raw; }
+    SLANG_NO_THROW virtual void SLANG_MCALL setRaw(const CharSlice& slice) SLANG_OVERRIDE;
+    SLANG_NO_THROW virtual void SLANG_MCALL appendRaw(const CharSlice& slice) SLANG_OVERRIDE;
+    SLANG_NO_THROW virtual ZeroTerminatedCharSlice SLANG_MCALL getRaw() SLANG_OVERRIDE { return CharSliceCaster::asTerminatedCharSlice(m_raw); }
     SLANG_NO_THROW virtual void SLANG_MCALL reset() SLANG_OVERRIDE;
-    SLANG_NO_THROW virtual Count SLANG_MCALL getCountAtLeastSeverity(Severity severity) SLANG_OVERRIDE;
-    SLANG_NO_THROW virtual Count SLANG_MCALL getCountBySeverity(Severity severity) SLANG_OVERRIDE;
-    SLANG_NO_THROW virtual bool SLANG_MCALL hasOfAtLeastSeverity(Severity severity) SLANG_OVERRIDE;
-    SLANG_NO_THROW virtual Count SLANG_MCALL getCountByStage(Stage stage, Count outCounts[Int(Severity::CountOf)]) SLANG_OVERRIDE;
-    SLANG_NO_THROW virtual void SLANG_MCALL removeBySeverity(Severity severity) SLANG_OVERRIDE;
-    SLANG_NO_THROW virtual void SLANG_MCALL maybeAddNote(const ZeroTerminatedCharSlice& in) SLANG_OVERRIDE;
+    SLANG_NO_THROW virtual Count SLANG_MCALL getCountAtLeastSeverity(Diagnostic::Severity severity) SLANG_OVERRIDE;
+    SLANG_NO_THROW virtual Count SLANG_MCALL getCountBySeverity(Diagnostic::Severity severity) SLANG_OVERRIDE;
+    SLANG_NO_THROW virtual bool SLANG_MCALL hasOfAtLeastSeverity(Diagnostic::Severity severity) SLANG_OVERRIDE;
+    SLANG_NO_THROW virtual Count SLANG_MCALL getCountByStage(Diagnostic::Stage stage, Count outCounts[Int(Diagnostic::Severity::CountOf)]) SLANG_OVERRIDE;
+    SLANG_NO_THROW virtual void SLANG_MCALL removeBySeverity(Diagnostic::Severity severity) SLANG_OVERRIDE;
+    SLANG_NO_THROW virtual void SLANG_MCALL maybeAddNote(const CharSlice& in) SLANG_OVERRIDE;
     SLANG_NO_THROW virtual void SLANG_MCALL requireErrorDiagnostic() SLANG_OVERRIDE;
-    SLANG_NO_THROW virtual void SLANG_MCALL appendSummary(ISlangBlob** outBlob) SLANG_OVERRIDE;
-    SLANG_NO_THROW virtual void SLANG_MCALL appendSimplifiedSummary(ISlangBlob** outBlob) SLANG_OVERRIDE;
+    SLANG_NO_THROW virtual void SLANG_MCALL calcSummary(ISlangBlob** outBlob) SLANG_OVERRIDE;
+    SLANG_NO_THROW virtual void SLANG_MCALL calcSimplifiedSummary(ISlangBlob** outBlob) SLANG_OVERRIDE;
+
+        /// Default ctor
+    ArtifactDiagnostics() {}
+        /// Copy ctor
+    ArtifactDiagnostics(const ThisType& rhs);
 
 protected:
     void* getInterface(const Guid& uuid);
     void* getObject(const Guid& uuid);
 
-    ArtifactSliceAllocator m_allocator;
+    TerminatedCharSliceAllocator m_allocator;
 
     List<Diagnostic> m_diagnostics;
     SlangResult m_result = SLANG_OK;
     
     // Raw diagnostics
-    ZeroTerminatedCharSlice m_raw;
+    StringBuilder m_raw;
 };
 
-/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!! PostEmitMetadataImpl !!!!!!!!!!!!!!!!!!!!!!!!!! */
+/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!! ArtifactPostEmitMetadata !!!!!!!!!!!!!!!!!!!!!!!!!! */
 
 struct ShaderBindingRange
 {
@@ -126,7 +138,7 @@ struct ShaderBindingRange
     }
 };
 
-class PostEmitMetadataImpl : public ComBaseObject, public IPostEmitMetadata
+class ArtifactPostEmitMetadata : public ComBaseObject, public IArtifactPostEmitMetadata
 {
 public:
     SLANG_CLASS_GUID(0x6f82509f, 0xe48b, 0x4b83, { 0xa3, 0x84, 0x5d, 0x70, 0x83, 0x19, 0x83, 0xcc })
@@ -136,39 +148,13 @@ public:
     // ICastable
     SLANG_NO_THROW void* SLANG_MCALL castAs(const Guid& guid) SLANG_OVERRIDE;
     
-    // IPostEmitMetadata
+    // IArtifactPostEmitMetadata
     SLANG_NO_THROW virtual Slice<ShaderBindingRange> SLANG_MCALL getUsedBindingRanges() SLANG_OVERRIDE;
     
     void* getInterface(const Guid& uuid);
     void* getObject(const Guid& uuid);
 
     List<ShaderBindingRange> m_usedBindings;
-};
-
-/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ArtifactDiagnosticsUtil !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
-
-struct ArtifactDiagnosticsUtil
-{
-    typedef IDiagnostics::Severity Severity;
-    typedef IDiagnostics::Diagnostic ArtifactDiagnostic;
-
-        /// Given severity return as text
-    static UnownedStringSlice getSeverityText(Severity severity);
-
-        /// Given a path, that holds line number and potentially column number in () after path, writes result into outDiagnostic
-    static SlangResult splitPathLocation(ArtifactSliceAllocator& allocator, const UnownedStringSlice& pathLocation, ArtifactDiagnostic& outDiagnostic);
-
-        /// Split the line (separated by :), where a path is at pathIndex 
-    static SlangResult splitColonDelimitedLine(const UnownedStringSlice& line, Int pathIndex, List<UnownedStringSlice>& outSlices);
-
-    typedef SlangResult(*LineParser)(ArtifactSliceAllocator& allocator, const UnownedStringSlice& line, List<UnownedStringSlice>& lineSlices, ArtifactDiagnostic& outDiagnostic);
-
-        /// Given diagnostics in inText that are colon delimited, use lineParser to do per line parsing.
-    static SlangResult parseColonDelimitedDiagnostics(ArtifactSliceAllocator& allocator, const UnownedStringSlice& inText, Int pathIndex, LineParser lineParser, List<ArtifactDiagnostic>& outDiagnostics);
-
-        /// Maybe add a note
-    static void maybeAddNote(ArtifactSliceAllocator& allocator, const UnownedStringSlice& in, List<ArtifactDiagnostic>& ioDiagnostics);
-
 };
 
 } // namespace Slang

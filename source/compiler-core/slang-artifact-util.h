@@ -5,43 +5,11 @@
 #include "slang-artifact.h"
 #include "slang-artifact-representation.h"
 
-#include "../core/slang-memory-arena.h"
-
 namespace Slang
 {
 
-struct ArtifactSliceUtil
-{
-        /// The slice will only be in scope whilst the string is
-    static ZeroTerminatedCharSlice asSlice(const String& in) { auto unowned = in.getUnownedSlice(); return ZeroTerminatedCharSlice(unowned.begin(), unowned.getLength()); }
-
-private:
-        // We don't want temporaries to be 'asSliced' so disable
-    static ZeroTerminatedCharSlice asSlice(const String&& in) = delete;
-};
-
-struct ArtifactSliceAllocator
-{
-    ZeroTerminatedCharSlice allocate(const Slice<char>& slice);
-    ZeroTerminatedCharSlice allocate(const UnownedStringSlice& slice);
-    ZeroTerminatedCharSlice allocate(const String& in) { return allocate(in.getUnownedSlice()); }
-    ZeroTerminatedCharSlice allocate(const char* in);
-    ZeroTerminatedCharSlice allocate(const char* start, const char* end) { return allocate(UnownedStringSlice(start, end); }
-
-    void deallocateAll() { m_arena.deallocateAll(); }
-
-    ArtifactSliceAllocator():
-        m_arena(1024)
-    {
-    }
-protected:
-    
-    MemoryArena m_arena;
-};
-
 struct ArtifactUtil
 {
-
         /// Get the base name of this artifact.
         /// If there is a path set, will extract the name from that (stripping prefix, extension as necessary).
         /// Else if there is an explicit name set, this is returned.

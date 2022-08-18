@@ -4,9 +4,9 @@
 namespace Slang
 {
 
-class PostEmitMetadataImpl;
+class ArtifactPostEmitMetadata;
 struct IRModule;
 
-void collectMetadata(const IRModule* irModule, PostEmitMetadataImpl& outMetadata);
+void collectMetadata(const IRModule* irModule, ArtifactPostEmitMetadata& outMetadata);
 
 }

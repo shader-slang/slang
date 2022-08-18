@@ -837,7 +837,7 @@ Result linkAndOptimizeIR(
 #endif
     validateIRModuleIfEnabled(codeGenContext, irModule);
 
-    auto metadata = new PostEmitMetadataImpl;
+    auto metadata = new ArtifactPostEmitMetadata;
     outLinkedIR.metadata = metadata;
 
     collectMetadata(irModule, *metadata);
@@ -928,7 +928,7 @@ SlangResult CodeGenContext::emitEntryPointsSourceFromIR(ComPtr<IArtifact>& outAr
 
     SLANG_RETURN_ON_FAIL(sourceEmitter->init());
 
-    ComPtr<IPostEmitMetadata> metadata;
+    ComPtr<IArtifactPostEmitMetadata> metadata;
     {
         LinkingAndOptimizationOptions linkingAndOptimizationOptions;
 

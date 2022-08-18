@@ -279,7 +279,7 @@ public:
     virtual SlangResult calcCompileProducts(const CompileOptions& options, DownstreamProductFlags flags, List<String>& outPaths) = 0;
 
     virtual SlangResult calcArgs(const CompileOptions& options, CommandLine& cmdLine) = 0;
-    virtual SlangResult parseOutput(const ExecuteResult& exeResult, IDiagnostics* diagnostics) = 0;
+    virtual SlangResult parseOutput(const ExecuteResult& exeResult, IArtifactDiagnostics* diagnostics) = 0;
 
     CommandLineDownstreamCompiler(const Desc& desc, const ExecutableLocation& exe) :
         Super(desc)

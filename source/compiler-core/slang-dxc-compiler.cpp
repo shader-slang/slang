@@ -21,6 +21,7 @@
 
 #include "slang-artifact-associated-impl.h"
 #include "slang-artifact-util.h"
+#include "slang-artifact-diagnostic-util.h"
 
 // Enable calling through to  `dxc` to
 // generate code on Windows.
@@ -193,7 +194,7 @@ SlangResult DXCDownstreamCompiler::init(ISlangSharedLibrary* library)
     return SLANG_OK;
 }
 
-static SlangResult _parseDiagnosticLine(ArtifactSliceAllocator& allocator, const UnownedStringSlice& line, List<UnownedStringSlice>& lineSlices, IDiagnostics::Diagnostic& outDiagnostic)
+static SlangResult _parseDiagnosticLine(TerminatedCharSliceAllocator& allocator, const UnownedStringSlice& line, List<UnownedStringSlice>& lineSlices, IArtifactDiagnostics::Diagnostic& outDiagnostic)
 {
     /* tests/diagnostics/syntax-error-intrinsic.slang:14:2: error: expected expression */
     if (lineSlices.getCount() < 5)
@@ -210,10 +211,10 @@ static SlangResult _parseDiagnosticLine(ArtifactSliceAllocator& allocator, const
 
     UnownedStringSlice severitySlice = lineSlices[3].trim();
 
-    outDiagnostic.severity = IDiagnostics::Severity::Error;
+    outDiagnostic.severity = ArtifactDiagnostic::Severity::Error;
     if (severitySlice == UnownedStringSlice::fromLiteral("warning"))
     {
-        outDiagnostic.severity = IDiagnostics::Severity::Warning;
+        outDiagnostic.severity = ArtifactDiagnostic::Severity::Warning;
     }
 
     // The rest of the line
@@ -221,7 +222,7 @@ static SlangResult _parseDiagnosticLine(ArtifactSliceAllocator& allocator, const
     return SLANG_OK;
 }
 
-static SlangResult _handleOperationResult(IDxcOperationResult* dxcResult, IDiagnostics* diagnostics, ComPtr<IDxcBlob>& outBlob)
+static SlangResult _handleOperationResult(IDxcOperationResult* dxcResult, IArtifactDiagnostics* diagnostics, ComPtr<IDxcBlob>& outBlob)
 {
     // Retrieve result.
     HRESULT resultCode = S_OK;
@@ -241,21 +242,16 @@ static SlangResult _handleOperationResult(IDxcOperationResult* dxcResult, IDiagn
     ComPtr<IDxcBlobEncoding> dxcErrorBlob;
     dxcResult->GetErrorBuffer(dxcErrorBlob.writeRef());
 
-    
     if (dxcErrorBlob)
     {
         const UnownedStringSlice diagnosticsSlice = _getSlice(dxcErrorBlob);
         if (diagnosticsSlice.getLength())
         {
-            if (ioDiagnostics.rawDiagnostics.getLength() > 0)
-            {
-                ioDiagnostics.rawDiagnostics.append("\n");
-            }
-            ioDiagnostics.rawDiagnostics.append(diagnosticsSlice);
+            diagnostics->appendRaw(asCharSlice(diagnosticsSlice));
 
-            ArtifactSliceAllocator allocator;
-            List<IDiagnostics::Diagnostic> parsedDiagnostics;
-            SlangResult diagnosticParseRes = ArtifactDiagnosticsUtil::parseColonDelimitedDiagnostics(allocator, diagnosticsSlice, 0, _parseDiagnosticLine, parsedDiagnostics);
+            TerminatedCharSliceAllocator allocator;
+            List<IArtifactDiagnostics::Diagnostic> parsedDiagnostics;
+            SlangResult diagnosticParseRes = ArtifactDiagnosticUtil::parseColonDelimitedDiagnostics(allocator, diagnosticsSlice, 0, _parseDiagnosticLine, diagnostics);
 
             SLANG_UNUSED(diagnosticParseRes);
             SLANG_ASSERT(SLANG_SUCCEEDED(diagnosticParseRes));
@@ -450,7 +446,7 @@ SlangResult DXCDownstreamCompiler::compile(const CompileOptions& options, IArtif
         &includeHandler,    // `#include` handler
         dxcResult.writeRef()));
 
-    ComPtr<IDiagnostics> diagnostics(new DiagnosticsImpl);
+    ComPtr<IArtifactDiagnostics> diagnostics(new ArtifactDiagnostics);
     
     ComPtr<IDxcBlob> dxcResultBlob;
 

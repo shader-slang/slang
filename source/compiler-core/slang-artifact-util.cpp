@@ -14,36 +14,6 @@ namespace Slang {
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ArtifactUtil !!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
-ZeroTerminatedCharSlice ArtifactSliceAllocator::allocate(const char* in)
-{
-    const size_t length = ::strlen(in);
-    auto dst = m_arena.allocateString(in, length);
-    return ZeroTerminatedCharSlice(dst, length);
-}
-
-ZeroTerminatedCharSlice ArtifactSliceAllocator::allocate(const UnownedStringSlice& slice)
-{
-    const auto length = slice.getLength();
-    auto dst = m_arena.allocateString(slice.begin(), length);
-    return ZeroTerminatedCharSlice(dst, length);
-}
-
-
-ZeroTerminatedCharSlice ArtifactSliceAllocator::allocate(const Slice<char>& slice)
-{
-    const auto count = slice.count;
-    auto dst = m_arena.allocateString(slice.begin(), count);
-    return ZeroTerminatedCharSlice(dst, count);
-}
-
-ZeroTerminatedCharSlice asSlice(const String& in)
-{
-    const auto unowned = in.getUnownedSlice();
-    return ZeroTerminatedCharSlice(unowned.begin(), unowned.getLength());
-}
-
-/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ArtifactUtil !!!!!!!!!!!!!!!!!!!!!!!!!!! */
-
 /* static */ComPtr<IArtifactContainer> ArtifactUtil::createContainer(const ArtifactDesc& desc)
 {
     const auto containerDesc = ArtifactDesc::make(ArtifactKind::Container, ArtifactPayload::CompileResults, desc.style);

@@ -14,6 +14,8 @@
 #include "../core/slang-semantic-version.h"
 #include "../core/slang-char-util.h"
 
+#include "slang-artifact-associated-impl.h"
+
 #include "slang-include-system.h"
 #include "slang-source-loc.h"
 
@@ -40,7 +42,7 @@ public:
     typedef DownstreamCompilerBase Super;
 
     // IDownstreamCompiler
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL compile(const CompileOptions& options, RefPtr<DownstreamCompileResult>& outResult) SLANG_OVERRIDE;
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL compile(const CompileOptions& options, IArtifact** outResult) SLANG_OVERRIDE;
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL disassemble(SlangCompileTarget sourceBlobTarget, const void* blob, size_t blobSize, ISlangBlob** out) SLANG_OVERRIDE;
     virtual SLANG_NO_THROW bool SLANG_MCALL isFileBased() SLANG_OVERRIDE { return false; }
 
@@ -94,7 +96,7 @@ SlangResult GlslangDownstreamCompiler::_invoke(glslang_CompileRequest_1_1& reque
     return err ? SLANG_FAIL : SLANG_OK;
 }
 
-static SlangResult _parseDiagnosticLine(const UnownedStringSlice& line, List<UnownedStringSlice>& lineSlices, DownstreamDiagnostic& outDiagnostic)
+static SlangResult _parseDiagnosticLine(TerminatedCharSliceAllocator& allocator, const UnownedStringSlice& line, List<UnownedStringSlice>& lineSlices, ArtifactDiagnostic& outDiagnostic)
 {
     /* ERROR: tests/diagnostics/syntax-error-intrinsic.slang:13: '@' : unexpected token */
 
@@ -105,23 +107,23 @@ static SlangResult _parseDiagnosticLine(const UnownedStringSlice& line, List<Uno
     {
         const UnownedStringSlice severitySlice = lineSlices[0].trim();
 
-        outDiagnostic.severity = DownstreamDiagnostic::Severity::Error;
+        outDiagnostic.severity = ArtifactDiagnostic::Severity::Error;
         if (severitySlice.caseInsensitiveEquals(UnownedStringSlice::fromLiteral("warning")))
         {
-            outDiagnostic.severity = DownstreamDiagnostic::Severity::Warning;
+            outDiagnostic.severity = ArtifactDiagnostic::Severity::Warning;
         }
     }
 
-    outDiagnostic.filePath = lineSlices[1];
+    outDiagnostic.filePath = allocator.allocate(lineSlices[1]);
 
-    SLANG_RETURN_ON_FAIL(StringUtil::parseInt(lineSlices[2], outDiagnostic.fileLine));
-    outDiagnostic.text = UnownedStringSlice(lineSlices[3].begin(), line.end());
+    SLANG_RETURN_ON_FAIL(StringUtil::parseInt(lineSlices[2], outDiagnostic.location.line));
+    outDiagnostic.text = allocator.allocate(lineSlices[3].begin(), line.end());
     return SLANG_OK;
 }
 
 
 
-SlangResult GlslangDownstreamCompiler::compile(const CompileOptions& options, RefPtr<DownstreamCompileResult>& outResult)
+SlangResult GlslangDownstreamCompiler::compile(const CompileOptions& options, IArtifact** outArtifact)
 {
     // This compiler doesn't read files, they should be read externally and stored in sourceContents/sourceContentsPath
     if (options.sourceFiles.getCount() > 0)
@@ -187,27 +189,31 @@ SlangResult GlslangDownstreamCompiler::compile(const CompileOptions& options, Re
 
     const SlangResult invokeResult = _invoke(request);
 
-    DownstreamDiagnostics diagnostics;
+    auto artifact = ArtifactUtil::createArtifactForCompileTarget(options.targetType);
+
+    ComPtr<IArtifactDiagnostics> diagnostics(new ArtifactDiagnostics);
 
     // Set the diagnostics result
-    diagnostics.result = invokeResult;
+    diagnostics->setResult(invokeResult);
+    artifact->addAssociated(diagnostics);
 
     if (SLANG_FAILED(invokeResult))
     {
-        diagnostics.rawDiagnostics = diagnosticOutput;
+        diagnostics->setRaw(CharSliceCaster::asCharSlice(diagnosticOutput));
 
-        SlangResult diagnosticParseRes = DownstreamDiagnostic::parseColonDelimitedDiagnostics(diagnosticOutput.getUnownedSlice(), 1, _parseDiagnosticLine, diagnostics.diagnostics);
+        TerminatedCharSliceAllocator allocator;
+
+        SlangResult diagnosticParseRes = ArtifactDiagnosticUtil::parseColonDelimitedDiagnostics(allocator, diagnosticOutput.getUnownedSlice(), 1, _parseDiagnosticLine, diagnostics);
         SLANG_UNUSED(diagnosticParseRes);
 
-        diagnostics.requireErrorDiagnostic();
-
-        outResult = new BlobDownstreamCompileResult(diagnostics, nullptr);
-        return SLANG_OK;
+        diagnostics->requireErrorDiagnostic();
+    }
+    else
+    {
+        artifact->addRepresentationUnknown(ListBlob::moveCreate(spirv));
     }
 
-    ComPtr<ISlangBlob> spirvBlob = ListBlob::moveCreate(spirv);
-    outResult = new BlobDownstreamCompileResult(diagnostics, spirvBlob);
-
+    *outArtifact = artifact.detach();
     return SLANG_OK;
 }
 

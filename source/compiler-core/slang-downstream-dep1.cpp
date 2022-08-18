@@ -90,28 +90,28 @@ SlangResult DownstreamCompilerAdapter_Dep1::compile(const CompileOptions& option
     RefPtr<DownstreamCompileResult_Dep1> result;
     SLANG_RETURN_ON_FAIL(m_dep->compile(options, result));
 
-    typedef ArtifactSliceUtil Util;
+    typedef CharSliceCaster Caster;
 
     ComPtr<IArtifact> artifact = ArtifactUtil::createArtifactForCompileTarget(options.targetType);
 
     // Convert the diagnostics
 
-    ComPtr<IDiagnostics> dstDiagnostics(new DiagnosticsImpl);
+    ComPtr<IArtifactDiagnostics> dstDiagnostics(new ArtifactDiagnostics);
     const DownstreamDiagnostics_Dep1* srcDiagnostics = &result->getDiagnostics();
 
     dstDiagnostics->setResult(srcDiagnostics->result);
-    dstDiagnostics->setRaw(Util::asSlice(srcDiagnostics->rawDiagnostics));
+    dstDiagnostics->setRaw(Caster::asCharSlice(srcDiagnostics->rawDiagnostics));
 
     for (const auto& srcDiagnostic : srcDiagnostics->diagnostics)
     {
-        IDiagnostics::Diagnostic dstDiagnostic;
+        IArtifactDiagnostics::Diagnostic dstDiagnostic;
 
-        dstDiagnostic.severity = IDiagnostics::Severity(srcDiagnostic.severity);
-        dstDiagnostic.stage = IDiagnostics::Stage(srcDiagnostic.stage);
+        dstDiagnostic.severity = ArtifactDiagnostic::Severity(srcDiagnostic.severity);
+        dstDiagnostic.stage = ArtifactDiagnostic::Stage(srcDiagnostic.stage);
 
-        dstDiagnostic.code = Util::asSlice(srcDiagnostic.code);
-        dstDiagnostic.text = Util::asSlice(srcDiagnostic.text);
-        dstDiagnostic.filePath = Util::asSlice(srcDiagnostic.filePath);
+        dstDiagnostic.code = Caster::asTerminatedCharSlice(srcDiagnostic.code);
+        dstDiagnostic.text = Caster::asTerminatedCharSlice(srcDiagnostic.text);
+        dstDiagnostic.filePath = Caster::asTerminatedCharSlice(srcDiagnostic.filePath);
 
         dstDiagnostic.location.line = srcDiagnostic.fileLine;
     }
