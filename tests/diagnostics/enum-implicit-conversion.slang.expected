@@ -1,5 +1,11 @@
 result code = -1
 standard error = {
+tests/diagnostics/enum-implicit-conversion.slang(18): warning 30081: implicit conversion from 'uint' to 'int' is not recommended
+int foo(uint x) { return x * 256 * 16; }
+                                 ^
+tests/diagnostics/enum-implicit-conversion.slang(22): warning 30081: implicit conversion from 'uint' to 'int' is not recommended
+int bar(uint  x) { return x * 256 * 256 * 16; }
+                                        ^
 tests/diagnostics/enum-implicit-conversion.slang(27): error 30019: expected an expression of type 'Color', got 'int'
     Color c = val;
               ^~~
@@ -17,6 +23,9 @@ tests/diagnostics/enum-implicit-conversion.slang(42): error 39999: ambiguous cal
                ^
 tests/diagnostics/enum-implicit-conversion.slang(18): note 39999: candidate: func foo(uint) -> int
 tests/diagnostics/enum-implicit-conversion.slang(17): note 39999: candidate: func foo(int) -> int
+tests/diagnostics/enum-implicit-conversion.slang(47): warning 30081: implicit conversion from 'uint' to 'int' is not recommended
+    return x + y + z;
+                 ^
 }
 standard output = {
 }

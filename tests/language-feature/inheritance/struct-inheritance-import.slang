@@ -22,7 +22,7 @@ RWStructuredBuffer<int> outputBuffer;
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
     uint tid = dispatchThreadID.x;
-    int inVal = tid;
+    int inVal = int(tid);
     int outVal = test(inVal);
     outputBuffer[tid] = outVal;
 }

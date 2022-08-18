@@ -38,7 +38,7 @@ RWTexture3D<float4>         t3  R(u3);
 
 float4 main() : SV_Target
 {
-    return t2.Load(CBUFFER_REF(C,u2))
-        + t2a.Load(CBUFFER_REF(C,u3))
-        +  t3.Load(CBUFFER_REF(C,u3));
+    return t2.Load(int2(CBUFFER_REF(C,u2)))
+        + t2a.Load(int3(CBUFFER_REF(C,u3)))
+        +  t3.Load(int3(CBUFFER_REF(C,u3)));
 }

@@ -13,7 +13,7 @@ struct RasterVertex
 float4 main(RasterVertex v) : SV_Target
 {
 	float4 result = v.c;
-	if(v.u & 1)
+	if((v.u & 1) != 0)
 	    result += 1.0;
    return result;
 }

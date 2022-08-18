@@ -29,7 +29,7 @@ int calcThing(int offset)
 [numthreads(4, 1, 1)]
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {    
-    int index = dispatchThreadID.x;
+    int index = int(dispatchThreadID.x);
 
     outputBuffer[index] = calcThing(index);
 }

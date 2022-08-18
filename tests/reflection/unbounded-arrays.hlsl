@@ -137,7 +137,7 @@
     [numthreads(4,1,1)]
     void main(uint3 tid : SV_DispatchThreadID)
     {
-        int idx = tid.x;
+        int idx = int(tid.x);
         float4 tmp = data[idx];
 
         SamplerState s = aa[idx];

@@ -37,5 +37,5 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
   
     int64_t v = (ti * 0x400010035435435ll) / 3ll + 7ll - 9ll; 
     
-    outputBuffer[idx] = int(v) ^ int(((v >> 32) & 0xffffffff)); 
+    outputBuffer[uint(idx)] = int(v) ^ int(((v >> 32) & 0xffffffff)); 
 }

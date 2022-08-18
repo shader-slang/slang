@@ -22,9 +22,9 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     
     //half offset = v2.x + v2.y;
     
-    half offset = 0.0f;
+    half offset = half(0.0f);
     
-    half v = tid;
+    half v = half(tid);
     v *= half(3.0f);
     v += half(1.0f);
     v += offset;

@@ -25,7 +25,7 @@ int test(int t)
 }
 
 [numthreads(4)]
-void computeMain(uint3 tid : SV_DispatchThreadID)
+void computeMain(int3 tid : SV_DispatchThreadID)
 {
     int val = tid.x;
     val = test(val);

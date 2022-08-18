@@ -13,8 +13,8 @@ void main(
 {
     beginInvocationInterlock();
 
-    result = texture[coords.xy];
-    texture[coords.xy] = result + coords;
+    result = texture[uint2(coords.xy)];
+    texture[uint2(coords.xy)] = result + coords;
 
     endInvocationInterlock();
 }

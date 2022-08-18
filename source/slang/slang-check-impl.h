@@ -562,8 +562,8 @@ namespace Slang
 
         Type* ExtractGenericArgType(Expr* exp);
 
-        IntVal* ExtractGenericArgInteger(Expr* exp, DiagnosticSink* sink);
-        IntVal* ExtractGenericArgInteger(Expr* exp);
+        IntVal* ExtractGenericArgInteger(Expr* exp, Type* genericParamType, DiagnosticSink* sink);
+        IntVal* ExtractGenericArgInteger(Expr* exp, Type* genericParamType);
 
         Val* ExtractGenericArgVal(Expr* exp);
 
@@ -1035,6 +1035,8 @@ namespace Slang
             /// Is `type` a scalar integer type.
         bool isScalarIntegerType(Type* type);
 
+        bool isIntValueInRangeOfType(IntegerLiteralValue value, Type* type);
+
         // Validate that `type` is a suitable type to use
         // as the tag type for an `enum`
         void validateEnumTagType(Type* type, SourceLoc const& loc);
@@ -1135,8 +1137,13 @@ namespace Slang
             ConstantFoldingCircularityInfo* circularityInfo);
 
         // Enforce that an expression resolves to an integer constant, and get its value
-        IntVal* CheckIntegerConstantExpression(Expr* inExpr);
-        IntVal* CheckIntegerConstantExpression(Expr* inExpr, DiagnosticSink* sink);
+        enum class IntegerConstantExpressionCoercionType
+        {
+            SpecificType,
+            AnyInteger
+        };
+        IntVal* CheckIntegerConstantExpression(Expr* inExpr, IntegerConstantExpressionCoercionType coercionType, Type* expectedType);
+        IntVal* CheckIntegerConstantExpression(Expr* inExpr, IntegerConstantExpressionCoercionType coercionType, Type* expectedType, DiagnosticSink* sink);
 
         IntVal* CheckEnumConstantExpression(Expr* expr);
 

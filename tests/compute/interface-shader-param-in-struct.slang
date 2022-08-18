@@ -70,7 +70,7 @@ void computeMain(
 //TEST_INPUT: entryPointExistentialType MyModifier
     uniform Stuff stuff,
 
-    uint3       dispatchThreadID : SV_DispatchThreadID)
+    int3       dispatchThreadID : SV_DispatchThreadID)
 {
     let tid = dispatchThreadID.x;
 

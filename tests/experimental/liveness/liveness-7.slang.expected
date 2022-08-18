@@ -35,7 +35,7 @@ int calcThing_0(int offset_0)
     {
         int _S3 = _S2;
         livenessEnd_0(_S2, 0);
-        if(bool(0 + _S3 & 1))
+        if((0 + _S3 & 1) != 0)
         {
             int  _S4[2] = arr_0;
             livenessEnd_1(arr_0, 0);

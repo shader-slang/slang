@@ -119,9 +119,14 @@ namespace Slang
         return ExpectAType(exp);
     }
 
-    IntVal* SemanticsVisitor::ExtractGenericArgInteger(Expr* exp, DiagnosticSink* sink)
+    IntVal* SemanticsVisitor::ExtractGenericArgInteger(Expr* exp, Type* genericParamType, DiagnosticSink* sink)
     {
-        IntVal* val = CheckIntegerConstantExpression(exp, sink);
+        IntVal* val = CheckIntegerConstantExpression(
+            exp,
+            genericParamType ? IntegerConstantExpressionCoercionType::SpecificType
+                             : IntegerConstantExpressionCoercionType::AnyInteger,
+            genericParamType,
+            sink);
         if(val) return val;
 
         // If the argument expression could not be coerced to an integer
@@ -132,9 +137,9 @@ namespace Slang
         return val;
     }
 
-    IntVal* SemanticsVisitor::ExtractGenericArgInteger(Expr* exp)
+    IntVal* SemanticsVisitor::ExtractGenericArgInteger(Expr* exp, Type* genericParamType)
     {
-        return ExtractGenericArgInteger(exp, getSink());
+        return ExtractGenericArgInteger(exp, genericParamType, getSink());
     }
 
     Val* SemanticsVisitor::ExtractGenericArgVal(Expr* exp)
@@ -158,7 +163,7 @@ namespace Slang
             {
                 CheckExpr(exp);
             }
-            return ExtractGenericArgInteger(exp);
+            return ExtractGenericArgInteger(exp, nullptr);
         }
     }
 
@@ -275,7 +280,6 @@ namespace Slang
                         }
                         return false;
                     }
-
                     // TODO: this is one place where syntax should get cloned!
                     if (outProperType)
                         args.add(valParam->initExpr);
