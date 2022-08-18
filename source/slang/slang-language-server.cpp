@@ -132,6 +132,7 @@ SlangResult LanguageServer::parseNextMessage()
                 result.capabilities.semanticTokensProvider.full = true;
                 result.capabilities.semanticTokensProvider.range = false;
                 result.capabilities.signatureHelpProvider.triggerCharacters.add("(");
+                result.capabilities.signatureHelpProvider.triggerCharacters.add(",");
                 result.capabilities.signatureHelpProvider.retriggerCharacters.add(",");
                 for (auto tokenType : kSemanticTokenTypes)
                     result.capabilities.semanticTokensProvider.legend.tokenTypes.add(tokenType);
