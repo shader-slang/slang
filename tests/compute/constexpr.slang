@@ -100,7 +100,7 @@ FragmentStageOutput fragmentMain(FragmentStageInput input)
 	output.fragment.color = float4(color, 1.0);
 
 	float4 val = float4(color, 1.0);
-	val = val - 16*tex.Sample(samp, uv, ab);
+	val = val - 16*tex.Sample(samp, uv, int2(ab));
 
 	outputBuffer[0] = 1;
 

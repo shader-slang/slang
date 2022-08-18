@@ -18,7 +18,7 @@ RWStructuredBuffer<uint64_t> outputBuffer;
 [numthreads(7, 1, 1)]
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
-    int idx = int64_t(dispatchThreadID.x);
+    int idx = int(int64_t(dispatchThreadID.x));
     
     uint64_t v = 0;
     

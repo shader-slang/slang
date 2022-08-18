@@ -23,9 +23,9 @@ RWByteAddressBuffer outputBuffer;
 RWStructuredBuffer<uint> inputBuffer;
 
 [numthreads(16, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
 {    
-    uint tid = dispatchThreadID.x;
+    int tid = dispatchThreadID.x;
 
     // Produces a different result on CUDA?
    
@@ -38,7 +38,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 
     {
         int idx = (tid & 3) ^ (tid >> 2);
-        if (idx & 1)
+        if (bool(idx & 1))
         {
             outputBuffer.InterlockedMaxU64((idx << 3), value);
         }

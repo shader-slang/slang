@@ -22,7 +22,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     ti += min(idx, 1ull); 
     ti += clamp(idx * 10, 11, 23);
     
-    ti += countbits(idx * 13);
+    ti += countbits(uint(idx * 13));
    
     // Math
     ti = ti - idx;

@@ -22,9 +22,9 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     
     int2 r0 = WaveMaskSum(mask, v0);
     float2 r1 = WaveMaskSum(mask, v1);
-    int2 r2 = WaveMaskBitXor(mask, uv0);
-    int2 r3 = WaveMaskBitOr(mask, uv0);
-    int2 r4 = WaveMaskBitAnd(mask, uv0);
+    int2 r2 = int2(WaveMaskBitXor(mask, uv0));
+    int2 r3 = int2(WaveMaskBitOr(mask, uv0));
+    int2 r4 = int2(WaveMaskBitAnd(mask, uv0));
     
     int2 r = r0 + int2(r1) + r2 + r3 + r4;
    

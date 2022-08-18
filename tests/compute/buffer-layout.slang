@@ -121,9 +121,9 @@ int test(int val)
 
 [numthreads(4, 1, 1)]
 void computeMain(
-    uint3 dispatchThreadID : SV_DispatchThreadID)
+    int3 dispatchThreadID : SV_DispatchThreadID)
 {
-    uint tid = dispatchThreadID.x;
+    int tid = dispatchThreadID.x;
 
     int inVal = tid;
     int outVal = test(inVal);

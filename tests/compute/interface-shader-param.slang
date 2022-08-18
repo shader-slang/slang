@@ -92,7 +92,7 @@ uniform IRandomNumberGenerationStrategy gStrategy;
 void computeMain(
 //TEST_INPUT:set modifier = new MyModifier{}
     uniform IModifier   modifier,
-            uint3       dispatchThreadID : SV_DispatchThreadID)
+            int3       dispatchThreadID : SV_DispatchThreadID)
 {
     let tid = dispatchThreadID.x;
 

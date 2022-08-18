@@ -22,5 +22,5 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     
     ti += countbits(idx * 13);
     
-    outputBuffer[idx] = ti; 
+    outputBuffer[idx] = int(ti); 
 }

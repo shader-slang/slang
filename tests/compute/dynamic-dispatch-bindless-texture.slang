@@ -14,7 +14,7 @@ RWStructuredBuffer<uint> gOutputBuffer;
 StructuredBuffer<IInterface> gCb;
 
 [numthreads(4, 1, 1)]
-void computeMain(uint3       dispatchThreadID : SV_DispatchThreadID)
+void computeMain(int3       dispatchThreadID : SV_DispatchThreadID)
 {
     let tid = dispatchThreadID.x;
 
@@ -22,7 +22,7 @@ void computeMain(uint3       dispatchThreadID : SV_DispatchThreadID)
     IInterface v0 = gCb.Load(0);
     SamplerState sampler;
     let outputVal = v0.run();
-    gOutputBuffer[tid] = trunc(outputVal);
+    gOutputBuffer[tid] = uint(trunc(outputVal));
 }
 
 //TEST_INPUT: globalExistentialType __Dynamic
