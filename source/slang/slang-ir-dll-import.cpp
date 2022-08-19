@@ -94,7 +94,7 @@ struct DllImportContext
         {
             IRSizeAndAlignment sizeAndAlignment;
             getNaturalSizeAndAlignment(targetReq, param->getDataType(), &sizeAndAlignment);
-            result += align(sizeAndAlignment.size, 4);
+            result += (uint32_t)align(sizeAndAlignment.size, 4);
         }
         return result;
     }
