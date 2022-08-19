@@ -314,8 +314,11 @@ SlangResult FXCDownstreamCompiler::compile(const CompileOptions& options, IArtif
     auto artifact = ArtifactUtil::createArtifactForCompileTarget(options.targetType);
     artifact->addAssociated(diagnostics);
 
-    // ID3DBlob is compatible with ISlangBlob, so just cast away...
-    artifact->addRepresentationUnknown((ISlangBlob*)codeBlob.get());
+    if (codeBlob)
+    {
+        // ID3DBlob is compatible with ISlangBlob, so just cast away...
+        artifact->addRepresentationUnknown((ISlangBlob*)codeBlob.get());
+    }
 
     *outArtifact = artifact.detach();
     return SLANG_OK;

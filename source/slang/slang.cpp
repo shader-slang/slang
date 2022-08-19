@@ -2737,7 +2737,7 @@ void Linkage::_diagnoseErrorInImportedModule(
 {
     for(auto info = m_modulesBeingImported; info; info = info->next)
     {
-            sink->diagnose(info->importLoc, Diagnostics::errorInImportedModule, info->name);
+        sink->diagnose(info->importLoc, Diagnostics::errorInImportedModule, info->name);
     }
     if (!isInLanguageServer())
     {
