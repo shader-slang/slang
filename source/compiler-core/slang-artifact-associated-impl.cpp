@@ -33,24 +33,23 @@ ArtifactDiagnostics::ArtifactDiagnostics(const ThisType& rhs):
     }
 }
 
-SlangResult ArtifactDiagnostics::clone(const Guid& guid, void** outClone)
+void* ArtifactDiagnostics::clone(const Guid& guid)
 {
     ThisType* copy = new ThisType(*this);
-    if (auto ptr = copy->getInterface(guid))
+    if (auto ptr = copy->castAs(guid))
     {
-        copy->addRef();
-        *outClone = copy;
-        return SLANG_OK;
+        return ptr;
     }
-
+    // If the cast fails, we delete the item. 
     delete copy;
-    return SLANG_E_NO_INTERFACE;
+    return nullptr;
 }
 
 void* ArtifactDiagnostics::getInterface(const Guid& guid)
 {
     if (guid == ISlangUnknown::getTypeGuid() ||
         guid == ICastable::getTypeGuid() ||
+        guid == IClonable::getTypeGuid() ||
         guid == IArtifactDiagnostics::getTypeGuid())
     {
         return static_cast<IArtifactDiagnostics*>(this);

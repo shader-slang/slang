@@ -13,6 +13,7 @@
 
 namespace Slang
 {
+    
 	typedef int32_t Int32;
 	typedef uint32_t UInt32;
 
@@ -66,6 +67,15 @@ namespace Slang
 		v0 = _Move(v1);
 		v1 = _Move(tmp);
 	}
+
+    // Make these interfaces have more convenient names
+    typedef ISlangCastable ICastable;
+    typedef ISlangClonable IClonable;
+
+    // Convenience function for using clonable
+    template <typename T>
+    SLANG_FORCE_INLINE T* clone(IClonable* clonable) { return (T*)clonable->clone(T::getTypeGuid()); }
+
 
 // TODO: Shouldn't these be SLANG_ prefixed?
 #ifdef _MSC_VER

@@ -26,9 +26,9 @@ public:
 
     // ICastable
     SLANG_NO_THROW void* SLANG_MCALL castAs(const Guid& guid) SLANG_OVERRIDE;
+    // IClonable
+    SLANG_NO_THROW virtual void* SLANG_MCALL clone(const Guid& intf) SLANG_OVERRIDE;
     // IDiagnostic
-    SLANG_NO_THROW virtual SlangResult SLANG_MCALL clone(const Guid& intf, void** outClone) SLANG_OVERRIDE;
-
     SLANG_NO_THROW virtual const Diagnostic* SLANG_MCALL getAt(Index i) SLANG_OVERRIDE { return &m_diagnostics[i]; }
     SLANG_NO_THROW virtual Count SLANG_MCALL getCount() SLANG_OVERRIDE { return m_diagnostics.getCount(); }
     SLANG_NO_THROW virtual void SLANG_MCALL add(const Diagnostic& diagnostic) SLANG_OVERRIDE; 

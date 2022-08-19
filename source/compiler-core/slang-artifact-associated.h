@@ -56,16 +56,12 @@ struct ArtifactDiagnostic
 /* Diagnostics.
 
 If there are raw diagnostics they can be associated to an artifact as (Kind::Text, Payload::Diagnostics) artifact */
-class IArtifactDiagnostics : public ICastable
+class IArtifactDiagnostics : public IClonable
 {
 public:
     SLANG_COM_INTERFACE(0x91f9b857, 0xcd6b, 0x45ca, { 0x8e, 0x3, 0x8f, 0xa3, 0x3c, 0x5c, 0xf0, 0x1a });
 
     typedef ArtifactDiagnostic Diagnostic;
-
-        /// TODO(JS): Probably want to add a clonable interface
-        /// Note the use of guid is for the desired interface.
-    SLANG_NO_THROW virtual SlangResult SLANG_MCALL clone(const Guid& intf, void** outClone) = 0;
 
         /// Get the diagnostic at the index
     SLANG_NO_THROW virtual const Diagnostic* SLANG_MCALL getAt(Index i) = 0;
