@@ -938,10 +938,10 @@ tool "slangd"
 	 addSourceDir "tools/gfx/debug-layer"
  
      postbuildcommands {
-        '{COPY} "%{wks.location}tools/gfx/gfx.slang" "%{cfg.targetdir}"',
-        '{COPY} "%{wks.location}tools/gfx/slang.slang" "%{cfg.targetdir}"'
+        '{COPY} "%{wks.location}/tools/gfx/gfx.slang" "%{cfg.targetdir}"',
+        '{COPY} "%{wks.location}/tools/gfx/slang.slang" "%{cfg.targetdir}"'
      }
-     
+
      -- To special case that we may be building using cygwin on windows. If 'true windows' we build for dx12/vk and run the script
      -- If not we assume it's a cygwin/mingw type situation and remove files that aren't appropriate
      if targetInfo.isWindows then

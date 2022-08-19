@@ -3381,9 +3381,7 @@ void CLikeSourceEmitter::ensureInstOperandsRec(ComputeEmitActionsContext* ctx, I
     case kIROp_COMWitnessDecoration:
         requiredLevel = EmitAction::ForwardDeclaration;
         break;
-    case kIROp_PtrType:
     case kIROp_NativePtrType:
-    case kIROp_RefType:
         requiredLevel = EmitAction::ForwardDeclaration;
         break;
     default:
@@ -3428,9 +3426,7 @@ void CLikeSourceEmitter::ensureGlobalInst(ComputeEmitActionsContext* ctx, IRInst
     // Certain inst ops will always emit as definition.
     switch (inst->getOp())
     {
-    case kIROp_PtrType:
     case kIROp_NativePtrType:
-    case kIROp_RefType:
         // Pointer type will have their value type emited as forward declaration,
         // but the pointer type itself should be considered emitted as definition.
         requiredLevel = EmitAction::Level::Definition;
