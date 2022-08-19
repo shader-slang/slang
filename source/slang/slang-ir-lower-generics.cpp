@@ -55,6 +55,9 @@ namespace Slang
             switch (inst->getOp())
             {
             case kIROp_WitnessTableIDType:
+                if (isComInterfaceType((IRType*)inst->getOperand(0)))
+                    continue;
+                // fall through
             case kIROp_RTTIHandleType:
                 {
                     IRBuilder builder(sharedContext->sharedBuilderStorage);

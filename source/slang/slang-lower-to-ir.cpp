@@ -1185,6 +1185,27 @@ static void addLinkageDecoration(
     addLinkageDecoration(context, inst, decl, mangledName.getUnownedSlice());
 }
 
+bool shouldDeclBeTreatedAsInterfaceRequirement(Decl* requirementDecl)
+{
+    if (auto funcDecl = as<CallableDecl>(requirementDecl))
+    {
+    }
+    else if (auto propertyDecl = as<PropertyDecl>(requirementDecl))
+    {
+    }
+    else if (auto assocTypeDecl = as<AssocTypeDecl>(requirementDecl))
+    {
+    }
+    else if (auto typeConstraint = as<TypeConstraintDecl>(requirementDecl))
+    {
+    }
+    else
+    {
+        return false;
+    }
+    return true;
+}
+
 IRStructKey* getInterfaceRequirementKey(
     IRGenContext*   context,
     Decl*           requirementDecl)
@@ -1195,6 +1216,12 @@ IRStructKey* getInterfaceRequirementKey(
     // decl as the requirement key.
     if (auto genericDecl = as<GenericDecl>(requirementDecl))
         return getInterfaceRequirementKey(context, genericDecl->inner);
+
+    // Only specific types of decls are treated as requirements, e.g. methods and asssociated types.
+    // Other types of decls are allowed but not regarded as a requirement.
+    if (!shouldDeclBeTreatedAsInterfaceRequirement(requirementDecl))
+        return nullptr;
+
     IRStructKey* requirementKey = nullptr;
     if(context->shared->interfaceRequirementKeys.TryGetValue(requirementDecl, requirementKey))
     {
@@ -1355,6 +1382,9 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
             // when looking up the requirement in a concrete witness table.
             //
             auto irReqKey = getInterfaceRequirementKey(context, reqDeclRef.getDecl());
+
+            if (!irReqKey)
+                continue;
 
             // We expect that each of the witness tables in `caseWitnessTables`
             // will have an entry to match these keys. However, we may not
@@ -5866,6 +5896,8 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             auto satisfyingWitness = entry.Value;
 
             auto irRequirementKey = getInterfaceRequirementKey(requiredMemberDecl);
+            if (!irRequirementKey) continue;
+
             IRInst* irSatisfyingVal = nullptr;
 
             switch(satisfyingWitness.getFlavor())
@@ -6613,6 +6645,9 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         UInt operandCount = 0;
         for (auto requirementDecl : decl->members)
         {
+            if (!shouldDeclBeTreatedAsInterfaceRequirement(requirementDecl))
+                continue;
+
             operandCount++;
             // As a special case, any type constraints placed
             // on an associated type will *also* need to be turned
@@ -6647,8 +6682,10 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
         for (auto requirementDecl : decl->members)
         {
+            auto requirementKey = getInterfaceRequirementKey(requirementDecl);
+            if (!requirementKey) continue;
             auto entry = subBuilder->createInterfaceRequirementEntry(
-                getInterfaceRequirementKey(requirementDecl),
+                requirementKey,
                 nullptr);
             if (auto inheritance = as<InheritanceDecl>(requirementDecl))
             {
@@ -8547,6 +8584,13 @@ static void ensureAllDeclsRec(
     if(auto containerDecl = as<AggTypeDeclBase>(decl))
     {
         for (auto memberDecl : containerDecl->members)
+        {
+            ensureAllDeclsRec(context, memberDecl);
+        }
+    }
+    else if (auto namespaceDecl = as<NamespaceDecl>(decl))
+    {
+        for (auto memberDecl : namespaceDecl->members)
         {
             ensureAllDeclsRec(context, memberDecl);
         }

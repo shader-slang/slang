@@ -4,6 +4,7 @@
 #include "slang-ir.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-marshal-native-call.h"
+#include "slang-ir-layout.h"
 
 namespace Slang
 {
@@ -12,6 +13,7 @@ struct DllImportContext
 {
     IRModule* module;
     DiagnosticSink* diagnosticSink;
+    TargetRequest* targetReq;
 
     SharedIRBuilder sharedBuilder;
 
@@ -56,12 +58,13 @@ struct DllImportContext
             builder.setInsertInto(module->getModuleInst());
 
             IRType* stringType = builder.getStringType();
-            IRType* paramTypes[] = {builder.getPtrType(builder.getVoidType()), stringType};
+            IRType* uintType = builder.getUIntType();
+            IRType* paramTypes[] = {builder.getPtrType(builder.getVoidType()), stringType, uintType };
             loadFuncPtrFunc = createBuiltinIntrinsicFunc(
-                2,
+                3,
                 paramTypes,
                 builder.getPtrType(builder.getVoidType()),
-                UnownedStringSlice("_slang_rt_load_dll_func($0, $1)"));
+                UnownedStringSlice("_slang_rt_load_dll_func($0, $1, $2)"));
         }
         return loadFuncPtrFunc;
     }
@@ -84,6 +87,17 @@ struct DllImportContext
         return stringGetBufferFunc;
     }
 
+    uint32_t getStdCallArgumentSize(IRFunc* func)
+    {
+        uint32_t result = 0;
+        for (auto param : func->getParams())
+        {
+            IRSizeAndAlignment sizeAndAlignment;
+            getNaturalSizeAndAlignment(targetReq, param->getDataType(), &sizeAndAlignment);
+            result += align(sizeAndAlignment.size, 4);
+        }
+        return result;
+    }
 
     void processFunc(IRFunc* func, IRDllImportDecoration* dllImportDecoration)
     {
@@ -136,10 +150,11 @@ struct DllImportContext
                 getLoadDllFunc(),
                 builder.getStringValue(dllImportDecoration->getLibraryName()));
         }
+        auto argumentSize = builder.getIntValue(builder.getUIntType(), getStdCallArgumentSize(func));
         IRInst* loadDllFuncArgs[] = {
-            modulePtr, builder.getStringValue(dllImportDecoration->getFunctionName())};
+            modulePtr, builder.getStringValue(dllImportDecoration->getFunctionName()), argumentSize};
         auto loadedNativeFuncPtr = builder.emitCallInst(
-            builder.getPtrType(builder.getVoidType()), getLoadFuncPtrFunc(), 2, loadDllFuncArgs);
+            builder.getPtrType(builder.getVoidType()), getLoadFuncPtrFunc(), 3, loadDllFuncArgs);
         builder.emitStore(
             funcPtr, builder.emitBitCast(nativeType, loadedNativeFuncPtr));
         builder.emitBranch(afterBlock);
@@ -175,10 +190,11 @@ struct DllImportContext
     }
 };
 
-void generateDllImportFuncs(IRModule* module, DiagnosticSink* sink)
+void generateDllImportFuncs(TargetRequest* targetReq, IRModule* module, DiagnosticSink* sink)
 {
     DllImportContext context;
     context.module = module;
+    context.targetReq = targetReq;
     context.diagnosticSink = sink;
     context.sharedBuilder.init(module);
     return context.processModule();

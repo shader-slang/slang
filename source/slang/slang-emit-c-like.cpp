@@ -3372,16 +3372,20 @@ void CLikeSourceEmitter::ensureInstOperand(ComputeEmitActionsContext* ctx, IRIns
 
 void CLikeSourceEmitter::ensureInstOperandsRec(ComputeEmitActionsContext* ctx, IRInst* inst)
 {
+    if (inst->_debugUID == 13964)
+        __debugbreak();
     ensureInstOperand(ctx, inst->getFullType());
 
     UInt operandCount = inst->operandCount;
     auto requiredLevel = EmitAction::Definition;
     switch (inst->getOp())
     {
-    case kIROp_InterfaceType:
+    case kIROp_COMWitnessDecoration:
         requiredLevel = EmitAction::ForwardDeclaration;
         break;
-    case kIROp_COMWitnessDecoration:
+    case kIROp_PtrType:
+    case kIROp_NativePtrType:
+    case kIROp_RefType:
         requiredLevel = EmitAction::ForwardDeclaration;
         break;
     default:
@@ -3415,12 +3419,27 @@ void CLikeSourceEmitter::ensureGlobalInst(ComputeEmitActionsContext* ctx, IRInst
     {
     case kIROp_Generic:
         return;
-
+    case kIROp_ThisType:
+        return;
     default:
         break;
     }
     if (as<IRBasicType>(inst))
         return;
+
+    // Certain inst ops will always emit as definition.
+    switch (inst->getOp())
+    {
+    case kIROp_PtrType:
+    case kIROp_NativePtrType:
+    case kIROp_RefType:
+        // Pointer type will have their value type emited as forward declaration,
+        // but the pointer type itself should be considered emitted as definition.
+        requiredLevel = EmitAction::Level::Definition;
+        break;
+    default:
+        break;
+    }
 
     // Have we already processed this instruction?
     EmitAction::Level existingLevel;
@@ -3457,7 +3476,9 @@ void CLikeSourceEmitter::ensureGlobalInst(ComputeEmitActionsContext* ctx, IRInst
     switch (inst->getOp())
     {
     case kIROp_InterfaceRequirementEntry:
+    {
         return;
+    }
 
     default:
         break;
@@ -3496,6 +3517,16 @@ void CLikeSourceEmitter::emitForwardDeclaration(IRInst* inst)
         m_writer->emit(getName(inst));
         m_writer->emit(";\n");
         break;
+    case kIROp_InterfaceType:
+    {
+        if (inst->findDecoration<IRComInterfaceDecoration>())
+        {
+            m_writer->emit("struct ");
+            m_writer->emit(getName(inst));
+            m_writer->emit(";\n");
+        }
+        break;
+    }
     default:
         SLANG_UNREACHABLE("emit forward declaration");
     }

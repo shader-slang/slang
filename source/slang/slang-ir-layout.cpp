@@ -256,6 +256,18 @@ static Result _calcNaturalSizeAndAlignment(
                 outSizeAndAlignment);
         }
         break;
+    case kIROp_OutType:
+    case kIROp_InOutType:
+    case kIROp_RefType:
+    case kIROp_RawPointerType:
+    case kIROp_PtrType:
+    case kIROp_NativePtrType:
+    case kIROp_ComPtrType:
+        {
+            *outSizeAndAlignment = IRSizeAndAlignment(sizeof(void*), sizeof(void*));
+            return SLANG_OK;
+        }
+        break;
     default:
         break;
     }
