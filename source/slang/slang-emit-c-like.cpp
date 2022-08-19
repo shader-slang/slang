@@ -3372,8 +3372,6 @@ void CLikeSourceEmitter::ensureInstOperand(ComputeEmitActionsContext* ctx, IRIns
 
 void CLikeSourceEmitter::ensureInstOperandsRec(ComputeEmitActionsContext* ctx, IRInst* inst)
 {
-    if (inst->_debugUID == 13964)
-        __debugbreak();
     ensureInstOperand(ctx, inst->getFullType());
 
     UInt operandCount = inst->operandCount;
