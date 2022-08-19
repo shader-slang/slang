@@ -428,8 +428,8 @@ static UnownedStringSlice _getEquals(const UnownedStringSlice& in)
 
 /* static */bool ParseDiagnosticUtil::areEqual(const UnownedStringSlice& a, const UnownedStringSlice& b, EqualityFlags flags)
 {
-    ComPtr<IArtifactDiagnostics> diagsA(new ArtifactDiagnostics);
-    ComPtr<IArtifactDiagnostics> diagsB(new ArtifactDiagnostics);
+    auto diagsA = ArtifactDiagnostics::create();
+    auto diagsB = ArtifactDiagnostics::create();
 
     SlangResult resA = ParseDiagnosticUtil::parseDiagnostics(a, diagsA);
     SlangResult resB = ParseDiagnosticUtil::parseDiagnostics(b, diagsB);

@@ -54,6 +54,9 @@ public:
         /// Copy ctor
     ArtifactDiagnostics(const ThisType& rhs);
 
+        /// Create 
+    static ComPtr<IArtifactDiagnostics> create() { return ComPtr<IArtifactDiagnostics>(new ThisType); }
+
 protected:
     void* getInterface(const Guid& uuid);
     void* getObject(const Guid& uuid);
@@ -141,6 +144,8 @@ struct ShaderBindingRange
 class ArtifactPostEmitMetadata : public ComBaseObject, public IArtifactPostEmitMetadata
 {
 public:
+    typedef ArtifactPostEmitMetadata ThisType;
+
     SLANG_CLASS_GUID(0x6f82509f, 0xe48b, 0x4b83, { 0xa3, 0x84, 0x5d, 0x70, 0x83, 0x19, 0x83, 0xcc })
 
     SLANG_COM_BASE_IUNKNOWN_ALL
@@ -153,6 +158,8 @@ public:
     
     void* getInterface(const Guid& uuid);
     void* getObject(const Guid& uuid);
+
+    static ComPtr<IArtifactPostEmitMetadata> create() { return ComPtr<IArtifactPostEmitMetadata>(new ThisType); }
 
     List<ShaderBindingRange> m_usedBindings;
 };

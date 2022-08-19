@@ -288,7 +288,7 @@ SlangResult FXCDownstreamCompiler::compile(const CompileOptions& options, IArtif
         codeBlob.writeRef(),
         diagnosticsBlob.writeRef());
 
-    ComPtr<IArtifactDiagnostics> diagnostics(new ArtifactDiagnostics);
+    auto diagnostics = ArtifactDiagnostics::create();
 
     // HRESULT is compatible with SlangResult
     diagnostics->setResult(hr);

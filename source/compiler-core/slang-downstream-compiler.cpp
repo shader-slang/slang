@@ -261,7 +261,7 @@ SlangResult CommandLineDownstreamCompiler::compile(const CompileOptions& inOptio
 
     auto artifact = ArtifactUtil::createArtifactForCompileTarget(options.targetType);
 
-    ComPtr<IArtifactDiagnostics> diagnostics(new ArtifactDiagnostics);
+    auto diagnostics = ArtifactDiagnostics::create();
 
     SLANG_RETURN_ON_FAIL(parseOutput(exeRes, diagnostics));
 

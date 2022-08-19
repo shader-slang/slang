@@ -838,7 +838,7 @@ SlangResult NVRTCDownstreamCompiler::compile(const DownstreamCompileOptions& opt
     res  = m_nvrtcCompileProgram(program, int(dstOptions.getCount()), dstOptions.getBuffer());
 
     auto artifact = ArtifactUtil::createArtifactForCompileTarget(options.targetType);
-    ComPtr<IArtifactDiagnostics> diagnostics(new ArtifactDiagnostics);
+    auto diagnostics = ArtifactDiagnostics::create();
 
     artifact->addAssociated(diagnostics);
 

@@ -1901,7 +1901,7 @@ TestResult runSimpleLineTest(TestContext* context, TestInput& input)
     }
 
     // Parse all the diagnostics so we can extract line numbers
-    ComPtr<IArtifactDiagnostics> diagnostics(new ArtifactDiagnostics);
+    auto diagnostics = ArtifactDiagnostics::create();
     if (SLANG_FAILED(ParseDiagnosticUtil::parseDiagnostics(exeRes.standardError.getUnownedSlice(), diagnostics)) || diagnostics->getCount() <= 0)
     {
         // Write out the diagnostics which couldn't be parsed.

@@ -96,7 +96,7 @@ SlangResult DownstreamCompilerAdapter_Dep1::compile(const CompileOptions& option
 
     // Convert the diagnostics
 
-    ComPtr<IArtifactDiagnostics> dstDiagnostics(new ArtifactDiagnostics);
+    auto dstDiagnostics = ArtifactDiagnostics::create();
     const DownstreamDiagnostics_Dep1* srcDiagnostics = &result->getDiagnostics();
 
     dstDiagnostics->setResult(srcDiagnostics->result);

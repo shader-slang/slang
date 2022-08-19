@@ -191,7 +191,7 @@ SlangResult GlslangDownstreamCompiler::compile(const CompileOptions& options, IA
 
     auto artifact = ArtifactUtil::createArtifactForCompileTarget(options.targetType);
 
-    ComPtr<IArtifactDiagnostics> diagnostics(new ArtifactDiagnostics);
+    auto diagnostics = ArtifactDiagnostics::create();
 
     // Set the diagnostics result
     diagnostics->setResult(invokeResult);

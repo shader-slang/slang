@@ -446,7 +446,7 @@ SlangResult DXCDownstreamCompiler::compile(const CompileOptions& options, IArtif
         &includeHandler,    // `#include` handler
         dxcResult.writeRef()));
 
-    ComPtr<IArtifactDiagnostics> diagnostics(new ArtifactDiagnostics);
+    auto diagnostics = ArtifactDiagnostics::create();
     
     ComPtr<IDxcBlob> dxcResultBlob;
 
