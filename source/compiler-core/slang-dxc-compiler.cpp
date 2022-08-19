@@ -519,7 +519,10 @@ SlangResult DXCDownstreamCompiler::compile(const CompileOptions& options, IArtif
 
     auto artifact = ArtifactUtil::createArtifactForCompileTarget(options.targetType);
     artifact->addAssociated(diagnostics);
-    artifact->addRepresentationUnknown((ISlangBlob*)dxcResultBlob.get());
+    if (dxcResultBlob)
+    {
+        artifact->addRepresentationUnknown((ISlangBlob*)dxcResultBlob.get());
+    }
 
     *outArtifact = artifact.detach();
     return SLANG_OK;
