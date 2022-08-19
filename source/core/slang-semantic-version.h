@@ -3,6 +3,7 @@
 #define SLANG_SEMANTIC_VERSION_H
 
 #include "../core/slang-basic.h"
+#include "../core/slang-hash.h"
 
 namespace Slang
 {
@@ -43,6 +44,9 @@ struct SemanticVersion
         m_minor = uint16_t(minor);
         m_patch = uint16_t(patch);
     }
+
+        /// Get hash value
+    HashCode getHashCode() const { return Slang::getHashCode(toInteger()); }
 
     static SlangResult parse(const UnownedStringSlice& value, SemanticVersion& outVersion);
     static SlangResult parse(const UnownedStringSlice& value, char separatorChar, SemanticVersion& outVersion);

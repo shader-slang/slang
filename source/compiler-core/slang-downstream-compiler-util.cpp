@@ -196,8 +196,7 @@ DownstreamCompilerMatchVersion DownstreamCompilerUtil::getCompiledVersion()
 {
     DownstreamCompilerDesc desc;
     desc.type = type;
-    desc.majorVersion = version.m_major;
-    desc.minorVersion = version.m_minor;
+    desc.version = version; 
     return findCompiler(compilers, desc);
 }
 
@@ -209,7 +208,7 @@ DownstreamCompilerMatchVersion DownstreamCompilerUtil::getCompiledVersion()
 
         if (desc.type == type)
         {
-            outVersions.add(SemanticVersion(int(desc.majorVersion), int(desc.minorVersion), 0));
+            outVersions.add(desc.version);
         }
     }
 }
@@ -455,12 +454,12 @@ static SlangResult _findPaths(const String& path, const char* libraryName, Strin
     out << TypeTextUtil::getPassThroughAsHumanText(desc.type);
 
     // Append the version if there is a version
-    if (desc.majorVersion || desc.minorVersion)
+    if (desc.version.isSet())
     {
         out << " ";
-        out << desc.majorVersion;
+        out << desc.version.m_major;
         out << ".";
-        out << desc.minorVersion;
+        out << desc.version.m_minor;
     }
 }
 

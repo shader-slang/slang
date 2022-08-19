@@ -85,6 +85,13 @@ SlangResult DownstreamResultArtifactRepresentationAdapater_Dep1::createRepresent
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!! DownstreamCompilerAdapter_Dep1 !!!!!!!!!!!!!!!!!!!!!!!! */
 
+DownstreamCompilerAdapter_Dep1::DownstreamCompilerAdapter_Dep1(DownstreamCompiler_Dep1* dep) :
+    m_dep(dep)
+{
+    auto desc = dep->getDesc();
+    m_desc = DownstreamCompilerDesc(desc.type, desc.majorVersion, desc.minorVersion);
+}
+
 SlangResult DownstreamCompilerAdapter_Dep1::compile(const CompileOptions& options, IArtifact** outArtifact)
 {
     RefPtr<DownstreamCompileResult_Dep1> result;

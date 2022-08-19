@@ -164,9 +164,7 @@ SlangResult NVRTCDownstreamCompiler::init(ISlangSharedLibrary* library)
 
     int major, minor;
     m_nvrtcVersion(&major, &minor);
-    m_desc.majorVersion = major;
-    m_desc.minorVersion = minor;
-
+    m_desc.version.set(major, minor);
     return SLANG_OK;
 }
 
@@ -734,7 +732,7 @@ SlangResult NVRTCDownstreamCompiler::compile(const DownstreamCompileOptions& opt
         // Newer releases of NVRTC only support `compute_35` and up
         // (with everything before `compute_52` being deprecated).
         //
-        if( m_desc.majorVersion >= 11 )
+        if( m_desc.version.m_major >= 11 )
         {
             version = SemanticVersion(3, 5);
         }

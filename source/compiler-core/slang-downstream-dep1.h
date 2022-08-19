@@ -8,6 +8,18 @@ namespace Slang
 {
 
 // (DEPRECIATED)
+
+// Compiler description
+struct DownstreamCompilerDesc_Dep1
+{
+    SlangPassThrough type;      ///< The type of the compiler
+
+    /// TODO(JS): Would probably be better if changed to SemanticVersion, but not trivial to change
+    // because this type is part of the DownstreamCompiler interface, which is used with `slang-llvm`.
+    Int majorVersion;           ///< Major version (interpretation is type specific)
+    Int minorVersion;           ///< Minor version (interpretation is type specific)
+};
+
 struct DownstreamDiagnostic_Dep1
 {
     enum class Severity
@@ -67,7 +79,7 @@ public:
     typedef RefObject Super;
 
         /// Get the desc of this compiler
-    const DownstreamCompilerDesc& getDesc() const { return m_desc;  }
+    const DownstreamCompilerDesc_Dep1& getDesc() const { return m_desc;  }
         /// Compile using the specified options. The result is in resOut
     virtual SlangResult compile(const DownstreamCompileOptions& options, RefPtr<DownstreamCompileResult_Dep1>& outResult) = 0;
         /// Some compilers have support converting a binary blob into disassembly. Output disassembly is held in the output blob
@@ -78,24 +90,24 @@ public:
 
 protected:
 
-    DownstreamCompilerDesc m_desc;
+    DownstreamCompilerDesc_Dep1 m_desc;
 };
 
 class DownstreamCompilerAdapter_Dep1 : public DownstreamCompilerBase
 {
 public:
     // IDownstreamCompiler
-    virtual SLANG_NO_THROW const Desc& SLANG_MCALL getDesc() SLANG_OVERRIDE { return m_dep->getDesc(); }
+    virtual SLANG_NO_THROW const Desc& SLANG_MCALL getDesc() SLANG_OVERRIDE { return m_desc; }
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL compile(const CompileOptions& options, IArtifact** outArtifact) SLANG_OVERRIDE;
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL disassemble(SlangCompileTarget sourceBlobTarget, const void* blob, size_t blobSize, ISlangBlob** out) SLANG_OVERRIDE { return m_dep->disassemble(sourceBlobTarget, blob, blobSize, out); }
     virtual SLANG_NO_THROW bool SLANG_MCALL isFileBased() SLANG_OVERRIDE { return m_dep->isFileBased(); }
 
-    DownstreamCompilerAdapter_Dep1(DownstreamCompiler_Dep1* dep) :
-        m_dep(dep)
-    {
-    }
+    DownstreamCompilerAdapter_Dep1(DownstreamCompiler_Dep1* dep);
 
 protected:
+
+    DownstreamCompilerDesc m_desc;
+
     RefPtr<DownstreamCompiler_Dep1> m_dep;
 };
 
