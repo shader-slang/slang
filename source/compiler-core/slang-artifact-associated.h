@@ -11,7 +11,7 @@ struct ArtifactDiagnostic
 {
     typedef ArtifactDiagnostic ThisType;
 
-    enum class Severity
+    enum class Severity : uint8_t
     {
         Unknown,
         Info,
@@ -19,7 +19,7 @@ struct ArtifactDiagnostic
         Error,
         CountOf,
     };
-    enum class Stage
+    enum class Stage : uint8_t
     {
         Compile,
         Link,
@@ -45,17 +45,18 @@ struct ArtifactDiagnostic
     }
     bool operator!=(const ThisType& rhs) const { return !(*this == rhs); }
 
-    Severity severity = Severity::Unknown;          ///< The severity of error
-    Stage stage = Stage::Compile;                   ///< The stage the error came from
+    Severity severity = Severity::Unknown;      ///< The severity of error
+    Stage stage = Stage::Compile;               ///< The stage the error came from
     TerminatedCharSlice text;                   ///< The text of the error
     TerminatedCharSlice code;                   ///< The compiler specific error code
     TerminatedCharSlice filePath;               ///< The path the error originated from
-    Location location;
+    Location location;                          ///< The location of the diagnostic in the filePath
 };
 
-/* Diagnostics.
+/* Artifact diagnostics interface.
 
-If there are raw diagnostics they can be associated to an artifact as (Kind::Text, Payload::Diagnostics) artifact */
+IArtifactDiagnostics are added as associated types on an IArtifact typically.
+*/
 class IArtifactDiagnostics : public IClonable
 {
 public:

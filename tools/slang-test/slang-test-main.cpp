@@ -2133,22 +2133,6 @@ String getExpectedOutput(String const& outputStem)
     return expectedOutput;
 }
 
-// We want to place this somewhere useful, but for now we just use here
-namespace { // anonymous
-template <typename T>
-SLANG_FORCE_INLINE ComPtr<T> cloneInterface(T* in)
-{
-    SLANG_ASSERT(in);
-    // Must be derivable from clonable
-    IClonable* clonable = in;
-    // We can clone with the same interface
-    T* clone = (T*)clonable->clone(T::getTypeGuid());
-    // Clone must exist
-    SLANG_ASSERT(clone);
-    return ComPtr<T>(clone);
-}
-} // anonymous
-
 static String _calcSummary(IArtifactDiagnostics* inDiagnostics)
 {
     auto diagnostics = cloneInterface(inDiagnostics);
