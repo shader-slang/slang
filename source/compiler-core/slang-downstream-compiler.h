@@ -38,7 +38,7 @@ struct DownstreamCompilerDesc
 
     /// Ctor
     explicit DownstreamCompilerDesc(SlangPassThrough inType = SLANG_PASS_THROUGH_NONE, Int inMajorVersion = 0, Int inMinorVersion = 0) :type(inType), version(int(inMajorVersion), int(inMinorVersion)) {}
-    explicit DownstreamCompilerDesc(SlangPassThrough inType, const SemanticVersion& inVersion) :type(inType), version(inVersion) {}
+    explicit DownstreamCompilerDesc(SlangPassThrough inType, const SemanticVersion& inVersion) : type(inType), version(inVersion) {}
 
     SlangPassThrough type;      ///< The type of the compiler
     SemanticVersion version;    ///< The version of the compiler

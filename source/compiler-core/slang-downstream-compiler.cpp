@@ -12,7 +12,7 @@
 #include "../core/slang-blob.h"
 #include "../core/slang-char-util.h"
 
-#include "../core/slang-castable-list-impl.h"
+#include "../core/slang-castable-util.h"
 
 #include "slang-artifact-associated-impl.h"
 #include "slang-artifact-util.h"
@@ -118,7 +118,9 @@ SlangResult CommandLineDownstreamArtifactRepresentation::createRepresentation(co
             // Read the contents of the binary
         SLANG_RETURN_ON_FAIL(File::readAllBytes(m_moduleFilePath, contents));
 
-        *outCastable = CastableUtil::getCastable(ScopeRefObjectBlob::create(ListBlob::moveCreate(contents), m_temporaryFiles).detach()).detach();
+        auto blob = ScopeRefObjectBlob::create(ListBlob::moveCreate(contents), m_temporaryFiles);
+
+        *outCastable = CastableUtil::getCastable(blob).detach();
         return SLANG_OK;
     }
 

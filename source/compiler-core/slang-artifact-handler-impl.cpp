@@ -8,7 +8,7 @@
 
 #include "slang-artifact-helper.h"
 
-#include "../core/slang-castable-list-impl.h"
+#include "../core/slang-castable-util.h"
 
 #include "../core/slang-file-system.h"
 #include "../core/slang-io.h"
