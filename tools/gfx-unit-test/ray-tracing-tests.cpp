@@ -384,12 +384,12 @@ namespace gfx_test
             size_t pixelSize = 0;
             GFX_CHECK_CALL_ABORT(device->readTextureResource(
                 resultTexture, ResourceState::CopySource, resultBlob.writeRef(), &rowPitch, &pixelSize));
-
+#if 0 // for debugging only
             writeImage("test.hdr", resultBlob, width, height, (uint32_t)rowPitch, (uint32_t)pixelSize);
-
+#endif
             auto buffer = removePadding(resultBlob, width, height, rowPitch, pixelSize);
             auto actualData = (float*)buffer.getBuffer();
-            SLANG_CHECK(memcmp(actualData, expectedResult, sizeof(expectedResult)) == 0)
+            SLANG_CHECK(memcmp(actualData, expectedResult, buffer.getCount() * sizeof(decltype(buffer[0]))) == 0)
         }
     };
 
