@@ -92,8 +92,71 @@ DownstreamCompilerAdapter_Dep1::DownstreamCompilerAdapter_Dep1(DownstreamCompile
     m_desc = DownstreamCompilerDesc(desc.type, desc.majorVersion, desc.minorVersion);
 }
 
-SlangResult DownstreamCompilerAdapter_Dep1::compile(const CompileOptions& options, IArtifact** outArtifact)
+SlangResult DownstreamCompilerAdapter_Dep1::compile(const CompileOptions& inOptions, IArtifact** outArtifact)
 {
+    typedef DownstreamCompileOptions_Dep1::SomeEnum SomeEnum;
+
+    // Convert to the Deps1 compile options
+
+    DownstreamCompileOptions_Dep1 options;
+
+    options.optimizationLevel = SomeEnum(inOptions.optimizationLevel);
+    options.debugInfoType = SomeEnum(inOptions.debugInfoType);
+    options.targetType = inOptions.targetType;
+    options.sourceLanguage = inOptions.sourceLanguage;
+    options.floatingPointMode = SomeEnum(inOptions.floatingPointMode);
+    options.pipelineType = SomeEnum(inOptions.pipelineType);
+    options.matrixLayout = inOptions.matrixLayout;
+
+    options.flags = inOptions.flags;
+    options.platform = SomeEnum(inOptions.platform);
+
+    options.modulePath = inOptions.modulePath;
+
+    for (auto& src : inOptions.defines)
+    {
+        DownstreamCompileOptions_Dep1::Define dst;
+
+        dst.nameWithSig = src.nameWithSig;
+        dst.value = src.value;
+
+        options.defines.add(dst);
+    }
+
+    options.sourceContents = inOptions.sourceContents;
+    options.sourceContentsPath = inOptions.sourceContentsPath;
+
+    options.sourceFiles = inOptions.sourceFiles;
+
+    options.includePaths = inOptions.includePaths;
+    options.libraryPaths = inOptions.libraryPaths;
+
+    options.libraries = inOptions.libraries;
+
+    for (auto& src : inOptions.requiredCapabilityVersions)
+    {
+        DownstreamCompileOptions_Dep1::CapabilityVersion capVer;
+        capVer.kind = SomeEnum(src.kind);
+
+        auto& srcVer = src.version;
+
+        capVer.version.m_major = srcVer.m_major;
+        capVer.version.m_minor = srcVer.m_minor;
+        capVer.version.m_patch = uint16_t(srcVer.m_patch);
+
+        options.requiredCapabilityVersions.add(capVer);
+    }
+
+    options.entryPointName = inOptions.entryPointName;
+    options.profileName = inOptions.profileName;
+
+    options.stage = inOptions.stage;
+
+    options.compilerSpecificArguments = inOptions.compilerSpecificArguments;
+
+    options.fileSystemExt = inOptions.fileSystemExt;
+    options.sourceManager = inOptions.sourceManager;
+
     RefPtr<DownstreamCompileResult_Dep1> result;
     SLANG_RETURN_ON_FAIL(m_dep->compile(options, result));
 
