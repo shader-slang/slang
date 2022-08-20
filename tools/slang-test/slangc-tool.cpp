@@ -33,15 +33,6 @@ SlangResult SlangCTool::innerMain(StdWriters* stdWriters, slang::IGlobalSession*
     SLANG_RETURN_ON_FAIL(session->createCompileRequest(compileRequest.writeRef()));
 
     auto compilerExecutablePath = Path::getParentDirectory(Path::getExecutablePath());
-    printf("SearchPath: '%s'\n", compilerExecutablePath.getBuffer());
-    if (File::exists(Path::combine(compilerExecutablePath, "gfx.slang")))
-    {
-        printf("gfx.slang: found\n");
-    }
-    else
-    {
-        printf("gfx.slang: NOT FOUND\n");
-    }
     compileRequest->addSearchPath(compilerExecutablePath.getBuffer());
 
     // Do any app specific configuration
