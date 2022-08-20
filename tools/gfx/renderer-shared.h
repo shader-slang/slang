@@ -1161,6 +1161,8 @@ public:
     virtual SLANG_NO_THROW Result SLANG_MCALL finish() override { return SLANG_OK; }
 };
 
+static const int kRayGenRecordSize = 64; // D3D12_RAYTRACING_SHADER_TABLE_BYTE_ALIGNMENT;
+
 class ShaderTableBase
     : public IShaderTable
     , public Slang::ComObject

@@ -45,9 +45,7 @@ namespace Slang
             return true;
         }
 
-        // TODO(JS): Perhaps it should do IRPtrTypeBase, or some more expansive set of 'PtrType's 
-        // but for now test for PtrType
-        if (auto ptrType = as<IRPtrType>(type))
+        if (auto ptrType = as<IRNativePtrType>(type))
         {
             auto valueType = ptrType->getValueType();
             return valueType->findDecoration<IRComInterfaceDecoration>() != nullptr;

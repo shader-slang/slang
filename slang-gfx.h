@@ -2500,13 +2500,13 @@ public:
 extern "C"
 {
     /// Checks if format is compressed
-    SLANG_GFX_API bool gfxIsCompressedFormat(Format format);
+    SLANG_GFX_API bool SLANG_MCALL gfxIsCompressedFormat(Format format);
 
     /// Checks if format is typeless
-    SLANG_GFX_API bool gfxIsTypelessFormat(Format format);
+    SLANG_GFX_API bool SLANG_MCALL gfxIsTypelessFormat(Format format);
 
     /// Gets information about the format 
-    SLANG_GFX_API SlangResult gfxGetFormatInfo(Format format, FormatInfo* outInfo);
+    SLANG_GFX_API SlangResult SLANG_MCALL gfxGetFormatInfo(Format format, FormatInfo* outInfo);
 
     /// Given a type returns a function that can construct it, or nullptr if there isn't one
     SLANG_GFX_API SlangResult SLANG_MCALL

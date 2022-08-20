@@ -315,7 +315,7 @@ newoption {
          -- Makes all symbols hidden by default unless explicitly 'exported'
          buildoptions { "-fvisibility=hidden" } 
          -- Warnings
-         buildoptions { "-Wno-unused-but-set-variable", "-Wno-unused-parameter", "-Wno-type-limits", "-Wno-sign-compare", "-Wno-unused-variable", "-Wno-switch", "-Wno-return-type", "-Wno-unused-local-typedefs", "-Wno-parentheses"}
+         buildoptions { "-Wno-unused-but-set-variable", "-Wno-unused-parameter", "-Wno-type-limits", "-Wno-sign-compare", "-Wno-unused-variable", "-Wno-switch", "-Wno-return-type", "-Wno-unused-local-typedefs", "-Wno-parentheses", "-Wno-class-memaccess"}
  
      filter { "toolset:gcc*"}
          buildoptions { "-Wno-implicit-fallthrough"  }
@@ -323,7 +323,7 @@ newoption {
          buildoptions { "-Wno-reorder"  }
 
      filter { "toolset:clang" }
-          buildoptions { "-Wno-deprecated-register", "-Wno-tautological-compare", "-Wno-missing-braces", "-Wno-undefined-var-template", "-Wno-unused-function", "-Wno-return-std-move", "-Wno-ignored-optimization-argument", "-Wno-unknown-warning-option", "-Wno-class-memaccess", "-Wno-reorder"}
+          buildoptions { "-Wno-deprecated-register", "-Wno-tautological-compare", "-Wno-missing-braces", "-Wno-undefined-var-template", "-Wno-unused-function", "-Wno-return-std-move", "-Wno-ignored-optimization-argument", "-Wno-unknown-warning-option", "-Wno-reorder"}
  
      -- When compiling the debug configuration, we want to turn
      -- optimization off, make sure debug symbols are output,
@@ -936,7 +936,17 @@ tool "slangd"
      addSourceDir "tools/gfx/nvapi"
      addSourceDir "tools/gfx/cuda"
 	 addSourceDir "tools/gfx/debug-layer"
- 
+     if targetInfo.isWindows then
+        postbuildcommands {
+            '{COPY} "$(SolutionDir)tools/gfx/gfx.slang" "%{cfg.targetdir}"',
+            '{COPY} "$(SolutionDir)tools/gfx/slang.slang" "%{cfg.targetdir}"'
+        }
+     else
+        postbuildcommands {
+            '{COPY} "' .. path.getabsolute("tools/gfx/gfx.slang") .. '" "%{cfg.targetdir}"',
+            '{COPY} "' .. path.getabsolute("tools/gfx/slang.slang") .. '" "%{cfg.targetdir}"',
+        }
+     end
      -- To special case that we may be building using cygwin on windows. If 'true windows' we build for dx12/vk and run the script
      -- If not we assume it's a cygwin/mingw type situation and remove files that aren't appropriate
      if targetInfo.isWindows then
@@ -991,7 +1001,7 @@ tool "slangd"
      if addCUDAIfEnabled() then
          defines { "GFX_ENABLE_CUDA" }
      end
- 
+     
  --
  -- `gfx-util` is a static library containing utilities and helpers for using
  -- the `gfx` library.

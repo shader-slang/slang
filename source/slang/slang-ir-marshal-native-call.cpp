@@ -16,6 +16,10 @@ namespace Slang
             return builder.getNativePtrType(type);
         case kIROp_ComPtrType:
             return builder.getNativePtrType((IRType*)as<IRComPtrType>(type)->getOperand(0));
+        case kIROp_InOutType:
+        case kIROp_RefType:
+        case kIROp_OutType:
+            return builder.getPtrType(getNativeType(builder, (IRType*)type->getOperand(0)));
         default:
             return type;
         }
@@ -72,6 +76,7 @@ namespace Slang
         {
         case kIROp_InOutType:
         case kIROp_RefType:
+        case kIROp_OutType:
             return marshalRefManagedValueToNativeValue(
                 builder, originalArg, args);
         case kIROp_StringType:
