@@ -263,6 +263,7 @@ static Result _calcNaturalSizeAndAlignment(
     case kIROp_PtrType:
     case kIROp_NativePtrType:
     case kIROp_ComPtrType:
+    case kIROp_NativeStringType:
         {
             *outSizeAndAlignment = IRSizeAndAlignment(sizeof(void*), sizeof(void*));
             return SLANG_OK;
