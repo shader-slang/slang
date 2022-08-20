@@ -3378,14 +3378,23 @@ void CLikeSourceEmitter::ensureInstOperandsRec(ComputeEmitActionsContext* ctx, I
     auto requiredLevel = EmitAction::Definition;
     switch (inst->getOp())
     {
-    case kIROp_COMWitnessDecoration:
-        requiredLevel = EmitAction::ForwardDeclaration;
-        break;
     case kIROp_NativePtrType:
         requiredLevel = EmitAction::ForwardDeclaration;
         break;
     default:
         break;
+    }
+
+    if (auto comWitnessDecoration = as<IRCOMWitnessDecoration>(inst))
+    {
+        // A COMWitnessDecoration marks the interface inheritance of a class.
+        // We need to make sure the implemented interface is emited before the class.
+        // The witness table itself doesn't matter.
+        if (auto witnessTable = as<IRWitnessTable>(comWitnessDecoration->getWitnessTable()))
+        {
+            ensureInstOperand(ctx, witnessTable->getConformanceType(), requiredLevel);
+        }
+        requiredLevel = EmitAction::ForwardDeclaration;
     }
 
     for(UInt ii = 0; ii < operandCount; ++ii)

@@ -1199,6 +1199,10 @@ bool shouldDeclBeTreatedAsInterfaceRequirement(Decl* requirementDecl)
     else if (auto typeConstraint = as<TypeConstraintDecl>(requirementDecl))
     {
     }
+    else if (auto genericDecl = as<GenericDecl>(requirementDecl))
+    {
+        return shouldDeclBeTreatedAsInterfaceRequirement(genericDecl->inner);
+    }
     else
     {
         return false;
