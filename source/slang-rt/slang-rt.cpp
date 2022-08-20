@@ -25,7 +25,7 @@ extern "C"
         ComPtr<ISlangSharedLibrary> lib;
         if (!slangRT_loadedLibraries.TryGetValue(modulePath, lib))
         {
-            if (DefaultSharedLibraryLoader::getSingleton()->loadPlatformSharedLibrary(
+            if (DefaultSharedLibraryLoader::getSingleton()->loadSharedLibrary(
                     modulePath.getBuffer(), lib.writeRef()) != SLANG_OK)
             {
                 _slang_rt_abort("Failed to load DLL \"" + modulePath + "\"");

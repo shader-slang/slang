@@ -32,7 +32,17 @@ SlangResult SlangCTool::innerMain(StdWriters* stdWriters, slang::IGlobalSession*
     ComPtr<slang::ICompileRequest> compileRequest;
     SLANG_RETURN_ON_FAIL(session->createCompileRequest(compileRequest.writeRef()));
 
-    compileRequest->addSearchPath(Path::getParentDirectory(Path::getExecutablePath()).getBuffer());
+    auto compilerExecutablePath = Path::getParentDirectory(Path::getExecutablePath());
+    stdWriters->getOut().print("SearchPath: '%s'\n", compilerExecutablePath.getBuffer());
+    if (File::exists(Path::combine(compilerExecutablePath, "gfx.slang")))
+    {
+        stdWriters->getOut().print("gfx.slang: found\n");
+    }
+    else
+    {
+        stdWriters->getOut().print("gfx.slang: NOT FOUND\n");
+    }
+    compileRequest->addSearchPath(compilerExecutablePath.getBuffer());
 
     // Do any app specific configuration
     for (int i = 0; i < SLANG_WRITER_CHANNEL_COUNT_OF; ++i)
