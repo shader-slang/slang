@@ -180,7 +180,7 @@ static void _compileTimeAsserts()
 
 extern "C"
 {
-    SLANG_GFX_API bool gfxIsCompressedFormat(Format format)
+    SLANG_GFX_API bool SLANG_MCALL gfxIsCompressedFormat(Format format)
     {
         switch (format)
         {
@@ -204,7 +204,7 @@ extern "C"
         }
     }
 
-    SLANG_GFX_API bool gfxIsTypelessFormat(Format format)
+    SLANG_GFX_API bool SLANG_MCALL gfxIsTypelessFormat(Format format)
     {
         switch (format)
         {
@@ -226,7 +226,7 @@ extern "C"
         }
     }
 
-    SLANG_GFX_API SlangResult gfxGetFormatInfo(Format format, FormatInfo* outInfo)
+    SLANG_GFX_API SlangResult SLANG_MCALL gfxGetFormatInfo(Format format, FormatInfo* outInfo)
     {
         *outInfo = s_formatInfoMap.get(format);
         return SLANG_OK;
