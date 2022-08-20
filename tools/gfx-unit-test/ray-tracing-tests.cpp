@@ -377,7 +377,7 @@ namespace gfx_test
             GFX_CHECK_CALL_ABORT(device->createShaderTable(shaderTableDesc, shaderTable.writeRef()));
         }
 
-        void checkTestResults(float* expectedResult)
+        void checkTestResults(float* expectedResult, uint32_t count)
         {
             ComPtr<ISlangBlob> resultBlob;
             size_t rowPitch = 0;
@@ -389,7 +389,7 @@ namespace gfx_test
 #endif
             auto buffer = removePadding(resultBlob, width, height, rowPitch, pixelSize);
             auto actualData = (float*)buffer.getBuffer();
-            SLANG_CHECK(memcmp(actualData, expectedResult, buffer.getCount() * sizeof(decltype(buffer[0]))) == 0)
+            SLANG_CHECK(memcmp(actualData, expectedResult, count * sizeof(float)) == 0)
         }
     };
 
@@ -421,7 +421,7 @@ namespace gfx_test
                                          0, 0, 1, 1,
                                          0, 1, 0, 1,
                                          1, 0, 0, 1 };
-            checkTestResults(expectedResult);
+            checkTestResults(expectedResult, 16);
         }
     };
 
@@ -453,7 +453,7 @@ namespace gfx_test
                                          1, 1, 0, 1,
                                          1, 0, 1, 1,
                                          0, 1, 1, 1 };
-            checkTestResults(expectedResult);
+            checkTestResults(expectedResult, 16);
         }
     };
 
