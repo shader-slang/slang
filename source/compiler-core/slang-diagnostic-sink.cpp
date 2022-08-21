@@ -405,10 +405,13 @@ static void formatDiagnostic(
     HumaneSourceLoc humaneLoc;
     const auto sourceLoc = diagnostic.loc;
     {
-        sourceView = sourceManager->findSourceViewRecursively(sourceLoc);
-        if (sourceView)
+        if (sourceManager)
         {
-            humaneLoc = sourceView->getHumaneLoc(sourceLoc);
+            sourceView = sourceManager->findSourceViewRecursively(sourceLoc);
+            if (sourceView)
+            {
+                humaneLoc = sourceView->getHumaneLoc(sourceLoc);
+            }
         }
         
         formatDiagnostic(humaneLoc, diagnostic, sink->getFlags(), sb);
@@ -418,7 +421,7 @@ static void formatDiagnostic(
 
             while (currentView && currentView->getInitiatingSourceLoc().isValid() && currentView->getSourceFile()->getPathInfo().type == PathInfo::Type::TokenPaste)
             {
-                SourceView* initiatingView = sourceManager->findSourceView(currentView->getInitiatingSourceLoc());
+                SourceView* initiatingView = sourceManager ? sourceManager->findSourceView(currentView->getInitiatingSourceLoc()) : nullptr;
                 if (initiatingView == nullptr)
                 {
                     break;

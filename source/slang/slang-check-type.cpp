@@ -367,8 +367,15 @@ namespace Slang
             {
                 return leftVar->declRef.equals(rightVar->declRef);
             }
+            else if (auto rightPoly = as<PolynomialIntVal>(right))
+            {
+                return right->equalsVal(leftVar);
+            }
         }
-
+        if (auto leftVar = as<PolynomialIntVal>(left))
+        {
+            return leftVar->equalsVal(right);
+        }
         return false;
     }
 
