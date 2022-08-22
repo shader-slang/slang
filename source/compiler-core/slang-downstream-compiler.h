@@ -26,27 +26,22 @@ struct DownstreamCompilerDesc
 {
     typedef DownstreamCompilerDesc ThisType;
 
-    HashCode getHashCode() const { return combineHash(HashCode(type), combineHash(HashCode(majorVersion), HashCode(minorVersion))); }
-    bool operator==(const ThisType& rhs) const { return type == rhs.type && majorVersion == rhs.majorVersion && minorVersion == rhs.minorVersion; }
+    HashCode getHashCode() const { return combineHash(HashCode(type), version.getHashCode()); }
+    bool operator==(const ThisType& rhs) const { return type == rhs.type && version == rhs.version; }
     bool operator!=(const ThisType& rhs) const { return !(*this == rhs); }
 
         /// Get the version as a value
-    Int getVersionValue() const { return majorVersion * 100 + minorVersion; }
+    Int getVersionValue() const { return version.m_major * 100 + version.m_minor; }
 
         /// true if has a version set
-    bool hasVersion() const { return majorVersion || minorVersion; }
+    bool hasVersion() const { return version.isSet(); }
 
     /// Ctor
-    explicit DownstreamCompilerDesc(SlangPassThrough inType = SLANG_PASS_THROUGH_NONE, Int inMajorVersion = 0, Int inMinorVersion = 0) :type(inType), majorVersion(inMajorVersion), minorVersion(inMinorVersion) {}
-
-    explicit DownstreamCompilerDesc(SlangPassThrough inType, const SemanticVersion& version) :type(inType), majorVersion(version.m_major), minorVersion(version.m_minor) {}
+    explicit DownstreamCompilerDesc(SlangPassThrough inType = SLANG_PASS_THROUGH_NONE, Int inMajorVersion = 0, Int inMinorVersion = 0) :type(inType), version(int(inMajorVersion), int(inMinorVersion)) {}
+    explicit DownstreamCompilerDesc(SlangPassThrough inType, const SemanticVersion& inVersion) : type(inType), version(inVersion) {}
 
     SlangPassThrough type;      ///< The type of the compiler
-
-    /// TODO(JS): Would probably be better if changed to SemanticVersion, but not trivial to change
-    // because this type is part of the DownstreamCompiler interface, which is used with `slang-llvm`.
-    Int majorVersion;           ///< Major version (interpretation is type specific)
-    Int minorVersion;           ///< Minor version (interpretation is type specific)
+    SemanticVersion version;    ///< The version of the compiler
 };
 
 struct DownstreamCompileOptions
@@ -63,7 +58,7 @@ struct DownstreamCompileOptions
         };
     };
 
-    enum class OptimizationLevel
+    enum class OptimizationLevel : uint8_t
     {
         None,           ///< Don't optimize at all. 
         Default,        ///< Default optimization level: balance code quality and compilation time. 
@@ -71,21 +66,21 @@ struct DownstreamCompileOptions
         Maximal,        ///< Include optimizations that may take a very long time, or may involve severe space-vs-speed tradeoffs 
     };
 
-    enum class DebugInfoType
+    enum class DebugInfoType : uint8_t
     {
         None,       ///< Don't emit debug information at all. 
         Minimal,    ///< Emit as little debug information as possible, while still supporting stack traces. 
         Standard,   ///< Emit whatever is the standard level of debug information for each target. 
         Maximal,    ///< Emit as much debug information as possible for each target. 
     };
-    enum class FloatingPointMode
+    enum class FloatingPointMode : uint8_t
     {
         Default,
         Fast,
         Precise,
     };
 
-    enum PipelineType
+    enum PipelineType : uint8_t
     {
         Unknown,
         Compute,
@@ -101,7 +96,7 @@ struct DownstreamCompileOptions
 
     struct CapabilityVersion
     {
-        enum class Kind
+        enum class Kind : uint8_t
         {
             CUDASM,                     ///< What the version is for
             SPIRV,
@@ -198,8 +193,10 @@ public:
     virtual SLANG_NO_THROW const Desc& SLANG_MCALL getDesc() = 0;
         /// Compile using the specified options. The result is in resOut
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL compile(const CompileOptions& options, IArtifact** outArtifact) = 0;
-        /// Some compilers have support converting a binary blob into disassembly. Output disassembly is held in the output blob
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL disassemble(SlangCompileTarget sourceBlobTarget, const void* blob, size_t blobSize, ISlangBlob** out) = 0;
+        /// Returns true if compiler can do a transformation of `from` to `to` Artifact types
+    virtual SLANG_NO_THROW bool SLANG_MCALL canConvert(const ArtifactDesc& from, const ArtifactDesc& to) = 0;
+        /// Converts an artifact `from` to a desc of `to` and puts the result in outArtifact
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL convert(IArtifact* from, const ArtifactDesc& to, IArtifact** outArtifact) = 0;
 
         /// True if underlying compiler uses file system to communicate source
     virtual SLANG_NO_THROW bool SLANG_MCALL isFileBased() = 0;
@@ -215,7 +212,8 @@ public:
 
     // IDownstreamCompiler
     virtual SLANG_NO_THROW const Desc& SLANG_MCALL getDesc() SLANG_OVERRIDE { return m_desc; }
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL disassemble(SlangCompileTarget sourceBlobTarget, const void* blob, size_t blobSize, ISlangBlob** out) SLANG_OVERRIDE;
+    virtual SLANG_NO_THROW bool SLANG_MCALL canConvert(const ArtifactDesc& from, const ArtifactDesc& to) SLANG_OVERRIDE { SLANG_UNUSED(from); SLANG_UNUSED(to); return false; } 
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL convert(IArtifact* from, const ArtifactDesc& to, IArtifact** outArtifact) SLANG_OVERRIDE;
 
     DownstreamCompilerBase(const Desc& desc):
         m_desc(desc)
@@ -298,7 +296,7 @@ public:
 };
 
 /* Only purpose of having base-class here is to make all the DownstreamCompiler types available directly in derived Utils */
-struct DownstreamCompilerBaseUtil
+struct DownstreamCompilerUtilBase
 {
     typedef DownstreamCompileOptions CompileOptions;
 

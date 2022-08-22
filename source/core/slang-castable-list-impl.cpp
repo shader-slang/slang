@@ -1,71 +1,9 @@
 // slang-castable-list-impl.cpp
 #include "slang-castable-list-impl.h"
 
+#include "slang-castable-util.h"
+
 namespace Slang {
-
-/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! CastableUtil !!!!!!!!!!!!!!!!!!!!!!!!!!! */
-
-/* static */ComPtr<ICastable> CastableUtil::getCastable(ISlangUnknown* unk)
-{
-    SLANG_ASSERT(unk);
-    ComPtr<ICastable> castable;
-    if (SLANG_SUCCEEDED(unk->queryInterface(ICastable::getTypeGuid(), (void**)castable.writeRef())))
-    {
-        SLANG_ASSERT(castable);
-    }
-    else
-    {
-        castable = new UnknownCastableAdapter(unk);
-    }
-    return castable;
-}
-
-/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! UnknownCastableAdapter !!!!!!!!!!!!!!!!!!!!!!!!!!! */
-
-void* UnknownCastableAdapter::castAs(const Guid& guid)
-{
-    if (auto intf = getInterface(guid))
-    {
-        return intf;
-    }
-    if (auto obj = getObject(guid))
-    {
-        return obj;
-    }
-
-    if (m_found && guid == m_foundGuid)
-    {
-        return m_found;
-    }
-
-    ComPtr<ISlangUnknown> cast;
-    if (SLANG_SUCCEEDED(m_contained->queryInterface(guid, (void**)cast.writeRef())) && cast)
-    {
-        // Save the interface in the cache
-        m_found = cast;
-        m_foundGuid = guid;
-
-        return cast;
-    }
-    return nullptr;
-}
-
-void* UnknownCastableAdapter::getInterface(const Guid& guid)
-{
-    if (guid == ISlangUnknown::getTypeGuid() ||
-        guid == ICastable::getTypeGuid() ||
-        guid == IUnknownCastableAdapter::getTypeGuid())
-    {
-        return static_cast<IUnknownCastableAdapter*>(this);
-    }
-    return nullptr;
-}
-
-void* UnknownCastableAdapter::getObject(const Guid& guid)
-{
-    SLANG_UNUSED(guid);
-    return nullptr;
-}
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! CastableList !!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
@@ -166,18 +104,7 @@ void CastableList::clear()
 
 void CastableList::addUnknown(ISlangUnknown* unk)
 {
-    // If it has ICastable interface we can just add as that
-    {
-        ComPtr<ICastable> castable;
-        if (SLANG_SUCCEEDED(unk->queryInterface(ICastable::getTypeGuid(), (void**)castable.writeRef())) && castable)
-        {
-            return add(castable);
-        }
-    }
-
-    // Wrap it in an adapter
-    IUnknownCastableAdapter* adapter = new UnknownCastableAdapter(unk);
-    add(adapter);
+    add(CastableUtil::getCastable(unk));
 }
 
 Index CastableList::indexOfUnknown(ISlangUnknown* unk)
@@ -202,6 +129,7 @@ Index CastableList::indexOfUnknown(ISlangUnknown* unk)
             return i;
         }
     }
+
     return -1;
 }
 

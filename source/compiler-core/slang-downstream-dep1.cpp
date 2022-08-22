@@ -3,8 +3,9 @@
 
 #include "slang-artifact-util.h"
 #include "slang-artifact-associated-impl.h"
+#include "slang-artifact-desc-util.h"
 
-#include "../core/slang-castable-list-impl.h"
+#include "../core/slang-castable-util.h"
 
 namespace Slang
 {
@@ -45,7 +46,7 @@ void* DownstreamResultArtifactRepresentationAdapater_Dep1::castAs(const SlangUUI
 
 void* DownstreamResultArtifactRepresentationAdapater_Dep1::getInterface(const Guid& guid)
 {
-    if (guid == ISlangBlob::getTypeGuid() ||
+    if (guid == ISlangUnknown::getTypeGuid() ||
         guid == ICastable::getTypeGuid() ||
         guid == IArtifactRepresentation::getTypeGuid())
     {
@@ -85,8 +86,78 @@ SlangResult DownstreamResultArtifactRepresentationAdapater_Dep1::createRepresent
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!! DownstreamCompilerAdapter_Dep1 !!!!!!!!!!!!!!!!!!!!!!!! */
 
-SlangResult DownstreamCompilerAdapter_Dep1::compile(const CompileOptions& options, IArtifact** outArtifact)
+DownstreamCompilerAdapter_Dep1::DownstreamCompilerAdapter_Dep1(DownstreamCompiler_Dep1* dep, ArtifactPayload disassemblyPayload) :
+    m_dep(dep),
+    m_disassemblyPayload(disassemblyPayload)
 {
+    auto desc = dep->getDesc();
+    m_desc = DownstreamCompilerDesc(desc.type, desc.majorVersion, desc.minorVersion);
+}
+SlangResult DownstreamCompilerAdapter_Dep1::compile(const CompileOptions& inOptions, IArtifact** outArtifact)
+{
+    typedef DownstreamCompileOptions_Dep1::SomeEnum SomeEnum;
+
+    // Convert to the Deps1 compile options
+
+    DownstreamCompileOptions_Dep1 options;
+
+    options.optimizationLevel = SomeEnum(inOptions.optimizationLevel);
+    options.debugInfoType = SomeEnum(inOptions.debugInfoType);
+    options.targetType = inOptions.targetType;
+    options.sourceLanguage = inOptions.sourceLanguage;
+    options.floatingPointMode = SomeEnum(inOptions.floatingPointMode);
+    options.pipelineType = SomeEnum(inOptions.pipelineType);
+    options.matrixLayout = inOptions.matrixLayout;
+
+    options.flags = inOptions.flags;
+    options.platform = SomeEnum(inOptions.platform);
+
+    options.modulePath = inOptions.modulePath;
+
+    for (auto& src : inOptions.defines)
+    {
+        DownstreamCompileOptions_Dep1::Define dst;
+
+        dst.nameWithSig = src.nameWithSig;
+        dst.value = src.value;
+
+        options.defines.add(dst);
+    }
+
+    options.sourceContents = inOptions.sourceContents;
+    options.sourceContentsPath = inOptions.sourceContentsPath;
+
+    options.sourceFiles = inOptions.sourceFiles;
+
+    options.includePaths = inOptions.includePaths;
+    options.libraryPaths = inOptions.libraryPaths;
+
+    options.libraries = inOptions.libraries;
+
+    for (auto& src : inOptions.requiredCapabilityVersions)
+    {
+        DownstreamCompileOptions_Dep1::CapabilityVersion capVer;
+        capVer.kind = SomeEnum(src.kind);
+
+        auto& srcVer = src.version;
+
+        capVer.version.m_major = srcVer.m_major;
+        capVer.version.m_minor = srcVer.m_minor;
+        capVer.version.m_patch = uint16_t(srcVer.m_patch);
+
+        options.requiredCapabilityVersions.add(capVer);
+    }
+
+    options.entryPointName = inOptions.entryPointName;
+    options.profileName = inOptions.profileName;
+
+    options.stage = inOptions.stage;
+
+    options.compilerSpecificArguments = inOptions.compilerSpecificArguments;
+
+    options.fileSystemExt = inOptions.fileSystemExt;
+    options.sourceManager = inOptions.sourceManager;
+
     RefPtr<DownstreamCompileResult_Dep1> result;
     SLANG_RETURN_ON_FAIL(m_dep->compile(options, result));
 
@@ -122,6 +193,36 @@ SlangResult DownstreamCompilerAdapter_Dep1::compile(const CompileOptions& option
 
     auto rep = new DownstreamResultArtifactRepresentationAdapater_Dep1(result);
     artifact->addRepresentation(rep);
+
+    *outArtifact = artifact.detach();
+    return SLANG_OK;
+}
+
+bool DownstreamCompilerAdapter_Dep1::canConvert(const ArtifactDesc& from, const ArtifactDesc& to)
+{
+    // Can only disassemble blobs that are DXBC
+    return ArtifactDescUtil::isDissassembly(from, to) && from.payload == m_disassemblyPayload;
+}
+
+SlangResult DownstreamCompilerAdapter_Dep1::convert(IArtifact* from, const ArtifactDesc& to, IArtifact** outArtifact)
+{
+    if (!canConvert(from->getDesc(), to))
+    {
+        return SLANG_FAIL;
+    }
+
+    ComPtr<ISlangBlob> fromBlob;
+    SLANG_RETURN_ON_FAIL(from->loadBlob(ArtifactKeep::No, fromBlob.writeRef()));
+
+    const auto compileTarget = ArtifactDescUtil::getCompileTargetFromDesc(from->getDesc());
+
+    // Do the disassembly
+    ComPtr<ISlangBlob> dstBlob;
+    SLANG_RETURN_ON_FAIL(m_dep->disassemble(compileTarget, fromBlob->getBufferPointer(), fromBlob->getBufferSize(), dstBlob.writeRef()));
+
+    auto artifact = ArtifactUtil::createArtifact(to);
+
+    artifact->addRepresentationUnknown(dstBlob);
 
     *outArtifact = artifact.detach();
     return SLANG_OK;

@@ -7,7 +7,7 @@ namespace Slang
 {
 
 
-struct VisualStudioCompilerUtil : public DownstreamCompilerBaseUtil
+struct VisualStudioCompilerUtil : public DownstreamCompilerUtilBase
 {
         /// Calculate Visual Studio family compilers cmdLine arguments from options
     static SlangResult calcArgs(const CompileOptions& options, CommandLine& cmdLine);

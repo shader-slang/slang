@@ -18,7 +18,7 @@
 #include "slang-source-loc.h"
 
 #include "slang-artifact-associated-impl.h"
-
+#include "slang-artifact-desc-util.h"
 #include "slang-artifact-diagnostic-util.h"
 
 #include "../core/slang-shared-library.h"
@@ -118,7 +118,8 @@ public:
 
     // IDownstreamCompiler
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL compile(const CompileOptions& options, IArtifact** outArtifact) SLANG_OVERRIDE;
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL disassemble(SlangCompileTarget sourceBlobTarget, const void* blob, size_t blobSize, ISlangBlob** out) SLANG_OVERRIDE;
+    virtual SLANG_NO_THROW bool SLANG_MCALL canConvert(const ArtifactDesc& from, const ArtifactDesc& to) SLANG_OVERRIDE;
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL convert(IArtifact* from, const ArtifactDesc& to, IArtifact** outArtifact) SLANG_OVERRIDE;
     virtual SLANG_NO_THROW bool SLANG_MCALL isFileBased() SLANG_OVERRIDE { return false; }
 
         /// Must be called before use
@@ -324,19 +325,30 @@ SlangResult FXCDownstreamCompiler::compile(const CompileOptions& options, IArtif
     return SLANG_OK;
 }
 
-SlangResult FXCDownstreamCompiler::disassemble(SlangCompileTarget sourceBlobTarget, const void* blob, size_t blobSize, ISlangBlob** out)
+bool FXCDownstreamCompiler::canConvert(const ArtifactDesc& from, const ArtifactDesc& to)
 {
     // Can only disassemble blobs that are DXBC
-    if (sourceBlobTarget != SLANG_DXBC)
+    return ArtifactDescUtil::isDissassembly(from, to) && from.payload == ArtifactPayload::DXBC;
+}
+
+SlangResult FXCDownstreamCompiler::convert(IArtifact* from, const ArtifactDesc& to, IArtifact** outArtifact) 
+{
+    if (!canConvert(from->getDesc(), to))
     {
         return SLANG_FAIL;
     }
 
-    ComPtr<ID3DBlob> codeBlob;
-    SLANG_RETURN_ON_FAIL(m_disassemble(blob, blobSize, 0, nullptr, codeBlob.writeRef()));
+    ComPtr<ISlangBlob> dxbcBlob;
+    SLANG_RETURN_ON_FAIL(from->loadBlob(ArtifactKeep::No, dxbcBlob.writeRef()));
 
+    ComPtr<ID3DBlob> disassemblyBlob;
+    SLANG_RETURN_ON_FAIL(m_disassemble(dxbcBlob->getBufferPointer(), dxbcBlob->getBufferSize(), 0, nullptr, disassemblyBlob.writeRef()));
+
+    auto artifact = ArtifactUtil::createArtifact(to);
     // ISlangBlob is compatible with ID3DBlob
-    *out = (ISlangBlob*)codeBlob.detach();
+    artifact->addRepresentationUnknown((ISlangBlob*)disassemblyBlob.get());
+
+    *outArtifact= artifact.detach();
     return SLANG_OK;
 }
 

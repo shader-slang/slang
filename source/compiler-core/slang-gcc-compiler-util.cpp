@@ -83,8 +83,7 @@ static Index _findVersionEnd(const UnownedStringSlice& in)
             return SLANG_FAIL;
         }
 
-        outDesc.majorVersion = digits[0];
-        outDesc.minorVersion = digits[1];
+        outDesc.version.set(int(digits[0]), int(digits[1]));
         return SLANG_OK;
     }
 
@@ -726,7 +725,7 @@ static SlangResult _parseGCCFamilyLine(CharSliceAllocator& allocator, const Unow
         // but that requires some more complex behavior, so we don't allow for now.
         
         auto desc = compiler->getDesc();
-        if (desc.majorVersion < 5)
+        if (desc.version.m_major < 5)
         {
             // If the version isn't 5 or higher, we don't add this version of the compiler.
             return SLANG_OK;

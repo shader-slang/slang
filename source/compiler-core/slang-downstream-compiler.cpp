@@ -12,7 +12,7 @@
 #include "../core/slang-blob.h"
 #include "../core/slang-char-util.h"
 
-#include "../core/slang-castable-list-impl.h"
+#include "../core/slang-castable-util.h"
 
 #include "slang-artifact-associated-impl.h"
 #include "slang-artifact-util.h"
@@ -22,13 +22,12 @@ namespace Slang
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! DownstreamCompilerBase !!!!!!!!!!!!!!!!!!!!!!!!!!!!!*/
 
-SlangResult DownstreamCompilerBase::disassemble(SlangCompileTarget sourceBlobTarget, const void* blob, size_t blobSize, ISlangBlob** out)
+SlangResult DownstreamCompilerBase::convert(IArtifact* from, const ArtifactDesc& to, IArtifact** outArtifact)
 {
-    SLANG_UNUSED(sourceBlobTarget);
-    SLANG_UNUSED(blob);
-    SLANG_UNUSED(blobSize);
-    SLANG_UNUSED(out);
-
+    SLANG_UNUSED(from);
+    SLANG_UNUSED(to);
+    SLANG_UNUSED(outArtifact);
+    
     return SLANG_E_NOT_AVAILABLE;
 }
 
@@ -118,7 +117,9 @@ SlangResult CommandLineDownstreamArtifactRepresentation::createRepresentation(co
             // Read the contents of the binary
         SLANG_RETURN_ON_FAIL(File::readAllBytes(m_moduleFilePath, contents));
 
-        *outCastable = CastableUtil::getCastable(ScopeRefObjectBlob::create(ListBlob::moveCreate(contents), m_temporaryFiles).detach()).detach();
+        auto blob = ScopeRefObjectBlob::create(ListBlob::moveCreate(contents), m_temporaryFiles);
+
+        *outCastable = CastableUtil::getCastable(blob).detach();
         return SLANG_OK;
     }
 

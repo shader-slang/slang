@@ -7,7 +7,7 @@
 
 namespace Slang
 {
-    enum class PlatformKind
+    enum class PlatformKind : uint8_t
     {
         Unknown,
         WinRT,
@@ -48,7 +48,7 @@ namespace Slang
         };
     };
 
-    enum class PlatformFamily
+    enum class PlatformFamily : uint8_t
     {
         Unknown,
         Windows,

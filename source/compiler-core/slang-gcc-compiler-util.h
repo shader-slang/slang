@@ -7,7 +7,7 @@ namespace Slang
 {
 
 /* Utility for processing input and output of gcc-like compilers, including clang */
-struct GCCDownstreamCompilerUtil : public DownstreamCompilerBaseUtil
+struct GCCDownstreamCompilerUtil : public DownstreamCompilerUtilBase
 {
         /// Extracts version number into desc from text (assumes gcc/clang -v layout with a line with version)
     static SlangResult parseVersion(const UnownedStringSlice& text, const UnownedStringSlice& prefix, DownstreamCompilerDesc& outDesc);

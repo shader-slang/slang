@@ -17,6 +17,7 @@
 
 #include "slang-artifact-diagnostic-util.h"
 #include "slang-artifact-util.h"
+#include "slang-artifact-desc-util.h"
 #include "slang-artifact-associated-impl.h"
 
 namespace nvrtc
@@ -104,6 +105,8 @@ public:
     // IDownstreamCompiler
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL compile(const CompileOptions& options, IArtifact** outArtifact) SLANG_OVERRIDE;
     virtual SLANG_NO_THROW bool SLANG_MCALL isFileBased() SLANG_OVERRIDE { return false; }
+    virtual SLANG_NO_THROW bool SLANG_MCALL canConvert(const ArtifactDesc& from, const ArtifactDesc& to) SLANG_OVERRIDE;
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL convert(IArtifact* from, const ArtifactDesc& to, IArtifact** outArtifact) SLANG_OVERRIDE;
 
         /// Must be called before use
     SlangResult init(ISlangSharedLibrary* library);
@@ -164,9 +167,7 @@ SlangResult NVRTCDownstreamCompiler::init(ISlangSharedLibrary* library)
 
     int major, minor;
     m_nvrtcVersion(&major, &minor);
-    m_desc.majorVersion = major;
-    m_desc.minorVersion = minor;
-
+    m_desc.version.set(major, minor);
     return SLANG_OK;
 }
 
@@ -734,7 +735,7 @@ SlangResult NVRTCDownstreamCompiler::compile(const DownstreamCompileOptions& opt
         // Newer releases of NVRTC only support `compute_35` and up
         // (with everything before `compute_52` being deprecated).
         //
-        if( m_desc.majorVersion >= 11 )
+        if( m_desc.version.m_major >= 11 )
         {
             version = SemanticVersion(3, 5);
         }
@@ -904,7 +905,31 @@ SlangResult NVRTCDownstreamCompiler::compile(const DownstreamCompileOptions& opt
     return SLANG_OK;
 }
 
+bool NVRTCDownstreamCompiler::canConvert(const ArtifactDesc& from, const ArtifactDesc& to)
+{
+    return ArtifactDescUtil::isDissassembly(from, to) || ArtifactDescUtil::isDissassembly(to, from);
+}
 
+SlangResult NVRTCDownstreamCompiler::convert(IArtifact* from, const ArtifactDesc& to, IArtifact** outArtifact)
+{
+    if (!canConvert(from->getDesc(), to))
+    {
+        return SLANG_FAIL;
+    }
+
+    // PTX is 'binary like' and 'assembly like' so we allow conversion either way
+    // We do it by just getting as a blob and sharing that blob. 
+    // A more sophisticated implementation could proxy to the original artifact, but this 
+    // is simpler, and probably fine in most scenarios.
+    ComPtr<ISlangBlob> blob;
+    SLANG_RETURN_ON_FAIL(from->loadBlob(ArtifactKeep::Yes, blob.writeRef()));
+
+    auto artifact = ArtifactUtil::createArtifact(to);
+    artifact->addRepresentationUnknown(blob);
+
+    *outArtifact = artifact.detach();
+    return SLANG_OK;
+}
 
 static SlangResult _findAndLoadNVRTC(ISlangSharedLibraryLoader* loader, ComPtr<ISlangSharedLibrary>& outLibrary)
 {

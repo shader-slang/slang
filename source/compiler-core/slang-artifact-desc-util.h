@@ -84,8 +84,21 @@ struct ArtifactDescUtil
         /// Given a target returns the ArtifactDesc
     static ArtifactDesc makeDescFromCompileTarget(SlangCompileTarget target);
 
+        /// Returns the closest compile target for desc. Will return 
+        /// SLANG_TARGET_UNKNOWN if not known
+    static SlangCompileTarget getCompileTargetFromDesc(const ArtifactDesc& desc);
+
         /// Make ArtifactDesc from target
     static bool isDescDerivedFrom(const ArtifactDesc& desc, const ArtifactDesc& from);
+
+        /// True if `to` is disassembly of `from`
+    static bool isDissassembly(const ArtifactDesc& from, const ArtifactDesc& to);
+
+        /// Append the desc as text to out
+    static void appendText(const ArtifactDesc& desc, StringBuilder& out);
+
+    static String getText(const ArtifactDesc& desc);
+
 };
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!

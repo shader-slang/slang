@@ -1,4 +1,4 @@
-// slang-castable-list.h
+// slang-castable-list-impl.h
 #ifndef SLANG_CASTABLE_LIST_IMPL_H
 #define SLANG_CASTABLE_LIST_IMPL_H
 
@@ -12,42 +12,8 @@
 namespace Slang
 {
 
-/* An adapter such that types which aren't derived from ICastable, can be used as such. 
-
-With the following caveats.
-* the interfaces/objects of the adapter are checked *first*, so IUnknown will always be for the adapter
-* assumes when doing a queryInterface on the contained item, it will remain in scope when released (this is *not* strict COM)
-*/
-class UnknownCastableAdapter : public ComBaseObject, public IUnknownCastableAdapter
-{
-public:
-    SLANG_COM_BASE_IUNKNOWN_ALL
-
-    // ICastable
-    SLANG_NO_THROW void* SLANG_MCALL castAs(const Guid& guid) SLANG_OVERRIDE;
-
-    // IUnknownCastableAdapter
-    virtual SLANG_NO_THROW ISlangUnknown* SLANG_MCALL getContained() SLANG_OVERRIDE { return m_contained; }
-
-    UnknownCastableAdapter(ISlangUnknown* unk):
-        m_contained(unk)
-    {
-        SLANG_ASSERT(unk);
-    }
-
-protected:
-    void* getInterface(const Guid& guid);
-    void* getObject(const Guid& guid);
-
-    ComPtr<ISlangUnknown> m_contained;
-
-    // We hold a cache for a single lookup to make things a little faster
-    void* m_found = nullptr;
-    Guid m_foundGuid;
-};
-
 /* Implementation of the ICastableList interface. 
-Is atomic reference counted*/
+Is atomic reference counted */
 class CastableList : public ComBaseObject, public ICastableList
 {
 public:
@@ -72,17 +38,12 @@ public:
         /// Dtor
     virtual ~CastableList();
 
-protected:
     void* getInterface(const Guid& guid);
     void* getObject(const Guid& guid);
 
-    List<ICastable*> m_list;
-};
+protected:
 
-struct CastableUtil
-{
-        /// Given an unk return as an unk
-    static ComPtr<ICastable> getCastable(ISlangUnknown* unk);
+    List<ICastable*> m_list;
 };
 
 } // namespace Slang

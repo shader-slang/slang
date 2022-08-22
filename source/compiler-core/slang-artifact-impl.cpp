@@ -8,7 +8,7 @@
 
 #include "slang-artifact-handler-impl.h"
 
-#include "../core/slang-castable-list-impl.h"
+#include "../core/slang-castable-util.h"
 
 namespace Slang {
 

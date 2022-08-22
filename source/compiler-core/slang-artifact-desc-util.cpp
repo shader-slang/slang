@@ -279,6 +279,68 @@ SLANG_HIERARCHICAL_ENUM(ArtifactStyle, SLANG_ARTIFACT_STYLE, SLANG_ARTIFACT_STYL
     SLANG_UNEXPECTED("Unhandled type");
 }
 
+/* static */SlangCompileTarget ArtifactDescUtil::getCompileTargetFromDesc(const ArtifactDesc& desc)
+{
+    switch (desc.kind)
+    {
+        case ArtifactKind::None:            return SLANG_TARGET_NONE;
+        case ArtifactKind::Source:
+        {
+            switch (desc.payload)
+            {
+                case Payload::HLSL:         return SLANG_HLSL;
+                case Payload::GLSL:         return SLANG_GLSL;
+                case Payload::C:            return SLANG_C_SOURCE;
+                case Payload::Cpp:          return (desc.style == Style::Host) ? SLANG_HOST_CPP_SOURCE : SLANG_CPP_SOURCE;
+                case Payload::CUDA:         return SLANG_CUDA_SOURCE;
+                default: break;
+            }
+            break;
+        }
+        case ArtifactKind::Assembly:
+        {
+            switch (desc.payload)
+            {
+                case Payload::SPIRV:        return SLANG_SPIRV_ASM;
+                case Payload::DXIL:         return SLANG_DXIL_ASM;
+                case Payload::DXBC:         return SLANG_DXBC_ASM;
+                case Payload::PTX:          return SLANG_PTX;
+                default: break;
+            }
+        }
+        default: break;
+    }
+
+    if (isDerivedFrom(desc.kind, ArtifactKind::BinaryLike))
+    {
+        if (isDerivedFrom(desc.payload, ArtifactPayload::CPULike))
+        {
+            switch (desc.kind)
+            {
+                case Kind::Executable:              return SLANG_HOST_EXECUTABLE;
+                case Kind::SharedLibrary:           return SLANG_SHADER_SHARED_LIBRARY;
+                case Kind::HostCallable:            return desc.style == ArtifactStyle::Host ? SLANG_HOST_HOST_CALLABLE : SLANG_SHADER_HOST_CALLABLE;
+                case Kind::ObjectCode:              return SLANG_OBJECT_CODE;
+                default: break;
+            }
+        }
+        else
+        {
+            switch (desc.payload)
+            {
+                case Payload::SPIRV:        return SLANG_SPIRV;
+                case Payload::DXIL:         return SLANG_DXIL;
+                case Payload::DXBC:         return SLANG_DXBC;
+                case Payload::PTX:          return SLANG_PTX;
+                default: break;
+            }
+        }
+    }
+
+    return SLANG_TARGET_UNKNOWN;
+}
+
+
 namespace { // anonymous
 struct KindExtension
 {
@@ -697,6 +759,55 @@ SlangResult ArtifactDescUtil::appendDefaultExtension(const ArtifactDesc& desc, S
     {
         return calcNameForDesc(desc, basePath, outPath);
     }
+}
+
+/* static */bool ArtifactDescUtil::isDissassembly(const ArtifactDesc& from, const ArtifactDesc& to)
+{
+    // From must be a binary like type
+    if (!isDerivedFrom(from.kind, ArtifactKind::BinaryLike))
+    {
+        return false;
+    }
+    
+    
+    // Target must be assembly, and the payload be the same type
+    if (!(to.kind == ArtifactKind::Assembly && 
+        to.payload == from.payload))
+    {
+        return false;
+    }
+
+    const auto payload = from.payload;
+
+    // Check the payload seems like something plausible to 'disassemble'
+    if (!(isDerivedFrom(payload, ArtifactPayload::KernelLike) ||
+        isDerivedFrom(payload, ArtifactPayload::CPULike) ||
+        isDerivedFrom(payload, ArtifactPayload::GeneralIR)))
+    {
+        return false;
+    }
+
+    // If the flags or style are different, then it's something more than just disassembly
+    if (!(from.style == to.style &&
+        from.flags == to.flags))
+    {
+        return false;
+    }
+
+    return true;
+}
+
+/* static */void ArtifactDescUtil::appendText(const ArtifactDesc& desc, StringBuilder& out)
+{
+    out << getName(desc.kind) << "/" << getName(desc.payload) << "/" << getName(desc.style);
+    // TODO(JS): Output flags? None currently used
+}
+
+/* static */String ArtifactDescUtil::getText(const ArtifactDesc& desc)
+{
+    StringBuilder buf;
+    appendText(desc, buf);
+    return buf;
 }
 
 } // namespace Slang

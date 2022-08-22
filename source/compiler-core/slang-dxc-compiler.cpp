@@ -22,6 +22,7 @@
 #include "slang-artifact-associated-impl.h"
 #include "slang-artifact-util.h"
 #include "slang-artifact-diagnostic-util.h"
+#include "slang-artifact-desc-util.h"
 
 // Enable calling through to  `dxc` to
 // generate code on Windows.
@@ -164,7 +165,8 @@ public:
 
     // IDownstreamCompiler
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL compile(const CompileOptions& options, IArtifact** outArtifact) SLANG_OVERRIDE;
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL disassemble(SlangCompileTarget sourceBlobTarget, const void* blob, size_t blobSize, ISlangBlob** out) SLANG_OVERRIDE;
+    virtual SLANG_NO_THROW bool SLANG_MCALL canConvert(const ArtifactDesc& from, const ArtifactDesc& to) SLANG_OVERRIDE;
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL convert(IArtifact* from, const ArtifactDesc& to, IArtifact** outArtifact) SLANG_OVERRIDE;
     virtual SLANG_NO_THROW bool SLANG_MCALL isFileBased() SLANG_OVERRIDE { return false; }
 
     /// Must be called before use
@@ -528,13 +530,21 @@ SlangResult DXCDownstreamCompiler::compile(const CompileOptions& options, IArtif
     return SLANG_OK;
 }
 
-SlangResult DXCDownstreamCompiler::disassemble(SlangCompileTarget sourceBlobTarget, const void* blob, size_t blobSize, ISlangBlob** out)
+bool DXCDownstreamCompiler::canConvert(const ArtifactDesc& from, const ArtifactDesc& to)
+{
+    return ArtifactDescUtil::isDissassembly(from, to) && from.payload == ArtifactPayload::DXIL;
+}
+
+SlangResult DXCDownstreamCompiler::convert(IArtifact* from, const ArtifactDesc& to, IArtifact** outArtifact) 
 {
     // Can only disassemble blobs that are DXIL
-    if (sourceBlobTarget != SLANG_DXIL)
+    if (!canConvert(from->getDesc(), to))
     {
         return SLANG_FAIL;
     }
+
+    ComPtr<ISlangBlob> dxilBlob;
+    SLANG_RETURN_ON_FAIL(from->loadBlob(ArtifactKeep::No, dxilBlob.writeRef()));
 
     ComPtr<IDxcCompiler> dxcCompiler;
     SLANG_RETURN_ON_FAIL(m_createInstance(CLSID_DxcCompiler, __uuidof(dxcCompiler), (LPVOID*)dxcCompiler.writeRef()));
@@ -543,13 +553,18 @@ SlangResult DXCDownstreamCompiler::disassemble(SlangCompileTarget sourceBlobTarg
 
     // Create blob from the input data
     ComPtr<IDxcBlobEncoding> dxcSourceBlob;
-    SLANG_RETURN_ON_FAIL(dxcLibrary->CreateBlobWithEncodingFromPinned((LPBYTE)blob, (UINT32)blobSize, 0, dxcSourceBlob.writeRef()));
+    SLANG_RETURN_ON_FAIL(dxcLibrary->CreateBlobWithEncodingFromPinned((LPBYTE)dxilBlob->getBufferPointer(), (UINT32)dxilBlob->getBufferSize(), 0, dxcSourceBlob.writeRef()));
 
     ComPtr<IDxcBlobEncoding> dxcResultBlob;
     SLANG_RETURN_ON_FAIL(dxcCompiler->Disassemble(dxcSourceBlob, dxcResultBlob.writeRef()));
 
+    auto artifact = ArtifactUtil::createArtifact(to);
+
     // Is compatible with ISlangBlob
-    *out = (ISlangBlob*)dxcResultBlob.detach();
+    ISlangBlob* disassemblyBlob = (ISlangBlob*)dxcResultBlob.get();
+    artifact->addRepresentationUnknown(disassemblyBlob);
+
+    *outArtifact = artifact.detach();
     return SLANG_OK;
 }
 

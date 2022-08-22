@@ -18,7 +18,7 @@ struct ArtifactOutputUtil
 		/// Attempts to disassembly artifact into outArtifact. 
 		/// Errors are output to sink if set. If not desired pass nullptr
 	static SlangResult dissassembleWithDownstream(Session* session, IArtifact* artifact, DiagnosticSink* sink, IArtifact** outArtifact);
-
+	
 		/// Disassembles if that is plausible 
 		/// Errors are output to sink if set. If not desired pass nullptr
 	static SlangResult maybeDisassemble(Session* session, IArtifact* artifact, DiagnosticSink* sink, ComPtr<IArtifact>& outArtifact);
