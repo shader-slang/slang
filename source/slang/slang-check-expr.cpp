@@ -928,7 +928,7 @@ namespace Slang
 
         if (!allConst)
         {
-            // TODO(tfoley): We probably want to support a very limited number of operations
+            // We support a very limited number of operations
             // on "constants" that aren't actually known, to be able to handle a generic
             // that takes an integer `N` but then constructs a vector of size `N+1`.
             //
@@ -937,7 +937,46 @@ namespace Slang
             // need inference to be smart enough to know that `2 + N` and `N + 2` are the
             // same value, as are `N + M + 1 + 1` and `M + 2 + N`.
             //
-            // For now we can just bail in this case.
+            // This is done by constructing a 'PolynomialIntVal' and rely on its
+            // `canonicalize` operation.
+            if (implicitCast)
+            {
+                // We cannot support casting in this case.
+                return nullptr;
+            }
+
+            auto opName = funcDeclRef.getName();
+
+            // handle binary operators
+            if (opName == getName("-"))
+            {
+                if (argCount == 1)
+                {
+                    return PolynomialIntVal::neg(m_astBuilder, argVals[0]);
+                }
+                else if (argCount == 2)
+                {
+                    return PolynomialIntVal::sub(m_astBuilder, argVals[0], argVals[1]);
+                }
+            }
+            else if (opName == getName("+"))
+            {
+                if (argCount == 1)
+                {
+                    return argVals[0];
+                }
+                else if (argCount == 2)
+                {
+                    return PolynomialIntVal::add(m_astBuilder, argVals[0], argVals[1]);
+                }
+            }
+            else if (opName == getName("*"))
+            {
+                if (argCount == 2)
+                {
+                    return PolynomialIntVal::mul(m_astBuilder, argVals[0], argVals[1]);
+                }
+            }
             return nullptr;
         }
 
@@ -1110,7 +1149,9 @@ namespace Slang
             if (auto genericValParamRef = declRef.as<GenericValueParamDecl>())
             {
                 // TODO(tfoley): handle the case of non-`int` value parameters...
-                return m_astBuilder->create<GenericParamIntVal>(genericValParamRef);
+                Val* valResult = m_astBuilder->create<GenericParamIntVal>(genericValParamRef);
+                valResult = valResult->substitute(m_astBuilder, expr.getSubsts());
+                return as<IntVal>(valResult);
             }
 
             // We may also need to check for references to variables that

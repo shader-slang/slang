@@ -1287,6 +1287,27 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
             lowerType(context, getType(context->astBuilder, val->declRef)));
     }
 
+    LoweredValInfo visitPolynomialIntVal(PolynomialIntVal* val)
+    {
+        auto irBuilder = getBuilder();
+        auto constTerm = irBuilder->getIntValue(irBuilder->getIntType(), val->constantTerm);
+        auto resultVal = constTerm;
+        for (auto term : val->terms)
+        {
+            auto termVal = irBuilder->getIntValue(irBuilder->getIntType(), term->constFactor);
+            for (auto factor : term->paramFactors)
+            {
+                auto factorVal = lowerVal(context, factor->param).val;
+                for (IntegerLiteralValue i = 0; i < factor->power; i++)
+                {
+                    termVal = irBuilder->emitMul(factorVal->getDataType(), termVal, factorVal);
+                }
+            }
+            resultVal = irBuilder->emitAdd(termVal->getDataType(), resultVal, termVal);
+        }
+        return LoweredValInfo::simple(resultVal);
+    }
+
     LoweredValInfo visitDeclaredSubtypeWitness(DeclaredSubtypeWitness* val)
     {
         return emitDeclRef(context, val->declRef,

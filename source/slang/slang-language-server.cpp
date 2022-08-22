@@ -243,7 +243,9 @@ String getDeclSignatureString(DeclRef<Decl> declRef, WorkspaceVersion* version)
                 DiagnosticSink sink;
                 SharedSemanticsContext semanticContext(version->linkage, getModule(varDecl), &sink);
                 SemanticsVisitor semanticsVisitor(&semanticContext);
-                if (auto intVal = semanticsVisitor.tryFoldIntegerConstantExpression(varDecl->initExpr, nullptr))
+                if (auto intVal = semanticsVisitor.tryFoldIntegerConstantExpression(
+                        declRef.substitute(version->linkage->getASTBuilder(), varDecl->initExpr),
+                        nullptr))
                 {
                     if (auto constantInt = as<ConstantIntVal>(intVal))
                     {
@@ -256,6 +258,11 @@ String getDeclSignatureString(DeclRef<Decl> declRef, WorkspaceVersion* version)
                         {
                             sb << constantInt->value;
                         }
+                    }
+                    else
+                    {
+                        sb << " = ";
+                        intVal->toText(sb);
                     }
                 }
             }
