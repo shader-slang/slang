@@ -1379,7 +1379,7 @@ void RayTracingCommandEncoderImpl::dispatchRays(
 
     dispatchDesc.RayGenerationShaderRecord.StartAddress =
         shaderTableAddr + shaderTableImpl->m_rayGenTableOffset +
-        rayGenShaderIndex * D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES;
+        rayGenShaderIndex * kRayGenRecordSize;
     dispatchDesc.RayGenerationShaderRecord.SizeInBytes = D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES;
 
     dispatchDesc.MissShaderTable.StartAddress =

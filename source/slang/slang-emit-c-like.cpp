@@ -3378,14 +3378,23 @@ void CLikeSourceEmitter::ensureInstOperandsRec(ComputeEmitActionsContext* ctx, I
     auto requiredLevel = EmitAction::Definition;
     switch (inst->getOp())
     {
-    case kIROp_InterfaceType:
-        requiredLevel = EmitAction::ForwardDeclaration;
-        break;
-    case kIROp_COMWitnessDecoration:
+    case kIROp_NativePtrType:
         requiredLevel = EmitAction::ForwardDeclaration;
         break;
     default:
         break;
+    }
+
+    if (auto comWitnessDecoration = as<IRCOMWitnessDecoration>(inst))
+    {
+        // A COMWitnessDecoration marks the interface inheritance of a class.
+        // We need to make sure the implemented interface is emited before the class.
+        // The witness table itself doesn't matter.
+        if (auto witnessTable = as<IRWitnessTable>(comWitnessDecoration->getWitnessTable()))
+        {
+            ensureInstOperand(ctx, witnessTable->getConformanceType(), requiredLevel);
+        }
+        requiredLevel = EmitAction::ForwardDeclaration;
     }
 
     for(UInt ii = 0; ii < operandCount; ++ii)
@@ -3415,12 +3424,25 @@ void CLikeSourceEmitter::ensureGlobalInst(ComputeEmitActionsContext* ctx, IRInst
     {
     case kIROp_Generic:
         return;
-
+    case kIROp_ThisType:
+        return;
     default:
         break;
     }
     if (as<IRBasicType>(inst))
         return;
+
+    // Certain inst ops will always emit as definition.
+    switch (inst->getOp())
+    {
+    case kIROp_NativePtrType:
+        // Pointer type will have their value type emited as forward declaration,
+        // but the pointer type itself should be considered emitted as definition.
+        requiredLevel = EmitAction::Level::Definition;
+        break;
+    default:
+        break;
+    }
 
     // Have we already processed this instruction?
     EmitAction::Level existingLevel;
@@ -3457,7 +3479,9 @@ void CLikeSourceEmitter::ensureGlobalInst(ComputeEmitActionsContext* ctx, IRInst
     switch (inst->getOp())
     {
     case kIROp_InterfaceRequirementEntry:
+    {
         return;
+    }
 
     default:
         break;
@@ -3496,6 +3520,16 @@ void CLikeSourceEmitter::emitForwardDeclaration(IRInst* inst)
         m_writer->emit(getName(inst));
         m_writer->emit(";\n");
         break;
+    case kIROp_InterfaceType:
+    {
+        if (inst->findDecoration<IRComInterfaceDecoration>())
+        {
+            m_writer->emit("struct ");
+            m_writer->emit(getName(inst));
+            m_writer->emit(";\n");
+        }
+        break;
+    }
     default:
         SLANG_UNREACHABLE("emit forward declaration");
     }

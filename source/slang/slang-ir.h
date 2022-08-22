@@ -1306,8 +1306,17 @@ SIMPLE_IR_PARENT_TYPE(OutTypeBase, PtrTypeBase)
 SIMPLE_IR_TYPE(OutType, OutTypeBase)
 SIMPLE_IR_TYPE(InOutType, OutTypeBase)
 
-SIMPLE_IR_TYPE(ComPtrType, Type)
-SIMPLE_IR_TYPE(NativePtrType, Type)
+struct IRComPtrType : public IRType
+{
+    IR_LEAF_ISA(ComPtrType);
+    IRType* getValueType() { return (IRType*)getOperand(0); }
+};
+
+struct IRNativePtrType : public IRType
+{
+    IR_LEAF_ISA(NativePtrType);
+    IRType* getValueType() { return (IRType*)getOperand(0); }
+};
 
 struct IRPseudoPtrType : public IRPtrTypeBase
 {

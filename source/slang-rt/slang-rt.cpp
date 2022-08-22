@@ -25,7 +25,7 @@ extern "C"
         ComPtr<ISlangSharedLibrary> lib;
         if (!slangRT_loadedLibraries.TryGetValue(modulePath, lib))
         {
-            if (DefaultSharedLibraryLoader::getSingleton()->loadPlatformSharedLibrary(
+            if (DefaultSharedLibraryLoader::getSingleton()->loadSharedLibrary(
                     modulePath.getBuffer(), lib.writeRef()) != SLANG_OK)
             {
                 _slang_rt_abort("Failed to load DLL \"" + modulePath + "\"");
@@ -36,7 +36,7 @@ extern "C"
     }
 
     SLANG_RT_API void* SLANG_MCALL
-        _slang_rt_load_dll_func(void* moduleHandle, Slang::String funcName)
+        _slang_rt_load_dll_func(void* moduleHandle, Slang::String funcName, uint32_t argSize)
     {
         if (moduleHandle == nullptr)
         {
@@ -44,6 +44,13 @@ extern "C"
         }
         auto lib = static_cast<ISlangSharedLibrary*>(moduleHandle);
         auto funcPtr = lib->findFuncByName(funcName.getBuffer());
+        if (!funcPtr)
+        {
+            // If failed, try stdcall mangled name.
+            StringBuilder sb;
+            sb << "_" << funcName << "@" << argSize;
+            funcPtr = lib->findFuncByName(sb.ToString().getBuffer());
+        }
         if (!funcPtr)
         {
             _slang_rt_abort("Cannot find function \"" + funcName + "\" in loaded library.");
