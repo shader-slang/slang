@@ -161,7 +161,9 @@ bool isDerivedFrom(ENUM_TYPE kind, ENUM_TYPE base) { return g_table##ENUM_TYPE.i
         x(Unknown, Base) \
         x(Container, Base) \
             x(Zip, Container) \
-            x(Riff, Container) \
+            x(RiffContainer, Container) \
+            x(RiffLz4Container, Container) \
+            x(RiffDeflateContainer, Container) \
         x(Text, Base) \
             x(HumanText, Text) \
             x(Source, Text) \
@@ -496,9 +498,22 @@ static const KindExtension g_cpuKindExts[] =
     {
         return ArtifactDesc::make(ArtifactKind::Zip, ArtifactPayload::Unknown);
     }
-    else if (slice == toSlice("riff"))
+
+    if (slice.startsWith(toSlice("riff")))
     {
-        return ArtifactDesc::make(ArtifactKind::Riff, ArtifactPayload::Unknown);
+        auto tail = slice.tail(4);
+        if (tail.getLength() == 0)
+        {
+            return ArtifactDesc::make(ArtifactKind::RiffContainer, ArtifactPayload::Unknown);
+        }
+        else if (tail == "-lz4")
+        {
+            return ArtifactDesc::make(ArtifactKind::RiffLz4Container, ArtifactPayload::Unknown);
+        }
+        else if (tail == "-deflate")
+        {
+            return ArtifactDesc::make(ArtifactKind::RiffDeflateContainer, ArtifactPayload::Unknown);
+        }
     }
 
     if (slice == toSlice("asm"))

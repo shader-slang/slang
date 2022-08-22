@@ -19,6 +19,8 @@ struct Slice
     const T* begin() const { return data; }
     const T* end() const { return data + count; }
 
+    const T& operator[](Index index) { SLANG_ASSERT(index >= 0 && index < count); return data[index]; }
+
     Slice() :count(0), data(nullptr) {}
     Slice(const T* inData, Count inCount) :
         data(inData),
@@ -74,7 +76,9 @@ enum class ArtifactKind : uint8_t
 
     Container,                  ///< Container like types
     Zip,                        ///< Zip container
-    Riff,                       ///< Riff format
+    RiffContainer,              ///< Riff container
+    RiffLz4Container,           ///< Riff container using Lz4 compression
+    RiffDeflateContainer,       ///< Riff container using deflate compression
 
     Text,                       ///< Representation is text. Encoding is utf8, unless prefixed with 'encoding'.
     
