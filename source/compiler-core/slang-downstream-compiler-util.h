@@ -56,7 +56,7 @@ struct DownstreamCompilerMatchVersion
     MatchSemanticVersion matchVersion;      ///< The match version
 };
 
-struct DownstreamCompilerUtil: public DownstreamCompilerBaseUtil
+struct DownstreamCompilerUtil: public DownstreamCompilerUtilBase
 {
     enum class MatchType
     {

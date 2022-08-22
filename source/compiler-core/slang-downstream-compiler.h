@@ -296,7 +296,7 @@ public:
 };
 
 /* Only purpose of having base-class here is to make all the DownstreamCompiler types available directly in derived Utils */
-struct DownstreamCompilerBaseUtil
+struct DownstreamCompilerUtilBase
 {
     typedef DownstreamCompileOptions CompileOptions;
 
