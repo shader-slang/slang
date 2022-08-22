@@ -22,10 +22,10 @@ namespace Slang
     auto desc = artifact->getDesc();
 
     auto assemblyDesc = desc;
-    desc.kind = ArtifactKind::Assembly;
+    assemblyDesc.kind = ArtifactKind::Assembly;
 
-    // If this likes a playsible disassebly conversion
-    if (ArtifactDescUtil::isDissassembly(desc, assemblyDesc))
+    // Check it seems like a plausbile disassembly 
+    if (!ArtifactDescUtil::isDissassembly(desc, assemblyDesc))
     {
         if (sink)
         {
