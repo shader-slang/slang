@@ -620,9 +620,19 @@ SlangResult ArtifactDescUtil::appendDefaultExtension(const ArtifactDesc& desc, S
             out << toSlice("zip");
             return SLANG_OK;
         }
-        case ArtifactKind::Riff:         
+        case ArtifactKind::RiffContainer:         
         {
             out << toSlice("riff");
+            return SLANG_OK;
+        }
+        case ArtifactKind::RiffLz4Container:
+        {
+            out << toSlice("riff-lz4");
+            return SLANG_OK;
+        }
+        case ArtifactKind::RiffDeflateContainer:
+        {
+            out << toSlice("riff-deflate");
             return SLANG_OK;
         }
         case ArtifactKind::Assembly:
