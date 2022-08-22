@@ -808,7 +808,7 @@ struct AccelerationStructureBuildInputs
 struct AccelerationStructureCreateDesc
 {
     AccelerationStructureKind kind;
-    IBufferResource *buffer;
+    NativeRef<IBufferResource> buffer;
     Offset offset;
     Size size;
 };
@@ -816,8 +816,8 @@ struct AccelerationStructureCreateDesc
 struct AccelerationStructureBuildDesc
 {
     AccelerationStructureBuildInputs inputs;
-    IAccelerationStructure *source;
-    IAccelerationStructure *dest;
+    NativeRef<IAccelerationStructure> source;
+    NativeRef<IAccelerationStructure> dest;
     DeviceAddress scratchData;
 };
 
@@ -889,7 +889,7 @@ interface IShaderObject
     Size getSize();
 
     /// Use the provided constant buffer instead of the internally created one.
-    Result setConstantBufferOverride(IBufferResource *constantBuffer);
+    Result setConstantBufferOverride(IBufferResource constantBuffer);
 };
 
 enum class StencilOp : uint8_t
@@ -1358,7 +1358,7 @@ interface IResourceCommandEncoder : ICommandEncoder
         ResourceState dstState,
         SubresourceRange dstSubresource,
         int3 dstOffset,
-        ITextureResource *src,
+        NativeRef<ITextureResource> src,
         ResourceState srcState,
         SubresourceRange srcSubresource,
         int3 srcOffset,
@@ -1422,7 +1422,7 @@ interface IRenderCommandEncoder : IResourceCommandEncoder
     Result bindPipeline(IPipelineState state, out IShaderObject outRootShaderObject);
 
     // Sets the current pipeline state along with a pre-created mutable root shader object.
-    Result bindPipelineWithRootObject(IPipelineState state, IShaderObject *rootObject);
+    Result bindPipelineWithRootObject(IPipelineState state, NativeRef<IShaderObject> rootObject);
 
     void setViewports(GfxCount count, Viewport *viewports);
     void setScissorRects(GfxCount count, ScissorRect *scissors);
@@ -1504,8 +1504,8 @@ interface IRayTracingCommandEncoder : IResourceCommandEncoder
                  GfxCount propertyQueryCount,
                  AccelerationStructureQueryDesc *queryDescs);
     void copyAccelerationStructure(
-        IAccelerationStructure *dest,
-        IAccelerationStructure *src,
+        NativeRef<IAccelerationStructure> dest,
+        NativeRef<IAccelerationStructure> src,
         AccelerationStructureCopyMode mode);
     void queryAccelerationStructureProperties(
         GfxCount accelerationStructureCount,
@@ -1523,7 +1523,7 @@ interface IRayTracingCommandEncoder : IResourceCommandEncoder
     /// `rayGenShaderIndex` specifies the index into the shader table that identifies the ray generation shader.
     void dispatchRays(
         GfxIndex rayGenShaderIndex,
-        IShaderTable *shaderTable,
+        NativeRef<IShaderTable> shaderTable,
         GfxCount width,
         GfxCount height,
         GfxCount depth);
@@ -1565,9 +1565,6 @@ struct CommandQueueDesc
 [COM("14e2bed0-0ad0-4dc8-b341-06-3f-e7-2d-bf-0e")]
 interface ICommandQueue
 {
-    // For D3D12, this is the pointer to the queue. For Vulkan, this is the queue itself.
-    typedef uint64_t NativeHandle;
-
     const CommandQueueDesc* getDesc();
 
     void executeCommandBuffers(
@@ -1936,7 +1933,7 @@ SLANG_GFX_IMPORT bool gfxIsTypelessFormat(Format format);
 SLANG_GFX_IMPORT Result gfxGetFormatInfo(Format format, FormatInfo *outInfo);
 
 /// Given a type returns a function that can construct it, or nullptr if there isn't one
-SLANG_GFX_IMPORT Result gfxCreateDevice(const DeviceDesc* desc, out IDevice outDevice);
+SLANG_GFX_IMPORT Result gfxCreateDevice(const DeviceDesc* desc, out Optional<IDevice> outDevice);
 
 /// Sets a callback for receiving debug messages.
 /// The layer does not hold a strong reference to the callback object.

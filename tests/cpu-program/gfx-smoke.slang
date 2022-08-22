@@ -8,8 +8,8 @@ public __extern_cpp int main()
 {
     gfx.DeviceDesc deviceDesc = {};
     deviceDesc.deviceType = gfx.DeviceType.CPU;
-    gfx.IDevice obj;
-    if (gfx.succeeded(gfx.gfxCreateDevice(&deviceDesc, obj)))
+    Optional<gfx.IDevice> obj;
+    if (gfx.succeeded(gfx.gfxCreateDevice(&deviceDesc, obj)) && obj.hasValue)
         writeln("succ");
     else
         writeln("fail");
