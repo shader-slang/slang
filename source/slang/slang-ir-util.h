@@ -22,6 +22,8 @@ bool isPointerOfType(IRInst* ptrType, IROp opCode);
 // Builds a dictionary that maps from requirement key to requirement value for `interfaceType`.
 Dictionary<IRInst*, IRInst*> buildInterfaceRequirementDict(IRInterfaceType* interfaceType);
 
+bool isComInterfaceType(IRType* type);
+
 }
 
 #endif

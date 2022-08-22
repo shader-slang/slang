@@ -2927,6 +2927,8 @@ public:
         IRType* type,
         IRInst* val);
 
+    IRInst* emitCastPtrToBool(IRInst* val);
+
     IRGlobalConstant* emitGlobalConstant(
         IRType* type);
 
