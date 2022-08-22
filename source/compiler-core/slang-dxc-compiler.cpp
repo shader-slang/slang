@@ -19,7 +19,9 @@
 
 #include "../core/slang-shared-library.h"
 
-#include "../compiler-core/slang-artifact-util.h"
+#include "slang-artifact-associated-impl.h"
+#include "slang-artifact-util.h"
+#include "slang-artifact-diagnostic-util.h"
 
 // Enable calling through to  `dxc` to
 // generate code on Windows.
@@ -161,7 +163,7 @@ public:
     typedef DownstreamCompilerBase Super;
 
     // IDownstreamCompiler
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL compile(const CompileOptions& options, RefPtr<DownstreamCompileResult>& outResult) SLANG_OVERRIDE;
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL compile(const CompileOptions& options, IArtifact** outArtifact) SLANG_OVERRIDE;
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL disassemble(SlangCompileTarget sourceBlobTarget, const void* blob, size_t blobSize, ISlangBlob** out) SLANG_OVERRIDE;
     virtual SLANG_NO_THROW bool SLANG_MCALL isFileBased() SLANG_OVERRIDE { return false; }
 
@@ -192,7 +194,7 @@ SlangResult DXCDownstreamCompiler::init(ISlangSharedLibrary* library)
     return SLANG_OK;
 }
 
-static SlangResult _parseDiagnosticLine(const UnownedStringSlice& line, List<UnownedStringSlice>& lineSlices, DownstreamDiagnostic& outDiagnostic)
+static SlangResult _parseDiagnosticLine(CharSliceAllocator& allocator, const UnownedStringSlice& line, List<UnownedStringSlice>& lineSlices, IArtifactDiagnostics::Diagnostic& outDiagnostic)
 {
     /* tests/diagnostics/syntax-error-intrinsic.slang:14:2: error: expected expression */
     if (lineSlices.getCount() < 5)
@@ -200,27 +202,27 @@ static SlangResult _parseDiagnosticLine(const UnownedStringSlice& line, List<Uno
         return SLANG_FAIL;
     }
 
-    outDiagnostic.filePath = lineSlices[0];
+    outDiagnostic.filePath = allocator.allocate(lineSlices[0]);
 
-    SLANG_RETURN_ON_FAIL(StringUtil::parseInt(lineSlices[1], outDiagnostic.fileLine));
+    SLANG_RETURN_ON_FAIL(StringUtil::parseInt(lineSlices[1], outDiagnostic.location.line));
 
     //Int lineCol;
     //SLANG_RETURN_ON_FAIL(StringUtil::parseInt(lineSlices[2], lineCol));
 
     UnownedStringSlice severitySlice = lineSlices[3].trim();
 
-    outDiagnostic.severity = DownstreamDiagnostic::Severity::Error;
+    outDiagnostic.severity = ArtifactDiagnostic::Severity::Error;
     if (severitySlice == UnownedStringSlice::fromLiteral("warning"))
     {
-        outDiagnostic.severity = DownstreamDiagnostic::Severity::Warning;
+        outDiagnostic.severity = ArtifactDiagnostic::Severity::Warning;
     }
 
     // The rest of the line
-    outDiagnostic.text = UnownedStringSlice(lineSlices[4].begin(), line.end());
+    outDiagnostic.text = allocator.allocate(lineSlices[4].begin(), line.end());
     return SLANG_OK;
 }
 
-static SlangResult _handleOperationResult(IDxcOperationResult* dxcResult, DownstreamDiagnostics& ioDiagnostics, ComPtr<IDxcBlob>& outBlob)
+static SlangResult _handleOperationResult(IDxcOperationResult* dxcResult, IArtifactDiagnostics* diagnostics, ComPtr<IDxcBlob>& outBlob)
 {
     // Retrieve result.
     HRESULT resultCode = S_OK;
@@ -231,9 +233,9 @@ static SlangResult _handleOperationResult(IDxcOperationResult* dxcResult, Downst
     // *unless* the compile failed (no way to get
     // warnings out!?).
 
-    if (SLANG_SUCCEEDED(ioDiagnostics.result))
+    if (SLANG_SUCCEEDED(diagnostics->getResult()))
     {
-        ioDiagnostics.result = resultCode;
+        diagnostics->setResult(resultCode);
     }
 
     // Try getting the error/diagnostics blob
@@ -245,13 +247,11 @@ static SlangResult _handleOperationResult(IDxcOperationResult* dxcResult, Downst
         const UnownedStringSlice diagnosticsSlice = _getSlice(dxcErrorBlob);
         if (diagnosticsSlice.getLength())
         {
-            if (ioDiagnostics.rawDiagnostics.getLength() > 0)
-            {
-                ioDiagnostics.rawDiagnostics.append("\n");
-            }
-            ioDiagnostics.rawDiagnostics.append(diagnosticsSlice);
+            diagnostics->appendRaw(asCharSlice(diagnosticsSlice));
 
-            SlangResult diagnosticParseRes = DownstreamDiagnostic::parseColonDelimitedDiagnostics(diagnosticsSlice, 0, _parseDiagnosticLine, ioDiagnostics.diagnostics);
+            CharSliceAllocator allocator;
+            List<IArtifactDiagnostics::Diagnostic> parsedDiagnostics;
+            SlangResult diagnosticParseRes = ArtifactDiagnosticUtil::parseColonDelimitedDiagnostics(allocator, diagnosticsSlice, 0, _parseDiagnosticLine, diagnostics);
 
             SLANG_UNUSED(diagnosticParseRes);
             SLANG_ASSERT(SLANG_SUCCEEDED(diagnosticParseRes));
@@ -262,7 +262,7 @@ static SlangResult _handleOperationResult(IDxcOperationResult* dxcResult, Downst
     if (SLANG_FAILED(resultCode))
     {
         // In case the parsing failed, we still have an error -> so require there is one in the diagnostics
-        ioDiagnostics.requireErrorDiagnostic();
+        diagnostics->requireErrorDiagnostic();
     }
     else
     {
@@ -274,7 +274,7 @@ static SlangResult _handleOperationResult(IDxcOperationResult* dxcResult, Downst
     return SLANG_OK;
 }
 
-SlangResult DXCDownstreamCompiler::compile(const CompileOptions& options, RefPtr<DownstreamCompileResult>& outResult)
+SlangResult DXCDownstreamCompiler::compile(const CompileOptions& options, IArtifact** outArtifact)
 {
     // This compiler doesn't read files, they should be read externally and stored in sourceContents/sourceContentsPath
     if (options.sourceFiles.getCount() > 0)
@@ -446,8 +446,8 @@ SlangResult DXCDownstreamCompiler::compile(const CompileOptions& options, RefPtr
         &includeHandler,    // `#include` handler
         dxcResult.writeRef()));
 
-    DownstreamDiagnostics diagnostics;
-
+    auto diagnostics = ArtifactDiagnostics::create();
+    
     ComPtr<IDxcBlob> dxcResultBlob;
 
     SLANG_RETURN_ON_FAIL(_handleOperationResult(dxcResult, diagnostics, dxcResultBlob));
@@ -517,7 +517,14 @@ SlangResult DXCDownstreamCompiler::compile(const CompileOptions& options, RefPtr
         dxcResultBlob = linkedBlob;
     }
 
-    outResult = new BlobDownstreamCompileResult(diagnostics, (ISlangBlob*)dxcResultBlob.get());
+    auto artifact = ArtifactUtil::createArtifactForCompileTarget(options.targetType);
+    artifact->addAssociated(diagnostics);
+    if (dxcResultBlob)
+    {
+        artifact->addRepresentationUnknown((ISlangBlob*)dxcResultBlob.get());
+    }
+
+    *outArtifact = artifact.detach();
     return SLANG_OK;
 }
 

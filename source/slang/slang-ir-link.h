@@ -11,10 +11,10 @@ namespace Slang
 
     struct LinkedIR
     {
-        RefPtr<IRModule>            module;
-        IRVarLayout*                globalScopeVarLayout;
-        List<IRFunc*>               entryPoints;
-        ComPtr<IPostEmitMetadata>   metadata;
+        RefPtr<IRModule>                    module;
+        IRVarLayout*                        globalScopeVarLayout;
+        List<IRFunc*>                       entryPoints;
+        ComPtr<IArtifactPostEmitMetadata>   metadata;
     };
 
 

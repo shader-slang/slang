@@ -33,6 +33,8 @@
 #include "../../source/compiler-core/slang-nvrtc-compiler.h"
 #include "../../source/compiler-core/slang-language-server-protocol.h"
 
+#include "../../source/compiler-core/slang-artifact-associated-impl.h"
+
 #define STB_IMAGE_IMPLEMENTATION
 #include "external/stb/stb_image.h"
 
@@ -1904,8 +1906,8 @@ TestResult runSimpleLineTest(TestContext* context, TestInput& input)
     }
 
     // Parse all the diagnostics so we can extract line numbers
-    List<DownstreamDiagnostic> diagnostics;
-    if (SLANG_FAILED(ParseDiagnosticUtil::parseDiagnostics(exeRes.standardError.getUnownedSlice(), diagnostics)) || diagnostics.getCount() <= 0)
+    auto diagnostics = ArtifactDiagnostics::create();
+    if (SLANG_FAILED(ParseDiagnosticUtil::parseDiagnostics(exeRes.standardError.getUnownedSlice(), diagnostics)) || diagnostics->getCount() <= 0)
     {
         // Write out the diagnostics which couldn't be parsed.
 
@@ -1917,9 +1919,9 @@ TestResult runSimpleLineTest(TestContext* context, TestInput& input)
 
     StringBuilder actualOutput;
 
-    if (diagnostics.getCount() > 0)
+    if (diagnostics->getCount() > 0)
     {
-        actualOutput << diagnostics[0].fileLine << "\n";
+        actualOutput << diagnostics->getAt(0)->location.line << "\n";
     }
     else
     {
@@ -2136,18 +2138,18 @@ String getExpectedOutput(String const& outputStem)
     return expectedOutput;
 }
 
-static String _calcSummary(const DownstreamDiagnostics& inOutput)
+static String _calcSummary(IArtifactDiagnostics* inDiagnostics)
 {
-    DownstreamDiagnostics output(inOutput);
-
+    auto diagnostics = cloneInterface(inDiagnostics);
+    
     // We only want to analyze errors for now
-    output.removeBySeverity(DownstreamDiagnostic::Severity::Info);
-    output.removeBySeverity(DownstreamDiagnostic::Severity::Warning);
+    diagnostics->removeBySeverity(ArtifactDiagnostic::Severity::Info);
+    diagnostics->removeBySeverity(ArtifactDiagnostic::Severity::Warning);
 
-    StringBuilder builder;
+    ComPtr<ISlangBlob> summary;
+    diagnostics->calcSimplifiedSummary(summary.writeRef());
 
-    output.appendSimplifiedSummary(builder);
-    return builder;
+    return StringUtil::getString(summary);
 }
 
 static TestResult runCPPCompilerCompile(TestContext* context, TestInput& input)
@@ -2236,15 +2238,15 @@ static TestResult runCPPCompilerSharedLibrary(TestContext* context, TestInput& i
 
     options.includePaths.add(".");
 
-    RefPtr<DownstreamCompileResult> compileResult;
-    if (SLANG_FAILED(compiler->compile(options, compileResult)))
+    ComPtr<IArtifact> artifact;
+    if (SLANG_FAILED(compiler->compile(options, artifact.writeRef())))
     {
         return TestResult::Fail;
     }
 
-    const auto& diagnostics = compileResult->getDiagnostics();
+    auto diagnostics = findAssociated<IArtifactDiagnostics>(artifact);
 
-    if (SLANG_FAILED(diagnostics.result))
+    if (diagnostics && SLANG_FAILED(diagnostics->getResult()))
     {
         // Compilation failed
         String actualOutput = _calcSummary(diagnostics);
@@ -2353,18 +2355,18 @@ static TestResult runCPPCompilerExecute(TestContext* context, TestInput& input)
     options.sourceFiles.add(filePath);
     options.modulePath = modulePath;
 
-    RefPtr<DownstreamCompileResult> compileResult;
-    if (SLANG_FAILED(compiler->compile(options, compileResult)))
+    ComPtr<IArtifact> artifact;
+    if (SLANG_FAILED(compiler->compile(options, artifact.writeRef())))
     {
         return TestResult::Fail;
     }
 
     String actualOutput;
 
-    const auto& diagnostics = compileResult->getDiagnostics();
+    auto diagnostics = findAssociated<IArtifactDiagnostics>(artifact);
 
     // If the actual compilation failed, then the output will be the summary
-    if (SLANG_FAILED(diagnostics.result))
+    if (diagnostics && SLANG_FAILED(diagnostics->getResult()))
     {
         actualOutput = _calcSummary(diagnostics);
     }

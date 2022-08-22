@@ -14,6 +14,7 @@
 #include "../core/slang-io.h"
 
 #include "slang-artifact-desc-util.h"
+#include "slang-artifact-diagnostic-util.h"
 #include "slang-artifact-util.h"
 
 namespace Slang
@@ -288,21 +289,21 @@ namespace Slang
     return SLANG_OK;
 }
 
-static SlangResult _parseSeverity(const UnownedStringSlice& in, DownstreamDiagnostics::Diagnostic::Severity& outSeverity)
+static SlangResult _parseSeverity(const UnownedStringSlice& in, ArtifactDiagnostic::Severity& outSeverity)
 {
-    typedef DownstreamDiagnostics::Diagnostic::Severity Type;
+    typedef ArtifactDiagnostic::Severity Severity;
 
     if (in == "error" || in == "fatal error")
     {
-        outSeverity = Type::Error;
+        outSeverity = Severity::Error;
     }
     else if (in == "warning")
     {
-        outSeverity = Type::Warning;
+        outSeverity = Severity::Warning;
     }
     else if (in == "info")
     {
-        outSeverity = Type::Info;
+        outSeverity = Severity::Info;
     }
     else
     {
@@ -311,22 +312,22 @@ static SlangResult _parseSeverity(const UnownedStringSlice& in, DownstreamDiagno
     return SLANG_OK;
 }
 
-static SlangResult _parseVisualStudioLine(const UnownedStringSlice& line, DownstreamDiagnostics::Diagnostic& outDiagnostic)
+static SlangResult _parseVisualStudioLine(CharSliceAllocator& allocator, const UnownedStringSlice& line, ArtifactDiagnostic& outDiagnostic)
 {
-    typedef DownstreamDiagnostics::Diagnostic Diagnostic;
+    typedef IArtifactDiagnostics::Diagnostic Diagnostic;
 
     UnownedStringSlice linkPrefix = UnownedStringSlice::fromLiteral("LINK :");
     if (line.startsWith(linkPrefix))
     {
-        outDiagnostic.stage = Diagnostic::Stage::Link;
-        outDiagnostic.severity = Diagnostic::Severity::Info;
+        outDiagnostic.stage = ArtifactDiagnostic::Stage::Link;
+        outDiagnostic.severity = ArtifactDiagnostic::Severity::Info;
 
-        outDiagnostic.text = UnownedStringSlice(line.begin() + linkPrefix.getLength(), line.end());
+        outDiagnostic.text = allocator.allocate(line.begin() + linkPrefix.getLength(), line.end());
 
         return SLANG_OK;
     }
 
-    outDiagnostic.stage = Diagnostic::Stage::Compile;
+    outDiagnostic.stage = ArtifactDiagnostic::Stage::Compile;
 
     const char*const start = line.begin();
     const char*const end = line.end();
@@ -385,13 +386,13 @@ static SlangResult _parseVisualStudioLine(const UnownedStringSlice& line, Downst
                 return SLANG_FAIL;
             }
 
-            outDiagnostic.filePath = UnownedStringSlice(start, lineNoStart);
-            outDiagnostic.fileLine = lineNo;
+            outDiagnostic.filePath = allocator.allocate(start, lineNoStart);
+            outDiagnostic.location.line = lineNo;
         }
         else
         {
-            outDiagnostic.filePath = UnownedStringSlice(start, cur + colonIndex);
-            outDiagnostic.fileLine = 0;
+            outDiagnostic.filePath = allocator.allocate(start, cur + colonIndex);
+            outDiagnostic.location.line = 0;
         }
 
         // Save the remaining text in 'postPath'
@@ -417,8 +418,8 @@ static SlangResult _parseVisualStudioLine(const UnownedStringSlice& line, Downst
         }
 
         // Extract the code
-        outDiagnostic.code = UnownedStringSlice(errorSection.begin() + errorCodeIndex + 1, errorSection.end());
-        if (outDiagnostic.code.startsWith(UnownedStringSlice::fromLiteral("LNK")))
+        outDiagnostic.code = allocator.allocate(errorSection.begin() + errorCodeIndex + 1, errorSection.end());
+        if (asStringSlice(outDiagnostic.code).startsWith(UnownedStringSlice::fromLiteral("LNK")))
         {
             outDiagnostic.stage = Diagnostic::Stage::Link;
         }
@@ -430,16 +431,18 @@ static SlangResult _parseVisualStudioLine(const UnownedStringSlice& line, Downst
         postError = UnownedStringSlice(postPath.begin() + errorColonIndex + 1, end); 
     }
 
-    outDiagnostic.text = postError;
+    outDiagnostic.text = allocator.allocate(postError);
 
     return SLANG_OK;
 }
 
-/* static */SlangResult VisualStudioCompilerUtil::parseOutput(const ExecuteResult& exeRes, DownstreamDiagnostics& outDiagnostics)
+/* static */SlangResult VisualStudioCompilerUtil::parseOutput(const ExecuteResult& exeRes, IArtifactDiagnostics* diagnostics)
 {
-    outDiagnostics.reset();
+    diagnostics->reset();
 
-    outDiagnostics.rawDiagnostics = exeRes.standardOutput;
+    diagnostics->setRaw(CharSliceCaster::asTerminatedCharSlice(exeRes.standardOutput));
+
+    CharSliceAllocator allocator;
 
     for (auto line : LineParser(exeRes.standardOutput.getUnownedSlice()))
     {
@@ -448,17 +451,17 @@ static SlangResult _parseVisualStudioLine(const UnownedStringSlice& line, Downst
         fprintf(stdout, "\n");
 #endif
 
-        Diagnostic diagnostic;
-        if (SLANG_SUCCEEDED(_parseVisualStudioLine(line, diagnostic)))
+        ArtifactDiagnostic diagnostic;
+        if (SLANG_SUCCEEDED(_parseVisualStudioLine(allocator, line, diagnostic)))
         {
-            outDiagnostics.diagnostics.add(diagnostic);
+            diagnostics->add(diagnostic);
         }
     }
 
     // if it has a compilation error.. set on output
-    if (outDiagnostics.has(Diagnostic::Severity::Error))
+    if (diagnostics->hasOfAtLeastSeverity(ArtifactDiagnostic::Severity::Error))
     {
-        outDiagnostics.result = SLANG_FAIL;
+        diagnostics->setResult(SLANG_FAIL);
     }
 
     return SLANG_OK;

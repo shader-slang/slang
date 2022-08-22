@@ -20,6 +20,7 @@
 #include "../compiler-core/slang-artifact-impl.h"
 #include "../compiler-core/slang-artifact-util.h"
 #include "../compiler-core/slang-artifact-associated.h"
+#include "../compiler-core/slang-artifact-diagnostic-util.h"
 
 // Artifact output
 #include "slang-artifact-output-util.h"
@@ -855,13 +856,12 @@ namespace Slang
         return true;
     }
 
-    static Severity _getDiagnosticSeverity(DownstreamDiagnostic::Severity severity)
+    static Severity _getDiagnosticSeverity(ArtifactDiagnostic::Severity severity)
     {
-        typedef DownstreamDiagnostic::Severity DownstreamSeverity;
         switch (severity)
         {
-            case DownstreamSeverity::Warning:   return Severity::Warning;
-            case DownstreamSeverity::Info:      return Severity::Note;
+            case ArtifactDiagnostic::Severity::Warning:   return Severity::Warning;
+            case ArtifactDiagnostic::Severity::Info:      return Severity::Note;
             default: return Severity::Error;
         }
     }
@@ -1077,10 +1077,10 @@ namespace Slang
             sourceLanguage = (SourceLanguage)TypeConvertUtil::getSourceLanguageFromTarget((SlangCompileTarget)sourceTarget);
         }
 
-        ComPtr<IPostEmitMetadata> metadata;
+        ComPtr<IArtifactPostEmitMetadata> metadata;
         if (sourceArtifact)
         {
-            metadata = findAssociated<IPostEmitMetadata>(sourceArtifact);
+            metadata = findAssociated<IArtifactPostEmitMetadata>(sourceArtifact);
             
             ComPtr<ISlangBlob> blob;
             SLANG_RETURN_ON_FAIL(sourceArtifact->loadBlob(ArtifactKeep::No, blob.writeRef()));
@@ -1354,73 +1354,69 @@ namespace Slang
         }
 
         // Compile
-        RefPtr<DownstreamCompileResult> downstreamCompileResult;
+        ComPtr<IArtifact> artifact;
         auto downstreamStartTime = std::chrono::high_resolution_clock::now();
-        SLANG_RETURN_ON_FAIL(compiler->compile(options, downstreamCompileResult));
+        SLANG_RETURN_ON_FAIL(compiler->compile(options, artifact.writeRef()));
         auto downstreamElapsedTime =
             (std::chrono::high_resolution_clock::now() - downstreamStartTime).count() * 0.000000001;
         getSession()->addDownstreamCompileTime(downstreamElapsedTime);
 
-        const auto& diagnostics = downstreamCompileResult->getDiagnostics();
+        auto diagnostics = findAssociated<IArtifactDiagnostics>(artifact);
 
-        if (diagnostics.diagnostics.getCount())
+        if (diagnostics->getCount())
         {
             StringBuilder compilerText;
             DownstreamCompilerUtil::appendAsText(compiler->getDesc(), compilerText);
 
             StringBuilder builder;
 
-            for (const auto& diagnostic : diagnostics.diagnostics)
+            auto const diagnosticCount = diagnostics->getCount();
+            for (Index i = 0; i < diagnosticCount; ++i)
             {
+                const auto& diagnostic = *diagnostics->getAt(i);
+
                 builder.Clear();
 
                 const Severity severity = _getDiagnosticSeverity(diagnostic.severity);
                 
-                if (diagnostic.filePath.getLength() == 0 && diagnostic.fileLine == 0 && severity == Severity::Note)
+                if (diagnostic.filePath.count == 0 && diagnostic.location.line == 0 && severity == Severity::Note)
                 {
                     // If theres no filePath line number and it's info, output severity and text alone
                     builder << getSeverityName(severity) << " : ";
                 }
                 else
                 {
-                    if (diagnostic.filePath.getLength())
+                    if (diagnostic.filePath.count)
                     {
-                        builder << diagnostic.filePath;
+                        builder << asStringSlice(diagnostic.filePath);
                     }
 
-                    if (diagnostic.fileLine)
+                    if (diagnostic.location.line)
                     {
-                        builder << "(" << diagnostic.fileLine <<")";
+                        builder << "(" << diagnostic.location.line <<")";
                     }
 
                     builder << ": ";
 
-                    if (diagnostic.stage == DownstreamDiagnostic::Stage::Link)
+                    if (diagnostic.stage == ArtifactDiagnostic::Stage::Link)
                     {
                         builder << "link ";
                     }
 
                     builder << getSeverityName(severity);
-                    builder << " " << diagnostic.code << ": ";
+                    builder << " " << asStringSlice(diagnostic.code) << ": ";
                 }
 
-                builder << diagnostic.text;
+                builder << asStringSlice(diagnostic.text);
                 reportExternalCompileError(compilerText.getBuffer(), severity, SLANG_OK, builder.getUnownedSlice(), sink);
             }
         }
 
         // If any errors are emitted, then we are done
-        if (diagnostics.has(DownstreamDiagnostic::Severity::Error))
+        if (diagnostics->hasOfAtLeastSeverity(ArtifactDiagnostic::Severity::Error))
         {
             return SLANG_FAIL;
         }
-
-        // Create the artifact that  encapsulates the result
-        auto artifact = ArtifactUtil::createArtifactForCompileTarget(asExternal(target));
-
-        // Wrap the downstream compile result 
-        auto objRep = new ObjectArtifactRepresentation(DownstreamCompileResult::getTypeGuid(), downstreamCompileResult);
-        artifact->addRepresentation(objRep);
 
         if (metadata)
         {

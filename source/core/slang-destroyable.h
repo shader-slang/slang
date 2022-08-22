@@ -48,6 +48,21 @@ SLANG_FORCE_INLINE T* as(ICastable* castable)
     return nullptr;
 }
 
+// A way to clone an interface (that derives from IClonable) such that it returns an interface 
+// of the same type.
+template <typename T>
+SLANG_FORCE_INLINE ComPtr<T> cloneInterface(T* in)
+{
+    SLANG_ASSERT(in);
+    // Must be derivable from clonable
+    IClonable* clonable = in;
+    // We can clone with the same interface
+    T* clone = (T*)clonable->clone(T::getTypeGuid());
+    // Clone must exist
+    SLANG_ASSERT(clone);
+    return ComPtr<T>(clone);
+}
+
 }
 
 #endif // SLANG_CORE_DESTROYABLE_H

@@ -945,7 +945,7 @@ extern "C"
 
     /* An interface to provide a mechanism to cast, that doesn't require ref counting
     and doesn't have to return a pointer to a ISlangUnknown derived class */
-    class ICastable : public ISlangUnknown
+    class ISlangCastable : public ISlangUnknown
     {
         SLANG_COM_INTERFACE(0x87ede0e1, 0x4852, 0x44b0, { 0x8b, 0xf2, 0xcb, 0x31, 0x87, 0x4d, 0xe2, 0x39 });
 
@@ -953,6 +953,17 @@ extern "C"
             /// Also provides access to internal implementations, when they provide a guid
             /// Can simulate a 'generated' interface as long as kept in scope by cast from. 
         virtual SLANG_NO_THROW void* SLANG_MCALL castAs(const SlangUUID& guid) = 0;
+    };
+
+    class ISlangClonable : public ISlangCastable
+    {
+        SLANG_COM_INTERFACE(0x1ec36168, 0xe9f4, 0x430d, { 0xbb, 0x17, 0x4, 0x8a, 0x80, 0x46, 0xb3, 0x1f });
+
+            /// Note the use of guid is for the desired interface/object.
+            /// The object is returned *not* ref counted. Any type that can implements the interface, 
+            /// derives from ICastable, and so (not withstanding some other issue) will always return
+            /// an ICastable interface which other interfaces/types are accessible from via castAs
+        SLANG_NO_THROW virtual void* SLANG_MCALL clone(const SlangUUID& guid) = 0;
     };
 
     /** A "blob" of binary data.
@@ -1019,7 +1030,7 @@ extern "C"
     /** An interface that can be used to encapsulate access to a shared library. An implementation
     does not have to implement the library as a shared library
     */
-    struct ISlangSharedLibrary : public ICastable
+    struct ISlangSharedLibrary : public ISlangCastable
     {
         SLANG_COM_INTERFACE(0x70dbc7c4, 0xdc3b, 0x4a07, { 0xae, 0x7e, 0x75, 0x2a, 0xf6, 0xa8, 0x15, 0x55 })
 
@@ -1276,6 +1287,7 @@ extern "C"
     namespace slang {
     struct IGlobalSession;
     struct ICompileRequest;
+
     } // namespace slang
 
     /*!

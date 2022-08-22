@@ -11,13 +11,13 @@
 #include "../../source/core/slang-byte-encode-util.h"
 #include "../../source/core/slang-char-util.h"
 
+#include "../../source/compiler-core/slang-artifact-diagnostic-util.h"
+#include "../../source/compiler-core/slang-artifact-associated-impl.h"
 #include "../../source/compiler-core/slang-downstream-compiler.h"
 
 using namespace Slang;
 
-
-
-/* static */SlangResult ParseDiagnosticUtil::parseGenericLine(const UnownedStringSlice& line, List<UnownedStringSlice>& lineSlices, DownstreamDiagnostic& outDiagnostic)
+/* static */SlangResult ParseDiagnosticUtil::parseGenericLine(CharSliceAllocator& allocator, const UnownedStringSlice& line, List<UnownedStringSlice>& lineSlices, ArtifactDiagnostic& outDiagnostic)
 {
     /* e:\git\somewhere\tests\diagnostics\syntax-error-intrinsic.slang(13): error C2018:  unknown character '0x40' */
     if (lineSlices.getCount() < 3)
@@ -28,29 +28,29 @@ using namespace Slang;
     {
         const UnownedStringSlice severityAndCodeSlice = lineSlices[1].trim();
         // Get the code
-        outDiagnostic.code = StringUtil::getAtInSplit(severityAndCodeSlice, ' ', 1).trim();
+        outDiagnostic.code = allocator.allocate(StringUtil::getAtInSplit(severityAndCodeSlice, ' ', 1).trim());
 
         const UnownedStringSlice severitySlice = StringUtil::getAtInSplit(severityAndCodeSlice, ' ', 0);
 
-        outDiagnostic.severity = DownstreamDiagnostic::Severity::Error;
+        outDiagnostic.severity = ArtifactDiagnostic::Severity::Error;
         if (severitySlice == UnownedStringSlice::fromLiteral("warning"))
         {
-            outDiagnostic.severity = DownstreamDiagnostic::Severity::Warning;
+            outDiagnostic.severity = ArtifactDiagnostic::Severity::Warning;
         }
         else if (severitySlice == UnownedStringSlice::fromLiteral("info"))
         {
-            outDiagnostic.severity = DownstreamDiagnostic::Severity::Info;
+            outDiagnostic.severity = ArtifactDiagnostic::Severity::Info;
         }
     }
 
     // Get the location info
-    SLANG_RETURN_ON_FAIL(DownstreamDiagnostic::splitPathLocation(lineSlices[0], outDiagnostic));
+    SLANG_RETURN_ON_FAIL(ArtifactDiagnosticUtil::splitPathLocation(allocator, lineSlices[0], outDiagnostic));
 
-    outDiagnostic.text = UnownedStringSlice(lineSlices[2].begin(), line.end());
+    outDiagnostic.text = allocator.allocate(lineSlices[2].begin(), line.end());
     return SLANG_OK;
 }
 
-static SlangResult _getSlangDiagnosticSeverity(const UnownedStringSlice& inText, DownstreamDiagnostic::Severity& outSeverity, Int& outCode)
+static SlangResult _getSlangDiagnosticSeverity(const UnownedStringSlice& inText, ArtifactDiagnostic::Severity& outSeverity, Int& outCode)
 {
     UnownedStringSlice text(inText.trim());
 
@@ -79,9 +79,9 @@ static SlangResult _getSlangDiagnosticSeverity(const UnownedStringSlice& inText,
     switch (index)
     {
         case -1:    return SLANG_FAIL;
-        case 0:     outSeverity = DownstreamDiagnostic::Severity::Info; break;
-        case 1:     outSeverity = DownstreamDiagnostic::Severity::Warning; break;
-        default:    outSeverity = DownstreamDiagnostic::Severity::Error; break;
+        case 0:     outSeverity = ArtifactDiagnostic::Severity::Info; break;
+        case 1:     outSeverity = ArtifactDiagnostic::Severity::Warning; break;
+        default:    outSeverity = ArtifactDiagnostic::Severity::Error; break;
     }
 
     outCode = 0;
@@ -108,12 +108,12 @@ static bool _isSlangDiagnostic(const UnownedStringSlice& line)
     // Extract the type/code slice
     UnownedStringSlice typeSlice = StringUtil::getAtInSplit(line, ':', typeIndex);
 
-    DownstreamDiagnostic::Severity type;
+    ArtifactDiagnostic::Severity type;
     Int code;
     return SLANG_SUCCEEDED(_getSlangDiagnosticSeverity(typeSlice, type, code));
 }
 
-/* static */SlangResult ParseDiagnosticUtil::parseSlangLine(const UnownedStringSlice& line, List<UnownedStringSlice>& lineSlices, DownstreamDiagnostic& outDiagnostic)
+/* static */SlangResult ParseDiagnosticUtil::parseSlangLine(CharSliceAllocator& allocator, const UnownedStringSlice& line, List<UnownedStringSlice>& lineSlices, ArtifactDiagnostic& outDiagnostic)
 {
     /*
     tests/diagnostics/accessors.slang(11): error 31101: accessors other than 'set' must not have parameters
@@ -125,7 +125,7 @@ static bool _isSlangDiagnostic(const UnownedStringSlice& line)
         return SLANG_FAIL;
     }
 
-    SLANG_RETURN_ON_FAIL(DownstreamDiagnostic::splitPathLocation(lineSlices[0], outDiagnostic));
+    SLANG_RETURN_ON_FAIL(ArtifactDiagnosticUtil::splitPathLocation(allocator, lineSlices[0], outDiagnostic));
     Int code;
     SLANG_RETURN_ON_FAIL(_getSlangDiagnosticSeverity(lineSlices[1], outDiagnostic.severity, code));
 
@@ -133,10 +133,10 @@ static bool _isSlangDiagnostic(const UnownedStringSlice& line)
     {
         StringBuilder buf;
         buf << code;
-        outDiagnostic.code = buf.ProduceString();
+        outDiagnostic.code = allocator.allocate(buf);
     }
 
-    outDiagnostic.text = UnownedStringSlice(lineSlices[2].begin(), line.end());
+    outDiagnostic.text = allocator.allocate(lineSlices[2].begin(), line.end());
     return SLANG_OK;
 }
 
@@ -251,12 +251,11 @@ static bool _isWhitespace(const UnownedStringSlice& slice)
     return true;
 }
 
-/* static */SlangResult ParseDiagnosticUtil::parseDiagnostics(const UnownedStringSlice& inText, List<DownstreamDiagnostic>& outDiagnostics)
+/* static */SlangResult ParseDiagnosticUtil::parseDiagnostics(const UnownedStringSlice& inText, IArtifactDiagnostics* diagnostics)
 {
     if (_isWhitespace(inText))
     {
         // If it's empty, then there are no diagnostics to add.
-        outDiagnostics.clear();
         return SLANG_OK;
     }
 
@@ -274,10 +273,10 @@ static bool _isWhitespace(const UnownedStringSlice& slice)
         // For now we assume no prefix.
     }
 
-    return parseDiagnostics(inText, compilerIdentity, linePrefix, outDiagnostics);
+    return parseDiagnostics(inText, compilerIdentity, linePrefix, diagnostics);
 }
 
-/* static */SlangResult ParseDiagnosticUtil::parseDiagnostics(const UnownedStringSlice& inText, const CompilerIdentity& compilerIdentity, const UnownedStringSlice& linePrefix, List<DownstreamDiagnostic>& outDiagnostics)
+/* static */SlangResult ParseDiagnosticUtil::parseDiagnostics(const UnownedStringSlice& inText, const CompilerIdentity& compilerIdentity, const UnownedStringSlice& linePrefix, IArtifactDiagnostics* diagnostics)
 {
     auto lineParser = getLineParser(compilerIdentity);
     if (!lineParser)
@@ -286,6 +285,8 @@ static bool _isWhitespace(const UnownedStringSlice& slice)
     }
 
     List<UnownedStringSlice> splitLine;
+
+    CharSliceAllocator allocator;
 
     UnownedStringSlice text(inText), line;
     while (StringUtil::extractLine(text, line))
@@ -307,23 +308,23 @@ static bool _isWhitespace(const UnownedStringSlice& slice)
         // If we don't have a valid split then just assume it's a note
         if (!isValidSplit)
         {
-            DownstreamDiagnostics::addNote(line, outDiagnostics);
+            diagnostics->maybeAddNote(asCharSlice(line));
             continue;
         }
 
-        DownstreamDiagnostic diagnostic;
-        diagnostic.severity = DownstreamDiagnostic::Severity::Error;
-        diagnostic.stage = DownstreamDiagnostic::Stage::Compile;
-        diagnostic.fileLine = 0;
+        ArtifactDiagnostic diagnostic;
+        diagnostic.severity = ArtifactDiagnostic::Severity::Error;
+        diagnostic.stage = ArtifactDiagnostic::Stage::Compile;
+        diagnostic.location.line = 0;
         
-        if (SLANG_SUCCEEDED(lineParser(line, splitLine, diagnostic)))
+        if (SLANG_SUCCEEDED(lineParser(allocator, line, splitLine, diagnostic)))
         {
-            outDiagnostics.add(diagnostic);   
+            diagnostics->add(diagnostic);
         }
         else
         {
             // If couldn't parse, just add as a note
-             DownstreamDiagnostics::addNote(line, outDiagnostics);
+             ArtifactDiagnosticUtil::maybeAddNote(line, diagnostics);
         }
     }
 
@@ -427,7 +428,9 @@ static UnownedStringSlice _getEquals(const UnownedStringSlice& in)
 
 /* static */bool ParseDiagnosticUtil::areEqual(const UnownedStringSlice& a, const UnownedStringSlice& b, EqualityFlags flags)
 {
-    List<DownstreamDiagnostic> diagsA, diagsB;
+    auto diagsA = ArtifactDiagnostics::create();
+    auto diagsB = ArtifactDiagnostics::create();
+
     SlangResult resA = ParseDiagnosticUtil::parseDiagnostics(a, diagsA);
     SlangResult resB = ParseDiagnosticUtil::parseDiagnostics(b, diagsB);
 
@@ -448,18 +451,21 @@ static UnownedStringSlice _getEquals(const UnownedStringSlice& in)
 
     // Must have both succeeded, and have the same amount of lines
     if (SLANG_SUCCEEDED(resA) && SLANG_SUCCEEDED(resB) &&
-        diagsA.getCount() == diagsB.getCount())
+        diagsA->getCount() == diagsB->getCount())
     {
-        for (Index i = 0; i < diagsA.getCount(); ++i)
+        const auto count = diagsA->getCount();
+        for (Index i = 0; i < count; ++i)
         {
-            DownstreamDiagnostic diagA = diagsA[i];
-            DownstreamDiagnostic diagB = diagsB[i];
+            ArtifactDiagnostic diagA = *diagsA->getAt(i);
+            ArtifactDiagnostic diagB = *diagsB->getAt(i);
 
             // Check if we need to ignore line numbers
             if (flags & EqualityFlag::IgnoreLineNos)
             {
-                diagA.fileLine = 0;
-                diagB.fileLine = 0;
+                const ArtifactDiagnostic::Location loc;
+
+                diagA.location = loc;
+                diagB.location = loc;
             }
 
             if (diagA != diagB)
