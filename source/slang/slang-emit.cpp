@@ -218,7 +218,7 @@ Result linkAndOptimizeIR(
         case CodeGenTarget::HostCPPSource:
         {
             lowerComInterfaces(irModule, artifactDesc.style, sink);
-            generateDllImportFuncs(irModule, sink);
+            generateDllImportFuncs(codeGenContext->getTargetReq(), irModule, sink);
             generateDllExportFuncs(irModule, sink);
             break;
         }

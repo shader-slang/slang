@@ -1411,7 +1411,12 @@ TestResult runExecutableTest(TestContext* context, TestInput& input)
         }
     }
     ExecuteResult exeRes;
-    TEST_RETURN_ON_DONE(spawnAndWait(context, outputStem, input.spawnType, cmdLine, exeRes));
+
+    // TODO(Yong) HACK:
+    // Just use shared library now, TestServer spawn mode seems to cause slangc to fail to find its own
+    // executable path, and thus failed to find the `gfx.slang` file sitting along side `slangc.exe`.
+    // We need to figure out what happened to `Path::getExecutablePath()` inside test-server.
+    TEST_RETURN_ON_DONE(spawnAndWait(context, outputStem, SpawnType::UseSharedLibrary, cmdLine, exeRes));
 
     String actualOutput;
 

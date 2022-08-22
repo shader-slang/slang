@@ -1300,7 +1300,7 @@ interface IQueryPool
 interface ICommandEncoder
 {
     void endEncoding();
-    void writeTimestamp(IQueryPool *queryPool, GfxIndex queryIndex);
+    void writeTimestamp(IQueryPool queryPool, GfxIndex queryIndex);
 };
 
 struct IndirectDispatchArguments
@@ -1541,36 +1541,12 @@ interface ICommandBuffer
         IRenderPassLayout renderPass,
         IFramebuffer framebuffer,
         out IRenderCommandEncoder outEncoder);
-    IRenderCommandEncoder encodeRenderCommands(IRenderPassLayout renderPass, IFramebuffer framebuffer)
-    {
-        IRenderCommandEncoder result;
-        encodeRenderCommands(renderPass, framebuffer, result);
-        return result;
-    }
 
     void encodeComputeCommands(out IComputeCommandEncoder encoder);
-    IComputeCommandEncoder encodeComputeCommands()
-    {
-        IComputeCommandEncoder result;
-        encodeComputeCommands(result);
-        return result;
-    }
 
     void encodeResourceCommands(out IResourceCommandEncoder outEncoder);
-    IResourceCommandEncoder encodeResourceCommands()
-    {
-        IResourceCommandEncoder result;
-        encodeResourceCommands(result);
-        return result;
-    }
 
     void encodeRayTracingCommands(out IRayTracingCommandEncoder outEncoder);
-    IRayTracingCommandEncoder encodeRayTracingCommands()
-    {
-        IRayTracingCommandEncoder result;
-        encodeRayTracingCommands(result);
-        return result;
-    }
 
     void close();
 
@@ -1599,12 +1575,6 @@ interface ICommandQueue
         NativeRef<ICommandBuffer> *commandBuffers,
         Optional<IFence> fenceToSignal,
         uint64_t newFenceValue);
-    void executeCommandBuffer(
-        ICommandBuffer commandBuffer, Optional<IFence> fenceToSignal = none, uint64_t newFenceValue = 0)
-    {
-        NativeRef<ICommandBuffer> nativeCmdBuffer = NativeRef<ICommandBuffer>(commandBuffer);
-        executeCommandBuffers(1, &nativeCmdBuffer, fenceToSignal, newFenceValue);
-    }
 
     Result getNativeHandle(out InteropHandle outHandle);
 
@@ -1954,5 +1924,33 @@ interface IDevice
 
     Result getTextureRowAlignment(out Size outAlignment);
 };
+
+#define SLANG_GFX_IMPORT [DllImport("gfx")]
+/// Checks if format is compressed
+SLANG_GFX_IMPORT bool gfxIsCompressedFormat(Format format);
+
+/// Checks if format is typeless
+SLANG_GFX_IMPORT bool gfxIsTypelessFormat(Format format);
+
+/// Gets information about the format
+SLANG_GFX_IMPORT Result gfxGetFormatInfo(Format format, FormatInfo *outInfo);
+
+/// Given a type returns a function that can construct it, or nullptr if there isn't one
+SLANG_GFX_IMPORT Result gfxCreateDevice(const DeviceDesc* desc, out IDevice outDevice);
+
+/// Sets a callback for receiving debug messages.
+/// The layer does not hold a strong reference to the callback object.
+/// The user is responsible for holding the callback object alive.
+SLANG_GFX_IMPORT Result gfxSetDebugCallback(IDebugCallback callback);
+
+/// Enables debug layer. The debug layer will check all `gfx` calls and verify that uses are valid.
+SLANG_GFX_IMPORT void gfxEnableDebugLayer();
+
+SLANG_GFX_IMPORT NativeString gfxGetDeviceTypeName(DeviceType type);
+
+public bool succeeded(Result code)
+{
+    return code >= 0;
+}
 
 }

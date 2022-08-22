@@ -178,7 +178,9 @@
       <TreatLinkerWarningAsErrors>true</TreatLinkerWarningAsErrors>
     </Link>
     <PostBuildEvent>
-      <Command>"$(SolutionDir)tools\copy-hlsl-libs.bat" "$(WindowsSdkDir)Redist/D3D/x86/" "../../../bin/windows-x86/debug/"</Command>
+      <Command>IF EXIST "$(SolutionDir)tools\gfx\gfx.slang"\ (xcopy /Q /E /Y /I "$(SolutionDir)tools\gfx\gfx.slang" "..\..\..\bin\windows-x86\debug" &gt; nul) ELSE (xcopy /Q /Y /I "$(SolutionDir)tools\gfx\gfx.slang" "..\..\..\bin\windows-x86\debug" &gt; nul)
+IF EXIST "$(SolutionDir)tools\gfx\slang.slang"\ (xcopy /Q /E /Y /I "$(SolutionDir)tools\gfx\slang.slang" "..\..\..\bin\windows-x86\debug" &gt; nul) ELSE (xcopy /Q /Y /I "$(SolutionDir)tools\gfx\slang.slang" "..\..\..\bin\windows-x86\debug" &gt; nul)
+"$(SolutionDir)tools\copy-hlsl-libs.bat" "$(WindowsSdkDir)Redist/D3D/x86/" "../../../bin/windows-x86/debug/"</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
@@ -199,7 +201,9 @@
       <TreatLinkerWarningAsErrors>true</TreatLinkerWarningAsErrors>
     </Link>
     <PostBuildEvent>
-      <Command>"$(SolutionDir)tools\copy-hlsl-libs.bat" "$(WindowsSdkDir)Redist/D3D/x64/" "../../../bin/windows-x64/debug/"</Command>
+      <Command>IF EXIST "$(SolutionDir)tools\gfx\gfx.slang"\ (xcopy /Q /E /Y /I "$(SolutionDir)tools\gfx\gfx.slang" "..\..\..\bin\windows-x64\debug" &gt; nul) ELSE (xcopy /Q /Y /I "$(SolutionDir)tools\gfx\gfx.slang" "..\..\..\bin\windows-x64\debug" &gt; nul)
+IF EXIST "$(SolutionDir)tools\gfx\slang.slang"\ (xcopy /Q /E /Y /I "$(SolutionDir)tools\gfx\slang.slang" "..\..\..\bin\windows-x64\debug" &gt; nul) ELSE (xcopy /Q /Y /I "$(SolutionDir)tools\gfx\slang.slang" "..\..\..\bin\windows-x64\debug" &gt; nul)
+"$(SolutionDir)tools\copy-hlsl-libs.bat" "$(WindowsSdkDir)Redist/D3D/x64/" "../../../bin/windows-x64/debug/"</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug aarch64|ARM'">
@@ -220,7 +224,9 @@
       <TreatLinkerWarningAsErrors>true</TreatLinkerWarningAsErrors>
     </Link>
     <PostBuildEvent>
-      <Command>"$(SolutionDir)tools\copy-hlsl-libs.bat" "$(WindowsSdkDir)Redist/D3D/aarch64/" "../../../bin/windows-aarch64/debug/"</Command>
+      <Command>IF EXIST "$(SolutionDir)tools\gfx\gfx.slang"\ (xcopy /Q /E /Y /I "$(SolutionDir)tools\gfx\gfx.slang" "..\..\..\bin\windows-aarch64\debug" &gt; nul) ELSE (xcopy /Q /Y /I "$(SolutionDir)tools\gfx\gfx.slang" "..\..\..\bin\windows-aarch64\debug" &gt; nul)
+IF EXIST "$(SolutionDir)tools\gfx\slang.slang"\ (xcopy /Q /E /Y /I "$(SolutionDir)tools\gfx\slang.slang" "..\..\..\bin\windows-aarch64\debug" &gt; nul) ELSE (xcopy /Q /Y /I "$(SolutionDir)tools\gfx\slang.slang" "..\..\..\bin\windows-aarch64\debug" &gt; nul)
+"$(SolutionDir)tools\copy-hlsl-libs.bat" "$(WindowsSdkDir)Redist/D3D/aarch64/" "../../../bin/windows-aarch64/debug/"</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -245,7 +251,9 @@
       <TreatLinkerWarningAsErrors>true</TreatLinkerWarningAsErrors>
     </Link>
     <PostBuildEvent>
-      <Command>"$(SolutionDir)tools\copy-hlsl-libs.bat" "$(WindowsSdkDir)Redist/D3D/x86/" "../../../bin/windows-x86/release/"</Command>
+      <Command>IF EXIST "$(SolutionDir)tools\gfx\gfx.slang"\ (xcopy /Q /E /Y /I "$(SolutionDir)tools\gfx\gfx.slang" "..\..\..\bin\windows-x86\release" &gt; nul) ELSE (xcopy /Q /Y /I "$(SolutionDir)tools\gfx\gfx.slang" "..\..\..\bin\windows-x86\release" &gt; nul)
+IF EXIST "$(SolutionDir)tools\gfx\slang.slang"\ (xcopy /Q /E /Y /I "$(SolutionDir)tools\gfx\slang.slang" "..\..\..\bin\windows-x86\release" &gt; nul) ELSE (xcopy /Q /Y /I "$(SolutionDir)tools\gfx\slang.slang" "..\..\..\bin\windows-x86\release" &gt; nul)
+"$(SolutionDir)tools\copy-hlsl-libs.bat" "$(WindowsSdkDir)Redist/D3D/x86/" "../../../bin/windows-x86/release/"</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -270,7 +278,9 @@
       <TreatLinkerWarningAsErrors>true</TreatLinkerWarningAsErrors>
     </Link>
     <PostBuildEvent>
-      <Command>"$(SolutionDir)tools\copy-hlsl-libs.bat" "$(WindowsSdkDir)Redist/D3D/x64/" "../../../bin/windows-x64/release/"</Command>
+      <Command>IF EXIST "$(SolutionDir)tools\gfx\gfx.slang"\ (xcopy /Q /E /Y /I "$(SolutionDir)tools\gfx\gfx.slang" "..\..\..\bin\windows-x64\release" &gt; nul) ELSE (xcopy /Q /Y /I "$(SolutionDir)tools\gfx\gfx.slang" "..\..\..\bin\windows-x64\release" &gt; nul)
+IF EXIST "$(SolutionDir)tools\gfx\slang.slang"\ (xcopy /Q /E /Y /I "$(SolutionDir)tools\gfx\slang.slang" "..\..\..\bin\windows-x64\release" &gt; nul) ELSE (xcopy /Q /Y /I "$(SolutionDir)tools\gfx\slang.slang" "..\..\..\bin\windows-x64\release" &gt; nul)
+"$(SolutionDir)tools\copy-hlsl-libs.bat" "$(WindowsSdkDir)Redist/D3D/x64/" "../../../bin/windows-x64/release/"</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release aarch64|ARM'">
@@ -295,7 +305,9 @@
       <TreatLinkerWarningAsErrors>true</TreatLinkerWarningAsErrors>
     </Link>
     <PostBuildEvent>
-      <Command>"$(SolutionDir)tools\copy-hlsl-libs.bat" "$(WindowsSdkDir)Redist/D3D/aarch64/" "../../../bin/windows-aarch64/release/"</Command>
+      <Command>IF EXIST "$(SolutionDir)tools\gfx\gfx.slang"\ (xcopy /Q /E /Y /I "$(SolutionDir)tools\gfx\gfx.slang" "..\..\..\bin\windows-aarch64\release" &gt; nul) ELSE (xcopy /Q /Y /I "$(SolutionDir)tools\gfx\gfx.slang" "..\..\..\bin\windows-aarch64\release" &gt; nul)
+IF EXIST "$(SolutionDir)tools\gfx\slang.slang"\ (xcopy /Q /E /Y /I "$(SolutionDir)tools\gfx\slang.slang" "..\..\..\bin\windows-aarch64\release" &gt; nul) ELSE (xcopy /Q /Y /I "$(SolutionDir)tools\gfx\slang.slang" "..\..\..\bin\windows-aarch64\release" &gt; nul)
+"$(SolutionDir)tools\copy-hlsl-libs.bat" "$(WindowsSdkDir)Redist/D3D/aarch64/" "../../../bin/windows-aarch64/release/"</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>

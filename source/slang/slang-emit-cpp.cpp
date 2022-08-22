@@ -1775,7 +1775,7 @@ void CPPSourceEmitter::emitComInterface(IRInterfaceType* interfaceType)
     for (UInt i = 0; i < interfaceType->getOperandCount(); i++)
     {
         auto entry = as<IRInterfaceRequirementEntry>(interfaceType->getOperand(i));
-        if (auto witnessTableType = as<IRWitnessTableType>(entry->getRequirementVal()))
+        if (auto witnessTableType = as<IRWitnessTableTypeBase>(entry->getRequirementVal()))
         {
             if (isFirst)
             {
@@ -2931,6 +2931,7 @@ void CPPSourceEmitter::_emitForwardDeclarations(const List<EmitAction>& actions)
                     {
                     case kIROp_Func:
                     case kIROp_StructType:
+                    case kIROp_InterfaceType:
                         emitForwardDeclaration(action.inst);
                         break;
                     default:

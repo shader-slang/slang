@@ -16,6 +16,8 @@ static bool _canReplace(IRUse* use)
         case kIROp_WitnessTableType:
         case kIROp_RTTIPointerType:
         case kIROp_RTTIHandleType:
+        case kIROp_ComPtrType:
+        case kIROp_NativePtrType:
         {
             // Don't replace
             return false;
@@ -25,7 +27,6 @@ static bool _canReplace(IRUse* use)
             // Appears replacable.
             break;
         }
-        case kIROp_ComPtrType:
         case kIROp_PtrType:
         {
             // We can have ** and ComPtr<T>*.
@@ -98,7 +99,7 @@ void lowerComInterfaces(IRModule* module, ArtifactStyle artifactStyle, Diagnosti
             // so has to be a raw pointer
             IRType* result = (artifactStyle == ArtifactStyle::Host) ?
                 static_cast<IRType*>(builder.getComPtrType(comIntf)) :
-                static_cast<IRType*>(builder.getPtrType(comIntf));
+                static_cast<IRType*>(builder.getNativePtrType(comIntf));
 
             // Go through replacing all of the replacable uses
             for (auto use : uses)
