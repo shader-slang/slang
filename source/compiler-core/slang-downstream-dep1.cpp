@@ -46,7 +46,7 @@ void* DownstreamResultArtifactRepresentationAdapater_Dep1::castAs(const SlangUUI
 
 void* DownstreamResultArtifactRepresentationAdapater_Dep1::getInterface(const Guid& guid)
 {
-    if (guid == ISlangBlob::getTypeGuid() ||
+    if (guid == ISlangUnknown::getTypeGuid() ||
         guid == ICastable::getTypeGuid() ||
         guid == IArtifactRepresentation::getTypeGuid())
     {
@@ -93,7 +93,6 @@ DownstreamCompilerAdapter_Dep1::DownstreamCompilerAdapter_Dep1(DownstreamCompile
     auto desc = dep->getDesc();
     m_desc = DownstreamCompilerDesc(desc.type, desc.majorVersion, desc.minorVersion);
 }
-
 SlangResult DownstreamCompilerAdapter_Dep1::compile(const CompileOptions& inOptions, IArtifact** outArtifact)
 {
     typedef DownstreamCompileOptions_Dep1::SomeEnum SomeEnum;
