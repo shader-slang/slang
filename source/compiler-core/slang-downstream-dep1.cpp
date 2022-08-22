@@ -3,6 +3,7 @@
 
 #include "slang-artifact-util.h"
 #include "slang-artifact-associated-impl.h"
+#include "slang-artifact-desc-util.h"
 
 #include "../core/slang-castable-util.h"
 
@@ -85,8 +86,9 @@ SlangResult DownstreamResultArtifactRepresentationAdapater_Dep1::createRepresent
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!! DownstreamCompilerAdapter_Dep1 !!!!!!!!!!!!!!!!!!!!!!!! */
 
-DownstreamCompilerAdapter_Dep1::DownstreamCompilerAdapter_Dep1(DownstreamCompiler_Dep1* dep) :
-    m_dep(dep)
+DownstreamCompilerAdapter_Dep1::DownstreamCompilerAdapter_Dep1(DownstreamCompiler_Dep1* dep, ArtifactPayload disassemblyPayload) :
+    m_dep(dep),
+    m_disassemblyPayload(disassemblyPayload)
 {
     auto desc = dep->getDesc();
     m_desc = DownstreamCompilerDesc(desc.type, desc.majorVersion, desc.minorVersion);
@@ -192,6 +194,36 @@ SlangResult DownstreamCompilerAdapter_Dep1::compile(const CompileOptions& inOpti
 
     auto rep = new DownstreamResultArtifactRepresentationAdapater_Dep1(result);
     artifact->addRepresentation(rep);
+
+    *outArtifact = artifact.detach();
+    return SLANG_OK;
+}
+
+bool DownstreamCompilerAdapter_Dep1::canConvert(const ArtifactDesc& from, const ArtifactDesc& to)
+{
+    // Can only disassemble blobs that are DXBC
+    return ArtifactDescUtil::isDissassembly(from, to) && from.payload == m_disassemblyPayload;
+}
+
+SlangResult DownstreamCompilerAdapter_Dep1::convert(IArtifact* from, const ArtifactDesc& to, IArtifact** outArtifact)
+{
+    if (!canConvert(from->getDesc(), to))
+    {
+        return SLANG_FAIL;
+    }
+
+    ComPtr<ISlangBlob> fromBlob;
+    SLANG_RETURN_ON_FAIL(from->loadBlob(ArtifactKeep::No, fromBlob.writeRef()));
+
+    const auto compileTarget = ArtifactDescUtil::getCompileTargetFromDesc(from->getDesc());
+
+    // Do the disassembly
+    ComPtr<ISlangBlob> dstBlob;
+    SLANG_RETURN_ON_FAIL(m_dep->disassemble(compileTarget, fromBlob->getBufferPointer(), fromBlob->getBufferSize(), dstBlob.writeRef()));
+
+    auto artifact = ArtifactUtil::createArtifact(to);
+
+    artifact->addRepresentationUnknown(dstBlob);
 
     *outArtifact = artifact.detach();
     return SLANG_OK;

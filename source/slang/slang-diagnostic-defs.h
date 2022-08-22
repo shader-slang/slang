@@ -592,6 +592,7 @@ DIAGNOSTIC(52000, Error, multiLevelBreakUnsupported, "control flow appears to re
 DIAGNOSTIC(52001, Warning, dxilNotFound, "dxil shared library not found, so 'dxc' output cannot be signed! Shader code will not be runnable in non-development environments.")
 
 DIAGNOSTIC(52002, Error, passThroughCompilerNotFound, "could not find a suitable pass-through compiler for '$0'.")
+DIAGNOSTIC(52003, Error, cannotDisassemble, "cannot disassemble '$0'.")
 
 DIAGNOSTIC(52004, Error, unableToWriteFile, "unable to write file '$0'")
 DIAGNOSTIC(52005, Error, unableToReadFile, "unable to read file '$0'")

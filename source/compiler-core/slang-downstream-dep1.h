@@ -176,15 +176,17 @@ public:
     // IDownstreamCompiler
     virtual SLANG_NO_THROW const Desc& SLANG_MCALL getDesc() SLANG_OVERRIDE { return m_desc; }
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL compile(const CompileOptions& options, IArtifact** outArtifact) SLANG_OVERRIDE;
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL disassemble(SlangCompileTarget sourceBlobTarget, const void* blob, size_t blobSize, ISlangBlob** out) SLANG_OVERRIDE { return m_dep->disassemble(sourceBlobTarget, blob, blobSize, out); }
+    virtual SLANG_NO_THROW bool SLANG_MCALL canConvert(const ArtifactDesc& from, const ArtifactDesc& to) SLANG_OVERRIDE;
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL convert(IArtifact* from, const ArtifactDesc& to, IArtifact** outArtifact) SLANG_OVERRIDE;
     virtual SLANG_NO_THROW bool SLANG_MCALL isFileBased() SLANG_OVERRIDE { return m_dep->isFileBased(); }
 
-    DownstreamCompilerAdapter_Dep1(DownstreamCompiler_Dep1* dep);
+    DownstreamCompilerAdapter_Dep1(DownstreamCompiler_Dep1* dep, ArtifactPayload disassemblyPayload);
 
 protected:
 
     DownstreamCompilerDesc m_desc;
 
+    ArtifactPayload m_disassemblyPayload;
     RefPtr<DownstreamCompiler_Dep1> m_dep;
 };
 

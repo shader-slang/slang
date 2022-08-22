@@ -48,7 +48,7 @@ namespace Slang
 
     SLANG_RETURN_ON_FAIL(fn(downstreamCompilerDep1));
 
-    ComPtr<IDownstreamCompiler> downstreamCompiler(new DownstreamCompilerAdapter_Dep1(downstreamCompilerDep1));
+    ComPtr<IDownstreamCompiler> downstreamCompiler(new DownstreamCompilerAdapter_Dep1(downstreamCompilerDep1, ArtifactPayload::None));
 
     set->addSharedLibrary(library);
     set->addCompiler(downstreamCompiler);

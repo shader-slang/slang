@@ -22,13 +22,12 @@ namespace Slang
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! DownstreamCompilerBase !!!!!!!!!!!!!!!!!!!!!!!!!!!!!*/
 
-SlangResult DownstreamCompilerBase::disassemble(SlangCompileTarget sourceBlobTarget, const void* blob, size_t blobSize, ISlangBlob** out)
+SlangResult DownstreamCompilerBase::convert(IArtifact* from, const ArtifactDesc& to, IArtifact** outArtifact)
 {
-    SLANG_UNUSED(sourceBlobTarget);
-    SLANG_UNUSED(blob);
-    SLANG_UNUSED(blobSize);
-    SLANG_UNUSED(out);
-
+    SLANG_UNUSED(from);
+    SLANG_UNUSED(to);
+    SLANG_UNUSED(outArtifact);
+    
     return SLANG_E_NOT_AVAILABLE;
 }
 

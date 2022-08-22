@@ -193,8 +193,10 @@ public:
     virtual SLANG_NO_THROW const Desc& SLANG_MCALL getDesc() = 0;
         /// Compile using the specified options. The result is in resOut
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL compile(const CompileOptions& options, IArtifact** outArtifact) = 0;
-        /// Some compilers have support converting a binary blob into disassembly. Output disassembly is held in the output blob
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL disassemble(SlangCompileTarget sourceBlobTarget, const void* blob, size_t blobSize, ISlangBlob** out) = 0;
+        /// Returns true if compiler can do a transformation of `from` to `to` Artifact types
+    virtual SLANG_NO_THROW bool SLANG_MCALL canConvert(const ArtifactDesc& from, const ArtifactDesc& to) = 0;
+        /// Converts an artifact `from` to a desc of `to` and puts the result in outArtifact
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL convert(IArtifact* from, const ArtifactDesc& to, IArtifact** outArtifact) = 0;
 
         /// True if underlying compiler uses file system to communicate source
     virtual SLANG_NO_THROW bool SLANG_MCALL isFileBased() = 0;
@@ -210,7 +212,8 @@ public:
 
     // IDownstreamCompiler
     virtual SLANG_NO_THROW const Desc& SLANG_MCALL getDesc() SLANG_OVERRIDE { return m_desc; }
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL disassemble(SlangCompileTarget sourceBlobTarget, const void* blob, size_t blobSize, ISlangBlob** out) SLANG_OVERRIDE;
+    virtual SLANG_NO_THROW bool SLANG_MCALL canConvert(const ArtifactDesc& from, const ArtifactDesc& to) SLANG_OVERRIDE { SLANG_UNUSED(from); SLANG_UNUSED(to); return false; } 
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL convert(IArtifact* from, const ArtifactDesc& to, IArtifact** outArtifact) SLANG_OVERRIDE;
 
     DownstreamCompilerBase(const Desc& desc):
         m_desc(desc)

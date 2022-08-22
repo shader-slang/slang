@@ -15,6 +15,7 @@
 #include "../core/slang-char-util.h"
 
 #include "slang-artifact-associated-impl.h"
+#include "slang-artifact-desc-util.h"
 
 #include "slang-include-system.h"
 #include "slang-source-loc.h"
@@ -43,7 +44,8 @@ public:
 
     // IDownstreamCompiler
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL compile(const CompileOptions& options, IArtifact** outResult) SLANG_OVERRIDE;
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL disassemble(SlangCompileTarget sourceBlobTarget, const void* blob, size_t blobSize, ISlangBlob** out) SLANG_OVERRIDE;
+    virtual SLANG_NO_THROW bool SLANG_MCALL canConvert(const ArtifactDesc& from, const ArtifactDesc& to) SLANG_OVERRIDE;
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL convert(IArtifact* from, const ArtifactDesc& to, IArtifact** outArtifact) SLANG_OVERRIDE;
     virtual SLANG_NO_THROW bool SLANG_MCALL isFileBased() SLANG_OVERRIDE { return false; }
 
         /// Must be called before use
@@ -217,13 +219,21 @@ SlangResult GlslangDownstreamCompiler::compile(const CompileOptions& options, IA
     return SLANG_OK;
 }
 
-SlangResult GlslangDownstreamCompiler::disassemble(SlangCompileTarget sourceBlobTarget, const void* blob, size_t blobSize, ISlangBlob** out)
+bool GlslangDownstreamCompiler::canConvert(const ArtifactDesc& from, const ArtifactDesc& to)
 {
-    // Can only disassemble blobs that are DXBC
-    if (sourceBlobTarget != SLANG_SPIRV)
+    // Can only disassemble blobs that are SPIR-V
+    return ArtifactDescUtil::isDissassembly(from, to) && from.payload == ArtifactPayload::SPIRV;
+}
+
+SlangResult GlslangDownstreamCompiler::convert(IArtifact* from, const ArtifactDesc& to, IArtifact** outArtifact) 
+{
+    if (!canConvert(from->getDesc(), to))
     {
         return SLANG_FAIL;
     }
+
+    ComPtr<ISlangBlob> blob;
+    SLANG_RETURN_ON_FAIL(from->loadBlob(ArtifactKeep::No, blob.writeRef()));
 
     StringBuilder builder;
     
@@ -240,16 +250,22 @@ SlangResult GlslangDownstreamCompiler::disassemble(SlangCompileTarget sourceBlob
 
     request.sourcePath = nullptr;
 
-    request.inputBegin = blob;
-    request.inputEnd = (char*)blob + blobSize;
+    char* blobData = (char*)blob->getBufferPointer();
+
+    request.inputBegin = blobData;
+    request.inputEnd = blobData + blob->getBufferSize();
 
     request.outputFunc = outputFunc;
     request.outputUserData = &builder;
 
     SLANG_RETURN_ON_FAIL(_invoke(request));
 
-    ComPtr<ISlangBlob> disassemblyBlob = StringUtil::createStringBlob(builder);
-    *out = disassemblyBlob.detach();
+    auto disassemblyBlob = StringBlob::moveCreate(builder);
+
+    auto artifact = ArtifactUtil::createArtifact(to);
+    artifact->addRepresentationUnknown(disassemblyBlob);
+
+    *outArtifact = artifact.detach();
 
     return SLANG_OK;
 }
