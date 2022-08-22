@@ -1,4 +1,5 @@
 #include "slang-ir-util.h"
+#include "slang-ir-insts.h"
 
 namespace Slang
 {
@@ -42,5 +43,25 @@ bool isPtrToArrayType(IRInst* type)
 {
     return isPointerOfType(type, kIROp_ArrayType) || isPointerOfType(type, kIROp_UnsizedArrayType);
 }
+
+
+bool isComInterfaceType(IRType* type)
+{
+    if (!type) return false;
+    if (type->findDecoration<IRComInterfaceDecoration>() ||
+        type->getOp() == kIROp_ComPtrType)
+    {
+        return true;
+    }
+
+    if (auto ptrType = as<IRNativePtrType>(type))
+    {
+        auto valueType = ptrType->getValueType();
+        return valueType->findDecoration<IRComInterfaceDecoration>() != nullptr;
+    }
+
+    return false;
+}
+
 
 }

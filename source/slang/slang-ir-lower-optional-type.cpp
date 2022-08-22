@@ -3,6 +3,7 @@
 #include "slang-ir-lower-optional-type.h"
 #include "slang-ir.h"
 #include "slang-ir-insts.h"
+#include "slang-ir-util.h"
 
 namespace Slang
 {
@@ -35,6 +36,23 @@ namespace Slang
                 return type;
         }
 
+        bool typeHasNullValue(IRInst* type)
+        {
+            switch (type->getOp())
+            {
+            case kIROp_ComPtrType:
+            case kIROp_NativePtrType:
+            case kIROp_NativeStringType:
+            case kIROp_PtrType:
+            case kIROp_ClassType:
+                return true;
+            case kIROp_InterfaceType:
+                return isComInterfaceType((IRType*)type);
+            default:
+                return false;
+            }
+        }
+
         LoweredOptionalTypeInfo* getLoweredOptionalType(IRBuilder* builder, IRInst* type)
         {
             if (auto loweredInfo = loweredOptionalTypes.TryGetValue(type))
@@ -48,25 +66,30 @@ namespace Slang
                 return nullptr;
 
             RefPtr<LoweredOptionalTypeInfo> info = new LoweredOptionalTypeInfo();
-            info->optionalType = (IRType*)type;
             auto optionalType = cast<IROptionalType>(type);
             auto valueType = optionalType->getValueType();
+            info->optionalType = (IRType*)type;
             info->valueType = valueType;
+            if (typeHasNullValue(valueType))
+            {
+                info->loweredType = valueType;
+            }
+            else
+            {
+                auto structType = builder->createStructType();
+                info->loweredType = structType;
+                builder->addNameHintDecoration(structType, UnownedStringSlice("OptionalType"));
 
-            auto structType = builder->createStructType();
-            info->loweredType = structType;
-            builder->addNameHintDecoration(structType, UnownedStringSlice("OptionalType"));
+                info->valueType = valueType;
+                auto valueKey = builder->createStructKey();
+                builder->addNameHintDecoration(valueKey, UnownedStringSlice("value"));
+                info->valueField = builder->createStructField(structType, valueKey, (IRType*)valueType);
 
-            info->valueType = valueType;
-            auto valueKey = builder->createStructKey();
-            builder->addNameHintDecoration(valueKey, UnownedStringSlice("value"));
-            info->valueField = builder->createStructField(structType, valueKey, (IRType*)valueType);
-
-            auto boolType = builder->getBoolType();
-            auto hasValueKey = builder->createStructKey();
-            builder->addNameHintDecoration(hasValueKey, UnownedStringSlice("hasValue"));
-            info->hasValueField = builder->createStructField(structType, hasValueKey, (IRType*)boolType);
-
+                auto boolType = builder->getBoolType();
+                auto hasValueKey = builder->createStructKey();
+                builder->addNameHintDecoration(hasValueKey, UnownedStringSlice("hasValue"));
+                info->hasValueField = builder->createStructField(structType, hasValueKey, (IRType*)boolType);
+            }
             mapLoweredTypeToOptionalTypeInfo[info->loweredType] = info;
             loweredOptionalTypes[type] = info;
             return info.Ptr();
@@ -123,12 +146,19 @@ namespace Slang
         {
             auto loweredOptionalTypeInfo = getLoweredOptionalType(builder, optionalInst->getDataType());
             SLANG_ASSERT(loweredOptionalTypeInfo);
-
-            auto value = builder->emitFieldExtract(
-                builder->getBoolType(),
-                optionalInst,
-                loweredOptionalTypeInfo->hasValueField->getKey());
-            return value;
+            IRInst* result = nullptr;
+            if (loweredOptionalTypeInfo->loweredType != loweredOptionalTypeInfo->valueType)
+            {
+                result = builder->emitFieldExtract(
+                    builder->getBoolType(),
+                    optionalInst,
+                    loweredOptionalTypeInfo->hasValueField->getKey());
+            }
+            else
+            {
+                result = builder->emitCastPtrToBool(optionalInst);
+            }
+            return result;
         }
 
         void processGetOptionalHasValue(IROptionalHasValue* inst)
@@ -151,13 +181,20 @@ namespace Slang
 
             auto base = inst->getOptionalOperand();
             auto loweredOptionalTypeInfo = getLoweredOptionalType(builder, base->getDataType());
-            SLANG_ASSERT(loweredOptionalTypeInfo);
-            SLANG_ASSERT(loweredOptionalTypeInfo->valueField);
-            auto getElement = builder->emitFieldExtract(
-                loweredOptionalTypeInfo->valueType,
-                base,
-                loweredOptionalTypeInfo->valueField->getKey());
-            inst->replaceUsesWith(getElement);
+            if (loweredOptionalTypeInfo->loweredType != loweredOptionalTypeInfo->valueType)
+            {
+                SLANG_ASSERT(loweredOptionalTypeInfo);
+                SLANG_ASSERT(loweredOptionalTypeInfo->valueField);
+                auto getElement = builder->emitFieldExtract(
+                    loweredOptionalTypeInfo->valueType,
+                    base,
+                    loweredOptionalTypeInfo->valueField->getKey());
+                inst->replaceUsesWith(getElement);
+            }
+            else
+            {
+                inst->replaceUsesWith(base);
+            }
             inst->removeAndDeallocate();
         }
 

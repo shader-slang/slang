@@ -3,6 +3,7 @@
 #include "slang-ir-generics-lowering-context.h"
 
 #include "slang-ir-layout.h"
+#include "slang-ir-util.h"
 
 namespace Slang
 {
@@ -33,24 +34,6 @@ namespace Slang
         {
             return isPolymorphicType(ptrType->getValueType());
         }
-        return false;
-    }
-
-    bool isComInterfaceType(IRType* type)
-    {
-        if (!type) return false;
-        if (type->findDecoration<IRComInterfaceDecoration>() || 
-            type->getOp() == kIROp_ComPtrType)
-        {
-            return true;
-        }
-
-        if (auto ptrType = as<IRNativePtrType>(type))
-        {
-            auto valueType = ptrType->getValueType();
-            return valueType->findDecoration<IRComInterfaceDecoration>() != nullptr;
-        }
-
         return false;
     }
 
