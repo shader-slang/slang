@@ -14,9 +14,6 @@
 #include "../core/slang-io.h"
 #include "../core/slang-shared-library.h"
 
-// For workaround for DownstreamResult
-#include "slang-downstream-dep1.h"
-
 namespace Slang {
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!! DefaultArtifactHandler !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
@@ -129,24 +126,6 @@ SlangResult DefaultArtifactHandler::getOrCreateRepresentation(IArtifact* artifac
 		}
 	}
 	
-	// TODO(JS): Temporary whilst DownstreamCompileResult is 
-	// Special handling for DownstreamCompileResult
-	if (auto downstreamResult = findRepresentation<DownstreamCompileResult>(artifact))
-	{
-		if (guid == ISlangBlob::getTypeGuid())
-		{
-			ComPtr<ISlangBlob> blob;
-			SLANG_RETURN_ON_FAIL(downstreamResult->getBinary(blob));
-			return _addRepresentation(artifact, keep, blob, outCastable);
-		}
-		else if (guid == ISlangSharedLibrary::getTypeGuid())
-		{
-			ComPtr<ISlangSharedLibrary> lib;
-			SLANG_RETURN_ON_FAIL(DownstreamUtil_Dep1::getDownstreamSharedLibrary(downstreamResult, lib));
-			return _addRepresentation(artifact, keep, lib, outCastable);
-		}
-	}
-
 	// We can ask each representation if they can do the conversion to the type, if they can we just use that
 	for (ICastable* castable : reps)
 	{

@@ -11,6 +11,7 @@
 #include "../core/slang-string-slice-pool.h"
 
 #include "slang-artifact-desc-util.h"
+#include "slang-artifact-diagnostic-util.h"
 #include "slang-artifact-util.h"
 
 namespace Slang
@@ -130,9 +131,9 @@ SlangResult GCCDownstreamCompilerUtil::calcVersion(const ExecutableLocation& exe
     return SLANG_FAIL;
 }
 
-static SlangResult _parseSeverity(const UnownedStringSlice& in, DownstreamDiagnostic::Severity& outSeverity)
+static SlangResult _parseSeverity(const UnownedStringSlice& in, ArtifactDiagnostic::Severity& outSeverity)
 {
-    typedef DownstreamDiagnostic::Severity Severity;
+    typedef ArtifactDiagnostic::Severity Severity;
 
     if (in == "error" || in == "fatal error")
     {
@@ -165,9 +166,9 @@ enum class LineParseResult
     
 } // anonymous
     
-static SlangResult _parseGCCFamilyLine(const UnownedStringSlice& line, LineParseResult& outLineParseResult, DownstreamDiagnostic& outDiagnostic)
+static SlangResult _parseGCCFamilyLine(CharSliceAllocator& allocator, const UnownedStringSlice& line, LineParseResult& outLineParseResult, ArtifactDiagnostic& outDiagnostic)
 {
-    typedef DownstreamDiagnostic Diagnostic;
+    typedef ArtifactDiagnostic Diagnostic;
     typedef Diagnostic::Severity Severity;
     
     // Set to default case
@@ -238,7 +239,7 @@ static SlangResult _parseGCCFamilyLine(const UnownedStringSlice& line, LineParse
             // We'll ignore for now
             outDiagnostic.stage = Diagnostic::Stage::Link;
             outDiagnostic.severity = Severity::Info;
-            outDiagnostic.text = split[1].trim();
+            outDiagnostic.text = allocator.allocate(split[1].trim());
             outLineParseResult = LineParseResult::Start;
             return SLANG_OK;
         }
@@ -247,7 +248,7 @@ static SlangResult _parseGCCFamilyLine(const UnownedStringSlice& line, LineParse
         {
             // Command line errors can be just contain 'error:' etc. Can be seen on apple/clang
             outDiagnostic.stage = Diagnostic::Stage::Compile;
-            outDiagnostic.text = split[1].trim();
+            outDiagnostic.text = allocator.allocate(split[1].trim());
             outLineParseResult = LineParseResult::Single;
             return SLANG_OK;
         }
@@ -275,25 +276,25 @@ static SlangResult _parseGCCFamilyLine(const UnownedStringSlice& line, LineParse
                 outDiagnostic.stage = Diagnostic::Stage::Link;
             }
 
-            outDiagnostic.text = text;
+            outDiagnostic.text = allocator.allocate(text);
             outLineParseResult = LineParseResult::Start;
             return SLANG_OK;
         }
         else if (split1.startsWith("(.text"))
         {
             // This is a little weak... but looks like it's a link error
-            outDiagnostic.filePath = split[0];
+            outDiagnostic.filePath = allocator.allocate(split[0]);
             outDiagnostic.severity = Severity::Error;
             outDiagnostic.stage = Diagnostic::Stage::Link;
-            outDiagnostic.text = text;
+            outDiagnostic.text = allocator.allocate(text);
             outLineParseResult = LineParseResult::Single;
             return SLANG_OK;
         }
         else if (text.startsWith("ld returned"))
         {
-            outDiagnostic.stage = DownstreamDiagnostic::Stage::Link;
+            outDiagnostic.stage = ArtifactDiagnostic::Stage::Link;
             SLANG_RETURN_ON_FAIL(_parseSeverity(split[1].trim(), outDiagnostic.severity));
-            outDiagnostic.text = line;
+            outDiagnostic.text = allocator.allocate(line);
             outLineParseResult = LineParseResult::Single;
             return SLANG_OK;
         }
@@ -317,11 +318,12 @@ static SlangResult _parseGCCFamilyLine(const UnownedStringSlice& line, LineParse
         }
         else
         {
-            outDiagnostic.filePath = split[1];
-            outDiagnostic.fileLine = 0;
+            outDiagnostic.filePath = allocator.allocate(split[1]);
+            outDiagnostic.location.line = 0;
+            outDiagnostic.location.column = 0;
             outDiagnostic.severity = Diagnostic::Severity::Error;
             outDiagnostic.stage = Diagnostic::Stage::Link;
-            outDiagnostic.text = split[3];
+            outDiagnostic.text = allocator.allocate(split[3]);
             
             outLineParseResult = LineParseResult::Start;
             return SLANG_OK;
@@ -332,11 +334,11 @@ static SlangResult _parseGCCFamilyLine(const UnownedStringSlice& line, LineParse
         // Probably a regular error line
         SLANG_RETURN_ON_FAIL(_parseSeverity(split[3].trim(), outDiagnostic.severity));
 
-        outDiagnostic.filePath = split[0];
-        SLANG_RETURN_ON_FAIL(StringUtil::parseInt(split[1], outDiagnostic.fileLine));
+        outDiagnostic.filePath = allocator.allocate(split[0]);
+        SLANG_RETURN_ON_FAIL(StringUtil::parseInt(split[1], outDiagnostic.location.line));
 
         // Everything from 4 to the end is the error
-        outDiagnostic.text = UnownedStringSlice(split[4].begin(), split.getLast().end());
+        outDiagnostic.text = allocator.allocate(split[4].begin(), split.getLast().end());
 
         outLineParseResult = LineParseResult::Start;
         return SLANG_OK;
@@ -347,35 +349,40 @@ static SlangResult _parseGCCFamilyLine(const UnownedStringSlice& line, LineParse
     return SLANG_OK;
 }
 
-/* static */SlangResult GCCDownstreamCompilerUtil::parseOutput(const ExecuteResult& exeRes, DownstreamDiagnostics& outOutput)
+/* static */SlangResult GCCDownstreamCompilerUtil::parseOutput(const ExecuteResult& exeRes, IArtifactDiagnostics* diagnostics)
 {
     LineParseResult prevLineResult = LineParseResult::Ignore;
     
-    outOutput.reset();
-    outOutput.rawDiagnostics = exeRes.standardError;
+    CharSliceAllocator allocator;
+
+    diagnostics->reset();
+    diagnostics->setRaw(CharSliceCaster::asCharSlice(exeRes.standardError));
+
+    // We hold in workDiagnostics so as it is more convenient to append to the last with a continuation
+    // also means we don't hold the allocations of building up continuations, just the results when finally allocated at the end
+    List<ArtifactDiagnostic> workDiagnostics;
 
     for (auto line : LineParser(exeRes.standardError.getUnownedSlice()))
     {
-        Diagnostic diagnostic;
-        diagnostic.reset();
-
+        ArtifactDiagnostic diagnostic;
+        
         LineParseResult lineRes;
         
-        SLANG_RETURN_ON_FAIL(_parseGCCFamilyLine(line, lineRes, diagnostic));
+        SLANG_RETURN_ON_FAIL(_parseGCCFamilyLine(allocator, line, lineRes, diagnostic));
         
         switch (lineRes)
         {
             case LineParseResult::Start:
             {
                 // It's start of a new message
-                outOutput.diagnostics.add(diagnostic);
+                workDiagnostics.add(diagnostic);
                 prevLineResult = LineParseResult::Start;
                 break;
             }
             case LineParseResult::Single:
             {
                 // It's a single message, without anything following
-                outOutput.diagnostics.add(diagnostic);
+                workDiagnostics.add(diagnostic);
                 prevLineResult = LineParseResult::Ignore;
                 break;
             }
@@ -383,12 +390,21 @@ static SlangResult _parseGCCFamilyLine(const UnownedStringSlice& line, LineParse
             {
                 if (prevLineResult == LineParseResult::Start || prevLineResult == LineParseResult::Continuation)
                 {
-                    if (outOutput.diagnostics.getCount() > 0)
+                    if (workDiagnostics.getCount() > 0)
                     {
+                        auto& last = workDiagnostics.getLast();
+
+                        // TODO(JS): Note that this is somewhat wasteful as every time we append we just allocate more memory
+                        // to hold the result.
+                        // If we had an allocator dedicated to 'text' we could perhaps just append to the end of the last allocation
+                        //  
                         // We are now in a continuation, add to the last
-                        auto& text = outOutput.diagnostics.getLast().text;
-                        text.append("\n");
-                        text.append(line);
+                        StringBuilder buf;
+                        buf.append(asStringSlice(last.text));
+                        buf.append("\n");
+                        buf.append(line);
+
+                        last.text = allocator.allocate(buf);
                     }
                     prevLineResult = LineParseResult::Continuation;
                 }
@@ -403,9 +419,14 @@ static SlangResult _parseGCCFamilyLine(const UnownedStringSlice& line, LineParse
         }
     }
 
-    if (outOutput.has(Diagnostic::Severity::Error) || exeRes.resultCode != 0)
+    for (const auto& diagnostic : workDiagnostics)
     {
-        outOutput.result = SLANG_FAIL;
+        diagnostics->add(diagnostic);
+    }
+
+    if (diagnostics->hasOfAtLeastSeverity(ArtifactDiagnostic::Severity::Error) || exeRes.resultCode != 0)
+    {
+        diagnostics->setResult(SLANG_FAIL);
     }
 
     return SLANG_OK;

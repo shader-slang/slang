@@ -10,7 +10,6 @@ namespace Slang
 
 struct ArtifactUtil
 {
-
         /// Get the base name of this artifact.
         /// If there is a path set, will extract the name from that (stripping prefix, extension as necessary).
         /// Else if there is an explicit name set, this is returned.

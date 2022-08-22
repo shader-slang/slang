@@ -7,30 +7,63 @@
 #include "../core/slang-io.h"
 #include "../core/slang-array-view.h"
 
-#include "slang-artifact-util.h"
+#include "../core/slang-char-util.h"
+
+#include "slang-artifact-diagnostic-util.h"
 
 namespace Slang {
 
-/* !!!!!!!!!!!!!!!!!!!!!!!!!!! DiagnosticsImpl !!!!!!!!!!!!!!!!!!!!!!!!!!! */
+/* !!!!!!!!!!!!!!!!!!!!!!!!!!! ArtifactDiagnostics !!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
-void* DiagnosticsImpl::getInterface(const Guid& guid)
+ArtifactDiagnostics::ArtifactDiagnostics(const ThisType& rhs):
+    m_result(rhs.m_result),
+    m_diagnostics(rhs.m_diagnostics),
+    m_raw(rhs.m_raw.getLength() + 1)
+{
+    // We need to be careful with raw, we want a new *copy* not a non atomic ref counting
+    // In initialization we should have enough space
+    m_raw.append(rhs.m_raw.getUnownedSlice());
+    
+    // Reallocate all the strings
+    for (auto& diagnostic : m_diagnostics)
+    {
+        diagnostic.filePath = m_allocator.allocate(diagnostic.filePath);
+        diagnostic.code = m_allocator.allocate(diagnostic.code);
+        diagnostic.text = m_allocator.allocate(diagnostic.text);
+    }
+}
+
+void* ArtifactDiagnostics::clone(const Guid& guid)
+{
+    ThisType* copy = new ThisType(*this);
+    if (auto ptr = copy->castAs(guid))
+    {
+        return ptr;
+    }
+    // If the cast fails, we delete the item. 
+    delete copy;
+    return nullptr;
+}
+
+void* ArtifactDiagnostics::getInterface(const Guid& guid)
 {
     if (guid == ISlangUnknown::getTypeGuid() ||
         guid == ICastable::getTypeGuid() ||
-        guid == IDiagnostics::getTypeGuid())
+        guid == IClonable::getTypeGuid() ||
+        guid == IArtifactDiagnostics::getTypeGuid())
     {
-        return static_cast<IDiagnostics*>(this);
+        return static_cast<IArtifactDiagnostics*>(this);
     }
     return nullptr;
 }
 
-void* DiagnosticsImpl::getObject(const Guid& guid)
+void* ArtifactDiagnostics::getObject(const Guid& guid)
 {
     SLANG_UNUSED(guid);
     return nullptr;
 }
 
-void* DiagnosticsImpl::castAs(const Guid& guid)
+void* ArtifactDiagnostics::castAs(const Guid& guid)
 {
     if (auto intf = getInterface(guid))
     {
@@ -39,42 +72,42 @@ void* DiagnosticsImpl::castAs(const Guid& guid)
     return getObject(guid);
 }
 
-void DiagnosticsImpl::reset()
+void ArtifactDiagnostics::reset()
 {
     m_diagnostics.clear();
-    m_raw = ZeroTerminatedCharSlice();
+    m_raw.Clear();
     m_result = SLANG_OK;
 
-    m_arena.deallocateAll();
+    m_allocator.deallocateAll();
 }
 
-ZeroTerminatedCharSlice DiagnosticsImpl::_allocateSlice(const Slice<char>& in)
-{
-    if (in.count == 0)
-    {
-        return ZeroTerminatedCharSlice("", 0);
-    }
-    const char* dst = m_arena.allocateString(in.data, in.count);
-    return ZeroTerminatedCharSlice(dst, in.count);
-}
-
-void DiagnosticsImpl::add(const Diagnostic& inDiagnostic)
+void ArtifactDiagnostics::add(const Diagnostic& inDiagnostic)
 {
     Diagnostic diagnostic(inDiagnostic);
 
-    diagnostic.text = _allocateSlice(inDiagnostic.text);
-    diagnostic.code = _allocateSlice(inDiagnostic.code);
-    diagnostic.filePath = _allocateSlice(inDiagnostic.filePath);
+    diagnostic.text = m_allocator.allocate(inDiagnostic.text);
+    diagnostic.code = m_allocator.allocate(inDiagnostic.code);
+    diagnostic.filePath = m_allocator.allocate(inDiagnostic.filePath);
 
     m_diagnostics.add(diagnostic);
 }
 
-void DiagnosticsImpl::setRaw(const ZeroTerminatedCharSlice& slice)
+void ArtifactDiagnostics::setRaw(const CharSlice& slice)
 {
-    m_raw = _allocateSlice(slice);
+    m_raw.Clear();
+    m_raw << asStringSlice(slice);
 }
 
-Count DiagnosticsImpl::getCountAtLeastSeverity(Severity severity) 
+void ArtifactDiagnostics::appendRaw(const CharSlice& slice)
+{
+    if (m_raw.getLength() && m_raw[m_raw.getLength() - 1] != '\n')
+    {
+        m_raw.appendChar('\n');
+    }
+    m_raw << asStringSlice(slice);
+}
+
+Count ArtifactDiagnostics::getCountAtLeastSeverity(Diagnostic::Severity severity) 
 {
     Index count = 0;
     for (const auto& msg : m_diagnostics)
@@ -84,7 +117,7 @@ Count DiagnosticsImpl::getCountAtLeastSeverity(Severity severity)
     return count;
 }
 
-Count DiagnosticsImpl::getCountBySeverity(Severity severity) 
+Count ArtifactDiagnostics::getCountBySeverity(Diagnostic::Severity severity)
 {
     Index count = 0;
     for (const auto& msg : m_diagnostics)
@@ -94,7 +127,7 @@ Count DiagnosticsImpl::getCountBySeverity(Severity severity)
     return count;
 }
 
-bool DiagnosticsImpl::hasOfAtLeastSeverity(Severity severity)
+bool ArtifactDiagnostics::hasOfAtLeastSeverity(Diagnostic::Severity severity)
 {
     for (const auto& msg : m_diagnostics)
     {
@@ -106,10 +139,10 @@ bool DiagnosticsImpl::hasOfAtLeastSeverity(Severity severity)
     return false;
 }
 
-Count DiagnosticsImpl::getCountByStage(Stage stage, Count outCounts[Int(Severity::CountOf)]) 
+Count ArtifactDiagnostics::getCountByStage(Diagnostic::Stage stage, Count outCounts[Int(Diagnostic::Severity::CountOf)])
 {
     Int count = 0;
-    ::memset(outCounts, 0, sizeof(Index) * Int(Severity::CountOf));
+    ::memset(outCounts, 0, sizeof(Index) * Int(Diagnostic::Severity::CountOf));
     for (const auto& diagnostic : m_diagnostics)
     {
         if (diagnostic.stage == stage)
@@ -121,7 +154,7 @@ Count DiagnosticsImpl::getCountByStage(Stage stage, Count outCounts[Int(Severity
     return count++;
 }
 
-void DiagnosticsImpl::removeBySeverity(Severity severity) 
+void ArtifactDiagnostics::removeBySeverity(Diagnostic::Severity severity)
 {
     Index count = m_diagnostics.getCount();
     for (Index i = 0; i < count; ++i)
@@ -135,51 +168,33 @@ void DiagnosticsImpl::removeBySeverity(Severity severity)
     }
 }
 
-void DiagnosticsImpl::maybeAddNote(const ZeroTerminatedCharSlice& in)
+void ArtifactDiagnostics::maybeAddNote(const CharSlice& in)
 {
-    // Don't bother adding an empty line
-    if (UnownedStringSlice(in.begin(), in.end()).trim().getLength() == 0)
-    {
-        return;
-    }
-
-    // If there's nothing previous, we'll ignore too, as note should be in addition to
-    // a pre-existing error/warning
-    if (m_diagnostics.getCount() == 0)
-    {
-        return;
-    }
-
-    // Make it a note on the output
-    Diagnostic diagnostic;
-    
-    diagnostic.severity = Severity::Info;
-    diagnostic.text = _allocateSlice(in);
-    m_diagnostics.add(diagnostic);
+    ArtifactDiagnosticUtil::maybeAddNote(asStringSlice(in), this);
 }
 
-void DiagnosticsImpl::requireErrorDiagnostic() 
+void ArtifactDiagnostics::requireErrorDiagnostic() 
 {
     // If we find an error, we don't need to add a generic diagnostic
     for (const auto& msg : m_diagnostics)
     {
-        if (Index(msg.severity) >= Index(Severity::Error))
+        if (Index(msg.severity) >= Index(Diagnostic::Severity::Error))
         {
             return;
         }
     }
 
     Diagnostic diagnostic;
-    diagnostic.severity = Severity::Error;
-    diagnostic.text = m_raw;
+    diagnostic.severity = Diagnostic::Severity::Error;
+    diagnostic.text = m_allocator.allocate(m_raw);
 
     // Add the diagnostic
     m_diagnostics.add(diagnostic);
 }
 
-/* static */UnownedStringSlice _getSeverityText(IDiagnostics::Severity severity)
+/* static */UnownedStringSlice _getSeverityText(ArtifactDiagnostic::Severity severity)
 {
-    typedef IDiagnostics::Severity Severity;
+    typedef ArtifactDiagnostic::Severity Severity;
     switch (severity)
     {
         default:                return UnownedStringSlice::fromLiteral("Unknown");
@@ -189,9 +204,9 @@ void DiagnosticsImpl::requireErrorDiagnostic()
     }
 }
 
-static void _appendCounts(const Index counts[Int(IDiagnostics::Severity::CountOf)], StringBuilder& out)
+static void _appendCounts(const Index counts[Int(ArtifactDiagnostic::Severity::CountOf)], StringBuilder& out)
 {
-    typedef IDiagnostics::Severity Severity;
+    typedef ArtifactDiagnostic::Severity Severity;
 
     for (Index i = 0; i < Int(Severity::CountOf); i++)
     {
@@ -202,9 +217,9 @@ static void _appendCounts(const Index counts[Int(IDiagnostics::Severity::CountOf
     }
 }
 
-static void _appendSimplified(const Index counts[Int(IDiagnostics::Severity::CountOf)], StringBuilder& out)
+static void _appendSimplified(const Index counts[Int(ArtifactDiagnostic::Severity::CountOf)], StringBuilder& out)
 {
-    typedef IDiagnostics::Severity Severity;
+    typedef ArtifactDiagnostic::Severity Severity;
     for (Index i = 0; i < Int(Severity::CountOf); i++)
     {
         if (counts[i] > 0)
@@ -214,18 +229,18 @@ static void _appendSimplified(const Index counts[Int(IDiagnostics::Severity::Cou
     }
 }
 
-void DiagnosticsImpl::appendSummary(ISlangBlob** outBlob)
+void ArtifactDiagnostics::calcSummary(ISlangBlob** outBlob)
 {
     StringBuilder buf;
 
-    Index counts[Int(Severity::CountOf)];
-    if (getCountByStage(Stage::Compile, counts) > 0)
+    Index counts[Int(Diagnostic::Severity::CountOf)];
+    if (getCountByStage(Diagnostic::Stage::Compile, counts) > 0)
     {
         buf << "Compile: ";
         _appendCounts(counts, buf);
         buf << "\n";
     }
-    if (getCountByStage(Stage::Link, counts) > 0)
+    if (getCountByStage(Diagnostic::Stage::Link, counts) > 0)
     {
         buf << "Link: ";
         _appendCounts(counts, buf);
@@ -235,18 +250,18 @@ void DiagnosticsImpl::appendSummary(ISlangBlob** outBlob)
     *outBlob = StringBlob::moveCreate(buf).detach();
 }
 
-void DiagnosticsImpl::appendSimplifiedSummary(ISlangBlob** outBlob)
+void ArtifactDiagnostics::calcSimplifiedSummary(ISlangBlob** outBlob)
 {
     StringBuilder buf;
 
-    Index counts[Int(Severity::CountOf)];
-    if (getCountByStage(Stage::Compile, counts) > 0)
+    Index counts[Int(Diagnostic::Severity::CountOf)];
+    if (getCountByStage(Diagnostic::Stage::Compile, counts) > 0)
     {
         buf << "Compile: ";
         _appendSimplified(counts, buf);
         buf << "\n";
     }
-    if (getCountByStage(Stage::Link, counts) > 0)
+    if (getCountByStage(Diagnostic::Stage::Link, counts) > 0)
     {
         buf << "Link: ";
         _appendSimplified(counts, buf);
@@ -256,20 +271,20 @@ void DiagnosticsImpl::appendSimplifiedSummary(ISlangBlob** outBlob)
     *outBlob = StringBlob::moveCreate(buf).detach();
 }
 
-/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!! PostEmitMetadataImpl !!!!!!!!!!!!!!!!!!!!!!!!!!! */
+/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ArtifactPostEmitMetadata !!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
-void* PostEmitMetadataImpl::getInterface(const Guid& guid)
+void* ArtifactPostEmitMetadata::getInterface(const Guid& guid)
 {
     if (guid == ISlangUnknown::getTypeGuid() ||
         guid == ICastable::getTypeGuid() ||
-        guid == IPostEmitMetadata::getTypeGuid())
+        guid == IArtifactPostEmitMetadata::getTypeGuid())
     {
-        return static_cast<IPostEmitMetadata*>(this);
+        return static_cast<IArtifactPostEmitMetadata*>(this);
     }
     return nullptr;
 }
 
-void* PostEmitMetadataImpl::getObject(const Guid& uuid)
+void* ArtifactPostEmitMetadata::getObject(const Guid& uuid)
 {
     if (uuid == getTypeGuid())
     {
@@ -278,7 +293,7 @@ void* PostEmitMetadataImpl::getObject(const Guid& uuid)
     return nullptr;
 }
 
-void* PostEmitMetadataImpl::castAs(const Guid& guid)
+void* ArtifactPostEmitMetadata::castAs(const Guid& guid)
 {
     if (auto ptr = getInterface(guid))
     {
@@ -287,7 +302,7 @@ void* PostEmitMetadataImpl::castAs(const Guid& guid)
     return getObject(guid);
 }
 
-Slice<ShaderBindingRange> PostEmitMetadataImpl::getUsedBindingRanges()
+Slice<ShaderBindingRange> ArtifactPostEmitMetadata::getUsedBindingRanges()
 { 
     return Slice<ShaderBindingRange>(m_usedBindings.getBuffer(), m_usedBindings.getCount()); 
 }

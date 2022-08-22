@@ -12,108 +12,13 @@
 #include "../core/slang-blob.h"
 #include "../core/slang-char-util.h"
 
+#include "../core/slang-castable-list-impl.h"
+
+#include "slang-artifact-associated-impl.h"
+#include "slang-artifact-util.h"
 
 namespace Slang
 {
-
-/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! DownstreamDiagnostic !!!!!!!!!!!!!!!!!!!!!!!!*/
-
-/* static */UnownedStringSlice DownstreamDiagnostic::getSeverityText(Severity severity)
-{
-    switch (severity)
-    {
-        default:                return UnownedStringSlice::fromLiteral("Unknown");
-        case Severity::Info:    return UnownedStringSlice::fromLiteral("Info");
-        case Severity::Warning: return UnownedStringSlice::fromLiteral("Warning");
-        case Severity::Error:   return UnownedStringSlice::fromLiteral("Error");
-    }
-}
-
-/* static */SlangResult DownstreamDiagnostic::splitPathLocation(const UnownedStringSlice& pathLocation, DownstreamDiagnostic& outDiagnostic)
-{
-    const Index lineStartIndex = pathLocation.lastIndexOf('(');
-    if (lineStartIndex >= 0)
-    {
-        outDiagnostic.filePath = UnownedStringSlice(pathLocation.head(lineStartIndex).trim());
-
-        const UnownedStringSlice tail = pathLocation.tail(lineStartIndex + 1);
-        const Index lineEndIndex = tail.indexOf(')');
-
-        if (lineEndIndex >= 0)
-        {
-            // Extract the location info
-            UnownedStringSlice locationSlice(tail.begin(), tail.begin() + lineEndIndex);
-
-            UnownedStringSlice slices[2];
-            const Index numSlices = StringUtil::split(locationSlice, ',', 2, slices);
-
-            // NOTE! FXC actually outputs a range of columns in the form of START-END in the column position
-            // We don't need to parse here, because we only care about the line number
-
-            Int lineNumber = 0;
-            if (numSlices > 0)
-            {
-                SLANG_RETURN_ON_FAIL(StringUtil::parseInt(slices[0], lineNumber));
-            }
-
-            // Store the line
-            outDiagnostic.fileLine = lineNumber;
-        }
-    }
-    else
-    {
-        outDiagnostic.filePath = pathLocation;
-    }
-    return SLANG_OK;
-}
-
-/* static */SlangResult DownstreamDiagnostic::splitColonDelimitedLine(const UnownedStringSlice& line, Int pathIndex, List<UnownedStringSlice>& outSlices)
-{
-    StringUtil::split(line, ':', outSlices);
-
-    // Now we want to fix up a path as might have drive letter, and therefore :
-    // If this is the situation then we need to have a slice after the one at the index
-    if (outSlices.getCount() > pathIndex + 1)
-    {
-        const UnownedStringSlice pathStart = outSlices[pathIndex].trim();
-        if (pathStart.getLength() == 1 && CharUtil::isAlpha(pathStart[0]))
-        {
-            // Splice back together
-            outSlices[pathIndex] = UnownedStringSlice(outSlices[pathIndex].begin(), outSlices[pathIndex + 1].end());
-            outSlices.removeAt(pathIndex + 1);
-        }
-    }
-
-    return SLANG_OK;
-}
-
-/* static */SlangResult DownstreamDiagnostic::parseColonDelimitedDiagnostics(const UnownedStringSlice& inText, Int pathIndex, LineParser lineParser, List<DownstreamDiagnostic>& outDiagnostics)
-{
-    List<UnownedStringSlice> splitLine;
-
-    UnownedStringSlice text(inText), line;
-    while (StringUtil::extractLine(text, line))
-    {
-        SLANG_RETURN_ON_FAIL(splitColonDelimitedLine(line, pathIndex, splitLine));
-
-        DownstreamDiagnostic diagnostic;
-        diagnostic.severity = DownstreamDiagnostic::Severity::Error;
-        diagnostic.stage = DownstreamDiagnostic::Stage::Compile;
-        diagnostic.fileLine = 0;
-
-        if (SLANG_SUCCEEDED(lineParser(line, splitLine, diagnostic)))
-        {
-            outDiagnostics.add(diagnostic);
-        }
-        else
-        {
-            // If couldn't parse, just add as a note
-            DownstreamDiagnostics::addNote(line, outDiagnostics);
-        }
-    }
-
-    return SLANG_OK;
-}
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! DownstreamCompilerBase !!!!!!!!!!!!!!!!!!!!!!!!!!!!!*/
 
@@ -154,211 +59,75 @@ void* DownstreamCompilerBase::getObject(const Guid& guid)
     return nullptr;
 }
 
-/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! DownstreamDiagnostics !!!!!!!!!!!!!!!!!!!!!!*/
+/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! CommandLineDownstreamArtifactRepresentation !!!!!!!!!!!!!!!!!!!!!!*/
 
-Index DownstreamDiagnostics::getCountAtLeastSeverity(Diagnostic::Severity severity) const
+void* CommandLineDownstreamArtifactRepresentation::castAs(const Guid& guid)
 {
-    Index count = 0;
-    for (const auto& msg : diagnostics)
+    if (auto ptr = getInterface(guid))
     {
-        count += Index(Index(msg.severity) >= Index(severity));
+        return ptr;
     }
-    return count;
+    return getObject(guid);
 }
 
-Index DownstreamDiagnostics::getCountBySeverity(Diagnostic::Severity severity) const
+void* CommandLineDownstreamArtifactRepresentation::getInterface(const Guid& guid)
 {
-    Index count = 0;
-    for (const auto& msg : diagnostics)
+    if (guid == ISlangUnknown::getTypeGuid() ||
+        guid == ICastable::getTypeGuid() ||
+        guid == IArtifactRepresentation::getTypeGuid())
     {
-        count += Index(msg.severity == severity);
+        IArtifactRepresentation* rep = this;
+        return rep;
     }
-    return count;
+
+    return nullptr;
 }
 
-void DownstreamDiagnostics::requireErrorDiagnostic()
+void* CommandLineDownstreamArtifactRepresentation::getObject(const Guid& guid)
 {
-    // If we find an error, we don't need to add a generic diagnostic
-    for (const auto& msg : diagnostics)
+    SLANG_UNUSED(guid);
+    return nullptr;
+}
+
+SlangResult CommandLineDownstreamArtifactRepresentation::createRepresentation(const Guid& typeGuid, ICastable** outCastable)
+{
+    if (typeGuid == ISlangSharedLibrary::getTypeGuid())
     {
-        if (Index(msg.severity) >= Index(DownstreamDiagnostic::Severity::Error))
+        // Okay we want to load
+        // Try loading the shared library
+        SharedLibrary::Handle handle;
+        if (SLANG_FAILED(SharedLibrary::loadWithPlatformPath(m_moduleFilePath.getBuffer(), handle)))
         {
-            return;
+            return SLANG_FAIL;
         }
-    }
 
-    DownstreamDiagnostic diagnostic;
-    diagnostic.reset();
-    diagnostic.severity = DownstreamDiagnostic::Severity::Error;
-    diagnostic.text = rawDiagnostics;
-
-    // Add the diagnostic
-    diagnostics.add(diagnostic);
-}
-
-Int DownstreamDiagnostics::countByStage(Diagnostic::Stage stage, Index counts[Int(Diagnostic::Severity::CountOf)]) const
-{
-    Int count = 0;
-    ::memset(counts, 0, sizeof(Index) * Int(Diagnostic::Severity::CountOf));
-    for (const auto& diagnostic : diagnostics)
-    {
-        if (diagnostic.stage == stage)
-        {
-            count++;
-            counts[Index(diagnostic.severity)]++;
-        }
-    }
-    return count++;
-}
-
-static void _appendCounts(const Index counts[Int(DownstreamDiagnostic::Severity::CountOf)], StringBuilder& out)
-{
-    typedef DownstreamDiagnostic::Severity Severity;
-
-    for (Index i = 0; i < Int(Severity::CountOf); i++)
-    {
-        if (counts[i] > 0)
-        {
-            out << DownstreamDiagnostic::getSeverityText(Severity(i)) << "(" << counts[i] << ") ";
-        }
-    }
-}
-
-static void _appendSimplified(const Index counts[Int(DownstreamDiagnostic::Severity::CountOf)], StringBuilder& out)
-{
-    typedef DownstreamDiagnostic::Severity Severity;
-    for (Index i = 0; i < Int(Severity::CountOf); i++)
-    {
-        if (counts[i] > 0)
-        {
-            out << DownstreamDiagnostic::getSeverityText(Severity(i)) << " ";
-        }
-    }
-}
-
-void DownstreamDiagnostics::appendSummary(StringBuilder& out) const
-{
-    Index counts[Int(Diagnostic::Severity::CountOf)];
-    if (countByStage(Diagnostic::Stage::Compile, counts) > 0)
-    {
-        out << "Compile: ";
-        _appendCounts(counts, out);
-        out << "\n";
-    }
-    if (countByStage(Diagnostic::Stage::Link, counts) > 0)
-    {
-        out << "Link: ";
-        _appendCounts(counts, out);
-        out << "\n";
-    }
-}
-
-void DownstreamDiagnostics::appendSimplifiedSummary(StringBuilder& out) const
-{
-    Index counts[Int(Diagnostic::Severity::CountOf)];
-    if (countByStage(Diagnostic::Stage::Compile, counts) > 0)
-    {
-        out << "Compile: ";
-        _appendSimplified(counts, out);
-        out << "\n";
-    }
-    if (countByStage(Diagnostic::Stage::Link, counts) > 0)
-    {
-        out << "Link: ";
-        _appendSimplified(counts, out);
-        out << "\n";
-    }
-}
-
-void DownstreamDiagnostics::removeBySeverity(Diagnostic::Severity severity)
-{
-    Index count = diagnostics.getCount();
-    for (Index i = 0; i < count; ++i)
-    {
-        if (diagnostics[i].severity == severity)
-        {
-            diagnostics.removeAt(i);
-            i--;
-            count--;
-        }
-    }
-}
-
-/* static */void DownstreamDiagnostics::addNote(const UnownedStringSlice& in, List<DownstreamDiagnostic>& ioDiagnostics)
-{
-    // Don't bother adding an empty line
-    if (in.trim().getLength() == 0)
-    {
-        return;
-    }
-
-    // If there's nothing previous, we'll ignore too, as note should be in addition to
-    // a pre-existing error/warning
-    if (ioDiagnostics.getCount() == 0)
-    {
-        return;
-    }
-
-    // Make it a note on the output
-    DownstreamDiagnostic diagnostic;
-    diagnostic.reset();
-    diagnostic.severity = DownstreamDiagnostic::Severity::Info;
-    diagnostic.text = in;
-    ioDiagnostics.add(diagnostic);
-}
-
-void DownstreamDiagnostics::addNote(const UnownedStringSlice& in)
-{
-    addNote(in, diagnostics);
-}
-
-/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! CommandLineDownstreamCompileResult !!!!!!!!!!!!!!!!!!!!!!*/
-
-SlangResult CommandLineDownstreamCompileResult::getHostCallableSharedLibrary(ComPtr<ISlangSharedLibrary>& outLibrary)
-{
-    if (m_hostCallableSharedLibrary)
-    {
-        outLibrary = m_hostCallableSharedLibrary;
-        return SLANG_OK;
-    }
-
-    // Okay we want to load
-    // Try loading the shared library
-    SharedLibrary::Handle handle;
-    if (SLANG_FAILED(SharedLibrary::loadWithPlatformPath(m_moduleFilePath.getBuffer(), handle)))
-    {
-        return SLANG_FAIL;
-    }
-    
-    {
         // The shared library needs to keep temp files in scope
         auto temporarySharedLibrary = new TemporarySharedLibrary(handle, m_moduleFilePath);
-        // Make sure it gets a ref count
-        m_hostCallableSharedLibrary = temporarySharedLibrary;
+        ComPtr<ISlangSharedLibrary> lib(temporarySharedLibrary);
+
         // Set any additional info on the non COM pointer
         temporarySharedLibrary->m_temporaryFileSet = m_temporaryFiles;
+
+        *outCastable = lib.detach();
+        return SLANG_OK;
     }
-
-    outLibrary = m_hostCallableSharedLibrary;
-    return SLANG_OK;
-}
-
-SlangResult CommandLineDownstreamCompileResult::getBinary(ComPtr<ISlangBlob>& outBlob)
-{
-    if (m_binaryBlob)
+    else if (typeGuid == ISlangBlob::getTypeGuid())
     {
-        outBlob = m_binaryBlob;
+        List<uint8_t> contents;
+        // Read the binary
+            // Read the contents of the binary
+        SLANG_RETURN_ON_FAIL(File::readAllBytes(m_moduleFilePath, contents));
+
+        *outCastable = CastableUtil::getCastable(ScopeRefObjectBlob::create(ListBlob::moveCreate(contents), m_temporaryFiles).detach()).detach();
         return SLANG_OK;
     }
 
-    List<uint8_t> contents;
-    // Read the binary
-        // Read the contents of the binary
-    SLANG_RETURN_ON_FAIL(File::readAllBytes(m_moduleFilePath, contents));
+    return SLANG_E_NOT_AVAILABLE;
+}
 
-    m_binaryBlob = ScopeRefObjectBlob::create(ListBlob::moveCreate(contents), m_temporaryFiles);
-    outBlob = m_binaryBlob;
-    return SLANG_OK;
+bool CommandLineDownstreamArtifactRepresentation::exists()
+{
+    return File::exists(m_moduleFilePath);
 }
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! CommandLineDownstreamCompiler !!!!!!!!!!!!!!!!!!!!!!*/
@@ -392,7 +161,7 @@ static bool _isContentsInFile(const DownstreamCompileOptions& options)
     return false;
 }
 
-SlangResult CommandLineDownstreamCompiler::compile(const CompileOptions& inOptions, RefPtr<DownstreamCompileResult>& out)
+SlangResult CommandLineDownstreamCompiler::compile(const CompileOptions& inOptions, IArtifact** outArtifact)
 {
     // Copy the command line options
     CommandLine cmdLine(m_cmdLine);
@@ -401,7 +170,6 @@ SlangResult CommandLineDownstreamCompiler::compile(const CompileOptions& inOptio
 
     // Find all the files that will be produced
     RefPtr<TemporaryFileSet> productFileSet(new TemporaryFileSet);
-    
     
     if (options.modulePath.getLength() == 0 || options.sourceContents.getLength() != 0)
     {
@@ -491,10 +259,19 @@ SlangResult CommandLineDownstreamCompiler::compile(const CompileOptions& inOptio
     }
 #endif
 
-    DownstreamDiagnostics diagnostics;
+    auto artifact = ArtifactUtil::createArtifactForCompileTarget(options.targetType);
+
+    auto diagnostics = ArtifactDiagnostics::create();
+
     SLANG_RETURN_ON_FAIL(parseOutput(exeRes, diagnostics));
 
-    out = new CommandLineDownstreamCompileResult(diagnostics, moduleFilePath, productFileSet);
+    // Add the artifact
+    artifact->addAssociated(diagnostics);
+
+    ComPtr<IArtifactRepresentation> rep(new CommandLineDownstreamArtifactRepresentation(moduleFilePath, productFileSet));
+    artifact->addRepresentation(rep);
+
+    *outArtifact = artifact.detach();
     
     return SLANG_OK;
 }
