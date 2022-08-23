@@ -1126,7 +1126,7 @@ struct OptionsParser
                     //
                     UnownedStringSlice profileName = sliceCount >= 1 ? slices[0] : UnownedTerminatedStringSlice("");
 
-                    SlangProfileID profileID = Slang::Profile::lookUp(profileName).raw;
+                    SlangProfileID profileID = SlangProfileID(Slang::Profile::lookUp(profileName).raw);
                     if( profileID == SLANG_PROFILE_UNKNOWN )
                     {
                         sink->diagnose(operand.loc, Diagnostics::unknownProfile, profileName);
@@ -1332,11 +1332,11 @@ struct OptionsParser
                 }
                 else if(argValue == "-matrix-layout-row-major")
                 {
-                    defaultMatrixLayoutMode = kMatrixLayoutMode_RowMajor;
+                    defaultMatrixLayoutMode = SlangMatrixLayoutMode(kMatrixLayoutMode_RowMajor);
                 }
                 else if(argValue == "-matrix-layout-column-major")
                 {
-                    defaultMatrixLayoutMode = kMatrixLayoutMode_ColumnMajor;
+                    defaultMatrixLayoutMode = SlangMatrixLayoutMode(kMatrixLayoutMode_ColumnMajor);
                 }
                 else if(argValue == "-line-directive-mode")
                 {
@@ -1993,7 +1993,7 @@ struct OptionsParser
 
             if( rawTarget.profileVersion != ProfileVersion::Unknown )
             {
-                compileRequest->setTargetProfile(targetID, Profile(rawTarget.profileVersion).raw);
+                compileRequest->setTargetProfile(targetID, SlangProfileID(Profile(rawTarget.profileVersion).raw));
             }
             for( auto atom : rawTarget.capabilityAtoms )
             {

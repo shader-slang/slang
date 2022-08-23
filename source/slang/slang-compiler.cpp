@@ -1221,7 +1221,7 @@ namespace Slang
                 }
 
                 // Set the matrix layout
-                options.matrixLayout = getTargetReq()->getDefaultMatrixLayoutMode();
+                options.matrixLayout = SlangMatrixLayoutMode(getTargetReq()->getDefaultMatrixLayoutMode());
             }
 
             // Set the profile

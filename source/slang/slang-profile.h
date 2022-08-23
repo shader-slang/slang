@@ -44,7 +44,7 @@ namespace Slang
 
     void printDiagnosticArg(StringBuilder& sb, ProfileVersion val);
     
-    enum class Stage : SlangStage
+    enum class Stage : SlangStageIntegral
     {
         Unknown = SLANG_STAGE_NONE,
 #define PROFILE_STAGE(TAG, NAME, VAL) TAG = VAL,
