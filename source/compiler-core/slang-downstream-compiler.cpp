@@ -178,8 +178,6 @@ SlangResult CommandLineDownstreamCompiler::compile(const CompileOptions& inOptio
 
     if (options.modulePath.getLength() == 0 || options.sourceContents.getLength() != 0)
     {
-        
-
         String modulePath = options.modulePath;
 
         // If there is no module path, generate one.
@@ -242,21 +240,18 @@ SlangResult CommandLineDownstreamCompiler::compile(const CompileOptions& inOptio
 
     {
         StringBuilder builder;
-        SLANG_RETURN_ON_FAIL(calcModuleFilePath(options, builder));
+        const auto desc = ArtifactDescUtil::makeDescForCompileTarget(options.targetType);
+        SLANG_RETURN_ON_FAIL(ArtifactDescUtil::calcPathForDesc(desc, options.modulePath.getUnownedSlice(), builder));
+
         moduleFilePath = builder.ProduceString();
     }
 
     {
-        // TODO(JS):
-        // We should make this output artifacts(!)
-        List<String> paths;
-        SLANG_RETURN_ON_FAIL(calcCompileProducts(options, DownstreamProductFlag::All, paths));
+        List<ComPtr<IArtifact>> artifacts;
+        SLANG_RETURN_ON_FAIL(calcCompileProducts(options, DownstreamProductFlag::All, lockFile, artifacts));
 
-        for (const auto& path : paths)
+        for (IArtifact* artifact : artifacts)
         {
-            auto fileRep = FileArtifactRepresentation::create(IFileArtifactRepresentation::Kind::Owned, path.getUnownedSlice(), lockFile, nullptr);
-            auto artifact = ArtifactUtil::createArtifact(ArtifactDesc::make(ArtifactKind::Unknown, ArtifactPayload::Unknown, ArtifactStyle::Unknown));
-            artifact->addRepresentation(fileRep);
             artifactList->add(artifact);
         }
     }

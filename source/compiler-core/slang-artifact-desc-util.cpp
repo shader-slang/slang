@@ -159,21 +159,22 @@ bool isDerivedFrom(ENUM_TYPE kind, ENUM_TYPE base) { return g_table##ENUM_TYPE.i
     x(Base, Invalid) \
         x(None, Base) \
         x(Unknown, Base) \
-        x(Container, Base) \
-            x(Zip, Container) \
-            x(RiffContainer, Container) \
-            x(RiffLz4Container, Container) \
-            x(RiffDeflateContainer, Container) \
+        x(BinaryFormat, Base) \
+            x(Container, BinaryFormat) \
+                x(Zip, Container) \
+                x(RiffContainer, Container) \
+                x(RiffLz4Container, Container) \
+                x(RiffDeflateContainer, Container) \
+            x(CompileBinary, BinaryFormat) \
+                x(ObjectCode, CompileBinary) \
+                x(Library, CompileBinary) \
+                x(Executable, CompileBinary) \
+                x(SharedLibrary, CompileBinary) \
+                x(HostCallable, CompileBinary) \
         x(Text, Base) \
             x(HumanText, Text) \
             x(Source, Text) \
             x(Assembly, Text) \
-        x(BinaryLike, Base) \
-            x(ObjectCode, BinaryLike) \
-            x(Library, BinaryLike) \
-            x(Executable, BinaryLike) \
-            x(SharedLibrary, BinaryLike) \
-            x(HostCallable, BinaryLike) \
         x(Instance, Base)
 
 #define SLANG_ARTIFACT_KIND_ENTRY(TYPE, PARENT) { Index(ArtifactKind::TYPE), Index(ArtifactKind::PARENT), #TYPE },
@@ -216,9 +217,9 @@ SLANG_HIERARCHICAL_ENUM(ArtifactKind, SLANG_ARTIFACT_KIND, SLANG_ARTIFACT_KIND_E
         x(AST, Base) \
             x(SlangAST, AST) \
         x(CompileResults, Base) \
-        x(MetaData, Base) \
-            x(DebugInfo, MetaData) \
-            x(Diagnostics, MetaData) \
+        x(Metadata, Base) \
+            x(DebugInfo, Metadata) \
+            x(Diagnostics, Metadata) \
         x(Miscellaneous, Base) \
             x(Log, Miscellaneous) \
             x(Lock, Miscellaneous)
@@ -339,7 +340,7 @@ SLANG_HIERARCHICAL_ENUM(ArtifactStyle, SLANG_ARTIFACT_STYLE, SLANG_ARTIFACT_STYL
         default: break;
     }
 
-    if (isDerivedFrom(desc.kind, ArtifactKind::BinaryLike))
+    if (isDerivedFrom(desc.kind, ArtifactKind::CompileBinary))
     {
         if (isDerivedFrom(desc.payload, ArtifactPayload::CPULike))
         {
@@ -405,7 +406,7 @@ static const KindExtension g_cpuKindExts[] =
 
 /* static */ bool ArtifactDescUtil::isCpuBinary(const ArtifactDesc& desc)
 {
-    return isDerivedFrom(desc.kind, ArtifactKind::BinaryLike) && isDerivedFrom(desc.payload, ArtifactPayload::CPULike);
+    return isDerivedFrom(desc.kind, ArtifactKind::CompileBinary) && isDerivedFrom(desc.payload, ArtifactPayload::CPULike);
 }
 
 /* static */bool ArtifactDescUtil::isText(const ArtifactDesc& desc)
@@ -417,7 +418,7 @@ static const KindExtension g_cpuKindExts[] =
     }
 
     // Special case PTX...
-    if (isDerivedFrom(desc.kind, ArtifactKind::BinaryLike))
+    if (isDerivedFrom(desc.kind, ArtifactKind::CompileBinary))
     {
         return desc.payload == ArtifactPayload::PTX;
     }
@@ -428,7 +429,7 @@ static const KindExtension g_cpuKindExts[] =
 
 /* static */bool ArtifactDescUtil::isGpuUsable(const ArtifactDesc& desc)
 {
-    if (isDerivedFrom(desc.kind, ArtifactKind::BinaryLike))
+    if (isDerivedFrom(desc.kind, ArtifactKind::CompileBinary))
     {
         return isDerivedFrom(desc.payload, ArtifactPayload::KernelLike);
     }
@@ -454,7 +455,7 @@ static const KindExtension g_cpuKindExts[] =
 
 /* static */bool ArtifactDescUtil::isLinkable(const ArtifactDesc& desc)
 {
-    if (isDerivedFrom(desc.kind, ArtifactKind::BinaryLike))
+    if (isDerivedFrom(desc.kind, ArtifactKind::CompileBinary))
     {
         if (isDerivedFrom(desc.payload, ArtifactPayload::KernelLike))
         {
@@ -488,7 +489,7 @@ static const KindExtension g_cpuKindExts[] =
 
 /* static */bool ArtifactDescUtil::isCpuLikeTarget(const ArtifactDesc& desc)
 {
-    if (isDerivedFrom(desc.kind, ArtifactKind::BinaryLike))
+    if (isDerivedFrom(desc.kind, ArtifactKind::CompileBinary))
     {
         return isDerivedFrom(desc.payload, ArtifactPayload::CPULike);
     }
@@ -815,7 +816,7 @@ SlangResult ArtifactDescUtil::appendDefaultExtension(const ArtifactDesc& desc, S
 /* static */bool ArtifactDescUtil::isDissassembly(const ArtifactDesc& from, const ArtifactDesc& to)
 {
     // From must be a binary like type
-    if (!isDerivedFrom(from.kind, ArtifactKind::BinaryLike))
+    if (!isDerivedFrom(from.kind, ArtifactKind::CompileBinary))
     {
         return false;
     }

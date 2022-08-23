@@ -72,7 +72,7 @@ namespace Slang {
     }
 
     // If it's binary like or assembly/source we it's significant
-    if (isDerivedFrom(desc.kind, ArtifactKind::BinaryLike) ||
+    if (isDerivedFrom(desc.kind, ArtifactKind::CompileBinary) ||
         desc.kind == ArtifactKind::Assembly ||
         desc.kind == ArtifactKind::Source)
     {
@@ -82,7 +82,7 @@ namespace Slang {
     /* Hmm, we might want to have a base class for 'signifiant' payloads,
     where signifiance here means somewhat approximately 'the meat' of a compilation result,
     as contrasted with 'meta data', 'diagnostics etc'*/
-    if (isDerivedFrom(desc.payload, ArtifactPayload::MetaData))
+    if (isDerivedFrom(desc.payload, ArtifactPayload::Metadata))
     {
         return false;
     }

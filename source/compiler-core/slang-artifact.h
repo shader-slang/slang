@@ -74,6 +74,8 @@ enum class ArtifactKind : uint8_t
     None,                       ///< Doesn't contain anything
     Unknown,                    ///< Unknown
 
+    BinaryFormat,               ///< A generic binary format. 
+
     Container,                  ///< Container like types
     Zip,                        ///< Zip container
     RiffContainer,              ///< Riff container
@@ -86,7 +88,7 @@ enum class ArtifactKind : uint8_t
     Assembly,                   ///< Assembly (Type is in payload)
     HumanText,                  ///< Text for human consumption
 
-    BinaryLike,                 ///< Kinds which are 'binary like' - can be executed, linked with and so forth. 
+    CompileBinary,              ///< Kinds which are 'binary like' - can be executed, linked with and so forth. 
     
     ObjectCode,                 ///< Object file
     Library,                    ///< Library (collection of object code)
@@ -157,7 +159,7 @@ enum class ArtifactPayload : uint8_t
 
     CompileResults, ///< Payload is a collection of compilation results
 
-    MetaData,       ///< Meta data
+    Metadata,       ///< Metadata
 
     DebugInfo,      ///< Debugging information
     Diagnostics,    ///< Diagnostics information
