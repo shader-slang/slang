@@ -66,7 +66,7 @@ int test(int val)
 RWStructuredBuffer<int> outputBuffer;
 
 [numthreads(4, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
 {
     int value = (Outer::someValue) + 1 + Outer::getHeuristicResult();
     Outer::Channel anotherValue = (Outer::Channel) +1;
@@ -77,7 +77,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     // Check can see this is a cast
     value += (Outer::SomeType)(value);
     
-    uint tid = dispatchThreadID.x;
+    int tid = dispatchThreadID.x;
     int inVal = tid;
     int outVal = test(inVal) + value * 2 + int(anotherValue) * 4;
     outputBuffer[tid] = outVal;

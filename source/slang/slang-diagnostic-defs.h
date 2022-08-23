@@ -293,7 +293,7 @@ DIAGNOSTIC(33071, Error, expectedAStringLiteral, "expected a string literal")
 
 DIAGNOSTIC(   -1, Note, noteExplicitConversionPossible, "explicit conversion from '$0' to '$1' is possible")
 DIAGNOSTIC(30080, Error, ambiguousConversion, "more than one implicit conversion exists from '$0' to '$1'")
-
+DIAGNOSTIC(30081, Warning, unrecommendedImplicitConversion, "implicit conversion from '$0' to '$1' is not recommended")
 DIAGNOSTIC(30090, Error, tryClauseMustApplyToInvokeExpr, "expression in a 'try' clause must be a call to a function or operator overload.")
 DIAGNOSTIC(30091, Error, tryInvokeCalleeShouldThrow, "'$0' called from a 'try' clause does not throw an error, make sure the callee is marked as 'throws'")
 DIAGNOSTIC(30092, Error, calleeOfTryCallMustBeFunc, "callee in a 'try' clause must be a function")
@@ -338,6 +338,10 @@ DIAGNOSTIC(32003, Error, unexpectedEnumTagExpr,     "unexpected form for 'enum' 
 // 303xx: interfaces and associated types
 DIAGNOSTIC(30300, Error, assocTypeInInterfaceOnly, "'associatedtype' can only be defined in an 'interface'.")
 DIAGNOSTIC(30301, Error, globalGenParamInGlobalScopeOnly, "'type_param' can only be defined global scope.")
+
+// Interop
+DIAGNOSTIC(30400, Error, cannotDefinePtrTypeToManagedResource, "pointer to a managed resource is invalid, use `NativeRef<T>` instead")
+
 // TODO: need to assign numbers to all these extra diagnostics...
 DIAGNOSTIC(39999, Fatal, cyclicReference, "cyclic reference '$0'.")
 DIAGNOSTIC(39999, Error, localVariableUsedBeforeDeclared, "local variable '$0' is being used before its declaration.")
@@ -592,6 +596,7 @@ DIAGNOSTIC(52000, Error, multiLevelBreakUnsupported, "control flow appears to re
 DIAGNOSTIC(52001, Warning, dxilNotFound, "dxil shared library not found, so 'dxc' output cannot be signed! Shader code will not be runnable in non-development environments.")
 
 DIAGNOSTIC(52002, Error, passThroughCompilerNotFound, "could not find a suitable pass-through compiler for '$0'.")
+DIAGNOSTIC(52003, Error, cannotDisassemble, "cannot disassemble '$0'.")
 
 DIAGNOSTIC(52004, Error, unableToWriteFile, "unable to write file '$0'")
 DIAGNOSTIC(52005, Error, unableToReadFile, "unable to read file '$0'")

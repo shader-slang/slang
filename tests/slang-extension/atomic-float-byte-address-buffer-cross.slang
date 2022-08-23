@@ -14,7 +14,7 @@ RWStructuredBuffer<float> anotherBuffer;
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
     uint tid = dispatchThreadID.x;
-    int idx = (tid & 3) ^ (tid >> 2); 
+    int idx = int((tid & 3) ^ (tid >> 2)); 
 
     const float delta = anotherBuffer[idx & 3];
     
@@ -22,6 +22,6 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     outputBuffer.InterlockedAddF32((idx << 2), 1.0f, previousValue);
     
     // The sum of values in anotherBuffer should also be added
-    int anotherIdx = tid >> 2;
+    int anotherIdx = int(tid >> 2);
     outputBuffer.InterlockedAddF32(anotherIdx << 2, delta);
 }

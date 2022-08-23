@@ -1,6 +1,7 @@
 // slang-ir-lower-generic-call.cpp
 #include "slang-ir-lower-generic-call.h"
 #include "slang-ir-generics-lowering-context.h"
+#include "slang-ir-util.h"
 
 namespace Slang
 {

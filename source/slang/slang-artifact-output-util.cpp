@@ -17,32 +17,28 @@
 namespace Slang
 {
 
-// Given a desc returns a codegen target if it can be used for disassembly
-// Returns Unknown if cannot be used for generating disassembly
-//
-// NOTE! This returns the code gen target for the input binary, *not* the dissassembly output
-static CodeGenTarget _getDisassemblyCodeGenTarget(const ArtifactDesc& desc)
-{
-    switch (desc.payload)
-    {
-        case ArtifactPayload::DXIL:     return CodeGenTarget::DXIL;
-        case ArtifactPayload::DXBC:     return CodeGenTarget::DXBytecode; 
-        case ArtifactPayload::SPIRV:    return CodeGenTarget::SPIRV; 
-        default: break;
-    }
-    return CodeGenTarget::Unknown;
-}
-
 /* static */SlangResult ArtifactOutputUtil::dissassembleWithDownstream(Session* session, IArtifact* artifact, DiagnosticSink* sink, IArtifact** outArtifact)
 {
     auto desc = artifact->getDesc();
 
+    auto assemblyDesc = desc;
+    assemblyDesc.kind = ArtifactKind::Assembly;
+
+    // Check it seems like a plausbile disassembly 
+    if (!ArtifactDescUtil::isDissassembly(desc, assemblyDesc))
+    {
+        if (sink)
+        {
+            sink->diagnose(SourceLoc(), Diagnostics::cannotDisassemble, ArtifactDescUtil::getText(desc));
+        }
+        return SLANG_FAIL;
+    }
     // Get the downstream compiler that can be used for this target
     // TODO(JS):
     // This could perhaps be performed in some other manner if there was more than one way to produce
     // disassembly from a binary.
 
-    const CodeGenTarget target = _getDisassemblyCodeGenTarget(desc);
+    const CodeGenTarget target = (CodeGenTarget)ArtifactDescUtil::getCompileTargetFromDesc(desc);
     if (target == CodeGenTarget::Unknown)
     {
         return SLANG_FAIL;
@@ -63,40 +59,26 @@ static CodeGenTarget _getDisassemblyCodeGenTarget(const ArtifactDesc& desc)
         return SLANG_FAIL;
     }
 
-    ComPtr<ISlangBlob> blob;
-    SLANG_RETURN_ON_FAIL(artifact->loadBlob(ArtifactKeep::No, blob.writeRef()));
+    SLANG_RETURN_ON_FAIL(compiler->convert(artifact, assemblyDesc, outArtifact));
 
-    const auto data = blob->getBufferPointer();
-    const auto dataSizeInBytes = blob->getBufferSize();
-
-    ComPtr<ISlangBlob> dissassemblyBlob;
-    SLANG_RETURN_ON_FAIL(compiler->disassemble(SlangCompileTarget(target), data, dataSizeInBytes, dissassemblyBlob.writeRef()));
-
-    ArtifactDesc disassemblyDesc(desc);
-    disassemblyDesc.kind = ArtifactKind::Assembly;
-
-    auto disassemblyArtifact = ArtifactUtil::createArtifact(disassemblyDesc);
-    disassemblyArtifact->addRepresentationUnknown(dissassemblyBlob);
-
-    *outArtifact = disassemblyArtifact.detach();
     return SLANG_OK;
 }
 
 SlangResult ArtifactOutputUtil::maybeDisassemble(Session* session, IArtifact* artifact, DiagnosticSink* sink, ComPtr<IArtifact>& outArtifact)
 {
     const auto desc = artifact->getDesc();
-    if (ArtifactDescUtil::isText(artifact->getDesc()))
+    if (ArtifactDescUtil::isText(desc))
     {
         // Nothing to convert
         return SLANG_OK;
     }
 
-    if (_getDisassemblyCodeGenTarget(desc) != CodeGenTarget::Unknown)
-    {
-        // Get the blob
-        ComPtr<ISlangBlob> blob;
-        SLANG_RETURN_ON_FAIL(artifact->loadBlob(ArtifactKeep::No, blob.writeRef()));
+    auto toDesc = desc;
+    toDesc.kind = ArtifactKind::Assembly;
 
+    // If this likes a playsible disassebly conversion
+    if (ArtifactDescUtil::isDissassembly(desc, toDesc))
+    {
         ComPtr<IArtifact> disassemblyArtifact;
 
         if (SLANG_SUCCEEDED(dissassembleWithDownstream(session, artifact, sink, disassemblyArtifact.writeRef())))

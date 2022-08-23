@@ -51,6 +51,9 @@ class IArtifactHelper : public ICastable
 
 		/// Given an interface returns as a castable interface. This might just cast unk into ICastable, or wrap it such that it uses the castable interface
 	virtual SLANG_NO_THROW void SLANG_MCALL getCastable(ISlangUnknown* unk, ICastable** outCastable) = 0;
+
+		/// Create an empty ICastableList
+	virtual SLANG_NO_THROW SlangResult SLANG_MCALL createCastableList(const Guid& guid, ICastableList** outList) = 0;
 };
 
 class DefaultArtifactHelper : public IArtifactHelper
@@ -64,7 +67,7 @@ public:
 	// ICastable
 	SLANG_NO_THROW void* SLANG_MCALL castAs(const Guid& guid) SLANG_OVERRIDE;
 
-	// IArtifactInterface
+	// IArtifactHelper
 	virtual SLANG_NO_THROW SlangResult SLANG_MCALL createArtifact(const ArtifactDesc& desc, const char* name, IArtifact** outArtifact) SLANG_OVERRIDE;
 	virtual SLANG_NO_THROW SlangResult SLANG_MCALL createArtifactContainer(const ArtifactDesc& desc, const char* name, IArtifactContainer** outArtifactContainer) SLANG_OVERRIDE;
 
@@ -87,6 +90,8 @@ public:
 	virtual SLANG_NO_THROW ArtifactDesc SLANG_MCALL makeDescFromCompileTarget(SlangCompileTarget target) SLANG_OVERRIDE;
 
 	virtual SLANG_NO_THROW void SLANG_MCALL getCastable(ISlangUnknown* unk, ICastable** outCastable) SLANG_OVERRIDE;
+
+	virtual SLANG_NO_THROW SlangResult SLANG_MCALL createCastableList(const Guid& guid, ICastableList** outList) SLANG_OVERRIDE;
 
 	static IArtifactHelper* getSingleton() { return &g_singleton; }
 

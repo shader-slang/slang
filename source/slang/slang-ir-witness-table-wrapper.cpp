@@ -5,6 +5,7 @@
 #include "slang-ir.h"
 #include "slang-ir-clone.h"
 #include "slang-ir-insts.h"
+#include "slang-ir-util.h"
 
 namespace Slang
 {

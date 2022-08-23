@@ -8,6 +8,8 @@
 
 #include "../../source/compiler-core/slang-downstream-compiler.h"
 
+#include "../../source/compiler-core/slang-artifact-diagnostic-util.h"
+
 #include "../../slang-com-ptr.h"
 
 struct ParseDiagnosticUtil
@@ -55,23 +57,23 @@ struct ParseDiagnosticUtil
         };
     };
 
-    typedef SlangResult (*LineParser)(const Slang::UnownedStringSlice& line, Slang::List<Slang::UnownedStringSlice>& lineSlices, Slang::DownstreamDiagnostic& outDiagnostic);
+    typedef SlangResult (*LineParser)(Slang::CharSliceAllocator& allocator, const Slang::UnownedStringSlice& line, Slang::List<Slang::UnownedStringSlice>& lineSlices, Slang::ArtifactDiagnostic& outDiagnostic);
 
         /// Given a compiler identity returns a line parsing function.
     static LineParser getLineParser(const CompilerIdentity& compilerIdentity);
 
         /// For a 'generic' (as in uses DownstreamCompiler mechanism) line parsing
-    static SlangResult parseGenericLine(const Slang::UnownedStringSlice& line, Slang::List<Slang::UnownedStringSlice>& lineSlices, Slang::DownstreamDiagnostic& outDiagnostic);
+    static SlangResult parseGenericLine(Slang::CharSliceAllocator& allocator, const Slang::UnownedStringSlice& line, Slang::List<Slang::UnownedStringSlice>& lineSlices, Slang::ArtifactDiagnostic& outDiagnostic);
 
         /// For parsing diagnostics from Slang
-    static SlangResult parseSlangLine(const Slang::UnownedStringSlice& line, Slang::List<Slang::UnownedStringSlice>& lineSlices, Slang::DownstreamDiagnostic& outDiagnostic);
+    static SlangResult parseSlangLine(Slang::CharSliceAllocator& allocator, const Slang::UnownedStringSlice& line, Slang::List<Slang::UnownedStringSlice>& lineSlices, Slang::ArtifactDiagnostic& outDiagnostic);
 
         /// Parse diagnostics into output text
-    static SlangResult parseDiagnostics(const Slang::UnownedStringSlice& inText, Slang::List<Slang::DownstreamDiagnostic>& outDiagnostics);
+    static SlangResult parseDiagnostics(const Slang::UnownedStringSlice& inText, Slang::IArtifactDiagnostics* diagnostics);
 
         /// Parse diagnostics with known compiler identity.
         /// If the prefix is empty, it is assumed there is no prefix and it won't be checked.
-    static SlangResult parseDiagnostics(const Slang::UnownedStringSlice& inText, const CompilerIdentity& identity, const Slang::UnownedStringSlice& prefix, Slang::List<Slang::DownstreamDiagnostic>& outDiagnostics);
+    static SlangResult parseDiagnostics(const Slang::UnownedStringSlice& inText, const CompilerIdentity& identity, const Slang::UnownedStringSlice& prefix, Slang::IArtifactDiagnostics* diagnostics);
 
         /// Given the file output style used by tests, get components of the output into Diagnostic
     static SlangResult parseOutputInfo(const Slang::UnownedStringSlice& in, OutputInfo& out);

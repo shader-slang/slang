@@ -29,7 +29,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 
     if (innerIndex >= bufferCount)
     {
-        innerIndex = bufferCount - 1;
+        innerIndex = int(bufferCount - 1);
     }
 	outputBuffer[index] = buffer[innerIndex]; 
 }

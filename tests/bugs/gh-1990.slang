@@ -59,5 +59,5 @@ void test<R : IInterface>(R r, int id)
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
     Impl impl;
-    test(impl, dispatchThreadID.x);
+    test(impl, int(dispatchThreadID.x));
 }

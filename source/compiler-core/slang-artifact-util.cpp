@@ -6,11 +6,11 @@
 
 #include "slang-artifact-desc-util.h"
 
-#include "../core/slang-castable-list-impl.h"
-
 #include "../core/slang-io.h"
 
 namespace Slang {
+
+/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ArtifactUtil !!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
 /* static */ComPtr<IArtifactContainer> ArtifactUtil::createContainer(const ArtifactDesc& desc)
 {

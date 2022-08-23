@@ -9,7 +9,6 @@
 namespace Slang
 {
 
-
 /* Simplest slice types. We can't use UnownedStringSlice etc, because they implement functionality in libraries,
 and we want to use these types in headers.
 If we wanted a C implementation it would be easy to use a macro to generate the functionality */
@@ -30,12 +29,30 @@ struct Slice
     Count count;
 };
 
-struct ZeroTerminatedCharSlice : Slice<char>
+struct CharSlice : public Slice<char>
 {
+    typedef CharSlice ThisType;
     typedef Slice<char> Super;
-    explicit ZeroTerminatedCharSlice(const char* in) :Super(in, ::strlen(in)) {}
-    ZeroTerminatedCharSlice(const char* in, Count inCount) :Super(in, inCount) { SLANG_ASSERT(in[inCount] == 0); }
-    ZeroTerminatedCharSlice() :Super("", 0) {}
+
+    bool operator==(const ThisType& rhs) const { return count == rhs.count && (data == rhs.data || ::memcmp(data, rhs.data, count) == 0); }
+    bool operator!=(const ThisType& rhs) const { return !(*this == rhs); }
+
+    explicit CharSlice(const char* in) :Super(in, ::strlen(in)) {}
+    CharSlice(const char* in, Count inCount) :Super(in, inCount) {}
+    CharSlice() :Super(nullptr, 0) {}
+};
+
+struct TerminatedCharSlice : public CharSlice
+{
+    typedef TerminatedCharSlice ThisType;
+    typedef CharSlice Super;
+
+    SLANG_FORCE_INLINE bool operator==(const ThisType& rhs) const { return Super::operator==(rhs); }
+    SLANG_FORCE_INLINE bool operator!=(const ThisType& rhs) const { return !(*this == rhs); }
+
+    explicit TerminatedCharSlice(const char* in) :Super(in) {}
+    TerminatedCharSlice(const char* in, Count inCount) :Super(in, inCount) { SLANG_ASSERT(in[inCount] == 0); }
+    TerminatedCharSlice() :Super("", 0) {}
 };
 
 /* As a rule of thumb, if we can define some aspect in a hierarchy then we should do so at the highest level. 
@@ -386,6 +403,15 @@ public:
     virtual SLANG_NO_THROW IArtifact* SLANG_MCALL findArtifactByDesc(FindStyle findStyle, const ArtifactDesc& desc) = 0;
 };
 
+/* Interface for an artifact that *contain* a hierarchy of other child artifacts.
+
+Containment is a different concept to *association*. An association can hold any interface, and associations are for
+objects that are associated with an artifact - like diagnostics or meta data. Children artifacts can build up hierarchies
+and the children can be thought to be contained by the artifact they are a child of. 
+
+The IArtifactContainer interface exists additionally to provide some type safety, and make it clear
+in code where a container or just 'an artifact' is required. 
+*/
 class IArtifactContainer : public IArtifact
 {
 public:

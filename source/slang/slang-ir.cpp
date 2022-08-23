@@ -4369,6 +4369,17 @@ namespace Slang
         return inst;
     }
 
+    IRInst* IRBuilder::emitCastPtrToBool(IRInst* val)
+    {
+        auto inst = createInst<IRInst>(
+            this,
+            kIROp_CastPtrToBool,
+            getBoolType(),
+            val);
+        addInst(inst);
+        return inst;
+    }
+
     IRGlobalConstant* IRBuilder::emitGlobalConstant(
         IRType* type)
     {

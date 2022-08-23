@@ -26,7 +26,7 @@ extern "C"
     SLANG_RT_API void SLANG_MCALL _slang_rt_abort(Slang::String errorMessage);
     SLANG_RT_API void* SLANG_MCALL _slang_rt_load_dll(Slang::String modulePath);
     SLANG_RT_API void* SLANG_MCALL
-        _slang_rt_load_dll_func(void* moduleHandle, Slang::String modulePath);
+        _slang_rt_load_dll_func(void* moduleHandle, Slang::String modulePath, uint32_t argSize);
 }
 
 #endif

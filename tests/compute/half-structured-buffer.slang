@@ -25,7 +25,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     
     Thing thing;
     thing.pos = tid;
-    thing.color = half4(base, base + 1.0f, base + 2.0f, base + 3.0f);    
+    thing.color = half4(float4(base, base + 1.0f, base + 2.0f, base + 3.0f));    
     thing.radius = v;
     
     outputBuffer[tid] = thing;

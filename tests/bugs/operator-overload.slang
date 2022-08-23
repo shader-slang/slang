@@ -16,7 +16,7 @@ Vec2d operator+(Vec2d a, Vec2d b)
 }
 
 [numthreads(4, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
 {    
     int index = dispatchThreadID.x;
     

@@ -31,7 +31,7 @@ int test(int val)
 
 [numthreads(4, 1, 1)]
 void computeMain(
-    uint3       dispatchThreadID : SV_DispatchThreadID)
+    int3       dispatchThreadID : SV_DispatchThreadID)
 {
     let tid = dispatchThreadID.x;
 

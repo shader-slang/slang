@@ -52,8 +52,8 @@ void computeMain(uint3       dispatchThreadID : SV_DispatchThreadID)
     v.v0 = 1;
     v.f0 = 2;
     v.v1 = 3;
-    v.v2 = 4;
-    v.v3 = 5;
+    v.v2 = half(4);
+    v.v3 = half(5);
     v.v4 = 6;
     IInterface dynamicObj1 = createDynamicObject<IInterface, Val>(11, v);;
     gOutputBuffer[1] = dynamicObj1.run();

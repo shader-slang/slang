@@ -37,8 +37,8 @@ struct ReflectionRay
 
 void main() 
 {
-    int2 launchID = DispatchRaysIndex().xy;
-    int2 launchSize = DispatchRaysDimensions().xy;
+    int2 launchID = int2(DispatchRaysIndex().xy);
+    int2 launchSize = int2(DispatchRaysDimensions().xy);
     
     float2 inUV = float2(
         (float(launchID.x) + 0.5f) / float(launchSize.x),

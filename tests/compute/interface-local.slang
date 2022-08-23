@@ -44,7 +44,7 @@ RWStructuredBuffer<int> gOutputBuffer;
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
 	uint tid = dispatchThreadID.x;
-	int inputVal = tid;
+	int inputVal = int(tid);
 	int outputVal = test(inputVal);
 	gOutputBuffer[tid] = outputVal;
 }

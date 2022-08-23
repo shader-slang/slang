@@ -19,7 +19,7 @@ int test(int val)
 
     if(c == Color.Red)
     {
-        if(val & 1)
+        if((val & 1) != 0)
         {
             c = Color.Blue;
         }

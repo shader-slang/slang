@@ -119,9 +119,14 @@ namespace Slang
         return ExpectAType(exp);
     }
 
-    IntVal* SemanticsVisitor::ExtractGenericArgInteger(Expr* exp, DiagnosticSink* sink)
+    IntVal* SemanticsVisitor::ExtractGenericArgInteger(Expr* exp, Type* genericParamType, DiagnosticSink* sink)
     {
-        IntVal* val = CheckIntegerConstantExpression(exp, sink);
+        IntVal* val = CheckIntegerConstantExpression(
+            exp,
+            genericParamType ? IntegerConstantExpressionCoercionType::SpecificType
+                             : IntegerConstantExpressionCoercionType::AnyInteger,
+            genericParamType,
+            sink);
         if(val) return val;
 
         // If the argument expression could not be coerced to an integer
@@ -132,9 +137,9 @@ namespace Slang
         return val;
     }
 
-    IntVal* SemanticsVisitor::ExtractGenericArgInteger(Expr* exp)
+    IntVal* SemanticsVisitor::ExtractGenericArgInteger(Expr* exp, Type* genericParamType)
     {
-        return ExtractGenericArgInteger(exp, getSink());
+        return ExtractGenericArgInteger(exp, genericParamType, getSink());
     }
 
     Val* SemanticsVisitor::ExtractGenericArgVal(Expr* exp)
@@ -158,7 +163,7 @@ namespace Slang
             {
                 CheckExpr(exp);
             }
-            return ExtractGenericArgInteger(exp);
+            return ExtractGenericArgInteger(exp, nullptr);
         }
     }
 
@@ -182,15 +187,27 @@ namespace Slang
         return DeclRefType::create(m_astBuilder, innerDeclRef);
     }
 
+    bool isManagedType(Type* type)
+    {
+        if (auto declRefValueType = as<DeclRefType>(type))
+        {
+            if (as<ClassDecl>(declRefValueType->declRef.getDecl()))
+                return true;
+            if (as<InterfaceDecl>(declRefValueType->declRef.getDecl()))
+                return true;
+        }
+        return false;
+    }
+
     bool SemanticsVisitor::CoerceToProperTypeImpl(
         TypeExp const&  typeExp,
         Type**   outProperType,
         DiagnosticSink* diagSink)
     {
+        Type* result = nullptr;
         Type* type = typeExp.type;
         auto originalExpr = typeExp.exp;
         auto expr = originalExpr;
-
         if(!type && expr)
         {
             expr = maybeResolveOverloadedExpr(expr, LookupMask::type, diagSink);
@@ -275,7 +292,6 @@ namespace Slang
                         }
                         return false;
                     }
-
                     // TODO: this is one place where syntax should get cloned!
                     if (outProperType)
                         args.add(valParam->initExpr);
@@ -285,18 +301,26 @@ namespace Slang
                     // ignore non-parameter members
                 }
             }
-            if (outProperType)
-            {
-                *outProperType = InstantiateGenericType(genericDeclRef, args);
-            }
-            return true;
+            result = InstantiateGenericType(genericDeclRef, args);
         }
             
         // default case: we expect this to already be a proper type
-        if (outProperType)
+        if (!result)
         {
-            *outProperType = type;
+            result = type;
         }
+
+        // Check for invalid types.
+        // We don't allow pointers to managed types.
+        if (auto ptrType = as<PtrType>(result))
+        {
+            if (isManagedType(ptrType->getValueType()))
+            {
+                getSink()->diagnose(typeExp.exp, Diagnostics::cannotDefinePtrTypeToManagedResource);
+            }
+        }
+
+        *outProperType = result;
         return true;
     }
 
@@ -363,8 +387,15 @@ namespace Slang
             {
                 return leftVar->declRef.equals(rightVar->declRef);
             }
+            else if (auto rightPoly = as<PolynomialIntVal>(right))
+            {
+                return right->equalsVal(leftVar);
+            }
         }
-
+        if (auto leftVar = as<PolynomialIntVal>(left))
+        {
+            return leftVar->equalsVal(right);
+        }
         return false;
     }
 

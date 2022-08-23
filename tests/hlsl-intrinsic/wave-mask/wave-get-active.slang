@@ -17,6 +17,6 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     uint4 multi = WaveGetActiveMulti();
     
     // Should be 0xf, because numthreads is 4, 1, 1
-    outputBuffer[idx * 2 + 0] = mask;
-    outputBuffer[idx * 2 + 1] = multi.x;
+    outputBuffer[idx * 2 + 0] = int(mask);
+    outputBuffer[idx * 2 + 1] = int(multi.x);
 }

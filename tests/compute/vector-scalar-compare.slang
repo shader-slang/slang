@@ -7,9 +7,9 @@
 RWStructuredBuffer<int> outputBuffer;
 
 [numthreads(4, 4, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
 {
-    uint2 threadInGroup = dispatchThreadID.xy;
+    int2 threadInGroup = dispatchThreadID.xy;
     
     int r = 0;
     if(all((threadInGroup & 1) == 0))

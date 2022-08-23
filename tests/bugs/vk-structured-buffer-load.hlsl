@@ -20,13 +20,13 @@ void HitMain(inout RayHitInfoPacked RayData, BuiltInTriangleIntersectionAttribut
 {
     float HitT = RayTCurrent();
     RayData.PackedHitInfoA.x = HitT;
-    uint offs = 0;
+    int offs = 0;
     uint use_rcp = USE_RCP;
     float offsfloat = gParamBlock.sbuf.Load(offs);
 
     use_rcp |= HitT > 0.0;
 
-    if (use_rcp)
+    if (use_rcp != 0)
         RayData.PackedHitInfoA.y = rcp(offsfloat);
     else if ((use_rcp > 0) & (offsfloat == 0.0))
         RayData.PackedHitInfoA.y = rsqrt(offsfloat + 1.0);

@@ -61,7 +61,7 @@ public:
         return nullptr;
     }
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL
-        queryInterface(SlangUUID const& uuid, void** outObject)
+        queryInterface(SlangUUID const& uuid, void** outObject) override
     {
         if (auto ptr = getInterface(uuid))
         {
@@ -70,8 +70,8 @@ public:
         }
         return SLANG_E_NO_INTERFACE;
     }
-    virtual SLANG_NO_THROW uint32_t SLANG_MCALL addRef() { return 1; }
-    virtual SLANG_NO_THROW uint32_t SLANG_MCALL release() { return 1; }
+    virtual SLANG_NO_THROW uint32_t SLANG_MCALL addRef() override { return 1; }
+    virtual SLANG_NO_THROW uint32_t SLANG_MCALL release() override { return 1; }
 
     virtual SLANG_NO_THROW void SLANG_MCALL copyBuffer(
         IBufferResource* dst,

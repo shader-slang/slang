@@ -17,6 +17,10 @@
 #include "slang-include-system.h"
 #include "slang-source-loc.h"
 
+#include "slang-artifact-associated-impl.h"
+#include "slang-artifact-desc-util.h"
+#include "slang-artifact-diagnostic-util.h"
+
 #include "../core/slang-shared-library.h"
 
 // Enable calling through to `fxc` or `dxc` to
@@ -113,8 +117,9 @@ public:
     typedef DownstreamCompilerBase Super;
 
     // IDownstreamCompiler
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL compile(const CompileOptions& options, RefPtr<DownstreamCompileResult>& outResult) SLANG_OVERRIDE;
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL disassemble(SlangCompileTarget sourceBlobTarget, const void* blob, size_t blobSize, ISlangBlob** out) SLANG_OVERRIDE;
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL compile(const CompileOptions& options, IArtifact** outArtifact) SLANG_OVERRIDE;
+    virtual SLANG_NO_THROW bool SLANG_MCALL canConvert(const ArtifactDesc& from, const ArtifactDesc& to) SLANG_OVERRIDE;
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL convert(IArtifact* from, const ArtifactDesc& to, IArtifact** outArtifact) SLANG_OVERRIDE;
     virtual SLANG_NO_THROW bool SLANG_MCALL isFileBased() SLANG_OVERRIDE { return false; }
 
         /// Must be called before use
@@ -148,7 +153,7 @@ SlangResult FXCDownstreamCompiler::init(ISlangSharedLibrary* library)
     return SLANG_OK;
 }
 
-static SlangResult _parseDiagnosticLine(const UnownedStringSlice& line, List<UnownedStringSlice>& lineSlices, DownstreamDiagnostic& outDiagnostic)
+static SlangResult _parseDiagnosticLine(CharSliceAllocator& allocator, const UnownedStringSlice& line, List<UnownedStringSlice>& lineSlices, ArtifactDiagnostic& outDiagnostic)
 {
     /* tests/diagnostics/syntax-error-intrinsic.slang(14,2): error X3000: syntax error: unexpected token '@' */
     if (lineSlices.getCount() < 3)
@@ -156,26 +161,26 @@ static SlangResult _parseDiagnosticLine(const UnownedStringSlice& line, List<Uno
         return SLANG_FAIL;
     }
 
-    SLANG_RETURN_ON_FAIL(DownstreamDiagnostic::splitPathLocation(lineSlices[0], outDiagnostic));
+    SLANG_RETURN_ON_FAIL(ArtifactDiagnosticUtil::splitPathLocation(allocator, lineSlices[0], outDiagnostic));
 
     {
         const UnownedStringSlice severityAndCodeSlice = lineSlices[1].trim();
         const UnownedStringSlice severitySlice = StringUtil::getAtInSplit(severityAndCodeSlice, ' ', 0);
 
-        outDiagnostic.code = StringUtil::getAtInSplit(severityAndCodeSlice, ' ', 1);
+        outDiagnostic.code = allocator.allocate(StringUtil::getAtInSplit(severityAndCodeSlice, ' ', 1));
 
-        outDiagnostic.severity = DownstreamDiagnostic::Severity::Error;
+        outDiagnostic.severity = ArtifactDiagnostic::Severity::Error;
         if (severitySlice == "warning")
         {
-            outDiagnostic.severity = DownstreamDiagnostic::Severity::Warning;
+            outDiagnostic.severity = ArtifactDiagnostic::Severity::Warning;
         }
     }
 
-    outDiagnostic.text = UnownedStringSlice(lineSlices[2].begin(), line.end());
+    outDiagnostic.text = allocator.allocate(lineSlices[2].begin(), line.end());
     return SLANG_OK;
 }
 
-SlangResult FXCDownstreamCompiler::compile(const CompileOptions& options, RefPtr<DownstreamCompileResult>& outResult)
+SlangResult FXCDownstreamCompiler::compile(const CompileOptions& options, IArtifact** outArtifact)
 {
     // This compiler doesn't read files, they should be read externally and stored in sourceContents/sourceContentsPath
     if (options.sourceFiles.getCount() > 0)
@@ -284,17 +289,19 @@ SlangResult FXCDownstreamCompiler::compile(const CompileOptions& options, RefPtr
         codeBlob.writeRef(),
         diagnosticsBlob.writeRef());
 
-    DownstreamDiagnostics diagnostics;
+    auto diagnostics = ArtifactDiagnostics::create();
 
     // HRESULT is compatible with SlangResult
-    diagnostics.result = hr;
+    diagnostics->setResult(hr);
+
+    CharSliceAllocator allocator;
 
     if (diagnosticsBlob)
     {
         UnownedStringSlice diagnosticText = _getSlice(diagnosticsBlob);
-        diagnostics.rawDiagnostics = diagnosticText;
+        diagnostics->setRaw(asCharSlice(diagnosticText));
 
-        SlangResult diagnosticParseRes = DownstreamDiagnostic::parseColonDelimitedDiagnostics(diagnosticText, 0, _parseDiagnosticLine, diagnostics.diagnostics);
+        SlangResult diagnosticParseRes = ArtifactDiagnosticUtil::parseColonDelimitedDiagnostics(allocator, diagnosticText, 0, _parseDiagnosticLine, diagnostics);
         SLANG_UNUSED(diagnosticParseRes);
         SLANG_ASSERT(SLANG_SUCCEEDED(diagnosticParseRes));
     }
@@ -302,29 +309,46 @@ SlangResult FXCDownstreamCompiler::compile(const CompileOptions& options, RefPtr
     // If FXC failed, make sure we have an error in the diagnostics
     if (FAILED(hr))
     {
-        diagnostics.requireErrorDiagnostic();
+        diagnostics->requireErrorDiagnostic();
     }
 
-    // ID3DBlob is compatible with ISlangBlob, so just cast away...
-    ISlangBlob* slangCodeBlob = (ISlangBlob*)codeBlob.get();
+    auto artifact = ArtifactUtil::createArtifactForCompileTarget(options.targetType);
+    artifact->addAssociated(diagnostics);
 
-    outResult = new BlobDownstreamCompileResult(diagnostics, slangCodeBlob);
+    if (codeBlob)
+    {
+        // ID3DBlob is compatible with ISlangBlob, so just cast away...
+        artifact->addRepresentationUnknown((ISlangBlob*)codeBlob.get());
+    }
+
+    *outArtifact = artifact.detach();
     return SLANG_OK;
 }
 
-SlangResult FXCDownstreamCompiler::disassemble(SlangCompileTarget sourceBlobTarget, const void* blob, size_t blobSize, ISlangBlob** out)
+bool FXCDownstreamCompiler::canConvert(const ArtifactDesc& from, const ArtifactDesc& to)
 {
     // Can only disassemble blobs that are DXBC
-    if (sourceBlobTarget != SLANG_DXBC)
+    return ArtifactDescUtil::isDissassembly(from, to) && from.payload == ArtifactPayload::DXBC;
+}
+
+SlangResult FXCDownstreamCompiler::convert(IArtifact* from, const ArtifactDesc& to, IArtifact** outArtifact) 
+{
+    if (!canConvert(from->getDesc(), to))
     {
         return SLANG_FAIL;
     }
 
-    ComPtr<ID3DBlob> codeBlob;
-    SLANG_RETURN_ON_FAIL(m_disassemble(blob, blobSize, 0, nullptr, codeBlob.writeRef()));
+    ComPtr<ISlangBlob> dxbcBlob;
+    SLANG_RETURN_ON_FAIL(from->loadBlob(ArtifactKeep::No, dxbcBlob.writeRef()));
 
+    ComPtr<ID3DBlob> disassemblyBlob;
+    SLANG_RETURN_ON_FAIL(m_disassemble(dxbcBlob->getBufferPointer(), dxbcBlob->getBufferSize(), 0, nullptr, disassemblyBlob.writeRef()));
+
+    auto artifact = ArtifactUtil::createArtifact(to);
     // ISlangBlob is compatible with ID3DBlob
-    *out = (ISlangBlob*)codeBlob.detach();
+    artifact->addRepresentationUnknown((ISlangBlob*)disassemblyBlob.get());
+
+    *outArtifact= artifact.detach();
     return SLANG_OK;
 }
 

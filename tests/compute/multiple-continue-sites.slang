@@ -13,7 +13,7 @@
 int test(int inVal)
 {
 	int ii = inVal;
-	for(;!(ii & 0x20); ii += 0x10)
+	for(;!bool(ii & 0x20); ii += 0x10)
 	{
 		if(ii == 2)
 		{

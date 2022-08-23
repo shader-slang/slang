@@ -11,10 +11,10 @@ struct Another<let W : int, let H : int>
 [numthreads(4, 1, 1)]
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
-    int index = dispatchThreadID.x;
+    int index = int(dispatchThreadID.x);
 
     Another<2, 4> a = {};
    
-	outputBuffer[index] = index + a.values[0].x;
+	outputBuffer[index] = index + int(a.values[0].x);
 }
 

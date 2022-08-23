@@ -447,10 +447,28 @@
             <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::ThisType">(Slang::ThisType*)&amp;astNodeType</ExpandedItem>
             <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::AndType">(Slang::AndType*)&amp;astNodeType</ExpandedItem>
             <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::ModifiedType">(Slang::ModifiedType*)&amp;astNodeType</ExpandedItem>
+            
             <Item Name="[Type]">(Slang::Type*)this,nd</Item>
         </Expand>
     </Type>
 
+    <Type Name="Slang::Substitutions">
+        <DisplayString>{astNodeType}</DisplayString>
+        <Expand>
+            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::GenericSubstitution">(Slang::GenericSubstitution*)&amp;astNodeType</ExpandedItem>
+            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::ThisTypeSubstitution">(Slang::ThisTypeSubstitution*)&amp;astNodeType</ExpandedItem>
+        </Expand>
+    </Type>
+    <Type Name="Slang::SubstitutionSet">
+        <DisplayString>{astNodeType}</DisplayString>
+        <Expand>
+            <LinkedListItems>
+                <HeadPointer>substitutions</HeadPointer>
+                <NextPointer>outer</NextPointer>
+                <ValueNode>this</ValueNode>
+            </LinkedListItems>
+        </Expand>
+    </Type>
     <Type Name="Slang::AggTypeDecl">
         <DisplayString>{nameAndLoc.name}: {astNodeType}</DisplayString>
         <Expand>

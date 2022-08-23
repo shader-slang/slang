@@ -89,6 +89,7 @@ SLANG_TEST_TOOL_API SlangResult innerMain(StdWriters* stdWriters, slang::IGlobal
     }
 
     SlangCompileRequest* compileRequest = spCreateCompileRequest(session);
+    compileRequest->addSearchPath(Path::getParentDirectory(Path::getExecutablePath()).getBuffer());
     SlangResult res = _compile(compileRequest, argc, argv);
     // Now that we are done, clean up after ourselves
     spDestroyCompileRequest(compileRequest);

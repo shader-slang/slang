@@ -14,6 +14,7 @@
 #include "slang-ir-specialize-dynamic-associatedtype-lookup.h"
 #include "slang-ir-witness-table-wrapper.h"
 #include "slang-ir-ssa-simplification.h"
+#include "slang-ir-util.h"
 
 
 namespace Slang
@@ -55,6 +56,9 @@ namespace Slang
             switch (inst->getOp())
             {
             case kIROp_WitnessTableIDType:
+                if (isComInterfaceType((IRType*)inst->getOperand(0)))
+                    continue;
+                // fall through
             case kIROp_RTTIHandleType:
                 {
                     IRBuilder builder(sharedContext->sharedBuilderStorage);

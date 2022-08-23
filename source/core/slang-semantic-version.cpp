@@ -26,16 +26,16 @@ SlangResult SemanticVersion::parse(const UnownedStringSlice& value, char separat
     {
         SLANG_RETURN_ON_FAIL(StringUtil::parseInt(slices[i], ints[i]));
 
-        const Int max = (i == 0) ? 0x7fffffff : 0xffff;
+        const Int max = (i == 2) ? 0x7fffffff : 0xffff;
         if (ints[i] < 0 || ints[i] > max)
         {
             return SLANG_FAIL;
         }
     }
 
-    outVersion.m_major = uint32_t(ints[0]);
+    outVersion.m_major = uint16_t(ints[0]);
     outVersion.m_minor = uint16_t(ints[1]);
-    outVersion.m_patch = uint16_t(ints[2]);
+    outVersion.m_patch = uint32_t(ints[2]);
 
     return SLANG_OK;
 }
@@ -50,7 +50,7 @@ void SemanticVersion::append(StringBuilder& buf) const
     buf << Int32(m_major) << "." << Int32(m_minor);
     if (m_patch != 0)
     {
-        buf << "." << Int32(m_patch);
+        buf << "." << UInt32(m_patch);
     }
 }
 
@@ -89,8 +89,6 @@ void SemanticVersion::append(StringBuilder& buf) const
     }
     return bestVersion;
 }
-
-
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! MatchSemanticVersion !!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 

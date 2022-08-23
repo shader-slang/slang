@@ -15,7 +15,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     uint uv = tid;
     int iv = int(tid);
     
-    bool2 bv2 = { tid & 1, tid > 10 };      
+    bool2 bv2 = { (tid & 1) != 0, tid > 10 };      
     
     float2 f2 = { float(tid), float(tid + 1) };
     
@@ -32,20 +32,20 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
         r |= 0x0002;
     }
     
-    if (iv)
+    if (iv != 0)
     {
         r|= 0x0004;
     }
-    if (!iv)
+    if (!bool(iv))
     {
         r|= 0x0008;
-    } 
-    
-    if (uv)
+    }
+
+    if (uv != 0)
     {
         r |= 0x0010;
     }
-    if (!uv)
+    if (!bool(uv))
     {
         r |= 0x0020;
     }
@@ -59,7 +59,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
         r |= 0x0080;
     }
     
-    if (any(!f2))
+    if (any(!bool2(f2)))
     {
         r |= 0x0100;
     }

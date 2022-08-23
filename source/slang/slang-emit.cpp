@@ -212,22 +212,6 @@ Result linkAndOptimizeIR(
     // un-specialized IR.
     dumpIRIfEnabled(codeGenContext, irModule);
 
-    switch (target)
-    {
-        case CodeGenTarget::CPPSource:
-        case CodeGenTarget::HostCPPSource:
-        {
-            lowerComInterfaces(irModule, artifactDesc.style, sink);
-            generateDllImportFuncs(irModule, sink);
-            generateDllExportFuncs(irModule, sink);
-            break;
-        }
-        default: break;
-    }
-
-    // Lower `Result<T,E>` types into ordinary struct types.
-    lowerResultType(irModule, sink);
-
     // Replace any global constants with their values.
     //
     replaceGlobalConstants(irModule);
@@ -323,6 +307,24 @@ Result linkAndOptimizeIR(
         break;
     }
 
+    lowerOptionalType(irModule, sink);
+    simplifyIR(irModule);
+
+    switch (target)
+    {
+    case CodeGenTarget::CPPSource:
+    case CodeGenTarget::HostCPPSource:
+    {
+        lowerComInterfaces(irModule, artifactDesc.style, sink);
+        generateDllImportFuncs(codeGenContext->getTargetReq(), irModule, sink);
+        generateDllExportFuncs(irModule, sink);
+        break;
+    }
+    default: break;
+    }
+
+    // Lower `Result<T,E>` types into ordinary struct types.
+    lowerResultType(irModule, sink);
 
     // Desguar any union types, since these will be illegal on
     // various targets.
@@ -392,8 +394,6 @@ Result linkAndOptimizeIR(
     // will run a DCE pass to clean up after the specialization.
     //
     simplifyIR(irModule);
-
-    lowerOptionalType(irModule, sink);
 
 #if 0
     dumpIRIfEnabled(codeGenContext, irModule, "AFTER DCE");
@@ -837,7 +837,7 @@ Result linkAndOptimizeIR(
 #endif
     validateIRModuleIfEnabled(codeGenContext, irModule);
 
-    auto metadata = new PostEmitMetadataImpl;
+    auto metadata = new ArtifactPostEmitMetadata;
     outLinkedIR.metadata = metadata;
 
     collectMetadata(irModule, *metadata);
@@ -928,7 +928,7 @@ SlangResult CodeGenContext::emitEntryPointsSourceFromIR(ComPtr<IArtifact>& outAr
 
     SLANG_RETURN_ON_FAIL(sourceEmitter->init());
 
-    ComPtr<IPostEmitMetadata> metadata;
+    ComPtr<IArtifactPostEmitMetadata> metadata;
     {
         LinkingAndOptimizationOptions linkingAndOptimizationOptions;
 

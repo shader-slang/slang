@@ -10,16 +10,24 @@
 
 #include "slang-artifact-associated.h"
 
+#include "slang-artifact-util.h"
+
+#include "slang-artifact-diagnostic-util.h"
+
 namespace Slang
 {
 
-class DiagnosticsImpl : public ComBaseObject, public IDiagnostics
+class ArtifactDiagnostics : public ComBaseObject, public IArtifactDiagnostics
 {
 public:
+    typedef ArtifactDiagnostics ThisType;
+
     SLANG_COM_BASE_IUNKNOWN_ALL
 
     // ICastable
     SLANG_NO_THROW void* SLANG_MCALL castAs(const Guid& guid) SLANG_OVERRIDE;
+    // IClonable
+    SLANG_NO_THROW virtual void* SLANG_MCALL clone(const Guid& intf) SLANG_OVERRIDE;
     // IDiagnostic
     SLANG_NO_THROW virtual const Diagnostic* SLANG_MCALL getAt(Index i) SLANG_OVERRIDE { return &m_diagnostics[i]; }
     SLANG_NO_THROW virtual Count SLANG_MCALL getCount() SLANG_OVERRIDE { return m_diagnostics.getCount(); }
@@ -27,42 +35,42 @@ public:
     SLANG_NO_THROW virtual void SLANG_MCALL removeAt(Index i) SLANG_OVERRIDE { m_diagnostics.removeAt(i); }
     SLANG_NO_THROW virtual SlangResult SLANG_MCALL getResult() SLANG_OVERRIDE { return m_result; }
     SLANG_NO_THROW virtual void SLANG_MCALL setResult(SlangResult res) SLANG_OVERRIDE { m_result = res; }
-    SLANG_NO_THROW virtual void SLANG_MCALL setRaw(const ZeroTerminatedCharSlice& slice) SLANG_OVERRIDE;
-    SLANG_NO_THROW virtual ZeroTerminatedCharSlice SLANG_MCALL getRaw() SLANG_OVERRIDE { return m_raw; }
+    SLANG_NO_THROW virtual void SLANG_MCALL setRaw(const CharSlice& slice) SLANG_OVERRIDE;
+    SLANG_NO_THROW virtual void SLANG_MCALL appendRaw(const CharSlice& slice) SLANG_OVERRIDE;
+    SLANG_NO_THROW virtual TerminatedCharSlice SLANG_MCALL getRaw() SLANG_OVERRIDE { return CharSliceCaster::asTerminatedCharSlice(m_raw); }
     SLANG_NO_THROW virtual void SLANG_MCALL reset() SLANG_OVERRIDE;
-    SLANG_NO_THROW virtual Count SLANG_MCALL getCountAtLeastSeverity(Severity severity) SLANG_OVERRIDE;
-    SLANG_NO_THROW virtual Count SLANG_MCALL getCountBySeverity(Severity severity) SLANG_OVERRIDE;
-    SLANG_NO_THROW virtual bool SLANG_MCALL hasOfAtLeastSeverity(Severity severity) SLANG_OVERRIDE;
-    SLANG_NO_THROW virtual Count SLANG_MCALL getCountByStage(Stage stage, Count outCounts[Int(Severity::CountOf)]) SLANG_OVERRIDE;
-    SLANG_NO_THROW virtual void SLANG_MCALL removeBySeverity(Severity severity) SLANG_OVERRIDE;
-    SLANG_NO_THROW virtual void SLANG_MCALL maybeAddNote(const ZeroTerminatedCharSlice& in) SLANG_OVERRIDE;
+    SLANG_NO_THROW virtual Count SLANG_MCALL getCountAtLeastSeverity(Diagnostic::Severity severity) SLANG_OVERRIDE;
+    SLANG_NO_THROW virtual Count SLANG_MCALL getCountBySeverity(Diagnostic::Severity severity) SLANG_OVERRIDE;
+    SLANG_NO_THROW virtual bool SLANG_MCALL hasOfAtLeastSeverity(Diagnostic::Severity severity) SLANG_OVERRIDE;
+    SLANG_NO_THROW virtual Count SLANG_MCALL getCountByStage(Diagnostic::Stage stage, Count outCounts[Int(Diagnostic::Severity::CountOf)]) SLANG_OVERRIDE;
+    SLANG_NO_THROW virtual void SLANG_MCALL removeBySeverity(Diagnostic::Severity severity) SLANG_OVERRIDE;
+    SLANG_NO_THROW virtual void SLANG_MCALL maybeAddNote(const CharSlice& in) SLANG_OVERRIDE;
     SLANG_NO_THROW virtual void SLANG_MCALL requireErrorDiagnostic() SLANG_OVERRIDE;
-    SLANG_NO_THROW virtual void SLANG_MCALL appendSummary(ISlangBlob** outBlob) SLANG_OVERRIDE;
-    SLANG_NO_THROW virtual void SLANG_MCALL appendSimplifiedSummary(ISlangBlob** outBlob) SLANG_OVERRIDE;
+    SLANG_NO_THROW virtual void SLANG_MCALL calcSummary(ISlangBlob** outBlob) SLANG_OVERRIDE;
+    SLANG_NO_THROW virtual void SLANG_MCALL calcSimplifiedSummary(ISlangBlob** outBlob) SLANG_OVERRIDE;
 
-    DiagnosticsImpl():
-        m_arena(1024)
-    {
-    }
+        /// Default ctor
+    ArtifactDiagnostics() {}
+        /// Copy ctor
+    ArtifactDiagnostics(const ThisType& rhs);
+
+        /// Create 
+    static ComPtr<IArtifactDiagnostics> create() { return ComPtr<IArtifactDiagnostics>(new ThisType); }
 
 protected:
     void* getInterface(const Guid& uuid);
     void* getObject(const Guid& uuid);
 
-    ZeroTerminatedCharSlice _allocateSlice(const Slice<char>& in);
-
-    // We could consider storing paths, codes in StringSlicePool, but for now we just allocate all 'string type things'
-    // in the arena.
-    MemoryArena m_arena;
+    CharSliceAllocator m_allocator;
 
     List<Diagnostic> m_diagnostics;
     SlangResult m_result = SLANG_OK;
     
     // Raw diagnostics
-    ZeroTerminatedCharSlice m_raw;
+    StringBuilder m_raw;
 };
 
-/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!! PostEmitMetadataImpl !!!!!!!!!!!!!!!!!!!!!!!!!! */
+/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!! ArtifactPostEmitMetadata !!!!!!!!!!!!!!!!!!!!!!!!!! */
 
 struct ShaderBindingRange
 {
@@ -133,9 +141,11 @@ struct ShaderBindingRange
     }
 };
 
-class PostEmitMetadataImpl : public ComBaseObject, public IPostEmitMetadata
+class ArtifactPostEmitMetadata : public ComBaseObject, public IArtifactPostEmitMetadata
 {
 public:
+    typedef ArtifactPostEmitMetadata ThisType;
+
     SLANG_CLASS_GUID(0x6f82509f, 0xe48b, 0x4b83, { 0xa3, 0x84, 0x5d, 0x70, 0x83, 0x19, 0x83, 0xcc })
 
     SLANG_COM_BASE_IUNKNOWN_ALL
@@ -143,11 +153,13 @@ public:
     // ICastable
     SLANG_NO_THROW void* SLANG_MCALL castAs(const Guid& guid) SLANG_OVERRIDE;
     
-    // IPostEmitMetadata
+    // IArtifactPostEmitMetadata
     SLANG_NO_THROW virtual Slice<ShaderBindingRange> SLANG_MCALL getUsedBindingRanges() SLANG_OVERRIDE;
     
     void* getInterface(const Guid& uuid);
     void* getObject(const Guid& uuid);
+
+    static ComPtr<IArtifactPostEmitMetadata> create() { return ComPtr<IArtifactPostEmitMetadata>(new ThisType); }
 
     List<ShaderBindingRange> m_usedBindings;
 };

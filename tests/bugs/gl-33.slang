@@ -21,7 +21,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
     uint tid = dispatchThreadID.x;
 
-    int val = tid;
+    int val = int(tid);
     val = test(val);
 
     gBuffer[tid] = val;

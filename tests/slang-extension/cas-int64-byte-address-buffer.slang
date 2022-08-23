@@ -18,9 +18,9 @@ RWStructuredBuffer<int> nvapiBuffer;
 RWByteAddressBuffer outputBuffer;
 
 [numthreads(16, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
 {    
-    uint tid = dispatchThreadID.x;
+    int tid = dispatchThreadID.x;
     int idx = (tid & 3) ^ (tid >> 2); 
 
     // Try directly reading

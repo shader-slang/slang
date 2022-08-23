@@ -884,7 +884,8 @@ namespace Slang
 
         auto funcDeclRef = getDeclRef(m_astBuilder, funcDeclRefExpr);
         auto intrinsicMod = funcDeclRef.getDecl()->findModifier<IntrinsicOpModifier>();
-        if (!intrinsicMod)
+        auto implicitCast = funcDeclRef.getDecl()->findModifier<ImplicitConversionModifier>();
+        if (!intrinsicMod && !implicitCast)
         {
             // We can't constant fold anything that doesn't map to a builtin
             // operation right now.
@@ -927,7 +928,7 @@ namespace Slang
 
         if (!allConst)
         {
-            // TODO(tfoley): We probably want to support a very limited number of operations
+            // We support a very limited number of operations
             // on "constants" that aren't actually known, to be able to handle a generic
             // that takes an integer `N` but then constructs a vector of size `N+1`.
             //
@@ -936,60 +937,136 @@ namespace Slang
             // need inference to be smart enough to know that `2 + N` and `N + 2` are the
             // same value, as are `N + M + 1 + 1` and `M + 2 + N`.
             //
-            // For now we can just bail in this case.
+            // This is done by constructing a 'PolynomialIntVal' and rely on its
+            // `canonicalize` operation.
+            if (implicitCast)
+            {
+                // We cannot support casting in this case.
+                return nullptr;
+            }
+
+            auto opName = funcDeclRef.getName();
+
+            // handle binary operators
+            if (opName == getName("-"))
+            {
+                if (argCount == 1)
+                {
+                    return PolynomialIntVal::neg(m_astBuilder, argVals[0]);
+                }
+                else if (argCount == 2)
+                {
+                    return PolynomialIntVal::sub(m_astBuilder, argVals[0], argVals[1]);
+                }
+            }
+            else if (opName == getName("+"))
+            {
+                if (argCount == 1)
+                {
+                    return argVals[0];
+                }
+                else if (argCount == 2)
+                {
+                    return PolynomialIntVal::add(m_astBuilder, argVals[0], argVals[1]);
+                }
+            }
+            else if (opName == getName("*"))
+            {
+                if (argCount == 2)
+                {
+                    return PolynomialIntVal::mul(m_astBuilder, argVals[0], argVals[1]);
+                }
+            }
             return nullptr;
         }
 
         // At this point, all the operands had simple integer values, so we are golden.
         IntegerLiteralValue resultValue = 0;
-        auto opName = funcDeclRef.getName();
-
-        // handle binary operators
-        if (opName == getName("-"))
+        // If this is an implicit cast, we can try to fold.
+        if (implicitCast)
         {
-            if (argCount == 1)
+            auto targetBasicType = as<BasicExpressionType>(invokeExpr.getExpr()->type.type);
+            if (!targetBasicType)
+                return nullptr;
+            switch (targetBasicType->baseType)
             {
-                resultValue = -constArgVals[0];
-            }
-            else if (argCount == 2)
-            {
-                resultValue = constArgVals[0] - constArgVals[1];
+            case BaseType::Bool:
+                resultValue = constArgVals[0] != 0;
+                break;
+            case BaseType::Int:
+            case BaseType::UInt:
+            case BaseType::UInt16:
+            case BaseType::Int16:
+            case BaseType::UInt8:
+            case BaseType::Int8:
+                resultValue = constArgVals[0];
+                break;
+            default:
+                return nullptr;
             }
         }
-
-        // simple binary operators
-#define CASE(OP)                                                    \
-        else if(opName == getName(#OP)) do {                    \
-            if(argCount != 2) return nullptr;                   \
-            resultValue = constArgVals[0] OP constArgVals[1];   \
-        } while(0)
-
-        CASE(+); // TODO: this can also be unary...
-        CASE(*);
-        CASE(<<);
-        CASE(>>);
-        CASE(&);
-        CASE(|);
-        CASE(^);
-#undef CASE
-
-        // binary operators with chance of divide-by-zero
-        // TODO: issue a suitable error in that case
-#define CASE(OP)                                                    \
-        else if(opName == getName(#OP)) do {                    \
-            if(argCount != 2) return nullptr;                   \
-            if(!constArgVals[1]) return nullptr;                \
-            resultValue = constArgVals[0] OP constArgVals[1];   \
-        } while(0)
-
-        CASE(/);
-        CASE(%);
-#undef CASE
-
-        // TODO(tfoley): more cases
         else
         {
-            return nullptr;
+            auto opName = funcDeclRef.getName();
+
+            // handle binary operators
+            if (opName == getName("-"))
+            {
+                if (argCount == 1)
+                {
+                    resultValue = -constArgVals[0];
+                }
+                else if (argCount == 2)
+                {
+                    resultValue = constArgVals[0] - constArgVals[1];
+                }
+            }
+            else if (opName == getName("!"))
+            {
+                resultValue = constArgVals[0] != 0;
+            }
+            else if (opName == getName("~"))
+            {
+                resultValue = ~constArgVals[0];
+            }
+
+            // simple binary operators
+#define CASE(OP)                                                    \
+            else if(opName == getName(#OP)) do {                    \
+                if(argCount != 2) return nullptr;                   \
+                resultValue = constArgVals[0] OP constArgVals[1];   \
+            } while(0)
+
+            CASE(+); // TODO: this can also be unary...
+            CASE(*);
+            CASE(<<);
+            CASE(>>);
+            CASE(&);
+            CASE(|);
+            CASE(^);
+            CASE(!=);
+            CASE(==);
+            CASE(>=);
+            CASE(<=);
+            CASE(<);
+            CASE(>);
+#undef CASE
+            // binary operators with chance of divide-by-zero
+            // TODO: issue a suitable error in that case
+#define CASE(OP)                                                    \
+            else if(opName == getName(#OP)) do {                    \
+                if(argCount != 2) return nullptr;                   \
+                if(!constArgVals[1]) return nullptr;                \
+                resultValue = constArgVals[0] OP constArgVals[1];   \
+            } while(0)
+            CASE(/);
+            CASE(%);
+#undef CASE
+            // TODO(tfoley): more cases
+            else
+            {
+                return nullptr;
+            }
         }
 
         IntVal* result = m_astBuilder->create<ConstantIntVal>(resultValue);
@@ -1072,7 +1149,9 @@ namespace Slang
             if (auto genericValParamRef = declRef.as<GenericValueParamDecl>())
             {
                 // TODO(tfoley): handle the case of non-`int` value parameters...
-                return m_astBuilder->create<GenericParamIntVal>(genericValParamRef);
+                Val* valResult = m_astBuilder->create<GenericParamIntVal>(genericValParamRef);
+                valResult = valResult->substitute(m_astBuilder, expr.getSubsts());
+                return as<IntVal>(valResult);
             }
 
             // We may also need to check for references to variables that
@@ -1126,13 +1205,27 @@ namespace Slang
         return tryConstantFoldExpr(expr, circularityInfo);
     }
 
-    IntVal* SemanticsVisitor::CheckIntegerConstantExpression(Expr* inExpr, DiagnosticSink* sink)
+    IntVal* SemanticsVisitor::CheckIntegerConstantExpression(Expr* inExpr, IntegerConstantExpressionCoercionType coercionType, Type* expectedType, DiagnosticSink* sink)
     {
         // No need to issue further errors if the expression didn't even type-check.
         if(IsErrorExpr(inExpr)) return nullptr;
 
         // First coerce the expression to the expected type
-        auto expr = coerce(m_astBuilder->getIntType(),inExpr);
+        Expr* expr = nullptr;
+        switch (coercionType)
+        {
+        case IntegerConstantExpressionCoercionType::SpecificType:
+            expr = coerce(expectedType, inExpr);
+            break;
+        case IntegerConstantExpressionCoercionType::AnyInteger:
+            if (isScalarIntegerType(inExpr->type))
+                expr = inExpr;
+            else
+                expr = coerce(m_astBuilder->getIntType(), inExpr);
+            break;
+        default:
+            break;
+        }
 
         // No need to issue further errors if the type coercion failed.
         if(IsErrorExpr(expr)) return nullptr;
@@ -1145,9 +1238,9 @@ namespace Slang
         return result;
     }
 
-    IntVal* SemanticsVisitor::CheckIntegerConstantExpression(Expr* inExpr)
+    IntVal* SemanticsVisitor::CheckIntegerConstantExpression(Expr* inExpr, IntegerConstantExpressionCoercionType coercionType, Type* expectedType)
     {
-        return CheckIntegerConstantExpression(inExpr, getSink());
+        return CheckIntegerConstantExpression(inExpr, coercionType, expectedType, getSink());
     }
 
     IntVal* SemanticsVisitor::CheckEnumConstantExpression(Expr* expr)
@@ -1218,7 +1311,7 @@ namespace Slang
             IntVal* elementCount = nullptr;
             if (indexExpr)
             {
-                elementCount = CheckIntegerConstantExpression(indexExpr);
+                elementCount = CheckIntegerConstantExpression(indexExpr, IntegerConstantExpressionCoercionType::AnyInteger, nullptr);
             }
 
             auto elementType = CoerceToUsableType(TypeExp(baseExpr, baseTypeType->type));
