@@ -95,6 +95,10 @@ FOREACH_BASE_TYPE(DEFINE_BASE_TYPE)
 
         static TextureFlavor create(SlangResourceShape shape, SlangResourceAccess access);
         static TextureFlavor create(SlangResourceShape shape, SlangResourceAccess access, int flags);
+
+        static TextureFlavor create(TextureFlavor::Shape shape, SlangResourceAccess access) { return create(SlangResourceShape(shape), access); }
+        static TextureFlavor create(TextureFlavor::Shape shape, SlangResourceAccess access, int flags) { return create(SlangResourceShape(shape), access, flags); }
+
     };
 
     enum class SamplerStateFlavor : uint8_t
