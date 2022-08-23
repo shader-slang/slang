@@ -21,6 +21,8 @@
 #include "slang-artifact-helper.h"
 #include "slang-artifact-desc-util.h"
 
+#include "../core/slang-castable-list-impl.h"
+
 namespace Slang
 {
 
@@ -172,7 +174,7 @@ SlangResult CommandLineDownstreamCompiler::compile(const CompileOptions& inOptio
 
     // Find all the files that will be produced
 
-    auto artifactList = ArtifactList::create();
+    auto artifactList = CastableList::create();
 
     ComPtr<IFileArtifactRepresentation> lockFile;
 

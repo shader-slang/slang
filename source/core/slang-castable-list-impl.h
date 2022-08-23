@@ -35,6 +35,8 @@ public:
     virtual ICastable* SLANG_MCALL findWithPredicate(FindFunc func, void* data) SLANG_OVERRIDE;
     virtual ICastable*const* SLANG_MCALL getBuffer() SLANG_OVERRIDE { return m_list.getBuffer(); }
 
+    static ComPtr<ICastableList> create() { return ComPtr<ICastableList>(new CastableList); }
+
         /// Dtor
     virtual ~CastableList();
 

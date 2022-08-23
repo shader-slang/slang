@@ -238,13 +238,13 @@ public:
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL createRepresentation(const Guid& typeGuid, ICastable** outCastable) SLANG_OVERRIDE;
     virtual SLANG_NO_THROW bool SLANG_MCALL exists() SLANG_OVERRIDE;
 
-    CommandLineDownstreamArtifactRepresentation(const UnownedStringSlice& moduleFilePath, IArtifactList* artifactList) :
+    CommandLineDownstreamArtifactRepresentation(const UnownedStringSlice& moduleFilePath, ICastableList* artifactList) :
         m_moduleFilePath(moduleFilePath),
         m_artifactList(artifactList)
     {
     }
 
-    ComPtr<IArtifactList> m_artifactList;
+    ComPtr<ICastableList> m_artifactList;
 
 protected:
 
