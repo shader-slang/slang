@@ -187,15 +187,27 @@ namespace Slang
         return DeclRefType::create(m_astBuilder, innerDeclRef);
     }
 
+    bool isManagedType(Type* type)
+    {
+        if (auto declRefValueType = as<DeclRefType>(type))
+        {
+            if (as<ClassDecl>(declRefValueType->declRef.getDecl()))
+                return true;
+            if (as<InterfaceDecl>(declRefValueType->declRef.getDecl()))
+                return true;
+        }
+        return false;
+    }
+
     bool SemanticsVisitor::CoerceToProperTypeImpl(
         TypeExp const&  typeExp,
         Type**   outProperType,
         DiagnosticSink* diagSink)
     {
+        Type* result = nullptr;
         Type* type = typeExp.type;
         auto originalExpr = typeExp.exp;
         auto expr = originalExpr;
-
         if(!type && expr)
         {
             expr = maybeResolveOverloadedExpr(expr, LookupMask::type, diagSink);
@@ -289,18 +301,26 @@ namespace Slang
                     // ignore non-parameter members
                 }
             }
-            if (outProperType)
-            {
-                *outProperType = InstantiateGenericType(genericDeclRef, args);
-            }
-            return true;
+            result = InstantiateGenericType(genericDeclRef, args);
         }
             
         // default case: we expect this to already be a proper type
-        if (outProperType)
+        if (!result)
         {
-            *outProperType = type;
+            result = type;
         }
+
+        // Check for invalid types.
+        // We don't allow pointers to managed types.
+        if (auto ptrType = as<PtrType>(result))
+        {
+            if (isManagedType(ptrType->getValueType()))
+            {
+                getSink()->diagnose(typeExp.exp, Diagnostics::cannotDefinePtrTypeToManagedResource);
+            }
+        }
+
+        *outProperType = result;
         return true;
     }
 

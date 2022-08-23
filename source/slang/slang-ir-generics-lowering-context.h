@@ -104,8 +104,6 @@ namespace Slang
 
     bool isPolymorphicType(IRInst* typeInst);
 
-    bool isComInterfaceType(IRType* type);
-
     // Returns true if typeInst represents a type and should be lowered into
     // Ptr(RTTIType).
     bool isTypeValue(IRInst* typeInst);

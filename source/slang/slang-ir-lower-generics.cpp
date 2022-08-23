@@ -14,6 +14,7 @@
 #include "slang-ir-specialize-dynamic-associatedtype-lookup.h"
 #include "slang-ir-witness-table-wrapper.h"
 #include "slang-ir-ssa-simplification.h"
+#include "slang-ir-util.h"
 
 
 namespace Slang
