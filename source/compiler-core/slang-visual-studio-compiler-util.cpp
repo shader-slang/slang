@@ -34,6 +34,8 @@ static void _addFile(const String& path, const ArtifactDesc& desc, IFileArtifact
 {
     SLANG_ASSERT(options.modulePath.getLength());
 
+    const auto targetDesc = ArtifactDescUtil::makeDescForCompileTarget(options.targetType);
+
     outArtifacts.clear();
 
     if (flags & ProductFlag::Execution)
@@ -51,17 +53,17 @@ static void _addFile(const String& path, const ArtifactDesc& desc, IFileArtifact
         if (options.targetType == SLANG_SHADER_SHARED_LIBRARY)
         {
             _addFile(options.modulePath + ".exp", ArtifactDesc::make(ArtifactKind::BinaryFormat, ArtifactPayload::Unknown, ArtifactStyle::None), lockFile, outArtifacts);
-            _addFile(options.modulePath + ".lib", ArtifactDesc::make(ArtifactKind::Library, ArtifactPayload::HostCPU, ArtifactStyle::None), lockFile, outArtifacts);
+            _addFile(options.modulePath + ".lib", ArtifactDesc::make(ArtifactKind::Library, ArtifactPayload::HostCPU, targetDesc), lockFile, outArtifacts);
         }
     }
     if (flags & ProductFlag::Compile)
     {
-        _addFile(options.modulePath + ".obj", ArtifactDesc::make(ArtifactKind::ObjectCode, ArtifactPayload::HostCPU, ArtifactStyle::None), lockFile, outArtifacts);
+        _addFile(options.modulePath + ".obj", ArtifactDesc::make(ArtifactKind::ObjectCode, ArtifactPayload::HostCPU, targetDesc), lockFile, outArtifacts);
     }
     if (flags & ProductFlag::Debug)
     {
         // TODO(JS): Could try and determine based on debug information
-        _addFile(options.modulePath + ".pdb", ArtifactDesc::make(ArtifactKind::BinaryFormat, ArtifactPayload::DebugInfo, ArtifactStyle::None), lockFile, outArtifacts);
+        _addFile(options.modulePath + ".pdb", ArtifactDesc::make(ArtifactKind::BinaryFormat, ArtifactPayload::DebugInfo, targetDesc), lockFile, outArtifacts);
     }
 
     return SLANG_OK;

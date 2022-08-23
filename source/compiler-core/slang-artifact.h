@@ -212,7 +212,7 @@ A value type to describe aspects of the contents of an Artifact.
 struct ArtifactDesc
 {
 public:
-    typedef ArtifactDesc This;
+    typedef ArtifactDesc ThisType;
 
     typedef ArtifactKind Kind;
     typedef ArtifactPayload Payload;
@@ -225,14 +225,15 @@ public:
         /// Get in packed format
     inline Packed getPacked() const;
 
-    bool operator==(const This& rhs) const { return kind == rhs.kind && payload == rhs.payload && style == rhs.style && flags == rhs.flags;  }
-    bool operator!=(const This& rhs) const { return !(*this == rhs); }
+    bool operator==(const ThisType& rhs) const { return kind == rhs.kind && payload == rhs.payload && style == rhs.style && flags == rhs.flags;  }
+    bool operator!=(const ThisType& rhs) const { return !(*this == rhs); }
 
         /// Construct from the elements
-    static This make(Kind inKind, Payload inPayload, Style inStyle = Style::Unknown, Flags flags = 0) { return This{ inKind, inPayload, inStyle, flags }; }
+    static ThisType make(Kind inKind, Payload inPayload, Style inStyle = Style::Unknown, Flags flags = 0) { return ThisType{ inKind, inPayload, inStyle, flags }; }
+    static ThisType make(Kind inKind, Payload inPayload, const ThisType& base) { return ThisType{ inKind, inPayload, base.style, base.flags }; }
 
         /// Construct from the packed format
-    inline static This make(Packed inPacked);
+    inline static ThisType make(Packed inPacked);
 
     Kind kind;
     Payload payload;
@@ -255,7 +256,7 @@ inline /* static */ArtifactDesc ArtifactDesc::make(Packed inPacked)
 {
     const PackedBacking packed = PackedBacking(inPacked);
 
-    This r;
+    ThisType r;
     r.kind = Kind(packed >> 24);
     r.payload = Payload(uint8_t(packed >> 16));
     r.style = Style(uint8_t(packed >> 8));
