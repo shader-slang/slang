@@ -48,7 +48,7 @@ namespace Slang {
 
 /* static */ComPtr<IArtifact> ArtifactUtil::createArtifactForCompileTarget(SlangCompileTarget target)
 {
-    auto desc = ArtifactDescUtil::makeDescFromCompileTarget(target);
+    auto desc = ArtifactDescUtil::makeDescForCompileTarget(target);
     return createArtifact(desc);
 }
 

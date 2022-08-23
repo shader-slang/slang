@@ -158,6 +158,34 @@ protected:
     List<ComPtr<IArtifact>> m_children;
 };
 
+class ArtifactList : public ComBaseObject, public IArtifactList
+{
+public:
+    typedef ArtifactList ThisType;
+
+    SLANG_CLASS_GUID(0xd3950337, 0xdb20, 0x4e7a, { 0xad, 0xfc, 0x89, 0x2e, 0xa1, 0xb0, 0x45, 0x2f })
+
+    SLANG_COM_BASE_IUNKNOWN_ALL
+
+    // ICastable
+    SLANG_NO_THROW void* SLANG_MCALL castAs(const Guid& guid) SLANG_OVERRIDE;
+
+    // IArtifactAssociatedFiles
+    SLANG_NO_THROW virtual void SLANG_MCALL add(IArtifact* artifact) SLANG_OVERRIDE;
+    SLANG_NO_THROW virtual Slice<IArtifact*> SLANG_MCALL getContents() SLANG_OVERRIDE { return Slice<IArtifact*>(m_artifacts.getBuffer(), m_artifacts.getCount()); }
+    SLANG_NO_THROW virtual void SLANG_MCALL removeAt(Index i) SLANG_OVERRIDE;
+    SLANG_NO_THROW virtual void SLANG_MCALL clear() SLANG_OVERRIDE;
+
+    static ComPtr<IArtifactList> create() { return ComPtr<IArtifactList>(new ThisType); }
+
+    ~ArtifactList();
+
+    void* getInterface(const Guid& uuid);
+    void* getObject(const Guid& uuid);
+
+    List<IArtifact*> m_artifacts;
+};
+
 } // namespace Slang
 
 #endif

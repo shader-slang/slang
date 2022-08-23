@@ -102,7 +102,7 @@ SlangResult DefaultArtifactHelper::createLockFile(const char* inNameBase, ISlang
 	String lockPath;
 	SLANG_RETURN_ON_FAIL(File::generateTemporary(nameBase, lockPath));
 
-	ComPtr<IFileArtifactRepresentation> lockFile(new FileArtifactRepresentation(IFileArtifactRepresentation::Kind::Lock, lockPath, nullptr, fileSystem));
+	ComPtr<IFileArtifactRepresentation> lockFile(new FileArtifactRepresentation(IFileArtifactRepresentation::Kind::Lock, lockPath.getUnownedSlice(), nullptr, fileSystem));
 
 	*outLockFile = lockFile.detach();
 	return SLANG_OK;
@@ -117,9 +117,9 @@ SlangResult DefaultArtifactHelper::calcArtifactPath(const ArtifactDesc& desc, co
 	return SLANG_OK;
 }
 
-ArtifactDesc DefaultArtifactHelper::makeDescFromCompileTarget(SlangCompileTarget target)
+ArtifactDesc DefaultArtifactHelper::makeDescForCompileTarget(SlangCompileTarget target)
 {
-	return ArtifactDescUtil::makeDescFromCompileTarget(target);
+	return ArtifactDescUtil::makeDescForCompileTarget(target);
 }
 
 void DefaultArtifactHelper::getCastable(ISlangUnknown* unk, ICastable** outCastable)

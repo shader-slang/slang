@@ -162,6 +162,11 @@ enum class ArtifactPayload : uint8_t
     DebugInfo,      ///< Debugging information
     Diagnostics,    ///< Diagnostics information
 
+    Miscellaneous,  ///< Category for miscellaneous payloads (like Log/Lock)
+
+    Log,            ///< Log file
+    Lock,           ///< Typically some kind of 'lock' file. Contents is typically not important.
+
     CountOf,
 };
 
@@ -178,7 +183,11 @@ enum class ArtifactStyle : uint8_t
     Invalid,            ///< Invalid style (indicating an error)
     Base,
         
+    None,               ///< A style is not applicable
+
     Unknown,            ///< Unknown
+
+    CodeLike,           ///< For styles that are 'code like' such as 'kernel' or 'host'.
 
     Kernel,             ///< Compiled as `GPU kernel` style.        
     Host,               ///< Compiled in `host` style
@@ -478,6 +487,23 @@ class IArtifactHandler : public ICastable
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL getOrCreateRepresentation(IArtifact* artifact, const Guid& guid, ArtifactKeep keep, ICastable** outCastable) = 0;
         /// Given an artifact gets a represenation of it on the file system. 
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL getOrCreateFileRepresentation(IArtifact* artifact, ArtifactKeep keep, ISlangMutableFileSystem* fileSystem, IFileArtifactRepresentation** outFileRep) = 0;
+};
+
+/* An interface to represent a list of artifacts. */
+class IArtifactList : public ICastable
+{
+public:
+    SLANG_COM_INTERFACE(0xdc663e53, 0xd074, 0x473a, { 0xae, 0x67, 0x8b, 0x7, 0xcb, 0x1a, 0x3c, 0xe8 })
+
+        /// Add an artifact
+    SLANG_NO_THROW virtual void SLANG_MCALL add(IArtifact* artifact) = 0;
+        /// Get the list of all contained artifacts
+        /// NOTE! The slice is only valid whilst the interface is scope and no mutation takes place.
+    SLANG_NO_THROW virtual Slice<IArtifact*> SLANG_MCALL getContents() = 0;
+        /// Remove the artifact at the specified index. The order is kept the same.
+    SLANG_NO_THROW virtual void SLANG_MCALL removeAt(Index i) = 0;
+        /// Clear the contents
+    SLANG_NO_THROW virtual void SLANG_MCALL clear() = 0;
 };
 
 } // namespace Slang

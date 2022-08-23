@@ -218,7 +218,10 @@ SLANG_HIERARCHICAL_ENUM(ArtifactKind, SLANG_ARTIFACT_KIND, SLANG_ARTIFACT_KIND_E
         x(CompileResults, Base) \
         x(MetaData, Base) \
             x(DebugInfo, MetaData) \
-            x(Diagnostics, MetaData)
+            x(Diagnostics, MetaData) \
+        x(Miscellaneous, Base) \
+            x(Log, Miscellaneous) \
+            x(Lock, Miscellaneous)
 
 #define SLANG_ARTIFACT_PAYLOAD_ENTRY(TYPE, PARENT) { Index(ArtifactPayload::TYPE), Index(ArtifactPayload::PARENT), #TYPE },
 
@@ -229,9 +232,11 @@ SLANG_HIERARCHICAL_ENUM(ArtifactPayload, SLANG_ARTIFACT_PAYLOAD, SLANG_ARTIFACT_
 #define SLANG_ARTIFACT_STYLE(x) \
     x(Invalid, Invalid) \
     x(Base, Invalid) \
+        x(None, Base) \
         x(Unknown, Base) \
-        x(Kernel, Base) \
-        x(Host, Base) 
+        x(CodeLike, Base) \
+            x(Kernel, CodeLike) \
+            x(Host, CodeLike) 
 
 #define SLANG_ARTIFACT_STYLE_ENTRY(TYPE, PARENT) { Index(ArtifactStyle::TYPE), Index(ArtifactStyle::PARENT), #TYPE },
 
@@ -240,7 +245,7 @@ SLANG_HIERARCHICAL_ENUM(ArtifactStyle, SLANG_ARTIFACT_STYLE, SLANG_ARTIFACT_STYL
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ArtifactDescUtil !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
-/* static */ArtifactDesc ArtifactDescUtil::makeDescFromCompileTarget(SlangCompileTarget target)
+/* static */ArtifactDesc ArtifactDescUtil::makeDescForCompileTarget(SlangCompileTarget target)
 {
     switch (target)
     {
@@ -279,6 +284,27 @@ SLANG_HIERARCHICAL_ENUM(ArtifactStyle, SLANG_ARTIFACT_STYLE, SLANG_ARTIFACT_STYL
     }
 
     SLANG_UNEXPECTED("Unhandled type");
+}
+
+
+/* static */ArtifactPayload ArtifactDescUtil::getPayloadForSourceLanaguage(SlangSourceLanguage language)
+{
+    switch (language)
+    {
+        default:
+        case SLANG_SOURCE_LANGUAGE_UNKNOWN:         return Payload::Unknown;
+        case SLANG_SOURCE_LANGUAGE_SLANG:           return Payload::Slang;
+        case SLANG_SOURCE_LANGUAGE_HLSL:            return Payload::HLSL;
+        case SLANG_SOURCE_LANGUAGE_GLSL:            return Payload::GLSL;
+        case SLANG_SOURCE_LANGUAGE_C:               return Payload::C;
+        case SLANG_SOURCE_LANGUAGE_CPP:             return Payload::Cpp;
+        case SLANG_SOURCE_LANGUAGE_CUDA:            return Payload::CUDA;
+    }
+}
+
+/* static */ArtifactDesc ArtifactDescUtil::makeDescForSourceLanguage(SlangSourceLanguage language)
+{
+    return Desc::make(Kind::Source, getPayloadForSourceLanaguage(language), Style::Unknown, 0);
 }
 
 /* static */SlangCompileTarget ArtifactDescUtil::getCompileTargetFromDesc(const ArtifactDesc& desc)
@@ -533,7 +559,7 @@ static const KindExtension g_cpuKindExts[] =
 
     const auto target = TypeTextUtil::findCompileTargetFromExtension(slice);
 
-    return makeDescFromCompileTarget(target);
+    return makeDescForCompileTarget(target);
 }
 
 /* static */ArtifactDesc ArtifactDescUtil::getDescFromPath(const UnownedStringSlice& slice)

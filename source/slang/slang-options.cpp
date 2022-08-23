@@ -1495,11 +1495,11 @@ struct OptionsParser
                     if (Path::getPathExt(path).getLength() <= 0)
                     {
                         // If there is no extension *assume* it is the name of a system level library
-                        fileRep = new FileArtifactRepresentation(IFileArtifactRepresentation::Kind::NameOnly, path, nullptr, nullptr);
+                        fileRep = new FileArtifactRepresentation(IFileArtifactRepresentation::Kind::NameOnly, path.getUnownedSlice(), nullptr, nullptr);
                     }
                     else
                     {
-                        fileRep = new FileArtifactRepresentation(IFileArtifactRepresentation::Kind::Reference, path, nullptr, nullptr);
+                        fileRep = new FileArtifactRepresentation(IFileArtifactRepresentation::Kind::Reference, path.getUnownedSlice(), nullptr, nullptr);
                         if (!fileRep->exists())
                         {
                             sink->diagnose(referenceModuleName.loc, Diagnostics::libraryDoesNotExist, path);
@@ -2045,7 +2045,7 @@ struct OptionsParser
         // and output type is callable, add an empty' rawOutput.
         if (rawOutputs.getCount() == 0 && 
             rawTargets.getCount() == 1 && 
-            ArtifactDescUtil::makeDescFromCompileTarget(asExternal(rawTargets[0].format)).kind == ArtifactKind::HostCallable)
+            ArtifactDescUtil::makeDescForCompileTarget(asExternal(rawTargets[0].format)).kind == ArtifactKind::HostCallable)
         {
             RawOutput rawOutput;
             rawOutput.impliedFormat = rawTargets[0].format;

@@ -238,13 +238,13 @@ public:
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL createRepresentation(const Guid& typeGuid, ICastable** outCastable) SLANG_OVERRIDE;
     virtual SLANG_NO_THROW bool SLANG_MCALL exists() SLANG_OVERRIDE;
 
-    CommandLineDownstreamArtifactRepresentation(const String& moduleFilePath, TemporaryFileSet* temporaryFileSet) :
+    CommandLineDownstreamArtifactRepresentation(const UnownedStringSlice& moduleFilePath, IArtifactList* artifactList) :
         m_moduleFilePath(moduleFilePath),
-        m_temporaryFiles(temporaryFileSet)
+        m_artifactList(artifactList)
     {
     }
 
-    RefPtr<TemporaryFileSet> m_temporaryFiles;
+    ComPtr<IArtifactList> m_artifactList;
 
 protected:
 
@@ -252,10 +252,6 @@ protected:
     void* getObject(const Guid& guid);
 
     String m_moduleFilePath;
-    DownstreamCompileOptions m_options;
-    ComPtr<ISlangBlob> m_binaryBlob;
-    /// Cache of the shared library if appropriate
-    ComPtr<ISlangSharedLibrary> m_hostCallableSharedLibrary;
 };
 
 class CommandLineDownstreamCompiler : public DownstreamCompilerBase

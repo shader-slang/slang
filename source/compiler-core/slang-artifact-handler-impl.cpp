@@ -189,7 +189,7 @@ SlangResult DefaultArtifactHandler::getOrCreateFileRepresentation(IArtifact* art
 	ComPtr<ISlangBlob> pathBlob;
 	SLANG_RETURN_ON_FAIL(helper->calcArtifactPath(artifact->getDesc(), lockFile->getPath(), pathBlob.writeRef()));
 
-	const auto path = StringUtil::getString(pathBlob);
+	const auto path = StringUtil::getSlice(pathBlob);
 
 	// Write the contents
 	SLANG_RETURN_ON_FAIL(File::writeAllBytes(path, blob->getBufferPointer(), blob->getBufferSize()));
@@ -202,7 +202,7 @@ SlangResult DefaultArtifactHandler::getOrCreateFileRepresentation(IArtifact* art
 	// As it stands calcArtifactPath impl doesn't do that, but that is perhaps somewhatfragile
 
 	// If the paths are identical, we can just use the lock file for the rep
-	if (UnownedStringSlice(lockFile->getPath()) == path.getUnownedSlice())
+	if (UnownedStringSlice(lockFile->getPath()) == path)
 	{
 		fileRep.swap(lockFile);
 	}

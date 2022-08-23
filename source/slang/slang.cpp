@@ -733,7 +733,7 @@ SlangPassThrough Session::getDownstreamCompilerForTransition(SlangCompileTarget 
         return (SlangPassThrough)m_codeGenTransitionMap.getTransition(source, target);
     }
 
-    const auto desc = ArtifactDescUtil::makeDescFromCompileTarget(inTarget);
+    const auto desc = ArtifactDescUtil::makeDescForCompileTarget(inTarget);
 
     // Special case host-callable
     if ((desc.kind == ArtifactKind::HostCallable) && 
