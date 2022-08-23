@@ -58,7 +58,7 @@ void* DefaultArtifactHelper::getObject(const Guid& guid)
 SlangResult DefaultArtifactHelper::createArtifact(const ArtifactDesc& desc, const char* inName, IArtifact** outArtifact)
 {
 	*outArtifact = inName ?
-		Artifact::create(desc, inName).detach() : 
+		Artifact::create(desc, UnownedStringSlice(inName)).detach() : 
 		Artifact::create(desc).detach();
 
 	return SLANG_OK;
@@ -67,7 +67,7 @@ SlangResult DefaultArtifactHelper::createArtifact(const ArtifactDesc& desc, cons
 SlangResult DefaultArtifactHelper::createArtifactContainer(const ArtifactDesc& desc, const char* inName, IArtifactContainer** outArtifactContainer)
 {
 	*outArtifactContainer = inName ?
-		ArtifactContainer::create(desc, inName).detach() :
+		ArtifactContainer::create(desc, UnownedStringSlice(inName)).detach() :
 		ArtifactContainer::create(desc).detach();
 
 	return SLANG_OK;

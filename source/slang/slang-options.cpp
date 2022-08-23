@@ -1484,7 +1484,7 @@ struct OptionsParser
                     const String name = ArtifactDescUtil::getBaseNameFromPath(desc, path.getUnownedSlice());
 
                     // Create the artifact
-                    auto artifact = Artifact::create(desc, name); 
+                    auto artifact = Artifact::create(desc, name.getUnownedSlice()); 
 
                     // There is a problem here if I want to reference a library that is a 'system' library or is not directly a file
                     // In that case the path shouldn't be set and the name should completely define the library.
