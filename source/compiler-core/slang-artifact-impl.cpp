@@ -26,8 +26,7 @@ static bool _checkChildren(IArtifact::FindStyle findStyle)
 
 IArtifactHandler* Artifact::_getHandler()
 {
-    // TODO(JS): For now we just use the default handler, but in the future this should probably be a member
-    return DefaultArtifactHandler::getSingleton();
+    return m_handler ? m_handler : DefaultArtifactHandler::getSingleton();
 }
 
 void* Artifact::castAs(const Guid& guid)
@@ -96,6 +95,16 @@ SlangResult Artifact::loadSharedLibrary(ArtifactKeep keep, ISlangSharedLibrary**
 
     *outSharedLibrary = lib;
     return SLANG_OK;
+}
+
+IArtifactHandler* Artifact::getHandler()
+{
+    return m_handler;
+}
+
+void Artifact::setHandler(IArtifactHandler* handler)
+{
+    m_handler = handler;
 }
 
 SlangResult Artifact::getOrCreateRepresentation(const Guid& typeGuid, ArtifactKeep keep, ICastable** outCastable)
