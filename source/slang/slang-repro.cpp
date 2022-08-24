@@ -373,7 +373,7 @@ static String _scrubName(const String& in)
         dst->useUnknownImageFormatAsDefault = request->useUnknownImageFormatAsDefault;
         dst->obfuscateCode = linkage->m_obfuscateCode;
 
-        dst->defaultMatrixLayoutMode = linkage->defaultMatrixLayoutMode;
+        dst->defaultMatrixLayoutMode = SlangMatrixLayoutMode(linkage->defaultMatrixLayoutMode);
     }
 
     // Entry points
