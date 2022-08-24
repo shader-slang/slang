@@ -3381,6 +3381,17 @@ void CLikeSourceEmitter::ensureInstOperandsRec(ComputeEmitActionsContext* ctx, I
     case kIROp_NativePtrType:
         requiredLevel = EmitAction::ForwardDeclaration;
         break;
+    case kIROp_lookup_interface_method:
+    case kIROp_FieldExtract:
+    case kIROp_FieldAddress:
+    {
+        auto opType = inst->getOperand(0)->getDataType();
+        if (auto nativePtrType = as<IRNativePtrType>(opType))
+        {
+            ensureInstOperand(ctx, nativePtrType->getValueType(), requiredLevel);
+        }
+        break;
+    }
     default:
         break;
     }
