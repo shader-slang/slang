@@ -3,6 +3,8 @@
 #include "core/slang-io.h"
 #include "core/slang-token-reader.h"
 
+#include "../../source/core/slang-file-system.h"
+
 using namespace Slang;
 
 namespace gfx
@@ -396,6 +398,15 @@ SLANG_NO_THROW Result SLANG_MCALL RendererBase::initialize(const Desc& desc)
     if (desc.shaderCacheFileSystem)
     {
         shaderCacheFileSystem = desc.shaderCacheFileSystem;
+    }
+    if (desc.shaderCachePath)
+    {
+         // Only a path was provided, create a RelativeFileSystem using the path
+        if (!shaderCacheFileSystem)
+        {
+            shaderCacheFileSystem = OSFileSystem::getMutableSingleton();
+        }
+        shaderCacheFileSystem = new RelativeFileSystem(shaderCacheFileSystem, desc.shaderCachePath);
     }
 
     if (desc.apiCommandDispatcher)

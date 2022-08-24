@@ -1,6 +1,7 @@
 #include "example-base.h"
 #include <chrono>
 
+
 #ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
@@ -35,6 +36,7 @@ Slang::Result WindowedAppBase::initializeBase(
 #endif
     IDevice::Desc deviceDesc = {};
     deviceDesc.deviceType = deviceType;
+    deviceDesc.shaderCachePath = "C:/Users/lucchen/Documents";
     gfx::Result res = gfxCreateDevice(&deviceDesc, gDevice.writeRef());
     if (SLANG_FAILED(res))
         return res;
