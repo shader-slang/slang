@@ -619,15 +619,15 @@ void PolynomialIntVal::_toTextOverride(StringBuilder& out)
     for (Index i = 0; i < terms.getCount(); i++)
     {
         auto& term = *(terms[i]);
-        if (i > 0)
+        if (term.constFactor > 0)
         {
-            if (term.constFactor > 0)
+            if (i > 0)
                 out << "+";
-            else
-                out << "-";
         }
+        else
+            out << "-";
         bool isFirstFactor = true;
-        if (term.constFactor != 1 || term.paramFactors.getCount() == 0)
+        if (abs(term.constFactor) != 1 || term.paramFactors.getCount() == 0)
         {
             out << abs(term.constFactor);
             isFirstFactor = false;
@@ -1039,19 +1039,19 @@ IntVal* PolynomialIntVal::canonicalize(ASTBuilder* builder)
     return this;
 }
 
-// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! SomeIntVal !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! FuncCallIntVal !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-bool SomeIntVal::_equalsValOverride(Val* val)
+bool FuncCallIntVal::_equalsValOverride(Val* val)
 {
-    if (auto someIntVal = as<SomeIntVal>(val))
+    if (auto funcCallIntVal = as<FuncCallIntVal>(val))
     {
-        if (!funcDeclRef.equals(someIntVal->funcDeclRef))
+        if (!funcDeclRef.equals(funcCallIntVal->funcDeclRef))
             return false;
-        if (args.getCount() != someIntVal->args.getCount())
+        if (args.getCount() != funcCallIntVal->args.getCount())
             return false;
         for (Index i = 0; i < args.getCount(); i++)
         {
-            if (!args[i]->equalsVal(someIntVal->args[i]))
+            if (!args[i]->equalsVal(funcCallIntVal->args[i]))
                 return false;
         }
         return true;
@@ -1059,11 +1059,11 @@ bool SomeIntVal::_equalsValOverride(Val* val)
     return false;
 }
 
-void SomeIntVal::_toTextOverride(StringBuilder& out)
+void FuncCallIntVal::_toTextOverride(StringBuilder& out)
 {
     auto argToText = [&](int index)
     {
-        if (as<PolynomialIntVal>(args[index]) || as<SomeIntVal>(args[index]))
+        if (as<PolynomialIntVal>(args[index]) || as<FuncCallIntVal>(args[index]))
         {
             out << "(";
             args[index]->toText(out);
@@ -1110,7 +1110,7 @@ void SomeIntVal::_toTextOverride(StringBuilder& out)
     }
 }
 
-HashCode SomeIntVal::_getHashCodeOverride()
+HashCode FuncCallIntVal::_getHashCodeOverride()
 {
     HashCode result = funcDeclRef.getHashCode();
     for (auto arg : args)
@@ -1127,7 +1127,7 @@ static bool nameIs(Name* name, const char* val)
     return false;
 }
 
-Val* SomeIntVal::tryFoldImpl(ASTBuilder* astBuilder, DeclRef<Decl> newFuncDecl, List<IntVal*>& newArgs, DiagnosticSink* sink)
+Val* FuncCallIntVal::tryFoldImpl(ASTBuilder* astBuilder, DeclRef<Decl> newFuncDecl, List<IntVal*>& newArgs, DiagnosticSink* sink)
 {
     // Are all args const now?
     List<ConstantIntVal*> constArgs;
@@ -1205,14 +1205,14 @@ Val* SomeIntVal::tryFoldImpl(ASTBuilder* astBuilder, DeclRef<Decl> newFuncDecl, 
         }
         else
         {
-            SLANG_UNREACHABLE("constant folding of SomeIntVal");
+            SLANG_UNREACHABLE("constant folding of FuncCallIntVal");
         }
         return astBuilder->create<ConstantIntVal>(resultValue);
     }
     return nullptr;
 }
 
-Val* SomeIntVal::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff)
+Val* FuncCallIntVal::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff)
 {
     int diff = 0;
     auto newFuncDeclRef = funcDeclRef.substituteImpl(astBuilder, subst, &diff);
@@ -1233,7 +1233,7 @@ Val* SomeIntVal::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet
             return newVal;
         else
         {
-            auto result = astBuilder->create<SomeIntVal>();
+            auto result = astBuilder->create<FuncCallIntVal>();
             result->args = _Move(newArgs);
             result->funcDeclRef = newFuncDeclRef;
             result->funcType = funcType;
@@ -1242,6 +1242,74 @@ Val* SomeIntVal::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet
     }
     // Nothing found: don't substitute.
     return this;
+}
+
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! WitnessLookupIntVal !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+bool WitnessLookupIntVal::_equalsValOverride(Val* val)
+{
+    if (auto lookupIntVal = as<WitnessLookupIntVal>(val))
+    {
+        if (!witness->equalsVal(lookupIntVal->witness))
+            return false;
+        if (key != lookupIntVal->key)
+            return false;
+        return true;
+    }
+    return false;
+}
+
+void WitnessLookupIntVal::_toTextOverride(StringBuilder& out)
+{
+    witness->sub->toText(out);
+    out << ".";
+    out << (key->getName() ? key->getName()->text : "??");
+}
+
+HashCode WitnessLookupIntVal::_getHashCodeOverride()
+{
+    HashCode result = witness->getHashCode();
+    result = combineHash(result, Slang::getHashCode(key));
+    return result;
+}
+Val* WitnessLookupIntVal::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff)
+{
+    int diff = 0;
+    auto newWitness = witness->substituteImpl(astBuilder, subst, &diff);
+    *ioDiff += diff;
+    if (diff)
+    {
+        auto witnessEntry = tryFoldOrNull(astBuilder, as<SubtypeWitness>(newWitness), key);
+        if (witnessEntry)
+            return witnessEntry;
+    }
+    // Nothing found: don't substitute.
+    return this;
+}
+
+Val* WitnessLookupIntVal::tryFoldOrNull(ASTBuilder* astBuilder, SubtypeWitness* witness, Decl* key)
+{
+    auto witnessEntry = tryLookUpRequirementWitness(astBuilder, witness, key);
+    switch (witnessEntry.getFlavor())
+    {
+    case RequirementWitness::Flavor::val:
+        return witnessEntry.getVal();
+        break;
+    default:
+        break;
+    }
+    return nullptr;
+}
+
+Val* WitnessLookupIntVal::tryFold(ASTBuilder* astBuilder, SubtypeWitness* witness, Decl* key, Type* type)
+{
+    if (auto result = tryFoldOrNull(astBuilder, witness, key))
+        return result;
+    auto witnessResult = astBuilder->create<WitnessLookupIntVal>();
+    witnessResult->witness = witness;
+    witnessResult->key = key;
+    witnessResult->type = type;
+    return witnessResult;
 }
 
 } // namespace Slang
