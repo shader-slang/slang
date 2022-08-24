@@ -76,30 +76,6 @@ class DefaultSharedLibrary : public ISlangSharedLibrary, public ComBaseObject
     SharedLibrary::Handle m_sharedLibraryHandle = nullptr;
 };
 
-class TemporarySharedLibrary : public DefaultSharedLibrary
-{
-public:
-    typedef DefaultSharedLibrary Super;
-
-        /// Get the path to the shared library
-    const String& getPath() const { return m_path; }
-
-        /// Ctor
-    TemporarySharedLibrary(const SharedLibrary::Handle sharedLibraryHandle, const String& path):
-        Super(sharedLibraryHandle),
-        m_path(path)
-    {
-    }
-
-    virtual ~TemporarySharedLibrary();
-
-        /// Any files specified in this set will be deleted on exit
-    RefPtr<TemporaryFileSet> m_temporaryFileSet;
-
-protected:
-    String m_path;
-};
-
 class ScopeSharedLibrary : public DefaultSharedLibrary
 {
 public: 

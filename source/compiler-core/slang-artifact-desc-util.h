@@ -82,7 +82,12 @@ struct ArtifactDescUtil
     static SlangResult calcNameForDesc(const ArtifactDesc& desc, const UnownedStringSlice& baseName, StringBuilder& outName);
 
         /// Given a target returns the ArtifactDesc
-    static ArtifactDesc makeDescFromCompileTarget(SlangCompileTarget target);
+    static ArtifactDesc makeDescForCompileTarget(SlangCompileTarget target);
+
+        /// Get the payload for the specified language
+    static ArtifactPayload getPayloadForSourceLanaguage(SlangSourceLanguage language);
+        /// Given a source language return a desc
+    static ArtifactDesc makeDescForSourceLanguage(SlangSourceLanguage language);
 
         /// Returns the closest compile target for desc. Will return 
         /// SLANG_TARGET_UNKNOWN if not known

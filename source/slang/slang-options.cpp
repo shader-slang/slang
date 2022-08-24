@@ -1126,7 +1126,7 @@ struct OptionsParser
                     //
                     UnownedStringSlice profileName = sliceCount >= 1 ? slices[0] : UnownedTerminatedStringSlice("");
 
-                    SlangProfileID profileID = Slang::Profile::lookUp(profileName).raw;
+                    SlangProfileID profileID = SlangProfileID(Slang::Profile::lookUp(profileName).raw);
                     if( profileID == SLANG_PROFILE_UNKNOWN )
                     {
                         sink->diagnose(operand.loc, Diagnostics::unknownProfile, profileName);
@@ -1332,11 +1332,11 @@ struct OptionsParser
                 }
                 else if(argValue == "-matrix-layout-row-major")
                 {
-                    defaultMatrixLayoutMode = kMatrixLayoutMode_RowMajor;
+                    defaultMatrixLayoutMode = SlangMatrixLayoutMode(kMatrixLayoutMode_RowMajor);
                 }
                 else if(argValue == "-matrix-layout-column-major")
                 {
-                    defaultMatrixLayoutMode = kMatrixLayoutMode_ColumnMajor;
+                    defaultMatrixLayoutMode = SlangMatrixLayoutMode(kMatrixLayoutMode_ColumnMajor);
                 }
                 else if(argValue == "-line-directive-mode")
                 {
@@ -1484,7 +1484,7 @@ struct OptionsParser
                     const String name = ArtifactDescUtil::getBaseNameFromPath(desc, path.getUnownedSlice());
 
                     // Create the artifact
-                    auto artifact = Artifact::create(desc, name); 
+                    auto artifact = Artifact::create(desc, name.getUnownedSlice()); 
 
                     // There is a problem here if I want to reference a library that is a 'system' library or is not directly a file
                     // In that case the path shouldn't be set and the name should completely define the library.
@@ -1495,11 +1495,11 @@ struct OptionsParser
                     if (Path::getPathExt(path).getLength() <= 0)
                     {
                         // If there is no extension *assume* it is the name of a system level library
-                        fileRep = new FileArtifactRepresentation(IFileArtifactRepresentation::Kind::NameOnly, path, nullptr, nullptr);
+                        fileRep = new FileArtifactRepresentation(IFileArtifactRepresentation::Kind::NameOnly, path.getUnownedSlice(), nullptr, nullptr);
                     }
                     else
                     {
-                        fileRep = new FileArtifactRepresentation(IFileArtifactRepresentation::Kind::Reference, path, nullptr, nullptr);
+                        fileRep = new FileArtifactRepresentation(IFileArtifactRepresentation::Kind::Reference, path.getUnownedSlice(), nullptr, nullptr);
                         if (!fileRep->exists())
                         {
                             sink->diagnose(referenceModuleName.loc, Diagnostics::libraryDoesNotExist, path);
@@ -1993,7 +1993,7 @@ struct OptionsParser
 
             if( rawTarget.profileVersion != ProfileVersion::Unknown )
             {
-                compileRequest->setTargetProfile(targetID, Profile(rawTarget.profileVersion).raw);
+                compileRequest->setTargetProfile(targetID, SlangProfileID(Profile(rawTarget.profileVersion).raw));
             }
             for( auto atom : rawTarget.capabilityAtoms )
             {
@@ -2045,7 +2045,7 @@ struct OptionsParser
         // and output type is callable, add an empty' rawOutput.
         if (rawOutputs.getCount() == 0 && 
             rawTargets.getCount() == 1 && 
-            ArtifactDescUtil::makeDescFromCompileTarget(asExternal(rawTargets[0].format)).kind == ArtifactKind::HostCallable)
+            ArtifactDescUtil::makeDescForCompileTarget(asExternal(rawTargets[0].format)).kind == ArtifactKind::HostCallable)
         {
             RawOutput rawOutput;
             rawOutput.impliedFormat = rawTargets[0].format;

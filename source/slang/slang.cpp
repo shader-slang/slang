@@ -612,7 +612,7 @@ SLANG_NO_THROW SlangResult SLANG_MCALL Session::createCompileRequest(slang::ICom
 SLANG_NO_THROW SlangProfileID SLANG_MCALL Session::findProfile(
     char const*     name)
 {
-    return Slang::Profile::lookUp(name).raw;
+    return SlangProfileID(Slang::Profile::lookUp(name).raw);
 }
 
 SLANG_NO_THROW SlangCapabilityID SLANG_MCALL Session::findCapability(
@@ -733,7 +733,7 @@ SlangPassThrough Session::getDownstreamCompilerForTransition(SlangCompileTarget 
         return (SlangPassThrough)m_codeGenTransitionMap.getTransition(source, target);
     }
 
-    const auto desc = ArtifactDescUtil::makeDescFromCompileTarget(inTarget);
+    const auto desc = ArtifactDescUtil::makeDescForCompileTarget(inTarget);
 
     // Special case host-callable
     if ((desc.kind == ArtifactKind::HostCallable) && 

@@ -1655,7 +1655,7 @@ CPPSourceEmitter::CPPSourceEmitter(const Desc& desc):
     //m_semanticUsedFlags = SemanticUsedFlag::GroupID | SemanticUsedFlag::GroupThreadID | SemanticUsedFlag::DispatchThreadID;
 
     
-    const auto artifactDesc = ArtifactDescUtil::makeDescFromCompileTarget(asExternal(getTarget()));
+    const auto artifactDesc = ArtifactDescUtil::makeDescForCompileTarget(asExternal(getTarget()));
 
     // If we have runtime library we can convert to a terminated string slice    
     m_hasString = (artifactDesc.style == ArtifactStyle::Host);
