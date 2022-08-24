@@ -83,7 +83,8 @@ RefPtr<BufferResource> ShaderTableImpl::createDeviceBuffer(
 
         auto shaderGroupIndex = *shaderGroupIndexPtr;
         auto srcHandlePtr = handles.getBuffer() + shaderGroupIndex * handleSize;
-        memcpy(dstHandlePtr, srcHandlePtr, rtProps.shaderGroupBaseAlignment);
+        memcpy(dstHandlePtr, srcHandlePtr, handleSize);
+        memset(dstHandlePtr + handleSize, 0, rtProps.shaderGroupBaseAlignment - handleSize);
     }
     subTablePtr += m_raygenTableSize;
 
