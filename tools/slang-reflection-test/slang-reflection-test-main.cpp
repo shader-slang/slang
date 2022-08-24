@@ -318,7 +318,7 @@ static void emitReflectionVarBindingInfoJSON(
 
         for(uint32_t cc = 0; cc < categoryCount; ++cc )
         {
-            auto category = var->getCategoryByIndex(cc);
+            auto category = SlangParameterCategory(var->getCategoryByIndex(cc));
             auto index = var->getOffset(category);
             auto space = var->getBindingSpace(category);
             auto count = typeLayout->getSize(category);
@@ -676,7 +676,7 @@ static void emitReflectionTypeInfoJSON(
         comma(writer);
         emitReflectionScalarTypeInfoJSON(
             writer,
-            type->getScalarType());
+            SlangScalarType(type->getScalarType()));
         break;
 
     case slang::TypeReflection::Kind::Vector:
@@ -1364,7 +1364,8 @@ SLANG_TEST_TOOL_API SlangResult innerMain(Slang::StdWriters* stdWriters, SlangSe
     SlangCompileRequest* request = spCreateCompileRequest(session);
     for (int i = 0; i < SLANG_WRITER_CHANNEL_COUNT_OF; ++i)
     {
-        spSetWriter(request, SlangWriterChannel(i), stdWriters->getWriter(i));
+        const auto channel = SlangWriterChannel(i);
+        spSetWriter(request, channel, stdWriters->getWriter(channel));
     }
 
     char const* appName = "slang-reflection-test";

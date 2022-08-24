@@ -542,7 +542,7 @@ SLANG_API unsigned int spReflectionType_GetColumnCount(SlangReflectionType* inTy
 SLANG_API SlangScalarType spReflectionType_GetScalarType(SlangReflectionType* inType)
 {
     auto type = convert(inType);
-    if(!type) return 0;
+    if(!type) return SLANG_SCALAR_TYPE_NONE;
 
     if(auto matrixType = as<MatrixExpressionType>(type))
     {
@@ -623,7 +623,7 @@ SLANG_API SlangReflectionUserAttribute* spReflectionType_FindUserAttributeByName
 SLANG_API SlangResourceShape spReflectionType_GetResourceShape(SlangReflectionType* inType)
 {
     auto type = convert(inType);
-    if(!type) return 0;
+    if(!type) return SLANG_RESOURCE_NONE;
 
     while(auto arrayType = as<ArrayExpressionType>(type))
     {
@@ -659,7 +659,7 @@ SLANG_API SlangResourceShape spReflectionType_GetResourceShape(SlangReflectionTy
 SLANG_API SlangResourceAccess spReflectionType_GetResourceAccess(SlangReflectionType* inType)
 {
     auto type = convert(inType);
-    if(!type) return 0;
+    if(!type) return SLANG_RESOURCE_ACCESS_NONE;
 
     while(auto arrayType = as<ArrayExpressionType>(type))
     {
@@ -1038,7 +1038,7 @@ SLANG_API SlangParameterCategory spReflectionTypeLayout_GetCategoryByIndex(Slang
     auto typeLayout = convert(inTypeLayout);
     if(!typeLayout) return SLANG_PARAMETER_CATEGORY_NONE;
 
-    return typeLayout->resourceInfos[index].kind;
+    return SlangParameterCategory(typeLayout->resourceInfos[index].kind);
 }
 
 SLANG_API SlangMatrixLayoutMode spReflectionTypeLayout_GetMatrixLayoutMode(SlangReflectionTypeLayout* inTypeLayout)
@@ -1048,7 +1048,7 @@ SLANG_API SlangMatrixLayoutMode spReflectionTypeLayout_GetMatrixLayoutMode(Slang
 
     if( auto matrixLayout = as<MatrixTypeLayout>(typeLayout) )
     {
-        return matrixLayout->mode;
+        return SlangMatrixLayoutMode(matrixLayout->mode);
     }
     else
     {
@@ -1248,10 +1248,10 @@ namespace Slang
             switch( shape )
             {
             default:
-                return SLANG_BINDING_TYPE_TEXTURE | mutableFlag;
+                return SlangBindingType(SLANG_BINDING_TYPE_TEXTURE | mutableFlag);
 
             case SLANG_TEXTURE_BUFFER:
-                return SLANG_BINDING_TYPE_TYPED_BUFFER | mutableFlag;
+                return SlangBindingType(SLANG_BINDING_TYPE_TYPED_BUFFER | mutableFlag);
             }
         }
         else if( auto structuredBufferType = as<HLSLStructuredBufferTypeBase>(type) )
@@ -1968,8 +1968,8 @@ SLANG_API SlangBindingType spReflectionTypeLayout_getBindingRangeType(SlangRefle
     if(!typeLayout) return SLANG_BINDING_TYPE_UNKNOWN;
 
     auto extTypeLayout = Slang::getExtendedTypeLayout(typeLayout);
-    if(index < 0) return 0;
-    if(index >= extTypeLayout->m_bindingRanges.getCount()) return 0;
+    if(index < 0) return SLANG_BINDING_TYPE_UNKNOWN;
+    if(index >= extTypeLayout->m_bindingRanges.getCount()) return SLANG_BINDING_TYPE_UNKNOWN;
     auto& bindingRange = extTypeLayout->m_bindingRanges[index];
 
     return bindingRange.bindingType;
@@ -2155,16 +2155,16 @@ SLANG_API SlangInt spReflectionTypeLayout_getDescriptorSetDescriptorRangeDescrip
 SLANG_API SlangBindingType spReflectionTypeLayout_getDescriptorSetDescriptorRangeType(SlangReflectionTypeLayout* inTypeLayout, SlangInt setIndex, SlangInt rangeIndex)
 {
     auto typeLayout = convert(inTypeLayout);
-    if(!typeLayout) return 0;
+    if(!typeLayout) return SLANG_BINDING_TYPE_UNKNOWN;
 
     auto extTypeLayout = Slang::getExtendedTypeLayout(typeLayout);
 
-    if(setIndex < 0) return 0;
-    if(setIndex >= extTypeLayout->m_descriptorSets.getCount()) return 0;
+    if(setIndex < 0) return SLANG_BINDING_TYPE_UNKNOWN;
+    if(setIndex >= extTypeLayout->m_descriptorSets.getCount()) return SLANG_BINDING_TYPE_UNKNOWN;
     auto descriptorSet = extTypeLayout->m_descriptorSets[setIndex];
 
-    if(rangeIndex < 0) return 0;
-    if(rangeIndex >= descriptorSet->descriptorRanges.getCount()) return 0;
+    if(rangeIndex < 0) return SLANG_BINDING_TYPE_UNKNOWN;
+    if(rangeIndex >= descriptorSet->descriptorRanges.getCount()) return SLANG_BINDING_TYPE_UNKNOWN;
     auto& range = descriptorSet->descriptorRanges[rangeIndex];
 
     return range.bindingType;
@@ -2173,16 +2173,16 @@ SLANG_API SlangBindingType spReflectionTypeLayout_getDescriptorSetDescriptorRang
 SLANG_API SlangParameterCategory spReflectionTypeLayout_getDescriptorSetDescriptorRangeCategory(SlangReflectionTypeLayout* inTypeLayout, SlangInt setIndex, SlangInt rangeIndex)
 {
     auto typeLayout = convert(inTypeLayout);
-    if(!typeLayout) return 0;
+    if(!typeLayout) return SLANG_PARAMETER_CATEGORY_NONE;
 
     auto extTypeLayout = Slang::getExtendedTypeLayout(typeLayout);
 
-    if(setIndex < 0) return 0;
-    if(setIndex >= extTypeLayout->m_descriptorSets.getCount()) return 0;
+    if(setIndex < 0) return SLANG_PARAMETER_CATEGORY_NONE;
+    if(setIndex >= extTypeLayout->m_descriptorSets.getCount()) return SLANG_PARAMETER_CATEGORY_NONE;
     auto descriptorSet = extTypeLayout->m_descriptorSets[setIndex];
 
-    if(rangeIndex < 0) return 0;
-    if(rangeIndex >= descriptorSet->descriptorRanges.getCount()) return 0;
+    if(rangeIndex < 0) return SLANG_PARAMETER_CATEGORY_NONE;
+    if(rangeIndex >= descriptorSet->descriptorRanges.getCount()) return SLANG_PARAMETER_CATEGORY_NONE;
     auto& range = descriptorSet->descriptorRanges[rangeIndex];
 
     return SlangParameterCategory(range.kind);

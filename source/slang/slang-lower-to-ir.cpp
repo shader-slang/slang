@@ -1199,6 +1199,9 @@ bool shouldDeclBeTreatedAsInterfaceRequirement(Decl* requirementDecl)
     else if (auto typeConstraint = as<TypeConstraintDecl>(requirementDecl))
     {
     }
+    else if (auto varDecl = as<VarDeclBase>(requirementDecl))
+    {
+    }
     else if (auto genericDecl = as<GenericDecl>(requirementDecl))
     {
         return shouldDeclBeTreatedAsInterfaceRequirement(genericDecl->inner);
@@ -1285,6 +1288,34 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
     {
         return emitDeclRef(context, val->declRef,
             lowerType(context, getType(context->astBuilder, val->declRef)));
+    }
+
+    LoweredValInfo visitFuncCallIntVal(FuncCallIntVal* val)
+    {
+        TryClauseEnvironment tryEnv;
+        List<IRInst*> args;
+        for (auto arg : val->args)
+        {
+            auto loweredArg = lowerVal(context, arg);
+            args.add(loweredArg.val);
+        }
+        auto funcType = lowerType(context, val->funcType);
+        return emitCallToDeclRef(
+            context,
+            as<IRFuncType>(funcType)->getResultType(),
+            val->funcDeclRef,
+            funcType,
+            args,
+            tryEnv);
+    }
+
+    LoweredValInfo visitWitnessLookupIntVal(WitnessLookupIntVal* val)
+    {
+        auto witnessVal = lowerVal(context, val->witness);
+        auto key = getInterfaceRequirementKey(context, val->key);
+        auto type = lowerType(context, val->type);
+        return LoweredValInfo::simple(getBuilder()->emitLookupInterfaceMethodInst(
+            type, witnessVal.val, key));
     }
 
     LoweredValInfo visitPolynomialIntVal(PolynomialIntVal* val)
@@ -8237,20 +8268,6 @@ bool canDeclLowerToAGeneric(Decl* decl)
         }
     }
     
-    return false;
-}
-
-static bool isInterfaceRequirement(Decl* decl)
-{
-    auto ancestor = decl->parentDecl;
-    for (; ancestor; ancestor = ancestor->parentDecl)
-    {
-        if (as<InterfaceDecl>(ancestor))
-            return true;
-
-        if (as<ExtensionDecl>(ancestor))
-            return false;
-    }
     return false;
 }
 

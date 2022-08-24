@@ -119,7 +119,8 @@ SlangResult innerMain(StdWriters* stdWriters, slang::IGlobalSession* sharedSessi
     // Do any app specific configuration
     for (int i = 0; i < SLANG_WRITER_CHANNEL_COUNT_OF; ++i)
     {
-        compileRequest->setWriter(SlangWriterChannel(i), stdWriters->getWriter(i));
+        const auto channel = SlangWriterChannel(i);
+        compileRequest->setWriter(channel, stdWriters->getWriter(channel));
     }
 
     compileRequest->setDiagnosticCallback(&_diagnosticCallback, stdWriters->getWriter(SLANG_WRITER_CHANNEL_STD_ERROR));

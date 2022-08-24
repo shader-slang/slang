@@ -494,4 +494,7 @@ class AttributeDecl : public ContainerDecl
     SyntaxClass<NodeBase> syntaxClass;
 };
 
+
+bool isInterfaceRequirement(Decl* decl);
+
 } // namespace Slang

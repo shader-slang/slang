@@ -62,6 +62,9 @@ public:
     virtual SLANG_NO_THROW ICastable* SLANG_MCALL findRepresentationWithPredicate(ICastableList::FindFunc findFunc, void* data) SLANG_OVERRIDE;
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL getOrCreateRepresentation(const Guid& typeGuid, ArtifactKeep keep, ICastable** outCastable) SLANG_OVERRIDE;
 
+    virtual SLANG_NO_THROW IArtifactHandler* SLANG_MCALL getHandler() SLANG_OVERRIDE;
+    virtual SLANG_NO_THROW void SLANG_MCALL setHandler(IArtifactHandler* handler) SLANG_OVERRIDE;
+
     virtual SLANG_NO_THROW Slice<IArtifact*> SLANG_MCALL getChildren() SLANG_OVERRIDE { return Slice<IArtifact*>(nullptr, 0); }
 
     virtual SLANG_NO_THROW IArtifact* SLANG_MCALL findArtifactByDerivedDesc(FindStyle findStyle, const ArtifactDesc& desc) SLANG_OVERRIDE;
@@ -102,6 +105,8 @@ protected:
     IArtifact* m_parent;                        ///< Artifact this artifact belongs to
 
     String m_name;                              ///< Name of this artifact
+
+    ComPtr<IArtifactHandler> m_handler;         ///< The handler. Can be nullptr and then default handler is used.
 
     LazyCastableList m_associated;              ///< Associated items
     LazyCastableList m_representations;         ///< Representations

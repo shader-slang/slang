@@ -612,7 +612,7 @@ SLANG_NO_THROW SlangResult SLANG_MCALL Session::createCompileRequest(slang::ICom
 SLANG_NO_THROW SlangProfileID SLANG_MCALL Session::findProfile(
     char const*     name)
 {
-    return Slang::Profile::lookUp(name).raw;
+    return SlangProfileID(Slang::Profile::lookUp(name).raw);
 }
 
 SLANG_NO_THROW SlangCapabilityID SLANG_MCALL Session::findCapability(
@@ -2867,17 +2867,24 @@ RefPtr<Module> Linkage::findOrImportModule(
     //
     // For example, `foo_bar` becomes `foo-bar.slang`.
 
-    StringBuilder sb;
-    for (auto c : getText(name))
+    String fileName;
+    if (!getText(name).getUnownedSlice().endsWithCaseInsensitive(".slang"))
     {
-        if (c == '_')
-            c = '-';
+        StringBuilder sb;
+        for (auto c : getText(name))
+        {
+            if (c == '_')
+                c = '-';
 
-        sb.Append(c);
+            sb.Append(c);
+        }
+        sb.Append(".slang");
+        fileName = sb.ProduceString();
     }
-    sb.Append(".slang");
-
-    String fileName = sb.ProduceString();
+    else
+    {
+        fileName = getText(name);
+    }
 
     // Next, try to find the file of the given name,
     // using our ordinary include-handling logic.

@@ -145,7 +145,7 @@ SlangResult DefaultArtifactHandler::getOrCreateRepresentation(IArtifact* artifac
 	if (guid == ISlangSharedLibrary::getTypeGuid())
 	{
 		ComPtr<ISlangSharedLibrary> sharedLib;
-		SLANG_RETURN_ON_FAIL(_loadSharedLibrary(artifact, keep, sharedLib.writeRef()));
+		SLANG_RETURN_ON_FAIL(_loadSharedLibrary(artifact, sharedLib.writeRef()));
 		return _addRepresentation(artifact, keep, sharedLib, outCastable);
 	}
 
@@ -223,7 +223,7 @@ SlangResult DefaultArtifactHandler::getOrCreateFileRepresentation(IArtifact* art
 	return SLANG_OK;
 }
 
-SlangResult DefaultArtifactHandler::_loadSharedLibrary(IArtifact* artifact, ArtifactKeep keep, ISlangSharedLibrary** outSharedLibrary)
+SlangResult DefaultArtifactHandler::_loadSharedLibrary(IArtifact* artifact, ISlangSharedLibrary** outSharedLibrary)
 {
 	// If it is 'shared library' for a CPU like thing, we can try and load it
 	const auto desc = artifact->getDesc();
@@ -233,7 +233,10 @@ SlangResult DefaultArtifactHandler::_loadSharedLibrary(IArtifact* artifact, Arti
 	{
 		// Get as a file represenation on the OS file system
 		ComPtr<IFileArtifactRepresentation> fileRep;
-		SLANG_RETURN_ON_FAIL(artifact->requireFile(ArtifactKeep::No, nullptr, fileRep.writeRef()));
+
+		// We want to keep the file representation, otherwise every request, could produce a new file
+		// and that seems like a bad idea.
+		SLANG_RETURN_ON_FAIL(artifact->requireFile(ArtifactKeep::Yes, nullptr, fileRep.writeRef()));
 
 		// We requested on the OS file system, just check that's what we got...
 		SLANG_ASSERT(fileRep->getFileSystem() == nullptr);
@@ -244,22 +247,8 @@ SlangResult DefaultArtifactHandler::_loadSharedLibrary(IArtifact* artifact, Arti
 		{
 			return SLANG_FAIL;
 		}
-
-		// The ScopeSharedLibrary will keep the fileRep in scope as long as is needed
-		auto sharedLibrary = new ScopeSharedLibrary(handle, fileRep);
-
-		if (canKeep(keep))
-		{
-			// We want to keep the fileRep, as that is necessary for the sharedLibrary to even work
-			artifact->addRepresentation(fileRep);
-			// Keep the shared library
-			artifact->addRepresentation(sharedLibrary);
-		}
-
 		// Output
-		sharedLibrary->addRef();
-		*outSharedLibrary = sharedLibrary;
-
+		*outSharedLibrary = ScopeSharedLibrary::create(handle, fileRep).detach();
 		return SLANG_OK;
 	}
 
