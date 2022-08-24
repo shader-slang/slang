@@ -284,30 +284,29 @@ protected:
     size_t m_dataCount;
 };
 
-class ScopeRefObjectBlob : public BlobBase
+class ScopeBlob : public BlobBase
 {
 public:
     // ISlangBlob
     SLANG_NO_THROW void const* SLANG_MCALL getBufferPointer() SLANG_OVERRIDE { return m_blob->getBufferPointer(); }
     SLANG_NO_THROW size_t SLANG_MCALL getBufferSize() SLANG_OVERRIDE { return m_blob->getBufferSize(); }
 
-    static inline ComPtr<ISlangBlob> create(ISlangBlob* blob, RefObject* scope)
+    static inline ComPtr<ISlangBlob> create(ISlangBlob* blob, ISlangUnknown* scope)
     {
-        return ComPtr<ISlangBlob>(new ScopeRefObjectBlob(blob, scope));
+        return ComPtr<ISlangBlob>(new ScopeBlob(blob, scope));
     }
 
 protected:
 
     // Ctor
 
-    ScopeRefObjectBlob(ISlangBlob* blob, RefObject* scope) :
+    ScopeBlob(ISlangBlob* blob, ISlangUnknown* scope) :
         m_blob(blob),
         m_scope(scope)
     {
     }
 
-
-    RefPtr<RefObject> m_scope;
+    ComPtr<ISlangUnknown> m_scope;
     ComPtr<ISlangBlob> m_blob;
 };
 

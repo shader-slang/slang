@@ -13,6 +13,7 @@
 #include "slang-artifact-desc-util.h"
 #include "slang-artifact-diagnostic-util.h"
 #include "slang-artifact-util.h"
+#include "slang-artifact-representation-impl.h"
 
 namespace Slang
 {
@@ -431,51 +432,23 @@ static SlangResult _parseGCCFamilyLine(CharSliceAllocator& allocator, const Unow
     return SLANG_OK;
 }
 
-/* static */ SlangResult GCCDownstreamCompilerUtil::calcModuleFilePath(const CompileOptions& options, StringBuilder& outPath)
+/* static */SlangResult GCCDownstreamCompilerUtil::calcCompileProducts(const CompileOptions& options, ProductFlags flags, IFileArtifactRepresentation* lockFile, List<ComPtr<IArtifact>>& outArtifacts)
 {
     SLANG_ASSERT(options.modulePath.getLength());
 
-    outPath.Clear();
-
-    switch (options.targetType)
-    {
-        case SLANG_SHADER_SHARED_LIBRARY:
-        {
-            outPath << SharedLibrary::calcPlatformPath(options.modulePath.getUnownedSlice());
-            return SLANG_OK;
-        }
-        case SLANG_HOST_EXECUTABLE:
-        {
-            outPath << options.modulePath;
-            outPath << Process::getExecutableSuffix();
-            return SLANG_OK;
-        }
-        case SLANG_OBJECT_CODE:
-        {
-#if __CYGWIN__
-            outPath << options.modulePath << ".obj";
-#else
-            // Will be .o for typical gcc targets
-            outPath << options.modulePath << ".o";
-#endif
-            return SLANG_OK;
-        }
-    }
-
-    return SLANG_FAIL;
-}
-
-/* static */SlangResult GCCDownstreamCompilerUtil::calcCompileProducts(const CompileOptions& options, ProductFlags flags, List<String>& outPaths)
-{
-    SLANG_ASSERT(options.modulePath.getLength());
-
-    outPaths.clear();
+    outArtifacts.clear();
 
     if (flags & ProductFlag::Execution)
     {
         StringBuilder builder;
-        SLANG_RETURN_ON_FAIL(calcModuleFilePath(options, builder));
-        outPaths.add(builder);
+        const auto desc = ArtifactDescUtil::makeDescForCompileTarget(options.targetType);
+        SLANG_RETURN_ON_FAIL(ArtifactDescUtil::calcPathForDesc(desc, options.modulePath.getUnownedSlice(), builder));
+
+        auto fileRep = FileArtifactRepresentation::create(IFileArtifactRepresentation::Kind::Owned, builder.getUnownedSlice(), lockFile, nullptr);
+        auto artifact = ArtifactUtil::createArtifact(desc);
+        artifact->addRepresentation(fileRep);
+
+        outArtifacts.add(artifact);
     }
 
     return SLANG_OK;
@@ -488,6 +461,8 @@ static SlangResult _parseGCCFamilyLine(CharSliceAllocator& allocator, const Unow
 
     PlatformKind platformKind = (options.platform == PlatformKind::Unknown) ? PlatformUtil::getPlatformKind() : options.platform;
         
+    const auto targetDesc = ArtifactDescUtil::makeDescForCompileTarget(options.targetType);
+
     if (options.sourceLanguage == SLANG_SOURCE_LANGUAGE_CPP)
     {
         cmdLine.addArg("-fvisibility=hidden");
@@ -563,9 +538,9 @@ static SlangResult _parseGCCFamilyLine(CharSliceAllocator& allocator, const Unow
         }
     }
 
-    StringBuilder moduleFilePath;
-    calcModuleFilePath(options, moduleFilePath);
-
+    StringBuilder moduleFilePath; 
+    SLANG_RETURN_ON_FAIL(ArtifactDescUtil::calcPathForDesc(targetDesc, options.modulePath.getUnownedSlice(), moduleFilePath));
+    
     cmdLine.addArg("-o");
     cmdLine.addArg(moduleFilePath);
 
@@ -661,9 +636,9 @@ static SlangResult _parseGCCFamilyLine(CharSliceAllocator& allocator, const Unow
     // Artifacts might add library paths
     for (IArtifact* artifact : options.libraries)
     {
-        const auto desc = artifact->getDesc();
+        const auto artifactDesc = artifact->getDesc();
         // If it's a library for CPU types, try and use it
-        if (ArtifactDescUtil::isCpuBinary(desc) && desc.kind == ArtifactKind::Library)
+        if (ArtifactDescUtil::isCpuBinary(artifactDesc) && artifactDesc.kind == ArtifactKind::Library)
         {
             ComPtr<IFileArtifactRepresentation> fileRep;
 

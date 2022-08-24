@@ -238,13 +238,13 @@ public:
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL createRepresentation(const Guid& typeGuid, ICastable** outCastable) SLANG_OVERRIDE;
     virtual SLANG_NO_THROW bool SLANG_MCALL exists() SLANG_OVERRIDE;
 
-    CommandLineDownstreamArtifactRepresentation(const String& moduleFilePath, TemporaryFileSet* temporaryFileSet) :
+    CommandLineDownstreamArtifactRepresentation(const UnownedStringSlice& moduleFilePath, ICastableList* artifactList) :
         m_moduleFilePath(moduleFilePath),
-        m_temporaryFiles(temporaryFileSet)
+        m_artifactList(artifactList)
     {
     }
 
-    RefPtr<TemporaryFileSet> m_temporaryFiles;
+    ComPtr<ICastableList> m_artifactList;
 
 protected:
 
@@ -252,10 +252,6 @@ protected:
     void* getObject(const Guid& guid);
 
     String m_moduleFilePath;
-    DownstreamCompileOptions m_options;
-    ComPtr<ISlangBlob> m_binaryBlob;
-    /// Cache of the shared library if appropriate
-    ComPtr<ISlangSharedLibrary> m_hostCallableSharedLibrary;
 };
 
 class CommandLineDownstreamCompiler : public DownstreamCompilerBase
@@ -269,12 +265,10 @@ public:
 
     // Functions to be implemented for a specific CommandLine
 
-        /// Given the compilation options and the module name, determines the actual file name used for output
-    virtual SlangResult calcModuleFilePath(const CompileOptions& options, StringBuilder& outPath) = 0;
         /// Given options determines the paths to products produced (including the 'moduleFilePath').
         /// Note that does *not* guarentee all products were or should be produced. Just aims to include all that could
         /// be produced, such that can be removed on completion.
-    virtual SlangResult calcCompileProducts(const CompileOptions& options, DownstreamProductFlags flags, List<String>& outPaths) = 0;
+    virtual SlangResult calcCompileProducts(const CompileOptions& options, DownstreamProductFlags flags, IFileArtifactRepresentation* lockFile, List<ComPtr<IArtifact>>& outArtifacts) = 0;
 
     virtual SlangResult calcArgs(const CompileOptions& options, CommandLine& cmdLine) = 0;
     virtual SlangResult parseOutput(const ExecuteResult& exeResult, IArtifactDiagnostics* diagnostics) = 0;

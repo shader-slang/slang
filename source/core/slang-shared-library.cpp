@@ -62,18 +62,6 @@ SlangResult DefaultSharedLibraryLoader::loadPlatformSharedLibrary(const char* pa
     }
 }
 
-/* !!!!!!!!!!!!!!!!!!!!!!!!!! TemporarySharedLibrary !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!*/
-
-TemporarySharedLibrary::~TemporarySharedLibrary()
-{
-    if (m_sharedLibraryHandle)
-    {
-        // We have to unload if we want to be able to remove
-        SharedLibrary::unload(m_sharedLibraryHandle);
-        m_sharedLibraryHandle = nullptr;
-    }
-}
-
 /* !!!!!!!!!!!!!!!!!!!!!!!!!! ScopeSharedLibrary !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!*/
 
 ScopeSharedLibrary::~ScopeSharedLibrary()

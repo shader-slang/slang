@@ -17,7 +17,7 @@ namespace Slang
 class FileArtifactRepresentation : public ComBaseObject, public IFileArtifactRepresentation
 {
 public:
-    typedef IFileArtifactRepresentation::Kind Kind;
+    typedef FileArtifactRepresentation ThisType;
 
     SLANG_COM_BASE_IUNKNOWN_ALL
 
@@ -35,15 +35,20 @@ public:
     virtual SLANG_NO_THROW void SLANG_MCALL disown() SLANG_OVERRIDE;
     virtual SLANG_NO_THROW IFileArtifactRepresentation* SLANG_MCALL getLockFile() SLANG_OVERRIDE { return m_lockFile; }
 
-    FileArtifactRepresentation(Kind kind, String path, IFileArtifactRepresentation* lockFile, ISlangMutableFileSystem* fileSystem):
+    FileArtifactRepresentation(Kind kind, const UnownedStringSlice& path, IFileArtifactRepresentation* lockFile, ISlangMutableFileSystem* fileSystem):
         m_kind(kind),
-        m_path(path),
         m_lockFile(lockFile),
+        m_path(path),
         m_fileSystem(fileSystem)
     {
     }
 
     ~FileArtifactRepresentation();
+
+    static ComPtr<IFileArtifactRepresentation> create(Kind kind, const UnownedStringSlice& path, IFileArtifactRepresentation* lockFile, ISlangMutableFileSystem* fileSystem)
+    {
+        return ComPtr<IFileArtifactRepresentation>(new ThisType(kind, path, lockFile, fileSystem)); 
+    }
 
 protected:
     void* getInterface(const Guid& uuid);

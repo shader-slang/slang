@@ -47,7 +47,7 @@ class IArtifactHelper : public ICastable
 	virtual SLANG_NO_THROW SlangResult SLANG_MCALL calcArtifactPath(const ArtifactDesc& desc, const char* basePath, ISlangBlob** outPath) = 0;
 
 		/// Given a compile target return the equivalent desc
-	virtual SLANG_NO_THROW ArtifactDesc SLANG_MCALL makeDescFromCompileTarget(SlangCompileTarget target) = 0;
+	virtual SLANG_NO_THROW ArtifactDesc SLANG_MCALL makeDescForCompileTarget(SlangCompileTarget target) = 0;
 
 		/// Given an interface returns as a castable interface. This might just cast unk into ICastable, or wrap it such that it uses the castable interface
 	virtual SLANG_NO_THROW void SLANG_MCALL getCastable(ISlangUnknown* unk, ICastable** outCastable) = 0;
@@ -87,7 +87,7 @@ public:
 
 	virtual SLANG_NO_THROW SlangResult SLANG_MCALL calcArtifactPath(const ArtifactDesc& desc, const char* basePath, ISlangBlob** outPath) SLANG_OVERRIDE;
 
-	virtual SLANG_NO_THROW ArtifactDesc SLANG_MCALL makeDescFromCompileTarget(SlangCompileTarget target) SLANG_OVERRIDE;
+	virtual SLANG_NO_THROW ArtifactDesc SLANG_MCALL makeDescForCompileTarget(SlangCompileTarget target) SLANG_OVERRIDE;
 
 	virtual SLANG_NO_THROW void SLANG_MCALL getCastable(ISlangUnknown* unk, ICastable** outCastable) SLANG_OVERRIDE;
 
