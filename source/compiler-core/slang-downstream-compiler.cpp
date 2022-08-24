@@ -276,6 +276,33 @@ SlangResult CommandLineDownstreamCompiler::compile(const CompileOptions& inOptio
     }
 #endif
 
+    // Go through the list of artifacts in the artifactList and check if they exist. 
+    // 
+    // This is useful because `calcCompileProducts` is conservative and may produce artifacts for products that aren't actually 
+    // produced, by the compilation.
+    {
+        Count count = artifactList->getCount();
+        for (Index i = 0; i < count; ++i)
+        {
+            auto artifact = as<IArtifact>(artifactList->getAt(i));
+
+            if (!artifact->exists())
+            {
+                // We should find a file rep and if we do we can disown it. Disowning will mean
+                // when scope is lost the rep won't try and delete the (apparently non existing) backing file.
+                if (auto fileRep = findRepresentation<IFileArtifactRepresentation>(artifact))
+                {
+                    fileRep->disown();
+                }
+
+                // Remove from the list
+                artifactList->removeAt(i);
+                count--;
+                i--;
+            }
+        }
+    }
+
     auto artifact = ArtifactUtil::createArtifactForCompileTarget(options.targetType);
 
     auto diagnostics = ArtifactDiagnostics::create();
