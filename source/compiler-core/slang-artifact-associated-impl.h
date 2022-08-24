@@ -37,7 +37,7 @@ public:
     SLANG_NO_THROW virtual void SLANG_MCALL setResult(SlangResult res) SLANG_OVERRIDE { m_result = res; }
     SLANG_NO_THROW virtual void SLANG_MCALL setRaw(const CharSlice& slice) SLANG_OVERRIDE;
     SLANG_NO_THROW virtual void SLANG_MCALL appendRaw(const CharSlice& slice) SLANG_OVERRIDE;
-    SLANG_NO_THROW virtual TerminatedCharSlice SLANG_MCALL getRaw() SLANG_OVERRIDE { return CharSliceCaster::asTerminatedCharSlice(m_raw); }
+    SLANG_NO_THROW virtual TerminatedCharSlice SLANG_MCALL getRaw() SLANG_OVERRIDE { return SliceCaster::asTerminatedCharSlice(m_raw); }
     SLANG_NO_THROW virtual void SLANG_MCALL reset() SLANG_OVERRIDE;
     SLANG_NO_THROW virtual Count SLANG_MCALL getCountAtLeastSeverity(Diagnostic::Severity severity) SLANG_OVERRIDE;
     SLANG_NO_THROW virtual Count SLANG_MCALL getCountBySeverity(Diagnostic::Severity severity) SLANG_OVERRIDE;
@@ -61,7 +61,7 @@ protected:
     void* getInterface(const Guid& uuid);
     void* getObject(const Guid& uuid);
 
-    CharSliceAllocator m_allocator;
+    SliceAllocator m_allocator;
 
     List<Diagnostic> m_diagnostics;
     SlangResult m_result = SLANG_OK;

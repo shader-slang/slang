@@ -42,9 +42,6 @@
     <ClInclude Include="..\..\..\source\compiler-core\slang-artifact.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\source\compiler-core\slang-char-slice-allocator.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\..\source\compiler-core\slang-command-line-args.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -132,6 +129,9 @@
     <ClInclude Include="..\..\..\source\compiler-core\slang-nvrtc-compiler.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\source\compiler-core\slang-slice-allocator.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\..\source\compiler-core\slang-source-loc.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -174,9 +174,6 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\source\compiler-core\slang-artifact-util.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\source\compiler-core\slang-char-slice-allocator.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\source\compiler-core\slang-command-line-args.cpp">
@@ -255,6 +252,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\source\compiler-core\slang-nvrtc-compiler.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\source\compiler-core\slang-slice-allocator.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\source\compiler-core\slang-source-loc.cpp">

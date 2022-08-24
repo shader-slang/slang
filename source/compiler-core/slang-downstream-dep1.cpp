@@ -7,7 +7,7 @@
 
 #include "../core/slang-castable-util.h"
 
-#include "slang-char-slice-allocator.h"
+#include "slang-slice-allocator.h"
 
 namespace Slang
 {
@@ -98,8 +98,7 @@ DownstreamCompilerAdapter_Dep1::DownstreamCompilerAdapter_Dep1(DownstreamCompile
 SlangResult DownstreamCompilerAdapter_Dep1::compile(const CompileOptions& inOptions, IArtifact** outArtifact)
 {
     typedef DownstreamCompileOptions_Dep1::SomeEnum SomeEnum;
-    typedef CharSliceCaster Caster;
-
+    
     // Convert to the Deps1 compile options
 
     DownstreamCompileOptions_Dep1 options;
@@ -130,12 +129,12 @@ SlangResult DownstreamCompilerAdapter_Dep1::compile(const CompileOptions& inOpti
     options.sourceContents = asStringSlice(inOptions.sourceContents);
     options.sourceContentsPath = asStringSlice(inOptions.sourceContentsPath);
 
-    options.sourceFiles = Caster::asList(inOptions.sourceFiles);
+    options.sourceFiles = SliceConverter::toList(inOptions.sourceFiles);
 
-    options.includePaths = Caster::asList(inOptions.includePaths);
-    options.libraryPaths = Caster::asList(inOptions.libraryPaths);
+    options.includePaths = SliceConverter::toList(inOptions.includePaths);
+    options.libraryPaths = SliceConverter::toList(inOptions.libraryPaths);
 
-    options.libraries = Caster::asComPtrList(inOptions.libraries);
+    options.libraries = SliceConverter::toComPtrList(inOptions.libraries);
 
     for (auto& src : inOptions.requiredCapabilityVersions)
     {
@@ -156,7 +155,7 @@ SlangResult DownstreamCompilerAdapter_Dep1::compile(const CompileOptions& inOpti
 
     options.stage = inOptions.stage;
 
-    options.compilerSpecificArguments = Caster::asList(inOptions.compilerSpecificArguments);
+    options.compilerSpecificArguments = SliceConverter::toList(inOptions.compilerSpecificArguments);
 
     options.fileSystemExt = inOptions.fileSystemExt;
     options.sourceManager = inOptions.sourceManager;
@@ -164,7 +163,7 @@ SlangResult DownstreamCompilerAdapter_Dep1::compile(const CompileOptions& inOpti
     RefPtr<DownstreamCompileResult_Dep1> result;
     SLANG_RETURN_ON_FAIL(m_dep->compile(options, result));
 
-    typedef CharSliceCaster Caster;
+    typedef SliceCaster Caster;
 
     ComPtr<IArtifact> artifact = ArtifactUtil::createArtifactForCompileTarget(options.targetType);
 

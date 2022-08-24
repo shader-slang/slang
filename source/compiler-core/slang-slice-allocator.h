@@ -1,6 +1,6 @@
-// slang-char-slice-allocator.h
-#ifndef SLANG_CHAR_SLICE_ALLOCATOR_H
-#define SLANG_CHAR_SLICE_ALLOCATOR_H
+// slang-slice-allocator.h
+#ifndef SLANG_SLICE_ALLOCATOR_H
+#define SLANG_SLICE_ALLOCATOR_H
 
 // Has definition of CharSlice 
 #include "slang-artifact.h"
@@ -14,33 +14,44 @@ namespace Slang
 The reason to wrap in a struct rather than have as free functions is doing so will lead to compile time 
 errors with incorrect usage around temporaries.
 */
-struct CharSliceCaster
+struct SliceCaster
 {
         /// The slice will only be in scope whilst the string is
     static TerminatedCharSlice asTerminatedCharSlice(const String& in) { auto unowned = in.getUnownedSlice(); return TerminatedCharSlice(unowned.begin(), unowned.getLength()); }
 
     static CharSlice asCharSlice(const String& in) { auto unowned = in.getUnownedSlice(); return CharSlice(unowned.begin(), unowned.getLength()); }
 
-        /// Convert into a list of strings
-    static List<String> asList(const Slice<TerminatedCharSlice>& in);
-
-    template <typename T>
-    static List<ComPtr<T>> asComPtrList(const Slice<T*>& in) 
-    { 
-        ISlangUnknown* check = (T*)nullptr;
-        SLANG_UNUSED(check);
-        List<ComPtr<T>> list; 
-        list.setCount(in.count);
-        for (Index i = 0; i < in.count; ++i) list[i] = ComPtr<T>(in[i]);
-        return list; 
-    }
     template <typename T>
     static Slice<T*> asSlice(const List<ComPtr<T>>& list) { return makeSlice((T*const*)list.getBuffer(), list.getCount()); }
 
+        /// Get a list as a slice
+    template <typename T>
+    static Slice<T> asSlice(const List<T>& list) { return Slice<T>(list.getBuffer(), list.getCount()); }
+
 private:
+        /// We don't want to make a temporary list into a slice..
+    template <typename T>
+    static Slice<T> asSlice(const List<T>&& list) = delete; 
         // We don't want temporaries to be 'asSliced' so disable
     static TerminatedCharSlice asTerminatedCharSlice(const String&& in) = delete;
     static CharSlice asCharSlice(const String&& in) = delete;
+};
+
+struct SliceConverter
+{
+        /// Convert into a list of strings
+    static List<String> toList(const Slice<TerminatedCharSlice>& in);
+
+    template <typename T>
+    static List<ComPtr<T>> toComPtrList(const Slice<T*>& in)
+    {
+        ISlangUnknown* check = (T*)nullptr;
+        SLANG_UNUSED(check);
+        List<ComPtr<T>> list;
+        list.setCount(in.count);
+        for (Index i = 0; i < in.count; ++i) list[i] = ComPtr<T>(in[i]);
+        return list;
+    }
 };
 
 SLANG_FORCE_INLINE UnownedStringSlice asStringSlice(const CharSlice& slice)
@@ -58,7 +69,7 @@ SLANG_FORCE_INLINE String asString(const CharSlice& slice)
     return String(slice.begin(), slice.end()); 
 }
 
-struct CharSliceAllocator
+struct SliceAllocator
 {
     TerminatedCharSlice allocate(const Slice<char>& slice);
     TerminatedCharSlice allocate(const UnownedStringSlice& slice);
@@ -73,7 +84,7 @@ struct CharSliceAllocator
 
     void deallocateAll() { m_arena.deallocateAll(); }
 
-    CharSliceAllocator():
+    SliceAllocator():
         m_arena(1024)
     {
     }

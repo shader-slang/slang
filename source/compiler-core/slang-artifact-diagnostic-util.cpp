@@ -19,7 +19,7 @@ namespace Slang {
     }
 }
 
-/* static */SlangResult ArtifactDiagnosticUtil::splitPathLocation(CharSliceAllocator& allocator, const UnownedStringSlice& pathLocation, ArtifactDiagnostic& outDiagnostic)
+/* static */SlangResult ArtifactDiagnosticUtil::splitPathLocation(SliceAllocator& allocator, const UnownedStringSlice& pathLocation, ArtifactDiagnostic& outDiagnostic)
 {
     const Index lineStartIndex = pathLocation.lastIndexOf('(');
     if (lineStartIndex >= 0)
@@ -77,7 +77,7 @@ namespace Slang {
     return SLANG_OK;
 }
 
-/* static */SlangResult ArtifactDiagnosticUtil::parseColonDelimitedDiagnostics(CharSliceAllocator& allocator, const UnownedStringSlice& inText, Int pathIndex, LineParser lineParser, IArtifactDiagnostics* diagnostics)
+/* static */SlangResult ArtifactDiagnosticUtil::parseColonDelimitedDiagnostics(SliceAllocator& allocator, const UnownedStringSlice& inText, Int pathIndex, LineParser lineParser, IArtifactDiagnostics* diagnostics)
 {
     List<UnownedStringSlice> splitLine;
 
@@ -127,7 +127,7 @@ namespace Slang {
     String text(in);
 
     diagnostic.severity = ArtifactDiagnostic::Severity::Info;
-    diagnostic.text = CharSliceCaster::asTerminatedCharSlice(text);
+    diagnostic.text = SliceCaster::asTerminatedCharSlice(text);
     diagnostics->add(diagnostic);
 }
 

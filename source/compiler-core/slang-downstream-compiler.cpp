@@ -104,7 +104,7 @@ SlangResult CommandLineDownstreamCompiler::compile(const CompileOptions& inOptio
 
     auto helper = DefaultArtifactHelper::getSingleton();
 
-    CharSliceAllocator allocator;
+    SliceAllocator allocator;
 
     // Find all the files that will be produced
 

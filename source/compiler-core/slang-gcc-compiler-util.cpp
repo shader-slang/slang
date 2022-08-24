@@ -166,7 +166,7 @@ enum class LineParseResult
     
 } // anonymous
     
-static SlangResult _parseGCCFamilyLine(CharSliceAllocator& allocator, const UnownedStringSlice& line, LineParseResult& outLineParseResult, ArtifactDiagnostic& outDiagnostic)
+static SlangResult _parseGCCFamilyLine(SliceAllocator& allocator, const UnownedStringSlice& line, LineParseResult& outLineParseResult, ArtifactDiagnostic& outDiagnostic)
 {
     typedef ArtifactDiagnostic Diagnostic;
     typedef Diagnostic::Severity Severity;
@@ -353,10 +353,10 @@ static SlangResult _parseGCCFamilyLine(CharSliceAllocator& allocator, const Unow
 {
     LineParseResult prevLineResult = LineParseResult::Ignore;
     
-    CharSliceAllocator allocator;
+    SliceAllocator allocator;
 
     diagnostics->reset();
-    diagnostics->setRaw(CharSliceCaster::asCharSlice(exeRes.standardError));
+    diagnostics->setRaw(SliceCaster::asCharSlice(exeRes.standardError));
 
     // We hold in workDiagnostics so as it is more convenient to append to the last with a continuation
     // also means we don't hold the allocations of building up continuations, just the results when finally allocated at the end

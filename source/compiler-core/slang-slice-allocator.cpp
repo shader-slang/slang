@@ -1,11 +1,11 @@
-// slang-char-slice-allocator.cpp
-#include "slang-char-slice-allocator.h"
+// slang-slice-allocator.cpp
+#include "slang-slice-allocator.h"
 
 namespace Slang {
 
-/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! CharSliceCaster !!!!!!!!!!!!!!!!!!!!!!!!!!! */
+/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! SliceConverter !!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
-/* static */ List<String> CharSliceCaster::asList(const Slice<TerminatedCharSlice>& in)
+/* static */ List<String> SliceConverter::toList(const Slice<TerminatedCharSlice>& in)
 {
     List<String> list;
     const auto count = in.count;
@@ -18,30 +18,30 @@ namespace Slang {
     return list;
 }
 
-/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! CharSliceAllocator !!!!!!!!!!!!!!!!!!!!!!!!!!! */
+/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! SliceAllocator !!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
-TerminatedCharSlice CharSliceAllocator::allocate(const char* in)
+TerminatedCharSlice SliceAllocator::allocate(const char* in)
 {
     const size_t length = ::strlen(in);
     auto dst = m_arena.allocateString(in, length);
     return TerminatedCharSlice(dst, length);
 }
 
-TerminatedCharSlice CharSliceAllocator::allocate(const UnownedStringSlice& slice)
+TerminatedCharSlice SliceAllocator::allocate(const UnownedStringSlice& slice)
 {
     const auto length = slice.getLength();
     auto dst = m_arena.allocateString(slice.begin(), length);
     return TerminatedCharSlice(dst, length);
 }
 
-TerminatedCharSlice CharSliceAllocator::allocate(const Slice<char>& slice)
+TerminatedCharSlice SliceAllocator::allocate(const Slice<char>& slice)
 {
     const auto count = slice.count;
     auto dst = m_arena.allocateString(slice.begin(), count);
     return TerminatedCharSlice(dst, count);
 }
 
-Slice<TerminatedCharSlice> CharSliceAllocator::allocate(const List<String>& in)
+Slice<TerminatedCharSlice> SliceAllocator::allocate(const List<String>& in)
 {
     const auto count = in.getCount();
     if (count == 0)

@@ -37,12 +37,6 @@ SLANG_FORCE_INLINE Slice<T> makeSlice(const T* inData, Count inCount)
     return Slice<T>(inData, inCount); 
 }
 
-template <typename T>
-SLANG_FORCE_INLINE Slice<T> makeSlice(const List<T>& list)
-{
-    return Slice<T>(list.getBuffer(), list.getCount()); 
-}
-
 struct CharSlice : public Slice<char>
 {
     typedef CharSlice ThisType;

@@ -196,7 +196,7 @@ SlangResult DXCDownstreamCompiler::init(ISlangSharedLibrary* library)
     return SLANG_OK;
 }
 
-static SlangResult _parseDiagnosticLine(CharSliceAllocator& allocator, const UnownedStringSlice& line, List<UnownedStringSlice>& lineSlices, IArtifactDiagnostics::Diagnostic& outDiagnostic)
+static SlangResult _parseDiagnosticLine(SliceAllocator& allocator, const UnownedStringSlice& line, List<UnownedStringSlice>& lineSlices, IArtifactDiagnostics::Diagnostic& outDiagnostic)
 {
     /* tests/diagnostics/syntax-error-intrinsic.slang:14:2: error: expected expression */
     if (lineSlices.getCount() < 5)
@@ -251,7 +251,7 @@ static SlangResult _handleOperationResult(IDxcOperationResult* dxcResult, IArtif
         {
             diagnostics->appendRaw(asCharSlice(diagnosticsSlice));
 
-            CharSliceAllocator allocator;
+            SliceAllocator allocator;
             List<IArtifactDiagnostics::Diagnostic> parsedDiagnostics;
             SlangResult diagnosticParseRes = ArtifactDiagnosticUtil::parseColonDelimitedDiagnostics(allocator, diagnosticsSlice, 0, _parseDiagnosticLine, diagnostics);
 

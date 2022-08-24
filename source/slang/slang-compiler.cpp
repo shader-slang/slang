@@ -927,9 +927,8 @@ namespace Slang
         RefPtr<ExtensionTracker> extensionTracker = _newExtensionTracker(target);
         PassThroughMode compilerType;
 
-        CharSliceAllocator allocator;
-        typedef CharSliceCaster Caster;
-
+        SliceAllocator allocator;
+        
         if (auto endToEndReq = isPassThroughEnabled())
         {
             compilerType = endToEndReq->m_passThrough;
@@ -1071,7 +1070,7 @@ namespace Slang
 
                 const SourceFile* sourceFile = sourceFiles[0];
                 
-                options.sourceContentsPath = Caster::asTerminatedCharSlice(sourceFile->getPathInfo().foundPath);
+                options.sourceContentsPath = SliceCaster::asTerminatedCharSlice(sourceFile->getPathInfo().foundPath);
                 options.sourceContents = asCharSlice(sourceFile->getContent());
             }
         }

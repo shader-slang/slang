@@ -2233,7 +2233,7 @@ static TestResult runCPPCompilerSharedLibrary(TestContext* context, TestInput& i
     options.targetType = SLANG_SHADER_SHARED_LIBRARY;
 
     // Compile this source
-    TerminatedCharSlice sourceFiles[] = { CharSliceCaster::asTerminatedCharSlice(filePath) };
+    TerminatedCharSlice sourceFiles[] = { SliceCaster::asTerminatedCharSlice(filePath) };
     TerminatedCharSlice includePaths[] = { TerminatedCharSlice(".") };
 
     options.sourceFiles = makeSlice(sourceFiles, 1);
@@ -2352,11 +2352,11 @@ static TestResult runCPPCompilerExecute(TestContext* context, TestInput& input)
 
     options.sourceLanguage = (ext == "c") ? SLANG_SOURCE_LANGUAGE_C : SLANG_SOURCE_LANGUAGE_CPP;
 
-    TerminatedCharSlice filePaths[] = { CharSliceCaster::asTerminatedCharSlice(filePath) };
+    TerminatedCharSlice filePaths[] = { SliceCaster::asTerminatedCharSlice(filePath) };
 
     // Compile this source
     options.sourceFiles = makeSlice(filePaths, 1);
-    options.modulePath = CharSliceCaster::asTerminatedCharSlice(modulePath);
+    options.modulePath = SliceCaster::asTerminatedCharSlice(modulePath);
 
     ComPtr<IArtifact> artifact;
     if (SLANG_FAILED(compiler->compile(options, artifact.writeRef())))
