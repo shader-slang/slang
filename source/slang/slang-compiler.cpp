@@ -44,7 +44,7 @@ namespace Slang
 
     bool isHeterogeneousTarget(CodeGenTarget target)
     {
-        return ArtifactDescUtil::makeDescFromCompileTarget(asExternal(target)).style == ArtifactStyle::Host;
+        return ArtifactDescUtil::makeDescForCompileTarget(asExternal(target)).style == ArtifactStyle::Host;
     }
 
     void printDiagnosticArg(StringBuilder& sb, CodeGenTarget val)
@@ -909,7 +909,7 @@ namespace Slang
 
     static bool _isCPUHostTarget(CodeGenTarget target)
     {
-        auto desc = ArtifactDescUtil::makeDescFromCompileTarget(asExternal(target));
+        auto desc = ArtifactDescUtil::makeDescForCompileTarget(asExternal(target));
         return desc.style == ArtifactStyle::Host;
     }
 
@@ -1230,7 +1230,7 @@ namespace Slang
 
         // If we aren't using LLVM 'host callable', we want downstream compile to produce a shared library
         if (compilerType != PassThroughMode::LLVM && 
-            ArtifactDescUtil::makeDescFromCompileTarget(asExternal(target)).kind == ArtifactKind::HostCallable)
+            ArtifactDescUtil::makeDescForCompileTarget(asExternal(target)).kind == ArtifactKind::HostCallable)
         {
             target = CodeGenTarget::ShaderSharedLibrary;
         }
@@ -1242,9 +1242,9 @@ namespace Slang
                 options.libraryPaths.add(Path::getParentDirectory(Path::getExecutablePath()));
 
                 // Set up the library artifact
-                auto artifact = Artifact::create(ArtifactDesc::make(ArtifactKind::Library, Artifact::Payload::HostCPU), "slang-rt");
+                auto artifact = Artifact::create(ArtifactDesc::make(ArtifactKind::Library, Artifact::Payload::HostCPU), toSlice("slang-rt"));
 
-                ComPtr<IFileArtifactRepresentation> fileRep(new FileArtifactRepresentation(IFileArtifactRepresentation::Kind::NameOnly, "slang-rt", nullptr, nullptr));
+                ComPtr<IFileArtifactRepresentation> fileRep(new FileArtifactRepresentation(IFileArtifactRepresentation::Kind::NameOnly, toSlice("slang-rt"), nullptr, nullptr));
                 artifact->addRepresentation(fileRep);
 
                 options.libraries.add(artifact);

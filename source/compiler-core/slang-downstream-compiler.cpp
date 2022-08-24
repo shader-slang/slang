@@ -14,8 +14,14 @@
 
 #include "../core/slang-castable-util.h"
 
+#include "slang-artifact-impl.h"
+#include "slang-artifact-representation-impl.h"
 #include "slang-artifact-associated-impl.h"
 #include "slang-artifact-util.h"
+#include "slang-artifact-helper.h"
+#include "slang-artifact-desc-util.h"
+
+#include "../core/slang-castable-list-impl.h"
 
 namespace Slang
 {
@@ -101,12 +107,7 @@ SlangResult CommandLineDownstreamArtifactRepresentation::createRepresentation(co
         }
 
         // The shared library needs to keep temp files in scope
-        auto temporarySharedLibrary = new TemporarySharedLibrary(handle, m_moduleFilePath);
-        ComPtr<ISlangSharedLibrary> lib(temporarySharedLibrary);
-
-        // Set any additional info on the non COM pointer
-        temporarySharedLibrary->m_temporaryFileSet = m_temporaryFiles;
-
+        ComPtr<ISlangSharedLibrary> lib(new ScopeSharedLibrary(handle, m_artifactList));
         *outCastable = lib.detach();
         return SLANG_OK;
     }
@@ -117,7 +118,7 @@ SlangResult CommandLineDownstreamArtifactRepresentation::createRepresentation(co
             // Read the contents of the binary
         SLANG_RETURN_ON_FAIL(File::readAllBytes(m_moduleFilePath, contents));
 
-        auto blob = ScopeRefObjectBlob::create(ListBlob::moveCreate(contents), m_temporaryFiles);
+        auto blob = ScopeBlob::create(ListBlob::moveCreate(contents), m_artifactList);
 
         *outCastable = CastableUtil::getCastable(blob).detach();
         return SLANG_OK;
@@ -169,9 +170,14 @@ SlangResult CommandLineDownstreamCompiler::compile(const CompileOptions& inOptio
 
     CompileOptions options(inOptions);
 
+    auto helper = DefaultArtifactHelper::getSingleton();
+
     // Find all the files that will be produced
-    RefPtr<TemporaryFileSet> productFileSet(new TemporaryFileSet);
-    
+
+    auto artifactList = CastableList::create();
+
+    ComPtr<IFileArtifactRepresentation> lockFile;
+
     if (options.modulePath.getLength() == 0 || options.sourceContents.getLength() != 0)
     {
         String modulePath = options.modulePath;
@@ -179,15 +185,14 @@ SlangResult CommandLineDownstreamCompiler::compile(const CompileOptions& inOptio
         // If there is no module path, generate one.
         if (modulePath.getLength() == 0)
         {
-            // Holds the temporary lock path, if a temporary path is used
-            String temporaryLockPath;
+            SLANG_RETURN_ON_FAIL(helper->createLockFile("slang-generated", nullptr, lockFile.writeRef()));
 
-            // Generate a unique module path name
-            SLANG_RETURN_ON_FAIL(File::generateTemporary(UnownedStringSlice::fromLiteral("slang-generated"), temporaryLockPath));
-            productFileSet->add(temporaryLockPath);
+            auto lockArtifact = Artifact::create(ArtifactDesc::make(ArtifactKind::Base, ArtifactPayload::Lock, ArtifactStyle::None));
+            lockArtifact->addRepresentation(lockFile);
 
-            modulePath = temporaryLockPath;
+            artifactList->add(lockArtifact);
 
+            modulePath = lockFile->getPath();
             options.modulePath = modulePath;
         }
 
@@ -199,7 +204,6 @@ SlangResult CommandLineDownstreamCompiler::compile(const CompileOptions& inOptio
         {
             String compileSourcePath = modulePath;
 
-            // NOTE: Strictly speaking producing filenames by modifying the generateTemporary path that may introduce a temp filename clash, but in practice is extraordinary unlikely
             compileSourcePath.append("-src");
 
             // Make the temporary filename have the appropriate extension.
@@ -213,9 +217,15 @@ SlangResult CommandLineDownstreamCompiler::compile(const CompileOptions& inOptio
             }
 
             // Write it out
-            productFileSet->add(compileSourcePath);
             SLANG_RETURN_ON_FAIL(File::writeAllText(compileSourcePath, options.sourceContents));
             
+            // Create the reference to the file 
+            auto fileRep = FileArtifactRepresentation::create(IFileArtifactRepresentation::Kind::Owned, compileSourcePath.getUnownedSlice(), lockFile, nullptr);
+            auto fileArtifact = ArtifactUtil::createArtifact(ArtifactDescUtil::makeDescForSourceLanguage(options.sourceLanguage));
+            fileArtifact->addRepresentation(fileRep);
+
+            artifactList->add(fileArtifact);
+
             // Add it as a source file
             options.sourceFiles.add(compileSourcePath);
         }
@@ -232,14 +242,20 @@ SlangResult CommandLineDownstreamCompiler::compile(const CompileOptions& inOptio
 
     {
         StringBuilder builder;
-        SLANG_RETURN_ON_FAIL(calcModuleFilePath(options, builder));
+        const auto desc = ArtifactDescUtil::makeDescForCompileTarget(options.targetType);
+        SLANG_RETURN_ON_FAIL(ArtifactDescUtil::calcPathForDesc(desc, options.modulePath.getUnownedSlice(), builder));
+
         moduleFilePath = builder.ProduceString();
     }
 
     {
-        List<String> paths;
-        SLANG_RETURN_ON_FAIL(calcCompileProducts(options, DownstreamProductFlag::All, paths));
-        productFileSet->add(paths);
+        List<ComPtr<IArtifact>> artifacts;
+        SLANG_RETURN_ON_FAIL(calcCompileProducts(options, DownstreamProductFlag::All, lockFile, artifacts));
+
+        for (IArtifact* artifact : artifacts)
+        {
+            artifactList->add(artifact);
+        }
     }
 
     ExecuteResult exeRes;
@@ -269,8 +285,9 @@ SlangResult CommandLineDownstreamCompiler::compile(const CompileOptions& inOptio
     // Add the artifact
     artifact->addAssociated(diagnostics);
 
-    ComPtr<IArtifactRepresentation> rep(new CommandLineDownstreamArtifactRepresentation(moduleFilePath, productFileSet));
+    ComPtr<IArtifactRepresentation> rep(new CommandLineDownstreamArtifactRepresentation(moduleFilePath.getUnownedSlice(), artifactList));
     artifact->addRepresentation(rep);
+    artifact->addAssociated(artifactList);
 
     *outArtifact = artifact.detach();
     
