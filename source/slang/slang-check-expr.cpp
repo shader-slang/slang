@@ -982,7 +982,7 @@ namespace Slang
                 || opName == getName("|") || opName == getName("&") || opName == getName("^") || opName == getName("~") || opName == getName("%") ||
                 opName == getName("?:") || opName == getName("<<") || opName == getName(">>"))
             {
-                auto result = m_astBuilder->create<SomeIntVal>();
+                auto result = m_astBuilder->create<FuncCallIntVal>();
                 result->args.addRange(argVals, argCount);
                 result->funcDeclRef = funcDeclRef;
                 result->funcType = as<Type>(funcDeclRefExpr.getExpr()->type->substitute(
@@ -1130,6 +1130,22 @@ namespace Slang
             return nullptr;
         if(!decl->hasModifier<ConstModifier>())
             return nullptr;
+
+        if (isInterfaceRequirement(decl))
+        {
+            for (auto subst = declRef.substitutions.substitutions; subst; subst = subst->outer)
+            {
+                if (auto thisTypeSubst = as<ThisTypeSubstitution>(subst))
+                {
+                    auto val = WitnessLookupIntVal::tryFold(
+                        m_astBuilder,
+                        thisTypeSubst->witness,
+                        decl,
+                        declRef.substitute(m_astBuilder, decl->type.type));
+                    return as<IntVal>(val);
+                }
+            }
+        }
 
         auto initExpr = getInitExpr(m_astBuilder, declRef);
         if(!initExpr)

@@ -898,6 +898,10 @@ namespace Slang
             DeclRef<PropertyDecl>   satisfyingMemberDeclRef,
             DeclRef<PropertyDecl>   requiredMemberDeclRef,
             RefPtr<WitnessTable>    witnessTable);
+        bool doesVarMatchRequirement(
+            DeclRef<VarDeclBase>   satisfyingMemberDeclRef,
+            DeclRef<VarDeclBase>   requiredMemberDeclRef,
+            RefPtr<WitnessTable>    witnessTable);
 
         bool doesGenericSignatureMatchRequirement(
             DeclRef<GenericDecl>        genDecl,

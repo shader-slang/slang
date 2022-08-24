@@ -18,4 +18,18 @@ const TypeExp& TypeConstraintDecl::_getSupOverride() const
 }
 
 
+bool isInterfaceRequirement(Decl* decl)
+{
+    auto ancestor = decl->parentDecl;
+    for (; ancestor; ancestor = ancestor->parentDecl)
+    {
+        if (as<InterfaceDecl>(ancestor))
+            return true;
+
+        if (as<ExtensionDecl>(ancestor))
+            return false;
+    }
+    return false;
+}
+
 } // namespace Slang

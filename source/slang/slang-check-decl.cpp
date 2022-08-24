@@ -1053,6 +1053,33 @@ namespace Slang
                 addModifier(varDecl, m_astBuilder->create<NVAPIMagicModifier>());
             }
         }
+
+        if (auto interfaceDecl = as<InterfaceDecl>(varDecl->parentDecl))
+        {
+            if (auto basicType = as<BasicExpressionType>(varDecl->getType()))
+            {
+                switch (basicType->baseType)
+                {
+                case BaseType::Bool:
+                case BaseType::Int8:
+                case BaseType::Int16:
+                case BaseType::Int:
+                case BaseType::Int64:
+                case BaseType::UInt8:
+                case BaseType::UInt16:
+                case BaseType::UInt:
+                case BaseType::UInt64:
+                    break;
+                default:
+                    getSink()->diagnose(varDecl, Diagnostics::staticConstRequirementMustBeIntOrBool);
+                    break;
+                }
+            }
+            if (!varDecl->findModifier<HLSLStaticModifier>() || !varDecl->findModifier<ConstModifier>())
+            {
+                getSink()->diagnose(varDecl, Diagnostics::valueRequirementMustBeCompileTimeConst);
+            }
+        }
     }
 
     void SemanticsDeclHeaderVisitor::visitStructDecl(StructDecl* structDecl)
@@ -1588,6 +1615,47 @@ namespace Slang
         return true;
     }
 
+    bool SemanticsVisitor::doesVarMatchRequirement(
+        DeclRef<VarDeclBase>   satisfyingMemberDeclRef,
+        DeclRef<VarDeclBase>   requiredMemberDeclRef,
+        RefPtr<WitnessTable>    witnessTable)
+    {
+        // The type of the satisfying member must match the type of the required member.
+        auto satisfyingType = getType(getASTBuilder(), satisfyingMemberDeclRef);
+        auto requiredType = getType(getASTBuilder(), requiredMemberDeclRef);
+        if (!satisfyingType->equals(requiredType))
+            return false;
+
+        for (auto modifier : requiredMemberDeclRef.getDecl()->modifiers)
+        {
+            bool found = false;
+            for (auto satisfyingModifier : satisfyingMemberDeclRef.getDecl()->modifiers)
+            {
+                if (satisfyingModifier->astNodeType == modifier->astNodeType)
+                {
+                    found = true;
+                    break;
+                }
+            }
+            if (!found)
+                return false;
+        }
+
+        auto satisfyingVal = tryConstantFoldDeclRef(satisfyingMemberDeclRef, nullptr);
+        if (satisfyingVal)
+        {
+            witnessTable->add(
+                requiredMemberDeclRef,
+                RequirementWitness(satisfyingVal));
+        }
+        else
+        {
+            witnessTable->add(
+                requiredMemberDeclRef.getDecl(),
+                RequirementWitness(satisfyingMemberDeclRef));
+        }
+        return true;
+    }
 
     bool SemanticsVisitor::doesGenericSignatureMatchRequirement(
         DeclRef<GenericDecl>        satisfyingGenericDeclRef,
@@ -1973,6 +2041,14 @@ namespace Slang
             {
                 ensureDecl(propertyDeclRef, DeclCheckState::CanUseFuncSignature);
                 return doesPropertyMatchRequirement(propertyDeclRef, requiredPropertyDeclRef, witnessTable);
+            }
+        }
+        else if (auto varDeclRef = memberDeclRef.as<VarDeclBase>())
+        {
+            if (auto requiredVarDeclRef = requiredMemberDeclRef.as<VarDeclBase>())
+            {
+                ensureDecl(varDeclRef, DeclCheckState::SignatureChecked);
+                return doesVarMatchRequirement(varDeclRef, requiredVarDeclRef, witnessTable);
             }
         }
         // Default: just assume that thing aren't being satisfied.
