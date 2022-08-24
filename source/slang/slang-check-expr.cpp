@@ -977,6 +977,19 @@ namespace Slang
                     return PolynomialIntVal::mul(m_astBuilder, argVals[0], argVals[1]);
                 }
             }
+            else if (opName == getName("/") || opName == getName("==") || opName == getName(">=") || opName == getName("<=") || opName == getName("!=")
+                || opName == getName(">") || opName == getName("<") || opName == getName("&&") || opName == getName("||") || opName == getName("!")
+                || opName == getName("|") || opName == getName("&") || opName == getName("^") || opName == getName("~") || opName == getName("%") ||
+                opName == getName("?:") || opName == getName("<<") || opName == getName(">>"))
+            {
+                auto result = m_astBuilder->create<SomeIntVal>();
+                result->args.addRange(argVals, argCount);
+                result->funcDeclRef = funcDeclRef;
+                result->funcType = as<Type>(funcDeclRefExpr.getExpr()->type->substitute(
+                    m_astBuilder, funcDeclRefExpr.getSubsts()));
+                SLANG_RELEASE_ASSERT(result->funcType);
+                return result;
+            }
             return nullptr;
         }
 
@@ -1062,6 +1075,15 @@ namespace Slang
             CASE(/);
             CASE(%);
 #undef CASE
+            else if (opName == getName("?:"))
+            {
+                if (argCount != 3)
+                    return nullptr;
+                if (constArgVals[0] != 0)
+                    resultValue = constArgVals[1];
+                else
+                    resultValue = constArgVals[2];
+            }
             // TODO(tfoley): more cases
             else
             {
