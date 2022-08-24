@@ -81,6 +81,11 @@ class ScopeSharedLibrary : public DefaultSharedLibrary
 public: 
     typedef DefaultSharedLibrary Super;
 
+    static ComPtr<ISlangSharedLibrary> create(const SharedLibrary::Handle sharedLibraryHandle, ISlangUnknown* scope) 
+    {
+        return ComPtr< ISlangSharedLibrary>(new ScopeSharedLibrary(sharedLibraryHandle, scope)); 
+    }
+
     /// Ctor
     ScopeSharedLibrary(const SharedLibrary::Handle sharedLibraryHandle, ISlangUnknown* scope) :
         Super(sharedLibraryHandle),

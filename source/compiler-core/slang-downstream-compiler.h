@@ -227,33 +227,6 @@ public:
     Desc m_desc;
 };
 
-class CommandLineDownstreamArtifactRepresentation : public ComBaseObject, public IArtifactRepresentation
-{
-public:
-    SLANG_COM_BASE_IUNKNOWN_ALL
-
-    // ICastable
-    virtual SLANG_NO_THROW void* SLANG_MCALL castAs(const Guid& guid) SLANG_OVERRIDE;
-    // IArtifactRepresentation
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL createRepresentation(const Guid& typeGuid, ICastable** outCastable) SLANG_OVERRIDE;
-    virtual SLANG_NO_THROW bool SLANG_MCALL exists() SLANG_OVERRIDE;
-
-    CommandLineDownstreamArtifactRepresentation(const UnownedStringSlice& moduleFilePath, ICastableList* artifactList) :
-        m_moduleFilePath(moduleFilePath),
-        m_artifactList(artifactList)
-    {
-    }
-
-    ComPtr<ICastableList> m_artifactList;
-
-protected:
-
-    void* getInterface(const Guid& guid);
-    void* getObject(const Guid& guid);
-
-    String m_moduleFilePath;
-};
-
 class CommandLineDownstreamCompiler : public DownstreamCompilerBase
 {
 public:
