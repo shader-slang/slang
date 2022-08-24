@@ -21,11 +21,8 @@ struct GCCDownstreamCompilerUtil : public DownstreamCompilerUtilBase
         /// Parse ExecuteResult into diagnostics 
     static SlangResult parseOutput(const ExecuteResult& exeRes, IArtifactDiagnostics* diagnostics);
 
-        /// Calculate the output module filename 
-    static SlangResult calcModuleFilePath(const CompileOptions& options, StringBuilder& outPath);
-
         /// Given options, calculate paths to products/files produced for a compilation
-    static SlangResult calcCompileProducts(const CompileOptions& options, ProductFlags flags, List<String>& outPaths);
+    static SlangResult calcCompileProducts(const CompileOptions& options, ProductFlags flags, IFileArtifactRepresentation* lockFile, List<ComPtr<IArtifact>>& outArtifacts);
 
         /// Given the exe location, creates a DownstreamCompiler.
         /// Note! Invoke/s the compiler  to determine the compiler version number. 
@@ -47,8 +44,7 @@ public:
     // CommandLineCPPCompiler impl  - just forwards to the Util
     virtual SlangResult calcArgs(const CompileOptions& options, CommandLine& cmdLine) SLANG_OVERRIDE { return Util::calcArgs(options, cmdLine); }
     virtual SlangResult parseOutput(const ExecuteResult& exeResult, IArtifactDiagnostics* diagnostics) SLANG_OVERRIDE { return Util::parseOutput(exeResult, diagnostics); }
-    virtual SlangResult calcModuleFilePath(const CompileOptions& options, StringBuilder& outPath) SLANG_OVERRIDE { return Util::calcModuleFilePath(options, outPath); }
-    virtual SlangResult calcCompileProducts(const CompileOptions& options, DownstreamProductFlags flags,  List<String>& outPaths) SLANG_OVERRIDE { return Util::calcCompileProducts(options, flags, outPaths); }
+    virtual SlangResult calcCompileProducts(const CompileOptions& options, DownstreamProductFlags flags, IFileArtifactRepresentation* lockFile, List<ComPtr<IArtifact>>& outArtifacts) SLANG_OVERRIDE { return Util::calcCompileProducts(options, flags, lockFile, outArtifacts); }
 
     GCCDownstreamCompiler(const Desc& desc):Super(desc) {}
 };

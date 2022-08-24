@@ -19,6 +19,8 @@ struct Slice
     const T* begin() const { return data; }
     const T* end() const { return data + count; }
 
+    const T& operator[](Index index) { SLANG_ASSERT(index >= 0 && index < count); return data[index]; }
+
     Slice() :count(0), data(nullptr) {}
     Slice(const T* inData, Count inCount) :
         data(inData),
@@ -72,9 +74,13 @@ enum class ArtifactKind : uint8_t
     None,                       ///< Doesn't contain anything
     Unknown,                    ///< Unknown
 
+    BinaryFormat,               ///< A generic binary format. 
+
     Container,                  ///< Container like types
     Zip,                        ///< Zip container
-    Riff,                       ///< Riff format
+    RiffContainer,              ///< Riff container
+    RiffLz4Container,           ///< Riff container using Lz4 compression
+    RiffDeflateContainer,       ///< Riff container using deflate compression
 
     Text,                       ///< Representation is text. Encoding is utf8, unless prefixed with 'encoding'.
     
@@ -82,7 +88,7 @@ enum class ArtifactKind : uint8_t
     Assembly,                   ///< Assembly (Type is in payload)
     HumanText,                  ///< Text for human consumption
 
-    BinaryLike,                 ///< Kinds which are 'binary like' - can be executed, linked with and so forth. 
+    CompileBinary,              ///< Kinds which are 'binary like' - can be executed, linked with and so forth. 
     
     ObjectCode,                 ///< Object file
     Library,                    ///< Library (collection of object code)
@@ -153,10 +159,15 @@ enum class ArtifactPayload : uint8_t
 
     CompileResults, ///< Payload is a collection of compilation results
 
-    MetaData,       ///< Meta data
+    Metadata,       ///< Metadata
 
     DebugInfo,      ///< Debugging information
     Diagnostics,    ///< Diagnostics information
+
+    Miscellaneous,  ///< Category for miscellaneous payloads (like Log/Lock)
+
+    Log,            ///< Log file
+    Lock,           ///< Typically some kind of 'lock' file. Contents is typically not important.
 
     CountOf,
 };
@@ -174,7 +185,11 @@ enum class ArtifactStyle : uint8_t
     Invalid,            ///< Invalid style (indicating an error)
     Base,
         
+    None,               ///< A style is not applicable
+
     Unknown,            ///< Unknown
+
+    CodeLike,           ///< For styles that are 'code like' such as 'kernel' or 'host'.
 
     Kernel,             ///< Compiled as `GPU kernel` style.        
     Host,               ///< Compiled in `host` style
@@ -197,7 +212,7 @@ A value type to describe aspects of the contents of an Artifact.
 struct ArtifactDesc
 {
 public:
-    typedef ArtifactDesc This;
+    typedef ArtifactDesc ThisType;
 
     typedef ArtifactKind Kind;
     typedef ArtifactPayload Payload;
@@ -210,14 +225,15 @@ public:
         /// Get in packed format
     inline Packed getPacked() const;
 
-    bool operator==(const This& rhs) const { return kind == rhs.kind && payload == rhs.payload && style == rhs.style && flags == rhs.flags;  }
-    bool operator!=(const This& rhs) const { return !(*this == rhs); }
+    bool operator==(const ThisType& rhs) const { return kind == rhs.kind && payload == rhs.payload && style == rhs.style && flags == rhs.flags;  }
+    bool operator!=(const ThisType& rhs) const { return !(*this == rhs); }
 
         /// Construct from the elements
-    static This make(Kind inKind, Payload inPayload, Style inStyle = Style::Unknown, Flags flags = 0) { return This{ inKind, inPayload, inStyle, flags }; }
+    static ThisType make(Kind inKind, Payload inPayload, Style inStyle = Style::Unknown, Flags flags = 0) { return ThisType{ inKind, inPayload, inStyle, flags }; }
+    static ThisType make(Kind inKind, Payload inPayload, const ThisType& base) { return ThisType{ inKind, inPayload, base.style, base.flags }; }
 
         /// Construct from the packed format
-    inline static This make(Packed inPacked);
+    inline static ThisType make(Packed inPacked);
 
     Kind kind;
     Payload payload;
@@ -240,7 +256,7 @@ inline /* static */ArtifactDesc ArtifactDesc::make(Packed inPacked)
 {
     const PackedBacking packed = PackedBacking(inPacked);
 
-    This r;
+    ThisType r;
     r.kind = Kind(packed >> 24);
     r.payload = Payload(uint8_t(packed >> 16));
     r.style = Style(uint8_t(packed >> 8));
@@ -252,7 +268,6 @@ inline /* static */ArtifactDesc ArtifactDesc::make(Packed inPacked)
 // Forward declare
 class IFileArtifactRepresentation;
 class IArtifactRepresentation;
-class IArtifactList;
 
 // Controls what items can be kept. 
 enum class ArtifactKeep

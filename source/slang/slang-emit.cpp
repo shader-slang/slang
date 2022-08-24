@@ -187,7 +187,7 @@ Result linkAndOptimizeIR(
     auto targetRequest = codeGenContext->getTargetReq();
 
     // Get the artifact desc for the target 
-    const auto artifactDesc = ArtifactDescUtil::makeDescFromCompileTarget(asExternal(target));
+    const auto artifactDesc = ArtifactDescUtil::makeDescForCompileTarget(asExternal(target));
 
     // We start out by performing "linking" at the level of the IR.
     // This step will create a fresh IR module to be used for
