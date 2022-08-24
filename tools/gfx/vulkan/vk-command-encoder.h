@@ -4,6 +4,14 @@
 #include "vk-base.h"
 #include "vk-pipeline-state.h"
 
+#ifndef ENABLE_VALIDATION_LAYER
+#    if _DEBUG
+#        define ENABLE_VALIDATION_LAYER 1
+#    else
+#        define ENABLE_VALIDATION_LAYER 0
+#    endif
+#endif
+
 namespace gfx
 {
 
