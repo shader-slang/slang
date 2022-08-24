@@ -64,74 +64,6 @@ void* DownstreamCompilerBase::getObject(const Guid& guid)
     return nullptr;
 }
 
-/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! CommandLineDownstreamArtifactRepresentation !!!!!!!!!!!!!!!!!!!!!!*/
-
-void* CommandLineDownstreamArtifactRepresentation::castAs(const Guid& guid)
-{
-    if (auto ptr = getInterface(guid))
-    {
-        return ptr;
-    }
-    return getObject(guid);
-}
-
-void* CommandLineDownstreamArtifactRepresentation::getInterface(const Guid& guid)
-{
-    if (guid == ISlangUnknown::getTypeGuid() ||
-        guid == ICastable::getTypeGuid() ||
-        guid == IArtifactRepresentation::getTypeGuid())
-    {
-        IArtifactRepresentation* rep = this;
-        return rep;
-    }
-
-    return nullptr;
-}
-
-void* CommandLineDownstreamArtifactRepresentation::getObject(const Guid& guid)
-{
-    SLANG_UNUSED(guid);
-    return nullptr;
-}
-
-SlangResult CommandLineDownstreamArtifactRepresentation::createRepresentation(const Guid& typeGuid, ICastable** outCastable)
-{
-    if (typeGuid == ISlangSharedLibrary::getTypeGuid())
-    {
-        // Okay we want to load
-        // Try loading the shared library
-        SharedLibrary::Handle handle;
-        if (SLANG_FAILED(SharedLibrary::loadWithPlatformPath(m_moduleFilePath.getBuffer(), handle)))
-        {
-            return SLANG_FAIL;
-        }
-
-        // The shared library needs to keep temp files in scope
-        ComPtr<ISlangSharedLibrary> lib(new ScopeSharedLibrary(handle, m_artifactList));
-        *outCastable = lib.detach();
-        return SLANG_OK;
-    }
-    else if (typeGuid == ISlangBlob::getTypeGuid())
-    {
-        List<uint8_t> contents;
-        // Read the binary
-            // Read the contents of the binary
-        SLANG_RETURN_ON_FAIL(File::readAllBytes(m_moduleFilePath, contents));
-
-        auto blob = ScopeBlob::create(ListBlob::moveCreate(contents), m_artifactList);
-
-        *outCastable = CastableUtil::getCastable(blob).detach();
-        return SLANG_OK;
-    }
-
-    return SLANG_E_NOT_AVAILABLE;
-}
-
-bool CommandLineDownstreamArtifactRepresentation::exists()
-{
-    return File::exists(m_moduleFilePath);
-}
-
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! CommandLineDownstreamCompiler !!!!!!!!!!!!!!!!!!!!!!*/
 
 static bool _isContentsInFile(const DownstreamCompileOptions& options)
@@ -238,24 +170,32 @@ SlangResult CommandLineDownstreamCompiler::compile(const CompileOptions& inOptio
     // Append command line args to the end of cmdLine using the target specific function for the specified options
     SLANG_RETURN_ON_FAIL(calcArgs(options, cmdLine));
 
-    String moduleFilePath;
-
+    // The 'mainArtifact' is the main product produced from the compilation - the executable/sharedlibrary/object etc
+    ComPtr<IArtifact> mainArtifact;
     {
-        StringBuilder builder;
         const auto desc = ArtifactDescUtil::makeDescForCompileTarget(options.targetType);
-        SLANG_RETURN_ON_FAIL(ArtifactDescUtil::calcPathForDesc(desc, options.modulePath.getUnownedSlice(), builder));
 
-        moduleFilePath = builder.ProduceString();
-    }
-
-    {
         List<ComPtr<IArtifact>> artifacts;
         SLANG_RETURN_ON_FAIL(calcCompileProducts(options, DownstreamProductFlag::All, lockFile, artifacts));
 
         for (IArtifact* artifact : artifacts)
         {
+            // The main artifact must be in the list, so add it if we find it
+            if (artifact->getDesc() == desc)
+            {
+                SLANG_ASSERT(mainArtifact == nullptr);
+                mainArtifact = artifact;
+            }
+
             artifactList->add(artifact);
         }
+    }
+    
+    SLANG_ASSERT(mainArtifact);
+    // Somethings gone wrong if we don't find the main artifact
+    if (!mainArtifact)
+    {
+        return SLANG_FAIL;
     }
 
     ExecuteResult exeRes;
@@ -276,6 +216,39 @@ SlangResult CommandLineDownstreamCompiler::compile(const CompileOptions& inOptio
     }
 #endif
 
+    // Go through the list of artifacts in the artifactList and check if they exist. 
+    // 
+    // This is useful because `calcCompileProducts` is conservative and may produce artifacts for products that aren't actually 
+    // produced, by the compilation.
+    {
+        Count count = artifactList->getCount();
+        for (Index i = 0; i < count; ++i)
+        {
+            auto artifact = as<IArtifact>(artifactList->getAt(i));
+
+            if (!artifact->exists())
+            {
+                // We should find a file rep and if we do we can disown it. Disowning will mean
+                // when scope is lost the rep won't try and delete the (apparently non existing) backing file.
+                if (auto fileRep = findRepresentation<IFileArtifactRepresentation>(artifact))
+                {
+                    fileRep->disown();
+                }
+
+                // If the main artifact doesn't exist, we don't have a main artifact
+                if (artifact == mainArtifact)
+                {
+                    mainArtifact.setNull();
+                }
+
+                // Remove from the list
+                artifactList->removeAt(i);
+                --count;
+                --i;
+            }
+        }
+    }
+
     auto artifact = ArtifactUtil::createArtifactForCompileTarget(options.targetType);
 
     auto diagnostics = ArtifactDiagnostics::create();
@@ -284,10 +257,19 @@ SlangResult CommandLineDownstreamCompiler::compile(const CompileOptions& inOptio
 
     // Add the artifact
     artifact->addAssociated(diagnostics);
+    
+    // Find the rep from the 'main' artifact, we'll just use the same representation on the output 
+    // artifact. Sharing is needed, because the rep owns the file.
+    if (auto fileRep = mainArtifact ? findRepresentation<IFileArtifactRepresentation>(mainArtifact) : nullptr)
+    {
+        artifact->addRepresentation(fileRep);
+    }
 
-    ComPtr<IArtifactRepresentation> rep(new CommandLineDownstreamArtifactRepresentation(moduleFilePath.getUnownedSlice(), artifactList));
-    artifact->addRepresentation(rep);
-    artifact->addAssociated(artifactList);
+    // Add the artifact list if there is anything in it
+    if (artifactList->getCount())
+    {
+        artifact->addAssociated(artifactList);
+    }
 
     *outArtifact = artifact.detach();
     

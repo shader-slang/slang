@@ -395,7 +395,6 @@ public:
     virtual SLANG_NO_THROW void* SLANG_MCALL findRepresentation(const Guid& guid) = 0;
         /// Find first representation that matches the predicate 
     virtual SLANG_NO_THROW ICastable* SLANG_MCALL findRepresentationWithPredicate(ICastableList::FindFunc findFunc, void* data) = 0;
-
         /// Get all the representations
     virtual SLANG_NO_THROW Slice<ICastable*> SLANG_MCALL getRepresentations() = 0;
         /// Get the list of all representations
@@ -405,6 +404,11 @@ public:
         /// If found outCastable holds an entity that *must* be castable to typeGuid
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL getOrCreateRepresentation(const Guid& typeGuid, ArtifactKeep keep, ICastable** outCastable) = 0;
     
+        /// Get the handler used for this artifact. If nullptr means the default handler will be used.
+    virtual SLANG_NO_THROW IArtifactHandler* SLANG_MCALL getHandler() = 0;
+        /// Set the handler associated with this artifact. Setting nullptr will use the default handler.
+    virtual SLANG_NO_THROW void SLANG_MCALL setHandler(IArtifactHandler* handler) = 0;
+
         /// Get the children, will only remain valid if no mutation of children list
     virtual SLANG_NO_THROW Slice<IArtifact*> SLANG_MCALL getChildren() = 0;
 
