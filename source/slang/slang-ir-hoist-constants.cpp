@@ -1,6 +1,5 @@
 // slang-ir-hoist-constants.cpp
-#pragma once
-
+#include "slang-ir-hoist-constants.h"
 #include "slang-ir-inst-pass-base.h"
 
 namespace Slang
