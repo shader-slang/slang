@@ -261,6 +261,7 @@
     <ClInclude Include="..\..\..\source\compiler-core\slang-artifact-representation.h" />
     <ClInclude Include="..\..\..\source\compiler-core\slang-artifact-util.h" />
     <ClInclude Include="..\..\..\source\compiler-core\slang-artifact.h" />
+    <ClInclude Include="..\..\..\source\compiler-core\slang-char-slice-allocator.h" />
     <ClInclude Include="..\..\..\source\compiler-core\slang-command-line-args.h" />
     <ClInclude Include="..\..\..\source\compiler-core\slang-core-diagnostics.h" />
     <ClInclude Include="..\..\..\source\compiler-core\slang-diagnostic-sink.h" />
@@ -306,6 +307,7 @@
     <ClCompile Include="..\..\..\source\compiler-core\slang-artifact-impl.cpp" />
     <ClCompile Include="..\..\..\source\compiler-core\slang-artifact-representation-impl.cpp" />
     <ClCompile Include="..\..\..\source\compiler-core\slang-artifact-util.cpp" />
+    <ClCompile Include="..\..\..\source\compiler-core\slang-char-slice-allocator.cpp" />
     <ClCompile Include="..\..\..\source\compiler-core\slang-command-line-args.cpp" />
     <ClCompile Include="..\..\..\source\compiler-core\slang-core-diagnostics.cpp" />
     <ClCompile Include="..\..\..\source\compiler-core\slang-diagnostic-sink.cpp" />

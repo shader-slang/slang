@@ -19,7 +19,7 @@ struct Slice
     const T* begin() const { return data; }
     const T* end() const { return data + count; }
 
-    const T& operator[](Index index) { SLANG_ASSERT(index >= 0 && index < count); return data[index]; }
+    const T& operator[](Index index) const { SLANG_ASSERT(index >= 0 && index < count); return data[index]; }
 
     Slice() :count(0), data(nullptr) {}
     Slice(const T* inData, Count inCount) :
@@ -30,6 +30,18 @@ struct Slice
     const T* data;
     Count count;
 };
+
+template <typename T>
+SLANG_FORCE_INLINE Slice<T> makeSlice(const T* inData, Count inCount) 
+{ 
+    return Slice<T>(inData, inCount); 
+}
+
+template <typename T>
+SLANG_FORCE_INLINE Slice<T> makeSlice(const List<T>& list)
+{
+    return Slice<T>(list.getBuffer(), list.getCount()); 
+}
 
 struct CharSlice : public Slice<char>
 {
@@ -51,6 +63,9 @@ struct TerminatedCharSlice : public CharSlice
 
     SLANG_FORCE_INLINE bool operator==(const ThisType& rhs) const { return Super::operator==(rhs); }
     SLANG_FORCE_INLINE bool operator!=(const ThisType& rhs) const { return !(*this == rhs); }
+
+        /// Make convertable to char*
+    SLANG_FORCE_INLINE operator const char* () const { return data; }
 
     explicit TerminatedCharSlice(const char* in) :Super(in) {}
     TerminatedCharSlice(const char* in, Count inCount) :Super(in, inCount) { SLANG_ASSERT(in[inCount] == 0); }

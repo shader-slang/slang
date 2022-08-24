@@ -32,7 +32,7 @@ static void _addFile(const String& path, const ArtifactDesc& desc, IFileArtifact
 
 /* static */SlangResult VisualStudioCompilerUtil::calcCompileProducts(const CompileOptions& options, ProductFlags flags, IFileArtifactRepresentation* lockFile, List<ComPtr<IArtifact>>& outArtifacts)
 {
-    SLANG_ASSERT(options.modulePath.getLength());
+    SLANG_ASSERT(options.modulePath.count);
 
     const auto targetDesc = ArtifactDescUtil::makeDescForCompileTarget(options.targetType);
 
@@ -42,7 +42,7 @@ static void _addFile(const String& path, const ArtifactDesc& desc, IFileArtifact
     {
         StringBuilder builder;
         const auto desc = ArtifactDescUtil::makeDescForCompileTarget(options.targetType);
-        SLANG_RETURN_ON_FAIL(ArtifactDescUtil::calcPathForDesc(desc, options.modulePath.getUnownedSlice(), builder));
+        SLANG_RETURN_ON_FAIL(ArtifactDescUtil::calcPathForDesc(desc, asStringSlice(options.modulePath), builder));
 
         _addFile(builder, desc, lockFile, outArtifacts);
     }
@@ -71,8 +71,8 @@ static void _addFile(const String& path, const ArtifactDesc& desc, IFileArtifact
 
 /* static */SlangResult VisualStudioCompilerUtil::calcArgs(const CompileOptions& options, CommandLine& cmdLine)
 {
-    SLANG_ASSERT(options.sourceContents.getLength() == 0);
-    SLANG_ASSERT(options.modulePath.getLength());
+    SLANG_ASSERT(options.sourceContents.count == 0);
+    SLANG_ASSERT(options.modulePath.count);
 
     // https://docs.microsoft.com/en-us/cpp/build/reference/compiler-options-listed-alphabetically?view=vs-2019
 
@@ -130,7 +130,7 @@ static void _addFile(const String& path, const ArtifactDesc& desc, IFileArtifact
     {
         // Generate complete debugging information
         cmdLine.addArg("/Zi");
-        cmdLine.addPrefixPathArg("/Fd", options.modulePath, ".pdb");
+        cmdLine.addPrefixPathArg("/Fd", asString(options.modulePath), ".pdb");
     }
 
     switch (options.optimizationLevel)
@@ -179,6 +179,8 @@ static void _addFile(const String& path, const ArtifactDesc& desc, IFileArtifact
         }
     }
 
+    const auto modulePath = asString(options.modulePath);
+
     switch (options.targetType)
     {
         case SLANG_SHADER_SHARED_LIBRARY:
@@ -193,29 +195,29 @@ static void _addFile(const String& path, const ArtifactDesc& desc, IFileArtifact
                 cmdLine.addArg("/LD");
             }
 
-            cmdLine.addPrefixPathArg("/Fe", options.modulePath, ".dll");
+            cmdLine.addPrefixPathArg("/Fe", modulePath, ".dll");
             break;
         }
         case SLANG_HOST_EXECUTABLE:
         {
-            cmdLine.addPrefixPathArg("/Fe", options.modulePath, ".exe");
+            cmdLine.addPrefixPathArg("/Fe", modulePath, ".exe");
             break;
         }
         default: break;
     }
 
     // Object file specify it's location - needed if we are out
-    cmdLine.addPrefixPathArg("/Fo", options.modulePath, ".obj");
+    cmdLine.addPrefixPathArg("/Fo", modulePath, ".obj");
 
     // Add defines
     for (const auto& define : options.defines)
     {
         StringBuilder builder;
         builder << "/D";
-        builder << define.nameWithSig;
-        if (define.value.getLength())
+        builder << asStringSlice(define.nameWithSig);
+        if (define.value.count)
         {
-            builder << "=" << define.value;
+            builder << "=" << asStringSlice(define.value);
         }
 
         cmdLine.addArg(builder);
@@ -225,7 +227,7 @@ static void _addFile(const String& path, const ArtifactDesc& desc, IFileArtifact
     for (const auto& include : options.includePaths)
     {
         cmdLine.addArg("/I");
-        cmdLine.addArg(include);
+        cmdLine.addArg(asString(include));
     }
 
     // https://docs.microsoft.com/en-us/cpp/build/reference/eh-exception-handling-model?view=vs-2019
@@ -234,7 +236,7 @@ static void _addFile(const String& path, const ArtifactDesc& desc, IFileArtifact
     // Files to compile
     for (const auto& sourceFile : options.sourceFiles)
     {
-        cmdLine.addArg(sourceFile);
+        cmdLine.addArg(asString(sourceFile));
     }
 
     // Link options (parameters past /link go to linker)

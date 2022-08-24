@@ -618,8 +618,9 @@ SlangResult NVRTCDownstreamCompiler::_maybeAddHalfSupport(const DownstreamCompil
     }
 
     // Let's see if one of the paths finds cuda_fp16.h
-    for (const auto& includePath : options.includePaths)
+    for (const auto& curIncludePath : options.includePaths)
     {
+        const String includePath = asString(curIncludePath);
         const String checkPath = Path::combine(includePath, g_fp16HeaderName);
         if (File::exists(checkPath))
         {
@@ -642,10 +643,29 @@ SlangResult NVRTCDownstreamCompiler::_maybeAddHalfSupport(const DownstreamCompil
     return SLANG_OK;
 }
 
+static const char* _getTerminated(String& ioBackingString, const Slice<char>& slice)
+{
+    if (slice.count <= 0)
+    {
+        return "";
+    }
+
+    if (slice[slice.count - 1] == 0)
+    {
+        return slice.data;
+    }
+
+    // Could check if the character @end is 0, but strictly speaking this isn't right, because we could be checking the 
+    // byte after the allocation. So to be safe we will just allocate
+
+    ioBackingString = UnownedStringSlice(slice.data, slice.count);
+    return ioBackingString.getBuffer();
+}
+
 SlangResult NVRTCDownstreamCompiler::compile(const DownstreamCompileOptions& options, IArtifact** outArtifact)
 {
     // This compiler doesn't read files, they should be read externally and stored in sourceContents/sourceContentsPath
-    if (options.sourceFiles.getCount() > 0)
+    if (options.sourceFiles.count > 0)
     {
         return SLANG_FAIL;
     }
@@ -696,10 +716,10 @@ SlangResult NVRTCDownstreamCompiler::compile(const DownstreamCompileOptions& opt
     {
         StringBuilder builder;
         builder << "-D";
-        builder << define.nameWithSig;
-        if (define.value.getLength())
+        builder << asStringSlice(define.nameWithSig);
+        if (define.value.count)
         {
-            builder << "=" << define.value;
+            builder << "=" << asStringSlice(define.value);
         }
 
         cmdLine.addArg(builder);
@@ -709,7 +729,7 @@ SlangResult NVRTCDownstreamCompiler::compile(const DownstreamCompileOptions& opt
     for (const auto& include : options.includePaths)
     {
         cmdLine.addArg("-I");
-        cmdLine.addArg(include);
+        cmdLine.addArg(asString(include));
     }
 
     SLANG_RETURN_ON_FAIL(_maybeAddHalfSupport(options, cmdLine));
@@ -818,8 +838,12 @@ SlangResult NVRTCDownstreamCompiler::compile(const DownstreamCompileOptions& opt
 
     SLANG_ASSERT(headers.getCount() == headerIncludeNames.getCount());
 
+    // Argh! We must have a zero terminated input source string. Lets make sure we have that
+    String sourceContentsString;
+    const auto sourceContents = _getTerminated(sourceContentsString, options.sourceContents);
+
     nvrtcProgram program = nullptr;
-    nvrtcResult res = m_nvrtcCreateProgram(&program, options.sourceContents.getBuffer(), options.sourceContentsPath.getBuffer(),
+    nvrtcResult res = m_nvrtcCreateProgram(&program, sourceContents, options.sourceContentsPath,
         (int) headers.getCount(),
         headers.getBuffer(),
         headerIncludeNames.getBuffer());

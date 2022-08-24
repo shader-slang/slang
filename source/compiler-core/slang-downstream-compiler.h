@@ -90,8 +90,8 @@ struct DownstreamCompileOptions
 
     struct Define
     {
-        String nameWithSig;             ///< If macro takes parameters include in brackets
-        String value;
+        TerminatedCharSlice nameWithSig;             ///< If macro takes parameters include in brackets
+        TerminatedCharSlice value;
     };
 
     struct CapabilityVersion
@@ -119,38 +119,38 @@ struct DownstreamCompileOptions
 
     /// The path/name of the output module. Should not have the extension, as that will be added for each of the target types.
     /// If not set a module path will be internally generated internally on a command line based compiler
-    String modulePath;
+    TerminatedCharSlice modulePath;
 
-    List<Define> defines;
+    Slice<Define> defines;
 
     /// The contents of the source to compile. This can be empty is sourceFiles is set.
     /// If the compiler is a commandLine file this source will be written to a temporary file.
-    String sourceContents;
+    CharSlice sourceContents;
     /// 'Path' that the contents originated from. NOTE! This is for reporting only and doesn't have to exist on file system
-    String sourceContentsPath;
+    TerminatedCharSlice sourceContentsPath;
 
     /// The names/paths of source to compile. This can be empty if sourceContents is set.
-    List<String> sourceFiles;
+    Slice<TerminatedCharSlice> sourceFiles;
 
-    List<String> includePaths;
-    List<String> libraryPaths;
+    Slice<TerminatedCharSlice> includePaths;
+    Slice<TerminatedCharSlice> libraryPaths;
 
     /// Libraries to link against.
-    List<ComPtr<IArtifact>> libraries;
+    Slice<IArtifact*> libraries;
 
-    List<CapabilityVersion> requiredCapabilityVersions;
+    Slice<CapabilityVersion> requiredCapabilityVersions;
 
     /// For compilers/compiles that require an entry point name, else can be empty
-    String entryPointName;
+    TerminatedCharSlice entryPointName;
     /// Profile name to use, only required for compiles that need to compile against a a specific profiles.
     /// Profile names are tied to compilers and targets.
-    String profileName;
+    TerminatedCharSlice profileName;
 
     /// The stage being compiled for 
     SlangStage stage = SLANG_STAGE_NONE;
 
     /// Arguments that are specific to a particular compiler implementation.
-    List<String> compilerSpecificArguments;
+    Slice<TerminatedCharSlice> compilerSpecificArguments;
 
     /// NOTE! Not all downstream compilers can use the fileSystemExt/sourceManager. This option will be ignored in those scenarios.
     ISlangFileSystemExt* fileSystemExt = nullptr;

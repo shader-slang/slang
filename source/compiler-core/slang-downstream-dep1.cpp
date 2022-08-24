@@ -7,6 +7,8 @@
 
 #include "../core/slang-castable-util.h"
 
+#include "slang-char-slice-allocator.h"
+
 namespace Slang
 {
 
@@ -96,6 +98,7 @@ DownstreamCompilerAdapter_Dep1::DownstreamCompilerAdapter_Dep1(DownstreamCompile
 SlangResult DownstreamCompilerAdapter_Dep1::compile(const CompileOptions& inOptions, IArtifact** outArtifact)
 {
     typedef DownstreamCompileOptions_Dep1::SomeEnum SomeEnum;
+    typedef CharSliceCaster Caster;
 
     // Convert to the Deps1 compile options
 
@@ -112,27 +115,27 @@ SlangResult DownstreamCompilerAdapter_Dep1::compile(const CompileOptions& inOpti
     options.flags = inOptions.flags;
     options.platform = SomeEnum(inOptions.platform);
 
-    options.modulePath = inOptions.modulePath;
+    options.modulePath = asString(inOptions.modulePath);
 
     for (auto& src : inOptions.defines)
     {
         DownstreamCompileOptions_Dep1::Define dst;
 
-        dst.nameWithSig = src.nameWithSig;
-        dst.value = src.value;
+        dst.nameWithSig = asStringSlice(src.nameWithSig);
+        dst.value = asStringSlice(src.value);
 
         options.defines.add(dst);
     }
 
-    options.sourceContents = inOptions.sourceContents;
-    options.sourceContentsPath = inOptions.sourceContentsPath;
+    options.sourceContents = asStringSlice(inOptions.sourceContents);
+    options.sourceContentsPath = asStringSlice(inOptions.sourceContentsPath);
 
-    options.sourceFiles = inOptions.sourceFiles;
+    options.sourceFiles = Caster::asList(inOptions.sourceFiles);
 
-    options.includePaths = inOptions.includePaths;
-    options.libraryPaths = inOptions.libraryPaths;
+    options.includePaths = Caster::asList(inOptions.includePaths);
+    options.libraryPaths = Caster::asList(inOptions.libraryPaths);
 
-    options.libraries = inOptions.libraries;
+    options.libraries = Caster::asComPtrList(inOptions.libraries);
 
     for (auto& src : inOptions.requiredCapabilityVersions)
     {
@@ -148,12 +151,12 @@ SlangResult DownstreamCompilerAdapter_Dep1::compile(const CompileOptions& inOpti
         options.requiredCapabilityVersions.add(capVer);
     }
 
-    options.entryPointName = inOptions.entryPointName;
-    options.profileName = inOptions.profileName;
+    options.entryPointName = asStringSlice(inOptions.entryPointName);
+    options.profileName = asStringSlice(inOptions.profileName);
 
     options.stage = inOptions.stage;
 
-    options.compilerSpecificArguments = inOptions.compilerSpecificArguments;
+    options.compilerSpecificArguments = Caster::asList(inOptions.compilerSpecificArguments);
 
     options.fileSystemExt = inOptions.fileSystemExt;
     options.sourceManager = inOptions.sourceManager;

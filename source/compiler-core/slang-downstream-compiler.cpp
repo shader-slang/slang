@@ -68,13 +68,13 @@ void* DownstreamCompilerBase::getObject(const Guid& guid)
 
 static bool _isContentsInFile(const DownstreamCompileOptions& options)
 {
-    if (options.sourceContentsPath.getLength() <= 0)
+    if (options.sourceContentsPath.count <= 0)
     {
         return false;
     }
 
     // We can see if we can load it
-    if (File::exists(options.sourceContentsPath))
+    if (File::exists(asStringSlice(options.sourceContentsPath)))
     {
         // Here we look for the file on the regular file system (as opposed to using the 
         // ISlangFileSystem. This is unfortunate but necessary - because when we call out
@@ -87,9 +87,9 @@ static bool _isContentsInFile(const DownstreamCompileOptions& options)
         // file system access.
         String readContents;
 
-        if (SLANG_SUCCEEDED(File::readAllText(options.sourceContentsPath, readContents)))
+        if (SLANG_SUCCEEDED(File::readAllText(asStringSlice(options.sourceContentsPath), readContents)))
         {
-            return options.sourceContents == readContents.getUnownedSlice();
+            return asStringSlice(options.sourceContents) == readContents.getUnownedSlice();
         }
     }
     return false;
@@ -104,15 +104,18 @@ SlangResult CommandLineDownstreamCompiler::compile(const CompileOptions& inOptio
 
     auto helper = DefaultArtifactHelper::getSingleton();
 
+    CharSliceAllocator allocator;
+
     // Find all the files that will be produced
 
     auto artifactList = CastableList::create();
 
     ComPtr<IFileArtifactRepresentation> lockFile;
+    List<String> sourceFiles;
 
-    if (options.modulePath.getLength() == 0 || options.sourceContents.getLength() != 0)
+    if (options.modulePath.count == 0 || options.sourceContents.count != 0)
     {
-        String modulePath = options.modulePath;
+        String modulePath = asString(options.modulePath);
 
         // If there is no module path, generate one.
         if (modulePath.getLength() == 0)
@@ -125,12 +128,12 @@ SlangResult CommandLineDownstreamCompiler::compile(const CompileOptions& inOptio
             artifactList->add(lockArtifact);
 
             modulePath = lockFile->getPath();
-            options.modulePath = modulePath;
+            options.modulePath = allocator.allocate(modulePath);
         }
-
+        
         if (_isContentsInFile(options))
         {
-            options.sourceFiles.add(options.sourceContentsPath);
+            sourceFiles.add(asStringSlice(options.sourceContentsPath));
         }
         else
         {
@@ -149,7 +152,7 @@ SlangResult CommandLineDownstreamCompiler::compile(const CompileOptions& inOptio
             }
 
             // Write it out
-            SLANG_RETURN_ON_FAIL(File::writeAllText(compileSourcePath, options.sourceContents));
+            SLANG_RETURN_ON_FAIL(File::writeAllText(compileSourcePath, asStringSlice(options.sourceContents)));
             
             // Create the reference to the file 
             auto fileRep = FileArtifactRepresentation::create(IFileArtifactRepresentation::Kind::Owned, compileSourcePath.getUnownedSlice(), lockFile, nullptr);
@@ -159,13 +162,15 @@ SlangResult CommandLineDownstreamCompiler::compile(const CompileOptions& inOptio
             artifactList->add(fileArtifact);
 
             // Add it as a source file
-            options.sourceFiles.add(compileSourcePath);
+            sourceFiles.add(compileSourcePath);
         }
 
         // There is no source contents
-        options.sourceContents = String();
-        options.sourceContentsPath = String();
+        options.sourceContents = TerminatedCharSlice();
+        options.sourceContentsPath = TerminatedCharSlice();
     }
+
+    options.sourceFiles = allocator.allocate(sourceFiles);
 
     // Append command line args to the end of cmdLine using the target specific function for the specified options
     SLANG_RETURN_ON_FAIL(calcArgs(options, cmdLine));
@@ -272,7 +277,6 @@ SlangResult CommandLineDownstreamCompiler::compile(const CompileOptions& inOptio
     }
 
     *outArtifact = artifact.detach();
-    
     return SLANG_OK;
 }
 

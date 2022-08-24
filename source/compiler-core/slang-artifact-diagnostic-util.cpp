@@ -6,29 +6,6 @@
 
 namespace Slang {
 
-/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! CharSliceAllocator !!!!!!!!!!!!!!!!!!!!!!!!!!! */
-
-TerminatedCharSlice CharSliceAllocator::allocate(const char* in)
-{
-    const size_t length = ::strlen(in);
-    auto dst = m_arena.allocateString(in, length);
-    return TerminatedCharSlice(dst, length);
-}
-
-TerminatedCharSlice CharSliceAllocator::allocate(const UnownedStringSlice& slice)
-{
-    const auto length = slice.getLength();
-    auto dst = m_arena.allocateString(slice.begin(), length);
-    return TerminatedCharSlice(dst, length);
-}
-
-TerminatedCharSlice CharSliceAllocator::allocate(const Slice<char>& slice)
-{
-    const auto count = slice.count;
-    auto dst = m_arena.allocateString(slice.begin(), count);
-    return TerminatedCharSlice(dst, count);
-}
-
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ArtifactDiagnosticsUtil !!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
 /* static */UnownedStringSlice ArtifactDiagnosticUtil::getSeverityText(Severity severity)
