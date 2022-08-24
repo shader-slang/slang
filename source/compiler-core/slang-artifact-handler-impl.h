@@ -28,7 +28,7 @@ public:
 	static IArtifactHandler* getSingleton() { return &g_singleton; }
 protected:
 
-	SlangResult _loadSharedLibrary(IArtifact* artifact, ArtifactKeep keep, ISlangSharedLibrary** outSharedLibrary);
+	SlangResult _loadSharedLibrary(IArtifact* artifact, ISlangSharedLibrary** outSharedLibrary);
 	
 	void* getInterface(const Guid& uuid);
 	void* getObject(const Guid& uuid);
