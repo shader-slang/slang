@@ -1618,7 +1618,7 @@ bool isKhronosTarget(TargetRequest* targetReq)
 
 bool isCPUTarget(TargetRequest* targetReq)
 {
-    return ArtifactDescUtil::isCpuLikeTarget(ArtifactDescUtil::makeDescFromCompileTarget(asExternal(targetReq->getTarget())));
+    return ArtifactDescUtil::isCpuLikeTarget(ArtifactDescUtil::makeDescForCompileTarget(asExternal(targetReq->getTarget())));
 }
 
 bool isCUDATarget(TargetRequest* targetReq)

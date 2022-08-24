@@ -3031,7 +3031,7 @@ static int _calcTotalNumUsedRegistersForLayoutResourceKind(ParameterBindingConte
 
 static bool _isCPUTarget(CodeGenTarget target)
 {
-    const auto desc = ArtifactDescUtil::makeDescFromCompileTarget(asExternal(target));
+    const auto desc = ArtifactDescUtil::makeDescForCompileTarget(asExternal(target));
     return ArtifactDescUtil::isCpuLikeTarget(desc);
 }
 

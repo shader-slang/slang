@@ -52,29 +52,70 @@ protected:
     {}
 };
 
+// An compile time int val as result of some general computation.
+class SomeIntVal : public IntVal
+{
+    SLANG_AST_CLASS(SomeIntVal)
+
+    bool _equalsValOverride(Val* val);
+    void _toTextOverride(StringBuilder& out);
+    HashCode _getHashCodeOverride();
+    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+
+    DeclRef<Decl> funcDeclRef;
+    List<IntVal*> args;
+    Type* funcType;
+    static Val* tryFoldImpl(ASTBuilder* astBuilder, DeclRef<Decl> newFuncDecl, List<IntVal*> &newArgs, DiagnosticSink* sink);
+};
+
 // polynomial expression "2*a*b^3 + 1" will be represented as:
 // { constantTerm:1, terms: [ { constFactor:2, paramFactors:[{"a", 1}, {"b", 3}] } ] }
 class PolynomialIntValFactor : public NodeBase
 {
     SLANG_AST_CLASS(PolynomialIntValFactor)
 public:
-    GenericParamIntVal* param;
+    IntVal* param;
     IntegerLiteralValue power;
     // for sorting only.
     bool operator<(const PolynomialIntValFactor& other) const
     {
-        if (param->declRef.decl < other.param->declRef.decl)
-            return true;
-        else if (param->declRef.decl == other.param->declRef.decl)
-            return power < other.power;
-        return false;
+        if (auto thisGenParam = as<GenericParamIntVal>(param))
+        {
+            if (auto thatGenParam = as<GenericParamIntVal>(other.param))
+            {
+                if (thisGenParam->equalsVal(thatGenParam))
+                    return power < other.power;
+                else
+                    return thisGenParam->declRef.decl < thatGenParam->declRef.decl;
+            }
+            else
+            {
+                return true;
+            }
+        }
+        else
+        {
+            if (auto thatGenParam = as<GenericParamIntVal>(other.param))
+            {
+                return false;
+            }
+            return param == other.param ? power < other.power : param < other.param;
+        }
+        
     }
     // for sorting only.
     bool operator==(const PolynomialIntValFactor& other) const
     {
-        if (param->declRef.decl == other.param->declRef.decl && power == other.power)
-            return true;
-        return false;
+        if (auto thisGenParam = as<GenericParamIntVal>(param))
+        {
+            if (auto thatGenParam = as<GenericParamIntVal>(other.param))
+            {
+                if (param->equalsVal(other.param) && power == other.power)
+                    return true;
+            }
+            return false;
+        }
+        return power == other.power && param == other.param;
     }
     bool equals(const PolynomialIntValFactor& other) const
     {
@@ -132,7 +173,10 @@ public:
     IntegerLiteralValue constantTerm = 0;
 
     bool isConstant() { return terms.getCount() == 0; }
-    void canonicalize(ASTBuilder* builder);
+    // Canonicalize the polynomial. If the polynomial can be simplified to a constant or a genericparam,
+    // the method returns the value simplified to.
+    // Otherwise, in-place modifications are performed and returns this.
+    IntVal* canonicalize(ASTBuilder* builder);
 
     // Overrides should be public so base classes can access
     bool _equalsValOverride(Val* val);

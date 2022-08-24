@@ -6,6 +6,7 @@
 #include "slang-ir-dce.h"
 #include "slang-ir-simplify-cfg.h"
 #include "slang-ir-peephole.h"
+#include "slang-ir-hoist-constants.h"
 
 namespace Slang
 {
@@ -21,6 +22,7 @@ namespace Slang
         while (changed && iterationCounter < kMaxIterations)
         {
             changed = false;
+            changed |= hoistConstants(module);
             changed |= applySparseConditionalConstantPropagation(module);
             changed |= peepholeOptimize(module);
             changed |= simplifyCFG(module);

@@ -387,15 +387,19 @@ Val* ArrayExpressionType::_substituteImplOverride(ASTBuilder* astBuilder, Substi
 {
     int diff = 0;
     auto elementType = as<Type>(baseType->substituteImpl(astBuilder, subst, &diff));
-    auto arrlen = as<IntVal>(arrayLength->substituteImpl(astBuilder, subst, &diff));
-    SLANG_ASSERT(arrlen);
+    IntVal* newArrayLength = nullptr;
+    if (arrayLength)
+    {
+        newArrayLength = as<IntVal>(arrayLength->substituteImpl(astBuilder, subst, &diff));
+        SLANG_ASSERT(newArrayLength);
+    }
     if (diff)
     {
         *ioDiff = 1;
         auto rsType = getArrayType(
             astBuilder,
             elementType,
-            arrlen);
+            newArrayLength);
         return rsType;
     }
     return this;

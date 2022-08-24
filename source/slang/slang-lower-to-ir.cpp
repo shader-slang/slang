@@ -1287,6 +1287,25 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
             lowerType(context, getType(context->astBuilder, val->declRef)));
     }
 
+    LoweredValInfo visitSomeIntVal(SomeIntVal* val)
+    {
+        TryClauseEnvironment tryEnv;
+        List<IRInst*> args;
+        for (auto arg : val->args)
+        {
+            auto loweredArg = lowerVal(context, arg);
+            args.add(loweredArg.val);
+        }
+        auto funcType = lowerType(context, val->funcType);
+        return emitCallToDeclRef(
+            context,
+            as<IRFuncType>(funcType)->getResultType(),
+            val->funcDeclRef,
+            funcType,
+            args,
+            tryEnv);
+    }
+
     LoweredValInfo visitPolynomialIntVal(PolynomialIntVal* val)
     {
         auto irBuilder = getBuilder();

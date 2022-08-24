@@ -1997,6 +1997,7 @@ namespace Slang
             case TokenType::Semicolon:
             case TokenType::OpEql:
             case TokenType::OpNeq:
+            case TokenType::OpGreater:
             {
                 return parseGenericApp(parser, base);
             }

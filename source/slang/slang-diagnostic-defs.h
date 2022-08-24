@@ -234,7 +234,7 @@ DIAGNOSTIC(20014, Error, classIsReservedKeyword, "'class' is a reserved keyword 
 //
 // 3xxxx - Semantic analysis
 //
-
+DIAGNOSTIC(30002, Error, divideByZero, "divide by zero")
 DIAGNOSTIC(30003, Error, breakOutsideLoop, "'break' must appear inside loop constructs.")
 DIAGNOSTIC(30004, Error, continueOutsideLoop, "'continue' must appear inside loop constructs.")
 DIAGNOSTIC(30005, Error, whilePredicateTypeError, "'while': expression must evaluate to int.")

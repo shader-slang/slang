@@ -78,12 +78,12 @@ public:
     virtual SLANG_NO_THROW void SLANG_MCALL clearChildren() SLANG_OVERRIDE { SLANG_UNREACHABLE("Not implemented"); }
 
     static ComPtr<IArtifact> create(const Desc& desc) { return ComPtr<IArtifact>(new Artifact(desc)); }
-    static ComPtr<IArtifact> create(const Desc& desc, const String& name) { return ComPtr<IArtifact>(new Artifact(desc, name)); }
+    static ComPtr<IArtifact> create(const Desc& desc, const UnownedStringSlice& name) { return ComPtr<IArtifact>(new Artifact(desc, name)); }
     
 protected:
 
     /// Ctor
-    Artifact(const Desc& desc, const String& name) :
+    Artifact(const Desc& desc, const UnownedStringSlice& name) :
         m_desc(desc),
         m_name(name),
         m_parent(nullptr)
@@ -105,8 +105,6 @@ protected:
 
     LazyCastableList m_associated;              ///< Associated items
     LazyCastableList m_representations;         ///< Representations
-
-    ComPtr<IArtifactList> m_children;           ///< The children to this artifact
 };
 
 class ArtifactContainer : public Artifact
@@ -134,11 +132,11 @@ public:
     virtual SLANG_NO_THROW void SLANG_MCALL clearChildren() SLANG_OVERRIDE;
     
     static ComPtr<IArtifactContainer> create(const Desc& desc) { return ComPtr<IArtifactContainer>(new ArtifactContainer(desc)); }
-    static ComPtr<IArtifactContainer> create(const Desc& desc, const String& name) { return ComPtr<IArtifactContainer>(new ArtifactContainer(desc, name)); }
+    static ComPtr<IArtifactContainer> create(const Desc& desc, const UnownedStringSlice& name) { return ComPtr<IArtifactContainer>(new ArtifactContainer(desc, name)); }
 
 protected:
     /// Ctor
-    ArtifactContainer(const Desc& desc, const String& name) :Super(desc, name) {}
+    ArtifactContainer(const Desc& desc, const UnownedStringSlice& name) :Super(desc, name) {}
     ArtifactContainer(const Desc& desc) : Super(desc) {}
 
     void* getInterface(const Guid& uuid);

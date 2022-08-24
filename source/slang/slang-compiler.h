@@ -49,7 +49,7 @@ namespace Slang
         GenerateChoice
     };
 
-    enum class StageTarget
+    enum class StageTarget 
     {
         Unknown,
         VertexShader,
@@ -60,7 +60,7 @@ namespace Slang
         ComputeShader,
     };
 
-    enum class CodeGenTarget 
+    enum class CodeGenTarget : SlangCompileTargetIntegral
     {
         Unknown             = SLANG_TARGET_UNKNOWN,
         None                = SLANG_TARGET_NONE,
@@ -91,13 +91,13 @@ namespace Slang
 
     void printDiagnosticArg(StringBuilder& sb, CodeGenTarget val);
 
-    enum class ContainerFormat : SlangContainerFormat
+    enum class ContainerFormat : SlangContainerFormatIntegral
     {
         None            = SLANG_CONTAINER_FORMAT_NONE,
         SlangModule     = SLANG_CONTAINER_FORMAT_SLANG_MODULE,
     };
 
-    enum class LineDirectiveMode : SlangLineDirectiveMode
+    enum class LineDirectiveMode : SlangLineDirectiveModeIntegral
     {
         Default     = SLANG_LINE_DIRECTIVE_MODE_DEFAULT,
         None        = SLANG_LINE_DIRECTIVE_MODE_NONE,
@@ -117,13 +117,13 @@ namespace Slang
     // laid out with row-major or column-major
     // storage.
     //
-    enum MatrixLayoutMode
+    enum MatrixLayoutMode : SlangMatrixLayoutModeIntegral
     {
         kMatrixLayoutMode_RowMajor      = SLANG_MATRIX_LAYOUT_ROW_MAJOR,
         kMatrixLayoutMode_ColumnMajor   = SLANG_MATRIX_LAYOUT_COLUMN_MAJOR,
     };
 
-    enum class DebugInfoLevel : SlangDebugInfoLevel
+    enum class DebugInfoLevel : SlangDebugInfoLevelIntegral
     {
         None        = SLANG_DEBUG_INFO_LEVEL_NONE,
         Minimal     = SLANG_DEBUG_INFO_LEVEL_MINIMAL,
@@ -131,7 +131,7 @@ namespace Slang
         Maximal     = SLANG_DEBUG_INFO_LEVEL_MAXIMAL,
     };
 
-    enum class OptimizationLevel : SlangOptimizationLevel
+    enum class OptimizationLevel : SlangOptimizationLevelIntegral
     {
         None    = SLANG_OPTIMIZATION_LEVEL_NONE,
         Default = SLANG_OPTIMIZATION_LEVEL_DEFAULT,
@@ -1416,14 +1416,14 @@ namespace Slang
         SourceManager* getSourceManager();
     };
 
-    enum class FloatingPointMode : SlangFloatingPointMode
+    enum class FloatingPointMode : SlangFloatingPointModeIntegral
     {
         Default = SLANG_FLOATING_POINT_MODE_DEFAULT,
         Fast = SLANG_FLOATING_POINT_MODE_FAST,
         Precise = SLANG_FLOATING_POINT_MODE_PRECISE,
     };
 
-    enum class WriterChannel : SlangWriterChannel
+    enum class WriterChannel : SlangWriterChannelIntegral
     {
         Diagnostic = SLANG_WRITER_CHANNEL_DIAGNOSTIC,
         StdOutput = SLANG_WRITER_CHANNEL_STD_OUTPUT,
@@ -1431,7 +1431,7 @@ namespace Slang
         CountOf = SLANG_WRITER_CHANNEL_COUNT_OF,
     };
 
-    enum class WriterMode : SlangWriterMode
+    enum class WriterMode : SlangWriterModeIntegral
     {
         Text = SLANG_WRITER_MODE_TEXT,
         Binary = SLANG_WRITER_MODE_BINARY,

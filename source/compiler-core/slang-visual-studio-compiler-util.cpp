@@ -16,69 +16,54 @@
 #include "slang-artifact-desc-util.h"
 #include "slang-artifact-diagnostic-util.h"
 #include "slang-artifact-util.h"
+#include "slang-artifact-representation-impl.h"
 
 namespace Slang
 {
 
-/* static */ SlangResult VisualStudioCompilerUtil::calcModuleFilePath(const CompileOptions& options, StringBuilder& outPath)
+static void _addFile(const String& path, const ArtifactDesc& desc, IFileArtifactRepresentation* lockFile, List<ComPtr<IArtifact>>& outArtifacts)
 {
-    SLANG_ASSERT(options.modulePath.getLength());
+    auto fileRep = FileArtifactRepresentation::create(IFileArtifactRepresentation::Kind::Owned, path.getUnownedSlice(), lockFile, nullptr);
+    auto artifact = ArtifactUtil::createArtifact(desc);
+    artifact->addRepresentation(fileRep);
 
-    outPath.Clear();
-
-    switch (options.targetType)
-    {
-        case SLANG_SHADER_SHARED_LIBRARY:
-        {
-            outPath << options.modulePath << ".dll";
-            return SLANG_OK;
-        }
-        case SLANG_HOST_EXECUTABLE:
-        {
-            outPath << options.modulePath << ".exe";
-            return SLANG_OK;
-        }
-        case SLANG_OBJECT_CODE:
-        {
-            outPath << options.modulePath << ".obj";
-            return SLANG_OK;
-        }
-        default: break;
-    }
-
-    return SLANG_FAIL;
+    outArtifacts.add(artifact);
 }
 
-/* static */SlangResult VisualStudioCompilerUtil::calcCompileProducts(const CompileOptions& options, ProductFlags flags, List<String>& outPaths)
+/* static */SlangResult VisualStudioCompilerUtil::calcCompileProducts(const CompileOptions& options, ProductFlags flags, IFileArtifactRepresentation* lockFile, List<ComPtr<IArtifact>>& outArtifacts)
 {
     SLANG_ASSERT(options.modulePath.getLength());
 
-    outPaths.clear();
+    const auto targetDesc = ArtifactDescUtil::makeDescForCompileTarget(options.targetType);
+
+    outArtifacts.clear();
 
     if (flags & ProductFlag::Execution)
     {
         StringBuilder builder;
-        SLANG_RETURN_ON_FAIL(calcModuleFilePath(options, builder));
-        outPaths.add(builder);
+        const auto desc = ArtifactDescUtil::makeDescForCompileTarget(options.targetType);
+        SLANG_RETURN_ON_FAIL(ArtifactDescUtil::calcPathForDesc(desc, options.modulePath.getUnownedSlice(), builder));
+
+        _addFile(builder, desc, lockFile, outArtifacts);
     }
     if (flags & ProductFlag::Miscellaneous)
     {
-        outPaths.add(options.modulePath + ".ilk");
+        _addFile(options.modulePath + ".ilk", ArtifactDesc::make(ArtifactKind::BinaryFormat, ArtifactPayload::Unknown, ArtifactStyle::None), lockFile, outArtifacts);
 
         if (options.targetType == SLANG_SHADER_SHARED_LIBRARY)
         {
-            outPaths.add(options.modulePath + ".exp");
-            outPaths.add(options.modulePath + ".lib");
+            _addFile(options.modulePath + ".exp", ArtifactDesc::make(ArtifactKind::BinaryFormat, ArtifactPayload::Unknown, ArtifactStyle::None), lockFile, outArtifacts);
+            _addFile(options.modulePath + ".lib", ArtifactDesc::make(ArtifactKind::Library, ArtifactPayload::HostCPU, targetDesc), lockFile, outArtifacts);
         }
     }
     if (flags & ProductFlag::Compile)
     {
-        outPaths.add(options.modulePath + ".obj");
+        _addFile(options.modulePath + ".obj", ArtifactDesc::make(ArtifactKind::ObjectCode, ArtifactPayload::HostCPU, targetDesc), lockFile, outArtifacts);
     }
     if (flags & ProductFlag::Debug)
     {
         // TODO(JS): Could try and determine based on debug information
-        outPaths.add(options.modulePath + ".pdb");
+        _addFile(options.modulePath + ".pdb", ArtifactDesc::make(ArtifactKind::BinaryFormat, ArtifactPayload::DebugInfo, targetDesc), lockFile, outArtifacts);
     }
 
     return SLANG_OK;
