@@ -1071,7 +1071,7 @@ namespace Slang
                 const SourceFile* sourceFile = sourceFiles[0];
                 
                 options.sourceContentsPath = SliceCaster::asTerminatedCharSlice(sourceFile->getPathInfo().foundPath);
-                options.sourceContents = asCharSlice(sourceFile->getContent());
+                options.sourceContents = SliceConverter::toTerminatedCharSlice(allocator, sourceFile->getContentBlob());
             }
         }
         else
@@ -1092,7 +1092,7 @@ namespace Slang
             ComPtr<ISlangBlob> blob;
             SLANG_RETURN_ON_FAIL(sourceArtifact->loadBlob(ArtifactKeep::No, blob.writeRef()));
 
-            options.sourceContents = asCharSlice(StringUtil::getSlice(blob));
+            options.sourceContents = SliceConverter::toTerminatedCharSlice(allocator, blob);
         }
 
         // Add any preprocessor definitions associated with the linkage
@@ -1369,8 +1369,8 @@ namespace Slang
         }
         
         options.compilerSpecificArguments = allocator.allocate(compilerSpecificArguments);
-        options.requiredCapabilityVersions = makeSlice(requiredCapabilityVersions);
-        options.libraries = Caster::asSlice(libraries);
+        options.requiredCapabilityVersions = SliceCaster::asSlice(requiredCapabilityVersions);
+        options.libraries = SliceCaster::asSlice(libraries);
         options.libraryPaths = allocator.allocate(libraryPaths);
 
         // Compile

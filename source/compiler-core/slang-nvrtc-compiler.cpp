@@ -643,25 +643,6 @@ SlangResult NVRTCDownstreamCompiler::_maybeAddHalfSupport(const DownstreamCompil
     return SLANG_OK;
 }
 
-static const char* _getTerminated(String& ioBackingString, const Slice<char>& slice)
-{
-    if (slice.count <= 0)
-    {
-        return "";
-    }
-
-    if (slice[slice.count - 1] == 0)
-    {
-        return slice.data;
-    }
-
-    // Could check if the character @end is 0, but strictly speaking this isn't right, because we could be checking the 
-    // byte after the allocation. So to be safe we will just allocate
-
-    ioBackingString = UnownedStringSlice(slice.data, slice.count);
-    return ioBackingString.getBuffer();
-}
-
 SlangResult NVRTCDownstreamCompiler::compile(const DownstreamCompileOptions& options, IArtifact** outArtifact)
 {
     // This compiler doesn't read files, they should be read externally and stored in sourceContents/sourceContentsPath
@@ -838,12 +819,8 @@ SlangResult NVRTCDownstreamCompiler::compile(const DownstreamCompileOptions& opt
 
     SLANG_ASSERT(headers.getCount() == headerIncludeNames.getCount());
 
-    // Argh! We must have a zero terminated input source string. Lets make sure we have that
-    String sourceContentsString;
-    const auto sourceContents = _getTerminated(sourceContentsString, options.sourceContents);
-
     nvrtcProgram program = nullptr;
-    nvrtcResult res = m_nvrtcCreateProgram(&program, sourceContents, options.sourceContentsPath,
+    nvrtcResult res = m_nvrtcCreateProgram(&program, options.sourceContents, options.sourceContentsPath,
         (int) headers.getCount(),
         headers.getBuffer(),
         headerIncludeNames.getBuffer());

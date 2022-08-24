@@ -34,6 +34,8 @@ static void _addFile(const String& path, const ArtifactDesc& desc, IFileArtifact
 {
     SLANG_ASSERT(options.modulePath.count);
 
+    const String modulePath = asString(options.modulePath);
+
     const auto targetDesc = ArtifactDescUtil::makeDescForCompileTarget(options.targetType);
 
     outArtifacts.clear();
@@ -42,28 +44,29 @@ static void _addFile(const String& path, const ArtifactDesc& desc, IFileArtifact
     {
         StringBuilder builder;
         const auto desc = ArtifactDescUtil::makeDescForCompileTarget(options.targetType);
-        SLANG_RETURN_ON_FAIL(ArtifactDescUtil::calcPathForDesc(desc, asStringSlice(options.modulePath), builder));
+        SLANG_RETURN_ON_FAIL(ArtifactDescUtil::calcPathForDesc(desc, modulePath.getUnownedSlice(), builder));
 
         _addFile(builder, desc, lockFile, outArtifacts);
     }
     if (flags & ProductFlag::Miscellaneous)
     {
-        _addFile(options.modulePath + ".ilk", ArtifactDesc::make(ArtifactKind::BinaryFormat, ArtifactPayload::Unknown, ArtifactStyle::None), lockFile, outArtifacts);
+        
+        _addFile(modulePath + ".ilk", ArtifactDesc::make(ArtifactKind::BinaryFormat, ArtifactPayload::Unknown, ArtifactStyle::None), lockFile, outArtifacts);
 
         if (options.targetType == SLANG_SHADER_SHARED_LIBRARY)
         {
-            _addFile(options.modulePath + ".exp", ArtifactDesc::make(ArtifactKind::BinaryFormat, ArtifactPayload::Unknown, ArtifactStyle::None), lockFile, outArtifacts);
-            _addFile(options.modulePath + ".lib", ArtifactDesc::make(ArtifactKind::Library, ArtifactPayload::HostCPU, targetDesc), lockFile, outArtifacts);
+            _addFile(modulePath + ".exp", ArtifactDesc::make(ArtifactKind::BinaryFormat, ArtifactPayload::Unknown, ArtifactStyle::None), lockFile, outArtifacts);
+            _addFile(modulePath + ".lib", ArtifactDesc::make(ArtifactKind::Library, ArtifactPayload::HostCPU, targetDesc), lockFile, outArtifacts);
         }
     }
     if (flags & ProductFlag::Compile)
     {
-        _addFile(options.modulePath + ".obj", ArtifactDesc::make(ArtifactKind::ObjectCode, ArtifactPayload::HostCPU, targetDesc), lockFile, outArtifacts);
+        _addFile(modulePath + ".obj", ArtifactDesc::make(ArtifactKind::ObjectCode, ArtifactPayload::HostCPU, targetDesc), lockFile, outArtifacts);
     }
     if (flags & ProductFlag::Debug)
     {
         // TODO(JS): Could try and determine based on debug information
-        _addFile(options.modulePath + ".pdb", ArtifactDesc::make(ArtifactKind::BinaryFormat, ArtifactPayload::DebugInfo, targetDesc), lockFile, outArtifacts);
+        _addFile(modulePath + ".pdb", ArtifactDesc::make(ArtifactKind::BinaryFormat, ArtifactPayload::DebugInfo, targetDesc), lockFile, outArtifacts);
     }
 
     return SLANG_OK;

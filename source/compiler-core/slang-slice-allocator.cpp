@@ -1,6 +1,8 @@
 // slang-slice-allocator.cpp
 #include "slang-slice-allocator.h"
 
+#include "../core/slang-blob.h"
+
 namespace Slang {
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! SliceConverter !!!!!!!!!!!!!!!!!!!!!!!!!!! */
@@ -16,6 +18,38 @@ namespace Slang {
         list[i] = asStringSlice(in[i]);
     }
     return list;
+}
+
+/* static */TerminatedCharSlice SliceConverter::toTerminatedCharSlice(SliceAllocator& allocator, ISlangBlob* blob)
+{
+    const auto size = blob->getBufferSize();
+
+    if (size == 0)
+    {
+        return TerminatedCharSlice();
+    }
+
+    // If there is a 0 at the end byte, we are zero terminated 
+    const char* chars = (const char*)blob->getBufferPointer();
+    if (chars[size - 1] == 0)
+    {
+        return TerminatedCharSlice(chars, Count(size - 1));
+    }
+
+    // See if it has a castable interface
+    ComPtr<ICastable> castable;
+    if (SLANG_SUCCEEDED(blob->queryInterface(ICastable::getTypeGuid(), (void**)castable.writeRef())))
+    {
+        if (castable->castAs(StringBlob::getTypeGuid()))
+        {
+            // It's actually backed by a String, which we know is 0 terminated
+            return TerminatedCharSlice(chars, Count(size - 1));
+        }
+    }
+
+    // We are out of options, we just have to allocate with zero termination which allocateString does
+    auto dst = allocator.getArena().allocateString(chars, Count(size));
+    return TerminatedCharSlice(dst, Count(size));
 }
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! SliceAllocator !!!!!!!!!!!!!!!!!!!!!!!!!!! */

@@ -33,6 +33,26 @@ void* BlobBase::castAs(const SlangUUID& guid)
     return getObject(guid);
 }
 
+/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! StringBlob !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
+
+void* StringBlob::castAs(const SlangUUID& guid)
+{
+    if (auto intf = getInterface(guid))
+    {
+        return intf;
+    }
+    return getObject(guid);
+}
+
+void* StringBlob::getObject(const Guid& guid)
+{
+    if (guid == getTypeGuid())
+    {
+        return this;
+    }
+    return nullptr;
+}
+
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! StaticBlob !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
 SlangResult StaticBlob::queryInterface(SlangUUID const& guid, void** outObject) 

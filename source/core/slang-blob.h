@@ -40,7 +40,12 @@ There is a reasonable argument that StringBlob should contain it's own copy of t
 class StringBlob : public BlobBase
 {
 public:
-        // ISlangBlob
+    SLANG_CLASS_GUID(0xf7e0e93c, 0xde70, 0x4531, { 0x9c, 0x9f, 0xdd, 0xa3, 0xf6, 0xc6, 0xc0, 0xdd });
+
+    // ICastable
+    virtual SLANG_NO_THROW void* SLANG_MCALL castAs(const SlangUUID& guid) SLANG_OVERRIDE;
+
+    // ISlangBlob
     SLANG_NO_THROW void const* SLANG_MCALL getBufferPointer() SLANG_OVERRIDE { return m_string.getBuffer(); }
     SLANG_NO_THROW size_t SLANG_MCALL getBufferSize() SLANG_OVERRIDE { return m_string.getLength(); }
 
@@ -60,6 +65,8 @@ protected:
 
         /// Get the contained string
     SLANG_FORCE_INLINE const String& getString() const { return m_string; }
+
+    void* getObject(const Guid& guid);
 
     String m_string;
 };

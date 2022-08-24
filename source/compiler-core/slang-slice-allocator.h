@@ -37,10 +37,15 @@ private:
     static CharSlice asCharSlice(const String&& in) = delete;
 };
 
+struct SliceAllocator;
+
 struct SliceConverter
 {
         /// Convert into a list of strings
     static List<String> toList(const Slice<TerminatedCharSlice>& in);
+
+        /// NOTE! the slice is only guarenteed to stay in scope whilst the blob does
+    static TerminatedCharSlice toTerminatedCharSlice(SliceAllocator& allocator, ISlangBlob* blob);
 
     template <typename T>
     static List<ComPtr<T>> toComPtrList(const Slice<T*>& in)
