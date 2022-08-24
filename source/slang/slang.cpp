@@ -612,7 +612,7 @@ SLANG_NO_THROW SlangResult SLANG_MCALL Session::createCompileRequest(slang::ICom
 SLANG_NO_THROW SlangProfileID SLANG_MCALL Session::findProfile(
     char const*     name)
 {
-    return Slang::Profile::lookUp(name).raw;
+    return SlangProfileID(Slang::Profile::lookUp(name).raw);
 }
 
 SLANG_NO_THROW SlangCapabilityID SLANG_MCALL Session::findCapability(

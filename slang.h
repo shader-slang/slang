@@ -518,8 +518,8 @@ extern "C"
     conditions, and all values >= SLANG_SEVERITY_ERROR indicating compilation
     failure.
     */
-    typedef int SlangSeverity;
-    enum
+    typedef int SlangSeverityIntegral;
+    enum SlangSeverity : SlangSeverityIntegral
     {
         SLANG_SEVERITY_DISABLED = 0, /**< A message that is disabled, filtered out. */
         SLANG_SEVERITY_NOTE,         /**< An informative message. */
@@ -536,8 +536,8 @@ extern "C"
         SLANG_DIAGNOSTIC_FLAG_TREAT_WARNINGS_AS_ERRORS = 0x02
     };
 
-    typedef int SlangBindableResourceType;
-    enum
+    typedef int SlangBindableResourceIntegral;
+    enum SlangBindableResourceType : SlangBindableResourceIntegral
     {
         SLANG_NON_BINDABLE = 0,
         SLANG_TEXTURE,
@@ -546,8 +546,8 @@ extern "C"
         SLANG_STORAGE_BUFFER,
     };
 
-    typedef int SlangCompileTarget;
-    enum
+    typedef int SlangCompileTargetIntegral;
+    enum SlangCompileTarget : SlangCompileTargetIntegral
     {
         SLANG_TARGET_UNKNOWN,
         SLANG_TARGET_NONE,
@@ -577,8 +577,8 @@ extern "C"
     /* A "container format" describes the way that the outputs
     for multiple files, entry points, targets, etc. should be
     combined into a single artifact for output. */
-    typedef int SlangContainerFormat;
-    enum
+    typedef int SlangContainerFormatIntegral;
+    enum SlangContainerFormat : SlangContainerFormatIntegral
     {
         /* Don't generate a container. */
         SLANG_CONTAINER_FORMAT_NONE,
@@ -641,7 +641,7 @@ extern "C"
     /*!
     @brief Flags to control code generation behavior of a compilation target */
     typedef unsigned int SlangTargetFlags;
-    enum
+    enum 
     {
         /* When compiling for a D3D Shader Model 5.1 or higher target, allocate
            distinct register spaces for parameter blocks.
@@ -666,8 +666,8 @@ extern "C"
     /*!
     @brief Options to control floating-point precision guarantees for a target.
     */
-    typedef unsigned int SlangFloatingPointMode;
-    enum
+    typedef unsigned int SlangFloatingPointModeIntegral;
+    enum SlangFloatingPointMode : SlangFloatingPointModeIntegral
     {
         SLANG_FLOATING_POINT_MODE_DEFAULT = 0,
         SLANG_FLOATING_POINT_MODE_FAST,
@@ -677,8 +677,8 @@ extern "C"
     /*!
     @brief Options to control emission of `#line` directives
     */
-    typedef unsigned int SlangLineDirectiveMode;
-    enum
+    typedef unsigned int SlangLineDirectiveModeIntegral;
+    enum SlangLineDirectiveMode : SlangLineDirectiveModeIntegral
     {
         SLANG_LINE_DIRECTIVE_MODE_DEFAULT = 0,  /**< Default behavior: pick behavior base on target. */
         SLANG_LINE_DIRECTIVE_MODE_NONE,         /**< Don't emit line directives at all. */
@@ -699,28 +699,29 @@ extern "C"
         SLANG_SOURCE_LANGUAGE_COUNT_OF,
     };
 
-    typedef unsigned int SlangProfileID;
-    enum
+    typedef unsigned int SlangProfileIDIntegral;
+    enum SlangProfileID : SlangProfileIDIntegral
     {
         SLANG_PROFILE_UNKNOWN,
     };
 
-    typedef SlangInt32 SlangCapabilityID;
-    enum
+
+    typedef SlangInt32 SlangCapabilityIDIntegral;
+    enum SlangCapabilityID : SlangCapabilityIDIntegral
     {
         SLANG_CAPABILITY_UNKNOWN = 0,
     };
 
-    typedef unsigned int SlangMatrixLayoutMode;
-    enum
+    typedef unsigned int SlangMatrixLayoutModeIntegral;
+    enum SlangMatrixLayoutMode : SlangMatrixLayoutModeIntegral
     {
         SLANG_MATRIX_LAYOUT_MODE_UNKNOWN = 0,
         SLANG_MATRIX_LAYOUT_ROW_MAJOR,
         SLANG_MATRIX_LAYOUT_COLUMN_MAJOR,
     };
 
-    typedef SlangUInt32 SlangStage;
-    enum
+    typedef SlangUInt32 SlangStageIntegral;
+    enum SlangStage : SlangStageIntegral
     {
         SLANG_STAGE_NONE,
         SLANG_STAGE_VERTEX,
@@ -742,8 +743,8 @@ extern "C"
         SLANG_STAGE_PIXEL = SLANG_STAGE_FRAGMENT,
     };
 
-    typedef SlangUInt32 SlangDebugInfoLevel;
-    enum
+    typedef SlangUInt32 SlangDebugInfoLevelIntegral;
+    enum SlangDebugInfoLevel : SlangDebugInfoLevelIntegral
     {
         SLANG_DEBUG_INFO_LEVEL_NONE = 0,    /**< Don't emit debug information at all. */
         SLANG_DEBUG_INFO_LEVEL_MINIMAL,     /**< Emit as little debug information as possible, while still supporting stack trackes. */
@@ -752,8 +753,8 @@ extern "C"
         
     };
 
-    typedef SlangUInt32 SlangOptimizationLevel;
-    enum
+    typedef SlangUInt32 SlangOptimizationLevelIntegral;
+    enum SlangOptimizationLevel : SlangOptimizationLevelIntegral
     {
         SLANG_OPTIMIZATION_LEVEL_NONE = 0,  /**< Don't optimize at all. */
         SLANG_OPTIMIZATION_LEVEL_DEFAULT,   /**< Default optimization level: balance code quality and compilation time. */
@@ -1064,8 +1065,8 @@ extern "C"
     #define SLANG_UUID_ISlangSharedLibraryLoader ISlangSharedLibraryLoader::getTypeGuid()
     
     /* Type that identifies how a path should be interpreted */
-    typedef unsigned int SlangPathType;
-    enum
+    typedef unsigned int SlangPathTypeIntegral;
+    enum SlangPathType : SlangPathTypeIntegral
     {
         SLANG_PATH_TYPE_DIRECTORY,      /**< Path specified specifies a directory. */
         SLANG_PATH_TYPE_FILE,           /**< Path specified is to a file. */
@@ -1233,8 +1234,8 @@ extern "C"
     #define SLANG_UUID_ISlangMutableFileSystem ISlangMutableFileSystem::getTypeGuid()
 
     /* Identifies different types of writer target*/
-    typedef unsigned int SlangWriterChannel;
-    enum
+    typedef unsigned int SlangWriterChannelIntegral;
+    enum SlangWriterChannel : SlangWriterChannelIntegral
     {
         SLANG_WRITER_CHANNEL_DIAGNOSTIC,
         SLANG_WRITER_CHANNEL_STD_OUTPUT,
@@ -1242,8 +1243,8 @@ extern "C"
         SLANG_WRITER_CHANNEL_COUNT_OF,
     };
 
-    typedef unsigned int SlangWriterMode;
-    enum 
+    typedef unsigned int SlangWriterModeIntegral;
+    enum SlangWriterMode : SlangWriterModeIntegral
     {
         SLANG_WRITER_MODE_TEXT,
         SLANG_WRITER_MODE_BINARY,
@@ -1797,8 +1798,8 @@ extern "C"
 
     // type reflection
 
-    typedef unsigned int SlangTypeKind;
-    enum
+    typedef unsigned int SlangTypeKindIntegral;
+    enum SlangTypeKind : SlangTypeKindIntegral
     {
         SLANG_TYPE_KIND_NONE,
         SLANG_TYPE_KIND_STRUCT,
@@ -1820,8 +1821,8 @@ extern "C"
         SLANG_TYPE_KIND_COUNT,
     };
 
-    typedef unsigned int SlangScalarType;
-    enum
+    typedef unsigned int SlangScalarTypeIntegral;
+    enum SlangScalarType : SlangScalarTypeIntegral
     {
         SLANG_SCALAR_TYPE_NONE,
         SLANG_SCALAR_TYPE_VOID,
@@ -1841,8 +1842,8 @@ extern "C"
 
 #ifndef SLANG_RESOURCE_SHAPE
 #    define SLANG_RESOURCE_SHAPE
-    typedef unsigned int SlangResourceShape;
-    enum
+    typedef unsigned int SlangResourceShapeIntegral;
+    enum SlangResourceShape : SlangResourceShapeIntegral
     {
         SLANG_RESOURCE_BASE_SHAPE_MASK      = 0x0F,
 
@@ -1873,8 +1874,8 @@ extern "C"
         SLANG_TEXTURE_2D_MULTISAMPLE_ARRAY  = SLANG_TEXTURE_2D | SLANG_TEXTURE_MULTISAMPLE_FLAG | SLANG_TEXTURE_ARRAY_FLAG,
     };
 #endif
-    typedef unsigned int SlangResourceAccess;
-    enum
+    typedef unsigned int SlangResourceAccessIntegral;
+    enum SlangResourceAccess : SlangResourceAccessIntegral
     {
         SLANG_RESOURCE_ACCESS_NONE,
         SLANG_RESOURCE_ACCESS_READ,
@@ -1885,8 +1886,8 @@ extern "C"
         SLANG_RESOURCE_ACCESS_WRITE,
     };
 
-    typedef unsigned int SlangParameterCategory;
-    enum
+    typedef unsigned int SlangParameterCategoryIntegral;
+    enum SlangParameterCategory : SlangParameterCategoryIntegral
     {
         SLANG_PARAMETER_CATEGORY_NONE,
         SLANG_PARAMETER_CATEGORY_MIXED,
@@ -1983,8 +1984,8 @@ extern "C"
     When you wnat to answer "what type of descriptor range should this parameter use?"
     you should use `SlangBindingType`.
     */
-    typedef SlangUInt32 SlangBindingType;
-    enum
+    typedef SlangUInt32 SlangBindingTypeIntegral;
+    enum SlangBindingType : SlangBindingTypeIntegral
     {
         SLANG_BINDING_TYPE_UNKNOWN = 0,
 
@@ -2015,14 +2016,14 @@ extern "C"
         SLANG_BINDING_TYPE_EXT_MASK  = 0xFF00,
     };
 
-    typedef SlangUInt32 SlangLayoutRules;
-    enum
+    typedef SlangUInt32 SlangLayoutRulesIntegral;
+    enum SlangLayoutRules : SlangLayoutRulesIntegral
     {
         SLANG_LAYOUT_RULES_DEFAULT,
     };
 
-    typedef SlangUInt32 SlangModifierID;
-    enum
+    typedef SlangUInt32 SlangModifierIDIntegral;
+    enum SlangModifierID : SlangModifierIDIntegral
     {
         SLANG_MODIFIER_SHARED,
     };
@@ -2347,7 +2348,7 @@ namespace slang
             Feedback = SLANG_TYPE_KIND_FEEDBACK,
         };
 
-        enum ScalarType : SlangScalarType
+        enum ScalarType : SlangScalarTypeIntegral
         {
             None    = SLANG_SCALAR_TYPE_NONE,
             Void    = SLANG_SCALAR_TYPE_VOID,
@@ -2468,7 +2469,7 @@ namespace slang
         }
     };
 
-    enum ParameterCategory : SlangParameterCategory
+    enum ParameterCategory : SlangParameterCategoryIntegral
     {
         // TODO: these aren't scoped...
         None = SLANG_PARAMETER_CATEGORY_NONE,
@@ -2500,7 +2501,7 @@ namespace slang
         FragmentOutput = SLANG_PARAMETER_CATEGORY_FRAGMENT_OUTPUT,
     };
 
-    enum class BindingType : SlangBindingType
+    enum class BindingType : SlangBindingTypeIntegral
     {
         Unknown                             = SLANG_BINDING_TYPE_UNKNOWN,
 
@@ -2847,7 +2848,7 @@ namespace slang
 
     struct Modifier
     {
-        enum ID : SlangModifierID
+        enum ID : SlangModifierIDIntegral
         {
             Shared = SLANG_MODIFIER_SHARED,
         };
@@ -3049,7 +3050,7 @@ namespace slang
         }
     };
 
-    enum class LayoutRules : SlangLayoutRules
+    enum class LayoutRules : SlangLayoutRulesIntegral
     {
         Default = SLANG_LAYOUT_RULES_DEFAULT,
     };
