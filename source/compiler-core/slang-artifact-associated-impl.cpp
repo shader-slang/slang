@@ -16,6 +16,7 @@ namespace Slang {
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!! ArtifactDiagnostics !!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
 ArtifactDiagnostics::ArtifactDiagnostics(const ThisType& rhs):
+    ComBaseObject(),
     m_result(rhs.m_result),
     m_diagnostics(rhs.m_diagnostics),
     m_raw(rhs.m_raw.getLength() + 1)

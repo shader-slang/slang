@@ -50,7 +50,7 @@ public:
     SLANG_NO_THROW virtual void SLANG_MCALL calcSimplifiedSummary(ISlangBlob** outBlob) SLANG_OVERRIDE;
 
         /// Default ctor
-    ArtifactDiagnostics() {}
+    ArtifactDiagnostics():ComBaseObject() {}
         /// Copy ctor
     ArtifactDiagnostics(const ThisType& rhs);
 
