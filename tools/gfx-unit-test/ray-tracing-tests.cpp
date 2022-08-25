@@ -488,11 +488,8 @@ namespace gfx_test
         runTestImpl(rayTracingTestImpl<RayTracingTestB>, unitTestContext, Slang::RenderApiFlag::D3D12);
     }
 
-#if 0
-    //TODO: fix test failure.
     SLANG_UNIT_TEST(RayTracingTestBVulkan)
     {
         runTestImpl(rayTracingTestImpl<RayTracingTestB>, unitTestContext, Slang::RenderApiFlag::Vulkan);
     }
-#endif
 }
