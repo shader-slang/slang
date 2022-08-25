@@ -40,10 +40,9 @@ namespace Slang {
     ComPtr<ICastable> castable;
     if (SLANG_SUCCEEDED(blob->queryInterface(ICastable::getTypeGuid(), (void**)castable.writeRef())))
     {
-        if (castable->castAs(StringBlob::getTypeGuid()))
+        if (castable->castAs(SlangTerminatedChars::getTypeGuid()))
         {
-            // It's actually backed by a String, which we know is 0 terminated
-            return TerminatedCharSlice(chars, Count(size - 1));
+            return TerminatedCharSlice(chars, Count(size));
         }
     }
 

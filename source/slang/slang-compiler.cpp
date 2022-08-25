@@ -1048,7 +1048,6 @@ namespace Slang
                 }
             }
 
-
             // If emitted source is required, emit and set the path            
             if (_useEmittedSource(compiler, translationUnit))
             {
@@ -1090,7 +1089,7 @@ namespace Slang
             metadata = findAssociated<IArtifactPostEmitMetadata>(sourceArtifact);
             
             ComPtr<ISlangBlob> blob;
-            SLANG_RETURN_ON_FAIL(sourceArtifact->loadBlob(ArtifactKeep::No, blob.writeRef()));
+            SLANG_RETURN_ON_FAIL(sourceArtifact->loadBlob(ArtifactKeep::Yes, blob.writeRef()));
 
             options.sourceContents = SliceConverter::toTerminatedCharSlice(allocator, blob);
         }
