@@ -102,24 +102,26 @@ SlangResult CommandLineDownstreamCompiler::compile(const CompileOptions& inOptio
 
     CompileOptions options(inOptions);
 
+    // Work out the ArtifactDesc 
+    const auto targetDesc = ArtifactDescUtil::makeDescForCompileTarget(options.targetType);
+
     auto helper = DefaultArtifactHelper::getSingleton();
 
-    SliceAllocator allocator;
-
-    // Find all the files that will be produced
-
+    // Holds all of the artifacts that are relatated to the final artifact - such as debug files, ancillary file and lock files
     auto artifactList = CastableList::create();
 
+    // It may be necessary to produce a temporary file 'lock file'.
     ComPtr<IFileArtifactRepresentation> lockFile;
 
-    List<String> sourceFiles;
+    // The allocator can be used for items that are not kept in scope by the options
+    SliceAllocator allocator;
+
+    // We may need to produce a new list of source files, use this list to hold them.
+    List<TerminatedCharSlice> sourceFiles;
 
     // Copy over all of the source files that are explicitly set, to sourceFiles which well use 
     // to hold the actual list of sourceFiles required.
-    for (const auto& sourceFile : inOptions.sourceFiles)
-    {
-        sourceFiles.add(asStringSlice(sourceFile));
-    }
+    sourceFiles.addRange(inOptions.sourceFiles.begin(), inOptions.sourceFiles.count);
 
     if (options.modulePath.count == 0 || options.sourceContents.count != 0)
     {
@@ -141,23 +143,16 @@ SlangResult CommandLineDownstreamCompiler::compile(const CompileOptions& inOptio
         
         if (_isContentsInFile(options))
         {
-            sourceFiles.add(asStringSlice(options.sourceContentsPath));
+            sourceFiles.add(options.sourceContentsPath);
         }
         else
         {
-            String compileSourcePath = modulePath;
+            // Work out the ArtifactDesc for the source language
+            const auto sourceDesc = ArtifactDescUtil::makeDescForSourceLanguage(options.sourceLanguage);
 
-            compileSourcePath.append("-src");
-
-            // Make the temporary filename have the appropriate extension.
-            if (options.sourceLanguage == SLANG_SOURCE_LANGUAGE_C)
-            {
-                compileSourcePath.append(".c");
-            }
-            else
-            {
-                compileSourcePath.append(".cpp");
-            }
+            // Work out the name for the source
+            StringBuilder compileSourcePath;
+            SLANG_RETURN_ON_FAIL(ArtifactDescUtil::calcPathForDesc(sourceDesc, (modulePath + "-src").getUnownedSlice(), compileSourcePath));
 
             // Write it out
             SLANG_RETURN_ON_FAIL(File::writeAllText(compileSourcePath, asStringSlice(options.sourceContents)));
@@ -170,7 +165,7 @@ SlangResult CommandLineDownstreamCompiler::compile(const CompileOptions& inOptio
             artifactList->add(fileArtifact);
 
             // Add it as a source file
-            sourceFiles.add(compileSourcePath);
+            sourceFiles.add(allocator.allocate(compileSourcePath));
         }
 
         // There is no source contents
@@ -178,7 +173,7 @@ SlangResult CommandLineDownstreamCompiler::compile(const CompileOptions& inOptio
         options.sourceContentsPath = TerminatedCharSlice();
     }
 
-    options.sourceFiles = allocator.allocate(sourceFiles);
+    options.sourceFiles = SliceCaster::asSlice(sourceFiles);
 
     // Append command line args to the end of cmdLine using the target specific function for the specified options
     SLANG_RETURN_ON_FAIL(calcArgs(options, cmdLine));
@@ -186,15 +181,13 @@ SlangResult CommandLineDownstreamCompiler::compile(const CompileOptions& inOptio
     // The 'mainArtifact' is the main product produced from the compilation - the executable/sharedlibrary/object etc
     ComPtr<IArtifact> mainArtifact;
     {
-        const auto desc = ArtifactDescUtil::makeDescForCompileTarget(options.targetType);
-
         List<ComPtr<IArtifact>> artifacts;
         SLANG_RETURN_ON_FAIL(calcCompileProducts(options, DownstreamProductFlag::All, lockFile, artifacts));
 
         for (IArtifact* artifact : artifacts)
         {
             // The main artifact must be in the list, so add it if we find it
-            if (artifact->getDesc() == desc)
+            if (artifact->getDesc() == targetDesc)
             {
                 SLANG_ASSERT(mainArtifact == nullptr);
                 mainArtifact = artifact;
@@ -262,8 +255,10 @@ SlangResult CommandLineDownstreamCompiler::compile(const CompileOptions& inOptio
         }
     }
 
-    auto artifact = ArtifactUtil::createArtifactForCompileTarget(options.targetType);
+    // Create the result artifact
+    auto artifact = ArtifactUtil::createArtifact(targetDesc);
 
+    // Createa the diagnostics 
     auto diagnostics = ArtifactDiagnostics::create();
 
     SLANG_RETURN_ON_FAIL(parseOutput(exeRes, diagnostics));
@@ -272,7 +267,7 @@ SlangResult CommandLineDownstreamCompiler::compile(const CompileOptions& inOptio
     artifact->addAssociated(diagnostics);
     
     // Find the rep from the 'main' artifact, we'll just use the same representation on the output 
-    // artifact. Sharing is needed, because the rep owns the file.
+    // artifact. Sharing is desirable, because the rep owns the file.
     if (auto fileRep = mainArtifact ? findRepresentation<IFileArtifactRepresentation>(mainArtifact) : nullptr)
     {
         artifact->addRepresentation(fileRep);
