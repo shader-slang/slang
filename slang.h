@@ -1085,6 +1085,14 @@ extern "C"
     The name is the name of a file system object (directory/file) in the specified path (ie it is without a path) */
     typedef void (*FileSystemContentsCallBack)(SlangPathType pathType, const char* name, void* userData);
 
+    /* Determines how paths map to files on the OS file system */
+    enum class OSPathKind : uint8_t
+    {
+        None,                ///< Paths do not map to the file system
+        Direct,              ///< Paths map directly to the file system
+        Canonical,           ///< Only canonical paths map to the file system
+    };
+
     /** An extended file system abstraction.
     
     Implementing and using this interface over ISlangFileSystem gives much more control over how paths
@@ -1200,6 +1208,12 @@ extern "C"
             const char* path,
             FileSystemContentsCallBack callback,
             void* userData) = 0;
+
+        /** Returns how paths map to the OS file system
+        
+        @returns true if this 
+        */
+        virtual SLANG_NO_THROW OSPathKind SLANG_MCALL getOSPathKind() = 0;
     };
 
     #define SLANG_UUID_ISlangFileSystemExt ISlangFileSystemExt::getTypeGuid()

@@ -4,6 +4,9 @@
 #include "../core/slang-string-util.h"
 #include "../core/slang-string-escape-util.h"
 
+#include "slang-artifact-representation-impl.h"
+#include "slang-artifact-impl.h"
+
 namespace Slang {
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!! SourceView !!!!!!!!!!!!!!!!!!!!!!!!!!!! */
@@ -427,6 +430,77 @@ String SourceFile::calcVerbosePath() const
     }
 
     return m_pathInfo.foundPath;
+}
+
+void SourceFile::maybeAddArtifact(ISlangFileSystemExt* ext)
+{
+    if (!m_contentBlob)
+    {
+        return;
+    }
+
+    // If there already is an artifact, or we are not using OSFile system then 
+    if (m_artifact)
+    {
+        // TODO(JS):
+        // Check if it has the blob or not
+        SLANG_ASSERT(m_contentBlob == findRepresentation<ISlangBlob>(m_artifact));
+        return;
+    }
+
+    // We don't know how the source will be used
+    m_artifact = Artifact::create(ArtifactDesc::make(ArtifactKind::Source, ArtifactPayload::Unknown, ArtifactStyle::Unknown));
+
+    // Add the blob as a representation.
+    m_artifact->addRepresentationUnknown(m_contentBlob);
+
+    // If we have the file system see if we can set up a path too
+    if (ext)
+    {
+        const auto osPathKind = ext->getOSPathKind();
+
+        if (osPathKind != OSPathKind::None)
+        {
+            String path;
+            switch (osPathKind)
+            {
+                case OSPathKind::Canonical:
+                {
+                    // Get the canonical path
+                    ComPtr<ISlangBlob> canonicalPath;
+                    if (SLANG_SUCCEEDED(ext->getCanonicalPath(getPathInfo().foundPath.getBuffer(), canonicalPath.writeRef())))
+                    {
+                        path = StringUtil::getString(canonicalPath);
+                    }
+                    break;
+                }
+                case OSPathKind::Direct:
+                {
+                    path = getPathInfo().foundPath;
+                    break;
+                }
+            }
+
+            if (path.getLength())
+            {
+                // We can sanity check that this works
+                SlangPathType pathType;
+                if (SLANG_SUCCEEDED(ext->getPathType(path.getBuffer(), &pathType)))
+                {
+                    // We can add a file representation
+                    FileArtifactRepresentation* fileRep = new FileArtifactRepresentation(IFileArtifactRepresentation::Kind::Reference, path.getUnownedSlice(), nullptr, nullptr);
+                    m_artifact->addRepresentation(fileRep);
+                }
+            }
+        }
+    }
+
+    // Get the name 
+    auto name = getPathInfo().getName();
+    if (name.getLength())
+    {
+        m_artifact->setName(name.getBuffer());
+    }
 }
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!! SourceManager !!!!!!!!!!!!!!!!!!!!!!!!!!!! */

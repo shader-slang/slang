@@ -1069,23 +1069,17 @@ namespace Slang
                 const auto& sourceFiles = translationUnit->getSourceFiles();
                 SLANG_ASSERT(sourceFiles.getCount() == 1);
 
-                const SourceFile* sourceFile = sourceFiles[0];
-             
-                // TODO(JS):
-                // We probably want to make a source artifact for this file. We don't 100% know if it's on the OS file system though.
+                SourceFile* sourceFile = sourceFiles[0];
+
+                // Make it have an artifact if doesn't have one already
+                // This is useful because it will mean any reps will be kept in scope
                 // 
-                // Really we would want to either store the ISlangFileSystem it was loaded from. For now though we'll just make a new
-                // artifact that has the blob
-                sourceArtifact = Artifact::create(ArtifactDescUtil::makeDescForCompileTarget(asExternal(sourceTarget)));
+                // For example if file backing is needed, the file rep will last the lifetime of the 
+                // SourceFile
+                sourceFile->maybeAddArtifact(nullptr);
 
-                // Set the blob
-                sourceArtifact->addRepresentationUnknown(sourceFile->getContentBlob());
-
-                auto name = sourceFile->getPathInfo().getName();
-                if (name.getLength())
-                {
-                    sourceArtifact->setName(name.getBuffer());
-                }
+                sourceArtifact = sourceFile->getArtifact();
+                SLANG_ASSERT(sourceArtifact);
             }
         }
         else

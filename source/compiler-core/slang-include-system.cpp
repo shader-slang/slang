@@ -4,8 +4,21 @@
 #include "../core/slang-io.h"
 #include "../core/slang-string-util.h"
 
+#include "../core/slang-file-system.h"
+
+#include "slang-slice-allocator.h"
+#include "slang-artifact-impl.h"
+#include "slang-artifact-representation-impl.h"
+
 namespace Slang
 {
+
+IncludeSystem::IncludeSystem(SearchDirectoryList* searchDirectories, ISlangFileSystemExt* fileSystemExt, SourceManager* sourceManager) :
+    m_searchDirectories(searchDirectories),
+    m_fileSystemExt(fileSystemExt),
+    m_sourceManager(sourceManager)
+{
+}
 
 SlangResult IncludeSystem::findFile(SlangPathType fromPathType, const String& fromPath, const String& path, PathInfo& outPathInfo)
 {
@@ -119,6 +132,8 @@ SlangResult IncludeSystem::loadFile(const PathInfo& pathInfo, ComPtr<ISlangBlob>
             sourceFile = m_sourceManager->createSourceFileWithBlob(pathInfo, foundSourceBlob);
             m_sourceManager->addSourceFile(pathInfo.uniqueIdentity, sourceFile);
 
+            sourceFile->maybeAddArtifact(m_fileSystemExt);
+
             outBlob = foundSourceBlob;
             return SLANG_OK;
         }
@@ -137,6 +152,8 @@ SlangResult IncludeSystem::loadFile(const PathInfo& pathInfo, ComPtr<ISlangBlob>
             }
 
             sourceFile->setContents(foundSourceBlob);
+            sourceFile->maybeAddArtifact(m_fileSystemExt);
+
             outBlob = foundSourceBlob;
             return SLANG_OK;
         }

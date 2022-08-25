@@ -33,13 +33,6 @@ struct SearchDirectoryList
 /* A helper class that builds basic include handling on top of searchDirectories/fileSystemExt and optionally a sourceManager */
 struct IncludeSystem
 {
-    IncludeSystem(SearchDirectoryList* searchDirectories, ISlangFileSystemExt* fileSystemExt, SourceManager* sourceManager = nullptr) :
-        m_searchDirectories(searchDirectories),
-        m_fileSystemExt(fileSystemExt),
-        m_sourceManager(sourceManager)
-    {
-    }
-
     SlangResult findFile(const String& pathToInclude, const String& pathIncludedFrom, PathInfo& outPathInfo);
     SlangResult findFile(SlangPathType fromPathType, const String& fromPath, const String& path, PathInfo& outPathInfo);
     String simplifyPath(const String& path);
@@ -50,6 +43,9 @@ struct IncludeSystem
     SearchDirectoryList* getSearchDirectoryList() const { return m_searchDirectories; }
     ISlangFileSystemExt* getFileSystem() const { return m_fileSystemExt; }
     SourceManager* getSourceManager() const { return m_sourceManager; }
+
+        /// Ctor
+    IncludeSystem(SearchDirectoryList* searchDirectories, ISlangFileSystemExt* fileSystemExt, SourceManager* sourceManager = nullptr);
 
 protected:
     
