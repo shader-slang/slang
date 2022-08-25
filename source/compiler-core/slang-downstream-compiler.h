@@ -123,14 +123,8 @@ struct DownstreamCompileOptions
 
     Slice<Define> defines;
 
-    /// The contents of the source to compile. This can be empty is sourceFiles is set.
-    /// If the compiler is a commandLine file this source will be written to a temporary file.
-    TerminatedCharSlice sourceContents;
-    /// 'Path' that the contents originated from. NOTE! This is for reporting only and doesn't have to exist on file system
-    TerminatedCharSlice sourceContentsPath;
-
-    /// The names/paths of source to compile. This can be empty if sourceContents is set.
-    Slice<TerminatedCharSlice> sourceFiles;
+    /// The source artifacts
+    Slice<IArtifact*> sourceArtifacts;
 
     Slice<TerminatedCharSlice> includePaths;
     Slice<TerminatedCharSlice> libraryPaths;

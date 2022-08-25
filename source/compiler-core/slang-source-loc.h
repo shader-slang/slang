@@ -60,6 +60,8 @@ struct PathInfo
     SLANG_FORCE_INLINE bool hasFoundPath() const { return type == Type::Normal || type == Type::FoundPath || (type == Type::FromString && foundPath.getLength() > 0); }
         /// True if has a found path that has originated from a file (as opposed to string or some other origin)
     SLANG_FORCE_INLINE bool hasFileFoundPath() const { return (type == Type::Normal || type == Type::FoundPath) && foundPath.getLength() > 0; }
+        /// Get the 'name'/path of the item. Will return an empty string if not applicable or not set.
+    String getName() const;
 
     bool operator==(const ThisType& rhs) const;
     bool operator!=(const ThisType& rhs) const { return !(*this == rhs); }

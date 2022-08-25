@@ -120,4 +120,80 @@ namespace Slang {
     return String();
 }
 
+/* static */IFileArtifactRepresentation* ArtifactUtil::findFileSystemTemporaryFile(IArtifact* artifact)
+{
+    if (auto fileRep = findFileSystemFile(artifact))
+    {
+        return fileRep->getLockFile() ? fileRep : nullptr;
+    }
+    return nullptr;
+}
+
+/* static */IFileArtifactRepresentation* ArtifactUtil::findFileSystemFile(IArtifact* artifact)
+{
+    for (auto rep : artifact->getRepresentations())
+    {
+        if (auto fileSystemRep = as<IFileArtifactRepresentation>(rep))
+        {
+            if (fileSystemRep->getFileSystem() == nullptr)
+            {
+                return fileSystemRep;
+            }
+        }
+    }
+    return nullptr;
+}
+
+/* static */IFileArtifactRepresentation* ArtifactUtil::findFileSystemPrimaryFile(IArtifact* artifact)
+{
+    for (auto rep : artifact->getRepresentations())
+    {
+        if (auto fileRep = as<IFileArtifactRepresentation>(rep))
+        {
+            // If it has a file system it's not on OS 
+            // If it has a lock file it can be assumed to be temporary
+            if (fileRep->getFileSystem() != nullptr ||
+                fileRep->getLockFile())
+            {
+                continue;
+            }
+
+            // If it's a file that is persistant it will just be a reference to a pre-existing file
+            const auto kind = fileRep->getKind();
+            if (kind != IFileArtifactRepresentation::Kind::Reference)
+            {
+                continue;
+            }
+
+            return fileRep;
+        }
+    }
+    return nullptr;
+}
+
+UnownedStringSlice ArtifactUtil::findPath(IArtifact* artifact)
+{
+    // If a name is set we'll just use that
+    {
+        const char* name = artifact->getName();
+        if (name && name[0] != 0)
+        {
+            return UnownedStringSlice(name);
+        }
+    }
+
+    // Find the *first* file rep and use it's path. 
+    // This may not be the file on the file system - but is probably the path/name the user most associated with the artifact
+    if (auto fileRep = findRepresentation<IFileArtifactRepresentation>(artifact))
+    {
+        // If there isn't a lock file it is
+        if (fileRep->getLockFile() == nullptr)
+        {
+            return UnownedStringSlice(fileRep->getPath());
+        }
+    }
+
+    return UnownedStringSlice();
+}
+
 } // namespace Slang

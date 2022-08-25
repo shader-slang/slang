@@ -52,8 +52,15 @@ class IArtifactHelper : public ICastable
 		/// Given an interface returns as a castable interface. This might just cast unk into ICastable, or wrap it such that it uses the castable interface
 	virtual SLANG_NO_THROW void SLANG_MCALL getCastable(ISlangUnknown* unk, ICastable** outCastable) = 0;
 
+		/// Create a file rep
+	virtual SLANG_NO_THROW SlangResult SLANG_MCALL createFileArtifactRepresentation(
+		IFileArtifactRepresentation::Kind kind, const CharSlice& path, IFileArtifactRepresentation* lockFile, ISlangMutableFileSystem* fileSystem, IFileArtifactRepresentation** outRep) = 0;
+
 		/// Create an empty ICastableList
 	virtual SLANG_NO_THROW SlangResult SLANG_MCALL createCastableList(const Guid& guid, ICastableList** outList) = 0;
+
+
+	virtual SLANG_NO_THROW SlangResult SLANG_MCALL createFileArtifact(const ArtifactDesc& desc, const CharSlice& slice, IArtifact** outArtifact) = 0;
 };
 
 class DefaultArtifactHelper : public IArtifactHelper
@@ -92,6 +99,11 @@ public:
 	virtual SLANG_NO_THROW void SLANG_MCALL getCastable(ISlangUnknown* unk, ICastable** outCastable) SLANG_OVERRIDE;
 
 	virtual SLANG_NO_THROW SlangResult SLANG_MCALL createCastableList(const Guid& guid, ICastableList** outList) SLANG_OVERRIDE;
+
+	virtual SLANG_NO_THROW SlangResult SLANG_MCALL createFileArtifactRepresentation(
+		IFileArtifactRepresentation::Kind kind, const CharSlice& path, IFileArtifactRepresentation* lockFile, ISlangMutableFileSystem* fileSystem, IFileArtifactRepresentation** outRep) SLANG_OVERRIDE;
+
+	virtual SLANG_NO_THROW SlangResult SLANG_MCALL createFileArtifact(const ArtifactDesc& desc, const CharSlice& slice, IArtifact** outArtifact) SLANG_OVERRIDE;
 
 	static IArtifactHelper* getSingleton() { return &g_singleton; }
 

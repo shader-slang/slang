@@ -7,6 +7,8 @@
 #include "slang-artifact-desc-util.h"
 #include "slang-artifact-util.h"
 
+#include "../compiler-core/slang-slice-allocator.h"
+
 #include "../core/slang-castable-list-impl.h"
 #include "../core/slang-castable-util.h"
 
@@ -138,6 +140,26 @@ SlangResult DefaultArtifactHelper::createCastableList(const Guid& guid, ICastabl
 	}
 	delete list;
 	return SLANG_E_NO_INTERFACE;
+}
+
+SlangResult DefaultArtifactHelper::createFileArtifactRepresentation(
+	IFileArtifactRepresentation::Kind kind, const CharSlice& path, IFileArtifactRepresentation* lockFile, ISlangMutableFileSystem* fileSystem, IFileArtifactRepresentation** outRep)
+{
+	*outRep = FileArtifactRepresentation::create(kind, asStringSlice(path), lockFile, fileSystem).detach();
+	return SLANG_OK;
+}
+
+
+SlangResult DefaultArtifactHelper::createFileArtifact(const ArtifactDesc& desc, const CharSlice& path, IArtifact** outArtifact)
+{
+	auto artifact = Artifact::create(desc);
+
+	auto fileRep = new FileArtifactRepresentation(IFileArtifactRepresentation::Kind::Reference, asStringSlice(path), nullptr, nullptr);
+
+	artifact->addRepresentation(fileRep);
+
+	*outArtifact = artifact.detach();
+	return SLANG_OK;
 }
 
 } // namespace Slang

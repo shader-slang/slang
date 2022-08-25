@@ -127,11 +127,13 @@ static SlangResult _parseDiagnosticLine(SliceAllocator& allocator, const Unowned
 
 SlangResult GlslangDownstreamCompiler::compile(const CompileOptions& options, IArtifact** outArtifact)
 {
-    // This compiler doesn't read files, they should be read externally and stored in sourceContents/sourceContentsPath
-    if (options.sourceFiles.count > 0)
+    // This compiler can only handle a single artifact
+    if (options.sourceArtifacts.count != 1)
     {
         return SLANG_FAIL;
     }
+
+    IArtifact* sourceArtifact = options.sourceArtifacts[0];
 
     if (options.sourceLanguage != SLANG_SOURCE_LANGUAGE_GLSL || options.targetType != SLANG_SPIRV)
     {
@@ -150,18 +152,23 @@ SlangResult GlslangDownstreamCompiler::compile(const CompileOptions& options, IA
         ((List<uint8_t>*)userData)->addRange((uint8_t*)data, size);
     };
 
-    
+    ComPtr<ISlangBlob> sourceBlob;
+    SLANG_RETURN_ON_FAIL(sourceArtifact->loadBlob(ArtifactKeep::Yes, sourceBlob.writeRef()));
+
+    String sourcePath = ArtifactUtil::findPath(sourceArtifact);
+
     glslang_CompileRequest_1_1 request;
     memset(&request, 0, sizeof(request));
     request.sizeInBytes = sizeof(request);
 
     request.action = GLSLANG_ACTION_COMPILE_GLSL_TO_SPIRV;
-    request.sourcePath = options.sourceContentsPath; 
+    request.sourcePath = sourcePath.getBuffer();
 
     request.slangStage = options.stage;
 
-    request.inputBegin = options.sourceContents.begin();
-    request.inputEnd = options.sourceContents.end();
+    const char* inputBegin = (const char*)sourceBlob->getBufferPointer();
+    request.inputBegin = inputBegin;
+    request.inputEnd = inputBegin + sourceBlob->getBufferSize();
 
     // Find the SPIR-V version if set
     SemanticVersion spirvVersion;
@@ -201,7 +208,7 @@ SlangResult GlslangDownstreamCompiler::compile(const CompileOptions& options, IA
 
     if (SLANG_FAILED(invokeResult))
     {
-        diagnostics->setRaw(SliceCaster::asCharSlice(diagnosticOutput));
+        diagnostics->setRaw(SliceUtil::asCharSlice(diagnosticOutput));
 
         SliceAllocator allocator;
 

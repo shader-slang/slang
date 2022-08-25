@@ -22,6 +22,20 @@ const String PathInfo::getMostUniqueIdentity() const
     }
 }
 
+String PathInfo::getName() const
+{
+    switch (type)
+    {
+        case Type::Normal:
+        case Type::FromString:
+        case Type::FoundPath:
+        {
+            return foundPath;
+        }
+    }
+    return String();
+}
+
 bool PathInfo::operator==(const ThisType& rhs) const
 {
     // They must be the same type

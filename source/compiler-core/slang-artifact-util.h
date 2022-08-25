@@ -37,6 +37,22 @@ struct ArtifactUtil
     static bool isSignificant(IArtifact* artifact, void* data = nullptr);
         /// Find a significant artifact
     static IArtifact* findSignificant(IArtifact* artifact);
+
+        /// Returns the rep of the artifact that contains a temporary (identified by having a lock) on 
+        /// the OS file system
+    static IFileArtifactRepresentation* findFileSystemTemporaryFile(IArtifact* artifact);
+        /// Returns true if the artifact contains a file on the OS file system
+    static IFileArtifactRepresentation* findFileSystemFile(IArtifact* artifact);
+        /// Returns the rep of a file system file which *isn't* temporary
+    static IFileArtifactRepresentation* findFileSystemPrimaryFile(IArtifact* artifact);
+
+        /// Find the path/name associated with the artifact.
+        /// The path is *not* necessarily the path on the file system. The order of search is 
+        /// * If the artifact has a name return that
+        /// * If the artifact has a IFileArtifactRepresentation (that isn't temporary) return it's path 
+        /// * If not found return an empty slice
+    static UnownedStringSlice findPath(IArtifact* artifact);
+
 };
 
 } // namespace Slang

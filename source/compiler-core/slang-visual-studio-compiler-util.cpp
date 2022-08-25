@@ -74,7 +74,6 @@ static void _addFile(const String& path, const ArtifactDesc& desc, IFileArtifact
 
 /* static */SlangResult VisualStudioCompilerUtil::calcArgs(const CompileOptions& options, CommandLine& cmdLine)
 {
-    SLANG_ASSERT(options.sourceContents.count == 0);
     SLANG_ASSERT(options.modulePath.count);
 
     // https://docs.microsoft.com/en-us/cpp/build/reference/compiler-options-listed-alphabetically?view=vs-2019
@@ -236,12 +235,17 @@ static void _addFile(const String& path, const ArtifactDesc& desc, IFileArtifact
     // https://docs.microsoft.com/en-us/cpp/build/reference/eh-exception-handling-model?view=vs-2019
     // /Eha - Specifies the model of exception handling. (a, s, c, r are options)
 
-    // Files to compile
-    for (const auto& sourceFile : options.sourceFiles)
+    // Files to compile, need to be on the file system.
+    for (IArtifact* sourceArtifact : options.sourceArtifacts)
     {
-        cmdLine.addArg(asString(sourceFile));
-    }
+        ComPtr<IFileArtifactRepresentation> fileRep;
 
+        // TODO(JS): 
+        // Do we want to keep the file on the file system? It's probably reasonable to do so.
+        SLANG_RETURN_ON_FAIL(sourceArtifact->requireFile(ArtifactKeep::Yes, nullptr, fileRep.writeRef()));
+        cmdLine.addArg(fileRep->getPath());
+    }
+    
     // Link options (parameters past /link go to linker)
     cmdLine.addArg("/link");
 
@@ -430,7 +434,7 @@ static SlangResult _parseVisualStudioLine(SliceAllocator& allocator, const Unown
 {
     diagnostics->reset();
 
-    diagnostics->setRaw(SliceCaster::asTerminatedCharSlice(exeRes.standardOutput));
+    diagnostics->setRaw(SliceUtil::asTerminatedCharSlice(exeRes.standardOutput));
 
     SliceAllocator allocator;
 

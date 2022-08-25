@@ -645,11 +645,13 @@ SlangResult NVRTCDownstreamCompiler::_maybeAddHalfSupport(const DownstreamCompil
 
 SlangResult NVRTCDownstreamCompiler::compile(const DownstreamCompileOptions& options, IArtifact** outArtifact)
 {
-    // This compiler doesn't read files, they should be read externally and stored in sourceContents/sourceContentsPath
-    if (options.sourceFiles.count > 0)
+    // This compiler can only deal with a single artifact
+    if (options.sourceArtifacts.count != 1)
     {
         return SLANG_FAIL;
     }
+
+    IArtifact* sourceArtifact = options.sourceArtifacts[0];
 
     CommandLine cmdLine;
 
@@ -819,9 +821,17 @@ SlangResult NVRTCDownstreamCompiler::compile(const DownstreamCompileOptions& opt
 
     SLANG_ASSERT(headers.getCount() == headerIncludeNames.getCount());
 
+    ComPtr<ISlangBlob> sourceBlob;
+    SLANG_RETURN_ON_FAIL(sourceArtifact->loadBlob(ArtifactKeep::Yes, sourceBlob.writeRef()));
+
+    auto sourcePath = ArtifactUtil::findPath(sourceArtifact);
+
+    StringBuilder storage;
+    auto sourceContents = SliceUtil::toTerminatedCharSlice(storage, sourceBlob);
+
     nvrtcProgram program = nullptr;
-    nvrtcResult res = m_nvrtcCreateProgram(&program, options.sourceContents, options.sourceContentsPath,
-        (int) headers.getCount(),
+    nvrtcResult res = m_nvrtcCreateProgram(&program, sourceContents, String(sourcePath).getBuffer(),
+        (int)headers.getCount(),
         headers.getBuffer(),
         headerIncludeNames.getBuffer());
     if (res != NVRTC_SUCCESS)
@@ -860,7 +870,7 @@ SlangResult NVRTCDownstreamCompiler::compile(const DownstreamCompileOptions& opt
             SLANG_NVRTC_RETURN_ON_FAIL(m_nvrtcGetProgramLog(program, dst));
             rawDiagnostics.appendInPlace(dst, Index(logSize));
 
-            diagnostics->setRaw(SliceCaster::asCharSlice(rawDiagnostics));
+            diagnostics->setRaw(SliceUtil::asCharSlice(rawDiagnostics));
         }
 
         SliceAllocator allocator;
