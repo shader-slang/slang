@@ -2238,6 +2238,7 @@ static TestResult runCPPCompilerSharedLibrary(TestContext* context, TestInput& i
 
     options.sourceFiles = makeSlice(sourceFiles, 1);
     options.includePaths = makeSlice(includePaths, 1);
+    options.modulePath = SliceCaster::asTerminatedCharSlice(modulePath);
 
     ComPtr<IArtifact> artifact;
     if (SLANG_FAILED(compiler->compile(options, artifact.writeRef())))
