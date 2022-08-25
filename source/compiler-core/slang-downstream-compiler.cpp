@@ -111,7 +111,15 @@ SlangResult CommandLineDownstreamCompiler::compile(const CompileOptions& inOptio
     auto artifactList = CastableList::create();
 
     ComPtr<IFileArtifactRepresentation> lockFile;
+
     List<String> sourceFiles;
+
+    // Copy over all of the source files that are explicitly set, to sourceFiles which well use 
+    // to hold the actual list of sourceFiles required.
+    for (const auto& sourceFile : inOptions.sourceFiles)
+    {
+        sourceFiles.add(asStringSlice(sourceFile));
+    }
 
     if (options.modulePath.count == 0 || options.sourceContents.count != 0)
     {
