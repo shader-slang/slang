@@ -3058,7 +3058,7 @@ static void HandleIncludeDirective(PreprocessorDirectiveContext* context)
         sourceFile = sourceManager->createSourceFileWithBlob(filePathInfo, foundSourceBlob);
 
         auto fileSystemExt = context->m_preprocessor->fileSystem;
-        sourceFile->maybeAddArtifact(fileSystemExt);
+        sourceFile->maybeAddArtifact(nullptr, fileSystemExt);
 
         sourceManager->addSourceFile(filePathInfo.uniqueIdentity, sourceFile);
     }

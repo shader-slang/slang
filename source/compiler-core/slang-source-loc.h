@@ -246,8 +246,9 @@ public:
         /// Set the content as a string
     void setContents(const String& content);
 
-        /// If artifact isn't defined will try and associate one. The pathInfo must be the one associated with the PathInfo
-    void maybeAddArtifact(ISlangFileSystemExt* ext);
+        /// If the desc isn't set, will use Unknown source type
+        /// If artifact isn't defined will try and associate one. 
+    void maybeAddArtifact(const ArtifactDesc* desc, ISlangFileSystemExt* ext);
 
         /// Calculate a display path -> can canonicalize if necessary
     String calcVerbosePath() const;
