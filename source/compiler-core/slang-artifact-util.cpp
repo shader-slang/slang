@@ -196,4 +196,67 @@ UnownedStringSlice ArtifactUtil::findPath(IArtifact* artifact)
     return UnownedStringSlice();
 }
 
+/* static */UnownedStringSlice ArtifactUtil::inferExtension(IArtifact* artifact)
+{
+    for (auto rep :artifact->getRepresentations())
+    {
+        if (auto fileRep = as<IFileArtifactRepresentation>(rep))
+        {
+            const char* path = fileRep->getPath();
+            auto ext = Path::getPathExt(UnownedStringSlice(path));
+            if (ext.getLength())
+            {
+                return ext;
+            }
+        }
+    }
+
+    // Okay lets see if the name has an extension
+    return Path::getPathExt(UnownedStringSlice(artifact->getName()));
+}
+
+static SlangResult _calcInferred(IArtifact* artifact, const UnownedStringSlice& basePath, StringBuilder& outPath)
+{
+    auto ext = ArtifactUtil::inferExtension(artifact);
+
+    // If no extension was determined by inferring, go with unknown
+    if (ext.begin() == nullptr)
+    {
+        ext = toSlice("unknown");
+    }
+
+    outPath.Clear();
+    outPath.append(basePath);
+    if (ext.getLength())
+    {
+        outPath.appendChar('.');
+        outPath.append(ext);
+    }
+    return SLANG_OK;
+}
+
+/* static */SlangResult ArtifactUtil::calcPath(IArtifact* artifact, const UnownedStringSlice& basePath, StringBuilder& outPath)
+{
+    if (ArtifactDescUtil::hasDefinedNameForDesc(artifact->getDesc()))
+    {
+        return ArtifactDescUtil::calcPathForDesc(artifact->getDesc(), basePath, outPath);
+    }
+    else
+    {
+        return _calcInferred(artifact, basePath, outPath);
+    }
+}
+
+/* static */SlangResult ArtifactUtil::calcName(IArtifact* artifact, const UnownedStringSlice& baseName, StringBuilder& outName)
+{
+    if (ArtifactDescUtil::hasDefinedNameForDesc(artifact->getDesc()))
+    {
+        return ArtifactDescUtil::calcNameForDesc(artifact->getDesc(), baseName, outName);
+    }
+    else
+    {
+        return _calcInferred(artifact, baseName, outName);
+    }
+}
+
 } // namespace Slang

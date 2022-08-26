@@ -53,6 +53,15 @@ struct ArtifactUtil
         /// * If not found return an empty slice
     static UnownedStringSlice findPath(IArtifact* artifact);
 
+        /// Sometimes we have artifacts that don't specify a payload type - perhaps because they can be interpretted in different ways
+        /// This function uses the associated name and file representations to infer a extension. If none is found returns an empty slice.
+    static UnownedStringSlice inferExtension(IArtifact* artifact);
+
+        /// Given a desc and a basePath returns a suitable path for a entity of specified desc
+    static SlangResult calcPath(IArtifact* artifact, const UnownedStringSlice& basePath, StringBuilder& outPath);
+
+        /// Given a desc and a baseName works out the the output file name
+    static SlangResult calcName(IArtifact* artifact, const UnownedStringSlice& baseName, StringBuilder& outName);
 };
 
 } // namespace Slang

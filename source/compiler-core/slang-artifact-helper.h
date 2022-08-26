@@ -44,7 +44,10 @@ class IArtifactHelper : public ICastable
 	virtual SLANG_NO_THROW SlangResult SLANG_MCALL createLockFile(const char* nameBase, ISlangMutableFileSystem* fileSystem, IFileArtifactRepresentation** outLockFile) = 0;
 
 		/// Given a desc and a basePath returns a suitable name
-	virtual SLANG_NO_THROW SlangResult SLANG_MCALL calcArtifactPath(const ArtifactDesc& desc, const char* basePath, ISlangBlob** outPath) = 0;
+	virtual SLANG_NO_THROW SlangResult SLANG_MCALL calcArtifactDescPath(const ArtifactDesc& desc, const char* basePath, ISlangBlob** outPath) = 0;
+
+		/// Given an artifact and a basePath returns a suitable name
+	virtual SLANG_NO_THROW SlangResult SLANG_MCALL calcArtifactPath(IArtifact* , const char* basePath, ISlangBlob** outPath) = 0;
 
 		/// Given a compile target return the equivalent desc
 	virtual SLANG_NO_THROW ArtifactDesc SLANG_MCALL makeDescForCompileTarget(SlangCompileTarget target) = 0;
@@ -92,7 +95,9 @@ public:
 
 	virtual SLANG_NO_THROW SlangResult SLANG_MCALL createLockFile(const char* nameBase, ISlangMutableFileSystem* fileSystem, IFileArtifactRepresentation** outLockFile) SLANG_OVERRIDE;
 
-	virtual SLANG_NO_THROW SlangResult SLANG_MCALL calcArtifactPath(const ArtifactDesc& desc, const char* basePath, ISlangBlob** outPath) SLANG_OVERRIDE;
+	virtual SLANG_NO_THROW SlangResult SLANG_MCALL calcArtifactDescPath(const ArtifactDesc& desc, const char* basePath, ISlangBlob** outPath) SLANG_OVERRIDE;
+
+	virtual SLANG_NO_THROW SlangResult SLANG_MCALL calcArtifactPath(IArtifact*, const char* basePath, ISlangBlob** outPath) SLANG_OVERRIDE;
 
 	virtual SLANG_NO_THROW ArtifactDesc SLANG_MCALL makeDescForCompileTarget(SlangCompileTarget target) SLANG_OVERRIDE;
 

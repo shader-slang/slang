@@ -81,6 +81,9 @@ struct ArtifactDescUtil
         /// Given a desc and a baseName works out the the output file name
     static SlangResult calcNameForDesc(const ArtifactDesc& desc, const UnownedStringSlice& baseName, StringBuilder& outName);
 
+        /// Returns true if there is a defined name extension/type for this desc
+    static SlangResult hasDefinedNameForDesc(const ArtifactDesc& desc);
+
         /// Given a target returns the ArtifactDesc
     static ArtifactDesc makeDescForCompileTarget(SlangCompileTarget target);
 

@@ -110,12 +110,21 @@ SlangResult DefaultArtifactHelper::createLockFile(const char* inNameBase, ISlang
 	return SLANG_OK;
 }
 
-SlangResult DefaultArtifactHelper::calcArtifactPath(const ArtifactDesc& desc, const char* inBasePath, ISlangBlob** outPath)
+SlangResult DefaultArtifactHelper::calcArtifactDescPath(const ArtifactDesc& desc, const char* inBasePath, ISlangBlob** outPath)
 {
 	UnownedStringSlice basePath(inBasePath);
 	StringBuilder path;
 	SLANG_RETURN_ON_FAIL(ArtifactDescUtil::calcPathForDesc(desc, basePath, path));
-	*outPath = StringBlob::create(path).detach();
+	*outPath = StringBlob::moveCreate(path).detach();
+	return SLANG_OK;
+}
+
+SlangResult DefaultArtifactHelper::calcArtifactPath(IArtifact* artifact, const char* inBasePath, ISlangBlob** outPath)
+{
+	UnownedStringSlice basePath(inBasePath);
+	StringBuilder path;
+	SLANG_RETURN_ON_FAIL(ArtifactUtil::calcPath(artifact, basePath, path));
+	*outPath = StringBlob::moveCreate(path).detach();
 	return SLANG_OK;
 }
 

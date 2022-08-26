@@ -443,12 +443,12 @@ static const KindExtension g_cpuKindExts[] =
 {
     switch (kind)
     {
-    case Kind::Library:
-    case Kind::ObjectCode:
-    {
-        return true;
-    }
-    default: break;
+        case Kind::Library:
+        case Kind::ObjectCode:
+        {
+            return true;
+        }
+        default: break;
     }
     return false;
 }
@@ -587,9 +587,6 @@ static UnownedStringSlice _getPayloadExtension(ArtifactPayload payload)
     typedef ArtifactPayload Payload;
     switch (payload)
     {
-        /* Misc */
-        case Payload::Unknown:      return toSlice("unknown");
-
         /* Source types */
         case Payload::HLSL:         return toSlice("hlsl");
         case Payload::GLSL:         return toSlice("glsl");
@@ -685,8 +682,14 @@ SlangResult ArtifactDescUtil::appendDefaultExtension(const ArtifactDesc& desc, S
         }
         case ArtifactKind::Source:
         {
-            out << _getPayloadExtension(desc.payload);
-            return SLANG_OK;
+            auto ext = _getPayloadExtension(desc.payload);
+            if (ext.begin() != nullptr)
+            {
+                out << ext;
+                return SLANG_OK;
+            }
+            // Don't know the extension for that 
+            return SLANG_E_NOT_FOUND;
         }
         default: break;
     }
@@ -695,16 +698,7 @@ SlangResult ArtifactDescUtil::appendDefaultExtension(const ArtifactDesc& desc, S
     {
         return appendCpuExtensionForKind(desc.kind, out);
     }
-    else
-    {
-        auto slice = _getPayloadExtension(desc.payload);
-        if (slice.getLength())
-        {
-            out << slice;
-            return SLANG_OK;
-        }
-    }
-
+    
     return SLANG_E_NOT_FOUND;
 }
 
@@ -752,6 +746,12 @@ SlangResult ArtifactDescUtil::appendDefaultExtension(const ArtifactDesc& desc, S
     return getBaseNameFromPath(desc, path);
 }
 
+/* static */SlangResult ArtifactDescUtil::hasDefinedNameForDesc(const ArtifactDesc& desc)
+{
+    StringBuilder buf;
+    return SLANG_SUCCEEDED(appendDefaultExtension(desc, buf));
+}
+
 /* static */SlangResult ArtifactDescUtil::calcNameForDesc(const ArtifactDesc& desc, const UnownedStringSlice& inBaseName, StringBuilder& outName)
 {
     UnownedStringSlice baseName(inBaseName);
@@ -779,10 +779,18 @@ SlangResult ArtifactDescUtil::appendDefaultExtension(const ArtifactDesc& desc, S
 
     // If there is an extension append it
     StringBuilder ext;
-    if (SLANG_SUCCEEDED(appendDefaultExtension(desc, ext)) && ext.getLength() > 0)
+    if (SLANG_SUCCEEDED(appendDefaultExtension(desc, ext)))
     {
-        outName.appendChar('.');
-        outName.append(ext);
+        if (ext.getLength())
+        {
+            outName.appendChar('.');
+            outName.append(ext);
+        }
+    }
+    else
+    {
+        // If we can't determine the type we can output with .unknown
+        outName.append(toSlice(".unknown"));
     }
 
     return SLANG_OK;
