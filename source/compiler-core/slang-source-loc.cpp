@@ -454,45 +454,12 @@ void SourceFile::maybeAddArtifact(ISlangFileSystemExt* ext)
     // Add the blob as a representation.
     m_artifact->addRepresentationUnknown(m_contentBlob);
 
-    // If we have the file system see if we can set up a path too
+    // If we have the file system, set up the rep to that
     if (ext)
     {
-        const auto osPathKind = ext->getOSPathKind();
-
-        if (osPathKind != OSPathKind::None)
-        {
-            String path;
-            switch (osPathKind)
-            {
-                case OSPathKind::Canonical:
-                {
-                    // Get the canonical path
-                    ComPtr<ISlangBlob> canonicalPath;
-                    if (SLANG_SUCCEEDED(ext->getCanonicalPath(getPathInfo().foundPath.getBuffer(), canonicalPath.writeRef())))
-                    {
-                        path = StringUtil::getString(canonicalPath);
-                    }
-                    break;
-                }
-                case OSPathKind::Direct:
-                {
-                    path = getPathInfo().foundPath;
-                    break;
-                }
-            }
-
-            if (path.getLength())
-            {
-                // We can sanity check that this works
-                SlangPathType pathType;
-                if (SLANG_SUCCEEDED(ext->getPathType(path.getBuffer(), &pathType)))
-                {
-                    // We can add a file representation
-                    FileArtifactRepresentation* fileRep = new FileArtifactRepresentation(IFileArtifactRepresentation::Kind::Reference, path.getUnownedSlice(), nullptr, nullptr);
-                    m_artifact->addRepresentation(fileRep);
-                }
-            }
-        }
+        // Add the representation on the file system
+        auto extRep = new ExtFileArtifactRepresentation(getPathInfo().foundPath.getUnownedSlice(), ext);
+        m_artifact->addRepresentation(extRep);
     }
 
     // Get the name 

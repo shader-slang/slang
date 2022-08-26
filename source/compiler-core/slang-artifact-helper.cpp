@@ -87,26 +87,12 @@ ArtifactStyle DefaultArtifactHelper::getStyleParent(ArtifactStyle style) { retur
 UnownedStringSlice DefaultArtifactHelper::getStyleName(ArtifactStyle style) { return getName(style); }
 bool DefaultArtifactHelper::isStyleDerivedFrom(ArtifactStyle style, ArtifactStyle base) { return isDerivedFrom(style, base); }
 
-SlangResult DefaultArtifactHelper::createLockFile(const char* inNameBase, ISlangMutableFileSystem* fileSystem, IFileArtifactRepresentation** outLockFile)
+SlangResult DefaultArtifactHelper::createLockFile(const CharSlice& inNameBase, IOSFileArtifactRepresentation** outLockFile)
 {
-	if (fileSystem)
-	{
-		if (fileSystem != OSFileSystem::getMutableSingleton())
-		{
-			// We can only create lock files, on the global OS file system
-			return SLANG_E_NOT_AVAILABLE;
-		}
-		fileSystem = nullptr;
-	}
-
-	const UnownedStringSlice nameBase = (inNameBase && inNameBase[0] != 0) ? UnownedStringSlice(inNameBase) : UnownedStringSlice("unknown");
-
+	const UnownedStringSlice nameBase = inNameBase.count ? asStringSlice(inNameBase) : UnownedStringSlice("unknown");
 	String lockPath;
 	SLANG_RETURN_ON_FAIL(File::generateTemporary(nameBase, lockPath));
-
-	ComPtr<IFileArtifactRepresentation> lockFile(new FileArtifactRepresentation(IFileArtifactRepresentation::Kind::Lock, lockPath.getUnownedSlice(), nullptr, fileSystem));
-
-	*outLockFile = lockFile.detach();
+	*outLockFile = OSFileArtifactRepresentation::create(IOSFileArtifactRepresentation::Kind::Lock, lockPath.getUnownedSlice(), nullptr).detach();
 	return SLANG_OK;
 }
 
@@ -151,22 +137,26 @@ SlangResult DefaultArtifactHelper::createCastableList(const Guid& guid, ICastabl
 	return SLANG_E_NO_INTERFACE;
 }
 
-SlangResult DefaultArtifactHelper::createFileArtifactRepresentation(
-	IFileArtifactRepresentation::Kind kind, const CharSlice& path, IFileArtifactRepresentation* lockFile, ISlangMutableFileSystem* fileSystem, IFileArtifactRepresentation** outRep)
+SlangResult DefaultArtifactHelper::createOSFileArtifactRepresentation(
+	IOSFileArtifactRepresentation::Kind kind, const CharSlice& path, IOSFileArtifactRepresentation* lockFile, IOSFileArtifactRepresentation** outRep)
 {
-	*outRep = FileArtifactRepresentation::create(kind, asStringSlice(path), lockFile, fileSystem).detach();
+	*outRep = OSFileArtifactRepresentation::create(kind, asStringSlice(path), lockFile).detach();
 	return SLANG_OK;
 }
 
+SlangResult DefaultArtifactHelper::createExtFileArtifactRepresentation(const CharSlice& path, ISlangFileSystemExt* system, IExtFileArtifactRepresentation** outRep)
+{
+	*outRep = ExtFileArtifactRepresentation::create(asStringSlice(path), system).detach();
+	return SLANG_OK;
+}
 
-SlangResult DefaultArtifactHelper::createFileArtifact(const ArtifactDesc& desc, const CharSlice& path, IArtifact** outArtifact)
+SlangResult DefaultArtifactHelper::createOSFileArtifact(const ArtifactDesc& desc, const CharSlice& path, IArtifact** outArtifact)
 {
 	auto artifact = Artifact::create(desc);
 
-	auto fileRep = new FileArtifactRepresentation(IFileArtifactRepresentation::Kind::Reference, asStringSlice(path), nullptr, nullptr);
-
+	auto fileRep = new OSFileArtifactRepresentation(IOSFileArtifactRepresentation::Kind::Reference, asStringSlice(path), nullptr);
 	artifact->addRepresentation(fileRep);
-
+	
 	*outArtifact = artifact.detach();
 	return SLANG_OK;
 }

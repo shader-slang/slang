@@ -10,16 +10,6 @@ namespace Slang
 
 struct ArtifactUtil
 {
-        /// Get the base name of this artifact.
-        /// If there is a path set, will extract the name from that (stripping prefix, extension as necessary).
-        /// Else if there is an explicit name set, this is returned.
-        /// Else returns the empty string
-    static String getBaseName(IArtifact* artifact);
-
-        /// Get the parent path (empty if there isn't one)
-    static String getParentPath(IArtifact* artifact);
-    static String getParentPath(IFileArtifactRepresentation* fileRep);
-
         /// Create an empty container which is compatible with the desc
     static ComPtr<IArtifactContainer> createContainer(const ArtifactDesc& desc);
 
@@ -38,20 +28,14 @@ struct ArtifactUtil
         /// Find a significant artifact
     static IArtifact* findSignificant(IArtifact* artifact);
 
-        /// Returns the rep of the artifact that contains a temporary (identified by having a lock) on 
-        /// the OS file system
-    static IFileArtifactRepresentation* findFileSystemTemporaryFile(IArtifact* artifact);
-        /// Returns true if the artifact contains a file on the OS file system
-    static IFileArtifactRepresentation* findFileSystemFile(IArtifact* artifact);
-        /// Returns the rep of a file system file which *isn't* temporary
-    static IFileArtifactRepresentation* findFileSystemPrimaryFile(IArtifact* artifact);
-
         /// Find the path/name associated with the artifact.
         /// The path is *not* necessarily the path on the file system. The order of search is 
         /// * If the artifact has a name return that
-        /// * If the artifact has a IFileArtifactRepresentation (that isn't temporary) return it's path 
+        /// * If the artifact has a IPathFileArtifactRepresentation (that isn't temporary) return it's path 
         /// * If not found return an empty slice
     static UnownedStringSlice findPath(IArtifact* artifact);
+        /// Find a name
+    static UnownedStringSlice findName(IArtifact* artifact);
 
         /// Sometimes we have artifacts that don't specify a payload type - perhaps because they can be interpretted in different ways
         /// This function uses the associated name and file representations to infer a extension. If none is found returns an empty slice.

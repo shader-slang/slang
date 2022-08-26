@@ -1258,7 +1258,7 @@ namespace Slang
                 // Set up the library artifact
                 auto artifact = Artifact::create(ArtifactDesc::make(ArtifactKind::Library, Artifact::Payload::HostCPU), toSlice("slang-rt"));
 
-                ComPtr<IFileArtifactRepresentation> fileRep(new FileArtifactRepresentation(IFileArtifactRepresentation::Kind::NameOnly, toSlice("slang-rt"), nullptr, nullptr));
+                ComPtr<IOSFileArtifactRepresentation> fileRep(new OSFileArtifactRepresentation(IOSFileArtifactRepresentation::Kind::NameOnly, toSlice("slang-rt"), nullptr));
                 artifact->addRepresentation(fileRep);
 
                 libraries.add(artifact);

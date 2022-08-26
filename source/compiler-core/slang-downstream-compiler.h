@@ -235,7 +235,7 @@ public:
         /// Given options determines the paths to products produced (including the 'moduleFilePath').
         /// Note that does *not* guarentee all products were or should be produced. Just aims to include all that could
         /// be produced, such that can be removed on completion.
-    virtual SlangResult calcCompileProducts(const CompileOptions& options, DownstreamProductFlags flags, IFileArtifactRepresentation* lockFile, List<ComPtr<IArtifact>>& outArtifacts) = 0;
+    virtual SlangResult calcCompileProducts(const CompileOptions& options, DownstreamProductFlags flags, IOSFileArtifactRepresentation* lockFile, List<ComPtr<IArtifact>>& outArtifacts) = 0;
 
     virtual SlangResult calcArgs(const CompileOptions& options, CommandLine& cmdLine) = 0;
     virtual SlangResult parseOutput(const ExecuteResult& exeResult, IArtifactDiagnostics* diagnostics) = 0;

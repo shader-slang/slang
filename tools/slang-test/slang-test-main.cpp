@@ -2239,7 +2239,7 @@ static TestResult runCPPCompilerSharedLibrary(TestContext* context, TestInput& i
 
     // Compile this source
     ComPtr<IArtifact> sourceArtifact;
-    helper->createFileArtifact(ArtifactDescUtil::makeDescForSourceLanguage(options.sourceLanguage), asCharSlice(filePath.getUnownedSlice()), sourceArtifact.writeRef());
+    helper->createOSFileArtifact(ArtifactDescUtil::makeDescForSourceLanguage(options.sourceLanguage), asCharSlice(filePath.getUnownedSlice()), sourceArtifact.writeRef());
 
     TerminatedCharSlice includePaths[] = { TerminatedCharSlice(".") };
 
@@ -2365,7 +2365,7 @@ static TestResult runCPPCompilerExecute(TestContext* context, TestInput& input)
     auto helper = DefaultArtifactHelper::getSingleton();
 
     ComPtr<IArtifact> sourceArtifact;
-    helper->createFileArtifact(ArtifactDescUtil::makeDescForSourceLanguage(options.sourceLanguage), asCharSlice(filePath.getUnownedSlice()), sourceArtifact.writeRef());
+    helper->createOSFileArtifact(ArtifactDescUtil::makeDescForSourceLanguage(options.sourceLanguage), asCharSlice(filePath.getUnownedSlice()), sourceArtifact.writeRef());
 
     // Compile this source
     options.sourceArtifacts = makeSlice(sourceArtifact.readRef(), 1);
