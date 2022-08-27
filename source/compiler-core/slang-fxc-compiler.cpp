@@ -153,7 +153,7 @@ SlangResult FXCDownstreamCompiler::init(ISlangSharedLibrary* library)
     return SLANG_OK;
 }
 
-static SlangResult _parseDiagnosticLine(CharSliceAllocator& allocator, const UnownedStringSlice& line, List<UnownedStringSlice>& lineSlices, ArtifactDiagnostic& outDiagnostic)
+static SlangResult _parseDiagnosticLine(SliceAllocator& allocator, const UnownedStringSlice& line, List<UnownedStringSlice>& lineSlices, ArtifactDiagnostic& outDiagnostic)
 {
     /* tests/diagnostics/syntax-error-intrinsic.slang(14,2): error X3000: syntax error: unexpected token '@' */
     if (lineSlices.getCount() < 3)
@@ -183,7 +183,7 @@ static SlangResult _parseDiagnosticLine(CharSliceAllocator& allocator, const Uno
 SlangResult FXCDownstreamCompiler::compile(const CompileOptions& options, IArtifact** outArtifact)
 {
     // This compiler doesn't read files, they should be read externally and stored in sourceContents/sourceContentsPath
-    if (options.sourceFiles.getCount() > 0)
+    if (options.sourceFiles.count > 0)
     {
         return SLANG_FAIL;
     }
@@ -204,7 +204,7 @@ SlangResult FXCDownstreamCompiler::compile(const CompileOptions& options, IArtif
     SearchDirectoryList searchDirectories;
     for (const auto& includePath : options.includePaths)
     {
-        searchDirectories.searchDirectories.add(includePath);
+        searchDirectories.searchDirectories.add(asString(includePath));
     }
 
     // Use the default fileSystemExt is not set
@@ -213,9 +213,9 @@ SlangResult FXCDownstreamCompiler::compile(const CompileOptions& options, IArtif
     FxcIncludeHandler fxcIncludeHandlerStorage(&searchDirectories, options.fileSystemExt, options.sourceManager);
     if (options.fileSystemExt)
     {
-        if (options.sourceContentsPath.getLength() > 0)
+        if (options.sourceContentsPath.count > 0)
         {
-            fxcIncludeHandlerStorage.m_rootPathInfo = PathInfo::makePath(options.sourceContentsPath);
+            fxcIncludeHandlerStorage.m_rootPathInfo = PathInfo::makePath(asString(options.sourceContentsPath));
         }
         includeHandler = &fxcIncludeHandlerStorage;
     }
@@ -223,13 +223,13 @@ SlangResult FXCDownstreamCompiler::compile(const CompileOptions& options, IArtif
     List<D3D_SHADER_MACRO> dxMacrosStorage;
     D3D_SHADER_MACRO const* dxMacros = nullptr;
 
-    if (options.defines.getCount() > 0)
+    if (options.defines.count > 0)
     {
         for (const auto& define : options.defines)
         {
             D3D_SHADER_MACRO dxMacro;
-            dxMacro.Name = define.nameWithSig.getBuffer();
-            dxMacro.Definition = define.value.getBuffer();
+            dxMacro.Name = define.nameWithSig;
+            dxMacro.Definition = define.value;
             dxMacrosStorage.add(dxMacro);
         }
         D3D_SHADER_MACRO nullTerminator = { 0, 0 };
@@ -278,12 +278,12 @@ SlangResult FXCDownstreamCompiler::compile(const CompileOptions& options, IArtif
     ComPtr<ID3DBlob> diagnosticsBlob;
     HRESULT hr = m_compile(
         options.sourceContents.begin(),
-        options.sourceContents.getLength(),
-        options.sourceContentsPath.getBuffer(),
+        options.sourceContents.count,
+        options.sourceContentsPath,
         dxMacros,
         includeHandler,
-        options.entryPointName.getBuffer(),
-        options.profileName.getBuffer(),
+        options.entryPointName,
+        options.profileName,
         flags,
         0, // unused: effect flags
         codeBlob.writeRef(),
@@ -294,7 +294,7 @@ SlangResult FXCDownstreamCompiler::compile(const CompileOptions& options, IArtif
     // HRESULT is compatible with SlangResult
     diagnostics->setResult(hr);
 
-    CharSliceAllocator allocator;
+    SliceAllocator allocator;
 
     if (diagnosticsBlob)
     {

@@ -32,7 +32,9 @@ static void _addFile(const String& path, const ArtifactDesc& desc, IFileArtifact
 
 /* static */SlangResult VisualStudioCompilerUtil::calcCompileProducts(const CompileOptions& options, ProductFlags flags, IFileArtifactRepresentation* lockFile, List<ComPtr<IArtifact>>& outArtifacts)
 {
-    SLANG_ASSERT(options.modulePath.getLength());
+    SLANG_ASSERT(options.modulePath.count);
+
+    const String modulePath = asString(options.modulePath);
 
     const auto targetDesc = ArtifactDescUtil::makeDescForCompileTarget(options.targetType);
 
@@ -42,28 +44,29 @@ static void _addFile(const String& path, const ArtifactDesc& desc, IFileArtifact
     {
         StringBuilder builder;
         const auto desc = ArtifactDescUtil::makeDescForCompileTarget(options.targetType);
-        SLANG_RETURN_ON_FAIL(ArtifactDescUtil::calcPathForDesc(desc, options.modulePath.getUnownedSlice(), builder));
+        SLANG_RETURN_ON_FAIL(ArtifactDescUtil::calcPathForDesc(desc, modulePath.getUnownedSlice(), builder));
 
         _addFile(builder, desc, lockFile, outArtifacts);
     }
     if (flags & ProductFlag::Miscellaneous)
     {
-        _addFile(options.modulePath + ".ilk", ArtifactDesc::make(ArtifactKind::BinaryFormat, ArtifactPayload::Unknown, ArtifactStyle::None), lockFile, outArtifacts);
+        
+        _addFile(modulePath + ".ilk", ArtifactDesc::make(ArtifactKind::BinaryFormat, ArtifactPayload::Unknown, ArtifactStyle::None), lockFile, outArtifacts);
 
         if (options.targetType == SLANG_SHADER_SHARED_LIBRARY)
         {
-            _addFile(options.modulePath + ".exp", ArtifactDesc::make(ArtifactKind::BinaryFormat, ArtifactPayload::Unknown, ArtifactStyle::None), lockFile, outArtifacts);
-            _addFile(options.modulePath + ".lib", ArtifactDesc::make(ArtifactKind::Library, ArtifactPayload::HostCPU, targetDesc), lockFile, outArtifacts);
+            _addFile(modulePath + ".exp", ArtifactDesc::make(ArtifactKind::BinaryFormat, ArtifactPayload::Unknown, ArtifactStyle::None), lockFile, outArtifacts);
+            _addFile(modulePath + ".lib", ArtifactDesc::make(ArtifactKind::Library, ArtifactPayload::HostCPU, targetDesc), lockFile, outArtifacts);
         }
     }
     if (flags & ProductFlag::Compile)
     {
-        _addFile(options.modulePath + ".obj", ArtifactDesc::make(ArtifactKind::ObjectCode, ArtifactPayload::HostCPU, targetDesc), lockFile, outArtifacts);
+        _addFile(modulePath + ".obj", ArtifactDesc::make(ArtifactKind::ObjectCode, ArtifactPayload::HostCPU, targetDesc), lockFile, outArtifacts);
     }
     if (flags & ProductFlag::Debug)
     {
         // TODO(JS): Could try and determine based on debug information
-        _addFile(options.modulePath + ".pdb", ArtifactDesc::make(ArtifactKind::BinaryFormat, ArtifactPayload::DebugInfo, targetDesc), lockFile, outArtifacts);
+        _addFile(modulePath + ".pdb", ArtifactDesc::make(ArtifactKind::BinaryFormat, ArtifactPayload::DebugInfo, targetDesc), lockFile, outArtifacts);
     }
 
     return SLANG_OK;
@@ -71,8 +74,8 @@ static void _addFile(const String& path, const ArtifactDesc& desc, IFileArtifact
 
 /* static */SlangResult VisualStudioCompilerUtil::calcArgs(const CompileOptions& options, CommandLine& cmdLine)
 {
-    SLANG_ASSERT(options.sourceContents.getLength() == 0);
-    SLANG_ASSERT(options.modulePath.getLength());
+    SLANG_ASSERT(options.sourceContents.count == 0);
+    SLANG_ASSERT(options.modulePath.count);
 
     // https://docs.microsoft.com/en-us/cpp/build/reference/compiler-options-listed-alphabetically?view=vs-2019
 
@@ -130,7 +133,7 @@ static void _addFile(const String& path, const ArtifactDesc& desc, IFileArtifact
     {
         // Generate complete debugging information
         cmdLine.addArg("/Zi");
-        cmdLine.addPrefixPathArg("/Fd", options.modulePath, ".pdb");
+        cmdLine.addPrefixPathArg("/Fd", asString(options.modulePath), ".pdb");
     }
 
     switch (options.optimizationLevel)
@@ -179,6 +182,8 @@ static void _addFile(const String& path, const ArtifactDesc& desc, IFileArtifact
         }
     }
 
+    const auto modulePath = asString(options.modulePath);
+
     switch (options.targetType)
     {
         case SLANG_SHADER_SHARED_LIBRARY:
@@ -193,29 +198,29 @@ static void _addFile(const String& path, const ArtifactDesc& desc, IFileArtifact
                 cmdLine.addArg("/LD");
             }
 
-            cmdLine.addPrefixPathArg("/Fe", options.modulePath, ".dll");
+            cmdLine.addPrefixPathArg("/Fe", modulePath, ".dll");
             break;
         }
         case SLANG_HOST_EXECUTABLE:
         {
-            cmdLine.addPrefixPathArg("/Fe", options.modulePath, ".exe");
+            cmdLine.addPrefixPathArg("/Fe", modulePath, ".exe");
             break;
         }
         default: break;
     }
 
     // Object file specify it's location - needed if we are out
-    cmdLine.addPrefixPathArg("/Fo", options.modulePath, ".obj");
+    cmdLine.addPrefixPathArg("/Fo", modulePath, ".obj");
 
     // Add defines
     for (const auto& define : options.defines)
     {
         StringBuilder builder;
         builder << "/D";
-        builder << define.nameWithSig;
-        if (define.value.getLength())
+        builder << asStringSlice(define.nameWithSig);
+        if (define.value.count)
         {
-            builder << "=" << define.value;
+            builder << "=" << asStringSlice(define.value);
         }
 
         cmdLine.addArg(builder);
@@ -225,7 +230,7 @@ static void _addFile(const String& path, const ArtifactDesc& desc, IFileArtifact
     for (const auto& include : options.includePaths)
     {
         cmdLine.addArg("/I");
-        cmdLine.addArg(include);
+        cmdLine.addArg(asString(include));
     }
 
     // https://docs.microsoft.com/en-us/cpp/build/reference/eh-exception-handling-model?view=vs-2019
@@ -234,7 +239,7 @@ static void _addFile(const String& path, const ArtifactDesc& desc, IFileArtifact
     // Files to compile
     for (const auto& sourceFile : options.sourceFiles)
     {
-        cmdLine.addArg(sourceFile);
+        cmdLine.addArg(asString(sourceFile));
     }
 
     // Link options (parameters past /link go to linker)
@@ -297,7 +302,7 @@ static SlangResult _parseSeverity(const UnownedStringSlice& in, ArtifactDiagnost
     return SLANG_OK;
 }
 
-static SlangResult _parseVisualStudioLine(CharSliceAllocator& allocator, const UnownedStringSlice& line, ArtifactDiagnostic& outDiagnostic)
+static SlangResult _parseVisualStudioLine(SliceAllocator& allocator, const UnownedStringSlice& line, ArtifactDiagnostic& outDiagnostic)
 {
     typedef IArtifactDiagnostics::Diagnostic Diagnostic;
 
@@ -425,9 +430,9 @@ static SlangResult _parseVisualStudioLine(CharSliceAllocator& allocator, const U
 {
     diagnostics->reset();
 
-    diagnostics->setRaw(CharSliceCaster::asTerminatedCharSlice(exeRes.standardOutput));
+    diagnostics->setRaw(SliceCaster::asTerminatedCharSlice(exeRes.standardOutput));
 
-    CharSliceAllocator allocator;
+    SliceAllocator allocator;
 
     for (auto line : LineParser(exeRes.standardOutput.getUnownedSlice()))
     {

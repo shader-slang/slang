@@ -196,7 +196,7 @@ SlangResult DXCDownstreamCompiler::init(ISlangSharedLibrary* library)
     return SLANG_OK;
 }
 
-static SlangResult _parseDiagnosticLine(CharSliceAllocator& allocator, const UnownedStringSlice& line, List<UnownedStringSlice>& lineSlices, IArtifactDiagnostics::Diagnostic& outDiagnostic)
+static SlangResult _parseDiagnosticLine(SliceAllocator& allocator, const UnownedStringSlice& line, List<UnownedStringSlice>& lineSlices, IArtifactDiagnostics::Diagnostic& outDiagnostic)
 {
     /* tests/diagnostics/syntax-error-intrinsic.slang:14:2: error: expected expression */
     if (lineSlices.getCount() < 5)
@@ -251,7 +251,7 @@ static SlangResult _handleOperationResult(IDxcOperationResult* dxcResult, IArtif
         {
             diagnostics->appendRaw(asCharSlice(diagnosticsSlice));
 
-            CharSliceAllocator allocator;
+            SliceAllocator allocator;
             List<IArtifactDiagnostics::Diagnostic> parsedDiagnostics;
             SlangResult diagnosticParseRes = ArtifactDiagnosticUtil::parseColonDelimitedDiagnostics(allocator, diagnosticsSlice, 0, _parseDiagnosticLine, diagnostics);
 
@@ -279,7 +279,7 @@ static SlangResult _handleOperationResult(IDxcOperationResult* dxcResult, IArtif
 SlangResult DXCDownstreamCompiler::compile(const CompileOptions& options, IArtifact** outArtifact)
 {
     // This compiler doesn't read files, they should be read externally and stored in sourceContents/sourceContentsPath
-    if (options.sourceFiles.getCount() > 0)
+    if (options.sourceFiles.count > 0)
     {
         return SLANG_FAIL;
     }
@@ -316,8 +316,8 @@ SlangResult DXCDownstreamCompiler::compile(const CompileOptions& options, IArtif
     // Create blob from the string
     ComPtr<IDxcBlobEncoding> dxcSourceBlob;
     SLANG_RETURN_ON_FAIL(dxcLibrary->CreateBlobWithEncodingFromPinned(
-        (LPBYTE)hlslSource.getBuffer(),
-        (UINT32)hlslSource.getLength(),
+        (LPBYTE)hlslSource.data,
+        (UINT32)hlslSource.count,
         0,
         dxcSourceBlob.writeRef()));
 
@@ -325,11 +325,11 @@ SlangResult DXCDownstreamCompiler::compile(const CompileOptions& options, IArtif
 
     // Add all compiler specific options
     List<OSString> compilerSpecific;
-    compilerSpecific.setCount(options.compilerSpecificArguments.getCount());
+    compilerSpecific.setCount(options.compilerSpecificArguments.count);
 
-    for (Index i = 0; i < options.compilerSpecificArguments.getCount(); ++i)
+    for (Index i = 0; i < options.compilerSpecificArguments.count; ++i)
     {
-        compilerSpecific[i] = options.compilerSpecificArguments[i].toWString();
+        compilerSpecific[i] = asString(options.compilerSpecificArguments[i]).toWString();
         args.add(compilerSpecific[i]);
     }
 
@@ -398,7 +398,7 @@ SlangResult DXCDownstreamCompiler::compile(const CompileOptions& options, IArtif
     //
     args.add(L"-no-warnings");
 
-    String profileName = options.profileName;
+    String profileName = asString(options.profileName);
     // If we are going to link we have to compile in the lib profile style
     if (libraries.getCount())
     {
@@ -418,7 +418,7 @@ SlangResult DXCDownstreamCompiler::compile(const CompileOptions& options, IArtif
         }
     }
 
-    OSString wideEntryPointName = options.entryPointName.toWString();
+    OSString wideEntryPointName = asString(options.entryPointName).toWString();
     OSString wideProfileName = profileName.toWString();
 
     if (options.flags & CompileOptions::Flag::EnableFloat16)
@@ -429,10 +429,10 @@ SlangResult DXCDownstreamCompiler::compile(const CompileOptions& options, IArtif
     SearchDirectoryList searchDirectories;
     for (const auto& includePath : options.includePaths)
     {
-        searchDirectories.searchDirectories.add(includePath);
+        searchDirectories.searchDirectories.add(asString(includePath));
     }
 
-    OSString sourcePath = options.sourceContentsPath.toWString();
+    OSString sourcePath = asString(options.sourceContentsPath).toWString();
 
     DxcIncludeHandler includeHandler(&searchDirectories, options.fileSystemExt, options.sourceManager);
 
@@ -476,13 +476,13 @@ SlangResult DXCDownstreamCompiler::compile(const CompileOptions& options, IArtif
 
         // Add the compiled blob name
         String name;
-        if (options.modulePath.getLength())
+        if (options.modulePath.count)
         {
-            name = Path::getFileNameWithoutExt(options.modulePath);
+            name = Path::getFileNameWithoutExt(asString(options.modulePath));
         }
-        else if (options.sourceContentsPath.getLength())
+        else if (options.sourceContentsPath.count)
         {
-            name = Path::getFileNameWithoutExt(options.sourceContentsPath);
+            name = Path::getFileNameWithoutExt(asString(options.sourceContentsPath));
         }
 
         // Add the blob with name
@@ -508,7 +508,7 @@ SlangResult DXCDownstreamCompiler::compile(const CompileOptions& options, IArtif
         }
 
         // Use the original profile name
-        wideProfileName = options.profileName.toWString();
+        wideProfileName = asString(options.profileName).toWString();
 
         ComPtr<IDxcOperationResult> linkDxcResult;
         SLANG_RETURN_ON_FAIL(linker->Link(wideEntryPointName.begin(), wideProfileName.begin(), linkLibraryNames.getBuffer(), UINT32(librariesCount), nullptr, 0, linkDxcResult.writeRef()));

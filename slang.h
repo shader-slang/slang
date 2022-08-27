@@ -980,6 +980,15 @@ extern "C"
     };
     #define SLANG_UUID_ISlangBlob ISlangBlob::getTypeGuid()
 
+    /* Can be requested from ISlangCastable cast to indicate the contained chars are null terminated.  
+    */
+    struct SlangTerminatedChars
+    {
+        SLANG_CLASS_GUID(0xbe0db1a8, 0x3594, 0x4603, { 0xa7, 0x8b, 0xc4, 0x86, 0x84, 0x30, 0xdf, 0xbb });
+        operator const char*() const { return chars; }
+        char chars[1];
+    };
+
     /** A (real or virtual) file system.
 
     Slang can make use of this interface whenever it would otherwise try to load files

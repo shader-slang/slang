@@ -290,6 +290,7 @@
     <ClInclude Include="..\..\..\source\compiler-core\slang-name-convention-util.h" />
     <ClInclude Include="..\..\..\source\compiler-core\slang-name.h" />
     <ClInclude Include="..\..\..\source\compiler-core\slang-nvrtc-compiler.h" />
+    <ClInclude Include="..\..\..\source\compiler-core\slang-slice-allocator.h" />
     <ClInclude Include="..\..\..\source\compiler-core\slang-source-loc.h" />
     <ClInclude Include="..\..\..\source\compiler-core\slang-test-server-protocol.h" />
     <ClInclude Include="..\..\..\source\compiler-core\slang-token-defs.h" />
@@ -332,6 +333,7 @@
     <ClCompile Include="..\..\..\source\compiler-core\slang-name-convention-util.cpp" />
     <ClCompile Include="..\..\..\source\compiler-core\slang-name.cpp" />
     <ClCompile Include="..\..\..\source\compiler-core\slang-nvrtc-compiler.cpp" />
+    <ClCompile Include="..\..\..\source\compiler-core\slang-slice-allocator.cpp" />
     <ClCompile Include="..\..\..\source\compiler-core\slang-source-loc.cpp" />
     <ClCompile Include="..\..\..\source\compiler-core\slang-test-server-protocol.cpp" />
     <ClCompile Include="..\..\..\source\compiler-core\slang-token.cpp" />

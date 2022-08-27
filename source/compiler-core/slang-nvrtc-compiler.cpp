@@ -171,7 +171,7 @@ SlangResult NVRTCDownstreamCompiler::init(ISlangSharedLibrary* library)
     return SLANG_OK;
 }
 
-static SlangResult _parseLocation(CharSliceAllocator& allocator, const UnownedStringSlice& in, ArtifactDiagnostic& outDiagnostic)
+static SlangResult _parseLocation(SliceAllocator& allocator, const UnownedStringSlice& in, ArtifactDiagnostic& outDiagnostic)
 {
     const Index startIndex = in.indexOf('(');
 
@@ -205,7 +205,7 @@ static bool _hasDriveLetter(const UnownedStringSlice& line)
     return line.getLength() > 2 && line[1] == ':' && _isDriveLetter(line[0]);
 }
 
-static SlangResult _parseNVRTCLine(CharSliceAllocator& allocator, const UnownedStringSlice& line, ArtifactDiagnostic& outDiagnostic)
+static SlangResult _parseNVRTCLine(SliceAllocator& allocator, const UnownedStringSlice& line, ArtifactDiagnostic& outDiagnostic)
 {
     typedef ArtifactDiagnostic Diagnostic;
     typedef ArtifactDiagnostic::Severity Severity;
@@ -618,8 +618,9 @@ SlangResult NVRTCDownstreamCompiler::_maybeAddHalfSupport(const DownstreamCompil
     }
 
     // Let's see if one of the paths finds cuda_fp16.h
-    for (const auto& includePath : options.includePaths)
+    for (const auto& curIncludePath : options.includePaths)
     {
+        const String includePath = asString(curIncludePath);
         const String checkPath = Path::combine(includePath, g_fp16HeaderName);
         if (File::exists(checkPath))
         {
@@ -645,7 +646,7 @@ SlangResult NVRTCDownstreamCompiler::_maybeAddHalfSupport(const DownstreamCompil
 SlangResult NVRTCDownstreamCompiler::compile(const DownstreamCompileOptions& options, IArtifact** outArtifact)
 {
     // This compiler doesn't read files, they should be read externally and stored in sourceContents/sourceContentsPath
-    if (options.sourceFiles.getCount() > 0)
+    if (options.sourceFiles.count > 0)
     {
         return SLANG_FAIL;
     }
@@ -696,10 +697,10 @@ SlangResult NVRTCDownstreamCompiler::compile(const DownstreamCompileOptions& opt
     {
         StringBuilder builder;
         builder << "-D";
-        builder << define.nameWithSig;
-        if (define.value.getLength())
+        builder << asStringSlice(define.nameWithSig);
+        if (define.value.count)
         {
-            builder << "=" << define.value;
+            builder << "=" << asStringSlice(define.value);
         }
 
         cmdLine.addArg(builder);
@@ -709,7 +710,7 @@ SlangResult NVRTCDownstreamCompiler::compile(const DownstreamCompileOptions& opt
     for (const auto& include : options.includePaths)
     {
         cmdLine.addArg("-I");
-        cmdLine.addArg(include);
+        cmdLine.addArg(asString(include));
     }
 
     SLANG_RETURN_ON_FAIL(_maybeAddHalfSupport(options, cmdLine));
@@ -819,7 +820,7 @@ SlangResult NVRTCDownstreamCompiler::compile(const DownstreamCompileOptions& opt
     SLANG_ASSERT(headers.getCount() == headerIncludeNames.getCount());
 
     nvrtcProgram program = nullptr;
-    nvrtcResult res = m_nvrtcCreateProgram(&program, options.sourceContents.getBuffer(), options.sourceContentsPath.getBuffer(),
+    nvrtcResult res = m_nvrtcCreateProgram(&program, options.sourceContents, options.sourceContentsPath,
         (int) headers.getCount(),
         headers.getBuffer(),
         headerIncludeNames.getBuffer());
@@ -859,10 +860,10 @@ SlangResult NVRTCDownstreamCompiler::compile(const DownstreamCompileOptions& opt
             SLANG_NVRTC_RETURN_ON_FAIL(m_nvrtcGetProgramLog(program, dst));
             rawDiagnostics.appendInPlace(dst, Index(logSize));
 
-            diagnostics->setRaw(CharSliceCaster::asCharSlice(rawDiagnostics));
+            diagnostics->setRaw(SliceCaster::asCharSlice(rawDiagnostics));
         }
 
-        CharSliceAllocator allocator;
+        SliceAllocator allocator;
 
         // Parse the diagnostics here
         for (auto line : LineParser(rawDiagnostics.getUnownedSlice()))

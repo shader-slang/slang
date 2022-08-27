@@ -6,29 +6,6 @@
 
 namespace Slang {
 
-/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! CharSliceAllocator !!!!!!!!!!!!!!!!!!!!!!!!!!! */
-
-TerminatedCharSlice CharSliceAllocator::allocate(const char* in)
-{
-    const size_t length = ::strlen(in);
-    auto dst = m_arena.allocateString(in, length);
-    return TerminatedCharSlice(dst, length);
-}
-
-TerminatedCharSlice CharSliceAllocator::allocate(const UnownedStringSlice& slice)
-{
-    const auto length = slice.getLength();
-    auto dst = m_arena.allocateString(slice.begin(), length);
-    return TerminatedCharSlice(dst, length);
-}
-
-TerminatedCharSlice CharSliceAllocator::allocate(const Slice<char>& slice)
-{
-    const auto count = slice.count;
-    auto dst = m_arena.allocateString(slice.begin(), count);
-    return TerminatedCharSlice(dst, count);
-}
-
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ArtifactDiagnosticsUtil !!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
 /* static */UnownedStringSlice ArtifactDiagnosticUtil::getSeverityText(Severity severity)
@@ -42,7 +19,7 @@ TerminatedCharSlice CharSliceAllocator::allocate(const Slice<char>& slice)
     }
 }
 
-/* static */SlangResult ArtifactDiagnosticUtil::splitPathLocation(CharSliceAllocator& allocator, const UnownedStringSlice& pathLocation, ArtifactDiagnostic& outDiagnostic)
+/* static */SlangResult ArtifactDiagnosticUtil::splitPathLocation(SliceAllocator& allocator, const UnownedStringSlice& pathLocation, ArtifactDiagnostic& outDiagnostic)
 {
     const Index lineStartIndex = pathLocation.lastIndexOf('(');
     if (lineStartIndex >= 0)
@@ -100,7 +77,7 @@ TerminatedCharSlice CharSliceAllocator::allocate(const Slice<char>& slice)
     return SLANG_OK;
 }
 
-/* static */SlangResult ArtifactDiagnosticUtil::parseColonDelimitedDiagnostics(CharSliceAllocator& allocator, const UnownedStringSlice& inText, Int pathIndex, LineParser lineParser, IArtifactDiagnostics* diagnostics)
+/* static */SlangResult ArtifactDiagnosticUtil::parseColonDelimitedDiagnostics(SliceAllocator& allocator, const UnownedStringSlice& inText, Int pathIndex, LineParser lineParser, IArtifactDiagnostics* diagnostics)
 {
     List<UnownedStringSlice> splitLine;
 
@@ -150,7 +127,7 @@ TerminatedCharSlice CharSliceAllocator::allocate(const Slice<char>& slice)
     String text(in);
 
     diagnostic.severity = ArtifactDiagnostic::Severity::Info;
-    diagnostic.text = CharSliceCaster::asTerminatedCharSlice(text);
+    diagnostic.text = SliceCaster::asTerminatedCharSlice(text);
     diagnostics->add(diagnostic);
 }
 
