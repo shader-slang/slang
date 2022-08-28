@@ -1519,7 +1519,7 @@ SlangResult TranslationUnitRequest::requireSourceFiles()
     SourceManager* sourceManager = compileRequest->getSourceManager();
 
     // Get he linkage file system
-    ISlangFileSystemExt* linkageFileSystem = compileRequest->getLinkage()->getFileSystemExt();
+    //ISlangFileSystemExt* linkageFileSystem = compileRequest->getLinkage()->getFileSystemExt();
 
     for (Index i = m_sourceFiles.getCount(); i < m_sourceArtifacts.getCount(); ++i)
     {
@@ -1531,12 +1531,18 @@ SlangResult TranslationUnitRequest::requireSourceFiles()
         {
             auto extFileSystem = extRep->getFileSystem();
 
-            // Must be the same file system
-            if (extFileSystem == linkageFileSystem)
+            // TODO(JS): 
+            // Ideally we'd confirm that the file system was the same, such we could know that the unique 
+            // identity is appropriate for the current file system.
+            //
+            // We just assume compatibility for the moment, because repro will be a different file system
+            // but we need to use the unique identity that is there.
+      
+            //if (extFileSystem == linkageFileSystem)
             {
                 // Get the unique identity
                 ComPtr<ISlangBlob> uniqueIdentityBlob;
-                if (extFileSystem->getFileUniqueIdentity(extRep->getPath(), uniqueIdentityBlob.writeRef()) && uniqueIdentityBlob)
+                if (SLANG_SUCCEEDED(extFileSystem->getFileUniqueIdentity(extRep->getPath(), uniqueIdentityBlob.writeRef())) && uniqueIdentityBlob)
                 {
                     auto uniqueIdentity = StringUtil::getString(uniqueIdentityBlob);
 
