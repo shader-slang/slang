@@ -60,12 +60,14 @@ public:
     static ComPtr<ISlangBlob> moveCreate(String&& in);
 
 protected:
+    enum class MoveUnique { kValue };
+
     explicit StringBlob(String const& string)
         : m_string(string)
     {}
-    StringBlob() {}
 
-    void _moveUnique(String& in);
+    StringBlob(MoveUnique, String& string);
+    StringBlob() {}
 
         /// Get the contained string
     SLANG_FORCE_INLINE const String& getString() const { return m_string; }
