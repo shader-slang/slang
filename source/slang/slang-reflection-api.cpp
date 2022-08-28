@@ -1245,7 +1245,7 @@ namespace Slang
             auto access = resourceType->getAccess();
             auto mutableFlag = access != SLANG_RESOURCE_ACCESS_READ ? SLANG_BINDING_TYPE_MUTABLE_FLAG : 0;
 
-            switch( shape )
+            switch(SlangResourceShape(shape ))
             {
             default:
                 return SlangBindingType(SLANG_BINDING_TYPE_TEXTURE | mutableFlag);
