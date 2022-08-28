@@ -22,8 +22,7 @@ RefPtr<BufferResource> ShaderTableImpl::createDeviceBuffer(
     auto vkApi = m_device->m_api;
     auto rtProps = vkApi.m_rtProperties;
     uint32_t handleSize = rtProps.shaderGroupHandleSize;
-    m_raygenTableSize = (uint32_t)VulkanUtil::calcAligned(
-        m_rayGenShaderCount * handleSize, rtProps.shaderGroupBaseAlignment);
+    m_raygenTableSize = m_rayGenShaderCount * rtProps.shaderGroupBaseAlignment;
     m_missTableSize = (uint32_t)VulkanUtil::calcAligned(
         m_missShaderCount * handleSize, rtProps.shaderGroupBaseAlignment);
     m_hitTableSize = (uint32_t)VulkanUtil::calcAligned(
@@ -75,7 +74,7 @@ RefPtr<BufferResource> ShaderTableImpl::createDeviceBuffer(
     // index in the buffer of handles.
     for (uint32_t i = 0; i < m_rayGenShaderCount; i++)
     {
-        auto dstHandlePtr = subTablePtr + i * handleSize;
+        auto dstHandlePtr = subTablePtr + i * rtProps.shaderGroupBaseAlignment;
         auto shaderGroupName = m_shaderGroupNames[shaderTableEntryCounter++];
         auto shaderGroupIndexPtr =
             pipelineImpl->shaderGroupNameToIndex.TryGetValue(shaderGroupName);
@@ -85,6 +84,7 @@ RefPtr<BufferResource> ShaderTableImpl::createDeviceBuffer(
         auto shaderGroupIndex = *shaderGroupIndexPtr;
         auto srcHandlePtr = handles.getBuffer() + shaderGroupIndex * handleSize;
         memcpy(dstHandlePtr, srcHandlePtr, handleSize);
+        memset(dstHandlePtr + handleSize, 0, rtProps.shaderGroupBaseAlignment - handleSize);
     }
     subTablePtr += m_raygenTableSize;
 
