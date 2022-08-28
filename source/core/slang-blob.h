@@ -51,6 +51,11 @@ public:
 
     static ComPtr<ISlangBlob> create(const String& in) { return ComPtr<ISlangBlob>(new StringBlob(in)); }
 
+        /// Moves from in into the created blob. 
+        /// NOTE! That will only use the representation from in, if it is *unique*
+        /// otherwise it will make a new copy.
+        /// This is so that StringBlob won't hold a reference count via a string held externally.
+        /// In contrast StringBlob::create *may* share the representation.
     static ComPtr<ISlangBlob> moveCreate(String& in);
     static ComPtr<ISlangBlob> moveCreate(String&& in);
 
@@ -59,6 +64,8 @@ protected:
         : m_string(string)
     {}
     StringBlob() {}
+
+    void _moveUnique(String& in);
 
         /// Get the contained string
     SLANG_FORCE_INLINE const String& getString() const { return m_string; }

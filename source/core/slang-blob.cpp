@@ -59,41 +59,36 @@ void* StringBlob::getObject(const Guid& guid)
     return nullptr;
 }
 
-/* static */ComPtr<ISlangBlob> StringBlob::moveCreate(String& in)
+void StringBlob::_moveUnique(String& in)
 {
-    auto blob = new StringBlob;
-
     auto rep = in.getStringRepresentation();
     if (rep && !rep->isUniquelyReferenced())
     {
         // Make a new unique copy
-        blob->m_string = in.getUnownedSlice();
+        m_string = in.getUnownedSlice();
+
+        // Move out of in
+        String tmp;
+        tmp.swapWith(in);
     }
     else
     {
         // Must either not have a rep or be unique
-        blob->m_string.swapWith(in);
+        m_string.swapWith(in);
     }
+}
 
+/* static */ComPtr<ISlangBlob> StringBlob::moveCreate(String& in)
+{
+    auto blob = new StringBlob;
+    blob->_moveUnique(in);
     return ComPtr<ISlangBlob>(blob);
 }
 
 /* static */ComPtr<ISlangBlob> StringBlob::moveCreate(String&& in)
 {
     auto blob = new StringBlob;
-
-    auto rep = in.getStringRepresentation();
-    if (rep && !rep->isUniquelyReferenced())
-    {
-        // Make a new unique copy
-        blob->m_string = in.getUnownedSlice();
-    }
-    else
-    {
-        // Must either not have a rep or be unique
-        blob->m_string.swapWith(in);
-    }
-
+    blob->_moveUnique(in);
     return ComPtr<ISlangBlob>(blob);
 }
 
