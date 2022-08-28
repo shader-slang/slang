@@ -2742,7 +2742,25 @@ void FrontEndCompileRequest::addTranslationUnitSourceFile(
     auto extRep = new ExtFileArtifactRepresentation(path.getUnownedSlice(), fileSystemExt);
     sourceArtifact->addRepresentation(extRep);
 
-    if (!sourceArtifact->exists())
+    SlangResult existsRes = SLANG_OK;
+
+    // If we require caching, we demand it's loaded here.
+    // 
+    // In practice this probably means repro capture is enabled. So we want to 
+    // load the blob such that it's in the cache, even if it doesn't actually 
+    // have to be loaded for the compilation.
+    if (getLinkage()->m_requireCacheFileSystem)
+    {
+        ComPtr<ISlangBlob> blob;
+        // If we can load the blob, then it exists
+        existsRes = sourceArtifact->loadBlob(ArtifactKeep::Yes, blob.writeRef());
+    }
+    else
+    {
+        existsRes = sourceArtifact->exists() ? SLANG_OK : SLANG_E_NOT_FOUND;
+    }
+
+    if (SLANG_FAILED(existsRes))
     {
         // Emit a diagnostic!
         getSink()->diagnose(
