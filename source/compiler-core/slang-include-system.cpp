@@ -132,8 +132,6 @@ SlangResult IncludeSystem::loadFile(const PathInfo& pathInfo, ComPtr<ISlangBlob>
             sourceFile = m_sourceManager->createSourceFileWithBlob(pathInfo, foundSourceBlob);
             m_sourceManager->addSourceFile(pathInfo.uniqueIdentity, sourceFile);
 
-            sourceFile->maybeAddArtifact(nullptr, m_fileSystemExt);
-
             outBlob = foundSourceBlob;
             return SLANG_OK;
         }
@@ -152,7 +150,6 @@ SlangResult IncludeSystem::loadFile(const PathInfo& pathInfo, ComPtr<ISlangBlob>
             }
 
             sourceFile->setContents(foundSourceBlob);
-            sourceFile->maybeAddArtifact(nullptr, m_fileSystemExt);
 
             outBlob = foundSourceBlob;
             return SLANG_OK;

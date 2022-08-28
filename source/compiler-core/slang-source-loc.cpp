@@ -434,6 +434,7 @@ String SourceFile::calcVerbosePath() const
     return m_pathInfo.foundPath;
 }
 
+#if 0
 void SourceFile::maybeAddArtifact(const ArtifactDesc* inArtifactDesc, ISlangFileSystemExt* ext)
 {
     if (!m_contentBlob)
@@ -496,6 +497,7 @@ void SourceFile::maybeAddArtifact(const ArtifactDesc* inArtifactDesc, ISlangFile
         m_artifact->setName(name.getBuffer());
     }
 }
+#endif
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!! SourceManager !!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 

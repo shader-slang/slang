@@ -1489,7 +1489,114 @@ SourceManager* TranslationUnitRequest::getSourceManager()
     return compileRequest->getSourceManager();
 }
 
-void TranslationUnitRequest::addSourceFile(SourceFile* sourceFile)
+void TranslationUnitRequest::addSourceArtifact(IArtifact* sourceArtifact)
+{
+    SLANG_ASSERT(sourceArtifact);
+    m_sourceArtifacts.add(ComPtr<IArtifact>(sourceArtifact));
+}
+
+
+void TranslationUnitRequest::addSource(IArtifact* sourceArtifact, SourceFile* sourceFile)
+{
+    SLANG_ASSERT(sourceArtifact && sourceFile);
+    // Must be in sync!
+    SLANG_ASSERT(m_sourceFiles.getCount() == m_sourceArtifacts.getCount());
+
+    addSourceArtifact(sourceArtifact);
+    _addSourceFile(sourceFile);
+}
+
+SlangResult TranslationUnitRequest::requireSourceFiles()
+{
+    SLANG_ASSERT(m_sourceFiles.getCount() <= m_sourceArtifacts.getCount());
+
+    if (m_sourceFiles.getCount() == m_sourceArtifacts.getCount())
+    {
+        return SLANG_OK;
+    }
+
+    auto sink = compileRequest->getSink();
+    SourceManager* sourceManager = compileRequest->getSourceManager();
+
+    // Get he linkage file system
+    ISlangFileSystemExt* linkageFileSystem = compileRequest->getLinkage()->getFileSystemExt();
+
+    for (Index i = m_sourceFiles.getCount(); i < m_sourceArtifacts.getCount(); ++i)
+    {
+        IArtifact* artifact = m_sourceArtifacts[i];
+
+        PathInfo pathInfo = PathInfo::makeUnknown();
+        
+        if (auto extRep = findRepresentation<IExtFileArtifactRepresentation>(artifact))
+        {
+            auto extFileSystem = extRep->getFileSystem();
+
+            // Must be the same file system
+            if (extFileSystem == linkageFileSystem)
+            {
+                // Get the unique identity
+                ComPtr<ISlangBlob> uniqueIdentityBlob;
+                if (extFileSystem->getFileUniqueIdentity(extRep->getPath(), uniqueIdentityBlob.writeRef()) && uniqueIdentityBlob)
+                {
+                    auto uniqueIdentity = StringUtil::getString(uniqueIdentityBlob);
+
+                    // See if this an already loaded source file
+                    if (auto sourceFile = sourceManager->findSourceFileRecursively(uniqueIdentity))
+                    {
+                        // If the source file has a blob, and the artifact doesn't copy over that representation
+                        if (sourceFile->getContentBlob() && findRepresentation<ISlangBlob>(artifact) == nullptr)
+                        {
+                            artifact->addRepresentationUnknown(sourceFile->getContentBlob());
+                        }
+
+                        _addSourceFile(sourceFile);
+                        continue;
+                    }
+
+                    pathInfo = PathInfo::makeNormal(extRep->getPath(), uniqueIdentity);
+                }
+                else
+                {
+                    pathInfo = PathInfo::makePath(extRep->getPath());
+                }
+            }
+        }
+
+        if (pathInfo.type == PathInfo::Type::Unknown)
+        {
+            const auto path = ArtifactUtil::findPath(artifact);
+
+            // If has a path representation we'll make it a FoundPath
+            if (findRepresentation<IPathArtifactRepresentation>(artifact))
+            {
+                pathInfo = PathInfo::makePath(path);
+            }
+            else
+            {
+                // Otherwise we'll assume it's created from a 'String' even if that's not quite the case
+                pathInfo = PathInfo::makeFromString(path);
+            }
+        }
+
+        ComPtr<ISlangBlob> blob;
+        const SlangResult blobRes = artifact->loadBlob(ArtifactKeep::Yes, blob.writeRef());
+        if (SLANG_FAILED(blobRes))
+        {
+            // Report couldn't load
+            sink->diagnose(SourceLoc(),
+                Diagnostics::cannotOpenFile,
+                pathInfo.getName());
+            return blobRes;
+        }
+        
+        auto sourceFile = sourceManager->createSourceFileWithBlob(pathInfo, blob);
+        _addSourceFile(sourceFile);
+    }
+
+    return SLANG_OK;
+}
+
+void TranslationUnitRequest::_addSourceFile(SourceFile* sourceFile)
 {
     m_sourceFiles.add(sourceFile);
 
@@ -1503,6 +1610,12 @@ void TranslationUnitRequest::addSourceFile(SourceFile* sourceFile)
     {
         getModule()->addFilePathDependency(pathInfo.foundPath);
     }
+}
+
+List<SourceFile*> const& TranslationUnitRequest::getSourceFiles() 
+{ 
+    SLANG_ASSERT(m_sourceArtifacts.getCount() == m_sourceFiles.getCount());
+    return m_sourceFiles; 
 }
 
 EndToEndCompileRequest::~EndToEndCompileRequest()
@@ -2246,8 +2359,11 @@ SlangResult FrontEndCompileRequest::executeActionsInner()
     // We currently allow GlSL files on the command line so that we can
     // drive our "pass-through" mode, but we really want to issue an error
     // message if the user is seriously asking us to compile them.
-    for (auto& translationUnit : translationUnits)
+    for (TranslationUnitRequest* translationUnit : translationUnits)
     {
+        // Make sure SourceFile representation is available for all translationUnits
+        SLANG_RETURN_ON_FAIL(translationUnit->requireSourceFiles());
+
         switch(translationUnit->sourceLanguage)
         {
         default:
@@ -2261,9 +2377,9 @@ SlangResult FrontEndCompileRequest::executeActionsInner()
 
 
     // Parse everything from the input files requested
-    for (auto& translationUnit : translationUnits)
+    for (TranslationUnitRequest* translationUnit : translationUnits)
     {
-        parseTranslationUnit(translationUnit.Ptr());
+        parseTranslationUnit(translationUnit);
     }
 
     if (outputPreprocessor)
@@ -2560,46 +2676,14 @@ int FrontEndCompileRequest::addTranslationUnit(TranslationUnitRequest* translati
 }
 
 
-void FrontEndCompileRequest::addTranslationUnitSourceFile(
+void FrontEndCompileRequest::addTranslationUnitSourceArtifact(
     int             translationUnitIndex,
-    SourceFile*     sourceFile)
+    IArtifact*      sourceArtifact)
 {
     auto translationUnit = translationUnits[translationUnitIndex];
     
-    // TODO(JS): 
-    // The larger problem here is that a file on a file system *could* be interpretted in different ways.
-    // When the user supplies the source as a string, we use the source type specified for the translation unit.
-    // 
-    // If it's on the file system it could be (say) compiled as HLSL or some other way. A *downstream* compiler
-    // that used the file system may care.  
-    //
-    // We will assume here, that if it's loaded from the file system, it's path extension defines how it should be interpretted
-    // If that wasn't the case we'd have to either *copy*, or do some command line fiddling to tell it for the downstream compiler
-    // what the file is. 
-
-    const auto& pathInfo = sourceFile->getPathInfo();
-    const auto pathType = pathInfo.type;
-
-    switch (pathType)
-    {
-        case PathInfo::Type::FromString:
-        {
-            // Set the artifact type from the the source language type
-            auto sourceDesc = ArtifactDescUtil::makeDescForSourceLanguage(asExternal(translationUnit->sourceLanguage));
-            sourceFile->maybeAddArtifact(&sourceDesc, nullptr);
-            break;
-        }
-        case PathInfo::Type::FoundPath:
-        case PathInfo::Type::Normal:
-        {
-            // We'll *not* use the source for the artifact type. Doing so will lead to the type being determined via extension
-            sourceFile->maybeAddArtifact(nullptr, getLinkage()->getFileSystemExt());
-            break;
-        }
-    }
-
     // Add the source file
-    translationUnit->addSourceFile(sourceFile);
+    translationUnit->addSourceArtifact(sourceArtifact);
 }
 
 void FrontEndCompileRequest::addTranslationUnitSourceBlob(
@@ -2607,10 +2691,13 @@ void FrontEndCompileRequest::addTranslationUnitSourceBlob(
     String const&   path,
     ISlangBlob*     sourceBlob)
 {
-    // The path specified may or may not be a file path - mark as being constructed 'FromString'.
-    SourceFile* sourceFile = getSourceManager()->createSourceFileWithBlob(PathInfo::makeFromString(path), sourceBlob);
-    
-    addTranslationUnitSourceFile(translationUnitIndex, sourceFile);
+    auto translationUnit = translationUnits[translationUnitIndex];
+    auto sourceDesc = ArtifactDescUtil::makeDescForSourceLanguage(asExternal(translationUnit->sourceLanguage));
+
+    auto artifact = ArtifactUtil::createArtifact(sourceDesc, path.getBuffer());
+    artifact->addRepresentationUnknown(sourceBlob);
+
+    translationUnit->addSourceArtifact(artifact);
 }
 
 void FrontEndCompileRequest::addTranslationUnitSourceString(
@@ -2618,10 +2705,13 @@ void FrontEndCompileRequest::addTranslationUnitSourceString(
     String const&   path,
     String const&   source)
 {
-    // The path specified may or may not be a file path - mark as being constructed 'FromString'.
-    SourceFile* sourceFile = getSourceManager()->createSourceFileWithString(PathInfo::makeFromString(path), source);
+    auto translationUnit = translationUnits[translationUnitIndex];
+    auto sourceDesc = ArtifactDescUtil::makeDescForSourceLanguage(asExternal(translationUnit->sourceLanguage));
 
-    addTranslationUnitSourceFile(translationUnitIndex, sourceFile);
+    auto artifact = ArtifactUtil::createArtifact(sourceDesc, path.getBuffer());
+    artifact->addRepresentationUnknown(StringBlob::create(source));
+
+    translationUnit->addSourceArtifact(artifact);
 }
 
 void FrontEndCompileRequest::addTranslationUnitSourceFile(
@@ -2636,11 +2726,17 @@ void FrontEndCompileRequest::addTranslationUnitSourceFile(
     // paths were not taken into account by this function.
     //
 
-    PathInfo pathInfo;
+    auto fileSystemExt = getLinkage()->getFileSystemExt();
+    auto translationUnit = getTranslationUnit(translationUnitIndex);
 
-    ComPtr<ISlangBlob> sourceBlob;
-    SlangResult result = loadFile(path, pathInfo, sourceBlob.writeRef());
-    if(SLANG_FAILED(result))
+    auto sourceDesc = ArtifactDescUtil::makeDescForSourceLanguage(asExternal(translationUnit->sourceLanguage));
+
+    auto sourceArtifact = ArtifactUtil::createArtifact(sourceDesc);
+
+    auto extRep = new ExtFileArtifactRepresentation(path.getUnownedSlice(), fileSystemExt);
+    sourceArtifact->addRepresentation(extRep);
+
+    if (!sourceArtifact->exists())
     {
         // Emit a diagnostic!
         getSink()->diagnose(
@@ -2650,10 +2746,7 @@ void FrontEndCompileRequest::addTranslationUnitSourceFile(
         return;
     }
 
-    // Was loaded from the specified path
-    SourceFile* sourceFile = getSourceManager()->createSourceFileWithBlob(pathInfo, sourceBlob);
-
-    addTranslationUnitSourceFile(translationUnitIndex, sourceFile);
+    translationUnit->addSourceArtifact(sourceArtifact);
 }
 
 int FrontEndCompileRequest::addEntryPoint(
@@ -2808,10 +2901,29 @@ RefPtr<Module> Linkage::loadModule(
         name,
         srcLoc);
 
+    // Create an artifact for the source
+    auto sourceArtifact = ArtifactUtil::createArtifact(ArtifactDesc::make(ArtifactKind::Source, ArtifactPayload::Slang, ArtifactStyle::Unknown));
+
     // Create with the 'friendly' name
-    SourceFile* sourceFile = getSourceManager()->createSourceFileWithBlob(filePathInfo, sourceBlob);
-    
-    translationUnit->addSourceFile(sourceFile);
+    if (filePathInfo.type == PathInfo::Type::Normal ||
+        filePathInfo.type == PathInfo::Type::FoundPath)
+    {
+        // We create that it was loaded from the file system
+        sourceArtifact->addRepresentation(new ExtFileArtifactRepresentation(filePathInfo.foundPath.getUnownedSlice(), getFileSystemExt()));
+    }
+    else
+    {
+        // Else we say we don't know and just add the blob
+        sourceArtifact->addRepresentationUnknown(sourceBlob);
+    }
+
+    translationUnit->addSourceArtifact(sourceArtifact);
+
+    if (SLANG_FAILED(translationUnit->requireSourceFiles()))
+    {
+        // Some problem accessing source files
+        return nullptr;
+    }
 
     int errorCountBefore = sink->getErrorCount();
     frontEndReq->parseTranslationUnit(translationUnit);
