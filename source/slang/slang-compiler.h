@@ -2912,7 +2912,7 @@ namespace Slang
         void addBuiltinSource(
             Scope*                  scope,
             String const&           path,
-            String const&           source);
+            ISlangBlob*             sourceBlob);
         ~Session();
 
         void addDownstreamCompileTime(double time) { m_downstreamCompileTime += time; }

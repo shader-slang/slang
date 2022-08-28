@@ -295,9 +295,9 @@ SlangResult Session::compileStdLib(slang::CompileStdLibFlags compileFlags)
     }
 
     // TODO(JS): Could make this return a SlangResult as opposed to exception
-    addBuiltinSource(coreLanguageScope, "core", getCoreLibraryCode());
-    addBuiltinSource(hlslLanguageScope, "hlsl", getHLSLLibraryCode());
-    addBuiltinSource(autodiffLanguageScope, "diff", getAutodiffLibraryCode());
+    addBuiltinSource(coreLanguageScope, "core", StringBlob::moveCreate(getCoreLibraryCode()));
+    addBuiltinSource(hlslLanguageScope, "hlsl", StringBlob::moveCreate(getHLSLLibraryCode()));
+    addBuiltinSource(autodiffLanguageScope, "diff", StringBlob::moveCreate(getAutodiffLibraryCode()));
 
     if (compileFlags & slang::CompileStdLibFlag::WriteDocumentation)
     {
@@ -4355,7 +4355,7 @@ RefPtr<Module> findOrImportModule(
 void Session::addBuiltinSource(
     Scope*                  scope,
     String const&           path,
-    String const&           source)
+    ISlangBlob*             source)
 {
     SourceManager* sourceManager = getBuiltinSourceManager();
 
@@ -4375,10 +4375,10 @@ void Session::addBuiltinSource(
     Name* moduleName = getNamePool()->getName(path);
     auto translationUnitIndex = compileRequest->addTranslationUnit(SourceLanguage::Slang, moduleName);
 
-    compileRequest->addTranslationUnitSourceString(
+    compileRequest->addTranslationUnitSourceBlob(
         translationUnitIndex,
         path,
-        source);
+        blob);
 
     SlangResult res = compileRequest->executeActionsInner();
     if (SLANG_FAILED(res))
