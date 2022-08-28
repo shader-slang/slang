@@ -2681,7 +2681,6 @@ int FrontEndCompileRequest::addTranslationUnit(TranslationUnitRequest* translati
     return (int) result;
 }
 
-
 void FrontEndCompileRequest::addTranslationUnitSourceArtifact(
     int             translationUnitIndex,
     IArtifact*      sourceArtifact)
@@ -2702,20 +2701,6 @@ void FrontEndCompileRequest::addTranslationUnitSourceBlob(
 
     auto artifact = ArtifactUtil::createArtifact(sourceDesc, path.getBuffer());
     artifact->addRepresentationUnknown(sourceBlob);
-
-    translationUnit->addSourceArtifact(artifact);
-}
-
-void FrontEndCompileRequest::addTranslationUnitSourceString(
-    int             translationUnitIndex,
-    String const&   path,
-    String const&   source)
-{
-    auto translationUnit = translationUnits[translationUnitIndex];
-    auto sourceDesc = ArtifactDescUtil::makeDescForSourceLanguage(asExternal(translationUnit->sourceLanguage));
-
-    auto artifact = ArtifactUtil::createArtifact(sourceDesc, path.getBuffer());
-    artifact->addRepresentationUnknown(StringBlob::create(source));
 
     translationUnit->addSourceArtifact(artifact);
 }
@@ -4773,7 +4758,11 @@ void EndToEndCompileRequest::addTranslationUnitSourceStringSpan(int translationU
 
     if (!path) path = "";
 
-    frontEndReq->addTranslationUnitSourceString(translationUnitIndex, path, UnownedStringSlice(sourceBegin, sourceEnd));
+    const auto slice = UnownedStringSlice(sourceBegin, sourceEnd);
+
+    auto blob = RawBlob::create(slice.begin(), slice.getLength());
+
+    frontEndReq->addTranslationUnitSourceBlob(translationUnitIndex, path, blob);
 }
 
 void EndToEndCompileRequest::addTranslationUnitSourceBlob(int translationUnitIndex, char const* path, ISlangBlob* sourceBlob)

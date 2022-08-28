@@ -2041,11 +2041,6 @@ namespace Slang
             String const&   path,
             ISlangBlob*     sourceBlob);
 
-        void addTranslationUnitSourceString(
-            int             translationUnitIndex,
-            String const&   path,
-            String const&   source);
-
         void addTranslationUnitSourceFile(
             int             translationUnitIndex,
             String const&   path);
