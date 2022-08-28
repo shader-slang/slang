@@ -50,12 +50,9 @@ public:
     SLANG_NO_THROW size_t SLANG_MCALL getBufferSize() SLANG_OVERRIDE { return m_string.getLength(); }
 
     static ComPtr<ISlangBlob> create(const String& in) { return ComPtr<ISlangBlob>(new StringBlob(in)); }
-    static ComPtr<ISlangBlob> moveCreate(String& in)
-    {
-        auto blob = new StringBlob;
-        blob->m_string.swapWith(in);
-        return ComPtr<ISlangBlob>(blob);
-    }
+
+    static ComPtr<ISlangBlob> moveCreate(String& in);
+    static ComPtr<ISlangBlob> moveCreate(String&& in);
 
 protected:
     explicit StringBlob(String const& string)

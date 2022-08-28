@@ -249,13 +249,15 @@ void Session::_initCodeGenTransitionMap()
 
 void Session::addBuiltins(
     char const*     sourcePath,
-    char const*     sourceString)
+    char const*     source)
 {
+    auto sourceBlob = StringBlob::moveCreate(String(source));
+
     // TODO(tfoley): Add ability to directly new builtins to the appropriate scope
     addBuiltinSource(
         coreLanguageScope,
         sourcePath,
-        sourceString);
+        sourceBlob);
 }
 
 void Session::setSharedLibraryLoader(ISlangSharedLibraryLoader* loader)
@@ -4355,7 +4357,7 @@ RefPtr<Module> findOrImportModule(
 void Session::addBuiltinSource(
     Scope*                  scope,
     String const&           path,
-    ISlangBlob*             source)
+    ISlangBlob*             sourceBlob)
 {
     SourceManager* sourceManager = getBuiltinSourceManager();
 
@@ -4378,7 +4380,7 @@ void Session::addBuiltinSource(
     compileRequest->addTranslationUnitSourceBlob(
         translationUnitIndex,
         path,
-        blob);
+        sourceBlob);
 
     SlangResult res = compileRequest->executeActionsInner();
     if (SLANG_FAILED(res))
