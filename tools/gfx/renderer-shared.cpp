@@ -327,15 +327,16 @@ void PipelineStateBase::initializeBase(const PipelineStateDesc& inDesc)
     }
 }
 
-const char* RendererBase::getShaderFilename(uint32_t* shaderHash)
+void getShaderFilename(uint32_t* shaderHash, String* outFilename)
 {
+    // TODO: Check naming, maybe change naming, code breaks when saving
     String filename;
     for (GfxIndex i = 0; i < 4; ++i)
     {
         filename.append(String(shaderHash[i], 16).getBuffer());
     }
-    
-    return filename.getBuffer();
+
+    *outFilename = filename;
 }
 
 Result RendererBase::getEntryPointCodeFromShaderCache(
@@ -356,30 +357,32 @@ Result RendererBase::getEntryPointCodeFromShaderCache(
     //    - two kinds of hashes - hash based on source code vs hash based purely on included filenames
     uint32_t shaderHash[4];
     program->getDependencyBasedHashCode((uint32_t**)&shaderHash);
-    auto shaderFilename = getShaderFilename(shaderHash);
+
+    String shaderFilename;
+    getShaderFilename(shaderHash, &shaderFilename);
 
     // Query shaderCacheFileSystem for a file by that hash
     //    - If we find it, then copy the file contents into memory and return in outCode
-    auto result = shaderCacheFileSystem->loadFile(shaderFilename, outCode);
+    auto result = shaderCacheFileSystem->loadFile(shaderFilename.getBuffer(), outCode);
     
     if (SLANG_FAILED(result))
     {
         // If we didn't find it, call program->getEntryPointCode() to get the code and return
         //    - Save a new file using the hash as name and dump the code into it before returning
         program->getEntryPointCode(entryPointIndex, targetIndex, outCode, outDiagnostics);
-        ComPtr<ISlangMutableFileSystem> fileSystem;
-        if (SLANG_SUCCEEDED(shaderCacheFileSystem->queryInterface(ISlangMutableFileSystem::getTypeGuid(), (void**)fileSystem.writeRef())))
+        ISlangMutableFileSystem* fileSystem;
+        if (SLANG_SUCCEEDED(shaderCacheFileSystem->queryInterface(ISlangMutableFileSystem::getTypeGuid(), (void**)&fileSystem)))
         {
-            fileSystem->saveFile(shaderFilename, outCode, (*outCode)->getBufferSize());
+            fileSystem->saveFile(shaderFilename.getBuffer(), outCode, (*outCode)->getBufferSize());
         }
     }
-    else
-    {
-        // TODO: The file exists, but how do we know if it's out-of-date?
-        // Hash for source code should not match hash of the returned file
-        uint32_t shaderContentHash;
-        program->getASTBasedHashCode(&shaderContentHash);
-    }
+//     else
+//     {
+//         // TODO: The file exists, but how do we know if it's out-of-date?
+//         // Hash for source code should not match hash of the returned file
+//         uint32_t shaderContentHash;
+//         program->getASTBasedHashCode(&shaderContentHash);
+//     }
     
     return SLANG_OK;
 }

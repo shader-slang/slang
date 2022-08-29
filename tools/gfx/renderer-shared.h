@@ -1309,8 +1309,6 @@ public:
     // Provides a default implementation that returns SLANG_E_NOT_AVAILABLE.
     virtual SLANG_NO_THROW Result SLANG_MCALL getTextureRowAlignment(size_t* outAlignment) override;
 
-    const char* getShaderFilename(uint32_t* shaderHash);
-
     Result getEntryPointCodeFromShaderCache(
         slang::IComponentType* program,
         SlangInt entryPointIndex,
