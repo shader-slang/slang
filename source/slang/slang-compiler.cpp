@@ -927,6 +927,8 @@ namespace Slang
         RefPtr<ExtensionTracker> extensionTracker = _newExtensionTracker(target);
         PassThroughMode compilerType;
 
+        SliceAllocator allocator;
+        
         if (auto endToEndReq = isPassThroughEnabled())
         {
             compilerType = endToEndReq->m_passThrough;
@@ -966,6 +968,11 @@ namespace Slang
         typedef DownstreamCompileOptions CompileOptions;
         CompileOptions options;
 
+        List<DownstreamCompileOptions::CapabilityVersion> requiredCapabilityVersions;
+        List<String> compilerSpecificArguments;
+        List<ComPtr<IArtifact>> libraries;
+        List<String> libraryPaths;
+
         // Set compiler specific args
         {
             auto linkage = getLinkage();
@@ -977,7 +984,7 @@ namespace Slang
                 auto& args = linkage->m_downstreamArgs.getArgsAt(nameIndex);
                 for (const auto& arg : args.m_args)
                 {
-                    options.compilerSpecificArguments.add(arg.value);
+                    compilerSpecificArguments.add(arg.value);
                 }
             }
         }
@@ -1041,13 +1048,12 @@ namespace Slang
                 }
             }
 
-
             // If emitted source is required, emit and set the path            
             if (_useEmittedSource(compiler, translationUnit))
             {
                 // If it's not file based we can set an appropriate path name, and it doesn't matter if it doesn't
                 // exist on the file system
-                options.sourceContentsPath = calcSourcePathForEntryPoints();
+                options.sourceContentsPath = allocator.allocate(calcSourcePathForEntryPoints());
 
                 CodeGenContext sourceCodeGenContext(this, sourceTarget, extensionTracker);
 
@@ -1063,8 +1069,8 @@ namespace Slang
 
                 const SourceFile* sourceFile = sourceFiles[0];
                 
-                options.sourceContentsPath = sourceFile->getPathInfo().foundPath;
-                options.sourceContents = sourceFile->getContent();
+                options.sourceContentsPath = SliceCaster::asTerminatedCharSlice(sourceFile->getPathInfo().foundPath);
+                options.sourceContents = SliceConverter::toTerminatedCharSlice(allocator, sourceFile->getContentBlob());
             }
         }
         else
@@ -1083,9 +1089,9 @@ namespace Slang
             metadata = findAssociated<IArtifactPostEmitMetadata>(sourceArtifact);
             
             ComPtr<ISlangBlob> blob;
-            SLANG_RETURN_ON_FAIL(sourceArtifact->loadBlob(ArtifactKeep::No, blob.writeRef()));
+            SLANG_RETURN_ON_FAIL(sourceArtifact->loadBlob(ArtifactKeep::Yes, blob.writeRef()));
 
-            options.sourceContents = StringUtil::getString(blob);
+            options.sourceContents = SliceConverter::toTerminatedCharSlice(allocator, blob);
         }
 
         // Add any preprocessor definitions associated with the linkage
@@ -1104,6 +1110,7 @@ namespace Slang
             }
         }
 
+        
         // If we have an extension tracker, we may need to set options such as SPIR-V version
         // and CUDA Shader Model.
         if (extensionTracker)
@@ -1119,7 +1126,7 @@ namespace Slang
                     version.kind = DownstreamCompileOptions::CapabilityVersion::Kind::CUDASM;
                     version.version = cudaTracker->m_smVersion;
 
-                    options.requiredCapabilityVersions.add(version);
+                    requiredCapabilityVersions.add(version);
                 }
 
                 if (cudaTracker->isBaseTypeRequired(BaseType::Half))
@@ -1133,7 +1140,7 @@ namespace Slang
                 version.kind = DownstreamCompileOptions::CapabilityVersion::Kind::SPIRV;
                 version.version = glslTracker->getSPIRVVersion();
 
-                options.requiredCapabilityVersions.add(version);
+                requiredCapabilityVersions.add(version);
             }
         }
 
@@ -1186,11 +1193,11 @@ namespace Slang
                 auto entryPoint = getEntryPoint(entryPointIndex);
                 profile = getEffectiveProfile(entryPoint, targetReq);
 
-                options.entryPointName = getText(entryPoint->getName());
+                options.entryPointName = allocator.allocate(getText(entryPoint->getName()));
                 auto entryPointNameOverride = getProgram()->getEntryPointNameOverride(entryPointIndex);
                 if (entryPointNameOverride.getLength() != 0)
                 {
-                    options.entryPointName = entryPointNameOverride;
+                    options.entryPointName = allocator.allocate(entryPointNameOverride);
                 }
             }
             else 
@@ -1225,7 +1232,7 @@ namespace Slang
             }
 
             // Set the profile
-            options.profileName = GetHLSLProfileName(profile);
+            options.profileName = allocator.allocate(GetHLSLProfileName(profile));
         }
 
         // If we aren't using LLVM 'host callable', we want downstream compile to produce a shared library
@@ -1239,7 +1246,7 @@ namespace Slang
         {
             if (_isCPUHostTarget(target))
             {
-                options.libraryPaths.add(Path::getParentDirectory(Path::getExecutablePath()));
+                libraryPaths.add(Path::getParentDirectory(Path::getExecutablePath()));
 
                 // Set up the library artifact
                 auto artifact = Artifact::create(ArtifactDesc::make(ArtifactKind::Library, Artifact::Payload::HostCPU), toSlice("slang-rt"));
@@ -1247,7 +1254,7 @@ namespace Slang
                 ComPtr<IFileArtifactRepresentation> fileRep(new FileArtifactRepresentation(IFileArtifactRepresentation::Kind::NameOnly, toSlice("slang-rt"), nullptr, nullptr));
                 artifact->addRepresentation(fileRep);
 
-                options.libraries.add(artifact);
+                libraries.add(artifact);
             }
         }
 
@@ -1335,23 +1342,35 @@ namespace Slang
             }
 
             // Add all the search paths (as calculated earlier - they will only be set if this is a pass through else will be empty)
-            options.includePaths = includePaths;
+            options.includePaths = allocator.allocate(includePaths);
 
             // Add the specified defines (as calculated earlier - they will only be set if this is a pass through else will be empty)
             {
+                const auto count = preprocessorDefinitions.Count();
+                auto dst = allocator.getArena().allocateArray<DownstreamCompileOptions::Define>(count);
+
+                Index i = 0;
+
                 for(auto& def : preprocessorDefinitions)
                 {
-                    DownstreamCompileOptions::Define define;
-                    define.nameWithSig = def.Key;
-                    define.value = def.Value;
+                    auto& define = dst[i];
+                    
+                    define.nameWithSig = allocator.allocate(def.Key);
+                    define.value = allocator.allocate(def.Value);
 
-                    options.defines.add(define);
+                    ++i;
                 }
+                options.defines = makeSlice(dst, count);
             }
 
             // Add all of the module libraries
-            options.libraries.addRange(linkage->m_libModules.getBuffer(), linkage->m_libModules.getCount());
+            libraries.addRange(linkage->m_libModules.getBuffer(), linkage->m_libModules.getCount());
         }
+        
+        options.compilerSpecificArguments = allocator.allocate(compilerSpecificArguments);
+        options.requiredCapabilityVersions = SliceCaster::asSlice(requiredCapabilityVersions);
+        options.libraries = SliceCaster::asSlice(libraries);
+        options.libraryPaths = allocator.allocate(libraryPaths);
 
         // Compile
         ComPtr<IArtifact> artifact;

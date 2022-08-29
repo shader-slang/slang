@@ -894,7 +894,7 @@ namespace Slang
 
         const size_t sizeInBytes = size_t(positionSizeInBytes);
 
-        void* data = out.allocate(sizeInBytes);
+        void* data = out.allocateTerminated(sizeInBytes);
         if (!data)
         {
             return SLANG_E_OUT_OF_MEMORY;

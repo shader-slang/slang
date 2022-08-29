@@ -33,6 +33,104 @@ void* BlobBase::castAs(const SlangUUID& guid)
     return getObject(guid);
 }
 
+/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! StringBlob !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
+
+void* StringBlob::castAs(const SlangUUID& guid)
+{
+    if (auto intf = getInterface(guid))
+    {
+        return intf;
+    }
+    return getObject(guid);
+}
+
+void* StringBlob::getObject(const Guid& guid)
+{
+    // Can allow accessing the contained String
+    if (guid == getTypeGuid())
+    {
+        return this;
+    }
+    // Can always be accessed as terminated char*
+    if (guid == SlangTerminatedChars::getTypeGuid())
+    {
+        return const_cast<char*>(m_string.getBuffer());
+    }
+    return nullptr;
+}
+
+/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! RawBlob !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
+
+void* RawBlob::castAs(const SlangUUID& guid)
+{
+    if (auto intf = getInterface(guid))
+    {
+        return intf;
+    }
+    return getObject(guid);
+}
+
+void* RawBlob::getObject(const Guid& guid)
+{
+    // If the data has 0 termination, we can return the pointer
+    if (guid == SlangTerminatedChars::getTypeGuid() && m_data.isTerminated())
+    {
+        return (char*)m_data.getData(); 
+    }
+    return nullptr;
+}
+
+/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ScopeBlob !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
+
+void* ScopeBlob::castAs(const SlangUUID& guid)
+{
+    if (auto intf = getInterface(guid))
+    {
+        return intf;
+    }
+    if (auto obj = getObject(guid))
+    {
+        return obj;
+    }
+
+    // If the contained thing is castable, ask it 
+    if (m_castable)
+    {
+        return m_castable->castAs(guid);
+    }
+
+    return nullptr;
+}
+
+/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ListBlob !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
+
+void* ListBlob::castAs(const SlangUUID& guid)
+{
+    if (auto intf = getInterface(guid))
+    {
+        return intf;
+    }
+    return getObject(guid);
+}
+
+void* ListBlob::getObject(const Guid& guid)
+{
+    // If the data is terminated return the pointer
+    if (guid == SlangTerminatedChars::getTypeGuid())
+    {
+        const auto count = m_data.getCount();
+        if (m_data.getCapacity() > count)
+        {
+            auto buf = m_data.getBuffer();
+            if (buf[count] == 0)
+            {
+                return (char*)buf;
+            }
+        }
+    }
+    return nullptr;
+}
+
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! StaticBlob !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
 SlangResult StaticBlob::queryInterface(SlangUUID const& guid, void** outObject) 

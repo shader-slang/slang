@@ -98,7 +98,7 @@ SlangResult GlslangDownstreamCompiler::_invoke(glslang_CompileRequest_1_1& reque
     return err ? SLANG_FAIL : SLANG_OK;
 }
 
-static SlangResult _parseDiagnosticLine(CharSliceAllocator& allocator, const UnownedStringSlice& line, List<UnownedStringSlice>& lineSlices, ArtifactDiagnostic& outDiagnostic)
+static SlangResult _parseDiagnosticLine(SliceAllocator& allocator, const UnownedStringSlice& line, List<UnownedStringSlice>& lineSlices, ArtifactDiagnostic& outDiagnostic)
 {
     /* ERROR: tests/diagnostics/syntax-error-intrinsic.slang:13: '@' : unexpected token */
 
@@ -128,7 +128,7 @@ static SlangResult _parseDiagnosticLine(CharSliceAllocator& allocator, const Uno
 SlangResult GlslangDownstreamCompiler::compile(const CompileOptions& options, IArtifact** outArtifact)
 {
     // This compiler doesn't read files, they should be read externally and stored in sourceContents/sourceContentsPath
-    if (options.sourceFiles.getCount() > 0)
+    if (options.sourceFiles.count > 0)
     {
         return SLANG_FAIL;
     }
@@ -156,7 +156,7 @@ SlangResult GlslangDownstreamCompiler::compile(const CompileOptions& options, IA
     request.sizeInBytes = sizeof(request);
 
     request.action = GLSLANG_ACTION_COMPILE_GLSL_TO_SPIRV;
-    request.sourcePath = options.sourceContentsPath.getBuffer();
+    request.sourcePath = options.sourceContentsPath; 
 
     request.slangStage = options.stage;
 
@@ -201,9 +201,9 @@ SlangResult GlslangDownstreamCompiler::compile(const CompileOptions& options, IA
 
     if (SLANG_FAILED(invokeResult))
     {
-        diagnostics->setRaw(CharSliceCaster::asCharSlice(diagnosticOutput));
+        diagnostics->setRaw(SliceCaster::asCharSlice(diagnosticOutput));
 
-        CharSliceAllocator allocator;
+        SliceAllocator allocator;
 
         SlangResult diagnosticParseRes = ArtifactDiagnosticUtil::parseColonDelimitedDiagnostics(allocator, diagnosticOutput.getUnownedSlice(), 1, _parseDiagnosticLine, diagnostics);
         SLANG_UNUSED(diagnosticParseRes);

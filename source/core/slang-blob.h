@@ -40,7 +40,12 @@ There is a reasonable argument that StringBlob should contain it's own copy of t
 class StringBlob : public BlobBase
 {
 public:
-        // ISlangBlob
+    SLANG_CLASS_GUID(0xf7e0e93c, 0xde70, 0x4531, { 0x9c, 0x9f, 0xdd, 0xa3, 0xf6, 0xc6, 0xc0, 0xdd });
+
+    // ICastable
+    virtual SLANG_NO_THROW void* SLANG_MCALL castAs(const SlangUUID& guid) SLANG_OVERRIDE;
+
+    // ISlangBlob
     SLANG_NO_THROW void const* SLANG_MCALL getBufferPointer() SLANG_OVERRIDE { return m_string.getBuffer(); }
     SLANG_NO_THROW size_t SLANG_MCALL getBufferSize() SLANG_OVERRIDE { return m_string.getLength(); }
 
@@ -61,6 +66,8 @@ protected:
         /// Get the contained string
     SLANG_FORCE_INLINE const String& getString() const { return m_string; }
 
+    void* getObject(const Guid& guid);
+
     String m_string;
 };
 
@@ -70,6 +77,8 @@ public:
     typedef BlobBase Super;
     typedef ListBlob ThisType;
 
+    // ICastable
+    virtual SLANG_NO_THROW void* SLANG_MCALL castAs(const SlangUUID& guid) SLANG_OVERRIDE;
     // ISlangBlob
     SLANG_NO_THROW void const* SLANG_MCALL getBufferPointer() SLANG_OVERRIDE { return m_data.getBuffer(); }
     SLANG_NO_THROW size_t SLANG_MCALL getBufferSize() SLANG_OVERRIDE { return m_data.getCount(); }
@@ -82,6 +91,8 @@ protected:
     explicit ListBlob(const List<uint8_t>& data) : m_data(data) {}
         // Move ctor
     explicit ListBlob(List<uint8_t>&& data) : m_data(data) {}
+
+    void* getObject(const Guid& guid);
 
     void operator=(const ThisType& rhs) = delete;
 
@@ -96,9 +107,21 @@ public:
     void* allocate(size_t size)
     {
         deallocate();
-        m_data = ::malloc(size);
+        if (size > 0)
+        {
+            m_data = ::malloc(size);
+        }
         m_sizeInBytes = size;
+        m_capacityInBytes = size;
         return m_data;
+    }
+        /// Allocate size including a 0 byte at `size`.
+    void* allocateTerminated(size_t size)
+    {
+        uint8_t* data = (uint8_t*)allocate(size + 1);
+        data[size] = 0;
+        m_sizeInBytes = size;
+        return data;
     }
     /// Deallocates if holds an allocation
     void deallocate()
@@ -109,14 +132,16 @@ public:
             m_data = nullptr;
         }
         m_sizeInBytes = 0;
+        m_capacityInBytes = 0;
     }
-    // Reallocate so the buffer is the specified size. Contents of buffer up to size remain intact.
-    void reallocate(size_t size)
+    // Reallocate so the buffer is the specified capacity/size. Contents of buffer up to size remain intact.
+    void reallocate(size_t capacity)
     {
-        if (size != m_sizeInBytes)
+        if (capacity != m_capacityInBytes)
         {
-            m_data = ::realloc(m_data, size); 
-            m_sizeInBytes = size;
+            m_data = ::realloc(m_data, capacity);
+            m_sizeInBytes = capacity;
+            m_capacityInBytes = capacity;
         }
     }
     /// Makes this no longer own the allocation. Returns the allocated data (or nullptr if no allocation)
@@ -125,6 +150,7 @@ public:
         void* data = m_data;
         m_data = nullptr;
         m_sizeInBytes = 0;
+        m_capacityInBytes = 0;
         return data;
     }
     /// Attach some data.
@@ -134,6 +160,7 @@ public:
         deallocate();
         m_data = data;
         m_sizeInBytes = size;
+        m_capacityInBytes = size;
     }
 
     void* set(const void* data, size_t size)
@@ -146,26 +173,33 @@ public:
         return dst;
     }
 
-    /// Get the allocated data. Returns nullptr if there is no allocated data
+        /// Get the allocated data. Returns nullptr if there is no allocated data
     void* getData() const { return m_data; }
-    /// Get the size of the allocated data.
+        /// Get the size of the allocated data.
     size_t getSizeInBytes() const { return m_sizeInBytes; }
+        /// Get the capacity in bytes
+    size_t getCapacityInBytes() const { return m_capacityInBytes; }
+
+    void setSizeInBytes(size_t size) 
+    {
+        SLANG_ASSERT(size <= m_capacityInBytes);
+        m_sizeInBytes = size;
+    }
 
     void swap(ThisType& rhs)
     {
-        void*const data = m_data;
-        const size_t sizeInBytes = m_sizeInBytes;
-
-        m_data = rhs.m_data;
-        m_sizeInBytes = rhs.m_sizeInBytes;
-
-        rhs.m_data = data;
-        rhs.m_sizeInBytes = sizeInBytes;
+        Swap(m_data, rhs.m_data);
+        Swap(m_sizeInBytes, rhs.m_sizeInBytes);
+        Swap(m_capacityInBytes, rhs.m_capacityInBytes);
     }
+
+        /// True if has zero termination, at the byte at m_sizeInBytes
+    bool isTerminated() const { return m_capacityInBytes > m_sizeInBytes && ((const char*)m_data)[m_sizeInBytes] == 0; }
 
     ScopedAllocation() :
         m_data(nullptr),
-        m_sizeInBytes(0)
+        m_sizeInBytes(0),
+        m_capacityInBytes(0)
     {
     }
 
@@ -178,6 +212,7 @@ private:
 
     void* m_data;
     size_t m_sizeInBytes;
+    size_t m_capacityInBytes;
 };
 
 /** A blob that manages some raw data that it owns.
@@ -185,18 +220,12 @@ private:
 class RawBlob : public BlobBase
 {
 public:
+    // ICastable
+    virtual SLANG_NO_THROW void* SLANG_MCALL castAs(const SlangUUID& guid) SLANG_OVERRIDE;
     // ISlangBlob
     SLANG_NO_THROW void const* SLANG_MCALL getBufferPointer() SLANG_OVERRIDE { return m_data.getData(); }
     SLANG_NO_THROW size_t SLANG_MCALL getBufferSize() SLANG_OVERRIDE { return m_data.getSizeInBytes(); }
 
-        /// Moves ownership of data and dataCount to the blob
-        /// data must be a pointer returned by ::malloc.
-    static ComPtr<ISlangBlob> moveCreate(uint8_t* data, size_t dataCount)
-    {
-        RawBlob* blob = new RawBlob;
-        blob->m_data.attach(data, dataCount);
-        return ComPtr<ISlangBlob>(blob);
-    }
     static ComPtr<ISlangBlob> moveCreate(ScopedAllocation& alloc)
     {
         RawBlob* blob = new RawBlob;
@@ -215,8 +244,10 @@ protected:
     // NOTE! Takes a copy of the input data
     RawBlob(const void* data, size_t size)
     {
-        memcpy(m_data.allocate(size), data, size);
+        memcpy(m_data.allocateTerminated(size), data, size);
     }
+
+    void* getObject(const Guid& guid);
 
     RawBlob() = default;
 
@@ -287,6 +318,9 @@ protected:
 class ScopeBlob : public BlobBase
 {
 public:
+    // ICastable
+    virtual SLANG_NO_THROW void* SLANG_MCALL castAs(const SlangUUID& guid) SLANG_OVERRIDE;
+
     // ISlangBlob
     SLANG_NO_THROW void const* SLANG_MCALL getBufferPointer() SLANG_OVERRIDE { return m_blob->getBufferPointer(); }
     SLANG_NO_THROW size_t SLANG_MCALL getBufferSize() SLANG_OVERRIDE { return m_blob->getBufferSize(); }
@@ -299,15 +333,17 @@ public:
 protected:
 
     // Ctor
-
     ScopeBlob(ISlangBlob* blob, ISlangUnknown* scope) :
         m_blob(blob),
         m_scope(scope)
     {
+        // Cache the ICastable interface if there is one.
+        blob->queryInterface(ICastable::getTypeGuid(), (void**)m_castable.writeRef());
     }
 
     ComPtr<ISlangUnknown> m_scope;
     ComPtr<ISlangBlob> m_blob;
+    ComPtr<ICastable> m_castable;              ///< Set if the blob has this interface. Set to nullptr if does not.
 };
 
 } // namespace Slang

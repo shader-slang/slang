@@ -166,7 +166,7 @@ enum class LineParseResult
     
 } // anonymous
     
-static SlangResult _parseGCCFamilyLine(CharSliceAllocator& allocator, const UnownedStringSlice& line, LineParseResult& outLineParseResult, ArtifactDiagnostic& outDiagnostic)
+static SlangResult _parseGCCFamilyLine(SliceAllocator& allocator, const UnownedStringSlice& line, LineParseResult& outLineParseResult, ArtifactDiagnostic& outDiagnostic)
 {
     typedef ArtifactDiagnostic Diagnostic;
     typedef Diagnostic::Severity Severity;
@@ -353,10 +353,10 @@ static SlangResult _parseGCCFamilyLine(CharSliceAllocator& allocator, const Unow
 {
     LineParseResult prevLineResult = LineParseResult::Ignore;
     
-    CharSliceAllocator allocator;
+    SliceAllocator allocator;
 
     diagnostics->reset();
-    diagnostics->setRaw(CharSliceCaster::asCharSlice(exeRes.standardError));
+    diagnostics->setRaw(SliceCaster::asCharSlice(exeRes.standardError));
 
     // We hold in workDiagnostics so as it is more convenient to append to the last with a continuation
     // also means we don't hold the allocations of building up continuations, just the results when finally allocated at the end
@@ -434,7 +434,7 @@ static SlangResult _parseGCCFamilyLine(CharSliceAllocator& allocator, const Unow
 
 /* static */SlangResult GCCDownstreamCompilerUtil::calcCompileProducts(const CompileOptions& options, ProductFlags flags, IFileArtifactRepresentation* lockFile, List<ComPtr<IArtifact>>& outArtifacts)
 {
-    SLANG_ASSERT(options.modulePath.getLength());
+    SLANG_ASSERT(options.modulePath.count);
 
     outArtifacts.clear();
 
@@ -442,7 +442,7 @@ static SlangResult _parseGCCFamilyLine(CharSliceAllocator& allocator, const Unow
     {
         StringBuilder builder;
         const auto desc = ArtifactDescUtil::makeDescForCompileTarget(options.targetType);
-        SLANG_RETURN_ON_FAIL(ArtifactDescUtil::calcPathForDesc(desc, options.modulePath.getUnownedSlice(), builder));
+        SLANG_RETURN_ON_FAIL(ArtifactDescUtil::calcPathForDesc(desc, asStringSlice(options.modulePath), builder));
 
         auto fileRep = FileArtifactRepresentation::create(IFileArtifactRepresentation::Kind::Owned, builder.getUnownedSlice(), lockFile, nullptr);
         auto artifact = ArtifactUtil::createArtifact(desc);
@@ -456,8 +456,8 @@ static SlangResult _parseGCCFamilyLine(CharSliceAllocator& allocator, const Unow
 
 /* static */SlangResult GCCDownstreamCompilerUtil::calcArgs(const CompileOptions& options, CommandLine& cmdLine)
 {
-    SLANG_ASSERT(options.sourceContents.getLength() == 0);
-    SLANG_ASSERT(options.modulePath.getLength());
+    SLANG_ASSERT(options.sourceContents.count == 0);
+    SLANG_ASSERT(options.modulePath.count);
 
     PlatformKind platformKind = (options.platform == PlatformKind::Unknown) ? PlatformUtil::getPlatformKind() : options.platform;
         
@@ -539,7 +539,7 @@ static SlangResult _parseGCCFamilyLine(CharSliceAllocator& allocator, const Unow
     }
 
     StringBuilder moduleFilePath; 
-    SLANG_RETURN_ON_FAIL(ArtifactDescUtil::calcPathForDesc(targetDesc, options.modulePath.getUnownedSlice(), moduleFilePath));
+    SLANG_RETURN_ON_FAIL(ArtifactDescUtil::calcPathForDesc(targetDesc, asStringSlice(options.modulePath), moduleFilePath));
     
     cmdLine.addArg("-o");
     cmdLine.addArg(moduleFilePath);
@@ -579,9 +579,9 @@ static SlangResult _parseGCCFamilyLine(CharSliceAllocator& allocator, const Unow
 
         builder << "-D";
         builder << define.nameWithSig;
-        if (define.value.getLength())
+        if (define.value.count)
         {
-            builder << "=" << define.value;
+            builder << "=" << asStringSlice(define.value);
         }
 
         cmdLine.addArg(builder);
@@ -591,7 +591,7 @@ static SlangResult _parseGCCFamilyLine(CharSliceAllocator& allocator, const Unow
     for (const auto& include : options.includePaths)
     {
         cmdLine.addArg("-I");
-        cmdLine.addArg(include);
+        cmdLine.addArg(asString(include));
     }
 
     // Link options
@@ -616,12 +616,12 @@ static SlangResult _parseGCCFamilyLine(CharSliceAllocator& allocator, const Unow
     // Files to compile
     for (const auto& sourceFile : options.sourceFiles)
     {
-        cmdLine.addArg(sourceFile);
+        cmdLine.addArg(asString(sourceFile));
     }
 
     // Add the library paths
 
-    if (options.libraryPaths.getCount() && options.targetType == SLANG_HOST_EXECUTABLE)
+    if (options.libraryPaths.count && options.targetType == SLANG_HOST_EXECUTABLE)
     {
         cmdLine.addArg("-Wl,-rpath,$ORIGIN");
     }
