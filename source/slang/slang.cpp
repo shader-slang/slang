@@ -350,7 +350,7 @@ SlangResult Session::loadStdLib(const void* stdLib, size_t stdLibSizeInBytes)
     }
 
     // Make a file system to read it from
-    ComPtr<IArchiveFileSystem> fileSystem;
+    ComPtr<ISlangFileSystemExt> fileSystem;
     SLANG_RETURN_ON_FAIL(loadArchiveFileSystem(stdLib, stdLibSizeInBytes, fileSystem));
 
     // Let's try loading serialized modules and adding them

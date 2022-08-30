@@ -1006,14 +1006,17 @@ struct OptionsParser
                         }
                     }
 
-                    RefPtr<CacheFileSystem> cacheFileSystem;
-                    SLANG_RETURN_ON_FAIL(ReproUtil::loadFileSystem(base, requestState, dirFileSystem, cacheFileSystem));
+                    ComPtr<ISlangFileSystemExt> fileSystem;
+                    SLANG_RETURN_ON_FAIL(ReproUtil::loadFileSystem(base, requestState, dirFileSystem, fileSystem));
+
+                    auto cacheFileSystem = as<CacheFileSystem>(fileSystem);
+                    SLANG_ASSERT(cacheFileSystem);
 
                     // I might want to make the dir file system the fallback file system...
                     cacheFileSystem->setInnerFileSystem(dirFileSystem, cacheFileSystem->getUniqueIdentityMode(), cacheFileSystem->getPathStyle());
 
                     // Set as the file system
-                    compileRequest->setFileSystem(cacheFileSystem);
+                    compileRequest->setFileSystem(fileSystem);
                 }
                 else if (argValue == "-serial-ir")
                 {

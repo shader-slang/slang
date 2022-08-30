@@ -135,7 +135,7 @@ SLANG_UNIT_TEST(compression)
             SLANG_CHECK(SLANG_SUCCEEDED(archiveFileSystem->storeArchive(false, archiveBlob.writeRef())));
 
 
-            RefPtr<ArchiveFileSystem> fileSystem;
+            ComPtr<ISlangFileSystemExt> fileSystem;
 #if 0
             SLANG_CHECK(SLANG_SUCCEEDED(createArchiveFileSystem(archiveType, fileSystem)));
 

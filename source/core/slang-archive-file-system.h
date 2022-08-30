@@ -153,7 +153,7 @@ public:
 };
 
 
-SlangResult loadArchiveFileSystem(const void* data, size_t dataSizeInBytes, ComPtr<IArchiveFileSystem>& outFileSystem);
+SlangResult loadArchiveFileSystem(const void* data, size_t dataSizeInBytes, ComPtr<ISlangFileSystemExt>& outFileSystem);
 SlangResult createArchiveFileSystem(SlangArchiveType type, ComPtr<IArchiveFileSystem>& outFileSystem);
 
 }
