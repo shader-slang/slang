@@ -4138,12 +4138,10 @@ void Linkage::setFileSystem(ISlangFileSystem* inFileSystem)
     }
     else
     {
-        CacheFileSystem* cacheFileSystemPtr = nullptr;   
-        inFileSystem->queryInterface(CacheFileSystem::getTypeGuid(), (void**)&cacheFileSystemPtr);
-        if (cacheFileSystemPtr)
+        if (auto cacheFileSystem = as<CacheFileSystem>(inFileSystem))
         {
-            m_cacheFileSystem = cacheFileSystemPtr;
-            m_fileSystemExt = cacheFileSystemPtr;
+            m_cacheFileSystem = cacheFileSystem;
+            m_fileSystemExt = cacheFileSystem;
         }
         else 
         {

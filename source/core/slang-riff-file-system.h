@@ -40,6 +40,9 @@ public:
     // ISlangUnknown 
     SLANG_REF_OBJECT_IUNKNOWN_ALL
 
+    // ISlangCastable
+    virtual SLANG_NO_THROW void* SLANG_MCALL castAs(const Guid& guid) SLANG_OVERRIDE;
+
     // ISlangFileSystem
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL loadFile(char const* path, ISlangBlob** outBlob) SLANG_OVERRIDE;
 
@@ -78,6 +81,7 @@ protected:
     };
 
     ISlangMutableFileSystem* getInterface(const Guid& guid);
+    void* getObject(const Guid& guid);
 
     SlangResult _calcCanonicalPath(const char* path, StringBuilder& out);
     Entry* _getEntryFromPath(const char* path, String* outPath = nullptr);

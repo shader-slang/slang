@@ -30,6 +30,9 @@ public:
     SLANG_NO_THROW uint32_t SLANG_MCALL addRef() SLANG_OVERRIDE { return 1; }
     SLANG_NO_THROW uint32_t SLANG_MCALL release() SLANG_OVERRIDE { return 1; } 
 
+    // ISlangCastable
+    virtual SLANG_NO_THROW void* SLANG_MCALL castAs(const Guid& guid) SLANG_OVERRIDE;
+
     // ISlangFileSystem
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL loadFile(char const* path, ISlangBlob** outBlob) SLANG_OVERRIDE;
 
@@ -62,6 +65,7 @@ private:
     virtual ~OSFileSystem() {}
 
     ISlangUnknown* getInterface(const Guid& guid);
+    void* getObject(const Guid& guid);
 
     FileSystemStyle m_style;
 
@@ -140,9 +144,10 @@ class CacheFileSystem: public ISlangFileSystemExt, public RefObject
     Dictionary<String, PathInfo*>& getUniqueMap() { return m_uniqueIdentityMap; }
 
     // ISlangUnknown
-    SLANG_NO_THROW SlangResult SLANG_MCALL queryInterface(SlangUUID const& uuid, void** outObject) SLANG_OVERRIDE;
-    SLANG_REF_OBJECT_IUNKNOWN_ADD_REF 
-    SLANG_REF_OBJECT_IUNKNOWN_RELEASE
+    SLANG_REF_OBJECT_IUNKNOWN_ALL
+
+    // ISlangCastable
+    virtual SLANG_NO_THROW void* SLANG_MCALL castAs(const Guid& guid) SLANG_OVERRIDE;
 
     // ISlangFileSystem
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL loadFile(char const* path, ISlangBlob** outBlob) SLANG_OVERRIDE;
@@ -175,6 +180,9 @@ class CacheFileSystem: public ISlangFileSystemExt, public RefObject
 
 protected:
     
+    void* getInterface(const Guid& guid);
+    void* getObject(const Guid& guid);
+
         /// Given a path, works out a uniqueIdentity, based on the uniqueIdentityMode.
         /// outFileContents will be set if file had to be read to produce the uniqueIdentity (ie with Hash)
         /// If the file doesn't have to be read, then outFileContents will be nullptr, even if it is backed by a file.
@@ -212,6 +220,9 @@ public:
     // ISlangFileSystem
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL loadFile(char const* path, ISlangBlob** outBlob) SLANG_OVERRIDE;
 
+    // ISlangCastable
+    virtual SLANG_NO_THROW void* SLANG_MCALL castAs(const Guid& guid) SLANG_OVERRIDE;
+
     // ISlangFileSystemExt
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL getFileUniqueIdentity(const char* path, ISlangBlob** outUniqueIdentity) SLANG_OVERRIDE;
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL calcCombinedPath(SlangPathType fromPathType, const char* fromPath, const char* path, ISlangBlob** pathOut) SLANG_OVERRIDE;
@@ -238,6 +249,7 @@ protected:
     SlangResult _getFixedPath(const char* path, String& outPath);
 
     ISlangUnknown* getInterface(const Guid& guid);
+    void* getObject(const Guid& guid);
 
     bool m_stripPath;
 
