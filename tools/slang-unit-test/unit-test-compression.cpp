@@ -46,7 +46,7 @@ SLANG_UNIT_TEST(compression)
     for (auto archiveType : archiveTypes)
     {
         // Test out archive file systems
-        ComPtr<IArchiveFileSystem> archiveFileSystem;
+        ComPtr<ISlangMutableFileSystem> archiveFileSystem;
         SLANG_CHECK(SLANG_SUCCEEDED(createArchiveFileSystem(archiveType, archiveFileSystem)));
         
         const char contents[] = "I'm compressed";

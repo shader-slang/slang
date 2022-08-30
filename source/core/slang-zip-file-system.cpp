@@ -799,7 +799,7 @@ void ZipFileSystemImpl::setCompressionStyle(const CompressionStyle& style)
     }
 }
 
-/* static */SlangResult ZipFileSystem::create(ComPtr<IArchiveFileSystem>& out)
+/* static */SlangResult ZipFileSystem::create(ComPtr<ISlangMutableFileSystem>& out)
 {
     out = new ZipFileSystemImpl;
     return SLANG_OK;

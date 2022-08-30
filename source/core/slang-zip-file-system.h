@@ -11,7 +11,7 @@ namespace Slang
 struct ZipFileSystem
 {
         /// Create an empty zip
-    static SlangResult create(ComPtr<IArchiveFileSystem>& out);
+    static SlangResult create(ComPtr<ISlangMutableFileSystem>& out);
         /// True if this appears to be a zip archive
     static bool isArchive(const void* data, size_t size);
 };
