@@ -4168,6 +4168,9 @@ void Linkage::setFileSystem(ISlangFileSystem* inFileSystem)
         }
     }
 
+    // If requires a cache file system, check that it does have one
+    SLANG_ASSERT(m_requireCacheFileSystem == false || as<CacheFileSystem>(m_fileSystemExt));
+
     // Set the file system used on the source manager
     getSourceManager()->setFileSystemExt(m_fileSystemExt);
 }
