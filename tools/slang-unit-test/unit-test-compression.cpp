@@ -46,7 +46,7 @@ SLANG_UNIT_TEST(compression)
     for (auto archiveType : archiveTypes)
     {
         // Test out archive file systems
-        RefPtr<ArchiveFileSystem> archiveFileSystem;
+        ComPtr<IArchiveFileSystem> archiveFileSystem;
         SLANG_CHECK(SLANG_SUCCEEDED(createArchiveFileSystem(archiveType, archiveFileSystem)));
         
         const char contents[] = "I'm compressed";
@@ -54,7 +54,7 @@ SLANG_UNIT_TEST(compression)
         const char contents3[] = "Replace it";
 
         {
-            ISlangMutableFileSystem* fileSystem = archiveFileSystem;
+            auto fileSystem = as<ISlangMutableFileSystem>(archiveFileSystem);
 
             SLANG_CHECK(SLANG_SUCCEEDED(fileSystem->createDirectory("hello")));
             SLANG_CHECK(SLANG_SUCCEEDED(fileSystem->createDirectory("hello2")));

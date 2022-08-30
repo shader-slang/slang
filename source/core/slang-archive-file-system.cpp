@@ -130,9 +130,9 @@ SlangResult ImplicitDirectoryCollector::enumerate(FileSystemContentsCallBack cal
     return getDirectoryExists() ? SLANG_OK : SLANG_E_NOT_FOUND;
 }
 
-SlangResult loadArchiveFileSystem(const void* data, size_t dataSizeInBytes, RefPtr<ArchiveFileSystem>& outFileSystem)
+SlangResult loadArchiveFileSystem(const void* data, size_t dataSizeInBytes, ComPtr<IArchiveFileSystem>& outFileSystem)
 {
-    RefPtr<ArchiveFileSystem> fileSystem;
+    ComPtr<IArchiveFileSystem> fileSystem;
     if (ZipFileSystem::isArchive(data, dataSizeInBytes))
     {
         // It's a zip
@@ -153,7 +153,7 @@ SlangResult loadArchiveFileSystem(const void* data, size_t dataSizeInBytes, RefP
     return SLANG_OK;
 }
     
-SlangResult createArchiveFileSystem(SlangArchiveType type, RefPtr<ArchiveFileSystem>& outFileSystem)
+SlangResult createArchiveFileSystem(SlangArchiveType type, ComPtr<IArchiveFileSystem>& outFileSystem)
 {
     switch (type)
     {

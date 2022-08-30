@@ -82,7 +82,7 @@ NOTE! That this behavior is the same as previously in that....
 1) calcRelativePath, just returns the path as processed by the Path:: methods 
 2) getUniqueIdentity behavior depends on the UniqueIdentityMode.
 */
-class CacheFileSystem: public ISlangFileSystemExt, public RefObject
+class CacheFileSystem: public ISlangFileSystemExt, public ComBaseObject
 {
     public:
     SLANG_CLASS_GUID(0x2f4d1d03, 0xa0d1, 0x434b, { 0x87, 0x7a, 0x65, 0x5, 0xa4, 0xa0, 0x9a, 0x3b })
@@ -144,7 +144,7 @@ class CacheFileSystem: public ISlangFileSystemExt, public RefObject
     Dictionary<String, PathInfo*>& getUniqueMap() { return m_uniqueIdentityMap; }
 
     // ISlangUnknown
-    SLANG_REF_OBJECT_IUNKNOWN_ALL
+    SLANG_COM_BASE_IUNKNOWN_ALL
 
     // ISlangCastable
     virtual SLANG_NO_THROW void* SLANG_MCALL castAs(const Guid& guid) SLANG_OVERRIDE;
@@ -212,10 +212,10 @@ protected:
     ComPtr<ISlangFileSystemExt> m_fileSystemExt;        ///< Optionally set -> if nullptr will fall back on the m_fileSystem and emulate all the other methods of ISlangFileSystemExt
 };
 
-class RelativeFileSystem : public ISlangMutableFileSystem, public RefObject
+class RelativeFileSystem : public ISlangMutableFileSystem, public ComBaseObject
 {
 public:
-    SLANG_REF_OBJECT_IUNKNOWN_ALL
+    SLANG_COM_BASE_IUNKNOWN_ALL
 
     // ISlangFileSystem
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL loadFile(char const* path, ISlangBlob** outBlob) SLANG_OVERRIDE;

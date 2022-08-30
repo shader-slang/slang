@@ -1731,11 +1731,11 @@ namespace Slang
         /// if fileSystem is nullptr. Otherwise it will either be fileSystem's interface, 
         /// or a wrapped impl that makes fileSystem operate as fileSystemExt
         ComPtr<ISlangFileSystemExt> m_fileSystemExt;
-
-        
-        /// Set if fileSystemExt is a cache file system
-        RefPtr<CacheFileSystem> m_cacheFileSystem;
-
+  
+        /// Set if fileSystemExt is a cache file system. 
+        /// NOTE! Since not directly reference counted relies on m_fileSystemExt to keep in scope.
+        CacheFileSystem* m_cacheFileSystem = nullptr;
+      
         ISlangFileSystemExt* getFileSystemExt() { return m_fileSystemExt; }
         CacheFileSystem* getCacheFileSystem() const { return m_cacheFileSystem; }
 

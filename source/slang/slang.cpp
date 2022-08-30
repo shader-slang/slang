@@ -350,7 +350,7 @@ SlangResult Session::loadStdLib(const void* stdLib, size_t stdLibSizeInBytes)
     }
 
     // Make a file system to read it from
-    RefPtr<ArchiveFileSystem> fileSystem;
+    ComPtr<IArchiveFileSystem> fileSystem;
     SLANG_RETURN_ON_FAIL(loadArchiveFileSystem(stdLib, stdLibSizeInBytes, fileSystem));
 
     // Let's try loading serialized modules and adding them
@@ -369,7 +369,7 @@ SlangResult Session::saveStdLib(SlangArchiveType archiveType, ISlangBlob** outBl
     }
 
     // Make a file system to read it from
-    RefPtr<ArchiveFileSystem> fileSystem;
+    ComPtr<IArchiveFileSystem> fileSystem;
     SLANG_RETURN_ON_FAIL(createArchiveFileSystem(archiveType, fileSystem));
 
     for (auto& pair : m_builtinLinkage->mapNameToLoadedModules)
@@ -4128,7 +4128,7 @@ void Linkage::setFileSystem(ISlangFileSystem* inFileSystem)
 
     // Release what's there
     m_fileSystemExt.setNull();
-    m_cacheFileSystem.setNull();
+    m_cacheFileSystem = nullptr;
 
     // If nullptr passed in set up default 
     if (inFileSystem == nullptr)
@@ -4148,7 +4148,7 @@ void Linkage::setFileSystem(ISlangFileSystem* inFileSystem)
             if (m_requireCacheFileSystem)
             {
                 m_cacheFileSystem = new Slang::CacheFileSystem(inFileSystem);
-                m_fileSystemExt = m_cacheFileSystem;
+                m_fileSystemExt = ComPtr<ISlangFileSystemExt>(m_cacheFileSystem);
             }
             else
             {
@@ -4160,7 +4160,7 @@ void Linkage::setFileSystem(ISlangFileSystem* inFileSystem)
                 {
                     // Construct a wrapper to emulate the extended interface behavior
                     m_cacheFileSystem = new Slang::CacheFileSystem(m_fileSystem);
-                    m_fileSystemExt = m_cacheFileSystem;
+                    m_fileSystemExt = ComPtr<ISlangFileSystemExt>(m_cacheFileSystem);
                 }
             }
         }
