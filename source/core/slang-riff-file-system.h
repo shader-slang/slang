@@ -80,7 +80,7 @@ protected:
         ComPtr<ISlangBlob> m_contents;          ///< Can be compressed or not
     };
 
-    ISlangMutableFileSystem* getInterface(const Guid& guid);
+    void* getInterface(const Guid& guid);
     void* getObject(const Guid& guid);
 
     SlangResult _calcCanonicalPath(const char* path, StringBuilder& out);

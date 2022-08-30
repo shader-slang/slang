@@ -21,7 +21,7 @@ RiffFileSystem::RiffFileSystem(ICompressionSystem* compressionSystem):
 {
 }
 
-ISlangMutableFileSystem* RiffFileSystem::getInterface(const Guid& guid)
+void* RiffFileSystem::getInterface(const Guid& guid)
 {
     if  (   guid == ISlangUnknown::getTypeGuid() || 
             guid == ISlangCastable::getTypeGuid() || 
@@ -30,6 +30,10 @@ ISlangMutableFileSystem* RiffFileSystem::getInterface(const Guid& guid)
             guid == ISlangMutableFileSystem::getTypeGuid())
     {
         return static_cast<ISlangMutableFileSystem*>(this);
+    }
+    else if (guid == IArchiveFileSystem::getTypeGuid())
+    {
+        return static_cast<IArchiveFileSystem*>(this);
     }
     return nullptr;
 }
