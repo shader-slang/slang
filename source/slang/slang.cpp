@@ -4135,27 +4135,23 @@ void Linkage::setFileSystem(ISlangFileSystem* inFileSystem)
 
     // Release what's there
     m_fileSystemExt.setNull();
-    m_cacheFileSystem = nullptr;
-
+    
     // If nullptr passed in set up default 
     if (inFileSystem == nullptr)
     {
-        m_cacheFileSystem = new Slang::CacheFileSystem(Slang::OSFileSystem::getExtSingleton());
-        m_fileSystemExt = m_cacheFileSystem;
+        m_fileSystemExt = new Slang::CacheFileSystem(Slang::OSFileSystem::getExtSingleton());
     }
     else
     {
         if (auto cacheFileSystem = as<CacheFileSystem>(inFileSystem))
         {
-            m_cacheFileSystem = cacheFileSystem;
             m_fileSystemExt = cacheFileSystem;
         }
         else 
         {
             if (m_requireCacheFileSystem)
             {
-                m_cacheFileSystem = new Slang::CacheFileSystem(inFileSystem);
-                m_fileSystemExt = ComPtr<ISlangFileSystemExt>(m_cacheFileSystem);
+                m_fileSystemExt = new Slang::CacheFileSystem(inFileSystem); 
             }
             else
             {
@@ -4166,8 +4162,7 @@ void Linkage::setFileSystem(ISlangFileSystem* inFileSystem)
                 if (!m_fileSystemExt)
                 {
                     // Construct a wrapper to emulate the extended interface behavior
-                    m_cacheFileSystem = new Slang::CacheFileSystem(m_fileSystem);
-                    m_fileSystemExt = ComPtr<ISlangFileSystemExt>(m_cacheFileSystem);
+                    m_fileSystemExt = new Slang::CacheFileSystem(m_fileSystem); 
                 }
             }
         }

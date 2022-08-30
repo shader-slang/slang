@@ -524,7 +524,7 @@ static String _scrubName(const String& in)
 
     // Find files from the file system, and mapping paths to files
     {
-        CacheFileSystem* cacheFileSystem = linkage->getCacheFileSystem();
+        CacheFileSystem* cacheFileSystem = as<CacheFileSystem>(linkage->getFileSystemExt());
         if (!cacheFileSystem)
         {
             return SLANG_FAIL;
@@ -1061,7 +1061,6 @@ struct LoadContext
         // with what was read from the file. 
 
         linkage->m_fileSystemExt.swap(fileSystemExt);
-        linkage->m_cacheFileSystem = cacheFileSystem;
     }
 
     return SLANG_OK;

@@ -2,6 +2,8 @@
 #include "../core/slang-char-util.h"
 #include "../compiler-core/slang-lexer.h"
 
+#include "../core/slang-file-system.h"
+
 namespace Slang
 {
 
