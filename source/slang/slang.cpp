@@ -369,8 +369,15 @@ SlangResult Session::saveStdLib(SlangArchiveType archiveType, ISlangBlob** outBl
     }
 
     // Make a file system to read it from
-    ComPtr<IArchiveFileSystem> fileSystem;
+    ComPtr<ISlangMutableFileSystem> fileSystem;
     SLANG_RETURN_ON_FAIL(createArchiveFileSystem(archiveType, fileSystem));
+
+    // Must have archiveFileSystem interface
+    auto archiveFileSystem = as<IArchiveFileSystem>(fileSystem);
+    if (!archiveFileSystem)
+    {
+        return SLANG_FAIL;
+    }
 
     for (auto& pair : m_builtinLinkage->mapNameToLoadedModules)
     {
@@ -400,7 +407,7 @@ SlangResult Session::saveStdLib(SlangArchiveType archiveType, ISlangBlob** outBl
     }
 
     // Now need to convert into a blob
-    SLANG_RETURN_ON_FAIL(fileSystem->storeArchive(true, outBlob));
+    SLANG_RETURN_ON_FAIL(archiveFileSystem->storeArchive(true, outBlob));
     return SLANG_OK;
 }
 
