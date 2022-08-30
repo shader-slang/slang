@@ -1,8 +1,6 @@
 Artifact Container Format
 =========================
 
-A proposal for a Slang language/compiler feature or system should start with a concise description of what the feature it and why it could be important.
-
 This proposal is for a file hierarchy based structure that can be used to represent compile results and more generally a 'shader cache'. Ideally it would feature
 
 * Does not require an extensive code base to implement
@@ -41,6 +39,14 @@ It's importance/relevance
 Status
 ------
 
+## Gfx
+
+There is a run time shader cache that is implemented in gfx.
+
+There is some work around a file system backed shader cache in gfx.
+
+## Artifact System
+
 The Artifact system exists and provides a mechanism to transport source/compile results through the Slang compiler. It already supports most of the different items that need to be stored.
 
 Artifact has support for "containers". An artifact container is an artifact that can contain other artifacts. Support for different 'file system' style container formats is also implemented. The currently supported underlying container formats supported are
@@ -59,7 +65,7 @@ Additionally the mechanisms already implemented support
 
 In order to access a file system via artifact, is as simple as adding a modification to the default handler to load the container, and to implement `expandChildren`, which will allow traversal of the container. In general the design is 'lazy' in design. Children are not expanded, unless requested, and files not decompressed unless required. The caching system also provides a caching mechanism such that a representation such as uncompressed blob can be associated with the artifact.
 
-Very little code is needed to support this behavior because the IExtFileArtifactRepresentation and the use of the ISlangFileSystemExt interface, mean it works using the existing mechanisms that are used.  
+Very little code is needed to support this behavior because the IExtFileArtifactRepresentation and the use of the ISlangFileSystemExt interface, mean it works using the existing already used and tested mechanisms.
 
 It is a desired feature of the container format that it can be represented as 'file system', and have the option of being human readable where appropraite. Doing so allows
 
@@ -122,6 +128,126 @@ Proposed Approach
 -----------------
 
 Explain the idea in enough detail that a reader can concretely know what you are proposing to do. Anybody who is just going to *use* the resulting feature/system should be able to read this and get an accurate idea of what that experience will be like.
+
+## Usage scenarios
+
+It is worth discussing in a little more detail usage scenarios. 
+
+1) Being able to find and load a kernel based on some key
+2) Being able to compile some implementation on demand
+3) Being able to compile and cache some combination on demand
+4) Being able to compile and store to a container or file/s on demand
+
+For scenario 1, there are perhaps two usage styles that might be desirable. One might be to have a compilation interface, and be able to use that to invoke a 'compilation', but would in fact just pull out the result from a shader cache. A challenge here is what is this 'compilation interface' and how do options on that map to keys to look up the result.
+
+You could also imagine a scenario where a shader cache is loaded as a 'artifact hierarchy'. This hierarchy or something like it is probably what is backing the 'compilation interface'. Both views are useful. The artifact hierarchy provides a mechanism to find out what is in the cache. It would also provide a way to lookup a kernel that doesn't require a way to map 'compilation options' to a result. 
+
+We may want a mechanism, on being given compilation options can produce a suitable 'key'. Ideas around key are discussed in following section.
+
+For scenario 2, we need an interface that can capture 'compilation'. The most obvious kind of interface would be
+
+```
+struct Options
+{
+    Includes ...;
+    Optimizations ...;
+    Miscellaneous ...;
+    Source* source[];
+    EntryPoint ... ;
+    ...
+    CompilerSpecific options;
+}
+
+ICompiler
+{
+    Result compile(const Options* options, IArtifact** outArtifact);
+}
+```
+
+This is similar to the `IDownstreamCompiler` interface. The implication being that the is some mapping from 'options' to the cached result (if there is one). There are problem around this, because
+
+* Items may be specified multiple times 
+* Ideally the hash would or at least could remain stable with updated to options 
+* Also ideally the user might want control over what constitutes a new version/key
+* Calculating a hash is fairly complicated, and would need to take into account ordering
+
+Another option might be to split common options from options that are likely to be modified per compilation. For example
+
+```
+struct Options
+{
+    const char* name;               ///< Human readable name
+    Includes ...;
+    Optimizations ...;
+    Miscellaneous ...;
+    Source* source[];
+    ...
+    CompilerSpecific options;
+}
+
+struct CompileOptions
+{
+    Stage stage ...;
+    SpecializationArgs ...;
+    EntryPoint ...;
+};
+
+ICompiler
+{
+    Result createOptions(Options* options, IOptions* outOptions);
+
+    Result compile(IOptions* options, const CompileOptions* compileOptions, IArtifact** outArtifact);
+}
+```
+
+Having the split greatly simplifies the key production, because we can use the unique human name, and the very much simpler values of CompileOptions to produce a key.
+
+Another idea might be to split out compilation options from naming and other aspects. 
+
+In scenario 3 we want to cache results somewhere. 
+
+It should be noted *by design* a `IArtifactContainers` children is *not* a mechanism that automatically updates some underlying representation, such as files on the file system. Once a IArtifactContainer has been expanded, it allows for manipulation of the children (for example adding and removing). The typical way to produce a zip from an artifact hierachy would be to call a function that writes it out as such. This is not something that happens incrementally. 
+
+For an in memory caching scenario this choice works well. We can update the artifact hierarchy as needed and all is good.
+
+In scenario 4 need to be made to the backing representation.
+
+It seems this most logically happens as part of the compilation interface implementation. The Artifact system doesn't need to know anything about such caching directly.
+
+Once a compilation is complete, an implementation could save the result in Artifact hierarchy and write out a representation to disk from that part of the hierarchy. For some file systems doing this on demand is probably not a great idea. For example the Zip file system does not free memory directly when a file is deleted. Perhaps as part of the interface there needs to be a way to 'flush' cached data to backing store. Lastly there could be a mechanism to write out the changes (or the new archive).
+
+## Cache keys
+
+### Hashing source
+
+The fastest/simplest way to hash source, is to take the blob and hash that. Unfortunately a problem occurse due line ending character changing, or other white space changes produce a different hash. A way to work around this would be to use a tokenizer, or a 'simplified' tokenizer that only handles the necessary special cases - for example white space in a string is important. Such a solution does not require an AST or rely on a specific tokenizer. 
+
+The process would be
+
+1) Find simplified tokens appending together with ` ` 
+2) Take the hash of that 
+
+Another approach would be to hash each token as produced. Doing so doesn't require memory allocation for the concatination. The belief is that a hash of a contiguous large chunk of memory is probably significantly faster than combining hashs of lots of potentially very small sub strings. 
+
+### How to handle unnamed compilation options?
+
+We cannot produce a hash for a compilation in general without having access to the source, as the source can change if it's produced on demand. We cannot in general have source available - most developers will not want to ship with source. Additionally we cannot demand that generated source is always available.
+
+As a fall back position, we could produce a hash that took into account all of these factors. The hash could only produced *after* compilation, as it would require the list of dependencies, and the source. 
+
+### Where are options stored?
+
+### How do we alter some options of a compilation?
+
+It is easy to imagine that for some targets, or some versions of a shader there is a need to change options. 
+
+It may be necessary to allow changes to some options on a per compilation level, but the compilation still use the same key. Here the 'key' provides an indirection. The compilation is tweaked for specific needs, and the application has the advantage of the indirection of not having to know the specifics of the compilation.
+
+### Input filenames/compilation options is not enough to unquely define a compilation, because source can be injected. How do we handle this?
+
+## Discussion
+
+
 
 ## Configuration and Identification
 
