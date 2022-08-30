@@ -227,13 +227,39 @@ The process would be
 1) Find simplified tokens appending together with ` ` 
 2) Take the hash of that 
 
-Another approach would be to hash each token as produced. Doing so doesn't require memory allocation for the concatination. The belief is that a hash of a contiguous large chunk of memory is probably significantly faster than combining hashs of lots of potentially very small sub strings. 
+Another approach would be to hash each "token" as produced. Doing so doesn't require memory allocation for the concatination. You could special case short strings or single chars, and hash longer strings.
+
+Why not use the Slang AST? You could do but it assumes
+
+1) You can produce an AST for the input source - this is not generally true as source could be CUDA, C++, etc 
+2) The AST would have to be produced post preprocessing - because prior to preprocessing it may not be valid source
+
+If we are are relying on dependencies specified at least in part by `#include`, it means the preprocessor must have already been executed for Slang.
+
+If the source is being passed down to other downstream compilers this isn't the case. We could potentially run the preprocessor for other source varities, but there will be problems with system files which won't be locatable in general. 
+
+The other disadvantage around using the AST is that it requires the extra work and space of parsing. 
+
+If we wanted to use Slang lexer it would imply the hash process would be 
+
+1) Load the file
+2) Lex the file
+3) Preprocess the file (to get dependencies). Throw these tokens away.
+4) Hash the original lex of the files tokens
+
+For hashing slang language and probably HLSL we can use the Slang preprocessor tokenizer, and hash the tokens (actually probably just the token text). 
+
+For other languages we may want to use some simple lexer. A problem with using a lexer at all is that it adds a great amount of complexity to a stand alone implementation. 
+
+We could side step the issues around source generation if we push that problem back onto users. If they are using code generation they will also have to provide a string that uniquely identifies the generation that is being used. This perhaps being a requirement for a persistant cache. For a temporary runtime cache, we can allow hash generation from source.
 
 ### How to handle unnamed compilation options?
 
 We cannot produce a hash for a compilation in general without having access to the source, as the source can change if it's produced on demand. We cannot in general have source available - most developers will not want to ship with source. Additionally we cannot demand that generated source is always available.
 
-As a fall back position, we could produce a hash that took into account all of these factors. The hash could only produced *after* compilation, as it would require the list of dependencies, and the source. 
+As a fall back position, we could produce a hash that took into account all of these factors. The hash could only produced *after* compilation, as it would require the list of dependencies, and the source. Producing such a hash after compilation, is workable for a runtime cache, but is not very useful for a persistant cache, because the key could only be produced after a compilation.
+
+
 
 ### Where are options stored?
 
