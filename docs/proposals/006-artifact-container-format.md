@@ -161,19 +161,19 @@ Hashing source
 
 The fastest/simplest way to hash source, is to take the blob and hash that. Unfortunately there are several issues 
 
-* Ignores dependencies - if this source includes another file the hash will also have to depend on that transitively
+* Ignores dependencies - if this source includes another file the hash will also need to depend on that transitively
 * Hash changes with line end character encoding
-* Hash changes with white space changes in general 
+* Hash is sensitivve to white space changes in general 
 
-A way to work around whitespace issues would be to use a tokenizer, or a 'simplified' tokenizer that only handles the necessary special cases - for example white space in a string is important. Such a solution does not require an AST or rely on a specific tokenizer. A hash could be made of concatination of all of the lexemes with white space inserted between.
+A way to work around whitespace issues would be to use a tokenizer, or a 'simplified' tokenizer that only handles the necessary special cases. An example special case would be white space in a string is always important. Such a solution does not require an AST or rely on a specific tokenizer. A hash could be made of concatination of all of the lexemes with white space inserted between.
 
 Another approach would be to hash each "token" as produced. Doing so doesn't require memory allocation for the concatination. You could special case short strings or single chars, and hash longer strings.
 
 ## Dependencies
 
-Its not enough to rely on hashing of input source, because of `#include` or other references resources, such as modules or libraries may be involved. 
+Its not enough to rely on hashing of input source, because `#include` or other resource references, such as modules or libraries may be involved. 
 
-If we are are relying on dependencies specified at least in part by `#include`, it implies the preprocessor be executed. This could be used for other languages such as C/C++. Some care would need to be taken because *some* includes will probably not be locatable by our preprocessor, such as system include paths in C++. For the purpose of hashing, an implementation could ignore #includes that cannot be resolved. This may work for some scenarios - but doesn't work in general because symbols defined in unfound includes might cause other includes. Thus this could lead to other dependencies not being found, or being assumed when they weren't possible.
+If we are are relying on dependencies specified at least in part by `#include`, it implies the preprocessor be executed. This could be used for other languages such as C/C++. Some care would need to be taken because *some* includes will probably not be locatable by our preprocessor, such as system include paths in C++. For the purpose of hashing, an implementation could ignore `#includes` that cannot be resolved. This may work for some scenarios - but doesn't work in general because symbols defined in unfound includes might cause other includes. Thus this could lead to other dependencies not being found, or being assumed when they weren't possible.
 
 In practice whilst not being perfect it may work well enough to be broadly usable. 
 
@@ -183,12 +183,12 @@ A hash could be performed via the AST. This assumes
 
 1) You can produce an AST for the input source - this is not generally true as source could be CUDA, C++, etc 
 2) The AST would have to be produced post preprocessing - because prior to preprocessing it may not be valid source
-3) If 3rd parties are supposed to be able to produce a hash it requires their implementing a Slang lexer/parser
+3) If 3rd parties are supposed to be able to produce a hash it requires their implementing a Slang lexer/parser in general
 4) Depending on how the AST is used, may not be stable between versions 
 
-The other disadvantage around using the AST is that it requires the extra work and space for parsing. 
+Another disadvantage around using the AST is that it requires the extra work and space for parsing. 
 
-Using the AST does allow using much of prexisting Slang code. It is probably more resilliant to structure changes. It would also provide slang specific information more simply - such as imports.
+Using the AST does allow using pre-existing Slang code. It is probably more resilliant to structure changes. It would also provide slang specific information more simply - such as imports.
 
 ## Slang lexer
 
@@ -202,12 +202,14 @@ If we wanted to use Slang lexer it would imply the hash process would
 
 For hashing Slang language and probably HLSL we can use the Slang preprocessor tokenizer, and hash the tokens (actually probably just the token text). 
 
+Using the Slang lexer/preprocessor may work reasonably for other languages such as C++/C/HLSL/GLSL. It does imply a reliance on a fairly large amount of slang source. 
+
 ## Simplified Lexer
 
 We may want to use some simple lexer. A problem with using a lexer at all is that it adds a great amount of complexity to a stand alone implementation. The simplified lexer would
 
 * Honor white space - so we can strip
-* Honor string representations (we can't strip)
+* Honor string representations (we can't strip whitespane)
 * Honor identifiers
 * We may want some special cases around operators and the like
 * Honor `#include` (but ignore preprocessor behavior in general)
@@ -226,6 +228,91 @@ We can provide source for an implementation. We could also provide a shared libr
 Generated source can be part of a hash if the source is available. As touched on there are scenarios where generated source may not be available.
 
 We could side step the issues around source generation if we push that problem back onto users. If they are using code generation, the system could require providing a string that uniquely identifies the generation that is being used. This perhaps being a requirement for a persistant cache. For a temporary runtime cache, we can allow hash generation from source.  
+    
+Naming
+======
+
+The container could be seen as a glorified key value store. The key identifying a kernel (and associated data). 
+
+Much of the difficulty here is how to define the key. If it's a combination of the 'inputs' it would be huge and complicated. If it's a hash, then it can be short, but not human understandable, and without considerable care not stable to small, or irrelevant changes.
+
+For a runtime cache type scenario, the instability and lack of human readability of the key probably doesn't matter too much. It probably is a consideration how slow and complicated it is to produce the key. 
+
+For any cache that is persistant how naming occurs probably is important. Because
+
+* Our 'options' aren't going to make much sense with other compilers
+* Our combinations of options aren't going to make much sense with other compilers
+* The options we have will not remain static
+* Having an indirection is useful from an application development and shipping perspective
+* That the *name* perhaps doesn't always have to indicate every aspect of a compilation
+
+One idea touched on in this document is to move 'namining' as a user space problem. That compilations are defined by the combination of 'named' options. In order to produce a shader cache name we have a concatination of names. The order can be user specified. Order could also break down into "directory" hierarchy as necessary.
+
+Some options will need to be part of some order. This is perhaps all a little abstract so as an example
+
+```JSON
+{
+    // Configuration
+
+    "configuration" : {
+    
+        "debug" : {
+            "group" : "configuration",
+            "optimization" : "0",
+            "debug-info" : true,
+            "defines" : [ "-DDEBUG=1" ]
+        },
+        "release" : {
+            "optimization" : "2",
+            "debug-info" : true,
+            "defines" : [ "-DRELEASE=1" ]
+        },
+        "full-release" : {
+            "optimization" : "3",
+            "debug-info" : false,
+            "defines" : [ "-DRELEASE=1", "-DFULL_RELEASE=1" ]
+        }
+    },
+    
+    // Target
+    "target" : { 
+        "vk" : {
+        }   
+        "d3d12" : {
+        }
+        
+        "cpu" : {
+        }
+    },
+    
+    // Stage
+    "stage" : {
+        "compute" : { 
+        },
+    }
+    
+    combinations : [
+        {
+            key : [ "vk", "compute", ["release", "full-release"] ],
+            options : 
+            {
+                "optimization" : 1
+            }
+        }
+    ]
+}
+``` 
+
+The combination in this manner doesn't quite work, because some combinations may imply different options. The "combination" section tries to address this. 
+
+We may also want to have options that don't appear in the name, but modify the output. 
+
+This whole mechanism provides a way of specifying a compilation by a series of names, that can produce a unique human readable key. It is under user control, but the mechanism on how the combination takes place is at least as a default defined within an implementation.
+
+
+
+
+
     
 Container Layout
 ================
@@ -284,8 +371,10 @@ When merged produces
 ```
 
 It's perhaps also worth pointing out that using JSON as the representation provides a level of compatibility. Things that are not understood can be ignored. It is human readable and understandable. We only need to convert the final JSON into the options that are then finally processed.
-
-## Producing a hash from options
+  
+One nice property of a JSON representation is that it is potentially the same for processing and hashing.   
+ 
+### Producing a hash from JSON options
     
 One approach would be to just hash the JSON if that is the representation. We might want a pass to filter out to just known fields and perhaps some other sanity processing. 
 
@@ -297,6 +386,78 @@ One approach would be to just hash the JSON if that is the representation. We mi
 Alternatively the JSON could be converted into a native representation and that hashed. The problem with this is that without a lot of care, the hash will not be stable with respect to small changes in the native representation.
 
 Another advantage of using JSON for hash production, is that it is something that could be performed fairly easily in user space.    
+
+Two issues remain significant with this approach
+
+* Filtering - how?
+* Handling multiple representations for values
+
+Filtering is not trivial - it's not a question of just specifying what fields are valid, because doing so requires context. In essence it is necessary to describe types, and then describe where in a hierarchy a type is used. 
+
+I guess this could be achieved with... JSON. For example
+
+```
+{
+    "types": {
+        "SomeType":
+        {
+            "kind" : "struct",
+            "derivesFrom": "..."
+            fields: {
+                [ "name", "type", "default"]
+            }
+        },
+        "MainOptions": 
+        {
+            "..."
+        }
+    },
+    "structure" : 
+    {
+        "MainOptions"
+    }
+}
+```
+
+When traversing we use the 'structure' to work out where a type is used. 
+
+This is workable, but adds additional significant complexity.
+
+The issue around different representations could also use the information in the description to convert into some canonical form. 
+
+The structure could potentially generated via reflection information.
+
+
+## Native bag of options
+
+Options could be represented via an internal struct on which a hash can be performed. 
+
+Input can be described as "deltas" to the current options. The final options is the combination of all the deltas - which would produce the final options structure for use. The hash of all of the options is the hash of the final structure.
+
+How are the deltas described?
+
+The in memory representation is not trivial in that if we want to add a struct to a list we would need a way to describe this.
+
+Whilst in the runtime the 'field' could be uniquely identified an offset, within a file format representation it would need to be by something that works across targets, and resistant to change in contents. 
+
+## Slangs Component System
+
+Slang has a component system that can be used for combining options to produce a compilation. An argument can be made that it should be part of the hashing representation, as it is part of compilation.
+
+If combination is at the level of components, then as long as components are serializable, we can represent a compilation by a collection of components. Has several derived interfaces...
+
+* IEntryPoint
+* ITypeConformance 
+* IModule
+
+Can be constructed into composites, through `createCompositeComponentType`, which describes aspects of the combination takes place.
+
+If the components were serializable (as say as JSON), we could describe a compilation as combination of components. If components are named, a concatenation of names could name a compilation.
+
+It doesn't appear as if there is a way to more finely control the application of component types. For example if there was a desire to change the optimizaion option, it would appear to remain part of the ICompileRequest (it's not part of a component). This implies this mechanism as it stands whilst allowing composition, doesn't provide the more nuanced composition. Additional component types could perhaps be added which would add such control.
+
+
+
         
 Proposed Approach
 =================
