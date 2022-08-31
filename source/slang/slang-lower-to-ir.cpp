@@ -1321,11 +1321,12 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
     LoweredValInfo visitPolynomialIntVal(PolynomialIntVal* val)
     {
         auto irBuilder = getBuilder();
-        auto constTerm = irBuilder->getIntValue(irBuilder->getIntType(), val->constantTerm);
+        auto type = lowerType(context, val->type);
+        auto constTerm = irBuilder->getIntValue(type, val->constantTerm);
         auto resultVal = constTerm;
         for (auto term : val->terms)
         {
-            auto termVal = irBuilder->getIntValue(irBuilder->getIntType(), term->constFactor);
+            auto termVal = irBuilder->getIntValue(type, term->constFactor);
             for (auto factor : term->paramFactors)
             {
                 auto factorVal = lowerVal(context, factor->param).val;
@@ -1701,10 +1702,7 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
 
     LoweredValInfo visitConstantIntVal(ConstantIntVal* val)
     {
-        // TODO: it is a bit messy here that the `ConstantIntVal` representation
-        // has no notion of a *type* associated with the value...
-
-        auto type = getIntType(context);
+        auto type = lowerType(context, val->type);
         return LoweredValInfo::simple(getBuilder()->getIntValue(type, val->value));
     }
 
