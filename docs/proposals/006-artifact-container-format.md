@@ -36,6 +36,38 @@ It's importance/relevance
 * Provide a standard 'shader cache' system that can be used for Slang tooling and customers 
 * Supports Slang tooling and language features
 
+## Use
+
+There are several kinds of use scenario
+
+* A runtime shader cache
+* A runtime shader cache with persistance
+* A capture of compilation/compilations
+* A baked persistant cache - must also work without source
+
+A runtime shader cache, ideally 
+
+* Works with mechanisms that do not require any user control. 
+* It is okay to have keys/naming that are not human understandable/readable. 
+* The source is available - such that hashes based on source contents can be produced. 
+* It does not matter if hashes/keys are static between runs. 
+* It is not important that a future version would be compatible with a previous version.
+* Could be all in memory.
+* May need mechanisms to limit size
+* Generated source can be made to work with some extra effort, because we can hash generated source
+
+At the other end of the spectrum a baked persistant cache
+
+* Probably wants user control over naming 
+* Doesn't have access to source so can't use that as part of a hash
+* Probably doesn't have access to dependencies
+* Having some indirection between a request and a result is a useful feature
+* Ideally can be manipulated 
+* Can serialize out results, potentially on demand
+* Generated source may need to be identified in some other way than the source itself
+
+It should be possible to write out a 'runtime shader cache' into the same format as used for persistant cache. It may be harder to use such a cache without Slang tooling, because the mapping from compilation options to keys is probably not simple.
+
 Status
 ------
 
@@ -87,7 +119,7 @@ If the proposal is about solving a problem, this section should clearly illustra
 If the proposal is about improving a design, it should explain where the current design falls short.
 
 Related Work
-------------
+============
 
 * Shader cache system as part of gfx (https://github.com/lucy96chen/slang/tree/shader-cache)
 * Lumberyard [shader cache](https://docs.aws.amazon.com/lumberyard/latest/userguide/mat-shaders-custom-dev-cache-intro.html)
@@ -124,8 +156,150 @@ The shader cache can be thought of as being parameterized by the pipeline and as
     
 Gfx does not appear to support any serialization/file representation.    
     
+Hashing source
+==============
+
+The fastest/simplest way to hash source, is to take the blob and hash that. Unfortunately there are several issues 
+
+* Ignores dependencies - if this source includes another file the hash will also have to depend on that transitively
+* Hash changes with line end character encoding
+* Hash changes with white space changes in general 
+
+A way to work around whitespace issues would be to use a tokenizer, or a 'simplified' tokenizer that only handles the necessary special cases - for example white space in a string is important. Such a solution does not require an AST or rely on a specific tokenizer. A hash could be made of concatination of all of the lexemes with white space inserted between.
+
+Another approach would be to hash each "token" as produced. Doing so doesn't require memory allocation for the concatination. You could special case short strings or single chars, and hash longer strings.
+
+## Dependencies
+
+Its not enough to rely on hashing of input source, because of `#include` or other references resources, such as modules or libraries may be involved. 
+
+If we are are relying on dependencies specified at least in part by `#include`, it implies the preprocessor be executed. This could be used for other languages such as C/C++. Some care would need to be taken because *some* includes will probably not be locatable by our preprocessor, such as system include paths in C++. For the purpose of hashing, an implementation could ignore #includes that cannot be resolved. This may work for some scenarios - but doesn't work in general because symbols defined in unfound includes might cause other includes. Thus this could lead to other dependencies not being found, or being assumed when they weren't possible.
+
+In practice whilst not being perfect it may work well enough to be broadly usable. 
+
+## AST
+
+A hash could be performed via the AST. This assumes
+
+1) You can produce an AST for the input source - this is not generally true as source could be CUDA, C++, etc 
+2) The AST would have to be produced post preprocessing - because prior to preprocessing it may not be valid source
+3) If 3rd parties are supposed to be able to produce a hash it requires their implementing a Slang lexer/parser
+4) Depending on how the AST is used, may not be stable between versions 
+
+The other disadvantage around using the AST is that it requires the extra work and space for parsing. 
+
+Using the AST does allow using much of prexisting Slang code. It is probably more resilliant to structure changes. It would also provide slang specific information more simply - such as imports.
+
+## Slang lexer
+
+If we wanted to use Slang lexer it would imply the hash process would 
+
+1) Load the file
+2) Lex the file
+3) Preprocess the file (to get dependencies). Throw these tokens away (we want the hash of just the source)
+4) Hash the original lex of the files tokens
+5) Dependencies would require hashing and combining
+
+For hashing Slang language and probably HLSL we can use the Slang preprocessor tokenizer, and hash the tokens (actually probably just the token text). 
+
+## Simplified Lexer
+
+We may want to use some simple lexer. A problem with using a lexer at all is that it adds a great amount of complexity to a stand alone implementation. The simplified lexer would
+
+* Honor white space - so we can strip
+* Honor string representations (we can't strip)
+* Honor identifiers
+* We may want some special cases around operators and the like
+* Honor `#include` (but ignore preprocessor behavior in general)
+* Ignore comments
+
+We need to honor `#include` such that we have dependencies. This can lead to dependencies that aren't required in actual compilation.
+
+We need to honor some language specific features - such as say `import` in Slang. 
+
+Such an implementation would be significantly simpler, and more broadly applicable than Slang lexer/parser etc. Writing an implementation would determine how complex - but would seem to be at a minimum 100s of lines of code.
+
+We can provide source for an implementation. We could also provide a shared library that made the functionality available via COM interface. This may help many usage scenarios, but we would want to limit the complexity as much as possible.
+
+## Generated Source
+
+Generated source can be part of a hash if the source is available. As touched on there are scenarios where generated source may not be available.
+
+We could side step the issues around source generation if we push that problem back onto users. If they are using code generation, the system could require providing a string that uniquely identifies the generation that is being used. This perhaps being a requirement for a persistant cache. For a temporary runtime cache, we can allow hash generation from source.  
+    
+Container Layout
+================
+
+    
+Describing Options
+==================
+
+## 'Bag of named options' 
+
+Perhaps identification is something that is largely in user space for the perisistant scenario. You could imagine a bag of 'options', that are typically named. Then the output name is the concatination of the names. If an option set isn't named it doesn't get included. Perhaps the order of the naming defines the precidence.
+
+This 'bag of options' would need some way to know the order the names would be combined. This could be achieved with another parameter or option that describes name ordering. Defining the ordering could be achieved if different types of options are grouped, by specifying the group. The ordering would only be significant for named items that will be concatinated. The ordering of the options could define the order of precedence of application.
+
+Problems: 
+
+How to combine all of these options to compile? 
+How to define what options are set? Working at the level of a struct doesn't work if you want to override a single option.
+The grouping - how does it actually work? It might require specifying what group a set of options is in.
+
+An advantage to this approach is that policy of how naming works as a user space problem. It is also powerful in that it allows control on compilation that has some independence from the name.
+
+### JSON options
+
+One way of dealing with the 'bag of options' issue would be to just make the runtime json options representation, describe options. Merging JSON at a most basic level is straight forward. For certain options it may make sense to have them describe adding, merging or replacing. We could add this control via adding a key prefix.
+
+```JSON
+{
+    "includePaths" : ["somePath", "another/path"],
+    "someValue" : 10,
+    "someEnum" : enumValue,
+    "someFlags" : 12
+}      
+```
+
+As an example
+
+```JSON
+{
+    "+includePaths" : ["yet/another"],
+    "intValue" : 20,
+    "-someValue" : null,
+    "+someFlags" : 1
+}
+```
+
+When merged produces
+
+```JSON
+{
+    "includePaths" : ["somePath", "another/path", "yet/another"],
+    "someEnum" : enumValue,
+    "someFlags" : 13,
+    "intValue" : 20
+}      
+```
+
+It's perhaps also worth pointing out that using JSON as the representation provides a level of compatibility. Things that are not understood can be ignored. It is human readable and understandable. We only need to convert the final JSON into the options that are then finally processed.
+
+## Producing a hash from options
+    
+One approach would be to just hash the JSON if that is the representation. We might want a pass to filter out to just known fields and perhaps some other sanity processing. 
+
+* Filtering  
+* Ordering - the order of fields is generally not the order we want to combine. One option would be to order by key in alphabetical order.
+* Handling values that can have multiple representations (if we allow an enum as int or text, we need to hash with one or ther other)
+* Duplicate handling 
+
+Alternatively the JSON could be converted into a native representation and that hashed. The problem with this is that without a lot of care, the hash will not be stable with respect to small changes in the native representation.
+
+Another advantage of using JSON for hash production, is that it is something that could be performed fairly easily in user space.    
+        
 Proposed Approach
------------------
+=================
 
 Explain the idea in enough detail that a reader can concretely know what you are proposing to do. Anybody who is just going to *use* the resulting feature/system should be able to read this and get an accurate idea of what that experience will be like.
 
@@ -218,40 +392,6 @@ Once a compilation is complete, an implementation could save the result in Artif
 
 ## Cache keys
 
-### Hashing source
-
-The fastest/simplest way to hash source, is to take the blob and hash that. Unfortunately a problem occurse due line ending character changing, or other white space changes produce a different hash. A way to work around this would be to use a tokenizer, or a 'simplified' tokenizer that only handles the necessary special cases - for example white space in a string is important. Such a solution does not require an AST or rely on a specific tokenizer. 
-
-The process would be
-
-1) Find simplified tokens appending together with ` ` 
-2) Take the hash of that 
-
-Another approach would be to hash each "token" as produced. Doing so doesn't require memory allocation for the concatination. You could special case short strings or single chars, and hash longer strings.
-
-Why not use the Slang AST? You could do but it assumes
-
-1) You can produce an AST for the input source - this is not generally true as source could be CUDA, C++, etc 
-2) The AST would have to be produced post preprocessing - because prior to preprocessing it may not be valid source
-
-If we are are relying on dependencies specified at least in part by `#include`, it means the preprocessor must have already been executed for Slang.
-
-If the source is being passed down to other downstream compilers this isn't the case. We could potentially run the preprocessor for other source varities, but there will be problems with system files which won't be locatable in general. 
-
-The other disadvantage around using the AST is that it requires the extra work and space of parsing. 
-
-If we wanted to use Slang lexer it would imply the hash process would be 
-
-1) Load the file
-2) Lex the file
-3) Preprocess the file (to get dependencies). Throw these tokens away.
-4) Hash the original lex of the files tokens
-
-For hashing slang language and probably HLSL we can use the Slang preprocessor tokenizer, and hash the tokens (actually probably just the token text). 
-
-For other languages we may want to use some simple lexer. A problem with using a lexer at all is that it adds a great amount of complexity to a stand alone implementation. 
-
-We could side step the issues around source generation if we push that problem back onto users. If they are using code generation they will also have to provide a string that uniquely identifies the generation that is being used. This perhaps being a requirement for a persistant cache. For a temporary runtime cache, we can allow hash generation from source.
 
 ### How to handle unnamed compilation options?
 
@@ -361,6 +501,11 @@ If it was necessary to have meta data stored in a more compressed format we coul
 ## Other aspects
 
 It may be useful for a representation to hold `slang-ir` of a compilation. This would allow some future proofing of the representation, because it would allow support for newer versions of Slang and downstream compilers without distributing source. 
+
+
+
+
+
 
 Detailed Explanation
 --------------------
