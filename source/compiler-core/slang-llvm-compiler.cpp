@@ -1,8 +1,6 @@
 // slang-llvm-compiler.cpp
 #include "slang-llvm-compiler.h"
 
-#include "slang-downstream-dep1.h"
-
 #include "../core/slang-common.h"
 #include "../../slang-com-helper.h"
 
@@ -36,19 +34,17 @@ namespace Slang
         return SLANG_FAIL;
     }
 
-    typedef SlangResult(*CreateDownstreamCompilerFunc_Dep1)(RefPtr<DownstreamCompiler_Dep1>& out);
+    typedef SlangResult(*CreateDownstreamCompilerFunc)(const Guid& intf, IDownstreamCompiler** outCompiler);
 
-    auto fn = (CreateDownstreamCompilerFunc_Dep1)library->findFuncByName("createLLVMDownstreamCompiler");
+    auto fn = (CreateDownstreamCompilerFunc)library->findFuncByName("createLLVMDownstreamCompiler_V2");
     if (!fn)
     {
         return SLANG_FAIL;
     }
 
-    RefPtr<DownstreamCompiler_Dep1> downstreamCompilerDep1;
+    ComPtr<IDownstreamCompiler> downstreamCompiler;
 
-    SLANG_RETURN_ON_FAIL(fn(downstreamCompilerDep1));
-
-    ComPtr<IDownstreamCompiler> downstreamCompiler(new DownstreamCompilerAdapter_Dep1(downstreamCompilerDep1, ArtifactPayload::None));
+    SLANG_RETURN_ON_FAIL(fn(IDownstreamCompiler::getTypeGuid(), downstreamCompiler.writeRef()));
 
     set->addSharedLibrary(library);
     set->addCompiler(downstreamCompiler);
