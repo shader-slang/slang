@@ -527,7 +527,7 @@ static String _scrubName(const String& in)
 
     // Find files from the file system, and mapping paths to files
     {
-        CacheFileSystem* cacheFileSystem = linkage->getCacheFileSystem();
+        CacheFileSystem* cacheFileSystem = as<CacheFileSystem>(linkage->getFileSystemExt());
         if (!cacheFileSystem)
         {
             return SLANG_FAIL;
@@ -831,11 +831,13 @@ struct LoadContext
 } // anonymous
 
 
-/* static */SlangResult ReproUtil::loadFileSystem(OffsetBase& base, RequestState* requestState, ISlangFileSystem* fileSystem, RefPtr<CacheFileSystem>& outFileSystem)
+/* static */SlangResult ReproUtil::loadFileSystem(OffsetBase& base, RequestState* requestState, ISlangFileSystem* replaceFileSystem, ComPtr<ISlangFileSystemExt>& outFileSystem)
 {
-    LoadContext context(nullptr, fileSystem, &base);
+    LoadContext context(nullptr, replaceFileSystem, &base);
 
-    RefPtr<CacheFileSystem> cacheFileSystem = new CacheFileSystem(nullptr);
+    CacheFileSystem* cacheFileSystem = new CacheFileSystem(nullptr);
+    ComPtr<ISlangFileSystemExt> scopeCacheFileSystem(cacheFileSystem);
+
     auto& dstUniqueMap = cacheFileSystem->getUniqueMap();
     auto& dstPathMap = cacheFileSystem->getPathMap();
 
@@ -880,7 +882,7 @@ struct LoadContext
         }
     }
 
-    outFileSystem = cacheFileSystem;
+    outFileSystem.swap(scopeCacheFileSystem);
     return SLANG_OK;
 }
 
@@ -1042,7 +1044,8 @@ struct LoadContext
     }
 
     {
-        RefPtr<CacheFileSystem> cacheFileSystem = new CacheFileSystem(nullptr);
+        auto cacheFileSystem = new CacheFileSystem(nullptr);
+        ComPtr<ISlangFileSystemExt> fileSystemExt(cacheFileSystem);
         auto& dstUniqueMap = cacheFileSystem->getUniqueMap();
         auto& dstPathMap = cacheFileSystem->getPathMap();
 
@@ -1070,8 +1073,7 @@ struct LoadContext
         // This is a bit of a hack, we are going to replace the file system, with our one which is filled in
         // with what was read from the file. 
 
-        linkage->m_fileSystemExt = cacheFileSystem;
-        linkage->m_cacheFileSystem = cacheFileSystem;
+        linkage->m_fileSystemExt.swap(fileSystemExt);
     }
 
     return SLANG_OK;

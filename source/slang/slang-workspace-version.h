@@ -164,6 +164,12 @@ namespace Slang
         // Inherited via ISlangFileSystem
         SLANG_COM_OBJECT_IUNKNOWN_ALL
         void* getInterface(const Guid& uuid);
+        void* getObject(const Guid& uuid);
+
+        // ISlangCastable
+        virtual SLANG_NO_THROW void* SLANG_MCALL castAs(const Guid& guid) override;
+
+        // ISlangFileSystem
         virtual SLANG_NO_THROW SlangResult SLANG_MCALL
             loadFile(const char* path, ISlangBlob** outBlob) override;
     };

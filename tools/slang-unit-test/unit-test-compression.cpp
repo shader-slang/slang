@@ -8,6 +8,8 @@
 #include "../../source/core/slang-lz4-compression-system.h"
 #include "../../source/core/slang-deflate-compression-system.h"
 
+#include "../../source/core/slang-destroyable.h"
+
 using namespace Slang;
 
 static bool _equals(const void* data, size_t size, ISlangBlob* blob)
@@ -46,16 +48,14 @@ SLANG_UNIT_TEST(compression)
     for (auto archiveType : archiveTypes)
     {
         // Test out archive file systems
-        RefPtr<ArchiveFileSystem> archiveFileSystem;
-        SLANG_CHECK(SLANG_SUCCEEDED(createArchiveFileSystem(archiveType, archiveFileSystem)));
+        ComPtr<ISlangMutableFileSystem> fileSystem;
+        SLANG_CHECK(SLANG_SUCCEEDED(createArchiveFileSystem(archiveType, fileSystem)));
         
         const char contents[] = "I'm compressed";
         const char contents2[] = "Some more stuff";
         const char contents3[] = "Replace it";
 
         {
-            ISlangMutableFileSystem* fileSystem = archiveFileSystem;
-
             SLANG_CHECK(SLANG_SUCCEEDED(fileSystem->createDirectory("hello")));
             SLANG_CHECK(SLANG_SUCCEEDED(fileSystem->createDirectory("hello2")));
             SLANG_CHECK(SLANG_SUCCEEDED(fileSystem->remove("hello")));
@@ -131,11 +131,13 @@ SLANG_UNIT_TEST(compression)
         // Load and check its okay
  
         {
+            IArchiveFileSystem* archiveFileSystem = as<IArchiveFileSystem>(fileSystem);
+
             ComPtr<ISlangBlob> archiveBlob;
             SLANG_CHECK(SLANG_SUCCEEDED(archiveFileSystem->storeArchive(false, archiveBlob.writeRef())));
 
 
-            RefPtr<ArchiveFileSystem> fileSystem;
+            ComPtr<ISlangFileSystemExt> fileSystem;
 #if 0
             SLANG_CHECK(SLANG_SUCCEEDED(createArchiveFileSystem(archiveType, fileSystem)));
 

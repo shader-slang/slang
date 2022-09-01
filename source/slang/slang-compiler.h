@@ -3,8 +3,6 @@
 
 #include "../core/slang-basic.h"
 #include "../core/slang-shared-library.h"
-#include "../core/slang-archive-file-system.h"
-#include "../core/slang-file-system.h"
 
 #include "../compiler-core/slang-downstream-compiler.h"
 #include "../compiler-core/slang-downstream-compiler-util.h"
@@ -1756,14 +1754,10 @@ namespace Slang
         /// if fileSystem is nullptr. Otherwise it will either be fileSystem's interface, 
         /// or a wrapped impl that makes fileSystem operate as fileSystemExt
         ComPtr<ISlangFileSystemExt> m_fileSystemExt;
-
-        
-        /// Set if fileSystemExt is a cache file system
-        RefPtr<CacheFileSystem> m_cacheFileSystem;
-
+  
+        /// Get the currenly set file system
         ISlangFileSystemExt* getFileSystemExt() { return m_fileSystemExt; }
-        CacheFileSystem* getCacheFileSystem() const { return m_cacheFileSystem; }
-
+      
         /// Load a file into memory using the configured file system.
         ///
         /// @param path The path to attempt to load from

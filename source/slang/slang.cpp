@@ -352,7 +352,7 @@ SlangResult Session::loadStdLib(const void* stdLib, size_t stdLibSizeInBytes)
     }
 
     // Make a file system to read it from
-    RefPtr<ArchiveFileSystem> fileSystem;
+    ComPtr<ISlangFileSystemExt> fileSystem;
     SLANG_RETURN_ON_FAIL(loadArchiveFileSystem(stdLib, stdLibSizeInBytes, fileSystem));
 
     // Let's try loading serialized modules and adding them
@@ -371,8 +371,15 @@ SlangResult Session::saveStdLib(SlangArchiveType archiveType, ISlangBlob** outBl
     }
 
     // Make a file system to read it from
-    RefPtr<ArchiveFileSystem> fileSystem;
+    ComPtr<ISlangMutableFileSystem> fileSystem;
     SLANG_RETURN_ON_FAIL(createArchiveFileSystem(archiveType, fileSystem));
+
+    // Must have archiveFileSystem interface
+    auto archiveFileSystem = as<IArchiveFileSystem>(fileSystem);
+    if (!archiveFileSystem)
+    {
+        return SLANG_FAIL;
+    }
 
     for (auto& pair : m_builtinLinkage->mapNameToLoadedModules)
     {
@@ -402,7 +409,7 @@ SlangResult Session::saveStdLib(SlangArchiveType archiveType, ISlangBlob** outBl
     }
 
     // Now need to convert into a blob
-    SLANG_RETURN_ON_FAIL(fileSystem->storeArchive(true, outBlob));
+    SLANG_RETURN_ON_FAIL(archiveFileSystem->storeArchive(true, outBlob));
     return SLANG_OK;
 }
 
@@ -4287,29 +4294,23 @@ void Linkage::setFileSystem(ISlangFileSystem* inFileSystem)
 
     // Release what's there
     m_fileSystemExt.setNull();
-    m_cacheFileSystem.setNull();
-
+    
     // If nullptr passed in set up default 
     if (inFileSystem == nullptr)
     {
-        m_cacheFileSystem = new Slang::CacheFileSystem(Slang::OSFileSystem::getExtSingleton());
-        m_fileSystemExt = m_cacheFileSystem;
+        m_fileSystemExt = new Slang::CacheFileSystem(Slang::OSFileSystem::getExtSingleton());
     }
     else
     {
-        CacheFileSystem* cacheFileSystemPtr = nullptr;   
-        inFileSystem->queryInterface(CacheFileSystem::getTypeGuid(), (void**)&cacheFileSystemPtr);
-        if (cacheFileSystemPtr)
+        if (auto cacheFileSystem = as<CacheFileSystem>(inFileSystem))
         {
-            m_cacheFileSystem = cacheFileSystemPtr;
-            m_fileSystemExt = cacheFileSystemPtr;
+            m_fileSystemExt = cacheFileSystem;
         }
         else 
         {
             if (m_requireCacheFileSystem)
             {
-                m_cacheFileSystem = new Slang::CacheFileSystem(inFileSystem);
-                m_fileSystemExt = m_cacheFileSystem;
+                m_fileSystemExt = new Slang::CacheFileSystem(inFileSystem); 
             }
             else
             {
@@ -4320,12 +4321,14 @@ void Linkage::setFileSystem(ISlangFileSystem* inFileSystem)
                 if (!m_fileSystemExt)
                 {
                     // Construct a wrapper to emulate the extended interface behavior
-                    m_cacheFileSystem = new Slang::CacheFileSystem(m_fileSystem);
-                    m_fileSystemExt = m_cacheFileSystem;
+                    m_fileSystemExt = new Slang::CacheFileSystem(m_fileSystem); 
                 }
             }
         }
     }
+
+    // If requires a cache file system, check that it does have one
+    SLANG_ASSERT(m_requireCacheFileSystem == false || as<CacheFileSystem>(m_fileSystemExt));
 
     // Set the file system used on the source manager
     getSourceManager()->setFileSystemExt(m_fileSystemExt);

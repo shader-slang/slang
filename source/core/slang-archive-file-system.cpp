@@ -11,6 +11,8 @@
 
 #include "slang-riff-file-system.h"
 
+#include "slang-destroyable.h"
+
 // Compression systems
 #include "slang-deflate-compression-system.h"
 #include "slang-lz4-compression-system.h"
@@ -130,9 +132,9 @@ SlangResult ImplicitDirectoryCollector::enumerate(FileSystemContentsCallBack cal
     return getDirectoryExists() ? SLANG_OK : SLANG_E_NOT_FOUND;
 }
 
-SlangResult loadArchiveFileSystem(const void* data, size_t dataSizeInBytes, RefPtr<ArchiveFileSystem>& outFileSystem)
+SlangResult loadArchiveFileSystem(const void* data, size_t dataSizeInBytes, ComPtr<ISlangFileSystemExt>& outFileSystem)
 {
-    RefPtr<ArchiveFileSystem> fileSystem;
+    ComPtr<ISlangMutableFileSystem> fileSystem;
     if (ZipFileSystem::isArchive(data, dataSizeInBytes))
     {
         // It's a zip
@@ -147,13 +149,20 @@ SlangResult loadArchiveFileSystem(const void* data, size_t dataSizeInBytes, RefP
     {
         return SLANG_FAIL;
     }
-    SLANG_RETURN_ON_FAIL(fileSystem->loadArchive(data, dataSizeInBytes));
+
+    auto archiveFileSystem = as<IArchiveFileSystem>(fileSystem);
+    if (!archiveFileSystem)
+    {
+        return SLANG_FAIL;
+    }
+
+    SLANG_RETURN_ON_FAIL(archiveFileSystem->loadArchive(data, dataSizeInBytes));
 
     outFileSystem = fileSystem;
     return SLANG_OK;
 }
     
-SlangResult createArchiveFileSystem(SlangArchiveType type, RefPtr<ArchiveFileSystem>& outFileSystem)
+SlangResult createArchiveFileSystem(SlangArchiveType type, ComPtr<ISlangMutableFileSystem>& outFileSystem)
 {
     switch (type)
     {
