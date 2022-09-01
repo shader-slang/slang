@@ -2456,23 +2456,23 @@ for (int tt = 0; tt < kBaseTypeCount; ++tt)
 }}}}
 extension $(kBaseTypes[tt].name) : IInteger
 {
-    int compareTo(This other) { return int(this - other); }
-    This add(This other) { return this + other; }
-    This sub(This other) { return this - other; }
-    This mul(This other) { return this * other; }
-    This div(This other) { return this / other; }
-    This mod(This other) { return this % other; }
-    This neg() { return -this; }
-    This shl(int value) { return this << value; }
-    This shr(int value) { return this >> value; }
-    This bitAnd(This other) { return this & other; }
-    This bitOr(This other) { return this | other; }
-    This bitXor(This other) { return this ^ other; }
-    This bitNot() { return ~this; }
-    int toInt() { return int(this); }
-    int64_t toInt64() { return int64_t(this); }
-    uint toUInt() { return uint(this); }
-    uint64_t toUInt64() { return uint64_t(this); }
+    [__unsafeForceInlineEarly] int compareTo(This other) { return int(this - other); }
+    [__unsafeForceInlineEarly] This add(This other) { return this + other; }
+    [__unsafeForceInlineEarly] This sub(This other) { return this - other; }
+    [__unsafeForceInlineEarly] This mul(This other) { return this * other; }
+    [__unsafeForceInlineEarly] This div(This other) { return this / other; }
+    [__unsafeForceInlineEarly] This mod(This other) { return this % other; }
+    [__unsafeForceInlineEarly] This neg() { return -this; }
+    [__unsafeForceInlineEarly] This shl(int value) { return this << value; }
+    [__unsafeForceInlineEarly] This shr(int value) { return this >> value; }
+    [__unsafeForceInlineEarly] This bitAnd(This other) { return this & other; }
+    [__unsafeForceInlineEarly] This bitOr(This other) { return this | other; }
+    [__unsafeForceInlineEarly] This bitXor(This other) { return this ^ other; }
+    [__unsafeForceInlineEarly] This bitNot() { return ~this; }
+    [__unsafeForceInlineEarly] int toInt() { return int(this); }
+    [__unsafeForceInlineEarly] int64_t toInt64() { return int64_t(this); }
+    [__unsafeForceInlineEarly] uint toUInt() { return uint(this); }
+    [__unsafeForceInlineEarly] uint64_t toUInt64() { return uint64_t(this); }
 }
 ${{{{
     }
@@ -2481,14 +2481,14 @@ ${{{{
 }}}}
 extension $(kBaseTypes[tt].name) : IFloat
 {
-    int compareTo(This other) { if (this > other) return 1; if (this < other) return -1; return 0; }
-    This add(This other) { return this + other; }
-    This sub(This other) { return this - other; }
-    This mul(This other) { return this * other; }
-    This div(This other) { return this / other; }
-    This mod(This other) { return this % other; }
-    This neg() { return -this; }
-    float toFloat() { return float(this); }
+    [__unsafeForceInlineEarly] int compareTo(This other) { return (this > other)?1:(this < other)?-1:0; }
+    [__unsafeForceInlineEarly] This add(This other) { return this + other; }
+    [__unsafeForceInlineEarly] This sub(This other) { return this - other; }
+    [__unsafeForceInlineEarly] This mul(This other) { return this * other; }
+    [__unsafeForceInlineEarly] This div(This other) { return this / other; }
+    [__unsafeForceInlineEarly] This mod(This other) { return this % other; }
+    [__unsafeForceInlineEarly] This neg() { return -this; }
+    [__unsafeForceInlineEarly] float toFloat() { return float(this); }
 }
 ${{{{
     }
