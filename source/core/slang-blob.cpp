@@ -80,12 +80,12 @@ void* StringBlob::getObject(const Guid& guid)
 
 /* static */ComPtr<ISlangBlob> StringBlob::moveCreate(String& in)
 {
-    return ComPtr<ISlangBlob>(new StringBlob(MoveUnique::kValue, in));
+    return ComPtr<ISlangBlob>(new StringBlob(MoveUnique{}, in));
 }
 
 /* static */ComPtr<ISlangBlob> StringBlob::moveCreate(String&& in)
 {
-    return ComPtr<ISlangBlob>(new StringBlob(MoveUnique::kValue, in));
+    return ComPtr<ISlangBlob>(new StringBlob(MoveUnique{}, in));
 }
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! RawBlob !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */

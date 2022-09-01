@@ -349,7 +349,7 @@ namespace Slang
                 // We have a new type for the conversion, based on what
                 // we learned.
                 toType = m_astBuilder->getArrayType(toElementType,
-                    m_astBuilder->create<ConstantIntVal>(elementCount));
+                    m_astBuilder->create<ConstantIntVal>(m_astBuilder->getIntType(), elementCount));
             }
         }
         else if(auto toMatrixType = as<MatrixExpressionType>(toType))

@@ -60,7 +60,9 @@ public:
     static ComPtr<ISlangBlob> moveCreate(String&& in);
 
 protected:
-    enum class MoveUnique { kValue };
+        /// A type that is only used to differentiate a constructor. Can construct with 
+        /// MoveUnique{}
+    struct MoveUnique {};
 
     explicit StringBlob(String const& string)
         : m_string(string)
