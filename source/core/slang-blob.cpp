@@ -35,6 +35,25 @@ void* BlobBase::castAs(const SlangUUID& guid)
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! StringBlob !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
+StringBlob::StringBlob(MoveUnique, String& in)
+{
+    auto rep = in.getStringRepresentation();
+    if (rep && !rep->isUniquelyReferenced())
+    {
+        // Make a new unique copy
+        m_string = in.getUnownedSlice();
+
+        // Move out of in
+        String tmp;
+        tmp.swapWith(in);
+    }
+    else
+    {
+        // Must either not have a rep or be unique
+        m_string.swapWith(in);
+    }
+}
+
 void* StringBlob::castAs(const SlangUUID& guid)
 {
     if (auto intf = getInterface(guid))
@@ -57,6 +76,16 @@ void* StringBlob::getObject(const Guid& guid)
         return const_cast<char*>(m_string.getBuffer());
     }
     return nullptr;
+}
+
+/* static */ComPtr<ISlangBlob> StringBlob::moveCreate(String& in)
+{
+    return ComPtr<ISlangBlob>(new StringBlob(MoveUnique{}, in));
+}
+
+/* static */ComPtr<ISlangBlob> StringBlob::moveCreate(String&& in)
+{
+    return ComPtr<ISlangBlob>(new StringBlob(MoveUnique{}, in));
 }
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! RawBlob !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */

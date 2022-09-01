@@ -23,7 +23,7 @@ void* ExtFileArtifactRepresentation::getInterface(const Guid& guid)
         guid == IPathArtifactRepresentation::getTypeGuid() ||
         guid == IExtFileArtifactRepresentation::getTypeGuid())
     {
-        return static_cast<IPathArtifactRepresentation*>(this);
+        return static_cast<IExtFileArtifactRepresentation*>(this);
     }
     return nullptr;
 }
