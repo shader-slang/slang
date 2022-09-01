@@ -1807,6 +1807,7 @@ for (auto op : intrinsicUnaryOps)
 
         // scalar version
         sb << "__prefix __intrinsic_op(" << int(op.opCode) << ") " << resultType << " operator" << op.opName << "(" << type.name << " value);\n";
+        sb << "__intrinsic_op(" << int(op.opCode) << ") " << resultType << " __" << op.funcName << "(" << type.name << " value);\n";
 
         // vector version
         sb << "__generic<let N : int> ";
@@ -1951,6 +1952,7 @@ for (auto op : intrinsicBinaryOps)
 
         // scalar version
         sb << "__intrinsic_op(" << int(op.opCode) << ") " << resultType << " operator" << op.opName << "(" << leftType << " left, " << rightType << " right);\n";
+        sb << "__intrinsic_op(" << int(op.opCode) << ") " << resultType << " __" << op.funcName << "(" << leftType << " left, " << rightType << " right);\n";
 
         // vector version
         sb << "__generic<let N : int> ";
@@ -2053,11 +2055,12 @@ for (auto op : intrinsicBinaryOps)
 static const struct ShiftOpInfo
 {
     char const* name;
+    char const* funcName;
     int op;
 } kShiftOps[] =
 {
-    { "<<",  kIROp_Lsh },
-    { ">>",  kIROp_Rsh },
+    { "<<", "shl", kIROp_Lsh },
+    { ">>", "shr", kIROp_Rsh },
 };
 for(auto info : kShiftOps) {
 }}}}
@@ -2065,6 +2068,10 @@ for(auto info : kShiftOps) {
 __generic<L: __BuiltinIntegerType, R: __BuiltinIntegerType>
 __intrinsic_op($(info.op))
 L operator$(info.name)(L left, R right);
+
+__generic<L: __BuiltinIntegerType, R: __BuiltinIntegerType>
+__intrinsic_op($(info.op))
+L __$(info.funcName)(L left, R right);
 
 __generic<L: __BuiltinIntegerType, R: __BuiltinIntegerType>
 [__unsafeForceInlineEarly]
@@ -2409,18 +2416,6 @@ __prefix T operator -(T v0)
 }
 __generic<T : IInteger>
 [__unsafeForceInlineEarly]
-T operator >>(T val, int other)
-{
-    return val.shr(other);
-}
-__generic<T : IInteger>
-[__unsafeForceInlineEarly]
-T operator<<(T val, int other)
-{
-    return val.shl(other);
-}
-__generic<T : IInteger>
-[__unsafeForceInlineEarly]
 T operator &(T v0, T v1)
 {
     return v0.bitAnd(v1);
@@ -2456,19 +2451,19 @@ for (int tt = 0; tt < kBaseTypeCount; ++tt)
 }}}}
 extension $(kBaseTypes[tt].name) : IInteger
 {
-    [__unsafeForceInlineEarly] int compareTo(This other) { return int(this - other); }
-    [__unsafeForceInlineEarly] This add(This other) { return this + other; }
-    [__unsafeForceInlineEarly] This sub(This other) { return this - other; }
-    [__unsafeForceInlineEarly] This mul(This other) { return this * other; }
-    [__unsafeForceInlineEarly] This div(This other) { return this / other; }
-    [__unsafeForceInlineEarly] This mod(This other) { return this % other; }
-    [__unsafeForceInlineEarly] This neg() { return -this; }
-    [__unsafeForceInlineEarly] This shl(int value) { return this << value; }
-    [__unsafeForceInlineEarly] This shr(int value) { return this >> value; }
-    [__unsafeForceInlineEarly] This bitAnd(This other) { return this & other; }
-    [__unsafeForceInlineEarly] This bitOr(This other) { return this | other; }
-    [__unsafeForceInlineEarly] This bitXor(This other) { return this ^ other; }
-    [__unsafeForceInlineEarly] This bitNot() { return ~this; }
+    [__unsafeForceInlineEarly] int compareTo(This other){return this-other;}
+    [__unsafeForceInlineEarly] This add(This other) { return __add(this, other); }
+    [__unsafeForceInlineEarly] This sub(This other) { return __sub(this, other); }
+    [__unsafeForceInlineEarly] This mul(This other) { return __mul(this, other); }
+    [__unsafeForceInlineEarly] This div(This other) { return __div(this, other); }
+    [__unsafeForceInlineEarly] This mod(This other) { return __irem(this, other); }
+    [__unsafeForceInlineEarly] This neg() { return __neg(this); }
+    [__unsafeForceInlineEarly] This shl(int other) { return __shl(this, other); }
+    [__unsafeForceInlineEarly] This shr(int other) { return __shr(this, other); }
+    [__unsafeForceInlineEarly] This bitAnd(This other) { return __add(this, other); }
+    [__unsafeForceInlineEarly] This bitOr(This other) { return __or(this, other); }
+    [__unsafeForceInlineEarly] This bitXor(This other) { return __xor(this, other); }
+    [__unsafeForceInlineEarly] This bitNot() { return __not(this); }
     [__unsafeForceInlineEarly] int toInt() { return int(this); }
     [__unsafeForceInlineEarly] int64_t toInt64() { return int64_t(this); }
     [__unsafeForceInlineEarly] uint toUInt() { return uint(this); }
@@ -2479,15 +2474,21 @@ ${{{{
     else if (kBaseTypes[tt].flags & FLOAT_MASK)
     {
 }}}}
+
 extension $(kBaseTypes[tt].name) : IFloat
 {
-    [__unsafeForceInlineEarly] int compareTo(This other) { return (this > other)?1:(this < other)?-1:0; }
-    [__unsafeForceInlineEarly] This add(This other) { return this + other; }
-    [__unsafeForceInlineEarly] This sub(This other) { return this - other; }
-    [__unsafeForceInlineEarly] This mul(This other) { return this * other; }
-    [__unsafeForceInlineEarly] This div(This other) { return this / other; }
-    [__unsafeForceInlineEarly] This mod(This other) { return this % other; }
-    [__unsafeForceInlineEarly] This neg() { return -this; }
+    [__unsafeForceInlineEarly] static int __sign(This val)
+    {
+        return int(__leq(This(0),val)) - int(__leq(val,This(0)));
+    }
+
+    [__unsafeForceInlineEarly] int compareTo(This other) { return __sign(this-other); }
+    [__unsafeForceInlineEarly] This add(This other) { return __add(this, other); }
+    [__unsafeForceInlineEarly] This sub(This other) { return __sub(this, other); }
+    [__unsafeForceInlineEarly] This mul(This other) { return __mul(this, other); }
+    [__unsafeForceInlineEarly] This div(This other) { return __div(this, other); }
+    [__unsafeForceInlineEarly] This mod(This other) { return __frem(this, other); }
+    [__unsafeForceInlineEarly] This neg() { return __neg(this); }
     [__unsafeForceInlineEarly] float toFloat() { return float(this); }
 }
 ${{{{
