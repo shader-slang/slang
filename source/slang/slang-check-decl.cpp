@@ -536,7 +536,9 @@ namespace Slang
             }
             else if( auto genericValueParamDecl = as<GenericValueParamDecl>(mm) )
             {
-                genericSubst->args.add(astBuilder->create<GenericParamIntVal>(DeclRef<GenericValueParamDecl>(genericValueParamDecl, outerSubst)));
+                genericSubst->args.add(astBuilder->create<GenericParamIntVal>(
+                    genericValueParamDecl->getType(),
+                    DeclRef<GenericValueParamDecl>(genericValueParamDecl, outerSubst)));
             }
         }
 
@@ -4235,6 +4237,7 @@ namespace Slang
             else if (auto valueParam = as<GenericValueParamDecl>(dd))
             {
                 auto val = m_astBuilder->create<GenericParamIntVal>(
+                    valueParam->getType(),
                     makeDeclRef(valueParam));
                 subst->args.add(val);
             }

@@ -2146,6 +2146,9 @@ namespace Slang
             keyInst.value.intVal = static_cast<uint16_t>(inValue);
             break;
         case kIROp_BoolType:
+            keyInst.m_op = kIROp_BoolLit;
+            keyInst.value.intVal = ((inValue != 0) ? 1 : 0);
+            break;
         case kIROp_UIntType:
             keyInst.value.intVal = static_cast<uint32_t>(inValue);
             break;
