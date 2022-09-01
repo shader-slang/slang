@@ -62,7 +62,7 @@ public:
 protected:
         /// A type that is only used to differentiate a constructor. Can construct with 
         /// MoveUnique{}
-    enum class MoveUnique {};
+    struct MoveUnique {};
 
     explicit StringBlob(String const& string)
         : m_string(string)
