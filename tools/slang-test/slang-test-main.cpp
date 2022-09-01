@@ -7,6 +7,9 @@
 #include "../../source/core/slang-type-text-util.h"
 #include "../../source/core/slang-memory-arena.h"
 
+#include "../../source/compiler-core/slang-artifact-desc-util.h"
+#include "../../source/compiler-core/slang-artifact-helper.h"
+
 #include "../../slang-com-helper.h"
 
 #include "../../source/core/slang-string-util.h"
@@ -2232,13 +2235,36 @@ static TestResult runCPPCompilerSharedLibrary(TestContext* context, TestInput& i
     // Build a shared library
     options.targetType = SLANG_SHADER_SHARED_LIBRARY;
 
+    auto helper = DefaultArtifactHelper::getSingleton();
+
     // Compile this source
-    TerminatedCharSlice sourceFiles[] = { SliceCaster::asTerminatedCharSlice(filePath) };
+    ComPtr<IArtifact> sourceArtifact;
+
+    // If set, we store the artifact in memory without a name. 
+    bool checkMemory = false;
+    if (checkMemory)
+    {
+        helper->createArtifact(ArtifactDescUtil::makeDescForSourceLanguage(options.sourceLanguage), "", sourceArtifact.writeRef());
+
+        ComPtr<IOSFileArtifactRepresentation> fileRep;
+        // Let's just add a blob with the contents
+        helper->createOSFileArtifactRepresentation(IOSFileArtifactRepresentation::Kind::Reference, asCharSlice(filePath.getUnownedSlice()), nullptr, fileRep.writeRef());
+
+        ComPtr<ICastable> castable;
+        fileRep->createRepresentation(ISlangBlob::getTypeGuid(), castable.writeRef());
+
+        sourceArtifact->addRepresentation(castable);
+    }
+    else
+    {
+        helper->createOSFileArtifact(ArtifactDescUtil::makeDescForSourceLanguage(options.sourceLanguage), asCharSlice(filePath.getUnownedSlice()), sourceArtifact.writeRef());
+    }
+
     TerminatedCharSlice includePaths[] = { TerminatedCharSlice(".") };
 
-    options.sourceFiles = makeSlice(sourceFiles, 1);
+    options.sourceArtifacts = makeSlice(sourceArtifact.readRef(), 1);
     options.includePaths = makeSlice(includePaths, 1);
-    options.modulePath = SliceCaster::asTerminatedCharSlice(modulePath);
+    options.modulePath = SliceUtil::asTerminatedCharSlice(modulePath);
 
     ComPtr<IArtifact> artifact;
     if (SLANG_FAILED(compiler->compile(options, artifact.writeRef())))
@@ -2353,11 +2379,16 @@ static TestResult runCPPCompilerExecute(TestContext* context, TestInput& input)
 
     options.sourceLanguage = (ext == "c") ? SLANG_SOURCE_LANGUAGE_C : SLANG_SOURCE_LANGUAGE_CPP;
 
-    TerminatedCharSlice filePaths[] = { SliceCaster::asTerminatedCharSlice(filePath) };
+    TerminatedCharSlice filePaths[] = { SliceUtil::asTerminatedCharSlice(filePath) };
+
+    auto helper = DefaultArtifactHelper::getSingleton();
+
+    ComPtr<IArtifact> sourceArtifact;
+    helper->createOSFileArtifact(ArtifactDescUtil::makeDescForSourceLanguage(options.sourceLanguage), asCharSlice(filePath.getUnownedSlice()), sourceArtifact.writeRef());
 
     // Compile this source
-    options.sourceFiles = makeSlice(filePaths, 1);
-    options.modulePath = SliceCaster::asTerminatedCharSlice(modulePath);
+    options.sourceArtifacts = makeSlice(sourceArtifact.readRef(), 1);
+    options.modulePath = SliceUtil::asTerminatedCharSlice(modulePath);
 
     ComPtr<IArtifact> artifact;
     if (SLANG_FAILED(compiler->compile(options, artifact.writeRef())))

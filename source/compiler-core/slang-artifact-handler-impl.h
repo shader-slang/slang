@@ -23,13 +23,13 @@ public:
 	// IArtifactHandler
 	SLANG_NO_THROW SlangResult SLANG_MCALL expandChildren(IArtifactContainer* container) SLANG_OVERRIDE;
 	SLANG_NO_THROW SlangResult SLANG_MCALL getOrCreateRepresentation(IArtifact* artifact, const Guid& guid, ArtifactKeep keep, ICastable** outCastable) SLANG_OVERRIDE;
-	SLANG_NO_THROW SlangResult SLANG_MCALL getOrCreateFileRepresentation(IArtifact* artifact, ArtifactKeep keep, ISlangMutableFileSystem* fileSystem, IFileArtifactRepresentation** outFileRep) SLANG_OVERRIDE;
-
+	
 	static IArtifactHandler* getSingleton() { return &g_singleton; }
 protected:
 
 	SlangResult _loadSharedLibrary(IArtifact* artifact, ISlangSharedLibrary** outSharedLibrary);
-	
+	SlangResult _createOSFile(IArtifact* artifact, ArtifactKeep intermediateKeep, IOSFileArtifactRepresentation** outFileRep);
+
 	void* getInterface(const Guid& uuid);
 	void* getObject(const Guid& uuid);
 

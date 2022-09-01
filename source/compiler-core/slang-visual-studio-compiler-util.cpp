@@ -21,16 +21,16 @@
 namespace Slang
 {
 
-static void _addFile(const String& path, const ArtifactDesc& desc, IFileArtifactRepresentation* lockFile, List<ComPtr<IArtifact>>& outArtifacts)
+static void _addFile(const String& path, const ArtifactDesc& desc, IOSFileArtifactRepresentation* lockFile, List<ComPtr<IArtifact>>& outArtifacts)
 {
-    auto fileRep = FileArtifactRepresentation::create(IFileArtifactRepresentation::Kind::Owned, path.getUnownedSlice(), lockFile, nullptr);
+    auto fileRep = OSFileArtifactRepresentation::create(IOSFileArtifactRepresentation::Kind::Owned, path.getUnownedSlice(), lockFile);
     auto artifact = ArtifactUtil::createArtifact(desc);
     artifact->addRepresentation(fileRep);
 
     outArtifacts.add(artifact);
 }
 
-/* static */SlangResult VisualStudioCompilerUtil::calcCompileProducts(const CompileOptions& options, ProductFlags flags, IFileArtifactRepresentation* lockFile, List<ComPtr<IArtifact>>& outArtifacts)
+/* static */SlangResult VisualStudioCompilerUtil::calcCompileProducts(const CompileOptions& options, ProductFlags flags, IOSFileArtifactRepresentation* lockFile, List<ComPtr<IArtifact>>& outArtifacts)
 {
     SLANG_ASSERT(options.modulePath.count);
 
@@ -74,7 +74,6 @@ static void _addFile(const String& path, const ArtifactDesc& desc, IFileArtifact
 
 /* static */SlangResult VisualStudioCompilerUtil::calcArgs(const CompileOptions& options, CommandLine& cmdLine)
 {
-    SLANG_ASSERT(options.sourceContents.count == 0);
     SLANG_ASSERT(options.modulePath.count);
 
     // https://docs.microsoft.com/en-us/cpp/build/reference/compiler-options-listed-alphabetically?view=vs-2019
@@ -236,12 +235,17 @@ static void _addFile(const String& path, const ArtifactDesc& desc, IFileArtifact
     // https://docs.microsoft.com/en-us/cpp/build/reference/eh-exception-handling-model?view=vs-2019
     // /Eha - Specifies the model of exception handling. (a, s, c, r are options)
 
-    // Files to compile
-    for (const auto& sourceFile : options.sourceFiles)
+    // Files to compile, need to be on the file system.
+    for (IArtifact* sourceArtifact : options.sourceArtifacts)
     {
-        cmdLine.addArg(asString(sourceFile));
-    }
+        ComPtr<IOSFileArtifactRepresentation> fileRep;
 
+        // TODO(JS): 
+        // Do we want to keep the file on the file system? It's probably reasonable to do so.
+        SLANG_RETURN_ON_FAIL(sourceArtifact->requireFile(ArtifactKeep::Yes, fileRep.writeRef()));
+        cmdLine.addArg(fileRep->getPath());
+    }
+    
     // Link options (parameters past /link go to linker)
     cmdLine.addArg("/link");
 
@@ -260,12 +264,13 @@ static void _addFile(const String& path, const ArtifactDesc& desc, IFileArtifact
         if (ArtifactDescUtil::isCpuBinary(desc) && desc.kind == ArtifactKind::Library)
         {
             // Get the libray name and path
-            ComPtr<IFileArtifactRepresentation> fileRep;
-            SLANG_RETURN_ON_FAIL(artifact->requireFile(ArtifactKeep::Yes, nullptr, fileRep.writeRef()));
+            ComPtr<IOSFileArtifactRepresentation> fileRep;
+            SLANG_RETURN_ON_FAIL(artifact->requireFile(ArtifactKeep::Yes, fileRep.writeRef()));
 
-            libPathPool.add(ArtifactUtil::getParentPath(fileRep));
+            const UnownedStringSlice path(fileRep->getPath());
+            libPathPool.add(Path::getParentDirectory(path));
             // We need the extension for windows
-            cmdLine.addArg(ArtifactDescUtil::getBaseName(artifact->getDesc(), fileRep) + ".lib");
+            cmdLine.addArg(ArtifactDescUtil::getBaseNameFromPath(desc, path) + ".lib");
         }
     }
 
@@ -430,7 +435,7 @@ static SlangResult _parseVisualStudioLine(SliceAllocator& allocator, const Unown
 {
     diagnostics->reset();
 
-    diagnostics->setRaw(SliceCaster::asTerminatedCharSlice(exeRes.standardOutput));
+    diagnostics->setRaw(SliceUtil::asTerminatedCharSlice(exeRes.standardOutput));
 
     SliceAllocator allocator;
 

@@ -443,12 +443,12 @@ static const KindExtension g_cpuKindExts[] =
 {
     switch (kind)
     {
-    case Kind::Library:
-    case Kind::ObjectCode:
-    {
-        return true;
-    }
-    default: break;
+        case Kind::Library:
+        case Kind::ObjectCode:
+        {
+            return true;
+        }
+        default: break;
     }
     return false;
 }
@@ -587,9 +587,6 @@ static UnownedStringSlice _getPayloadExtension(ArtifactPayload payload)
     typedef ArtifactPayload Payload;
     switch (payload)
     {
-        /* Misc */
-        case Payload::Unknown:      return toSlice("unknown");
-
         /* Source types */
         case Payload::HLSL:         return toSlice("hlsl");
         case Payload::GLSL:         return toSlice("glsl");
@@ -685,8 +682,14 @@ SlangResult ArtifactDescUtil::appendDefaultExtension(const ArtifactDesc& desc, S
         }
         case ArtifactKind::Source:
         {
-            out << _getPayloadExtension(desc.payload);
-            return SLANG_OK;
+            auto ext = _getPayloadExtension(desc.payload);
+            if (ext.begin() != nullptr)
+            {
+                out << ext;
+                return SLANG_OK;
+            }
+            // Don't know the extension for that 
+            return SLANG_E_NOT_FOUND;
         }
         default: break;
     }
@@ -695,22 +698,19 @@ SlangResult ArtifactDescUtil::appendDefaultExtension(const ArtifactDesc& desc, S
     {
         return appendCpuExtensionForKind(desc.kind, out);
     }
-    else
-    {
-        auto slice = _getPayloadExtension(desc.payload);
-        if (slice.getLength())
-        {
-            out << slice;
-            return SLANG_OK;
-        }
-    }
-
+    
     return SLANG_E_NOT_FOUND;
 }
 
 /* static */String ArtifactDescUtil::getBaseNameFromPath(const ArtifactDesc& desc, const UnownedStringSlice& path)
 {
-    String name = Path::getFileName(path);
+    const String name = Path::getFileName(path);
+    return getBaseNameFromName(desc, name.getUnownedSlice());
+}
+
+/* static */String ArtifactDescUtil::getBaseNameFromName(const ArtifactDesc& desc, const UnownedStringSlice& inName)
+{
+    String name(inName);
 
     const bool isSharedLibraryPrefixPlatform = SLANG_LINUX_FAMILY || SLANG_APPLE_FAMILY;
     if (isSharedLibraryPrefixPlatform)
@@ -729,16 +729,19 @@ SlangResult ArtifactDescUtil::appendDefaultExtension(const ArtifactDesc& desc, S
         }
     }
 
-    // Strip any extension 
+    // Strip any extension
     {
         StringBuilder descExt;
-
-        appendDefaultExtension(desc, descExt);
-
-        // Strip the extension if it's a match
-        if (descExt.getLength() &&
-            Path::getPathExt(name) == descExt)
+        if (SLANG_SUCCEEDED(appendDefaultExtension(desc, descExt)) && 
+            descExt.getLength())
         {
+            // TODO(JS): 
+            // It has an extension. We could check if they are the same
+            // but if they are not that might be fine, because of case insensitivity 
+            // or perhaps there are multiple valid extensions. So for now we just strip
+            // and don't bother confirming with something like..
+            // if (Path::getPathExt(name) == descExt))
+
             name = Path::getFileNameWithoutExt(name);
         }
     }
@@ -746,10 +749,16 @@ SlangResult ArtifactDescUtil::appendDefaultExtension(const ArtifactDesc& desc, S
     return name;
 }
 
-/* static */String ArtifactDescUtil::getBaseName(const ArtifactDesc& desc, IFileArtifactRepresentation* fileRep)
+/* static */String ArtifactDescUtil::getBaseName(const ArtifactDesc& desc, IPathArtifactRepresentation* pathRep)
 {
-    UnownedStringSlice path(fileRep->getPath());
+    UnownedStringSlice path(pathRep->getPath());
     return getBaseNameFromPath(desc, path);
+}
+
+/* static */SlangResult ArtifactDescUtil::hasDefinedNameForDesc(const ArtifactDesc& desc)
+{
+    StringBuilder buf;
+    return SLANG_SUCCEEDED(appendDefaultExtension(desc, buf));
 }
 
 /* static */SlangResult ArtifactDescUtil::calcNameForDesc(const ArtifactDesc& desc, const UnownedStringSlice& inBaseName, StringBuilder& outName)
@@ -779,10 +788,18 @@ SlangResult ArtifactDescUtil::appendDefaultExtension(const ArtifactDesc& desc, S
 
     // If there is an extension append it
     StringBuilder ext;
-    if (SLANG_SUCCEEDED(appendDefaultExtension(desc, ext)) && ext.getLength() > 0)
+    if (SLANG_SUCCEEDED(appendDefaultExtension(desc, ext)))
     {
-        outName.appendChar('.');
-        outName.append(ext);
+        if (ext.getLength())
+        {
+            outName.appendChar('.');
+            outName.append(ext);
+        }
+    }
+    else
+    {
+        // If we can't determine the type we can output with .unknown
+        outName.append(toSlice(".unknown"));
     }
 
     return SLANG_OK;

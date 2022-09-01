@@ -77,10 +77,18 @@ bool Artifact::exists()
     return false;
 }
 
-SlangResult Artifact::requireFile(Keep keep, ISlangMutableFileSystem* fileSystem, IFileArtifactRepresentation** outFileRep)
+SlangResult Artifact::requireFile(Keep keep, IOSFileArtifactRepresentation** outFileRep)
 {
     auto handler = _getHandler();
-    return handler->getOrCreateFileRepresentation(this, keep, fileSystem, outFileRep);
+
+    ComPtr<ICastable> castable;
+    SLANG_RETURN_ON_FAIL(handler->getOrCreateRepresentation(this, IOSFileArtifactRepresentation::getTypeGuid(), keep, castable.writeRef()));
+
+    auto fileRep = as<IOSFileArtifactRepresentation>(castable);
+    fileRep->addRef();
+
+    *outFileRep = fileRep;
+    return SLANG_OK;
 }
 
 SlangResult Artifact::loadSharedLibrary(ArtifactKeep keep, ISlangSharedLibrary** outSharedLibrary)
@@ -90,7 +98,7 @@ SlangResult Artifact::loadSharedLibrary(ArtifactKeep keep, ISlangSharedLibrary**
     ComPtr<ICastable> castable;
     SLANG_RETURN_ON_FAIL(handler->getOrCreateRepresentation(this, ISlangSharedLibrary::getTypeGuid(), keep, castable.writeRef()));
    
-    ISlangSharedLibrary* lib = as<ISlangSharedLibrary>(castable);
+    auto lib = as<ISlangSharedLibrary>(castable);
     lib->addRef();
 
     *outSharedLibrary = lib;
