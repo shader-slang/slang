@@ -1,5 +1,5 @@
-Artifact Container Format
-=========================
+Shader Container Format
+=======================
 
 This proposal is for a file hierarchy based structure that can be used to represent compile results and more generally a 'shader cache'. Ideally it would feature
 
@@ -38,16 +38,17 @@ It's importance/relevance
 
 ## Use
 
-There are several kinds of use scenario
+There are several kinds of usage scenario
 
 * A runtime shader cache
 * A runtime shader cache with persistance
 * A capture of compilation/compilations
-* A baked persistant cache - must also work without source
+* A baked persistant cache - must also work without shader source
+* A baked persistant cache, that is obfuscated
 
-A runtime shader cache, ideally 
+A runtime shader cache has the following characteristics:
 
-* Works with mechanisms that do not require any user control. 
+* Can works with mechanisms that do not require any user control (such as naming). Ie purely inputs/options can define a 'key'.
 * It is okay to have keys/naming that are not human understandable/readable. 
 * The source is available - such that hashes based on source contents can be produced. 
 * It does not matter if hashes/keys are static between runs. 
@@ -62,11 +63,10 @@ At the other end of the spectrum a baked persistant cache
 * Doesn't have access to source so can't use that as part of a hash
 * Probably doesn't have access to dependencies
 * Having some indirection between a request and a result is a useful feature
-* Ideally can be manipulated 
-* Can serialize out results, potentially on demand
+* Ideally can be manipulated and altered without significant tooling
 * Generated source may need to be identified in some other way than the source itself
 
-It should be possible to write out a 'runtime shader cache' into the same format as used for persistant cache. It may be harder to use such a cache without Slang tooling, because the mapping from compilation options to keys is probably not simple.
+It should be possible to serialize out a 'runtime shader cache' into the same format as used for persistant cache. It may be harder to use such a cache without Slang tooling, because the mapping from compilation options to keys is not simple.
 
 Status
 ------
@@ -240,13 +240,12 @@ For a runtime cache type scenario, the instability and lack of human readability
 
 For any cache that is persistant how naming occurs probably is important. Because
 
-* Our 'options' aren't going to make much sense with other compilers
-* Our combinations of options aren't going to make much sense with other compilers
+* Our 'options' aren't going to make much sense with other compilers (if we want the standard to be more broadly applicable)
 * The options we have will not remain static
 * Having an indirection is useful from an application development and shipping perspective
 * That the *name* perhaps doesn't always have to indicate every aspect of a compilation
 
-One idea touched on in this document is to move 'namining' as a user space problem. That compilations are defined by the combination of 'named' options. In order to produce a shader cache name we have a concatination of names. The order can be user specified. Order could also break down into "directory" hierarchy as necessary.
+One idea touched on in this document is to move 'naming' into a user space problem. That compilations are defined by the combination of 'named' options. In order to produce a shader cache name we have a concatination of names. The order can be user specified. Order could also break down into "directory" hierarchy as necessary.
 
 Some options will need to be part of some order. This is perhaps all a little abstract so as an example
 
@@ -303,17 +302,16 @@ Some options will need to be part of some order. This is perhaps all a little ab
 }
 ``` 
 
-The combination in this manner doesn't quite work, because some combinations may imply different options. The "combination" section tries to address this. 
+The combination in this manner doesn't quite work, because some combinations may imply different options. The "combinations" section tries to address this. 
 
 We may also want to have options that don't appear in the name, but modify the output. 
 
 This whole mechanism provides a way of specifying a compilation by a series of names, that can produce a unique human readable key. It is under user control, but the mechanism on how the combination takes place is at least as a default defined within an implementation.
 
+It may be necessary to define options by tool chain. Doing so would mean the names can group together what might be quite different options on different compilers. Having options defined in JSON means that the mechanisms described here can be used for other tooling. If the desire is to have some more broadly applicable 'shader cache' representation this is desirable. 
 
+If it is necessary obfuscate the contents, it would be possible to put the human readable key though a hash, and then the hash can be used for lookup. 
 
-
-
-    
 Container Layout
 ================
 
@@ -456,6 +454,7 @@ If the components were serializable (as say as JSON), we could describe a compil
 
 It doesn't appear as if there is a way to more finely control the application of component types. For example if there was a desire to change the optimizaion option, it would appear to remain part of the ICompileRequest (it's not part of a component). This implies this mechanism as it stands whilst allowing composition, doesn't provide the more nuanced composition. Additional component types could perhaps be added which would add such control.
 
+Perhaps having components is not necessary as part of the representation, as 'component' system is a mechanism for achiving a 'bag of options' and so we can get the same effect by using that mechanism without components.
 
 
         
