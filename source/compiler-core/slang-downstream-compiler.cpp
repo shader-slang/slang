@@ -82,7 +82,7 @@ SlangResult CommandLineDownstreamCompiler::compile(const CompileOptions& inOptio
     auto artifactList = CastableList::create();
 
     // It may be necessary to produce a temporary file 'lock file'.
-    ComPtr<IFileArtifactRepresentation> lockFile;
+    ComPtr<IOSFileArtifactRepresentation> lockFile;
 
     // The allocator can be used for items that are not kept in scope by the options
     String modulePath;
@@ -92,7 +92,7 @@ SlangResult CommandLineDownstreamCompiler::compile(const CompileOptions& inOptio
     {
         // We could use the path to the source, or use the source name/paths as defined on the artifact
         // For now we just go with a lock file based on "slang-generated".
-        SLANG_RETURN_ON_FAIL(helper->createLockFile("slang-generated", nullptr, lockFile.writeRef()));
+        SLANG_RETURN_ON_FAIL(helper->createLockFile(asCharSlice(toSlice("slang-generated")), lockFile.writeRef()));
 
         auto lockArtifact = Artifact::create(ArtifactDesc::make(ArtifactKind::Base, ArtifactPayload::Lock, ArtifactStyle::None));
         lockArtifact->addRepresentation(lockFile);
@@ -108,8 +108,8 @@ SlangResult CommandLineDownstreamCompiler::compile(const CompileOptions& inOptio
     // Append command line args to the end of cmdLine using the target specific function for the specified options
     SLANG_RETURN_ON_FAIL(calcArgs(options, cmdLine));
 
-    // The 'mainArtifact' is the main product produced from the compilation - the executable/sharedlibrary/object etc
-    ComPtr<IArtifact> mainArtifact;
+    // The 'productArtifact' is the main product produced from the compilation - the executable/sharedlibrary/object etc
+    ComPtr<IArtifact> productArtifact;
     {
         List<ComPtr<IArtifact>> artifacts;
         SLANG_RETURN_ON_FAIL(calcCompileProducts(options, DownstreamProductFlag::All, lockFile, artifacts));
@@ -119,17 +119,17 @@ SlangResult CommandLineDownstreamCompiler::compile(const CompileOptions& inOptio
             // The main artifact must be in the list, so add it if we find it
             if (artifact->getDesc() == targetDesc)
             {
-                SLANG_ASSERT(mainArtifact == nullptr);
-                mainArtifact = artifact;
+                SLANG_ASSERT(productArtifact == nullptr);
+                productArtifact = artifact;
             }
 
             artifactList->add(artifact);
         }
     }
     
-    SLANG_ASSERT(mainArtifact);
+    SLANG_ASSERT(productArtifact);
     // Somethings gone wrong if we don't find the main artifact
-    if (!mainArtifact)
+    if (!productArtifact)
     {
         return SLANG_FAIL;
     }
@@ -166,15 +166,15 @@ SlangResult CommandLineDownstreamCompiler::compile(const CompileOptions& inOptio
             {
                 // We should find a file rep and if we do we can disown it. Disowning will mean
                 // when scope is lost the rep won't try and delete the (apparently non existing) backing file.
-                if (auto fileRep = findRepresentation<IFileArtifactRepresentation>(artifact))
+                if (auto fileRep = findRepresentation<IOSFileArtifactRepresentation>(artifact))
                 {
                     fileRep->disown();
                 }
 
                 // If the main artifact doesn't exist, we don't have a main artifact
-                if (artifact == mainArtifact)
+                if (artifact == productArtifact)
                 {
-                    mainArtifact.setNull();
+                    productArtifact.setNull();
                 }
 
                 // Remove from the list
@@ -188,9 +188,13 @@ SlangResult CommandLineDownstreamCompiler::compile(const CompileOptions& inOptio
     // Add all of the source artifacts, that are temporary on the file system, such that they can stay in scope for debugging
     for (auto sourceArtifact : options.sourceArtifacts)
     {
-        if (ArtifactUtil::findFileSystemTemporaryFile(sourceArtifact) && sourceArtifact->exists())
+        if (auto fileRep = findRepresentation<IOSFileArtifactRepresentation>(sourceArtifact))
         {
-            artifactList->add(sourceArtifact);
+            // If it has a lock file we can assume it's a temporary
+            if (fileRep->getLockFile())
+            {
+                artifactList->add(sourceArtifact);
+            }
         }
     }
 
@@ -207,7 +211,7 @@ SlangResult CommandLineDownstreamCompiler::compile(const CompileOptions& inOptio
     
     // Find the rep from the 'main' artifact, we'll just use the same representation on the output 
     // artifact. Sharing is desirable, because the rep owns the file.
-    if (auto fileRep = mainArtifact ? findRepresentation<IFileArtifactRepresentation>(mainArtifact) : nullptr)
+    if (auto fileRep = productArtifact ? findRepresentation<IOSFileArtifactRepresentation>(productArtifact) : nullptr)
     {
         artifact->addRepresentation(fileRep);
     }

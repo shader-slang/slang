@@ -2239,7 +2239,26 @@ static TestResult runCPPCompilerSharedLibrary(TestContext* context, TestInput& i
 
     // Compile this source
     ComPtr<IArtifact> sourceArtifact;
-    helper->createFileArtifact(ArtifactDescUtil::makeDescForSourceLanguage(options.sourceLanguage), asCharSlice(filePath.getUnownedSlice()), sourceArtifact.writeRef());
+
+    // If set, we store the artifact in memory without a name. 
+    bool checkMemory = false;
+    if (checkMemory)
+    {
+        helper->createArtifact(ArtifactDescUtil::makeDescForSourceLanguage(options.sourceLanguage), "", sourceArtifact.writeRef());
+
+        ComPtr<IOSFileArtifactRepresentation> fileRep;
+        // Let's just add a blob with the contents
+        helper->createOSFileArtifactRepresentation(IOSFileArtifactRepresentation::Kind::Reference, asCharSlice(filePath.getUnownedSlice()), nullptr, fileRep.writeRef());
+
+        ComPtr<ICastable> castable;
+        fileRep->createRepresentation(ISlangBlob::getTypeGuid(), castable.writeRef());
+
+        sourceArtifact->addRepresentation(castable);
+    }
+    else
+    {
+        helper->createOSFileArtifact(ArtifactDescUtil::makeDescForSourceLanguage(options.sourceLanguage), asCharSlice(filePath.getUnownedSlice()), sourceArtifact.writeRef());
+    }
 
     TerminatedCharSlice includePaths[] = { TerminatedCharSlice(".") };
 
@@ -2365,7 +2384,7 @@ static TestResult runCPPCompilerExecute(TestContext* context, TestInput& input)
     auto helper = DefaultArtifactHelper::getSingleton();
 
     ComPtr<IArtifact> sourceArtifact;
-    helper->createFileArtifact(ArtifactDescUtil::makeDescForSourceLanguage(options.sourceLanguage), asCharSlice(filePath.getUnownedSlice()), sourceArtifact.writeRef());
+    helper->createOSFileArtifact(ArtifactDescUtil::makeDescForSourceLanguage(options.sourceLanguage), asCharSlice(filePath.getUnownedSlice()), sourceArtifact.writeRef());
 
     // Compile this source
     options.sourceArtifacts = makeSlice(sourceArtifact.readRef(), 1);

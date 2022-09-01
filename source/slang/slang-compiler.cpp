@@ -1071,13 +1071,6 @@ namespace Slang
 
                 SourceFile* sourceFile = sourceFiles[0];
 
-                // Make it have an artifact if doesn't have one already
-                // This is useful because it will mean any reps will be kept in scope
-                // 
-                // For example if file backing is needed, the file rep will last the lifetime of the 
-                // SourceFile
-                sourceFile->maybeAddArtifact(nullptr);
-
                 sourceArtifact = sourceFile->getArtifact();
                 SLANG_ASSERT(sourceArtifact);
             }
@@ -1258,7 +1251,7 @@ namespace Slang
                 // Set up the library artifact
                 auto artifact = Artifact::create(ArtifactDesc::make(ArtifactKind::Library, Artifact::Payload::HostCPU), toSlice("slang-rt"));
 
-                ComPtr<IFileArtifactRepresentation> fileRep(new FileArtifactRepresentation(IFileArtifactRepresentation::Kind::NameOnly, toSlice("slang-rt"), nullptr, nullptr));
+                ComPtr<IOSFileArtifactRepresentation> fileRep(new OSFileArtifactRepresentation(IOSFileArtifactRepresentation::Kind::NameOnly, toSlice("slang-rt"), nullptr));
                 artifact->addRepresentation(fileRep);
 
                 libraries.add(artifact);

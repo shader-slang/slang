@@ -14,10 +14,10 @@ namespace Slang
 {
 
 /* A representation of an artifact that is held in a file */
-class FileArtifactRepresentation : public ComBaseObject, public IFileArtifactRepresentation
+class OSFileArtifactRepresentation : public ComBaseObject, public IOSFileArtifactRepresentation
 {
 public:
-    typedef FileArtifactRepresentation ThisType;
+    typedef OSFileArtifactRepresentation ThisType;
 
     SLANG_COM_BASE_IUNKNOWN_ALL
 
@@ -28,26 +28,27 @@ public:
     SLANG_NO_THROW SlangResult SLANG_MCALL createRepresentation(const Guid& typeGuid, ICastable** outCastable) SLANG_OVERRIDE;
     SLANG_NO_THROW bool SLANG_MCALL exists() SLANG_OVERRIDE;
 
-    // IFileArtifactRepresentation
-    virtual SLANG_NO_THROW Kind SLANG_MCALL getKind() SLANG_OVERRIDE { return m_kind; }
+    // IPathArtifactRepresentation
     virtual SLANG_NO_THROW const char* SLANG_MCALL getPath() SLANG_OVERRIDE { return m_path.getBuffer(); }
-    virtual SLANG_NO_THROW ISlangMutableFileSystem* SLANG_MCALL getFileSystem() SLANG_OVERRIDE { return m_fileSystem; }
-    virtual SLANG_NO_THROW void SLANG_MCALL disown() SLANG_OVERRIDE;
-    virtual SLANG_NO_THROW IFileArtifactRepresentation* SLANG_MCALL getLockFile() SLANG_OVERRIDE { return m_lockFile; }
+    virtual SLANG_NO_THROW SlangPathType SLANG_MCALL getPathType() SLANG_OVERRIDE { return SLANG_PATH_TYPE_FILE; }
 
-    FileArtifactRepresentation(Kind kind, const UnownedStringSlice& path, IFileArtifactRepresentation* lockFile, ISlangMutableFileSystem* fileSystem):
+    // IOSFileArtifactRepresentation
+    virtual SLANG_NO_THROW Kind SLANG_MCALL getKind() SLANG_OVERRIDE { return m_kind; }
+    virtual SLANG_NO_THROW void SLANG_MCALL disown() SLANG_OVERRIDE;
+    virtual SLANG_NO_THROW IOSFileArtifactRepresentation* SLANG_MCALL getLockFile() SLANG_OVERRIDE { return m_lockFile; }
+
+    OSFileArtifactRepresentation(Kind kind, const UnownedStringSlice& path, IOSFileArtifactRepresentation* lockFile):
         m_kind(kind),
         m_lockFile(lockFile),
-        m_path(path),
-        m_fileSystem(fileSystem)
+        m_path(path)
     {
     }
 
-    ~FileArtifactRepresentation();
+    ~OSFileArtifactRepresentation();
 
-    static ComPtr<IFileArtifactRepresentation> create(Kind kind, const UnownedStringSlice& path, IFileArtifactRepresentation* lockFile, ISlangMutableFileSystem* fileSystem)
+    static ComPtr<IOSFileArtifactRepresentation> create(Kind kind, const UnownedStringSlice& path, IOSFileArtifactRepresentation* lockFile)
     {
-        return ComPtr<IFileArtifactRepresentation>(new ThisType(kind, path, lockFile, fileSystem)); 
+        return ComPtr<IOSFileArtifactRepresentation>(new ThisType(kind, path, lockFile));
     }
 
 protected:
@@ -57,12 +58,52 @@ protected:
         /// True if the file is owned
     bool _isOwned() const { return Index(m_kind) >= Index(Kind::Owned); }
 
-    ISlangMutableFileSystem* _getFileSystem();
+    static ISlangMutableFileSystem* _getFileSystem();
 
     Kind m_kind;
     String m_path;
-    ComPtr<IFileArtifactRepresentation> m_lockFile;
+    ComPtr<IOSFileArtifactRepresentation> m_lockFile;
     ComPtr<ISlangMutableFileSystem> m_fileSystem;
+};
+
+class ExtFileArtifactRepresentation : public ComBaseObject, public IExtFileArtifactRepresentation
+{
+public:
+    typedef ExtFileArtifactRepresentation ThisType;
+
+    SLANG_COM_BASE_IUNKNOWN_ALL
+
+    // ICastable
+    SLANG_NO_THROW void* SLANG_MCALL castAs(const Guid& guid) SLANG_OVERRIDE;
+
+    // IArtifactRepresentation
+    SLANG_NO_THROW SlangResult SLANG_MCALL createRepresentation(const Guid& typeGuid, ICastable** outCastable) SLANG_OVERRIDE;
+    SLANG_NO_THROW bool SLANG_MCALL exists() SLANG_OVERRIDE;
+
+    // IPathArtifactRepresentation
+    virtual SLANG_NO_THROW const char* SLANG_MCALL getPath() SLANG_OVERRIDE { return m_path.getBuffer(); }
+    virtual SLANG_NO_THROW SlangPathType SLANG_MCALL getPathType() SLANG_OVERRIDE { return SLANG_PATH_TYPE_FILE; }
+
+    // IExtFileArtifactRepresentation
+    virtual SLANG_NO_THROW ISlangFileSystemExt* SLANG_MCALL getFileSystem() SLANG_OVERRIDE { return m_fileSystem; }
+
+    ExtFileArtifactRepresentation(const UnownedStringSlice& path, ISlangFileSystemExt* fileSystem) :
+        m_path(path),
+        m_fileSystem(fileSystem)
+    {
+    }
+
+    static ComPtr<IExtFileArtifactRepresentation> create(const UnownedStringSlice& path, ISlangFileSystemExt* fileSystem)
+    {
+        return ComPtr<IExtFileArtifactRepresentation>(new ThisType(path, fileSystem));
+    }
+
+protected:
+    void* getInterface(const Guid& uuid);
+    void* getObject(const Guid& uuid);
+
+    String m_path;
+    ComPtr<ISlangFileSystemExt> m_fileSystem;
 };
 
 /* This allows wrapping any object to be an artifact representation. 

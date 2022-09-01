@@ -41,7 +41,7 @@ class IArtifactHelper : public ICastable
 	virtual SLANG_NO_THROW bool SLANG_MCALL isStyleDerivedFrom(ArtifactStyle style, ArtifactStyle base) = 0;
 
 		/// Create a lock file, the path of which can be used to generate other temporary files
-	virtual SLANG_NO_THROW SlangResult SLANG_MCALL createLockFile(const char* nameBase, ISlangMutableFileSystem* fileSystem, IFileArtifactRepresentation** outLockFile) = 0;
+	virtual SLANG_NO_THROW SlangResult SLANG_MCALL createLockFile(const CharSlice& nameBase, IOSFileArtifactRepresentation** outLockFile) = 0;
 
 		/// Given a desc and a basePath returns a suitable name
 	virtual SLANG_NO_THROW SlangResult SLANG_MCALL calcArtifactDescPath(const ArtifactDesc& desc, const char* basePath, ISlangBlob** outPath) = 0;
@@ -56,14 +56,16 @@ class IArtifactHelper : public ICastable
 	virtual SLANG_NO_THROW void SLANG_MCALL getCastable(ISlangUnknown* unk, ICastable** outCastable) = 0;
 
 		/// Create a file rep
-	virtual SLANG_NO_THROW SlangResult SLANG_MCALL createFileArtifactRepresentation(
-		IFileArtifactRepresentation::Kind kind, const CharSlice& path, IFileArtifactRepresentation* lockFile, ISlangMutableFileSystem* fileSystem, IFileArtifactRepresentation** outRep) = 0;
+	virtual SLANG_NO_THROW SlangResult SLANG_MCALL createOSFileArtifactRepresentation(
+		IOSFileArtifactRepresentation::Kind kind, const CharSlice& path, IOSFileArtifactRepresentation* lockFile, IOSFileArtifactRepresentation** outRep) = 0;
+
+	virtual SLANG_NO_THROW SlangResult SLANG_MCALL createExtFileArtifactRepresentation(const CharSlice& path, ISlangFileSystemExt* system, IExtFileArtifactRepresentation** outRep) = 0;
 
 		/// Create an empty ICastableList
 	virtual SLANG_NO_THROW SlangResult SLANG_MCALL createCastableList(const Guid& guid, ICastableList** outList) = 0;
 
 
-	virtual SLANG_NO_THROW SlangResult SLANG_MCALL createFileArtifact(const ArtifactDesc& desc, const CharSlice& slice, IArtifact** outArtifact) = 0;
+	virtual SLANG_NO_THROW SlangResult SLANG_MCALL createOSFileArtifact(const ArtifactDesc& desc, const CharSlice& slice, IArtifact** outArtifact) = 0;
 };
 
 class DefaultArtifactHelper : public IArtifactHelper
@@ -93,7 +95,7 @@ public:
 	virtual SLANG_NO_THROW UnownedStringSlice SLANG_MCALL getStyleName(ArtifactStyle style) SLANG_OVERRIDE;
 	virtual SLANG_NO_THROW bool SLANG_MCALL isStyleDerivedFrom(ArtifactStyle style, ArtifactStyle base) SLANG_OVERRIDE;
 
-	virtual SLANG_NO_THROW SlangResult SLANG_MCALL createLockFile(const char* nameBase, ISlangMutableFileSystem* fileSystem, IFileArtifactRepresentation** outLockFile) SLANG_OVERRIDE;
+	virtual SLANG_NO_THROW SlangResult SLANG_MCALL createLockFile(const CharSlice& nameBase, IOSFileArtifactRepresentation** outLockFile) SLANG_OVERRIDE;
 
 	virtual SLANG_NO_THROW SlangResult SLANG_MCALL calcArtifactDescPath(const ArtifactDesc& desc, const char* basePath, ISlangBlob** outPath) SLANG_OVERRIDE;
 
@@ -105,10 +107,12 @@ public:
 
 	virtual SLANG_NO_THROW SlangResult SLANG_MCALL createCastableList(const Guid& guid, ICastableList** outList) SLANG_OVERRIDE;
 
-	virtual SLANG_NO_THROW SlangResult SLANG_MCALL createFileArtifactRepresentation(
-		IFileArtifactRepresentation::Kind kind, const CharSlice& path, IFileArtifactRepresentation* lockFile, ISlangMutableFileSystem* fileSystem, IFileArtifactRepresentation** outRep) SLANG_OVERRIDE;
+	virtual SLANG_NO_THROW SlangResult SLANG_MCALL createOSFileArtifactRepresentation(
+		IOSFileArtifactRepresentation::Kind kind, const CharSlice& path, IOSFileArtifactRepresentation* lockFile, IOSFileArtifactRepresentation** outRep) SLANG_OVERRIDE;
 
-	virtual SLANG_NO_THROW SlangResult SLANG_MCALL createFileArtifact(const ArtifactDesc& desc, const CharSlice& slice, IArtifact** outArtifact) SLANG_OVERRIDE;
+	virtual SLANG_NO_THROW SlangResult SLANG_MCALL createExtFileArtifactRepresentation(const CharSlice& path, ISlangFileSystemExt* system, IExtFileArtifactRepresentation** outRep) SLANG_OVERRIDE;
+
+	virtual SLANG_NO_THROW SlangResult SLANG_MCALL createOSFileArtifact(const ArtifactDesc& desc, const CharSlice& slice, IArtifact** outArtifact) SLANG_OVERRIDE;
 
 	static IArtifactHelper* getSingleton() { return &g_singleton; }
 

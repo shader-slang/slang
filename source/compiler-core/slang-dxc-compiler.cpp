@@ -86,7 +86,7 @@ static UnownedStringSlice _addName(const UnownedStringSlice& inSlice, StringSlic
 
 static UnownedStringSlice _addName(IArtifact* artifact, StringSlicePool& pool)
 {
-    return _addName(ArtifactUtil::getBaseName(artifact).getUnownedSlice(), pool);
+    return _addName(ArtifactUtil::findName(artifact), pool);
 }
 
 class DxcIncludeHandler : public IDxcIncludeHandler
