@@ -66,35 +66,6 @@ void* DownstreamCompilerBase::getObject(const Guid& guid)
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! CommandLineDownstreamCompiler !!!!!!!!!!!!!!!!!!!!!!*/
 
-static bool _isContentsInFile(const DownstreamCompileOptions& options)
-{
-    if (options.sourceContentsPath.count <= 0)
-    {
-        return false;
-    }
-
-    // We can see if we can load it
-    if (File::exists(asStringSlice(options.sourceContentsPath)))
-    {
-        // Here we look for the file on the regular file system (as opposed to using the 
-        // ISlangFileSystem. This is unfortunate but necessary - because when we call out
-        // to the compiler all it is able to (currently) see are files on the file system.
-        //
-        // Note that it could be coincidence that the filesystem has a file that's identical in
-        // contents/name. That being the case though, any includes wouldn't work for a generated
-        // file either from some specialized ISlangFileSystem, so this is probably as good as it gets
-        // until we can integrate directly to a C/C++ compiler through say a shared library where we can control
-        // file system access.
-        String readContents;
-
-        if (SLANG_SUCCEEDED(File::readAllText(asStringSlice(options.sourceContentsPath), readContents)))
-        {
-            return asStringSlice(options.sourceContents) == readContents.getUnownedSlice();
-        }
-    }
-    return false;
-}
-
 SlangResult CommandLineDownstreamCompiler::compile(const CompileOptions& inOptions, IArtifact** outArtifact)
 {
     // Copy the command line options
@@ -114,66 +85,25 @@ SlangResult CommandLineDownstreamCompiler::compile(const CompileOptions& inOptio
     ComPtr<IFileArtifactRepresentation> lockFile;
 
     // The allocator can be used for items that are not kept in scope by the options
-    SliceAllocator allocator;
+    String modulePath;
 
-    // We may need to produce a new list of source files, use this list to hold them.
-    List<TerminatedCharSlice> sourceFiles;
-
-    // Copy over all of the source files that are explicitly set, to sourceFiles which well use 
-    // to hold the actual list of sourceFiles required.
-    sourceFiles.addRange(inOptions.sourceFiles.begin(), inOptions.sourceFiles.count);
-
-    if (options.modulePath.count == 0 || options.sourceContents.count != 0)
+    // If no module path is set we will need to generate one
+    if (options.modulePath.count == 0)
     {
-        String modulePath = asString(options.modulePath);
+        // We could use the path to the source, or use the source name/paths as defined on the artifact
+        // For now we just go with a lock file based on "slang-generated".
+        SLANG_RETURN_ON_FAIL(helper->createLockFile("slang-generated", nullptr, lockFile.writeRef()));
 
-        // If there is no module path, generate one.
-        if (modulePath.getLength() == 0)
-        {
-            SLANG_RETURN_ON_FAIL(helper->createLockFile("slang-generated", nullptr, lockFile.writeRef()));
+        auto lockArtifact = Artifact::create(ArtifactDesc::make(ArtifactKind::Base, ArtifactPayload::Lock, ArtifactStyle::None));
+        lockArtifact->addRepresentation(lockFile);
 
-            auto lockArtifact = Artifact::create(ArtifactDesc::make(ArtifactKind::Base, ArtifactPayload::Lock, ArtifactStyle::None));
-            lockArtifact->addRepresentation(lockFile);
+        artifactList->add(lockArtifact);
 
-            artifactList->add(lockArtifact);
+        // Add the source files such that they can exist
+        modulePath = lockFile->getPath();
 
-            modulePath = lockFile->getPath();
-            options.modulePath = allocator.allocate(modulePath);
-        }
-        
-        if (_isContentsInFile(options))
-        {
-            sourceFiles.add(options.sourceContentsPath);
-        }
-        else
-        {
-            // Work out the ArtifactDesc for the source language
-            const auto sourceDesc = ArtifactDescUtil::makeDescForSourceLanguage(options.sourceLanguage);
-
-            // Work out the name for the source
-            StringBuilder compileSourcePath;
-            SLANG_RETURN_ON_FAIL(ArtifactDescUtil::calcPathForDesc(sourceDesc, (modulePath + "-src").getUnownedSlice(), compileSourcePath));
-
-            // Write it out
-            SLANG_RETURN_ON_FAIL(File::writeAllText(compileSourcePath, asStringSlice(options.sourceContents)));
-            
-            // Create the reference to the file 
-            auto fileRep = FileArtifactRepresentation::create(IFileArtifactRepresentation::Kind::Owned, compileSourcePath.getUnownedSlice(), lockFile, nullptr);
-            auto fileArtifact = ArtifactUtil::createArtifact(ArtifactDescUtil::makeDescForSourceLanguage(options.sourceLanguage));
-            fileArtifact->addRepresentation(fileRep);
-
-            artifactList->add(fileArtifact);
-
-            // Add it as a source file
-            sourceFiles.add(allocator.allocate(compileSourcePath));
-        }
-
-        // There is no source contents
-        options.sourceContents = TerminatedCharSlice();
-        options.sourceContentsPath = TerminatedCharSlice();
+        options.modulePath = SliceUtil::asTerminatedCharSlice(modulePath);
     }
-
-    options.sourceFiles = SliceCaster::asSlice(sourceFiles);
 
     // Append command line args to the end of cmdLine using the target specific function for the specified options
     SLANG_RETURN_ON_FAIL(calcArgs(options, cmdLine));
@@ -252,6 +182,15 @@ SlangResult CommandLineDownstreamCompiler::compile(const CompileOptions& inOptio
                 --count;
                 --i;
             }
+        }
+    }
+
+    // Add all of the source artifacts, that are temporary on the file system, such that they can stay in scope for debugging
+    for (auto sourceArtifact : options.sourceArtifacts)
+    {
+        if (ArtifactUtil::findFileSystemTemporaryFile(sourceArtifact) && sourceArtifact->exists())
+        {
+            artifactList->add(sourceArtifact);
         }
     }
 

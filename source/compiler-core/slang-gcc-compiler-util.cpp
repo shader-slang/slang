@@ -356,7 +356,7 @@ static SlangResult _parseGCCFamilyLine(SliceAllocator& allocator, const UnownedS
     SliceAllocator allocator;
 
     diagnostics->reset();
-    diagnostics->setRaw(SliceCaster::asCharSlice(exeRes.standardError));
+    diagnostics->setRaw(SliceUtil::asCharSlice(exeRes.standardError));
 
     // We hold in workDiagnostics so as it is more convenient to append to the last with a continuation
     // also means we don't hold the allocations of building up continuations, just the results when finally allocated at the end
@@ -456,7 +456,6 @@ static SlangResult _parseGCCFamilyLine(SliceAllocator& allocator, const UnownedS
 
 /* static */SlangResult GCCDownstreamCompilerUtil::calcArgs(const CompileOptions& options, CommandLine& cmdLine)
 {
-    SLANG_ASSERT(options.sourceContents.count == 0);
     SLANG_ASSERT(options.modulePath.count);
 
     PlatformKind platformKind = (options.platform == PlatformKind::Unknown) ? PlatformUtil::getPlatformKind() : options.platform;
@@ -613,10 +612,15 @@ static SlangResult _parseGCCFamilyLine(SliceAllocator& allocator, const UnownedS
         }
     }
 
-    // Files to compile
-    for (const auto& sourceFile : options.sourceFiles)
+    // Files to compile, need to be on the file system.
+    for (IArtifact* sourceArtifact : options.sourceArtifacts)
     {
-        cmdLine.addArg(asString(sourceFile));
+        ComPtr<IFileArtifactRepresentation> fileRep;
+
+        // TODO(JS): 
+        // Do we want to keep the file on the file system? It's probably reasonable to do so.
+        SLANG_RETURN_ON_FAIL(sourceArtifact->requireFile(ArtifactKeep::Yes, nullptr, fileRep.writeRef()));
+        cmdLine.addArg(fileRep->getPath());
     }
 
     // Add the library paths

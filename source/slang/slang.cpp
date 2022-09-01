@@ -2575,6 +2575,8 @@ void FrontEndCompileRequest::addTranslationUnitSourceBlob(
     // The path specified may or may not be a file path - mark as being constructed 'FromString'.
     SourceFile* sourceFile = getSourceManager()->createSourceFileWithBlob(PathInfo::makeFromString(path), sourceBlob);
     
+    sourceFile->maybeAddArtifact(nullptr);
+
     addTranslationUnitSourceFile(translationUnitIndex, sourceFile);
 }
 
@@ -2585,6 +2587,8 @@ void FrontEndCompileRequest::addTranslationUnitSourceString(
 {
     // The path specified may or may not be a file path - mark as being constructed 'FromString'.
     SourceFile* sourceFile = getSourceManager()->createSourceFileWithString(PathInfo::makeFromString(path), source);
+
+    sourceFile->maybeAddArtifact(nullptr);
 
     addTranslationUnitSourceFile(translationUnitIndex, sourceFile);
 }
@@ -2617,6 +2621,9 @@ void FrontEndCompileRequest::addTranslationUnitSourceFile(
 
     // Was loaded from the specified path
     SourceFile* sourceFile = getSourceManager()->createSourceFileWithBlob(pathInfo, sourceBlob);
+
+    sourceFile->maybeAddArtifact(getLinkage()->getFileSystemExt());
+
     addTranslationUnitSourceFile(translationUnitIndex, sourceFile);
 }
 

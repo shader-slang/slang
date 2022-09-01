@@ -7,6 +7,8 @@
 #include "slang-artifact-desc-util.h"
 #include "slang-artifact-util.h"
 
+#include "../compiler-core/slang-slice-allocator.h"
+
 #include "../core/slang-castable-list-impl.h"
 #include "../core/slang-castable-util.h"
 
@@ -108,12 +110,21 @@ SlangResult DefaultArtifactHelper::createLockFile(const char* inNameBase, ISlang
 	return SLANG_OK;
 }
 
-SlangResult DefaultArtifactHelper::calcArtifactPath(const ArtifactDesc& desc, const char* inBasePath, ISlangBlob** outPath)
+SlangResult DefaultArtifactHelper::calcArtifactDescPath(const ArtifactDesc& desc, const char* inBasePath, ISlangBlob** outPath)
 {
 	UnownedStringSlice basePath(inBasePath);
 	StringBuilder path;
 	SLANG_RETURN_ON_FAIL(ArtifactDescUtil::calcPathForDesc(desc, basePath, path));
-	*outPath = StringBlob::create(path).detach();
+	*outPath = StringBlob::moveCreate(path).detach();
+	return SLANG_OK;
+}
+
+SlangResult DefaultArtifactHelper::calcArtifactPath(IArtifact* artifact, const char* inBasePath, ISlangBlob** outPath)
+{
+	UnownedStringSlice basePath(inBasePath);
+	StringBuilder path;
+	SLANG_RETURN_ON_FAIL(ArtifactUtil::calcPath(artifact, basePath, path));
+	*outPath = StringBlob::moveCreate(path).detach();
 	return SLANG_OK;
 }
 
@@ -138,6 +149,26 @@ SlangResult DefaultArtifactHelper::createCastableList(const Guid& guid, ICastabl
 	}
 	delete list;
 	return SLANG_E_NO_INTERFACE;
+}
+
+SlangResult DefaultArtifactHelper::createFileArtifactRepresentation(
+	IFileArtifactRepresentation::Kind kind, const CharSlice& path, IFileArtifactRepresentation* lockFile, ISlangMutableFileSystem* fileSystem, IFileArtifactRepresentation** outRep)
+{
+	*outRep = FileArtifactRepresentation::create(kind, asStringSlice(path), lockFile, fileSystem).detach();
+	return SLANG_OK;
+}
+
+
+SlangResult DefaultArtifactHelper::createFileArtifact(const ArtifactDesc& desc, const CharSlice& path, IArtifact** outArtifact)
+{
+	auto artifact = Artifact::create(desc);
+
+	auto fileRep = new FileArtifactRepresentation(IFileArtifactRepresentation::Kind::Reference, asStringSlice(path), nullptr, nullptr);
+
+	artifact->addRepresentation(fileRep);
+
+	*outArtifact = artifact.detach();
+	return SLANG_OK;
 }
 
 } // namespace Slang

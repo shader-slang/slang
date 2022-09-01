@@ -187,7 +187,7 @@ SlangResult DefaultArtifactHandler::getOrCreateFileRepresentation(IArtifact* art
 
 	// Now we need the appropriate name for this item
 	ComPtr<ISlangBlob> pathBlob;
-	SLANG_RETURN_ON_FAIL(helper->calcArtifactPath(artifact->getDesc(), lockFile->getPath(), pathBlob.writeRef()));
+	SLANG_RETURN_ON_FAIL(helper->calcArtifactPath(artifact, lockFile->getPath(), pathBlob.writeRef()));
 
 	const auto path = StringUtil::getSlice(pathBlob);
 

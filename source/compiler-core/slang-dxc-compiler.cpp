@@ -278,11 +278,13 @@ static SlangResult _handleOperationResult(IDxcOperationResult* dxcResult, IArtif
 
 SlangResult DXCDownstreamCompiler::compile(const CompileOptions& options, IArtifact** outArtifact)
 {
-    // This compiler doesn't read files, they should be read externally and stored in sourceContents/sourceContentsPath
-    if (options.sourceFiles.count > 0)
+    // This compiler can only deal with a single artifact
+    if (options.sourceArtifacts.count != 1)
     {
         return SLANG_FAIL;
     }
+
+    IArtifact* sourceArtifact = options.sourceArtifacts[0];
 
     if (options.sourceLanguage != SLANG_SOURCE_LANGUAGE_HLSL || options.targetType != SLANG_DXIL)
     {
@@ -311,13 +313,14 @@ SlangResult DXCDownstreamCompiler::compile(const CompileOptions& options, IArtif
     ComPtr<IDxcLibrary> dxcLibrary;
     SLANG_RETURN_ON_FAIL(m_createInstance(CLSID_DxcLibrary, __uuidof(dxcLibrary), (LPVOID*)dxcLibrary.writeRef()));
 
-    const auto& hlslSource = options.sourceContents;
+    ComPtr<ISlangBlob> sourceBlob;
+    SLANG_RETURN_ON_FAIL(sourceArtifact->loadBlob(ArtifactKeep::Yes, sourceBlob.writeRef()));
 
     // Create blob from the string
     ComPtr<IDxcBlobEncoding> dxcSourceBlob;
     SLANG_RETURN_ON_FAIL(dxcLibrary->CreateBlobWithEncodingFromPinned(
-        (LPBYTE)hlslSource.data,
-        (UINT32)hlslSource.count,
+        (LPBYTE)sourceBlob->getBufferPointer(),
+        (UINT32)sourceBlob->getBufferSize(),
         0,
         dxcSourceBlob.writeRef()));
 
@@ -432,13 +435,14 @@ SlangResult DXCDownstreamCompiler::compile(const CompileOptions& options, IArtif
         searchDirectories.searchDirectories.add(asString(includePath));
     }
 
-    OSString sourcePath = asString(options.sourceContentsPath).toWString();
+    String sourcePath = ArtifactUtil::findPath(sourceArtifact);
+    OSString wideSourcePath = sourcePath.toWString();
 
     DxcIncludeHandler includeHandler(&searchDirectories, options.fileSystemExt, options.sourceManager);
 
     ComPtr<IDxcOperationResult> dxcResult;
     SLANG_RETURN_ON_FAIL(dxcCompiler->Compile(dxcSourceBlob,
-        sourcePath.begin(),
+        wideSourcePath.begin(),
         wideEntryPointName.begin(),
         wideProfileName.begin(),
         args.getBuffer(),
@@ -480,9 +484,9 @@ SlangResult DXCDownstreamCompiler::compile(const CompileOptions& options, IArtif
         {
             name = Path::getFileNameWithoutExt(asString(options.modulePath));
         }
-        else if (options.sourceContentsPath.count)
+        else if (sourcePath.getLength())
         {
-            name = Path::getFileNameWithoutExt(asString(options.sourceContentsPath));
+            name = Path::getFileNameWithoutExt(sourcePath);
         }
 
         // Add the blob with name
