@@ -3025,6 +3025,8 @@ SLANG_FORCE_INLINE EndToEndCompileRequest* asInternal(SlangCompileRequest* reque
 
 SLANG_FORCE_INLINE SlangCompileTarget asExternal(CodeGenTarget target) { return (SlangCompileTarget)target; }
 
+SLANG_FORCE_INLINE SlangSourceLanguage asExternal(SourceLanguage sourceLanguage) { return (SlangSourceLanguage)sourceLanguage; }
+
 }
 
 #endif

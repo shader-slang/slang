@@ -2564,7 +2564,42 @@ void FrontEndCompileRequest::addTranslationUnitSourceFile(
     int             translationUnitIndex,
     SourceFile*     sourceFile)
 {
-    translationUnits[translationUnitIndex]->addSourceFile(sourceFile);
+    auto translationUnit = translationUnits[translationUnitIndex];
+    
+    // TODO(JS): 
+    // The larger problem here is that a file on a file system *could* be interpretted in different ways.
+    // When the user supplies the source as a string, we use the source type specified for the translation unit.
+    // 
+    // If it's on the file system it could be (say) compiled as HLSL or some other way. A *downstream* compiler
+    // that used the file system may care.  
+    //
+    // We will assume here, that if it's loaded from the file system, it's path extension defines how it should be interpretted
+    // If that wasn't the case we'd have to either *copy*, or do some command line fiddling to tell it for the downstream compiler
+    // what the file is. 
+
+    const auto& pathInfo = sourceFile->getPathInfo();
+    const auto pathType = pathInfo.type;
+
+    switch (pathType)
+    {
+        case PathInfo::Type::FromString:
+        {
+            // Set the artifact type from the the source language type
+            auto sourceDesc = ArtifactDescUtil::makeDescForSourceLanguage(asExternal(translationUnit->sourceLanguage));
+            sourceFile->maybeAddArtifact(&sourceDesc, nullptr);
+            break;
+        }
+        case PathInfo::Type::FoundPath:
+        case PathInfo::Type::Normal:
+        {
+            // We'll *not* use the source for the artifact type. Doing so will lead to the type being determined via extension
+            sourceFile->maybeAddArtifact(nullptr, getLinkage()->getFileSystemExt());
+            break;
+        }
+    }
+
+    // Add the source file
+    translationUnit->addSourceFile(sourceFile);
 }
 
 void FrontEndCompileRequest::addTranslationUnitSourceBlob(
@@ -2617,6 +2652,7 @@ void FrontEndCompileRequest::addTranslationUnitSourceFile(
 
     // Was loaded from the specified path
     SourceFile* sourceFile = getSourceManager()->createSourceFileWithBlob(pathInfo, sourceBlob);
+
     addTranslationUnitSourceFile(translationUnitIndex, sourceFile);
 }
 

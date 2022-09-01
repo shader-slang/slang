@@ -41,6 +41,7 @@ public:
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL getCanonicalPath(const char* path, ISlangBlob** outCanonicalPath) SLANG_OVERRIDE;
     virtual SLANG_NO_THROW void SLANG_MCALL clearCache() SLANG_OVERRIDE {}
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL enumeratePathContents(const char* path, FileSystemContentsCallBack callback, void* userData) SLANG_OVERRIDE;
+    virtual SLANG_NO_THROW OSPathKind SLANG_MCALL getOSPathKind() SLANG_OVERRIDE { return OSPathKind::Direct; }
 
     // ISlangModifyableFileSystem
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL saveFile(const char* path, const void* data, size_t size) SLANG_OVERRIDE;
@@ -155,6 +156,7 @@ class CacheFileSystem: public ISlangFileSystemExt, public RefObject
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL getCanonicalPath(const char* path, ISlangBlob** outCanonicalPath) SLANG_OVERRIDE;
     virtual SLANG_NO_THROW void SLANG_MCALL clearCache() SLANG_OVERRIDE;
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL enumeratePathContents(const char* path, FileSystemContentsCallBack callback, void* userData) SLANG_OVERRIDE;
+    virtual SLANG_NO_THROW OSPathKind SLANG_MCALL getOSPathKind() SLANG_OVERRIDE { return m_osPathKind; }
 
         /// Get the unique identity mode
     UniqueIdentityMode getUniqueIdentityMode() const { return m_uniqueIdentityMode; }
@@ -202,6 +204,8 @@ protected:
 
     ComPtr<ISlangFileSystem> m_fileSystem;              ///< Must always be set
     ComPtr<ISlangFileSystemExt> m_fileSystemExt;        ///< Optionally set -> if nullptr will fall back on the m_fileSystem and emulate all the other methods of ISlangFileSystemExt
+
+    OSPathKind m_osPathKind = OSPathKind::None;         ///< OS path kind
 };
 
 class RelativeFileSystem : public ISlangMutableFileSystem, public RefObject
@@ -220,6 +224,7 @@ public:
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL getCanonicalPath(const char* path, ISlangBlob** outCanonicalPath) SLANG_OVERRIDE;
     virtual SLANG_NO_THROW void SLANG_MCALL clearCache() SLANG_OVERRIDE;
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL enumeratePathContents(const char* path, FileSystemContentsCallBack callback, void* userData) SLANG_OVERRIDE;
+    virtual SLANG_NO_THROW OSPathKind SLANG_MCALL getOSPathKind() SLANG_OVERRIDE { return m_osPathKind; }
 
     // ISlangModifyableFileSystem
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL saveFile(const char* path, const void* data, size_t size) SLANG_OVERRIDE;
@@ -245,6 +250,7 @@ protected:
     ComPtr<ISlangFileSystem> m_fileSystem;          ///< NOTE! Has to match what's in style, such style can be reached via reinterpret_cast
 
     String m_relativePath;
+    OSPathKind m_osPathKind = OSPathKind::None;         ///< OS path kind
 };
 
 }

@@ -722,10 +722,10 @@ Val* PolynomialIntVal::_substituteImplOverride(ASTBuilder* astBuilder, Substitut
     *ioDiff += diff;
 
     if (evaluatedTerms.getCount() == 0)
-        return astBuilder->create<ConstantIntVal>(evaluatedConstantTerm);
+        return astBuilder->create<ConstantIntVal>(type, evaluatedConstantTerm);
     if (diff != 0)
     {
-        auto newPolynomial = astBuilder->create<PolynomialIntVal>();
+        auto newPolynomial = astBuilder->create<PolynomialIntVal>(type);
         newPolynomial->constantTerm = evaluatedConstantTerm;
         newPolynomial->terms = _Move(evaluatedTerms);
         return newPolynomial->canonicalize(astBuilder);
@@ -770,7 +770,7 @@ bool addToPolynomialTerm(ASTBuilder* astBuilder, PolynomialIntVal* val, IntVal* 
 
 PolynomialIntVal* PolynomialIntVal::neg(ASTBuilder* astBuilder, IntVal* base)
 {
-    auto result = astBuilder->create<PolynomialIntVal>();
+    auto result = astBuilder->create<PolynomialIntVal>(base->type);
     if (!addToPolynomialTerm(astBuilder, result, base, -1))
         return nullptr;
     result->canonicalize(astBuilder);
@@ -779,7 +779,7 @@ PolynomialIntVal* PolynomialIntVal::neg(ASTBuilder* astBuilder, IntVal* base)
 
 PolynomialIntVal* PolynomialIntVal::sub(ASTBuilder* astBuilder, IntVal* op0, IntVal* op1)
 {
-    auto result = astBuilder->create<PolynomialIntVal>();
+    auto result = astBuilder->create<PolynomialIntVal>(op0->type);
     if (!addToPolynomialTerm(astBuilder, result, op0, 1))
         return nullptr;
     if (!addToPolynomialTerm(astBuilder, result, op1, -1))
@@ -790,7 +790,7 @@ PolynomialIntVal* PolynomialIntVal::sub(ASTBuilder* astBuilder, IntVal* op0, Int
 
 PolynomialIntVal* PolynomialIntVal::add(ASTBuilder* astBuilder, IntVal* op0, IntVal* op1)
 {
-    auto result = astBuilder->create<PolynomialIntVal>();
+    auto result = astBuilder->create<PolynomialIntVal>(op0->type);
     if (!addToPolynomialTerm(astBuilder, result, op0, 1))
         return nullptr;
     if (!addToPolynomialTerm(astBuilder, result, op1, 1))
@@ -805,7 +805,7 @@ PolynomialIntVal* PolynomialIntVal::mul(ASTBuilder* astBuilder, IntVal* op0, Int
     {
         if (auto poly1 = as<PolynomialIntVal>(op1))
         {
-            auto result = astBuilder->create<PolynomialIntVal>();
+            auto result = astBuilder->create<PolynomialIntVal>(poly0->type);
             // add poly0.constant * poly1.constant
             result->constantTerm = poly0->constantTerm * poly1->constantTerm;
             // add poly0.constant * poly1.terms
@@ -847,7 +847,7 @@ PolynomialIntVal* PolynomialIntVal::mul(ASTBuilder* astBuilder, IntVal* op0, Int
         }
         else if (auto cVal1 = as<ConstantIntVal>(op1))
         {
-            auto result = astBuilder->create<PolynomialIntVal>();
+            auto result = astBuilder->create<PolynomialIntVal>(poly0->type);
             result->constantTerm = poly0->constantTerm * cVal1->value;
             auto factor1 = astBuilder->create<PolynomialIntValFactor>();
             for (auto term : poly0->terms)
@@ -863,7 +863,7 @@ PolynomialIntVal* PolynomialIntVal::mul(ASTBuilder* astBuilder, IntVal* op0, Int
         }
         else if (auto val1 = as<IntVal>(op1))
         {
-            auto result = astBuilder->create<PolynomialIntVal>();
+            auto result = astBuilder->create<PolynomialIntVal>(poly0->type);
             result->constantTerm = 0;
             auto factor1 = astBuilder->create<PolynomialIntValFactor>();
             factor1->power = 1;
@@ -901,7 +901,7 @@ PolynomialIntVal* PolynomialIntVal::mul(ASTBuilder* astBuilder, IntVal* op0, Int
         }
         else if (auto cVal1 = as<ConstantIntVal>(op1))
         {
-            auto result = astBuilder->create<PolynomialIntVal>();
+            auto result = astBuilder->create<PolynomialIntVal>(val0->type);
             auto term = astBuilder->create<PolynomialIntValTerm>();
             term->constFactor = cVal1->value;
             auto factor0 = astBuilder->create<PolynomialIntValFactor>();
@@ -914,7 +914,7 @@ PolynomialIntVal* PolynomialIntVal::mul(ASTBuilder* astBuilder, IntVal* op0, Int
         }
         else if (auto val1 = as<IntVal>(op1))
         {
-            auto result = astBuilder->create<PolynomialIntVal>();
+            auto result = astBuilder->create<PolynomialIntVal>(val0->type);
             auto term = astBuilder->create<PolynomialIntValTerm>();
             term->constFactor = 1;
             auto factor0 = astBuilder->create<PolynomialIntValFactor>();
@@ -1035,7 +1035,7 @@ IntVal* PolynomialIntVal::canonicalize(ASTBuilder* builder)
         return terms[0]->paramFactors[0]->param;
     }
     if (terms.getCount() == 0)
-        return builder->create<ConstantIntVal>(constantTerm);
+        return builder->create<ConstantIntVal>(type, constantTerm);
     return this;
 }
 
@@ -1127,7 +1127,7 @@ static bool nameIs(Name* name, const char* val)
     return false;
 }
 
-Val* FuncCallIntVal::tryFoldImpl(ASTBuilder* astBuilder, DeclRef<Decl> newFuncDecl, List<IntVal*>& newArgs, DiagnosticSink* sink)
+Val* FuncCallIntVal::tryFoldImpl(ASTBuilder* astBuilder, Type* resultType, DeclRef<Decl> newFuncDecl, List<IntVal*>& newArgs, DiagnosticSink* sink)
 {
     // Are all args const now?
     List<ConstantIntVal*> constArgs;
@@ -1207,7 +1207,7 @@ Val* FuncCallIntVal::tryFoldImpl(ASTBuilder* astBuilder, DeclRef<Decl> newFuncDe
         {
             SLANG_UNREACHABLE("constant folding of FuncCallIntVal");
         }
-        return astBuilder->create<ConstantIntVal>(resultValue);
+        return astBuilder->create<ConstantIntVal>(resultType, resultValue);
     }
     return nullptr;
 }
@@ -1228,12 +1228,12 @@ Val* FuncCallIntVal::_substituteImplOverride(ASTBuilder* astBuilder, Substitutio
     if (diff)
     {
         // TODO: report diagnostics back.
-        auto newVal = tryFoldImpl(astBuilder, newFuncDeclRef, newArgs, nullptr);
+        auto newVal = tryFoldImpl(astBuilder, type, newFuncDeclRef, newArgs, nullptr);
         if (newVal)
             return newVal;
         else
         {
-            auto result = astBuilder->create<FuncCallIntVal>();
+            auto result = astBuilder->create<FuncCallIntVal>(type);
             result->args = _Move(newArgs);
             result->funcDeclRef = newFuncDeclRef;
             result->funcType = funcType;

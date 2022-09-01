@@ -95,29 +95,99 @@ namespace Slang {
     return artifact->findArtifactByPredicate(IArtifact::FindStyle::SelfOrChildren, &ArtifactUtil::isSignificant, nullptr);
 }
 
-/* static */String ArtifactUtil::getBaseName(IArtifact* artifact)
+UnownedStringSlice ArtifactUtil::findPath(IArtifact* artifact)
 {
-    if (auto fileRep = findRepresentation<IFileArtifactRepresentation>(artifact))
+    // If a name is set we'll just use that
     {
-        return ArtifactDescUtil::getBaseName(artifact->getDesc(), fileRep);
+        const UnownedStringSlice name(artifact->getName());
+        if (name.getLength())
+        {
+            return name;
+        }
     }
-    // Else use the name
-    return artifact->getName();
+
+    IPathArtifactRepresentation* bestRep = nullptr;
+
+    // Look for a rep with a path. Prefer IExtFile because a IOSFile might be a temporary file
+    for (auto rep : artifact->getRepresentations())
+    {
+        if (auto pathRep = as<IPathArtifactRepresentation>(rep))
+        {
+            if (pathRep->getPathType() == SLANG_PATH_TYPE_FILE && 
+                (bestRep == nullptr || as<IExtFileArtifactRepresentation>(rep)))
+            {
+                bestRep = pathRep;
+            }
+        }
+    }
+
+    const UnownedStringSlice name = bestRep ? UnownedStringSlice(bestRep->getPath()) : UnownedStringSlice();
+    return name.getLength() ? name : UnownedStringSlice();
 }
 
-/* static */String ArtifactUtil::getParentPath(IFileArtifactRepresentation* fileRep)
+/* static */UnownedStringSlice ArtifactUtil::inferExtension(IArtifact* artifact)
 {
-    UnownedStringSlice path(fileRep->getPath());
-    return Path::getParentDirectory(path);
+    const UnownedStringSlice path = findPath(artifact);
+    if (path.getLength())
+    {
+        auto ext = Path::getPathExt(UnownedStringSlice(path));
+        if (ext.getLength())
+        {
+            return ext;
+        }
+    }
+    return UnownedStringSlice();
 }
 
-/* static */String ArtifactUtil::getParentPath(IArtifact* artifact)
+/* static */UnownedStringSlice ArtifactUtil::findName(IArtifact* artifact)
 {
-    if (auto fileRep = findRepresentation<IFileArtifactRepresentation>(artifact))
+    const UnownedStringSlice path = findPath(artifact);
+    const Index pos = Path::findLastSeparatorIndex(path);
+    return (pos >= 0) ? path.tail(pos + 1) : path;
+}
+
+static SlangResult _calcInferred(IArtifact* artifact, const UnownedStringSlice& basePath, StringBuilder& outPath)
+{
+    auto ext = ArtifactUtil::inferExtension(artifact);
+
+    // If no extension was determined by inferring, go with unknown
+    if (ext.begin() == nullptr)
     {
-        return getParentPath(fileRep);
+        ext = toSlice("unknown");
     }
-    return String();
+
+    outPath.Clear();
+    outPath.append(basePath);
+    if (ext.getLength())
+    {
+        outPath.appendChar('.');
+        outPath.append(ext);
+    }
+    return SLANG_OK;
+}
+
+/* static */SlangResult ArtifactUtil::calcPath(IArtifact* artifact, const UnownedStringSlice& basePath, StringBuilder& outPath)
+{
+    if (ArtifactDescUtil::hasDefinedNameForDesc(artifact->getDesc()))
+    {
+        return ArtifactDescUtil::calcPathForDesc(artifact->getDesc(), basePath, outPath);
+    }
+    else
+    {
+        return _calcInferred(artifact, basePath, outPath);
+    }
+}
+
+/* static */SlangResult ArtifactUtil::calcName(IArtifact* artifact, const UnownedStringSlice& baseName, StringBuilder& outName)
+{
+    if (ArtifactDescUtil::hasDefinedNameForDesc(artifact->getDesc()))
+    {
+        return ArtifactDescUtil::calcNameForDesc(artifact->getDesc(), baseName, outName);
+    }
+    else
+    {
+        return _calcInferred(artifact, baseName, outName);
+    }
 }
 
 } // namespace Slang

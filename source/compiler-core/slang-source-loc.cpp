@@ -4,6 +4,11 @@
 #include "../core/slang-string-util.h"
 #include "../core/slang-string-escape-util.h"
 
+#include "slang-artifact-representation-impl.h"
+#include "slang-artifact-impl.h"
+#include "slang-artifact-util.h"
+#include "slang-artifact-desc-util.h"
+
 namespace Slang {
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!! SourceView !!!!!!!!!!!!!!!!!!!!!!!!!!!! */
@@ -20,6 +25,20 @@ const String PathInfo::getMostUniqueIdentity() const
         }
         default:                return "";
     }
+}
+
+String PathInfo::getName() const
+{
+    switch (type)
+    {
+        case Type::Normal:
+        case Type::FromString:
+        case Type::FoundPath:
+        {
+            return foundPath;
+        }
+    }
+    return String();
 }
 
 bool PathInfo::operator==(const ThisType& rhs) const
@@ -413,6 +432,69 @@ String SourceFile::calcVerbosePath() const
     }
 
     return m_pathInfo.foundPath;
+}
+
+void SourceFile::maybeAddArtifact(const ArtifactDesc* inArtifactDesc, ISlangFileSystemExt* ext)
+{
+    if (!m_contentBlob)
+    {
+        return;
+    }
+
+    // If there already is an artifact, we don't need to create one
+    if (m_artifact)
+    {
+        // Check it has a blob and the blob is the same as the content blob
+        SLANG_ASSERT(m_contentBlob == findRepresentation<ISlangBlob>(m_artifact));
+        return;
+    }
+
+    ArtifactDesc artifactDesc;
+
+    if (inArtifactDesc)
+    {
+        artifactDesc = *inArtifactDesc;
+    }
+    else
+    {
+        // Set the default
+        artifactDesc = ArtifactDesc::make(ArtifactKind::Source, ArtifactPayload::Unknown, ArtifactStyle::Unknown);
+
+        // Let's work out from the 
+        // We could try and work it out
+        if (getPathInfo().foundPath.getLength())
+        {
+            // Let's work out what kind of source it is from the this
+            auto desc = ArtifactDescUtil::getDescFromPath(getPathInfo().foundPath.getUnownedSlice());
+
+            // If found something just use that
+            if (desc.kind == ArtifactKind::Source)
+            {
+                artifactDesc = desc;
+            }
+        }
+    }
+
+    // We don't know how the source will be used
+    m_artifact = Artifact::create(artifactDesc);
+
+    // Add the blob as a representation.
+    m_artifact->addRepresentationUnknown(m_contentBlob);
+
+    // If we have the file system, set up the rep to that
+    if (ext)
+    {
+        // Add the representation on the file system
+        auto extRep = new ExtFileArtifactRepresentation(getPathInfo().foundPath.getUnownedSlice(), ext);
+        m_artifact->addRepresentation(extRep);
+    }
+
+    // Get the name 
+    auto name = getPathInfo().getName();
+    if (name.getLength())
+    {
+        m_artifact->setName(name.getBuffer());
+    }
 }
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!! SourceManager !!!!!!!!!!!!!!!!!!!!!!!!!!!! */

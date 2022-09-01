@@ -731,6 +731,7 @@ struct SpecializationContext
         // This prevents us from generating duplicated specializations
         // when this pass is invoked iteratively.
         readSpecializationDictionaries();
+        sharedBuilder->deduplicateAndRebuildGlobalNumberingMap();
 
         // The unspecialized IR we receive as input will have
         // `IRBindGlobalGenericParam` instructions that associate
