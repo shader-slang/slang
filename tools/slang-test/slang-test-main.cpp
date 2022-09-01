@@ -1202,33 +1202,39 @@ TestResult asTestResult(ToolReturnCode code)
         } \
     }
 
-static SlangResult _executeBinary(const UnownedStringSlice& hexDump, ExecuteResult& outExeRes)
+static SlangResult _createArtifactFromHexDump(const UnownedStringSlice& hexDump, const ArtifactDesc& desc, ComPtr<IArtifact>& outArtifact)
 {
     // We need to extract the binary
     List<uint8_t> data;
     SLANG_RETURN_ON_FAIL(HexDumpUtil::parseWithMarkers(hexDump, data));
 
-    TemporaryFileSet temporaryFileSet;
+    auto blob = ListBlob::moveCreate(data);
+    auto artifact = ArtifactUtil::createArtifact(desc);
+    artifact->addRepresentationUnknown(blob);
 
-    // Need to write this off to a temporary file
+    outArtifact.swap(artifact);
+    return SLANG_OK;
+}
 
-    String temporaryLockPath;
+static SlangResult _loadAsSharedLibrary(const UnownedStringSlice& hexDump, TemporaryFileSet& inOutTemporaryFileSet, ComPtr<ISlangSharedLibrary>& outSharedLibrary)
+{
+    ComPtr<IArtifact> artifact;
+    SLANG_RETURN_ON_FAIL(_createArtifactFromHexDump(hexDump, ArtifactDesc::make(ArtifactKind::SharedLibrary, ArtifactPayload::HostCPU, ArtifactStyle::Unknown), artifact));
+    ComPtr<ICastable> castable;
+    SLANG_RETURN_ON_FAIL(artifact->getOrCreateRepresentation(ISlangSharedLibrary::getTypeGuid(), ArtifactKeep::Yes, castable.writeRef()));
+    outSharedLibrary = as<ISlangSharedLibrary>(castable);
+    return SLANG_OK;
+}
 
-    SLANG_RETURN_ON_FAIL(File::generateTemporary(UnownedStringSlice("slang-test"), temporaryLockPath));
-    String fileName = temporaryLockPath;
-    // And the temporary lock path
-    temporaryFileSet.add(temporaryLockPath);
+static SlangResult _executeBinary(const UnownedStringSlice& hexDump, ExecuteResult& outExeRes)
+{
+    ComPtr<IArtifact> artifact;
+    SLANG_RETURN_ON_FAIL(_createArtifactFromHexDump(hexDump, ArtifactDesc::make(ArtifactKind::Executable, ArtifactPayload::HostCPU, ArtifactStyle::Unknown), artifact));
 
-    fileName.append(Process::getExecutableSuffix());
+    ComPtr<IOSFileArtifactRepresentation> fileRep;
+    SLANG_RETURN_ON_FAIL(artifact->requireFile(ArtifactKeep::Yes, fileRep.writeRef()));
 
-    temporaryFileSet.add(fileName);
-    
-    {
-        ComPtr<ISlangWriter> writer;
-        SLANG_RETURN_ON_FAIL(FileWriter::createBinary(fileName.getBuffer(), 0, writer));
-
-        SLANG_RETURN_ON_FAIL(writer->write((const char*)data.getBuffer(), data.getCount()));
-    }
+    const auto fileName = fileRep->getPath();
 
     // Make executable... (for linux/unix like targets)
     SLANG_RETURN_ON_FAIL(File::makeExecutable(fileName));
@@ -2009,37 +2015,6 @@ TestResult runCompile(TestContext* context, TestInput& input)
     }
 
     return TestResult::Pass;
-}
-
-
-static SlangResult _loadAsSharedLibrary(const UnownedStringSlice& hexDump, TemporaryFileSet& inOutTemporaryFileSet, SharedLibrary::Handle& outSharedLibrary)
-{
-    // We need to extract the binary
-    List<uint8_t> data;
-    SLANG_RETURN_ON_FAIL(HexDumpUtil::parseWithMarkers(hexDump, data));
-
-    // Need to write this off to a temporary file
-    
-    String temporaryLockPath;
-    SLANG_RETURN_ON_FAIL(File::generateTemporary(UnownedStringSlice("slang-test"), temporaryLockPath));
-    inOutTemporaryFileSet.add(temporaryLockPath);
-
-    String fileName = temporaryLockPath;
-
-    // Need to work out the dll name
-    String sharedLibraryName = SharedLibrary::calcPlatformPath(fileName.getUnownedSlice());
-    inOutTemporaryFileSet.add(sharedLibraryName);
-
-    {
-        ComPtr<ISlangWriter> writer;
-        SLANG_RETURN_ON_FAIL(FileWriter::createBinary(sharedLibraryName.getBuffer(), 0, writer));
-        SLANG_RETURN_ON_FAIL(writer->write((const char*)data.getBuffer(), data.getCount()));
-    }
-
-    // Make executable... (for linux/unix like targets)
-    //SLANG_RETURN_ON_FAIL(File::makeExecutable(fileName));
-
-    return SharedLibrary::loadWithPlatformPath(sharedLibraryName.getBuffer(), outSharedLibrary);
 }
 
 TestResult runSimpleCompareCommandLineTest(TestContext* context, TestInput& input)

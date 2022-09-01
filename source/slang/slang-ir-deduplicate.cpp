@@ -53,17 +53,22 @@ namespace Slang
         context.builder = this;
         m_constantMap.Clear();
         m_globalValueNumberingMap.Clear();
+        List<IRInst*> instToRemove;
         for (auto inst : m_module->getGlobalInsts())
         {
             if (auto constVal = as<IRConstant>(inst))
             {
-                context.addConstantValue(constVal);
+                auto newConst = context.addConstantValue(constVal);
+                if (newConst != constVal)
+                {
+                    constVal->replaceUsesWith(newConst);
+                    instToRemove.add(constVal);
+                }
             }
         }
-        List<IRInst*> instToRemove;
         for (auto inst : m_module->getGlobalInsts())
         {
-            if (as<IRType>(inst))
+            if (as<IRType>(inst) || as<IRSpecialize>(inst))
             {
                 auto newInst = context.addTypeValue(inst);
                 if (newInst != inst)

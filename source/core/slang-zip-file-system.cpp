@@ -19,12 +19,14 @@
 namespace Slang
 {
 
-class ZipFileSystemImpl : public ArchiveFileSystem 
+class ZipFileSystemImpl : public ISlangMutableFileSystem, public IArchiveFileSystem, public ComBaseObject
 {
 public:
     // ISlangUnknown 
-   // override ref counting, as DefaultFileSystem is singleton
-    SLANG_REF_OBJECT_IUNKNOWN_ALL
+    SLANG_COM_BASE_IUNKNOWN_ALL
+
+    // ISlangCastable
+    virtual SLANG_NO_THROW void* SLANG_MCALL castAs(const Guid& guid) SLANG_OVERRIDE;
 
     // ISlangFileSystem
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL loadFile(char const* path, ISlangBlob** outBlob) SLANG_OVERRIDE;
@@ -44,10 +46,10 @@ public:
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL remove(const char* path) SLANG_OVERRIDE;
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL createDirectory(const char* path) SLANG_OVERRIDE;
 
-    // ArchiveFileSystem
-    SlangResult loadArchive(const void* archive, size_t archiveSizeInBytes) SLANG_OVERRIDE;
-    virtual SlangResult storeArchive(bool blobOwnsContent, ISlangBlob** outBlob) SLANG_OVERRIDE;
-    virtual void setCompressionStyle(const CompressionStyle& style) SLANG_OVERRIDE;
+    // IArchiveFileSystem
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL loadArchive(const void* archive, size_t archiveSizeInBytes) SLANG_OVERRIDE;
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL storeArchive(bool blobOwnsContent, ISlangBlob** outBlob) SLANG_OVERRIDE;
+    virtual SLANG_NO_THROW void SLANG_MCALL setCompressionStyle(const CompressionStyle& style) SLANG_OVERRIDE;
 
     ZipFileSystemImpl();
     ~ZipFileSystemImpl();
@@ -82,7 +84,8 @@ protected:
         /// Returns true if the named item is at the index
     UnownedStringSlice _getPathAtIndex(Index index);
 
-    ISlangMutableFileSystem* getInterface(const Guid& guid);
+    void* getInterface(const Guid& guid);
+    void* getObject(const Guid& guid);
 
     void _initReadWrite(mz_zip_archive& outWriter);
 
@@ -101,9 +104,39 @@ protected:
     mz_zip_archive m_archive;           
 };
 
-ISlangMutableFileSystem* ZipFileSystemImpl::getInterface(const Guid& guid)
+void* ZipFileSystemImpl::getInterface(const Guid& guid)
 {
-    return (guid == ISlangUnknown::getTypeGuid() || guid == ISlangFileSystem::getTypeGuid() || guid == ISlangFileSystemExt::getTypeGuid() || guid == ISlangMutableFileSystem::getTypeGuid()) ? static_cast<ISlangMutableFileSystem*>(this) : nullptr;
+    if (    guid == ISlangUnknown::getTypeGuid() || 
+            guid == ISlangCastable::getTypeGuid())
+    {
+        return static_cast<ISlangMutableFileSystem*>(this);
+    }
+    else if (guid == ISlangFileSystem::getTypeGuid() || 
+            guid == ISlangFileSystemExt::getTypeGuid() || 
+            guid == ISlangMutableFileSystem::getTypeGuid())
+    {
+        return static_cast<ISlangMutableFileSystem*>(this);
+    }
+    else if (guid == IArchiveFileSystem::getTypeGuid())
+    {
+        return static_cast<IArchiveFileSystem*>(this);
+    }
+    return nullptr;
+}
+
+void* ZipFileSystemImpl::getObject(const Guid& guid)
+{
+    SLANG_UNUSED(guid);
+    return nullptr;
+}
+
+void* ZipFileSystemImpl::castAs(const Guid& guid)
+{
+    if (auto ptr = getInterface(guid))
+    {
+        return ptr;
+    }
+    return getObject(guid);
 }
 
 // This is a very awkward hack to make it so we can get a read func, without having to implement all of the tracking etc.
@@ -767,7 +800,7 @@ void ZipFileSystemImpl::setCompressionStyle(const CompressionStyle& style)
     }
 }
 
-/* static */SlangResult ZipFileSystem::create(RefPtr<ArchiveFileSystem>& out)
+/* static */SlangResult ZipFileSystem::create(ComPtr<ISlangMutableFileSystem>& out)
 {
     out = new ZipFileSystemImpl;
     return SLANG_OK;

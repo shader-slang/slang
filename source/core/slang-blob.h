@@ -50,17 +50,25 @@ public:
     SLANG_NO_THROW size_t SLANG_MCALL getBufferSize() SLANG_OVERRIDE { return m_string.getLength(); }
 
     static ComPtr<ISlangBlob> create(const String& in) { return ComPtr<ISlangBlob>(new StringBlob(in)); }
-    static ComPtr<ISlangBlob> moveCreate(String& in)
-    {
-        auto blob = new StringBlob;
-        blob->m_string.swapWith(in);
-        return ComPtr<ISlangBlob>(blob);
-    }
+
+        /// Moves from in into the created blob. 
+        /// NOTE! That will only use the representation from in, if it is *unique*
+        /// otherwise it will make a new copy.
+        /// This is so that StringBlob won't hold a reference count via a string held externally.
+        /// In contrast StringBlob::create *may* share the representation.
+    static ComPtr<ISlangBlob> moveCreate(String& in);
+    static ComPtr<ISlangBlob> moveCreate(String&& in);
 
 protected:
+        /// A type that is only used to differentiate a constructor. Can construct with 
+        /// MoveUnique{}
+    struct MoveUnique {};
+
     explicit StringBlob(String const& string)
         : m_string(string)
     {}
+
+    StringBlob(MoveUnique, String& string);
     StringBlob() {}
 
         /// Get the contained string
