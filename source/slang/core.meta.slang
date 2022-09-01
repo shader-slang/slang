@@ -398,6 +398,9 @@ void __store<T>(Ptr<T> ptr, T val);
 __intrinsic_op($(kIROp_getElementPtr))
 Ptr<T> __getElementPtr<T>(Ptr<T> ptr, int index);
 
+__intrinsic_op($(kIROp_getElementPtr))
+Ptr<T> __getElementPtr<T>(Ptr<T> ptr, int64_t index);
+
 __generic<T>
 __intrinsic_op($(kIROp_Less))
 bool operator<(Ptr<T> p1, Ptr<T> p2);
@@ -429,8 +432,8 @@ extension bool
     __intrinsic_op($(kIROp_CastPtrToBool))
     __init(Ptr<T> ptr);
 
-    static bool maxValue = true;
-    static bool minValue = false;
+    static const bool maxValue = true;
+    static const bool minValue = false;
 }
 
 extension uint64_t
@@ -439,8 +442,8 @@ extension uint64_t
     __intrinsic_op($(kIROp_Construct))
     __init(Ptr<T> ptr);
 
-    static uint64_t maxValue = 0xFFFFFFFFFFFFFFFFULL;
-    static uint64_t minValue = 0;
+    static const uint64_t maxValue = 0xFFFFFFFFFFFFFFFFULL;
+    static const uint64_t minValue = 0;
 }
 
 extension int64_t
@@ -449,8 +452,8 @@ extension int64_t
     __intrinsic_op($(kIROp_Construct))
     __init(Ptr<T> ptr);
 
-    static int64_t maxValue =  0x7FFFFFFFFFFFFFFFLL;
-    static int64_t minValue = -0x8000000000000000LL;
+    static const int64_t maxValue =  0x7FFFFFFFFFFFFFFFLL;
+    static const int64_t minValue = -0x8000000000000000LL;
 }
 
 __generic<T>
@@ -555,50 +558,59 @@ __intrinsic_type($(kIROp_DynamicType))
 struct __Dynamic
 {};
 
+extension half
+{
+    static const half maxValue = half(65504);
+    static const half minValue = half(-65504);
+}
+
 extension float
 {
-    static float maxValue = 340282346638528859811704183484516925440.0f;
+    static const float maxValue = 340282346638528859811704183484516925440.0f;
+    static const float minValue = -340282346638528859811704183484516925440.0f;
+
 }
 
 extension double
 {
-    static double maxValue = 179769313486231570814527423731704356798070567525844996598917476803157260780028538760589558632766878171540458953514382464234321326889464182768467546703537516986049910576551282076245490090389328944075868508455133942304583236903222948165808559332123348274797826204144723168738177180919299881250404026184124858368.0;
+    static const double maxValue = 179769313486231570814527423731704356798070567525844996598917476803157260780028538760589558632766878171540458953514382464234321326889464182768467546703537516986049910576551282076245490090389328944075868508455133942304583236903222948165808559332123348274797826204144723168738177180919299881250404026184124858368.0;
+    static const double minValue = -179769313486231570814527423731704356798070567525844996598917476803157260780028538760589558632766878171540458953514382464234321326889464182768467546703537516986049910576551282076245490090389328944075868508455133942304583236903222948165808559332123348274797826204144723168738177180919299881250404026184124858368.0;
 }
 
 extension int
 {
-    static int maxValue = 2147483647;
-    static int minValue = -2147483648;
+    static const int maxValue = 2147483647;
+    static const int minValue = -2147483648;
 }
 
 extension uint
 {
-    static uint maxValue = 4294967295;
-    static uint minValue = 0;
+    static const uint maxValue = 4294967295;
+    static const uint minValue = 0;
 }
 
 extension int8_t
 {
-    static int8_t maxValue = 127;
-    static int8_t minValue = -128;
+    static const int8_t maxValue = 127;
+    static const int8_t minValue = -128;
+}
+
+extension uint8_t
+{
+    static const uint8_t maxValue = 255;
+    static const uint8_t minValue = 0;
 }
 
 extension uint16_t
 {
-    static uint16_t maxValue = 255;
-    static uint16_t minValue = 0;
+    static const uint16_t maxValue = 65535;
+    static const uint16_t minValue = 0;
 }
 
 extension int16_t
 {
-    static int16_t maxValue = 32767;
-    static int16_t minValue = -32768;
-}
-
-extension uint16_t
-{
-    static uint16_t maxValue = 65535;
-    static uint16_t minValue = 0;
+    static const int16_t maxValue = 32767;
+    static const int16_t minValue = -32768;
 }
 
     /// An `N` component vector with elements of type `T`.
@@ -2188,6 +2200,7 @@ ${{{{
 
 //@ public:
 
+
 // Bit cast
 __generic<T, U>
 [__unsafeForceInlineEarly]
@@ -2275,6 +2288,212 @@ __intrinsic_op($(kIROp_Neq))
 bool operator!=(E left, E right);
 
 //@ public:
+
+// public interfaces for generic arithmetic types.
+
+interface IComparable
+{
+    int compareTo(This other);
+}
+
+interface IArithmetic : IComparable
+{
+    This add(This other);
+    This sub(This other);
+    This mul(This other);
+    This div(This other);
+    This mod(This other);
+    This neg();
+    __init(int val);
+    static const This maxValue;
+    static const This minValue;
+}
+
+interface IInteger : IArithmetic
+{
+    This shl(int value);
+    This shr(int value);
+    This bitAnd(This other);
+    This bitOr(This other);
+    This bitXor(This other);
+    This bitNot();
+    int toInt();
+    int64_t toInt64();
+    uint toUInt();
+    uint64_t toUInt64();
+}
+
+interface IFloat : IArithmetic
+{
+    __init(float value);
+    float toFloat();
+}
+
+__generic<T : IComparable>
+[__unsafeForceInlineEarly]
+bool operator<(T v0, T v1)
+{
+    return v0.compareTo(v1) < 0;
+}
+__generic<T : IComparable>
+[__unsafeForceInlineEarly]
+bool operator>(T v0, T v1)
+{
+    return v0.compareTo(v1) > 0;
+}
+__generic<T : IComparable>
+[__unsafeForceInlineEarly]
+bool operator ==(T v0, T v1)
+{
+    return v0.compareTo(v1) == 0;
+}
+__generic<T : IComparable>
+[__unsafeForceInlineEarly]
+bool operator >=(T v0, T v1)
+{
+    return v0.compareTo(v1) >= 0;
+}
+__generic<T : IComparable>
+[__unsafeForceInlineEarly]
+bool operator <=(T v0, T v1)
+{
+    return v0.compareTo(v1) <= 0;
+}
+__generic<T : IComparable>
+[__unsafeForceInlineEarly]
+bool operator !=(T v0, T v1)
+{
+    return v0.compareTo(v1) != 0;
+}
+
+__generic<T : IArithmetic>
+[__unsafeForceInlineEarly]
+T operator +(T v0, T v1)
+{
+    return v0.add(v1);
+}
+
+__generic<T : IArithmetic>
+[__unsafeForceInlineEarly]
+T operator -(T v0, T v1)
+{
+    return v0.sub(v1);
+}
+
+__generic<T : IArithmetic>
+[__unsafeForceInlineEarly]
+T operator *(T v0, T v1)
+{
+    return v0.mul(v1);
+}
+
+__generic<T : IArithmetic>
+[__unsafeForceInlineEarly]
+T operator /(T v0, T v1)
+{
+    return v0.div(v1);
+}
+
+__generic<T : IArithmetic>
+[__unsafeForceInlineEarly]
+T operator %(T v0, T v1)
+{
+    return v0.mod(v1);
+}
+
+__generic<T : IArithmetic>
+[__unsafeForceInlineEarly]
+__prefix T operator -(T v0)
+{
+    return v0.neg();
+}
+__generic<T : IInteger>
+[__unsafeForceInlineEarly]
+T operator >>(T val, int other)
+{
+    return val.shr(other);
+}
+__generic<T : IInteger>
+[__unsafeForceInlineEarly]
+T operator<<(T val, int other)
+{
+    return val.shl(other);
+}
+__generic<T : IInteger>
+[__unsafeForceInlineEarly]
+T operator &(T v0, T v1)
+{
+    return v0.bitAnd(v1);
+}
+__generic<T : IInteger>
+[__unsafeForceInlineEarly]
+T operator |(T v0, T v1)
+{
+    return v0.bitOr(v1);
+}
+__generic<T : IInteger>
+[__unsafeForceInlineEarly]
+T operator ^(T v0, T v1)
+{
+    return v0.bitXor(v1);
+}
+__generic<T : IInteger>
+[__unsafeForceInlineEarly]
+__prefix T operator ~(T v0)
+{
+    return v0.bitNot();
+}
+
+// Provide implementations to public generic arithmetic interfaces for builtin types.
+
+${{{{
+// Code gen integer type implementations.
+
+for (int tt = 0; tt < kBaseTypeCount; ++tt)
+{
+    if (kBaseTypes[tt].flags & (SINT_MASK | UINT_MASK))
+    {
+}}}}
+extension $(kBaseTypes[tt].name) : IInteger
+{
+    int compareTo(This other) { return int(this - other); }
+    This add(This other) { return this + other; }
+    This sub(This other) { return this - other; }
+    This mul(This other) { return this * other; }
+    This div(This other) { return this / other; }
+    This mod(This other) { return this % other; }
+    This neg() { return -this; }
+    This shl(int value) { return this << value; }
+    This shr(int value) { return this >> value; }
+    This bitAnd(This other) { return this & other; }
+    This bitOr(This other) { return this | other; }
+    This bitXor(This other) { return this ^ other; }
+    This bitNot() { return ~this; }
+    int toInt() { return int(this); }
+    int64_t toInt64() { return int64_t(this); }
+    uint toUInt() { return uint(this); }
+    uint64_t toUInt64() { return uint64_t(this); }
+}
+${{{{
+    }
+    else if (kBaseTypes[tt].flags & FLOAT_MASK)
+    {
+}}}}
+extension $(kBaseTypes[tt].name) : IFloat
+{
+    int compareTo(This other) { if (this > other) return 1; if (this < other) return -1; return 0; }
+    This add(This other) { return this + other; }
+    This sub(This other) { return this - other; }
+    This mul(This other) { return this * other; }
+    This div(This other) { return this / other; }
+    This mod(This other) { return this % other; }
+    This neg() { return -this; }
+    float toFloat() { return float(this); }
+}
+${{{{
+    }
+}
+}}}}
 
 // Binding Attributes
 
