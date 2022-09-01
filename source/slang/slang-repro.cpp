@@ -10,6 +10,9 @@
 
 #include "slang-options.h"
 
+#include "../compiler-core/slang-artifact-util.h"
+#include "../compiler-core/slang-artifact-desc-util.h"
+
 #include "../compiler-core/slang-source-loc.h"
 
 namespace Slang {
@@ -996,15 +999,25 @@ struct LoadContext
             dstTranslationUnit->moduleName = moduleName;
 
             const auto& srcSourceFiles = srcTranslationUnit.sourceFiles;
-            auto& dstSourceFiles = dstTranslationUnit->m_sourceFiles;
 
-            dstSourceFiles.clear();
+            dstTranslationUnit->clearSource();
+
+            const auto sourceDesc = ArtifactDescUtil::makeDescForSourceLanguage(asExternal(dstTranslationUnit->sourceLanguage));
 
             for (Index j = 0; j < srcSourceFiles.getCount(); ++j)
             {
+                // Create the source file
                 SourceFile* sourceFile = context.getSourceFile(base.asRaw(base.asRaw(srcSourceFiles[i])));
+
+                // Create the artifact
+                auto sourceArtifact = ArtifactUtil::createArtifact(sourceDesc, sourceFile->getPathInfo().getName().getBuffer());
+                if (sourceFile->getContentBlob())
+                {
+                    sourceArtifact->addRepresentationUnknown(sourceFile->getContentBlob());
+                }
+
                 // Add to translation unit
-                dstTranslationUnit->addSourceFile(sourceFile);
+                dstTranslationUnit->addSource(sourceArtifact, sourceFile);
             }
         }
     }

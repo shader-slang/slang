@@ -9,8 +9,6 @@
 #include "../../slang-com-ptr.h"
 #include "../../slang.h"
 
-#include "slang-artifact-representation.h"
-
 namespace Slang {
 
 /** Overview: 
@@ -236,19 +234,10 @@ public:
         /// Get path info
     const PathInfo& getPathInfo() const { return m_pathInfo;  }
 
-        /// Get the (optional) assoicated artifact. Note its desc might be Source/Unknown 
-    IArtifact* getArtifact() const { return m_artifact; }
-        /// Set the artifact
-    void setArtifact(IArtifact* artifact) { m_artifact = artifact; }
-
         /// Set the content as a blob
     void setContents(ISlangBlob* blob);
         /// Set the content as a string
     void setContents(const String& content);
-
-        /// If the desc isn't set, will use Unknown source type
-        /// If artifact isn't defined will try and associate one. 
-    void maybeAddArtifact(const ArtifactDesc* desc, ISlangFileSystemExt* ext);
 
         /// Calculate a display path -> can canonicalize if necessary
     String calcVerbosePath() const;
@@ -266,7 +255,6 @@ public:
     SourceManager* m_sourceManager;                             ///< The source manager this belongs to
     PathInfo m_pathInfo;                                        ///< The path The logical file path to report for locations inside this span.
 
-    ComPtr<IArtifact> m_artifact;                               ///< Optional artifact
     ComPtr<ISlangBlob> m_contentBlob;                           ///< A blob that owns the storage for the file contents. If nullptr, there is no contents
     UnownedStringSlice m_content;                               ///< The actual contents of the file.
     size_t m_contentSize;                                       ///< The size of the actual contents
