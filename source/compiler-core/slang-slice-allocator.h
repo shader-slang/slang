@@ -10,42 +10,34 @@
 namespace Slang
 {
 
-/* 
-The reason to wrap in a struct rather than have as free functions is doing so will lead to compile time 
-errors with incorrect usage around temporaries.
-*/
-struct SliceCaster
-{
-        /// The slice will only be in scope whilst the string is
-    static TerminatedCharSlice asTerminatedCharSlice(const String& in) { auto unowned = in.getUnownedSlice(); return TerminatedCharSlice(unowned.begin(), unowned.getLength()); }
-
-    static CharSlice asCharSlice(const String& in) { auto unowned = in.getUnownedSlice(); return CharSlice(unowned.begin(), unowned.getLength()); }
-
-    template <typename T>
-    static Slice<T*> asSlice(const List<ComPtr<T>>& list) { return makeSlice((T*const*)list.getBuffer(), list.getCount()); }
-
-        /// Get a list as a slice
-    template <typename T>
-    static Slice<T> asSlice(const List<T>& list) { return Slice<T>(list.getBuffer(), list.getCount()); }
-
-private:
-        /// We don't want to make a temporary list into a slice..
-    template <typename T>
-    static Slice<T> asSlice(const List<T>&& list) = delete; 
-        // We don't want temporaries to be 'asSliced' so disable
-    static TerminatedCharSlice asTerminatedCharSlice(const String&& in) = delete;
-    static CharSlice asCharSlice(const String&& in) = delete;
-};
 
 struct SliceAllocator;
 
-struct SliceConverter
+struct SliceUtil
 {
         /// Convert into a list of strings
     static List<String> toList(const Slice<TerminatedCharSlice>& in);
 
+        /// Gets a 0 terminated string from a blob. If not possible returns nullptr
+    static const char* getTerminated(ISlangBlob* blob, TerminatedCharSlice& outSlice);
+
         /// NOTE! the slice is only guarenteed to stay in scope whilst the blob does
     static TerminatedCharSlice toTerminatedCharSlice(SliceAllocator& allocator, ISlangBlob* blob);
+        /// 
+    static TerminatedCharSlice toTerminatedCharSlice(StringBuilder& storage, ISlangBlob* blob);
+
+        /// The slice will only be in scope whilst the string is
+    static TerminatedCharSlice asTerminatedCharSlice(const String& in) { auto unowned = in.getUnownedSlice(); return TerminatedCharSlice(unowned.begin(), unowned.getLength()); }
+
+        /// Get string as a char slice
+    static CharSlice asCharSlice(const String& in) { auto unowned = in.getUnownedSlice(); return CharSlice(unowned.begin(), unowned.getLength()); }
+
+    template <typename T>
+    static Slice<T*> asSlice(const List<ComPtr<T>>& list) { return makeSlice((T* const*)list.getBuffer(), list.getCount()); }
+
+        /// Get a list as a slice
+    template <typename T>
+    static Slice<T> asSlice(const List<T>& list) { return Slice<T>(list.getBuffer(), list.getCount()); }
 
     template <typename T>
     static List<ComPtr<T>> toComPtrList(const Slice<T*>& in)
@@ -57,6 +49,20 @@ struct SliceConverter
         for (Index i = 0; i < in.count; ++i) list[i] = ComPtr<T>(in[i]);
         return list;
     }
+
+private:
+
+    /*
+    A reason to wrap in a struct rather than have as free functions is doing so will lead to compile time
+    errors with incorrect usage around temporaries.
+    */
+
+    /// We don't want to make a temporary list into a slice..
+    template <typename T>
+    static Slice<T> asSlice(const List<T>&& list) = delete;
+    // We don't want temporaries to be 'asSliced' so disable
+    static TerminatedCharSlice asTerminatedCharSlice(const String&& in) = delete;
+    static CharSlice asCharSlice(const String&& in) = delete;
 };
 
 SLANG_FORCE_INLINE UnownedStringSlice asStringSlice(const CharSlice& slice)

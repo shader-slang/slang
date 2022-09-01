@@ -68,18 +68,21 @@ struct ArtifactDescUtil
         /// Given a desc and a path returns the base name (stripped of prefix and extension)
     static String getBaseNameFromPath(const ArtifactDesc& desc, const UnownedStringSlice& path);
 
-        /// Get the base name of this artifact.
-        /// If there is a path set, will extract the name from that (stripping prefix, extension as necessary).
-        /// Else if there is an explicit name set, this is returned.
-        /// Else returns the empty string
-    
-    static String getBaseName(const ArtifactDesc& desc, IFileArtifactRepresentation* fileRep);
+        /// Given a desc and a name returns the base name (stripped of prefix and extension)
+    static String getBaseNameFromName(const ArtifactDesc& desc, const UnownedStringSlice& path);
+
+        /// Get the base name of the fileRep
+        /// If no base name is found will return an empty slice
+    static String getBaseName(const ArtifactDesc& desc, IPathArtifactRepresentation* fileRep);
 
         /// Given a desc and a basePath returns a suitable path for a entity of specified desc
     static SlangResult calcPathForDesc(const ArtifactDesc& desc, const UnownedStringSlice& basePath, StringBuilder& outPath);
 
         /// Given a desc and a baseName works out the the output file name
     static SlangResult calcNameForDesc(const ArtifactDesc& desc, const UnownedStringSlice& baseName, StringBuilder& outName);
+
+        /// Returns true if there is a defined name extension/type for this desc
+    static SlangResult hasDefinedNameForDesc(const ArtifactDesc& desc);
 
         /// Given a target returns the ArtifactDesc
     static ArtifactDesc makeDescForCompileTarget(SlangCompileTarget target);

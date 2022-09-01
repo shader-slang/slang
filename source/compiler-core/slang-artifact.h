@@ -275,7 +275,9 @@ inline /* static */ArtifactDesc ArtifactDesc::make(Packed inPacked)
 }
 
 // Forward declare
-class IFileArtifactRepresentation;
+class IOSFileArtifactRepresentation;
+class IPathArtifactRepresentation;
+
 class IArtifactRepresentation;
 
 // Controls what items can be kept. 
@@ -376,7 +378,7 @@ public:
     
         /// Require artifact is available as a file.
         /// NOTE! May need to serialize and write as a temporary file.
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL requireFile(Keep keep, ISlangMutableFileSystem* fileSystem, IFileArtifactRepresentation** outFileRep) = 0;
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL requireFile(Keep keep, IOSFileArtifactRepresentation** outFileRep) = 0;
 
         /// Load the artifact as a shared library
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL loadSharedLibrary(ArtifactKeep keep, ISlangSharedLibrary** outSharedLibrary) = 0;
@@ -500,8 +502,6 @@ class IArtifactHandler : public ICastable
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL expandChildren(IArtifactContainer* container) = 0;
         /// Given an artifact gets or creates a representation. 
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL getOrCreateRepresentation(IArtifact* artifact, const Guid& guid, ArtifactKeep keep, ICastable** outCastable) = 0;
-        /// Given an artifact gets a represenation of it on the file system. 
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL getOrCreateFileRepresentation(IArtifact* artifact, ArtifactKeep keep, ISlangMutableFileSystem* fileSystem, IFileArtifactRepresentation** outFileRep) = 0;
 };
 
 } // namespace Slang

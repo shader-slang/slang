@@ -1051,13 +1051,15 @@ namespace Slang
             // If emitted source is required, emit and set the path            
             if (_useEmittedSource(compiler, translationUnit))
             {
-                // If it's not file based we can set an appropriate path name, and it doesn't matter if it doesn't
-                // exist on the file system
-                options.sourceContentsPath = allocator.allocate(calcSourcePathForEntryPoints());
-
                 CodeGenContext sourceCodeGenContext(this, sourceTarget, extensionTracker);
 
                 SLANG_RETURN_ON_FAIL(sourceCodeGenContext.emitEntryPointsSource(sourceArtifact));
+
+                // If it's not file based we can set an appropriate path name, and it doesn't matter if it doesn't
+                // exist on the file system. 
+                // We set the name to the path as this will be used for downstream reporting.
+                auto sourcePath = calcSourcePathForEntryPoints();
+                sourceArtifact->setName(sourcePath.getBuffer());
 
                 sourceCodeGenContext.maybeDumpIntermediate(sourceArtifact);
             }
@@ -1067,10 +1069,10 @@ namespace Slang
                 const auto& sourceFiles = translationUnit->getSourceFiles();
                 SLANG_ASSERT(sourceFiles.getCount() == 1);
 
-                const SourceFile* sourceFile = sourceFiles[0];
-                
-                options.sourceContentsPath = SliceCaster::asTerminatedCharSlice(sourceFile->getPathInfo().foundPath);
-                options.sourceContents = SliceConverter::toTerminatedCharSlice(allocator, sourceFile->getContentBlob());
+                SourceFile* sourceFile = sourceFiles[0];
+
+                sourceArtifact = sourceFile->getArtifact();
+                SLANG_ASSERT(sourceArtifact);
             }
         }
         else
@@ -1087,11 +1089,9 @@ namespace Slang
         if (sourceArtifact)
         {
             metadata = findAssociated<IArtifactPostEmitMetadata>(sourceArtifact);
-            
-            ComPtr<ISlangBlob> blob;
-            SLANG_RETURN_ON_FAIL(sourceArtifact->loadBlob(ArtifactKeep::Yes, blob.writeRef()));
 
-            options.sourceContents = SliceConverter::toTerminatedCharSlice(allocator, blob);
+            // Set the source artifacts
+            options.sourceArtifacts = makeSlice(sourceArtifact.readRef(), 1);
         }
 
         // Add any preprocessor definitions associated with the linkage
@@ -1251,7 +1251,7 @@ namespace Slang
                 // Set up the library artifact
                 auto artifact = Artifact::create(ArtifactDesc::make(ArtifactKind::Library, Artifact::Payload::HostCPU), toSlice("slang-rt"));
 
-                ComPtr<IFileArtifactRepresentation> fileRep(new FileArtifactRepresentation(IFileArtifactRepresentation::Kind::NameOnly, toSlice("slang-rt"), nullptr, nullptr));
+                ComPtr<IOSFileArtifactRepresentation> fileRep(new OSFileArtifactRepresentation(IOSFileArtifactRepresentation::Kind::NameOnly, toSlice("slang-rt"), nullptr));
                 artifact->addRepresentation(fileRep);
 
                 libraries.add(artifact);
@@ -1368,8 +1368,8 @@ namespace Slang
         }
         
         options.compilerSpecificArguments = allocator.allocate(compilerSpecificArguments);
-        options.requiredCapabilityVersions = SliceCaster::asSlice(requiredCapabilityVersions);
-        options.libraries = SliceCaster::asSlice(libraries);
+        options.requiredCapabilityVersions = SliceUtil::asSlice(requiredCapabilityVersions);
+        options.libraries = SliceUtil::asSlice(libraries);
         options.libraryPaths = allocator.allocate(libraryPaths);
 
         // Compile

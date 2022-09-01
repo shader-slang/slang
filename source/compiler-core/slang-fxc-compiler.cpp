@@ -182,11 +182,13 @@ static SlangResult _parseDiagnosticLine(SliceAllocator& allocator, const Unowned
 
 SlangResult FXCDownstreamCompiler::compile(const CompileOptions& options, IArtifact** outArtifact)
 {
-    // This compiler doesn't read files, they should be read externally and stored in sourceContents/sourceContentsPath
-    if (options.sourceFiles.count > 0)
+    // This compiler can only deal with a single source artifact
+    if (options.sourceArtifacts.count != 1)
     {
         return SLANG_FAIL;
     }
+
+    IArtifact* sourceArtifact = options.sourceArtifacts[0];
 
     if (options.sourceLanguage != SLANG_SOURCE_LANGUAGE_HLSL || options.targetType != SLANG_DXBC)
     {
@@ -207,15 +209,18 @@ SlangResult FXCDownstreamCompiler::compile(const CompileOptions& options, IArtif
         searchDirectories.searchDirectories.add(asString(includePath));
     }
 
+    const auto sourcePath = ArtifactUtil::findPath(sourceArtifact);
+
     // Use the default fileSystemExt is not set
     ID3DInclude* includeHandler = nullptr;
 
     FxcIncludeHandler fxcIncludeHandlerStorage(&searchDirectories, options.fileSystemExt, options.sourceManager);
     if (options.fileSystemExt)
     {
-        if (options.sourceContentsPath.count > 0)
+        
+        if (sourcePath.getLength() > 0)
         {
-            fxcIncludeHandlerStorage.m_rootPathInfo = PathInfo::makePath(asString(options.sourceContentsPath));
+            fxcIncludeHandlerStorage.m_rootPathInfo = PathInfo::makePath(sourcePath);
         }
         includeHandler = &fxcIncludeHandlerStorage;
     }
@@ -274,12 +279,15 @@ SlangResult FXCDownstreamCompiler::compile(const CompileOptions& options, IArtif
             break;
     }
 
+    ComPtr<ISlangBlob> sourceBlob;
+    SLANG_RETURN_ON_FAIL(sourceArtifact->loadBlob(ArtifactKeep::Yes, sourceBlob.writeRef()));
+
     ComPtr<ID3DBlob> codeBlob;
     ComPtr<ID3DBlob> diagnosticsBlob;
     HRESULT hr = m_compile(
-        options.sourceContents.begin(),
-        options.sourceContents.count,
-        options.sourceContentsPath,
+        sourceBlob->getBufferPointer(),
+        sourceBlob->getBufferSize(),
+        String(sourcePath).getBuffer(),
         dxMacros,
         includeHandler,
         options.entryPointName,

@@ -123,14 +123,8 @@ struct DownstreamCompileOptions
 
     Slice<Define> defines;
 
-    /// The contents of the source to compile. This can be empty is sourceFiles is set.
-    /// If the compiler is a commandLine file this source will be written to a temporary file.
-    TerminatedCharSlice sourceContents;
-    /// 'Path' that the contents originated from. NOTE! This is for reporting only and doesn't have to exist on file system
-    TerminatedCharSlice sourceContentsPath;
-
-    /// The names/paths of source to compile. This can be empty if sourceContents is set.
-    Slice<TerminatedCharSlice> sourceFiles;
+    /// The source artifacts
+    Slice<IArtifact*> sourceArtifacts;
 
     Slice<TerminatedCharSlice> includePaths;
     Slice<TerminatedCharSlice> libraryPaths;
@@ -241,7 +235,7 @@ public:
         /// Given options determines the paths to products produced (including the 'moduleFilePath').
         /// Note that does *not* guarentee all products were or should be produced. Just aims to include all that could
         /// be produced, such that can be removed on completion.
-    virtual SlangResult calcCompileProducts(const CompileOptions& options, DownstreamProductFlags flags, IFileArtifactRepresentation* lockFile, List<ComPtr<IArtifact>>& outArtifacts) = 0;
+    virtual SlangResult calcCompileProducts(const CompileOptions& options, DownstreamProductFlags flags, IOSFileArtifactRepresentation* lockFile, List<ComPtr<IArtifact>>& outArtifacts) = 0;
 
     virtual SlangResult calcArgs(const CompileOptions& options, CommandLine& cmdLine) = 0;
     virtual SlangResult parseOutput(const ExecuteResult& exeResult, IArtifactDiagnostics* diagnostics) = 0;

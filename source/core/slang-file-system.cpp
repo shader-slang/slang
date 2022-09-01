@@ -316,6 +316,9 @@ void CacheFileSystem::setInnerFileSystem(ISlangFileSystem* fileSystem, UniqueIde
         fileSystem->queryInterface(ISlangFileSystemExt::getTypeGuid(), (void**)m_fileSystemExt.writeRef());
     }
 
+    // Determine how paths map
+    m_osPathKind = m_fileSystemExt ? m_fileSystemExt->getOSPathKind() : OSPathKind::None;
+
     switch (m_uniqueIdentityMode)
     {
         case UniqueIdentityMode::Default:
@@ -771,6 +774,20 @@ RelativeFileSystem::RelativeFileSystem(ISlangFileSystem* fileSystem, const Strin
     m_stripPath(stripPath)
 {
     m_style = _getFileSystemStyle(fileSystem, m_fileSystem);
+
+    m_osPathKind = OSPathKind::None;
+
+    ComPtr<ISlangFileSystemExt> ext;
+    if (SLANG_SUCCEEDED(fileSystem->queryInterface(ISlangFileSystemExt::getTypeGuid(), (void**)ext.writeRef())))
+    {
+        m_osPathKind = ext->getOSPathKind();
+
+        // If it's direct, but we have a relative path, canonical should work
+        if (m_osPathKind == OSPathKind::Direct && relativePath.getLength())
+        {
+            m_osPathKind = OSPathKind::Canonical;
+        }
+    }
 }
 
 ISlangUnknown* RelativeFileSystem::getInterface(const Guid& guid)

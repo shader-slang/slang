@@ -1494,15 +1494,15 @@ struct OptionsParser
                     // Seeing as on all targets the baseName doesn't have an extension, and all library types do
                     // if the name doesn't have an extension we can assume there is no path to it.
                     
-                    ComPtr<IFileArtifactRepresentation> fileRep;
+                    ComPtr<IOSFileArtifactRepresentation> fileRep;
                     if (Path::getPathExt(path).getLength() <= 0)
                     {
                         // If there is no extension *assume* it is the name of a system level library
-                        fileRep = new FileArtifactRepresentation(IFileArtifactRepresentation::Kind::NameOnly, path.getUnownedSlice(), nullptr, nullptr);
+                        fileRep = new OSFileArtifactRepresentation(IOSFileArtifactRepresentation::Kind::NameOnly, path.getUnownedSlice(), nullptr);
                     }
                     else
                     {
-                        fileRep = new FileArtifactRepresentation(IFileArtifactRepresentation::Kind::Reference, path.getUnownedSlice(), nullptr, nullptr);
+                        fileRep = new OSFileArtifactRepresentation(IOSFileArtifactRepresentation::Kind::Reference, path.getUnownedSlice(), nullptr);
                         if (!fileRep->exists())
                         {
                             sink->diagnose(referenceModuleName.loc, Diagnostics::libraryDoesNotExist, path);
