@@ -8119,6 +8119,10 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         {
             return ensureDecl(context, interfaceDecl);
         }
+        else if (auto typedefDecl = as<TypeDefDecl>(genDecl->inner))
+        {
+            return ensureDecl(context, typedefDecl);
+        }
         SLANG_RELEASE_ASSERT(false);
         UNREACHABLE_RETURN(LoweredValInfo());
     }
