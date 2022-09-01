@@ -52,10 +52,10 @@ A runtime shader cache has the following characteristics:
 * It is okay to have keys/naming that are not human understandable/readable. 
 * The source is available - such that hashes based on source contents can be produced. 
 * It does not matter if hashes/keys are static between runs. 
-* It is not important that a future version would be compatible with a previous version.
+* It is not important that a future version would be compatible with a previous version or vice versa.
 * Could be all in memory.
-* May need mechanisms to limit size
-* Generated source can be made to work with some extra effort, because we can hash generated source
+* May need mechanism/s to limit the working set
+* Generated source can be made to work, because it is possible to hash generated source
 
 At the other end of the spectrum a baked persistant cache
 
@@ -66,7 +66,7 @@ At the other end of the spectrum a baked persistant cache
 * Ideally can be manipulated and altered without significant tooling
 * Generated source may need to be identified in some other way than the source itself
 
-It should be possible to serialize out a 'runtime shader cache' into the same format as used for persistant cache. It may be harder to use such a cache without Slang tooling, because the mapping from compilation options to keys is not simple.
+It should be possible to serialize out a 'runtime shader cache' into the same format as used for persistant cache. It may be harder to use such a cache without Slang tooling, because the mapping from compilation options to keys will probably not be simple.
 
 Status
 ------
@@ -79,7 +79,7 @@ There is some work around a file system backed shader cache in gfx.
 
 ## Artifact System
 
-The Artifact system exists and provides a mechanism to transport source/compile results through the Slang compiler. It already supports most of the different items that need to be stored.
+The Artifact provides a mechanism to transport source/compile results through the Slang compiler. It already supports most of the different items that need to be stored.
 
 Artifact has support for "containers". An artifact container is an artifact that can contain other artifacts. Support for different 'file system' style container formats is also implemented. The currently supported underlying container formats supported are
 
@@ -95,9 +95,9 @@ Additionally the mechanisms already implemented support
 * A virtual file system 
 * A 'chroot' of the file system (using RelativeFileSystem)
 
-In order to access a file system via artifact, is as simple as adding a modification to the default handler to load the container, and to implement `expandChildren`, which will allow traversal of the container. In general the design is 'lazy' in design. Children are not expanded, unless requested, and files not decompressed unless required. The caching system also provides a caching mechanism such that a representation such as uncompressed blob can be associated with the artifact.
+In order to access a file system via artifact, is as simple as adding a modification to the default handler to load the container, and to implement `expandChildren`, which will allow traversal of the container. In general this works in a 'lazy' manner. Children are not expanded, unless requested, and files not decompressed unless required. The system also provides a caching mechanism such that a representation, such as uncompressed blob, can be associated with the artifact.
 
-Very little code is needed to support this behavior because the IExtFileArtifactRepresentation and the use of the ISlangFileSystemExt interface, mean it works using the existing already used and tested mechanisms.
+Very little code is needed to support this behavior because the IExtFileArtifactRepresentation and the use of the ISlangFileSystemExt interface, mean it can work using the existing mechanisms.
 
 It is a desired feature of the container format that it can be represented as 'file system', and have the option of being human readable where appropraite. Doing so allows
 
@@ -109,55 +109,23 @@ It is a desired feature of the container format that it can be represented as 'f
 
 This documents is about how to structure the file system to represent a 'shader cache' like scenario. 
 
-Incorporating into the Artifact system will require a Payload type. It may be acceptable to use `ArtifactPayload::CompileResults`. The IArtifactHandler will need to know how to interpret the contents. This will need to occur lazily at the `expandChildren` level. This will create IArtifacts for the children that some aspects are lazily evaluated, and others are interpretted at the expansion. For example setting up the ArtifactDesc will need to happen at expansion.
+Incorporating the 'shader container' into the Artifact system will require a suitable Payload type. It may be acceptable to use `ArtifactPayload::CompileResults`. The IArtifactHandler will need to know how to interpret the contents. This will need to occur lazily at the `expandChildren` level. This will create IArtifacts for the children that some aspects are lazily evaluated, and others are interpretted at the expansion. For example setting up the ArtifactDesc will need to happen at expansion.
 
 Background
-----------
+==========
 
-The background section should explain where things stand in the language/compiler today, along with any relevant concepts or terms of art from the wider industry.
-If the proposal is about solving a problem, this section should clearly illustrate the problem.
-If the proposal is about improving a design, it should explain where the current design falls short.
+To enumerate the major challenges
 
-Related Work
-============
+* How to generate a key for the runtime scenario
+* How to produce keys for the persistant scenario - implies user control, and human readability
+* How to represent compilation in a composible 'nameable' way 
 
-* Shader cache system as part of gfx (https://github.com/lucy96chen/slang/tree/shader-cache)
-* Lumberyard [shader cache](https://docs.aws.amazon.com/lumberyard/latest/userguide/mat-shaders-custom-dev-cache-intro.html)
-* Unreal [FShaderCache](https://docs.unrealengine.com/5.0/en-US/fshadercache-in-unreal-engine/)
-* Unreal [Derived Data Cache - DDC](https://docs.unrealengine.com/4.26/en-US/ProductionPipelines/DerivedDataCache/)
-* Microsoft [D3DSCache](https://github.com/microsoft/DirectX-Specs/blob/master/d3d/ShaderCache.md) 
+The mechanism for producing keys in the runtime scenario could be used to check if an entry in the cache is out of date.
 
-Lumberyard uses the zip format for its '.pak' format. 
+Background: Hashing source
+==========================
 
-Microsoft D3DSCache provides a binary keyed key-value store. 
-
-## Gfx
-
-Gfx has a runtime shader cache based on `PipelineKey`, `ComponentKey` and `ShaderCache`. ShaderCache is a key value store. 
-
-A key for a pipeline is a combination of 
-
-```
-    PipelineStateBase* pipeline;
-    Slang::ShortList<ShaderComponentID> specializationArgs;
-```
-
-`ShaderComponentID` can be created on the ShaderCache, from 
-
-```
-    Slang::UnownedStringSlice typeName;
-    Slang::ShortList<ShaderComponentID> specializationArgs;
-    Slang::HashCode hash;
-```    
-    
-For reflected types, a type name is generated if specialized.
-    
-The shader cache can be thought of as being parameterized by the pipeline and associated specialization args. It appears to currently only support specialization types.    
-    
-Gfx does not appear to support any serialization/file representation.    
-    
-Hashing source
-==============
+Hashing source is something that is needed for runtime cache scenario, as it is necessary to generate a key purely from 'input' which source is part of.
 
 The fastest/simplest way to hash source, is to take the blob and hash that. Unfortunately there are several issues 
 
@@ -228,11 +196,12 @@ We can provide source for an implementation. We could also provide a shared libr
 Generated source can be part of a hash if the source is available. As touched on there are scenarios where generated source may not be available.
 
 We could side step the issues around source generation if we push that problem back onto users. If they are using code generation, the system could require providing a string that uniquely identifies the generation that is being used. This perhaps being a requirement for a persistant cache. For a temporary runtime cache, we can allow hash generation from source.  
-    
-Naming
-======
 
-The container could be seen as a glorified key value store. The key identifying a kernel (and associated data). 
+
+Background: Key Naming
+======================
+
+The container could be seen as a glorified key value store. The key identifying a kernel and associated data. 
 
 Much of the difficulty here is how to define the key. If it's a combination of the 'inputs' it would be huge and complicated. If it's a hash, then it can be short, but not human understandable, and without considerable care not stable to small, or irrelevant changes.
 
@@ -243,7 +212,7 @@ For any cache that is persistant how naming occurs probably is important. Becaus
 * Our 'options' aren't going to make much sense with other compilers (if we want the standard to be more broadly applicable)
 * The options we have will not remain static
 * Having an indirection is useful from an application development and shipping perspective
-* That the *name* perhaps doesn't always have to indicate every aspect of a compilation
+* That the *name* perhaps doesn't always have to indicate every aspect of a compilation from the point of view of the application
 
 One idea touched on in this document is to move 'naming' into a user space problem. That compilations are defined by the combination of 'named' options. In order to produce a shader cache name we have a concatination of names. The order can be user specified. Order could also break down into "directory" hierarchy as necessary.
 
@@ -311,9 +280,6 @@ This whole mechanism provides a way of specifying a compilation by a series of n
 It may be necessary to define options by tool chain. Doing so would mean the names can group together what might be quite different options on different compilers. Having options defined in JSON means that the mechanisms described here can be used for other tooling. If the desire is to have some more broadly applicable 'shader cache' representation this is desirable. 
 
 If it is necessary obfuscate the contents, it would be possible to put the human readable key though a hash, and then the hash can be used for lookup. 
-
-Container Layout
-================
 
     
 Describing Options
@@ -455,9 +421,238 @@ If the components were serializable (as say as JSON), we could describe a compil
 It doesn't appear as if there is a way to more finely control the application of component types. For example if there was a desire to change the optimizaion option, it would appear to remain part of the ICompileRequest (it's not part of a component). This implies this mechanism as it stands whilst allowing composition, doesn't provide the more nuanced composition. Additional component types could perhaps be added which would add such control.
 
 Perhaps having components is not necessary as part of the representation, as 'component' system is a mechanism for achiving a 'bag of options' and so we can get the same effect by using that mechanism without components.
+    
+Background: Describing Options
+==============================
+
+## 'Bag of named options' 
+
+Perhaps identification is something that is largely in user space for the perisistant scenario. You could imagine a bag of 'options', that are typically named. Then the output name is the concatination of the names. If an option set isn't named it doesn't get included. Perhaps the order of the naming defines the precedence.
+
+This 'bag of options' would need some way to know the order the names would be combined. This could be achieved with another parameter or option that describes name ordering. Defining the ordering could be achieved if different types of options are grouped, by specifying the group. The ordering would only be significant for named items that will be concatinated. The ordering of the options could define the order of precedence of application.
+
+Problems: 
+
+How to combine all of these options to compile? 
+How to define what options are set? Working at the level of a struct doesn't work if you want to override a single option.
+The grouping - how does it actually work? It might require specifying what group a set of options is in.
+
+An advantage to this approach is that policy of how naming works as a user space problem. It is also powerful in that it allows control on compilation that has some independence from the name.
+
+### JSON options
+
+One way of dealing with the 'bag of options' issue would be to just make the runtime json options representation, describe options. Merging JSON at a most basic level is straight forward. For certain options it may make sense to have them describe adding, merging or replacing. We could add this control via adding a key prefix.
+
+```JSON
+{
+    "includePaths" : ["somePath", "another/path"],
+    "someValue" : 10,
+    "someEnum" : enumValue,
+    "someFlags" : 12
+}      
+```
+
+As an example
+
+```JSON
+{
+    "+includePaths" : ["yet/another"],
+    "intValue" : 20,
+    "-someValue" : null,
+    "+someFlags" : 1
+}
+```
+
+When merged produces
+
+```JSON
+{
+    "includePaths" : ["somePath", "another/path", "yet/another"],
+    "someEnum" : enumValue,
+    "someFlags" : 13,
+    "intValue" : 20
+}      
+```
+
+It's perhaps also worth pointing out that using JSON as the representation provides a level of compatibility. Things that are not understood can be ignored. It is human readable and understandable. We only need to convert the final JSON into the options that are then finally processed.
+  
+One nice property of a JSON representation is that it is potentially the same for processing and hashing.   
+ 
+### Producing a hash from JSON options
+    
+One approach would be to just hash the JSON if that is the representation. We might want a pass to filter out to just known fields and perhaps some other sanity processing. 
+
+* Filtering  
+* Ordering - the order of fields is generally not the order we want to combine. One option would be to order by key in alphabetical order.
+* Handling values that can have multiple representations (if we allow an enum as int or text, we need to hash with one or ther other)
+* Duplicate handling 
+
+Alternatively the JSON could be converted into a native representation and that hashed. The problem with this is that without a lot of care, the hash will not be stable with respect to small changes in the native representation.
+
+Another advantage of using JSON for hash production, is that it is something that could be performed fairly easily in user space.    
+
+Two issues remain significant with this approach
+
+* Filtering - how?
+* Handling multiple representations for values
+
+Filtering is not trivial - it's not a question of just specifying what fields are valid, because doing so requires context. In essence it is necessary to describe types, and then describe where in a hierarchy a type is used. 
+
+I guess this could be achieved with... JSON. For example
+
+```
+{
+    "types": {
+        "SomeType":
+        {
+            "kind" : "struct",
+            "derivesFrom": "..."
+            fields: {
+                [ "name", "type", "default"]
+            }
+        },
+        "MainOptions": 
+        {
+            "..."
+        }
+    },
+    "structure" : 
+    {
+        "MainOptions"
+    }
+}
+```
+
+When traversing we use the 'structure' to work out where a type is used. 
+
+This is workable, but adds additional significant complexity.
+
+The issue around different representations could also use the information in the description to convert into some canonical form. 
+
+The structure could potentially generated via reflection information.
+
+## Native bag of options
+
+Options could be represented via an internal struct on which a hash can be performed. 
+
+Input can be described as "deltas" to the current options. The final options is the combination of all the deltas - which would produce the final options structure for use. The hash of all of the options is the hash of the final structure.
+
+How are the deltas described?
+
+The in memory representation is not trivial in that if we want to add a struct to a list we would need a way to describe this.
+
+Whilst in the runtime the 'field' could be uniquely identified an offset, within a file format representation it would need to be by something that works across targets, and resistant to change in contents. 
+
+## Slangs Component System
+
+Slang has a component system that can be used for combining options to produce a compilation. An argument can be made that it should be part of the hashing representation, as it is part of compilation.
+
+If combination is at the level of components, then as long as components are serializable, we can represent a compilation by a collection of components. Has several derived interfaces...
+
+* IEntryPoint
+* ITypeConformance 
+* IModule
+
+Can be constructed into composites, through `createCompositeComponentType`, which describes aspects of the combination takes place.
+
+If the components were serializable (as say as JSON), we could describe a compilation as combination of components. If components are named, a concatenation of names could name a compilation.
+
+It doesn't appear as if there is a way to more finely control the application of component types. For example if there was a desire to change the optimizaion option, it would appear to remain part of the ICompileRequest (it's not part of a component). This implies this mechanism as it stands whilst allowing composition, doesn't provide the more nuanced composition. Additional component types could perhaps be added which would add such control.
+
+Perhaps having components is not necessary as part of the representation, as 'component' system is a mechanism for achiving a 'bag of options' and so we can get the same effect by using that mechanism without components.
+
+Discussion: Container 
+=====================
+    
+## Manifest or association
+
+A typical container will contain kernels - in effect blobs. The blobs themselves, or the blob names are not going to be sufficient to express the amount of information that is necessary to meet the goals laid out at the start of this document. Some extra information may be user supplied. Some extra information might be user based to know how to classify different kernels. Therefore it is necessary to have some system to handle this metadata. 
+
+As previously discussed the underlying container format is a file system. Some limited information could be infered from the filename. For example a .spv extension file is probably SPIR-V blob. For more rich meta data describing a kernel something more is needed. Two possible approaches could be to have a 'manifest' that described the contents of the container. Another approach would to have a file associated with the kernel that describes it's contents.
+
+Single Manifest Pros
+
+* Single file describes contents
+* Probably faster to load and use
+* Reduces the amount of extra files
+* Everything describing how the contents is to be interpretted is all in one place
+
+Single Manifest Cons
+
+* Not possible to easily add and remove contents - requires editing of the manifest, or tooling 
+  * Extra tooling specialized tooling was deemed undesirable in original problem description
+* Manifest could easily get out of sync with the contents
+
+Associated Files Pros
+
+* Simple 
+* Can use normal file system tooling to manipulate
+* The contents of the container is implied by the contents of the file system
+  * Easier to keep in sync
+  
+Associated Files Cons
+
+* Requires traversal of the container 'file system' to find the contents
+* Might mean a more 'loose' association between results
+
+Another possible way of doing the association is via a directory structure. The directory might contain the 'manifest' for that directory. 
+
+Given that we want the format to represent a file system, and that we would want it to be easy and intuitive how to manipulate the represtation, using a single manifest is probably ruled out. It remains to be seen which is preferable in practice, but it seems likely that using 'associated files' is probably the way to go.
+
+## How to represent data
+
+As previously discussed, unless there is a very compelling reason not to we want to use representations that are open standards and easy to use. We also need such representations to be resilient to changes. It is important that file formats can be human readable or easily changable into something that is human readable. For these reasons, JSON seems to be a good option for our main 'meta data' representation. Additionally Slang already has a JSON system.
+
+If it was necessary to have meta data stored in a more compressed format we could consider also supporting [BSON](https://en.wikipedia.org/wiki/BSON). Conversion between BSON and JSON can be made quickly and simply. BSON is a well known and used standard.    
+    
+Discussion: Container Layout
+============================
+
+Container will need to store
+
+* 
 
 
-        
+
+Related Work
+============
+
+* Shader cache system as part of gfx (https://github.com/lucy96chen/slang/tree/shader-cache)
+* Lumberyard [shader cache](https://docs.aws.amazon.com/lumberyard/latest/userguide/mat-shaders-custom-dev-cache-intro.html)
+* Unreal [FShaderCache](https://docs.unrealengine.com/5.0/en-US/fshadercache-in-unreal-engine/)
+* Unreal [Derived Data Cache - DDC](https://docs.unrealengine.com/4.26/en-US/ProductionPipelines/DerivedDataCache/)
+* Microsoft [D3DSCache](https://github.com/microsoft/DirectX-Specs/blob/master/d3d/ShaderCache.md) 
+
+Lumberyard uses the zip format for its '.pak' format. 
+
+Microsoft D3DSCache provides a binary keyed key-value store. 
+
+## Gfx
+
+Gfx has a runtime shader cache based on `PipelineKey`, `ComponentKey` and `ShaderCache`. ShaderCache is a key value store. 
+
+A key for a pipeline is a combination of 
+
+```
+    PipelineStateBase* pipeline;
+    Slang::ShortList<ShaderComponentID> specializationArgs;
+```
+
+`ShaderComponentID` can be created on the ShaderCache, from 
+
+```
+    Slang::UnownedStringSlice typeName;
+    Slang::ShortList<ShaderComponentID> specializationArgs;
+    Slang::HashCode hash;
+```    
+    
+For reflected types, a type name is generated if specialized.
+    
+The shader cache can be thought of as being parameterized by the pipeline and associated specialization args. It appears to currently only support specialization types.    
+    
+Gfx does not appear to support any serialization/file representation.    
+    
+
 Proposed Approach
 =================
 
@@ -617,46 +812,7 @@ In the `slang-repro` mechanism the source is actually stored in a 'flat' manner,
 
 Including source, provides a way to distribute a 'compilation' much like the `slang-repro` file. It may also be useful such that a shader could be recompiled on a target. This could be for many reasons - allowing support for future platforms, allowing recompilation to improve performance or allowing compilation to happen on client machines for rare scenarios on demand.
 
-## Manifest or association
 
-A typical container will contain kernels - in effect blobs. The blobs themselves, or the blob names are not going to be sufficient to express the amount of information that is necessary to meet the goals laid out at the start of this document. Some extra information may be user supplied. Some extra information might be user based to know how to classify different kernels. Therefore it is necessary to have some system to handle this metadata. 
-
-As previously discussed the underlying container format is a file system. Some limited information could be infered from the filename. For example a .spv extension file is probably SPIR-V blob. For more rich meta data describing a kernel something more is needed. Two possible approaches could be to have a 'manifest' that described the contents of the container. Another approach would to have a file associated with the kernel that describes it's contents.
-
-Single Manifest Pros
-
-* Single file describes contents
-* Probably faster to load and use
-* Reduces the amount of extra files
-* Everything describing how the contents is to be interpretted is all in one place
-
-Single Manifest Cons
-
-* Not possible to easily add and remove contents - requires editing of the manifest, or tooling 
-  * Extra tooling specialized tooling was deemed undesirable in original problem description
-* Manifest could easily get out of sync with the contents
-
-Associated Files Pros
-
-* Simple 
-* Can use normal file system tooling to manipulate
-* The contents of the container is implied by the contents of the file system
-  * Easier to keep in sync
-  
-Associated Files Cons
-
-* Requires traversal of the container 'file system' to find the contents
-* Might mean a more 'loose' association between results
-
-Another possible way of doing the association is via a directory structure. The directory might contain the 'manifest' for that directory. 
-
-Given that we want the format to represent a file system, and that we would want it to be easy and intuitive how to manipulate the represtation, using a single manifest is probably ruled out. It remains to be seen which is preferable in practice, but it seems likely that using 'associated files' is probably the way to go.
-
-## How to represent data
-
-As previously discussed, unless there is a very compelling reason not to we want to use representations that are open standards and easy to use. We also need such representations to be resilient to changes. It is important that file formats can be human readable or easily changable into something that is human readable. For these reasons, JSON seems to be a good option for our main 'meta data' representation. Additionally Slang already has a JSON system.
-
-If it was necessary to have meta data stored in a more compressed format we could consider also supporting [BSON](https://en.wikipedia.org/wiki/BSON). Conversion between BSON and JSON can be made quickly and simply. BSON is a well known and used standard.
 
 ## Other aspects
 
