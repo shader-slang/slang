@@ -356,7 +356,7 @@ static SlangResult _parseGCCFamilyLine(SliceAllocator& allocator, const UnownedS
     SliceAllocator allocator;
 
     diagnostics->reset();
-    diagnostics->setRaw(SliceCaster::asCharSlice(exeRes.standardError));
+    diagnostics->setRaw(SliceUtil::asCharSlice(exeRes.standardError));
 
     // We hold in workDiagnostics so as it is more convenient to append to the last with a continuation
     // also means we don't hold the allocations of building up continuations, just the results when finally allocated at the end
@@ -432,7 +432,7 @@ static SlangResult _parseGCCFamilyLine(SliceAllocator& allocator, const UnownedS
     return SLANG_OK;
 }
 
-/* static */SlangResult GCCDownstreamCompilerUtil::calcCompileProducts(const CompileOptions& options, ProductFlags flags, IFileArtifactRepresentation* lockFile, List<ComPtr<IArtifact>>& outArtifacts)
+/* static */SlangResult GCCDownstreamCompilerUtil::calcCompileProducts(const CompileOptions& options, ProductFlags flags, IOSFileArtifactRepresentation* lockFile, List<ComPtr<IArtifact>>& outArtifacts)
 {
     SLANG_ASSERT(options.modulePath.count);
 
@@ -444,7 +444,7 @@ static SlangResult _parseGCCFamilyLine(SliceAllocator& allocator, const UnownedS
         const auto desc = ArtifactDescUtil::makeDescForCompileTarget(options.targetType);
         SLANG_RETURN_ON_FAIL(ArtifactDescUtil::calcPathForDesc(desc, asStringSlice(options.modulePath), builder));
 
-        auto fileRep = FileArtifactRepresentation::create(IFileArtifactRepresentation::Kind::Owned, builder.getUnownedSlice(), lockFile, nullptr);
+        auto fileRep = OSFileArtifactRepresentation::create(IOSFileArtifactRepresentation::Kind::Owned, builder.getUnownedSlice(), lockFile);
         auto artifact = ArtifactUtil::createArtifact(desc);
         artifact->addRepresentation(fileRep);
 
@@ -456,7 +456,6 @@ static SlangResult _parseGCCFamilyLine(SliceAllocator& allocator, const UnownedS
 
 /* static */SlangResult GCCDownstreamCompilerUtil::calcArgs(const CompileOptions& options, CommandLine& cmdLine)
 {
-    SLANG_ASSERT(options.sourceContents.count == 0);
     SLANG_ASSERT(options.modulePath.count);
 
     PlatformKind platformKind = (options.platform == PlatformKind::Unknown) ? PlatformUtil::getPlatformKind() : options.platform;
@@ -613,10 +612,15 @@ static SlangResult _parseGCCFamilyLine(SliceAllocator& allocator, const UnownedS
         }
     }
 
-    // Files to compile
-    for (const auto& sourceFile : options.sourceFiles)
+    // Files to compile, need to be on the file system.
+    for (IArtifact* sourceArtifact : options.sourceArtifacts)
     {
-        cmdLine.addArg(asString(sourceFile));
+        ComPtr<IOSFileArtifactRepresentation> fileRep;
+
+        // TODO(JS): 
+        // Do we want to keep the file on the file system? It's probably reasonable to do so.
+        SLANG_RETURN_ON_FAIL(sourceArtifact->requireFile(ArtifactKeep::Yes, fileRep.writeRef()));
+        cmdLine.addArg(fileRep->getPath());
     }
 
     // Add the library paths
@@ -640,13 +644,15 @@ static SlangResult _parseGCCFamilyLine(SliceAllocator& allocator, const UnownedS
         // If it's a library for CPU types, try and use it
         if (ArtifactDescUtil::isCpuBinary(artifactDesc) && artifactDesc.kind == ArtifactKind::Library)
         {
-            ComPtr<IFileArtifactRepresentation> fileRep;
+            ComPtr<IOSFileArtifactRepresentation> fileRep;
 
             // Get the name and path (can be empty) to the library
-            SLANG_RETURN_ON_FAIL(artifact->requireFile(ArtifactKeep::Yes, nullptr, fileRep.writeRef()));
+            SLANG_RETURN_ON_FAIL(artifact->requireFile(ArtifactKeep::Yes, fileRep.writeRef()));
 
-            libPathPool.add(ArtifactUtil::getParentPath(fileRep));
-            cmdLine.addPrefixPathArg("-l", ArtifactDescUtil::getBaseName(artifact->getDesc(), fileRep));
+            const UnownedStringSlice path(fileRep->getPath());
+            libPathPool.add(Path::getParentDirectory(path));
+        
+            cmdLine.addPrefixPathArg("-l", ArtifactDescUtil::getBaseNameFromPath(artifact->getDesc(), path));
         }
     }
 

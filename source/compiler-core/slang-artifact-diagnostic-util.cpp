@@ -127,7 +127,7 @@ namespace Slang {
     String text(in);
 
     diagnostic.severity = ArtifactDiagnostic::Severity::Info;
-    diagnostic.text = SliceCaster::asTerminatedCharSlice(text);
+    diagnostic.text = SliceUtil::asTerminatedCharSlice(text);
     diagnostics->add(diagnostic);
 }
 

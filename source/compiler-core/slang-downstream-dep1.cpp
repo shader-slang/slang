@@ -6,6 +6,7 @@
 #include "slang-artifact-desc-util.h"
 
 #include "../core/slang-castable-util.h"
+#include "../core/slang-string-util.h"
 
 #include "slang-slice-allocator.h"
 
@@ -97,6 +98,14 @@ DownstreamCompilerAdapter_Dep1::DownstreamCompilerAdapter_Dep1(DownstreamCompile
 }
 SlangResult DownstreamCompilerAdapter_Dep1::compile(const CompileOptions& inOptions, IArtifact** outArtifact)
 {
+    // Currently this only for llvm, so we'll just ignore other scenarios
+    if (inOptions.sourceArtifacts.count != 1)
+    {
+        return SLANG_FAIL;
+    }
+
+    IArtifact* sourceArtifact = inOptions.sourceArtifacts[0];
+
     typedef DownstreamCompileOptions_Dep1::SomeEnum SomeEnum;
     
     // Convert to the Deps1 compile options
@@ -126,15 +135,16 @@ SlangResult DownstreamCompilerAdapter_Dep1::compile(const CompileOptions& inOpti
         options.defines.add(dst);
     }
 
-    options.sourceContents = asStringSlice(inOptions.sourceContents);
-    options.sourceContentsPath = asStringSlice(inOptions.sourceContentsPath);
+    ComPtr<ISlangBlob> blob;
+    SLANG_RETURN_ON_FAIL(sourceArtifact->loadBlob(ArtifactKeep::Yes, blob.writeRef()));
+               
+    options.sourceContents = StringUtil::getString(blob);
+    options.sourceContentsPath = ArtifactUtil::findPath(sourceArtifact);
 
-    options.sourceFiles = SliceConverter::toList(inOptions.sourceFiles);
+    options.includePaths = SliceUtil::toList(inOptions.includePaths);
+    options.libraryPaths = SliceUtil::toList(inOptions.libraryPaths);
 
-    options.includePaths = SliceConverter::toList(inOptions.includePaths);
-    options.libraryPaths = SliceConverter::toList(inOptions.libraryPaths);
-
-    options.libraries = SliceConverter::toComPtrList(inOptions.libraries);
+    options.libraries = SliceUtil::toComPtrList(inOptions.libraries);
 
     for (auto& src : inOptions.requiredCapabilityVersions)
     {
@@ -155,15 +165,13 @@ SlangResult DownstreamCompilerAdapter_Dep1::compile(const CompileOptions& inOpti
 
     options.stage = inOptions.stage;
 
-    options.compilerSpecificArguments = SliceConverter::toList(inOptions.compilerSpecificArguments);
+    options.compilerSpecificArguments = SliceUtil::toList(inOptions.compilerSpecificArguments);
 
     options.fileSystemExt = inOptions.fileSystemExt;
     options.sourceManager = inOptions.sourceManager;
 
     RefPtr<DownstreamCompileResult_Dep1> result;
     SLANG_RETURN_ON_FAIL(m_dep->compile(options, result));
-
-    typedef SliceCaster Caster;
 
     ComPtr<IArtifact> artifact = ArtifactUtil::createArtifactForCompileTarget(options.targetType);
 
@@ -173,7 +181,7 @@ SlangResult DownstreamCompilerAdapter_Dep1::compile(const CompileOptions& inOpti
     const DownstreamDiagnostics_Dep1* srcDiagnostics = &result->getDiagnostics();
 
     dstDiagnostics->setResult(srcDiagnostics->result);
-    dstDiagnostics->setRaw(Caster::asCharSlice(srcDiagnostics->rawDiagnostics));
+    dstDiagnostics->setRaw(SliceUtil::asCharSlice(srcDiagnostics->rawDiagnostics));
 
     for (const auto& srcDiagnostic : srcDiagnostics->diagnostics)
     {
@@ -182,11 +190,14 @@ SlangResult DownstreamCompilerAdapter_Dep1::compile(const CompileOptions& inOpti
         dstDiagnostic.severity = ArtifactDiagnostic::Severity(srcDiagnostic.severity);
         dstDiagnostic.stage = ArtifactDiagnostic::Stage(srcDiagnostic.stage);
 
-        dstDiagnostic.code = Caster::asTerminatedCharSlice(srcDiagnostic.code);
-        dstDiagnostic.text = Caster::asTerminatedCharSlice(srcDiagnostic.text);
-        dstDiagnostic.filePath = Caster::asTerminatedCharSlice(srcDiagnostic.filePath);
+        dstDiagnostic.code = SliceUtil::asTerminatedCharSlice(srcDiagnostic.code);
+        dstDiagnostic.text = SliceUtil::asTerminatedCharSlice(srcDiagnostic.text);
+        dstDiagnostic.filePath = SliceUtil::asTerminatedCharSlice(srcDiagnostic.filePath);
 
         dstDiagnostic.location.line = srcDiagnostic.fileLine;
+
+        // Add the diagnostic
+        dstDiagnostics->add(dstDiagnostic);
     }
 
     artifact->addAssociated(dstDiagnostics);

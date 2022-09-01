@@ -7,8 +7,11 @@
 #include "slang-artifact-desc-util.h"
 
 #include "slang-artifact-helper.h"
+#include "slang-artifact-util.h"
 
 #include "../core/slang-castable-util.h"
+
+#include "slang-slice-allocator.h"
 
 #include "../core/slang-file-system.h"
 #include "../core/slang-io.h"
@@ -148,53 +151,83 @@ SlangResult DefaultArtifactHandler::getOrCreateRepresentation(IArtifact* artifac
 		SLANG_RETURN_ON_FAIL(_loadSharedLibrary(artifact, sharedLib.writeRef()));
 		return _addRepresentation(artifact, keep, sharedLib, outCastable);
 	}
+	else if (guid == IOSFileArtifactRepresentation::getTypeGuid())
+	{
+		ComPtr<IOSFileArtifactRepresentation> fileRep;
+		SLANG_RETURN_ON_FAIL(_createOSFile(artifact, getIntermediateKeep(keep), fileRep.writeRef()));
+		return _addRepresentation(artifact, keep, fileRep, outCastable);
+	}
 
 	return SLANG_E_NOT_AVAILABLE;
 }
 
-static bool _isFileSystemFile(ICastable* castable, void* data)
+SlangResult DefaultArtifactHandler::_createOSFile(IArtifact* artifact, ArtifactKeep keep, IOSFileArtifactRepresentation** outFileRep)
 {
-	if (auto fileRep = as<IFileArtifactRepresentation>(castable))
+	// Look if we have an IExtFile representation, as we might already have a OS file associated with that
+	if (auto extRep = findRepresentation<IExtFileArtifactRepresentation>(artifact))
 	{
-		ISlangMutableFileSystem* fileSystem = (ISlangMutableFileSystem*)data;
-		if (fileRep->getFileSystem() == fileSystem)
+		auto system = extRep->getFileSystem();
+
+		String path;
+		switch (system->getOSPathKind())
 		{
-			return true;
+			case OSPathKind::Direct:
+			{
+				path = UnownedStringSlice(extRep->getPath());
+				break;
+			}
+			case OSPathKind::Canonical:
+			{
+				ComPtr<ISlangBlob> canonicalPathBlob;
+				if (SLANG_SUCCEEDED(system->getCanonicalPath(extRep->getPath(), canonicalPathBlob.writeRef())))
+				{
+					path = StringUtil::getString(canonicalPathBlob);
+				}
+				break;
+			}
+			default: break;
+		}
+
+		if (path.getLength())
+		{
+			auto fileRep = OSFileArtifactRepresentation::create(IOSFileArtifactRepresentation::Kind::Reference, path.getUnownedSlice() , nullptr);
+			// As a sanity check make sure it exists!
+			if (fileRep->exists())
+			{
+				*outFileRep = fileRep.detach();
+				return SLANG_OK;
+			}
 		}
 	}
-	return false;
-}
 
-SlangResult DefaultArtifactHandler::getOrCreateFileRepresentation(IArtifact* artifact, ArtifactKeep keep, ISlangMutableFileSystem* fileSystem, IFileArtifactRepresentation** outFileRep)
-{
-	// See if we already have it
-	if (auto fileRep = as<IFileArtifactRepresentation>(artifact->findRepresentationWithPredicate(&_isFileSystemFile, fileSystem)))
-	{
-		fileRep->addRef();
-		*outFileRep = fileRep;
-		return SLANG_OK;
-	}
-
+	// Okay looks like we will need to generate a temporary file
 	auto helper = DefaultArtifactHelper::getSingleton();
 
 	// If we are going to access as a file we need to be able to write it, and to do that we need a blob
 	ComPtr<ISlangBlob> blob;
 	SLANG_RETURN_ON_FAIL(artifact->loadBlob(getIntermediateKeep(keep), blob.writeRef()));
 
+	// Find some name associated 
+	auto name = ArtifactUtil::findName(artifact);
+	if (name.getLength() == 0)
+	{
+		name = toSlice("unknown");
+	}
+
 	// Okay we need to store as a temporary. Get a lock file.
-	ComPtr<IFileArtifactRepresentation> lockFile;
-	SLANG_RETURN_ON_FAIL(helper->createLockFile(artifact->getName(), fileSystem, lockFile.writeRef()));
+	ComPtr<IOSFileArtifactRepresentation> lockFile;
+	SLANG_RETURN_ON_FAIL(helper->createLockFile(asCharSlice(name), lockFile.writeRef()));
 
 	// Now we need the appropriate name for this item
 	ComPtr<ISlangBlob> pathBlob;
-	SLANG_RETURN_ON_FAIL(helper->calcArtifactPath(artifact->getDesc(), lockFile->getPath(), pathBlob.writeRef()));
+	SLANG_RETURN_ON_FAIL(helper->calcArtifactPath(artifact, lockFile->getPath(), pathBlob.writeRef()));
 
 	const auto path = StringUtil::getSlice(pathBlob);
 
 	// Write the contents
 	SLANG_RETURN_ON_FAIL(File::writeAllBytes(path, blob->getBufferPointer(), blob->getBufferSize()));
 
-	ComPtr<IFileArtifactRepresentation> fileRep;
+	ComPtr<IOSFileArtifactRepresentation> fileRep;
 
 	// TODO(JS): This path comparison is perhaps not perfect, in that it assumes the path is not changed
 	// in any way. For example an impl of calcArtifactPath that changed slashes or used a canonical path
@@ -209,13 +242,7 @@ SlangResult DefaultArtifactHandler::getOrCreateFileRepresentation(IArtifact* art
 	else
 	{
 		// Create a new rep that references the lock file
-		fileRep = new FileArtifactRepresentation(IFileArtifactRepresentation::Kind::Owned, path, lockFile, lockFile->getFileSystem());
-	}
-
-	// Create the rep
-	if (canKeep(keep))
-	{
-		artifact->addRepresentation(fileRep);
+		fileRep = new OSFileArtifactRepresentation(IOSFileArtifactRepresentation::Kind::Owned, path, lockFile);
 	}
 
 	// Return the file
@@ -232,14 +259,11 @@ SlangResult DefaultArtifactHandler::_loadSharedLibrary(IArtifact* artifact, ISla
 		isDerivedFrom(desc.payload, ArtifactPayload::CPULike))
 	{
 		// Get as a file represenation on the OS file system
-		ComPtr<IFileArtifactRepresentation> fileRep;
+		ComPtr<IOSFileArtifactRepresentation> fileRep;
 
 		// We want to keep the file representation, otherwise every request, could produce a new file
 		// and that seems like a bad idea.
-		SLANG_RETURN_ON_FAIL(artifact->requireFile(ArtifactKeep::Yes, nullptr, fileRep.writeRef()));
-
-		// We requested on the OS file system, just check that's what we got...
-		SLANG_ASSERT(fileRep->getFileSystem() == nullptr);
+		SLANG_RETURN_ON_FAIL(artifact->requireFile(ArtifactKeep::Yes, fileRep.writeRef()));
 
 		// Try loading the shared library
 		SharedLibrary::Handle handle;
@@ -247,6 +271,7 @@ SlangResult DefaultArtifactHandler::_loadSharedLibrary(IArtifact* artifact, ISla
 		{
 			return SLANG_FAIL;
 		}
+
 		// Output
 		*outSharedLibrary = ScopeSharedLibrary::create(handle, fileRep).detach();
 		return SLANG_OK;
