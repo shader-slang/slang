@@ -119,13 +119,14 @@ To enumerate the major challenges
 * How to generate a key for the runtime scenario
 * How to produce keys for the persistant scenario - implies user control, and human readability
 * How to represent compilation in a composible 'nameable' way 
+* How to produce options from a named combination
 
 The mechanism for producing keys in the runtime scenario could be used to check if an entry in the cache is out of date.
 
 Background: Hashing source
 ==========================
 
-Hashing source is something that is needed for runtime cache scenario, as it is necessary to generate a key purely from 'input' which source is part of.
+Hashing source is something that is needed for runtime cache scenario, as it is necessary to generate a key purely from 'input' which source is part of. It can also be used in the persistent scenario, in order to validate if everything is in sync. That sync checking might perhaps only be performed when source and other resources are available. 
 
 The fastest/simplest way to hash source, is to take the blob and hash that. Unfortunately there are several issues 
 
@@ -197,13 +198,74 @@ Generated source can be part of a hash if the source is available. As touched on
 
 We could side step the issues around source generation if we push that problem back onto users. If they are using code generation, the system could require providing a string that uniquely identifies the generation that is being used. This perhaps being a requirement for a persistant cache. For a temporary runtime cache, we can allow hash generation from source.  
 
+Background: Hashing stability
+=============================
+
+Ideally a hashing mechanism can be resilient to unimportant changes. The previous section described some approaches for changes in source. The other area of significant complexity is around options. If options are defined as JSON (or some other 'bag of values') hashing can be performed relatively easily with a few rules. If the representation is such that if a value is not set, the default is used, it is resilient to changes of options that are explicitly set. 
+
+When the hashing is on some native representation this isn't quite so simple, as a typical has function will include all fields. A field value, default or not will alter the hash. Therefore adding or removing a field will necessarily change the hash.
+
+One way around this would be to use a hashing regime that only altered the hash if the values are not default.
+
+```C++
+
+Hash calcHash(const Options& options)
+{
+    const Options defaultOptions;
+
+    Hash = ...;
+    if (option.someOption != defaultOption.someValue)
+    {
+        hash = combineHash(hash, option.someOption.getHash());
+    }
+    // ...
+}
+```
+
+This could perhaps be simplified with some macro magic.
+
+```
+
+// Another 
+
+struct HashCalculator<T>
+{
+    template <typename FIELD>
+    void hashIfDifferent(const field& f, const T& defaultValue)
+    {
+        if (value != defaultValue)
+        {
+            hash = combineHash(hash, value.getHash());
+        }
+    }
+    
+    const T defaultValue;
+    const T* value;
+    Hash hash;
+};
+
+Hash calcHash(const Options& options)
+{
+    HashCalculator calc;
+    const Options defaultOptions;
+
+    calc.hashIfDifferent(options.someOption, defaultOptions.someOption);
+    // ...
+    Hash = ...;
+    
+}
+```
+
+This is a little more clumsy, but if we wanted to use a final native representation, it is workable.
+
+Note that the ordering of hashing is also important for stability.
 
 Background: Key Naming
 ======================
 
-The container could be seen as a glorified key value store. The key identifying a kernel and associated data. 
+The container could be seen as a glorified key value store, with the key identifying a kernel and associated data. 
 
-Much of the difficulty here is how to define the key. If it's a combination of the 'inputs' it would be huge and complicated. If it's a hash, then it can be short, but not human understandable, and without considerable care not stable to small, or irrelevant changes.
+Much of the difficulty here is how to define the key. If it's a combination of the 'inputs' it would be huge and complicated. If it's a hash, then it can be short, but not human readable, and without considerable care not stable to small or irrelevant changes.
 
 For a runtime cache type scenario, the instability and lack of human readability of the key probably doesn't matter too much. It probably is a consideration how slow and complicated it is to produce the key. 
 
@@ -281,9 +343,66 @@ It may be necessary to define options by tool chain. Doing so would mean the nam
 
 If it is necessary obfuscate the contents, it would be possible to put the human readable key though a hash, and then the hash can be used for lookup. 
 
+## Container Location
+
+We could consider the contents of the container as 'flat' with files for each of the keys. There could be several files related to a key if we use file association mechanism (as opposed to a single manifest).
+
+Whilst this works it probably isn't particularly great from an organizational point of view. It might be more convenient if we can use the directory hierarchy if at least optionally. For example putting all the kernels for a target together...
+
+```
+/target/name-entryPoint
+```    
     
-Describing Options
-==================
+Or 
+
+```
+/target/name/entryPoint-generated-hash
+```    
+    
+Where 'generated-hash' was the hash for generated source code.    
+    
+Perhaps this information would be configured in a JSON file for the repository. 
+
+What happens if we want to obfuscate? We could make the whole path obfuscated. We could in the configuration describe which parts of the name will be obfuscated, such that it's okay to see there are different 'target' names.
+
+## Default names    
+    
+When originally discussed, the idea was that all options can be named, and thus any combination is just a combination of names. That combination produces the key. 
+
+Whilst this works, it might make sense to allow 'meta' names for common types. The things that will typically change for a fixed set of options would be 
+
+* The input translation unit source
+* The target (in the Slang sense)
+* The entryPoint/stage (can we say the entry point name implies the stage?)
+
+We could have psuedo names for these commonly changed values. If there are multiple input source files for a translation unit, we could key on the first. 
+
+We could also have some 'names' that are built in. For example default configuration names such as 'debug' and 'release'. They can be changed in part of configuration but have some default meaning. That options can perhaps override the defaults. 
+
+Using the psuedo name idea might mean it is possible to produce reasonable default names. Moreover we can still use the hashing mechanism to either report a validation issue, or trigger recompilation when everything needed to do as much is available.
+
+## Target
+
+A target can be quite a complicated thing to represent. Artifact has
+
+* 'Kind' - executable, library, object code, shared library
+* 'Payload' - SPIR-V, DIXL, DXBC, Host code, Universal, x86_64 etc...
+  * Version
+* 'Style' - Kernel, host, unknown
+
+This doesn't take into account a specific 'platform', where that could vary a kernel depending on the specific features of the platform. There are different versions of SPIR-V and there are different extensions. 
+
+This doesn't cover the breadth though because for CPU targets there is additionally
+
+* Operating system - including operating system version
+* Tool chain - Compiler 
+
+Making this part of the filename could lead to very long filenames. The more detailed information could be made available in json associated files. 
+
+This section doesn't provide a specific plan on how to encapsulate the subtlety around a 'target'. Again how this is named is probably something that is controllable in user space, but there are some reasonable defaults when it is not defined. 
+    
+Background: Describing Options
+==============================
 
 ## 'Bag of named options' 
 
@@ -298,6 +417,8 @@ How to define what options are set? Working at the level of a struct doesn't wor
 The grouping - how does it actually work? It might require specifying what group a set of options is in.
 
 An advantage to this approach is that policy of how naming works as a user space problem. It is also powerful in that it allows control on compilation that has some independence from the name.
+
+We could have some options that are named, but do not appear as part of the name/path within the container. The purpose of this is to allow customization of a compilation, without that customization necessarily appearing withing the application code. The container could store group of named options that is used, such that it is possible to recreate the compilation or perhaps to detect there is a difference. 
 
 ### JSON options
 
@@ -391,7 +512,6 @@ The issue around different representations could also use the information in the
 
 The structure could potentially generated via reflection information.
 
-
 ## Native bag of options
 
 Options could be represented via an internal struct on which a hash can be performed. 
@@ -425,6 +545,8 @@ Perhaps having components is not necessary as part of the representation, as 'co
 Background: Describing Options
 ==============================
 
+The 'naming' options idea implies that options and ways of combining options can be stored within the configuration for a container. Perhaps there is additionally a runtime API that allows creation of deltas. 
+    
 ## 'Bag of named options' 
 
 Perhaps identification is something that is largely in user space for the perisistant scenario. You could imagine a bag of 'options', that are typically named. Then the output name is the concatination of the names. If an option set isn't named it doesn't get included. Perhaps the order of the naming defines the precedence.
@@ -541,7 +663,19 @@ How are the deltas described?
 
 The in memory representation is not trivial in that if we want to add a struct to a list we would need a way to describe this.
 
-Whilst in the runtime the 'field' could be uniquely identified an offset, within a file format representation it would need to be by something that works across targets, and resistant to change in contents. 
+Whilst in the runtime the 'field' could be uniquely identified an offset, within a file format representation it would need to be by something that works across targets, and resistant to change in contents. That implies it should be a name.
+
+If we ensure that all types involved in options as JSON serializable via reflection, this does provide a way for code to traffic between and manipulate the native types.
+
+How do we add a structure to a list?
+
+```JSON
+{
+    "+listField", { "structField" : 10, "anotherField" : 20 }
+} 
+```
+
+The problem perhaps is how to implement this in native code? It looks like it is workable with the functionality already available in RttiUtil.
 
 ## Slangs Component System
 
@@ -557,7 +691,7 @@ Can be constructed into composites, through `createCompositeComponentType`, whic
 
 If the components were serializable (as say as JSON), we could describe a compilation as combination of components. If components are named, a concatenation of names could name a compilation.
 
-It doesn't appear as if there is a way to more finely control the application of component types. For example if there was a desire to change the optimizaion option, it would appear to remain part of the ICompileRequest (it's not part of a component). This implies this mechanism as it stands whilst allowing composition, doesn't provide the more nuanced composition. Additional component types could perhaps be added which would add such control.
+It doesn't appear as if there is a way to more finely control the application of component types. For example if there was a desire to change the optimization option, it would appear to remain part of the ICompileRequest (it's not part of a component). This implies this mechanism as it stands whilst allowing composition, doesn't provide the more nuanced composition. Additional component types could perhaps be added which would add such control.
 
 Perhaps having components is not necessary as part of the representation, as 'component' system is a mechanism for achiving a 'bag of options' and so we can get the same effect by using that mechanism without components.
 
@@ -608,9 +742,6 @@ If it was necessary to have meta data stored in a more compressed format we coul
 Discussion: Container Layout
 ============================
 
-Container will need to store
-
-* 
 
 
 
