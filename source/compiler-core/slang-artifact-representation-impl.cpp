@@ -13,32 +13,28 @@
 
 namespace Slang {
 
-/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!! FileArtifactRepresentation !!!!!!!!!!!!!!!!!!!!!!!!!!! */
+/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ExtFileArtifactRepresentation !!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
-void* FileArtifactRepresentation::getInterface(const Guid& guid)
+void* ExtFileArtifactRepresentation::getInterface(const Guid& guid)
 {
     if (guid == ISlangUnknown::getTypeGuid() ||
         guid == ICastable::getTypeGuid() ||
         guid == IArtifactRepresentation::getTypeGuid() ||
-        guid == IFileArtifactRepresentation::getTypeGuid())
+        guid == IPathArtifactRepresentation::getTypeGuid() ||
+        guid == IExtFileArtifactRepresentation::getTypeGuid())
     {
-        return static_cast<IFileArtifactRepresentation*>(this);
+        return static_cast<IExtFileArtifactRepresentation*>(this);
     }
     return nullptr;
 }
 
-void* FileArtifactRepresentation::getObject(const Guid& guid)
+void* ExtFileArtifactRepresentation::getObject(const Guid& guid)
 {
     SLANG_UNUSED(guid);
     return nullptr;
 }
 
-ISlangMutableFileSystem* FileArtifactRepresentation::_getFileSystem()
-{
-    return m_fileSystem ? m_fileSystem : OSFileSystem::getMutableSingleton();
-}
-
-void* FileArtifactRepresentation::castAs(const Guid& guid)
+void* ExtFileArtifactRepresentation::castAs(const Guid& guid)
 {
     if (auto intf = getInterface(guid))
     {
@@ -47,7 +43,66 @@ void* FileArtifactRepresentation::castAs(const Guid& guid)
     return getObject(guid);
 }
 
-SlangResult FileArtifactRepresentation::createRepresentation(const Guid& typeGuid, ICastable** outCastable)
+SlangResult ExtFileArtifactRepresentation::createRepresentation(const Guid& typeGuid, ICastable** outCastable)
+{
+    // We can convert into a blob only, and only if we have a path
+    // If it's referenced by a name only, it's a file that *can't* be loaded as a blob in general.
+    if (typeGuid != ISlangBlob::getTypeGuid())
+    {
+        return SLANG_E_NOT_AVAILABLE;
+    }
+
+    ComPtr<ISlangBlob> blob;
+    SLANG_RETURN_ON_FAIL(m_fileSystem->loadFile(m_path.getBuffer(), blob.writeRef()));
+
+    *outCastable = CastableUtil::getCastable(blob).detach();
+    return SLANG_OK;
+}
+
+bool ExtFileArtifactRepresentation::exists()
+{
+    SlangPathType pathType;
+    const auto res = m_fileSystem->getPathType(m_path.getBuffer(), &pathType);
+    // It exists if it is a file
+    return SLANG_SUCCEEDED(res) && pathType == getPathType();
+}
+
+/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!! FileArtifactRepresentation !!!!!!!!!!!!!!!!!!!!!!!!!!! */
+
+void* OSFileArtifactRepresentation::getInterface(const Guid& guid)
+{
+    if (guid == ISlangUnknown::getTypeGuid() ||
+        guid == ICastable::getTypeGuid() ||
+        guid == IArtifactRepresentation::getTypeGuid() ||
+        guid == IPathArtifactRepresentation::getTypeGuid() ||
+        guid == IOSFileArtifactRepresentation::getTypeGuid())
+    {
+        return static_cast<IOSFileArtifactRepresentation*>(this);
+    }
+    return nullptr;
+}
+
+void* OSFileArtifactRepresentation::getObject(const Guid& guid)
+{
+    SLANG_UNUSED(guid);
+    return nullptr;
+}
+
+/* static */ISlangMutableFileSystem* OSFileArtifactRepresentation::_getFileSystem()
+{
+    return OSFileSystem::getMutableSingleton();
+}
+
+void* OSFileArtifactRepresentation::castAs(const Guid& guid)
+{
+    if (auto intf = getInterface(guid))
+    {
+        return intf;
+    }
+    return getObject(guid);
+}
+
+SlangResult OSFileArtifactRepresentation::createRepresentation(const Guid& typeGuid, ICastable** outCastable)
 {
     // We can convert into a blob only, and only if we have a path
     // If it's referenced by a name only, it's a file that *can't* be loaded as a blob in general.
@@ -66,7 +121,7 @@ SlangResult FileArtifactRepresentation::createRepresentation(const Guid& typeGui
     return SLANG_OK;
 }
 
-bool FileArtifactRepresentation::exists()
+bool OSFileArtifactRepresentation::exists()
 {
     // TODO(JS):
     // If it's a name only it's hard to know what exists should do. It can't *check* because it relies on the 'system' doing 
@@ -86,7 +141,7 @@ bool FileArtifactRepresentation::exists()
     return SLANG_SUCCEEDED(res) && pathType == SLANG_PATH_TYPE_FILE;
 }
 
-void FileArtifactRepresentation::disown()
+void OSFileArtifactRepresentation::disown()
 {
     if (_isOwned())
     {
@@ -94,7 +149,7 @@ void FileArtifactRepresentation::disown()
     }
 }
 
-FileArtifactRepresentation::~FileArtifactRepresentation()
+OSFileArtifactRepresentation::~OSFileArtifactRepresentation()
 {
     if (_isOwned())
     {

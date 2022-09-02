@@ -831,10 +831,10 @@ SLANG_API SlangResult spLoadReproAsFileSystem(
     MemoryOffsetBase base;
     base.set(buffer.getBuffer(), buffer.getCount());
 
-    RefPtr<CacheFileSystem> cacheFileSystem;
-    SLANG_RETURN_ON_FAIL(ReproUtil::loadFileSystem(base, requestState, replaceFileSystem, cacheFileSystem));
+    ComPtr<ISlangFileSystemExt> fileSystem;
+    SLANG_RETURN_ON_FAIL(ReproUtil::loadFileSystem(base, requestState, replaceFileSystem, fileSystem));
 
-    *outFileSystem = cacheFileSystem.detach();
+    *outFileSystem = fileSystem.detach();
     return SLANG_OK;
 }
 

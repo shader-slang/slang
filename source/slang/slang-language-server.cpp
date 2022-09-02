@@ -8,9 +8,12 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+
 #include "../core/slang-secure-crt.h"
 #include "../core/slang-range.h"
 #include "../core/slang-char-util.h"
+#include "../core/slang-string-util.h"
+
 #include "../../slang-com-helper.h"
 #include "../compiler-core/slang-json-native.h"
 #include "../compiler-core/slang-json-rpc-connection.h"

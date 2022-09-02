@@ -12,6 +12,13 @@ namespace Slang {
 class IntVal : public Val 
 {
     SLANG_ABSTRACT_AST_CLASS(IntVal)
+
+    Type* type;
+
+    IntVal(Type* inType)
+        : type(inType)
+    {}
+
 };
 
 // Trivial case of a value that is just a constant integer
@@ -27,8 +34,8 @@ class ConstantIntVal : public IntVal
     HashCode _getHashCodeOverride();
 
 protected:
-    ConstantIntVal(IntegerLiteralValue inValue)
-        : value(inValue)
+    ConstantIntVal(Type* inType, IntegerLiteralValue inValue)
+        : IntVal(inType), value(inValue)
     {}
 
 };
@@ -47,8 +54,8 @@ class GenericParamIntVal : public IntVal
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
 
 protected:
-    GenericParamIntVal(DeclRef<VarDeclBase> inDeclRef)
-        : declRef(inDeclRef)
+    GenericParamIntVal(Type* inType, DeclRef<VarDeclBase> inDeclRef)
+        : IntVal(inType), declRef(inDeclRef)
     {}
 };
 
@@ -66,7 +73,9 @@ class FuncCallIntVal : public IntVal
     Type* funcType;
     List<IntVal*> args;
 
-    static Val* tryFoldImpl(ASTBuilder* astBuilder, DeclRef<Decl> newFuncDecl, List<IntVal*>& newArgs, DiagnosticSink* sink);
+    FuncCallIntVal(Type* inType) : IntVal(inType) {}
+
+    static Val* tryFoldImpl(ASTBuilder* astBuilder, Type* resultType, DeclRef<Decl> newFuncDecl, List<IntVal*>& newArgs, DiagnosticSink* sink);
 };
 
 class WitnessLookupIntVal : public IntVal
@@ -80,7 +89,8 @@ class WitnessLookupIntVal : public IntVal
 
     SubtypeWitness* witness;
     Decl* key;
-    Type* type;
+
+    WitnessLookupIntVal(Type* inType) : IntVal(inType) {}
 
     static Val* tryFoldOrNull(ASTBuilder* astBuilder, SubtypeWitness* witness, Decl* key);
 
@@ -140,6 +150,7 @@ public:
     {
         return power == other.power && param->equalsVal(other.param);
     }
+
 };
 class PolynomialIntValTerm : public NodeBase
 {
@@ -207,6 +218,7 @@ public:
     static PolynomialIntVal* add(ASTBuilder* astBuilder, IntVal* op0, IntVal* op1);
     static PolynomialIntVal* sub(ASTBuilder* astBuilder, IntVal* op0, IntVal* op1);
     static PolynomialIntVal* mul(ASTBuilder* astBuilder, IntVal* op0, IntVal* op1);
+    PolynomialIntVal(Type* inType) : IntVal(inType) {}
 
 };
 
@@ -214,6 +226,8 @@ public:
 class ErrorIntVal : public IntVal 
 {
     SLANG_AST_CLASS(ErrorIntVal)
+
+    ErrorIntVal(Type* inType) : IntVal(inType) {}
 
     // TODO: We should probably eventually just have an `ErrorVal` here
     // and have all `Val`s that represent ordinary values hold their

@@ -4,6 +4,11 @@
 #include "../core/slang-string-util.h"
 #include "../core/slang-string-escape-util.h"
 
+#include "slang-artifact-representation-impl.h"
+#include "slang-artifact-impl.h"
+#include "slang-artifact-util.h"
+#include "slang-artifact-desc-util.h"
+
 namespace Slang {
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!! SourceView !!!!!!!!!!!!!!!!!!!!!!!!!!!! */
@@ -20,6 +25,20 @@ const String PathInfo::getMostUniqueIdentity() const
         }
         default:                return "";
     }
+}
+
+String PathInfo::getName() const
+{
+    switch (type)
+    {
+        case Type::Normal:
+        case Type::FromString:
+        case Type::FoundPath:
+        {
+            return foundPath;
+        }
+    }
+    return String();
 }
 
 bool PathInfo::operator==(const ThisType& rhs) const

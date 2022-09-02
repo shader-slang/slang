@@ -7,14 +7,14 @@
 namespace Slang
 {
 
-// Allocate static const storage for the various interface IDs that the Slang API needs to expose
-
 SLANG_FORCE_INLINE static SlangResult _checkExt(FileSystemStyle style) { return Index(style) >= Index(FileSystemStyle::Ext) ? SLANG_OK : SLANG_E_NOT_IMPLEMENTED; }
 SLANG_FORCE_INLINE static SlangResult _checkMutable(FileSystemStyle style) { return Index(style) >= Index(FileSystemStyle::Mutable) ? SLANG_OK : SLANG_E_NOT_IMPLEMENTED; }
 
 SLANG_FORCE_INLINE static bool _canCast(FileSystemStyle style, const Guid& guid)
 {
-    if (guid == ISlangUnknown::getTypeGuid() || guid == ISlangFileSystem::getTypeGuid())
+    if (guid == ISlangUnknown::getTypeGuid() ||
+        guid == ISlangCastable::getTypeGuid() ||
+        guid == ISlangFileSystem::getTypeGuid())
     {
         return true;
     }
@@ -81,9 +81,24 @@ static SlangResult _calcCombinedPath(SlangPathType fromPathType, const char* fro
 /* static */OSFileSystem OSFileSystem::g_ext(FileSystemStyle::Ext);
 /* static */OSFileSystem OSFileSystem::g_mutable(FileSystemStyle::Mutable);
 
+void* OSFileSystem::castAs(const Guid& guid)
+{
+    if (auto ptr = getInterface(guid))
+    {
+        return ptr;
+    }
+    return getObject(guid);
+}
+
 ISlangUnknown* OSFileSystem::getInterface(const Guid& guid)
 {
     return _canCast(m_style, guid) ? static_cast<ISlangFileSystem*>(this) : nullptr;
+}
+
+void* OSFileSystem::getObject(const Guid& guid)
+{
+    SLANG_UNUSED(guid);
+    return nullptr;
 }
 
 static String _fixPathDelimiters(const char* pathIn)
@@ -245,21 +260,31 @@ SlangResult OSFileSystem::createDirectory(const char* path)
     }
 }
 
-SLANG_NO_THROW SlangResult SLANG_MCALL CacheFileSystem::queryInterface(SlangUUID const& uuid, void** outObject)
+void* CacheFileSystem::castAs(const Guid& guid)
 {
-    if (uuid == CacheFileSystem::getTypeGuid())
+    if (auto ptr = getInterface(guid))
     {
-        *outObject = this;
-        return SLANG_OK;
+        return ptr;
     }
+    return getObject(guid);
+}
 
-    if (_canCast(FileSystemStyle::Ext, uuid))
+void* CacheFileSystem::getInterface(const Guid& guid)
+{
+    if (_canCast(FileSystemStyle::Ext, guid))
     {
-        addReference();
-        *outObject = static_cast<ISlangFileSystemExt*>(this);
-        return SLANG_OK;
+        return static_cast<ISlangFileSystemExt*>(this);
     }
-    return SLANG_E_NO_INTERFACE;
+    return nullptr;
+}
+
+void* CacheFileSystem::getObject(const Guid& guid)
+{
+    if (guid == CacheFileSystem::getTypeGuid())
+    {
+        return this;
+    }
+    return nullptr;
 }
 
 CacheFileSystem::CacheFileSystem(ISlangFileSystem* fileSystem, UniqueIdentityMode uniqueIdentityMode, PathStyle pathStyle) 
@@ -290,6 +315,9 @@ void CacheFileSystem::setInnerFileSystem(ISlangFileSystem* fileSystem, UniqueIde
         // Try to get the more sophisticated interface
         fileSystem->queryInterface(ISlangFileSystemExt::getTypeGuid(), (void**)m_fileSystemExt.writeRef());
     }
+
+    // Determine how paths map
+    m_osPathKind = m_fileSystemExt ? m_fileSystemExt->getOSPathKind() : OSPathKind::None;
 
     switch (m_uniqueIdentityMode)
     {
@@ -746,11 +774,40 @@ RelativeFileSystem::RelativeFileSystem(ISlangFileSystem* fileSystem, const Strin
     m_stripPath(stripPath)
 {
     m_style = _getFileSystemStyle(fileSystem, m_fileSystem);
+
+    m_osPathKind = OSPathKind::None;
+
+    ComPtr<ISlangFileSystemExt> ext;
+    if (SLANG_SUCCEEDED(fileSystem->queryInterface(ISlangFileSystemExt::getTypeGuid(), (void**)ext.writeRef())))
+    {
+        m_osPathKind = ext->getOSPathKind();
+
+        // If it's direct, but we have a relative path, canonical should work
+        if (m_osPathKind == OSPathKind::Direct && relativePath.getLength())
+        {
+            m_osPathKind = OSPathKind::Canonical;
+        }
+    }
 }
 
 ISlangUnknown* RelativeFileSystem::getInterface(const Guid& guid)
 {
     return _canCast(m_style, guid) ? static_cast<ISlangMutableFileSystem*>(this) : nullptr;
+}
+
+void* RelativeFileSystem::getObject(const Guid& guid)
+{
+    SLANG_UNUSED(guid);
+    return nullptr;
+}
+
+void* RelativeFileSystem::castAs(const Guid& guid)
+{
+    if (auto ptr = getInterface(guid))
+    {
+        return ptr;
+    }
+    return getObject(guid);
 }
 
 SlangResult RelativeFileSystem::_calcCombinedPathInner(SlangPathType fromPathType, const char* fromPath, const char* path, ISlangBlob** outPath)

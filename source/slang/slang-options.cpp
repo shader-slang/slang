@@ -1006,14 +1006,17 @@ struct OptionsParser
                         }
                     }
 
-                    RefPtr<CacheFileSystem> cacheFileSystem;
-                    SLANG_RETURN_ON_FAIL(ReproUtil::loadFileSystem(base, requestState, dirFileSystem, cacheFileSystem));
+                    ComPtr<ISlangFileSystemExt> fileSystem;
+                    SLANG_RETURN_ON_FAIL(ReproUtil::loadFileSystem(base, requestState, dirFileSystem, fileSystem));
+
+                    auto cacheFileSystem = as<CacheFileSystem>(fileSystem);
+                    SLANG_ASSERT(cacheFileSystem);
 
                     // I might want to make the dir file system the fallback file system...
                     cacheFileSystem->setInnerFileSystem(dirFileSystem, cacheFileSystem->getUniqueIdentityMode(), cacheFileSystem->getPathStyle());
 
                     // Set as the file system
-                    compileRequest->setFileSystem(cacheFileSystem);
+                    compileRequest->setFileSystem(fileSystem);
                 }
                 else if (argValue == "-serial-ir")
                 {
@@ -1491,15 +1494,15 @@ struct OptionsParser
                     // Seeing as on all targets the baseName doesn't have an extension, and all library types do
                     // if the name doesn't have an extension we can assume there is no path to it.
                     
-                    ComPtr<IFileArtifactRepresentation> fileRep;
+                    ComPtr<IOSFileArtifactRepresentation> fileRep;
                     if (Path::getPathExt(path).getLength() <= 0)
                     {
                         // If there is no extension *assume* it is the name of a system level library
-                        fileRep = new FileArtifactRepresentation(IFileArtifactRepresentation::Kind::NameOnly, path.getUnownedSlice(), nullptr, nullptr);
+                        fileRep = new OSFileArtifactRepresentation(IOSFileArtifactRepresentation::Kind::NameOnly, path.getUnownedSlice(), nullptr);
                     }
                     else
                     {
-                        fileRep = new FileArtifactRepresentation(IFileArtifactRepresentation::Kind::Reference, path.getUnownedSlice(), nullptr, nullptr);
+                        fileRep = new OSFileArtifactRepresentation(IOSFileArtifactRepresentation::Kind::Reference, path.getUnownedSlice(), nullptr);
                         if (!fileRep->exists())
                         {
                             sink->diagnose(referenceModuleName.loc, Diagnostics::libraryDoesNotExist, path);

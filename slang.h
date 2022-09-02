@@ -1000,7 +1000,7 @@ extern "C"
     longer used (using 'release').
     */
 
-    struct ISlangFileSystem : public ISlangUnknown
+    struct ISlangFileSystem : public ISlangCastable
     {
         SLANG_COM_INTERFACE(0x003A09FC, 0x3A4D, 0x4BA0, { 0xAD, 0x60, 0x1F, 0xD8, 0x63, 0xA9, 0x15, 0xAB })
 
@@ -1084,6 +1084,14 @@ extern "C"
     /* Callback to enumerate the contents of of a directory in a ISlangFileSystemExt.
     The name is the name of a file system object (directory/file) in the specified path (ie it is without a path) */
     typedef void (*FileSystemContentsCallBack)(SlangPathType pathType, const char* name, void* userData);
+
+    /* Determines how paths map to files on the OS file system */
+    enum class OSPathKind : uint8_t
+    {
+        None,                ///< Paths do not map to the file system
+        Direct,              ///< Paths map directly to the file system
+        Canonical,           ///< Only canonical paths map to the file system
+    };
 
     /** An extended file system abstraction.
     
@@ -1200,6 +1208,12 @@ extern "C"
             const char* path,
             FileSystemContentsCallBack callback,
             void* userData) = 0;
+
+        /** Returns how paths map to the OS file system
+        
+        @returns true if this 
+        */
+        virtual SLANG_NO_THROW OSPathKind SLANG_MCALL getOSPathKind() = 0;
     };
 
     #define SLANG_UUID_ISlangFileSystemExt ISlangFileSystemExt::getTypeGuid()
