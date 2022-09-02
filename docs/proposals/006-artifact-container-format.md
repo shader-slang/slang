@@ -42,7 +42,7 @@ There are several kinds of usage scenario
 
 * A runtime shader cache
 * A runtime shader cache with persistance
-* A capture of compilation/compilations
+* A capture of compilations
 * A baked persistant cache - must also work without shader source
 * A baked persistant cache, that is obfuscated
 
@@ -333,9 +333,7 @@ Some options will need to be part of some order. This is perhaps all a little ab
 }
 ``` 
 
-The combination in this manner doesn't quite work, because some combinations may imply different options. The "combinations" section tries to address this. 
-
-We may also want to have options that don't appear in the name, but modify the output. 
+The combination in this manner doesn't quite work, because some combinations may imply different options. The "combinations" section tries to address this by providing a way to 'override' behavior. This could of course be achieved with a call back mechanism. We may also want to have options that don't appear in the key, allowing 'overriding' behavior without needing a 'combinations' section. The implication is that when used in the application when looking up only the 'named' configuration is needed. 
 
 This whole mechanism provides a way of specifying a compilation by a series of names, that can produce a unique human readable key. It is under user control, but the mechanism on how the combination takes place is at least as a default defined within an implementation.
 
@@ -483,7 +481,8 @@ I guess this could be achieved with... JSON. For example
 
 ```
 {
-    "types": {
+    "types": 
+    {
         "SomeType":
         {
             "kind" : "struct",
@@ -754,7 +753,12 @@ config
 config/global.json
 config/slang.json
 config/dxc.json
+source/
+source/some-source.slang
+source/some-header.h
 ```
+
+The `source` path holds all the unique source used during a compilation. This is the 'deduped' representation. Any include hierarchy is lost. Names are generated such that they remain the same as the original where possible, but are made unique if not. The 'dependency' file for a compilation specifies how the source as included maps to the source held in the source directory. The source held in the repository like this provides a way to repeat compilations from source, but isn't the same as the source hierarchy for compilation and is typically a subset. 
 
 `config/global.json` holds configuration that applies to the whole of the container. In particular how names map to the container contents - say the use of directories, or naming concat order.
 `config/slang.json` holds how names map to option configuration that is specific to Slang
@@ -782,21 +786,28 @@ We end up with
 
 ```
 vk/thing/computeMain-release.spv
-vk/thing/computeMain-release.spv-info
-vk/thing/computeMain-release.spv-diagnostics
-vk/thing/computeMain-release.spv-layout
+vk/thing/computeMain-release.spv-info.json
+vk/thing/computeMain-release.spv-diagnostics.json
+vk/thing/computeMain-release.spv-layout.json
+vk/thing/computeMain-release.spv-dependency.json
 ```
 
-Info holds the detailed information about what is in spv to identify the artifact, but also for the 'system' in general. Including 
+`-info.json` holds the detailed information about what is in spv to identify the artifact, but also for the 'system' in general. Including 
+
+`-dependency.json` is a mapping of source 'names' as part of compilation to the file
 
 * Artifact type
 * The combination of options (which might be *more* than in the path)
 * Hashes/other extra information
 
+Other items associated with the main 'artifact' - typically stored as 'associated' in an artifact, are optional and could be deleted. 
+
+Having an extension, on the associated types is perhaps not necessary. Doing so makes it more clear what items are from a usability point of view. If this data can be represented in multiple ways - say JSON and BSON it also makes clear which it is.
+
 Discussion: Interface
 =====================
 
-There are probably two ends of the spectrum of how an interface might work. One one end would be the interface is a 'slang like' compiler interface, with the the most extreme version being it *is* the Slang compiler interface. Having this interface like this means
+There are perhaps two ends of the spectrum of how an interface might work. One one end would be the interface is a 'slang like' compiler interface, with the the most extreme version being it *is* the Slang compiler interface. Having this interface like this means
 
 * There is direct access to all options
 * If your application already uses the Slang interface, it can just be switched out for the cache
@@ -807,13 +818,13 @@ There are probably two ends of the spectrum of how an interface might work. One 
 It also means
 
 * The API has a very large surface area
-* It is working at the detail of the API
+* It works at the detail of the API
 * Does not provide an application level indirection to some more meaningful naming/identification
 * It is tied to the Slang compiler - so can't be seen as an interface to 'shader container's more generally
-* Naming will almost certainly need to include a hash
+* Naming will almost certainly need to include a hash 
 * The hash will be hard to produce independently (it will be hard to calculate just anyway)
 
-More seriously
+More significantly
 
 * Higher requirement for source
   * Could store hashes of source seen
@@ -823,7 +834,7 @@ More seriously
 * All source does in general need to be hashed - as paths do not indicate uniqueness
 * How is this obfuscated? The amount of information needed is *all of the settings*.
 
-At the other end of the spectrum the interface could be akin to passing in a set of user configurable parameter "names", that identify the result. The most extreme form might look something like....
+At the other end of the spectrum the interface could be akin to passing in a set of user configurable parameter "names", that identify the input 'options'. The most extreme form might look something like....
 
 ```
 class IShaderContainer
@@ -833,10 +844,11 @@ class IShaderContainer
 };
 ```
 
-Q: Perhaps we don't return an Artifact, because the IArtifact interface is not simple enough. Maybe it returns a blob and an ArtifactDesc?
-Q: Is there a way to access other information - diagnostics for example? With IArtifact that can be returned as part of that
+Q: Perhaps we don't return an Artifact, because the IArtifact interface is not simple enough. Maybe it returns a blob and an ArtifactDesc? 
+Q: We could simplify the IArtifact interface by moving to IArtifactContainer. Perhaps we should do this just for this reason?
+Q: Is there a way to access other information - diagnostics for example? With IArtifact that can be returned as associated data. We don't want to create by default probably.
 Q: If we wanted to associate 'user data' with a result how do we do that? It could just be JSON stored in the `-info`?
-
+Q: We could have a JSON like interface for arbitrary data?
 
 The combination of the 'configNames' produce the key/paths within the container. 
 
@@ -849,7 +861,7 @@ As previously touched on it may be useful to pass in configuration that is *not*
 This style means
 
 * Naming is trivial
-* Hashing is not necessary
+* Hashing is often not necessary
 * Issues such as 'generated source' are pushed to user space
 * Is user configurable 
 * Main interface is very simple and small
@@ -859,11 +871,11 @@ This style means
 * Hashing of source/options is still possible, for a variety of purposes, but is not a *requirement* as it doesn't identify a compilation. 
   * Meaning a simpler/less stable hashing might be fine
 
-There is an implication that the identification of a unique combination is a user space problem. Including that source is static, or if not that becomes a client side problem. Note that mechanisms previously discussed - such as hashing the source can still be useful and used. The hashing of source could be used to identify in a development environment that a recompilation is required. Or an edit of source could be made, and a single command could update all contents that is applicable automatically. These are more advanced features, and are not necessary for a user space implementation, which doesn't require the capability.
+With this style is it implied that the identification of a unique combination is a user space problem. For example that the source is static in general, and if not generated source identification is a user space problem. It's perhaps important to note that mechanisms previously discussed - such as hashing the source can still be useful and used. The hashing of source could be used to identify in a development environment that a recompilation is required. Or an edit of source could be made, and a single command could update all contents that is applicable automatically. These are more advanced features, and are not necessary for a user space implementation, which typically do not require the capability.
 
 More problematically
 
-* Doesn't provide a runtime cache that 'just works' - say just using the slang API
+* Doesn't provide a runtime cache that 'just works' for example just using the slang API
 * Needs to provide a way given a combination of config names to produce the appropriate settings
   * If it is just a delivery mechanism this isn't a requirement
 * Probably needs both an API and 'config' mechanisms to describe options
@@ -877,6 +889,41 @@ All things considered, based on the goals of the effort it seems to make more se
 * Can use more advanced features (like souce hashing) if desired
 
 How config options are described or combined may be somewhat complicated, but is not necessary to use the system, and allows different compilers to implement however is appropriate.
+
+Discussion : Deduping source
+============================
+
+When compiling shaders, typically much of the source is shared. Unfortunately it is not generally possible to just save 'used source', because some source can be generated on demand. One way this is already performed by users is to use a specialized include handler, that will inject the necessary code. 
+
+It is not generally possible therefore to identify source by path, or unique identity (as used by the slang file system interface). 
+
+It is also the case that compilations can be performed where the source is passed by contents, and the name is not set, or not unique. 
+
+The `slang-repro` system already handles these cases, and outputs a map from the input path to the potentially 'uniquified' name within the repro.
+
+You could imagine a container holding a folder of source that is shared between all the kernels. In general it would additionally require a map of each kernel that would map names to uniqified files.
+
+In the `slang-repro` mechanism the source is actually stored in a 'flat' manner, with the actual looked up paths stored within a map for the compilation. It would be preferable if the source could be stored in a hiearchy similar to the file system it originates. This would be possible for source that are on a file system, but would in general lead to deeper and more complex hierarchies contained in container. 
+
+Including source, provides a way to distribute a 'compilation' much like the `slang-repro` file. It may also be useful such that a shader could be recompiled on a target. This could be for many reasons - allowing support for future platforms, allowing recompilation to improve performance or allowing compilation to happen on client machines for rare scenarios on demand.
+
+We may want to have tooling such that directories of source can be specified and are added to the deduplicated source library.
+
+We may also want to have configuration information that describes how the contents maps to search paths. It might be useful to have only the differences for lookup stored for a compilation, and some or perhaps multiple configuration files that describe the common cases.
+
+Discussion : Other
+==================
+
+It would be a useful feature to have tooling where it is possible to
+
+* Generate updated kernels automatically offline
+  * For example when a source file changed
+  * For example when a config file changed
+  * Just force rebuilding the whole container
+
+* Specify the combinations that are wanted in some offline manner
+  * Perhaps compiling in parallel
+  * Perhaps noticing aspects such that work can be shared 
 
 Related Work
 ============
@@ -999,7 +1046,7 @@ Another idea might be to split out compilation options from naming and other asp
 
 In scenario 3 we want to cache results somewhere. 
 
-It should be noted *by design* a `IArtifactContainers` children is *not* a mechanism that automatically updates some underlying representation, such as files on the file system. Once a IArtifactContainer has been expanded, it allows for manipulation of the children (for example adding and removing). The typical way to produce a zip from an artifact hierachy would be to call a function that writes it out as such. This is not something that happens incrementally. 
+It should be noted *by design* a `IArtifactContainer`s children is *not* a mechanism that automatically updates some underlying representation, such as files on the file system. Once a IArtifactContainer has been expanded, it allows for manipulation of the children (for example adding and removing). The typical way to produce a zip from an artifact hierachy would be to call a function that writes it out as such. This is not something that happens incrementally. 
 
 For an in memory caching scenario this choice works well. We can update the artifact hierarchy as needed and all is good.
 
@@ -1009,7 +1056,9 @@ It seems this most logically happens as part of the compilation interface implem
 
 Once a compilation is complete, an implementation could save the result in Artifact hierarchy and write out a representation to disk from that part of the hierarchy. For some file systems doing this on demand is probably not a great idea. For example the Zip file system does not free memory directly when a file is deleted. Perhaps as part of the interface there needs to be a way to 'flush' cached data to backing store. Lastly there could be a mechanism to write out the changes (or the new archive).
 
-## Cache keys
+
+
+
 
 
 ### How to handle unnamed compilation options?
@@ -1018,9 +1067,6 @@ We cannot produce a hash for a compilation in general without having access to t
 
 As a fall back position, we could produce a hash that took into account all of these factors. The hash could only produced *after* compilation, as it would require the list of dependencies, and the source. Producing such a hash after compilation, is workable for a runtime cache, but is not very useful for a persistant cache, because the key could only be produced after a compilation.
 
-
-
-### Where are options stored?
 
 ### How do we alter some options of a compilation?
 
@@ -1059,22 +1105,6 @@ At a minimum there needs to be mechanisms to be able to strip out information th
 There probably also additionally needs to be a way to specify items such that names, such as type names, source names, entry point names, compile options and so forth are not trivially contained in the format, as their existance could leak sensitive information about the specifics of a compilation.
 
 ## Indexing
-
-## Deduping source
-
-When compiling shaders, typically much of the source is shared. Unfortunately it is not generally possible to just save 'used source', because some source can be generated on demand. One way this is already performed by users is to use a specialized include handler, that will inject the necessary code. 
-
-It is not generally possible therefore to identify source by path, or unique identity (as used by the slang file system interface). 
-
-It is also the case that compilations can be performed where the source is passed by contents, and the name is not set, or not unique. 
-
-The `slang-repro` system already handles these cases, and outputs a map from the input path to the potentially 'uniquified' name within the repro.
-
-You could imagine a container holding a folder of source that is shared between all the kernels. In general it would additionally require a map of each kernel that would map names to uniqified files.
-
-In the `slang-repro` mechanism the source is actually stored in a 'flat' manner, with the actual looked up paths stored within a map for the compilation. It would be preferable if the source could be stored in a hiearchy similar to the file system it originates. This would be possible for source that are on a file system, but would in general lead to deeper and more complex hierarchies contained in container. 
-
-Including source, provides a way to distribute a 'compilation' much like the `slang-repro` file. It may also be useful such that a shader could be recompiled on a target. This could be for many reasons - allowing support for future platforms, allowing recompilation to improve performance or allowing compilation to happen on client machines for rare scenarios on demand.
 
 
 
