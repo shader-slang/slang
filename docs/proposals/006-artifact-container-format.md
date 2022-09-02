@@ -23,7 +23,7 @@ Should be able to store
 
 API support needs to allow
 
-* Interchangable use of static shader cache/slang compilation/combination of the two
+* Interchangeable use of static shader cache/slang compilation/combination of the two
   * Implies compilation needs to be initiated in some way that is compatible with shader cache keying
 * Ability to store compilations as they are produced
 
@@ -41,10 +41,10 @@ It's importance/relevance
 There are several kinds of usage scenario
 
 * A runtime shader cache
-* A runtime shader cache with persistance
+* A runtime shader cache with persistence
 * A capture of compilations
-* A baked persistant cache - must also work without shader source
-* A baked persistant cache, that is obfuscated
+* A baked persistent cache - must also work without shader source
+* A baked persistent cache, that is obfuscated
 
 A runtime shader cache has the following characteristics:
 
@@ -57,7 +57,7 @@ A runtime shader cache has the following characteristics:
 * May need mechanism/s to limit the working set
 * Generated source can be made to work, because it is possible to hash generated source
 
-At the other end of the spectrum a baked persistant cache
+At the other end of the spectrum a baked persistent cache
 
 * Probably wants user control over naming 
 * Doesn't have access to source so can't use that as part of a hash
@@ -66,7 +66,7 @@ At the other end of the spectrum a baked persistant cache
 * Ideally can be manipulated and altered without significant tooling
 * Generated source may need to be identified in some other way than the source itself
 
-It should be possible to serialize out a 'runtime shader cache' into the same format as used for persistant cache. It may be harder to use such a cache without Slang tooling, because the mapping from compilation options to keys will probably not be simple.
+It should be possible to serialize out a 'runtime shader cache' into the same format as used for persistent cache. It may be harder to use such a cache without Slang tooling, because the mapping from compilation options to keys will probably not be simple.
 
 Status
 ------
@@ -99,7 +99,7 @@ In order to access a file system via artifact, is as simple as adding a modifica
 
 Very little code is needed to support this behavior because the IExtFileArtifactRepresentation and the use of the ISlangFileSystemExt interface, mean it can work using the existing mechanisms.
 
-It is a desired feature of the container format that it can be represented as 'file system', and have the option of being human readable where appropraite. Doing so allows
+It is a desired feature of the container format that it can be represented as 'file system', and have the option of being human readable where appropriate. Doing so allows
 
 * Third party to develop tools/formats that suit their specific purposes
 * Allows different containers to used
@@ -109,7 +109,7 @@ It is a desired feature of the container format that it can be represented as 'f
 
 This documents is, at least in part,  about how to structure the file system to represent a 'shader cache' like scenario. 
 
-Incorporating the 'shader container' into the Artifact system will require a suitable Payload type. It may be acceptable to use `ArtifactPayload::CompileResults`. The IArtifactHandler will need to know how to interpret the contents. This will need to occur lazily at the `expandChildren` level. This will create IArtifacts for the children that some aspects are lazily evaluated, and others are interpretted at the expansion. For example setting up the ArtifactDesc will need to happen at expansion.
+Incorporating the 'shader container' into the Artifact system will require a suitable Payload type. It may be acceptable to use `ArtifactPayload::CompileResults`. The IArtifactHandler will need to know how to interpret the contents. This will need to occur lazily at the `expandChildren` level. This will create IArtifacts for the children that some aspects are lazily evaluated, and others are interpreted at the expansion. For example setting up the ArtifactDesc will need to happen at expansion.
 
 Background
 ==========
@@ -119,8 +119,8 @@ The following long section provides background discussion on a variety of topics
 To enumerate the major challenges
 
 * How to generate a key for the runtime scenario
-* How to produce keys for the persistant scenario - implies user control, and human readability
-* How to represent compilation in a composible 'nameable' way 
+* How to produce keys for the persistent scenario - implies user control, and human readability
+* How to represent compilation in a composable 'nameable' way 
 * How to produce options from a named combination
 
 The mechanism for producing keys in the runtime scenario could be used to check if an entry in the cache is out of date.
@@ -128,7 +128,7 @@ The mechanism for producing keys in the runtime scenario could be used to check 
 A compilation can be configured in many ways. Including
 
 * The source including source injection
-* Preprocessor defines
+* Pre-processor defines
 * Compile options - optimization, debug information, include paths, libraries 
 * Specialization types and values
 * Target and target specific features API/tools/operating system
@@ -149,15 +149,15 @@ The fastest/simplest way to hash source, is to take the blob and hash that. Unfo
 * Hash changes with line end character encoding
 * Hash is sensitivve to white space changes in general 
 
-A way to work around whitespace issues would be to use a tokenizer, or a 'simplified' tokenizer that only handles the necessary special cases. An example special case would be white space in a string is always important. Such a solution does not require an AST or rely on a specific tokenizer. A hash could be made of concatination of all of the lexemes with white space inserted between.
+A way to work around whitespace issues would be to use a tokenizer, or a 'simplified' tokenizer that only handles the necessary special cases. An example special case would be white space in a string is always important. Such a solution does not require an AST or rely on a specific tokenizer. A hash could be made of concatenation of all of the lexemes with white space inserted between.
 
-Another approach would be to hash each "token" as produced. Doing so doesn't require memory allocation for the concatination. You could special case short strings or single chars, and hash longer strings.
+Another approach would be to hash each "token" as produced. Doing so doesn't require memory allocation for the concatenation. You could special case short strings or single chars, and hash longer strings.
 
 ## Dependencies
 
 Its not enough to rely on hashing of input source, because `#include` or other resource references, such as modules or libraries may be involved. 
 
-If we are are relying on dependencies specified at least in part by `#include`, it implies the preprocessor be executed. This could be used for other languages such as C/C++. Some care would need to be taken because *some* includes will probably not be locatable by our preprocessor, such as system include paths in C++. For the purpose of hashing, an implementation could ignore `#includes` that cannot be resolved. This may work for some scenarios - but doesn't work in general because symbols defined in unfound includes might cause other includes. Thus this could lead to other dependencies not being found, or being assumed when they weren't possible.
+If we are are relying on dependencies specified at least in part by `#include`, it implies the preprocessor be executed. This could be used for other languages such as C/C++. Some care would need to be taken because *some* includes will probably not be located by our preprocessor, such as system include paths in C++. For the purpose of hashing, an implementation could ignore `#includes` that cannot be resolved. This may work for some scenarios - but doesn't work in general because symbols defined in unfound includes might cause other includes. Thus this could lead to other dependencies not being found, or being assumed when they weren't possible.
 
 In practice whilst not being perfect it may work well enough to be broadly usable. 
 
@@ -172,7 +172,7 @@ A hash could be performed via the AST. This assumes
 
 Another disadvantage around using the AST is that it requires the extra work and space for parsing. 
 
-Using the AST does allow using pre-existing Slang code. It is probably more resilliant to structure changes. It would also provide slang specific information more simply - such as imports.
+Using the AST does allow using pre-existing Slang code. It is probably more resilient to structure changes. It would also provide slang specific information more simply - such as imports.
 
 ## Slang lexer
 
@@ -192,14 +192,14 @@ Using the Slang lexer/preprocessor may work reasonably for other languages such 
 
 We may want to use some simple lexer. A problem with using a lexer at all is that it adds a great amount of complexity to a stand alone implementation. The simplified lexer would
 
-* Honor white space - so we can strip
-* Honor string representations (we can't strip whitespane)
+* Simplify white space - much we can strip
+* Honor string representations (we can't strip whitespace)
 * Honor identifiers
 * We may want some special cases around operators and the like
 * Honor `#include` (but ignore preprocessor behavior in general)
 * Ignore comments
 
-We need to honor `#include` such that we have dependencies. This can lead to dependencies that aren't required in actual compilation.
+We need to handle `#include` such that we have dependencies. This can lead to dependencies that aren't required in actual compilation.
 
 We need to honor some language specific features - such as say `import` in Slang. 
 
@@ -211,9 +211,9 @@ We can provide source for an implementation. We could also provide a shared libr
 
 Generated source can be part of a hash if the source is available. As touched on there are scenarios where generated source may not be available.
 
-We could side step the issues around source generation if we push that problem back onto users. If they are using code generation, the system could require providing a string that uniquely identifies the generation that is being used. This perhaps being a requirement for a persistant cache. For a temporary runtime cache, we can allow hash generation from source.  
+We could side step the issues around source generation if we push that problem back onto users. If they are using code generation, the system could require providing a string that uniquely identifies the generation that is being used. This perhaps being a requirement for a persistent cache. For a temporary runtime cache, we can allow hash generation from source.  
 
-Background: Hashing stability
+Background: Hashing Stability
 =============================
 
 Ideally a hashing mechanism can be resilient to unimportant changes. The previous section described some approaches for changes in source. The other area of significant complexity is around options. If options are defined as JSON (or some other 'bag of values') hashing can be performed relatively easily with a few rules. If the representation is such that if a value is not set, the default is used, it is resilient to changes of options that are explicitly set. 
@@ -284,7 +284,7 @@ Much of the difficulty here is how to define the key. If it's a combination of t
 
 For a runtime cache type scenario, the instability and lack of human readability of the key probably doesn't matter too much. It probably is a consideration how slow and complicated it is to produce the key. 
 
-For any cache that is persistant how naming occurs probably is important. Because
+For any cache that is persistent how naming occurs probably is important. Because
 
 * Our 'options' aren't going to make much sense with other compilers (if we want the standard to be more broadly applicable)
 * The options we have will not remain static
@@ -334,7 +334,7 @@ Some options will need to be part of some order. This is perhaps all a little ab
     "stage" : {
         "compute" : { 
         },
-    }
+    },
     
     combinations : [
         {
@@ -388,11 +388,11 @@ Whilst this works, it might make sense to allow 'meta' names for common types. T
 * The target (in the Slang sense)
 * The entryPoint/stage (can we say the entry point name implies the stage?)
 
-We could have psuedo names for these commonly changed values. If there are multiple input source files for a translation unit, we could key on the first. 
+We could have pseudo names for these commonly changed values. If there are multiple input source files for a translation unit, we could key on the first. 
 
 We could also have some 'names' that are built in. For example default configuration names such as 'debug' and 'release'. They can be changed in part of configuration but have some default meaning. That options can perhaps override the defaults. 
 
-Using the psuedo name idea might mean it is possible to produce reasonable default names. Moreover we can still use the hashing mechanism to either report a validation issue, or trigger recompilation when everything needed to do as much is available.
+Using the pseudo name idea might mean it is possible to produce reasonable default names. Moreover we can still use the hashing mechanism to either report a validation issue, or trigger recompilation when everything needed to do as much is available.
 
 ## Target
 
@@ -410,7 +410,7 @@ This doesn't cover the breadth though because for CPU targets there is additiona
 * Operating system - including operating system version
 * Tool chain - Compiler 
 
-Making this part of the filename could lead to very long filenames. The more detailed information could be made available in json associated files. 
+Making this part of the filename could lead to very long filenames. The more detailed information could be made available in JSON associated files. 
 
 This section doesn't provide a specific plan on how to encapsulate the subtlety around a 'target'. Again how this is named is probably something that is controllable in user space, but there are some reasonable defaults when it is not defined. 
     
@@ -419,7 +419,7 @@ Background: Describing Options
 
 We need some way to describe options for compilation. The most 'obvious' way would be something like the IDownstreamCompiler interface and associated types
 
-```
+```C++
 struct Options
 {
     Includes ...;
@@ -477,11 +477,11 @@ Having the split greatly simplifies the key production, because we can use the u
 
 This specifying of options in this way is tied fairly tightly to the Slang API. We can generalize the named options by allowing more than one named option set.
 
-## 'Bag of named options' 
+## Bag of Named Options
 
-Perhaps identification is something that is largely in user space for the persistant scenario. You could imagine a bag of 'options', that are typically named. Then the output name is the concatination of the names. If an option set isn't named it doesn't get included. Perhaps the order of the naming defines the precidence.
+Perhaps identification is something that is largely in user space for the persistent scenario. You could imagine a bag of 'options', that are typically named. Then the output name is the concatenation of the names. If an option set isn't named it doesn't get included. Perhaps the order of the naming defines the precedence.
 
-This 'bag of options' would need some way to know the order the names would be combined. This could be achieved with another parameter or option that describes name ordering. Defining the ordering could be achieved if different types of options are grouped, by specifying the group. The ordering would only be significant for named items that will be concatinated. The ordering of the options could define the order of precedence of application.
+This 'bag of options' would need some way to know the order the names would be combined. This could be achieved with another parameter or option that describes name ordering. Defining the ordering could be achieved if different types of options are grouped, by specifying the group. The ordering would only be significant for named items that will be concatenated. The ordering of the options could define the order of precedence of application.
 
 Problems: 
 
@@ -612,9 +612,9 @@ Can be constructed into composites, through `createCompositeComponentType`, whic
 
 If the components were serializable (as say as JSON), we could describe a compilation as combination of components. If components are named, a concatenation of names could name a compilation.
 
-It doesn't appear as if there is a way to more finely control the application of component types. For example if there was a desire to change the optimizaion option, it would appear to remain part of the ICompileRequest (it's not part of a component). This implies this mechanism as it stands whilst allowing composition, doesn't provide the more nuanced composition. Additional component types could perhaps be added which would add such control.
+It doesn't appear as if there is a way to more finely control the application of component types. For example if there was a desire to change the optimization option, it would appear to remain part of the ICompileRequest (it's not part of a component). This implies this mechanism as it stands whilst allowing composition, doesn't provide the more nuanced composition. Additional component types could perhaps be added which would add such control.
 
-Perhaps having components is not necessary as part of the representation, as 'component' system is a mechanism for achiving a 'bag of options' and so we can get the same effect by using that mechanism without components.
+Perhaps having components is not necessary as part of the representation, as 'component' system is a mechanism for achieving a 'bag of options' and so we can get the same effect by using that mechanism without components.
     
 Background: Describing Options
 ==============================
@@ -623,9 +623,9 @@ The 'naming' options idea implies that options and ways of combining options can
     
 ## 'Bag of named options' 
 
-Perhaps identification is something that is largely in user space for the perisistant scenario. You could imagine a bag of 'options', that are typically named. Then the output name is the concatination of the names. If an option set isn't named it doesn't get included. Perhaps the order of the naming defines the precedence.
+Perhaps identification is something that is largely in user space for the persistent scenario. You could imagine a bag of 'options', that are typically named. Then the output name is the concatenation of the names. If an option set isn't named it doesn't get included. Perhaps the order of the naming defines the precedence.
 
-This 'bag of options' would need some way to know the order the names would be combined. This could be achieved with another parameter or option that describes name ordering. Defining the ordering could be achieved if different types of options are grouped, by specifying the group. The ordering would only be significant for named items that will be concatinated. The ordering of the options could define the order of precedence of application.
+This 'bag of options' would need some way to know the order the names would be combined. This could be achieved with another parameter or option that describes name ordering. Defining the ordering could be achieved if different types of options are grouped, by specifying the group. The ordering would only be significant for named items that will be concatenated. The ordering of the options could define the order of precedence of application.
 
 Problems: 
 
@@ -637,7 +637,7 @@ An advantage to this approach is that policy of how naming works as a user space
 
 ### JSON options
 
-One way of dealing with the 'bag of options' issue would be to just make the runtime json options representation, describe options. Merging JSON at a most basic level is straight forward. For certain options it may make sense to have them describe adding, merging or replacing. We could add this control via adding a key prefix.
+One way of dealing with the 'bag of options' issue would be to just make the runtime JSON options representation, describe options. Merging JSON at a most basic level is straight forward. For certain options it may make sense to have them describe adding, merging or replacing. We could add this control via adding a key prefix.
 
 ```JSON
 {
@@ -767,7 +767,7 @@ If the components were serializable (as say as JSON), we could describe a compil
 
 It doesn't appear as if there is a way to more finely control the application of component types. For example if there was a desire to change the optimization option, it would appear to remain part of the ICompileRequest (it's not part of a component). This implies this mechanism as it stands whilst allowing composition, doesn't provide the more nuanced composition. Additional component types could perhaps be added which would add such control.
 
-Perhaps having components is not necessary as part of the representation, as 'component' system is a mechanism for achiving a 'bag of options' and so we can get the same effect by using that mechanism without components.
+Perhaps having components is not necessary as part of the representation, as 'component' system is a mechanism for achieving a 'bag of options' and so we can get the same effect by using that mechanism without components.
 
 Discussion: Container 
 =====================
@@ -783,7 +783,7 @@ Single Manifest Pros
 * Single file describes contents
 * Probably faster to load and use
 * Reduces the amount of extra files
-* Everything describing how the contents is to be interpretted is all in one place
+* Everything describing how the contents is to be interpreted is all in one place
 
 Single Manifest Cons
 
@@ -805,11 +805,11 @@ Associated Files Cons
 
 Another possible way of doing the association is via a directory structure. The directory might contain the 'manifest' for that directory. 
 
-Given that we want the format to represent a file system, and that we would want it to be easy and intuitive how to manipulate the represtation, using a single manifest is probably ruled out. It remains to be seen which is preferable in practice, but it seems likely that using 'associated files' is probably the way to go.
+Given that we want the format to represent a file system, and that we would want it to be easy and intuitive how to manipulate the representation, using a single manifest is probably ruled out. It remains to be seen which is preferable in practice, but it seems likely that using 'associated files' is probably the way to go.
 
 ## How to represent data
 
-As previously discussed, unless there is a very compelling reason not to we want to use representations that are open standards and easy to use. We also need such representations to be resilient to changes. It is important that file formats can be human readable or easily changable into something that is human readable. For these reasons, JSON seems to be a good option for our main 'meta data' representation. Additionally Slang already has a JSON system.
+As previously discussed, unless there is a very compelling reason not to we want to use representations that are open standards and easy to use. We also need such representations to be resilient to changes. It is important that file formats can be human readable or easily changeable into something that is human readable. For these reasons, JSON seems to be a good option for our main 'meta data' representation. Additionally Slang already has a JSON system.
 
 If it was necessary to have meta data stored in a more compressed format we could consider also supporting [BSON](https://en.wikipedia.org/wiki/BSON). Conversion between BSON and JSON can be made quickly and simply. BSON is a well known and used standard.    
     
@@ -961,7 +961,7 @@ All things considered, based on the goals of the effort it seems to make more se
 * It allows trivial 3rd party implementation
 * It works with other compilers - (important if it's to work as some kind of standard)
 * Provides an easy to understand mapping from input to the contents of the cache
-* Can use more advanced features (like souce hashing) if desired
+* Can use more advanced features (like source hashing) if desired
 
 How config options are described or combined may be somewhat complicated, but is not necessary to use the system, and allows different compilers to implement however is appropriate.
 
@@ -978,7 +978,7 @@ The `slang-repro` system already handles these cases, and outputs a map from the
 
 You could imagine a container holding a folder of source that is shared between all the kernels. In general it would additionally require a map of each kernel that would map names to uniqified files.
 
-In the `slang-repro` mechanism the source is actually stored in a 'flat' manner, with the actual looked up paths stored within a map for the compilation. It would be preferable if the source could be stored in a hiearchy similar to the file system it originates. This would be possible for source that are on a file system, but would in general lead to deeper and more complex hierarchies contained in container. 
+In the `slang-repro` mechanism the source is actually stored in a 'flat' manner, with the actual looked up paths stored within a map for the compilation. It would be preferable if the source could be stored in a hierarchy similar to the file system it originates. This would be possible for source that are on a file system, but would in general lead to deeper and more complex hierarchies contained in container. 
 
 Including source, provides a way to distribute a 'compilation' much like the `slang-repro` file. It may also be useful such that a shader could be recompiled on a target. This could be for many reasons - allowing support for future platforms, allowing recompilation to improve performance or allowing compilation to happen on client machines for rare scenarios on demand.
 
@@ -989,7 +989,7 @@ We may also want to have configuration information that describes how the conten
 Discussion : Artifact With Runtime Interface
 ============================================
 
-It should be noted *by design* `IArtifactContainer`s children is *not* a mechanism that automatically updates some underlying representation, such as files on the file system. Once a IArtifactContainer has been expanded, it allows for manipulation of the children (for example adding and removing). The typical way to produce a zip from an artifact hierachy would be to call a function that writes it out as such. This is not something that happens incrementally. 
+It should be noted *by design* `IArtifactContainer`s children is *not* a mechanism that automatically updates some underlying representation, such as files on the file system. Once a IArtifactContainer has been expanded, it allows for manipulation of the children (for example adding and removing). The typical way to produce a zip from an artifact hierarchy would be to call a function that writes it out as such. This is not something that happens incrementally. 
 
 For an in memory caching scenario this choice works well. We can update the artifact hierarchy as needed and all is good.
 
@@ -1023,7 +1023,7 @@ It would be a useful feature to have tooling where it is possible to
 
 At a minimum there needs to be mechanisms to be able to strip out information that is not needed for use on a target. 
 
-There probably also additionally needs to be a way to specify items such that names, such as type names, source names, entry point names, compile options and so forth are not trivially contained in the format, as their existance could leak sensitive information about the specifics of a compilation.
+There probably also additionally needs to be a way to specify items such that names, such as type names, source names, entry point names, compile options and so forth are not trivially contained in the format, as their existence could leak sensitive information about the specifics of a compilation.
 
 ## Indexing
 
@@ -1031,7 +1031,7 @@ No optimized indexed scheme is described as part of this proposal.
 
 Indexing is probably something that happens at the 'runtime interface' level. The index can be built up using the contents of the file system.
 
-No attempt at a index is made as part of the container, unless later we find scenarios where this is important. Not having an index means that the file system structure itself describes it's contents, and allows manipulation of the containers contents, without manipulation of an index or some other tooling.
+No attempt at an index is made as part of the container, unless later we find scenarios where this is important. Not having an index means that the file system structure itself describes it's contents, and allows manipulation of the containers contents, without manipulation of an index or some other tooling.
 
 ## Slang IR
 
@@ -1086,7 +1086,7 @@ Based on the goals described in the introduction, the proposed approach is
 * Meaning of names can be described within configuration and through an API
 * Some names contribute to the key, whilst others do not 
 * Some options within a configuration can use standard names, others will require being compiler specific
-* Probably easiet to use  anative representation for combining
+* Probably easiest to use a native representation for combining
   * Using the collection of names approach makes hash stability and hashes in general less important
 * Use JSON/BSON as the format for configuration files
   * Possible to have some options defined that *aren't* part of the key name
