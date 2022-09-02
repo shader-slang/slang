@@ -1082,9 +1082,13 @@ Proposed Approach
 
 Based on the goals described in the introduction, the proposed approach is
 
-* Use a collection of names to describe a compilation
+* Use a collection of named options to describe a compilation
+  * Requires a mechanism to provide combining
+  * Have some additional symbols (such as + field name prefix as described elsewhere) to describe how options should be applied
 * Meaning of names can be described within configuration and through an API
-* Some names contribute to the key, whilst others do not 
+  * API might be compiler specific
+* Some names contribute to the key, whilst others do not
+  * Non inclusion in key allows customization for a specific result without a key change
 * Some options within a configuration can use standard names, others will require being compiler specific
 * Probably easiest to use a native representation for combining
   * Using the collection of names approach makes hash stability and hashes in general less important
@@ -1092,14 +1096,15 @@ Based on the goals described in the introduction, the proposed approach is
   * Possible to have some options defined that *aren't* part of the key name
   * The actual combination can be stored along with products, such that the combination can be recreated, or an inconsistency detected
 * Use JSON to native conversion to produce native types that can then be combined
-* Have some additional symbols (such as + field name prefix as described elsewhere) to describe how options should be applied
-* Have some standard ways to generate names for standard scenarios
+* Can have some standard ways to generate names for standard scenarios
+  * Such as using input source name as part of key
 * Use associated files (not a global manifest), to allow easy manipulation/tooling
 * Source will in general be deduped, with a compilation describing where it's source originated
+  * This is similar to how repro files work
 * Some names will be automatically available by default 
 * Ideally a 'non configured' (or default configured) cache can work for common usage scenarios.  
   
-For the runtime cache scenario this all still works. If an application wants a runtime cache that is memory based that works transparently (ie just through the use of Slang API), this is of course possible and it's output can be made compatible with the format and persisted.   
+For the runtime cache scenario this all still works. If an application wants a runtime cache that is memory based that works transparently (ie just through the use of Slang API), this is of course possible and it's output can be made compatible with the format. It will be fragile to Slang API changes, and probably not usable outside of the Slang ecosystem.   
   
 Alternatives Considered
 -----------------------
