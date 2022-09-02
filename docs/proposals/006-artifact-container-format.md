@@ -107,12 +107,14 @@ It is a desired feature of the container format that it can be represented as 'f
 * Allows editing and manipulating of contents using pre-existing extensive and cross platform tools
 * Is a simple basis
 
-This documents is about how to structure the file system to represent a 'shader cache' like scenario. 
+This documents is, at least in part,  about how to structure the file system to represent a 'shader cache' like scenario. 
 
 Incorporating the 'shader container' into the Artifact system will require a suitable Payload type. It may be acceptable to use `ArtifactPayload::CompileResults`. The IArtifactHandler will need to know how to interpret the contents. This will need to occur lazily at the `expandChildren` level. This will create IArtifacts for the children that some aspects are lazily evaluated, and others are interpretted at the expansion. For example setting up the ArtifactDesc will need to happen at expansion.
 
 Background
 ==========
+
+The following long section provides background discussion on a variety of topics. Jump to the [Proposed Approach](#proposed-approach) to describe what is actually being suggested in conclusion.
 
 To enumerate the major challenges
 
@@ -122,6 +124,19 @@ To enumerate the major challenges
 * How to produce options from a named combination
 
 The mechanism for producing keys in the runtime scenario could be used to check if an entry in the cache is out of date.
+
+A compilation can be configured in many ways. Including
+
+* The source including source injection
+* Preprocessor defines
+* Compile options - optimization, debug information, include paths, libraries 
+* Specialization types and values
+* Target and target specific features API/tools/operating system
+* Specific version of slang and/or downstream compilers
+* Pipeline aspects
+* Slang components
+
+In general we probably don't want to use the combination of source and/or the above options as a 'key'. Such a key would be hard and slow to produce. It would not be something that could be created and used easily by an application. Moreover it is commonly useful to be able to name results such that the actual products can be changed and have things still work. 
 
 Background: Hashing source
 ==========================
@@ -402,9 +417,69 @@ This section doesn't provide a specific plan on how to encapsulate the subtlety 
 Background: Describing Options
 ==============================
 
+We need some way to describe options for compilation. The most 'obvious' way would be something like the IDownstreamCompiler interface and associated types
+
+```
+struct Options
+{
+    Includes ...;
+    Optimizations ...;
+    Miscellaneous ...;
+    Source* source[];
+    EntryPoint ... ;
+    ...
+    CompilerSpecific options;
+}
+
+ICompiler
+{
+    Result compile(const Options* options, IArtifact** outArtifact);
+}
+```
+
+For this to work we need a mapping from 'options' to the cached result (if there is one). There are problem around this, because
+
+* Items may be specified multiple times 
+* Ideally the hash would or at least could remain stable with updated to options 
+* Also ideally the user might want control over what constitutes a new version/key
+* Calculating a hash is fairly complicated, and would need to take into account ordering
+
+Another option might be to split common options from options that are likely to be modified per compilation. For example
+
+```
+struct Options
+{
+    const char* name;               ///< Human readable name
+    Includes ...;
+    Optimizations ...;
+    Miscellaneous ...;
+    Source* source[];
+    ...
+    CompilerSpecific options;
+}
+
+struct CompileOptions
+{
+    Stage stage ...;
+    SpecializationArgs ...;
+    EntryPoint ...;
+};
+
+ICompiler
+{
+    Result createOptions(Options* options, IOptions* outOptions);
+
+    Result compile(IOptions* options, const CompileOptions* compileOptions, IArtifact** outArtifact);
+}
+```
+
+Having the split greatly simplifies the key production, because we can use the unique human name, and the very much simpler values of CompileOptions to produce a key.
+
+This specifying of options in this way is tied fairly tightly to the Slang API. We can generalize the named options by allowing more than one named option set.
+
 ## 'Bag of named options' 
 
-Perhaps identification is something that is largely in user space for the perisistant scenario. You could imagine a bag of 'options', that are typically named. Then the output name is the concatination of the names. If an option set isn't named it doesn't get included. Perhaps the order of the naming defines the precidence.
+Perhaps identification is something that is largely in user space for the persistant scenario. You could imagine a bag of 'options', that are typically named. Then the output name is the concatination of the names. If an option set isn't named it doesn't get included. Perhaps the order of the naming defines the precidence.
 
 This 'bag of options' would need some way to know the order the names would be combined. This could be achieved with another parameter or option that describes name ordering. Defining the ordering could be achieved if different types of options are grouped, by specifying the group. The ordering would only be significant for named items that will be concatinated. The ordering of the options could define the order of precedence of application.
 
@@ -911,19 +986,56 @@ We may want to have tooling such that directories of source can be specified and
 
 We may also want to have configuration information that describes how the contents maps to search paths. It might be useful to have only the differences for lookup stored for a compilation, and some or perhaps multiple configuration files that describe the common cases.
 
+Discussion : Artifact With Runtime Interface
+============================================
+
+It should be noted *by design* `IArtifactContainer`s children is *not* a mechanism that automatically updates some underlying representation, such as files on the file system. Once a IArtifactContainer has been expanded, it allows for manipulation of the children (for example adding and removing). The typical way to produce a zip from an artifact hierachy would be to call a function that writes it out as such. This is not something that happens incrementally. 
+
+For an in memory caching scenario this choice works well. We can update the artifact hierarchy as needed and all is good.
+
+In terms of just saving off the whole container - this is also fine as we can have a function given a hierarchy that saves off the contents into a ISlangMutableFileSystem, such that it's on the file system or compressed. 
+
+If we want the representation to be *synced* to some backing store this presents some problems. It seems this most logically happens as part of the compilation interface implementation. The Artifact system doesn't need to know anything about such issues directly.
+
+Once a compilation is complete, an implementation could save the result in Artifact hierarchy and write out a representation to disk from that part of the hierarchy. For some file systems doing this on demand is probably not a great idea. For example the Zip file system does not free memory directly when a file is deleted. Perhaps as part of the interface there needs to be a way to 'flush' cached data to backing store. Lastly there could be a mechanism to write out the changes (or the new archive).
+
 Discussion : Other
 ==================
 
 It would be a useful feature to have tooling where it is possible to
 
+## Generating the container
+
 * Generate updated kernels automatically offline
   * For example when a source file changed
   * For example when a config file changed
   * Just force rebuilding the whole container
-
 * Specify the combinations that are wanted in some offline manner
   * Perhaps compiling in parallel
   * Perhaps noticing aspects such that work can be shared 
+
+## Obfuscation
+
+* Most simply could be using a hash of a 'key'. 
+* Or perhaps if the desire is to obfuscate at the application level, a hash of the *names* as input could be used
+
+## Stripping containers
+
+At a minimum there needs to be mechanisms to be able to strip out information that is not needed for use on a target. 
+
+There probably also additionally needs to be a way to specify items such that names, such as type names, source names, entry point names, compile options and so forth are not trivially contained in the format, as their existance could leak sensitive information about the specifics of a compilation.
+
+## Indexing
+
+No optimized indexed scheme is described as part of this proposal. 
+
+Indexing is probably something that happens at the 'runtime interface' level. The index can be built up using the contents of the file system.
+
+No attempt at a index is made as part of the container, unless later we find scenarios where this is important. Not having an index means that the file system structure itself describes it's contents, and allows manipulation of the containers contents, without manipulation of an index or some other tooling.
+
+## Slang IR
+
+It may be useful for a representation to hold `slang-ir` of a compilation. This would allow some future proofing of the representation, because it would allow support for newer versions of Slang and downstream compilers without distributing source. 
 
 Related Work
 ============
@@ -964,167 +1076,35 @@ The shader cache can be thought of as being parameterized by the pipeline and as
 Gfx does not appear to support any serialization/file representation.    
     
 
+<a id="proposed-approach"></a>
 Proposed Approach
 =================
 
-Explain the idea in enough detail that a reader can concretely know what you are proposing to do. Anybody who is just going to *use* the resulting feature/system should be able to read this and get an accurate idea of what that experience will be like.
+Based on the goals described in the introduction, the proposed approach is
 
-## Usage scenarios
-
-It is worth discussing in a little more detail usage scenarios. 
-
-1) Being able to find and load a kernel based on some key
-2) Being able to compile some implementation on demand
-3) Being able to compile and cache some combination on demand
-4) Being able to compile and store to a container or file/s on demand
-
-For scenario 1, there are perhaps two usage styles that might be desirable. One might be to have a compilation interface, and be able to use that to invoke a 'compilation', but would in fact just pull out the result from a shader cache. A challenge here is what is this 'compilation interface' and how do options on that map to keys to look up the result.
-
-You could also imagine a scenario where a shader cache is loaded as a 'artifact hierarchy'. This hierarchy or something like it is probably what is backing the 'compilation interface'. Both views are useful. The artifact hierarchy provides a mechanism to find out what is in the cache. It would also provide a way to lookup a kernel that doesn't require a way to map 'compilation options' to a result. 
-
-We may want a mechanism, on being given compilation options can produce a suitable 'key'. Ideas around key are discussed in following section.
-
-For scenario 2, we need an interface that can capture 'compilation'. The most obvious kind of interface would be
-
-```
-struct Options
-{
-    Includes ...;
-    Optimizations ...;
-    Miscellaneous ...;
-    Source* source[];
-    EntryPoint ... ;
-    ...
-    CompilerSpecific options;
-}
-
-ICompiler
-{
-    Result compile(const Options* options, IArtifact** outArtifact);
-}
-```
-
-This is similar to the `IDownstreamCompiler` interface. The implication being that the is some mapping from 'options' to the cached result (if there is one). There are problem around this, because
-
-* Items may be specified multiple times 
-* Ideally the hash would or at least could remain stable with updated to options 
-* Also ideally the user might want control over what constitutes a new version/key
-* Calculating a hash is fairly complicated, and would need to take into account ordering
-
-Another option might be to split common options from options that are likely to be modified per compilation. For example
-
-```
-struct Options
-{
-    const char* name;               ///< Human readable name
-    Includes ...;
-    Optimizations ...;
-    Miscellaneous ...;
-    Source* source[];
-    ...
-    CompilerSpecific options;
-}
-
-struct CompileOptions
-{
-    Stage stage ...;
-    SpecializationArgs ...;
-    EntryPoint ...;
-};
-
-ICompiler
-{
-    Result createOptions(Options* options, IOptions* outOptions);
-
-    Result compile(IOptions* options, const CompileOptions* compileOptions, IArtifact** outArtifact);
-}
-```
-
-Having the split greatly simplifies the key production, because we can use the unique human name, and the very much simpler values of CompileOptions to produce a key.
-
-Another idea might be to split out compilation options from naming and other aspects. 
-
-In scenario 3 we want to cache results somewhere. 
-
-It should be noted *by design* a `IArtifactContainer`s children is *not* a mechanism that automatically updates some underlying representation, such as files on the file system. Once a IArtifactContainer has been expanded, it allows for manipulation of the children (for example adding and removing). The typical way to produce a zip from an artifact hierachy would be to call a function that writes it out as such. This is not something that happens incrementally. 
-
-For an in memory caching scenario this choice works well. We can update the artifact hierarchy as needed and all is good.
-
-In scenario 4 need to be made to the backing representation.
-
-It seems this most logically happens as part of the compilation interface implementation. The Artifact system doesn't need to know anything about such caching directly.
-
-Once a compilation is complete, an implementation could save the result in Artifact hierarchy and write out a representation to disk from that part of the hierarchy. For some file systems doing this on demand is probably not a great idea. For example the Zip file system does not free memory directly when a file is deleted. Perhaps as part of the interface there needs to be a way to 'flush' cached data to backing store. Lastly there could be a mechanism to write out the changes (or the new archive).
-
-
-
-
-
-
-### How to handle unnamed compilation options?
-
-We cannot produce a hash for a compilation in general without having access to the source, as the source can change if it's produced on demand. We cannot in general have source available - most developers will not want to ship with source. Additionally we cannot demand that generated source is always available.
-
-As a fall back position, we could produce a hash that took into account all of these factors. The hash could only produced *after* compilation, as it would require the list of dependencies, and the source. Producing such a hash after compilation, is workable for a runtime cache, but is not very useful for a persistant cache, because the key could only be produced after a compilation.
-
-
-### How do we alter some options of a compilation?
-
-It is easy to imagine that for some targets, or some versions of a shader there is a need to change options. 
-
-It may be necessary to allow changes to some options on a per compilation level, but the compilation still use the same key. Here the 'key' provides an indirection. The compilation is tweaked for specific needs, and the application has the advantage of the indirection of not having to know the specifics of the compilation.
-
-### Input filenames/compilation options is not enough to unquely define a compilation, because source can be injected. How do we handle this?
-
-## Discussion
-
-
-
-## Configuration and Identification
-
-A compilation can be configured in many ways. Including
-
-* The source including source injection
-* Preprocessor defines
-* Compile options - optimization, debug information, include paths, libraries 
-* Specialization types and values
-* Target and target specific features API/tools/operating system
-* Specific version of slang and/or downstream compilers
-* Pipeline aspects
-
-In general we probably don't want to use the combination of source and/or the above options as a 'key'. Such a key would be hard and slow to produce. It would not be something that could be created and used easily by an application. Moreover it is commonly useful to be able to name results such that the actual products can be changed and have things still work. 
-
-You could imagine some set of options could be named, and further attribution appended to that. For example compile options for a standardized type, and source could be named, but versions with different specializations applied on top of that. Such a system would provide some thing similar to how the gfx shader cache works.
-
-## Obfuscation
-
-For some use cases the amount of information about the contents of the shader cache need to be limited.
-
-At a minimum there needs to be mechanisms to be able to strip out information that is not needed for use on a target. 
-
-There probably also additionally needs to be a way to specify items such that names, such as type names, source names, entry point names, compile options and so forth are not trivially contained in the format, as their existance could leak sensitive information about the specifics of a compilation.
-
-## Indexing
-
-
-
-## Other aspects
-
-It may be useful for a representation to hold `slang-ir` of a compilation. This would allow some future proofing of the representation, because it would allow support for newer versions of Slang and downstream compilers without distributing source. 
-
-
-
-
-
-
-Detailed Explanation
---------------------
-
-Here's where you go into the messy details related to language semantics, implementation, corner cases and gotchas, etc.
-Ideally this section provides enough detail that a contributor who wasn't involved in the proposal process could implement the feature in a way that is faithful to the original.
-
+* Use a collection of names to describe a compilation
+* Meaning of names can be described within configuration and through an API
+* Some names contribute to the key, whilst others do not 
+* Some options within a configuration can use standard names, others will require being compiler specific
+* Probably easiet to use  anative representation for combining
+  * Using the collection of names approach makes hash stability and hashes in general less important
+* Use JSON/BSON as the format for configuration files
+  * Possible to have some options defined that *aren't* part of the key name
+  * The actual combination can be stored along with products, such that the combination can be recreated, or an inconsistency detected
+* Use JSON to native conversion to produce native types that can then be combined
+* Have some additional symbols (such as + field name prefix as described elsewhere) to describe how options should be applied
+* Have some standard ways to generate names for standard scenarios
+* Use associated files (not a global manifest), to allow easy manipulation/tooling
+* Source will in general be deduped, with a compilation describing where it's source originated
+* Some names will be automatically available by default 
+* Ideally a 'non configured' (or default configured) cache can work for common usage scenarios.  
+  
+For the runtime cache scenario this all still works. If an application wants a runtime cache that is memory based that works transparently (ie just through the use of Slang API), this is of course possible and it's output can be made compatible with the format and persisted.   
+  
 Alternatives Considered
 -----------------------
+
+Discussed elsewhere.
 
 ## Issues On Github 
 
@@ -1132,39 +1112,3 @@ Alternatives Considered
 * Compilation id/hash [#2050](https://github.com/shader-slang/slang/issues/2050)
 * Support a simple zip-based container format [#860](https://github.com/shader-slang/slang/issues/860)
  
-## Discussion with Theresa Foley
-
-```
-{
-    "modules": [
-        { "name":"foo", "translationUnits":[...], ... }
-        ...
-    ]
-    "configs": [
-        { "name":"my-vulkan-config", "target":"spirv", "optimization":"full", ... }
-        ...
-    ]
-    "kernels": [
-         { "module:"foo", "config":"my-vulkan-config", "path":"./kernels/my-vulkan-config/foo.spv" }
-        ...
-    ]
-}
-```
-
-```
-./kernels/my-vulkan-config/foo.spv
-./kernels/my-vulkan-config/foo.spv.info-stuff
-...
-./kernels/my-vulkan-config/bar.spv
-./kernels/my-vulkan-config/bar.spv.info-stuff
-...
-./kernels/my-vulkan-config.config.json
-```
-
-## ...
-
-
-Any important alternative designs should be listed here.
-If somebody comes along and says "that proposal is neat, but you should just do X" you want to be able to show that X was considered, and give enough context on why we made the decision we did.
-This section doesn't need to be defensive, or focus on which of various options is "best".
-Ideally we can acknowledge that different designs are suited for different circumstances/constraints.
