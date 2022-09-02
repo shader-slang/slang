@@ -742,8 +742,141 @@ If it was necessary to have meta data stored in a more compressed format we coul
 Discussion: Container Layout
 ============================
 
+We probably want
+
+* Global configuration information - describe how names map to contents
+* Configuration that is compiler specific
+  * The format could support configuration for different compilers
+* Use 'associated' file style for additional information to a result 
+
+```
+config
+config/global.json
+config/slang.json
+config/dxc.json
+```
+
+`config/global.json` holds configuration that applies to the whole of the container. In particular how names map to the container contents - say the use of directories, or naming concat order.
+`config/slang.json` holds how names map to option configuration that is specific to Slang
+
+We may want to have some config that applies to all different compilers. 
+
+We may want to use the 'name' mechanism for some options, but commonly changing items such as the translation unit source name, entry point name can be passed directly (and used as part of the name).
+
+Let's say we have a config that consists of `target`, `configuration`. And we use the source name and entry point directly. We could have a configuration that expressed this as a location 
+
+```JSON
+{
+    "keyPath" : "$(target)/$(filename)/$(entry-point)-$(configuration)"
+}
+```
+
+Lets say we compile `thing.slang`, with entry point 'computeMain' and options
+
+```
+target: vk
+configuration: release
+```
+
+We end up with 
+
+```
+vk/thing/computeMain-release.spv
+vk/thing/computeMain-release.spv-info
+vk/thing/computeMain-release.spv-diagnostics
+vk/thing/computeMain-release.spv-layout
+```
+
+Info holds the detailed information about what is in spv to identify the artifact, but also for the 'system' in general. Including 
+
+* Artifact type
+* The combination of options (which might be *more* than in the path)
+* Hashes/other extra information
+
+Discussion: Interface
+=====================
+
+There are probably two ends of the spectrum of how an interface might work. One one end would be the interface is a 'slang like' compiler interface, with the the most extreme version being it *is* the Slang compiler interface. Having this interface like this means
+
+* There is direct access to all options
+* If your application already uses the Slang interface, it can just be switched out for the cache
+* Has full knowledge of the compilation - making identification unambiguous, and trivially allowing fallback to actually doing a compilation
+* Trivially supports more unusual aspects of the API such as the component system
+* There is no (or very little) new API, the shader container API *is* the Slang API
+
+It also means
+
+* The API has a very large surface area
+* It is working at the detail of the API
+* Does not provide an application level indirection to some more meaningful naming/identification
+* It is tied to the Slang compiler - so can't be seen as an interface to 'shader container's more generally
+* Naming will almost certainly need to include a hash
+* The hash will be hard to produce independently (it will be hard to calculate just anyway)
+
+More seriously
+
+* Higher requirement for source
+  * Could store hashes of source seen
+    * If there is source injection does this even make sense?
+  * Could store modules as Slang IR
+* For generated source it requires the source
+* All source does in general need to be hashed - as paths do not indicate uniqueness
+* How is this obfuscated? The amount of information needed is *all of the settings*.
+
+At the other end of the spectrum the interface could be akin to passing in a set of user configurable parameter "names", that identify the result. The most extreme form might look something like....
+
+```
+class IShaderContainer
+{
+    Result getArtifact(const char*const* configNames, Count configNamesCount, const Options& options, IArtifact** outArtifact);
+    Result getOrCreateArtifact(const char*const* configNames, Count configNamesCount, const Options& options, IArtifact** outArtifact);
+};
+```
+
+Q: Perhaps we don't return an Artifact, because the IArtifact interface is not simple enough. Maybe it returns a blob and an ArtifactDesc?
+Q: Is there a way to access other information - diagnostics for example? With IArtifact that can be returned as part of that
+Q: If we wanted to associate 'user data' with a result how do we do that? It could just be JSON stored in the `-info`?
 
 
+The combination of the 'configNames' produce the key/paths within the container. 
+
+It would probably be desirable to be able to create 'configNames' through an API. This would have to be Slang specific, and not part of this interface. The config system could be passed into the construction of the container. Doing so might contain all the information to map names to how to compile something. 
+
+This interface may be a little too abstract, and perhaps should have parameters for common types of controls.
+
+As previously touched on it may be useful to pass in configuration that is *not* part of the key name to override compilation behavior. 
+
+This style means
+
+* Naming is trivial
+* Hashing is not necessary
+* Issues such as 'generated source' are pushed to user space
+* Is user configurable 
+* Main interface is very simple and small
+* Can be used with other compilers - because the interface is not tied to Slang in any way
+* Implies the container format itself can be used trivially 
+* Human/application centered
+* Hashing of source/options is still possible, for a variety of purposes, but is not a *requirement* as it doesn't identify a compilation. 
+  * Meaning a simpler/less stable hashing might be fine
+
+There is an implication that the identification of a unique combination is a user space problem. Including that source is static, or if not that becomes a client side problem. Note that mechanisms previously discussed - such as hashing the source can still be useful and used. The hashing of source could be used to identify in a development environment that a recompilation is required. Or an edit of source could be made, and a single command could update all contents that is applicable automatically. These are more advanced features, and are not necessary for a user space implementation, which doesn't require the capability.
+
+More problematically
+
+* Doesn't provide a runtime cache that 'just works' - say just using the slang API
+* Needs to provide a way given a combination of config names to produce the appropriate settings
+  * If it is just a delivery mechanism this isn't a requirement
+* Probably needs both an API and 'config' mechanisms to describe options
+* The indirection may lose some control
+
+All things considered, based on the goals of the effort it seems to make more sense to have an interface that is in the named config style. Because
+
+* It allows trivial 3rd party implementation
+* It works with other compilers - (important if it's to work as some kind of standard)
+* Provides an easy to understand mapping from input to the contents of the cache
+* Can use more advanced features (like souce hashing) if desired
+
+How config options are described or combined may be somewhat complicated, but is not necessary to use the system, and allows different compilers to implement however is appropriate.
 
 Related Work
 ============
