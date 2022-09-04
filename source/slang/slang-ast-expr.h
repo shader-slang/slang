@@ -212,9 +212,12 @@ class PostfixExpr: public OperatorExpr
 class IndexExpr: public Expr
 {
     SLANG_AST_CLASS(IndexExpr)
+    Expr* baseExpression;
+    List<Expr*> indexExprs;
 
-    Expr* baseExpression = nullptr;
-    Expr* indexExpression = nullptr;
+    // The source location of `(`, `)`, and `,` that marks the start/end of the application op and
+    // each argument expr. This info is used by language server.
+    List<SourceLoc> argumentDelimeterLocs;
 };
 
 class MemberExpr: public DeclRefExpr

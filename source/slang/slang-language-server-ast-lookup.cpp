@@ -112,8 +112,9 @@ public:
     bool visitIncompleteExpr(IncompleteExpr*) { return false; }
     bool visitIndexExpr(IndexExpr* subscriptExpr)
     {
-        if (dispatchIfNotNull(subscriptExpr->indexExpression))
-            return true;
+        for (auto arg : subscriptExpr->indexExprs)
+            if (dispatchIfNotNull(arg))
+                return true;
         return dispatchIfNotNull(subscriptExpr->baseExpression);
     }
 

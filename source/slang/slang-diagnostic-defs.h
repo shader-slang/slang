@@ -385,7 +385,7 @@ DIAGNOSTIC(30832, Error, invalidTypeForInheritance, "type '$0' cannot be used fo
 DIAGNOSTIC(30850, Error, invalidExtensionOnType, "type '$0' cannot be extended. `extension` can only be used to extend a nominal type.")
 
 // 309xx: subscripts
-
+DIAGNOSTIC(30900, Error, multiDimensionalArrayNotSupported, "multi-dimensional array is not supported.")
 // 310xx: properties
 
 // 311xx: accessors

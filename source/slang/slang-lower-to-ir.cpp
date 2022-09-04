@@ -3073,7 +3073,10 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
     {
         auto type = lowerType(context, expr->type);
         auto baseVal = lowerSubExpr(expr->baseExpression);
-        auto indexVal = getSimpleVal(context, lowerRValueExpr(context, expr->indexExpression));
+
+        SLANG_RELEASE_ASSERT(expr->indexExprs.getCount() == 1);
+
+        auto indexVal = getSimpleVal(context, lowerRValueExpr(context, expr->indexExprs[0]));
 
         return subscriptValue(type, baseVal, indexVal);
     }
