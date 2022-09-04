@@ -1825,7 +1825,8 @@ namespace Slang
                     auto arrayTypeExpr = astBuilder->create<IndexExpr>();
                     arrayTypeExpr->loc = arrayDeclarator->openBracketLoc;
                     arrayTypeExpr->baseExpression = ioInfo->typeSpec;
-                    arrayTypeExpr->indexExprs.add(arrayDeclarator->elementCountExpr);
+                    if (arrayDeclarator->elementCountExpr)
+                        arrayTypeExpr->indexExprs.add(arrayDeclarator->elementCountExpr);
                     ioInfo->typeSpec = arrayTypeExpr;
 
                     declarator = arrayDeclarator->inner;

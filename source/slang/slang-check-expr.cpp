@@ -1334,7 +1334,7 @@ namespace Slang
     Expr* SemanticsExprVisitor::visitIndexExpr(IndexExpr* subscriptExpr)
     {
         auto baseExpr = subscriptExpr->baseExpression;
-        baseExpr = CheckTerm(baseExpr);
+        baseExpr = CheckExpr(baseExpr);
 
         for (auto& arg : subscriptExpr->indexExprs)
         {
@@ -1361,7 +1361,7 @@ namespace Slang
             {
                 elementCount = CheckIntegerConstantExpression(subscriptExpr->indexExprs[0], IntegerConstantExpressionCoercionType::AnyInteger, nullptr);
             }
-            else
+            else if (subscriptExpr->indexExprs.getCount() != 0)
             {
                 getSink()->diagnose(subscriptExpr, Diagnostics::multiDimensionalArrayNotSupported);
             }
