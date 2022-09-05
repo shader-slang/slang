@@ -186,8 +186,14 @@ namespace Slang
             // we can't consider this case a hard error.
             //
             auto concreteType = witnessTable->getConcreteType();
-            if(!sharedContext->doesTypeFitInAnyValue(concreteType, interfaceType))
+            IRIntegerValue typeSize, sizeLimit;
+            if (!sharedContext->doesTypeFitInAnyValue(concreteType, interfaceType, &typeSize, &sizeLimit))
+            {
+                sharedContext->sink->diagnose(concreteType, Diagnostics::typeDoesNotFitAnyValueSize, concreteType);
+                sharedContext->sink->diagnose(concreteType, Diagnostics::typeAndLimit, typeSize, sizeLimit);
+                sharedContext->sink->diagnose(interfaceType, Diagnostics::seeInterfaceDefinitionOf);
                 return;
+            }
 
             for (auto child : witnessTable->getChildren())
             {

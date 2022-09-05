@@ -1002,6 +1002,9 @@ struct ResourceOutputSpecializationPass
             if(oldParamInfo.flavor == OutputInfo::Flavor::None)
                 continue;
 
+            if (oldParamInfo.flavor == OutputInfo::Flavor::Undefined)
+                continue;
+
             // For any paraemter that was specialized, we will use
             // the computed information on the parameter to materialize
             // a value for the output in the context of the caller.
