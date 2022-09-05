@@ -774,6 +774,7 @@ struct ResourceOutputSpecializationPass
             // `InOut<T>`.
             //
             IRInst* newParam = paramsBuilder.createParam(valueType);
+            newParam->insertBefore(param);
             param->transferDecorationsTo(newParam);
 
             // The start of the function body should assign
