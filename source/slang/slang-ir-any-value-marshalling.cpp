@@ -86,18 +86,7 @@ namespace Slang
             virtual void marshalBasicType(IRBuilder* builder, IRType* dataType, IRInst* concreteTypedVar) = 0;
             // Defines what to do with resource handle elements.
             virtual void marshalResourceHandle(IRBuilder* builder, IRType* dataType, IRInst* concreteTypedVar) = 0;
-            // Validates that the type fits in the given AnyValueSize.
-            // After calling emitMarshallingCode, `fieldOffset` will be increased to the required `AnyValue` size.
-            // If this is larger than the provided AnyValue size, report a dianogstic. We might want to front load
-            // this in a separate IR validation pass in the future, but this is the easiest way to report the
-            // diagnostic now.
-            void validateAnyTypeSize(DiagnosticSink* sink, IRType* concreteType)
-            {
-                if (fieldOffset > static_cast<uint32_t>(anyValInfo->fieldKeys.getCount()))
-                {
-                    sink->diagnose(concreteType->sourceLoc, Diagnostics::typeDoesNotFitAnyValueSize, concreteType);
-                }
-            }
+
             void ensureOffsetAt4ByteBoundary()
             {
                 if (intraFieldOffset)
@@ -395,8 +384,6 @@ namespace Slang
             context.uintPtrType = builder.getPtrType(builder.getUIntType());
             context.anyValueVar = resultVar;
             emitMarshallingCode(&builder, &context, concreteTypedVar);
-
-            context.validateAnyTypeSize(sharedContext->sink, type);
 
             auto load = builder.emitLoad(resultVar);
             builder.emitReturn(load);

@@ -6717,7 +6717,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
         // Allocate an IRInterfaceType with the `operandCount` operands.
         IRInterfaceType* irInterface = subBuilder->createInterfaceType(operandCount, nullptr);
-
+        
         // Add `irInterface` to decl mapping now to prevent cyclic lowering.
         setValue(subContext, decl, LoweredValInfo::simple(irInterface));
 
