@@ -160,18 +160,19 @@ namespace Slang
                 auto elementType = matrixType->getElementType();
                 auto colCount = getIntVal(matrixType->getColumnCount());
                 auto rowCount = getIntVal(matrixType->getRowCount());
+                auto rowVecType = builder->getVectorType(elementType, matrixType->getRowCount());
                 for (IRIntegerValue i = 0; i < colCount; i++)
                 {
                     auto col = builder->emitElementAddress(
-                        elementType,
+                        builder->getPtrType(rowVecType),
                         concreteTypedVar,
                         builder->getIntValue(builder->getIntType(), i));
                     for (IRIntegerValue j = 0; j < rowCount; j++)
                     {
-                        auto element = builder->emitElementExtract(
-                            elementType,
+                        auto element = builder->emitElementAddress(
+                            builder->getPtrType(elementType),
                             col,
-                            builder->getIntValue(builder->getIntType(), i));
+                            builder->getIntValue(builder->getIntType(), j));
                         emitMarshallingCode(builder, context, element);
                     }
                 }
