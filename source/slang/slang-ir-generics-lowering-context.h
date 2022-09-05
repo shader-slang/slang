@@ -99,7 +99,7 @@ namespace Slang
         }
 
             /// Does the given `concreteType` fit within the any-value size deterined by `interfaceType`?
-        bool doesTypeFitInAnyValue(IRType* concreteType, IRInterfaceType* interfaceType);
+        bool doesTypeFitInAnyValue(IRType* concreteType, IRInterfaceType* interfaceType, IRIntegerValue* outTypeSize = nullptr, IRIntegerValue* outLimit = nullptr);
     };
 
     bool isPolymorphicType(IRInst* typeInst);

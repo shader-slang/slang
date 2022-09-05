@@ -67,7 +67,8 @@ struct ASTIterator
         {
             iterator->maybeDispatchCallback(subscriptExpr);
             dispatchIfNotNull(subscriptExpr->baseExpression);
-            dispatchIfNotNull(subscriptExpr->indexExpression);
+            for (auto arg : subscriptExpr->indexExprs)
+                dispatchIfNotNull(arg);
         }
 
         void visitParenExpr(ParenExpr* expr)

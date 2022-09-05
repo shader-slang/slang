@@ -3073,7 +3073,10 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
     {
         auto type = lowerType(context, expr->type);
         auto baseVal = lowerSubExpr(expr->baseExpression);
-        auto indexVal = getSimpleVal(context, lowerRValueExpr(context, expr->indexExpression));
+
+        SLANG_RELEASE_ASSERT(expr->indexExprs.getCount() == 1);
+
+        auto indexVal = getSimpleVal(context, lowerRValueExpr(context, expr->indexExprs[0]));
 
         return subscriptValue(type, baseVal, indexVal);
     }
@@ -6714,7 +6717,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
         // Allocate an IRInterfaceType with the `operandCount` operands.
         IRInterfaceType* irInterface = subBuilder->createInterfaceType(operandCount, nullptr);
-
+        
         // Add `irInterface` to decl mapping now to prevent cyclic lowering.
         setValue(subContext, decl, LoweredValInfo::simple(irInterface));
 

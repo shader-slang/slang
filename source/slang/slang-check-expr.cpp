@@ -1303,7 +1303,18 @@ namespace Slang
         Type*              elementType)
     {
         auto baseExpr = subscriptExpr->baseExpression;
-        auto indexExpr = subscriptExpr->indexExpression;
+        if (subscriptExpr->indexExprs.getCount() < 1)
+        {
+            getSink()->diagnose(subscriptExpr, Diagnostics::notEnoughArguments, subscriptExpr->indexExprs.getCount(), 1);
+            return CreateErrorExpr(subscriptExpr);
+        }
+        else if (subscriptExpr->indexExprs.getCount() > 1)
+        {
+            getSink()->diagnose(subscriptExpr, Diagnostics::tooManyArguments, subscriptExpr->indexExprs.getCount(), 1);
+            return CreateErrorExpr(subscriptExpr);
+        }
+
+        auto indexExpr = subscriptExpr->indexExprs[0];
 
         if (!indexExpr->type->equals(m_astBuilder->getIntType()) &&
             !indexExpr->type->equals(m_astBuilder->getUIntType()))
@@ -1325,19 +1336,17 @@ namespace Slang
         auto baseExpr = subscriptExpr->baseExpression;
         baseExpr = CheckExpr(baseExpr);
 
-        Expr* indexExpr = subscriptExpr->indexExpression;
-        if (indexExpr)
+        for (auto& arg : subscriptExpr->indexExprs)
         {
-            indexExpr = CheckTerm(indexExpr);
+            arg = CheckTerm(arg);
         }
-
-        subscriptExpr->baseExpression = baseExpr;
-        subscriptExpr->indexExpression = indexExpr;
 
         // If anything went wrong in the base expression,
         // then just move along...
         if (IsErrorExpr(baseExpr))
             return CreateErrorExpr(subscriptExpr);
+
+        subscriptExpr->baseExpression = baseExpr;
 
         // Otherwise, we need to look at the type of the base expression,
         // to figure out how subscripting should work.
@@ -1348,9 +1357,13 @@ namespace Slang
             // which should be interpreted as resolving to an array type.
 
             IntVal* elementCount = nullptr;
-            if (indexExpr)
+            if (subscriptExpr->indexExprs.getCount() == 1)
             {
-                elementCount = CheckIntegerConstantExpression(indexExpr, IntegerConstantExpressionCoercionType::AnyInteger, nullptr);
+                elementCount = CheckIntegerConstantExpression(subscriptExpr->indexExprs[0], IntegerConstantExpressionCoercionType::AnyInteger, nullptr);
+            }
+            else if (subscriptExpr->indexExprs.getCount() != 0)
+            {
+                getSink()->diagnose(subscriptExpr, Diagnostics::multiDimensionalArrayNotSupported);
             }
 
             auto elementType = CoerceToUsableType(TypeExp(baseExpr, baseTypeType->type));
@@ -1420,9 +1433,8 @@ namespace Slang
             InvokeExpr* subscriptCallExpr = m_astBuilder->create<InvokeExpr>();
             subscriptCallExpr->loc = subscriptExpr->loc;
             subscriptCallExpr->functionExpr = subscriptFuncExpr;
-
-            // TODO(tfoley): This path can support multiple arguments easily
-            subscriptCallExpr->arguments.add(subscriptExpr->indexExpression);
+            subscriptCallExpr->arguments.addRange(subscriptExpr->indexExprs);
+            subscriptCallExpr->argumentDelimeterLocs.addRange(subscriptExpr->argumentDelimeterLocs);
 
             return CheckInvokeExprWithCheckedOperands(subscriptCallExpr);
         }

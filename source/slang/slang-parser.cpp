@@ -1476,7 +1476,8 @@ namespace Slang
         void visitIndexExpr(IndexExpr * expr)
         {
             expr->baseExpression->accept(this, nullptr);
-            expr->indexExpression->accept(this, nullptr);
+            for (auto arg : expr->indexExprs)
+                arg->accept(this, nullptr);
         }
         void visitMemberExpr(MemberExpr * expr)
         {
@@ -1824,7 +1825,8 @@ namespace Slang
                     auto arrayTypeExpr = astBuilder->create<IndexExpr>();
                     arrayTypeExpr->loc = arrayDeclarator->openBracketLoc;
                     arrayTypeExpr->baseExpression = ioInfo->typeSpec;
-                    arrayTypeExpr->indexExpression = arrayDeclarator->elementCountExpr;
+                    if (arrayDeclarator->elementCountExpr)
+                        arrayTypeExpr->indexExprs.add(arrayDeclarator->elementCountExpr);
                     ioInfo->typeSpec = arrayTypeExpr;
 
                     declarator = arrayDeclarator->inner;
@@ -2045,7 +2047,7 @@ namespace Slang
                 parser->ReadToken(TokenType::LBracket);
                 if (!parser->LookAheadToken(TokenType::RBracket))
                 {
-                    arrType->indexExpression = parser->ParseExpression();
+                    arrType->indexExprs.add(parser->ParseExpression());
                 }
                 parser->ReadToken(TokenType::RBracket);
                 typeExpr = arrType;
@@ -5779,18 +5781,23 @@ namespace Slang
                     IndexExpr* indexExpr = parser->astBuilder->create<IndexExpr>();
                     indexExpr->baseExpression = expr;
                     parser->FillPosition(indexExpr);
-                    parser->ReadToken(TokenType::LBracket);
-                    // TODO: eventually we may want to support multiple arguments inside the `[]`
-                    if (!parser->LookAheadToken(TokenType::RBracket))
+                    auto lBracket = parser->ReadToken(TokenType::LBracket);
+                    indexExpr->argumentDelimeterLocs.add(lBracket.loc);
+                    while (!parser->tokenReader.isAtEnd())
                     {
-                        indexExpr->indexExpression = parser->ParseExpression();
+                        if (!parser->LookAheadToken(TokenType::RBracket))
+                            indexExpr->indexExprs.add(parser->ParseArgExpr());
+                        else
+                        {
+                            break;
+                        }
+                        if (!parser->LookAheadToken(TokenType::Comma))
+                            break;
+                        auto comma = parser->ReadToken(TokenType::Comma);
+                        indexExpr->argumentDelimeterLocs.add(comma.loc);
                     }
-                    else
-                    {
-                        indexExpr->indexExpression = parser->astBuilder->create<IncompleteExpr>();
-                    }
-                    parser->ReadToken(TokenType::RBracket);
-
+                    auto rBracket = parser->ReadToken(TokenType::RBracket);
+                    indexExpr->argumentDelimeterLocs.add(rBracket.loc);
                     expr = indexExpr;
                 }
                 break;
