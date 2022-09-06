@@ -91,7 +91,10 @@ IRFunc* specializeDispatchFunction(SharedGenericsLoweringContext* sharedContext,
     {
         auto witnessTable = witnessTables[i];
         auto seqIdDecoration = witnessTable->findDecoration<IRSequentialIDDecoration>();
-        SLANG_ASSERT(seqIdDecoration);
+        if (!seqIdDecoration)
+        {
+            sharedContext->sink->diagnose(witnessTable->getConcreteType(), Diagnostics::typeCannotBeUsedInDynamicDispatch, witnessTable->getConcreteType());
+        }
 
         if (i != witnessTables.getCount() - 1)
         {
