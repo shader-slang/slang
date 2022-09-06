@@ -296,6 +296,11 @@ namespace Slang
             auto requirementKey = lookupInst->getRequirementKey();
             auto requirementVal =
                 sharedContext->findInterfaceRequirementVal(interfaceType, requirementKey);
+
+            if (interfaceType->findDecoration<IRSpecializeDecoration>())
+            {
+                sharedContext->sink->diagnose(callInst->sourceLoc, Diagnostics::dynamicDispatchOnSpecializeOnlyInterface, interfaceType);
+            }
             auto dispatchFunc = getOrCreateInterfaceDispatchMethod(
                 builder, interfaceType, requirementKey, requirementVal);
 

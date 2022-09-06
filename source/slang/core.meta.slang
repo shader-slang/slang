@@ -2655,6 +2655,9 @@ attribute_syntax [open] : OpenAttribute;
 __attributeTarget(InterfaceDecl)
 attribute_syntax [anyValueSize(size:int)] : AnyValueSizeAttribute;
 
+__attributeTarget(InterfaceDecl)
+attribute_syntax [Specialize] : SpecializeAttribute;
+
 __attributeTarget(DeclBase)
 attribute_syntax [builtin] : BuiltinAttribute;
 

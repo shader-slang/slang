@@ -177,6 +177,12 @@ struct IRAnyValueSizeDecoration : IRDecoration
     }
 };
 
+struct IRSpecializeDecoration : IRDecoration
+{
+    enum { kOp = kIROp_SpecializeDecoration };
+    IR_LEAF_ISA(SpecializeDecoration)
+};
+
 struct IRComInterfaceDecoration : IRDecoration
 {
     enum
@@ -3223,6 +3229,11 @@ public:
     void addAnyValueSizeDecoration(IRInst* inst, IRIntegerValue value)
     {
         addDecoration(inst, kIROp_AnyValueSizeDecoration, getIntValue(getIntType(), value));
+    }
+
+    void addSpecializeDecoration(IRInst* inst)
+    {
+        addDecoration(inst, kIROp_SpecializeDecoration);
     }
 
     void addComInterfaceDecoration(IRInst* inst, UnownedStringSlice guid)

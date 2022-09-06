@@ -935,6 +935,13 @@ class AnyValueSizeAttribute : public Attribute
     int32_t size;
 };
 
+    /// An attribute that marks an interface for specialization use only. Any operation that triggers dynamic
+    /// dispatch through the interface is a compile-time error.
+class SpecializeAttribute : public Attribute
+{
+    SLANG_AST_CLASS(SpecializeAttribute)
+};
+
 class DllImportAttribute : public Attribute
 {
     SLANG_AST_CLASS(DllImportAttribute)
