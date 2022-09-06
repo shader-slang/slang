@@ -197,6 +197,7 @@ namespace Slang
                 }
             }
             loweredType = builder.createInterfaceType(newEntries.getCount(), (IRInst**)newEntries.getBuffer());
+            loweredType->sourceLoc = interfaceType->sourceLoc;
             IRCloneEnv cloneEnv;
             cloneInstDecorationsAndChildren(&cloneEnv, &sharedContext->sharedBuilderStorage,
                 interfaceType, loweredType);

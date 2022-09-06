@@ -95,6 +95,8 @@ IRInst* cloneInstAndOperands(
         newInst->getOperands()[ii].init(newInst, newOperand);
     }
 
+    newInst->sourceLoc = oldInst->sourceLoc;
+
     return newInst;
 }
 

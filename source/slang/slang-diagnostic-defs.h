@@ -605,6 +605,8 @@ DIAGNOSTIC(52005, Error, unableToReadFile, "unable to read file '$0'")
 
 DIAGNOSTIC(52006, Error, compilerNotDefinedForTransition, "compiler not defined for transition '$0' to '$1'.")
 
+DIAGNOSTIC(52007, Error, typeCannotBeUsedInDynamicDispatch, "failed to generate dynamic dispatch code for type '$0'.")
+DIAGNOSTIC(52008, Error, dynamicDispatchOnSpecializeOnlyInterface, "type '$0' is marked for specialization only, but dynamic dispatch is needed for the call.")
 DIAGNOSTIC(53001,Error, invalidTypeMarshallingForImportedDLLSymbol, "invalid type marshalling in imported func $0.")
 
 //

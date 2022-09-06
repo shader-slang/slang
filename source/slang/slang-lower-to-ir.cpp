@@ -6809,6 +6809,10 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         {
             subBuilder->addAnyValueSizeDecoration(irInterface, anyValueSizeAttr->size);
         }
+        if (auto specializeAttr = decl->findModifier<SpecializeAttribute>())
+        {
+            subBuilder->addSpecializeDecoration(irInterface);
+        }
         if (auto comInterfaceAttr = decl->findModifier<ComInterfaceAttribute>())
         {
             subBuilder->addComInterfaceDecoration(irInterface, comInterfaceAttr->guid.getUnownedSlice());

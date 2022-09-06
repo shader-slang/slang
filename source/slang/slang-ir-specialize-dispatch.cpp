@@ -91,7 +91,10 @@ IRFunc* specializeDispatchFunction(SharedGenericsLoweringContext* sharedContext,
     {
         auto witnessTable = witnessTables[i];
         auto seqIdDecoration = witnessTable->findDecoration<IRSequentialIDDecoration>();
-        SLANG_ASSERT(seqIdDecoration);
+        if (!seqIdDecoration)
+        {
+            sharedContext->sink->diagnose(witnessTable->getConcreteType(), Diagnostics::typeCannotBeUsedInDynamicDispatch, witnessTable->getConcreteType());
+        }
 
         if (i != witnessTables.getCount() - 1)
         {
@@ -220,6 +223,15 @@ void ensureWitnessTableSequentialIDs(SharedGenericsLoweringContext* sharedContex
             }
             else
             {
+                auto witnessTableType = as<IRWitnessTableType>(inst->getDataType());
+                if (witnessTableType && witnessTableType->getConformanceType()->findDecoration<IRSpecializeDecoration>())
+                {
+                    // The interface is for specialization only, it would be an error if dynamic dispatch is used
+                    // through the interface.
+                    // Skip assigning ID for the witness table.
+                    continue;
+                }
+
                 // If this witness table entry does not have a linkage,
                 // we need to check if it is transitively visible via
                 // associatedtypes from an existing witness table with linkage.
