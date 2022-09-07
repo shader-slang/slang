@@ -33,24 +33,22 @@ namespace Slang
     /* Any 32-bit or wider unsigned integer data type will do */
     typedef unsigned int MD5_u32plus;
 
+    struct MD5Context
+    {
+        MD5_u32plus lo, hi;
+        MD5_u32plus a, b, c, d;
+        unsigned char buffer[64];
+        MD5_u32plus block[16];
+    };
+
     class MD5HashGen
     {
     public:
-        struct MD5Context
-        {
-            MD5_u32plus lo, hi;
-            MD5_u32plus a, b, c, d;
-            unsigned char buffer[64];
-            MD5_u32plus block[16];
-        };
-
-        void init(MD5Context* context);
-        void update(const void* data, unsigned long size);
-        void finalize(unsigned char* result);
+        void init(MD5Context* ctx);
+        void update(MD5Context* ctx, const void* data, unsigned long size);
+        void finalize(MD5Context* ctx, unsigned char* result);
 
     private:
-        MD5Context* ctx;
-
         static const void* body(MD5Context* ctx, const void* data, unsigned long size);
     };
 }

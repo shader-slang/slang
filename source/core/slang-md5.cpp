@@ -206,9 +206,8 @@ namespace Slang
 	    return ptr;
     }
  
-    void MD5HashGen::init(MD5Context* context)
+    void MD5HashGen::init(MD5Context* ctx)
     {
-        ctx = context;
 	    ctx->a = 0x67452301;
 	    ctx->b = 0xefcdab89;
 	    ctx->c = 0x98badcfe;
@@ -218,7 +217,7 @@ namespace Slang
 	    ctx->hi = 0;
     }
  
-    void MD5HashGen::update(const void* data, unsigned long size)
+    void MD5HashGen::update(MD5Context* ctx, const void* data, unsigned long size)
     {
 	    MD5_u32plus saved_lo;
 	    unsigned long used, available;
@@ -258,7 +257,7 @@ namespace Slang
 	    (dst)[2] = (unsigned char)((src) >> 16); \
 	    (dst)[3] = (unsigned char)((src) >> 24);
  
-    void MD5HashGen::finalize(unsigned char* result)
+    void MD5HashGen::finalize(MD5Context* ctx, unsigned char* result)
     {
 	    unsigned long used, available;
  

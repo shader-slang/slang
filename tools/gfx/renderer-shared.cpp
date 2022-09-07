@@ -339,6 +339,19 @@ void getShaderFilename(uint32_t* shaderHash, String* outFilename)
     *outFilename = filename;
 }
 
+void updateCacheEntry(ISlangMutableFileSystem* fileSystem, slang::IBlob* compiledCode, String shaderFilename, uint32_t* ASTHash)
+{
+    auto hashSize = 4 * sizeof(uint32_t); // MD5 hashes are 128 bits, represented here as an array of four uint32_t.
+
+    ListBlob contents;
+    auto bufferSize = hashSize + compiledCode->getBufferSize();
+    contents.m_data.setCount(bufferSize);
+    char* buffer = (char*)contents.m_data.begin();
+    memcpy(buffer, (void*)ASTHash, hashSize);
+    memcpy(buffer + hashSize, (void*)compiledCode->getBufferPointer(), compiledCode->getBufferSize());
+    fileSystem->saveFile(shaderFilename.getBuffer(), buffer, bufferSize);
+}
+
 Result RendererBase::getEntryPointCodeFromShaderCache(
     slang::IComponentType* program,
     SlangInt entryPointIndex,
@@ -346,6 +359,8 @@ Result RendererBase::getEntryPointCodeFromShaderCache(
     slang::IBlob** outCode,
     slang::IBlob** outDiagnostics)
 {
+    //return program->getEntryPointCode(entryPointIndex, targetIndex, outCode, outDiagnostics);
+
     // Immediately call getEntryPointCode if no shader cache was provided on initialization
     if (!shaderCacheFileSystem)
     {
@@ -356,34 +371,59 @@ Result RendererBase::getEntryPointCodeFromShaderCache(
     //    - want to update the Slang API so that IComponentType (program) can query the hash
     //    - two kinds of hashes - hash based on source code vs hash based purely on included filenames
     uint32_t shaderHash[4];
-    program->getDependencyBasedHashCode((uint32_t**)&shaderHash);
+    program->getDependencyBasedHashCode(entryPointIndex, targetIndex, shaderHash);
+
+    // Get the hash generated from the AST - This is needed to check whether a cache entry is effectively dirty,
+    // or to save along with the compiled code into an entry so the entry can be checked if fetched later on.
+    uint32_t ASTHash[4];
+    program->getASTBasedHashCode(ASTHash);
 
     String shaderFilename;
     getShaderFilename(shaderHash, &shaderFilename);
 
+    ComPtr<ISlangBlob> codeBlob;
+
     // Query shaderCacheFileSystem for a file by that hash
     //    - If we find it, then copy the file contents into memory and return in outCode
-    auto result = shaderCacheFileSystem->loadFile(shaderFilename.getBuffer(), outCode);
+    auto result = shaderCacheFileSystem->loadFile(shaderFilename.getBuffer(), codeBlob.writeRef());
     
     if (SLANG_FAILED(result))
     {
         // If we didn't find it, call program->getEntryPointCode() to get the code and return
         //    - Save a new file using the hash as name and dump the code into it before returning
-        program->getEntryPointCode(entryPointIndex, targetIndex, outCode, outDiagnostics);
+        program->getEntryPointCode(entryPointIndex, targetIndex, codeBlob.writeRef(), outDiagnostics);
         ISlangMutableFileSystem* fileSystem;
         if (SLANG_SUCCEEDED(shaderCacheFileSystem->queryInterface(ISlangMutableFileSystem::getTypeGuid(), (void**)&fileSystem)))
         {
-            fileSystem->saveFile(shaderFilename.getBuffer(), outCode, (*outCode)->getBufferSize());
+            updateCacheEntry(fileSystem, codeBlob, shaderFilename, ASTHash);
         }
     }
-//     else
-//     {
-//         // TODO: The file exists, but how do we know if it's out-of-date?
-//         // Hash for source code should not match hash of the returned file
-//         uint32_t shaderContentHash;
-//         program->getASTBasedHashCode(&shaderContentHash);
-//     }
-    
+    else
+    {
+        // If the entry exists, we need to check that the entry isn't effectively dirty. Since we stored
+        // the AST hash with the compiled code, we can determine this by comparing the stored hash with the
+        // AST hash generated earlier.
+        auto entryContents = codeBlob->getBufferPointer();
+        auto hashSize = 4 * sizeof(uint32_t);
+        if (memcmp(ASTHash, entryContents, hashSize) != 0)
+        {
+            // The AST hash stored in the entry does not match the AST hash generated earlier, indicating
+            // that the shader code has changed and the entry needs to be updated.
+            program->getEntryPointCode(entryPointIndex, targetIndex, codeBlob.writeRef(), outDiagnostics);
+            ISlangMutableFileSystem* fileSystem;
+            if (SLANG_SUCCEEDED(shaderCacheFileSystem->queryInterface(ISlangMutableFileSystem::getTypeGuid(), (void**)&fileSystem)))
+            {
+                updateCacheEntry(fileSystem, codeBlob, shaderFilename, ASTHash);
+            }
+        }
+        else
+        {
+            RefPtr<RawBlob> compiledCode = new RawBlob((uint8_t*)codeBlob->getBufferPointer() + hashSize, codeBlob->getBufferSize() - hashSize);
+            codeBlob = compiledCode;
+        }
+    }
+
+    *outCode = codeBlob.detach();
     return SLANG_OK;
 }
 

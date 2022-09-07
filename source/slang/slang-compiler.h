@@ -273,7 +273,10 @@ namespace Slang
             SlangInt        targetIndex,
             slang::IBlob**  outCode,
             slang::IBlob** outDiagnostics) SLANG_OVERRIDE;
-        SLANG_NO_THROW SlangResult SLANG_MCALL getDependencyBasedHashCode(uint32_t** outHashCode) SLANG_OVERRIDE;
+        SLANG_NO_THROW SlangResult SLANG_MCALL getDependencyBasedHashCode(
+            SlangInt entryPointIndex,
+            SlangInt targetIndex,
+            uint32_t* outHashCode) SLANG_OVERRIDE;
         SLANG_NO_THROW SlangResult SLANG_MCALL getASTBasedHashCode(uint32_t* outHashCode) SLANG_OVERRIDE;
         SLANG_NO_THROW SlangResult SLANG_MCALL specialize(
             slang::SpecializationArg const* specializationArgs,
@@ -497,7 +500,10 @@ namespace Slang
             Linkage*                            linkage,
             List<RefPtr<ComponentType>> const&  childComponents);
 
-        SLANG_NO_THROW SlangResult SLANG_MCALL getDependencyBasedHashCode(uint32_t** outHashCode) SLANG_OVERRIDE;
+        SLANG_NO_THROW SlangResult SLANG_MCALL getDependencyBasedHashCode(
+            SlangInt entryPointIndex,
+            SlangInt targetIndex,
+            uint32_t* outHashCode) SLANG_OVERRIDE;
         SLANG_NO_THROW SlangResult SLANG_MCALL getASTBasedHashCode(uint32_t* outHashCode) SLANG_OVERRIDE;
 
         List<RefPtr<ComponentType>> const& getChildComponents() { return m_childComponents; };
@@ -851,7 +857,10 @@ namespace Slang
             return Super::getEntryPointHostCallable(entryPointIndex, targetIndex, outSharedLibrary, outDiagnostics);
         }
 
-        SLANG_NO_THROW SlangResult SLANG_MCALL getDependencyBasedHashCode(uint32_t** outHashCode) SLANG_OVERRIDE;
+        SLANG_NO_THROW SlangResult SLANG_MCALL getDependencyBasedHashCode(
+            SlangInt entryPointIndex,
+            SlangInt targetIndex,
+            uint32_t* outHashCode) SLANG_OVERRIDE;
         SLANG_NO_THROW SlangResult SLANG_MCALL getASTBasedHashCode(uint32_t* outHashCode) SLANG_OVERRIDE;
 
             /// Create an entry point that refers to the given function.
@@ -1059,14 +1068,31 @@ namespace Slang
                 entryPointIndex, targetIndex, outSharedLibrary, outDiagnostics);
         }
 
-        SLANG_NO_THROW SlangResult SLANG_MCALL getDependencyBasedHashCode(uint32_t** outHashCode) SLANG_OVERRIDE
+        SLANG_NO_THROW SlangResult SLANG_MCALL getDependencyBasedHashCode(
+            SlangInt entryPointIndex,
+            SlangInt targetIndex,
+            uint32_t* outHashCode) SLANG_OVERRIDE
         {
-            return Super::getDependencyBasedHashCode(outHashCode);
+            SLANG_UNUSED(entryPointIndex);
+            SLANG_UNUSED(targetIndex);
+            return getASTBasedHashCode(outHashCode);
         }
 
         SLANG_NO_THROW SlangResult SLANG_MCALL getASTBasedHashCode(uint32_t* outHashCode) SLANG_OVERRIDE
         {
-            return Super::getASTBasedHashCode(outHashCode);
+            // Hash m_subtypeWitness and m_conformanceIdOverride
+            auto subtypeWitness = m_subtypeWitness->toString();
+
+            unsigned char hashCode[16];
+            MD5HashGen hashGen;
+            MD5Context context;
+            hashGen.init(&context);
+            hashGen.update(&context, subtypeWitness.getBuffer(), (unsigned long)subtypeWitness.getLength());
+            hashGen.update(&context, &m_conformanceIdOverride, (unsigned long)sizeof(m_conformanceIdOverride));
+            hashGen.finalize(&context, hashCode);
+
+            memcpy(outHashCode, hashCode, 4 * sizeof(uint32_t));
+            return SLANG_OK;
         }
 
         List<Module*> const& getModuleDependencies() SLANG_OVERRIDE;
@@ -1243,7 +1269,10 @@ namespace Slang
 
         //
 
-        SLANG_NO_THROW SlangResult SLANG_MCALL getDependencyBasedHashCode(uint32_t** outHashCode) SLANG_OVERRIDE;
+        SLANG_NO_THROW SlangResult SLANG_MCALL getDependencyBasedHashCode(
+            SlangInt entryPointIndex,
+            SlangInt targetIndex,
+            uint32_t* outHashCode) SLANG_OVERRIDE;
         SLANG_NO_THROW SlangResult SLANG_MCALL getASTBasedHashCode(uint32_t* outHashCode) SLANG_OVERRIDE;
 
             /// Create a module (initially empty).

@@ -224,36 +224,63 @@ namespace Slang
         visitor->visitEntryPoint(this, as<EntryPointSpecializationInfo>(specializationInfo));
     }
 
-    SlangResult EntryPoint::getDependencyBasedHashCode(uint32_t** outHashCode)
+    SlangResult EntryPoint::getDependencyBasedHashCode(
+        SlangInt entryPointIndex,
+        SlangInt targetIndex,
+        uint32_t* outHashCode)
     {
         auto fileDeps = getFilePathDependencies();
 
         unsigned char hashCode[16];
         MD5HashGen hashGen;
-        MD5HashGen::MD5Context context;
+        MD5Context context;
         hashGen.init(&context);
         for (auto& file : fileDeps)
         {
-            hashGen.update((void*)file.getBuffer(), (unsigned long)file.getLength());
+            hashGen.update(&context, (void*)file.getBuffer(), (unsigned long)file.getLength());
         }
-        hashGen.finalize(hashCode);
+        SlangInt indices[2];
+        indices[0] = entryPointIndex;
+        indices[1] = targetIndex;
+        hashGen.update(&context, (void*)indices, 2 * sizeof(SlangInt));
 
-        *outHashCode = (uint32_t*)hashCode;
+        assert(getName());
+        if (getName())
+        {
+            hashGen.update(&context, getName()->text.getBuffer(), (unsigned long)getName()->text.getLength());
+        }
+
+        uint32_t tempHash[4];
+        getModule()->getDependencyBasedHashCode(entryPointIndex, targetIndex, tempHash);
+        hashGen.update(&context, tempHash, 4 * sizeof(uint32_t));
+
+        hashGen.finalize(&context, hashCode);
+
+        memcpy(outHashCode, hashCode, 4 * sizeof(uint32_t));
         return SLANG_OK;
     }
 
-    SlangResult EntryPoint::getASTBasedHashCode(uint32_t* outHashCode)
+    SlangResult EntryPoint::getASTBasedHashCode(
+        uint32_t* outHashCode)
     {
-        auto serializedAST = ASTSerialUtil::serializeAST(getModule()->getModuleDecl());
-
-        unsigned char hashCode;
+        unsigned char hashCode[16];
         MD5HashGen hashGen;
-        MD5HashGen::MD5Context context;
+        MD5Context context;
         hashGen.init(&context);
-        hashGen.update((void*)serializedAST.getBuffer(), (unsigned long)serializedAST.getCount());
-        hashGen.finalize((unsigned char*)&hashCode);
 
-        *outHashCode = (uint32_t)hashCode;
+        assert(getName());
+        if (getName())
+        {
+            hashGen.update(&context, getName()->text.getBuffer(), (unsigned long)getName()->text.getLength());
+        }
+
+        uint32_t tempHash[4];
+        getModule()->getASTBasedHashCode(tempHash);
+        hashGen.update(&context, tempHash, 4 * sizeof(uint32_t));
+
+        hashGen.finalize(&context, hashCode);
+
+        memcpy(outHashCode, hashCode, 4 * sizeof(uint32_t));
         return SLANG_OK;
     }
 

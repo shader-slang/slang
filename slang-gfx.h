@@ -2089,7 +2089,7 @@ public:
         handleMessage(DebugMessageType type, DebugMessageSource source, const char* message) = 0;
 };
 
-class IDevice: public ISlangUnknown
+class IDevice : public ISlangUnknown
 {
 public:
     struct SlangDesc
@@ -2480,6 +2480,18 @@ public:
           0x715bdf26, 0x5135, 0x11eb, { 0xAE, 0x93, 0x02, 0x42, 0xAC, 0x13, 0x00, 0x02 } \
     }
 
+class IShaderCacheStatistics : public ISlangUnknown
+{
+    // getCacheEntryHitCount - file exists
+    // getCacheEntryMissCount - file does not exist
+    // getCacheHitCount - file exists and is up-to-date
+    // getCacheMissCount - file exists but is out-of-date
+};
+
+#define SLANG_UUID_IShaderCacheStatistics                                                \
+    {                                                                                    \
+          0x8eccc8ec, 0x5c04, 0x4a51, { 0x99, 0x75, 0x13, 0xf8, 0xfe, 0xa1, 0x59, 0xf3 } \
+    }
 
 class IPipelineCreationAPIDispatcher : public ISlangUnknown
 {

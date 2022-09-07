@@ -476,6 +476,8 @@ convention for interface methods.
 #include <stddef.h>
 #endif // ! SLANG_NO_STDDEF
 
+#include "source/core/slang-md5.h"
+
 #ifdef __cplusplus
 extern "C"
 {
@@ -4424,7 +4426,10 @@ namespace slang
             /** Get the name for the specified shader file containing code for the entry point at
                 'entryPointIndex' for the chosen 'targetIndex'
             */
-        virtual SLANG_NO_THROW SlangResult SLANG_MCALL getDependencyBasedHashCode(uint32_t** outHashCode) = 0;
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL getDependencyBasedHashCode(
+            SlangInt entryPointIndex,
+            SlangInt targetIndex,
+            uint32_t* outHashCode) = 0;
 
         virtual SLANG_NO_THROW SlangResult SLANG_MCALL getASTBasedHashCode(uint32_t* outHashCode) = 0;
 
