@@ -210,7 +210,7 @@ namespace Slang
         //
         auto genSubst = m_astBuilder->create<GenericSubstitution>();
         candidate.subst = genSubst;
-        auto& checkedArgs = genSubst->args;
+        auto& checkedArgs = (List<Val*>&)genSubst->getArgs();
 
         // Rather than bail out as soon as we hit a problem,
         // we are going to process *all* of the parameters of the
@@ -474,7 +474,7 @@ namespace Slang
 
     bool SemanticsVisitor::TryCheckOverloadCandidateConstraints(
         OverloadResolveContext&		context,
-        OverloadCandidate const&	candidate)
+        OverloadCandidate&	candidate)
     {
         // We only need this step for generics, so always succeed on
         // everything else.
@@ -493,6 +493,8 @@ namespace Slang
         subst->genericDecl = genericDeclRef.getDecl();
         subst->outer = genericDeclRef.substitutions.substitutions;
 
+        List<Val*> newArgs = subst->getArgs();
+
         for( auto constraintDecl : genericDeclRef.getDecl()->getMembersOfType<GenericTypeConstraintDecl>() )
         {
             auto subset = genericDeclRef.substitutions;
@@ -506,7 +508,7 @@ namespace Slang
             auto subTypeWitness = tryGetSubtypeWitness(sub, sup);
             if(subTypeWitness)
             {
-                subst->args.add(subTypeWitness);
+                newArgs.add(subTypeWitness);
             }
             else
             {
@@ -517,6 +519,8 @@ namespace Slang
                 return false;
             }
         }
+
+        candidate.subst = m_astBuilder->getOrCreateGenericSubstitution(genericDeclRef.getDecl(), newArgs, genericDeclRef.substitutions.substitutions);
 
         // Done checking all the constraints, hooray.
         return true;

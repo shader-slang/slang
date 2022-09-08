@@ -374,9 +374,9 @@ namespace Slang
             {
                 // This is the case where we *do* have substitutions.
                 emitRaw(context, "G");
-                UInt genericArgCount = subst->args.getCount();
+                UInt genericArgCount = subst->getArgs().getCount();
                 emit(context, genericArgCount);
-                for( auto aa : subst->args )
+                for (auto aa : subst->getArgs())
                 {
                     emitVal(context, aa);
                 }

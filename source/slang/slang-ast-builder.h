@@ -98,6 +98,49 @@ class ASTBuilder : public RefObject
 {
     friend class SharedASTBuilder;
 public:
+    // Node cache:
+    struct NodeOperand
+    {
+        union
+        {
+            NodeBase* nodeOperand;
+            int64_t intOperand;
+        } values;
+        NodeOperand() { values.nodeOperand = nullptr; }
+        NodeOperand(NodeBase* node) { values.nodeOperand = node; }
+        template<typename EnumType>
+        NodeOperand(EnumType intVal)
+        {
+            static_assert(sizeof(EnumType) <= sizeof(values), "size of operand must be less than pointer size.");
+            values.intOperand = 0;
+            memcpy(&values, &intVal, sizeof(intVal));
+        }
+    };
+    struct NodeDesc
+    {
+        ASTNodeType             type;
+        ShortList<NodeOperand, 4> operands;
+
+        bool operator==(NodeDesc const& that) const;
+        HashCode getHashCode() const;
+    };
+
+    template<typename NodeCreateFunc>
+    NodeBase* _getOrCreateImpl(NodeDesc const& desc, NodeCreateFunc createFunc)
+    {
+        if (auto found = m_cachedNodes.TryGetValue(desc))
+            return *found;
+
+        auto node = createFunc();
+        m_cachedNodes.Add(desc, node);
+        return node;
+    }
+
+    /// A cache for AST nodes that are entirely defined by their node type, with
+    /// no need for additional state.
+    Dictionary<NodeDesc, NodeBase*> m_cachedNodes;
+
+public:
 
     // For compile time check to see if thing being constructed is an AST type
     template <typename T>
@@ -113,10 +156,109 @@ public:
         /// Create AST types 
     template <typename T>
     T* create() { return _initAndAdd(new (m_arena.allocate(sizeof(T))) T); }
-    template<typename T, typename P0>
-    T* create(const P0& p0) { return _initAndAdd(new (m_arena.allocate(sizeof(T))) T(p0)); }
-    template<typename T, typename P0, typename P1>
-    T* create(const P0& p0, const P1& p1) { return _initAndAdd(new (m_arena.allocate(sizeof(T))) T(p0, p1));}
+    template<typename T, typename... TArgs>
+    T* create(TArgs... args) { return _initAndAdd(new (m_arena.allocate(sizeof(T))) T(args...)); }
+
+    template<typename T, typename ... TArgs>
+    SLANG_FORCE_INLINE T* getOrCreate(TArgs ... args)
+    {
+        SLANG_COMPILE_TIME_ASSERT(IsValidType<T>::Value);
+        NodeDesc desc;
+        desc.type = T::kType;
+        addToList(desc.operands, args...);
+        return (T*)_getOrCreateImpl(desc, [&]()
+            {
+                return create<T>(args...);
+            });
+    }
+
+    template<typename T>
+    SLANG_FORCE_INLINE T* getOrCreate()
+    {
+        SLANG_COMPILE_TIME_ASSERT(IsValidType<T>::Value);
+
+        NodeDesc desc;
+        desc.type = T::kType;
+        return (T*)_getOrCreateImpl(desc, [this]() { return create<T>(); });
+    }
+
+    template<typename T, typename ... TArgs>
+    SLANG_FORCE_INLINE T* getOrCreateWithDefaultCtor(TArgs ... args)
+    {
+        SLANG_COMPILE_TIME_ASSERT(IsValidType<T>::Value);
+        NodeDesc desc;
+        desc.type = T::kType;
+        addToList(desc.operands, args...);
+        return (T*)_getOrCreateImpl(desc, [&]()
+            {
+                return create<T>();
+            });
+    }
+
+    template<typename T>
+    SLANG_FORCE_INLINE T* getOrCreateWithDefaultCtor(ConstArrayView<NodeOperand> operands)
+    {
+        SLANG_COMPILE_TIME_ASSERT(IsValidType<T>::Value);
+        NodeDesc desc;
+        desc.type = T::kType;
+        desc.operands.addRange(operands);
+        return (T*)_getOrCreateImpl(desc, [&]()
+            {
+                return create<T>();
+            });
+    }
+
+    DeclRefType* getOrCreateDeclRefType(Decl* decl, Substitutions* outer)
+    {
+        NodeDesc desc;
+        desc.type = DeclRefType::kType;
+        desc.operands.add(decl);
+        if (outer)
+        {
+            desc.operands.add(outer);
+        }
+        auto result = (DeclRefType*)_getOrCreateImpl(desc, [&]() {return create<DeclRefType>(decl, outer); });
+        return result;
+    }
+
+    GenericSubstitution* getOrCreateGenericSubstitution(GenericDecl* decl, const List<Val*>& args, Substitutions* outer)
+    {
+        NodeDesc desc;
+        desc.type = GenericSubstitution::kType;
+        desc.operands.add(decl);
+        for (auto arg : args)
+            desc.operands.add(arg);
+        if (outer)
+        {
+            desc.operands.add(outer);
+        }
+        auto result = (GenericSubstitution*)_getOrCreateImpl(desc, [this]() {return create<GenericSubstitution>(); });
+        if (result->args.getCount() != args.getCount())
+        {
+            SLANG_RELEASE_ASSERT(result->args.getCount() == 0);
+            result->args.addRange(args);
+            result->genericDecl = decl;
+            result->outer = outer;
+        }
+        return result;
+    }
+
+    ThisTypeSubstitution* getOrCreateThisTypeSubstitution(InterfaceDecl* interfaceDecl, SubtypeWitness* subtypeWitness, Substitutions* outer)
+    {
+        NodeDesc desc;
+        desc.type = ThisTypeSubstitution::kType;
+        desc.operands.add(interfaceDecl);
+        desc.operands.add(subtypeWitness);
+        if (outer)
+        {
+            desc.operands.add(outer);
+        }
+        auto result = (ThisTypeSubstitution*)_getOrCreateImpl(desc, [this]() {return create<ThisTypeSubstitution>(); });
+        result->interfaceDecl = interfaceDecl;
+        result->witness = subtypeWitness;
+        result->outer = outer;
+        return result;
+    }
 
     NodeBase* createByNodeType(ASTNodeType nodeType);
 
@@ -173,7 +315,7 @@ public:
 
     DeclRef<InterfaceDecl> getDifferentiableInterface();
 
-    DeclRef<Decl> getBuiltinDeclRef(const char* builtinMagicTypeName, ConstArrayView<Val*> genericArgs);
+    DeclRef<Decl> getBuiltinDeclRef(const char* builtinMagicTypeName, Val* genericArg);
 
     Type* getAndType(Type* left, Type* right);
 
@@ -208,9 +350,12 @@ public:
         /// Dtor
     ~ASTBuilder();
 
+    Dictionary<Decl*, GenericSubstitution*> m_genericDefaultSubst;
+
 protected:
     // Special default Ctor that can only be used by SharedASTBuilder
     ASTBuilder();
+
 
     template <typename T>
     SLANG_FORCE_INLINE T* _initAndAdd(T* node)
@@ -237,62 +382,6 @@ protected:
 
     MemoryArena m_arena;
 
-    struct NodeDesc
-    {
-        ASTNodeType         type;
-        Count               operandCount = 0;
-        NodeBase* const*    operands = nullptr;
-
-        bool operator==(NodeDesc const& that) const;
-        HashCode getHashCode() const;
-    };
-
-        /// A cache for AST nodes that are entirely defined by their node type, with
-        /// no need for additional state.
-    Dictionary<NodeDesc, NodeBase*> m_cachedNodes;
-
-
-    typedef NodeBase* (*NodeCreateFunc)(ASTBuilder* astBuilder, NodeDesc const& desc, void* userData);
-
-    NodeBase* _getOrCreateImpl(NodeDesc const& desc, NodeCreateFunc createFunc, void* createFuncUserData);
-
-    template<typename T>
-    SLANG_FORCE_INLINE T* _getOrCreate(Count operandCount, NodeBase* const* operands)
-    {
-        SLANG_COMPILE_TIME_ASSERT(IsValidType<T>::Value);
-
-        struct Helper
-        {
-            static NodeBase* create(ASTBuilder* astBuilder, NodeDesc const& desc, void* /*userData*/)
-            {
-                return astBuilder->create<T>(desc.operandCount, desc.operands);
-            }
-        };
-
-        NodeDesc desc;
-        desc.type = T::kType;
-        desc.operandCount = operandCount;
-        desc.operands = operands;
-        return (T*) _getOrCreateImpl(desc, &Helper::create, nullptr);
-    }
-
-    template<typename T>
-    SLANG_FORCE_INLINE T* _getOrCreate()
-    {
-        SLANG_COMPILE_TIME_ASSERT(IsValidType<T>::Value);
-
-        struct Helper
-        {
-            static NodeBase* create(ASTBuilder* astBuilder, NodeDesc const& /*desc*/, void* /*userData*/)
-            {
-                return astBuilder->create<T>();
-            }
-        };
-
-        NodeDesc desc;
-        desc.type = T::kType;
-        return (T*) _getOrCreateImpl(desc, &Helper::create, nullptr);
-    }
 };
 
 } // namespace Slang

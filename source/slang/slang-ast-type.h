@@ -78,8 +78,12 @@ class DeclRefType : public Type
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
 
 protected:
-    DeclRefType( DeclRef<Decl> declRef)
+    DeclRefType(DeclRef<Decl> declRef)
         : declRef(declRef)
+    {}
+
+    DeclRefType(Decl* decl, Substitutions* substitutions)
+        : declRef(decl, substitutions)
     {}
 };
 
@@ -210,6 +214,11 @@ class SamplerStateType : public BuiltinType
 
     // What flavor of sampler state is this
     SamplerStateFlavor flavor;
+
+    SamplerStateType(SamplerStateFlavor inFlavor)
+    {
+        flavor = inFlavor;
+    }
 };
 
 // Other cases of generic types known to the compiler
@@ -467,6 +476,10 @@ class VectorExpressionType : public ArithmeticExpressionType
     // Overrides should be public so base classes can access
     void _toTextOverride(StringBuilder& out);
     BasicExpressionType* _getScalarTypeOverride();
+
+    VectorExpressionType(Type* inElementType, IntVal* inElementCount)
+        : elementType(inElementType), elementCount(inElementCount)
+    {}
 };
 
 // A matrix type, e.g., `matrix<T,R,C>`
@@ -486,6 +499,8 @@ class MatrixExpressionType : public ArithmeticExpressionType
 
 private:
     Type* rowType = nullptr;
+
+    MatrixExpressionType(Type*, IntVal*, IntVal*) {}
 };
 
 // Base class for built in string types
@@ -793,6 +808,10 @@ class AndType : public Type
 
     Type* left;
     Type* right;
+
+    AndType(Type* leftType, Type* rightType)
+        : left(leftType), right(rightType)
+    {}
 
     // Overrides should be public so base classes can access
     void _toTextOverride(StringBuilder& out);

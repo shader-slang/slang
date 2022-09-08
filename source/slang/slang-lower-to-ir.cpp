@@ -1813,7 +1813,7 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         _collectSubstitutionArgs(operands, subst->outer);
         if (auto genSubst = as<GenericSubstitution>(subst))
         {
-            for (auto arg : genSubst->args)
+            for (auto arg : genSubst->getArgs())
             {
                 operands.add(lowerVal(context, arg).val);
             }
@@ -2561,19 +2561,19 @@ ParameterDirection getThisParamDirection(Decl* parentDecl, ParameterDirection de
     return kParameterDirection_In;
 }
 
-DeclRef<Decl> createDefaultSpecializedDeclRefImpl(IRGenContext* context, Decl* decl)
+DeclRef<Decl> createDefaultSpecializedDeclRefImpl(IRGenContext* context, SemanticsVisitor* semantics, Decl* decl)
 {
     DeclRef<Decl> declRef;
     declRef.decl = decl;
-    declRef.substitutions = createDefaultSubstitutions(context->astBuilder, decl);
+    declRef.substitutions = createDefaultSubstitutions(context->astBuilder, semantics, decl);
     return declRef;
 }
 //
 // The client should actually call the templated wrapper, to preserve type information.
 template<typename D>
-DeclRef<D> createDefaultSpecializedDeclRef(IRGenContext* context, D* decl)
+DeclRef<D> createDefaultSpecializedDeclRef(IRGenContext* context, SemanticsVisitor* semantics, D* decl)
 {
-    DeclRef<Decl> declRef = createDefaultSpecializedDeclRefImpl(context, decl);
+    DeclRef<Decl> declRef = createDefaultSpecializedDeclRefImpl(context, semantics, decl);
     return declRef.as<D>();
 }
 
@@ -3502,8 +3502,8 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
 
     void _lowerSubstitutionArg(IRGenContext* subContext, GenericSubstitution* subst, Decl* paramDecl, Index argIndex)
     {
-        SLANG_ASSERT(argIndex < subst->args.getCount());
-        auto argVal = lowerVal(subContext, subst->args[argIndex]);
+        SLANG_ASSERT(argIndex < subst->getArgs().getCount());
+        auto argVal = lowerVal(subContext, subst->getArgs()[argIndex]);
         setValue(subContext, paramDecl, argVal);
     }
 
@@ -7669,7 +7669,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         FuncDeclBaseTypeInfo info;
         _lowerFuncDeclBaseTypeInfo(
             funcTypeContext,
-            createDefaultSpecializedDeclRef(funcTypeContext, decl),
+            createDefaultSpecializedDeclRef(funcTypeContext, nullptr, decl),
             info);
 
         auto irFuncType = info.type;
@@ -7710,7 +7710,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         FuncDeclBaseTypeInfo info;
         _lowerFuncDeclBaseTypeInfo(
             subContext,
-            createDefaultSpecializedDeclRef(context, decl),
+            createDefaultSpecializedDeclRef(context, nullptr, decl),
             info);
 
         auto irFuncType = info.type;
@@ -8368,7 +8368,7 @@ LoweredValInfo emitDeclRef(
         // We have the IR value for the generic we'd like to specialize,
         // and now we need to get the value for the arguments.
         List<IRInst*> irArgs;
-        for (auto argVal : genericSubst->args)
+        for (auto argVal : genericSubst->getArgs())
         {
             auto irArgVal = lowerSimpleVal(context, argVal);
             SLANG_ASSERT(irArgVal);

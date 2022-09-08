@@ -1178,7 +1178,7 @@ SLANG_NO_THROW slang::TypeReflection* SLANG_MCALL Linkage::getContainerType(
                 ConstantBufferType* cbType = getASTBuilder()->create<ConstantBufferType>();
                 cbType->elementType = type;
                 cbType->declRef = getASTBuilder()->getBuiltinDeclRef(
-                    "ConstantBuffer", makeConstArrayViewSingle<Val*>(static_cast<Val*>(type)));
+                    "ConstantBuffer", static_cast<Val*>(type));
                 containerTypeReflection = cbType;
             }
             break;
@@ -1187,7 +1187,7 @@ SLANG_NO_THROW slang::TypeReflection* SLANG_MCALL Linkage::getContainerType(
                 ParameterBlockType* pbType = getASTBuilder()->create<ParameterBlockType>();
                 pbType->elementType = type;
                 pbType->declRef = getASTBuilder()->getBuiltinDeclRef(
-                    "ParameterBlock", makeConstArrayViewSingle<Val*>(static_cast<Val*>(type)));
+                    "ParameterBlock", static_cast<Val*>(type));
                 containerTypeReflection = pbType;
             }
             break;
@@ -1197,7 +1197,7 @@ SLANG_NO_THROW slang::TypeReflection* SLANG_MCALL Linkage::getContainerType(
                     getASTBuilder()->create<HLSLStructuredBufferType>();
                 sbType->elementType = type;
                 sbType->declRef = getASTBuilder()->getBuiltinDeclRef(
-                    "HLSLStructuredBufferType", makeConstArrayViewSingle<Val*>(static_cast<Val*>(type)));
+                    "HLSLStructuredBufferType", static_cast<Val*>(type));
                 containerTypeReflection = sbType;
             }
             break;
@@ -3839,7 +3839,7 @@ struct SpecializationArgModuleCollector : ComponentTypeVisitor
     {
         if(auto genericSubst = as<GenericSubstitution>(substitution))
         {
-            for(auto arg : genericSubst->args)
+            for(auto arg : genericSubst->getArgs())
             {
                 collectReferencedModules(arg);
             }

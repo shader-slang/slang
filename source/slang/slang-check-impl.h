@@ -202,10 +202,32 @@ namespace Slang
         Substitutions*   subst = nullptr;
     };
 
+    struct LookupRequestKey
+    {
+        Type* type;
+        Name* name;
+        LookupOptions options;
+        LookupMask mask;
+        bool operator==(const LookupRequestKey& other) const
+        {
+            return type == other.type && name == other.name && options == other.options && mask == other.mask;
+        }
+        HashCode getHashCode() const
+        {
+            Hasher hasher;
+            hasher.hashValue(type);
+            hasher.hashValue(name);
+            hasher.hashValue(options);
+            hasher.hashValue(mask);
+            return hasher.getResult();
+        }
+    };
+
     struct TypeCheckingCache
     {
         Dictionary<OperatorOverloadCacheKey, OverloadCandidate> resolvedOperatorOverloadCache;
         Dictionary<BasicTypeKeyPair, ConversionCost> conversionCostCache;
+        Dictionary<LookupRequestKey, LookupResult> lookupCache;
     };
 
         /// Shared state for a semantics-checking session.
@@ -1467,7 +1489,7 @@ namespace Slang
         //
         bool TryCheckOverloadCandidateConstraints(
             OverloadResolveContext&		context,
-            OverloadCandidate const&	candidate);
+            OverloadCandidate&	candidate);
 
         // Try to check an overload candidate, but bail out
         // if any step fails

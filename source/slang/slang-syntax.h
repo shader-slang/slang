@@ -286,20 +286,24 @@ namespace Slang
 
     // TODO: where should this live?
     SubstitutionSet createDefaultSubstitutions(
-        ASTBuilder*     astBuilder, 
+        ASTBuilder*     astBuilder,
+        SemanticsVisitor* semantics,
         Decl*           decl,
         SubstitutionSet  parentSubst);
 
     SubstitutionSet createDefaultSubstitutions(
-        ASTBuilder*     astBuilder, 
+        ASTBuilder*     astBuilder,
+        SemanticsVisitor* semantics,
         Decl*   decl);
 
     DeclRef<Decl> createDefaultSubstitutionsIfNeeded(
-        ASTBuilder*     astBuilder, 
+        ASTBuilder*     astBuilder,
+        SemanticsVisitor* semantics,
         DeclRef<Decl>   declRef);
 
     GenericSubstitution* createDefaultSubstitutionsForGeneric(
-        ASTBuilder*             astBuilder, 
+        ASTBuilder*             astBuilder,
+        SemanticsVisitor* semantics,
         GenericDecl*            genericDecl,
         Substitutions*   outerSubst);
 

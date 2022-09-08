@@ -63,10 +63,8 @@ Substitutions* GenericSubstitution::_applySubstitutionsShallowOverride(ASTBuilde
     if (!diff) return this;
 
     (*ioDiff)++;
-    auto substSubst = astBuilder->create<GenericSubstitution>();
-    substSubst->genericDecl = genericDecl;
-    substSubst->args = substArgs;
-    substSubst->outer = substOuter;
+
+    auto substSubst = astBuilder->getOrCreateGenericSubstitution(genericDecl, substArgs, substOuter);
     return substSubst;
 }
 
@@ -126,10 +124,9 @@ Substitutions* ThisTypeSubstitution::_applySubstitutionsShallowOverride(ASTBuild
     if (!diff) return this;
 
     (*ioDiff)++;
-    auto substSubst = astBuilder->create<ThisTypeSubstitution>();
-    substSubst->interfaceDecl = interfaceDecl;
-    substSubst->witness = substWitness;
-    substSubst->outer = substOuter;
+    ThisTypeSubstitution* substSubst;
+
+    substSubst = astBuilder->getOrCreateThisTypeSubstitution(interfaceDecl, substWitness, substOuter);
     return substSubst;
 }
 

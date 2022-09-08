@@ -125,6 +125,23 @@ namespace Slang
 		insertArray(rs, args...);
 		return rs;
 	}
+
+
+    template<typename TList>
+    void addToList(TList&)
+    {
+    }
+    template<typename TList, typename T>
+    void addToList(TList& list, T node)
+    {
+        list.add(node);
+    }
+    template<typename TList, typename T, typename ... TArgs>
+    void addToList(TList& list, T node, TArgs ... args)
+    {
+        list.add(node);
+        addToList(list, args...);
+    }
 }
 
 #endif
