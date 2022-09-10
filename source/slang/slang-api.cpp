@@ -98,7 +98,7 @@ SLANG_API SlangResult slang_createGlobalSession(
     {
         Slang::String cacheFilename;
         uint64_t dllTimestamp = 0;
-#define SLANG_PROFILE_STDLIB_COMPILE 1
+#define SLANG_PROFILE_STDLIB_COMPILE 0
 #if SLANG_PROFILE_STDLIB_COMPILE
         auto startTime = std::chrono::high_resolution_clock::now();
 #else
