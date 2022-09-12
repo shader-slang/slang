@@ -204,18 +204,18 @@ namespace Slang
 
     struct LookupRequestKey
     {
-        Type* type;
+        NodeBase* base;
         Name* name;
         LookupOptions options;
         LookupMask mask;
         bool operator==(const LookupRequestKey& other) const
         {
-            return type == other.type && name == other.name && options == other.options && mask == other.mask;
+            return base == other.base && name == other.name && options == other.options && mask == other.mask;
         }
         HashCode getHashCode() const
         {
             Hasher hasher;
-            hasher.hashValue(type);
+            hasher.hashValue(base);
             hasher.hashValue(name);
             hasher.hashValue(options);
             hasher.hashValue(mask);

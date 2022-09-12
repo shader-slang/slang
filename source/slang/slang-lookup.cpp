@@ -835,166 +835,143 @@ static void _lookUpInScopes(
         // also finding a hit in another
         for(auto link = scope; link; link = link->nextSibling)
         {
-            TypeCheckingCache* typeCheckingCache =
-                request.semantics ? request.semantics->getLinkage()->getTypeCheckingCache() : nullptr;
-            LookupRequestKey key = {};
-            key.type = (Type*)link;
-            key.name = name;
-            key.options = request.options;
-            key.mask = request.mask;
-            LookupResult scopeResult;
-            if (typeCheckingCache && typeCheckingCache->lookupCache.TryGetValue(key, scopeResult))
+            auto containerDecl = link->containerDecl;
+
+            // It is possible for the first scope in a list of
+            // siblings to be a "dummy" scope that only exists
+            // to combine the siblings; in that case it will
+            // have a null `containerDecl` and needs to be
+            // skipped over.
+            //
+            if (!containerDecl)
+                continue;
+
+            // TODO: If we need default substitutions to be applied to
+            // the `containerDecl`, then it might make sense to have
+            // each `link` in the scope store a decl-ref instead of
+            // just a decl.
+            //
+            DeclRef<ContainerDecl> containerDeclRef =
+                DeclRef<Decl>(containerDecl, createDefaultSubstitutions(astBuilder, request.semantics, containerDecl)).as<ContainerDecl>();
+
+            // If the container we are looking into represents a type
+            // or an `extension` of a type, then we need to treat
+            // this step as lookup into the `this` variable (or the
+            // `This` type), which means including any `extension`s
+            // or inheritance clauses in the lookup process.
+            //
+            // Note: The `AggTypeDeclBase` class is the common superclass
+            // between `AggTypeDecl` and `ExtensionDecl`.
+            //
+            if (auto aggTypeDeclBaseRef = containerDeclRef.as<AggTypeDeclBase>())
             {
-                goto scopeEnd;
-            }
-            {
-                auto containerDecl = link->containerDecl;
+                // When reconstructing the final expression for a result
+                // looked up through the type or extension, we will need
+                // a `this` expression (or a `This` type expression) to
+                // mark the base of the member reference, so we create
+                // a "breadcrumb" here to track that fact.
+                //
+                BreadcrumbInfo breadcrumb;
+                breadcrumb.kind = LookupResultItem::Breadcrumb::Kind::This;
+                breadcrumb.thisParameterMode = thisParameterMode;
+                breadcrumb.declRef = aggTypeDeclBaseRef;
+                breadcrumb.prev = nullptr;
 
-                // It is possible for the first scope in a list of
-                // siblings to be a "dummy" scope that only exists
-                // to combine the siblings; in that case it will
-                // have a null `containerDecl` and needs to be
-                // skipped over.
-                //
-                if (!containerDecl)
-                    continue;
-
-                // TODO: If we need default substitutions to be applied to
-                // the `containerDecl`, then it might make sense to have
-                // each `link` in the scope store a decl-ref instead of
-                // just a decl.
-                //
-                DeclRef<ContainerDecl> containerDeclRef =
-                    DeclRef<Decl>(containerDecl, createDefaultSubstitutions(astBuilder, request.semantics, containerDecl)).as<ContainerDecl>();
-
-                // If the container we are looking into represents a type
-                // or an `extension` of a type, then we need to treat
-                // this step as lookup into the `this` variable (or the
-                // `This` type), which means including any `extension`s
-                // or inheritance clauses in the lookup process.
-                //
-                // Note: The `AggTypeDeclBase` class is the common superclass
-                // between `AggTypeDecl` and `ExtensionDecl`.
-                //
-                if (auto aggTypeDeclBaseRef = containerDeclRef.as<AggTypeDeclBase>())
+                Type* type = nullptr;
+                if (auto extDeclRef = aggTypeDeclBaseRef.as<ExtensionDecl>())
                 {
-                    // When reconstructing the final expression for a result
-                    // looked up through the type or extension, we will need
-                    // a `this` expression (or a `This` type expression) to
-                    // mark the base of the member reference, so we create
-                    // a "breadcrumb" here to track that fact.
+                    if (request.semantics)
+                    {
+                        ensureDecl(request.semantics, extDeclRef.getDecl(), DeclCheckState::CanUseExtensionTargetType);
+                    }
+
+                    // If we are doing lookup from inside an `extension`
+                    // declaration, then the `this` expression will have
+                    // a type that uses the "target type" of the `extension`.
                     //
-                    BreadcrumbInfo breadcrumb;
-                    breadcrumb.kind = LookupResultItem::Breadcrumb::Kind::This;
-                    breadcrumb.thisParameterMode = thisParameterMode;
-                    breadcrumb.declRef = aggTypeDeclBaseRef;
-                    breadcrumb.prev = nullptr;
-
-                    Type* type = nullptr;
-                    if (auto extDeclRef = aggTypeDeclBaseRef.as<ExtensionDecl>())
-                    {
-                        if (request.semantics)
-                        {
-                            ensureDecl(request.semantics, extDeclRef.getDecl(), DeclCheckState::CanUseExtensionTargetType);
-                        }
-
-                        // If we are doing lookup from inside an `extension`
-                        // declaration, then the `this` expression will have
-                        // a type that uses the "target type" of the `extension`.
-                        //
-                        type = getTargetType(astBuilder, extDeclRef);
-                    }
-                    else
-                    {
-                        assert(aggTypeDeclBaseRef.as<AggTypeDecl>());
-                        type = DeclRefType::create(astBuilder, aggTypeDeclBaseRef);
-                    }
-
-                    _lookUpMembersInType(astBuilder, name, type, request, scopeResult, &breadcrumb);
+                    type = getTargetType(astBuilder, extDeclRef);
                 }
                 else
                 {
-                    // The default case is when the scope doesn't represent a
-                    // type or `extension` declaration, so we can look up members
-                    // in that scope much more simply.
-                    //
-                    _lookUpDirectAndTransparentMembers(astBuilder, name, containerDeclRef, request, scopeResult, nullptr);
+                    assert(aggTypeDeclBaseRef.as<AggTypeDecl>());
+                    type = DeclRefType::create(astBuilder, aggTypeDeclBaseRef);
                 }
 
-                // Before we proceed up to the next outer scope to perform lookup
-                // again, we need to consider what the current scope tells us
-                // about how to interpret uses of implicit `this` or `This`. For
-                // example, if we are inside a `[mutating]` method, then the implicit
-                // `this` that we use for lookup should be an l-value.
+                _lookUpMembersInType(astBuilder, name, type, request, result, &breadcrumb);
+            }
+            else
+            {
+                // The default case is when the scope doesn't represent a
+                // type or `extension` declaration, so we can look up members
+                // in that scope much more simply.
                 //
-                // Similarly, if we look up a member in a type from the scope
-                // of some nested type, then there shouldn't be an implicit `this`
-                // expression for the outer type, but instead an implicit `This`.
+                _lookUpDirectAndTransparentMembers(astBuilder, name, containerDeclRef, request, result, nullptr);
+            }
+
+            // Before we proceed up to the next outer scope to perform lookup
+            // again, we need to consider what the current scope tells us
+            // about how to interpret uses of implicit `this` or `This`. For
+            // example, if we are inside a `[mutating]` method, then the implicit
+            // `this` that we use for lookup should be an l-value.
+            //
+            // Similarly, if we look up a member in a type from the scope
+            // of some nested type, then there shouldn't be an implicit `this`
+            // expression for the outer type, but instead an implicit `This`.
+            //
+            if (containerDeclRef.is<ConstructorDecl>())
+            {
+                // In the context of an `__init` declaration, the members of
+                // the surrounding type are accessible through a mutable `this`.
                 //
-                if (containerDeclRef.is<ConstructorDecl>())
+                thisParameterMode = LookupResultItem::Breadcrumb::ThisParameterMode::MutableValue;
+            }
+            else if (containerDeclRef.is<SetterDecl>())
+            {
+                // In the context of a `set` accessor, the members of the
+                // surrounding type are accessible through a mutable `this`.
+                //
+                // TODO: At some point we may want a way to opt out of this
+                // behavior; it is possible to have a setter on a `struct`
+                // that actually just sets data into a buffer that is
+                // referenced by one of the `struct`'s fields.
+                //
+                thisParameterMode = LookupResultItem::Breadcrumb::ThisParameterMode::MutableValue;
+            }
+            else if (auto funcDeclRef = containerDeclRef.as<FunctionDeclBase>())
+            {
+                // The implicit `this`/`This` for a function-like declaration
+                // depends on modifiers attached to the declaration.
+                //
+                if (funcDeclRef.getDecl()->hasModifier<HLSLStaticModifier>())
                 {
-                    // In the context of an `__init` declaration, the members of
-                    // the surrounding type are accessible through a mutable `this`.
-                    //
-                    thisParameterMode = LookupResultItem::Breadcrumb::ThisParameterMode::MutableValue;
-                }
-                else if (containerDeclRef.is<SetterDecl>())
-                {
-                    // In the context of a `set` accessor, the members of the
-                    // surrounding type are accessible through a mutable `this`.
-                    //
-                    // TODO: At some point we may want a way to opt out of this
-                    // behavior; it is possible to have a setter on a `struct`
-                    // that actually just sets data into a buffer that is
-                    // referenced by one of the `struct`'s fields.
-                    //
-                    thisParameterMode = LookupResultItem::Breadcrumb::ThisParameterMode::MutableValue;
-                }
-                else if (auto funcDeclRef = containerDeclRef.as<FunctionDeclBase>())
-                {
-                    // The implicit `this`/`This` for a function-like declaration
-                    // depends on modifiers attached to the declaration.
-                    //
-                    if (funcDeclRef.getDecl()->hasModifier<HLSLStaticModifier>())
-                    {
-                        // A `static` method only has access to an implicit `This`,
-                        // and does not have a `this` expression available.
-                        //
-                        thisParameterMode = LookupResultItem::Breadcrumb::ThisParameterMode::Type;
-                    }
-                    else if (funcDeclRef.getDecl()->hasModifier<MutatingAttribute>())
-                    {
-                        // In a non-`static` method marked `[mutating]` there is
-                        // an implicit `this` parameter that is mutable.
-                        //
-                        thisParameterMode = LookupResultItem::Breadcrumb::ThisParameterMode::MutableValue;
-                    }
-                    else
-                    {
-                        // In all other cases, there is an implicit `this` parameter
-                        // that is immutable.
-                        //
-                        thisParameterMode = LookupResultItem::Breadcrumb::ThisParameterMode::ImmutableValue;
-                    }
-                }
-                else if (containerDeclRef.as<AggTypeDeclBase>())
-                {
-                    // When lookup moves from a nested typed declaration to an
-                    // outer scope, there is no ability to use an implicit `this`
-                    // expression, and we have only the `This` type available.
+                    // A `static` method only has access to an implicit `This`,
+                    // and does not have a `this` expression available.
                     //
                     thisParameterMode = LookupResultItem::Breadcrumb::ThisParameterMode::Type;
                 }
-                // TODO: What other cases need to be enumerated here?
+                else if (funcDeclRef.getDecl()->hasModifier<MutatingAttribute>())
+                {
+                    // In a non-`static` method marked `[mutating]` there is
+                    // an implicit `this` parameter that is mutable.
+                    //
+                    thisParameterMode = LookupResultItem::Breadcrumb::ThisParameterMode::MutableValue;
+                }
+                else
+                {
+                    // In all other cases, there is an implicit `this` parameter
+                    // that is immutable.
+                    //
+                    thisParameterMode = LookupResultItem::Breadcrumb::ThisParameterMode::ImmutableValue;
+                }
             }
-        scopeEnd:
-            if (typeCheckingCache)
+            else if (containerDeclRef.as<AggTypeDeclBase>())
             {
-                typeCheckingCache->lookupCache[key] = scopeResult;
+                // When lookup moves from a nested typed declaration to an
+                // outer scope, there is no ability to use an implicit `this`
+                // expression, and we have only the `This` type available.
+                //
+                thisParameterMode = LookupResultItem::Breadcrumb::ThisParameterMode::Type;
             }
-
-            for (auto& item : scopeResult)
-                AddToLookupResult(result, item);
         }
 
         if (result.isValid())
@@ -1024,9 +1001,27 @@ LookupResult lookUp(
     Scope*              scope,
     LookupMask          mask)
 {
-    LookupRequest request = initLookupRequest(semantics, name, mask, LookupOptions::None, scope);
     LookupResult result;
+    LookupRequestKey key;
+    TypeCheckingCache* typeCheckingCache = nullptr;
+    if (semantics)
+    {
+        typeCheckingCache = semantics->getLinkage()->getTypeCheckingCache();
+        key.base = scope;
+        key.name = name;
+        key.options = LookupOptions::None;
+        key.mask = mask;
+        if (typeCheckingCache->lookupCache.TryGetValue(key, result))
+        {
+            return result;
+        }
+    }
+    LookupRequest request = initLookupRequest(semantics, name, mask, LookupOptions::None, scope);
     _lookUpInScopes(astBuilder, name, request, result);
+    if (typeCheckingCache)
+    {
+        typeCheckingCache->lookupCache[key] = result;
+    }
     return result;
 }
 
@@ -1040,7 +1035,7 @@ LookupResult lookUpMember(
 {
     TypeCheckingCache* typeCheckingCache = semantics->getLinkage()->getTypeCheckingCache();
     LookupRequestKey key;
-    key.type = type;
+    key.base = type;
     key.name = name;
     key.options = options;
     key.mask = mask;
