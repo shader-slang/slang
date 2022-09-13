@@ -838,6 +838,15 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
                 // Otherwise, check if we are trying to apply
                 // a this-type substitution to the given interface
                 //
+                // Note: We want to skip the ThisTypeSubstitution that specializes
+                // declToSpecialize itself (when declToSpecialize is an interface
+                // decl and the subst specializes it), and only pull the
+                // ThisTypeSubstitution when the decl is referencing a child of
+                // the interface decl being specialized. This is because
+                // by default an interface declref type is a "free" existential
+                // type that shouldn't be specialized by someone else, unless
+                // there is an "implicit" ThisType reference preceeding a child
+                // reference.
                 if (declToSpecialize != ancestorInterfaceDecl)
                 {
                     for (auto s = substsToApply; s; s = s->outer)
