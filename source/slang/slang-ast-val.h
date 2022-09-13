@@ -53,6 +53,10 @@ class GenericParamIntVal : public IntVal
     HashCode _getHashCodeOverride();
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
 
+    GenericParamIntVal(Type* inType, VarDeclBase* inDecl, Substitutions* inSubst)
+        : IntVal(inType), declRef(inDecl, inSubst)
+    {}
+
 protected:
     GenericParamIntVal(Type* inType, DeclRef<VarDeclBase> inDeclRef)
         : IntVal(inType), declRef(inDeclRef)
@@ -315,6 +319,13 @@ class DeclaredSubtypeWitness : public SubtypeWitness
     void _toTextOverride(StringBuilder& out);
     HashCode _getHashCodeOverride();
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+
+    DeclaredSubtypeWitness(Type* inSub, Type* inSup, Decl* decl, Substitutions* subst)
+        : declRef(decl, subst)
+    {
+        sub = inSub;
+        sup = inSup;
+    }
 };
 
 // A witness that `sub : sup` because `sub : mid` and `mid : sup`
@@ -333,6 +344,10 @@ class TransitiveSubtypeWitness : public SubtypeWitness
     void _toTextOverride(StringBuilder& out);
     HashCode _getHashCodeOverride();
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+
+    TransitiveSubtypeWitness(SubtypeWitness* inSubToMid, SubtypeWitness* inMidToSup)
+        : subToMid(inSubToMid), midToSup(inMidToSup)
+    {}
 };
 
 // A witness taht `sub : sup` because `sub` was wrapped into

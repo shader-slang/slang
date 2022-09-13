@@ -137,7 +137,7 @@ Val* GenericParamIntVal::_substituteImplOverride(ASTBuilder* /* astBuilder */, S
             {
                 // We've found it, so return the corresponding specialization argument
                 (*ioDiff)++;
-                return genSubst->args[index];
+                return genSubst->getArgs()[index];
             }
             else if (auto typeParam = as<GenericTypeParamDecl>(m))
             {
@@ -265,8 +265,8 @@ Val* DeclaredSubtypeWitness::_substituteImplOverride(ASTBuilder* astBuilder, Sub
                     (*ioDiff)++;
                     auto ordinaryParamCount = genericDecl->getMembersOfType<GenericTypeParamDecl>().getCount() +
                         genericDecl->getMembersOfType<GenericValueParamDecl>().getCount();
-                    SLANG_ASSERT(index + ordinaryParamCount < genericSubst->args.getCount());
-                    return genericSubst->args[index + ordinaryParamCount];
+                    SLANG_ASSERT(index + ordinaryParamCount < genericSubst->getArgs().getCount());
+                    return genericSubst->getArgs()[index + ordinaryParamCount];
                 }
             }
         }
@@ -323,7 +323,8 @@ Val* DeclaredSubtypeWitness::_substituteImplOverride(ASTBuilder* astBuilder, Sub
         }
     }
 
-    DeclaredSubtypeWitness* rs = astBuilder->create<DeclaredSubtypeWitness>();
+    DeclaredSubtypeWitness* rs = astBuilder->getOrCreate<DeclaredSubtypeWitness>(
+        substSub, substSup, substDeclRef.getDecl(), substDeclRef.substitutions.substitutions);
     rs->sub = substSub;
     rs->sup = substSup;
     rs->declRef = substDeclRef;
@@ -722,7 +723,7 @@ Val* PolynomialIntVal::_substituteImplOverride(ASTBuilder* astBuilder, Substitut
     *ioDiff += diff;
 
     if (evaluatedTerms.getCount() == 0)
-        return astBuilder->create<ConstantIntVal>(type, evaluatedConstantTerm);
+        return astBuilder->getOrCreate<ConstantIntVal>(type, evaluatedConstantTerm);
     if (diff != 0)
     {
         auto newPolynomial = astBuilder->create<PolynomialIntVal>(type);
@@ -1035,7 +1036,7 @@ IntVal* PolynomialIntVal::canonicalize(ASTBuilder* builder)
         return terms[0]->paramFactors[0]->param;
     }
     if (terms.getCount() == 0)
-        return builder->create<ConstantIntVal>(type, constantTerm);
+        return builder->getOrCreate<ConstantIntVal>(type, constantTerm);
     return this;
 }
 
@@ -1207,7 +1208,7 @@ Val* FuncCallIntVal::tryFoldImpl(ASTBuilder* astBuilder, Type* resultType, DeclR
         {
             SLANG_UNREACHABLE("constant folding of FuncCallIntVal");
         }
-        return astBuilder->create<ConstantIntVal>(resultType, resultValue);
+        return astBuilder->getOrCreate<ConstantIntVal>(resultType, resultValue);
     }
     return nullptr;
 }

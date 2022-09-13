@@ -843,7 +843,7 @@ static void _lookUpInScopes(
             // have a null `containerDecl` and needs to be
             // skipped over.
             //
-            if(!containerDecl)
+            if (!containerDecl)
                 continue;
 
             // TODO: If we need default substitutions to be applied to
@@ -852,8 +852,8 @@ static void _lookUpInScopes(
             // just a decl.
             //
             DeclRef<ContainerDecl> containerDeclRef =
-                DeclRef<Decl>(containerDecl, createDefaultSubstitutions(astBuilder, containerDecl)).as<ContainerDecl>();
-            
+                DeclRef<Decl>(containerDecl, createDefaultSubstitutions(astBuilder, request.semantics, containerDecl)).as<ContainerDecl>();
+
             // If the container we are looking into represents a type
             // or an `extension` of a type, then we need to treat
             // this step as lookup into the `this` variable (or the
@@ -878,9 +878,9 @@ static void _lookUpInScopes(
                 breadcrumb.prev = nullptr;
 
                 Type* type = nullptr;
-                if(auto extDeclRef = aggTypeDeclBaseRef.as<ExtensionDecl>())
+                if (auto extDeclRef = aggTypeDeclBaseRef.as<ExtensionDecl>())
                 {
-                    if( request.semantics )
+                    if (request.semantics)
                     {
                         ensureDecl(request.semantics, extDeclRef.getDecl(), DeclCheckState::CanUseExtensionTargetType);
                     }
@@ -918,14 +918,14 @@ static void _lookUpInScopes(
             // of some nested type, then there shouldn't be an implicit `this`
             // expression for the outer type, but instead an implicit `This`.
             //
-            if( containerDeclRef.is<ConstructorDecl>() )
+            if (containerDeclRef.is<ConstructorDecl>())
             {
                 // In the context of an `__init` declaration, the members of
                 // the surrounding type are accessible through a mutable `this`.
                 //
                 thisParameterMode = LookupResultItem::Breadcrumb::ThisParameterMode::MutableValue;
             }
-            else if( containerDeclRef.is<SetterDecl>() )
+            else if (containerDeclRef.is<SetterDecl>())
             {
                 // In the context of a `set` accessor, the members of the
                 // surrounding type are accessible through a mutable `this`.
@@ -937,19 +937,19 @@ static void _lookUpInScopes(
                 //
                 thisParameterMode = LookupResultItem::Breadcrumb::ThisParameterMode::MutableValue;
             }
-            else if( auto funcDeclRef = containerDeclRef.as<FunctionDeclBase>() )
+            else if (auto funcDeclRef = containerDeclRef.as<FunctionDeclBase>())
             {
                 // The implicit `this`/`This` for a function-like declaration
                 // depends on modifiers attached to the declaration.
                 //
-                if( funcDeclRef.getDecl()->hasModifier<HLSLStaticModifier>() )
+                if (funcDeclRef.getDecl()->hasModifier<HLSLStaticModifier>())
                 {
                     // A `static` method only has access to an implicit `This`,
                     // and does not have a `this` expression available.
                     //
                     thisParameterMode = LookupResultItem::Breadcrumb::ThisParameterMode::Type;
                 }
-                else if( funcDeclRef.getDecl()->hasModifier<MutatingAttribute>() )
+                else if (funcDeclRef.getDecl()->hasModifier<MutatingAttribute>())
                 {
                     // In a non-`static` method marked `[mutating]` there is
                     // an implicit `this` parameter that is mutable.
@@ -964,7 +964,7 @@ static void _lookUpInScopes(
                     thisParameterMode = LookupResultItem::Breadcrumb::ThisParameterMode::ImmutableValue;
                 }
             }
-            else if( containerDeclRef.as<AggTypeDeclBase>() )
+            else if (containerDeclRef.as<AggTypeDeclBase>())
             {
                 // When lookup moves from a nested typed declaration to an
                 // outer scope, there is no ability to use an implicit `this`
@@ -972,7 +972,6 @@ static void _lookUpInScopes(
                 //
                 thisParameterMode = LookupResultItem::Breadcrumb::ThisParameterMode::Type;
             }
-            // TODO: What other cases need to be enumerated here?
         }
 
         if (result.isValid())
@@ -1002,9 +1001,27 @@ LookupResult lookUp(
     Scope*              scope,
     LookupMask          mask)
 {
-    LookupRequest request = initLookupRequest(semantics, name, mask, LookupOptions::None, scope);
     LookupResult result;
+    LookupRequestKey key;
+    TypeCheckingCache* typeCheckingCache = nullptr;
+    if (semantics)
+    {
+        typeCheckingCache = semantics->getLinkage()->getTypeCheckingCache();
+        key.base = scope;
+        key.name = name;
+        key.options = LookupOptions::None;
+        key.mask = mask;
+        if (typeCheckingCache->lookupCache.TryGetValue(key, result))
+        {
+            return result;
+        }
+    }
+    LookupRequest request = initLookupRequest(semantics, name, mask, LookupOptions::None, scope);
     _lookUpInScopes(astBuilder, name, request, result);
+    if (typeCheckingCache)
+    {
+        typeCheckingCache->lookupCache[key] = result;
+    }
     return result;
 }
 
@@ -1016,9 +1033,20 @@ LookupResult lookUpMember(
     LookupMask          mask,
     LookupOptions       options)
 {
-    LookupRequest request = initLookupRequest(semantics, name, mask, options, nullptr);
+    TypeCheckingCache* typeCheckingCache = semantics->getLinkage()->getTypeCheckingCache();
+    LookupRequestKey key;
+    key.base = type;
+    key.name = name;
+    key.options = options;
+    key.mask = mask;
     LookupResult result;
+    if (typeCheckingCache->lookupCache.TryGetValue(key, result))
+    {
+        return result;
+    }
+    LookupRequest request = initLookupRequest(semantics, name, mask, options, nullptr);
     _lookUpMembersInType(astBuilder, name, type, request, result, nullptr);
+    typeCheckingCache->lookupCache[key] = result;
     return result;
 }
 

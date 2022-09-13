@@ -391,11 +391,8 @@ namespace Slang
         // search for a conformance `Robin : ISidekick`, which involved
         // apply the substitutions we already know...
 
-        GenericSubstitution* solvedSubst = m_astBuilder->create<GenericSubstitution>();
-        solvedSubst->genericDecl = genericDeclRef.getDecl();
-        solvedSubst->outer = genericDeclRef.substitutions.substitutions;
-        solvedSubst->args = args;
-        resultSubst.substitutions = solvedSubst;
+        GenericSubstitution* solvedSubst = m_astBuilder->getOrCreateGenericSubstitution(
+            genericDeclRef.getDecl(), args, genericDeclRef.substitutions.substitutions);
 
         for( auto constraintDecl : genericDeclRef.getDecl()->getMembersOfType<GenericTypeConstraintDecl>() )
         {
@@ -412,7 +409,7 @@ namespace Slang
             if(subTypeWitness)
             {
                 // We found a witness, so it will become an (implicit) argument.
-                solvedSubst->args.add(subTypeWitness);
+                args.add(subTypeWitness);
             }
             else
             {
@@ -437,6 +434,8 @@ namespace Slang
             }
         }
 
+        resultSubst = m_astBuilder->getOrCreateGenericSubstitution(
+            genericDeclRef.getDecl(), args, genericDeclRef.substitutions.substitutions);
         return resultSubst;
     }
 
@@ -546,12 +545,12 @@ namespace Slang
             return false;
 
         // Their arguments must unify
-        SLANG_RELEASE_ASSERT(fstGen->args.getCount() == sndGen->args.getCount());
-        Index argCount = fstGen->args.getCount();
+        SLANG_RELEASE_ASSERT(fstGen->getArgs().getCount() == sndGen->getArgs().getCount());
+        Index argCount = fstGen->getArgs().getCount();
         bool okay = true;
         for (Index aa = 0; aa < argCount; ++aa)
         {
-            if (!TryUnifyVals(constraints, fstGen->args[aa], sndGen->args[aa]))
+            if (!TryUnifyVals(constraints, fstGen->getArgs()[aa], sndGen->getArgs()[aa]))
             {
                 okay = false;
             }

@@ -224,7 +224,7 @@ Val* DeclRefType::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSe
                 {
                     // We've found it, so return the corresponding specialization argument
                     (*ioDiff)++;
-                    return genericSubst->args[index];
+                    return genericSubst->getArgs()[index];
                 }
                 else if (auto typeParam = as<GenericTypeParamDecl>(m))
                 {
@@ -351,17 +351,17 @@ BasicExpressionType* MatrixExpressionType::_getScalarTypeOverride()
 
 Type* MatrixExpressionType::getElementType()
 {
-    return as<Type>(findInnerMostGenericSubstitution(declRef.substitutions)->args[0]);
+    return as<Type>(findInnerMostGenericSubstitution(declRef.substitutions)->getArgs()[0]);
 }
 
 IntVal* MatrixExpressionType::getRowCount()
 {
-    return as<IntVal>(findInnerMostGenericSubstitution(declRef.substitutions)->args[1]);
+    return as<IntVal>(findInnerMostGenericSubstitution(declRef.substitutions)->getArgs()[1]);
 }
 
 IntVal* MatrixExpressionType::getColumnCount()
 {
-    return as<IntVal>(findInnerMostGenericSubstitution(declRef.substitutions)->args[2]);
+    return as<IntVal>(findInnerMostGenericSubstitution(declRef.substitutions)->getArgs()[2]);
 }
 
 Type* MatrixExpressionType::getRowType()
@@ -518,12 +518,12 @@ Type* NamespaceType::_createCanonicalTypeOverride()
 
 Type* PtrTypeBase::getValueType()
 {
-    return as<Type>(findInnerMostGenericSubstitution(declRef.substitutions)->args[0]);
+    return as<Type>(findInnerMostGenericSubstitution(declRef.substitutions)->getArgs()[0]);
 }
 
 Type* OptionalType::getValueType()
 {
-    return as<Type>(findInnerMostGenericSubstitution(declRef.substitutions)->args[0]);
+    return as<Type>(findInnerMostGenericSubstitution(declRef.substitutions)->getArgs()[0]);
 }
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! NamedExpressionType !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!

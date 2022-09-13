@@ -865,8 +865,7 @@ namespace Slang
 
     IntVal* SemanticsVisitor::getIntVal(IntegerLiteralExpr* expr)
     {
-        // TODO(tfoley): don't keep allocating here!
-        return m_astBuilder->create<ConstantIntVal>(expr->type.type, expr->value);
+        return m_astBuilder->getOrCreate<ConstantIntVal>(expr->type.type, expr->value);
     }
 
     IntVal* SemanticsVisitor::tryConstantFoldExpr(
@@ -1091,7 +1090,7 @@ namespace Slang
             }
         }
 
-        IntVal* result = m_astBuilder->create<ConstantIntVal>(invokeExpr.getExpr()->type.type, resultValue);
+        IntVal* result = m_astBuilder->getOrCreate<ConstantIntVal>(invokeExpr.getExpr()->type.type, resultValue);
         return result;
     }
 
@@ -1166,7 +1165,6 @@ namespace Slang
             expr = getBaseExpr(parenExpr);
         }
 
-        // TODO(tfoley): more serious constant folding here
         if (auto intLitExpr = expr.as<IntegerLiteralExpr>())
         {
             return getIntVal(intLitExpr);
@@ -1176,7 +1174,7 @@ namespace Slang
         {
             // If it's a boolean, we allow promotion to int.
             const IntegerLiteralValue value = IntegerLiteralValue(boolLitExpr.getExpr()->value);
-            return m_astBuilder->create<ConstantIntVal>(m_astBuilder->getBoolType(), value);
+            return m_astBuilder->getOrCreate<ConstantIntVal>(m_astBuilder->getBoolType(), value);
         }
 
         // it is possible that we are referring to a generic value param
@@ -1186,9 +1184,10 @@ namespace Slang
 
             if (auto genericValParamRef = declRef.as<GenericValueParamDecl>())
             {
-                Val* valResult = m_astBuilder->create<GenericParamIntVal>(
+                Val* valResult = m_astBuilder->getOrCreate<GenericParamIntVal>(
                     declRef.substitute(m_astBuilder, genericValParamRef.getDecl()->getType()),
-                    genericValParamRef);
+                    genericValParamRef.getDecl(),
+                    genericValParamRef.substitutions.substitutions);
                 valResult = valResult->substitute(m_astBuilder, expr.getSubsts());
                 return as<IntVal>(valResult);
             }
@@ -2158,7 +2157,7 @@ namespace Slang
             // here if the input type had a sugared name...
             swizExpr->type = QualType(createVectorType(
                 baseElementType,
-                m_astBuilder->create<ConstantIntVal>(m_astBuilder->getIntType(), elementCount)));
+                m_astBuilder->getOrCreate<ConstantIntVal>(m_astBuilder->getIntType(), elementCount)));
         }
 
         // A swizzle can be used as an l-value as long as there
@@ -2279,7 +2278,7 @@ namespace Slang
             // here if the input type had a sugared name...
             swizExpr->type = QualType(createVectorType(
                 baseElementType,
-                m_astBuilder->create<ConstantIntVal>(m_astBuilder->getIntType(), elementCount)));
+                m_astBuilder->getOrCreate<ConstantIntVal>(m_astBuilder->getIntType(), elementCount)));
         }
 
         // A swizzle can be used as an l-value as long as there
