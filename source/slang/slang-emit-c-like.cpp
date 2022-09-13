@@ -1617,6 +1617,7 @@ void CLikeSourceEmitter::emitComInterfaceCallExpr(IRCall* inst, EmitOpInfo const
 
     auto outerPrec = inOuterPrec;
     bool needClose = maybeEmitParens(outerPrec, prec);
+
     emitOperand(object, leftSide(outerPrec, prec));
     m_writer->emit("->");
     m_writer->emit(getName(methodKey));
@@ -1634,10 +1635,19 @@ void CLikeSourceEmitter::emitCallExpr(IRCall* inst, EmitOpInfo outerPrec)
     // Detect if this is a call into a COM interface method.
     if (funcValue->getOp() == kIROp_lookup_interface_method)
     {
-        const auto operand0TypeOp = funcValue->getOperand(0)->getDataType()->getOp();
-
-        switch (operand0TypeOp)
+        auto operand0Type = funcValue->getOperand(0)->getDataType();
+        switch (operand0Type->getOp())
         {
+        case kIROp_WitnessTableIDType:
+        case kIROp_WitnessTableType:
+            if (as<IRWitnessTableTypeBase>(operand0Type)
+                    ->getConformanceType()
+                    ->findDecoration<IRComInterfaceDecoration>())
+            {
+                emitComInterfaceCallExpr(inst, outerPrec);
+                return;
+            }
+            break;
         case kIROp_ComPtrType:
         case kIROp_PtrType:
         case kIROp_NativePtrType:

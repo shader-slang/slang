@@ -53,7 +53,10 @@ bool isComInterfaceType(IRType* type)
     {
         return true;
     }
-
+    if (auto witnessTableType = as<IRWitnessTableTypeBase>(type))
+    {
+        return isComInterfaceType((IRType*)witnessTableType->getConformanceType());
+    }
     if (auto ptrType = as<IRNativePtrType>(type))
     {
         auto valueType = ptrType->getValueType();

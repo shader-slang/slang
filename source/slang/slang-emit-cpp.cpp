@@ -2533,7 +2533,7 @@ bool CPPSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOut
             m_writer->emit("*>(");
             auto prec = getInfo(EmitOp::Postfix);
             emitOperand(inst->getOperand(0), leftSide(getInfo(EmitOp::General), prec));
-            m_writer->emit(".Ptr()");
+            m_writer->emit(".get()");
             m_writer->emit("))");
             return true;
         }
