@@ -838,28 +838,31 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
                 // Otherwise, check if we are trying to apply
                 // a this-type substitution to the given interface
                 //
-                for(auto s = substsToApply; s; s = s->outer)
+                if (declToSpecialize != ancestorInterfaceDecl)
                 {
-                    auto appThisTypeSubst = as<ThisTypeSubstitution>(s);
-                    if(!appThisTypeSubst)
-                        continue;
+                    for (auto s = substsToApply; s; s = s->outer)
+                    {
+                        auto appThisTypeSubst = as<ThisTypeSubstitution>(s);
+                        if (!appThisTypeSubst)
+                            continue;
 
-                    if(appThisTypeSubst->interfaceDecl != ancestorInterfaceDecl)
-                        continue;
+                        if (appThisTypeSubst->interfaceDecl != ancestorInterfaceDecl)
+                            continue;
 
-                    int diff = 0;
-                    auto restSubst = specializeSubstitutions(
-                        astBuilder,
-                        ancestorInterfaceDecl->parentDecl,
-                        substsToSpecialize,
-                        substsToApply,
-                        &diff);
+                        int diff = 0;
+                        auto restSubst = specializeSubstitutions(
+                            astBuilder,
+                            ancestorInterfaceDecl->parentDecl,
+                            substsToSpecialize,
+                            substsToApply,
+                            &diff);
 
-                    ThisTypeSubstitution* firstSubst = astBuilder->getOrCreateThisTypeSubstitution(
-                        ancestorInterfaceDecl, appThisTypeSubst->witness, restSubst);
+                        ThisTypeSubstitution* firstSubst = astBuilder->getOrCreateThisTypeSubstitution(
+                            ancestorInterfaceDecl, appThisTypeSubst->witness, restSubst);
 
-                    (*ioDiff)++;
-                    return firstSubst;
+                        (*ioDiff)++;
+                        return firstSubst;
+                    }
                 }
             }
         }
