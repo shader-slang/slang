@@ -157,8 +157,6 @@ namespace Slang
             openedType->originalInterfaceType = expr->type.type;
             openedType->originalInterfaceDeclRef = interfaceDeclRef;
 
-            DeclRef<InterfaceDecl> substDeclRef = openedType->getSpecializedInterfaceDeclRef();
-
             ExtractExistentialValueExpr* openedValue = m_astBuilder->create<ExtractExistentialValueExpr>();
             openedValue->declRef = varDeclRef;
             openedValue->type = QualType(openedType);
