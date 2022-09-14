@@ -481,9 +481,24 @@ class ModifiedTypeExpr : public Expr
     /// A type expression that rrepresents a pointer type, e.g. T*
 class PointerTypeExpr : public Expr
 {
-    SLANG_AST_CLASS(PointerTypeExpr)
+    SLANG_AST_CLASS(PointerTypeExpr);
 
     TypeExp base;
+};
+
+    /// An expression that applies a generic to arguments for some,
+    /// but not all, of its explicit parameters.
+    ///
+class PartiallyAppliedGenericExpr : public Expr
+{
+    SLANG_AST_CLASS(PartiallyAppliedGenericExpr);
+
+public:
+        /// The generic being applied
+    DeclRef<GenericDecl> baseGenericDeclRef;
+
+        /// A substitution that includes the generic arguments known so far
+    GenericSubstitution* substWithKnownGenericArgs = nullptr;
 };
 
 } // namespace Slang

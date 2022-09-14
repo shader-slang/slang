@@ -152,6 +152,14 @@ class Val : public NodeBase
 
 SLANG_FORCE_INLINE StringBuilder& operator<<(StringBuilder& io, Val* val) { SLANG_ASSERT(val); val->toText(io); return io; }
 
+    /// Given a `value` that refers to a `param` of some generic, attempt to apply
+    /// the `subst` to it and produce a new `Val` as a result.
+    ///
+    /// If the `subst` does not include anything to replace `value`, then this function
+    /// returns null.
+    ///
+Val* maybeSubstituteGenericParam(Val* value, Decl* param, SubstitutionSet subst, int* ioDiff);
+
 class Type;
 
 template <typename T>

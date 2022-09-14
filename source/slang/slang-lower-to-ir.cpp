@@ -3069,6 +3069,12 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
         UNREACHABLE_RETURN(LoweredValInfo());
     }
 
+    LoweredValInfo visitPartiallyAppliedGenericExpr(PartiallyAppliedGenericExpr* /*expr*/)
+    {
+        SLANG_UNEXPECTED("partially applied generics should not occur in checked AST");
+        UNREACHABLE_RETURN(LoweredValInfo());
+    }
+
     LoweredValInfo visitIndexExpr(IndexExpr* expr)
     {
         auto type = lowerType(context, expr->type);
