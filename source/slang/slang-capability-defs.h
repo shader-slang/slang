@@ -86,6 +86,7 @@ SLANG_CAPABILITY_ATOM1(SPIRV_1_5,   spirv_1_5,  Concrete,None,0,   SPIRV_1_4)
 SLANG_CAPABILITY_ATOM1(GLSLRayTracing,      __glslRayTracing,   Abstract,None,0,   GLSL)
 SLANG_CAPABILITY_ATOM1(GL_NV_ray_tracing,   GL_NV_ray_tracing,  Concrete,RayTracingExtension,0,   GLSLRayTracing)
 SLANG_CAPABILITY_ATOM2(GL_EXT_ray_tracing,  GL_EXT_ray_tracing, Concrete,RayTracingExtension,1,   GLSLRayTracing, SPIRV_1_4)
+SLANG_CAPABILITY_ATOM1(GL_EXT_debug_printf, GL_EXT_debug_printf, Concrete,None,0,   HLSL)
 
 #undef SLANG_CAPABILITY_ATOM0
 #undef SLANG_CAPABILITY_ATOM1

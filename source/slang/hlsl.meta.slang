@@ -2737,7 +2737,14 @@ matrix<T,N,M> pow(matrix<T,N,M> x, matrix<T,N,M> y)
 
 // Output message
 
-// void printf( string format, ... );
+// __target_intrinsic(cpp, "printf(\"$0\", $1)")
+// __target_intrinsic(GL_EXT_debug_printf, "printf(\"$0\", $1)")
+// __target_intrinsic(GL_EXT_debug_printf)
+
+__target_intrinsic(hlsl)
+__glsl_extension(GL_EXT_debug_printf)
+__target_intrinsic(glsl, "debugPrintfEXT(\"$0\", $1)")
+void printf(String format, float arg0);
 
 // Tessellation factor fixup routines
 
