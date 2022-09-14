@@ -4,22 +4,7 @@ void writeln(String text);
 
 import gfx;
 import slang;
-extension Ptr<void>
-{
-    __intrinsic_op(0)
-    __implicit_conversion(200)
-    __init(NativeString nativeStr);
 
-    __generic<T>
-    __intrinsic_op(0)
-    __implicit_conversion(200)
-    __init(T* ptr);
-
-    __generic<T>
-    __intrinsic_op(0)
-    __implicit_conversion(200)
-    __init(NativeRef<T> ptr);
-}
 public __extern_cpp int main()
 {
     gfx.DeviceDesc deviceDesc = {};
