@@ -468,6 +468,7 @@ extension intptr_t
     __init(Ptr<T> ptr);
     static const intptr_t maxValue = $(SLANG_PROCESSOR_X86_64?"0x7FFFFFFFFFFFFFFFz":"0x7FFFFFFFz");
     static const intptr_t minValue = $(SLANG_PROCESSOR_X86_64?"0x8000000000000000z":"0x80000000z");
+    static const int size = $(SLANG_PROCESSOR_X86_64?"8":"4");
 }
 
 extension uintptr_t
@@ -477,6 +478,7 @@ extension uintptr_t
     __init(Ptr<T> ptr);
     static const uintptr_t maxValue = $(SLANG_PROCESSOR_X86_64?"0xFFFFFFFFFFFFFFFFz":"0xFFFFFFFFz");
     static const uintptr_t minValue = 0z;
+    static const int size = $(SLANG_PROCESSOR_X86_64?"8":"4");
 }
 
 __generic<T>
