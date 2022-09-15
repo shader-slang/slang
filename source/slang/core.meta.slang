@@ -678,14 +678,12 @@ static const struct {
     {"int32_t",     "i32"},
     {"int",         "i"},
     {"int64_t",     "i64"},
-    {"intptr_t",    "i64"},
 
     {"uint8_t",     "u8"},
     {"uint16_t",    "u16"},
     {"uint32_t",    "u32"},
     {"uint",        "u"},
     {"uint64_t",    "u64"},
-    {"uintptr_t",   "u64"},
 
     {"bool",        "b"},
 };
