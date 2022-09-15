@@ -219,7 +219,7 @@ void CLikeSourceEmitter::emitSimpleType(IRType* type)
 
         case kIROp_UInt8Type:   return UnownedStringSlice("uint8_t");   
         case kIROp_UInt16Type:  return UnownedStringSlice("uint16_t");  
-        case kIROp_UIntType:    return UnownedStringSlice("uint");     
+        case kIROp_UIntType:    return UnownedStringSlice("uint32_t");     
         case kIROp_UInt64Type:  return UnownedStringSlice("uint64_t"); 
         case kIROp_UIntPtrType: return UnownedStringSlice("uintptr_t");
 
