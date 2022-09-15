@@ -2229,7 +2229,7 @@ T reinterpret(U value);
 // Specialized function
 
 /// Given a string returns an integer hash of that string.
-__intrinsic_op
+__intrinsic_op($(kIROp_GetStringHash))
 int getStringHash(String string);
 
 /// Use will produce a syntax error in downstream compiler
