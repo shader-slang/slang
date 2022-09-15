@@ -71,7 +71,9 @@ static BaseType _getBaseTypeFromScalarType(SlangScalarType type)
         case SLANG_SCALAR_TYPE_INT16:       return BaseType::Int16;
         case SLANG_SCALAR_TYPE_UINT16:      return BaseType::UInt16;
         case SLANG_SCALAR_TYPE_INT64:       return BaseType::Int64;
+        case SLANG_SCALAR_TYPE_INTPTR:      return BaseType::IntPtr;
         case SLANG_SCALAR_TYPE_UINT64:      return BaseType::UInt64;
+        case SLANG_SCALAR_TYPE_UINTPTR:     return BaseType::UIntPtr;
         case SLANG_SCALAR_TYPE_INT8:        return BaseType::Int8;
         case SLANG_SCALAR_TYPE_UINT8:       return BaseType::UInt8;
         case SLANG_SCALAR_TYPE_FLOAT16:     return BaseType::Half;

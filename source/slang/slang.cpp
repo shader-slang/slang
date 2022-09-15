@@ -79,6 +79,8 @@ namespace Slang {
     { uint8_t(sizeof(float)),    BaseTypeInfo::Flag::FloatingPoint , uint8_t(BaseType::Float) },
     { uint8_t(sizeof(double)),   BaseTypeInfo::Flag::FloatingPoint , uint8_t(BaseType::Double) },
     { uint8_t(sizeof(char)),     BaseTypeInfo::Flag::Signed | BaseTypeInfo::Flag::Integer , uint8_t(BaseType::Char) },
+    { uint8_t(sizeof(intptr_t)),  BaseTypeInfo::Flag::Signed | BaseTypeInfo::Flag::Integer , uint8_t(BaseType::IntPtr) },
+    { uint8_t(sizeof(uintptr_t)),                              BaseTypeInfo::Flag::Integer , uint8_t(BaseType::UIntPtr) },
 };
 
 /* static */bool BaseTypeInfo::check()
@@ -111,6 +113,9 @@ namespace Slang {
         case BaseType::Half:            return UnownedStringSlice::fromLiteral("half");
         case BaseType::Float:           return UnownedStringSlice::fromLiteral("float");
         case BaseType::Double:          return UnownedStringSlice::fromLiteral("double");
+        case BaseType::Char:            return UnownedStringSlice::fromLiteral("char");
+        case BaseType::IntPtr:           return UnownedStringSlice::fromLiteral("intptr_t");
+        case BaseType::UIntPtr:          return UnownedStringSlice::fromLiteral("uintptr_t");
         default:
         {
             SLANG_ASSERT(!"Unknown basic type");

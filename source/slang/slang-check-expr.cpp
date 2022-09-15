@@ -1009,6 +1009,10 @@ namespace Slang
             case BaseType::Int16:
             case BaseType::UInt8:
             case BaseType::Int8:
+            case BaseType::UIntPtr:
+            case BaseType::IntPtr:
+            case BaseType::Int64:
+            case BaseType::UInt64:
                 resultValue = constArgVals[0];
                 break;
             default:
