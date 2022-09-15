@@ -8,6 +8,9 @@ typedef double float64_t;
 typedef int int32_t;
 typedef uint uint32_t;
 
+typedef uintptr_t size_t;
+typedef uintptr_t usize_t
+typedef intptr_t ssize_t;
 
 // Modifier for variables that must resolve to compile-time constants
 // as part of translation.
