@@ -34,6 +34,8 @@ static bool _isSingleNameBasicType(IROp op)
         case kIROp_UInt16Type:
         case kIROp_UIntType: 
         case kIROp_UInt64Type:
+        case kIROp_IntPtrType:
+        case kIROp_UIntPtrType:
         {
             return false;
         }
@@ -53,14 +55,18 @@ UnownedStringSlice CUDASourceEmitter::getBuiltinTypeName(IROp op)
         case kIROp_Int16Type:   return UnownedStringSlice("short");
         case kIROp_IntType:     return UnownedStringSlice("int");
         case kIROp_Int64Type:   return UnownedStringSlice("longlong");
-        case kIROp_IntPtrType:  return UnownedStringSlice("intptr_t");
 
         case kIROp_UInt8Type:   return UnownedStringSlice("uchar");
         case kIROp_UInt16Type:  return UnownedStringSlice("ushort");
         case kIROp_UIntType:    return UnownedStringSlice("uint");
         case kIROp_UInt64Type:  return UnownedStringSlice("ulonglong");
-        case kIROp_UIntPtrType: return UnownedStringSlice("uintptr_t");
-
+#if SLANG_PTR_IS_64
+        case kIROp_IntPtrType:  return UnownedStringSlice("int64_t");
+        case kIROp_UIntPtrType: return UnownedStringSlice("uint64_t");
+#else
+        case kIROp_IntPtrType:  return UnownedStringSlice("int");
+        case kIROp_UIntPtrType: return UnownedStringSlice("uint");
+#endif
         case kIROp_HalfType:
         {
             m_extensionTracker->requireBaseType(BaseType::Half);
