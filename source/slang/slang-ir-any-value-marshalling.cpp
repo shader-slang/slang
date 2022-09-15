@@ -136,6 +136,8 @@ namespace Slang
             case kIROp_UInt16Type:
             case kIROp_HalfType:
             case kIROp_BoolType:
+            case kIROp_IntPtrType:
+            case kIROp_UIntPtrType:
                 context->marshalBasicType(builder, dataType, concreteTypedVar);
                 break;
             case kIROp_VectorType:
@@ -239,6 +241,9 @@ namespace Slang
                 case kIROp_IntType:
                 case kIROp_FloatType:
                 case kIROp_BoolType:
+#if SLANG_PTR_IS_32
+                case kIROp_IntPtrType:
+#endif
                 {
                     ensureOffsetAt4ByteBoundary();
                     if (fieldOffset < static_cast<uint32_t>(anyValInfo->fieldKeys.getCount()))
@@ -255,6 +260,9 @@ namespace Slang
                     break;
                 }
                 case kIROp_UIntType:
+#if SLANG_PTR_IS_32
+                case kIROp_UIntPtrType:
+#endif
                 {
                     ensureOffsetAt4ByteBoundary();
                     if (fieldOffset < static_cast<uint32_t>(anyValInfo->fieldKeys.getCount()))
@@ -313,6 +321,10 @@ namespace Slang
                 case kIROp_UInt64Type:
                 case kIROp_Int64Type:
                 case kIROp_DoubleType:
+#if SLANG_PTR_IS_64
+                case kIROp_UIntPtrType:
+                case kIROp_IntPtrType:
+#endif
                     SLANG_UNIMPLEMENTED_X("AnyValue type packing for non 32-bit elements");
                     break;
                 default:

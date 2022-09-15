@@ -4,13 +4,13 @@ namespace gfx
 {
 typedef slang.Result Result;
 
-typedef int64_t Int;
-typedef uint64_t UInt;
+typedef intptr_t Int;
+typedef uintptr_t UInt;
 typedef uint64_t DeviceAddress;
 typedef int GfxIndex;
 typedef int GfxCount;
-typedef uint64_t Size;
-typedef uint64_t Offset;
+typedef intptr_t Size;
+typedef intptr_t Offset;
 
 const uint64_t kTimeoutInfinite = 0xFFFFFFFFFFFFFFFF;
 

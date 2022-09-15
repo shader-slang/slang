@@ -82,11 +82,13 @@ struct DefaultLayoutRulesImpl : SimpleLayoutRulesImpl
         case BaseType::Int16:   return SimpleLayoutInfo( LayoutResourceKind::Uniform, 2,2);
         case BaseType::Int:     return SimpleLayoutInfo( LayoutResourceKind::Uniform, 4,4);
         case BaseType::Int64:   return SimpleLayoutInfo( LayoutResourceKind::Uniform, 8,8);
+        case BaseType::IntPtr:  return SimpleLayoutInfo(LayoutResourceKind::Uniform, 8, 8);
 
         case BaseType::UInt8:   return SimpleLayoutInfo( LayoutResourceKind::Uniform, 1,1);
         case BaseType::UInt16:  return SimpleLayoutInfo( LayoutResourceKind::Uniform, 2,2);
         case BaseType::UInt:    return SimpleLayoutInfo( LayoutResourceKind::Uniform, 4,4);
         case BaseType::UInt64:  return SimpleLayoutInfo( LayoutResourceKind::Uniform, 8,8);
+        case BaseType::UIntPtr: return SimpleLayoutInfo(LayoutResourceKind::Uniform, 8, 8);
 
         case BaseType::Half:    return SimpleLayoutInfo( LayoutResourceKind::Uniform, 2,2);
         case BaseType::Float:   return SimpleLayoutInfo( LayoutResourceKind::Uniform, 4,4);

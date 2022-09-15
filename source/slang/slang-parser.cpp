@@ -5502,6 +5502,7 @@ namespace Slang
 
                     int lCount = 0;
                     int uCount = 0;
+                    int zCount = 0;
                     int unknownCount = 0;
                     while(suffixCursor < suffixEnd)
                     {
@@ -5513,6 +5514,10 @@ namespace Slang
 
                         case 'u': case 'U':
                             uCount++;
+                            break;
+
+                        case 'z': case 'Z':
+                            zCount++;
                             break;
 
                         default:
@@ -5527,24 +5532,32 @@ namespace Slang
                         suffixBaseType = BaseType::Void;
                     }
                     // `u` or `ul` suffix -> `uint`
-                    else if(uCount == 1 && (lCount <= 1))
+                    else if(uCount == 1 && (lCount <= 1) && zCount == 0)
                     {
                         suffixBaseType = BaseType::UInt;
                     }
                     // `l` suffix on integer -> `int` (== `long`)
-                    else if(lCount == 1 && !uCount)
+                    else if(lCount == 1 && !uCount && zCount == 0)
                     {
                         suffixBaseType = BaseType::Int; 
                     }
                     // `ull` suffix -> `uint64_t`
-                    else if(uCount == 1 && lCount == 2)
+                    else if(uCount == 1 && lCount == 2 && zCount == 0)
                     {
                         suffixBaseType = BaseType::UInt64;
                     }
                     // `ll` suffix -> `int64_t`
-                    else if(uCount == 0 && lCount == 2)
+                    else if(uCount == 0 && lCount == 2 && zCount == 0)
                     {
                         suffixBaseType = BaseType::Int64;
+                    }
+                    else if (uCount == 0 && zCount == 1)
+                    {
+                        suffixBaseType = BaseType::IntPtr;
+                    }
+                    else if (uCount == 1 && zCount == 1)
+                    {
+                        suffixBaseType == BaseType::UIntPtr;
                     }
                     // TODO: do we need suffixes for smaller integer types?
                     else

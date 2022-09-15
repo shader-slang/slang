@@ -229,6 +229,7 @@ ${{{{
     case BaseType::Int16:
     case BaseType::Int:
     case BaseType::Int64:
+    case BaseType::IntPtr:
 }}}}
     ,  __BuiltinSignedArithmeticType
 ${{{{
@@ -237,6 +238,7 @@ ${{{{
     case BaseType::UInt16:
     case BaseType::UInt:
     case BaseType::UInt64:
+    case BaseType::UIntPtr:
 }}}}
     ,  __BuiltinArithmeticType
     ,  __BuiltinIntegerType
@@ -456,6 +458,29 @@ extension int64_t
     static const int64_t minValue = -0x8000000000000000LL;
 }
 
+extension intptr_t
+{
+    __generic<T>
+    __intrinsic_op($(kIROp_Construct))
+    __init(Ptr<T> ptr);
+    static const intptr_t maxValue = $(SLANG_PROCESSOR_X86_64?0x7FFFFFFFFFFFFFFF:0x7FFFFFFF);
+    static const intptr_t minValue = $(SLANG_PROCESSOR_X86_64?0x8000000000000000:0);
+}
+
+extension uintptr_t
+{
+    __generic<T>
+    __intrinsic_op($(kIROp_Construct))
+    __init(Ptr<T> ptr);
+#ifdef _X64
+    static const uintptr_t maxValue = 0xFFFFFFFFFFFFFFFFz;
+    static const uintptr_t minValue = 0z;
+#else
+    static const uintptr_t maxValue = 0xFFFFFFFFz;
+    static const uintptr_t minValue = 0z;
+#endif
+}
+
 __generic<T>
 __magic_type(OutType)
 __intrinsic_type($(kIROp_OutType))
@@ -658,12 +683,14 @@ static const struct {
     {"int32_t",     "i32"},
     {"int",         "i"},
     {"int64_t",     "i64"},
+    {"intptr_t",    "i64"},
 
     {"uint8_t",     "u8"},
     {"uint16_t",    "u16"},
     {"uint32_t",    "u32"},
     {"uint",        "u"},
     {"uint64_t",    "u64"},
+    {"uintptr_t",   "u64"},
 
     {"bool",        "b"},
 };
@@ -2300,7 +2327,9 @@ bool operator!=(E left, E right);
 
 interface IComparable
 {
-    int compareTo(This other);
+    bool equals(This other);
+    bool lessThan(This other);
+    bool lessThanOrEquals(This other);
 }
 
 interface IArithmetic : IComparable
@@ -2340,37 +2369,37 @@ __generic<T : IComparable>
 [__unsafeForceInlineEarly]
 bool operator<(T v0, T v1)
 {
-    return v0.compareTo(v1) < 0;
+    return v0.lessThan(v1);
 }
 __generic<T : IComparable>
 [__unsafeForceInlineEarly]
 bool operator>(T v0, T v1)
 {
-    return v0.compareTo(v1) > 0;
+    return v1.lessThan(v0);
 }
 __generic<T : IComparable>
 [__unsafeForceInlineEarly]
 bool operator ==(T v0, T v1)
 {
-    return v0.compareTo(v1) == 0;
+    return v0.equals(v1);
 }
 __generic<T : IComparable>
 [__unsafeForceInlineEarly]
 bool operator >=(T v0, T v1)
 {
-    return v0.compareTo(v1) >= 0;
+    return v1.lessThanOrEquals(v1);
 }
 __generic<T : IComparable>
 [__unsafeForceInlineEarly]
 bool operator <=(T v0, T v1)
 {
-    return v0.compareTo(v1) <= 0;
+    return v0.lessThanOrEquals(v1);
 }
 __generic<T : IComparable>
 [__unsafeForceInlineEarly]
 bool operator !=(T v0, T v1)
 {
-    return v0.compareTo(v1) != 0;
+    return !v0.equals(v1);
 }
 
 __generic<T : IArithmetic>
@@ -2451,7 +2480,9 @@ for (int tt = 0; tt < kBaseTypeCount; ++tt)
 }}}}
 extension $(kBaseTypes[tt].name) : IInteger
 {
-    [__unsafeForceInlineEarly] int compareTo(This other){return this-other;}
+    [__unsafeForceInlineEarly] bool equals(This other){return this==other;}
+    [__unsafeForceInlineEarly] bool lessThan(This other){return this<other;}
+    [__unsafeForceInlineEarly] bool lessThanOrEquals(This other){return this<=other;}
     [__unsafeForceInlineEarly] This add(This other) { return __add(this, other); }
     [__unsafeForceInlineEarly] This sub(This other) { return __sub(this, other); }
     [__unsafeForceInlineEarly] This mul(This other) { return __mul(this, other); }
@@ -2477,12 +2508,9 @@ ${{{{
 
 extension $(kBaseTypes[tt].name) : IFloat
 {
-    [__unsafeForceInlineEarly] static int __sign(This val)
-    {
-        return int(__leq(This(0),val)) - int(__leq(val,This(0)));
-    }
-
-    [__unsafeForceInlineEarly] int compareTo(This other) { return __sign(this-other); }
+    [__unsafeForceInlineEarly] bool lessThan(This other) { return this < other; }
+    [__unsafeForceInlineEarly] bool lessThanOrEquals(This other) { return this <= other; }
+    [__unsafeForceInlineEarly] bool equals(This other) { return this == other; }
     [__unsafeForceInlineEarly] This add(This other) { return __add(this, other); }
     [__unsafeForceInlineEarly] This sub(This other) { return __sub(this, other); }
     [__unsafeForceInlineEarly] This mul(This other) { return __mul(this, other); }

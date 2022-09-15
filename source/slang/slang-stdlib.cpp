@@ -97,6 +97,8 @@ namespace Slang
         { "int16_t",	BaseType::Int16,    SINT_MASK,  kBaseTypeConversionKind_Signed,     kBaseTypeConversionRank_Int16},
         { "int",	    BaseType::Int,      SINT_MASK,  kBaseTypeConversionKind_Signed,     kBaseTypeConversionRank_Int32},
         { "int64_t",	BaseType::Int64,    SINT_MASK,  kBaseTypeConversionKind_Signed,     kBaseTypeConversionRank_Int64},
+        { "intptr_t",	BaseType::IntPtr,   SINT_MASK,  kBaseTypeConversionKind_Signed,     kBaseTypeConversionRank_IntPtr},
+
 
         { "half",	BaseType::Half,     FLOAT_MASK, kBaseTypeConversionKind_Float,      kBaseTypeConversionRank_Int16},
         { "float",	BaseType::Float,    FLOAT_MASK, kBaseTypeConversionKind_Float,      kBaseTypeConversionRank_Int32},
@@ -106,6 +108,8 @@ namespace Slang
         { "uint16_t",	BaseType::UInt16,   UINT_MASK,  kBaseTypeConversionKind_Unsigned,   kBaseTypeConversionRank_Int16},
         { "uint",	    BaseType::UInt,     UINT_MASK,  kBaseTypeConversionKind_Unsigned,   kBaseTypeConversionRank_Int32},
         { "uint64_t",   BaseType::UInt64,   UINT_MASK,  kBaseTypeConversionKind_Unsigned,   kBaseTypeConversionRank_Int64},
+        { "uintptr_t",  BaseType::UIntPtr,  UINT_MASK,  kBaseTypeConversionKind_Unsigned,   kBaseTypeConversionRank_IntPtr},
+
     };
 
     // Given two base types, we need to be able to compute the cost of converting between them.

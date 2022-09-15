@@ -1096,10 +1096,12 @@ namespace Slang
                 case BaseType::Int16:
                 case BaseType::Int:
                 case BaseType::Int64:
+                case BaseType::IntPtr:
                 case BaseType::UInt8:
                 case BaseType::UInt16:
                 case BaseType::UInt:
                 case BaseType::UInt64:
+                case BaseType::UIntPtr:
                     break;
                 default:
                     getSink()->diagnose(varDecl, Diagnostics::staticConstRequirementMustBeIntOrBool);
@@ -3620,16 +3622,28 @@ namespace Slang
         case BaseType::UInt16:
             return (value >= 0 && value <= std::numeric_limits<uint16_t>::max()) || (value == -1);
         case BaseType::UInt:
+#if SLANG_PTR_IS_32
+        case BaseType::UIntPtr:
+#endif
             return (value >= 0 && value <= std::numeric_limits<uint32_t>::max()) || (value == -1);
         case BaseType::UInt64:
+#if SLANG_PTR_IS_64
+        case BaseType::UIntPtr:
+#endif
             return true;
         case BaseType::Int8:
             return value >= std::numeric_limits<int8_t>::min() && value <= std::numeric_limits<int8_t>::max();
         case BaseType::Int16:
             return value >= std::numeric_limits<int16_t>::min() && value <= std::numeric_limits<int16_t>::max();
         case BaseType::Int:
+#if SLANG_PTR_IS_32
+        case BaseType::IntPtr:
+#endif
             return value >= std::numeric_limits<int32_t>::min() && value <= std::numeric_limits<int32_t>::max();
         case BaseType::Int64:
+#if SLANG_PTR_IS_64
+        case BaseType::IntPtr:
+#endif
             return value >= std::numeric_limits<int64_t>::min() && value <= std::numeric_limits<int64_t>::max();
         default:
             return false;

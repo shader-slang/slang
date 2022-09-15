@@ -303,6 +303,8 @@ struct SCCPContext
         case kIROp_UInt16Type:
         case kIROp_UIntType:
         case kIROp_UInt64Type:
+        case kIROp_IntPtrType:
+        case kIROp_UIntPtrType:
             switch (irConstant->getOp())
             {
             case kIROp_FloatLit:
@@ -368,10 +370,12 @@ struct SCCPContext
         case kIROp_Int16Type:
         case kIROp_IntType:
         case kIROp_Int64Type:
+        case kIROp_IntPtrType:
         case kIROp_UInt8Type:
         case kIROp_UInt16Type:
         case kIROp_UIntType:
         case kIROp_UInt64Type:
+        case kIROp_UIntPtrType:
             resultVal = getBuilder()->getIntValue(type, (IRIntegerValue)0);
             break;
 
@@ -413,6 +417,8 @@ struct SCCPContext
         case kIROp_UInt16Type:
         case kIROp_UIntType:
         case kIROp_UInt64Type:
+        case kIROp_IntPtrType:
+        case kIROp_UIntPtrType:
         case kIROp_BoolType:
             resultVal = getBuilder()->getIntValue(type, intFunc(c0->value.intVal, c1->value.intVal));
             break;
@@ -447,10 +453,12 @@ struct SCCPContext
         case kIROp_Int16Type:
         case kIROp_IntType:
         case kIROp_Int64Type:
+        case kIROp_IntPtrType:
         case kIROp_UInt8Type:
         case kIROp_UInt16Type:
         case kIROp_UIntType:
         case kIROp_UInt64Type:
+        case kIROp_UIntPtrType:
         case kIROp_BoolType:
             resultVal =
                 getBuilder()->getIntValue(type, intFunc(c0->value.intVal, c1->value.intVal));
@@ -476,10 +484,12 @@ struct SCCPContext
         case kIROp_Int16Type:
         case kIROp_IntType:
         case kIROp_Int64Type:
+        case kIROp_IntPtrType:
         case kIROp_UInt8Type:
         case kIROp_UInt16Type:
         case kIROp_UIntType:
         case kIROp_UInt64Type:
+        case kIROp_UIntPtrType:
         case kIROp_BoolType:
             resultVal =
                 getBuilder()->getIntValue(type, intFunc(c0->value.intVal));
@@ -511,10 +521,12 @@ struct SCCPContext
         case kIROp_Int16Type:
         case kIROp_IntType:
         case kIROp_Int64Type:
+        case kIROp_IntPtrType:
         case kIROp_UInt8Type:
         case kIROp_UInt16Type:
         case kIROp_UIntType:
         case kIROp_UInt64Type:
+        case kIROp_UIntPtrType:
         case kIROp_BoolType:
             resultVal =
                 getBuilder()->getBoolValue(intFunc(c0->value.intVal, c1->value.intVal));
@@ -680,10 +692,12 @@ struct SCCPContext
         case kIROp_Int16Type:
         case kIROp_IntType:
         case kIROp_Int64Type:
+        case kIROp_IntPtrType:
         case kIROp_UInt8Type:
         case kIROp_UInt16Type:
         case kIROp_UIntType:
         case kIROp_UInt64Type:
+        case kIROp_UIntPtrType:
             resultVal = getBuilder()->getIntValue(type, -c0->value.intVal);
             break;
         case kIROp_FloatType:
@@ -708,10 +722,18 @@ struct SCCPContext
         {
         case kIROp_Int64Type:
         case kIROp_UInt64Type:
+#if SLANG_PTR_IS_64
+        case kIROp_IntPtrType:
+        case kIROp_UIntPtrType:
+#endif
             resultVal = getBuilder()->getIntValue(type, c0->value.intVal);
             break;
         case kIROp_IntType:
         case kIROp_UIntType:
+#if SLANG_PTR_IS_32
+        case kIROp_IntPtrType:
+        case kIROp_UIntPtrType:
+#endif
             {
                 float val = (float)c0->value.floatVal;
                 uint32_t intVal = (uint32_t)FloatAsInt(val);

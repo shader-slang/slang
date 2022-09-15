@@ -97,6 +97,8 @@ static IROp _getTypeStyle(IROp op)
         case kIROp_UIntType:
         case kIROp_Int64Type:
         case kIROp_UInt64Type:
+        case kIROp_IntPtrType:
+        case kIROp_UIntPtrType:
         {
             // All int like 
             return kIROp_IntType;
@@ -130,6 +132,11 @@ static IROp _getCType(IROp op)
         {
             // Promote all these to Int
             return kIROp_IntType;
+        }
+        case kIROp_IntPtrType:
+        case kIROp_UIntPtrType:
+        {
+            return kIROp_IntPtrType;
         }
         case kIROp_Int64Type:
         case kIROp_UInt64Type:
@@ -165,6 +172,8 @@ static UnownedStringSlice _getCTypeVecPostFix(IROp op)
         case kIROp_FloatType:       return UnownedStringSlice::fromLiteral("F");
         case kIROp_Int64Type:       return UnownedStringSlice::fromLiteral("I64");
         case kIROp_DoubleType:      return UnownedStringSlice::fromLiteral("F64");
+        case kIROp_IntPtrType:      return UnownedStringSlice::fromLiteral("");
+        case kIROp_UIntPtrType:     return UnownedStringSlice::fromLiteral("");
         default:                    return UnownedStringSlice::fromLiteral("?");
     }
 }
@@ -207,11 +216,13 @@ static bool _isCppOrCudaTarget(CodeGenTarget target)
         case kIROp_Int16Type:   return UnownedStringSlice("int16_t");
         case kIROp_IntType:     return UnownedStringSlice("int32_t");
         case kIROp_Int64Type:   return UnownedStringSlice("int64_t");
+        case kIROp_IntPtrType:  return UnownedStringSlice("intptr_t");
 
         case kIROp_UInt8Type:   return UnownedStringSlice("uint8_t");
         case kIROp_UInt16Type:  return UnownedStringSlice("uint16_t");
         case kIROp_UIntType:    return UnownedStringSlice("uint32_t");
         case kIROp_UInt64Type:  return UnownedStringSlice("uint64_t");
+        case kIROp_UIntPtrType: return UnownedStringSlice("uintptr_t");
 
         // Not clear just yet how we should handle half... we want all processing as float probly, but when reading/writing to memory converting
 
