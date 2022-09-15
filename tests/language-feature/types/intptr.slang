@@ -27,7 +27,7 @@ void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
     {
         testResult = 0;
     }
-    uintptr_t b = 0z;
+    uintptr_t b = 0uz;
     actualSize = getSizeOf(b);
     if (expectedSize != actualSize)
     {
