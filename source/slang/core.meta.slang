@@ -463,8 +463,8 @@ extension intptr_t
     __generic<T>
     __intrinsic_op($(kIROp_Construct))
     __init(Ptr<T> ptr);
-    static const intptr_t maxValue = $(SLANG_PROCESSOR_X86_64?0x7FFFFFFFFFFFFFFF:0x7FFFFFFF);
-    static const intptr_t minValue = $(SLANG_PROCESSOR_X86_64?0x8000000000000000:0);
+    static const intptr_t maxValue = $(SLANG_PROCESSOR_X86_64?"0x7FFFFFFFFFFFFFFFz":"0x7FFFFFFFz");
+    static const intptr_t minValue = $(SLANG_PROCESSOR_X86_64?"0x8000000000000000z":"0x80000000z");
 }
 
 extension uintptr_t
@@ -472,13 +472,8 @@ extension uintptr_t
     __generic<T>
     __intrinsic_op($(kIROp_Construct))
     __init(Ptr<T> ptr);
-#ifdef _X64
-    static const uintptr_t maxValue = 0xFFFFFFFFFFFFFFFFz;
+    static const uintptr_t maxValue = $(SLANG_PROCESSOR_X86_64?"0xFFFFFFFFFFFFFFFFz":"0xFFFFFFFFz");
     static const uintptr_t minValue = 0z;
-#else
-    static const uintptr_t maxValue = 0xFFFFFFFFz;
-    static const uintptr_t minValue = 0z;
-#endif
 }
 
 __generic<T>
