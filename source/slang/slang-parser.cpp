@@ -5557,7 +5557,7 @@ namespace Slang
                     }
                     else if (uCount == 1 && zCount == 1)
                     {
-                        suffixBaseType == BaseType::UIntPtr;
+                        suffixBaseType = BaseType::UIntPtr;
                     }
                     // TODO: do we need suffixes for smaller integer types?
                     else
