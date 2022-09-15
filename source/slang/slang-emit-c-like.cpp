@@ -981,9 +981,8 @@ void CLikeSourceEmitter::emitSimpleValueImpl(IRInst* inst)
                     m_writer->emitUInt64(uint64_t(litInst->value.intVal));
                     m_writer->emit(")");
 #else
-                    m_writer->emit("uint(");
                     m_writer->emit(UInt(uint32_t(litInst->value.intVal)));
-                    m_writer->emit(")");
+                    m_writer->emit("U");
 #endif
                     break;
                 }
