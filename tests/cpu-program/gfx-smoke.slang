@@ -8,7 +8,7 @@ import slang;
 public __extern_cpp int main()
 {
     gfx.DeviceDesc deviceDesc = {};
-    deviceDesc.deviceType = gfx.DeviceType.CPU;
+    deviceDesc.deviceType = gfx.DeviceType.Default;
     Optional<gfx.IDevice> device;
     gfx.gfxCreateDevice(&deviceDesc, device);
     if (device == none)
@@ -86,7 +86,8 @@ public __extern_cpp int main()
     entryPointObject.value.setResource(&offset, bufferView.value);
     encoder.value.dispatchCompute(1, 1, 1);
     encoder.value.endEncoding();
-
+    commandBuffer.value.close();
+    
     NativeRef<gfx.ICommandBuffer> commandBufferRef = NativeRef<gfx.ICommandBuffer>(commandBuffer.value);
     queue.value.executeCommandBuffers(1, &commandBufferRef, none, 0);
     queue.value.waitOnHost();
