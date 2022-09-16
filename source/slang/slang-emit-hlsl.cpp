@@ -539,19 +539,21 @@ bool HLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
         }
         case kIROp_StringLit:
         {
-            IRStringLit* lit = cast<IRStringLit>(inst);
-            UnownedStringSlice slice = lit->getStringSlice();
-            m_writer->emit(int32_t(getStableHashCode32(slice.begin(), slice.getLength())));
+            const auto handler = StringEscapeUtil::getHandler(StringEscapeUtil::Style::Slang);
+
+            StringBuilder buf;
+            const UnownedStringSlice slice = as<IRStringLit>(inst)->getStringSlice();
+            StringEscapeUtil::appendQuoted(handler, slice, buf);
+
+            m_writer->emit(buf);
+
             return true;
         }
         case kIROp_GetStringHash:
         {
-            // On GLSL target, the `String` type is just an `int`
-            // that is the hash of the string, so we can emit
-            // the first operand to `getStringHash` directly.
-            //
-            EmitOpInfo outerPrec = inOuterPrec;
-            emitOperand(inst->getOperand(0), outerPrec);
+            const UnownedStringSlice slice = as<IRStringLit>(inst->getOperand(0))->getStringSlice();
+            m_writer->emit(static_cast<int32_t>(getStableHashCode32(slice.begin(), slice.getLength())));
+
             return true;
         }
         case kIROp_ByteAddressBufferLoad:

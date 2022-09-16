@@ -38,7 +38,7 @@ SlangResult GLSLSourceEmitter::init()
         case Stage::Miss:
         case Stage::RayGeneration:
         {
-            _requireRayTracing();   
+            _requireRayTracing();
             break;
         }
         default: break;
@@ -448,7 +448,7 @@ void GLSLSourceEmitter::_emitGLSLImageFormatModifier(IRInst* var, IRTextureType*
                 // inference (e.g., to specify r11fg11fb10f).
 
                 m_writer->emit("rgba");
-                //Emit("rgb");                                
+                //Emit("rgb");
                 break;
             }
 
@@ -784,7 +784,7 @@ void GLSLSourceEmitter::_emitSpecialFloatImpl(IRType* type, const char* valueExp
     m_writer->emit(")");
 }
 
-void GLSLSourceEmitter::emitSimpleValueImpl(IRInst* inst) 
+void GLSLSourceEmitter::emitSimpleValueImpl(IRInst* inst)
 {
     switch (inst->getOp())
     {
@@ -797,8 +797,8 @@ void GLSLSourceEmitter::emitSimpleValueImpl(IRInst* inst)
             {
                 switch (type->getBaseType())
                 {
-                    default: 
-                    
+                    default:
+
                     case BaseType::Int8:
                     {
                         emitType(type);
@@ -856,7 +856,7 @@ void GLSLSourceEmitter::emitSimpleValueImpl(IRInst* inst)
 
                 }
             }
-            break;   
+            break;
         }
         case kIROp_FloatLit:
         {
@@ -988,7 +988,7 @@ void GLSLSourceEmitter::emitEntryPointAttributesImpl(IRFunc* irFunc, IREntryPoin
                     case kIROp_HLSLLineStreamType:      m_writer->emit("layout(line_strip) out;\n"); break;
                     case kIROp_HLSLTriangleStreamType:  m_writer->emit("layout(triangle_strip) out;\n"); break;
                     default: SLANG_ASSERT(!"Unknown stream out type");
-                }    
+                }
             }
         }
         break;
@@ -1652,19 +1652,21 @@ bool GLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
 
         case kIROp_StringLit:
         {
-            IRStringLit* lit = cast<IRStringLit>(inst);
-            const UnownedStringSlice slice = lit->getStringSlice();
-            m_writer->emit(int32_t(getStableHashCode32(slice.begin(), slice.getLength())));
+            const auto handler = StringEscapeUtil::getHandler(StringEscapeUtil::Style::Slang);
+
+            StringBuilder buf;
+            const UnownedStringSlice slice = as<IRStringLit>(inst)->getStringSlice();
+            StringEscapeUtil::appendQuoted(handler, slice, buf);
+
+            m_writer->emit(buf);
+
             return true;
         }
         case kIROp_GetStringHash:
         {
-            // On GLSL target, the `String` type is just an `int`
-            // that is the hash of the string, so we can emit
-            // the first operand to `getStringHash` directly.
-            //
-            EmitOpInfo outerPrec = inOuterPrec;
-            emitOperand(inst->getOperand(0), outerPrec);
+            const UnownedStringSlice slice = as<IRStringLit>(inst->getOperand(0))->getStringSlice();
+            m_writer->emit(static_cast<int32_t>(getStableHashCode32(slice.begin(), slice.getLength())));
+
             return true;
         }
         case kIROp_ImageLoad:
@@ -1771,7 +1773,7 @@ static Index _getGLSLVersion(ProfileVersion profile)
 {
     switch (profile)
     {
-#define CASE(TAG, VALUE) case ProfileVersion::TAG: return VALUE; 
+#define CASE(TAG, VALUE) case ProfileVersion::TAG: return VALUE;
         CASE(GLSL_110, 110);
         CASE(GLSL_120, 120);
         CASE(GLSL_130, 130);
@@ -1960,7 +1962,7 @@ void GLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
         case kIROp_UInt8Type:
         case kIROp_UInt16Type:
         case kIROp_UIntType:
-        case kIROp_FloatType:   
+        case kIROp_FloatType:
         case kIROp_DoubleType:
         {
             _requireBaseType(cast<IRBasicType>(type)->getBaseType());
@@ -2011,9 +2013,9 @@ void GLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
             return;
         }
         case kIROp_NativeStringType:
-        case kIROp_StringType: 
+        case kIROp_StringType:
         {
-            m_writer->emit("int"); 
+            m_writer->emit("int");
             return;
         }
         default: break;
@@ -2135,7 +2137,7 @@ void GLSLSourceEmitter::emitRateQualifiersImpl(IRRate* rate)
     if (as<IRConstExprRate>(rate))
     {
         m_writer->emit("const ");
-        
+
     }
     else if (as<IRGroupSharedRate>(rate))
     {

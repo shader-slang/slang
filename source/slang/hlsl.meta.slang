@@ -2736,8 +2736,35 @@ matrix<T,N,M> pow(matrix<T,N,M> x, matrix<T,N,M> y)
 }
 
 // Output message
+__target_intrinsic(hlsl)
+__glsl_extension(GL_EXT_debug_printf)
+__target_intrinsic(glsl, "debugPrintfEXT($0)")
+void printf(NativeString format);
 
-// void printf( string format, ... );
+__target_intrinsic(hlsl)
+__glsl_extension(GL_EXT_debug_printf)
+__target_intrinsic(glsl, "debugPrintfEXT($0, $1)")
+void printf<T0>(NativeString format, T0 arg0);
+
+__target_intrinsic(hlsl)
+__glsl_extension(GL_EXT_debug_printf)
+__target_intrinsic(glsl, "debugPrintfEXT($0, $1, $2)")
+void printf<T0, T1>(NativeString format, T0 arg0, T1 arg1);
+
+__target_intrinsic(hlsl)
+__glsl_extension(GL_EXT_debug_printf)
+__target_intrinsic(glsl, "debugPrintfEXT($0, $1, $2, $3)")
+void printf<T0, T1, T2>(NativeString format, T0 arg0, T1 arg1, T2 arg2);
+
+__target_intrinsic(hlsl)
+__glsl_extension(GL_EXT_debug_printf)
+__target_intrinsic(glsl, "debugPrintfEXT($0, $1, $2, $3, $4)")
+void printf<T0, T1, T2, T3>(NativeString format, T0 arg0, T1 arg1, T2 arg2, T3 arg3);
+
+__target_intrinsic(hlsl)
+__glsl_extension(GL_EXT_debug_printf)
+__target_intrinsic(glsl, "debugPrintfEXT($0, $1, $2, $3, $4, $5)")
+void printf<T0, T1, T2, T3, T4>(NativeString format, T0 arg0, T1 arg1, T2 arg2, T3 arg3, T4 arg4);
 
 // Tessellation factor fixup routines
 
