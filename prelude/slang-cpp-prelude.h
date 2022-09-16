@@ -6,7 +6,7 @@
 // https://stackoverflow.com/questions/39130040/cmath-hides-isnan-in-math-h-in-c14-c11
  
 #ifdef SLANG_LLVM
-#   include "slang-llvm.h"
+#include "slang-llvm.h"
 #else // SLANG_LLVM
 #   if SLANG_GCC_FAMILY && __GNUC__ < 6
 #       include <cmath>

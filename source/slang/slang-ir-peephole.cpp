@@ -90,7 +90,7 @@ struct PeepholeContext : InstPassBase
                 auto ptr = inst->getOperand(0);
                 IRBuilder builder(&sharedBuilderStorage);
                 builder.setInsertBefore(inst);
-                auto neq = builder.emitNeq(ptr, builder.getPtrValue(nullptr));
+                auto neq = builder.emitNeq(ptr, builder.getNullVoidPtrValue());
                 inst->replaceUsesWith(neq);
                 inst->removeAndDeallocate();
                 changed = true;
@@ -172,6 +172,26 @@ struct PeepholeContext : InstPassBase
                     builder.setInsertBefore(inst);
                     auto falseVal = builder.getBoolValue(false);
                     inst->replaceUsesWith(falseVal);
+                    inst->removeAndDeallocate();
+                    changed = true;
+                }
+            }
+            break;
+        case kIROp_GetNativePtr:
+            {
+                if (inst->getOperand(0)->getOp() == kIROp_PtrLit)
+                {
+                    inst->replaceUsesWith(inst->getOperand(0));
+                    inst->removeAndDeallocate();
+                    changed = true;
+                }
+            }
+            break;
+        case kIROp_MakeExistential:
+            {
+                if (inst->getOperand(0)->getOp() == kIROp_ExtractExistentialValue)
+                {
+                    inst->replaceUsesWith(inst->getOperand(0)->getOperand(0));
                     inst->removeAndDeallocate();
                     changed = true;
                 }

@@ -864,9 +864,9 @@ interface IShaderObject
     slang::TypeLayoutReflection* getElementTypeLayout();
     ShaderObjectContainerType getContainerType();
     GfxCount getEntryPointCount();
-    Result getEntryPoint(GfxIndex index, out IShaderObject entryPoint);
-    Result setData(ShaderOffset* offset, void *data, Size size);
-    Result getObject(ShaderOffset* offset, out IShaderObject object);
+    Result getEntryPoint(GfxIndex index, out Optional<IShaderObject> entryPoint);
+    Result setData(ShaderOffset *offset, void *data, Size size);
+    Result getObject(ShaderOffset *offset, out Optional<IShaderObject> object);
     Result setObject(ShaderOffset* offset, IShaderObject object);
     Result setResource(ShaderOffset* offset, IResourceView resourceView);
     Result setSampler(ShaderOffset* offset, ISamplerState sampler);
@@ -1473,7 +1473,7 @@ interface IComputeCommandEncoder : IResourceCommandEncoder
     // sub-shader-objects bound to it. The user must be responsible for ensuring that any
     // resources or shader objects that is set into `outRooShaderObject` stays alive during
     // the execution of the command buffer.
-    Result bindPipeline(IPipelineState state, out IShaderObject outRootShaderObject);
+    Result bindPipeline(IPipelineState state, out Optional<IShaderObject> outRootShaderObject);
     
     // Sets the current pipeline state along with a pre-created mutable root shader object.
     Result bindPipelineWithRootObject(IPipelineState state, IShaderObject rootObject);
@@ -1542,11 +1542,11 @@ interface ICommandBuffer
         IFramebuffer framebuffer,
         out IRenderCommandEncoder outEncoder);
 
-    void encodeComputeCommands(out IComputeCommandEncoder encoder);
+    void encodeComputeCommands(out Optional<IComputeCommandEncoder> encoder);
 
-    void encodeResourceCommands(out IResourceCommandEncoder outEncoder);
+    void encodeResourceCommands(out Optional<IResourceCommandEncoder> outEncoder);
 
-    void encodeRayTracingCommands(out IRayTracingCommandEncoder outEncoder);
+    void encodeRayTracingCommands(out Optional<IRayTracingCommandEncoder> outEncoder);
 
     void close();
 
@@ -1616,7 +1616,7 @@ interface ITransientResourceHeap
     // buffers must be closed before submission. The current D3D12 implementation has a limitation
     // that only one command buffer maybe recorded at a time. User must finish recording a command
     // buffer before creating another command buffer.
-    Result createCommandBuffer(out ICommandBuffer outCommandBuffer);
+    Result createCommandBuffer(out Optional<ICommandBuffer> outCommandBuffer);
 };
 
 struct SwapchainDesc
@@ -1759,7 +1759,7 @@ interface IDevice
 
     Result createTransientResourceHeap(
         TransientResourceHeapDesc *desc,
-        out ITransientResourceHeap outHeap);
+        out Optional<ITransientResourceHeap> outHeap);
 
     /// Create a texture resource.
     ///
@@ -1795,7 +1795,7 @@ interface IDevice
     Result createBufferResource(
         BufferResourceDesc* desc,
         void *initData,
-        out IBufferResource outResource);
+        out Optional<IBufferResource> outResource);
 
     Result createBufferFromNativeHandle(
         InteropHandle handle,
@@ -1814,9 +1814,9 @@ interface IDevice
 
     Result createBufferView(
         IBufferResource buffer,
-        IBufferResource counterBuffer,
+        Optional<IBufferResource> counterBuffer,
         ResourceViewDesc* desc,
-        out IResourceView outView);
+        out Optional<IResourceView> outView);
 
     Result createFramebufferLayout(FramebufferLayoutDesc* desc, out IFramebufferLayout outFrameBuffer);
     
@@ -1832,7 +1832,7 @@ interface IDevice
     Result createInputLayout(
         InputLayoutDesc* desc, out IInputLayout outLayout);
 
-    Result createCommandQueue(CommandQueueDesc* desc, out ICommandQueue outQueue);
+    Result createCommandQueue(CommandQueueDesc* desc, out Optional<ICommandQueue> outQueue);
 
     Result createShaderObject(
         slang::TypeReflection *type,
@@ -1863,19 +1863,19 @@ interface IDevice
 
     Result createProgram2(
         ShaderProgramDesc2 *desc,
-        out IShaderProgram outProgram,
-        out slang::ISlangBlob outDiagnosticBlob);
+        out Optional<IShaderProgram> outProgram,
+        out Optional<slang::ISlangBlob> outDiagnosticBlob);
 
     Result createGraphicsPipelineState(
-        GraphicsPipelineStateDesc* desc,
-        out IPipelineState outState);
+        GraphicsPipelineStateDesc *desc,
+        out Optional<IPipelineState> outState);
 
     Result createComputePipelineState(
         ComputePipelineStateDesc* desc,
-        out IPipelineState outState);
+        out Optional<IPipelineState> outState);
 
     Result createRayTracingPipelineState(
-        RayTracingPipelineStateDesc* desc, out IPipelineState outState);
+        RayTracingPipelineStateDesc *desc, out Optional<IPipelineState> outState);
 
     /// Read back texture resource and stores the result in `outBlob`.
     Result readTextureResource(
@@ -1889,7 +1889,7 @@ interface IDevice
         IBufferResource buffer,
         Offset offset,
         Size size,
-        out slang::ISlangBlob outBlob);
+        out Optional<slang::ISlangBlob> outBlob);
 
     /// Get the type of this renderer
     DeviceInfo* getDeviceInfo();

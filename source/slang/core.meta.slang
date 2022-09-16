@@ -571,12 +571,58 @@ T __attachToNativeRef(NativeRef<T> nativeVal)
 __magic_type(StringType)
 __intrinsic_type($(kIROp_StringType))
 struct String
-{};
+{
+    __target_intrinsic(cpp)
+    __init(int val);
+    __target_intrinsic(cpp)
+    __init(uint val);
+    __target_intrinsic(cpp)
+    __init(int64_t val);
+    __target_intrinsic(cpp)
+    __init(uint64_t val);
+    __target_intrinsic(cpp)
+    __init(float val);
+    __target_intrinsic(cpp)
+    __init(double val);
+
+    __target_intrinsic(cpp)
+    int64_t getLength();
+
+    property int length
+    {
+        get { return (int)getLength(); }
+    }
+};
 
 __magic_type(NativeStringType)
 __intrinsic_type($(kIROp_NativeStringType))
 struct NativeString
-{};
+{
+    __target_intrinsic(cpp, "int(strlen($0))")
+    int getLength();
+
+    __target_intrinsic(cpp, "(void*)((const char*)($0))")
+    Ptr<void> getBuffer();
+
+    property int length { [__unsafeForceInlineEarly] get{return getLength();} }
+};
+
+extension Ptr<void>
+{
+    __implicit_conversion($(kConversionCost_PtrToVoidPtr))
+    [__unsafeForceInlineEarly]
+    __init(NativeString nativeStr) { this = nativeStr.getBuffer(); }
+
+    __generic<T>
+    __intrinsic_op(0)
+    __implicit_conversion($(kConversionCost_PtrToVoidPtr))
+    __init(Ptr<T> ptr);
+
+    __generic<T>
+    __intrinsic_op(0)
+    __implicit_conversion($(kConversionCost_PtrToVoidPtr))
+    __init(NativeRef<T> ptr);
+}
 
 __magic_type(DynamicType)
 __intrinsic_type($(kIROp_DynamicType))

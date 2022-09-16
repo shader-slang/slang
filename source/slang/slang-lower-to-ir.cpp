@@ -3451,7 +3451,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
 
     LoweredValInfo visitNullPtrLiteralExpr(NullPtrLiteralExpr*)
     {
-        return LoweredValInfo::simple(context->irBuilder->getPtrValue(nullptr));
+        return LoweredValInfo::simple(context->irBuilder->getNullVoidPtrValue());
     }
 
     LoweredValInfo visitNoneLiteralExpr(NoneLiteralExpr*)
@@ -3889,7 +3889,10 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
             // These may include `out` and `inout` arguments that
             // require "fixup" work on the other side.
             //
-            auto funcType = lowerType(context, funcExpr->type);
+            FuncDeclBaseTypeInfo funcTypeInfo;
+            _lowerFuncDeclBaseTypeInfo(context, funcDeclRef.template as<FunctionDeclBase>(), funcTypeInfo);
+
+            auto funcType = funcTypeInfo.type;
             addDirectCallArgs(expr, funcDeclRef, &irArgs, &argFixups);
             auto result = emitCallToDeclRef(
                 context,

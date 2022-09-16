@@ -8,10 +8,12 @@
 RWStructuredBuffer<int> outputBuffer;
 
 __target_intrinsic(cpp, "sizeof(intptr_t)")
+__target_intrinsic(cuda, "sizeof(size_t)")
 intptr_t getNativeIntPtrSize();
 
 __generic<T>
 __target_intrinsic(cpp, "sizeof($0)")
+__target_intrinsic(cuda, "sizeof($0)")
 intptr_t getSizeOf(T val);
 
 intptr_t getIntPtrVal() { return 0z; }
