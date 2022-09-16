@@ -708,7 +708,14 @@ struct SPIRVEmitContext
             return result;
         SpvWord valWord;
         memcpy(&valWord, &val, sizeof(SpvWord));
-        if (type->getOp() == kIROp_Int64Type || type->getOp() == kIROp_UInt64Type)
+        switch (type->getOp())
+        {
+        case kIROp_Int64Type:
+        case kIROp_UInt64Type:
+#if SLANG_PTR_IS_64
+        case kIROp_PtrType:
+        case kIROp_UIntPtrType:
+#endif
         {
             SpvWord valHighWord;
             memcpy(&valHighWord, (char*)(&val) + 4, sizeof(SpvWord));
@@ -720,8 +727,9 @@ struct SPIRVEmitContext
                 kResultID,
                 valWord,
                 valHighWord);
+            break;
         }
-        else
+        default:
         {
             result = emitInst(
                 getSection(SpvLogicalSectionID::Constants),
@@ -730,6 +738,8 @@ struct SPIRVEmitContext
                 type,
                 kResultID,
                 valWord);
+            break;
+        }
         }
         m_spvIntConstants[key] = result;
         return result;
@@ -1722,6 +1732,8 @@ struct SPIRVEmitContext
                 {
                 case BaseType::Int64:
                 case BaseType::UInt64:
+                case BaseType::IntPtr:
+                case BaseType::UIntPtr:
                     return emitInst(
                         getSection(SpvLogicalSectionID::Constants),
                         inst,

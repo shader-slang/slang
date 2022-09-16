@@ -43,7 +43,7 @@ namespace Slang
 
         // Marshal a managed value to a native value for input into a native functions.
         void marshalManagedValueToNativeValue(
-            IRBuilder& builder, IRInst* originalArg, List<IRInst*>& args);
+            IRBuilder& builder, IRType* originalParamType, IRInst* originalArg, List<IRInst*>& args);
 
         // Marshal a managed value to a native value for the return value of a native function.
         void marshalManagedValueToNativeResultValue(

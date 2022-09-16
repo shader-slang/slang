@@ -20,9 +20,10 @@ namespace Slang
             IRBuilder builderStorage(sharedContext->sharedBuilderStorage);
             auto builder = &builderStorage;
             builder->setInsertBefore(inst);
-
             auto value = inst->getWrappedValue();
             auto valueType = sharedContext->lowerType(builder, value->getDataType());
+            if (valueType->getOp() == kIROp_ComPtrType)
+                return;
             auto witnessTableType = cast<IRWitnessTableTypeBase>(inst->getWitnessTable()->getDataType());
             auto interfaceType = witnessTableType->getConformanceType();
             if (interfaceType->findDecoration<IRComInterfaceDecoration>())

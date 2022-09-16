@@ -172,6 +172,8 @@ namespace Slang
         case BaseType::Half:    emitRaw(context, "h");  break;
         case BaseType::Float:   emitRaw(context, "f");  break;
         case BaseType::Double:  emitRaw(context, "d");  break;
+        case BaseType::UIntPtr: emitRaw(context, "up");  break;
+        case BaseType::IntPtr:  emitRaw(context, "ip");  break;
             break;
 
         default:

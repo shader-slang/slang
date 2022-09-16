@@ -30,9 +30,21 @@ struct ComMethodLoweringContext : public InstPassBase
         auto callee = as<IRLookupWitnessMethod>(comCall->getCallee());
         SLANG_ASSERT(callee);
 
+        IRLookupWitnessMethod* innerMostCallee = callee;
+        while (innerMostCallee->getOperand(0)->getOp() == kIROp_lookup_interface_method)
+        {
+            innerMostCallee = as<IRLookupWitnessMethod>(innerMostCallee->getOperand(0));
+        }
+        if (callee != innerMostCallee)
+        {
+            callee = (IRLookupWitnessMethod*)builder.emitLookupInterfaceMethodInst(
+                callee->getDataType(),
+                innerMostCallee->getWitnessTable(),
+                callee->getRequirementKey());
+        }
         comCallees.Add(callee);
         
-        auto calleeType = as<IRFuncType>(comCall->getCallee()->getDataType());
+        auto calleeType = as<IRFuncType>(callee->getDataType());
         SLANG_ASSERT(calleeType);
 
         auto nativeFuncType = marshal.getNativeFuncType(builder, calleeType);
@@ -45,7 +57,7 @@ struct ComMethodLoweringContext : public InstPassBase
             builder,
             calleeType,
             nativeFuncType,
-            comCall->getCallee(),
+            callee,
             args.getCount(),
             args.getArrayView().getBuffer());
 

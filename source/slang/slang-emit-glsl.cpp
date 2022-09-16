@@ -465,9 +465,11 @@ void GLSLSourceEmitter::_emitGLSLImageFormatModifier(IRInst* var, IRTextureType*
             case BaseType::Int8:    m_writer->emit("8i"); break;
             case BaseType::Int16:   m_writer->emit("16i"); break;
             case BaseType::Int64:   m_writer->emit("64i"); break;
+            case BaseType::IntPtr:  m_writer->emit("64i"); break;
             case BaseType::UInt8:   m_writer->emit("8ui"); break;
             case BaseType::UInt16:  m_writer->emit("16ui"); break;
             case BaseType::UInt64:  m_writer->emit("64ui"); break;
+            case BaseType::UIntPtr: m_writer->emit("64ui"); break;
 
                 // TODO: Here are formats that are available in GLSL,
                 // but that are not handled by the above cases.
@@ -668,6 +670,16 @@ void GLSLSourceEmitter::_emitGLSLTypePrefix(IRType* type, bool promoteHalfToFloa
             m_writer->emit("i64");
             break;
         }
+        case kIROp_IntPtrType:   
+        {
+#if SLANG_PTR_IS_64
+            _requireBaseType(BaseType::Int64);
+            m_writer->emit("i64");
+#else
+            m_writer->emit("i");
+#endif
+            break;
+        }
 
         case kIROp_UInt8Type:   m_writer->emit("u8");     break;
         case kIROp_UInt16Type:  m_writer->emit("u16");    break;
@@ -679,7 +691,16 @@ void GLSLSourceEmitter::_emitGLSLTypePrefix(IRType* type, bool promoteHalfToFloa
             m_writer->emit("u64");
             break;
         }
-
+        case kIROp_UIntPtrType:
+        {
+#if SLANG_PTR_IS_64
+            _requireBaseType(BaseType::Int64);
+            m_writer->emit("u64");
+#else
+            m_writer->emit("u");
+#endif
+            break;
+        }
         case kIROp_BoolType:    m_writer->emit("b");		break;
 
         case kIROp_HalfType:
@@ -817,12 +838,14 @@ void GLSLSourceEmitter::emitSimpleValueImpl(IRInst* inst)
                         m_writer->emit("U");
                         return;
                     }
+                    case BaseType::IntPtr:
                     case BaseType::Int64:
                     {
                         m_writer->emitInt64(int64_t(litInst->value.intVal));
                         m_writer->emit("L");
                         return;
                     }
+                    case BaseType::UIntPtr:
                     case BaseType::UInt64:
                     {
                         SLANG_COMPILE_TIME_ASSERT(sizeof(litInst->value.intVal) >= sizeof(uint64_t));
@@ -1909,6 +1932,26 @@ void GLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
         {
             _requireBaseType(BaseType::UInt64);
             m_writer->emit(getDefaultBuiltinTypeName(type->getOp()));
+            return;
+        }
+        case kIROp_IntPtrType:
+        {
+#if SLANG_PTR_IS_64
+            _requireBaseType(BaseType::Int64);
+            m_writer->emit("int64_t");
+#else
+            m_writer->emit("int");
+#endif
+            return;
+        }
+        case kIROp_UIntPtrType:
+        {
+#if SLANG_PTR_IS_64
+            _requireBaseType(BaseType::UInt64);
+            m_writer->emit("uint64_t");
+#else
+            m_writer->emit("uint");
+#endif
             return;
         }
         case kIROp_VoidType:

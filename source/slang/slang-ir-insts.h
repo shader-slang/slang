@@ -2262,7 +2262,9 @@ public:
     IRInst* getIntValue(IRType* type, IRIntegerValue value);
     IRInst* getFloatValue(IRType* type, IRFloatingPointValue value);
     IRStringLit* getStringValue(const UnownedStringSlice& slice);
-    IRPtrLit* getPtrValue(void* value);
+    IRPtrLit* _getPtrValue(void* ptr);
+    IRPtrLit* getNullPtrValue(IRType* type);
+    IRPtrLit* getNullVoidPtrValue() { return getNullPtrValue(getPtrType(getVoidType())); }
     IRVoidLit* getVoidValue();
     IRInst* getCapabilityValue(CapabilitySet const& caps);
 

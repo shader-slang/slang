@@ -168,6 +168,10 @@ struct BitCastLoweringContext
         case kIROp_UIntType:
         case kIROp_FloatType:
         case kIROp_BoolType:
+#if SLANG_PTR_IS_32
+        case kIROp_IntPtrType:
+        case kIROp_UIntPtrType:
+#endif
             {
                 auto object = extractValueAtOffset(builder, targetReq, src, offset, 4);
                 return builder.emitBitCast(type, object);
@@ -176,6 +180,10 @@ struct BitCastLoweringContext
         case kIROp_DoubleType:
         case kIROp_Int64Type:
         case kIROp_UInt64Type:
+#if SLANG_PTR_IS_64
+        case kIROp_IntPtrType:
+        case kIROp_UIntPtrType:
+#endif
         case kIROp_RawPointerType:
             {
                 auto low = extractValueAtOffset(builder, targetReq, src, offset, 4);

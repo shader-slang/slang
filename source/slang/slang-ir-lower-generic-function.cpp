@@ -268,6 +268,8 @@ namespace Slang
             IRInst* interfaceRequirementVal = nullptr;
             auto witnessTableType = as<IRWitnessTableType>(lookupInst->getWitnessTable()->getDataType());
             if (!witnessTableType) return;
+            if (witnessTableType->getConformanceType()->findDecoration<IRComInterfaceDecoration>())
+                return;
             auto interfaceType = maybeLowerInterfaceType(cast<IRInterfaceType>(witnessTableType->getConformanceType()));
             interfaceRequirementVal = sharedContext->findInterfaceRequirementVal(interfaceType, lookupInst->getRequirementKey());
             lookupInst->setFullType((IRType*)interfaceRequirementVal);

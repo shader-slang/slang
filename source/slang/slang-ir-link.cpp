@@ -272,7 +272,8 @@ IRInst* IRSpecContext::maybeCloneValue(IRInst* originalValue)
     case kIROp_PtrLit:
         {
             IRConstant* c = (IRConstant*)originalValue;
-            return builder->getPtrValue(c->value.ptrVal);
+            SLANG_RELEASE_ASSERT(c->value.ptrVal == nullptr);
+            return builder->getNullVoidPtrValue();
         }
         break;
 

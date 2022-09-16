@@ -20,6 +20,8 @@ namespace Slang
     X(Float)                    \
     X(Double)                   \
     X(Char)                     \
+    X(IntPtr)                   \
+    X(UIntPtr)                  \
 /* end */
 
     enum class BaseType
