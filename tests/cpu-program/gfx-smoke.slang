@@ -8,7 +8,7 @@ import slang;
 public __extern_cpp int main()
 {
     gfx.DeviceDesc deviceDesc = {};
-    deviceDesc.deviceType = gfx.DeviceType.Default;
+    deviceDesc.deviceType = gfx.DeviceType.CPU;
     Optional<gfx.IDevice> device;
     gfx.gfxCreateDevice(&deviceDesc, device);
     if (device == none)
