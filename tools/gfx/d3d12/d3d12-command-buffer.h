@@ -49,6 +49,7 @@ public:
     void bindDescriptorHeaps();
 
     virtual SLANG_NO_THROW void SLANG_MCALL invalidateDescriptorHeapBinding() override { m_descriptorHeapsBound = false; }
+    virtual SLANG_NO_THROW void SLANG_MCALL ensureInternalDescriptorHeapsBound() override { bindDescriptorHeaps(); }
 
     void reinit();
 

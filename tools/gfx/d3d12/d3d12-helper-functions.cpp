@@ -408,7 +408,10 @@ Result uploadBufferDataImpl(
         SLANG_RETURN_ON_FAIL(transientHeap->allocateStagingBuffer(
             size, uploadResource, uploadResourceOffset, MemoryType::Upload));
     }
-
+    else
+    {
+        uploadResourceOffset = offset;
+    }
     D3D12Resource& uploadResourceRef =
         (buffer->getDesc()->memoryType == MemoryType::Upload)
         ? buffer->m_resource
