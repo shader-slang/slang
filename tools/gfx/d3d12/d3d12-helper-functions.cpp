@@ -408,7 +408,10 @@ Result uploadBufferDataImpl(
         SLANG_RETURN_ON_FAIL(transientHeap->allocateStagingBuffer(
             size, uploadResource, uploadResourceOffset, MemoryType::Upload));
     }
-
+    else
+    {
+        uploadResourceOffset = offset;
+    }
     D3D12Resource& uploadResourceRef =
         (buffer->getDesc()->memoryType == MemoryType::Upload)
         ? buffer->m_resource
@@ -420,10 +423,10 @@ Result uploadBufferDataImpl(
     void* uploadData;
     SLANG_RETURN_ON_FAIL(
         uploadResourceRef.getResource()->Map(0, &readRange, reinterpret_cast<void**>(&uploadData)));
-    memcpy((uint8_t*)uploadData + uploadResourceOffset + offset, data, size);
+    memcpy((uint8_t*)uploadData + uploadResourceOffset, data, size);
     D3D12_RANGE writtenRange = {};
-    writtenRange.Begin = uploadResourceOffset + offset;
-    writtenRange.End = uploadResourceOffset + offset + size;
+    writtenRange.Begin = uploadResourceOffset;
+    writtenRange.End = uploadResourceOffset + size;
     uploadResourceRef.getResource()->Unmap(0, &writtenRange);
 
     if (buffer->getDesc()->memoryType != MemoryType::Upload)
@@ -432,7 +435,7 @@ Result uploadBufferDataImpl(
             buffer->m_resource.getResource(),
             offset,
             uploadResourceRef.getResource(),
-            uploadResourceOffset + offset,
+            uploadResourceOffset,
             size);
     }
 

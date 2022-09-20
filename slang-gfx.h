@@ -1894,6 +1894,7 @@ class ICommandBufferD3D12 : public ICommandBuffer
 {
 public:
     virtual SLANG_NO_THROW void SLANG_MCALL invalidateDescriptorHeapBinding() = 0;
+    virtual SLANG_NO_THROW void SLANG_MCALL ensureInternalDescriptorHeapsBound() = 0;
 };
 #define SLANG_UUID_ICommandBufferD3D12                                                 \
     {                                                                                  \
