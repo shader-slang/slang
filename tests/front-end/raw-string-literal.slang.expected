@@ -1,0 +1,8 @@
+result code = 0
+standard error = {
+}
+standard output = {
+This is line 1.
+        This is line 2.
+        "Hello World"
+        }

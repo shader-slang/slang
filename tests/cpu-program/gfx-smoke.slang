@@ -23,17 +23,17 @@ public __extern_cpp int main()
     device.value.createCommandQueue(&queueDesc, queue);
 
     gfx.ShaderProgramDesc2 programDesc = {};
-    NativeString s =
-        "[shader(\"compute\")]"
-        "[numthreads(4, 1, 1)]"
-        "void computeMain("
-        "    uint3 sv_dispatchThreadID: SV_DispatchThreadID,"
-        "    uniform RWStructuredBuffer<float> buffer"
-        "    )"
-        "{"
-        "    var input = buffer[sv_dispatchThreadID.x];"
-        "    buffer[sv_dispatchThreadID.x] = sv_dispatchThreadID.x;"
-        "}";
+    NativeString s = R"(
+        [shader("compute")]
+        [numthreads(4, 1, 1)]
+        void computeMain(
+            uint3 sv_dispatchThreadID: SV_DispatchThreadID,
+            uniform RWStructuredBuffer<float> buffer
+            )
+        {
+            var input = buffer[sv_dispatchThreadID.x];
+            buffer[sv_dispatchThreadID.x] = sv_dispatchThreadID.x;
+        })";
     programDesc.sourceData = s;
     programDesc.sourceType = gfx.ShaderModuleSourceType.SlangSource;
     programDesc.sourceDataSize = s.length;
