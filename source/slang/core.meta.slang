@@ -605,6 +605,9 @@ struct NativeString
     Ptr<void> getBuffer();
 
     property int length { [__unsafeForceInlineEarly] get{return getLength();} }
+
+    __intrinsic_op($(kIROp_getNativeStr))
+    __init(String value);
 };
 
 extension Ptr<void>

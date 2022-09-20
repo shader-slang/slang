@@ -1,7 +1,4 @@
 //TEST:EXECUTABLE:
-__target_intrinsic(cpp, "printf(\"%s\\n\", ($0).getBuffer())")
-void writeln(String text);
-
 import gfx;
 import slang;
 
@@ -13,7 +10,7 @@ public __extern_cpp int main()
     gfx.gfxCreateDevice(&deviceDesc, device);
     if (device == none)
     {
-        writeln("fail");
+        printf("fail\n");
         return -1;
     }
     
@@ -98,7 +95,7 @@ public __extern_cpp int main()
     for (int i = 0; i < 4; i++)
     {
         float val = ((float *)blob.value.getBufferPointer())[i];
-        writeln(String(val));
+        printf("%.1f\n", val);
     }
     return 0;
 }
