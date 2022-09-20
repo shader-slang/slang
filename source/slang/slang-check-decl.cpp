@@ -5229,7 +5229,7 @@ namespace Slang
             if (!TryUnifyTypes(constraints, extDecl->targetType.Ptr(), type))
                 return DeclRef<ExtensionDecl>();
 
-            auto constraintSubst = TrySolveConstraintSystem(&constraints, DeclRef<Decl>(extGenericDecl, nullptr).as<GenericDecl>());
+            auto constraintSubst = trySolveConstraintSystem(&constraints, DeclRef<Decl>(extGenericDecl, nullptr).as<GenericDecl>());
             if (!constraintSubst)
             {
                 return DeclRef<ExtensionDecl>();

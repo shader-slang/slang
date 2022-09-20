@@ -180,6 +180,13 @@ namespace Slang
         };
         Status status = Status::Unchecked;
 
+        typedef unsigned int Flags;
+        enum Flag : Flags
+        {
+            IsPartiallyAppliedGeneric = 1 << 0,
+        };
+        Flags flags = 0;
+
         // Reference to the declaration being applied
         LookupResultItem item;
 
@@ -1366,9 +1373,10 @@ namespace Slang
         //
         // Returns a new substitution representing the values that
         // we solved for along the way.
-        SubstitutionSet TrySolveConstraintSystem(
-            ConstraintSystem*		system,
-            DeclRef<GenericDecl>          genericDeclRef);
+        SubstitutionSet trySolveConstraintSystem(
+            ConstraintSystem*       system,
+            DeclRef<GenericDecl>    genericDeclRef,
+            GenericSubstitution*    substWithKnownGenericArgs = nullptr);
 
 
         // State related to overload resolution for a call
@@ -1616,12 +1624,16 @@ namespace Slang
             ExtensionDecl*  extDecl,
             Type*    type);
 
-        // Take a generic declaration and try to specialize its parameters
-        // so that the resulting inner declaration can be applicable in
-        // a particular context...
-        DeclRef<Decl> SpecializeGenericForOverload(
+            // Take a generic declaration that is being applied
+            // in a context and attempt to infer any missing generic
+            // arguments to form a `DeclRef` to the inner declaration
+            // that could be applicable in the context of the given
+            // overloaded call.
+            //
+        DeclRef<Decl> inferGenericArguments(
             DeclRef<GenericDecl>    genericDeclRef,
-            OverloadResolveContext& context);
+            OverloadResolveContext& context,
+            GenericSubstitution*    substWithKnownGenericArgs);
 
         void AddTypeOverloadCandidates(
             Type*	        type,
@@ -1651,6 +1663,19 @@ namespace Slang
         void AddGenericOverloadCandidates(
             Expr*	baseExpr,
             OverloadResolveContext&			context);
+
+            // Add overload candidates based on use of `genericDeclRef`
+            // in an ordinary function-call context (that is, where it
+            // has been applied to arguments using `()` and not `<>`).
+            //
+            // If some or all of the generic arguments to `genericDeclRef`
+            // are known at the call site, they should be passed in via
+            // `substWithKnownGenericArgs`.
+            //
+        void addOverloadCandidatesForCallToGeneric(
+            LookupResultItem        genericItem,
+            OverloadResolveContext& context,
+            GenericSubstitution*    substWithKnownGenericArgs = nullptr);
 
             /// Check a generic application where the operands have already been checked.
         Expr* checkGenericAppWithCheckedArgs(GenericAppExpr* genericAppExpr);
@@ -1786,6 +1811,7 @@ namespace Slang
         CASE(ExtractExistentialValueExpr)
         CASE(OpenRefExpr)
         CASE(MakeOptionalExpr)
+        CASE(PartiallyAppliedGenericExpr)
 
     #undef CASE
 

@@ -263,9 +263,10 @@ namespace Slang
         return nullptr;
     }
 
-    SubstitutionSet SemanticsVisitor::TrySolveConstraintSystem(
-        ConstraintSystem*		system,
-        DeclRef<GenericDecl>          genericDeclRef)
+    SubstitutionSet SemanticsVisitor::trySolveConstraintSystem(
+        ConstraintSystem*       system,
+        DeclRef<GenericDecl>    genericDeclRef,
+        GenericSubstitution*    substWithKnownGenericArgs)
     {
         // For now the "solver" is going to be ridiculously simplistic.
 
@@ -290,14 +291,60 @@ namespace Slang
                 return SubstitutionSet();
         }
         SubstitutionSet resultSubst = genericDeclRef.substitutions;
-        // We will loop over the generic parameters, and for
-        // each we will try to find a way to satisfy all
-        // the constraints for that parameter
+
+        // Once have built up the full list of constraints we are trying to satisfy,
+        // we will attempt to solve for each parameter in a way that satisfies all
+        // the constraints that apply to that parameter.
+        //
+        // Note: this is a very limited kind of solver, in that it doesn't have a
+        // way to make use of constraints between two or more parameters.
+        //
+        // As we go, we will build up a list of argument values for a possible
+        // solution for how to assign the parameters in a way that satisfies all
+        // the constraints.
+        //
         List<Val*> args;
+
+        // If the context is such that some of the arguments are already specified
+        // or known, we need to go ahead and use those arguments direclty (whether
+        // or not they are compatible with the constraints).
+        //
+        Count knownGenericArgCount = 0;
+        if (substWithKnownGenericArgs)
+        {
+            knownGenericArgCount = substWithKnownGenericArgs->getArgs().getCount();
+            for (auto arg : substWithKnownGenericArgs->getArgs())
+            {
+                args.add(arg);
+            }
+        }
+
+        // We will then iterate over the explicit parameters of the generic
+        // and try to solve for each.
+        //
+        Count paramCounter = 0;
         for (auto m : getMembers(genericDeclRef))
         {
             if (auto typeParam = m.as<GenericTypeParamDecl>())
             {
+                // If the parameter is one where we already know
+                // the argument value to use, we don't bother with
+                // trying to solve for it, and treat any constraints
+                // on such a parameter as implicitly solved-for.
+                //
+                Index paramIndex = paramCounter++;
+                if (paramIndex < knownGenericArgCount)
+                {
+                    for (auto& c : system->constraints)
+                    {
+                        if (c.decl != typeParam.getDecl())
+                            continue;
+
+                        c.satisfied = true;
+                    }
+                    continue;
+                }
+
                 Type* type = nullptr;
                 for (auto& c : system->constraints)
                 {
@@ -334,6 +381,24 @@ namespace Slang
             }
             else if (auto valParam = m.as<GenericValueParamDecl>())
             {
+                // If the parameter is one where we already know
+                // the argument value to use, we don't bother with
+                // trying to solve for it, and treat any constraints
+                // on such a parameter as implicitly solved-for.
+                //
+                Index paramIndex = paramCounter++;
+                if (paramIndex < knownGenericArgCount)
+                {
+                    for (auto& c : system->constraints)
+                    {
+                        if (c.decl != typeParam.getDecl())
+                            continue;
+
+                        c.satisfied = true;
+                    }
+                    continue;
+                }
+
                 // TODO(tfoley): maybe support more than integers some day?
                 // TODO(tfoley): figure out how this needs to interact with
                 // compile-time integers that aren't just constants...
