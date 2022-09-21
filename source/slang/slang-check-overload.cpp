@@ -1418,7 +1418,10 @@ namespace Slang
         }
         else if (auto genericDeclRef = item.declRef.as<GenericDecl>())
         {
-            addOverloadCandidatesForCallToGeneric(LookupResultItem(genericDeclRef), context);
+            LookupResultItem innerItem;
+            innerItem.breadcrumbs = item.breadcrumbs;
+            innerItem.declRef = genericDeclRef;
+            addOverloadCandidatesForCallToGeneric(innerItem, context);
         }
         else if( auto typeDefDeclRef = item.declRef.as<TypeDefDecl>() )
         {
