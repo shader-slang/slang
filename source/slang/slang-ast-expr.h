@@ -494,6 +494,8 @@ class PartiallyAppliedGenericExpr : public Expr
     SLANG_AST_CLASS(PartiallyAppliedGenericExpr);
 
 public:
+    Expr* originalExpr = nullptr;
+
         /// The generic being applied
     DeclRef<GenericDecl> baseGenericDeclRef;
 

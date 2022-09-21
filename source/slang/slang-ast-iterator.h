@@ -258,6 +258,10 @@ struct ASTIterator
             dispatchIfNotNull(expr->value);
             dispatchIfNotNull(expr->typeExpr);
         }
+        void visitPartiallyAppliedGenericExpr(PartiallyAppliedGenericExpr* expr)
+        {
+            dispatchIfNotNull(expr->originalExpr);
+        }
     };
 
     struct ASTIteratorStmtVisitor : public StmtVisitor<ASTIteratorStmtVisitor>
