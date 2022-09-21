@@ -729,7 +729,7 @@ namespace Slang
                 {
                     auto expr = m_astBuilder->create<PartiallyAppliedGenericExpr>();
                     expr->loc = context.loc;
-
+                    expr->originalExpr = originalAppExpr;
                     expr->baseGenericDeclRef = as<DeclRefExpr>(baseExpr)->declRef.as<GenericDecl>();
                     expr->substWithKnownGenericArgs = (GenericSubstitution*)candidate.subst;
                     return expr;
@@ -1418,7 +1418,10 @@ namespace Slang
         }
         else if (auto genericDeclRef = item.declRef.as<GenericDecl>())
         {
-            addOverloadCandidatesForCallToGeneric(LookupResultItem(genericDeclRef), context);
+            LookupResultItem innerItem;
+            innerItem.breadcrumbs = item.breadcrumbs;
+            innerItem.declRef = genericDeclRef;
+            addOverloadCandidatesForCallToGeneric(innerItem, context);
         }
         else if( auto typeDefDeclRef = item.declRef.as<TypeDefDecl>() )
         {
