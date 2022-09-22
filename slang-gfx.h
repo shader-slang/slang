@@ -477,6 +477,8 @@ enum class ResourceState
     ResolveDestination,
     AccelerationStructure,
     AccelerationStructureBuildInput,
+    PixelShaderResource,
+    NonPixelShaderResource,
     _Count
 };
 

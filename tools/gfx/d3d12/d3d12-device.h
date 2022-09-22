@@ -78,7 +78,7 @@ public:
     PFN_D3D12_GET_DEBUG_INTERFACE m_D3D12GetDebugInterface = nullptr;
     PFN_D3D12_CREATE_DEVICE m_D3D12CreateDevice = nullptr;
     PFN_D3D12_SERIALIZE_ROOT_SIGNATURE m_D3D12SerializeRootSignature = nullptr;
-
+    PFN_D3D12_SERIALIZE_VERSIONED_ROOT_SIGNATURE m_D3D12SerializeVersionedRootSignature = nullptr;
     PFN_BeginEventOnCommandList m_BeginEventOnCommandList = nullptr;
     PFN_EndEventOnCommandList m_EndEventOnCommandList = nullptr;
 
