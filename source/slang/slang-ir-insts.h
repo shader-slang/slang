@@ -177,6 +177,12 @@ struct IRAnyValueSizeDecoration : IRDecoration
     }
 };
 
+struct IRSpecializeDecoration : IRDecoration
+{
+    enum { kOp = kIROp_SpecializeDecoration };
+    IR_LEAF_ISA(SpecializeDecoration)
+};
+
 struct IRComInterfaceDecoration : IRDecoration
 {
     enum
@@ -2256,7 +2262,9 @@ public:
     IRInst* getIntValue(IRType* type, IRIntegerValue value);
     IRInst* getFloatValue(IRType* type, IRFloatingPointValue value);
     IRStringLit* getStringValue(const UnownedStringSlice& slice);
-    IRPtrLit* getPtrValue(void* value);
+    IRPtrLit* _getPtrValue(void* ptr);
+    IRPtrLit* getNullPtrValue(IRType* type);
+    IRPtrLit* getNullVoidPtrValue() { return getNullPtrValue(getPtrType(getVoidType())); }
     IRVoidLit* getVoidValue();
     IRInst* getCapabilityValue(CapabilitySet const& caps);
 
@@ -3223,6 +3231,11 @@ public:
     void addAnyValueSizeDecoration(IRInst* inst, IRIntegerValue value)
     {
         addDecoration(inst, kIROp_AnyValueSizeDecoration, getIntValue(getIntType(), value));
+    }
+
+    void addSpecializeDecoration(IRInst* inst)
+    {
+        addDecoration(inst, kIROp_SpecializeDecoration);
     }
 
     void addComInterfaceDecoration(IRInst* inst, UnownedStringSlice guid)

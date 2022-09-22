@@ -774,6 +774,7 @@ struct ResourceOutputSpecializationPass
             // `InOut<T>`.
             //
             IRInst* newParam = paramsBuilder.createParam(valueType);
+            newParam->insertBefore(param);
             param->transferDecorationsTo(newParam);
 
             // The start of the function body should assign
@@ -1000,6 +1001,9 @@ struct ResourceOutputSpecializationPass
             // We skip over parameters that were not specialized.
             //
             if(oldParamInfo.flavor == OutputInfo::Flavor::None)
+                continue;
+
+            if (oldParamInfo.flavor == OutputInfo::Flavor::Undefined)
                 continue;
 
             // For any paraemter that was specialized, we will use

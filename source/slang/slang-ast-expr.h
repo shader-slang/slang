@@ -212,9 +212,12 @@ class PostfixExpr: public OperatorExpr
 class IndexExpr: public Expr
 {
     SLANG_AST_CLASS(IndexExpr)
+    Expr* baseExpression;
+    List<Expr*> indexExprs;
 
-    Expr* baseExpression = nullptr;
-    Expr* indexExpression = nullptr;
+    // The source location of `(`, `)`, and `,` that marks the start/end of the application op and
+    // each argument expr. This info is used by language server.
+    List<SourceLoc> argumentDelimeterLocs;
 };
 
 class MemberExpr: public DeclRefExpr
@@ -478,9 +481,26 @@ class ModifiedTypeExpr : public Expr
     /// A type expression that rrepresents a pointer type, e.g. T*
 class PointerTypeExpr : public Expr
 {
-    SLANG_AST_CLASS(PointerTypeExpr)
+    SLANG_AST_CLASS(PointerTypeExpr);
 
     TypeExp base;
+};
+
+    /// An expression that applies a generic to arguments for some,
+    /// but not all, of its explicit parameters.
+    ///
+class PartiallyAppliedGenericExpr : public Expr
+{
+    SLANG_AST_CLASS(PartiallyAppliedGenericExpr);
+
+public:
+    Expr* originalExpr = nullptr;
+
+        /// The generic being applied
+    DeclRef<GenericDecl> baseGenericDeclRef;
+
+        /// A substitution that includes the generic arguments known so far
+    GenericSubstitution* substWithKnownGenericArgs = nullptr;
 };
 
 } // namespace Slang

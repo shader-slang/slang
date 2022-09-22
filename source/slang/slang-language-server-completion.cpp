@@ -8,6 +8,8 @@
 #include "slang-check-impl.h"
 #include "slang-syntax.h"
 
+#include "../core/slang-file-system.h"
+
 #include "../core/slang-char-util.h"
 #include <chrono>
 

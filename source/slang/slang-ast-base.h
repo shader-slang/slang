@@ -22,7 +22,18 @@ class NodeBase
 
         // MUST be called before used. Called automatically via the ASTBuilder.
         // Note that the astBuilder is not stored in the NodeBase derived types by default.
-    SLANG_FORCE_INLINE void init(ASTNodeType inAstNodeType, ASTBuilder* /* astBuilder*/ ) { astNodeType = inAstNodeType; }
+    SLANG_FORCE_INLINE void init(ASTNodeType inAstNodeType, ASTBuilder* /* astBuilder*/)
+    {
+        astNodeType = inAstNodeType;
+#ifdef _DEBUG
+        static uint32_t uidCounter = 0;
+        static uint32_t breakValue = 0;
+        uidCounter++;
+        _debugUID = uidCounter;
+        if (breakValue != 0 && _debugUID == breakValue)
+            SLANG_BREAKPOINT(0)
+#endif
+    }
 
         /// Get the class info 
     SLANG_FORCE_INLINE const ReflectClassInfo& getClassInfo() const { return *ASTClassInfo::getInfo(astNodeType); }
@@ -36,6 +47,9 @@ class NodeBase
 
     // Handy when debugging, shouldn't be checked in though!
     // virtual ~NodeBase() {}
+#ifdef _DEBUG
+    SLANG_UNREFLECTED uint32_t _debugUID = 0;
+#endif
 };
 
 // Casting of NodeBase
@@ -138,6 +152,14 @@ class Val : public NodeBase
 
 SLANG_FORCE_INLINE StringBuilder& operator<<(StringBuilder& io, Val* val) { SLANG_ASSERT(val); val->toText(io); return io; }
 
+    /// Given a `value` that refers to a `param` of some generic, attempt to apply
+    /// the `subst` to it and produce a new `Val` as a result.
+    ///
+    /// If the `subst` does not include anything to replace `value`, then this function
+    /// returns null.
+    ///
+Val* maybeSubstituteGenericParam(Val* value, Decl* param, SubstitutionSet subst, int* ioDiff);
+
 class Type;
 
 template <typename T>
@@ -228,13 +250,28 @@ class GenericSubstitution : public Substitutions
     // parameters we are binding to arguments
     GenericDecl* genericDecl = nullptr;
 
+private:
     // The actual values of the arguments
     List<Val* > args;
-
+public:
+    const List<Val*>& getArgs() const { return args; }
     // Overrides should be public so base classes can access
     Substitutions* _applySubstitutionsShallowOverride(ASTBuilder* astBuilder, SubstitutionSet substSet, Substitutions* substOuter, int* ioDiff);
     bool _equalsOverride(Substitutions* subst);
     HashCode _getHashCodeOverride() const;
+
+    GenericSubstitution(GenericDecl* decl)
+    {
+        genericDecl = decl;
+    }
+
+    template<typename... TArgs>
+    GenericSubstitution(GenericDecl* decl, TArgs... inArgs)
+    {
+        genericDecl = decl;
+        addToList(args, inArgs...);
+    }
+
 };
 
 class ThisTypeSubstitution : public Substitutions
@@ -253,6 +290,10 @@ class ThisTypeSubstitution : public Substitutions
     Substitutions* _applySubstitutionsShallowOverride(ASTBuilder* astBuilder, SubstitutionSet substSet, Substitutions* substOuter, int* ioDiff);
     bool _equalsOverride(Substitutions* subst);
     HashCode _getHashCodeOverride() const;
+
+    ThisTypeSubstitution(InterfaceDecl* inInterfaceDecl, SubtypeWitness* inWitness)
+        : interfaceDecl(inInterfaceDecl), witness(inWitness)
+    {}
 };
 
 class SyntaxNode : public SyntaxNodeBase

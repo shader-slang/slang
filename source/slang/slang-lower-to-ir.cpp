@@ -1321,11 +1321,12 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
     LoweredValInfo visitPolynomialIntVal(PolynomialIntVal* val)
     {
         auto irBuilder = getBuilder();
-        auto constTerm = irBuilder->getIntValue(irBuilder->getIntType(), val->constantTerm);
+        auto type = lowerType(context, val->type);
+        auto constTerm = irBuilder->getIntValue(type, val->constantTerm);
         auto resultVal = constTerm;
         for (auto term : val->terms)
         {
-            auto termVal = irBuilder->getIntValue(irBuilder->getIntType(), term->constFactor);
+            auto termVal = irBuilder->getIntValue(type, term->constFactor);
             for (auto factor : term->paramFactors)
             {
                 auto factorVal = lowerVal(context, factor->param).val;
@@ -1701,10 +1702,7 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
 
     LoweredValInfo visitConstantIntVal(ConstantIntVal* val)
     {
-        // TODO: it is a bit messy here that the `ConstantIntVal` representation
-        // has no notion of a *type* associated with the value...
-
-        auto type = getIntType(context);
+        auto type = lowerType(context, val->type);
         return LoweredValInfo::simple(getBuilder()->getIntValue(type, val->value));
     }
 
@@ -1815,7 +1813,7 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         _collectSubstitutionArgs(operands, subst->outer);
         if (auto genSubst = as<GenericSubstitution>(subst))
         {
-            for (auto arg : genSubst->args)
+            for (auto arg : genSubst->getArgs())
             {
                 operands.add(lowerVal(context, arg).val);
             }
@@ -2563,19 +2561,19 @@ ParameterDirection getThisParamDirection(Decl* parentDecl, ParameterDirection de
     return kParameterDirection_In;
 }
 
-DeclRef<Decl> createDefaultSpecializedDeclRefImpl(IRGenContext* context, Decl* decl)
+DeclRef<Decl> createDefaultSpecializedDeclRefImpl(IRGenContext* context, SemanticsVisitor* semantics, Decl* decl)
 {
     DeclRef<Decl> declRef;
     declRef.decl = decl;
-    declRef.substitutions = createDefaultSubstitutions(context->astBuilder, decl);
+    declRef.substitutions = createDefaultSubstitutions(context->astBuilder, semantics, decl);
     return declRef;
 }
 //
 // The client should actually call the templated wrapper, to preserve type information.
 template<typename D>
-DeclRef<D> createDefaultSpecializedDeclRef(IRGenContext* context, D* decl)
+DeclRef<D> createDefaultSpecializedDeclRef(IRGenContext* context, SemanticsVisitor* semantics, D* decl)
 {
-    DeclRef<Decl> declRef = createDefaultSpecializedDeclRefImpl(context, decl);
+    DeclRef<Decl> declRef = createDefaultSpecializedDeclRefImpl(context, semantics, decl);
     return declRef.as<D>();
 }
 
@@ -3071,11 +3069,20 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
         UNREACHABLE_RETURN(LoweredValInfo());
     }
 
+    LoweredValInfo visitPartiallyAppliedGenericExpr(PartiallyAppliedGenericExpr* /*expr*/)
+    {
+        SLANG_UNEXPECTED("partially applied generics should not occur in checked AST");
+        UNREACHABLE_RETURN(LoweredValInfo());
+    }
+
     LoweredValInfo visitIndexExpr(IndexExpr* expr)
     {
         auto type = lowerType(context, expr->type);
         auto baseVal = lowerSubExpr(expr->baseExpression);
-        auto indexVal = getSimpleVal(context, lowerRValueExpr(context, expr->indexExpression));
+
+        SLANG_RELEASE_ASSERT(expr->indexExprs.getCount() == 1);
+
+        auto indexVal = getSimpleVal(context, lowerRValueExpr(context, expr->indexExprs[0]));
 
         return subscriptValue(type, baseVal, indexVal);
     }
@@ -3184,6 +3191,8 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
             case BaseType::UInt16:
             case BaseType::UInt:
             case BaseType::UInt64:
+            case BaseType::UIntPtr:
+            case BaseType::IntPtr:
                 return LoweredValInfo::simple(getBuilder()->getIntValue(type, 0));
 
             case BaseType::Half:
@@ -3448,7 +3457,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
 
     LoweredValInfo visitNullPtrLiteralExpr(NullPtrLiteralExpr*)
     {
-        return LoweredValInfo::simple(context->irBuilder->getPtrValue(nullptr));
+        return LoweredValInfo::simple(context->irBuilder->getNullVoidPtrValue());
     }
 
     LoweredValInfo visitNoneLiteralExpr(NoneLiteralExpr*)
@@ -3501,8 +3510,8 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
 
     void _lowerSubstitutionArg(IRGenContext* subContext, GenericSubstitution* subst, Decl* paramDecl, Index argIndex)
     {
-        SLANG_ASSERT(argIndex < subst->args.getCount());
-        auto argVal = lowerVal(subContext, subst->args[argIndex]);
+        SLANG_ASSERT(argIndex < subst->getArgs().getCount());
+        auto argVal = lowerVal(subContext, subst->getArgs()[argIndex]);
         setValue(subContext, paramDecl, argVal);
     }
 
@@ -3886,7 +3895,10 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
             // These may include `out` and `inout` arguments that
             // require "fixup" work on the other side.
             //
-            auto funcType = lowerType(context, funcExpr->type);
+            FuncDeclBaseTypeInfo funcTypeInfo;
+            _lowerFuncDeclBaseTypeInfo(context, funcDeclRef.template as<FunctionDeclBase>(), funcTypeInfo);
+
+            auto funcType = funcTypeInfo.type;
             addDirectCallArgs(expr, funcDeclRef, &irArgs, &argFixups);
             auto result = emitCallToDeclRef(
                 context,
@@ -6716,7 +6728,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
         // Allocate an IRInterfaceType with the `operandCount` operands.
         IRInterfaceType* irInterface = subBuilder->createInterfaceType(operandCount, nullptr);
-
+        
         // Add `irInterface` to decl mapping now to prevent cyclic lowering.
         setValue(subContext, decl, LoweredValInfo::simple(irInterface));
 
@@ -6807,6 +6819,10 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         if (auto anyValueSizeAttr = decl->findModifier<AnyValueSizeAttribute>())
         {
             subBuilder->addAnyValueSizeDecoration(irInterface, anyValueSizeAttr->size);
+        }
+        if (auto specializeAttr = decl->findModifier<SpecializeAttribute>())
+        {
+            subBuilder->addSpecializeDecoration(irInterface);
         }
         if (auto comInterfaceAttr = decl->findModifier<ComInterfaceAttribute>())
         {
@@ -7664,7 +7680,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         FuncDeclBaseTypeInfo info;
         _lowerFuncDeclBaseTypeInfo(
             funcTypeContext,
-            createDefaultSpecializedDeclRef(funcTypeContext, decl),
+            createDefaultSpecializedDeclRef(funcTypeContext, nullptr, decl),
             info);
 
         auto irFuncType = info.type;
@@ -7705,7 +7721,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         FuncDeclBaseTypeInfo info;
         _lowerFuncDeclBaseTypeInfo(
             subContext,
-            createDefaultSpecializedDeclRef(context, decl),
+            createDefaultSpecializedDeclRef(context, nullptr, decl),
             info);
 
         auto irFuncType = info.type;
@@ -8121,6 +8137,10 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         {
             return ensureDecl(context, interfaceDecl);
         }
+        else if (auto typedefDecl = as<TypeDefDecl>(genDecl->inner))
+        {
+            return ensureDecl(context, typedefDecl);
+        }
         SLANG_RELEASE_ASSERT(false);
         UNREACHABLE_RETURN(LoweredValInfo());
     }
@@ -8359,7 +8379,7 @@ LoweredValInfo emitDeclRef(
         // We have the IR value for the generic we'd like to specialize,
         // and now we need to get the value for the arguments.
         List<IRInst*> irArgs;
-        for (auto argVal : genericSubst->args)
+        for (auto argVal : genericSubst->getArgs())
         {
             auto irArgVal = lowerSimpleVal(context, argVal);
             SLANG_ASSERT(irArgVal);

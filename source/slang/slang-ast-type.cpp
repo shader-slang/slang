@@ -196,6 +196,8 @@ Type* DeclRefType::_createCanonicalTypeOverride()
     return this;
 }
 
+Val* maybeSubstituteGenericParam(Val* paramVal, Decl* paramDecl, SubstitutionSet subst, int* ioDiff);
+
 Val* DeclRefType::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff)
 {
     if (!subst) return this;
@@ -204,41 +206,8 @@ Val* DeclRefType::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSe
     // of a generic parameter, since that is what we might be substituting...
     if (auto genericTypeParamDecl = as<GenericTypeParamDecl>(declRef.getDecl()))
     {
-        // search for a substitution that might apply to us
-        for (auto s = subst.substitutions; s; s = s->outer)
-        {
-            auto genericSubst = as<GenericSubstitution>(s);
-            if (!genericSubst)
-                continue;
-
-            // the generic decl associated with the substitution list must be
-            // the generic decl that declared this parameter
-            auto genericDecl = genericSubst->genericDecl;
-            if (genericDecl != genericTypeParamDecl->parentDecl)
-                continue;
-
-            int index = 0;
-            for (auto m : genericDecl->members)
-            {
-                if (m == genericTypeParamDecl)
-                {
-                    // We've found it, so return the corresponding specialization argument
-                    (*ioDiff)++;
-                    return genericSubst->args[index];
-                }
-                else if (auto typeParam = as<GenericTypeParamDecl>(m))
-                {
-                    index++;
-                }
-                else if (auto valParam = as<GenericValueParamDecl>(m))
-                {
-                    index++;
-                }
-                else
-                {
-                }
-            }
-        }
+        if (auto result = maybeSubstituteGenericParam(this, genericTypeParamDecl, subst, ioDiff))
+            return result;
     }
     int diff = 0;
     DeclRef<Decl> substDeclRef = declRef.substituteImpl(astBuilder, subst, &diff);
@@ -351,17 +320,17 @@ BasicExpressionType* MatrixExpressionType::_getScalarTypeOverride()
 
 Type* MatrixExpressionType::getElementType()
 {
-    return as<Type>(findInnerMostGenericSubstitution(declRef.substitutions)->args[0]);
+    return as<Type>(findInnerMostGenericSubstitution(declRef.substitutions)->getArgs()[0]);
 }
 
 IntVal* MatrixExpressionType::getRowCount()
 {
-    return as<IntVal>(findInnerMostGenericSubstitution(declRef.substitutions)->args[1]);
+    return as<IntVal>(findInnerMostGenericSubstitution(declRef.substitutions)->getArgs()[1]);
 }
 
 IntVal* MatrixExpressionType::getColumnCount()
 {
-    return as<IntVal>(findInnerMostGenericSubstitution(declRef.substitutions)->args[2]);
+    return as<IntVal>(findInnerMostGenericSubstitution(declRef.substitutions)->getArgs()[2]);
 }
 
 Type* MatrixExpressionType::getRowType()
@@ -518,12 +487,12 @@ Type* NamespaceType::_createCanonicalTypeOverride()
 
 Type* PtrTypeBase::getValueType()
 {
-    return as<Type>(findInnerMostGenericSubstitution(declRef.substitutions)->args[0]);
+    return as<Type>(findInnerMostGenericSubstitution(declRef.substitutions)->getArgs()[0]);
 }
 
 Type* OptionalType::getValueType()
 {
-    return as<Type>(findInnerMostGenericSubstitution(declRef.substitutions)->args[0]);
+    return as<Type>(findInnerMostGenericSubstitution(declRef.substitutions)->getArgs()[0]);
 }
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! NamedExpressionType !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!

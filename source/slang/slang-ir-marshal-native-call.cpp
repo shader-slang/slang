@@ -33,7 +33,7 @@ namespace Slang
         for (UInt i = 0; i < declaredFuncType->getParamCount(); ++i)
         {
             auto paramType = declaredFuncType->getParamType(i);
-            nativeParamTypes.add(getNativeType(builder, as<IRType>(paramType)));
+            nativeParamTypes.add(getNativeType(builder, (IRType*)(paramType)));
         }
         IRType* returnType = declaredFuncType->getResultType();
         if (auto resultType = as<IRResultType>(declaredFuncType->getResultType()))
@@ -70,9 +70,9 @@ namespace Slang
     }
 
     void NativeCallMarshallingContext::marshalManagedValueToNativeValue(
-        IRBuilder& builder, IRInst* originalArg, List<IRInst*>& args)
+        IRBuilder& builder, IRType* originalParamType, IRInst* originalArg, List<IRInst*>& args)
     {
-        switch (originalArg->getDataType()->getOp())
+        switch (originalParamType->getOp())
         {
         case kIROp_InOutType:
         case kIROp_RefType:
@@ -257,7 +257,8 @@ namespace Slang
         List<IRInst*> args;
         for (Int i = 0; i < argCount; i++)
         {
-            marshalManagedValueToNativeValue(builder, originalArgs[i], args);
+            auto paramType = originalFuncType->getParamType(i);
+            marshalManagedValueToNativeValue(builder, paramType, originalArgs[i], args);
         }
         IRType* originalReturnType = originalFuncType->getResultType();
 

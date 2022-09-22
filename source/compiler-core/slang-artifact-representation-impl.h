@@ -108,7 +108,7 @@ protected:
 
 /* This allows wrapping any object to be an artifact representation. 
 
-NOTE! Only allows casting from a single guid. Passing a RefObject across an ABI bounday remains risky!
+NOTE! Only allows casting from a single guid. Passing a RefObject across an ABI boundary remains risky!
 */
 class ObjectArtifactRepresentation : public ComBaseObject, public IArtifactRepresentation
 {

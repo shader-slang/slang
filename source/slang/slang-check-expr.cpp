@@ -157,8 +157,6 @@ namespace Slang
             openedType->originalInterfaceType = expr->type.type;
             openedType->originalInterfaceDeclRef = interfaceDeclRef;
 
-            DeclRef<InterfaceDecl> substDeclRef = openedType->getSpecializedInterfaceDeclRef();
-
             ExtractExistentialValueExpr* openedValue = m_astBuilder->create<ExtractExistentialValueExpr>();
             openedValue->declRef = varDeclRef;
             openedValue->type = QualType(openedType);
@@ -865,8 +863,7 @@ namespace Slang
 
     IntVal* SemanticsVisitor::getIntVal(IntegerLiteralExpr* expr)
     {
-        // TODO(tfoley): don't keep allocating here!
-        return m_astBuilder->create<ConstantIntVal>(expr->value);
+        return m_astBuilder->getOrCreate<ConstantIntVal>(expr->type.type, expr->value);
     }
 
     IntVal* SemanticsVisitor::tryConstantFoldExpr(
@@ -982,7 +979,7 @@ namespace Slang
                 || opName == getName("|") || opName == getName("&") || opName == getName("^") || opName == getName("~") || opName == getName("%") ||
                 opName == getName("?:") || opName == getName("<<") || opName == getName(">>"))
             {
-                auto result = m_astBuilder->create<FuncCallIntVal>();
+                auto result = m_astBuilder->create<FuncCallIntVal>(invokeExpr.getExpr()->type.type);
                 result->args.addRange(argVals, argCount);
                 result->funcDeclRef = funcDeclRef;
                 result->funcType = as<Type>(funcDeclRefExpr.getExpr()->type->substitute(
@@ -1012,6 +1009,10 @@ namespace Slang
             case BaseType::Int16:
             case BaseType::UInt8:
             case BaseType::Int8:
+            case BaseType::UIntPtr:
+            case BaseType::IntPtr:
+            case BaseType::Int64:
+            case BaseType::UInt64:
                 resultValue = constArgVals[0];
                 break;
             default:
@@ -1091,7 +1092,7 @@ namespace Slang
             }
         }
 
-        IntVal* result = m_astBuilder->create<ConstantIntVal>(resultValue);
+        IntVal* result = m_astBuilder->getOrCreate<ConstantIntVal>(invokeExpr.getExpr()->type.type, resultValue);
         return result;
     }
 
@@ -1166,7 +1167,6 @@ namespace Slang
             expr = getBaseExpr(parenExpr);
         }
 
-        // TODO(tfoley): more serious constant folding here
         if (auto intLitExpr = expr.as<IntegerLiteralExpr>())
         {
             return getIntVal(intLitExpr);
@@ -1176,7 +1176,7 @@ namespace Slang
         {
             // If it's a boolean, we allow promotion to int.
             const IntegerLiteralValue value = IntegerLiteralValue(boolLitExpr.getExpr()->value);
-            return m_astBuilder->create<ConstantIntVal>(value);
+            return m_astBuilder->getOrCreate<ConstantIntVal>(m_astBuilder->getBoolType(), value);
         }
 
         // it is possible that we are referring to a generic value param
@@ -1186,8 +1186,10 @@ namespace Slang
 
             if (auto genericValParamRef = declRef.as<GenericValueParamDecl>())
             {
-                // TODO(tfoley): handle the case of non-`int` value parameters...
-                Val* valResult = m_astBuilder->create<GenericParamIntVal>(genericValParamRef);
+                Val* valResult = m_astBuilder->getOrCreate<GenericParamIntVal>(
+                    declRef.substitute(m_astBuilder, genericValParamRef.getDecl()->getType()),
+                    genericValParamRef.getDecl(),
+                    genericValParamRef.substitutions.substitutions);
                 valResult = valResult->substitute(m_astBuilder, expr.getSubsts());
                 return as<IntVal>(valResult);
             }
@@ -1302,7 +1304,18 @@ namespace Slang
         Type*              elementType)
     {
         auto baseExpr = subscriptExpr->baseExpression;
-        auto indexExpr = subscriptExpr->indexExpression;
+        if (subscriptExpr->indexExprs.getCount() < 1)
+        {
+            getSink()->diagnose(subscriptExpr, Diagnostics::notEnoughArguments, subscriptExpr->indexExprs.getCount(), 1);
+            return CreateErrorExpr(subscriptExpr);
+        }
+        else if (subscriptExpr->indexExprs.getCount() > 1)
+        {
+            getSink()->diagnose(subscriptExpr, Diagnostics::tooManyArguments, subscriptExpr->indexExprs.getCount(), 1);
+            return CreateErrorExpr(subscriptExpr);
+        }
+
+        auto indexExpr = subscriptExpr->indexExprs[0];
 
         if (!indexExpr->type->equals(m_astBuilder->getIntType()) &&
             !indexExpr->type->equals(m_astBuilder->getUIntType()))
@@ -1324,19 +1337,17 @@ namespace Slang
         auto baseExpr = subscriptExpr->baseExpression;
         baseExpr = CheckExpr(baseExpr);
 
-        Expr* indexExpr = subscriptExpr->indexExpression;
-        if (indexExpr)
+        for (auto& arg : subscriptExpr->indexExprs)
         {
-            indexExpr = CheckTerm(indexExpr);
+            arg = CheckTerm(arg);
         }
-
-        subscriptExpr->baseExpression = baseExpr;
-        subscriptExpr->indexExpression = indexExpr;
 
         // If anything went wrong in the base expression,
         // then just move along...
         if (IsErrorExpr(baseExpr))
             return CreateErrorExpr(subscriptExpr);
+
+        subscriptExpr->baseExpression = baseExpr;
 
         // Otherwise, we need to look at the type of the base expression,
         // to figure out how subscripting should work.
@@ -1347,9 +1358,13 @@ namespace Slang
             // which should be interpreted as resolving to an array type.
 
             IntVal* elementCount = nullptr;
-            if (indexExpr)
+            if (subscriptExpr->indexExprs.getCount() == 1)
             {
-                elementCount = CheckIntegerConstantExpression(indexExpr, IntegerConstantExpressionCoercionType::AnyInteger, nullptr);
+                elementCount = CheckIntegerConstantExpression(subscriptExpr->indexExprs[0], IntegerConstantExpressionCoercionType::AnyInteger, nullptr);
+            }
+            else if (subscriptExpr->indexExprs.getCount() != 0)
+            {
+                getSink()->diagnose(subscriptExpr, Diagnostics::multiDimensionalArrayNotSupported);
             }
 
             auto elementType = CoerceToUsableType(TypeExp(baseExpr, baseTypeType->type));
@@ -1419,9 +1434,8 @@ namespace Slang
             InvokeExpr* subscriptCallExpr = m_astBuilder->create<InvokeExpr>();
             subscriptCallExpr->loc = subscriptExpr->loc;
             subscriptCallExpr->functionExpr = subscriptFuncExpr;
-
-            // TODO(tfoley): This path can support multiple arguments easily
-            subscriptCallExpr->arguments.add(subscriptExpr->indexExpression);
+            subscriptCallExpr->arguments.addRange(subscriptExpr->indexExprs);
+            subscriptCallExpr->argumentDelimeterLocs.addRange(subscriptExpr->argumentDelimeterLocs);
 
             return CheckInvokeExprWithCheckedOperands(subscriptCallExpr);
         }
@@ -2145,7 +2159,7 @@ namespace Slang
             // here if the input type had a sugared name...
             swizExpr->type = QualType(createVectorType(
                 baseElementType,
-                m_astBuilder->create<ConstantIntVal>(elementCount)));
+                m_astBuilder->getOrCreate<ConstantIntVal>(m_astBuilder->getIntType(), elementCount)));
         }
 
         // A swizzle can be used as an l-value as long as there
@@ -2266,7 +2280,7 @@ namespace Slang
             // here if the input type had a sugared name...
             swizExpr->type = QualType(createVectorType(
                 baseElementType,
-                m_astBuilder->create<ConstantIntVal>(elementCount)));
+                m_astBuilder->getOrCreate<ConstantIntVal>(m_astBuilder->getIntType(), elementCount)));
         }
 
         // A swizzle can be used as an l-value as long as there

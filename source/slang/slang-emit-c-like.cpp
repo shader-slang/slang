@@ -215,11 +215,13 @@ void CLikeSourceEmitter::emitSimpleType(IRType* type)
         case kIROp_Int16Type:   return UnownedStringSlice("int16_t");   
         case kIROp_IntType:     return UnownedStringSlice("int");       
         case kIROp_Int64Type:   return UnownedStringSlice("int64_t");   
+        case kIROp_IntPtrType:  return UnownedStringSlice("intptr_t");
 
         case kIROp_UInt8Type:   return UnownedStringSlice("uint8_t");   
         case kIROp_UInt16Type:  return UnownedStringSlice("uint16_t");  
         case kIROp_UIntType:    return UnownedStringSlice("uint");     
         case kIROp_UInt64Type:  return UnownedStringSlice("uint64_t"); 
+        case kIROp_UIntPtrType: return UnownedStringSlice("uintptr_t");
 
         case kIROp_HalfType:    return UnownedStringSlice("half");     
 
@@ -959,6 +961,32 @@ void CLikeSourceEmitter::emitSimpleValueImpl(IRInst* inst)
                     m_writer->emit("ULL");
                     break;
                 }
+                case BaseType::IntPtr:
+                {
+#if SLANG_PTR_IS_64
+                    m_writer->emit("int64_t(");
+                    m_writer->emitInt64(int64_t(litInst->value.intVal));
+                    m_writer->emit(")");
+#else
+                    m_writer->emit("int(");
+                    m_writer->emit(int(litInst->value.intVal));
+                    m_writer->emit(")");
+#endif
+                    break;
+                }
+                case BaseType::UIntPtr:
+                {
+#if SLANG_PTR_IS_64
+                    m_writer->emit("uint64_t(");
+                    m_writer->emitUInt64(uint64_t(litInst->value.intVal));
+                    m_writer->emit(")");
+#else
+                    m_writer->emit(UInt(uint32_t(litInst->value.intVal)));
+                    m_writer->emit("U");
+#endif
+                    break;
+                }
+                
             }
         }
         else
@@ -1588,6 +1616,7 @@ void CLikeSourceEmitter::emitComInterfaceCallExpr(IRCall* inst, EmitOpInfo const
 
     auto outerPrec = inOuterPrec;
     bool needClose = maybeEmitParens(outerPrec, prec);
+
     emitOperand(object, leftSide(outerPrec, prec));
     m_writer->emit("->");
     m_writer->emit(getName(methodKey));
@@ -1605,10 +1634,19 @@ void CLikeSourceEmitter::emitCallExpr(IRCall* inst, EmitOpInfo outerPrec)
     // Detect if this is a call into a COM interface method.
     if (funcValue->getOp() == kIROp_lookup_interface_method)
     {
-        const auto operand0TypeOp = funcValue->getOperand(0)->getDataType()->getOp();
-
-        switch (operand0TypeOp)
+        auto operand0Type = funcValue->getOperand(0)->getDataType();
+        switch (operand0Type->getOp())
         {
+        case kIROp_WitnessTableIDType:
+        case kIROp_WitnessTableType:
+            if (as<IRWitnessTableTypeBase>(operand0Type)
+                    ->getConformanceType()
+                    ->findDecoration<IRComInterfaceDecoration>())
+            {
+                emitComInterfaceCallExpr(inst, outerPrec);
+                return;
+            }
+            break;
         case kIROp_ComPtrType:
         case kIROp_PtrType:
         case kIROp_NativePtrType:

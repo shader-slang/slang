@@ -348,13 +348,31 @@ WorkspaceVersion* Workspace::createVersionForCompletion()
         ContentAssistCheckingMode::Completion;
     return currentCompletionVersion.Ptr();
 }
+
+void* Workspace::getObject(const Guid& uuid)
+{
+    SLANG_UNUSED(uuid);
+    return nullptr;
+}
+
 void* Workspace::getInterface(const Guid& uuid)
 {
-    if (uuid == ISlangUnknown::getTypeGuid() || uuid == ISlangFileSystem::getTypeGuid())
+    if (uuid == ISlangUnknown::getTypeGuid() || 
+        uuid == ISlangCastable::getTypeGuid() ||
+        uuid == ISlangFileSystem::getTypeGuid())
     {
         return static_cast<ISlangFileSystem*>(this);
     }
     return nullptr;
+}
+
+void* Workspace::castAs(const Guid& guid)
+{
+    if (auto ptr = getInterface(guid))
+    {
+        return ptr;
+    }
+    return getObject(guid);
 }
 
 void DocumentVersion::setText(const String& newText)

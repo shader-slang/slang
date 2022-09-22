@@ -86,18 +86,7 @@ namespace Slang
             virtual void marshalBasicType(IRBuilder* builder, IRType* dataType, IRInst* concreteTypedVar) = 0;
             // Defines what to do with resource handle elements.
             virtual void marshalResourceHandle(IRBuilder* builder, IRType* dataType, IRInst* concreteTypedVar) = 0;
-            // Validates that the type fits in the given AnyValueSize.
-            // After calling emitMarshallingCode, `fieldOffset` will be increased to the required `AnyValue` size.
-            // If this is larger than the provided AnyValue size, report a dianogstic. We might want to front load
-            // this in a separate IR validation pass in the future, but this is the easiest way to report the
-            // diagnostic now.
-            void validateAnyTypeSize(DiagnosticSink* sink, IRType* concreteType)
-            {
-                if (fieldOffset > static_cast<uint32_t>(anyValInfo->fieldKeys.getCount()))
-                {
-                    sink->diagnose(concreteType->sourceLoc, Diagnostics::typeDoesNotFitAnyValueSize, concreteType);
-                }
-            }
+
             void ensureOffsetAt4ByteBoundary()
             {
                 if (intraFieldOffset)
@@ -147,6 +136,8 @@ namespace Slang
             case kIROp_UInt16Type:
             case kIROp_HalfType:
             case kIROp_BoolType:
+            case kIROp_IntPtrType:
+            case kIROp_UIntPtrType:
                 context->marshalBasicType(builder, dataType, concreteTypedVar);
                 break;
             case kIROp_VectorType:
@@ -171,18 +162,19 @@ namespace Slang
                 auto elementType = matrixType->getElementType();
                 auto colCount = getIntVal(matrixType->getColumnCount());
                 auto rowCount = getIntVal(matrixType->getRowCount());
+                auto rowVecType = builder->getVectorType(elementType, matrixType->getRowCount());
                 for (IRIntegerValue i = 0; i < colCount; i++)
                 {
                     auto col = builder->emitElementAddress(
-                        elementType,
+                        builder->getPtrType(rowVecType),
                         concreteTypedVar,
                         builder->getIntValue(builder->getIntType(), i));
                     for (IRIntegerValue j = 0; j < rowCount; j++)
                     {
-                        auto element = builder->emitElementExtract(
-                            elementType,
+                        auto element = builder->emitElementAddress(
+                            builder->getPtrType(elementType),
                             col,
-                            builder->getIntValue(builder->getIntType(), i));
+                            builder->getIntValue(builder->getIntType(), j));
                         emitMarshallingCode(builder, context, element);
                     }
                 }
@@ -249,6 +241,9 @@ namespace Slang
                 case kIROp_IntType:
                 case kIROp_FloatType:
                 case kIROp_BoolType:
+#if SLANG_PTR_IS_32
+                case kIROp_IntPtrType:
+#endif
                 {
                     ensureOffsetAt4ByteBoundary();
                     if (fieldOffset < static_cast<uint32_t>(anyValInfo->fieldKeys.getCount()))
@@ -265,6 +260,9 @@ namespace Slang
                     break;
                 }
                 case kIROp_UIntType:
+#if SLANG_PTR_IS_32
+                case kIROp_UIntPtrType:
+#endif
                 {
                     ensureOffsetAt4ByteBoundary();
                     if (fieldOffset < static_cast<uint32_t>(anyValInfo->fieldKeys.getCount()))
@@ -323,6 +321,10 @@ namespace Slang
                 case kIROp_UInt64Type:
                 case kIROp_Int64Type:
                 case kIROp_DoubleType:
+#if SLANG_PTR_IS_64
+                case kIROp_UIntPtrType:
+                case kIROp_IntPtrType:
+#endif
                     SLANG_UNIMPLEMENTED_X("AnyValue type packing for non 32-bit elements");
                     break;
                 default:
@@ -395,8 +397,6 @@ namespace Slang
             context.uintPtrType = builder.getPtrType(builder.getUIntType());
             context.anyValueVar = resultVar;
             emitMarshallingCode(&builder, &context, concreteTypedVar);
-
-            context.validateAnyTypeSize(sharedContext->sink, type);
 
             auto load = builder.emitLoad(resultVar);
             builder.emitReturn(load);

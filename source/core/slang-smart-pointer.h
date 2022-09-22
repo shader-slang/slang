@@ -217,6 +217,11 @@ namespace Slang
 			return pointer;
 		}
 
+        T* get() const
+        {
+            return pointer;
+        }
+
         operator T*() const
         {
             return pointer;

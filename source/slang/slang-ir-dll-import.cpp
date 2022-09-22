@@ -111,7 +111,7 @@ struct DllImportContext
         auto funcPtr = builder.createGlobalVar(nativeType);
         builder.setInsertInto(funcPtr);
         builder.emitBlock();
-        builder.emitReturn(builder.getPtrValue(nullptr));
+        builder.emitReturn(builder.getNullVoidPtrValue());
 
         builder.setInsertInto(func);
         auto block = builder.emitBlock();
@@ -126,7 +126,7 @@ struct DllImportContext
             params.add(builder.emitParam((IRType*)paramType));
         }
 
-        IRInst* cmpArgs[] = {builder.emitLoad(nativeType, funcPtr), builder.getPtrValue(nullptr)};
+        IRInst* cmpArgs[] = {builder.emitLoad(nativeType, funcPtr), builder.getNullVoidPtrValue() };
         auto isUninitialized =
             builder.emitIntrinsicInst(builder.getBoolType(), kIROp_Eql, 2, cmpArgs);
 
@@ -141,7 +141,7 @@ struct DllImportContext
 
         if (dllImportDecoration->getLibraryName() == "")
         {
-            modulePtr = builder.getPtrValue(nullptr);
+            modulePtr = builder.getNullVoidPtrValue();
         }
         else
         {

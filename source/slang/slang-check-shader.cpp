@@ -1120,7 +1120,7 @@ namespace Slang
                     if(!intVal)
                     {
                         sink->diagnose(param.loc, Diagnostics::expectedValueOfTypeForSpecializationArg, paramDecl->getType(), paramDecl);
-                        intVal = getLinkage()->getASTBuilder()->create<ConstantIntVal>(0);
+                        intVal = getLinkage()->getASTBuilder()->getOrCreate<ConstantIntVal>(m_astBuilder->getIntType(), 0);
                     }
 
                     ModuleSpecializationInfo::GenericArgInfo expandedArg;
@@ -1192,15 +1192,18 @@ namespace Slang
             auto genericDeclRef = m_funcDeclRef.getParent().as<GenericDecl>();
             SLANG_ASSERT(genericDeclRef); // otherwise we wouldn't have generic parameters
 
-            GenericSubstitution* genericSubst = getLinkage()->getASTBuilder()->create<GenericSubstitution>();
-            genericSubst->outer = genericDeclRef.substitutions.substitutions;
-            genericSubst->genericDecl = genericDeclRef.getDecl();
+            List<Val*> genericArgs;
 
             for(Index ii = 0; ii < genericSpecializationParamCount; ++ii)
             {
                 auto specializationArg = args[ii];
-                genericSubst->args.add(specializationArg.val);
+                genericArgs.add(specializationArg.val);
             }
+            GenericSubstitution* genericSubst =
+                getLinkage()->getASTBuilder()->getOrCreateGenericSubstitution(
+                    genericDeclRef.getDecl(),
+                    genericArgs,
+                    genericDeclRef.substitutions.substitutions);
 
             for( auto constraintDecl : genericDeclRef.getDecl()->getMembersOfType<GenericTypeConstraintDecl>() )
             {
@@ -1218,7 +1221,7 @@ namespace Slang
                 auto subTypeWitness = visitor.tryGetSubtypeWitness(sub, sup);
                 if(subTypeWitness)
                 {
-                    genericSubst->args.add(subTypeWitness);
+                    genericArgs.add(subTypeWitness);
                 }
                 else
                 {
@@ -1228,6 +1231,11 @@ namespace Slang
                 }
             }
 
+            genericSubst =
+                getLinkage()->getASTBuilder()->getOrCreateGenericSubstitution(
+                    genericDeclRef.getDecl(),
+                    genericArgs,
+                    genericDeclRef.substitutions.substitutions);
             specializedFuncDeclRef.substitutions.substitutions = genericSubst;
         }
 

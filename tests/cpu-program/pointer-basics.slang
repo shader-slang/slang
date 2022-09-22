@@ -1,7 +1,4 @@
 //TEST:EXECUTABLE:
-__target_intrinsic(cpp, "printf(\"%s\\n\", ($0).getBuffer())")
-void writeln(String text);
-
 public __extern_cpp int main()
 {
     uint2 value;
@@ -19,8 +16,8 @@ public __extern_cpp int main()
         && ptrVal != 0
         && value[0] == 3
         && pValue[1] == 1)
-        writeln("Success");
+        printf("Success\n");
     else
-        writeln("Fail");
+        printf("Fail\n");
     return 0;
 }

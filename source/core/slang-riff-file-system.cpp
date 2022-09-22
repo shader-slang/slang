@@ -21,9 +21,36 @@ RiffFileSystem::RiffFileSystem(ICompressionSystem* compressionSystem):
 {
 }
 
-ISlangMutableFileSystem* RiffFileSystem::getInterface(const Guid& guid)
+void* RiffFileSystem::getInterface(const Guid& guid)
 {
-    return (guid == ISlangUnknown::getTypeGuid() || guid == ISlangFileSystem::getTypeGuid() || guid == ISlangFileSystemExt::getTypeGuid() || guid == ISlangMutableFileSystem::getTypeGuid()) ? static_cast<ISlangMutableFileSystem*>(this) : nullptr;
+    if  (   guid == ISlangUnknown::getTypeGuid() || 
+            guid == ISlangCastable::getTypeGuid() || 
+            guid == ISlangFileSystem::getTypeGuid() || 
+            guid == ISlangFileSystemExt::getTypeGuid() || 
+            guid == ISlangMutableFileSystem::getTypeGuid())
+    {
+        return static_cast<ISlangMutableFileSystem*>(this);
+    }
+    else if (guid == IArchiveFileSystem::getTypeGuid())
+    {
+        return static_cast<IArchiveFileSystem*>(this);
+    }
+    return nullptr;
+}
+
+void* RiffFileSystem::getObject(const Guid& guid)
+{
+    SLANG_UNUSED(guid);
+    return nullptr;
+}
+
+void* RiffFileSystem::castAs(const Guid& guid)
+{
+    if (auto ptr = getInterface(guid))
+    {
+        return ptr;
+    }
+    return getObject(guid);
 }
 
 SlangResult RiffFileSystem::_calcCanonicalPath(const char* path, StringBuilder& out)

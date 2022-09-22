@@ -98,11 +98,19 @@ SLANG_API SlangResult slang_createGlobalSession(
     {
         Slang::String cacheFilename;
         uint64_t dllTimestamp = 0;
+#define SLANG_PROFILE_STDLIB_COMPILE 0
+#if SLANG_PROFILE_STDLIB_COMPILE
+        auto startTime = std::chrono::high_resolution_clock::now();
+#else
         if (tryLoadStdLibFromCache(globalSession, cacheFilename, dllTimestamp) != SLANG_OK)
+#endif
         {
             // Compile std lib from embeded source.
             SLANG_RETURN_ON_FAIL(globalSession->compileStdLib(0));
-
+#if SLANG_PROFILE_STDLIB_COMPILE
+            auto timeElapsed = std::chrono::high_resolution_clock::now() - startTime;
+            printf("stdlib compilation time: %.1fms\n", timeElapsed.count() / 1000000.0);
+#endif
             // Store the compiled stdlib to cache file.
             trySaveStdLibToCache(globalSession, cacheFilename, dllTimestamp);
         }
@@ -831,10 +839,10 @@ SLANG_API SlangResult spLoadReproAsFileSystem(
     MemoryOffsetBase base;
     base.set(buffer.getBuffer(), buffer.getCount());
 
-    RefPtr<CacheFileSystem> cacheFileSystem;
-    SLANG_RETURN_ON_FAIL(ReproUtil::loadFileSystem(base, requestState, replaceFileSystem, cacheFileSystem));
+    ComPtr<ISlangFileSystemExt> fileSystem;
+    SLANG_RETURN_ON_FAIL(ReproUtil::loadFileSystem(base, requestState, replaceFileSystem, fileSystem));
 
-    *outFileSystem = cacheFileSystem.detach();
+    *outFileSystem = fileSystem.detach();
     return SLANG_OK;
 }
 

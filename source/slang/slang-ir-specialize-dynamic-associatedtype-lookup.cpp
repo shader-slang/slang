@@ -197,7 +197,8 @@ struct AssociatedTypeLookupSpecializationContext
             if (inst->getOp() == kIROp_WitnessTable)
             {
                 auto seqId = inst->findDecoration<IRSequentialIDDecoration>();
-                SLANG_ASSERT(seqId);
+                if (!seqId)
+                    return;
                 // Insert code to pack sequential ID into an uint2 at all use sites.
                 IRUse* nextUse = nullptr;
                 for (auto use = inst->firstUse; use; use = nextUse)

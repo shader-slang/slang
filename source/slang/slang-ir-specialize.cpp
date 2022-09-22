@@ -4,6 +4,7 @@
 #include "slang-ir.h"
 #include "slang-ir-clone.h"
 #include "slang-ir-insts.h"
+#include "slang-ir-ssa-simplification.h"
 
 namespace Slang
 {
@@ -258,6 +259,10 @@ struct SpecializationContext
         //
         IRInst* specializedVal = specializeGenericImpl(genericVal, specializeInst, module, this);
 
+        // The body of the specialized generic may expose more specialization opportunities, so
+        // we add the children to workList.
+        for (auto child : specializedVal->getDecorationsAndChildren())
+            addToWorkList(child);
 
         // The value that was returned from evaluating
         // the generic is the specialized value, and we
@@ -341,7 +346,7 @@ struct SpecializationContext
     // `specialize(g, a, b, c, ...)` instruction and performs
     // specialization if it is possible.
     //
-    void maybeSpecializeGeneric(
+    bool maybeSpecializeGeneric(
         IRSpecialize* specInst)
     {
         // We will only attempt to specialize when all of the
@@ -349,7 +354,7 @@ struct SpecializationContext
         // themselves fully specialized.
         //
         if(!areAllOperandsFullySpecialized(specInst))
-            return;
+            return false;
 
         // The invariant that the arguments are fully specialized
         // should mean that `a, b, c, ...` are in a form that
@@ -362,13 +367,13 @@ struct SpecializationContext
         auto baseVal = specInst->getBase();
         auto genericVal = as<IRGeneric>(baseVal);
         if(!genericVal)
-            return;
+            return false;
 
         // We can also only specialize a generic if it
         // represents a definition rather than a declaration.
         //
         if(!canSpecializeGeneric(genericVal))
-            return;
+            return false;
 
         // Once we know that specialization is possible,
         // the actual work is fairly simple.
@@ -391,6 +396,8 @@ struct SpecializationContext
         //
         specInst->replaceUsesWith(specializedVal);
         specInst->removeAndDeallocate();
+
+        return true;
     }
 
     // Generic specialization depends on identifying when
@@ -493,7 +500,7 @@ struct SpecializationContext
     // at a time, and try to perform whatever specialization
     // is appropriate based on its opcode.
     //
-    void maybeSpecializeInst(
+    bool maybeSpecializeInst(
         IRInst*                     inst)
     {
         switch(inst->getOp())
@@ -502,14 +509,13 @@ struct SpecializationContext
             // By default we assume that specialization is
             // not possible for a given opcode.
             //
-            break;
+            return false;
 
         case kIROp_Specialize:
             // The logic for specializing a `specialize(...)`
             // instruction has already been elaborated above.
             //
-            maybeSpecializeGeneric(cast<IRSpecialize>(inst));
-            break;
+            return maybeSpecializeGeneric(cast<IRSpecialize>(inst));
 
         case kIROp_lookup_interface_method:
             // The remaining case we need to consider here for generics
@@ -518,8 +524,7 @@ struct SpecializationContext
             // because we can specialize it to just be a direct
             // reference to the actual witness value from the table.
             //
-            maybeSpecializeWitnessLookup(cast<IRLookupWitnessMethod>(inst));
-            break;
+            return maybeSpecializeWitnessLookup(cast<IRLookupWitnessMethod>(inst));
 
         case kIROp_Call:
             // When writing functions with existential-type parameters,
@@ -527,8 +532,7 @@ struct SpecializationContext
             // function based on the concrete type encapsulated in
             // an argument of existential type.
             //
-            maybeSpecializeExistentialsForCall(cast<IRCall>(inst));
-            break;
+            return maybeSpecializeExistentialsForCall(cast<IRCall>(inst));
 
             // The specialization of functions with existential-type
             // parameters can create further opportunities for specialization,
@@ -536,36 +540,27 @@ struct SpecializationContext
             // through local simplification on values of existential type.
             //
         case kIROp_ExtractExistentialType:
-            maybeSpecializeExtractExistentialType(inst);
-            break;
+            return maybeSpecializeExtractExistentialType(inst);
         case kIROp_ExtractExistentialValue:
-            maybeSpecializeExtractExistentialValue(inst);
-            break;
+            return maybeSpecializeExtractExistentialValue(inst);
         case kIROp_ExtractExistentialWitnessTable:
-            maybeSpecializeExtractExistentialWitnessTable(inst);
-            break;
+            return maybeSpecializeExtractExistentialWitnessTable(inst);
 
         case kIROp_Load:
-            maybeSpecializeLoad(as<IRLoad>(inst));
-            break;
+            return maybeSpecializeLoad(as<IRLoad>(inst));
 
         case kIROp_FieldExtract:
-            maybeSpecializeFieldExtract(as<IRFieldExtract>(inst));
-            break;
+            return maybeSpecializeFieldExtract(as<IRFieldExtract>(inst));
         case kIROp_FieldAddress:
-            maybeSpecializeFieldAddress(as<IRFieldAddress>(inst));
-            break;
+            return maybeSpecializeFieldAddress(as<IRFieldAddress>(inst));
 
         case kIROp_getElement:
-            maybeSpecializeGetElement(as<IRGetElement>(inst));
-            break;
+            return maybeSpecializeGetElement(as<IRGetElement>(inst));
         case kIROp_getElementPtr:
-            maybeSpecializeGetElementAddress(as<IRGetElementPtr>(inst));
-            break;
+            return maybeSpecializeGetElementAddress(as<IRGetElementPtr>(inst));
 
         case kIROp_BindExistentialsType:
-            maybeSpecializeBindExistentialsType(as<IRBindExistentialsType>(inst));
-            break;
+            return maybeSpecializeBindExistentialsType(as<IRBindExistentialsType>(inst));
         }
     }
 
@@ -573,7 +568,7 @@ struct SpecializationContext
     // transformation that helps with both generic and
     // existential-based code. 
     //
-    void maybeSpecializeWitnessLookup(
+    bool maybeSpecializeWitnessLookup(
         IRLookupWitnessMethod* lookupInst)
     {
         // Note: While we currently have named the instruction
@@ -590,7 +585,7 @@ struct SpecializationContext
         //
         auto witnessTable = as<IRWitnessTable>(lookupInst->getWitnessTable());
         if(!witnessTable)
-            return;
+            return false;
 
         // Because we have a concrete witness table, we can
         // use it to look up the IR value that satisfies
@@ -605,7 +600,7 @@ struct SpecializationContext
         // we cannot find a concrete value to use.
         //
         if(!satisfyingVal)
-            return;
+            return false;
 
         // At this point, we know that `satisfyingVal` is what
         // would result from executing this `lookup_witness_method`
@@ -619,6 +614,8 @@ struct SpecializationContext
         addUsersToWorkList(lookupInst);
         lookupInst->replaceUsesWith(satisfyingVal);
         lookupInst->removeAndDeallocate();
+
+        return true;
     }
 
     // The above subroutine needed a way to look up
@@ -727,10 +724,13 @@ struct SpecializationContext
         SharedIRBuilder* sharedBuilder = &sharedBuilderStorage;
         sharedBuilder->init(module);
 
+        bool changed = true;
+
         // Read specialization dictionary from module if it is defined.
         // This prevents us from generating duplicated specializations
         // when this pass is invoked iteratively.
         readSpecializationDictionaries();
+        sharedBuilder->deduplicateAndRebuildGlobalNumberingMap();
 
         // The unspecialized IR we receive as input will have
         // `IRBindGlobalGenericParam` instructions that associate
@@ -770,60 +770,65 @@ struct SpecializationContext
         // We start out simple by putting the root instruction for the
         // module onto our work list.
         //
-        addToWorkList(module->getModuleInst());
-
-        while(workList.Count() != 0)
+        while (changed)
         {
+            changed = false;
+            addToWorkList(module->getModuleInst());
 
-        // We will then iterate until our work list goes dry.
-        //
-        while(workList.Count() != 0)
-        {
-            IRInst* inst = workList.getLast();
-
-            workList.removeLast();
-
-            cleanInsts.Add(inst);
-
-            // For each instruction we process, we want to perform
-            // a few steps.
-            //
-            // First we will do any checking required to tag an
-            // instruction as being fully specialized.
-            //
-            maybeMarkAsFullySpecialized(inst);
-
-            // Next we will look for all the general-purpose
-            // specialization opportunities (generic specialization,
-            // existential specialization, simplifications, etc.)
-            //
-            maybeSpecializeInst(inst);
-
-            // Finally, we need to make our logic recurse through
-            // the whole IR module, so we want to add the children
-            // of any parent instructions to our work list so that
-            // we process them too.
-            //
-            // Note that we are adding the children of an instruction
-            // in reverse order. This is because the way we are
-            // using the work list treats it like a stack (LIFO) and
-            // we know that fully-specialized-ness will tend to flow
-            // top-down through the program, so that we want to process
-            // the children of an instruction in their original order.
-            //
-            for(auto child = inst->getLastChild(); child; child = child->getPrevInst())
+            while (workList.Count() != 0)
             {
-                // Also note that `addToWorkList` has been written
-                // to avoid adding any instruction that is a descendent
-                // of an IR generic, because we don't actually want
-                // to perform specialization inside of generics.
+                // We will then iterate until our work list goes dry.
                 //
-                addToWorkList(child);
+                while (workList.Count() != 0)
+                {
+                    IRInst* inst = workList.getLast();
+
+                    workList.removeLast();
+
+                    cleanInsts.Add(inst);
+
+                    // For each instruction we process, we want to perform
+                    // a few steps.
+                    //
+                    // First we will do any checking required to tag an
+                    // instruction as being fully specialized.
+                    //
+                    maybeMarkAsFullySpecialized(inst);
+
+                    // Next we will look for all the general-purpose
+                    // specialization opportunities (generic specialization,
+                    // existential specialization, simplifications, etc.)
+                    //
+                    changed |= maybeSpecializeInst(inst);
+
+                    // Finally, we need to make our logic recurse through
+                    // the whole IR module, so we want to add the children
+                    // of any parent instructions to our work list so that
+                    // we process them too.
+                    //
+                    // Note that we are adding the children of an instruction
+                    // in reverse order. This is because the way we are
+                    // using the work list treats it like a stack (LIFO) and
+                    // we know that fully-specialized-ness will tend to flow
+                    // top-down through the program, so that we want to process
+                    // the children of an instruction in their original order.
+                    //
+                    for (auto child = inst->getLastChild(); child; child = child->getPrevInst())
+                    {
+                        // Also note that `addToWorkList` has been written
+                        // to avoid adding any instruction that is a descendent
+                        // of an IR generic, because we don't actually want
+                        // to perform specialization inside of generics.
+                        //
+                        addToWorkList(child);
+                    }
+                }
+
+                addDirtyInstsToWorkListRec(module->getModuleInst());
             }
-        }
 
-        addDirtyInstsToWorkListRec(module->getModuleInst());
-
+            if (changed)
+                simplifyIR(module);
         }
 
         // Once the work list has gone dry, we should have the invariant
@@ -967,19 +972,19 @@ struct SpecializationContext
     // call site it is statically clear what concrete type(s) the arguments
     // will have.
     //
-    void maybeSpecializeExistentialsForCall(IRCall* inst)
+    bool maybeSpecializeExistentialsForCall(IRCall* inst)
     {
         // Handle a special case of `StructuredBuffer.operator[]/Load/Consume`
         // calls first. These calls on builtin generic types should be handled
         // the same way as a `load` inst.
         if (maybeSpecializeBufferLoadCall(inst))
-            return;
+            return false;
 
         // We can only specialize a call when the callee function is known.
         //
         auto calleeFunc = as<IRFunc>(inst->getCallee());
         if(!calleeFunc)
-            return;
+            return false;
 
         // Update result type since the callee may have been changed.
         if (inst->getDataType() != calleeFunc->getResultType())
@@ -990,7 +995,7 @@ struct SpecializationContext
         // We can only specialize if we have access to a body for the callee.
         //
         if(!calleeFunc->isDefinition())
-            return;
+            return false;
 
         // We shouldn't bother specializing unless the callee has at least
         // one parameter that has an existential/interface type.
@@ -1009,13 +1014,13 @@ struct SpecializationContext
             // to such a parameter is one we can specialize.
             //
             if( !canSpecializeExistentialArg(arg))
-                return;
+                return false;
 
         }
         // If we never found a parameter worth specializing, we should bail out.
         //
         if(!shouldSpecialize)
-            return;
+            return false;
 
         // At this point, we believe we *should* and *can* specialize.
         //
@@ -1176,6 +1181,8 @@ struct SpecializationContext
         // for specialization, but we can always play it safe.
         //
         addUsersToWorkList(newCall);
+
+        return true;
     }
 
     // The above `maybeSpecializeExistentialsForCall` routine needed
@@ -1529,7 +1536,7 @@ struct SpecializationContext
     // Let's start with the routine for the case above of extracting
     // a witness table.
     //
-    void maybeSpecializeExtractExistentialWitnessTable(IRInst* inst)
+    bool maybeSpecializeExtractExistentialWitnessTable(IRInst* inst)
     {
         // We know `inst` is `extractExistentialWitnessTable(existentialArg)`.
         //
@@ -1554,13 +1561,15 @@ struct SpecializationContext
 
             inst->replaceUsesWith(witnessTable);
             inst->removeAndDeallocate();
+            return true;
         }
+        return false;
     }
 
     // The cases for simplifying `extractExistentialValue` is more or less the same
     // as for witness tables.
     //
-    void maybeSpecializeExtractExistentialValue(IRInst* inst)
+    bool maybeSpecializeExtractExistentialValue(IRInst* inst)
     {
         // We know `inst` is `extractExistentialValue(existentialArg)`.
         //
@@ -1579,13 +1588,15 @@ struct SpecializationContext
 
             inst->replaceUsesWith(val);
             inst->removeAndDeallocate();
+            return true;
         }
+        return false;
     }
 
     // The cases for simplifying `extractExistentialType` is more or less the same
     // as for witness tables.
     //
-    void maybeSpecializeExtractExistentialType(IRInst* inst)
+    bool maybeSpecializeExtractExistentialType(IRInst* inst)
     {
         // We know `inst` is `extractExistentialValue(existentialArg)`.
         //
@@ -1605,10 +1616,12 @@ struct SpecializationContext
 
             inst->replaceUsesWith(valType);
             inst->removeAndDeallocate();
+            return true;
         }
+        return false;
     }
 
-    void maybeSpecializeLoad(IRLoad* inst)
+    bool maybeSpecializeLoad(IRLoad* inst)
     {
         auto ptrArg = inst->ptr.get();
 
@@ -1637,7 +1650,7 @@ struct SpecializationContext
             //
             auto elementType = tryGetPointedToType(&builder, val->getDataType());
             if(!elementType)
-                return;
+                return false;
 
 
             List<IRInst*> slotOperands;
@@ -1658,7 +1671,9 @@ struct SpecializationContext
 
             inst->replaceUsesWith(newWrapExistentialInst);
             inst->removeAndDeallocate();
+            return true;
         }
+        return false;
     }
 
     UInt calcExistentialBoxSlotCount(IRType* type)
@@ -1707,7 +1722,7 @@ struct SpecializationContext
         }
     }
 
-    void maybeSpecializeFieldExtract(IRFieldExtract* inst)
+    bool maybeSpecializeFieldExtract(IRFieldExtract* inst)
     {
         auto baseArg = inst->getBase();
         auto fieldKey = inst->getField();
@@ -1745,7 +1760,7 @@ struct SpecializationContext
             auto valType = val->getDataType();
             auto valStructType = as<IRStructType>(valType);
             if(!valStructType)
-                return;
+                return false;
 
             UInt slotOperandOffset = 0;
 
@@ -1762,7 +1777,7 @@ struct SpecializationContext
             }
 
             if(!foundField)
-                return;
+                return false;
 
             auto foundFieldType = foundField->getFieldType();
 
@@ -1788,11 +1803,13 @@ struct SpecializationContext
             addUsersToWorkList(inst);
             inst->replaceUsesWith(newWrapExistentialInst);
             inst->removeAndDeallocate();
+            return true;
         }
+        return false;
     }
 
 
-    void maybeSpecializeFieldAddress(IRFieldAddress* inst)
+    bool maybeSpecializeFieldAddress(IRFieldAddress* inst)
     {
         auto baseArg = inst->getBase();
         auto fieldKey = inst->getField();
@@ -1829,11 +1846,11 @@ struct SpecializationContext
             //
             auto valType = tryGetPointedToType(&builder, val->getDataType());
             if(!valType)
-                return;
+                return false;
 
             auto valStructType = as<IRStructType>(valType);
             if(!valStructType)
-                return;
+                return false;
 
             UInt slotOperandOffset = 0;
 
@@ -1850,7 +1867,7 @@ struct SpecializationContext
             }
 
             if(!foundField)
-                return;
+                return false;
 
             auto foundFieldType = foundField->getFieldType();
 
@@ -1876,10 +1893,12 @@ struct SpecializationContext
             addUsersToWorkList(inst);
             inst->replaceUsesWith(newWrapExistentialInst);
             inst->removeAndDeallocate();
+            return true;
         }
+        return false;
     }
 
-    void maybeSpecializeGetElement(IRGetElement* inst)
+    bool maybeSpecializeGetElement(IRGetElement* inst)
     {
         auto baseArg = inst->getBase();
         if (auto wrapInst = as<IRWrapExistential>(baseArg))
@@ -1913,10 +1932,12 @@ struct SpecializationContext
             addUsersToWorkList(inst);
             inst->replaceUsesWith(newWrapExistentialInst);
             inst->removeAndDeallocate();
+            return true;
         }
+        return false;
     }
 
-    void maybeSpecializeGetElementAddress(IRGetElementPtr* inst)
+    bool maybeSpecializeGetElementAddress(IRGetElementPtr* inst)
     {
         auto baseArg = inst->getBase();
         if (auto wrapInst = as<IRWrapExistential>(baseArg))
@@ -1953,7 +1974,9 @@ struct SpecializationContext
             addUsersToWorkList(inst);
             inst->replaceUsesWith(newWrapExistentialInst);
             inst->removeAndDeallocate();
+            return true;
         }
+        return false;
     }
 
     UInt calcExistentialTypeParamSlotCount(IRType* type)
@@ -1995,7 +2018,7 @@ struct SpecializationContext
 
     Dictionary<IRSimpleSpecializationKey, IRStructType*> existentialSpecializedStructs;
 
-    void maybeSpecializeBindExistentialsType(IRBindExistentialsType* type)
+    bool maybeSpecializeBindExistentialsType(IRBindExistentialsType* type)
     {
         auto baseType = type->getBaseType();
         UInt slotOperandCount = type->getExistentialArgCount();
@@ -2009,7 +2032,7 @@ struct SpecializationContext
             // and one for the witness table.
             //
             SLANG_ASSERT(slotOperandCount == 2);
-            if(slotOperandCount < 2) return;
+            if(slotOperandCount < 2) return false;
 
             auto concreteType = (IRType*) type->getExistentialArg(0);
             auto witnessTable = type->getExistentialArg(1);
@@ -2018,7 +2041,7 @@ struct SpecializationContext
             addUsersToWorkList(type);
             type->replaceUsesWith(newVal);
             type->removeAndDeallocate();
-            return;
+            return true;
         }
         else if( as<IRPointerLikeType>(baseType) ||
                  as<IRHLSLStructuredBufferTypeBase>(baseType) ||
@@ -2051,7 +2074,7 @@ struct SpecializationContext
 
             type->replaceUsesWith(newPtrLikeType);
             type->removeAndDeallocate();
-            return;
+            return true;
         }
         else if( auto baseStructType = as<IRStructType>(baseType) )
         {
@@ -2066,7 +2089,7 @@ struct SpecializationContext
             // have a unique type.
             //
             if( !areAllOperandsFullySpecialized(type) )
-                return;
+                return false;
 
             // Now we we check to see if we've already created
             // a specialized struct type or not.
@@ -2114,9 +2137,10 @@ struct SpecializationContext
 
             type->replaceUsesWith(newStructType);
             type->removeAndDeallocate();
-            return;
+            return true;
 
         }
+        return false;
     }
 
     // The handling of specialization for global generic type

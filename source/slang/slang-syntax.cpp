@@ -355,6 +355,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
 
     DeclRef<Decl> createDefaultSubstitutionsIfNeeded(
         ASTBuilder*     astBuilder,
+        SemanticsVisitor* semantics,
         DeclRef<Decl>   declRef)
     {
         // It is possible that `declRef` refers to a generic type,
@@ -413,7 +414,8 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
                 if(!foundSubst)
                 {
                     Substitutions* newSubst = createDefaultSubstitutionsForGeneric(
-                        astBuilder, 
+                        astBuilder,
+                        semantics,
                         genericParentDecl,
                         nullptr);
 
@@ -436,7 +438,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         ASTBuilder*     astBuilder,
         DeclRef<Decl>   declRef)
     {
-        declRef = createDefaultSubstitutionsIfNeeded(astBuilder, declRef);
+        declRef = createDefaultSubstitutionsIfNeeded(astBuilder, nullptr, declRef);
 
         if (auto builtinMod = declRef.getDecl()->findModifier<BuiltinTypeModifier>())
         {
@@ -458,58 +460,60 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
 
             if (magicMod->magicName == "SamplerState")
             {
-                auto type = astBuilder->create<SamplerStateType>();
+                auto type = astBuilder->getOrCreate<SamplerStateType>(SamplerStateFlavor(magicMod->tag));
                 type->declRef = declRef;
-                type->flavor = SamplerStateFlavor(magicMod->tag);
                 return type;
             }
             else if (magicMod->magicName == "Vector")
             {
-                SLANG_ASSERT(subst && subst->args.getCount() == 2);
-                auto vecType = astBuilder->create<VectorExpressionType>();
+                SLANG_ASSERT(subst && subst->getArgs().getCount() == 2);
+                auto vecType = astBuilder->getOrCreate<VectorExpressionType>(ExtractGenericArgType(subst->getArgs()[0]), ExtractGenericArgInteger(subst->getArgs()[1]));
                 vecType->declRef = declRef;
-                vecType->elementType = ExtractGenericArgType(subst->args[0]);
-                vecType->elementCount = ExtractGenericArgInteger(subst->args[1]);
+                vecType->elementType = ExtractGenericArgType(subst->getArgs()[0]);
+                vecType->elementCount = ExtractGenericArgInteger(subst->getArgs()[1]);
                 return vecType;
             }
             else if (magicMod->magicName == "Matrix")
             {
-                SLANG_ASSERT(subst && subst->args.getCount() == 3);
-                auto matType = astBuilder->create<MatrixExpressionType>();
+                SLANG_ASSERT(subst && subst->getArgs().getCount() == 3);
+                auto matType = astBuilder->getOrCreate<MatrixExpressionType>(
+                    ExtractGenericArgType(subst->getArgs()[0]),
+                    ExtractGenericArgInteger(subst->getArgs()[1]),
+                    ExtractGenericArgInteger(subst->getArgs()[2]));
                 matType->declRef = declRef;
                 return matType;
             }
             else if (magicMod->magicName == "Texture")
             {
-                SLANG_ASSERT(subst && subst->args.getCount() >= 1);
-                auto textureType = astBuilder->create<TextureType>(
+                SLANG_ASSERT(subst && subst->getArgs().getCount() >= 1);
+                auto textureType = astBuilder->getOrCreate<TextureType>(
                     TextureFlavor(magicMod->tag),
-                    ExtractGenericArgType(subst->args[0]));
+                    ExtractGenericArgType(subst->getArgs()[0]));
                 textureType->declRef = declRef;
                 return textureType;
             }
             else if (magicMod->magicName == "TextureSampler")
             {
-                SLANG_ASSERT(subst && subst->args.getCount() >= 1);
+                SLANG_ASSERT(subst && subst->getArgs().getCount() >= 1);
                 auto textureType = astBuilder->create<TextureSamplerType>(
                     TextureFlavor(magicMod->tag),
-                    ExtractGenericArgType(subst->args[0]));
+                    ExtractGenericArgType(subst->getArgs()[0]));
                 textureType->declRef = declRef;
                 return textureType;
             }
             else if (magicMod->magicName == "GLSLImageType")
             {
-                SLANG_ASSERT(subst && subst->args.getCount() >= 1);
-                auto textureType = astBuilder->create<GLSLImageType>(
+                SLANG_ASSERT(subst && subst->getArgs().getCount() >= 1);
+                auto textureType = astBuilder->getOrCreate<GLSLImageType>(
                     TextureFlavor(magicMod->tag),
-                    ExtractGenericArgType(subst->args[0]));
+                    ExtractGenericArgType(subst->getArgs()[0]));
                 textureType->declRef = declRef;
                 return textureType;
             }
             else if (magicMod->magicName == "FeedbackType")
             {
                 SLANG_ASSERT(subst == nullptr);
-                auto type = astBuilder->create<FeedbackType>();
+                auto type = astBuilder->getOrCreateWithDefaultCtor<FeedbackType>(magicMod->tag);
                 type->declRef = declRef;
                 type->kind = FeedbackType::Kind(magicMod->tag);
                 return type;
@@ -519,11 +523,13 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
             // and we can drive the dispatch with a table instead
             // of this ridiculously slow `if` cascade.
 
-        #define CASE(n,T)													\
-            else if(magicMod->magicName == #n) {									\
-                auto type = astBuilder->create<T>();						\
-                type->declRef = declRef;									\
-                return type;												\
+        #define CASE(n, T)                                              \
+            else if (magicMod->magicName == #n)                         \
+            {                                                           \
+                auto type = astBuilder->getOrCreateWithDefaultCtor<T>(  \
+                    declRef.decl, declRef.substitutions.substitutions); \
+                type->declRef = declRef;                                \
+                return type;                                            \
             }
 
             CASE(HLSLInputPatchType, HLSLInputPatchType)
@@ -531,14 +537,16 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
 
         #undef CASE
 
-            #define CASE(n,T)													\
-                else if(magicMod->magicName == #n) {									\
-                    SLANG_ASSERT(subst && subst->args.getCount() == 1);			\
-                    auto type = astBuilder->create<T>();						\
-                    type->elementType = ExtractGenericArgType(subst->args[0]);	\
-                    type->declRef = declRef;									\
-                    return type;												\
-                }
+        #define CASE(n, T)                                                                            \
+            else if (magicMod->magicName == #n)                                                       \
+            {                                                                                         \
+                SLANG_ASSERT(subst && subst->getArgs().getCount() == 1);                                   \
+                auto type =                                                                           \
+                    astBuilder->getOrCreateWithDefaultCtor<T>(ExtractGenericArgType(subst->getArgs()[0])); \
+                type->elementType = ExtractGenericArgType(subst->getArgs()[0]);                            \
+                type->declRef = declRef;                                                              \
+                return type;                                                                          \
+            }
 
             CASE(ConstantBuffer, ConstantBufferType)
             CASE(TextureBuffer, TextureBufferType)
@@ -561,8 +569,8 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
 
             // "magic" builtin types which have no generic parameters
             #define CASE(n,T)													\
-                else if(magicMod->magicName == #n) {									\
-                    auto type = astBuilder->create<T>();						\
+                else if(magicMod->magicName == #n) {		     				\
+                    auto type = astBuilder->getOrCreate<T>();					\
                     type->declRef = declRef;									\
                     return type;												\
                 }
@@ -601,7 +609,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         }
         else
         {
-            return astBuilder->create<DeclRefType>(declRef);
+            return astBuilder->getOrCreateDeclRefType(declRef.decl, declRef.substitutions.substitutions);
         }
     }
 
@@ -786,10 +794,8 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
                         substsToApply,
                         &diff);
 
-                    GenericSubstitution* firstSubst = astBuilder->create<GenericSubstitution>();
-                    firstSubst->genericDecl = ancestorGenericDecl;
-                    firstSubst->args = appGenericSubst->args;
-                    firstSubst->outer = restSubst;
+                    GenericSubstitution* firstSubst = astBuilder->getOrCreateGenericSubstitution(
+                        ancestorGenericDecl, appGenericSubst->getArgs(), restSubst);
 
                     (*ioDiff)++;
                     return firstSubst;
@@ -832,30 +838,40 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
                 // Otherwise, check if we are trying to apply
                 // a this-type substitution to the given interface
                 //
-                for(auto s = substsToApply; s; s = s->outer)
+                // Note: We want to skip the ThisTypeSubstitution that specializes
+                // declToSpecialize itself (when declToSpecialize is an interface
+                // decl and the subst specializes it), and only pull the
+                // ThisTypeSubstitution when the decl is referencing a child of
+                // the interface decl being specialized. This is because
+                // by default an interface declref type is a "free" existential
+                // type that shouldn't be specialized by someone else, unless
+                // there is an "implicit" ThisType reference preceeding a child
+                // reference.
+                if (declToSpecialize != ancestorInterfaceDecl)
                 {
-                    auto appThisTypeSubst = as<ThisTypeSubstitution>(s);
-                    if(!appThisTypeSubst)
-                        continue;
+                    for (auto s = substsToApply; s; s = s->outer)
+                    {
+                        auto appThisTypeSubst = as<ThisTypeSubstitution>(s);
+                        if (!appThisTypeSubst)
+                            continue;
 
-                    if(appThisTypeSubst->interfaceDecl != ancestorInterfaceDecl)
-                        continue;
+                        if (appThisTypeSubst->interfaceDecl != ancestorInterfaceDecl)
+                            continue;
 
-                    int diff = 0;
-                    auto restSubst = specializeSubstitutions(
-                        astBuilder,
-                        ancestorInterfaceDecl->parentDecl,
-                        substsToSpecialize,
-                        substsToApply,
-                        &diff);
+                        int diff = 0;
+                        auto restSubst = specializeSubstitutions(
+                            astBuilder,
+                            ancestorInterfaceDecl->parentDecl,
+                            substsToSpecialize,
+                            substsToApply,
+                            &diff);
 
-                    ThisTypeSubstitution* firstSubst = astBuilder->create<ThisTypeSubstitution>();
-                    firstSubst->interfaceDecl = ancestorInterfaceDecl;
-                    firstSubst->witness = appThisTypeSubst->witness;
-                    firstSubst->outer = restSubst;
+                        ThisTypeSubstitution* firstSubst = astBuilder->getOrCreateThisTypeSubstitution(
+                            ancestorInterfaceDecl, appThisTypeSubst->witness, restSubst);
 
-                    (*ioDiff)++;
-                    return firstSubst;
+                        (*ioDiff)++;
+                        return firstSubst;
+                    }
                 }
             }
         }
@@ -1013,12 +1029,12 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
 
     Type* HLSLPatchType::getElementType()
     {
-        return as<Type>(findInnerMostGenericSubstitution(declRef.substitutions)->args[0]);
+        return as<Type>(findInnerMostGenericSubstitution(declRef.substitutions)->getArgs()[0]);
     }
 
     IntVal* HLSLPatchType::getElementCount()
     {
-        return as<IntVal>(findInnerMostGenericSubstitution(declRef.substitutions)->args[1]);
+        return as<IntVal>(findInnerMostGenericSubstitution(declRef.substitutions)->getArgs()[1]);
     }
 
     // Constructors for types
@@ -1047,7 +1063,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         ASTBuilder*                 astBuilder,
         DeclRef<TypeDefDecl> const& declRef)
     {
-        DeclRef<TypeDefDecl> specializedDeclRef = createDefaultSubstitutionsIfNeeded(astBuilder, declRef).as<TypeDefDecl>();
+        DeclRef<TypeDefDecl> specializedDeclRef = createDefaultSubstitutionsIfNeeded(astBuilder, nullptr, declRef).as<TypeDefDecl>();
 
         return astBuilder->create<NamedExpressionType>(specializedDeclRef);
     }
@@ -1179,7 +1195,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
             {
                 out << "<";
                 bool isFirst = true;
-                for (const auto& it : genericSubstitution->args)
+                for (const auto& it : genericSubstitution->getArgs())
                 {
                     if (!isFirst)
                         out << ", ";

@@ -97,6 +97,8 @@ namespace Slang
         { "int16_t",	BaseType::Int16,    SINT_MASK,  kBaseTypeConversionKind_Signed,     kBaseTypeConversionRank_Int16},
         { "int",	    BaseType::Int,      SINT_MASK,  kBaseTypeConversionKind_Signed,     kBaseTypeConversionRank_Int32},
         { "int64_t",	BaseType::Int64,    SINT_MASK,  kBaseTypeConversionKind_Signed,     kBaseTypeConversionRank_Int64},
+        { "intptr_t",	BaseType::IntPtr,   SINT_MASK,  kBaseTypeConversionKind_Signed,     kBaseTypeConversionRank_IntPtr},
+
 
         { "half",	BaseType::Half,     FLOAT_MASK, kBaseTypeConversionKind_Float,      kBaseTypeConversionRank_Int16},
         { "float",	BaseType::Float,    FLOAT_MASK, kBaseTypeConversionKind_Float,      kBaseTypeConversionRank_Int32},
@@ -106,6 +108,8 @@ namespace Slang
         { "uint16_t",	BaseType::UInt16,   UINT_MASK,  kBaseTypeConversionKind_Unsigned,   kBaseTypeConversionRank_Int16},
         { "uint",	    BaseType::UInt,     UINT_MASK,  kBaseTypeConversionKind_Unsigned,   kBaseTypeConversionRank_Int32},
         { "uint64_t",   BaseType::UInt64,   UINT_MASK,  kBaseTypeConversionKind_Unsigned,   kBaseTypeConversionRank_Int64},
+        { "uintptr_t",  BaseType::UIntPtr,  UINT_MASK,  kBaseTypeConversionKind_Unsigned,   kBaseTypeConversionRank_IntPtr},
+
     };
 
     // Given two base types, we need to be able to compute the cost of converting between them.
@@ -189,32 +193,32 @@ namespace Slang
         }
     }
 
-    struct IntrinsicOpInfo { IROp opCode; char const* opName; char const* interface; unsigned flags; };
+    struct IntrinsicOpInfo { IROp opCode; char const* funcName; char const* opName; char const* interface; unsigned flags; };
 
     static const IntrinsicOpInfo intrinsicUnaryOps[] = {
-        { kIROp_Neg,                    "-",    "__BuiltinArithmeticType",  ARITHMETIC_MASK },
-        { kIROp_Not,                    "!",    nullptr,                    BOOL_MASK | BOOL_RESULT },
-        { kIROp_BitNot,                 "~",    "__BuiltinIntegerType",     INT_MASK        },
+        { kIROp_Neg,    "neg",              "-",    "__BuiltinArithmeticType",  ARITHMETIC_MASK },
+        { kIROp_Not,    "logicalNot",       "!",    nullptr,                    BOOL_MASK | BOOL_RESULT },
+        { kIROp_BitNot, "not",              "~",    "__BuiltinIntegerType",     INT_MASK        },
     };
 
     static const IntrinsicOpInfo intrinsicBinaryOps[] = {
-        { kIROp_Add,                        "+",    "__BuiltinArithmeticType",      ARITHMETIC_MASK },
-        { kIROp_Sub,                        "-",    "__BuiltinArithmeticType",      ARITHMETIC_MASK },
-        { kIROp_Mul,                        "*",    "__BuiltinArithmeticType",      ARITHMETIC_MASK },
-        { kIROp_Div,                        "/",    "__BuiltinArithmeticType",      ARITHMETIC_MASK },
-        { kIROp_IRem,                       "%",    "__BuiltinIntegerType",         INT_MASK },
-        { kIROp_FRem,                       "%",    "__BuiltinFloatingPointType",   FLOAT_MASK },
-        { kIROp_And,                        "&&",   nullptr,                        BOOL_MASK | BOOL_RESULT},
-        { kIROp_Or,                         "||",   nullptr,                        BOOL_MASK | BOOL_RESULT },
-        { kIROp_BitAnd,                     "&",    "__BuiltinLogicalType",         LOGICAL_MASK },
-        { kIROp_BitOr,                      "|",    "__BuiltinLogicalType",         LOGICAL_MASK },
-        { kIROp_BitXor,                     "^",    "__BuiltinLogicalType",         LOGICAL_MASK },
-        { kIROp_Eql,                        "==",   "__BuiltinType",                ANY_MASK | BOOL_RESULT },
-        { kIROp_Neq,                        "!=",   "__BuiltinType",                ANY_MASK | BOOL_RESULT },
-        { kIROp_Greater,                    ">",    "__BuiltinArithmeticType",      ARITHMETIC_MASK | BOOL_RESULT },
-        { kIROp_Less,                       "<",    "__BuiltinArithmeticType",      ARITHMETIC_MASK | BOOL_RESULT },
-        { kIROp_Geq,                        ">=",   "__BuiltinArithmeticType",      ARITHMETIC_MASK | BOOL_RESULT },
-        { kIROp_Leq,                        "<=",   "__BuiltinArithmeticType",      ARITHMETIC_MASK | BOOL_RESULT },
+        {kIROp_Add, "add", "+", "__BuiltinArithmeticType", ARITHMETIC_MASK},
+        {kIROp_Sub, "sub", "-", "__BuiltinArithmeticType", ARITHMETIC_MASK},
+        {kIROp_Mul, "mul", "*", "__BuiltinArithmeticType", ARITHMETIC_MASK},
+        {kIROp_Div, "div", "/", "__BuiltinArithmeticType", ARITHMETIC_MASK},
+        {kIROp_IRem, "irem", "%", "__BuiltinIntegerType", INT_MASK},
+        {kIROp_FRem, "frem", "%", "__BuiltinFloatingPointType", FLOAT_MASK},
+        {kIROp_And, "logicalAnd", "&&", nullptr, BOOL_MASK | BOOL_RESULT},
+        {kIROp_Or, "logicalOr", "||", nullptr, BOOL_MASK | BOOL_RESULT},
+        {kIROp_BitAnd, "and", "&", "__BuiltinLogicalType", LOGICAL_MASK},
+        {kIROp_BitOr, "or", "|", "__BuiltinLogicalType", LOGICAL_MASK},
+        {kIROp_BitXor, "xor", "^", "__BuiltinLogicalType", LOGICAL_MASK},
+        {kIROp_Eql, "eql", "==", "__BuiltinType", ANY_MASK | BOOL_RESULT},
+        {kIROp_Neq, "neq", "!=", "__BuiltinType", ANY_MASK | BOOL_RESULT},
+        {kIROp_Greater, "greater", ">", "__BuiltinArithmeticType", ARITHMETIC_MASK | BOOL_RESULT},
+        {kIROp_Less, "less", "<", "__BuiltinArithmeticType", ARITHMETIC_MASK | BOOL_RESULT},
+        {kIROp_Geq, "geq", ">=", "__BuiltinArithmeticType", ARITHMETIC_MASK | BOOL_RESULT},
+        {kIROp_Leq, "leq", "<=", "__BuiltinArithmeticType", ARITHMETIC_MASK | BOOL_RESULT},
     };
 
     // Both the following functions use these macros.

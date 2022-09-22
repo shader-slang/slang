@@ -2146,6 +2146,9 @@ namespace Slang
             keyInst.value.intVal = static_cast<uint16_t>(inValue);
             break;
         case kIROp_BoolType:
+            keyInst.m_op = kIROp_BoolLit;
+            keyInst.value.intVal = ((inValue != 0) ? 1 : 0);
+            break;
         case kIROp_UIntType:
             keyInst.value.intVal = static_cast<uint32_t>(inValue);
             break;
@@ -2200,15 +2203,24 @@ namespace Slang
         return static_cast<IRStringLit*>(_findOrEmitConstant(keyInst));
     }
 
-    IRPtrLit* IRBuilder::getPtrValue(void* value)
+    IRPtrLit* IRBuilder::_getPtrValue(void* data)
     {
-        IRType* type = getPtrType(getVoidType());
-
+        auto type = getPtrType(getVoidType());
         IRConstant keyInst;
         memset(&keyInst, 0, sizeof(keyInst));
         keyInst.m_op = kIROp_PtrLit;
         keyInst.typeUse.usedValue = type;
-        keyInst.value.ptrVal = value;
+        keyInst.value.ptrVal = data;
+        return (IRPtrLit*)_findOrEmitConstant(keyInst);
+    }
+
+    IRPtrLit* IRBuilder::getNullPtrValue(IRType* type)
+    {
+        IRConstant keyInst;
+        memset(&keyInst, 0, sizeof(keyInst));
+        keyInst.m_op = kIROp_PtrLit;
+        keyInst.typeUse.usedValue = type;
+        keyInst.value.ptrVal = nullptr;
         return (IRPtrLit*) _findOrEmitConstant(keyInst);
     }
 
@@ -4586,6 +4598,9 @@ namespace Slang
         switch (managedPtrType->getOp())
         {
         case kIROp_InterfaceType:
+            return emitIntrinsicInst(
+                getPtrType(getNativePtrType((IRType*)managedPtrType)), kIROp_GetManagedPtrWriteRef, 1, &ptrToManagedPtr);
+            break;
         case kIROp_ComPtrType:
             return emitIntrinsicInst(
                 getPtrType(getNativePtrType((IRType*)managedPtrType->getOperand(0))), kIROp_GetManagedPtrWriteRef, 1, &ptrToManagedPtr);
@@ -4648,7 +4663,7 @@ namespace Slang
 
     void IRBuilder::addHighLevelDeclDecoration(IRInst* inst, Decl* decl)
     {
-        auto ptrConst = getPtrValue(decl);
+        auto ptrConst = _getPtrValue(decl);
         addDecoration(inst, kIROp_HighLevelDeclDecoration, ptrConst);
     }
 
@@ -6190,6 +6205,7 @@ namespace Slang
         case kIROp_PackAnyValue:
         case kIROp_UnpackAnyValue:
         case kIROp_Reinterpret:
+        case kIROp_GetNativePtr:
             return false;
         }
     }

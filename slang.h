@@ -1000,7 +1000,7 @@ extern "C"
     longer used (using 'release').
     */
 
-    struct ISlangFileSystem : public ISlangUnknown
+    struct ISlangFileSystem : public ISlangCastable
     {
         SLANG_COM_INTERFACE(0x003A09FC, 0x3A4D, 0x4BA0, { 0xAD, 0x60, 0x1F, 0xD8, 0x63, 0xA9, 0x15, 0xAB })
 
@@ -1861,6 +1861,8 @@ extern "C"
         SLANG_SCALAR_TYPE_UINT8,
         SLANG_SCALAR_TYPE_INT16,
         SLANG_SCALAR_TYPE_UINT16,
+        SLANG_SCALAR_TYPE_INTPTR,
+        SLANG_SCALAR_TYPE_UINTPTR
     };
 
 #ifndef SLANG_RESOURCE_SHAPE

@@ -784,10 +784,79 @@ namespace Slang
         }
     }
 
+    static void _lexRawStringLiteralBody(Lexer* lexer)
+    {
+        const char* start = lexer->m_cursor;
+        const char* endOfDelimiter = nullptr;
+        for (;;)
+        {
+            int c = _peek(lexer);
+            if (c == '(' && endOfDelimiter == nullptr)
+                endOfDelimiter = lexer->m_cursor;
+            if (c == '\"')
+            {
+                if (!endOfDelimiter)
+                {
+                    if (auto sink = lexer->getDiagnosticSink())
+                    {
+                        sink->diagnose(_getSourceLoc(lexer), LexerDiagnostics::quoteCannotBeDelimiter);
+                    }
+                }
+                else
+                {
+                    auto testStart = lexer->m_cursor - (endOfDelimiter - start);
+                    if (testStart > endOfDelimiter)
+                    {
+                        auto testDelimiter = UnownedStringSlice(testStart, lexer->m_cursor);
+                        auto delimiter = UnownedStringSlice(start, endOfDelimiter);
+                        if (*(testStart - 1) == ')' && testDelimiter == delimiter)
+                        {
+                            _advance(lexer);
+                            return;
+                        }
+                    }
+                }
+            }
+
+            switch (c)
+            {
+            case kEOF:
+                if (auto sink = lexer->getDiagnosticSink())
+                {
+                    sink->diagnose(_getSourceLoc(lexer), LexerDiagnostics::endOfFileInLiteral);
+                }
+                return;
+            default:
+                _advance(lexer);
+                continue;
+            }
+        }
+    }
+
+    UnownedStringSlice getRawStringLiteralTokenValue(Token const& token)
+    {
+        auto content = token.getContent();
+        if (content.getLength() <= 5)
+            return UnownedStringSlice();
+        auto start = content.begin() + 2;
+        auto delimEnd = start;
+        while (delimEnd < content.end() && *delimEnd != '(')
+            delimEnd++;
+        auto delimLength = delimEnd - start;
+        auto contentEnd = content.end() - delimLength - 2;
+        auto contentBegin = start + delimLength + 1;
+        if (contentEnd <= contentBegin)
+            return UnownedStringSlice();
+        return UnownedStringSlice(contentBegin, contentEnd);
+    }
+
     String getStringLiteralTokenValue(Token const& token)
     {
         SLANG_ASSERT(token.type == TokenType::StringLiteral
             || token.type == TokenType::CharLiteral);
+
+        if (token.getContent().startsWith("R"))
+            return getRawStringLiteralTokenValue(token);
 
         const UnownedStringSlice content = token.getContent();
 
@@ -1016,12 +1085,24 @@ namespace Slang
         case 'A': case 'B': case 'C': case 'D': case 'E':
         case 'F': case 'G': case 'H': case 'I': case 'J':
         case 'K': case 'L': case 'M': case 'N': case 'O':
-        case 'P': case 'Q': case 'R': case 'S': case 'T':
+        case 'P': case 'Q': case 'S': case 'T':
         case 'U': case 'V': case 'W': case 'X': case 'Y':
         case 'Z':
         case '_':
             _lexIdentifier(lexer);
             return TokenType::Identifier;
+        case 'R':
+            _advance(lexer);
+            switch (_peek(lexer))
+            {
+            default:
+                _lexIdentifier(lexer);
+                return TokenType::Identifier;
+            case '\"':
+                _advance(lexer);
+                _lexRawStringLiteralBody(lexer);
+                return TokenType::StringLiteral;
+            }
 
         case '\"':
             _advance(lexer);
@@ -1032,6 +1113,7 @@ namespace Slang
             _advance(lexer);
             _lexStringLiteralBody(lexer, '\'');
             return TokenType::CharLiteral;
+
 
         case '+':
             _advance(lexer);

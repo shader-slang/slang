@@ -519,40 +519,73 @@ namespace Slang
         return semantics->ApplyExtensionToType(extDecl, type);
     }
 
+    void ensureDecl(SemanticsVisitor* visitor, Decl* decl, DeclCheckState state)
+    {
+        visitor->ensureDecl(decl, state);
+    }
+
     GenericSubstitution* createDefaultSubstitutionsForGeneric(
-        ASTBuilder*             astBuilder, 
+        ASTBuilder*             astBuilder,
+        SemanticsVisitor* semantics,
         GenericDecl*            genericDecl,
         Substitutions*   outerSubst)
     {
-        GenericSubstitution* genericSubst = astBuilder->create<GenericSubstitution>();
-        genericSubst->genericDecl = genericDecl;
-        genericSubst->outer = outerSubst;
+        GenericSubstitution* cachedResult = nullptr;
+        if (astBuilder->m_genericDefaultSubst.TryGetValue(genericDecl, cachedResult))
+        {
+            if (cachedResult->outer == outerSubst)
+                return cachedResult;
+        }
+
+        List<Val*> args;
 
         for( auto mm : genericDecl->members )
         {
             if( auto genericTypeParamDecl = as<GenericTypeParamDecl>(mm) )
             {
-                genericSubst->args.add(DeclRefType::create(astBuilder, DeclRef<Decl>(genericTypeParamDecl, outerSubst)));
+                args.add(DeclRefType::create(astBuilder, DeclRef<Decl>(genericTypeParamDecl, outerSubst)));
             }
             else if( auto genericValueParamDecl = as<GenericValueParamDecl>(mm) )
             {
-                genericSubst->args.add(astBuilder->create<GenericParamIntVal>(DeclRef<GenericValueParamDecl>(genericValueParamDecl, outerSubst)));
+                args.add(astBuilder->getOrCreate<GenericParamIntVal>(
+                    genericValueParamDecl->getType(),
+                    genericValueParamDecl, outerSubst));
             }
         }
+
+        bool shouldCache = true;
 
         // create default substitution arguments for constraints
         for (auto mm : genericDecl->members)
         {
             if (auto genericTypeConstraintDecl = as<GenericTypeConstraintDecl>(mm))
             {
-                DeclaredSubtypeWitness* witness = astBuilder->create<DeclaredSubtypeWitness>();
-                witness->declRef = DeclRef<Decl>(genericTypeConstraintDecl, outerSubst);
-                witness->sub = genericTypeConstraintDecl->sub.type;
-                witness->sup = genericTypeConstraintDecl->sup.type;
-                genericSubst->args.add(witness);
+                if (semantics)
+                {
+                    ensureDecl(semantics, genericTypeConstraintDecl, DeclCheckState::ReadyForReference);
+                }
+                auto constraintDeclRef = DeclRef<GenericTypeConstraintDecl>(genericTypeConstraintDecl, outerSubst);
+                DeclaredSubtypeWitness* witness =
+                    astBuilder->getOrCreate<DeclaredSubtypeWitness>(
+                        getSub(astBuilder, constraintDeclRef),
+                        getSup(astBuilder, constraintDeclRef),
+                        genericTypeConstraintDecl,
+                        outerSubst);
+                // TODO: this is an ugly hack to prevent crashing.
+                // In early stages of compilation witness->sub and witness->sup may not be checked yet.
+                // When semanticVisitor is present we have used that to ensure the type is checked.
+                // However due to how the code is written we cannot guarantee semanticVisitor is always available
+                // here, and if we can't get the checked sup/sub type this subst is incomplete and should not be
+                // cached.
+                if (!witness->sub)
+                    shouldCache = false;
+                args.add(witness);
             }
         }
 
+        GenericSubstitution* genericSubst = astBuilder->getOrCreateGenericSubstitution(genericDecl, args, outerSubst);
+        if (shouldCache)
+            astBuilder->m_genericDefaultSubst[genericDecl] = genericSubst;
         return genericSubst;
     }
 
@@ -561,7 +594,8 @@ namespace Slang
     // using their archetypes).
     //
     SubstitutionSet createDefaultSubstitutions(
-        ASTBuilder*     astBuilder, 
+        ASTBuilder*     astBuilder,
+        SemanticsVisitor* semantics,
         Decl*           decl,
         SubstitutionSet outerSubstSet)
     {
@@ -575,6 +609,7 @@ namespace Slang
 
             GenericSubstitution* genericSubst = createDefaultSubstitutionsForGeneric(
                 astBuilder,
+                semantics,
                 genericDecl,
                 outerSubstSet.substitutions);
 
@@ -585,21 +620,17 @@ namespace Slang
     }
 
     SubstitutionSet createDefaultSubstitutions(
-        ASTBuilder* astBuilder, 
+        ASTBuilder* astBuilder,
+        SemanticsVisitor* semantics,
         Decl*   decl)
     {
         SubstitutionSet subst;
         if( auto parentDecl = decl->parentDecl )
         {
-            subst = createDefaultSubstitutions(astBuilder, parentDecl);
+            subst = createDefaultSubstitutions(astBuilder, semantics, parentDecl);
         }
-        subst = createDefaultSubstitutions(astBuilder, decl, subst);
+        subst = createDefaultSubstitutions(astBuilder, semantics, decl, subst);
         return subst;
-    }
-
-    void ensureDecl(SemanticsVisitor* visitor, Decl* decl, DeclCheckState state)
-    {
-        visitor->ensureDecl(decl, state);
     }
 
     bool SemanticsVisitor::isDeclUsableAsStaticMember(
@@ -1065,10 +1096,12 @@ namespace Slang
                 case BaseType::Int16:
                 case BaseType::Int:
                 case BaseType::Int64:
+                case BaseType::IntPtr:
                 case BaseType::UInt8:
                 case BaseType::UInt16:
                 case BaseType::UInt:
                 case BaseType::UInt64:
+                case BaseType::UIntPtr:
                     break;
                 default:
                     getSink()->diagnose(varDecl, Diagnostics::staticConstRequirementMustBeIntOrBool);
@@ -1193,7 +1226,7 @@ namespace Slang
         {
             if (auto declRefType = as<DeclRefType>(sharedTypeExpr->base))
             {
-                declRefType->declRef.substitutions = createDefaultSubstitutions(m_astBuilder, declRefType->declRef.getDecl());
+                declRefType->declRef.substitutions = createDefaultSubstitutions(m_astBuilder, this, declRefType->declRef.getDecl());
 
                 if (auto typetype = as<TypeType>(typeExp.exp->type))
                     typetype->type = declRefType;
@@ -1752,9 +1785,7 @@ namespace Slang
         // compare `Derived::doThing` against `IBase::doThing<U>` where the `U` there is
         // the parameter of `Dervived::doThing`.
         //
-        GenericSubstitution* requiredSubst = m_astBuilder->create<GenericSubstitution>();
-        requiredSubst->genericDecl = requiredGenericDeclRef.getDecl();
-        requiredSubst->outer = requiredGenericDeclRef.substitutions;
+        List<Val*> requiredSubstArgs;
 
         for (Index i = 0; i < memberCount; i++)
         {
@@ -1767,17 +1798,20 @@ namespace Slang
                 SLANG_ASSERT(satisfyingTypeParamDeclRef);
                 auto satisfyingType = DeclRefType::create(m_astBuilder, satisfyingTypeParamDeclRef);
 
-                requiredSubst->args.add(satisfyingType);
+                requiredSubstArgs.add(satisfyingType);
             }
             else if (auto requiredValueParamDeclRef = requiredMemberDeclRef.as<GenericValueParamDecl>())
             {
                 auto satisfyingValueParamDeclRef = satisfyingMemberDeclRef.as<GenericValueParamDecl>();
                 SLANG_ASSERT(satisfyingValueParamDeclRef);
 
-                auto satisfyingVal = m_astBuilder->create<GenericParamIntVal>();
+                auto satisfyingVal = m_astBuilder->getOrCreate<GenericParamIntVal>(
+                    requiredValueParamDeclRef.getDecl()->getType(),
+                    satisfyingValueParamDeclRef.getDecl(),
+                    satisfyingValueParamDeclRef.substitutions.substitutions);
                 satisfyingVal->declRef = satisfyingValueParamDeclRef;
 
-                requiredSubst->args.add(satisfyingVal);
+                requiredSubstArgs.add(satisfyingVal);
             }
         }
         for (Index i = 0; i < memberCount; i++)
@@ -1790,14 +1824,19 @@ namespace Slang
                 auto satisfyingConstraintDeclRef = satisfyingMemberDeclRef.as<GenericTypeConstraintDecl>();
                 SLANG_ASSERT(satisfyingConstraintDeclRef);
 
-                auto satisfyingWitness = m_astBuilder->create<DeclaredSubtypeWitness>();
+                auto satisfyingWitness = m_astBuilder->getOrCreate<DeclaredSubtypeWitness>();
                 satisfyingWitness->sub = getSub(m_astBuilder, satisfyingConstraintDeclRef);
                 satisfyingWitness->sup = getSup(m_astBuilder, satisfyingConstraintDeclRef);
                 satisfyingWitness->declRef = satisfyingConstraintDeclRef;
 
-                requiredSubst->args.add(satisfyingWitness);
+                requiredSubstArgs.add(satisfyingWitness);
             }
         }
+
+        GenericSubstitution* requiredSubst = m_astBuilder->getOrCreateGenericSubstitution(
+            requiredGenericDeclRef.getDecl(),
+            requiredSubstArgs,
+            requiredGenericDeclRef.substitutions);
 
         // Now that we have computed a set of specialization arguments that will
         // specialize the generic requirement at the type parameters of the satisfying
@@ -2762,13 +2801,15 @@ namespace Slang
 
             auto reqType = getBaseType(m_astBuilder, requiredInheritanceDeclRef);
 
-            DeclaredSubtypeWitness* interfaceIsReqWitness = m_astBuilder->create<DeclaredSubtypeWitness>();
-            interfaceIsReqWitness->sub = superInterfaceType;
-            interfaceIsReqWitness->sup = reqType;
-            interfaceIsReqWitness->declRef = requiredInheritanceDeclRef;
+            DeclaredSubtypeWitness* interfaceIsReqWitness =
+                m_astBuilder->getOrCreate<DeclaredSubtypeWitness>(
+                    superInterfaceType,
+                    reqType,
+                    requiredInheritanceDeclRef.getDecl(),
+                    requiredInheritanceDeclRef.substitutions.substitutions);
             // ...
 
-            TransitiveSubtypeWitness* subIsReqWitness = m_astBuilder->create<TransitiveSubtypeWitness>();
+            TransitiveSubtypeWitness* subIsReqWitness = m_astBuilder->getOrCreateWithDefaultCtor<TransitiveSubtypeWitness>(subType, reqType, interfaceIsReqWitness);
             subIsReqWitness->sub = subType;
             subIsReqWitness->sup = reqType;
             subIsReqWitness->subToMid = subTypeConformsToSuperInterfaceWitness;
@@ -3230,7 +3271,7 @@ namespace Slang
 
     void SemanticsVisitor::checkExtensionConformance(ExtensionDecl* decl)
     {
-        auto declRef = createDefaultSubstitutionsIfNeeded(m_astBuilder, makeDeclRef(decl)).as<ExtensionDecl>();
+        auto declRef = createDefaultSubstitutionsIfNeeded(m_astBuilder, this, makeDeclRef(decl)).as<ExtensionDecl>();
         auto targetType = getTargetType(m_astBuilder, declRef);
 
         for (auto inheritanceDecl : decl->getMembersOfType<InheritanceDecl>())
@@ -3263,7 +3304,7 @@ namespace Slang
 
             auto astBuilder = getASTBuilder();
 
-            auto declRef = createDefaultSubstitutionsIfNeeded(astBuilder, makeDeclRef(decl)).as<AggTypeDeclBase>();
+            auto declRef = createDefaultSubstitutionsIfNeeded(astBuilder, this, makeDeclRef(decl)).as<AggTypeDeclBase>();
             auto type = DeclRefType::create(astBuilder, declRef);
 
             // TODO: Need to figure out what this should do for
@@ -3581,16 +3622,28 @@ namespace Slang
         case BaseType::UInt16:
             return (value >= 0 && value <= std::numeric_limits<uint16_t>::max()) || (value == -1);
         case BaseType::UInt:
+#if SLANG_PTR_IS_32
+        case BaseType::UIntPtr:
+#endif
             return (value >= 0 && value <= std::numeric_limits<uint32_t>::max()) || (value == -1);
         case BaseType::UInt64:
+#if SLANG_PTR_IS_64
+        case BaseType::UIntPtr:
+#endif
             return true;
         case BaseType::Int8:
             return value >= std::numeric_limits<int8_t>::min() && value <= std::numeric_limits<int8_t>::max();
         case BaseType::Int16:
             return value >= std::numeric_limits<int16_t>::min() && value <= std::numeric_limits<int16_t>::max();
         case BaseType::Int:
+#if SLANG_PTR_IS_32
+        case BaseType::IntPtr:
+#endif
             return value >= std::numeric_limits<int32_t>::min() && value <= std::numeric_limits<int32_t>::max();
         case BaseType::Int64:
+#if SLANG_PTR_IS_64
+        case BaseType::IntPtr:
+#endif
             return value >= std::numeric_limits<int64_t>::min() && value <= std::numeric_limits<int64_t>::max();
         default:
             return false;
@@ -4220,8 +4273,7 @@ namespace Slang
     GenericSubstitution* SemanticsVisitor::createDummySubstitutions(
         GenericDecl* genericDecl)
     {
-        GenericSubstitution* subst = m_astBuilder->create<GenericSubstitution>();
-        subst->genericDecl = genericDecl;
+        List<Val*> args;
         for (auto dd : genericDecl->members)
         {
             if (dd == genericDecl->inner)
@@ -4230,16 +4282,19 @@ namespace Slang
             if (auto typeParam = as<GenericTypeParamDecl>(dd))
             {
                 auto type = DeclRefType::create(m_astBuilder, makeDeclRef(typeParam));
-                subst->args.add(type);
+                args.add(type);
             }
             else if (auto valueParam = as<GenericValueParamDecl>(dd))
             {
-                auto val = m_astBuilder->create<GenericParamIntVal>(
-                    makeDeclRef(valueParam));
-                subst->args.add(val);
+                auto val = m_astBuilder->getOrCreate<GenericParamIntVal>(
+                    valueParam->getType(),
+                    valueParam,
+                    nullptr);
+                args.add(val);
             }
             // TODO: need to handle constraints here?
         }
+        GenericSubstitution* subst = m_astBuilder->getOrCreateGenericSubstitution(genericDecl, args, nullptr);
         return subst;
     }
 
@@ -5174,7 +5229,7 @@ namespace Slang
             if (!TryUnifyTypes(constraints, extDecl->targetType.Ptr(), type))
                 return DeclRef<ExtensionDecl>();
 
-            auto constraintSubst = TrySolveConstraintSystem(&constraints, DeclRef<Decl>(extGenericDecl, nullptr).as<GenericDecl>());
+            auto constraintSubst = trySolveConstraintSystem(&constraints, DeclRef<Decl>(extGenericDecl, nullptr).as<GenericDecl>());
             if (!constraintSubst)
             {
                 return DeclRef<ExtensionDecl>();

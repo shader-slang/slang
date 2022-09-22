@@ -8,6 +8,9 @@ typedef double float64_t;
 typedef int int32_t;
 typedef uint uint32_t;
 
+typedef uintptr_t size_t;
+typedef uintptr_t usize_t
+typedef intptr_t ssize_t;
 
 // Modifier for variables that must resolve to compile-time constants
 // as part of translation.
@@ -229,6 +232,7 @@ ${{{{
     case BaseType::Int16:
     case BaseType::Int:
     case BaseType::Int64:
+    case BaseType::IntPtr:
 }}}}
     ,  __BuiltinSignedArithmeticType
 ${{{{
@@ -237,6 +241,7 @@ ${{{{
     case BaseType::UInt16:
     case BaseType::UInt:
     case BaseType::UInt64:
+    case BaseType::UIntPtr:
 }}}}
     ,  __BuiltinArithmeticType
     ,  __BuiltinIntegerType
@@ -398,6 +403,9 @@ void __store<T>(Ptr<T> ptr, T val);
 __intrinsic_op($(kIROp_getElementPtr))
 Ptr<T> __getElementPtr<T>(Ptr<T> ptr, int index);
 
+__intrinsic_op($(kIROp_getElementPtr))
+Ptr<T> __getElementPtr<T>(Ptr<T> ptr, int64_t index);
+
 __generic<T>
 __intrinsic_op($(kIROp_Less))
 bool operator<(Ptr<T> p1, Ptr<T> p2);
@@ -429,8 +437,8 @@ extension bool
     __intrinsic_op($(kIROp_CastPtrToBool))
     __init(Ptr<T> ptr);
 
-    static bool maxValue = true;
-    static bool minValue = false;
+    static const bool maxValue = true;
+    static const bool minValue = false;
 }
 
 extension uint64_t
@@ -439,8 +447,8 @@ extension uint64_t
     __intrinsic_op($(kIROp_Construct))
     __init(Ptr<T> ptr);
 
-    static uint64_t maxValue = 0xFFFFFFFFFFFFFFFFULL;
-    static uint64_t minValue = 0;
+    static const uint64_t maxValue = 0xFFFFFFFFFFFFFFFFULL;
+    static const uint64_t minValue = 0;
 }
 
 extension int64_t
@@ -449,8 +457,28 @@ extension int64_t
     __intrinsic_op($(kIROp_Construct))
     __init(Ptr<T> ptr);
 
-    static int64_t maxValue =  0x7FFFFFFFFFFFFFFFLL;
-    static int64_t minValue = -0x8000000000000000LL;
+    static const int64_t maxValue =  0x7FFFFFFFFFFFFFFFLL;
+    static const int64_t minValue = -0x8000000000000000LL;
+}
+
+extension intptr_t
+{
+    __generic<T>
+    __intrinsic_op($(kIROp_Construct))
+    __init(Ptr<T> ptr);
+    static const intptr_t maxValue = $(SLANG_PROCESSOR_X86_64?"0x7FFFFFFFFFFFFFFFz":"0x7FFFFFFFz");
+    static const intptr_t minValue = $(SLANG_PROCESSOR_X86_64?"0x8000000000000000z":"0x80000000z");
+    static const int size = $(SLANG_PROCESSOR_X86_64?"8":"4");
+}
+
+extension uintptr_t
+{
+    __generic<T>
+    __intrinsic_op($(kIROp_Construct))
+    __init(Ptr<T> ptr);
+    static const uintptr_t maxValue = $(SLANG_PROCESSOR_X86_64?"0xFFFFFFFFFFFFFFFFz":"0xFFFFFFFFz");
+    static const uintptr_t minValue = 0z;
+    static const int size = $(SLANG_PROCESSOR_X86_64?"8":"4");
 }
 
 __generic<T>
@@ -543,62 +571,120 @@ T __attachToNativeRef(NativeRef<T> nativeVal)
 __magic_type(StringType)
 __intrinsic_type($(kIROp_StringType))
 struct String
-{};
+{
+    __target_intrinsic(cpp)
+    __init(int val);
+    __target_intrinsic(cpp)
+    __init(uint val);
+    __target_intrinsic(cpp)
+    __init(int64_t val);
+    __target_intrinsic(cpp)
+    __init(uint64_t val);
+    __target_intrinsic(cpp)
+    __init(float val);
+    __target_intrinsic(cpp)
+    __init(double val);
+
+    __target_intrinsic(cpp)
+    int64_t getLength();
+
+    property int length
+    {
+        get { return (int)getLength(); }
+    }
+};
 
 __magic_type(NativeStringType)
 __intrinsic_type($(kIROp_NativeStringType))
 struct NativeString
-{};
+{
+    __target_intrinsic(cpp, "int(strlen($0))")
+    int getLength();
+
+    __target_intrinsic(cpp, "(void*)((const char*)($0))")
+    Ptr<void> getBuffer();
+
+    property int length { [__unsafeForceInlineEarly] get{return getLength();} }
+
+    __intrinsic_op($(kIROp_getNativeStr))
+    __init(String value);
+};
+
+extension Ptr<void>
+{
+    __implicit_conversion($(kConversionCost_PtrToVoidPtr))
+    [__unsafeForceInlineEarly]
+    __init(NativeString nativeStr) { this = nativeStr.getBuffer(); }
+
+    __generic<T>
+    __intrinsic_op(0)
+    __implicit_conversion($(kConversionCost_PtrToVoidPtr))
+    __init(Ptr<T> ptr);
+
+    __generic<T>
+    __intrinsic_op(0)
+    __implicit_conversion($(kConversionCost_PtrToVoidPtr))
+    __init(NativeRef<T> ptr);
+}
 
 __magic_type(DynamicType)
 __intrinsic_type($(kIROp_DynamicType))
 struct __Dynamic
 {};
 
+extension half
+{
+    static const half maxValue = half(65504);
+    static const half minValue = half(-65504);
+}
+
 extension float
 {
-    static float maxValue = 340282346638528859811704183484516925440.0f;
+    static const float maxValue = 340282346638528859811704183484516925440.0f;
+    static const float minValue = -340282346638528859811704183484516925440.0f;
+
 }
 
 extension double
 {
-    static double maxValue = 179769313486231570814527423731704356798070567525844996598917476803157260780028538760589558632766878171540458953514382464234321326889464182768467546703537516986049910576551282076245490090389328944075868508455133942304583236903222948165808559332123348274797826204144723168738177180919299881250404026184124858368.0;
+    static const double maxValue = 179769313486231570814527423731704356798070567525844996598917476803157260780028538760589558632766878171540458953514382464234321326889464182768467546703537516986049910576551282076245490090389328944075868508455133942304583236903222948165808559332123348274797826204144723168738177180919299881250404026184124858368.0;
+    static const double minValue = -179769313486231570814527423731704356798070567525844996598917476803157260780028538760589558632766878171540458953514382464234321326889464182768467546703537516986049910576551282076245490090389328944075868508455133942304583236903222948165808559332123348274797826204144723168738177180919299881250404026184124858368.0;
 }
 
 extension int
 {
-    static int maxValue = 2147483647;
-    static int minValue = -2147483648;
+    static const int maxValue = 2147483647;
+    static const int minValue = -2147483648;
 }
 
 extension uint
 {
-    static uint maxValue = 4294967295;
-    static uint minValue = 0;
+    static const uint maxValue = 4294967295;
+    static const uint minValue = 0;
 }
 
 extension int8_t
 {
-    static int8_t maxValue = 127;
-    static int8_t minValue = -128;
+    static const int8_t maxValue = 127;
+    static const int8_t minValue = -128;
+}
+
+extension uint8_t
+{
+    static const uint8_t maxValue = 255;
+    static const uint8_t minValue = 0;
 }
 
 extension uint16_t
 {
-    static uint16_t maxValue = 255;
-    static uint16_t minValue = 0;
+    static const uint16_t maxValue = 65535;
+    static const uint16_t minValue = 0;
 }
 
 extension int16_t
 {
-    static int16_t maxValue = 32767;
-    static int16_t minValue = -32768;
-}
-
-extension uint16_t
-{
-    static uint16_t maxValue = 65535;
-    static uint16_t minValue = 0;
+    static const int16_t maxValue = 32767;
+    static const int16_t minValue = -32768;
 }
 
     /// An `N` component vector with elements of type `T`.
@@ -1795,6 +1881,7 @@ for (auto op : intrinsicUnaryOps)
 
         // scalar version
         sb << "__prefix __intrinsic_op(" << int(op.opCode) << ") " << resultType << " operator" << op.opName << "(" << type.name << " value);\n";
+        sb << "__intrinsic_op(" << int(op.opCode) << ") " << resultType << " __" << op.funcName << "(" << type.name << " value);\n";
 
         // vector version
         sb << "__generic<let N : int> ";
@@ -1939,6 +2026,7 @@ for (auto op : intrinsicBinaryOps)
 
         // scalar version
         sb << "__intrinsic_op(" << int(op.opCode) << ") " << resultType << " operator" << op.opName << "(" << leftType << " left, " << rightType << " right);\n";
+        sb << "__intrinsic_op(" << int(op.opCode) << ") " << resultType << " __" << op.funcName << "(" << leftType << " left, " << rightType << " right);\n";
 
         // vector version
         sb << "__generic<let N : int> ";
@@ -2041,11 +2129,12 @@ for (auto op : intrinsicBinaryOps)
 static const struct ShiftOpInfo
 {
     char const* name;
+    char const* funcName;
     int op;
 } kShiftOps[] =
 {
-    { "<<",  kIROp_Lsh },
-    { ">>",  kIROp_Rsh },
+    { "<<", "shl", kIROp_Lsh },
+    { ">>", "shr", kIROp_Rsh },
 };
 for(auto info : kShiftOps) {
 }}}}
@@ -2053,6 +2142,10 @@ for(auto info : kShiftOps) {
 __generic<L: __BuiltinIntegerType, R: __BuiltinIntegerType>
 __intrinsic_op($(info.op))
 L operator$(info.name)(L left, R right);
+
+__generic<L: __BuiltinIntegerType, R: __BuiltinIntegerType>
+__intrinsic_op($(info.op))
+L __$(info.funcName)(L left, R right);
 
 __generic<L: __BuiltinIntegerType, R: __BuiltinIntegerType>
 [__unsafeForceInlineEarly]
@@ -2188,6 +2281,7 @@ ${{{{
 
 //@ public:
 
+
 // Bit cast
 __generic<T, U>
 [__unsafeForceInlineEarly]
@@ -2209,7 +2303,7 @@ T reinterpret(U value);
 // Specialized function
 
 /// Given a string returns an integer hash of that string.
-__intrinsic_op
+__intrinsic_op($(kIROp_GetStringHash))
 int getStringHash(String string);
 
 /// Use will produce a syntax error in downstream compiler
@@ -2275,6 +2369,207 @@ __intrinsic_op($(kIROp_Neq))
 bool operator!=(E left, E right);
 
 //@ public:
+
+// public interfaces for generic arithmetic types.
+
+interface IComparable
+{
+    bool equals(This other);
+    bool lessThan(This other);
+    bool lessThanOrEquals(This other);
+}
+
+interface IArithmetic : IComparable
+{
+    This add(This other);
+    This sub(This other);
+    This mul(This other);
+    This div(This other);
+    This mod(This other);
+    This neg();
+    __init(int val);
+    static const This maxValue;
+    static const This minValue;
+}
+
+interface IInteger : IArithmetic
+{
+    This shl(int value);
+    This shr(int value);
+    This bitAnd(This other);
+    This bitOr(This other);
+    This bitXor(This other);
+    This bitNot();
+    int toInt();
+    int64_t toInt64();
+    uint toUInt();
+    uint64_t toUInt64();
+}
+
+interface IFloat : IArithmetic
+{
+    __init(float value);
+    float toFloat();
+}
+
+__generic<T : IComparable>
+[__unsafeForceInlineEarly]
+bool operator<(T v0, T v1)
+{
+    return v0.lessThan(v1);
+}
+__generic<T : IComparable>
+[__unsafeForceInlineEarly]
+bool operator>(T v0, T v1)
+{
+    return v1.lessThan(v0);
+}
+__generic<T : IComparable>
+[__unsafeForceInlineEarly]
+bool operator ==(T v0, T v1)
+{
+    return v0.equals(v1);
+}
+__generic<T : IComparable>
+[__unsafeForceInlineEarly]
+bool operator >=(T v0, T v1)
+{
+    return v1.lessThanOrEquals(v1);
+}
+__generic<T : IComparable>
+[__unsafeForceInlineEarly]
+bool operator <=(T v0, T v1)
+{
+    return v0.lessThanOrEquals(v1);
+}
+__generic<T : IComparable>
+[__unsafeForceInlineEarly]
+bool operator !=(T v0, T v1)
+{
+    return !v0.equals(v1);
+}
+
+__generic<T : IArithmetic>
+[__unsafeForceInlineEarly]
+T operator +(T v0, T v1)
+{
+    return v0.add(v1);
+}
+
+__generic<T : IArithmetic>
+[__unsafeForceInlineEarly]
+T operator -(T v0, T v1)
+{
+    return v0.sub(v1);
+}
+
+__generic<T : IArithmetic>
+[__unsafeForceInlineEarly]
+T operator *(T v0, T v1)
+{
+    return v0.mul(v1);
+}
+
+__generic<T : IArithmetic>
+[__unsafeForceInlineEarly]
+T operator /(T v0, T v1)
+{
+    return v0.div(v1);
+}
+
+__generic<T : IArithmetic>
+[__unsafeForceInlineEarly]
+T operator %(T v0, T v1)
+{
+    return v0.mod(v1);
+}
+
+__generic<T : IArithmetic>
+[__unsafeForceInlineEarly]
+__prefix T operator -(T v0)
+{
+    return v0.neg();
+}
+__generic<T : IInteger>
+[__unsafeForceInlineEarly]
+T operator &(T v0, T v1)
+{
+    return v0.bitAnd(v1);
+}
+__generic<T : IInteger>
+[__unsafeForceInlineEarly]
+T operator |(T v0, T v1)
+{
+    return v0.bitOr(v1);
+}
+__generic<T : IInteger>
+[__unsafeForceInlineEarly]
+T operator ^(T v0, T v1)
+{
+    return v0.bitXor(v1);
+}
+__generic<T : IInteger>
+[__unsafeForceInlineEarly]
+__prefix T operator ~(T v0)
+{
+    return v0.bitNot();
+}
+
+// Provide implementations to public generic arithmetic interfaces for builtin types.
+
+${{{{
+// Code gen integer type implementations.
+
+for (int tt = 0; tt < kBaseTypeCount; ++tt)
+{
+    if (kBaseTypes[tt].flags & (SINT_MASK | UINT_MASK))
+    {
+}}}}
+extension $(kBaseTypes[tt].name) : IInteger
+{
+    [__unsafeForceInlineEarly] bool equals(This other){return this==other;}
+    [__unsafeForceInlineEarly] bool lessThan(This other){return this<other;}
+    [__unsafeForceInlineEarly] bool lessThanOrEquals(This other){return this<=other;}
+    [__unsafeForceInlineEarly] This add(This other) { return __add(this, other); }
+    [__unsafeForceInlineEarly] This sub(This other) { return __sub(this, other); }
+    [__unsafeForceInlineEarly] This mul(This other) { return __mul(this, other); }
+    [__unsafeForceInlineEarly] This div(This other) { return __div(this, other); }
+    [__unsafeForceInlineEarly] This mod(This other) { return __irem(this, other); }
+    [__unsafeForceInlineEarly] This neg() { return __neg(this); }
+    [__unsafeForceInlineEarly] This shl(int other) { return __shl(this, other); }
+    [__unsafeForceInlineEarly] This shr(int other) { return __shr(this, other); }
+    [__unsafeForceInlineEarly] This bitAnd(This other) { return __add(this, other); }
+    [__unsafeForceInlineEarly] This bitOr(This other) { return __or(this, other); }
+    [__unsafeForceInlineEarly] This bitXor(This other) { return __xor(this, other); }
+    [__unsafeForceInlineEarly] This bitNot() { return __not(this); }
+    [__unsafeForceInlineEarly] int toInt() { return int(this); }
+    [__unsafeForceInlineEarly] int64_t toInt64() { return int64_t(this); }
+    [__unsafeForceInlineEarly] uint toUInt() { return uint(this); }
+    [__unsafeForceInlineEarly] uint64_t toUInt64() { return uint64_t(this); }
+}
+${{{{
+    }
+    else if (kBaseTypes[tt].flags & FLOAT_MASK)
+    {
+}}}}
+
+extension $(kBaseTypes[tt].name) : IFloat
+{
+    [__unsafeForceInlineEarly] bool lessThan(This other) { return this < other; }
+    [__unsafeForceInlineEarly] bool lessThanOrEquals(This other) { return this <= other; }
+    [__unsafeForceInlineEarly] bool equals(This other) { return this == other; }
+    [__unsafeForceInlineEarly] This add(This other) { return __add(this, other); }
+    [__unsafeForceInlineEarly] This sub(This other) { return __sub(this, other); }
+    [__unsafeForceInlineEarly] This mul(This other) { return __mul(this, other); }
+    [__unsafeForceInlineEarly] This div(This other) { return __div(this, other); }
+    [__unsafeForceInlineEarly] This mod(This other) { return __frem(this, other); }
+    [__unsafeForceInlineEarly] This neg() { return __neg(this); }
+    [__unsafeForceInlineEarly] float toFloat() { return float(this); }
+}
+${{{{
+    }
+}
+}}}}
 
 // Binding Attributes
 
@@ -2434,6 +2729,9 @@ attribute_syntax [open] : OpenAttribute;
 
 __attributeTarget(InterfaceDecl)
 attribute_syntax [anyValueSize(size:int)] : AnyValueSizeAttribute;
+
+__attributeTarget(InterfaceDecl)
+attribute_syntax [Specialize] : SpecializeAttribute;
 
 __attributeTarget(DeclBase)
 attribute_syntax [builtin] : BuiltinAttribute;

@@ -10,10 +10,11 @@ namespace Slang
     DeclaredSubtypeWitness* SemanticsVisitor::createSimpleSubtypeWitness(
         TypeWitnessBreadcrumb*  breadcrumb)
     {
-        DeclaredSubtypeWitness* witness = m_astBuilder->create<DeclaredSubtypeWitness>();
-        witness->sub = breadcrumb->sub;
-        witness->sup = breadcrumb->sup;
-        witness->declRef = breadcrumb->declRef;
+        DeclaredSubtypeWitness* witness = m_astBuilder->getOrCreate<DeclaredSubtypeWitness>(
+            breadcrumb->sub,
+            breadcrumb->sup,
+            breadcrumb->declRef.decl,
+            breadcrumb->declRef.substitutions.substitutions);
         return witness;
     }
 
@@ -82,12 +83,11 @@ namespace Slang
             // where `[...]` represents the "hole" we leave
             // open to fill in next.
             //
-            DeclaredSubtypeWitness* declaredWitness = m_astBuilder->create<DeclaredSubtypeWitness>();
-            declaredWitness->sub = bb->sub;
-            declaredWitness->sup = bb->sup;
-            declaredWitness->declRef = bb->declRef;
+            DeclaredSubtypeWitness* declaredWitness =
+                m_astBuilder->getOrCreate<DeclaredSubtypeWitness>(
+                    bb->sub, bb->sup, bb->declRef.decl, bb->declRef.substitutions.substitutions);
 
-            TransitiveSubtypeWitness* transitiveWitness = m_astBuilder->create<TransitiveSubtypeWitness>();
+            TransitiveSubtypeWitness* transitiveWitness = m_astBuilder->getOrCreateWithDefaultCtor<TransitiveSubtypeWitness>(subType, bb->sup, declaredWitness);
             transitiveWitness->sub = subType;
             transitiveWitness->sup = bb->sup;
             transitiveWitness->midToSup = declaredWitness;

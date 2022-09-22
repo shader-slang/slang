@@ -115,7 +115,7 @@ HashCode GenericParamIntVal::_getHashCodeOverride()
     return declRef.getHashCode() ^ HashCode(0xFFFF);
 }
 
-Val* GenericParamIntVal::_substituteImplOverride(ASTBuilder* /* astBuilder */, SubstitutionSet subst, int* ioDiff)
+Val* maybeSubstituteGenericParam(Val* paramVal, Decl* paramDecl, SubstitutionSet subst, int* ioDiff)
 {
     // search for a substitution that might apply to us
     for (auto s = subst.substitutions; s; s = s->outer)
@@ -127,25 +127,45 @@ Val* GenericParamIntVal::_substituteImplOverride(ASTBuilder* /* astBuilder */, S
         // the generic decl associated with the substitution list must be
         // the generic decl that declared this parameter
         auto genericDecl = genSubst->genericDecl;
-        if (genericDecl != declRef.getDecl()->parentDecl)
+        if (genericDecl != paramDecl->parentDecl)
             continue;
 
-        int index = 0;
+        // In some cases, we construct a `DeclRef` to a `GenericDecl`
+        // (or a declaration under one) that only includes argument
+        // values for a prefix of the parameters of the generic.
+        //
+        // If we aren't careful, we could end up indexing into the
+        // argument list past the available range.
+        //
+        Count argCount = genSubst->getArgs().getCount();
+
+        Count argIndex = 0;
         for (auto m : genericDecl->members)
         {
-            if (m == declRef.getDecl())
+            // If we have run out of arguments, then we can stop
+            // iterating over the parameters, because `this`
+            // parameter will not be replaced with anything by
+            // the substituion.
+            //
+            if (argIndex >= argCount)
+            {
+                return paramVal;
+            }
+
+
+            if (m == paramDecl)
             {
                 // We've found it, so return the corresponding specialization argument
                 (*ioDiff)++;
-                return genSubst->args[index];
+                return genSubst->getArgs()[argIndex];
             }
             else if (auto typeParam = as<GenericTypeParamDecl>(m))
             {
-                index++;
+                argIndex++;
             }
             else if (auto valParam = as<GenericValueParamDecl>(m))
             {
-                index++;
+                argIndex++;
             }
             else
             {
@@ -154,6 +174,15 @@ Val* GenericParamIntVal::_substituteImplOverride(ASTBuilder* /* astBuilder */, S
     }
 
     // Nothing found: don't substitute.
+    return paramVal;
+
+}
+
+Val* GenericParamIntVal::_substituteImplOverride(ASTBuilder* /* astBuilder */, SubstitutionSet subst, int* ioDiff)
+{
+    if (auto result = maybeSubstituteGenericParam(this, declRef.getDecl(), subst, ioDiff))
+        return result;
+
     return this;
 }
 
@@ -265,8 +294,8 @@ Val* DeclaredSubtypeWitness::_substituteImplOverride(ASTBuilder* astBuilder, Sub
                     (*ioDiff)++;
                     auto ordinaryParamCount = genericDecl->getMembersOfType<GenericTypeParamDecl>().getCount() +
                         genericDecl->getMembersOfType<GenericValueParamDecl>().getCount();
-                    SLANG_ASSERT(index + ordinaryParamCount < genericSubst->args.getCount());
-                    return genericSubst->args[index + ordinaryParamCount];
+                    SLANG_ASSERT(index + ordinaryParamCount < genericSubst->getArgs().getCount());
+                    return genericSubst->getArgs()[index + ordinaryParamCount];
                 }
             }
         }
@@ -323,7 +352,8 @@ Val* DeclaredSubtypeWitness::_substituteImplOverride(ASTBuilder* astBuilder, Sub
         }
     }
 
-    DeclaredSubtypeWitness* rs = astBuilder->create<DeclaredSubtypeWitness>();
+    DeclaredSubtypeWitness* rs = astBuilder->getOrCreate<DeclaredSubtypeWitness>(
+        substSub, substSup, substDeclRef.getDecl(), substDeclRef.substitutions.substitutions);
     rs->sub = substSub;
     rs->sup = substSup;
     rs->declRef = substDeclRef;
@@ -722,10 +752,10 @@ Val* PolynomialIntVal::_substituteImplOverride(ASTBuilder* astBuilder, Substitut
     *ioDiff += diff;
 
     if (evaluatedTerms.getCount() == 0)
-        return astBuilder->create<ConstantIntVal>(evaluatedConstantTerm);
+        return astBuilder->getOrCreate<ConstantIntVal>(type, evaluatedConstantTerm);
     if (diff != 0)
     {
-        auto newPolynomial = astBuilder->create<PolynomialIntVal>();
+        auto newPolynomial = astBuilder->create<PolynomialIntVal>(type);
         newPolynomial->constantTerm = evaluatedConstantTerm;
         newPolynomial->terms = _Move(evaluatedTerms);
         return newPolynomial->canonicalize(astBuilder);
@@ -770,7 +800,7 @@ bool addToPolynomialTerm(ASTBuilder* astBuilder, PolynomialIntVal* val, IntVal* 
 
 PolynomialIntVal* PolynomialIntVal::neg(ASTBuilder* astBuilder, IntVal* base)
 {
-    auto result = astBuilder->create<PolynomialIntVal>();
+    auto result = astBuilder->create<PolynomialIntVal>(base->type);
     if (!addToPolynomialTerm(astBuilder, result, base, -1))
         return nullptr;
     result->canonicalize(astBuilder);
@@ -779,7 +809,7 @@ PolynomialIntVal* PolynomialIntVal::neg(ASTBuilder* astBuilder, IntVal* base)
 
 PolynomialIntVal* PolynomialIntVal::sub(ASTBuilder* astBuilder, IntVal* op0, IntVal* op1)
 {
-    auto result = astBuilder->create<PolynomialIntVal>();
+    auto result = astBuilder->create<PolynomialIntVal>(op0->type);
     if (!addToPolynomialTerm(astBuilder, result, op0, 1))
         return nullptr;
     if (!addToPolynomialTerm(astBuilder, result, op1, -1))
@@ -790,7 +820,7 @@ PolynomialIntVal* PolynomialIntVal::sub(ASTBuilder* astBuilder, IntVal* op0, Int
 
 PolynomialIntVal* PolynomialIntVal::add(ASTBuilder* astBuilder, IntVal* op0, IntVal* op1)
 {
-    auto result = astBuilder->create<PolynomialIntVal>();
+    auto result = astBuilder->create<PolynomialIntVal>(op0->type);
     if (!addToPolynomialTerm(astBuilder, result, op0, 1))
         return nullptr;
     if (!addToPolynomialTerm(astBuilder, result, op1, 1))
@@ -805,7 +835,7 @@ PolynomialIntVal* PolynomialIntVal::mul(ASTBuilder* astBuilder, IntVal* op0, Int
     {
         if (auto poly1 = as<PolynomialIntVal>(op1))
         {
-            auto result = astBuilder->create<PolynomialIntVal>();
+            auto result = astBuilder->create<PolynomialIntVal>(poly0->type);
             // add poly0.constant * poly1.constant
             result->constantTerm = poly0->constantTerm * poly1->constantTerm;
             // add poly0.constant * poly1.terms
@@ -847,7 +877,7 @@ PolynomialIntVal* PolynomialIntVal::mul(ASTBuilder* astBuilder, IntVal* op0, Int
         }
         else if (auto cVal1 = as<ConstantIntVal>(op1))
         {
-            auto result = astBuilder->create<PolynomialIntVal>();
+            auto result = astBuilder->create<PolynomialIntVal>(poly0->type);
             result->constantTerm = poly0->constantTerm * cVal1->value;
             auto factor1 = astBuilder->create<PolynomialIntValFactor>();
             for (auto term : poly0->terms)
@@ -863,7 +893,7 @@ PolynomialIntVal* PolynomialIntVal::mul(ASTBuilder* astBuilder, IntVal* op0, Int
         }
         else if (auto val1 = as<IntVal>(op1))
         {
-            auto result = astBuilder->create<PolynomialIntVal>();
+            auto result = astBuilder->create<PolynomialIntVal>(poly0->type);
             result->constantTerm = 0;
             auto factor1 = astBuilder->create<PolynomialIntValFactor>();
             factor1->power = 1;
@@ -901,7 +931,7 @@ PolynomialIntVal* PolynomialIntVal::mul(ASTBuilder* astBuilder, IntVal* op0, Int
         }
         else if (auto cVal1 = as<ConstantIntVal>(op1))
         {
-            auto result = astBuilder->create<PolynomialIntVal>();
+            auto result = astBuilder->create<PolynomialIntVal>(val0->type);
             auto term = astBuilder->create<PolynomialIntValTerm>();
             term->constFactor = cVal1->value;
             auto factor0 = astBuilder->create<PolynomialIntValFactor>();
@@ -914,7 +944,7 @@ PolynomialIntVal* PolynomialIntVal::mul(ASTBuilder* astBuilder, IntVal* op0, Int
         }
         else if (auto val1 = as<IntVal>(op1))
         {
-            auto result = astBuilder->create<PolynomialIntVal>();
+            auto result = astBuilder->create<PolynomialIntVal>(val0->type);
             auto term = astBuilder->create<PolynomialIntValTerm>();
             term->constFactor = 1;
             auto factor0 = astBuilder->create<PolynomialIntValFactor>();
@@ -1035,7 +1065,7 @@ IntVal* PolynomialIntVal::canonicalize(ASTBuilder* builder)
         return terms[0]->paramFactors[0]->param;
     }
     if (terms.getCount() == 0)
-        return builder->create<ConstantIntVal>(constantTerm);
+        return builder->getOrCreate<ConstantIntVal>(type, constantTerm);
     return this;
 }
 
@@ -1127,7 +1157,7 @@ static bool nameIs(Name* name, const char* val)
     return false;
 }
 
-Val* FuncCallIntVal::tryFoldImpl(ASTBuilder* astBuilder, DeclRef<Decl> newFuncDecl, List<IntVal*>& newArgs, DiagnosticSink* sink)
+Val* FuncCallIntVal::tryFoldImpl(ASTBuilder* astBuilder, Type* resultType, DeclRef<Decl> newFuncDecl, List<IntVal*>& newArgs, DiagnosticSink* sink)
 {
     // Are all args const now?
     List<ConstantIntVal*> constArgs;
@@ -1207,7 +1237,7 @@ Val* FuncCallIntVal::tryFoldImpl(ASTBuilder* astBuilder, DeclRef<Decl> newFuncDe
         {
             SLANG_UNREACHABLE("constant folding of FuncCallIntVal");
         }
-        return astBuilder->create<ConstantIntVal>(resultValue);
+        return astBuilder->getOrCreate<ConstantIntVal>(resultType, resultValue);
     }
     return nullptr;
 }
@@ -1228,12 +1258,12 @@ Val* FuncCallIntVal::_substituteImplOverride(ASTBuilder* astBuilder, Substitutio
     if (diff)
     {
         // TODO: report diagnostics back.
-        auto newVal = tryFoldImpl(astBuilder, newFuncDeclRef, newArgs, nullptr);
+        auto newVal = tryFoldImpl(astBuilder, type, newFuncDeclRef, newArgs, nullptr);
         if (newVal)
             return newVal;
         else
         {
-            auto result = astBuilder->create<FuncCallIntVal>();
+            auto result = astBuilder->create<FuncCallIntVal>(type);
             result->args = _Move(newArgs);
             result->funcDeclRef = newFuncDeclRef;
             result->funcType = funcType;
