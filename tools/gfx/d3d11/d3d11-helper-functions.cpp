@@ -43,6 +43,8 @@ namespace d3d11
         case ResourceState::UnorderedAccess:
             return D3D11_BIND_UNORDERED_ACCESS;
         case ResourceState::ShaderResource:
+        case ResourceState::PixelShaderResource:
+        case ResourceState::NonPixelShaderResource:
             return D3D11_BIND_SHADER_RESOURCE;
         default:
             return D3D11_BIND_FLAG(0);
