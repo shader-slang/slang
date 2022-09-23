@@ -500,7 +500,7 @@ Result RootShaderObjectLayoutImpl::RootSignatureDescBuilder::addDescriptorRange(
 {
     if (isRootParameter)
     {
-        D3D12_ROOT_PARAMETER rootParam = {};
+        D3D12_ROOT_PARAMETER1 rootParam = {};
         switch (rangeType)
         {
         case D3D12_DESCRIPTOR_RANGE_TYPE_SRV:
@@ -525,7 +525,7 @@ Result RootShaderObjectLayoutImpl::RootSignatureDescBuilder::addDescriptorRange(
 
     auto& descriptorSet = m_descriptorSets[physicalDescriptorSetIndex];
 
-    D3D12_DESCRIPTOR_RANGE range = {};
+    D3D12_DESCRIPTOR_RANGE1 range = {};
     range.RangeType = rangeType;
     range.NumDescriptors = count;
     range.BaseShaderRegister = registerIndex;
@@ -824,14 +824,14 @@ void RootShaderObjectLayoutImpl::RootSignatureDescBuilder::addAsValue(
     }
 }
 
-D3D12_ROOT_SIGNATURE_DESC& RootShaderObjectLayoutImpl::RootSignatureDescBuilder::build()
+D3D12_ROOT_SIGNATURE_DESC1& RootShaderObjectLayoutImpl::RootSignatureDescBuilder::build()
 {
     for (Index i = 0; i < m_descriptorSets.getCount(); i++)
     {
         auto& descriptorSet = m_descriptorSets[i];
         if (descriptorSet.m_resourceRanges.getCount())
         {
-            D3D12_ROOT_PARAMETER rootParam = {};
+            D3D12_ROOT_PARAMETER1 rootParam = {};
             rootParam.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
             rootParam.DescriptorTable.NumDescriptorRanges =
                 (UINT)descriptorSet.m_resourceRanges.getCount();
@@ -841,7 +841,7 @@ D3D12_ROOT_SIGNATURE_DESC& RootShaderObjectLayoutImpl::RootSignatureDescBuilder:
         }
         if (descriptorSet.m_samplerRanges.getCount())
         {
-            D3D12_ROOT_PARAMETER rootParam = {};
+            D3D12_ROOT_PARAMETER1 rootParam = {};
             rootParam.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
             rootParam.DescriptorTable.NumDescriptorRanges =
                 (UINT)descriptorSet.m_samplerRanges.getCount();
@@ -915,12 +915,13 @@ Result RootShaderObjectLayoutImpl::createRootSignatureFromSlang(
     }
 
     auto& rootSignatureDesc = builder.build();
-
+    D3D12_VERSIONED_ROOT_SIGNATURE_DESC versionedDesc = {};
+    versionedDesc.Version = D3D_ROOT_SIGNATURE_VERSION_1_1;
+    versionedDesc.Desc_1_1 = rootSignatureDesc;
     ComPtr<ID3DBlob> signature;
     ComPtr<ID3DBlob> error;
-    if (SLANG_FAILED(device->m_D3D12SerializeRootSignature(
-        &rootSignatureDesc,
-        D3D_ROOT_SIGNATURE_VERSION_1,
+    if (SLANG_FAILED(device->m_D3D12SerializeVersionedRootSignature(
+        &versionedDesc,
         signature.writeRef(),
         error.writeRef())))
     {

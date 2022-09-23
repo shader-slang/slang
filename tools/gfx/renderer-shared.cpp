@@ -386,6 +386,8 @@ Result RendererBase::getFormatSupportedResourceStates(Format format, ResourceSta
     outStates->add(ResourceState::ResolveDestination);
     outStates->add(ResourceState::ResolveSource);
     outStates->add(ResourceState::ShaderResource);
+    outStates->add(ResourceState::PixelShaderResource);
+    outStates->add(ResourceState::NonPixelShaderResource);
     outStates->add(ResourceState::StreamOutput);
     outStates->add(ResourceState::Undefined);
     outStates->add(ResourceState::UnorderedAccess);

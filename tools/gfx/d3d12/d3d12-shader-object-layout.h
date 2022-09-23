@@ -257,8 +257,8 @@ public:
 
     struct DescriptorSetLayout
     {
-        List<D3D12_DESCRIPTOR_RANGE> m_resourceRanges;
-        List<D3D12_DESCRIPTOR_RANGE> m_samplerRanges;
+        List<D3D12_DESCRIPTOR_RANGE1> m_resourceRanges;
+        List<D3D12_DESCRIPTOR_RANGE1> m_samplerRanges;
         uint32_t m_resourceCount = 0;
         uint32_t m_samplerCount = 0;
     };
@@ -275,8 +275,10 @@ public:
         // descriptor set for each `ParameterBlock` binding range in the shader object
         // hierarchy, regardless of the shader's `space` indices.
         List<DescriptorSetLayout> m_descriptorSets;
-        List<D3D12_ROOT_PARAMETER> m_rootParameters;
-        D3D12_ROOT_SIGNATURE_DESC m_rootSignatureDesc = {};
+        List<D3D12_ROOT_PARAMETER1> m_rootParameters;
+        List<D3D12_ROOT_PARAMETER1> m_rootDescTableParameters;
+
+        D3D12_ROOT_SIGNATURE_DESC1 m_rootSignatureDesc = {};
 
         static Result translateDescriptorRangeType(
             slang::BindingType c, D3D12_DESCRIPTOR_RANGE_TYPE* outType);
@@ -449,7 +451,7 @@ public:
             BindingRegisterOffsetPair const& containerOffset,
             BindingRegisterOffsetPair const& elementOffset);
 
-        D3D12_ROOT_SIGNATURE_DESC& build();
+        D3D12_ROOT_SIGNATURE_DESC1& build();
     };
 
     static Result createRootSignatureFromSlang(
