@@ -374,12 +374,15 @@ namespace Slang
     }
 
 
-    bool SharedGenericsLoweringContext::doesTypeFitInAnyValue(IRType* concreteType, IRInterfaceType* interfaceType)
+    bool SharedGenericsLoweringContext::doesTypeFitInAnyValue(IRType* concreteType, IRInterfaceType* interfaceType, IRIntegerValue* outTypeSize, IRIntegerValue* outLimit)
     {
         auto anyValueSize = getInterfaceAnyValueSize(interfaceType, interfaceType->sourceLoc);
+        if (outLimit) *outLimit = anyValueSize;
 
         IRSizeAndAlignment sizeAndAlignment;
         Result result = getNaturalSizeAndAlignment(targetReq, concreteType, &sizeAndAlignment);
+        if (outTypeSize) *outTypeSize = sizeAndAlignment.size;
+
         if(SLANG_FAILED(result) || (sizeAndAlignment.size > anyValueSize))
         {
             // The value does not fit, either because it is too large,

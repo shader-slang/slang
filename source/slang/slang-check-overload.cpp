@@ -108,6 +108,13 @@ namespace Slang
 
         case OverloadCandidate::Flavor::Generic:
             paramCounts = CountParameters(candidate.item.declRef.as<GenericDecl>());
+
+            // A generic can be applied to any number of arguments less
+            // than or equal to the number of explicitly declared parameters.
+            // When a program provides fewer arguments than their are parameters,
+            // the rest will be inferred.
+            //
+            paramCounts.required = 0;
             break;
 
         case OverloadCandidate::Flavor::Expr:
@@ -209,8 +216,9 @@ namespace Slang
         // appropriate forms.
         //
         auto genSubst = m_astBuilder->create<GenericSubstitution>();
+        genSubst->genericDecl = genericDeclRef.getDecl();
         candidate.subst = genSubst;
-        auto& checkedArgs = genSubst->args;
+        auto& checkedArgs = (List<Val*>&)genSubst->getArgs();
 
         // Rather than bail out as soon as we hit a problem,
         // we are going to process *all* of the parameters of the
@@ -228,39 +236,41 @@ namespace Slang
         {
             if (auto typeParamRef = memberRef.as<GenericTypeParamDecl>())
             {
+                if (aa >= context.argCount)
+                {
+                    // If we have run out of arguments, then we don't
+                    // apply any more checks at this step. We will instead
+                    // attempt to *infer* an argument at this position
+                    // at a later stage.
+                    //
+                    candidate.flags |= OverloadCandidate::Flag::IsPartiallyAppliedGeneric;
+                    break;
+                }
+
                 // We have a type parameter, and we expect to find
                 // a type argument.
                 //
                 TypeExp typeArg;
-                if( aa >= context.argCount )
+
+                // Per the earlier check, we have at least one
+                // argument left, so we will grab
+                // it and try to coerce it to a proper type. The
+                // manner in which we handle the coercion depends
+                // on whether we are "just trying" the candidate
+                // (so a failure would rule out the candidate, but
+                // shouldn't be reported to the user), or are doing
+                // the checking "for real" in which case any errors
+                // we run into need to be reported.
+                //
+                auto arg = context.getArg(aa++);
+                if (context.mode == OverloadResolveContext::Mode::JustTrying)
                 {
-                    // If we have run out of arguments, then we definitely
-                    // fail checking (in principle this should have been
-                    // checked already by an earlier step).
-                    //
-                    success = false;
+                    typeArg = tryCoerceToProperType(TypeExp(arg));
                 }
                 else
                 {
-                    // If we have at least one argument left, we grab
-                    // it and try to coerce it to a proper type. The
-                    // manner in which we handle the coercion depends
-                    // on whether we are "just trying" the candidate
-                    // (so a failure would rule out the candidate, but
-                    // shouldn't be reported to the user), or are doing
-                    // the checking "for real" in which case any errors
-                    // we run into need to be reported.
-                    //
-                    auto arg = context.getArg(aa++);
-                    if (context.mode == OverloadResolveContext::Mode::JustTrying)
-                    {
-                        typeArg = tryCoerceToProperType(TypeExp(arg));
-                    }
-                    else
-                    {
-                        arg = ExpectATypeRepr(arg);
-                        typeArg = CoerceToProperType(TypeExp(arg));
-                    }
+                    arg = ExpectATypeRepr(arg);
+                    typeArg = CoerceToProperType(TypeExp(arg));
                 }
 
                 // If we failed to get a valid type (either because
@@ -278,37 +288,39 @@ namespace Slang
             }
             else if (auto valParamRef = memberRef.as<GenericValueParamDecl>())
             {
+                if (aa >= context.argCount)
+                {
+                    // If we have run out of arguments, then we don't
+                    // apply any more checks at this step. We will instead
+                    // attempt to *infer* an argument at this position
+                    // at a later stage.
+                    //
+                    candidate.flags |= OverloadCandidate::Flag::IsPartiallyAppliedGeneric;
+                    break;
+                }
+
                 // The case for a generic value parameter is similar to that
                 // for a generic type parameter.
                 //
                 Expr* arg = nullptr;
-                if( aa >= context.argCount )
+
+                // If we have an argument then we need to coerce it
+                // to the type of the parameter (and fail if the
+                // coercion is not possible)
+                //
+                arg = context.getArg(aa++);
+                if (context.mode == OverloadResolveContext::Mode::JustTrying)
                 {
-                    // If there are no arguments left to consume, then
-                    // we have a definite failure.
-                    //
-                    success = false;
+                    ConversionCost cost = kConversionCost_None;
+                    if (!canCoerce(getType(m_astBuilder, valParamRef), arg->type, arg, &cost))
+                    {
+                        success = false;
+                    }
+                    candidate.conversionCostSum += cost;
                 }
                 else
                 {
-                    // If we have an argument then we need to coerce it
-                    // to the type of the parameter (and fail if the
-                    // coercion is not possible)
-                    //
-                    arg = context.getArg(aa++);
-                    if (context.mode == OverloadResolveContext::Mode::JustTrying)
-                    {
-                        ConversionCost cost = kConversionCost_None;
-                        if (!canCoerce(getType(m_astBuilder, valParamRef), arg->type, arg, &cost))
-                        {
-                            success = false;
-                        }
-                        candidate.conversionCostSum += cost;
-                    }
-                    else
-                    {
-                        arg = coerce(getType(m_astBuilder, valParamRef), arg);
-                    }
+                    arg = coerce(getType(m_astBuilder, valParamRef), arg);
                 }
 
                 // If we have an argument to work with, then we will
@@ -474,11 +486,22 @@ namespace Slang
 
     bool SemanticsVisitor::TryCheckOverloadCandidateConstraints(
         OverloadResolveContext&		context,
-        OverloadCandidate const&	candidate)
+        OverloadCandidate&	candidate)
     {
         // We only need this step for generics, so always succeed on
         // everything else.
         if(candidate.flavor != OverloadCandidate::Flavor::Generic)
+            return true;
+
+        // It is possible that the overload candidate was only partially
+        // applied (the number of arguments was not equal to the number
+        // of explicit parameters). In that case, we want to defer
+        // final checking of things like constraints until later, in
+        // case a subsequent pass of overload resolution (like applying
+        // an overloaded generic function to arguments) will give us
+        // the missing information to enable inference.
+        //
+        if(candidate.flags & OverloadCandidate::Flag::IsPartiallyAppliedGeneric)
             return true;
 
         auto genericDeclRef = candidate.item.declRef.as<GenericDecl>();
@@ -486,12 +509,13 @@ namespace Slang
 
         // We should have the existing arguments to the generic
         // handy, so that we can construct a substitution list.
-
         auto subst = as<GenericSubstitution>(candidate.subst);
         SLANG_ASSERT(subst);
 
         subst->genericDecl = genericDeclRef.getDecl();
         subst->outer = genericDeclRef.substitutions.substitutions;
+
+        List<Val*> newArgs = subst->getArgs();
 
         for( auto constraintDecl : genericDeclRef.getDecl()->getMembersOfType<GenericTypeConstraintDecl>() )
         {
@@ -506,7 +530,7 @@ namespace Slang
             auto subTypeWitness = tryGetSubtypeWitness(sub, sup);
             if(subTypeWitness)
             {
-                subst->args.add(subTypeWitness);
+                newArgs.add(subTypeWitness);
             }
             else
             {
@@ -517,6 +541,8 @@ namespace Slang
                 return false;
             }
         }
+
+        candidate.subst = m_astBuilder->getOrCreateGenericSubstitution(genericDeclRef.getDecl(), newArgs, genericDeclRef.substitutions.substitutions);
 
         // Done checking all the constraints, hooray.
         return true;
@@ -695,6 +721,20 @@ namespace Slang
                 break;
 
             case OverloadCandidate::Flavor::Generic:
+                // We allow a generic to be applied to fewer arguments than its number
+                // of parameters, and defer the process of inferring the remaining
+                // arguments until later.
+                //
+                if(candidate.flags & OverloadCandidate::Flag::IsPartiallyAppliedGeneric)
+                {
+                    auto expr = m_astBuilder->create<PartiallyAppliedGenericExpr>();
+                    expr->loc = context.loc;
+                    expr->originalExpr = originalAppExpr;
+                    expr->baseGenericDeclRef = as<DeclRefExpr>(baseExpr)->declRef.as<GenericDecl>();
+                    expr->substWithKnownGenericArgs = (GenericSubstitution*)candidate.subst;
+                    return expr;
+                }
+
                 return createGenericDeclRef(
                     baseExpr,
                     context.originalExpr,
@@ -1131,30 +1171,75 @@ namespace Slang
         AddOverloadCandidate(context, candidate);
     }
 
-    DeclRef<Decl> SemanticsVisitor::SpecializeGenericForOverload(
+    DeclRef<Decl> SemanticsVisitor::inferGenericArguments(
         DeclRef<GenericDecl>    genericDeclRef,
-        OverloadResolveContext& context)
+        OverloadResolveContext& context,
+        GenericSubstitution*    substWithKnownGenericArgs)
     {
+        // We have been asked to infer zero or more arguments to
+        // `genericDeclRef`, in a context where it is being applied
+        // to value-level arguments in `context`.
+        //
+        // It is possible that the call site included one or more
+        // explicit arguments, in which case `substWithKnownGenericArgs`
+        // will have been filled in and contain those. Otherwise,
+        // that parameter will be null, and we are expected to
+        // infer all arguments.
+
+        // The declaration of the generic must be checked up to a point
+        // where we can attempt to form specializations of it (which in
+        // practice means that the declarations of its parameters and
+        // their constraints must have been checked).
+        //
         ensureDecl(genericDeclRef, DeclCheckState::CanSpecializeGeneric);
 
+        // Conceptually, we are going to be trying to infer any unspecified
+        // generic arguments by forming a system of constraints on those arguments
+        // and then attempting to solve the constraint system.
+        //
+        // While the constraint solver we have implemented today is not especially
+        // clever, we follow a flow that should in principle allow us to plug in
+        // something more clever down the line.
+        //
         ConstraintSystem constraints;
         constraints.loc = context.loc;
         constraints.genericDecl = genericDeclRef.getDecl();
 
-        // Construct a reference to the inner declaration that has any generic
-        // parameter substitutions in place already, but *not* any substutions
-        // for the generic declaration we are currently trying to infer.
+        // In order to perform matching between the types passed in at the
+        // call site represented by `context` and the parameters of the
+        // declaraiton being applied, we want to form a reference to
+        // the "inner" declaration of the generic (e.g., the `FuncitonDecl`
+        // under the `GenericDecl`).
+        //
+        // In the case where no explicit arguments are available, we will
+        // use any substitutions that were in place for referring to the
+        // generic itself.
+        //
+        Substitutions* substForInnerDecl = genericDeclRef.substitutions;
+        Count knownGenericArgCount = 0;
+        //
+        // In the case where we have explicit/known arguments,
+        // we will use those as our baseline substitutions.
+        //
+        if (substWithKnownGenericArgs)
+        {
+            substForInnerDecl = substWithKnownGenericArgs;
+            knownGenericArgCount = substWithKnownGenericArgs->getArgs().getCount();
+        }
+
         auto innerDecl = getInner(genericDeclRef);
-        DeclRef<Decl> unspecializedInnerRef = DeclRef<Decl>(innerDecl, genericDeclRef.substitutions);
+        DeclRef<Decl> partiallySpecializedInnerRef = DeclRef<Decl>(
+            innerDecl,
+            substForInnerDecl);
 
         // Check what type of declaration we are dealing with, and then try
         // to match it up with the arguments accordingly...
-        if (auto funcDeclRef = unspecializedInnerRef.as<CallableDecl>())
+        if (auto funcDeclRef = partiallySpecializedInnerRef.as<CallableDecl>())
         {
             auto params = getParameters(funcDeclRef).toArray();
 
-            Index argCount = context.getArgCount();
-            Index paramCount = params.getCount();
+            Index valueArgCount = context.getArgCount();
+            Index valueParamCount = params.getCount();
 
             // If there are too many arguments, we cannot possibly have a match.
             //
@@ -1162,12 +1247,16 @@ namespace Slang
             // a match, because the other arguments might have default values
             // that can be used.
             //
-            if (argCount > paramCount)
+            if (valueArgCount > valueParamCount)
             {
                 return DeclRef<Decl>(nullptr, nullptr);
             }
 
-            for (Index aa = 0; aa < argCount; ++aa)
+            // If any of the arguments were specified explicitly (and are thus known),
+            // we do not want to take them into account during the unification and
+            // constraint generation step.
+            //
+            for (Index aa = 0; aa < valueArgCount; ++aa)
             {
                 // The question here is whether failure to "unify" an argument
                 // and parameter should lead to immediate failure.
@@ -1187,7 +1276,10 @@ namespace Slang
                 // So the question is then whether a mismatch during the
                 // unification step should be taken as an immediate failure...
 
-                TryUnifyTypes(constraints, context.getArgTypeForInference(aa, this), getType(m_astBuilder, params[aa]));
+                TryUnifyTypes(
+                    constraints,
+                    context.getArgTypeForInference(aa, this),
+                    getType(m_astBuilder, params[aa]));
             }
         }
         else
@@ -1196,15 +1288,38 @@ namespace Slang
             return DeclRef<Decl>(nullptr, nullptr);
         }
 
-        auto constraintSubst = TrySolveConstraintSystem(&constraints, genericDeclRef);
+        // Once we have added all the appropriate constraints to the system, we
+        // will try to solve for a set of arguments to the generic that satisfy
+        // those constraints.
+        //
+        // Note that this step *also* attempts to infer arguments for all the
+        // implicit parameters of a generic. Notably, this means inferring
+        // witnesses for interface conformance constraints.
+        //
+        // TODO(tfoley): We probably need to pass along the explicit arguments here,
+        // so that the solver knows to accept those arguments as-is.
+        //
+        auto constraintSubst = trySolveConstraintSystem(
+            &constraints, genericDeclRef, substWithKnownGenericArgs);
         if (!constraintSubst)
         {
-            // constraint solving failed
+            // In this case, the solver failed to find a solution to the constraint
+            // system, and we will signal that failure up to the client that called
+            // this operation.
+            //
+            // TODO: We really ought to be passing up some kind of representation
+            // of the failure, so that constraint-related issues can be reported to
+            // the user. This could either be a return path here (returning some
+            // diagnostics), or this code could have a "just trying" vs. "actually
+            // do things" distinction like some other steps.
+            //
             return DeclRef<Decl>(nullptr, nullptr);
         }
 
-        // We can now construct a reference to the inner declaration using
-        // the solution to our constraints.
+        // If we found a solution (that is, a set of argument values that satisfy
+        // all the constraints), we can construct a reference to the inner
+        // declaration that applies the generic to those arguments.
+        //
         return DeclRef<Decl>(innerDecl, constraintSubst);
     }
 
@@ -1245,9 +1360,50 @@ namespace Slang
         AddOverloadCandidates(initializers, context);
     }
 
+    void SemanticsVisitor::addOverloadCandidatesForCallToGeneric(
+        LookupResultItem                genericItem,
+        OverloadResolveContext&         context,
+        GenericSubstitution*            substWithKnownGenericArgs)
+    {
+        auto genericDeclRef = genericItem.declRef.as<GenericDecl>();
+        SLANG_ASSERT(genericDeclRef);
+
+        if (substWithKnownGenericArgs)
+        {
+            substWithKnownGenericArgs = substWithKnownGenericArgs;
+        }
+
+        // Try to infer generic arguments, based on the context
+        DeclRef<Decl> innerRef = inferGenericArguments(genericDeclRef, context, substWithKnownGenericArgs);
+
+        if (innerRef)
+        {
+            // If inference works, then we've now got a
+            // specialized declaration reference we can apply.
+
+            LookupResultItem innerItem;
+            innerItem.breadcrumbs = genericItem.breadcrumbs;
+            innerItem.declRef = innerRef;
+
+            AddDeclRefOverloadCandidates(innerItem, context);
+        }
+        else
+        {
+            // If inference failed, then we need to create
+            // a candidate that can be used to reflect that fact
+            // (so we can report a good error)
+            OverloadCandidate candidate;
+            candidate.item = genericItem;
+            candidate.flavor = OverloadCandidate::Flavor::UnspecializedGeneric;
+            candidate.status = OverloadCandidate::Status::GenericArgumentInferenceFailed;
+
+            AddOverloadCandidateInner(context, candidate);
+        }
+    }
+
     void SemanticsVisitor::AddDeclRefOverloadCandidates(
-        LookupResultItem		item,
-        OverloadResolveContext&	context)
+        LookupResultItem        item,
+        OverloadResolveContext& context)
     {
         auto declRef = item.declRef;
 
@@ -1262,32 +1418,10 @@ namespace Slang
         }
         else if (auto genericDeclRef = item.declRef.as<GenericDecl>())
         {
-            // Try to infer generic arguments, based on the context
-            DeclRef<Decl> innerRef = SpecializeGenericForOverload(genericDeclRef, context);
-
-            if (innerRef)
-            {
-                // If inference works, then we've now got a
-                // specialized declaration reference we can apply.
-
-                LookupResultItem innerItem;
-                innerItem.breadcrumbs = item.breadcrumbs;
-                innerItem.declRef = innerRef;
-
-                AddDeclRefOverloadCandidates(innerItem, context);
-            }
-            else
-            {
-                // If inference failed, then we need to create
-                // a candidate that can be used to reflect that fact
-                // (so we can report a good error)
-                OverloadCandidate candidate;
-                candidate.item = item;
-                candidate.flavor = OverloadCandidate::Flavor::UnspecializedGeneric;
-                candidate.status = OverloadCandidate::Status::GenericArgumentInferenceFailed;
-
-                AddOverloadCandidateInner(context, candidate);
-            }
+            LookupResultItem innerItem;
+            innerItem.breadcrumbs = item.breadcrumbs;
+            innerItem.declRef = genericDeclRef;
+            addOverloadCandidatesForCallToGeneric(innerItem, context);
         }
         else if( auto typeDefDeclRef = item.declRef.as<TypeDefDecl>() )
         {
@@ -1360,6 +1494,17 @@ namespace Slang
             {
                 AddOverloadCandidates(item, context);
             }
+        }
+        else if (auto partiallyAppliedGenericExpr = as<PartiallyAppliedGenericExpr>(funcExpr))
+        {
+            // A partially-applied generic is allowed as an overload candidate,
+            // and carries along an (incomplete) substitution that can be used
+            // to carry the arguments known so far.
+            //
+            addOverloadCandidatesForCallToGeneric(
+                LookupResultItem(partiallyAppliedGenericExpr->baseGenericDeclRef),
+                context,
+                partiallyAppliedGenericExpr->substWithKnownGenericArgs);
         }
         else if (auto typeType = as<TypeType>(funcExprType))
         {

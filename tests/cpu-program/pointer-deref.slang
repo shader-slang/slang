@@ -1,7 +1,4 @@
 //TEST:EXECUTABLE:
-__target_intrinsic(cpp, "printf(\"%s\\n\", ($0).getBuffer())")
-void writeln(String text);
-
 struct SubRecord
 {
     int field2;
@@ -23,11 +20,11 @@ public __extern_cpp int main()
     pRec.sub.field3 = 3.0f;
     if (rec.field == 1 && rec.sub.field2 == 2 && pRec.sub.field3 == 3.0f)
     {
-        writeln("success");
+        printf("success\n");
     }
     else
     {
-        writeln("fail");
+        printf("fail\n");
     }
     return 0;
 }

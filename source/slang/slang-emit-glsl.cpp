@@ -38,7 +38,7 @@ SlangResult GLSLSourceEmitter::init()
         case Stage::Miss:
         case Stage::RayGeneration:
         {
-            _requireRayTracing();   
+            _requireRayTracing();
             break;
         }
         default: break;
@@ -448,7 +448,7 @@ void GLSLSourceEmitter::_emitGLSLImageFormatModifier(IRInst* var, IRTextureType*
                 // inference (e.g., to specify r11fg11fb10f).
 
                 m_writer->emit("rgba");
-                //Emit("rgb");                                
+                //Emit("rgb");
                 break;
             }
 
@@ -465,9 +465,11 @@ void GLSLSourceEmitter::_emitGLSLImageFormatModifier(IRInst* var, IRTextureType*
             case BaseType::Int8:    m_writer->emit("8i"); break;
             case BaseType::Int16:   m_writer->emit("16i"); break;
             case BaseType::Int64:   m_writer->emit("64i"); break;
+            case BaseType::IntPtr:  m_writer->emit("64i"); break;
             case BaseType::UInt8:   m_writer->emit("8ui"); break;
             case BaseType::UInt16:  m_writer->emit("16ui"); break;
             case BaseType::UInt64:  m_writer->emit("64ui"); break;
+            case BaseType::UIntPtr: m_writer->emit("64ui"); break;
 
                 // TODO: Here are formats that are available in GLSL,
                 // but that are not handled by the above cases.
@@ -662,10 +664,20 @@ void GLSLSourceEmitter::_emitGLSLTypePrefix(IRType* type, bool promoteHalfToFloa
         case kIROp_Int8Type:    m_writer->emit("i8");     break;
         case kIROp_Int16Type:   m_writer->emit("i16");    break;
         case kIROp_IntType:     m_writer->emit("i");      break;
-        case kIROp_Int64Type:   
+        case kIROp_Int64Type:
         {
             _requireBaseType(BaseType::Int64);
             m_writer->emit("i64");
+            break;
+        }
+        case kIROp_IntPtrType:   
+        {
+#if SLANG_PTR_IS_64
+            _requireBaseType(BaseType::Int64);
+            m_writer->emit("i64");
+#else
+            m_writer->emit("i");
+#endif
             break;
         }
 
@@ -679,7 +691,16 @@ void GLSLSourceEmitter::_emitGLSLTypePrefix(IRType* type, bool promoteHalfToFloa
             m_writer->emit("u64");
             break;
         }
-
+        case kIROp_UIntPtrType:
+        {
+#if SLANG_PTR_IS_64
+            _requireBaseType(BaseType::Int64);
+            m_writer->emit("u64");
+#else
+            m_writer->emit("u");
+#endif
+            break;
+        }
         case kIROp_BoolType:    m_writer->emit("b");		break;
 
         case kIROp_HalfType:
@@ -763,7 +784,7 @@ void GLSLSourceEmitter::_emitSpecialFloatImpl(IRType* type, const char* valueExp
     m_writer->emit(")");
 }
 
-void GLSLSourceEmitter::emitSimpleValueImpl(IRInst* inst) 
+void GLSLSourceEmitter::emitSimpleValueImpl(IRInst* inst)
 {
     switch (inst->getOp())
     {
@@ -776,8 +797,8 @@ void GLSLSourceEmitter::emitSimpleValueImpl(IRInst* inst)
             {
                 switch (type->getBaseType())
                 {
-                    default: 
-                    
+                    default:
+
                     case BaseType::Int8:
                     {
                         emitType(type);
@@ -817,12 +838,14 @@ void GLSLSourceEmitter::emitSimpleValueImpl(IRInst* inst)
                         m_writer->emit("U");
                         return;
                     }
+                    case BaseType::IntPtr:
                     case BaseType::Int64:
                     {
                         m_writer->emitInt64(int64_t(litInst->value.intVal));
                         m_writer->emit("L");
                         return;
                     }
+                    case BaseType::UIntPtr:
                     case BaseType::UInt64:
                     {
                         SLANG_COMPILE_TIME_ASSERT(sizeof(litInst->value.intVal) >= sizeof(uint64_t));
@@ -833,7 +856,7 @@ void GLSLSourceEmitter::emitSimpleValueImpl(IRInst* inst)
 
                 }
             }
-            break;   
+            break;
         }
         case kIROp_FloatLit:
         {
@@ -965,7 +988,7 @@ void GLSLSourceEmitter::emitEntryPointAttributesImpl(IRFunc* irFunc, IREntryPoin
                     case kIROp_HLSLLineStreamType:      m_writer->emit("layout(line_strip) out;\n"); break;
                     case kIROp_HLSLTriangleStreamType:  m_writer->emit("layout(triangle_strip) out;\n"); break;
                     default: SLANG_ASSERT(!"Unknown stream out type");
-                }    
+                }
             }
         }
         break;
@@ -1629,19 +1652,21 @@ bool GLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
 
         case kIROp_StringLit:
         {
-            IRStringLit* lit = cast<IRStringLit>(inst);
-            const UnownedStringSlice slice = lit->getStringSlice();
-            m_writer->emit(int32_t(getStableHashCode32(slice.begin(), slice.getLength())));
+            const auto handler = StringEscapeUtil::getHandler(StringEscapeUtil::Style::Slang);
+
+            StringBuilder buf;
+            const UnownedStringSlice slice = as<IRStringLit>(inst)->getStringSlice();
+            StringEscapeUtil::appendQuoted(handler, slice, buf);
+
+            m_writer->emit(buf);
+
             return true;
         }
         case kIROp_GetStringHash:
         {
-            // On GLSL target, the `String` type is just an `int`
-            // that is the hash of the string, so we can emit
-            // the first operand to `getStringHash` directly.
-            //
-            EmitOpInfo outerPrec = inOuterPrec;
-            emitOperand(inst->getOperand(0), outerPrec);
+            const UnownedStringSlice slice = as<IRStringLit>(inst->getOperand(0))->getStringSlice();
+            m_writer->emit(static_cast<int32_t>(getStableHashCode32(slice.begin(), slice.getLength())));
+
             return true;
         }
         case kIROp_ImageLoad:
@@ -1748,7 +1773,7 @@ static Index _getGLSLVersion(ProfileVersion profile)
 {
     switch (profile)
     {
-#define CASE(TAG, VALUE) case ProfileVersion::TAG: return VALUE; 
+#define CASE(TAG, VALUE) case ProfileVersion::TAG: return VALUE;
         CASE(GLSL_110, 110);
         CASE(GLSL_120, 120);
         CASE(GLSL_130, 130);
@@ -1909,6 +1934,26 @@ void GLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
             m_writer->emit(getDefaultBuiltinTypeName(type->getOp()));
             return;
         }
+        case kIROp_IntPtrType:
+        {
+#if SLANG_PTR_IS_64
+            _requireBaseType(BaseType::Int64);
+            m_writer->emit("int64_t");
+#else
+            m_writer->emit("int");
+#endif
+            return;
+        }
+        case kIROp_UIntPtrType:
+        {
+#if SLANG_PTR_IS_64
+            _requireBaseType(BaseType::UInt64);
+            m_writer->emit("uint64_t");
+#else
+            m_writer->emit("uint");
+#endif
+            return;
+        }
         case kIROp_VoidType:
         case kIROp_BoolType:
         case kIROp_Int8Type:
@@ -1917,7 +1962,7 @@ void GLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
         case kIROp_UInt8Type:
         case kIROp_UInt16Type:
         case kIROp_UIntType:
-        case kIROp_FloatType:   
+        case kIROp_FloatType:
         case kIROp_DoubleType:
         {
             _requireBaseType(cast<IRBasicType>(type)->getBaseType());
@@ -1968,9 +2013,9 @@ void GLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
             return;
         }
         case kIROp_NativeStringType:
-        case kIROp_StringType: 
+        case kIROp_StringType:
         {
-            m_writer->emit("int"); 
+            m_writer->emit("int");
             return;
         }
         default: break;
@@ -2092,7 +2137,7 @@ void GLSLSourceEmitter::emitRateQualifiersImpl(IRRate* rate)
     if (as<IRConstExprRate>(rate))
     {
         m_writer->emit("const ");
-        
+
     }
     else if (as<IRGroupSharedRate>(rate))
     {

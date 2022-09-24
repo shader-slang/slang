@@ -103,10 +103,12 @@ namespace Slang
             case kIROp_Int16Type:
             case kIROp_IntType:
             case kIROp_Int64Type:
+            case kIROp_IntPtrType:
             case kIROp_UInt8Type:
             case kIROp_UInt16Type:
             case kIROp_UIntType:
             case kIROp_UInt64Type:
+            case kIROp_UIntPtrType:
                 break;
             default:
                 SLANG_ASSERT_FAILURE("error type is not lowered to an integer type.");

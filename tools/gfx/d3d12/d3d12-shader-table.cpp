@@ -31,6 +31,7 @@ RefPtr<BufferResource> ShaderTableImpl::createDeviceBuffer(
     IBufferResource::Desc bufferDesc = {};
     bufferDesc.memoryType = gfx::MemoryType::DeviceLocal;
     bufferDesc.defaultState = ResourceState::General;
+    bufferDesc.allowedStates.add(ResourceState::NonPixelShaderResource);
     bufferDesc.type = IResource::Type::Buffer;
     bufferDesc.sizeInBytes = tableSize;
     m_device->createBufferResource(bufferDesc, nullptr, bufferResource.writeRef());
@@ -57,10 +58,6 @@ RefPtr<BufferResource> ShaderTableImpl::createDeviceBuffer(
             void* shaderId = stateObjectProperties->GetShaderIdentifier(name.toWString().begin());
             memcpy(dest, shaderId, D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES);
         }
-        else
-        {
-            memset(dest, 0, D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES);
-        }
         if (overwrite.size)
         {
             memcpy((uint8_t*)dest + overwrite.offset, overwrite.data, overwrite.size);
@@ -68,6 +65,8 @@ RefPtr<BufferResource> ShaderTableImpl::createDeviceBuffer(
     };
 
     uint8_t* stagingBufferPtr = (uint8_t*)stagingPtr + stagingBufferOffset;
+    memset(stagingBufferPtr, 0, tableSize);
+
     for (uint32_t i = 0; i < m_rayGenShaderCount; i++)
     {
         copyShaderIdInto(
@@ -96,7 +95,7 @@ RefPtr<BufferResource> ShaderTableImpl::createDeviceBuffer(
         1,
         bufferResource.readRef(),
         gfx::ResourceState::CopyDestination,
-        gfx::ResourceState::ShaderResource);
+        gfx::ResourceState::NonPixelShaderResource);
     RefPtr<BufferResource> resultPtr = static_cast<BufferResource*>(bufferResource.get());
     return _Move(resultPtr);
 }

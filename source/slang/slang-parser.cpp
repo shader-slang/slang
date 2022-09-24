@@ -1476,7 +1476,8 @@ namespace Slang
         void visitIndexExpr(IndexExpr * expr)
         {
             expr->baseExpression->accept(this, nullptr);
-            expr->indexExpression->accept(this, nullptr);
+            for (auto arg : expr->indexExprs)
+                arg->accept(this, nullptr);
         }
         void visitMemberExpr(MemberExpr * expr)
         {
@@ -1824,7 +1825,8 @@ namespace Slang
                     auto arrayTypeExpr = astBuilder->create<IndexExpr>();
                     arrayTypeExpr->loc = arrayDeclarator->openBracketLoc;
                     arrayTypeExpr->baseExpression = ioInfo->typeSpec;
-                    arrayTypeExpr->indexExpression = arrayDeclarator->elementCountExpr;
+                    if (arrayDeclarator->elementCountExpr)
+                        arrayTypeExpr->indexExprs.add(arrayDeclarator->elementCountExpr);
                     ioInfo->typeSpec = arrayTypeExpr;
 
                     declarator = arrayDeclarator->inner;
@@ -2045,7 +2047,7 @@ namespace Slang
                 parser->ReadToken(TokenType::LBracket);
                 if (!parser->LookAheadToken(TokenType::RBracket))
                 {
-                    arrType->indexExpression = parser->ParseExpression();
+                    arrType->indexExprs.add(parser->ParseExpression());
                 }
                 parser->ReadToken(TokenType::RBracket);
                 typeExpr = arrType;
@@ -5500,6 +5502,7 @@ namespace Slang
 
                     int lCount = 0;
                     int uCount = 0;
+                    int zCount = 0;
                     int unknownCount = 0;
                     while(suffixCursor < suffixEnd)
                     {
@@ -5511,6 +5514,10 @@ namespace Slang
 
                         case 'u': case 'U':
                             uCount++;
+                            break;
+
+                        case 'z': case 'Z':
+                            zCount++;
                             break;
 
                         default:
@@ -5525,24 +5532,32 @@ namespace Slang
                         suffixBaseType = BaseType::Void;
                     }
                     // `u` or `ul` suffix -> `uint`
-                    else if(uCount == 1 && (lCount <= 1))
+                    else if(uCount == 1 && (lCount <= 1) && zCount == 0)
                     {
                         suffixBaseType = BaseType::UInt;
                     }
                     // `l` suffix on integer -> `int` (== `long`)
-                    else if(lCount == 1 && !uCount)
+                    else if(lCount == 1 && !uCount && zCount == 0)
                     {
                         suffixBaseType = BaseType::Int; 
                     }
                     // `ull` suffix -> `uint64_t`
-                    else if(uCount == 1 && lCount == 2)
+                    else if(uCount == 1 && lCount == 2 && zCount == 0)
                     {
                         suffixBaseType = BaseType::UInt64;
                     }
                     // `ll` suffix -> `int64_t`
-                    else if(uCount == 0 && lCount == 2)
+                    else if(uCount == 0 && lCount == 2 && zCount == 0)
                     {
                         suffixBaseType = BaseType::Int64;
+                    }
+                    else if (uCount == 0 && zCount == 1)
+                    {
+                        suffixBaseType = BaseType::IntPtr;
+                    }
+                    else if (uCount == 1 && zCount == 1)
+                    {
+                        suffixBaseType = BaseType::UIntPtr;
                     }
                     // TODO: do we need suffixes for smaller integer types?
                     else
@@ -5779,18 +5794,23 @@ namespace Slang
                     IndexExpr* indexExpr = parser->astBuilder->create<IndexExpr>();
                     indexExpr->baseExpression = expr;
                     parser->FillPosition(indexExpr);
-                    parser->ReadToken(TokenType::LBracket);
-                    // TODO: eventually we may want to support multiple arguments inside the `[]`
-                    if (!parser->LookAheadToken(TokenType::RBracket))
+                    auto lBracket = parser->ReadToken(TokenType::LBracket);
+                    indexExpr->argumentDelimeterLocs.add(lBracket.loc);
+                    while (!parser->tokenReader.isAtEnd())
                     {
-                        indexExpr->indexExpression = parser->ParseExpression();
+                        if (!parser->LookAheadToken(TokenType::RBracket))
+                            indexExpr->indexExprs.add(parser->ParseArgExpr());
+                        else
+                        {
+                            break;
+                        }
+                        if (!parser->LookAheadToken(TokenType::Comma))
+                            break;
+                        auto comma = parser->ReadToken(TokenType::Comma);
+                        indexExpr->argumentDelimeterLocs.add(comma.loc);
                     }
-                    else
-                    {
-                        indexExpr->indexExpression = parser->astBuilder->create<IncompleteExpr>();
-                    }
-                    parser->ReadToken(TokenType::RBracket);
-
+                    auto rBracket = parser->ReadToken(TokenType::RBracket);
+                    indexExpr->argumentDelimeterLocs.add(rBracket.loc);
                     expr = indexExpr;
                 }
                 break;

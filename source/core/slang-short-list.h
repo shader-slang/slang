@@ -288,6 +288,8 @@ namespace Slang
 
         void addRange(ArrayView<T> list) { addRange(list.m_buffer, list.m_count); }
 
+        void addRange(ConstArrayView<T> list) { addRange(list.m_buffer, list.m_count); }
+
         template<int _otherShortListSize, typename TOtherAllocator>
         void addRange(const ShortList<T, _otherShortListSize, TOtherAllocator>& list)
         {

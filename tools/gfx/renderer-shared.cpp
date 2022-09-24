@@ -386,6 +386,8 @@ Result RendererBase::getFormatSupportedResourceStates(Format format, ResourceSta
     outStates->add(ResourceState::ResolveDestination);
     outStates->add(ResourceState::ResolveSource);
     outStates->add(ResourceState::ShaderResource);
+    outStates->add(ResourceState::PixelShaderResource);
+    outStates->add(ResourceState::NonPixelShaderResource);
     outStates->add(ResourceState::StreamOutput);
     outStates->add(ResourceState::Undefined);
     outStates->add(ResourceState::UnorderedAccess);
@@ -472,14 +474,31 @@ Result RendererBase::createProgram2(
     ISlangBlob** outDiagnostic)
 {
     auto slangSession = slangContext.session.get();
-
-    SLANG_RELEASE_ASSERT(desc.sourceType == ShaderModuleSourceType::SlangSourceFile);
-
-    auto fileName = (char*)desc.sourceData;
+    slang::IModule* module = nullptr;
     ComPtr<slang::IBlob> diagnosticsBlob;
-    slang::IModule* module = slangSession->loadModule(fileName, diagnosticsBlob.writeRef());
-    if (!module)
-        return SLANG_FAIL;
+    switch (desc.sourceType)
+    {
+        case ShaderModuleSourceType::SlangSourceFile:
+        {
+            auto fileName = (char*)desc.sourceData;
+            module = slangSession->loadModule(fileName, diagnosticsBlob.writeRef());
+            if (!module)
+                return SLANG_FAIL;
+            break;
+        }
+        case ShaderModuleSourceType::SlangSource:
+        {
+            auto hash = getStableHashCode32((char*)desc.sourceData, desc.sourceDataSize);
+            auto hashStr = String(hash);
+            auto srcBlob = UnownedRawBlob::create(desc.sourceData, desc.sourceDataSize);
+            module = slangSession->loadModuleFromSource(hashStr.getBuffer(), hashStr.getBuffer(), srcBlob, diagnosticsBlob.writeRef());
+            if (!module)
+                return SLANG_FAIL;
+            break;
+        }
+        default:
+            SLANG_RELEASE_ASSERT(false);
+    }
 
     Slang::List<ComPtr<slang::IComponentType>> componentTypes;
     componentTypes.add(ComPtr<slang::IComponentType>(module));

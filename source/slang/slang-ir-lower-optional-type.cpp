@@ -118,12 +118,20 @@ namespace Slang
             builder->setInsertBefore(inst);
 
             auto info = getLoweredOptionalType(builder, inst->getDataType());
-            List<IRInst*> operands;
-            operands.add(inst->getOperand(0));
-            operands.add(builder->getBoolValue(true));
-            auto makeStruct = builder->emitMakeStruct(info->loweredType, operands);
-            inst->replaceUsesWith(makeStruct);
-            inst->removeAndDeallocate();
+            if (info->loweredType != info->valueType)
+            {
+                List<IRInst*> operands;
+                operands.add(inst->getOperand(0));
+                operands.add(builder->getBoolValue(true));
+                auto makeStruct = builder->emitMakeStruct(info->loweredType, operands);
+                inst->replaceUsesWith(makeStruct);
+                inst->removeAndDeallocate();
+            }
+            else
+            {
+                inst->replaceUsesWith(inst->getOperand(0));
+                inst->removeAndDeallocate();
+            }
         }
 
         void processMakeOptionalNone(IRMakeOptionalNone* inst)
@@ -133,13 +141,20 @@ namespace Slang
             builder->setInsertBefore(inst);
 
             auto info = getLoweredOptionalType(builder, inst->getDataType());
-
-            List<IRInst*> operands;
-            operands.add(inst->getDefaultValue());
-            operands.add(builder->getBoolValue(false));
-            auto makeStruct = builder->emitMakeStruct(info->loweredType, operands);
-            inst->replaceUsesWith(makeStruct);
-            inst->removeAndDeallocate();
+            if (info->loweredType != info->valueType)
+            {
+                List<IRInst*> operands;
+                operands.add(inst->getDefaultValue());
+                operands.add(builder->getBoolValue(false));
+                auto makeStruct = builder->emitMakeStruct(info->loweredType, operands);
+                inst->replaceUsesWith(makeStruct);
+                inst->removeAndDeallocate();
+            }
+            else
+            {
+                inst->replaceUsesWith(builder->getNullPtrValue(info->valueType));
+                inst->removeAndDeallocate();
+            }
         }
 
         IRInst* getOptionalHasValue(IRBuilder* builder, IRInst* optionalInst)

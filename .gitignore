@@ -63,6 +63,7 @@ prelude/*.h.cpp
 /examples/heterogeneous-hello-world/shader.cpp
 /multiple-definitions.hlsl
 /external/slang-llvm/
+/external/slang-glslang/
 
 build/**/*.tlog
 build/**/*.lastbuildstate

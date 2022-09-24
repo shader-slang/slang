@@ -190,7 +190,7 @@ void ASTPrinter::_addDeclPathRec(const DeclRef<Decl>& declRef, Index depth)
 
             sb << "<";
             bool first = true;
-            for (auto arg : genSubst->args)
+            for (auto arg : genSubst->getArgs())
             {
                 // When printing the representation of a specialized
                 // generic declaration we don't want to include the

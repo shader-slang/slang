@@ -49,8 +49,8 @@ void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
     Bar bar;
     bar.foo = f;
 
-    AnyVal data = reinterpret<AnyVal, Bar>(bar);
-    IBar dynBar = createDynamicObject<IBar, AnyVal>(0, data);
+    AnyVal data = reinterpret<AnyVal>(bar);
+    IBar dynBar = createDynamicObject<IBar>(0, data);
 
     outputBuffer[index] = dynBar.sample();
 }

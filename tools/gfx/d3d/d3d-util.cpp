@@ -810,6 +810,10 @@ D3D12_RESOURCE_STATES D3DUtil::getResourceState(ResourceState state)
     case ResourceState::ShaderResource:
     case ResourceState::AccelerationStructureBuildInput:
         return D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
+    case ResourceState::PixelShaderResource:
+        return D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+    case ResourceState::NonPixelShaderResource:
+        return D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
     case ResourceState::UnorderedAccess:
         return D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
     case ResourceState::RenderTarget:

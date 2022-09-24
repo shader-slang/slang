@@ -67,7 +67,8 @@ struct ASTIterator
         {
             iterator->maybeDispatchCallback(subscriptExpr);
             dispatchIfNotNull(subscriptExpr->baseExpression);
-            dispatchIfNotNull(subscriptExpr->indexExpression);
+            for (auto arg : subscriptExpr->indexExprs)
+                dispatchIfNotNull(arg);
         }
 
         void visitParenExpr(ParenExpr* expr)
@@ -256,6 +257,10 @@ struct ASTIterator
             iterator->maybeDispatchCallback(expr);
             dispatchIfNotNull(expr->value);
             dispatchIfNotNull(expr->typeExpr);
+        }
+        void visitPartiallyAppliedGenericExpr(PartiallyAppliedGenericExpr* expr)
+        {
+            dispatchIfNotNull(expr->originalExpr);
         }
     };
 

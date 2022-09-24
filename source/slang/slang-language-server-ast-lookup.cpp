@@ -112,8 +112,9 @@ public:
     bool visitIncompleteExpr(IncompleteExpr*) { return false; }
     bool visitIndexExpr(IndexExpr* subscriptExpr)
     {
-        if (dispatchIfNotNull(subscriptExpr->indexExpression))
-            return true;
+        for (auto arg : subscriptExpr->indexExprs)
+            if (dispatchIfNotNull(arg))
+                return true;
         return dispatchIfNotNull(subscriptExpr->baseExpression);
     }
 
@@ -400,6 +401,10 @@ public:
         if (dispatchIfNotNull(expr->typeExpr))
             return true;
         return dispatchIfNotNull(expr->value);
+    }
+    bool visitPartiallyAppliedGenericExpr(PartiallyAppliedGenericExpr* expr)
+    {
+        return dispatchIfNotNull(expr->originalExpr);
     }
     bool visitModifiedTypeExpr(ModifiedTypeExpr* expr) { return dispatchIfNotNull(expr->base.exp); }
     bool visitTryExpr(TryExpr* expr) { return dispatchIfNotNull(expr->base); }

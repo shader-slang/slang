@@ -1,7 +1,4 @@
 //TEST:EXECUTABLE:
-__target_intrinsic(cpp, "printf(\"%s\\n\", ($0).getBuffer())")
-void writeln(String text);
-
 class MyClass
 {
     int intMember;
@@ -11,7 +8,7 @@ class MyClass
     }
     int method()
     {
-        writeln("method");
+        printf("method\n");
         return intMember;
     }
 }

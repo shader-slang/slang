@@ -8,6 +8,9 @@ typedef double float64_t;
 typedef int int32_t;
 typedef uint uint32_t;
 
+typedef uintptr_t size_t;
+typedef uintptr_t usize_t
+typedef intptr_t ssize_t;
 
 // Modifier for variables that must resolve to compile-time constants
 // as part of translation.
@@ -229,6 +232,7 @@ ${{{{
     case BaseType::Int16:
     case BaseType::Int:
     case BaseType::Int64:
+    case BaseType::IntPtr:
 }}}}
     ,  __BuiltinSignedArithmeticType
 ${{{{
@@ -237,6 +241,7 @@ ${{{{
     case BaseType::UInt16:
     case BaseType::UInt:
     case BaseType::UInt64:
+    case BaseType::UIntPtr:
 }}}}
     ,  __BuiltinArithmeticType
     ,  __BuiltinIntegerType
@@ -456,6 +461,26 @@ extension int64_t
     static const int64_t minValue = -0x8000000000000000LL;
 }
 
+extension intptr_t
+{
+    __generic<T>
+    __intrinsic_op($(kIROp_Construct))
+    __init(Ptr<T> ptr);
+    static const intptr_t maxValue = $(SLANG_PROCESSOR_X86_64?"0x7FFFFFFFFFFFFFFFz":"0x7FFFFFFFz");
+    static const intptr_t minValue = $(SLANG_PROCESSOR_X86_64?"0x8000000000000000z":"0x80000000z");
+    static const int size = $(SLANG_PROCESSOR_X86_64?"8":"4");
+}
+
+extension uintptr_t
+{
+    __generic<T>
+    __intrinsic_op($(kIROp_Construct))
+    __init(Ptr<T> ptr);
+    static const uintptr_t maxValue = $(SLANG_PROCESSOR_X86_64?"0xFFFFFFFFFFFFFFFFz":"0xFFFFFFFFz");
+    static const uintptr_t minValue = 0z;
+    static const int size = $(SLANG_PROCESSOR_X86_64?"8":"4");
+}
+
 __generic<T>
 __magic_type(OutType)
 __intrinsic_type($(kIROp_OutType))
@@ -546,12 +571,61 @@ T __attachToNativeRef(NativeRef<T> nativeVal)
 __magic_type(StringType)
 __intrinsic_type($(kIROp_StringType))
 struct String
-{};
+{
+    __target_intrinsic(cpp)
+    __init(int val);
+    __target_intrinsic(cpp)
+    __init(uint val);
+    __target_intrinsic(cpp)
+    __init(int64_t val);
+    __target_intrinsic(cpp)
+    __init(uint64_t val);
+    __target_intrinsic(cpp)
+    __init(float val);
+    __target_intrinsic(cpp)
+    __init(double val);
+
+    __target_intrinsic(cpp)
+    int64_t getLength();
+
+    property int length
+    {
+        get { return (int)getLength(); }
+    }
+};
 
 __magic_type(NativeStringType)
 __intrinsic_type($(kIROp_NativeStringType))
 struct NativeString
-{};
+{
+    __target_intrinsic(cpp, "int(strlen($0))")
+    int getLength();
+
+    __target_intrinsic(cpp, "(void*)((const char*)($0))")
+    Ptr<void> getBuffer();
+
+    property int length { [__unsafeForceInlineEarly] get{return getLength();} }
+
+    __intrinsic_op($(kIROp_getNativeStr))
+    __init(String value);
+};
+
+extension Ptr<void>
+{
+    __implicit_conversion($(kConversionCost_PtrToVoidPtr))
+    [__unsafeForceInlineEarly]
+    __init(NativeString nativeStr) { this = nativeStr.getBuffer(); }
+
+    __generic<T>
+    __intrinsic_op(0)
+    __implicit_conversion($(kConversionCost_PtrToVoidPtr))
+    __init(Ptr<T> ptr);
+
+    __generic<T>
+    __intrinsic_op(0)
+    __implicit_conversion($(kConversionCost_PtrToVoidPtr))
+    __init(NativeRef<T> ptr);
+}
 
 __magic_type(DynamicType)
 __intrinsic_type($(kIROp_DynamicType))
@@ -2229,7 +2303,7 @@ T reinterpret(U value);
 // Specialized function
 
 /// Given a string returns an integer hash of that string.
-__intrinsic_op
+__intrinsic_op($(kIROp_GetStringHash))
 int getStringHash(String string);
 
 /// Use will produce a syntax error in downstream compiler
@@ -2300,7 +2374,9 @@ bool operator!=(E left, E right);
 
 interface IComparable
 {
-    int compareTo(This other);
+    bool equals(This other);
+    bool lessThan(This other);
+    bool lessThanOrEquals(This other);
 }
 
 interface IArithmetic : IComparable
@@ -2340,37 +2416,37 @@ __generic<T : IComparable>
 [__unsafeForceInlineEarly]
 bool operator<(T v0, T v1)
 {
-    return v0.compareTo(v1) < 0;
+    return v0.lessThan(v1);
 }
 __generic<T : IComparable>
 [__unsafeForceInlineEarly]
 bool operator>(T v0, T v1)
 {
-    return v0.compareTo(v1) > 0;
+    return v1.lessThan(v0);
 }
 __generic<T : IComparable>
 [__unsafeForceInlineEarly]
 bool operator ==(T v0, T v1)
 {
-    return v0.compareTo(v1) == 0;
+    return v0.equals(v1);
 }
 __generic<T : IComparable>
 [__unsafeForceInlineEarly]
 bool operator >=(T v0, T v1)
 {
-    return v0.compareTo(v1) >= 0;
+    return v1.lessThanOrEquals(v1);
 }
 __generic<T : IComparable>
 [__unsafeForceInlineEarly]
 bool operator <=(T v0, T v1)
 {
-    return v0.compareTo(v1) <= 0;
+    return v0.lessThanOrEquals(v1);
 }
 __generic<T : IComparable>
 [__unsafeForceInlineEarly]
 bool operator !=(T v0, T v1)
 {
-    return v0.compareTo(v1) != 0;
+    return !v0.equals(v1);
 }
 
 __generic<T : IArithmetic>
@@ -2451,7 +2527,9 @@ for (int tt = 0; tt < kBaseTypeCount; ++tt)
 }}}}
 extension $(kBaseTypes[tt].name) : IInteger
 {
-    [__unsafeForceInlineEarly] int compareTo(This other){return this-other;}
+    [__unsafeForceInlineEarly] bool equals(This other){return this==other;}
+    [__unsafeForceInlineEarly] bool lessThan(This other){return this<other;}
+    [__unsafeForceInlineEarly] bool lessThanOrEquals(This other){return this<=other;}
     [__unsafeForceInlineEarly] This add(This other) { return __add(this, other); }
     [__unsafeForceInlineEarly] This sub(This other) { return __sub(this, other); }
     [__unsafeForceInlineEarly] This mul(This other) { return __mul(this, other); }
@@ -2477,12 +2555,9 @@ ${{{{
 
 extension $(kBaseTypes[tt].name) : IFloat
 {
-    [__unsafeForceInlineEarly] static int __sign(This val)
-    {
-        return int(__leq(This(0),val)) - int(__leq(val,This(0)));
-    }
-
-    [__unsafeForceInlineEarly] int compareTo(This other) { return __sign(this-other); }
+    [__unsafeForceInlineEarly] bool lessThan(This other) { return this < other; }
+    [__unsafeForceInlineEarly] bool lessThanOrEquals(This other) { return this <= other; }
+    [__unsafeForceInlineEarly] bool equals(This other) { return this == other; }
     [__unsafeForceInlineEarly] This add(This other) { return __add(this, other); }
     [__unsafeForceInlineEarly] This sub(This other) { return __sub(this, other); }
     [__unsafeForceInlineEarly] This mul(This other) { return __mul(this, other); }
@@ -2654,6 +2729,9 @@ attribute_syntax [open] : OpenAttribute;
 
 __attributeTarget(InterfaceDecl)
 attribute_syntax [anyValueSize(size:int)] : AnyValueSizeAttribute;
+
+__attributeTarget(InterfaceDecl)
+attribute_syntax [Specialize] : SpecializeAttribute;
 
 __attributeTarget(DeclBase)
 attribute_syntax [builtin] : BuiltinAttribute;

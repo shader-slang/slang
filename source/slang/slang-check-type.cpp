@@ -171,14 +171,15 @@ namespace Slang
         DeclRef<GenericDecl>        genericDeclRef,
         List<Expr*> const&   args)
     {
-        GenericSubstitution* subst = m_astBuilder->create<GenericSubstitution>();
-        subst->genericDecl = genericDeclRef.getDecl();
-        subst->outer = genericDeclRef.substitutions.substitutions;
+        List<Val*> evaledArgs;
 
         for (auto argExpr : args)
         {
-            subst->args.add(ExtractGenericArgVal(argExpr));
+            evaledArgs.add(ExtractGenericArgVal(argExpr));
         }
+
+        GenericSubstitution* subst = m_astBuilder->getOrCreateGenericSubstitution(
+            genericDeclRef.getDecl(), evaledArgs, genericDeclRef.substitutions.substitutions);
 
         DeclRef<Decl> innerDeclRef;
         innerDeclRef.decl = getInner(genericDeclRef);
@@ -403,18 +404,7 @@ namespace Slang
         Type*  elementType,
         IntVal*          elementCount)
     {
-        auto vectorGenericDecl = as<GenericDecl>(m_astBuilder->getSharedASTBuilder()->findMagicDecl("Vector"));
-            
-        auto vectorTypeDecl = vectorGenericDecl->inner;
-
-        auto substitutions = m_astBuilder->create<GenericSubstitution>();
-        substitutions->genericDecl = vectorGenericDecl;
-        substitutions->args.add(elementType);
-        substitutions->args.add(elementCount);
-
-        auto declRef = DeclRef<Decl>(vectorTypeDecl, substitutions);
-
-        return as<VectorExpressionType>(DeclRefType::create(m_astBuilder, declRef));
+        return m_astBuilder->getVectorType(elementType, elementCount);
     }
 
     Expr* SemanticsExprVisitor::visitSharedTypeExpr(SharedTypeExpr* expr)

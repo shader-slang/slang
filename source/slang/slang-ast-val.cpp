@@ -115,7 +115,7 @@ HashCode GenericParamIntVal::_getHashCodeOverride()
     return declRef.getHashCode() ^ HashCode(0xFFFF);
 }
 
-Val* GenericParamIntVal::_substituteImplOverride(ASTBuilder* /* astBuilder */, SubstitutionSet subst, int* ioDiff)
+Val* maybeSubstituteGenericParam(Val* paramVal, Decl* paramDecl, SubstitutionSet subst, int* ioDiff)
 {
     // search for a substitution that might apply to us
     for (auto s = subst.substitutions; s; s = s->outer)
@@ -127,25 +127,45 @@ Val* GenericParamIntVal::_substituteImplOverride(ASTBuilder* /* astBuilder */, S
         // the generic decl associated with the substitution list must be
         // the generic decl that declared this parameter
         auto genericDecl = genSubst->genericDecl;
-        if (genericDecl != declRef.getDecl()->parentDecl)
+        if (genericDecl != paramDecl->parentDecl)
             continue;
 
-        int index = 0;
+        // In some cases, we construct a `DeclRef` to a `GenericDecl`
+        // (or a declaration under one) that only includes argument
+        // values for a prefix of the parameters of the generic.
+        //
+        // If we aren't careful, we could end up indexing into the
+        // argument list past the available range.
+        //
+        Count argCount = genSubst->getArgs().getCount();
+
+        Count argIndex = 0;
         for (auto m : genericDecl->members)
         {
-            if (m == declRef.getDecl())
+            // If we have run out of arguments, then we can stop
+            // iterating over the parameters, because `this`
+            // parameter will not be replaced with anything by
+            // the substituion.
+            //
+            if (argIndex >= argCount)
+            {
+                return paramVal;
+            }
+
+
+            if (m == paramDecl)
             {
                 // We've found it, so return the corresponding specialization argument
                 (*ioDiff)++;
-                return genSubst->args[index];
+                return genSubst->getArgs()[argIndex];
             }
             else if (auto typeParam = as<GenericTypeParamDecl>(m))
             {
-                index++;
+                argIndex++;
             }
             else if (auto valParam = as<GenericValueParamDecl>(m))
             {
-                index++;
+                argIndex++;
             }
             else
             {
@@ -154,6 +174,15 @@ Val* GenericParamIntVal::_substituteImplOverride(ASTBuilder* /* astBuilder */, S
     }
 
     // Nothing found: don't substitute.
+    return paramVal;
+
+}
+
+Val* GenericParamIntVal::_substituteImplOverride(ASTBuilder* /* astBuilder */, SubstitutionSet subst, int* ioDiff)
+{
+    if (auto result = maybeSubstituteGenericParam(this, declRef.getDecl(), subst, ioDiff))
+        return result;
+
     return this;
 }
 
@@ -265,8 +294,8 @@ Val* DeclaredSubtypeWitness::_substituteImplOverride(ASTBuilder* astBuilder, Sub
                     (*ioDiff)++;
                     auto ordinaryParamCount = genericDecl->getMembersOfType<GenericTypeParamDecl>().getCount() +
                         genericDecl->getMembersOfType<GenericValueParamDecl>().getCount();
-                    SLANG_ASSERT(index + ordinaryParamCount < genericSubst->args.getCount());
-                    return genericSubst->args[index + ordinaryParamCount];
+                    SLANG_ASSERT(index + ordinaryParamCount < genericSubst->getArgs().getCount());
+                    return genericSubst->getArgs()[index + ordinaryParamCount];
                 }
             }
         }
@@ -323,7 +352,8 @@ Val* DeclaredSubtypeWitness::_substituteImplOverride(ASTBuilder* astBuilder, Sub
         }
     }
 
-    DeclaredSubtypeWitness* rs = astBuilder->create<DeclaredSubtypeWitness>();
+    DeclaredSubtypeWitness* rs = astBuilder->getOrCreate<DeclaredSubtypeWitness>(
+        substSub, substSup, substDeclRef.getDecl(), substDeclRef.substitutions.substitutions);
     rs->sub = substSub;
     rs->sup = substSup;
     rs->declRef = substDeclRef;
@@ -722,7 +752,7 @@ Val* PolynomialIntVal::_substituteImplOverride(ASTBuilder* astBuilder, Substitut
     *ioDiff += diff;
 
     if (evaluatedTerms.getCount() == 0)
-        return astBuilder->create<ConstantIntVal>(type, evaluatedConstantTerm);
+        return astBuilder->getOrCreate<ConstantIntVal>(type, evaluatedConstantTerm);
     if (diff != 0)
     {
         auto newPolynomial = astBuilder->create<PolynomialIntVal>(type);
@@ -1035,7 +1065,7 @@ IntVal* PolynomialIntVal::canonicalize(ASTBuilder* builder)
         return terms[0]->paramFactors[0]->param;
     }
     if (terms.getCount() == 0)
-        return builder->create<ConstantIntVal>(type, constantTerm);
+        return builder->getOrCreate<ConstantIntVal>(type, constantTerm);
     return this;
 }
 
@@ -1207,7 +1237,7 @@ Val* FuncCallIntVal::tryFoldImpl(ASTBuilder* astBuilder, Type* resultType, DeclR
         {
             SLANG_UNREACHABLE("constant folding of FuncCallIntVal");
         }
-        return astBuilder->create<ConstantIntVal>(resultType, resultValue);
+        return astBuilder->getOrCreate<ConstantIntVal>(resultType, resultValue);
     }
     return nullptr;
 }

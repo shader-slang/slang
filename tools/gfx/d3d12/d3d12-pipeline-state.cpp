@@ -330,7 +330,6 @@ Result RayTracingPipelineStateImpl::ensureAPIPipelineStateCreated()
     ChunkedList<ComPtr<ISlangBlob>> codeBlobs;
     ChunkedList<D3D12_EXPORT_DESC> exports;
     ChunkedList<const wchar_t*> strPtrs;
-
     ComPtr<ISlangBlob> diagnostics;
     ChunkedList<OSString> stringPool;
     auto getWStr = [&](const char* name)
@@ -339,6 +338,19 @@ Result RayTracingPipelineStateImpl::ensureAPIPipelineStateCreated()
         auto wstr = str.toWString();
         return stringPool.add(wstr)->begin();
     };
+
+    D3D12_RAYTRACING_PIPELINE_CONFIG1 pipelineConfig = {};
+    pipelineConfig.MaxTraceRecursionDepth = desc.rayTracing.maxRecursion;
+    if (desc.rayTracing.flags & RayTracingPipelineFlags::SkipTriangles)
+        pipelineConfig.Flags |= D3D12_RAYTRACING_PIPELINE_FLAG_SKIP_TRIANGLES;
+    if (desc.rayTracing.flags & RayTracingPipelineFlags::SkipProcedurals)
+        pipelineConfig.Flags |= D3D12_RAYTRACING_PIPELINE_FLAG_SKIP_PROCEDURAL_PRIMITIVES;
+
+    D3D12_STATE_SUBOBJECT pipelineConfigSubobject = {};
+    pipelineConfigSubobject.Type = D3D12_STATE_SUBOBJECT_TYPE_RAYTRACING_PIPELINE_CONFIG1;
+    pipelineConfigSubobject.pDesc = &pipelineConfig;
+    subObjects.add(pipelineConfigSubobject);
+
     auto compileShader = [&](slang::EntryPointLayout* entryPointInfo,
         slang::IComponentType* component,
         SlangInt entryPointIndex)
@@ -361,7 +373,7 @@ Result RayTracingPipelineStateImpl::ensureAPIPipelineStateCreated()
         library.NumExports = 1;
         D3D12_EXPORT_DESC exportDesc = {};
         exportDesc.Name = getWStr(entryPointInfo->getNameOverride());
-        exportDesc.ExportToRename = getWStr(entryPointInfo->getNameOverride());
+        exportDesc.ExportToRename = nullptr;
         exportDesc.Flags = D3D12_EXPORT_FLAG_NONE;
         library.pExports = exports.add(exportDesc);
 
@@ -434,13 +446,6 @@ Result RayTracingPipelineStateImpl::ensureAPIPipelineStateCreated()
     globalSignatureSubobject.Type = D3D12_STATE_SUBOBJECT_TYPE_GLOBAL_ROOT_SIGNATURE;
     globalSignatureSubobject.pDesc = &globalSignatureDesc;
     subObjects.add(globalSignatureSubobject);
-
-    D3D12_RAYTRACING_PIPELINE_CONFIG pipelineConfig = {};
-    pipelineConfig.MaxTraceRecursionDepth = desc.rayTracing.maxRecursion;
-    D3D12_STATE_SUBOBJECT pipelineConfigSubobject = {};
-    pipelineConfigSubobject.Type = D3D12_STATE_SUBOBJECT_TYPE_RAYTRACING_PIPELINE_CONFIG;
-    pipelineConfigSubobject.pDesc = &pipelineConfig;
-    subObjects.add(pipelineConfigSubobject);
 
     if (m_device->m_pipelineCreationAPIDispatcher)
     {

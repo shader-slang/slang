@@ -467,10 +467,12 @@ bool HLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
                 case BaseType::Int16:
                 case BaseType::Int:
                 case BaseType::Int64:
+                case BaseType::IntPtr:
                 case BaseType::UInt8:
                 case BaseType::UInt16:
                 case BaseType::UInt:
                 case BaseType::UInt64:
+                case BaseType::UIntPtr:
                 case BaseType::Bool:
                     // Because the intermediate type will always
                     // be an integer type, we can convert to
@@ -537,19 +539,21 @@ bool HLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
         }
         case kIROp_StringLit:
         {
-            IRStringLit* lit = cast<IRStringLit>(inst);
-            UnownedStringSlice slice = lit->getStringSlice();
-            m_writer->emit(int32_t(getStableHashCode32(slice.begin(), slice.getLength())));
+            const auto handler = StringEscapeUtil::getHandler(StringEscapeUtil::Style::Slang);
+
+            StringBuilder buf;
+            const UnownedStringSlice slice = as<IRStringLit>(inst)->getStringSlice();
+            StringEscapeUtil::appendQuoted(handler, slice, buf);
+
+            m_writer->emit(buf);
+
             return true;
         }
         case kIROp_GetStringHash:
         {
-            // On GLSL target, the `String` type is just an `int`
-            // that is the hash of the string, so we can emit
-            // the first operand to `getStringHash` directly.
-            //
-            EmitOpInfo outerPrec = inOuterPrec;
-            emitOperand(inst->getOperand(0), outerPrec);
+            const UnownedStringSlice slice = as<IRStringLit>(inst->getOperand(0))->getStringSlice();
+            m_writer->emit(static_cast<int32_t>(getStableHashCode32(slice.begin(), slice.getLength())));
+
             return true;
         }
         case kIROp_ByteAddressBufferLoad:
@@ -809,11 +813,26 @@ void HLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
         case kIROp_DoubleType:
         case kIROp_Int16Type:
         case kIROp_UInt16Type:
-        {
         case kIROp_HalfType:
+        {
             m_writer->emit(getDefaultBuiltinTypeName(type->getOp()));
             return;
         }
+#if SLANG_PTR_IS_64
+        case kIROp_IntPtrType:
+            m_writer->emit("int64_t");
+            return;
+        case kIROp_UIntPtrType:
+            m_writer->emit("uint64_t");
+            return;
+#else
+        case kIROp_IntPtrType:
+            m_writer->emit("int");
+            return;
+        case kIROp_UIntPtrType:
+            m_writer->emit("uint");
+            return;
+#endif
         case kIROp_StructType:
             m_writer->emit(getName(type));
             return;
@@ -856,7 +875,7 @@ void HLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
         case kIROp_NativeStringType:
         case kIROp_StringType: 
         {
-            m_writer->emit("int"); 
+            m_writer->emit("string"); 
             return;
         }
         default: break;

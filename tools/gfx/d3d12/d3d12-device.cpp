@@ -31,6 +31,8 @@ namespace d3d12
 
 using namespace Slang;
 
+static const uint32_t D3D_FEATURE_LEVEL_12_2 = 0xc200;
+
 Result DeviceImpl::createBuffer(
     const D3D12_RESOURCE_DESC& resourceDesc,
     const void* srcData,
@@ -416,6 +418,13 @@ Result DeviceImpl::initialize(const Desc& desc)
         return SLANG_FAIL;
     }
 
+    m_D3D12SerializeVersionedRootSignature =
+        (PFN_D3D12_SERIALIZE_VERSIONED_ROOT_SIGNATURE)loadProc(d3dModule, "D3D12SerializeVersionedRootSignature");
+    if (!m_D3D12SerializeVersionedRootSignature)
+    {
+        return SLANG_FAIL;
+    }
+
     HMODULE pixModule = LoadLibraryW(L"WinPixEventRuntime.dll");
     if (pixModule)
     {
@@ -472,21 +481,36 @@ Result DeviceImpl::initialize(const Desc& desc)
             DeviceCheckFlag::UseHardwareDevice,
             ChangeType::OnOff); ///< First try hardware, then reference
 
-        const D3D_FEATURE_LEVEL featureLevel = D3D_FEATURE_LEVEL_11_0;
 
-        const int numCombinations = combiner.getNumCombinations();
-        for (int i = 0; i < numCombinations; ++i)
+        const D3D_FEATURE_LEVEL featureLevels[] =
         {
-            if (SLANG_SUCCEEDED(_createDevice(
-                combiner.getCombination(i),
-                UnownedStringSlice(desc.adapter),
-                featureLevel,
-                m_deviceInfo)))
+            (D3D_FEATURE_LEVEL)D3D_FEATURE_LEVEL_12_2,
+            D3D_FEATURE_LEVEL_12_1,
+            D3D_FEATURE_LEVEL_12_0,
+            D3D_FEATURE_LEVEL_11_1,
+            D3D_FEATURE_LEVEL_11_0,
+            D3D_FEATURE_LEVEL_10_1,
+            D3D_FEATURE_LEVEL_10_0,
+            D3D_FEATURE_LEVEL_9_3,
+            D3D_FEATURE_LEVEL_9_2,
+            D3D_FEATURE_LEVEL_9_1
+        };
+        for (auto featureLevel : featureLevels)
+        {
+            const int numCombinations = combiner.getNumCombinations();
+            for (int i = 0; i < numCombinations; ++i)
             {
-                break;
+                if (SLANG_SUCCEEDED(_createDevice(
+                    combiner.getCombination(i),
+                    UnownedStringSlice(desc.adapter),
+                    featureLevel,
+                    m_deviceInfo)))
+                {
+                    goto succ;
+                }
             }
         }
-
+        succ:
         if (!m_deviceInfo.m_adapter)
         {
             // Couldn't find an adapter
