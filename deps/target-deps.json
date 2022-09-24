@@ -12,7 +12,7 @@
                     "windows-x86" : { "type": "url", "path" : "slang-llvm-13.x-31-win32.zip" },
                     "linux-x86_64" : { "type": "url", "path" : "slang-llvm-v13.x-31-linux-x86_64-release.zip" },
                     "macosx-x86_64" : { "type": "url", "path" : "slang-llvm-v13.x-31-macosx-x86_64-release.zip" }
-                }
+                } 
             },
             {
                 "name" : "slang-glslang",
