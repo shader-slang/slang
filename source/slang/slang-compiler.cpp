@@ -352,6 +352,32 @@ namespace Slang
         return Super::getInterface(guid);
     }
 
+    SlangResult TypeConformance::getDependencyBasedHashCode(
+        SlangInt entryPointIndex,
+        SlangInt targetIndex,
+        uint32_t* outHashCode)
+    {
+        SLANG_UNUSED(entryPointIndex);
+        SLANG_UNUSED(targetIndex);
+        return getASTBasedHashCode(outHashCode);
+    }
+
+    SlangResult TypeConformance::getASTBasedHashCode(uint32_t* outHashCode)
+    {
+        auto subtypeWitness = m_subtypeWitness->toString();
+
+        unsigned char hashCode[16];
+        MD5HashGen hashGen;
+        MD5Context context;
+        hashGen.init(&context);
+        hashGen.update(&context, subtypeWitness.getBuffer(), (unsigned long)subtypeWitness.getLength());
+        hashGen.update(&context, &m_conformanceIdOverride, (unsigned long)sizeof(m_conformanceIdOverride));
+        hashGen.finalize(&context, hashCode);
+
+        memcpy(outHashCode, hashCode, 4 * sizeof(uint32_t));
+        return SLANG_OK;
+    }
+
     List<Module*> const& TypeConformance::getModuleDependencies()
     {
         return m_moduleDependency.getModuleList();

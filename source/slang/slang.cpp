@@ -3218,6 +3218,10 @@ SlangResult Module::getASTBasedHashCode(uint32_t* outHashCode)
 {
     auto serializedAST = ASTSerialUtil::serializeAST(getModuleDecl());
 
+    SourceWriter writer(getLinkage()->getSourceManager(), LineDirectiveMode::None);
+    ASTDumpUtil::dump(getModuleDecl(), ASTDumpUtil::Style::Flat, 0, &writer);
+    auto debugString = writer.getContent();
+
     unsigned char hashCode[16];
     MD5HashGen hashGen;
     MD5Context context;

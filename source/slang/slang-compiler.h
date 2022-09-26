@@ -1071,29 +1071,8 @@ namespace Slang
         SLANG_NO_THROW SlangResult SLANG_MCALL getDependencyBasedHashCode(
             SlangInt entryPointIndex,
             SlangInt targetIndex,
-            uint32_t* outHashCode) SLANG_OVERRIDE
-        {
-            SLANG_UNUSED(entryPointIndex);
-            SLANG_UNUSED(targetIndex);
-            return getASTBasedHashCode(outHashCode);
-        }
-
-        SLANG_NO_THROW SlangResult SLANG_MCALL getASTBasedHashCode(uint32_t* outHashCode) SLANG_OVERRIDE
-        {
-            // Hash m_subtypeWitness and m_conformanceIdOverride
-            auto subtypeWitness = m_subtypeWitness->toString();
-
-            unsigned char hashCode[16];
-            MD5HashGen hashGen;
-            MD5Context context;
-            hashGen.init(&context);
-            hashGen.update(&context, subtypeWitness.getBuffer(), (unsigned long)subtypeWitness.getLength());
-            hashGen.update(&context, &m_conformanceIdOverride, (unsigned long)sizeof(m_conformanceIdOverride));
-            hashGen.finalize(&context, hashCode);
-
-            memcpy(outHashCode, hashCode, 4 * sizeof(uint32_t));
-            return SLANG_OK;
-        }
+            uint32_t* outHashCode) SLANG_OVERRIDE;
+        SLANG_NO_THROW SlangResult SLANG_MCALL getASTBasedHashCode(uint32_t* outHashCode) SLANG_OVERRIDE;
 
         List<Module*> const& getModuleDependencies() SLANG_OVERRIDE;
         List<String> const& getFilePathDependencies() SLANG_OVERRIDE;

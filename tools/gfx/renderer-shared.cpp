@@ -25,6 +25,7 @@ const Slang::Guid GfxGUID::IID_IResource = SLANG_UUID_IResource;
 const Slang::Guid GfxGUID::IID_IBufferResource = SLANG_UUID_IBufferResource;
 const Slang::Guid GfxGUID::IID_ITextureResource = SLANG_UUID_ITextureResource;
 const Slang::Guid GfxGUID::IID_IDevice = SLANG_UUID_IDevice;
+const Slang::Guid GfxGUID::IID_IShaderCacheStatistics = SLANG_UUID_IShaderCacheStatistics;
 const Slang::Guid GfxGUID::IID_IShaderObject = SLANG_UUID_IShaderObject;
 
 const Slang::Guid GfxGUID::IID_IRenderPassLayout = SLANG_UUID_IRenderPassLayout;
@@ -343,10 +344,10 @@ void updateCacheEntry(ISlangMutableFileSystem* fileSystem, slang::IBlob* compile
 {
     auto hashSize = 4 * sizeof(uint32_t); // MD5 hashes are 128 bits, represented here as an array of four uint32_t.
 
-    ListBlob contents;
     auto bufferSize = hashSize + compiledCode->getBufferSize();
-    contents.m_data.setCount(bufferSize);
-    char* buffer = (char*)contents.m_data.begin();
+    List<uint8_t> contents;
+    contents.setCount(bufferSize);
+    uint8_t* buffer = contents.begin();
     memcpy(buffer, (void*)ASTHash, hashSize);
     memcpy(buffer + hashSize, (void*)compiledCode->getBufferPointer(), compiledCode->getBufferSize());
     fileSystem->saveFile(shaderFilename.getBuffer(), buffer, bufferSize);
@@ -359,7 +360,8 @@ Result RendererBase::getEntryPointCodeFromShaderCache(
     slang::IBlob** outCode,
     slang::IBlob** outDiagnostics)
 {
-    //return program->getEntryPointCode(entryPointIndex, targetIndex, outCode, outDiagnostics);
+    // TODO: Need a way in filesystem to query both file size and file creation time, if cache size exceeds
+    // specified maximum size (in bytes or files) then delete oldest files
 
     // Immediately call getEntryPointCode if no shader cache was provided on initialization
     if (!shaderCacheFileSystem)
@@ -397,6 +399,8 @@ Result RendererBase::getEntryPointCodeFromShaderCache(
         {
             updateCacheEntry(fileSystem, codeBlob, shaderFilename, ASTHash);
         }
+
+        shaderCacheEntryMissCount++;
     }
     else
     {
@@ -415,15 +419,32 @@ Result RendererBase::getEntryPointCodeFromShaderCache(
             {
                 updateCacheEntry(fileSystem, codeBlob, shaderFilename, ASTHash);
             }
+
+            shaderCacheMissCount++;
         }
         else
         {
-            RefPtr<RawBlob> compiledCode = new RawBlob((uint8_t*)codeBlob->getBufferPointer() + hashSize, codeBlob->getBufferSize() - hashSize);
+            auto compiledCode = RawBlob::create((uint8_t*)codeBlob->getBufferPointer() + hashSize, codeBlob->getBufferSize() - hashSize);
             codeBlob = compiledCode;
+
+            shaderCacheHitCount++;
         }
     }
 
     *outCode = codeBlob.detach();
+    return SLANG_OK;
+}
+
+SlangResult RendererBase::queryInterface(SlangUUID const& uuid, void** outObject)
+{
+    if (uuid == GfxGUID::IID_IShaderCacheStatistics)
+    {
+        *outObject = static_cast<IShaderCacheStatistics*>(this);
+        addRef();
+        return SLANG_OK;
+    }
+
+    *outObject = getInterface(uuid);
     return SLANG_OK;
 }
 
@@ -782,7 +803,28 @@ Result RendererBase::getShaderObjectLayout(
     return SLANG_OK;
 }
 
+GfxCount RendererBase::getCacheEntryMissCount()
+{
+    return shaderCacheEntryMissCount;
+}
 
+GfxCount RendererBase::getCacheHitCount()
+{
+    return shaderCacheHitCount;
+}
+
+GfxCount RendererBase::getCacheMissCount()
+{
+    return shaderCacheMissCount;
+}
+
+Result RendererBase::resetCacheStatistics()
+{
+    shaderCacheEntryMissCount = 0;
+    shaderCacheHitCount = 0;
+    shaderCacheMissCount = 0;
+    return SLANG_OK;
+}
 
 ShaderComponentID ShaderCache::getComponentId(slang::TypeReflection* type)
 {

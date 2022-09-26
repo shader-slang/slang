@@ -28,6 +28,7 @@ struct GfxGUID
     static const Slang::Guid IID_ITextureResource;
     static const Slang::Guid IID_IInputLayout;
     static const Slang::Guid IID_IDevice;
+    static const Slang::Guid IID_IShaderCacheStatistics;
     static const Slang::Guid IID_IShaderObjectLayout;
     static const Slang::Guid IID_IShaderObject;
     static const Slang::Guid IID_IRenderPassLayout;
@@ -1213,11 +1214,12 @@ public:
 
 // Renderer implementation shared by all platforms.
 // Responsible for shader compilation, specialization and caching.
-class RendererBase : public IDevice, public Slang::ComObject
+class RendererBase : public IDevice, public IShaderCacheStatistics, public Slang::ComObject
 {
     friend class ShaderObjectBase;
 public:
-    SLANG_COM_OBJECT_IUNKNOWN_ALL
+    SLANG_COM_OBJECT_IUNKNOWN_ADD_REF
+    SLANG_COM_OBJECT_IUNKNOWN_RELEASE
 
     virtual SLANG_NO_THROW Result SLANG_MCALL getNativeDeviceHandles(InteropHandles* outHandles) SLANG_OVERRIDE;
     virtual SLANG_NO_THROW Result SLANG_MCALL getFeatures(
@@ -1226,6 +1228,8 @@ public:
     virtual SLANG_NO_THROW Result SLANG_MCALL
         getFormatSupportedResourceStates(Format format, ResourceStateSet* outStates) override;
     virtual SLANG_NO_THROW Result SLANG_MCALL getSlangSession(slang::ISession** outSlangSession) SLANG_OVERRIDE;
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL
+        queryInterface(SlangUUID const& uuid, void** outObject) SLANG_OVERRIDE;
     IDevice* getInterface(const Slang::Guid& guid);
 
     virtual SLANG_NO_THROW Result SLANG_MCALL createTextureFromNativeHandle(
@@ -1354,6 +1358,17 @@ protected:
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL initialize(const Desc& desc);
 protected:
     Slang::List<Slang::String> m_features;
+
+public:
+    virtual SLANG_NO_THROW GfxCount SLANG_MCALL getCacheEntryMissCount() override;
+    virtual SLANG_NO_THROW GfxCount SLANG_MCALL getCacheHitCount() override;
+    virtual SLANG_NO_THROW GfxCount SLANG_MCALL getCacheMissCount() override;
+    virtual SLANG_NO_THROW Result SLANG_MCALL resetCacheStatistics() override;
+
+protected:
+    GfxCount shaderCacheEntryMissCount = 0;
+    GfxCount shaderCacheHitCount = 0;
+    GfxCount shaderCacheMissCount = 0;
 
 public:
     SlangContext slangContext;

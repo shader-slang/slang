@@ -2052,6 +2052,25 @@ public:
         0xbe91ba6c, 0x784, 0x4308, { 0xa1, 0x0, 0x19, 0xc3, 0x66, 0x83, 0x44, 0xb2 } \
     }
 
+// These are exclusively used to track hit/miss counts for shader cache entries. Entry hit and
+// miss counts specifically indicate if the file containing relevant shader code was found in
+// the cache, while the general hit and miss counts indicate whether the file was both found and
+// up-to-date.
+class IShaderCacheStatistics : public ISlangUnknown
+{
+public:
+    virtual SLANG_NO_THROW GfxCount SLANG_MCALL getCacheEntryMissCount() = 0;
+    virtual SLANG_NO_THROW GfxCount SLANG_MCALL getCacheHitCount() = 0;
+    virtual SLANG_NO_THROW GfxCount SLANG_MCALL getCacheMissCount() = 0;
+
+    virtual SLANG_NO_THROW Result SLANG_MCALL resetCacheStatistics() = 0;
+};
+
+#define SLANG_UUID_IShaderCacheStatistics                                                \
+    {                                                                                    \
+          0x8eccc8ec, 0x5c04, 0x4a51, { 0x99, 0x75, 0x13, 0xf8, 0xfe, 0xa1, 0x59, 0xf3 } \
+    }
+
 struct DeviceInfo
 {
     DeviceType deviceType;
@@ -2478,19 +2497,6 @@ public:
 #define SLANG_UUID_IDevice                                                               \
     {                                                                                    \
           0x715bdf26, 0x5135, 0x11eb, { 0xAE, 0x93, 0x02, 0x42, 0xAC, 0x13, 0x00, 0x02 } \
-    }
-
-class IShaderCacheStatistics : public ISlangUnknown
-{
-    // getCacheEntryHitCount - file exists
-    // getCacheEntryMissCount - file does not exist
-    // getCacheHitCount - file exists and is up-to-date
-    // getCacheMissCount - file exists but is out-of-date
-};
-
-#define SLANG_UUID_IShaderCacheStatistics                                                \
-    {                                                                                    \
-          0x8eccc8ec, 0x5c04, 0x4a51, { 0x99, 0x75, 0x13, 0xf8, 0xfe, 0xa1, 0x59, 0xf3 } \
     }
 
 class IPipelineCreationAPIDispatcher : public ISlangUnknown

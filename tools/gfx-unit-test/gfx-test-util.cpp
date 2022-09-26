@@ -169,7 +169,7 @@ namespace gfx_test
         compareComputeResultFuzzy(result, expectedResult, expectedBufferSize);
     }
 
-    Slang::ComPtr<gfx::IDevice> createTestingDevice(UnitTestContext* context, Slang::RenderApiFlag::Enum api)
+    Slang::ComPtr<gfx::IDevice> createTestingDevice(UnitTestContext* context, Slang::RenderApiFlag::Enum api, ISlangMutableFileSystem* fileSystem)
     {
         Slang::ComPtr<gfx::IDevice> device;
         gfx::IDevice::Desc deviceDesc = {};
@@ -207,6 +207,11 @@ namespace gfx_test
         deviceDesc.extendedDescCount = 1;
         void* extDescPtr = &extDesc;
         deviceDesc.extendedDescs = &extDescPtr;
+
+        if (fileSystem)
+        {
+            deviceDesc.shaderCacheFileSystem = fileSystem;
+        }
 
         auto createDeviceResult = gfxCreateDevice(&deviceDesc, device.writeRef());
         if (SLANG_FAILED(createDeviceResult))

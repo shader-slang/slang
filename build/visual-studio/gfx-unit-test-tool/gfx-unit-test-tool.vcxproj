@@ -295,6 +295,7 @@
     <ClCompile Include="..\..\..\tools\gfx-unit-test\root-mutable-shader-object.cpp" />
     <ClCompile Include="..\..\..\tools\gfx-unit-test\root-shader-parameter.cpp" />
     <ClCompile Include="..\..\..\tools\gfx-unit-test\sampler-array.cpp" />
+    <ClCompile Include="..\..\..\tools\gfx-unit-test\shader-cache-tests.cpp" />
     <ClCompile Include="..\..\..\tools\gfx-unit-test\shared-buffers-tests.cpp" />
     <ClCompile Include="..\..\..\tools\gfx-unit-test\shared-textures-tests.cpp" />
     <ClCompile Include="..\..\..\tools\gfx-unit-test\swap-chain-resize-test.cpp" />
