@@ -167,15 +167,15 @@ SlangResult LanguageServer::parseNextMessage()
                 if (response.result.getKind() == JSONValue::Kind::Array)
                 {
                     auto arr = m_connection->getContainer()->getArray(response.result);
-                    if (arr.getCount() == 11)
+                    if (arr.getCount() == 12)
                     {
                         updatePredefinedMacros(arr[0]);
                         updateSearchPaths(arr[1]);
                         updateSearchInWorkspace(arr[2]);
                         updateCommitCharacters(arr[3]);
-                        updateFormattingOptions(arr[4], arr[5], arr[6], arr[7]);
-                        updateInlayHintOptions(arr[8], arr[9]);
-                        updateTraceOptions(arr[10]);
+                        updateFormattingOptions(arr[4], arr[5], arr[6], arr[7], arr[8]);
+                        updateInlayHintOptions(arr[9], arr[10]);
+                        updateTraceOptions(arr[11]);
                     }
                 }
                 break;
@@ -1149,6 +1149,7 @@ SlangResult LanguageServer::formatting(const LanguageServerProtocol::DocumentFor
     }
     if (m_formatOptions.clangFormatLocation.getLength() == 0)
         m_formatOptions.clangFormatLocation = findClangFormatTool();
+    m_formatOptions.fileName = canonicalPath;
     auto edits = formatSource(doc->getText().getUnownedSlice(), -1, -1, -1, m_formatOptions);
     auto textEdits = translateTextEdits(doc, edits);
     m_connection->sendResult(&textEdits, responseId);
@@ -1332,12 +1333,13 @@ void LanguageServer::updateCommitCharacters(const JSONValue& jsonValue)
     }
 }
 
-void LanguageServer::updateFormattingOptions(const JSONValue& clangFormatLoc, const JSONValue& clangFormatStyle, const JSONValue& allowLineBreakOnType, const JSONValue& allowLineBreakInRange)
+void LanguageServer::updateFormattingOptions(const JSONValue& clangFormatLoc, const JSONValue& clangFormatStyle, const JSONValue& clangFormatFallbackStyle, const JSONValue& allowLineBreakOnType, const JSONValue& allowLineBreakInRange)
 {
     auto container = m_connection->getContainer();
     JSONToNativeConverter converter(container, m_connection->getSink());
     converter.convert(clangFormatLoc, &m_formatOptions.clangFormatLocation);
     converter.convert(clangFormatStyle, &m_formatOptions.style);
+    converter.convert(clangFormatFallbackStyle, &m_formatOptions.fallbackStyle);
     converter.convert(allowLineBreakOnType, &m_formatOptions.allowLineBreakInOnTypeFormatting);
     converter.convert(allowLineBreakInRange, &m_formatOptions.allowLineBreakInRangeFormatting);
     if (m_formatOptions.style.getLength() == 0)
@@ -1395,6 +1397,8 @@ void LanguageServer::sendConfigRequest()
     item.section = "slang.format.clangFormatLocation";
     args.items.add(item);
     item.section = "slang.format.clangFormatStyle";
+    args.items.add(item);
+    item.section = "slang.format.clangFormatFallbackStyle";
     args.items.add(item);
     item.section = "slang.format.allowLineBreakChangesInOnTypeFormatting";
     args.items.add(item);
