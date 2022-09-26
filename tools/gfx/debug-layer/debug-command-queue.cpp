@@ -47,6 +47,10 @@ void DebugCommandQueue::executeCommandBuffers(GfxCount count, ICommandBuffer* co
         }
     }
     baseObject->executeCommandBuffers(count, innerCommandBuffers.getBuffer(), getInnerObj(fence), valueToSignal);
+    if (fence)
+    {
+        getDebugObj(fence)->maxValueToSignal = Math::Max(getDebugObj(fence)->maxValueToSignal, valueToSignal);
+    }
 }
 
 void DebugCommandQueue::waitOnHost()

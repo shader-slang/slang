@@ -471,12 +471,15 @@ Result DeviceImpl::initialize(const Desc& desc)
         // TODO: we should probably provide a command-line option
         // to override UseDebug of default rather than leave it
         // up to each back-end to specify.
-#if ENABLE_DEBUG_LAYER
-        combiner.add(
-            DeviceCheckFlag::UseDebug, ChangeType::OnOff); ///< First try debug then non debug
-#else
-        combiner.add(DeviceCheckFlag::UseDebug, ChangeType::Off); ///< Don't bother with debug
-#endif
+        if (ENABLE_DEBUG_LAYER || isGfxDebugLayerEnabled())
+        {
+            combiner.add(
+                DeviceCheckFlag::UseDebug, ChangeType::OnOff); ///< First try debug then non debug
+        }
+        else
+        {
+            combiner.add(DeviceCheckFlag::UseDebug, ChangeType::Off); ///< Don't bother with debug
+        }
         combiner.add(
             DeviceCheckFlag::UseHardwareDevice,
             ChangeType::OnOff); ///< First try hardware, then reference
