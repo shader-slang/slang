@@ -715,57 +715,70 @@ struct OptionsParser
 #undef EXECUTABLE_EXTENSION
     }
 
-    SlangResult _overrideDiagnostics(const UnownedStringSlice& identifierList, Severity overrideSeverity, DiagnosticSink* sink)
+    // Pass Severity::Disabled to allow any original severity
+    SlangResult _overrideDiagnostics(const UnownedStringSlice& identifierList, Severity originalSeverity, Severity overrideSeverity, DiagnosticSink* sink)
     {
         List<UnownedStringSlice> slices;
         StringUtil::split(identifierList, ',', slices);
         
         for (const auto& slice : slices)
         {
-            SLANG_RETURN_ON_FAIL(_overrideDiagnostic(slice, overrideSeverity, sink));
+            SLANG_RETURN_ON_FAIL(_overrideDiagnostic(slice, originalSeverity, overrideSeverity, sink));
         }
         return SLANG_OK;
     }
 
-    SlangResult _overrideDiagnostic(const UnownedStringSlice& identifier, Severity overrideSeverity, DiagnosticSink* sink)
+    // Pass Severity::Disabled to allow any original severity
+    SlangResult _overrideDiagnostic(const UnownedStringSlice& identifier, Severity originalSeverity, Severity overrideSeverity, DiagnosticSink* sink)
     {
+        auto diagnosticsLookup = getDiagnosticsLookup();
+
+        const DiagnosticInfo* diagnostic = nullptr;
         Int diagnosticId = -1;
 
         // If it starts with a digit we assume it a number 
         if (identifier.getLength() > 0 && (CharUtil::isDigit(identifier[0]) || identifier[0] == '-'))
         {
-            const auto res = StringUtil::parseInt(identifier, diagnosticId);
-            if (SLANG_FAILED(res))
-            {
-                sink->diagnose(SourceLoc(), Diagnostics::unknownDiagnosticName, identifier);
-                return res;
-            }
-
-            // If we use numbers, we don't (currently) lookup if the number is a known 
-            // id, and assume it's ok if ignored. 
-        }
-        else
-        {
-            // Get the diagnostics and dump them
-            auto diagnosticsLookup = getDiagnosticsLookup();
-            const auto diagnostic = diagnosticsLookup->findDiagnosticByName(identifier);
-
-            if (!diagnostic)
+            if (SLANG_FAILED(StringUtil::parseInt(identifier, diagnosticId)))
             {
                 sink->diagnose(SourceLoc(), Diagnostics::unknownDiagnosticName, identifier);
                 return SLANG_FAIL;
             }
 
+            // If we use numbers, we don't worry if we can't find a diagnostic
+            // and silently ignore. This was the previous behavior, and perhaps
+            // provides a way to safely disable warnings, without worrying about
+            // the version of the compiler.
+            diagnostic = diagnosticsLookup->getDiagnosticById(diagnosticId);
+        }
+        else
+        {
+            diagnostic = diagnosticsLookup->findDiagnosticByName(identifier);
+            if (!diagnostic)
+            {
+                sink->diagnose(SourceLoc(), Diagnostics::unknownDiagnosticName, identifier);
+                return SLANG_FAIL;
+            }
             diagnosticId = diagnostic->id;
         }
-        
+
+        // If we are only allowing certain original severities check it's the right type
+        if (diagnostic && originalSeverity != Severity::Disable && diagnostic->severity != originalSeverity)
+        {
+            // Strictly speaking the diagnostic name is known, but it's not the right severity
+            // to be converted from, so it is an 'unknown name' in the context of severity...
+            // Or perhaps we want another diagnostic
+            sink->diagnose(SourceLoc(), Diagnostics::unknownDiagnosticName, identifier);
+            return SLANG_FAIL;
+        }
+
         // Override the diagnostic severity in the sink
-        requestImpl->getSink()->overrideDiagnosticSeverity(int(diagnosticId), overrideSeverity);
+        requestImpl->getSink()->overrideDiagnosticSeverity(int(diagnosticId), overrideSeverity, diagnostic);
 
         return SLANG_OK;
     }
 
-    SlangResult _dumpWarningDiagnostics(DiagnosticSink* sink)
+    SlangResult _dumpDiagnostics(Severity originalSeverity, DiagnosticSink* sink)
     {
         // Get the diagnostics and dump them
         auto diagnosticsLookup = getDiagnosticsLookup();
@@ -774,7 +787,8 @@ struct OptionsParser
 
         for (const auto& diagnostic : diagnosticsLookup->getDiagnostics())
         {
-            if (diagnostic->severity != Severity::Warning)
+            if (originalSeverity != Severity::Disable &&
+                diagnostic->severity != originalSeverity)
             {
                 continue;
             }
@@ -1100,7 +1114,7 @@ struct OptionsParser
                 }
                 else if (argValue == "-dump-warning-diagnostics")
                 {
-                    _dumpWarningDiagnostics(sink);
+                    _dumpDiagnostics(Severity::Warning, sink);
                 }
                 else if (argValue == "-warnings-as-errors")
                 {
@@ -1109,23 +1123,35 @@ struct OptionsParser
 
                     if (operand.value == "all")
                     {
+                        // TODO(JS):
+                        // Perhaps there needs to be a way to disable this selectively.
                         requestImpl->getSink()->setFlag(DiagnosticSink::Flag::TreatWarningsAsErrors);
                     }
                     else
                     {
-                        SLANG_RETURN_ON_FAIL(_overrideDiagnostics(operand.value.getUnownedSlice(), Severity::Error, sink));
+                        SLANG_RETURN_ON_FAIL(_overrideDiagnostics(operand.value.getUnownedSlice(), Severity::Warning, Severity::Error, sink));
                     }
                 }
                 else if (argValue == "-warnings-disable")
                 {
                     CommandLineArg operand;
                     SLANG_RETURN_ON_FAIL(reader.expectArg(operand));
-                    SLANG_RETURN_ON_FAIL(_overrideDiagnostics(operand.value.getUnownedSlice(), Severity::Disable, sink));
+                    SLANG_RETURN_ON_FAIL(_overrideDiagnostics(operand.value.getUnownedSlice(), Severity::Warning, Severity::Disable, sink));
                 }
-                else if (argValue.startsWith("-Wno-"))
+                else if (argValue.startsWith(toSlice("-W")))
                 {
-                    auto name = argValue.getUnownedSlice().tail(5);
-                    SLANG_RETURN_ON_FAIL(_overrideDiagnostic(name, Severity::Disable, sink));
+                    auto name = argValue.getUnownedSlice().tail(2);
+
+                    // If prefixed with 'no-', disable the warning
+                    if (name.startsWith(toSlice("no-")))
+                    {
+                        SLANG_RETURN_ON_FAIL(_overrideDiagnostic(name.tail(3), Severity::Warning, Severity::Disable, sink));
+                    }
+                    else
+                    {
+                        // Enable the warning
+                        SLANG_RETURN_ON_FAIL(_overrideDiagnostic(name, Severity::Warning, Severity::Warning, sink));
+                    }
                 }
                 else if (argValue == "-verify-debug-serial-ir")
                 {
