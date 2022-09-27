@@ -920,7 +920,7 @@ struct JVPTranscriber
             IRInst* diffReturnVal = findOrTranscribeDiffInst(builder, origReturnVal);
             
             // Neither of these should be nullptr.
-            SLANG_ASSERT(primalReturnVal && diffReturnVal);
+            SLANG_RELEASE_ASSERT(primalReturnVal && diffReturnVal);
             IRReturn* diffReturn = as<IRReturn>(builder->emitReturn(diffReturnVal));
 
             return InstPair(diffReturn, diffReturn);
@@ -1300,7 +1300,7 @@ struct JVPTranscriber
     {
         // For now, we assume there's only one generic layer. So this inst must be top level
         bool isTopLevel = (as<IRModuleInst>(origGeneric->getParent()) != nullptr);
-        SLANG_ASSERT(isTopLevel);
+        SLANG_RELEASE_ASSERT(isTopLevel);
 
         IRGeneric* primalGeneric = origGeneric;
 
