@@ -1312,18 +1312,18 @@ namespace Slang
             {
                 // Describes a sub-type super-type relationship through a 
                 // reference to an inhertiance declaration.
-                Decl,
+                DeclFlavor,
 
                 // Describes a sub-type super-type relationship through 
                 // conjunction. This doesn't necessarily have a corresponding declaration
                 // since AndTypes cannot actually be used as types.
                 // i.e. if (A & B) subtype C because A subtype C, then we use AndTypeLeft to represent
                 // that relationship.
-                AndTypeLeft,
-                AndTypeRight
+                AndTypeLeftFlavor,
+                AndTypeRightFlavor
             };
 
-            Flavor flavor = Decl;
+            Flavor flavor = DeclFlavor;
         };
 
             // Create a subtype witness based on the declared relationship

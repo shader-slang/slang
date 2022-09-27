@@ -83,7 +83,7 @@ namespace Slang
             // where `[...]` represents the "hole" we leave
             // open to fill in next.
             //
-            if (bb->flavor == TypeWitnessBreadcrumb::Flavor::Decl)
+            if (bb->flavor == TypeWitnessBreadcrumb::Flavor::DeclFlavor)
             {
                 DeclaredSubtypeWitness* declaredWitness =
                     m_astBuilder->getOrCreate<DeclaredSubtypeWitness>(
@@ -99,7 +99,7 @@ namespace Slang
                 *link = transitiveWitness;
                 link = &transitiveWitness->subToMid;
             }
-            else if(bb->flavor == TypeWitnessBreadcrumb::Flavor::AndTypeLeft)
+            else if(bb->flavor == TypeWitnessBreadcrumb::Flavor::AndTypeLeftFlavor)
             {
                 ExtractFromConjunctionSubtypeWitness* extractWitness = m_astBuilder->create<ExtractFromConjunctionSubtypeWitness>();
                 extractWitness->sub = bb->sub;
@@ -109,7 +109,7 @@ namespace Slang
                 *link = extractWitness;
                 link = (SubtypeWitness**) &extractWitness->conunctionWitness;
             }
-            else if(bb->flavor == TypeWitnessBreadcrumb::Flavor::AndTypeRight)
+            else if(bb->flavor == TypeWitnessBreadcrumb::Flavor::AndTypeRightFlavor)
             {
                 ExtractFromConjunctionSubtypeWitness* extractWitness = m_astBuilder->create<ExtractFromConjunctionSubtypeWitness>();
                 extractWitness->sub = bb->sub;
@@ -412,7 +412,7 @@ namespace Slang
             leftBreadcrumb.sub = andType;
             leftBreadcrumb.sup = andType->left;
             leftBreadcrumb.declRef = makeDeclRef((Decl*)nullptr);
-            leftBreadcrumb.flavor = TypeWitnessBreadcrumb::Flavor::AndTypeLeft;
+            leftBreadcrumb.flavor = TypeWitnessBreadcrumb::Flavor::AndTypeLeftFlavor;
 
             if(_isDeclaredSubtype(originalSubType, andType->left, superTypeDeclRef, outWitness, &leftBreadcrumb))
             {   
@@ -424,7 +424,7 @@ namespace Slang
             rightBreadcrumb.sub = andType;
             rightBreadcrumb.sup = andType->right;
             rightBreadcrumb.declRef = makeDeclRef((Decl*)nullptr);
-            rightBreadcrumb.flavor = TypeWitnessBreadcrumb::Flavor::AndTypeRight;
+            rightBreadcrumb.flavor = TypeWitnessBreadcrumb::Flavor::AndTypeRightFlavor;
 
             if(_isDeclaredSubtype(originalSubType, andType->right, superTypeDeclRef, outWitness, &rightBreadcrumb))
             {
