@@ -1,5 +1,5 @@
-//TEST(smoke,compute):COMPARE_COMPUTE: -shaderobj -Xslang... -warnings-disable 30081 -X.
-//TEST(smoke,compute):COMPARE_COMPUTE:-cpu -shaderobj -Xslang... -warnings-disable 30081 -X.
+//TEST(smoke,compute):COMPARE_COMPUTE: -shaderobj -Xslang... -Wno-unrecommended-implicit-conversion -X.
+//TEST(smoke,compute):COMPARE_COMPUTE:-cpu -shaderobj -Xslang... -Wno-unrecommended-implicit-conversion -X.
 
 // Test to check warning disable
 

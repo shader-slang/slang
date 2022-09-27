@@ -673,18 +673,8 @@ void DiagnosticsLookup::_add(const char* name, Index index)
 {
     UnownedStringSlice nameSlice(name);
     m_map.Add(nameSlice, index);
-
-    // Add a dashed version (KababCase)
-    {
-        m_work.Clear();
-
-        NameConventionUtil::convert(NameConvention::Camel, nameSlice, CharCase::Lower, NameConvention::Kabab, m_work);
-
-        UnownedStringSlice dashSlice(m_arena.allocateString(m_work.getBuffer(), m_work.getLength()), m_work.getLength());
-
-        m_map.AddIfNotExists(dashSlice, index);
-    }
 }
+
 void DiagnosticsLookup::addAlias(const char* name, const char* diagnosticName)
 {
     const Index index = _findDiagnosticIndex(UnownedStringSlice(diagnosticName));
@@ -693,6 +683,29 @@ void DiagnosticsLookup::addAlias(const char* name, const char* diagnosticName)
     {
         _add(name, index);
     }
+}
+
+const DiagnosticInfo* DiagnosticsLookup::findDiagnosticByName(const UnownedStringSlice& slice) const
+{
+    if (slice.getLength() <= 0 || !CharUtil::isAlpha(slice[0]))
+    {
+        return nullptr;
+    }
+
+    auto convention = NameConventionUtil::getConvention(slice);
+
+    const CharCase charCase = CharUtil::isLower(slice[0]) ? CharCase::Lower : CharCase::Upper;
+
+    // We can just use as is
+    if (charCase == CharCase::Lower && convention == NameConvention::Camel)
+    {
+        return findDiagnosticByExactName(slice);
+    }
+
+    StringBuilder buf;
+    NameConventionUtil::convert(convention, slice, CharCase::Lower, NameConvention::Camel, buf);
+
+    return findDiagnosticByExactName(buf.getUnownedSlice());
 }
 
 Index DiagnosticsLookup::add(const DiagnosticInfo* info)

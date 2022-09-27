@@ -322,7 +322,10 @@ class DiagnosticsLookup : public RefObject
 public:
     static const Index kArenaInitialSize = 2048;
 
-    const DiagnosticInfo* findDiagostic(const UnownedStringSlice& slice) const
+        /// Will take into account the slice name could be using different conventions
+    const DiagnosticInfo* findDiagnosticByName(const UnownedStringSlice& slice) const;
+        /// The name must be as defined in the diagnostics exactly, typically lower camel
+    const DiagnosticInfo* findDiagnosticByExactName(const UnownedStringSlice& slice) const
     {
         const Index* indexPtr = m_map.TryGetValue(slice);
         return indexPtr ? m_diagnostics[*indexPtr] : nullptr;

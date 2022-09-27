@@ -189,6 +189,9 @@ void NameConventionUtil::split(const UnownedStringSlice& slice, List<UnownedStri
 
                 dst += count;
             }
+
+            SLANG_ASSERT(dstStart + totalSize == dst);
+            out.appendInPlace(dstStart, totalSize);
             break;
         }
     }

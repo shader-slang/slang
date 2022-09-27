@@ -15,6 +15,8 @@
 #include "../compiler-core/slang-artifact-impl.h"
 #include "../compiler-core/slang-artifact-representation-impl.h"
 
+#include "../compiler-core/slang-name-convention-util.h"
+
 #include "slang-repro.h"
 #include "slang-serialize-ir.h"
 
@@ -25,6 +27,8 @@
 #include "../compiler-core/slang-command-line-args.h"
 #include "../compiler-core/slang-artifact-desc-util.h"
 #include "../compiler-core/slang-core-diagnostics.h"
+
+#include "../core/slang-char-util.h"
 
 #include <assert.h>
 
@@ -711,20 +715,76 @@ struct OptionsParser
 #undef EXECUTABLE_EXTENSION
     }
 
-    SlangResult overrideDiagnosticSeverity(String const& identifierList, Severity overrideSeverity)
+    SlangResult _overrideDiagnostics(const UnownedStringSlice& identifierList, Severity overrideSeverity, DiagnosticSink* sink)
     {
         List<UnownedStringSlice> slices;
-        StringUtil::split(identifierList.getUnownedSlice(), ',', slices);
-        Index sliceCount = slices.getCount();
-
-        for (Index i = 0; i < sliceCount; ++i)
+        StringUtil::split(identifierList, ',', slices);
+        
+        for (const auto& slice : slices)
         {
-            UnownedStringSlice warningIdentifier = slices[i];
+            SLANG_RETURN_ON_FAIL(_overrideDiagnostic(slice, overrideSeverity, sink));
+        }
+        return SLANG_OK;
+    }
 
-            Int warningIndex = -1;
-            SLANG_RETURN_ON_FAIL(StringUtil::parseInt(warningIdentifier, warningIndex));
+    SlangResult _overrideDiagnostic(const UnownedStringSlice& identifier, Severity overrideSeverity, DiagnosticSink* sink)
+    {
+        Int diagnosticId = -1;
 
-            requestImpl->getSink()->overrideDiagnosticSeverity(int(warningIndex), overrideSeverity);
+        // If it starts with a digit we assume it a number 
+        if (identifier.getLength() > 0 && (CharUtil::isDigit(identifier[0]) || identifier[0] == '-'))
+        {
+            const auto res = StringUtil::parseInt(identifier, diagnosticId);
+            if (SLANG_FAILED(res))
+            {
+                sink->diagnose(SourceLoc(), Diagnostics::unknownDiagnosticName, identifier);
+                return res;
+            }
+
+            // If we use numbers, we don't (currently) lookup if the number is a known 
+            // id, and assume it's ok if ignored. 
+        }
+        else
+        {
+            // Get the diagnostics and dump them
+            auto diagnosticsLookup = getDiagnosticsLookup();
+            const auto diagnostic = diagnosticsLookup->findDiagnosticByName(identifier);
+
+            if (!diagnostic)
+            {
+                sink->diagnose(SourceLoc(), Diagnostics::unknownDiagnosticName, identifier);
+                return SLANG_FAIL;
+            }
+
+            diagnosticId = diagnostic->id;
+        }
+        
+        // Override the diagnostic severity in the sink
+        requestImpl->getSink()->overrideDiagnosticSeverity(int(diagnosticId), overrideSeverity);
+
+        return SLANG_OK;
+    }
+
+    SlangResult _dumpWarningDiagnostics(DiagnosticSink* sink)
+    {
+        // Get the diagnostics and dump them
+        auto diagnosticsLookup = getDiagnosticsLookup();
+
+        StringBuilder buf;
+
+        for (const auto& diagnostic : diagnosticsLookup->getDiagnostics())
+        {
+            if (diagnostic->severity != Severity::Warning)
+            {
+                continue;
+            }
+
+            buf.Clear();
+
+            buf << diagnostic->id << " : ";
+            NameConventionUtil::convert(NameConvention::Camel, UnownedStringSlice(diagnostic->name), CharCase::Lower, NameConvention::Kabab, buf);
+            buf << "\n";
+            sink->diagnoseRaw(Severity::Note, buf.getUnownedSlice());
         }
 
         return SLANG_OK;
@@ -1038,32 +1098,34 @@ struct OptionsParser
                 {
                     requestImpl->getSink()->setFlag(DiagnosticSink::Flag::VerbosePath);
                 }
+                else if (argValue == "-dump-warning-diagnostics")
+                {
+                    _dumpWarningDiagnostics(sink);
+                }
                 else if (argValue == "-warnings-as-errors")
                 {
                     CommandLineArg operand;
                     SLANG_RETURN_ON_FAIL(reader.expectArg(operand));
 
                     if (operand.value == "all")
+                    {
                         requestImpl->getSink()->setFlag(DiagnosticSink::Flag::TreatWarningsAsErrors);
+                    }
                     else
                     {
-                        if (SLANG_FAILED(overrideDiagnosticSeverity(operand.value, Severity::Error)))
-                        {
-                            sink->diagnose(operand.loc, MiscDiagnostics::invalidArgumentForOption, "-warnings-as-errors");
-                            return SLANG_FAIL;
-                        }
+                        SLANG_RETURN_ON_FAIL(_overrideDiagnostics(operand.value.getUnownedSlice(), Severity::Error, sink));
                     }
                 }
                 else if (argValue == "-warnings-disable")
                 {
                     CommandLineArg operand;
                     SLANG_RETURN_ON_FAIL(reader.expectArg(operand));
-
-                    if (SLANG_FAILED(overrideDiagnosticSeverity(operand.value, Severity::Disable)))
-                    {
-                        sink->diagnose(operand.loc, MiscDiagnostics::invalidArgumentForOption, "-warnings-disable");
-                        return SLANG_FAIL;
-                    }
+                    SLANG_RETURN_ON_FAIL(_overrideDiagnostics(operand.value.getUnownedSlice(), Severity::Disable, sink));
+                }
+                else if (argValue.startsWith("-Wno-"))
+                {
+                    auto name = argValue.getUnownedSlice().tail(5);
+                    SLANG_RETURN_ON_FAIL(_overrideDiagnostic(name, Severity::Disable, sink));
                 }
                 else if (argValue == "-verify-debug-serial-ir")
                 {

@@ -52,7 +52,12 @@ static DiagnosticsLookup* _getDiagnosticLookupSingleton()
 
 DiagnosticInfo const* findDiagnosticByName(UnownedStringSlice const& name)
 {
-    return _getDiagnosticLookupSingleton()->findDiagostic(name);
+    return _getDiagnosticLookupSingleton()->findDiagnosticByName(name);
+}
+
+const DiagnosticsLookup* getDiagnosticsLookup()
+{
+    return _getDiagnosticLookupSingleton();
 }
 
 } // namespace Slang
