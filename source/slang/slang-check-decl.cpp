@@ -1549,7 +1549,8 @@ namespace Slang
         // Generate a dictionary node to hold information about all
         // available differentiable types in scope (including imports and stdlib)
         // 
-        finishDifferentiableTypeDictionary(moduleDecl);
+        if (getShared()->getDiffTypeContext()->isDictionaryRequired())
+            finishDifferentiableTypeDictionary(moduleDecl);
     }
 
     void SemanticsVisitor::finishDifferentiableTypeDictionary(ModuleDecl* moduleDecl)
@@ -4809,6 +4810,11 @@ namespace Slang
 
     void SemanticsDeclHeaderVisitor::checkCallableDeclCommon(CallableDecl* decl)
     {
+        if (decl->findModifier<JVPDerivativeModifier>())
+        {
+            this->getShared()->getDiffTypeContext()->requireDifferentiableTypeDictionary();
+        }
+
         for(auto paramDecl : decl->getParameters())
         {
             ensureDecl(paramDecl, DeclCheckState::ReadyForReference);
@@ -5673,6 +5679,11 @@ namespace Slang
     
     void DifferentiableTypeSemanticContext::registerDifferentiableType(DeclRefType* type, SubtypeWitness* witness)
     {
+        // Need to generate a type dictionary since we have a declaration that works with
+        // a differentiable type.
+        //  
+        this->requireDifferentiableTypeDictionary();
+
         m_mapTypeToIDifferentiableWitness.AddIfNotExists(type, witness);
     }
 
@@ -5723,6 +5734,16 @@ namespace Slang
         {
             m_importedDictionaries.add(makeDeclRef(diffTypeDict));
         }
+    }
+
+    void DifferentiableTypeSemanticContext::requireDifferentiableTypeDictionary()
+    {
+        this->m_isTypeDictionaryRequired = true;
+    }
+
+    bool DifferentiableTypeSemanticContext::isDictionaryRequired()
+    {
+        return this->m_isTypeDictionaryRequired;
     }
 
     void SharedSemanticsContext::_addCandidateExtensionsFromModule(ModuleDecl* moduleDecl)

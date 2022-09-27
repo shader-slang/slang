@@ -1743,6 +1743,8 @@ namespace Slang
 
     Expr* SemanticsExprVisitor::visitJVPDifferentiateExpr(JVPDifferentiateExpr* expr)
     {
+        this->getShared()->getDiffTypeContext()->requireDifferentiableTypeDictionary();
+        
         // Check/Resolve inner function declaration.
         expr->baseFunction = CheckTerm(expr->baseFunction);
         return expr;

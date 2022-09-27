@@ -1226,10 +1226,12 @@ struct JVPTranscriber
         // TODO: This logic might have issues if there are additional instructions (say lookup_interface_requirement) 
         // that are operands.
         // TODO: This is currently cloning the global dictionary. Should only clone dictionaries in generic blocks.
-        auto origDict = builder->findDifferentiableTypeDictionary(origBlock);
-        auto clonedDict = cloneInst(&cloneEnv, builder, origDict);
-        mapPrimalInst(origDict, clonedDict);
-        mapDifferentialInst(origDict, clonedDict);
+        if (auto origDict = builder->findDifferentiableTypeDictionary(origBlock))
+        {
+            auto clonedDict = cloneInst(&cloneEnv, builder, origDict);
+            mapPrimalInst(origDict, clonedDict);
+            mapDifferentialInst(origDict, clonedDict);
+        }
 
         // Then, run through every instruction and use the transcriber to generate the appropriate
         // derivative code.

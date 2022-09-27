@@ -37,6 +37,12 @@ __magic_type(DifferentiableType)
 interface IDifferentiable
 {
     associatedtype Differential;
+
+    //Differential zero();
+
+    //Differential add(Differential, Differential);
+
+    //Differential mul(ThisType, Differential); // Is this reqd?
 };
 
     /// Pair type that serves to wrap the primal and

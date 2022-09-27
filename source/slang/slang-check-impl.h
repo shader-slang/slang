@@ -261,12 +261,21 @@ namespace Slang
             ///
         void addImportedModule(ModuleDecl* importedModuleDecl);
 
+            /// Set flag to indicate that the type dictionary is requried.
+        void requireDifferentiableTypeDictionary();
+
+            /// Returns flag indicating whether the type dictionary is requried.
+        bool isDictionaryRequired();
+
     private:
             /// Mapping from types to subtype witnesses for conformance to IDifferentiable.
-        Dictionary<DeclRefType*, SubtypeWitness*> m_mapTypeToIDifferentiableWitness;
+        Dictionary<DeclRefType*, SubtypeWitness*>   m_mapTypeToIDifferentiableWitness;
 
             /// List of external dictionaries (from imported modules)
         List<DeclRef<DifferentiableTypeDictionary>> m_importedDictionaries;
+
+            /// Flag to indicate if a differentiable type dictionary is required.
+        bool                                        m_isTypeDictionaryRequired = false;
     };
 
         /// Shared state for a semantics-checking session.
