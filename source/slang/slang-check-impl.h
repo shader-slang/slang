@@ -237,6 +237,38 @@ namespace Slang
         Dictionary<LookupRequestKey, LookupResult> lookupCache;
     };
 
+    struct DifferentiableTypeSemanticContext
+    {
+    
+    public:
+            /// Registers a type as conforming to IDifferentiable, along with a witness 
+            /// describing the relationship.
+            ///
+        void registerDifferentiableType(DeclRefType* type, SubtypeWitness* witness);
+
+            /// Returns the list of registered differentiable types.
+        List<KeyValuePair<DeclRefType*, SubtypeWitness*>> getDifferentiableTypeConformanceList();
+
+            /// Creates a DifferentiableTypeDictionary AST container node with an entry for
+            /// every registered type. This can be inserted into the appropriate context for the
+            /// auto-diff pass.
+            ///
+        DifferentiableTypeDictionary* makeDifferentiableTypeDictionaryNode(ASTBuilder* builder);
+
+            /// Creates a DifferentiableTypeDictionary AST container node with an entry for
+            /// every registered type. This can be inserted into the appropriate context for the
+            /// auto-diff pass.
+            ///
+        void addImportedModule(ModuleDecl* importedModuleDecl);
+
+    private:
+            /// Mapping from types to subtype witnesses for conformance to IDifferentiable.
+        Dictionary<DeclRefType*, SubtypeWitness*> m_mapTypeToIDifferentiableWitness;
+
+            /// List of external dictionaries (from imported modules)
+        List<DeclRef<DifferentiableTypeDictionary>> m_importedDictionaries;
+    };
+
         /// Shared state for a semantics-checking session.
     struct SharedSemanticsContext
     {
@@ -264,6 +296,8 @@ namespace Slang
         //
         List<ModuleDecl*> importedModulesList;
         HashSet<ModuleDecl*> importedModulesSet;
+
+        DifferentiableTypeSemanticContext diffTypeContext;
 
     public:
         SharedSemanticsContext(
@@ -298,6 +332,12 @@ namespace Slang
                 return m_linkage->isInLanguageServer();
             return false;
         }
+
+        DifferentiableTypeSemanticContext* getDiffTypeContext()
+        {
+            return &diffTypeContext;
+        }
+
             /// Get the list of extension declarations that appear to apply to `decl` in this context
         List<ExtensionDecl*> const& getCandidateExtensionsForTypeDecl(AggTypeDecl* decl);
 
@@ -711,6 +751,9 @@ namespace Slang
         //
         Type* _toJVPReturnType(ASTBuilder* builder, Type* primalType);
         
+        // Convert a function's original type to it's JVP type.
+        Type* processJVPFuncType(ASTBuilder* builder, FuncType* originalType);
+        
     public:
 
         bool ValuesAreEqual(
@@ -999,6 +1042,16 @@ namespace Slang
             DeclRef<Decl>               requiredMemberDeclRef,
             RefPtr<WitnessTable>        witnessTable);
 
+            /// Registers a type as differentiable in the currrent semantic context, if the declaration represents
+            /// a subtype of IDifferentable. Does nothing otherwise.
+        void tryAddDifferentiableConformanceToContext(
+            Decl* decl,
+            DifferentiableTypeSemanticContext* context);
+
+            /// Generates a dictionary node for the module with all registered differentiable types,
+            /// as well as information about differentiable types in imported modules.
+        void finishDifferentiableTypeDictionary(ModuleDecl* moduleDecl);
+
         // Find the appropriate member of a declared type to
         // satisfy a requirement of an interface the type
         // claims to conform to.
@@ -1254,6 +1307,23 @@ namespace Slang
             Type*            sub = nullptr;
             Type*            sup = nullptr;
             DeclRef<Decl>           declRef;
+
+            enum Flavor 
+            {
+                // Describes a sub-type super-type relationship through a 
+                // reference to an inhertiance declaration.
+                Decl,
+
+                // Describes a sub-type super-type relationship through 
+                // conjunction. This doesn't necessarily have a corresponding declaration
+                // since AndTypes cannot actually be used as types.
+                // i.e. if (A & B) subtype C because A subtype C, then we use AndTypeLeft to represent
+                // that relationship.
+                AndTypeLeft,
+                AndTypeRight
+            };
+
+            Flavor flavor = Decl;
         };
 
             // Create a subtype witness based on the declared relationship
@@ -1549,6 +1619,10 @@ namespace Slang
         void AddOverloadCandidate(
             OverloadResolveContext& context,
             OverloadCandidate&		candidate);
+        
+        void AddHigherOrderOverloadCandidates(
+            Expr*                   funcExpr,
+            OverloadResolveContext& context);
 
         void AddFuncOverloadCandidate(
             LookupResultItem			item,
@@ -1616,7 +1690,7 @@ namespace Slang
 
         bool TryUnifyConjunctionType(
             ConstraintSystem&   constraints,
-            AndType*            fst,
+            Type*            fst,
             Type*               snd);
 
         // Is the candidate extension declaration actually applicable to the given type
@@ -1633,7 +1707,8 @@ namespace Slang
         DeclRef<Decl> inferGenericArguments(
             DeclRef<GenericDecl>    genericDeclRef,
             OverloadResolveContext& context,
-            GenericSubstitution*    substWithKnownGenericArgs);
+            GenericSubstitution*    substWithKnownGenericArgs,
+            List<Type*>             *innerParameterTypes = nullptr);
 
         void AddTypeOverloadCandidates(
             Type*	        type,

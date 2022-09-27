@@ -564,6 +564,19 @@ namespace Slang
             }
         }
 
+        // Two subtype witnesses can be unified if they exist (non-null) and 
+        // prove that some pair of types are subtypes of types that can be unified.
+        // 
+        if (auto fstWit = as<SubtypeWitness>(fst))
+        {
+            if (auto sndWit = as<SubtypeWitness>(snd))
+            {
+                return TryUnifyTypes(constraints,
+                    fstWit->sup,
+                    sndWit->sup);
+            }
+        }
+
         SLANG_UNIMPLEMENTED_X("value unification case");
 
         // default: fail
@@ -725,17 +738,29 @@ namespace Slang
 
     bool SemanticsVisitor::TryUnifyConjunctionType(
         ConstraintSystem&   constraints,
-        AndType*            fst,
+        Type*               fst,
         Type*               snd)
     {
-        // Unifying a type `T` with `A & B` amounts to unifying
-        // `T` with `A` and also `T` with `B`.
+        // Unifying a type `A & B` with `T` amounts to unifying
+        // `A` with `T` and also `B` with `T` while
+        // unifying a type `T` with `A & B` amounts to either 
+        // unifying `T` with `A` or `T` with `B`
         //
         // If either unification is impossible, then the full
         // case is also impossible.
         //
-        return TryUnifyTypes(constraints, fst->left, snd)
-            && TryUnifyTypes(constraints, fst->right, snd);
+        if (auto fstAndType = as<AndType>(fst))
+        {
+            return TryUnifyTypes(constraints, fstAndType->left, snd)
+                && TryUnifyTypes(constraints, fstAndType->right, snd);
+        }
+        else if (auto sndAndType = as<AndType>(snd))
+        {
+            return TryUnifyTypes(constraints, fst, sndAndType->left)
+                || TryUnifyTypes(constraints, fst, sndAndType->right);
+        }
+        else
+            return false;
     }
 
     bool SemanticsVisitor::TryUnifyTypes(
@@ -762,13 +787,9 @@ namespace Slang
         // a conjunction directly, and will instead find all of the
         // "leaf" types we need to constrain it to.
         //
-        if( auto fstAndType = as<AndType>(fst) )
+        if (as<AndType>(fst) || as<AndType>(snd))
         {
-            return TryUnifyConjunctionType(constraints, fstAndType, snd);
-        }
-        if( auto sndAndType = as<AndType>(snd) )
-        {
-            return TryUnifyConjunctionType(constraints, sndAndType, fst);
+            return TryUnifyConjunctionType(constraints, fst, snd);
         }
 
         // A generic parameter type can unify with anything.

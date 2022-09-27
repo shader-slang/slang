@@ -1715,48 +1715,36 @@ namespace Slang
             return primalType;
     }
 
+    Type* SemanticsVisitor::processJVPFuncType(ASTBuilder* builder, FuncType* originalType)
+    {
+        // Resolve JVP type here. 
+        // Note that this type checking needs to be in sync with
+        // the auto-generation logic in slang-ir-jvp-diff.cpp
+        
+        FuncType* jvpType = builder->create<FuncType>();
+
+        // The JVP return type is float if primal return type is float
+        // void otherwise.
+        //
+        jvpType->resultType = _toJVPReturnType(builder, originalType->getResultType());
+        
+        // No support for differentiating function that throw errors, for now.
+        SLANG_ASSERT(originalType->errorType->equals(builder->getBottomType()));
+        jvpType->errorType = originalType->errorType;
+
+        for (UInt i = 0; i < originalType->getParamCount(); i++)
+        {
+            if(auto jvpParamType = _toDifferentialParamType(builder, originalType->getParamType(i)))
+                jvpType->paramTypes.add(jvpParamType);
+        }
+
+        return jvpType;
+    }
+
     Expr* SemanticsExprVisitor::visitJVPDifferentiateExpr(JVPDifferentiateExpr* expr)
     {
         // Check/Resolve inner function declaration.
         expr->baseFunction = CheckTerm(expr->baseFunction);
-        
-        auto astBuilder = this->getASTBuilder();
-
-        if(auto primalType = as<FuncType>(expr->baseFunction->type))
-        {
-            // Resolve JVP type here. 
-            // Note that this type checking needs to be in sync with
-            // the auto-generation logic in slang-ir-jvp-diff.cpp
-            
-            FuncType* jvpType = astBuilder->create<FuncType>();
-
-            // The JVP return type is float if primal return type is float
-            // void otherwise.
-            //
-            jvpType->resultType = _toJVPReturnType(astBuilder, primalType->getResultType());
-            
-            // No support for differentiating function that throw errors, for now.
-            SLANG_ASSERT(primalType->errorType->equals(astBuilder->getBottomType()));
-            jvpType->errorType = primalType->errorType;
-
-            for (UInt i = 0; i < primalType->getParamCount(); i++)
-            {
-                if(auto jvpParamType = _toDifferentialParamType(astBuilder, primalType->getParamType(i)))
-                    jvpType->paramTypes.add(jvpParamType);
-            }
-
-            expr->type = jvpType;
-        }
-        else
-        {
-            // Error
-            expr->type = astBuilder->getErrorType();
-            if (!as<ErrorType>(expr->baseFunction->type))
-            {
-                getSink()->diagnose(expr->baseFunction->loc, Diagnostics::expectedFunction, expr->baseFunction->type);
-            }
-        }
-
         return expr;
     }
 

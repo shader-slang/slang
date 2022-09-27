@@ -179,6 +179,18 @@ Decl* SharedASTBuilder::findMagicDecl(const String& name)
     return m_magicDecls[name].GetValue();
 }
 
+Decl* SharedASTBuilder::tryFindMagicDecl(const String& name)
+{
+    if (m_magicDecls.ContainsKey(name))
+    {
+        return m_magicDecls[name].GetValue();
+    }
+    else
+    {
+        return nullptr;
+    }
+}
+
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ASTBuilder !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 ASTBuilder::ASTBuilder(SharedASTBuilder* sharedASTBuilder, const String& name):
@@ -306,6 +318,11 @@ DeclRef<InterfaceDecl> ASTBuilder::getDifferentiableInterface()
     DeclRef<InterfaceDecl> declRef;
     declRef.decl = dynamicCast<InterfaceDecl>(m_sharedASTBuilder->findMagicDecl("DifferentiableType"));
     return declRef;
+}
+
+bool ASTBuilder::isDifferentiableInterfaceAvailable()
+{
+    return (m_sharedASTBuilder->tryFindMagicDecl("DifferentiableType") != nullptr);
 }
 
 DeclRef<Decl> ASTBuilder::getBuiltinDeclRef(const char* builtinMagicTypeName, Val* genericArg)

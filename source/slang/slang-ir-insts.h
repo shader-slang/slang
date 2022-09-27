@@ -552,7 +552,7 @@ struct IRJVPDerivativeReferenceDecoration : IRDecoration
     };
     IR_LEAF_ISA(JVPDerivativeReferenceDecoration)
 
-    IRFunc* getJVPFunc() { return as<IRFunc>(getOperand(0)); }
+    IRInst* getJVPFunc() { return getOperand(0); }
 };
 
 
@@ -570,6 +570,15 @@ struct IRJVPDifferentiate : IRInst
 
     IR_LEAF_ISA(JVPDifferentiate)
 };
+
+// Dictionary item mapping a type with a corresponding 
+// IDifferentiable witness table
+// 
+struct IRDifferentiableTypeDictionaryItem : IRInst
+{
+    IR_LEAF_ISA(DifferentiableTypeDictionaryItem)
+};
+
 
 // An instruction that specializes another IR value
 // (representing a generic) to a particular set of generic arguments 
@@ -2457,6 +2466,27 @@ public:
     IRInst* emitJVPDifferentiateInst(IRType* type, IRInst* baseFn);
 
     IRInst* emitMakeDifferentialPair(IRType* type, IRInst* primal, IRInst* differential);
+
+    // Emit and return a dictionary instruction to the global or generic scope.
+    IRInst* emitDifferentiableTypeDictionary();
+
+    // Emit and return a dictionary instruction to the global or generic scope,
+    // if one is not already present.
+    // 
+    IRInst* findOrEmitDifferentiableTypeDictionary();
+
+    // Returns the IRDifferentiableTypeDictionary in the scope of inst.
+    IRInst* findDifferentiableTypeDictionary(IRInst* inst);
+
+    // Add a differentiable type entry to the appropriate dictionary.
+    IRInst* addDifferentiableTypeEntry(IRInst* irType, IRInst* conformanceWitness);
+    
+    // Lookup a differentiable type entry in the appropriate dictionary.
+    // This recursively looks up in upper contexts.
+    // 
+    IRInst* findDifferentiableTypeEntry(IRInst* irType);
+
+    IRInst* findDifferentiableTypeEntry(IRInst* irType, IRInst* scope);
 
     IRInst* emitSpecializeInst(
         IRType*         type,

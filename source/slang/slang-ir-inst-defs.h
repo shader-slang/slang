@@ -802,6 +802,10 @@ INST(GenericSpecializationDictionary, GenericSpecializationDictionary, 0, PARENT
 INST(ExistentialFuncSpecializationDictionary, ExistentialFuncSpecializationDictionary, 0, PARENT)
 INST(ExistentialTypeSpecializationDictionary, ExistentialTypeSpecializationDictionary, 0, PARENT)
 
+/* Differentiable Type Dictionary */
+INST(DifferentiableTypeDictionary, DifferentiableTypeDictionary, 0, PARENT)
+INST(DifferentiableTypeDictionaryItem, DifferentiableTypeDictionaryItem, 0, 0)
+
 #undef PARENT
 #undef USE_OTHER
 #undef INST_RANGE
