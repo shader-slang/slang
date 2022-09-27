@@ -22,7 +22,9 @@ enum class FormatBehavior
 struct FormatOptions
 {
     String clangFormatLocation;
-    String style = "{BasedOnStyle: Microsoft}";
+    String style = "file";
+    String fallbackStyle = "{BasedOnStyle: Microsoft}";
+    String fileName;
     bool allowLineBreakInOnTypeFormatting = false;
     bool allowLineBreakInRangeFormatting = false;
     FormatBehavior behavior = FormatBehavior::Standard;
