@@ -106,13 +106,14 @@ jobs:
           7z a slang-macos-dist.zip libslang.dylib
           7z a slang-macos-dist.zip slangd
           7z a slang-macos-dist.zip slangc
+          cp slang-macos-dist.zip slang-macos-dist-${{matrix.targetPlatform}}.zip
           timeout 1000 gon ./extras/macos-notarize.json
       - name: UploadNotarizedBinary
         if: always()
         uses: softprops/action-gh-release@v1
         with:
           files: |
-            slang-macos-dist-${{matrix.platform}}.zip
+            slang-macos-dist-${{matrix.targetPlatform}}.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       
