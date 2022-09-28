@@ -16,7 +16,6 @@ jobs:
         configuration: ['release'] # 'debug'
         compiler: ['clang']
         platform: ['x64'] 
-        
     steps:
     - uses: actions/checkout@v2.3.4
       with:
@@ -27,6 +26,7 @@ jobs:
         CC=${{matrix.compiler}}
         CONFIGURATION=${{matrix.configuration}}
         ARCH=${{matrix.platform}}
+        TARGETARCH=${{matrix.platform}}
         CPPFLAGS=-Werror
         CFLAGS=-Werror
         CXXFLAGS=-Werror
