@@ -167,6 +167,29 @@ newoption {
     allowed     = { { "true", "True"}, { "false", "False" } }
  }
 
+ newoption {
+    trigger     = "skip-source-generation",
+    description = "(Optional) If true will skip source generation steps.",
+    value       = "bool",
+    default     = "false",
+    allowed     = { { "true", "True"}, { "false", "False" } }
+ }
+
+ newoption {
+    trigger     = "deploy-slang-llvm",
+    description = "(Optional) If true will copy slang-llvm to output directory.",
+    value       = "bool",
+    default     = "true",
+    allowed     = { { "true", "True"}, { "false", "False" } }
+ }
+ newoption {
+    trigger     = "deploy-slang-glslang",
+    description = "(Optional) If true will copy slang-glslang to output directory.",
+    value       = "bool",
+    default     = "true",
+    allowed     = { { "true", "True"}, { "false", "False" } }
+ }
+
  buildLocation = _OPTIONS["build-location"]
  executeBinary = (_OPTIONS["execute-binary"] == "true")
  buildGlslang = (_OPTIONS["build-glslang"] == "true")
@@ -177,7 +200,9 @@ newoption {
  enableProfile = (_OPTIONS["enable-profile"] == "true")
  enableEmbedStdLib = (_OPTIONS["enable-embed-stdlib"] == "true")
  enableXlib = (_OPTIONS["enable-xlib"] == "true")
- enableExperimental = (_OPTIONS["enable-experimental-projects"] == "true")
+ skipSourceGeneration = (_OPTIONS["skip-source-generation"] == "true")
+ deployLLVM = (_OPTIONS["deploy-slang-llvm"] == "true")
+ deployGLSLang = (_OPTIONS["deploy-slang-glslang"] == "true")
  
  -- If stdlib embedding is enabled, disable stdlib source embedding by default
  disableStdlibSource = enableEmbedStdLib
@@ -1181,6 +1206,8 @@ tool "slangd"
      buildinputs { builddir .. "/slang-embed" .. getExecutableSuffix() }
  end
  
+ if not skipSourceGeneration then
+
  generatorProject("run-generators", nil)
  
      -- We make 'source/slang' the location of the source, to make paths to source
@@ -1323,7 +1350,7 @@ tool "slangd"
              buildinputs { "%{cfg.targetdir}/slangc-bootstrap" .. executableSuffix }
              buildcommands { '"%{cfg.targetdir}/slangc-bootstrap" -archive-type riff-lz4 -save-stdlib-bin-source "%{file.directory}/slang-stdlib-generated.h"' }
  end
- 
+ end -- not skipSourceGeneration
  
  --
  -- TODO: Slang's current `Makefile` build does some careful incantations
@@ -1360,7 +1387,9 @@ tool "slangd"
  
      if enableEmbedStdLib then
          -- We only have this dependency if we are embedding stdlib
-         dependson { "embed-stdlib-generator" }
+         if not skipSourceGeneration then
+            dependson { "embed-stdlib-generator" }
+         end
      else
          -- Disable StdLib embedding
          defines { "SLANG_WITHOUT_EMBEDDED_STD_LIB" }
@@ -1395,12 +1424,14 @@ tool "slangd"
      -- to generate. We do this by executing the run-generators 'dummy' project
      -- which produces the appropriate source
  
-     dependson { "run-generators" }
- 
+     if not skipSourceGeneration then
+        dependson { "run-generators" }
+     end
+
      -- If we have slang-llvm copy it
      local slangLLVMPath = deps:getProjectRelativePath("slang-llvm", "../../..")
      
-     if slangLLVMPath then
+     if slangLLVMPath and deployLLVM then
          filter { "system:linux or macosx or windows" }
              local sharedLibName = slangUtil.getSharedLibraryFileName(targetInfo, "slang-llvm")            
              postbuildcommands {
@@ -1412,7 +1443,7 @@ tool "slangd"
  
      -- If we are not building glslang from source, then be
      -- sure to copy a binary copy over to the output directory
-     if not buildGlslang then
+     if not buildGlslang and slangGlslangPath~=nil and deployGLSLang then
          filter { "system:linux or macosx or windows" }
              local sharedLibName = slangUtil.getSharedLibraryFileName(targetInfo, "slang-glslang")            
              postbuildcommands {

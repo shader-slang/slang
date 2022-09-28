@@ -17,6 +17,21 @@ jobs:
         platform: ['x64'] 
         targetPlatform: ['x64', 'aarch64'] 
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+        with:
+          submodules: 'true'
+          fetch-depth: '0'
+      - name: Build release project
+        id: build
+        run: |
+          echo "starting to build..."
+          export CC=${{matrix.compiler}}
+          export CONFIGURATION=${{matrix.configuration}}
+          export ARCH=${{matrix.platform}}
+          export TARGETARCH=${{matrix.targetPlatform}}
+          echo "building..."
+          source ./github_macos_build.sh
       - name: "Import signing certificate"
         env:
           BUILD_CERTIFICATE_BASE64: ${{ secrets.BUILD_CERTIFICATE_BASE64 }}
@@ -46,21 +61,6 @@ jobs:
           brew install mitchellh/gon/gon
           security find-identity -v
           brew install coreutils
-      - name: Checkout code
-        uses: actions/checkout@v2
-        with:
-          submodules: 'true'
-          fetch-depth: '0'
-      - name: Build release project
-        id: build
-        run: |
-          echo "starting to build..."
-          export CC=${{matrix.compiler}}
-          export CONFIGURATION=${{matrix.configuration}}
-          export ARCH=${{matrix.platform}}
-          export TARGETARCH=${{matrix.targetPlatform}}
-          echo "building..."
-          source ./github_macos_build.sh
       - name: Sign binaries
         env:
           IDENTITY_ID: d6ada82a113e4204aaad914e1013e9548ffd30d0
