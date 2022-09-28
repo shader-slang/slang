@@ -19,6 +19,8 @@ if [[ "${ARCH}" != "${TARGETARCH}" ]]; then
 # Build the configuration
 make config=${CONFIGURATION}_${ARCH} -j`sysctl -n hw.ncpu`
 
+rm -rf ./bin
+
 # Create the makefile
 ./premake5 gmake --cc=${CC} --enable-xlib=false --enable-embed-stdlib=true --arch=${TARGETARCH} --deps=true --no-progress=true  --skip-source-generation=true --deploy-slang-llvm=false --deploy-slang-glslang=false
 

@@ -72,7 +72,7 @@ jobs:
         id: package
         run: |
           export SLANG_OS_NAME=macos
-          export SLANG_ARCH_NAME=`uname -p`
+          export SLANG_ARCH_NAME=${{matrix.platform}}
           export TAG_NAME=`git describe --tags`
           export SLANG_TAG=${TAG_NAME#v}
           echo "tag:$TAG_NAME"
@@ -100,19 +100,19 @@ jobs:
         env:
           AC_PASSWORD: ${{secrets.APPLE_ID_PASSWORD}}
         run: |
-          cp ./bin/macosx-x64/release/libslang.dylib libslang.dylib
-          cp ./bin/macosx-x64/release/slangd slangd
-          cp ./bin/macosx-x64/release/slangc slangc
-          7z a slang-macos-dist.zip libslang.dylib
-          7z a slang-macos-dist.zip slangd
-          7z a slang-macos-dist.zip slangc
+          cp ./bin/macosx-${{matrix.platform}}/release/libslang.dylib libslang.dylib
+          cp ./bin/macosx-${{matrix.platform}}/release/slangd slangd
+          cp ./bin/macosx-${{matrix.platform}}/release/slangc slangc
+          7z a slang-macos-dist-${{matrix.platform}}.zip libslang.dylib
+          7z a slang-macos-dist-${{matrix.platform}}.zip slangd
+          7z a slang-macos-dist-${{matrix.platform}}.zip slangc
           timeout 1000 gon ./extras/macos-notarize.json
       - name: UploadNotarizedBinary
         if: always()
         uses: softprops/action-gh-release@v1
         with:
           files: |
-            slang-macos-dist.zip
+            slang-macos-dist-${{matrix.platform}}.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       
