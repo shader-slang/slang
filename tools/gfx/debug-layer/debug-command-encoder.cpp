@@ -30,7 +30,7 @@ Result DebugComputeCommandEncoder::bindPipeline(
 {
     SLANG_GFX_API_FUNC;
 
-    auto innerState = static_cast<DebugPipelineState*>(state)->baseObject;
+    auto innerState = getInnerObj(state);
     IShaderObject* innerRootObject = nullptr;
     commandBuffer->rootObject.reset();
     auto result = baseObject->bindPipeline(innerState, &innerRootObject);
@@ -72,7 +72,7 @@ Result DebugRenderCommandEncoder::bindPipeline(
 {
     SLANG_GFX_API_FUNC;
 
-    auto innerState = static_cast<DebugPipelineState*>(state)->baseObject;
+    auto innerState = getInnerObj(state);
     IShaderObject* innerRootObject = nullptr;
     commandBuffer->rootObject.reset();
     auto result = baseObject->bindPipeline(innerState, &innerRootObject);

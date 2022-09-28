@@ -79,7 +79,7 @@ SourceOrigin* NodeTree::addSourceOrigin(SourceFile* sourceFile, const Options& o
     slice = slice.trim('-');
 
     StringBuilder out;
-    NameConventionUtil::convert(slice, CharCase::Upper, NameConvention::Snake, out);
+    NameConventionUtil::convert(slice, NameConvention::UpperSnake, out);
     return out;
 }
 
