@@ -30,10 +30,8 @@ void DebugCommandBuffer::encodeRenderCommands(
     SLANG_GFX_API_FUNC;
     checkCommandBufferOpenWhenCreatingEncoder();
     checkEncodersClosedBeforeNewEncoder();
-    auto innerRenderPass =
-        renderPass ? static_cast<DebugRenderPassLayout*>(renderPass)->baseObject : nullptr;
-    auto innerFramebuffer =
-        framebuffer ? static_cast<DebugFramebuffer*>(framebuffer)->baseObject : nullptr;
+    auto innerRenderPass = getInnerObj(renderPass);
+    auto innerFramebuffer = getInnerObj(framebuffer);
     m_renderCommandEncoder.isOpen = true;
     baseObject->encodeRenderCommands(
         innerRenderPass, innerFramebuffer, &m_renderCommandEncoder.baseObject);

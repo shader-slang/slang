@@ -86,25 +86,25 @@ Result DebugShaderObject::getObject(ShaderOffset const& offset, IShaderObject** 
 Result DebugShaderObject::setObject(ShaderOffset const& offset, IShaderObject* object)
 {
     SLANG_GFX_API_FUNC;
-    auto objectImpl = static_cast<DebugShaderObject*>(object);
+    auto objectImpl = getDebugObj(object);
     m_objects[ShaderOffsetKey{offset}] = objectImpl;
-    return baseObject->setObject(offset, objectImpl->baseObject.get());
+    return baseObject->setObject(offset, getInnerObj(object));
 }
 
 Result DebugShaderObject::setResource(ShaderOffset const& offset, IResourceView* resourceView)
 {
     SLANG_GFX_API_FUNC;
-    auto viewImpl = static_cast<DebugResourceView*>(resourceView);
+    auto viewImpl = getDebugObj(resourceView);
     m_resources[ShaderOffsetKey{offset}] = viewImpl;
-    return baseObject->setResource(offset, viewImpl->baseObject.get());
+    return baseObject->setResource(offset, getInnerObj(resourceView));
 }
 
 Result DebugShaderObject::setSampler(ShaderOffset const& offset, ISamplerState* sampler)
 {
     SLANG_GFX_API_FUNC;
-    auto samplerImpl = static_cast<DebugSamplerState*>(sampler);
+    auto samplerImpl = getDebugObj(sampler);
     m_samplers[ShaderOffsetKey{offset}] = samplerImpl;
-    return baseObject->setSampler(offset, samplerImpl->baseObject.get());
+    return baseObject->setSampler(offset, getInnerObj(sampler));
 }
 
 Result DebugShaderObject::setCombinedTextureSampler(
@@ -113,12 +113,12 @@ Result DebugShaderObject::setCombinedTextureSampler(
     ISamplerState* sampler)
 {
     SLANG_GFX_API_FUNC;
-    auto samplerImpl = static_cast<DebugSamplerState*>(sampler);
+    auto samplerImpl = getDebugObj(sampler);
     m_samplers[ShaderOffsetKey{offset}] = samplerImpl;
-    auto viewImpl = static_cast<DebugResourceView*>(textureView);
+    auto viewImpl = getDebugObj(textureView);
     m_resources[ShaderOffsetKey{offset}] = viewImpl;
     return baseObject->setCombinedTextureSampler(
-        offset, viewImpl->baseObject.get(), samplerImpl->baseObject.get());
+        offset, getInnerObj(viewImpl), getInnerObj(sampler));
 }
 
 Result DebugShaderObject::setSpecializationArgs(

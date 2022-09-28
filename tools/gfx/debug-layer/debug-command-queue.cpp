@@ -27,8 +27,8 @@ void DebugCommandQueue::executeCommandBuffers(GfxCount count, ICommandBuffer* co
     for (GfxIndex i = 0; i < count; i++)
     {
         auto cmdBufferIn = commandBuffers[i];
-        auto cmdBufferImpl = static_cast<DebugCommandBuffer*>(cmdBufferIn);
-        auto innerCmdBuffer = cmdBufferImpl->baseObject.get();
+        auto cmdBufferImpl = getDebugObj(cmdBufferIn);
+        auto innerCmdBuffer = getInnerObj(cmdBufferIn);
         innerCommandBuffers.add(innerCmdBuffer);
         if (cmdBufferImpl->isOpen)
         {
