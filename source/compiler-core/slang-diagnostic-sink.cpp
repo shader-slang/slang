@@ -667,32 +667,74 @@ void DiagnosticSink::diagnoseRaw(
     }
 }
 
+void DiagnosticSink::overrideDiagnosticSeverity(int diagnosticId, Severity overrideSeverity, const DiagnosticInfo* info)
+{
+    if (info)
+    {
+        SLANG_ASSERT(info->id == diagnosticId);
+
+        // If the override is the same as the default, we can just remove the override
+        if (info->severity == overrideSeverity)
+        {
+            m_severityOverrides.Remove(diagnosticId);
+            return;
+        }
+    }
+
+    // Set the override
+    m_severityOverrides[diagnosticId] = overrideSeverity;
+}
+
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! DiagnosticLookup !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
-void DiagnosticsLookup::_add(const char* name, Index index)
+Index DiagnosticsLookup::_findDiagnosticIndexByExactName(const UnownedStringSlice& slice) const
+{
+    const Index* indexPtr = m_nameMap.TryGetValue(slice);
+    return indexPtr ? *indexPtr : -1;
+}
+
+void DiagnosticsLookup::_addName(const char* name, Index diagnosticIndex)
 {
     UnownedStringSlice nameSlice(name);
-    m_map.Add(nameSlice, index);
-
-    // Add a dashed version (KababCase)
-    {
-        m_work.Clear();
-
-        NameConventionUtil::convert(NameConvention::Camel, nameSlice, CharCase::Lower, NameConvention::Kabab, m_work);
-
-        UnownedStringSlice dashSlice(m_arena.allocateString(m_work.getBuffer(), m_work.getLength()), m_work.getLength());
-
-        m_map.AddIfNotExists(dashSlice, index);
-    }
+    m_nameMap.Add(nameSlice, diagnosticIndex);
 }
+
 void DiagnosticsLookup::addAlias(const char* name, const char* diagnosticName)
 {
-    const Index index = _findDiagnosticIndex(UnownedStringSlice(diagnosticName));
+    const Index index = _findDiagnosticIndexByExactName(UnownedStringSlice(diagnosticName));
     SLANG_ASSERT(index >= 0);
     if (index >= 0)
     {
-        _add(name, index);
+        _addName(name, index);
     }
+}
+
+const DiagnosticInfo* DiagnosticsLookup::getDiagnosticById(Int id) const
+{
+    const auto indexPtr = m_idMap.TryGetValue(id);
+    return indexPtr ? m_diagnostics[*indexPtr] : nullptr;
+}
+
+const DiagnosticInfo* DiagnosticsLookup::findDiagnosticByExactName(const UnownedStringSlice& slice) const
+{
+    const Index* indexPtr = m_nameMap.TryGetValue(slice);
+    return indexPtr ? m_diagnostics[*indexPtr] : nullptr;
+}
+
+const DiagnosticInfo* DiagnosticsLookup::findDiagnosticByName(const UnownedStringSlice& slice) const
+{
+    const auto convention = NameConventionUtil::inferConventionFromText(slice);
+    switch (convention)
+    {
+        case NameConvention::Invalid:       return nullptr;
+        case NameConvention::LowerCamel:    return findDiagnosticByExactName(slice);
+        default:                            break;
+    }
+
+    StringBuilder buf;
+    NameConventionUtil::convert(getNameStyle(convention), slice, NameConvention::LowerCamel, buf);
+
+    return findDiagnosticByExactName(buf.getUnownedSlice());
 }
 
 Index DiagnosticsLookup::add(const DiagnosticInfo* info)
@@ -700,12 +742,13 @@ Index DiagnosticsLookup::add(const DiagnosticInfo* info)
     // Check it's not already added
     SLANG_ASSERT(m_diagnostics.indexOf(info) < 0);
 
-    const Index index = m_diagnostics.getCount();
-
-    _add(info->name, index);
-
+    const Index diagnosticIndex = m_diagnostics.getCount();
     m_diagnostics.add(info);
-    return index;
+
+    _addName(info->name, diagnosticIndex);
+    m_idMap.AddIfNotExists(info->id, diagnosticIndex);
+    
+    return diagnosticIndex;
 }
 
 void DiagnosticsLookup::add(const DiagnosticInfo*const* infos, Index infosCount)
@@ -724,21 +767,13 @@ DiagnosticsLookup::DiagnosticsLookup():
 DiagnosticsLookup::DiagnosticsLookup(const DiagnosticInfo*const* diagnostics, Index diagnosticsCount) :
     m_arena(kArenaInitialSize)
 {
-    m_diagnostics.addRange(diagnostics, diagnosticsCount);
-
     // TODO: We should eventually have a more formal system for associating individual
     // diagnostics, or groups of diagnostics, with user-exposed names for use when
     // enabling/disabling warnings (or turning warnings into errors, etc.).
     //
-    // For now we build a map from diagnostic name to it's entry. Two entries are typically
-    // added - the 'original name' as associated with the diagnostic in lowerCamel, and
-    // a dashified version.
+    // For now we build a map from diagnostic name to it's entry. 
 
-    for (Index i = 0; i < diagnosticsCount; ++i)
-    {
-        const DiagnosticInfo* diagnostic = diagnostics[i];
-        _add(diagnostic->name, i);
-    }
+    add(diagnostics, diagnosticsCount);
 }
 
 } // namespace Slang
