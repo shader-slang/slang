@@ -1077,28 +1077,15 @@ tool "slangd"
      kind "ConsoleApp"
      links { "core", "slang" }
  
- function getWinArm64Filter(isArm64)
-     if isArm64 then
-         return { "system:windows", "platforms:aarch64" }
-     else
-         return { "system:not windows or platforms:not aarch64" }
-     end
- end
- 
- function getWinArm64BuildDir(isArm64)
-     if isArm64 then
-         return "%{wks.location}/bin/windows-x64/%{cfg.buildcfg:lower()}"
-     else
-         return "%{cfg.targetdir}"
-     end
+ function getBuildDir(isArm64)
+
+     return "%{cfg.targetdir}"
  end
  
  function astReflectGenerator(isArm64)
-     local f = getWinArm64Filter(isArm64)
-     local builddir = getWinArm64BuildDir(isArm64)
+     local builddir = getBuildDir()
  
-     table.insert(f, "files:**/slang-ast-reflect.h")
-     filter(f)
+     filter("files:**/slang-ast-reflect.h")
  
      buildmessage "C++ Extractor %{file.relpath}"
  
@@ -1147,12 +1134,10 @@ tool "slangd"
      buildinputs(buildInputTable)
  end
  
- function metaSlangGenerator(isArm64)
-     local f = getWinArm64Filter(isArm64)
-     local builddir = getWinArm64BuildDir(isArm64)
+ function metaSlangGenerator()
+     local builddir = getBuildDir()
  
-     table.insert(f, "files:**.meta.slang")
-     filter(f)
+     filter("files:**.meta.slang")
  
      -- Specify the "friendly" message that should print to the build log for the action
      buildmessage "slang-generate %{file.relpath}"
@@ -1193,12 +1178,10 @@ tool "slangd"
      buildinputs { builddir .. "/slang-generate" .. getExecutableSuffix() }
  end
  
- function preludeGenerator(isArm64)
-     local f = getWinArm64Filter(isArm64)
-     local builddir = getWinArm64BuildDir(isArm64)
+ function preludeGenerator()
+     local builddir = getBuildDir()
  
-     table.insert(f, "files:prelude/*-prelude.h")
-     filter(f)
+     filter("files:prelude/*-prelude.h")
  
      buildmessage "slang-embed %{file.relpath}"
      buildcommands { '"' .. builddir .. '/slang-embed" %{file.relpath}' }
@@ -1241,8 +1224,7 @@ tool "slangd"
  
      -- We need to run the C++ extractor to generate some include files
      if executeBinary then
-         astReflectGenerator(true)
-         astReflectGenerator(false)
+         astReflectGenerator()
      end
  
      -- Next, we want to add a custom build rule for each of the
@@ -1252,13 +1234,8 @@ tool "slangd"
      -- defining custom build commands:
      --
      if executeBinary then
-         metaSlangGenerator(true)
-         metaSlangGenerator(false)
-     end
- 
-     if executeBinary then
-         preludeGenerator(true)
-         preludeGenerator(false)
+         metaSlangGenerator()
+         preludeGenerator()
      end
  
      filter { }
