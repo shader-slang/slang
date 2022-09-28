@@ -799,7 +799,7 @@ struct OptionsParser
             buf.Clear();
 
             buf << diagnostic->id << " : ";
-            NameConventionUtil::convert(NameConvention::Camel, UnownedStringSlice(diagnostic->name), CharCase::Lower, NameConvention::Kabab, buf);
+            NameConventionUtil::convert(NameStyle::Camel, UnownedStringSlice(diagnostic->name), NameConvention::makeLower(NameStyle::Kabab), buf);
             buf << "\n";
             sink->diagnoseRaw(Severity::Note, buf.getUnownedSlice());
         }

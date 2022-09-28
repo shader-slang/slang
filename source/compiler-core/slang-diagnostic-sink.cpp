@@ -730,16 +730,14 @@ const DiagnosticInfo* DiagnosticsLookup::findDiagnosticByName(const UnownedStrin
 
     auto convention = NameConventionUtil::getConvention(slice);
 
-    const CharCase charCase = CharUtil::isLower(slice[0]) ? CharCase::Lower : CharCase::Upper;
-
     // We can just use as is
-    if (charCase == CharCase::Lower && convention == NameConvention::Camel)
+    if (convention.charCase == CharCase::Lower && convention.style == NameStyle::Camel)
     {
         return findDiagnosticByExactName(slice);
     }
 
     StringBuilder buf;
-    NameConventionUtil::convert(convention, slice, CharCase::Lower, NameConvention::Camel, buf);
+    NameConventionUtil::convert(convention.style, slice, NameConvention::makeLower(NameStyle::Camel), buf);
 
     return findDiagnosticByExactName(buf.getUnownedSlice());
 }
