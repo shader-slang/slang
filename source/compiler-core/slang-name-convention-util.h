@@ -71,6 +71,10 @@ struct NameConventionUtil
 
         /// Gets the naming convention based on the slice.
         /// Will return invalid convention if cannot be determined.
+        ///
+        /// TODO(JS):
+        /// Does not handle leading `_` styles: "_a" and "_1" will be invalid.
+        /// We may want to make it do so, but requires changes in infer, split and join.
     static NameConvention inferConventionFromText(const UnownedStringSlice& slice);
 
         /// Given a slice and a naming convention, split into it's constituent parts. If convention isn't specified, will infer from slice using getConvention.

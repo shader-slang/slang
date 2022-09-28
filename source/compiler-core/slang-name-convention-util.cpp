@@ -7,54 +7,14 @@
 namespace Slang
 {
 
-/* static */NameConvention NameConventionUtil::inferConventionFromText(const UnownedStringSlice& inSlice)
+/* static */NameConvention NameConventionUtil::inferConventionFromText(const UnownedStringSlice& slice)
 {
     // If no chars, or first char isn't alpha we don't know what it is
-    if (inSlice.getLength() <= 0)
+    if (slice.getLength() <= 0 || !CharUtil::isAlpha(slice[0]))
     {
         return NameConvention::Invalid;
     }
     
-    // Take a copy
-    UnownedStringSlice slice(inSlice);
-
-    // In essence we ignore leading underscores, in terms of determining style
-    // 
-    // If the first char is _, we look for the first character which is not _
-    if (slice[0] == '_')
-    {
-        const auto count = slice.getLength();
-        // Find the index of first non _ char
-        Index i = 1;
-        for (; i < count; ++i)
-        {
-            if (slice[i] != '_')
-            {
-                break;
-            }
-        }
-        slice = slice.tail(i);
-    }
-
-    // We will allow _, __, __12, _2_3 to be seen as 'upper snake'
-    if (slice.getLength() == 0 || CharUtil::isDigit(slice[0]))
-    {
-        for (const char c : slice)
-        {
-            if (!(CharUtil::isDigit(c) || c == '_'))
-            {
-                return NameConvention::Invalid;      
-            }
-        }
-        return NameConvention::UpperSnake;
-    }
-
-    // If the first char isn't alpha then it's not valid
-    if (!CharUtil::isAlpha(slice[0]))
-    {
-        return NameConvention::Invalid;
-    }
-
     typedef int Flags;
     struct Flag
     {
@@ -96,12 +56,6 @@ namespace Slang
                 }
             }
         }
-    }
-
-    // The dash style can't have leading _
-    if ((flags & Flag::Dash) && inSlice[0] == '_')
-    {
-       return NameConvention::Invalid;
     }
 
     // Use flags to determine what convention is used
