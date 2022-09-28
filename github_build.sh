@@ -19,6 +19,8 @@ if [[ "${ARCH}" != "${TARGETARCH}" ]]; then
 # Build the configuration
 make config=${CONFIGURATION}_${ARCH} -j`nproc`
 
+rm -rf ./bin
+
 # Create the makefile
 ./premake5 gmake --cc=${CC} --enable-embed-stdlib=true --arch=${TARGETARCH} --deps=true --no-progress=true  --skip-source-generation=true --deploy-slang-llvm=false --deploy-slang-glslang=false
 
