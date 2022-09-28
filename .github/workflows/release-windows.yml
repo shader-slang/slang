@@ -13,7 +13,7 @@ jobs:
     strategy:
       matrix:
         configuration: ['Release']
-        platform: ['Win32', 'x64']
+        platform: ['Win32', 'x64', 'aarch64']
     steps:
       - uses: actions/checkout@v2.3.4
         with:
@@ -22,17 +22,18 @@ jobs:
       - name: setup-msbuild
         uses: microsoft/setup-msbuild@v1
         
-      # If we are building for aarch64 we want to build x64 first, so that all generated files are produced
       - name: msbuild (x64 tools)
+        # If we are building for ARM64 we want to build x64 first, so that all generated files are produced
         if: ${{ matrix.platform == 'aarch64' }}
         run: |
-          .\premake.bat vs2017 --arch=x64 --ignore-deps=slang-llvm,slang-glslang --no-progress=true
+          .\premake.bat vs2019 --arch=x64 --ignore-deps=slang-llvm,slang-glslang --no-progress=true
           MSBuild.exe slang.sln -v:m -m -property:Configuration=Release -property:Platform=x64 -property:WindowsTargetPlatformVersion=10.0.19041.0
-          
+          .\premake.bat vs2019 --arch=${{matrix.platform}} --ignore-deps=slang-llvm,slang-glslang --no-progress=true --skip-source-generation=true
       # Do the premake for the actual target, downloading dependencies if necessary    
       - name: premake 
+        if: ${{ matrix.platform != 'aarch64' }}
         run:
-          .\premake.bat vs2017 --enable-embed-stdlib=true --arch=${{matrix.platform}} --deps=true --no-progress=true
+          .\premake.bat vs2019 --enable-embed-stdlib=true --arch=${{matrix.platform}} --deps=true --no-progress=true
       - name: msbuild
         run:
           MSBuild.exe slang.sln -v:m -m -property:Configuration=${{matrix.configuration}} -property:Platform=${{matrix.platform}} -property:WindowsTargetPlatformVersion=10.0.19041.0
@@ -42,7 +43,7 @@ jobs:
           echo "achiving files..."
           if ("${{matrix.platform}}" -eq "aarch64")
           {
-            $slangDeployPlatform = "win-aarch64"
+            $slangDeployPlatform = "win-arm64"
           }
           elseif ("${{matrix.platform}}" -eq "x64")
           {

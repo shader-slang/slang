@@ -15,6 +15,7 @@ jobs:
         configuration: ['release'] # 'debug'
         compiler: ['clang']
         platform: ['x64'] 
+        targetPlatform: ['x64', 'aarch64'] 
     steps:
       - name: "Import signing certificate"
         env:
@@ -57,6 +58,7 @@ jobs:
           export CC=${{matrix.compiler}}
           export CONFIGURATION=${{matrix.configuration}}
           export ARCH=${{matrix.platform}}
+          export TARGETARCH=${{matrix.targetPlatform}}
           echo "building..."
           source ./github_macos_build.sh
       - name: Sign binaries
