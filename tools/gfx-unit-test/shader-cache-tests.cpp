@@ -15,6 +15,7 @@ namespace gfx_test
     {
         ComPtr<IDevice> device;
         UnitTestContext* context;
+        Slang::RenderApiFlag::Enum api;
 
         ComPtr<ISlangMutableFileSystem> fileSystem;
         ComPtr<IPipelineState> pipelineState;
@@ -105,13 +106,36 @@ namespace gfx_test
         // seemingly not accounting for updated shader code under the same module name with the same entry point.
         void generateNewDevice()
         {
-            device = createTestingDevice(context, Slang::RenderApiFlag::D3D12, fileSystem);
+            device = createTestingDevice(context, api, fileSystem);
         }
 
         void init(ComPtr<IDevice> device, UnitTestContext* context)
         {
             this->device = device;
             this->context = context;
+            switch (device->getDeviceInfo().deviceType)
+            {
+            case DeviceType::DirectX11:
+                api = Slang::RenderApiFlag::D3D11;
+                break;
+            case DeviceType::DirectX12:
+                api = Slang::RenderApiFlag::D3D12;
+                break;
+            case DeviceType::Vulkan:
+                api = Slang::RenderApiFlag::Vulkan;
+                break;
+            case DeviceType::CPU:
+                api = Slang::RenderApiFlag::CPU;
+                break;
+            case DeviceType::CUDA:
+                api = Slang::RenderApiFlag::CUDA;
+                break;
+            case DeviceType::OpenGl:
+                api = Slang::RenderApiFlag::OpenGl;
+                break;
+            default:
+                SLANG_IGNORE_TEST
+            }
 
             fileSystem = Slang::OSFileSystem::getMutableSingleton();
         }
@@ -146,7 +170,6 @@ namespace gfx_test
         void run()
         {
             createRequiredResources();
-
             generateNewPipelineState(contentsA);
             submitGPUWork();
 
@@ -156,6 +179,7 @@ namespace gfx_test
             SLANG_CHECK(shaderCacheStats->getCacheMissCount() == 0);
 
             generateNewDevice();
+            createRequiredResources();
             generateNewPipelineState(contentsA);
             submitGPUWork();
 
@@ -165,6 +189,7 @@ namespace gfx_test
             SLANG_CHECK(shaderCacheStats->getCacheMissCount() == 0);
 
             generateNewDevice();
+            createRequiredResources();
             generateNewPipelineState(contentsC);
             submitGPUWork();
 
