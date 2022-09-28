@@ -1316,13 +1316,8 @@ tool "slangd"
          filter("files:source/slang/slang-stdlib-api.cpp")
          -- Note! Has to be an absolute path else doesn't work(!)
          buildoutputs { absOutputPath }
-         local f = getWinArm64Filter(true)
-         table.insert(f, "files:source/slang/slang-stdlib-api.cpp")
-         filter(f)
-             buildinputs { getWinArm64BuildDir(true) .. '/slangc-bootstrap' .. executableSuffix }
-             buildcommands {'"' .. getWinArm64BuildDir(true) .. '/slangc-bootstrap" -archive-type riff-lz4 -save-stdlib-bin-source "%{file.directory}/slang-stdlib-generated.h"' }
-         f = getWinArm64Filter(false)
-         table.insert(f, "files:source/slang/slang-stdlib-api.cpp")
+         filter("files:source/slang/slang-stdlib-api.cpp")
+
          filter(f)
              buildinputs { "%{cfg.targetdir}/slangc-bootstrap" .. executableSuffix }
              buildcommands { '"%{cfg.targetdir}/slangc-bootstrap" -archive-type riff-lz4 -save-stdlib-bin-source "%{file.directory}/slang-stdlib-generated.h"' }
