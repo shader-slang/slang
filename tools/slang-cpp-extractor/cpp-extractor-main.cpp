@@ -246,7 +246,7 @@ SlangResult App::execute(const Options& options)
             {
                 StringBuilder buf;
                 // Let's guess a 'fileMark' (it becomes part of the filename) based on the macro name. Use lower kabab.
-                NameConventionUtil::join(slices.getBuffer(), slices.getCount(), CharCase::Lower, NameConvention::Kabab, buf);
+                NameConventionUtil::join(slices.getBuffer(), slices.getCount(), NameConvention::LowerKabab, buf);
                 typeSet->m_fileMark = buf.ProduceString();
             }
 
@@ -254,7 +254,7 @@ SlangResult App::execute(const Options& options)
             {
                 // Let's guess a typename if not set -> go with upper camel
                 StringBuilder buf;
-                NameConventionUtil::join(slices.getBuffer(), slices.getCount(), CharCase::Upper, NameConvention::Camel, buf);
+                NameConventionUtil::join(slices.getBuffer(), slices.getCount(), NameConvention::UpperCamel, buf);
                 typeSet->m_typeName = buf.ProduceString();
             }
         }
