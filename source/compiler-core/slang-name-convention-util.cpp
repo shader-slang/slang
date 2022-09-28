@@ -7,10 +7,50 @@
 namespace Slang
 {
 
-/* static */NameConvention NameConventionUtil::inferConventionFromText(const UnownedStringSlice& slice)
+/* static */NameConvention NameConventionUtil::inferConventionFromText(const UnownedStringSlice& inSlice)
 {
     // If no chars, or first char isn't alpha we don't know what it is
-    if (slice.getLength() <= 0 || !CharUtil::isAlpha(slice[0]))
+    if (inSlice.getLength() <= 0)
+    {
+        return NameConvention::Invalid;
+    }
+    
+    // Take a copy
+    UnownedStringSlice slice(inSlice);
+
+    // In essence we ignore leading underscores, in terms of determining style
+    // 
+    // If the first char is _, we look for the first character which is not _
+    if (slice[0] == '_')
+    {
+        const auto count = slice.getLength();
+        // Find the index of first non _ char
+        Index i = 1;
+        for (; i < count; ++i)
+        {
+            if (slice[i] != '_')
+            {
+                break;
+            }
+        }
+        slice = slice.tail(i);
+    }
+
+    // We will allow _, __, __12, _2_3 to be seen as 'upper snake'
+    if (slice.getLength() == 0 || CharUtil::isDigit(slice[0]))
+    {
+        for (const char c : slice)
+        {
+            if (!(CharUtil::isDigit(c) || c == '_'))
+            {
+                return NameConvention::Invalid;      
+            }
+        }
+        return NameConvention::UpperSnake;
+    }
+
+    // If the first char isn't alpha then it's not valid
+    if (!CharUtil::isAlpha(slice[0]))
     {
         return NameConvention::Invalid;
     }
@@ -20,15 +60,15 @@ namespace Slang
     {
         enum Enum : Flags
         {
-            Underscore  = 0x1,
-            Dash        = 0x2,
-            Upper       = 0x4,
-            Lower       = 0x8,
+            Underscore = 0x1,
+            Dash = 0x2,
+            Upper = 0x4,
+            Lower = 0x8,
         };
     };
 
     Flags flags = 0;
-    
+
     for (const char c : slice)
     {
         switch (c)
@@ -58,8 +98,13 @@ namespace Slang
         }
     }
 
-    // Use flags to determine what convention is used
+    // The dash style can't have leading _
+    if ((flags & Flag::Dash) && inSlice[0] == '_')
+    {
+       return NameConvention::Invalid;
+    }
 
+    // Use flags to determine what convention is used
     switch (flags)
     {
         // We'll assume it's lower camel. 
@@ -82,7 +127,6 @@ namespace Slang
     // Don't know what this style is
     return NameConvention::Invalid;
 }
-
 
 /* static */NameStyle NameConventionUtil::inferStyleFromText(const UnownedStringSlice& slice)
 {
