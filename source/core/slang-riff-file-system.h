@@ -79,9 +79,30 @@ protected:
         void reset() 
         {
             m_type = SLANG_PATH_TYPE_FILE;
-            m_canonicalPath.swapWith(String());
+            m_canonicalPath = String();
             m_uncompressedSizeInBytes = 0;
             m_contents.setNull();
+        }
+
+        void initDirectory(const String& canonicalPath)
+        {
+            m_type = SLANG_PATH_TYPE_DIRECTORY;
+            m_canonicalPath = canonicalPath;
+            m_uncompressedSizeInBytes = 0;
+            m_contents.setNull();
+        }
+        void initFile(const String& canonicalPath, size_t uncompressedSize, ISlangBlob* blob)
+        {
+            m_type = SLANG_PATH_TYPE_FILE;
+            m_canonicalPath = canonicalPath;
+            setContents(uncompressedSize, blob);
+        }
+        void setContents(size_t uncompressedSize, ISlangBlob* blob)
+        {
+            SLANG_ASSERT(m_type == SLANG_PATH_TYPE_FILE);
+            SLANG_ASSERT(blob);
+            m_uncompressedSizeInBytes = uncompressedSize;
+            m_contents = blob;
         }
 
         SlangPathType m_type;

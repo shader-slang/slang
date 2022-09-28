@@ -245,18 +245,18 @@ SlangResult RiffFileSystem::saveFile(const char* path, const void* data, size_t 
 
     if (Entry* foundEntry = _getEntryFromCanonicalPath(canonicalPath))
     {
-        foundEntry->m_uncompressedSizeInBytes = size;
-        foundEntry->m_contents = contents;
+        if (foundEntry->m_type != SLANG_PATH_TYPE_FILE)
+        {
+            // Can only set if it's already a file, if it's anything else it's an error
+            return SLANG_FAIL;
+        }
+
+        foundEntry->setContents(size, contents);
     }
     else
     {
         Entry entry;
-        entry.m_type = SLANG_PATH_TYPE_FILE;
-        entry.m_canonicalPath = canonicalPath;
-        entry.m_uncompressedSizeInBytes = size;
-        entry.m_uncompressedSizeInBytes = size;
-        entry.m_contents = contents;
-
+        entry.initFile(canonicalPath, size, contents);
         m_entries.Add(canonicalPath, entry);
     }
 
@@ -270,7 +270,7 @@ SlangResult RiffFileSystem::remove(const char* path)
 
     if (entry)
     {
-        if (entry->m_type ==SLANG_PATH_TYPE_DIRECTORY)
+        if (entry->m_type == SLANG_PATH_TYPE_DIRECTORY)
         {
             ImplicitDirectoryCollector collector(canonicalPath);
 
@@ -287,7 +287,7 @@ SlangResult RiffFileSystem::remove(const char* path)
             }
         }
 
-        // Reset so doesn't hold references
+        // Reset so doesn't hold references/keep memory in scope
         entry->reset();
         m_entries.Remove(canonicalPath);
         return SLANG_OK;
@@ -305,10 +305,7 @@ SlangResult RiffFileSystem::createDirectory(const char* path)
     }
 
     Entry entry;
-    entry.m_type = SLANG_PATH_TYPE_DIRECTORY;
-    entry.m_canonicalPath = canonicalPath;
-    entry.m_uncompressedSizeInBytes = 0;
-
+    entry.initDirectory(canonicalPath);
     m_entries.Add(canonicalPath, entry);
     return SLANG_OK;
 }
