@@ -66,15 +66,24 @@ public:
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL storeArchive(bool blobOwnsContent, ISlangBlob** outBlob) SLANG_OVERRIDE;
     virtual SLANG_NO_THROW void SLANG_MCALL setCompressionStyle(const CompressionStyle& style) SLANG_OVERRIDE { m_compressionStyle = style; }
 
-    RiffFileSystem(ICompressionSystem* compressionSystem);
+        /// Pass in nullptr, if no compression is wanted. In that scenario the contents will be stored in memory as is
+    explicit RiffFileSystem(ICompressionSystem* compressionSystem);
 
         /// True if this appears to be Riff archive
     static bool isArchive(const void* data, size_t sizeInBytes);
 
 protected:
 
-    struct Entry : RefObject
+    struct Entry
     {
+        void reset() 
+        {
+            m_type = SLANG_PATH_TYPE_FILE;
+            m_canonicalPath.swapWith(String());
+            m_uncompressedSizeInBytes = 0;
+            m_contents.setNull();
+        }
+
         SlangPathType m_type;
         String m_canonicalPath;
         size_t m_uncompressedSizeInBytes;       ///< Needed if m_contents is compressed.
@@ -88,10 +97,11 @@ protected:
     Entry* _getEntryFromPath(const char* path, String* outPath = nullptr);
     Entry* _getEntryFromCanonicalPath(const String& canonicalPath);
 
-    void _clear() { m_entries.Clear(); }
+        /// Clear, ensures any backing memory is also freed
+    void _clear() { m_entries = Dictionary<String, Entry>(); }
 
     // Maps a path to an entry
-    Dictionary<String, RefPtr<Entry>> m_entries;
+    Dictionary<String, Entry> m_entries;
 
     ComPtr<ICompressionSystem> m_compressionSystem;
 
