@@ -7,7 +7,9 @@
 namespace Slang
 {
 
-enum class NameStyle : uint8_t
+typedef uint8_t NameConventionBackingType;
+
+enum class NameStyle : NameConventionBackingType
 {
     Unknown,    /// Unknown style
     Kabab,      /// Words are separated with -. WORDS-ARE-SEPARATED, words-are-separted
@@ -15,24 +17,41 @@ enum class NameStyle : uint8_t
     Camel,      /// Words start with a capital. (Upper will make first words character capitalized, aka PascalCase)
 };
 
-enum class CharCase : uint8_t
+struct NameConventionFlag
 {
-    Upper,
-    Lower,
+    enum Enum : NameConventionBackingType
+    {
+        UpperCase = 0x80,
+    };
 };
 
-struct NameConvention
+struct NameConventionMask
 {
-    static NameConvention make(CharCase inCharCase, NameStyle inStyle) { return NameConvention{inStyle, inCharCase}; }
-    static NameConvention makeLower(NameStyle inStyle) { return NameConvention{ inStyle, CharCase::Lower }; }
-    static NameConvention makeUpper(NameStyle inStyle) { return NameConvention{ inStyle, CharCase::Upper }; }
-    static NameConvention makeInvalid() { return NameConvention{NameStyle::Unknown, CharCase::Lower}; }
-
-    bool isValid() const { return style != NameStyle::Unknown; }
-
-    NameStyle style;
-    CharCase charCase;
+    enum Enum : NameConventionBackingType
+    {
+        Style = 0x7,
+    };
 };
+
+enum class NameConvention : NameConventionBackingType
+{
+    Invalid = NameConventionBackingType(NameStyle::Unknown),
+
+    LowerKabab   = NameConventionBackingType(NameStyle::Kabab),
+    LowerSnake   = NameConventionBackingType(NameStyle::Snake),
+    LowerCamel   = NameConventionBackingType(NameStyle::Camel),
+
+    UpperKabab = NameConventionBackingType(NameStyle::Kabab) | NameConventionFlag::UpperCase,
+    UpperSnake = NameConventionBackingType(NameStyle::Snake) | NameConventionFlag::UpperCase,
+    UpperCamel = NameConventionBackingType(NameStyle::Camel) | NameConventionFlag::UpperCase,
+};
+
+SLANG_FORCE_INLINE NameConvention makeUpper(NameStyle style) { return NameConvention(NameConventionBackingType(style) | NameConventionFlag::UpperCase); }
+SLANG_FORCE_INLINE NameConvention makeLower(NameStyle style) { return NameConvention(style); }
+
+SLANG_FORCE_INLINE bool isUpper(NameConvention convention) { return (NameConventionBackingType(convention) & NameConventionFlag::UpperCase) != 0; }
+SLANG_FORCE_INLINE bool isLower(NameConvention convention) { return (NameConventionBackingType(convention) & NameConventionFlag::UpperCase) == 0; }
+SLANG_FORCE_INLINE NameStyle getNameStyle(NameConvention convention) { return NameStyle(NameConventionBackingType(convention) & NameConventionMask::Style); }
 
 /* This utility is to enable easy conversion and interpretation of names that use standard conventions, typically in programming
 languages. The conventions are largely how to represent multiple words together.
@@ -48,10 +67,11 @@ struct NameConventionUtil
         /// If no separators are found, will assume Camel
         /// Doesn't exhaustively test the string slice, or determine invalid scenarios
         /// Use 'getConvention' to get error checking
-    static NameStyle getStyle(const UnownedStringSlice& slice);
+    static NameStyle inferStyleFromText(const UnownedStringSlice& slice);
+
         /// Gets the naming convention based on the slice.
         /// Will return invalid convention if cannot be determined.
-    static NameConvention getConvention(const UnownedStringSlice& slice);
+    static NameConvention inferConventionFromText(const UnownedStringSlice& slice);
 
         /// Given a slice and a naming convention, split into it's constituent parts. If convention isn't specified, will infer from slice using getConvention.
     static void split(NameStyle nameStyle, const UnownedStringSlice& slice, List<UnownedStringSlice>& out);
@@ -61,7 +81,7 @@ struct NameConventionUtil
     static void join(const UnownedStringSlice* slices, Index slicesCount, NameConvention convention, StringBuilder& out);
 
         /// Join with a join char, and potentially changing case of input slices
-    static void join(const UnownedStringSlice* slices, Index slicesCount, CharCase charCase, char joinChar, StringBuilder& out);
+    static void join(const UnownedStringSlice* slices, Index slicesCount, NameConvention convention, char joinChar, StringBuilder& out);
 
         /// Convert from one convention to another. If fromConvention isn't specified, will infer from slice using getConvention.
     static void convert(NameStyle fromStyle, const UnownedStringSlice& slice, NameConvention toConvention, StringBuilder& out);

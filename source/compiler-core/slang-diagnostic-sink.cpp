@@ -723,21 +723,16 @@ const DiagnosticInfo* DiagnosticsLookup::findDiagnosticByExactName(const Unowned
 
 const DiagnosticInfo* DiagnosticsLookup::findDiagnosticByName(const UnownedStringSlice& slice) const
 {
-    if (slice.getLength() <= 0 || !CharUtil::isAlpha(slice[0]))
+    const auto convention = NameConventionUtil::inferConventionFromText(slice);
+    switch (convention)
     {
-        return nullptr;
-    }
-
-    auto convention = NameConventionUtil::getConvention(slice);
-
-    // We can just use as is
-    if (convention.charCase == CharCase::Lower && convention.style == NameStyle::Camel)
-    {
-        return findDiagnosticByExactName(slice);
+        case NameConvention::Invalid:       return nullptr;
+        case NameConvention::LowerCamel:    return findDiagnosticByExactName(slice);
+        default:                            break;
     }
 
     StringBuilder buf;
-    NameConventionUtil::convert(convention.style, slice, NameConvention::makeLower(NameStyle::Camel), buf);
+    NameConventionUtil::convert(getNameStyle(convention), slice, NameConvention::LowerCamel, buf);
 
     return findDiagnosticByExactName(buf.getUnownedSlice());
 }
