@@ -207,13 +207,11 @@ SlangResult RiffFileSystem::enumeratePathContents(const char* path, FileSystemCo
 {
     String canonicalPath;
     Entry* entry = _getEntryFromPath(path, &canonicalPath);
-    if (entry && entry->m_type != SLANG_PATH_TYPE_DIRECTORY)
-    {
-        return SLANG_FAIL;
-    }
 
-    // If we didn't find an explicit directory, lets handle an implicit one
-    ImplicitDirectoryCollector collector(canonicalPath);
+    const bool foundDirectory = (entry && entry->m_type == SLANG_PATH_TYPE_DIRECTORY);
+
+    // We allow implicit directories, so this works even if there isn't an explicit one
+    ImplicitDirectoryCollector collector(canonicalPath, foundDirectory);
 
     // If it is a directory, we need to see if there is anything in it
     for (const auto& pair : m_entries)
