@@ -393,7 +393,7 @@ Result DeviceImpl::initialize(const Desc& desc)
         memcpy(&stype, desc.extendedDescs[i], sizeof(stype));
         switch (stype )
         {
-        case StructType::D3D12ExtendedDesc:
+        case StructType::D3D12DeviceExtendedDesc:
             memcpy(&m_extendedDesc, desc.extendedDescs[i], sizeof(m_extendedDesc));
             break;
         case StructType::D3D12ExperimentalFeaturesDesc:
