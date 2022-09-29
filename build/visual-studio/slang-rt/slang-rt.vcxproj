@@ -296,6 +296,7 @@
     <ClInclude Include="..\..\..\source\core\slang-lz4-compression-system.h" />
     <ClInclude Include="..\..\..\source\core\slang-math.h" />
     <ClInclude Include="..\..\..\source\core\slang-memory-arena.h" />
+    <ClInclude Include="..\..\..\source\core\slang-memory-file-system.h" />
     <ClInclude Include="..\..\..\source\core\slang-offset-container.h" />
     <ClInclude Include="..\..\..\source\core\slang-platform.h" />
     <ClInclude Include="..\..\..\source\core\slang-process-util.h" />
@@ -349,6 +350,7 @@
     <ClCompile Include="..\..\..\source\core\slang-lazy-castable-list.cpp" />
     <ClCompile Include="..\..\..\source\core\slang-lz4-compression-system.cpp" />
     <ClCompile Include="..\..\..\source\core\slang-memory-arena.cpp" />
+    <ClCompile Include="..\..\..\source\core\slang-memory-file-system.cpp" />
     <ClCompile Include="..\..\..\source\core\slang-offset-container.cpp" />
     <ClCompile Include="..\..\..\source\core\slang-platform.cpp" />
     <ClCompile Include="..\..\..\source\core\slang-process-util.cpp" />
