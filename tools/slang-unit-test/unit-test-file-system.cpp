@@ -110,7 +110,7 @@ static SlangResult _enumeratePath(ISlangMutableFileSystem* fileSystem, const cha
 static SlangResult _checkSimplifiedPath(ISlangMutableFileSystem* fileSystem, const char* path, const char* normalPath)
 {
 	ComPtr<ISlangBlob> simplifiedPathBlob;
-	SLANG_RETURN_ON_FAIL(fileSystem->getSimplifiedPath(path, simplifiedPathBlob.writeRef()));
+	SLANG_RETURN_ON_FAIL(fileSystem->getPath(PathKind::Simplified, path, simplifiedPathBlob.writeRef()));
 
 	auto simplifiedPath = StringUtil::getString(simplifiedPathBlob);
 

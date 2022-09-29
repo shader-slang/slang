@@ -112,7 +112,7 @@ SlangResult MemoryFileSystem::loadFile(char const* path, ISlangBlob** outBlob)
 
 SlangResult MemoryFileSystem::getFileUniqueIdentity(const char* path, ISlangBlob** outUniqueIdentity)
 {
-    return getCanonicalPath(path, outUniqueIdentity);
+    return getPath(PathKind::Canonical, path, outUniqueIdentity);
 }
 
 SlangResult MemoryFileSystem::calcCombinedPath(SlangPathType fromPathType, const char* fromPath, const char* path, ISlangBlob** pathOut)
@@ -165,19 +165,27 @@ SlangResult MemoryFileSystem::getPathType(const char* path, SlangPathType* outPa
     return SLANG_OK;
 }
 
-SlangResult MemoryFileSystem::getSimplifiedPath(const char* path, ISlangBlob** outSimplifiedPath)
+SlangResult MemoryFileSystem::getPath(PathKind kind, const char* path, ISlangBlob** outPath)
 {
-    String simplifiedPath = Path::simplify(path);
-    *outSimplifiedPath = StringBlob::moveCreate(simplifiedPath).detach();
-    return SLANG_OK;
-}
-
-SlangResult MemoryFileSystem::getCanonicalPath(const char* path, ISlangBlob** outCanonicalPath)
-{
-    StringBuilder buffer;
-    SLANG_RETURN_ON_FAIL(_calcCanonicalPath(path, buffer));
-    *outCanonicalPath = StringBlob::moveCreate(buffer).detach();
-    return SLANG_OK;
+    switch (kind)
+    {
+        case PathKind::Simplified:
+        {
+            String simplifiedPath = Path::simplify(path);
+            *outPath = StringBlob::moveCreate(simplifiedPath).detach();
+            return SLANG_OK;
+        }
+        case PathKind::Display:
+        case PathKind::Canonical:
+        {
+            StringBuilder buffer;
+            SLANG_RETURN_ON_FAIL(_calcCanonicalPath(path, buffer));
+            *outPath = StringBlob::moveCreate(buffer).detach();
+            return SLANG_OK;
+        }
+        default: break;
+    }
+    return SLANG_E_NOT_AVAILABLE;
 }
 
 SlangResult MemoryFileSystem::enumeratePathContents(const char* path, FileSystemContentsCallBack callback, void* userData)

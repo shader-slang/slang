@@ -1090,7 +1090,27 @@ extern "C"
     {
         None,                ///< Paths do not map to the file system
         Direct,              ///< Paths map directly to the file system
-        Canonical,           ///< Only canonical paths map to the file system
+        OperatingSystem,     ///< Only paths gained via PathKind::OperatingSystem map to the file system
+    };
+
+    /* Used to determine what kind of path is required from an input path */
+    enum class PathKind
+    {
+            /// Given a path, returns a simplified version of that path - typically removing '..' and /or '.'.A simplified
+            /// path must point to the same object as the original.
+        Simplified,             
+            /// Given a path, returns a 'canonicalPath' to the file. This may be a file system 'canonical path' to
+            /// show where a file was read from.
+        Canonical,
+            /// Give a path such that it can be displayed for user 
+            /// If the file system is say a zip file - it might include the path to the zip
+            /// container as well as the absolute path to the specific file.
+            /// NOTE! The display path won't necessarily work to access the item
+        Display,
+            /// Give the the associated path to the item on the operating system file system, if available
+        OperatingSystem,
+
+        CountOf,
     };
 
     /** An extended file system abstraction.
@@ -1161,36 +1181,19 @@ extern "C"
             const char* path, 
             SlangPathType* pathTypeOut) = 0;
 
-        /** Get a simplified path. 
-        Given a path, returns a simplified version of that path - typically removing '..' and/or '.'. A simplified
-        path must point to the same object as the original. 
-       
+        /** Get a path based on the kind.
+
         This method is optional, if not implemented return SLANG_E_NOT_IMPLEMENTED.
 
-        @param path
-        @param outSimplifiedPath
+        @param kind The kind of path wanted
+        @param path The input path
+        @param outPath The output path held in a blob
         @returns SLANG_OK if successfully simplified the path (SLANG_E_NOT_IMPLEMENTED if not implemented, or some other error code)
         */
-        virtual SLANG_NO_THROW SlangResult SLANG_MCALL getSimplifiedPath(
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL getPath(
+            PathKind kind,
             const char* path,
-            ISlangBlob** outSimplifiedPath) = 0;
-
-        /** Get a canonical path identifies an object of the file system.
-
-        Given a path, returns a 'canonicalPath' to the file. This may be a file system 'canonical path' to
-        show where a file was read from. If the file system is say a zip file - it might include the path to the zip
-        container as well as the absolute path to the specific file. The main purpose of the method is to be able
-        to display to uses unambiguously where a file was read from.
-
-        This method is optional, if not implemented return SLANG_E_NOT_IMPLEMENTED.
-
-        @param path
-        @param outCanonicalPath
-        @returns SLANG_OK if successfully canonicalized the path (SLANG_E_NOT_IMPLEMENTED if not implemented, or some other error code)
-        */
-        virtual SLANG_NO_THROW SlangResult SLANG_MCALL getCanonicalPath(
-            const char* path,
-            ISlangBlob** outCanonicalPath) = 0;
+            ISlangBlob** outPath) = 0;
 
         /** Clears any cached information */
         virtual SLANG_NO_THROW void SLANG_MCALL clearCache() = 0;

@@ -35,8 +35,7 @@ public:
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL getFileUniqueIdentity(const char* path, ISlangBlob** uniqueIdentityOut) SLANG_OVERRIDE;
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL calcCombinedPath(SlangPathType fromPathType, const char* fromPath, const char* path, ISlangBlob** pathOut) SLANG_OVERRIDE;
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL getPathType(const char* path, SlangPathType* pathTypeOut) SLANG_OVERRIDE;
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL getSimplifiedPath(const char* path, ISlangBlob** outSimplifiedPath) SLANG_OVERRIDE;
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL getCanonicalPath(const char* path, ISlangBlob** outCanonicalPath) SLANG_OVERRIDE;
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL getPath(PathKind pathKind, const char* path, ISlangBlob** outPath) SLANG_OVERRIDE;
     virtual SLANG_NO_THROW void SLANG_MCALL clearCache() SLANG_OVERRIDE {}
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL enumeratePathContents(const char* path, FileSystemContentsCallBack callback, void* userData) SLANG_OVERRIDE;
     virtual SLANG_NO_THROW OSPathKind SLANG_MCALL getOSPathKind() SLANG_OVERRIDE { return OSPathKind::None; }
@@ -519,25 +518,40 @@ SlangResult ZipFileSystemImpl::getPathType(const char* path, SlangPathType* outP
     return SLANG_E_NOT_FOUND;
 }
 
-SlangResult ZipFileSystemImpl::getCanonicalPath(const char* path, ISlangBlob** outCanonicalPath)
+SlangResult ZipFileSystemImpl::getPath(PathKind pathKind, const char* path, ISlangBlob** outPath)
 {
-    mz_uint index;
-    SLANG_RETURN_ON_FAIL(_findEntryIndex(path, index));
-
-    mz_zip_archive_file_stat fileStat;
-    if (!mz_zip_reader_file_stat(&m_archive, index, &fileStat))
+    switch (pathKind)
     {
-        return SLANG_FAIL;
+        case PathKind::Display:
+        case PathKind::Canonical:
+        {
+            mz_uint index;
+            SLANG_RETURN_ON_FAIL(_findEntryIndex(path, index));
+
+            mz_zip_archive_file_stat fileStat;
+            if (!mz_zip_reader_file_stat(&m_archive, index, &fileStat))
+            {
+                return SLANG_FAIL;
+            }
+
+            // Use the path in the archive itself
+            *outPath = StringUtil::createStringBlob(fileStat.m_filename).detach();
+            return SLANG_OK;
+        }
+        case PathKind::Simplified:
+        {
+            *outPath = StringUtil::createStringBlob(Path::simplify(path)).detach();
+            return SLANG_OK;
+        }
+        default: break;
     }
 
-    // Use the path in the archive itself
-    *outCanonicalPath = StringUtil::createStringBlob(fileStat.m_filename).detach();
-    return SLANG_OK;
+    return SLANG_E_NOT_AVAILABLE;
 }
 
 SlangResult ZipFileSystemImpl::getFileUniqueIdentity(const char* path, ISlangBlob** outUniqueIdentity)
 {
-    return getCanonicalPath(path, outUniqueIdentity);
+    return getPath(PathKind::Canonical, path, outUniqueIdentity);
 }
 
 SlangResult ZipFileSystemImpl::calcCombinedPath(SlangPathType fromPathType, const char* fromPath, const char* path, ISlangBlob** pathOut)
@@ -558,12 +572,6 @@ SlangResult ZipFileSystemImpl::calcCombinedPath(SlangPathType fromPathType, cons
     }
 
     *pathOut = StringUtil::createStringBlob(relPath).detach();
-    return SLANG_OK;
-}
-
-SlangResult ZipFileSystemImpl::getSimplifiedPath(const char* path, ISlangBlob** outSimplifiedPath)
-{
-    *outSimplifiedPath = StringUtil::createStringBlob(Path::simplify(path)).detach();
     return SLANG_OK;
 }
 

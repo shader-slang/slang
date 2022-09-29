@@ -117,26 +117,42 @@ SlangResult OSFileSystem::getFileUniqueIdentity(const char* pathIn, ISlangBlob**
     SLANG_RETURN_ON_FAIL(_checkExt(m_style));
 
     // By default we use the canonical path to uniquely identify a file
-    return getCanonicalPath(pathIn, outUniqueIdentity);
+    return getPath(PathKind::Canonical, pathIn, outUniqueIdentity);
 }
 
-SlangResult OSFileSystem::getCanonicalPath(const char* path, ISlangBlob** outCanonicalPath)
+SlangResult OSFileSystem::getPath(PathKind pathKind, const char* path, ISlangBlob** outPath)
 {
     SLANG_RETURN_ON_FAIL(_checkExt(m_style));
 
-    String canonicalPath;
-    SLANG_RETURN_ON_FAIL(Path::getCanonical(_fixPathDelimiters(path), canonicalPath));
-    *outCanonicalPath = StringUtil::createStringBlob(canonicalPath).detach();
-    return SLANG_OK;
-}
+    switch (pathKind)
+    {
+        case PathKind::OperatingSystem:
+        case PathKind::Display:
+        {
+            // It's possible canonical path fail...
+            if (SLANG_SUCCEEDED(getPath(PathKind::Canonical, path, outPath)))
+            {
+                return SLANG_OK;
+            }
+            // If so try simplified
+            return getPath(PathKind::Simplified, path, outPath);
+        }
+        case PathKind::Canonical:
+        {
+            String canonicalPath;
+            SLANG_RETURN_ON_FAIL(Path::getCanonical(_fixPathDelimiters(path), canonicalPath));
+            *outPath = StringUtil::createStringBlob(canonicalPath).detach();
+            return SLANG_OK;
+        }
+        case PathKind::Simplified:
+        {
+            String simplifiedPath = Path::simplify(path);
+            *outPath = StringUtil::createStringBlob(simplifiedPath).detach();
+            return SLANG_OK;
+        }
+    }
 
-SlangResult OSFileSystem::getSimplifiedPath(const char* pathIn, ISlangBlob** outSimplifiedPath)
-{
-    SLANG_RETURN_ON_FAIL(_checkExt(m_style));
-
-    String simplifiedPath = Path::simplify(pathIn);
-    *outSimplifiedPath = StringUtil::createStringBlob(simplifiedPath).detach();
-    return SLANG_OK;
+    return SLANG_E_NOT_AVAILABLE;
 }
 
 SlangResult OSFileSystem::calcCombinedPath(SlangPathType fromPathType, const char* fromPath, const char* path, ISlangBlob** pathOut)
@@ -702,14 +718,32 @@ SlangResult CacheFileSystem::getPathType(const char* inPath, SlangPathType* outP
     return _getPathType(info, inPath, outPathType);
 }
 
-SlangResult CacheFileSystem::getSimplifiedPath(const char* path, ISlangBlob** outSimplifiedPath)
+SlangResult CacheFileSystem::getPath(PathKind kind, const char* path, ISlangBlob** outPath)
+{
+    switch (kind)
+    {
+        case PathKind::Simplified:          return _getSimplifiedPath(path, outPath);
+        case PathKind::Canonical:           return _getCanonicalPath(path, outPath);
+        default: break;
+    }
+
+    if (m_fileSystemExt)
+    {
+        return m_fileSystemExt->getPath(kind, path, outPath);
+    }
+
+    // If we don't have a fileSystem, then best we can do is get a canonical path...
+    return _getCanonicalPath(path, outPath);
+}
+
+SlangResult CacheFileSystem::_getSimplifiedPath(const char* path, ISlangBlob** outSimplifiedPath)
 {
     // If we have a ISlangFileSystemExt we can just pass on the request to it
     switch (m_pathStyle)
     {
         case PathStyle::FileSystemExt:
         {
-            return m_fileSystemExt->getSimplifiedPath(path, outSimplifiedPath);
+            return m_fileSystemExt->getPath(PathKind::Simplified, path, outSimplifiedPath);
         }
         case PathStyle::Simplifiable:
         {
@@ -721,7 +755,7 @@ SlangResult CacheFileSystem::getSimplifiedPath(const char* path, ISlangBlob** ou
     }
 }
 
-SlangResult CacheFileSystem::getCanonicalPath(const char* path, ISlangBlob** outCanonicalPath)
+SlangResult CacheFileSystem::_getCanonicalPath(const char* path, ISlangBlob** outCanonicalPath)
 {
     *outCanonicalPath = nullptr;
 
@@ -742,7 +776,7 @@ SlangResult CacheFileSystem::getCanonicalPath(const char* path, ISlangBlob** out
 
         // Try getting the canonicalPath by asking underlying file system
         ComPtr<ISlangBlob> canonicalPathBlob;
-        SlangResult res = m_fileSystemExt->getCanonicalPath(path, canonicalPathBlob.writeRef());
+        SlangResult res = m_fileSystemExt->getPath(PathKind::Canonical, path, canonicalPathBlob.writeRef());
 
         if (SLANG_SUCCEEDED(res))
         {
@@ -785,7 +819,7 @@ RelativeFileSystem::RelativeFileSystem(ISlangFileSystem* fileSystem, const Strin
         // If it's direct, but we have a relative path, canonical should work
         if (m_osPathKind == OSPathKind::Direct && relativePath.getLength())
         {
-            m_osPathKind = OSPathKind::Canonical;
+            m_osPathKind = OSPathKind::OperatingSystem;
         }
     }
 }
@@ -878,22 +912,24 @@ SlangResult RelativeFileSystem::getPathType(const char* path, SlangPathType* out
     return fileSystem->getPathType(fixedPath.getBuffer(), outPathType);
 }
 
-SlangResult RelativeFileSystem::getSimplifiedPath(const char* path, ISlangBlob** outSimplifiedPath)
+SlangResult RelativeFileSystem::getPath(PathKind kind, const char* path, ISlangBlob** outPath)
 {
     auto fileSystem = _getExt();
     if (!fileSystem) return SLANG_E_NOT_IMPLEMENTED;
 
-    return fileSystem->getSimplifiedPath(path, outSimplifiedPath);
-}
-
-SlangResult RelativeFileSystem::getCanonicalPath(const char* path, ISlangBlob** outCanonicalPath)
-{
-    auto fileSystem = _getExt();
-    if (!fileSystem) return SLANG_E_NOT_IMPLEMENTED;
+    if (kind == PathKind::Simplified)
+    {
+        return fileSystem->getPath(kind, path, outPath);
+    }
+    else if (kind == PathKind::Display && fileSystem->getOSPathKind() != OSPathKind::None)
+    {
+        // Display -> if we are backed by OS, we display the OS path
+        return fileSystem->getPath(PathKind::OperatingSystem, path, outPath);
+    }
 
     String fixedPath;
     SLANG_RETURN_ON_FAIL(_getFixedPath(path, fixedPath));
-    return fileSystem->getCanonicalPath(fixedPath.getBuffer(), outCanonicalPath);
+    return fileSystem->getPath(kind, fixedPath.getBuffer(), outPath);
 }
 
 void RelativeFileSystem::clearCache()

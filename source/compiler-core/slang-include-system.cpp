@@ -68,7 +68,7 @@ SlangResult IncludeSystem::findFile(SlangPathType fromPathType, const String& fr
 String IncludeSystem::simplifyPath(const String& path)
 {
     ComPtr<ISlangBlob> simplifiedPath;
-    if (SLANG_FAILED(m_fileSystemExt->getSimplifiedPath(path.getBuffer(), simplifiedPath.writeRef())))
+    if (SLANG_FAILED(m_fileSystemExt->getPath(PathKind::Simplified, path.getBuffer(), simplifiedPath.writeRef())))
     {
         return path;
     }
