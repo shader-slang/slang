@@ -272,23 +272,7 @@ newoption {
  end
  
  function getPlatforms(targetInfo)
-    if _ACTION == "xcode4" then
-        local arch = targetInfo.arch
-        local valueMap = 
-        {
-            x86_64 = "x64",
-            arm = "aarch64",
-        }
-        
-        local value = valueMap[arch:lower()]
-        if value == nil then
-            return { arch }
-        else
-            return { value }
-        end       
-    else
-        return { "x86", "x64", "aarch64" }
-    end
+    return { "x86", "x64", "aarch64" }
  end
  
  workspace "slang"
@@ -333,8 +317,11 @@ newoption {
          architecture "x64"
      filter { "platforms:x86" }
          architecture "x86"
-     filter { "platforms:aarch64"}
-         architecture "ARM"
+     filter { "platforms:aarch64" }
+         architecture "ARM64"
+     filter { "platforms:aarch64", "toolset:clang" }
+         buildoptions { "-arch arm64" }
+		 linkoptions { "-arch arm64" }
  
      filter { "toolset:clang or gcc*" }
          -- Makes all symbols hidden by default unless explicitly 'exported'
