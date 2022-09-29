@@ -56,7 +56,7 @@ const uint64_t kTimeoutInfinite = 0xFFFFFFFFFFFFFFFF;
 
 enum class StructType
 {
-    D3D12ExtendedDesc,
+    D3D12DeviceExtendedDesc, D3D12ExperimentalFeaturesDesc
 };
 
 // TODO: Rename to Stage
@@ -2528,9 +2528,18 @@ extern "C"
 }
 
 // Extended descs.
+struct D3D12ExperimentalFeaturesDesc
+{
+    StructType structType = StructType::D3D12ExperimentalFeaturesDesc;
+    uint32_t numFeatures;
+    const void* featureIIDs;
+    void* configurationStructs;
+    uint32_t* configurationStructSizes;
+};
+
 struct D3D12DeviceExtendedDesc
 {
-    StructType structType = StructType::D3D12ExtendedDesc;
+    StructType structType = StructType::D3D12DeviceExtendedDesc;
     const char* rootParameterShaderAttributeName = nullptr;
     bool debugBreakOnD3D12Error = false;
 };
