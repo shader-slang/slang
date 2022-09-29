@@ -55,7 +55,7 @@ MemoryFileSystem::Entry* MemoryFileSystem::_getEntryFromCanonicalPath(const Stri
 MemoryFileSystem::Entry* MemoryFileSystem::_getEntryFromPath(const char* path, String* outPath)
 {
     StringBuilder buffer;
-    if (SLANG_FAILED(_getCanonicalWithExistingParent(path, buffer)))
+    if (SLANG_FAILED(_getCanonical(path, buffer)))
     {
         return nullptr;
     }
@@ -182,13 +182,19 @@ SlangResult MemoryFileSystem::saveFile(const char* path, const void* data, size_
     return SLANG_OK;
 }
 
-SlangResult MemoryFileSystem::_getCanonicalWithExistingParent(const char* path, StringBuilder& outCanonicalPath)
+SlangResult MemoryFileSystem::_getCanonical(const char* path, StringBuilder& outCanonicalPath)
 {
     StringBuilder canonicalPath;
     SLANG_RETURN_ON_FAIL(Path::simplifyAbsolute(UnownedStringSlice(path), outCanonicalPath));
+    return SLANG_OK;
+}
+
+SlangResult MemoryFileSystem::_getCanonicalWithExistingParent(const char* path, StringBuilder& outCanonicalPath)
+{
+    SLANG_RETURN_ON_FAIL(_getCanonical(path, outCanonicalPath));
 
     // Get the parent to the canoncial path (which should be canonical itself)
-    auto parent = Path::getParentDirectory(canonicalPath);
+    auto parent = Path::getParentDirectory(outCanonicalPath);
 
     if (parent.getLength())
     {
@@ -202,7 +208,6 @@ SlangResult MemoryFileSystem::_getCanonicalWithExistingParent(const char* path, 
     
     return SLANG_OK;
 }
-
 
 SlangResult MemoryFileSystem::_requireFile(const char* path, Entry** outEntry)
 {
@@ -273,8 +278,10 @@ SlangResult MemoryFileSystem::remove(const char* path)
 
 SlangResult MemoryFileSystem::createDirectory(const char* path)
 {
-    String canonicalPath;
-    if (_getEntryFromPath(path, &canonicalPath))
+    StringBuilder canonicalPath;
+    SLANG_RETURN_ON_FAIL(_getCanonicalWithExistingParent(path, canonicalPath));
+
+    if (_getEntryFromCanonicalPath(canonicalPath))
     {
         return SLANG_FAIL;
     }

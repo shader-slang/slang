@@ -120,6 +120,9 @@ protected:
         /// The canonical path must have *existing* parent paths.
     SlangResult _getCanonicalWithExistingParent(const char* path, StringBuilder& canonicalPath);
 
+        /// Given a path returns a canonical path. 
+    SlangResult _getCanonical(const char* path, StringBuilder& canonicalPath);
+
         /// Clear, ensures any backing memory is also freed
     void _clear();
 
