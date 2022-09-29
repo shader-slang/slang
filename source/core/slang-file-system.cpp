@@ -821,7 +821,7 @@ RelativeFileSystem::RelativeFileSystem(ISlangFileSystem* fileSystem, const Strin
     {
         m_osPathKind = ext->getOSPathKind();
 
-        // If it's direct, but we have a relative path, canonical should work
+        // If it's direct, but we have a relative path, "operating system" should work
         if (m_osPathKind == OSPathKind::Direct && relativePath.getLength())
         {
             m_osPathKind = OSPathKind::OperatingSystem;
@@ -861,13 +861,12 @@ SlangResult RelativeFileSystem::_calcCombinedPathInner(SlangPathType fromPathTyp
         return _calcCombinedPath(fromPathType, fromPath, path, outPath);
     }
 }
-
 SlangResult RelativeFileSystem::_getFixedPath(const char* path, String& outPath)
 {
     ComPtr<ISlangBlob> blob;
     if (m_stripPath)
     {
-        // The filename cannot be relative..
+        // We are just using the filename. There is no path that could go outside of the the relative path so we can use as is
         String strippedPath = Path::getFileName(path);
         SLANG_RETURN_ON_FAIL(_calcCombinedPathInner(SLANG_PATH_TYPE_DIRECTORY, m_relativePath.getBuffer(), strippedPath.getBuffer(), blob.writeRef()));
     }
@@ -927,26 +926,48 @@ SlangResult RelativeFileSystem::getPath(PathKind kind, const char* path, ISlangB
     auto fileSystem = _getExt();
     if (!fileSystem) return SLANG_E_NOT_IMPLEMENTED;
     
-    // If it's for display, and it's backed by an OS, then get the operating system path
-    if (kind == PathKind::Display && fileSystem->getOSPathKind() != OSPathKind::None)
-    {
-        kind = PathKind::OperatingSystem;
-    }
-
     switch (kind)
     {
-        case PathKind::Simplified:          
+        case PathKind::Simplified: 
         {
             return fileSystem->getPath(kind, path, outPath);
         }
         case PathKind::Display:
-        case PathKind::Canonical:
         {
-            // Can only be for paths inside 
-            StringBuilder absPath;
-            SLANG_RETURN_ON_FAIL(Path::simplifyAbsolute(UnownedStringSlice(path), absPath));
+            // If it's display and it's backed by OS, get the OS path
+            if (fileSystem->getOSPathKind() != OSPathKind::None)
+            {
+                kind = PathKind::OperatingSystem;
+            }
+            else
+            {
+                // Otherwise lets just simplify
+                *outPath = StringBlob::moveCreate(Path::simplify(UnownedStringSlice(path))).detach();
+                return SLANG_OK;
+            }
+        }
+        default: break;
+    }
 
-            *outPath = StringBlob::moveCreate(absPath).detach();
+    switch (kind)
+    {
+        case PathKind::Canonical:
+        {   
+            // Work out the path within this file system.
+            String canonicalPath;
+            if (m_stripPath)
+            {
+                // Get the filename it uniquely defines the filename, if we are stripping the path
+                canonicalPath = Path::getFileName(path);
+            }
+            else
+            {
+                // It must work as an absolute path, to be in the file system.
+                StringBuilder absPath;
+                SLANG_RETURN_ON_FAIL(Path::simplifyAbsolute(UnownedStringSlice(path), absPath));
+                canonicalPath = absPath;
+            }
+            *outPath = StringBlob::moveCreate(canonicalPath).detach();
             return SLANG_OK;
         }
         case PathKind::OperatingSystem:     

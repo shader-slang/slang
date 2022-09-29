@@ -254,15 +254,16 @@ protected:
 
     SlangResult _calcCombinedPathInner(SlangPathType fromPathType, const char* fromPath, const char* path, ISlangBlob** pathOut);
 
+        /// Get the fixed path to the item for the backing file system.
     SlangResult _getFixedPath(const char* path, String& outPath);
-
+    
     ISlangUnknown* getInterface(const Guid& guid);
     void* getObject(const Guid& guid);
 
-    bool m_stripPath;
+    bool m_stripPath;                                   ///< If set any path prior to an item will be stripped (making the directory in effect flat)
 
     FileSystemStyle m_style;
-    ComPtr<ISlangFileSystem> m_fileSystem;          ///< NOTE! Has to match what's in style, such style can be reached via reinterpret_cast
+    ComPtr<ISlangFileSystem> m_fileSystem;              ///< NOTE! Has to match what's in style, such style can be reached via reinterpret_cast
 
     String m_relativePath;
     OSPathKind m_osPathKind = OSPathKind::None;         ///< OS path kind

@@ -189,6 +189,12 @@ SlangResult RiffFileSystem::loadArchive(const void* archive, size_t archiveSizeI
                 default: return SLANG_FAIL;
             }
 
+            // If it's the root entry we can ignore (as already added)
+            if (dstEntry.m_canonicalPath == ".")
+            {
+                continue;
+            }
+
             // Add to the list of entries
             m_entries.Add(dstEntry.m_canonicalPath, dstEntry);
         }
@@ -214,9 +220,15 @@ SlangResult RiffFileSystem::storeArchive(bool blobOwnsContent, ISlangBlob** outB
 
     for (const auto& pair : m_entries)
     {
-        RiffContainer::ScopeChunk scopeData(&container, RiffContainer::Chunk::Kind::Data, RiffFileSystemBinary::kEntryFourCC);
-
         const Entry* srcEntry = &pair.Value;
+
+        // Ignore the root entry
+        if (srcEntry->m_canonicalPath == toSlice("."))
+        {
+            continue;
+        }
+
+        RiffContainer::ScopeChunk scopeData(&container, RiffContainer::Chunk::Kind::Data, RiffFileSystemBinary::kEntryFourCC);
 
         RiffFileSystemBinary::Entry dstEntry;
         dstEntry.uncompressedSize = 0;
