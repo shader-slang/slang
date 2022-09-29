@@ -624,6 +624,16 @@ Result DeviceImpl::initialize(const Desc& desc)
             }
         }
         {
+            D3D12_FEATURE_DATA_D3D12_OPTIONS1 options;
+            if (SLANG_SUCCEEDED(m_device->CheckFeatureSupport(
+                D3D12_FEATURE_D3D12_OPTIONS1, &options, sizeof(options))))
+            {
+                // Check wave operations support
+                if (options.WaveOps)
+                    m_features.add("wave-ops");
+            }
+        }
+        {
             D3D12_FEATURE_DATA_D3D12_OPTIONS2 options;
             if (SLANG_SUCCEEDED(m_device->CheckFeatureSupport(
                 D3D12_FEATURE_D3D12_OPTIONS2, &options, sizeof(options))))
