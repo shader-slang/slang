@@ -36,7 +36,6 @@ Slang::Result WindowedAppBase::initializeBase(
 #endif
     IDevice::Desc deviceDesc = {};
     deviceDesc.deviceType = deviceType;
-    deviceDesc.shaderCachePath = "C:/Users/lucchen/Documents/test-cache";
     gfx::Result res = gfxCreateDevice(&deviceDesc, gDevice.writeRef());
     if (SLANG_FAILED(res))
         return res;

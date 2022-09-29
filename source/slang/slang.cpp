@@ -3160,8 +3160,6 @@ void FilePathDependencyList::addDependency(Module* module)
     }
 }
 
-
-
 //
 // Module
 //
@@ -3189,12 +3187,14 @@ ISlangUnknown* Module::getInterface(const Guid& guid)
     return Super::getInterface(guid);
 }
 
+// One implementation under ComponentType that takes entryPointIndex/targetIndex
+// One per subtype without
 SlangResult Module::getDependencyBasedHashCode(
-    SlangInt entryPointIndex,
-    SlangInt targetIndex,
+//     SlangInt entryPointIndex,
+//     SlangInt targetIndex,
     uint32_t* outHashCode)
 {
-    auto fileDeps = getFilePathDependencyList();
+    auto fileDeps = getFilePathDependencyList(); // TODO: what needs to go into code
 
     unsigned char hashCode[16];
     MD5HashGen hashGen;
@@ -3206,7 +3206,7 @@ SlangResult Module::getDependencyBasedHashCode(
     }
     SlangInt indices[2];
     indices[0] = entryPointIndex;
-    indices[1] = targetIndex;
+    //indices[1] = targetIndex; // Should be hashing in flags in TargetRequest at this index, not the index
     hashGen.update(&context, indices, 2 * sizeof(SlangInt));
     hashGen.finalize(&context, hashCode);
 

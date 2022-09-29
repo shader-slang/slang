@@ -4,7 +4,7 @@
 #include "gfx-test-util.h"
 #include "tools/gfx-util/shader-cursor.h"
 #include "source/core/slang-basic.h"
-#include "source/core/slang-file-system.h"
+#include "source/core/slang-riff-file-system.h"
 
 using namespace gfx;
 
@@ -17,7 +17,8 @@ namespace gfx_test
         UnitTestContext* context;
         Slang::RenderApiFlag::Enum api;
 
-        ComPtr<ISlangMutableFileSystem> fileSystem;
+        ComPtr<Slang::RiffFileSystem> fileSystem;
+        //ComPtr<ISlangMutableFileSystem> fileSystem;
         ComPtr<IPipelineState> pipelineState;
         ComPtr<IResourceView> bufferView;
 
@@ -137,7 +138,8 @@ namespace gfx_test
                 SLANG_IGNORE_TEST
             }
 
-            fileSystem = Slang::OSFileSystem::getMutableSingleton();
+            fileSystem = new Slang::RiffFileSystem(nullptr);
+            //fileSystem = Slang::OSFileSystem::getMutableSingleton();
         }
 
         void submitGPUWork()
