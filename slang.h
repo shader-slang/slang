@@ -1090,24 +1090,36 @@ extern "C"
     {
         None,                ///< Paths do not map to the file system
         Direct,              ///< Paths map directly to the file system
-        OperatingSystem,     ///< Only paths gained via PathKind::OperatingSystem map to the file system
+        OperatingSystem,     ///< Only paths gained via PathKind::OperatingSystem map to the operating system file system
     };
 
     /* Used to determine what kind of path is required from an input path */
     enum class PathKind
     {
-            /// Given a path, returns a simplified version of that path - typically removing '..' and /or '.'.A simplified
-            /// path must point to the same object as the original.
+            /// Given a path, returns a simplified version of that path.  
+            /// This typically means removing '..' and/or '.' from the path.
+            /// A simplified path must point to the same object as the original.
         Simplified,             
-            /// Given a path, returns a 'canonicalPath' to the file. This may be a file system 'canonical path' to
-            /// show where a file was read from.
+
+            /// Given a path, returns a 'canonical path' to the item. 
+            /// This may be the operating system 'canonical path' that is the unique path to the item.
+            /// 
+            /// If the item exists the returned canonical path should always be usable to access the item.
+            /// 
+            /// If the item the path specifies doesn't exist, the canonical path may not be returnable
+            /// or be a path simplification.             
+            /// Not all file systems support canonical paths.
         Canonical,
-            /// Give a path such that it can be displayed for user 
-            /// If the file system is say a zip file - it might include the path to the zip
-            /// container as well as the absolute path to the specific file.
-            /// NOTE! The display path won't necessarily work to access the item
+
+            /// Given a path returns a path such that it is suitable to be displayed to the user.
+            /// 
+            /// For example if the file system is a zip file - it might include the path to the zip
+            /// container as well as the path to the specific file.
+            /// 
+            /// NOTE! The display path won't necessarily work on the file system to access the item
         Display,
-            /// Give the the associated path to the item on the operating system file system, if available
+
+            /// Get the path to the item on the *operating system* file system, if available.
         OperatingSystem,
 
         CountOf,
@@ -1183,8 +1195,6 @@ extern "C"
 
         /** Get a path based on the kind.
 
-        This method is optional, if not implemented return SLANG_E_NOT_IMPLEMENTED.
-
         @param kind The kind of path wanted
         @param path The input path
         @param outPath The output path held in a blob
@@ -1214,7 +1224,7 @@ extern "C"
 
         /** Returns how paths map to the OS file system
         
-        @returns true if this 
+        @returns OSPathKind that describes how paths map to the Operating System file system
         */
         virtual SLANG_NO_THROW OSPathKind SLANG_MCALL getOSPathKind() = 0;
     };

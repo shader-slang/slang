@@ -126,6 +126,12 @@ namespace Slang
         static String simplify(const UnownedStringSlice& path);
         static String simplify(const String& path) { return simplify(path.getUnownedSlice()); }
 
+            /// Given a path simplifies it such the the resultant path is absolute (ie contains no . or ..)
+            /// Can return '.' as the path as the directory 'root'.
+        static SlangResult simplifyAbsolute(const UnownedStringSlice& path, StringBuilder& outPath);
+        static SlangResult simplifyAbsolute(const String& path, StringBuilder& outPath) { return simplifyAbsolute(path.getUnownedSlice(), outPath); }
+        static SlangResult simplifyAbsolute(const char* path, StringBuilder& outPath) { return simplifyAbsolute(UnownedStringSlice(path), outPath); }
+
             /// Simplifies the path split up
         static void simplify(List<UnownedStringSlice>& ioSplit);
 

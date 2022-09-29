@@ -22,9 +22,6 @@ This is in contrast with an implementation that held items in directories 'objec
 would need to be traversed to find the item. Finding all of the items in a directory is very fast - it's all the items held 
 in the the directory 'object'.
 
-The implementation allows for 'implicit' directories. If we have a file "a/b" it's existance *implicitly* implies the existance of the 
-directory 'a'. This is similar to how archive file formats such as zip works. 
-
 TODO(JS):
 * We may want to make saveFile take a blob, or have a version that does. Doing so would allow the application to handle memory management 
 around the blob.
@@ -55,6 +52,9 @@ public:
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL saveFile(const char* path, const void* data, size_t size) SLANG_OVERRIDE;
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL remove(const char* path) SLANG_OVERRIDE;
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL createDirectory(const char* path) SLANG_OVERRIDE;
+
+        /// Ctor
+    MemoryFileSystem() { _clear(); }
 
 protected:
 
@@ -108,7 +108,6 @@ protected:
     void* getInterface(const Guid& guid);
     void* getObject(const Guid& guid);
 
-    SlangResult _calcCanonicalPath(const char* path, StringBuilder& out);
     Entry* _getEntryFromPath(const char* path, String* outPath = nullptr);
     Entry* _getEntryFromCanonicalPath(const String& canonicalPath);
         /// Creates or returns a file entry for the given path.
@@ -117,8 +116,12 @@ protected:
         /// Given the path returns the entry if it's a file, or returns an error
     SlangResult _loadFile(const char* path, Entry** outEntry);
 
+        /// Given a path returns a canonical path. 
+        /// The canonical path must have *existing* parent paths.
+    SlangResult _getCanonicalWithExistingParent(const char* path, StringBuilder& canonicalPath);
+
         /// Clear, ensures any backing memory is also freed
-    void _clear() { m_entries = Dictionary<String, Entry>(); }
+    void _clear();
 
     // Maps canonical paths to an entries (which could be files or directories)
     Dictionary<String, Entry> m_entries;

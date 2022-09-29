@@ -103,7 +103,7 @@ void ImplicitDirectoryCollector::addRemainingPath(SlangPathType pathType, const 
 
 void ImplicitDirectoryCollector::addPath(SlangPathType pathType, const UnownedStringSlice& canonicalPath)
 {
-    if (hasPrefix(canonicalPath))
+    if (canonicalPath != toSlice(".") && hasPrefix(canonicalPath))
     {
         UnownedStringSlice remainder = getRemainder(canonicalPath);
         addRemainingPath(pathType, remainder);

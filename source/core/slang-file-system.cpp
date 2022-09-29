@@ -732,8 +732,13 @@ SlangResult CacheFileSystem::getPath(PathKind kind, const char* path, ISlangBlob
         return m_fileSystemExt->getPath(kind, path, outPath);
     }
 
-    // If we don't have a fileSystem, then best we can do is get a canonical path...
-    return _getCanonicalPath(path, outPath);
+    // If we don't have a fileSystem, we can try the canonical path
+    if (SLANG_SUCCEEDED(getPath(PathKind::Canonical, path, outPath)))
+    {
+        return SLANG_OK;
+    }
+    // Else we can try simplified
+    return getPath(PathKind::Simplified, path, outPath);
 }
 
 SlangResult CacheFileSystem::_getSimplifiedPath(const char* path, ISlangBlob** outSimplifiedPath)
@@ -862,12 +867,17 @@ SlangResult RelativeFileSystem::_getFixedPath(const char* path, String& outPath)
     ComPtr<ISlangBlob> blob;
     if (m_stripPath)
     {
+        // The filename cannot be relative..
         String strippedPath = Path::getFileName(path);
         SLANG_RETURN_ON_FAIL(_calcCombinedPathInner(SLANG_PATH_TYPE_DIRECTORY, m_relativePath.getBuffer(), strippedPath.getBuffer(), blob.writeRef()));
     }
     else
     {
-        SLANG_RETURN_ON_FAIL(_calcCombinedPathInner(SLANG_PATH_TYPE_DIRECTORY, m_relativePath.getBuffer(), path, blob.writeRef()));
+        // We want the input path to be local to this file system
+        StringBuilder localPath;
+        SLANG_RETURN_ON_FAIL(Path::simplifyAbsolute(path, localPath));
+        // Combine
+        SLANG_RETURN_ON_FAIL(_calcCombinedPathInner(SLANG_PATH_TYPE_DIRECTORY, m_relativePath.getBuffer(), localPath.getBuffer(), blob.writeRef()));
     }
 
     outPath = StringUtil::getString(blob);
@@ -916,20 +926,38 @@ SlangResult RelativeFileSystem::getPath(PathKind kind, const char* path, ISlangB
 {
     auto fileSystem = _getExt();
     if (!fileSystem) return SLANG_E_NOT_IMPLEMENTED;
-
-    if (kind == PathKind::Simplified)
+    
+    // If it's for display, and it's backed by an OS, then get the operating system path
+    if (kind == PathKind::Display && fileSystem->getOSPathKind() != OSPathKind::None)
     {
-        return fileSystem->getPath(kind, path, outPath);
-    }
-    else if (kind == PathKind::Display && fileSystem->getOSPathKind() != OSPathKind::None)
-    {
-        // Display -> if we are backed by OS, we display the OS path
-        return fileSystem->getPath(PathKind::OperatingSystem, path, outPath);
+        kind = PathKind::OperatingSystem;
     }
 
-    String fixedPath;
-    SLANG_RETURN_ON_FAIL(_getFixedPath(path, fixedPath));
-    return fileSystem->getPath(kind, fixedPath.getBuffer(), outPath);
+    switch (kind)
+    {
+        case PathKind::Simplified:          
+        {
+            return fileSystem->getPath(kind, path, outPath);
+        }
+        case PathKind::Display:
+        case PathKind::Canonical:
+        {
+            // Can only be for paths inside 
+            StringBuilder absPath;
+            SLANG_RETURN_ON_FAIL(Path::simplifyAbsolute(UnownedStringSlice(path), absPath));
+
+            *outPath = StringBlob::moveCreate(absPath).detach();
+            return SLANG_OK;
+        }
+        case PathKind::OperatingSystem:     
+        {
+            String fixedPath;
+            SLANG_RETURN_ON_FAIL(_getFixedPath(path, fixedPath));
+            return fileSystem->getPath(kind, fixedPath.getBuffer(), outPath);
+        }
+    }
+
+    return SLANG_FAIL;
 }
 
 void RelativeFileSystem::clearCache()
