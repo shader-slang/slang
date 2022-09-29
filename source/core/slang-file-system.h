@@ -242,6 +242,8 @@ public:
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL remove(const char* path) SLANG_OVERRIDE;
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL createDirectory(const char* path) SLANG_OVERRIDE;
 
+        /// stripPath will remove any path for an access, making an access always just 
+        /// access the *filename* from the input path, in the contained filesystem at the relative path
     RelativeFileSystem(ISlangFileSystem* fileSystem, const String& relativePath, bool stripPath = false);
 
 protected:
