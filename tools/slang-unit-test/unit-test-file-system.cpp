@@ -10,6 +10,10 @@
 #include "../../source/core/slang-deflate-compression-system.h"
 #include "../../source/core/slang-lz4-compression-system.h"
 
+#include "../../source/core/slang-destroyable.h"
+
+#include "../../source/core/slang-io.h"
+
 #include "tools/unit-test/slang-unit-test.h"
 
 using namespace Slang;
@@ -91,7 +95,7 @@ static void _entryCallback(SlangPathType pathType, const char* name, void* userD
 	out.add(Entry{pathType, name});
 }
 
-static SlangResult _enumeratePath(ISlangMutableFileSystem* fileSystem, const char* path, const ConstArrayView<Entry>& entries)
+static SlangResult _enumeratePath(ISlangFileSystemExt* fileSystem, const char* path, const ConstArrayView<Entry>& entries)
 {
 	List<Entry> contents;
 	
@@ -107,7 +111,7 @@ static SlangResult _enumeratePath(ISlangMutableFileSystem* fileSystem, const cha
 	return SLANG_OK;
 }
 
-static SlangResult _checkSimplifiedPath(ISlangMutableFileSystem* fileSystem, const char* path, const char* normalPath)
+static SlangResult _checkSimplifiedPath(ISlangFileSystemExt* fileSystem, const char* path, const char* normalPath)
 {
 	ComPtr<ISlangBlob> simplifiedPathBlob;
 	SLANG_RETURN_ON_FAIL(fileSystem->getPath(PathKind::Simplified, path, simplifiedPathBlob.writeRef()));
@@ -117,6 +121,74 @@ static SlangResult _checkSimplifiedPath(ISlangMutableFileSystem* fileSystem, con
 	if (simplifiedPath != normalPath)
 	{
 		return SLANG_FAIL;
+	}
+
+	return SLANG_OK;
+}
+
+SlangResult _getAllEntries(ISlangFileSystemExt* fileSystem, List<Entry>& outEntries)
+{
+	outEntries.clear();
+	
+	SLANG_RETURN_ON_FAIL(fileSystem->enumeratePathContents(".", _entryCallback, (void*)&outEntries));
+	
+	for (Index i = 0; i < outEntries.getCount(); ++i)
+	{
+		const Entry entry = outEntries[i];
+		if (entry.type != SLANG_PATH_TYPE_DIRECTORY)
+		{
+			continue;
+		}
+
+		List<Entry> localEntries;
+		SLANG_RETURN_ON_FAIL(fileSystem->enumeratePathContents(entry.name.getBuffer(), _entryCallback, (void*)&localEntries));
+
+		for (const auto& localEntry : localEntries)
+		{
+			outEntries.add(Entry{ localEntry.type, Path::combine(entry.name, localEntry.name) });
+		}
+	}
+
+	outEntries.sort();
+
+	return SLANG_OK;
+}
+
+static SlangResult _checkEqual(ISlangFileSystemExt* a, ISlangFileSystemExt* b)
+{
+	List<Entry> aEntries, bEntries;
+
+	SLANG_RETURN_ON_FAIL(_getAllEntries(a, aEntries));
+	SLANG_RETURN_ON_FAIL(_getAllEntries(b, bEntries));
+
+	if (aEntries != bEntries)
+	{
+		return SLANG_FAIL;
+	}
+
+	// For all the files check the contents is the same
+
+	for (const auto& entry : aEntries)
+	{
+		if (entry.type != SLANG_PATH_TYPE_FILE)
+		{
+			continue;
+		}
+
+		ComPtr<ISlangBlob> blobA, blobB;
+
+		SLANG_RETURN_ON_FAIL(a->loadFile(entry.name.getBuffer(), blobA.writeRef()));
+		SLANG_RETURN_ON_FAIL(b->loadFile(entry.name.getBuffer(), blobB.writeRef()));
+
+		if (blobA->getBufferSize() != blobB->getBufferSize())
+		{
+			return SLANG_FAIL;
+		}
+
+		if (::memcmp(blobA->getBufferPointer(), blobB->getBufferPointer(), blobA->getBufferSize()) != 0)
+		{
+			return SLANG_FAIL;
+		}
 	}
 
 	return SLANG_OK;
@@ -186,6 +258,22 @@ static SlangResult _test(FileSystemType type)
 		SLANG_RETURN_ON_FAIL(_checkSimplifiedPath(fileSystem, "d/../a", "a"));
 	}
 	
+
+	// If we have an archive file system check out it's behavior
+	if (IArchiveFileSystem* archiveFileSystem = as<IArchiveFileSystem>(fileSystem))
+	{
+		// Load and check its okay
+
+		ComPtr<ISlangBlob> archiveBlob;
+		SLANG_RETURN_ON_FAIL(archiveFileSystem->storeArchive(false, archiveBlob.writeRef()));
+
+		ComPtr<ISlangFileSystemExt> loadedFileSystem;
+		SLANG_RETURN_ON_FAIL(loadArchiveFileSystem(archiveBlob->getBufferPointer(), archiveBlob->getBufferSize(), loadedFileSystem));
+
+		// Check the file systems contents are the same
+		SLANG_RETURN_ON_FAIL(_checkEqual(loadedFileSystem, fileSystem));
+	}
+
 	SLANG_RETURN_ON_FAIL(fileSystem->remove("d/a"));
 	{
 		const Entry entries[] = { {SLANG_PATH_TYPE_FILE, "b" } };
@@ -206,6 +294,7 @@ static SlangResult _test(FileSystemType type)
 		const Entry entries[] = { {SLANG_PATH_TYPE_FILE, "a" }, {SLANG_PATH_TYPE_FILE, "b" } };
 		SLANG_RETURN_ON_FAIL(_enumeratePath(fileSystem, ".", makeConstArrayView(entries)));
 	}
+
 
 	return SLANG_OK;
 }
