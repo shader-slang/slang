@@ -10,6 +10,26 @@
 namespace Slang
 {
 
+/* MemoryFileSystem is an implementation of ISlangMutableFileSystem that stores file contents in 'blobs' (typically) in memory.
+
+A derived class can change what the contents of the blob is (so for example the RiffFileSystem is implemented in this way 
+on top of this class).
+
+This implementation uses a map to store the entities based on their canonical path. This makes access relatively fast and simple - 
+an access only requires a path being converted into a canonical path, and then a lookup. This is to contrast with an implementation
+that held files in directories 'objects', which hold their contents. In that scenario the hierarchy would need to be traversed to 
+find the item. 
+
+Whilst this makes typical access fast, it means doing an enumeration of a directory slower as it requires traversing all entries to 
+find which are in the path.
+
+The implementation also allows for 'implicit' directories. If we have a file "a/b" it's existance *implicitly* implies the existance of the 
+directory 'a'. This is similar to how archive file formats such as zip works. 
+
+TODO(JS):
+* We may want to make saveFile take a blob, or have a version that does. Doing so would allow the application to handle memory management 
+around the blob.
+*/
 class MemoryFileSystem : public ISlangMutableFileSystem, public ComBaseObject
 {
 public:
