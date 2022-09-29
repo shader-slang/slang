@@ -208,13 +208,11 @@ IF EXIST ..\..\..\external\slang-glslang\bin\windows-x64\release\slang-glslang.d
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
       <Optimization>Disabled</Optimization>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
-      <AdditionalOptions>-arch arm64 %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <ImportLibrary>..\..\..\bin\windows-aarch64\debug\slang.lib</ImportLibrary>
-      <AdditionalOptions>-arch arm64 %(AdditionalOptions)</AdditionalOptions>
     </Link>
     <PostBuildEvent>
       <Command>IF EXIST ..\..\..\external\slang-llvm\bin\windows-aarch64\release\slang-llvm.dll\ (xcopy /Q /E /Y /I ..\..\..\external\slang-llvm\bin\windows-aarch64\release\slang-llvm.dll ..\..\..\bin\windows-aarch64\debug &gt; nul) ELSE (xcopy /Q /Y /I ..\..\..\external\slang-llvm\bin\windows-aarch64\release\slang-llvm.dll ..\..\..\bin\windows-aarch64\debug &gt; nul)
@@ -281,14 +279,12 @@ IF EXIST ..\..\..\external\slang-glslang\bin\windows-x64\release\slang-glslang.d
       <MinimalRebuild>false</MinimalRebuild>
       <StringPooling>true</StringPooling>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
-      <AdditionalOptions>-arch arm64 %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <ImportLibrary>..\..\..\bin\windows-aarch64\release\slang.lib</ImportLibrary>
-      <AdditionalOptions>-arch arm64 %(AdditionalOptions)</AdditionalOptions>
     </Link>
     <PostBuildEvent>
       <Command>IF EXIST ..\..\..\external\slang-llvm\bin\windows-aarch64\release\slang-llvm.dll\ (xcopy /Q /E /Y /I ..\..\..\external\slang-llvm\bin\windows-aarch64\release\slang-llvm.dll ..\..\..\bin\windows-aarch64\release &gt; nul) ELSE (xcopy /Q /Y /I ..\..\..\external\slang-llvm\bin\windows-aarch64\release\slang-llvm.dll ..\..\..\bin\windows-aarch64\release &gt; nul)
