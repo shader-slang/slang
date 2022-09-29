@@ -26,12 +26,6 @@ class IArchiveFileSystem : public ISlangCastable
     SLANG_NO_THROW virtual void SLANG_MCALL setCompressionStyle(const CompressionStyle& style) = 0;
 };
 
-class ArchiveFileSystem : public ISlangMutableFileSystem, public ComBaseObject
-{
-public:
- 
-};
-
 /* Maps an UnownedStringSlice to an index. All substrings are held internally in a StringSlicePool, and so
 owned by the type. */
 class StringSliceIndexMap
@@ -96,7 +90,6 @@ KeyValuePair<UnownedStringSlice, Index> StringSliceIndexMap::getAt(CountIndex co
     return pair;
 }
 
-
 /* This class helps to find the contents and/or existence of an implicit directory.This finds the contents of a directory.
 
 This is achieved by using a path prefix that any contained path must at least match. If the remainder of the path contains a folder
@@ -151,7 +144,6 @@ public:
     String m_prefix;
     bool m_directoryExists;
 };
-
 
 SlangResult loadArchiveFileSystem(const void* data, size_t dataSizeInBytes, ComPtr<ISlangFileSystemExt>& outFileSystem);
 SlangResult createArchiveFileSystem(SlangArchiveType type, ComPtr<ISlangMutableFileSystem>& outFileSystem);

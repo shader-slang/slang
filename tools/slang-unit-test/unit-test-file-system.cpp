@@ -1,8 +1,11 @@
 // unit-test-file-system.cpp
 
 #include "../../source/core/slang-file-system.h"
+
 #include "../../source/core/slang-riff-file-system.h"
 #include "../../source/core/slang-zip-file-system.h"
+
+#include "../../source/core/slang-memory-file-system.h"
 
 #include "../../source/core/slang-deflate-compression-system.h"
 #include "../../source/core/slang-lz4-compression-system.h"
@@ -19,6 +22,7 @@ enum class FileSystemType
 	RiffUncompressed,
 	RiffDeflate,
 	RiffLZ4,
+	Memory,
 	Relative,
 	CountOf,
 };
@@ -103,6 +107,21 @@ static SlangResult _enumeratePath(ISlangMutableFileSystem* fileSystem, const cha
 	return SLANG_OK;
 }
 
+static SlangResult _checkSimplifiedPath(ISlangMutableFileSystem* fileSystem, const char* path, const char* normalPath)
+{
+	ComPtr<ISlangBlob> simplifiedPathBlob;
+	SLANG_RETURN_ON_FAIL(fileSystem->getSimplifiedPath(path, simplifiedPathBlob.writeRef()));
+
+	auto simplifiedPath = StringUtil::getString(simplifiedPathBlob);
+
+	if (simplifiedPath != normalPath)
+	{
+		return SLANG_FAIL;
+	}
+
+	return SLANG_OK;
+}
+
 static SlangResult _test(FileSystemType type)
 {
 	ComPtr<ISlangMutableFileSystem> fileSystem;
@@ -129,16 +148,20 @@ static SlangResult _test(FileSystemType type)
 			fileSystem = new RiffFileSystem(LZ4CompressionSystem::getSingleton());
 			break;
 		}
+		case FileSystemType::Memory:
+		{
+			fileSystem = new MemoryFileSystem;
+			break;
+		}
 		case FileSystemType::Relative:
 		{
-			ComPtr<ISlangMutableFileSystem> memoryFileSystem(new RiffFileSystem(nullptr));
+			ComPtr<ISlangMutableFileSystem> memoryFileSystem(new MemoryFileSystem);
 			memoryFileSystem->createDirectory("base");
 
 			fileSystem = new RelativeFileSystem(memoryFileSystem, "base");
 			break;
 		}
 	}
-
 
 	SLANG_RETURN_ON_FAIL(_createAndCheckFile(fileSystem, "a", "someText"));
 	SLANG_RETURN_ON_FAIL(_createAndCheckFile(fileSystem, "b", "A longer bit of text...."));
@@ -157,6 +180,10 @@ static SlangResult _test(FileSystemType type)
 	{
 		const Entry entries[] = { {SLANG_PATH_TYPE_FILE, "a" }, {SLANG_PATH_TYPE_FILE, "b" }, {SLANG_PATH_TYPE_DIRECTORY, "d" } };
 		SLANG_RETURN_ON_FAIL(_enumeratePath(fileSystem, ".", makeConstArrayView(entries)));
+	}
+
+	{
+		SLANG_RETURN_ON_FAIL(_checkSimplifiedPath(fileSystem, "d/../a", "a"));
 	}
 	
 	SLANG_RETURN_ON_FAIL(fileSystem->remove("d/a"));

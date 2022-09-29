@@ -3,11 +3,7 @@
 #include "../../slang-com-helper.h"
 #include "../../slang-com-ptr.h"
 
-#include "slang-io.h"
-#include "slang-string-util.h"
 #include "slang-blob.h"
-#include "slang-string-slice-pool.h"
-#include "slang-uint-set.h"
 
 // Compression systems
 #include "slang-deflate-compression-system.h"
@@ -23,13 +19,9 @@ RiffFileSystem::RiffFileSystem(ICompressionSystem* compressionSystem):
 
 void* RiffFileSystem::getInterface(const Guid& guid)
 {
-    if  (   guid == ISlangUnknown::getTypeGuid() || 
-            guid == ISlangCastable::getTypeGuid() || 
-            guid == ISlangFileSystem::getTypeGuid() || 
-            guid == ISlangFileSystemExt::getTypeGuid() || 
-            guid == ISlangMutableFileSystem::getTypeGuid())
+    if (auto ptr = Super::getInterface(guid))
     {
-        return static_cast<ISlangMutableFileSystem*>(this);
+        return ptr;
     }
     else if (guid == IArchiveFileSystem::getTypeGuid())
     {
@@ -53,183 +45,40 @@ void* RiffFileSystem::castAs(const Guid& guid)
     return getObject(guid);
 }
 
-SlangResult RiffFileSystem::_calcCanonicalPath(const char* path, StringBuilder& out)
-{
-    List<UnownedStringSlice> splitPath;
-    Path::split(UnownedStringSlice(path), splitPath);
-
-    // If the first part of a path is "", it means path of form "/some/path". Turn into "some/path".
-    if (splitPath.getCount() > 1 && splitPath[0].getLength() == 0)
-    {
-        splitPath.removeAt(0);
-    }
-
-    Path::simplify(splitPath);
-
-    if (splitPath.indexOf(UnownedStringSlice::fromLiteral("..")) >= 0)
-    {
-        return SLANG_E_NOT_FOUND;
-    }
-
-    if (splitPath.getCount() == 0)
-    {
-        // It's an empty path;
-        return SLANG_FAIL;
-    }
-
-    Path::join(splitPath.getBuffer(), splitPath.getCount(), out);
-    return SLANG_OK;
-}
-
-RiffFileSystem::Entry* RiffFileSystem::_getEntryFromCanonicalPath(const String& canonicalPath)
-{
-    return m_entries.TryGetValue(canonicalPath);
-}
-
-RiffFileSystem::Entry* RiffFileSystem::_getEntryFromPath(const char* path, String* outPath)
-{
-    StringBuilder buffer;
-    if (SLANG_FAILED(_calcCanonicalPath(path, buffer)))
-    {
-        return nullptr;
-    }
-
-    if (outPath)
-    {
-        *outPath = buffer;
-    }
-    return _getEntryFromCanonicalPath(buffer);
-}
-
 SlangResult RiffFileSystem::loadFile(char const* path, ISlangBlob** outBlob)
 {
-    Entry* entry = _getEntryFromPath(path);
-    if (entry == nullptr || entry->m_type != SLANG_PATH_TYPE_FILE)
-    {
-        return SLANG_E_NOT_FOUND;
-    }
+    Entry* entry;
+    SLANG_RETURN_ON_FAIL(_loadFile(path, &entry));
+
+    ISlangBlob* contents = entry->m_contents;
 
     if (m_compressionSystem)
     {
         // Okay lets decompress into a blob
         ScopedAllocation alloc;
         void* dst = alloc.allocateTerminated(entry->m_uncompressedSizeInBytes);
-
-        ISlangBlob* compressedData = entry->m_contents;
-        SLANG_RETURN_ON_FAIL(m_compressionSystem->decompress(compressedData->getBufferPointer(), compressedData->getBufferSize(), entry->m_uncompressedSizeInBytes, dst)); 
+        SLANG_RETURN_ON_FAIL(m_compressionSystem->decompress(contents->getBufferPointer(), contents->getBufferSize(), entry->m_uncompressedSizeInBytes, dst));
 
         auto blob = RawBlob::moveCreate(alloc);
 
         *outBlob = blob.detach();
+        return SLANG_OK;
     }
     else
     {
-        // We don't have any compression, so can just return the blob
-        ISlangBlob* contents = entry->m_contents;
+        // Just return as is
         contents->addRef();
         *outBlob = contents;
+        return SLANG_OK;
     }
-
-    return SLANG_OK;
-}
-
-SlangResult RiffFileSystem::getFileUniqueIdentity(const char* path, ISlangBlob** outUniqueIdentity)
-{
-    return getCanonicalPath(path, outUniqueIdentity);
-}
-
-SlangResult RiffFileSystem::calcCombinedPath(SlangPathType fromPathType, const char* fromPath, const char* path, ISlangBlob** pathOut)
-{
-    String combinedPath;
-    switch (fromPathType)
-    {
-        case SLANG_PATH_TYPE_FILE:
-        {
-            combinedPath = Path::combine(Path::getParentDirectory(fromPath), path);
-            break;
-        }
-        case SLANG_PATH_TYPE_DIRECTORY:
-        {
-            combinedPath = Path::combine(fromPath, path);
-            break;
-        }
-    }
-
-    *pathOut = StringUtil::createStringBlob(combinedPath).detach();
-    return SLANG_OK;
-}
-
-SlangResult RiffFileSystem::getPathType(const char* path, SlangPathType* outPathType)
-{
-    String canonicalPath;
-    Entry* entry = _getEntryFromPath(path, &canonicalPath);
-    if (entry == nullptr)
-    {
-        // Could be an implicit path
-        ImplicitDirectoryCollector collector(canonicalPath);
-        for (const auto& pair : m_entries)
-        {
-            const Entry* childEntry = &pair.Value;
-            collector.addPath(childEntry->m_type, childEntry->m_canonicalPath.getUnownedSlice());
-            // If on adding a path we determine a directory exists, then we are done
-            if (collector.getDirectoryExists())
-            {
-                *outPathType = SLANG_PATH_TYPE_DIRECTORY;
-                return SLANG_OK;
-            }
-        }
-
-        // If not implicit or explicit we are done.
-        return SLANG_E_NOT_FOUND;
-    }
-
-    // Explicit type
-    *outPathType = entry->m_type;
-    return SLANG_OK;
-}
-
-SlangResult RiffFileSystem::getSimplifiedPath(const char* path, ISlangBlob** outSimplifiedPath)
-{
-    String simplifiedPath = Path::simplify(path);
-    *outSimplifiedPath = StringUtil::createStringBlob(simplifiedPath).detach();
-    return SLANG_OK;
-}
-
-SlangResult RiffFileSystem::getCanonicalPath(const char* path, ISlangBlob** outCanonicalPath)
-{
-    StringBuilder buffer;
-    SLANG_RETURN_ON_FAIL(_calcCanonicalPath(path, buffer));
-    *outCanonicalPath = StringUtil::createStringBlob(buffer).detach();
-    return SLANG_OK;
-}
-
-SlangResult RiffFileSystem::enumeratePathContents(const char* path, FileSystemContentsCallBack callback, void* userData)
-{
-    String canonicalPath;
-    Entry* entry = _getEntryFromPath(path, &canonicalPath);
-
-    const bool foundDirectory = (entry && entry->m_type == SLANG_PATH_TYPE_DIRECTORY);
-
-    // We allow implicit directories, so this works even if there isn't an explicit one
-    ImplicitDirectoryCollector collector(canonicalPath, foundDirectory);
-
-    // If it is a directory, we need to see if there is anything in it
-    for (const auto& pair : m_entries)
-    {
-        const Entry* childEntry = &pair.Value;
-        collector.addPath(childEntry->m_type, childEntry->m_canonicalPath.getUnownedSlice());
-    }
-
-    return collector.enumerate(callback, userData);
 }
 
 SlangResult RiffFileSystem::saveFile(const char* path, const void* data, size_t size)
-{
-    StringBuilder canonicalPath;
-    SLANG_RETURN_ON_FAIL(_calcCanonicalPath(path, canonicalPath));
+{   
+    Entry* entry;
+    SLANG_RETURN_ON_FAIL(_requireFile(path, &entry));
 
     ComPtr<ISlangBlob> contents;
-
     if (m_compressionSystem)
     {
         // Lets try compressing the input
@@ -240,71 +89,7 @@ SlangResult RiffFileSystem::saveFile(const char* path, const void* data, size_t 
         // Just store the data directly.
         contents = RawBlob::create(data, size);
     }
-
-    if (Entry* foundEntry = _getEntryFromCanonicalPath(canonicalPath))
-    {
-        if (foundEntry->m_type != SLANG_PATH_TYPE_FILE)
-        {
-            // Can only set if it's already a file, if it's anything else it's an error
-            return SLANG_FAIL;
-        }
-
-        foundEntry->setContents(size, contents);
-    }
-    else
-    {
-        Entry entry;
-        entry.initFile(canonicalPath, size, contents);
-        m_entries.Add(canonicalPath, entry);
-    }
-
-    return SLANG_OK;
-}
-
-SlangResult RiffFileSystem::remove(const char* path)
-{
-    String canonicalPath;
-    Entry* entry = _getEntryFromPath(path, &canonicalPath);
-
-    if (entry)
-    {
-        if (entry->m_type == SLANG_PATH_TYPE_DIRECTORY)
-        {
-            ImplicitDirectoryCollector collector(canonicalPath);
-
-            // If it is a directory, we need to see if there is anything in it
-            for (const auto& pair : m_entries)
-            {
-                const Entry* childEntry = &pair.Value;
-                collector.addPath(childEntry->m_type, childEntry->m_canonicalPath.getUnownedSlice());
-                if (collector.hasContent())
-                {
-                    // Directory is not empty
-                    return SLANG_FAIL;
-                }
-            }
-        }
-
-        // Reset so doesn't hold references/keep memory in scope
-        entry->reset();
-        m_entries.Remove(canonicalPath);
-        return SLANG_OK;
-    }
-
-    return SLANG_E_NOT_FOUND;
-}
-
-SlangResult RiffFileSystem::createDirectory(const char* path)
-{
-    String canonicalPath;
-    if (_getEntryFromPath(path, &canonicalPath))
-    {
-        return SLANG_FAIL;
-    }
-
-    Entry entry;
-    entry.initDirectory(canonicalPath);
-    m_entries.Add(canonicalPath, entry);
+    entry->setContents(size, contents);
     return SLANG_OK;
 }
 
