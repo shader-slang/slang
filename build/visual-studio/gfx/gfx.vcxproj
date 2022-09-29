@@ -216,14 +216,12 @@ IF EXIST "$(SolutionDir)tools\gfx\slang.slang"\ (xcopy /Q /E /Y /I "$(SolutionDi
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
       <Optimization>Disabled</Optimization>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
-      <AdditionalOptions>-arch arm64 %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <ImportLibrary>..\..\..\bin\windows-aarch64\debug\gfx.lib</ImportLibrary>
       <TreatLinkerWarningAsErrors>true</TreatLinkerWarningAsErrors>
-      <AdditionalOptions>-arch arm64 %(AdditionalOptions)</AdditionalOptions>
     </Link>
     <PostBuildEvent>
       <Command>IF EXIST "$(SolutionDir)tools\gfx\gfx.slang"\ (xcopy /Q /E /Y /I "$(SolutionDir)tools\gfx\gfx.slang" "..\..\..\bin\windows-aarch64\debug" &gt; nul) ELSE (xcopy /Q /Y /I "$(SolutionDir)tools\gfx\gfx.slang" "..\..\..\bin\windows-aarch64\debug" &gt; nul)
@@ -298,7 +296,6 @@ IF EXIST "$(SolutionDir)tools\gfx\slang.slang"\ (xcopy /Q /E /Y /I "$(SolutionDi
       <MinimalRebuild>false</MinimalRebuild>
       <StringPooling>true</StringPooling>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
-      <AdditionalOptions>-arch arm64 %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -306,7 +303,6 @@ IF EXIST "$(SolutionDir)tools\gfx\slang.slang"\ (xcopy /Q /E /Y /I "$(SolutionDi
       <OptimizeReferences>true</OptimizeReferences>
       <ImportLibrary>..\..\..\bin\windows-aarch64\release\gfx.lib</ImportLibrary>
       <TreatLinkerWarningAsErrors>true</TreatLinkerWarningAsErrors>
-      <AdditionalOptions>-arch arm64 %(AdditionalOptions)</AdditionalOptions>
     </Link>
     <PostBuildEvent>
       <Command>IF EXIST "$(SolutionDir)tools\gfx\gfx.slang"\ (xcopy /Q /E /Y /I "$(SolutionDir)tools\gfx\gfx.slang" "..\..\..\bin\windows-aarch64\release" &gt; nul) ELSE (xcopy /Q /Y /I "$(SolutionDir)tools\gfx\gfx.slang" "..\..\..\bin\windows-aarch64\release" &gt; nul)
