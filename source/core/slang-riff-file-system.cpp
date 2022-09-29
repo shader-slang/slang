@@ -47,20 +47,17 @@ void* RiffFileSystem::castAs(const Guid& guid)
 
 SlangResult RiffFileSystem::loadFile(char const* path, ISlangBlob** outBlob)
 {
+    Entry* entry;
+    SLANG_RETURN_ON_FAIL(_loadFile(path, &entry));
+
+    ISlangBlob* contents = entry->m_contents;
+
     if (m_compressionSystem)
     {
-        Entry* entry = _getEntryFromPath(path);
-        if (entry == nullptr || entry->m_type != SLANG_PATH_TYPE_FILE)
-        {
-            return SLANG_E_NOT_FOUND;
-        }
-
         // Okay lets decompress into a blob
         ScopedAllocation alloc;
         void* dst = alloc.allocateTerminated(entry->m_uncompressedSizeInBytes);
-
-        ISlangBlob* compressedData = entry->m_contents;
-        SLANG_RETURN_ON_FAIL(m_compressionSystem->decompress(compressedData->getBufferPointer(), compressedData->getBufferSize(), entry->m_uncompressedSizeInBytes, dst)); 
+        SLANG_RETURN_ON_FAIL(m_compressionSystem->decompress(contents->getBufferPointer(), contents->getBufferSize(), entry->m_uncompressedSizeInBytes, dst));
 
         auto blob = RawBlob::moveCreate(alloc);
 
@@ -69,7 +66,10 @@ SlangResult RiffFileSystem::loadFile(char const* path, ISlangBlob** outBlob)
     }
     else
     {
-        return Super::loadFile(path, outBlob);
+        // Just return as is
+        contents->addRef();
+        *outBlob = contents;
+        return SLANG_OK;
     }
 }
 

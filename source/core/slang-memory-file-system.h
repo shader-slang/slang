@@ -11,18 +11,18 @@ namespace Slang
 
 /* MemoryFileSystem is an implementation of ISlangMutableFileSystem that stores file contents in 'blobs' (typically) in memory.
 
-A derived class can change what the contents of the blob is (so for example the RiffFileSystem is implemented in this way 
-on top of this class).
+A derived class can change how the contents of the contents blob is interpretted (so for example the RiffFileSystem is implemented 
+such that the Entry.m_contents is the files contents compressed).
 
-This implementation uses a map to store the entities based on their canonical path. This makes access relatively fast and simple - 
-an access only requires a path being converted into a canonical path, and then a lookup. This is to contrast with an implementation
-that held files in directories 'objects', which hold their contents. In that scenario the hierarchy would need to be traversed to 
-find the item. 
+The implementation uses a map to store the file/directory based on their canonical path. This makes access relatively fast and simple - 
+an access only requires a path being converted into a canonical path, and then a lookup. Whilst this makes typical access fast, it means 
+doing an enumeration of a directory slower as it requires traversing all entries to find which are in the path.
 
-Whilst this makes typical access fast, it means doing an enumeration of a directory slower as it requires traversing all entries to 
-find which are in the path.
+This is in contrast with an implementation that held items in directories 'objects'. In that scenario the path through the hierarchy 
+would need to be traversed to find the item. Finding all of the items in a directory is very fast - it's all the items held 
+in the the directory 'object'.
 
-The implementation also allows for 'implicit' directories. If we have a file "a/b" it's existance *implicitly* implies the existance of the 
+The implementation allows for 'implicit' directories. If we have a file "a/b" it's existance *implicitly* implies the existance of the 
 directory 'a'. This is similar to how archive file formats such as zip works. 
 
 TODO(JS):
@@ -115,6 +115,8 @@ protected:
         /// Creates or returns a file entry for the given path.
         /// If created the entry is empty.
     SlangResult _requireFile(const char* path, Entry** outEntry);
+        /// Given the path returns the entry if it's a file, or returns an error
+    SlangResult _loadFile(const char* path, Entry** outEntry);
 
         /// Clear, ensures any backing memory is also freed
     void _clear() { m_entries = Dictionary<String, Entry>(); }

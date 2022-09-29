@@ -33,19 +33,19 @@ struct RiffFileSystemBinary
     };
 };
 
-/* RiffFileSystem is a FileSystem, that can save out it's contents (through the IArchiveFileSystem interface) to an archive
+/* RiffFileSystem implements ISlangMutableFileSystem and can be used to save and load the whole of it's contents as an 'archive' blob.
 
 The 'RIFF' part provides the structure to store out the contents. The data is only accessed in the RIFF format when being 
 read/written to an archive. Normal operations on the file system act in memory.
 
-A RiffFileSystem also allows compression to be used on files. To use compression pass in a suitable ICompressionSystem 
-implementation. If constructed without an ICompressionSystem, data is stored without compression. This is true of the in memory 
-representation as well as in an archive. When compression is used, files 'contents' blob is actually the *compressed* version of the contents.
-Calling loadFile/saveFile with uncompress/compress as need. If there is no compression contents is identical to the file contents.
+A RiffFileSystem allows for compression to be used on files. To use compression pass in a suitable ICompressionSystem 
+implementation on construction. If constructed without an ICompressionSystem, data is stored uncompressed. When compression is 
+used, files 'contents' blob is actually the *compressed* version of the contents. Calling loadFile/saveFile will 
+uncompress/compress as need. If there is no compression contents is identical to the file contents.
 
 NOTE:
 * The RIFF chunk IDs are *slang specific*. It conforms to RIFF but is unlikely to be usable with other tooling.
-* The RIFF chunk IDs are in RiffFileSystemBinary
+* The RIFF chunk IDs are in RiffFileSystemBinary struct
 */
 class RiffFileSystem : public MemoryFileSystem, public IArchiveFileSystem
 {

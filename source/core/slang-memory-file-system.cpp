@@ -86,14 +86,23 @@ MemoryFileSystem::Entry* MemoryFileSystem::_getEntryFromPath(const char* path, S
     return _getEntryFromCanonicalPath(buffer);
 }
 
-SlangResult MemoryFileSystem::loadFile(char const* path, ISlangBlob** outBlob)
+SlangResult MemoryFileSystem::_loadFile(const char* path, Entry** outEntry)
 {
+    *outEntry = nullptr;
     Entry* entry = _getEntryFromPath(path);
     if (entry == nullptr || entry->m_type != SLANG_PATH_TYPE_FILE)
     {
         return SLANG_E_NOT_FOUND;
     }
+    *outEntry = entry;
+    return SLANG_OK;
+}
 
+SlangResult MemoryFileSystem::loadFile(char const* path, ISlangBlob** outBlob)
+{
+    Entry* entry;
+    SLANG_RETURN_ON_FAIL(_loadFile(path, &entry));
+    
     ISlangBlob* contents = entry->m_contents;
     contents->addRef();
     *outBlob = contents;
