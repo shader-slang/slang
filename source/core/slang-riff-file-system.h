@@ -2,11 +2,9 @@
 #define SLANG_RIFF_FILE_SYSTEM_H
 
 #include "slang-archive-file-system.h"
-
 #include "slang-memory-file-system.h"
 
 #include "slang-riff.h"
-#include "slang-io.h"
 
 namespace Slang
 {
@@ -30,7 +28,7 @@ struct RiffFileSystemBinary
         uint32_t pathSize;                  ///< The size of the path in bytes, including terminating 0
         uint32_t pathType;                  ///< One of SlangPathType
 
-        // Followed by the path (including terminating0)
+        // Followed by the path (including terminating 0)
         // Followed by the compressed data
     };
 };

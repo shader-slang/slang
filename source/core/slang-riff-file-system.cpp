@@ -3,12 +3,7 @@
 #include "../../slang-com-helper.h"
 #include "../../slang-com-ptr.h"
 
-#include "slang-io.h"
-#include "slang-string-util.h"
 #include "slang-blob.h"
-
-//#include "slang-string-slice-pool.h"
-//#include "slang-uint-set.h"
 
 // Compression systems
 #include "slang-deflate-compression-system.h"

@@ -1,10 +1,7 @@
 #include "slang-memory-file-system.h"
 
-#include "../../slang-com-helper.h"
-#include "../../slang-com-ptr.h"
-
+// For Path::
 #include "slang-io.h"
-#include "slang-string-util.h"
 #include "slang-blob.h"
 
 // For ImplicitDirectoryCollector
@@ -126,7 +123,7 @@ SlangResult MemoryFileSystem::calcCombinedPath(SlangPathType fromPathType, const
         }
     }
 
-    *pathOut = StringUtil::createStringBlob(combinedPath).detach();
+    *pathOut = StringBlob::moveCreate(combinedPath).detach();
     return SLANG_OK;
 }
 
@@ -162,7 +159,7 @@ SlangResult MemoryFileSystem::getPathType(const char* path, SlangPathType* outPa
 SlangResult MemoryFileSystem::getSimplifiedPath(const char* path, ISlangBlob** outSimplifiedPath)
 {
     String simplifiedPath = Path::simplify(path);
-    *outSimplifiedPath = StringUtil::createStringBlob(simplifiedPath).detach();
+    *outSimplifiedPath = StringBlob::moveCreate(simplifiedPath).detach();
     return SLANG_OK;
 }
 
@@ -170,7 +167,7 @@ SlangResult MemoryFileSystem::getCanonicalPath(const char* path, ISlangBlob** ou
 {
     StringBuilder buffer;
     SLANG_RETURN_ON_FAIL(_calcCanonicalPath(path, buffer));
-    *outCanonicalPath = StringUtil::createStringBlob(buffer).detach();
+    *outCanonicalPath = StringBlob::moveCreate(buffer).detach();
     return SLANG_OK;
 }
 

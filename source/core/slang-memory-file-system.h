@@ -6,7 +6,6 @@
 #include "../../slang-com-ptr.h"
 #include "slang-com-object.h"
 
-
 namespace Slang
 {
 
@@ -120,7 +119,7 @@ protected:
         /// Clear, ensures any backing memory is also freed
     void _clear() { m_entries = Dictionary<String, Entry>(); }
 
-    // Maps a path to an entry
+    // Maps canonical paths to an entries (which could be files or directories)
     Dictionary<String, Entry> m_entries;
 };
 
