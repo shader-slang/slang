@@ -42,6 +42,7 @@ public:
 
     // ISlangModifyableFileSystem
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL saveFile(const char* path, const void* data, size_t size) SLANG_OVERRIDE;
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL saveFileBlob(const char* path, ISlangBlob* dataBlob) SLANG_OVERRIDE;
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL remove(const char* path) SLANG_OVERRIDE;
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL createDirectory(const char* path) SLANG_OVERRIDE;
 
@@ -625,6 +626,16 @@ SlangResult ZipFileSystemImpl::enumeratePathContents(const char* path, FileSyste
     ImplicitDirectoryCollector collector(fixedPath);
     SLANG_RETURN_ON_FAIL(_getPathContents(ImplicitDirectoryCollector::State::None, &collector));
     return collector.enumerate(callback, userData);
+}
+
+SlangResult ZipFileSystemImpl::saveFileBlob(const char* path, ISlangBlob* dataBlob)
+{
+    if (!dataBlob)
+    {
+        return SLANG_E_INVALID_ARG;
+    }
+
+    return saveFile(path, dataBlob->getBufferPointer(), dataBlob->getBufferSize());
 }
 
 SlangResult ZipFileSystemImpl::saveFile(const char* path, const void* data, size_t size)

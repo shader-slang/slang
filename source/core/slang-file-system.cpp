@@ -239,6 +239,15 @@ SlangResult OSFileSystem::saveFile(const char* pathIn, const void* data, size_t 
     return SLANG_OK;
 }
 
+SlangResult OSFileSystem::saveFileBlob(const char* path, ISlangBlob* dataBlob)
+{
+    if (!dataBlob)
+    {
+        return SLANG_E_INVALID_ARG;
+    }
+    return saveFile(path, dataBlob->getBufferPointer(), dataBlob->getBufferSize());
+}
+
 SlangResult OSFileSystem::remove(const char* path)
 {
     SLANG_RETURN_ON_FAIL(_checkMutable(m_style));
@@ -1007,6 +1016,16 @@ SlangResult RelativeFileSystem::saveFile(const char* path, const void* data, siz
     String fixedPath;
     SLANG_RETURN_ON_FAIL(_getFixedPath(path, fixedPath));
     return fileSystem->saveFile(fixedPath.getBuffer(), data, size);
+}
+
+SlangResult RelativeFileSystem::saveFileBlob(const char* path, ISlangBlob* dataBlob)
+{
+    auto fileSystem = _getMutable();
+    if (!fileSystem) return SLANG_E_NOT_IMPLEMENTED;
+    
+    String fixedPath;
+    SLANG_RETURN_ON_FAIL(_getFixedPath(path, fixedPath));
+    return fileSystem->saveFileBlob(fixedPath.getBuffer(), dataBlob);
 }
 
 SlangResult RelativeFileSystem::remove(const char* path)

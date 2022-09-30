@@ -93,6 +93,23 @@ SlangResult RiffFileSystem::saveFile(const char* path, const void* data, size_t 
     return SLANG_OK;
 }
 
+SlangResult RiffFileSystem::saveFileBlob(const char* path, ISlangBlob* dataBlob)
+{
+    if (!dataBlob)
+    {
+        return SLANG_E_INVALID_ARG;
+    }
+
+    if (m_compressionSystem)
+    {
+        return saveFile(path, dataBlob->getBufferPointer(), dataBlob->getBufferSize());
+    }
+    else
+    {
+        return Super::saveFileBlob(path, dataBlob);
+    }
+}
+
 SlangResult RiffFileSystem::loadArchive(const void* archive, size_t archiveSizeInBytes)
 {
     // Load the riff

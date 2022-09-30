@@ -45,12 +45,8 @@ struct Entry
 
 } // anonymous
 
-static SlangResult _createAndCheckFile(ISlangMutableFileSystem* fileSystem, const char* path, const char* contents)
+static SlangResult _checkFile(ISlangFileSystemExt* fileSystem, const char* path, const UnownedStringSlice& contentsSlice)
 {
-	UnownedStringSlice contentsSlice(contents);
-
-	SLANG_RETURN_ON_FAIL(fileSystem->saveFile(path, contentsSlice.begin(), contentsSlice.getLength()));
-
 	SlangPathType pathType;
 	SLANG_RETURN_ON_FAIL(fileSystem->getPathType(path, &pathType));
 
@@ -70,6 +66,31 @@ static SlangResult _createAndCheckFile(ISlangMutableFileSystem* fileSystem, cons
 	{
 		return SLANG_FAIL;
 	}
+	return SLANG_OK;
+}
+
+static SlangResult _createAndCheckFile(ISlangMutableFileSystem* fileSystem, const char* path, const char* contents)
+{
+	UnownedStringSlice contentsSlice(contents);
+
+	SLANG_RETURN_ON_FAIL(fileSystem->saveFile(path, contentsSlice.begin(), contentsSlice.getLength()));
+	SLANG_RETURN_ON_FAIL(_checkFile(fileSystem, path, contentsSlice));
+
+	// Delete it
+	SLANG_RETURN_ON_FAIL(fileSystem->remove(path));
+
+	// Check it's gone
+	SlangPathType pathType;
+	if (SLANG_SUCCEEDED(fileSystem->getPathType(path, &pathType)))
+	{
+		return SLANG_FAIL;
+	}
+
+	// Save as a blob
+	ComPtr<ISlangBlob> blob = RawBlob::create(contentsSlice.begin(), contentsSlice.getLength());
+
+	SLANG_RETURN_ON_FAIL(fileSystem->saveFileBlob(path, blob));
+	SLANG_RETURN_ON_FAIL(_checkFile(fileSystem, path, contentsSlice));
 
 	return SLANG_OK;
 }

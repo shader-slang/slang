@@ -1235,17 +1235,33 @@ extern "C"
     {
         SLANG_COM_INTERFACE(0xa058675c, 0x1d65, 0x452a, { 0x84, 0x58, 0xcc, 0xde, 0xd1, 0x42, 0x71, 0x5 })
 
-        /** Write the data specified with data and size to the specified path.
+        /** Write data to the specified path.
 
         @param path The path for data to be saved to
         @param data The data to be saved
-        @param size The size of the data
+        @param size The size of the data in bytes
         @returns SLANG_OK if successful (SLANG_E_NOT_IMPLEMENTED if not implemented, or some other error code)
         */
         virtual SLANG_NO_THROW SlangResult SLANG_MCALL saveFile(
             const char* path,
             const void* data,
             size_t size) = 0;
+
+        /** Write data in the form of a blob to the specified path.
+
+        Depending on the implementation writing a blob might be faster/use less memory. It is assumed the 
+        blob is *immutable* and that an implementation can reference count it.
+
+        It is not guaranteed loading the same file will return the *same* blob - just a blob with same 
+        contents.
+
+        @param path The path for data to be saved to
+        @param dataBlob The data to be saved
+        @returns SLANG_OK if successful (SLANG_E_NOT_IMPLEMENTED if not implemented, or some other error code)
+        */
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL saveFileBlob(
+            const char* path,
+            ISlangBlob* dataBlob) = 0;
 
         /** Remove the entry in the path (directory of file). Will only delete an empty directory, if not empty
         will return an error.

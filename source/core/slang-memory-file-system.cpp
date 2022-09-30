@@ -182,6 +182,19 @@ SlangResult MemoryFileSystem::saveFile(const char* path, const void* data, size_
     return SLANG_OK;
 }
 
+SlangResult MemoryFileSystem::saveFileBlob(const char* path, ISlangBlob* dataBlob)
+{
+    if (!dataBlob)
+    {
+        return SLANG_E_INVALID_ARG;
+    }
+
+    Entry* entry;
+    SLANG_RETURN_ON_FAIL(_requireFile(path, &entry));
+    entry->setContents(dataBlob->getBufferSize(), dataBlob);
+    return SLANG_OK;
+}
+
 SlangResult MemoryFileSystem::_getCanonical(const char* path, StringBuilder& outCanonicalPath)
 {
     StringBuilder canonicalPath;
