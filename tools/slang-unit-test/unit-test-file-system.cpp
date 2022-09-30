@@ -18,7 +18,7 @@
 
 using namespace Slang;
 
-namespace { 
+namespace { // anonymous
 
 enum class FileSystemType
 {
@@ -35,15 +35,15 @@ struct Entry
 {
 	typedef Entry ThisType;
 
-	bool operator<(const ThisType& rhs) const { return name < rhs.name; }
-	bool operator==(const ThisType& rhs) const { return name == rhs.name && type == rhs.type; }
+	bool operator<(const ThisType& rhs) const { return path < rhs.path; }
+	bool operator==(const ThisType& rhs) const { return path == rhs.path && type == rhs.type; }
 	bool operator!=(const ThisType& rhs) const { return !(*this == rhs); }
 
 	SlangPathType type;
-	String name;
+	String path;
 };
 
-} // 
+} // anonymous
 
 static SlangResult _createAndCheckFile(ISlangMutableFileSystem* fileSystem, const char* path, const char* contents)
 {
@@ -126,31 +126,54 @@ static SlangResult _checkSimplifiedPath(ISlangFileSystemExt* fileSystem, const c
 	return SLANG_OK;
 }
 
-SlangResult _getAllEntries(ISlangFileSystemExt* fileSystem, List<Entry>& outEntries)
+SlangResult _appendPathEntries(ISlangFileSystemExt* fileSystem, const char* inBasePath, List<Entry>& outEntries)
 {
-	outEntries.clear();
-	
-	SLANG_RETURN_ON_FAIL(fileSystem->enumeratePathContents(".", _entryCallback, (void*)&outEntries));
-	
-	for (Index i = 0; i < outEntries.getCount(); ++i)
+	const UnownedStringSlice basePath(inBasePath);
+	if (basePath == toSlice(".") || basePath.getLength() == 0)
 	{
-		const Entry entry = outEntries[i];
-		if (entry.type != SLANG_PATH_TYPE_DIRECTORY)
-		{
-			continue;
-		}
+		// We don't need to append path prefixes if we are at the root.
+		SLANG_RETURN_ON_FAIL(fileSystem->enumeratePathContents(inBasePath, _entryCallback, (void*)&outEntries));
+	}
+	else
+	{
+		const Index startIndex = outEntries.getCount();
+		SLANG_RETURN_ON_FAIL(fileSystem->enumeratePathContents(inBasePath, _entryCallback, (void*)&outEntries));
 
-		List<Entry> localEntries;
-		SLANG_RETURN_ON_FAIL(fileSystem->enumeratePathContents(entry.name.getBuffer(), _entryCallback, (void*)&localEntries));
+		const String basePathString(basePath);
 
-		for (const auto& localEntry : localEntries)
+		// we need to fix all of the added paths to make absolute
+		const Count count = outEntries.getCount();
+		for (Index i = startIndex; i < count; ++i)
 		{
-			outEntries.add(Entry{ localEntry.type, Path::combine(entry.name, localEntry.name) });
+			auto& entry = outEntries[i];
+			entry.path = Path::combine(basePathString, entry.path);
 		}
 	}
 
-	outEntries.sort();
+	return SLANG_OK;
+}
 
+static SlangResult _getAllEntries(ISlangFileSystemExt* fileSystem, const char* inBasePath, List<Entry>& outEntries)
+{
+	outEntries.clear();
+
+	// Simplify the base
+	auto basePath = Path::simplify(inBasePath);
+
+	_appendPathEntries(fileSystem, basePath.getBuffer(), outEntries);
+
+	for (Index i = 0; i < outEntries.getCount(); ++i)
+	{
+		// We need to make a copy as outEntries is mutated 
+		const Entry entry = outEntries[i];
+		if (entry.type == SLANG_PATH_TYPE_DIRECTORY)
+		{
+			_appendPathEntries(fileSystem, entry.path.getBuffer(), outEntries);
+		}
+	}
+
+	// Sort to remove issues with traversal ordering
+	outEntries.sort();
 	return SLANG_OK;
 }
 
@@ -158,8 +181,8 @@ static SlangResult _checkEqual(ISlangFileSystemExt* a, ISlangFileSystemExt* b)
 {
 	List<Entry> aEntries, bEntries;
 
-	SLANG_RETURN_ON_FAIL(_getAllEntries(a, aEntries));
-	SLANG_RETURN_ON_FAIL(_getAllEntries(b, bEntries));
+	SLANG_RETURN_ON_FAIL(_getAllEntries(a, ".", aEntries));
+	SLANG_RETURN_ON_FAIL(_getAllEntries(b, ".", bEntries));
 
 	if (aEntries != bEntries)
 	{
@@ -177,8 +200,8 @@ static SlangResult _checkEqual(ISlangFileSystemExt* a, ISlangFileSystemExt* b)
 
 		ComPtr<ISlangBlob> blobA, blobB;
 
-		SLANG_RETURN_ON_FAIL(a->loadFile(entry.name.getBuffer(), blobA.writeRef()));
-		SLANG_RETURN_ON_FAIL(b->loadFile(entry.name.getBuffer(), blobB.writeRef()));
+		SLANG_RETURN_ON_FAIL(a->loadFile(entry.path.getBuffer(), blobA.writeRef()));
+		SLANG_RETURN_ON_FAIL(b->loadFile(entry.path.getBuffer(), blobB.writeRef()));
 
 		if (blobA->getBufferSize() != blobB->getBufferSize())
 		{
@@ -194,46 +217,76 @@ static SlangResult _checkEqual(ISlangFileSystemExt* a, ISlangFileSystemExt* b)
 	return SLANG_OK;
 }
 
-static SlangResult _test(FileSystemType type)
+static SlangResult _createFileSystem(FileSystemType type, ComPtr<ISlangMutableFileSystem>& outFileSystem)
 {
-	ComPtr<ISlangMutableFileSystem> fileSystem;
-
+	outFileSystem.setNull();
 	switch (type)
 	{
-		case FileSystemType::Zip:
-		{
-			SLANG_RETURN_ON_FAIL(ZipFileSystem::create(fileSystem));
-			break;
-		}
-		case FileSystemType::RiffUncompressed:
-		{
-			fileSystem = new RiffFileSystem(nullptr);
-			break;
-		}
-		case FileSystemType::RiffDeflate:
-		{
-			fileSystem = new RiffFileSystem(DeflateCompressionSystem::getSingleton());
-			break;
-		}
-		case FileSystemType::RiffLZ4:
-		{
-			fileSystem = new RiffFileSystem(LZ4CompressionSystem::getSingleton());
-			break;
-		}
-		case FileSystemType::Memory:
-		{
-			fileSystem = new MemoryFileSystem;
-			break;
-		}
+		case FileSystemType::Zip:				return ZipFileSystem::create(outFileSystem);
+		case FileSystemType::RiffUncompressed:	outFileSystem = new RiffFileSystem(nullptr); break;
+		case FileSystemType::RiffDeflate:		outFileSystem = new RiffFileSystem(DeflateCompressionSystem::getSingleton()); break;
+		case FileSystemType::RiffLZ4:			outFileSystem = new RiffFileSystem(LZ4CompressionSystem::getSingleton()); break;
+		case FileSystemType::Memory:			outFileSystem = new MemoryFileSystem; break;
 		case FileSystemType::Relative:
 		{
 			ComPtr<ISlangMutableFileSystem> memoryFileSystem(new MemoryFileSystem);
 			memoryFileSystem->createDirectory("base");
 
-			fileSystem = new RelativeFileSystem(memoryFileSystem, "base");
+			outFileSystem = new RelativeFileSystem(memoryFileSystem, "base");
 			break;
 		}
 	}
+
+	return outFileSystem ? SLANG_OK : SLANG_FAIL;
+}
+
+static SlangResult _testImplicitDirectory(FileSystemType type)
+{
+	ComPtr<ISlangMutableFileSystem> fileSystem;
+	SLANG_RETURN_ON_FAIL(_createFileSystem(type, fileSystem));
+
+	const char contents3[] = "Some text....";
+
+	SLANG_RETURN_ON_FAIL(fileSystem->saveFile("implicit-path/file2.txt", contents3, SLANG_COUNT_OF(contents3)));
+
+	{
+		SlangPathType pathType;
+		SLANG_RETURN_ON_FAIL(fileSystem->getPathType("implicit-path", &pathType));
+
+		SLANG_CHECK(pathType == SLANG_PATH_TYPE_DIRECTORY);
+
+		auto checkEntries = [&]() -> SlangResult
+		{
+			List<Entry> entries;
+			SLANG_RETURN_ON_FAIL(_getAllEntries(fileSystem, "implicit-path", entries));
+
+			// It contains a file
+			SLANG_CHECK(entries.getCount() == 1);
+
+			for (const auto& entry : entries)
+			{
+				// All of these should exist
+				SlangPathType pathType;
+				SLANG_RETURN_ON_FAIL(fileSystem->getPathType(entry.path.getBuffer(), &pathType));
+			}
+			return SLANG_OK;
+		};
+
+		SLANG_RETURN_ON_FAIL(checkEntries());
+
+		// Make an explicit path, and see whe have the same results
+		fileSystem->createDirectory("implicit-path");
+
+		SLANG_RETURN_ON_FAIL(checkEntries());
+	}
+
+	return SLANG_OK;
+}
+
+static SlangResult _test(FileSystemType type)
+{
+	ComPtr<ISlangMutableFileSystem> fileSystem;
+	SLANG_RETURN_ON_FAIL(_createFileSystem(type, fileSystem));
 
 	SLANG_RETURN_ON_FAIL(_createAndCheckFile(fileSystem, "a", "someText"));
 	SLANG_RETURN_ON_FAIL(_createAndCheckFile(fileSystem, "b", "A longer bit of text...."));
@@ -295,7 +348,6 @@ static SlangResult _test(FileSystemType type)
 		SLANG_RETURN_ON_FAIL(_enumeratePath(fileSystem, ".", makeConstArrayView(entries)));
 	}
 
-
 	return SLANG_OK;
 }
 
@@ -305,9 +357,21 @@ SLANG_UNIT_TEST(fileSystem)
 	{
 		const auto type = FileSystemType(i);
 
-		auto const res = _test(type);
+		SLANG_CHECK(SLANG_SUCCEEDED(_test(type)));
 
-		SLANG_CHECK(SLANG_SUCCEEDED(res));
+		// Some file system types support 'implicit directories'. 
+		// This means that if a file is created with a path, the directories 
+		// required to make that path valid are 'implicitly' created. 
+		// 
+		// Currently this behavior is supported by zip, and this test checks
+		// that it is working correctly, as we require the file system to 
+		// behave correctly in other ways irrespectively of if the directory is
+		// implicit or not.
+		const bool hasImplicitDirectory = (type == FileSystemType::Zip);
+		if (hasImplicitDirectory)
+		{
+			SLANG_CHECK(SLANG_SUCCEEDED(_testImplicitDirectory(type)));
+		}
 	}
 }
 
