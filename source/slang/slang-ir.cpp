@@ -3629,28 +3629,19 @@ namespace Slang
 
     IRInst* IRBuilder::findDifferentiableTypeEntry(IRInst* irType, IRInst* scope)
     {
-        IRInst* diffTypeDict = nullptr;
         for (auto child = scope->getFirstChild(); child; child = child->getNextInst()) 
         {
             if (child->getOp() == kIROp_DifferentiableTypeDictionary)
             {
-                // No duplicates should exist within the same container.
-                SLANG_ASSERT(diffTypeDict == nullptr);
-                diffTypeDict = child;
-            }
-        }
-
-        if (diffTypeDict)
-        {
-            for (auto entry = diffTypeDict->getFirstChild(); entry; entry = entry->getNextInst())
-            {
-                SLANG_ASSERT(entry->getOp() == kIROp_DifferentiableTypeDictionaryItem);
-                IRInst* entryType = entry->getOperand(0);
-                IRInst* entryConformanceWitness = entry->getOperand(1);
-
-                if (irType == entryType)
+                for (auto entry = child->getFirstChild(); entry; entry = entry->getNextInst())
                 {
-                    return entryConformanceWitness;
+                    IRInst* entryType = entry->getOperand(0);
+                    IRInst* entryConformanceWitness = entry->getOperand(1);
+
+                    if (irType == entryType)
+                    {
+                        return entryConformanceWitness;
+                    }
                 }
             }
         }

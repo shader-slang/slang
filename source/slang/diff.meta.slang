@@ -8,42 +8,83 @@ syntax __differentiate_jvp : JVPDerivativeModifier;
 __attributeTarget(FuncDecl)
 attribute_syntax [__custom_jvp(function)]   : CustomJVPAttribute;
 
+/// Interface to denote types as differentiable.
+/// Allows for user-specified differential types as
+/// well as automatic generation, for when the associated type
+/// hasn't been declared explicitly.
+/// Note that the requirements must currently be defined in this exact order
+/// since the auto-diff pass relies on the order to grab the struct keys.
+/// 
+__magic_type(DifferentiableType)
+interface IDifferentiable
+{
+    associatedtype Differential;
+    
+    static Differential zero();
+
+    static Differential add(Differential, Differential);
+};
+
 // Add extensions for the standard types
 extension float : IDifferentiable
 {
     typedef float Differential;
+
+    static Differential zero()
+    {
+        return 0.f;
+    }
+
+    static Differential add(Differential a, Differential b)
+    {
+        return a + b;
+    }
 }
 
 extension vector<float, 3> : IDifferentiable
 {
     typedef vector<float, 3> Differential;
+
+    static Differential zero()
+    {
+        return vector<float, 3>(0.f);
+    }
+
+    static Differential add(Differential a, Differential b)
+    {
+        return a + b;
+    }
 }
 
 extension vector<float, 2> : IDifferentiable
 {
     typedef vector<float, 2> Differential;
+
+    static Differential zero()
+    {
+        return vector<float, 2>(0.f);
+    }
+
+    static Differential add(Differential a, Differential b)
+    {
+        return a + b;
+    }
 }
 
 extension vector<float, 4> : IDifferentiable
 {
     typedef vector<float, 4> Differential;
+
+    static Differential zero()
+    {
+        return vector<float, 4>(0.f);
+    }
+
+    static Differential add(Differential a, Differential b)
+    {
+        return a + b;
+    }
 }
-
-/// Interface to denote types as differentiable.
-/// Allows for user-specified differential types as
-/// well as automatic generation, for when the associated type
-/// hasn't been declared explicitly.
-__magic_type(DifferentiableType)
-interface IDifferentiable
-{
-    associatedtype Differential;
-
-    //Differential zero();
-
-    //Differential add(Differential, Differential);
-
-    //Differential mul(ThisType, Differential); // Is this reqd?
-};
 
     /// Pair type that serves to wrap the primal and
     /// differential types of an arbitrary type T.

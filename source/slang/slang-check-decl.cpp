@@ -1257,6 +1257,8 @@ namespace Slang
             // any substitutions.
             // 
             auto declRef = makeDeclRef(decl);
+
+            // TODO: Strip substitutions from the declreftype
             type = DeclRefType::create(m_astBuilder, declRef);
         }
 

@@ -6,6 +6,10 @@
 #include "slang-ir-clone.h"
 #include "slang-ir-dce.h"
 
+// origX, primalX, diffX
+// origX -> primalX (cloneEnv)
+// origX -> diffX (instMapD)
+
 namespace Slang
 {
 
@@ -38,6 +42,18 @@ struct DifferentiableTypeConformanceContext
     // type in the conformance table associated with the concrete type.
     // 
     IRStructKey*                            differentialAssocTypeStructKey = nullptr;
+
+    // The struct key for the 'zero()' associated type
+    // defined inside IDifferential. We use this to lookup the 
+    // implementation of zero() for a given type.
+    // 
+    IRStructKey*                            zeroMethodStructKey = nullptr;
+    
+    // The struct key for the 'add()' associated type
+    // defined inside IDifferential. We use this to lookup the 
+    // implementation of add() for a given type.
+    // 
+    IRStructKey*                            addMethodStructKey = nullptr;
     
     // Modules that don't use differentiable types
     // won't have the IDifferentiable interface type available. 
@@ -55,6 +71,9 @@ struct DifferentiableTypeConformanceContext
         {
             differentiableInterfaceType = parent->differentiableInterfaceType;
             differentialAssocTypeStructKey = parent->differentialAssocTypeStructKey;
+            zeroMethodStructKey = parent->zeroMethodStructKey;
+            addMethodStructKey = parent->addMethodStructKey;
+
             isInterfaceAvailable = parent->isInterfaceAvailable;
         }
         else
@@ -63,6 +82,8 @@ struct DifferentiableTypeConformanceContext
             if (differentiableInterfaceType)
             {
                 differentialAssocTypeStructKey = findDifferentialTypeStructKey();
+                zeroMethodStructKey = findZeroMethodStructKey();
+                addMethodStructKey = findAddMethodStructKey();
 
                 if (differentialAssocTypeStructKey)
                     isInterfaceAvailable = true;
@@ -90,6 +111,30 @@ struct DifferentiableTypeConformanceContext
 
         return nullptr;
     }
+
+    IRInst* lookUpInterfaceMethod(IRBuilder* builder, IRType* origType, IRStructKey* key)
+    {
+         if (auto conformance = lookUpConformanceForType(builder, origType))
+        {
+            if (auto witnessTable = as<IRWitnessTable>(conformance))
+            {
+                for (auto entry : witnessTable->getEntries())
+                {
+                    if (entry->getRequirementKey() == key)
+                        return entry->getSatisfyingVal();
+                }
+            }
+            else if (auto witnessTableParam = as<IRParam>(conformance))
+            {
+                return builder->emitLookupInterfaceMethodInst(
+                    builder->getTypeKind(),
+                    witnessTableParam,
+                    key);
+            }
+        }
+
+        return nullptr;
+    }
     
     // Lookup and return the 'Differential' type declared in the concrete type
     // in order to conform to the IDifferentiable interface.
@@ -98,27 +143,17 @@ struct DifferentiableTypeConformanceContext
     // 
     IRInst* getDifferentialForType(IRBuilder* builder, IRType* origType)
     {
+        return lookUpInterfaceMethod(builder, origType, differentialAssocTypeStructKey);
+    }
 
-        if (auto conformance = lookUpConformanceForType(builder, origType))
-        {
-            if (auto witnessTable = as<IRWitnessTable>(conformance))
-            {
-                for (auto entry : witnessTable->getEntries())
-                {
-                    if (entry->getRequirementKey() == differentialAssocTypeStructKey)
-                        return as<IRType>(entry->getSatisfyingVal());
-                }
-            }
-            else if (auto witnessTableParam = as<IRParam>(conformance))
-            {
-                return builder->emitLookupInterfaceMethodInst(
-                    builder->getTypeKind(),
-                    witnessTableParam,
-                    differentialAssocTypeStructKey);
-            }
-        }
+    IRInst* getZeroMethodForType(IRBuilder* builder, IRType* origType)
+    {
+        return lookUpInterfaceMethod(builder, origType, zeroMethodStructKey);
+    }
 
-        return nullptr;
+    IRInst* getAddMethodForType(IRBuilder* builder, IRType* origType)
+    {
+        return lookUpInterfaceMethod(builder, origType, addMethodStructKey);
     }
 
     private:
@@ -144,11 +179,26 @@ struct DifferentiableTypeConformanceContext
 
     IRStructKey* findDifferentialTypeStructKey()
     {
+        return getIDifferentiableStructKeyAtIndex(0);
+    }
+
+    IRStructKey* findZeroMethodStructKey()
+    {
+        return getIDifferentiableStructKeyAtIndex(1);
+    }
+
+    IRStructKey* findAddMethodStructKey()
+    {
+        return getIDifferentiableStructKeyAtIndex(2);
+    }
+
+    IRStructKey* getIDifferentiableStructKeyAtIndex(UInt index)
+    {
         if (as<IRModuleInst>(inst) && differentiableInterfaceType)
         {
-            // Assume for now that IDifferentiable has exactly one field: the 'Differential' associated type.
-            SLANG_ASSERT(differentiableInterfaceType->getOperandCount() == 1);
-            if (auto entry = as<IRInterfaceRequirementEntry>(differentiableInterfaceType->getOperand(0)))
+            // Assume for now that IDifferentiable has exactly three fields.
+            SLANG_ASSERT(differentiableInterfaceType->getOperandCount() == 3);
+            if (auto entry = as<IRInterfaceRequirementEntry>(differentiableInterfaceType->getOperand(index)))
                 return as<IRStructKey>(entry->getRequirementKey());
             else
             {
@@ -338,6 +388,14 @@ struct DifferentialPairTypeBuilder
                     ));
                 }
             }
+            else if (auto ptrBaseStructType = as<IRStructType>(ptrType->getValueType()))
+            {
+                return as<IRFieldAddress>(builder->emitFieldAddress(
+                    builder->getPtrType((IRType*)
+                            findField(ptrBaseStructType, key)->getFieldType()),
+                    baseInst,
+                    key));
+            }
         }
         else if (auto specializedType = as<IRSpecialize>(baseInst->getDataType()))
         {
@@ -483,24 +541,13 @@ struct DifferentialPairTypeBuilder
     {
         if (auto diffBaseType = diffConformanceContext->getDifferentialForType(builder, origBaseType))
         {
-            if (auto param = as<IRParam>(origBaseType))
-            {
-                auto genericDiffPair = _getOrCreateGenericDiffPairType(builder);
-                IRInst* args[] = {origBaseType, diffBaseType};
+            SLANG_ASSERT(!as<IRParam>(origBaseType));
 
-                auto irSpecialize = builder->emitSpecializeInst(builder->getTypeKind(), genericDiffPair, 2, args);
+            auto pairStructType = builder->createStructType();
+            builder->createStructField(pairStructType, _getOrCreatePrimalStructKey(builder), origBaseType);
+            builder->createStructField(pairStructType, _getOrCreateDiffStructKey(builder), (IRType*) diffBaseType);
 
-                return irSpecialize;
-            }
-            else
-            {
-                auto genericDiffPair = _getOrCreateGenericDiffPairType(builder);
-                IRInst* args[] = {origBaseType, diffBaseType};
-
-                auto irSpecialize = builder->emitSpecializeInst(builder->getTypeKind(), genericDiffPair, 2, args);
-
-                return irSpecialize;
-            }
+            return pairStructType;
         }
         return nullptr;
     }
@@ -678,14 +725,12 @@ struct JVPTranscriber
         //
         IRInst* primalType = lookupPrimalInst(origType, origType);
         
+        // Special case certain compound types (PtrType, FuncType, etc..)
+        // otherwise try to lookup a differential definition for the given type.
+        // If one does not exist, then we assume it's not differentiable.
+        // 
         switch (primalType->getOp())
         {
-        case kIROp_HalfType:
-        case kIROp_FloatType:
-        case kIROp_DoubleType:
-        case kIROp_VectorType:
-            return (IRType*)(diffConformanceContext->getDifferentialForType(builder, as<IRType>(primalType)));
-
         case kIROp_Param:
             if (as<IRTypeType>(primalType->getDataType()))
                 return (IRType*)(diffConformanceContext->getDifferentialForType(
@@ -716,7 +761,7 @@ struct JVPTranscriber
             }
 
         default:
-            SLANG_UNEXPECTED("Cannot differentiate unhandled type");
+            return (IRType*)(diffConformanceContext->getDifferentialForType(builder, (IRType*)primalType));
         }
     }
     
@@ -826,8 +871,8 @@ struct JVPTranscriber
         auto diffLeft = findOrTranscribeDiffInst(builder, origLeft);
         auto diffRight = findOrTranscribeDiffInst(builder, origRight);
 
-        auto leftZero = builder->getFloatValue(origLeft->getDataType(), 0.0);
-        auto rightZero = builder->getFloatValue(origRight->getDataType(), 0.0);
+        auto leftZero = getDifferentialZeroOfType(builder, primalLeft->getDataType());
+        auto rightZero = getDifferentialZeroOfType(builder, primalRight->getDataType());
 
         if (diffLeft || diffRight)
         {
@@ -930,7 +975,10 @@ struct JVPTranscriber
             IRInst* primalReturnVal = findOrTranscribePrimalInst(builder, origReturnVal);
             IRInst* diffReturnVal = findOrTranscribeDiffInst(builder, origReturnVal);
             if(!diffReturnVal)
-                diffReturnVal = getZeroOfType(builder, returnDataType);
+                diffReturnVal = getDifferentialZeroOfType(builder, returnDataType);
+
+            // If the pair type can be formed, this must be non-null.
+            SLANG_RELEASE_ASSERT(diffReturnVal);
 
             auto diffPair = builder->emitMakeDifferentialPair(pairType, primalReturnVal, diffReturnVal);
             IRReturn* pairReturn = as<IRReturn>(builder->emitReturn(diffPair));
@@ -938,10 +986,19 @@ struct JVPTranscriber
         }
         else
         {
-            // If the differential return value is not available, emit a 
-            // void return.
-            IRInst* voidReturn = builder->emitReturn();
-            return InstPair(voidReturn, voidReturn);
+            // If the return type is not differentiable, emit the primal value only.
+            IRInst* primalReturnVal = findOrTranscribePrimalInst(builder, origReturnVal);
+
+            IRInst* primalReturn = builder->emitReturn(primalReturnVal);
+            return InstPair(primalReturn, nullptr);
+            
+            /*
+                // If the differential return value is not available, emit a 
+                // void return.
+                // TODO(sai): This seems incorrect.
+                IRInst* voidReturn = builder->emitReturn();
+                return InstPair(voidReturn, voidReturn);
+            */
         }
     }
 
@@ -973,7 +1030,7 @@ struct JVPTranscriber
                 {
                     auto operandDataType = origConstruct->getOperand(ii)->getDataType();
                     operandDataType = (IRType*) lookupPrimalInst(operandDataType, operandDataType);
-                    diffOperands.add(getZeroOfType(builder, operandDataType));
+                    diffOperands.add(getDifferentialZeroOfType(builder, operandDataType));
                 }
             }
             
@@ -997,15 +1054,21 @@ struct JVPTranscriber
     // 
     InstPair transcribeCall(IRBuilder* builder, IRCall* origCall)
     {   
-        if (as<IRFunc>(origCall->getCallee()) || as<IRSpecialize>(origCall->getCallee()))
+
+        if (as<IRFunc>(origCall->getCallee()))
         {
-            
             auto origCallee = origCall->getCallee();
 
+            // Since concrete functions are globals, the primal callee is the same
+            // as the original callee.
+            //
+            auto primalCallee = origCallee;
+
+            // TODO: If inner is not differentiable, treat as non-differentiable call.
             // Build the differential callee
             IRInst* diffCall = builder->emitJVPDifferentiateInst(
-                differentiateFunctionType(builder, as<IRFuncType>(origCallee->getFullType())),
-                origCallee);
+                differentiateFunctionType(builder, as<IRFuncType>(primalCallee->getFullType())),
+                primalCallee);
             
             List<IRInst*> args;
             // Go over the parameter list and create pairs for each input (if required)
@@ -1018,14 +1081,14 @@ struct JVPTranscriber
                 auto primalType = primalArg->getDataType();
                 if (auto pairType = tryGetDiffPairType(builder, primalType))
                 {
-                    
                     auto diffArg = findOrTranscribeDiffInst(builder, origArg);
 
-                    // TODO(sai): This part is temporary. Replace with a call to the 
-                    // 'zero()' interface method.
                     if (!diffArg)
-                        diffArg = getZeroOfType(builder, primalType);
+                        diffArg = getDifferentialZeroOfType(builder, primalType);
                     
+                    // If a pair type can be formed, this must be non-null.
+                    SLANG_RELEASE_ASSERT(diffArg);
+
                     auto diffPair = builder->emitMakeDifferentialPair(pairType, primalArg, diffArg);
 
                     args.add(diffPair);
@@ -1045,6 +1108,13 @@ struct JVPTranscriber
             return InstPair(
                 pairBuilder->emitPrimalFieldAccess(builder, callInst),
                 pairBuilder->emitDiffFieldAccess(builder, callInst));
+        }
+        else if(as<IRSpecialize>(origCall->getCallee()) ||
+                as<IRLookupWitnessMethod>(origCall->getCallee()))
+        {
+            getSink()->diagnose(origCall->sourceLoc,
+                Diagnostics::unimplemented,
+                "attempting to differentiate unspecialized callee or an interface method");
         }
         else
         {
@@ -1148,6 +1218,7 @@ struct JVPTranscriber
         switch(origInst->getOp())
         {
             case kIROp_FloatLit:
+            case kIROp_VoidLit:
                 return InstPair(origInst, nullptr);
         }
 
@@ -1172,12 +1243,57 @@ struct JVPTranscriber
         return InstPair(diffSpecialize, diffSpecialize);
     }
 
+    InstPair transcibeLookupInterfaceMethod(IRBuilder* builder, IRLookupWitnessMethod* origLookup)
+    {
+        // This is slightly counter-intuitive, but we don't perform any differentiation
+        // logic here. We simple clone the original lookup which points to the original function,
+        // or the cloned version in case we're inside a generic scope.
+        // The differentiation logic is inserted later when this is used in an IRCall.
+        // This decision is mostly to maintain a uniform convention of JVPDifferentiate(Lookup(Table))
+        // rather than have Lookup(JVPDifferentiate(Table))
+        // 
+        auto diffLookup = cloneInst(&cloneEnv, builder, origLookup);
+        return InstPair(diffLookup, diffLookup);
+    }
+
     // In differential computation, the 'default' differential value is always zero.
     // This is a consequence of differential computing being inherently linear. As a 
     // result, it's useful to have a method to generate zero literals of any (arithmetic) type.
+    // The current implementation requires that types are defined linearly.
     // 
-    IRInst* getZeroOfType(IRBuilder* builder, IRType* type)
+    IRInst* getDifferentialZeroOfType(IRBuilder* builder, IRType* primalType)
     {
+        if (auto diffType = differentiateType(builder, primalType))
+        {
+            // Since primalType has a corresponding differential type, we can lookup the 
+            // definition for zero().
+            auto zeroMethod = this->diffConformanceContext->getZeroMethodForType(builder, primalType);
+            SLANG_ASSERT(zeroMethod);
+
+            auto emptyArgList = List<IRInst*>();
+            return builder->emitCallInst((IRType*)diffType, zeroMethod, emptyArgList);
+        }
+        else
+        {
+            // We special case a few non-differentiable types that sometimes appear in places
+            // where we're forced to provide a differential zero value. For instance, 
+            // float3(float, float, int) is accepted by the compiler, but is tricky in the context
+            // of differentiation since int is non-differentiable, and should be cast to float first.
+            // In the absence of such casts, this piece of code generates appropriate zero values.
+            // 
+            switch (primalType->getOp())
+            {
+                case kIROp_IntType:
+                    return builder->getIntValue(primalType, 0);
+                default:
+                    getSink()->diagnose(primalType->sourceLoc,
+                        Diagnostics::internalCompilerError,
+                        "could not generate zero value for given type");
+                    return nullptr;
+            }
+        }
+
+        /*
         switch (type->getOp())
         {
             case kIROp_FloatType:
@@ -1188,7 +1304,7 @@ struct JVPTranscriber
                 return builder->getIntValue(type, 0);
             case kIROp_VectorType:
             {
-                IRInst* args[] = {getZeroOfType(builder, as<IRVectorType>(type)->getElementType())};
+                IRInst* args[] = {getDifferentialZeroOfType(builder, as<IRVectorType>(type)->getElementType())};
                 return builder->emitIntrinsicInst(
                     type,
                     kIROp_constructVectorFromScalar,
@@ -1201,6 +1317,7 @@ struct JVPTranscriber
                     "could not generate zero value for given type");
                 return nullptr;       
         }
+        */
     }
 
     InstPair transcribeBlock(IRBuilder* builder, IRBlock* origBlock)
@@ -1242,6 +1359,44 @@ struct JVPTranscriber
         builder->setInsertLoc(oldLoc);
 
         return InstPair(diffBlock, diffBlock);
+    }
+
+    InstPair transcribeFieldExtract(IRBuilder* builder, IRFieldExtract* origExtract)
+    {
+        IRInst* origBase = origExtract->getBase();
+        auto primalBase = findOrTranscribePrimalInst(builder, origBase);
+        auto diffBase = findOrTranscribeDiffInst(builder, origBase);
+
+        auto primalExtractType = (IRType*)lookupPrimalInst(origExtract->getDataType(), origExtract->getDataType());
+
+        IRInst* primalExtract = builder->emitFieldExtract(primalExtractType, primalBase, origExtract->getField());
+        IRInst* diffExtract = nullptr;
+
+        if (auto diffExtractType = differentiateType(builder, primalExtractType))
+        {
+            diffExtract = builder->emitFieldExtract(diffExtractType, diffBase, origExtract->getField());
+        }
+
+        return InstPair(primalExtract, diffExtract);
+    }
+
+    InstPair transcribeFieldAddress(IRBuilder* builder, IRFieldAddress* origAddress)
+    {
+        IRInst* origBase = origAddress->getBase();
+        auto primalBase = findOrTranscribePrimalInst(builder, origBase);
+        auto diffBase = findOrTranscribeDiffInst(builder, origBase);
+
+        auto primalAddressType = (IRType*)lookupPrimalInst(origAddress->getDataType(), origAddress->getDataType());
+
+        IRInst* primalAddress = builder->emitFieldAddress(primalAddressType, primalBase, origAddress->getField());
+        IRInst* diffAddress = nullptr;
+
+        if (auto diffAddressType = differentiateType(builder, primalAddressType))
+        {
+            diffAddress = builder->emitFieldAddress(diffAddressType, diffBase, origAddress->getField());
+        }
+
+        return InstPair(primalAddress, diffAddress);
     }
 
     // Transcribe a function definition.
@@ -1416,7 +1571,20 @@ struct JVPTranscriber
             return transcribeControlFlow(builder, origInst);
 
         case kIROp_FloatLit:
+        case kIROp_VoidLit:
             return transcribeConst(builder, origInst);
+
+        case kIROp_Specialize:
+            return transcribeSpecialize(builder, as<IRSpecialize>(origInst));
+
+        case kIROp_lookup_interface_method:
+            return transcibeLookupInterfaceMethod(builder, as<IRLookupWitnessMethod>(origInst));
+
+        case kIROp_FieldExtract:
+            return transcribeFieldExtract(builder, as<IRFieldExtract>(origInst));
+        
+        case kIROp_FieldAddress:
+            return transcribeFieldAddress(builder, as<IRFieldAddress>(origInst));
 
         case kIROp_DifferentiableTypeDictionary:
             // Ignore dictionary insts.
@@ -1425,7 +1593,7 @@ struct JVPTranscriber
         }
     
         // If none of the cases have been hit, check if the instruction is a
-        // type. Only differentiate types if they appear inside a block.
+        // type. Only need to explicitly differentiate types if they appear inside a block.
         // 
         if (auto origType = as<IRType>(origInst))
         {   

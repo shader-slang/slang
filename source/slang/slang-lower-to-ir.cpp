@@ -1146,10 +1146,6 @@ static void addLinkageDecoration(
     {
         builder->addExternCppDecoration(inst, mangledName);
     }
-    if (decl->findModifier<JVPDerivativeModifier>())
-    {
-        builder->addJVPDerivativeMarkerDecoration(inst);
-    }
     if (as<InterfaceDecl>(decl->parentDecl) &&
         decl->parentDecl->hasModifier<ComInterfaceAttribute>())
     {
@@ -7767,6 +7763,11 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         addNameHint(context, irFunc, decl);
         addLinkageDecoration(context, irFunc, decl);
 
+        if (decl->findModifier<JVPDerivativeModifier>())
+        {
+            getBuilder()->addJVPDerivativeMarkerDecoration(irFunc);
+        }
+
         FuncDeclBaseTypeInfo info;
         _lowerFuncDeclBaseTypeInfo(
             subContext,
@@ -8826,15 +8827,6 @@ RefPtr<IRModule> generateIRForTranslationUnit(
     // Next, attempt to promote local variables to SSA
     // temporaries whenever possible.
     constructSSA(module);
-
-    // Process higher-order-function calls before any optimization passes
-    // to allow the optimizations to affect the generated funcitons.
-    // 1. Process JVP derivative functions.
-    processJVPDerivativeMarkers(module, compileRequest->getSink());
-    // 2. Process VJP derivative functions.
-    // processVJPDerivativeMarkers(module); // Disabled currently. No impl yet.
-    // 3. Replace JVP & VJP calls.
-    processDerivativeCalls(module);
 
     // Do basic constant folding and dead code elimination
     // using Sparse Conditional Constant Propagation (SCCP)
