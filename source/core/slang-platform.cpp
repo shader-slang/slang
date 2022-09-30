@@ -289,6 +289,14 @@ static const PlatformFlags s_familyFlags[int(PlatformFamily::CountOf)] =
     return s_familyFlags[int(family)];
 }
 
-
+/* static */SlangResult PlatformUtil::outputDebugMessage(const char* text)
+{
+#ifdef _WIN32
+    OutputDebugStringA(text);
+    return SLANG_OK;
+#else
+    return SLANG_E_NOT_AVAILABLE;
+#endif
+}
 
 }
