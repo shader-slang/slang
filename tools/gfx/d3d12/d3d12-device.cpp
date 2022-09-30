@@ -376,14 +376,29 @@ Result DeviceImpl::initialize(const Desc& desc)
 {
     SLANG_RETURN_ON_FAIL(RendererBase::initialize(desc));
 
+    // Rather than statically link against D3D, we load it dynamically.
+
+    HMODULE d3dModule = LoadLibraryA("d3d12.dll");
+    if (!d3dModule)
+    {
+        getDebugCallback()->handleMessage(
+            DebugMessageType::Error, DebugMessageSource::Layer, "error: failed load 'd3d12.dll'\n");
+        return SLANG_FAIL;
+    }
+
     // Find extended desc.
     for (GfxIndex i = 0; i < desc.extendedDescCount; i++)
     {
         StructType stype;
         memcpy(&stype, desc.extendedDescs[i], sizeof(stype));
-        if (stype == StructType::D3D12ExtendedDesc)
+        switch (stype )
         {
+        case StructType::D3D12DeviceExtendedDesc:
             memcpy(&m_extendedDesc, desc.extendedDescs[i], sizeof(m_extendedDesc));
+            break;
+        case StructType::D3D12ExperimentalFeaturesDesc:
+            processExperimentalFeaturesDesc(d3dModule, desc.extendedDescs[i]);
+            break;
         }
     }
 
@@ -399,15 +414,6 @@ Result DeviceImpl::initialize(const Desc& desc)
         m_info.apiName = "Direct3D 12";
         static const float kIdentity[] = { 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1 };
         ::memcpy(m_info.identityProjectionMatrix, kIdentity, sizeof(kIdentity));
-    }
-
-    // Rather than statically link against D3D, we load it dynamically.
-
-    HMODULE d3dModule = LoadLibraryA("d3d12.dll");
-    if (!d3dModule)
-    {
-        fprintf(stderr, "error: failed load 'd3d12.dll'\n");
-        return SLANG_FAIL;
     }
 
     // Get all the dll entry points
@@ -621,6 +627,16 @@ Result DeviceImpl::initialize(const Desc& desc)
                 {
                     m_features.add("rasterizer-ordered-views");
                 }
+            }
+        }
+        {
+            D3D12_FEATURE_DATA_D3D12_OPTIONS1 options;
+            if (SLANG_SUCCEEDED(m_device->CheckFeatureSupport(
+                D3D12_FEATURE_D3D12_OPTIONS1, &options, sizeof(options))))
+            {
+                // Check wave operations support
+                if (options.WaveOps)
+                    m_features.add("wave-ops");
             }
         }
         {
@@ -1905,6 +1921,39 @@ void DeviceImpl::submitResourceCommandsAndWait(const DeviceImpl::ResourceCommand
     m_resourceCommandQueue->executeCommandBuffer(info.commandBuffer);
     m_resourceCommandTransientHeap->finish();
     m_resourceCommandTransientHeap->synchronizeAndReset();
+}
+
+void DeviceImpl::processExperimentalFeaturesDesc(void* d3dModule, void* inDesc)
+{
+    typedef HRESULT(WINAPI* PFN_D3D12_ENABLE_EXPERIMENTAL_FEATURES)(
+        UINT      NumFeatures,
+        const IID* pIIDs,
+        void* pConfigurationStructs,
+        UINT* pConfigurationStructSizes
+        );
+
+    D3D12ExperimentalFeaturesDesc desc = {};
+    memcpy(&desc, inDesc, sizeof(desc));
+    auto enableExperimentalFeaturesFunc =
+        (PFN_D3D12_ENABLE_EXPERIMENTAL_FEATURES)loadProc((HMODULE)d3dModule, "D3D12EnableExperimentalFeatures");
+    if (!enableExperimentalFeaturesFunc)
+    {
+        getDebugCallback()->handleMessage(
+            gfx::DebugMessageType::Warning,
+            gfx::DebugMessageSource::Layer,
+            "cannot enable D3D12 experimental features, 'D3D12EnableExperimentalFeatures' function "
+            "not found.");
+        return;
+    }
+    if (!SLANG_SUCCEEDED(enableExperimentalFeaturesFunc(desc.numFeatures, (IID*)desc.featureIIDs, desc.configurationStructs, desc.configurationStructSizes)))
+    {
+        getDebugCallback()->handleMessage(
+            gfx::DebugMessageType::Warning,
+            gfx::DebugMessageSource::Layer,
+            "cannot enable D3D12 experimental features, 'D3D12EnableExperimentalFeatures' call "
+            "failed.");
+        return;
+    }
 }
 
 Result DeviceImpl::createQueryPool(const IQueryPool::Desc& desc, IQueryPool** outState)

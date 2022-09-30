@@ -6,8 +6,6 @@
 #include "slang-io.h"
 #include "slang-string-util.h"
 #include "slang-blob.h"
-#include "slang-string-slice-pool.h"
-#include "slang-uint-set.h"
 
 #include "slang-riff-file-system.h"
 

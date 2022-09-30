@@ -29,6 +29,9 @@
     <ClCompile Include="..\..\..\tools\slang-unit-test\unit-test-compression.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\tools\slang-unit-test\unit-test-file-system.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\..\tools\slang-unit-test\unit-test-find-type-by-name.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
