@@ -53,7 +53,7 @@ static FileSystemStyle _getFileSystemStyle(ISlangFileSystem* system, ComPtr<ISla
     return style;
 }
 
-// Cacluate a combined path, just using Path:: string processing
+// Calcuate a combined path, just using Path:: string processing
 static SlangResult _calcCombinedPath(SlangPathType fromPathType, const char* fromPath, const char* path, ISlangBlob** pathOut)
 {
     String relPath;
@@ -870,23 +870,31 @@ SlangResult RelativeFileSystem::_calcCombinedPathInner(SlangPathType fromPathTyp
         return _calcCombinedPath(fromPathType, fromPath, path, outPath);
     }
 }
-SlangResult RelativeFileSystem::_getFixedPath(const char* path, String& outPath)
+
+SlangResult RelativeFileSystem::_getCanonicalPath(const char* path, StringBuilder& outPath)
 {
-    ComPtr<ISlangBlob> blob;
     if (m_stripPath)
     {
         // We are just using the filename. There is no path that could go outside of the the relative path so we can use as is
-        String strippedPath = Path::getFileName(path);
-        SLANG_RETURN_ON_FAIL(_calcCombinedPathInner(SLANG_PATH_TYPE_DIRECTORY, m_relativePath.getBuffer(), strippedPath.getBuffer(), blob.writeRef()));
+        auto fileName = Path::getFileName(path);
+
+        outPath.swapWith(fileName);
     }
     else
     {
         // We want the input path to be local to this file system
-        StringBuilder localPath;
-        SLANG_RETURN_ON_FAIL(Path::simplifyAbsolute(path, localPath));
-        // Combine
-        SLANG_RETURN_ON_FAIL(_calcCombinedPathInner(SLANG_PATH_TYPE_DIRECTORY, m_relativePath.getBuffer(), localPath.getBuffer(), blob.writeRef()));
+        SLANG_RETURN_ON_FAIL(Path::simplifyAbsolute(path, outPath));
     }
+    return SLANG_OK;
+}
+
+SlangResult RelativeFileSystem::_getFixedPath(const char* path, String& outPath)
+{
+    ComPtr<ISlangBlob> blob;
+
+    StringBuilder canonicalPath;
+    SLANG_RETURN_ON_FAIL(_getCanonicalPath(path, canonicalPath));
+    SLANG_RETURN_ON_FAIL(_calcCombinedPathInner(SLANG_PATH_TYPE_DIRECTORY, m_relativePath.getBuffer(), canonicalPath.getBuffer(), blob.writeRef()));
 
     outPath = StringUtil::getString(blob);
     return SLANG_OK;
@@ -943,39 +951,14 @@ SlangResult RelativeFileSystem::getPath(PathKind kind, const char* path, ISlangB
         }
         case PathKind::Display:
         {
-            // If it's display and it's backed by OS, get the OS path
-            if (fileSystem->getOSPathKind() != OSPathKind::None)
-            {
-                kind = PathKind::OperatingSystem;
-            }
-            else
-            {
-                // Otherwise lets just simplify
-                *outPath = StringBlob::moveCreate(Path::simplify(UnownedStringSlice(path))).detach();
-                return SLANG_OK;
-            }
+            // If not backed by OS, just use simplified path, else use the Operating system path
+            kind = (fileSystem->getOSPathKind() == OSPathKind::None) ? PathKind::Simplified : PathKind::OperatingSystem;
+            return getPath(kind, path, outPath);
         }
-        default: break;
-    }
-
-    switch (kind)
-    {
         case PathKind::Canonical:
         {   
-            // Work out the path within this file system.
-            String canonicalPath;
-            if (m_stripPath)
-            {
-                // Get the filename it uniquely defines the filename, if we are stripping the path
-                canonicalPath = Path::getFileName(path);
-            }
-            else
-            {
-                // It must work as an absolute path, to be in the file system.
-                StringBuilder absPath;
-                SLANG_RETURN_ON_FAIL(Path::simplifyAbsolute(UnownedStringSlice(path), absPath));
-                canonicalPath = absPath;
-            }
+            StringBuilder canonicalPath;
+            SLANG_RETURN_ON_FAIL(_getCanonicalPath(path, canonicalPath));
             *outPath = StringBlob::moveCreate(canonicalPath).detach();
             return SLANG_OK;
         }
