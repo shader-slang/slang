@@ -10,6 +10,8 @@
 #include "slang-uint-set.h"
 #include "slang-riff.h"
 
+#include "slang-implicit-directory-collector.h"
+
 #include "../../external/miniz/miniz.h"
 #include "../../external/miniz/miniz_common.h"
 #include "../../external/miniz/miniz_tdef.h"

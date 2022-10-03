@@ -4,8 +4,7 @@
 #include "slang-io.h"
 #include "slang-blob.h"
 
-// For ImplicitDirectoryCollector
-#include "slang-archive-file-system.h"
+#include "slang-implicit-directory-collector.h"
 
 namespace Slang
 {
