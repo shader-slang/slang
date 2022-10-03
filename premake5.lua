@@ -356,11 +356,12 @@ newoption {
      filter { "system:linux" }
          links { "dl" }
          --
-         -- `--start-group`  - allows libraries to be listed in any order (do not require dependency order)
          -- `--no-undefined` - by default if a symbol is not found in a link it will assume it will be resolved at runtime (!)
          --                    this option ensures that all the referenced symbols exist
          --
-         linkoptions{ "-Wl,-rpath,'$$ORIGIN',--no-as-needed,--no-undefined,--start-group" }
+         linkoptions{ "-Wl,-rpath,'$$ORIGIN',--no-as-needed,--no-undefined" }
+         -- allow libraries to be listed in any order (do not require dependency order)
+         linkgroups "On"
  
  function dump(o)
      if type(o) == 'table' then
