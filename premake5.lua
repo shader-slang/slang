@@ -513,7 +513,8 @@ newoption {
      --
      objdir("intermediate/" .. targetName .. "/%{cfg.buildcfg:lower()}/%{prj.name}")
  
-     -- All of our projects are written in C++.
+     -- Treat C++ as the default language, projects in other languages can
+     -- override this later
      --
      language "C++"
 
@@ -1479,6 +1480,7 @@ tool "slangd"
      pic "On"
  
      -- Add the files explicitly
+     language "C"
      files
      {
          "external/miniz/miniz.c",
@@ -1496,6 +1498,7 @@ tool "slangd"
      pic "On"
  
      -- Add the files explicitly
+     language "C"
      files
      {
          "external/lz4/lib/lz4.c",
