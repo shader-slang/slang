@@ -1,14 +1,11 @@
-#ifndef SLANG_ARCHIVE_FILE_SYSTEM_H
-#define SLANG_ARCHIVE_FILE_SYSTEM_H
+#ifndef SLANG_CORE_ARCHIVE_FILE_SYSTEM_H
+#define SLANG_CORE_ARCHIVE_FILE_SYSTEM_H
 
 #include "slang-basic.h"
 
 #include "../../slang-com-ptr.h"
 
 #include "slang-compression-system.h"
-
-#include "slang-string-slice-pool.h"
-#include "slang-com-object.h"
 
 namespace Slang
 {
