@@ -7244,14 +7244,21 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             }
         }
 
-        for (auto member : genericDecl->members)
+        // We only need dictionaries to be lowered for decls with executable code (i.e. statements)
+        // Do not lower type dictionaries for inhertiance decls or decls 
+        // that are declaring a type, since this can create a cyclic dependancy.
+        // 
+        if (as<FunctionDeclBase>(leafDecl))
         {
-            if (auto diffTypeDict = as<DifferentiableTypeDictionary>(member))
+            for (auto member : genericDecl->members)
             {
-                // We directly use lowerDecl() instead of ensureDecl() to emit to
-                // the current generic block instead of the top-level module.
-                // 
-                lowerDecl(subContext, diffTypeDict);
+                if (auto diffTypeDict = as<DifferentiableTypeDictionary>(member))
+                {
+                    // We directly use lowerDecl() instead of ensureDecl() to emit to
+                    // the current generic block instead of the top-level module.
+                    // 
+                    lowerDecl(subContext, diffTypeDict);
+                }
             }
         }
 

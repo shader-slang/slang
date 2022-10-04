@@ -1763,8 +1763,8 @@ namespace Slang
         // without needing dummy initializer/constructor declarations.
         //
         // Handling that special casing here (rather than in, say,
-        // `visitTypeCastExpr`) would allow us to continue to ensure
         // that `(T) expr` and `T(expr)` continue to be semantically
+        // `visitTypeCastExpr`) would allow us to continue to ensure
         // equivalent in (almost) all cases.
 
         if (!context.bestCandidate)

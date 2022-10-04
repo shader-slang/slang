@@ -305,8 +305,10 @@ namespace Slang
         //
         List<ModuleDecl*> importedModulesList;
         HashSet<ModuleDecl*> importedModulesSet;
-
+        
         DifferentiableTypeSemanticContext diffTypeContext;
+
+        List<DifferentiableTypeSemanticContext*> diffTypeContextStack;
 
     public:
         SharedSemanticsContext(
@@ -345,6 +347,23 @@ namespace Slang
         DifferentiableTypeSemanticContext* getDiffTypeContext()
         {
             return &diffTypeContext;
+        }
+
+        DifferentiableTypeSemanticContext* innermostDiffTypeContext()
+        {
+            return (diffTypeContextStack.getCount() > 0) ? diffTypeContextStack.getLast() : &diffTypeContext;
+        }
+
+        void pushDiffTypeContext(DifferentiableTypeSemanticContext* context)
+        {
+            diffTypeContextStack.add(context);
+        }
+
+        DifferentiableTypeSemanticContext* popDiffTypeContext()
+        {
+            auto context = diffTypeContextStack.getLast();
+            diffTypeContextStack.removeLast();
+            return context;
         }
 
             /// Get the list of extension declarations that appear to apply to `decl` in this context
@@ -730,6 +749,8 @@ namespace Slang
         TypeExp CheckUsableType(TypeExp typeExp);
 
         Expr* CheckTerm(Expr* term);
+
+        Expr* _CheckTerm(Expr* term);
 
         Expr* CreateErrorExpr(Expr* expr);
 

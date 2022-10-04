@@ -835,7 +835,15 @@ namespace Slang
 
         // If `decl` is a container, then we want to ensure its children.
         if(auto containerDecl = as<ContainerDecl>(decl))
-        {            
+        {
+            bool trackDiffTypes = (as<GenericDecl>(decl) != nullptr);
+            if (trackDiffTypes)
+            {
+                // Add a context to track differentiable types.
+                DifferentiableTypeSemanticContext subDiffTypeContext;
+                visitor->getShared()->pushDiffTypeContext(&subDiffTypeContext);
+            }
+
             // NOTE! We purposefully do not iterate with the for(auto childDecl : containerDecl->members) here,
             // because the visitor may add to `members` whilst iteration takes place, invalidating the iterator
             // and likely a crash.
@@ -856,6 +864,21 @@ namespace Slang
                     continue;
 
                 _ensureAllDeclsRec(visitor, childDecl, state);
+            }
+
+            if (trackDiffTypes)
+            {    
+                auto subDiffTypeContext = visitor->getShared()->popDiffTypeContext();
+
+                // If there were any differentiable types used in differentiable 
+                // methods, generate a dictionary with the required info.
+                // 
+                if (subDiffTypeContext->isDictionaryRequired())
+                {
+                    auto diffTypeDict = subDiffTypeContext->makeDifferentiableTypeDictionaryNode(visitor->getASTBuilder());
+                    diffTypeDict->parentDecl = containerDecl;
+                    containerDecl->members.add(diffTypeDict);
+                }
             }
         }
 
@@ -1234,7 +1257,7 @@ namespace Slang
         }
     }
 
-    void SemanticsVisitor::tryAddDifferentiableConformanceToContext(Decl* decl, DifferentiableTypeSemanticContext* context)
+    void SemanticsVisitor::tryAddDifferentiableConformanceToContext(Decl* decl, DifferentiableTypeSemanticContext*)
     {
         // If the autodiff core library (diff.meta.slang) has not been loaded yet, ignore any
         // request to check differentiable types.
@@ -1271,7 +1294,8 @@ namespace Slang
         // 
         if (auto witness = as<SubtypeWitness>(tryGetInterfaceConformanceWitness(type, diffInterface)))
         {
-            context->registerDifferentiableType(type, witness);
+            // TODO: Temporarily disabled to move to new system. Fix later.
+            // context->registerDifferentiableType(type, witness);
         }
 
     }
@@ -4379,7 +4403,23 @@ namespace Slang
                     nullptr);
                 args.add(val);
             }
-            // TODO: need to handle constraints here?
+        }
+
+        // Add defaults for constraint parameters.
+        for (auto dd : genericDecl->members)
+        {
+            if (auto constraintDecl = as<GenericTypeConstraintDecl>(dd))
+            {
+                // Convert the constraint to an appropriate witness.
+                auto witness = tryGetSubtypeWitness(constraintDecl->sub, constraintDecl->sup);
+
+                // Must be non-null since we know there's a constraint. If null, something is 
+                // very wrong.
+                //
+                SLANG_ASSERT(witness);
+
+                args.add(witness);
+            }
         }
         GenericSubstitution* subst = m_astBuilder->getOrCreateGenericSubstitution(genericDecl, args, nullptr);
         return subst;

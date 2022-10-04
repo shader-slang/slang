@@ -18,6 +18,62 @@ namespace Slang
         return witness;
     }
 
+    
+    Val* simplifyWitness(ASTBuilder* builder, Val* witness)
+    {
+        if (auto extractFromConjunction = as<ExtractFromConjunctionSubtypeWitness>(witness))
+        {
+            auto simplWitness = simplifyWitness(builder, extractFromConjunction->conunctionWitness);
+            if (auto conjunction = as<ConjunctionSubtypeWitness>(simplWitness))
+            {
+                auto index = extractFromConjunction->indexInConjunction;
+                SLANG_ASSERT(index == 0 || index == 1);
+                if (index == 0)
+                    return conjunction->leftWitness;
+                else
+                    return conjunction->rightWitness;
+            }
+
+            ExtractFromConjunctionSubtypeWitness* simplExtractFromConjunction = builder->create<ExtractFromConjunctionSubtypeWitness>();
+            simplExtractFromConjunction->sub = extractFromConjunction->sub;
+            simplExtractFromConjunction->sup = extractFromConjunction->sup;
+            simplExtractFromConjunction->indexInConjunction = extractFromConjunction->indexInConjunction;
+            simplExtractFromConjunction->conunctionWitness = as<SubtypeWitness>(simplWitness);
+
+            return simplExtractFromConjunction;
+        }
+        else if (auto conjunctionWitness = as<ConjunctionSubtypeWitness>(witness))
+        {
+            auto simplConjunctionWitness = builder->create<ConjunctionSubtypeWitness>();
+            simplConjunctionWitness->leftWitness = as<SubtypeWitness>(simplifyWitness(builder, conjunctionWitness->leftWitness));
+            simplConjunctionWitness->rightWitness = as<SubtypeWitness>(simplifyWitness(builder, conjunctionWitness->rightWitness));
+            simplConjunctionWitness->sub = conjunctionWitness->sub;
+            simplConjunctionWitness->sup = conjunctionWitness->sup;
+
+            return simplConjunctionWitness;
+        }
+        else if (auto transitiveWitness = as<TransitiveSubtypeWitness>(witness))
+        {
+            TransitiveSubtypeWitness* simplTransitiveWitness = builder->getOrCreateWithDefaultCtor<TransitiveSubtypeWitness>(
+                transitiveWitness->sub,
+                transitiveWitness->sup,
+                transitiveWitness->midToSup);
+
+            simplTransitiveWitness->sub = transitiveWitness->sub;
+            simplTransitiveWitness->sup = transitiveWitness->sup;
+            simplTransitiveWitness->midToSup = as<SubtypeWitness>(simplifyWitness(builder, transitiveWitness->midToSup));
+            simplTransitiveWitness->subToMid = as<SubtypeWitness>(simplifyWitness(builder, transitiveWitness->subToMid));
+
+            return simplTransitiveWitness;
+        }
+        else
+        {
+            // TODO: Add other cases.
+            return witness;
+        }
+    }
+
+
     Val* SemanticsVisitor::createTypeWitness(
         Type*            subType,
         DeclRef<AggTypeDecl>    superTypeDeclRef,
@@ -102,7 +158,7 @@ namespace Slang
             else if(bb->flavor == TypeWitnessBreadcrumb::Flavor::AndTypeLeftFlavor)
             {
                 ExtractFromConjunctionSubtypeWitness* extractWitness = m_astBuilder->create<ExtractFromConjunctionSubtypeWitness>();
-                extractWitness->sub = bb->sub;
+                extractWitness->sub = subType;
                 extractWitness->sup = bb->sup;
                 extractWitness->indexInConjunction = 0;
 
@@ -112,7 +168,7 @@ namespace Slang
             else if(bb->flavor == TypeWitnessBreadcrumb::Flavor::AndTypeRightFlavor)
             {
                 ExtractFromConjunctionSubtypeWitness* extractWitness = m_astBuilder->create<ExtractFromConjunctionSubtypeWitness>();
-                extractWitness->sub = bb->sub;
+                extractWitness->sub = subType;
                 extractWitness->sup = bb->sup;
                 extractWitness->indexInConjunction = 1;
 
@@ -131,9 +187,14 @@ namespace Slang
         DeclaredSubtypeWitness* declaredWitness = createSimpleSubtypeWitness(bb);
         *link = declaredWitness;
 
+        // Simplify witnesses of the form ExtractFromConjunction(ConjunctionWitness(...))
+        // TODO: At some point, we need a more robust way of checking that two witnesses are in-fact 'equal'.
+        // In the meantime, this step should suffice.
+        
+
         // We now know that our original `witness` variable has been
         // filled in, and there are no other holes.
-        return witness;
+        return simplifyWitness(m_astBuilder, witness);
     }
 
     bool SemanticsVisitor::isInterfaceSafeForTaggedUnion(
@@ -410,7 +471,7 @@ namespace Slang
             TypeWitnessBreadcrumb leftBreadcrumb;
             leftBreadcrumb.prev = inBreadcrumbs;
             leftBreadcrumb.sub = andType;
-            leftBreadcrumb.sup = andType->left;
+            leftBreadcrumb.sup = DeclRefType::create(m_astBuilder, superTypeDeclRef);
             leftBreadcrumb.declRef = makeDeclRef((Decl*)nullptr);
             leftBreadcrumb.flavor = TypeWitnessBreadcrumb::Flavor::AndTypeLeftFlavor;
 
@@ -422,7 +483,7 @@ namespace Slang
             TypeWitnessBreadcrumb rightBreadcrumb;
             rightBreadcrumb.prev = inBreadcrumbs;
             rightBreadcrumb.sub = andType;
-            rightBreadcrumb.sup = andType->right;
+            rightBreadcrumb.sup = DeclRefType::create(m_astBuilder, superTypeDeclRef);
             rightBreadcrumb.declRef = makeDeclRef((Decl*)nullptr);
             rightBreadcrumb.flavor = TypeWitnessBreadcrumb::Flavor::AndTypeRightFlavor;
 

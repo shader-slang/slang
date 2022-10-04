@@ -721,6 +721,27 @@ namespace Slang
 
     Expr* SemanticsVisitor::CheckTerm(Expr* term)
     {
+        auto checkedTerm = _CheckTerm(term);
+
+        // Differentiable type checking.
+        // TODO: This can be super slow. Switch to caching the result asap.
+        if (this->m_parentFunc && 
+            this->m_parentFunc->findModifier<JVPDerivativeModifier>())
+        {
+            auto diffTypeContext = this->getShared()->innermostDiffTypeContext();
+            if (auto subtypeWitness = as<SubtypeWitness>(
+                tryGetInterfaceConformanceWitness(checkedTerm->type.type, getASTBuilder()->getDifferentiableInterface())))
+            {
+                diffTypeContext->requireDifferentiableTypeDictionary();
+                diffTypeContext->registerDifferentiableType((DeclRefType*)checkedTerm->type.type, subtypeWitness);
+            }
+        }
+
+        return checkedTerm;
+    }
+
+    Expr* SemanticsVisitor::_CheckTerm(Expr* term)
+    {
         if (!term) return nullptr;
 
         // The process of checking a term/expression can end up introducing

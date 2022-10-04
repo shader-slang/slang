@@ -197,7 +197,7 @@ struct DifferentiableTypeConformanceContext
         if (as<IRModuleInst>(inst) && differentiableInterfaceType)
         {
             // Assume for now that IDifferentiable has exactly three fields.
-            SLANG_ASSERT(differentiableInterfaceType->getOperandCount() == 3);
+            SLANG_ASSERT(differentiableInterfaceType->getOperandCount() == 4);
             if (auto entry = as<IRInterfaceRequirementEntry>(differentiableInterfaceType->getOperand(index)))
                 return as<IRStructKey>(entry->getRequirementKey());
             else

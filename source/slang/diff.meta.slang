@@ -22,7 +22,9 @@ interface IDifferentiable
     
     static Differential zero();
 
-    static Differential add(Differential, Differential);
+    static Differential dadd(Differential, Differential);
+
+    static Differential dmul(This, Differential);
 };
 
 // Add extensions for the standard types
@@ -35,9 +37,14 @@ extension float : IDifferentiable
         return 0.f;
     }
 
-    static Differential add(Differential a, Differential b)
+    static Differential dadd(Differential a, Differential b)
     {
         return a + b;
+    }
+
+    static Differential dmul(This a, Differential b)
+    {
+        return a * b;
     }
 }
 
@@ -50,9 +57,14 @@ extension vector<float, 3> : IDifferentiable
         return vector<float, 3>(0.f);
     }
 
-    static Differential add(Differential a, Differential b)
+    static Differential dadd(Differential a, Differential b)
     {
         return a + b;
+    }
+
+    static Differential dmul(This a, Differential b)
+    {
+        return a * b;
     }
 }
 
@@ -65,9 +77,14 @@ extension vector<float, 2> : IDifferentiable
         return vector<float, 2>(0.f);
     }
 
-    static Differential add(Differential a, Differential b)
+    static Differential dadd(Differential a, Differential b)
     {
         return a + b;
+    }
+
+    static Differential dmul(This a, Differential b)
+    {
+        return a * b;
     }
 }
 
@@ -80,9 +97,14 @@ extension vector<float, 4> : IDifferentiable
         return vector<float, 4>(0.f);
     }
 
-    static Differential add(Differential a, Differential b)
+    static Differential dadd(Differential a, Differential b)
     {
         return a + b;
+    }
+
+    static Differential dmul(This a, Differential b)
+    {
+        return a * b;
     }
 }
 
