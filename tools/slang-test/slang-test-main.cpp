@@ -1216,16 +1216,6 @@ static SlangResult _createArtifactFromHexDump(const UnownedStringSlice& hexDump,
     return SLANG_OK;
 }
 
-static SlangResult _loadAsSharedLibrary(const UnownedStringSlice& hexDump, TemporaryFileSet& inOutTemporaryFileSet, ComPtr<ISlangSharedLibrary>& outSharedLibrary)
-{
-    ComPtr<IArtifact> artifact;
-    SLANG_RETURN_ON_FAIL(_createArtifactFromHexDump(hexDump, ArtifactDesc::make(ArtifactKind::SharedLibrary, ArtifactPayload::HostCPU, ArtifactStyle::Unknown), artifact));
-    ComPtr<ICastable> castable;
-    SLANG_RETURN_ON_FAIL(artifact->getOrCreateRepresentation(ISlangSharedLibrary::getTypeGuid(), ArtifactKeep::Yes, castable.writeRef()));
-    outSharedLibrary = as<ISlangSharedLibrary>(castable);
-    return SLANG_OK;
-}
-
 static SlangResult _executeBinary(const UnownedStringSlice& hexDump, ExecuteResult& outExeRes)
 {
     ComPtr<IArtifact> artifact;

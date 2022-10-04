@@ -90,6 +90,9 @@
     <ClInclude Include="..\..\..\source\core\slang-http.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\source\core\slang-implicit-directory-collector.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\..\source\core\slang-io.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -174,6 +177,9 @@
     <ClInclude Include="..\..\..\source\core\slang-string-escape-util.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\source\core\slang-string-slice-index-map.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\..\source\core\slang-string-slice-pool.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -254,6 +260,9 @@
     <ClCompile Include="..\..\..\source\core\slang-http.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\source\core\slang-implicit-directory-collector.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\..\source\core\slang-io.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -312,6 +321,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\source\core\slang-string-escape-util.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\source\core\slang-string-slice-index-map.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\source\core\slang-string-slice-pool.cpp">

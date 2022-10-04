@@ -419,6 +419,38 @@ namespace Slang
         return false;
     }
 
+    /* static */SlangResult Path::simplifyAbsolute(const UnownedStringSlice& path, StringBuilder& outPath)
+    {
+        if (path.getLength() == 0)
+        {
+            return SLANG_FAIL;
+        }
+
+        List<UnownedStringSlice> splitPath;
+        Path::split(UnownedStringSlice(path), splitPath);
+
+        // If the first part of a path is "", it means path of form "/some/path". Turn into "some/path".
+        if (splitPath.getCount() > 1 && splitPath[0].getLength() == 0)
+        {
+            splitPath.removeAt(0);
+        }
+
+        Path::simplify(splitPath);
+
+        // If it has a relative part then it's not absolute
+        if (splitPath.indexOf(UnownedStringSlice::fromLiteral("..")) >= 0)
+        {
+            return SLANG_E_NOT_FOUND;
+        }
+
+        // We allow splitPath.getCount() == 0, because 
+        // the original path could have been '.' or './.'
+        // Special handling for this is in join
+
+        Path::join(splitPath.getBuffer(), splitPath.getCount(), outPath);
+        return SLANG_OK;
+    }
+
     /* static */void Path::simplify(List<UnownedStringSlice>& ioSplit)
     {
         // Strictly speaking we could do something about case on platforms like window, but here we won't worry about that

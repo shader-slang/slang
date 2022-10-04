@@ -49,14 +49,6 @@
 // Used to print exception type names in internal-compiler-error messages
 #include <typeinfo>
 
-#ifdef _WIN32
-#define WIN32_LEAN_AND_MEAN
-#define NOMINMAX
-#include <Windows.h>
-#undef WIN32_LEAN_AND_MEAN
-#undef NOMINMAX
-#endif
-
 extern Slang::String get_slang_cuda_prelude();
 extern Slang::String get_slang_cpp_prelude();
 extern Slang::String get_slang_hlsl_prelude();
@@ -4396,9 +4388,7 @@ void Session::addBuiltinSource(
         char const* diagnostics = sink.outputBuffer.getBuffer();
         fprintf(stderr, "%s", diagnostics);
 
-#ifdef _WIN32
-        OutputDebugStringA(diagnostics);
-#endif
+        PlatformUtil::outputDebugMessage(diagnostics);
 
         SLANG_UNEXPECTED("error in Slang standard library");
     }
