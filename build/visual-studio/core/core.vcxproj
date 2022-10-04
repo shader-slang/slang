@@ -277,6 +277,7 @@
     <ClInclude Include="..\..\..\source\core\slang-hash.h" />
     <ClInclude Include="..\..\..\source\core\slang-hex-dump-util.h" />
     <ClInclude Include="..\..\..\source\core\slang-http.h" />
+    <ClInclude Include="..\..\..\source\core\slang-implicit-directory-collector.h" />
     <ClInclude Include="..\..\..\source\core\slang-io.h" />
     <ClInclude Include="..\..\..\source\core\slang-lazy-castable-list.h" />
     <ClInclude Include="..\..\..\source\core\slang-linked-list.h" />
@@ -305,6 +306,7 @@
     <ClInclude Include="..\..\..\source\core\slang-std-writers.h" />
     <ClInclude Include="..\..\..\source\core\slang-stream.h" />
     <ClInclude Include="..\..\..\source\core\slang-string-escape-util.h" />
+    <ClInclude Include="..\..\..\source\core\slang-string-slice-index-map.h" />
     <ClInclude Include="..\..\..\source\core\slang-string-slice-pool.h" />
     <ClInclude Include="..\..\..\source\core\slang-string-util.h" />
     <ClInclude Include="..\..\..\source\core\slang-string.h" />
@@ -333,6 +335,7 @@
     <ClCompile Include="..\..\..\source\core\slang-free-list.cpp" />
     <ClCompile Include="..\..\..\source\core\slang-hex-dump-util.cpp" />
     <ClCompile Include="..\..\..\source\core\slang-http.cpp" />
+    <ClCompile Include="..\..\..\source\core\slang-implicit-directory-collector.cpp" />
     <ClCompile Include="..\..\..\source\core\slang-io.cpp" />
     <ClCompile Include="..\..\..\source\core\slang-lazy-castable-list.cpp" />
     <ClCompile Include="..\..\..\source\core\slang-lz4-compression-system.cpp" />
@@ -353,6 +356,7 @@
     <ClCompile Include="..\..\..\source\core\slang-std-writers.cpp" />
     <ClCompile Include="..\..\..\source\core\slang-stream.cpp" />
     <ClCompile Include="..\..\..\source\core\slang-string-escape-util.cpp" />
+    <ClCompile Include="..\..\..\source\core\slang-string-slice-index-map.cpp" />
     <ClCompile Include="..\..\..\source\core\slang-string-slice-pool.cpp" />
     <ClCompile Include="..\..\..\source\core\slang-string-util.cpp" />
     <ClCompile Include="..\..\..\source\core\slang-string.cpp" />
