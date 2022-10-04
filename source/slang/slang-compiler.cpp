@@ -229,30 +229,19 @@ namespace Slang
         SlangInt targetIndex,
         uint32_t* outHashCode)
     {
-        auto fileDeps = getFilePathDependencies();
+        SLANG_UNUSED(entryPointIndex);
+        SLANG_UNUSED(targetIndex);
 
         unsigned char hashCode[16];
         MD5HashGen hashGen;
         MD5Context context;
         hashGen.init(&context);
-        for (auto& file : fileDeps)
-        {
-            hashGen.update(&context, (void*)file.getBuffer(), (unsigned long)file.getLength());
-        }
-        SlangInt indices[2];
-        indices[0] = entryPointIndex;
-        indices[1] = targetIndex;
-        hashGen.update(&context, (void*)indices, 2 * sizeof(SlangInt));
 
         assert(getName());
         if (getName())
         {
             hashGen.update(&context, getName()->text.getBuffer(), (unsigned long)getName()->text.getLength());
         }
-
-        uint32_t tempHash[4];
-        getModule()->getDependencyBasedHashCode(entryPointIndex, targetIndex, tempHash);
-        hashGen.update(&context, tempHash, 4 * sizeof(uint32_t));
 
         hashGen.finalize(&context, hashCode);
 

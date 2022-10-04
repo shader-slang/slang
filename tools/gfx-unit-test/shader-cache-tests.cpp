@@ -4,7 +4,8 @@
 #include "gfx-test-util.h"
 #include "tools/gfx-util/shader-cursor.h"
 #include "source/core/slang-basic.h"
-#include "source/core/slang-riff-file-system.h"
+
+#include "source/core/slang-memory-file-system.h"
 
 using namespace gfx;
 
@@ -17,8 +18,7 @@ namespace gfx_test
         UnitTestContext* context;
         Slang::RenderApiFlag::Enum api;
 
-        ComPtr<Slang::RiffFileSystem> fileSystem;
-        //ComPtr<ISlangMutableFileSystem> fileSystem;
+        ComPtr<ISlangMutableFileSystem> fileSystem;
         ComPtr<IPipelineState> pipelineState;
         ComPtr<IResourceView> bufferView;
 
@@ -138,8 +138,7 @@ namespace gfx_test
                 SLANG_IGNORE_TEST
             }
 
-            fileSystem = new Slang::RiffFileSystem(nullptr);
-            //fileSystem = Slang::OSFileSystem::getMutableSingleton();
+            fileSystem = new Slang::MemoryFileSystem;
         }
 
         void submitGPUWork()
@@ -171,6 +170,7 @@ namespace gfx_test
 
         void run()
         {
+            generateNewDevice();
             createRequiredResources();
             generateNewPipelineState(contentsA);
             submitGPUWork();
@@ -211,14 +211,12 @@ namespace gfx_test
 
     SLANG_UNIT_TEST(shaderCacheD3D12)
     {
-        auto fileSystem = Slang::OSFileSystem::getMutableSingleton();
-        runTestImpl(shaderCacheTestImpl, unitTestContext, Slang::RenderApiFlag::D3D12, fileSystem);
+        runTestImpl(shaderCacheTestImpl, unitTestContext, Slang::RenderApiFlag::D3D12, nullptr);
     }
 
     SLANG_UNIT_TEST(shaderCacheVulkan)
     {
-        auto fileSystem = Slang::OSFileSystem::getMutableSingleton();
-        runTestImpl(shaderCacheTestImpl, unitTestContext, Slang::RenderApiFlag::Vulkan, fileSystem);
+        runTestImpl(shaderCacheTestImpl, unitTestContext, Slang::RenderApiFlag::Vulkan, nullptr);
     }
 
 }

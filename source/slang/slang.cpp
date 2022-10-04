@@ -3190,24 +3190,49 @@ ISlangUnknown* Module::getInterface(const Guid& guid)
 // One implementation under ComponentType that takes entryPointIndex/targetIndex
 // One per subtype without
 SlangResult Module::getDependencyBasedHashCode(
-//     SlangInt entryPointIndex,
-//     SlangInt targetIndex,
+    SlangInt entryPointIndex,
+    SlangInt targetIndex,
     uint32_t* outHashCode)
 {
-    auto fileDeps = getFilePathDependencyList(); // TODO: what needs to go into code
+    SLANG_UNUSED(entryPointIndex);
 
     unsigned char hashCode[16];
     MD5HashGen hashGen;
     MD5Context context;
     hashGen.init(&context);
+
+    auto fileDeps = getFilePathDependencyList();
     for (auto& file : fileDeps)
     {
         hashGen.update(&context, file.getBuffer(), (unsigned long)file.getLength());
     }
-    SlangInt indices[2];
-    indices[0] = entryPointIndex;
-    //indices[1] = targetIndex; // Should be hashing in flags in TargetRequest at this index, not the index
-    hashGen.update(&context, indices, 2 * sizeof(SlangInt));
+
+    auto linkage = getLinkage();
+    
+    auto targetReq = linkage->targets[targetIndex];
+    SlangInt targetInfo[3];
+    targetInfo[0] = (SlangInt)targetReq->getTarget();
+    targetInfo[1] = (SlangInt)targetReq->getTargetFlags();
+    targetInfo[2] = (SlangInt)targetReq->getFloatingPointMode();
+    targetInfo[3] = (SlangInt)targetReq->getLineDirectiveMode();
+    hashGen.update(&context, targetInfo, 3 * sizeof(SlangInt));
+
+    auto targetCapabilities = targetReq->getTargetCaps();
+    hashGen.update(&context, &targetCapabilities, sizeof(CapabilitySet));
+
+    auto preprocessorDefs = linkage->preprocessorDefinitions;
+    for (auto& key : preprocessorDefs)
+    {
+        hashGen.update(&context, key.Key.getBuffer(), key.Key.getLength());
+    }
+
+    // hash searchDirectories
+    auto searchDirectories = linkage->getSearchDirectories();
+    // FINISH
+
+    auto version = getBuildTagString();
+    hashGen.update(&context, version, strlen(version));
+
     hashGen.finalize(&context, hashCode);
 
     memcpy(outHashCode, hashCode, 4 * sizeof(uint32_t));
@@ -3217,10 +3242,6 @@ SlangResult Module::getDependencyBasedHashCode(
 SlangResult Module::getASTBasedHashCode(uint32_t* outHashCode)
 {
     auto serializedAST = ASTSerialUtil::serializeAST(getModuleDecl());
-
-    SourceWriter writer(getLinkage()->getSourceManager(), LineDirectiveMode::None);
-    ASTDumpUtil::dump(getModuleDecl(), ASTDumpUtil::Style::Flat, 0, &writer);
-    auto debugString = writer.getContent();
 
     unsigned char hashCode[16];
     MD5HashGen hashGen;
