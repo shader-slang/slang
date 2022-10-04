@@ -327,15 +327,15 @@ newoption {
          -- Makes all symbols hidden by default unless explicitly 'exported'
          buildoptions { "-fvisibility=hidden" } 
          -- Warnings
-         buildoptions { "-Wno-unused-but-set-variable", "-Wno-unused-parameter", "-Wno-type-limits", "-Wno-sign-compare", "-Wno-unused-variable", "-Wno-switch", "-Wno-return-type", "-Wno-unused-local-typedefs", "-Wno-parentheses", "-Wno-class-memaccess"}
- 
+         buildoptions { "-Wno-unused-but-set-variable", "-Wno-unused-parameter", "-Wno-type-limits", "-Wno-sign-compare", "-Wno-unused-variable", "-Wno-switch", "-Wno-return-type", "-Wno-unused-local-typedefs", "-Wno-parentheses" }
+     filter { "toolset:clang or gcc*", "language:C++" }
+         buildoptions { "-Wno-reorder", "-Wno-class-memaccess"}
+
      filter { "toolset:gcc*"}
          buildoptions { "-Wno-implicit-fallthrough"  }
-     filter { "toolset:gcc*", "language:C++"}
-         buildoptions { "-Wno-reorder"  }
 
      filter { "toolset:clang" }
-          buildoptions { "-Wno-deprecated-register", "-Wno-tautological-compare", "-Wno-missing-braces", "-Wno-undefined-var-template", "-Wno-unused-function", "-Wno-return-std-move", "-Wno-ignored-optimization-argument", "-Wno-unknown-warning-option", "-Wno-reorder"}
+          buildoptions { "-Wno-deprecated-register", "-Wno-tautological-compare", "-Wno-missing-braces", "-Wno-undefined-var-template", "-Wno-unused-function", "-Wno-return-std-move", "-Wno-ignored-optimization-argument", "-Wno-unknown-warning-option" }
  
      -- When compiling the debug configuration, we want to turn
      -- optimization off, make sure debug symbols are output,
@@ -356,11 +356,12 @@ newoption {
      filter { "system:linux" }
          links { "dl" }
          --
-         -- `--start-group`  - allows libraries to be listed in any order (do not require dependency order)
          -- `--no-undefined` - by default if a symbol is not found in a link it will assume it will be resolved at runtime (!)
          --                    this option ensures that all the referenced symbols exist
          --
-         linkoptions{ "-Wl,-rpath,'$$ORIGIN',--no-as-needed,--no-undefined,--start-group" }
+         linkoptions{ "-Wl,-rpath,'$$ORIGIN',--no-as-needed,--no-undefined" }
+         -- allow libraries to be listed in any order (do not require dependency order)
+         linkgroups "On"
  
  function dump(o)
      if type(o) == 'table' then
@@ -512,7 +513,8 @@ newoption {
      --
      objdir("intermediate/" .. targetName .. "/%{cfg.buildcfg:lower()}/%{prj.name}")
  
-     -- All of our projects are written in C++.
+     -- Treat C++ as the default language, projects in other languages can
+     -- override this later
      --
      language "C++"
 
@@ -1478,6 +1480,7 @@ tool "slangd"
      pic "On"
  
      -- Add the files explicitly
+     language "C"
      files
      {
          "external/miniz/miniz.c",
@@ -1495,6 +1498,7 @@ tool "slangd"
      pic "On"
  
      -- Add the files explicitly
+     language "C"
      files
      {
          "external/lz4/lib/lz4.c",
