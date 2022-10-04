@@ -1849,11 +1849,15 @@ namespace Slang
         template<typename T>
         T* FindOuterStmt();
 
+        Stmt* findOuterStmtWithLabel(Name* label);
+
         void visitDeclStmt(DeclStmt* stmt);
 
         void visitBlockStmt(BlockStmt* stmt);
 
         void visitSeqStmt(SeqStmt* stmt);
+
+        void visitLabelStmt(LabelStmt* stmt);
 
         void visitBreakStmt(BreakStmt *stmt);
 
