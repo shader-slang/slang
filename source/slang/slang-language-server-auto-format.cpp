@@ -116,6 +116,42 @@ String parseXmlText(UnownedStringSlice text)
     return sb.ProduceString();
 }
 
+bool shouldUseFallbackStyle(const FormatOptions& options)
+{
+    if (!options.style.startsWith("file"))
+        return false;
+
+    String clangFormatFileName = ".clang-format";
+    bool standardFileName = true;
+    if (options.style.startsWith("file:"))
+    {
+        auto fileName = options.style.getUnownedSlice().tail(5);
+        if (fileName.startsWith("\""))
+            fileName = fileName.head(fileName.getLength() - 1).tail(1);
+        clangFormatFileName = fileName;
+        standardFileName = false;
+    }
+    auto path = options.fileName;
+    do
+    {
+        path = Path::getParentDirectory(path);
+        auto expectedFormatFileName = Path::combine(path, clangFormatFileName);
+        if (File::exists(expectedFormatFileName))
+        {
+            return false;
+        }
+        if (standardFileName)
+        {
+            expectedFormatFileName = Path::combine(path, "_clang_format");
+            if (File::exists(expectedFormatFileName))
+            {
+                return false;
+            }
+        }
+    } while (path.getLength());
+    return true;
+}
+
 List<Edit> formatSource(UnownedStringSlice text, Index lineStart, Index lineEnd, Index cursorOffset, const FormatOptions& options)
 {
     List<Edit> edits;
@@ -123,7 +159,9 @@ List<Edit> formatSource(UnownedStringSlice text, Index lineStart, Index lineEnd,
     String clangProcessName = options.clangFormatLocation;
     CommandLine cmdLine;
     cmdLine.setExecutableLocation(ExecutableLocation(clangProcessName));
-    cmdLine.addArg("--assume-filename=source.cs");
+
+    cmdLine.addArg("--assume-filename");
+    cmdLine.addArg(options.fileName + ".cs");
     if (cursorOffset != -1)
     {
         cmdLine.addArg("--cursor=" + String(cursorOffset));
@@ -133,7 +171,17 @@ List<Edit> formatSource(UnownedStringSlice text, Index lineStart, Index lineEnd,
         cmdLine.addArg("--lines=" + String(lineStart) + ":" + String(lineEnd + 1));
     }
     cmdLine.addArg("--output-replacements-xml");
-    if (options.style.getLength())
+    // clang-format does not allow non-builtin style for `fallback-style`.
+    // We detect if clang format file exists, and if not set style directly to user specified fallback style.
+    if (shouldUseFallbackStyle(options))
+    {
+        if (options.fallbackStyle.getLength())
+        {
+            cmdLine.addArg("-style");
+            cmdLine.addArg(options.fallbackStyle);
+        }
+    }
+    else if (options.style.getLength())
     {
         cmdLine.addArg("-style");
         cmdLine.addArg(options.style);

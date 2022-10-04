@@ -16,6 +16,7 @@ Result SLANG_MCALL createCUDADevice(const IDevice::Desc* desc, IDevice** outDevi
 Result SLANG_MCALL createCPUDevice(const IDevice::Desc* desc, IDevice** outDevice);
 
 static bool debugLayerEnabled = false;
+bool isGfxDebugLayerEnabled() { return debugLayerEnabled; }
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!! Global Renderer Functions !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 

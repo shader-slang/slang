@@ -662,7 +662,7 @@ SlangResult DeviceImpl::initialize(const Desc& desc)
             continue;
         descriptorSetAllocator.m_api = &m_api;
         initDeviceResult = initVulkanInstanceAndDevice(
-            desc.existingDeviceHandles.handles, ENABLE_VALIDATION_LAYER != 0);
+            desc.existingDeviceHandles.handles, ENABLE_VALIDATION_LAYER != 0 || isGfxDebugLayerEnabled());
         if (initDeviceResult == SLANG_OK)
             break;
     }

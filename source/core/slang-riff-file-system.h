@@ -2,9 +2,9 @@
 #define SLANG_RIFF_FILE_SYSTEM_H
 
 #include "slang-archive-file-system.h"
+#include "slang-memory-file-system.h"
 
 #include "slang-riff.h"
-#include "slang-io.h"
 
 namespace Slang
 {
@@ -28,14 +28,29 @@ struct RiffFileSystemBinary
         uint32_t pathSize;                  ///< The size of the path in bytes, including terminating 0
         uint32_t pathType;                  ///< One of SlangPathType
 
-        // Followed by the path (including terminating0)
+        // Followed by the path (including terminating 0)
         // Followed by the compressed data
     };
 };
 
-class RiffFileSystem : public ISlangMutableFileSystem, public IArchiveFileSystem, public ComBaseObject
+/* RiffFileSystem implements ISlangMutableFileSystem and can be used to save and load the whole of it's contents as an 'archive' blob.
+
+The 'RIFF' part provides the structure to store out the contents. The data is only accessed in the RIFF format when being 
+read/written to an archive. Normal operations on the file system act in memory.
+
+A RiffFileSystem allows for compression to be used on files. To use compression pass in a suitable ICompressionSystem 
+implementation on construction. If constructed without an ICompressionSystem, data is stored uncompressed. When compression is 
+used, files 'contents' blob is actually the *compressed* version of the contents. Calling loadFile/saveFile will 
+uncompress/compress as need. If there is no compression contents is identical to the file contents.
+
+NOTE:
+* The RIFF chunk IDs are *slang specific*. It conforms to RIFF but is unlikely to be usable with other tooling.
+* The RIFF chunk IDs are in RiffFileSystemBinary struct
+*/
+class RiffFileSystem : public MemoryFileSystem, public IArchiveFileSystem
 {
 public:
+    typedef MemoryFileSystem Super;
 
     // ISlangUnknown 
     SLANG_COM_BASE_IUNKNOWN_ALL
@@ -46,52 +61,24 @@ public:
     // ISlangFileSystem
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL loadFile(char const* path, ISlangBlob** outBlob) SLANG_OVERRIDE;
 
-    // ISlangFileSystemExt
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL getFileUniqueIdentity(const char* path, ISlangBlob** uniqueIdentityOut) SLANG_OVERRIDE;
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL calcCombinedPath(SlangPathType fromPathType, const char* fromPath, const char* path, ISlangBlob** pathOut) SLANG_OVERRIDE;
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL getPathType(const char* path, SlangPathType* pathTypeOut) SLANG_OVERRIDE;
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL getSimplifiedPath(const char* path, ISlangBlob** outSimplifiedPath) SLANG_OVERRIDE;
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL getCanonicalPath(const char* path, ISlangBlob** outCanonicalPath) SLANG_OVERRIDE;
-    virtual SLANG_NO_THROW void SLANG_MCALL clearCache() SLANG_OVERRIDE {}
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL enumeratePathContents(const char* path, FileSystemContentsCallBack callback, void* userData) SLANG_OVERRIDE;
-    virtual SLANG_NO_THROW OSPathKind SLANG_MCALL getOSPathKind() SLANG_OVERRIDE { return OSPathKind::None; }
-
     // ISlangModifyableFileSystem
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL saveFile(const char* path, const void* data, size_t size) SLANG_OVERRIDE;
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL remove(const char* path) SLANG_OVERRIDE;
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL createDirectory(const char* path) SLANG_OVERRIDE;
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL saveFileBlob(const char* path, ISlangBlob* dataBlob) SLANG_OVERRIDE;
 
-    // ArchiveFileSystem
+    // IArchiveFileSystem
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL loadArchive(const void* archive, size_t archiveSizeInBytes) SLANG_OVERRIDE;
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL storeArchive(bool blobOwnsContent, ISlangBlob** outBlob) SLANG_OVERRIDE;
     virtual SLANG_NO_THROW void SLANG_MCALL setCompressionStyle(const CompressionStyle& style) SLANG_OVERRIDE { m_compressionStyle = style; }
 
-    RiffFileSystem(ICompressionSystem* compressionSystem);
+        /// Pass in nullptr, if no compression is wanted. 
+    explicit RiffFileSystem(ICompressionSystem* compressionSystem);
 
         /// True if this appears to be Riff archive
     static bool isArchive(const void* data, size_t sizeInBytes);
 
 protected:
-
-    struct Entry : RefObject
-    {
-        SlangPathType m_type;
-        String m_canonicalPath;
-        size_t m_uncompressedSizeInBytes;       ///< Needed if m_contents is compressed.
-        ComPtr<ISlangBlob> m_contents;          ///< Can be compressed or not
-    };
-
     void* getInterface(const Guid& guid);
     void* getObject(const Guid& guid);
-
-    SlangResult _calcCanonicalPath(const char* path, StringBuilder& out);
-    Entry* _getEntryFromPath(const char* path, String* outPath = nullptr);
-    Entry* _getEntryFromCanonicalPath(const String& canonicalPath);
-
-    void _clear() { m_entries.Clear(); }
-
-    // Maps a path to an entry
-    Dictionary<String, RefPtr<Entry>> m_entries;
 
     ComPtr<ICompressionSystem> m_compressionSystem;
 

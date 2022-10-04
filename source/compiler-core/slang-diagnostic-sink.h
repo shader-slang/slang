@@ -227,10 +227,8 @@ public:
     bool isFlagSet(Flag::Enum flag) { return (m_flags & Flags(flag)) != 0; }
 
         /// Sets an override on the severity of a specific diagnostic message (by numeric identifier)
-    void overrideDiagnosticSeverity(int messageID, Severity overrideSeverity)
-    {
-        m_severityOverrides[messageID] = overrideSeverity;
-    }
+        /// info can be set to nullptr if only to override 
+    void overrideDiagnosticSeverity(int diagnosticId, Severity overrideSeverity, const DiagnosticInfo* info = nullptr);
 
         /// Get the (optional) diagnostic sink lexer. This is used to
         /// improve quality of highlighting a locations token. If not set, will just have a single
@@ -322,37 +320,46 @@ class DiagnosticsLookup : public RefObject
 public:
     static const Index kArenaInitialSize = 2048;
 
-    const DiagnosticInfo* findDiagostic(const UnownedStringSlice& slice) const
-    {
-        const Index* indexPtr = m_map.TryGetValue(slice);
-        return indexPtr ? m_diagnostics[*indexPtr] : nullptr;
-    }
-    Index _findDiagnosticIndex(const UnownedStringSlice& slice) const
-    {
-        const Index* indexPtr = m_map.TryGetValue(slice);
-        return indexPtr ? *indexPtr : 0;
-    }
+        /// Will take into account the slice name could be using different conventions
+    const DiagnosticInfo* findDiagnosticByName(const UnownedStringSlice& slice) const;
+        /// The name must be as defined in the diagnostics exactly, typically lower camel
+    const DiagnosticInfo* findDiagnosticByExactName(const UnownedStringSlice& slice) const;
+
+        /// Get a diagnostic by it's id. 
+        /// NOTE! That it is possible for multiple diagnostics to have the same id. This will return 
+        /// the first added
+    const DiagnosticInfo* getDiagnosticById(Int id) const;
 
         /// info must stay in scope
     Index add(const DiagnosticInfo* info);
+        /// Infos referenced must remain in scope
     void add(const DiagnosticInfo*const* infos, Index infosCount);
 
+        /// NOTE! Name must stay in scope as long as the diagnostics lookup. 
+        /// If not possible add it to the arena to keep in scope.
     void addAlias(const char* name, const char* diagnosticName);
 
         /// Get the diagnostics held in this lookup
     const List<const DiagnosticInfo*>& getDiagnostics() const { return m_diagnostics; }
+
+        /// Get the associated arena
+    MemoryArena& getArena() { return m_arena; }
 
         /// NOTE! diagnostics must stay in scope for lifetime of lookup
     DiagnosticsLookup(const DiagnosticInfo*const* diagnostics, Index diagnosticsCount);
     DiagnosticsLookup();
 
 protected:  
-    void _add(const char* name, Index index);
+    void _addName(const char* name, Index diagnosticIndex);
+
+    Index _findDiagnosticIndexByExactName(const UnownedStringSlice& slice) const;
 
     List<const DiagnosticInfo*> m_diagnostics;
 
     StringBuilder m_work;
-    Dictionary<UnownedStringSlice, Index> m_map;
+    Dictionary<UnownedStringSlice, Index> m_nameMap;
+    Dictionary<Int, Index> m_idMap;
+
     MemoryArena m_arena;
 };
 
