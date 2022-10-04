@@ -4270,12 +4270,6 @@ namespace Slang
 
     Stmt* Parser::ParseStatement()
     {
-        if (LookAheadToken(TokenType::Identifier) && LookAheadToken(TokenType::Colon, 1))
-        {
-            // An identifier followed by an ":" is a label.
-            return parseLabelStatement();
-        }
-
         auto modifiers = ParseModifiers(this);
 
         Stmt* statement = nullptr;
@@ -4320,6 +4314,12 @@ namespace Slang
         }
         else if (LookAheadToken(TokenType::Identifier))
         {
+            if (LookAheadToken(TokenType::Colon, 1))
+            {
+                // An identifier followed by an ":" is a label.
+                return parseLabelStatement();
+            }
+
             // We might be looking at a local declaration, or an
             // expression statement, and we need to figure out which.
             //
