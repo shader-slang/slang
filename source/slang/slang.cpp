@@ -3201,37 +3201,71 @@ SlangResult Module::getDependencyBasedHashCode(
     MD5Context context;
     hashGen.init(&context);
 
+    // Add file path dependencies to the hash
     auto fileDeps = getFilePathDependencyList();
     for (auto& file : fileDeps)
     {
         hashGen.update(&context, file.getBuffer(), (unsigned long)file.getLength());
     }
 
+    // Add the linkage to the hash
     auto linkage = getLinkage();
-    
+
+    // Add the corresponding TargetRequest based on targetIndex to the hash (except
+    // for the linkage because we've already included it)
     auto targetReq = linkage->targets[targetIndex];
-    SlangInt targetInfo[3];
-    targetInfo[0] = (SlangInt)targetReq->getTarget();
-    targetInfo[1] = (SlangInt)targetReq->getTargetFlags();
-    targetInfo[2] = (SlangInt)targetReq->getFloatingPointMode();
-    targetInfo[3] = (SlangInt)targetReq->getLineDirectiveMode();
-    hashGen.update(&context, targetInfo, 3 * sizeof(SlangInt));
+    uint32_t targetInfo[7];
+    targetInfo[0] = (uint32_t)targetReq->getTarget();
+    targetInfo[1] = (uint32_t)targetReq->getTargetFlags();
+    targetInfo[2] = (uint32_t)targetReq->getFloatingPointMode();
+    targetInfo[3] = (uint32_t)targetReq->getLineDirectiveMode();
+    targetInfo[4] = (uint32_t)targetReq->shouldDumpIntermediates();
+    targetInfo[5] = (uint32_t)targetReq->getForceGLSLScalarBufferLayout();
+    targetInfo[6] = (uint32_t)targetReq->shouldTrackLiveness();
+    hashGen.update(&context, targetInfo, 7 * sizeof(uint32_t));
 
-    auto targetCapabilities = targetReq->getTargetCaps();
-    hashGen.update(&context, &targetCapabilities, sizeof(CapabilitySet));
+    auto targetProfile = targetReq->getTargetProfile();
+    uint32_t profileInfo[3];
+    profileInfo[0] = (uint32_t)targetProfile.getStage();
+    profileInfo[1] = (uint32_t)targetProfile.getVersion();
+    profileInfo[2] = (uint32_t)targetProfile.getFamily();
+    hashGen.update(&context, profileInfo, 3 * sizeof(uint32_t));
 
+    auto targetProfileName = targetProfile.getName();
+    hashGen.update(&context, targetProfileName, (unsigned long)strlen(targetProfileName));
+
+    auto cookedCapabilities = targetReq->getTargetCaps().getExpandedAtoms();
+    for (auto& capability : cookedCapabilities)
+    {
+        hashGen.update(&context, &capability, sizeof(CapabilityAtom));
+    }
+
+    // Add this Module's preprocessor definitions to the hash
     auto preprocessorDefs = linkage->preprocessorDefinitions;
     for (auto& key : preprocessorDefs)
     {
-        hashGen.update(&context, key.Key.getBuffer(), key.Key.getLength());
+        hashGen.update(&context, key.Key.getBuffer(), (unsigned long)key.Key.getLength());
     }
 
-    // hash searchDirectories
-    auto searchDirectories = linkage->getSearchDirectories();
-    // FINISH
+    // Add this Module's search directory paths to the hash
+    auto searchDirectories = linkage->getSearchDirectories().searchDirectories;
+    for (auto& searchDir : searchDirectories)
+    {
+        auto searchPath = searchDir.path;
+        hashGen.update(&context, searchPath.getBuffer(), (unsigned long)searchPath.getLength());
+    }
 
+    // Add all entry point names contained within this Module to the hash
+    auto entryPoints = getEntryPoints();
+    for (auto& entryPoint : entryPoints)
+    {
+        auto entryPointName = entryPoint->getName()->text;
+        hashGen.update(&context, entryPointName.getBuffer(), (unsigned long)entryPointName.getLength());
+    }
+
+    // Add the Slang compiler version to the hash
     auto version = getBuildTagString();
-    hashGen.update(&context, version, strlen(version));
+    hashGen.update(&context, version, (unsigned long)strlen(version));
 
     hashGen.finalize(&context, hashCode);
 
@@ -4325,6 +4359,41 @@ SpecializedComponentType::SpecializedComponentType(
     collector.visitSpecialized(this);
 }
 
+SlangResult SpecializedComponentType::getDependencyBasedHashCode(
+    SlangInt entryPointIndex,
+    SlangInt targetIndex,
+    uint32_t* outHashCode)
+{
+    SLANG_UNUSED(entryPointIndex);
+    SLANG_UNUSED(targetIndex);
+
+    unsigned char hashCode[16];
+    MD5HashGen hashGen;
+    MD5Context context;
+    hashGen.init(&context);
+
+    auto fileDependencies = getFilePathDependencies();
+    for (auto& file : fileDependencies)
+    {
+        hashGen.update(&context, file.getBuffer(), (unsigned long)file.getLength());
+    }
+
+    auto specializationArgCount = getSpecializationArgCount();
+    for (Index i = 0; i < specializationArgCount; ++i)
+    {
+        auto specializationArg = getSpecializationArg(i);
+        auto argString = specializationArg.val->toString();
+        hashGen.update(&context, argString.getBuffer(), (unsigned long)argString.getLength());
+    }
+
+    // TODO: Does m_base need to be hashed?
+
+    hashGen.finalize(&context, hashCode);
+
+    memcpy(outHashCode, hashCode, 4 * sizeof(uint32_t));
+    return SLANG_OK;
+}
+
 void SpecializedComponentType::acceptVisitor(ComponentTypeVisitor* visitor, SpecializationInfo* specializationInfo)
 {
     SLANG_ASSERT(specializationInfo == nullptr);
@@ -4367,6 +4436,30 @@ void RenamedEntryPointComponentType::acceptVisitor(
 {
     visitor->visitRenamedEntryPoint(
         this, as<EntryPoint::EntryPointSpecializationInfo>(specializationInfo));
+}
+
+SlangResult RenamedEntryPointComponentType::getDependencyBasedHashCode(
+    SlangInt entryPointIndex,
+    SlangInt targetIndex,
+    uint32_t* outHashCode)
+{
+    SLANG_UNUSED(entryPointIndex);
+    SLANG_UNUSED(targetIndex);
+
+    unsigned char hashCode[16];
+    MD5HashGen hashGen;
+    MD5Context context;
+    hashGen.init(&context);
+
+    auto nameOverride = getEntryPointNameOverride(0);
+    hashGen.update(&context, nameOverride.getBuffer(), (unsigned long)nameOverride.getLength());
+
+    // TODO: does m_base need to be hashed?
+
+    hashGen.finalize(&context, hashCode);
+
+    memcpy(outHashCode, hashCode, 4 * sizeof(uint32_t));
+    return SLANG_OK;
 }
 
 void ComponentTypeVisitor::visitChildren(CompositeComponentType* composite, CompositeComponentType::CompositeSpecializationInfo* specializationInfo)

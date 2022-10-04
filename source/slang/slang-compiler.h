@@ -582,6 +582,11 @@ namespace Slang
             List<SpecializationArg> const&  specializationArgs,
             DiagnosticSink*                 sink);
 
+        SLANG_NO_THROW SlangResult SLANG_MCALL getDependencyBasedHashCode(
+            SlangInt entryPointIndex,
+            SlangInt targetIndex,
+            uint32_t* outHashCode) SLANG_OVERRIDE;
+
             /// Get the base (unspecialized) component type that is being specialized.
         RefPtr<ComponentType> getBaseComponentType() { return m_base; }
 
@@ -765,6 +770,12 @@ namespace Slang
 
         void acceptVisitor(ComponentTypeVisitor* visitor, SpecializationInfo* specializationInfo)
             SLANG_OVERRIDE;
+
+        SLANG_NO_THROW SlangResult SLANG_MCALL getDependencyBasedHashCode(
+            SlangInt entryPointIndex,
+            SlangInt targetIndex,
+            uint32_t* outHashCode) SLANG_OVERRIDE;
+
     private:
         RefPtr<ComponentType> m_base;
         String m_entryPointNameOverride;
