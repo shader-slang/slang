@@ -53,8 +53,8 @@ namespace Slang
                     /// "/" -> "."
                     /// "/a/.." -> "."
                     /// "/a" -> "a"
-                    /// Its worth noting that a path prefixed "/" will never be returned, but if the root it specified 
-                    /// it returns ".".
+                    /// Its worth noting that a path prefixed "/" will never be returned and if *just* the root it specified 
+                    /// it will return as ".".
                 NoRoot       = 0x2,             
             };
         };
