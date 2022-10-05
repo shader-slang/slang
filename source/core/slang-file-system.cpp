@@ -909,7 +909,7 @@ SlangResult RelativeFileSystem::_getFixedPath(const char* path, String& outPath)
     ComPtr<ISlangBlob> blob;
 
     String canonicalPath;
-    SLANG_RETURN_ON_FAIL(_getCanonicalPath(path, outPath));
+    SLANG_RETURN_ON_FAIL(_getCanonicalPath(path, canonicalPath));
   
     SLANG_RETURN_ON_FAIL(_calcCombinedPathInner(SLANG_PATH_TYPE_DIRECTORY, m_relativePath.getBuffer(), canonicalPath.getBuffer(), blob.writeRef()));
     outPath = StringUtil::getString(blob);

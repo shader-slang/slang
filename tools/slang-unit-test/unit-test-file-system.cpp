@@ -112,6 +112,37 @@ static SlangResult _createAndCheckFile(ISlangMutableFileSystem* fileSystem, cons
 	return SLANG_OK;
 }
 
+
+static SlangResult _checkCanonical(ISlangMutableFileSystem* fileSystem, const char*const* paths, Count count)
+{
+	if (count <= 0)
+	{
+		return SLANG_FAIL;
+	}
+
+	String canonicalPath;
+	{
+		ComPtr<ISlangBlob> blob;
+		SLANG_RETURN_ON_FAIL(fileSystem->getPath(PathKind::Canonical, paths[0], blob.writeRef()));
+		canonicalPath = StringUtil::getString(blob);
+	}
+
+	for (Index i = 1; i < count; ++i)
+	{
+		ComPtr<ISlangBlob> blob;
+		SLANG_RETURN_ON_FAIL(fileSystem->getPath(PathKind::Canonical, paths[i], blob.writeRef()));
+		const auto checkPath = StringUtil::getString(blob);
+
+		if (checkPath != canonicalPath)
+		{
+			return SLANG_FAIL;
+		}
+	}
+
+	return SLANG_OK;
+}
+
+
 static SlangResult _createAndCheckDirectory(ISlangMutableFileSystem* fileSystem, const char* path)
 {
 	SLANG_RETURN_ON_FAIL(fileSystem->createDirectory(path));
@@ -343,6 +374,11 @@ static SlangResult _test(FileSystemType type)
 	SLANG_RETURN_ON_FAIL(_checkFile(fileSystem, "/b", bText));
 	SLANG_RETURN_ON_FAIL(_checkFile(fileSystem, "/d/a", d_aText));
 	SLANG_RETURN_ON_FAIL(_checkFile(fileSystem, "/d\\b", d_bText));
+
+	{
+		const char* paths[] = { "a", "/a", "./a", "d/../a", ".\\d/.\\..\\a" };
+		SLANG_RETURN_ON_FAIL(_checkCanonical(fileSystem, paths, SLANG_COUNT_OF(paths)));
+	}
 
 	// Lets find all the files in the directory
 
