@@ -418,21 +418,8 @@ SlangResult ZipFileSystemImpl::_requireMode(Mode newMode)
 
 SlangResult ZipFileSystemImpl::_getFixedPath(const char* path, String& outPath)
 {
-    String simplifiedPath = Path::simplify(UnownedStringSlice(path));
-    // Can simplify to just ., thats okay, if it otherwise has something relative it means it couldn't be simplified into the
-    // contents of the archive
-    if (simplifiedPath != "." && Path::hasRelativeElement(simplifiedPath))
-    {
-        // If it still has a relative element, then it must be 'outside' of the archive
-        return SLANG_E_NOT_FOUND;
-    }
-    else if (simplifiedPath.getLength() && Path::isDelimiter(simplifiedPath[0]))
-    {
-        // Strip absolute prefix
-        String copy(simplifiedPath);
-        simplifiedPath = copy.getUnownedSlice().tail(1);
-    }
-
+    StringBuilder simplifiedPath;
+    SLANG_RETURN_ON_FAIL(Path::simplify(path, Path::SimplifyStyle::AbsoluteOnlyAndNoRoot, simplifiedPath));
     outPath = simplifiedPath;
     return SLANG_OK;
 }

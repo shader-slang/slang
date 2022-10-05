@@ -49,14 +49,9 @@ void MemoryFileSystem::_clear()
 
 MemoryFileSystem::Entry* MemoryFileSystem::_getEntryFromCanonicalPath(const String& canonicalPath)
 {
-    if (ImplicitDirectoryCollector::isRootPath(canonicalPath.getUnownedSlice()))
+    if (canonicalPath == toSlice("."))
     {
         return &m_rootEntry;
-    }
-    else if (canonicalPath.getLength() > 0 && Path::isDelimiter(canonicalPath[0]))
-    {
-        const String fixedPath = canonicalPath.getUnownedSlice().tail(1);
-        return m_entries.TryGetValue(fixedPath);
     }
     else
     {
@@ -154,7 +149,7 @@ SlangResult MemoryFileSystem::getPath(PathKind kind, const char* path, ISlangBlo
         case PathKind::Canonical:
         {
             StringBuilder buffer;
-            SLANG_RETURN_ON_FAIL(Path::simplifyAbsolute(path, buffer));
+            SLANG_RETURN_ON_FAIL(Path::simplify(path, Path::SimplifyStyle::AbsoluteOnly, buffer));
             *outPath = StringBlob::moveCreate(buffer).detach();
             return SLANG_OK;
         }
@@ -210,7 +205,7 @@ SlangResult MemoryFileSystem::saveFileBlob(const char* path, ISlangBlob* dataBlo
 SlangResult MemoryFileSystem::_getCanonical(const char* path, StringBuilder& outCanonicalPath)
 {
     StringBuilder canonicalPath;
-    SLANG_RETURN_ON_FAIL(Path::simplifyAbsolute(UnownedStringSlice(path), outCanonicalPath));
+    SLANG_RETURN_ON_FAIL(Path::simplify(UnownedStringSlice(path), Path::SimplifyStyle::AbsoluteOnlyAndNoRoot, outCanonicalPath));
     return SLANG_OK;
 }
 
