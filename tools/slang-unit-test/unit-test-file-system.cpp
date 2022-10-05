@@ -112,6 +112,19 @@ static SlangResult _createAndCheckFile(ISlangMutableFileSystem* fileSystem, cons
 	return SLANG_OK;
 }
 
+static bool _areEqual(ISlangBlob* a, ISlangBlob* b)
+{
+	if (a == b)
+	{
+		return true;
+	}
+	if ((!a || !b) || (a->getBufferSize() != b->getBufferSize()))
+	{
+		return false;
+	}
+	
+	return ::memcmp(a->getBufferPointer(), b->getBufferPointer(), a->getBufferSize()) == 0;
+}
 
 static SlangResult _checkCanonical(ISlangMutableFileSystem* fileSystem, const char*const* paths, Count count)
 {
@@ -120,11 +133,38 @@ static SlangResult _checkCanonical(ISlangMutableFileSystem* fileSystem, const ch
 		return SLANG_FAIL;
 	}
 
+	// The path has to exist to something for canonicalization to be relied upon
+	SlangPathType pathType;
+	SLANG_RETURN_ON_FAIL(fileSystem->getPathType(paths[0], &pathType));
+
 	String canonicalPath;
 	{
 		ComPtr<ISlangBlob> blob;
 		SLANG_RETURN_ON_FAIL(fileSystem->getPath(PathKind::Canonical, paths[0], blob.writeRef()));
 		canonicalPath = StringUtil::getString(blob);
+	}
+
+	// The canonicalized path must point to the same thing
+	SlangPathType canonicalPathType;
+	SLANG_RETURN_ON_FAIL(fileSystem->getPathType(canonicalPath.getBuffer(), &canonicalPathType));
+
+	if (canonicalPathType != pathType)
+	{
+		return SLANG_FAIL;
+	}
+
+	// If they are the file, being hte same file, they must hold the same data...
+	if (pathType == SLANG_PATH_TYPE_FILE)
+	{
+		ComPtr<ISlangBlob> blob;
+		ComPtr<ISlangBlob> canonicalPathBlob;
+		SLANG_RETURN_ON_FAIL(fileSystem->loadFile(paths[0], blob.writeRef()));
+		SLANG_RETURN_ON_FAIL(fileSystem->loadFile(canonicalPath.getBuffer(), canonicalPathBlob.writeRef()));
+
+		if (!_areEqual(blob, canonicalPathBlob))
+		{
+			return SLANG_FAIL;
+		}
 	}
 
 	for (Index i = 1; i < count; ++i)
@@ -375,8 +415,26 @@ static SlangResult _test(FileSystemType type)
 	SLANG_RETURN_ON_FAIL(_checkFile(fileSystem, "/d/a", d_aText));
 	SLANG_RETURN_ON_FAIL(_checkFile(fileSystem, "/d\\b", d_bText));
 
+
+	// Check canonical on files
 	{
 		const char* paths[] = { "a", "/a", "./a", "d/../a", ".\\d/.\\..\\a" };
+		SLANG_RETURN_ON_FAIL(_checkCanonical(fileSystem, paths, SLANG_COUNT_OF(paths)));
+	}
+
+	{
+		const char* paths[] = { "/d/b", "d/./b" };
+		SLANG_RETURN_ON_FAIL(_checkCanonical(fileSystem, paths, SLANG_COUNT_OF(paths)));
+	}
+
+	// Check canonical on directories
+	{
+		const char* paths[] = { ".", "/", "/d/..", "d/.." };
+		SLANG_RETURN_ON_FAIL(_checkCanonical(fileSystem, paths, SLANG_COUNT_OF(paths)));
+	}
+
+	{
+		const char* paths[] = { "d", "./d", "/d", "/d/./../d" };
 		SLANG_RETURN_ON_FAIL(_checkCanonical(fileSystem, paths, SLANG_COUNT_OF(paths)));
 	}
 
