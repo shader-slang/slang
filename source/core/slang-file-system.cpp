@@ -4,8 +4,6 @@
 #include "../core/slang-io.h"
 #include "../core/slang-string-util.h"
 
-#include "../core/slang-implicit-directory-collector.h"
-
 namespace Slang
 {
 
