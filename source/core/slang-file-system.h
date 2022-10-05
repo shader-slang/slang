@@ -259,6 +259,8 @@ protected:
         /// Get the fixed path to the item for the backing file system.
     SlangResult _getFixedPath(const char* path, String& outPath);
     
+    SlangResult _getCanonicalPath(const char* path, String& outPath);
+
     ISlangUnknown* getInterface(const Guid& guid);
     void* getObject(const Guid& guid);
 
