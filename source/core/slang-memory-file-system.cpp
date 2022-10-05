@@ -149,7 +149,7 @@ SlangResult MemoryFileSystem::getPath(PathKind kind, const char* path, ISlangBlo
         case PathKind::Canonical:
         {
             StringBuilder buffer;
-            SLANG_RETURN_ON_FAIL(Path::simplify(path, Path::SimplifyStyle::AbsoluteOnly, buffer));
+            SLANG_RETURN_ON_FAIL(_getCanonical(path, buffer));
             *outPath = StringBlob::moveCreate(buffer).detach();
             return SLANG_OK;
         }
