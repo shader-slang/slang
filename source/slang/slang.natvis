@@ -282,6 +282,8 @@
         <DisplayString Condition="nameAndLoc.name!=0">{nameAndLoc.name->text}: {astNodeType}</DisplayString>
         <DisplayString Condition="nameAndLoc.name==0">{astNodeType}</DisplayString>
         <Expand>
+            <Item Name="[Name]" Condition="nameAndLoc.name!=0">nameAndLoc.name->text</Item>
+            <Item Name="[Parent]">parentDecl</Item>
             <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::ContainerDecl">(Slang::ContainerDecl*)&amp;astNodeType</ExpandedItem>
             <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::ExtensionDecl">(Slang::ExtensionDecl*)&amp;astNodeType</ExpandedItem>
             <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::StructDecl">(Slang::StructDecl*)&amp;astNodeType</ExpandedItem>
@@ -322,6 +324,7 @@
             <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::EmptyDecl">(Slang::EmptyDecl*)&amp;astNodeType</ExpandedItem>
             <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::SyntaxDecl">(Slang::SyntaxDecl*)&amp;astNodeType</ExpandedItem>
             <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::DeclGroup">(Slang::DeclGroup*)&amp;astNodeType</ExpandedItem>
+            
             <Item Name="Decl">(Slang::DeclBase*)this,nd</Item>
         </Expand>
     </Type>
@@ -369,7 +372,7 @@
             <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::EmptyDecl">(Slang::EmptyDecl*)&amp;astNodeType</ExpandedItem>
             <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::SyntaxDecl">(Slang::SyntaxDecl*)&amp;astNodeType</ExpandedItem>
             <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::DeclGroup">(Slang::DeclGroup*)&amp;astNodeType</ExpandedItem>
-            <Item Name="Decl">(Slang::DeclBase*)this,nd</Item>
+            <Item Name="Decl">(Slang::Decl*)this,nd</Item>
         </Expand>
     </Type>
 
@@ -473,8 +476,6 @@
     <Type Name="Slang::AggTypeDecl">
         <DisplayString>{nameAndLoc.name}: {astNodeType}</DisplayString>
         <Expand>
-            <Item Name="[Name]">nameAndLoc.name</Item>
-            <Item Name="[Parent]">parentDecl</Item>
             <Item Name="[Members]">members</Item>
         </Expand>
     </Type>
