@@ -69,6 +69,18 @@ static SlangResult _checkFile(ISlangFileSystemExt* fileSystem, const char* path,
 	return SLANG_OK;
 }
 
+static SlangResult _checkDirectoryExists(ISlangFileSystemExt* fileSystem, const char* path)
+{
+	SlangPathType pathType;
+	SLANG_RETURN_ON_FAIL(fileSystem->getPathType(path, &pathType));
+
+	if (pathType != SLANG_PATH_TYPE_DIRECTORY)
+	{
+		return SLANG_FAIL;
+	}
+	return SLANG_OK;
+}
+
 static SlangResult _createAndCheckFile(ISlangMutableFileSystem* fileSystem, const char* path, const char* contents)
 {
 	UnownedStringSlice contentsSlice(contents);
@@ -326,6 +338,17 @@ static SlangResult _test(FileSystemType type)
 	{
 		const Entry entries[] = { {SLANG_PATH_TYPE_FILE, "a" }, {SLANG_PATH_TYPE_FILE, "b" }, {SLANG_PATH_TYPE_DIRECTORY, "d" } };
 		SLANG_RETURN_ON_FAIL(_enumeratePath(fileSystem, ".", makeConstArrayView(entries)));
+
+		// Let's check that / and \ works for the root directory
+		SLANG_RETURN_ON_FAIL(_enumeratePath(fileSystem, "/", makeConstArrayView(entries)));
+		SLANG_RETURN_ON_FAIL(_enumeratePath(fileSystem, "\\", makeConstArrayView(entries)));
+	}
+
+	// Check the root directory exists
+	{
+		SLANG_RETURN_ON_FAIL(_checkDirectoryExists(fileSystem, "."));
+		SLANG_RETURN_ON_FAIL(_checkDirectoryExists(fileSystem, "/"));
+		SLANG_RETURN_ON_FAIL(_checkDirectoryExists(fileSystem, "\\"));
 	}
 
 	{

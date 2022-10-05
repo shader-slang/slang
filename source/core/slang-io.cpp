@@ -427,15 +427,9 @@ namespace Slang
         }
 
         List<UnownedStringSlice> splitPath;
-        Path::split(UnownedStringSlice(path), splitPath);
+        split(UnownedStringSlice(path), splitPath);
 
-        // If the first part of a path is "", it means path of form "/some/path". Turn into "some/path".
-        if (splitPath.getCount() > 1 && splitPath[0].getLength() == 0)
-        {
-            splitPath.removeAt(0);
-        }
-
-        Path::simplify(splitPath);
+        simplify(splitPath);
 
         // If it has a relative part then it's not absolute
         if (splitPath.indexOf(UnownedStringSlice::fromLiteral("..")) >= 0)
@@ -485,10 +479,16 @@ namespace Slang
         if (count == 0)
         {
             out << ".";
-            return;
         }
-
-        StringUtil::join(slices, count, kPathDelimiter, out);
+        else if (count == 1 && slices[0].getLength() == 0)
+        {
+            // It's the root
+            out << kPathDelimiter;
+        }
+        else
+        {
+            StringUtil::join(slices, count, kPathDelimiter, out);
+        }
     }
 
 

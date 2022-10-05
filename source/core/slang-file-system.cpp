@@ -4,6 +4,8 @@
 #include "../core/slang-io.h"
 #include "../core/slang-string-util.h"
 
+#include "../core/slang-implicit-directory-collector.h"
+
 namespace Slang
 {
 
@@ -894,9 +896,17 @@ SlangResult RelativeFileSystem::_getFixedPath(const char* path, String& outPath)
 
     StringBuilder canonicalPath;
     SLANG_RETURN_ON_FAIL(_getCanonicalPath(path, canonicalPath));
-    SLANG_RETURN_ON_FAIL(_calcCombinedPathInner(SLANG_PATH_TYPE_DIRECTORY, m_relativePath.getBuffer(), canonicalPath.getBuffer(), blob.writeRef()));
-
-    outPath = StringUtil::getString(blob);
+    if (ImplicitDirectoryCollector::isRootPath(canonicalPath.getUnownedSlice()))
+    {
+        // If it's root, the path is just the relative path
+        outPath = m_relativePath;
+    }
+    else
+    {
+        SLANG_RETURN_ON_FAIL(_calcCombinedPathInner(SLANG_PATH_TYPE_DIRECTORY, m_relativePath.getBuffer(), canonicalPath.getBuffer(), blob.writeRef()));
+        outPath = StringUtil::getString(blob);
+    }
+    
     return SLANG_OK;
 }
 

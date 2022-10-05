@@ -9,6 +9,11 @@
 namespace Slang
 {
 
+MemoryFileSystem::MemoryFileSystem()
+{
+    m_rootEntry.initDirectory("/");
+}
+
 void* MemoryFileSystem::getInterface(const Guid& guid)
 {
     if  (   guid == ISlangUnknown::getTypeGuid() || 
@@ -40,14 +45,15 @@ void* MemoryFileSystem::castAs(const Guid& guid)
 void MemoryFileSystem::_clear() 
 { 
     m_entries = Dictionary<String, Entry>(); 
-    // Add the root
-    Entry entry;
-    entry.initDirectory(".");
-    m_entries.Add(entry.m_canonicalPath, entry);
 }
 
 MemoryFileSystem::Entry* MemoryFileSystem::_getEntryFromCanonicalPath(const String& canonicalPath)
 {
+    if (ImplicitDirectoryCollector::isRootPath(canonicalPath.getUnownedSlice()))
+    {
+        return &m_rootEntry;
+    }
+
     return m_entries.TryGetValue(canonicalPath);
 }
 
@@ -260,7 +266,7 @@ SlangResult MemoryFileSystem::remove(const char* path)
     Entry* entry = _getEntryFromPath(path, &canonicalPath);
 
     // If there is an entry and not the root of the file system
-    if (entry && entry->m_canonicalPath != toSlice("."))
+    if (entry && entry != &m_rootEntry)
     {
         if (entry->m_type == SLANG_PATH_TYPE_DIRECTORY)
         {
