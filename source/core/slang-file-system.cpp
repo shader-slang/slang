@@ -896,6 +896,7 @@ SlangResult RelativeFileSystem::_getFixedPath(const char* path, String& outPath)
 
     StringBuilder canonicalPath;
     SLANG_RETURN_ON_FAIL(_getCanonicalPath(path, canonicalPath));
+
     if (ImplicitDirectoryCollector::isRootPath(canonicalPath.getUnownedSlice()))
     {
         // If it's root, the path is just the relative path
@@ -903,6 +904,14 @@ SlangResult RelativeFileSystem::_getFixedPath(const char* path, String& outPath)
     }
     else
     {
+        // If it's an absolute path, strip the first delimiter
+        if (canonicalPath.getLength() && Path::isDelimiter(canonicalPath[0]))
+        {
+            const String copy(canonicalPath);
+            canonicalPath.Clear();
+            canonicalPath.append(copy.getUnownedSlice().tail(1));
+        }
+
         SLANG_RETURN_ON_FAIL(_calcCombinedPathInner(SLANG_PATH_TYPE_DIRECTORY, m_relativePath.getBuffer(), canonicalPath.getBuffer(), blob.writeRef()));
         outPath = StringUtil::getString(blob);
     }

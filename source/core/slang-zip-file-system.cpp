@@ -426,6 +426,12 @@ SlangResult ZipFileSystemImpl::_getFixedPath(const char* path, String& outPath)
         // If it still has a relative element, then it must be 'outside' of the archive
         return SLANG_E_NOT_FOUND;
     }
+    else if (simplifiedPath.getLength() && Path::isDelimiter(simplifiedPath[0]))
+    {
+        // Strip absolute prefix
+        String copy(simplifiedPath);
+        simplifiedPath = copy.getUnownedSlice().tail(1);
+    }
 
     outPath = simplifiedPath;
     return SLANG_OK;

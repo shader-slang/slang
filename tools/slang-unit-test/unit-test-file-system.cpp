@@ -69,6 +69,11 @@ static SlangResult _checkFile(ISlangFileSystemExt* fileSystem, const char* path,
 	return SLANG_OK;
 }
 
+static SlangResult _checkFile(ISlangMutableFileSystem* fileSystem, const char* path, const char* contents)
+{
+	return _checkFile(fileSystem, path, UnownedStringSlice(contents));
+}
+
 static SlangResult _checkDirectoryExists(ISlangFileSystemExt* fileSystem, const char* path)
 {
 	SlangPathType pathType;
@@ -321,12 +326,23 @@ static SlangResult _test(FileSystemType type)
 	ComPtr<ISlangMutableFileSystem> fileSystem;
 	SLANG_RETURN_ON_FAIL(_createFileSystem(type, fileSystem));
 
-	SLANG_RETURN_ON_FAIL(_createAndCheckFile(fileSystem, "a", "someText"));
-	SLANG_RETURN_ON_FAIL(_createAndCheckFile(fileSystem, "b", "A longer bit of text...."));
+	const auto aText = "someText";
+	const auto bText = "A longer bit of text....";
+	const auto d_aText = "Some more silly stuff";
+	const auto d_bText = "Lets go!";
+
+	SLANG_RETURN_ON_FAIL(_createAndCheckFile(fileSystem, "a", aText));
+	SLANG_RETURN_ON_FAIL(_createAndCheckFile(fileSystem, "b", bText));
 
 	SLANG_RETURN_ON_FAIL(_createAndCheckDirectory(fileSystem, "d"));
-	SLANG_RETURN_ON_FAIL(_createAndCheckFile(fileSystem, "d/a", "Some more silly stuff"));
-	SLANG_RETURN_ON_FAIL(_createAndCheckFile(fileSystem, "d\\b", "Lets go empty"));
+	SLANG_RETURN_ON_FAIL(_createAndCheckFile(fileSystem, "d/a", d_aText));
+	SLANG_RETURN_ON_FAIL(_createAndCheckFile(fileSystem, "d\\b", d_bText));
+
+	// Try and absolute path
+	SLANG_RETURN_ON_FAIL(_checkFile(fileSystem, "/a", aText));
+	SLANG_RETURN_ON_FAIL(_checkFile(fileSystem, "/b", bText));
+	SLANG_RETURN_ON_FAIL(_checkFile(fileSystem, "/d/a", d_aText));
+	SLANG_RETURN_ON_FAIL(_checkFile(fileSystem, "/d\\b", d_bText));
 
 	// Lets find all the files in the directory
 

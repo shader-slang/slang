@@ -121,13 +121,18 @@ namespace Slang
         static bool isDriveSpecification(const UnownedStringSlice& pathPrefix);
 
             /// Splits the path into it's individual bits
+            /// Absolute paths of the form "/" will become [""]
+            /// Absolute paths of the form "a:/" will become ["a:", ""]
+            /// A drive specification of the form "a:" will become ["a:"]
+            /// Relative paths that are in effect "." will become []
         static void split(const UnownedStringSlice& path, List<UnownedStringSlice>& splitOut);
+
             /// Strips .. and . as much as it can 
         static String simplify(const UnownedStringSlice& path);
         static String simplify(const String& path) { return simplify(path.getUnownedSlice()); }
 
             /// Given a path simplifies it such the the resultant path is absolute (ie contains no . or ..)
-            /// Can return '.' as the path as the directory 'root'.
+            /// Same behavior as simplify around the root 
         static SlangResult simplifyAbsolute(const UnownedStringSlice& path, StringBuilder& outPath);
         static SlangResult simplifyAbsolute(const String& path, StringBuilder& outPath) { return simplifyAbsolute(path.getUnownedSlice(), outPath); }
         static SlangResult simplifyAbsolute(const char* path, StringBuilder& outPath) { return simplifyAbsolute(UnownedStringSlice(path), outPath); }

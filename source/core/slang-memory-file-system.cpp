@@ -53,8 +53,15 @@ MemoryFileSystem::Entry* MemoryFileSystem::_getEntryFromCanonicalPath(const Stri
     {
         return &m_rootEntry;
     }
-
-    return m_entries.TryGetValue(canonicalPath);
+    else if (canonicalPath.getLength() > 0 && Path::isDelimiter(canonicalPath[0]))
+    {
+        const String fixedPath = canonicalPath.getUnownedSlice().tail(1);
+        return m_entries.TryGetValue(fixedPath);
+    }
+    else
+    {
+        return m_entries.TryGetValue(canonicalPath);
+    }
 }
 
 MemoryFileSystem::Entry* MemoryFileSystem::_getEntryFromPath(const char* path, String* outPath)
