@@ -533,6 +533,37 @@ Result createNullDescriptor(
         d3dDevice->CreateShaderResourceView(nullptr, &srvDesc, destDescriptor);
     }
     break;
+    case slang::BindingType::MutableTexture:
+    {
+        D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
+        uavDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+        switch (bindingRange.resourceShape)
+        {
+        case SLANG_TEXTURE_1D:
+            uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE1D;
+            break;
+        case SLANG_TEXTURE_1D_ARRAY:
+            uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE1DARRAY;
+            break;
+        case SLANG_TEXTURE_2D:
+            uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
+            break;
+        case SLANG_TEXTURE_2D_ARRAY:
+            uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2DARRAY;
+            break;
+        case SLANG_TEXTURE_3D:
+            uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE3D;
+            break;
+        case SLANG_TEXTURE_CUBE:
+        case SLANG_TEXTURE_CUBE_ARRAY:
+        case SLANG_TEXTURE_2D_MULTISAMPLE:
+        case SLANG_TEXTURE_2D_MULTISAMPLE_ARRAY:
+        default:
+            return SLANG_OK;
+        }
+        d3dDevice->CreateUnorderedAccessView(nullptr, nullptr, &uavDesc, destDescriptor);
+    }
+    break;
     default:
         break;
     }
