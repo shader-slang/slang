@@ -285,6 +285,7 @@
     <ClInclude Include="..\..\..\source\compiler-core\slang-lexer-diagnostic-defs.h" />
     <ClInclude Include="..\..\..\source\compiler-core\slang-lexer.h" />
     <ClInclude Include="..\..\..\source\compiler-core\slang-llvm-compiler.h" />
+    <ClInclude Include="..\..\..\source\compiler-core\slang-md5.h" />
     <ClInclude Include="..\..\..\source\compiler-core\slang-misc-diagnostic-defs.h" />
     <ClInclude Include="..\..\..\source\compiler-core\slang-name-convention-util.h" />
     <ClInclude Include="..\..\..\source\compiler-core\slang-name.h" />
@@ -328,6 +329,7 @@
     <ClCompile Include="..\..\..\source\compiler-core\slang-language-server-protocol.cpp" />
     <ClCompile Include="..\..\..\source\compiler-core\slang-lexer.cpp" />
     <ClCompile Include="..\..\..\source\compiler-core\slang-llvm-compiler.cpp" />
+    <ClCompile Include="..\..\..\source\compiler-core\slang-md5.cpp" />
     <ClCompile Include="..\..\..\source\compiler-core\slang-name-convention-util.cpp" />
     <ClCompile Include="..\..\..\source\compiler-core\slang-name.cpp" />
     <ClCompile Include="..\..\..\source\compiler-core\slang-nvrtc-compiler.cpp" />

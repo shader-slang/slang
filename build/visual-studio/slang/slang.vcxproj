@@ -312,6 +312,7 @@ IF EXIST ..\..\..\external\slang-glslang\bin\windows-aarch64\release\slang-glsla
     <ClInclude Include="..\..\..\source\slang\slang-capability.h" />
     <ClInclude Include="..\..\..\source\slang\slang-check-impl.h" />
     <ClInclude Include="..\..\..\source\slang\slang-check.h" />
+    <ClInclude Include="..\..\..\source\slang\slang-checksum-utils.h" />
     <ClInclude Include="..\..\..\source\slang\slang-compiler.h" />
     <ClInclude Include="..\..\..\source\slang\slang-content-assist-info.h" />
     <ClInclude Include="..\..\..\source\slang\slang-diagnostic-defs.h" />

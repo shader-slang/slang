@@ -5,6 +5,9 @@
 
 #include "../../source/core/slang-file-system.h"
 
+#include "../../slang.h"
+#include "../../source/slang/slang-checksum-utils.h"
+
 using namespace Slang;
 
 namespace gfx
@@ -328,18 +331,6 @@ void PipelineStateBase::initializeBase(const PipelineStateDesc& inDesc)
     }
 }
 
-void getShaderFilename(uint32_t* shaderHash, String* outFilename)
-{
-    // TODO: Check naming, maybe change naming, code breaks when saving
-    String filename;
-    for (GfxIndex i = 0; i < 4; ++i)
-    {
-        filename.append(String(shaderHash[i], 16).getBuffer());
-    }
-
-    *outFilename = filename;
-}
-
 void updateCacheEntry(ISlangMutableFileSystem* fileSystem, slang::IBlob* compiledCode, String shaderFilename, uint32_t* ASTHash)
 {
     auto hashSize = 4 * sizeof(uint32_t); // MD5 hashes are 128 bits, represented here as an array of four uint32_t.
@@ -372,16 +363,15 @@ Result RendererBase::getEntryPointCodeFromShaderCache(
     // Combine program, entryPointIndex, targetIndex into some kind of key (probably a string) for file lookup - the hash
     //    - want to update the Slang API so that IComponentType (program) can query the hash
     //    - two kinds of hashes - hash based on source code vs hash based purely on included filenames
-    uint32_t shaderHash[4];
-    program->getDependencyBasedHashCode(entryPointIndex, targetIndex, shaderHash);
+    slang::Checksum shaderHash;
+    program->getDependencyBasedHashCode(entryPointIndex, targetIndex, &shaderHash);
 
     // Get the hash generated from the AST - This is needed to check whether a cache entry is effectively dirty,
     // or to save along with the compiled code into an entry so the entry can be checked if fetched later on.
-    uint32_t ASTHash[4];
-    program->getASTBasedHashCode(ASTHash);
+    slang::Checksum ASTHash;
+    program->getASTBasedHashCode(&ASTHash);
 
-    String shaderFilename;
-    getShaderFilename(shaderHash, &shaderFilename);
+    String shaderFilename = checksumToString(shaderHash);
 
     ComPtr<ISlangBlob> codeBlob;
 
@@ -397,7 +387,7 @@ Result RendererBase::getEntryPointCodeFromShaderCache(
         ISlangMutableFileSystem* fileSystem;
         if (SLANG_SUCCEEDED(shaderCacheFileSystem->queryInterface(ISlangMutableFileSystem::getTypeGuid(), (void**)&fileSystem)))
         {
-            updateCacheEntry(fileSystem, codeBlob, shaderFilename, ASTHash);
+            updateCacheEntry(fileSystem, codeBlob, shaderFilename, ASTHash.checksum);
         }
 
         shaderCacheEntryMissCount++;
@@ -409,7 +399,7 @@ Result RendererBase::getEntryPointCodeFromShaderCache(
         // AST hash generated earlier.
         auto entryContents = codeBlob->getBufferPointer();
         auto hashSize = 4 * sizeof(uint32_t);
-        if (memcmp(ASTHash, entryContents, hashSize) != 0)
+        if (memcmp(ASTHash.checksum, entryContents, hashSize) != 0)
         {
             // The AST hash stored in the entry does not match the AST hash generated earlier, indicating
             // that the shader code has changed and the entry needs to be updated.
@@ -417,7 +407,7 @@ Result RendererBase::getEntryPointCodeFromShaderCache(
             ISlangMutableFileSystem* fileSystem;
             if (SLANG_SUCCEEDED(shaderCacheFileSystem->queryInterface(ISlangMutableFileSystem::getTypeGuid(), (void**)&fileSystem)))
             {
-                updateCacheEntry(fileSystem, codeBlob, shaderFilename, ASTHash);
+                updateCacheEntry(fileSystem, codeBlob, shaderFilename, ASTHash.checksum);
             }
 
             shaderCacheMissCount++;

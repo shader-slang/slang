@@ -28,6 +28,8 @@
 #elif !defined(_MD5_H)
 #define _MD5_H
 
+#include "../../slang.h"
+
 namespace Slang
 {
     /* Any 32-bit or wider unsigned integer data type will do */
@@ -46,7 +48,7 @@ namespace Slang
     public:
         void init(MD5Context* ctx);
         void update(MD5Context* ctx, const void* data, unsigned long size);
-        void finalize(MD5Context* ctx, unsigned char* result);
+        void finalize(MD5Context* ctx, slang::Checksum* result);
 
     private:
         static const void* body(MD5Context* ctx, const void* data, unsigned long size);

@@ -44,7 +44,8 @@
 
 #include "slang-check-impl.h"
 
-#include "../core/slang-md5.h"
+#include "../compiler-core/slang-md5.h"
+#include "slang-checksum-utils.h"
 
 #include "../../slang-tag-version.h"
 
@@ -1631,7 +1632,14 @@ void TranslationUnitRequest::_addSourceFile(SourceFile* sourceFile)
         // for non-file-based dependencies later when shader files are being hashed for
         // the shader cache.
 
-        // TODO: Add a file path dependency using a fake path string for this source
+        slang::Checksum sourceHash;
+        MD5Context context;
+        MD5HashGen hashGen;
+        hashGen.init(&context);
+        hashGen.update(&context, sourceFile->getContentBlob()->getBufferPointer(), sourceFile->getContentSize());
+        hashGen.finalize(&context, &sourceHash);
+
+        getModule()->addFilePathDependency(checksumToString(sourceHash));
     }
 }
 
@@ -3192,11 +3200,11 @@ ISlangUnknown* Module::getInterface(const Guid& guid)
 SlangResult Module::getDependencyBasedHashCode(
     SlangInt entryPointIndex,
     SlangInt targetIndex,
-    uint32_t* outHashCode)
+    slang::Checksum* outHashCode)
 {
     SLANG_UNUSED(entryPointIndex);
 
-    unsigned char hashCode[16];
+    slang::Checksum hashCode;
     MD5HashGen hashGen;
     MD5Context context;
     hashGen.init(&context);
@@ -3222,14 +3230,14 @@ SlangResult Module::getDependencyBasedHashCode(
     targetInfo[4] = (uint32_t)targetReq->shouldDumpIntermediates();
     targetInfo[5] = (uint32_t)targetReq->getForceGLSLScalarBufferLayout();
     targetInfo[6] = (uint32_t)targetReq->shouldTrackLiveness();
-    hashGen.update(&context, targetInfo, 7 * sizeof(uint32_t));
+    hashGen.update(&context, targetInfo, sizeof(targetInfo));
 
     auto targetProfile = targetReq->getTargetProfile();
     uint32_t profileInfo[3];
     profileInfo[0] = (uint32_t)targetProfile.getStage();
     profileInfo[1] = (uint32_t)targetProfile.getVersion();
     profileInfo[2] = (uint32_t)targetProfile.getFamily();
-    hashGen.update(&context, profileInfo, 3 * sizeof(uint32_t));
+    hashGen.update(&context, profileInfo, sizeof(targetProfile));
 
     auto targetProfileName = targetProfile.getName();
     hashGen.update(&context, targetProfileName, (unsigned long)strlen(targetProfileName));
@@ -3267,24 +3275,24 @@ SlangResult Module::getDependencyBasedHashCode(
     auto version = getBuildTagString();
     hashGen.update(&context, version, (unsigned long)strlen(version));
 
-    hashGen.finalize(&context, hashCode);
+    hashGen.finalize(&context, &hashCode);
 
-    memcpy(outHashCode, hashCode, 4 * sizeof(uint32_t));
+    *outHashCode = hashCode;
     return SLANG_OK;
 }
 
-SlangResult Module::getASTBasedHashCode(uint32_t* outHashCode)
+SlangResult Module::getASTBasedHashCode(slang::Checksum* outHashCode)
 {
     auto serializedAST = ASTSerialUtil::serializeAST(getModuleDecl());
 
-    unsigned char hashCode[16];
+    slang::Checksum hashCode;
     MD5HashGen hashGen;
     MD5Context context;
     hashGen.init(&context);
     hashGen.update(&context, serializedAST.getBuffer(), (unsigned long)serializedAST.getCount());
-    hashGen.finalize(&context, hashCode);
+    hashGen.finalize(&context, &hashCode);
 
-    memcpy(outHashCode, hashCode, 4 * sizeof(uint32_t));
+    *outHashCode = hashCode;
     return SLANG_OK;
 }
 
@@ -3489,7 +3497,7 @@ SLANG_NO_THROW SlangResult SLANG_MCALL ComponentType::getEntryPointCode(
 SLANG_NO_THROW SlangResult SLANG_MCALL ComponentType::getDependencyBasedHashCode(
     SlangInt entryPointIndex,
     SlangInt targetIndex,
-    uint32_t* outHashCode)
+    slang::Checksum* outHashCode)
 {
     SLANG_UNUSED(entryPointIndex);
     SLANG_UNUSED(targetIndex);
@@ -3497,7 +3505,7 @@ SLANG_NO_THROW SlangResult SLANG_MCALL ComponentType::getDependencyBasedHashCode
     return SLANG_E_NOT_AVAILABLE;
 }
 
-SLANG_NO_THROW SlangResult SLANG_MCALL ComponentType::getASTBasedHashCode(uint32_t* outHashCode)
+SLANG_NO_THROW SlangResult SLANG_MCALL ComponentType::getASTBasedHashCode(slang::Checksum* outHashCode)
 {
     SLANG_UNUSED(outHashCode);
     return SLANG_E_NOT_AVAILABLE;
@@ -3838,45 +3846,45 @@ CompositeComponentType::CompositeComponentType(
 SlangResult CompositeComponentType::getDependencyBasedHashCode(
     SlangInt entryPointIndex,
     SlangInt targetIndex,
-    uint32_t* outHashCode)
+    slang::Checksum* outHashCode)
 {
     auto componentCount = getChildComponentCount();
 
-    unsigned char hashCode[16];
+    slang::Checksum hashCode;
     MD5HashGen hashGen;
     MD5Context context;
     hashGen.init(&context);
 
     for (Index i = 0; i < componentCount; ++i)
     {
-        unsigned char tempHash[16];
-        getChildComponent(i)->getDependencyBasedHashCode(entryPointIndex, targetIndex, (uint32_t*)tempHash);
-        hashGen.update(&context, tempHash, 16 * sizeof(unsigned char));
+        slang::Checksum tempHash;
+        getChildComponent(i)->getDependencyBasedHashCode(entryPointIndex, targetIndex, &tempHash);
+        hashGen.update(&context, tempHash.checksum, sizeof(tempHash.checksum));
     }
 
-    hashGen.finalize(&context, hashCode);
+    hashGen.finalize(&context, &hashCode);
 
-    memcpy(outHashCode, hashCode, 4 * sizeof(uint32_t));
+    *outHashCode = hashCode;
     return SLANG_OK;
 }
 
-SlangResult CompositeComponentType::getASTBasedHashCode(uint32_t* outHashCode)
+SlangResult CompositeComponentType::getASTBasedHashCode(slang::Checksum* outHashCode)
 {
     auto componentCount = getChildComponentCount();
 
-    unsigned char hashCode[16];
+    slang::Checksum hashCode;
     MD5HashGen hashGen;
     MD5Context context;
     hashGen.init(&context);
     for (Index i = 0; i < componentCount; ++i)
     {
-        unsigned char tempHash[16];
-        getChildComponent(i)->getASTBasedHashCode((uint32_t*)tempHash);
-        hashGen.update(&context, tempHash, 16 * sizeof(unsigned char));
+        slang::Checksum tempHash;
+        getChildComponent(i)->getASTBasedHashCode(&tempHash);
+        hashGen.update(&context, tempHash.checksum, sizeof(tempHash.checksum));
     }
-    hashGen.finalize(&context, hashCode);
+    hashGen.finalize(&context, &hashCode);
 
-    memcpy(outHashCode, hashCode, 4 * sizeof(uint32_t));
+    *outHashCode = hashCode;
     return SLANG_OK;
 }
 
@@ -4362,12 +4370,9 @@ SpecializedComponentType::SpecializedComponentType(
 SlangResult SpecializedComponentType::getDependencyBasedHashCode(
     SlangInt entryPointIndex,
     SlangInt targetIndex,
-    uint32_t* outHashCode)
+    slang::Checksum* outHashCode)
 {
-    SLANG_UNUSED(entryPointIndex);
-    SLANG_UNUSED(targetIndex);
-
-    unsigned char hashCode[16];
+    slang::Checksum hashCode;
     MD5HashGen hashGen;
     MD5Context context;
     hashGen.init(&context);
@@ -4386,11 +4391,13 @@ SlangResult SpecializedComponentType::getDependencyBasedHashCode(
         hashGen.update(&context, argString.getBuffer(), (unsigned long)argString.getLength());
     }
 
-    // TODO: Does m_base need to be hashed?
+    slang::Checksum baseHash;
+    getBaseComponentType()->getDependencyBasedHashCode(entryPointIndex, targetIndex, &baseHash);
+    hashGen.update(&context, baseHash.checksum, (unsigned long)sizeof(baseHash.checksum));
 
-    hashGen.finalize(&context, hashCode);
+    hashGen.finalize(&context, &hashCode);
 
-    memcpy(outHashCode, hashCode, 4 * sizeof(uint32_t));
+    *outHashCode = hashCode;
     return SLANG_OK;
 }
 
@@ -4441,12 +4448,9 @@ void RenamedEntryPointComponentType::acceptVisitor(
 SlangResult RenamedEntryPointComponentType::getDependencyBasedHashCode(
     SlangInt entryPointIndex,
     SlangInt targetIndex,
-    uint32_t* outHashCode)
+    slang::Checksum* outHashCode)
 {
-    SLANG_UNUSED(entryPointIndex);
-    SLANG_UNUSED(targetIndex);
-
-    unsigned char hashCode[16];
+    slang::Checksum hashCode;
     MD5HashGen hashGen;
     MD5Context context;
     hashGen.init(&context);
@@ -4454,11 +4458,13 @@ SlangResult RenamedEntryPointComponentType::getDependencyBasedHashCode(
     auto nameOverride = getEntryPointNameOverride(0);
     hashGen.update(&context, nameOverride.getBuffer(), (unsigned long)nameOverride.getLength());
 
-    // TODO: does m_base need to be hashed?
+    slang::Checksum baseHash;
+    getBase()->getDependencyBasedHashCode(entryPointIndex, targetIndex, &baseHash);
+    hashGen.update(&context, baseHash.checksum, (unsigned long)sizeof(baseHash.checksum));
 
-    hashGen.finalize(&context, hashCode);
+    hashGen.finalize(&context, &hashCode);
 
-    memcpy(outHashCode, hashCode, 4 * sizeof(uint32_t));
+    *outHashCode = hashCode;
     return SLANG_OK;
 }
 

@@ -8,12 +8,12 @@
 #include "../core/slang-riff.h"
 #include "../core/slang-type-text-util.h"
 #include "../core/slang-type-convert-util.h"
-#include "../core/slang-md5.h"
 
 #include "slang-check.h"
 #include "slang-compiler.h"
 
 #include "../compiler-core/slang-lexer.h"
+#include "../compiler-core/slang-md5.h"
 
 // Artifact
 #include "../compiler-core/slang-artifact-desc-util.h"
@@ -227,12 +227,12 @@ namespace Slang
     SlangResult EntryPoint::getDependencyBasedHashCode(
         SlangInt entryPointIndex,
         SlangInt targetIndex,
-        uint32_t* outHashCode)
+        slang::Checksum* outHashCode)
     {
         SLANG_UNUSED(entryPointIndex);
         SLANG_UNUSED(targetIndex);
 
-        unsigned char hashCode[16];
+        slang::Checksum hashCode;
         MD5HashGen hashGen;
         MD5Context context;
         hashGen.init(&context);
@@ -243,33 +243,17 @@ namespace Slang
             hashGen.update(&context, getName()->text.getBuffer(), (unsigned long)getName()->text.getLength());
         }
 
-        hashGen.finalize(&context, hashCode);
+        hashGen.finalize(&context, &hashCode);
 
-        memcpy(outHashCode, hashCode, 4 * sizeof(uint32_t));
+        *outHashCode = hashCode;
         return SLANG_OK;
     }
 
     SlangResult EntryPoint::getASTBasedHashCode(
-        uint32_t* outHashCode)
+        slang::Checksum* outHashCode)
     {
-        unsigned char hashCode[16];
-        MD5HashGen hashGen;
-        MD5Context context;
-        hashGen.init(&context);
-
-        assert(getName());
-        if (getName())
-        {
-            hashGen.update(&context, getName()->text.getBuffer(), (unsigned long)getName()->text.getLength());
-        }
-
-        uint32_t tempHash[4];
-        getModule()->getASTBasedHashCode(tempHash);
-        hashGen.update(&context, tempHash, 4 * sizeof(uint32_t));
-
-        hashGen.finalize(&context, hashCode);
-
-        memcpy(outHashCode, hashCode, 4 * sizeof(uint32_t));
+        slang::Checksum zeroHash;
+        *outHashCode = zeroHash;
         return SLANG_OK;
     }
 
@@ -344,26 +328,31 @@ namespace Slang
     SlangResult TypeConformance::getDependencyBasedHashCode(
         SlangInt entryPointIndex,
         SlangInt targetIndex,
-        uint32_t* outHashCode)
+        slang::Checksum* outHashCode)
     {
         SLANG_UNUSED(entryPointIndex);
         SLANG_UNUSED(targetIndex);
-        return getASTBasedHashCode(outHashCode);
-    }
 
-    SlangResult TypeConformance::getASTBasedHashCode(uint32_t* outHashCode)
-    {
         auto subtypeWitness = m_subtypeWitness->toString();
 
-        unsigned char hashCode[16];
+        slang::Checksum hashCode;
         MD5HashGen hashGen;
         MD5Context context;
         hashGen.init(&context);
+
         hashGen.update(&context, subtypeWitness.getBuffer(), (unsigned long)subtypeWitness.getLength());
         hashGen.update(&context, &m_conformanceIdOverride, (unsigned long)sizeof(m_conformanceIdOverride));
-        hashGen.finalize(&context, hashCode);
 
-        memcpy(outHashCode, hashCode, 4 * sizeof(uint32_t));
+        hashGen.finalize(&context, &hashCode);
+
+        *outHashCode = hashCode;
+        return SLANG_OK;
+    }
+
+    SlangResult TypeConformance::getASTBasedHashCode(slang::Checksum* outHashCode)
+    {
+        slang::Checksum zeroHash;
+        *outHashCode = zeroHash;
         return SLANG_OK;
     }
 

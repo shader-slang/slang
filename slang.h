@@ -476,8 +476,6 @@ convention for interface methods.
 #include <stddef.h>
 #endif // ! SLANG_NO_STDDEF
 
-#include "source/core/slang-md5.h"
-
 #ifdef __cplusplus
 extern "C"
 {
@@ -4307,6 +4305,26 @@ namespace slang
 
     #define SLANG_UUID_ISession ISession::getTypeGuid()
 
+    // A struct for storing checksums designed to be used with the MD5 hashing implementation
+    struct Checksum
+    {
+        uint32_t checksum[4] = { 0 };
+
+        Checksum& operator=(const Checksum& rhs)
+        {
+            if (this == &rhs)
+            {
+                return *this;
+            }
+
+            checksum[0] = rhs.checksum[0];
+            checksum[1] = rhs.checksum[1];
+            checksum[2] = rhs.checksum[2];
+            checksum[3] = rhs.checksum[3];
+            return *this;
+        }
+    };
+
         /** A component type is a unit of shader code layout, reflection, and linking.
 
         A component type is a unit of shader code that can be included into
@@ -4423,15 +4441,20 @@ namespace slang
             IBlob**     outCode,
             IBlob**     outDiagnostics = nullptr) = 0;
 
-            /** Get the name for the specified shader file containing code for the entry point at
-                'entryPointIndex' for the chosen 'targetIndex'
+            /** Compute the hash code of all compilation arguments for the specified target. This includes
+                all dependent source file names, preprocessor defines, target options and other compiler options.
+                The computed hash code can be used as a lookup key in a shader cache.
             */
         virtual SLANG_NO_THROW SlangResult SLANG_MCALL getDependencyBasedHashCode(
             SlangInt entryPointIndex,
             SlangInt targetIndex,
-            uint32_t* outHashCode) = 0;
+            Checksum* outHashCode) = 0;
 
-        virtual SLANG_NO_THROW SlangResult SLANG_MCALL getASTBasedHashCode(uint32_t* outHashCode) = 0;
+            /** Get the MD5 hash generated from this component type's AST. Not all component types
+                will store an AST, and consequently, not all component types will have a
+                meaningful implementation for this function.
+            */
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL getASTBasedHashCode(Checksum* outHashCode) = 0;
 
             /** Specialize the component by binding its specialization parameters to concrete arguments.
 

@@ -480,6 +480,9 @@
     <ClInclude Include="..\..\..\source\slang\slang-workspace-version.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\source\slang\slang-checksum-utils.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\prelude\slang-cpp-host-prelude.h.cpp">

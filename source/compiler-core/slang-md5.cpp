@@ -257,7 +257,7 @@ namespace Slang
 	    (dst)[2] = (unsigned char)((src) >> 16); \
 	    (dst)[3] = (unsigned char)((src) >> 24);
  
-    void MD5HashGen::finalize(MD5Context* ctx, unsigned char* result)
+    void MD5HashGen::finalize(MD5Context* ctx, slang::Checksum* result)
     {
 	    unsigned long used, available;
  
@@ -281,11 +281,11 @@ namespace Slang
 	    OUT(&ctx->buffer[60], ctx->hi)
  
 	    body(ctx, ctx->buffer, 64);
- 
-	    OUT(&result[0], ctx->a)
-	    OUT(&result[4], ctx->b)
-	    OUT(&result[8], ctx->c)
-	    OUT(&result[12], ctx->d)
+
+	    OUT(&result->checksum[0], ctx->a)
+	    OUT(&result->checksum[4], ctx->b)
+	    OUT(&result->checksum[8], ctx->c)
+	    OUT(&result->checksum[12], ctx->d)
  
 	    memset(ctx, 0, sizeof(*ctx));
     }

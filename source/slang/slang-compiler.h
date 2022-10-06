@@ -276,8 +276,8 @@ namespace Slang
         SLANG_NO_THROW SlangResult SLANG_MCALL getDependencyBasedHashCode(
             SlangInt entryPointIndex,
             SlangInt targetIndex,
-            uint32_t* outHashCode) SLANG_OVERRIDE;
-        SLANG_NO_THROW SlangResult SLANG_MCALL getASTBasedHashCode(uint32_t* outHashCode) SLANG_OVERRIDE;
+            slang::Checksum* outHashCode) SLANG_OVERRIDE;
+        SLANG_NO_THROW SlangResult SLANG_MCALL getASTBasedHashCode(slang::Checksum* outHashCode) SLANG_OVERRIDE;
         SLANG_NO_THROW SlangResult SLANG_MCALL specialize(
             slang::SpecializationArg const* specializationArgs,
             SlangInt                        specializationArgCount,
@@ -503,8 +503,8 @@ namespace Slang
         SLANG_NO_THROW SlangResult SLANG_MCALL getDependencyBasedHashCode(
             SlangInt entryPointIndex,
             SlangInt targetIndex,
-            uint32_t* outHashCode) SLANG_OVERRIDE;
-        SLANG_NO_THROW SlangResult SLANG_MCALL getASTBasedHashCode(uint32_t* outHashCode) SLANG_OVERRIDE;
+            slang::Checksum* outHashCode) SLANG_OVERRIDE;
+        SLANG_NO_THROW SlangResult SLANG_MCALL getASTBasedHashCode(slang::Checksum* outHashCode) SLANG_OVERRIDE;
 
         List<RefPtr<ComponentType>> const& getChildComponents() { return m_childComponents; };
         Index getChildComponentCount() { return m_childComponents.getCount(); }
@@ -585,7 +585,7 @@ namespace Slang
         SLANG_NO_THROW SlangResult SLANG_MCALL getDependencyBasedHashCode(
             SlangInt entryPointIndex,
             SlangInt targetIndex,
-            uint32_t* outHashCode) SLANG_OVERRIDE;
+            slang::Checksum* outHashCode) SLANG_OVERRIDE;
 
             /// Get the base (unspecialized) component type that is being specialized.
         RefPtr<ComponentType> getBaseComponentType() { return m_base; }
@@ -774,7 +774,7 @@ namespace Slang
         SLANG_NO_THROW SlangResult SLANG_MCALL getDependencyBasedHashCode(
             SlangInt entryPointIndex,
             SlangInt targetIndex,
-            uint32_t* outHashCode) SLANG_OVERRIDE;
+            slang::Checksum* outHashCode) SLANG_OVERRIDE;
 
     private:
         RefPtr<ComponentType> m_base;
@@ -871,8 +871,8 @@ namespace Slang
         SLANG_NO_THROW SlangResult SLANG_MCALL getDependencyBasedHashCode(
             SlangInt entryPointIndex,
             SlangInt targetIndex,
-            uint32_t* outHashCode) SLANG_OVERRIDE;
-        SLANG_NO_THROW SlangResult SLANG_MCALL getASTBasedHashCode(uint32_t* outHashCode) SLANG_OVERRIDE;
+            slang::Checksum* outHashCode) SLANG_OVERRIDE;
+        SLANG_NO_THROW SlangResult SLANG_MCALL getASTBasedHashCode(slang::Checksum* outHashCode) SLANG_OVERRIDE;
 
             /// Create an entry point that refers to the given function.
         static RefPtr<EntryPoint> create(
@@ -1082,8 +1082,8 @@ namespace Slang
         SLANG_NO_THROW SlangResult SLANG_MCALL getDependencyBasedHashCode(
             SlangInt entryPointIndex,
             SlangInt targetIndex,
-            uint32_t* outHashCode) SLANG_OVERRIDE;
-        SLANG_NO_THROW SlangResult SLANG_MCALL getASTBasedHashCode(uint32_t* outHashCode) SLANG_OVERRIDE;
+            slang::Checksum* outHashCode) SLANG_OVERRIDE;
+        SLANG_NO_THROW SlangResult SLANG_MCALL getASTBasedHashCode(slang::Checksum* outHashCode) SLANG_OVERRIDE;
 
         List<Module*> const& getModuleDependencies() SLANG_OVERRIDE;
         List<String> const& getFilePathDependencies() SLANG_OVERRIDE;
@@ -1262,8 +1262,8 @@ namespace Slang
         SLANG_NO_THROW SlangResult SLANG_MCALL getDependencyBasedHashCode(
             SlangInt entryPointIndex,
             SlangInt targetIndex,
-            uint32_t* outHashCode) SLANG_OVERRIDE;
-        SLANG_NO_THROW SlangResult SLANG_MCALL getASTBasedHashCode(uint32_t* outHashCode) SLANG_OVERRIDE;
+            slang::Checksum* outHashCode) SLANG_OVERRIDE;
+        SLANG_NO_THROW SlangResult SLANG_MCALL getASTBasedHashCode(slang::Checksum* outHashCode) SLANG_OVERRIDE;
 
             /// Create a module (initially empty).
         Module(Linkage* linkage, ASTBuilder* astBuilder = nullptr);

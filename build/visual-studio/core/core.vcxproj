@@ -250,7 +250,6 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\..\source\core\slang-md5.h" />
     <ClInclude Include="..\..\..\source\core\slang-allocator.h" />
     <ClInclude Include="..\..\..\source\core\slang-archive-file-system.h" />
     <ClInclude Include="..\..\..\source\core\slang-array-view.h" />
@@ -323,7 +322,6 @@
     <ClInclude Include="..\..\..\source\core\slang-zip-file-system.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\..\source\core\slang-md5.cpp" />
     <ClCompile Include="..\..\..\source\core\slang-archive-file-system.cpp" />
     <ClCompile Include="..\..\..\source\core\slang-blob.cpp" />
     <ClCompile Include="..\..\..\source\core\slang-byte-encode-util.cpp" />
