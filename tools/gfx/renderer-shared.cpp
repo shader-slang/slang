@@ -376,7 +376,7 @@ Result RendererBase::getEntryPointCodeFromShaderCache(
     // Produce a hash using the AST for this program - This is needed to check whether a cache entry is effectively dirty,
     // or to save along with the compiled code into an entry so the entry can be checked if fetched later on.
     slang::Checksum ASTHash;
-    program->getASTBasedHashCode(&ASTHash);
+    program->computeASTBasedHash(&ASTHash);
     
     ComPtr<ISlangBlob> codeBlob;
 

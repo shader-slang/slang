@@ -3279,7 +3279,7 @@ SlangResult Module::computeDependencyBasedHash(
     return SLANG_OK;
 }
 
-SlangResult Module::getASTBasedHashCode(slang::Checksum* outHashCode)
+SlangResult Module::computeASTBasedHash(slang::Checksum* outHashCode)
 {
     auto serializedAST = ASTSerialUtil::serializeAST(getModuleDecl());
 
@@ -3503,7 +3503,7 @@ SLANG_NO_THROW SlangResult SLANG_MCALL ComponentType::computeDependencyBasedHash
     return SLANG_E_NOT_AVAILABLE;
 }
 
-SLANG_NO_THROW SlangResult SLANG_MCALL ComponentType::getASTBasedHashCode(slang::Checksum* outHashCode)
+SLANG_NO_THROW SlangResult SLANG_MCALL ComponentType::computeASTBasedHash(slang::Checksum* outHashCode)
 {
     SLANG_UNUSED(outHashCode);
     return SLANG_E_NOT_AVAILABLE;
@@ -3866,7 +3866,7 @@ SlangResult CompositeComponentType::computeDependencyBasedHash(
     return SLANG_OK;
 }
 
-SlangResult CompositeComponentType::getASTBasedHashCode(slang::Checksum* outHashCode)
+SlangResult CompositeComponentType::computeASTBasedHash(slang::Checksum* outHashCode)
 {
     auto componentCount = getChildComponentCount();
 
@@ -3877,7 +3877,7 @@ SlangResult CompositeComponentType::getASTBasedHashCode(slang::Checksum* outHash
     for (Index i = 0; i < componentCount; ++i)
     {
         slang::Checksum tempHash;
-        getChildComponent(i)->getASTBasedHashCode(&tempHash);
+        getChildComponent(i)->computeASTBasedHash(&tempHash);
         hashGen.update(&context, tempHash);
     }
     hashGen.finalize(&context, &hashCode);

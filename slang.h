@@ -4456,7 +4456,7 @@ namespace slang
                 will store an AST, and consequently, not all component types will have a
                 meaningful implementation for this function.
             */
-        virtual SLANG_NO_THROW SlangResult SLANG_MCALL getASTBasedHashCode(Checksum* outHashCode) = 0;
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL computeASTBasedHash(Checksum* outHashCode) = 0;
 
             /** Specialize the component by binding its specialization parameters to concrete arguments.
 

@@ -249,7 +249,7 @@ namespace Slang
         return SLANG_OK;
     }
 
-    SlangResult EntryPoint::getASTBasedHashCode(
+    SlangResult EntryPoint::computeASTBasedHash(
         slang::Checksum* outHashCode)
     {
         slang::Checksum zeroHash;
@@ -349,7 +349,7 @@ namespace Slang
         return SLANG_OK;
     }
 
-    SlangResult TypeConformance::getASTBasedHashCode(slang::Checksum* outHashCode)
+    SlangResult TypeConformance::computeASTBasedHash(slang::Checksum* outHashCode)
     {
         slang::Checksum zeroHash;
         *outHashCode = zeroHash;

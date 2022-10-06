@@ -69,6 +69,9 @@
     <ClInclude Include="..\..\..\source\slang\slang-check.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\source\slang\slang-checksum-utils.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\..\source\slang\slang-compiler.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -478,9 +481,6 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\source\slang\slang-workspace-version.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\source\slang\slang-checksum-utils.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

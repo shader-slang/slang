@@ -277,7 +277,7 @@ namespace Slang
             SlangInt entryPointIndex,
             SlangInt targetIndex,
             slang::Checksum* outHashCode) SLANG_OVERRIDE;
-        SLANG_NO_THROW SlangResult SLANG_MCALL getASTBasedHashCode(slang::Checksum* outHashCode) SLANG_OVERRIDE;
+        SLANG_NO_THROW SlangResult SLANG_MCALL computeASTBasedHash(slang::Checksum* outHashCode) SLANG_OVERRIDE;
         SLANG_NO_THROW SlangResult SLANG_MCALL specialize(
             slang::SpecializationArg const* specializationArgs,
             SlangInt                        specializationArgCount,
@@ -504,7 +504,7 @@ namespace Slang
             SlangInt entryPointIndex,
             SlangInt targetIndex,
             slang::Checksum* outHashCode) SLANG_OVERRIDE;
-        SLANG_NO_THROW SlangResult SLANG_MCALL getASTBasedHashCode(slang::Checksum* outHashCode) SLANG_OVERRIDE;
+        SLANG_NO_THROW SlangResult SLANG_MCALL computeASTBasedHash(slang::Checksum* outHashCode) SLANG_OVERRIDE;
 
         List<RefPtr<ComponentType>> const& getChildComponents() { return m_childComponents; };
         Index getChildComponentCount() { return m_childComponents.getCount(); }
@@ -872,7 +872,7 @@ namespace Slang
             SlangInt entryPointIndex,
             SlangInt targetIndex,
             slang::Checksum* outHashCode) SLANG_OVERRIDE;
-        SLANG_NO_THROW SlangResult SLANG_MCALL getASTBasedHashCode(slang::Checksum* outHashCode) SLANG_OVERRIDE;
+        SLANG_NO_THROW SlangResult SLANG_MCALL computeASTBasedHash(slang::Checksum* outHashCode) SLANG_OVERRIDE;
 
             /// Create an entry point that refers to the given function.
         static RefPtr<EntryPoint> create(
@@ -1083,7 +1083,7 @@ namespace Slang
             SlangInt entryPointIndex,
             SlangInt targetIndex,
             slang::Checksum* outHashCode) SLANG_OVERRIDE;
-        SLANG_NO_THROW SlangResult SLANG_MCALL getASTBasedHashCode(slang::Checksum* outHashCode) SLANG_OVERRIDE;
+        SLANG_NO_THROW SlangResult SLANG_MCALL computeASTBasedHash(slang::Checksum* outHashCode) SLANG_OVERRIDE;
 
         List<Module*> const& getModuleDependencies() SLANG_OVERRIDE;
         List<String> const& getFilePathDependencies() SLANG_OVERRIDE;
@@ -1263,7 +1263,7 @@ namespace Slang
             SlangInt entryPointIndex,
             SlangInt targetIndex,
             slang::Checksum* outHashCode) SLANG_OVERRIDE;
-        SLANG_NO_THROW SlangResult SLANG_MCALL getASTBasedHashCode(slang::Checksum* outHashCode) SLANG_OVERRIDE;
+        SLANG_NO_THROW SlangResult SLANG_MCALL computeASTBasedHash(slang::Checksum* outHashCode) SLANG_OVERRIDE;
 
             /// Create a module (initially empty).
         Module(Linkage* linkage, ASTBuilder* astBuilder = nullptr);
