@@ -4134,6 +4134,26 @@ namespace slang
         None, UnsizedArray, StructuredBuffer, ConstantBuffer, ParameterBlock
     };
 
+    // A struct for storing checksums designed to be used with the MD5 hashing implementation
+    struct Checksum
+    {
+        uint32_t checksum[4] = { 0 };
+
+        Checksum& operator=(const Checksum& rhs)
+        {
+            if (this == &rhs)
+            {
+                return *this;
+            }
+
+            checksum[0] = rhs.checksum[0];
+            checksum[1] = rhs.checksum[1];
+            checksum[2] = rhs.checksum[2];
+            checksum[3] = rhs.checksum[3];
+            return *this;
+        }
+    };
+
         /** A session provides a scope for code that is loaded.
 
         A session can be used to load modules of Slang source code,
@@ -4301,29 +4321,11 @@ namespace slang
             ITypeConformance** outConformance,
             SlangInt conformanceIdOverride,
             ISlangBlob** outDiagnostics) = 0;
+
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL computeDependencyBasedHash(Checksum* outHash) = 0;
     };
 
     #define SLANG_UUID_ISession ISession::getTypeGuid()
-
-    // A struct for storing checksums designed to be used with the MD5 hashing implementation
-    struct Checksum
-    {
-        uint32_t checksum[4] = { 0 };
-
-        Checksum& operator=(const Checksum& rhs)
-        {
-            if (this == &rhs)
-            {
-                return *this;
-            }
-
-            checksum[0] = rhs.checksum[0];
-            checksum[1] = rhs.checksum[1];
-            checksum[2] = rhs.checksum[2];
-            checksum[3] = rhs.checksum[3];
-            return *this;
-        }
-    };
 
         /** A component type is a unit of shader code layout, reflection, and linking.
 
@@ -4445,7 +4447,7 @@ namespace slang
                 all dependent source file names, preprocessor defines, target options and other compiler options.
                 The computed hash code can be used as a lookup key in a shader cache.
             */
-        virtual SLANG_NO_THROW SlangResult SLANG_MCALL getDependencyBasedHashCode(
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL computeDependencyBasedHash(
             SlangInt entryPointIndex,
             SlangInt targetIndex,
             Checksum* outHashCode) = 0;

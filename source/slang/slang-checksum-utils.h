@@ -5,7 +5,7 @@
 namespace Slang
 {
     // Returns the stored hash in checksum as a String.
-    inline String checksumToString(slang::Checksum checksum)
+    inline StringBuilder checksumToString(slang::Checksum checksum)
     {
         StringBuilder filename;
 

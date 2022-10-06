@@ -1321,6 +1321,37 @@ SLANG_NO_THROW SlangResult SLANG_MCALL Linkage::createCompileRequest(
     return SLANG_OK;
 }
 
+SLANG_NO_THROW SlangResult SLANG_MCALL Linkage::computeDependencyBasedHash(
+    slang::Checksum* outHash)
+{
+    slang::Checksum hash;
+    MD5Context context;
+    MD5HashGen hashGen;
+    hashGen.init(&context);
+
+    // Add the Slang compiler version to the hash
+    auto version = String(getBuildTagString());
+    hashGen.update(&context, version);
+
+    // Add the search directory paths to the hash
+    auto searchDirectoryList = getSearchDirectories().searchDirectories;
+    for (auto& searchDir : searchDirectoryList)
+    {
+        auto searchPath = searchDir.path;
+        hashGen.update(&context, searchPath);
+    }
+
+    // Add the preprocessor definitions to the hash
+    for (auto& key : preprocessorDefinitions)
+    {
+        hashGen.update(&context, key.Key);
+    }
+
+    hashGen.finalize(&context, &hash);
+    *outHash = hash;
+    return SLANG_OK;
+}
+
 SlangResult Linkage::addSearchPath(
     char const* path)
 {
@@ -1636,7 +1667,7 @@ void TranslationUnitRequest::_addSourceFile(SourceFile* sourceFile)
         MD5Context context;
         MD5HashGen hashGen;
         hashGen.init(&context);
-        hashGen.update(&context, sourceFile->getContentBlob()->getBufferPointer(), sourceFile->getContentSize());
+        hashGen.update(&context, sourceFile->getContent());
         hashGen.finalize(&context, &sourceHash);
 
         getModule()->addFilePathDependency(checksumToString(sourceHash));
@@ -3197,7 +3228,7 @@ ISlangUnknown* Module::getInterface(const Guid& guid)
 
 // One implementation under ComponentType that takes entryPointIndex/targetIndex
 // One per subtype without
-SlangResult Module::getDependencyBasedHashCode(
+SlangResult Module::computeDependencyBasedHash(
     SlangInt entryPointIndex,
     SlangInt targetIndex,
     slang::Checksum* outHashCode)
@@ -3213,67 +3244,34 @@ SlangResult Module::getDependencyBasedHashCode(
     auto fileDeps = getFilePathDependencyList();
     for (auto& file : fileDeps)
     {
-        hashGen.update(&context, file.getBuffer(), (unsigned long)file.getLength());
+        hashGen.update(&context, file);
     }
 
-    // Add the linkage to the hash
-    auto linkage = getLinkage();
-
     // Add the corresponding TargetRequest based on targetIndex to the hash (except
-    // for the linkage because we've already included it)
+    // for the linkage because the linkage's hash will be computed separately)
+    auto linkage = getLinkage();
     auto targetReq = linkage->targets[targetIndex];
-    uint32_t targetInfo[7];
-    targetInfo[0] = (uint32_t)targetReq->getTarget();
-    targetInfo[1] = (uint32_t)targetReq->getTargetFlags();
-    targetInfo[2] = (uint32_t)targetReq->getFloatingPointMode();
-    targetInfo[3] = (uint32_t)targetReq->getLineDirectiveMode();
-    targetInfo[4] = (uint32_t)targetReq->shouldDumpIntermediates();
-    targetInfo[5] = (uint32_t)targetReq->getForceGLSLScalarBufferLayout();
-    targetInfo[6] = (uint32_t)targetReq->shouldTrackLiveness();
-    hashGen.update(&context, targetInfo, sizeof(targetInfo));
+    hashGen.update(&context, targetReq->getTarget());
+    hashGen.update(&context, targetReq->getTargetFlags());
+    hashGen.update(&context, targetReq->getFloatingPointMode());
+    hashGen.update(&context, targetReq->getLineDirectiveMode());
+    hashGen.update(&context, targetReq->shouldDumpIntermediates());
+    hashGen.update(&context, targetReq->getForceGLSLScalarBufferLayout());
+    hashGen.update(&context, targetReq->shouldTrackLiveness());
 
     auto targetProfile = targetReq->getTargetProfile();
-    uint32_t profileInfo[3];
-    profileInfo[0] = (uint32_t)targetProfile.getStage();
-    profileInfo[1] = (uint32_t)targetProfile.getVersion();
-    profileInfo[2] = (uint32_t)targetProfile.getFamily();
-    hashGen.update(&context, profileInfo, sizeof(targetProfile));
+    hashGen.update(&context, targetProfile.getStage());
+    hashGen.update(&context, targetProfile.getVersion());
+    hashGen.update(&context, targetProfile.getFamily());
 
-    auto targetProfileName = targetProfile.getName();
-    hashGen.update(&context, targetProfileName, (unsigned long)strlen(targetProfileName));
+    auto targetProfileName = String(targetProfile.getName());
+    hashGen.update(&context, targetProfileName);
 
     auto cookedCapabilities = targetReq->getTargetCaps().getExpandedAtoms();
     for (auto& capability : cookedCapabilities)
     {
-        hashGen.update(&context, &capability, sizeof(CapabilityAtom));
+        hashGen.update(&context, capability);
     }
-
-    // Add this Module's preprocessor definitions to the hash
-    auto preprocessorDefs = linkage->preprocessorDefinitions;
-    for (auto& key : preprocessorDefs)
-    {
-        hashGen.update(&context, key.Key.getBuffer(), (unsigned long)key.Key.getLength());
-    }
-
-    // Add this Module's search directory paths to the hash
-    auto searchDirectories = linkage->getSearchDirectories().searchDirectories;
-    for (auto& searchDir : searchDirectories)
-    {
-        auto searchPath = searchDir.path;
-        hashGen.update(&context, searchPath.getBuffer(), (unsigned long)searchPath.getLength());
-    }
-
-    // Add all entry point names contained within this Module to the hash
-    auto entryPoints = getEntryPoints();
-    for (auto& entryPoint : entryPoints)
-    {
-        auto entryPointName = entryPoint->getName()->text;
-        hashGen.update(&context, entryPointName.getBuffer(), (unsigned long)entryPointName.getLength());
-    }
-
-    // Add the Slang compiler version to the hash
-    auto version = getBuildTagString();
-    hashGen.update(&context, version, (unsigned long)strlen(version));
 
     hashGen.finalize(&context, &hashCode);
 
@@ -3289,7 +3287,7 @@ SlangResult Module::getASTBasedHashCode(slang::Checksum* outHashCode)
     MD5HashGen hashGen;
     MD5Context context;
     hashGen.init(&context);
-    hashGen.update(&context, serializedAST.getBuffer(), (unsigned long)serializedAST.getCount());
+    hashGen.update(&context, serializedAST);
     hashGen.finalize(&context, &hashCode);
 
     *outHashCode = hashCode;
@@ -3494,7 +3492,7 @@ SLANG_NO_THROW SlangResult SLANG_MCALL ComponentType::getEntryPointCode(
     return artifact->loadBlob(ArtifactKeep::Yes, outCode);
 }
 
-SLANG_NO_THROW SlangResult SLANG_MCALL ComponentType::getDependencyBasedHashCode(
+SLANG_NO_THROW SlangResult SLANG_MCALL ComponentType::computeDependencyBasedHash(
     SlangInt entryPointIndex,
     SlangInt targetIndex,
     slang::Checksum* outHashCode)
@@ -3843,7 +3841,7 @@ CompositeComponentType::CompositeComponentType(
     }
 }
 
-SlangResult CompositeComponentType::getDependencyBasedHashCode(
+SlangResult CompositeComponentType::computeDependencyBasedHash(
     SlangInt entryPointIndex,
     SlangInt targetIndex,
     slang::Checksum* outHashCode)
@@ -3858,8 +3856,8 @@ SlangResult CompositeComponentType::getDependencyBasedHashCode(
     for (Index i = 0; i < componentCount; ++i)
     {
         slang::Checksum tempHash;
-        getChildComponent(i)->getDependencyBasedHashCode(entryPointIndex, targetIndex, &tempHash);
-        hashGen.update(&context, tempHash.checksum, sizeof(tempHash.checksum));
+        getChildComponent(i)->computeDependencyBasedHash(entryPointIndex, targetIndex, &tempHash);
+        hashGen.update(&context, tempHash);
     }
 
     hashGen.finalize(&context, &hashCode);
@@ -3880,7 +3878,7 @@ SlangResult CompositeComponentType::getASTBasedHashCode(slang::Checksum* outHash
     {
         slang::Checksum tempHash;
         getChildComponent(i)->getASTBasedHashCode(&tempHash);
-        hashGen.update(&context, tempHash.checksum, sizeof(tempHash.checksum));
+        hashGen.update(&context, tempHash);
     }
     hashGen.finalize(&context, &hashCode);
 
@@ -4367,7 +4365,7 @@ SpecializedComponentType::SpecializedComponentType(
     collector.visitSpecialized(this);
 }
 
-SlangResult SpecializedComponentType::getDependencyBasedHashCode(
+SlangResult SpecializedComponentType::computeDependencyBasedHash(
     SlangInt entryPointIndex,
     SlangInt targetIndex,
     slang::Checksum* outHashCode)
@@ -4380,7 +4378,7 @@ SlangResult SpecializedComponentType::getDependencyBasedHashCode(
     auto fileDependencies = getFilePathDependencies();
     for (auto& file : fileDependencies)
     {
-        hashGen.update(&context, file.getBuffer(), (unsigned long)file.getLength());
+        hashGen.update(&context, file);
     }
 
     auto specializationArgCount = getSpecializationArgCount();
@@ -4388,12 +4386,12 @@ SlangResult SpecializedComponentType::getDependencyBasedHashCode(
     {
         auto specializationArg = getSpecializationArg(i);
         auto argString = specializationArg.val->toString();
-        hashGen.update(&context, argString.getBuffer(), (unsigned long)argString.getLength());
+        hashGen.update(&context, argString);
     }
 
     slang::Checksum baseHash;
-    getBaseComponentType()->getDependencyBasedHashCode(entryPointIndex, targetIndex, &baseHash);
-    hashGen.update(&context, baseHash.checksum, (unsigned long)sizeof(baseHash.checksum));
+    getBaseComponentType()->computeDependencyBasedHash(entryPointIndex, targetIndex, &baseHash);
+    hashGen.update(&context, baseHash);
 
     hashGen.finalize(&context, &hashCode);
 
@@ -4445,7 +4443,7 @@ void RenamedEntryPointComponentType::acceptVisitor(
         this, as<EntryPoint::EntryPointSpecializationInfo>(specializationInfo));
 }
 
-SlangResult RenamedEntryPointComponentType::getDependencyBasedHashCode(
+SlangResult RenamedEntryPointComponentType::computeDependencyBasedHash(
     SlangInt entryPointIndex,
     SlangInt targetIndex,
     slang::Checksum* outHashCode)
@@ -4456,11 +4454,11 @@ SlangResult RenamedEntryPointComponentType::getDependencyBasedHashCode(
     hashGen.init(&context);
 
     auto nameOverride = getEntryPointNameOverride(0);
-    hashGen.update(&context, nameOverride.getBuffer(), (unsigned long)nameOverride.getLength());
+    hashGen.update(&context, nameOverride);
 
     slang::Checksum baseHash;
-    getBase()->getDependencyBasedHashCode(entryPointIndex, targetIndex, &baseHash);
-    hashGen.update(&context, baseHash.checksum, (unsigned long)sizeof(baseHash.checksum));
+    getBase()->computeDependencyBasedHash(entryPointIndex, targetIndex, &baseHash);
+    hashGen.update(&context, baseHash);
 
     hashGen.finalize(&context, &hashCode);
 

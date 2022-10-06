@@ -99,7 +99,7 @@ namespace Slang
      * This processes one or more 64-byte data blocks, but does NOT update the bit
      * counters.  There are no alignment requirements.
      */
-    /*static*/const void* MD5HashGen::body(MD5Context* ctx, const void* data, unsigned long size)
+    /*static*/const void* MD5HashGen::body(MD5Context* ctx, const void* data, SlangInt size)
     {
 	    const unsigned char* ptr;
 	    MD5_u32plus a, b, c, d;
@@ -216,11 +216,26 @@ namespace Slang
 	    ctx->lo = 0;
 	    ctx->hi = 0;
     }
- 
-    void MD5HashGen::update(MD5Context* ctx, const void* data, unsigned long size)
+
+    void MD5HashGen::update(MD5Context* ctx, UnownedStringSlice string)
+    {
+        update(ctx, string.begin(), string.getLength());
+    }
+
+    void MD5HashGen::update(MD5Context* ctx, String str)
+    {
+        update(ctx, str.getBuffer(), str.getLength());
+    }
+
+    void MD5HashGen::update(MD5Context* ctx, slang::Checksum checksum)
+    {
+        update(ctx, checksum.checksum, sizeof(checksum.checksum));
+    }
+
+    void MD5HashGen::update(MD5Context* ctx, const void* data, SlangInt size)
     {
 	    MD5_u32plus saved_lo;
-	    unsigned long used, available;
+	    SlangInt used, available;
  
 	    saved_lo = ctx->lo;
 	    if ((ctx->lo = (saved_lo + size) & 0x1fffffff) < saved_lo)
@@ -244,14 +259,17 @@ namespace Slang
 	    }
  
 	    if (size >= 64) {
-		    data = body(ctx, data, size & ~(unsigned long)0x3f);
+		    data = body(ctx, data, size & ~(SlangInt)0x3f);
 		    size &= 0x3f;
 	    }
  
 	    memcpy(ctx->buffer, data, size);
     }
  
-    #define OUT(dst, src) \
+    #define OUTUINT(dst, src) \
+	    (dst)[0] = (uint32_t)src; \
+
+    #define OUTCHAR(dst, src) \
 	    (dst)[0] = (unsigned char)(src); \
 	    (dst)[1] = (unsigned char)((src) >> 8); \
 	    (dst)[2] = (unsigned char)((src) >> 16); \
@@ -277,15 +295,15 @@ namespace Slang
 	    memset(&ctx->buffer[used], 0, available - 8);
  
 	    ctx->lo <<= 3;
-	    OUT(&ctx->buffer[56], ctx->lo)
-	    OUT(&ctx->buffer[60], ctx->hi)
+	    OUTCHAR(&ctx->buffer[56], ctx->lo)
+	    OUTCHAR(&ctx->buffer[60], ctx->hi)
  
 	    body(ctx, ctx->buffer, 64);
 
-	    OUT(&result->checksum[0], ctx->a)
-	    OUT(&result->checksum[4], ctx->b)
-	    OUT(&result->checksum[8], ctx->c)
-	    OUT(&result->checksum[12], ctx->d)
+	    OUTUINT(&result->checksum[0], ctx->a)
+	    OUTUINT(&result->checksum[1], ctx->b)
+	    OUTUINT(&result->checksum[2], ctx->c)
+	    OUTUINT(&result->checksum[3], ctx->d)
  
 	    memset(ctx, 0, sizeof(*ctx));
     }

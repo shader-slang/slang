@@ -29,11 +29,13 @@
 #define _MD5_H
 
 #include "../../slang.h"
+#include "../core/slang-string.h"
+#include "../core/slang-list.h"
 
 namespace Slang
 {
     /* Any 32-bit or wider unsigned integer data type will do */
-    typedef unsigned int MD5_u32plus;
+    typedef SlangInt MD5_u32plus;
 
     struct MD5Context
     {
@@ -47,11 +49,31 @@ namespace Slang
     {
     public:
         void init(MD5Context* ctx);
-        void update(MD5Context* ctx, const void* data, unsigned long size);
+
+        // Helper update function for raw values (e.g. ints, uints)
+        template<typename T>
+        void update(MD5Context* ctx, T val)
+        {
+            update(ctx, &val, sizeof(T));
+        }
+        // Helper update function for Slang::List
+        template<typename T>
+        void update(MD5Context* ctx, List<T> list)
+        {
+            update(ctx, list.getBuffer(), list.getCount());
+        }
+        // Helper update function for UnownedStringSlice
+        void update(MD5Context* ctx, UnownedStringSlice string);
+        // Helper update function for Slang::String
+        void update(MD5Context* ctx, String str);
+        // Helper update function for Checksums
+        void update(MD5Context* ctx, slang::Checksum checksum);
+
         void finalize(MD5Context* ctx, slang::Checksum* result);
 
     private:
-        static const void* body(MD5Context* ctx, const void* data, unsigned long size);
+        static const void* body(MD5Context* ctx, const void* data, SlangInt size);
+        void update(MD5Context* ctx, const void* data, SlangInt size);
     };
 }
  

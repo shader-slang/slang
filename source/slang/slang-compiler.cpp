@@ -224,7 +224,7 @@ namespace Slang
         visitor->visitEntryPoint(this, as<EntryPointSpecializationInfo>(specializationInfo));
     }
 
-    SlangResult EntryPoint::getDependencyBasedHashCode(
+    SlangResult EntryPoint::computeDependencyBasedHash(
         SlangInt entryPointIndex,
         SlangInt targetIndex,
         slang::Checksum* outHashCode)
@@ -240,7 +240,7 @@ namespace Slang
         assert(getName());
         if (getName())
         {
-            hashGen.update(&context, getName()->text.getBuffer(), (unsigned long)getName()->text.getLength());
+            hashGen.update(&context, getName()->text);
         }
 
         hashGen.finalize(&context, &hashCode);
@@ -325,7 +325,7 @@ namespace Slang
         return Super::getInterface(guid);
     }
 
-    SlangResult TypeConformance::getDependencyBasedHashCode(
+    SlangResult TypeConformance::computeDependencyBasedHash(
         SlangInt entryPointIndex,
         SlangInt targetIndex,
         slang::Checksum* outHashCode)
@@ -340,8 +340,8 @@ namespace Slang
         MD5Context context;
         hashGen.init(&context);
 
-        hashGen.update(&context, subtypeWitness.getBuffer(), (unsigned long)subtypeWitness.getLength());
-        hashGen.update(&context, &m_conformanceIdOverride, (unsigned long)sizeof(m_conformanceIdOverride));
+        hashGen.update(&context, subtypeWitness);
+        hashGen.update(&context, m_conformanceIdOverride);
 
         hashGen.finalize(&context, &hashCode);
 

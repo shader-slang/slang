@@ -331,15 +331,15 @@ void PipelineStateBase::initializeBase(const PipelineStateDesc& inDesc)
     }
 }
 
-void updateCacheEntry(ISlangMutableFileSystem* fileSystem, slang::IBlob* compiledCode, String shaderFilename, uint32_t* ASTHash)
+void updateCacheEntry(ISlangMutableFileSystem* fileSystem, slang::IBlob* compiledCode, String shaderFilename, slang::Checksum ASTHash)
 {
-    auto hashSize = 4 * sizeof(uint32_t); // MD5 hashes are 128 bits, represented here as an array of four uint32_t.
+    auto hashSize = sizeof(slang::Checksum);
 
     auto bufferSize = hashSize + compiledCode->getBufferSize();
     List<uint8_t> contents;
     contents.setCount(bufferSize);
     uint8_t* buffer = contents.begin();
-    memcpy(buffer, (void*)ASTHash, hashSize);
+    memcpy(buffer, (void*)ASTHash.checksum, hashSize);
     memcpy(buffer + hashSize, (void*)compiledCode->getBufferPointer(), compiledCode->getBufferSize());
     fileSystem->saveFile(shaderFilename.getBuffer(), buffer, bufferSize);
 }
@@ -352,7 +352,7 @@ Result RendererBase::getEntryPointCodeFromShaderCache(
     slang::IBlob** outDiagnostics)
 {
     // TODO: Need a way in filesystem to query both file size and file creation time, if cache size exceeds
-    // specified maximum size (in bytes or files) then delete oldest files
+    // specified maximum size (in bytes or files) then delete oldest files - cache eviction policy
 
     // Immediately call getEntryPointCode if no shader cache was provided on initialization
     if (!shaderCacheFileSystem)
@@ -360,19 +360,24 @@ Result RendererBase::getEntryPointCodeFromShaderCache(
         return program->getEntryPointCode(entryPointIndex, targetIndex, outCode, outDiagnostics);
     }
 
-    // Combine program, entryPointIndex, targetIndex into some kind of key (probably a string) for file lookup - the hash
-    //    - want to update the Slang API so that IComponentType (program) can query the hash
-    //    - two kinds of hashes - hash based on source code vs hash based purely on included filenames
-    slang::Checksum shaderHash;
-    program->getDependencyBasedHashCode(entryPointIndex, targetIndex, &shaderHash);
+    // Produce a string which we can use to query the shader cache by combining two separate hashes which
+    // together comprise all the compilation arguments for this program.
+    ComPtr<slang::ISession> session;
+    getSlangSession(session.writeRef());
 
-    // Get the hash generated from the AST - This is needed to check whether a cache entry is effectively dirty,
+    slang::Checksum linkageHash;
+    slang::Checksum programHash;
+    session->computeDependencyBasedHash(&linkageHash);
+    program->computeDependencyBasedHash(entryPointIndex, targetIndex, &programHash);
+
+    StringBuilder shaderFilename = checksumToString(linkageHash);
+    shaderFilename.append(checksumToString(programHash));
+
+    // Produce a hash using the AST for this program - This is needed to check whether a cache entry is effectively dirty,
     // or to save along with the compiled code into an entry so the entry can be checked if fetched later on.
     slang::Checksum ASTHash;
     program->getASTBasedHashCode(&ASTHash);
-
-    String shaderFilename = checksumToString(shaderHash);
-
+    
     ComPtr<ISlangBlob> codeBlob;
 
     // Query shaderCacheFileSystem for a file by that hash
@@ -381,13 +386,13 @@ Result RendererBase::getEntryPointCodeFromShaderCache(
     
     if (SLANG_FAILED(result))
     {
-        // If we didn't find it, call program->getEntryPointCode() to get the code and return
-        //    - Save a new file using the hash as name and dump the code into it before returning
+        // If we didn't find it, call program->getEntryPointCode() to get and return the code. We also
+        // make sure to save a new entry in the shader cache.
         program->getEntryPointCode(entryPointIndex, targetIndex, codeBlob.writeRef(), outDiagnostics);
         ISlangMutableFileSystem* fileSystem;
         if (SLANG_SUCCEEDED(shaderCacheFileSystem->queryInterface(ISlangMutableFileSystem::getTypeGuid(), (void**)&fileSystem)))
         {
-            updateCacheEntry(fileSystem, codeBlob, shaderFilename, ASTHash.checksum);
+            updateCacheEntry(fileSystem, codeBlob, shaderFilename, ASTHash);
         }
 
         shaderCacheEntryMissCount++;
@@ -407,7 +412,7 @@ Result RendererBase::getEntryPointCodeFromShaderCache(
             ISlangMutableFileSystem* fileSystem;
             if (SLANG_SUCCEEDED(shaderCacheFileSystem->queryInterface(ISlangMutableFileSystem::getTypeGuid(), (void**)&fileSystem)))
             {
-                updateCacheEntry(fileSystem, codeBlob, shaderFilename, ASTHash.checksum);
+                updateCacheEntry(fileSystem, codeBlob, shaderFilename, ASTHash);
             }
 
             shaderCacheMissCount++;
@@ -447,8 +452,7 @@ IDevice* gfx::RendererBase::getInterface(const Guid& guid)
 
 SLANG_NO_THROW Result SLANG_MCALL RendererBase::initialize(const Desc& desc)
 {
-    // need cache of compiled shaders on disk somewhere
-    //   - need to get to IDevice::Desc::shaderCacheFileSystem - Just add it as a field to RendererBase and assign it during initialize() down below
+    // If a shader cache file system was provided, use the provided system.
     if (desc.shaderCacheFileSystem)
     {
         shaderCacheFileSystem = desc.shaderCacheFileSystem;

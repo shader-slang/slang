@@ -6,6 +6,7 @@
 #include "source/core/slang-basic.h"
 
 #include "source/core/slang-memory-file-system.h"
+#include "source/core/slang-file-system.h"
 
 using namespace gfx;
 
@@ -14,15 +15,18 @@ namespace gfx_test
 
     struct ShaderCacheTest
     {
-        ComPtr<IDevice> device;
         UnitTestContext* context;
         Slang::RenderApiFlag::Enum api;
 
-        ComPtr<ISlangMutableFileSystem> fileSystem;
+        ComPtr<IDevice> device;
         ComPtr<IPipelineState> pipelineState;
         ComPtr<IResourceView> bufferView;
 
-        ComPtr<IShaderCacheStatistics> shaderCacheStats;
+        // The test shader needs to physically exist on disk for loadComputeProgram to
+        // correctly load it while the shader cache should exist in memory to avoid needing
+        // to clean up old cache files from previous test runs.
+        ComPtr<ISlangMutableFileSystem> diskFileSystem;
+        ComPtr<ISlangMutableFileSystem> cacheFileSystem;
 
         Slang::String contentsA = Slang::String(
             R"(uniform RWStructuredBuffer<float> buffer;
@@ -91,7 +95,7 @@ namespace gfx_test
 
         void generateNewPipelineState(Slang::String shaderContents)
         {
-            fileSystem->saveFile("shader-cache-shader.slang", shaderContents.getBuffer(), shaderContents.getLength());
+            diskFileSystem->saveFile("shader-cache-shader.slang", shaderContents.getBuffer(), shaderContents.getLength());
 
             ComPtr<IShaderProgram> shaderProgram;
             slang::ProgramLayout* slangReflection;
@@ -103,11 +107,19 @@ namespace gfx_test
                 device->createComputePipelineState(pipelineDesc, pipelineState.writeRef()));
         }
 
+        void freeOldResources()
+        {
+            bufferView = nullptr;
+            pipelineState = nullptr;
+            device = nullptr;
+        }
+
         // TODO: This should be removed at some point. Currently exists as a workaround for module loading
         // seemingly not accounting for updated shader code under the same module name with the same entry point.
         void generateNewDevice()
         {
-            device = createTestingDevice(context, api, fileSystem);
+            freeOldResources();
+            device = createTestingDevice(context, api, cacheFileSystem);
         }
 
         void init(ComPtr<IDevice> device, UnitTestContext* context)
@@ -138,7 +150,9 @@ namespace gfx_test
                 SLANG_IGNORE_TEST
             }
 
-            fileSystem = new Slang::MemoryFileSystem();
+            cacheFileSystem = new Slang::MemoryFileSystem();
+            diskFileSystem = Slang::OSFileSystem::getMutableSingleton();
+            diskFileSystem = new Slang::RelativeFileSystem(diskFileSystem, "tools/gfx-unit-test");
         }
 
         void submitGPUWork()
@@ -170,6 +184,16 @@ namespace gfx_test
 
         void run()
         {
+            ComPtr<IShaderCacheStatistics> shaderCacheStats;
+
+            // Due to needing a workaround to prevent loading old, outdated modules, we need to
+            // recreate the device between each segment of the test. However, we need to maintain the
+            // same cache filesystem for the duration of the test, so the device is immediately recreated
+            // to ensure we can pass the filesystem all the way through.
+            //
+            // TODO: Remove the repeated generateNewDevice() and createRequiredResources() calls once
+            // a solution exists that allows source code changes under the same module name to be picked
+            // up on load.
             generateNewDevice();
             createRequiredResources();
             generateNewPipelineState(contentsA);
@@ -208,7 +232,7 @@ namespace gfx_test
         test.init(device, context);
         test.run();
     }
-#if 0
+#if 1
     // TODO: Tests are currently not functional after switching to MemoryFileSystem. loadComputeProgram
     // is failing to find saved shader files despite seemingly no errors in saveFile
     SLANG_UNIT_TEST(shaderCacheD3D12)
