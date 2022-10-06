@@ -5,6 +5,7 @@
 #include "slang-ir-insts.h"
 #include "slang-ir-clone.h"
 #include "slang-ir-dce.h"
+#include "slang-ir-eliminate-phis.h"
 
 namespace Slang
 {
@@ -1308,7 +1309,8 @@ struct JVPDerivativeContext
     IRFunc* emitJVPFunction(IRBuilder* builder,
                             IRFunc*    primalFn)
     {
-        
+        eliminatePhisInFunc(LivenessMode::Disabled, module, primalFn);
+
         builder->setInsertBefore(primalFn->getNextInst()); 
 
         auto jvpFn = builder->createFunc();
