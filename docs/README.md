@@ -25,7 +25,7 @@ The [CUDA target guide](cuda-target.md) provides information on compiling Slang/
 Contributors
 ------------
 
-For contributors to the Slang project, the information under the [`design/`](design/) diretory may help explain the rationale behind certain design decisions and help when ramping up in the codebase.
+For contributors to the Slang project, the information under the [`design/`](design/) directory may help explain the rationale behind certain design decisions and help when ramping up in the codebase.
 
 Research
 --------
