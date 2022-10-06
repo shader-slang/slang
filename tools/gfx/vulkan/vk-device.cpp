@@ -158,9 +158,8 @@ Result DeviceImpl::initVulkanInstanceAndDevice(
 #elif defined(SLANG_ENABLE_XLIB)
             instanceExtensions.add(VK_KHR_XLIB_SURFACE_EXTENSION_NAME);
 #endif
-#if ENABLE_VALIDATION_LAYER
+        if (ENABLE_VALIDATION_LAYER || isGfxDebugLayerEnabled())
             instanceExtensions.add(VK_EXT_DEBUG_REPORT_EXTENSION_NAME);
-#endif
         }
 
         VkInstanceCreateInfo instanceCreateInfo = { VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO };

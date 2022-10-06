@@ -353,6 +353,7 @@ void ResourceCommandEncoderImpl::clearResourceView(
     IResourceView* view, ClearValue* clearValue, ClearResourceViewFlags::Enum flags)
 {
     auto viewImpl = static_cast<ResourceViewImpl*>(view);
+    m_commandBuffer->bindDescriptorHeaps();
     switch (view->getViewDesc()->type)
     {
     case IResourceView::Type::RenderTarget:
