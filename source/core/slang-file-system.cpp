@@ -871,19 +871,35 @@ SlangResult RelativeFileSystem::_calcCombinedPathInner(SlangPathType fromPathTyp
     }
 }
 
-SlangResult RelativeFileSystem::_getCanonicalPath(const char* path, StringBuilder& outPath)
+SlangResult RelativeFileSystem::_getCanonicalPath(const char* path, String& outPath)
 {
     if (m_stripPath)
     {
         // We are just using the filename. There is no path that could go outside of the the relative path so we can use as is
-        auto fileName = Path::getFileName(path);
-
-        outPath.swapWith(fileName);
+        outPath = Path::getFileName(path);
     }
     else
     {
+        // NOTE that we don't want the canonical path to be absolute with a leading "/"
+        // because paths specified which aren't absolute, would produce a different path.
+        // 
+        // Ie we want (and get with these options)
+        // "a" -> "a"
+        // "/a" -> "a".
+        //
+        // If we allowed the root to be included then...
+        // "a" -> "a"
+        // "/a" -> "/a"
+        // 
+        // Two identical paths would match to different paths, which wouldn't be canonical.
+        // 
+        // This could be fixed by making all paths absolute with '/' too, but it's easier to just make all not 
+        // have "/"
+
+        StringBuilder canonicalPath;
         // We want the input path to be local to this file system
-        SLANG_RETURN_ON_FAIL(Path::simplifyAbsolute(path, outPath));
+        SLANG_RETURN_ON_FAIL(Path::simplify(path, Path::SimplifyStyle::AbsoluteOnlyAndNoRoot, canonicalPath));
+        outPath = canonicalPath;
     }
     return SLANG_OK;
 }
@@ -892,11 +908,12 @@ SlangResult RelativeFileSystem::_getFixedPath(const char* path, String& outPath)
 {
     ComPtr<ISlangBlob> blob;
 
-    StringBuilder canonicalPath;
+    String canonicalPath;
     SLANG_RETURN_ON_FAIL(_getCanonicalPath(path, canonicalPath));
+  
     SLANG_RETURN_ON_FAIL(_calcCombinedPathInner(SLANG_PATH_TYPE_DIRECTORY, m_relativePath.getBuffer(), canonicalPath.getBuffer(), blob.writeRef()));
-
     outPath = StringUtil::getString(blob);
+    
     return SLANG_OK;
 }
 
@@ -957,8 +974,8 @@ SlangResult RelativeFileSystem::getPath(PathKind kind, const char* path, ISlangB
         }
         case PathKind::Canonical:
         {   
-            StringBuilder canonicalPath;
-            SLANG_RETURN_ON_FAIL(_getCanonicalPath(path, canonicalPath));
+            String canonicalPath;
+            SLANG_RETURN_ON_FAIL(_getCanonicalPath(path, canonicalPath));            
             *outPath = StringBlob::moveCreate(canonicalPath).detach();
             return SLANG_OK;
         }

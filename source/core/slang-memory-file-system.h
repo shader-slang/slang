@@ -55,7 +55,7 @@ public:
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL createDirectory(const char* path) SLANG_OVERRIDE;
 
         /// Ctor
-    MemoryFileSystem() { _clear(); }
+    MemoryFileSystem();
 
 protected:
 
@@ -129,6 +129,8 @@ protected:
 
     // Maps canonical paths to an entries (which could be files or directories)
     Dictionary<String, Entry> m_entries;
+
+    Entry m_rootEntry; 
 };
 
 }

@@ -1,5 +1,7 @@
 #include "slang-implicit-directory-collector.h"
 
+#include "slang-io.h"
+
 namespace Slang
 {
 
@@ -8,13 +10,28 @@ namespace Slang
 ImplicitDirectoryCollector::ImplicitDirectoryCollector(const String& canonicalPath, bool directoryExists) :
     m_directoryExists(directoryExists)
 {
-    StringBuilder buffer;
-    if (canonicalPath != ".")
+    if (!isRootPath(canonicalPath.getUnownedSlice()))
     {
+        StringBuilder buffer;
         buffer << canonicalPath;
         buffer.append('/');
+        m_prefix = buffer.ProduceString();
     }
-    m_prefix = buffer.ProduceString();
+}
+
+/* static */bool ImplicitDirectoryCollector::isRootPath(const UnownedStringSlice& path)
+{
+    const auto length = path.getLength();
+    if (length == 0)
+    {
+        return true;
+    }
+    else if (length == 1)
+    {
+        const auto c = path[0];
+        return c == '.' || Path::isDelimiter(c);
+    }
+    return false;
 }
 
 void ImplicitDirectoryCollector::addRemainingPath(SlangPathType pathType, const UnownedStringSlice& inPathRemainder)
