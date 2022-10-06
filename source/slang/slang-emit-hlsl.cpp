@@ -875,7 +875,7 @@ void HLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
         case kIROp_NativeStringType:
         case kIROp_StringType: 
         {
-            m_writer->emit("string"); 
+            m_writer->emit("int"); 
             return;
         }
         default: break;

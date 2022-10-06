@@ -57,6 +57,8 @@ public:
         /// Ctor
     ImplicitDirectoryCollector(const String& canonicalPath, bool directoryExists = false);
 
+    static bool isRootPath(const UnownedStringSlice& path);
+
     protected:
     StringSliceIndexMap m_map;
     String m_prefix;

@@ -419,7 +419,7 @@ namespace Slang
         return false;
     }
 
-    /* static */SlangResult Path::simplifyAbsolute(const UnownedStringSlice& path, StringBuilder& outPath)
+    /* static */SlangResult Path::simplify(const UnownedStringSlice& path, SimplifyStyle style, StringBuilder& outPath)
     {
         if (path.getLength() == 0)
         {
@@ -427,27 +427,38 @@ namespace Slang
         }
 
         List<UnownedStringSlice> splitPath;
-        Path::split(UnownedStringSlice(path), splitPath);
+        split(UnownedStringSlice(path), splitPath);
 
-        // If the first part of a path is "", it means path of form "/some/path". Turn into "some/path".
-        if (splitPath.getCount() > 1 && splitPath[0].getLength() == 0)
-        {
-            splitPath.removeAt(0);
-        }
+        simplify(splitPath);
 
-        Path::simplify(splitPath);
+        const auto simplifyIntegral = SimplifyIntegral(style);
 
         // If it has a relative part then it's not absolute
-        if (splitPath.indexOf(UnownedStringSlice::fromLiteral("..")) >= 0)
+        if ((simplifyIntegral & SimplifyFlag::AbsoluteOnly) &&
+            splitPath.indexOf(UnownedStringSlice::fromLiteral("..")) >= 0)
         {
             return SLANG_E_NOT_FOUND;
         }
 
         // We allow splitPath.getCount() == 0, because 
         // the original path could have been '.' or './.'
-        // Special handling for this is in join
+        //
+        // Special handling this case is in Path::join
 
-        Path::join(splitPath.getBuffer(), splitPath.getCount(), outPath);
+        // If we want the path produced such that is *not* output with a root (ie SimplifyFlag::NoRoot)
+        // we detect if we a rooted path (ie in effect starting with "/") and so splitPath[0] == ""
+        // and remove that part from when doing the join.
+        if ((simplifyIntegral & SimplifyFlag::NoRoot) &&
+            (splitPath.getCount() && splitPath[0].getLength() == 0))
+        {
+            // If we allow without a root, we remove from the join
+            Path::join(splitPath.getBuffer() + 1, splitPath.getCount() - 1, outPath);
+        }
+        else
+        {
+            Path::join(splitPath.getBuffer(), splitPath.getCount(), outPath);
+        }
+
         return SLANG_OK;
     }
 
@@ -485,10 +496,16 @@ namespace Slang
         if (count == 0)
         {
             out << ".";
-            return;
         }
-
-        StringUtil::join(slices, count, kPathDelimiter, out);
+        else if (count == 1 && slices[0].getLength() == 0)
+        {
+            // It's the root
+            out << kPathDelimiter;
+        }
+        else
+        {
+            StringUtil::join(slices, count, kPathDelimiter, out);
+        }
     }
 
 

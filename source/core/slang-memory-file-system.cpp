@@ -9,6 +9,11 @@
 namespace Slang
 {
 
+MemoryFileSystem::MemoryFileSystem()
+{
+    m_rootEntry.initDirectory("/");
+}
+
 void* MemoryFileSystem::getInterface(const Guid& guid)
 {
     if  (   guid == ISlangUnknown::getTypeGuid() || 
@@ -40,15 +45,18 @@ void* MemoryFileSystem::castAs(const Guid& guid)
 void MemoryFileSystem::_clear() 
 { 
     m_entries = Dictionary<String, Entry>(); 
-    // Add the root
-    Entry entry;
-    entry.initDirectory(".");
-    m_entries.Add(entry.m_canonicalPath, entry);
 }
 
 MemoryFileSystem::Entry* MemoryFileSystem::_getEntryFromCanonicalPath(const String& canonicalPath)
 {
-    return m_entries.TryGetValue(canonicalPath);
+    if (canonicalPath == toSlice("."))
+    {
+        return &m_rootEntry;
+    }
+    else
+    {
+        return m_entries.TryGetValue(canonicalPath);
+    }
 }
 
 MemoryFileSystem::Entry* MemoryFileSystem::_getEntryFromPath(const char* path, String* outPath)
@@ -141,7 +149,7 @@ SlangResult MemoryFileSystem::getPath(PathKind kind, const char* path, ISlangBlo
         case PathKind::Canonical:
         {
             StringBuilder buffer;
-            SLANG_RETURN_ON_FAIL(Path::simplifyAbsolute(path, buffer));
+            SLANG_RETURN_ON_FAIL(_getCanonical(path, buffer));
             *outPath = StringBlob::moveCreate(buffer).detach();
             return SLANG_OK;
         }
@@ -197,7 +205,7 @@ SlangResult MemoryFileSystem::saveFileBlob(const char* path, ISlangBlob* dataBlo
 SlangResult MemoryFileSystem::_getCanonical(const char* path, StringBuilder& outCanonicalPath)
 {
     StringBuilder canonicalPath;
-    SLANG_RETURN_ON_FAIL(Path::simplifyAbsolute(UnownedStringSlice(path), outCanonicalPath));
+    SLANG_RETURN_ON_FAIL(Path::simplify(UnownedStringSlice(path), Path::SimplifyStyle::AbsoluteOnlyAndNoRoot, outCanonicalPath));
     return SLANG_OK;
 }
 
@@ -260,7 +268,7 @@ SlangResult MemoryFileSystem::remove(const char* path)
     Entry* entry = _getEntryFromPath(path, &canonicalPath);
 
     // If there is an entry and not the root of the file system
-    if (entry && entry->m_canonicalPath != toSlice("."))
+    if (entry && entry != &m_rootEntry)
     {
         if (entry->m_type == SLANG_PATH_TYPE_DIRECTORY)
         {
