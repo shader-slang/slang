@@ -440,30 +440,31 @@ Result DeviceImpl::initialize(const Desc& desc)
             (PFN_EndEventOnCommandList)GetProcAddress(pixModule, "PIXEndEventOnCommandList");
     }
 
-#if ENABLE_DEBUG_LAYER
-    m_D3D12GetDebugInterface =
-        (PFN_D3D12_GET_DEBUG_INTERFACE)loadProc(d3dModule, "D3D12GetDebugInterface");
-    if (m_D3D12GetDebugInterface)
+    if (ENABLE_DEBUG_LAYER || isGfxDebugLayerEnabled())
     {
-        if (SLANG_SUCCEEDED(m_D3D12GetDebugInterface(IID_PPV_ARGS(m_dxDebug.writeRef()))))
+        m_D3D12GetDebugInterface =
+            (PFN_D3D12_GET_DEBUG_INTERFACE)loadProc(d3dModule, "D3D12GetDebugInterface");
+        if (m_D3D12GetDebugInterface)
         {
-#    if 0
-            // Can enable for extra validation. NOTE! That d3d12 warns if you do.... 
-            // D3D12 MESSAGE : Device Debug Layer Startup Options : GPU - Based Validation is enabled(disabled by default).
-            // This results in new validation not possible during API calls on the CPU, by creating patched shaders that have validation
-            // added directly to the shader. However, it can slow things down a lot, especially for applications with numerous
-            // PSOs.Time to see the first render frame may take several minutes.
-            // [INITIALIZATION MESSAGE #1016: CREATEDEVICE_DEBUG_LAYER_STARTUP_OPTIONS]
-
-            ComPtr<ID3D12Debug1> debug1;
-            if (SLANG_SUCCEEDED(m_dxDebug->QueryInterface(debug1.writeRef())))
+            if (SLANG_SUCCEEDED(m_D3D12GetDebugInterface(IID_PPV_ARGS(m_dxDebug.writeRef()))))
             {
-                debug1->SetEnableGPUBasedValidation(true);
-            }
+#    if 0
+                // Can enable for extra validation. NOTE! That d3d12 warns if you do.... 
+                // D3D12 MESSAGE : Device Debug Layer Startup Options : GPU - Based Validation is enabled(disabled by default).
+                // This results in new validation not possible during API calls on the CPU, by creating patched shaders that have validation
+                // added directly to the shader. However, it can slow things down a lot, especially for applications with numerous
+                // PSOs.Time to see the first render frame may take several minutes.
+                // [INITIALIZATION MESSAGE #1016: CREATEDEVICE_DEBUG_LAYER_STARTUP_OPTIONS]
+
+                ComPtr<ID3D12Debug1> debug1;
+                if (SLANG_SUCCEEDED(m_dxDebug->QueryInterface(debug1.writeRef())))
+                {
+                    debug1->SetEnableGPUBasedValidation(true);
+                }
 #    endif
+            }
         }
     }
-#endif
 
     m_D3D12CreateDevice = (PFN_D3D12_CREATE_DEVICE)loadProc(d3dModule, "D3D12CreateDevice");
     if (!m_D3D12CreateDevice)
