@@ -418,15 +418,8 @@ SlangResult ZipFileSystemImpl::_requireMode(Mode newMode)
 
 SlangResult ZipFileSystemImpl::_getFixedPath(const char* path, String& outPath)
 {
-    String simplifiedPath = Path::simplify(UnownedStringSlice(path));
-    // Can simplify to just ., thats okay, if it otherwise has something relative it means it couldn't be simplified into the
-    // contents of the archive
-    if (simplifiedPath != "." && Path::hasRelativeElement(simplifiedPath))
-    {
-        // If it still has a relative element, then it must be 'outside' of the archive
-        return SLANG_E_NOT_FOUND;
-    }
-
+    StringBuilder simplifiedPath;
+    SLANG_RETURN_ON_FAIL(Path::simplify(path, Path::SimplifyStyle::AbsoluteOnlyAndNoRoot, simplifiedPath));
     outPath = simplifiedPath;
     return SLANG_OK;
 }
@@ -528,17 +521,27 @@ SlangResult ZipFileSystemImpl::getPath(PathKind pathKind, const char* path, ISla
         case PathKind::Display:
         case PathKind::Canonical:
         {
-            mz_uint index;
-            SLANG_RETURN_ON_FAIL(_findEntryIndex(path, index));
+            // Get the fixed path
+            String fixedPath;
+            SLANG_RETURN_ON_FAIL(_getFixedPath(path, fixedPath));
 
-            mz_zip_archive_file_stat fileStat;
-            if (!mz_zip_reader_file_stat(&m_archive, index, &fileStat))
+            // See if we can find in the zip explicitly
+            mz_uint index;
+            if (SLANG_SUCCEEDED(_findEntryIndexFromFixedPath(fixedPath, index)))
             {
-                return SLANG_FAIL;
+                mz_zip_archive_file_stat fileStat;
+                if (!mz_zip_reader_file_stat(&m_archive, index, &fileStat))
+                {
+                    return SLANG_FAIL;
+                }
+
+                // Use the path in the archive itself
+                *outPath = StringUtil::createStringBlob(fileStat.m_filename).detach();
+                return SLANG_OK;
             }
 
-            // Use the path in the archive itself
-            *outPath = StringUtil::createStringBlob(fileStat.m_filename).detach();
+            // Else output the fixed path
+            *outPath = StringUtil::createStringBlob(fixedPath).detach();
             return SLANG_OK;
         }
         case PathKind::Simplified:

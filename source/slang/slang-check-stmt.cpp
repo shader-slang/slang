@@ -67,6 +67,12 @@ namespace Slang
         }
     }
 
+    void SemanticsStmtVisitor::visitLabelStmt(LabelStmt* stmt)
+    {
+        WithOuterStmt subContext(this, stmt);
+        subContext.checkStmt(stmt->innerStmt);
+    }
+
     void SemanticsStmtVisitor::checkStmt(Stmt* stmt)
     {
         SemanticsVisitor::checkStmt(stmt, *this);
@@ -85,14 +91,51 @@ namespace Slang
         return nullptr;
     }
 
+    Stmt* SemanticsStmtVisitor::findOuterStmtWithLabel(Name* label)
+    {
+        for (auto outerStmtInfo = m_outerStmts; outerStmtInfo; outerStmtInfo = outerStmtInfo->next)
+        {
+            auto outerStmt = outerStmtInfo->stmt;
+            auto found = as<LabelStmt>(outerStmt);
+            if (found)
+            {
+                if (found->label.getName() == label)
+                {
+                    return found->innerStmt;
+                }
+            }
+        }
+        return nullptr;
+    }
+
     void SemanticsStmtVisitor::visitBreakStmt(BreakStmt *stmt)
     {
-        auto outer = FindOuterStmt<BreakableStmt>();
-        if (!outer)
+        Stmt* targetStmt = nullptr;
+        if (stmt->targetLabel.type == TokenType::Identifier)
         {
-            getSink()->diagnose(stmt, Diagnostics::breakOutsideLoop);
+            // This is a break statement with an explicit target label.
+            // Try to find the outer stmt with the label.
+            targetStmt = findOuterStmtWithLabel(stmt->targetLabel.getName());
+            if (!targetStmt)
+            {
+                getSink()->diagnose(stmt, Diagnostics::breakLabelNotFound, stmt->targetLabel.getName());
+            }
+            if (!as<BreakableStmt>(targetStmt))
+            {
+                getSink()->diagnose(stmt, Diagnostics::targetLabelDoesNotMarkBreakableStmt, stmt->targetLabel.getName());
+            }
         }
-        stmt->parentStmt = outer;
+        else
+        {
+            // For `break` statements without an explicit target,
+            // find the inner most breakable stmt.
+            targetStmt = FindOuterStmt<BreakableStmt>();
+            if (!targetStmt)
+            {
+                getSink()->diagnose(stmt, Diagnostics::breakOutsideLoop);
+            }
+        }
+        stmt->parentStmt = targetStmt;
     }
 
     void SemanticsStmtVisitor::visitContinueStmt(ContinueStmt *stmt)

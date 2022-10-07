@@ -39,6 +39,34 @@ namespace Slang
     class Path
     {
     public:
+        typedef uint32_t SimplifyIntegral;
+
+        struct SimplifyFlag
+        {
+            enum Enum : SimplifyIntegral
+            {
+                    /// Can only simplify to an absolute path. Will return an error if not possible.
+                    /// Useful to constrain a path, such as when wanting something like 'chroot'.
+                AbsoluteOnly = 0x1,             
+                    /// If the simplified path is a root path, remove the root. 
+                    /// Will mean that for example
+                    /// "/" -> "."
+                    /// "/a/.." -> "."
+                    /// "/a" -> "a"
+                    /// Its worth noting that a path prefixed "/" will never be returned and if *just* the root it specified 
+                    /// it will return as ".".
+                NoRoot       = 0x2,             
+            };
+        };
+
+        // A more convenient typesafe way to specify the SimplifyFlag combinations
+        enum SimplifyStyle : SimplifyIntegral
+        {
+            Normal                      = 0,
+            AbsoluteOnly                = SimplifyFlag::AbsoluteOnly,
+            NoRoot                      = SimplifyFlag::NoRoot,
+            AbsoluteOnlyAndNoRoot       = SimplifyFlag::AbsoluteOnly | SimplifyFlag::NoRoot,
+        };
 
         enum class Type
         {
@@ -121,16 +149,21 @@ namespace Slang
         static bool isDriveSpecification(const UnownedStringSlice& pathPrefix);
 
             /// Splits the path into it's individual bits
+            /// Absolute paths of the form "/" will become [""]
+            /// Absolute paths of the form "a:/" will become ["a:", ""]
+            /// A drive specification of the form "a:" will become ["a:"]
+            /// Relative paths that are in effect "." will become []
         static void split(const UnownedStringSlice& path, List<UnownedStringSlice>& splitOut);
+
             /// Strips .. and . as much as it can 
         static String simplify(const UnownedStringSlice& path);
         static String simplify(const String& path) { return simplify(path.getUnownedSlice()); }
 
             /// Given a path simplifies it such the the resultant path is absolute (ie contains no . or ..)
-            /// Can return '.' as the path as the directory 'root'.
-        static SlangResult simplifyAbsolute(const UnownedStringSlice& path, StringBuilder& outPath);
-        static SlangResult simplifyAbsolute(const String& path, StringBuilder& outPath) { return simplifyAbsolute(path.getUnownedSlice(), outPath); }
-        static SlangResult simplifyAbsolute(const char* path, StringBuilder& outPath) { return simplifyAbsolute(UnownedStringSlice(path), outPath); }
+            /// Same behavior as simplify around the root 
+        static SlangResult simplify(const UnownedStringSlice& path, SimplifyStyle style, StringBuilder& outPath);
+        static SlangResult simplify(const String& path, SimplifyStyle style, StringBuilder& outPath) { return simplify(path.getUnownedSlice(), style, outPath); }
+        static SlangResult simplify(const char* path, SimplifyStyle style, StringBuilder& outPath) { return simplify(UnownedStringSlice(path), style, outPath); }
 
             /// Simplifies the path split up
         static void simplify(List<UnownedStringSlice>& ioSplit);
