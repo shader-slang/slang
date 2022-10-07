@@ -339,7 +339,7 @@ void updateCacheEntry(ISlangMutableFileSystem* fileSystem, slang::IBlob* compile
     List<uint8_t> contents;
     contents.setCount(bufferSize);
     uint8_t* buffer = contents.begin();
-    memcpy(buffer, (void*)ASTHash.checksum, hashSize);
+    memcpy(buffer, &ASTHash, hashSize);
     memcpy(buffer + hashSize, (void*)compiledCode->getBufferPointer(), compiledCode->getBufferSize());
     fileSystem->saveFile(shaderFilename.getBuffer(), buffer, bufferSize);
 }

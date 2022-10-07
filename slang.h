@@ -4138,20 +4138,6 @@ namespace slang
     struct Checksum
     {
         uint32_t checksum[4] = { 0 };
-
-        Checksum& operator=(const Checksum& rhs)
-        {
-            if (this == &rhs)
-            {
-                return *this;
-            }
-
-            checksum[0] = rhs.checksum[0];
-            checksum[1] = rhs.checksum[1];
-            checksum[2] = rhs.checksum[2];
-            checksum[3] = rhs.checksum[3];
-            return *this;
-        }
     };
 
         /** A session provides a scope for code that is loaded.

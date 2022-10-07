@@ -6,6 +6,20 @@
 
 namespace Slang
 {
+    // Compute the hash for an UnownedStringSlice
+    inline slang::Checksum computeChecksumForStringSlice(UnownedStringSlice text)
+    {
+        MD5Context context;
+        MD5HashGen hashGen;
+        hashGen.init(&context);
+        hashGen.update(&context, text);
+
+        slang::Checksum textHash;
+        hashGen.finalize(&context, &textHash);
+
+        return textHash;
+    }
+
     // Combines the two provided hashes to produce the final shader cache entry key.
     inline slang::Checksum combineChecksum(const slang::Checksum& linkageHash, const slang::Checksum& programHash)
     {

@@ -15,11 +15,6 @@ SLANG_UNIT_TEST(checksum)
         testA.checksum[2] = 3;
         testA.checksum[3] = 4;
 
-        // Test operator = overload
-        slang::Checksum testB;
-        testB = testA;
-        SLANG_CHECK(memcmp(testA.checksum, testB.checksum, sizeof(testA.checksum)) == 0);
-
         String testAString = checksumToString(testA);
         SLANG_CHECK(testAString.equals(String("00000001000000020000000300000004")));
     }

@@ -1689,13 +1689,7 @@ void TranslationUnitRequest::_addSourceFile(SourceFile* sourceFile)
         // for non-file-based dependencies later when shader files are being hashed for
         // the shader cache.
 
-        slang::Checksum sourceHash;
-        MD5Context context;
-        MD5HashGen hashGen;
-        hashGen.init(&context);
-        hashGen.update(&context, sourceFile->getContent());
-        hashGen.finalize(&context, &sourceHash);
-
+        slang::Checksum sourceHash = computeChecksumForStringSlice(sourceFile->getContent());
         getModule()->addFilePathDependency(checksumToString(sourceHash));
     }
 }

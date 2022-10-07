@@ -53,13 +53,13 @@ namespace Slang
 
         // Helper update function for raw values (e.g. ints, uints)
         template<typename T>
-        void update(MD5Context* ctx, T val)
+        void update(MD5Context* ctx, const T& val)
         {
             update(ctx, &val, sizeof(T));
         }
         // Helper update function for Slang::List
         template<typename T>
-        void update(MD5Context* ctx, const List<T> list)
+        void update(MD5Context* ctx, const List<T>& list)
         {
             update(ctx, list.getBuffer(), list.getCount());
         }
