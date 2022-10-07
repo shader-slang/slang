@@ -28,6 +28,7 @@
 #elif !defined(_MD5_H)
 #define _MD5_H
 
+#pragma once
 #include "../../slang.h"
 #include "../core/slang-string.h"
 #include "../core/slang-list.h"
@@ -58,7 +59,7 @@ namespace Slang
         }
         // Helper update function for Slang::List
         template<typename T>
-        void update(MD5Context* ctx, List<T> list)
+        void update(MD5Context* ctx, const List<T> list)
         {
             update(ctx, list.getBuffer(), list.getCount());
         }
@@ -67,7 +68,7 @@ namespace Slang
         // Helper update function for Slang::String
         void update(MD5Context* ctx, String str);
         // Helper update function for Checksums
-        void update(MD5Context* ctx, slang::Checksum checksum);
+        void update(MD5Context* ctx, const slang::Checksum& checksum);
 
         void finalize(MD5Context* ctx, slang::Checksum* result);
 

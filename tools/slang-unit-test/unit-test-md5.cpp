@@ -1,8 +1,7 @@
 // unit-test-md5.cpp
-
 #include "tools/unit-test/slang-unit-test.h"
 
-#include "../../source/compiler-core/slang-md5.h"
+#include "../../source/core/slang-md5.h"
 #include "../../source/core/slang-string.h"
 #include "../../source/slang/slang-checksum-utils.h"
 

@@ -227,7 +227,7 @@ namespace Slang
         update(ctx, str.getBuffer(), str.getLength());
     }
 
-    void MD5HashGen::update(MD5Context* ctx, slang::Checksum checksum)
+    void MD5HashGen::update(MD5Context* ctx, const slang::Checksum& checksum)
     {
         update(ctx, checksum.checksum, sizeof(checksum.checksum));
     }

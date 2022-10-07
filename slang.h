@@ -4322,7 +4322,13 @@ namespace slang
             SlangInt conformanceIdOverride,
             ISlangBlob** outDiagnostics) = 0;
 
-        virtual SLANG_NO_THROW SlangResult SLANG_MCALL computeDependencyBasedHash(Checksum* outHash) = 0;
+            /** Computes the hash for the linkage, which includes preprocessor defines, the compiler version,
+                and other compiler options. This is then merged with the hash produced for the program to
+                produce a key that can be used with the shader cache.
+            */
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL computeDependencyBasedHash(
+            SlangInt targetIndex,
+            Checksum* outHash) = 0;
     };
 
     #define SLANG_UUID_ISession ISession::getTypeGuid()
@@ -4443,13 +4449,11 @@ namespace slang
             IBlob**     outCode,
             IBlob**     outDiagnostics = nullptr) = 0;
 
-            /** Compute the hash code of all compilation arguments for the specified target. This includes
-                all dependent source file names, preprocessor defines, target options and other compiler options.
-                The computed hash code can be used as a lookup key in a shader cache.
+            /** Compute the hash code of all dependent source file names and target options for the specified
+                TargetRequest. The computed hash code is then merged with the hash for the linkage, which
+                can be used as a lookup key in a shader cache.
             */
         virtual SLANG_NO_THROW SlangResult SLANG_MCALL computeDependencyBasedHash(
-            SlangInt entryPointIndex,
-            SlangInt targetIndex,
             Checksum* outHashCode) = 0;
 
             /** Get the MD5 hash generated from this component type's AST. Not all component types

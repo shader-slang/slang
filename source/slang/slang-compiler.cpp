@@ -8,12 +8,12 @@
 #include "../core/slang-riff.h"
 #include "../core/slang-type-text-util.h"
 #include "../core/slang-type-convert-util.h"
+#include "../core/slang-md5.h"
 
 #include "slang-check.h"
 #include "slang-compiler.h"
 
 #include "../compiler-core/slang-lexer.h"
-#include "../compiler-core/slang-md5.h"
 
 // Artifact
 #include "../compiler-core/slang-artifact-desc-util.h"
@@ -225,13 +225,8 @@ namespace Slang
     }
 
     SlangResult EntryPoint::computeDependencyBasedHash(
-        SlangInt entryPointIndex,
-        SlangInt targetIndex,
         slang::Checksum* outHashCode)
     {
-        SLANG_UNUSED(entryPointIndex);
-        SLANG_UNUSED(targetIndex);
-
         slang::Checksum hashCode;
         MD5HashGen hashGen;
         MD5Context context;
@@ -326,13 +321,8 @@ namespace Slang
     }
 
     SlangResult TypeConformance::computeDependencyBasedHash(
-        SlangInt entryPointIndex,
-        SlangInt targetIndex,
         slang::Checksum* outHashCode)
     {
-        SLANG_UNUSED(entryPointIndex);
-        SLANG_UNUSED(targetIndex);
-
         auto subtypeWitness = m_subtypeWitness->toString();
 
         slang::Checksum hashCode;

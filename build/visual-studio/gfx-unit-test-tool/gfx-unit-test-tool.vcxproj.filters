@@ -121,6 +121,9 @@
     <None Include="..\..\..\tools\gfx-unit-test\graphics-smoke.slang">
       <Filter>Source Files</Filter>
     </None>
+    <None Include="..\..\..\tools\gfx-unit-test\multiple-entry-point-shader-cache-shader.slang">
+      <Filter>Source Files</Filter>
+    </None>
     <None Include="..\..\..\tools\gfx-unit-test\mutable-shader-object.slang">
       <Filter>Source Files</Filter>
     </None>
@@ -139,6 +142,15 @@
     <None Include="..\..\..\tools\gfx-unit-test\sampler-array.slang">
       <Filter>Source Files</Filter>
     </None>
+    <None Include="..\..\..\tools\gfx-unit-test\shader-cache-shader-A.slang">
+      <Filter>Source Files</Filter>
+    </None>
+    <None Include="..\..\..\tools\gfx-unit-test\shader-cache-shader-B.slang">
+      <Filter>Source Files</Filter>
+    </None>
+    <None Include="..\..\..\tools\gfx-unit-test\shader-cache-shader-C.slang">
+      <Filter>Source Files</Filter>
+    </None>
     <None Include="..\..\..\tools\gfx-unit-test\shader-cache-shader.slang">
       <Filter>Source Files</Filter>
     </None>
@@ -149,18 +161,6 @@
       <Filter>Source Files</Filter>
     </None>
     <None Include="..\..\..\tools\gfx-unit-test\trivial-copy.slang">
-      <Filter>Source Files</Filter>
-    </None>
-    <None Include="..\..\..\tools\gfx-unit-test\multiple-entry-point-shader-cache-shader.slang">
-      <Filter>Source Files</Filter>
-    </None>
-    <None Include="..\..\..\tools\gfx-unit-test\shader-cache-shader-A.slang">
-      <Filter>Source Files</Filter>
-    </None>
-    <None Include="..\..\..\tools\gfx-unit-test\shader-cache-shader-B.slang">
-      <Filter>Source Files</Filter>
-    </None>
-    <None Include="..\..\..\tools\gfx-unit-test\shader-cache-shader-C.slang">
       <Filter>Source Files</Filter>
     </None>
   </ItemGroup>

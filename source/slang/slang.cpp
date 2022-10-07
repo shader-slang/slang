@@ -44,7 +44,7 @@
 
 #include "slang-check-impl.h"
 
-#include "../compiler-core/slang-md5.h"
+#include "../core/slang-md5.h"
 #include "slang-checksum-utils.h"
 
 #include "../../slang-tag-version.h"
@@ -1322,6 +1322,7 @@ SLANG_NO_THROW SlangResult SLANG_MCALL Linkage::createCompileRequest(
 }
 
 SLANG_NO_THROW SlangResult SLANG_MCALL Linkage::computeDependencyBasedHash(
+    SlangInt targetIndex,
     slang::Checksum* outHash)
 {
     slang::Checksum hash;
@@ -1345,8 +1346,33 @@ SLANG_NO_THROW SlangResult SLANG_MCALL Linkage::computeDependencyBasedHash(
     for (auto& key : preprocessorDefinitions)
     {
         hashGen.update(&context, key.Key);
+        hashGen.update(&context, key.Value);
     }
 
+    // Add the target specified by targetIndex
+    auto targetReq = targets[targetIndex];
+    hashGen.update(&context, targetReq->getTarget());
+    hashGen.update(&context, targetReq->getTargetFlags());
+    hashGen.update(&context, targetReq->getFloatingPointMode());
+    hashGen.update(&context, targetReq->getLineDirectiveMode());
+    hashGen.update(&context, targetReq->shouldDumpIntermediates());
+    hashGen.update(&context, targetReq->getForceGLSLScalarBufferLayout());
+    hashGen.update(&context, targetReq->shouldTrackLiveness());
+
+    auto targetProfile = targetReq->getTargetProfile();
+    hashGen.update(&context, targetProfile.getStage());
+    hashGen.update(&context, targetProfile.getVersion());
+    hashGen.update(&context, targetProfile.getFamily());
+
+    auto targetProfileName = String(targetProfile.getName());
+    hashGen.update(&context, targetProfileName);
+
+    auto cookedCapabilities = targetReq->getTargetCaps().getExpandedAtoms();
+    for (auto& capability : cookedCapabilities)
+    {
+        hashGen.update(&context, capability);
+    }
+    
     hashGen.finalize(&context, &hash);
     *outHash = hash;
     return SLANG_OK;
@@ -3228,13 +3254,8 @@ ISlangUnknown* Module::getInterface(const Guid& guid)
 
 // One implementation under ComponentType that takes entryPointIndex/targetIndex
 // One per subtype without
-SlangResult Module::computeDependencyBasedHash(
-    SlangInt entryPointIndex,
-    SlangInt targetIndex,
-    slang::Checksum* outHashCode)
+SlangResult Module::computeDependencyBasedHash(slang::Checksum* outHashCode)
 {
-    SLANG_UNUSED(entryPointIndex);
-
     slang::Checksum hashCode;
     MD5HashGen hashGen;
     MD5Context context;
@@ -3245,32 +3266,6 @@ SlangResult Module::computeDependencyBasedHash(
     for (auto& file : fileDeps)
     {
         hashGen.update(&context, file);
-    }
-
-    // Add the corresponding TargetRequest based on targetIndex to the hash (except
-    // for the linkage because the linkage's hash will be computed separately)
-    auto linkage = getLinkage();
-    auto targetReq = linkage->targets[targetIndex];
-    hashGen.update(&context, targetReq->getTarget());
-    hashGen.update(&context, targetReq->getTargetFlags());
-    hashGen.update(&context, targetReq->getFloatingPointMode());
-    hashGen.update(&context, targetReq->getLineDirectiveMode());
-    hashGen.update(&context, targetReq->shouldDumpIntermediates());
-    hashGen.update(&context, targetReq->getForceGLSLScalarBufferLayout());
-    hashGen.update(&context, targetReq->shouldTrackLiveness());
-
-    auto targetProfile = targetReq->getTargetProfile();
-    hashGen.update(&context, targetProfile.getStage());
-    hashGen.update(&context, targetProfile.getVersion());
-    hashGen.update(&context, targetProfile.getFamily());
-
-    auto targetProfileName = String(targetProfile.getName());
-    hashGen.update(&context, targetProfileName);
-
-    auto cookedCapabilities = targetReq->getTargetCaps().getExpandedAtoms();
-    for (auto& capability : cookedCapabilities)
-    {
-        hashGen.update(&context, capability);
     }
 
     hashGen.finalize(&context, &hashCode);
@@ -3492,13 +3487,8 @@ SLANG_NO_THROW SlangResult SLANG_MCALL ComponentType::getEntryPointCode(
     return artifact->loadBlob(ArtifactKeep::Yes, outCode);
 }
 
-SLANG_NO_THROW SlangResult SLANG_MCALL ComponentType::computeDependencyBasedHash(
-    SlangInt entryPointIndex,
-    SlangInt targetIndex,
-    slang::Checksum* outHashCode)
+SLANG_NO_THROW SlangResult SLANG_MCALL ComponentType::computeDependencyBasedHash(slang::Checksum* outHashCode)
 {
-    SLANG_UNUSED(entryPointIndex);
-    SLANG_UNUSED(targetIndex);
     SLANG_UNUSED(outHashCode);
     return SLANG_E_NOT_AVAILABLE;
 }
@@ -3841,10 +3831,7 @@ CompositeComponentType::CompositeComponentType(
     }
 }
 
-SlangResult CompositeComponentType::computeDependencyBasedHash(
-    SlangInt entryPointIndex,
-    SlangInt targetIndex,
-    slang::Checksum* outHashCode)
+SlangResult CompositeComponentType::computeDependencyBasedHash(slang::Checksum* outHashCode)
 {
     auto componentCount = getChildComponentCount();
 
@@ -3856,7 +3843,7 @@ SlangResult CompositeComponentType::computeDependencyBasedHash(
     for (Index i = 0; i < componentCount; ++i)
     {
         slang::Checksum tempHash;
-        getChildComponent(i)->computeDependencyBasedHash(entryPointIndex, targetIndex, &tempHash);
+        getChildComponent(i)->computeDependencyBasedHash(&tempHash);
         hashGen.update(&context, tempHash);
     }
 
@@ -4365,10 +4352,7 @@ SpecializedComponentType::SpecializedComponentType(
     collector.visitSpecialized(this);
 }
 
-SlangResult SpecializedComponentType::computeDependencyBasedHash(
-    SlangInt entryPointIndex,
-    SlangInt targetIndex,
-    slang::Checksum* outHashCode)
+SlangResult SpecializedComponentType::computeDependencyBasedHash(slang::Checksum* outHashCode)
 {
     slang::Checksum hashCode;
     MD5HashGen hashGen;
@@ -4390,7 +4374,7 @@ SlangResult SpecializedComponentType::computeDependencyBasedHash(
     }
 
     slang::Checksum baseHash;
-    getBaseComponentType()->computeDependencyBasedHash(entryPointIndex, targetIndex, &baseHash);
+    getBaseComponentType()->computeDependencyBasedHash(&baseHash);
     hashGen.update(&context, baseHash);
 
     hashGen.finalize(&context, &hashCode);
@@ -4443,10 +4427,7 @@ void RenamedEntryPointComponentType::acceptVisitor(
         this, as<EntryPoint::EntryPointSpecializationInfo>(specializationInfo));
 }
 
-SlangResult RenamedEntryPointComponentType::computeDependencyBasedHash(
-    SlangInt entryPointIndex,
-    SlangInt targetIndex,
-    slang::Checksum* outHashCode)
+SlangResult RenamedEntryPointComponentType::computeDependencyBasedHash(slang::Checksum* outHashCode)
 {
     slang::Checksum hashCode;
     MD5HashGen hashGen;
@@ -4457,7 +4438,7 @@ SlangResult RenamedEntryPointComponentType::computeDependencyBasedHash(
     hashGen.update(&context, nameOverride);
 
     slang::Checksum baseHash;
-    getBase()->computeDependencyBasedHash(entryPointIndex, targetIndex, &baseHash);
+    getBase()->computeDependencyBasedHash(&baseHash);
     hashGen.update(&context, baseHash);
 
     hashGen.finalize(&context, &hashCode);
