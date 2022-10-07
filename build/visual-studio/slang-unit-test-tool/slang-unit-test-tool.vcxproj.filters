@@ -80,6 +80,12 @@
     <ClCompile Include="..\..\..\tools\unit-test\slang-unit-test.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\tools\slang-unit-test\unit-test-checksum.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\tools\slang-unit-test\unit-test-md5.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\..\..\tools\slang-unit-test\unit-test-com-host-callable.slang">

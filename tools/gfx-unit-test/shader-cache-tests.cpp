@@ -13,7 +13,7 @@ using namespace gfx;
 namespace gfx_test
 {
 
-    struct ShaderCacheTest
+    struct BaseShaderCacheTest
     {
         UnitTestContext* context;
         Slang::RenderApiFlag::Enum api;
@@ -28,6 +28,7 @@ namespace gfx_test
         ComPtr<ISlangMutableFileSystem> diskFileSystem;
         ComPtr<ISlangMutableFileSystem> cacheFileSystem;
 
+        // Simple compute shaders we can pipe to our individual shader files for cache testing
         Slang::String contentsA = Slang::String(
             R"(uniform RWStructuredBuffer<float> buffer;
             
@@ -91,20 +92,6 @@ namespace gfx_test
             viewDesc.format = Format::Unknown;
             GFX_CHECK_CALL_ABORT(
                 device->createBufferView(numbersBuffer, nullptr, viewDesc, bufferView.writeRef()));
-        }
-
-        void generateNewPipelineState(Slang::String shaderContents)
-        {
-            diskFileSystem->saveFile("shader-cache-shader.slang", shaderContents.getBuffer(), shaderContents.getLength());
-
-            ComPtr<IShaderProgram> shaderProgram;
-            slang::ProgramLayout* slangReflection;
-            GFX_CHECK_CALL_ABORT(loadComputeProgram(device, shaderProgram, "shader-cache-shader", "computeMain", slangReflection));
-
-            ComputePipelineStateDesc pipelineDesc = {};
-            pipelineDesc.program = shaderProgram.get();
-            GFX_CHECK_CALL_ABORT(
-                device->createComputePipelineState(pipelineDesc, pipelineState.writeRef()));
         }
 
         void freeOldResources()
@@ -181,6 +168,24 @@ namespace gfx_test
             queue->executeCommandBuffer(commandBuffer);
             queue->waitOnHost();
         }
+    };
+
+    // One shader file on disk, all modifications are done to the same file
+    struct SingleEntryShaderCache : BaseShaderCacheTest
+    {
+        void generateNewPipelineState(Slang::String shaderContents)
+        {
+            diskFileSystem->saveFile("shader-cache-shader.slang", shaderContents.getBuffer(), shaderContents.getLength());
+
+            ComPtr<IShaderProgram> shaderProgram;
+            slang::ProgramLayout* slangReflection;
+            GFX_CHECK_CALL_ABORT(loadComputeProgram(device, shaderProgram, "shader-cache-shader", "computeMain", slangReflection));
+
+            ComputePipelineStateDesc pipelineDesc = {};
+            pipelineDesc.program = shaderProgram.get();
+            GFX_CHECK_CALL_ABORT(
+                device->createComputePipelineState(pipelineDesc, pipelineState.writeRef()));
+        }
 
         void run()
         {
@@ -226,23 +231,235 @@ namespace gfx_test
         }
     };
 
+    // Several shader files on disk, modifications may be done to any file
+    struct MultipleEntryShaderCache : BaseShaderCacheTest
+    {
+        void modifyShaderA(Slang::String shaderContents)
+        {
+            diskFileSystem->saveFile("shader-cache-shader-A.slang", shaderContents.getBuffer(), shaderContents.getLength());
+        }
+
+        void modifyShaderB(Slang::String shaderContents)
+        {
+            diskFileSystem->saveFile("shader-cache-shader-B.slang", shaderContents.getBuffer(), shaderContents.getLength());
+        }
+
+        void modifyShaderC(Slang::String shaderContents)
+        {
+            diskFileSystem->saveFile("shader-cache-shader-C.slang", shaderContents.getBuffer(), shaderContents.getLength());
+        }
+
+        void generateNewPipelineState(GfxIndex shaderIndex)
+        {
+            ComPtr<IShaderProgram> shaderProgram;
+            slang::ProgramLayout* slangReflection;
+            char* shaderFilename;
+            switch (shaderIndex)
+            {
+            case 0:
+                shaderFilename = "shader-cache-shader-A";
+                break;
+            case 1:
+                shaderFilename = "shader-cache-shader-B";
+                break;
+            case 2:
+                shaderFilename = "shader-cache-shader-C";
+                break;
+            default:
+                // Should never reach this point since we wrote the test
+                SLANG_IGNORE_TEST;
+            }
+            GFX_CHECK_CALL_ABORT(loadComputeProgram(device, shaderProgram, shaderFilename, "computeMain", slangReflection));
+            
+            ComputePipelineStateDesc pipelineDesc = {};
+            pipelineDesc.program = shaderProgram.get();
+            GFX_CHECK_CALL_ABORT(
+                device->createComputePipelineState(pipelineDesc, pipelineState.writeRef()));
+        }
+
+        void checkAllCacheEntries()
+        {
+            generateNewPipelineState(0);
+            submitGPUWork();
+            generateNewPipelineState(1);
+            submitGPUWork();
+            generateNewPipelineState(2);
+            submitGPUWork();
+        }
+
+        void run()
+        {
+            ComPtr<IShaderCacheStatistics> shaderCacheStats;
+
+            // Due to needing a workaround to prevent loading old, outdated modules, we need to
+            // recreate the device between each segment of the test. However, we need to maintain the
+            // same cache filesystem for the duration of the test, so the device is immediately recreated
+            // to ensure we can pass the filesystem all the way through.
+            //
+            // TODO: Remove the repeated generateNewDevice() and createRequiredResources() calls once
+            // a solution exists that allows source code changes under the same module name to be picked
+            // up on load.
+            generateNewDevice();
+            createRequiredResources();
+            modifyShaderA(contentsA);
+            modifyShaderB(contentsB);
+            modifyShaderC(contentsC);
+            checkAllCacheEntries();
+
+            device->queryInterface(SLANG_UUID_IShaderCacheStatistics, (void**)shaderCacheStats.writeRef());
+            SLANG_CHECK(shaderCacheStats->getCacheEntryMissCount() == 3);
+            SLANG_CHECK(shaderCacheStats->getCacheHitCount() == 0);
+            SLANG_CHECK(shaderCacheStats->getCacheMissCount() == 0);
+
+            generateNewDevice();
+            createRequiredResources();
+            checkAllCacheEntries();
+
+            device->queryInterface(SLANG_UUID_IShaderCacheStatistics, (void**)shaderCacheStats.writeRef());
+            SLANG_CHECK(shaderCacheStats->getCacheEntryMissCount() == 0);
+            SLANG_CHECK(shaderCacheStats->getCacheHitCount() == 3);
+            SLANG_CHECK(shaderCacheStats->getCacheMissCount() == 0);
+
+            generateNewDevice();
+            createRequiredResources();
+            modifyShaderA(contentsB);
+            checkAllCacheEntries();
+
+            device->queryInterface(SLANG_UUID_IShaderCacheStatistics, (void**)shaderCacheStats.writeRef());
+            SLANG_CHECK(shaderCacheStats->getCacheEntryMissCount() == 0);
+            SLANG_CHECK(shaderCacheStats->getCacheHitCount() == 2);
+            SLANG_CHECK(shaderCacheStats->getCacheMissCount() == 1);
+
+            generateNewDevice();
+            createRequiredResources();
+            modifyShaderA(contentsC);
+            modifyShaderB(contentsA);
+            modifyShaderC(contentsB);
+            checkAllCacheEntries();
+
+            device->queryInterface(SLANG_UUID_IShaderCacheStatistics, (void**)shaderCacheStats.writeRef());
+            SLANG_CHECK(shaderCacheStats->getCacheEntryMissCount() == 0);
+            SLANG_CHECK(shaderCacheStats->getCacheHitCount() == 0);
+            SLANG_CHECK(shaderCacheStats->getCacheMissCount() == 3);
+        }
+    };
+
+    // One shader file on disk containing several entry points, no modifications are made to the file
+    struct MultipleEntryPointShader : BaseShaderCacheTest
+    {
+        void generateNewPipelineState(GfxIndex shaderIndex)
+        {
+            ComPtr<IShaderProgram> shaderProgram;
+            slang::ProgramLayout* slangReflection;
+            char* entryPointName;
+            switch (shaderIndex)
+            {
+            case 0:
+                entryPointName = "computeA";
+                break;
+            case 1:
+                entryPointName = "computeB";
+                break;
+            case 2:
+                entryPointName = "computeC";
+                break;
+            default:
+                // Should never reach this point since we wrote the test
+                SLANG_IGNORE_TEST;
+            }
+            GFX_CHECK_CALL_ABORT(loadComputeProgram(device, shaderProgram, "multiple-entry-point-shader-cache-shader", entryPointName, slangReflection));
+
+            ComputePipelineStateDesc pipelineDesc = {};
+            pipelineDesc.program = shaderProgram.get();
+            GFX_CHECK_CALL_ABORT(
+                device->createComputePipelineState(pipelineDesc, pipelineState.writeRef()));
+        }
+
+        void run()
+        {
+            ComPtr<IShaderCacheStatistics> shaderCacheStats;
+
+            // Due to needing a workaround to prevent loading old, outdated modules, we need to
+            // recreate the device between each segment of the test. However, we need to maintain the
+            // same cache filesystem for the duration of the test, so the device is immediately recreated
+            // to ensure we can pass the filesystem all the way through.
+            //
+            // TODO: Remove the repeated generateNewDevice() and createRequiredResources() calls once
+            // a solution exists that allows source code changes under the same module name to be picked
+            // up on load.
+            generateNewDevice();
+            createRequiredResources();
+            generateNewPipelineState(0);
+            submitGPUWork();
+
+            device->queryInterface(SLANG_UUID_IShaderCacheStatistics, (void**)shaderCacheStats.writeRef());
+            SLANG_CHECK(shaderCacheStats->getCacheEntryMissCount() == 1);
+            SLANG_CHECK(shaderCacheStats->getCacheHitCount() == 0);
+            SLANG_CHECK(shaderCacheStats->getCacheMissCount() == 0);
+
+            generateNewDevice();
+            createRequiredResources();
+            generateNewPipelineState(1);
+            submitGPUWork();
+            generateNewPipelineState(0);
+            submitGPUWork();
+
+            device->queryInterface(SLANG_UUID_IShaderCacheStatistics, (void**)shaderCacheStats.writeRef());
+            SLANG_CHECK(shaderCacheStats->getCacheEntryMissCount() == 1);
+            SLANG_CHECK(shaderCacheStats->getCacheHitCount() == 1);
+            SLANG_CHECK(shaderCacheStats->getCacheMissCount() == 0);
+
+            generateNewDevice();
+            createRequiredResources();
+            generateNewPipelineState(2);
+            submitGPUWork();
+            generateNewPipelineState(1);
+            submitGPUWork();
+            generateNewPipelineState(0);
+            submitGPUWork();
+
+            device->queryInterface(SLANG_UUID_IShaderCacheStatistics, (void**)shaderCacheStats.writeRef());
+            SLANG_CHECK(shaderCacheStats->getCacheEntryMissCount() == 1);
+            SLANG_CHECK(shaderCacheStats->getCacheHitCount() == 2);
+            SLANG_CHECK(shaderCacheStats->getCacheMissCount() == 0);
+        }
+    };
+
+    template <typename T>
     void shaderCacheTestImpl(ComPtr<IDevice> device, UnitTestContext* context)
     {
-        ShaderCacheTest test;
+        T test;
         test.init(device, context);
         test.run();
     }
-#if 1
-    // TODO: Tests are currently not functional after switching to MemoryFileSystem. loadComputeProgram
-    // is failing to find saved shader files despite seemingly no errors in saveFile
-    SLANG_UNIT_TEST(shaderCacheD3D12)
+
+    SLANG_UNIT_TEST(singleEntryShaderCacheD3D12)
     {
-        runTestImpl(shaderCacheTestImpl, unitTestContext, Slang::RenderApiFlag::D3D12, nullptr);
+        runTestImpl(shaderCacheTestImpl<SingleEntryShaderCache>, unitTestContext, Slang::RenderApiFlag::D3D12);
     }
 
-    SLANG_UNIT_TEST(shaderCacheVulkan)
+    SLANG_UNIT_TEST(singleEntryShaderCacheVulkan)
     {
-        runTestImpl(shaderCacheTestImpl, unitTestContext, Slang::RenderApiFlag::Vulkan, nullptr);
+        runTestImpl(shaderCacheTestImpl<SingleEntryShaderCache>, unitTestContext, Slang::RenderApiFlag::Vulkan);
     }
-#endif
+
+    SLANG_UNIT_TEST(multipleEntryShaderCacheD3D12)
+    {
+        runTestImpl(shaderCacheTestImpl<MultipleEntryShaderCache>, unitTestContext, Slang::RenderApiFlag::D3D12);
+    }
+
+    SLANG_UNIT_TEST(multipleEntryShaderCacheVulkan)
+    {
+        runTestImpl(shaderCacheTestImpl<MultipleEntryShaderCache>, unitTestContext, Slang::RenderApiFlag::Vulkan);
+    }
+
+    SLANG_UNIT_TEST(multipleEntryPointShaderCacheD3D12)
+    {
+        runTestImpl(shaderCacheTestImpl<MultipleEntryPointShader>, unitTestContext, Slang::RenderApiFlag::D3D12);
+    }
+
+    SLANG_UNIT_TEST(multipleEntryPointShaderCacheVulkan)
+    {
+        runTestImpl(shaderCacheTestImpl<MultipleEntryPointShader>, unitTestContext, Slang::RenderApiFlag::Vulkan);
+    }
 }
