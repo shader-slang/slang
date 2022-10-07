@@ -235,7 +235,7 @@ DIAGNOSTIC(20014, Error, classIsReservedKeyword, "'class' is a reserved keyword 
 // 3xxxx - Semantic analysis
 //
 DIAGNOSTIC(30002, Error, divideByZero, "divide by zero")
-DIAGNOSTIC(30003, Error, breakOutsideLoop, "'break' must appear inside loop constructs.")
+DIAGNOSTIC(30003, Error, breakOutsideLoop, "'break' must appear inside loop or switch constructs.")
 DIAGNOSTIC(30004, Error, continueOutsideLoop, "'continue' must appear inside loop constructs.")
 DIAGNOSTIC(30005, Error, whilePredicateTypeError, "'while': expression must evaluate to int.")
 DIAGNOSTIC(30006, Error, ifPredicateTypeError,  "'if': expression must evaluate to int.")
@@ -272,6 +272,8 @@ DIAGNOSTIC(30050, Error,  mutatingMethodOnImmutableValue, "mutating method '$0' 
 
 DIAGNOSTIC(30051, Error, invalidValueForArgument, "invalid value for argument '$0'")
 DIAGNOSTIC(30052, Error, invalidSwizzleExpr, "invalid swizzle pattern '$0' on type '$1'")
+DIAGNOSTIC(30053, Error, breakLabelNotFound, "label '$0' used as break target is not found.")
+DIAGNOSTIC(30054, Error, targetLabelDoesNotMarkBreakableStmt, "invalid break target: statement labeled '$0' is not breakable.")
 DIAGNOSTIC(30043, Error, getStringHashRequiresStringLiteral, "getStringHash parameter can only accept a string literal")
 
 DIAGNOSTIC(30060, Error, expectedAType, "expected a type, got a '$0'")
