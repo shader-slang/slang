@@ -36,7 +36,7 @@
 namespace Slang
 {
     /* Any 32-bit or wider unsigned integer data type will do */
-    typedef SlangInt MD5_u32plus;
+    typedef uint32_t MD5_u32plus;
 
     struct MD5Context
     {

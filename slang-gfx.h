@@ -2153,13 +2153,8 @@ public:
         ISlangUnknown* apiCommandDispatcher = nullptr;
         // The slot (typically UAV) used to identify NVAPI intrinsics. If >=0 NVAPI is required.
         GfxIndex nvapiExtnSlot = -1;
-
+        // The root directory for the shader cache.
         const char* shaderCachePath = nullptr;
-        // Case 1: no path and no system -> no caching
-        // Case 2: no path and yes system -> directly use the system for caching
-        // Case 3: yes path and no system -> get OSFileSystem and wrap in RelativeFileSystem using the path as m_relativePath
-        // Case 4: yes path and yes system -> take system and wrap in RelativeFileSystem using the path as m_relativePath
-
         // The file system for loading cached shader kernels. The layer does not maintain a strong reference to the object,
         // instead the user is responsible for holding the object alive during the lifetime of an `IDevice`.
         ISlangFileSystem* shaderCacheFileSystem = nullptr;

@@ -15,8 +15,8 @@ SLANG_UNIT_TEST(md5hash)
         MD5HashGen testHashGen;
         testHashGen.init(&testCtx);
 
-        SlangInt valueA = -1;
-        SlangUInt valueB = 1;
+        int64_t valueA = -1;
+        uint64_t valueB = 1;
         testHashGen.update(&testCtx, valueA);
         testHashGen.update(&testCtx, valueB);
 
@@ -33,7 +33,7 @@ SLANG_UNIT_TEST(md5hash)
         MD5HashGen testHashGen;
         testHashGen.init(&testCtx);
 
-        List<SlangInt> listA;
+        List<int64_t> listA;
         listA.add(1);
         listA.add(2);
         listA.add(3);
