@@ -256,20 +256,30 @@ static const uint32_t s_unalignedUInt32Mask[5] =
             int numBytesRemaining = b0 - kLiteCut2 + 2 - 1;
 
 #if SLANG_BYTE_ENCODE_USE_UNALIGNED_ACCESS
-            const uint32_t mask = s_unalignedUInt32Mask[numBytesRemaining];
-            //const uint32_t mask = ~(uint32_t(0xffffff00) << ((numBytesRemaining - 1) * 8));
-            const uint32_t value = (*(const uint32_t*)encodeIn) & mask;
-#else
-            // This works on all cpus although slower
-            uint32_t value = encodeIn[0];
-            switch (numBytesRemaining)
+            uint32_t value = 0;
+            // Do not use unaligned access for the last two values,
+            // (3rd last is safe because this value will have at least 2 bytes, followed by at worst two 1-byte values)
+            // otherwise we can access outside the bounds of the encoded array
+            // This prevents memory validation tools from causing an exception here
+            if (i < numValues - 2)
             {
+                const uint32_t mask = s_unalignedUInt32Mask[numBytesRemaining];
+                //const uint32_t mask = ~(uint32_t(0xffffff00) << ((numBytesRemaining - 1) * 8));
+                value = (*(const uint32_t*)encodeIn) & mask;
+            }
+            else
+#endif
+            {
+                // This works on all cpus although slower
+                value = encodeIn[0];
+                switch (numBytesRemaining)
+                {
                 case 4: value |= uint32_t(encodeIn[3]) << 24;         /* fall thru */
                 case 3: value |= uint32_t(encodeIn[2]) << 16;         /* fall thru */
                 case 2: value |= uint32_t(encodeIn[1]) << 8;          /* fall thru */
                 case 1: break;
+                }
             }
-#endif  
             valuesOut[i] = value;
             encodeIn += numBytesRemaining;
         }
