@@ -355,10 +355,8 @@ Result RendererBase::getEntryPointCodeFromShaderCache(
     // specified maximum size (in bytes or files) then delete oldest files - cache eviction policy
 
     // Immediately call getEntryPointCode if no shader cache was provided on initialization
-    printf("Checking for shader cache...\n");
     if (!shaderCacheFileSystem)
     {
-        printf("Shader cache not present, directly fetching entry point code...\n");
         return program->getEntryPointCode(entryPointIndex, targetIndex, outCode, outDiagnostics);
     }
 
@@ -389,13 +387,21 @@ Result RendererBase::getEntryPointCodeFromShaderCache(
     {
         // If we didn't find it, call program->getEntryPointCode() to get and return the code. We also
         // make sure to save a new entry in the shader cache.
-        program->getEntryPointCode(entryPointIndex, targetIndex, codeBlob.writeRef(), outDiagnostics);
-        if (mutableShaderCacheFileSystem)
+        if (SLANG_SUCCEEDED(program->getEntryPointCode(entryPointIndex, targetIndex, codeBlob.writeRef(), outDiagnostics)))
         {
-            updateCacheEntry(mutableShaderCacheFileSystem, codeBlob, shaderFilename, ASTHash);
-        }
+            if (mutableShaderCacheFileSystem)
+            {
+                updateCacheEntry(mutableShaderCacheFileSystem, codeBlob, shaderFilename, ASTHash);
+            }
 
-        shaderCacheEntryMissCount++;
+            shaderCacheEntryMissCount++;
+        }
+        else
+        {
+            // If getEntryPointCode() failed to fetch the code, we return SLANG_FAIL along with the diagnostics output
+            // in outDiagnostics.
+            return SLANG_FAIL;
+        }
     }
     else
     {
@@ -408,13 +414,21 @@ Result RendererBase::getEntryPointCodeFromShaderCache(
         {
             // The AST hash stored in the entry does not match the AST hash generated earlier, indicating
             // that the shader code has changed and the entry needs to be updated.
-            program->getEntryPointCode(entryPointIndex, targetIndex, codeBlob.writeRef(), outDiagnostics);
-            if (mutableShaderCacheFileSystem)
+            if (SLANG_SUCCEEDED(program->getEntryPointCode(entryPointIndex, targetIndex, codeBlob.writeRef(), outDiagnostics)))
             {
-                updateCacheEntry(mutableShaderCacheFileSystem, codeBlob, shaderFilename, ASTHash);
-            }
+                if (mutableShaderCacheFileSystem)
+                {
+                    updateCacheEntry(mutableShaderCacheFileSystem, codeBlob, shaderFilename, ASTHash);
+                }
 
-            shaderCacheMissCount++;
+                shaderCacheMissCount++;
+            }
+            else
+            {
+                // If getEntryPointCode() failed to fetch the code, we return SLANG_FAIL along with the diagnostics output
+                // in outDiagnostics.
+                return SLANG_FAIL;
+            }
         }
         else
         {
