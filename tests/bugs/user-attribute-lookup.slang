@@ -4,11 +4,12 @@
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name outputBuffer
 RWStructuredBuffer<int> outputBuffer;
 
+// To test for a bug where a user attribute, gets incorrectly looked up
+// as a cached lookup made before creation will make it multiply defined.
+
 // Define an attribute that will appear in reflection
 [__AttributeUsage(_AttributeTargets.Var)]
 struct StaticSamplerAttribute {};
-
-//#define StaticSamplerState [StaticSampler] SamplerState
 
 struct Thing
 {
