@@ -1373,6 +1373,7 @@ public:
     ShaderCache shaderCache;
 
     ISlangFileSystem* shaderCacheFileSystem = nullptr;
+    ComPtr<ISlangMutableFileSystem> mutableShaderCacheFileSystem = nullptr;
 
     Slang::Dictionary<slang::TypeLayoutReflection*, Slang::RefPtr<ShaderObjectLayoutBase>> m_shaderObjectLayoutCache;
     Slang::ComPtr<IPipelineCreationAPIDispatcher> m_pipelineCreationAPIDispatcher;

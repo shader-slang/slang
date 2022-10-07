@@ -355,8 +355,10 @@ Result RendererBase::getEntryPointCodeFromShaderCache(
     // specified maximum size (in bytes or files) then delete oldest files - cache eviction policy
 
     // Immediately call getEntryPointCode if no shader cache was provided on initialization
+    printf("Checking for shader cache...\n");
     if (!shaderCacheFileSystem)
     {
+        printf("Shader cache not present, directly fetching entry point code...\n");
         return program->getEntryPointCode(entryPointIndex, targetIndex, outCode, outDiagnostics);
     }
 
@@ -388,10 +390,9 @@ Result RendererBase::getEntryPointCodeFromShaderCache(
         // If we didn't find it, call program->getEntryPointCode() to get and return the code. We also
         // make sure to save a new entry in the shader cache.
         program->getEntryPointCode(entryPointIndex, targetIndex, codeBlob.writeRef(), outDiagnostics);
-        ISlangMutableFileSystem* fileSystem;
-        if (SLANG_SUCCEEDED(shaderCacheFileSystem->queryInterface(ISlangMutableFileSystem::getTypeGuid(), (void**)&fileSystem)))
+        if (mutableShaderCacheFileSystem)
         {
-            updateCacheEntry(fileSystem, codeBlob, shaderFilename, ASTHash);
+            updateCacheEntry(mutableShaderCacheFileSystem, codeBlob, shaderFilename, ASTHash);
         }
 
         shaderCacheEntryMissCount++;
@@ -408,10 +409,9 @@ Result RendererBase::getEntryPointCodeFromShaderCache(
             // The AST hash stored in the entry does not match the AST hash generated earlier, indicating
             // that the shader code has changed and the entry needs to be updated.
             program->getEntryPointCode(entryPointIndex, targetIndex, codeBlob.writeRef(), outDiagnostics);
-            ISlangMutableFileSystem* fileSystem;
-            if (SLANG_SUCCEEDED(shaderCacheFileSystem->queryInterface(ISlangMutableFileSystem::getTypeGuid(), (void**)&fileSystem)))
+            if (mutableShaderCacheFileSystem)
             {
-                updateCacheEntry(fileSystem, codeBlob, shaderFilename, ASTHash);
+                updateCacheEntry(mutableShaderCacheFileSystem, codeBlob, shaderFilename, ASTHash);
             }
 
             shaderCacheMissCount++;
@@ -464,6 +464,13 @@ SLANG_NO_THROW Result SLANG_MCALL RendererBase::initialize(const Desc& desc)
             shaderCacheFileSystem = OSFileSystem::getMutableSingleton();
         }
         shaderCacheFileSystem = new RelativeFileSystem(shaderCacheFileSystem, desc.shaderCachePath);
+    }
+
+    // If we initialized a file system for the shader cache, check if it's mutable. If so, store a pointer
+    // to the mutable version in order to save new entries later.
+    if (shaderCacheFileSystem)
+    {
+        shaderCacheFileSystem->queryInterface(ISlangMutableFileSystem::getTypeGuid(), (void**)mutableShaderCacheFileSystem.writeRef());
     }
 
     if (desc.apiCommandDispatcher)
