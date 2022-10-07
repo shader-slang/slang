@@ -229,12 +229,14 @@ namespace Slang
         SLANG_ASSERT(!parentDecl->isMemberDictionaryValid());
 
         // TODO(JS): A bit of a work around(!)
-        // By adding this attribute we change lookup. Since previous lookup, 
-        // we have already looked up this name, and determined nothing can be found and that is stored in 
-        // the cache!
         // 
-        // Now we've added the name, we need the added name to be found. We force this by removing the eroneous 
-        // cache entry
+        // To get to this point we must have already have performed a lookup for attributeName, 
+        // and it failed. That lookup used the TypeCheckingCache, and 
+        // so we know there is a cache entry that will be *wrong*, now we have created and 
+        // added the AttributeDecl with the attributeName.
+        // 
+        // To work around, we remove all cached lookups around the name, such that when a subsequent 
+        // lookup is made, the cache will not return the old (wrong) result.
         removeLookupForName(getLinkage()->getTypeCheckingCache(), attributeName);
 
         // Finally, we perform any required semantic checks on
