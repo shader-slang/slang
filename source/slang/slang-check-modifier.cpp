@@ -226,6 +226,17 @@ namespace Slang
         attrDecl->parentDecl = parentDecl;
         parentDecl->members.add(attrDecl);
         
+        SLANG_ASSERT(!parentDecl->isMemberDictionaryValid());
+
+        // TODO(JS): A bit of a work around(!)
+        // By adding this attribute we change lookup. Since previous lookup, 
+        // we have already looked up this name, and determined nothing can be found and that is stored in 
+        // the cache!
+        // 
+        // Now we've added the name, we need the added name to be found. We force this by removing the eroneous 
+        // cache entry
+        removeLookupForName(getLinkage()->getTypeCheckingCache(), attributeName);
+
         // Finally, we perform any required semantic checks on
         // the newly constructed attribute decl.
         //
