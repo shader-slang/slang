@@ -409,7 +409,7 @@ Result RendererBase::getEntryPointCodeFromShaderCache(
         // the AST hash with the compiled code, we can determine this by comparing the stored hash with the
         // AST hash generated earlier.
         auto entryContents = codeBlob->getBufferPointer();
-        auto hashSize = 4 * sizeof(uint32_t);
+        auto hashSize = sizeof(slang::Checksum);
         if (memcmp(ASTHash.checksum, entryContents, hashSize) != 0)
         {
             // The AST hash stored in the entry does not match the AST hash generated earlier, indicating

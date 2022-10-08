@@ -52,7 +52,7 @@ namespace Slang
         void init(MD5Context* ctx);
 
         // Helper update function for raw values (e.g. ints, uints)
-        template<typename T>
+        template<typename T, typename = std::enable_if_t<std::is_enum<T>::value || std::is_arithmetic<T>::value>>
         void update(MD5Context* ctx, const T& val)
         {
             update(ctx, &val, sizeof(T));
