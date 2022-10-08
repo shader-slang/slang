@@ -208,7 +208,7 @@ SLANG_FORCE_INLINE static uint32_t _decodeLiteCut2UInt32(const uint8_t* in, int 
         case 2:     value = *(const uint16_t*)in; break;
         case 3:     value = (uint32_t(in[2]) << 16) | (uint32_t(in[1]) << 8) | uint32_t(in[0]); break;
         case 4:     value = *(const uint32_t*)in; break;
-        default:
+        default: break;
     }
 #else
     // This works on all cpus although slower
