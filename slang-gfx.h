@@ -2059,9 +2059,9 @@ public:
 class IShaderCacheStatistics : public ISlangUnknown
 {
 public:
-    virtual SLANG_NO_THROW GfxCount SLANG_MCALL getCacheEntryMissCount() = 0;
-    virtual SLANG_NO_THROW GfxCount SLANG_MCALL getCacheHitCount() = 0;
     virtual SLANG_NO_THROW GfxCount SLANG_MCALL getCacheMissCount() = 0;
+    virtual SLANG_NO_THROW GfxCount SLANG_MCALL getCacheHitCount() = 0;
+    virtual SLANG_NO_THROW GfxCount SLANG_MCALL getCacheEntryDirtyCount() = 0;
 
     virtual SLANG_NO_THROW Result SLANG_MCALL resetCacheStatistics() = 0;
 };

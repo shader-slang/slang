@@ -205,9 +205,9 @@ namespace gfx_test
             submitGPUWork();
 
             device->queryInterface(SLANG_UUID_IShaderCacheStatistics, (void**)shaderCacheStats.writeRef());
-            SLANG_CHECK(shaderCacheStats->getCacheEntryMissCount() == 1);
+            SLANG_CHECK(shaderCacheStats->getCacheMissCount() == 1);
             SLANG_CHECK(shaderCacheStats->getCacheHitCount() == 0);
-            SLANG_CHECK(shaderCacheStats->getCacheMissCount() == 0);
+            SLANG_CHECK(shaderCacheStats->getCacheEntryDirtyCount() == 0);
 
             generateNewDevice();
             createRequiredResources();
@@ -215,9 +215,9 @@ namespace gfx_test
             submitGPUWork();
 
             device->queryInterface(SLANG_UUID_IShaderCacheStatistics, (void**)shaderCacheStats.writeRef());
-            SLANG_CHECK(shaderCacheStats->getCacheEntryMissCount() == 0);
-            SLANG_CHECK(shaderCacheStats->getCacheHitCount() == 1);
             SLANG_CHECK(shaderCacheStats->getCacheMissCount() == 0);
+            SLANG_CHECK(shaderCacheStats->getCacheHitCount() == 1);
+            SLANG_CHECK(shaderCacheStats->getCacheEntryDirtyCount() == 0);
 
             generateNewDevice();
             createRequiredResources();
@@ -225,9 +225,9 @@ namespace gfx_test
             submitGPUWork();
 
             device->queryInterface(SLANG_UUID_IShaderCacheStatistics, (void**)shaderCacheStats.writeRef());
-            SLANG_CHECK(shaderCacheStats->getCacheEntryMissCount() == 0);
+            SLANG_CHECK(shaderCacheStats->getCacheMissCount() == 0);
             SLANG_CHECK(shaderCacheStats->getCacheHitCount() == 0);
-            SLANG_CHECK(shaderCacheStats->getCacheMissCount() == 1);
+            SLANG_CHECK(shaderCacheStats->getCacheEntryDirtyCount() == 1);
         }
     };
 
@@ -307,18 +307,18 @@ namespace gfx_test
             checkAllCacheEntries();
 
             device->queryInterface(SLANG_UUID_IShaderCacheStatistics, (void**)shaderCacheStats.writeRef());
-            SLANG_CHECK(shaderCacheStats->getCacheEntryMissCount() == 3);
+            SLANG_CHECK(shaderCacheStats->getCacheMissCount() == 3);
             SLANG_CHECK(shaderCacheStats->getCacheHitCount() == 0);
-            SLANG_CHECK(shaderCacheStats->getCacheMissCount() == 0);
+            SLANG_CHECK(shaderCacheStats->getCacheEntryDirtyCount() == 0);
 
             generateNewDevice();
             createRequiredResources();
             checkAllCacheEntries();
 
             device->queryInterface(SLANG_UUID_IShaderCacheStatistics, (void**)shaderCacheStats.writeRef());
-            SLANG_CHECK(shaderCacheStats->getCacheEntryMissCount() == 0);
-            SLANG_CHECK(shaderCacheStats->getCacheHitCount() == 3);
             SLANG_CHECK(shaderCacheStats->getCacheMissCount() == 0);
+            SLANG_CHECK(shaderCacheStats->getCacheHitCount() == 3);
+            SLANG_CHECK(shaderCacheStats->getCacheEntryDirtyCount() == 0);
 
             generateNewDevice();
             createRequiredResources();
@@ -326,9 +326,9 @@ namespace gfx_test
             checkAllCacheEntries();
 
             device->queryInterface(SLANG_UUID_IShaderCacheStatistics, (void**)shaderCacheStats.writeRef());
-            SLANG_CHECK(shaderCacheStats->getCacheEntryMissCount() == 0);
+            SLANG_CHECK(shaderCacheStats->getCacheMissCount() == 0);
             SLANG_CHECK(shaderCacheStats->getCacheHitCount() == 2);
-            SLANG_CHECK(shaderCacheStats->getCacheMissCount() == 1);
+            SLANG_CHECK(shaderCacheStats->getCacheEntryDirtyCount() == 1);
 
             generateNewDevice();
             createRequiredResources();
@@ -338,9 +338,9 @@ namespace gfx_test
             checkAllCacheEntries();
 
             device->queryInterface(SLANG_UUID_IShaderCacheStatistics, (void**)shaderCacheStats.writeRef());
-            SLANG_CHECK(shaderCacheStats->getCacheEntryMissCount() == 0);
+            SLANG_CHECK(shaderCacheStats->getCacheMissCount() == 0);
             SLANG_CHECK(shaderCacheStats->getCacheHitCount() == 0);
-            SLANG_CHECK(shaderCacheStats->getCacheMissCount() == 3);
+            SLANG_CHECK(shaderCacheStats->getCacheEntryDirtyCount() == 3);
         }
     };
 
@@ -393,9 +393,9 @@ namespace gfx_test
             submitGPUWork();
 
             device->queryInterface(SLANG_UUID_IShaderCacheStatistics, (void**)shaderCacheStats.writeRef());
-            SLANG_CHECK(shaderCacheStats->getCacheEntryMissCount() == 1);
+            SLANG_CHECK(shaderCacheStats->getCacheMissCount() == 1);
             SLANG_CHECK(shaderCacheStats->getCacheHitCount() == 0);
-            SLANG_CHECK(shaderCacheStats->getCacheMissCount() == 0);
+            SLANG_CHECK(shaderCacheStats->getCacheEntryDirtyCount() == 0);
 
             generateNewDevice();
             createRequiredResources();
@@ -405,9 +405,9 @@ namespace gfx_test
             submitGPUWork();
 
             device->queryInterface(SLANG_UUID_IShaderCacheStatistics, (void**)shaderCacheStats.writeRef());
-            SLANG_CHECK(shaderCacheStats->getCacheEntryMissCount() == 1);
+            SLANG_CHECK(shaderCacheStats->getCacheMissCount() == 1);
             SLANG_CHECK(shaderCacheStats->getCacheHitCount() == 1);
-            SLANG_CHECK(shaderCacheStats->getCacheMissCount() == 0);
+            SLANG_CHECK(shaderCacheStats->getCacheEntryDirtyCount() == 0);
 
             generateNewDevice();
             createRequiredResources();
@@ -419,9 +419,157 @@ namespace gfx_test
             submitGPUWork();
 
             device->queryInterface(SLANG_UUID_IShaderCacheStatistics, (void**)shaderCacheStats.writeRef());
-            SLANG_CHECK(shaderCacheStats->getCacheEntryMissCount() == 1);
+            SLANG_CHECK(shaderCacheStats->getCacheMissCount() == 1);
             SLANG_CHECK(shaderCacheStats->getCacheHitCount() == 2);
+            SLANG_CHECK(shaderCacheStats->getCacheEntryDirtyCount() == 0);
+        }
+    };
+
+    // One shader file contains an import/include, direct code modifications are made to the imported file
+    // This test specifically checks four cases:
+    //    1. import w/o changes in the imported file
+    //    2. import w/ changes in the imported file
+    //    3. #include w/o changes in the included file (the included file is the same as the imported file in the prior step)
+    //    4. #include w/ changes in the included file
+    struct ShaderFileImportsShaderCache : BaseShaderCacheTest
+    {
+        Slang::String importedContentsA = Slang::String(
+            R"(struct TestFunction
+            {
+                void simpleElementAdd(RWStructuredBuffer<float> buffer, uint index)
+                {
+                    var input = buffer[index];
+                    buffer[index] = input + 1.0f;
+                }
+            };)");
+
+        Slang::String importedContentsB = Slang::String(
+            R"(struct TestFunction
+            {
+                void simpleElementAdd(RWStructuredBuffer<float> buffer, uint index)
+                {
+                    var input = buffer[index];
+                    buffer[index] = input + 2.0f;
+                }
+            };)");
+
+        Slang::String importFile = Slang::String(
+            R"(import imported;
+
+            uniform RWStructuredBuffer<float> buffer;
+            
+            [shader("compute")]
+            [numthreads(4, 1, 1)]
+            void computeMain(
+            uint3 sv_dispatchThreadID : SV_DispatchThreadID)
+            {
+                TestFunction test;
+                for (uint i = 0; i < 4; ++i)
+                {
+                    test.simpleElementAdd(buffer, i);
+                }
+            })");
+
+        Slang::String includeFile = Slang::String(
+            R"(#include "imported.slang"
+
+            uniform RWStructuredBuffer<float> buffer;
+            
+            [shader("compute")]
+            [numthreads(4, 1, 1)]
+            void computeMain(
+            uint3 sv_dispatchThreadID : SV_DispatchThreadID)
+            {
+                TestFunction test;
+                for (uint i = 0; i < 4; ++i)
+                {
+                    test.simpleElementAdd(buffer, i);
+                }
+            })");
+
+        void initializeFiles()
+        {
+            diskFileSystem->saveFile("imported.slang", importedContentsA.getBuffer(), importedContentsA.getLength());
+            diskFileSystem->saveFile("importing-shader-cache-shader.slang", importFile.getBuffer(), importFile.getLength());
+        }
+
+        void modifyImportedFile(Slang::String importedContents)
+        {
+            diskFileSystem->saveFile("imported.slang", importedContents.getBuffer(), importedContents.getLength());
+        }
+
+        void changeImportToInclude()
+        {
+            diskFileSystem->saveFile("importing-shader-cache-shader.slang", includeFile.getBuffer(), includeFile.getLength());
+        }
+
+        void generateNewPipelineState()
+        {
+            ComPtr<IShaderProgram> shaderProgram;
+            slang::ProgramLayout* slangReflection;
+            GFX_CHECK_CALL_ABORT(loadComputeProgram(device, shaderProgram, "importing-shader-cache-shader", "computeMain", slangReflection));
+
+            ComputePipelineStateDesc pipelineDesc = {};
+            pipelineDesc.program = shaderProgram.get();
+            GFX_CHECK_CALL_ABORT(
+                device->createComputePipelineState(pipelineDesc, pipelineState.writeRef()));
+        }
+
+        void run()
+        {
+            ComPtr<IShaderCacheStatistics> shaderCacheStats;
+
+            // Due to needing a workaround to prevent loading old, outdated modules, we need to
+            // recreate the device between each segment of the test. However, we need to maintain the
+            // same cache filesystem for the duration of the test, so the device is immediately recreated
+            // to ensure we can pass the filesystem all the way through.
+            //
+            // TODO: Remove the repeated generateNewDevice() and createRequiredResources() calls once
+            // a solution exists that allows source code changes under the same module name to be picked
+            // up on load.
+            generateNewDevice();
+            createRequiredResources();
+            initializeFiles();
+            generateNewPipelineState();
+            submitGPUWork();
+
+            device->queryInterface(SLANG_UUID_IShaderCacheStatistics, (void**)shaderCacheStats.writeRef());
+            SLANG_CHECK(shaderCacheStats->getCacheMissCount() == 1);
+            SLANG_CHECK(shaderCacheStats->getCacheHitCount() == 0);
+            SLANG_CHECK(shaderCacheStats->getCacheEntryDirtyCount() == 0);
+
+            generateNewDevice();
+            createRequiredResources();
+            modifyImportedFile(importedContentsB);
+            generateNewPipelineState();
+            submitGPUWork();
+
+            device->queryInterface(SLANG_UUID_IShaderCacheStatistics, (void**)shaderCacheStats.writeRef());
             SLANG_CHECK(shaderCacheStats->getCacheMissCount() == 0);
+            SLANG_CHECK(shaderCacheStats->getCacheHitCount() == 0);
+            SLANG_CHECK(shaderCacheStats->getCacheEntryDirtyCount() == 1);
+
+            generateNewDevice();
+            createRequiredResources();
+            changeImportToInclude();
+            generateNewPipelineState();
+            submitGPUWork();
+
+            device->queryInterface(SLANG_UUID_IShaderCacheStatistics, (void**)shaderCacheStats.writeRef());
+            SLANG_CHECK(shaderCacheStats->getCacheMissCount() == 1);
+            SLANG_CHECK(shaderCacheStats->getCacheHitCount() == 0);
+            SLANG_CHECK(shaderCacheStats->getCacheEntryDirtyCount() == 0);
+
+            generateNewDevice();
+            createRequiredResources();
+            modifyImportedFile(importedContentsA);
+            generateNewPipelineState();
+            submitGPUWork();
+
+            device->queryInterface(SLANG_UUID_IShaderCacheStatistics, (void**)shaderCacheStats.writeRef());
+            SLANG_CHECK(shaderCacheStats->getCacheMissCount() == 0);
+            SLANG_CHECK(shaderCacheStats->getCacheHitCount() == 0);
+            SLANG_CHECK(shaderCacheStats->getCacheEntryDirtyCount() == 1);
         }
     };
 
@@ -461,5 +609,15 @@ namespace gfx_test
     SLANG_UNIT_TEST(multipleEntryPointShaderCacheVulkan)
     {
         runTestImpl(shaderCacheTestImpl<MultipleEntryPointShader>, unitTestContext, Slang::RenderApiFlag::Vulkan);
+    }
+
+    SLANG_UNIT_TEST(shaderFileImportsShaderCacheD3D12)
+    {
+        runTestImpl(shaderCacheTestImpl<ShaderFileImportsShaderCache>, unitTestContext, Slang::RenderApiFlag::D3D12);
+    }
+
+    SLANG_UNIT_TEST(shaderFileImportsShaderCacheVulkan)
+    {
+        runTestImpl(shaderCacheTestImpl<ShaderFileImportsShaderCache>, unitTestContext, Slang::RenderApiFlag::Vulkan);
     }
 }

@@ -394,7 +394,7 @@ Result RendererBase::getEntryPointCodeFromShaderCache(
                 updateCacheEntry(mutableShaderCacheFileSystem, codeBlob, shaderFilename, ASTHash);
             }
 
-            shaderCacheEntryMissCount++;
+            shaderCacheMissCount++;
         }
         else
         {
@@ -421,7 +421,7 @@ Result RendererBase::getEntryPointCodeFromShaderCache(
                     updateCacheEntry(mutableShaderCacheFileSystem, codeBlob, shaderFilename, ASTHash);
                 }
 
-                shaderCacheMissCount++;
+                shaderCacheEntryDirtyCount++;
             }
             else
             {
@@ -817,9 +817,9 @@ Result RendererBase::getShaderObjectLayout(
     return SLANG_OK;
 }
 
-GfxCount RendererBase::getCacheEntryMissCount()
+GfxCount RendererBase::getCacheMissCount()
 {
-    return shaderCacheEntryMissCount;
+    return shaderCacheMissCount;
 }
 
 GfxCount RendererBase::getCacheHitCount()
@@ -827,16 +827,16 @@ GfxCount RendererBase::getCacheHitCount()
     return shaderCacheHitCount;
 }
 
-GfxCount RendererBase::getCacheMissCount()
+GfxCount RendererBase::getCacheEntryDirtyCount()
 {
-    return shaderCacheMissCount;
+    return shaderCacheEntryDirtyCount;
 }
 
 Result RendererBase::resetCacheStatistics()
 {
-    shaderCacheEntryMissCount = 0;
-    shaderCacheHitCount = 0;
     shaderCacheMissCount = 0;
+    shaderCacheHitCount = 0;
+    shaderCacheEntryDirtyCount = 0;
     return SLANG_OK;
 }
 

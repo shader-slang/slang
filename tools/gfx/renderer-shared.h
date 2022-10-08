@@ -1358,15 +1358,15 @@ protected:
     Slang::List<Slang::String> m_features;
 
 public:
-    virtual SLANG_NO_THROW GfxCount SLANG_MCALL getCacheEntryMissCount() override;
-    virtual SLANG_NO_THROW GfxCount SLANG_MCALL getCacheHitCount() override;
     virtual SLANG_NO_THROW GfxCount SLANG_MCALL getCacheMissCount() override;
+    virtual SLANG_NO_THROW GfxCount SLANG_MCALL getCacheHitCount() override;
+    virtual SLANG_NO_THROW GfxCount SLANG_MCALL getCacheEntryDirtyCount() override;
     virtual SLANG_NO_THROW Result SLANG_MCALL resetCacheStatistics() override;
 
 protected:
-    GfxCount shaderCacheEntryMissCount = 0;
-    GfxCount shaderCacheHitCount = 0;
     GfxCount shaderCacheMissCount = 0;
+    GfxCount shaderCacheHitCount = 0;
+    GfxCount shaderCacheEntryDirtyCount = 0;
 
 public:
     SlangContext slangContext;

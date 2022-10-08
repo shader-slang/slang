@@ -308,6 +308,8 @@
     <None Include="..\..\..\tools\gfx-unit-test\compute-trivial.slang" />
     <None Include="..\..\..\tools\gfx-unit-test\format-test-shaders.slang" />
     <None Include="..\..\..\tools\gfx-unit-test\graphics-smoke.slang" />
+    <None Include="..\..\..\tools\gfx-unit-test\imported.slang" />
+    <None Include="..\..\..\tools\gfx-unit-test\importing-shader-cache-shader.slang" />
     <None Include="..\..\..\tools\gfx-unit-test\multiple-entry-point-shader-cache-shader.slang" />
     <None Include="..\..\..\tools\gfx-unit-test\mutable-shader-object.slang" />
     <None Include="..\..\..\tools\gfx-unit-test\nested-parameter-block.slang" />

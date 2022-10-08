@@ -913,7 +913,7 @@ SLANG_NO_THROW Result SLANG_MCALL DeviceImpl::createProgram(
 
     ComPtr<ISlangBlob> kernelCode;
     ComPtr<ISlangBlob> diagnostics;
-    auto compileResult = getEntryPointCodeFromShaderCache(desc.slangGlobalScope
+    auto compileResult = getEntryPointCodeFromShaderCache(desc.slangGlobalScope,
         (SlangInt)0, 0, kernelCode.writeRef(), diagnostics.writeRef());
     if (diagnostics)
     {
