@@ -936,7 +936,7 @@ SlangResult CodeGenContext::emitEntryPointsSourceFromIR(ComPtr<IArtifact>& outAr
 
         linkingAndOptimizationOptions.sourceEmitter = sourceEmitter;
 
-        switch( sourceLanguage )
+        switch (sourceLanguage)
         {
         default:
             break;
@@ -964,7 +964,11 @@ SlangResult CodeGenContext::emitEntryPointsSourceFromIR(ComPtr<IArtifact>& outAr
         // TODO: do we want to emit directly from IR, or translate the
         // IR back into AST for emission?
 #if 0
-        dumpIR(compileRequest, irModule, "PRE-EMIT");
+        {
+            StringBuilder sb;
+            StringWriter writer(&sb, Slang::WriterFlag::AutoFlush);
+            dumpIR(irModule, getIRDumpOptions(), sourceManager, &writer);
+        }
 #endif
         sourceEmitter->emitModule(irModule, sink);
     }

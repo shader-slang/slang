@@ -28,7 +28,7 @@ bool processFunc(IRGlobalValueWithCode* func)
                 auto continueBlock = loop->getContinueBlock();
                 if (continueBlock && !continueBlock->hasMoreThanOneUse())
                 {
-                    loop->continueBlock.set(loop->getBreakBlock());
+                    loop->continueBlock.set(loop->getTargetBlock());
                     continueBlock->removeAndDeallocate();
                 }
             }

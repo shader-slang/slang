@@ -203,9 +203,12 @@ struct EliminateMultiLevelBreakContext
             // `newBreakBlock` defines the `IRParam` for the break target, then immediately jumps to `newBreakBodyBlock` for the actual branch. We need this
             // separation to avoid introducing critical edge to the CFG (blocks cannot have more
             // than 1 predecessors and more than 1 successors at the same time).
-            auto jumpToOuterBlock = builder.emitBlock();
-            auto newBreakBodyBlock = builder.emitBlock();
-            auto newBreakBlock = builder.emitBlock();
+            auto jumpToOuterBlock = builder.createBlock();
+            auto newBreakBodyBlock = builder.createBlock();
+            auto newBreakBlock = builder.createBlock();
+            newBreakBlock->insertBefore(breakBlock);
+            newBreakBodyBlock->insertAfter(breakBlock);
+            jumpToOuterBlock->insertAfter(newBreakBlock);
             mapNewBreakBlockToLoopLevel[newBreakBlock] = skippedLoop->level;
             breakBlock->replaceUsesWith(newBreakBlock);
             builder.setInsertInto(newBreakBlock);
