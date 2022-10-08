@@ -53,7 +53,7 @@ namespace Slang
 
         // Helper update function for raw values (e.g. ints, uints)
         template<typename T,
-            typename = std::enable_if<std::is_enum<T>::value || std::is_arithmetic<T>::value>::type>
+            typename = typename std::enable_if<std::is_enum<T>::value || std::is_arithmetic<T>::value>::type>
         void update(MD5Context* ctx, const T& val)
         {
             update(ctx, &val, sizeof(T));
