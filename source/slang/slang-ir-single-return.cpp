@@ -31,7 +31,12 @@ struct SingleReturnContext : public InstPassBase
         auto returnBlock = builder.emitBlock();
         builder.setInsertInto(breakBlock);
         auto resultType = as<IRFuncType>(func->getDataType())->getResultType();
-        auto retVal = builder.emitParam(resultType);
+
+        IRInst* retValParam = nullptr;
+        if (resultType->getOp() != kIROp_VoidType)
+        {
+            retValParam = builder.emitParam(resultType);
+        }
         builder.emitBranch(returnBlock);
 
         auto originalStartBlock = func->getFirstBlock();
@@ -60,12 +65,22 @@ struct SingleReturnContext : public InstPassBase
                 else
                     retVal = returnInst->getVal();
                 builder.setInsertBefore(returnInst);
-                builder.emitBranch(breakBlock, 1, &retVal);
+                if (resultType->getOp()==kIROp_VoidType)
+                {
+                    builder.emitBranch(breakBlock);
+                }
+                else
+                {
+                    builder.emitBranch(breakBlock, 1, &retVal);
+                }
                 returnInst->removeAndDeallocate();
             });
 
         builder.setInsertInto(returnBlock);
-        builder.emitReturn(retVal);
+        if (retValParam)
+            builder.emitReturn(retValParam);
+        else
+            builder.emitReturn();
 
         // Now run the multi-level-break pass.
         eliminateMultiLevelBreakForFunc(module, func);
