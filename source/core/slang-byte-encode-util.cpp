@@ -196,6 +196,34 @@ static const uint32_t s_unalignedUInt32Mask[5] =
     0xffffffff,
 };
 
+// Decode the >= kLiteCut2. 
+// in is pointing past the first byte. 
+// Only valid numBytesRemaining is 2, 3, or 4
+SLANG_FORCE_INLINE static uint32_t _decodeLiteCut2UInt32(const uint8_t* in, int numBytesRemaining)
+{
+    uint32_t value = 0;
+#if SLANG_BYTE_ENCODE_USE_UNALIGNED_ACCESS
+    switch (numBytesRemaining)
+    {
+        case 2:     value = *(const uint16_t*)in; break;
+        case 3:     value = (uint32_t(in[2]) << 16) | (uint32_t(in[1]) << 8) | uint32_t(in[0]); break;
+        case 4:     value = *(const uint32_t*)in; break;
+        default:
+    }
+#else
+    // This works on all cpus although slower
+    value = in[0];
+    switch (numBytesRemaining)
+    {
+        case 4: value |= uint32_t(in[3]) << 24;         /* fall thru */
+        case 3: value |= uint32_t(in[2]) << 16;         /* fall thru */
+        case 2: value |= uint32_t(in[1]) << 8;          /* fall thru */
+        case 1: break;
+    }
+#endif
+    return value;
+}
+
 /* static */int ByteEncodeUtil::decodeLiteUInt32(const uint8_t* in, uint32_t* out)
 {
     uint8_t b0 = *in++;
@@ -212,25 +240,8 @@ static const uint32_t s_unalignedUInt32Mask[5] =
     }
     else
     {
-        int numBytesRemaining = b0 - kLiteCut2 + 2 - 1;
-        
-#if SLANG_BYTE_ENCODE_USE_UNALIGNED_ACCESS
-        //const uint32_t mask = s_unalignedUInt32Mask[numBytesRemaining];
-        const uint32_t mask = ~(uint32_t(0xffffff00) << ((numBytesRemaining - 1) * 8));
-        const uint32_t value = (*(const uint32_t*)in) & mask;
-#else
-        // This works on all cpus although slower
-        uint32_t value = in[0];
-
-        switch (numBytesRemaining)
-        {
-            case 4: value |= uint32_t(in[3]) << 24;         /* fall thru */
-            case 3: value |= uint32_t(in[2]) << 16;         /* fall thru */
-            case 2: value |= uint32_t(in[1]) << 8;          /* fall thru */
-            case 1: break;
-        }        
-#endif
-        *out = value;
+        const int numBytesRemaining = b0 - kLiteCut2 + 2 - 1;
+        *out = _decodeLiteCut2UInt32(in, numBytesRemaining);
         return numBytesRemaining + 1;
     }
 }
@@ -253,34 +264,23 @@ static const uint32_t s_unalignedUInt32Mask[5] =
         }
         else
         {
-            int numBytesRemaining = b0 - kLiteCut2 + 2 - 1;
+            const int numBytesRemaining = b0 - kLiteCut2 + 2 - 1;
 
-#if SLANG_BYTE_ENCODE_USE_UNALIGNED_ACCESS
-            uint32_t value = 0;
-            // Do not use unaligned access for the last two values,
+            // For unaligned access, do not use unaligned access for the last two values,
             // (3rd last is safe because this value will have at least 2 bytes, followed by at worst two 1-byte values)
             // otherwise we can access outside the bounds of the encoded array
             // This prevents memory validation tools from causing an exception here
-            if (i < numValues - 2)
+            if (SLANG_BYTE_ENCODE_USE_UNALIGNED_ACCESS && i < numValues - 2)
             {
                 const uint32_t mask = s_unalignedUInt32Mask[numBytesRemaining];
                 //const uint32_t mask = ~(uint32_t(0xffffff00) << ((numBytesRemaining - 1) * 8));
-                value = (*(const uint32_t*)encodeIn) & mask;
+                valuesOut[i] = (*(const uint32_t*)encodeIn) & mask;
             }
             else
-#endif
             {
-                // This works on all cpus although slower
-                value = encodeIn[0];
-                switch (numBytesRemaining)
-                {
-                case 4: value |= uint32_t(encodeIn[3]) << 24;         /* fall thru */
-                case 3: value |= uint32_t(encodeIn[2]) << 16;         /* fall thru */
-                case 2: value |= uint32_t(encodeIn[1]) << 8;          /* fall thru */
-                case 1: break;
-                }
+                valuesOut[i] = _decodeLiteCut2UInt32(encodeIn, numBytesRemaining);
             }
-            valuesOut[i] = value;
+
             encodeIn += numBytesRemaining;
         }
     }
