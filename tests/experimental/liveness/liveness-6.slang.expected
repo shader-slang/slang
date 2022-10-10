@@ -55,20 +55,21 @@ int calcThing_0(int offset_0)
             {
                 break;
             }
-            another_0[i_0 & 1] = another_0[i_0 & 1] + (k_0 + i_0);
+            int _S3 = k_0 + i_0;
+            another_0[i_0 & 1] = another_0[i_0 & 1] + _S3;
             arr_0[k_0 & 1] = arr_0[k_0 & 1] + i_0;
             i_0 = i_0 + 1;
         }
         livenessEnd_0(i_0, 0);
-        int _S3 = another_0[k_0 & 1];
-        int _S4 = total_0;
+        int _S4 = another_0[k_0 & 1];
+        int _S5 = total_0;
         livenessEnd_0(total_0, 0);
-        int total_1 = _S4 + _S3;
-        int _S5 = arr_0[k_0 & 1];
+        int total_1 = _S5 + _S4;
+        int _S6 = arr_0[k_0 & 1];
         livenessEnd_1(arr_0, 0);
-        int total_2 = total_1 + _S5;
-        int _S6 = (k_0 + 7) % 5;
-        if(_S6 == 4)
+        int total_2 = total_1 + _S6;
+        int _S7 = (k_0 + 7) % 5;
+        if(_S7 == 4)
         {
             livenessEnd_0(k_0, 0);
             livenessEnd_1(another_0, 0);
@@ -83,32 +84,32 @@ int calcThing_0(int offset_0)
     int total_3;
     if(total_0 > 4)
     {
-        int _S7 = total_0;
+        int _S8 = total_0;
         livenessEnd_0(total_0, 0);
-        int _S8 = - _S7;
+        int _S9 = - _S8;
         livenessStart_1(total_3, 0);
-        total_3 = _S8;
+        total_3 = _S9;
     }
     else
     {
-        int _S9 = total_0;
+        int _S10 = total_0;
         livenessEnd_0(total_0, 0);
         livenessStart_1(total_3, 0);
-        total_3 = _S9;
+        total_3 = _S10;
     }
     return total_3;
 }
 
-layout(std430, binding = 0) buffer _S10 {
+layout(std430, binding = 0) buffer _S11 {
     int _data[];
 } outputBuffer_0;
 layout(local_size_x = 4, local_size_y = 1, local_size_z = 1) in;
 void main()
 {
     int index_0 = int(gl_GlobalInvocationID.x);
-    uint _S11 = uint(index_0);
-    int _S12 = calcThing_0(index_0);
-    ((outputBuffer_0)._data[(_S11)]) = _S12;
+    uint _S12 = uint(index_0);
+    int _S13 = calcThing_0(index_0);
+    ((outputBuffer_0)._data[(_S12)]) = _S13;
     return;
 }
 
