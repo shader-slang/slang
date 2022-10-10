@@ -237,6 +237,11 @@ namespace Slang
         Dictionary<LookupRequestKey, LookupResult> lookupCache;
     };
 
+
+        /// Give a cache and a name, will remove all entries associated with a name
+        /// Might be useful/necessary if a new name is introduced
+    void removeLookupForName(TypeCheckingCache* cache, Name* name);
+
         /// Shared state for a semantics-checking session.
     struct SharedSemanticsContext
     {
