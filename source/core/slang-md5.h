@@ -69,9 +69,9 @@ namespace Slang
         // Helper update function for Slang::String
         void update(MD5Context* ctx, String str);
         // Helper update function for Checksums
-        void update(MD5Context* ctx, const slang::Checksum& checksum);
+        void update(MD5Context* ctx, const slang::Hash& checksum);
 
-        void finalize(MD5Context* ctx, slang::Checksum* result);
+        void finalize(MD5Context* ctx, slang::Hash* result);
 
     private:
         static const void* body(MD5Context* ctx, const void* data, SlangInt size);

@@ -69,7 +69,7 @@
     <ClInclude Include="..\..\..\source\slang\slang-check.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\source\slang\slang-checksum-utils.h">
+    <ClInclude Include="..\..\..\source\slang\slang-hash-utils.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\source\slang\slang-compiler.h">

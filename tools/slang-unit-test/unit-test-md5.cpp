@@ -3,7 +3,7 @@
 
 #include "../../source/core/slang-md5.h"
 #include "../../source/core/slang-string.h"
-#include "../../source/slang/slang-checksum-utils.h"
+#include "../../source/slang/slang-hash-utils.h"
 
 using namespace Slang;
 
@@ -20,10 +20,10 @@ SLANG_UNIT_TEST(md5hash)
         testHashGen.update(&testCtx, valueA);
         testHashGen.update(&testCtx, valueB);
 
-        slang::Checksum testA;
+        slang::Hash testA;
         testHashGen.finalize(&testCtx, &testA);
 
-        String testAString = checksumToString(testA);
+        String testAString = hashToString(testA);
         SLANG_CHECK(testAString.equals(String("E271A15BD2BD98081390630579266F74")));
     }
 
@@ -40,10 +40,10 @@ SLANG_UNIT_TEST(md5hash)
         listA.add(4);
         testHashGen.update(&testCtx, listA);
 
-        slang::Checksum testB;
+        slang::Hash testB;
         testHashGen.finalize(&testCtx, &testB);
 
-        String testBString = checksumToString(testB);
+        String testBString = hashToString(testB);
         SLANG_CHECK(testBString.equals(String("8AD852437539AA78D60CF70BA5CA7BF2")));
     }
 
@@ -56,10 +56,10 @@ SLANG_UNIT_TEST(md5hash)
         UnownedStringSlice stringSlice = UnownedStringSlice("String Slice Test");
         testHashGen.update(&testCtx, stringSlice);
 
-        slang::Checksum testC;
+        slang::Hash testC;
         testHashGen.finalize(&testCtx, &testC);
 
-        String testCString = checksumToString(testC);
+        String testCString = hashToString(testC);
         SLANG_CHECK(testCString.equals(String("8EC56C5DDFA424183957CFD01633605B")));
     }
 
@@ -72,26 +72,26 @@ SLANG_UNIT_TEST(md5hash)
         String str = String("String Test");
         testHashGen.update(&testCtx, str);
 
-        slang::Checksum testD;
+        slang::Hash testD;
         testHashGen.finalize(&testCtx, &testD);
 
-        String testDString = checksumToString(testD);
+        String testDString = hashToString(testD);
         SLANG_CHECK(testDString.equals(String("CC795ADF40C7702106A5F01C24CEB0CE")));
     }
 
     {
-        // Checksum
+        // Hash
         MD5Context testCtx;
         MD5HashGen testHashGen;
         testHashGen.init(&testCtx);
 
-        slang::Checksum checksum;
-        testHashGen.update(&testCtx, checksum);
+        slang::Hash Hash;
+        testHashGen.update(&testCtx, Hash);
 
-        slang::Checksum testE;
+        slang::Hash testE;
         testHashGen.finalize(&testCtx, &testE);
 
-        String testEString = checksumToString(testE);
+        String testEString = hashToString(testE);
         SLANG_CHECK(testEString.equals(String("3613E74ABFF94BE42E75D279A5184823")));
     }
 }

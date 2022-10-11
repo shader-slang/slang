@@ -22,9 +22,10 @@ namespace gfx_test
         ComPtr<IPipelineState> pipelineState;
         ComPtr<IResourceView> bufferView;
 
-        // The test shader needs to physically exist on disk for loadComputeProgram to
-        // correctly load it while the shader cache should exist in memory to avoid needing
-        // to clean up old cache files from previous test runs.
+        // diskFileSystem is used to save the test shaders to disk as necessary as
+        // loadComputeProgram() always loads from the OS file system. cacheFileSystem
+        // is used to hold the shader cache in memory to avoid needing to manually erase all the
+        // shader cache entry files between consecutive runs of the test.
         ComPtr<ISlangMutableFileSystem> diskFileSystem;
         ComPtr<ISlangMutableFileSystem> cacheFileSystem;
 

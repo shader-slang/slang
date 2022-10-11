@@ -1,6 +1,6 @@
 /*
  * This is an OpenSSL-compatible implementation of the RSA Data Security, Inc.
- * MD5 Message-Digest Algorithm (RFC 1321).
+ * MD5 Message-value Algorithm (RFC 1321).
  *
  * Homepage:
  * http://openwall.info/wiki/people/solar/software/public-domain-source-code/md5
@@ -227,9 +227,9 @@ namespace Slang
         update(ctx, str.getBuffer(), str.getLength());
     }
 
-    void MD5HashGen::update(MD5Context* ctx, const slang::Checksum& checksum)
+    void MD5HashGen::update(MD5Context* ctx, const slang::Hash& hash)
     {
-        update(ctx, checksum.checksum, sizeof(checksum.checksum));
+        update(ctx, hash.value, sizeof(hash.value));
     }
 
     void MD5HashGen::update(MD5Context* ctx, const void* data, SlangInt size)
@@ -275,7 +275,7 @@ namespace Slang
 	    (dst)[2] = (unsigned char)((src) >> 16); \
 	    (dst)[3] = (unsigned char)((src) >> 24);
  
-    void MD5HashGen::finalize(MD5Context* ctx, slang::Checksum* result)
+    void MD5HashGen::finalize(MD5Context* ctx, slang::Hash* result)
     {
 	    unsigned long used, available;
  
@@ -300,10 +300,10 @@ namespace Slang
  
 	    body(ctx, ctx->buffer, 64);
 
-	    OUTUINT(&result->checksum[0], ctx->a)
-	    OUTUINT(&result->checksum[1], ctx->b)
-	    OUTUINT(&result->checksum[2], ctx->c)
-	    OUTUINT(&result->checksum[3], ctx->d)
+	    OUTUINT(&result->value[0], ctx->a)
+	    OUTUINT(&result->value[1], ctx->b)
+	    OUTUINT(&result->value[2], ctx->c)
+	    OUTUINT(&result->value[3], ctx->d)
  
 	    memset(ctx, 0, sizeof(*ctx));
     }

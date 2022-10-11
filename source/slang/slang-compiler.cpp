@@ -224,32 +224,22 @@ namespace Slang
         visitor->visitEntryPoint(this, as<EntryPointSpecializationInfo>(specializationInfo));
     }
 
-    SlangResult EntryPoint::computeDependencyBasedHash(
-        slang::Checksum* outHashCode)
+    void EntryPoint::computeDependencyBasedHash(
+        SlangInt entryPointIndex,
+        slang::Hash* outHash)
     {
-        slang::Checksum hashCode;
-        MD5HashGen hashGen;
-        MD5Context context;
-        hashGen.init(&context);
-
-        assert(getName());
-        if (getName())
-        {
-            hashGen.update(&context, getName()->text);
-        }
-
-        hashGen.finalize(&context, &hashCode);
-
-        *outHashCode = hashCode;
-        return SLANG_OK;
+        // CompositeComponentType will have already hashed the relevant entry point's name
+        // and file path dependencies, so we immediately return.
+        SLANG_UNUSED(entryPointIndex);
+        SLANG_UNUSED(outHash);
+        return;
     }
 
-    SlangResult EntryPoint::computeASTBasedHash(
-        slang::Checksum* outHashCode)
+    void EntryPoint::computeASTBasedHash(
+        slang::Hash* outHash)
     {
-        slang::Checksum zeroHash;
-        *outHashCode = zeroHash;
-        return SLANG_OK;
+        slang::Hash zeroHash;
+        *outHash = zeroHash;
     }
 
     List<Module*> const& EntryPoint::getModuleDependencies()
@@ -320,12 +310,15 @@ namespace Slang
         return Super::getInterface(guid);
     }
 
-    SlangResult TypeConformance::computeDependencyBasedHash(
-        slang::Checksum* outHashCode)
+    void TypeConformance::computeDependencyBasedHash(
+        SlangInt entryPointIndex,
+        slang::Hash* outHash)
     {
+        SLANG_UNUSED(entryPointIndex);
+
         auto subtypeWitness = m_subtypeWitness->toString();
 
-        slang::Checksum hashCode;
+        slang::Hash hash;
         MD5HashGen hashGen;
         MD5Context context;
         hashGen.init(&context);
@@ -333,17 +326,15 @@ namespace Slang
         hashGen.update(&context, subtypeWitness);
         hashGen.update(&context, m_conformanceIdOverride);
 
-        hashGen.finalize(&context, &hashCode);
+        hashGen.finalize(&context, &hash);
 
-        *outHashCode = hashCode;
-        return SLANG_OK;
+        *outHash = hash;
     }
 
-    SlangResult TypeConformance::computeASTBasedHash(slang::Checksum* outHashCode)
+    void TypeConformance::computeASTBasedHash(slang::Hash* outHash)
     {
-        slang::Checksum zeroHash;
-        *outHashCode = zeroHash;
-        return SLANG_OK;
+        slang::Hash zeroHash;
+        *outHash = zeroHash;
     }
 
     List<Module*> const& TypeConformance::getModuleDependencies()

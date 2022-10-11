@@ -210,11 +210,11 @@ SerialClasses::SerialClasses():
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! SerialWriter  !!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-SerialWriter::SerialWriter(SerialClasses* classes, SerialFilter* filter, Flags flags) :
-    m_arena(2048),
-    m_classes(classes),
-    m_filter(filter),
-    m_flags(flags)
+SerialWriter::SerialWriter(SerialClasses* classes, SerialFilter* filter, Flags flags)
+    : m_arena(2048)
+    , m_classes(classes)
+    , m_filter(filter)
+    , m_flags(flags)
 {
     // 0 is always the null pointer
     m_entries.add(nullptr);

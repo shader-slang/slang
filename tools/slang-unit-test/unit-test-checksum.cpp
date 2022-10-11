@@ -2,31 +2,31 @@
 
 #include "tools/unit-test/slang-unit-test.h"
 
-#include "../../source/slang/slang-checksum-utils.h"
+#include "../../source/slang/slang-hash-utils.h"
 
 using namespace Slang;
 
 SLANG_UNIT_TEST(checksum)
 {
     {
-        slang::Checksum testA;
-        testA.checksum[0] = 1;
-        testA.checksum[1] = 2;
-        testA.checksum[2] = 3;
-        testA.checksum[3] = 4;
+        slang::Hash testA;
+        testA.value[0] = 1;
+        testA.value[1] = 2;
+        testA.value[2] = 3;
+        testA.value[3] = 4;
 
-        String testAString = checksumToString(testA);
+        String testAString = hashToString(testA);
         SLANG_CHECK(testAString.equals(String("00000001000000020000000300000004")));
     }
 
     {
-        slang::Checksum testC;
-        testC.checksum[0] = 0x11111111;
-        testC.checksum[1] = 0x22222222;
-        testC.checksum[2] = 0x33333333;
-        testC.checksum[3] = 0x44444444;
+        slang::Hash testC;
+        testC.value[0] = 0x11111111;
+        testC.value[1] = 0x22222222;
+        testC.value[2] = 0x33333333;
+        testC.value[3] = 0x44444444;
 
-        String testCString = checksumToString(testC);
+        String testCString = hashToString(testC);
         SLANG_CHECK(testCString.equals(String("11111111222222223333333344444444")));
     }
 }

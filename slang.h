@@ -4134,10 +4134,11 @@ namespace slang
         None, UnsizedArray, StructuredBuffer, ConstantBuffer, ParameterBlock
     };
 
-    // A struct for storing checksums designed to be used with the MD5 hashing implementation
-    struct Checksum
+    // A struct storing a single hash represented as a four element uint32_t array.
+    // This is intended to be used with the current MD5 hashing implementation.
+    struct Hash
     {
-        uint32_t checksum[4] = { 0 };
+        uint32_t value[4] = { 0 };
     };
 
         /** A session provides a scope for code that is loaded.
@@ -4312,9 +4313,9 @@ namespace slang
                 and other compiler options. This is then merged with the hash produced for the program to
                 produce a key that can be used with the shader cache.
             */
-        virtual SLANG_NO_THROW SlangResult SLANG_MCALL computeDependencyBasedHash(
+        virtual SLANG_NO_THROW void SLANG_MCALL computeDependencyBasedHash(
             SlangInt targetIndex,
-            Checksum* outHash) = 0;
+            slang::Hash* outHash) = 0;
     };
 
     #define SLANG_UUID_ISession ISession::getTypeGuid()
@@ -4435,18 +4436,29 @@ namespace slang
             IBlob**     outCode,
             IBlob**     outDiagnostics = nullptr) = 0;
 
-            /** Compute the hash code of all dependent source file names and target options for the specified
-                TargetRequest. The computed hash code is then merged with the hash for the linkage, which
-                can be used as a lookup key in a shader cache.
+            /** Compute the hash code of all dependencies for this component type. This generally means file path
+                dependencies but can also include the component's name or sub-components. The dependency-based
+                hash effectively represents all the files that may be included/imported by a component type along with
+                any non-code-specific that helps define a component. This can be useful to simply check for a component
+                type without needing to inspect the code. For example, a shader cache might key its entries using the
+                dependency-based hash in order to determine at a glance if a particular shader is present, with no
+                regard for the shader's contents.
             */
-        virtual SLANG_NO_THROW SlangResult SLANG_MCALL computeDependencyBasedHash(
-            Checksum* outHashCode) = 0;
+        virtual SLANG_NO_THROW void SLANG_MCALL computeDependencyBasedHash(
+            SlangInt entryPointIndex,
+            Hash* outHash) = 0;
 
-            /** Get the MD5 hash generated from this component type's AST. Not all component types
-                will store an AST, and consequently, not all component types will have a
+            /** Compute the hash code of this component type's AST. This hash effectively represents
+                the contents of the code covered by this component type, making its use ideal when we need
+                to confirm whether shader code changes have occurred. For example, a shader cache needs to be
+                able to check when a cache entry contains out-of-date code, which can be easily detected by
+                comparing the AST-based hashes since any change to the shader's code will be reflected in the
+                AST, and subsequently, the AST-based hash.
+
+                Not all component types will store an AST, and consequently, not all component types will have a
                 meaningful implementation for this function.
             */
-        virtual SLANG_NO_THROW SlangResult SLANG_MCALL computeASTBasedHash(Checksum* outHashCode) = 0;
+        virtual SLANG_NO_THROW void SLANG_MCALL computeASTBasedHash(Hash* outHash) = 0;
 
             /** Specialize the component by binding its specialization parameters to concrete arguments.
 

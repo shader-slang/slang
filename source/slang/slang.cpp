@@ -45,7 +45,7 @@
 #include "slang-check-impl.h"
 
 #include "../core/slang-md5.h"
-#include "slang-checksum-utils.h"
+#include "slang-hash-utils.h"
 
 #include "../../slang-tag-version.h"
 
@@ -1321,11 +1321,11 @@ SLANG_NO_THROW SlangResult SLANG_MCALL Linkage::createCompileRequest(
     return SLANG_OK;
 }
 
-SLANG_NO_THROW SlangResult SLANG_MCALL Linkage::computeDependencyBasedHash(
+void Linkage::computeDependencyBasedHash(
     SlangInt targetIndex,
-    slang::Checksum* outHash)
+    slang::Hash* outHash)
 {
-    slang::Checksum hash;
+    slang::Hash hash;
     MD5Context context;
     MD5HashGen hashGen;
     hashGen.init(&context);
@@ -1375,7 +1375,6 @@ SLANG_NO_THROW SlangResult SLANG_MCALL Linkage::computeDependencyBasedHash(
     
     hashGen.finalize(&context, &hash);
     *outHash = hash;
-    return SLANG_OK;
 }
 
 SlangResult Linkage::addSearchPath(
@@ -1689,8 +1688,8 @@ void TranslationUnitRequest::_addSourceFile(SourceFile* sourceFile)
         // for non-file-based dependencies later when shader files are being hashed for
         // the shader cache.
 
-        slang::Checksum sourceHash = computeChecksumForStringSlice(sourceFile->getContent());
-        getModule()->addFilePathDependency(checksumToString(sourceHash));
+        slang::Hash sourceHash = computeHashForStringSlice(sourceFile->getContent());
+        getModule()->addFilePathDependency(hashToString(sourceHash));
     }
 }
 
@@ -3246,41 +3245,29 @@ ISlangUnknown* Module::getInterface(const Guid& guid)
     return Super::getInterface(guid);
 }
 
-// One implementation under ComponentType that takes entryPointIndex/targetIndex
-// One per subtype without
-SlangResult Module::computeDependencyBasedHash(slang::Checksum* outHashCode)
+void Module::computeDependencyBasedHash(
+    SlangInt entryPointIndex,
+    slang::Hash* outHash)
 {
-    slang::Checksum hashCode;
-    MD5HashGen hashGen;
-    MD5Context context;
-    hashGen.init(&context);
-
-    // Add file path dependencies to the hash
-    auto fileDeps = getFilePathDependencyList();
-    for (auto& file : fileDeps)
-    {
-        hashGen.update(&context, file);
-    }
-
-    hashGen.finalize(&context, &hashCode);
-
-    *outHashCode = hashCode;
-    return SLANG_OK;
+    // CompositeComponentType will have already hashed this Module's file
+    // dependencies, so we immediately return.
+    SLANG_UNUSED(entryPointIndex);
+    SLANG_UNUSED(outHash);
+    return;
 }
 
-SlangResult Module::computeASTBasedHash(slang::Checksum* outHashCode)
+void Module::computeASTBasedHash(slang::Hash* outHash)
 {
     auto serializedAST = ASTSerialUtil::serializeAST(getModuleDecl());
 
-    slang::Checksum hashCode;
+    slang::Hash hash;
     MD5HashGen hashGen;
     MD5Context context;
     hashGen.init(&context);
     hashGen.update(&context, serializedAST);
-    hashGen.finalize(&context, &hashCode);
+    hashGen.finalize(&context, &hash);
 
-    *outHashCode = hashCode;
-    return SLANG_OK;
+    *outHash = hash;
 }
 
 void Module::addModuleDependency(Module* module)
@@ -3481,16 +3468,19 @@ SLANG_NO_THROW SlangResult SLANG_MCALL ComponentType::getEntryPointCode(
     return artifact->loadBlob(ArtifactKeep::Yes, outCode);
 }
 
-SLANG_NO_THROW SlangResult SLANG_MCALL ComponentType::computeDependencyBasedHash(slang::Checksum* outHashCode)
+SLANG_NO_THROW void SLANG_MCALL ComponentType::computeDependencyBasedHash(
+    SlangInt entryPointIndex,
+    slang::Hash* outHash)
 {
-    SLANG_UNUSED(outHashCode);
-    return SLANG_E_NOT_AVAILABLE;
+    SLANG_UNUSED(entryPointIndex);
+    SLANG_UNUSED(outHash);
+    return;
 }
 
-SLANG_NO_THROW SlangResult SLANG_MCALL ComponentType::computeASTBasedHash(slang::Checksum* outHashCode)
+SLANG_NO_THROW void SLANG_MCALL ComponentType::computeASTBasedHash(slang::Hash* outHash)
 {
-    SLANG_UNUSED(outHashCode);
-    return SLANG_E_NOT_AVAILABLE;
+    SLANG_UNUSED(outHash);
+    return;
 }
 
 SLANG_NO_THROW SlangResult SLANG_MCALL ComponentType::getEntryPointHostCallable(
@@ -3825,46 +3815,61 @@ CompositeComponentType::CompositeComponentType(
     }
 }
 
-SlangResult CompositeComponentType::computeDependencyBasedHash(slang::Checksum* outHashCode)
+void CompositeComponentType::computeDependencyBasedHash(
+    SlangInt entryPointIndex,
+    slang::Hash* outHash)
 {
     auto componentCount = getChildComponentCount();
 
-    slang::Checksum hashCode;
+    slang::Hash hash;
     MD5HashGen hashGen;
     MD5Context context;
     hashGen.init(&context);
 
+    // Add file path dependencies to the hash - all child components
+    // will have file path dependencies that are a subset of this list.
+    auto fileDeps = getFilePathDependencies();
+    for (auto& file : fileDeps)
+    {
+        hashGen.update(&context, file);
+    }
+
+    // Add the name and name override for the specified entry point
+    // to the hash.
+    auto entryPointName = getEntryPoint(entryPointIndex)->getName()->text;
+    hashGen.update(&context, entryPointName);
+    auto entryPointNameOverride = getEntryPointNameOverride(entryPointIndex);
+    hashGen.update(&context, entryPointNameOverride);
+
     for (Index i = 0; i < componentCount; ++i)
     {
-        slang::Checksum tempHash;
-        getChildComponent(i)->computeDependencyBasedHash(&tempHash);
+        slang::Hash tempHash;
+        getChildComponent(i)->computeDependencyBasedHash(entryPointIndex, &tempHash);
         hashGen.update(&context, tempHash);
     }
 
-    hashGen.finalize(&context, &hashCode);
+    hashGen.finalize(&context, &hash);
 
-    *outHashCode = hashCode;
-    return SLANG_OK;
+    *outHash = hash;
 }
 
-SlangResult CompositeComponentType::computeASTBasedHash(slang::Checksum* outHashCode)
+void CompositeComponentType::computeASTBasedHash(slang::Hash* outHash)
 {
     auto componentCount = getChildComponentCount();
 
-    slang::Checksum hashCode;
+    slang::Hash hash;
     MD5HashGen hashGen;
     MD5Context context;
     hashGen.init(&context);
     for (Index i = 0; i < componentCount; ++i)
     {
-        slang::Checksum tempHash;
+        slang::Hash tempHash;
         getChildComponent(i)->computeASTBasedHash(&tempHash);
         hashGen.update(&context, tempHash);
     }
-    hashGen.finalize(&context, &hashCode);
+    hashGen.finalize(&context, &hash);
 
-    *outHashCode = hashCode;
-    return SLANG_OK;
+    *outHash = hash;
 }
 
 Index CompositeComponentType::getEntryPointCount()
@@ -4346,18 +4351,14 @@ SpecializedComponentType::SpecializedComponentType(
     collector.visitSpecialized(this);
 }
 
-SlangResult SpecializedComponentType::computeDependencyBasedHash(slang::Checksum* outHashCode)
+void SpecializedComponentType::computeDependencyBasedHash(
+    SlangInt entryPointIndex,
+    slang::Hash* outHash)
 {
-    slang::Checksum hashCode;
+    slang::Hash hash;
     MD5HashGen hashGen;
     MD5Context context;
     hashGen.init(&context);
-
-    auto fileDependencies = getFilePathDependencies();
-    for (auto& file : fileDependencies)
-    {
-        hashGen.update(&context, file);
-    }
 
     auto specializationArgCount = getSpecializationArgCount();
     for (Index i = 0; i < specializationArgCount; ++i)
@@ -4367,14 +4368,13 @@ SlangResult SpecializedComponentType::computeDependencyBasedHash(slang::Checksum
         hashGen.update(&context, argString);
     }
 
-    slang::Checksum baseHash;
-    getBaseComponentType()->computeDependencyBasedHash(&baseHash);
+    slang::Hash baseHash;
+    getBaseComponentType()->computeDependencyBasedHash(entryPointIndex, &baseHash);
     hashGen.update(&context, baseHash);
 
-    hashGen.finalize(&context, &hashCode);
+    hashGen.finalize(&context, &hash);
 
-    *outHashCode = hashCode;
-    return SLANG_OK;
+    *outHash = hash;
 }
 
 void SpecializedComponentType::acceptVisitor(ComponentTypeVisitor* visitor, SpecializationInfo* specializationInfo)
@@ -4421,24 +4421,15 @@ void RenamedEntryPointComponentType::acceptVisitor(
         this, as<EntryPoint::EntryPointSpecializationInfo>(specializationInfo));
 }
 
-SlangResult RenamedEntryPointComponentType::computeDependencyBasedHash(slang::Checksum* outHashCode)
+void RenamedEntryPointComponentType::computeDependencyBasedHash(
+    SlangInt entryPointIndex,
+    slang::Hash* outHash)
 {
-    slang::Checksum hashCode;
-    MD5HashGen hashGen;
-    MD5Context context;
-    hashGen.init(&context);
-
-    auto nameOverride = getEntryPointNameOverride(0);
-    hashGen.update(&context, nameOverride);
-
-    slang::Checksum baseHash;
-    getBase()->computeDependencyBasedHash(&baseHash);
-    hashGen.update(&context, baseHash);
-
-    hashGen.finalize(&context, &hashCode);
-
-    *outHashCode = hashCode;
-    return SLANG_OK;
+    // CompositeComponentType will have already hashed the name override and file
+    // dependencies for this entry point, so we immediately return.
+    SLANG_UNUSED(entryPointIndex);
+    SLANG_UNUSED(outHash);
+    return;
 }
 
 void ComponentTypeVisitor::visitChildren(CompositeComponentType* composite, CompositeComponentType::CompositeSpecializationInfo* specializationInfo)
