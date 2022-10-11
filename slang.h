@@ -4308,14 +4308,6 @@ namespace slang
             ITypeConformance** outConformance,
             SlangInt conformanceIdOverride,
             ISlangBlob** outDiagnostics) = 0;
-
-            /** Computes the hash for the linkage, which includes preprocessor defines, the compiler version,
-                and other compiler options. This is then merged with the hash produced for the program to
-                produce a key that can be used with the shader cache.
-            */
-        virtual SLANG_NO_THROW void SLANG_MCALL computeDependencyBasedHash(
-            SlangInt targetIndex,
-            slang::Hash* outHash) = 0;
     };
 
     #define SLANG_UUID_ISession ISession::getTypeGuid()
@@ -4446,6 +4438,7 @@ namespace slang
             */
         virtual SLANG_NO_THROW void SLANG_MCALL computeDependencyBasedHash(
             SlangInt entryPointIndex,
+            SlangInt targetIndex,
             Hash* outHash) = 0;
 
             /** Compute the hash code of this component type's AST. This hash effectively represents

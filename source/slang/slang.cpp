@@ -1322,59 +1322,54 @@ SLANG_NO_THROW SlangResult SLANG_MCALL Linkage::createCompileRequest(
 }
 
 void Linkage::computeDependencyBasedHash(
-    SlangInt targetIndex,
-    slang::Hash* outHash)
+    HashBuilder& builder,
+    SlangInt targetIndex)
 {
-    slang::Hash hash;
-    MD5Context context;
-    MD5HashGen hashGen;
-    hashGen.init(&context);
+    auto hashGen = builder.hashGen;
+    auto context = &builder.context;
 
     // Add the Slang compiler version to the hash
     auto version = String(getBuildTagString());
-    hashGen.update(&context, version);
+    hashGen.update(context, version);
 
     // Add the search directory paths to the hash
     auto searchDirectoryList = getSearchDirectories().searchDirectories;
     for (auto& searchDir : searchDirectoryList)
     {
         auto searchPath = searchDir.path;
-        hashGen.update(&context, searchPath);
+        hashGen.update(context, searchPath);
     }
 
     // Add the preprocessor definitions to the hash
     for (auto& key : preprocessorDefinitions)
     {
-        hashGen.update(&context, key.Key);
-        hashGen.update(&context, key.Value);
+        hashGen.update(context, key.Key);
+        hashGen.update(context, key.Value);
     }
 
     // Add the target specified by targetIndex
     auto targetReq = targets[targetIndex];
-    hashGen.update(&context, targetReq->getTarget());
-    hashGen.update(&context, targetReq->getTargetFlags());
-    hashGen.update(&context, targetReq->getFloatingPointMode());
-    hashGen.update(&context, targetReq->getLineDirectiveMode());
-    hashGen.update(&context, targetReq->shouldDumpIntermediates());
-    hashGen.update(&context, targetReq->getForceGLSLScalarBufferLayout());
-    hashGen.update(&context, targetReq->shouldTrackLiveness());
+    hashGen.update(context, targetReq->getTarget());
+    hashGen.update(context, targetReq->getTargetFlags());
+    hashGen.update(context, targetReq->getFloatingPointMode());
+    hashGen.update(context, targetReq->getLineDirectiveMode());
+    hashGen.update(context, targetReq->shouldDumpIntermediates());
+    hashGen.update(context, targetReq->getForceGLSLScalarBufferLayout());
+    hashGen.update(context, targetReq->shouldTrackLiveness());
 
     auto targetProfile = targetReq->getTargetProfile();
-    hashGen.update(&context, targetProfile.getStage());
-    hashGen.update(&context, targetProfile.getVersion());
-    hashGen.update(&context, targetProfile.getFamily());
+    hashGen.update(context, targetProfile.getStage());
+    hashGen.update(context, targetProfile.getVersion());
+    hashGen.update(context, targetProfile.getFamily());
 
     auto targetProfileName = String(targetProfile.getName());
-    hashGen.update(&context, targetProfileName);
+    hashGen.update(context, targetProfileName);
 
     auto cookedCapabilities = targetReq->getTargetCaps().getExpandedAtoms();
     for (auto& capability : cookedCapabilities)
     {
-        hashGen.update(&context, capability);
+        hashGen.update(context, capability);
     }
-    
-    hashGen.finalize(&context, &hash);
-    *outHash = hash;
 }
 
 SlangResult Linkage::addSearchPath(
@@ -3245,14 +3240,14 @@ ISlangUnknown* Module::getInterface(const Guid& guid)
     return Super::getInterface(guid);
 }
 
-void Module::computeDependencyBasedHash(
-    SlangInt entryPointIndex,
-    slang::Hash* outHash)
+void Module::computeDependencyBasedHashImpl(
+    HashBuilder& builder,
+    SlangInt entryPointIndex)
 {
     // CompositeComponentType will have already hashed this Module's file
     // dependencies, so we immediately return.
+    SLANG_UNUSED(builder);
     SLANG_UNUSED(entryPointIndex);
-    SLANG_UNUSED(outHash);
     return;
 }
 
@@ -3261,8 +3256,8 @@ void Module::computeASTBasedHash(slang::Hash* outHash)
     auto serializedAST = ASTSerialUtil::serializeAST(getModuleDecl());
 
     slang::Hash hash;
-    MD5HashGen hashGen;
-    MD5Context context;
+    HashGen hashGen;
+    HashContext context;
     hashGen.init(&context);
     hashGen.update(&context, serializedAST);
     hashGen.finalize(&context, &hash);
@@ -3470,11 +3465,17 @@ SLANG_NO_THROW SlangResult SLANG_MCALL ComponentType::getEntryPointCode(
 
 SLANG_NO_THROW void SLANG_MCALL ComponentType::computeDependencyBasedHash(
     SlangInt entryPointIndex,
+    SlangInt targetIndex,
     slang::Hash* outHash)
 {
-    SLANG_UNUSED(entryPointIndex);
-    SLANG_UNUSED(outHash);
-    return;
+    HashBuilder builder;
+    builder.hashGen.init(&builder.context);
+    getLinkage()->computeDependencyBasedHash(builder, targetIndex);
+    computeDependencyBasedHashImpl(builder, entryPointIndex);
+
+    slang::Hash hash;
+    builder.hashGen.finalize(&builder.context, &hash);
+    *outHash = hash;
 }
 
 SLANG_NO_THROW void SLANG_MCALL ComponentType::computeASTBasedHash(slang::Hash* outHash)
@@ -3815,42 +3816,36 @@ CompositeComponentType::CompositeComponentType(
     }
 }
 
-void CompositeComponentType::computeDependencyBasedHash(
-    SlangInt entryPointIndex,
-    slang::Hash* outHash)
+void CompositeComponentType::computeDependencyBasedHashImpl(
+    HashBuilder& builder,
+    SlangInt entryPointIndex)
 {
-    auto componentCount = getChildComponentCount();
+    auto hashGen = builder.hashGen;
+    auto context = &builder.context;
 
-    slang::Hash hash;
-    MD5HashGen hashGen;
-    MD5Context context;
-    hashGen.init(&context);
+    auto componentCount = getChildComponentCount();
 
     // Add file path dependencies to the hash - all child components
     // will have file path dependencies that are a subset of this list.
     auto fileDeps = getFilePathDependencies();
     for (auto& file : fileDeps)
     {
-        hashGen.update(&context, file);
+        hashGen.update(context, file);
     }
 
     // Add the name and name override for the specified entry point
     // to the hash.
     auto entryPointName = getEntryPoint(entryPointIndex)->getName()->text;
-    hashGen.update(&context, entryPointName);
+    hashGen.update(context, entryPointName);
     auto entryPointNameOverride = getEntryPointNameOverride(entryPointIndex);
-    hashGen.update(&context, entryPointNameOverride);
+    hashGen.update(context, entryPointNameOverride);
 
     for (Index i = 0; i < componentCount; ++i)
     {
         slang::Hash tempHash;
-        getChildComponent(i)->computeDependencyBasedHash(entryPointIndex, &tempHash);
-        hashGen.update(&context, tempHash);
+        getChildComponent(i)->computeDependencyBasedHashImpl(builder, entryPointIndex);
+        hashGen.update(context, tempHash);
     }
-
-    hashGen.finalize(&context, &hash);
-
-    *outHash = hash;
 }
 
 void CompositeComponentType::computeASTBasedHash(slang::Hash* outHash)
@@ -3858,8 +3853,8 @@ void CompositeComponentType::computeASTBasedHash(slang::Hash* outHash)
     auto componentCount = getChildComponentCount();
 
     slang::Hash hash;
-    MD5HashGen hashGen;
-    MD5Context context;
+    HashGen hashGen;
+    HashContext context;
     hashGen.init(&context);
     for (Index i = 0; i < componentCount; ++i)
     {
@@ -4351,30 +4346,23 @@ SpecializedComponentType::SpecializedComponentType(
     collector.visitSpecialized(this);
 }
 
-void SpecializedComponentType::computeDependencyBasedHash(
-    SlangInt entryPointIndex,
-    slang::Hash* outHash)
+void SpecializedComponentType::computeDependencyBasedHashImpl(
+    HashBuilder& builder,
+    SlangInt entryPointIndex)
 {
-    slang::Hash hash;
-    MD5HashGen hashGen;
-    MD5Context context;
-    hashGen.init(&context);
+    auto hashGen = builder.hashGen;
+    auto context = &builder.context;
 
     auto specializationArgCount = getSpecializationArgCount();
     for (Index i = 0; i < specializationArgCount; ++i)
     {
         auto specializationArg = getSpecializationArg(i);
         auto argString = specializationArg.val->toString();
-        hashGen.update(&context, argString);
+        hashGen.update(context, argString);
     }
 
     slang::Hash baseHash;
-    getBaseComponentType()->computeDependencyBasedHash(entryPointIndex, &baseHash);
-    hashGen.update(&context, baseHash);
-
-    hashGen.finalize(&context, &hash);
-
-    *outHash = hash;
+    getBaseComponentType()->computeDependencyBasedHashImpl(builder, entryPointIndex);
 }
 
 void SpecializedComponentType::acceptVisitor(ComponentTypeVisitor* visitor, SpecializationInfo* specializationInfo)
@@ -4421,14 +4409,14 @@ void RenamedEntryPointComponentType::acceptVisitor(
         this, as<EntryPoint::EntryPointSpecializationInfo>(specializationInfo));
 }
 
-void RenamedEntryPointComponentType::computeDependencyBasedHash(
-    SlangInt entryPointIndex,
-    slang::Hash* outHash)
+void RenamedEntryPointComponentType::computeDependencyBasedHashImpl(
+    HashBuilder& builder,
+    SlangInt entryPointIndex)
 {
     // CompositeComponentType will have already hashed the name override and file
     // dependencies for this entry point, so we immediately return.
     SLANG_UNUSED(entryPointIndex);
-    SLANG_UNUSED(outHash);
+    SLANG_UNUSED(builder);
     return;
 }
 

@@ -365,12 +365,10 @@ Result RendererBase::getEntryPointCodeFromShaderCache(
     ComPtr<slang::ISession> session;
     getSlangSession(session.writeRef());
 
-    slang::Hash linkageHash;
-    slang::Hash programHash;
-    session->computeDependencyBasedHash(targetIndex, &linkageHash);
-    program->computeDependencyBasedHash(entryPointIndex, &programHash);
+    slang::Hash shaderKeyHash;
+    program->computeDependencyBasedHash(entryPointIndex, targetIndex, &shaderKeyHash);
 
-    StringBuilder shaderFilename = hashToString(combineHashes(linkageHash, programHash));
+    StringBuilder shaderKey = hashToString(shaderKeyHash);
 
     // Produce a hash using the AST for this program - This is needed to check whether a cache entry is effectively dirty,
     // or to save along with the compiled code into an entry so the entry can be checked if fetched later on.
@@ -381,7 +379,7 @@ Result RendererBase::getEntryPointCodeFromShaderCache(
 
     // Query shaderCacheFileSystem for an entry whose key matches shaderFilename
     //    - If we find it, then copy the file contents into memory and return in outCode
-    auto result = shaderCacheFileSystem->loadFile(shaderFilename.getBuffer(), codeBlob.writeRef());
+    auto result = shaderCacheFileSystem->loadFile(shaderKey.getBuffer(), codeBlob.writeRef());
     
     if (SLANG_FAILED(result))
     {
@@ -391,7 +389,7 @@ Result RendererBase::getEntryPointCodeFromShaderCache(
         {
             if (mutableShaderCacheFileSystem)
             {
-                updateCacheEntry(mutableShaderCacheFileSystem, codeBlob, shaderFilename, ASTHash);
+                updateCacheEntry(mutableShaderCacheFileSystem, codeBlob, shaderKey, ASTHash);
             }
 
             shaderCacheMissCount++;
@@ -418,7 +416,7 @@ Result RendererBase::getEntryPointCodeFromShaderCache(
             {
                 if (mutableShaderCacheFileSystem)
                 {
-                    updateCacheEntry(mutableShaderCacheFileSystem, codeBlob, shaderFilename, ASTHash);
+                    updateCacheEntry(mutableShaderCacheFileSystem, codeBlob, shaderKey, ASTHash);
                 }
 
                 shaderCacheEntryDirtyCount++;

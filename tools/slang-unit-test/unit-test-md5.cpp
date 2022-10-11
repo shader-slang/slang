@@ -11,8 +11,8 @@ SLANG_UNIT_TEST(md5hash)
 {
     {
         // Raw numerical values, etc.
-        MD5Context testCtx;
-        MD5HashGen testHashGen;
+        HashContext testCtx;
+        HashGen testHashGen;
         testHashGen.init(&testCtx);
 
         int64_t valueA = -1;
@@ -29,8 +29,8 @@ SLANG_UNIT_TEST(md5hash)
 
     {
         // List
-        MD5Context testCtx;
-        MD5HashGen testHashGen;
+        HashContext testCtx;
+        HashGen testHashGen;
         testHashGen.init(&testCtx);
 
         List<int64_t> listA;
@@ -49,8 +49,8 @@ SLANG_UNIT_TEST(md5hash)
 
     {
         // UnownedStringSlice
-        MD5Context testCtx;
-        MD5HashGen testHashGen;
+        HashContext testCtx;
+        HashGen testHashGen;
         testHashGen.init(&testCtx);
 
         UnownedStringSlice stringSlice = UnownedStringSlice("String Slice Test");
@@ -65,8 +65,8 @@ SLANG_UNIT_TEST(md5hash)
 
     {
         // String
-        MD5Context testCtx;
-        MD5HashGen testHashGen;
+        HashContext testCtx;
+        HashGen testHashGen;
         testHashGen.init(&testCtx);
 
         String str = String("String Test");
@@ -81,8 +81,8 @@ SLANG_UNIT_TEST(md5hash)
 
     {
         // Hash
-        MD5Context testCtx;
-        MD5HashGen testHashGen;
+        HashContext testCtx;
+        HashGen testHashGen;
         testHashGen.init(&testCtx);
 
         slang::Hash Hash;

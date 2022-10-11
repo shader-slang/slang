@@ -312,7 +312,6 @@ IF EXIST ..\..\..\external\slang-glslang\bin\windows-aarch64\release\slang-glsla
     <ClInclude Include="..\..\..\source\slang\slang-capability.h" />
     <ClInclude Include="..\..\..\source\slang\slang-check-impl.h" />
     <ClInclude Include="..\..\..\source\slang\slang-check.h" />
-    <ClInclude Include="..\..\..\source\slang\slang-hash-utils.h" />
     <ClInclude Include="..\..\..\source\slang\slang-compiler.h" />
     <ClInclude Include="..\..\..\source\slang\slang-content-assist-info.h" />
     <ClInclude Include="..\..\..\source\slang\slang-diagnostic-defs.h" />
@@ -328,6 +327,7 @@ IF EXIST ..\..\..\external\slang-glslang\bin\windows-aarch64\release\slang-glsla
     <ClInclude Include="..\..\..\source\slang\slang-emit-precedence.h" />
     <ClInclude Include="..\..\..\source\slang\slang-emit-source-writer.h" />
     <ClInclude Include="..\..\..\source\slang\slang-glsl-extension-tracker.h" />
+    <ClInclude Include="..\..\..\source\slang\slang-hash-utils.h" />
     <ClInclude Include="..\..\..\source\slang\slang-hlsl-intrinsic-set.h" />
     <ClInclude Include="..\..\..\source\slang\slang-image-format-defs.h" />
     <ClInclude Include="..\..\..\source\slang\slang-intrinsic-expand.h" />

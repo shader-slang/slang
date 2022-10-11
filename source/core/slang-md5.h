@@ -38,7 +38,7 @@ namespace Slang
     /* Any 32-bit or wider unsigned integer data type will do */
     typedef uint32_t MD5_u32plus;
 
-    struct MD5Context
+    struct HashContext
     {
         MD5_u32plus lo, hi;
         MD5_u32plus a, b, c, d;
@@ -46,36 +46,36 @@ namespace Slang
         MD5_u32plus block[16];
     };
 
-    class MD5HashGen
+    class HashGen
     {
     public:
-        void init(MD5Context* ctx);
+        void init(HashContext* ctx);
 
         // Helper update function for raw values (e.g. ints, uints)
         template<typename T,
             typename = typename std::enable_if<std::is_enum<T>::value || std::is_arithmetic<T>::value>::type>
-        void update(MD5Context* ctx, const T& val)
+        void update(HashContext* ctx, const T& val)
         {
             update(ctx, &val, sizeof(T));
         }
         // Helper update function for Slang::List
         template<typename T>
-        void update(MD5Context* ctx, const List<T>& list)
+        void update(HashContext* ctx, const List<T>& list)
         {
             update(ctx, list.getBuffer(), list.getCount());
         }
         // Helper update function for UnownedStringSlice
-        void update(MD5Context* ctx, UnownedStringSlice string);
+        void update(HashContext* ctx, UnownedStringSlice string);
         // Helper update function for Slang::String
-        void update(MD5Context* ctx, String str);
+        void update(HashContext* ctx, String str);
         // Helper update function for Checksums
-        void update(MD5Context* ctx, const slang::Hash& checksum);
+        void update(HashContext* ctx, const slang::Hash& checksum);
 
-        void finalize(MD5Context* ctx, slang::Hash* result);
+        void finalize(HashContext* ctx, slang::Hash* result);
 
     private:
-        static const void* body(MD5Context* ctx, const void* data, SlangInt size);
-        void update(MD5Context* ctx, const void* data, SlangInt size);
+        static const void* body(HashContext* ctx, const void* data, SlangInt size);
+        void update(HashContext* ctx, const void* data, SlangInt size);
     };
 }
  

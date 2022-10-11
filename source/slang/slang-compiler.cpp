@@ -8,7 +8,6 @@
 #include "../core/slang-riff.h"
 #include "../core/slang-type-text-util.h"
 #include "../core/slang-type-convert-util.h"
-#include "../core/slang-md5.h"
 
 #include "slang-check.h"
 #include "slang-compiler.h"
@@ -224,14 +223,14 @@ namespace Slang
         visitor->visitEntryPoint(this, as<EntryPointSpecializationInfo>(specializationInfo));
     }
 
-    void EntryPoint::computeDependencyBasedHash(
-        SlangInt entryPointIndex,
-        slang::Hash* outHash)
+    void EntryPoint::computeDependencyBasedHashImpl(
+        HashBuilder& builder,
+        SlangInt entryPointIndex)
     {
         // CompositeComponentType will have already hashed the relevant entry point's name
         // and file path dependencies, so we immediately return.
+        SLANG_UNUSED(builder);
         SLANG_UNUSED(entryPointIndex);
-        SLANG_UNUSED(outHash);
         return;
     }
 
@@ -310,25 +309,19 @@ namespace Slang
         return Super::getInterface(guid);
     }
 
-    void TypeConformance::computeDependencyBasedHash(
-        SlangInt entryPointIndex,
-        slang::Hash* outHash)
+    void TypeConformance::computeDependencyBasedHashImpl(
+        HashBuilder& builder,
+        SlangInt entryPointIndex)
     {
         SLANG_UNUSED(entryPointIndex);
 
+        auto hashGen = builder.hashGen;
+        auto context = &builder.context;
+
         auto subtypeWitness = m_subtypeWitness->toString();
 
-        slang::Hash hash;
-        MD5HashGen hashGen;
-        MD5Context context;
-        hashGen.init(&context);
-
-        hashGen.update(&context, subtypeWitness);
-        hashGen.update(&context, m_conformanceIdOverride);
-
-        hashGen.finalize(&context, &hash);
-
-        *outHash = hash;
+        hashGen.update(context, subtypeWitness);
+        hashGen.update(context, m_conformanceIdOverride);
     }
 
     void TypeConformance::computeASTBasedHash(slang::Hash* outHash)

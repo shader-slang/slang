@@ -99,7 +99,7 @@ namespace Slang
      * This processes one or more 64-byte data blocks, but does NOT update the bit
      * counters.  There are no alignment requirements.
      */
-    /*static*/const void* MD5HashGen::body(MD5Context* ctx, const void* data, SlangInt size)
+    /*static*/const void* HashGen::body(HashContext* ctx, const void* data, SlangInt size)
     {
 	    const unsigned char* ptr;
 	    MD5_u32plus a, b, c, d;
@@ -206,7 +206,7 @@ namespace Slang
 	    return ptr;
     }
  
-    void MD5HashGen::init(MD5Context* ctx)
+    void HashGen::init(HashContext* ctx)
     {
 	    ctx->a = 0x67452301;
 	    ctx->b = 0xefcdab89;
@@ -217,22 +217,22 @@ namespace Slang
 	    ctx->hi = 0;
     }
 
-    void MD5HashGen::update(MD5Context* ctx, UnownedStringSlice string)
+    void HashGen::update(HashContext* ctx, UnownedStringSlice string)
     {
         update(ctx, string.begin(), string.getLength());
     }
 
-    void MD5HashGen::update(MD5Context* ctx, String str)
+    void HashGen::update(HashContext* ctx, String str)
     {
         update(ctx, str.getBuffer(), str.getLength());
     }
 
-    void MD5HashGen::update(MD5Context* ctx, const slang::Hash& hash)
+    void HashGen::update(HashContext* ctx, const slang::Hash& hash)
     {
         update(ctx, hash.value, sizeof(hash.value));
     }
 
-    void MD5HashGen::update(MD5Context* ctx, const void* data, SlangInt size)
+    void HashGen::update(HashContext* ctx, const void* data, SlangInt size)
     {
 	    MD5_u32plus saved_lo;
 	    SlangInt used, available;
@@ -275,7 +275,7 @@ namespace Slang
 	    (dst)[2] = (unsigned char)((src) >> 16); \
 	    (dst)[3] = (unsigned char)((src) >> 24);
  
-    void MD5HashGen::finalize(MD5Context* ctx, slang::Hash* result)
+    void HashGen::finalize(HashContext* ctx, slang::Hash* result)
     {
 	    unsigned long used, available;
  

@@ -9,8 +9,8 @@ namespace Slang
     // Compute the hash for an UnownedStringSlice
     inline slang::Hash computeHashForStringSlice(UnownedStringSlice text)
     {
-        MD5Context context;
-        MD5HashGen hashGen;
+        HashContext context;
+        HashGen hashGen;
         hashGen.init(&context);
         hashGen.update(&context, text);
 
@@ -23,8 +23,8 @@ namespace Slang
     // Combines the two provided hashes to produce the final shader cache entry key.
     inline slang::Hash combineHashes(const slang::Hash& linkageHash, const slang::Hash& programHash)
     {
-        MD5Context context;
-        MD5HashGen hashGen;
+        HashContext context;
+        HashGen hashGen;
         hashGen.init(&context);
         hashGen.update(&context, linkageHash);
         hashGen.update(&context, programHash);
