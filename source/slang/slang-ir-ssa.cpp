@@ -531,12 +531,13 @@ IRInst* addPhiOperands(
     auto block = blockInfo->block;
 
     List<IRInst*> operandValues;
+    auto predecessorCount = block->getPredecessors().getCount();
     for (auto predBlock : block->getPredecessors())
     {
         // Precondition: if we have multiple predecessors, then
         // each must have only one successor (no critical edges).
         //
-        SLANG_ASSERT(predBlock->getSuccessors().getCount() == 1);
+        SLANG_RELEASE_ASSERT(predecessorCount <= 1 || predBlock->getSuccessors().getCount() == 1);
 
         auto predInfo = *context->blockInfos.TryGetValue(predBlock);
 
