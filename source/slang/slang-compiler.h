@@ -296,6 +296,10 @@ namespace Slang
             int                     targetIndex,
             ISlangSharedLibrary** outSharedLibrary,
             slang::IBlob** outDiagnostics) SLANG_OVERRIDE;
+
+            /// ComponentType is the only class inheriting from IComponentType that provides a
+            /// meaningful implmentation for these two functions. All others should do nothing with
+            /// these and implement updateDependencyBasedHash and updateASTBasedHash instead.
         SLANG_NO_THROW void SLANG_MCALL computeDependencyBasedHash(
             SlangInt entryPointIndex,
             SlangInt targetIndex,
@@ -310,10 +314,16 @@ namespace Slang
             /// The `target` must be a target on the `Linkage` that was used to create this program.
         TargetProgram* getTargetProgram(TargetRequest* target);
 
-            /// Compute the dependency-based hash code for this component type.
-        virtual void computeDependencyBasedHashImpl(
+            /// Update the hash builder with the dependencies for this component type. 
+        virtual void updateDependencyBasedHash(
             HashBuilder& hashBuilder,
             SlangInt entryPointIndex) = 0;
+
+            /// Update the hash builder with the AST contents for this component type.
+            /// The AST is associated with a Module component, so most derived ComponentType classes
+            /// will simply do nothing with this.
+        virtual void updateASTBasedHash(
+            HashBuilder& hashBuilder) = 0;
 
             /// Get the number of entry points linked into this component type.
         virtual Index getEntryPointCount() = 0;
@@ -512,11 +522,12 @@ namespace Slang
             Linkage*                            linkage,
             List<RefPtr<ComponentType>> const&  childComponents);
 
-        SLANG_NO_THROW void SLANG_MCALL computeASTBasedHash(slang::Hash* outHash) SLANG_OVERRIDE;
-
-        virtual void computeDependencyBasedHashImpl(
+        virtual void updateDependencyBasedHash(
             HashBuilder& hashBuilder,
             SlangInt entryPointIndex) override;
+
+        virtual void updateASTBasedHash(
+            HashBuilder& hashBuilder) override;
 
         List<RefPtr<ComponentType>> const& getChildComponents() { return m_childComponents; };
         Index getChildComponentCount() { return m_childComponents.getCount(); }
@@ -594,9 +605,12 @@ namespace Slang
             List<SpecializationArg> const&  specializationArgs,
             DiagnosticSink*                 sink);
 
-        virtual void computeDependencyBasedHashImpl(
+        virtual void updateDependencyBasedHash(
             HashBuilder& hashBuilder,
             SlangInt entryPointIndex) override;
+
+        virtual void updateASTBasedHash(
+            HashBuilder& hashBuilder) override { SLANG_UNUSED(hashBuilder); }
 
             /// Get the base (unspecialized) component type that is being specialized.
         RefPtr<ComponentType> getBaseComponentType() { return m_base; }
@@ -782,9 +796,12 @@ namespace Slang
         void acceptVisitor(ComponentTypeVisitor* visitor, SpecializationInfo* specializationInfo)
             SLANG_OVERRIDE;
 
-        virtual void computeDependencyBasedHashImpl(
+        virtual void updateDependencyBasedHash(
             HashBuilder& hashBuilder,
             SlangInt entryPointIndex) override;
+
+        virtual void updateASTBasedHash(
+            HashBuilder& hashBuilder) override { SLANG_UNUSED(hashBuilder); }
 
     private:
         RefPtr<ComponentType> m_base;
@@ -888,11 +905,17 @@ namespace Slang
             SLANG_UNUSED(outHash);
         }
 
-        SLANG_NO_THROW void SLANG_MCALL computeASTBasedHash(slang::Hash* outHash) SLANG_OVERRIDE;
+        SLANG_NO_THROW void SLANG_MCALL computeASTBasedHash(slang::Hash* outHash)
+        {
+            SLANG_UNUSED(outHash);
+        }
 
-        virtual void computeDependencyBasedHashImpl(
+        virtual void updateDependencyBasedHash(
             HashBuilder& hashBuilder,
             SlangInt entryPointIndex) override;
+
+        virtual void updateASTBasedHash(
+            HashBuilder& hashBuilder) override { SLANG_UNUSED(hashBuilder); }
 
             /// Create an entry point that refers to the given function.
         static RefPtr<EntryPoint> create(
@@ -1109,11 +1132,17 @@ namespace Slang
             SLANG_UNUSED(outHash);
         }
 
-        SLANG_NO_THROW void SLANG_MCALL computeASTBasedHash(slang::Hash* outHash) SLANG_OVERRIDE;
+        SLANG_NO_THROW void SLANG_MCALL computeASTBasedHash(slang::Hash* outHash)
+        {
+            SLANG_UNUSED(outHash);
+        }
 
-        virtual void computeDependencyBasedHashImpl(
+        virtual void updateDependencyBasedHash(
             HashBuilder& hashBuilder,
             SlangInt entryPointIndex) override;
+
+        virtual void updateASTBasedHash(
+            HashBuilder& hashBuilder) override { SLANG_UNUSED(hashBuilder); }
 
         List<Module*> const& getModuleDependencies() SLANG_OVERRIDE;
         List<String> const& getFilePathDependencies() SLANG_OVERRIDE;
@@ -1299,11 +1328,17 @@ namespace Slang
             SLANG_UNUSED(outHash);
         }
 
-        SLANG_NO_THROW void SLANG_MCALL computeASTBasedHash(slang::Hash* outHash) SLANG_OVERRIDE;
+        SLANG_NO_THROW void SLANG_MCALL computeASTBasedHash(slang::Hash* outHash)
+        {
+            SLANG_UNUSED(outHash);
+        }
 
-        virtual void computeDependencyBasedHashImpl(
+        virtual void updateDependencyBasedHash(
             HashBuilder& hashBuilder,
             SlangInt entryPointIndex) override;
+
+        virtual void updateASTBasedHash(
+            HashBuilder& hashBuilder) override;
 
             /// Create a module (initially empty).
         Module(Linkage* linkage, ASTBuilder* astBuilder = nullptr);

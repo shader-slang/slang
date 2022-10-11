@@ -223,7 +223,7 @@ namespace Slang
         visitor->visitEntryPoint(this, as<EntryPointSpecializationInfo>(specializationInfo));
     }
 
-    void EntryPoint::computeDependencyBasedHashImpl(
+    void EntryPoint::updateDependencyBasedHash(
         HashBuilder& builder,
         SlangInt entryPointIndex)
     {
@@ -231,14 +231,6 @@ namespace Slang
         // and file path dependencies, so we immediately return.
         SLANG_UNUSED(builder);
         SLANG_UNUSED(entryPointIndex);
-        return;
-    }
-
-    void EntryPoint::computeASTBasedHash(
-        slang::Hash* outHash)
-    {
-        slang::Hash zeroHash;
-        *outHash = zeroHash;
     }
 
     List<Module*> const& EntryPoint::getModuleDependencies()
@@ -309,7 +301,7 @@ namespace Slang
         return Super::getInterface(guid);
     }
 
-    void TypeConformance::computeDependencyBasedHashImpl(
+    void TypeConformance::updateDependencyBasedHash(
         HashBuilder& builder,
         SlangInt entryPointIndex)
     {
@@ -322,12 +314,6 @@ namespace Slang
 
         hashGen.update(context, subtypeWitness);
         hashGen.update(context, m_conformanceIdOverride);
-    }
-
-    void TypeConformance::computeASTBasedHash(slang::Hash* outHash)
-    {
-        slang::Hash zeroHash;
-        *outHash = zeroHash;
     }
 
     List<Module*> const& TypeConformance::getModuleDependencies()

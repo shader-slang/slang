@@ -4435,6 +4435,9 @@ namespace slang
                 type without needing to inspect the code. For example, a shader cache might key its entries using the
                 dependency-based hash in order to determine at a glance if a particular shader is present, with no
                 regard for the shader's contents.
+
+                This function should only have a meaningful implementation in ComponentType. All other types derived from
+                ComponentType that also inherit from IComponentType should do nothing.
             */
         virtual SLANG_NO_THROW void SLANG_MCALL computeDependencyBasedHash(
             SlangInt entryPointIndex,
@@ -4450,6 +4453,9 @@ namespace slang
 
                 Not all component types will store an AST, and consequently, not all component types will have a
                 meaningful implementation for this function.
+
+                This function should only have a meaningful implementation in ComponentType. All other types derived
+                from ComponentType that also inherit from IComponentType should do nothing.
             */
         virtual SLANG_NO_THROW void SLANG_MCALL computeASTBasedHash(Hash* outHash) = 0;
 

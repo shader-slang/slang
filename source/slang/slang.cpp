@@ -3240,7 +3240,7 @@ ISlangUnknown* Module::getInterface(const Guid& guid)
     return Super::getInterface(guid);
 }
 
-void Module::computeDependencyBasedHashImpl(
+void Module::updateDependencyBasedHash(
     HashBuilder& builder,
     SlangInt entryPointIndex)
 {
@@ -3248,21 +3248,15 @@ void Module::computeDependencyBasedHashImpl(
     // dependencies, so we immediately return.
     SLANG_UNUSED(builder);
     SLANG_UNUSED(entryPointIndex);
-    return;
 }
 
-void Module::computeASTBasedHash(slang::Hash* outHash)
+void Module::updateASTBasedHash(HashBuilder& builder)
 {
+    auto hashGen = builder.hashGen;
+    auto context = &builder.context;
+
     auto serializedAST = ASTSerialUtil::serializeAST(getModuleDecl());
-
-    slang::Hash hash;
-    HashGen hashGen;
-    HashContext context;
-    hashGen.init(&context);
-    hashGen.update(&context, serializedAST);
-    hashGen.finalize(&context, &hash);
-
-    *outHash = hash;
+    hashGen.update(context, serializedAST);
 }
 
 void Module::addModuleDependency(Module* module)
@@ -3470,8 +3464,15 @@ SLANG_NO_THROW void SLANG_MCALL ComponentType::computeDependencyBasedHash(
 {
     HashBuilder builder;
     builder.hashGen.init(&builder.context);
+
+    // A note on enums that may be hashed in as part of the following two function calls:
+    // 
+    // While enums are not guaranteed to be encoded the same way across all versions of
+    // the compiler, part of hashing the linkage is hashing in the compiler version.
+    // Consequently, any encoding differences as a result of different compiler versions
+    // will already be reflected in the resulting hash.
     getLinkage()->computeDependencyBasedHash(builder, targetIndex);
-    computeDependencyBasedHashImpl(builder, entryPointIndex);
+    updateDependencyBasedHash(builder, entryPointIndex);
 
     slang::Hash hash;
     builder.hashGen.finalize(&builder.context, &hash);
@@ -3480,8 +3481,15 @@ SLANG_NO_THROW void SLANG_MCALL ComponentType::computeDependencyBasedHash(
 
 SLANG_NO_THROW void SLANG_MCALL ComponentType::computeASTBasedHash(slang::Hash* outHash)
 {
-    SLANG_UNUSED(outHash);
-    return;
+    HashBuilder builder;
+    auto hashGen = builder.hashGen;
+    auto context = &builder.context;
+    hashGen.init(context);
+    updateASTBasedHash(builder);
+
+    slang::Hash hash;
+    hashGen.finalize(context, &hash);
+    *outHash = hash;
 }
 
 SLANG_NO_THROW SlangResult SLANG_MCALL ComponentType::getEntryPointHostCallable(
@@ -3816,7 +3824,7 @@ CompositeComponentType::CompositeComponentType(
     }
 }
 
-void CompositeComponentType::computeDependencyBasedHashImpl(
+void CompositeComponentType::updateDependencyBasedHash(
     HashBuilder& builder,
     SlangInt entryPointIndex)
 {
@@ -3842,29 +3850,18 @@ void CompositeComponentType::computeDependencyBasedHashImpl(
 
     for (Index i = 0; i < componentCount; ++i)
     {
-        slang::Hash tempHash;
-        getChildComponent(i)->computeDependencyBasedHashImpl(builder, entryPointIndex);
-        hashGen.update(context, tempHash);
+        getChildComponent(i)->updateDependencyBasedHash(builder, entryPointIndex);
     }
 }
 
-void CompositeComponentType::computeASTBasedHash(slang::Hash* outHash)
+void CompositeComponentType::updateASTBasedHash(HashBuilder& builder)
 {
     auto componentCount = getChildComponentCount();
 
-    slang::Hash hash;
-    HashGen hashGen;
-    HashContext context;
-    hashGen.init(&context);
     for (Index i = 0; i < componentCount; ++i)
     {
-        slang::Hash tempHash;
-        getChildComponent(i)->computeASTBasedHash(&tempHash);
-        hashGen.update(&context, tempHash);
+        getChildComponent(i)->updateASTBasedHash(builder);
     }
-    hashGen.finalize(&context, &hash);
-
-    *outHash = hash;
 }
 
 Index CompositeComponentType::getEntryPointCount()
@@ -4346,7 +4343,7 @@ SpecializedComponentType::SpecializedComponentType(
     collector.visitSpecialized(this);
 }
 
-void SpecializedComponentType::computeDependencyBasedHashImpl(
+void SpecializedComponentType::updateDependencyBasedHash(
     HashBuilder& builder,
     SlangInt entryPointIndex)
 {
@@ -4362,7 +4359,7 @@ void SpecializedComponentType::computeDependencyBasedHashImpl(
     }
 
     slang::Hash baseHash;
-    getBaseComponentType()->computeDependencyBasedHashImpl(builder, entryPointIndex);
+    getBaseComponentType()->updateDependencyBasedHash(builder, entryPointIndex);
 }
 
 void SpecializedComponentType::acceptVisitor(ComponentTypeVisitor* visitor, SpecializationInfo* specializationInfo)
@@ -4409,7 +4406,7 @@ void RenamedEntryPointComponentType::acceptVisitor(
         this, as<EntryPoint::EntryPointSpecializationInfo>(specializationInfo));
 }
 
-void RenamedEntryPointComponentType::computeDependencyBasedHashImpl(
+void RenamedEntryPointComponentType::updateDependencyBasedHash(
     HashBuilder& builder,
     SlangInt entryPointIndex)
 {
