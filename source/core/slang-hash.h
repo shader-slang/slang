@@ -177,6 +177,15 @@ namespace Slang
         return h;
     }
 
+    inline HashCode combineHash(HashCode hash0, HashCode hash1, HashCode hash2, HashCode hash3)
+    {
+        auto h = hash0;
+        h = combineHash(h, hash1);
+        h = combineHash(h, hash2);
+        h = combineHash(h, hash3);
+        return h;
+    }
+
     struct Hasher
     {
     public:

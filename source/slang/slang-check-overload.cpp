@@ -537,6 +537,7 @@ namespace Slang
             {
                 if(context.mode != OverloadResolveContext::Mode::JustTrying)
                 {
+                    subTypeWitness = tryGetSubtypeWitness(sub, sup);
                     getSink()->diagnose(context.loc, Diagnostics::typeArgumentDoesNotConformToInterface, sub, sup);
                 }
                 return false;
@@ -1414,6 +1415,14 @@ namespace Slang
             candidate.item = genericItem;
             candidate.flavor = OverloadCandidate::Flavor::UnspecializedGeneric;
             candidate.status = OverloadCandidate::Status::GenericArgumentInferenceFailed;
+
+            if(candidate.item.declRef.getName()->text == "__shl")
+            {
+                candidate = candidate;
+            }
+
+            // HACK(tess): debugging logic:
+            inferGenericArguments(genericDeclRef, context, substWithKnownGenericArgs);
 
             AddOverloadCandidateInner(context, candidate);
         }

@@ -10,9 +10,10 @@
     </Expand>
   </Type>
   <Type Name="Slang::DeclRef&lt;*&gt;">
-    <SmartPointer Usage="Minimal">decl ? ($T1*)(decl) : ($T1*)0</SmartPointer>
-    <DisplayString Condition="decl == 0">DeclRef nullptr</DisplayString>
-    <DisplayString Condition="decl != 0">{(*(*(Slang::DeclRefBase*)this).decl).nameAndLoc}</DisplayString>
+    <SmartPointer Usage="Minimal">declRefBase ? ($T1*)(declRefBase->decl) : ($T1*)0</SmartPointer>
+    <DisplayString Condition="declRefBase == 0">DeclRef nullptr</DisplayString>
+    <DisplayString Condition="declRefBase != 0">{*declRefBase}</DisplayString>
+    <!--
     <Expand>
       <ExpandedItem>decl ? ($T1*)(decl) : ($T1*)0</ExpandedItem>
       <Synthetic Name="[Substitutions]">
@@ -25,23 +26,27 @@
         </Expand>
       </Synthetic>
     </Expand>
+    -->
   </Type>
     <Type Name="Slang::DeclRefBase">
-        <SmartPointer Usage="Minimal">decl</SmartPointer>
-        <DisplayString Condition="decl == 0">DeclRefBase nullptr</DisplayString>
-        <DisplayString Condition="decl != 0">{(*(*(Slang::DeclRefBase*)this).decl).nameAndLoc}</DisplayString>
-        <Expand>
-            <ExpandedItem>decl</ExpandedItem>
-            <Synthetic Name="[Substitutions]">
-                <Expand>
-                    <LinkedListItems>
-                        <HeadPointer>substitutions.substitutions</HeadPointer>
-                        <NextPointer>outer</NextPointer>
-                        <ValueNode>this</ValueNode>
-                    </LinkedListItems>
-                </Expand>
-            </Synthetic>
-        </Expand>
+      <SmartPointer Usage="Minimal">decl</SmartPointer>
+      <DisplayString Condition="decl != 0 &amp;&amp; substitutions != 0">{*decl}{*substitutions}</DisplayString>
+      <DisplayString Condition="decl != 0">{*decl}</DisplayString>
+      <DisplayString Condition="decl == 0">DeclRefBase nullptr</DisplayString>
+      <!--
+      <Expand>
+          <ExpandedItem>decl</ExpandedItem>
+          <Synthetic Name="[Substitutions]">
+              <Expand>
+                  <LinkedListItems>
+                      <HeadPointer>substitutions.substitutions</HeadPointer>
+                      <NextPointer>outer</NextPointer>
+                      <ValueNode>this</ValueNode>
+                  </LinkedListItems>
+              </Expand>
+          </Synthetic>
+      </Expand>
+      -->
     </Type>
     <Type Name="Slang::GenericSubstitution">
         <DisplayString>GenSubst {(*genericDecl).nameAndLoc}</DisplayString>
@@ -191,7 +196,7 @@
   </Type>
 
     <Type Name="Slang::Expr" Inheritable="false">
-        <DisplayString>{astNodeType}</DisplayString>
+        <DisplayString>{astNodeType,en}</DisplayString>
         <Expand>
             <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::DeclRefExpr">(Slang::DeclRefExpr*)&amp;astNodeType</ExpandedItem>
             <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::VarExpr">(Slang::VarExpr*)&amp;astNodeType</ExpandedItem>
@@ -246,7 +251,7 @@
         </Expand>
     </Type>
     <Type Name="Slang::Stmt" Inheritable="false">
-        <DisplayString>{astNodeType}</DisplayString>
+        <DisplayString>{astNodeType,en}</DisplayString>
         <Expand>
             <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::ScopeStmt">(Slang::ScopeStmt*)&amp;astNodeType</ExpandedItem>
             <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::BlockStmt">(Slang::BlockStmt*)&amp;astNodeType</ExpandedItem>
@@ -281,8 +286,8 @@
         <DisplayString>{text}</DisplayString>
     </Type>
     <Type Name="Slang::Decl" Inheritable="false">
-        <DisplayString Condition="nameAndLoc.name!=0">{nameAndLoc.name->text}: {astNodeType}</DisplayString>
-        <DisplayString Condition="nameAndLoc.name==0">{astNodeType}</DisplayString>
+        <DisplayString Condition="nameAndLoc.name!=0">{nameAndLoc.name->text}</DisplayString>
+        <DisplayString Condition="nameAndLoc.name==0">{astNodeType,en}</DisplayString>
         <Expand>
             <Item Name="[Name]" Condition="nameAndLoc.name!=0">nameAndLoc.name->text</Item>
             <Item Name="[Parent]">parentDecl</Item>
@@ -332,7 +337,7 @@
     </Type>
 
     <Type Name="Slang::DeclBase" Inheritable="false">
-        <DisplayString>{astNodeType}</DisplayString>
+        <DisplayString>{astNodeType,en}</DisplayString>
         <Expand>
             <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::ContainerDecl">(Slang::ContainerDecl*)&amp;astNodeType</ExpandedItem>
             <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::ExtensionDecl">(Slang::ExtensionDecl*)&amp;astNodeType</ExpandedItem>
@@ -379,8 +384,9 @@
     </Type>
 
     <Type Name="Slang::Type" Inheritable="false">
-        <DisplayString>{astNodeType}</DisplayString>
-        <Expand>
+      <DisplayString Condition="astNodeType == Slang::ASTNodeType::DeclRefType">{((Slang::DeclRefType*)&amp;astNodeType)->declRef}</DisplayString>
+      <DisplayString>{astNodeType,en}</DisplayString>
+      <Expand>
             <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::OverloadGroupType">(Slang::OverloadGroupType*)&amp;astNodeType</ExpandedItem>
             <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::InitializerListType">(Slang::InitializerListType*)&amp;astNodeType</ExpandedItem>
             <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::ErrorType">(Slang::ErrorType*)&amp;astNodeType</ExpandedItem>
@@ -420,7 +426,7 @@
             <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::HLSLPointStreamType">(Slang::HLSLPointStreamType*)&amp;astNodeType</ExpandedItem>
             <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::HLSLLineStreamType">(Slang::HLSLLineStreamType*)&amp;astNodeType</ExpandedItem>
             <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::HLSLTriangleStreamType">(Slang::HLSLTriangleStreamType*)&amp;astNodeType</ExpandedItem>
-            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::MeshOutputType">(Slang::HLSLMeshOutputType*)&amp;astNodeType</ExpandedItem>
+            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::MeshOutputType">(Slang::MeshOutputType*)&amp;astNodeType</ExpandedItem>
             <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::VerticesType">(Slang::VerticesType*)&amp;astNodeType</ExpandedItem>
             <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::IndicesType">(Slang::IndicesType*)&amp;astNodeType</ExpandedItem>
             <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::PrimitivesType">(Slang::PrimitivesType*)&amp;astNodeType</ExpandedItem>
@@ -462,16 +468,26 @@
             <Item Name="[Type]">(Slang::Type*)this,nd</Item>
         </Expand>
     </Type>
-
     <Type Name="Slang::Substitutions" Inheritable="false">
-        <DisplayString>{astNodeType}</DisplayString>
+      <DisplayString Condition="astNodeType == Slang::ASTNodeType::GenericSubstitution">{*(Slang::GenericSubstitution*)&amp;astNodeType}</DisplayString>
+      <DisplayString Condition="astNodeType == Slang::ASTNodeType::ThisTypeSubstitution">{*(Slang::ThisTypeSubstitution*)&amp;astNodeType}</DisplayString>
+      <DisplayString>{astNodeType,en}</DisplayString>
+      <DisplayString>{astNodeType,en}</DisplayString>
         <Expand>
             <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::GenericSubstitution">(Slang::GenericSubstitution*)&amp;astNodeType</ExpandedItem>
             <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::ThisTypeSubstitution">(Slang::ThisTypeSubstitution*)&amp;astNodeType</ExpandedItem>
         </Expand>
     </Type>
+    <Type Name="Slang::GenericSubstitution" Inheritable="false">
+      <DisplayString Condition="outer != 0">&lt;{args}&gt;{*outer}</DisplayString>
+      <DisplayString>&lt;{args}&gt;</DisplayString>
+    </Type>
+    <Type Name="Slang::ThisTypeSubstitution" Inheritable="false">
+      <DisplayString Condition="outer != 0">{*outer}[This=={witness->sub,na}]</DisplayString>
+      <DisplayString>[{witness->sup,na}.This: {witness->sub,na}]</DisplayString>
+    </Type>
     <Type Name="Slang::SubstitutionSet">
-        <DisplayString>{astNodeType}</DisplayString>
+        <DisplayString>{astNodeType,en}</DisplayString>
         <Expand>
             <LinkedListItems>
                 <HeadPointer>substitutions</HeadPointer>
@@ -481,13 +497,13 @@
         </Expand>
     </Type>
     <Type Name="Slang::AggTypeDecl">
-        <DisplayString>{nameAndLoc.name}: {astNodeType}</DisplayString>
+        <DisplayString>{astNodeType}({nameAndLoc.name})</DisplayString>
         <Expand>
             <Item Name="[Members]">members</Item>
         </Expand>
     </Type>
     <Type Name="Slang::Val" Inheritable="false">
-        <DisplayString>{astNodeType}</DisplayString>
+        <DisplayString>{astNodeType,en}</DisplayString>
         <Expand>
             <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::ConstantIntVal">(Slang::ConstantIntVal*)&amp;astNodeType</ExpandedItem>
             <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::PolynomialIntVal">(Slang::PolynomialIntVal*)&amp;astNodeType</ExpandedItem>
@@ -569,4 +585,36 @@
             <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::ModifiedType">(Slang::ModifiedType*)&amp;astNodeType</ExpandedItem>
         </Expand>
     </Type>
+    <Type Name="Slang::Facet">
+        <SmartPointer Usage="Minimal">_impl</SmartPointer>
+        <DisplayString Condition="_impl == 0">nullptr</DisplayString>
+        <DisplayString Condition="_impl != 0">{_impl}</DisplayString>
+    </Type>
+    <Type Name="Slang::FacetList">
+        <DisplayString Condition="_head == 0">empty</DisplayString>
+        <Expand>
+            <LinkedListItems>
+                <HeadPointer>_head._impl != 0 ? &amp;_head : 0</HeadPointer>
+                <NextPointer>_impl->next._impl != 0 ? &amp;_impl->next : 0</NextPointer>
+                <ValueNode>*this</ValueNode>
+            </LinkedListItems>
+        </Expand>
+    </Type>
+  <Type Name="Slang::SharedSemanticsContext::DirectBaseList">
+    <DisplayString Condition="_head == 0">empty</DisplayString>
+    <Expand>
+      <LinkedListItems>
+        <HeadPointer>_head != 0 ? _head : 0</HeadPointer>
+        <NextPointer>next != 0 ? next : 0</NextPointer>
+        <ValueNode>*this</ValueNode>
+      </LinkedListItems>
+    </Expand>
+  </Type>
+  <Type Name="Slang::SubtypeWitness">
+    <DisplayString Condition="astNodeType == Slang::ASTNodeType::TypeEqualityWitness">{*(Slang::TypeEqualityWitness*)this}</DisplayString>
+    <DisplayString>{sub,na} &lt;: {sup,na}</DisplayString>
+  </Type>
+  <Type Name="Slang::TypeEqualityWitness">
+    <DisplayString>{sub,na} == {sup,na}</DisplayString>
+  </Type>
 </AutoVisualizer>

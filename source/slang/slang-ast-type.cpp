@@ -1063,8 +1063,6 @@ HashCode AndType::_getHashCodeOverride()
 
 Type* AndType::_createCanonicalTypeOverride()
 {
-    AndType* canType = m_astBuilder->create<AndType>();
-
     // TODO: proper canonicalization of an `&` type relies on
     // several different things:
     //
@@ -1097,9 +1095,10 @@ Type* AndType::_createCanonicalTypeOverride()
     // We are going to completely ignore these issues for
     // right now, in the name of getting something up and running.
     //
-    canType->left = left->getCanonicalType();
-    canType->right = right->getCanonicalType();
 
+    auto canLeft = left->getCanonicalType();
+    auto canRight = right->getCanonicalType();
+    auto canType = m_astBuilder->getAndType(canLeft, canRight);
     return canType;
 }
 
@@ -1115,9 +1114,7 @@ Val* AndType::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet su
 
     (*ioDiff)++;
 
-    AndType* substType = m_astBuilder->create<AndType>();
-    substType->left = substLeft;
-    substType->right = substRight;
+    auto substType = m_astBuilder->getAndType(substLeft, substRight);
     return substType;
 }
 

@@ -891,43 +891,39 @@ namespace Slang
             }
             return true;
         }
-        // If we are casting to an interface type, then that will succeed
-        // if the "from" type conforms to the interface.
-        //
-        if (auto toDeclRefType = as<DeclRefType>(toType))
-        {
-            auto toTypeDeclRef = toDeclRefType->declRef;
-            if (auto toAggTypeDeclRef = toTypeDeclRef.as<AggTypeDecl>())
-            {
-                if(auto witness = tryGetSubtypeWitness(fromType, toAggTypeDeclRef))
-                {
-                    if (outToExpr)
-                    {
-                        *outToExpr = createCastToSuperTypeExpr(toType, fromExpr, witness);
 
-                        // If the original expression was an l-value, then the result
-                        // of the cast may be an l-value itself. We want to be able
-                        // to invoke `[mutating]` methods on a value that is cast to
-                        // an interface it conforms to, and we also expect to be able
-                        // to pass a value of a derived `struct` type into methods that
-                        // expect a value of its base type.
-                        //
-                        // TODO: vet this logic for correctness.
-                        //
-                        if (fromExpr && fromExpr->type.isLeftValue)
-                        {
-                            (*outToExpr)->type.isLeftValue = true;
-                        }
-                    }
-                    if (outCost)
-                        *outCost = kConversionCost_CastToInterface;
-                    return true;
+        // A type is always convertible to any of its supertypes.
+        //
+        if(auto witness = tryGetSubtypeWitness(fromType, toType))
+        {
+            if (outToExpr)
+            {
+                *outToExpr = createCastToSuperTypeExpr(toType, fromExpr, witness);
+
+                // If the original expression was an l-value, then the result
+                // of the cast may be an l-value itself. We want to be able
+                // to invoke `[mutating]` methods on a value that is cast to
+                // an interface it conforms to, and we also expect to be able
+                // to pass a value of a derived `struct` type into methods that
+                // expect a value of its base type.
+                //
+                // TODO: vet this logic for correctness.
+                //
+                if (fromExpr && fromExpr->type.isLeftValue)
+                {
+                    (*outToExpr)->type.isLeftValue = true;
                 }
             }
+            if (outCost)
+                *outCost = kConversionCost_CastToInterface;
+            return true;
         }
 
         // Disallow converting to a ParameterGroupType.
-        if (const auto toParameterGroupType = as<ParameterGroupType>(toType))
+        //
+        // TODO(tfoley): Under what circumstances would this check ever be needed?
+        //
+        if (auto toParameterGroupType = as<ParameterGroupType>(toType))
         {
             return _failedCoercion(toType, outToExpr, fromExpr);
         }

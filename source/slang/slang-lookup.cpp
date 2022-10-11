@@ -4,6 +4,12 @@
 #include "../compiler-core/slang-name.h"
 #include "slang-check-impl.h"
 
+// TODO(tfoley): The implementation of lookup still involves
+// recursion over the structure of a type/declaration, but
+// it should be possible for it to use the flattened/linearized
+// inheritance information that is being computed in
+// `slang-check-inheritance.cpp`.
+
 namespace Slang {
 
 void ensureDecl(SemanticsVisitor* visitor, Decl* decl, DeclCheckState state);
@@ -278,13 +284,14 @@ static SubtypeWitness* _makeSubtypeWitness(
     Type*                       superType,
     SubtypeWitness*             midtoSuperWitness)
 {
+    SLANG_UNUSED(subType);
+    SLANG_UNUSED(superType);
+
     if(subToMidWitness)
     {
-        TransitiveSubtypeWitness* transitiveWitness = astBuilder->create<TransitiveSubtypeWitness>();
-        transitiveWitness->subToMid = subToMidWitness;
-        transitiveWitness->midToSup = midtoSuperWitness;
-        transitiveWitness->sub = subType;
-        transitiveWitness->sup = superType;
+        auto transitiveWitness = astBuilder->getTransitiveSubtypeWitness(
+            subToMidWitness,
+            midtoSuperWitness);
         return transitiveWitness;
     }
     else
@@ -300,11 +307,10 @@ static SubtypeWitness* _makeSubtypeWitness(
     Type*                       superType,
     DeclRef<TypeConstraintDecl> midToSuperConstraint)
 {
-    DeclaredSubtypeWitness* midToSuperWitness = astBuilder->create<DeclaredSubtypeWitness>();
-    midToSuperWitness->declRef = midToSuperConstraint;
-    midToSuperWitness->sub = subType;
-    midToSuperWitness->sup = superType;
-    return _makeSubtypeWitness(astBuilder, subType, subToMidWitness, superType, midToSuperWitness);
+    auto midToSuperWitness = astBuilder->getDeclaredSubtypeWitness(
+        subType, superType, midToSuperConstraint);
+    return _makeSubtypeWitness(
+        astBuilder, subType, subToMidWitness, superType, midToSuperWitness);
 }
 
 // Same as the above, but we are specializing a type instead of a decl-ref
@@ -380,14 +386,6 @@ static void _lookUpMembersInSuperType(
     breadcrumb.val = leafIsSuperWitness;
     breadcrumb.prev = inBreadcrumbs;
 
-    // TODO: Need to consider case where this might recurse infinitely (e.g.,
-    // if an inheritance clause does something like `Bad<T> : Bad<Bad<T>>`.
-    //
-    // TODO: The even simpler thing we need to worry about here is that if
-    // there is ever a "diamond" relationship in the inheritance hierarchy,
-    // we might end up seeing the same interface via different "paths" and
-    // we wouldn't want that to lead to overload-resolution failure.
-    //
     _lookUpMembersInSuperTypeImpl(astBuilder, name, leafType, superType, leafIsSuperWitness, request, ioResult, &breadcrumb);
 }
 
@@ -663,36 +661,24 @@ static void _lookUpMembersInSuperTypeImpl(
         //
         // Effectively, we have a witness that `T : X & Y` and we
         // need to extract from it a witness that `T : X`.
-        // Fortunately, we have a class of subtype witness that does
-        // *precisely* this:
         //
-        auto leafIsLeftWitness = astBuilder->create<ExtractFromConjunctionSubtypeWitness>();
         //
-        // Our witness will be to the fact that `leafType` is a subtype of `leftType`
-        //
-        leafIsLeftWitness->sub = leafType;
-        leafIsLeftWitness->sup = leftType;
-        //
-        // The evidence for the subtype relationship will be a witness
-        // proving that `leafType : leftType & rightType`:
-        //
-        leafIsLeftWitness->conjunctionWitness = leafIsSuperWitness;
-        //
-        // ... along with the index of the desired super-type in
-        // that conjunction. The index of `leftType` in `leftType & rightType`
-        // is zero.
-        //
-        leafIsLeftWitness->indexInConjunction = 0;
+        auto leafIsLeftWitness = astBuilder->getExtractFromConjunctionSubtypeWitness(
+            leafType,
+            leftType,
+            leafIsSuperWitness,
+            0);
+
 
         // The witness for the fact that `leafType : rightType` is the
         // same as for the left case, just with a different index into
         // the conjunction.
         //
-        auto leafIsRightWitness = astBuilder->create<ExtractFromConjunctionSubtypeWitness>();
-        leafIsRightWitness->conjunctionWitness = leafIsSuperWitness;
-        leafIsRightWitness->indexInConjunction = 1;
-        leafIsRightWitness->sub = leafType;
-        leafIsRightWitness->sup = rightType;
+        auto leafIsRightWitness = astBuilder->getExtractFromConjunctionSubtypeWitness(
+            leafType,
+            rightType,
+            leafIsSuperWitness,
+            1);
 
         // We then perform lookup on both sides of the conjunction, and
         // accumulate whatever items are found on either/both sides.

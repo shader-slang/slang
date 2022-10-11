@@ -529,6 +529,7 @@ IF EXIST ..\..\..\external\slang-glslang\bin\windows-aarch64\release\slang-glsla
     <ClCompile Include="..\..\..\source\slang\slang-check-conversion.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-check-decl.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-check-expr.cpp" />
+    <ClCompile Include="..\..\..\source\slang\slang-check-inheritance.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-check-modifier.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-check-overload.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-check-shader.cpp" />

@@ -281,12 +281,12 @@ namespace Slang
         }
         else if (auto conjunctionWitness = as<ConjunctionSubtypeWitness>(witness))
         {
-            auto left = as<SubtypeWitness>(conjunctionWitness->leftWitness);
-            if (left)
-                addDepedencyFromWitness(left);
-            auto right = as<SubtypeWitness>(conjunctionWitness->rightWitness);
-            if (right)
-                addDepedencyFromWitness(right);
+            auto componentCount = conjunctionWitness->getComponentCount();
+            for (Index i = 0; i < componentCount; ++i)
+            {
+                auto w = as<SubtypeWitness>(conjunctionWitness->getComponentWitness(i));
+                if (w) addDepedencyFromWitness(w);
+            }
         }
     }
 

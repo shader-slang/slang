@@ -753,7 +753,7 @@ namespace Slang
     Val* _tryLookupConcreteAssociatedTypeFromThisTypeSubst(ASTBuilder* builder, DeclRef<Decl> declRef);
     void _printNestedDecl(const Substitutions* substitutions, const Decl* decl, StringBuilder& out);
 
-    template<typename T>
+    template<typename T = Decl>
     struct DeclRef
     {
         friend class ASTBuilder;
@@ -773,12 +773,10 @@ namespace Slang
             init(base);
         }
 
-        template <typename U>
-        DeclRef(DeclRef<U> const& other,
-            typename EnableIf<IsConvertible<T*, U*>::Value, void>::type* = 0)
+        template <typename U, typename = typename EnableIf<IsConvertible<T*, U*>::Value, void>::type>
+        DeclRef(DeclRef<U> const& other)
             : declRefBase(other.declRefBase)
-        {
-        }
+        {}
 
         T* getDecl() const;
         Substitutions* getSubst() const;
