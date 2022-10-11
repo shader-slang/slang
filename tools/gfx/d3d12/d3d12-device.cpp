@@ -579,7 +579,11 @@ Result DeviceImpl::initialize(const Desc& desc)
     }
 
     D3D12_FEATURE_DATA_SHADER_MODEL shaderModelData = {};
-    shaderModelData.HighestShaderModel = D3D_SHADER_MODEL_6_6;
+
+    if (m_extendedDesc.highestShaderModel != 0)
+        shaderModelData.HighestShaderModel = (D3D_SHADER_MODEL)m_extendedDesc.highestShaderModel;
+    else
+        shaderModelData.HighestShaderModel = D3D_SHADER_MODEL_6_6;
 
     // Find what features are supported
     {
@@ -773,6 +777,10 @@ Result DeviceImpl::initialize(const Desc& desc)
     case D3D_SHADER_MODEL_6_5:
         compileTarget = SLANG_DXIL;
         profileName = "sm_6_5";
+        break;
+    case 0x67:
+        compileTarget = SLANG_DXIL;
+        profileName = "sm_6_7";
         break;
     default:
         compileTarget = SLANG_DXIL;
