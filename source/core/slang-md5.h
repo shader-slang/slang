@@ -38,7 +38,7 @@ namespace Slang
     /* Any 32-bit or wider unsigned integer data type will do */
     typedef uint32_t MD5_u32plus;
 
-    struct HashContext
+    struct MD5Context
     {
         MD5_u32plus lo, hi;
         MD5_u32plus a, b, c, d;
@@ -46,36 +46,36 @@ namespace Slang
         MD5_u32plus block[16];
     };
 
-    class HashGen
+    class MD5HashGen
     {
     public:
-        void init(HashContext* ctx);
+        void init(MD5Context* ctx);
 
         // Helper update function for raw values (e.g. ints, uints)
         template<typename T,
             typename = typename std::enable_if<std::is_enum<T>::value || std::is_arithmetic<T>::value>::type>
-        void update(HashContext* ctx, const T& val)
+        void update(MD5Context* ctx, const T& val)
         {
             update(ctx, &val, sizeof(T));
         }
         // Helper update function for Slang::List
         template<typename T>
-        void update(HashContext* ctx, const List<T>& list)
+        void update(MD5Context* ctx, const List<T>& list)
         {
             update(ctx, list.getBuffer(), list.getCount());
         }
         // Helper update function for UnownedStringSlice
-        void update(HashContext* ctx, UnownedStringSlice string);
+        void update(MD5Context* ctx, UnownedStringSlice string);
         // Helper update function for Slang::String
-        void update(HashContext* ctx, String str);
+        void update(MD5Context* ctx, String str);
         // Helper update function for Checksums
-        void update(HashContext* ctx, const slang::Hash& checksum);
+        void update(MD5Context* ctx, const slang::Digest& checksum);
 
-        void finalize(HashContext* ctx, slang::Hash* result);
+        void finalize(MD5Context* ctx, slang::Digest* result);
 
     private:
-        static const void* body(HashContext* ctx, const void* data, SlangInt size);
-        void update(HashContext* ctx, const void* data, SlangInt size);
+        static const void* body(MD5Context* ctx, const void* data, SlangInt size);
+        void update(MD5Context* ctx, const void* data, SlangInt size);
     };
 }
  

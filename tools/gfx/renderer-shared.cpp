@@ -331,9 +331,9 @@ void PipelineStateBase::initializeBase(const PipelineStateDesc& inDesc)
     }
 }
 
-void updateCacheEntry(ISlangMutableFileSystem* fileSystem, slang::IBlob* compiledCode, String shaderFilename, slang::Hash ASTHash)
+void updateCacheEntry(ISlangMutableFileSystem* fileSystem, slang::IBlob* compiledCode, String shaderFilename, slang::Digest ASTHash)
 {
-    auto hashSize = sizeof(slang::Hash);
+    auto hashSize = sizeof(slang::Digest);
 
     auto bufferSize = hashSize + compiledCode->getBufferSize();
     List<uint8_t> contents;
@@ -365,14 +365,14 @@ Result RendererBase::getEntryPointCodeFromShaderCache(
     ComPtr<slang::ISession> session;
     getSlangSession(session.writeRef());
 
-    slang::Hash shaderKeyHash;
+    slang::Digest shaderKeyHash;
     program->computeDependencyBasedHash(entryPointIndex, targetIndex, &shaderKeyHash);
 
     StringBuilder shaderKey = hashToString(shaderKeyHash);
 
     // Produce a hash using the AST for this program - This is needed to check whether a cache entry is effectively dirty,
     // or to save along with the compiled code into an entry so the entry can be checked if fetched later on.
-    slang::Hash ASTHash;
+    slang::Digest ASTHash;
     program->computeASTBasedHash(&ASTHash);
     
     ComPtr<ISlangBlob> codeBlob;
@@ -407,8 +407,8 @@ Result RendererBase::getEntryPointCodeFromShaderCache(
         // the AST hash with the compiled code, we can determine this by comparing the stored hash with the
         // AST hash generated earlier.
         auto entryContents = codeBlob->getBufferPointer();
-        auto hashSize = sizeof(slang::Hash);
-        if (memcmp(ASTHash.value, entryContents, hashSize) != 0)
+        auto hashSize = sizeof(slang::Digest);
+        if (memcmp(ASTHash.values, entryContents, hashSize) != 0)
         {
             // The AST hash stored in the entry does not match the AST hash generated earlier, indicating
             // that the shader code has changed and the entry needs to be updated.

@@ -1,4 +1,4 @@
-// slang-hash-utils.h - Utility functions specifically designed to be used with slang::Hash
+// slang-hash-utils.h - Utility functions specifically designed to be used with slang::Digest
 #pragma once
 #include "../../slang.h"
 #include "../core/slang-basic.h"
@@ -7,41 +7,41 @@
 namespace Slang
 {
     // Compute the hash for an UnownedStringSlice
-    inline slang::Hash computeHashForStringSlice(UnownedStringSlice text)
+    inline slang::Digest computeHashForStringSlice(UnownedStringSlice text)
     {
-        HashContext context;
-        HashGen hashGen;
+        MD5Context context;
+        MD5HashGen hashGen;
         hashGen.init(&context);
         hashGen.update(&context, text);
 
-        slang::Hash textHash;
+        slang::Digest textHash;
         hashGen.finalize(&context, &textHash);
 
         return textHash;
     }
 
     // Combines the two provided hashes to produce the final shader cache entry key.
-    inline slang::Hash combineHashes(const slang::Hash& linkageHash, const slang::Hash& programHash)
+    inline slang::Digest combineHashes(const slang::Digest& linkageHash, const slang::Digest& programHash)
     {
-        HashContext context;
-        HashGen hashGen;
+        MD5Context context;
+        MD5HashGen hashGen;
         hashGen.init(&context);
         hashGen.update(&context, linkageHash);
         hashGen.update(&context, programHash);
 
-        slang::Hash combined;
+        slang::Digest combined;
         hashGen.finalize(&context, &combined);
         return combined;
     }
 
     // Returns the stored hash in checksum as a String.
-    inline StringBuilder hashToString(const slang::Hash& hash)
+    inline StringBuilder hashToString(const slang::Digest& hash)
     {
         StringBuilder filename;
 
         for (Index i = 0; i < 4; ++i)
         {
-            auto hashSegmentString = String(hash.value[i], 16);
+            auto hashSegmentString = String(hash.values[i], 16);
 
             auto leadingZeroCount = 8 - hashSegmentString.getLength();
             for (Index j = 0; j < leadingZeroCount; ++j)

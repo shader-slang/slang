@@ -11,8 +11,8 @@ SLANG_UNIT_TEST(md5hash)
 {
     {
         // Raw numerical values, etc.
-        HashContext testCtx;
-        HashGen testHashGen;
+        MD5Context testCtx;
+        MD5HashGen testHashGen;
         testHashGen.init(&testCtx);
 
         int64_t valueA = -1;
@@ -20,7 +20,7 @@ SLANG_UNIT_TEST(md5hash)
         testHashGen.update(&testCtx, valueA);
         testHashGen.update(&testCtx, valueB);
 
-        slang::Hash testA;
+        slang::Digest testA;
         testHashGen.finalize(&testCtx, &testA);
 
         String testAString = hashToString(testA);
@@ -29,8 +29,8 @@ SLANG_UNIT_TEST(md5hash)
 
     {
         // List
-        HashContext testCtx;
-        HashGen testHashGen;
+        MD5Context testCtx;
+        MD5HashGen testHashGen;
         testHashGen.init(&testCtx);
 
         List<int64_t> listA;
@@ -40,7 +40,7 @@ SLANG_UNIT_TEST(md5hash)
         listA.add(4);
         testHashGen.update(&testCtx, listA);
 
-        slang::Hash testB;
+        slang::Digest testB;
         testHashGen.finalize(&testCtx, &testB);
 
         String testBString = hashToString(testB);
@@ -49,14 +49,14 @@ SLANG_UNIT_TEST(md5hash)
 
     {
         // UnownedStringSlice
-        HashContext testCtx;
-        HashGen testHashGen;
+        MD5Context testCtx;
+        MD5HashGen testHashGen;
         testHashGen.init(&testCtx);
 
         UnownedStringSlice stringSlice = UnownedStringSlice("String Slice Test");
         testHashGen.update(&testCtx, stringSlice);
 
-        slang::Hash testC;
+        slang::Digest testC;
         testHashGen.finalize(&testCtx, &testC);
 
         String testCString = hashToString(testC);
@@ -65,14 +65,14 @@ SLANG_UNIT_TEST(md5hash)
 
     {
         // String
-        HashContext testCtx;
-        HashGen testHashGen;
+        MD5Context testCtx;
+        MD5HashGen testHashGen;
         testHashGen.init(&testCtx);
 
         String str = String("String Test");
         testHashGen.update(&testCtx, str);
 
-        slang::Hash testD;
+        slang::Digest testD;
         testHashGen.finalize(&testCtx, &testD);
 
         String testDString = hashToString(testD);
@@ -81,14 +81,14 @@ SLANG_UNIT_TEST(md5hash)
 
     {
         // Hash
-        HashContext testCtx;
-        HashGen testHashGen;
+        MD5Context testCtx;
+        MD5HashGen testHashGen;
         testHashGen.init(&testCtx);
 
-        slang::Hash Hash;
+        slang::Digest Hash;
         testHashGen.update(&testCtx, Hash);
 
-        slang::Hash testE;
+        slang::Digest testE;
         testHashGen.finalize(&testCtx, &testE);
 
         String testEString = hashToString(testE);

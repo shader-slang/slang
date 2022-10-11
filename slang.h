@@ -4136,9 +4136,9 @@ namespace slang
 
     // A struct storing a single hash represented as a four element uint32_t array.
     // This is intended to be used with the current MD5 hashing implementation.
-    struct Hash
+    struct Digest
     {
-        uint32_t value[4] = { 0 };
+        uint32_t values[4] = { 0 };
     };
 
         /** A session provides a scope for code that is loaded.
@@ -4442,7 +4442,7 @@ namespace slang
         virtual SLANG_NO_THROW void SLANG_MCALL computeDependencyBasedHash(
             SlangInt entryPointIndex,
             SlangInt targetIndex,
-            Hash* outHash) = 0;
+            Digest* outHash) = 0;
 
             /** Compute the hash code of this component type's AST. This hash effectively represents
                 the contents of the code covered by this component type, making its use ideal when we need
@@ -4457,7 +4457,7 @@ namespace slang
                 This function should only have a meaningful implementation in ComponentType. All other types derived
                 from ComponentType that also inherit from IComponentType should do nothing.
             */
-        virtual SLANG_NO_THROW void SLANG_MCALL computeASTBasedHash(Hash* outHash) = 0;
+        virtual SLANG_NO_THROW void SLANG_MCALL computeASTBasedHash(Digest* outHash) = 0;
 
             /** Specialize the component by binding its specialization parameters to concrete arguments.
 

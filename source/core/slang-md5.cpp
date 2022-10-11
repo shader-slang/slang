@@ -1,6 +1,6 @@
 /*
  * This is an OpenSSL-compatible implementation of the RSA Data Security, Inc.
- * MD5 Message-value Algorithm (RFC 1321).
+ * MD5 Message-Digest Algorithm (RFC 1321).
  *
  * Homepage:
  * http://openwall.info/wiki/people/solar/software/public-domain-source-code/md5
@@ -99,7 +99,7 @@ namespace Slang
      * This processes one or more 64-byte data blocks, but does NOT update the bit
      * counters.  There are no alignment requirements.
      */
-    /*static*/const void* HashGen::body(HashContext* ctx, const void* data, SlangInt size)
+    /*static*/const void* MD5HashGen::body(MD5Context* ctx, const void* data, SlangInt size)
     {
 	    const unsigned char* ptr;
 	    MD5_u32plus a, b, c, d;
@@ -206,7 +206,7 @@ namespace Slang
 	    return ptr;
     }
  
-    void HashGen::init(HashContext* ctx)
+    void MD5HashGen::init(MD5Context* ctx)
     {
 	    ctx->a = 0x67452301;
 	    ctx->b = 0xefcdab89;
@@ -217,22 +217,22 @@ namespace Slang
 	    ctx->hi = 0;
     }
 
-    void HashGen::update(HashContext* ctx, UnownedStringSlice string)
+    void MD5HashGen::update(MD5Context* ctx, UnownedStringSlice string)
     {
         update(ctx, string.begin(), string.getLength());
     }
 
-    void HashGen::update(HashContext* ctx, String str)
+    void MD5HashGen::update(MD5Context* ctx, String str)
     {
         update(ctx, str.getBuffer(), str.getLength());
     }
 
-    void HashGen::update(HashContext* ctx, const slang::Hash& hash)
+    void MD5HashGen::update(MD5Context* ctx, const slang::Digest& hash)
     {
-        update(ctx, hash.value, sizeof(hash.value));
+        update(ctx, hash.values, sizeof(hash.values));
     }
 
-    void HashGen::update(HashContext* ctx, const void* data, SlangInt size)
+    void MD5HashGen::update(MD5Context* ctx, const void* data, SlangInt size)
     {
 	    MD5_u32plus saved_lo;
 	    SlangInt used, available;
@@ -275,7 +275,7 @@ namespace Slang
 	    (dst)[2] = (unsigned char)((src) >> 16); \
 	    (dst)[3] = (unsigned char)((src) >> 24);
  
-    void HashGen::finalize(HashContext* ctx, slang::Hash* result)
+    void MD5HashGen::finalize(MD5Context* ctx, slang::Digest* result)
     {
 	    unsigned long used, available;
  
@@ -300,10 +300,10 @@ namespace Slang
  
 	    body(ctx, ctx->buffer, 64);
 
-	    OUTUINT(&result->value[0], ctx->a)
-	    OUTUINT(&result->value[1], ctx->b)
-	    OUTUINT(&result->value[2], ctx->c)
-	    OUTUINT(&result->value[3], ctx->d)
+	    OUTUINT(&result->values[0], ctx->a)
+	    OUTUINT(&result->values[1], ctx->b)
+	    OUTUINT(&result->values[2], ctx->c)
+	    OUTUINT(&result->values[3], ctx->d)
  
 	    memset(ctx, 0, sizeof(*ctx));
     }

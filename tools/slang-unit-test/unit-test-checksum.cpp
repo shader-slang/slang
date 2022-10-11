@@ -9,22 +9,22 @@ using namespace Slang;
 SLANG_UNIT_TEST(checksum)
 {
     {
-        slang::Hash testA;
-        testA.value[0] = 1;
-        testA.value[1] = 2;
-        testA.value[2] = 3;
-        testA.value[3] = 4;
+        slang::Digest testA;
+        testA.values[0] = 1;
+        testA.values[1] = 2;
+        testA.values[2] = 3;
+        testA.values[3] = 4;
 
         String testAString = hashToString(testA);
         SLANG_CHECK(testAString.equals(String("00000001000000020000000300000004")));
     }
 
     {
-        slang::Hash testC;
-        testC.value[0] = 0x11111111;
-        testC.value[1] = 0x22222222;
-        testC.value[2] = 0x33333333;
-        testC.value[3] = 0x44444444;
+        slang::Digest testC;
+        testC.values[0] = 0x11111111;
+        testC.values[1] = 0x22222222;
+        testC.values[2] = 0x33333333;
+        testC.values[3] = 0x44444444;
 
         String testCString = hashToString(testC);
         SLANG_CHECK(testCString.equals(String("11111111222222223333333344444444")));
