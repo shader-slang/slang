@@ -346,6 +346,7 @@ IF EXIST ..\..\..\external\slang-glslang\bin\windows-aarch64\release\slang-glsla
     <ClInclude Include="..\..\..\source\slang\slang-ir-dll-export.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-dll-import.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-dominators.h" />
+    <ClInclude Include="..\..\..\source\slang\slang-ir-eliminate-multilevel-break.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-eliminate-phis.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-entry-point-pass.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-entry-point-raw-ptr-params.h" />
@@ -387,6 +388,7 @@ IF EXIST ..\..\..\external\slang-glslang\bin\windows-aarch64\release\slang-glsla
     <ClInclude Include="..\..\..\source\slang\slang-ir-restructure.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-sccp.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-simplify-cfg.h" />
+    <ClInclude Include="..\..\..\source\slang\slang-ir-single-return.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-specialize-arrays.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-specialize-buffer-load-arg.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-specialize-dispatch.h" />
@@ -513,6 +515,7 @@ IF EXIST ..\..\..\external\slang-glslang\bin\windows-aarch64\release\slang-glsla
     <ClCompile Include="..\..\..\source\slang\slang-ir-dll-export.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-dll-import.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-dominators.cpp" />
+    <ClCompile Include="..\..\..\source\slang\slang-ir-eliminate-multilevel-break.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-eliminate-phis.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-entry-point-pass.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-entry-point-raw-ptr-params.cpp" />
@@ -552,6 +555,7 @@ IF EXIST ..\..\..\external\slang-glslang\bin\windows-aarch64\release\slang-glsla
     <ClCompile Include="..\..\..\source\slang\slang-ir-restructure.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-sccp.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-simplify-cfg.cpp" />
+    <ClCompile Include="..\..\..\source\slang\slang-ir-single-return.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-specialize-arrays.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-specialize-buffer-load-arg.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-specialize-dispatch.cpp" />
