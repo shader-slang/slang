@@ -3972,6 +3972,11 @@ static void _disableCPPBackends(TestContext* context)
     }
 }
 
+static void _disableD3D12Backend(TestContext* context)
+{
+    context->options.enabledApis &= ~(RenderApiFlag::D3D12);
+}
+
 static TestResult _asTestResult(ToolReturnCode retCode)
 {
     switch (retCode)
@@ -4210,6 +4215,11 @@ SlangResult innerMain(int argc, char** argv)
         _disableCPPBackends(&context);
 #endif
     }
+
+#if SLANG_PROCESSOR_X86
+    // Disable d3d12 tests on x86 right now since dxc for 32-bit windows doesn't seem to recognize sm_6_6.
+    _disableD3D12Backend(&context);
+#endif
 
     if (options.subCommand.getLength())
     {

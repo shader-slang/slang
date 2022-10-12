@@ -50,7 +50,7 @@ Result PipelineStateImpl::ensureAPIPipelineStateCreated()
     auto programImpl = static_cast<ShaderProgramImpl*>(m_program.Ptr());
     if (programImpl->m_shaders.getCount() == 0)
     {
-        SLANG_RETURN_ON_FAIL(programImpl->compileShaders());
+        SLANG_RETURN_ON_FAIL(programImpl->compileShaders(m_device));
     }
     if (desc.type == PipelineType::Graphics)
     {
@@ -356,7 +356,7 @@ Result RayTracingPipelineStateImpl::ensureAPIPipelineStateCreated()
         SlangInt entryPointIndex)
     {
         ComPtr<ISlangBlob> codeBlob;
-        auto compileResult = component->getEntryPointCode(
+        auto compileResult = m_device->getEntryPointCodeFromShaderCache(component,
             entryPointIndex, 0, codeBlob.writeRef(), diagnostics.writeRef());
         if (diagnostics.get())
         {

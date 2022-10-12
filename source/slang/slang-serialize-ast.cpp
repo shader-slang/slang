@@ -154,4 +154,29 @@ struct ASTFieldAccess
     return SLANG_OK;
 }
 
+/* static */List<uint8_t> ASTSerialUtil::serializeAST(ModuleDecl* moduleDecl)
+{
+    //TODO: we should store `classes` in GlobalSession to avoid recomputing them every time.
+    RefPtr<SerialClasses> classes;
+    SerialClassesUtil::create(classes);
+
+    List<uint8_t> contents;
+    OwnedMemoryStream stream(FileAccess::ReadWrite);
+
+    // Only serialize out things *in* this module
+    ModuleSerialFilter filterStorage(moduleDecl);
+
+    SerialFilter* filter = moduleDecl ? &filterStorage : nullptr;
+
+    SerialWriter writer(classes, filter);
+
+    // Lets serialize it all
+    writer.addPointer(moduleDecl);
+    // Let's stick it all in a stream
+    writer.write(&stream);
+
+    stream.swapContents(contents);
+    return contents;
+}
+
 } // namespace Slang

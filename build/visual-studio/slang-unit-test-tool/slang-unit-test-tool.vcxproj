@@ -272,6 +272,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\tools\slang-unit-test\unit-test-byte-encode.cpp" />
+    <ClCompile Include="..\..\..\tools\slang-unit-test\unit-test-checksum.cpp" />
     <ClCompile Include="..\..\..\tools\slang-unit-test\unit-test-chunked-list.cpp" />
     <ClCompile Include="..\..\..\tools\slang-unit-test\unit-test-com-host-callable.cpp" />
     <ClCompile Include="..\..\..\tools\slang-unit-test\unit-test-command-line-args.cpp" />
@@ -282,6 +283,7 @@
     <ClCompile Include="..\..\..\tools\slang-unit-test\unit-test-io.cpp" />
     <ClCompile Include="..\..\..\tools\slang-unit-test\unit-test-json-native.cpp" />
     <ClCompile Include="..\..\..\tools\slang-unit-test\unit-test-json.cpp" />
+    <ClCompile Include="..\..\..\tools\slang-unit-test\unit-test-md5.cpp" />
     <ClCompile Include="..\..\..\tools\slang-unit-test\unit-test-memory-arena.cpp" />
     <ClCompile Include="..\..\..\tools\slang-unit-test\unit-test-offset-container.cpp" />
     <ClCompile Include="..\..\..\tools\slang-unit-test\unit-test-path.cpp" />

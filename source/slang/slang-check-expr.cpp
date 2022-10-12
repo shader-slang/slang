@@ -2195,6 +2195,10 @@ namespace Slang
         SwizzleExpr* swizExpr = m_astBuilder->create<SwizzleExpr>();
         swizExpr->loc = memberRefExpr->loc;
         swizExpr->base = memberRefExpr->baseExpression;
+        swizExpr->elementIndices[0] = 0;
+        swizExpr->elementIndices[1] = 0;
+        swizExpr->elementIndices[2] = 0;
+        swizExpr->elementIndices[3] = 0;
         swizExpr->memberOpLoc = memberRefExpr->memberOperatorLoc;
         IntegerLiteralValue limitElement = baseElementCount;
 

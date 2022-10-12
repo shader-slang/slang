@@ -4134,6 +4134,13 @@ namespace slang
         None, UnsizedArray, StructuredBuffer, ConstantBuffer, ParameterBlock
     };
 
+    // A struct storing a single hash represented as a four element uint32_t array.
+    // This is intended to be used with the current MD5 hashing implementation.
+    struct Digest
+    {
+        uint32_t values[4] = { 0 };
+    };
+
         /** A session provides a scope for code that is loaded.
 
         A session can be used to load modules of Slang source code,
@@ -4420,6 +4427,37 @@ namespace slang
             SlangInt    targetIndex,
             IBlob**     outCode,
             IBlob**     outDiagnostics = nullptr) = 0;
+
+            /** Compute the hash code of all dependencies for this component type. This generally means file path
+                dependencies but can also include the component's name or sub-components. The dependency-based
+                hash effectively represents all the files that may be included/imported by a component type along with
+                any non-code-specific that helps define a component. This can be useful to simply check for a component
+                type without needing to inspect the code. For example, a shader cache might key its entries using the
+                dependency-based hash in order to determine at a glance if a particular shader is present, with no
+                regard for the shader's contents.
+
+                This function should only have a meaningful implementation in ComponentType. All other types derived from
+                ComponentType that also inherit from IComponentType should do nothing.
+            */
+        virtual SLANG_NO_THROW void SLANG_MCALL computeDependencyBasedHash(
+            SlangInt entryPointIndex,
+            SlangInt targetIndex,
+            Digest* outHash) = 0;
+
+            /** Compute the hash code of this component type's AST. This hash effectively represents
+                the contents of the code covered by this component type, making its use ideal when we need
+                to confirm whether shader code changes have occurred. For example, a shader cache needs to be
+                able to check when a cache entry contains out-of-date code, which can be easily detected by
+                comparing the AST-based hashes since any change to the shader's code will be reflected in the
+                AST, and subsequently, the AST-based hash.
+
+                Not all component types will store an AST, and consequently, not all component types will have a
+                meaningful implementation for this function.
+
+                This function should only have a meaningful implementation in ComponentType. All other types derived
+                from ComponentType that also inherit from IComponentType should do nothing.
+            */
+        virtual SLANG_NO_THROW void SLANG_MCALL computeASTBasedHash(Digest* outHash) = 0;
 
             /** Specialize the component by binding its specialization parameters to concrete arguments.
 

@@ -86,6 +86,9 @@
     <ClCompile Include="..\..\..\tools\gfx-unit-test\sampler-array.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\tools\gfx-unit-test\shader-cache-tests.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\..\tools\gfx-unit-test\shared-buffers-tests.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -118,6 +121,15 @@
     <None Include="..\..\..\tools\gfx-unit-test\graphics-smoke.slang">
       <Filter>Source Files</Filter>
     </None>
+    <None Include="..\..\..\tools\gfx-unit-test\imported.slang">
+      <Filter>Source Files</Filter>
+    </None>
+    <None Include="..\..\..\tools\gfx-unit-test\importing-shader-cache-shader.slang">
+      <Filter>Source Files</Filter>
+    </None>
+    <None Include="..\..\..\tools\gfx-unit-test\multiple-entry-point-shader-cache-shader.slang">
+      <Filter>Source Files</Filter>
+    </None>
     <None Include="..\..\..\tools\gfx-unit-test\mutable-shader-object.slang">
       <Filter>Source Files</Filter>
     </None>
@@ -134,6 +146,18 @@
       <Filter>Source Files</Filter>
     </None>
     <None Include="..\..\..\tools\gfx-unit-test\sampler-array.slang">
+      <Filter>Source Files</Filter>
+    </None>
+    <None Include="..\..\..\tools\gfx-unit-test\shader-cache-shader-A.slang">
+      <Filter>Source Files</Filter>
+    </None>
+    <None Include="..\..\..\tools\gfx-unit-test\shader-cache-shader-B.slang">
+      <Filter>Source Files</Filter>
+    </None>
+    <None Include="..\..\..\tools\gfx-unit-test\shader-cache-shader-C.slang">
+      <Filter>Source Files</Filter>
+    </None>
+    <None Include="..\..\..\tools\gfx-unit-test\shader-cache-shader.slang">
       <Filter>Source Files</Filter>
     </None>
     <None Include="..\..\..\tools\gfx-unit-test\swapchain-shader.slang">
