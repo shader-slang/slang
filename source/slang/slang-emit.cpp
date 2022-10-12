@@ -830,6 +830,9 @@ Result linkAndOptimizeIR(
         }
     }
 
+    // Run a final round of DCE to clean up unused things after phi-elimination.
+    eliminateDeadCode(irModule);
+
     // We include one final step to (optionally) dump the IR and validate
     // it after all of the optimization passes are complete. This should
     // reflect the IR that code is generated from as closely as possible.
