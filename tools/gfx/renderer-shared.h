@@ -43,7 +43,7 @@ struct GfxGUID
     static const Slang::Guid IID_IFence;
     static const Slang::Guid IID_IShaderTable;
     static const Slang::Guid IID_IPipelineCreationAPIDispatcher;
-    static const Slang::Guid IID_ID3D12TransientResourceHeap;
+    static const Slang::Guid IID_ITransientResourceHeapD3D12;
 };
 
 bool isGfxDebugLayerEnabled();

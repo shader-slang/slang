@@ -46,7 +46,7 @@ const Slang::Guid GfxGUID::IID_IAccelerationStructure = SLANG_UUID_IAcceleration
 const Slang::Guid GfxGUID::IID_IFence = SLANG_UUID_IFence;
 const Slang::Guid GfxGUID::IID_IShaderTable = SLANG_UUID_IShaderTable;
 const Slang::Guid GfxGUID::IID_IPipelineCreationAPIDispatcher = SLANG_UUID_IPipelineCreationAPIDispatcher;
-const Slang::Guid GfxGUID::IID_ID3D12TransientResourceHeap = SLANG_UUID_ID3D12TransientResourceHeap;
+const Slang::Guid GfxGUID::IID_ITransientResourceHeapD3D12 = SLANG_UUID_ITransientResourceHeapD3D12;
 
 
 StageType translateStage(SlangStage slangStage)
