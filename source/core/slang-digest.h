@@ -4,6 +4,8 @@
 
 namespace Slang
 {
+    using slang::Digest;
+
     // Wrapper struct that holds objects necessary for hashing.
     struct DigestBuilder
     {
@@ -19,9 +21,11 @@ namespace Slang
             hashGen.update(&context, item);
         }
 
-        void finalize(slang::Digest* outHash)
+        Digest finalize()
         {
-            hashGen.finalize(&context, outHash);
+            Digest hash;
+            hashGen.finalize(&context, &hash);
+            return hash;
         }
 
     private:
