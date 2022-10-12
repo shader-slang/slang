@@ -168,6 +168,7 @@ public:
     virtual SLANG_NO_THROW bool SLANG_MCALL canConvert(const ArtifactDesc& from, const ArtifactDesc& to) SLANG_OVERRIDE;
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL convert(IArtifact* from, const ArtifactDesc& to, IArtifact** outArtifact) SLANG_OVERRIDE;
     virtual SLANG_NO_THROW bool SLANG_MCALL isFileBased() SLANG_OVERRIDE { return false; }
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL getVersionString(slang::IBlob** outVersionString) SLANG_OVERRIDE;
 
     /// Must be called before use
     SlangResult init(ISlangSharedLibrary* library);
@@ -570,6 +571,20 @@ SlangResult DXCDownstreamCompiler::convert(IArtifact* from, const ArtifactDesc& 
 
     *outArtifact = artifact.detach();
     return SLANG_OK;
+}
+
+SlangResult DXCDownstreamCompiler::getVersionString(slang::IBlob** outVersionString)
+{
+    if (m_desc.hasVersion())
+    {
+        auto version = m_desc.getVersionValue();
+        ComPtr<slang::IBlob> versionBlob = Slang::StringUtil::createStringBlob(Slang::String(version));
+        *outVersionString = versionBlob.detach();
+        return SLANG_OK;
+    }
+
+    *outVersionString = nullptr;
+    return SLANG_FAIL;
 }
 
 /* static */SlangResult DXCDownstreamCompilerUtil::locateCompilers(const String& path, ISlangSharedLibraryLoader* loader, DownstreamCompilerSet* set)

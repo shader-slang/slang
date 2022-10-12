@@ -191,6 +191,8 @@ public:
     virtual SLANG_NO_THROW bool SLANG_MCALL canConvert(const ArtifactDesc& from, const ArtifactDesc& to) = 0;
         /// Converts an artifact `from` to a desc of `to` and puts the result in outArtifact
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL convert(IArtifact* from, const ArtifactDesc& to, IArtifact** outArtifact) = 0;
+        /// Get the version of this compiler
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL getVersionString(slang::IBlob** outVersionString) = 0;
 
         /// True if underlying compiler uses file system to communicate source
     virtual SLANG_NO_THROW bool SLANG_MCALL isFileBased() = 0;
@@ -208,6 +210,7 @@ public:
     virtual SLANG_NO_THROW const Desc& SLANG_MCALL getDesc() SLANG_OVERRIDE { return m_desc; }
     virtual SLANG_NO_THROW bool SLANG_MCALL canConvert(const ArtifactDesc& from, const ArtifactDesc& to) SLANG_OVERRIDE { SLANG_UNUSED(from); SLANG_UNUSED(to); return false; } 
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL convert(IArtifact* from, const ArtifactDesc& to, IArtifact** outArtifact) SLANG_OVERRIDE;
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL getVersionString(slang::IBlob** outVersionString) SLANG_OVERRIDE { *outVersionString = nullptr; return SLANG_FAIL; }
 
     DownstreamCompilerBase(const Desc& desc):
         m_desc(desc)
