@@ -70,6 +70,8 @@ namespace Slang
         void update(MD5Context* ctx, String str);
         // Helper update function for Checksums
         void update(MD5Context* ctx, const slang::Digest& checksum);
+        // Helper update function for ISlangBlob
+        void update(MD5Context* ctx, ISlangBlob* blob);
 
         void finalize(MD5Context* ctx, slang::Digest* result);
 

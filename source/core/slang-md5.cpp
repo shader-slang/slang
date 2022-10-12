@@ -232,6 +232,11 @@ namespace Slang
         update(ctx, hash.values, sizeof(hash.values));
     }
 
+    void MD5HashGen::update(MD5Context* ctx, ISlangBlob* blob)
+    {
+        update(ctx, blob->getBufferPointer(), blob->getBufferSize());
+    }
+
     void MD5HashGen::update(MD5Context* ctx, const void* data, SlangInt size)
     {
 	    MD5_u32plus saved_lo;

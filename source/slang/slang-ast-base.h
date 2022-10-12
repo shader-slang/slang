@@ -145,7 +145,8 @@ class Val : public NodeBase
         return equalsVal(const_cast<Val*>(&v));
     }
 
-    // 
+    // Hash this value into the provided hash builder.
+    // TODO: Refine implementation of _hashIntoOverride for all subtypes
     void hashInto(DigestBuilder& builder);
 
     // Overrides should be public so base classes can access

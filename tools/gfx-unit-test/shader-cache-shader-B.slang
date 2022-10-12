@@ -6,5 +6,5 @@ uniform RWStructuredBuffer<float> buffer;
             uint3 sv_dispatchThreadID : SV_DispatchThreadID)
             {
                 var input = buffer[sv_dispatchThreadID.x];
-                buffer[sv_dispatchThreadID.x] = input + 1.0f;
+                buffer[sv_dispatchThreadID.x] = input + 2.0f;
             }

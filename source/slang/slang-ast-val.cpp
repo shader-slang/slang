@@ -86,7 +86,7 @@ void Val::_hashIntoOverride(DigestBuilder& builder)
 
 void ConstantIntVal::_hashIntoOverride(DigestBuilder& builder)
 {
-    builder.addToDigest(_getHashCodeOverride());
+    builder.addToDigest(value);
 }
 
 bool ConstantIntVal::_equalsValOverride(Val* val)
