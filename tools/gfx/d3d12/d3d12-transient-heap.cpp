@@ -81,9 +81,9 @@ D3D12DescriptorHeap& TransientResourceHeapImpl::getCurrentSamplerHeap()
 
 Result TransientResourceHeapImpl::queryInterface(SlangUUID const& uuid, void** outObject)
 {
-    if (uuid == GfxGUID::IID_ID3D12TransientResourceHeap)
+    if (uuid == GfxGUID::IID_ITransientResourceHeapD3D12)
     {
-        *outObject = static_cast<ID3D12TransientResourceHeap*>(this);
+        *outObject = static_cast<ITransientResourceHeapD3D12*>(this);
         addRef();
         return SLANG_OK;
     }
