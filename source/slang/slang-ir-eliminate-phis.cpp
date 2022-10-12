@@ -807,7 +807,10 @@ struct PhiEliminationContext
             // so that any logic that might have moved another parameter
             // into a temporary will influence our result.
             //
-            m_builder.emitStore(dstParam.temp, *srcArg.currentValPtr);
+            if ((*srcArg.currentValPtr)->getOp() != kIROp_undefined)
+            {
+                m_builder.emitStore(dstParam.temp, *srcArg.currentValPtr);
+            }
 
             //
             // Once the store is emitted, the assignment has been performed,
