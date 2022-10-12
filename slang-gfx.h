@@ -2562,6 +2562,7 @@ struct D3D12DeviceExtendedDesc
     StructType structType = StructType::D3D12DeviceExtendedDesc;
     const char* rootParameterShaderAttributeName = nullptr;
     bool debugBreakOnD3D12Error = false;
+    uint32_t highestShaderModel = 0;
 };
 
 }
