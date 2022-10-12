@@ -2,10 +2,10 @@
 #include "slang-md5.h"
 #include "../../slang.h"
 
-using slang::Digest;
-
 namespace Slang
 {
+    using slang::Digest;
+
     // Wrapper struct that holds objects necessary for hashing.
     struct DigestBuilder
     {
