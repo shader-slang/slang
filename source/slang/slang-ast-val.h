@@ -3,6 +3,7 @@
 #pragma once
 
 #include "slang-ast-base.h"
+#include "../core/slang-digest.h"
 
 namespace Slang {
 
@@ -28,6 +29,8 @@ class ConstantIntVal : public IntVal
 
     IntegerLiteralValue value;
 
+    void hashInto(DigestBuilder& builder);
+
     // Overrides should be public so base classes can access
     bool _equalsValOverride(Val* val);
     void _toTextOverride(StringBuilder& out);
@@ -46,6 +49,8 @@ class GenericParamIntVal : public IntVal
     SLANG_AST_CLASS(GenericParamIntVal)
 
     DeclRef<VarDeclBase> declRef;
+
+    void hashInto(DigestBuilder& builder);
 
     // Overrides should be public so base classes can access
     bool _equalsValOverride(Val* val);
@@ -68,6 +73,8 @@ class FuncCallIntVal : public IntVal
 {
     SLANG_AST_CLASS(FuncCallIntVal)
 
+    void hashInto(DigestBuilder& builder);
+
     bool _equalsValOverride(Val* val);
     void _toTextOverride(StringBuilder& out);
     HashCode _getHashCodeOverride();
@@ -85,6 +92,8 @@ class FuncCallIntVal : public IntVal
 class WitnessLookupIntVal : public IntVal
 {
     SLANG_AST_CLASS(WitnessLookupIntVal)
+
+    void hashInto(DigestBuilder& builder);
 
     bool _equalsValOverride(Val* val);
     void _toTextOverride(StringBuilder& out);
@@ -212,6 +221,8 @@ public:
     // Otherwise, in-place modifications are performed and returns this.
     IntVal* canonicalize(ASTBuilder* builder);
 
+    void hashInto(DigestBuilder& builder);
+
     // Overrides should be public so base classes can access
     bool _equalsValOverride(Val* val);
     void _toTextOverride(StringBuilder& out);
@@ -236,6 +247,8 @@ class ErrorIntVal : public IntVal
     // TODO: We should probably eventually just have an `ErrorVal` here
     // and have all `Val`s that represent ordinary values hold their
     // `Type` so that we can have an `ErrorVal` of any type.
+
+    void hashInto(DigestBuilder& builder);
 
     // Overrides should be public so base classes can access
     bool _equalsValOverride(Val* val);
@@ -299,6 +312,8 @@ class TypeEqualityWitness : public SubtypeWitness
 {
     SLANG_AST_CLASS(TypeEqualityWitness)
 
+    void hashInto(DigestBuilder& builder);
+
     // Overrides should be public so base classes can access
     bool _equalsValOverride(Val* val);
     void _toTextOverride(StringBuilder& out);
@@ -313,6 +328,8 @@ class DeclaredSubtypeWitness : public SubtypeWitness
     SLANG_AST_CLASS(DeclaredSubtypeWitness)
 
     DeclRef<Decl> declRef;
+
+    void hashInto(DigestBuilder& builder);
 
     // Overrides should be public so base classes can access
     bool _equalsValOverride(Val* val);
@@ -339,6 +356,8 @@ class TransitiveSubtypeWitness : public SubtypeWitness
     // Witness that `mid : sup`
     SubtypeWitness* midToSup = nullptr;
 
+    void hashInto(DigestBuilder& builder);
+
     // Overrides should be public so base classes can access
     bool _equalsValOverride(Val* val);
     void _toTextOverride(StringBuilder& out);
@@ -358,6 +377,8 @@ class ExtractExistentialSubtypeWitness : public SubtypeWitness
 
     // The declaration of the existential value that has been opened
     DeclRef<VarDeclBase> declRef;
+
+    void hashInto(DigestBuilder& builder);
 
     // Overrides should be public so base classes can access
     bool _equalsValOverride(Val* val);
@@ -379,6 +400,7 @@ class TaggedUnionSubtypeWitness : public SubtypeWitness
     //
     List<Val*> caseWitnesses;
 
+    void hashInto(DigestBuilder& builder);
 
     // Overrides should be public so base classes can access
     bool _equalsValOverride(Val* val);
@@ -432,6 +454,8 @@ class ExtractFromConjunctionSubtypeWitness : public SubtypeWitness
 class ModifierVal : public Val
 {
     SLANG_AST_CLASS(ModifierVal)
+
+    void hashInto(DigestBuilder& builder);
 
     bool _equalsValOverride(Val* val);
     HashCode _getHashCodeOverride();

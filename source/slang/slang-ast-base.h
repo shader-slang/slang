@@ -9,6 +9,8 @@
 
 #include "slang-serialize-reflection.h"
 
+#include "../core/slang-digest.h"
+
 // This file defines the primary base classes for the hierarchy of
 // AST nodes and related objects. For example, this is where the
 // basic `Decl`, `Stmt`, `Expr`, `type`, etc. definitions come from.
@@ -142,6 +144,9 @@ class Val : public NodeBase
     {
         return equalsVal(const_cast<Val*>(&v));
     }
+
+    // 
+    void hashInto(DigestBuilder& builder);
 
     // Overrides should be public so base classes can access
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
