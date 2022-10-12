@@ -29,12 +29,11 @@ class ConstantIntVal : public IntVal
 
     IntegerLiteralValue value;
 
-    void hashInto(DigestBuilder& builder);
-
     // Overrides should be public so base classes can access
     bool _equalsValOverride(Val* val);
     void _toTextOverride(StringBuilder& out);
     HashCode _getHashCodeOverride();
+    void _hashIntoOverride(DigestBuilder& builder);
 
 protected:
     ConstantIntVal(Type* inType, IntegerLiteralValue inValue)
@@ -50,13 +49,12 @@ class GenericParamIntVal : public IntVal
 
     DeclRef<VarDeclBase> declRef;
 
-    void hashInto(DigestBuilder& builder);
-
     // Overrides should be public so base classes can access
     bool _equalsValOverride(Val* val);
     void _toTextOverride(StringBuilder& out);
     HashCode _getHashCodeOverride();
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+    void _hashIntoOverride(DigestBuilder& builder);
 
     GenericParamIntVal(Type* inType, VarDeclBase* inDecl, Substitutions* inSubst)
         : IntVal(inType), declRef(inDecl, inSubst)
@@ -73,12 +71,11 @@ class FuncCallIntVal : public IntVal
 {
     SLANG_AST_CLASS(FuncCallIntVal)
 
-    void hashInto(DigestBuilder& builder);
-
     bool _equalsValOverride(Val* val);
     void _toTextOverride(StringBuilder& out);
     HashCode _getHashCodeOverride();
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+    void _hashIntoOverride(DigestBuilder& builder);
 
     DeclRef<Decl> funcDeclRef;
     Type* funcType;
@@ -93,12 +90,11 @@ class WitnessLookupIntVal : public IntVal
 {
     SLANG_AST_CLASS(WitnessLookupIntVal)
 
-    void hashInto(DigestBuilder& builder);
-
     bool _equalsValOverride(Val* val);
     void _toTextOverride(StringBuilder& out);
     HashCode _getHashCodeOverride();
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+    void _hashIntoOverride(DigestBuilder& builder);
 
     SubtypeWitness* witness;
     Decl* key;
@@ -221,13 +217,12 @@ public:
     // Otherwise, in-place modifications are performed and returns this.
     IntVal* canonicalize(ASTBuilder* builder);
 
-    void hashInto(DigestBuilder& builder);
-
     // Overrides should be public so base classes can access
     bool _equalsValOverride(Val* val);
     void _toTextOverride(StringBuilder& out);
     HashCode _getHashCodeOverride();
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+    void _hashIntoOverride(DigestBuilder& builder);
 
     static PolynomialIntVal* neg(ASTBuilder* astBuilder, IntVal* base);
     static PolynomialIntVal* add(ASTBuilder* astBuilder, IntVal* op0, IntVal* op1);
@@ -248,13 +243,12 @@ class ErrorIntVal : public IntVal
     // and have all `Val`s that represent ordinary values hold their
     // `Type` so that we can have an `ErrorVal` of any type.
 
-    void hashInto(DigestBuilder& builder);
-
     // Overrides should be public so base classes can access
     bool _equalsValOverride(Val* val);
     void _toTextOverride(StringBuilder& out);
     HashCode _getHashCodeOverride();
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+    void _hashIntoOverride(DigestBuilder& builder);
 };
 
 // A witness to the fact that some proposition is true, encoded
@@ -312,13 +306,12 @@ class TypeEqualityWitness : public SubtypeWitness
 {
     SLANG_AST_CLASS(TypeEqualityWitness)
 
-    void hashInto(DigestBuilder& builder);
-
     // Overrides should be public so base classes can access
     bool _equalsValOverride(Val* val);
     void _toTextOverride(StringBuilder& out);
     HashCode _getHashCodeOverride();
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+    void _hashIntoOverride(DigestBuilder& builder);
 };
 
 // A witness that one type is a subtype of another
@@ -329,13 +322,12 @@ class DeclaredSubtypeWitness : public SubtypeWitness
 
     DeclRef<Decl> declRef;
 
-    void hashInto(DigestBuilder& builder);
-
     // Overrides should be public so base classes can access
     bool _equalsValOverride(Val* val);
     void _toTextOverride(StringBuilder& out);
     HashCode _getHashCodeOverride();
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+    void _hashIntoOverride(DigestBuilder& builder);
 
     DeclaredSubtypeWitness(Type* inSub, Type* inSup, Decl* decl, Substitutions* subst)
         : declRef(decl, subst)
@@ -356,13 +348,12 @@ class TransitiveSubtypeWitness : public SubtypeWitness
     // Witness that `mid : sup`
     SubtypeWitness* midToSup = nullptr;
 
-    void hashInto(DigestBuilder& builder);
-
     // Overrides should be public so base classes can access
     bool _equalsValOverride(Val* val);
     void _toTextOverride(StringBuilder& out);
     HashCode _getHashCodeOverride();
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+    void _hashIntoOverride(DigestBuilder& builder);
 
     TransitiveSubtypeWitness(SubtypeWitness* inSubToMid, SubtypeWitness* inMidToSup)
         : subToMid(inSubToMid), midToSup(inMidToSup)
@@ -378,13 +369,12 @@ class ExtractExistentialSubtypeWitness : public SubtypeWitness
     // The declaration of the existential value that has been opened
     DeclRef<VarDeclBase> declRef;
 
-    void hashInto(DigestBuilder& builder);
-
     // Overrides should be public so base classes can access
     bool _equalsValOverride(Val* val);
     void _toTextOverride(StringBuilder& out);
     HashCode _getHashCodeOverride();
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+    void _hashIntoOverride(DigestBuilder& builder);
 };
 
 // A witness that `sub : sup`, because `sub` is a tagged union
@@ -400,13 +390,12 @@ class TaggedUnionSubtypeWitness : public SubtypeWitness
     //
     List<Val*> caseWitnesses;
 
-    void hashInto(DigestBuilder& builder);
-
     // Overrides should be public so base classes can access
     bool _equalsValOverride(Val* val);
     void _toTextOverride(StringBuilder& out);
     HashCode _getHashCodeOverride();
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+    void _hashIntoOverride(DigestBuilder& builder);
 };
 
     /// A witness of the fact that `ThisType(someInterface) : someInterface`
@@ -455,10 +444,9 @@ class ModifierVal : public Val
 {
     SLANG_AST_CLASS(ModifierVal)
 
-    void hashInto(DigestBuilder& builder);
-
     bool _equalsValOverride(Val* val);
     HashCode _getHashCodeOverride();
+    void _hashIntoOverride(DigestBuilder& builder);
 };
 
 class TypeModifierVal : public ModifierVal

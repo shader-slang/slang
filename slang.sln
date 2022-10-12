@@ -1,8 +1,6 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 16
-VisualStudioVersion = 16.0.32630.194
-MinimumVisualStudioVersion = 10.0.40219.1
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tools", "tools", "{FD47AE19-69FD-260F-F2F1-20E65EA61D13}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "slang-test", "build\visual-studio\slang-test\slang-test.vcxproj", "{0C768A18-1D25-4000-9F37-DA5FE99E3B64}"
@@ -57,8 +55,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "generator", "generator", "{
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "run-generators", "build\visual-studio\run-generators\run-generators.vcxproj", "{E145B2B8-CD13-A6BE-B6A7-16E5A2148223}"
 	ProjectSection(ProjectDependencies) = postProject
-		{66174227-8541-41FC-A6DF-4764FC66F78E} = {66174227-8541-41FC-A6DF-4764FC66F78E}
 		{CA8A30D1-8FA9-4330-B7F7-84709246D8DC} = {CA8A30D1-8FA9-4330-B7F7-84709246D8DC}
+		{66174227-8541-41FC-A6DF-4764FC66F78E} = {66174227-8541-41FC-A6DF-4764FC66F78E}
 		{7F773DD9-EB8F-2403-B43C-B49C2014B99C} = {7F773DD9-EB8F-2403-B43C-B49C2014B99C}
 	EndProjectSection
 EndProject
@@ -84,11 +82,6 @@ EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "slang-reflection-test-tool", "build\visual-studio\slang-reflection-test-tool\slang-reflection-test-tool.vcxproj", "{C5ACCA6E-C04D-4B36-8516-3752B3C13C2F}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "slang-unit-test-tool", "build\visual-studio\slang-unit-test-tool\slang-unit-test-tool.vcxproj", "{0162864E-7651-4B5E-9105-C571105276EA}"
-EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "gfx-smoke-test", "gfx-smoke-test\gfx-smoke-test.vcxproj", "{CF63093B-FC39-4FAA-86C0-F59E3A3DC1B5}"
-	ProjectSection(ProjectDependencies) = postProject
-		{F9BE7957-8399-899E-0C49-E714FDDD4B65} = {F9BE7957-8399-899E-0C49-E714FDDD4B65}
-	EndProjectSection
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -496,16 +489,6 @@ Global
 		{0162864E-7651-4B5E-9105-C571105276EA}.Release|Win32.Build.0 = Release|Win32
 		{0162864E-7651-4B5E-9105-C571105276EA}.Release|x64.ActiveCfg = Release|x64
 		{0162864E-7651-4B5E-9105-C571105276EA}.Release|x64.Build.0 = Release|x64
-		{CF63093B-FC39-4FAA-86C0-F59E3A3DC1B5}.Debug|aarch64.ActiveCfg = Debug|Win32
-		{CF63093B-FC39-4FAA-86C0-F59E3A3DC1B5}.Debug|Win32.ActiveCfg = Debug|Win32
-		{CF63093B-FC39-4FAA-86C0-F59E3A3DC1B5}.Debug|Win32.Build.0 = Debug|Win32
-		{CF63093B-FC39-4FAA-86C0-F59E3A3DC1B5}.Debug|x64.ActiveCfg = Debug|x64
-		{CF63093B-FC39-4FAA-86C0-F59E3A3DC1B5}.Debug|x64.Build.0 = Debug|x64
-		{CF63093B-FC39-4FAA-86C0-F59E3A3DC1B5}.Release|aarch64.ActiveCfg = Release|Win32
-		{CF63093B-FC39-4FAA-86C0-F59E3A3DC1B5}.Release|Win32.ActiveCfg = Release|Win32
-		{CF63093B-FC39-4FAA-86C0-F59E3A3DC1B5}.Release|Win32.Build.0 = Release|Win32
-		{CF63093B-FC39-4FAA-86C0-F59E3A3DC1B5}.Release|x64.ActiveCfg = Release|x64
-		{CF63093B-FC39-4FAA-86C0-F59E3A3DC1B5}.Release|x64.Build.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -537,8 +520,5 @@ Global
 		{61F7EB00-7281-4BF3-9470-7C2EA92620C3} = {57B5AA5E-C340-1823-CC51-9B17385C7423}
 		{C5ACCA6E-C04D-4B36-8516-3752B3C13C2F} = {57B5AA5E-C340-1823-CC51-9B17385C7423}
 		{0162864E-7651-4B5E-9105-C571105276EA} = {57B5AA5E-C340-1823-CC51-9B17385C7423}
-	EndGlobalSection
-	GlobalSection(ExtensibilityGlobals) = postSolution
-		SolutionGuid = {45801101-804E-47A3-A4A9-76F793F0E1AD}
 	EndGlobalSection
 EndGlobal

@@ -307,10 +307,7 @@ namespace Slang
     {
         SLANG_UNUSED(entryPointIndex);
 
-        //TODO: Implement some kind of hashInto for Val then replace this
-        auto subtypeWitness = m_subtypeWitness->toString();
-
-        builder.addToDigest(subtypeWitness);
+        m_subtypeWitness->hashInto(builder);
         builder.addToDigest(m_conformanceIdOverride);
     }
 

@@ -77,6 +77,11 @@ Type* Type::getCanonicalType()
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! OverloadGroupType !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
+void OverloadGroupType::_hashIntoOverride(DigestBuilder& builder)
+{
+    builder.addToDigest(_getHashCodeOverride());
+}
+
 void OverloadGroupType::_toTextOverride(StringBuilder& out)
 {
     out << toSlice("overload group");
@@ -99,6 +104,11 @@ HashCode OverloadGroupType::_getHashCodeOverride()
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! InitializerListType !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
+void InitializerListType::_hashIntoOverride(DigestBuilder& builder)
+{
+    builder.addToDigest(_getHashCodeOverride());
+}
+
 void InitializerListType::_toTextOverride(StringBuilder& out)
 {
     out << toSlice("initializer list");
@@ -120,6 +130,11 @@ HashCode InitializerListType::_getHashCodeOverride()
 }
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ErrorType !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+void ErrorType::_hashIntoOverride(DigestBuilder& builder)
+{
+    builder.addToDigest(_getHashCodeOverride());
+}
 
 void ErrorType::_toTextOverride(StringBuilder& out)
 {
@@ -150,6 +165,11 @@ HashCode ErrorType::_getHashCodeOverride()
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! BottomType !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
+void BottomType::_hashIntoOverride(DigestBuilder& builder)
+{
+    builder.addToDigest(_getHashCodeOverride());
+}
+
 void BottomType::_toTextOverride(StringBuilder& out) { out << toSlice("never"); }
 
 bool BottomType::_equalsImplOverride(Type* type)
@@ -170,6 +190,11 @@ Val* BottomType::_substituteImplOverride(
 HashCode BottomType::_getHashCodeOverride() { return HashCode(size_t(this)); }
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! DeclRefType !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+void DeclRefType::_hashIntoOverride(DigestBuilder& builder)
+{
+    builder.addToDigest(_getHashCodeOverride());
+}
 
 void DeclRefType::_toTextOverride(StringBuilder& out)
 {
@@ -344,6 +369,11 @@ Type* MatrixExpressionType::getRowType()
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ArrayExpressionType !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
+void ArrayExpressionType::_hashIntoOverride(DigestBuilder& builder)
+{
+    builder.addToDigest(_getHashCodeOverride());
+}
+
 bool ArrayExpressionType::_equalsImplOverride(Type* type)
 {
     auto arrType = as<ArrayExpressionType>(type);
@@ -404,6 +434,11 @@ void ArrayExpressionType::_toTextOverride(StringBuilder& out)
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! TypeType !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
+void TypeType::_hashIntoOverride(DigestBuilder& builder)
+{
+    builder.addToDigest(_getHashCodeOverride());
+}
+
 void TypeType::_toTextOverride(StringBuilder& out)
 {
     out << toSlice("typeof(") << type << toSlice(")");
@@ -431,6 +466,11 @@ HashCode TypeType::_getHashCodeOverride()
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! GenericDeclRefType !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
+void GenericDeclRefType::_hashIntoOverride(DigestBuilder& builder)
+{
+    builder.addToDigest(_getHashCodeOverride());
+}
+
 void GenericDeclRefType::_toTextOverride(StringBuilder& out)
 {
     // TODO: what is appropriate here?
@@ -457,6 +497,11 @@ Type* GenericDeclRefType::_createCanonicalTypeOverride()
 }
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! NamespaceType !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+void NamespaceType::_hashIntoOverride(DigestBuilder& builder)
+{
+    builder.addToDigest(_getHashCodeOverride());
+}
 
 void NamespaceType::_toTextOverride(StringBuilder& out)
 {
@@ -497,6 +542,11 @@ Type* OptionalType::getValueType()
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! NamedExpressionType !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
+void NamedExpressionType::_hashIntoOverride(DigestBuilder& builder)
+{
+    builder.addToDigest(_getHashCodeOverride());
+}
+
 void NamedExpressionType::_toTextOverride(StringBuilder& out)
 {
     Name* name = declRef.getName();
@@ -534,6 +584,11 @@ HashCode NamedExpressionType::_getHashCodeOverride()
 }
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! FuncType !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+void FuncType::_hashIntoOverride(DigestBuilder& builder)
+{
+    builder.addToDigest(_getHashCodeOverride());
+}
 
 ParameterDirection FuncType::getParamDirection(Index index)
 {
@@ -673,6 +728,11 @@ HashCode FuncType::_getHashCodeOverride()
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ExtractExistentialType !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
+void ExtractExistentialType::_hashIntoOverride(DigestBuilder& builder)
+{
+    builder.addToDigest(_getHashCodeOverride());
+}
+
 void ExtractExistentialType::_toTextOverride(StringBuilder& out)
 {
     out << declRef << toSlice(".This");
@@ -752,6 +812,11 @@ DeclRef<InterfaceDecl> ExtractExistentialType::getSpecializedInterfaceDeclRef()
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! TaggedUnionType !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
+void TaggedUnionType::_hashIntoOverride(DigestBuilder& builder)
+{
+    builder.addToDigest(_getHashCodeOverride());
+}
+
 void TaggedUnionType::_toTextOverride(StringBuilder& out)
 {
     out << toSlice("__TaggedUnion(");
@@ -830,6 +895,11 @@ Val* TaggedUnionType::_substituteImplOverride(ASTBuilder* astBuilder, Substituti
 }
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ExistentialSpecializedType !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+void ExistentialSpecializedType::_hashIntoOverride(DigestBuilder& builder)
+{
+    builder.addToDigest(_getHashCodeOverride());
+}
 
 void ExistentialSpecializedType::_toTextOverride(StringBuilder& out)
 {
@@ -943,6 +1013,11 @@ Val* ExistentialSpecializedType::_substituteImplOverride(ASTBuilder* astBuilder,
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ThisType !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
+void ThisType::_hashIntoOverride(DigestBuilder& builder)
+{
+    builder.addToDigest(_getHashCodeOverride());
+}
+
 void ThisType::_toTextOverride(StringBuilder& out)
 {
     out << interfaceDeclRef << toSlice(".This");
@@ -999,6 +1074,11 @@ Val* ThisType::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet s
 }
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! AndType !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+void AndType::_hashIntoOverride(DigestBuilder& builder)
+{
+    builder.addToDigest(_getHashCodeOverride());
+}
 
 void AndType::_toTextOverride(StringBuilder& out)
 {
@@ -1089,6 +1169,10 @@ Val* AndType::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet su
 
 // ModifiedType
 
+void ModifiedType::_hashIntoOverride(DigestBuilder& builder)
+{
+    builder.addToDigest(_getHashCodeOverride());
+}
 
 void ModifiedType::_toTextOverride(StringBuilder& out)
 {

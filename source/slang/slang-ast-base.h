@@ -153,6 +153,7 @@ class Val : public NodeBase
     bool _equalsValOverride(Val* val);
     void _toTextOverride(StringBuilder& out);
     HashCode _getHashCodeOverride();
+    void _hashIntoOverride(DigestBuilder& builder);
 };
 
 SLANG_FORCE_INLINE StringBuilder& operator<<(StringBuilder& io, Val* val) { SLANG_ASSERT(val); val->toText(io); return io; }

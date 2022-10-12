@@ -76,9 +76,15 @@ HashCode Val::_getHashCodeOverride()
     //return HashCode(0);
 }
 
+void Val::_hashIntoOverride(DigestBuilder& builder)
+{
+    SLANG_UNUSED(builder);
+    SLANG_UNEXPECTED("Val::_hashIntoOverride not overridden");
+}
+
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ConstantIntVal !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-void ConstantIntVal::hashInto(DigestBuilder& builder)
+void ConstantIntVal::_hashIntoOverride(DigestBuilder& builder)
 {
     builder.addToDigest(_getHashCodeOverride());
 }
@@ -102,7 +108,7 @@ HashCode ConstantIntVal::_getHashCodeOverride()
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! GenericParamIntVal !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-void GenericParamIntVal::hashInto(DigestBuilder& builder)
+void GenericParamIntVal::_hashIntoOverride(DigestBuilder& builder)
 {
     builder.addToDigest(_getHashCodeOverride());
 }
@@ -203,7 +209,7 @@ Val* GenericParamIntVal::_substituteImplOverride(ASTBuilder* /* astBuilder */, S
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ErrorIntVal !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-void ErrorIntVal::hashInto(DigestBuilder& builder)
+void ErrorIntVal::_hashIntoOverride(DigestBuilder& builder)
 {
     builder.addToDigest(_getHashCodeOverride());
 }
@@ -239,7 +245,7 @@ Val* ErrorIntVal::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSe
 
 // TODO: should really have a `type.cpp` and a `witness.cpp`
 
-void TypeEqualityWitness::hashInto(DigestBuilder& builder)
+void TypeEqualityWitness::_hashIntoOverride(DigestBuilder& builder)
 {
     builder.addToDigest(_getHashCodeOverride());
 }
@@ -272,7 +278,7 @@ HashCode TypeEqualityWitness::_getHashCodeOverride()
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! DeclaredSubtypeWitness !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-void DeclaredSubtypeWitness::hashInto(DigestBuilder& builder)
+void DeclaredSubtypeWitness::_hashIntoOverride(DigestBuilder& builder)
 {
     builder.addToDigest(_getHashCodeOverride());
 }
@@ -402,7 +408,7 @@ HashCode DeclaredSubtypeWitness::_getHashCodeOverride()
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! TransitiveSubtypeWitness !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-void TransitiveSubtypeWitness::hashInto(DigestBuilder& builder)
+void TransitiveSubtypeWitness::_hashIntoOverride(DigestBuilder& builder)
 {
     builder.addToDigest(_getHashCodeOverride());
 }
@@ -480,7 +486,7 @@ HashCode TransitiveSubtypeWitness::_getHashCodeOverride()
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ExtractExistentialSubtypeWitness !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-void ExtractExistentialSubtypeWitness::hashInto(DigestBuilder& builder)
+void ExtractExistentialSubtypeWitness::_hashIntoOverride(DigestBuilder& builder)
 {
     builder.addToDigest(_getHashCodeOverride());
 }
@@ -527,7 +533,7 @@ Val* ExtractExistentialSubtypeWitness::_substituteImplOverride(ASTBuilder* astBu
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! TaggedUnionSubtypeWitness !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-void TaggedUnionSubtypeWitness::hashInto(DigestBuilder& builder)
+void TaggedUnionSubtypeWitness::_hashIntoOverride(DigestBuilder& builder)
 {
     builder.addToDigest(_getHashCodeOverride());
 }
@@ -605,7 +611,7 @@ Val* TaggedUnionSubtypeWitness::_substituteImplOverride(ASTBuilder* astBuilder, 
 
 // ModifierVal
 
-void ModifierVal::hashInto(DigestBuilder& builder)
+void ModifierVal::_hashIntoOverride(DigestBuilder& builder)
 {
     builder.addToDigest(_getHashCodeOverride());
 }
@@ -658,7 +664,7 @@ Val* SNormModifierVal::_substituteImplOverride(ASTBuilder* astBuilder, Substitut
 
 // PolynomialIntVal
 
-void PolynomialIntVal::hashInto(DigestBuilder& builder)
+void PolynomialIntVal::_hashIntoOverride(DigestBuilder& builder)
 {
     builder.addToDigest(_getHashCodeOverride());
 }
@@ -1126,7 +1132,7 @@ IntVal* PolynomialIntVal::canonicalize(ASTBuilder* builder)
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! FuncCallIntVal !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-void FuncCallIntVal::hashInto(DigestBuilder& builder)
+void FuncCallIntVal::_hashIntoOverride(DigestBuilder& builder)
 {
     builder.addToDigest(_getHashCodeOverride());
 }
@@ -1336,7 +1342,7 @@ Val* FuncCallIntVal::_substituteImplOverride(ASTBuilder* astBuilder, Substitutio
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! WitnessLookupIntVal !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-void WitnessLookupIntVal::hashInto(DigestBuilder& builder)
+void WitnessLookupIntVal::_hashIntoOverride(DigestBuilder& builder)
 {
     builder.addToDigest(_getHashCodeOverride());
 }
