@@ -104,6 +104,12 @@ struct SerialTypeInfo<T[N]>
     static void toSerial(SerialWriter* writer, const void* inNative, void* outSerial)
     {
         SerialElementType* serial = (SerialElementType*)outSerial;
+
+        if (writer->getFlags() & SerialWriter::Flag::ZeroInitialize)
+        {
+            ::memset(outSerial, 0, sizeof(SerialElementType) * N);
+        }
+
         const T* native = (const T*)inNative;
         for (Index i = 0; i < Index(N); ++i)
         {
@@ -277,6 +283,12 @@ struct SerialTypeInfo<Dictionary<KEY, VALUE>>
         Index count = Index(src.Count());
         keys.setCount(count);
         values.setCount(count);
+
+        if (writer->getFlags() & SerialWriter::Flag::ZeroInitialize)
+        {
+            ::memset(keys.getBuffer(), 0, count * sizeof(KeySerialType));
+            ::memset(values.getBuffer(), 0, count * sizeof(ValueSerialType));
+        }
 
         Index i = 0;
         for (const auto& pair : src)

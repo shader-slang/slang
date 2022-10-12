@@ -210,10 +210,11 @@ SerialClasses::SerialClasses():
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! SerialWriter  !!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-SerialWriter::SerialWriter(SerialClasses* classes, SerialFilter* filter) :
-    m_arena(2048),
-    m_classes(classes),
-    m_filter(filter)
+SerialWriter::SerialWriter(SerialClasses* classes, SerialFilter* filter, Flags flags)
+    : m_arena(2048)
+    , m_classes(classes)
+    , m_filter(filter)
+    , m_flags(flags)
 {
     // 0 is always the null pointer
     m_entries.add(nullptr);
@@ -236,6 +237,7 @@ SerialIndex SerialWriter::writeObject(const SerialClass* serialCls, const void* 
 
     nodeEntry->typeKind = serialCls->typeKind;
     nodeEntry->subType = serialCls->subType;
+    nodeEntry->_pad0 = 0;
 
     nodeEntry->info = SerialInfo::makeEntryInfo(serialCls->alignment);
 
@@ -244,6 +246,12 @@ SerialIndex SerialWriter::writeObject(const SerialClass* serialCls, const void* 
 
     // Point to start of payload
     uint8_t* serialPayload = (uint8_t*)(nodeEntry + 1);
+
+    if (m_flags & Flag::ZeroInitialize)
+    {
+        ::memset(serialPayload, 0, serialCls->size);
+    }
+
     while (serialCls)
     {
         for (Index i = 0; i < serialCls->fieldsCount; ++i)
@@ -483,6 +491,7 @@ SlangResult SerialWriter::write(Stream* stream)
         for (Index i = 1; i < entriesCount; ++i)
         {
             SerialInfo::Entry* next = entries[i + 1];
+
             // Before writing we need to store the next alignment
 
             const size_t nextAlignment = SerialInfo::getAlignment(next->info);
