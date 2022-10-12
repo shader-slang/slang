@@ -1,8 +1,8 @@
 {
     "source" : [
-        "./bin/macosx-x64/release/libslang.dylib",
-        "./bin/macosx-x64/release/slangc", 
-        "./bin/macosx-x64/release/slangd"
+        "./bin/macosx-*/release/libslang.dylib",
+        "./bin/macosx-*/release/slangc", 
+        "./bin/macosx-*/release/slangd"
         ],
     "bundle_id" : "shader-slang.slang",
     "apple_id": {

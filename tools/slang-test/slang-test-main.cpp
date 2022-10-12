@@ -1216,16 +1216,6 @@ static SlangResult _createArtifactFromHexDump(const UnownedStringSlice& hexDump,
     return SLANG_OK;
 }
 
-static SlangResult _loadAsSharedLibrary(const UnownedStringSlice& hexDump, TemporaryFileSet& inOutTemporaryFileSet, ComPtr<ISlangSharedLibrary>& outSharedLibrary)
-{
-    ComPtr<IArtifact> artifact;
-    SLANG_RETURN_ON_FAIL(_createArtifactFromHexDump(hexDump, ArtifactDesc::make(ArtifactKind::SharedLibrary, ArtifactPayload::HostCPU, ArtifactStyle::Unknown), artifact));
-    ComPtr<ICastable> castable;
-    SLANG_RETURN_ON_FAIL(artifact->getOrCreateRepresentation(ISlangSharedLibrary::getTypeGuid(), ArtifactKeep::Yes, castable.writeRef()));
-    outSharedLibrary = as<ISlangSharedLibrary>(castable);
-    return SLANG_OK;
-}
-
 static SlangResult _executeBinary(const UnownedStringSlice& hexDump, ExecuteResult& outExeRes)
 {
     ComPtr<IArtifact> artifact;
@@ -3982,6 +3972,11 @@ static void _disableCPPBackends(TestContext* context)
     }
 }
 
+static void _disableD3D12Backend(TestContext* context)
+{
+    context->options.enabledApis &= ~(RenderApiFlag::D3D12);
+}
+
 static TestResult _asTestResult(ToolReturnCode retCode)
 {
     switch (retCode)
@@ -4220,6 +4215,11 @@ SlangResult innerMain(int argc, char** argv)
         _disableCPPBackends(&context);
 #endif
     }
+
+#if SLANG_PROCESSOR_X86
+    // Disable d3d12 tests on x86 right now since dxc for 32-bit windows doesn't seem to recognize sm_6_6.
+    _disableD3D12Backend(&context);
+#endif
 
     if (options.subCommand.getLength())
     {

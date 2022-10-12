@@ -7,35 +7,110 @@
 namespace Slang
 {
 
-/* static */NameConvention NameConventionUtil::getConvention(const UnownedStringSlice& slice)
+/* static */NameConvention NameConventionUtil::inferConventionFromText(const UnownedStringSlice& slice)
+{
+    // If no chars, or first char isn't alpha we don't know what it is
+    if (slice.getLength() <= 0 || !CharUtil::isAlpha(slice[0]))
+    {
+        return NameConvention::Invalid;
+    }
+    
+    typedef int Flags;
+    struct Flag
+    {
+        enum Enum : Flags
+        {
+            Underscore = 0x1,
+            Dash = 0x2,
+            Upper = 0x4,
+            Lower = 0x8,
+        };
+    };
+
+    Flags flags = 0;
+
+    for (const char c : slice)
+    {
+        switch (c)
+        {
+            case '-':   flags |= Flag::Dash; break;
+            case '_':   flags |= Flag::Underscore; break;
+            default:
+            {
+                if (CharUtil::isLower(c))
+                {
+                    flags |= Flag::Lower;
+                }
+                else if (CharUtil::isUpper(c))
+                {
+                    flags |= Flag::Upper;
+                }
+                else if (CharUtil::isDigit(c))
+                {
+                    // Is okay as long as not first char (which we already tested is alpha)
+                }
+                else
+                {
+                    // Don't know what this style is
+                    return NameConvention::Invalid;
+                }
+            }
+        }
+    }
+
+    // Use flags to determine what convention is used
+    switch (flags)
+    {
+        // We'll assume it's lower camel. 
+        case Flag::Lower:               return NameConvention::LowerCamel;
+        // We'll assume it's upper snake. It almost certainly isn't camel, and snake is more usual
+        // than kabab.
+        case Flag::Upper:               return NameConvention::UpperSnake;
+        case Flag::Upper | Flag::Lower:
+        {
+            // Looks like camel, choose the right case based on first char
+            return CharUtil::isUpper(slice[0]) ? NameConvention::UpperCamel : NameConvention::LowerCamel;
+        }
+        case Flag::Lower | Flag::Dash:          return NameConvention::LowerKabab;
+        case Flag::Upper | Flag::Dash:          return NameConvention::UpperKabab;
+        case Flag::Lower | Flag::Underscore:    return NameConvention::LowerSnake;
+        case Flag::Upper | Flag::Underscore:    return NameConvention::UpperSnake;
+        default: break;
+    }
+
+    // Don't know what this style is
+    return NameConvention::Invalid;
+}
+
+/* static */NameStyle NameConventionUtil::inferStyleFromText(const UnownedStringSlice& slice)
 {
     for (const char c : slice)
     {
         switch (c)
         {
-            case '-':   return NameConvention::Kabab;
-            case '_':   return NameConvention::Snake;
+            case '-':   return NameStyle::Kabab;
+            case '_':   return NameStyle::Snake;
             default: break;
         }
     }
-    return NameConvention::Camel;
+    return NameStyle::Camel;
 }
 
-/* static */void NameConventionUtil::split(NameConvention convention, const UnownedStringSlice& slice, List<UnownedStringSlice>& out)
+/* static */void NameConventionUtil::split(NameStyle style, const UnownedStringSlice& slice, List<UnownedStringSlice>& out)
 {
-    switch (convention)
+    switch (style)
     {
-        case NameConvention::Kabab:
+        case NameStyle::Kabab:
         {
             StringUtil::split(slice, '-', out);
             break;
         }
-        case NameConvention::Snake:
+        case NameStyle::Snake:
         {
             StringUtil::split(slice, '_', out);
             break;
         }
-        case NameConvention::Camel:
+        case NameStyle::Camel:
         {
             typedef CharUtil::Flags CharFlags;
             typedef CharUtil::Flag CharFlag;
@@ -87,15 +162,20 @@ namespace Slang
             }
             break;
         }
+        case NameStyle::Unknown:
+        {
+            out.add(slice);
+            break;
+        }
     }
 }
 
 void NameConventionUtil::split(const UnownedStringSlice& slice, List<UnownedStringSlice>& out)
 {
-    split(getConvention(slice), slice, out);
+    split(inferStyleFromText(slice), slice, out);
 }
 
-/* static */void NameConventionUtil::join(const UnownedStringSlice* slices, Index slicesCount, CharCase charCase, char joinChar, StringBuilder& out)
+/* static */void NameConventionUtil::join(const UnownedStringSlice* slices, Index slicesCount, NameConvention convention, char joinChar, StringBuilder& out)
 {
     if (slicesCount <= 0)
     {
@@ -111,6 +191,8 @@ void NameConventionUtil::split(const UnownedStringSlice& slice, List<UnownedStri
     char*const dstStart = out.prepareForAppend(totalSize);
     char* dst = dstStart;
 
+    const bool upper = isUpper(convention);
+
     for (Index i = 0; i < slicesCount; ++i)
     {
         const UnownedStringSlice& slice = slices[i];
@@ -122,23 +204,18 @@ void NameConventionUtil::split(const UnownedStringSlice& slice, List<UnownedStri
             *dst++ = joinChar;
         }
 
-        switch (charCase)
+        if (upper)
         {
-            case CharCase::Upper:
+            for (Index j = 0; j < count; ++j)
             {
-                for (Index j = 0; j < count; ++j)
-                {
-                    dst[j] = CharUtil::toUpper(src[j]);
-                }
-                break;
+                dst[j] = CharUtil::toUpper(src[j]);
             }
-            case CharCase::Lower:
+        }
+        else
+        {
+            for (Index j = 0; j < count; ++j)
             {
-                for (Index j = 0; j < count; ++j)
-                {
-                    dst[j] = CharUtil::toLower(src[j]);
-                }
-                break;
+                dst[j] = CharUtil::toLower(src[j]);
             }
         }
 
@@ -149,13 +226,15 @@ void NameConventionUtil::split(const UnownedStringSlice& slice, List<UnownedStri
     out.appendInPlace(dstStart, totalSize);
 }
 
-/* static */void NameConventionUtil::join(const UnownedStringSlice* slices, Index slicesCount, CharCase charCase, NameConvention convention, StringBuilder& out)
+/* static */void NameConventionUtil::join(const UnownedStringSlice* slices, Index slicesCount, NameConvention convention, StringBuilder& out)
 {
-    switch (convention)
+    const auto style = getNameStyle(convention);
+
+    switch (style)
     {
-        case NameConvention::Kabab:        return join(slices, slicesCount, charCase, '-', out);
-        case NameConvention::Snake:        return join(slices, slicesCount, charCase, '_', out);
-        case NameConvention::Camel:
+        case NameStyle::Kabab:        return join(slices, slicesCount, convention, '-', out);
+        case NameStyle::Snake:        return join(slices, slicesCount, convention, '_', out);
+        case NameStyle::Camel:
         {
             Index totalSize = 0;
 
@@ -175,7 +254,7 @@ void NameConventionUtil::split(const UnownedStringSlice& slice, List<UnownedStri
 
                 Int j = 0;
 
-                if (count > 0 && !(i == 0 && charCase == CharCase::Lower))
+                if (count > 0 && !(i == 0 && isLower(convention)))
                 {
                     // Capitalize first letter of each word, unless on first word and 'lower'
                     dst[j] = CharUtil::toUpper(src[j]);
@@ -189,24 +268,27 @@ void NameConventionUtil::split(const UnownedStringSlice& slice, List<UnownedStri
 
                 dst += count;
             }
+
+            SLANG_ASSERT(dstStart + totalSize == dst);
+            out.appendInPlace(dstStart, totalSize);
             break;
         }
     }
 }
 
-/* static */void NameConventionUtil::convert(NameConvention fromConvention, const UnownedStringSlice& slice, CharCase charCase, NameConvention toConvention, StringBuilder& out)
+/* static */void NameConventionUtil::convert(NameStyle fromStyle, const UnownedStringSlice& slice, NameConvention toConvention, StringBuilder& out)
 {
     // Split into slices
     List<UnownedStringSlice> slices;
-    split(fromConvention, slice, slices);
+    split(fromStyle, slice, slices);
 
     // Join the slices in the toConvention
-    join(slices.getBuffer(), slices.getCount(), charCase, toConvention, out);
+    join(slices.getBuffer(), slices.getCount(), toConvention, out);
 }
 
-/* static */void NameConventionUtil::convert(const UnownedStringSlice& slice, CharCase charCase, NameConvention toConvention, StringBuilder& out)
+/* static */void NameConventionUtil::convert(const UnownedStringSlice& slice, NameConvention toConvention, StringBuilder& out)
 {
-    convert(getConvention(slice), slice, charCase, toConvention, out);
+    convert(inferStyleFromText(slice), slice, toConvention, out);
 }
 
 }

@@ -64,15 +64,13 @@ struct PhiEliminationContext
     // At the top level, our pas needs to have access to the IR module, and needs
     // a builder it can use to generate code.
     //
-    CodeGenContext* m_codeGenContext = nullptr;
     IRModule* m_module = nullptr;
     SharedIRBuilder m_sharedBuilder;
     IRBuilder m_builder;
     LivenessMode m_livenessMode;
 
-    PhiEliminationContext(CodeGenContext* codeGenContext, LivenessMode livenessMode, IRModule* module)
-        : m_codeGenContext(codeGenContext)
-        , m_module(module)
+    PhiEliminationContext(LivenessMode livenessMode, IRModule* module)
+        : m_module(module)
         , m_sharedBuilder(module)
         , m_builder(m_sharedBuilder)
         , m_livenessMode(livenessMode)
@@ -809,7 +807,10 @@ struct PhiEliminationContext
             // so that any logic that might have moved another parameter
             // into a temporary will influence our result.
             //
-            m_builder.emitStore(dstParam.temp, *srcArg.currentValPtr);
+            if ((*srcArg.currentValPtr)->getOp() != kIROp_undefined)
+            {
+                m_builder.emitStore(dstParam.temp, *srcArg.currentValPtr);
+            }
 
             //
             // Once the store is emitted, the assignment has been performed,
@@ -900,10 +901,16 @@ struct PhiEliminationContext
     }
 };
 
-void eliminatePhis(CodeGenContext* codeGenContext, LivenessMode livenessMode, IRModule* module)
+void eliminatePhis(LivenessMode livenessMode, IRModule* module)
 {
-    PhiEliminationContext context(codeGenContext, livenessMode, module);
+    PhiEliminationContext context(livenessMode, module);
     context.eliminatePhisInModule();
+}
+
+void eliminatePhisInFunc(LivenessMode livenessMode, IRModule* module, IRGlobalValueWithCode* func)
+{
+    PhiEliminationContext context(livenessMode, module);
+    context.eliminatePhisInFunc(func);
 }
 
 }

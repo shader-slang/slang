@@ -1552,6 +1552,8 @@ struct IRContinue : IRUnconditionalBranch {};
 // about the loop structure:
 struct IRLoop : IRUnconditionalBranch
 {
+    IR_LEAF_ISA(loop);
+
     // The next block after the loop, which
     // is where we expect control flow to
     // re-converge, and also where a

@@ -278,6 +278,11 @@ namespace Slang
         bool                                        m_isTypeDictionaryRequired = false;
     };
 
+        /// Give a cache and a name, will remove all entries associated with a name
+        /// Might be useful/necessary if a new name is introduced
+    void removeLookupForName(TypeCheckingCache* cache, Name* name);
+
+
         /// Shared state for a semantics-checking session.
     struct SharedSemanticsContext
     {
@@ -1933,11 +1938,15 @@ namespace Slang
         template<typename T>
         T* FindOuterStmt();
 
+        Stmt* findOuterStmtWithLabel(Name* label);
+
         void visitDeclStmt(DeclStmt* stmt);
 
         void visitBlockStmt(BlockStmt* stmt);
 
         void visitSeqStmt(SeqStmt* stmt);
+
+        void visitLabelStmt(LabelStmt* stmt);
 
         void visitBreakStmt(BreakStmt *stmt);
 

@@ -167,6 +167,29 @@ newoption {
     allowed     = { { "true", "True"}, { "false", "False" } }
  }
 
+ newoption {
+    trigger     = "skip-source-generation",
+    description = "(Optional) If true will skip source generation steps.",
+    value       = "bool",
+    default     = "false",
+    allowed     = { { "true", "True"}, { "false", "False" } }
+ }
+
+ newoption {
+    trigger     = "deploy-slang-llvm",
+    description = "(Optional) If true will copy slang-llvm to output directory.",
+    value       = "bool",
+    default     = "true",
+    allowed     = { { "true", "True"}, { "false", "False" } }
+ }
+ newoption {
+    trigger     = "deploy-slang-glslang",
+    description = "(Optional) If true will copy slang-glslang to output directory.",
+    value       = "bool",
+    default     = "true",
+    allowed     = { { "true", "True"}, { "false", "False" } }
+ }
+
  buildLocation = _OPTIONS["build-location"]
  executeBinary = (_OPTIONS["execute-binary"] == "true")
  buildGlslang = (_OPTIONS["build-glslang"] == "true")
@@ -177,7 +200,9 @@ newoption {
  enableProfile = (_OPTIONS["enable-profile"] == "true")
  enableEmbedStdLib = (_OPTIONS["enable-embed-stdlib"] == "true")
  enableXlib = (_OPTIONS["enable-xlib"] == "true")
- enableExperimental = (_OPTIONS["enable-experimental-projects"] == "true")
+ skipSourceGeneration = (_OPTIONS["skip-source-generation"] == "true")
+ deployLLVM = (_OPTIONS["deploy-slang-llvm"] == "true")
+ deployGLSLang = (_OPTIONS["deploy-slang-glslang"] == "true")
  
  -- If stdlib embedding is enabled, disable stdlib source embedding by default
  disableStdlibSource = enableEmbedStdLib
@@ -247,23 +272,7 @@ newoption {
  end
  
  function getPlatforms(targetInfo)
-    if _ACTION == "xcode4" then
-        local arch = targetInfo.arch
-        local valueMap = 
-        {
-            x86_64 = "x64",
-            arm = "aarch64",
-        }
-        
-        local value = valueMap[arch:lower()]
-        if value == nil then
-            return { arch }
-        else
-            return { value }
-        end       
-    else
-        return { "x86", "x64", "aarch64" }
-    end
+    return { "x86", "x64", "aarch64" }
  end
  
  workspace "slang"
@@ -308,22 +317,25 @@ newoption {
          architecture "x64"
      filter { "platforms:x86" }
          architecture "x86"
-     filter { "platforms:aarch64"}
-         architecture "ARM"
+     filter { "platforms:aarch64" }
+         architecture "ARM64"
+     filter { "platforms:aarch64", "toolset:clang" }
+         buildoptions { "-arch arm64" }
+		 linkoptions { "-arch arm64" }
  
      filter { "toolset:clang or gcc*" }
          -- Makes all symbols hidden by default unless explicitly 'exported'
          buildoptions { "-fvisibility=hidden" } 
          -- Warnings
-         buildoptions { "-Wno-unused-but-set-variable", "-Wno-unused-parameter", "-Wno-type-limits", "-Wno-sign-compare", "-Wno-unused-variable", "-Wno-switch", "-Wno-return-type", "-Wno-unused-local-typedefs", "-Wno-parentheses", "-Wno-class-memaccess"}
- 
+         buildoptions { "-Wno-unused-but-set-variable", "-Wno-unused-parameter", "-Wno-type-limits", "-Wno-sign-compare", "-Wno-unused-variable", "-Wno-switch", "-Wno-return-type", "-Wno-unused-local-typedefs", "-Wno-parentheses" }
+     filter { "toolset:clang or gcc*", "language:C++" }
+         buildoptions { "-Wno-reorder", "-Wno-class-memaccess"}
+
      filter { "toolset:gcc*"}
          buildoptions { "-Wno-implicit-fallthrough"  }
-     filter { "toolset:gcc*", "language:C++"}
-         buildoptions { "-Wno-reorder"  }
 
      filter { "toolset:clang" }
-          buildoptions { "-Wno-deprecated-register", "-Wno-tautological-compare", "-Wno-missing-braces", "-Wno-undefined-var-template", "-Wno-unused-function", "-Wno-return-std-move", "-Wno-ignored-optimization-argument", "-Wno-unknown-warning-option", "-Wno-reorder"}
+          buildoptions { "-Wno-deprecated-register", "-Wno-tautological-compare", "-Wno-missing-braces", "-Wno-undefined-var-template", "-Wno-unused-function", "-Wno-return-std-move", "-Wno-ignored-optimization-argument", "-Wno-unknown-warning-option" }
  
      -- When compiling the debug configuration, we want to turn
      -- optimization off, make sure debug symbols are output,
@@ -344,11 +356,12 @@ newoption {
      filter { "system:linux" }
          links { "dl" }
          --
-         -- `--start-group`  - allows libraries to be listed in any order (do not require dependency order)
          -- `--no-undefined` - by default if a symbol is not found in a link it will assume it will be resolved at runtime (!)
          --                    this option ensures that all the referenced symbols exist
          --
-         linkoptions{ "-Wl,-rpath,'$$ORIGIN',--no-as-needed,--no-undefined,--start-group" }
+         linkoptions{ "-Wl,-rpath,'$$ORIGIN',--no-as-needed,--no-undefined" }
+         -- allow libraries to be listed in any order (do not require dependency order)
+         linkgroups "On"
  
  function dump(o)
      if type(o) == 'table' then
@@ -500,7 +513,8 @@ newoption {
      --
      objdir("intermediate/" .. targetName .. "/%{cfg.buildcfg:lower()}/%{prj.name}")
  
-     -- All of our projects are written in C++.
+     -- Treat C++ as the default language, projects in other languages can
+     -- override this later
      --
      language "C++"
 
@@ -1052,28 +1066,15 @@ tool "slangd"
      kind "ConsoleApp"
      links { "core", "slang" }
  
- function getWinArm64Filter(isArm64)
-     if isArm64 then
-         return { "system:windows", "platforms:aarch64" }
-     else
-         return { "system:not windows or platforms:not aarch64" }
-     end
- end
- 
- function getWinArm64BuildDir(isArm64)
-     if isArm64 then
-         return "%{wks.location}/bin/windows-x64/%{cfg.buildcfg:lower()}"
-     else
-         return "%{cfg.targetdir}"
-     end
+ function getBuildDir(isArm64)
+
+     return "%{cfg.targetdir}"
  end
  
  function astReflectGenerator(isArm64)
-     local f = getWinArm64Filter(isArm64)
-     local builddir = getWinArm64BuildDir(isArm64)
+     local builddir = getBuildDir()
  
-     table.insert(f, "files:**/slang-ast-reflect.h")
-     filter(f)
+     filter("files:**/slang-ast-reflect.h")
  
      buildmessage "C++ Extractor %{file.relpath}"
  
@@ -1122,12 +1123,10 @@ tool "slangd"
      buildinputs(buildInputTable)
  end
  
- function metaSlangGenerator(isArm64)
-     local f = getWinArm64Filter(isArm64)
-     local builddir = getWinArm64BuildDir(isArm64)
+ function metaSlangGenerator()
+     local builddir = getBuildDir()
  
-     table.insert(f, "files:**.meta.slang")
-     filter(f)
+     filter("files:**.meta.slang")
  
      -- Specify the "friendly" message that should print to the build log for the action
      buildmessage "slang-generate %{file.relpath}"
@@ -1168,12 +1167,10 @@ tool "slangd"
      buildinputs { builddir .. "/slang-generate" .. getExecutableSuffix() }
  end
  
- function preludeGenerator(isArm64)
-     local f = getWinArm64Filter(isArm64)
-     local builddir = getWinArm64BuildDir(isArm64)
+ function preludeGenerator()
+     local builddir = getBuildDir()
  
-     table.insert(f, "files:prelude/*-prelude.h")
-     filter(f)
+     filter("files:prelude/*-prelude.h")
  
      buildmessage "slang-embed %{file.relpath}"
      buildcommands { '"' .. builddir .. '/slang-embed" %{file.relpath}' }
@@ -1181,6 +1178,8 @@ tool "slangd"
      buildinputs { builddir .. "/slang-embed" .. getExecutableSuffix() }
  end
  
+ if not skipSourceGeneration then
+
  generatorProject("run-generators", nil)
  
      -- We make 'source/slang' the location of the source, to make paths to source
@@ -1214,8 +1213,7 @@ tool "slangd"
  
      -- We need to run the C++ extractor to generate some include files
      if executeBinary then
-         astReflectGenerator(true)
-         astReflectGenerator(false)
+         astReflectGenerator()
      end
  
      -- Next, we want to add a custom build rule for each of the
@@ -1225,13 +1223,8 @@ tool "slangd"
      -- defining custom build commands:
      --
      if executeBinary then
-         metaSlangGenerator(true)
-         metaSlangGenerator(false)
-     end
- 
-     if executeBinary then
-         preludeGenerator(true)
-         preludeGenerator(false)
+         metaSlangGenerator()
+         preludeGenerator()
      end
  
      filter { }
@@ -1312,18 +1305,13 @@ tool "slangd"
          filter("files:source/slang/slang-stdlib-api.cpp")
          -- Note! Has to be an absolute path else doesn't work(!)
          buildoutputs { absOutputPath }
-         local f = getWinArm64Filter(true)
-         table.insert(f, "files:source/slang/slang-stdlib-api.cpp")
-         filter(f)
-             buildinputs { getWinArm64BuildDir(true) .. '/slangc-bootstrap' .. executableSuffix }
-             buildcommands {'"' .. getWinArm64BuildDir(true) .. '/slangc-bootstrap" -archive-type riff-lz4 -save-stdlib-bin-source "%{file.directory}/slang-stdlib-generated.h"' }
-         f = getWinArm64Filter(false)
-         table.insert(f, "files:source/slang/slang-stdlib-api.cpp")
+         filter("files:source/slang/slang-stdlib-api.cpp")
+
          filter(f)
              buildinputs { "%{cfg.targetdir}/slangc-bootstrap" .. executableSuffix }
              buildcommands { '"%{cfg.targetdir}/slangc-bootstrap" -archive-type riff-lz4 -save-stdlib-bin-source "%{file.directory}/slang-stdlib-generated.h"' }
  end
- 
+ end -- not skipSourceGeneration
  
  --
  -- TODO: Slang's current `Makefile` build does some careful incantations
@@ -1360,7 +1348,9 @@ tool "slangd"
  
      if enableEmbedStdLib then
          -- We only have this dependency if we are embedding stdlib
-         dependson { "embed-stdlib-generator" }
+         if not skipSourceGeneration then
+            dependson { "embed-stdlib-generator" }
+         end
      else
          -- Disable StdLib embedding
          defines { "SLANG_WITHOUT_EMBEDDED_STD_LIB" }
@@ -1395,12 +1385,14 @@ tool "slangd"
      -- to generate. We do this by executing the run-generators 'dummy' project
      -- which produces the appropriate source
  
-     dependson { "run-generators" }
- 
+     if not skipSourceGeneration then
+        dependson { "run-generators" }
+     end
+
      -- If we have slang-llvm copy it
      local slangLLVMPath = deps:getProjectRelativePath("slang-llvm", "../../..")
      
-     if slangLLVMPath then
+     if slangLLVMPath and deployLLVM then
          filter { "system:linux or macosx or windows" }
              local sharedLibName = slangUtil.getSharedLibraryFileName(targetInfo, "slang-llvm")            
              postbuildcommands {
@@ -1412,7 +1404,7 @@ tool "slangd"
  
      -- If we are not building glslang from source, then be
      -- sure to copy a binary copy over to the output directory
-     if not buildGlslang then
+     if not buildGlslang and slangGlslangPath~=nil and deployGLSLang then
          filter { "system:linux or macosx or windows" }
              local sharedLibName = slangUtil.getSharedLibraryFileName(targetInfo, "slang-glslang")            
              postbuildcommands {
@@ -1488,6 +1480,7 @@ tool "slangd"
      pic "On"
  
      -- Add the files explicitly
+     language "C"
      files
      {
          "external/miniz/miniz.c",
@@ -1505,6 +1498,7 @@ tool "slangd"
      pic "On"
  
      -- Add the files explicitly
+     language "C"
      files
      {
          "external/lz4/lib/lz4.c",

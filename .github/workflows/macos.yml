@@ -16,7 +16,7 @@ jobs:
         configuration: ['release'] # 'debug'
         compiler: ['clang']
         platform: ['x64'] 
-        
+        targetPlatform: ['x64'] 
     steps:
     - uses: actions/checkout@v2.3.4
       with:
@@ -27,6 +27,7 @@ jobs:
         CC=${{matrix.compiler}}
         CONFIGURATION=${{matrix.configuration}}
         ARCH=${{matrix.platform}}
+        TARGETARCH=${{matrix.targetPlatform}}
         CPPFLAGS=-Werror
         CFLAGS=-Werror
         CXXFLAGS=-Werror
@@ -35,7 +36,7 @@ jobs:
       id: package
       run: |
         export SLANG_OS_NAME=macos
-        export SLANG_ARCH_NAME=`uname -p`
+        export SLANG_ARCH_NAME=${{matrix.targetPlatform}}
         export TAG_NAME=`git describe --tags`
         export SLANG_TAG=${TAG_NAME#v}
         echo "tag:$TAG_NAME"
@@ -54,12 +55,13 @@ jobs:
         echo "::set-output name=SLANG_BINARY_ARCHIVE::${SLANG_BINARY_ARCHIVE}"
     - uses: actions/upload-artifact@v3
       with:
-        name: slang-build-${{matrix.configuration}}-${{matrix.platform}}-${{matrix.compiler}}
+        name: slang-build-${{matrix.configuration}}-${{matrix.targetPlatform}}-${{matrix.compiler}}
         path: |
           ${{ steps.package.outputs.SLANG_BINARY_ARCHIVE }}
     - name: test
+      if:  ${{ matrix.targetPlatform != 'aarch64' }}
       run: 
         CONFIGURATION=${{matrix.configuration}}
         CC=${{matrix.compiler}}
-        ARCH=${{matrix.platform}}
+        ARCH=${{matrix.targetPlatform}}
         source ./github_test.sh       

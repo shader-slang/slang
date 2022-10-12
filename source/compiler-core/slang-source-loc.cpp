@@ -419,15 +419,15 @@ String SourceFile::calcVerbosePath() const
 
     if (fileSystemExt)
     {
-        String canonicalPath;
-        ComPtr<ISlangBlob> canonicalPathBlob;
-        if (SLANG_SUCCEEDED(fileSystemExt->getCanonicalPath(m_pathInfo.foundPath.getBuffer(), canonicalPathBlob.writeRef())))
+        String displayPath;
+        ComPtr<ISlangBlob> displayPathBlob;
+        if (SLANG_SUCCEEDED(fileSystemExt->getPath(PathKind::Display, m_pathInfo.foundPath.getBuffer(), displayPathBlob.writeRef())))
         {
-            canonicalPath = StringUtil::getString(canonicalPathBlob);
+            displayPath = StringUtil::getString(displayPathBlob);
         }
-        if (canonicalPath.getLength() > 0)
+        if (displayPath.getLength() > 0)
         {
-            return canonicalPath;
+            return displayPath;
         }
     }
 

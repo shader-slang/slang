@@ -19,6 +19,25 @@ ShaderObjectContainerType DebugShaderObject::getContainerType()
     return baseObject->getContainerType();
 }
 
+void DebugShaderObject::checkCompleteness()
+{
+    auto layout = baseObject->getElementTypeLayout();
+    for (Index i = 0; i < layout->getBindingRangeCount(); i++)
+    {
+        if (layout->getBindingRangeBindingCount(i) != 0)
+        {
+            if (!m_initializedBindingRanges.Contains(i))
+            {
+                auto var = layout->getBindingRangeLeafVariable(i);
+                GFX_DIAGNOSE_ERROR_FORMAT(
+                    "shader parameter '%s' is not initialized in the shader object of type '%s'.",
+                    var->getName(),
+                    m_slangType->getName());
+            }
+        }
+    }
+}
+
 slang::TypeLayoutReflection* DebugShaderObject::getElementTypeLayout()
 {
     SLANG_GFX_API_FUNC;
@@ -86,25 +105,29 @@ Result DebugShaderObject::getObject(ShaderOffset const& offset, IShaderObject** 
 Result DebugShaderObject::setObject(ShaderOffset const& offset, IShaderObject* object)
 {
     SLANG_GFX_API_FUNC;
-    auto objectImpl = static_cast<DebugShaderObject*>(object);
+    auto objectImpl = getDebugObj(object);
     m_objects[ShaderOffsetKey{offset}] = objectImpl;
-    return baseObject->setObject(offset, objectImpl->baseObject.get());
+    m_initializedBindingRanges.Add(offset.bindingRangeIndex);
+    objectImpl->checkCompleteness();
+    return baseObject->setObject(offset, getInnerObj(object));
 }
 
 Result DebugShaderObject::setResource(ShaderOffset const& offset, IResourceView* resourceView)
 {
     SLANG_GFX_API_FUNC;
-    auto viewImpl = static_cast<DebugResourceView*>(resourceView);
+    auto viewImpl = getDebugObj(resourceView);
     m_resources[ShaderOffsetKey{offset}] = viewImpl;
-    return baseObject->setResource(offset, viewImpl->baseObject.get());
+    m_initializedBindingRanges.Add(offset.bindingRangeIndex);
+    return baseObject->setResource(offset, getInnerObj(resourceView));
 }
 
 Result DebugShaderObject::setSampler(ShaderOffset const& offset, ISamplerState* sampler)
 {
     SLANG_GFX_API_FUNC;
-    auto samplerImpl = static_cast<DebugSamplerState*>(sampler);
+    auto samplerImpl = getDebugObj(sampler);
     m_samplers[ShaderOffsetKey{offset}] = samplerImpl;
-    return baseObject->setSampler(offset, samplerImpl->baseObject.get());
+    m_initializedBindingRanges.Add(offset.bindingRangeIndex);
+    return baseObject->setSampler(offset, getInnerObj(sampler));
 }
 
 Result DebugShaderObject::setCombinedTextureSampler(
@@ -113,12 +136,13 @@ Result DebugShaderObject::setCombinedTextureSampler(
     ISamplerState* sampler)
 {
     SLANG_GFX_API_FUNC;
-    auto samplerImpl = static_cast<DebugSamplerState*>(sampler);
+    auto samplerImpl = getDebugObj(sampler);
     m_samplers[ShaderOffsetKey{offset}] = samplerImpl;
-    auto viewImpl = static_cast<DebugResourceView*>(textureView);
+    auto viewImpl = getDebugObj(textureView);
     m_resources[ShaderOffsetKey{offset}] = viewImpl;
+    m_initializedBindingRanges.Add(offset.bindingRangeIndex);
     return baseObject->setCombinedTextureSampler(
-        offset, viewImpl->baseObject.get(), samplerImpl->baseObject.get());
+        offset, getInnerObj(viewImpl), getInnerObj(sampler));
 }
 
 Result DebugShaderObject::setSpecializationArgs(

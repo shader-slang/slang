@@ -251,7 +251,7 @@ Result PipelineStateImpl::createVKGraphicsPipelineState()
     auto programImpl = static_cast<ShaderProgramImpl*>(m_program.Ptr());
     if (programImpl->m_stageCreateInfos.getCount() == 0)
     {
-        SLANG_RETURN_ON_FAIL(programImpl->compileShaders());
+        SLANG_RETURN_ON_FAIL(programImpl->compileShaders(m_device));
     }
 
     pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
@@ -281,7 +281,7 @@ Result PipelineStateImpl::createVKComputePipelineState()
     auto programImpl = static_cast<ShaderProgramImpl*>(m_program.Ptr());
     if (programImpl->m_stageCreateInfos.getCount() == 0)
     {
-        SLANG_RETURN_ON_FAIL(programImpl->compileShaders());
+        SLANG_RETURN_ON_FAIL(programImpl->compileShaders(m_device));
     }
 
     VkPipelineCache pipelineCache = VK_NULL_HANDLE;
@@ -340,7 +340,7 @@ Result RayTracingPipelineStateImpl::createVKRayTracingPipelineState()
     auto programImpl = static_cast<ShaderProgramImpl*>(m_program.Ptr());
     if (programImpl->m_stageCreateInfos.getCount() == 0)
     {
-        SLANG_RETURN_ON_FAIL(programImpl->compileShaders());
+        SLANG_RETURN_ON_FAIL(programImpl->compileShaders(m_device));
     }
 
     VkRayTracingPipelineCreateInfoKHR raytracingPipelineInfo = {

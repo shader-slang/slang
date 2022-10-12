@@ -3,6 +3,11 @@
 #include "core/slang-io.h"
 #include "core/slang-token-reader.h"
 
+#include "../../source/core/slang-file-system.h"
+
+#include "../../slang.h"
+#include "../../source/slang/slang-hash-utils.h"
+
 using namespace Slang;
 
 namespace gfx
@@ -23,6 +28,7 @@ const Slang::Guid GfxGUID::IID_IResource = SLANG_UUID_IResource;
 const Slang::Guid GfxGUID::IID_IBufferResource = SLANG_UUID_IBufferResource;
 const Slang::Guid GfxGUID::IID_ITextureResource = SLANG_UUID_ITextureResource;
 const Slang::Guid GfxGUID::IID_IDevice = SLANG_UUID_IDevice;
+const Slang::Guid GfxGUID::IID_IShaderCacheStatistics = SLANG_UUID_IShaderCacheStatistics;
 const Slang::Guid GfxGUID::IID_IShaderObject = SLANG_UUID_IShaderObject;
 
 const Slang::Guid GfxGUID::IID_IRenderPassLayout = SLANG_UUID_IRenderPassLayout;
@@ -40,7 +46,7 @@ const Slang::Guid GfxGUID::IID_IAccelerationStructure = SLANG_UUID_IAcceleration
 const Slang::Guid GfxGUID::IID_IFence = SLANG_UUID_IFence;
 const Slang::Guid GfxGUID::IID_IShaderTable = SLANG_UUID_IShaderTable;
 const Slang::Guid GfxGUID::IID_IPipelineCreationAPIDispatcher = SLANG_UUID_IPipelineCreationAPIDispatcher;
-const Slang::Guid GfxGUID::IID_ID3D12TransientResourceHeap = SLANG_UUID_ID3D12TransientResourceHeap;
+const Slang::Guid GfxGUID::IID_ITransientResourceHeapD3D12 = SLANG_UUID_ITransientResourceHeapD3D12;
 
 
 StageType translateStage(SlangStage slangStage)
@@ -325,6 +331,129 @@ void PipelineStateBase::initializeBase(const PipelineStateDesc& inDesc)
     }
 }
 
+void updateCacheEntry(ISlangMutableFileSystem* fileSystem, slang::IBlob* compiledCode, String shaderFilename, slang::Digest ASTHash)
+{
+    auto hashSize = sizeof(slang::Digest);
+
+    auto bufferSize = hashSize + compiledCode->getBufferSize();
+    List<uint8_t> contents;
+    contents.setCount(bufferSize);
+    uint8_t* buffer = contents.begin();
+    memcpy(buffer, &ASTHash, hashSize);
+    memcpy(buffer + hashSize, (void*)compiledCode->getBufferPointer(), compiledCode->getBufferSize());
+    fileSystem->saveFile(shaderFilename.getBuffer(), buffer, bufferSize);
+}
+
+Result RendererBase::getEntryPointCodeFromShaderCache(
+    slang::IComponentType* program,
+    SlangInt entryPointIndex,
+    SlangInt targetIndex,
+    slang::IBlob** outCode,
+    slang::IBlob** outDiagnostics)
+{
+    // TODO: Need a way in filesystem to query both file size and file creation time, if cache size exceeds
+    // specified maximum size (in bytes or files) then delete oldest files - cache eviction policy
+
+    // Immediately call getEntryPointCode if no shader cache was provided on initialization
+    if (!shaderCacheFileSystem)
+    {
+        return program->getEntryPointCode(entryPointIndex, targetIndex, outCode, outDiagnostics);
+    }
+
+    // Produce a string which we can use to query the shader cache by combining two separate hashes which
+    // together comprise all the compilation arguments for this program.
+    ComPtr<slang::ISession> session;
+    getSlangSession(session.writeRef());
+
+    slang::Digest shaderKeyHash;
+    program->computeDependencyBasedHash(entryPointIndex, targetIndex, &shaderKeyHash);
+
+    StringBuilder shaderKey = hashToString(shaderKeyHash);
+
+    // Produce a hash using the AST for this program - This is needed to check whether a cache entry is effectively dirty,
+    // or to save along with the compiled code into an entry so the entry can be checked if fetched later on.
+    slang::Digest ASTHash;
+    program->computeASTBasedHash(&ASTHash);
+    
+    ComPtr<ISlangBlob> codeBlob;
+
+    // Query shaderCacheFileSystem for an entry whose key matches shaderFilename
+    //    - If we find it, then copy the file contents into memory and return in outCode
+    auto result = shaderCacheFileSystem->loadFile(shaderKey.getBuffer(), codeBlob.writeRef());
+    
+    if (SLANG_FAILED(result))
+    {
+        // If we didn't find it, call program->getEntryPointCode() to get and return the code. We also
+        // make sure to save a new entry in the shader cache.
+        if (SLANG_SUCCEEDED(program->getEntryPointCode(entryPointIndex, targetIndex, codeBlob.writeRef(), outDiagnostics)))
+        {
+            if (mutableShaderCacheFileSystem)
+            {
+                updateCacheEntry(mutableShaderCacheFileSystem, codeBlob, shaderKey, ASTHash);
+            }
+
+            shaderCacheMissCount++;
+        }
+        else
+        {
+            // If getEntryPointCode() failed to fetch the code, we return SLANG_FAIL along with the diagnostics output
+            // in outDiagnostics.
+            return SLANG_FAIL;
+        }
+    }
+    else
+    {
+        // If the entry exists, we need to check that the entry isn't effectively dirty. Since we stored
+        // the AST hash with the compiled code, we can determine this by comparing the stored hash with the
+        // AST hash generated earlier.
+        auto entryContents = codeBlob->getBufferPointer();
+        auto hashSize = sizeof(slang::Digest);
+        if (memcmp(ASTHash.values, entryContents, hashSize) != 0)
+        {
+            // The AST hash stored in the entry does not match the AST hash generated earlier, indicating
+            // that the shader code has changed and the entry needs to be updated.
+            if (SLANG_SUCCEEDED(program->getEntryPointCode(entryPointIndex, targetIndex, codeBlob.writeRef(), outDiagnostics)))
+            {
+                if (mutableShaderCacheFileSystem)
+                {
+                    updateCacheEntry(mutableShaderCacheFileSystem, codeBlob, shaderKey, ASTHash);
+                }
+
+                shaderCacheEntryDirtyCount++;
+            }
+            else
+            {
+                // If getEntryPointCode() failed to fetch the code, we return SLANG_FAIL along with the diagnostics output
+                // in outDiagnostics.
+                return SLANG_FAIL;
+            }
+        }
+        else
+        {
+            auto compiledCode = RawBlob::create((uint8_t*)codeBlob->getBufferPointer() + hashSize, codeBlob->getBufferSize() - hashSize);
+            codeBlob = compiledCode;
+
+            shaderCacheHitCount++;
+        }
+    }
+
+    *outCode = codeBlob.detach();
+    return SLANG_OK;
+}
+
+SlangResult RendererBase::queryInterface(SlangUUID const& uuid, void** outObject)
+{
+    if (uuid == GfxGUID::IID_IShaderCacheStatistics)
+    {
+        *outObject = static_cast<IShaderCacheStatistics*>(this);
+        addRef();
+        return SLANG_OK;
+    }
+
+    *outObject = getInterface(uuid);
+    return SLANG_OK;
+}
+
 IDevice* gfx::RendererBase::getInterface(const Guid& guid)
 {
     return (guid == GfxGUID::IID_ISlangUnknown || guid == GfxGUID::IID_IDevice)
@@ -334,6 +463,28 @@ IDevice* gfx::RendererBase::getInterface(const Guid& guid)
 
 SLANG_NO_THROW Result SLANG_MCALL RendererBase::initialize(const Desc& desc)
 {
+    // If a shader cache file system was provided, use the provided system.
+    if (desc.shaderCacheFileSystem)
+    {
+        shaderCacheFileSystem = desc.shaderCacheFileSystem;
+    }
+    if (desc.shaderCachePath)
+    {
+         // Only a path was provided, create a RelativeFileSystem using the path
+        if (!shaderCacheFileSystem)
+        {
+            shaderCacheFileSystem = OSFileSystem::getMutableSingleton();
+        }
+        shaderCacheFileSystem = new RelativeFileSystem(shaderCacheFileSystem, desc.shaderCachePath);
+    }
+
+    // If we initialized a file system for the shader cache, check if it's mutable. If so, store a pointer
+    // to the mutable version in order to save new entries later.
+    if (shaderCacheFileSystem)
+    {
+        shaderCacheFileSystem->queryInterface(ISlangMutableFileSystem::getTypeGuid(), (void**)mutableShaderCacheFileSystem.writeRef());
+    }
+
     if (desc.apiCommandDispatcher)
     {
         desc.apiCommandDispatcher->queryInterface(
@@ -664,7 +815,28 @@ Result RendererBase::getShaderObjectLayout(
     return SLANG_OK;
 }
 
+GfxCount RendererBase::getCacheMissCount()
+{
+    return shaderCacheMissCount;
+}
 
+GfxCount RendererBase::getCacheHitCount()
+{
+    return shaderCacheHitCount;
+}
+
+GfxCount RendererBase::getCacheEntryDirtyCount()
+{
+    return shaderCacheEntryDirtyCount;
+}
+
+Result RendererBase::resetCacheStatistics()
+{
+    shaderCacheMissCount = 0;
+    shaderCacheHitCount = 0;
+    shaderCacheEntryDirtyCount = 0;
+    return SLANG_OK;
+}
 
 ShaderComponentID ShaderCache::getComponentId(slang::TypeReflection* type)
 {
@@ -908,7 +1080,7 @@ void ShaderProgramBase::init(const IShaderProgram::Desc& inDesc)
     }
 }
 
-Result ShaderProgramBase::compileShaders()
+Result ShaderProgramBase::compileShaders(RendererBase* device)
 {
     // For a fully specialized program, read and store its kernel code in `shaderProgram`.
     auto compileShader = [&](slang::EntryPointReflection* entryPointInfo,
@@ -918,7 +1090,7 @@ Result ShaderProgramBase::compileShaders()
         auto stage = entryPointInfo->getStage();
         ComPtr<ISlangBlob> kernelCode;
         ComPtr<ISlangBlob> diagnostics;
-        auto compileResult = entryPointComponent->getEntryPointCode(
+        auto compileResult = device->getEntryPointCodeFromShaderCache(entryPointComponent,
             entryPointIndex, 0, kernelCode.writeRef(), diagnostics.writeRef());
         if (diagnostics)
         {

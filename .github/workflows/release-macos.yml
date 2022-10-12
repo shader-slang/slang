@@ -15,7 +15,23 @@ jobs:
         configuration: ['release'] # 'debug'
         compiler: ['clang']
         platform: ['x64'] 
+        targetPlatform: ['x64', 'aarch64'] 
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+        with:
+          submodules: 'true'
+          fetch-depth: '0'
+      - name: Build release project
+        id: build
+        run: |
+          echo "starting to build..."
+          export CC=${{matrix.compiler}}
+          export CONFIGURATION=${{matrix.configuration}}
+          export ARCH=${{matrix.platform}}
+          export TARGETARCH=${{matrix.targetPlatform}}
+          echo "building..."
+          source ./github_macos_build.sh
       - name: "Import signing certificate"
         env:
           BUILD_CERTIFICATE_BASE64: ${{ secrets.BUILD_CERTIFICATE_BASE64 }}
@@ -45,32 +61,18 @@ jobs:
           brew install mitchellh/gon/gon
           security find-identity -v
           brew install coreutils
-      - name: Checkout code
-        uses: actions/checkout@v2
-        with:
-          submodules: 'true'
-          fetch-depth: '0'
-      - name: Build release project
-        id: build
-        run: |
-          echo "starting to build..."
-          export CC=${{matrix.compiler}}
-          export CONFIGURATION=${{matrix.configuration}}
-          export ARCH=${{matrix.platform}}
-          echo "building..."
-          source ./github_macos_build.sh
       - name: Sign binaries
         env:
           IDENTITY_ID: d6ada82a113e4204aaad914e1013e9548ffd30d0
         run: |
-          /usr/bin/codesign --force --options runtime -s ${IDENTITY_ID} ./bin/macosx-x64/release/libslang.dylib -v
-          /usr/bin/codesign --force --options runtime -s ${IDENTITY_ID} ./bin/macosx-x64/release/slangd -v
-          /usr/bin/codesign --force --options runtime -s ${IDENTITY_ID} ./bin/macosx-x64/release/slangc -v
+          /usr/bin/codesign --force --options runtime -s ${IDENTITY_ID} ./bin/macosx-${{matrix.targetPlatform}}/release/libslang.dylib -v
+          /usr/bin/codesign --force --options runtime -s ${IDENTITY_ID} ./bin/macosx-${{matrix.targetPlatform}}/release/slangd -v
+          /usr/bin/codesign --force --options runtime -s ${IDENTITY_ID} ./bin/macosx-${{matrix.targetPlatform}}/release/slangc -v
       - name: Package
         id: package
         run: |
           export SLANG_OS_NAME=macos
-          export SLANG_ARCH_NAME=`uname -p`
+          export SLANG_ARCH_NAME=${{matrix.targetPlatform}}
           export TAG_NAME=`git describe --tags`
           export SLANG_TAG=${TAG_NAME#v}
           echo "tag:$TAG_NAME"
@@ -98,19 +100,20 @@ jobs:
         env:
           AC_PASSWORD: ${{secrets.APPLE_ID_PASSWORD}}
         run: |
-          cp ./bin/macosx-x64/release/libslang.dylib libslang.dylib
-          cp ./bin/macosx-x64/release/slangd slangd
-          cp ./bin/macosx-x64/release/slangc slangc
+          cp ./bin/macosx-${{matrix.targetPlatform}}/release/libslang.dylib libslang.dylib
+          cp ./bin/macosx-${{matrix.targetPlatform}}/release/slangd slangd
+          cp ./bin/macosx-${{matrix.targetPlatform}}/release/slangc slangc
           7z a slang-macos-dist.zip libslang.dylib
           7z a slang-macos-dist.zip slangd
           7z a slang-macos-dist.zip slangc
+          cp slang-macos-dist.zip slang-macos-dist-${{matrix.targetPlatform}}.zip
           timeout 1000 gon ./extras/macos-notarize.json
       - name: UploadNotarizedBinary
         if: always()
         uses: softprops/action-gh-release@v1
         with:
           files: |
-            slang-macos-dist.zip
+            slang-macos-dist-${{matrix.targetPlatform}}.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       

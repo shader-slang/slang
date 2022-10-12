@@ -170,21 +170,22 @@ namespace Slang
         bool LookAheadToken(TokenType type, int offset);
         bool LookAheadToken(const char* string, int offset);
 
-        void                                        parseSourceFile(ModuleDecl* program);
-        Decl*					ParseStruct();
-        ClassDecl*					    ParseClass();
-        Stmt*					ParseStatement();
-        Stmt*			        parseBlockStatement();
-        DeclStmt*			parseVarDeclrStatement(Modifiers modifiers);
-        IfStmt*				parseIfStatement();
-        ForStmt*				ParseForStatement();
-        WhileStmt*			ParseWhileStatement();
-        DoWhileStmt*			ParseDoWhileStatement();
-        BreakStmt*			ParseBreakStatement();
-        ContinueStmt*			ParseContinueStatement();
-        ReturnStmt*			ParseReturnStatement();
-        ExpressionStmt*		ParseExpressionStatement();
-        Expr*				ParseExpression(Precedence level = Precedence::Comma);
+        void parseSourceFile(ModuleDecl* program);
+        Decl* ParseStruct();
+        ClassDecl* ParseClass();
+        Stmt* ParseStatement();
+        Stmt* parseBlockStatement();
+        Stmt* parseLabelStatement();
+        DeclStmt* parseVarDeclrStatement(Modifiers modifiers);
+        IfStmt* parseIfStatement();
+        ForStmt* ParseForStatement();
+        WhileStmt* ParseWhileStatement();
+        DoWhileStmt* ParseDoWhileStatement();
+        BreakStmt* ParseBreakStatement();
+        ContinueStmt* ParseContinueStatement();
+        ReturnStmt* ParseReturnStatement();
+        ExpressionStmt* ParseExpressionStatement();
+        Expr* ParseExpression(Precedence level = Precedence::Comma);
 
         // Parse an expression that might be used in an initializer or argument context, so we should avoid operator-comma
         inline Expr*			ParseInitExpr() { return ParseExpression(Precedence::Assignment); }
@@ -4313,6 +4314,12 @@ namespace Slang
         }
         else if (LookAheadToken(TokenType::Identifier))
         {
+            if (LookAheadToken(TokenType::Colon, 1))
+            {
+                // An identifier followed by an ":" is a label.
+                return parseLabelStatement();
+            }
+
             // We might be looking at a local declaration, or an
             // expression statement, and we need to figure out which.
             //
@@ -4484,6 +4491,16 @@ namespace Slang
         return blockStatement;
     }
 
+    Stmt* Parser::parseLabelStatement()
+    {
+        LabelStmt* stmt = astBuilder->create<LabelStmt>();
+        FillPosition(stmt);
+        stmt->label = ReadToken(TokenType::Identifier);
+        ReadToken(TokenType::Colon);
+        stmt->innerStmt = ParseStatement();
+        return stmt;
+    }
+
     DeclStmt* Parser::parseVarDeclrStatement(
         Modifiers modifiers)
     {
@@ -4604,6 +4621,10 @@ namespace Slang
         BreakStmt* breakStatement = astBuilder->create<BreakStmt>();
         FillPosition(breakStatement);
         ReadToken("break");
+        if (LookAheadToken(TokenType::Identifier))
+        {
+            breakStatement->targetLabel = ReadToken();
+        }
         ReadToken(TokenType::Semicolon);
         return breakStatement;
     }

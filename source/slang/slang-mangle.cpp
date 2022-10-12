@@ -234,6 +234,10 @@ namespace Slang
             emitRaw(context, "t");
             emitQualifiedName(context, thisType->interfaceDeclRef);
         }
+        else if (auto errorType = dynamicCast<ErrorType>(type))
+        {
+            emitRaw(context, "E");
+        }
         else
         {
             SLANG_UNEXPECTED("unimplemented case in mangling");

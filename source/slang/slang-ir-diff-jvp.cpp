@@ -5,6 +5,7 @@
 #include "slang-ir-insts.h"
 #include "slang-ir-clone.h"
 #include "slang-ir-dce.h"
+#include "slang-ir-eliminate-phis.h"
 
 namespace Slang
 {

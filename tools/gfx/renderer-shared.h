@@ -26,6 +26,7 @@ struct GfxGUID
     static const Slang::Guid IID_ITextureResource;
     static const Slang::Guid IID_IInputLayout;
     static const Slang::Guid IID_IDevice;
+    static const Slang::Guid IID_IShaderCacheStatistics;
     static const Slang::Guid IID_IShaderObjectLayout;
     static const Slang::Guid IID_IShaderObject;
     static const Slang::Guid IID_IRenderPassLayout;
@@ -42,7 +43,7 @@ struct GfxGUID
     static const Slang::Guid IID_IFence;
     static const Slang::Guid IID_IShaderTable;
     static const Slang::Guid IID_IPipelineCreationAPIDispatcher;
-    static const Slang::Guid IID_ID3D12TransientResourceHeap;
+    static const Slang::Guid IID_ITransientResourceHeapD3D12;
 };
 
 bool isGfxDebugLayerEnabled();
@@ -857,7 +858,7 @@ public:
         return false;
     }
 
-    Slang::Result compileShaders();
+    Slang::Result compileShaders(RendererBase* device);
     virtual Slang::Result createShaderModule(
         slang::EntryPointReflection* entryPointInfo, Slang::ComPtr<ISlangBlob> kernelCode);
 
@@ -1211,11 +1212,12 @@ public:
 
 // Renderer implementation shared by all platforms.
 // Responsible for shader compilation, specialization and caching.
-class RendererBase : public IDevice, public Slang::ComObject
+class RendererBase : public IDevice, public IShaderCacheStatistics, public Slang::ComObject
 {
     friend class ShaderObjectBase;
 public:
-    SLANG_COM_OBJECT_IUNKNOWN_ALL
+    SLANG_COM_OBJECT_IUNKNOWN_ADD_REF
+    SLANG_COM_OBJECT_IUNKNOWN_RELEASE
 
     virtual SLANG_NO_THROW Result SLANG_MCALL getNativeDeviceHandles(InteropHandles* outHandles) SLANG_OVERRIDE;
     virtual SLANG_NO_THROW Result SLANG_MCALL getFeatures(
@@ -1224,6 +1226,8 @@ public:
     virtual SLANG_NO_THROW Result SLANG_MCALL
         getFormatSupportedResourceStates(Format format, ResourceStateSet* outStates) override;
     virtual SLANG_NO_THROW Result SLANG_MCALL getSlangSession(slang::ISession** outSlangSession) SLANG_OVERRIDE;
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL
+        queryInterface(SlangUUID const& uuid, void** outObject) SLANG_OVERRIDE;
     IDevice* getInterface(const Slang::Guid& guid);
 
     virtual SLANG_NO_THROW Result SLANG_MCALL createTextureFromNativeHandle(
@@ -1309,6 +1313,13 @@ public:
     // Provides a default implementation that returns SLANG_E_NOT_AVAILABLE.
     virtual SLANG_NO_THROW Result SLANG_MCALL getTextureRowAlignment(size_t* outAlignment) override;
 
+    Result getEntryPointCodeFromShaderCache(
+        slang::IComponentType* program,
+        SlangInt entryPointIndex,
+        SlangInt targetIndex,
+        slang::IBlob** outCode,
+        slang::IBlob** outDiagnostics = nullptr);
+
     Result getShaderObjectLayout(
         slang::TypeReflection*      type,
         ShaderObjectContainerType   container,
@@ -1347,8 +1358,22 @@ protected:
     Slang::List<Slang::String> m_features;
 
 public:
+    virtual SLANG_NO_THROW GfxCount SLANG_MCALL getCacheMissCount() override;
+    virtual SLANG_NO_THROW GfxCount SLANG_MCALL getCacheHitCount() override;
+    virtual SLANG_NO_THROW GfxCount SLANG_MCALL getCacheEntryDirtyCount() override;
+    virtual SLANG_NO_THROW Result SLANG_MCALL resetCacheStatistics() override;
+
+protected:
+    GfxCount shaderCacheMissCount = 0;
+    GfxCount shaderCacheHitCount = 0;
+    GfxCount shaderCacheEntryDirtyCount = 0;
+
+public:
     SlangContext slangContext;
     ShaderCache shaderCache;
+
+    ISlangFileSystem* shaderCacheFileSystem = nullptr;
+    ComPtr<ISlangMutableFileSystem> mutableShaderCacheFileSystem = nullptr;
 
     Slang::Dictionary<slang::TypeLayoutReflection*, Slang::RefPtr<ShaderObjectLayoutBase>> m_shaderObjectLayoutCache;
     Slang::ComPtr<IPipelineCreationAPIDispatcher> m_pipelineCreationAPIDispatcher;

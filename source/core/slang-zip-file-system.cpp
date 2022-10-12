@@ -10,6 +10,8 @@
 #include "slang-uint-set.h"
 #include "slang-riff.h"
 
+#include "slang-implicit-directory-collector.h"
+
 #include "../../external/miniz/miniz.h"
 #include "../../external/miniz/miniz_common.h"
 #include "../../external/miniz/miniz_tdef.h"
@@ -35,14 +37,14 @@ public:
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL getFileUniqueIdentity(const char* path, ISlangBlob** uniqueIdentityOut) SLANG_OVERRIDE;
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL calcCombinedPath(SlangPathType fromPathType, const char* fromPath, const char* path, ISlangBlob** pathOut) SLANG_OVERRIDE;
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL getPathType(const char* path, SlangPathType* pathTypeOut) SLANG_OVERRIDE;
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL getSimplifiedPath(const char* path, ISlangBlob** outSimplifiedPath) SLANG_OVERRIDE;
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL getCanonicalPath(const char* path, ISlangBlob** outCanonicalPath) SLANG_OVERRIDE;
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL getPath(PathKind pathKind, const char* path, ISlangBlob** outPath) SLANG_OVERRIDE;
     virtual SLANG_NO_THROW void SLANG_MCALL clearCache() SLANG_OVERRIDE {}
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL enumeratePathContents(const char* path, FileSystemContentsCallBack callback, void* userData) SLANG_OVERRIDE;
     virtual SLANG_NO_THROW OSPathKind SLANG_MCALL getOSPathKind() SLANG_OVERRIDE { return OSPathKind::None; }
 
     // ISlangModifyableFileSystem
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL saveFile(const char* path, const void* data, size_t size) SLANG_OVERRIDE;
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL saveFileBlob(const char* path, ISlangBlob* dataBlob) SLANG_OVERRIDE;
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL remove(const char* path) SLANG_OVERRIDE;
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL createDirectory(const char* path) SLANG_OVERRIDE;
 
@@ -416,15 +418,8 @@ SlangResult ZipFileSystemImpl::_requireMode(Mode newMode)
 
 SlangResult ZipFileSystemImpl::_getFixedPath(const char* path, String& outPath)
 {
-    String simplifiedPath = Path::simplify(UnownedStringSlice(path));
-    // Can simplify to just ., thats okay, if it otherwise has something relative it means it couldn't be simplified into the
-    // contents of the archive
-    if (simplifiedPath != "." && Path::hasRelativeElement(simplifiedPath))
-    {
-        // If it still has a relative element, then it must be 'outside' of the archive
-        return SLANG_E_NOT_FOUND;
-    }
-
+    StringBuilder simplifiedPath;
+    SLANG_RETURN_ON_FAIL(Path::simplify(path, Path::SimplifyStyle::AbsoluteOnlyAndNoRoot, simplifiedPath));
     outPath = simplifiedPath;
     return SLANG_OK;
 }
@@ -519,25 +514,50 @@ SlangResult ZipFileSystemImpl::getPathType(const char* path, SlangPathType* outP
     return SLANG_E_NOT_FOUND;
 }
 
-SlangResult ZipFileSystemImpl::getCanonicalPath(const char* path, ISlangBlob** outCanonicalPath)
+SlangResult ZipFileSystemImpl::getPath(PathKind pathKind, const char* path, ISlangBlob** outPath)
 {
-    mz_uint index;
-    SLANG_RETURN_ON_FAIL(_findEntryIndex(path, index));
-
-    mz_zip_archive_file_stat fileStat;
-    if (!mz_zip_reader_file_stat(&m_archive, index, &fileStat))
+    switch (pathKind)
     {
-        return SLANG_FAIL;
+        case PathKind::Display:
+        case PathKind::Canonical:
+        {
+            // Get the fixed path
+            String fixedPath;
+            SLANG_RETURN_ON_FAIL(_getFixedPath(path, fixedPath));
+
+            // See if we can find in the zip explicitly
+            mz_uint index;
+            if (SLANG_SUCCEEDED(_findEntryIndexFromFixedPath(fixedPath, index)))
+            {
+                mz_zip_archive_file_stat fileStat;
+                if (!mz_zip_reader_file_stat(&m_archive, index, &fileStat))
+                {
+                    return SLANG_FAIL;
+                }
+
+                // Use the path in the archive itself
+                *outPath = StringUtil::createStringBlob(fileStat.m_filename).detach();
+                return SLANG_OK;
+            }
+
+            // Else output the fixed path
+            *outPath = StringUtil::createStringBlob(fixedPath).detach();
+            return SLANG_OK;
+        }
+        case PathKind::Simplified:
+        {
+            *outPath = StringUtil::createStringBlob(Path::simplify(path)).detach();
+            return SLANG_OK;
+        }
+        default: break;
     }
 
-    // Use the path in the archive itself
-    *outCanonicalPath = StringUtil::createStringBlob(fileStat.m_filename).detach();
-    return SLANG_OK;
+    return SLANG_E_NOT_AVAILABLE;
 }
 
 SlangResult ZipFileSystemImpl::getFileUniqueIdentity(const char* path, ISlangBlob** outUniqueIdentity)
 {
-    return getCanonicalPath(path, outUniqueIdentity);
+    return getPath(PathKind::Canonical, path, outUniqueIdentity);
 }
 
 SlangResult ZipFileSystemImpl::calcCombinedPath(SlangPathType fromPathType, const char* fromPath, const char* path, ISlangBlob** pathOut)
@@ -558,12 +578,6 @@ SlangResult ZipFileSystemImpl::calcCombinedPath(SlangPathType fromPathType, cons
     }
 
     *pathOut = StringUtil::createStringBlob(relPath).detach();
-    return SLANG_OK;
-}
-
-SlangResult ZipFileSystemImpl::getSimplifiedPath(const char* path, ISlangBlob** outSimplifiedPath)
-{
-    *outSimplifiedPath = StringUtil::createStringBlob(Path::simplify(path)).detach();
     return SLANG_OK;
 }
 
@@ -617,6 +631,16 @@ SlangResult ZipFileSystemImpl::enumeratePathContents(const char* path, FileSyste
     ImplicitDirectoryCollector collector(fixedPath);
     SLANG_RETURN_ON_FAIL(_getPathContents(ImplicitDirectoryCollector::State::None, &collector));
     return collector.enumerate(callback, userData);
+}
+
+SlangResult ZipFileSystemImpl::saveFileBlob(const char* path, ISlangBlob* dataBlob)
+{
+    if (!dataBlob)
+    {
+        return SLANG_E_INVALID_ARG;
+    }
+
+    return saveFile(path, dataBlob->getBufferPointer(), dataBlob->getBufferSize());
 }
 
 SlangResult ZipFileSystemImpl::saveFile(const char* path, const void* data, size_t size)

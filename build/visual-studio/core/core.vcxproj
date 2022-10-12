@@ -9,9 +9,9 @@
       <Configuration>Debug</Configuration>
       <Platform>x64</Platform>
     </ProjectConfiguration>
-    <ProjectConfiguration Include="Debug|ARM">
+    <ProjectConfiguration Include="Debug|ARM64">
       <Configuration>Debug</Configuration>
-      <Platform>ARM</Platform>
+      <Platform>ARM64</Platform>
     </ProjectConfiguration>
     <ProjectConfiguration Include="Debug aarch64|Win32">
       <Configuration>Debug aarch64</Configuration>
@@ -21,9 +21,9 @@
       <Configuration>Debug aarch64</Configuration>
       <Platform>x64</Platform>
     </ProjectConfiguration>
-    <ProjectConfiguration Include="Debug aarch64|ARM">
+    <ProjectConfiguration Include="Debug aarch64|ARM64">
       <Configuration>Debug aarch64</Configuration>
-      <Platform>ARM</Platform>
+      <Platform>ARM64</Platform>
     </ProjectConfiguration>
     <ProjectConfiguration Include="Release|Win32">
       <Configuration>Release</Configuration>
@@ -33,9 +33,9 @@
       <Configuration>Release</Configuration>
       <Platform>x64</Platform>
     </ProjectConfiguration>
-    <ProjectConfiguration Include="Release|ARM">
+    <ProjectConfiguration Include="Release|ARM64">
       <Configuration>Release</Configuration>
-      <Platform>ARM</Platform>
+      <Platform>ARM64</Platform>
     </ProjectConfiguration>
     <ProjectConfiguration Include="Release aarch64|Win32">
       <Configuration>Release aarch64</Configuration>
@@ -45,9 +45,9 @@
       <Configuration>Release aarch64</Configuration>
       <Platform>x64</Platform>
     </ProjectConfiguration>
-    <ProjectConfiguration Include="Release aarch64|ARM">
+    <ProjectConfiguration Include="Release aarch64|ARM64">
       <Configuration>Release aarch64</Configuration>
-      <Platform>ARM</Platform>
+      <Platform>ARM64</Platform>
     </ProjectConfiguration>
   </ItemGroup>
   <PropertyGroup Label="Globals">
@@ -69,12 +69,12 @@
     <CharacterSet>Unicode</CharacterSet>
     <PlatformToolset>v142</PlatformToolset>
   </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug aarch64|ARM'" Label="Configuration">
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug aarch64|ARM64'" Label="Configuration">
     <ConfigurationType>StaticLibrary</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
     <CharacterSet>Unicode</CharacterSet>
     <PlatformToolset>v142</PlatformToolset>
-    <WindowsSDKDesktopARMSupport>true</WindowsSDKDesktopARMSupport>
+    <WindowsSDKDesktopARM64Support>true</WindowsSDKDesktopARM64Support>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
     <ConfigurationType>StaticLibrary</ConfigurationType>
@@ -88,12 +88,12 @@
     <CharacterSet>Unicode</CharacterSet>
     <PlatformToolset>v142</PlatformToolset>
   </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release aarch64|ARM'" Label="Configuration">
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release aarch64|ARM64'" Label="Configuration">
     <ConfigurationType>StaticLibrary</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
     <CharacterSet>Unicode</CharacterSet>
     <PlatformToolset>v142</PlatformToolset>
-    <WindowsSDKDesktopARMSupport>true</WindowsSDKDesktopARMSupport>
+    <WindowsSDKDesktopARM64Support>true</WindowsSDKDesktopARM64Support>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <ImportGroup Label="ExtensionSettings">
@@ -104,7 +104,7 @@
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
-  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug aarch64|ARM'">
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug aarch64|ARM64'">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -113,7 +113,7 @@
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
-  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release aarch64|ARM'">
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release aarch64|ARM64'">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
@@ -129,7 +129,7 @@
     <TargetName>core</TargetName>
     <TargetExt>.lib</TargetExt>
   </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug aarch64|ARM'">
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug aarch64|ARM64'">
     <OutDir>..\..\..\bin\windows-aarch64\debug\</OutDir>
     <IntDir>..\..\..\intermediate\windows-aarch64\debug\core\</IntDir>
     <TargetName>core</TargetName>
@@ -147,7 +147,7 @@
     <TargetName>core</TargetName>
     <TargetExt>.lib</TargetExt>
   </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release aarch64|ARM'">
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release aarch64|ARM64'">
     <OutDir>..\..\..\bin\windows-aarch64\release\</OutDir>
     <IntDir>..\..\..\intermediate\windows-aarch64\release\core\</IntDir>
     <TargetName>core</TargetName>
@@ -181,7 +181,7 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
     </Link>
   </ItemDefinitionGroup>
-  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug aarch64|ARM'">
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug aarch64|ARM64'">
     <ClCompile>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <WarningLevel>Level4</WarningLevel>
@@ -231,7 +231,7 @@
       <OptimizeReferences>true</OptimizeReferences>
     </Link>
   </ItemDefinitionGroup>
-  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release aarch64|ARM'">
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release aarch64|ARM64'">
     <ClCompile>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <WarningLevel>Level4</WarningLevel>
@@ -270,6 +270,7 @@
     <ClInclude Include="..\..\..\source\core\slang-deflate-compression-system.h" />
     <ClInclude Include="..\..\..\source\core\slang-destroyable.h" />
     <ClInclude Include="..\..\..\source\core\slang-dictionary.h" />
+    <ClInclude Include="..\..\..\source\core\slang-digest.h" />
     <ClInclude Include="..\..\..\source\core\slang-exception.h" />
     <ClInclude Include="..\..\..\source\core\slang-file-system.h" />
     <ClInclude Include="..\..\..\source\core\slang-free-list.h" />
@@ -277,13 +278,16 @@
     <ClInclude Include="..\..\..\source\core\slang-hash.h" />
     <ClInclude Include="..\..\..\source\core\slang-hex-dump-util.h" />
     <ClInclude Include="..\..\..\source\core\slang-http.h" />
+    <ClInclude Include="..\..\..\source\core\slang-implicit-directory-collector.h" />
     <ClInclude Include="..\..\..\source\core\slang-io.h" />
     <ClInclude Include="..\..\..\source\core\slang-lazy-castable-list.h" />
     <ClInclude Include="..\..\..\source\core\slang-linked-list.h" />
     <ClInclude Include="..\..\..\source\core\slang-list.h" />
     <ClInclude Include="..\..\..\source\core\slang-lz4-compression-system.h" />
     <ClInclude Include="..\..\..\source\core\slang-math.h" />
+    <ClInclude Include="..\..\..\source\core\slang-md5.h" />
     <ClInclude Include="..\..\..\source\core\slang-memory-arena.h" />
+    <ClInclude Include="..\..\..\source\core\slang-memory-file-system.h" />
     <ClInclude Include="..\..\..\source\core\slang-offset-container.h" />
     <ClInclude Include="..\..\..\source\core\slang-platform.h" />
     <ClInclude Include="..\..\..\source\core\slang-process-util.h" />
@@ -304,6 +308,7 @@
     <ClInclude Include="..\..\..\source\core\slang-std-writers.h" />
     <ClInclude Include="..\..\..\source\core\slang-stream.h" />
     <ClInclude Include="..\..\..\source\core\slang-string-escape-util.h" />
+    <ClInclude Include="..\..\..\source\core\slang-string-slice-index-map.h" />
     <ClInclude Include="..\..\..\source\core\slang-string-slice-pool.h" />
     <ClInclude Include="..\..\..\source\core\slang-string-util.h" />
     <ClInclude Include="..\..\..\source\core\slang-string.h" />
@@ -332,10 +337,13 @@
     <ClCompile Include="..\..\..\source\core\slang-free-list.cpp" />
     <ClCompile Include="..\..\..\source\core\slang-hex-dump-util.cpp" />
     <ClCompile Include="..\..\..\source\core\slang-http.cpp" />
+    <ClCompile Include="..\..\..\source\core\slang-implicit-directory-collector.cpp" />
     <ClCompile Include="..\..\..\source\core\slang-io.cpp" />
     <ClCompile Include="..\..\..\source\core\slang-lazy-castable-list.cpp" />
     <ClCompile Include="..\..\..\source\core\slang-lz4-compression-system.cpp" />
+    <ClCompile Include="..\..\..\source\core\slang-md5.cpp" />
     <ClCompile Include="..\..\..\source\core\slang-memory-arena.cpp" />
+    <ClCompile Include="..\..\..\source\core\slang-memory-file-system.cpp" />
     <ClCompile Include="..\..\..\source\core\slang-offset-container.cpp" />
     <ClCompile Include="..\..\..\source\core\slang-platform.cpp" />
     <ClCompile Include="..\..\..\source\core\slang-process-util.cpp" />
@@ -351,6 +359,7 @@
     <ClCompile Include="..\..\..\source\core\slang-std-writers.cpp" />
     <ClCompile Include="..\..\..\source\core\slang-stream.cpp" />
     <ClCompile Include="..\..\..\source\core\slang-string-escape-util.cpp" />
+    <ClCompile Include="..\..\..\source\core\slang-string-slice-index-map.cpp" />
     <ClCompile Include="..\..\..\source\core\slang-string-slice-pool.cpp" />
     <ClCompile Include="..\..\..\source\core\slang-string-util.cpp" />
     <ClCompile Include="..\..\..\source\core\slang-string.cpp" />

@@ -33,6 +33,28 @@ using namespace Slang;
 
 static const uint32_t D3D_FEATURE_LEVEL_12_2 = 0xc200;
 
+struct ShaderModelInfo
+{
+    D3D_SHADER_MODEL shaderModel;
+    SlangCompileTarget compileTarget;
+    const char* profileName;
+};
+static ShaderModelInfo kKnownShaderModels[] = {
+#define SHADER_MODEL_INFO_DXBC(major, minor) {D3D_SHADER_MODEL_##major##_##minor, SLANG_DXBC, "sm_" #major "_" #minor }
+    SHADER_MODEL_INFO_DXBC(5, 1),
+#undef SHADER_MODEL_INFO_DXBC
+#define SHADER_MODEL_INFO_DXIL(major, minor) {(D3D_SHADER_MODEL)0x##major##minor, SLANG_DXIL, "sm_" #major "_" #minor }
+    SHADER_MODEL_INFO_DXIL(6, 0),
+    SHADER_MODEL_INFO_DXIL(6, 1),
+    SHADER_MODEL_INFO_DXIL(6, 2),
+    SHADER_MODEL_INFO_DXIL(6, 3),
+    SHADER_MODEL_INFO_DXIL(6, 4),
+    SHADER_MODEL_INFO_DXIL(6, 5),
+    SHADER_MODEL_INFO_DXIL(6, 6),
+    SHADER_MODEL_INFO_DXIL(6, 7)
+#undef SHADER_MODEL_INFO_DXIL
+};
+
 Result DeviceImpl::createBuffer(
     const D3D12_RESOURCE_DESC& resourceDesc,
     const void* srcData,
@@ -376,14 +398,29 @@ Result DeviceImpl::initialize(const Desc& desc)
 {
     SLANG_RETURN_ON_FAIL(RendererBase::initialize(desc));
 
+    // Rather than statically link against D3D, we load it dynamically.
+
+    HMODULE d3dModule = LoadLibraryA("d3d12.dll");
+    if (!d3dModule)
+    {
+        getDebugCallback()->handleMessage(
+            DebugMessageType::Error, DebugMessageSource::Layer, "error: failed load 'd3d12.dll'\n");
+        return SLANG_FAIL;
+    }
+
     // Find extended desc.
     for (GfxIndex i = 0; i < desc.extendedDescCount; i++)
     {
         StructType stype;
         memcpy(&stype, desc.extendedDescs[i], sizeof(stype));
-        if (stype == StructType::D3D12ExtendedDesc)
+        switch (stype )
         {
+        case StructType::D3D12DeviceExtendedDesc:
             memcpy(&m_extendedDesc, desc.extendedDescs[i], sizeof(m_extendedDesc));
+            break;
+        case StructType::D3D12ExperimentalFeaturesDesc:
+            processExperimentalFeaturesDesc(d3dModule, desc.extendedDescs[i]);
+            break;
         }
     }
 
@@ -399,15 +436,6 @@ Result DeviceImpl::initialize(const Desc& desc)
         m_info.apiName = "Direct3D 12";
         static const float kIdentity[] = { 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1 };
         ::memcpy(m_info.identityProjectionMatrix, kIdentity, sizeof(kIdentity));
-    }
-
-    // Rather than statically link against D3D, we load it dynamically.
-
-    HMODULE d3dModule = LoadLibraryA("d3d12.dll");
-    if (!d3dModule)
-    {
-        fprintf(stderr, "error: failed load 'd3d12.dll'\n");
-        return SLANG_FAIL;
     }
 
     // Get all the dll entry points
@@ -434,30 +462,31 @@ Result DeviceImpl::initialize(const Desc& desc)
             (PFN_EndEventOnCommandList)GetProcAddress(pixModule, "PIXEndEventOnCommandList");
     }
 
-#if ENABLE_DEBUG_LAYER
-    m_D3D12GetDebugInterface =
-        (PFN_D3D12_GET_DEBUG_INTERFACE)loadProc(d3dModule, "D3D12GetDebugInterface");
-    if (m_D3D12GetDebugInterface)
+    if (ENABLE_DEBUG_LAYER || isGfxDebugLayerEnabled())
     {
-        if (SLANG_SUCCEEDED(m_D3D12GetDebugInterface(IID_PPV_ARGS(m_dxDebug.writeRef()))))
+        m_D3D12GetDebugInterface =
+            (PFN_D3D12_GET_DEBUG_INTERFACE)loadProc(d3dModule, "D3D12GetDebugInterface");
+        if (m_D3D12GetDebugInterface)
         {
-#    if 0
-            // Can enable for extra validation. NOTE! That d3d12 warns if you do.... 
-            // D3D12 MESSAGE : Device Debug Layer Startup Options : GPU - Based Validation is enabled(disabled by default).
-            // This results in new validation not possible during API calls on the CPU, by creating patched shaders that have validation
-            // added directly to the shader. However, it can slow things down a lot, especially for applications with numerous
-            // PSOs.Time to see the first render frame may take several minutes.
-            // [INITIALIZATION MESSAGE #1016: CREATEDEVICE_DEBUG_LAYER_STARTUP_OPTIONS]
-
-            ComPtr<ID3D12Debug1> debug1;
-            if (SLANG_SUCCEEDED(m_dxDebug->QueryInterface(debug1.writeRef())))
+            if (SLANG_SUCCEEDED(m_D3D12GetDebugInterface(IID_PPV_ARGS(m_dxDebug.writeRef()))))
             {
-                debug1->SetEnableGPUBasedValidation(true);
-            }
+#    if 0
+                // Can enable for extra validation. NOTE! That d3d12 warns if you do.... 
+                // D3D12 MESSAGE : Device Debug Layer Startup Options : GPU - Based Validation is enabled(disabled by default).
+                // This results in new validation not possible during API calls on the CPU, by creating patched shaders that have validation
+                // added directly to the shader. However, it can slow things down a lot, especially for applications with numerous
+                // PSOs.Time to see the first render frame may take several minutes.
+                // [INITIALIZATION MESSAGE #1016: CREATEDEVICE_DEBUG_LAYER_STARTUP_OPTIONS]
+
+                ComPtr<ID3D12Debug1> debug1;
+                if (SLANG_SUCCEEDED(m_dxDebug->QueryInterface(debug1.writeRef())))
+                {
+                    debug1->SetEnableGPUBasedValidation(true);
+                }
 #    endif
+            }
         }
     }
-#endif
 
     m_D3D12CreateDevice = (PFN_D3D12_CREATE_DEVICE)loadProc(d3dModule, "D3D12CreateDevice");
     if (!m_D3D12CreateDevice)
@@ -572,7 +601,10 @@ Result DeviceImpl::initialize(const Desc& desc)
     }
 
     D3D12_FEATURE_DATA_SHADER_MODEL shaderModelData = {};
-    shaderModelData.HighestShaderModel = D3D_SHADER_MODEL_6_6;
+    if (m_extendedDesc.highestShaderModel != 0)
+        shaderModelData.HighestShaderModel = (D3D_SHADER_MODEL)m_extendedDesc.highestShaderModel;
+    else
+        shaderModelData.HighestShaderModel = kKnownShaderModels[SLANG_COUNT_OF(kKnownShaderModels)-1].shaderModel;
 
     // Find what features are supported
     {
@@ -621,6 +653,16 @@ Result DeviceImpl::initialize(const Desc& desc)
                 {
                     m_features.add("rasterizer-ordered-views");
                 }
+            }
+        }
+        {
+            D3D12_FEATURE_DATA_D3D12_OPTIONS1 options;
+            if (SLANG_SUCCEEDED(m_device->CheckFeatureSupport(
+                D3D12_FEATURE_D3D12_OPTIONS1, &options, sizeof(options))))
+            {
+                // Check wave operations support
+                if (options.WaveOps)
+                    m_features.add("wave-ops");
             }
         }
         {
@@ -727,42 +769,19 @@ Result DeviceImpl::initialize(const Desc& desc)
     // Check shader model version.
     SlangCompileTarget compileTarget = SLANG_DXBC;
     const char* profileName = "sm_5_1";
-    switch (shaderModelData.HighestShaderModel)
+    for (auto& sm : kKnownShaderModels)
     {
-    case D3D_SHADER_MODEL_5_1:
-        compileTarget = SLANG_DXBC;
-        profileName = "sm_5_1";
-        break;
-    case D3D_SHADER_MODEL_6_0:
-        compileTarget = SLANG_DXIL;
-        profileName = "sm_6_0";
-        break;
-    case D3D_SHADER_MODEL_6_1:
-        compileTarget = SLANG_DXIL;
-        profileName = "sm_6_1";
-        break;
-    case D3D_SHADER_MODEL_6_2:
-        compileTarget = SLANG_DXIL;
-        profileName = "sm_6_2";
-        break;
-    case D3D_SHADER_MODEL_6_3:
-        compileTarget = SLANG_DXIL;
-        profileName = "sm_6_3";
-        break;
-    case D3D_SHADER_MODEL_6_4:
-        compileTarget = SLANG_DXIL;
-        profileName = "sm_6_4";
-        break;
-    case D3D_SHADER_MODEL_6_5:
-        compileTarget = SLANG_DXIL;
-        profileName = "sm_6_5";
-        break;
-    default:
-        compileTarget = SLANG_DXIL;
-        profileName = "sm_6_6";
-        break;
+        if (sm.shaderModel <= shaderModelData.HighestShaderModel)
+        {
+            m_features.add(sm.profileName);
+            profileName = sm.profileName;
+            compileTarget = sm.compileTarget;
+        }
+        else
+        {
+            break;
+        }
     }
-    m_features.add(profileName);
     // If user specified a higher shader model than what the system supports, return failure.
     int userSpecifiedShaderModel = D3DUtil::getShaderModelFromProfileName(desc.slang.targetProfile);
     if (userSpecifiedShaderModel > shaderModelData.HighestShaderModel)
@@ -1905,6 +1924,39 @@ void DeviceImpl::submitResourceCommandsAndWait(const DeviceImpl::ResourceCommand
     m_resourceCommandQueue->executeCommandBuffer(info.commandBuffer);
     m_resourceCommandTransientHeap->finish();
     m_resourceCommandTransientHeap->synchronizeAndReset();
+}
+
+void DeviceImpl::processExperimentalFeaturesDesc(void* d3dModule, void* inDesc)
+{
+    typedef HRESULT(WINAPI* PFN_D3D12_ENABLE_EXPERIMENTAL_FEATURES)(
+        UINT      NumFeatures,
+        const IID* pIIDs,
+        void* pConfigurationStructs,
+        UINT* pConfigurationStructSizes
+        );
+
+    D3D12ExperimentalFeaturesDesc desc = {};
+    memcpy(&desc, inDesc, sizeof(desc));
+    auto enableExperimentalFeaturesFunc =
+        (PFN_D3D12_ENABLE_EXPERIMENTAL_FEATURES)loadProc((HMODULE)d3dModule, "D3D12EnableExperimentalFeatures");
+    if (!enableExperimentalFeaturesFunc)
+    {
+        getDebugCallback()->handleMessage(
+            gfx::DebugMessageType::Warning,
+            gfx::DebugMessageSource::Layer,
+            "cannot enable D3D12 experimental features, 'D3D12EnableExperimentalFeatures' function "
+            "not found.");
+        return;
+    }
+    if (!SLANG_SUCCEEDED(enableExperimentalFeaturesFunc(desc.numFeatures, (IID*)desc.featureIIDs, desc.configurationStructs, desc.configurationStructSizes)))
+    {
+        getDebugCallback()->handleMessage(
+            gfx::DebugMessageType::Warning,
+            gfx::DebugMessageSource::Layer,
+            "cannot enable D3D12 experimental features, 'D3D12EnableExperimentalFeatures' call "
+            "failed.");
+        return;
+    }
 }
 
 Result DeviceImpl::createQueryPool(const IQueryPool::Desc& desc, IQueryPool** outState)

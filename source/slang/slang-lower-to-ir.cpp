@@ -4508,6 +4508,11 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         SLANG_UNEXPECTED("`case` or `default` not under `switch`");
     }
 
+    void visitLabelStmt(LabelStmt* stmt)
+    {
+        lowerStmt(context, stmt->innerStmt);
+    }
+
     void visitCompileTimeForStmt(CompileTimeForStmt* stmt)
     {
         // The user is asking us to emit code for the loop
