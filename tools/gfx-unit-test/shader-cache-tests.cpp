@@ -557,9 +557,9 @@ namespace gfx_test
             submitGPUWork();
 
             device->queryInterface(SLANG_UUID_IShaderCacheStatistics, (void**)shaderCacheStats.writeRef());
-            SLANG_CHECK(shaderCacheStats->getCacheMissCount() == 1);
+            SLANG_CHECK(shaderCacheStats->getCacheMissCount() == 0);
             SLANG_CHECK(shaderCacheStats->getCacheHitCount() == 0);
-            SLANG_CHECK(shaderCacheStats->getCacheEntryDirtyCount() == 0);
+            SLANG_CHECK(shaderCacheStats->getCacheEntryDirtyCount() == 1);
 
             generateNewDevice();
             createRequiredResources();

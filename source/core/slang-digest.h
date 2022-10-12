@@ -7,9 +7,7 @@ namespace Slang
     // Wrapper struct that holds objects necessary for hashing.
     struct DigestBuilder
     {
-        MD5HashGen hashGen;
-        MD5Context context;
-
+    public:
         DigestBuilder()
         {
             hashGen.init(&context);
@@ -25,5 +23,9 @@ namespace Slang
         {
             hashGen.finalize(&context, outHash);
         }
+
+    private:
+        MD5HashGen hashGen;
+        MD5Context context;
     };
 }

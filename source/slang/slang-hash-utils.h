@@ -3,34 +3,31 @@
 #include "../../slang.h"
 #include "../core/slang-basic.h"
 #include "../core/slang-md5.h"
+#include "../core/slang-digest.h"
 
 namespace Slang
 {
     // Compute the hash for an UnownedStringSlice
     inline slang::Digest computeHashForStringSlice(UnownedStringSlice text)
     {
-        MD5Context context;
-        MD5HashGen hashGen;
-        hashGen.init(&context);
-        hashGen.update(&context, text);
+        DigestBuilder builder;
+        builder.addToDigest(text);
 
         slang::Digest textHash;
-        hashGen.finalize(&context, &textHash);
+        builder.finalize(&textHash);
 
         return textHash;
     }
 
-    // Combines the two provided hashes to produce the final shader cache entry key.
-    inline slang::Digest combineHashes(const slang::Digest& linkageHash, const slang::Digest& programHash)
+    // Combines the two provided hashes.
+    inline slang::Digest combineHashes(const slang::Digest& hashA, const slang::Digest& hashB)
     {
-        MD5Context context;
-        MD5HashGen hashGen;
-        hashGen.init(&context);
-        hashGen.update(&context, linkageHash);
-        hashGen.update(&context, programHash);
+        DigestBuilder builder;
+        builder.addToDigest(hashA);
+        builder.addToDigest(hashB);
 
         slang::Digest combined;
-        hashGen.finalize(&context, &combined);
+        builder.finalize(&combined);
         return combined;
     }
 
