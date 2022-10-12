@@ -260,12 +260,6 @@ SlangResult OSFileSystem::createDirectory(const char* path)
     return Path::createDirectory(path);
 }
 
-OSDirectoryFileSystem::OSDirectoryFileSystem(FileSystemStyle style, const char* rootDir)
-{
-    m_style = style;
-    m_rootDir = rootDir;
-}
-
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! CacheFileSystem !!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 /* static */ const Result CacheFileSystem::s_compressedResultToResult[] = 
