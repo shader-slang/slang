@@ -104,6 +104,7 @@ PROFILE_VERSION(DX_6_3,             DX)
 PROFILE_VERSION(DX_6_4,             DX)
 PROFILE_VERSION(DX_6_5,             DX)
 PROFILE_VERSION(DX_6_6,             DX)
+PROFILE_VERSION(DX_6_7,             DX)
 
 PROFILE_VERSION(GLSL_110,           GLSL)
 PROFILE_VERSION(GLSL_120,           GLSL)
@@ -210,6 +211,7 @@ PROFILE(DX_Lib_6_3,              lib_6_3,             Unknown, DX_6_3)
 PROFILE(DX_Lib_6_4,              lib_6_4,             Unknown, DX_6_4)
 PROFILE(DX_Lib_6_5,              lib_6_5,             Unknown, DX_6_5)
 PROFILE(DX_Lib_6_6,              lib_6_6,             Unknown, DX_6_6)
+PROFILE(DX_Lib_6_7,              lib_6_7,             Unknown, DX_6_7)
 
 PROFILE_ALIAS(DX_None_6_1,  DX_Lib_6_1,     sm_6_1)
 PROFILE_ALIAS(DX_None_6_2,  DX_Lib_6_2,     sm_6_2)
@@ -217,6 +219,8 @@ PROFILE_ALIAS(DX_None_6_3,  DX_Lib_6_3,     sm_6_3)
 PROFILE_ALIAS(DX_None_6_4,  DX_Lib_6_4,     sm_6_4)
 PROFILE_ALIAS(DX_None_6_5,  DX_Lib_6_5,     sm_6_5)
 PROFILE_ALIAS(DX_None_6_6,  DX_Lib_6_6,     sm_6_6)
+PROFILE_ALIAS(DX_None_6_7,  DX_Lib_6_7,     sm_6_7)
+
 
 // Define all the GLSL profiles
 
