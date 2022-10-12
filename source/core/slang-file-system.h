@@ -75,16 +75,6 @@ private:
     static OSFileSystem g_mutable;
 };
 
-class OSDirectoryFileSystem : public OSFileSystem, public RefObject
-{
-public:
-    OSDirectoryFileSystem(FileSystemStyle style, const char* rootDir);
-
-private:
-    FileSystemStyle m_style;
-    const char* m_rootDir;
-};
-
 /* Wraps an underlying ISlangFileSystem or ISlangFileSystemExt and provides caching, 
 as well as emulation of methods if only has ISlangFileSystem interface. Will query capabilities
 of the interface on the constructor.
