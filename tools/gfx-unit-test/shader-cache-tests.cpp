@@ -574,6 +574,121 @@ namespace gfx_test
         }
     };
 
+    // One shader featuring multiple kinds of shader objects that can be bound.
+    struct SpecializationArgsEntries : BaseShaderCacheTest
+    {
+        slang::ProgramLayout* slangReflection;
+
+        void createAddTransformer(IShaderObject** transformer)
+        {
+            slang::TypeReflection* addTransformerType =
+                slangReflection->findTypeByName("AddTransformer");
+            GFX_CHECK_CALL_ABORT(device->createShaderObject(
+                addTransformerType, ShaderObjectContainerType::None, transformer));
+
+            float c = 1.0f;
+            ShaderCursor(*transformer).getPath("c").setData(&c, sizeof(float));
+        }
+
+        void createMulTransformer(IShaderObject** transformer)
+        {
+            slang::TypeReflection* mulTransformerType =
+                slangReflection->findTypeByName("MulTransformer");
+            GFX_CHECK_CALL_ABORT(device->createShaderObject(
+                mulTransformerType, ShaderObjectContainerType::None, transformer));
+
+            float c = 1.0f;
+            ShaderCursor(*transformer).getPath("c").setData(&c, sizeof(float));
+        }
+
+        void submitGPUWork(GfxIndex transformerType)
+        {
+            Slang::ComPtr<ITransientResourceHeap> transientHeap;
+            ITransientResourceHeap::Desc transientHeapDesc = {};
+            transientHeapDesc.constantBufferSize = 4096;
+            GFX_CHECK_CALL_ABORT(
+                device->createTransientResourceHeap(transientHeapDesc, transientHeap.writeRef()));
+
+            ICommandQueue::Desc queueDesc = { ICommandQueue::QueueType::Graphics };
+            auto queue = device->createCommandQueue(queueDesc);
+
+            auto commandBuffer = transientHeap->createCommandBuffer();
+            auto encoder = commandBuffer->encodeComputeCommands();
+
+            auto rootObject = encoder->bindPipeline(pipelineState);
+
+            ComPtr<IShaderObject> transformer;
+            switch (transformerType)
+            {
+            case 0:
+                createAddTransformer(transformer.writeRef());
+                break;
+            case 1:
+                createMulTransformer(transformer.writeRef());
+                break;
+            default:
+                /* Should not get here */
+                SLANG_IGNORE_TEST;
+            }
+
+            ShaderCursor entryPointCursor(rootObject->getEntryPoint(0));
+            entryPointCursor.getPath("buffer").setResource(bufferView);
+
+            entryPointCursor.getPath("transformer").setObject(transformer);
+
+            encoder->dispatchCompute(1, 1, 1);
+            encoder->endEncoding();
+            commandBuffer->close();
+            queue->executeCommandBuffer(commandBuffer);
+            queue->waitOnHost();
+        }
+
+        void generateNewPipelineState()
+        {
+            ComPtr<IShaderProgram> shaderProgram;
+
+            GFX_CHECK_CALL_ABORT(loadComputeProgram(device, shaderProgram, "compute-smoke", "computeMain", slangReflection));
+
+            ComputePipelineStateDesc pipelineDesc = {};
+            pipelineDesc.program = shaderProgram.get();
+            GFX_CHECK_CALL_ABORT(
+                device->createComputePipelineState(pipelineDesc, pipelineState.writeRef()));
+        }
+
+        void run()
+        {
+            ComPtr<IShaderCacheStatistics> shaderCacheStats;
+
+            // Due to needing a workaround to prevent loading old, outdated modules, we need to
+            // recreate the device between each segment of the test. However, we need to maintain the
+            // same cache filesystem for the duration of the test, so the device is immediately recreated
+            // to ensure we can pass the filesystem all the way through.
+            //
+            // TODO: Remove the repeated generateNewDevice() and createRequiredResources() calls once
+            // a solution exists that allows source code changes under the same module name to be picked
+            // up on load.
+            generateNewDevice();
+            createRequiredResources();
+            generateNewPipelineState();
+            submitGPUWork(0);
+
+            device->queryInterface(SLANG_UUID_IShaderCacheStatistics, (void**)shaderCacheStats.writeRef());
+            SLANG_CHECK(shaderCacheStats->getCacheMissCount() == 1);
+            SLANG_CHECK(shaderCacheStats->getCacheHitCount() == 0);
+            SLANG_CHECK(shaderCacheStats->getCacheEntryDirtyCount() == 0);
+
+            generateNewDevice();
+            createRequiredResources();
+            generateNewPipelineState();
+            submitGPUWork(1);
+
+            device->queryInterface(SLANG_UUID_IShaderCacheStatistics, (void**)shaderCacheStats.writeRef());
+            SLANG_CHECK(shaderCacheStats->getCacheMissCount() == 1);
+            SLANG_CHECK(shaderCacheStats->getCacheHitCount() == 0);
+            SLANG_CHECK(shaderCacheStats->getCacheEntryDirtyCount() == 0);
+        }
+    };
+
     template <typename T>
     void shaderCacheTestImpl(ComPtr<IDevice> device, UnitTestContext* context)
     {
@@ -620,5 +735,15 @@ namespace gfx_test
     SLANG_UNIT_TEST(shaderFileImportsShaderCacheVulkan)
     {
         runTestImpl(shaderCacheTestImpl<ShaderFileImportsShaderCache>, unitTestContext, Slang::RenderApiFlag::Vulkan);
+    }
+
+    SLANG_UNIT_TEST(specializationArgsShaderCacheD3D12)
+    {
+        runTestImpl(shaderCacheTestImpl<SpecializationArgsEntries>, unitTestContext, Slang::RenderApiFlag::D3D12);
+    }
+
+    SLANG_UNIT_TEST(specializationArgsShaderCacheVulkan)
+    {
+        runTestImpl(shaderCacheTestImpl<SpecializationArgsEntries>, unitTestContext, Slang::RenderApiFlag::Vulkan);
     }
 }

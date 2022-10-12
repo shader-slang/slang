@@ -2,6 +2,8 @@
 #include "slang-md5.h"
 #include "../../slang.h"
 
+using slang::Digest;
+
 namespace Slang
 {
     // Wrapper struct that holds objects necessary for hashing.
@@ -19,9 +21,11 @@ namespace Slang
             hashGen.update(&context, item);
         }
 
-        void finalize(slang::Digest* outHash)
+        Digest finalize()
         {
-            hashGen.finalize(&context, outHash);
+            Digest hash;
+            hashGen.finalize(&context, &hash);
+            return hash;
         }
 
     private:
