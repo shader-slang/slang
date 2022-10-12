@@ -295,6 +295,7 @@
     <ClCompile Include="..\..\..\tools\gfx-unit-test\root-mutable-shader-object.cpp" />
     <ClCompile Include="..\..\..\tools\gfx-unit-test\root-shader-parameter.cpp" />
     <ClCompile Include="..\..\..\tools\gfx-unit-test\sampler-array.cpp" />
+    <ClCompile Include="..\..\..\tools\gfx-unit-test\shader-cache-tests.cpp" />
     <ClCompile Include="..\..\..\tools\gfx-unit-test\shared-buffers-tests.cpp" />
     <ClCompile Include="..\..\..\tools\gfx-unit-test\shared-textures-tests.cpp" />
     <ClCompile Include="..\..\..\tools\gfx-unit-test\swap-chain-resize-test.cpp" />
@@ -307,12 +308,19 @@
     <None Include="..\..\..\tools\gfx-unit-test\compute-trivial.slang" />
     <None Include="..\..\..\tools\gfx-unit-test\format-test-shaders.slang" />
     <None Include="..\..\..\tools\gfx-unit-test\graphics-smoke.slang" />
+    <None Include="..\..\..\tools\gfx-unit-test\imported.slang" />
+    <None Include="..\..\..\tools\gfx-unit-test\importing-shader-cache-shader.slang" />
+    <None Include="..\..\..\tools\gfx-unit-test\multiple-entry-point-shader-cache-shader.slang" />
     <None Include="..\..\..\tools\gfx-unit-test\mutable-shader-object.slang" />
     <None Include="..\..\..\tools\gfx-unit-test\nested-parameter-block.slang" />
     <None Include="..\..\..\tools\gfx-unit-test\ray-tracing-test-shaders.slang" />
     <None Include="..\..\..\tools\gfx-unit-test\resolve-resource-shader.slang" />
     <None Include="..\..\..\tools\gfx-unit-test\root-shader-parameter.slang" />
     <None Include="..\..\..\tools\gfx-unit-test\sampler-array.slang" />
+    <None Include="..\..\..\tools\gfx-unit-test\shader-cache-shader-A.slang" />
+    <None Include="..\..\..\tools\gfx-unit-test\shader-cache-shader-B.slang" />
+    <None Include="..\..\..\tools\gfx-unit-test\shader-cache-shader-C.slang" />
+    <None Include="..\..\..\tools\gfx-unit-test\shader-cache-shader.slang" />
     <None Include="..\..\..\tools\gfx-unit-test\swapchain-shader.slang" />
     <None Include="..\..\..\tools\gfx-unit-test\trivial-copy-textures.slang" />
     <None Include="..\..\..\tools\gfx-unit-test\trivial-copy.slang" />

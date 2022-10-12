@@ -54,6 +54,13 @@ namespace gfx_test
             diagnosticsBlob.writeRef());
         diagnoseIfNeeded(diagnosticsBlob);
         SLANG_RETURN_ON_FAIL(result);
+
+        ComPtr<slang::IComponentType> linkedProgram;
+        result = composedProgram->link(linkedProgram.writeRef(), diagnosticsBlob.writeRef());
+        diagnoseIfNeeded(diagnosticsBlob);
+        SLANG_RETURN_ON_FAIL(result);
+
+        composedProgram = linkedProgram;
         slangReflection = composedProgram->getLayout();
 
         gfx::IShaderProgram::Desc programDesc = {};
@@ -169,7 +176,7 @@ namespace gfx_test
         compareComputeResultFuzzy(result, expectedResult, expectedBufferSize);
     }
 
-    Slang::ComPtr<gfx::IDevice> createTestingDevice(UnitTestContext* context, Slang::RenderApiFlag::Enum api)
+    Slang::ComPtr<gfx::IDevice> createTestingDevice(UnitTestContext* context, Slang::RenderApiFlag::Enum api, ISlangMutableFileSystem* fileSystem)
     {
         Slang::ComPtr<gfx::IDevice> device;
         gfx::IDevice::Desc deviceDesc = {};
@@ -207,6 +214,11 @@ namespace gfx_test
         deviceDesc.extendedDescCount = 1;
         void* extDescPtr = &extDesc;
         deviceDesc.extendedDescs = &extDescPtr;
+
+        if (fileSystem)
+        {
+            deviceDesc.shaderCacheFileSystem = fileSystem;
+        }
 
         auto createDeviceResult = gfxCreateDevice(&deviceDesc, device.writeRef());
         if (SLANG_FAILED(createDeviceResult))

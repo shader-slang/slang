@@ -1733,6 +1733,8 @@ struct DeviceDesc
     void *apiCommandDispatcher = nullptr;
     // The slot (typically UAV) used to identify NVAPI intrinsics. If >=0 NVAPI is required.
     GfxIndex nvapiExtnSlot = -1;
+    // The root directory for the shader cache.
+    NativeString shaderCachePath;
     // The file system for loading cached shader kernels. The layer does not maintain a strong reference to the object,
     // instead the user is responsible for holding the object alive during the lifetime of an `IDevice`.
     void *shaderCacheFileSystem = nullptr;
