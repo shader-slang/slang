@@ -662,6 +662,14 @@ GLSLSystemValueInfo* getGLSLSystemValueInfo(
         requiredType = builder->getBasicType(BaseType::Int);
         name = "gl_VertexIndex";
     }
+    else if (semanticName == "sv_viewid")
+    {
+        // uint in hlsl, int in glsl
+        // https://github.com/KhronosGroup/GLSL/blob/master/extensions/ext/GL_EXT_multiview.txt
+        requiredType = builder->getBasicType(BaseType::Int);
+        context->requireGLSLExtension(UnownedStringSlice::fromLiteral("GL_EXT_multiview"));
+        name = "gl_ViewIndex";
+    }
     else if (semanticName == "sv_viewportarrayindex")
     {
         // uint on hlsl, int on glsl
