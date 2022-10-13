@@ -145,16 +145,11 @@ class Val : public NodeBase
         return equalsVal(const_cast<Val*>(&v));
     }
 
-    // Hash this value into the provided hash builder.
-    // TODO: Refine implementation of _hashIntoOverride for all subtypes
-    void hashInto(DigestBuilder& builder);
-
     // Overrides should be public so base classes can access
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
     bool _equalsValOverride(Val* val);
     void _toTextOverride(StringBuilder& out);
     HashCode _getHashCodeOverride();
-    void _hashIntoOverride(DigestBuilder& builder);
 };
 
 SLANG_FORCE_INLINE StringBuilder& operator<<(StringBuilder& io, Val* val) { SLANG_ASSERT(val); val->toText(io); return io; }

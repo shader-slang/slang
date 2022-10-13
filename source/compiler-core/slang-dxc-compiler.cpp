@@ -14,6 +14,8 @@
 #include "../core/slang-semantic-version.h"
 #include "../core/slang-char-util.h"
 
+#include "../core/slang-digest.h"
+
 #include "slang-include-system.h"
 #include "slang-source-loc.h"
 
@@ -180,6 +182,8 @@ protected:
     DxcCreateInstanceProc m_createInstance = nullptr;
 
     ComPtr<ISlangSharedLibrary> m_sharedLibrary;
+
+    slang::Digest dllContentsHash;
 };
 
 SlangResult DXCDownstreamCompiler::init(ISlangSharedLibrary* library)
@@ -192,7 +196,16 @@ SlangResult DXCDownstreamCompiler::init(ISlangSharedLibrary* library)
         return SLANG_FAIL;
     }
 
-    m_desc = Desc(SLANG_PASS_THROUGH_DXC); 
+    m_desc = Desc(SLANG_PASS_THROUGH_DXC);
+
+    auto filename = Slang::SharedLibraryUtils::getSharedLibraryFileName(m_createInstance);
+    ScopedAllocation alloc;
+    SLANG_RETURN_ON_FAIL(Slang::File::readAllBytes(filename, alloc));
+    ISlangBlob* dllContents = RawBlob::moveCreate(alloc).detach();
+
+    DigestBuilder builder;
+    builder.addToDigest(dllContents);
+    builder.finalize(&dllContentsHash);
 
     return SLANG_OK;
 }
@@ -575,16 +588,9 @@ SlangResult DXCDownstreamCompiler::convert(IArtifact* from, const ArtifactDesc& 
 
 SlangResult DXCDownstreamCompiler::getVersionString(slang::IBlob** outVersionString)
 {
-    if (m_desc.hasVersion())
-    {
-        auto version = m_desc.getVersionValue();
-        ComPtr<slang::IBlob> versionBlob = Slang::StringUtil::createStringBlob(Slang::String(version));
-        *outVersionString = versionBlob.detach();
-        return SLANG_OK;
-    }
-
-    *outVersionString = nullptr;
-    return SLANG_FAIL;
+    auto dllHashBlob = RawBlob::create(dllContentsHash.values, sizeof(dllContentsHash.values));
+    *outVersionString = dllHashBlob.detach();
+    return SLANG_OK;
 }
 
 /* static */SlangResult DXCDownstreamCompilerUtil::locateCompilers(const String& path, ISlangSharedLibraryLoader* loader, DownstreamCompilerSet* set)

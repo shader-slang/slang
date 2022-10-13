@@ -14,6 +14,8 @@
 #include "../core/slang-semantic-version.h"
 #include "../core/slang-char-util.h"
 
+#include "../core/slang-digest.h"
+
 #include "slang-artifact-associated-impl.h"
 #include "slang-artifact-desc-util.h"
 
@@ -61,7 +63,9 @@ protected:
     glslang_CompileFunc_1_0 m_compile_1_0 = nullptr; 
     glslang_CompileFunc_1_1 m_compile_1_1 = nullptr; 
     
-    ComPtr<ISlangSharedLibrary> m_sharedLibrary;  
+    ComPtr<ISlangSharedLibrary> m_sharedLibrary;
+
+    slang::Digest dllContentsHash;
 };
 
 SlangResult GlslangDownstreamCompiler::init(ISlangSharedLibrary* library)
@@ -78,6 +82,28 @@ SlangResult GlslangDownstreamCompiler::init(ISlangSharedLibrary* library)
 
     // It's not clear how to query for a version, but we can get a version number from the header
     m_desc = Desc(SLANG_PASS_THROUGH_GLSLANG);
+
+    Slang::String filename;
+    if (m_compile_1_1)
+    {
+        filename = Slang::SharedLibraryUtils::getSharedLibraryFileName(m_compile_1_1);
+    }
+    else if (m_compile_1_0)
+    {
+        filename = Slang::SharedLibraryUtils::getSharedLibraryFileName(m_compile_1_0);
+    }
+    else
+    {
+        return SLANG_FAIL;
+    }
+
+    ScopedAllocation alloc;
+    SLANG_RETURN_ON_FAIL(Slang::File::readAllBytes(filename, alloc));
+    ISlangBlob* dllContents = RawBlob::moveCreate(alloc).detach();
+
+    DigestBuilder builder;
+    builder.addToDigest(dllContents);
+    builder.finalize(&dllContentsHash);
 
     return SLANG_OK;
 }
@@ -280,16 +306,9 @@ SlangResult GlslangDownstreamCompiler::convert(IArtifact* from, const ArtifactDe
 
 SlangResult GlslangDownstreamCompiler::getVersionString(slang::IBlob** outVersionString)
 {
-    if (m_desc.hasVersion())
-    {
-        auto version = m_desc.getVersionValue();
-        ComPtr<slang::IBlob> versionBlob = Slang::StringUtil::createStringBlob(Slang::String(version));
-        *outVersionString = versionBlob.detach();
-        return SLANG_OK;
-    }
-
-    *outVersionString = nullptr;
-    return SLANG_FAIL;
+    auto dllHashBlob = RawBlob::create(dllContentsHash.values, sizeof(dllContentsHash.values));
+    *outVersionString = dllHashBlob.detach();
+    return SLANG_OK;
 }
 
 /* static */SlangResult GlslangDownstreamCompilerUtil::locateCompilers(const String& path, ISlangSharedLibraryLoader* loader, DownstreamCompilerSet* set)
