@@ -198,14 +198,14 @@ SlangResult DXCDownstreamCompiler::init(ISlangSharedLibrary* library)
 
     m_desc = Desc(SLANG_PASS_THROUGH_DXC);
 
-    auto filename = Slang::SharedLibraryUtils::getSharedLibraryFileName(m_createInstance);
+    auto filename = Slang::SharedLibraryUtils::getSharedLibraryFileName((void*)m_createInstance);
     ScopedAllocation alloc;
     SLANG_RETURN_ON_FAIL(Slang::File::readAllBytes(filename, alloc));
     ISlangBlob* dllContents = RawBlob::moveCreate(alloc).detach();
 
     DigestBuilder builder;
     builder.addToDigest(dllContents);
-    builder.finalize(&dllContentsHash);
+    dllContentsHash = builder.finalize();
 
     return SLANG_OK;
 }

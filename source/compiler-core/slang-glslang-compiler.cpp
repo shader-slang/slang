@@ -86,11 +86,11 @@ SlangResult GlslangDownstreamCompiler::init(ISlangSharedLibrary* library)
     Slang::String filename;
     if (m_compile_1_1)
     {
-        filename = Slang::SharedLibraryUtils::getSharedLibraryFileName(m_compile_1_1);
+        filename = Slang::SharedLibraryUtils::getSharedLibraryFileName((void*)m_compile_1_1);
     }
     else if (m_compile_1_0)
     {
-        filename = Slang::SharedLibraryUtils::getSharedLibraryFileName(m_compile_1_0);
+        filename = Slang::SharedLibraryUtils::getSharedLibraryFileName((void*)m_compile_1_0);
     }
     else
     {
@@ -103,7 +103,7 @@ SlangResult GlslangDownstreamCompiler::init(ISlangSharedLibrary* library)
 
     DigestBuilder builder;
     builder.addToDigest(dllContents);
-    builder.finalize(&dllContentsHash);
+    dllContentsHash = builder.finalize();
 
     return SLANG_OK;
 }
