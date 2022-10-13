@@ -584,24 +584,11 @@ SlangResult DXCDownstreamCompiler::getVersionString(slang::IBlob** outVersionStr
     ComPtr<IDxcVersionInfo> versionInfo;
     if (SLANG_SUCCEEDED(dxcCompiler->QueryInterface(versionInfo.writeRef())))
     {
-        uint32_t flags;
-        versionInfo->GetFlags(&flags);
-        if (flags && DxcVersionInfoFlags_Internal)
-        {
-            ComPtr<IDxcVersionInfo2> versionInfo2;
-            if (SLANG_SUCCEEDED(dxcCompiler->QueryInterface(versionInfo2.writeRef())))
-            {
-                char* commitHash;
-                uint32_t unused;
-                versionInfo2->GetCommitInfo(&unused, &commitHash);
-
-                version = RawBlob::create(commitHash, sizeof(commitHash));
-                CoTaskMemFree(commitHash);
-                *outVersionString = version.detach();
-                return SLANG_OK;
-            }
-        }
-        else
+        // Because the major/minor version alone does not necessarily capture different releases
+        // of the DX compiler, we also need to query for the commit hash. If we are unable to
+        // obtain the commit hash, then we return the shared library timestamp instead.
+        ComPtr<IDxcVersionInfo2> versionInfo2;
+        if (SLANG_SUCCEEDED(dxcCompiler->QueryInterface(versionInfo2.writeRef())))
         {
             uint32_t major;
             uint32_t minor;
@@ -611,6 +598,14 @@ SlangResult DXCDownstreamCompiler::getVersionString(slang::IBlob** outVersionStr
             versionString.append(major);
             versionString.append(".");
             versionString.append(minor);
+
+            char* commitHash;
+            uint32_t unused;
+            versionInfo2->GetCommitInfo(&unused, &commitHash);
+
+            versionString.append(commitHash);
+            CoTaskMemFree(commitHash);
+
             version = StringBlob::create(versionString.getBuffer());
             *outVersionString = version.detach();
             return SLANG_OK;
