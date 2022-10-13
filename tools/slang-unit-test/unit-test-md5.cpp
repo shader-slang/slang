@@ -24,7 +24,7 @@ SLANG_UNIT_TEST(md5hash)
         testHashGen.finalize(&testCtx, &testA);
 
         String testAString = hashToString(testA);
-        SLANG_CHECK(testAString.equals(String("E271A15BD2BD98081390630579266F74")));
+        SLANG_CHECK(testAString.equals(String("5BA171E20898BDD205639013746F2679")));
     }
 
     {
@@ -44,7 +44,7 @@ SLANG_UNIT_TEST(md5hash)
         testHashGen.finalize(&testCtx, &testB);
 
         String testBString = hashToString(testB);
-        SLANG_CHECK(testBString.equals(String("8AD852437539AA78D60CF70BA5CA7BF2")));
+        SLANG_CHECK(testBString.equals(String("4352D88A78AA39750BF70CD6F27BCAA5")));
     }
 
     {
@@ -60,7 +60,7 @@ SLANG_UNIT_TEST(md5hash)
         testHashGen.finalize(&testCtx, &testC);
 
         String testCString = hashToString(testC);
-        SLANG_CHECK(testCString.equals(String("8EC56C5DDFA424183957CFD01633605B")));
+        SLANG_CHECK(testCString.equals(String("5D6CC58E1824A4DFD0CF57395B603316")));
     }
 
     {
@@ -76,7 +76,7 @@ SLANG_UNIT_TEST(md5hash)
         testHashGen.finalize(&testCtx, &testD);
 
         String testDString = hashToString(testD);
-        SLANG_CHECK(testDString.equals(String("CC795ADF40C7702106A5F01C24CEB0CE")));
+        SLANG_CHECK(testDString.equals(String("DF5A79CC2170C7401CF0A506CEB0CE24")));
     }
 
     {
@@ -92,6 +92,6 @@ SLANG_UNIT_TEST(md5hash)
         testHashGen.finalize(&testCtx, &testE);
 
         String testEString = hashToString(testE);
-        SLANG_CHECK(testEString.equals(String("3613E74ABFF94BE42E75D279A5184823")));
+        SLANG_CHECK(testEString.equals(String("4AE71336E44BF9BF79D2752E234818A5")));
     }
 }
