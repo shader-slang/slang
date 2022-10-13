@@ -20,7 +20,7 @@ struct EliminateMultiLevelBreakContext
         IRInst* headerInst;
         List<IRBlock*> blocks;
         HashSet<IRBlock*> blockSet;
-        List<RefPtr<BreakableRegionInfo>> childLoops;
+        List<RefPtr<BreakableRegionInfo>> childRegions;
         IRBlock* getBreakBlock()
         {
             switch (headerInst->getOp())
@@ -38,7 +38,7 @@ struct EliminateMultiLevelBreakContext
         void forEach(const Func& f)
         {
             f(this);
-            for (auto child : childLoops)
+            for (auto child : childRegions)
                 child->forEach(f);
         }
     };
@@ -86,7 +86,7 @@ struct EliminateMultiLevelBreakContext
                         childRegion->parent = &info;
                         childRegion->level = info.level + 1;
                         collectBreakableRegionBlocks(*childRegion);
-                        info.childLoops.add(childRegion);
+                        info.childRegions.add(childRegion);
                         block = childRegion->getBreakBlock();
                         if (info.blockSet.Add(block))
                         {
@@ -137,11 +137,11 @@ struct EliminateMultiLevelBreakContext
             for (auto& l : regions)
             {
                 l->forEach(
-                    [&](BreakableRegionInfo* loop)
+                    [&](BreakableRegionInfo* region)
                     {
-                        mapBreakBlockToRegion.Add(loop->getBreakBlock(), loop);
-                        for (auto block : loop->blocks)
-                            mapBlockToRegion.Add(block, loop);
+                        mapBreakBlockToRegion.Add(region->getBreakBlock(), region);
+                        for (auto block : region->blocks)
+                            mapBlockToRegion.Add(block, region);
                     });
             }
 
@@ -223,7 +223,7 @@ struct EliminateMultiLevelBreakContext
 
         // Rewrite skipped-over break blocks to accept a target level argument.
         builder.setInsertInto(func);
-        OrderedDictionary<IRBlock*, int> mapNewBreakBlockToLoopLevel;
+        OrderedDictionary<IRBlock*, int> mapNewBreakBlockToRegionLevel;
         for (auto skippedRegion : skippedOverRegions)
         {
             auto breakBlock = skippedRegion->getBreakBlock();
@@ -243,7 +243,7 @@ struct EliminateMultiLevelBreakContext
             newBreakBlock->insertBefore(breakBlock);
             newBreakBodyBlock->insertAfter(breakBlock);
             jumpToOuterBlock->insertAfter(newBreakBlock);
-            mapNewBreakBlockToLoopLevel[newBreakBlock] = skippedRegion->level;
+            mapNewBreakBlockToRegionLevel[newBreakBlock] = skippedRegion->level;
             breakBlock->replaceUsesWith(newBreakBlock);
             builder.setInsertInto(newBreakBlock);
             auto targetLevelParam = builder.emitParam(builder.getIntType());
@@ -265,7 +265,7 @@ struct EliminateMultiLevelBreakContext
         // Once we have rewritten regions' break blocks with additional targetLevel parameter, all
         // original branches into that block without a parameter will now need to provide a default
         // value equal to the level of its corresponding region.
-        for (auto breakBlockKV : mapNewBreakBlockToLoopLevel)
+        for (auto breakBlockKV : mapNewBreakBlockToRegionLevel)
         {
             auto breakBlock = breakBlockKV.Key;
             auto level = breakBlockKV.Value;
