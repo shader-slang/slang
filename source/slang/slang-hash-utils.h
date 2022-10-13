@@ -35,8 +35,7 @@ namespace Slang
         {
             auto hashSegmentString = String(uint8Hash[i], 16);
 
-            auto leadingZeroCount = 2 - hashSegmentString.getLength();
-            for (Index j = 0; j < leadingZeroCount; ++j)
+            if (hashSegmentString.getLength() == 1)
             {
                 filename.append("0");
             }

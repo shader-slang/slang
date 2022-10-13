@@ -64,8 +64,6 @@ protected:
     glslang_CompileFunc_1_1 m_compile_1_1 = nullptr; 
     
     ComPtr<ISlangSharedLibrary> m_sharedLibrary;
-
-    slang::Digest dllContentsHash;
 };
 
 SlangResult GlslangDownstreamCompiler::init(ISlangSharedLibrary* library)
@@ -96,14 +94,6 @@ SlangResult GlslangDownstreamCompiler::init(ISlangSharedLibrary* library)
     {
         return SLANG_FAIL;
     }
-
-    ScopedAllocation alloc;
-    SLANG_RETURN_ON_FAIL(Slang::File::readAllBytes(filename, alloc));
-    ISlangBlob* dllContents = RawBlob::moveCreate(alloc).detach();
-
-    DigestBuilder builder;
-    builder.addToDigest(dllContents);
-    dllContentsHash = builder.finalize();
 
     return SLANG_OK;
 }
@@ -306,8 +296,23 @@ SlangResult GlslangDownstreamCompiler::convert(IArtifact* from, const ArtifactDe
 
 SlangResult GlslangDownstreamCompiler::getVersionString(slang::IBlob** outVersionString)
 {
-    auto dllHashBlob = RawBlob::create(dllContentsHash.values, sizeof(dllContentsHash.values));
-    *outVersionString = dllHashBlob.detach();
+    uint64_t timestamp;
+    if (m_compile_1_1)
+    {
+        timestamp = SharedLibraryUtils::getSharedLibraryTimestamp(m_compile_1_1);
+    }
+    else if (m_compile_1_0)
+    {
+        timestamp = SharedLibraryUtils::getSharedLibraryTimestamp(m_compile_1_0);
+    }
+    else
+    {
+        return SLANG_FAIL;
+    }
+    
+    auto timestampString = String(timestamp);
+    ComPtr<ISlangBlob> version = RawBlob::create(timestampString.getBuffer(), timestampString.getLength());
+    *outVersionString = version.detach();
     return SLANG_OK;
 }
 

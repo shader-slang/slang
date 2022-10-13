@@ -182,8 +182,6 @@ protected:
     DxcCreateInstanceProc m_createInstance = nullptr;
 
     ComPtr<ISlangSharedLibrary> m_sharedLibrary;
-
-    slang::Digest dllContentsHash;
 };
 
 SlangResult DXCDownstreamCompiler::init(ISlangSharedLibrary* library)
@@ -197,15 +195,6 @@ SlangResult DXCDownstreamCompiler::init(ISlangSharedLibrary* library)
     }
 
     m_desc = Desc(SLANG_PASS_THROUGH_DXC);
-
-    auto filename = Slang::SharedLibraryUtils::getSharedLibraryFileName((void*)m_createInstance);
-    ScopedAllocation alloc;
-    SLANG_RETURN_ON_FAIL(Slang::File::readAllBytes(filename, alloc));
-    ISlangBlob* dllContents = RawBlob::moveCreate(alloc).detach();
-
-    DigestBuilder builder;
-    builder.addToDigest(dllContents);
-    dllContentsHash = builder.finalize();
 
     return SLANG_OK;
 }
@@ -588,8 +577,52 @@ SlangResult DXCDownstreamCompiler::convert(IArtifact* from, const ArtifactDesc& 
 
 SlangResult DXCDownstreamCompiler::getVersionString(slang::IBlob** outVersionString)
 {
-    auto dllHashBlob = RawBlob::create(dllContentsHash.values, sizeof(dllContentsHash.values));
-    *outVersionString = dllHashBlob.detach();
+    ComPtr<IDxcCompiler> dxcCompiler;
+    SLANG_RETURN_ON_FAIL(m_createInstance(CLSID_DxcCompiler, __uuidof(dxcCompiler), (LPVOID*)dxcCompiler.writeRef()));
+
+    ComPtr<ISlangBlob> version;
+    ComPtr<IDxcVersionInfo> versionInfo;
+    if (SLANG_SUCCEEDED(dxcCompiler->QueryInterface(versionInfo.writeRef())))
+    {
+        uint32_t flags;
+        versionInfo->GetFlags(&flags);
+        if (flags && DxcVersionInfoFlags_Internal)
+        {
+            ComPtr<IDxcVersionInfo2> versionInfo2;
+            if (SLANG_SUCCEEDED(dxcCompiler->QueryInterface(versionInfo2.writeRef())))
+            {
+                char* commitHash;
+                uint32_t unused;
+                versionInfo2->GetCommitInfo(&unused, &commitHash);
+
+                version = RawBlob::create(commitHash, sizeof(commitHash));
+                CoTaskMemFree(commitHash);
+                *outVersionString = version.detach();
+                return SLANG_OK;
+            }
+        }
+        else
+        {
+            uint32_t major;
+            uint32_t minor;
+            versionInfo->GetVersion(&major, &minor);
+
+            StringBuilder versionString;
+            versionString.append(major);
+            versionString.append(".");
+            versionString.append(minor);
+            version = RawBlob::create(versionString.getBuffer(), versionString.getLength());
+            *outVersionString = version.detach();
+            return SLANG_OK;
+        }
+    }
+
+    // If either of the QueryInterface calls fails, we return the shared library timestamp
+    // as the version instead.
+    auto timestamp = SharedLibraryUtils::getSharedLibraryTimestamp(m_createInstance);
+    auto timestampString = String(timestamp);
+    version = RawBlob::create(timestampString.getBuffer(), timestampString.getLength());
+    *outVersionString = version.detach();
     return SLANG_OK;
 }
 
