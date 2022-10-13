@@ -299,11 +299,11 @@ SlangResult GlslangDownstreamCompiler::getVersionString(slang::IBlob** outVersio
     uint64_t timestamp;
     if (m_compile_1_1)
     {
-        timestamp = SharedLibraryUtils::getSharedLibraryTimestamp(m_compile_1_1);
+        timestamp = SharedLibraryUtils::getSharedLibraryTimestamp((void*)m_compile_1_1);
     }
     else if (m_compile_1_0)
     {
-        timestamp = SharedLibraryUtils::getSharedLibraryTimestamp(m_compile_1_0);
+        timestamp = SharedLibraryUtils::getSharedLibraryTimestamp((void*)m_compile_1_0);
     }
     else
     {
