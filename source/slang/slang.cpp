@@ -1367,6 +1367,18 @@ void Linkage::updateDependencyBasedHash(
     {
         builder.addToDigest(capability);
     }
+
+    // Add the downstream compiler version (if it exists) to the hash
+    auto passThroughMode = getDownstreamCompilerRequiredForTarget(targetReq->getTarget());
+    auto downstreamCompiler = getSessionImpl()->getOrLoadDownstreamCompiler(passThroughMode, nullptr);
+    if (downstreamCompiler)
+    {
+        ComPtr<ISlangBlob> versionString;
+        if (SLANG_SUCCEEDED(downstreamCompiler->getVersionString(versionString.writeRef())))
+        {
+            builder.addToDigest(versionString);
+        }
+    }
 }
 
 SlangResult Linkage::addSearchPath(

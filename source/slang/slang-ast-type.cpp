@@ -1089,7 +1089,6 @@ Val* AndType::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet su
 
 // ModifiedType
 
-
 void ModifiedType::_toTextOverride(StringBuilder& out)
 {
     for( auto modifier : modifiers )

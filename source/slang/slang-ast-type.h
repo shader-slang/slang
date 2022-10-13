@@ -26,7 +26,6 @@ class InitializerListType : public Type
 {
     SLANG_AST_CLASS(InitializerListType)
 
-    
     // Overrides should be public so base classes can access
     void _toTextOverride(StringBuilder& out);
     Type* _createCanonicalTypeOverride();
@@ -694,7 +693,7 @@ class NamespaceType : public Type
     void _toTextOverride(StringBuilder& out);
     bool _equalsImplOverride(Type* type);
     HashCode _getHashCodeOverride();
-    Type* _createCanonicalTypeOverride();    
+    Type* _createCanonicalTypeOverride();
 };
 
 // The concrete type for a value wrapped in an existential, accessible

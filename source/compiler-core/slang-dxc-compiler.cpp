@@ -14,6 +14,8 @@
 #include "../core/slang-semantic-version.h"
 #include "../core/slang-char-util.h"
 
+#include "../core/slang-digest.h"
+
 #include "slang-include-system.h"
 #include "slang-source-loc.h"
 
@@ -168,6 +170,7 @@ public:
     virtual SLANG_NO_THROW bool SLANG_MCALL canConvert(const ArtifactDesc& from, const ArtifactDesc& to) SLANG_OVERRIDE;
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL convert(IArtifact* from, const ArtifactDesc& to, IArtifact** outArtifact) SLANG_OVERRIDE;
     virtual SLANG_NO_THROW bool SLANG_MCALL isFileBased() SLANG_OVERRIDE { return false; }
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL getVersionString(slang::IBlob** outVersionString) SLANG_OVERRIDE;
 
     /// Must be called before use
     SlangResult init(ISlangSharedLibrary* library);
@@ -191,7 +194,7 @@ SlangResult DXCDownstreamCompiler::init(ISlangSharedLibrary* library)
         return SLANG_FAIL;
     }
 
-    m_desc = Desc(SLANG_PASS_THROUGH_DXC); 
+    m_desc = Desc(SLANG_PASS_THROUGH_DXC);
 
     return SLANG_OK;
 }
@@ -569,6 +572,52 @@ SlangResult DXCDownstreamCompiler::convert(IArtifact* from, const ArtifactDesc& 
     artifact->addRepresentationUnknown(disassemblyBlob);
 
     *outArtifact = artifact.detach();
+    return SLANG_OK;
+}
+
+SlangResult DXCDownstreamCompiler::getVersionString(slang::IBlob** outVersionString)
+{
+    ComPtr<IDxcCompiler> dxcCompiler;
+    SLANG_RETURN_ON_FAIL(m_createInstance(CLSID_DxcCompiler, __uuidof(dxcCompiler), (LPVOID*)dxcCompiler.writeRef()));
+
+    ComPtr<ISlangBlob> version;
+    ComPtr<IDxcVersionInfo> versionInfo;
+    if (SLANG_SUCCEEDED(dxcCompiler->QueryInterface(versionInfo.writeRef())))
+    {
+        // Because the major/minor version alone does not necessarily capture different releases
+        // of the DX compiler, we also need to query for the commit hash. If we are unable to
+        // obtain the commit hash, then we return the shared library timestamp instead.
+        ComPtr<IDxcVersionInfo2> versionInfo2;
+        if (SLANG_SUCCEEDED(dxcCompiler->QueryInterface(versionInfo2.writeRef())))
+        {
+            uint32_t major;
+            uint32_t minor;
+            versionInfo->GetVersion(&major, &minor);
+
+            StringBuilder versionString;
+            versionString.append(major);
+            versionString.append(".");
+            versionString.append(minor);
+
+            char* commitHash;
+            uint32_t unused;
+            versionInfo2->GetCommitInfo(&unused, &commitHash);
+
+            versionString.append(commitHash);
+            CoTaskMemFree(commitHash);
+
+            version = StringBlob::create(versionString.getBuffer());
+            *outVersionString = version.detach();
+            return SLANG_OK;
+        }
+    }
+
+    // If either of the QueryInterface calls fails, we return the shared library timestamp
+    // as the version instead.
+    auto timestamp = SharedLibraryUtils::getSharedLibraryTimestamp(m_createInstance);
+    auto timestampString = String(timestamp);
+    version = StringBlob::create(timestampString.getBuffer());
+    *outVersionString = version.detach();
     return SLANG_OK;
 }
 
