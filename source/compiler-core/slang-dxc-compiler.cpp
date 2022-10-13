@@ -599,16 +599,19 @@ SlangResult DXCDownstreamCompiler::getVersionString(slang::IBlob** outVersionStr
             versionString.append(".");
             versionString.append(minor);
 
-            char* commitHash;
+            char* commitHash = nullptr;
             uint32_t unused;
             versionInfo2->GetCommitInfo(&unused, &commitHash);
+            if (commitHash)
+            {
+                // Successfully queried the commit hash, append to the version and return.
+                versionString.append(commitHash);
+                CoTaskMemFree(commitHash);
 
-            versionString.append(commitHash);
-            CoTaskMemFree(commitHash);
-
-            version = StringBlob::create(versionString.getBuffer());
-            *outVersionString = version.detach();
-            return SLANG_OK;
+                version = StringBlob::create(versionString.getBuffer());
+                *outVersionString = version.detach();
+                return SLANG_OK;
+            }
         }
     }
 
