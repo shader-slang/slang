@@ -1671,7 +1671,7 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         // witness that `T : L & R`, so lower that first and expect it to be
         // a value of tuple type.
         //
-        auto conjunctionWitness = lowerSimpleVal(context, val->conunctionWitness);
+        auto conjunctionWitness = lowerSimpleVal(context, val->conjunctionWitness);
         auto conjunctionTupleType = as<IRTupleType>(conjunctionWitness->getDataType());
         SLANG_ASSERT(conjunctionTupleType);
 
