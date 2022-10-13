@@ -10,56 +10,50 @@ namespace Slang
     class ShaderCacheIndex
     {
     public:
+        struct ShaderCacheEntry
+        {
+            slang::Digest dependencyBasedDigest;
+            slang::Digest astBasedDigest;
+        }
+
         ShaderCacheIndex(SlangInt size)
-            : entryLimit(size)
+            : entryCountLimit(size)
         {}
 
         // Load a previous cache index saved to disk. If not found, create a new cache index
         // and save it to disk as filename.
         SlangResult loadCacheIndex(String filename);
 
-        // Fetch the cache entry corresponding to the provided key. If found, store the
-        // mapped AST hash for that entry in outContents and return SLANG_OK. Else, set
-        // outContents to nullptr and return SLANG_FAIL.
-        SlangResult fetchEntry(String key, String* outContents);
+        // Fetch the cache entry corresponding to the provided key. If found, move the entry to
+        // the front of entries and return the entry. Else, return nullptr.
+        ShaderCacheEntry* findEntry(const slang::Digest& key);
 
         // Add an entry to the cache with the provided key and contents hashes. If
         // adding an entry causes the cache to exceed size limitations, this will also
         // delete the least recently used entry.
-        void addEntry(String key, String contents);
+        void addEntry(const slang::Digest& dependencyDigest, const slang::Digest& astDigest);
 
         // Update the contents hash for the specified entry in the cache.
-        void updateEntry(String key, String newContents);
+        void updateEntry(const slang::Digest& dependencyDigest, const slang::Digest& astDigest);
 
     private:
-        // Update the entry for key in the cache index on disk. This should be called any
-        // time keyToContents changes.
-        SlangResult updateCacheIndex(String key);
-
-        // Move the entry corresponding to key to the front of entries. This should only
-        // be called by fetchEntry upon successfully finding an existing entry.
-        void moveEntryToFront(String key);
+        // Update the cache index on disk. This should be called any time an entry changes.
+        SlangResult updateCacheIndex();
 
         // Delete the last entry from entries and remove its key/value pair from keyToContents
         // as well as remove the corresponding file on disk. This should only be used when the
         // cache has reached the size limit specified by entryLimit to create space for a new entry.
-        SlangResult deleteEntry();
+        void deleteEntry();
 
-        // Dictionary mapping each shader's key (dependency-based hash) in the cache
-        // to its contents (AST-based hash).
-        Dictionary<String, String> keyToContents;
+        // Dictionary mapping each shader's key to its corresponding node (entry) in the list
+        // of entries.
+        Dictionary<slang::Digest, LinkedNode<ShaderCacheEntry>*> keyToEntry;
 
         // Linked list containing the entries stored in the shader cache in order
         // of most to least recently used.
-        LinkedList<String> entries;
+        LinkedList<ShaderCacheEntry> entries;
 
         // The maximum number of cache entries allowed.
-        SlangInt entryLimit = -1;
+        SlangInt entryCountLimit = -1;
     }
-
-    // Notes:
-    // - Should cache index load/save take a filename? Easiest to maintain if the filename is something set,
-    //   but maybe someone might use the same directory for multiple caches?
-    // - Do we ever need to delete an entry aside from when the cache reaches size limitations?
-
 }
