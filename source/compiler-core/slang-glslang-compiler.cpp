@@ -311,7 +311,7 @@ SlangResult GlslangDownstreamCompiler::getVersionString(slang::IBlob** outVersio
     }
     
     auto timestampString = String(timestamp);
-    ComPtr<ISlangBlob> version = RawBlob::create(timestampString.getBuffer(), timestampString.getLength());
+    ComPtr<ISlangBlob> version = StringBlob::create(timestampString.getBuffer());
     *outVersionString = version.detach();
     return SLANG_OK;
 }

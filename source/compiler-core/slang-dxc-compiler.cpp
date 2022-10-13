@@ -611,7 +611,7 @@ SlangResult DXCDownstreamCompiler::getVersionString(slang::IBlob** outVersionStr
             versionString.append(major);
             versionString.append(".");
             versionString.append(minor);
-            version = RawBlob::create(versionString.getBuffer(), versionString.getLength());
+            version = StringBlob::create(versionString.getBuffer());
             *outVersionString = version.detach();
             return SLANG_OK;
         }
@@ -621,7 +621,7 @@ SlangResult DXCDownstreamCompiler::getVersionString(slang::IBlob** outVersionStr
     // as the version instead.
     auto timestamp = SharedLibraryUtils::getSharedLibraryTimestamp(m_createInstance);
     auto timestampString = String(timestamp);
-    version = RawBlob::create(timestampString.getBuffer(), timestampString.getLength());
+    version = StringBlob::create(timestampString.getBuffer());
     *outVersionString = version.detach();
     return SLANG_OK;
 }
