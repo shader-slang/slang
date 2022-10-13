@@ -668,11 +668,13 @@ Result DeviceImpl::createTextureView(ITextureResource* texture, IResourceView::D
         viewImpl->m_type = ResourceViewImpl::Type::RTV;
         viewImpl->m_rtv = rtv;
         viewImpl->m_desc = desc;
-
-        memcpy(
-            viewImpl->m_clearValue,
-            &resourceImpl->getDesc()->optimalClearValue.color,
-            sizeof(float) * 4);
+        if (resourceImpl->getDesc()->optimalClearValue)
+        {
+            memcpy(
+                viewImpl->m_clearValue,
+                &resourceImpl->getDesc()->optimalClearValue->color,
+                sizeof(float) * 4);
+        }
         returnComPtr(outView, viewImpl);
         return SLANG_OK;
     }
@@ -686,7 +688,8 @@ Result DeviceImpl::createTextureView(ITextureResource* texture, IResourceView::D
         RefPtr<DepthStencilViewImpl> viewImpl = new DepthStencilViewImpl();
         viewImpl->m_type = ResourceViewImpl::Type::DSV;
         viewImpl->m_dsv = dsv;
-        viewImpl->m_clearValue = resourceImpl->getDesc()->optimalClearValue.depthStencil;
+        if (resourceImpl->getDesc()->optimalClearValue)
+            viewImpl->m_clearValue = resourceImpl->getDesc()->optimalClearValue->depthStencil;
         viewImpl->m_desc = desc;
 
         returnComPtr(outView, viewImpl);

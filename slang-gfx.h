@@ -706,7 +706,7 @@ public:
         GfxCount numMipLevels = 0;       ///< Number of mip levels - if 0 will create all mip levels
         Format format;                   ///< The resources format
         SampleDesc sampleDesc;           ///< How the resource is sampled
-        ClearValue optimalClearValue;
+        ClearValue* optimalClearValue = nullptr;
     };
 
         /// Data for a single subresource of a texture.

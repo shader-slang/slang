@@ -941,7 +941,7 @@ Result DeviceImpl::createTextureResource(
             flags |= D3D12_HEAP_FLAG_SHARED;
 
         D3D12_CLEAR_VALUE clearValue;
-        D3D12_CLEAR_VALUE* clearValuePtr = &clearValue;
+        D3D12_CLEAR_VALUE* clearValuePtr = nullptr;
         if ((resourceDesc.Flags & (D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET |
             D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL)) == 0)
         {
@@ -952,9 +952,13 @@ Result DeviceImpl::createTextureResource(
             clearValuePtr = nullptr;
         }
         clearValue.Format = resourceDesc.Format;
-        memcpy(clearValue.Color, &descIn.optimalClearValue.color, sizeof(clearValue.Color));
-        clearValue.DepthStencil.Depth = descIn.optimalClearValue.depthStencil.depth;
-        clearValue.DepthStencil.Stencil = descIn.optimalClearValue.depthStencil.stencil;
+        if (descIn.optimalClearValue)
+        {
+            memcpy(clearValue.Color, &descIn.optimalClearValue->color, sizeof(clearValue.Color));
+            clearValue.DepthStencil.Depth = descIn.optimalClearValue->depthStencil.depth;
+            clearValue.DepthStencil.Stencil = descIn.optimalClearValue->depthStencil.stencil;
+            clearValuePtr = &clearValue;
+        }
         SLANG_RETURN_ON_FAIL(texture->m_resource.initCommitted(
             m_device,
             heapProps,
@@ -1633,8 +1637,11 @@ Result DeviceImpl::createFramebuffer(IFramebuffer::Desc const& desc, IFramebuffe
                 static_cast<TextureResourceImpl*>(
                     static_cast<ResourceViewImpl*>(desc.renderTargetViews[i])->m_resource.Ptr())
                 ->getDesc()
-                ->optimalClearValue.color;
-            memcpy(&framebuffer->renderTargetClearValues[i], &clearValue, sizeof(ColorClearValue));
+                ->optimalClearValue;
+            if (clearValue)
+            {
+                memcpy(&framebuffer->renderTargetClearValues[i], &clearValue->color, sizeof(ColorClearValue));
+            }
         }
         else
         {
@@ -1644,11 +1651,15 @@ Result DeviceImpl::createFramebuffer(IFramebuffer::Desc const& desc, IFramebuffe
     framebuffer->depthStencilView = static_cast<ResourceViewImpl*>(desc.depthStencilView);
     if (desc.depthStencilView)
     {
-        framebuffer->depthStencilClearValue =
-            static_cast<TextureResourceImpl*>(
-                static_cast<ResourceViewImpl*>(desc.depthStencilView)->m_resource.Ptr())
+        auto clearValue = static_cast<TextureResourceImpl*>(
+            static_cast<ResourceViewImpl*>(desc.depthStencilView)->m_resource.Ptr())
             ->getDesc()
-            ->optimalClearValue.depthStencil;
+            ->optimalClearValue;
+
+        if (clearValue)
+        {
+            framebuffer->depthStencilClearValue = clearValue->depthStencil;
+        }
         framebuffer->depthStencilDescriptor =
             static_cast<ResourceViewImpl*>(desc.depthStencilView)->m_descriptor.cpuHandle;
     }
