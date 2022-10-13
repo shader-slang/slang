@@ -629,6 +629,7 @@ void ExtractFromConjunctionSubtypeWitness::_toTextOverride(StringBuilder& out)
     if (conjunctionWitness)
         out << conjunctionWitness;
     out << "," << indexInConjunction;
+    out << ")";
 }
 
 HashCode ExtractFromConjunctionSubtypeWitness::_getHashCodeOverride()
