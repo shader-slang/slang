@@ -18,7 +18,6 @@ class OverloadGroupType : public Type
     Type* _createCanonicalTypeOverride();
     bool _equalsImplOverride(Type* type);
     HashCode _getHashCodeOverride();
-    void _hashIntoOverride(DigestBuilder& builder);
 };
 
 // The type of an initializer-list expression (before it has
@@ -32,7 +31,6 @@ class InitializerListType : public Type
     Type* _createCanonicalTypeOverride();
     bool _equalsImplOverride(Type* type);
     HashCode _getHashCodeOverride();
-    void _hashIntoOverride(DigestBuilder& builder);
 };
 
 // The type of an expression that was erroneous
@@ -46,7 +44,6 @@ class ErrorType : public Type
     bool _equalsImplOverride(Type* type);
     HashCode _getHashCodeOverride();
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
-    void _hashIntoOverride(DigestBuilder& builder);
 };
 
 // The bottom/empty type that has no values.
@@ -60,7 +57,6 @@ class BottomType : public Type
     bool _equalsImplOverride(Type* type);
     HashCode _getHashCodeOverride();
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
-    void _hashIntoOverride(DigestBuilder& builder);
 };
 
 // A type that takes the form of a reference to some declaration
@@ -79,7 +75,6 @@ class DeclRefType : public Type
     bool _equalsImplOverride(Type* type);
     HashCode _getHashCodeOverride();
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
-    void _hashIntoOverride(DigestBuilder& builder);
 
 protected:
     DeclRefType(DeclRef<Decl> declRef)
@@ -424,7 +419,6 @@ class ArrayExpressionType : public Type
     bool _equalsImplOverride(Type* type);
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
     HashCode _getHashCodeOverride();
-    void _hashIntoOverride(DigestBuilder& builder);
 };
 
 // The "type" of an expression that resolves to a type.
@@ -442,7 +436,6 @@ class TypeType : public Type
     Type* _createCanonicalTypeOverride();
     bool _equalsImplOverride(Type* type);
     HashCode _getHashCodeOverride();
-    void _hashIntoOverride(DigestBuilder& builder);
 
 protected:
     TypeType(Type* type)
@@ -624,7 +617,6 @@ class NamedExpressionType : public Type
     Type* _createCanonicalTypeOverride();
     bool _equalsImplOverride(Type* type);
     HashCode _getHashCodeOverride();
-    void _hashIntoOverride(DigestBuilder& builder);
 
 protected:
     NamedExpressionType(
@@ -664,7 +656,6 @@ class FuncType : public Type
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
     bool _equalsImplOverride(Type* type);
     HashCode _getHashCodeOverride();
-    void _hashIntoOverride(DigestBuilder& builder);
 };
 
 // The "type" of an expression that names a generic declaration.
@@ -681,7 +672,6 @@ class GenericDeclRefType : public Type
     bool _equalsImplOverride(Type* type);
     HashCode _getHashCodeOverride();
     Type* _createCanonicalTypeOverride();
-    void _hashIntoOverride(DigestBuilder& builder);
 
 protected:
     GenericDeclRefType(
@@ -704,7 +694,6 @@ class NamespaceType : public Type
     bool _equalsImplOverride(Type* type);
     HashCode _getHashCodeOverride();
     Type* _createCanonicalTypeOverride();
-    void _hashIntoOverride(DigestBuilder& builder);
 };
 
 // The concrete type for a value wrapped in an existential, accessible
@@ -744,7 +733,6 @@ SLANG_UNREFLECTED
     HashCode _getHashCodeOverride();
     Type* _createCanonicalTypeOverride();
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
-    void _hashIntoOverride(DigestBuilder& builder);
 
         /// Get a witness that shows how this type is a subtype of `originalInterfaceType`.
         ///
@@ -778,7 +766,6 @@ class TaggedUnionType : public Type
     HashCode _getHashCodeOverride();
     Type* _createCanonicalTypeOverride();
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
-    void _hashIntoOverride(DigestBuilder& builder);
 };
 
 class ExistentialSpecializedType : public Type 
@@ -794,7 +781,6 @@ class ExistentialSpecializedType : public Type
     HashCode _getHashCodeOverride();
     Type* _createCanonicalTypeOverride();
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
-    void _hashIntoOverride(DigestBuilder& builder);
 };
 
     /// The type of `this` within a polymorphic declaration
@@ -810,7 +796,6 @@ class ThisType : public Type
     HashCode _getHashCodeOverride();
     Type* _createCanonicalTypeOverride();
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
-    void _hashIntoOverride(DigestBuilder& builder);
 };
 
     /// The type of `A & B` where `A` and `B` are types
@@ -833,7 +818,6 @@ class AndType : public Type
     HashCode _getHashCodeOverride();
     Type* _createCanonicalTypeOverride();
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
-    void _hashIntoOverride(DigestBuilder& builder);
 };
 
 class ModifiedType : public Type
@@ -849,7 +833,6 @@ class ModifiedType : public Type
     HashCode _getHashCodeOverride();
     Type* _createCanonicalTypeOverride();
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
-    void _hashIntoOverride(DigestBuilder& builder);
 };
 
 } // namespace Slang

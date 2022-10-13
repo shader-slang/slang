@@ -29,11 +29,13 @@ namespace Slang
     {
         StringBuilder filename;
 
-        for (Index i = 0; i < 4; ++i)
-        {
-            auto hashSegmentString = String(hash.values[i], 16);
+        uint8_t* uint8Hash = (uint8_t*)hash.values;
 
-            auto leadingZeroCount = 8 - hashSegmentString.getLength();
+        for (Index i = 0; i < 16; ++i)
+        {
+            auto hashSegmentString = String(uint8Hash[i], 16);
+
+            auto leadingZeroCount = 2 - hashSegmentString.getLength();
             for (Index j = 0; j < leadingZeroCount; ++j)
             {
                 filename.append("0");
