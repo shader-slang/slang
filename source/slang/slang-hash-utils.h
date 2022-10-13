@@ -12,11 +12,7 @@ namespace Slang
     {
         DigestBuilder builder;
         builder.addToDigest(text);
-
-        slang::Digest textHash;
-        builder.finalize(&textHash);
-
-        return textHash;
+        return builder.finalize();
     }
 
     // Combines the two provided hashes.
@@ -25,10 +21,7 @@ namespace Slang
         DigestBuilder builder;
         builder.addToDigest(hashA);
         builder.addToDigest(hashB);
-
-        slang::Digest combined;
-        builder.finalize(&combined);
-        return combined;
+        return builder.finalize();
     }
 
     // Returns the stored hash in checksum as a String.

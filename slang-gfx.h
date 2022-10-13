@@ -1995,7 +1995,7 @@ public:
         0xcd48bd29, 0xee72, 0x41b8, { 0xbc, 0xff, 0xa, 0x2b, 0x3a, 0xaa, 0x6d, 0xeb } \
     }
 
-class ID3D12TransientResourceHeap : public ISlangUnknown
+class ITransientResourceHeapD3D12 : public ISlangUnknown
 {
 public:
     enum class DescriptorType
@@ -2008,7 +2008,7 @@ public:
         Offset& outDescriptorOffset,
         void** outD3DDescriptorHeapHandle) = 0;
 };
-#define SLANG_UUID_ID3D12TransientResourceHeap                                             \
+#define SLANG_UUID_ITransientResourceHeapD3D12                                             \
     {                                                                                  \
         0x9bc6a8bc, 0x5f7a, 0x454a, { 0x93, 0xef, 0x3b, 0x10, 0x5b, 0xb7, 0x63, 0x7e } \
     }
@@ -2562,6 +2562,7 @@ struct D3D12DeviceExtendedDesc
     StructType structType = StructType::D3D12DeviceExtendedDesc;
     const char* rootParameterShaderAttributeName = nullptr;
     bool debugBreakOnD3D12Error = false;
+    uint32_t highestShaderModel = 0;
 };
 
 }

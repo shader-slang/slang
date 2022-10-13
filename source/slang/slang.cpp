@@ -3494,19 +3494,14 @@ SLANG_NO_THROW void SLANG_MCALL ComponentType::computeDependencyBasedHash(
     auto entryPointNameOverride = getEntryPointNameOverride(entryPointIndex);
     builder.addToDigest(entryPointNameOverride);
 
-    slang::Digest hash;
-    builder.finalize(&hash);
-    *outHash = hash;
+    *outHash = builder.finalize();
 }
 
 SLANG_NO_THROW void SLANG_MCALL ComponentType::computeASTBasedHash(slang::Digest* outHash)
 {
     DigestBuilder builder;
     updateASTBasedHash(builder);
-
-    slang::Digest hash;
-    builder.finalize(&hash);
-    *outHash = hash;
+    *outHash = builder.finalize();
 }
 
 SLANG_NO_THROW SlangResult SLANG_MCALL ComponentType::getEntryPointHostCallable(

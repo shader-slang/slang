@@ -12,6 +12,23 @@ using namespace Slang;
 namespace debug
 {
 
+SlangResult DebugTransientResourceHeap::queryInterface(SlangUUID const& uuid, void** outObject)
+{
+    if (uuid == GfxGUID::IID_ISlangUnknown || uuid == GfxGUID::IID_ITransientResourceHeap)
+        *outObject = static_cast<ITransientResourceHeap*>(this);
+    if (uuid == GfxGUID::IID_ITransientResourceHeapD3D12)
+    {
+        RefPtr<DebugTransientResourceHeapD3D12> result = new DebugTransientResourceHeapD3D12();
+        baseObject->queryInterface(uuid, (void**)result->baseObject.writeRef());
+        returnComPtr((ITransientResourceHeapD3D12**)outObject, result);
+        return SLANG_OK;
+    }
+    else
+    {
+        return baseObject->queryInterface(uuid, outObject);
+    }
+}
+
 Result DebugTransientResourceHeap::synchronizeAndReset()
 {
     SLANG_GFX_API_FUNC;
@@ -32,8 +49,37 @@ Result DebugTransientResourceHeap::createCommandBuffer(ICommandBuffer** outComma
     auto result = baseObject->createCommandBuffer(outObject->baseObject.writeRef());
     if (SLANG_FAILED(result))
         return result;
-    returnComPtr(outCommandBuffer, outObject);
+    outObject->queryInterface(SlangUUID SLANG_UUID_ICommandBuffer, (void**)outCommandBuffer);
     return result;
+}
+
+SlangResult DebugTransientResourceHeapD3D12::queryInterface(SlangUUID const& uuid, void** outObject)
+{
+    if (uuid == GfxGUID::IID_ISlangUnknown || uuid == GfxGUID::IID_ITransientResourceHeapD3D12)
+        *outObject = static_cast<ITransientResourceHeapD3D12*>(this);
+    if (uuid == GfxGUID::IID_ITransientResourceHeap)
+    {
+        RefPtr<DebugTransientResourceHeap> result = new DebugTransientResourceHeap();
+        baseObject->queryInterface(uuid, (void**)result->baseObject.writeRef());
+        returnComPtr((ITransientResourceHeap**)outObject, result);
+        return SLANG_OK;
+    }
+    else
+    {
+        return baseObject->queryInterface(uuid, outObject);
+    }
+}
+
+Result DebugTransientResourceHeapD3D12::allocateTransientDescriptorTable(
+    DescriptorType type,
+    GfxCount count,
+    Offset& outDescriptorOffset,
+    void** outD3DDescriptorHeapHandle)
+{
+    SLANG_GFX_API_FUNC;
+
+    return baseObject->allocateTransientDescriptorTable(
+        type, count, outDescriptorOffset, outD3DDescriptorHeapHandle);
 }
 
 } // namespace debug

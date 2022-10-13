@@ -131,13 +131,30 @@ void _gfxDiagnoseImpl(DebugMessageType type, const char* format, TArgs... args)
 
 // Utility conversion functions to get Debug* object or the inner object from a user provided
 // pointer.
-#define SLANG_GFX_DEBUG_GET_OBJ_IMPL(type)                                                   \
-    inline Debug##type* getDebugObj(I##type* ptr) { return static_cast<Debug##type*>(ptr); } \
-    inline I##type* getInnerObj(I##type* ptr)                                                \
-    {                                                                                        \
-        if (!ptr) return nullptr;                                                            \
-        auto debugObj = getDebugObj(ptr);                                                    \
-        return debugObj->baseObject;                                                         \
+#define SLANG_GFX_DEBUG_GET_OBJ_IMPL(type)                                         \
+    inline Debug##type* getDebugObj(I##type* ptr)                                  \
+    {                                                                              \
+        return static_cast<Debug##type*>(static_cast<DebugObject<I##type>*>(ptr)); \
+    }                                                                              \
+    inline I##type* getInnerObj(I##type* ptr)                                      \
+    {                                                                              \
+        if (!ptr)                                                                  \
+            return nullptr;                                                        \
+        auto debugObj = getDebugObj(ptr);                                          \
+        return debugObj->baseObject;                                               \
+    }
+
+#define SLANG_GFX_DEBUG_GET_OBJ_IMPL_UNOWNED(type)                                        \
+    inline Debug##type* getDebugObj(I##type* ptr)                                         \
+    {                                                                                     \
+        return static_cast<Debug##type*>(static_cast<UnownedDebugObject<I##type>*>(ptr)); \
+    }                                                                                     \
+    inline I##type* getInnerObj(I##type* ptr)                                             \
+    {                                                                                     \
+        if (!ptr)                                                                         \
+            return nullptr;                                                               \
+        auto debugObj = getDebugObj(ptr);                                                 \
+        return debugObj->baseObject;                                                      \
     }
 
 SLANG_GFX_DEBUG_GET_OBJ_IMPL(Device)
@@ -145,10 +162,10 @@ SLANG_GFX_DEBUG_GET_OBJ_IMPL(BufferResource)
 SLANG_GFX_DEBUG_GET_OBJ_IMPL(TextureResource)
 SLANG_GFX_DEBUG_GET_OBJ_IMPL(CommandBuffer)
 SLANG_GFX_DEBUG_GET_OBJ_IMPL(CommandQueue)
-SLANG_GFX_DEBUG_GET_OBJ_IMPL(ComputeCommandEncoder)
-SLANG_GFX_DEBUG_GET_OBJ_IMPL(RenderCommandEncoder)
-SLANG_GFX_DEBUG_GET_OBJ_IMPL(ResourceCommandEncoder)
-SLANG_GFX_DEBUG_GET_OBJ_IMPL(RayTracingCommandEncoder)
+SLANG_GFX_DEBUG_GET_OBJ_IMPL_UNOWNED(ComputeCommandEncoder)
+SLANG_GFX_DEBUG_GET_OBJ_IMPL_UNOWNED(RenderCommandEncoder)
+SLANG_GFX_DEBUG_GET_OBJ_IMPL_UNOWNED(ResourceCommandEncoder)
+SLANG_GFX_DEBUG_GET_OBJ_IMPL_UNOWNED(RayTracingCommandEncoder)
 SLANG_GFX_DEBUG_GET_OBJ_IMPL(Framebuffer)
 SLANG_GFX_DEBUG_GET_OBJ_IMPL(FramebufferLayout)
 SLANG_GFX_DEBUG_GET_OBJ_IMPL(InputLayout)
