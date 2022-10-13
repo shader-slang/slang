@@ -712,7 +712,7 @@ static void _lookUpMembersInSuperTypeImpl(
         // The evidence for the subtype relationship will be a witness
         // proving that `leafType : leftType & rightType`:
         //
-        leafIsLeftWitness->conunctionWitness = leafIsSuperWitness;
+        leafIsLeftWitness->conjunctionWitness = leafIsSuperWitness;
         //
         // ... along with the index of the desired super-type in
         // that conjunction. The index of `leftType` in `leftType & rightType`
@@ -725,7 +725,7 @@ static void _lookUpMembersInSuperTypeImpl(
         // the conjunction.
         //
         auto leafIsRightWitness = astBuilder->create<ExtractFromConjunctionSubtypeWitness>();
-        leafIsRightWitness->conunctionWitness = leafIsSuperWitness;
+        leafIsRightWitness->conjunctionWitness = leafIsSuperWitness;
         leafIsRightWitness->indexInConjunction = 1;
         leafIsRightWitness->sub = leafType;
         leafIsRightWitness->sup = rightType;
