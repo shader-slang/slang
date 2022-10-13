@@ -410,6 +410,11 @@ class ConjunctionSubtypeWitness : public SubtypeWitness
 
         /// Witness that `sub : sup->right`
     Val* rightWitness;
+
+    bool _equalsValOverride(Val* val);
+    void _toTextOverride(StringBuilder& out);
+    HashCode _getHashCodeOverride();
+    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
 };
 
     /// A witness that `T : X` because `T : X & Y` or `T : Y & X`
@@ -418,14 +423,19 @@ class ExtractFromConjunctionSubtypeWitness : public SubtypeWitness
     SLANG_AST_CLASS(ExtractFromConjunctionSubtypeWitness)
 
         /// Witness that `T : L & R` for some `R`
-    Val* conunctionWitness;
+    Val* conjunctionWitness;
 
         /// The zero-based index of the super-type we care about in the conjunction
         ///
-        /// If `conunctionWitness` is `T : X & Y` then this index should be zero if
+        /// If `conjunctionWitness` is `T : X & Y` then this index should be zero if
         /// we want to represent `T : X` and one if we want `T : Y`.
         ///
     int indexInConjunction;
+
+    bool _equalsValOverride(Val* val);
+    void _toTextOverride(StringBuilder& out);
+    HashCode _getHashCodeOverride();
+    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
 };
 
     /// A value that represents a modifier attached to some other value
