@@ -4,9 +4,34 @@
 #include "slang-hash-utils.h"
 #include "../core/slang-io.h"
 #include "../core/slang-string-util.h"
+#include "../core/slang-file-system.h"
 
 namespace Slang
 {
+
+ShaderCacheIndex::ShaderCacheIndex(SlangInt size, const char* path, ISlangFileSystem* fileSystem)
+{
+    entryCountLimit = size;
+    shaderCacheFileSystem = fileSystem;
+
+    if (path)
+    {
+        if (!shaderCacheFileSystem)
+        {
+            // Only a path was provided, so we get a mutable file system
+            // using OSFileSystem::getMutableSingleton.
+            shaderCacheFileSystem = OSFileSystem::getMutableSingleton();
+        }
+        shaderCacheFileSystem = new RelativeFileSystem(shaderCacheFileSystem, path);
+    }
+
+    // If our shader cache has an underlying file system, check if it's mutable. If so, store a pointer
+    // to the mutable version in order to save new entries later.
+    if (shaderCacheFileSystem)
+    {
+        shaderCacheFileSystem->queryInterface(ISlangMutableFileSystem::getTypeGuid(), (void**)mutableShaderCacheFileSystem.writeRef());
+    }
+}
 
 // Load a previous cache index saved to disk. If not found, create a new cache index
 // and save it to disk as filename.

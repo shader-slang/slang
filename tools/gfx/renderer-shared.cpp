@@ -463,6 +463,9 @@ IDevice* gfx::RendererBase::getInterface(const Guid& guid)
 
 SLANG_NO_THROW Result SLANG_MCALL RendererBase::initialize(const Desc& desc)
 {
+    // TODO: This logic for initalizing the shader cache has been replicated inside
+    // the constructor for ShaderCacheIndex. Remove when ShaderCacheIndex is integrated in.
+
     // If a shader cache file system was provided, use the provided system.
     if (desc.shaderCacheFileSystem)
     {

@@ -19,9 +19,7 @@ public:
         slang::Digest astBasedDigest;
     };
 
-    ShaderCacheIndex(SlangInt size)
-        : entryCountLimit(size)
-    {}
+    ShaderCacheIndex(SlangInt size, const char* path, ISlangFileSystem* fileSystem);
 
     // Load a previous cache index saved to disk. If not found, create a new cache index
     // and save it to disk as filename.
