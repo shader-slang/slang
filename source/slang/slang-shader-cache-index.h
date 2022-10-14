@@ -4,8 +4,8 @@
 #include "../../slang-com-ptr.h"
 
 #include "../core/slang-string.h"
-#include "../core/slang-linked-list.h"
 #include "../core/slang-dictionary.h"
+#include "../core/slang-linked-list.h"
 
 namespace Slang
 {
@@ -56,7 +56,7 @@ private:
 
     // Dictionary mapping each shader's key to its corresponding node (entry) in the list
     // of entries.
-    Dictionary<slang::Digest, LinkedNode<ShaderCacheEntry>*> keyToEntry;
+    Dictionary<String, LinkedNode<ShaderCacheEntry>*> keyToEntry;
 
     // Linked list containing the entries stored in the shader cache in order
     // of most to least recently used.
