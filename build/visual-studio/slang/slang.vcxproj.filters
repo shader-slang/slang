@@ -471,6 +471,9 @@
     <ClInclude Include="..\..\..\source\slang\slang-serialize.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\source\slang\slang-shader-cache-index.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\..\source\slang\slang-syntax.h">
       <Filter>Header Files</Filter>
     </ClInclude>
