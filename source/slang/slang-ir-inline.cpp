@@ -516,6 +516,28 @@ void performMandatoryEarlyInlining(IRModule* module)
     pass.considerAllCallSites();
 }
 
+struct ForceInliningPass : InliningPassBase
+{
+    typedef InliningPassBase Super;
+
+    ForceInliningPass(IRModule* module)
+        : Super(module)
+    {}
+
+    bool shouldInline(CallSiteInfo const& info)
+    {
+        if (info.callee->findDecoration<IRForceInlineDecoration>() ||
+            info.callee->findDecoration<IRUnsafeForceInlineEarlyDecoration>())
+            return true;
+        return false;
+    }
+};
+
+void performForceInlining(IRModule* module)
+{
+    ForceInliningPass pass(module);
+    pass.considerAllCallSites();
+}
 
     // Defined in slang-ir-specialize-resource.cpp
 bool isResourceType(IRType* type);

@@ -501,6 +501,8 @@ struct IRFormatDecoration : IRDecoration
 
 IR_SIMPLE_DECORATION(UnsafeForceInlineEarlyDecoration)
 
+IR_SIMPLE_DECORATION(ForceInlineDecoration)
+
 struct IRNaturalSizeAndAlignmentDecoration : IRDecoration
 {
     enum { kOp = kIROp_NaturalSizeAndAlignmentDecoration };
