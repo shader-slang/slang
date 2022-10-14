@@ -959,6 +959,9 @@
     <ClCompile Include="..\..\..\source\slang\slang-serialize.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\source\slang\slang-shader-cache-index.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\..\source\slang\slang-stdlib-api.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>

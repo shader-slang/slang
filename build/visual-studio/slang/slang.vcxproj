@@ -610,6 +610,7 @@ IF EXIST ..\..\..\external\slang-glslang\bin\windows-aarch64\release\slang-glsla
     <ClCompile Include="..\..\..\source\slang\slang-serialize-source-loc.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-serialize-types.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-serialize.cpp" />
+    <ClCompile Include="..\..\..\source\slang\slang-shader-cache-index.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-stdlib-api.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-stdlib.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-syntax.cpp" />

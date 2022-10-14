@@ -7,8 +7,10 @@
 
 namespace Slang
 {
+    using slang::Digest;
+
     // Compute the hash for an UnownedStringSlice
-    inline slang::Digest computeHashForStringSlice(UnownedStringSlice text)
+    inline Digest computeHashForStringSlice(UnownedStringSlice text)
     {
         DigestBuilder builder;
         builder.addToDigest(text);
@@ -16,7 +18,7 @@ namespace Slang
     }
 
     // Combines the two provided hashes.
-    inline slang::Digest combineHashes(const slang::Digest& hashA, const slang::Digest& hashB)
+    inline Digest combineHashes(const Digest& hashA, const Digest& hashB)
     {
         DigestBuilder builder;
         builder.addToDigest(hashA);
@@ -25,7 +27,7 @@ namespace Slang
     }
 
     // Returns the stored hash in checksum as a String.
-    inline StringBuilder hashToString(const slang::Digest& hash)
+    inline StringBuilder hashToString(const Digest& hash)
     {
         StringBuilder filename;
 
@@ -45,5 +47,8 @@ namespace Slang
         return filename;
     }
 
-    // TODO: fromString implementation?
+    inline Digest stringToHash(String hashString)
+    {
+
+    }
 }

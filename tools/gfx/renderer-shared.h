@@ -1372,6 +1372,8 @@ public:
     SlangContext slangContext;
     ShaderCache shaderCache;
 
+    // TODO: These should be removed when ShaderCacheIndex is ready to be integrated. ShaderCacheIndex
+    // will be responsible for keeping track of the underlying filesystem for the cache.
     ISlangFileSystem* shaderCacheFileSystem = nullptr;
     ComPtr<ISlangMutableFileSystem> mutableShaderCacheFileSystem = nullptr;
 
