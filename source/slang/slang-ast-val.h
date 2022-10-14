@@ -3,6 +3,7 @@
 #pragma once
 
 #include "slang-ast-base.h"
+#include "../core/slang-digest.h"
 
 namespace Slang {
 
@@ -378,7 +379,6 @@ class TaggedUnionSubtypeWitness : public SubtypeWitness
     // is a subtype of `sup`.
     //
     List<Val*> caseWitnesses;
-
 
     // Overrides should be public so base classes can access
     bool _equalsValOverride(Val* val);

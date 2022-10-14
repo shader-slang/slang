@@ -16,7 +16,7 @@ SLANG_UNIT_TEST(checksum)
         testA.values[3] = 4;
 
         String testAString = hashToString(testA);
-        SLANG_CHECK(testAString.equals(String("00000001000000020000000300000004")));
+        SLANG_CHECK(testAString.equals(String("01000000020000000300000004000000")));
     }
 
     {
