@@ -54,7 +54,7 @@ private:
 
     // Dictionary mapping each shader's key to its corresponding node (entry) in the list
     // of entries.
-    Dictionary<String, LinkedNode<ShaderCacheEntry>*> keyToEntry;
+    Dictionary<slang::Digest, LinkedNode<ShaderCacheEntry>*> keyToEntry;
 
     // Linked list containing the entries stored in the shader cache in order
     // of most to least recently used.

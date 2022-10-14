@@ -65,7 +65,7 @@ SlangResult ShaderCacheIndex::loadCacheIndexFromFile(String filename)
 
         ShaderCacheEntry entry = { dependencyDigest, astDigest };
         auto entryNode = entries.AddFirst(entry);
-        keyToEntry.Add(digests[0], entryNode);
+        keyToEntry.Add(dependencyDigest, entryNode);
     }
     return SLANG_OK;
 }
@@ -73,8 +73,7 @@ SlangResult ShaderCacheIndex::loadCacheIndexFromFile(String filename)
 LinkedNode<ShaderCacheIndex::ShaderCacheEntry>* ShaderCacheIndex::findEntry(const slang::Digest& key, ISlangBlob** outCompiledCode)
 {
     LinkedNode<ShaderCacheEntry>* entryNode;
-    auto keyString = hashToString(key);
-    if (!keyToEntry.TryGetValue(keyString, entryNode))
+    if (!keyToEntry.TryGetValue(key, entryNode))
     {
         // The key was not found in the cache, so we return nullptr.
         *outCompiledCode = nullptr;
@@ -85,7 +84,7 @@ LinkedNode<ShaderCacheIndex::ShaderCacheEntry>* ShaderCacheIndex::findEntry(cons
     // the list and load the stored contents from disk.
     entries.RemoveFromList(entryNode);
     entries.AddFirst(entryNode);
-    shaderCacheFileSystem->loadFile(keyString.getBuffer(), outCompiledCode);
+    shaderCacheFileSystem->loadFile(hashToString(key).getBuffer(), outCompiledCode);
     return entryNode;
 }
 
@@ -104,12 +103,11 @@ void ShaderCacheIndex::addEntry(const slang::Digest& dependencyDigest, const sla
         deleteLRUEntry();
     }
 
-    auto digestString = hashToString(dependencyDigest);
     ShaderCacheEntry entry = { dependencyDigest, astDigest };
     auto entryNode = entries.AddFirst(entry);
-    keyToEntry.Add(digestString, entryNode);
+    keyToEntry.Add(dependencyDigest, entryNode);
 
-    mutableShaderCacheFileSystem->saveFileBlob(digestString.getBuffer(), compiledCode);
+    mutableShaderCacheFileSystem->saveFileBlob(hashToString(dependencyDigest).getBuffer(), compiledCode);
 
     saveCacheIndexToFile();
 }
@@ -168,10 +166,9 @@ void ShaderCacheIndex::deleteLRUEntry()
 
     auto lruEntry = entries.LastNode();
     auto shaderKey = lruEntry->Value.dependencyBasedDigest;
-    auto shaderKeyString = hashToString(shaderKey);
 
-    keyToEntry.Remove(shaderKeyString);
-    mutableShaderCacheFileSystem->remove(shaderKeyString.getBuffer());
+    keyToEntry.Remove(shaderKey);
+    mutableShaderCacheFileSystem->remove(hashToString(shaderKey).getBuffer());
 
     entries.Delete(lruEntry);
 }
