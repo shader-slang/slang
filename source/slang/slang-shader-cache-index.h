@@ -1,6 +1,6 @@
+// slang-shader-cache-index.h
 #pragma once
 #include "../../slang.h"
-#include "../../slang-com-helper.h"
 #include "../../slang-com-ptr.h"
 
 #include "../core/slang-string.h"
@@ -28,8 +28,9 @@ public:
     SlangResult loadCacheIndexFromFile(String filename);
 
     // Fetch the cache entry corresponding to the provided key. If found, move the entry to
-    // the front of entries and return the entry. Else, return nullptr.
-    LinkedNode<ShaderCacheEntry>* findEntry(const slang::Digest& key);
+    // the front of entries and return the entry and the corresponding compiled code in
+    // outCompiledCode. Else, return nullptr.
+    LinkedNode<ShaderCacheEntry>* findEntry(const slang::Digest& key, ISlangBlob** outCompiledCode);
 
     // Add an entry to the cache with the provided key and contents hashes. If
     // adding an entry causes the cache to exceed size limitations, this will also

@@ -1,3 +1,4 @@
+// slang-shader-cache-index.cpp
 #include "slang-shader-cache-index.h"
 
 #include "slang-hash-utils.h"
@@ -43,19 +44,21 @@ SlangResult ShaderCacheIndex::loadCacheIndexFromFile(String filename)
     }
 }
 
-LinkedNode<ShaderCacheIndex::ShaderCacheEntry>* ShaderCacheIndex::findEntry(const slang::Digest& key)
+LinkedNode<ShaderCacheIndex::ShaderCacheEntry>* ShaderCacheIndex::findEntry(const slang::Digest& key, ISlangBlob** outCompiledCode)
 {
     LinkedNode<ShaderCacheEntry>* entryNode;
     if (!keyToEntry.TryGetValue(key, entryNode))
     {
         // The key was not found in the cache, so we return nullptr.
+        *outCompiledCode = nullptr;
         return nullptr;
     }
 
     // If the key is found, we need to move its corresponding entry to the front of
-    // the list.
+    // the list and load the stored contents from disk.
     entries.RemoveFromList(entryNode);
     entries.AddFirst(entryNode);
+    shaderCacheFileSystem->loadFile(hashToString(key).getBuffer(), outCompiledCode);
     return entryNode;
 }
 
@@ -107,7 +110,9 @@ SlangResult ShaderCacheIndex::saveCacheIndexToFile()
     if (!mutableShaderCacheFileSystem)
     {
         // Cannot save the index to disk if the underlying file system isn't mutable.
-        return;
+        // A file system of some kind is required for shader caching to even be enabled, so
+        // this is not a failure.
+        return SLANG_OK;
     }
 
     StringBuilder indexString;
