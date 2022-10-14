@@ -555,6 +555,28 @@ struct IRJVPDerivativeReferenceDecoration : IRDecoration
     IRInst* getJVPFunc() { return getOperand(0); }
 };
 
+struct IRDifferentialGetterDecoration : IRDecoration
+{
+    enum
+    {
+        kOp = kIROp_DifferentialGetterDecoration
+    };
+    IR_LEAF_ISA(DifferentialGetterDecoration)
+
+    IRInst* getGetterFunc() { return getOperand(0); }
+};
+
+struct IRDifferentialSetterDecoration : IRDecoration
+{
+    enum
+    {
+        kOp = kIROp_DifferentialSetterDecoration
+    };
+    IR_LEAF_ISA(DifferentialSetterDecoration)
+
+    IRInst* getSetterFunc() { return getOperand(0); }
+};
+
 
 // An instruction that replaces the function symbol
 // with it's derivative function.
@@ -3186,6 +3208,16 @@ public:
     void addJVPDerivativeReferenceDecoration(IRInst* value, IRInst* jvpFn)
     {
         addDecoration(value, kIROp_JVPDerivativeReferenceDecoration, jvpFn);
+    }
+
+    void addDifferentialGetterDecoration(IRInst* value, IRInst* getterFn)
+    {
+        addDecoration(value, kIROp_DifferentialGetterDecoration, getterFn);
+    }
+
+    void addDifferentialSetterDecoration(IRInst* value, IRInst* setterFn)
+    {
+        addDecoration(value, kIROp_DifferentialSetterDecoration, setterFn);
     }
 
     void addCOMWitnessDecoration(IRInst* value, IRInst* witnessTable)

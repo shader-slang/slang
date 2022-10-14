@@ -5726,7 +5726,7 @@ namespace Slang
         //  
         this->requireDifferentiableTypeDictionary();
 
-        m_mapTypeToIDifferentiableWitness.AddIfNotExists(type, witness);
+        m_mapTypeToIDifferentiableWitness.AddIfNotExists(DeclRefTypeKey(type), witness);
     }
 
     List<KeyValuePair<DeclRefType*, SubtypeWitness*>> DifferentiableTypeSemanticContext::getDifferentiableTypeConformanceList()
@@ -5734,7 +5734,7 @@ namespace Slang
         List<KeyValuePair<DeclRefType*, SubtypeWitness*>> diffConformances;
         for (auto entry : m_mapTypeToIDifferentiableWitness)
         {
-            diffConformances.add(entry);
+            diffConformances.add(KeyValuePair<DeclRefType*, SubtypeWitness*>(entry.Key.type, entry.Value));
         }
 
         return diffConformances;
@@ -5748,7 +5748,7 @@ namespace Slang
         for (auto item : m_mapTypeToIDifferentiableWitness)
         {
             auto entry = builder->create<DifferentiableTypeDictionaryItem>();
-            entry->baseType = item.Key;
+            entry->baseType = item.Key.type;
             entry->confWitness = item.Value;
             entry->parentDecl = dictionary;
 

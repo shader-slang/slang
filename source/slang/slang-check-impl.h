@@ -268,9 +268,36 @@ namespace Slang
         bool isDictionaryRequired();
 
     private:
-            /// Mapping from types to subtype witnesses for conformance to IDifferentiable.
-        Dictionary<DeclRefType*, SubtypeWitness*>   m_mapTypeToIDifferentiableWitness;
+        // Nested struct to override the '==' operator for DeclRefTypes
+        struct DeclRefTypeKey
+        {
+            DeclRefType* type;
 
+            DeclRefTypeKey(DeclRefType* type) : type(type) 
+            {};
+
+            DeclRefTypeKey(DeclRefTypeKey& typeKey) : type(typeKey.type)
+            {};
+
+            DeclRefTypeKey() : type(nullptr)
+            {};
+
+            bool operator==(const DeclRefTypeKey& other) const
+            {
+                return (other.type->declRef == this->type->declRef);
+            }
+
+            HashCode getHashCode() const
+            {
+                Hasher hasher;
+                hasher.hashObject(&type->declRef);
+                return hasher.getResult();
+            }
+        };
+
+            /// Mapping from types to subtype witnesses for conformance to IDifferentiable.
+        Dictionary<DeclRefTypeKey, SubtypeWitness*>   m_mapTypeToIDifferentiableWitness;
+        
             /// List of external dictionaries (from imported modules)
         List<DeclRef<DifferentiableTypeDictionary>> m_importedDictionaries;
 
@@ -1880,6 +1907,8 @@ namespace Slang
         Expr* visitInvokeExpr(InvokeExpr *expr);
 
         Expr* visitVarExpr(VarExpr *expr);
+
+        Expr* visitDifferentiableDeclRefExpr(DifferentiableDeclRefExpr *expr);
 
         Expr* visitTypeCastExpr(TypeCastExpr * expr);
 

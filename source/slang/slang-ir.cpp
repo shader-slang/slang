@@ -6441,6 +6441,37 @@ namespace Slang
         return inst;
     }
 
+    IRInst* findOuterGeneric(IRInst* inst)
+    {
+        if (inst)
+        {
+            inst = inst->getParent();
+        }
+        else
+        {
+            return nullptr;
+        }
+        
+        while(inst)
+        {
+            if (as<IRGeneric>(inst))
+                return inst;
+
+            inst = inst->getParent();
+        }
+        return nullptr;
+    }
+
+    IRInst* findOuterMostGeneric(IRInst* inst)
+    {
+        IRInst* currInst = inst;
+        while(auto outerGeneric = findOuterGeneric(currInst))
+        {
+            currInst = outerGeneric;
+        }
+        return currInst;
+    }
+
     IRGeneric* findSpecializedGeneric(IRSpecialize* specialize)
     {
         return as<IRGeneric>(specialize->getBase());

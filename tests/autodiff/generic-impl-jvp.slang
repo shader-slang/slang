@@ -11,14 +11,42 @@ typealias IDFloat = IFloat & IDifferentiable;
 __generic<T, let N : int>
 struct dvector
 {
-    T values[N];
+    // T values[N];
+    vector<T, N> values;
 };
 
 __generic<T : IDFloat, let N : int>
 struct myvector : IDifferentiable
 {
-    T values[N];
+    // T values[N];
+    vector<T, N> values;
     typedef dvector<T.Differential, N> Differential;
+
+    /*
+    [__unsafeForceInlineEarly]
+    static T.Differential __getDifferentialAtIndexFor_values(dvector<T.Differential, N> d, uint32_t index)
+    {
+        return d.values[index];
+    }
+
+    [__unsafeForceInlineEarly]
+    static void __setDifferentialAtIndexFor_values(inout dvector<T.Differential, N> d, T.Differential v, uint32_t index)
+    {
+        d.values[index] = v;
+    }
+    */
+
+    [__unsafeForceInlineEarly]
+    static vector<T.Differential, N> __getDifferentialFor_values(dvector<T.Differential, N> d)
+    {
+        return d.values;
+    }
+
+    [__unsafeForceInlineEarly]
+    static void __setDifferentialFor_values(inout dvector<T.Differential, N> d, vector<T.Differential, N> v)
+    {
+        d.values = v;
+    }
 
     __init(T c)
     {
@@ -134,11 +162,27 @@ __DifferentialPair<T> dot_jvp(dpvector<T, N> a, dpvector<T, N> b)
 }
 
 __generic<let N : int>
+struct lineardvector
+{
+     myvector<Real, N>.Differential val;
+};
+
+__generic<let N : int>
 struct linearvector : MyLinearArithmeticType, IDifferentiable
 {
-    typedef linearvector<N> Differential;
+    typedef lineardvector<N> Differential;
 
     myvector<Real, N> val;
+
+    static myvector<Real, N>.Differential __getDifferentialForVal(lineardvector<N> dvec)
+    {
+        return dvec.val;
+    }
+
+    static void __setDifferentialForVal(lineardvector<N> dvec, myvector<Real, N>.Differential v)
+    {
+        dvec.val = v;
+    }
 
     static __differentiate_jvp linearvector<N> ladd(linearvector<N> a, linearvector<N> b)
     {
@@ -167,12 +211,12 @@ struct linearvector : MyLinearArithmeticType, IDifferentiable
 
     static Differential dadd(Differential a, Differential b)
     {
-        return a + b;
+        return myvector<Real, N>.dadd(a.val, b.val);
     }
     
     static Differential dmul(This a, Differential b)
     {
-        return a * b;
+        return myvector<Real, N>.dmul(a.val, b.val);
     }
 
     __differentiate_jvp __init(vector<Real, N> a)
@@ -260,8 +304,8 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
         dpfloat4 dpf4 = dpfloat4(myfloat4(float4(1.5, 2.0, 0.5, 1.0)), myfloat4(float4(0.5, 0.8, 1.6, 2.5)));
         dpfloat3 dpf3 = dpfloat3(myfloat3(float3(1.0, 3.0, 5.0)), myfloat3(float3(0.5, 1.5, 2.5)));
 
-        outputBuffer[0] = f(dpa.p());                       // Expect: 22.0
-        outputBuffer[1] = __jvp(f)(dpfloat(2.0, 0.5)).d();  // Expect: 9.5
+        outputBuffer[0] = f(dpa.p());                               // Expect: 22.0
+        outputBuffer[1] = __jvp(f)(dpfloat(2.0, 0.5)).d();          // Expect: 9.5
         outputBuffer[2] = __jvp(f)(dpf4).d().val.values[3];         // Expect: 27.5
         outputBuffer[3] = __jvp(f)(dpf3).d().val.values[1];         // Expect: 40.5
     }

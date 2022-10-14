@@ -739,14 +739,31 @@ struct JVPTranscriber
             else if (as<IRWitnessTableType>(primalType->getDataType()))
                 return (IRType*)primalType;
         
+        case kIROp_ArrayType:
+            {
+                auto primalArrayType = as<IRArrayType>(primalType);
+                if (auto diffElementType = differentiateType(builder, primalArrayType->getElementType()))
+                    return builder->getArrayType(
+                        diffElementType,
+                        primalArrayType->getElementCount());
+                else
+                    return nullptr;
+            }
+        
         case kIROp_FuncType:
             return differentiateFunctionType(builder, as<IRFuncType>(primalType));
 
         case kIROp_OutType:
-            return builder->getOutType(differentiateType(builder, as<IROutType>(primalType)->getValueType()));
+            if (auto diffValueType = differentiateType(builder, as<IROutType>(primalType)->getValueType()))
+                return builder->getOutType(diffValueType);
+            else   
+                return nullptr;
 
         case kIROp_InOutType:
-            return builder->getInOutType(differentiateType(builder, as<IRInOutType>(primalType)->getValueType()));
+            if (auto diffValueType = differentiateType(builder, as<IRInOutType>(primalType)->getValueType()))
+                return builder->getInOutType(diffValueType);
+            else
+                return nullptr;
 
         case kIROp_TupleType:
             {
@@ -909,15 +926,71 @@ struct JVPTranscriber
         return InstPair(primalArith, nullptr);
     }
 
+    
+    InstPair transcribeBinaryLogic(IRBuilder* builder, IRInst* origLogic)
+    {
+        SLANG_ASSERT(origLogic->getOperandCount() == 2);
+
+        // TODO: Check other boolean cases.
+        if (as<IRBoolType>(origLogic->getDataType()))
+        {
+            // Boolean operations are not differentiable. For the linearization
+            // pass, we do not need to do anything but copy them over to the ne
+            // function.
+            auto primalLogic = cloneInst(&cloneEnv, builder, origLogic);
+            return InstPair(primalLogic, nullptr);
+        }
+        
+        SLANG_UNEXPECTED("Logical operation with non-boolean result");
+        UNREACHABLE_RETURN("");
+    }
+
     InstPair transcribeLoad(IRBuilder* builder, IRLoad* origLoad)
     {
         auto origPtr = origLoad->getPtr();
         
         auto primalLoad = cloneInst(&cloneEnv, builder, origLoad);
 
+        IRInst* diffLoad = nullptr;
+
         if (auto diffPtr = lookupDiffInst(origPtr, nullptr))
         {
-            IRLoad* diffLoad = as<IRLoad>(builder->emitLoad(diffPtr));
+            if (auto diffAddress = as<IRFieldAddress>(diffPtr))
+            {
+                // If we have a field address without a proper field key, we need to 
+                // use a differential getter func instead of a traditional load since we 
+                // don't know where to look inside the differential ptr type for the 
+                // differential corresponding to the primal load.
+                // 
+                if (diffAddress->getField() == nullptr)
+                {
+                    auto getterDecoration = diffAddress->findDecoration<IRDifferentialGetterDecoration>();
+                    IRInst* getterFunc = getterDecoration->getGetterFunc();
+                
+                    // Must be a method with a single parameter.
+                    SLANG_ASSERT(as<IRFuncType>(getterFunc->getDataType())->getParamCount() == 1);
+
+                    List<IRInst*> args;
+                    args.add(diffAddress->getBase());
+
+                    // Emit a call to the getter.
+                    diffLoad = builder->emitCallInst(
+                        as<IRFuncType>(getterFunc->getDataType())->getResultType(),
+                        getterFunc,
+                        args);
+                }
+                else
+                {
+                    // We're dealing with a fully formed differential ptr
+                    diffLoad = as<IRLoad>(builder->emitLoad(diffPtr));
+                }
+            }
+            else
+            {
+                // Default case, we're loading from a known differential inst.
+                diffLoad = as<IRLoad>(builder->emitLoad(diffPtr));
+            }
+
             SLANG_ASSERT(diffLoad);
 
             return InstPair(primalLoad, diffLoad);
@@ -935,15 +1008,52 @@ struct JVPTranscriber
         auto diffStoreLocation = lookupDiffInst(origStoreLocation, nullptr);
         auto diffStoreVal = lookupDiffInst(origStoreVal, nullptr);
 
+        IRInst* diffStore = nullptr;
+
         // If the stored value has a differential version, 
         // emit a store instruction for the differential parameter.
         // Otherwise, emit nothing since there's nothing to load.
         // 
         if (diffStoreLocation && diffStoreVal)
         {
-            IRStore* diffStore = as<IRStore>(
+            // If we have a field address without a proper field key, we need to 
+            // use a differential setter func instead of a traditional store since we 
+            // don't know where to store the differential val inside the differential 
+            // ptr type.
+            // 
+            if (auto diffAddress = as<IRFieldAddress>(diffStoreLocation))
+            {
+                if (diffAddress->getField() == nullptr)
+                {
+                    auto setterDecoration = diffAddress->findDecoration<IRDifferentialSetterDecoration>();
+                    IRInst* setterFunc = setterDecoration->getSetterFunc();
+                
+                    // Must be a method with exactly two parameters.
+                    SLANG_ASSERT(as<IRFuncType>(setterFunc->getDataType())->getParamCount() == 2);
+
+                    List<IRInst*> args;
+                    args.add(diffAddress->getBase());
+                    args.add(diffStoreVal);
+
+                    // Emit a call to the setter.
+                    diffStore = builder->emitCallInst(
+                        as<IRFuncType>(setterFunc->getDataType())->getResultType(),
+                        setterFunc,
+                        args);
+                }   
+                else
+                {
+                    // We already know where to store the differential.
+                    diffStore = as<IRStore>(
+                        builder->emitStore(diffStoreLocation, diffStoreVal));
+                }
+            }
+            else
+            {
+                // Default case, storing the entire type (and not a member)
+                diffStore = as<IRStore>(
                     builder->emitStore(diffStoreLocation, diffStoreVal));
-            SLANG_ASSERT(diffStore);
+            }
             
             return InstPair(primalStore, diffStore);
         }
@@ -1100,8 +1210,11 @@ struct JVPTranscriber
                 }
             }
             
+            auto diffReturnType = tryGetDiffPairType(builder, origCall->getFullType());
+            SLANG_ASSERT(diffReturnType);
+
             auto callInst = builder->emitCallInst(
-                tryGetDiffPairType(builder, origCall->getFullType()),
+                diffReturnType,
                 diffCall,
                 args);
             
@@ -1189,14 +1302,41 @@ struct JVPTranscriber
             case kIROp_unconditionalBranch:
                 auto origBranch = as<IRUnconditionalBranch>(origInst);
 
-                // Branches with extra operands not handled currently.
-                if (origBranch->getOperandCount() > 1)
-                    break;
+                // Grab the differentials for any phi nodes.
+                List<IRInst*> pairArgs;
+                for (UIndex ii = 0; ii < origBranch->getArgCount(); ii++)
+                {
+                    auto origArg = origBranch->getArg(ii);
+
+                    IRInst* pairArg = nullptr;
+                    if (auto diffPairType = tryGetDiffPairType(builder, (IRType*)origArg->getDataType()))
+                    {
+                        auto diffArg = lookupDiffInst(origArg, nullptr);
+                        if (!diffArg)
+                        {
+                            diffArg = getDifferentialZeroOfType(builder, (IRType*)origArg->getDataType());
+                        }
+                        
+                        pairArg = builder->emitMakeDifferentialPair(
+                            diffPairType,
+                            lookupPrimalInst(origArg),
+                            diffArg);
+                    }
+                    else
+                    {
+                        pairArg = lookupPrimalInst(origArg);
+                    }
+                    pairArgs.add(pairArg);
+                }
 
                 IRInst* diffBranch = nullptr;
-
                 if (auto diffBlock = findOrTranscribeDiffInst(builder, origBranch->getTargetBlock()))
-                    diffBranch = builder->emitBranch(as<IRBlock>(diffBlock));
+                {
+                    diffBranch = builder->emitBranch(
+                        as<IRBlock>(diffBlock),
+                        pairArgs.getCount(),
+                        pairArgs.getBuffer());
+                }
 
                 // For now, every block in the original fn must have a corresponding
                 // block to compute *both* primals and derivatives (i.e linearized block)
@@ -1219,6 +1359,7 @@ struct JVPTranscriber
         {
             case kIROp_FloatLit:
             case kIROp_VoidLit:
+            case kIROp_IntLit:
                 return InstPair(origInst, nullptr);
         }
 
@@ -1368,13 +1509,30 @@ struct JVPTranscriber
         auto diffBase = findOrTranscribeDiffInst(builder, origBase);
 
         auto primalExtractType = (IRType*)lookupPrimalInst(origExtract->getDataType(), origExtract->getDataType());
-
+ 
         IRInst* primalExtract = builder->emitFieldExtract(primalExtractType, primalBase, origExtract->getField());
         IRInst* diffExtract = nullptr;
 
         if (auto diffExtractType = differentiateType(builder, primalExtractType))
         {
-            diffExtract = builder->emitFieldExtract(diffExtractType, diffBase, origExtract->getField());
+            // Check if we have a getter.
+            if (auto getterDecoration = origExtract->findDecoration<IRDifferentialGetterDecoration>())
+            {
+
+                IRInst* getterFunc = getterDecoration->getGetterFunc();
+                
+                // Must be a method with a single parameter.
+                SLANG_ASSERT(as<IRFuncType>(getterFunc->getDataType())->getParamCount() == 1);
+
+                List<IRInst*> args;
+                args.add(diffBase);
+
+                // Emit a call to the getter.
+                diffExtract = builder->emitCallInst(
+                    diffExtractType,
+                    getterDecoration->getGetterFunc(),
+                    args);
+            }
         }
 
         return InstPair(primalExtract, diffExtract);
@@ -1393,10 +1551,144 @@ struct JVPTranscriber
 
         if (auto diffAddressType = differentiateType(builder, primalAddressType))
         {
-            diffAddress = builder->emitFieldAddress(diffAddressType, diffBase, origAddress->getField());
+            // An issue with transcribing IRFieldAddress is that we don't know if this value is being
+            // loaded from or stored into. Therefore, we will defer this decision by creating a dummy
+            // IRFieldAddress without a field key, with the getter and setter decorations copied over.
+            //
+            diffAddress = builder->emitFieldAddress(diffAddressType, diffBase, nullptr);
+            
+            if (auto getterDecoration = origAddress->findDecoration<IRDifferentialGetterDecoration>())
+                cloneDecoration(getterDecoration, diffAddress);
+
+            if (auto setterDecoration = origAddress->findDecoration<IRDifferentialSetterDecoration>())
+                cloneDecoration(setterDecoration, diffAddress);
         }
 
         return InstPair(primalAddress, diffAddress);
+    }
+
+    
+    InstPair transcribeGetElement(IRBuilder* builder, IRInst* origGetElementPtr)
+    {
+        SLANG_ASSERT(as<IRGetElement>(origGetElementPtr) || as<IRGetElementPtr>(origGetElementPtr));
+
+        IRInst* origBase = origGetElementPtr->getOperand(0);
+        auto primalBase = findOrTranscribePrimalInst(builder, origBase);
+        auto primalIndex = findOrTranscribePrimalInst(builder, origGetElementPtr->getOperand(1));
+
+        auto primalType = (IRType*)lookupPrimalInst(origGetElementPtr->getDataType(), origGetElementPtr->getDataType());
+
+        IRInst* primalOperands[] = {primalBase, primalIndex};
+        IRInst* primalGetElementPtr = builder->emitIntrinsicInst(
+            primalType,
+            origGetElementPtr->getOp(),
+            2,
+            primalOperands);
+
+        IRInst* diffGetElementPtr = nullptr;
+
+        if (auto diffType = differentiateType(builder, primalType))
+        {
+            if (auto diffBase = findOrTranscribeDiffInst(builder, origBase))
+            {
+                IRInst* diffOperands[] = {diffBase, primalIndex};
+                diffGetElementPtr = builder->emitIntrinsicInst(
+                    diffType,
+                    origGetElementPtr->getOp(),
+                    2,
+                    diffOperands);
+            }
+        }
+
+        return InstPair(primalGetElementPtr, diffGetElementPtr);
+    }
+
+    
+    InstPair transcribeLoop(IRBuilder* builder, IRLoop* origLoop)
+    {
+        // The loop comes with three blocks.. we just need to transcribe each one
+        // and assemble the new loop instruction.
+        
+        // Transcribe the target block (this is the 'condition' part of the loop, which
+        // will branch into the loop body)
+        auto diffTargetBlock = findOrTranscribeDiffInst(builder, origLoop->getTargetBlock());
+
+        // Transcribe the break block (this is the block after the exiting the loop)
+        auto diffBreakBlock = findOrTranscribeDiffInst(builder, origLoop->getBreakBlock());
+
+        // Transcribe the continue block (this is the 'update' part of the loop, which will
+        // branch into the condition block)
+        auto diffContinueBlock = findOrTranscribeDiffInst(builder, origLoop->getContinueBlock());
+
+        
+        List<IRInst*> diffLoopOperands;
+        diffLoopOperands.add(diffTargetBlock);
+        diffLoopOperands.add(diffBreakBlock);
+        diffLoopOperands.add(diffContinueBlock);
+
+        // If there are any other operands, use their primal versions.
+        for (UIndex ii = diffLoopOperands.getCount(); ii < origLoop->getOperandCount(); ii++)
+        {
+            auto primalOperand = findOrTranscribePrimalInst(builder, origLoop->getOperand(ii));
+            diffLoopOperands.add(primalOperand);
+        }
+
+        IRInst* diffLoop = builder->emitIntrinsicInst(
+            nullptr,
+            kIROp_loop,
+            diffLoopOperands.getCount(),
+            diffLoopOperands.getBuffer());
+
+        return InstPair(diffLoop, diffLoop);
+    }
+
+    InstPair transcribeIfElse(IRBuilder* builder, IRIfElse* origIfElse)
+    {
+        // The loop comes with three blocks.. we just need to transcribe each one
+        // and assemble the new loop instruction.
+        
+        // Transcribe the target block (this is the 'condition' part of the loop, which
+        // will branch into the loop body).
+        // Note that for the condition we use the primal inst (condition values should not have a 
+        // differential)
+        auto primalConditionBlock = findOrTranscribePrimalInst(builder, origIfElse->getCondition());
+        SLANG_ASSERT(primalConditionBlock);
+
+        // Transcribe the break block (this is the block after the exiting the loop)
+        auto diffTrueBlock = findOrTranscribeDiffInst(builder, origIfElse->getTrueBlock());
+        SLANG_ASSERT(diffTrueBlock);
+
+        // Transcribe the continue block (this is the 'update' part of the loop, which will
+        // branch into the condition block)
+        auto diffFalseBlock = findOrTranscribeDiffInst(builder, origIfElse->getFalseBlock());
+        SLANG_ASSERT(diffFalseBlock);
+
+        // Transcribe the continue block (this is the 'update' part of the loop, which will
+        // branch into the condition block)
+        auto diffAfterBlock = findOrTranscribeDiffInst(builder, origIfElse->getAfterBlock());
+        SLANG_ASSERT(diffAfterBlock);
+
+        
+        List<IRInst*> diffIfElseArgs;
+        diffIfElseArgs.add(primalConditionBlock);
+        diffIfElseArgs.add(diffTrueBlock);
+        diffIfElseArgs.add(diffFalseBlock);
+        diffIfElseArgs.add(diffAfterBlock);
+
+        // If there are any other operands, use their primal versions.
+        for (UIndex ii = diffIfElseArgs.getCount(); ii < origIfElse->getOperandCount(); ii++)
+        {
+            auto primalOperand = findOrTranscribePrimalInst(builder, origIfElse->getOperand(ii));
+            diffIfElseArgs.add(primalOperand);
+        }
+
+        IRInst* diffLoop = builder->emitIntrinsicInst(
+            nullptr,
+            kIROp_ifElse,
+            diffIfElseArgs.getCount(),
+            diffIfElseArgs.getBuffer());
+
+        return InstPair(diffLoop, diffLoop);
     }
 
     // Transcribe a function definition.
@@ -1552,6 +1844,14 @@ struct JVPTranscriber
         case kIROp_Sub:
         case kIROp_Div:
             return transcribeBinaryArith(builder, origInst);
+        
+        case kIROp_Less:
+        case kIROp_Greater:
+        case kIROp_And:
+        case kIROp_Or:
+        case kIROp_Geq:
+        case kIROp_Leq:
+            return transcribeBinaryLogic(builder, origInst);
 
         case kIROp_Construct:
             return transcribeConstruct(builder, origInst);
@@ -1567,15 +1867,17 @@ struct JVPTranscriber
             return transcribeByPassthrough(builder, origInst);
 
         case kIROp_unconditionalBranch:
-        case kIROp_conditionalBranch:
             return transcribeControlFlow(builder, origInst);
 
         case kIROp_FloatLit:
+        case kIROp_IntLit:
         case kIROp_VoidLit:
             return transcribeConst(builder, origInst);
 
         case kIROp_Specialize:
-            return transcribeSpecialize(builder, as<IRSpecialize>(origInst));
+            getSink()->diagnose(origInst->sourceLoc,
+                    Diagnostics::unexpected,
+                    "should not be attempting to differentiate anything specialized here.");
 
         case kIROp_lookup_interface_method:
             return transcibeLookupInterfaceMethod(builder, as<IRLookupWitnessMethod>(origInst));
@@ -1585,6 +1887,16 @@ struct JVPTranscriber
         
         case kIROp_FieldAddress:
             return transcribeFieldAddress(builder, as<IRFieldAddress>(origInst));
+        
+        case kIROp_getElement:
+        case kIROp_getElementPtr:
+            return transcribeGetElement(builder, origInst);
+        
+        case kIROp_loop:
+            return transcribeLoop(builder, as<IRLoop>(origInst));
+
+        case kIROp_ifElse:
+            return transcribeIfElse(builder, as<IRIfElse>(origInst));
 
         case kIROp_DifferentiableTypeDictionary:
             // Ignore dictionary insts.

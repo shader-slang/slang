@@ -7,31 +7,63 @@ RWStructuredBuffer<float> outputBuffer;
 typedef float Real;
 
 __generic<let N : int>
-struct myvector : MyLinearArithmeticType
+struct myvector
 {
     vector<Real, N> val;
+}
 
-    static __differentiate_jvp myvector<N> ladd(myvector<N> a, myvector<N> b)
+extension myvector<3> : MyLinearArithmeticType
+{
+    static __differentiate_jvp myvector<3> ladd(myvector<3> a, myvector<3> b)
     {
-        return myvector<N>(a.val + b.val);
+        return myvector<3>(a.val + b.val);
     }
 
-    static __differentiate_jvp myvector<N> lmul(myvector<N> a, myvector<N> b)
+    static __differentiate_jvp myvector<3> lmul(myvector<3> a, myvector<3> b)
     {
-        return myvector<N>(a.val * b.val);
+        return myvector<3>(a.val * b.val);
     }
 
-    static __differentiate_jvp myvector<N> lscale(float a, myvector<N> b)
+    static __differentiate_jvp myvector<3> lscale(float a, myvector<3> b)
     {
-        return myvector<N>(a * b.val);
+        return myvector<3>(a * b.val);
     }
 
-    static __differentiate_jvp float ldot(myvector<N> a, myvector<N> b)
+    static __differentiate_jvp float ldot(myvector<3> a, myvector<3> b)
     {
         return dot(a.val, b.val);
     }
 
-    __differentiate_jvp __init(vector<Real, N> a)
+    __differentiate_jvp __init(vector<Real, 3> a)
+    {
+        val = a;
+    }
+};
+
+
+extension myvector<4> : MyLinearArithmeticType
+{
+    static __differentiate_jvp myvector<4> ladd(myvector<4> a, myvector<4> b)
+    {
+        return myvector<4>(a.val + b.val);
+    }
+
+    static __differentiate_jvp myvector<4> lmul(myvector<4> a, myvector<4> b)
+    {
+        return myvector<4>(a.val * b.val);
+    }
+
+    static __differentiate_jvp myvector<4> lscale(float a, myvector<4> b)
+    {
+        return myvector<4>(a * b.val);
+    }
+
+    static __differentiate_jvp float ldot(myvector<4> a, myvector<4> b)
+    {
+        return dot(a.val, b.val);
+    }
+
+    __differentiate_jvp __init(vector<Real, 4> a)
     {
         val = a;
     }
@@ -59,9 +91,14 @@ extension myfloat3 : IDifferentiable
         return myfloat3(0);
     }
 
-    static __differentiate_jvp Differential add(Differential a, Differential b)
+    static __differentiate_jvp Differential dadd(Differential a, Differential b)
     {
         return a + b;
+    }
+
+    static __differentiate_jvp Differential dmul(Differential a, Differential b)
+    {
+        return a * b;
     }
 };
 
@@ -74,9 +111,14 @@ extension myfloat4 : IDifferentiable
         return myfloat4(0);
     }
 
-    static __differentiate_jvp Differential add(Differential a, Differential b)
+    static __differentiate_jvp Differential dadd(Differential a, Differential b)
     {
         return a + b;
+    }
+
+    static __differentiate_jvp Differential dmul(Differential a, Differential b)
+    {
+        return a * b;
     }
 };
 

@@ -330,7 +330,6 @@ namespace Slang
             if (auto subtypeWitness = as<SubtypeWitness>(
                 tryGetInterfaceConformanceWitness(result, getASTBuilder()->getDifferentiableInterface())))
             {
-                diffTypeContext->requireDifferentiableTypeDictionary();
                 diffTypeContext->registerDifferentiableType((DeclRefType*)result, subtypeWitness);
             }
         }

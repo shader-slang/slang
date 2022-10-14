@@ -725,6 +725,7 @@ namespace Slang
 
         // Differentiable type checking.
         // TODO: This can be super slow. Switch to caching the result asap.
+        // TODO: Move to CheckInvokeWithCheckedOperands()
         if (this->m_parentFunc && 
             this->m_parentFunc->findModifier<JVPDerivativeModifier>())
         {
@@ -732,8 +733,101 @@ namespace Slang
             if (auto subtypeWitness = as<SubtypeWitness>(
                 tryGetInterfaceConformanceWitness(checkedTerm->type.type, getASTBuilder()->getDifferentiableInterface())))
             {
-                diffTypeContext->requireDifferentiableTypeDictionary();
                 diffTypeContext->registerDifferentiableType((DeclRefType*)checkedTerm->type.type, subtypeWitness);
+            }
+
+            // Check that member lookups on differentiable types have appropriate differential
+            // getters and setters.
+            if (auto declRefExpr = as<DeclRefExpr>(checkedTerm))
+            {
+                // Check if we have a parent container. If yes, then checkedTerm is
+                // referencing a member of this parent.
+                //
+                // TODO: Check if member (not function)
+                auto parentType = DeclRefType::create(getASTBuilder(), declRefExpr->declRef.getParent());
+                
+                if (parentType->declRef.as<AggTypeDeclBase>())
+                {   
+                    // Check if the parent container type is differentiable.
+                    if (auto parentDiffWitness = as<SubtypeWitness>(
+                        tryGetInterfaceConformanceWitness(
+                            parentType, getASTBuilder()->getDifferentiableInterface())))
+                    {
+                        // DifferentiableExpr[Expr]
+                        //  lower-to-ir = lower child expr + decorations as necessary.
+
+                        // If yes, the member in checkedTerm should have a differential getter and setter.
+                        // Otherwise, <ERROR>
+                        auto diffExpr = m_astBuilder->create<DifferentiableDeclRefExpr>();
+                        diffExpr->type = checkedTerm->type;
+                        diffExpr->inner = checkedTerm;
+
+                        {
+                            auto getterName = getName("__getDifferentialFor_" + declRefExpr->name->text);
+                            auto getterResult = lookUpMember(
+                                getASTBuilder(),
+                                this,
+                                getterName,
+                                parentType,
+                                Slang::LookupMask::Function,
+                                Slang::LookupOptions::None);
+
+                            if (!getterResult.isValid())
+                            {
+                                // Diagnose no getter.
+                                // getSink()->diagnose(checkedTerm, Diagnostics::undefinedIdentifier2, getterName);
+                                // Do nothing..
+                            }
+                            else if (getterResult.isOverloaded())
+                            {
+                                // Diagnose ambiguous getter.
+                                SLANG_UNIMPLEMENTED_X("Ambiguous differential getters not supported");
+                            }
+                            else
+                            {
+                                auto getterRefExpr = ConstructLookupResultExpr(
+                                    getterResult.item,
+                                    declRefExpr,
+                                    checkedTerm->loc,
+                                    nullptr);
+                                diffExpr->getterExpr = getterRefExpr;
+                            }
+                            
+                            /* auto setterName = getName("__setDifferentialFor_" + declRefExpr->name->text);
+                            auto setterResult = lookUpMember(
+                                getASTBuilder(),
+                                this,
+                                setterName,
+                                parentType,
+                                Slang::LookupMask::Function,
+                                Slang::LookupOptions::None);
+                            
+                            if (!setterResult.isValid())
+                            {
+                                // Diagnose no setter.
+                                getSink()->diagnose(checkedTerm, Diagnostics::undefinedIdentifier2, setterName);
+                            }
+                            else if (setterResult.isOverloaded())
+                            {
+                                // Diagnose ambiguous setter.
+                                SLANG_UNIMPLEMENTED_X("Ambiguous differential setters not supported");
+                            }
+                            else
+                            {
+                                auto setterRefExpr = ConstructLookupResultExpr(
+                                    setterResult.item,
+                                    declRefExpr,
+                                    checkedTerm->loc,
+                                    nullptr);
+                                // Insert differentiable setter modifier on this expr.
+                                diffExpr->setterExpr = setterRefExpr;
+                            }*/
+                        }
+
+                        checkedTerm = diffExpr;
+                        // Check expression now.
+                    }
+                }
             }
         }
 
@@ -1695,6 +1789,13 @@ namespace Slang
 
         getSink()->diagnose(expr, Diagnostics::undefinedIdentifier2, expr->name);
 
+        return expr;
+    }
+
+    Expr* SemanticsExprVisitor::visitDifferentiableDeclRefExpr(DifferentiableDeclRefExpr* expr)
+    {
+        auto checkedInnerTerm = CheckTerm(expr->inner);
+        expr->type = checkedInnerTerm->type;
         return expr;
     }
 

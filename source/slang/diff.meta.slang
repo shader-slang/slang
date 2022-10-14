@@ -31,17 +31,20 @@ interface IDifferentiable
 extension float : IDifferentiable
 {
     typedef float Differential;
-
+    
+    [__unsafeForceInlineEarly]
     static Differential zero()
     {
         return 0.f;
     }
 
+    [__unsafeForceInlineEarly]
     static Differential dadd(Differential a, Differential b)
     {
         return a + b;
     }
 
+    [__unsafeForceInlineEarly]
     static Differential dmul(This a, Differential b)
     {
         return a * b;
@@ -52,16 +55,19 @@ extension vector<float, 3> : IDifferentiable
 {
     typedef vector<float, 3> Differential;
 
+    [__unsafeForceInlineEarly]
     static Differential zero()
     {
         return vector<float, 3>(0.f);
     }
 
+    [__unsafeForceInlineEarly]
     static Differential dadd(Differential a, Differential b)
     {
         return a + b;
     }
 
+    [__unsafeForceInlineEarly]
     static Differential dmul(This a, Differential b)
     {
         return a * b;
@@ -72,16 +78,19 @@ extension vector<float, 2> : IDifferentiable
 {
     typedef vector<float, 2> Differential;
 
+    [__unsafeForceInlineEarly]
     static Differential zero()
     {
         return vector<float, 2>(0.f);
     }
 
+    [__unsafeForceInlineEarly]
     static Differential dadd(Differential a, Differential b)
     {
         return a + b;
     }
 
+    [__unsafeForceInlineEarly]
     static Differential dmul(This a, Differential b)
     {
         return a * b;
@@ -92,16 +101,19 @@ extension vector<float, 4> : IDifferentiable
 {
     typedef vector<float, 4> Differential;
 
+    [__unsafeForceInlineEarly]
     static Differential zero()
     {
         return vector<float, 4>(0.f);
     }
 
+    [__unsafeForceInlineEarly]
     static Differential dadd(Differential a, Differential b)
     {
         return a + b;
     }
 
+    [__unsafeForceInlineEarly]
     static Differential dmul(This a, Differential b)
     {
         return a * b;

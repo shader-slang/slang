@@ -3038,6 +3038,48 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
         return info;
     }
 
+    LoweredValInfo visitDifferentiableDeclRefExpr(DifferentiableDeclRefExpr* expr)
+    {
+        LoweredValInfo info = lowerSubExpr(expr->inner);
+
+        IRInst* irBaseVal = nullptr;
+        switch (info.flavor)
+        {
+        case LoweredValInfo::Flavor::Simple:
+            irBaseVal = getSimpleVal(context, info);
+            break;
+
+        case LoweredValInfo::Flavor::Ptr:
+            irBaseVal = info.val;
+            break;
+
+        default:
+            SLANG_UNEXPECTED("Unhandled lowered value cases");
+        }
+
+        // If the differentiable expr has an associated getter or setter, lower it
+        // and put it in a decoration.
+        // 
+        if (expr->getterExpr != nullptr)
+        {
+            auto irGetter = lowerSubExpr(expr->getterExpr);
+            SLANG_ASSERT(irGetter.flavor == LoweredValInfo::Flavor::Simple);
+            getBuilder()->addDifferentialGetterDecoration(irBaseVal, irGetter.val);
+        }
+
+        // If the differentiable expr has an associated getter or setter, lower it
+        // and put it in a decoration.
+        // 
+        if (expr->setterExpr != nullptr)
+        {
+            auto irSetter = lowerSubExpr(expr->setterExpr);
+            SLANG_ASSERT(irSetter.flavor == LoweredValInfo::Flavor::Simple);
+            getBuilder()->addDifferentialSetterDecoration(irBaseVal, irSetter.val);
+        }
+
+        return info;
+    }
+
     // Emit IR to denote the forward-mode derivative
     // of the inner func-expr. This will be resolved 
     // to a concrete function during the derivative 
@@ -5865,6 +5907,12 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             }
         }
 
+        if (auto diffTypeDict = getBuilder()->findOrEmitDifferentiableTypeDictionary())
+        {
+            // Place the dictionary at the end of modules and generic blocks.
+            diffTypeDict->moveToEnd();
+        }
+
         return LoweredValInfo();
     }
 
@@ -6155,7 +6203,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         auto irWitnessTable = subBuilder->createWitnessTable(irWitnessTableBaseType, nullptr);
 
         // Register the value now, rather than later, to avoid any possible infinite recursion.
-        setGlobalValue(context, inheritanceDecl, LoweredValInfo::simple(irWitnessTable));
+        setGlobalValue(context, inheritanceDecl, LoweredValInfo::simple(findOuterMostGeneric(irWitnessTable)));
 
         auto irSubType = lowerType(subContext, subType);
         irWitnessTable->setOperand(0, irSubType);
@@ -7250,15 +7298,12 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // 
         if (as<FunctionDeclBase>(leafDecl))
         {
-            for (auto member : genericDecl->members)
+            for (auto diffTypeDict : genericDecl->getMembersOfType<DifferentiableTypeDictionary>())
             {
-                if (auto diffTypeDict = as<DifferentiableTypeDictionary>(member))
-                {
-                    // We directly use lowerDecl() instead of ensureDecl() to emit to
-                    // the current generic block instead of the top-level module.
-                    // 
-                    lowerDecl(subContext, diffTypeDict);
-                }
+                // We directly use lowerDecl() instead of ensureDecl() to emit to
+                // the current generic block instead of the top-level module.
+                // 
+                lowerDecl(subContext, diffTypeDict);
             }
         }
 

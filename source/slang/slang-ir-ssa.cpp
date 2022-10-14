@@ -318,10 +318,17 @@ IRInst* applyAccessChain(
             auto fieldKey = accessChain->getOperand(1);
             auto type = cast<IRPtrTypeBase>(accessChain->getDataType())->getValueType();
             auto baseValue = applyAccessChain(context, builder, baseChain, leafVarValue);
-            return builder->emitFieldExtract(
+            auto extractInst = builder->emitFieldExtract(
                 type,
                 baseValue,
                 fieldKey);
+
+            for (auto decoration : accessChain->getDecorations())
+            {
+                cloneDecoration(decoration, extractInst);
+            }
+            
+            return extractInst;
         }
 
     case kIROp_getElementPtr:
