@@ -2,6 +2,7 @@
 
 #include "slang-hash-utils.h"
 #include "../core/slang-io.h"
+#include "../core/slang-string-util.h"
 
 namespace Slang
 {
@@ -11,26 +12,30 @@ namespace Slang
 SlangResult ShaderCacheIndex::loadCacheIndexFromFile(String filename)
 {
     ComPtr<ISlangBlob> indexBlob;
-    if (SLANG_FAILED(shaderCacheFileSystem->loadFile(filename.getBuffer(), indexBlob.writeRef())))// Should use the mutable system if available
+    if (SLANG_FAILED(shaderCacheFileSystem->loadFile(filename.getBuffer(), indexBlob.writeRef())))
     {
         // Cache index not found, so we'll create and save a new one.
         if (mutableShaderCacheFileSystem)
         {
             SLANG_RETURN_ON_FAIL(mutableShaderCacheFileSystem->saveFile(filename.getBuffer(), nullptr, 0));
             indexFilename = filename;
-            return SLANG_OK;
         }
+        // We still want to return SLANG_OK if there is no pre-existing index file and the filesystem does not
+        // support saving.
+        return SLANG_OK;
     }
 
     String indexString;
     File::readAllText(filename, indexString);
-    for (Index i = 0; i < indexString.getLength(); i += 66)
-    {
-        auto depString = String(indexString.subString(66 * i, 32)); // 66 characters per row, 32 per hash plus either space or newline
-        slang::Digest dependencyDigest = stringToHash(depString);
 
-        auto astString = String(indexString.subString(66 * i + 33, 32));
-        slang::Digest astDigest = stringToHash(astString);
+    List<UnownedStringSlice> lines;
+    StringUtil::calcLines(indexString.getUnownedSlice(), lines);
+    for (auto line : lines)
+    {
+        List<UnownedStringSlice> digests;
+        StringUtil::split(line, ' ', digests); // This will return our two hashes as two elements in digests.
+        auto dependencyDigest = stringToHash(digests[0]);
+        auto astDigest = stringToHash(digests[1]);
 
         ShaderCacheEntry entry = { dependencyDigest, astDigest };
         auto entryNode = entries.AddFirst(entry);
@@ -38,7 +43,7 @@ SlangResult ShaderCacheIndex::loadCacheIndexFromFile(String filename)
     }
 }
 
-ShaderCacheIndex::ShaderCacheEntry* ShaderCacheIndex::findEntry(const slang::Digest& key)
+LinkedNode<ShaderCacheIndex::ShaderCacheEntry>* ShaderCacheIndex::findEntry(const slang::Digest& key)
 {
     LinkedNode<ShaderCacheEntry>* entryNode;
     if (!keyToEntry.TryGetValue(key, entryNode))
@@ -49,15 +54,22 @@ ShaderCacheIndex::ShaderCacheEntry* ShaderCacheIndex::findEntry(const slang::Dig
 
     // If the key is found, we need to move its corresponding entry to the front of
     // the list.
-    entries.MoveToFirst(entryNode);
-    return &entryNode->Value;
+    entries.RemoveFromList(entryNode);
+    entries.AddFirst(entryNode);
+    return entryNode;
 }
 
 void ShaderCacheIndex::addEntry(const slang::Digest& dependencyDigest, const slang::Digest& astDigest, ISlangBlob* compiledCode)
 {
+    if (!mutableShaderCacheFileSystem)
+    {
+        // Should not save new entries if the underlying file system isn't mutable.
+        return;
+    }
+    
     // Check that we do not exceed the cache's size limit by adding another entry. If so,
     // remove the least recently used entry first.
-    if (entries.Count() == entryCountLimit)
+    while (entryCountLimit > 0 && entries.Count() >= entryCountLimit)
     {
         deleteLRUEntry();
     }
@@ -66,30 +78,38 @@ void ShaderCacheIndex::addEntry(const slang::Digest& dependencyDigest, const sla
     auto entryNode = entries.AddFirst(entry);
     keyToEntry.Add(dependencyDigest, entryNode);
 
-    if (mutableShaderCacheFileSystem)
-    {
-        mutableShaderCacheFileSystem->saveFileBlob(hashToString(dependencyDigest).getBuffer(), compiledCode);
-    }
+    mutableShaderCacheFileSystem->saveFileBlob(hashToString(dependencyDigest).getBuffer(), compiledCode);
 
     saveCacheIndexToFile();
 }
 
-void ShaderCacheIndex::updateEntry(const slang::Digest& dependencyDigest, const slang::Digest& astDigest, ISlangBlob* updatedCode)
+void ShaderCacheIndex::updateEntry(
+    LinkedNode<ShaderCacheEntry>* entryNode,
+    const slang::Digest& dependencyDigest,
+    const slang::Digest& astDigest,
+    ISlangBlob* updatedCode)
 {
-    LinkedNode<ShaderCacheEntry>* entryNode;
-    keyToEntry.TryGetValue(dependencyDigest, entryNode);
-    entryNode->Value.astBasedDigest = astDigest;
-
-    if (mutableShaderCacheFileSystem)
+    if (!mutableShaderCacheFileSystem)
     {
-        mutableShaderCacheFileSystem->saveFileBlob(hashToString(dependencyDigest).getBuffer(), updatedCode);
+        // Updating entries requires saving to disk in order to overwrite the old shader file
+        // on disk, so we return if the underlying file system isn't mutable.
+        return;
     }
+
+    entryNode->Value.astBasedDigest = astDigest;
+    mutableShaderCacheFileSystem->saveFileBlob(hashToString(dependencyDigest).getBuffer(), updatedCode);
 
     saveCacheIndexToFile();
 }
 
 SlangResult ShaderCacheIndex::saveCacheIndexToFile()
 {
+    if (!mutableShaderCacheFileSystem)
+    {
+        // Cannot save the index to disk if the underlying file system isn't mutable.
+        return;
+    }
+
     StringBuilder indexString;
     for (auto& entry : entries)
     {
@@ -99,23 +119,25 @@ SlangResult ShaderCacheIndex::saveCacheIndexToFile()
         indexString.append("\n");
     }
 
-    if (mutableShaderCacheFileSystem)
-    {
-        SLANG_RETURN_ON_FAIL(mutableShaderCacheFileSystem->saveFile(indexFilename.getBuffer(), indexString.getBuffer(), indexString.getLength()));
-    }
+    SLANG_RETURN_ON_FAIL(mutableShaderCacheFileSystem->saveFile(indexFilename.getBuffer(), indexString.getBuffer(), indexString.getLength()));
+
     return SLANG_OK;
 }
 
 void ShaderCacheIndex::deleteLRUEntry()
 {
+    if (!mutableShaderCacheFileSystem)
+    {
+        // This is here as a safety precaution but should never be hit as
+        // addEntry() is the only function that should call this.
+        return;
+    }
+
     auto lruEntry = entries.LastNode();
     auto shaderKey = lruEntry->Value.dependencyBasedDigest;
 
     keyToEntry.Remove(shaderKey);
-    if (mutableShaderCacheFileSystem)
-    {
-        mutableShaderCacheFileSystem->remove(hashToString(shaderKey).getBuffer());
-    }
+    mutableShaderCacheFileSystem->remove(hashToString(shaderKey).getBuffer());
 
     entries.Delete(lruEntry);
 }

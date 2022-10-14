@@ -49,6 +49,39 @@ namespace Slang
 
     inline Digest stringToHash(String hashString)
     {
+        uint8_t uint8Hash[16];
 
+        // When the hash is converted to a String, ReverseInternalAscii is called
+        // at the very end. Since there is no way to get a char* for hashString to pass
+        // to ReverseInternalAscii to flip the string back, we instead loop starting from
+        // the end and work backwards towards the beginning.
+        for (Index i = 15; i >= 0; --i)
+        {
+            uint8_t hashSegment = 0;
+            for (Index j = 0; j < 2; ++j)
+            {
+                auto character = hashString[2 * i + j];
+                uint8_t charBits;
+                if (character - 'A' < 0)
+                {
+                    // If the difference is negative, this character is a number.
+                    charBits = character - '0';
+                }
+                else
+                {
+                    // If the difference is 0 or positive, this character is a letter.
+                    charBits = character - 'A' + 10;
+                }
+                // Each character represents 4 bits of data in the original value, so
+                // we left shift charBits in order to mask over the corresponding bits in
+                // hashSegment.
+                hashSegment |= charBits << (4 * (1 - j));
+            }
+            uint8Hash[i] = hashSegment;
+        }
+
+        Digest digest;
+        memcpy(digest.values, uint8Hash, 16);
+        return digest;
     }
 }

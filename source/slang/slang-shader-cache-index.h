@@ -19,7 +19,6 @@ public:
         slang::Digest astBasedDigest;
     };
 
-    // TODO: Constructor with a default size?
     ShaderCacheIndex(SlangInt size)
         : entryCountLimit(size)
     {}
@@ -30,7 +29,7 @@ public:
 
     // Fetch the cache entry corresponding to the provided key. If found, move the entry to
     // the front of entries and return the entry. Else, return nullptr.
-    ShaderCacheEntry* findEntry(const slang::Digest& key);
+    LinkedNode<ShaderCacheEntry>* findEntry(const slang::Digest& key);
 
     // Add an entry to the cache with the provided key and contents hashes. If
     // adding an entry causes the cache to exceed size limitations, this will also
@@ -39,7 +38,11 @@ public:
 
     // Update the contents hash for the specified entry in the cache and update the
     // corresponding file on disk.
-    void updateEntry(const slang::Digest& dependencyDigest, const slang::Digest& astDigest, ISlangBlob* updatedCode);
+    void updateEntry(
+        LinkedNode<ShaderCacheEntry>* entryNode,
+        const slang::Digest& dependencyDigest,
+        const slang::Digest& astDigest,
+        ISlangBlob* updatedCode);
 
 private:
     // Update the cache index on disk. This should be called any time an entry changes.
@@ -59,7 +62,6 @@ private:
     LinkedList<ShaderCacheEntry> entries;
 
     // The underlying file system used for the shader cache.
-    // TODO: Should a mutable file system be required?
     ISlangFileSystem* shaderCacheFileSystem = nullptr;
     ComPtr<ISlangMutableFileSystem> mutableShaderCacheFileSystem = nullptr;
 

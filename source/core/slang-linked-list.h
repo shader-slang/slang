@@ -253,9 +253,18 @@ public:
         count++;
         return n;
     };
-    void MoveToFirst(LinkedNode<T>* n)
+    void AddFirst(LinkedNode<T>* n)
     {
-        // Remove the node from its current position.
+        n->prev = 0;
+        n->next = head;
+        if (head)
+            head->prev = n;
+        head = n;
+        if (!tail)
+            tail = n;
+    }
+    void RemoveFromList(LinkedNode<T>* n)
+    {
         LinkedNode<T>* n1, * n2 = 0;
         n1 = n->prev;
         n2 = n->next;
@@ -267,15 +276,6 @@ public:
             n2->prev = n1;
         else
             tail = n1;
-
-        // Insert the node in front.
-        n->prev = 0;
-        n->next = head;
-        if (head)
-            head->prev = n;
-        head = n;
-        if (!tail)
-            tail = n;
     }
     void Delete(LinkedNode<T>* n, int Count = 1)
     {
