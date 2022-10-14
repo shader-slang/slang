@@ -70,7 +70,7 @@ SlangResult ShaderCacheIndex::loadCacheIndexFromFile(String filename)
     return SLANG_OK;
 }
 
-LinkedNode<ShaderCacheIndex::ShaderCacheEntry>* ShaderCacheIndex::findEntry(const slang::Digest& key, ISlangBlob** outCompiledCode)
+LinkedNode<ShaderCacheEntry>* ShaderCacheIndex::findEntry(const slang::Digest& key, ISlangBlob** outCompiledCode)
 {
     LinkedNode<ShaderCacheEntry>* entryNode;
     if (!keyToEntry.TryGetValue(key, entryNode))

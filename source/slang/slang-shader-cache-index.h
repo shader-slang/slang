@@ -10,14 +10,15 @@
 namespace Slang
 {
 
+struct ShaderCacheEntry
+{
+    slang::Digest dependencyBasedDigest;
+    slang::Digest astBasedDigest;
+};
+
 class ShaderCacheIndex
 {
 public:
-    struct ShaderCacheEntry
-    {
-        slang::Digest dependencyBasedDigest;
-        slang::Digest astBasedDigest;
-    };
 
     ShaderCacheIndex(SlangInt size, const char* path, ISlangFileSystem* fileSystem);
 

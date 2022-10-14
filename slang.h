@@ -4150,10 +4150,7 @@ namespace slang
 
         uint32_t getHashCode()
         {
-            uint32_t hash = (values[0] * 16777619) ^ values[1];
-            hash = (hash * 16777619) ^ values[2];
-            hash = (hash * 16777619) ^ values[3];
-            return hash;
+            return values[0];
         }
     };
 
