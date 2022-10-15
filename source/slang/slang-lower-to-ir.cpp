@@ -8102,6 +8102,11 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             getBuilder()->addDecoration(irFunc, kIROp_UnsafeForceInlineEarlyDecoration);
         }
 
+        if (decl->findModifier<ForceInlineAttribute>())
+        {
+            getBuilder()->addDecoration(irFunc, kIROp_ForceInlineDecoration);
+        }
+
         if (auto attr = decl->findModifier<CustomJVPAttribute>())
         {
             auto loweredVal = lowerLValueExpr(this->context, attr->funcDeclRef);
