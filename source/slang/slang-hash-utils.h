@@ -58,7 +58,8 @@ namespace Slang
         // the end and work backwards towards the beginning.
         for (Index i = 0; i < 16; i++)
         {
-            uint8Hash[i] = CharUtil::getHexDigitValue(hashString[i * 2]) * 16 + CharUtil::getHexDigitValue(hashString[i * 2 + 1]);
+            uint8Hash[i] = (uint8_t)CharUtil::getHexDigitValue(hashString[i * 2]) * 16
+                         + (uint8_t)CharUtil::getHexDigitValue(hashString[i * 2 + 1]);
         }
 
         Digest digest;
