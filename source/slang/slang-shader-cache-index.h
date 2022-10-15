@@ -42,10 +42,10 @@ public:
 private:
     // Load a previous cache index saved to disk. If not found, create a new cache index
     // and save it to disk as filename.
-    SlangResult loadCacheIndexFromFile();
+    void loadCacheIndexFromFile();
 
     // Update the cache index on disk. This should be called any time an entry changes.
-    SlangResult saveCacheIndexToFile();
+    void saveCacheIndexToFile();
 
     // Delete the last entry (the least recently used) from entries, remove its key/value pair
     // from keyToEntry, and remove the corresponding file on disk. This should only be called

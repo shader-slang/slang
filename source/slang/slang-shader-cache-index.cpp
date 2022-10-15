@@ -38,7 +38,7 @@ ShaderCacheIndex::ShaderCacheIndex(SlangInt size, String path, ISlangFileSystem*
 
 // Load a previous cache index saved to disk. If not found, create a new cache index
 // and save it to disk as filename.
-SlangResult ShaderCacheIndex::loadCacheIndexFromFile()
+void ShaderCacheIndex::loadCacheIndexFromFile()
 {
     ComPtr<ISlangBlob> indexBlob;
     if (SLANG_FAILED(shaderCacheFileSystem->loadFile(indexFilename.getBuffer(), indexBlob.writeRef())))
@@ -46,11 +46,11 @@ SlangResult ShaderCacheIndex::loadCacheIndexFromFile()
         // Cache index not found, so we'll create and save a new one.
         if (mutableShaderCacheFileSystem)
         {
-            SLANG_RETURN_ON_FAIL(mutableShaderCacheFileSystem->saveFile(indexFilename.getBuffer(), nullptr, 0));
-            return SLANG_OK;
+            mutableShaderCacheFileSystem->saveFile(indexFilename.getBuffer(), nullptr, 0);
+            return;
         }
         // Cache index not found and we can't save a new one due to the file system being immutable.
-        return SLANG_FAIL;
+        return;
     }
 
     String indexString;
@@ -69,7 +69,6 @@ SlangResult ShaderCacheIndex::loadCacheIndexFromFile()
         auto entryNode = entries.AddFirst(entry);
         keyToEntry.Add(dependencyDigest, entryNode);
     }
-    return SLANG_OK;
 }
 
 LinkedNode<ShaderCacheEntry>* ShaderCacheIndex::findEntry(const slang::Digest& key, ISlangBlob** outCompiledCode)
@@ -133,14 +132,12 @@ void ShaderCacheIndex::updateEntry(
     saveCacheIndexToFile();
 }
 
-SlangResult ShaderCacheIndex::saveCacheIndexToFile()
+void ShaderCacheIndex::saveCacheIndexToFile()
 {
     if (!mutableShaderCacheFileSystem)
     {
         // Cannot save the index to disk if the underlying file system isn't mutable.
-        // A file system of some kind is required for shader caching to even be enabled, so
-        // this is not a failure.
-        return SLANG_OK;
+        return;
     }
 
     StringBuilder indexString;
@@ -152,9 +149,7 @@ SlangResult ShaderCacheIndex::saveCacheIndexToFile()
         indexString.append("\n");
     }
 
-    SLANG_RETURN_ON_FAIL(mutableShaderCacheFileSystem->saveFile(indexFilename.getBuffer(), indexString.getBuffer(), indexString.getLength()));
-
-    return SLANG_OK;
+    mutableShaderCacheFileSystem->saveFile(indexFilename.getBuffer(), indexString.getBuffer(), indexString.getLength());
 }
 
 void ShaderCacheIndex::deleteLRUEntry()
