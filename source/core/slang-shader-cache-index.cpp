@@ -1,10 +1,10 @@
 // slang-shader-cache-index.cpp
 #include "slang-shader-cache-index.h"
 
-#include "slang-hash-utils.h"
-#include "../core/slang-io.h"
-#include "../core/slang-string-util.h"
-#include "../core/slang-file-system.h"
+#include "../slang/slang-hash-utils.h"
+#include "slang-io.h"
+#include "slang-string-util.h"
+#include "slang-file-system.h"
 
 namespace Slang
 {

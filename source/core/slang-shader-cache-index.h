@@ -3,9 +3,9 @@
 #include "../../slang.h"
 #include "../../slang-com-ptr.h"
 
-#include "../core/slang-string.h"
-#include "../core/slang-dictionary.h"
-#include "../core/slang-linked-list.h"
+#include "slang-string.h"
+#include "slang-dictionary.h"
+#include "slang-linked-list.h"
 
 namespace Slang
 {
