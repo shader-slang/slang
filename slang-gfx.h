@@ -2130,6 +2130,19 @@ public:
         SlangLineDirectiveMode lineDirectiveMode = SLANG_LINE_DIRECTIVE_MODE_DEFAULT;
     };
 
+    struct ShaderCacheDesc
+    {
+        // The root directory for the shader cache.
+        const char* shaderCachePath = nullptr;
+        // The filename for an existing shader cache index file.
+        const char* indexFilename = "cacheIndex.txt";
+        // The file system for loading cached shader kernels. The layer does not maintain a strong reference to the object,
+        // instead the user is responsible for holding the object alive during the lifetime of an `IDevice`.
+        ISlangFileSystem* shaderCacheFileSystem = nullptr;
+        // The maximum number of entries stored in the cache.
+        GfxCount maxEntryCount = 1000;
+    };
+
     struct InteropHandles
     {
         InteropHandle handles[3] = {};
@@ -2153,11 +2166,8 @@ public:
         ISlangUnknown* apiCommandDispatcher = nullptr;
         // The slot (typically UAV) used to identify NVAPI intrinsics. If >=0 NVAPI is required.
         GfxIndex nvapiExtnSlot = -1;
-        // The root directory for the shader cache.
-        const char* shaderCachePath = nullptr;
-        // The file system for loading cached shader kernels. The layer does not maintain a strong reference to the object,
-        // instead the user is responsible for holding the object alive during the lifetime of an `IDevice`.
-        ISlangFileSystem* shaderCacheFileSystem = nullptr;
+        // Configurations for the shader cache.
+        ShaderCacheDesc shaderCache = {};
         // Configurations for Slang compiler.
         SlangDesc slang = {};
 

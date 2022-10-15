@@ -351,11 +351,8 @@ Result RendererBase::getEntryPointCodeFromShaderCache(
     slang::IBlob** outCode,
     slang::IBlob** outDiagnostics)
 {
-    // TODO: Need a way in filesystem to query both file size and file creation time, if cache size exceeds
-    // specified maximum size (in bytes or files) then delete oldest files - cache eviction policy
-
-    // Immediately call getEntryPointCode if no shader cache was provided on initialization
-    if (!shaderCacheFileSystem)
+    // Immediately call getEntryPointCode if no shader cache has been initialized
+    if (!cacheIndex)
     {
         return program->getEntryPointCode(entryPointIndex, targetIndex, outCode, outDiagnostics);
     }
@@ -372,26 +369,20 @@ Result RendererBase::getEntryPointCodeFromShaderCache(
 
     // Produce a hash using the AST for this program - This is needed to check whether a cache entry is effectively dirty,
     // or to save along with the compiled code into an entry so the entry can be checked if fetched later on.
-    slang::Digest ASTHash;
-    program->computeASTBasedHash(&ASTHash);
-    
+    slang::Digest contentsHash;
+    program->computeASTBasedHash(&contentsHash);
+
     ComPtr<ISlangBlob> codeBlob;
 
-    // Query shaderCacheFileSystem for an entry whose key matches shaderFilename
-    //    - If we find it, then copy the file contents into memory and return in outCode
-    auto result = shaderCacheFileSystem->loadFile(shaderKey.getBuffer(), codeBlob.writeRef());
-    
-    if (SLANG_FAILED(result))
+    // Query the shader cache index for an entry with shaderKeyHash as its key. 
+    auto entry = cacheIndex->findEntry(shaderKey, codeBlob.writeRef());
+    if (!entry)
     {
-        // If we didn't find it, call program->getEntryPointCode() to get and return the code. We also
-        // make sure to save a new entry in the shader cache.
+        // If we didn't find it, call program->getEntryPointCode() to get and return the code. We then
+        // save a new entry in the shader cache.
         if (SLANG_SUCCEEDED(program->getEntryPointCode(entryPointIndex, targetIndex, codeBlob.writeRef(), outDiagnostics)))
         {
-            if (mutableShaderCacheFileSystem)
-            {
-                updateCacheEntry(mutableShaderCacheFileSystem, codeBlob, shaderKey, ASTHash);
-            }
-
+            cacheIndex->addEntry(shaderKey, contentsHash, codeBlob);
             shaderCacheMissCount++;
         }
         else
@@ -403,22 +394,16 @@ Result RendererBase::getEntryPointCodeFromShaderCache(
     }
     else
     {
-        // If the entry exists, we need to check that the entry isn't effectively dirty. Since we stored
-        // the AST hash with the compiled code, we can determine this by comparing the stored hash with the
-        // AST hash generated earlier.
-        auto entryContents = codeBlob->getBufferPointer();
-        auto hashSize = sizeof(slang::Digest);
-        if (memcmp(ASTHash.values, entryContents, hashSize) != 0)
+        // If the entry exists, we need to check that the entry hasn't changed changed since it was last accessed.
+        // Since we also stored the AST hash in the shader cache index, we can determine this by comparing the stored hash
+        // with the AST hash we generated earlier.
+        if (contentsHash == entry->Value.astBasedDigest)
         {
             // The AST hash stored in the entry does not match the AST hash generated earlier, indicating
             // that the shader code has changed and the entry needs to be updated.
             if (SLANG_SUCCEEDED(program->getEntryPointCode(entryPointIndex, targetIndex, codeBlob.writeRef(), outDiagnostics)))
             {
-                if (mutableShaderCacheFileSystem)
-                {
-                    updateCacheEntry(mutableShaderCacheFileSystem, codeBlob, shaderKey, ASTHash);
-                }
-
+                cacheIndex->updateEntry(entry, shaderKey, contentsHash, codeBlob);
                 shaderCacheEntryDirtyCount++;
             }
             else
@@ -430,9 +415,7 @@ Result RendererBase::getEntryPointCodeFromShaderCache(
         }
         else
         {
-            auto compiledCode = RawBlob::create((uint8_t*)codeBlob->getBufferPointer() + hashSize, codeBlob->getBufferSize() - hashSize);
-            codeBlob = compiledCode;
-
+            // The entry is up-to-date, so we can immediately return the fetched code.
             shaderCacheHitCount++;
         }
     }
@@ -463,29 +446,10 @@ IDevice* gfx::RendererBase::getInterface(const Guid& guid)
 
 SLANG_NO_THROW Result SLANG_MCALL RendererBase::initialize(const Desc& desc)
 {
-    // TODO: This logic for initalizing the shader cache has been replicated inside
-    // the constructor for ShaderCacheIndex. Remove when ShaderCacheIndex is integrated in.
-
-    // If a shader cache file system was provided, use the provided system.
-    if (desc.shaderCacheFileSystem)
+    auto cacheDesc = desc.shaderCache;
+    if (cacheDesc.shaderCachePath || cacheDesc.shaderCacheFileSystem)
     {
-        shaderCacheFileSystem = desc.shaderCacheFileSystem;
-    }
-    if (desc.shaderCachePath)
-    {
-         // Only a path was provided, create a RelativeFileSystem using the path
-        if (!shaderCacheFileSystem)
-        {
-            shaderCacheFileSystem = OSFileSystem::getMutableSingleton();
-        }
-        shaderCacheFileSystem = new RelativeFileSystem(shaderCacheFileSystem, desc.shaderCachePath);
-    }
-
-    // If we initialized a file system for the shader cache, check if it's mutable. If so, store a pointer
-    // to the mutable version in order to save new entries later.
-    if (shaderCacheFileSystem)
-    {
-        shaderCacheFileSystem->queryInterface(ISlangMutableFileSystem::getTypeGuid(), (void**)mutableShaderCacheFileSystem.writeRef());
+        cacheIndex = new ShaderCacheIndex(cacheDesc.maxEntryCount, cacheDesc.shaderCachePath, cacheDesc.shaderCacheFileSystem, cacheDesc.indexFilename);
     }
 
     if (desc.apiCommandDispatcher)

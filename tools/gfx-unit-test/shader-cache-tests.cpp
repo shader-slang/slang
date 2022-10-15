@@ -107,7 +107,7 @@ namespace gfx_test
         void generateNewDevice()
         {
             freeOldResources();
-            device = createTestingDevice(context, api, cacheFileSystem);
+            device = createTestingDevice(context, api, 1000, cacheFileSystem);
         }
 
         void init(ComPtr<IDevice> device, UnitTestContext* context)
@@ -689,6 +689,150 @@ namespace gfx_test
         }
     };
 
+    // Same as MultipleEntryShaderCache, but we now have a maximum cache entry limit of 2, so the cache
+// will now evict entries when it reaches capacity
+    struct CacheWithMaxEntryLimit : BaseShaderCacheTest
+    {
+        void modifyShaderA(Slang::String shaderContents)
+        {
+            diskFileSystem->saveFile("shader-cache-shader-A.slang", shaderContents.getBuffer(), shaderContents.getLength());
+        }
+
+        void modifyShaderB(Slang::String shaderContents)
+        {
+            diskFileSystem->saveFile("shader-cache-shader-B.slang", shaderContents.getBuffer(), shaderContents.getLength());
+        }
+
+        void modifyShaderC(Slang::String shaderContents)
+        {
+            diskFileSystem->saveFile("shader-cache-shader-C.slang", shaderContents.getBuffer(), shaderContents.getLength());
+        }
+
+        void generateNewDevice(GfxCount maxCacheSize)
+        {
+            freeOldResources();
+            device = createTestingDevice(context, api, maxCacheSize, cacheFileSystem);
+        }
+
+        void generateNewPipelineState(GfxIndex shaderIndex)
+        {
+            ComPtr<IShaderProgram> shaderProgram;
+            slang::ProgramLayout* slangReflection;
+            char* shaderFilename;
+            switch (shaderIndex)
+            {
+            case 0:
+                shaderFilename = "shader-cache-shader-A";
+                break;
+            case 1:
+                shaderFilename = "shader-cache-shader-B";
+                break;
+            case 2:
+                shaderFilename = "shader-cache-shader-C";
+                break;
+            default:
+                // Should never reach this point since we wrote the test
+                SLANG_IGNORE_TEST;
+            }
+            GFX_CHECK_CALL_ABORT(loadComputeProgram(device, shaderProgram, shaderFilename, "computeMain", slangReflection));
+
+            ComputePipelineStateDesc pipelineDesc = {};
+            pipelineDesc.program = shaderProgram.get();
+            GFX_CHECK_CALL_ABORT(
+                device->createComputePipelineState(pipelineDesc, pipelineState.writeRef()));
+        }
+
+        void run()
+        {
+            ComPtr<IShaderCacheStatistics> shaderCacheStats;
+
+            // Due to needing a workaround to prevent loading old, outdated modules, we need to
+            // recreate the device between each segment of the test. However, we need to maintain the
+            // same cache filesystem for the duration of the test, so the device is immediately recreated
+            // to ensure we can pass the filesystem all the way through.
+            //
+            // TODO: Remove the repeated generateNewDevice() and createRequiredResources() calls once
+            // a solution exists that allows source code changes under the same module name to be picked
+            // up on load.
+            generateNewDevice(2);
+            createRequiredResources();
+            modifyShaderA(contentsA);
+            modifyShaderB(contentsB);
+            modifyShaderC(contentsC);
+            generateNewPipelineState(0);
+            submitGPUWork();
+            generateNewPipelineState(1);
+            submitGPUWork();
+            generateNewPipelineState(2);
+            submitGPUWork();
+
+            // Cache limit 2, three unique shaders
+            device->queryInterface(SLANG_UUID_IShaderCacheStatistics, (void**)shaderCacheStats.writeRef());
+            SLANG_CHECK(shaderCacheStats->getCacheMissCount() == 3);
+            SLANG_CHECK(shaderCacheStats->getCacheHitCount() == 0);
+            SLANG_CHECK(shaderCacheStats->getCacheEntryDirtyCount() == 0);
+
+            generateNewDevice(2);
+            createRequiredResources();
+            generateNewPipelineState(1);
+            submitGPUWork();
+            generateNewPipelineState(0);
+            submitGPUWork();
+
+            // Cache limit 2, access shaders B and then A
+            device->queryInterface(SLANG_UUID_IShaderCacheStatistics, (void**)shaderCacheStats.writeRef());
+            SLANG_CHECK(shaderCacheStats->getCacheMissCount() == 1);
+            SLANG_CHECK(shaderCacheStats->getCacheHitCount() == 1);
+            SLANG_CHECK(shaderCacheStats->getCacheEntryDirtyCount() == 0);
+
+            generateNewDevice(2);
+            createRequiredResources();
+            modifyShaderB(contentsA);
+            generateNewPipelineState(1);
+            submitGPUWork();
+            generateNewPipelineState(2);
+            submitGPUWork();
+
+            // Cache limit 2, access shaders B and then C after modifying B
+            device->queryInterface(SLANG_UUID_IShaderCacheStatistics, (void**)shaderCacheStats.writeRef());
+            SLANG_CHECK(shaderCacheStats->getCacheMissCount() == 1);
+            SLANG_CHECK(shaderCacheStats->getCacheHitCount() == 0);
+            SLANG_CHECK(shaderCacheStats->getCacheEntryDirtyCount() == 1);
+
+            generateNewDevice(3);
+            createRequiredResources();
+            modifyShaderA(contentsC);
+            modifyShaderC(contentsB);
+            generateNewPipelineState(0);
+            submitGPUWork();
+            generateNewPipelineState(1);
+            submitGPUWork();
+            generateNewPipelineState(2);
+            submitGPUWork();
+
+            // Cache limit 3, access shaders A then B then C after modifying A and C
+            device->queryInterface(SLANG_UUID_IShaderCacheStatistics, (void**)shaderCacheStats.writeRef());
+            SLANG_CHECK(shaderCacheStats->getCacheMissCount() == 1);
+            SLANG_CHECK(shaderCacheStats->getCacheHitCount() == 1);
+            SLANG_CHECK(shaderCacheStats->getCacheEntryDirtyCount() == 1);
+
+            generateNewDevice(3);
+            createRequiredResources();
+            generateNewPipelineState(0);
+            submitGPUWork();
+            generateNewPipelineState(1);
+            submitGPUWork();
+            generateNewPipelineState(2);
+            submitGPUWork();
+
+            // Cache limit 3, access shaders A then B then C
+            device->queryInterface(SLANG_UUID_IShaderCacheStatistics, (void**)shaderCacheStats.writeRef());
+            SLANG_CHECK(shaderCacheStats->getCacheMissCount() == 0);
+            SLANG_CHECK(shaderCacheStats->getCacheHitCount() == 0);
+            SLANG_CHECK(shaderCacheStats->getCacheEntryDirtyCount() == 3);
+        }
+    };
+
     template <typename T>
     void shaderCacheTestImpl(ComPtr<IDevice> device, UnitTestContext* context)
     {
@@ -745,5 +889,15 @@ namespace gfx_test
     SLANG_UNIT_TEST(specializationArgsShaderCacheVulkan)
     {
         runTestImpl(shaderCacheTestImpl<SpecializationArgsEntries>, unitTestContext, Slang::RenderApiFlag::Vulkan);
+    }
+
+    SLANG_UNIT_TEST(cacheEvictionPolicyD3D12)
+    {
+        runTestImpl(shaderCacheTestImpl<CacheWithMaxEntryLimit>, unitTestContext, Slang::RenderApiFlag::D3D12);
+    }
+
+    SLANG_UNIT_TEST(cacheEvictionPolicyVulkan)
+    {
+        runTestImpl(shaderCacheTestImpl<CacheWithMaxEntryLimit>, unitTestContext, Slang::RenderApiFlag::Vulkan);
     }
 }
