@@ -31,22 +31,16 @@ SLANG_UNIT_TEST(digestUtils)
     }
 
     {
-        String digestString = String("5D6CC58E1824A4DFD0CF57395B603316");
+        auto digestString = UnownedStringSlice("5D6CC58E1824A4DFD0CF57395B603316");
         slang::Digest digest = stringToHash(digestString);
-
-        SLANG_CHECK(digest.values[0] == 2395303005);
-        SLANG_CHECK(digest.values[1] == 3752076312);
-        SLANG_CHECK(digest.values[2] == 962056144);
-        SLANG_CHECK(digest.values[3] == 372465755);
+        auto resultString = hashToString(digest);
+        SLANG_CHECK(resultString == digestString);
     }
 
     {
-        String digestString = String("01000000020000000300000004000000");
+        auto  digestString = UnownedStringSlice("01000000020000000300000004000000");
         slang::Digest digest = stringToHash(digestString);
-
-        SLANG_CHECK(digest.values[0] == 1);
-        SLANG_CHECK(digest.values[1] == 2);
-        SLANG_CHECK(digest.values[2] == 3);
-        SLANG_CHECK(digest.values[3] == 4);
+        auto resultString = hashToString(digest);
+        SLANG_CHECK(resultString == digestString);
     }
 }

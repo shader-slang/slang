@@ -4,6 +4,7 @@
 #include "../core/slang-basic.h"
 #include "../core/slang-md5.h"
 #include "../core/slang-digest.h"
+#include "../core/slang-char-util.h"
 
 namespace Slang
 {
@@ -18,7 +19,7 @@ namespace Slang
     }
 
     // Combines the two provided hashes.
-    inline Digest combineHashes(const Digest& hashA, const Digest& hashB)
+    inline Digest combineDigests(const Digest& hashA, const Digest& hashB)
     {
         DigestBuilder builder;
         builder.addToDigest(hashA);
@@ -27,9 +28,9 @@ namespace Slang
     }
 
     // Returns the stored hash in checksum as a String.
-    inline StringBuilder hashToString(const Digest& hash)
+    inline String hashToString(const Digest& hash)
     {
-        StringBuilder filename;
+        StringBuilder hashString;
 
         uint8_t* uint8Hash = (uint8_t*)hash.values;
 
@@ -39,15 +40,15 @@ namespace Slang
 
             if (hashSegmentString.getLength() == 1)
             {
-                filename.append("0");
+                hashString.append("0");
             }
-            filename.append(hashSegmentString.getBuffer());
+            hashString.append(hashSegmentString.getBuffer());
         }
 
-        return filename;
+        return hashString;
     }
 
-    inline Digest stringToHash(String hashString)
+    inline Digest stringToHash(UnownedStringSlice hashString)
     {
         uint8_t uint8Hash[16];
 
@@ -55,29 +56,9 @@ namespace Slang
         // at the very end. Since there is no way to get a char* for hashString to pass
         // to ReverseInternalAscii to flip the string back, we instead loop starting from
         // the end and work backwards towards the beginning.
-        for (Index i = 15; i >= 0; --i)
+        for (Index i = 0; i < 16; i++)
         {
-            uint8_t hashSegment = 0;
-            for (Index j = 0; j < 2; ++j)
-            {
-                auto character = hashString[2 * i + j];
-                uint8_t charBits;
-                if (character - 'A' < 0)
-                {
-                    // If the difference is negative, this character is a number.
-                    charBits = character - '0';
-                }
-                else
-                {
-                    // If the difference is 0 or positive, this character is a letter.
-                    charBits = character - 'A' + 10;
-                }
-                // Each character represents 4 bits of data in the original value, so
-                // we left shift charBits in order to mask over the corresponding bits in
-                // hashSegment.
-                hashSegment |= charBits << (4 * (1 - j));
-            }
-            uint8Hash[i] = hashSegment;
+            uint8Hash[i] = CharUtil::getHexDigitValue(hashString[i * 2]) * 16 + CharUtil::getHexDigitValue(hashString[i * 2 + 1]);
         }
 
         Digest digest;

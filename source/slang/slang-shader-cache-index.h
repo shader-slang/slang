@@ -19,12 +19,7 @@ struct ShaderCacheEntry
 class ShaderCacheIndex
 {
 public:
-
-    ShaderCacheIndex(SlangInt size, const char* path, ISlangFileSystem* fileSystem);
-
-    // Load a previous cache index saved to disk. If not found, create a new cache index
-    // and save it to disk as filename.
-    SlangResult loadCacheIndexFromFile(String filename);
+    ShaderCacheIndex(SlangInt size, String path, ISlangFileSystem* fileSystem, String filename);
 
     // Fetch the cache entry corresponding to the provided key. If found, move the entry to
     // the front of entries and return the entry and the corresponding compiled code in
@@ -45,6 +40,10 @@ public:
         ISlangBlob* updatedCode);
 
 private:
+    // Load a previous cache index saved to disk. If not found, create a new cache index
+    // and save it to disk as filename.
+    SlangResult loadCacheIndexFromFile();
+
     // Update the cache index on disk. This should be called any time an entry changes.
     SlangResult saveCacheIndexToFile();
 
@@ -62,14 +61,14 @@ private:
     LinkedList<ShaderCacheEntry> entries;
 
     // The underlying file system used for the shader cache.
-    ISlangFileSystem* shaderCacheFileSystem = nullptr;
+    ComPtr<ISlangFileSystem> shaderCacheFileSystem = nullptr;
     ComPtr<ISlangMutableFileSystem> mutableShaderCacheFileSystem = nullptr;
 
     // The filename of the index on disk.
     String indexFilename;
 
     // The maximum number of cache entries allowed.
-    SlangInt entryCountLimit = -1;
+    SlangInt entryCountLimit = 1000;
 };
 
 }

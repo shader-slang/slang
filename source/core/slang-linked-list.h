@@ -243,13 +243,7 @@ public:
     {
         LinkedNode<T>* n = new LinkedNode<T>(this);
         n->Value = nData;
-        n->prev = 0;
-        n->next = head;
-        if (head)
-            head->prev = n;
-        head = n;
-        if (!tail)
-            tail = n;
+        AddFirst(n);
         count++;
         return n;
     };

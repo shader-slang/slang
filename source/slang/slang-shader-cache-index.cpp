@@ -9,12 +9,13 @@
 namespace Slang
 {
 
-ShaderCacheIndex::ShaderCacheIndex(SlangInt size, const char* path, ISlangFileSystem* fileSystem)
+ShaderCacheIndex::ShaderCacheIndex(SlangInt size, String path, ISlangFileSystem* fileSystem, String filename)
 {
     entryCountLimit = size;
     shaderCacheFileSystem = fileSystem;
+    indexFilename = filename;
 
-    if (path)
+    if (!path.getBuffer())
     {
         if (!shaderCacheFileSystem)
         {
@@ -31,20 +32,21 @@ ShaderCacheIndex::ShaderCacheIndex(SlangInt size, const char* path, ISlangFileSy
     {
         shaderCacheFileSystem->queryInterface(ISlangMutableFileSystem::getTypeGuid(), (void**)mutableShaderCacheFileSystem.writeRef());
     }
+
+    loadCacheIndexFromFile();
 }
 
 // Load a previous cache index saved to disk. If not found, create a new cache index
 // and save it to disk as filename.
-SlangResult ShaderCacheIndex::loadCacheIndexFromFile(String filename)
+SlangResult ShaderCacheIndex::loadCacheIndexFromFile()
 {
     ComPtr<ISlangBlob> indexBlob;
-    if (SLANG_FAILED(shaderCacheFileSystem->loadFile(filename.getBuffer(), indexBlob.writeRef())))
+    if (SLANG_FAILED(shaderCacheFileSystem->loadFile(indexFilename.getBuffer(), indexBlob.writeRef())))
     {
         // Cache index not found, so we'll create and save a new one.
         if (mutableShaderCacheFileSystem)
         {
-            SLANG_RETURN_ON_FAIL(mutableShaderCacheFileSystem->saveFile(filename.getBuffer(), nullptr, 0));
-            indexFilename = filename;
+            SLANG_RETURN_ON_FAIL(mutableShaderCacheFileSystem->saveFile(indexFilename.getBuffer(), nullptr, 0));
             return SLANG_OK;
         }
         // Cache index not found and we can't save a new one due to the file system being immutable.
@@ -52,7 +54,7 @@ SlangResult ShaderCacheIndex::loadCacheIndexFromFile(String filename)
     }
 
     String indexString;
-    File::readAllText(filename, indexString);
+    File::readAllText(indexFilename, indexString);
 
     List<UnownedStringSlice> lines;
     StringUtil::calcLines(indexString.getUnownedSlice(), lines);

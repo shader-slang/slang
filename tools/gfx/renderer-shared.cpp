@@ -368,7 +368,7 @@ Result RendererBase::getEntryPointCodeFromShaderCache(
     slang::Digest shaderKeyHash;
     program->computeDependencyBasedHash(entryPointIndex, targetIndex, &shaderKeyHash);
 
-    StringBuilder shaderKey = hashToString(shaderKeyHash);
+    String shaderKey = hashToString(shaderKeyHash);
 
     // Produce a hash using the AST for this program - This is needed to check whether a cache entry is effectively dirty,
     // or to save along with the compiled code into an entry so the entry can be checked if fetched later on.
