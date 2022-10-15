@@ -2711,6 +2711,9 @@ attribute_syntax [__extern] : ExternAttribute;
 __attributeTarget(FunctionDeclBase)
 attribute_syntax [__unsafeForceInlineEarly] : UnsafeForceInlineEarlyAttribute;
 
+__attributeTarget(FunctionDeclBase)
+attribute_syntax [ForceInline] : ForceInlineAttribute;
+
 __attributeTarget(FuncDecl)
 attribute_syntax [DllImport(modulePath: String)] : DllImportAttribute;
 

@@ -910,6 +910,14 @@ class UnsafeForceInlineEarlyAttribute : public Attribute
     SLANG_AST_CLASS(UnsafeForceInlineEarlyAttribute)
 };
 
+// A `[ForceInline]` attribute indicates that the callee should be inlined
+// by the Slang compiler.
+//
+class ForceInlineAttribute : public Attribute
+{
+    SLANG_AST_CLASS(ForceInlineAttribute)
+};
+
     /// An attribute that marks a type declaration as either allowing or
     /// disallowing the type to be inherited from in other modules.
 class InheritanceControlAttribute : public Attribute { SLANG_AST_CLASS(InheritanceControlAttribute) };

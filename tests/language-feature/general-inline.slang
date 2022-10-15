@@ -4,7 +4,7 @@
 //TEST(compute):COMPARE_COMPUTE: -vk -shaderobj
 //DISABLE_TEST(compute):COMPARE_COMPUTE:-cpu -shaderobj
 
-[__unsafeForceInlineEarly]
+[ForceInline]
 int test(int r)
 {
     int result = 0;
@@ -24,7 +24,7 @@ int test(int r)
     return result;
 }
 
-[__unsafeForceInlineEarly]
+[ForceInline]
 void testVoid(int r, out int result)
 {
     result = 0;
