@@ -51,10 +51,10 @@ public:
 private:
     // Load a previous cache index saved to disk. If not found, create a new cache index
     // and save it to disk as filename.
-    void loadCacheIndexFromFile();
+    void loadCacheFromFile();
 
     // Update the cache index on disk. This should be called any time an entry changes.
-    void saveCacheIndexToFile();
+    void saveCacheToFile();
 
     // Delete the last entry (the least recently used) from entries, remove its key/value pair
     // from keyToEntry, and remove the corresponding file on disk. This should only be called
@@ -73,8 +73,8 @@ private:
     ComPtr<ISlangFileSystem> shaderCacheFileSystem = nullptr;
     ComPtr<ISlangMutableFileSystem> mutableShaderCacheFileSystem = nullptr;
 
-    // The filename of the index on disk.
-    String indexFilename;
+    // The filename of the file containing the cache's contents on disk.
+    String cacheFilename;
 
     // The maximum number of cache entries allowed.
     SlangInt entryCountLimit = 1000;

@@ -13,7 +13,7 @@ PersistentShaderCache::PersistentShaderCache(const Desc& desc)
 {
     entryCountLimit = desc.entryCountLimit;
     shaderCacheFileSystem = desc.shaderCacheFileSystem;
-    indexFilename = desc.indexFilename;
+    cacheFilename = desc.indexFilename;
 
     if (!desc.shaderCachePath.getBuffer())
     {
@@ -33,20 +33,20 @@ PersistentShaderCache::PersistentShaderCache(const Desc& desc)
         shaderCacheFileSystem->queryInterface(ISlangMutableFileSystem::getTypeGuid(), (void**)mutableShaderCacheFileSystem.writeRef());
     }
 
-    loadCacheIndexFromFile();
+    loadCacheFromFile();
 }
 
 // Load a previous cache index saved to disk. If not found, create a new cache index
 // and save it to disk as filename.
-void PersistentShaderCache::loadCacheIndexFromFile()
+void PersistentShaderCache::loadCacheFromFile()
 {
     ComPtr<ISlangBlob> indexBlob;
-    if (SLANG_FAILED(shaderCacheFileSystem->loadFile(indexFilename.getBuffer(), indexBlob.writeRef())))
+    if (SLANG_FAILED(shaderCacheFileSystem->loadFile(cacheFilename.getBuffer(), indexBlob.writeRef())))
     {
         // Cache index not found, so we'll create and save a new one.
         if (mutableShaderCacheFileSystem)
         {
-            mutableShaderCacheFileSystem->saveFile(indexFilename.getBuffer(), nullptr, 0);
+            mutableShaderCacheFileSystem->saveFile(cacheFilename.getBuffer(), nullptr, 0);
             return;
         }
         // Cache index not found and we can't save a new one due to the file system being immutable.
@@ -54,7 +54,7 @@ void PersistentShaderCache::loadCacheIndexFromFile()
     }
 
     String indexString;
-    File::readAllText(indexFilename, indexString);
+    File::readAllText(cacheFilename, indexString);
 
     List<UnownedStringSlice> lines;
     StringUtil::calcLines(indexString.getUnownedSlice(), lines);
@@ -81,8 +81,8 @@ LinkedNode<ShaderCacheEntry>* PersistentShaderCache::findEntry(const slang::Dige
         return nullptr;
     }
 
-    // If the key is found, we need to move its corresponding entry to the front of
-    // the list and load the stored contents from disk.
+    // If the key is found, load the stored contents from disk. We then move the corresponding
+    // entry to the front of the linked list and update the cache file on disk
     shaderCacheFileSystem->loadFile(DigestUtil::toString(key).getBuffer(), outCompiledCode);
     if (entries.FirstNode() != entryNode)
     {
@@ -90,7 +90,7 @@ LinkedNode<ShaderCacheEntry>* PersistentShaderCache::findEntry(const slang::Dige
         entries.AddFirst(entryNode);
         if (mutableShaderCacheFileSystem)
         {
-            saveCacheIndexToFile();
+            saveCacheToFile();
         }
     }
     return entryNode;
@@ -106,6 +106,10 @@ void PersistentShaderCache::addEntry(const slang::Digest& dependencyDigest, cons
     
     // Check that we do not exceed the cache's size limit by adding another entry. If so,
     // remove the least recently used entry first.
+    //
+    // In theory, this could loop infinitely since deleteLRUEntry() immediately returns if
+    // mutableShaderCacheFileSystem is not set. However, this situation is functionally impossible
+    // because we check immediately before this as well.
     while (entryCountLimit > 0 && entries.Count() >= entryCountLimit)
     {
         deleteLRUEntry();
@@ -117,7 +121,7 @@ void PersistentShaderCache::addEntry(const slang::Digest& dependencyDigest, cons
 
     mutableShaderCacheFileSystem->saveFileBlob(DigestUtil::toString(dependencyDigest).getBuffer(), compiledCode);
 
-    saveCacheIndexToFile();
+    saveCacheToFile();
 }
 
 void PersistentShaderCache::updateEntry(
@@ -136,10 +140,10 @@ void PersistentShaderCache::updateEntry(
     entryNode->Value.astBasedDigest = astDigest;
     mutableShaderCacheFileSystem->saveFileBlob(DigestUtil::toString(dependencyDigest).getBuffer(), updatedCode);
 
-    saveCacheIndexToFile();
+    saveCacheToFile();
 }
 
-void PersistentShaderCache::saveCacheIndexToFile()
+void PersistentShaderCache::saveCacheToFile()
 {
     if (!mutableShaderCacheFileSystem)
     {
@@ -156,7 +160,7 @@ void PersistentShaderCache::saveCacheIndexToFile()
         indexSb << "\n";
     }
 
-    mutableShaderCacheFileSystem->saveFile(indexFilename.getBuffer(), indexSb.getBuffer(), indexSb.getLength());
+    mutableShaderCacheFileSystem->saveFile(cacheFilename.getBuffer(), indexSb.getBuffer(), indexSb.getLength());
 }
 
 void PersistentShaderCache::deleteLRUEntry()

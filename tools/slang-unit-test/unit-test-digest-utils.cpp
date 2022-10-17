@@ -38,9 +38,21 @@ SLANG_UNIT_TEST(digestUtils)
     }
 
     {
-        auto  digestString = UnownedStringSlice("01000000020000000300000004000000");
+        auto digestString = UnownedStringSlice("01000000020000000300000004000000");
         slang::Digest digest = DigestUtil::fromString(digestString);
         auto resultString = DigestUtil::toString(digest);
         SLANG_CHECK(resultString == digestString);
+    }
+
+    {
+        slang::Digest testD;
+        testD.values[0] = 1;
+        testD.values[1] = 2;
+        testD.values[2] = 3;
+        testD.values[3] = 4;
+
+        StringBuilder testDSb;
+        testDSb << testD;
+        SLANG_CHECK(testDSb.equals(String("01000000020000000300000004000000")));
     }
 }

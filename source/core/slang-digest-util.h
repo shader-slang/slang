@@ -24,10 +24,20 @@ namespace Slang
 
     inline StringBuilder& operator<<(StringBuilder& sb, const Digest& d)
     {
-        for (Index i = 0; i < 4; ++i)
+        // Must cast to uint8_t* first in order to correctly account for
+        // endianness.
+        uint8_t* uint8Hash = (uint8_t*)d.values;
+
+        for (Index i = 0; i < 16; ++i)
         {
-            char temp[8];
-            IntToAscii(temp, d.values[i], 16);
+            char temp[2];
+            int hashSegment = (int)uint8Hash[i];
+            // Check if we need to append a leading zero.
+            if (hashSegment < 16)
+            {
+                sb << "0";
+            }
+            IntToAscii(temp, hashSegment, 16);
             sb << temp;
         }
         return sb;
