@@ -270,6 +270,8 @@ public:
             n2->prev = n1;
         else
             tail = n1;
+        n->prev = nullptr;
+        n->next = nullptr;
     }
     void Delete(LinkedNode<T>* n, int Count = 1)
     {
@@ -278,8 +280,8 @@ public:
         int numDeleted = 0;
         for (int i = 0; i < Count; i++)
         {
-            RemoveFromList(cur);
             next = cur->next;
+            RemoveFromList(cur);
             delete cur;
             cur = next;
             numDeleted++;
