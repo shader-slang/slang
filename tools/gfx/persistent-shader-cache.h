@@ -3,9 +3,9 @@
 #include "../../slang.h"
 #include "../../slang-com-ptr.h"
 
-#include "slang-string.h"
-#include "slang-dictionary.h"
-#include "slang-linked-list.h"
+#include "../../source/core/slang-string.h"
+#include "../../source/core/slang-dictionary.h"
+#include "../../source/core/slang-linked-list.h"
 
 namespace Slang
 {
@@ -16,10 +16,18 @@ struct ShaderCacheEntry
     slang::Digest astBasedDigest;
 };
 
-class ShaderCacheIndex
+class PersistentShaderCache
 {
 public:
-    ShaderCacheIndex(SlangInt size, String path, ISlangFileSystem* fileSystem, String filename);
+    struct Desc
+    {
+        SlangInt entryCountLimit;
+        String indexFilename;
+        String shaderCachePath;
+        ISlangFileSystem* shaderCacheFileSystem;
+    };
+
+    PersistentShaderCache(const Desc& des);
 
     // Fetch the cache entry corresponding to the provided key. If found, move the entry to
     // the front of entries and return the entry and the corresponding compiled code in

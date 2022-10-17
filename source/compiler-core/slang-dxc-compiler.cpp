@@ -14,7 +14,7 @@
 #include "../core/slang-semantic-version.h"
 #include "../core/slang-char-util.h"
 
-#include "../core/slang-digest.h"
+#include "../core/slang-digest-builder.h"
 
 #include "slang-include-system.h"
 #include "slang-source-loc.h"

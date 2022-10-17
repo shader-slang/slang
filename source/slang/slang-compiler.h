@@ -3,7 +3,7 @@
 
 #include "../core/slang-basic.h"
 #include "../core/slang-shared-library.h"
-#include "../core/slang-digest.h"
+#include "../core/slang-digest-builder.h"
 
 #include "../compiler-core/slang-downstream-compiler.h"
 #include "../compiler-core/slang-downstream-compiler-util.h"

@@ -259,7 +259,7 @@ public:
     }
     void RemoveFromList(LinkedNode<T>* n)
     {
-        LinkedNode<T>* n1, * n2 = 0;
+        LinkedNode<T>*n1, *n2 = 0;
         n1 = n->prev;
         n2 = n->next;
         if (n1)
@@ -273,27 +273,19 @@ public:
     }
     void Delete(LinkedNode<T>* n, int Count = 1)
     {
-        LinkedNode<T>*n1, *n2 = 0, *tn;
-        n1 = n->prev;
-        tn = n;
+        LinkedNode<T>*cur, *next;
+        cur = n;
         int numDeleted = 0;
         for (int i = 0; i < Count; i++)
         {
-            n2 = tn->next;
-            delete tn;
-            tn = n2;
+            RemoveFromList(cur);
+            next = cur->next;
+            delete cur;
+            cur = next;
             numDeleted++;
-            if (tn == 0)
+            if (cur == 0)
                 break;
         }
-        if (n1)
-            n1->next = n2;
-        else
-            head = n2;
-        if (n2)
-            n2->prev = n1;
-        else
-            tail = n1;
         count -= numDeleted;
     }
     void Clear()

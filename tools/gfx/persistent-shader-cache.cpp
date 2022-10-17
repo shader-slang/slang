@@ -1,21 +1,21 @@
 // slang-shader-cache-index.cpp
-#include "slang-shader-cache-index.h"
+#include "persistent-shader-cache.h"
 
-#include "../slang/slang-hash-utils.h"
-#include "slang-io.h"
-#include "slang-string-util.h"
-#include "slang-file-system.h"
+#include "../../source/core/slang-digest-util.h"
+#include "../../source/core/slang-io.h"
+#include "../../source/core/slang-string-util.h"
+#include "../../source/core/slang-file-system.h"
 
 namespace Slang
 {
 
-ShaderCacheIndex::ShaderCacheIndex(SlangInt size, String path, ISlangFileSystem* fileSystem, String filename)
+PersistentShaderCache::PersistentShaderCache(const Desc& desc)
 {
-    entryCountLimit = size;
-    shaderCacheFileSystem = fileSystem;
-    indexFilename = filename;
+    entryCountLimit = desc.entryCountLimit;
+    shaderCacheFileSystem = desc.shaderCacheFileSystem;
+    indexFilename = desc.indexFilename;
 
-    if (!path.getBuffer())
+    if (!desc.shaderCachePath.getBuffer())
     {
         if (!shaderCacheFileSystem)
         {
@@ -23,7 +23,7 @@ ShaderCacheIndex::ShaderCacheIndex(SlangInt size, String path, ISlangFileSystem*
             // using OSFileSystem::getMutableSingleton.
             shaderCacheFileSystem = OSFileSystem::getMutableSingleton();
         }
-        shaderCacheFileSystem = new RelativeFileSystem(shaderCacheFileSystem, path);
+        shaderCacheFileSystem = new RelativeFileSystem(shaderCacheFileSystem, desc.shaderCachePath);
     }
 
     // If our shader cache has an underlying file system, check if it's mutable. If so, store a pointer
@@ -38,7 +38,7 @@ ShaderCacheIndex::ShaderCacheIndex(SlangInt size, String path, ISlangFileSystem*
 
 // Load a previous cache index saved to disk. If not found, create a new cache index
 // and save it to disk as filename.
-void ShaderCacheIndex::loadCacheIndexFromFile()
+void PersistentShaderCache::loadCacheIndexFromFile()
 {
     ComPtr<ISlangBlob> indexBlob;
     if (SLANG_FAILED(shaderCacheFileSystem->loadFile(indexFilename.getBuffer(), indexBlob.writeRef())))
@@ -62,16 +62,16 @@ void ShaderCacheIndex::loadCacheIndexFromFile()
     {
         List<UnownedStringSlice> digests;
         StringUtil::split(line, ' ', digests); // This will return our two hashes as two elements in digests.
-        auto dependencyDigest = stringToHash(digests[0]);
-        auto astDigest = stringToHash(digests[1]);
+        auto dependencyDigest = DigestUtil::fromString(digests[0]);
+        auto astDigest = DigestUtil::fromString(digests[1]);
 
         ShaderCacheEntry entry = { dependencyDigest, astDigest };
-        auto entryNode = entries.AddFirst(entry);
+        auto entryNode = entries.AddLast(entry);
         keyToEntry.Add(dependencyDigest, entryNode);
     }
 }
 
-LinkedNode<ShaderCacheEntry>* ShaderCacheIndex::findEntry(const slang::Digest& key, ISlangBlob** outCompiledCode)
+LinkedNode<ShaderCacheEntry>* PersistentShaderCache::findEntry(const slang::Digest& key, ISlangBlob** outCompiledCode)
 {
     LinkedNode<ShaderCacheEntry>* entryNode;
     if (!keyToEntry.TryGetValue(key, entryNode))
@@ -83,13 +83,20 @@ LinkedNode<ShaderCacheEntry>* ShaderCacheIndex::findEntry(const slang::Digest& k
 
     // If the key is found, we need to move its corresponding entry to the front of
     // the list and load the stored contents from disk.
-    entries.RemoveFromList(entryNode);
-    entries.AddFirst(entryNode);
-    shaderCacheFileSystem->loadFile(hashToString(key).getBuffer(), outCompiledCode);
+    shaderCacheFileSystem->loadFile(DigestUtil::toString(key).getBuffer(), outCompiledCode);
+    if (entries.FirstNode() != entryNode)
+    {
+        entries.RemoveFromList(entryNode);
+        entries.AddFirst(entryNode);
+        if (mutableShaderCacheFileSystem)
+        {
+            saveCacheIndexToFile();
+        }
+    }
     return entryNode;
 }
 
-void ShaderCacheIndex::addEntry(const slang::Digest& dependencyDigest, const slang::Digest& astDigest, ISlangBlob* compiledCode)
+void PersistentShaderCache::addEntry(const slang::Digest& dependencyDigest, const slang::Digest& astDigest, ISlangBlob* compiledCode)
 {
     if (!mutableShaderCacheFileSystem)
     {
@@ -108,12 +115,12 @@ void ShaderCacheIndex::addEntry(const slang::Digest& dependencyDigest, const sla
     auto entryNode = entries.AddFirst(entry);
     keyToEntry.Add(dependencyDigest, entryNode);
 
-    mutableShaderCacheFileSystem->saveFileBlob(hashToString(dependencyDigest).getBuffer(), compiledCode);
+    mutableShaderCacheFileSystem->saveFileBlob(DigestUtil::toString(dependencyDigest).getBuffer(), compiledCode);
 
     saveCacheIndexToFile();
 }
 
-void ShaderCacheIndex::updateEntry(
+void PersistentShaderCache::updateEntry(
     LinkedNode<ShaderCacheEntry>* entryNode,
     const slang::Digest& dependencyDigest,
     const slang::Digest& astDigest,
@@ -127,12 +134,12 @@ void ShaderCacheIndex::updateEntry(
     }
 
     entryNode->Value.astBasedDigest = astDigest;
-    mutableShaderCacheFileSystem->saveFileBlob(hashToString(dependencyDigest).getBuffer(), updatedCode);
+    mutableShaderCacheFileSystem->saveFileBlob(DigestUtil::toString(dependencyDigest).getBuffer(), updatedCode);
 
     saveCacheIndexToFile();
 }
 
-void ShaderCacheIndex::saveCacheIndexToFile()
+void PersistentShaderCache::saveCacheIndexToFile()
 {
     if (!mutableShaderCacheFileSystem)
     {
@@ -140,19 +147,19 @@ void ShaderCacheIndex::saveCacheIndexToFile()
         return;
     }
 
-    StringBuilder indexString;
+    StringBuilder indexSb;
     for (auto& entry : entries)
     {
-        indexString.append(hashToString(entry.dependencyBasedDigest));
-        indexString.append(" ");
-        indexString.append(hashToString(entry.astBasedDigest));
-        indexString.append("\n");
+        indexSb << entry.dependencyBasedDigest;
+        indexSb << " ";
+        indexSb << entry.astBasedDigest;
+        indexSb << "\n";
     }
 
-    mutableShaderCacheFileSystem->saveFile(indexFilename.getBuffer(), indexString.getBuffer(), indexString.getLength());
+    mutableShaderCacheFileSystem->saveFile(indexFilename.getBuffer(), indexSb.getBuffer(), indexSb.getLength());
 }
 
-void ShaderCacheIndex::deleteLRUEntry()
+void PersistentShaderCache::deleteLRUEntry()
 {
     if (!mutableShaderCacheFileSystem)
     {
@@ -165,7 +172,7 @@ void ShaderCacheIndex::deleteLRUEntry()
     auto shaderKey = lruEntry->Value.dependencyBasedDigest;
 
     keyToEntry.Remove(shaderKey);
-    mutableShaderCacheFileSystem->remove(hashToString(shaderKey).getBuffer());
+    mutableShaderCacheFileSystem->remove(DigestUtil::toString(shaderKey).getBuffer());
 
     entries.Delete(lruEntry);
 }

@@ -2,7 +2,7 @@
 
 #include "tools/unit-test/slang-unit-test.h"
 
-#include "../../source/slang/slang-hash-utils.h"
+#include "../../source/core/slang-digest-util.h"
 
 using namespace Slang;
 
@@ -15,7 +15,7 @@ SLANG_UNIT_TEST(digestUtils)
         testA.values[2] = 3;
         testA.values[3] = 4;
 
-        String testAString = hashToString(testA);
+        String testAString = DigestUtil::toString(testA);
         SLANG_CHECK(testAString.equals(String("01000000020000000300000004000000")));
     }
 
@@ -26,21 +26,21 @@ SLANG_UNIT_TEST(digestUtils)
         testC.values[2] = 0x33333333;
         testC.values[3] = 0x44444444;
 
-        String testCString = hashToString(testC);
+        String testCString = DigestUtil::toString(testC);
         SLANG_CHECK(testCString.equals(String("11111111222222223333333344444444")));
     }
 
     {
         auto digestString = UnownedStringSlice("5D6CC58E1824A4DFD0CF57395B603316");
-        slang::Digest digest = stringToHash(digestString);
-        auto resultString = hashToString(digest);
+        slang::Digest digest = DigestUtil::fromString(digestString);
+        auto resultString = DigestUtil::toString(digest);
         SLANG_CHECK(resultString == digestString);
     }
 
     {
         auto  digestString = UnownedStringSlice("01000000020000000300000004000000");
-        slang::Digest digest = stringToHash(digestString);
-        auto resultString = hashToString(digest);
+        slang::Digest digest = DigestUtil::fromString(digestString);
+        auto resultString = DigestUtil::toString(digest);
         SLANG_CHECK(resultString == digestString);
     }
 }
