@@ -30,15 +30,13 @@ namespace Slang
 
         for (Index i = 0; i < 16; ++i)
         {
-            char temp[2];
-            int hashSegment = (int)uint8Hash[i];
+            int hashSegment = uint8Hash[i];
             // Check if we need to append a leading zero.
             if (hashSegment < 16)
             {
                 sb << "0";
             }
-            IntToAscii(temp, hashSegment, 16);
-            sb << temp;
+            sb.append(hashSegment, 16);
         }
         return sb;
     }

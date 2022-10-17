@@ -22,13 +22,13 @@ public:
     // TODO: Remove in integration PR in favor of new ShaderCacheDesc in slang-gfx.h
     struct Desc
     {
-        SlangInt entryCountLimit;
-        String indexFilename;
+        String cacheFilename;
         String shaderCachePath;
-        ISlangFileSystem* shaderCacheFileSystem;
+        SlangInt entryCountLimit = 1000;
+        ISlangFileSystem* shaderCacheFileSystem = nullptr;
     };
 
-    PersistentShaderCache(const Desc& des);
+    PersistentShaderCache(const Desc& inDesc);
 
     // Fetch the cache entry corresponding to the provided key. If found, move the entry to
     // the front of entries and return the entry and the corresponding compiled code in
@@ -61,6 +61,9 @@ private:
     // by addEntry() when the cache reaches maximum capacity.
     void deleteLRUEntry();
 
+    // The shader cache's description.
+    Desc desc;
+
     // Dictionary mapping each shader's key to its corresponding node (entry) in the list
     // of entries.
     Dictionary<slang::Digest, LinkedNode<ShaderCacheEntry>*> keyToEntry;
@@ -70,14 +73,7 @@ private:
     LinkedList<ShaderCacheEntry> entries;
 
     // The underlying file system used for the shader cache.
-    ComPtr<ISlangFileSystem> shaderCacheFileSystem = nullptr;
     ComPtr<ISlangMutableFileSystem> mutableShaderCacheFileSystem = nullptr;
-
-    // The filename of the file containing the cache's contents on disk.
-    String cacheFilename;
-
-    // The maximum number of cache entries allowed.
-    SlangInt entryCountLimit = 1000;
 };
 
 }
