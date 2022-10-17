@@ -19,6 +19,7 @@ struct ShaderCacheEntry
 class PersistentShaderCache
 {
 public:
+    // TODO: Remove in integration PR in favor of new ShaderCacheDesc in slang-gfx.h
     struct Desc
     {
         SlangInt entryCountLimit;

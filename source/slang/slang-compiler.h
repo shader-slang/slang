@@ -899,7 +899,7 @@ namespace Slang
             return Super::computeDependencyBasedHash(entryPointIndex, targetIndex, outHash);
         }
 
-        SLANG_NO_THROW void SLANG_MCALL computeASTBasedHash(slang::Digest* outHash)
+        SLANG_NO_THROW void SLANG_MCALL computeASTBasedHash(slang::Digest* outHash) SLANG_OVERRIDE
         {
             return Super::computeASTBasedHash(outHash);
         }
@@ -1126,7 +1126,7 @@ namespace Slang
             return Super::computeDependencyBasedHash(entryPointIndex, targetIndex, outHash);
         }
 
-        SLANG_NO_THROW void SLANG_MCALL computeASTBasedHash(slang::Digest* outHash)
+        SLANG_NO_THROW void SLANG_MCALL computeASTBasedHash(slang::Digest* outHash) SLANG_OVERRIDE
         {
             return Super::computeASTBasedHash(outHash);
         }
@@ -1322,7 +1322,7 @@ namespace Slang
             return Super::computeDependencyBasedHash(entryPointIndex, targetIndex, outHash);
         }
 
-        SLANG_NO_THROW void SLANG_MCALL computeASTBasedHash(slang::Digest* outHash)
+        SLANG_NO_THROW void SLANG_MCALL computeASTBasedHash(slang::Digest* outHash) SLANG_OVERRIDE
         {
             return Super::computeASTBasedHash(outHash);
         }
