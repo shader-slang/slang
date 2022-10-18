@@ -5,7 +5,7 @@
 #include "core/slang-basic.h"
 #include "core/slang-com-object.h"
 
-#include "core/slang-shader-cache-index.h"
+#include "persistent-shader-cache.h"
 
 #include "resource-desc-utils.h"
 
@@ -1374,7 +1374,7 @@ public:
     SlangContext slangContext;
     ShaderCache shaderCache;
 
-    Slang::ShaderCacheIndex* cacheIndex = nullptr;
+    RefPtr<PersistentShaderCache> cacheIndex = nullptr;
 
     Slang::Dictionary<slang::TypeLayoutReflection*, Slang::RefPtr<ShaderObjectLayoutBase>> m_shaderObjectLayoutCache;
     Slang::ComPtr<IPipelineCreationAPIDispatcher> m_pipelineCreationAPIDispatcher;

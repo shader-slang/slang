@@ -362,10 +362,8 @@ Result RendererBase::getEntryPointCodeFromShaderCache(
     ComPtr<slang::ISession> session;
     getSlangSession(session.writeRef());
 
-    slang::Digest shaderKeyHash;
-    program->computeDependencyBasedHash(entryPointIndex, targetIndex, &shaderKeyHash);
-
-    String shaderKey = DigestUtil::toString(shaderKeyHash);
+    slang::Digest shaderKey;
+    program->computeDependencyBasedHash(entryPointIndex, targetIndex, &shaderKey);
 
     // Produce a hash using the AST for this program - This is needed to check whether a cache entry is effectively dirty,
     // or to save along with the compiled code into an entry so the entry can be checked if fetched later on.
@@ -374,49 +372,30 @@ Result RendererBase::getEntryPointCodeFromShaderCache(
 
     ComPtr<ISlangBlob> codeBlob;
 
-    // Query the shader cache index for an entry with shaderKeyHash as its key. 
+    // Query the shader cache index for an entry with shaderKey as its key. 
     auto entry = cacheIndex->findEntry(shaderKey, codeBlob.writeRef());
-    if (!entry)
+    if (entry && contentsHash == entry->Value.astBasedDigest)
     {
-        // If we didn't find it, call program->getEntryPointCode() to get and return the code. We then
-        // save a new entry in the shader cache.
-        if (SLANG_SUCCEEDED(program->getEntryPointCode(entryPointIndex, targetIndex, codeBlob.writeRef(), outDiagnostics)))
+        // We found the entry in the cache, and the entry's contents are up-to-date. Nothing else needs to be done.
+        shaderCacheHitCount++;
+    }
+    else
+    {
+        // There are two possibilities: the entry does not exist in the cache, or the entry's contents are out-of-date.
+        // Both will require calling getEntryPointCode() in order to fetch the correct compiled code, so we'll do that now.
+        SLANG_RETURN_ON_FAIL(program->getEntryPointCode(entryPointIndex, targetIndex, codeBlob.writeRef(), outDiagnostics));
+
+        // If the entry was not found in the cache, let's add it. Otherwise, the entry's contents were out-of-date, so let's
+        // update the entry with the updated contents.
+        if (!entry)
         {
             cacheIndex->addEntry(shaderKey, contentsHash, codeBlob);
             shaderCacheMissCount++;
         }
         else
         {
-            // If getEntryPointCode() failed to fetch the code, we return SLANG_FAIL along with the diagnostics output
-            // in outDiagnostics.
-            return SLANG_FAIL;
-        }
-    }
-    else
-    {
-        // If the entry exists, we need to check that the entry hasn't changed changed since it was last accessed.
-        // Since we also stored the AST hash in the shader cache index, we can determine this by comparing the stored hash
-        // with the AST hash we generated earlier.
-        if (contentsHash == entry->Value.astBasedDigest)
-        {
-            // The AST hash stored in the entry does not match the AST hash generated earlier, indicating
-            // that the shader code has changed and the entry needs to be updated.
-            if (SLANG_SUCCEEDED(program->getEntryPointCode(entryPointIndex, targetIndex, codeBlob.writeRef(), outDiagnostics)))
-            {
-                cacheIndex->updateEntry(entry, shaderKey, contentsHash, codeBlob);
-                shaderCacheEntryDirtyCount++;
-            }
-            else
-            {
-                // If getEntryPointCode() failed to fetch the code, we return SLANG_FAIL along with the diagnostics output
-                // in outDiagnostics.
-                return SLANG_FAIL;
-            }
-        }
-        else
-        {
-            // The entry is up-to-date, so we can immediately return the fetched code.
-            shaderCacheHitCount++;
+            cacheIndex->updateEntry(entry, shaderKey, contentsHash, codeBlob);
+            shaderCacheEntryDirtyCount++;
         }
     }
 
@@ -447,9 +426,11 @@ IDevice* gfx::RendererBase::getInterface(const Guid& guid)
 SLANG_NO_THROW Result SLANG_MCALL RendererBase::initialize(const Desc& desc)
 {
     auto cacheDesc = desc.shaderCache;
+    // We only want to initialize the shader cache if either a shader cache path or file system
+    // was provided.
     if (cacheDesc.shaderCachePath || cacheDesc.shaderCacheFileSystem)
     {
-        cacheIndex = new ShaderCacheIndex(cacheDesc.maxEntryCount, cacheDesc.shaderCachePath, cacheDesc.shaderCacheFileSystem, cacheDesc.indexFilename);
+        cacheIndex = new PersistentShaderCache(desc.shaderCache);
     }
 
     if (desc.apiCommandDispatcher)

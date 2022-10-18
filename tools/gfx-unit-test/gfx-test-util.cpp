@@ -223,7 +223,7 @@ namespace gfx_test
         if (fileSystem)
         {
             deviceDesc.shaderCache.shaderCacheFileSystem = fileSystem;
-            deviceDesc.shaderCache.maxEntryCount = maxCacheEntryCount;
+            deviceDesc.shaderCache.entryCountLimit = maxCacheEntryCount;
         }
 
         auto createDeviceResult = gfxCreateDevice(&deviceDesc, device.writeRef());

@@ -1,14 +1,17 @@
 // slang-shader-cache-index.h
 #pragma once
 #include "../../slang.h"
+#include "../../slang-gfx.h"
 #include "../../slang-com-ptr.h"
 
 #include "../../source/core/slang-string.h"
 #include "../../source/core/slang-dictionary.h"
 #include "../../source/core/slang-linked-list.h"
 
-namespace Slang
+namespace gfx
 {
+
+    using namespace Slang;
 
 struct ShaderCacheEntry
 {
@@ -16,19 +19,10 @@ struct ShaderCacheEntry
     slang::Digest astBasedDigest;
 };
 
-class PersistentShaderCache
+class PersistentShaderCache : public RefObject
 {
 public:
-    // TODO: Remove in integration PR in favor of new ShaderCacheDesc in slang-gfx.h
-    struct Desc
-    {
-        String cacheFilename;
-        String shaderCachePath;
-        SlangInt entryCountLimit = 1000;
-        ISlangFileSystem* shaderCacheFileSystem = nullptr;
-    };
-
-    PersistentShaderCache(const Desc& inDesc);
+    PersistentShaderCache(const IDevice::ShaderCacheDesc& inDesc);
 
     // Fetch the cache entry corresponding to the provided key. If found, move the entry to
     // the front of entries and return the entry and the corresponding compiled code in
@@ -62,7 +56,7 @@ private:
     void deleteLRUEntry();
 
     // The shader cache's description.
-    Desc desc;
+    IDevice::ShaderCacheDesc desc;
 
     // Dictionary mapping each shader's key to its corresponding node (entry) in the list
     // of entries.

@@ -6,14 +6,15 @@
 #include "../../source/core/slang-string-util.h"
 #include "../../source/core/slang-file-system.h"
 
-namespace Slang
+namespace gfx
 {
 
-PersistentShaderCache::PersistentShaderCache(const Desc& inDesc)
+PersistentShaderCache::PersistentShaderCache(const IDevice::ShaderCacheDesc& inDesc)
 {
     desc = inDesc;
 
-    if (!desc.shaderCachePath.getBuffer())
+    // If a path is provided, we will want our underlying file system to be initialized using that path.
+    if (desc.shaderCachePath)
     {
         if (!desc.shaderCacheFileSystem)
         {
@@ -25,7 +26,7 @@ PersistentShaderCache::PersistentShaderCache(const Desc& inDesc)
     }
 
     // If our shader cache has an underlying file system, check if it's mutable. If so, store a pointer
-    // to the mutable version in order to save new entries later.
+    // to the mutable version for operations which require writing to disk.
     if (desc.shaderCacheFileSystem)
     {
         desc.shaderCacheFileSystem->queryInterface(ISlangMutableFileSystem::getTypeGuid(), (void**)mutableShaderCacheFileSystem.writeRef());
@@ -39,12 +40,12 @@ PersistentShaderCache::PersistentShaderCache(const Desc& inDesc)
 void PersistentShaderCache::loadCacheFromFile()
 {
     ComPtr<ISlangBlob> indexBlob;
-    if (SLANG_FAILED(desc.shaderCacheFileSystem->loadFile(desc.cacheFilename.getBuffer(), indexBlob.writeRef())))
+    if (SLANG_FAILED(desc.shaderCacheFileSystem->loadFile(desc.cacheFilename, indexBlob.writeRef())))
     {
         // Cache index not found, so we'll create and save a new one.
         if (mutableShaderCacheFileSystem)
         {
-            mutableShaderCacheFileSystem->saveFile(desc.cacheFilename.getBuffer(), nullptr, 0);
+            mutableShaderCacheFileSystem->saveFile(desc.cacheFilename, nullptr, 0);
             return;
         }
         // Cache index not found and we can't save a new one due to the file system being immutable.
@@ -158,7 +159,7 @@ void PersistentShaderCache::saveCacheToFile()
         indexSb << "\n";
     }
 
-    mutableShaderCacheFileSystem->saveFile(desc.cacheFilename.getBuffer(), indexSb.getBuffer(), indexSb.getLength());
+    mutableShaderCacheFileSystem->saveFile(desc.cacheFilename, indexSb.getBuffer(), indexSb.getLength());
 }
 
 void PersistentShaderCache::deleteLRUEntry()

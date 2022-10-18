@@ -2132,15 +2132,15 @@ public:
 
     struct ShaderCacheDesc
     {
+        // The filename for an existing shader cache index file.
+        const char* cacheFilename = "cacheIndex.txt";
         // The root directory for the shader cache.
         const char* shaderCachePath = nullptr;
-        // The filename for an existing shader cache index file.
-        const char* indexFilename = "cacheIndex.txt";
         // The file system for loading cached shader kernels. The layer does not maintain a strong reference to the object,
         // instead the user is responsible for holding the object alive during the lifetime of an `IDevice`.
         ISlangFileSystem* shaderCacheFileSystem = nullptr;
         // The maximum number of entries stored in the cache.
-        GfxCount maxEntryCount = 1000;
+        GfxCount entryCountLimit = 1000;
     };
 
     struct InteropHandles
