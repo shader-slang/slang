@@ -4,11 +4,13 @@
 #include "gfx-test-util.h"
 #include "tools/gfx-util/shader-cursor.h"
 #include "source/core/slang-basic.h"
+#include "source/core/slang-string-util.h"
 
 #include "source/core/slang-memory-file-system.h"
 #include "source/core/slang-file-system.h"
 
 using namespace gfx;
+using namespace Slang;
 
 namespace gfx_test
 {
@@ -16,7 +18,7 @@ namespace gfx_test
     struct BaseShaderCacheTest
     {
         UnitTestContext* context;
-        Slang::RenderApiFlag::Enum api;
+        RenderApiFlag::Enum api;
 
         ComPtr<IDevice> device;
         ComPtr<IPipelineState> pipelineState;
@@ -36,7 +38,7 @@ namespace gfx_test
         ComPtr<ISlangMutableFileSystem> cacheFileSystem;
 
         // Simple compute shaders we can pipe to our individual shader files for cache testing
-        Slang::String contentsA = Slang::String(
+        String contentsA = String(
             R"(uniform RWStructuredBuffer<float> buffer;
             
             [shader("compute")]
@@ -48,7 +50,7 @@ namespace gfx_test
                 buffer[sv_dispatchThreadID.x] = input + 1.0f;
             })");    
 
-        Slang::String contentsB = Slang::String(
+        String contentsB = String(
             R"(uniform RWStructuredBuffer<float> buffer;
             
             [shader("compute")]
@@ -60,7 +62,7 @@ namespace gfx_test
                 buffer[sv_dispatchThreadID.x] = input + 2.0f;
             })");
 
-        Slang::String contentsC = Slang::String(
+        String contentsC = String(
             R"(uniform RWStructuredBuffer<float> buffer;
             
             [shader("compute")]
@@ -78,7 +80,7 @@ namespace gfx_test
             float initialData[] = { 0.0f, 1.0f, 2.0f, 3.0f };
             IBufferResource::Desc bufferDesc = {};
             bufferDesc.sizeInBytes = numberCount * sizeof(float);
-            bufferDesc.format = gfx::Format::Unknown;
+            bufferDesc.format = Format::Unknown;
             bufferDesc.elementSize = sizeof(float);
             bufferDesc.allowedStates = ResourceStateSet(
                 ResourceState::ShaderResource,
@@ -123,37 +125,37 @@ namespace gfx_test
             switch (device->getDeviceInfo().deviceType)
             {
             case DeviceType::DirectX11:
-                api = Slang::RenderApiFlag::D3D11;
+                api = RenderApiFlag::D3D11;
                 break;
             case DeviceType::DirectX12:
-                api = Slang::RenderApiFlag::D3D12;
+                api = RenderApiFlag::D3D12;
                 break;
             case DeviceType::Vulkan:
-                api = Slang::RenderApiFlag::Vulkan;
+                api = RenderApiFlag::Vulkan;
                 break;
             case DeviceType::CPU:
-                api = Slang::RenderApiFlag::CPU;
+                api = RenderApiFlag::CPU;
                 break;
             case DeviceType::CUDA:
-                api = Slang::RenderApiFlag::CUDA;
+                api = RenderApiFlag::CUDA;
                 break;
             case DeviceType::OpenGl:
-                api = Slang::RenderApiFlag::OpenGl;
+                api = RenderApiFlag::OpenGl;
                 break;
             default:
                 SLANG_IGNORE_TEST
             }
 
-            cacheFileSystem = new Slang::MemoryFileSystem();
-            diskFileSystem = Slang::OSFileSystem::getMutableSingleton();
-            diskFileSystem = new Slang::RelativeFileSystem(diskFileSystem, "tools/gfx-unit-test");
+            cacheFileSystem = new MemoryFileSystem();
+            diskFileSystem = OSFileSystem::getMutableSingleton();
+            diskFileSystem = new RelativeFileSystem(diskFileSystem, "tools/gfx-unit-test");
 
             shaderCache.shaderCacheFileSystem = cacheFileSystem;
         }
 
         void submitGPUWork()
         {
-            Slang::ComPtr<ITransientResourceHeap> transientHeap;
+            ComPtr<ITransientResourceHeap> transientHeap;
             ITransientResourceHeap::Desc transientHeapDesc = {};
             transientHeapDesc.constantBufferSize = 4096;
             GFX_CHECK_CALL_ABORT(
@@ -243,17 +245,17 @@ namespace gfx_test
     // Several shader files on disk, modifications may be done to any file
     struct MultipleEntryShaderCache : BaseShaderCacheTest
     {
-        void modifyShaderA(Slang::String shaderContents)
+        void modifyShaderA(String shaderContents)
         {
             diskFileSystem->saveFile("shader-cache-shader-A.slang", shaderContents.getBuffer(), shaderContents.getLength());
         }
 
-        void modifyShaderB(Slang::String shaderContents)
+        void modifyShaderB(String shaderContents)
         {
             diskFileSystem->saveFile("shader-cache-shader-B.slang", shaderContents.getBuffer(), shaderContents.getLength());
         }
 
-        void modifyShaderC(Slang::String shaderContents)
+        void modifyShaderC(String shaderContents)
         {
             diskFileSystem->saveFile("shader-cache-shader-C.slang", shaderContents.getBuffer(), shaderContents.getLength());
         }
@@ -442,7 +444,7 @@ namespace gfx_test
     //    4. #include w/ changes in the included file
     struct ShaderFileImportsShaderCache : BaseShaderCacheTest
     {
-        Slang::String importedContentsA = Slang::String(
+        String importedContentsA = String(
             R"(struct TestFunction
             {
                 void simpleElementAdd(RWStructuredBuffer<float> buffer, uint index)
@@ -452,7 +454,7 @@ namespace gfx_test
                 }
             };)");
 
-        Slang::String importedContentsB = Slang::String(
+        String importedContentsB = String(
             R"(struct TestFunction
             {
                 void simpleElementAdd(RWStructuredBuffer<float> buffer, uint index)
@@ -462,7 +464,7 @@ namespace gfx_test
                 }
             };)");
 
-        Slang::String importFile = Slang::String(
+        String importFile = String(
             R"(import imported;
 
             uniform RWStructuredBuffer<float> buffer;
@@ -479,7 +481,7 @@ namespace gfx_test
                 }
             })");
 
-        Slang::String includeFile = Slang::String(
+        String includeFile = String(
             R"(#include "imported.slang"
 
             uniform RWStructuredBuffer<float> buffer;
@@ -502,7 +504,7 @@ namespace gfx_test
             diskFileSystem->saveFile("importing-shader-cache-shader.slang", importFile.getBuffer(), importFile.getLength());
         }
 
-        void modifyImportedFile(Slang::String importedContents)
+        void modifyImportedFile(String importedContents)
         {
             diskFileSystem->saveFile("imported.slang", importedContents.getBuffer(), importedContents.getLength());
         }
@@ -697,51 +699,48 @@ namespace gfx_test
         }
     };
 
-    // Same as MultipleEntryShaderCache, but we now have a maximum cache entry limit of 2, so the cache
-// will now evict entries when it reaches capacity
-    struct CacheWithMaxEntryLimit : BaseShaderCacheTest
+    // Same as MultipleEntryShaderCache, but we now set the maximum entry count limit, so the cache
+    // should remove entries as needed when it reaches capacity.
+    struct CacheWithMaxEntryLimit : MultipleEntryShaderCache
     {
-        void modifyShaderA(Slang::String shaderContents)
+        // Check the correctness of the cache's entries by comparing the order of entries in the
+        // current state of the cache with what we expect.
+        void checkCacheFile(GfxIndex testIndex)
         {
-            diskFileSystem->saveFile("shader-cache-shader-A.slang", shaderContents.getBuffer(), shaderContents.getLength());
-        }
+            ComPtr<ISlangBlob> cacheContents;
+            cacheFileSystem->loadFile(shaderCache.cacheFilename, cacheContents.writeRef());
 
-        void modifyShaderB(Slang::String shaderContents)
-        {
-            diskFileSystem->saveFile("shader-cache-shader-B.slang", shaderContents.getBuffer(), shaderContents.getLength());
-        }
-
-        void modifyShaderC(Slang::String shaderContents)
-        {
-            diskFileSystem->saveFile("shader-cache-shader-C.slang", shaderContents.getBuffer(), shaderContents.getLength());
-        }
-
-        void generateNewPipelineState(GfxIndex shaderIndex)
-        {
-            ComPtr<IShaderProgram> shaderProgram;
-            slang::ProgramLayout* slangReflection;
-            char* shaderFilename;
-            switch (shaderIndex)
+            String apiString;
+            switch (api)
             {
-            case 0:
-                shaderFilename = "shader-cache-shader-A";
+            case RenderApiFlag::Enum::D3D11:
+                apiString = String("d3d11");
                 break;
-            case 1:
-                shaderFilename = "shader-cache-shader-B";
+            case RenderApiFlag::Enum::D3D12:
+                apiString = String("d3d12");
                 break;
-            case 2:
-                shaderFilename = "shader-cache-shader-C";
+            case RenderApiFlag::Enum::Vulkan:
+                apiString = String("vk");
+                break;
+            case RenderApiFlag::Enum::CPU:
+                apiString = String("cpu");
+                break;
+            case RenderApiFlag::Enum::CUDA:
+                apiString = String("cuda");
+                break;
+            case RenderApiFlag::Enum::OpenGl:
+                apiString = String("openGL");
                 break;
             default:
-                // Should never reach this point since we wrote the test
-                SLANG_IGNORE_TEST;
+                SLANG_IGNORE_TEST
             }
-            GFX_CHECK_CALL_ABORT(loadComputeProgram(device, shaderProgram, shaderFilename, "computeMain", slangReflection));
 
-            ComputePipelineStateDesc pipelineDesc = {};
-            pipelineDesc.program = shaderProgram.get();
-            GFX_CHECK_CALL_ABORT(
-                device->createComputePipelineState(pipelineDesc, pipelineState.writeRef()));
+            StringBuilder expectedFilename;
+            expectedFilename << "cache-eviction-policy-expected-" << apiString << "-" << testIndex << ".txt";
+            ComPtr<ISlangBlob> expectedContents;
+            diskFileSystem->loadFile(expectedFilename.getBuffer(), expectedContents.writeRef());
+
+            SLANG_CHECK(memcmp(cacheContents->getBufferPointer(), expectedContents->getBufferPointer(), expectedContents->getBufferSize()) == 0);
         }
 
         void run()
@@ -774,6 +773,7 @@ namespace gfx_test
             SLANG_CHECK(shaderCacheStats->getCacheMissCount() == 3);
             SLANG_CHECK(shaderCacheStats->getCacheHitCount() == 0);
             SLANG_CHECK(shaderCacheStats->getCacheEntryDirtyCount() == 0);
+            checkCacheFile(1);
 
             generateNewDevice();
             createRequiredResources();
@@ -787,6 +787,7 @@ namespace gfx_test
             SLANG_CHECK(shaderCacheStats->getCacheMissCount() == 1);
             SLANG_CHECK(shaderCacheStats->getCacheHitCount() == 1);
             SLANG_CHECK(shaderCacheStats->getCacheEntryDirtyCount() == 0);
+            checkCacheFile(2);
 
             generateNewDevice();
             createRequiredResources();
@@ -801,6 +802,7 @@ namespace gfx_test
             SLANG_CHECK(shaderCacheStats->getCacheMissCount() == 1);
             SLANG_CHECK(shaderCacheStats->getCacheHitCount() == 0);
             SLANG_CHECK(shaderCacheStats->getCacheEntryDirtyCount() == 1);
+            checkCacheFile(3);
 
             shaderCache.entryCountLimit = 3;
             generateNewDevice();
@@ -819,6 +821,7 @@ namespace gfx_test
             SLANG_CHECK(shaderCacheStats->getCacheMissCount() == 1);
             SLANG_CHECK(shaderCacheStats->getCacheHitCount() == 1);
             SLANG_CHECK(shaderCacheStats->getCacheEntryDirtyCount() == 1);
+            checkCacheFile(4);
 
             generateNewDevice();
             createRequiredResources();
@@ -834,6 +837,7 @@ namespace gfx_test
             SLANG_CHECK(shaderCacheStats->getCacheMissCount() == 0);
             SLANG_CHECK(shaderCacheStats->getCacheHitCount() == 3);
             SLANG_CHECK(shaderCacheStats->getCacheEntryDirtyCount() == 0);
+            checkCacheFile(4); // No changes so we expect the cache file to remain the same.
         }
     };
 

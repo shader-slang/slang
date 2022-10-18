@@ -210,6 +210,7 @@ namespace gfx_test
         const char* searchPaths[] = { "", "../../tools/gfx-unit-test", "tools/gfx-unit-test" };
         deviceDesc.slang.searchPathCount = (SlangInt)SLANG_COUNT_OF(searchPaths);
         deviceDesc.slang.searchPaths = searchPaths;
+        deviceDesc.slang.targetProfile = "sm_6_5";
 
         deviceDesc.shaderCache = shaderCache;
 

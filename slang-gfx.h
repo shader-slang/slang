@@ -2132,8 +2132,8 @@ public:
 
     struct ShaderCacheDesc
     {
-        // The filename for an existing shader cache index file.
-        const char* cacheFilename = "cacheIndex.txt";
+        // The filename for the file the cache's state should be saved to or loaded from.
+        const char* cacheFilename = "cache.txt";
         // The root directory for the shader cache.
         const char* shaderCachePath = nullptr;
         // The file system for loading cached shader kernels. The layer does not maintain a strong reference to the object,
