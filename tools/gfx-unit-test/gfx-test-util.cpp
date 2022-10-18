@@ -179,8 +179,7 @@ namespace gfx_test
     Slang::ComPtr<gfx::IDevice> createTestingDevice(
         UnitTestContext* context,
         Slang::RenderApiFlag::Enum api,
-        SlangInt maxCacheEntryCount,
-        ISlangMutableFileSystem* fileSystem)
+        gfx::IDevice::ShaderCacheDesc shaderCache)
     {
         Slang::ComPtr<gfx::IDevice> device;
         gfx::IDevice::Desc deviceDesc = {};
@@ -211,7 +210,8 @@ namespace gfx_test
         const char* searchPaths[] = { "", "../../tools/gfx-unit-test", "tools/gfx-unit-test" };
         deviceDesc.slang.searchPathCount = (SlangInt)SLANG_COUNT_OF(searchPaths);
         deviceDesc.slang.searchPaths = searchPaths;
-        deviceDesc.slang.targetProfile = "sm_6_5";
+
+        deviceDesc.shaderCache = shaderCache;
 
         gfx::D3D12DeviceExtendedDesc extDesc = {};
         extDesc.rootParameterShaderAttributeName = "root";
@@ -219,12 +219,6 @@ namespace gfx_test
         deviceDesc.extendedDescCount = 1;
         void* extDescPtr = &extDesc;
         deviceDesc.extendedDescs = &extDescPtr;
-
-        if (fileSystem)
-        {
-            deviceDesc.shaderCache.shaderCacheFileSystem = fileSystem;
-            deviceDesc.shaderCache.entryCountLimit = maxCacheEntryCount;
-        }
 
         auto createDeviceResult = gfxCreateDevice(&deviceDesc, device.writeRef());
         if (SLANG_FAILED(createDeviceResult))

@@ -22,10 +22,16 @@ namespace gfx_test
         ComPtr<IPipelineState> pipelineState;
         ComPtr<IResourceView> bufferView;
 
-        // diskFileSystem is used to save the test shaders to disk as necessary as
-        // loadComputeProgram() always loads from the OS file system. cacheFileSystem
-        // is used to hold the shader cache in memory to avoid needing to manually erase all the
-        // shader cache entry files between consecutive runs of the test.
+        IDevice::ShaderCacheDesc shaderCache = {};
+
+        // Two file systems in order to get around problems posed by the testing framework.
+        // 
+        // - diskFileSystem - Used to save any files that must exist on disk for subsequent
+        //                    save/load function calls (most prominently loadComputeProgram()) to pick up.
+        // - cacheFileSystem - Used to hold for the actual cache for all tests. This removes the need to
+        //                     manually clean out old cache files from previous test runs as it is
+        //                     located in-memory. This is the file system passed to device creation
+        //                     as part of the shader cache desc.
         ComPtr<ISlangMutableFileSystem> diskFileSystem;
         ComPtr<ISlangMutableFileSystem> cacheFileSystem;
 
@@ -107,8 +113,7 @@ namespace gfx_test
         void generateNewDevice()
         {
             freeOldResources();
-            //device = createTestingDevice(context, api, 1000, cacheFileSystem);
-            device = createTestingDevice(context, api, 1000, cacheFileSystem);
+            device = createTestingDevice(context, api, shaderCache);
         }
 
         void init(ComPtr<IDevice> device, UnitTestContext* context)
@@ -142,6 +147,8 @@ namespace gfx_test
             cacheFileSystem = new Slang::MemoryFileSystem();
             diskFileSystem = Slang::OSFileSystem::getMutableSingleton();
             diskFileSystem = new Slang::RelativeFileSystem(diskFileSystem, "tools/gfx-unit-test");
+
+            shaderCache.shaderCacheFileSystem = cacheFileSystem;
         }
 
         void submitGPUWork()
@@ -709,12 +716,6 @@ namespace gfx_test
             diskFileSystem->saveFile("shader-cache-shader-C.slang", shaderContents.getBuffer(), shaderContents.getLength());
         }
 
-        void generateNewDevice(GfxCount maxCacheSize)
-        {
-            freeOldResources();
-            device = createTestingDevice(context, api, maxCacheSize, cacheFileSystem);
-        }
-
         void generateNewPipelineState(GfxIndex shaderIndex)
         {
             ComPtr<IShaderProgram> shaderProgram;
@@ -755,7 +756,8 @@ namespace gfx_test
             // TODO: Remove the repeated generateNewDevice() and createRequiredResources() calls once
             // a solution exists that allows source code changes under the same module name to be picked
             // up on load.
-            generateNewDevice(2);
+            shaderCache.entryCountLimit = 2;
+            generateNewDevice();
             createRequiredResources();
             modifyShaderA(contentsA);
             modifyShaderB(contentsB);
@@ -773,7 +775,7 @@ namespace gfx_test
             SLANG_CHECK(shaderCacheStats->getCacheHitCount() == 0);
             SLANG_CHECK(shaderCacheStats->getCacheEntryDirtyCount() == 0);
 
-            generateNewDevice(2);
+            generateNewDevice();
             createRequiredResources();
             generateNewPipelineState(1);
             submitGPUWork();
@@ -786,7 +788,7 @@ namespace gfx_test
             SLANG_CHECK(shaderCacheStats->getCacheHitCount() == 1);
             SLANG_CHECK(shaderCacheStats->getCacheEntryDirtyCount() == 0);
 
-            generateNewDevice(2);
+            generateNewDevice();
             createRequiredResources();
             modifyShaderB(contentsA);
             generateNewPipelineState(1);
@@ -800,7 +802,8 @@ namespace gfx_test
             SLANG_CHECK(shaderCacheStats->getCacheHitCount() == 0);
             SLANG_CHECK(shaderCacheStats->getCacheEntryDirtyCount() == 1);
 
-            generateNewDevice(3);
+            shaderCache.entryCountLimit = 3;
+            generateNewDevice();
             createRequiredResources();
             modifyShaderA(contentsC);
             modifyShaderC(contentsB);
@@ -817,7 +820,7 @@ namespace gfx_test
             SLANG_CHECK(shaderCacheStats->getCacheHitCount() == 1);
             SLANG_CHECK(shaderCacheStats->getCacheEntryDirtyCount() == 1);
 
-            generateNewDevice(3);
+            generateNewDevice();
             createRequiredResources();
             generateNewPipelineState(0);
             submitGPUWork();
@@ -829,8 +832,8 @@ namespace gfx_test
             // Cache limit 3, access shaders A then B then C
             device->queryInterface(SLANG_UUID_IShaderCacheStatistics, (void**)shaderCacheStats.writeRef());
             SLANG_CHECK(shaderCacheStats->getCacheMissCount() == 0);
-            SLANG_CHECK(shaderCacheStats->getCacheHitCount() == 0);
-            SLANG_CHECK(shaderCacheStats->getCacheEntryDirtyCount() == 3);
+            SLANG_CHECK(shaderCacheStats->getCacheHitCount() == 3);
+            SLANG_CHECK(shaderCacheStats->getCacheEntryDirtyCount() == 0);
         }
     };
 

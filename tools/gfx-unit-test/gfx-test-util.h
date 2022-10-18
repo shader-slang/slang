@@ -72,8 +72,7 @@ namespace gfx_test
     Slang::ComPtr<gfx::IDevice> createTestingDevice(
         UnitTestContext* context,
         Slang::RenderApiFlag::Enum api,
-        SlangInt maxCacheEntryCount = 1000,
-        ISlangMutableFileSystem* fileSystem = nullptr);
+        gfx::IDevice::ShaderCacheDesc shaderCache = {});
 
     void initializeRenderDoc();
     void renderDocBeginFrame();
@@ -84,14 +83,13 @@ namespace gfx_test
         const ImplFunc& f,
         UnitTestContext* context,
         Slang::RenderApiFlag::Enum api,
-        SlangInt maxCacheEntryCount = 1000,
-        ISlangMutableFileSystem* fileSystem = nullptr)
+        gfx::IDevice::ShaderCacheDesc shaderCache = {})
     {
         if ((api & context->enabledApis) == 0)
         {
             SLANG_IGNORE_TEST
         }
-        auto device = createTestingDevice(context, api, maxCacheEntryCount, fileSystem);
+        auto device = createTestingDevice(context, api, shaderCache);
         if (!device)
         {
             SLANG_IGNORE_TEST

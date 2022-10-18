@@ -52,13 +52,14 @@ void PersistentShaderCache::loadCacheFromFile()
         return;
     }
 
-    String indexString;
-    File::readAllText(desc.cacheFilename, indexString);
+    String indexString = String((char*)indexBlob->getBufferPointer());
 
     List<UnownedStringSlice> lines;
     StringUtil::calcLines(indexString.getUnownedSlice(), lines);
     for (auto line : lines)
     {
+        if (line == "")
+            break;
         List<UnownedStringSlice> digests;
         StringUtil::split(line, ' ', digests); // This will return our two hashes as two elements in digests.
         auto dependencyDigest = DigestUtil::fromString(digests[0]);
