@@ -955,44 +955,8 @@ struct JVPTranscriber
 
         if (auto diffPtr = lookupDiffInst(origPtr, nullptr))
         {
-            if (auto diffAddress = as<IRFieldAddress>(diffPtr))
-            {
-                // If we have a field address without a proper field key, we need to 
-                // use a differential getter func instead of a traditional load since we 
-                // don't know where to look inside the differential ptr type for the 
-                // differential corresponding to the primal load.
-                // 
-                if (diffAddress->getField() == nullptr)
-                {
-                    auto getterDecoration = diffAddress->findDecoration<IRDifferentialGetterDecoration>();
-                    IRInst* getterFunc = getterDecoration->getGetterFunc();
-                
-                    // Must be a method with a single parameter.
-                    SLANG_ASSERT(as<IRFuncType>(getterFunc->getDataType())->getParamCount() == 1);
-
-                    List<IRInst*> args;
-                    args.add(diffAddress->getBase());
-
-                    // Emit a call to the getter.
-                    diffLoad = builder->emitCallInst(
-                        as<IRFuncType>(getterFunc->getDataType())->getResultType(),
-                        getterFunc,
-                        args);
-                }
-                else
-                {
-                    // We're dealing with a fully formed differential ptr
-                    diffLoad = as<IRLoad>(builder->emitLoad(diffPtr));
-                }
-            }
-            else
-            {
-                // Default case, we're loading from a known differential inst.
-                diffLoad = as<IRLoad>(builder->emitLoad(diffPtr));
-            }
-
-            SLANG_ASSERT(diffLoad);
-
+            // Default case, we're loading from a known differential inst.
+            diffLoad = as<IRLoad>(builder->emitLoad(diffPtr));
             return InstPair(primalLoad, diffLoad);
         }
         return InstPair(primalLoad, nullptr);
@@ -1016,44 +980,9 @@ struct JVPTranscriber
         // 
         if (diffStoreLocation && diffStoreVal)
         {
-            // If we have a field address without a proper field key, we need to 
-            // use a differential setter func instead of a traditional store since we 
-            // don't know where to store the differential val inside the differential 
-            // ptr type.
-            // 
-            if (auto diffAddress = as<IRFieldAddress>(diffStoreLocation))
-            {
-                if (diffAddress->getField() == nullptr)
-                {
-                    auto setterDecoration = diffAddress->findDecoration<IRDifferentialSetterDecoration>();
-                    IRInst* setterFunc = setterDecoration->getSetterFunc();
-                
-                    // Must be a method with exactly two parameters.
-                    SLANG_ASSERT(as<IRFuncType>(setterFunc->getDataType())->getParamCount() == 2);
-
-                    List<IRInst*> args;
-                    args.add(diffAddress->getBase());
-                    args.add(diffStoreVal);
-
-                    // Emit a call to the setter.
-                    diffStore = builder->emitCallInst(
-                        as<IRFuncType>(setterFunc->getDataType())->getResultType(),
-                        setterFunc,
-                        args);
-                }   
-                else
-                {
-                    // We already know where to store the differential.
-                    diffStore = as<IRStore>(
-                        builder->emitStore(diffStoreLocation, diffStoreVal));
-                }
-            }
-            else
-            {
-                // Default case, storing the entire type (and not a member)
-                diffStore = as<IRStore>(
-                    builder->emitStore(diffStoreLocation, diffStoreVal));
-            }
+            // Default case, storing the entire type (and not a member)
+            diffStore = as<IRStore>(
+                builder->emitStore(diffStoreLocation, diffStoreVal));
             
             return InstPair(primalStore, diffStore);
         }
@@ -1524,14 +1453,27 @@ struct JVPTranscriber
                 // Must be a method with a single parameter.
                 SLANG_ASSERT(as<IRFuncType>(getterFunc->getDataType())->getParamCount() == 1);
 
+                // Our getter func accepts a _pointer_ to the target type
+                // So we have to create a variable and store our type into memory 
+                // here. This will eventually get optimized out in later passes.
+                // 
+                auto diffTempVar = builder->emitVar(
+                    diffBase->getDataType());
+                
+                builder->emitStore(diffTempVar, diffBase);
+                
                 List<IRInst*> args;
-                args.add(diffBase);
+                args.add(diffTempVar);
 
-                // Emit a call to the getter.
-                diffExtract = builder->emitCallInst(
-                    diffExtractType,
-                    getterDecoration->getGetterFunc(),
+                // Emit a call to the getter. The getter will return a reference type.
+                // We need to load from this to go to a non-ptr 'solid' type.
+                //
+                auto diffGetterCall = builder->emitCallInst(
+                    as<IRFuncType>(getterFunc->getDataType())->getResultType(),
+                    getterFunc,
                     args);
+                
+                diffExtract = builder->emitLoad(diffGetterCall);
             }
         }
 
@@ -1551,17 +1493,21 @@ struct JVPTranscriber
 
         if (auto diffAddressType = differentiateType(builder, primalAddressType))
         {
-            // An issue with transcribing IRFieldAddress is that we don't know if this value is being
-            // loaded from or stored into. Therefore, we will defer this decision by creating a dummy
-            // IRFieldAddress without a field key, with the getter and setter decorations copied over.
-            //
-            diffAddress = builder->emitFieldAddress(diffAddressType, diffBase, nullptr);
-            
+            // If we have a getter associated with this field, we want to use that.   
             if (auto getterDecoration = origAddress->findDecoration<IRDifferentialGetterDecoration>())
-                cloneDecoration(getterDecoration, diffAddress);
+            {
+                auto getterFunc = getterDecoration->getGetterFunc();
 
-            if (auto setterDecoration = origAddress->findDecoration<IRDifferentialSetterDecoration>())
-                cloneDecoration(setterDecoration, diffAddress);
+                // Add the base differential inst as the argument.
+                List<IRInst*> args;
+                args.add(diffBase);
+
+                diffAddress = builder->emitCallInst(
+                    as<IRFuncType>(getterFunc->getDataType())->getResultType(),
+                    getterFunc,
+                    args);
+            }
+                
         }
 
         return InstPair(primalAddress, diffAddress);
@@ -2031,8 +1977,10 @@ struct JVPDerivativeContext
         // Temporary fix: Move generated types, if any, to before their use locations.
         (&pairBuilderStorage)->relocateNewTypes(builder);
 
-        // Remove all kIROp_DifferentiableTypeDictionary instructions.
-        modified |= stripDiffTypeDictionaries(builder, module->getModuleInst());
+        // Remove all kIROp_DifferentiableTypeDictionary instructions and 
+        // kIROp_DifferentialGetterDecoration decorations
+        // 
+        modified |= stripDiffTypeInformation(builder, module->getModuleInst());
 
         return modified;
     }
@@ -2253,7 +2201,7 @@ struct JVPDerivativeContext
         return modified;
     }
 
-    bool stripDiffTypeDictionaries(IRBuilder* builder, IRInst* parent)
+    bool stripDiffTypeInformation(IRBuilder* builder, IRInst* parent)
     {
         bool modified = false;
 
@@ -2270,9 +2218,14 @@ struct JVPDerivativeContext
                 continue;
             }
 
+            if (auto getterDecoration = child->findDecoration<IRDifferentialGetterDecoration>())
+            {
+                getterDecoration->removeAndDeallocate();
+            }
+
             if (child->getFirstChild() != nullptr)
             {
-                modified |= stripDiffTypeDictionaries(builder, child);
+                modified |= stripDiffTypeInformation(builder, child);
             }
 
             child = nextChild;

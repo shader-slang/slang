@@ -810,6 +810,12 @@ namespace Slang
         
         // Convert a function's original type to it's JVP type.
         Type* processJVPFuncType(ASTBuilder* builder, FuncType* originalType);
+
+        // Check and register a type if it is differentiable.
+        void maybeRegisterDifferentiableType(ASTBuilder* builder, Type* type);
+
+        // Construct the differential for 'type', if it exists.
+        Type* _getDifferential(ASTBuilder* builder, Type* type);
         
     public:
 

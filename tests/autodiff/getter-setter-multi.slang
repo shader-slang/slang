@@ -6,20 +6,27 @@ RWStructuredBuffer<float> outputBuffer;
 
 struct B
 {
-    float z;
+    float3 z;
+    float.Differential k[10];
 };
 
 struct A : IDifferentiable
 {
     typedef B Differential;
     
-    float x;
-    float y;
+    float3 x;
+    float y[10];
 
     [__unsafeForceInlineEarly]
-    static Ptr<float.Differential> __getDifferentialFor_x(inout Differential b)
+    static Ptr<float3.Differential> __getDifferentialFor_x(inout Differential b)
     {
         return &(b.z);
+    }
+
+    [__unsafeForceInlineEarly]
+    static Ptr<float.Differential[10]> __getDifferentialFor_y(inout Differential b)
+    {
+        return &(b.k);
     }
 
     [__unsafeForceInlineEarly]
@@ -49,8 +56,10 @@ typedef __DifferentialPair<A> dpA;
 __differentiate_jvp A f(A a)
 {
     A aout;
-    aout.y = 2 * a.x;
-    aout.x = 5 * a.x;
+
+    aout.y[5] = (2 * a.x).y;
+    aout.y[2] = (3 * a.y[4]);
+    aout.x = float3(5 * a.x.z, 3 * a.x.y, 0.5 * a.x.x);
 
     return aout;
 }
@@ -59,11 +68,16 @@ __differentiate_jvp A f(A a)
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
     {
-        A a = {1.0, 2.0};
-        B b = {0.2};
+        float arr[10] = { 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0 };
+        A a = {float3(1.0, 2.0, 3.0), arr};
+
+        float d_arr[10] = { 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0 };
+        B b = {float3(1.0, 0.5, 0.3), d_arr};
 
         dpA dpa = dpA(a, b);
 
-        outputBuffer[0] = __jvp(f)(dpa).d().z;                    // Expect: 1
+        outputBuffer[0] = __jvp(f)(dpa).d().z.z;  // Expect: 0.5
+        outputBuffer[1] = __jvp(f)(dpa).d().k[5]; // Expect: 1
+        outputBuffer[2] = __jvp(f)(dpa).d().k[2]; // Expect: 1.5
     }
 }
