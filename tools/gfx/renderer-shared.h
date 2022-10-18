@@ -1374,7 +1374,7 @@ public:
     SlangContext slangContext;
     ShaderCache shaderCache;
 
-    RefPtr<PersistentShaderCache> cacheIndex = nullptr;
+    RefPtr<PersistentShaderCache> persistentShaderCache = nullptr;
 
     Slang::Dictionary<slang::TypeLayoutReflection*, Slang::RefPtr<ShaderObjectLayoutBase>> m_shaderObjectLayoutCache;
     Slang::ComPtr<IPipelineCreationAPIDispatcher> m_pipelineCreationAPIDispatcher;

@@ -2139,8 +2139,8 @@ public:
         // The file system for loading cached shader kernels. The layer does not maintain a strong reference to the object,
         // instead the user is responsible for holding the object alive during the lifetime of an `IDevice`.
         ISlangFileSystem* shaderCacheFileSystem = nullptr;
-        // The maximum number of entries stored in the cache.
-        GfxCount entryCountLimit = 1000;
+        // The maximum number of entries stored in the cache. By default, there is no limit.
+        GfxCount entryCountLimit = 0;
     };
 
     struct InteropHandles

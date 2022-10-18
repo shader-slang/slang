@@ -52,16 +52,16 @@ void PersistentShaderCache::loadCacheFromFile()
         return;
     }
 
-    String indexString = String((char*)indexBlob->getBufferPointer());
+    auto indexString = UnownedStringSlice((char*)indexBlob->getBufferPointer());
 
     List<UnownedStringSlice> lines;
-    StringUtil::calcLines(indexString.getUnownedSlice(), lines);
+    StringUtil::calcLines(indexString, lines);
     for (auto line : lines)
     {
-        if (line == "")
-            break;
         List<UnownedStringSlice> digests;
-        StringUtil::split(line, ' ', digests); // This will return our two hashes as two elements in digests.
+        StringUtil::split(line, ' ', digests); // This will return our two hashes as two elements in digests, unless we've reached the end.
+        if (digests.getCount() != 2)
+            continue;
         auto dependencyDigest = DigestUtil::fromString(digests[0]);
         auto astDigest = DigestUtil::fromString(digests[1]);
 

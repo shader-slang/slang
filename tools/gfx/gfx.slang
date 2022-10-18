@@ -1715,12 +1715,12 @@ struct ShaderCacheDesc
     // The filename for the file the cache's state should be saved to or loaded from.
     NativeString cacheFilename = "cache.txt";
     // The root directory for the shader cache.
-    NativeString shaderCachePath = nullptr;
+    NativeString shaderCachePath;
     // The file system for loading cached shader kernels. The layer does not maintain a strong reference to the object,
     // instead the user is responsible for holding the object alive during the lifetime of an `IDevice`.
     void* shaderCacheFileSystem = nullptr;
     // The maximum number of entries stored in the cache.
-    GfxCount entryCountLimit = 1000;
+    GfxCount entryCountLimit = 0;
 };
 
 struct DeviceInteropHandles

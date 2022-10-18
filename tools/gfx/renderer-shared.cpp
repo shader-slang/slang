@@ -352,7 +352,7 @@ Result RendererBase::getEntryPointCodeFromShaderCache(
     slang::IBlob** outDiagnostics)
 {
     // Immediately call getEntryPointCode if no shader cache has been initialized
-    if (!cacheIndex)
+    if (!persistentShaderCache)
     {
         return program->getEntryPointCode(entryPointIndex, targetIndex, outCode, outDiagnostics);
     }
@@ -373,7 +373,7 @@ Result RendererBase::getEntryPointCodeFromShaderCache(
     ComPtr<ISlangBlob> codeBlob;
 
     // Query the shader cache index for an entry with shaderKey as its key. 
-    auto entry = cacheIndex->findEntry(shaderKey, codeBlob.writeRef());
+    auto entry = persistentShaderCache->findEntry(shaderKey, codeBlob.writeRef());
     if (entry && contentsHash == entry->Value.astBasedDigest)
     {
         // We found the entry in the cache, and the entry's contents are up-to-date. Nothing else needs to be done.
@@ -389,12 +389,12 @@ Result RendererBase::getEntryPointCodeFromShaderCache(
         // update the entry with the updated contents.
         if (!entry)
         {
-            cacheIndex->addEntry(shaderKey, contentsHash, codeBlob);
+            persistentShaderCache->addEntry(shaderKey, contentsHash, codeBlob);
             shaderCacheMissCount++;
         }
         else
         {
-            cacheIndex->updateEntry(entry, shaderKey, contentsHash, codeBlob);
+            persistentShaderCache->updateEntry(entry, shaderKey, contentsHash, codeBlob);
             shaderCacheEntryDirtyCount++;
         }
     }
@@ -430,7 +430,7 @@ SLANG_NO_THROW Result SLANG_MCALL RendererBase::initialize(const Desc& desc)
     // was provided.
     if (cacheDesc.shaderCachePath || cacheDesc.shaderCacheFileSystem)
     {
-        cacheIndex = new PersistentShaderCache(desc.shaderCache);
+        persistentShaderCache = new PersistentShaderCache(desc.shaderCache);
     }
 
     if (desc.apiCommandDispatcher)
