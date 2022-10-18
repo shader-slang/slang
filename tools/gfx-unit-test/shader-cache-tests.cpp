@@ -108,7 +108,7 @@ namespace gfx_test
         {
             freeOldResources();
             //device = createTestingDevice(context, api, 1000, cacheFileSystem);
-            device = createTestingDevice(context, api, 1000, diskFileSystem);
+            device = createTestingDevice(context, api, 1000, cacheFileSystem);
         }
 
         void init(ComPtr<IDevice> device, UnitTestContext* context)
