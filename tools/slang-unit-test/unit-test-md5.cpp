@@ -3,7 +3,7 @@
 
 #include "../../source/core/slang-md5.h"
 #include "../../source/core/slang-string.h"
-#include "../../source/slang/slang-hash-utils.h"
+#include "../../source/core/slang-digest-util.h"
 
 using namespace Slang;
 
@@ -23,7 +23,7 @@ SLANG_UNIT_TEST(md5hash)
         slang::Digest testA;
         testHashGen.finalize(&testCtx, &testA);
 
-        String testAString = hashToString(testA);
+        String testAString = DigestUtil::toString(testA);
         SLANG_CHECK(testAString.equals(String("5BA171E20898BDD205639013746F2679")));
     }
 
@@ -43,7 +43,7 @@ SLANG_UNIT_TEST(md5hash)
         slang::Digest testB;
         testHashGen.finalize(&testCtx, &testB);
 
-        String testBString = hashToString(testB);
+        String testBString = DigestUtil::toString(testB);
         SLANG_CHECK(testBString.equals(String("4352D88A78AA39750BF70CD6F27BCAA5")));
     }
 
@@ -59,7 +59,7 @@ SLANG_UNIT_TEST(md5hash)
         slang::Digest testC;
         testHashGen.finalize(&testCtx, &testC);
 
-        String testCString = hashToString(testC);
+        String testCString = DigestUtil::toString(testC);
         SLANG_CHECK(testCString.equals(String("5D6CC58E1824A4DFD0CF57395B603316")));
     }
 
@@ -75,7 +75,7 @@ SLANG_UNIT_TEST(md5hash)
         slang::Digest testD;
         testHashGen.finalize(&testCtx, &testD);
 
-        String testDString = hashToString(testD);
+        String testDString = DigestUtil::toString(testD);
         SLANG_CHECK(testDString.equals(String("DF5A79CC2170C7401CF0A506CEB0CE24")));
     }
 
@@ -91,7 +91,7 @@ SLANG_UNIT_TEST(md5hash)
         slang::Digest testE;
         testHashGen.finalize(&testCtx, &testE);
 
-        String testEString = hashToString(testE);
+        String testEString = DigestUtil::toString(testE);
         SLANG_CHECK(testEString.equals(String("4AE71336E44BF9BF79D2752E234818A5")));
     }
 }

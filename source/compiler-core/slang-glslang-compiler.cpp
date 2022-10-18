@@ -14,7 +14,7 @@
 #include "../core/slang-semantic-version.h"
 #include "../core/slang-char-util.h"
 
-#include "../core/slang-digest.h"
+#include "../core/slang-digest-builder.h"
 
 #include "slang-artifact-associated-impl.h"
 #include "slang-artifact-desc-util.h"

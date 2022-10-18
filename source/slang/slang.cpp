@@ -45,7 +45,7 @@
 #include "slang-check-impl.h"
 
 #include "../core/slang-md5.h"
-#include "slang-hash-utils.h"
+#include "../core/slang-digest-util.h"
 
 #include "../../slang-tag-version.h"
 
@@ -1692,8 +1692,8 @@ void TranslationUnitRequest::_addSourceFile(SourceFile* sourceFile)
         // for non-file-based dependencies later when shader files are being hashed for
         // the shader cache.
 
-        slang::Digest sourceHash = computeHashForStringSlice(sourceFile->getContent());
-        getModule()->addFilePathDependency(hashToString(sourceHash));
+        slang::Digest sourceHash = DigestUtil::computeDigestForStringSlice(sourceFile->getContent());
+        getModule()->addFilePathDependency(DigestUtil::toString(sourceHash));
     }
 }
 

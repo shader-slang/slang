@@ -3,7 +3,6 @@
 #pragma once
 
 #include "slang-ast-base.h"
-#include "../core/slang-digest.h"
 
 namespace Slang {
 

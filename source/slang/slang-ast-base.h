@@ -9,8 +9,6 @@
 
 #include "slang-serialize-reflection.h"
 
-#include "../core/slang-digest.h"
-
 // This file defines the primary base classes for the hierarchy of
 // AST nodes and related objects. For example, this is where the
 // basic `Decl`, `Stmt`, `Expr`, `type`, etc. definitions come from.
