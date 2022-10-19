@@ -69,20 +69,27 @@ namespace gfx_test
         return compareComputeResult(device, buffer, 0, expectedBuffer.getBuffer(), bufferSize);
     }
     
-    Slang::ComPtr<gfx::IDevice> createTestingDevice(UnitTestContext* context, Slang::RenderApiFlag::Enum api, ISlangMutableFileSystem* fileSystem = nullptr);
+    Slang::ComPtr<gfx::IDevice> createTestingDevice(
+        UnitTestContext* context,
+        Slang::RenderApiFlag::Enum api,
+        gfx::IDevice::ShaderCacheDesc shaderCache = {});
 
     void initializeRenderDoc();
     void renderDocBeginFrame();
     void renderDocEndFrame();
 
     template<typename ImplFunc>
-    void runTestImpl(const ImplFunc& f, UnitTestContext* context, Slang::RenderApiFlag::Enum api, ISlangMutableFileSystem* fileSystem = nullptr)
+    void runTestImpl(
+        const ImplFunc& f,
+        UnitTestContext* context,
+        Slang::RenderApiFlag::Enum api,
+        gfx::IDevice::ShaderCacheDesc shaderCache = {})
     {
         if ((api & context->enabledApis) == 0)
         {
             SLANG_IGNORE_TEST
         }
-        auto device = createTestingDevice(context, api, fileSystem);
+        auto device = createTestingDevice(context, api, shaderCache);
         if (!device)
         {
             SLANG_IGNORE_TEST
