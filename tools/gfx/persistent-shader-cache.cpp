@@ -68,6 +68,12 @@ void PersistentShaderCache::loadCacheFromFile()
         ShaderCacheEntry entry = { dependencyDigest, astDigest };
         auto entryNode = entries.AddLast(entry);
         keyToEntry.Add(dependencyDigest, entryNode);
+
+        // If there are more entries present in the cache file than the entry count limit allows,
+        // ignore the rest. Since we output the lines in the cache file in order of most to least
+        // recently used, the cache's behavior will still be correct.
+        if (entries.Count() == desc.entryCountLimit)
+            break;
     }
 }
 
