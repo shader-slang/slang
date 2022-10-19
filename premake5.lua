@@ -420,7 +420,7 @@ newoption {
      {
          "**/*.meta.slang.h",
          "**/slang-*generated*.h",
-		 "**/gfx-unit-test/test-tmp*"
+         "**/gfx-unit-test/test-tmp*"
      }
  end
  
