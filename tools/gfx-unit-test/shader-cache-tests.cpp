@@ -701,7 +701,8 @@ namespace gfx_test
             StringUtil::calcLines(UnownedStringSlice((char*)contentsBlob->getBufferPointer()), temp);
             for (auto line : temp)
             {
-                lines.add(line);
+                if (line != "")
+                    lines.add(line);
             }
         }
 
@@ -741,9 +742,7 @@ namespace gfx_test
             SLANG_CHECK(shaderCacheStats->getCacheHitCount() == 0);
             SLANG_CHECK(shaderCacheStats->getCacheEntryDirtyCount() == 0);
 
-            // All of the cache files include an extra newline at the end that we don't want
-            // to include in our check.
-            SLANG_CHECK(test0Lines.getCount() - 1 == 3);
+            SLANG_CHECK(test0Lines.getCount() == 3);
 
             // This segment also doubles as the point where we fetch the keys for all three shaders
             // to use in later checks.
@@ -784,7 +783,7 @@ namespace gfx_test
             SLANG_CHECK(shaderCacheStats->getCacheHitCount() == 0);
             SLANG_CHECK(shaderCacheStats->getCacheEntryDirtyCount() == 0);
 
-            SLANG_CHECK(test1Lines.getCount() - 1 == 2);
+            SLANG_CHECK(test1Lines.getCount() == 2);
 
             ComPtr<ISlangBlob> unused;
             SLANG_CHECK(SLANG_SUCCEEDED(cacheFileSystem->loadFile(entryKeys[0].getBuffer(), unused.writeRef())));
@@ -808,7 +807,7 @@ namespace gfx_test
             SLANG_CHECK(shaderCacheStats->getCacheHitCount() == 1);
             SLANG_CHECK(shaderCacheStats->getCacheEntryDirtyCount() == 0);
 
-            SLANG_CHECK(test2Lines.getCount() - 1 == 2);
+            SLANG_CHECK(test2Lines.getCount() == 2);
 
             ComPtr<ISlangBlob> unused;
             SLANG_CHECK(SLANG_FAILED(cacheFileSystem->loadFile(entryKeys[0].getBuffer(), unused.writeRef())));
@@ -832,7 +831,7 @@ namespace gfx_test
             SLANG_CHECK(shaderCacheStats->getCacheHitCount() == 1);
             SLANG_CHECK(shaderCacheStats->getCacheEntryDirtyCount() == 0);
 
-            SLANG_CHECK(test3Lines.getCount() - 1 == 2);
+            SLANG_CHECK(test3Lines.getCount() == 2);
 
             ComPtr<ISlangBlob> unused;
             SLANG_CHECK(SLANG_SUCCEEDED(cacheFileSystem->loadFile(entryKeys[0].getBuffer(), unused.writeRef())));
@@ -859,7 +858,7 @@ namespace gfx_test
             SLANG_CHECK(shaderCacheStats->getCacheHitCount() == 2);
             SLANG_CHECK(shaderCacheStats->getCacheEntryDirtyCount() == 0);
 
-            SLANG_CHECK(test4Lines.getCount() - 1 == 3);
+            SLANG_CHECK(test4Lines.getCount() == 3);
 
             ComPtr<ISlangBlob> unused;
             SLANG_CHECK(SLANG_SUCCEEDED(cacheFileSystem->loadFile(entryKeys[0].getBuffer(), unused.writeRef())));
