@@ -72,7 +72,7 @@ void PersistentShaderCache::loadCacheFromFile()
         // If there are more entries present in the cache file than the entry count limit allows,
         // ignore the rest. Since we output the lines in the cache file in order of most to least
         // recently used, the cache's behavior will still be correct.
-        if (entries.Count() == desc.entryCountLimit)
+        if (desc.entryCountLimit > 0 && entries.Count() == desc.entryCountLimit)
             break;
     }
 }
