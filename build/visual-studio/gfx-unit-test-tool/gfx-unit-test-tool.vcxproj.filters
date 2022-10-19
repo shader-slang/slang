@@ -145,24 +145,6 @@
     <None Include="..\..\..\tools\gfx-unit-test\swapchain-shader.slang">
       <Filter>Source Files</Filter>
     </None>
-    <None Include="..\..\..\tools\gfx-unit-test\test-tmp-imported.slang">
-      <Filter>Source Files</Filter>
-    </None>
-    <None Include="..\..\..\tools\gfx-unit-test\test-tmp-importing.slang">
-      <Filter>Source Files</Filter>
-    </None>
-    <None Include="..\..\..\tools\gfx-unit-test\test-tmp-multi-entry-A.slang">
-      <Filter>Source Files</Filter>
-    </None>
-    <None Include="..\..\..\tools\gfx-unit-test\test-tmp-multi-entry-B.slang">
-      <Filter>Source Files</Filter>
-    </None>
-    <None Include="..\..\..\tools\gfx-unit-test\test-tmp-multi-entry-C.slang">
-      <Filter>Source Files</Filter>
-    </None>
-    <None Include="..\..\..\tools\gfx-unit-test\test-tmp-single-entry.slang">
-      <Filter>Source Files</Filter>
-    </None>
     <None Include="..\..\..\tools\gfx-unit-test\trivial-copy-textures.slang">
       <Filter>Source Files</Filter>
     </None>
