@@ -10,6 +10,8 @@
 #include "source/core/slang-memory-file-system.h"
 #include "source/core/slang-file-system.h"
 
+#include "gfx-test-texture-util.h"
+
 using namespace gfx;
 using namespace Slang;
 
@@ -676,43 +678,19 @@ namespace gfx_test
         }
     };
 
+    // Same gist as the multiple entry point compute shader but with a graphics
+    // shader file containing a vertex and fragment shader
     struct Vertex
     {
         float position[3];
     };
 
-    struct Instance
-    {
-        float position[3];
-        float color[3];
-    };
-
-    static const int kVertexCount = 6;
+    static const int kVertexCount = 3;
     static const Vertex kVertexData[kVertexCount] =
     {
-        // Triangle 1
         { 0, 0, 0.5 },
         { 1, 0, 0.5 },
         { 0, 1, 0.5 },
-
-        // Triangle 2
-        { -1, 0, 0.5 },
-        {  0, 0, 0.5 },
-        { -1, 1, 0.5 },
-    };
-
-    static const int kInstanceCount = 2;
-    static const Instance kInstanceData[kInstanceCount] =
-    {
-        { { 0,  0, 0 }, { 1, 0, 0 } },
-        { { 0, -1, 0 }, { 0, 0, 1 } },
-    };
-
-    static const int kIndexCount = 6;
-    static const uint32_t kIndexData[kIndexCount] =
-    {
-        0, 2, 5,
-        0, 1, 2,
     };
 
     struct GraphicsShaderCache : BaseShaderCacheTest
@@ -725,7 +703,6 @@ namespace gfx_test
         ComPtr<IFramebuffer> framebuffer;
 
         ComPtr<IBufferResource> vertexBuffer;
-        ComPtr<IBufferResource> instanceBuffer;
         ComPtr<ITextureResource> colorBuffer;
 
         ComPtr<IBufferResource> createVertexBuffer(IDevice* device)
@@ -738,30 +715,6 @@ namespace gfx_test
             ComPtr<IBufferResource> vertexBuffer = device->createBufferResource(vertexBufferDesc, &kVertexData[0]);
             SLANG_CHECK_ABORT(vertexBuffer != nullptr);
             return vertexBuffer;
-        }
-
-        ComPtr<IBufferResource> createInstanceBuffer(IDevice* device)
-        {
-            IBufferResource::Desc instanceBufferDesc;
-            instanceBufferDesc.type = IResource::Type::Buffer;
-            instanceBufferDesc.sizeInBytes = kInstanceCount * sizeof(Instance);
-            instanceBufferDesc.defaultState = ResourceState::VertexBuffer;
-            instanceBufferDesc.allowedStates = ResourceState::VertexBuffer;
-            ComPtr<IBufferResource> instanceBuffer = device->createBufferResource(instanceBufferDesc, &kInstanceData[0]);
-            SLANG_CHECK_ABORT(instanceBuffer != nullptr);
-            return instanceBuffer;
-        }
-
-        ComPtr<IBufferResource> createIndexBuffer(IDevice* device)
-        {
-            IBufferResource::Desc indexBufferDesc;
-            indexBufferDesc.type = IResource::Type::Buffer;
-            indexBufferDesc.sizeInBytes = kIndexCount * sizeof(uint32_t);
-            indexBufferDesc.defaultState = ResourceState::IndexBuffer;
-            indexBufferDesc.allowedStates = ResourceState::IndexBuffer;
-            ComPtr<IBufferResource> indexBuffer = device->createBufferResource(indexBufferDesc, &kIndexData[0]);
-            SLANG_CHECK_ABORT(indexBuffer != nullptr);
-            return indexBuffer;
         }
 
         ComPtr<ITextureResource> createColorBuffer(IDevice* device)
@@ -784,16 +737,11 @@ namespace gfx_test
         {
             VertexStreamDesc vertexStreams[] = {
                 { sizeof(Vertex), InputSlotClass::PerVertex, 0 },
-                { sizeof(Instance), InputSlotClass::PerInstance, 1 },
             };
 
             InputElementDesc inputElements[] = {
                 // Vertex buffer data
-                { "POSITIONA", 0, Format::R32G32B32_FLOAT, offsetof(Vertex, position), 0 },
-
-                // Instance buffer data
-                { "POSITIONB", 0, Format::R32G32B32_FLOAT, offsetof(Instance, position), 1 },
-                { "COLOR",     0, Format::R32G32B32_FLOAT, offsetof(Instance, color),    1 },
+                { "POSITION", 0, Format::R32G32B32_FLOAT, offsetof(Vertex, position), 0 },
             };
             IInputLayout::Desc inputLayoutDesc = {};
             inputLayoutDesc.inputElementCount = SLANG_COUNT_OF(inputElements);
@@ -804,12 +752,11 @@ namespace gfx_test
             SLANG_CHECK_ABORT(inputLayout != nullptr);
 
             vertexBuffer = createVertexBuffer(device);
-            instanceBuffer = createInstanceBuffer(device);
             colorBuffer = createColorBuffer(device);
 
             ComPtr<IShaderProgram> shaderProgram;
             slang::ProgramLayout* slangReflection;
-            GFX_CHECK_CALL_ABORT(loadGraphicsProgram(device, shaderProgram, "graphics-smoke", "vertexMain", "fragmentMain", slangReflection));
+            GFX_CHECK_CALL_ABORT(loadGraphicsProgram(device, shaderProgram, "shader-cache-graphics", "vertexMain", "fragmentMain", slangReflection));
 
             IFramebufferLayout::TargetLayout targetLayout;
             targetLayout.format = format;
@@ -856,7 +803,7 @@ namespace gfx_test
             GFX_CHECK_CALL_ABORT(device->createFramebuffer(framebufferDesc, framebuffer.writeRef()));
         }
 
-        void setUpAndDraw()
+        void submitGPUWork()
         {
             ComPtr<ITransientResourceHeap> transientHeap;
             ITransientResourceHeap::Desc transientHeapDesc = {};
@@ -873,18 +820,14 @@ namespace gfx_test
 
             gfx::Viewport viewport = {};
             viewport.maxZ = 1.0f;
-            viewport.extentX = kWidth;
-            viewport.extentY = kHeight;
+            viewport.extentX = (float)kWidth;
+            viewport.extentY = (float)kHeight;
             encoder->setViewportAndScissor(viewport);
 
-            uint32_t startVertex = 0;
-            uint32_t startInstanceLocation = 0;
-
             encoder->setVertexBuffer(0, vertexBuffer);
-            encoder->setVertexBuffer(1, instanceBuffer);
             encoder->setPrimitiveTopology(PrimitiveTopology::TriangleList);
 
-            encoder->drawInstanced(kVertexCount, kInstanceCount, startVertex, startInstanceLocation);
+            encoder->draw(kVertexCount);
             encoder->endEncoding();
             commandBuffer->close();
             queue->executeCommandBuffer(commandBuffer);
@@ -895,7 +838,7 @@ namespace gfx_test
         {
             generateNewDevice();
             createRequiredResources();
-            setUpAndDraw();
+            submitGPUWork();
 
             ComPtr<IShaderCacheStatistics> shaderCacheStats;
 
@@ -1176,8 +1119,13 @@ namespace gfx_test
         runTestImpl(shaderCacheTestImpl<CacheWithMaxEntryLimit>, unitTestContext, Slang::RenderApiFlag::Vulkan);
     }
 
-    SLANG_UNIT_TEST(graphicsShader)
+    SLANG_UNIT_TEST(graphicsShaderCacheD3D12)
     {
         runTestImpl(shaderCacheTestImpl<GraphicsShaderCache>, unitTestContext, Slang::RenderApiFlag::D3D12);
+    }
+
+    SLANG_UNIT_TEST(graphicsShaderCacheVulkan)
+    {
+        runTestImpl(shaderCacheTestImpl<GraphicsShaderCache>, unitTestContext, Slang::RenderApiFlag::Vulkan);
     }
 }

@@ -4,7 +4,6 @@
 struct AssembledVertex
 {
     float3	position : POSITION;
-    float3	color    : COLOR;
 };
 
 // Output of the vertex shader, and input to the fragment shader.
@@ -34,7 +33,7 @@ VertexStageOutput vertexMain(
     VertexStageOutput output;
 
     float3 position = assembledVertex.position;
-    float3 color    = assembledVertex.color;
+    float3 color    = float3(1.0, 0.0, 0.0);
 
     output.coarseVertex.color = color;
     output.sv_position = float4(position, 1.0);
