@@ -15,6 +15,7 @@
 #include "slang-ir-dll-export.h"
 #include "slang-ir-dll-import.h"
 #include "slang-ir-eliminate-phis.h"
+#include "slang-ir-eliminate-multilevel-break.h"
 #include "slang-ir-entry-point-uniforms.h"
 #include "slang-ir-entry-point-raw-ptr-params.h"
 #include "slang-ir-explicit-global-context.h"
@@ -50,7 +51,6 @@
 #include "slang-ir-wrap-structured-buffers.h"
 #include "slang-ir-liveness.h"
 #include "slang-ir-glsl-liveness.h"
-
 #include "slang-legalize-types.h"
 #include "slang-lower-to-ir.h"
 #include "slang-mangle.h"
@@ -401,6 +401,8 @@ Result linkAndOptimizeIR(
     if (sink->getErrorCount() != 0)
         return SLANG_FAIL;
 
+    eliminateMultiLevelBreak(irModule);
+
     // TODO(DG): There are multiple DCE steps here, which need to be changed
     //   so that they don't just throw out any non-entry point code
     // Debugging code for IR transformations...
@@ -409,10 +411,8 @@ Result linkAndOptimizeIR(
 #endif
     validateIRModuleIfEnabled(codeGenContext, irModule);
 
-    // Inline calls to any functions marked with [__unsafeInlineEarly] again,
-    // since we may be missing out cases prevented by the generic constructs
-    // that we just lowered out.
-    performMandatoryEarlyInlining(irModule);
+    // Inline calls to any functions marked with [__unsafeInlineEarly] or [ForceInline].
+    performForceInlining(irModule);
 
     // Specialization can introduce dead code that could trip
     // up downstream passes like type legalization, so we
@@ -809,7 +809,7 @@ Result linkAndOptimizeIR(
 
         {
             // We only want to accumulate locations if liveness tracking is enabled.
-            eliminatePhis(codeGenContext, livenessMode, irModule);
+            eliminatePhis(livenessMode, irModule);
 #if 0
             dumpIRIfEnabled(codeGenContext, irModule, "PHIS ELIMINATED");
 #endif
@@ -852,6 +852,9 @@ Result linkAndOptimizeIR(
             applyGLSLLiveness(irModule);
         }
     }
+
+    // Run a final round of DCE to clean up unused things after phi-elimination.
+    eliminateDeadCode(irModule);
 
     // We include one final step to (optionally) dump the IR and validate
     // it after all of the optimization passes are complete. This should
@@ -959,7 +962,7 @@ SlangResult CodeGenContext::emitEntryPointsSourceFromIR(ComPtr<IArtifact>& outAr
 
         linkingAndOptimizationOptions.sourceEmitter = sourceEmitter;
 
-        switch( sourceLanguage )
+        switch (sourceLanguage)
         {
         default:
             break;
@@ -987,7 +990,11 @@ SlangResult CodeGenContext::emitEntryPointsSourceFromIR(ComPtr<IArtifact>& outAr
         // TODO: do we want to emit directly from IR, or translate the
         // IR back into AST for emission?
 #if 0
-        dumpIR(compileRequest, irModule, "PRE-EMIT");
+        {
+            StringBuilder sb;
+            StringWriter writer(&sb, Slang::WriterFlag::AutoFlush);
+            dumpIR(irModule, getIRDumpOptions(), sourceManager, &writer);
+        }
 #endif
         sourceEmitter->emitModule(irModule, sink);
     }

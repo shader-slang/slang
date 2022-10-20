@@ -451,6 +451,13 @@ struct ASTLookupStmtVisitor : public StmtVisitor<ASTLookupStmtVisitor, bool>
         return false;
     }
 
+    bool visitLabelStmt(LabelStmt* stmt)
+    {
+        if (_isLocInRange(context, stmt->label.loc, stmt->label.getContent().getLength()))
+            return true;
+        return dispatchIfNotNull(stmt->innerStmt);
+    }
+
     bool visitBreakStmt(BreakStmt*) { return false; }
 
     bool visitContinueStmt(ContinueStmt*) { return false; }

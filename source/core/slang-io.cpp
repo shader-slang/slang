@@ -419,6 +419,49 @@ namespace Slang
         return false;
     }
 
+    /* static */SlangResult Path::simplify(const UnownedStringSlice& path, SimplifyStyle style, StringBuilder& outPath)
+    {
+        if (path.getLength() == 0)
+        {
+            return SLANG_FAIL;
+        }
+
+        List<UnownedStringSlice> splitPath;
+        split(UnownedStringSlice(path), splitPath);
+
+        simplify(splitPath);
+
+        const auto simplifyIntegral = SimplifyIntegral(style);
+
+        // If it has a relative part then it's not absolute
+        if ((simplifyIntegral & SimplifyFlag::AbsoluteOnly) &&
+            splitPath.indexOf(UnownedStringSlice::fromLiteral("..")) >= 0)
+        {
+            return SLANG_E_NOT_FOUND;
+        }
+
+        // We allow splitPath.getCount() == 0, because 
+        // the original path could have been '.' or './.'
+        //
+        // Special handling this case is in Path::join
+
+        // If we want the path produced such that is *not* output with a root (ie SimplifyFlag::NoRoot)
+        // we detect if we a rooted path (ie in effect starting with "/") and so splitPath[0] == ""
+        // and remove that part from when doing the join.
+        if ((simplifyIntegral & SimplifyFlag::NoRoot) &&
+            (splitPath.getCount() && splitPath[0].getLength() == 0))
+        {
+            // If we allow without a root, we remove from the join
+            Path::join(splitPath.getBuffer() + 1, splitPath.getCount() - 1, outPath);
+        }
+        else
+        {
+            Path::join(splitPath.getBuffer(), splitPath.getCount(), outPath);
+        }
+
+        return SLANG_OK;
+    }
+
     /* static */void Path::simplify(List<UnownedStringSlice>& ioSplit)
     {
         // Strictly speaking we could do something about case on platforms like window, but here we won't worry about that
@@ -453,10 +496,16 @@ namespace Slang
         if (count == 0)
         {
             out << ".";
-            return;
         }
-
-        StringUtil::join(slices, count, kPathDelimiter, out);
+        else if (count == 1 && slices[0].getLength() == 0)
+        {
+            // It's the root
+            out << kPathDelimiter;
+        }
+        else
+        {
+            StringUtil::join(slices, count, kPathDelimiter, out);
+        }
     }
 
 

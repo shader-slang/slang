@@ -56,7 +56,7 @@ const uint64_t kTimeoutInfinite = 0xFFFFFFFFFFFFFFFF;
 
 enum class StructType
 {
-    D3D12ExtendedDesc,
+    D3D12DeviceExtendedDesc, D3D12ExperimentalFeaturesDesc
 };
 
 // TODO: Rename to Stage
@@ -706,7 +706,7 @@ public:
         GfxCount numMipLevels = 0;       ///< Number of mip levels - if 0 will create all mip levels
         Format format;                   ///< The resources format
         SampleDesc sampleDesc;           ///< How the resource is sampled
-        ClearValue optimalClearValue;
+        ClearValue* optimalClearValue = nullptr;
     };
 
         /// Data for a single subresource of a texture.
@@ -1995,7 +1995,7 @@ public:
         0xcd48bd29, 0xee72, 0x41b8, { 0xbc, 0xff, 0xa, 0x2b, 0x3a, 0xaa, 0x6d, 0xeb } \
     }
 
-class ID3D12TransientResourceHeap : public ISlangUnknown
+class ITransientResourceHeapD3D12 : public ISlangUnknown
 {
 public:
     enum class DescriptorType
@@ -2008,7 +2008,7 @@ public:
         Offset& outDescriptorOffset,
         void** outD3DDescriptorHeapHandle) = 0;
 };
-#define SLANG_UUID_ID3D12TransientResourceHeap                                             \
+#define SLANG_UUID_ITransientResourceHeapD3D12                                             \
     {                                                                                  \
         0x9bc6a8bc, 0x5f7a, 0x454a, { 0x93, 0xef, 0x3b, 0x10, 0x5b, 0xb7, 0x63, 0x7e } \
     }
@@ -2052,6 +2052,25 @@ public:
         0xbe91ba6c, 0x784, 0x4308, { 0xa1, 0x0, 0x19, 0xc3, 0x66, 0x83, 0x44, 0xb2 } \
     }
 
+// These are exclusively used to track hit/miss counts for shader cache entries. Entry hit and
+// miss counts specifically indicate if the file containing relevant shader code was found in
+// the cache, while the general hit and miss counts indicate whether the file was both found and
+// up-to-date.
+class IShaderCacheStatistics : public ISlangUnknown
+{
+public:
+    virtual SLANG_NO_THROW GfxCount SLANG_MCALL getCacheMissCount() = 0;
+    virtual SLANG_NO_THROW GfxCount SLANG_MCALL getCacheHitCount() = 0;
+    virtual SLANG_NO_THROW GfxCount SLANG_MCALL getCacheEntryDirtyCount() = 0;
+
+    virtual SLANG_NO_THROW Result SLANG_MCALL resetCacheStatistics() = 0;
+};
+
+#define SLANG_UUID_IShaderCacheStatistics                                                \
+    {                                                                                    \
+          0x8eccc8ec, 0x5c04, 0x4a51, { 0x99, 0x75, 0x13, 0xf8, 0xfe, 0xa1, 0x59, 0xf3 } \
+    }
+
 struct DeviceInfo
 {
     DeviceType deviceType;
@@ -2089,7 +2108,7 @@ public:
         handleMessage(DebugMessageType type, DebugMessageSource source, const char* message) = 0;
 };
 
-class IDevice: public ISlangUnknown
+class IDevice : public ISlangUnknown
 {
 public:
     struct SlangDesc
@@ -2109,6 +2128,19 @@ public:
         SlangOptimizationLevel optimizationLevel = SLANG_OPTIMIZATION_LEVEL_DEFAULT;
         SlangTargetFlags targetFlags = 0;
         SlangLineDirectiveMode lineDirectiveMode = SLANG_LINE_DIRECTIVE_MODE_DEFAULT;
+    };
+
+    struct ShaderCacheDesc
+    {
+        // The filename for the file the cache's state should be saved to or loaded from.
+        const char* cacheFilename = "cache.txt";
+        // The root directory for the shader cache.
+        const char* shaderCachePath = nullptr;
+        // The file system for loading cached shader kernels. The layer does not maintain a strong reference to the object,
+        // instead the user is responsible for holding the object alive during the lifetime of an `IDevice`.
+        ISlangFileSystem* shaderCacheFileSystem = nullptr;
+        // The maximum number of entries stored in the cache. By default, there is no limit.
+        GfxCount entryCountLimit = 0;
     };
 
     struct InteropHandles
@@ -2134,9 +2166,8 @@ public:
         ISlangUnknown* apiCommandDispatcher = nullptr;
         // The slot (typically UAV) used to identify NVAPI intrinsics. If >=0 NVAPI is required.
         GfxIndex nvapiExtnSlot = -1;
-        // The file system for loading cached shader kernels. The layer does not maintain a strong reference to the object,
-        // instead the user is responsible for holding the object alive during the lifetime of an `IDevice`.
-        ISlangFileSystem* shaderCacheFileSystem = nullptr;
+        // Configurations for the shader cache.
+        ShaderCacheDesc shaderCache = {};
         // Configurations for Slang compiler.
         SlangDesc slang = {};
 
@@ -2473,7 +2504,6 @@ public:
           0x715bdf26, 0x5135, 0x11eb, { 0xAE, 0x93, 0x02, 0x42, 0xAC, 0x13, 0x00, 0x02 } \
     }
 
-
 class IPipelineCreationAPIDispatcher : public ISlangUnknown
 {
 public:
@@ -2528,11 +2558,21 @@ extern "C"
 }
 
 // Extended descs.
+struct D3D12ExperimentalFeaturesDesc
+{
+    StructType structType = StructType::D3D12ExperimentalFeaturesDesc;
+    uint32_t numFeatures;
+    const void* featureIIDs;
+    void* configurationStructs;
+    uint32_t* configurationStructSizes;
+};
+
 struct D3D12DeviceExtendedDesc
 {
-    StructType structType = StructType::D3D12ExtendedDesc;
+    StructType structType = StructType::D3D12DeviceExtendedDesc;
     const char* rootParameterShaderAttributeName = nullptr;
     bool debugBreakOnD3D12Error = false;
+    uint32_t highestShaderModel = 0;
 };
 
 }

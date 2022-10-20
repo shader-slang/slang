@@ -247,6 +247,8 @@ public:
     };
     ResourceCommandRecordInfo encodeResourceCommands();
     void submitResourceCommandsAndWait(const ResourceCommandRecordInfo& info);
+private:
+    void processExperimentalFeaturesDesc(void* d3dModule, void* desc);
 };
 
 } // namespace d3d12

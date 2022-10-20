@@ -23,6 +23,15 @@ class SeqStmt : public Stmt
     List<Stmt*> stmts;
 };
 
+// A statement with a label.
+class LabelStmt : public Stmt
+{
+    SLANG_AST_CLASS(LabelStmt)
+
+    Token label;
+    Stmt* innerStmt;
+};
+
 // The simplest kind of scope statement: just a `{...}` block
 class BlockStmt : public ScopeStmt 
 {
@@ -196,6 +205,8 @@ class JumpStmt : public ChildStmt
 class BreakStmt : public JumpStmt 
 {
     SLANG_AST_CLASS(BreakStmt)
+
+    Token targetLabel;
 };
 
 class ContinueStmt : public JumpStmt 

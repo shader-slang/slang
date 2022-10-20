@@ -85,9 +85,20 @@ void ShaderCompilerUtil::Output::reset()
             args.add(arg.value.getBuffer());
         }
 
+        // If there are additional args parse them
         if (args.getCount())
         {
-            SLANG_RETURN_ON_FAIL(spProcessCommandLineArguments(slangRequest, args.getBuffer(), int(args.getCount())));
+            const auto res = slangRequest->processCommandLineArguments(args.getBuffer(), int(args.getCount()));
+
+            // If there is a parse failure and diagnostic, output it
+            if (SLANG_FAILED(res))
+            {
+                if (auto diagnostics = slangRequest->getDiagnosticOutput())
+                {
+                    fprintf(stderr, "%s", diagnostics);
+                }
+                return res;
+            }
         }
     }
 

@@ -136,6 +136,13 @@ namespace Slang
             /// Get the path to this instance (the path to the dll/executable/shared library the call is in)
             /// NOTE! This is not supported on all platforms, and will return SLANG_E_NOT_IMPLEMENTED in that scenario
         static SlangResult getInstancePath(StringBuilder& out);
+
+            /// Outputs message to a debug stream. Not all platforms support 
+            /// this feature.
+            /// 
+            /// @param text Text to be displayed in 'debugger output' 
+            /// @return SLANG_E_NOT_AVAILABLE if not on this platform, and potentially other errors 
+        static SlangResult outputDebugMessage(const char* text);
     };
 
 #ifndef _MSC_VER

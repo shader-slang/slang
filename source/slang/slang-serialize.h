@@ -316,6 +316,18 @@ void SerialReader::getArray(SerialIndex index, List<T>& out)
 class SerialWriter : public RefObject
 {
 public:
+    typedef uint32_t Flags;
+    struct Flag
+    {
+        enum Enum : Flags
+        {
+                /// If set will zero initialize backing memory. This is slower but 
+                /// is desirable to make two serializations of the same thing produce the 
+                /// identical serialized result.
+            ZeroInitialize = 0x1
+        };
+    };
+
     SerialIndex addPointer(const NodeBase* ptr);
     SerialIndex addPointer(const RefObject* ptr);
 
@@ -367,8 +379,11 @@ public:
         /// Used for attaching extra objects necessary for serializing
     SerialExtraObjects& getExtraObjects() { return m_extraObjects; }
 
+        /// Get the flag
+    Flags getFlags() const { return m_flags; }
+
         /// Ctor
-    SerialWriter(SerialClasses* classes, SerialFilter* filter);
+    SerialWriter(SerialClasses* classes, SerialFilter* filter, Flags flags = Flag::ZeroInitialize);
 
 protected:
 
@@ -388,7 +403,6 @@ protected:
 
     Dictionary<const void*, Index> m_ptrMap;    // Maps a pointer to an entry index
 
-    
     // NOTE! Assumes the content stays in scope!
     SliceMap m_sliceMap;
     SliceMap m_importSymbolMap;
@@ -399,6 +413,8 @@ protected:
     MemoryArena m_arena;                    ///< Holds the payloads
     SerialClasses* m_classes;
     SerialFilter* m_filter;                 ///< Filter to control what is serialized
+
+    Flags m_flags;                          ///< Flags to control behavior
 };
 
 // ---------------------------------------------------------------------------
@@ -418,6 +434,11 @@ SerialIndex SerialWriter::addArray(const T* in, Index count)
         // Else we need to convert
         List<ElementSerialType> work;
         work.setCount(count);
+
+        if (getFlags() & Flag::ZeroInitialize)
+        {
+            ::memset(work.getBuffer(), 0, sizeof(ElementSerialType) * count);
+        }
 
         for (Index i = 0; i < count; ++i)
         {

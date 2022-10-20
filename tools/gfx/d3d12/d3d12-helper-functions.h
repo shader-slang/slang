@@ -5,6 +5,7 @@
 #include "d3d12-base.h"
 #include "d3d12-shader-object-layout.h"
 #include "d3d12-submitter.h"
+#include "../../../source/core/slang-short-list.h"
 
 #ifndef __ID3D12GraphicsCommandList1_FWD_DEFINED__
 // If can't find a definition of CommandList1, just use an empty definition
@@ -19,6 +20,12 @@ using namespace Slang;
 
 namespace d3d12
 {
+struct PendingDescriptorTableBinding
+{
+    uint32_t rootIndex;
+    D3D12_GPU_DESCRIPTOR_HANDLE handle;
+};
+
 /// Contextual data and operations required when binding shader objects to the pipeline state
 struct BindingContext
 {
@@ -28,6 +35,7 @@ struct BindingContext
     DeviceImpl* device;
     D3D12_DESCRIPTOR_HEAP_TYPE
         outOfMemoryHeap; // The type of descriptor heap that is OOM during binding.
+    ShortList<PendingDescriptorTableBinding>* pendingTableBindings;
 };
 
 bool isSupportedNVAPIOp(ID3D12Device* dev, uint32_t op);

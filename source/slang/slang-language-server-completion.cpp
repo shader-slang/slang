@@ -65,6 +65,7 @@ static const char* hlslSemanticNames[] = {
     "SV_Target",
     "SV_TessFactor",
     "SV_VertexID",
+    "SV_ViewID",
     "SV_ViewportArrayIndex",
     "SV_ShadingRate",
 };

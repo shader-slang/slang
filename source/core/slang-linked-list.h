@@ -243,6 +243,12 @@ public:
     {
         LinkedNode<T>* n = new LinkedNode<T>(this);
         n->Value = nData;
+        AddFirst(n);
+        count++;
+        return n;
+    };
+    void AddFirst(LinkedNode<T>* n)
+    {
         n->prev = 0;
         n->next = head;
         if (head)
@@ -250,24 +256,12 @@ public:
         head = n;
         if (!tail)
             tail = n;
-        count++;
-        return n;
-    };
-    void Delete(LinkedNode<T>* n, int Count = 1)
+    }
+    void RemoveFromList(LinkedNode<T>* n)
     {
-        LinkedNode<T>*n1, *n2 = 0, *tn;
+        LinkedNode<T>*n1, *n2 = 0;
         n1 = n->prev;
-        tn = n;
-        int numDeleted = 0;
-        for (int i = 0; i < Count; i++)
-        {
-            n2 = tn->next;
-            delete tn;
-            tn = n2;
-            numDeleted++;
-            if (tn == 0)
-                break;
-        }
+        n2 = n->next;
         if (n1)
             n1->next = n2;
         else
@@ -276,6 +270,24 @@ public:
             n2->prev = n1;
         else
             tail = n1;
+        n->prev = nullptr;
+        n->next = nullptr;
+    }
+    void Delete(LinkedNode<T>* n, int Count = 1)
+    {
+        LinkedNode<T>*cur, *next;
+        cur = n;
+        int numDeleted = 0;
+        for (int i = 0; i < Count; i++)
+        {
+            next = cur->next;
+            RemoveFromList(cur);
+            delete cur;
+            cur = next;
+            numDeleted++;
+            if (cur == 0)
+                break;
+        }
         count -= numDeleted;
     }
     void Clear()

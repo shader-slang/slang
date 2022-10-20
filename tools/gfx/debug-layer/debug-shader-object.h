@@ -32,6 +32,7 @@ class DebugShaderObject : public DebugObject<IShaderObject>
 {
 public:
     SLANG_COM_OBJECT_IUNKNOWN_ALL;
+    void checkCompleteness();
 
 public:
     IShaderObject* getInterface(const Slang::Guid& guid);
@@ -83,6 +84,7 @@ public:
     Slang::Dictionary<ShaderOffsetKey, Slang::RefPtr<DebugShaderObject>> m_objects;
     Slang::Dictionary<ShaderOffsetKey, Slang::RefPtr<DebugResourceView>> m_resources;
     Slang::Dictionary<ShaderOffsetKey, Slang::RefPtr<DebugSamplerState>> m_samplers;
+    Slang::HashSet<SlangInt> m_initializedBindingRanges;
 };
 
 class DebugRootShaderObject : public DebugShaderObject

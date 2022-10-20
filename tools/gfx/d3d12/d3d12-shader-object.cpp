@@ -447,6 +447,14 @@ void ShaderObjectImpl::updateSubObjectsRecursive()
     }
 }
 
+static void bindPendingTables(BindingContext* context)
+{
+    for (auto& binding : *context->pendingTableBindings)
+    {
+        context->submitter->setRootDescriptorTable(binding.rootIndex, binding.handle);
+    }
+}
+
 /// Prepare to bind this object as a parameter block.
 ///
 /// This involves allocating and binding any descriptor tables necessary
@@ -504,7 +512,7 @@ Result ShaderObjectImpl::prepareToBindAsParameterBlock(
         // root parameter.
         //
         auto tableRootParamIndex = rootParamIndex++;
-        submitter->setRootDescriptorTable(tableRootParamIndex, table.getGpuHandle());
+        context->pendingTableBindings->add(PendingDescriptorTableBinding{ tableRootParamIndex, table.getGpuHandle() });
     }
     if (auto descriptorCount = specializedLayout->getTotalSamplerDescriptorCount())
     {
@@ -527,7 +535,7 @@ Result ShaderObjectImpl::prepareToBindAsParameterBlock(
         // root parameter.
         //
         auto tableRootParamIndex = rootParamIndex++;
-        submitter->setRootDescriptorTable(tableRootParamIndex, table.getGpuHandle());
+        context->pendingTableBindings->add(PendingDescriptorTableBinding{ tableRootParamIndex, table.getGpuHandle() });
     }
 
     return SLANG_OK;
@@ -602,6 +610,10 @@ Result ShaderObjectImpl::bindAsParameterBlock(
     // descriptor table) to represent its values.
     //
     BindingOffset subOffset = offset;
+    ShortList<PendingDescriptorTableBinding> pendingTableBindings;
+    auto oldPendingTableBindings = context->pendingTableBindings;
+    context->pendingTableBindings = &pendingTableBindings;
+
     SLANG_RETURN_ON_FAIL(prepareToBindAsParameterBlock(
         context, /* inout */ subOffset, specializedLayout, m_cachedGPUDescriptorSet));
 
@@ -610,6 +622,9 @@ Result ShaderObjectImpl::bindAsParameterBlock(
     //
     SLANG_RETURN_ON_FAIL(
         bindAsConstantBuffer(context, m_cachedGPUDescriptorSet, subOffset, specializedLayout));
+
+    bindPendingTables(context);
+    context->pendingTableBindings = oldPendingTableBindings;
 
     m_cachedGPUDescriptorSetVersion = m_version;
     return SLANG_OK;
@@ -1116,8 +1131,12 @@ Result RootShaderObjectImpl::bindAsRoot(
     // need to bind the entry points into the same descriptor set that is
     // being used for the root object.
 
-    BindingOffset rootOffset;
+    ShortList<PendingDescriptorTableBinding> pendingTableBindings;
+    auto oldPendingTableBindings = context->pendingTableBindings;
+    context->pendingTableBindings = &pendingTableBindings;
 
+    BindingOffset rootOffset;
+    
     // Bind all root parameters first.
     Super::bindRootArguments(context, rootOffset.rootParam);
 
@@ -1142,6 +1161,9 @@ Result RootShaderObjectImpl::bindAsRoot(
         SLANG_RETURN_ON_FAIL(entryPoint->bindAsConstantBuffer(
             context, descriptorSet, entryPointOffset, entryPointInfo.layout));
     }
+
+    bindPendingTables(context);
+    context->pendingTableBindings = oldPendingTableBindings;
 
     return SLANG_OK;
 }

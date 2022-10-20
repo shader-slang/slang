@@ -13,6 +13,7 @@
 namespace Slang
 {
     DiagnosticInfo const* findDiagnosticByName(UnownedStringSlice const& name);
+    const DiagnosticsLookup* getDiagnosticsLookup();
 
     namespace Diagnostics
     {

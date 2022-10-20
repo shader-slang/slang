@@ -305,6 +305,18 @@ void computePostorder(IRGlobalValueWithCode* code, List<IRBlock*>& outOrder)
     PostorderComputationContext context;
     context.order = &outOrder;
     context.walk(code);
+
+    // Append unvisited blocks (unreachable blocks) to the begining of postOrder.
+    List<IRBlock*> prefix;
+    for (auto block : code->getBlocks())
+    {
+        if (!context.visited.Contains(block))
+        {
+            prefix.add(block);
+        }
+    }
+    prefix.addRange(outOrder);
+    outOrder = _Move(prefix);
 }
 
 //

@@ -164,20 +164,26 @@ Result FramebufferImpl::init(DeviceImpl* renderer, const IFramebuffer::Desc& des
         auto resourceView = static_cast<TextureResourceViewImpl*>(desc.renderTargetViews[i]);
         renderTargetViews[i] = resourceView;
         imageViews[i] = resourceView->m_view;
-        memcpy(
-            &m_clearValues[i],
-            &resourceView->m_texture->getDesc()->optimalClearValue.color,
-            sizeof(gfx::ColorClearValue));
+        if (resourceView->m_texture->getDesc()->optimalClearValue)
+        {
+            memcpy(
+                &m_clearValues[i],
+                &resourceView->m_texture->getDesc()->optimalClearValue->color,
+                sizeof(gfx::ColorClearValue));
+        }
     }
 
     if (dsv)
     {
         imageViews[desc.renderTargetCount] = dsv->m_view;
         depthStencilView = dsv;
-        memcpy(
-            &m_clearValues[desc.renderTargetCount],
-            &dsv->m_texture->getDesc()->optimalClearValue.depthStencil,
-            sizeof(gfx::DepthStencilClearValue));
+        if (dsv->m_texture->getDesc()->optimalClearValue)
+        {
+            memcpy(
+                &m_clearValues[desc.renderTargetCount],
+                &dsv->m_texture->getDesc()->optimalClearValue->depthStencil,
+                sizeof(gfx::DepthStencilClearValue));
+        }
     }
 
     // Create framebuffer.

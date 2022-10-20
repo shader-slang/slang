@@ -22,6 +22,15 @@ DebugCommandBuffer::DebugCommandBuffer()
     m_rayTracingCommandEncoder.commandBuffer = this;
 }
 
+ICommandBuffer* DebugCommandBuffer::getInterface(const Slang::Guid& guid)
+{
+    if (guid == GfxGUID::IID_ICommandBuffer || guid == GfxGUID::IID_ISlangUnknown)
+        return (DebugObject<ICommandBuffer>*)this;
+    if (guid == GfxGUID::IID_ICommandBufferD3D12)
+        return static_cast<ICommandBufferD3D12*>(this);
+    return nullptr;
+}
+
 void DebugCommandBuffer::encodeRenderCommands(
     IRenderPassLayout* renderPass,
     IFramebuffer* framebuffer,
@@ -30,10 +39,8 @@ void DebugCommandBuffer::encodeRenderCommands(
     SLANG_GFX_API_FUNC;
     checkCommandBufferOpenWhenCreatingEncoder();
     checkEncodersClosedBeforeNewEncoder();
-    auto innerRenderPass =
-        renderPass ? static_cast<DebugRenderPassLayout*>(renderPass)->baseObject : nullptr;
-    auto innerFramebuffer =
-        framebuffer ? static_cast<DebugFramebuffer*>(framebuffer)->baseObject : nullptr;
+    auto innerRenderPass = getInnerObj(renderPass);
+    auto innerFramebuffer = getInnerObj(framebuffer);
     m_renderCommandEncoder.isOpen = true;
     baseObject->encodeRenderCommands(
         innerRenderPass, innerFramebuffer, &m_renderCommandEncoder.baseObject);
@@ -127,6 +134,30 @@ Result DebugCommandBuffer::getNativeHandle(InteropHandle* outHandle)
 {
     SLANG_GFX_API_FUNC;
     return baseObject->getNativeHandle(outHandle);
+}
+
+void DebugCommandBuffer::invalidateDescriptorHeapBinding()
+{
+    SLANG_GFX_API_FUNC;
+    ComPtr<ICommandBufferD3D12> cmdBuf;
+    if (SLANG_FAILED(baseObject->queryInterface(SlangUUID SLANG_UUID_ICommandBufferD3D12, (void**)cmdBuf.writeRef())))
+    {
+        GFX_DIAGNOSE_ERROR("The current command buffer implementation does not provide ICommandBufferD3D12 interface.");
+        return;
+    }
+    return cmdBuf->invalidateDescriptorHeapBinding();
+}
+
+void DebugCommandBuffer::ensureInternalDescriptorHeapsBound()
+{
+    SLANG_GFX_API_FUNC;
+    ComPtr<ICommandBufferD3D12> cmdBuf;
+    if (SLANG_FAILED(baseObject->queryInterface(SlangUUID SLANG_UUID_ICommandBufferD3D12, (void**)cmdBuf.writeRef())))
+    {
+        GFX_DIAGNOSE_ERROR("The current command buffer implementation does not provide ICommandBufferD3D12 interface.");
+        return;
+    }
+    return cmdBuf->ensureInternalDescriptorHeapsBound();
 }
 
 void DebugCommandBuffer::checkEncodersClosedBeforeNewEncoder()

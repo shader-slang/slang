@@ -56,6 +56,32 @@ namespace Slang
             }
         }
 
+        template <typename InstType, typename Func>
+        void processChildInstsOfType(IROp instOp, IRInst* parent, const Func& f)
+        {
+            workList.clear();
+            workListSet.Clear();
+
+            addToWorkList(parent);
+
+            while (workList.getCount() != 0)
+            {
+                IRInst* inst = workList.getLast();
+
+                workList.removeLast();
+                workListSet.Remove(inst);
+                if (inst->getOp() == instOp)
+                {
+                    f(as<InstType>(inst));
+                }
+
+                for (auto child = inst->getLastChild(); child; child = child->getPrevInst())
+                {
+                    addToWorkList(child);
+                }
+            }
+        }
+
         template <typename Func>
         void processAllInsts(const Func& f)
         {

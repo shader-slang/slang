@@ -69,6 +69,12 @@
     <ClInclude Include="..\..\..\source\core\slang-dictionary.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\source\core\slang-digest-builder.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\source\core\slang-digest-util.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\..\source\core\slang-exception.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -90,6 +96,9 @@
     <ClInclude Include="..\..\..\source\core\slang-http.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\source\core\slang-implicit-directory-collector.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\..\source\core\slang-io.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -108,7 +117,13 @@
     <ClInclude Include="..\..\..\source\core\slang-math.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\source\core\slang-md5.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\..\source\core\slang-memory-arena.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\source\core\slang-memory-file-system.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\source\core\slang-offset-container.h">
@@ -169,6 +184,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\source\core\slang-string-escape-util.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\source\core\slang-string-slice-index-map.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\source\core\slang-string-slice-pool.h">
@@ -242,6 +260,9 @@
     <ClCompile Include="..\..\..\source\core\slang-deflate-compression-system.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\source\core\slang-digest-util.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\..\source\core\slang-file-system.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -254,6 +275,9 @@
     <ClCompile Include="..\..\..\source\core\slang-http.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\source\core\slang-implicit-directory-collector.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\..\source\core\slang-io.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -263,7 +287,13 @@
     <ClCompile Include="..\..\..\source\core\slang-lz4-compression-system.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\source\core\slang-md5.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\..\source\core\slang-memory-arena.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\source\core\slang-memory-file-system.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\source\core\slang-offset-container.cpp">
@@ -309,6 +339,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\source\core\slang-string-escape-util.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\source\core\slang-string-slice-index-map.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\source\core\slang-string-slice-pool.cpp">

@@ -2,6 +2,7 @@
 #include "slang-ir-inline.h"
 
 #include "slang-ir-ssa-simplification.h"
+#include "slang-ir-single-return.h"
 
 // This file provides general facilities for inlining function calls.
 
@@ -320,48 +321,9 @@ struct InliningPassBase
         // For now, our inlining pass only handles the case where
         // the callee is a "single-return" function, which means the callee
         // function contains only one return at the end of the body.
-        if (isSingleReturnFunc(callee))
-        {
-            inlineSingleReturnFuncBody(callSite, &env, &builder);    
-        }
-        else
-        {
-            // Running into any non-trivial function to be inlined
-            // is currently an internal compiler error.
-            //
-            SLANG_UNIMPLEMENTED_X("general case of inlining");
-        }
-    }
-
-        /// Check if `func` represents a simple callee that has only a single `return`.
-    bool isSingleReturnFunc(IRFunc* func)
-    {
-        auto firstBlock = func->getFirstBlock();
-
-        // If the body block is decorated (for some reason), then the function is non-trivial.
-        //
-        if( firstBlock->getFirstDecoration() )
-            return false;
-
-        // If the body has more than one returns, we cannot inline it now.
-        bool returnFound = false;
-        for (auto block : func->getBlocks())
-        {
-            for (auto inst : block->getChildren())
-            {
-                if (inst->getOp() == kIROp_Return)
-                {
-                    // If the return is not at the end of the block, we cannot handle it.
-                    if (inst != block->getTerminator())
-                        return false;
-                    // If there is already a return found, this function cannot be simple.
-                    if (returnFound)
-                        return false;
-                    returnFound = true;
-                }
-            }
-        }
-        return true;
+        
+        convertFuncToSingleReturnForm(m_module, callSite.callee);
+        inlineSingleReturnFuncBody(callSite, &env, &builder);    
     }
 
         // When instructions are cloned, with cloneInst no sourceLoc information is copied over by default.
@@ -527,6 +489,7 @@ struct InliningPassBase
         //
         call->removeAndDeallocate();
     }
+
 };
 
     /// An inlining pass that inlines calls to `[unsafeForceInlineEarly]` functions
@@ -553,6 +516,28 @@ void performMandatoryEarlyInlining(IRModule* module)
     pass.considerAllCallSites();
 }
 
+struct ForceInliningPass : InliningPassBase
+{
+    typedef InliningPassBase Super;
+
+    ForceInliningPass(IRModule* module)
+        : Super(module)
+    {}
+
+    bool shouldInline(CallSiteInfo const& info)
+    {
+        if (info.callee->findDecoration<IRForceInlineDecoration>() ||
+            info.callee->findDecoration<IRUnsafeForceInlineEarlyDecoration>())
+            return true;
+        return false;
+    }
+};
+
+void performForceInlining(IRModule* module)
+{
+    ForceInliningPass pass(module);
+    pass.considerAllCallSites();
+}
 
     // Defined in slang-ir-specialize-resource.cpp
 bool isResourceType(IRType* type);

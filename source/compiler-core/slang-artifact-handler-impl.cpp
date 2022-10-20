@@ -176,12 +176,12 @@ SlangResult DefaultArtifactHandler::_createOSFile(IArtifact* artifact, ArtifactK
 				path = UnownedStringSlice(extRep->getPath());
 				break;
 			}
-			case OSPathKind::Canonical:
+			case OSPathKind::OperatingSystem:
 			{
-				ComPtr<ISlangBlob> canonicalPathBlob;
-				if (SLANG_SUCCEEDED(system->getCanonicalPath(extRep->getPath(), canonicalPathBlob.writeRef())))
+				ComPtr<ISlangBlob> osPathBlob;
+				if (SLANG_SUCCEEDED(system->getPath(PathKind::OperatingSystem, extRep->getPath(), osPathBlob.writeRef())))
 				{
-					path = StringUtil::getString(canonicalPathBlob);
+					path = StringUtil::getString(osPathBlob);
 				}
 				break;
 			}

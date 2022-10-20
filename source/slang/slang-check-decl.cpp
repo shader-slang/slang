@@ -5358,9 +5358,17 @@ namespace Slang
             constraints.loc = extDecl->loc;
             constraints.genericDecl = extGenericDecl;
 
+            // Inside the body of an extension declaration, we may end up trying to apply that
+            // extension to its own target type.
+            // If we see that we are in that case, we can apply the extension declaration as - is,
+            // without any additional substitutions.
+            if (extDecl->targetType->equals(type))
+            {
+                return extDeclRef;
+            }
+
             if (!TryUnifyTypes(constraints, extDecl->targetType.Ptr(), type))
                 return DeclRef<ExtensionDecl>();
-
             auto constraintSubst = trySolveConstraintSystem(&constraints, DeclRef<Decl>(extGenericDecl, nullptr).as<GenericDecl>());
             if (!constraintSubst)
             {

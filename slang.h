@@ -1090,7 +1090,39 @@ extern "C"
     {
         None,                ///< Paths do not map to the file system
         Direct,              ///< Paths map directly to the file system
-        Canonical,           ///< Only canonical paths map to the file system
+        OperatingSystem,     ///< Only paths gained via PathKind::OperatingSystem map to the operating system file system
+    };
+
+    /* Used to determine what kind of path is required from an input path */
+    enum class PathKind
+    {
+            /// Given a path, returns a simplified version of that path.  
+            /// This typically means removing '..' and/or '.' from the path.
+            /// A simplified path must point to the same object as the original.
+        Simplified,             
+
+            /// Given a path, returns a 'canonical path' to the item. 
+            /// This may be the operating system 'canonical path' that is the unique path to the item.
+            /// 
+            /// If the item exists the returned canonical path should always be usable to access the item.
+            /// 
+            /// If the item the path specifies doesn't exist, the canonical path may not be returnable
+            /// or be a path simplification.             
+            /// Not all file systems support canonical paths.
+        Canonical,
+
+            /// Given a path returns a path such that it is suitable to be displayed to the user.
+            /// 
+            /// For example if the file system is a zip file - it might include the path to the zip
+            /// container as well as the path to the specific file.
+            /// 
+            /// NOTE! The display path won't necessarily work on the file system to access the item
+        Display,
+
+            /// Get the path to the item on the *operating system* file system, if available.
+        OperatingSystem,
+
+        CountOf,
     };
 
     /** An extended file system abstraction.
@@ -1161,36 +1193,17 @@ extern "C"
             const char* path, 
             SlangPathType* pathTypeOut) = 0;
 
-        /** Get a simplified path. 
-        Given a path, returns a simplified version of that path - typically removing '..' and/or '.'. A simplified
-        path must point to the same object as the original. 
-       
-        This method is optional, if not implemented return SLANG_E_NOT_IMPLEMENTED.
+        /** Get a path based on the kind.
 
-        @param path
-        @param outSimplifiedPath
+        @param kind The kind of path wanted
+        @param path The input path
+        @param outPath The output path held in a blob
         @returns SLANG_OK if successfully simplified the path (SLANG_E_NOT_IMPLEMENTED if not implemented, or some other error code)
         */
-        virtual SLANG_NO_THROW SlangResult SLANG_MCALL getSimplifiedPath(
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL getPath(
+            PathKind kind,
             const char* path,
-            ISlangBlob** outSimplifiedPath) = 0;
-
-        /** Get a canonical path identifies an object of the file system.
-
-        Given a path, returns a 'canonicalPath' to the file. This may be a file system 'canonical path' to
-        show where a file was read from. If the file system is say a zip file - it might include the path to the zip
-        container as well as the absolute path to the specific file. The main purpose of the method is to be able
-        to display to uses unambiguously where a file was read from.
-
-        This method is optional, if not implemented return SLANG_E_NOT_IMPLEMENTED.
-
-        @param path
-        @param outCanonicalPath
-        @returns SLANG_OK if successfully canonicalized the path (SLANG_E_NOT_IMPLEMENTED if not implemented, or some other error code)
-        */
-        virtual SLANG_NO_THROW SlangResult SLANG_MCALL getCanonicalPath(
-            const char* path,
-            ISlangBlob** outCanonicalPath) = 0;
+            ISlangBlob** outPath) = 0;
 
         /** Clears any cached information */
         virtual SLANG_NO_THROW void SLANG_MCALL clearCache() = 0;
@@ -1211,7 +1224,7 @@ extern "C"
 
         /** Returns how paths map to the OS file system
         
-        @returns true if this 
+        @returns OSPathKind that describes how paths map to the Operating System file system
         */
         virtual SLANG_NO_THROW OSPathKind SLANG_MCALL getOSPathKind() = 0;
     };
@@ -1222,17 +1235,33 @@ extern "C"
     {
         SLANG_COM_INTERFACE(0xa058675c, 0x1d65, 0x452a, { 0x84, 0x58, 0xcc, 0xde, 0xd1, 0x42, 0x71, 0x5 })
 
-        /** Write the data specified with data and size to the specified path.
+        /** Write data to the specified path.
 
         @param path The path for data to be saved to
         @param data The data to be saved
-        @param size The size of the data
+        @param size The size of the data in bytes
         @returns SLANG_OK if successful (SLANG_E_NOT_IMPLEMENTED if not implemented, or some other error code)
         */
         virtual SLANG_NO_THROW SlangResult SLANG_MCALL saveFile(
             const char* path,
             const void* data,
             size_t size) = 0;
+
+        /** Write data in the form of a blob to the specified path.
+
+        Depending on the implementation writing a blob might be faster/use less memory. It is assumed the 
+        blob is *immutable* and that an implementation can reference count it.
+
+        It is not guaranteed loading the same file will return the *same* blob - just a blob with same 
+        contents.
+
+        @param path The path for data to be saved to
+        @param dataBlob The data to be saved
+        @returns SLANG_OK if successful (SLANG_E_NOT_IMPLEMENTED if not implemented, or some other error code)
+        */
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL saveFileBlob(
+            const char* path,
+            ISlangBlob* dataBlob) = 0;
 
         /** Remove the entry in the path (directory of file). Will only delete an empty directory, if not empty
         will return an error.
@@ -4105,6 +4134,26 @@ namespace slang
         None, UnsizedArray, StructuredBuffer, ConstantBuffer, ParameterBlock
     };
 
+    // A struct storing a single hash represented as a four element uint32_t array.
+    // This is intended to be used with the current MD5 hashing implementation.
+    struct Digest
+    {
+        uint32_t values[4] = { 0 };
+
+        bool operator==(const Digest& rhs)
+        {
+            return values[0] == rhs.values[0]
+                && values[1] == rhs.values[1]
+                && values[2] == rhs.values[2]
+                && values[3] == rhs.values[3];
+        }
+
+        uint32_t getHashCode()
+        {
+            return values[0];
+        }
+    };
+
         /** A session provides a scope for code that is loaded.
 
         A session can be used to load modules of Slang source code,
@@ -4391,6 +4440,37 @@ namespace slang
             SlangInt    targetIndex,
             IBlob**     outCode,
             IBlob**     outDiagnostics = nullptr) = 0;
+
+            /** Compute the hash code of all dependencies for this component type. This generally means file path
+                dependencies but can also include the component's name or sub-components. The dependency-based
+                hash effectively represents all the files that may be included/imported by a component type along with
+                any non-code-specific that helps define a component. This can be useful to simply check for a component
+                type without needing to inspect the code. For example, a shader cache might key its entries using the
+                dependency-based hash in order to determine at a glance if a particular shader is present, with no
+                regard for the shader's contents.
+
+                This function should only have a meaningful implementation in ComponentType. All other types derived from
+                ComponentType that also inherit from IComponentType should do nothing.
+            */
+        virtual SLANG_NO_THROW void SLANG_MCALL computeDependencyBasedHash(
+            SlangInt entryPointIndex,
+            SlangInt targetIndex,
+            Digest* outHash) = 0;
+
+            /** Compute the hash code of this component type's AST. This hash effectively represents
+                the contents of the code covered by this component type, making its use ideal when we need
+                to confirm whether shader code changes have occurred. For example, a shader cache needs to be
+                able to check when a cache entry contains out-of-date code, which can be easily detected by
+                comparing the AST-based hashes since any change to the shader's code will be reflected in the
+                AST, and subsequently, the AST-based hash.
+
+                Not all component types will store an AST, and consequently, not all component types will have a
+                meaningful implementation for this function.
+
+                This function should only have a meaningful implementation in ComponentType. All other types derived
+                from ComponentType that also inherit from IComponentType should do nothing.
+            */
+        virtual SLANG_NO_THROW void SLANG_MCALL computeASTBasedHash(Digest* outHash) = 0;
 
             /** Specialize the component by binding its specialization parameters to concrete arguments.
 

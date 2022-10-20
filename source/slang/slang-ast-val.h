@@ -379,7 +379,6 @@ class TaggedUnionSubtypeWitness : public SubtypeWitness
     //
     List<Val*> caseWitnesses;
 
-
     // Overrides should be public so base classes can access
     bool _equalsValOverride(Val* val);
     void _toTextOverride(StringBuilder& out);
@@ -411,7 +410,6 @@ class ConjunctionSubtypeWitness : public SubtypeWitness
         /// Witness that `sub : sup->right`
     Val* rightWitness;
 
-    // Overrides should be public so base classes can access
     bool _equalsValOverride(Val* val);
     void _toTextOverride(StringBuilder& out);
     HashCode _getHashCodeOverride();
@@ -424,16 +422,15 @@ class ExtractFromConjunctionSubtypeWitness : public SubtypeWitness
     SLANG_AST_CLASS(ExtractFromConjunctionSubtypeWitness)
 
         /// Witness that `T : L & R` for some `R`
-    Val* conunctionWitness;
+    Val* conjunctionWitness;
 
         /// The zero-based index of the super-type we care about in the conjunction
         ///
-        /// If `conunctionWitness` is `T : X & Y` then this index should be zero if
+        /// If `conjunctionWitness` is `T : X & Y` then this index should be zero if
         /// we want to represent `T : X` and one if we want `T : Y`.
         ///
     int indexInConjunction;
-    
-    // Overrides should be public so base classes can access
+
     bool _equalsValOverride(Val* val);
     void _toTextOverride(StringBuilder& out);
     HashCode _getHashCodeOverride();

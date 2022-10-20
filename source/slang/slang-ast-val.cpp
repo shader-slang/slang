@@ -710,6 +710,108 @@ Val* TaggedUnionSubtypeWitness::_substituteImplOverride(ASTBuilder* astBuilder, 
     return substWitness;
 }
 
+bool ConjunctionSubtypeWitness::_equalsValOverride(Val* val)
+{
+    if (auto other = as<ConjunctionSubtypeWitness>(val))
+    {
+        return other->leftWitness && other->leftWitness->equalsVal(leftWitness) &&
+               other->rightWitness && other->rightWitness->equalsVal(rightWitness);
+    }
+    return false;
+}
+
+void ConjunctionSubtypeWitness::_toTextOverride(StringBuilder& out)
+{
+    out << "ConjunctionSubtypeWitness(";
+    if (leftWitness) out << leftWitness;
+    out << ",";
+    if (rightWitness) out << rightWitness;
+    out << ")";
+}
+
+HashCode ConjunctionSubtypeWitness::_getHashCodeOverride()
+{
+    HashCode result = 0;
+    if (leftWitness) result = leftWitness->getHashCode();
+    if (rightWitness) result = combineHash(result, rightWitness->getHashCode());
+    return result;
+}
+
+Val* ConjunctionSubtypeWitness::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff)
+{
+    int diff = 0;
+    Val* left = nullptr;
+    Val* right = nullptr;
+
+    auto substSub = as<Type>(sub->substituteImpl(astBuilder, subst, &diff));
+    auto substSup = as<Type>(sup->substituteImpl(astBuilder, subst, &diff));
+
+    if (leftWitness)
+        left = leftWitness->substituteImpl(astBuilder, subst, &diff);
+    if (rightWitness)
+        right = rightWitness->substituteImpl(astBuilder, subst, &diff);
+
+    *ioDiff += diff;
+
+    if (diff)
+    {
+        auto result = astBuilder->create<ConjunctionSubtypeWitness>();
+        result->leftWitness = left;
+        result->rightWitness = right;
+        result->sub = substSub;
+        result->sup = substSup;
+        return result;
+    }
+    return this;
+}
+
+bool ExtractFromConjunctionSubtypeWitness::_equalsValOverride(Val* val)
+{
+    if (auto other = as<ExtractFromConjunctionSubtypeWitness>(val))
+    {
+        return other->conjunctionWitness && other->conjunctionWitness->equalsVal(conjunctionWitness) &&
+            other->indexInConjunction == indexInConjunction;
+    }
+    return false;
+}
+
+void ExtractFromConjunctionSubtypeWitness::_toTextOverride(StringBuilder& out)
+{
+    out << "ExtractFromConjunctionSubtypeWitness(";
+    if (conjunctionWitness)
+        out << conjunctionWitness;
+    out << "," << indexInConjunction;
+    out << ")";
+}
+
+HashCode ExtractFromConjunctionSubtypeWitness::_getHashCodeOverride()
+{
+    return combineHash(indexInConjunction, conjunctionWitness ? conjunctionWitness->getHashCode() : 0);
+}
+
+Val* ExtractFromConjunctionSubtypeWitness::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff)
+{
+    int diff = 0;
+    Val* newConjunctionWitness = nullptr;
+
+    auto substSub = as<Type>(sub->substituteImpl(astBuilder, subst, &diff));
+    auto substSup = as<Type>(sup->substituteImpl(astBuilder, subst, &diff));
+
+    if (this->conjunctionWitness)
+        newConjunctionWitness = conjunctionWitness->substituteImpl(astBuilder, subst, &diff);
+    *ioDiff += diff;
+
+    if (diff)
+    {
+        auto result = astBuilder->create<ExtractFromConjunctionSubtypeWitness>();
+        result->conjunctionWitness = newConjunctionWitness;
+        result->sub = substSub;
+        result->sup = substSup;
+        return result;
+    }
+    return this;
+}
+
 // ModifierVal
 
 bool ModifierVal::_equalsValOverride(Val* val)

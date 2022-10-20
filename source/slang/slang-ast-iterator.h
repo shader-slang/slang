@@ -297,6 +297,12 @@ struct ASTIterator
                 dispatchIfNotNull(stmt);
         }
 
+        void visitLabelStmt(LabelStmt* stmt)
+        {
+            iterator->maybeDispatchCallback(stmt);
+            dispatchIfNotNull(stmt->innerStmt);
+        }
+
         void visitBreakStmt(BreakStmt* stmt) { iterator->maybeDispatchCallback(stmt); }
 
         void visitContinueStmt(ContinueStmt* stmt) { iterator->maybeDispatchCallback(stmt); }

@@ -191,7 +191,7 @@ Result DebugDevice::createTextureView(
 
     RefPtr<DebugResourceView> outObject = new DebugResourceView();
     auto result = baseObject->createTextureView(
-        static_cast<DebugTextureResource*>(texture)->baseObject,
+        getInnerObj(texture),
         desc,
         outObject->baseObject.writeRef());
     if (SLANG_FAILED(result))
@@ -210,8 +210,8 @@ Result DebugDevice::createBufferView(
 
     RefPtr<DebugResourceView> outObject = new DebugResourceView();
     auto result = baseObject->createBufferView(
-        static_cast<DebugBufferResource*>(buffer)->baseObject,
-        counterBuffer ? static_cast<DebugBufferResource*>(counterBuffer)->baseObject : nullptr,
+        getInnerObj(buffer),
+        getInnerObj(counterBuffer),
         desc,
         outObject->baseObject.writeRef());
     if (SLANG_FAILED(result))
@@ -263,19 +263,12 @@ Result DebugDevice::createFramebuffer(IFramebuffer::Desc const& desc, IFramebuff
     SLANG_GFX_API_FUNC;
 
     auto innerDesc = desc;
-    innerDesc.layout =
-        desc.layout ? static_cast<DebugFramebufferLayout*>(desc.layout)->baseObject.get() : nullptr;
-    innerDesc.depthStencilView =
-        desc.depthStencilView
-            ? static_cast<DebugResourceView*>(desc.depthStencilView)->baseObject.get()
-            : nullptr;
+    innerDesc.layout = getInnerObj(desc.layout);
+    innerDesc.depthStencilView = getInnerObj(desc.depthStencilView);
     List<IResourceView*> innerRenderTargets;
     for (GfxIndex i = 0; i < desc.renderTargetCount; i++)
     {
-        auto innerRenderTarget =
-            desc.renderTargetViews[i]
-                ? static_cast<DebugResourceView*>(desc.renderTargetViews[i])->baseObject.get()
-                : nullptr;
+        auto innerRenderTarget = getInnerObj(desc.renderTargetViews[i]);
         innerRenderTargets.add(innerRenderTarget);
     }
     innerDesc.renderTargetViews = innerRenderTargets.getBuffer();
@@ -295,9 +288,7 @@ Result DebugDevice::createRenderPassLayout(
     SLANG_GFX_API_FUNC;
 
     auto innerDesc = desc;
-    innerDesc.framebufferLayout =
-        desc.framebufferLayout? static_cast<DebugFramebufferLayout*>(desc.framebufferLayout)->baseObject.get()
-            : nullptr;
+    innerDesc.framebufferLayout = getInnerObj(desc.framebufferLayout);
     RefPtr<DebugRenderPassLayout> outObject = new DebugRenderPassLayout();
     auto result = baseObject->createRenderPassLayout(innerDesc, outObject->baseObject.writeRef());
     if (SLANG_FAILED(result))
@@ -314,9 +305,9 @@ Result DebugDevice::createSwapchain(
     SLANG_GFX_API_FUNC;
 
     auto innerDesc = desc;
-    innerDesc.queue = static_cast<DebugCommandQueue*>(desc.queue)->baseObject.get();
+    innerDesc.queue = getInnerObj(desc.queue);
     RefPtr<DebugSwapchain> outObject = new DebugSwapchain();
-    outObject->queue = static_cast<DebugCommandQueue*>(desc.queue);
+    outObject->queue = getDebugObj(desc.queue);
     auto result = baseObject->createSwapchain(innerDesc, window, outObject->baseObject.writeRef());
     if (SLANG_FAILED(result))
         return result;
@@ -479,14 +470,9 @@ Result DebugDevice::createGraphicsPipelineState(
     SLANG_GFX_API_FUNC;
 
     GraphicsPipelineStateDesc innerDesc = desc;
-    innerDesc.program =
-        desc.program ? static_cast<DebugShaderProgram*>(desc.program)->baseObject : nullptr;
-    innerDesc.inputLayout =
-        desc.inputLayout ? static_cast<DebugInputLayout*>(desc.inputLayout)->baseObject : nullptr;
-    innerDesc.framebufferLayout =
-        desc.framebufferLayout
-            ? static_cast<DebugFramebufferLayout*>(desc.framebufferLayout)->baseObject
-            : nullptr;
+    innerDesc.program = getInnerObj(desc.program);
+    innerDesc.inputLayout = getInnerObj(desc.inputLayout);
+    innerDesc.framebufferLayout = getInnerObj(desc.framebufferLayout);
     RefPtr<DebugPipelineState> outObject = new DebugPipelineState();
     auto result =
         baseObject->createGraphicsPipelineState(innerDesc, outObject->baseObject.writeRef());
@@ -503,7 +489,7 @@ Result DebugDevice::createComputePipelineState(
     SLANG_GFX_API_FUNC;
 
     ComputePipelineStateDesc innerDesc = desc;
-    innerDesc.program = static_cast<DebugShaderProgram*>(desc.program)->baseObject;
+    innerDesc.program = getInnerObj(desc.program);
 
     RefPtr<DebugPipelineState> outObject = new DebugPipelineState();
     auto result =
@@ -521,7 +507,7 @@ Result DebugDevice::createRayTracingPipelineState(
     SLANG_GFX_API_FUNC;
 
     RayTracingPipelineStateDesc innerDesc = desc;
-    innerDesc.program = static_cast<DebugShaderProgram*>(desc.program)->baseObject;
+    innerDesc.program = getInnerObj(desc.program);
 
     RefPtr<DebugPipelineState> outObject = new DebugPipelineState();
     auto result =
@@ -540,9 +526,8 @@ SlangResult DebugDevice::readTextureResource(
     size_t* outPixelSize)
 {
     SLANG_GFX_API_FUNC;
-    auto resourceImpl = static_cast<DebugTextureResource*>(resource);
     return baseObject->readTextureResource(
-        resourceImpl->baseObject, state, outBlob, outRowPitch, outPixelSize);
+        getInnerObj(resource), state, outBlob, outRowPitch, outPixelSize);
 }
 
 SlangResult DebugDevice::readBufferResource(
@@ -552,8 +537,7 @@ SlangResult DebugDevice::readBufferResource(
     ISlangBlob** outBlob)
 {
     SLANG_GFX_API_FUNC;
-    auto bufferImpl = static_cast<DebugBufferResource*>(buffer);
-    return baseObject->readBufferResource(bufferImpl->baseObject, offset, size, outBlob);
+    return baseObject->readBufferResource(getInnerObj(buffer), offset, size, outBlob);
 }
 
 const DeviceInfo& DebugDevice::getDeviceInfo() const
@@ -585,7 +569,12 @@ Result DebugDevice::waitForFences(
     GfxCount fenceCount, IFence** fences, uint64_t* values , bool waitForAll, uint64_t timeout)
 {
     SLANG_GFX_API_FUNC;
-    return baseObject->waitForFences(fenceCount, fences, values, waitForAll, timeout);
+    ShortList<IFence*> innerFences;
+    for (GfxCount i = 0; i < fenceCount; i++)
+    {
+        innerFences.add(getInnerObj(fences[i]));
+    }
+    return baseObject->waitForFences(fenceCount, innerFences.getArrayView().getBuffer(), values, waitForAll, timeout);
 }
 
 Result DebugDevice::getTextureAllocationInfo(
