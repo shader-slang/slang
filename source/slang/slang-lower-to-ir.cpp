@@ -1925,6 +1925,14 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         return lowerGenericIntrinsicType(type, elementType, count);
     }
 
+    IRType* visitMeshOutputType(MeshOutputType* type)
+    {
+        Type* elementType = type->getElementType();
+        IntVal* count = type->getElementCount();
+
+        return lowerGenericIntrinsicType(type, elementType, count);
+    }
+
     IRType* visitExtractExistentialType(ExtractExistentialType* type)
     {
         auto declRef = type->declRef;
@@ -2134,6 +2142,15 @@ void addVarDecorations(
         else if(auto formatAttr = as<FormatAttribute>(mod))
         {
             builder->addFormatDecoration(inst, formatAttr->format);
+        }
+        else if(as<HLSLIndicesModifier>(mod))
+        {
+            // TODO: Ellie handle no result here
+            builder->addIndicesDecoration(inst, getFixedArraySize(inst->getFullType()).value());
+        }
+        else if(as<HLSLVerticesModifier>(mod))
+        {
+            builder->addVerticesDecoration(inst, getFixedArraySize(inst->getFullType()).value());
         }
 
         // TODO: what are other modifiers we need to propagate through?

@@ -164,6 +164,12 @@ INST(Nop, nop, 0, 0)
             INST(HLSLTriangleStreamType,    TriangleStream, 1, 0)
         INST_RANGE(HLSLStreamOutputType, HLSLPointStreamType, HLSLTriangleStreamType)
 
+        /* MeshOutputType */
+            INST(VerticesType,   Vertices, 2, 0)
+            INST(IndicesType,    Indices,  2, 0)
+            INST(PrimitivesType, Primitives, 2, 0)
+        INST_RANGE(MeshOutputType, VerticesType, PrimitivesType)
+
         /* HLSLStructuredBufferTypeBase */
             INST(HLSLStructuredBufferType,                  StructuredBuffer,                   0, 0)
             INST(HLSLRWStructuredBufferType,                RWStructuredBuffer,                 0, 0)

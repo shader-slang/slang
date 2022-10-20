@@ -755,6 +755,26 @@ struct IRPayloadDecoration : public IRDecoration
     IR_LEAF_ISA(PayloadDecoration)
 };
 
+// Mesh shader decorations
+
+struct IRMeshOutputDecoration : public IRDecoration
+{
+    IR_PARENT_ISA(MeshOutputDecoration)
+    IRIntLit* getMaxSize() { return cast<IRIntLit>(getOperand(0)); }
+};
+
+struct IRIndicesDecoration : public IRMeshOutputDecoration
+{
+    enum { kOp = kIROp_IndicesDecoration };
+    IR_LEAF_ISA(IndicesDecoration)
+};
+
+struct IRVerticesDecoration : public IRMeshOutputDecoration
+{
+    enum { kOp = kIROp_VerticesDecoration };
+    IR_LEAF_ISA(VerticesDecoration)
+};
+
     /// An attribute that can be attached to another instruction as an operand.
     ///
     /// Attributes serve a similar role to decorations, in that both are ways
@@ -3369,6 +3389,16 @@ public:
         addDecoration(inst, kIROp_VulkanHitObjectAttributesDecoration, getIntValue(getIntType(), location));
     }
 
+    void addIndicesDecoration(IRInst* value, const int maxCount)
+    {
+        // TODO: Ellie, correct int type here?
+        addDecoration(value, kIROp_IndicesDecoration, getIntValue(getUIntType(), maxCount));
+    }
+
+    void addVerticesDecoration(IRInst* value, const int maxCount)
+    {
+        addDecoration(value, kIROp_VerticesDecoration, getIntValue(getUIntType(), maxCount));
+    }
 };
 
 void addHoistableInst(

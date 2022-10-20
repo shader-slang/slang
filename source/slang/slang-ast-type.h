@@ -354,6 +354,31 @@ class HLSLTriangleStreamType : public HLSLStreamOutputType
     SLANG_AST_CLASS(HLSLTriangleStreamType)
 };
 
+// mesh shader output types
+
+class MeshOutputType : public BuiltinGenericType
+{
+    SLANG_AST_CLASS(MeshOutputType)
+
+    Type* getElementType();
+    IntVal* getElementCount();
+};
+
+class VerticesType : public MeshOutputType
+{
+    SLANG_AST_CLASS(VerticesType)
+};
+
+class IndicesType : public MeshOutputType
+{
+    SLANG_AST_CLASS(IndicesType)
+};
+
+class PrimitivesType : public MeshOutputType
+{
+    SLANG_AST_CLASS(PrimitivesType)
+};
+
 
 //
 class GLSLInputAttachmentType : public BuiltinType 

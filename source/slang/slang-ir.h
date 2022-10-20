@@ -1259,6 +1259,21 @@ SIMPLE_IR_TYPE(HLSLPointStreamType, HLSLStreamOutputType)
 SIMPLE_IR_TYPE(HLSLLineStreamType, HLSLStreamOutputType)
 SIMPLE_IR_TYPE(HLSLTriangleStreamType, HLSLStreamOutputType)
 
+// Mesh shaders
+// TODO: Ellie, should this parent struct be shared with Patch?
+// IRArrayLikeType?
+struct IRMeshOutputType : IRType
+{
+    IRType* getElementType() { return (IRType*)getOperand(0); }
+    IRInst* getElementCount() { return getOperand(1); }
+
+    IR_PARENT_ISA(MeshOutputType)
+};
+
+SIMPLE_IR_TYPE(VerticesType, MeshOutputType)
+SIMPLE_IR_TYPE(IndicesType, MeshOutputType)
+SIMPLE_IR_TYPE(PrimitivesType, MeshOutputType)
+
 SIMPLE_IR_TYPE(GLSLInputAttachmentType, Type)
 SIMPLE_IR_PARENT_TYPE(ParameterGroupType, PointerLikeType)
 SIMPLE_IR_PARENT_TYPE(UniformParameterGroupType, ParameterGroupType)
@@ -1902,6 +1917,6 @@ IRFunc* getParentFunc(IRInst* inst);
 uint32_t& _debugGetIRAllocCounter();
 #endif
 
-}
+} // namespace Slang
 
 #endif

@@ -1065,6 +1065,19 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         return as<IntVal>(findInnerMostGenericSubstitution(declRef.substitutions)->getArgs()[1]);
     }
 
+    // MeshOutputType
+    // TODO: Ellie, deduplicate?
+
+    Type* MeshOutputType::getElementType()
+    {
+        return as<Type>(findInnerMostGenericSubstitution(declRef.substitutions)->getArgs()[0]);
+    }
+
+    IntVal* MeshOutputType::getElementCount()
+    {
+        return as<IntVal>(findInnerMostGenericSubstitution(declRef.substitutions)->getArgs()[1]);
+    }
+
     // Constructors for types
 
     ArrayExpressionType* getArrayType(

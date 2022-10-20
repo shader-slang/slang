@@ -849,6 +849,44 @@ __intrinsic_type($(kIROp_ParameterBlockType))
 __magic_type(ParameterBlockType)
 struct ParameterBlock {}
 
+__generic<T, let MAX_VERTS : uint>
+__magic_type(VerticesType)
+__intrinsic_type($(kIROp_VerticesType))
+struct Vertices
+{
+    __subscript(uint index) -> T
+    {
+        set;
+        // TODO: Ellie make sure this remains write only
+        ref;
+    }
+};
+
+__generic<T, let MAX_PRIMITIVES : uint>
+__magic_type(IndicesType)
+__intrinsic_type($(kIROp_IndicesType))
+struct Indices
+{
+    __subscript(uint index) -> T
+    {
+        set;
+        // It's illegal to not write out the whole primitive at once, hence no
+        // 'ref'
+    }
+};
+
+__generic<T, let MAX_PRIMITIVES : uint>
+__magic_type(PrimitivesType)
+__intrinsic_type($(kIROp_PrimitivesType))
+struct Primitives
+{
+    __subscript(uint index) -> T
+    {
+        set;
+        ref;
+    }
+};
+
 //@ hidden:
 
 // Need to add constructors to the types above
