@@ -3262,6 +3262,11 @@ void Module::updateDependencyBasedHash(
 void Module::updateASTBasedHash(DigestBuilder& builder)
 {
     auto serializedAST = ASTSerialUtil::serializeAST(getModuleDecl());
+
+    SourceWriter writer(getLinkage()->getSourceManager(), LineDirectiveMode::None);
+    ASTDumpUtil::dump(getModuleDecl(), ASTDumpUtil::Style::Flat, 0, &writer);
+    File::writeAllText("C:/Users/lucchen/Documents/dump2.txt", writer.getContent());
+
     builder.addToDigest(serializedAST);
 }
 
