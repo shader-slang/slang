@@ -14,6 +14,8 @@
 #include "../core/slang-semantic-version.h"
 #include "../core/slang-char-util.h"
 
+#include "../core/slang-digest-builder.h"
+
 #include "slang-artifact-associated-impl.h"
 #include "slang-artifact-desc-util.h"
 
@@ -47,6 +49,7 @@ public:
     virtual SLANG_NO_THROW bool SLANG_MCALL canConvert(const ArtifactDesc& from, const ArtifactDesc& to) SLANG_OVERRIDE;
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL convert(IArtifact* from, const ArtifactDesc& to, IArtifact** outArtifact) SLANG_OVERRIDE;
     virtual SLANG_NO_THROW bool SLANG_MCALL isFileBased() SLANG_OVERRIDE { return false; }
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL getVersionString(slang::IBlob** outVersionString) SLANG_OVERRIDE;
 
         /// Must be called before use
     SlangResult init(ISlangSharedLibrary* library);
@@ -60,7 +63,7 @@ protected:
     glslang_CompileFunc_1_0 m_compile_1_0 = nullptr; 
     glslang_CompileFunc_1_1 m_compile_1_1 = nullptr; 
     
-    ComPtr<ISlangSharedLibrary> m_sharedLibrary;  
+    ComPtr<ISlangSharedLibrary> m_sharedLibrary;
 };
 
 SlangResult GlslangDownstreamCompiler::init(ISlangSharedLibrary* library)
@@ -77,6 +80,20 @@ SlangResult GlslangDownstreamCompiler::init(ISlangSharedLibrary* library)
 
     // It's not clear how to query for a version, but we can get a version number from the header
     m_desc = Desc(SLANG_PASS_THROUGH_GLSLANG);
+
+    Slang::String filename;
+    if (m_compile_1_1)
+    {
+        filename = Slang::SharedLibraryUtils::getSharedLibraryFileName((void*)m_compile_1_1);
+    }
+    else if (m_compile_1_0)
+    {
+        filename = Slang::SharedLibraryUtils::getSharedLibraryFileName((void*)m_compile_1_0);
+    }
+    else
+    {
+        return SLANG_FAIL;
+    }
 
     return SLANG_OK;
 }
@@ -274,6 +291,28 @@ SlangResult GlslangDownstreamCompiler::convert(IArtifact* from, const ArtifactDe
 
     *outArtifact = artifact.detach();
 
+    return SLANG_OK;
+}
+
+SlangResult GlslangDownstreamCompiler::getVersionString(slang::IBlob** outVersionString)
+{
+    uint64_t timestamp;
+    if (m_compile_1_1)
+    {
+        timestamp = SharedLibraryUtils::getSharedLibraryTimestamp((void*)m_compile_1_1);
+    }
+    else if (m_compile_1_0)
+    {
+        timestamp = SharedLibraryUtils::getSharedLibraryTimestamp((void*)m_compile_1_0);
+    }
+    else
+    {
+        return SLANG_FAIL;
+    }
+    
+    auto timestampString = String(timestamp);
+    ComPtr<ISlangBlob> version = StringBlob::create(timestampString.getBuffer());
+    *outVersionString = version.detach();
     return SLANG_OK;
 }
 

@@ -272,11 +272,11 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\tools\slang-unit-test\unit-test-byte-encode.cpp" />
-    <ClCompile Include="..\..\..\tools\slang-unit-test\unit-test-checksum.cpp" />
     <ClCompile Include="..\..\..\tools\slang-unit-test\unit-test-chunked-list.cpp" />
     <ClCompile Include="..\..\..\tools\slang-unit-test\unit-test-com-host-callable.cpp" />
     <ClCompile Include="..\..\..\tools\slang-unit-test\unit-test-command-line-args.cpp" />
     <ClCompile Include="..\..\..\tools\slang-unit-test\unit-test-compression.cpp" />
+    <ClCompile Include="..\..\..\tools\slang-unit-test\unit-test-digest-utils.cpp" />
     <ClCompile Include="..\..\..\tools\slang-unit-test\unit-test-file-system.cpp" />
     <ClCompile Include="..\..\..\tools\slang-unit-test\unit-test-find-type-by-name.cpp" />
     <ClCompile Include="..\..\..\tools\slang-unit-test\unit-test-free-list.cpp" />

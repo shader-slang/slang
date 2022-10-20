@@ -5,6 +5,8 @@
 #include "core/slang-basic.h"
 #include "core/slang-com-object.h"
 
+#include "persistent-shader-cache.h"
+
 #include "resource-desc-utils.h"
 
 namespace gfx
@@ -1372,8 +1374,7 @@ public:
     SlangContext slangContext;
     ShaderCache shaderCache;
 
-    ISlangFileSystem* shaderCacheFileSystem = nullptr;
-    ComPtr<ISlangMutableFileSystem> mutableShaderCacheFileSystem = nullptr;
+    RefPtr<PersistentShaderCache> persistentShaderCache = nullptr;
 
     Slang::Dictionary<slang::TypeLayoutReflection*, Slang::RefPtr<ShaderObjectLayoutBase>> m_shaderObjectLayoutCache;
     Slang::ComPtr<IPipelineCreationAPIDispatcher> m_pipelineCreationAPIDispatcher;

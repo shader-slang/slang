@@ -114,9 +114,6 @@
     <ClInclude Include="..\..\..\source\slang\slang-glsl-extension-tracker.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\source\slang\slang-hash-utils.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\..\source\slang\slang-hlsl-intrinsic-set.h">
       <Filter>Header Files</Filter>
     </ClInclude>

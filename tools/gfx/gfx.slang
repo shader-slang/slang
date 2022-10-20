@@ -486,7 +486,7 @@ struct TextureResourceDesc : ResourceDescBase
     GfxCount numMipLevels = 0; ///< Number of mip levels - if 0 will create all mip levels
     Format format;             ///< The resources format
     TextureResourceSampleDesc sampleDesc;     ///< How the resource is sampled
-    ClearValue optimalClearValue;
+    ClearValue* optimalClearValue;
 };
 
 /// Data for a single subresource of a texture.
@@ -1710,6 +1710,19 @@ struct SlangDesc
     slang::SlangLineDirectiveMode lineDirectiveMode = slang::SlangLineDirectiveMode::SLANG_LINE_DIRECTIVE_MODE_DEFAULT;
 };
 
+struct ShaderCacheDesc
+{
+    // The filename for the file the cache's state should be saved to or loaded from.
+    NativeString cacheFilename = "cache.txt";
+    // The root directory for the shader cache.
+    NativeString shaderCachePath;
+    // The file system for loading cached shader kernels. The layer does not maintain a strong reference to the object,
+    // instead the user is responsible for holding the object alive during the lifetime of an `IDevice`.
+    void* shaderCacheFileSystem = nullptr;
+    // The maximum number of entries stored in the cache.
+    GfxCount entryCountLimit = 0;
+};
+
 struct DeviceInteropHandles
 {
     InteropHandle handles[3] = {};
@@ -1733,11 +1746,8 @@ struct DeviceDesc
     void *apiCommandDispatcher = nullptr;
     // The slot (typically UAV) used to identify NVAPI intrinsics. If >=0 NVAPI is required.
     GfxIndex nvapiExtnSlot = -1;
-    // The root directory for the shader cache.
-    NativeString shaderCachePath;
-    // The file system for loading cached shader kernels. The layer does not maintain a strong reference to the object,
-    // instead the user is responsible for holding the object alive during the lifetime of an `IDevice`.
-    void *shaderCacheFileSystem = nullptr;
+    // Configurations for the shader cache.
+    ShaderCacheDesc shaderCache = {};
     // Configurations for Slang compiler.
     SlangDesc slang = {};
 

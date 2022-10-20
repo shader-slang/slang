@@ -4139,6 +4139,19 @@ namespace slang
     struct Digest
     {
         uint32_t values[4] = { 0 };
+
+        bool operator==(const Digest& rhs)
+        {
+            return values[0] == rhs.values[0]
+                && values[1] == rhs.values[1]
+                && values[2] == rhs.values[2]
+                && values[3] == rhs.values[3];
+        }
+
+        uint32_t getHashCode()
+        {
+            return values[0];
+        }
     };
 
         /** A session provides a scope for code that is loaded.

@@ -3,7 +3,7 @@
 
 #include "../core/slang-basic.h"
 #include "../core/slang-shared-library.h"
-#include "../core/slang-digest.h"
+#include "../core/slang-digest-builder.h"
 
 #include "../compiler-core/slang-downstream-compiler.h"
 #include "../compiler-core/slang-downstream-compiler-util.h"
@@ -899,7 +899,7 @@ namespace Slang
             return Super::computeDependencyBasedHash(entryPointIndex, targetIndex, outHash);
         }
 
-        SLANG_NO_THROW void SLANG_MCALL computeASTBasedHash(slang::Digest* outHash)
+        SLANG_NO_THROW void SLANG_MCALL computeASTBasedHash(slang::Digest* outHash) SLANG_OVERRIDE
         {
             return Super::computeASTBasedHash(outHash);
         }
@@ -1126,7 +1126,7 @@ namespace Slang
             return Super::computeDependencyBasedHash(entryPointIndex, targetIndex, outHash);
         }
 
-        SLANG_NO_THROW void SLANG_MCALL computeASTBasedHash(slang::Digest* outHash)
+        SLANG_NO_THROW void SLANG_MCALL computeASTBasedHash(slang::Digest* outHash) SLANG_OVERRIDE
         {
             return Super::computeASTBasedHash(outHash);
         }
@@ -1322,7 +1322,7 @@ namespace Slang
             return Super::computeDependencyBasedHash(entryPointIndex, targetIndex, outHash);
         }
 
-        SLANG_NO_THROW void SLANG_MCALL computeASTBasedHash(slang::Digest* outHash)
+        SLANG_NO_THROW void SLANG_MCALL computeASTBasedHash(slang::Digest* outHash) SLANG_OVERRIDE
         {
             return Super::computeASTBasedHash(outHash);
         }

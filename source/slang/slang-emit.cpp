@@ -386,10 +386,8 @@ Result linkAndOptimizeIR(
 #endif
     validateIRModuleIfEnabled(codeGenContext, irModule);
 
-    // Inline calls to any functions marked with [__unsafeInlineEarly] again,
-    // since we may be missing out cases prevented by the generic constructs
-    // that we just lowered out.
-    performMandatoryEarlyInlining(irModule);
+    // Inline calls to any functions marked with [__unsafeInlineEarly] or [ForceInline].
+    performForceInlining(irModule);
 
     // Specialization can introduce dead code that could trip
     // up downstream passes like type legalization, so we
