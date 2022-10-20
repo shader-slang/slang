@@ -3207,11 +3207,6 @@ public:
         addDecoration(value, kIROp_DifferentialGetterDecoration, getterFn);
     }
 
-    void addDifferentialSetterDecoration(IRInst* value, IRInst* setterFn)
-    {
-        addDecoration(value, kIROp_DifferentialSetterDecoration, setterFn);
-    }
-
     void addCOMWitnessDecoration(IRInst* value, IRInst* witnessTable)
     {
         addDecoration(value, kIROp_COMWitnessDecoration, &witnessTable, 1);

@@ -443,80 +443,7 @@ HashCode TransitiveSubtypeWitness::_getHashCodeOverride()
     return hash;
 }
 
-// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ConjunctionSubtypeWitness !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
-bool ConjunctionSubtypeWitness::_equalsValOverride(Val* val)
-{
-    auto otherWitness = as<ConjunctionSubtypeWitness>(val);
-    if (!otherWitness)
-        return false;
-
-    return sub->equals(otherWitness->sub)
-        && sup->equals(otherWitness->sup)
-        && leftWitness->equalsVal(otherWitness->leftWitness)
-        && rightWitness->equalsVal(otherWitness->rightWitness);
-}
-
-Val* ConjunctionSubtypeWitness::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int * ioDiff)
-{
-    int diff = 0;
-
-    Type* substSub = as<Type>(sub->substituteImpl(astBuilder, subst, &diff));
-    Type* substSup = as<Type>(sup->substituteImpl(astBuilder, subst, &diff));
-    SubtypeWitness* substLeftWitness = as<SubtypeWitness>(leftWitness->substituteImpl(astBuilder, subst, &diff));
-    SubtypeWitness* substRightWitness = as<SubtypeWitness>(rightWitness->substituteImpl(astBuilder, subst, &diff));
-
-    // If nothing changed, then we can bail out early.
-    if (!diff)
-        return this;
-
-    // Something changes, so let the caller know.
-    (*ioDiff)++;
-
-    // TODO: Any other cases to consider?
-
-    // In the simple case, we just construct a new conjunction subtype
-    // witness.
-    ConjunctionSubtypeWitness* result = astBuilder->create<ConjunctionSubtypeWitness>();
-    result->sub = substSub;
-    result->sup = substSup;
-    result->leftWitness = substLeftWitness;
-    result->rightWitness = substRightWitness;
-    return result;
-}
-
-void ConjunctionSubtypeWitness::_toTextOverride(StringBuilder& out)
-{
-    // Note: we only print the constituent
-    // witnesses, and rely on them to print
-    // the starting and ending types.
-    
-    out << toSlice("ConjunctionSubtypeWitness(") << leftWitness << toSlice(", ") << rightWitness << toSlice(")");
-}
-
-HashCode ConjunctionSubtypeWitness::_getHashCodeOverride()
-{
-    auto hash = sub->getHashCode();
-    hash = combineHash(hash, sup->getHashCode());
-    hash = combineHash(hash, leftWitness->getHashCode());
-    hash = combineHash(hash, rightWitness->getHashCode());
-    return hash;
-}
-
-
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ExtractFromConjunctionSubtypeWitness !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
-bool ExtractFromConjunctionSubtypeWitness::_equalsValOverride(Val* val)
-{
-    auto otherWitness = as<ExtractFromConjunctionSubtypeWitness>(val);
-    if (!otherWitness)
-        return false;
-
-    return sub->equals(otherWitness->sub)
-        && sup->equals(otherWitness->sup)
-        && conunctionWitness->equalsVal(otherWitness->conunctionWitness)
-        && (indexInConjunction == otherWitness->indexInConjunction);
-}
 
 Val* ExtractFromConjunctionSubtypeWitness::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int * ioDiff)
 {
@@ -524,7 +451,7 @@ Val* ExtractFromConjunctionSubtypeWitness::_substituteImplOverride(ASTBuilder* a
 
     Type* substSub = as<Type>(sub->substituteImpl(astBuilder, subst, &diff));
     Type* substSup = as<Type>(sup->substituteImpl(astBuilder, subst, &diff));
-    SubtypeWitness* substConjunctionWitness = as<SubtypeWitness>(conunctionWitness->substituteImpl(astBuilder, subst, &diff));
+    SubtypeWitness* substWitness = as<SubtypeWitness>(conjunctionWitness->substituteImpl(astBuilder, subst, &diff));
 
     // If nothing changed, then we can bail out early.
     if (!diff)
@@ -536,11 +463,11 @@ Val* ExtractFromConjunctionSubtypeWitness::_substituteImplOverride(ASTBuilder* a
     // If the substituted witness is a conjunction, break it apart, but it's important to replace the
     // sub and super types with the current ones since the conjunction witness will have an 
     // 
-    if (auto conjunctionWitness = as<ConjunctionSubtypeWitness>(substConjunctionWitness))
+    if (auto substConjunctionWitness = as<ConjunctionSubtypeWitness>(substWitness))
     {
         if (indexInConjunction == 0)
         {
-            auto witness = as<SubtypeWitness>(conjunctionWitness->leftWitness);
+            auto witness = as<SubtypeWitness>(substConjunctionWitness->leftWitness);
             SLANG_ASSERT(witness);
 
             witness->sub = substSub;
@@ -550,7 +477,7 @@ Val* ExtractFromConjunctionSubtypeWitness::_substituteImplOverride(ASTBuilder* a
         }
         else if (indexInConjunction == 1)
         {
-            auto witness = as<SubtypeWitness>(conjunctionWitness->rightWitness);
+            auto witness = as<SubtypeWitness>(substConjunctionWitness->rightWitness);
             SLANG_ASSERT(witness);
             
             witness->sub = substSub;
@@ -570,30 +497,11 @@ Val* ExtractFromConjunctionSubtypeWitness::_substituteImplOverride(ASTBuilder* a
         ExtractFromConjunctionSubtypeWitness* result = astBuilder->create<ExtractFromConjunctionSubtypeWitness>();
         result->sub = substSub;
         result->sup = substSup;
-        result->conunctionWitness = substConjunctionWitness;
+        result->conjunctionWitness = substConjunctionWitness;
         result->indexInConjunction = indexInConjunction;
         return result;
     }
 }
-
-void ExtractFromConjunctionSubtypeWitness::_toTextOverride(StringBuilder& out)
-{
-    // Note: we only print the constituent
-    // witnesses, and rely on them to print
-    // the starting and ending types.
-    
-    out << toSlice("ExtractFromConjunctionSubtypeWitness(") << conunctionWitness << toSlice("[") << indexInConjunction << toSlice("])");
-}
-
-HashCode ExtractFromConjunctionSubtypeWitness::_getHashCodeOverride()
-{
-    auto hash = sub->getHashCode();
-    hash = combineHash(hash, sup->getHashCode());
-    hash = combineHash(hash, conunctionWitness->getHashCode());
-    hash = combineHash(hash, indexInConjunction);
-    return hash;
-}
-
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ExtractExistentialSubtypeWitness !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
@@ -787,29 +695,6 @@ void ExtractFromConjunctionSubtypeWitness::_toTextOverride(StringBuilder& out)
 HashCode ExtractFromConjunctionSubtypeWitness::_getHashCodeOverride()
 {
     return combineHash(indexInConjunction, conjunctionWitness ? conjunctionWitness->getHashCode() : 0);
-}
-
-Val* ExtractFromConjunctionSubtypeWitness::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff)
-{
-    int diff = 0;
-    Val* newConjunctionWitness = nullptr;
-
-    auto substSub = as<Type>(sub->substituteImpl(astBuilder, subst, &diff));
-    auto substSup = as<Type>(sup->substituteImpl(astBuilder, subst, &diff));
-
-    if (this->conjunctionWitness)
-        newConjunctionWitness = conjunctionWitness->substituteImpl(astBuilder, subst, &diff);
-    *ioDiff += diff;
-
-    if (diff)
-    {
-        auto result = astBuilder->create<ExtractFromConjunctionSubtypeWitness>();
-        result->conjunctionWitness = newConjunctionWitness;
-        result->sub = substSub;
-        result->sup = substSup;
-        return result;
-    }
-    return this;
 }
 
 // ModifierVal

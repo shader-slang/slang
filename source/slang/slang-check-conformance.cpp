@@ -23,7 +23,7 @@ namespace Slang
     {
         if (auto extractFromConjunction = as<ExtractFromConjunctionSubtypeWitness>(witness))
         {
-            auto simplWitness = simplifyWitness(builder, extractFromConjunction->conunctionWitness);
+            auto simplWitness = simplifyWitness(builder, extractFromConjunction->conjunctionWitness);
             if (auto conjunction = as<ConjunctionSubtypeWitness>(simplWitness))
             {
                 auto index = extractFromConjunction->indexInConjunction;
@@ -38,7 +38,7 @@ namespace Slang
             simplExtractFromConjunction->sub = extractFromConjunction->sub;
             simplExtractFromConjunction->sup = extractFromConjunction->sup;
             simplExtractFromConjunction->indexInConjunction = extractFromConjunction->indexInConjunction;
-            simplExtractFromConjunction->conunctionWitness = as<SubtypeWitness>(simplWitness);
+            simplExtractFromConjunction->conjunctionWitness = as<SubtypeWitness>(simplWitness);
 
             return simplExtractFromConjunction;
         }
@@ -163,7 +163,7 @@ namespace Slang
                 extractWitness->indexInConjunction = 0;
 
                 *link = extractWitness;
-                link = (SubtypeWitness**) &extractWitness->conunctionWitness;
+                link = (SubtypeWitness**) &extractWitness->conjunctionWitness;
             }
             else if(bb->flavor == TypeWitnessBreadcrumb::Flavor::AndTypeRightFlavor)
             {
@@ -173,7 +173,7 @@ namespace Slang
                 extractWitness->indexInConjunction = 1;
 
                 *link = extractWitness;
-                link = (SubtypeWitness**) &extractWitness->conunctionWitness;
+                link = (SubtypeWitness**) &extractWitness->conjunctionWitness;
             }
 
             // Move on with the list.

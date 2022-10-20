@@ -3067,16 +3067,6 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
             getBuilder()->addDifferentialGetterDecoration(irBaseVal, irGetter.val);
         }
 
-        // If the differentiable expr has an associated getter or setter, lower it
-        // and put it in a decoration.
-        // 
-        if (expr->setterExpr != nullptr)
-        {
-            auto irSetter = lowerSubExpr(expr->setterExpr);
-            SLANG_ASSERT(irSetter.flavor == LoweredValInfo::Flavor::Simple);
-            getBuilder()->addDifferentialSetterDecoration(irBaseVal, irSetter.val);
-        }
-
         return info;
     }
 
