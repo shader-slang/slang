@@ -676,6 +676,236 @@ namespace gfx_test
         }
     };
 
+    struct Vertex
+    {
+        float position[3];
+    };
+
+    struct Instance
+    {
+        float position[3];
+        float color[3];
+    };
+
+    static const int kVertexCount = 6;
+    static const Vertex kVertexData[kVertexCount] =
+    {
+        // Triangle 1
+        { 0, 0, 0.5 },
+        { 1, 0, 0.5 },
+        { 0, 1, 0.5 },
+
+        // Triangle 2
+        { -1, 0, 0.5 },
+        {  0, 0, 0.5 },
+        { -1, 1, 0.5 },
+    };
+
+    static const int kInstanceCount = 2;
+    static const Instance kInstanceData[kInstanceCount] =
+    {
+        { { 0,  0, 0 }, { 1, 0, 0 } },
+        { { 0, -1, 0 }, { 0, 0, 1 } },
+    };
+
+    static const int kIndexCount = 6;
+    static const uint32_t kIndexData[kIndexCount] =
+    {
+        0, 2, 5,
+        0, 1, 2,
+    };
+
+    struct GraphicsShaderCache : BaseShaderCacheTest
+    {
+        const int kWidth = 256;
+        const int kHeight = 256;
+        const Format format = Format::R32G32B32A32_FLOAT;
+
+        ComPtr<IRenderPassLayout> renderPass;
+        ComPtr<IFramebuffer> framebuffer;
+
+        ComPtr<IBufferResource> vertexBuffer;
+        ComPtr<IBufferResource> instanceBuffer;
+        ComPtr<ITextureResource> colorBuffer;
+
+        ComPtr<IBufferResource> createVertexBuffer(IDevice* device)
+        {
+            IBufferResource::Desc vertexBufferDesc;
+            vertexBufferDesc.type = IResource::Type::Buffer;
+            vertexBufferDesc.sizeInBytes = kVertexCount * sizeof(Vertex);
+            vertexBufferDesc.defaultState = ResourceState::VertexBuffer;
+            vertexBufferDesc.allowedStates = ResourceState::VertexBuffer;
+            ComPtr<IBufferResource> vertexBuffer = device->createBufferResource(vertexBufferDesc, &kVertexData[0]);
+            SLANG_CHECK_ABORT(vertexBuffer != nullptr);
+            return vertexBuffer;
+        }
+
+        ComPtr<IBufferResource> createInstanceBuffer(IDevice* device)
+        {
+            IBufferResource::Desc instanceBufferDesc;
+            instanceBufferDesc.type = IResource::Type::Buffer;
+            instanceBufferDesc.sizeInBytes = kInstanceCount * sizeof(Instance);
+            instanceBufferDesc.defaultState = ResourceState::VertexBuffer;
+            instanceBufferDesc.allowedStates = ResourceState::VertexBuffer;
+            ComPtr<IBufferResource> instanceBuffer = device->createBufferResource(instanceBufferDesc, &kInstanceData[0]);
+            SLANG_CHECK_ABORT(instanceBuffer != nullptr);
+            return instanceBuffer;
+        }
+
+        ComPtr<IBufferResource> createIndexBuffer(IDevice* device)
+        {
+            IBufferResource::Desc indexBufferDesc;
+            indexBufferDesc.type = IResource::Type::Buffer;
+            indexBufferDesc.sizeInBytes = kIndexCount * sizeof(uint32_t);
+            indexBufferDesc.defaultState = ResourceState::IndexBuffer;
+            indexBufferDesc.allowedStates = ResourceState::IndexBuffer;
+            ComPtr<IBufferResource> indexBuffer = device->createBufferResource(indexBufferDesc, &kIndexData[0]);
+            SLANG_CHECK_ABORT(indexBuffer != nullptr);
+            return indexBuffer;
+        }
+
+        ComPtr<ITextureResource> createColorBuffer(IDevice* device)
+        {
+            gfx::ITextureResource::Desc colorBufferDesc;
+            colorBufferDesc.type = IResource::Type::Texture2D;
+            colorBufferDesc.size.width = kWidth;
+            colorBufferDesc.size.height = kHeight;
+            colorBufferDesc.size.depth = 1;
+            colorBufferDesc.numMipLevels = 1;
+            colorBufferDesc.format = format;
+            colorBufferDesc.defaultState = ResourceState::RenderTarget;
+            colorBufferDesc.allowedStates = { ResourceState::RenderTarget, ResourceState::CopySource };
+            ComPtr<ITextureResource> colorBuffer = device->createTextureResource(colorBufferDesc, nullptr);
+            SLANG_CHECK_ABORT(colorBuffer != nullptr);
+            return colorBuffer;
+        }
+
+        void createRequiredResources()
+        {
+            VertexStreamDesc vertexStreams[] = {
+                { sizeof(Vertex), InputSlotClass::PerVertex, 0 },
+                { sizeof(Instance), InputSlotClass::PerInstance, 1 },
+            };
+
+            InputElementDesc inputElements[] = {
+                // Vertex buffer data
+                { "POSITIONA", 0, Format::R32G32B32_FLOAT, offsetof(Vertex, position), 0 },
+
+                // Instance buffer data
+                { "POSITIONB", 0, Format::R32G32B32_FLOAT, offsetof(Instance, position), 1 },
+                { "COLOR",     0, Format::R32G32B32_FLOAT, offsetof(Instance, color),    1 },
+            };
+            IInputLayout::Desc inputLayoutDesc = {};
+            inputLayoutDesc.inputElementCount = SLANG_COUNT_OF(inputElements);
+            inputLayoutDesc.inputElements = inputElements;
+            inputLayoutDesc.vertexStreamCount = SLANG_COUNT_OF(vertexStreams);
+            inputLayoutDesc.vertexStreams = vertexStreams;
+            auto inputLayout = device->createInputLayout(inputLayoutDesc);
+            SLANG_CHECK_ABORT(inputLayout != nullptr);
+
+            vertexBuffer = createVertexBuffer(device);
+            instanceBuffer = createInstanceBuffer(device);
+            colorBuffer = createColorBuffer(device);
+
+            ComPtr<IShaderProgram> shaderProgram;
+            slang::ProgramLayout* slangReflection;
+            GFX_CHECK_CALL_ABORT(loadGraphicsProgram(device, shaderProgram, "graphics-smoke", "vertexMain", "fragmentMain", slangReflection));
+
+            IFramebufferLayout::TargetLayout targetLayout;
+            targetLayout.format = format;
+            targetLayout.sampleCount = 1;
+
+            IFramebufferLayout::Desc framebufferLayoutDesc;
+            framebufferLayoutDesc.renderTargetCount = 1;
+            framebufferLayoutDesc.renderTargets = &targetLayout;
+            ComPtr<gfx::IFramebufferLayout> framebufferLayout = device->createFramebufferLayout(framebufferLayoutDesc);
+            SLANG_CHECK_ABORT(framebufferLayout != nullptr);
+
+            GraphicsPipelineStateDesc pipelineDesc = {};
+            pipelineDesc.program = shaderProgram.get();
+            pipelineDesc.inputLayout = inputLayout;
+            pipelineDesc.framebufferLayout = framebufferLayout;
+            pipelineDesc.depthStencil.depthTestEnable = false;
+            pipelineDesc.depthStencil.depthWriteEnable = false;
+            GFX_CHECK_CALL_ABORT(
+                device->createGraphicsPipelineState(pipelineDesc, pipelineState.writeRef()));
+
+            IRenderPassLayout::Desc renderPassDesc = {};
+            renderPassDesc.framebufferLayout = framebufferLayout;
+            renderPassDesc.renderTargetCount = 1;
+            IRenderPassLayout::TargetAccessDesc renderTargetAccess = {};
+            renderTargetAccess.loadOp = IRenderPassLayout::TargetLoadOp::Clear;
+            renderTargetAccess.storeOp = IRenderPassLayout::TargetStoreOp::Store;
+            renderTargetAccess.initialState = ResourceState::RenderTarget;
+            renderTargetAccess.finalState = ResourceState::CopySource;
+            renderPassDesc.renderTargetAccess = &renderTargetAccess;
+            GFX_CHECK_CALL_ABORT(device->createRenderPassLayout(renderPassDesc, renderPass.writeRef()));
+
+            gfx::IResourceView::Desc colorBufferViewDesc;
+            memset(&colorBufferViewDesc, 0, sizeof(colorBufferViewDesc));
+            colorBufferViewDesc.format = format;
+            colorBufferViewDesc.renderTarget.shape = gfx::IResource::Type::Texture2D;
+            colorBufferViewDesc.type = gfx::IResourceView::Type::RenderTarget;
+            auto rtv = device->createTextureView(colorBuffer, colorBufferViewDesc);
+
+            gfx::IFramebuffer::Desc framebufferDesc;
+            framebufferDesc.renderTargetCount = 1;
+            framebufferDesc.depthStencilView = nullptr;
+            framebufferDesc.renderTargetViews = rtv.readRef();
+            framebufferDesc.layout = framebufferLayout;
+            GFX_CHECK_CALL_ABORT(device->createFramebuffer(framebufferDesc, framebuffer.writeRef()));
+        }
+
+        void setUpAndDraw()
+        {
+            ComPtr<ITransientResourceHeap> transientHeap;
+            ITransientResourceHeap::Desc transientHeapDesc = {};
+            transientHeapDesc.constantBufferSize = 4096;
+            GFX_CHECK_CALL_ABORT(
+                device->createTransientResourceHeap(transientHeapDesc, transientHeap.writeRef()));
+
+            ICommandQueue::Desc queueDesc = { ICommandQueue::QueueType::Graphics };
+            auto queue = device->createCommandQueue(queueDesc);
+            auto commandBuffer = transientHeap->createCommandBuffer();
+
+            auto encoder = commandBuffer->encodeRenderCommands(renderPass, framebuffer);
+            auto rootObject = encoder->bindPipeline(pipelineState);
+
+            gfx::Viewport viewport = {};
+            viewport.maxZ = 1.0f;
+            viewport.extentX = kWidth;
+            viewport.extentY = kHeight;
+            encoder->setViewportAndScissor(viewport);
+
+            uint32_t startVertex = 0;
+            uint32_t startInstanceLocation = 0;
+
+            encoder->setVertexBuffer(0, vertexBuffer);
+            encoder->setVertexBuffer(1, instanceBuffer);
+            encoder->setPrimitiveTopology(PrimitiveTopology::TriangleList);
+
+            encoder->drawInstanced(kVertexCount, kInstanceCount, startVertex, startInstanceLocation);
+            encoder->endEncoding();
+            commandBuffer->close();
+            queue->executeCommandBuffer(commandBuffer);
+            queue->waitOnHost();
+        }
+
+        void run()
+        {
+            generateNewDevice();
+            createRequiredResources();
+            setUpAndDraw();
+
+            ComPtr<IShaderCacheStatistics> shaderCacheStats;
+
+            device->queryInterface(SLANG_UUID_IShaderCacheStatistics, (void**)shaderCacheStats.writeRef());
+            SLANG_CHECK(shaderCacheStats->getCacheMissCount() == 2);
+            SLANG_CHECK(shaderCacheStats->getCacheHitCount() == 0);
+            SLANG_CHECK(shaderCacheStats->getCacheEntryDirtyCount() == 0);
+        }
+    };
+
     // Same as MultipleEntryShaderCache, but we now set the maximum entry count limit, so the cache
     // should remove entries as needed when it reaches capacity.
     //
@@ -944,5 +1174,10 @@ namespace gfx_test
     SLANG_UNIT_TEST(cacheEvictionPolicyVulkan)
     {
         runTestImpl(shaderCacheTestImpl<CacheWithMaxEntryLimit>, unitTestContext, Slang::RenderApiFlag::Vulkan);
+    }
+
+    SLANG_UNIT_TEST(graphicsShader)
+    {
+        runTestImpl(shaderCacheTestImpl<GraphicsShaderCache>, unitTestContext, Slang::RenderApiFlag::D3D12);
     }
 }
