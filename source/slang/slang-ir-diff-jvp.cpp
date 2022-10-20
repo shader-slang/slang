@@ -941,7 +941,6 @@ struct JVPTranscriber
         }
         
         SLANG_UNEXPECTED("Logical operation with non-boolean result");
-        UNREACHABLE_RETURN("");
     }
 
     InstPair transcribeLoad(IRBuilder* builder, IRLoad* origLoad)
@@ -1030,13 +1029,6 @@ struct JVPTranscriber
             IRInst* primalReturn = builder->emitReturn(primalReturnVal);
             return InstPair(primalReturn, nullptr);
             
-            /*
-                // If the differential return value is not available, emit a 
-                // void return.
-                // TODO(sai): This seems incorrect.
-                IRInst* voidReturn = builder->emitReturn();
-                return InstPair(voidReturn, voidReturn);
-            */
         }
     }
 
@@ -1361,32 +1353,6 @@ struct JVPTranscriber
                     return nullptr;
             }
         }
-
-        /*
-        switch (type->getOp())
-        {
-            case kIROp_FloatType:
-            case kIROp_HalfType:
-            case kIROp_DoubleType:
-                return builder->getFloatValue(type, 0.0);
-            case kIROp_IntType:
-                return builder->getIntValue(type, 0);
-            case kIROp_VectorType:
-            {
-                IRInst* args[] = {getDifferentialZeroOfType(builder, as<IRVectorType>(type)->getElementType())};
-                return builder->emitIntrinsicInst(
-                    type,
-                    kIROp_constructVectorFromScalar,
-                    1,
-                    args);
-            }
-            default:
-                getSink()->diagnose(type->sourceLoc,
-                    Diagnostics::internalCompilerError,
-                    "could not generate zero value for given type");
-                return nullptr;       
-        }
-        */
     }
 
     InstPair transcribeBlock(IRBuilder* builder, IRBlock* origBlock)
