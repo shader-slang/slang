@@ -549,6 +549,7 @@ class AttributeTargetModifier : public Modifier
     SyntaxClass<NodeBase> syntaxClass;
 };
 
+
 // Base class for checked and unchecked `[name(arg0, ...)]` style attribute.
 class AttributeBase : public Modifier 
 {

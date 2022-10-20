@@ -38,6 +38,18 @@ class VarExpr : public DeclRefExpr
     SLANG_AST_CLASS(VarExpr)
 };
 
+class DifferentiableDeclRefExpr : public Expr
+{
+    SLANG_AST_CLASS(DifferentiableDeclRefExpr)
+
+    // Inner decl ref expr that references a differentiable expression.
+    Expr* inner = nullptr;
+
+    // Information on getters and setters if available.
+    Expr* setterExpr = nullptr;
+    Expr* getterExpr = nullptr;
+};
+
 // An expression that references an overloaded set of declarations
 // having the same name.
 class OverloadedExpr : public Expr
@@ -428,13 +440,21 @@ class OpenRefExpr : public Expr
     Expr* innerExpr = nullptr;
 };
 
+    /// Base class for higher-order function application
+    /// Eg: foo(fn) where fn is a function expression.
+    ///
+class HigherOrderInvokeExpr : public Expr
+{
+    SLANG_ABSTRACT_AST_CLASS(HigherOrderInvokeExpr)
+    Expr* baseFunction;
+};
+
     /// An expression of the form `__jvp(fn)` to access the 
     /// forward-mode derivative version of the function `fn`
     ///
-class JVPDifferentiateExpr: public Expr
+class JVPDifferentiateExpr: public HigherOrderInvokeExpr
 {
     SLANG_AST_CLASS(JVPDifferentiateExpr)
-    Expr* baseFunction;
 };
 
     /// A type expression of the form `__TaggedUnion(A, ...)`.
