@@ -813,7 +813,7 @@ namespace Slang
         }
     }
 
-    void SemanticsVisitor::maybeAddDifferentialGetterModifier(Expr* checkedTerm)
+    Expr* SemanticsVisitor::maybeMakeDifferentialExpr(Expr* checkedTerm)
     {
         // Check that member lookups on differentiable types have appropriate differential
         // getters and setters.
@@ -902,11 +902,12 @@ namespace Slang
                         }
                     }
 
-                    checkedTerm = diffExpr;
-                    // Check expression now.
+                    return diffExpr;
                 }
             }
         }
+
+        return checkedTerm;
     }
 
     Expr* SemanticsVisitor::CheckTerm(Expr* term)
@@ -922,7 +923,7 @@ namespace Slang
             
             if (auto declRefExpr = as<DeclRefExpr>(checkedTerm))
             {
-                maybeAddDifferentialGetterModifier(checkedTerm);
+                checkedTerm = maybeMakeDifferentialExpr(checkedTerm);
             }
         }
 

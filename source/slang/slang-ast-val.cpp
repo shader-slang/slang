@@ -497,7 +497,7 @@ Val* ExtractFromConjunctionSubtypeWitness::_substituteImplOverride(ASTBuilder* a
         ExtractFromConjunctionSubtypeWitness* result = astBuilder->create<ExtractFromConjunctionSubtypeWitness>();
         result->sub = substSub;
         result->sup = substSup;
-        result->conjunctionWitness = substConjunctionWitness;
+        result->conjunctionWitness = substWitness;
         result->indexInConjunction = indexInConjunction;
         return result;
     }

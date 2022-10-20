@@ -822,7 +822,7 @@ namespace Slang
         // Check if a term is referencing a member, and add a decoration to it's
         // differential getter function, if one exists.
         //
-        void maybeAddDifferentialGetterModifier(Expr* checkedTerm);
+        Expr* maybeMakeDifferentialExpr(Expr* checkedTerm);
 
         // Construct the differential for 'type', if it exists.
         Type* _getDifferential(ASTBuilder* builder, Type* type);
