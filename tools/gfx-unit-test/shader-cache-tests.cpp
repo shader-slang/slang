@@ -701,7 +701,7 @@ namespace gfx_test
             StringUtil::calcLines(UnownedStringSlice((char*)contentsBlob->getBufferPointer()), temp);
             for (auto line : temp)
             {
-                if (line != "")
+                if (line.trim().getLength() != 0)
                     lines.add(line);
             }
         }
