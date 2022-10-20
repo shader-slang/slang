@@ -5,6 +5,7 @@
 #include "tools/gfx-util/shader-cursor.h"
 #include "source/core/slang-basic.h"
 #include "source/core/slang-string-util.h"
+#include "source/core/slang-digest-util.h"
 
 #include "source/core/slang-memory-file-system.h"
 #include "source/core/slang-file-system.h"
@@ -184,6 +185,15 @@ namespace gfx_test
         }
     };
 
+    // Due to needing a workaround to prevent loading old, outdated modules, we need to
+    // recreate the device between each segment of the test for all tests. However, we need to maintain the
+    // same cache filesystem for the same duration, so the device is immediately recreated
+    // to ensure we can pass the filesystem all the way through.
+    //
+    // General TODO: Remove the repeated generateNewDevice() and createRequiredResources() calls once
+    // a solution exists that allows source code changes under the same module name to be picked
+    // up on load.
+
     // One shader file on disk, all modifications are done to the same file
     struct SingleEntryShaderCache : BaseShaderCacheTest
     {
@@ -205,14 +215,6 @@ namespace gfx_test
         {
             ComPtr<IShaderCacheStatistics> shaderCacheStats;
 
-            // Due to needing a workaround to prevent loading old, outdated modules, we need to
-            // recreate the device between each segment of the test. However, we need to maintain the
-            // same cache filesystem for the duration of the test, so the device is immediately recreated
-            // to ensure we can pass the filesystem all the way through.
-            //
-            // TODO: Remove the repeated generateNewDevice() and createRequiredResources() calls once
-            // a solution exists that allows source code changes under the same module name to be picked
-            // up on load.
             generateNewDevice();
             createRequiredResources();
             generateNewPipelineState(contentsA);
@@ -305,14 +307,6 @@ namespace gfx_test
         {
             ComPtr<IShaderCacheStatistics> shaderCacheStats;
 
-            // Due to needing a workaround to prevent loading old, outdated modules, we need to
-            // recreate the device between each segment of the test. However, we need to maintain the
-            // same cache filesystem for the duration of the test, so the device is immediately recreated
-            // to ensure we can pass the filesystem all the way through.
-            //
-            // TODO: Remove the repeated generateNewDevice() and createRequiredResources() calls once
-            // a solution exists that allows source code changes under the same module name to be picked
-            // up on load.
             generateNewDevice();
             createRequiredResources();
             modifyShaderA(contentsA);
@@ -393,14 +387,6 @@ namespace gfx_test
         {
             ComPtr<IShaderCacheStatistics> shaderCacheStats;
 
-            // Due to needing a workaround to prevent loading old, outdated modules, we need to
-            // recreate the device between each segment of the test. However, we need to maintain the
-            // same cache filesystem for the duration of the test, so the device is immediately recreated
-            // to ensure we can pass the filesystem all the way through.
-            //
-            // TODO: Remove the repeated generateNewDevice() and createRequiredResources() calls once
-            // a solution exists that allows source code changes under the same module name to be picked
-            // up on load.
             generateNewDevice();
             createRequiredResources();
             generateNewPipelineState(0);
@@ -537,14 +523,6 @@ namespace gfx_test
         {
             ComPtr<IShaderCacheStatistics> shaderCacheStats;
 
-            // Due to needing a workaround to prevent loading old, outdated modules, we need to
-            // recreate the device between each segment of the test. However, we need to maintain the
-            // same cache filesystem for the duration of the test, so the device is immediately recreated
-            // to ensure we can pass the filesystem all the way through.
-            //
-            // TODO: Remove the repeated generateNewDevice() and createRequiredResources() calls once
-            // a solution exists that allows source code changes under the same module name to be picked
-            // up on load.
             generateNewDevice();
             createRequiredResources();
             initializeFiles();
@@ -676,14 +654,6 @@ namespace gfx_test
         {
             ComPtr<IShaderCacheStatistics> shaderCacheStats;
 
-            // Due to needing a workaround to prevent loading old, outdated modules, we need to
-            // recreate the device between each segment of the test. However, we need to maintain the
-            // same cache filesystem for the duration of the test, so the device is immediately recreated
-            // to ensure we can pass the filesystem all the way through.
-            //
-            // TODO: Remove the repeated generateNewDevice() and createRequiredResources() calls once
-            // a solution exists that allows source code changes under the same module name to be picked
-            // up on load.
             generateNewDevice();
             createRequiredResources();
             generateNewPipelineState();
@@ -714,10 +684,14 @@ namespace gfx_test
     // the right order.
     struct CacheWithMaxEntryLimit : MultipleEntryShaderCache
     {
+        List<String> test0Lines; // C -> B -> A
         List<String> test1Lines; // C -> B
         List<String> test2Lines; // A -> B
         List<String> test3Lines; // A -> C
         List<String> test4Lines; // C -> B -> A
+        List<String> entryKeys; // C, B, A
+
+        ComPtr<IShaderCacheStatistics> shaderCacheStats;
 
         void getCacheFile(List<String>& lines)
         {
@@ -727,7 +701,8 @@ namespace gfx_test
             StringUtil::calcLines(UnownedStringSlice((char*)contentsBlob->getBufferPointer()), temp);
             for (auto line : temp)
             {
-                lines.add(line);
+                if (line.trim().getLength() != 0)
+                    lines.add(line);
             }
         }
 
@@ -748,18 +723,47 @@ namespace gfx_test
             SLANG_CHECK(test1Lines[0] == test4Lines[0]);
         }
 
-        void run()
+        // Cache limit 3, three unique shaders
+        void runTest0()
         {
-            ComPtr<IShaderCacheStatistics> shaderCacheStats;
+            shaderCache.entryCountLimit = 3;
+            generateNewDevice();
+            createRequiredResources();
+            generateNewPipelineState(0);
+            submitGPUWork();
+            generateNewPipelineState(1);
+            submitGPUWork();
+            generateNewPipelineState(2);
+            submitGPUWork();
+            getCacheFile(test0Lines);
 
-            // Due to needing a workaround to prevent loading old, outdated modules, we need to
-            // recreate the device between each segment of the test. However, we need to maintain the
-            // same cache filesystem for the duration of the test, so the device is immediately recreated
-            // to ensure we can pass the filesystem all the way through.
-            //
-            // TODO: Remove the repeated generateNewDevice() and createRequiredResources() calls once
-            // a solution exists that allows source code changes under the same module name to be picked
-            // up on load.
+            device->queryInterface(SLANG_UUID_IShaderCacheStatistics, (void**)shaderCacheStats.writeRef());
+            SLANG_CHECK(shaderCacheStats->getCacheMissCount() == 3);
+            SLANG_CHECK(shaderCacheStats->getCacheHitCount() == 0);
+            SLANG_CHECK(shaderCacheStats->getCacheEntryDirtyCount() == 0);
+
+            SLANG_CHECK(test0Lines.getCount() == 3);
+
+            // This segment also doubles as the point where we fetch the keys for all three shaders
+            // to use in later checks.
+            for (auto line : test0Lines)
+            {
+                List<UnownedStringSlice> digests;
+                StringUtil::split(line.getUnownedSlice(), ' ', digests);
+                if (digests.getCount() != 2)
+                    continue;
+                entryKeys.add(digests[0]);
+            }
+
+            ComPtr<ISlangBlob> unused;
+            SLANG_CHECK(SLANG_SUCCEEDED(cacheFileSystem->loadFile(entryKeys[0].getBuffer(), unused.writeRef())));
+            SLANG_CHECK(SLANG_SUCCEEDED(cacheFileSystem->loadFile(entryKeys[1].getBuffer(), unused.writeRef())));
+            SLANG_CHECK(SLANG_SUCCEEDED(cacheFileSystem->loadFile(entryKeys[2].getBuffer(), unused.writeRef())));
+        }
+
+        // Cache limit 2, access shaders A then B then C
+        void runTest1()
+        {
             shaderCache.entryCountLimit = 2;
             generateNewDevice();
             createRequiredResources();
@@ -772,42 +776,72 @@ namespace gfx_test
             submitGPUWork();
             generateNewPipelineState(2);
             submitGPUWork();
+            getCacheFile(test1Lines);
 
-            // Cache limit 2, three unique shaders
             device->queryInterface(SLANG_UUID_IShaderCacheStatistics, (void**)shaderCacheStats.writeRef());
             SLANG_CHECK(shaderCacheStats->getCacheMissCount() == 3);
             SLANG_CHECK(shaderCacheStats->getCacheHitCount() == 0);
             SLANG_CHECK(shaderCacheStats->getCacheEntryDirtyCount() == 0);
-            getCacheFile(test1Lines);
 
+            SLANG_CHECK(test1Lines.getCount() == 2);
+
+            ComPtr<ISlangBlob> unused;
+            SLANG_CHECK(SLANG_SUCCEEDED(cacheFileSystem->loadFile(entryKeys[0].getBuffer(), unused.writeRef())));
+            SLANG_CHECK(SLANG_SUCCEEDED(cacheFileSystem->loadFile(entryKeys[1].getBuffer(), unused.writeRef())));
+            SLANG_CHECK(SLANG_FAILED(cacheFileSystem->loadFile(entryKeys[2].getBuffer(), unused.writeRef())));
+        }
+
+        // Cache limit 2, access shaders B and then A
+        void runTest2()
+        {
             generateNewDevice();
             createRequiredResources();
             generateNewPipelineState(1);
             submitGPUWork();
             generateNewPipelineState(0);
             submitGPUWork();
+            getCacheFile(test2Lines);
 
-            // Cache limit 2, access shaders B and then A
             device->queryInterface(SLANG_UUID_IShaderCacheStatistics, (void**)shaderCacheStats.writeRef());
             SLANG_CHECK(shaderCacheStats->getCacheMissCount() == 1);
             SLANG_CHECK(shaderCacheStats->getCacheHitCount() == 1);
             SLANG_CHECK(shaderCacheStats->getCacheEntryDirtyCount() == 0);
-            getCacheFile(test2Lines);
 
+            SLANG_CHECK(test2Lines.getCount() == 2);
+
+            ComPtr<ISlangBlob> unused;
+            SLANG_CHECK(SLANG_FAILED(cacheFileSystem->loadFile(entryKeys[0].getBuffer(), unused.writeRef())));
+            SLANG_CHECK(SLANG_SUCCEEDED(cacheFileSystem->loadFile(entryKeys[1].getBuffer(), unused.writeRef())));
+            SLANG_CHECK(SLANG_SUCCEEDED(cacheFileSystem->loadFile(entryKeys[2].getBuffer(), unused.writeRef())));
+        }
+
+        // Cache limit 2, access shaders C and then A
+        void runTest3()
+        {
             generateNewDevice();
             createRequiredResources();
             generateNewPipelineState(2);
             submitGPUWork();
             generateNewPipelineState(0);
             submitGPUWork();
+            getCacheFile(test3Lines);
 
-            // Cache limit 2, access shaders C and then A
             device->queryInterface(SLANG_UUID_IShaderCacheStatistics, (void**)shaderCacheStats.writeRef());
             SLANG_CHECK(shaderCacheStats->getCacheMissCount() == 1);
             SLANG_CHECK(shaderCacheStats->getCacheHitCount() == 1);
             SLANG_CHECK(shaderCacheStats->getCacheEntryDirtyCount() == 0);
-            getCacheFile(test3Lines);
 
+            SLANG_CHECK(test3Lines.getCount() == 2);
+
+            ComPtr<ISlangBlob> unused;
+            SLANG_CHECK(SLANG_SUCCEEDED(cacheFileSystem->loadFile(entryKeys[0].getBuffer(), unused.writeRef())));
+            SLANG_CHECK(SLANG_FAILED(cacheFileSystem->loadFile(entryKeys[1].getBuffer(), unused.writeRef())));
+            SLANG_CHECK(SLANG_SUCCEEDED(cacheFileSystem->loadFile(entryKeys[2].getBuffer(), unused.writeRef())));
+        }
+
+        // Cache limit 3, access shaders A then B then C
+        void runTest4()
+        {
             shaderCache.entryCountLimit = 3;
             generateNewDevice();
             createRequiredResources();
@@ -817,13 +851,28 @@ namespace gfx_test
             submitGPUWork();
             generateNewPipelineState(2);
             submitGPUWork();
+            getCacheFile(test4Lines);
 
-            // Cache limit 3, access shaders A then B then C
             device->queryInterface(SLANG_UUID_IShaderCacheStatistics, (void**)shaderCacheStats.writeRef());
             SLANG_CHECK(shaderCacheStats->getCacheMissCount() == 1);
             SLANG_CHECK(shaderCacheStats->getCacheHitCount() == 2);
             SLANG_CHECK(shaderCacheStats->getCacheEntryDirtyCount() == 0);
-            getCacheFile(test4Lines);
+
+            SLANG_CHECK(test4Lines.getCount() == 3);
+
+            ComPtr<ISlangBlob> unused;
+            SLANG_CHECK(SLANG_SUCCEEDED(cacheFileSystem->loadFile(entryKeys[0].getBuffer(), unused.writeRef())));
+            SLANG_CHECK(SLANG_SUCCEEDED(cacheFileSystem->loadFile(entryKeys[1].getBuffer(), unused.writeRef())));
+            SLANG_CHECK(SLANG_SUCCEEDED(cacheFileSystem->loadFile(entryKeys[2].getBuffer(), unused.writeRef())));
+        }
+
+        void run()
+        {
+            runTest0();
+            runTest1();
+            runTest2();
+            runTest3();
+            runTest4();
 
             checkCacheFiles();
         }
