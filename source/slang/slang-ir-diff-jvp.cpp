@@ -888,13 +888,11 @@ struct JVPTranscriber
         auto diffLeft = findOrTranscribeDiffInst(builder, origLeft);
         auto diffRight = findOrTranscribeDiffInst(builder, origRight);
 
-        auto leftZero = getDifferentialZeroOfType(builder, primalLeft->getDataType());
-        auto rightZero = getDifferentialZeroOfType(builder, primalRight->getDataType());
 
         if (diffLeft || diffRight)
         {
-            diffLeft = diffLeft ? diffLeft : leftZero;
-            diffRight = diffRight ? diffRight : rightZero;
+            diffLeft = diffLeft ? diffLeft : getDifferentialZeroOfType(builder, primalLeft->getDataType());
+            diffRight = diffRight ? diffRight : getDifferentialZeroOfType(builder, primalRight->getDataType());
 
             auto resultType = primalArith->getDataType();
             switch(origArith->getOp())

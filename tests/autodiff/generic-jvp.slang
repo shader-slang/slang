@@ -67,6 +67,7 @@ extension myvector<4> : MyLinearArithmeticType
     {
         val = a;
     }
+
 };
 
 typedef myvector<3> myfloat3;
@@ -86,6 +87,12 @@ extension myfloat3 : IDifferentiable
 {
     typedef myfloat3 Differential;
 
+    [__unsafeForceInlineEarly]
+    static Ptr<float3> __getDifferentialFor_val(inout Differential dx)
+    {
+        return &(dx.val);
+    }
+
     static Differential zero()
     {
         return myfloat3(0);
@@ -100,11 +107,18 @@ extension myfloat3 : IDifferentiable
     {
         return a * b;
     }
+
 };
 
 extension myfloat4 : IDifferentiable
 {
     typedef myfloat4 Differential;
+
+    [__unsafeForceInlineEarly]
+    static Ptr<float4> __getDifferentialFor_val(inout Differential dx)
+    {
+        return &(dx.val);
+    }
 
     static Differential zero()
     {

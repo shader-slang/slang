@@ -779,7 +779,11 @@ namespace Slang
 
     void SemanticsVisitor::maybeRegisterDifferentiableType(ASTBuilder* builder, Type* type)
     {
-
+        if (!builder->isDifferentiableInterfaceAvailable())
+        {
+            return;
+        }
+        
         // Check for special cases such as PtrTypeBase<T> or Array<T>
         // This could potentially be handled later by simply defining extensions
         // for Ptr<T:IDifferentiable> etc..
@@ -814,8 +818,7 @@ namespace Slang
         auto checkedTerm = _CheckTerm(term);
 
         // Differentiable type checking.
-        // TODO: This can be super slow. Switch to caching the result asap.
-        // TODO: Move to CheckInvokeWithCheckedOperands()
+        // TODO: This can be super slow.
         if (this->m_parentFunc && 
             this->m_parentFunc->findModifier<JVPDerivativeModifier>())
         {
