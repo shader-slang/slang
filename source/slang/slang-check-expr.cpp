@@ -783,7 +783,7 @@ namespace Slang
         {
             return;
         }
-        
+
         // Check for special cases such as PtrTypeBase<T> or Array<T>
         // This could potentially be handled later by simply defining extensions
         // for Ptr<T:IDifferentiable> etc..
@@ -813,6 +813,102 @@ namespace Slang
         }
     }
 
+    void SemanticsVisitor::maybeAddDifferentialGetterModifier(Expr* checkedTerm)
+    {
+        // Check that member lookups on differentiable types have appropriate differential
+        // getters and setters.
+        if (auto declRefExpr = as<DeclRefExpr>(checkedTerm))
+        {
+            
+            // Check if we have a parent container. If yes, then checkedTerm is
+            // referencing a member of this parent.
+            //
+            auto parentType = DeclRefType::create(getASTBuilder(), declRefExpr->declRef.getParent());
+            
+            // Check if we have an aggregate (i.e. struct-like) type.
+            // Ignore interfaces and the case when the term refers to a function
+            // 
+            if (parentType->declRef.as<AggTypeDeclBase>() &&
+                !parentType->declRef.as<InterfaceDecl>() &&
+                !declRefExpr->declRef.as<CallableDecl>())
+            {   
+                // Check if the parent container type is differentiable.
+                if (auto parentDiffWitness = as<SubtypeWitness>(
+                    tryGetInterfaceConformanceWitness(
+                        parentType, getASTBuilder()->getDifferentiableInterface())))
+                {
+                    // If yes, the member in checkedTerm should have a differential getter and setter.
+                    // Otherwise, <ERROR>
+                    //
+                    auto diffExpr = m_astBuilder->create<DifferentiableDeclRefExpr>();
+                    diffExpr->type = checkedTerm->type;
+                    diffExpr->inner = checkedTerm;
+
+                    {
+                        auto getterName = getName("__getDifferentialFor_" + declRefExpr->name->text);
+                        auto getterResult = lookUpMember(
+                            getASTBuilder(),
+                            this,
+                            getterName,
+                            parentType,
+                            Slang::LookupMask::Function,
+                            Slang::LookupOptions::None);
+
+                        if (!getterResult.isValid())
+                        {
+                            // Do nothing.. we assume that this field cannot be differentiated.
+                            // Could this be confusing from a user perspective?
+                        }
+                        else if (getterResult.isOverloaded())
+                        {
+                            // Diagnose ambiguous getter.
+                            SLANG_UNIMPLEMENTED_X("Ambiguous differential getters not supported");
+                        }
+                        else
+                        {
+                            auto getterRefExpr = ConstructLookupResultExpr(
+                            getterResult.item,
+                            declRefExpr,
+                            getterResult.item.declRef.getLoc(),
+                            nullptr);
+
+                            // Check that the type is what we expect. 
+                            // We're going to do this in a very crude way for now.
+                            // Ideally, we want to use the overload resolution and type 
+                            // coercion logic in ResolveInvoke()
+                            // 
+
+                            auto diffType = _getDifferential(m_astBuilder, checkedTerm->type.type);
+                            auto diffParentType = _getDifferential(m_astBuilder, parentType);
+
+                            auto ptrDiffType = m_astBuilder->getPtrType(diffType);
+                            auto inoutContainerDiffType = m_astBuilder->getInOutType(diffParentType);
+
+                            auto funcType = as<FuncType>(getterRefExpr->type);
+
+                            if (!ptrDiffType->equals(funcType->getResultType()))
+                            {
+                                getSink()->diagnose(getterRefExpr, Diagnostics::typeMismatch,
+                                                    ptrDiffType, funcType->getResultType());
+                            }
+                            
+                            if (!inoutContainerDiffType->equals(funcType->getParamType(0)))
+                            {
+                                getSink()->diagnose(getterRefExpr, Diagnostics::typeMismatch,
+                                                    inoutContainerDiffType, funcType->getParamType(0));
+                            }
+                            
+                            diffExpr->getterExpr = getterRefExpr;
+                        }
+                    }
+
+                    checkedTerm = diffExpr;
+                    // Check expression now.
+                }
+            }
+        }
+    }
+
     Expr* SemanticsVisitor::CheckTerm(Expr* term)
     {
         auto checkedTerm = _CheckTerm(term);
@@ -824,99 +920,9 @@ namespace Slang
         {
             maybeRegisterDifferentiableType(getASTBuilder(), checkedTerm->type.type);
             
-            // Check that member lookups on differentiable types have appropriate differential
-            // getters and setters.
             if (auto declRefExpr = as<DeclRefExpr>(checkedTerm))
             {
-                
-                // Check if we have a parent container. If yes, then checkedTerm is
-                // referencing a member of this parent.
-                //
-                auto parentType = DeclRefType::create(getASTBuilder(), declRefExpr->declRef.getParent());
-                
-                // Check if we have an aggregate (i.e. struct-like) type.
-                // Ignore interfaces and the case when the term refers to a function
-                // 
-                if (parentType->declRef.as<AggTypeDeclBase>() &&
-                    !parentType->declRef.as<InterfaceDecl>() &&
-                    !declRefExpr->declRef.as<CallableDecl>())
-                {   
-                    // Check if the parent container type is differentiable.
-                    if (auto parentDiffWitness = as<SubtypeWitness>(
-                        tryGetInterfaceConformanceWitness(
-                            parentType, getASTBuilder()->getDifferentiableInterface())))
-                    {
-                        // DifferentiableExpr[Expr]
-                        //  lower-to-ir = lower child expr + decorations as necessary.
-
-                        // If yes, the member in checkedTerm should have a differential getter and setter.
-                        // Otherwise, <ERROR>
-                        auto diffExpr = m_astBuilder->create<DifferentiableDeclRefExpr>();
-                        diffExpr->type = checkedTerm->type;
-                        diffExpr->inner = checkedTerm;
-
-                        {
-                            auto getterName = getName("__getDifferentialFor_" + declRefExpr->name->text);
-                            auto getterResult = lookUpMember(
-                                getASTBuilder(),
-                                this,
-                                getterName,
-                                parentType,
-                                Slang::LookupMask::Function,
-                                Slang::LookupOptions::None);
-
-                            if (!getterResult.isValid())
-                            {
-                                // Do nothing.. we assume that this field cannot be differentiated.
-                                // Could this be confusing from a user perspective?
-                            }
-                            else if (getterResult.isOverloaded())
-                            {
-                                // Diagnose ambiguous getter.
-                                SLANG_UNIMPLEMENTED_X("Ambiguous differential getters not supported");
-                            }
-                            else
-                            {
-                                 auto getterRefExpr = ConstructLookupResultExpr(
-                                    getterResult.item,
-                                    declRefExpr,
-                                    getterResult.item.declRef.getLoc(),
-                                    nullptr);
-
-                                // Check that the type is what we expect. 
-                                // We're going to do this in a very crude way for now.
-                                // Ideally, we want to use the overload resolution and type 
-                                // coercion logic in ResolveInvoke()
-                                // 
-
-                                auto diffType = _getDifferential(m_astBuilder, checkedTerm->type.type);
-                                auto diffParentType = _getDifferential(m_astBuilder, parentType);
-
-                                auto ptrDiffType = m_astBuilder->getPtrType(diffType);
-                                auto inoutContainerDiffType = m_astBuilder->getInOutType(diffParentType);
-
-                                auto funcType = as<FuncType>(getterRefExpr->type);
-
-                                if (!ptrDiffType->equals(funcType->getResultType()))
-                                {
-                                    getSink()->diagnose(getterRefExpr, Diagnostics::typeMismatch,
-                                                        ptrDiffType, funcType->getResultType());
-                                }
-                                
-                                if (!inoutContainerDiffType->equals(funcType->getParamType(0)))
-                                {
-                                    getSink()->diagnose(getterRefExpr, Diagnostics::typeMismatch,
-                                                        inoutContainerDiffType, funcType->getParamType(0));
-                                }
-                                
-                                diffExpr->getterExpr = getterRefExpr;
-                            }
-                        }
-
-                        checkedTerm = diffExpr;
-                        // Check expression now.
-                    }
-                }
+                maybeAddDifferentialGetterModifier(checkedTerm);
             }
         }
 

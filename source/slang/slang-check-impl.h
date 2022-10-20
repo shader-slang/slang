@@ -814,6 +814,11 @@ namespace Slang
         // Check and register a type if it is differentiable.
         void maybeRegisterDifferentiableType(ASTBuilder* builder, Type* type);
 
+        // Check if a term is referencing a member, and add a decoration to it's
+        // differential getter function, if one exists.
+        //
+        void maybeAddDifferentialGetterModifier(Expr* checkedTerm);
+
         // Construct the differential for 'type', if it exists.
         Type* _getDifferential(ASTBuilder* builder, Type* type);
         

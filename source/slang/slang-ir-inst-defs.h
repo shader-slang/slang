@@ -707,10 +707,6 @@ INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
         /// differential getter associated with this expression.
     INST(DifferentialGetterDecoration, diffGetter, 1, 0)
 
-        /// Used by the auto-diff pass to hold a reference to a
-        /// differential getter associated with this expression.
-    INST(DifferentialSetterDecoration, diffSetter, 1, 0)
-
         /// Marks a class type as a COM interface implementation, which enables
         /// the witness table to be easily picked up by emit.
     INST(COMWitnessDecoration, COMWitnessDecoration, 1, 0)

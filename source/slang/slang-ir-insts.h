@@ -566,18 +566,6 @@ struct IRDifferentialGetterDecoration : IRDecoration
     IRInst* getGetterFunc() { return getOperand(0); }
 };
 
-struct IRDifferentialSetterDecoration : IRDecoration
-{
-    enum
-    {
-        kOp = kIROp_DifferentialSetterDecoration
-    };
-    IR_LEAF_ISA(DifferentialSetterDecoration)
-
-    IRInst* getSetterFunc() { return getOperand(0); }
-};
-
-
 // An instruction that replaces the function symbol
 // with it's derivative function.
 struct IRJVPDifferentiate : IRInst
