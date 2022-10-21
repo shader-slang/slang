@@ -706,6 +706,10 @@ INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
         /// generated derivative function.
     INST(JVPDerivativeReferenceDecoration, jvpFnReference, 1, 0)
 
+        /// Used by the auto-diff pass to hold a reference to a
+        /// differential getter associated with this expression.
+    INST(DifferentialGetterDecoration, diffGetter, 1, 0)
+
         /// Marks a class type as a COM interface implementation, which enables
         /// the witness table to be easily picked up by emit.
     INST(COMWitnessDecoration, COMWitnessDecoration, 1, 0)
@@ -804,6 +808,10 @@ INST(SpecializationDictionaryItem, SpecializationDictionaryItem, 0, 0)
 INST(GenericSpecializationDictionary, GenericSpecializationDictionary, 0, PARENT)
 INST(ExistentialFuncSpecializationDictionary, ExistentialFuncSpecializationDictionary, 0, PARENT)
 INST(ExistentialTypeSpecializationDictionary, ExistentialTypeSpecializationDictionary, 0, PARENT)
+
+/* Differentiable Type Dictionary */
+INST(DifferentiableTypeDictionary, DifferentiableTypeDictionary, 0, PARENT)
+INST(DifferentiableTypeDictionaryItem, DifferentiableTypeDictionaryItem, 0, 0)
 
 #undef PARENT
 #undef USE_OTHER
