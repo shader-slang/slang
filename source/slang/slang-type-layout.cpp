@@ -3240,6 +3240,168 @@ RefPtr<TypeLayout> createTypeLayoutForGlobalGenericTypeParam(
     return _createTypeLayoutForGlobalGenericTypeParam(context, type, globalGenericParamDecl).layout;
 }
 
+static TypeLayoutResult createArrayTypeLayout(
+    TypeLayoutContext const&    context,
+    ArrayExpressionType* arrayType)
+{
+    auto rules = context.rules;
+
+    auto elementResult = _createTypeLayout(
+        context,
+        arrayType->baseType);
+    auto elementInfo = elementResult.info;
+    auto elementTypeLayout = elementResult.layout;
+
+    // To a first approximation, an array will usually be laid out
+    // by taking the element's type layout and laying out `elementCount`
+    // copies of it. There are of course many details that make
+    // this simplistic version of things not quite work.
+    //
+    // An important complication to deal with is the possibility of
+    // having "unbounded" arrays, which don't specify a size.'
+    // The layout rules for these vary heavily by resource kind and API.
+    //
+
+    auto elementCount = GetElementCount(arrayType->arrayLength);
+
+    //
+    // We can compute the uniform storage layout of an array using
+    // the rules for the target API.
+    //
+    // TODO: ensure that this does something reasonable with the unbounded
+    // case, or else issue an error message that the target doesn't
+    // support unbounded types.
+    //
+
+    auto arrayUniformInfo = rules->GetArrayLayout(
+        elementInfo,
+        elementCount).getUniformLayout();
+
+    RefPtr<ArrayTypeLayout> typeLayout = new ArrayTypeLayout();
+
+    // Some parts of the array type layout object are easy to fill in:
+    typeLayout->type = arrayType;
+    typeLayout->rules = rules;
+    typeLayout->originalElementTypeLayout = elementTypeLayout;
+    typeLayout->uniformAlignment = arrayUniformInfo.alignment;
+    typeLayout->uniformStride = arrayUniformInfo.elementStride;
+
+    typeLayout->addResourceUsage(LayoutResourceKind::Uniform, arrayUniformInfo.size);
+
+    //
+    // The tricky part in constructing an array type layout comes when
+    // the element type is (or nests) a structure with resource-type
+    // fields, because in that case we need to perform AoS-to-SoA
+    // conversion as part of computing the final type layout, and
+    // we also need to pre-compute an "adjusted" element type
+    // layout that accounts for the striding that happens with
+    // resource-type contents.
+    //
+    // This complication is only made worse when we have to deal with
+    // unbounded-size arrays over such element types, since those
+    // resource-type fields will each end up consuming a full space
+    // in the resulting layout.
+    //
+    // The `maybeAdjustLayoutForArrayElementType` computes an "adjusted"
+    // type layout for the element type which takes the array stride into
+    // account. If it returns the same type layout that was passed in,
+    // then that means no adjustement took place.
+    //
+    // The `additionalSpacesNeededForAdjustedElementType` variable counts
+    // the number of additional register spaces that were consumed,
+    // in the case of an unbounded array.
+    //
+    UInt additionalSpacesNeededForAdjustedElementType = 0;
+    RefPtr<TypeLayout> adjustedElementTypeLayout = maybeAdjustLayoutForArrayElementType(
+        elementTypeLayout,
+        elementCount,
+        additionalSpacesNeededForAdjustedElementType);
+
+    typeLayout->elementTypeLayout = adjustedElementTypeLayout;
+
+    // We will now iterate over the resources consumed by the element
+    // type to compute how they contribute to the resource usage
+    // of the overall array type.
+    //
+    for( auto elementResourceInfo : elementTypeLayout->resourceInfos )
+    {
+        // The uniform case was already handled above
+        if( elementResourceInfo.kind == LayoutResourceKind::Uniform )
+            continue;
+
+        LayoutSize arrayResourceCount = 0;
+
+        // In almost all cases, the resources consumed by an array
+        // will be its element count times the resources consumed
+        // by its element type.
+        //
+        // The first exception to this is arrays of resources when
+        // compiling to GLSL for Vulkan, where an entire array
+        // only consumes a single descriptor-table slot.
+        //
+        if (elementResourceInfo.kind == LayoutResourceKind::DescriptorTableSlot)
+        {
+            arrayResourceCount = elementResourceInfo.count;
+        }
+        // The second exception to this is arrays of an existential type
+        // where the entire array should be specialized to a single concrete type.
+        //
+        else if (elementResourceInfo.kind == LayoutResourceKind::ExistentialTypeParam)
+        {
+            arrayResourceCount = elementResourceInfo.count;
+        }
+        //
+        // The next big exception is when we are forming an unbounded-size
+        // array and the element type got "adjusted," because that means
+        // the array type will need to allocate full spaces for any resource-type
+        // fields in the element type.
+        //
+        // Note: we carefully carve things out so that the case of a simple
+        // array of resources does *not* lead to the element type being adjusted,
+        // so that this logic doesn't trigger and we instead handle it with
+        // the default logic below.
+        //
+        else if(
+            elementCount.isInfinite()
+            && adjustedElementTypeLayout != elementTypeLayout
+            && doesResourceRequireAdjustmentForArrayOfStructs(elementResourceInfo.kind) )
+        {
+            // We want to ignore resource types consumed by the element type
+            // that need adjustement if the array size is infinite, since
+            // we will be allocating whole spaces for that part of the
+            // element's resource usage.
+        }
+        else
+        {
+            arrayResourceCount = elementResourceInfo.count * elementCount;
+        }
+
+        // Now that we've computed how the resource usage of the element type
+        // should contribute to the resource usage of the array, we can
+        // add in that resource usage.
+        //
+        typeLayout->addResourceUsage(
+            elementResourceInfo.kind,
+            arrayResourceCount);
+    }
+
+    // The loop above to compute the resource usage of the array from its
+    // element type ignored any resource-type fields in an unbounded-size
+    // array if they would have been allocated as full register spaces.
+    // Those same fields were counted in `additionalSpacesNeededForAdjustedElementType`,
+    // and need to be added into the total resource usage for the array
+    // if we skipped them as part of the loop (which happens when
+    // we detect that the element type layout had been "adjusted").
+    //
+    if( adjustedElementTypeLayout != elementTypeLayout )
+    {
+        typeLayout->addResourceUsage(LayoutResourceKind::RegisterSpace, additionalSpacesNeededForAdjustedElementType);
+    }
+
+    return TypeLayoutResult(typeLayout, arrayUniformInfo);
+}
+
+
 static TypeLayoutResult _createTypeLayout(
     TypeLayoutContext const&    context,
     Type*                       type)
@@ -3504,159 +3666,7 @@ static TypeLayoutResult _createTypeLayout(
     }
     else if (auto arrayType = as<ArrayExpressionType>(type))
     {
-        auto elementResult = _createTypeLayout(
-            context,
-            arrayType->baseType);
-        auto elementInfo = elementResult.info;
-        auto elementTypeLayout = elementResult.layout;
-
-        // To a first approximation, an array will usually be laid out
-        // by taking the element's type layout and laying out `elementCount`
-        // copies of it. There are of course many details that make
-        // this simplistic version of things not quite work.
-        //
-        // An important complication to deal with is the possibility of
-        // having "unbounded" arrays, which don't specify a size.'
-        // The layout rules for these vary heavily by resource kind and API.
-        //
-
-        auto elementCount = GetElementCount(arrayType->arrayLength);
-
-        //
-        // We can compute the uniform storage layout of an array using
-        // the rules for the target API.
-        //
-        // TODO: ensure that this does something reasonable with the unbounded
-        // case, or else issue an error message that the target doesn't
-        // support unbounded types.
-        //
-        
-        auto arrayUniformInfo = rules->GetArrayLayout(
-            elementInfo,
-            elementCount).getUniformLayout();
-
-        RefPtr<ArrayTypeLayout> typeLayout = new ArrayTypeLayout();
-
-        // Some parts of the array type layout object are easy to fill in:
-        typeLayout->type = type;
-        typeLayout->rules = rules;
-        typeLayout->originalElementTypeLayout = elementTypeLayout;
-        typeLayout->uniformAlignment = arrayUniformInfo.alignment;
-        typeLayout->uniformStride = arrayUniformInfo.elementStride;
-
-        typeLayout->addResourceUsage(LayoutResourceKind::Uniform, arrayUniformInfo.size);
-
-        //
-        // The tricky part in constructing an array type layout comes when
-        // the element type is (or nests) a structure with resource-type
-        // fields, because in that case we need to perform AoS-to-SoA
-        // conversion as part of computing the final type layout, and
-        // we also need to pre-compute an "adjusted" element type
-        // layout that accounts for the striding that happens with
-        // resource-type contents.
-        //
-        // This complication is only made worse when we have to deal with
-        // unbounded-size arrays over such element types, since those
-        // resource-type fields will each end up consuming a full space
-        // in the resulting layout.
-        //
-        // The `maybeAdjustLayoutForArrayElementType` computes an "adjusted"
-        // type layout for the element type which takes the array stride into
-        // account. If it returns the same type layout that was passed in,
-        // then that means no adjustement took place.
-        //
-        // The `additionalSpacesNeededForAdjustedElementType` variable counts
-        // the number of additional register spaces that were consumed,
-        // in the case of an unbounded array.
-        //
-        UInt additionalSpacesNeededForAdjustedElementType = 0;
-        RefPtr<TypeLayout> adjustedElementTypeLayout = maybeAdjustLayoutForArrayElementType(
-            elementTypeLayout,
-            elementCount,
-            additionalSpacesNeededForAdjustedElementType);
-
-        typeLayout->elementTypeLayout = adjustedElementTypeLayout;
-
-        // We will now iterate over the resources consumed by the element
-        // type to compute how they contribute to the resource usage
-        // of the overall array type.
-        //
-        for( auto elementResourceInfo : elementTypeLayout->resourceInfos )
-        {
-            // The uniform case was already handled above
-            if( elementResourceInfo.kind == LayoutResourceKind::Uniform )
-                continue;
-
-            LayoutSize arrayResourceCount = 0;
-
-            // In almost all cases, the resources consumed by an array
-            // will be its element count times the resources consumed
-            // by its element type.
-            //
-            // The first exception to this is arrays of resources when
-            // compiling to GLSL for Vulkan, where an entire array
-            // only consumes a single descriptor-table slot.
-            //
-            if (elementResourceInfo.kind == LayoutResourceKind::DescriptorTableSlot)
-            {
-                arrayResourceCount = elementResourceInfo.count;
-            }
-            // The second exception to this is arrays of an existential type
-            // where the entire array should be specialized to a single concrete type.
-            //
-            else if (elementResourceInfo.kind == LayoutResourceKind::ExistentialTypeParam)
-            {
-                arrayResourceCount = elementResourceInfo.count;
-            }
-            //
-            // The next big exception is when we are forming an unbounded-size
-            // array and the element type got "adjusted," because that means
-            // the array type will need to allocate full spaces for any resource-type
-            // fields in the element type.
-            //
-            // Note: we carefully carve things out so that the case of a simple
-            // array of resources does *not* lead to the element type being adjusted,
-            // so that this logic doesn't trigger and we instead handle it with
-            // the default logic below.
-            //
-            else if(
-                elementCount.isInfinite()
-                && adjustedElementTypeLayout != elementTypeLayout
-                && doesResourceRequireAdjustmentForArrayOfStructs(elementResourceInfo.kind) )
-            {
-                // We want to ignore resource types consumed by the element type
-                // that need adjustement if the array size is infinite, since
-                // we will be allocating whole spaces for that part of the
-                // element's resource usage.
-            }
-            else
-            {
-                arrayResourceCount = elementResourceInfo.count * elementCount;
-            }
-
-            // Now that we've computed how the resource usage of the element type
-            // should contribute to the resource usage of the array, we can
-            // add in that resource usage.
-            //
-            typeLayout->addResourceUsage(
-                elementResourceInfo.kind,
-                arrayResourceCount);
-        }
-
-        // The loop above to compute the resource usage of the array from its
-        // element type ignored any resource-type fields in an unbounded-size
-        // array if they would have been allocated as full register spaces.
-        // Those same fields were counted in `additionalSpacesNeededForAdjustedElementType`,
-        // and need to be added into the total resource usage for the array
-        // if we skipped them as part of the loop (which happens when
-        // we detect that the element type layout had been "adjusted").
-        //
-        if( adjustedElementTypeLayout != elementTypeLayout )
-        {
-            typeLayout->addResourceUsage(LayoutResourceKind::RegisterSpace, additionalSpacesNeededForAdjustedElementType);
-        }
-
-        return TypeLayoutResult(typeLayout, arrayUniformInfo);
+        return createArrayTypeLayout(context, arrayType);
     }
     else if (auto declRefType = as<DeclRefType>(type))
     {
