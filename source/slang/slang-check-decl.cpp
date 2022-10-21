@@ -5483,8 +5483,11 @@ namespace Slang
         // in which case we will set it to the expected
         // type automatically.
         //
-        auto differentialParentType = m_astBuilder->getInOutType(_getDifferential(
-            m_astBuilder, calcThisType(DeclRef<Decl>(decl->parentDecl->parentDecl, nullptr))));
+        auto differentialParentType = _getDifferential(
+            m_astBuilder, calcThisType(DeclRef<Decl>(decl->parentDecl->parentDecl, nullptr)));
+
+        if (!differentialValueParam->hasModifier<InOutModifier>())
+            addModifier(differentialValueParam, m_astBuilder->create<InOutModifier>());
 
         if (!differentialValueParam->type.exp)
         {

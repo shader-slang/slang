@@ -831,7 +831,7 @@ namespace Slang
             // 
             if (parentType->declRef.as<AggTypeDeclBase>() &&
                 !parentType->declRef.as<InterfaceDecl>() &&
-                !declRefExpr->declRef.as<CallableDecl>())
+                declRefExpr->declRef.as<VarDeclBase>())
             {   
                 // Check if the parent container type is differentiable.
                 if (auto parentDiffWitness = as<SubtypeWitness>(

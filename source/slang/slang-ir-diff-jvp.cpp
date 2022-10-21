@@ -144,6 +144,15 @@ struct DifferentiableTypeConformanceContext
     // 
     IRInst* getDifferentialForType(IRBuilder* builder, IRType* origType)
     {
+        switch (origType->getOp())
+        {
+        case kIROp_VoidType:
+        case kIROp_FloatType:
+        case kIROp_HalfType:
+        case kIROp_DoubleType:
+        case kIROp_VectorType:
+            return origType;
+        }
         return lookUpInterfaceMethod(builder, origType, differentialAssocTypeStructKey);
     }
 
@@ -1083,8 +1092,7 @@ struct JVPTranscriber
     // in the current transcription context.
     // 
     InstPair transcribeCall(IRBuilder* builder, IRCall* origCall)
-    {   
-
+    {
         if (as<IRFunc>(origCall->getCallee()))
         {
             auto origCallee = origCall->getCallee();
@@ -1102,13 +1110,18 @@ struct JVPTranscriber
                 diffCallee = accessorDecor->getJVPFunc();
                 isAccessor = true;
             }
-            else
+            else if (primalCallee->findDecoration<IRJVPDerivativeMarkerDecoration>())
             {
-                // TODO: If inner is not differentiable, treat as non-differentiable call.
                 // Build the differential callee
                 diffCallee = builder->emitJVPDifferentiateInst(
                     differentiateFunctionType(builder, as<IRFuncType>(primalCallee->getFullType())),
                     primalCallee);
+            }
+            else
+            {
+                // The callee is non differentiable.
+                IRInst* primalCall = cloneInst(&cloneEnv, builder, origCall);
+                return InstPair(primalCall, nullptr);
             }
 
             List<IRInst*> args;
@@ -1165,7 +1178,8 @@ struct JVPTranscriber
             IRInst* diffResultValue = nullptr;
             if (isAccessor)
             {
-                primalResultValue = origCall;
+                IRInst* primalCall = cloneInst(&cloneEnv, builder, origCall);
+                primalResultValue = primalCall;
                 diffResultValue = callInst;
             }
             else
@@ -2128,8 +2142,9 @@ struct JVPDerivativeContext
         {
             auto nextChild = child->getNextInst();
             
-            if (child->getOp() == kIROp_DifferentiableTypeDictionary)
+            switch (child->getOp())
             {
+            case kIROp_DifferentiableTypeDictionary:
                 child->removeAndDeallocate();
                 child = nextChild;
                 modified = true;
@@ -2261,6 +2276,30 @@ bool processJVPDerivativeMarkers(
     JVPDerivativeContext context(module, sink);
 
     return context.processModule();
+}
+
+void stripAutoDiffDecorations(IRModule* module)
+{
+    for (auto inst : module->getGlobalInsts())
+    {
+        if (auto func = as<IRGlobalValueWithCode>(inst))
+        {
+            for (auto decor = func->getFirstDecoration(); decor; )
+            {
+                auto next = decor->getNextDecoration();
+                switch (decor->getOp())
+                {
+                case kIROp_JVPDerivativeAccessorReferenceDecoration:
+                case kIROp_JVPDerivativeReferenceDecoration:
+                    decor->removeAndDeallocate();
+                    break;
+                default:
+                    break;
+                }
+                decor = next;
+            }
+        }
+    }
 }
 
 }

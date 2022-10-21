@@ -13,13 +13,21 @@ struct A : IDifferentiable
 {
     typedef B Differential;
     
-    float x;
-    float y;
+    float _x;
+    float _y;
 
-    [__unsafeForceInlineEarly]
-    static Ptr<float.Differential> __getDifferentialFor_x(inout Differential b)
+    property float x
     {
-        return &(b.z);
+        get { return _x; }
+        set { _x = newValue; }
+        dget { return differential.z; }
+        dset { differential.z = newValue; }
+    }
+
+    property float y
+    {
+        get { return _y; }
+        set { _y = newValue; }
     }
 
     [__unsafeForceInlineEarly]

@@ -7783,6 +7783,16 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             getBuilder()->addJVPDerivativeMarkerDecoration(irFunc);
         }
 
+        // Always force inline diff setter accessor to prevent downstream compiler from complaining
+        // fields are not fully initialized for the first `inout` parameter.
+        if (as<DiffSetterDecl>(decl) || as<SetterDecl>(decl))
+        {
+            if (!decl->findModifier<ForceInlineAttribute>())
+            {
+                getBuilder()->addForceInlineDecoration(irFunc);
+            }
+        }
+
         FuncDeclBaseTypeInfo info;
         _lowerFuncDeclBaseTypeInfo(
             subContext,
