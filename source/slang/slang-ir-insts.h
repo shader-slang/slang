@@ -557,15 +557,15 @@ struct IRJVPDerivativeReferenceDecoration : IRDecoration
     IRInst* getJVPFunc() { return getOperand(0); }
 };
 
-struct IRDifferentialGetterDecoration : IRDecoration
+struct IRJVPDerivativeAccessorReferenceDecoration : IRDecoration
 {
     enum
     {
-        kOp = kIROp_DifferentialGetterDecoration
+        kOp = kIROp_JVPDerivativeAccessorReferenceDecoration
     };
-    IR_LEAF_ISA(DifferentialGetterDecoration)
+    IR_LEAF_ISA(JVPDerivativeAccessorReferenceDecoration)
 
-    IRInst* getGetterFunc() { return getOperand(0); }
+        IRInst* getJVPFunc() { return getOperand(0); }
 };
 
 // An instruction that replaces the function symbol
@@ -3200,11 +3200,6 @@ public:
     void addJVPDerivativeReferenceDecoration(IRInst* value, IRInst* jvpFn)
     {
         addDecoration(value, kIROp_JVPDerivativeReferenceDecoration, jvpFn);
-    }
-
-    void addDifferentialGetterDecoration(IRInst* value, IRInst* getterFn)
-    {
-        addDecoration(value, kIROp_DifferentialGetterDecoration, getterFn);
     }
 
     void addCOMWitnessDecoration(IRInst* value, IRInst* witnessTable)

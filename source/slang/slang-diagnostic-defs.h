@@ -398,6 +398,14 @@ DIAGNOSTIC(31101, Error, nonSetAccessorMustNotHaveParams, "accessors other than 
 DIAGNOSTIC(31102, Error, setAccessorMayNotHaveMoreThanOneParam, "a 'set' accessor may not have more than one parameter")
 DIAGNOSTIC(31102, Error, setAccessorParamWrongType, "'set' parameter '$0' has type '$1' which does not match the expected type '$2'")
 
+DIAGNOSTIC(31110, Error, accessToRawMemberInDifferentialFuncIsNotAllowed, "access to raw data member '$0' from a differentiable function is not allowed.")
+DIAGNOSTIC(31111, Error, dgetAccessorMayNotHaveMoreThanOneParam, "a 'dget' accessor may not have more than one parameter")
+DIAGNOSTIC(31102, Error, dgetAccessorParamWrongType, "'dget' parameter '$0' has type '$1' which does not match the expected type '$2'")
+DIAGNOSTIC(31111, Error, dsetAccessorMayNotHaveMoreThanTwoParams, "a 'dset' accessor may not have more than two parameters")
+DIAGNOSTIC(31112, Error, dsetAccessorWrongNumberOfParams, "a 'dset' accessor must have two parameters")
+DIAGNOSTIC(31113, Error, dsetAccessorParamWrongType, "'dset' parameter '$0' has type '$1' which does not match the expected type '$2'")
+
+
 // 39999 waiting to be placed in the right range
 
 DIAGNOSTIC(39999, Error, expectedIntegerConstantWrongType, "expected integer constant (found: '$0')")

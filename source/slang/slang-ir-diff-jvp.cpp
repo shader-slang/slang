@@ -115,7 +115,7 @@ struct DifferentiableTypeConformanceContext
 
     IRInst* lookUpInterfaceMethod(IRBuilder* builder, IRType* origType, IRStructKey* key)
     {
-         if (auto conformance = lookUpConformanceForType(builder, origType))
+        if (auto conformance = lookUpConformanceForType(builder, origType))
         {
             if (auto witnessTable = as<IRWitnessTable>(conformance))
             {
@@ -1094,12 +1094,23 @@ struct JVPTranscriber
             //
             auto primalCallee = origCallee;
 
-            // TODO: If inner is not differentiable, treat as non-differentiable call.
-            // Build the differential callee
-            IRInst* diffCall = builder->emitJVPDifferentiateInst(
-                differentiateFunctionType(builder, as<IRFuncType>(primalCallee->getFullType())),
-                primalCallee);
-            
+            IRInst* diffCallee = nullptr;
+            bool isAccessor = false;
+
+            if (auto accessorDecor = primalCallee->findDecoration<IRJVPDerivativeAccessorReferenceDecoration>())
+            {
+                diffCallee = accessorDecor->getJVPFunc();
+                isAccessor = true;
+            }
+            else
+            {
+                // TODO: If inner is not differentiable, treat as non-differentiable call.
+                // Build the differential callee
+                diffCallee = builder->emitJVPDifferentiateInst(
+                    differentiateFunctionType(builder, as<IRFuncType>(primalCallee->getFullType())),
+                    primalCallee);
+            }
+
             List<IRInst*> args;
             // Go over the parameter list and create pairs for each input (if required)
             for (UIndex ii = 0; ii < origCall->getArgCount(); ii++)
@@ -1119,9 +1130,17 @@ struct JVPTranscriber
                     // If a pair type can be formed, this must be non-null.
                     SLANG_RELEASE_ASSERT(diffArg);
 
-                    auto diffPair = builder->emitMakeDifferentialPair(pairType, primalArg, diffArg);
-
-                    args.add(diffPair);
+                    if (isAccessor)
+                    {
+                        // `dget` `dset` accessors takes in only diff values as parameter, so don't wrap them in
+                        // a DifferentialPair.
+                        args.add(diffArg);
+                    }
+                    else
+                    {
+                        auto diffPair = builder->emitMakeDifferentialPair(pairType, primalArg, diffArg);
+                        args.add(diffPair);
+                    }
                 }
                 else
                 {
@@ -1130,17 +1149,32 @@ struct JVPTranscriber
                 }
             }
             
-            auto diffReturnType = tryGetDiffPairType(builder, origCall->getFullType());
+            IRType* diffReturnType = nullptr;
+            if (isAccessor)
+                diffReturnType = as<IRFunc>(diffCallee)->getResultType();
+            else
+                diffReturnType = tryGetDiffPairType(builder, origCall->getFullType());
             SLANG_ASSERT(diffReturnType);
 
             auto callInst = builder->emitCallInst(
                 diffReturnType,
-                diffCall,
+                diffCallee,
                 args);
+
+            IRInst* primalResultValue = nullptr;
+            IRInst* diffResultValue = nullptr;
+            if (isAccessor)
+            {
+                primalResultValue = origCall;
+                diffResultValue = callInst;
+            }
+            else
+            {
+                primalResultValue = pairBuilder->emitPrimalFieldAccess(builder, callInst);
+                diffResultValue = pairBuilder->emitDiffFieldAccess(builder, callInst);
+            }
             
-            return InstPair(
-                pairBuilder->emitPrimalFieldAccess(builder, callInst),
-                pairBuilder->emitDiffFieldAccess(builder, callInst));
+            return InstPair(primalResultValue, diffResultValue);
         }
         else if(as<IRSpecialize>(origCall->getCallee()) ||
                 as<IRLookupWitnessMethod>(origCall->getCallee()))
@@ -1395,89 +1429,6 @@ struct JVPTranscriber
 
         return InstPair(diffBlock, diffBlock);
     }
-
-    InstPair transcribeFieldExtract(IRBuilder* builder, IRFieldExtract* origExtract)
-    {
-        IRInst* origBase = origExtract->getBase();
-        auto primalBase = findOrTranscribePrimalInst(builder, origBase);
-        auto diffBase = findOrTranscribeDiffInst(builder, origBase);
-
-        auto primalExtractType = (IRType*)lookupPrimalInst(origExtract->getDataType(), origExtract->getDataType());
- 
-        IRInst* primalExtract = builder->emitFieldExtract(primalExtractType, primalBase, origExtract->getField());
-        IRInst* diffExtract = nullptr;
-
-        if (auto diffExtractType = differentiateType(builder, primalExtractType))
-        {
-            // Check if we have a getter.
-            if (auto getterDecoration = origExtract->findDecoration<IRDifferentialGetterDecoration>())
-            {
-
-                IRInst* getterFunc = getterDecoration->getGetterFunc();
-                
-                // Must be a method with a single parameter.
-                SLANG_ASSERT(as<IRFuncType>(getterFunc->getDataType())->getParamCount() == 1);
-
-                // Our getter func accepts a _pointer_ to the target type
-                // So we have to create a variable and store our type into memory 
-                // here. This will eventually get optimized out in later passes.
-                // 
-                auto diffTempVar = builder->emitVar(
-                    diffBase->getDataType());
-                
-                builder->emitStore(diffTempVar, diffBase);
-                
-                List<IRInst*> args;
-                args.add(diffTempVar);
-
-                // Emit a call to the getter. The getter will return a reference type.
-                // We need to load from this to go to a non-ptr 'solid' type.
-                //
-                auto diffGetterCall = builder->emitCallInst(
-                    as<IRFuncType>(getterFunc->getDataType())->getResultType(),
-                    getterFunc,
-                    args);
-                
-                diffExtract = builder->emitLoad(diffGetterCall);
-            }
-        }
-
-        return InstPair(primalExtract, diffExtract);
-    }
-
-    InstPair transcribeFieldAddress(IRBuilder* builder, IRFieldAddress* origAddress)
-    {
-        IRInst* origBase = origAddress->getBase();
-        auto primalBase = findOrTranscribePrimalInst(builder, origBase);
-        auto diffBase = findOrTranscribeDiffInst(builder, origBase);
-
-        auto primalAddressType = (IRType*)lookupPrimalInst(origAddress->getDataType(), origAddress->getDataType());
-
-        IRInst* primalAddress = builder->emitFieldAddress(primalAddressType, primalBase, origAddress->getField());
-        IRInst* diffAddress = nullptr;
-
-        if (auto diffAddressType = differentiateType(builder, primalAddressType))
-        {
-            // If we have a getter associated with this field, we want to use that.   
-            if (auto getterDecoration = origAddress->findDecoration<IRDifferentialGetterDecoration>())
-            {
-                auto getterFunc = getterDecoration->getGetterFunc();
-
-                // Add the base differential inst as the argument.
-                List<IRInst*> args;
-                args.add(diffBase);
-
-                diffAddress = builder->emitCallInst(
-                    as<IRFuncType>(getterFunc->getDataType())->getResultType(),
-                    getterFunc,
-                    args);
-            }
-                
-        }
-
-        return InstPair(primalAddress, diffAddress);
-    }
-
     
     InstPair transcribeGetElement(IRBuilder* builder, IRInst* origGetElementPtr)
     {
@@ -1789,16 +1740,17 @@ struct JVPTranscriber
             getSink()->diagnose(origInst->sourceLoc,
                     Diagnostics::unexpected,
                     "should not be attempting to differentiate anything specialized here.");
+            return InstPair(nullptr, nullptr);
 
         case kIROp_lookup_interface_method:
             return transcibeLookupInterfaceMethod(builder, as<IRLookupWitnessMethod>(origInst));
 
         case kIROp_FieldExtract:
-            return transcribeFieldExtract(builder, as<IRFieldExtract>(origInst));
-        
         case kIROp_FieldAddress:
-            return transcribeFieldAddress(builder, as<IRFieldAddress>(origInst));
-        
+            getSink()->diagnose(origInst->sourceLoc,
+                Diagnostics::unexpected,
+                "should not be attempting to differentiate field extract/field address.");
+            return InstPair(nullptr, nullptr);
         case kIROp_getElement:
         case kIROp_getElementPtr:
             return transcribeGetElement(builder, origInst);
@@ -1954,7 +1906,8 @@ struct JVPDerivativeContext
     {
         if(auto jvpDefinition = primalFunction->findDecoration<IRJVPDerivativeReferenceDecoration>())
             return jvpDefinition->getJVPFunc();
-        
+        if (auto jvpGetter = primalFunction->findDecoration<IRJVPDerivativeAccessorReferenceDecoration>())
+            return jvpGetter->getJVPFunc();
         return nullptr;
     }
 
@@ -2181,11 +2134,6 @@ struct JVPDerivativeContext
                 child = nextChild;
                 modified = true;
                 continue;
-            }
-
-            if (auto getterDecoration = child->findDecoration<IRDifferentialGetterDecoration>())
-            {
-                getterDecoration->removeAndDeallocate();
             }
 
             if (child->getFirstChild() != nullptr)

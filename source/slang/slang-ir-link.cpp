@@ -449,6 +449,7 @@ static void cloneExtraDecorations(
             case kIROp_PublicDecoration:
             case kIROp_SequentialIDDecoration:
             case kIROp_JVPDerivativeReferenceDecoration:
+            case kIROp_JVPDerivativeAccessorReferenceDecoration:
                 if(!clonedInst->findDecorationImpl(decoration->getOp()))
                 {
                     cloneInst(context, builder, decoration);

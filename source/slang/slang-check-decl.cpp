@@ -78,6 +78,8 @@ namespace Slang
 
         void checkCallableDeclCommon(CallableDecl* decl);
 
+        void maybeCheckDifferentiableAccessorSignature(FuncDecl* funcDecl);
+
         void visitFuncDecl(FuncDecl* funcDecl);
 
         void visitParamDecl(ParamDecl* paramDecl);
@@ -104,6 +106,8 @@ namespace Slang
 
         void visitAccessorDecl(AccessorDecl* decl);
         void visitSetterDecl(SetterDecl* decl);
+        void visitDiffGetterDecl(DiffGetterDecl* decl);
+        void visitDiffSetterDecl(DiffSetterDecl* decl);
     };
 
     struct SemanticsDeclRedeclarationVisitor
@@ -221,6 +225,10 @@ namespace Slang
         if(as<AggTypeDecl>(decl))
             return true;
         if(as<SimpleTypeDecl>(decl))
+            return true;
+        if (as<DiffGetterDecl>(decl))
+            return true;
+        if (as<DiffSetterDecl>(decl))
             return true;
 
         // Initializer/constructor declarations are effectively `static`
@@ -5330,6 +5338,211 @@ namespace Slang
             else
             {
                 getSink()->diagnose(newValueParam, Diagnostics::setAccessorParamWrongType, newValueParam, actualType, newValueType);
+            }
+        }
+    }
+
+    void SemanticsDeclHeaderVisitor::visitDiffGetterDecl(DiffGetterDecl* decl)
+    {
+        _visitAccessorDeclCommon(decl);
+
+        if (!decl->parentDecl)
+            return;
+
+        // DiffGetter accessor will have one parameter representing the differential.
+        //
+        auto params = decl->getParameters();
+        ParamDecl* differentialValueParam = nullptr;
+        if (params.getCount() >= 1)
+        {
+            // If the user declared an explicit parameter
+            // then that is the one that will represent
+            // the new value.
+            //
+            differentialValueParam = params.getFirst();
+
+            if (params.getCount() > 1)
+            {
+                // If the user declared more than one explicit
+                // parameter, then that is an error.
+                //
+                getSink()->diagnose(params[1], Diagnostics::dgetAccessorMayNotHaveMoreThanOneParam);
+            }
+        }
+        else
+        {
+            // If the user didn't declare any explicit parameters,
+            // then we create an implicit one and add it into
+            // the AST.
+            //
+            differentialValueParam = m_astBuilder->create<ParamDecl>();
+            differentialValueParam->nameAndLoc.name = getName("differential");
+            differentialValueParam->nameAndLoc.loc = decl->loc;
+
+            differentialValueParam->parentDecl = decl;
+            decl->members.add(differentialValueParam);
+        }
+
+        // The return type of the accessor should be the Differential type of the original property type.
+        decl->returnType.type = _getDifferential(m_astBuilder, _getAccessorStorageType(decl));
+
+        // It is allowed and encouraged for the programmer
+        // to leave off the type on the differential parameter,
+        // in which case we will set it to the expected
+        // type automatically.
+        //
+        auto differentialParentType = _getDifferential(m_astBuilder, calcThisType(DeclRef<Decl>(decl->parentDecl->parentDecl, nullptr)));
+
+        if (!differentialValueParam->type.exp)
+        {
+            differentialValueParam->type.type = differentialParentType;
+        }
+        else
+        {
+            // If the user *did* give the new-value parameter
+            // an explicit type, then we need to check it
+            // and then enforce that it matches what we expect.
+            //
+            auto actualType = CheckProperType(differentialValueParam->type);
+
+            if (as<ErrorType>(actualType))
+            {
+            }
+            else if (actualType->equals(differentialParentType))
+            {
+            }
+            else
+            {
+                getSink()->diagnose(
+                    differentialValueParam,
+                    Diagnostics::setAccessorParamWrongType,
+                    differentialValueParam,
+                    actualType,
+                    differentialParentType);
+            }
+        }
+    }
+
+    void SemanticsDeclHeaderVisitor::visitDiffSetterDecl(DiffSetterDecl* decl)
+    {
+        _visitAccessorDeclCommon(decl);
+
+        if (!decl->parentDecl)
+            return;
+
+        // DiffGetter accessor will have one parameter representing the differential.
+        //
+        auto params = decl->getParameters();
+        ParamDecl* differentialValueParam = nullptr;
+        ParamDecl* differentialNewValueParam = nullptr;
+
+        if (params.getCount() >= 2)
+        {
+            // If the user declared an explicit parameter
+            // then that is the one that will represent
+            // the new value.
+            //
+            differentialValueParam = params.getFirst();
+
+            if (params.getCount() > 2)
+            {
+                // If the user declared more than one explicit
+                // parameter, then that is an error.
+                //
+                getSink()->diagnose(params[2], Diagnostics::dsetAccessorMayNotHaveMoreThanTwoParams);
+            }
+        }
+        else if (params.getCount() == 0)
+        {
+            // If the user didn't declare any explicit parameters,
+            // then we create an implicit one and add it into
+            // the AST.
+            //
+            differentialValueParam = m_astBuilder->create<ParamDecl>();
+            differentialValueParam->nameAndLoc.name = getName("differential");
+            differentialValueParam->nameAndLoc.loc = decl->loc;
+            differentialValueParam->parentDecl = decl;
+            decl->members.add(differentialValueParam);
+
+            differentialNewValueParam = m_astBuilder->create<ParamDecl>();
+            differentialNewValueParam->nameAndLoc.name = getName("newValue");
+            differentialNewValueParam->nameAndLoc.loc = decl->loc;
+            differentialNewValueParam->parentDecl = decl;
+            decl->members.add(differentialNewValueParam);
+        }
+        else
+        {
+            getSink()->diagnose(params[0], Diagnostics::dsetAccessorWrongNumberOfParams);
+        }
+
+        // The return type of the dset should be void.
+        decl->returnType.type = m_astBuilder->getVoidType();;
+
+        // It is allowed and encouraged for the programmer
+        // to leave off the type on the differential parameter,
+        // in which case we will set it to the expected
+        // type automatically.
+        //
+        auto differentialParentType = m_astBuilder->getInOutType(_getDifferential(
+            m_astBuilder, calcThisType(DeclRef<Decl>(decl->parentDecl->parentDecl, nullptr))));
+
+        if (!differentialValueParam->type.exp)
+        {
+            differentialValueParam->type.type = differentialParentType;
+        }
+        else
+        {
+            // If the user *did* give the differential parameter
+            // an explicit type, then we need to check it
+            // and then enforce that it matches what we expect.
+            //
+            auto actualType = CheckProperType(differentialValueParam->type);
+
+            if (as<ErrorType>(actualType))
+            {
+            }
+            else if (actualType->equals(differentialParentType))
+            {
+            }
+            else
+            {
+                getSink()->diagnose(
+                    differentialValueParam,
+                    Diagnostics::dsetAccessorParamWrongType,
+                    differentialValueParam,
+                    actualType,
+                    differentialParentType);
+            }
+        }
+
+        auto differentialMemberType = _getDifferential(m_astBuilder, _getAccessorStorageType(decl));
+
+        if (!differentialNewValueParam->type.exp)
+        {
+            differentialNewValueParam->type.type = differentialMemberType;
+        }
+        else
+        {
+            // If the user *did* give the new-value parameter
+            // an explicit type, then we need to check it
+            // and then enforce that it matches what we expect.
+            //
+            auto actualType = CheckProperType(differentialNewValueParam->type);
+
+            if (as<ErrorType>(actualType))
+            {
+            }
+            else if (actualType->equals(differentialMemberType))
+            {
+            }
+            else
+            {
+                getSink()->diagnose(
+                    differentialNewValueParam,
+                    Diagnostics::dsetAccessorParamWrongType,
+                    differentialNewValueParam,
+                    actualType,
+                    differentialMemberType);
             }
         }
     }

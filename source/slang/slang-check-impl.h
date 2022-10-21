@@ -822,7 +822,7 @@ namespace Slang
         // Check if a term is referencing a member, and add a decoration to it's
         // differential getter function, if one exists.
         //
-        Expr* maybeMakeDifferentialExpr(Expr* checkedTerm);
+        void checkForInvalidMemberAccessInDifferentiableFunc(Expr* checkedTerm);
 
         // Construct the differential for 'type', if it exists.
         Type* _getDifferential(ASTBuilder* builder, Type* type);
@@ -1923,8 +1923,6 @@ namespace Slang
         Expr* visitInvokeExpr(InvokeExpr *expr);
 
         Expr* visitVarExpr(VarExpr *expr);
-
-        Expr* visitDifferentiableDeclRefExpr(DifferentiableDeclRefExpr *expr);
 
         Expr* visitTypeCastExpr(TypeCastExpr * expr);
 

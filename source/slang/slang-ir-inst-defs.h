@@ -707,8 +707,8 @@ INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
     INST(JVPDerivativeReferenceDecoration, jvpFnReference, 1, 0)
 
         /// Used by the auto-diff pass to hold a reference to a
-        /// differential getter associated with this expression.
-    INST(DifferentialGetterDecoration, diffGetter, 1, 0)
+        /// differential getter/setter associated with a function lowered from a property getter/setter.
+    INST(JVPDerivativeAccessorReferenceDecoration, diffGetterAccessor, 1, 0)
 
         /// Marks a class type as a COM interface implementation, which enables
         /// the witness table to be easily picked up by emit.

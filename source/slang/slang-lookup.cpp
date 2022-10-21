@@ -942,7 +942,7 @@ static void _lookUpInScopes(
                 // The implicit `this`/`This` for a function-like declaration
                 // depends on modifiers attached to the declaration.
                 //
-                if (funcDeclRef.getDecl()->hasModifier<HLSLStaticModifier>())
+                if (isEffectivelyStatic(funcDeclRef.getDecl()))
                 {
                     // A `static` method only has access to an implicit `This`,
                     // and does not have a `this` expression available.

@@ -951,6 +951,12 @@ class SpecializeAttribute : public Attribute
     SLANG_AST_CLASS(SpecializeAttribute)
 };
 
+    /// An attribute that marks a type, function or variable as differentiable.
+class DifferentiableAttribute : public Attribute
+{
+    SLANG_AST_CLASS(DifferentiableAttribute)
+};
+
 class DllImportAttribute : public Attribute
 {
     SLANG_AST_CLASS(DllImportAttribute)

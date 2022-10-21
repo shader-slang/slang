@@ -3038,38 +3038,6 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
         return info;
     }
 
-    LoweredValInfo visitDifferentiableDeclRefExpr(DifferentiableDeclRefExpr* expr)
-    {
-        LoweredValInfo info = lowerSubExpr(expr->inner);
-
-        IRInst* irBaseVal = nullptr;
-        switch (info.flavor)
-        {
-        case LoweredValInfo::Flavor::Simple:
-            irBaseVal = getSimpleVal(context, info);
-            break;
-
-        case LoweredValInfo::Flavor::Ptr:
-            irBaseVal = info.val;
-            break;
-
-        default:
-            SLANG_UNEXPECTED("Unhandled lowered value cases");
-        }
-
-        // If the differentiable expr has an associated getter or setter, lower it
-        // and put it in a decoration.
-        // 
-        if (expr->getterExpr != nullptr)
-        {
-            auto irGetter = lowerSubExpr(expr->getterExpr);
-            SLANG_ASSERT(irGetter.flavor == LoweredValInfo::Flavor::Simple);
-            getBuilder()->addDifferentialGetterDecoration(irBaseVal, irGetter.val);
-        }
-
-        return info;
-    }
-
     // Emit IR to denote the forward-mode derivative
     // of the inner func-expr. This will be resolved 
     // to a concrete function during the derivative 
@@ -8207,6 +8175,28 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             getBuilder()->addDecoration(irFunc, kIROp_JVPDerivativeReferenceDecoration, jvpFunc);
         }
 
+        if (as<DiffSetterDecl>(decl))
+        {
+            // Add a manual differential decoration for `dset` function.
+            auto setters = decl->parentDecl->getMembersOfType<SetterDecl>();
+            if (setters.getCount() == 1)
+            {
+                auto primalSetter = setters.getFirst();
+                auto primalSetterFunc = ensureDecl(this->context, primalSetter);
+                getBuilder()->addDecoration(primalSetterFunc.val, kIROp_JVPDerivativeAccessorReferenceDecoration, irFunc);
+            }
+        }
+        if (as<DiffGetterDecl>(decl))
+        {
+            // Add a manual differential decoration for `dget` function.
+            auto getters = decl->parentDecl->getMembersOfType<GetterDecl>();
+            if (getters.getCount() == 1)
+            {
+                auto primalGetter = getters.getFirst();
+                auto primalGetterFunc = ensureDecl(this->context, primalGetter);
+                getBuilder()->addDecoration(primalGetterFunc.val, kIROp_JVPDerivativeAccessorReferenceDecoration, irFunc);
+            }
+        }
         // For convenience, ensure that any additional global
         // values that were emitted while outputting the function
         // body appear before the function itself in the list
