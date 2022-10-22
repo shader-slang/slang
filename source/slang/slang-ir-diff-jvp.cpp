@@ -146,7 +146,6 @@ struct DifferentiableTypeConformanceContext
     {
         switch (origType->getOp())
         {
-        case kIROp_VoidType:
         case kIROp_FloatType:
         case kIROp_HalfType:
         case kIROp_DoubleType:
@@ -1110,16 +1109,22 @@ struct JVPTranscriber
                 diffCallee = accessorDecor->getJVPFunc();
                 isAccessor = true;
             }
+            else if (auto derivativeReferenceDecor = primalCallee->findDecoration<IRJVPDerivativeReferenceDecoration>())
+            {
+                // If the user has already provided an differentiated implementation, use that.
+                diffCallee = derivativeReferenceDecor->getJVPFunc();
+            }
             else if (primalCallee->findDecoration<IRJVPDerivativeMarkerDecoration>())
             {
-                // Build the differential callee
+                // If the function is marked for auto-diff, push a `differentiate` inst for a follow up pass
+                // to generate the implementation.
                 diffCallee = builder->emitJVPDifferentiateInst(
                     differentiateFunctionType(builder, as<IRFuncType>(primalCallee->getFullType())),
                     primalCallee);
             }
             else
             {
-                // The callee is non differentiable.
+                // The callee is non differentiable, just return primal value with null diff value.
                 IRInst* primalCall = cloneInst(&cloneEnv, builder, origCall);
                 return InstPair(primalCall, nullptr);
             }
