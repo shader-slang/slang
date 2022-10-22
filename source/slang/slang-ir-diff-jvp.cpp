@@ -1133,27 +1133,24 @@ struct JVPTranscriber
                 SLANG_ASSERT(primalArg);
 
                 auto primalType = primalArg->getDataType();
-                if (auto pairType = tryGetDiffPairType(builder, primalType))
-                {
-                    auto diffArg = findOrTranscribeDiffInst(builder, origArg);
+                auto diffArg = findOrTranscribeDiffInst(builder, origArg);
 
-                    if (!diffArg)
-                        diffArg = getDifferentialZeroOfType(builder, primalType);
-                    
+                if (!diffArg)
+                    diffArg = getDifferentialZeroOfType(builder, primalType);
+
+                // `dget` `dset` accessors takes in only diff values as parameter, so don't wrap them in
+                // a DifferentialPair.
+                if (isAccessor)
+                {
+                    SLANG_RELEASE_ASSERT(diffArg);
+                    args.add(diffArg);
+                }
+                else if (auto pairType = tryGetDiffPairType(builder, primalType))
+                {
                     // If a pair type can be formed, this must be non-null.
                     SLANG_RELEASE_ASSERT(diffArg);
-
-                    if (isAccessor)
-                    {
-                        // `dget` `dset` accessors takes in only diff values as parameter, so don't wrap them in
-                        // a DifferentialPair.
-                        args.add(diffArg);
-                    }
-                    else
-                    {
-                        auto diffPair = builder->emitMakeDifferentialPair(pairType, primalArg, diffArg);
-                        args.add(diffPair);
-                    }
+                    auto diffPair = builder->emitMakeDifferentialPair(pairType, primalArg, diffArg);
+                    args.add(diffPair);
                 }
                 else
                 {

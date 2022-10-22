@@ -23,6 +23,7 @@
 #include "slang-ir-glsl-legalize.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-inline.h"
+#include "slang-ir-legalize-array-return-type.h"
 #include "slang-ir-legalize-varying-params.h"
 #include "slang-ir-link.h"
 #include "slang-ir-com-interface.h"
@@ -666,6 +667,8 @@ Result linkAndOptimizeIR(
     default:
         break;
     }
+
+    legalizeArrayReturnType(irModule);
 
     // For GLSL only, we will need to perform "legalization" of
     // the entry point and any entry-point parameters.

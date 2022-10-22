@@ -14,19 +14,23 @@ struct A : IDifferentiable
 {
     typedef B Differential;
     
-    float3 x;
-    float y[10];
+    float3 _x;
+    float _y[10];
 
-    [__unsafeForceInlineEarly]
-    static Ptr<float3.Differential> __getDifferentialFor_x(inout Differential b)
+    property float3 x
     {
-        return &(b.z);
+        get { return _x; }
+        set { _x = newValue; }
+        dget { return differential.z; }
+        dset { differential.z = newValue; }
     }
 
-    [__unsafeForceInlineEarly]
-    static Ptr<float.Differential[10]> __getDifferentialFor_y(inout Differential b)
+    property float[10] y
     {
-        return &(b.k);
+        get { return _y; }
+        set { _y = newValue; }
+        dget { return differential.k; }
+        dset { for (int i = 0; i < 10; i++) differential.k[i] = newValue[i]; }
     }
 
     [__unsafeForceInlineEarly]
@@ -57,8 +61,10 @@ __differentiate_jvp A f(A a)
 {
     A aout;
 
-    aout.y[5] = (2 * a.x).y;
-    aout.y[2] = (3 * a.y[4]);
+    var tmp = aout.y;
+    tmp[5] = (2 * a.x).y;
+    tmp[2] = (3 * a.y[4]);
+    aout.y = tmp;
     aout.x = float3(5 * a.x.z, 3 * a.x.y, 0.5 * a.x.x);
 
     return aout;
