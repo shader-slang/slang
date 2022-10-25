@@ -18,4 +18,5 @@ namespace Slang
         DiagnosticSink*                     sink,
         IRJVPDerivativePassOptions const&   options = IRJVPDerivativePassOptions());
 
+    void stripAutoDiffDecorations(IRModule* module);
 }
