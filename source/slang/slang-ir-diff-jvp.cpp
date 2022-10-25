@@ -2036,6 +2036,12 @@ struct JVPDerivativeContext
         {
             builder->setInsertBefore(pairType);
 
+            if (!as<IRType>(pairType->getValueType()))
+            {
+                // Do not handle non-concrete types.
+                return nullptr;
+            }
+
             auto diffPairStructType = (&pairBuilderStorage)->getOrCreateDiffPairType(
                 builder,
                 pairType->getValueType());
@@ -2064,19 +2070,20 @@ struct JVPDerivativeContext
         
         if (auto makePairInst = as<IRMakeDifferentialPair>(inst))
         {
-            auto diffPairStructType = lowerPairType(builder, makePairInst->getDataType(), diffContext);
-            
-            builder->setInsertBefore(makePairInst);
-            
-            List<IRInst*> operands;
-            operands.add(makePairInst->getPrimalValue());
-            operands.add(makePairInst->getDifferentialValue());
+            if (auto diffPairStructType = lowerPairType(builder, makePairInst->getDataType(), diffContext))
+            {
+                builder->setInsertBefore(makePairInst);
+                
+                List<IRInst*> operands;
+                operands.add(makePairInst->getPrimalValue());
+                operands.add(makePairInst->getDifferentialValue());
 
-            auto makeStructInst = builder->emitMakeStruct((IRType*)(diffPairStructType), operands);
-            makePairInst->replaceUsesWith(makeStructInst);
-            makePairInst->removeAndDeallocate();
+                auto makeStructInst = builder->emitMakeStruct((IRType*)(diffPairStructType), operands);
+                makePairInst->replaceUsesWith(makeStructInst);
+                makePairInst->removeAndDeallocate();
 
-            return makeStructInst;
+                return makeStructInst;
+            }
         }
         
         return nullptr;
@@ -2084,30 +2091,30 @@ struct JVPDerivativeContext
 
     IRInst* lowerPairAccess(IRBuilder* builder, IRInst* inst, DifferentiableTypeConformanceContext* diffContext)
     {
-        
         if (auto getDiffInst = as<IRDifferentialPairGetDifferential>(inst))
         {
-            lowerPairType(builder, getDiffInst->getBase()->getDataType(), diffContext);
-
-            builder->setInsertBefore(getDiffInst);
-            
-            auto diffFieldExtract = (&pairBuilderStorage)->emitDiffFieldAccess(builder, getDiffInst->getBase());
-            getDiffInst->replaceUsesWith(diffFieldExtract);
-            getDiffInst->removeAndDeallocate();
-
-            return diffFieldExtract;
+            if (lowerPairType(builder, getDiffInst->getBase()->getDataType(), diffContext))
+            {
+                builder->setInsertBefore(getDiffInst);
+                
+                auto diffFieldExtract = (&pairBuilderStorage)->emitDiffFieldAccess(builder, getDiffInst->getBase());
+                getDiffInst->replaceUsesWith(diffFieldExtract);
+                getDiffInst->removeAndDeallocate();
+                return diffFieldExtract;
+            }
         }
         else if (auto getPrimalInst = as<IRDifferentialPairGetPrimal>(inst))
         {
-            lowerPairType(builder, getPrimalInst->getBase()->getDataType(), diffContext);
+            if (lowerPairType(builder, getPrimalInst->getBase()->getDataType(), diffContext))
+            {
+                builder->setInsertBefore(getPrimalInst);
 
-            builder->setInsertBefore(getPrimalInst);
+                auto primalFieldExtract = (&pairBuilderStorage)->emitPrimalFieldAccess(builder, getPrimalInst->getBase());
+                getPrimalInst->replaceUsesWith(primalFieldExtract);
+                getPrimalInst->removeAndDeallocate();
 
-            auto primalFieldExtract = (&pairBuilderStorage)->emitPrimalFieldAccess(builder, getPrimalInst->getBase());
-            getPrimalInst->replaceUsesWith(primalFieldExtract);
-            getPrimalInst->removeAndDeallocate();
-
-            return primalFieldExtract;
+                return primalFieldExtract;
+            }
         }
         
         return nullptr;
@@ -2305,9 +2312,9 @@ bool processJVPDerivativeMarkers(
     return changed;
 }
 
-void stripAutoDiffDecorations(IRModule* module)
+void stripAutoDiffDecorationsFromChildren(IRInst* parent)
 {
-    for (auto inst : module->getGlobalInsts())
+    for (auto inst : parent->getChildren())
     {
         for (auto decor = inst->getFirstDecoration(); decor; )
         {
@@ -2323,7 +2330,18 @@ void stripAutoDiffDecorations(IRModule* module)
             }
             decor = next;
         }
+
+        if (inst->getFirstChild() != nullptr)
+        {
+            stripAutoDiffDecorationsFromChildren(inst);
+        }
     }
 }
+
+void stripAutoDiffDecorations(IRModule* module)
+{
+    stripAutoDiffDecorationsFromChildren(module->getModuleInst());
+}
+
 
 }

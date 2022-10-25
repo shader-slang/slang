@@ -5,7 +5,7 @@
 syntax __differentiate_jvp : JVPDerivativeModifier;
 
 // Custom JVP Function reference
-__attributeTarget(FuncDecl)
+__attributeTarget(FunctionDeclBase)
 attribute_syntax [__custom_jvp(function)]   : CustomJVPAttribute;
 
 /// Interface to denote types as differentiable.
