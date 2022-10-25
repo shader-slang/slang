@@ -228,17 +228,6 @@ namespace Slang
         
         SLANG_ASSERT(!parentDecl->isMemberDictionaryValid());
 
-        // TODO(JS): A bit of a work around(!)
-        // 
-        // To get to this point we must have already have performed a lookup for attributeName, 
-        // and it failed. That lookup used the TypeCheckingCache, and 
-        // so we know there is a cache entry that will be *wrong*, now we have created and 
-        // added the AttributeDecl with the attributeName.
-        // 
-        // To work around, we remove all cached lookups around the name, such that when a subsequent 
-        // lookup is made, the cache will not return the old (wrong) result.
-        removeLookupForName(getLinkage()->getTypeCheckingCache(), attributeName);
-
         // Finally, we perform any required semantic checks on
         // the newly constructed attribute decl.
         //
@@ -301,7 +290,7 @@ namespace Slang
         return false;
     }
 
-    bool SemanticsVisitor::validateAttribute(Attribute* attr, AttributeDecl* attribClassDecl)
+    bool SemanticsVisitor::validateAttribute(Attribute* attr, AttributeDecl* attribClassDecl, ModifiableSyntaxNode* attrTarget)
     {
         if(auto numThreadsAttr = as<NumThreadsAttribute>(attr))
         {
@@ -504,7 +493,6 @@ namespace Slang
         }
         else if (auto userDefAttr = as<UserDefinedAttribute>(attr))
         {
-
             // check arguments against attribute parameters defined in attribClassDecl
             Index paramIndex = 0;
             auto params = attribClassDecl->getMembersOfType<ParamDecl>();
@@ -659,6 +647,15 @@ namespace Slang
                 return false;
             }
         }
+        else if (auto derivativeMemberAttr = as<DerivativeMemberAttribute>(attr))
+        {
+            auto varDecl = as<VarDeclBase>(attrTarget);
+            if (!varDecl)
+            {
+                getSink()->diagnose(attr, Diagnostics::attributeNotApplicable, attr->getKeywordName());
+                return false;
+            }
+        }
         else
         {
             if(attr->args.getCount() == 0)
@@ -784,7 +781,7 @@ namespace Slang
         }
 
         // Now apply type-specific validation to the attribute.
-        if(!validateAttribute(attr, attrDecl))
+        if(!validateAttribute(attr, attrDecl, attrTarget))
         {
             return uncheckedAttr;
         }
@@ -817,7 +814,40 @@ namespace Slang
                     CompletionSuggestions::ScopeKind::HLSLSemantics;
             }
         }
-        
+
+        if (auto externModifier = as<ExternModifier>(m))
+        {
+            if (auto varDecl = as<VarDeclBase>(syntaxNode))
+            {
+                if (auto parentExtension = as<ExtensionDecl>(varDecl->parentDecl))
+                {
+                    auto originalMemberLookup = lookUpMember(m_astBuilder, this, varDecl->getName(), parentExtension->targetType);
+                    LookupResult filteredResult;
+                    for (auto item : originalMemberLookup.items)
+                    {
+                        if (item.declRef.getDecl() != varDecl)
+                            AddToLookupResult(filteredResult, item);
+                    }
+                    if (filteredResult.isValid() && !filteredResult.isOverloaded())
+                    {
+                        auto extensionExternMemberModifier = m_astBuilder->create<ExtensionExternVarModifier>();
+                        extensionExternMemberModifier->originalDecl = filteredResult.item.declRef;
+                        return extensionExternMemberModifier;
+                    }
+                    else if (filteredResult.isOverloaded())
+                    {
+                        getSink()->diagnose(varDecl, Diagnostics::ambiguousOriginalDefintionOfExternDecl, varDecl);
+                    }
+                    else
+                    {
+                        getSink()->diagnose(varDecl, Diagnostics::missingOriginalDefintionOfExternDecl, varDecl);
+                    }
+                }
+                // The next part of the check is to make sure the type defined here is consistent with the original definition.
+                // Since we haven't checked the type of this decl yet, we defer that until we have fully checked decl.
+                // See SemanticsDeclHeaderVisitor::checkExtensionExternVarAttribute.
+            }
+        }
         // Default behavior is to leave things as they are,
         // and assume that modifiers are mostly already checked.
         //

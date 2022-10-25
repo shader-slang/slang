@@ -13,21 +13,11 @@ struct B
 struct A : IDifferentiable
 {
     typedef B Differential;
-    
+
+    [DerivativeMember(B.z)]
     float3 x;
+    [DerivativeMember(B.k)]
     float y[10];
-
-    [__unsafeForceInlineEarly]
-    static Ptr<float3.Differential> __getDifferentialFor_x(inout Differential b)
-    {
-        return &(b.z);
-    }
-
-    [__unsafeForceInlineEarly]
-    static Ptr<float.Differential[10]> __getDifferentialFor_y(inout Differential b)
-    {
-        return &(b.k);
-    }
 
     [__unsafeForceInlineEarly]
     static Differential zero()

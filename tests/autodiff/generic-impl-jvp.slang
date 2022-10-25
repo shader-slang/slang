@@ -17,15 +17,11 @@ struct dvector
 __generic<T : IDFloat, let N : int>
 struct myvector : IDifferentiable
 {
-    T values[N];
     typedef dvector<T.Differential, N> Differential;
 
-    [__unsafeForceInlineEarly]
-    static Ptr<T.Differential[N]> __getDifferentialFor_values(inout Differential d)
-    {
-        return &(d.values);
-    }
-
+    [DerivativeMember(Differential.values)]
+    T values[N];
+    
     __init(T c)
     {
         for (int i = 0; i < N; i++)
@@ -158,18 +154,8 @@ struct linearvector : MyLinearArithmeticType, IDifferentiable
 {
     typedef lineardvector<N> Differential;
 
+    [DerivativeMember(Differential.val)]
     myvector<Real, N> val;
-
-    [__unsafeForceInlineEarly]
-    static Ptr<myvector<Real, N>.Differential> __getDifferentialFor_val(inout Differential dvec)
-    {
-        return &(dvec.val);
-    }
-
-    static void __setDifferentialForVal(lineardvector<N> dvec, myvector<Real, N>.Differential v)
-    {
-        dvec.val = v;
-    }
 
     static __differentiate_jvp linearvector<N> ladd(linearvector<N> a, linearvector<N> b)
     {

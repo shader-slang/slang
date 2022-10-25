@@ -45,7 +45,10 @@ namespace Slang
 
         void visitDecl(Decl*) {}
         void visitDeclGroup(DeclGroup*) {}
-       
+
+        void checkDerivativeMemberAttribute(VarDeclBase* varDecl, DerivativeMemberAttribute* attr);
+        void checkExtensionExternVarAttribute(VarDeclBase* varDecl, ExtensionExternVarModifier* m);
+
         void checkVarDeclCommon(VarDeclBase* varDecl);
 
         void visitVarDecl(VarDecl* varDecl)
@@ -77,6 +80,8 @@ namespace Slang
         void visitAssocTypeDecl(AssocTypeDecl* decl);
 
         void checkCallableDeclCommon(CallableDecl* decl);
+
+        void maybeCheckDifferentiableAccessorSignature(FuncDecl* funcDecl);
 
         void visitFuncDecl(FuncDecl* funcDecl);
 
@@ -636,6 +641,9 @@ namespace Slang
     bool SemanticsVisitor::isDeclUsableAsStaticMember(
         Decl*   decl)
     {
+        if (m_allowStaticReferenceToNonStaticMember)
+            return true;
+
         if(auto genericDecl = as<GenericDecl>(decl))
             decl = genericDecl->inner;
 
@@ -663,6 +671,9 @@ namespace Slang
     bool SemanticsVisitor::isUsableAsStaticMember(
         LookupResultItem const& item)
     {
+        if (m_allowStaticReferenceToNonStaticMember)
+            return true;
+
         // There's a bit of a gotcha here, because a lookup result
         // item might include "breadcrumbs" that indicate more steps
         // along the lookup path. As a result it isn't always
@@ -966,6 +977,87 @@ namespace Slang
         tryConstantFoldDeclRef(DeclRef<VarDeclBase>(varDecl, nullptr), nullptr);
     }
 
+    void SemanticsDeclHeaderVisitor::checkDerivativeMemberAttribute(
+        VarDeclBase* varDecl, DerivativeMemberAttribute* derivativeMemberAttr)
+    {
+        auto memberType = checkProperType(getLinkage(), varDecl->type, getSink());
+        auto diffType = _getDifferential(m_astBuilder, memberType);
+        if (as<ErrorType>(diffType))
+        {
+            getSink()->diagnose(derivativeMemberAttr, Diagnostics::typeIsNotDifferentiable, memberType);
+        }
+        auto thisType = calcThisType(makeDeclRef(varDecl->parentDecl));
+        if (!thisType)
+        {
+            getSink()->diagnose(
+                derivativeMemberAttr,
+                Diagnostics::
+                derivativeMemberAttributeCanOnlyBeUsedOnMembers);
+        }
+        auto diffThisType = _getDifferential(m_astBuilder, thisType);
+        if (!thisType)
+        {
+            getSink()->diagnose(
+                derivativeMemberAttr,
+                Diagnostics::invalidUseOfDerivativeMemberAttributeParentTypeIsNotDifferentiable);
+        }
+        SLANG_ASSERT(derivativeMemberAttr->args.getCount() == 1);
+        auto checkedExpr = dispatchExpr(derivativeMemberAttr->args[0], allowStaticReferenceToNonStaticMember());
+        if (auto declRefExpr = as<DeclRefExpr>(checkedExpr))
+        {
+            derivativeMemberAttr->memberDeclRef = declRefExpr;
+            if (!diffType->equals(declRefExpr->type))
+            {
+                getSink()->diagnose(derivativeMemberAttr, Diagnostics::typeMismatch, diffType, declRefExpr->type);
+            }
+            if (!varDecl->parentDecl)
+            {
+                getSink()->diagnose(derivativeMemberAttr, Diagnostics::attributeNotApplicable, diffType, declRefExpr->type);
+            }
+            if (auto memberExpr = as<StaticMemberExpr>(declRefExpr))
+            {
+                auto baseExprType = memberExpr->baseExpression->type.type;
+                if (auto typeType = as<TypeType>(baseExprType))
+                {
+                    if (diffThisType->equals(typeType->type))
+                    {
+                        return;
+                    }
+                }
+
+            }
+        }
+        getSink()->diagnose(
+            derivativeMemberAttr,
+            Diagnostics::
+            derivativeMemberAttributeMustNameAMemberInExpectedDifferentialType,
+            diffThisType);
+    }
+
+    void SemanticsDeclHeaderVisitor::checkExtensionExternVarAttribute(VarDeclBase* varDecl, ExtensionExternVarModifier* extensionExternMemberModifier)
+    {
+        if (auto parentExtension = as<ExtensionDecl>(varDecl->parentDecl))
+        {
+            if (auto originalVarDecl = extensionExternMemberModifier->originalDecl.as<VarDeclBase>())
+            {
+                auto originalType = GetTypeForDeclRef(originalVarDecl, originalVarDecl.getLoc());
+                auto extVarType = varDecl->type;
+                if (!extVarType.type || !extVarType.type->equals(originalType))
+                {
+                    getSink()->diagnose(varDecl, Diagnostics::typeOfExternDeclMismatchesOriginalDefinition, varDecl, originalType);
+                }
+                else
+                {
+                    return;
+                }
+            }
+            else
+            {
+                getSink()->diagnose(varDecl, Diagnostics::definitionOfExternDeclMismatchesOriginalDefinition, varDecl);
+            }
+        }
+    }
+
     void SemanticsDeclHeaderVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
     {
         // A variable that didn't have an explicit type written must
@@ -1135,6 +1227,16 @@ namespace Slang
             {
                 getSink()->diagnose(varDecl, Diagnostics::valueRequirementMustBeCompileTimeConst);
             }
+        }
+
+        // Check modifiers that can't be checked earlier during modifier checking stage.
+        if (auto derivativeMemberAttr = varDecl->findModifier<DerivativeMemberAttribute>())
+        {
+            checkDerivativeMemberAttribute(varDecl, derivativeMemberAttr);
+        }
+        if (auto extensionExternAttr = varDecl->findModifier<ExtensionExternVarModifier>())
+        {
+            checkExtensionExternVarAttribute(varDecl, extensionExternAttr);
         }
     }
 

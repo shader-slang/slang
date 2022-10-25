@@ -1115,7 +1115,6 @@ namespace Slang
         Function = 0x2,
         Value = 0x4,
         Attribute = 0x8,
-
         Default = type | Function | Value,
     };
 
