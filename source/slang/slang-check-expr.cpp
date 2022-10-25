@@ -393,12 +393,75 @@ namespace Slang
         return derefExpr;
     }
 
+    Expr* SemanticsVisitor::maybeUseSynthesizedDeclForLookupResult(LookupResultItem const& item, Expr* originalExpr)
+    {
+        if (!item.breadcrumbs)
+            return nullptr;
+
+        auto builtinAssocTypeAttr = item.declRef.getDecl()->findModifier<BuiltinAssociatedTypeRequirementAttribute>();
+        if (!builtinAssocTypeAttr)
+            return nullptr;
+
+        DeclRefType* subType = nullptr;
+
+        // Check if we are accessing the associated type through inheritance from a concrete type.
+        for (auto breadcrumb = item.breadcrumbs; breadcrumb; breadcrumb = breadcrumb->next)
+        {
+            switch (breadcrumb->kind)
+            {
+            case LookupResultItem::Breadcrumb::Kind::SuperType:
+                {
+                    auto witness = as<SubtypeWitness>(breadcrumb->val);
+                    if (auto subDeclRefType = as<DeclRefType>(witness->sub))
+                    {
+                        if (!as<InterfaceDecl>(subDeclRefType->declRef.getDecl()))
+                        {
+                            // Store the inner most concrete super type.
+                            subType = subDeclRefType;
+                        }
+                    }
+                }
+                break;
+            default:
+                break;
+            }
+        }
+        if (!subType)
+            return nullptr;
+
+        subType = as<DeclRefType>(subType->getCanonicalType());
+        if (!subType)
+            return nullptr;
+
+        // Don't synthesize for generic parameters.
+        auto parent = as<AggTypeDecl>(subType->declRef.getDecl());
+        if (!parent)
+            return nullptr;
+
+        // If we reach here, we are expecting a synthesized associated type defined in `subType`.
+        // Instead of returning a DeclRefExpr to the requirement decl, we synthesize a placeholder type
+        // in `subType` and return a DeclRefExpr to the synthesized decl.
+        auto assocType = m_astBuilder->create<StructDecl>();
+        assocType->nameAndLoc.name = item.declRef.getName();
+        assocType->loc = parent->loc;
+        parent->members.add(assocType);
+        parent->memberDictionary[item.declRef.getName()] = assocType;
+        auto toBeSynthesized = m_astBuilder->create<ToBeSynthesizedModifier>();
+        addModifier(assocType, toBeSynthesized);
+        return ConstructDeclRefExpr(makeDeclRef(assocType), nullptr, originalExpr->loc, originalExpr);
+    }
+
     Expr* SemanticsVisitor::ConstructLookupResultExpr(
         LookupResultItem const& item,
         Expr*            baseExpr,
         SourceLoc loc,
         Expr* originalExpr)
     {
+        // We could be referencing a decl that will be synthesized. If so create a placeholder
+        // and return a DeclRefExpr to it.
+        if (auto lookupResultExpr = maybeUseSynthesizedDeclForLookupResult(item, originalExpr))
+            return lookupResultExpr;
+
         // If we collected any breadcrumbs, then these represent
         // additional segments of the lookup path that we need
         // to expand here.
@@ -719,21 +782,25 @@ namespace Slang
         return _resolveOverloadedExprImpl(overloadedExpr, mask, getSink());
     }
 
-    Type* SemanticsVisitor::_getDifferential(ASTBuilder* builder, Type* type)
+    Type* SemanticsVisitor::tryGetDifferentialType(ASTBuilder* builder, Type* type)
     {
         if (auto ptrType = as<PtrTypeBase>(type))
         {
+            auto baseDiffType = tryGetDifferentialType(builder, ptrType->getValueType());
+            if (!baseDiffType) return nullptr;
             return builder->getPtrType(
-                _getDifferential(builder, ptrType->getValueType()),
+                baseDiffType,
                 ptrType->getClassInfo().m_name);
         }
         else if (auto arrayType = as<ArrayExpressionType>(type))
         {
+            auto baseDiffType = tryGetDifferentialType(builder, arrayType->baseType);
+            if (!baseDiffType) return nullptr;
             return builder->getArrayType(
-                _getDifferential(builder, arrayType->baseType),
+                baseDiffType,
                 arrayType->arrayLength);
         }
-        
+
         if (auto declRefType = as<DeclRefType>(type))
         {
             if (auto witness = as<SubtypeWitness>(tryGetInterfaceConformanceWitness(type, builder->getDifferentiableInterface())))
@@ -745,17 +812,16 @@ namespace Slang
                     type,
                     Slang::LookupMask::type,
                     Slang::LookupOptions::None);
-                
+
                 diffTypeLookupResult = resolveOverloadedLookup(diffTypeLookupResult);
 
                 if (!diffTypeLookupResult.isValid())
                 {
-                    // Diagnose no 'Differential' member.
-                    getSink()->diagnose(declRefType->declRef, Diagnostics::typeDoesntImplementInterfaceRequirement, type, getName("Differential"));
+                    return nullptr;
                 }
                 else if (diffTypeLookupResult.isOverloaded())
                 {
-                    getSink()->diagnose(declRefType->declRef, Diagnostics::ambiguousReference, getName("Differential"));
+                    return nullptr;
                 }
                 else
                 {
@@ -764,16 +830,26 @@ namespace Slang
                     baseTypeExpr->type.type = m_astBuilder->getTypeType(type);
 
                     auto diffTypeExpr = ConstructLookupResultExpr(
-                                            diffTypeLookupResult.item,
-                                            baseTypeExpr,
-                                            declRefType->declRef.getLoc(),
-                                            baseTypeExpr);
-                    
+                        diffTypeLookupResult.item,
+                        baseTypeExpr,
+                        declRefType->declRef.getLoc(),
+                        baseTypeExpr);
+
                     return ExtractTypeFromTypeRepr(diffTypeExpr);
                 }
             }
         }
 
+        return nullptr;
+    }
+
+    Type* SemanticsVisitor::getDifferentialType(ASTBuilder* builder, Type* type, SourceLoc loc)
+    {
+        auto result = tryGetDifferentialType(builder, type);
+        if (!result)
+        {
+            getSink()->diagnose(loc, Diagnostics::typeDoesntImplementInterfaceRequirement, type, getName("Differential"));
+        }
         return m_astBuilder->getErrorType();
     }
 

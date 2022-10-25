@@ -292,7 +292,7 @@ namespace Slang
 
     bool SemanticsVisitor::validateAttribute(Attribute* attr, AttributeDecl* attribClassDecl, ModifiableSyntaxNode* attrTarget)
     {
-        if(auto numThreadsAttr = as<NumThreadsAttribute>(attr))
+        if (auto numThreadsAttr = as<NumThreadsAttribute>(attr))
         {
             SLANG_ASSERT(attr->args.getCount() == 3);
 
@@ -320,9 +320,9 @@ namespace Slang
                 values[i] = value;
             }
 
-            numThreadsAttr->x          = values[0];
-            numThreadsAttr->y          = values[1];
-            numThreadsAttr->z          = values[2]; 
+            numThreadsAttr->x = values[0];
+            numThreadsAttr->y = values[1];
+            numThreadsAttr->z = values[2];
         }
         else if (auto anyValueSizeAttr = as<AnyValueSizeAttribute>(attr))
         {
@@ -368,7 +368,7 @@ namespace Slang
             {
                 return false;
             }
-                    
+
             bindingAttr->binding = int32_t(binding->value);
             bindingAttr->set = int32_t(set->value);
         }
@@ -395,31 +395,31 @@ namespace Slang
             SLANG_ASSERT(attr->args.getCount() == 1);
             auto val = checkConstantIntVal(attr->args[0]);
 
-            if(!val) return false;
+            if (!val) return false;
 
             maxVertexCountAttr->value = (int32_t)val->value;
         }
-        else if(auto instanceAttr = as<InstanceAttribute>(attr))
+        else if (auto instanceAttr = as<InstanceAttribute>(attr))
         {
             SLANG_ASSERT(attr->args.getCount() == 1);
             auto val = checkConstantIntVal(attr->args[0]);
 
-            if(!val) return false;
+            if (!val) return false;
 
             instanceAttr->value = (int32_t)val->value;
         }
-        else if(auto entryPointAttr = as<EntryPointAttribute>(attr))
+        else if (auto entryPointAttr = as<EntryPointAttribute>(attr))
         {
             SLANG_ASSERT(attr->args.getCount() == 1);
 
             String stageName;
-            if(!checkLiteralStringVal(attr->args[0], &stageName))
+            if (!checkLiteralStringVal(attr->args[0], &stageName))
             {
                 return false;
             }
 
             auto stage = findStageByName(stageName);
-            if(stage == Stage::Unknown)
+            if (stage == Stage::Unknown)
             {
                 getSink()->diagnose(attr->args[0], Diagnostics::unknownStageName, stageName);
             }
@@ -427,10 +427,10 @@ namespace Slang
             entryPointAttr->stage = stage;
         }
         else if ((as<DomainAttribute>(attr)) ||
-                    (as<MaxTessFactorAttribute>(attr)) ||
-                    (as<OutputTopologyAttribute>(attr)) ||
-                    (as<PartitioningAttribute>(attr)) ||
-                    (as<PatchConstantFuncAttribute>(attr)))
+            (as<MaxTessFactorAttribute>(attr)) ||
+            (as<OutputTopologyAttribute>(attr)) ||
+            (as<PartitioningAttribute>(attr)) ||
+            (as<PatchConstantFuncAttribute>(attr)))
         {
             // Let it go thru iff single string attribute
             if (!hasStringArgs(attr, 1))
@@ -439,7 +439,7 @@ namespace Slang
             }
         }
         else if (as<OutputControlPointsAttribute>(attr) ||
-                    as<SPIRVInstructionOpAttribute>(attr))
+            as<SPIRVInstructionOpAttribute>(attr))
         {
             // Let it go thru iff single integral attribute
             if (!hasIntArgs(attr, 1))
@@ -481,6 +481,27 @@ namespace Slang
             if (!getAttributeTargetSyntaxClasses(attrUsageAttr->targetSyntaxClass, targetClassId))
             {
                 getSink()->diagnose(attr, Diagnostics::invalidAttributeTarget);
+                return false;
+            }
+        }
+        else if (auto builtinAssocTypeAttr = as<BuiltinAssociatedTypeRequirementAttribute>(attr))
+        {
+            if (attr->args.getCount() == 1)
+            {
+                //IntVal* outIntVal;
+                if (auto cInt = checkConstantEnumVal(attr->args[0]))
+                {
+                    builtinAssocTypeAttr->kind = (BuiltinAssociatedTypeRequirementKind)(cInt->value);
+                }
+                else
+                {
+                    getSink()->diagnose(attr, Diagnostics::expectedSingleIntArg, attr->keywordName);
+                    return false;
+                }
+            }
+            else
+            {
+                getSink()->diagnose(attr, Diagnostics::expectedSingleIntArg, attr->keywordName);
                 return false;
             }
         }

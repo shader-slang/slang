@@ -630,6 +630,10 @@ namespace Slang
             Expr*    base,
             SourceLoc       loc);
 
+        Expr* maybeUseSynthesizedDeclForLookupResult(
+            LookupResultItem const& item,
+            Expr* orignalExpr);
+
         Expr* ConstructLookupResultExpr(
             LookupResultItem const& item,
             Expr*            baseExpr,
@@ -804,7 +808,9 @@ namespace Slang
         void maybeRegisterDifferentiableType(ASTBuilder* builder, Type* type);
 
         // Construct the differential for 'type', if it exists.
-        Type* _getDifferential(ASTBuilder* builder, Type* type);
+        Type* getDifferentialType(ASTBuilder* builder, Type* type, SourceLoc loc);
+        Type* tryGetDifferentialType(ASTBuilder* builder, Type* type);
+
         
     public:
 
@@ -1093,6 +1099,18 @@ namespace Slang
             LookupResult const&         lookupResult,
             DeclRef<Decl>               requiredMemberDeclRef,
             RefPtr<WitnessTable>        witnessTable);
+
+            /// Attempt to synthesize an associated `Differential` type for a type that conforms to
+            /// `IDifferentiable`.
+            ///
+            /// On success, installs the syntethesized type in `witnessTable`, injects `[DerivativeMember]`
+            /// modifiers on differentiable fields to point to the corresponding field in the synthesized
+            /// differential type, and returns `true`.
+            /// Otherwise, returns `false`.
+        bool trySynthesizeDifferentialAssociatedTypeRequirementWitness(
+            ConformanceCheckingContext* context,
+            DeclRef<Decl> requirementDeclRef,
+            RefPtr<WitnessTable> witnessTable);
 
             /// Registers a type as differentiable in the currrent semantic context, if the declaration represents
             /// a subtype of IDifferentable. Does nothing otherwise.
