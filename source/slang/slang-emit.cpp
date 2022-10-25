@@ -384,6 +384,8 @@ Result linkAndOptimizeIR(
     // 3. Fill in higher-order invocations with the generated functions.
     processDerivativeCalls(irModule);
 
+    stripAutoDiffDecorations(irModule);
+
     dumpIRIfEnabled(codeGenContext, irModule, "AFTER-AUTODIFF");
 
     validateIRModuleIfEnabled(codeGenContext, irModule);

@@ -546,6 +546,15 @@ struct IRSequentialIDDecoration : IRDecoration
     IRIntegerValue getSequentialID() { return getSequentialIDOperand()->getValue(); }
 };
 
+struct IRJVPDerivativeMarkerDecoration : IRDecoration
+{
+    enum
+    {
+        kOp = kIROp_JVPDerivativeMarkerDecoration
+    };
+    IR_LEAF_ISA(JVPDerivativeMarkerDecoration)
+};
+
 struct IRJVPDerivativeReferenceDecoration : IRDecoration
 {
     enum
@@ -557,15 +566,15 @@ struct IRJVPDerivativeReferenceDecoration : IRDecoration
     IRInst* getJVPFunc() { return getOperand(0); }
 };
 
-struct IRDifferentialGetterDecoration : IRDecoration
+struct IRJVPDerivativeMemberReferenceDecoration : IRDecoration
 {
     enum
     {
-        kOp = kIROp_DifferentialGetterDecoration
+        kOp = kIROp_JVPDerivativeMemberReferenceDecoration
     };
-    IR_LEAF_ISA(DifferentialGetterDecoration)
+    IR_LEAF_ISA(JVPDerivativeMemberReferenceDecoration)
 
-    IRInst* getGetterFunc() { return getOperand(0); }
+    IRInst* getDerivativeMemberStructKey() { return getOperand(0); }
 };
 
 // An instruction that replaces the function symbol
@@ -3192,6 +3201,11 @@ public:
         addDecoration(value, kIROp_ExternCppDecoration, getStringValue(mangledName));
     }
 
+    void addForceInlineDecoration(IRInst* value)
+    {
+        addDecoration(value, kIROp_ForceInlineDecoration);
+    }
+
     void addJVPDerivativeMarkerDecoration(IRInst* value)
     {
         addDecoration(value, kIROp_JVPDerivativeMarkerDecoration);
@@ -3200,11 +3214,6 @@ public:
     void addJVPDerivativeReferenceDecoration(IRInst* value, IRInst* jvpFn)
     {
         addDecoration(value, kIROp_JVPDerivativeReferenceDecoration, jvpFn);
-    }
-
-    void addDifferentialGetterDecoration(IRInst* value, IRInst* getterFn)
-    {
-        addDecoration(value, kIROp_DifferentialGetterDecoration, getterFn);
     }
 
     void addCOMWitnessDecoration(IRInst* value, IRInst* witnessTable)

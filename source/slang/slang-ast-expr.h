@@ -38,18 +38,6 @@ class VarExpr : public DeclRefExpr
     SLANG_AST_CLASS(VarExpr)
 };
 
-class DifferentiableDeclRefExpr : public Expr
-{
-    SLANG_AST_CLASS(DifferentiableDeclRefExpr)
-
-    // Inner decl ref expr that references a differentiable expression.
-    Expr* inner = nullptr;
-
-    // Information on getters and setters if available.
-    Expr* setterExpr = nullptr;
-    Expr* getterExpr = nullptr;
-};
-
 // An expression that references an overloaded set of declarations
 // having the same name.
 class OverloadedExpr : public Expr

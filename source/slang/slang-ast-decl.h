@@ -337,7 +337,6 @@ class RefAccessorDecl : public AccessorDecl
 {
     SLANG_AST_CLASS(RefAccessorDecl)
 };
-
 class FuncDecl : public FunctionDeclBase
 {
     SLANG_AST_CLASS(FuncDecl)
