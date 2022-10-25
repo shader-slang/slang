@@ -35,7 +35,7 @@ extension float : IDifferentiable
     [__unsafeForceInlineEarly]
     static Differential zero()
     {
-        return 0.f;
+        return float(0.f);
     }
 
     [__unsafeForceInlineEarly]

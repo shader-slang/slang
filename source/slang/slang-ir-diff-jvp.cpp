@@ -1084,72 +1084,10 @@ struct JVPTranscriber
     // 
     InstPair transcribeCall(IRBuilder* builder, IRCall* origCall)
     {   
+        
+        IRInst* origCallee = origCall->getCallee();
 
-        if (as<IRFunc>(origCall->getCallee()))
-        {
-            auto origCallee = origCall->getCallee();
-
-            // Since concrete functions are globals, the primal callee is the same
-            // as the original callee.
-            //
-            auto primalCallee = origCallee;
-
-            // TODO: If inner is not differentiable, treat as non-differentiable call.
-            // Build the differential callee
-            IRInst* diffCall = builder->emitJVPDifferentiateInst(
-                differentiateFunctionType(builder, as<IRFuncType>(primalCallee->getFullType())),
-                primalCallee);
-            
-            List<IRInst*> args;
-            // Go over the parameter list and create pairs for each input (if required)
-            for (UIndex ii = 0; ii < origCall->getArgCount(); ii++)
-            {
-                auto origArg = origCall->getArg(ii);
-                auto primalArg = findOrTranscribePrimalInst(builder, origArg);
-                SLANG_ASSERT(primalArg);
-
-                auto primalType = primalArg->getDataType();
-                if (auto pairType = tryGetDiffPairType(builder, primalType))
-                {
-                    auto diffArg = findOrTranscribeDiffInst(builder, origArg);
-
-                    if (!diffArg)
-                        diffArg = getDifferentialZeroOfType(builder, primalType);
-                    
-                    // If a pair type can be formed, this must be non-null.
-                    SLANG_RELEASE_ASSERT(diffArg);
-
-                    auto diffPair = builder->emitMakeDifferentialPair(pairType, primalArg, diffArg);
-
-                    args.add(diffPair);
-                }
-                else
-                {
-                    // Add original/primal argument.
-                    args.add(primalArg);
-                }
-            }
-            
-            auto diffReturnType = tryGetDiffPairType(builder, origCall->getFullType());
-            SLANG_ASSERT(diffReturnType);
-
-            auto callInst = builder->emitCallInst(
-                diffReturnType,
-                diffCall,
-                args);
-            
-            return InstPair(
-                pairBuilder->emitPrimalFieldAccess(builder, callInst),
-                pairBuilder->emitDiffFieldAccess(builder, callInst));
-        }
-        else if(as<IRSpecialize>(origCall->getCallee()) ||
-                as<IRLookupWitnessMethod>(origCall->getCallee()))
-        {
-            getSink()->diagnose(origCall->sourceLoc,
-                Diagnostics::unimplemented,
-                "attempting to differentiate unspecialized callee or an interface method");
-        }
-        else
+        if (!origCallee)
         {
             // Note that this can only happen if the callee is a result
             // of a higher-order operation. For now, we assume that we cannot
@@ -1159,9 +1097,62 @@ struct JVPTranscriber
             getSink()->diagnose(origCall->sourceLoc,
                 Diagnostics::internalCompilerError,
                 "attempting to differentiate unresolved callee");
+            
+            return InstPair(nullptr, nullptr);
         }
 
-        return InstPair(nullptr, nullptr);
+        // Since concrete functions are globals, the primal callee is the same
+        // as the original callee.
+        //
+        auto primalCallee = origCallee;
+
+        // TODO: If inner is not differentiable, treat as non-differentiable call.
+        // Build the differential callee
+        IRInst* diffCall = builder->emitJVPDifferentiateInst(
+            differentiateFunctionType(builder, as<IRFuncType>(primalCallee->getFullType())),
+            primalCallee);
+        
+        List<IRInst*> args;
+        // Go over the parameter list and create pairs for each input (if required)
+        for (UIndex ii = 0; ii < origCall->getArgCount(); ii++)
+        {
+            auto origArg = origCall->getArg(ii);
+            auto primalArg = findOrTranscribePrimalInst(builder, origArg);
+            SLANG_ASSERT(primalArg);
+
+            auto primalType = primalArg->getDataType();
+            if (auto pairType = tryGetDiffPairType(builder, primalType))
+            {
+                auto diffArg = findOrTranscribeDiffInst(builder, origArg);
+
+                if (!diffArg)
+                    diffArg = getDifferentialZeroOfType(builder, primalType);
+                
+                // If a pair type can be formed, this must be non-null.
+                SLANG_RELEASE_ASSERT(diffArg);
+
+                auto diffPair = builder->emitMakeDifferentialPair(pairType, primalArg, diffArg);
+
+                args.add(diffPair);
+            }
+            else
+            {
+                // Add original/primal argument.
+                args.add(primalArg);
+            }
+        }
+        
+        auto diffReturnType = tryGetDiffPairType(builder, origCall->getFullType());
+        SLANG_ASSERT(diffReturnType);
+
+        auto callInst = builder->emitCallInst(
+            diffReturnType,
+            diffCall,
+            args);
+        
+        return InstPair(
+            pairBuilder->emitPrimalFieldAccess(builder, callInst),
+            pairBuilder->emitDiffFieldAccess(builder, callInst));
     }
 
     InstPair transcribeSwizzle(IRBuilder* builder, IRSwizzle* origSwizzle)
@@ -1291,17 +1282,35 @@ struct JVPTranscriber
         return InstPair(nullptr, nullptr);
     }
 
-    InstPair transcribeSpecialize(IRBuilder* builder, IRSpecialize* origSpecialize)
+    InstPair transcribeSpecialize(IRBuilder*, IRSpecialize* origSpecialize)
     {
-        // This is slightly counter-intuitive, but we don't perform any differentiation
-        // logic here. We simple clone the original specialize which points to the original function,
-        // or the cloned version in case we're inside a generic scope.
-        // The differentiation logic is inserted later when this is used in an IRCall.
-        // This decision is mostly to maintain a uniform convention of JVPDifferentiate(Specialize(Fn))
-        // rather than have Specialize(JVPDifferentiate(Fn))
-        // 
-        auto diffSpecialize = cloneInst(&cloneEnv, builder, origSpecialize);
-        return InstPair(diffSpecialize, diffSpecialize);
+        // In general, we should not see any specialize insts at this stage.
+        // The exceptions are target intrinsics.
+        auto genericInnerVal = findInnerMostGenericReturnVal(as<IRGeneric>(origSpecialize->getBase()));
+        if (genericInnerVal->findDecoration<IRTargetIntrinsicDecoration>())
+        {
+            // Look for an IRJVPDerivativeReferenceDecoration on the specialize inst.
+            // (Normally, this would be on the inner IRFunc, but in this case only the JVP func
+            // can be specialized, so we put a decoration on the IRSpecialize)
+            //
+            if (auto jvpFuncDecoration = origSpecialize->findDecoration<IRJVPDerivativeReferenceDecoration>())
+            {
+                auto jvpFunc = jvpFuncDecoration->getJVPFunc();
+
+                // Make sure this isn't itself a specialize .
+                SLANG_RELEASE_ASSERT(!as<IRSpecialize>(jvpFunc));
+
+                return InstPair(jvpFunc, jvpFunc);
+            }
+        }
+        else
+        {
+            getSink()->diagnose(origSpecialize->sourceLoc,
+                    Diagnostics::unexpected,
+                    "should not be attempting to differentiate anything specialized here.");
+        }
+        
+        return InstPair(nullptr, nullptr);
     }
 
     InstPair transcibeLookupInterfaceMethod(IRBuilder* builder, IRLookupWitnessMethod* origLookup)
@@ -1786,9 +1795,7 @@ struct JVPTranscriber
             return transcribeConst(builder, origInst);
 
         case kIROp_Specialize:
-            getSink()->diagnose(origInst->sourceLoc,
-                    Diagnostics::unexpected,
-                    "should not be attempting to differentiate anything specialized here.");
+            return transcribeSpecialize(builder, as<IRSpecialize>(origInst));
 
         case kIROp_lookup_interface_method:
             return transcibeLookupInterfaceMethod(builder, as<IRLookupWitnessMethod>(origInst));
@@ -1989,7 +1996,10 @@ struct JVPDerivativeContext
 
                     if (auto specializeInst = as<IRSpecialize>(baseInst))
                     {
-                        baseFunction = as<IRGlobalValueWithCode>(specializeInst->getBase());
+                        // Certain specialize insts come with a derivative
+                        // reference attached. Skip such instructions.
+                        // 
+                        if (lookupJVPReference(specializeInst)) continue;
                     }
                     else if (auto globalValWithCode = as<IRGlobalValueWithCode>(baseInst))
                     {
