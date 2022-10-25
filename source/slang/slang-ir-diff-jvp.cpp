@@ -1102,7 +1102,6 @@ struct JVPTranscriber
             auto primalCallee = origCallee;
 
             IRInst* diffCallee = nullptr;
-            bool isAccessor = false;
 
             if (auto derivativeReferenceDecor = primalCallee->findDecoration<IRJVPDerivativeReferenceDecoration>())
             {
@@ -1138,14 +1137,7 @@ struct JVPTranscriber
                 if (!diffArg)
                     diffArg = getDifferentialZeroOfType(builder, primalType);
 
-                // `dget` `dset` accessors takes in only diff values as parameter, so don't wrap them in
-                // a DifferentialPair.
-                if (isAccessor)
-                {
-                    SLANG_RELEASE_ASSERT(diffArg);
-                    args.add(diffArg);
-                }
-                else if (auto pairType = tryGetDiffPairType(builder, primalType))
+                if (auto pairType = tryGetDiffPairType(builder, primalType))
                 {
                     // If a pair type can be formed, this must be non-null.
                     SLANG_RELEASE_ASSERT(diffArg);
@@ -1160,10 +1152,7 @@ struct JVPTranscriber
             }
             
             IRType* diffReturnType = nullptr;
-            if (isAccessor)
-                diffReturnType = as<IRFunc>(diffCallee)->getResultType();
-            else
-                diffReturnType = tryGetDiffPairType(builder, origCall->getFullType());
+            diffReturnType = tryGetDiffPairType(builder, origCall->getFullType());
             SLANG_ASSERT(diffReturnType);
 
             auto callInst = builder->emitCallInst(
@@ -1171,19 +1160,8 @@ struct JVPTranscriber
                 diffCallee,
                 args);
 
-            IRInst* primalResultValue = nullptr;
-            IRInst* diffResultValue = nullptr;
-            if (isAccessor)
-            {
-                IRInst* primalCall = cloneInst(&cloneEnv, builder, origCall);
-                primalResultValue = primalCall;
-                diffResultValue = callInst;
-            }
-            else
-            {
-                primalResultValue = pairBuilder->emitPrimalFieldAccess(builder, callInst);
-                diffResultValue = pairBuilder->emitDiffFieldAccess(builder, callInst);
-            }
+            IRInst* primalResultValue = pairBuilder->emitPrimalFieldAccess(builder, callInst);
+            IRInst* diffResultValue = pairBuilder->emitDiffFieldAccess(builder, callInst);
             
             return InstPair(primalResultValue, diffResultValue);
         }
