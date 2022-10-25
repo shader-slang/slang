@@ -1224,6 +1224,10 @@ bool CLikeSourceEmitter::shouldFoldInstIntoUseSites(IRInst* inst)
         {
             return true;
         }
+        else if(as<IRMeshOutputType>(type))
+        {
+            return true;
+        }
     }
 
 

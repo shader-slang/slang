@@ -680,7 +680,7 @@ Result linkAndOptimizeIR(
             session,
             irModule,
             irEntryPoints,
-            codeGenContext->getSink(),
+            codeGenContext,
             glslExtensionTracker);
 
 #if 0

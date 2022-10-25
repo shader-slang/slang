@@ -6275,6 +6275,7 @@ namespace Slang
         case kIROp_FieldAddress:
         case kIROp_getElement:
         case kIROp_getElementPtr:
+        case kIROp_MeshOutputRef:
         case kIROp_constructVectorFromScalar:
         case kIROp_swizzle:
         case kIROp_swizzleSet:  // Doesn't actually "set" anything - just returns the resulting vector

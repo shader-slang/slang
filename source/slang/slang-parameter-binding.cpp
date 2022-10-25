@@ -1912,6 +1912,27 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
 
         return arrayTypeLayout;
     }
+    else if( auto meshOutputType = as<MeshOutputType>(type) )
+    {
+        // TODO: Ellie, revisit
+        // Note: Bad Things will happen if we have an array input
+        // without a semantic already being enforced.
+
+        // We use the first element to derive the layout for the element type
+        auto elementTypeLayout = processEntryPointVaryingParameter(context, meshOutputType->getElementType(), state, varLayout);
+
+        RefPtr<ArrayTypeLayout> arrayTypeLayout = new ArrayTypeLayout();
+        arrayTypeLayout->elementTypeLayout = elementTypeLayout;
+        arrayTypeLayout->type = arrayType;
+
+        for (auto rr : elementTypeLayout->resourceInfos)
+        {
+            // TODO: Ellie, explain why only one slot is consumed here
+            arrayTypeLayout->findOrAddResourceInfo(rr.kind)->count = rr.count;
+        }
+
+        return arrayTypeLayout;
+    }
     // Ignore a bunch of types that don't make sense here...
     else if (auto textureType = as<TextureType>(type)) { return nullptr;  }
     else if(auto samplerStateType = as<SamplerStateType>(type)) { return nullptr;  }

@@ -856,8 +856,8 @@ struct Vertices
 {
     __subscript(uint index) -> T
     {
-        set;
-        // TODO: Ellie make sure this remains write only
+        // TODO: Ellie make sure these remains write only
+        __intrinsic_op($(kIROp_getElementPtr))
         ref;
     }
 };
@@ -869,9 +869,9 @@ struct Indices
 {
     __subscript(uint index) -> T
     {
-        set;
-        // It's illegal to not write out the whole primitive at once, hence no
-        // 'ref'
+        // TODO: Ellie: It's illegal to not write out the whole primitive at once, should we use set over ref?
+        __intrinsic_op($(kIROp_getElementPtr))
+        ref;
     }
 };
 
@@ -882,7 +882,7 @@ struct Primitives
 {
     __subscript(uint index) -> T
     {
-        set;
+        __intrinsic_op($(kIROp_getElementPtr))
         ref;
     }
 };

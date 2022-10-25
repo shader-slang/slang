@@ -1073,7 +1073,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         return as<Type>(findInnerMostGenericSubstitution(declRef.substitutions)->getArgs()[0]);
     }
 
-    IntVal* MeshOutputType::getElementCount()
+    IntVal* MeshOutputType::getMaxElementCount()
     {
         return as<IntVal>(findInnerMostGenericSubstitution(declRef.substitutions)->getArgs()[1]);
     }

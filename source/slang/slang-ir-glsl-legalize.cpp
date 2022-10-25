@@ -3,6 +3,8 @@
 
 #include "slang-ir.h"
 #include "slang-ir-insts.h"
+#include "slang-ir-inst-pass-base.h"
+#include "slang-ir-specialize-function-call.h"
 
 #include "slang-glsl-extension-tracker.h"
 
@@ -175,9 +177,10 @@ IRType* getFieldType(
             if(ff->getKey() == fieldKey)
                 return ff->getFieldType();
         }
+        SLANG_UNEXPECTED("no such field");
+        UNREACHABLE_RETURN(nullptr);
     }
-
-    SLANG_UNEXPECTED("no such field");
+    SLANG_UNEXPECTED("not a struct");
     UNREACHABLE_RETURN(nullptr);
 }
 
@@ -284,6 +287,7 @@ struct GlobalVaryingDeclarator
     enum class Flavor
     {
         array,
+        meshOutput,
     };
 
     Flavor                      flavor;
@@ -781,28 +785,54 @@ ScalarizedVal createSimpleGLSLGlobalVarying(
     IRTypeLayout* typeLayout = inTypeLayout;
     for( auto dd = declarator; dd; dd = dd->next )
     {
-        // We only have one declarator case right now...
-        SLANG_ASSERT(dd->flavor == GlobalVaryingDeclarator::Flavor::array);
-
-        auto arrayType = builder->getArrayType(
-            type,
-            dd->elementCount);
-
-        IRArrayTypeLayout::Builder arrayTypeLayoutBuilder(builder, typeLayout);
-        if( auto resInfo = inTypeLayout->findSizeAttr(kind) )
+        switch(dd->flavor)
         {
-            // TODO: it is kind of gross to be re-running some
-            // of the type layout logic here.
+        case GlobalVaryingDeclarator::Flavor::array:
+        {
+            auto arrayType = builder->getArrayType(
+                type,
+                dd->elementCount);
 
-            UInt elementCount = (UInt) getIntVal(dd->elementCount);
-            arrayTypeLayoutBuilder.addResourceUsage(
-                kind,
-                resInfo->getSize() * elementCount);
+            IRArrayTypeLayout::Builder arrayTypeLayoutBuilder(builder, typeLayout);
+            if( auto resInfo = inTypeLayout->findSizeAttr(kind) )
+            {
+                // TODO: it is kind of gross to be re-running some
+                // of the type layout logic here.
+
+                UInt elementCount = (UInt) getIntVal(dd->elementCount);
+                arrayTypeLayoutBuilder.addResourceUsage(
+                    kind,
+                    resInfo->getSize() * elementCount);
+            }
+            auto arrayTypeLayout = arrayTypeLayoutBuilder.build();
+
+            type = arrayType;
+            typeLayout = arrayTypeLayout;
         }
-        auto arrayTypeLayout = arrayTypeLayoutBuilder.build();
+        break;
+        case GlobalVaryingDeclarator::Flavor::meshOutput:
+        {
+            auto arrayType = builder->getUnsizedArrayType(type);
 
-        type = arrayType;
-        typeLayout = arrayTypeLayout;
+            IRArrayTypeLayout::Builder arrayTypeLayoutBuilder(builder, typeLayout);
+            if( auto resInfo = inTypeLayout->findSizeAttr(kind) )
+            {
+                // Although these are arrays, they consume slots as though
+                // they're scalar parameters, so don't multiply the usage by the
+                // (runtime) array size.
+                arrayTypeLayoutBuilder.addResourceUsage(
+                    kind,
+                    resInfo->getSize());
+            }
+            auto arrayTypeLayout = arrayTypeLayoutBuilder.build();
+
+            type = arrayType;
+            typeLayout = arrayTypeLayout;
+        }
+        break;
+        default:
+            SLANG_ASSERT(!"Unhandled declarator case");
+        }
     }
 
     // We need to construct a fresh layout for the variable, even
@@ -938,6 +968,35 @@ ScalarizedVal createGLSLGlobalVaryingsImpl(
             &arrayDeclarator,
             leafVar);
     }
+    else if( auto meshOutputType = as<IRMeshOutputType>(type))
+    {
+        // We will need to SOA-ize any nested types.
+        // TODO: Ellie, deduplicate with the above case?
+
+        auto elementType = meshOutputType->getElementType();
+        auto arrayLayout = as<IRArrayTypeLayout>(typeLayout);
+        SLANG_ASSERT(arrayLayout);
+        auto elementTypeLayout = arrayLayout->getElementTypeLayout();
+
+        GlobalVaryingDeclarator arrayDeclarator;
+        arrayDeclarator.flavor = GlobalVaryingDeclarator::Flavor::meshOutput;
+        // No need for anything downstream to know about this size
+        arrayDeclarator.elementCount = nullptr;
+        arrayDeclarator.next = declarator;
+
+        return createGLSLGlobalVaryingsImpl(
+            context,
+            builder,
+            elementType,
+            varLayout,
+            elementTypeLayout,
+            kind,
+            stage,
+            bindingIndex,
+            bindingSpace,
+            &arrayDeclarator,
+            leafVar);
+    }
     else if( auto streamType = as<IRHLSLStreamOutputType>(type))
     {
         auto elementType = streamType->getElementType();
@@ -972,10 +1031,21 @@ ScalarizedVal createGLSLGlobalVaryingsImpl(
         IRType* fullType = type;
         for( auto dd = declarator; dd; dd = dd->next )
         {
-            SLANG_ASSERT(dd->flavor == GlobalVaryingDeclarator::Flavor::array);
-            fullType = builder->getArrayType(
-                fullType,
-                dd->elementCount);
+            switch(dd->flavor)
+            {
+            case GlobalVaryingDeclarator::Flavor::array:
+                {
+                    fullType = builder->getArrayType(
+                        fullType,
+                        dd->elementCount);
+                }
+                break;
+            case GlobalVaryingDeclarator::Flavor::meshOutput:
+                {
+                    fullType = builder->getUnsizedArrayType(fullType);
+                }
+                break;
+            }
         }
 
         tupleValImpl->type = fullType;
@@ -1131,7 +1201,9 @@ ScalarizedVal adaptType(
 void assign(
     IRBuilder*              builder,
     ScalarizedVal const&    left,
-    ScalarizedVal const&    right)
+    ScalarizedVal const&    right,
+    // Pass nullptr for an unindexed write (for everything but mesh shaders)
+    IRInst*                 index = nullptr)
 {
     switch( left.flavor )
     {
@@ -1140,7 +1212,12 @@ void assign(
         {
         case ScalarizedVal::Flavor::value:
             {
-                builder->emitStore(left.irValue, right.irValue);
+                auto address = left.irValue;
+                if(index)
+                {
+                    address = builder->emitElementAddress(right.irValue->getFullType(), left.irValue, index);
+                }
+                builder->emitStore(address, right.irValue);
             }
             break;
 
@@ -1167,7 +1244,7 @@ void assign(
                         left,
                         ee,
                         rightElement.key);
-                    assign(builder, leftElementVal, rightElement.val);
+                    assign(builder, leftElementVal, rightElement.val, index);
                 }
             }
             break;
@@ -1192,7 +1269,7 @@ void assign(
                     right,
                     ee,
                     leftTupleVal->elements[ee].key);
-                assign(builder, leftTupleVal->elements[ee].val, rightElementVal);
+                assign(builder, leftTupleVal->elements[ee].val, rightElementVal, index);
             }
         }
         break;
@@ -1206,7 +1283,7 @@ void assign(
             // from the "pretend" type that it had in the IR before.
             auto typeAdapter = as<ScalarizedTypeAdapterValImpl>(left.impl);
             auto adaptedRight = adaptType(builder, right, typeAdapter->actualType, typeAdapter->pretendType);
-            assign(builder, typeAdapter->val, adaptedRight);
+            assign(builder, typeAdapter->val, adaptedRight, index);
         }
         break;
 
@@ -1456,6 +1533,7 @@ void legalizeRayTracingEntryPointParameterForGLSL(
 
 void legalizeEntryPointParameterForGLSL(
     GLSLLegalizationContext*    context,
+    CodeGenContext*             codeGenContext,
     IRFunc*                     func,
     IRParam*                    pp,
     IRVarLayout*                paramLayout)
@@ -1515,6 +1593,17 @@ void legalizeEntryPointParameterForGLSL(
         }
     }
 
+    // Lift Mesh Output decorations to the function
+    // TODO: Ellie, check for duplication and assert consistency
+    if (stage == Stage::Mesh)
+    {
+        if (auto d = pp->findDecoration<IRMeshOutputDecoration>())
+        {
+            builder->addDecoration(func, d->getOp(), d->getMaxSize());
+        }
+    }
+
+
     // We need to create a global variable that will replace the parameter.
     // It seems superficially obvious that the variable should have
     // the same type as the parameter.
@@ -1531,8 +1620,8 @@ void legalizeEntryPointParameterForGLSL(
 
     // First we will special-case stage input/outputs that
     // don't fit into the standard varying model.
-    // For right now we are only doing special-case handling
-    // of geometry shader output streams.
+    // - Geometry shader output streams
+    // - Mesh shader outputs
     if( auto paramPtrType = as<IROutTypeBase>(paramType) )
     {
         auto valueType = paramPtrType->getValueType();
@@ -1646,6 +1735,118 @@ void legalizeEntryPointParameterForGLSL(
             builder->setInsertBefore(func->getFirstBlock()->getFirstOrdinaryInst());
             auto undefinedVal = builder->emitUndefined(pp->getFullType());
             pp->replaceUsesWith(undefinedVal);
+
+            return;
+        }
+        if( auto meshOutputType = as<IRMeshOutputType>(valueType) )
+        {
+            // TODO: Ellie, move this out of this already massive function
+            auto globalOutputVal = createGLSLGlobalVaryings(
+                context,
+                builder,
+                meshOutputType,
+                paramLayout,
+                LayoutResourceKind::VaryingOutput,
+                stage,
+                pp);
+
+            switch ( globalOutputVal.flavor )
+            {
+            case ScalarizedVal::Flavor::tuple:
+                {
+                    auto v = as<ScalarizedTupleValImpl>(globalOutputVal.impl);
+
+                    Index elementCount = v->elements.getCount();
+                    for( Index ee = 0; ee < elementCount; ++ee )
+                    {
+                        auto e = v->elements[ee];
+                        auto leftElementVal = extractField(
+                            builder,
+                            globalOutputVal,
+                            ee,
+                            e.key);
+                        builder->addKeepAliveDecoration(leftElementVal.irValue);
+                    }
+                }
+                break;
+            case ScalarizedVal::Flavor::value:
+                builder->addKeepAliveDecoration(globalOutputVal.irValue);
+                break;
+            case ScalarizedVal::Flavor::address:
+                builder->addKeepAliveDecoration(globalOutputVal.irValue);
+                break;
+            default:
+                {
+                    SLANG_ASSERT(!"TODO: Ellie");
+                }
+                break;
+            }
+
+            //
+            // Introduce a global parameter to drive the specialization machinery
+            //
+            auto g = addGlobalParam(builder->getModule(), pp->getFullType());
+            moveValueBefore(g, builder->getFunc());
+            builder->addNameHintDecoration(g, pp->findDecoration<IRNameHintDecoration>()->getName());
+            pp->replaceUsesWith(g);
+            struct MeshOutputSpecializationCondition : FunctionCallSpecializeCondition
+            {
+                bool doesParamWantSpecialization(IRParam*, IRInst* arg)
+                {
+                    return arg == g;
+                }
+                IRInst* g;
+            } condition;
+            condition.g = g;
+            specializeFunctionCalls(codeGenContext, builder->getModule(), &condition);
+
+            //
+            // Remove this global by making all writes actually write to the
+            // newly introduced out variables.
+            //
+            // TODO: Ellie abstract over these awful loops lol
+            for(auto u = g->firstUse; u; u = u->nextUse)
+            {
+                auto l = as<IRLoad>(u->getUser());
+                SLANG_ASSERT(l && "Mesh Output sentinal parameter wasn't used in a load");
+
+                for(auto v = l->firstUse; v; v = v->nextUse)
+                {
+                    auto p = as<IRGetElementPtr>(v->getUser());
+                    SLANG_ASSERT(p && "Mesh Output sentinal parameter wasn't used as an array");
+                    auto sn = p->firstUse;
+                    IRUse* s;
+                    while((s = sn))
+                    {
+                        sn = s->nextUse;
+                        instMatch_(s->getUser(),
+                            [builder, globalOutputVal, p](IRStore* s)
+                            {
+                                // Store using the SOA repsentation
+                                IRBuilderInsertLocScope locScope{builder};
+                                builder->setInsertBefore(s);
+
+                                // TODO: Ellie assignElement
+                                assign(
+                                    builder,
+                                    globalOutputVal,
+                                    ScalarizedVal::value(s->getVal()),
+                                    p->getIndex());
+
+                                // Stores aren't used, safe to remove here without checking
+                                s->removeAndDeallocate();
+                            },
+                            [](IRInst* s)
+                            {
+                                // TODO: Ellie
+                                printf("UNHANDLED\n");
+                                SLANG_ASSERT(!"Ellie: TODO");
+                            }
+                        );
+                    }
+                }
+
+            }
 
             return;
         }
@@ -1776,7 +1977,7 @@ void legalizeEntryPointForGLSL(
     Session*                session,
     IRModule*               module,
     IRFunc*                 func,
-    DiagnosticSink*         sink,
+    CodeGenContext*         codeGenContext,
     GLSLExtensionTracker*   glslExtensionTracker)
 {
     auto entryPointDecor = func->findDecoration<IREntryPointDecoration>();
@@ -1795,7 +1996,7 @@ void legalizeEntryPointForGLSL(
     GLSLLegalizationContext context;
     context.session = session;
     context.stage = stage;
-    context.sink = sink;
+    context.sink = codeGenContext->getSink();
     context.glslExtensionTracker = glslExtensionTracker;
 
     // We require that the entry-point function has no uses,
@@ -1916,6 +2117,7 @@ void legalizeEntryPointForGLSL(
 
             legalizeEntryPointParameterForGLSL(
                 &context,
+                codeGenContext,
                 func,
                 pp,
                 paramLayout);
@@ -1957,12 +2159,12 @@ void legalizeEntryPointsForGLSL(
     Session*                session,
     IRModule*               module,
     const List<IRFunc*>&    funcs,
-    DiagnosticSink*         sink,
+    CodeGenContext*         context,
     GLSLExtensionTracker*   glslExtensionTracker)
 {
     for (auto func : funcs)
     {
-        legalizeEntryPointForGLSL(session, module, func, sink, glslExtensionTracker);
+        legalizeEntryPointForGLSL(session, module, func, context, glslExtensionTracker);
     }
 }
 

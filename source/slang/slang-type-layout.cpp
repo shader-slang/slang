@@ -3240,15 +3240,18 @@ RefPtr<TypeLayout> createTypeLayoutForGlobalGenericTypeParam(
     return _createTypeLayoutForGlobalGenericTypeParam(context, type, globalGenericParamDecl).layout;
 }
 
-static TypeLayoutResult createArrayTypeLayout(
+static TypeLayoutResult createArrayLikeTypeLayout(
     TypeLayoutContext const&    context,
-    ArrayExpressionType* arrayType)
+    Type* type,
+    Type* baseType,
+    IntVal* arrayLength
+    )
 {
     auto rules = context.rules;
 
     auto elementResult = _createTypeLayout(
         context,
-        arrayType->baseType);
+        baseType);
     auto elementInfo = elementResult.info;
     auto elementTypeLayout = elementResult.layout;
 
@@ -3262,7 +3265,7 @@ static TypeLayoutResult createArrayTypeLayout(
     // The layout rules for these vary heavily by resource kind and API.
     //
 
-    auto elementCount = GetElementCount(arrayType->arrayLength);
+    auto elementCount = GetElementCount(arrayLength);
 
     //
     // We can compute the uniform storage layout of an array using
@@ -3280,7 +3283,7 @@ static TypeLayoutResult createArrayTypeLayout(
     RefPtr<ArrayTypeLayout> typeLayout = new ArrayTypeLayout();
 
     // Some parts of the array type layout object are easy to fill in:
-    typeLayout->type = arrayType;
+    typeLayout->type = type;
     typeLayout->rules = rules;
     typeLayout->originalElementTypeLayout = elementTypeLayout;
     typeLayout->uniformAlignment = arrayUniformInfo.alignment;
@@ -3666,7 +3669,12 @@ static TypeLayoutResult _createTypeLayout(
     }
     else if (auto arrayType = as<ArrayExpressionType>(type))
     {
-        return createArrayTypeLayout(context, arrayType);
+        return createArrayLikeTypeLayout(context, arrayType, arrayType->baseType, arrayType->arrayLength);
+    }
+    else if (auto meshOutputType = as<MeshOutputType>(type))
+    {
+        // TODO: Ellie, explain why we aren't making an array layout here
+        return _createTypeLayout(context, meshOutputType->getElementType());
     }
     else if (auto declRefType = as<DeclRefType>(type))
     {

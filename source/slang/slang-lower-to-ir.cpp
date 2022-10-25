@@ -984,6 +984,7 @@ top:
                 goto top;
             }
 
+            // TODO: Ellie, Is this really unreachable? User code input can get here
             SLANG_UNEXPECTED("subscript had no getter");
             UNREACHABLE_RETURN(LoweredValInfo());
         }
@@ -1928,7 +1929,7 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
     IRType* visitMeshOutputType(MeshOutputType* type)
     {
         Type* elementType = type->getElementType();
-        IntVal* count = type->getElementCount();
+        IntVal* count = type->getMaxElementCount();
 
         return lowerGenericIntrinsicType(type, elementType, count);
     }
@@ -2143,17 +2144,63 @@ void addVarDecorations(
         {
             builder->addFormatDecoration(inst, formatAttr->format);
         }
-        else if(as<HLSLIndicesModifier>(mod))
+        else if(as<HLSLMeshShaderOutputModifier>(mod))
         {
-            // TODO: Ellie handle no result here
-            builder->addIndicesDecoration(inst, getFixedArraySize(inst->getFullType()).value());
-        }
-        else if(as<HLSLVerticesModifier>(mod))
-        {
-            builder->addVerticesDecoration(inst, getFixedArraySize(inst->getFullType()).value());
+            IROp op;
+            switch(mod->kType)
+            {
+            case ASTNodeType::HLSLVerticesModifier:
+                op = kIROp_VerticesDecoration;
+                break;
+            case ASTNodeType::HLSLIndicesModifier:
+                op = kIROp_PrimitivesDecoration;
+                break;
+            case ASTNodeType::HLSLPrimitivesModifier:
+                op = kIROp_PrimitivesDecoration;
+                break;
+            default:
+                SLANG_UNREACHABLE("Missing case for HLSLMeshShaderOutputModifier");
+                break;
+            }
+            // TODO: Ellie handle failure here
+            IRIntegerValue maxSize;
+            if(auto c = composeGetters<IRIntLit>(
+                inst,
+                &IRInst::getFullType,
+                &IROutTypeBase::getValueType,
+                &IRArrayType::getElementCount))
+            {
+                maxSize = c->getValue();
+            }
+            builder->addMeshOutputDecoration(op, inst, maxSize);
         }
 
         // TODO: what are other modifiers we need to propagate through?
+    }
+    if(auto t = composeGetters<IRMeshOutputType>(inst->getFullType(), &IROutTypeBase::getValueType))
+    {
+        IROp op;
+        switch(t->getOp())
+        {
+        case kIROp_VerticesType:
+            op = kIROp_VerticesDecoration;
+            break;
+        case kIROp_IndicesType:
+            op = kIROp_PrimitivesDecoration;
+            break;
+        case kIROp_PrimitivesType:
+            op = kIROp_PrimitivesDecoration;
+            break;
+        default:
+            SLANG_UNREACHABLE("Missing case for IRMeshOutputType");
+            break;
+        }
+        IRIntegerValue maxSize;
+        if(auto c = composeGetters<IRIntLit>(t, &IRMeshOutputType::getMaxElementCount))
+        {
+            maxSize = c->getValue();
+        }
+        builder->addMeshOutputDecoration(op, inst, maxSize);
     }
 }
 

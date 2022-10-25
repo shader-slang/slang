@@ -1015,15 +1015,15 @@ void GLSLSourceEmitter::emitEntryPointAttributesImpl(IRFunc* irFunc, IREntryPoin
         case Stage::Mesh:
         {
             emitLocalSizeLayout();
-            if (auto decor = irFunc->findDecoration<IRIndicesDecoration>())
-            {
-                m_writer->emit("layout(max_primitives = ");
-                m_writer->emit(decor->getMaxSize()->getValue());
-                m_writer->emit(")\n");
-            }
             if (auto decor = irFunc->findDecoration<IRVerticesDecoration>())
             {
                 m_writer->emit("layout(max_vertices = ");
+                m_writer->emit(decor->getMaxSize()->getValue());
+                m_writer->emit(")\n");
+            }
+            if (auto decor = irFunc->findDecoration<IRPrimitivesDecoration>())
+            {
+                m_writer->emit("layout(max_primitives = ");
                 m_writer->emit(decor->getMaxSize()->getValue());
                 m_writer->emit(")\n");
             }

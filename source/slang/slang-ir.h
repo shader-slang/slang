@@ -7,6 +7,8 @@
 // similar in spirit to LLVM (but much simpler).
 //
 
+#include <functional>
+
 #include "../core/slang-basic.h"
 #include "../core/slang-memory-arena.h"
 
@@ -635,6 +637,7 @@ struct IRInst
 
     IRInst* getOperand(UInt index)
     {
+        SLANG_ASSERT(index < getOperandCount());
         return getOperands()[index].get();
     }
 
@@ -1261,11 +1264,11 @@ SIMPLE_IR_TYPE(HLSLTriangleStreamType, HLSLStreamOutputType)
 
 // Mesh shaders
 // TODO: Ellie, should this parent struct be shared with Patch?
-// IRArrayLikeType?
+// IRArrayLikeType? IROpaqueArrayLikeType?
 struct IRMeshOutputType : IRType
 {
     IRType* getElementType() { return (IRType*)getOperand(0); }
-    IRInst* getElementCount() { return getOperand(1); }
+    IRInst* getMaxElementCount() { return getOperand(1); }
 
     IR_PARENT_ISA(MeshOutputType)
 };
@@ -1916,6 +1919,117 @@ IRFunc* getParentFunc(IRInst* inst);
 #if SLANG_ENABLE_IR_BREAK_ALLOC
 uint32_t& _debugGetIRAllocCounter();
 #endif
+
+// TODO: Ellie, comment and move somewhere more appropriate?
+
+template<typename F, typename I = IRInst> 
+static void traverseUses(IRInst* inst, F f)
+{
+    for(auto* u = inst->firstUse; u; u = u->nextUse)
+    {
+        if(auto s = as<I>(u->getUser()))
+        {
+            f(s);
+        }
+    }
+}
+
+namespace detail
+{
+// A helper to get the singular pointer argument of something callable
+// Use std::function to allow passing in anything from which std::function can
+// be deduced (pointers, lambdas, functors):
+// https://en.cppreference.com/w/cpp/utility/functional/function/deduction_guides
+// GetPtrArg<T> matches T against R(A*) and returns A
+template<typename R, typename A>
+static A returnArg(std::function<R(A*)>);
+
+// Get the class type from a pointer to member function
+template<typename R, typename T>
+static T thisArg(R (T::*&&())());
+}
+
+// A tool to "pattern match" an instruction against multiple cases
+// Use like:
+//
+// ```
+// auto r = instMatch_(myInst,
+//   default,
+//   [](IRStore* store){ return handleStore... },
+//   [](IRType* type){ return handleTypes... },
+//   );
+// ```
+//
+// This version returns default if none of the cases match
+template<typename R, typename F, typename... Fs>
+R instMatch(IRInst* i, R def, F f, Fs... fs)
+{
+    // Recursive case
+    using P = decltype(detail::returnArg(std::function{std::declval<F>()}));
+    if(auto s = as<P>(i))
+    {
+        return f(s);
+    }
+    return instMatch(i, def, fs...);
+}
+
+// Base case with no eliminators, return the default value
+template<typename R>
+R instMatch(IRInst* i, R def)
+{
+    return def;
+}
+
+// A tool to "pattern match" an instruction against multiple cases
+// Use like:
+//
+// ```
+// instMatch_(myInst,
+//   [](IRStore* store){ handleStore... },
+//   [](IRType* type){ handleTypes... },
+//   [](IRInst* inst){ catch-all case...}
+//   );
+// ```
+//
+// This version returns nothing
+template<typename F, typename... Fs>
+void instMatch_(IRInst* i, F f, Fs... fs)
+{
+    // Recursive case
+    using P = decltype(detail::returnArg(std::function{std::declval<F>()}));
+    if(auto s = as<P>(i))
+    {
+        return f(s);
+    }
+    return instMatch_(i, fs...);
+}
+
+template<typename... Fs>
+void instMatch_(IRInst* i)
+{
+    // Base case with no eliminators
+}
+
+// A tool to compose a bunch of downcasts and accessors
+// `composeGetters<R>(x, &MyStruct::getFoo, &MyOtherStruct::getBar)` translates to
+// `if(auto y = as<MyStruct>) if(auto z = as<MyOtherStruct>(y->getFoo())) return as<R>(z->getBar())`
+template<typename R, typename T, typename F, typename... Fs>
+R* composeGetters(T* t, F f, Fs... fs)
+{
+    using D = decltype(detail::thisArg(std::declval<F>));
+    if(D* d = as<D>(t))
+    {
+        auto* n = std::invoke(f, d);
+        return composeGetters<R>(n, fs...);
+    }
+    return nullptr;
+}
+
+template<typename R, typename T>
+R* composeGetters(T* t)
+{
+    return as<R>(t);
+}
 
 } // namespace Slang
 

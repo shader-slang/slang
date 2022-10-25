@@ -333,6 +333,7 @@ struct IROutputControlPointsDecoration : IRDecoration
     IRIntLit* getControlPointCount() { return cast<IRIntLit>(getOperand(0)); }
 };
 
+// This is used for mesh shaders too
 struct IROutputTopologyDecoration : IRDecoration
 {
     enum { kOp = kIROp_OutputTopologyDecoration };
@@ -763,16 +764,22 @@ struct IRMeshOutputDecoration : public IRDecoration
     IRIntLit* getMaxSize() { return cast<IRIntLit>(getOperand(0)); }
 };
 
-struct IRIndicesDecoration : public IRMeshOutputDecoration
-{
-    enum { kOp = kIROp_IndicesDecoration };
-    IR_LEAF_ISA(IndicesDecoration)
-};
-
 struct IRVerticesDecoration : public IRMeshOutputDecoration
 {
-    enum { kOp = kIROp_VerticesDecoration };
     IR_LEAF_ISA(VerticesDecoration)
+};
+
+struct IRPrimitivesDecoration : public IRMeshOutputDecoration
+{
+    IR_LEAF_ISA(PrimitivesDecoration)
+};
+
+struct IRMeshOutputRef : public IRInst
+{
+    enum { kOp = kIROp_MeshOutputRef };
+    IR_LEAF_ISA(MeshOutputRef)
+    IRInst* getIndex() { return getOperand(1); }
+    IRInst* getOutputType() { return cast<IRPtrTypeBase>(getFullType())->getValueType(); }
 };
 
     /// An attribute that can be attached to another instruction as an operand.
@@ -3389,15 +3396,11 @@ public:
         addDecoration(inst, kIROp_VulkanHitObjectAttributesDecoration, getIntValue(getIntType(), location));
     }
 
-    void addIndicesDecoration(IRInst* value, const int maxCount)
+    void addMeshOutputDecoration(IROp d, IRInst* value, const int maxCount)
     {
+        SLANG_ASSERT(IRMeshOutputDecoration::isaImpl(d));
         // TODO: Ellie, correct int type here?
-        addDecoration(value, kIROp_IndicesDecoration, getIntValue(getUIntType(), maxCount));
-    }
-
-    void addVerticesDecoration(IRInst* value, const int maxCount)
-    {
-        addDecoration(value, kIROp_VerticesDecoration, getIntValue(getUIntType(), maxCount));
+        addDecoration(value, d, getIntValue(getUIntType(), maxCount));
     }
 };
 
@@ -3428,6 +3431,20 @@ struct IRBuilderSourceLocRAII
     {
         SLANG_ASSERT(builder->getSourceLocInfo() == this);
         builder->setSourceLocInfo(next);
+    }
+};
+
+// A helper to restore the builder's insert location on destruction
+struct IRBuilderInsertLocScope
+{
+    IRBuilder* builder;
+    IRInsertLoc insertLoc;
+    IRBuilderInsertLocScope(IRBuilder* b)
+        : builder(b), insertLoc(builder->getInsertLoc())
+    {}
+    ~IRBuilderInsertLocScope()
+    {
+        builder->setInsertLoc(insertLoc);
     }
 };
 

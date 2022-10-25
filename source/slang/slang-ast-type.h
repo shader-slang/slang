@@ -361,7 +361,8 @@ class MeshOutputType : public BuiltinGenericType
     SLANG_AST_CLASS(MeshOutputType)
 
     Type* getElementType();
-    IntVal* getElementCount();
+
+    IntVal* getMaxElementCount();
 };
 
 class VerticesType : public MeshOutputType

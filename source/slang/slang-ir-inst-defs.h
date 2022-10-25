@@ -399,6 +399,9 @@ INST(StructuredBufferLoad, structuredBufferLoad, 2, 0)
 //
 INST(StructuredBufferStore, structuredBufferStore, 3, 0)
 
+INST(MeshOutputSet, meshOutputSet, 3, 0)
+INST(MeshOutputRef, meshOutputRef, 2, 0)
+
 // Construct a vector from a scalar
 //
 // %dst = constructVectorFromScalar %T %N %val
@@ -698,6 +701,11 @@ INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
     INST(NoInlineDecoration, noInline, 0, 0)
 
     INST(PayloadDecoration, payload, 0, 0)
+
+    /* Mesh Shader outputs */
+        INST(VerticesDecoration, vertices, 0, 0)
+        INST(PrimitivesDecoration, primitives, 0, 0)
+    INST_RANGE(MeshOutputDecoration, VerticesDecoration, PrimitivesDecoration)
 
     /* StageAccessDecoration */
         INST(StageReadAccessDecoration, stageReadAccess, 0, 0)
