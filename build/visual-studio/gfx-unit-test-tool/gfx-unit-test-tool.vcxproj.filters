@@ -86,6 +86,9 @@
     <ClCompile Include="..\..\..\tools\gfx-unit-test\sampler-array.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\tools\gfx-unit-test\shader-cache-tests.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\..\tools\gfx-unit-test\shared-buffers-tests.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -116,6 +119,9 @@
       <Filter>Source Files</Filter>
     </None>
     <None Include="..\..\..\tools\gfx-unit-test\graphics-smoke.slang">
+      <Filter>Source Files</Filter>
+    </None>
+    <None Include="..\..\..\tools\gfx-unit-test\multiple-entry-point-shader-cache-shader.slang">
       <Filter>Source Files</Filter>
     </None>
     <None Include="..\..\..\tools\gfx-unit-test\mutable-shader-object.slang">

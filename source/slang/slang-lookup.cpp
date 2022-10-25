@@ -89,6 +89,18 @@ void buildMemberDictionary(ContainerDecl* decl)
 
 bool DeclPassesLookupMask(Decl* decl, LookupMask mask)
 {
+    // Always exclude extern members from lookup result.
+    if (decl->hasModifier<ExtensionExternVarModifier>())
+    {
+        return false;
+    }
+    else if (decl->hasModifier<ExternModifier>())
+    {
+        if (as<ExtensionDecl>(decl->parentDecl))
+        {
+            return false;
+        }
+    }
     // type declarations
     if(auto aggTypeDecl = as<AggTypeDecl>(decl))
     {
@@ -108,7 +120,7 @@ bool DeclPassesLookupMask(Decl* decl, LookupMask mask)
     {
         return (int(mask) & int(LookupMask::Attribute)) != 0;
     }
-
+    
     // default behavior is to assume a value declaration
     // (no overloading allowed)
 
@@ -712,7 +724,7 @@ static void _lookUpMembersInSuperTypeImpl(
         // The evidence for the subtype relationship will be a witness
         // proving that `leafType : leftType & rightType`:
         //
-        leafIsLeftWitness->conunctionWitness = leafIsSuperWitness;
+        leafIsLeftWitness->conjunctionWitness = leafIsSuperWitness;
         //
         // ... along with the index of the desired super-type in
         // that conjunction. The index of `leftType` in `leftType & rightType`
@@ -725,7 +737,7 @@ static void _lookUpMembersInSuperTypeImpl(
         // the conjunction.
         //
         auto leafIsRightWitness = astBuilder->create<ExtractFromConjunctionSubtypeWitness>();
-        leafIsRightWitness->conunctionWitness = leafIsSuperWitness;
+        leafIsRightWitness->conjunctionWitness = leafIsSuperWitness;
         leafIsRightWitness->indexInConjunction = 1;
         leafIsRightWitness->sub = leafType;
         leafIsRightWitness->sup = rightType;
@@ -942,7 +954,7 @@ static void _lookUpInScopes(
                 // The implicit `this`/`This` for a function-like declaration
                 // depends on modifiers attached to the declaration.
                 //
-                if (funcDeclRef.getDecl()->hasModifier<HLSLStaticModifier>())
+                if (isEffectivelyStatic(funcDeclRef.getDecl()))
                 {
                     // A `static` method only has access to an implicit `This`,
                     // and does not have a `this` expression available.
@@ -1002,26 +1014,8 @@ LookupResult lookUp(
     LookupMask          mask)
 {
     LookupResult result;
-    LookupRequestKey key;
-    TypeCheckingCache* typeCheckingCache = nullptr;
-    if (semantics)
-    {
-        typeCheckingCache = semantics->getLinkage()->getTypeCheckingCache();
-        key.base = scope;
-        key.name = name;
-        key.options = LookupOptions::None;
-        key.mask = mask;
-        if (typeCheckingCache->lookupCache.TryGetValue(key, result))
-        {
-            return result;
-        }
-    }
     LookupRequest request = initLookupRequest(semantics, name, mask, LookupOptions::None, scope);
     _lookUpInScopes(astBuilder, name, request, result);
-    if (typeCheckingCache)
-    {
-        typeCheckingCache->lookupCache[key] = result;
-    }
     return result;
 }
 
@@ -1033,20 +1027,9 @@ LookupResult lookUpMember(
     LookupMask          mask,
     LookupOptions       options)
 {
-    TypeCheckingCache* typeCheckingCache = semantics->getLinkage()->getTypeCheckingCache();
-    LookupRequestKey key;
-    key.base = type;
-    key.name = name;
-    key.options = options;
-    key.mask = mask;
     LookupResult result;
-    if (typeCheckingCache->lookupCache.TryGetValue(key, result))
-    {
-        return result;
-    }
     LookupRequest request = initLookupRequest(semantics, name, mask, options, nullptr);
     _lookUpMembersInType(astBuilder, name, type, request, result, nullptr);
-    typeCheckingCache->lookupCache[key] = result;
     return result;
 }
 

@@ -1146,10 +1146,6 @@ static void addLinkageDecoration(
     {
         builder->addExternCppDecoration(inst, mangledName);
     }
-    if (decl->findModifier<JVPDerivativeModifier>())
-    {
-        builder->addJVPDerivativeMarkerDecoration(inst);
-    }
     if (as<InterfaceDecl>(decl->parentDecl) &&
         decl->parentDecl->hasModifier<ComInterfaceAttribute>())
     {
@@ -1671,7 +1667,7 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         // witness that `T : L & R`, so lower that first and expect it to be
         // a value of tuple type.
         //
-        auto conjunctionWitness = lowerSimpleVal(context, val->conunctionWitness);
+        auto conjunctionWitness = lowerSimpleVal(context, val->conjunctionWitness);
         auto conjunctionTupleType = as<IRTupleType>(conjunctionWitness->getDataType());
         SLANG_ASSERT(conjunctionTupleType);
 
@@ -5844,6 +5840,45 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         return LoweredValInfo();
     }
 
+    LoweredValInfo visitDifferentiableTypeDictionary(DifferentiableTypeDictionary* decl)
+    {
+        for (auto & member : decl->members)
+        {
+            if (auto entry = as<DifferentiableTypeDictionaryItem>(member))
+            {
+
+                // Lower type and witness.
+                IRType* irType = lowerType(context, entry->baseType);
+                IRInst* irWitness = lowerVal(context, entry->confWitness).val;
+
+                SLANG_ASSERT(irType);
+
+                // If the witness can be lowered, and the differentiable type entry exists,
+                // add an entry to the context.
+                // 
+                if (irWitness && !getBuilder()->findDifferentiableTypeEntry(irType))
+                    getBuilder()->addDifferentiableTypeEntry(irType, irWitness);
+            }
+            else if (auto importEntry = as<DifferentiableTypeDictionaryImportItem>(member))
+            {
+                ensureDecl(context, importEntry->dictionaryRef.getDecl());
+            }
+            else
+            {
+                SLANG_UNEXPECTED("Unrecognized item in DifferentiableTypeDictionary");
+                UNREACHABLE_RETURN(LoweredValInfo());
+            }
+        }
+
+        if (auto diffTypeDict = getBuilder()->findOrEmitDifferentiableTypeDictionary())
+        {
+            // Place the dictionary at the end of modules and generic blocks.
+            diffTypeDict->moveToEnd();
+        }
+
+        return LoweredValInfo();
+    }
+
 #define IGNORED_CASE(NAME) \
     LoweredValInfo visit##NAME(NAME*) { return LoweredValInfo(); }
 
@@ -5853,6 +5888,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
     IGNORED_CASE(SyntaxDecl)
     IGNORED_CASE(AttributeDecl)
     IGNORED_CASE(NamespaceDecl)
+    IGNORED_CASE(DifferentiableTypeDictionaryItem)
 
 #undef IGNORED_CASE
 
@@ -6130,7 +6166,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         auto irWitnessTable = subBuilder->createWitnessTable(irWitnessTableBaseType, nullptr);
 
         // Register the value now, rather than later, to avoid any possible infinite recursion.
-        setGlobalValue(context, inheritanceDecl, LoweredValInfo::simple(irWitnessTable));
+        setGlobalValue(context, inheritanceDecl, LoweredValInfo::simple(findOuterMostGeneric(irWitnessTable)));
 
         auto irSubType = lowerType(subContext, subType);
         irWitnessTable->setOperand(0, irSubType);
@@ -6251,7 +6287,13 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             // A variable declared inside of an aggregate type declaration is a member.
             return true;
         }
-
+        if (auto extDecl = as<ExtensionDecl>(parent))
+        {
+            if (auto declRefType = as<DeclRefType>(extDecl->targetType.type))
+            {
+                return true;
+            }
+        }
         return false;
     }
 
@@ -7040,6 +7082,14 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         builder->addDecoration(inst, op, operands.getBuffer(), operands.getCount());
     }
 
+    void lowerDerivativeMemberModifier(IRInst* inst, DerivativeMemberAttribute* derivativeMember)
+    {
+        auto key = lowerRValueExpr(context, derivativeMember->memberDeclRef).val;
+        SLANG_RELEASE_ASSERT(as<IRStructKey>(key));
+        auto builder = getBuilder();
+        builder->addDecoration(inst, kIROp_JVPDerivativeMemberReferenceDecoration, key);
+    }
+
     LoweredValInfo lowerMemberVarDecl(VarDecl* fieldDecl)
     {
         // Each field declaration in the AST translates into
@@ -7052,12 +7102,21 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // will use the same space of keys.
 
         auto builder = getBuilder();
-        auto irFieldKey = builder->createStructKey();
-        addNameHint(context, irFieldKey, fieldDecl);
+        IRInst* irFieldKey = nullptr;
+        if (auto extVarModifier = fieldDecl->findModifier<ExtensionExternVarModifier>())
+        {
+            irFieldKey = ensureDecl(context, extVarModifier->originalDecl.getDecl()).val;
+            SLANG_RELEASE_ASSERT(as<IRStructKey>(irFieldKey));
+        }
 
-        addVarDecorations(context, irFieldKey, fieldDecl);
+        if (!irFieldKey)
+        {
+            irFieldKey = builder->createStructKey();
 
-        addLinkageDecoration(context, irFieldKey, fieldDecl);
+            addNameHint(context, irFieldKey, fieldDecl);
+            addVarDecorations(context, irFieldKey, fieldDecl);
+            addLinkageDecoration(context, irFieldKey, fieldDecl);
+        }
 
         if (auto semanticModifier = fieldDecl->findModifier<HLSLSimpleSemantic>())
         {
@@ -7071,6 +7130,10 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         if( auto writeModifier = fieldDecl->findModifier<RayPayloadWriteSemantic>())
         {
             lowerRayPayloadAccessModifier(irFieldKey, writeModifier, kIROp_StageWriteAccessDecoration);
+        }
+        if (auto derivativeMemberModifier = fieldDecl->findModifier<DerivativeMemberAttribute>())
+        {
+            lowerDerivativeMemberModifier(irFieldKey, derivativeMemberModifier);
         }
 
         // We allow a field to be marked as a target intrinsic,
@@ -7216,6 +7279,21 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             if (auto constraintDecl = as<GenericTypeConstraintDecl>(member))
             {
                 emitGenericConstraintDecl(subContext, constraintDecl);
+            }
+        }
+
+        // We only need dictionaries to be lowered for decls with executable code (i.e. statements)
+        // Do not lower type dictionaries for inhertiance decls or decls 
+        // that are declaring a type, since this can create a cyclic dependancy.
+        // 
+        if (as<FunctionDeclBase>(leafDecl))
+        {
+            for (auto diffTypeDict : genericDecl->getMembersOfType<DifferentiableTypeDictionary>())
+            {
+                // We directly use lowerDecl() instead of ensureDecl() to emit to
+                // the current generic block instead of the top-level module.
+                // 
+                lowerDecl(subContext, diffTypeDict);
             }
         }
 
@@ -7372,6 +7450,10 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                     {
                         markInstsToClone(valuesToClone, parentGeneric->getFirstBlock(), genericParam);
                     }
+                    
+                    // Add a differentiable type dictionary if necessary.
+                    if (auto diffTypeDict = subBuilder->findDifferentiableTypeDictionary(parentGeneric->getFirstBlock()))
+                        markInstsToClone(valuesToClone, parentGeneric->getFirstBlock(), diffTypeDict);
                 }
                 if (valuesToClone.Count() == 0)
                 {
@@ -7722,6 +7804,21 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         IRFunc* irFunc = subBuilder->createFunc();
         addNameHint(context, irFunc, decl);
         addLinkageDecoration(context, irFunc, decl);
+
+        if (decl->findModifier<JVPDerivativeModifier>())
+        {
+            getBuilder()->addJVPDerivativeMarkerDecoration(irFunc);
+        }
+
+        // Always force inline diff setter accessor to prevent downstream compiler from complaining
+        // fields are not fully initialized for the first `inout` parameter.
+        if (as<SetterDecl>(decl))
+        {
+            if (!decl->findModifier<ForceInlineAttribute>())
+            {
+                getBuilder()->addForceInlineDecoration(irFunc);
+            }
+        }
 
         FuncDeclBaseTypeInfo info;
         _lowerFuncDeclBaseTypeInfo(
@@ -8100,6 +8197,11 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         if(decl->findModifier<UnsafeForceInlineEarlyAttribute>())
         {
             getBuilder()->addDecoration(irFunc, kIROp_UnsafeForceInlineEarlyDecoration);
+        }
+
+        if (decl->findModifier<ForceInlineAttribute>())
+        {
+            getBuilder()->addDecoration(irFunc, kIROp_ForceInlineDecoration);
         }
 
         if (auto attr = decl->findModifier<CustomJVPAttribute>())
@@ -8782,15 +8884,6 @@ RefPtr<IRModule> generateIRForTranslationUnit(
     // Next, attempt to promote local variables to SSA
     // temporaries whenever possible.
     constructSSA(module);
-
-    // Process higher-order-function calls before any optimization passes
-    // to allow the optimizations to affect the generated funcitons.
-    // 1. Process JVP derivative functions.
-    processJVPDerivativeMarkers(module, compileRequest->getSink());
-    // 2. Process VJP derivative functions.
-    // processVJPDerivativeMarkers(module); // Disabled currently. No impl yet.
-    // 3. Replace JVP & VJP calls.
-    processDerivativeCalls(module);
 
     // Do basic constant folding and dead code elimination
     // using Sparse Conditional Constant Propagation (SCCP)

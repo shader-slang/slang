@@ -35,6 +35,7 @@
 #include "slang-glsl-extension-tracker.h"
 #include "slang-emit-cuda.h"
 
+#include "slang-serialize-ast.h"
 #include "slang-serialize-container.h"
 
 namespace Slang
@@ -222,6 +223,16 @@ namespace Slang
         visitor->visitEntryPoint(this, as<EntryPointSpecializationInfo>(specializationInfo));
     }
 
+    void EntryPoint::updateDependencyBasedHash(
+        DigestBuilder& builder,
+        SlangInt entryPointIndex)
+    {
+        // CompositeComponentType will have already hashed the relevant entry point's name
+        // and file path dependencies, so we immediately return.
+        SLANG_UNUSED(builder);
+        SLANG_UNUSED(entryPointIndex);
+    }
+
     List<Module*> const& EntryPoint::getModuleDependencies()
     {
         if(auto module = getModule())
@@ -288,6 +299,19 @@ namespace Slang
             return static_cast<slang::ITypeConformance*>(this);
 
         return Super::getInterface(guid);
+    }
+
+    void TypeConformance::updateDependencyBasedHash(
+        DigestBuilder& builder,
+        SlangInt entryPointIndex)
+    {
+        SLANG_UNUSED(entryPointIndex);
+
+        //TODO: Implement some kind of hashInto for Val then replace this
+        auto subtypeWitness = m_subtypeWitness->toString();
+
+        builder.addToDigest(subtypeWitness);
+        builder.addToDigest(m_conformanceIdOverride);
     }
 
     List<Module*> const& TypeConformance::getModuleDependencies()

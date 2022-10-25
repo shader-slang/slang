@@ -12,7 +12,7 @@ using namespace Slang;
 
 class TransientResourceHeapImpl
     : public TransientResourceHeapBaseImpl<DeviceImpl, BufferResourceImpl>
-    , public ID3D12TransientResourceHeap
+    , public ITransientResourceHeapD3D12
 {
 private:
     typedef TransientResourceHeapBaseImpl<DeviceImpl, BufferResourceImpl> Super;

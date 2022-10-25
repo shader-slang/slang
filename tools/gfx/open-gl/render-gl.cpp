@@ -400,7 +400,14 @@ public:
                 renderer->glFramebufferTexture2D(
                     GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0 + (uint32_t)i, GL_TEXTURE_2D, rtv->m_textureID, 0);
                 m_drawBuffers.add((GLenum)(GL_COLOR_ATTACHMENT0 + i));
-                m_colorClearValues.add(rtv->m_resource->getDesc()->optimalClearValue.color);
+                if (rtv->m_resource->getDesc()->optimalClearValue)
+                {
+                    m_colorClearValues.add(rtv->m_resource->getDesc()->optimalClearValue->color);
+                }
+                else
+                {
+                    m_colorClearValues.add(ColorClearValue());
+                }
             }
             m_sameClearValues = true;
             for (Index i = 1; i < m_colorClearValues.getCount() && m_sameClearValues; i++)
@@ -423,8 +430,11 @@ public:
                     GL_TEXTURE_2D,
                     depthStencilView->m_textureID,
                     0);
-                m_depthStencilClearValue =
-                    depthStencilView->m_resource->getDesc()->optimalClearValue.depthStencil;
+                if (depthStencilView->m_resource->getDesc()->optimalClearValue)
+                {
+                    m_depthStencilClearValue =
+                        depthStencilView->m_resource->getDesc()->optimalClearValue->depthStencil;
+                }
             }
             auto error = renderer->glCheckFramebufferStatus(GL_FRAMEBUFFER);
             if (error != GL_FRAMEBUFFER_COMPLETE)
@@ -2791,7 +2801,7 @@ Result GLDevice::createProgram(
     {
         ComPtr<ISlangBlob> kernelCode;
         ComPtr<ISlangBlob> diagnostics;
-        auto compileResult = desc.slangGlobalScope->getEntryPointCode(
+        auto compileResult = getEntryPointCodeFromShaderCache(desc.slangGlobalScope,
             i, 0, kernelCode.writeRef(), diagnostics.writeRef());
         if (diagnostics)
         {

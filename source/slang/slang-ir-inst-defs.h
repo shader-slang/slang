@@ -639,6 +639,9 @@ INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
         /// An `[unsafeForceInlineEarly]` decoration specifies that calls to this function should be inline after initial codegen
     INST(UnsafeForceInlineEarlyDecoration, unsafeForceInlineEarly, 0, 0)
 
+        /// A `[ForceInline]` decoration indicates the callee should be inlined by the Slang compiler.
+    INST(ForceInlineDecoration, ForceInline, 0, 0)
+
         /// A `[naturalSizeAndAlignment(s,a)]` decoration is attached to a type to indicate that is has natural size `s` and alignment `a`
     INST(NaturalSizeAndAlignmentDecoration, naturalSizeAndAlignment, 2, 0)
 
@@ -702,6 +705,10 @@ INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
         /// Used by the auto-diff pass to hold a reference to the
         /// generated derivative function.
     INST(JVPDerivativeReferenceDecoration, jvpFnReference, 1, 0)
+
+        /// Used by the auto-diff pass to hold a reference to a
+        /// differential member of a type in its associated differential type.
+    INST(JVPDerivativeMemberReferenceDecoration, derivativeMemberDecoration, 1, 0)
 
         /// Marks a class type as a COM interface implementation, which enables
         /// the witness table to be easily picked up by emit.
@@ -801,6 +808,10 @@ INST(SpecializationDictionaryItem, SpecializationDictionaryItem, 0, 0)
 INST(GenericSpecializationDictionary, GenericSpecializationDictionary, 0, PARENT)
 INST(ExistentialFuncSpecializationDictionary, ExistentialFuncSpecializationDictionary, 0, PARENT)
 INST(ExistentialTypeSpecializationDictionary, ExistentialTypeSpecializationDictionary, 0, PARENT)
+
+/* Differentiable Type Dictionary */
+INST(DifferentiableTypeDictionary, DifferentiableTypeDictionary, 0, PARENT)
+INST(DifferentiableTypeDictionaryItem, DifferentiableTypeDictionaryItem, 0, 0)
 
 #undef PARENT
 #undef USE_OTHER

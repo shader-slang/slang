@@ -238,6 +238,7 @@ IRInst* IRSpecContext::maybeCloneValue(IRInst* originalValue)
     case kIROp_WitnessTable:
     case kIROp_InterfaceType:
     case kIROp_TaggedUnionType:
+    case kIROp_DifferentiableTypeDictionary:
         return cloneGlobalValue(this, originalValue);
 
     case kIROp_BoolLit:
@@ -591,6 +592,24 @@ IRWitnessTable* cloneWitnessTableImpl(
     cloneSimpleGlobalValueImpl(context, originalTable, originalValues, clonedTable, registerValue);
     return clonedTable;
 }
+
+IRInst* cloneDifferentiableTypeDictionary(
+    IRSpecContextBase*  context,
+    IRBuilder*          builder,
+    IRInst*             originalDict,
+    IROriginalValuesForClone const& originalValues,
+    IRInst* dstDict = nullptr,
+    bool registerValue = true)
+{
+    IRInst* clonedDict = dstDict;
+    if (!clonedDict)
+    {
+        clonedDict = builder->emitDifferentiableTypeDictionary();
+    }
+    cloneSimpleGlobalValueImpl(context, originalDict, originalValues, clonedDict, registerValue);
+    return clonedDict;
+}
+
 
 IRWitnessTable* cloneWitnessTableWithoutRegistering(
     IRSpecContextBase*  context,
@@ -1118,6 +1137,9 @@ IRInst* cloneInst(
 
     case kIROp_GlobalGenericParam:
         return cloneGlobalGenericParamImpl(context, builder, cast<IRGlobalGenericParam>(originalInst), originalValues);
+    
+    case kIROp_DifferentiableTypeDictionary:
+        return cloneDifferentiableTypeDictionary(context, builder, originalInst, originalValues);
 
     default:
         break;
@@ -1504,11 +1526,14 @@ LinkedIR linkIR(
     {
         for (auto inst : irModule->getGlobalInsts())
         {
-            auto bindInst = as<IRBindGlobalGenericParam>(inst);
-            if (!bindInst)
-                continue;
-
-            cloneValue(context, bindInst);
+            if (auto bindInst = as<IRBindGlobalGenericParam>(inst))
+            {
+                cloneValue(context, bindInst);
+            }
+            else if (inst->getOp() == kIROp_DifferentiableTypeDictionary)
+            {
+                cloneValue(context, inst);
+            }
         }
     }
 

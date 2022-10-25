@@ -419,7 +419,8 @@ newoption {
      removefiles
      {
          "**/*.meta.slang.h",
-         "**/slang-*generated*.h"
+         "**/slang-*generated*.h",
+         "**/gfx-unit-test/test-tmp*"
      }
  end
  

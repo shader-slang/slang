@@ -329,19 +329,26 @@ DIAGNOSTIC(31123, Error, invalidGUID, "'$0' is not a valid GUID")
 DIAGNOSTIC(31124, Error, structCannotImplementComInterface, "a struct type cannot implement a [COM] interface")
 DIAGNOSTIC(31124, Error, interfaceInheritingComMustBeCom, "an interface type that inherits from a [COM] interface must itself be a [COM] interface")
 
+DIAGNOSTIC(31130, Error, derivativeMemberAttributeMustNameAMemberInExpectedDifferentialType, "[DerivativeMember] must reference to a member in the associated differential type '$0'.")
+DIAGNOSTIC(31131, Error, invalidUseOfDerivativeMemberAttributeParentTypeIsNotDifferentiable, "invalid use of [DerivativeMember], parent type is not differentiable.")
+DIAGNOSTIC(31132, Error, derivativeMemberAttributeCanOnlyBeUsedOnMembers, "[DerivativeMember] is allowed on members only.")
+
+DIAGNOSTIC(31140, Error, typeOfExternDeclMismatchesOriginalDefinition, "type of `extern` decl '$0' differs from its original definition. expected '$1'.")
+DIAGNOSTIC(31141, Error, definitionOfExternDeclMismatchesOriginalDefinition, "`extern` decl '$0' is not consistent with its original definition.")
+DIAGNOSTIC(31142, Error, ambiguousOriginalDefintionOfExternDecl, "`extern` decl '$0' has ambiguous original definitions.")
+DIAGNOSTIC(31143, Error, missingOriginalDefintionOfExternDecl, "no original definition found for `extern` decl '$0'.")
 
 // Enums
 
 DIAGNOSTIC(32000, Error, invalidEnumTagType,        "invalid tag type for 'enum': '$0'")
 DIAGNOSTIC(32003, Error, unexpectedEnumTagExpr,     "unexpected form for 'enum' tag value expression")
 
-
-
 // 303xx: interfaces and associated types
 DIAGNOSTIC(30300, Error, assocTypeInInterfaceOnly, "'associatedtype' can only be defined in an 'interface'.")
 DIAGNOSTIC(30301, Error, globalGenParamInGlobalScopeOnly, "'type_param' can only be defined global scope.")
 DIAGNOSTIC(30302, Error, staticConstRequirementMustBeIntOrBool, "'static const' requirement can only have int or bool type.")
 DIAGNOSTIC(30303, Error, valueRequirementMustBeCompileTimeConst, "requirement in the form of a simple value must be declared as 'static const'.")
+DIAGNOSTIC(30310, Error, typeIsNotDifferentiable, "type '$0' is not differentiable.")
 
 // Interop
 DIAGNOSTIC(30400, Error, cannotDefinePtrTypeToManagedResource, "pointer to a managed resource is invalid, use `NativeRef<T>` instead")

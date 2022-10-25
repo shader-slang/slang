@@ -32,6 +32,14 @@ class GloballyCoherentModifier : public Modifier { SLANG_AST_CLASS(GloballyCoher
 class ExternCppModifier : public Modifier { SLANG_AST_CLASS(ExternCppModifier)};
 class JVPDerivativeModifier : public Modifier { SLANG_AST_CLASS(JVPDerivativeModifier)};
 
+// An `extern` variable in an extension is used to introduce additional attributes on an existing
+// field.
+class ExtensionExternVarModifier : public Modifier
+{
+    SLANG_AST_CLASS(ExtensionExternVarModifier)
+    DeclRef<Decl> originalDecl;
+};
+
 // An 'ActualGlobal' is a global that is output as a normal global in CPU code. 
 // Globals in HLSL/Slang are constant state passed into kernel execution 
 class ActualGlobalModifier : public Modifier { SLANG_AST_CLASS(ActualGlobalModifier)};
@@ -549,6 +557,7 @@ class AttributeTargetModifier : public Modifier
     SyntaxClass<NodeBase> syntaxClass;
 };
 
+
 // Base class for checked and unchecked `[name(arg0, ...)]` style attribute.
 class AttributeBase : public Modifier 
 {
@@ -910,6 +919,14 @@ class UnsafeForceInlineEarlyAttribute : public Attribute
     SLANG_AST_CLASS(UnsafeForceInlineEarlyAttribute)
 };
 
+// A `[ForceInline]` attribute indicates that the callee should be inlined
+// by the Slang compiler.
+//
+class ForceInlineAttribute : public Attribute
+{
+    SLANG_AST_CLASS(ForceInlineAttribute)
+};
+
     /// An attribute that marks a type declaration as either allowing or
     /// disallowing the type to be inherited from in other modules.
 class InheritanceControlAttribute : public Attribute { SLANG_AST_CLASS(InheritanceControlAttribute) };
@@ -942,6 +959,12 @@ class SpecializeAttribute : public Attribute
     SLANG_AST_CLASS(SpecializeAttribute)
 };
 
+    /// An attribute that marks a type, function or variable as differentiable.
+class DifferentiableAttribute : public Attribute
+{
+    SLANG_AST_CLASS(DifferentiableAttribute)
+};
+
 class DllImportAttribute : public Attribute
 {
     SLANG_AST_CLASS(DllImportAttribute)
@@ -954,6 +977,13 @@ class DllImportAttribute : public Attribute
 class DllExportAttribute : public Attribute
 {
     SLANG_AST_CLASS(DllExportAttribute)
+};
+
+class DerivativeMemberAttribute : public Attribute
+{
+    SLANG_AST_CLASS(DerivativeMemberAttribute)
+
+    DeclRefExpr* memberDeclRef;
 };
 
     /// An attribute that marks an interface type as a COM interface declaration.

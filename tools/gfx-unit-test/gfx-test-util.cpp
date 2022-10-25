@@ -54,6 +54,13 @@ namespace gfx_test
             diagnosticsBlob.writeRef());
         diagnoseIfNeeded(diagnosticsBlob);
         SLANG_RETURN_ON_FAIL(result);
+
+        ComPtr<slang::IComponentType> linkedProgram;
+        result = composedProgram->link(linkedProgram.writeRef(), diagnosticsBlob.writeRef());
+        diagnoseIfNeeded(diagnosticsBlob);
+        SLANG_RETURN_ON_FAIL(result);
+
+        composedProgram = linkedProgram;
         slangReflection = composedProgram->getLayout();
 
         gfx::IShaderProgram::Desc programDesc = {};
@@ -169,7 +176,10 @@ namespace gfx_test
         compareComputeResultFuzzy(result, expectedResult, expectedBufferSize);
     }
 
-    Slang::ComPtr<gfx::IDevice> createTestingDevice(UnitTestContext* context, Slang::RenderApiFlag::Enum api)
+    Slang::ComPtr<gfx::IDevice> createTestingDevice(
+        UnitTestContext* context,
+        Slang::RenderApiFlag::Enum api,
+        gfx::IDevice::ShaderCacheDesc shaderCache)
     {
         Slang::ComPtr<gfx::IDevice> device;
         gfx::IDevice::Desc deviceDesc = {};
@@ -200,6 +210,8 @@ namespace gfx_test
         const char* searchPaths[] = { "", "../../tools/gfx-unit-test", "tools/gfx-unit-test" };
         deviceDesc.slang.searchPathCount = (SlangInt)SLANG_COUNT_OF(searchPaths);
         deviceDesc.slang.searchPaths = searchPaths;
+
+        deviceDesc.shaderCache = shaderCache;
 
         gfx::D3D12DeviceExtendedDesc extDesc = {};
         extDesc.rootParameterShaderAttributeName = "root";

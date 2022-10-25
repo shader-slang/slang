@@ -337,7 +337,6 @@ class RefAccessorDecl : public AccessorDecl
 {
     SLANG_AST_CLASS(RefAccessorDecl)
 };
-
 class FuncDecl : public FunctionDeclBase
 {
     SLANG_AST_CLASS(FuncDecl)
@@ -492,6 +491,35 @@ class AttributeDecl : public ContainerDecl
     SLANG_AST_CLASS(AttributeDecl)
     // What type of syntax node will be produced to represent this attribute.
     SyntaxClass<NodeBase> syntaxClass;
+};
+
+// A declaration to hold differentiable type conformances generated during
+// the semantic checking phase.
+// 
+class DifferentiableTypeDictionary : public ContainerDecl
+{
+    SLANG_AST_CLASS(DifferentiableTypeDictionary);
+};
+
+// A declaration to hold differentiable type conformances generated during
+// the semantic checking phase.
+// 
+class DifferentiableTypeDictionaryItem : public Decl
+{
+    SLANG_AST_CLASS(DifferentiableTypeDictionaryItem);
+
+    DeclRefType* baseType;
+    SubtypeWitness* confWitness;
+};
+
+// A declaration that references another dictionary (generally from another module)
+// Used to tell the IR lowering pass to process the referenced dictionary.
+// 
+class DifferentiableTypeDictionaryImportItem : public Decl
+{
+    SLANG_AST_CLASS(DifferentiableTypeDictionaryImportItem);
+
+    DeclRef<DifferentiableTypeDictionary> dictionaryRef;
 };
 
 

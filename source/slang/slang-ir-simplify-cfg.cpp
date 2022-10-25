@@ -12,6 +12,9 @@ bool processFunc(IRGlobalValueWithCode* func)
     if (!firstBlock)
         return false;
 
+    SharedIRBuilder sharedBuilder(func->getModule());
+    IRBuilder builder(&sharedBuilder);
+
     bool changed = false;
 
     List<IRBlock*> workList;
@@ -25,11 +28,26 @@ bool processFunc(IRGlobalValueWithCode* func)
         {
             if (auto loop = as<IRLoop>(block->getTerminator()))
             {
+                // If continue block is unreachable, remove it.
                 auto continueBlock = loop->getContinueBlock();
                 if (continueBlock && !continueBlock->hasMoreThanOneUse())
                 {
                     loop->continueBlock.set(loop->getTargetBlock());
                     continueBlock->removeAndDeallocate();
+                }
+                // If there isn't any actual back jumps into loop target, remove the header
+                // and turn it into a normal branch.
+                auto targetBlock = loop->getTargetBlock();
+                if (targetBlock->getPredecessors().getCount() == 1 && *targetBlock->getPredecessors().begin() == block)
+                {
+                    builder.setInsertBefore(loop);
+                    List<IRInst*> args;
+                    for (UInt i = 0; i < loop->getArgCount(); i++)
+                    {
+                        args.add(loop->getArg(i));
+                    }
+                    builder.emitBranch(targetBlock, args.getCount(), args.getBuffer());
+                    loop->removeAndDeallocate();
                 }
             }
             // If `block` does not end with an unconditional branch, bail.

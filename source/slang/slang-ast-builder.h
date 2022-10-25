@@ -45,6 +45,8 @@ public:
         // Look up a magic declaration by its name
     Decl* findMagicDecl(String const& name);
 
+    Decl* tryFindMagicDecl(String const& name);
+
         /// A name pool that can be used for lookup for findClassInfo etc. It is the same pool as the Session.
     NamePool* getNamePool() { return m_namePool; }
 
@@ -155,9 +157,20 @@ public:
 
         /// Create AST types 
     template <typename T>
-    T* create() { return _initAndAdd(new (m_arena.allocate(sizeof(T))) T); }
+    T* create()
+    {
+        auto alloced = m_arena.allocate(sizeof(T));
+        memset(alloced, 0, sizeof(T));
+        return _initAndAdd(new (alloced) T);
+    }
+
     template<typename T, typename... TArgs>
-    T* create(TArgs... args) { return _initAndAdd(new (m_arena.allocate(sizeof(T))) T(args...)); }
+    T* create(TArgs... args)
+    {
+        auto alloced = m_arena.allocate(sizeof(T));
+        memset(alloced, 0, sizeof(T));
+        return _initAndAdd(new (alloced) T(args...));
+    }
 
     template<typename T, typename ... TArgs>
     SLANG_FORCE_INLINE T* getOrCreate(TArgs ... args)
@@ -316,6 +329,8 @@ public:
     DifferentialPairType* getDifferentialPairType(Type* valueType, Witness* conformanceWitness);
 
     DeclRef<InterfaceDecl> getDifferentiableInterface();
+
+    bool isDifferentiableInterfaceAvailable();
 
     DeclRef<Decl> getBuiltinDeclRef(const char* builtinMagicTypeName, Val* genericArg);
 

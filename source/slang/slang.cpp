@@ -44,6 +44,9 @@
 
 #include "slang-check-impl.h"
 
+#include "../core/slang-md5.h"
+#include "../core/slang-digest-util.h"
+
 #include "../../slang-tag-version.h"
 
 // Used to print exception type names in internal-compiler-error messages
@@ -1318,6 +1321,66 @@ SLANG_NO_THROW SlangResult SLANG_MCALL Linkage::createCompileRequest(
     return SLANG_OK;
 }
 
+void Linkage::updateDependencyBasedHash(
+    DigestBuilder& builder,
+    SlangInt targetIndex)
+{
+    // Add the Slang compiler version to the hash
+    auto version = String(getBuildTagString());
+    builder.addToDigest(version);
+
+    // Add the search directory paths to the hash
+    auto searchDirectoryList = getSearchDirectories().searchDirectories;
+    for (auto& searchDir : searchDirectoryList)
+    {
+        auto searchPath = searchDir.path;
+        builder.addToDigest(searchPath);
+    }
+
+    // Add the preprocessor definitions to the hash
+    for (auto& key : preprocessorDefinitions)
+    {
+        builder.addToDigest(key.Key);
+        builder.addToDigest(key.Value);
+    }
+
+    // Add the target specified by targetIndex
+    auto targetReq = targets[targetIndex];
+    builder.addToDigest(targetReq->getTarget());
+    builder.addToDigest(targetReq->getTargetFlags());
+    builder.addToDigest(targetReq->getFloatingPointMode());
+    builder.addToDigest(targetReq->getLineDirectiveMode());
+    builder.addToDigest(targetReq->shouldDumpIntermediates());
+    builder.addToDigest(targetReq->getForceGLSLScalarBufferLayout());
+    builder.addToDigest(targetReq->shouldTrackLiveness());
+
+    auto targetProfile = targetReq->getTargetProfile();
+    builder.addToDigest(targetProfile.getStage());
+    builder.addToDigest(targetProfile.getVersion());
+    builder.addToDigest(targetProfile.getFamily());
+
+    auto targetProfileName = String(targetProfile.getName());
+    builder.addToDigest(targetProfileName);
+
+    auto cookedCapabilities = targetReq->getTargetCaps().getExpandedAtoms();
+    for (auto& capability : cookedCapabilities)
+    {
+        builder.addToDigest(capability);
+    }
+
+    // Add the downstream compiler version (if it exists) to the hash
+    auto passThroughMode = getDownstreamCompilerRequiredForTarget(targetReq->getTarget());
+    auto downstreamCompiler = getSessionImpl()->getOrLoadDownstreamCompiler(passThroughMode, nullptr);
+    if (downstreamCompiler)
+    {
+        ComPtr<ISlangBlob> versionString;
+        if (SLANG_SUCCEEDED(downstreamCompiler->getVersionString(versionString.writeRef())))
+        {
+            builder.addToDigest(versionString);
+        }
+    }
+}
+
 SlangResult Linkage::addSearchPath(
     char const* path)
 {
@@ -1618,9 +1681,19 @@ void TranslationUnitRequest::_addSourceFile(SourceFile* sourceFile)
     // an associated path and/or wasn't from a file.
 
     auto pathInfo = sourceFile->getPathInfo();
-    if (pathInfo.hasFileFoundPath())
+    if (pathInfo.hasFoundPath())
     {
         getModule()->addFilePathDependency(pathInfo.foundPath);
+    }
+    else
+    {
+        // No path exists for this source, so we generate a new string to use as a
+        // fake path in the list of file path dependencies. This is needed to account
+        // for non-file-based dependencies later when shader files are being hashed for
+        // the shader cache.
+
+        slang::Digest sourceHash = DigestUtil::computeDigestForStringSlice(sourceFile->getContent());
+        getModule()->addFilePathDependency(DigestUtil::toString(sourceHash));
     }
 }
 
@@ -3149,8 +3222,6 @@ void FilePathDependencyList::addDependency(Module* module)
     }
 }
 
-
-
 //
 // Module
 //
@@ -3176,6 +3247,22 @@ ISlangUnknown* Module::getInterface(const Guid& guid)
     if(guid == IModule::getTypeGuid())
         return asExternal(this);
     return Super::getInterface(guid);
+}
+
+void Module::updateDependencyBasedHash(
+    DigestBuilder& builder,
+    SlangInt entryPointIndex)
+{
+    // CompositeComponentType will have already hashed this Module's file
+    // dependencies.
+    SLANG_UNUSED(builder);
+    SLANG_UNUSED(entryPointIndex);
+}
+
+void Module::updateASTBasedHash(DigestBuilder& builder)
+{
+    auto serializedAST = ASTSerialUtil::serializeAST(getModuleDecl());
+    builder.addToDigest(serializedAST);
 }
 
 void Module::addModuleDependency(Module* module)
@@ -3374,6 +3461,47 @@ SLANG_NO_THROW SlangResult SLANG_MCALL ComponentType::getEntryPointCode(
         return SLANG_FAIL;
 
     return artifact->loadBlob(ArtifactKeep::Yes, outCode);
+}
+
+SLANG_NO_THROW void SLANG_MCALL ComponentType::computeDependencyBasedHash(
+    SlangInt entryPointIndex,
+    SlangInt targetIndex,
+    slang::Digest* outHash)
+{
+    DigestBuilder builder;
+
+    // A note on enums that may be hashed in as part of the following two function calls:
+    // 
+    // While enums are not guaranteed to be encoded the same way across all versions of
+    // the compiler, part of hashing the linkage is hashing in the compiler version.
+    // Consequently, any encoding differences as a result of different compiler versions
+    // will already be reflected in the resulting hash.
+    getLinkage()->updateDependencyBasedHash(builder, targetIndex);
+    updateDependencyBasedHash(builder, entryPointIndex);
+
+    // Add file path dependencies to the hash - all child components
+    // will have file path dependencies that are a subset of this list.
+    auto fileDeps = getFilePathDependencies();
+    for (auto& file : fileDeps)
+    {
+        builder.addToDigest(file);
+    }
+
+    // Add the name and name override for the specified entry point
+    // to the hash.
+    auto entryPointName = getEntryPoint(entryPointIndex)->getName()->text;
+    builder.addToDigest(entryPointName);
+    auto entryPointNameOverride = getEntryPointNameOverride(entryPointIndex);
+    builder.addToDigest(entryPointNameOverride);
+
+    *outHash = builder.finalize();
+}
+
+SLANG_NO_THROW void SLANG_MCALL ComponentType::computeASTBasedHash(slang::Digest* outHash)
+{
+    DigestBuilder builder;
+    updateASTBasedHash(builder);
+    *outHash = builder.finalize();
 }
 
 SLANG_NO_THROW SlangResult SLANG_MCALL ComponentType::getEntryPointHostCallable(
@@ -3705,6 +3833,28 @@ CompositeComponentType::CompositeComponentType(
                 m_requirements.add(childRequirement);
             }
         }
+    }
+}
+
+void CompositeComponentType::updateDependencyBasedHash(
+    DigestBuilder& builder,
+    SlangInt entryPointIndex)
+{
+    auto componentCount = getChildComponentCount();
+
+    for (Index i = 0; i < componentCount; ++i)
+    {
+        getChildComponent(i)->updateDependencyBasedHash(builder, entryPointIndex);
+    }
+}
+
+void CompositeComponentType::updateASTBasedHash(DigestBuilder& builder)
+{
+    auto componentCount = getChildComponentCount();
+
+    for (Index i = 0; i < componentCount; ++i)
+    {
+        getChildComponent(i)->updateASTBasedHash(builder);
     }
 }
 
@@ -4187,6 +4337,22 @@ SpecializedComponentType::SpecializedComponentType(
     collector.visitSpecialized(this);
 }
 
+void SpecializedComponentType::updateDependencyBasedHash(
+    DigestBuilder& builder,
+    SlangInt entryPointIndex)
+{
+    auto specializationArgCount = getSpecializationArgCount();
+    for (Index i = 0; i < specializationArgCount; ++i)
+    {
+        auto specializationArg = getSpecializationArg(i);
+        auto argString = specializationArg.val->toString();
+        builder.addToDigest(argString);
+    }
+
+    slang::Digest baseHash;
+    getBaseComponentType()->updateDependencyBasedHash(builder, entryPointIndex);
+}
+
 void SpecializedComponentType::acceptVisitor(ComponentTypeVisitor* visitor, SpecializationInfo* specializationInfo)
 {
     SLANG_ASSERT(specializationInfo == nullptr);
@@ -4229,6 +4395,16 @@ void RenamedEntryPointComponentType::acceptVisitor(
 {
     visitor->visitRenamedEntryPoint(
         this, as<EntryPoint::EntryPointSpecializationInfo>(specializationInfo));
+}
+
+void RenamedEntryPointComponentType::updateDependencyBasedHash(
+    DigestBuilder& builder,
+    SlangInt entryPointIndex)
+{
+    // CompositeComponentType will have already hashed the name override and file
+    // dependencies for this entry point.
+    SLANG_UNUSED(entryPointIndex);
+    SLANG_UNUSED(builder);
 }
 
 void ComponentTypeVisitor::visitChildren(CompositeComponentType* composite, CompositeComponentType::CompositeSpecializationInfo* specializationInfo)

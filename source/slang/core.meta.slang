@@ -2711,6 +2711,9 @@ attribute_syntax [__extern] : ExternAttribute;
 __attributeTarget(FunctionDeclBase)
 attribute_syntax [__unsafeForceInlineEarly] : UnsafeForceInlineEarlyAttribute;
 
+__attributeTarget(FunctionDeclBase)
+attribute_syntax [ForceInline] : ForceInlineAttribute;
+
 __attributeTarget(FuncDecl)
 attribute_syntax [DllImport(modulePath: String)] : DllImportAttribute;
 
@@ -2732,6 +2735,12 @@ attribute_syntax [anyValueSize(size:int)] : AnyValueSizeAttribute;
 
 __attributeTarget(InterfaceDecl)
 attribute_syntax [Specialize] : SpecializeAttribute;
+
+__attributeTarget(DeclBase)
+attribute_syntax [Differentiable] : DifferentiableAttribute;
+
+__attributeTarget(DeclBase)
+attribute_syntax [DerivativeMember(memberName)] : DerivativeMemberAttribute;
 
 __attributeTarget(DeclBase)
 attribute_syntax [builtin] : BuiltinAttribute;

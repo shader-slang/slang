@@ -719,7 +719,116 @@ namespace Slang
         return _resolveOverloadedExprImpl(overloadedExpr, mask, getSink());
     }
 
+    Type* SemanticsVisitor::_getDifferential(ASTBuilder* builder, Type* type)
+    {
+        if (auto ptrType = as<PtrTypeBase>(type))
+        {
+            return builder->getPtrType(
+                _getDifferential(builder, ptrType->getValueType()),
+                ptrType->getClassInfo().m_name);
+        }
+        else if (auto arrayType = as<ArrayExpressionType>(type))
+        {
+            return builder->getArrayType(
+                _getDifferential(builder, arrayType->baseType),
+                arrayType->arrayLength);
+        }
+        
+        if (auto declRefType = as<DeclRefType>(type))
+        {
+            if (auto witness = as<SubtypeWitness>(tryGetInterfaceConformanceWitness(type, builder->getDifferentiableInterface())))
+            {
+                auto diffTypeLookupResult = lookUpMember(
+                    getASTBuilder(),
+                    this,
+                    getName("Differential"),
+                    type,
+                    Slang::LookupMask::type,
+                    Slang::LookupOptions::None);
+                
+                diffTypeLookupResult = resolveOverloadedLookup(diffTypeLookupResult);
+
+                if (!diffTypeLookupResult.isValid())
+                {
+                    // Diagnose no 'Differential' member.
+                    getSink()->diagnose(declRefType->declRef, Diagnostics::typeDoesntImplementInterfaceRequirement, type, getName("Differential"));
+                }
+                else if (diffTypeLookupResult.isOverloaded())
+                {
+                    getSink()->diagnose(declRefType->declRef, Diagnostics::ambiguousReference, getName("Differential"));
+                }
+                else
+                {
+                    SharedTypeExpr* baseTypeExpr = m_astBuilder->create<SharedTypeExpr>();
+                    baseTypeExpr->base.type = type;
+                    baseTypeExpr->type.type = m_astBuilder->getTypeType(type);
+
+                    auto diffTypeExpr = ConstructLookupResultExpr(
+                                            diffTypeLookupResult.item,
+                                            baseTypeExpr,
+                                            declRefType->declRef.getLoc(),
+                                            baseTypeExpr);
+                    
+                    return ExtractTypeFromTypeRepr(diffTypeExpr);
+                }
+            }
+        }
+
+        return m_astBuilder->getErrorType();
+    }
+
+    void SemanticsVisitor::maybeRegisterDifferentiableType(ASTBuilder* builder, Type* type)
+    {
+        if (!builder->isDifferentiableInterfaceAvailable())
+        {
+            return;
+        }
+
+        // Check for special cases such as PtrTypeBase<T> or Array<T>
+        // This could potentially be handled later by simply defining extensions
+        // for Ptr<T:IDifferentiable> etc..
+        //
+        if (auto ptrType = as<PtrTypeBase>(type))
+        {
+            maybeRegisterDifferentiableType(builder, ptrType->getValueType());
+            return;
+        }
+
+        if (auto arrayType = as<ArrayExpressionType>(type))
+        {
+            maybeRegisterDifferentiableType(builder, arrayType->baseType);
+            return;
+        }
+
+        if (auto declRefType = as<DeclRefType>(type))
+        {
+            if (auto subtypeWitness = as<SubtypeWitness>(
+                tryGetInterfaceConformanceWitness(type, getASTBuilder()->getDifferentiableInterface())))
+            {
+                auto diffTypeContext = this->getShared()->innermostDiffTypeContext();
+                diffTypeContext->registerDifferentiableType((DeclRefType*)type, subtypeWitness);
+            }
+
+            return;
+        }
+    }
+
     Expr* SemanticsVisitor::CheckTerm(Expr* term)
+    {
+        auto checkedTerm = _CheckTerm(term);
+
+        // Differentiable type checking.
+        // TODO: This can be super slow.
+        if (this->m_parentFunc && 
+            this->m_parentFunc->findModifier<JVPDerivativeModifier>())
+        {
+            maybeRegisterDifferentiableType(getASTBuilder(), checkedTerm->type.type);
+        }
+
+        return checkedTerm;
+    }
+
+    Expr* SemanticsVisitor::_CheckTerm(Expr* term)
     {
         if (!term) return nullptr;
 
@@ -1677,7 +1786,6 @@ namespace Slang
         return expr;
     }
 
-
     Type* SemanticsVisitor::_toDifferentialParamType(ASTBuilder* builder, Type* primalType)
     {
         // Check for type modifiers like 'out' and 'inout'. We need to differentiate the
@@ -1715,48 +1823,38 @@ namespace Slang
             return primalType;
     }
 
+    Type* SemanticsVisitor::processJVPFuncType(ASTBuilder* builder, FuncType* originalType)
+    {
+        // Resolve JVP type here. 
+        // Note that this type checking needs to be in sync with
+        // the auto-generation logic in slang-ir-jvp-diff.cpp
+        
+        FuncType* jvpType = builder->create<FuncType>();
+
+        // The JVP return type is float if primal return type is float
+        // void otherwise.
+        //
+        jvpType->resultType = _toJVPReturnType(builder, originalType->getResultType());
+        
+        // No support for differentiating function that throw errors, for now.
+        SLANG_ASSERT(originalType->errorType->equals(builder->getBottomType()));
+        jvpType->errorType = originalType->errorType;
+
+        for (UInt i = 0; i < originalType->getParamCount(); i++)
+        {
+            if(auto jvpParamType = _toDifferentialParamType(builder, originalType->getParamType(i)))
+                jvpType->paramTypes.add(jvpParamType);
+        }
+
+        return jvpType;
+    }
+
     Expr* SemanticsExprVisitor::visitJVPDifferentiateExpr(JVPDifferentiateExpr* expr)
     {
+        this->getShared()->getDiffTypeContext()->requireDifferentiableTypeDictionary();
+        
         // Check/Resolve inner function declaration.
         expr->baseFunction = CheckTerm(expr->baseFunction);
-        
-        auto astBuilder = this->getASTBuilder();
-
-        if(auto primalType = as<FuncType>(expr->baseFunction->type))
-        {
-            // Resolve JVP type here. 
-            // Note that this type checking needs to be in sync with
-            // the auto-generation logic in slang-ir-jvp-diff.cpp
-            
-            FuncType* jvpType = astBuilder->create<FuncType>();
-
-            // The JVP return type is float if primal return type is float
-            // void otherwise.
-            //
-            jvpType->resultType = _toJVPReturnType(astBuilder, primalType->getResultType());
-            
-            // No support for differentiating function that throw errors, for now.
-            SLANG_ASSERT(primalType->errorType->equals(astBuilder->getBottomType()));
-            jvpType->errorType = primalType->errorType;
-
-            for (UInt i = 0; i < primalType->getParamCount(); i++)
-            {
-                if(auto jvpParamType = _toDifferentialParamType(astBuilder, primalType->getParamType(i)))
-                    jvpType->paramTypes.add(jvpParamType);
-            }
-
-            expr->type = jvpType;
-        }
-        else
-        {
-            // Error
-            expr->type = astBuilder->getErrorType();
-            if (!as<ErrorType>(expr->baseFunction->type))
-            {
-                getSink()->diagnose(expr->baseFunction->loc, Diagnostics::expectedFunction, expr->baseFunction->type);
-            }
-        }
-
         return expr;
     }
 
@@ -2195,6 +2293,10 @@ namespace Slang
         SwizzleExpr* swizExpr = m_astBuilder->create<SwizzleExpr>();
         swizExpr->loc = memberRefExpr->loc;
         swizExpr->base = memberRefExpr->baseExpression;
+        swizExpr->elementIndices[0] = 0;
+        swizExpr->elementIndices[1] = 0;
+        swizExpr->elementIndices[2] = 0;
+        swizExpr->elementIndices[3] = 0;
         swizExpr->memberOpLoc = memberRefExpr->memberOperatorLoc;
         IntegerLiteralValue limitElement = baseElementCount;
 
@@ -2517,31 +2619,32 @@ namespace Slang
         // we can return an overloaded result.
         if (auto overloadedExpr = as<OverloadedExpr>(baseExpr))
         {
-            if (overloadedExpr->base)
+            // If a member (dynamic or static) lookup result contains both the actual definition
+            // and the interface definition obtained from inheritance, we want to filter out
+            // the interface definitions.
+            LookupResult filteredLookupResult;
+            for (auto lookupResult : overloadedExpr->lookupResult2)
             {
-                // If a member (dynamic or static) lookup result contains both the actual definition
-                // and the interface definition obtained from inheritance, we want to filter out
-                // the interface definitions.
-                LookupResult filteredLookupResult;
-                for (auto lookupResult : overloadedExpr->lookupResult2)
+                bool shouldRemove = false;
+                if (lookupResult.declRef.getParent().as<InterfaceDecl>())
                 {
-                    bool shouldRemove = false;
-                    if (lookupResult.declRef.getParent().as<InterfaceDecl>())
-                        shouldRemove = true;
-                    if (!shouldRemove)
-                    {
-                        filteredLookupResult.items.add(lookupResult);
-                    }
+                    shouldRemove = true;
                 }
-                if (filteredLookupResult.items.getCount() == 1)
-                    filteredLookupResult.item = filteredLookupResult.items.getFirst();
-                baseExpr = createLookupResultExpr(
-                    overloadedExpr->name,
-                    filteredLookupResult,
-                    overloadedExpr->base,
-                    overloadedExpr->loc,
-                    overloadedExpr);
+                if (lookupResult.declRef.getDecl()->hasModifier<ExtensionExternVarModifier>())
+                    shouldRemove = true;
+                if (!shouldRemove)
+                {
+                    filteredLookupResult.items.add(lookupResult);
+                }
             }
+            if (filteredLookupResult.items.getCount() == 1)
+                filteredLookupResult.item = filteredLookupResult.items.getFirst();
+            baseExpr = createLookupResultExpr(
+                overloadedExpr->name,
+                filteredLookupResult,
+                overloadedExpr->base,
+                overloadedExpr->loc,
+                overloadedExpr);
             // TODO: handle other cases of OverloadedExpr that need filtering.
         }
 

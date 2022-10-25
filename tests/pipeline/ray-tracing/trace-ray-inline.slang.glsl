@@ -1,6 +1,3 @@
-// trace-ray-inline.slang.glsl
-//TEST_IGNORE_FILE:
-
 #version 460
 #extension GL_EXT_ray_tracing : require
 #extension GL_EXT_ray_query : require
@@ -23,14 +20,6 @@ layout(std140) uniform _S1
 {
     SLANG_ParameterGroup_C_0 _data;
 } C_0;
-
-struct RayDesc_0
-{
-    vec3 Origin_0;
-    float TMin_0;
-    vec3 Direction_0;
-    float TMax_0;
-};
 
 layout(binding = 0)
 uniform accelerationStructureEXT myAccelerationStructure_0;
@@ -78,13 +67,17 @@ void myMiss_0(inout MyRayPayload_0 payload_4)
     return;
 }
 
+struct RayDesc_0
+{
+    vec3 Origin_0;
+    float TMin_0;
+    vec3 Direction_0;
+    float TMax_0;
+};
+
 layout(local_size_x = 1, local_size_y = 1, local_size_z = 1) in;
 void main()
 {
-    MyProceduralHitAttrs_0 committedProceduralAttrs_0;
-    MyProceduralHitAttrs_0 committedProceduralAttrs_1;
-    MyProceduralHitAttrs_0 committedProceduralAttrs_2;
-    MyProceduralHitAttrs_0 committedProceduralAttrs_3;
 
     rayQueryEXT query_0;
 
@@ -95,63 +88,87 @@ void main()
     RayDesc_0 ray_0 = { C_0._data.origin_0, C_0._data.tMin_0, C_0._data.direction_0, C_0._data.tMax_0 };
     rayQueryInitializeEXT((query_0), (myAccelerationStructure_0), (C_0._data.rayFlags_0 | 512), (C_0._data.instanceMask_0), (ray_0.Origin_0), (ray_0.TMin_0), (ray_0.Direction_0), (ray_0.TMax_0));
 
-    MyProceduralHitAttrs_0 _S3;
-    committedProceduralAttrs_0 = _S3;
+    MyProceduralHitAttrs_0 committedProceduralAttrs_0;
 
     for(;;)
     {
-        bool _S4 = rayQueryProceedEXT(query_0);
-        if(!_S4)
+
+        bool _S3 = rayQueryProceedEXT(query_0);
+
+        if(!_S3)
         {
             break;
         }
-        uint _S5 = (rayQueryGetIntersectionTypeEXT((query_0), false));
-        switch(_S5)
+        uint _S4 = (rayQueryGetIntersectionTypeEXT((query_0), false));
+
+        MyProceduralHitAttrs_0 committedProceduralAttrs_1;
+
+        switch(_S4)
         {
-        case uint(1):
+        case 1U:
             {
                 MyProceduralHitAttrs_0 candidateProceduralAttrs_0;
-                MyProceduralHitAttrs_0 _S6 = { 0 };
-                candidateProceduralAttrs_0 = _S6;
+
+                MyProceduralHitAttrs_0 _S5 = { 0 };
+
+                candidateProceduralAttrs_0 = _S5;
                 float tHit_1;
                 tHit_1 = 0.00000000000000000000;
-                bool _S7 = myProceduralIntersection_0(tHit_1, candidateProceduralAttrs_0);
-                if(_S7)
+                bool _S6 = myProceduralIntersection_0(tHit_1, candidateProceduralAttrs_0);
+
+                MyProceduralHitAttrs_0 committedProceduralAttrs_2;
+
+                if(_S6)
                 {
-                    bool _S8 = myProceduralAnyHit_0(payload_5);
-                    if(_S8)
+                    bool _S7 = myProceduralAnyHit_0(payload_5);
+
+                    MyProceduralHitAttrs_0 committedProceduralAttrs_3;
+
+                    if(_S7)
                     {
                         rayQueryGenerateIntersectionEXT(query_0, tHit_1);
-                        MyProceduralHitAttrs_0 _S9 = candidateProceduralAttrs_0;
-                        if(bool(C_0._data.shouldStopAtFirstHit_0))
+                        MyProceduralHitAttrs_0 _S8 = candidateProceduralAttrs_0;
+                        if(C_0._data.shouldStopAtFirstHit_0 != 0U)
                         {
                             rayQueryTerminateEXT(query_0);
                         }
                         else
                         {
                         }
-                        committedProceduralAttrs_1 = _S9;
+
+                        committedProceduralAttrs_3 = _S8;
+
                     }
                     else
                     {
-                        committedProceduralAttrs_1 = committedProceduralAttrs_0;
+
+                        committedProceduralAttrs_3 = committedProceduralAttrs_0;
+
                     }
-                    committedProceduralAttrs_2 = committedProceduralAttrs_1;
+
+                    committedProceduralAttrs_2 = committedProceduralAttrs_3;
+
                 }
                 else
                 {
+
                     committedProceduralAttrs_2 = committedProceduralAttrs_0;
+
                 }
-                committedProceduralAttrs_3 = committedProceduralAttrs_2;
+
+                committedProceduralAttrs_1 = committedProceduralAttrs_2;
+
                 break;
             }
-        case uint(0):
+        case 0U:
             {
-                bool _S10 = myTriangleAnyHit_0(payload_5);
-                if(_S10)
+
+                bool _S9 = myTriangleAnyHit_0(payload_5);
+
+                if(_S9)
                 {
                     rayQueryConfirmIntersectionEXT(query_0);
-                    if(bool(C_0._data.shouldStopAtFirstHit_0))
+                    if(C_0._data.shouldStopAtFirstHit_0 != 0U)
                     {
                         rayQueryTerminateEXT(query_0);
                     }
@@ -162,31 +179,39 @@ void main()
                 else
                 {
                 }
-                committedProceduralAttrs_3 = committedProceduralAttrs_0;
+
+                committedProceduralAttrs_1 = committedProceduralAttrs_0;
+
                 break;
             }
         default:
             {
-                committedProceduralAttrs_3 = committedProceduralAttrs_0;
+
+                committedProceduralAttrs_1 = committedProceduralAttrs_0;
+
                 break;
             }
         }
-        committedProceduralAttrs_0 = committedProceduralAttrs_3;
+
+        committedProceduralAttrs_0 = committedProceduralAttrs_1;
+
     }
-    uint _S11 = (rayQueryGetIntersectionTypeEXT((query_0), true));
-    switch(_S11)
+
+    uint _S10 = (rayQueryGetIntersectionTypeEXT((query_0), true));
+
+    switch(_S10)
     {
-    case uint(1):
+    case 1U:
         {
             myTriangleClosestHit_0(payload_5);
             break;
         }
-    case uint(2):
+    case 2U:
         {
             myProceduralClosestHit_0(payload_5, committedProceduralAttrs_0);
             break;
         }
-    case uint(0):
+    case 0U:
         {
             myMiss_0(payload_5);
             break;
