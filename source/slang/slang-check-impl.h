@@ -209,32 +209,10 @@ namespace Slang
         Substitutions*   subst = nullptr;
     };
 
-    struct LookupRequestKey
-    {
-        NodeBase* base;
-        Name* name;
-        LookupOptions options;
-        LookupMask mask;
-        bool operator==(const LookupRequestKey& other) const
-        {
-            return base == other.base && name == other.name && options == other.options && mask == other.mask;
-        }
-        HashCode getHashCode() const
-        {
-            Hasher hasher;
-            hasher.hashValue(base);
-            hasher.hashValue(name);
-            hasher.hashValue(options);
-            hasher.hashValue(mask);
-            return hasher.getResult();
-        }
-    };
-
     struct TypeCheckingCache
     {
         Dictionary<OperatorOverloadCacheKey, OverloadCandidate> resolvedOperatorOverloadCache;
         Dictionary<BasicTypeKeyPair, ConversionCost> conversionCostCache;
-        Dictionary<LookupRequestKey, LookupResult> lookupCache;
     };
 
     struct DifferentiableTypeSemanticContext
@@ -304,11 +282,6 @@ namespace Slang
             /// Flag to indicate if a differentiable type dictionary is required.
         bool                                        m_isTypeDictionaryRequired = false;
     };
-
-        /// Give a cache and a name, will remove all entries associated with a name
-        /// Might be useful/necessary if a new name is introduced
-    void removeLookupForName(TypeCheckingCache* cache, Name* name);
-
 
         /// Shared state for a semantics-checking session.
     struct SharedSemanticsContext
@@ -525,6 +498,13 @@ namespace Slang
             return result;
         }
 
+        SemanticsContext allowStaticReferenceToNonStaticMember()
+        {
+            SemanticsContext result(*this);
+            result.m_allowStaticReferenceToNonStaticMember = true;
+            return result;
+        }
+
     private:
         SharedSemanticsContext* m_shared = nullptr;
 
@@ -544,6 +524,10 @@ namespace Slang
 
             /// The type of a try clause (if any) enclosing current expr.
         TryClauseType m_enclosingTryClauseType = TryClauseType::None;
+
+            /// Whether an expr referencing to a non-static member in static style (e.g. `Type.member`)
+            /// is considered valid in the current context.
+        bool m_allowStaticReferenceToNonStaticMember = false;
 
         ASTBuilder* m_astBuilder = nullptr;
     };
@@ -819,11 +803,6 @@ namespace Slang
         // Check and register a type if it is differentiable.
         void maybeRegisterDifferentiableType(ASTBuilder* builder, Type* type);
 
-        // Check if a term is referencing a member, and add a decoration to it's
-        // differential getter function, if one exists.
-        //
-        void checkForInvalidMemberAccessInDifferentiableFunc(Expr* checkedTerm);
-
         // Construct the differential for 'type', if it exists.
         Type* _getDifferential(ASTBuilder* builder, Type* type);
         
@@ -1018,7 +997,7 @@ namespace Slang
 
         bool getAttributeTargetSyntaxClasses(SyntaxClass<NodeBase> & cls, uint32_t typeFlags);
 
-        bool validateAttribute(Attribute* attr, AttributeDecl* attribClassDecl);
+        bool validateAttribute(Attribute* attr, AttributeDecl* attribClassDecl, ModifiableSyntaxNode* attrTarget);
 
         AttributeBase* checkAttribute(
             UncheckedAttribute*     uncheckedAttr,

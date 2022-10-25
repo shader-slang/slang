@@ -1104,12 +1104,7 @@ struct JVPTranscriber
             IRInst* diffCallee = nullptr;
             bool isAccessor = false;
 
-            if (auto accessorDecor = primalCallee->findDecoration<IRJVPDerivativeAccessorReferenceDecoration>())
-            {
-                diffCallee = accessorDecor->getJVPFunc();
-                isAccessor = true;
-            }
-            else if (auto derivativeReferenceDecor = primalCallee->findDecoration<IRJVPDerivativeReferenceDecoration>())
+            if (auto derivativeReferenceDecor = primalCallee->findDecoration<IRJVPDerivativeReferenceDecoration>())
             {
                 // If the user has already provided an differentiated implementation, use that.
                 diffCallee = derivativeReferenceDecor->getJVPFunc();
@@ -1445,7 +1440,46 @@ struct JVPTranscriber
 
         return InstPair(diffBlock, diffBlock);
     }
-    
+
+    InstPair transcribeFieldExtract(IRBuilder* builder, IRInst* originalInst)
+    {
+        SLANG_ASSERT(as<IRFieldExtract>(originalInst) || as<IRFieldAddress>(originalInst));
+
+        IRInst* origBase = originalInst->getOperand(0);
+        auto primalBase = findOrTranscribePrimalInst(builder, origBase);
+        auto field = originalInst->getOperand(1);
+        auto derivativeRefDecor = field->findDecoration<IRJVPDerivativeMemberReferenceDecoration>();
+        auto primalType = (IRType*)lookupPrimalInst(originalInst->getDataType(), originalInst->getDataType());
+
+        IRInst* primalOperands[] = { primalBase, field };
+        IRInst* primalFieldExtract = builder->emitIntrinsicInst(
+            primalType,
+            originalInst->getOp(),
+            2,
+            primalOperands);
+
+        if (!derivativeRefDecor)
+        {
+            return InstPair(primalFieldExtract, nullptr);
+        }
+
+        IRInst* diffFieldExtract = nullptr;
+
+        if (auto diffType = differentiateType(builder, primalType))
+        {
+            if (auto diffBase = findOrTranscribeDiffInst(builder, origBase))
+            {
+                IRInst* diffOperands[] = { diffBase, derivativeRefDecor->getDerivativeMemberStructKey() };
+                diffFieldExtract = builder->emitIntrinsicInst(
+                    diffType,
+                    originalInst->getOp(),
+                    2,
+                    diffOperands);
+            }
+        }
+        return InstPair(primalFieldExtract, diffFieldExtract);
+    }
+
     InstPair transcribeGetElement(IRBuilder* builder, IRInst* origGetElementPtr)
     {
         SLANG_ASSERT(as<IRGetElement>(origGetElementPtr) || as<IRGetElementPtr>(origGetElementPtr));
@@ -1481,7 +1515,6 @@ struct JVPTranscriber
         return InstPair(primalGetElementPtr, diffGetElementPtr);
     }
 
-    
     InstPair transcribeLoop(IRBuilder* builder, IRLoop* origLoop)
     {
         // The loop comes with three blocks.. we just need to transcribe each one
@@ -1607,9 +1640,13 @@ struct JVPTranscriber
             as<IRFuncType>(origFunc->getFullType()));
         diffFunc->setFullType(diffFuncType);
 
-        // TODO(sai): Replace naming scheme
-        // if (auto jvpName = this->getJVPFuncName(builder, primalFn))
-        //    builder->addNameHintDecoration(diffFunc, jvpName);
+        if (auto nameHint = origFunc->findDecoration<IRNameHintDecoration>())
+        {
+            auto originalName = nameHint->getName();
+            StringBuilder newNameSb;
+            newNameSb << "s_jvp_" << originalName;
+            builder->addNameHintDecoration(diffFunc, newNameSb.getUnownedSlice());
+        }
         
         // Transcribe children from origFunc into diffFunc
         builder->setInsertInto(diffFunc);
@@ -1686,9 +1723,18 @@ struct JVPTranscriber
         {
             mapPrimalInst(origInst, pair.primal);
             mapDifferentialInst(origInst, pair.differential);
+            if (pair.differential)
+            {
+                // Generate name hint for the inst.
+                if (auto primalNameHint = primalInst->findDecoration<IRNameHintDecoration>())
+                {
+                    StringBuilder sb;
+                    sb << "s_diff_" << primalNameHint->getName();
+                    builder->addNameHintDecoration(pair.differential, sb.getUnownedSlice());
+                }
+            }
             return pair.differential;
         }
-
         instsInProgress.Remove(origInst);
 
         getSink()->diagnose(origInst->sourceLoc,
@@ -1763,10 +1809,7 @@ struct JVPTranscriber
 
         case kIROp_FieldExtract:
         case kIROp_FieldAddress:
-            getSink()->diagnose(origInst->sourceLoc,
-                Diagnostics::unexpected,
-                "should not be attempting to differentiate field extract/field address.");
-            return InstPair(nullptr, nullptr);
+            return transcribeFieldExtract(builder, origInst);
         case kIROp_getElement:
         case kIROp_getElementPtr:
             return transcribeGetElement(builder, origInst);
@@ -1910,11 +1953,6 @@ struct JVPDerivativeContext
         // Temporary fix: Move generated types, if any, to before their use locations.
         (&pairBuilderStorage)->relocateNewTypes(builder);
 
-        // Remove all kIROp_DifferentiableTypeDictionary instructions and 
-        // kIROp_DifferentialGetterDecoration decorations
-        // 
-        modified |= stripDiffTypeInformation(builder, module->getModuleInst());
-
         return modified;
     }
 
@@ -1922,8 +1960,6 @@ struct JVPDerivativeContext
     {
         if(auto jvpDefinition = primalFunction->findDecoration<IRJVPDerivativeReferenceDecoration>())
             return jvpDefinition->getJVPFunc();
-        if (auto jvpGetter = primalFunction->findDecoration<IRJVPDerivativeAccessorReferenceDecoration>())
-            return jvpGetter->getJVPFunc();
         return nullptr;
     }
 
@@ -2135,7 +2171,7 @@ struct JVPDerivativeContext
         return modified;
     }
 
-    bool stripDiffTypeInformation(IRBuilder* builder, IRInst* parent)
+    bool stripDiffTypeInformation(IRInst* parent)
     {
         bool modified = false;
 
@@ -2155,7 +2191,7 @@ struct JVPDerivativeContext
 
             if (child->getFirstChild() != nullptr)
             {
-                modified |= stripDiffTypeInformation(builder, child);
+                modified |= stripDiffTypeInformation(child);
             }
 
             child = nextChild;
@@ -2276,30 +2312,28 @@ bool processJVPDerivativeMarkers(
     eliminateDeadCode(module, options);
 
     JVPDerivativeContext context(module, sink);
-
-    return context.processModule();
+    bool changed = context.processModule();
+    changed |= context.stripDiffTypeInformation(module->getModuleInst());
+    return changed;
 }
 
 void stripAutoDiffDecorations(IRModule* module)
 {
     for (auto inst : module->getGlobalInsts())
     {
-        if (auto func = as<IRGlobalValueWithCode>(inst))
+        for (auto decor = inst->getFirstDecoration(); decor; )
         {
-            for (auto decor = func->getFirstDecoration(); decor; )
+            auto next = decor->getNextDecoration();
+            switch (decor->getOp())
             {
-                auto next = decor->getNextDecoration();
-                switch (decor->getOp())
-                {
-                case kIROp_JVPDerivativeAccessorReferenceDecoration:
-                case kIROp_JVPDerivativeReferenceDecoration:
-                    decor->removeAndDeallocate();
-                    break;
-                default:
-                    break;
-                }
-                decor = next;
+            case kIROp_JVPDerivativeReferenceDecoration:
+            case kIROp_JVPDerivativeMemberReferenceDecoration:
+                decor->removeAndDeallocate();
+                break;
+            default:
+                break;
             }
+            decor = next;
         }
     }
 }

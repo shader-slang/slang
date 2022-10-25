@@ -89,6 +89,18 @@ void buildMemberDictionary(ContainerDecl* decl)
 
 bool DeclPassesLookupMask(Decl* decl, LookupMask mask)
 {
+    // Always exclude extern members from lookup result.
+    if (decl->hasModifier<ExtensionExternVarModifier>())
+    {
+        return false;
+    }
+    else if (decl->hasModifier<ExternModifier>())
+    {
+        if (as<ExtensionDecl>(decl->parentDecl))
+        {
+            return false;
+        }
+    }
     // type declarations
     if(auto aggTypeDecl = as<AggTypeDecl>(decl))
     {
@@ -108,7 +120,7 @@ bool DeclPassesLookupMask(Decl* decl, LookupMask mask)
     {
         return (int(mask) & int(LookupMask::Attribute)) != 0;
     }
-
+    
     // default behavior is to assume a value declaration
     // (no overloading allowed)
 
@@ -1002,26 +1014,8 @@ LookupResult lookUp(
     LookupMask          mask)
 {
     LookupResult result;
-    LookupRequestKey key;
-    TypeCheckingCache* typeCheckingCache = nullptr;
-    if (semantics)
-    {
-        typeCheckingCache = semantics->getLinkage()->getTypeCheckingCache();
-        key.base = scope;
-        key.name = name;
-        key.options = LookupOptions::None;
-        key.mask = mask;
-        if (typeCheckingCache->lookupCache.TryGetValue(key, result))
-        {
-            return result;
-        }
-    }
     LookupRequest request = initLookupRequest(semantics, name, mask, LookupOptions::None, scope);
     _lookUpInScopes(astBuilder, name, request, result);
-    if (typeCheckingCache)
-    {
-        typeCheckingCache->lookupCache[key] = result;
-    }
     return result;
 }
 
@@ -1033,20 +1027,9 @@ LookupResult lookUpMember(
     LookupMask          mask,
     LookupOptions       options)
 {
-    TypeCheckingCache* typeCheckingCache = semantics->getLinkage()->getTypeCheckingCache();
-    LookupRequestKey key;
-    key.base = type;
-    key.name = name;
-    key.options = options;
-    key.mask = mask;
     LookupResult result;
-    if (typeCheckingCache->lookupCache.TryGetValue(key, result))
-    {
-        return result;
-    }
     LookupRequest request = initLookupRequest(semantics, name, mask, options, nullptr);
     _lookUpMembersInType(astBuilder, name, type, request, result, nullptr);
-    typeCheckingCache->lookupCache[key] = result;
     return result;
 }
 

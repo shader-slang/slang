@@ -210,24 +210,4 @@ namespace Slang
             throw;
         }
     }
-
-    void removeLookupForName(TypeCheckingCache* cache, Name* name)
-    {
-        auto& lookupCache = cache->lookupCache;
-
-        List<LookupRequestKey> keys;
-
-        for (const auto& pairs : lookupCache)
-        {
-            const auto& key = pairs.Key;
-            if (key.name == name)
-            {
-                keys.add(key);
-            }
-        }
-        for (auto& key : keys)
-        {
-            lookupCache.Remove(key);
-        }
-    }
 }

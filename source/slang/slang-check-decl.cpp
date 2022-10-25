@@ -45,7 +45,10 @@ namespace Slang
 
         void visitDecl(Decl*) {}
         void visitDeclGroup(DeclGroup*) {}
-       
+
+        void checkDerivativeMemberAttribute(VarDeclBase* varDecl, DerivativeMemberAttribute* attr);
+        void checkExtensionExternVarAttribute(VarDeclBase* varDecl, ExtensionExternVarModifier* m);
+
         void checkVarDeclCommon(VarDeclBase* varDecl);
 
         void visitVarDecl(VarDecl* varDecl)
@@ -106,8 +109,6 @@ namespace Slang
 
         void visitAccessorDecl(AccessorDecl* decl);
         void visitSetterDecl(SetterDecl* decl);
-        void visitDiffGetterDecl(DiffGetterDecl* decl);
-        void visitDiffSetterDecl(DiffSetterDecl* decl);
     };
 
     struct SemanticsDeclRedeclarationVisitor
@@ -225,10 +226,6 @@ namespace Slang
         if(as<AggTypeDecl>(decl))
             return true;
         if(as<SimpleTypeDecl>(decl))
-            return true;
-        if (as<DiffGetterDecl>(decl))
-            return true;
-        if (as<DiffSetterDecl>(decl))
             return true;
 
         // Initializer/constructor declarations are effectively `static`
@@ -644,6 +641,9 @@ namespace Slang
     bool SemanticsVisitor::isDeclUsableAsStaticMember(
         Decl*   decl)
     {
+        if (m_allowStaticReferenceToNonStaticMember)
+            return true;
+
         if(auto genericDecl = as<GenericDecl>(decl))
             decl = genericDecl->inner;
 
@@ -671,6 +671,9 @@ namespace Slang
     bool SemanticsVisitor::isUsableAsStaticMember(
         LookupResultItem const& item)
     {
+        if (m_allowStaticReferenceToNonStaticMember)
+            return true;
+
         // There's a bit of a gotcha here, because a lookup result
         // item might include "breadcrumbs" that indicate more steps
         // along the lookup path. As a result it isn't always
@@ -974,6 +977,87 @@ namespace Slang
         tryConstantFoldDeclRef(DeclRef<VarDeclBase>(varDecl, nullptr), nullptr);
     }
 
+    void SemanticsDeclHeaderVisitor::checkDerivativeMemberAttribute(
+        VarDeclBase* varDecl, DerivativeMemberAttribute* derivativeMemberAttr)
+    {
+        auto memberType = checkProperType(getLinkage(), varDecl->type, getSink());
+        auto diffType = _getDifferential(m_astBuilder, memberType);
+        if (as<ErrorType>(diffType))
+        {
+            getSink()->diagnose(derivativeMemberAttr, Diagnostics::typeIsNotDifferentiable, memberType);
+        }
+        auto thisType = calcThisType(makeDeclRef(varDecl->parentDecl));
+        if (!thisType)
+        {
+            getSink()->diagnose(
+                derivativeMemberAttr,
+                Diagnostics::
+                derivativeMemberAttributeCanOnlyBeUsedOnMembers);
+        }
+        auto diffThisType = _getDifferential(m_astBuilder, thisType);
+        if (!thisType)
+        {
+            getSink()->diagnose(
+                derivativeMemberAttr,
+                Diagnostics::invalidUseOfDerivativeMemberAttributeParentTypeIsNotDifferentiable);
+        }
+        SLANG_ASSERT(derivativeMemberAttr->args.getCount() == 1);
+        auto checkedExpr = dispatchExpr(derivativeMemberAttr->args[0], allowStaticReferenceToNonStaticMember());
+        if (auto declRefExpr = as<DeclRefExpr>(checkedExpr))
+        {
+            derivativeMemberAttr->memberDeclRef = declRefExpr;
+            if (!diffType->equals(declRefExpr->type))
+            {
+                getSink()->diagnose(derivativeMemberAttr, Diagnostics::typeMismatch, diffType, declRefExpr->type);
+            }
+            if (!varDecl->parentDecl)
+            {
+                getSink()->diagnose(derivativeMemberAttr, Diagnostics::attributeNotApplicable, diffType, declRefExpr->type);
+            }
+            if (auto memberExpr = as<StaticMemberExpr>(declRefExpr))
+            {
+                auto baseExprType = memberExpr->baseExpression->type.type;
+                if (auto typeType = as<TypeType>(baseExprType))
+                {
+                    if (diffThisType->equals(typeType->type))
+                    {
+                        return;
+                    }
+                }
+
+            }
+        }
+        getSink()->diagnose(
+            derivativeMemberAttr,
+            Diagnostics::
+            derivativeMemberAttributeMustNameAMemberInExpectedDifferentialType,
+            diffThisType);
+    }
+
+    void SemanticsDeclHeaderVisitor::checkExtensionExternVarAttribute(VarDeclBase* varDecl, ExtensionExternVarModifier* extensionExternMemberModifier)
+    {
+        if (auto parentExtension = as<ExtensionDecl>(varDecl->parentDecl))
+        {
+            if (auto originalVarDecl = extensionExternMemberModifier->originalDecl.as<VarDeclBase>())
+            {
+                auto originalType = GetTypeForDeclRef(originalVarDecl, originalVarDecl.getLoc());
+                auto extVarType = varDecl->type;
+                if (!extVarType.type || !extVarType.type->equals(originalType))
+                {
+                    getSink()->diagnose(varDecl, Diagnostics::typeOfExternDeclMismatchesOriginalDefinition, varDecl, originalType);
+                }
+                else
+                {
+                    return;
+                }
+            }
+            else
+            {
+                getSink()->diagnose(varDecl, Diagnostics::definitionOfExternDeclMismatchesOriginalDefinition, varDecl);
+            }
+        }
+    }
+
     void SemanticsDeclHeaderVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
     {
         // A variable that didn't have an explicit type written must
@@ -1143,6 +1227,16 @@ namespace Slang
             {
                 getSink()->diagnose(varDecl, Diagnostics::valueRequirementMustBeCompileTimeConst);
             }
+        }
+
+        // Check modifiers that can't be checked earlier during modifier checking stage.
+        if (auto derivativeMemberAttr = varDecl->findModifier<DerivativeMemberAttribute>())
+        {
+            checkDerivativeMemberAttribute(varDecl, derivativeMemberAttr);
+        }
+        if (auto extensionExternAttr = varDecl->findModifier<ExtensionExternVarModifier>())
+        {
+            checkExtensionExternVarAttribute(varDecl, extensionExternAttr);
         }
     }
 
@@ -5338,214 +5432,6 @@ namespace Slang
             else
             {
                 getSink()->diagnose(newValueParam, Diagnostics::setAccessorParamWrongType, newValueParam, actualType, newValueType);
-            }
-        }
-    }
-
-    void SemanticsDeclHeaderVisitor::visitDiffGetterDecl(DiffGetterDecl* decl)
-    {
-        _visitAccessorDeclCommon(decl);
-
-        if (!decl->parentDecl)
-            return;
-
-        // DiffGetter accessor will have one parameter representing the differential.
-        //
-        auto params = decl->getParameters();
-        ParamDecl* differentialValueParam = nullptr;
-        if (params.getCount() >= 1)
-        {
-            // If the user declared an explicit parameter
-            // then that is the one that will represent
-            // the new value.
-            //
-            differentialValueParam = params.getFirst();
-
-            if (params.getCount() > 1)
-            {
-                // If the user declared more than one explicit
-                // parameter, then that is an error.
-                //
-                getSink()->diagnose(params[1], Diagnostics::dgetAccessorMayNotHaveMoreThanOneParam);
-            }
-        }
-        else
-        {
-            // If the user didn't declare any explicit parameters,
-            // then we create an implicit one and add it into
-            // the AST.
-            //
-            differentialValueParam = m_astBuilder->create<ParamDecl>();
-            differentialValueParam->nameAndLoc.name = getName("differential");
-            differentialValueParam->nameAndLoc.loc = decl->loc;
-
-            differentialValueParam->parentDecl = decl;
-            decl->members.add(differentialValueParam);
-        }
-
-        // The return type of the accessor should be the Differential type of the original property type.
-        decl->returnType.type = _getDifferential(m_astBuilder, _getAccessorStorageType(decl));
-
-        // It is allowed and encouraged for the programmer
-        // to leave off the type on the differential parameter,
-        // in which case we will set it to the expected
-        // type automatically.
-        //
-        auto differentialParentType = _getDifferential(m_astBuilder, calcThisType(DeclRef<Decl>(decl->parentDecl->parentDecl, nullptr)));
-
-        if (!differentialValueParam->type.exp)
-        {
-            differentialValueParam->type.type = differentialParentType;
-        }
-        else
-        {
-            // If the user *did* give the new-value parameter
-            // an explicit type, then we need to check it
-            // and then enforce that it matches what we expect.
-            //
-            auto actualType = CheckProperType(differentialValueParam->type);
-
-            if (as<ErrorType>(actualType))
-            {
-            }
-            else if (actualType->equals(differentialParentType))
-            {
-            }
-            else
-            {
-                getSink()->diagnose(
-                    differentialValueParam,
-                    Diagnostics::setAccessorParamWrongType,
-                    differentialValueParam,
-                    actualType,
-                    differentialParentType);
-            }
-        }
-    }
-
-    void SemanticsDeclHeaderVisitor::visitDiffSetterDecl(DiffSetterDecl* decl)
-    {
-        _visitAccessorDeclCommon(decl);
-
-        if (!decl->parentDecl)
-            return;
-
-        // DiffGetter accessor will have one parameter representing the differential.
-        //
-        auto params = decl->getParameters();
-        ParamDecl* differentialValueParam = nullptr;
-        ParamDecl* differentialNewValueParam = nullptr;
-
-        if (params.getCount() >= 2)
-        {
-            // If the user declared an explicit parameter
-            // then that is the one that will represent
-            // the new value.
-            //
-            differentialValueParam = params.getFirst();
-
-            if (params.getCount() > 2)
-            {
-                // If the user declared more than one explicit
-                // parameter, then that is an error.
-                //
-                getSink()->diagnose(params[2], Diagnostics::dsetAccessorMayNotHaveMoreThanTwoParams);
-            }
-        }
-        else if (params.getCount() == 0)
-        {
-            // If the user didn't declare any explicit parameters,
-            // then we create an implicit one and add it into
-            // the AST.
-            //
-            differentialValueParam = m_astBuilder->create<ParamDecl>();
-            differentialValueParam->nameAndLoc.name = getName("differential");
-            differentialValueParam->nameAndLoc.loc = decl->loc;
-            differentialValueParam->parentDecl = decl;
-            decl->members.add(differentialValueParam);
-
-            differentialNewValueParam = m_astBuilder->create<ParamDecl>();
-            differentialNewValueParam->nameAndLoc.name = getName("newValue");
-            differentialNewValueParam->nameAndLoc.loc = decl->loc;
-            differentialNewValueParam->parentDecl = decl;
-            decl->members.add(differentialNewValueParam);
-        }
-        else
-        {
-            getSink()->diagnose(params[0], Diagnostics::dsetAccessorWrongNumberOfParams);
-        }
-
-        // The return type of the dset should be void.
-        decl->returnType.type = m_astBuilder->getVoidType();;
-
-        // It is allowed and encouraged for the programmer
-        // to leave off the type on the differential parameter,
-        // in which case we will set it to the expected
-        // type automatically.
-        //
-        auto differentialParentType = _getDifferential(
-            m_astBuilder, calcThisType(DeclRef<Decl>(decl->parentDecl->parentDecl, nullptr)));
-
-        if (!differentialValueParam->hasModifier<InOutModifier>())
-            addModifier(differentialValueParam, m_astBuilder->create<InOutModifier>());
-
-        if (!differentialValueParam->type.exp)
-        {
-            differentialValueParam->type.type = differentialParentType;
-        }
-        else
-        {
-            // If the user *did* give the differential parameter
-            // an explicit type, then we need to check it
-            // and then enforce that it matches what we expect.
-            //
-            auto actualType = CheckProperType(differentialValueParam->type);
-
-            if (as<ErrorType>(actualType))
-            {
-            }
-            else if (actualType->equals(differentialParentType))
-            {
-            }
-            else
-            {
-                getSink()->diagnose(
-                    differentialValueParam,
-                    Diagnostics::dsetAccessorParamWrongType,
-                    differentialValueParam,
-                    actualType,
-                    differentialParentType);
-            }
-        }
-
-        auto differentialMemberType = _getDifferential(m_astBuilder, _getAccessorStorageType(decl));
-
-        if (!differentialNewValueParam->type.exp)
-        {
-            differentialNewValueParam->type.type = differentialMemberType;
-        }
-        else
-        {
-            // If the user *did* give the new-value parameter
-            // an explicit type, then we need to check it
-            // and then enforce that it matches what we expect.
-            //
-            auto actualType = CheckProperType(differentialNewValueParam->type);
-
-            if (as<ErrorType>(actualType))
-            {
-            }
-            else if (actualType->equals(differentialMemberType))
-            {
-            }
-            else
-            {
-                getSink()->diagnose(
-                    differentialNewValueParam,
-                    Diagnostics::dsetAccessorParamWrongType,
-                    differentialNewValueParam,
-                    actualType,
-                    differentialMemberType);
             }
         }
     }

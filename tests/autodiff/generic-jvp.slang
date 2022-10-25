@@ -87,11 +87,8 @@ extension myfloat3 : IDifferentiable
 {
     typedef myfloat3 Differential;
 
-    [__unsafeForceInlineEarly]
-    static Ptr<float3> __getDifferentialFor_val(inout Differential dx)
-    {
-        return &(dx.val);
-    }
+    [DerivativeMember(Differential.val)]
+    extern vector<Real, 3> val;
 
     static Differential zero()
     {
@@ -114,11 +111,8 @@ extension myfloat4 : IDifferentiable
 {
     typedef myfloat4 Differential;
 
-    [__unsafeForceInlineEarly]
-    static Ptr<float4> __getDifferentialFor_val(inout Differential dx)
-    {
-        return &(dx.val);
-    }
+    [DerivativeMember(Differential.val)]
+    extern vector<Real, 4> val;
 
     static Differential zero()
     {

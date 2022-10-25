@@ -6287,7 +6287,13 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             // A variable declared inside of an aggregate type declaration is a member.
             return true;
         }
-
+        if (auto extDecl = as<ExtensionDecl>(parent))
+        {
+            if (auto declRefType = as<DeclRefType>(extDecl->targetType.type))
+            {
+                return true;
+            }
+        }
         return false;
     }
 
@@ -7076,6 +7082,14 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         builder->addDecoration(inst, op, operands.getBuffer(), operands.getCount());
     }
 
+    void lowerDerivativeMemberModifier(IRInst* inst, DerivativeMemberAttribute* derivativeMember)
+    {
+        auto key = lowerRValueExpr(context, derivativeMember->memberDeclRef).val;
+        SLANG_RELEASE_ASSERT(as<IRStructKey>(key));
+        auto builder = getBuilder();
+        builder->addDecoration(inst, kIROp_JVPDerivativeMemberReferenceDecoration, key);
+    }
+
     LoweredValInfo lowerMemberVarDecl(VarDecl* fieldDecl)
     {
         // Each field declaration in the AST translates into
@@ -7088,12 +7102,21 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // will use the same space of keys.
 
         auto builder = getBuilder();
-        auto irFieldKey = builder->createStructKey();
-        addNameHint(context, irFieldKey, fieldDecl);
+        IRInst* irFieldKey = nullptr;
+        if (auto extVarModifier = fieldDecl->findModifier<ExtensionExternVarModifier>())
+        {
+            irFieldKey = ensureDecl(context, extVarModifier->originalDecl.getDecl()).val;
+            SLANG_RELEASE_ASSERT(as<IRStructKey>(irFieldKey));
+        }
 
-        addVarDecorations(context, irFieldKey, fieldDecl);
+        if (!irFieldKey)
+        {
+            irFieldKey = builder->createStructKey();
 
-        addLinkageDecoration(context, irFieldKey, fieldDecl);
+            addNameHint(context, irFieldKey, fieldDecl);
+            addVarDecorations(context, irFieldKey, fieldDecl);
+            addLinkageDecoration(context, irFieldKey, fieldDecl);
+        }
 
         if (auto semanticModifier = fieldDecl->findModifier<HLSLSimpleSemantic>())
         {
@@ -7107,6 +7130,10 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         if( auto writeModifier = fieldDecl->findModifier<RayPayloadWriteSemantic>())
         {
             lowerRayPayloadAccessModifier(irFieldKey, writeModifier, kIROp_StageWriteAccessDecoration);
+        }
+        if (auto derivativeMemberModifier = fieldDecl->findModifier<DerivativeMemberAttribute>())
+        {
+            lowerDerivativeMemberModifier(irFieldKey, derivativeMemberModifier);
         }
 
         // We allow a field to be marked as a target intrinsic,
@@ -7785,7 +7812,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
         // Always force inline diff setter accessor to prevent downstream compiler from complaining
         // fields are not fully initialized for the first `inout` parameter.
-        if (as<DiffSetterDecl>(decl) || as<SetterDecl>(decl))
+        if (as<SetterDecl>(decl))
         {
             if (!decl->findModifier<ForceInlineAttribute>())
             {
@@ -8185,28 +8212,6 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             getBuilder()->addDecoration(irFunc, kIROp_JVPDerivativeReferenceDecoration, jvpFunc);
         }
 
-        if (as<DiffSetterDecl>(decl))
-        {
-            // Add a manual differential decoration for `dset` function.
-            auto setters = decl->parentDecl->getMembersOfType<SetterDecl>();
-            if (setters.getCount() == 1)
-            {
-                auto primalSetter = setters.getFirst();
-                auto primalSetterFunc = ensureDecl(this->context, primalSetter);
-                getBuilder()->addDecoration(primalSetterFunc.val, kIROp_JVPDerivativeAccessorReferenceDecoration, irFunc);
-            }
-        }
-        if (as<DiffGetterDecl>(decl))
-        {
-            // Add a manual differential decoration for `dget` function.
-            auto getters = decl->parentDecl->getMembersOfType<GetterDecl>();
-            if (getters.getCount() == 1)
-            {
-                auto primalGetter = getters.getFirst();
-                auto primalGetterFunc = ensureDecl(this->context, primalGetter);
-                getBuilder()->addDecoration(primalGetterFunc.val, kIROp_JVPDerivativeAccessorReferenceDecoration, irFunc);
-            }
-        }
         // For convenience, ensure that any additional global
         // values that were emitted while outputting the function
         // body appear before the function itself in the list

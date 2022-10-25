@@ -13,22 +13,9 @@ struct A : IDifferentiable
 {
     typedef B Differential;
     
-    float _x;
-    float _y;
-
-    property float x
-    {
-        get { return _x; }
-        set { _x = newValue; }
-        dget { return differential.z; }
-        dset { differential.z = newValue; }
-    }
-
-    property float y
-    {
-        get { return _y; }
-        set { _y = newValue; }
-    }
+    [DerivativeMember(B.z)]
+    float x;
+    float y;
 
     [__unsafeForceInlineEarly]
     static Differential zero()

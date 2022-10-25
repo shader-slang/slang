@@ -813,37 +813,6 @@ namespace Slang
         }
     }
 
-    void SemanticsVisitor::checkForInvalidMemberAccessInDifferentiableFunc(Expr* checkedTerm)
-    {
-        // We don't allow accessing raw data members in a differentiable function for now.
-
-        if (auto declRefExpr = as<DeclRefExpr>(checkedTerm))
-        {
-            // Check if we have a parent container. If yes, then checkedTerm is
-            // referencing a member of this parent.
-            //
-            auto parentType = as<DeclRefType>(calcThisType(declRefExpr->declRef.getParent()));
-            if (!parentType)
-                return;
-
-            // Check if we have an aggregate (i.e. struct-like) type.
-            // Ignore interfaces and the case when the term refers to a function
-            // 
-            if (parentType->declRef.as<AggTypeDeclBase>() &&
-                !parentType->declRef.as<InterfaceDecl>() &&
-                declRefExpr->declRef.as<VarDeclBase>())
-            {   
-                // Check if the parent container type is differentiable.
-                if (auto parentDiffWitness = as<SubtypeWitness>(
-                    tryGetInterfaceConformanceWitness(
-                        parentType, getASTBuilder()->getDifferentiableInterface())))
-                {
-                    getSink()->diagnose(checkedTerm, Diagnostics::accessToRawMemberInDifferentialFuncIsNotAllowed, declRefExpr->declRef.getName());
-                }
-            }
-        }
-    }
-
     Expr* SemanticsVisitor::CheckTerm(Expr* term)
     {
         auto checkedTerm = _CheckTerm(term);
@@ -854,11 +823,6 @@ namespace Slang
             this->m_parentFunc->findModifier<JVPDerivativeModifier>())
         {
             maybeRegisterDifferentiableType(getASTBuilder(), checkedTerm->type.type);
-            
-            if (auto declRefExpr = as<DeclRefExpr>(checkedTerm))
-            {
-                checkForInvalidMemberAccessInDifferentiableFunc(checkedTerm);
-            }
         }
 
         return checkedTerm;
@@ -2655,31 +2619,32 @@ namespace Slang
         // we can return an overloaded result.
         if (auto overloadedExpr = as<OverloadedExpr>(baseExpr))
         {
-            if (overloadedExpr->base)
+            // If a member (dynamic or static) lookup result contains both the actual definition
+            // and the interface definition obtained from inheritance, we want to filter out
+            // the interface definitions.
+            LookupResult filteredLookupResult;
+            for (auto lookupResult : overloadedExpr->lookupResult2)
             {
-                // If a member (dynamic or static) lookup result contains both the actual definition
-                // and the interface definition obtained from inheritance, we want to filter out
-                // the interface definitions.
-                LookupResult filteredLookupResult;
-                for (auto lookupResult : overloadedExpr->lookupResult2)
+                bool shouldRemove = false;
+                if (lookupResult.declRef.getParent().as<InterfaceDecl>())
                 {
-                    bool shouldRemove = false;
-                    if (lookupResult.declRef.getParent().as<InterfaceDecl>())
-                        shouldRemove = true;
-                    if (!shouldRemove)
-                    {
-                        filteredLookupResult.items.add(lookupResult);
-                    }
+                    shouldRemove = true;
                 }
-                if (filteredLookupResult.items.getCount() == 1)
-                    filteredLookupResult.item = filteredLookupResult.items.getFirst();
-                baseExpr = createLookupResultExpr(
-                    overloadedExpr->name,
-                    filteredLookupResult,
-                    overloadedExpr->base,
-                    overloadedExpr->loc,
-                    overloadedExpr);
+                if (lookupResult.declRef.getDecl()->hasModifier<ExtensionExternVarModifier>())
+                    shouldRemove = true;
+                if (!shouldRemove)
+                {
+                    filteredLookupResult.items.add(lookupResult);
+                }
             }
+            if (filteredLookupResult.items.getCount() == 1)
+                filteredLookupResult.item = filteredLookupResult.items.getFirst();
+            baseExpr = createLookupResultExpr(
+                overloadedExpr->name,
+                filteredLookupResult,
+                overloadedExpr->base,
+                overloadedExpr->loc,
+                overloadedExpr);
             // TODO: handle other cases of OverloadedExpr that need filtering.
         }
 

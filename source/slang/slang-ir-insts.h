@@ -566,15 +566,15 @@ struct IRJVPDerivativeReferenceDecoration : IRDecoration
     IRInst* getJVPFunc() { return getOperand(0); }
 };
 
-struct IRJVPDerivativeAccessorReferenceDecoration : IRDecoration
+struct IRJVPDerivativeMemberReferenceDecoration : IRDecoration
 {
     enum
     {
-        kOp = kIROp_JVPDerivativeAccessorReferenceDecoration
+        kOp = kIROp_JVPDerivativeMemberReferenceDecoration
     };
-    IR_LEAF_ISA(JVPDerivativeAccessorReferenceDecoration)
+    IR_LEAF_ISA(JVPDerivativeMemberReferenceDecoration)
 
-    IRInst* getJVPFunc() { return getOperand(0); }
+    IRInst* getDerivativeMemberStructKey() { return getOperand(0); }
 };
 
 // An instruction that replaces the function symbol

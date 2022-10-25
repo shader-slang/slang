@@ -3216,14 +3216,6 @@ namespace Slang
         {
             decl = parser->astBuilder->create<RefAccessorDecl>();
         }
-        else if (AdvanceIf(parser, "dget"))
-        {
-            decl = parser->astBuilder->create<DiffGetterDecl>();
-        }
-        else if (AdvanceIf(parser, "dset"))
-        {
-            decl = parser->astBuilder->create<DiffSetterDecl>();
-        }
         else
         {
             Unexpected(parser);

@@ -13,25 +13,11 @@ struct B
 struct A : IDifferentiable
 {
     typedef B Differential;
-    
-    float3 _x;
-    float _y[10];
 
-    property float3 x
-    {
-        get { return _x; }
-        set { _x = newValue; }
-        dget { return differential.z; }
-        dset { differential.z = newValue; }
-    }
-
-    property float[10] y
-    {
-        get { return _y; }
-        set { _y = newValue; }
-        dget { return differential.k; }
-        dset { for (int i = 0; i < 10; i++) differential.k[i] = newValue[i]; }
-    }
+    [DerivativeMember(B.z)]
+    float3 x;
+    [DerivativeMember(B.k)]
+    float y[10];
 
     [__unsafeForceInlineEarly]
     static Differential zero()
@@ -61,10 +47,8 @@ __differentiate_jvp A f(A a)
 {
     A aout;
 
-    var tmp = aout.y;
-    tmp[5] = (2 * a.x).y;
-    tmp[2] = (3 * a.y[4]);
-    aout.y = tmp;
+    aout.y[5] = (2 * a.x).y;
+    aout.y[2] = (3 * a.y[4]);
     aout.x = float3(5 * a.x.z, 3 * a.x.y, 0.5 * a.x.x);
 
     return aout;

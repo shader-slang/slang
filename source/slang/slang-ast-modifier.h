@@ -32,6 +32,14 @@ class GloballyCoherentModifier : public Modifier { SLANG_AST_CLASS(GloballyCoher
 class ExternCppModifier : public Modifier { SLANG_AST_CLASS(ExternCppModifier)};
 class JVPDerivativeModifier : public Modifier { SLANG_AST_CLASS(JVPDerivativeModifier)};
 
+// An `extern` variable in an extension is used to introduce additional attributes on an existing
+// field.
+class ExtensionExternVarModifier : public Modifier
+{
+    SLANG_AST_CLASS(ExtensionExternVarModifier)
+    DeclRef<Decl> originalDecl;
+};
+
 // An 'ActualGlobal' is a global that is output as a normal global in CPU code. 
 // Globals in HLSL/Slang are constant state passed into kernel execution 
 class ActualGlobalModifier : public Modifier { SLANG_AST_CLASS(ActualGlobalModifier)};
@@ -969,6 +977,13 @@ class DllImportAttribute : public Attribute
 class DllExportAttribute : public Attribute
 {
     SLANG_AST_CLASS(DllExportAttribute)
+};
+
+class DerivativeMemberAttribute : public Attribute
+{
+    SLANG_AST_CLASS(DerivativeMemberAttribute)
+
+    DeclRefExpr* memberDeclRef;
 };
 
     /// An attribute that marks an interface type as a COM interface declaration.
