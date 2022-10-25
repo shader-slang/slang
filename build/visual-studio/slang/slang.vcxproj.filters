@@ -222,9 +222,6 @@
     <ClInclude Include="..\..\..\source\slang\slang-ir-layout.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\source\slang\slang-ir-legalize-array-return-type.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\..\source\slang\slang-ir-legalize-varying-params.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -717,9 +714,6 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\source\slang\slang-ir-layout.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\source\slang\slang-ir-legalize-array-return-type.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\source\slang\slang-ir-legalize-types.cpp">
