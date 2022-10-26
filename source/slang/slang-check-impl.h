@@ -630,10 +630,6 @@ namespace Slang
             Expr*    base,
             SourceLoc       loc);
 
-        Expr* maybeUseSynthesizedTypeDeclForLookupResult(
-            LookupResultItem const& item,
-            Expr* orignalExpr);
-
         Expr* maybeUseSynthesizedDeclForLookupResult(
             LookupResultItem const& item,
             Expr* orignalExpr);
@@ -1073,6 +1069,12 @@ namespace Slang
             Dictionary<DeclRef<InterfaceDecl>, RefPtr<WitnessTable>>    mapInterfaceToWitnessTable;
         };
 
+        FuncDecl* synthesizeMethodSignatureForRequirementWitness(
+            ConformanceCheckingContext* context,
+            DeclRef<FuncDecl> requiredMemberDeclRef,
+            List<Expr*>& synArgs,
+            ThisExpr*& synThis);
+
             /// Attempt to synthesize a method that can satisfy `requiredMemberDeclRef` using `lookupResult`.
             ///
             /// On success, installs the syntethesized method in `witnessTable` and returns `true`.
@@ -1103,6 +1105,15 @@ namespace Slang
             LookupResult const&         lookupResult,
             DeclRef<Decl>               requiredMemberDeclRef,
             RefPtr<WitnessTable>        witnessTable);
+
+            /// Attempt to synthesize `zero`, `dadd` and `dmul` methods for a type that conforms to
+            /// `IDifferentiable`.
+            /// On success, installs the syntethesized functions and returns `true`.
+            /// Otherwise, returns `false`.
+        bool trySynthesizeDifferentialMethodRequirementWitness(
+            ConformanceCheckingContext* context,
+            DeclRef<Decl> requirementDeclRef,
+            RefPtr<WitnessTable> witnessTable);
 
             /// Attempt to synthesize an associated `Differential` type for a type that conforms to
             /// `IDifferentiable`.

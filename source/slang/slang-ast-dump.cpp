@@ -345,7 +345,7 @@ struct ASTDumpContext
     {
         m_writer->emit(getTryClauseTypeName(clauseType));
     }
-    void dump(BuiltinAssociatedTypeRequirementKind kind)
+    void dump(BuiltinRequirementKind kind)
     {
         m_writer->emit((int)kind);
     }

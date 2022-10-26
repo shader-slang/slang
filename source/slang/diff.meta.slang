@@ -21,13 +21,16 @@ interface IDifferentiable
     // Note: the compiler implementation requires the `Differential` associated type to be defined
     // before anything else.
 
-    [__BuiltinAssociatedTypeRequirementAttribute(_BuiltinAssociatedTypeRequirementKind.Differential)]
+    [__BuiltinRequirement(_BuiltinRequirementKind.DifferentialType)]
     associatedtype Differential;
-    
+
+    [__BuiltinRequirement(_BuiltinRequirementKind.DZeroFunc)]
     static Differential zero();
 
+    [__BuiltinRequirement(_BuiltinRequirementKind.DAddFunc)]
     static Differential dadd(Differential, Differential);
 
+    [__BuiltinRequirement(_BuiltinRequirementKind.DMulFunc)]
     static Differential dmul(This, Differential);
 };
 

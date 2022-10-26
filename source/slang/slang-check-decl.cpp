@@ -81,8 +81,6 @@ namespace Slang
 
         void checkCallableDeclCommon(CallableDecl* decl);
 
-        void maybeCheckDifferentiableAccessorSignature(FuncDecl* funcDecl);
-
         void visitFuncDecl(FuncDecl* funcDecl);
 
         void visitParamDecl(ParamDecl* paramDecl);
@@ -889,6 +887,7 @@ namespace Slang
                     auto diffTypeDict = subDiffTypeContext->makeDifferentiableTypeDictionaryNode(visitor->getASTBuilder());
                     diffTypeDict->parentDecl = containerDecl;
                     containerDecl->members.add(diffTypeDict);
+                    containerDecl->invalidateMemberDictionary();
                 }
             }
         }
@@ -1072,8 +1071,11 @@ namespace Slang
             auto initExpr = varDecl->initExpr;
             if(!initExpr)
             {
-                getSink()->diagnose(varDecl, Diagnostics::varWithoutTypeMustHaveInitializer);
-                varDecl->type.type = m_astBuilder->getErrorType();
+                if (!varDecl->type.type)
+                {
+                    getSink()->diagnose(varDecl, Diagnostics::varWithoutTypeMustHaveInitializer);
+                    varDecl->type.type = m_astBuilder->getErrorType();
+                }
             }
             else
             {
@@ -1390,7 +1392,7 @@ namespace Slang
             context->parentDecl->members.add((aggTypeDecl));
             aggTypeDecl->nameAndLoc.name = requirementDeclRef.getName();
             aggTypeDecl->loc = context->parentDecl->nameAndLoc.loc;
-            context->parentDecl->getMemberDictionary().Add(aggTypeDecl->getName(), aggTypeDecl);
+            context->parentDecl->invalidateMemberDictionary();
         }
 
         // TODO: if we want to make the synthesized type itself to be differentiable,
@@ -1409,6 +1411,7 @@ namespace Slang
             diffField->checkState = DeclCheckState::SignatureChecked;
             diffField->parentDecl = aggTypeDecl;
             aggTypeDecl->members.add(diffField);
+            aggTypeDecl->invalidateMemberDictionary();
 
             // Inject a `DerivativeMember` modifier on the original decl.
             auto derivativeMemberModifier = m_astBuilder->create<DerivativeMemberAttribute>();
@@ -2412,6 +2415,113 @@ namespace Slang
         return false;
     }
 
+    FuncDecl* SemanticsVisitor::synthesizeMethodSignatureForRequirementWitness(
+        ConformanceCheckingContext* context,
+        DeclRef<FuncDecl> requiredMemberDeclRef,
+        List<Expr*>& synArgs,
+        ThisExpr*& synThis)
+    {
+        auto synFuncDecl = m_astBuilder->create<FuncDecl>();
+
+        // For now our synthesized method will use the name and source
+        // location of the requirement we are trying to satisfy.
+        //
+        // TODO: as it stands right now our syntesized method will
+        // get a mangled name, which we don't actually want. Leaving
+        // out the name here doesn't help matters, because then *all*
+        // snthesized methods on a given type would share the same
+        // mangled name!
+        //
+        synFuncDecl->nameAndLoc = requiredMemberDeclRef.getDecl()->nameAndLoc;
+
+        // The result type of our synthesized method will be the expected
+        // result type from the interface requirement.
+        //
+        // TODO: This logic can/will run into problems if the return type
+        // is an associated type.
+        //
+        // The ideal solution is that we should be solving for interface
+        // conformance in two phases: a first phase to solve for how
+        // associated types are satisfied, and then a second phase to solve
+        // for how other requirements are satisfied (where we can substitute
+        // in the associated type witnesses for the abstract associated
+        // types as part of `requiredMemberDeclRef`).
+        //
+        // TODO: We should also double-check that this logic will work
+        // with a method that returns `This`.
+        //
+        auto resultType = getResultType(m_astBuilder, requiredMemberDeclRef);
+        synFuncDecl->returnType.type = resultType;
+
+        // Our synthesized method will have parameters matching the names
+        // and types of those on the requirement, and it will use expressions
+        // that reference those parametesr as arguments for the call expresison
+        // that makes up the body.
+        //
+        for (auto paramDeclRef : getParameters(requiredMemberDeclRef))
+        {
+            auto paramType = getType(m_astBuilder, paramDeclRef);
+
+            // For each parameter of the requirement, we create a matching
+            // parameter (same name and type) for the synthesized method.
+            //
+            auto synParamDecl = m_astBuilder->create<ParamDecl>();
+            synParamDecl->nameAndLoc = paramDeclRef.getDecl()->nameAndLoc;
+            synParamDecl->type.type = paramType;
+
+            // We need to add the parameter as a child declaration of
+            // the method we are building.
+            //
+            synParamDecl->parentDecl = synFuncDecl;
+            synFuncDecl->members.add(synParamDecl);
+
+            // For each paramter, we will create an argument expression
+            // for the call in the function body.
+            //
+            auto synArg = m_astBuilder->create<VarExpr>();
+            synArg->declRef = makeDeclRef(synParamDecl);
+            synArg->type = paramType;
+            synArgs.add(synArg);
+        }
+
+
+        // Required interface methods can be `static` or non-`static`,
+        // and non-`static` methods can be `[mutating]` or non-`[mutating]`.
+        // All of these details affect how we introduce our `this` parameter,
+        // if any.
+        //
+        if (requiredMemberDeclRef.getDecl()->hasModifier<HLSLStaticModifier>())
+        {
+            auto synStaticModifier = m_astBuilder->create<HLSLStaticModifier>();
+            synFuncDecl->modifiers.first = synStaticModifier;
+        }
+        else
+        {
+            // For a non-`static` requirement, we need a `this` parameter.
+            //
+            synThis = m_astBuilder->create<ThisExpr>();
+
+            // The type of `this` in our method will be the type for
+            // which we are synthesizing a conformance.
+            //
+            synThis->type.type = context->conformingType;
+
+            if (requiredMemberDeclRef.getDecl()->hasModifier<MutatingAttribute>())
+            {
+                // If the interface requirement is `[mutating]` then our
+                // synthesized method should be too, and also the `this`
+                // parameter should be an l-value.
+                //
+                synThis->type.isLeftValue = true;
+
+                auto synMutatingAttr = m_astBuilder->create<MutatingAttribute>();
+                synFuncDecl->modifiers.first = synMutatingAttr;
+            }
+        }
+
+        return synFuncDecl;
+    }
+
     bool SemanticsVisitor::trySynthesizeMethodRequirementWitness(
         ConformanceCheckingContext* context,
         LookupResult const&         lookupResult,
@@ -2460,104 +2570,12 @@ namespace Slang
         // With the big picture spelled out, we can settle into
         // the work of constructing our synthesized method.
         //
-        auto synFuncDecl = m_astBuilder->create<FuncDecl>();
-
-        // For now our synthesized method will use the name and source
-        // location of the requirement we are trying to satisfy.
-        //
-        // TODO: as it stands right now our syntesized method will
-        // get a mangled name, which we don't actually want. Leaving
-        // out the name here doesn't help matters, because then *all*
-        // snthesized methods on a given type would share the same
-        // mangled name!
-        //
-        synFuncDecl->nameAndLoc = requiredMemberDeclRef.getDecl()->nameAndLoc;
-
-        // The result type of our synthesized method will be the expected
-        // result type from the interface requirement.
-        //
-        // TODO: This logic can/will run into problems if the return type
-        // is an associated type.
-        //
-        // The ideal solution is that we should be solving for interface
-        // conformance in two phases: a first phase to solve for how
-        // associated types are satisfied, and then a second phase to solve
-        // for how other requirements are satisfied (where we can substitute
-        // in the associated type witnesses for the abstract associated
-        // types as part of `requiredMemberDeclRef`).
-        //
-        // TODO: We should also double-check that this logic will work
-        // with a method that returns `This`.
-        //
-        auto resultType = getResultType(m_astBuilder, requiredMemberDeclRef);
-        synFuncDecl->returnType.type = resultType;
-
-        // Our synthesized method will have parameters matching the names
-        // and types of those on the requirement, and it will use expressions
-        // that reference those parametesr as arguments for the call expresison
-        // that makes up the body.
-        //
-        List<Expr*> synArgs;
-        for( auto paramDeclRef : getParameters(requiredMemberDeclRef) )
-        {
-            auto paramType = getType(m_astBuilder, paramDeclRef);
-
-            // For each parameter of the requirement, we create a matching
-            // parameter (same name and type) for the synthesized method.
-            //
-            auto synParamDecl = m_astBuilder->create<ParamDecl>();
-            synParamDecl->nameAndLoc = paramDeclRef.getDecl()->nameAndLoc;
-            synParamDecl->type.type = paramType;
-
-            // We need to add the parameter as a child declaration of
-            // the method we are building.
-            //
-            synParamDecl->parentDecl = synFuncDecl;
-            synFuncDecl->members.add(synParamDecl);
-
-            // For each paramter, we will create an argument expression
-            // for the call in the function body.
-            //
-            auto synArg = m_astBuilder->create<VarExpr>();
-            synArg->declRef = makeDeclRef(synParamDecl);
-            synArg->type = paramType;
-            synArgs.add(synArg);
-        }
-
-        // Required interface methods can be `static` or non-`static`,
-        // and non-`static` methods can be `[mutating]` or non-`[mutating]`.
-        // All of these details affect how we introduce our `this` parameter,
-        // if any.
-        //
         ThisExpr* synThis = nullptr;
-        if( requiredMemberDeclRef.getDecl()->hasModifier<HLSLStaticModifier>() )
-        {
-            auto synStaticModifier = m_astBuilder->create<HLSLStaticModifier>();
-            synFuncDecl->modifiers.first = synStaticModifier;
-        }
-        else
-        {
-            // For a non-`static` requirement, we need a `this` parameter.
-            //
-            synThis = m_astBuilder->create<ThisExpr>();
+        List<Expr*> synArgs;
+        auto synFuncDecl = synthesizeMethodSignatureForRequirementWitness(
+            context, requiredMemberDeclRef, synArgs, synThis);
 
-            // The type of `this` in our method will be the type for
-            // which we are synthesizing a conformance.
-            //
-            synThis->type.type = context->conformingType;
-
-            if( requiredMemberDeclRef.getDecl()->hasModifier<MutatingAttribute>() )
-            {
-                // If the interface requirement is `[mutating]` then our
-                // synthesized method should be too, and also the `this`
-                // parameter should be an l-value.
-                //
-                synThis->type.isLeftValue = true;
-
-                auto synMutatingAttr = m_astBuilder->create<MutatingAttribute>();
-                synFuncDecl->modifiers.first = synMutatingAttr;
-            }
-        }
+        auto resultType = synFuncDecl->returnType.type;
 
         // The body of our synthesized method is going to try to
         // make a call using the name of the method requirement (e.g.,
@@ -3036,11 +3054,27 @@ namespace Slang
         if (auto requiredFuncDeclRef = requiredMemberDeclRef.as<FuncDecl>())
         {
             // Check signature match.
-            return trySynthesizeMethodRequirementWitness(
+            if (trySynthesizeMethodRequirementWitness(
                 context,
                 lookupResult,
                 requiredFuncDeclRef,
-                witnessTable);
+                witnessTable))
+                return true;
+
+            if (auto builtinAttr = requiredFuncDeclRef.getDecl()->findModifier<BuiltinRequirementAttribute>())
+            {
+                switch (builtinAttr->kind)
+                {
+                case BuiltinRequirementKind::DAddFunc:
+                case BuiltinRequirementKind::DMulFunc:
+                case BuiltinRequirementKind::DZeroFunc:
+                    return trySynthesizeDifferentialMethodRequirementWitness(
+                        context,
+                        requiredFuncDeclRef,
+                        witnessTable);
+                }
+            }
+            return false;
         }
 
         if( auto requiredPropertyDeclRef = requiredMemberDeclRef.as<PropertyDecl>() )
@@ -3054,11 +3088,11 @@ namespace Slang
 
         if (auto requiredAssocTypeDeclRef = requiredMemberDeclRef.as<AssocTypeDecl>())
         {
-            if (auto builtinAttr = requiredAssocTypeDeclRef.getDecl()->findModifier<BuiltinAssociatedTypeRequirementAttribute>())
+            if (auto builtinAttr = requiredAssocTypeDeclRef.getDecl()->findModifier<BuiltinRequirementAttribute>())
             {
                 switch (builtinAttr->kind)
                 {
-                case BuiltinAssociatedTypeRequirementKind::Differential:
+                case BuiltinRequirementKind::DifferentialType:
                     return trySynthesizeDifferentialAssociatedTypeRequirementWitness(
                         context,
                         requiredAssocTypeDeclRef,
@@ -3086,6 +3120,108 @@ namespace Slang
         // apply existing semantic checking logic to generate the code.
 
         return false;
+    }
+
+    bool SemanticsVisitor::trySynthesizeDifferentialMethodRequirementWitness(
+        ConformanceCheckingContext* context,
+        DeclRef<Decl> requirementDeclRef,
+        RefPtr<WitnessTable> witnessTable)
+    {
+        List<Expr*> synArgs;
+        ThisExpr* synThis = nullptr;
+        auto synFunc = synthesizeMethodSignatureForRequirementWitness(
+            context, requirementDeclRef.as<FuncDecl>(), synArgs, synThis);
+
+        auto blockStmt = m_astBuilder->create<BlockStmt>();
+        synFunc->body = blockStmt;
+        auto seqStmt = m_astBuilder->create<SeqStmt>();
+        blockStmt->body = seqStmt;
+
+        // Create a variable for return value.
+        auto scopeDecl = m_astBuilder->create<ScopeDecl>();
+        synFunc->members.add(scopeDecl);
+        scopeDecl->parentDecl = synFunc;
+        auto varStmt = m_astBuilder->create<DeclStmt>();
+        seqStmt->stmts.add(varStmt);
+
+        auto returnVar = m_astBuilder->create<VarDecl>();
+        returnVar->parentDecl = scopeDecl;
+        scopeDecl->members.add(returnVar);
+
+        returnVar->type.type = synFunc->returnType.type;
+        returnVar->nameAndLoc.name = getName("result");
+        varStmt->decl = returnVar;
+        auto resultVarExpr = m_astBuilder->create<VarExpr>();
+        resultVarExpr->declRef = makeDeclRef(returnVar);
+        resultVarExpr->type.type = synFunc->returnType.type;
+        resultVarExpr->type.isLeftValue = true;
+
+        for (auto member : context->parentDecl->members)
+        {
+            auto derivativeAttr = member->findModifier<DerivativeMemberAttribute>();
+            if (!derivativeAttr)
+                continue;
+            auto varMember = as<VarDeclBase>(member);
+            if (!varMember)
+                continue;
+            ensureDecl(varMember, DeclCheckState::ReadyForReference);
+            auto memberType = varMember->getType();
+            auto diffMemberType = tryGetDifferentialType(m_astBuilder, memberType);
+            if (!diffMemberType)
+                continue;
+
+            // Construct reference exprs to the member's corresponding fields in each parameter.
+            List<Expr*> paramFields;
+            int paramIndex = 0;
+            for (auto arg : synArgs)
+            {
+                auto memberExpr = m_astBuilder->create<MemberExpr>();
+                memberExpr->baseExpression = arg;
+                memberExpr->name = varMember->getName();
+                paramFields.add(memberExpr);
+                paramIndex++;
+            }
+
+            // Invoke the method for the field.
+            auto callee = m_astBuilder->create<StaticMemberExpr>();
+            auto baseSharedType = m_astBuilder->create<SharedTypeExpr>();
+            auto baseSharedTypeType = m_astBuilder->create<TypeType>();
+            baseSharedTypeType->type = memberType;
+            baseSharedType->type = baseSharedTypeType;
+            baseSharedType->base.type = memberType;
+            callee->baseExpression = baseSharedType;
+            callee->name = requirementDeclRef.getName();
+            callee->loc = synFunc->loc;
+            auto invokeExpr = m_astBuilder->create<InvokeExpr>();
+            invokeExpr->functionExpr = callee;
+            invokeExpr->arguments = _Move(paramFields);
+
+            // Assign the value to resultVar.
+            auto leftVal = m_astBuilder->create<MemberExpr>();
+            leftVal->baseExpression = resultVarExpr;
+            leftVal->name = varMember->getName();
+
+            auto assignExpr = m_astBuilder->create<AssignExpr>();
+            assignExpr->left = leftVal;
+            assignExpr->right = invokeExpr;
+            auto assignStmt = m_astBuilder->create<ExpressionStmt>();
+            assignStmt->expression = assignExpr;
+            seqStmt->stmts.add(assignStmt);
+        }
+
+        //TODO: synthesize assignments for inherited members here.
+        
+        auto synReturn = m_astBuilder->create<ReturnStmt>();
+        synReturn->expression = resultVarExpr;
+        seqStmt->stmts.add(synReturn);
+
+        synFunc->parentDecl = context->parentDecl;
+        context->parentDecl->members.add(synFunc);
+        context->parentDecl->invalidateMemberDictionary();
+        addModifier(synFunc, m_astBuilder->create<SynthesizedModifier>());
+
+        witnessTable->add(requirementDeclRef, RequirementWitness(makeDeclRef(synFunc)));
+        return true;
     }
 
     bool SemanticsVisitor::findWitnessForInterfaceRequirement(
@@ -3210,18 +3346,16 @@ namespace Slang
 
         if(!lookupResult.isValid())
         {
-            // If we failed to even look up a member with the name of the
-            // requirement, then we can be certain that the type doesn't
-            // satisfy the requirement.
-            //
-            // TODO: If we ever allowed certain kinds of requirements to
-            // be inferred (e.g., inferring associated types from the
-            // signatures of methods, as is done for Swift), we'd
-            // need to revisit this step.
-            //
-            getSink()->diagnose(inheritanceDecl, Diagnostics::typeDoesntImplementInterfaceRequirement, subType, requiredMemberDeclRef);
-            getSink()->diagnose(requiredMemberDeclRef, Diagnostics::seeDeclarationOf, requiredMemberDeclRef);
-            return false;
+            // If we failed to look up a member with the name of the
+            // requirement, it may be possible that we can still synthesis the
+            // implementation if this is one of the known builtin requirements.
+            // Otherwise, report diagnostic now.
+            if (!requiredMemberDeclRef.getDecl()->hasModifier<BuiltinRequirementAttribute>())
+            {
+                getSink()->diagnose(inheritanceDecl, Diagnostics::typeDoesntImplementInterfaceRequirement, subType, requiredMemberDeclRef);
+                getSink()->diagnose(requiredMemberDeclRef, Diagnostics::seeDeclarationOf, requiredMemberDeclRef);
+                return false;
+            }
         }
 
         // Iterate over the members and look for one that matches
@@ -5103,7 +5237,7 @@ namespace Slang
         {
             resultType = CheckProperType(resultType);
         }
-        else
+        else if (!funcDecl->returnType.type)
         {
             resultType = TypeExp(m_astBuilder->getVoidType());
         }

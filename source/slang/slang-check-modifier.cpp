@@ -484,14 +484,14 @@ namespace Slang
                 return false;
             }
         }
-        else if (auto builtinAssocTypeAttr = as<BuiltinAssociatedTypeRequirementAttribute>(attr))
+        else if (auto builtinAssocTypeAttr = as<BuiltinRequirementAttribute>(attr))
         {
             if (attr->args.getCount() == 1)
             {
                 //IntVal* outIntVal;
                 if (auto cInt = checkConstantEnumVal(attr->args[0]))
                 {
-                    builtinAssocTypeAttr->kind = (BuiltinAssociatedTypeRequirementKind)(cInt->value);
+                    builtinAssocTypeAttr->kind = (BuiltinRequirementKind)(cInt->value);
                 }
                 else
                 {

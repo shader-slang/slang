@@ -2742,12 +2742,15 @@ attribute_syntax [Differentiable] : DifferentiableAttribute;
 __attributeTarget(DeclBase)
 attribute_syntax [DerivativeMember(memberName)] : DerivativeMemberAttribute;
 
-enum _BuiltinAssociatedTypeRequirementKind
+enum _BuiltinRequirementKind
 {
-    Differential = $( (int) BuiltinAssociatedTypeRequirementKind::Differential),
+    DifferentialType = $( (int) BuiltinRequirementKind::DifferentialType),
+    DZeroFunc = $( (int) BuiltinRequirementKind::DZeroFunc),
+    DAddFunc = $( (int) BuiltinRequirementKind::DAddFunc),
+    DMulFunc = $( (int) BuiltinRequirementKind::DMulFunc),
 };
 __attributeTarget(DeclBase)
-attribute_syntax [__BuiltinAssociatedTypeRequirementAttribute(kind: _BuiltinAssociatedTypeRequirementKind)] : BuiltinAssociatedTypeRequirementAttribute;
+attribute_syntax [__BuiltinRequirement(kind: _BuiltinRequirementKind)] : BuiltinRequirementAttribute;
 
 __attributeTarget(DeclBase)
 attribute_syntax [builtin] : BuiltinAttribute;

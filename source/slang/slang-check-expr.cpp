@@ -405,14 +405,17 @@ namespace Slang
         switch (item.declRef.getDecl()->astNodeType)
         {
         case ASTNodeType::AssocTypeDecl:
-            return maybeUseSynthesizedTypeDeclForLookupResult(item, originalExpr);
+            break;
+        case ASTNodeType::FuncDecl:
+            // We don't need to intercept lookup results with synthesized decls for methods,
+            // because function lookups will only take place when we are checking the decl bodies.
+            // At that point conformance check and synthesis is already done so they will always resolve
+            // to the synthesized method.
+            return nullptr;
         default:
             return nullptr;
         }
-    }
 
-    Expr* SemanticsVisitor::maybeUseSynthesizedTypeDeclForLookupResult(LookupResultItem const& item, Expr* originalExpr)
-    {
         // We need to check if the lookup should resolve to a definition in an implementation type
         // if it existed.
         // This will be the case when the lookup is initiated from the concrete implementation type instead of
@@ -425,7 +428,7 @@ namespace Slang
 
         // We will only ever need to synthesis a type to satisfy an associatedtype requirement.
         // In this case the lookup should have resolved to a known associatedtype decl.
-        auto builtinAssocTypeAttr = item.declRef.getDecl()->findModifier<BuiltinAssociatedTypeRequirementAttribute>();
+        auto builtinAssocTypeAttr = item.declRef.getDecl()->findModifier<BuiltinRequirementAttribute>();
         if (!builtinAssocTypeAttr)
             return nullptr;
 
@@ -465,22 +468,32 @@ namespace Slang
         if (!parent)
             return nullptr;
 
-        // If we reach here, we are expecting a synthesized associated type defined in `subType`.
-        // Instead of returning a DeclRefExpr to the requirement decl, we synthesize a placeholder type
+        // If we reach here, we are expecting a synthesized decl defined in `subType`.
+        // Instead of returning a DeclRefExpr to the requirement decl, we synthesize a placeholder decl
         // in `subType` and return a DeclRefExpr to the synthesized decl.
-        auto assocType = m_astBuilder->create<StructDecl>();
-        assocType->parentDecl = parent;
-        assocType->nameAndLoc.name = item.declRef.getName();
-        assocType->loc = parent->loc;
-        parent->members.add(assocType);
+
+        Decl* synthesizedDecl = nullptr;
+        switch (builtinAssocTypeAttr->kind)
+        {
+        case BuiltinRequirementKind::DifferentialType:
+            synthesizedDecl = m_astBuilder->create<StructDecl>();
+            break;
+        default:
+            break;
+        }
+        synthesizedDecl = m_astBuilder->create<StructDecl>();
+        synthesizedDecl->parentDecl = parent;
+        synthesizedDecl->nameAndLoc.name = item.declRef.getName();
+        synthesizedDecl->loc = parent->loc;
+        parent->members.add(synthesizedDecl);
         parent->invalidateMemberDictionary();
 
         // Mark the newly synthesized decl as `ToBeSynthesized` so future checking can differentiate it
         // from user-provided definitions, and proceed to fill in its definition.
         auto toBeSynthesized = m_astBuilder->create<ToBeSynthesizedModifier>();
-        addModifier(assocType, toBeSynthesized);
+        addModifier(synthesizedDecl, toBeSynthesized);
 
-        return ConstructDeclRefExpr(makeDeclRef(assocType), nullptr, originalExpr->loc, originalExpr);
+        return ConstructDeclRefExpr(makeDeclRef(synthesizedDecl), nullptr, originalExpr->loc, originalExpr);
     }
 
     Expr* SemanticsVisitor::ConstructLookupResultExpr(
