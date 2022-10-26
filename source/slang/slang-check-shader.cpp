@@ -236,13 +236,10 @@ namespace Slang
     {
         auto translationUnitSyntax = translationUnit->getModuleDecl();
 
-        // Make sure we've got a query-able member dictionary
-        buildMemberDictionary(translationUnitSyntax);
-
         // We will look up any global-scope declarations in the translation
         // unit that match the name of our entry point.
         Decl* firstDeclWithName = nullptr;
-        if (!translationUnitSyntax->memberDictionary.TryGetValue(name, firstDeclWithName))
+        if (!translationUnitSyntax->getMemberDictionary().TryGetValue(name, firstDeclWithName))
         {
             // If there doesn't appear to be any such declaration, then we are done.
 
@@ -454,13 +451,10 @@ namespace Slang
 
         auto entryPointName = entryPointReq->getName();
 
-        // Make sure we've got a query-able member dictionary
-        buildMemberDictionary(translationUnitSyntax);
-
         // We will look up any global-scope declarations in the translation
         // unit that match the name of our entry point.
         Decl* firstDeclWithName = nullptr;
-        if( !translationUnitSyntax->memberDictionary.TryGetValue(entryPointName, firstDeclWithName) )
+        if( !translationUnitSyntax->getMemberDictionary().TryGetValue(entryPointName, firstDeclWithName))
         {
             // If there doesn't appear to be any such declaration, then
             // we need to diagnose it as an error, and then bail out.

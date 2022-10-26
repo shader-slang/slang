@@ -1372,7 +1372,7 @@ namespace Slang
 
         Decl* existingDecl = nullptr;
         AggTypeDecl* aggTypeDecl = nullptr;
-        if (context->parentDecl->memberDictionary.TryGetValue(requirementDeclRef.getName(), existingDecl))
+        if (context->parentDecl->getMemberDictionary().TryGetValue(requirementDeclRef.getName(), existingDecl))
         {
             aggTypeDecl = as<AggTypeDecl>(existingDecl);
             SLANG_RELEASE_ASSERT(aggTypeDecl);
@@ -1386,10 +1386,11 @@ namespace Slang
         else
         {
             aggTypeDecl = m_astBuilder->create<StructDecl>();
+            aggTypeDecl->parentDecl = context->parentDecl;
             context->parentDecl->members.add((aggTypeDecl));
             aggTypeDecl->nameAndLoc.name = requirementDeclRef.getName();
             aggTypeDecl->loc = context->parentDecl->nameAndLoc.loc;
-            context->parentDecl->memberDictionary.Add(aggTypeDecl->getName(), aggTypeDecl);
+            context->parentDecl->getMemberDictionary().Add(aggTypeDecl->getName(), aggTypeDecl);
         }
 
         // TODO: if we want to make the synthesized type itself to be differentiable,
@@ -1398,19 +1399,29 @@ namespace Slang
 
         // Helper function to add a `diffType` field into the synthesized type for the original
         // `member`.
-        auto addDiffMember = [&](Decl* member, Type* diffType)
+        auto differentialType = GetTypeForDeclRef(makeDeclRef(aggTypeDecl), context->parentDecl->loc);
+        auto addDiffMember = [&](Decl* member, Type* diffMemberType)
         {
             // If the field is differentiable, add a corresponding field in the associated Differential type.
             auto diffField = m_astBuilder->create<VarDecl>();
             diffField->nameAndLoc = member->nameAndLoc;
-            diffField->type.type = diffType;
+            diffField->type.type = diffMemberType;
             diffField->checkState = DeclCheckState::SignatureChecked;
+            diffField->parentDecl = aggTypeDecl;
             aggTypeDecl->members.add(diffField);
 
             // Inject a `DerivativeMember` modifier on the original decl.
             auto derivativeMemberModifier = m_astBuilder->create<DerivativeMemberAttribute>();
-            derivativeMemberModifier->memberDeclRef = m_astBuilder->create<DeclRefExpr>();
-            derivativeMemberModifier->memberDeclRef->declRef = makeDeclRef(diffField);
+            auto fieldLookupExpr = m_astBuilder->create<StaticMemberExpr>();
+            fieldLookupExpr->type.type = diffMemberType;
+            auto baseTypeExpr = m_astBuilder->create<SharedTypeExpr>();
+            baseTypeExpr->base.type = differentialType;
+            auto baseTypeType = m_astBuilder->create<TypeType>();
+            baseTypeType->type = differentialType;
+            baseTypeExpr->type.type = baseTypeType;
+            fieldLookupExpr->baseExpression = baseTypeExpr;
+            fieldLookupExpr->declRef = makeDeclRef(diffField);
+            derivativeMemberModifier->memberDeclRef = fieldLookupExpr;
             addModifier(member, derivativeMemberModifier);
         };
 
@@ -4985,7 +4996,7 @@ namespace Slang
         // We will now look for other declarations with
         // the same name in the same parent/container.
         //
-        buildMemberDictionary(parentDecl);
+        parentDecl->buildMemberDictionary();
         for (auto oldDecl = newDecl->nextInContainerWithSameName; oldDecl; oldDecl = oldDecl->nextInContainerWithSameName)
         {
             // For each matching declaration, we will check

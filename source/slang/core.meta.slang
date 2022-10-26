@@ -2742,7 +2742,7 @@ attribute_syntax [Differentiable] : DifferentiableAttribute;
 __attributeTarget(DeclBase)
 attribute_syntax [DerivativeMember(memberName)] : DerivativeMemberAttribute;
 
-enum _BuiltinAssociatedTypeRequirementAttributeKind
+enum _BuiltinAssociatedTypeRequirementKind
 {
     Differential = $( (int) BuiltinAssociatedTypeRequirementKind::Differential),
 };

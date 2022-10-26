@@ -3078,11 +3078,6 @@ namespace Slang
             // would trigger a rebuild of the member dictionary that
             // would take O(N) time.
             //
-            // Eventually we should make `builtMemberDictionary()`
-            // incremental, so that it only has to process members
-            // added since the last time it was invoked.
-            //
-            buildMemberDictionary(parentDecl);
 
             // There might be multiple members of the same name
             // (if we define a namespace `foo` after an overloaded
@@ -3090,7 +3085,7 @@ namespace Slang
             // lookup will only give us the first.
             //
             Decl* firstDecl = nullptr;
-            parentDecl->memberDictionary.TryGetValue(nameAndLoc.name, firstDecl);
+            parentDecl->getMemberDictionary().TryGetValue(nameAndLoc.name, firstDecl);
             //
             // We will search through the declarations of the name
             // and find the first that is a namespace (if any).

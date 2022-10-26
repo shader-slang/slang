@@ -30,63 +30,6 @@ struct BreadcrumbInfo
 
 //
 
-void buildMemberDictionary(ContainerDecl* decl)
-{
-    // Don't rebuild if already built
-    if (decl->isMemberDictionaryValid())
-        return;
-
-    // If it's < 0 it means that the dictionaries are entirely invalid
-    if (decl->dictionaryLastCount < 0)
-    {
-        decl->dictionaryLastCount = 0;
-        decl->memberDictionary.Clear();
-        decl->transparentMembers.clear();
-    }
-
-    // are we a generic?
-    GenericDecl* genericDecl = as<GenericDecl>(decl);
-
-    const Index membersCount = decl->members.getCount();
-
-    SLANG_ASSERT(decl->dictionaryLastCount >= 0 && decl->dictionaryLastCount <= membersCount);
-
-    for (Index i = decl->dictionaryLastCount; i < membersCount; ++i)
-    {
-        Decl* m = decl->members[i];
-
-        auto name = m->getName();
-
-        // Add any transparent members to a separate list for lookup
-        if (m->hasModifier<TransparentModifier>())
-        {
-            TransparentMemberInfo info;
-            info.decl = m;
-            decl->transparentMembers.add(info);
-        }
-
-        // Ignore members with no name
-        if (!name)
-            continue;
-
-        // Ignore the "inner" member of a generic declaration
-        if (genericDecl && m == genericDecl->inner)
-            continue;
-
-        m->nextInContainerWithSameName = nullptr;
-
-        Decl* next = nullptr;
-        if (decl->memberDictionary.TryGetValue(name, next))
-            m->nextInContainerWithSameName = next;
-
-        decl->memberDictionary[name] = m;
-    }
-
-    decl->dictionaryLastCount = membersCount;
-    SLANG_ASSERT(decl->isMemberDictionaryValid());
-}
-
-
 bool DeclPassesLookupMask(Decl* decl, LookupMask mask)
 {
     // Always exclude extern members from lookup result.
@@ -229,15 +172,9 @@ static void _lookUpDirectAndTransparentMembers(
     }
     else
     {
-        // Ensure that the lookup dictionary in the container is up to date
-        if (!containerDecl->isMemberDictionaryValid())
-        {
-            buildMemberDictionary(containerDecl);
-        }
-
         // Look up the declarations with the chosen name in the container.
         Decl* firstDecl = nullptr;
-        containerDecl->memberDictionary.TryGetValue(name, firstDecl);
+        containerDecl->getMemberDictionary().TryGetValue(name, firstDecl);
 
         // Now iterate over those declarations (if any) and see if
         // we find any that meet our filtering criteria.
@@ -255,7 +192,7 @@ static void _lookUpDirectAndTransparentMembers(
 
     // TODO(tfoley): should we look up in the transparent decls
     // if we already has a hit in the current container?
-    for(auto transparentInfo : containerDecl->transparentMembers)
+    for(auto transparentInfo : containerDecl->getTransparentMembers())
     {
         // The reference to the transparent member should use whatever
         // substitutions we used in referring to its outer container

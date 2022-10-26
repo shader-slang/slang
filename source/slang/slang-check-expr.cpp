@@ -442,10 +442,11 @@ namespace Slang
         // Instead of returning a DeclRefExpr to the requirement decl, we synthesize a placeholder type
         // in `subType` and return a DeclRefExpr to the synthesized decl.
         auto assocType = m_astBuilder->create<StructDecl>();
+        assocType->parentDecl = parent;
         assocType->nameAndLoc.name = item.declRef.getName();
         assocType->loc = parent->loc;
         parent->members.add(assocType);
-        parent->memberDictionary[item.declRef.getName()] = assocType;
+        parent->invalidateMemberDictionary();
         auto toBeSynthesized = m_astBuilder->create<ToBeSynthesizedModifier>();
         addModifier(assocType, toBeSynthesized);
         return ConstructDeclRefExpr(makeDeclRef(assocType), nullptr, originalExpr->loc, originalExpr);
@@ -849,8 +850,9 @@ namespace Slang
         if (!result)
         {
             getSink()->diagnose(loc, Diagnostics::typeDoesntImplementInterfaceRequirement, type, getName("Differential"));
+            return m_astBuilder->getErrorType();
         }
-        return m_astBuilder->getErrorType();
+        return result;
     }
 
     void SemanticsVisitor::maybeRegisterDifferentiableType(ASTBuilder* builder, Type* type)
