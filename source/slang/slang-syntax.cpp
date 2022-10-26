@@ -682,9 +682,6 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         return Slang::as<Type>(type->substitute(astBuilder, substs));
     }
 
-
-    void buildMemberDictionary(ContainerDecl* decl);
-
     InterfaceDecl* findOuterInterfaceDecl(Decl* decl)
     {
         Decl* dd = decl;

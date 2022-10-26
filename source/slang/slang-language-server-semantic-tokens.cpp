@@ -60,7 +60,6 @@ List<SemanticToken> getSemanticTokens(Linkage* linkage, Module* module, UnownedS
                              .pathInfo.foundPath.getUnownedSlice()
                              .endsWithCaseInsensitive(fileName))
                         return;
-
                     SemanticToken token =
                         _createSemanticToken(manager, declRef->loc, declRef->name);
                     auto target = declRef->declRef.decl;

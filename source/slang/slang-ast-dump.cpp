@@ -345,6 +345,10 @@ struct ASTDumpContext
     {
         m_writer->emit(getTryClauseTypeName(clauseType));
     }
+    void dump(BuiltinAssociatedTypeRequirementKind kind)
+    {
+        m_writer->emit((int)kind);
+    }
     void dump(const String& string)
     {
         dump(string.getUnownedSlice());
