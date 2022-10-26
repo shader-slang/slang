@@ -395,33 +395,60 @@ namespace Slang
 
     Expr* SemanticsVisitor::maybeUseSynthesizedDeclForLookupResult(LookupResultItem const& item, Expr* originalExpr)
     {
+        // If the only result from lookup is an entry in an interface decl, it could be that
+        // the user is leaving out an explicit definition for the requirement and depending on
+        // the compiler to synthesis the definition.
+        // In this case, if the lookup is triggered from a location such that the satisfying
+        // definition should be returned should it existed, we should create a placeholder decl for
+        // the definition and return a reference to to newly created decl instead of the requirement
+        // decl in the interface.
+        switch (item.declRef.getDecl()->astNodeType)
+        {
+        case ASTNodeType::AssocTypeDecl:
+            return maybeUseSynthesizedTypeDeclForLookupResult(item, originalExpr);
+        default:
+            return nullptr;
+        }
+    }
+
+    Expr* SemanticsVisitor::maybeUseSynthesizedTypeDeclForLookupResult(LookupResultItem const& item, Expr* originalExpr)
+    {
+        // We need to check if the lookup should resolve to a definition in an implementation type
+        // if it existed.
+        // This will be the case when the lookup is initiated from the concrete implementation type instead of
+        // directly from the Interface decl. The breadcrumbs of the lookup should provide this information.
+
+        // If no breadcrumbs existed, then the lookup should just resolve to the interface requirement.
+
         if (!item.breadcrumbs)
             return nullptr;
 
+        // We will only ever need to synthesis a type to satisfy an associatedtype requirement.
+        // In this case the lookup should have resolved to a known associatedtype decl.
         auto builtinAssocTypeAttr = item.declRef.getDecl()->findModifier<BuiltinAssociatedTypeRequirementAttribute>();
         if (!builtinAssocTypeAttr)
             return nullptr;
 
         DeclRefType* subType = nullptr;
 
-        // Check if we are accessing the associated type through inheritance from a concrete type.
+        // Check if we are reaching the associated type decl through inheritance from a concrete type.
         for (auto breadcrumb = item.breadcrumbs; breadcrumb; breadcrumb = breadcrumb->next)
         {
             switch (breadcrumb->kind)
             {
             case LookupResultItem::Breadcrumb::Kind::SuperType:
+            {
+                auto witness = as<SubtypeWitness>(breadcrumb->val);
+                if (auto subDeclRefType = as<DeclRefType>(witness->sub))
                 {
-                    auto witness = as<SubtypeWitness>(breadcrumb->val);
-                    if (auto subDeclRefType = as<DeclRefType>(witness->sub))
+                    if (!as<InterfaceDecl>(subDeclRefType->declRef.getDecl()))
                     {
-                        if (!as<InterfaceDecl>(subDeclRefType->declRef.getDecl()))
-                        {
-                            // Store the inner most concrete super type.
-                            subType = subDeclRefType;
-                        }
+                        // Store the inner most concrete super type.
+                        subType = subDeclRefType;
                     }
                 }
-                break;
+            }
+            break;
             default:
                 break;
             }
@@ -447,8 +474,12 @@ namespace Slang
         assocType->loc = parent->loc;
         parent->members.add(assocType);
         parent->invalidateMemberDictionary();
+
+        // Mark the newly synthesized decl as `ToBeSynthesized` so future checking can differentiate it
+        // from user-provided definitions, and proceed to fill in its definition.
         auto toBeSynthesized = m_astBuilder->create<ToBeSynthesizedModifier>();
         addModifier(assocType, toBeSynthesized);
+
         return ConstructDeclRefExpr(makeDeclRef(assocType), nullptr, originalExpr->loc, originalExpr);
     }
 

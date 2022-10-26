@@ -630,6 +630,10 @@ namespace Slang
             Expr*    base,
             SourceLoc       loc);
 
+        Expr* maybeUseSynthesizedTypeDeclForLookupResult(
+            LookupResultItem const& item,
+            Expr* orignalExpr);
+
         Expr* maybeUseSynthesizedDeclForLookupResult(
             LookupResultItem const& item,
             Expr* orignalExpr);
