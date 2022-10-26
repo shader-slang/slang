@@ -1166,17 +1166,31 @@ struct JVPTranscriber
         
         IRType* diffReturnType = nullptr;
         diffReturnType = tryGetDiffPairType(builder, origCall->getFullType());
-        SLANG_ASSERT(diffReturnType);
+
+        if (!diffReturnType)
+        {
+            SLANG_RELEASE_ASSERT(origCall->getFullType()->getOp() == kIROp_VoidType);
+            diffReturnType = builder->getVoidType();
+        }
 
         auto callInst = builder->emitCallInst(
             diffReturnType,
             diffCallee,
             args);
 
-        IRInst* primalResultValue = pairBuilder->emitPrimalFieldAccess(builder, callInst);
-        IRInst* diffResultValue = pairBuilder->emitDiffFieldAccess(builder, callInst);
-        
-        return InstPair(primalResultValue, diffResultValue);
+        if (diffReturnType->getOp() != kIROp_VoidType)
+        {
+            IRInst* primalResultValue = pairBuilder->emitPrimalFieldAccess(builder, callInst);
+            IRInst* diffResultValue = pairBuilder->emitDiffFieldAccess(builder, callInst);
+            return InstPair(primalResultValue, diffResultValue);
+        }
+        else
+        {
+            // Return the inst itself if the return value is void.
+            // This is fine since these values should never actually be used anywhere.
+            // 
+            return InstPair(callInst, callInst);
+        }
     }
 
     InstPair transcribeSwizzle(IRBuilder* builder, IRSwizzle* origSwizzle)

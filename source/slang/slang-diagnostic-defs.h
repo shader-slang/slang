@@ -338,6 +338,10 @@ DIAGNOSTIC(31141, Error, definitionOfExternDeclMismatchesOriginalDefinition, "`e
 DIAGNOSTIC(31142, Error, ambiguousOriginalDefintionOfExternDecl, "`extern` decl '$0' has ambiguous original definitions.")
 DIAGNOSTIC(31143, Error, missingOriginalDefintionOfExternDecl, "no original definition found for `extern` decl '$0'.")
 
+DIAGNOSTIC(31144, Error, customDerivativeNotAFunction, "$0, used as a custom derivative, is not a function")
+DIAGNOSTIC(31145, Error, customDerivativeGenericSignatureMismatch, "cannot use $0 as custom derivative for $1. generic signature does not match")
+DIAGNOSTIC(31146, Error, customDerivativeSignatureMismatch, "cannot use $0 as custom derivative for $1. signature does not match")
+DIAGNOSTIC(31146, Error, invalidCustomDerivative, "unable to resolve custom differential for $0.")
 // Enums
 
 DIAGNOSTIC(32000, Error, invalidEnumTagType,        "invalid tag type for 'enum': '$0'")

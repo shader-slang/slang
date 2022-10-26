@@ -147,3 +147,62 @@ struct __DifferentialPair
         return p();
     }
 };
+
+typealias IDFloat = IFloat & IDifferentiable;
+
+namespace dstd
+{
+    // Natural Exponent
+    __generic<T : IDFloat>
+    __target_intrinsic(hlsl)
+    __target_intrinsic(glsl)
+    __target_intrinsic(cuda, "$P_exp($0)")
+    __target_intrinsic(cpp, "$P_exp($0)")
+    __target_intrinsic(spirv_direct, "12 resultType resultId glsl450 27 _0")
+    [__custom_jvp(d_exp<T>)]
+    T exp(T x);
+
+    __generic<T : IDFloat>
+    __DifferentialPair<T> d_exp(__DifferentialPair<T> dpx)
+    {
+        return __DifferentialPair<T>(
+            exp(dpx.p()),
+            T.dmul(exp(dpx.p()), dpx.d()));
+    }
+
+    // Sine
+    __generic<T : IDFloat>
+    __target_intrinsic(hlsl)
+    __target_intrinsic(glsl)
+    __target_intrinsic(cuda, "$P_sin($0)")
+    __target_intrinsic(cpp, "$P_sin($0)")
+    __target_intrinsic(spirv_direct, "12 resultType resultId glsl450 13 _0")
+    [__custom_jvp(d_sin<T>)]
+    T sin(T x);
+
+    __generic<T : IDFloat>
+    __DifferentialPair<T> d_sin(__DifferentialPair<T> dpx)
+    {
+        return __DifferentialPair<T>(
+            sin(dpx.p()),
+            T.dmul(cos(dpx.p()), dpx.d()));
+    }
+
+    // Cosine
+    __generic<T : IDFloat>
+    __target_intrinsic(hlsl)
+    __target_intrinsic(glsl)
+    __target_intrinsic(cuda, "$P_cos($0)")
+    __target_intrinsic(cpp, "$P_cos($0)")
+    __target_intrinsic(spirv_direct, "12 resultType resultId glsl450 14 _0")
+    [__custom_jvp(d_cos<T>)]
+    T cos(T x);
+
+    __generic<T : IDFloat>
+    __DifferentialPair<T> d_cos(__DifferentialPair<T> dpx)
+    {
+        return __DifferentialPair<T>(
+            cos(dpx.p()),
+            T.dmul(-sin(dpx.p()), dpx.d()));
+    }
+};

@@ -8214,10 +8214,13 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             // insts into the function body, which shouldn't happen.
             // 
             subContext->irBuilder->setInsertInto(irFunc->getParent());            
-            auto funcType = lowerType(subContext, getType(subContext->astBuilder, attr->funcDeclRef));
-            auto loweredVal = emitDeclRef(subContext, attr->funcDeclRef->declRef, funcType);
-            SLANG_ASSERT(loweredVal.flavor == LoweredValInfo::Flavor::Simple);
+            
+            auto diffFuncType = getFuncType(subContext->astBuilder, attr->funcDeclRef->declRef.as<CallableDecl>());
+            auto irDiffFuncType = lowerType(subContext, diffFuncType);
 
+            auto loweredVal = emitDeclRef(subContext, attr->funcDeclRef->declRef, irDiffFuncType);
+
+            SLANG_ASSERT(loweredVal.flavor == LoweredValInfo::Flavor::Simple);
             IRInst* jvpFunc = loweredVal.val;
             getBuilder()->addDecoration(irFunc, kIROp_JVPDerivativeReferenceDecoration, jvpFunc);
 
