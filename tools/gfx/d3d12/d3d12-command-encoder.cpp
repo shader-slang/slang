@@ -1383,17 +1383,23 @@ void RayTracingCommandEncoderImpl::dispatchRays(
         rayGenShaderIndex * kRayGenRecordSize;
     dispatchDesc.RayGenerationShaderRecord.SizeInBytes = D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES;
 
-    dispatchDesc.MissShaderTable.StartAddress =
-        shaderTableAddr + shaderTableImpl->m_missTableOffset;
-    dispatchDesc.MissShaderTable.SizeInBytes =
-        shaderTableImpl->m_missShaderCount * D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES;
-    dispatchDesc.MissShaderTable.StrideInBytes = D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES;
+    if (shaderTableImpl->m_missShaderCount > 0)
+    {
+        dispatchDesc.MissShaderTable.StartAddress =
+            shaderTableAddr + shaderTableImpl->m_missTableOffset;
+        dispatchDesc.MissShaderTable.SizeInBytes =
+            shaderTableImpl->m_missShaderCount * D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES;
+        dispatchDesc.MissShaderTable.StrideInBytes = D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES;
+    }
 
-    dispatchDesc.HitGroupTable.StartAddress =
-        shaderTableAddr + shaderTableImpl->m_hitGroupTableOffset;
-    dispatchDesc.HitGroupTable.SizeInBytes =
-        shaderTableImpl->m_hitGroupCount * D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES;
-    dispatchDesc.HitGroupTable.StrideInBytes = D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES;
+    if (shaderTableImpl->m_hitGroupCount > 0)
+    {
+        dispatchDesc.HitGroupTable.StartAddress =
+            shaderTableAddr + shaderTableImpl->m_hitGroupTableOffset;
+        dispatchDesc.HitGroupTable.SizeInBytes =
+            shaderTableImpl->m_hitGroupCount * D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES;
+        dispatchDesc.HitGroupTable.StrideInBytes = D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES;
+    }
 
     dispatchDesc.Width = (UINT)width;
     dispatchDesc.Height = (UINT)height;
