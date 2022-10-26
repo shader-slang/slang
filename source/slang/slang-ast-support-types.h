@@ -1490,6 +1490,12 @@ namespace Slang
         kParameterDirection_Ref,    ///< By-reference
     };
 
+    /// The type of a builtin associated type requirement.
+    enum class BuiltinAssociatedTypeRequirementKind
+    {
+        Differential
+    };
+
 } // namespace Slang
 
 #endif

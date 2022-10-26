@@ -942,6 +942,14 @@ Result DeviceImpl::createTextureResource(
 
         D3D12_CLEAR_VALUE clearValue;
         D3D12_CLEAR_VALUE* clearValuePtr = nullptr;
+        clearValue.Format = resourceDesc.Format;
+        if (descIn.optimalClearValue)
+        {
+            memcpy(clearValue.Color, &descIn.optimalClearValue->color, sizeof(clearValue.Color));
+            clearValue.DepthStencil.Depth = descIn.optimalClearValue->depthStencil.depth;
+            clearValue.DepthStencil.Stencil = descIn.optimalClearValue->depthStencil.stencil;
+            clearValuePtr = &clearValue;
+        }
         if ((resourceDesc.Flags & (D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET |
             D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL)) == 0)
         {
@@ -950,14 +958,6 @@ Result DeviceImpl::createTextureResource(
         if (isTypelessDepthFormat(resourceDesc.Format))
         {
             clearValuePtr = nullptr;
-        }
-        clearValue.Format = resourceDesc.Format;
-        if (descIn.optimalClearValue)
-        {
-            memcpy(clearValue.Color, &descIn.optimalClearValue->color, sizeof(clearValue.Color));
-            clearValue.DepthStencil.Depth = descIn.optimalClearValue->depthStencil.depth;
-            clearValue.DepthStencil.Stencil = descIn.optimalClearValue->depthStencil.stencil;
-            clearValuePtr = &clearValue;
         }
         SLANG_RETURN_ON_FAIL(texture->m_resource.initCommitted(
             m_device,

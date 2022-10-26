@@ -32,6 +32,12 @@ class GloballyCoherentModifier : public Modifier { SLANG_AST_CLASS(GloballyCoher
 class ExternCppModifier : public Modifier { SLANG_AST_CLASS(ExternCppModifier)};
 class JVPDerivativeModifier : public Modifier { SLANG_AST_CLASS(JVPDerivativeModifier)};
 
+// Marks that the definition of a decl is not yet synthesized.
+class ToBeSynthesizedModifier : public Modifier {SLANG_AST_CLASS(ToBeSynthesizedModifier)};
+
+// Marks that the definition of a decl is synthesized.
+class SynthesizedModifier : public Modifier { SLANG_AST_CLASS(SynthesizedModifier) };
+
 // An `extern` variable in an extension is used to introduce additional attributes on an existing
 // field.
 class ExtensionExternVarModifier : public Modifier
@@ -582,6 +588,14 @@ class Attribute : public AttributeBase
     SLANG_AST_CLASS(Attribute)
  
     AttributeArgumentValueDict intArgVals;
+};
+
+// A modifier that indicates a built-in associated type requirement (e.g., `Differential`)
+class BuiltinAssociatedTypeRequirementAttribute : public Attribute
+{
+    SLANG_AST_CLASS(BuiltinAssociatedTypeRequirementAttribute);
+
+    BuiltinAssociatedTypeRequirementKind kind;
 };
 
 class UserDefinedAttribute : public Attribute 

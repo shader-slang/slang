@@ -18,6 +18,10 @@ attribute_syntax [__custom_jvp(function)]   : CustomJVPAttribute;
 __magic_type(DifferentiableType)
 interface IDifferentiable
 {
+    // Note: the compiler implementation requires the `Differential` associated type to be defined
+    // before anything else.
+
+    [__BuiltinAssociatedTypeRequirementAttribute(_BuiltinAssociatedTypeRequirementKind.Differential)]
     associatedtype Differential;
     
     static Differential zero();
