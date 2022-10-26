@@ -37,11 +37,10 @@ __differentiate_jvp float4 j(float4 x, float4 y)
 [numthreads(1, 1, 1)]
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
-     {
+    {
         float3 a = float3(2.0, 2.0, 2.0);
         float3 b = float3(1.5, 1.5, 1.5);
         float3 da = float3(1.0, 1.0, 1.0);
-        //dpfloat3 dpa = dpfloat3(a, da);
 
         float2 a2 = float2(2.0, 1.0);
         float2 b2 = float2(1.5, -2.0);

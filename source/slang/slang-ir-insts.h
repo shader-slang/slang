@@ -546,6 +546,15 @@ struct IRSequentialIDDecoration : IRDecoration
     IRIntegerValue getSequentialID() { return getSequentialIDOperand()->getValue(); }
 };
 
+struct IRJVPDerivativeMarkerDecoration : IRDecoration
+{
+    enum
+    {
+        kOp = kIROp_JVPDerivativeMarkerDecoration
+    };
+    IR_LEAF_ISA(JVPDerivativeMarkerDecoration)
+};
+
 struct IRJVPDerivativeReferenceDecoration : IRDecoration
 {
     enum
@@ -554,9 +563,19 @@ struct IRJVPDerivativeReferenceDecoration : IRDecoration
     };
     IR_LEAF_ISA(JVPDerivativeReferenceDecoration)
 
-    IRFunc* getJVPFunc() { return as<IRFunc>(getOperand(0)); }
+    IRInst* getJVPFunc() { return getOperand(0); }
 };
 
+struct IRJVPDerivativeMemberReferenceDecoration : IRDecoration
+{
+    enum
+    {
+        kOp = kIROp_JVPDerivativeMemberReferenceDecoration
+    };
+    IR_LEAF_ISA(JVPDerivativeMemberReferenceDecoration)
+
+    IRInst* getDerivativeMemberStructKey() { return getOperand(0); }
+};
 
 // An instruction that replaces the function symbol
 // with it's derivative function.
@@ -572,6 +591,15 @@ struct IRJVPDifferentiate : IRInst
 
     IR_LEAF_ISA(JVPDifferentiate)
 };
+
+// Dictionary item mapping a type with a corresponding 
+// IDifferentiable witness table
+// 
+struct IRDifferentiableTypeDictionaryItem : IRInst
+{
+    IR_LEAF_ISA(DifferentiableTypeDictionaryItem)
+};
+
 
 // An instruction that specializes another IR value
 // (representing a generic) to a particular set of generic arguments 
@@ -2462,6 +2490,27 @@ public:
 
     IRInst* emitMakeDifferentialPair(IRType* type, IRInst* primal, IRInst* differential);
 
+    // Emit and return a dictionary instruction to the global or generic scope.
+    IRInst* emitDifferentiableTypeDictionary();
+
+    // Emit and return a dictionary instruction to the global or generic scope,
+    // if one is not already present.
+    // 
+    IRInst* findOrEmitDifferentiableTypeDictionary();
+
+    // Returns the IRDifferentiableTypeDictionary in the scope of inst.
+    IRInst* findDifferentiableTypeDictionary(IRInst* inst);
+
+    // Add a differentiable type entry to the appropriate dictionary.
+    IRInst* addDifferentiableTypeEntry(IRInst* irType, IRInst* conformanceWitness);
+    
+    // Lookup a differentiable type entry in the appropriate dictionary.
+    // This recursively looks up in upper contexts.
+    // 
+    IRInst* findDifferentiableTypeEntry(IRInst* irType);
+
+    IRInst* findDifferentiableTypeEntry(IRInst* irType, IRInst* scope);
+
     IRInst* emitSpecializeInst(
         IRType*         type,
         IRInst*         genericVal,
@@ -3150,6 +3199,11 @@ public:
     void addExternCppDecoration(IRInst* value, UnownedStringSlice const& mangledName)
     {
         addDecoration(value, kIROp_ExternCppDecoration, getStringValue(mangledName));
+    }
+
+    void addForceInlineDecoration(IRInst* value)
+    {
+        addDecoration(value, kIROp_ForceInlineDecoration);
     }
 
     void addJVPDerivativeMarkerDecoration(IRInst* value)

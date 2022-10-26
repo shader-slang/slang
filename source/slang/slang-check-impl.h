@@ -209,38 +209,79 @@ namespace Slang
         Substitutions*   subst = nullptr;
     };
 
-    struct LookupRequestKey
-    {
-        NodeBase* base;
-        Name* name;
-        LookupOptions options;
-        LookupMask mask;
-        bool operator==(const LookupRequestKey& other) const
-        {
-            return base == other.base && name == other.name && options == other.options && mask == other.mask;
-        }
-        HashCode getHashCode() const
-        {
-            Hasher hasher;
-            hasher.hashValue(base);
-            hasher.hashValue(name);
-            hasher.hashValue(options);
-            hasher.hashValue(mask);
-            return hasher.getResult();
-        }
-    };
-
     struct TypeCheckingCache
     {
         Dictionary<OperatorOverloadCacheKey, OverloadCandidate> resolvedOperatorOverloadCache;
         Dictionary<BasicTypeKeyPair, ConversionCost> conversionCostCache;
-        Dictionary<LookupRequestKey, LookupResult> lookupCache;
     };
 
+    struct DifferentiableTypeSemanticContext
+    {
+    
+    public:
+            /// Registers a type as conforming to IDifferentiable, along with a witness 
+            /// describing the relationship.
+            ///
+        void registerDifferentiableType(DeclRefType* type, SubtypeWitness* witness);
 
-        /// Give a cache and a name, will remove all entries associated with a name
-        /// Might be useful/necessary if a new name is introduced
-    void removeLookupForName(TypeCheckingCache* cache, Name* name);
+            /// Returns the list of registered differentiable types.
+        List<KeyValuePair<DeclRefType*, SubtypeWitness*>> getDifferentiableTypeConformanceList();
+
+            /// Creates a DifferentiableTypeDictionary AST container node with an entry for
+            /// every registered type. This can be inserted into the appropriate context for the
+            /// auto-diff pass.
+            ///
+        DifferentiableTypeDictionary* makeDifferentiableTypeDictionaryNode(ASTBuilder* builder);
+
+            /// Creates a DifferentiableTypeDictionary AST container node with an entry for
+            /// every registered type. This can be inserted into the appropriate context for the
+            /// auto-diff pass.
+            ///
+        void addImportedModule(ModuleDecl* importedModuleDecl);
+
+            /// Set flag to indicate that the type dictionary is requried.
+        void requireDifferentiableTypeDictionary();
+
+            /// Returns flag indicating whether the type dictionary is requried.
+        bool isDictionaryRequired();
+
+    private:
+        // Nested struct to override the '==' operator for DeclRefTypes
+        struct DeclRefTypeKey
+        {
+            DeclRefType* type;
+
+            DeclRefTypeKey(DeclRefType* type) : type(type) 
+            {};
+
+            DeclRefTypeKey(DeclRefTypeKey& typeKey) : type(typeKey.type)
+            {};
+
+            DeclRefTypeKey() : type(nullptr)
+            {};
+
+            bool operator==(const DeclRefTypeKey& other) const
+            {
+                return (other.type->declRef == this->type->declRef);
+            }
+
+            HashCode getHashCode() const
+            {
+                Hasher hasher;
+                hasher.hashObject(&type->declRef);
+                return hasher.getResult();
+            }
+        };
+
+            /// Mapping from types to subtype witnesses for conformance to IDifferentiable.
+        Dictionary<DeclRefTypeKey, SubtypeWitness*>   m_mapTypeToIDifferentiableWitness;
+        
+            /// List of external dictionaries (from imported modules)
+        List<DeclRef<DifferentiableTypeDictionary>> m_importedDictionaries;
+
+            /// Flag to indicate if a differentiable type dictionary is required.
+        bool                                        m_isTypeDictionaryRequired = false;
+    };
 
         /// Shared state for a semantics-checking session.
     struct SharedSemanticsContext
@@ -269,6 +310,10 @@ namespace Slang
         //
         List<ModuleDecl*> importedModulesList;
         HashSet<ModuleDecl*> importedModulesSet;
+        
+        DifferentiableTypeSemanticContext diffTypeContext;
+
+        List<DifferentiableTypeSemanticContext*> diffTypeContextStack;
 
     public:
         SharedSemanticsContext(
@@ -303,6 +348,29 @@ namespace Slang
                 return m_linkage->isInLanguageServer();
             return false;
         }
+
+        DifferentiableTypeSemanticContext* getDiffTypeContext()
+        {
+            return &diffTypeContext;
+        }
+
+        DifferentiableTypeSemanticContext* innermostDiffTypeContext()
+        {
+            return (diffTypeContextStack.getCount() > 0) ? diffTypeContextStack.getLast() : &diffTypeContext;
+        }
+
+        void pushDiffTypeContext(DifferentiableTypeSemanticContext* context)
+        {
+            diffTypeContextStack.add(context);
+        }
+
+        DifferentiableTypeSemanticContext* popDiffTypeContext()
+        {
+            auto context = diffTypeContextStack.getLast();
+            diffTypeContextStack.removeLast();
+            return context;
+        }
+
             /// Get the list of extension declarations that appear to apply to `decl` in this context
         List<ExtensionDecl*> const& getCandidateExtensionsForTypeDecl(AggTypeDecl* decl);
 
@@ -430,6 +498,13 @@ namespace Slang
             return result;
         }
 
+        SemanticsContext allowStaticReferenceToNonStaticMember()
+        {
+            SemanticsContext result(*this);
+            result.m_allowStaticReferenceToNonStaticMember = true;
+            return result;
+        }
+
     private:
         SharedSemanticsContext* m_shared = nullptr;
 
@@ -449,6 +524,10 @@ namespace Slang
 
             /// The type of a try clause (if any) enclosing current expr.
         TryClauseType m_enclosingTryClauseType = TryClauseType::None;
+
+            /// Whether an expr referencing to a non-static member in static style (e.g. `Type.member`)
+            /// is considered valid in the current context.
+        bool m_allowStaticReferenceToNonStaticMember = false;
 
         ASTBuilder* m_astBuilder = nullptr;
     };
@@ -687,6 +766,8 @@ namespace Slang
 
         Expr* CheckTerm(Expr* term);
 
+        Expr* _CheckTerm(Expr* term);
+
         Expr* CreateErrorExpr(Expr* expr);
 
         bool IsErrorExpr(Expr* expr);
@@ -715,6 +796,15 @@ namespace Slang
         // function.
         //
         Type* _toJVPReturnType(ASTBuilder* builder, Type* primalType);
+        
+        // Convert a function's original type to it's JVP type.
+        Type* processJVPFuncType(ASTBuilder* builder, FuncType* originalType);
+
+        // Check and register a type if it is differentiable.
+        void maybeRegisterDifferentiableType(ASTBuilder* builder, Type* type);
+
+        // Construct the differential for 'type', if it exists.
+        Type* _getDifferential(ASTBuilder* builder, Type* type);
         
     public:
 
@@ -907,7 +997,7 @@ namespace Slang
 
         bool getAttributeTargetSyntaxClasses(SyntaxClass<NodeBase> & cls, uint32_t typeFlags);
 
-        bool validateAttribute(Attribute* attr, AttributeDecl* attribClassDecl);
+        bool validateAttribute(Attribute* attr, AttributeDecl* attribClassDecl, ModifiableSyntaxNode* attrTarget);
 
         AttributeBase* checkAttribute(
             UncheckedAttribute*     uncheckedAttr,
@@ -1003,6 +1093,16 @@ namespace Slang
             LookupResult const&         lookupResult,
             DeclRef<Decl>               requiredMemberDeclRef,
             RefPtr<WitnessTable>        witnessTable);
+
+            /// Registers a type as differentiable in the currrent semantic context, if the declaration represents
+            /// a subtype of IDifferentable. Does nothing otherwise.
+        void tryAddDifferentiableConformanceToContext(
+            Decl* decl,
+            DifferentiableTypeSemanticContext* context);
+
+            /// Generates a dictionary node for the module with all registered differentiable types,
+            /// as well as information about differentiable types in imported modules.
+        void finishDifferentiableTypeDictionary(ModuleDecl* moduleDecl);
 
         // Find the appropriate member of a declared type to
         // satisfy a requirement of an interface the type
@@ -1259,6 +1359,23 @@ namespace Slang
             Type*            sub = nullptr;
             Type*            sup = nullptr;
             DeclRef<Decl>           declRef;
+
+            enum Flavor 
+            {
+                // Describes a sub-type super-type relationship through a 
+                // reference to an inhertiance declaration.
+                DeclFlavor,
+
+                // Describes a sub-type super-type relationship through 
+                // conjunction. This doesn't necessarily have a corresponding declaration
+                // since AndTypes cannot actually be used as types.
+                // i.e. if (A & B) subtype C because A subtype C, then we use AndTypeLeft to represent
+                // that relationship.
+                AndTypeLeftFlavor,
+                AndTypeRightFlavor
+            };
+
+            Flavor flavor = DeclFlavor;
         };
 
             // Create a subtype witness based on the declared relationship
@@ -1554,6 +1671,10 @@ namespace Slang
         void AddOverloadCandidate(
             OverloadResolveContext& context,
             OverloadCandidate&		candidate);
+        
+        void AddHigherOrderOverloadCandidates(
+            Expr*                   funcExpr,
+            OverloadResolveContext& context);
 
         void AddFuncOverloadCandidate(
             LookupResultItem			item,
@@ -1621,7 +1742,7 @@ namespace Slang
 
         bool TryUnifyConjunctionType(
             ConstraintSystem&   constraints,
-            AndType*            fst,
+            Type*            fst,
             Type*               snd);
 
         // Is the candidate extension declaration actually applicable to the given type
@@ -1638,7 +1759,8 @@ namespace Slang
         DeclRef<Decl> inferGenericArguments(
             DeclRef<GenericDecl>    genericDeclRef,
             OverloadResolveContext& context,
-            GenericSubstitution*    substWithKnownGenericArgs);
+            GenericSubstitution*    substWithKnownGenericArgs,
+            List<Type*>             *innerParameterTypes = nullptr);
 
         void AddTypeOverloadCandidates(
             Type*	        type,

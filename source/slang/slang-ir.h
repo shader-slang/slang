@@ -1723,6 +1723,12 @@ IRInst* findGenericReturnVal(IRGeneric* generic);
 // Recursively find the inner most generic return value.
 IRInst* findInnerMostGenericReturnVal(IRGeneric* generic);
 
+// Find the generic container, if any, that this inst is contained in
+// Returns nullptr if there is no outer container.
+IRInst* findOuterGeneric(IRInst* inst);
+// Recursively find the outer most generic container.
+IRInst* findOuterMostGeneric(IRInst* inst);
+
 struct IRSpecialize;
 IRGeneric* findSpecializedGeneric(IRSpecialize* specialize);
 IRInst* findSpecializeReturnVal(IRSpecialize* specialize);

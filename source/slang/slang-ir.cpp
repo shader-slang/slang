@@ -3547,6 +3547,125 @@ namespace Slang
         }
     }
 
+    
+    IRInst* IRBuilder::emitDifferentiableTypeDictionary()
+    {
+        auto inst = createInst<IRInst>(
+            this,
+            kIROp_DifferentiableTypeDictionary,
+            nullptr);
+
+        addGlobalValue(this, inst);
+        return inst;
+    }
+
+    IRInst* IRBuilder::findOrEmitDifferentiableTypeDictionary()
+    {
+        auto currentLoc = this->getInsertLoc();
+        auto currentInst = currentLoc.getInst();
+        
+        if (auto diffTypeDictionary = findDifferentiableTypeDictionary(currentInst))
+            return diffTypeDictionary;
+
+        return emitDifferentiableTypeDictionary();
+    }
+
+    IRInst* IRBuilder::findDifferentiableTypeDictionary(IRInst* parent)
+    {
+        //auto parent = inst->getParent();
+        while (parent)
+        {
+            // Inserting into the top level of a module?
+            // That is fine, and we can stop searching.
+            if (as<IRModuleInst>(parent))
+                break;
+
+            // Inserting into a basic block inside of
+            // a generic? That is okay too.
+            if (auto block = as<IRBlock>(parent))
+            {
+                if (as<IRGeneric>(block->parent))
+                    break;
+            }
+
+            // Otherwise, move up the chain.
+            parent = parent->parent;
+        }
+
+        for (auto child = parent->getFirstChild(); child; child = child->getNextInst())
+        {
+            if (child->getOp() == kIROp_DifferentiableTypeDictionary)
+                return child;
+        }
+
+        return nullptr;
+    }
+
+    IRInst* IRBuilder::addDifferentiableTypeEntry(IRInst* irType, IRInst* conformanceWitness)
+    {
+        auto oldLoc = this->getInsertLoc();
+
+        IRDifferentiableTypeDictionaryItem* item = nullptr;
+
+        if (auto diffTypeDictionary = findOrEmitDifferentiableTypeDictionary())
+        {
+            this->setInsertInto(diffTypeDictionary);
+
+            IRInst* args[2] = {irType, conformanceWitness};
+            item = createInstWithTrailingArgs<IRDifferentiableTypeDictionaryItem>(
+                this,
+                kIROp_DifferentiableTypeDictionaryItem,
+                nullptr,
+                2,
+                args);
+                
+            addInst(item);
+        }
+
+        this->setInsertLoc(oldLoc);
+
+        return item;
+    }
+
+    IRInst* IRBuilder::findDifferentiableTypeEntry(IRInst* irType, IRInst* scope)
+    {
+        for (auto child = scope->getFirstChild(); child; child = child->getNextInst()) 
+        {
+            if (child->getOp() == kIROp_DifferentiableTypeDictionary)
+            {
+                for (auto entry = child->getFirstChild(); entry; entry = entry->getNextInst())
+                {
+                    IRInst* entryType = entry->getOperand(0);
+                    IRInst* entryConformanceWitness = entry->getOperand(1);
+
+                    if (irType == entryType)
+                    {
+                        return entryConformanceWitness;
+                    }
+                }
+            }
+        }
+
+        return nullptr;
+    }
+
+    IRInst* IRBuilder::findDifferentiableTypeEntry(IRInst* irType)
+    {
+        auto instScope = this->getInsertLoc().getInst();
+
+        while (instScope)
+        {
+            if (auto witness = findDifferentiableTypeEntry(irType, instScope))
+            {
+                return witness;
+            }
+            instScope = instScope->getParent();
+        }
+
+        return nullptr;
+    }
+
+
     IRFunc* IRBuilder::createFunc()
     {
         IRFunc* rsFunc = createInst<IRFunc>(
@@ -6320,6 +6439,37 @@ namespace Slang
         while (auto genericInst = as<IRGeneric>(inst))
             inst = findGenericReturnVal(genericInst);
         return inst;
+    }
+
+    IRInst* findOuterGeneric(IRInst* inst)
+    {
+        if (inst)
+        {
+            inst = inst->getParent();
+        }
+        else
+        {
+            return nullptr;
+        }
+        
+        while(inst)
+        {
+            if (as<IRGeneric>(inst))
+                return inst;
+
+            inst = inst->getParent();
+        }
+        return nullptr;
+    }
+
+    IRInst* findOuterMostGeneric(IRInst* inst)
+    {
+        IRInst* currInst = inst;
+        while(auto outerGeneric = findOuterGeneric(currInst))
+        {
+            currInst = outerGeneric;
+        }
+        return currInst;
     }
 
     IRGeneric* findSpecializedGeneric(IRSpecialize* specialize)

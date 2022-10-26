@@ -283,7 +283,7 @@ Val* DeclaredSubtypeWitness::_substituteImplOverride(ASTBuilder* astBuilder, Sub
                     {
                         if (constraintParam == declRef.getDecl())
                         {
-                            found = true;
+                            found = true; 
                             break;
                         }
                         index++;
@@ -441,6 +441,66 @@ HashCode TransitiveSubtypeWitness::_getHashCodeOverride()
     hash = combineHash(hash, subToMid->getHashCode());
     hash = combineHash(hash, midToSup->getHashCode());
     return hash;
+}
+
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ExtractFromConjunctionSubtypeWitness !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+Val* ExtractFromConjunctionSubtypeWitness::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int * ioDiff)
+{
+    int diff = 0;
+
+    Type* substSub = as<Type>(sub->substituteImpl(astBuilder, subst, &diff));
+    Type* substSup = as<Type>(sup->substituteImpl(astBuilder, subst, &diff));
+    SubtypeWitness* substWitness = as<SubtypeWitness>(conjunctionWitness->substituteImpl(astBuilder, subst, &diff));
+
+    // If nothing changed, then we can bail out early.
+    if (!diff)
+        return this;
+
+    // Something changes, so let the caller know.
+    (*ioDiff)++;
+
+    // If the substituted witness is a conjunction, break it apart, but it's important to replace the
+    // sub and super types with the current ones since the conjunction witness will have an 
+    // 
+    if (auto substConjunctionWitness = as<ConjunctionSubtypeWitness>(substWitness))
+    {
+        if (indexInConjunction == 0)
+        {
+            auto witness = as<SubtypeWitness>(substConjunctionWitness->leftWitness);
+            SLANG_ASSERT(witness);
+
+            witness->sub = substSub;
+            witness->sup = substSup;
+            
+            return witness;
+        }
+        else if (indexInConjunction == 1)
+        {
+            auto witness = as<SubtypeWitness>(substConjunctionWitness->rightWitness);
+            SLANG_ASSERT(witness);
+            
+            witness->sub = substSub;
+            witness->sup = substSup;
+
+            return witness;
+        }
+        else
+        {
+            SLANG_UNIMPLEMENTED_X("conjunction index must be 0 or 1");
+        }
+    }
+    else
+    {
+        // In the simple case, we just construct a new conjunction subtype
+        // witness.
+        ExtractFromConjunctionSubtypeWitness* result = astBuilder->create<ExtractFromConjunctionSubtypeWitness>();
+        result->sub = substSub;
+        result->sup = substSup;
+        result->conjunctionWitness = substWitness;
+        result->indexInConjunction = indexInConjunction;
+        return result;
+    }
 }
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ExtractExistentialSubtypeWitness !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -635,29 +695,6 @@ void ExtractFromConjunctionSubtypeWitness::_toTextOverride(StringBuilder& out)
 HashCode ExtractFromConjunctionSubtypeWitness::_getHashCodeOverride()
 {
     return combineHash(indexInConjunction, conjunctionWitness ? conjunctionWitness->getHashCode() : 0);
-}
-
-Val* ExtractFromConjunctionSubtypeWitness::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff)
-{
-    int diff = 0;
-    Val* newConjunctionWitness = nullptr;
-
-    auto substSub = as<Type>(sub->substituteImpl(astBuilder, subst, &diff));
-    auto substSup = as<Type>(sup->substituteImpl(astBuilder, subst, &diff));
-
-    if (this->conjunctionWitness)
-        newConjunctionWitness = conjunctionWitness->substituteImpl(astBuilder, subst, &diff);
-    *ioDiff += diff;
-
-    if (diff)
-    {
-        auto result = astBuilder->create<ExtractFromConjunctionSubtypeWitness>();
-        result->conjunctionWitness = newConjunctionWitness;
-        result->sub = substSub;
-        result->sup = substSup;
-        return result;
-    }
-    return this;
 }
 
 // ModifierVal

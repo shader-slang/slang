@@ -1,30 +1,196 @@
-//TEST_IGNORE_FILE:(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj -output-using-type
-//TEST_IGNORE_FILE:(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj -output-using-type
+//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj -output-using-type
+//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj -output-using-type
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
 
-typedef __DifferentialPair<float> dpfloat;
-typedef __DifferentialPair<double> dpdouble;
-typedef __DifferentialPair<float3> dpfloat3;
+typedef float Real;
 
-__generic<T:__BuiltinArithmeticType>
-__differentiate_jvp T g(T x)
+__generic<let N : int>
+struct myvector
 {
-    return x + x;
+    vector<Real, N> val;
 }
+
+extension myvector<3> : MyLinearArithmeticType
+{
+    static __differentiate_jvp myvector<3> ladd(myvector<3> a, myvector<3> b)
+    {
+        return myvector<3>(a.val + b.val);
+    }
+
+    static __differentiate_jvp myvector<3> lmul(myvector<3> a, myvector<3> b)
+    {
+        return myvector<3>(a.val * b.val);
+    }
+
+    static __differentiate_jvp myvector<3> lscale(float a, myvector<3> b)
+    {
+        return myvector<3>(a * b.val);
+    }
+
+    static __differentiate_jvp float ldot(myvector<3> a, myvector<3> b)
+    {
+        return dot(a.val, b.val);
+    }
+
+    __differentiate_jvp __init(vector<Real, 3> a)
+    {
+        val = a;
+    }
+};
+
+
+extension myvector<4> : MyLinearArithmeticType
+{
+    static __differentiate_jvp myvector<4> ladd(myvector<4> a, myvector<4> b)
+    {
+        return myvector<4>(a.val + b.val);
+    }
+
+    static __differentiate_jvp myvector<4> lmul(myvector<4> a, myvector<4> b)
+    {
+        return myvector<4>(a.val * b.val);
+    }
+
+    static __differentiate_jvp myvector<4> lscale(float a, myvector<4> b)
+    {
+        return myvector<4>(a * b.val);
+    }
+
+    static __differentiate_jvp float ldot(myvector<4> a, myvector<4> b)
+    {
+        return dot(a.val, b.val);
+    }
+
+    __differentiate_jvp __init(vector<Real, 4> a)
+    {
+        val = a;
+    }
+
+};
+
+typedef myvector<3> myfloat3;
+typedef myvector<4> myfloat4;
+
+typedef __DifferentialPair<Real> dpfloat;
+
+interface MyLinearArithmeticType
+{
+    static This ladd(This a, This b);
+    static This lmul(This a, This b);
+    static This lscale(Real a, This b);
+    static Real ldot(This a, This b);
+};
+
+extension myfloat3 : IDifferentiable
+{
+    typedef myfloat3 Differential;
+
+    [DerivativeMember(Differential.val)]
+    extern vector<Real, 3> val;
+
+    static Differential zero()
+    {
+        return myfloat3(0);
+    }
+
+    static __differentiate_jvp Differential dadd(Differential a, Differential b)
+    {
+        return a + b;
+    }
+
+    static __differentiate_jvp Differential dmul(Differential a, Differential b)
+    {
+        return a * b;
+    }
+
+};
+
+extension myfloat4 : IDifferentiable
+{
+    typedef myfloat4 Differential;
+
+    [DerivativeMember(Differential.val)]
+    extern vector<Real, 4> val;
+
+    static Differential zero()
+    {
+        return myfloat4(0);
+    }
+
+    static __differentiate_jvp Differential dadd(Differential a, Differential b)
+    {
+        return a + b;
+    }
+
+    static __differentiate_jvp Differential dmul(Differential a, Differential b)
+    {
+        return a * b;
+    }
+};
+
+typedef __DifferentialPair<myfloat4> dpfloat4;
+typedef __DifferentialPair<myfloat3> dpfloat3;
+
+extension float : MyLinearArithmeticType
+{
+    static __differentiate_jvp float ladd(float a, float b)
+    {
+        return a + b;
+    }
+
+    static __differentiate_jvp float lmul(float a, float b)
+    {
+        return a * b;
+    }
+
+    static __differentiate_jvp float lscale(float a, float b)
+    {
+        return a * b;
+    }
+
+    static __differentiate_jvp float ldot(float a, float b)
+    {
+        return a * b;
+    }
+};
+
+typealias MyLinearArithmeticDifferentiableType = IDifferentiable & MyLinearArithmeticType;
+
+__generic<T : MyLinearArithmeticDifferentiableType>
+__differentiate_jvp T operator +(T a, T b)
+{
+    return T.ladd(a, b);
+}
+
+__generic<T : MyLinearArithmeticDifferentiableType>
+__differentiate_jvp T operator *(T a, T b)
+{
+    return T.lmul(a, b);
+}
+
+__generic<G : MyLinearArithmeticDifferentiableType>
+__differentiate_jvp G f(G x)
+{
+    G a = x + x;
+    G b = x * x;
+
+    return a * a + G.lscale((Real)3.0, x); 
+}
+
 
 [numthreads(1, 1, 1)]
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
     {
         dpfloat dpa = dpfloat(2.0, 1.0);
-        dpdouble dpb = dpdouble(1.5, 2.0);
-        dpfloat3 dpf3 = dpfloat3(float3(1.0, 3.0, 5.0), float3(0.5, 1.5, 2.5));
+        dpfloat4 dpf4 = dpfloat4(myfloat4(float4(1.5, 2.0, 0.5, 1.0)), myfloat4(float4(0.5, 0.8, 1.6, 2.5)));
+        dpfloat3 dpf3 = dpfloat3(myfloat3(float3(1.0, 3.0, 5.0)), myfloat3(float3(0.5, 1.5, 2.5)));
 
-        outputBuffer[0] = f(dpa.p());                               // Expect: 1
-        outputBuffer[1] = __jvp(f)(dpfloat(2.0, 0.0)).d();          // Expect: 0
-        outputBuffer[2] = (float)__jvp(f)(dpb).d();                 // Expect: 2
-        outputBuffer[3] = __jvp(f)(dpf3).d().y;              // Expect: 1.5
+        outputBuffer[0] = f(dpa.p());                       // Expect: 22.0
+        outputBuffer[1] = __jvp(f)(dpfloat(2.0, 0.5)).d();  // Expect: 9.5
+        outputBuffer[2] = __jvp(f)(dpf4).d().val.w;         // Expect: 27.5
+        outputBuffer[3] = __jvp(f)(dpf3).d().val.y;         // Expect: 40.5
     }
 }

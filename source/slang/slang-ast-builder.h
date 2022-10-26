@@ -45,6 +45,8 @@ public:
         // Look up a magic declaration by its name
     Decl* findMagicDecl(String const& name);
 
+    Decl* tryFindMagicDecl(String const& name);
+
         /// A name pool that can be used for lookup for findClassInfo etc. It is the same pool as the Session.
     NamePool* getNamePool() { return m_namePool; }
 
@@ -327,6 +329,8 @@ public:
     DifferentialPairType* getDifferentialPairType(Type* valueType, Witness* conformanceWitness);
 
     DeclRef<InterfaceDecl> getDifferentiableInterface();
+
+    bool isDifferentiableInterfaceAvailable();
 
     DeclRef<Decl> getBuiltinDeclRef(const char* builtinMagicTypeName, Val* genericArg);
 
