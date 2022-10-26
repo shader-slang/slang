@@ -1424,7 +1424,7 @@ namespace Slang
         Val*                m_val = nullptr;
     };
 
-    typedef Dictionary<Decl*, RequirementWitness> RequirementDictionary;
+    typedef OrderedDictionary<Decl*, RequirementWitness> RequirementDictionary;
 
     struct WitnessTable : SerialRefObject
     {
