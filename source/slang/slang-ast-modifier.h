@@ -591,11 +591,11 @@ class Attribute : public AttributeBase
 };
 
 // A modifier that indicates a built-in associated type requirement (e.g., `Differential`)
-class BuiltinAssociatedTypeRequirementAttribute : public Attribute
+class BuiltinRequirementAttribute : public Attribute
 {
-    SLANG_AST_CLASS(BuiltinAssociatedTypeRequirementAttribute);
+    SLANG_AST_CLASS(BuiltinRequirementAttribute);
 
-    BuiltinAssociatedTypeRequirementKind kind;
+    BuiltinRequirementKind kind;
 };
 
 class UserDefinedAttribute : public Attribute 

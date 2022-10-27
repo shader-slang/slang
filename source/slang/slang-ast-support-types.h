@@ -1490,10 +1490,13 @@ namespace Slang
         kParameterDirection_Ref,    ///< By-reference
     };
 
-    /// The type of a builtin associated type requirement.
-    enum class BuiltinAssociatedTypeRequirementKind
+    /// The kind of a builtin interface requirement that can be automatically synthesized.
+    enum class BuiltinRequirementKind
     {
-        Differential
+        DifferentialType, ///< The `IDifferentiable.Differential` associated type requirement 
+        DZeroFunc, ///< The `IDifferentiable.dzero` function requirement 
+        DAddFunc, ///< The `IDifferentiable.dadd` function requirement 
+        DMulFunc, ///< The `IDifferentiable.dmul` function requirement 
     };
 
 } // namespace Slang
