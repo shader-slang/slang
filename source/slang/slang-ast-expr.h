@@ -20,8 +20,8 @@ class DeclRefExpr: public Expr
 
     
     // The declaration of the symbol being referenced
-    DeclRef<Decl> declRef;
 
+    DeclRef<Decl> declRef;
     // The name of the symbol being referenced
     Name* name = nullptr;
 

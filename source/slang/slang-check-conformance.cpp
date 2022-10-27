@@ -353,6 +353,7 @@ namespace Slang
 
                 for( auto constraintDeclRef : getMembersOfType<GenericTypeConstraintDecl>(genericDeclRef) )
                 {
+                    ensureDecl(constraintDeclRef, DeclCheckState::CanUseBaseOfInheritanceDecl);
                     auto sub = getSub(m_astBuilder, constraintDeclRef);
                     auto sup = getSup(m_astBuilder, constraintDeclRef);
 

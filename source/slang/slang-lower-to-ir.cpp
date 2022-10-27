@@ -8204,12 +8204,28 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             getBuilder()->addDecoration(irFunc, kIROp_ForceInlineDecoration);
         }
 
+        // Register the value now, to avoid any possible infinite recursion when lowering CustomJVPAttribute
+        setGlobalValue(context, decl, LoweredValInfo::simple(findOuterMostGeneric(irFunc)));
+
         if (auto attr = decl->findModifier<CustomJVPAttribute>())
         {
-            auto loweredVal = lowerLValueExpr(this->context, attr->funcDeclRef);
+            // TODO(Sai): HACK.. we need to emit a decl-ref to handle this modifier correctly. 
+            // If we don't move the cursor to the parent, we sometimes emit supporting
+            // insts into the function body, which shouldn't happen.
+            // 
+            subContext->irBuilder->setInsertInto(irFunc->getParent());            
+            
+            auto diffFuncType = getFuncType(subContext->astBuilder, attr->funcDeclRef->declRef.as<CallableDecl>());
+            auto irDiffFuncType = lowerType(subContext, diffFuncType);
+
+            auto loweredVal = emitDeclRef(subContext, attr->funcDeclRef->declRef, irDiffFuncType);
+
             SLANG_ASSERT(loweredVal.flavor == LoweredValInfo::Flavor::Simple);
-            IRFunc* jvpFunc = as<IRFunc>(loweredVal.val);
+            IRInst* jvpFunc = loweredVal.val;
             getBuilder()->addDecoration(irFunc, kIROp_JVPDerivativeReferenceDecoration, jvpFunc);
+
+            // Reset cursor.
+            subContext->irBuilder->setInsertInto(irFunc);            
         }
 
         // For convenience, ensure that any additional global

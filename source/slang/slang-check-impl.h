@@ -1831,8 +1831,8 @@ namespace Slang
 
         Expr* CheckExpr(Expr* expr);
 
-        Expr* CheckInvokeExprWithCheckedOperands(InvokeExpr *expr);
 
+        Expr* CheckInvokeExprWithCheckedOperands(InvokeExpr *expr);
         // Get the type to use when referencing a declaration
         QualType GetTypeForDeclRef(DeclRef<Decl> declRef, SourceLoc loc);
 
