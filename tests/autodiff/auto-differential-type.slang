@@ -14,7 +14,7 @@ struct A : IDifferentiable
     [__unsafeForceInlineEarly]
     static Differential zero()
     {
-        Differential b = {0.0, 0.0};
+        Differential b = {0.0, float.zero()};
         return b;
     }
 
@@ -53,6 +53,6 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 
         dpA dpa = dpA(a, b);
 
-        outputBuffer[0] = __jvp(f)(dpa).d().x;                    // Expect: 1
+        outputBuffer[0] = __fwd_diff(f)(dpa).d().x;                    // Expect: 1
     }
 }

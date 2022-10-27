@@ -1987,7 +1987,7 @@ namespace Slang
         Expr* visitPointerTypeExpr(PointerTypeExpr* expr);
         Expr* visitModifiedTypeExpr(ModifiedTypeExpr* expr);
 
-        Expr* visitJVPDifferentiateExpr(JVPDifferentiateExpr* expr);
+        Expr* visitForwardDifferentiateExpr(ForwardDifferentiateExpr* expr);
 
             /// Perform semantic checking on a `modifier` that is being applied to the given `type`
         Val* checkTypeModifier(Modifier* modifier, Type* type);

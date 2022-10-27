@@ -23,7 +23,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     float dy = 0.5;
 
     dpfloat dresult;
-    __jvp(h)(dpfloat(x, dx), dpfloat(y, dy), dresult);
+    __fwd_diff(h)(dpfloat(x, dx), dpfloat(y, dy), dresult);
 
     outputBuffer[0] = dresult.d(); // Expect: 9.5
 

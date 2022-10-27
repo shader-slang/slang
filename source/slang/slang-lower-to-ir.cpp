@@ -3042,13 +3042,13 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
     // of the inner func-expr. This will be resolved 
     // to a concrete function during the derivative 
     // pass.
-    LoweredValInfo visitJVPDifferentiateExpr(JVPDifferentiateExpr* expr)
+    LoweredValInfo visitForwardDifferentiateExpr(ForwardDifferentiateExpr* expr)
     {
         auto baseVal = lowerSubExpr(expr->baseFunction);
         SLANG_ASSERT(baseVal.flavor == LoweredValInfo::Flavor::Simple);
 
         return LoweredValInfo::simple(
-            getBuilder()->emitJVPDifferentiateInst(
+            getBuilder()->emitForwardDifferentiateInst(
                 lowerType(context, expr->type),
                 baseVal.val));
     }

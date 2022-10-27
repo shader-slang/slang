@@ -1971,7 +1971,7 @@ namespace Slang
         return jvpType;
     }
 
-    Expr* SemanticsExprVisitor::visitJVPDifferentiateExpr(JVPDifferentiateExpr* expr)
+    Expr* SemanticsExprVisitor::visitForwardDifferentiateExpr(ForwardDifferentiateExpr* expr)
     {
         this->getShared()->getDiffTypeContext()->requireDifferentiableTypeDictionary();
         

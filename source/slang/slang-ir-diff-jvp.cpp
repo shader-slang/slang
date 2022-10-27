@@ -1125,7 +1125,7 @@ struct JVPTranscriber
         {
             // If the function is marked for auto-diff, push a `differentiate` inst for a follow up pass
             // to generate the implementation.
-            diffCallee = builder->emitJVPDifferentiateInst(
+            diffCallee = builder->emitForwardDifferentiateInst(
                 differentiateFunctionType(builder, as<IRFuncType>(primalCallee->getFullType())),
                 primalCallee);
         }
@@ -1357,8 +1357,8 @@ struct JVPTranscriber
         // logic here. We simple clone the original lookup which points to the original function,
         // or the cloned version in case we're inside a generic scope.
         // The differentiation logic is inserted later when this is used in an IRCall.
-        // This decision is mostly to maintain a uniform convention of JVPDifferentiate(Lookup(Table))
-        // rather than have Lookup(JVPDifferentiate(Table))
+        // This decision is mostly to maintain a uniform convention of ForwardDifferentiate(Lookup(Table))
+        // rather than have Lookup(ForwardDifferentiate(Table))
         // 
         auto diffLookup = cloneInst(&cloneEnv, builder, origLookup);
         return InstPair(diffLookup, diffLookup);
@@ -1937,7 +1937,7 @@ struct JVPDerivativeContext
         IRBuilder builderStorage(sharedBuilderStorage);
         IRBuilder* builder = &builderStorage;
 
-        // Process all JVPDifferentiate instructions (kIROp_JVPDifferentiate), by 
+        // Process all ForwardDifferentiate instructions (kIROp_ForwardDifferentiate), by 
         // generating derivative code for the referenced function.
         //
         bool modified = processReferencedFunctions(builder);
@@ -1962,7 +1962,7 @@ struct JVPDerivativeContext
         return nullptr;
     }
 
-    // Recursively process instructions looking for JVP calls (kIROp_JVPDifferentiate),
+    // Recursively process instructions looking for JVP calls (kIROp_ForwardDifferentiate),
     // then check that the referenced function is marked correctly for differentiation.
     //
     bool processReferencedFunctions(IRBuilder* builder)
@@ -1979,13 +1979,13 @@ struct JVPDerivativeContext
             {
                 // Either the child instruction has more children (func/block etc..)
                 // and we add it to the work list for further processing, or 
-                // it's an ordinary inst in which case we check if it's a JVPDifferentiate
+                // it's an ordinary inst in which case we check if it's a ForwardDifferentiate
                 // instruction.
                 //
                 if (child->getFirstChild() != nullptr)
                     workQueue->push(child);
                 
-                if (auto jvpDiffInst = as<IRJVPDifferentiate>(child))
+                if (auto jvpDiffInst = as<IRForwardDifferentiate>(child))
                 {
                     auto baseInst = jvpDiffInst->getBaseFn();
 
