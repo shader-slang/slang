@@ -700,15 +700,15 @@ INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
     INST(SPIRVOpDecoration, spirvOpDecoration, 1, 0)
 
         /// Decorated function is marked for the forward-mode differentiation pass.
-    INST(JVPDerivativeMarkerDecoration, differentiateJvp, 0, 0)
+    INST(ForwardDifferentiableDecoration, forwardDifferentiable, 0, 0)
 
         /// Used by the auto-diff pass to hold a reference to the
         /// generated derivative function.
-    INST(JVPDerivativeReferenceDecoration, jvpFnReference, 1, 0)
+    INST(ForwardDerivativeDecoration, jvpFnReference, 1, 0)
 
         /// Used by the auto-diff pass to hold a reference to a
         /// differential member of a type in its associated differential type.
-    INST(JVPDerivativeMemberReferenceDecoration, derivativeMemberDecoration, 1, 0)
+    INST(DerivativeMemberDecoration, derivativeMemberDecoration, 1, 0)
 
         /// Marks a class type as a COM interface implementation, which enables
         /// the witness table to be easily picked up by emit.

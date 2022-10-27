@@ -388,15 +388,15 @@ struct SpecializationContext
             auto genericReturnVal = findInnerMostGenericReturnVal(genericVal);
             if (genericReturnVal->findDecoration<IRTargetIntrinsicDecoration>())
             {
-                if (auto customDiffRef = genericReturnVal->findDecoration<IRJVPDerivativeReferenceDecoration>())
+                if (auto customDiffRef = genericReturnVal->findDecoration<IRForwardDerivativeDecoration>())
                 {
                     // If we already have a diff func on this specialize, skip.
-                    if (auto specDiffRef = specInst->findDecoration<IRJVPDerivativeReferenceDecoration>())
+                    if (auto specDiffRef = specInst->findDecoration<IRForwardDerivativeDecoration>())
                     {
                         return false;
                     }
 
-                    auto specDiffFunc = as<IRSpecialize>(customDiffRef->getJVPFunc());
+                    auto specDiffFunc = as<IRSpecialize>(customDiffRef->getForwardDerivativeFunc());
 
                     // If the base is specialized, the JVP version must be also be a specialized
                     // generic.
@@ -436,7 +436,7 @@ struct SpecializationContext
                     addToWorkList(newDiffFuncType);
                     addToWorkList(newDiffFunc);
 
-                    builder.addJVPDerivativeReferenceDecoration(specInst, newDiffFunc);
+                    builder.addForwardDerivativeDecoration(specInst, newDiffFunc);
 
                     return true;
                 }

@@ -546,33 +546,33 @@ struct IRSequentialIDDecoration : IRDecoration
     IRIntegerValue getSequentialID() { return getSequentialIDOperand()->getValue(); }
 };
 
-struct IRJVPDerivativeMarkerDecoration : IRDecoration
+struct IRForwardDifferentiableDecoration : IRDecoration
 {
     enum
     {
-        kOp = kIROp_JVPDerivativeMarkerDecoration
+        kOp = kIROp_ForwardDifferentiableDecoration
     };
-    IR_LEAF_ISA(JVPDerivativeMarkerDecoration)
+    IR_LEAF_ISA(ForwardDifferentiableDecoration)
 };
 
-struct IRJVPDerivativeReferenceDecoration : IRDecoration
+struct IRForwardDerivativeDecoration : IRDecoration
 {
     enum
     {
-        kOp = kIROp_JVPDerivativeReferenceDecoration
+        kOp = kIROp_ForwardDerivativeDecoration
     };
-    IR_LEAF_ISA(JVPDerivativeReferenceDecoration)
+    IR_LEAF_ISA(ForwardDerivativeDecoration)
 
-    IRInst* getJVPFunc() { return getOperand(0); }
+    IRInst* getForwardDerivativeFunc() { return getOperand(0); }
 };
 
-struct IRJVPDerivativeMemberReferenceDecoration : IRDecoration
+struct IRDerivativeMemberDecoration : IRDecoration
 {
     enum
     {
-        kOp = kIROp_JVPDerivativeMemberReferenceDecoration
+        kOp = kIROp_DerivativeMemberDecoration
     };
-    IR_LEAF_ISA(JVPDerivativeMemberReferenceDecoration)
+    IR_LEAF_ISA(DerivativeMemberDecoration)
 
     IRInst* getDerivativeMemberStructKey() { return getOperand(0); }
 };
@@ -3206,14 +3206,14 @@ public:
         addDecoration(value, kIROp_ForceInlineDecoration);
     }
 
-    void addJVPDerivativeMarkerDecoration(IRInst* value)
+    void addForwardDifferentiableDecoration(IRInst* value)
     {
-        addDecoration(value, kIROp_JVPDerivativeMarkerDecoration);
+        addDecoration(value, kIROp_ForwardDifferentiableDecoration);
     }
 
-    void addJVPDerivativeReferenceDecoration(IRInst* value, IRInst* jvpFn)
+    void addForwardDerivativeDecoration(IRInst* value, IRInst* jvpFn)
     {
-        addDecoration(value, kIROp_JVPDerivativeReferenceDecoration, jvpFn);
+        addDecoration(value, kIROp_ForwardDerivativeDecoration, jvpFn);
     }
 
     void addCOMWitnessDecoration(IRInst* value, IRInst* witnessTable)

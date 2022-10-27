@@ -377,7 +377,7 @@ Result linkAndOptimizeIR(
     
     // Process higher-order calles to auto-diff passes.
     // 1. Generate JVP code wherever necessary. (Linearization or "forward-mode" pass)
-    processJVPDerivativeMarkers(irModule, sink);
+    processForwardDifferentiableFuncs(irModule, sink);
 
     // 2. Transpose JVP to VJP code wherever needed. (Transposition or "reverse-mode" pass)
     // processVJPDerivativeMarkers(module); // Disabled currently. No impl yet.

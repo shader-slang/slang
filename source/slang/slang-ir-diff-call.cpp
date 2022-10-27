@@ -62,9 +62,9 @@ struct DerivativeCallProcessContext
         // 
         if (auto origSpecialize = as<IRSpecialize>(origCallable))
         {
-            if (auto jvpSpecRefDecorator = origSpecialize->findDecoration<IRJVPDerivativeReferenceDecoration>())
+            if (auto jvpSpecRefDecorator = origSpecialize->findDecoration<IRForwardDerivativeDecoration>())
             {
-                jvpCallable = jvpSpecRefDecorator->getJVPFunc();
+                jvpCallable = jvpSpecRefDecorator->getForwardDerivativeFunc();
             }
         }
 
@@ -73,9 +73,9 @@ struct DerivativeCallProcessContext
         // Check for the 'JVPDerivativeReference' decorator on the
         // base function.
         //
-        if (auto jvpRefDecorator = origCallable->findDecoration<IRJVPDerivativeReferenceDecoration>())
+        if (auto jvpRefDecorator = origCallable->findDecoration<IRForwardDerivativeDecoration>())
         {
-            jvpCallable = jvpRefDecorator->getJVPFunc();
+            jvpCallable = jvpRefDecorator->getForwardDerivativeFunc();
         }
 
         SLANG_ASSERT(jvpCallable);
