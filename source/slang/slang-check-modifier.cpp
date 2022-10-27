@@ -625,7 +625,7 @@ namespace Slang
 
             callablePayloadAttr->location = (int32_t)val->value;
         }
-        else if (auto customJVPAttr = as<ForwardDerivativeAttribute>(attr))
+        else if (auto forwardDerivativeAttr = as<ForwardDerivativeAttribute>(attr))
         {
             SLANG_ASSERT(attr->args.getCount() == 1);
             SLANG_ASSERT(as<Decl>(attrTarget));
@@ -723,7 +723,7 @@ namespace Slang
             }
             
             // TODO: Can possibly just store a DeclRef (no need for DeclRefExpr)
-            customJVPAttr->funcDeclRef = as<DeclRefExpr>(ConstructDeclRefExpr(currentDiffDeclRef, nullptr, currentDiffDeclRefExpr->loc, diffExpr));
+            forwardDerivativeAttr->funcDeclRef = as<DeclRefExpr>(ConstructDeclRefExpr(currentDiffDeclRef, nullptr, currentDiffDeclRefExpr->loc, diffExpr));
         }
         else if (auto comInterfaceAttr = as<ComInterfaceAttribute>(attr))
         {
