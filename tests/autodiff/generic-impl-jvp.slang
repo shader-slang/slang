@@ -105,7 +105,7 @@ myvector<T, N> operator *(T a, myvector<T, N> b)
 }
 
 __generic<T : IDFloat, let N : int>
-[__custom_jvp(dot_jvp)]
+[ForwardDerivative(dot_jvp)]
 T dot(myvector<T, N> a, myvector<T, N> b)
 {
     T curr = (T)0.0;

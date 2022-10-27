@@ -16,7 +16,7 @@ namespace myintrinsiclib
     __target_intrinsic(cuda, "$P_exp($0)")
     __target_intrinsic(cpp, "$P_exp($0)")
     __target_intrinsic(spirv_direct, "12 resultType resultId glsl450 27 _0")
-    [__custom_jvp(d_exp<T>)]
+    [ForwardDerivative(d_exp<T>)]
     T exp(T x);
 
     __generic<T : IDFloat>
@@ -35,7 +35,7 @@ namespace myintrinsiclib
     __target_intrinsic(cuda, "$P_sin($0)")
     __target_intrinsic(cpp, "$P_sin($0)")
     __target_intrinsic(spirv_direct, "12 resultType resultId glsl450 13 _0")
-    [__custom_jvp(d_sin<T>)]
+    [ForwardDerivative(d_sin<T>)]
     T sin(T x);
 
     __generic<T : IDFloat>
@@ -53,7 +53,7 @@ namespace myintrinsiclib
     __target_intrinsic(cuda, "$P_cos($0)")
     __target_intrinsic(cpp, "$P_cos($0)")
     __target_intrinsic(spirv_direct, "12 resultType resultId glsl450 14 _0")
-    [__custom_jvp(d_cos<T>)]
+    [ForwardDerivative(d_cos<T>)]
     T cos(T x);
 
     __generic<T : IDFloat>
@@ -68,7 +68,7 @@ namespace myintrinsiclib
     __generic<T : IDFloat>
     __target_intrinsic(hlsl)
     __target_intrinsic(cuda, "$P_sincos($0, $1, $2)")
-    [__custom_jvp(d_sincos<T>)]
+    [ForwardDerivative(d_sincos<T>)]
     void sincos(T x, out T s, out T c)
     {
         s = sin(x);

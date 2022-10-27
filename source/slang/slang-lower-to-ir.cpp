@@ -8204,10 +8204,10 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             getBuilder()->addDecoration(irFunc, kIROp_ForceInlineDecoration);
         }
 
-        // Register the value now, to avoid any possible infinite recursion when lowering CustomJVPAttribute
+        // Register the value now, to avoid any possible infinite recursion when lowering ForwardDerivativeAttribute
         setGlobalValue(context, decl, LoweredValInfo::simple(findOuterMostGeneric(irFunc)));
 
-        if (auto attr = decl->findModifier<CustomJVPAttribute>())
+        if (auto attr = decl->findModifier<ForwardDerivativeAttribute>())
         {
             // TODO(Sai): HACK.. we need to emit a decl-ref to handle this modifier correctly. 
             // If we don't move the cursor to the parent, we sometimes emit supporting
