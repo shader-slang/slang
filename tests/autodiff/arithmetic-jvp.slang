@@ -18,7 +18,7 @@ dpfloat g_jvp_(dpfloat dpx)
     return dpfloat(dpx.p(), 2 * dpx.d());
 }
 
-[__custom_jvp(g_jvp_)]
+[ForwardDerivative(g_jvp_)]
 float g(float x)
 {
     return x + x;

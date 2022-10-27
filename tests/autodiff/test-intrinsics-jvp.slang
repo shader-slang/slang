@@ -2,14 +2,14 @@
 
 __exported import test_intrinsics;
 
-[__custom_jvp(pow_jvp)]
+[ForwardDerivative(pow_jvp)]
 float pow_(float x, float n);
 float pow_jvp(float x, float n, float dx, float dn)
 {
     return dx * n * pow(x, n-1) + dn * pow(x, n) * log(x);
 }
 
-[__custom_jvp(max_jvp)]
+[ForwardDerivative(max_jvp)]
 float max_(float x, float y);
 float max_jvp(float x, float y, float dx, float dy)
 {

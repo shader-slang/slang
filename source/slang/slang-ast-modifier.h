@@ -1021,7 +1021,7 @@ class ForwardDifferentiableAttribute : public Attribute
     SLANG_AST_CLASS(ForwardDifferentiableAttribute)
 };
 
-    /// The `[__custom_jvp(function)]` attribute specifies a custom function that should
+    /// The `[ForwardDerivative(function)]` attribute specifies a custom function that should
     /// be used as the derivative for the decorated function.
 class CustomJVPAttribute : public Attribute 
 {

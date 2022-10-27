@@ -15,7 +15,7 @@ dpfloat my_pow_jvp(dpfloat x, dpfloat n)
         x.d() * n.p() * pow(x.p(), n.p()-1) + n.d() * pow(x.p(), n.p()) * log(x.p()));
 }
 
-[__custom_jvp(my_pow_jvp)]
+[ForwardDerivative(my_pow_jvp)]
 float _pow(float, float);
 
 [numthreads(1, 1, 1)]
