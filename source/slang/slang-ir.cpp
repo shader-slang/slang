@@ -2853,6 +2853,15 @@ namespace Slang
             operands);
     }
 
+    IRGLSLOutputParameterGroupType* IRBuilder::getGLSLOutputParameterGroupType(IRType* elementType)
+    {
+        IRInst* operands[] = { elementType };
+        return (IRGLSLOutputParameterGroupType*) getType(
+          kIROp_GLSLOutputParameterGroupType,
+          1,
+          operands);
+    }
+
     IRConstExprRate* IRBuilder::getConstExprRate()
     {
         return (IRConstExprRate*)getType(kIROp_ConstExprRate);
@@ -5836,7 +5845,29 @@ namespace Slang
         // _isTypeOperandEqual handles comparison of types so can defer to it
         return _isTypeOperandEqual(a, b);
     }
-     
+
+    bool isIntegralType(IRType *t)
+    {
+        if(auto basic = as<IRBasicType>(t))
+        {
+            switch(basic->getBaseType())
+            {
+            case BaseType::Int8:
+            case BaseType::Int16:
+            case BaseType::Int:
+            case BaseType::Int64:
+            case BaseType::UInt8:
+            case BaseType::UInt16:
+            case BaseType::UInt:
+            case BaseType::UInt64:
+                return true;
+            default:
+                return false;
+            }
+        }
+        return false;
+    }
+
     void findAllInstsBreadthFirst(IRInst* inst, List<IRInst*>& outInsts)
     {
         Index index = outInsts.getCount();

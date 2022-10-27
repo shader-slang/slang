@@ -255,6 +255,9 @@ struct ScalarizedVal
         return result;
     }
 
+    // TODO: Ellie, generalize this to any algebra over ScalarizedVal
+    List<IRInst*> leaves();
+
     Flavor                      flavor = Flavor::none;
     IRInst*                     irValue = nullptr;
     RefPtr<ScalarizedValImpl>   impl;
@@ -287,7 +290,9 @@ struct GlobalVaryingDeclarator
     enum class Flavor
     {
         array,
-        meshOutput,
+        meshOutputVertices,
+        meshOutputIndices,
+        meshOutputPrimitives,
     };
 
     Flavor                      flavor;
@@ -307,6 +312,41 @@ struct GLSLSystemValueInfo
     // The required type of the built-in variable
     IRType*     requiredType;
 };
+
+static void leavesImpl(List<IRInst*>& ret, const ScalarizedVal& v)
+{
+    switch(v.flavor)
+    {
+    case ScalarizedVal::Flavor::value:
+    case ScalarizedVal::Flavor::address:
+    {
+        ret.add(v.irValue);
+    }
+    break;
+    case ScalarizedVal::Flavor::tuple:
+    {
+        auto tupleVal = as<ScalarizedTupleValImpl>(v.impl);
+        for(auto e : tupleVal->elements)
+        {
+            leavesImpl(ret, e.val);
+        }
+    }
+    break;
+    case ScalarizedVal::Flavor::typeAdapter:
+    {
+        auto typeAdapterVal = as<ScalarizedTypeAdapterValImpl>(v.impl);
+        leavesImpl(ret, typeAdapterVal->val);
+    }
+    break;
+    }
+}
+
+List<IRInst*> ScalarizedVal::leaves()
+{
+    List<IRInst*> ret;
+    leavesImpl(ret, *this);
+    return ret;
+}
 
 struct GLSLLegalizationContext
 {
@@ -344,13 +384,88 @@ struct GLSLLegalizationContext
     IRBuilder* getBuilder() { return builder; }
 };
 
+// This examines the passed type and determines the GLSL mesh shader indices
+// builtin name and type
+GLSLSystemValueInfo* getMeshOutputIndicesSystemValueInfo(
+    GLSLLegalizationContext*    context,
+    LayoutResourceKind          kind,
+    Stage                       stage,
+    IRType*                     type,
+    GlobalVaryingDeclarator*    declarator,
+    GLSLSystemValueInfo*        inStorage)
+{
+    IRBuilder* builder = context->builder;
+    if(stage != Stage::Mesh)
+    {
+        return nullptr;
+    }
+    if(kind != LayoutResourceKind::VaryingOutput)
+    {
+        return nullptr;
+    }
+    if(!declarator || declarator->flavor != GlobalVaryingDeclarator::Flavor::meshOutputIndices)
+    {
+        return nullptr;
+    }
+
+    inStorage->outerArrayName = nullptr;
+
+    // Points
+    if(isIntegralType(type))
+    {
+        inStorage->name = "gl_PrimitivePointIndicesEXT";
+        inStorage->requiredType = builder->getUIntType();
+        return inStorage;
+    }
+
+    auto vectorCount = composeGetters<IRIntLit>(type, &IRVectorType::getElementCount);
+    auto elemType = composeGetters<IRType>(type, &IRVectorType::getElementType);
+
+    // Lines
+    if(vectorCount->getValue() == 2 && isIntegralType(elemType))
+    {
+        inStorage->name = "gl_PrimitiveLineIndicesEXT";
+        inStorage->requiredType =
+            builder->getVectorType(
+                builder->getUIntType(),
+                builder->getIntValue(builder->getIntType(), 2));
+        return inStorage;
+    }
+
+    // Triangles
+    if(vectorCount->getValue() == 3 && isIntegralType(elemType))
+    {
+        inStorage->name = "gl_PrimitiveTriangleIndicesEXT";
+        inStorage->requiredType =
+            builder->getVectorType(
+                builder->getUIntType(),
+                builder->getIntValue(builder->getIntType(), 3));
+        return inStorage;
+    }
+
+    SLANG_UNREACHABLE("Unhandled mesh output indices type");
+}
+
 GLSLSystemValueInfo* getGLSLSystemValueInfo(
     GLSLLegalizationContext*    context,
     IRVarLayout*                varLayout,
     LayoutResourceKind          kind,
     Stage                       stage,
+    IRType*                     type,
+    GlobalVaryingDeclarator*    declarator,
     GLSLSystemValueInfo*        inStorage)
 {
+    if(auto indicesSemantic = getMeshOutputIndicesSystemValueInfo(
+            context,
+            kind,
+            stage,
+            type,
+            declarator,
+            inStorage))
+    {
+        return indicesSemantic;
+    }
+
     char const* name = nullptr;
     char const* outerArrayName = nullptr;
 
@@ -769,6 +884,8 @@ ScalarizedVal createSimpleGLSLGlobalVarying(
         inVarLayout,
         kind,
         stage,
+        inType,
+        declarator,
         &systemValueInfoStorage);
 
     IRType* type = inType;
@@ -810,7 +927,8 @@ ScalarizedVal createSimpleGLSLGlobalVarying(
             typeLayout = arrayTypeLayout;
         }
         break;
-        case GlobalVaryingDeclarator::Flavor::meshOutput:
+        case GlobalVaryingDeclarator::Flavor::meshOutputVertices:
+        case GlobalVaryingDeclarator::Flavor::meshOutputIndices:
         {
             auto arrayType = builder->getUnsizedArrayType(type);
 
@@ -830,8 +948,6 @@ ScalarizedVal createSimpleGLSLGlobalVarying(
             typeLayout = arrayTypeLayout;
         }
         break;
-        default:
-            SLANG_ASSERT(!"Unhandled declarator case");
         }
     }
 
@@ -979,7 +1095,21 @@ ScalarizedVal createGLSLGlobalVaryingsImpl(
         auto elementTypeLayout = arrayLayout->getElementTypeLayout();
 
         GlobalVaryingDeclarator arrayDeclarator;
-        arrayDeclarator.flavor = GlobalVaryingDeclarator::Flavor::meshOutput;
+        switch(type->getOp())
+        {
+            using F = GlobalVaryingDeclarator::Flavor;
+            case kIROp_VerticesType:
+                arrayDeclarator.flavor = F::meshOutputVertices;
+                break;
+            case kIROp_IndicesType:
+                arrayDeclarator.flavor = F::meshOutputIndices;
+                break;
+            case kIROp_PrimitivesType:
+                arrayDeclarator.flavor = F::meshOutputPrimitives;
+                break;
+            default:
+                SLANG_UNEXPECTED("Unhandled mesh output type");
+        }
         // No need for anything downstream to know about this size
         arrayDeclarator.elementCount = nullptr;
         arrayDeclarator.next = declarator;
@@ -1040,7 +1170,9 @@ ScalarizedVal createGLSLGlobalVaryingsImpl(
                         dd->elementCount);
                 }
                 break;
-            case GlobalVaryingDeclarator::Flavor::meshOutput:
+            case GlobalVaryingDeclarator::Flavor::meshOutputVertices:
+            case GlobalVaryingDeclarator::Flavor::meshOutputIndices:
+            case GlobalVaryingDeclarator::Flavor::meshOutputPrimitives:
                 {
                     fullType = builder->getUnsizedArrayType(fullType);
                 }
@@ -1531,6 +1663,247 @@ void legalizeRayTracingEntryPointParameterForGLSL(
     builder->addDependsOnDecoration(func, globalParam);
 }
 
+void legalizeMeshOutputParam(
+    GLSLLegalizationContext* context,
+    CodeGenContext*          codeGenContext,
+    IRFunc*                  func,
+    IRParam*                 pp,
+    IRVarLayout*             paramLayout,
+    IRMeshOutputType*        meshOutputType)
+{
+    auto builder = context->getBuilder();
+    auto stage = context->getStage();
+    SLANG_ASSERT(stage == Stage::Mesh && "legalizing mesh output, but we're not a mesh shader");
+
+    // TODO: Ellie, move this out of this already massive function
+    auto globalOutputVal = createGLSLGlobalVaryings(
+        context,
+        builder,
+        meshOutputType,
+        paramLayout,
+        LayoutResourceKind::VaryingOutput,
+        stage,
+        pp);
+
+    switch ( globalOutputVal.flavor )
+    {
+    case ScalarizedVal::Flavor::tuple:
+        {
+            auto v = as<ScalarizedTupleValImpl>(globalOutputVal.impl);
+
+            Index elementCount = v->elements.getCount();
+            for( Index ee = 0; ee < elementCount; ++ee )
+            {
+                auto e = v->elements[ee];
+                auto leftElementVal = extractField(
+                    builder,
+                    globalOutputVal,
+                    ee,
+                    e.key);
+            }
+        }
+        break;
+    case ScalarizedVal::Flavor::value:
+    case ScalarizedVal::Flavor::address:
+    case ScalarizedVal::Flavor::typeAdapter:
+        break;
+    }
+
+    //
+    // Introduce a global parameter to drive the specialization machinery
+    //
+    // It would potentially be nicer to orthogonalize the SOA-ization
+    // and the entry point parameter legalization, however this isn't
+    // possible in the general case as we need to know which members
+    // map to builtin values and which to user defined varyings;
+    // information which is only readily available given the entry
+    // point.
+    // The AOS handling of builtins is a quirk specific to GLSL and
+    // once we've moved to a SPIR-V direct backend we can neaten this
+    // up.
+    //
+    auto g = addGlobalParam(builder->getModule(), pp->getFullType());
+    moveValueBefore(g, builder->getFunc());
+    builder->addNameHintDecoration(g, pp->findDecoration<IRNameHintDecoration>()->getName());
+    pp->replaceUsesWith(g);
+    struct MeshOutputSpecializationCondition : FunctionCallSpecializeCondition
+    {
+        bool doesParamWantSpecialization(IRParam*, IRInst* arg)
+        {
+            return arg == g;
+        }
+        IRInst* g;
+    } condition;
+    condition.g = g;
+    specializeFunctionCalls(codeGenContext, builder->getModule(), &condition);
+
+    //
+    // Remove this global by making all writes actually write to the
+    // newly introduced out variables.
+    //
+    traverseUses(g, [&](IRInst* u)
+    {
+        auto l = as<IRLoad>(u);
+        SLANG_ASSERT(l && "Mesh Output sentinel parameter wasn't used in a load");
+
+        traverseUses(l, [&](IRInst* v)
+        {
+            auto p = as<IRGetElementPtr>(v);
+            SLANG_ASSERT(p && "Mesh Output sentinel parameter wasn't used as an array");
+            traverseUses(p, [&](IRInst* s)
+            {
+                instMatch_(s,
+                    [builder, globalOutputVal, p](IRStore* s)
+                    {
+                        // Store using the SOA representation
+                        IRBuilderInsertLocScope locScope{builder};
+                        builder->setInsertBefore(s);
+
+                        // TODO: Ellie assignElement
+                        assign(
+                            builder,
+                            globalOutputVal,
+                            ScalarizedVal::value(s->getVal()),
+                            p->getIndex());
+
+                        // Stores aren't used, safe to remove here without checking
+                        s->removeAndDeallocate();
+                    },
+                    [](IRInst* s)
+                    {
+                        // TODO: Ellie
+                        printf("UNHANDLED\n");
+                        SLANG_ASSERT(!"Ellie: TODO");
+                    }
+                );
+            });
+        });
+    });
+
+    //
+    // GLSL requires that builtins are written to a block named
+    // gl_MeshVerticesEXT or gl_MeshPrimitivesEXT. Once we've done the
+    // specialization above, we can fix this.
+    // This part is split into a separate step so as not to infect
+    // ScalarizedVal and also so it can be excised easily when moving
+    // to a SPIR-V direct.
+    // We are allowed to redeclare these with just the necessary subset of
+    // members.
+    //
+    // out gl_MeshPerVertexEXT {
+    //   vec4  gl_Position;
+    //   float gl_PointSize;
+    //   float gl_ClipDistance[];
+    //   float gl_CullDistance[];
+    // } gl_MeshVerticesEXT[];
+    //
+    // perprimitiveEXT out gl_MeshPerPrimitiveEXT {
+    //   int  gl_PrimitiveID;
+    //   int  gl_Layer;
+    //   int  gl_ViewportIndex;
+    //   bool gl_CullPrimitiveEXT;
+    //   int  gl_PrimitiveShadingRateEXT;
+    // } gl_MeshPrimitivesEXT[];
+    //
+
+    // First, collect the subset of outputs being used
+    auto isMeshOutputBuiltin = [](IRInst* g)
+    {
+        if(const auto s = composeGetters<IRStringLit>(
+            g,
+            &IRInst::findDecoration<IRImportDecoration>,
+            &IRImportDecoration::getMangledNameOperand
+            ))
+        {
+            const auto n = s->getStringSlice();
+            if (n == "gl_Position" ||
+                n == "gl_PointSize" ||
+                n == "gl_ClipDistance" ||
+                n == "gl_CullDistance" ||
+                n == "gl_PrimitiveID" ||
+                n == "gl_Layer" ||
+                n == "gl_ViewportIndex" ||
+                n == "gl_CullPrimitiveEXT" ||
+                n == "gl_PrimitiveShadingRateEXT")
+            {
+                return s;
+            }
+        }
+        return (IRStringLit*)nullptr;
+    };
+    auto leaves = globalOutputVal.leaves();
+    struct BuiltinOutputInfo
+    {
+        IRInst* param;
+        IRStringLit* nameDecoration;
+        IRType* type;
+        IRStructKey* key;
+    };
+    List<BuiltinOutputInfo> builtins;
+    for(auto leaf : leaves)
+    {
+        if(auto decoration = isMeshOutputBuiltin(leaf))
+        {
+            builtins.add({leaf, decoration, nullptr, nullptr});
+        }
+    }
+    if(builtins.getCount() == 0)
+    {
+        return;
+    }
+    const auto _locScope = IRBuilderInsertLocScope{builder};
+    builder->setInsertBefore(func);
+    auto meshOutputBlockType = builder->createStructType();
+    {
+        const auto _locScope = IRBuilderInsertLocScope{builder};
+        builder->setInsertInto(meshOutputBlockType);
+        for(auto& builtin : builtins)
+        {
+            auto t = composeGetters<IRType>(
+                builtin.param,
+                &IRInst::getFullType,
+                &IROutTypeBase::getValueType,
+                &IRArrayTypeBase::getElementType);
+            auto key = builder->createStructKey();
+            auto n = builtin.nameDecoration->getStringSlice();
+            builder->addImportDecoration(key, n);
+            builder->createStructField(meshOutputBlockType, key, t);
+            builtin.type = t;
+            builtin.key = key;
+        }
+    }
+
+    // No emitter actually handles GLSLOutputParameterGroupTypes, this isn't a
+    // problem as it's used as an intrinsic.
+    // GLSL does permit redeclaring these particular ones, so it might be nice to
+    // add a linkage decoration instead of it being an intrinsic in the event
+    // that we start outputting the linkage decoration instead of it being an
+    // intrinsic in the event that we start outputting these
+    auto blockParamType = builder->getGLSLOutputParameterGroupType(builder->getUnsizedArrayType(meshOutputBlockType));
+    auto blockParam = builder->createGlobalParam(blockParamType);
+    builder->addTargetIntrinsicDecoration(
+        meshOutputBlockType,
+        CapabilitySet(CapabilityAtom::GLSL),
+        UnownedStringSlice("gl_MeshPerVertexEXT"));
+    builder->addImportDecoration(blockParam, UnownedStringSlice("gl_MeshVerticesEXT"));
+
+    for(auto builtin : builtins)
+    {
+        traverseUses(builtin.param, [&](IRInst* u)
+        {
+            auto p = as<IRGetElementPtr>(u);
+            SLANG_ASSERT(p && "Mesh Output sentinel parameter wasn't used as an array");
+
+            IRBuilderInsertLocScope locScope{builder};
+            builder->setInsertBefore(p);
+            auto e = builder->emitElementAddress(meshOutputBlockType, blockParam, p->getIndex());
+            auto a = builder->emitFieldAddress(builtin.type, e, builtin.key);
+
+            p->replaceUsesWith(a);
+        });
+    }
+}
+
 void legalizeEntryPointParameterForGLSL(
     GLSLLegalizationContext*    context,
     CodeGenContext*             codeGenContext,
@@ -1740,115 +2113,7 @@ void legalizeEntryPointParameterForGLSL(
         }
         if( auto meshOutputType = as<IRMeshOutputType>(valueType) )
         {
-            // TODO: Ellie, move this out of this already massive function
-            auto globalOutputVal = createGLSLGlobalVaryings(
-                context,
-                builder,
-                meshOutputType,
-                paramLayout,
-                LayoutResourceKind::VaryingOutput,
-                stage,
-                pp);
-
-            switch ( globalOutputVal.flavor )
-            {
-            case ScalarizedVal::Flavor::tuple:
-                {
-                    auto v = as<ScalarizedTupleValImpl>(globalOutputVal.impl);
-
-                    Index elementCount = v->elements.getCount();
-                    for( Index ee = 0; ee < elementCount; ++ee )
-                    {
-                        auto e = v->elements[ee];
-                        auto leftElementVal = extractField(
-                            builder,
-                            globalOutputVal,
-                            ee,
-                            e.key);
-                        builder->addKeepAliveDecoration(leftElementVal.irValue);
-                    }
-                }
-                break;
-            case ScalarizedVal::Flavor::value:
-                builder->addKeepAliveDecoration(globalOutputVal.irValue);
-                break;
-            case ScalarizedVal::Flavor::address:
-                builder->addKeepAliveDecoration(globalOutputVal.irValue);
-                break;
-            default:
-                {
-                    SLANG_ASSERT(!"TODO: Ellie");
-                }
-                break;
-            }
-
-            //
-            // Introduce a global parameter to drive the specialization machinery
-            //
-            auto g = addGlobalParam(builder->getModule(), pp->getFullType());
-            moveValueBefore(g, builder->getFunc());
-            builder->addNameHintDecoration(g, pp->findDecoration<IRNameHintDecoration>()->getName());
-            pp->replaceUsesWith(g);
-            struct MeshOutputSpecializationCondition : FunctionCallSpecializeCondition
-            {
-                bool doesParamWantSpecialization(IRParam*, IRInst* arg)
-                {
-                    return arg == g;
-                }
-                IRInst* g;
-            } condition;
-            condition.g = g;
-            specializeFunctionCalls(codeGenContext, builder->getModule(), &condition);
-
-            //
-            // Remove this global by making all writes actually write to the
-            // newly introduced out variables.
-            //
-            // TODO: Ellie abstract over these awful loops lol
-            for(auto u = g->firstUse; u; u = u->nextUse)
-            {
-                auto l = as<IRLoad>(u->getUser());
-                SLANG_ASSERT(l && "Mesh Output sentinal parameter wasn't used in a load");
-
-                for(auto v = l->firstUse; v; v = v->nextUse)
-                {
-                    auto p = as<IRGetElementPtr>(v->getUser());
-                    SLANG_ASSERT(p && "Mesh Output sentinal parameter wasn't used as an array");
-                    auto sn = p->firstUse;
-                    IRUse* s;
-                    while((s = sn))
-                    {
-                        sn = s->nextUse;
-                        instMatch_(s->getUser(),
-                            [builder, globalOutputVal, p](IRStore* s)
-                            {
-                                // Store using the SOA repsentation
-                                IRBuilderInsertLocScope locScope{builder};
-                                builder->setInsertBefore(s);
-
-                                // TODO: Ellie assignElement
-                                assign(
-                                    builder,
-                                    globalOutputVal,
-                                    ScalarizedVal::value(s->getVal()),
-                                    p->getIndex());
-
-                                // Stores aren't used, safe to remove here without checking
-                                s->removeAndDeallocate();
-                            },
-                            [](IRInst* s)
-                            {
-                                // TODO: Ellie
-                                printf("UNHANDLED\n");
-                                SLANG_ASSERT(!"Ellie: TODO");
-                            }
-                        );
-                    }
-                }
-
-            }
-
-            return;
+            return legalizeMeshOutputParam(context, codeGenContext, func, pp, paramLayout, meshOutputType);
         }
     }
 

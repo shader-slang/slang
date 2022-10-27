@@ -1019,21 +1019,22 @@ void GLSLSourceEmitter::emitEntryPointAttributesImpl(IRFunc* irFunc, IREntryPoin
             {
                 m_writer->emit("layout(max_vertices = ");
                 m_writer->emit(decor->getMaxSize()->getValue());
-                m_writer->emit(")\n");
+                m_writer->emit(") out;\n");
             }
             if (auto decor = irFunc->findDecoration<IRPrimitivesDecoration>())
             {
                 m_writer->emit("layout(max_primitives = ");
                 m_writer->emit(decor->getMaxSize()->getValue());
-                m_writer->emit(")\n");
+                m_writer->emit(") out;\n");
             }
             if (auto decor = irFunc->findDecoration<IROutputTopologyDecoration>())
             {
                 // TODO: Ellie validate here/elsewhere, what's allowed here is
                 // different from the tesselator
+                // The naming here is plural, so add an 's'
                 m_writer->emit("layout(");
                 m_writer->emit(decor->getTopology()->getStringSlice());
-                m_writer->emit(");\n");
+                m_writer->emit("s) out;\n");
             }
         }
         break;

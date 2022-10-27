@@ -870,6 +870,9 @@ SIMPLE_IR_TYPE(DifferentialBottomType, Type)
 // Note compares nominal types by name alone 
 bool isTypeEqual(IRType* a, IRType* b);
 
+// True if this is an integral IRBasicType, not including Char or Ptr types
+bool isIntegralType(IRType* t);
+
 void findAllInstsBreadthFirst(IRInst* inst, List<IRInst*>& outInsts);
 
 // Constant Instructions
@@ -1925,8 +1928,11 @@ uint32_t& _debugGetIRAllocCounter();
 template<typename F, typename I = IRInst> 
 static void traverseUses(IRInst* inst, F f)
 {
-    for(auto* u = inst->firstUse; u; u = u->nextUse)
+    auto n = inst->firstUse;
+    IRUse* u;
+    while((u = n))
     {
+        n = u->nextUse;
         if(auto s = as<I>(u->getUser()))
         {
             f(s);

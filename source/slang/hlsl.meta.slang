@@ -5033,6 +5033,9 @@ float dot2add(float2 left, float2 right, float acc);
 //
 
 // Set the number of output vertices and primitives for a mesh shader invocation.
+__target_intrinsic(glsl, "SetMeshOutputsEXT")
+__glsl_extension(GL_EXT_mesh_shader)
+__glsl_version(450)
 void SetMeshOutputCounts(uint vertexCount, uint primitiveCount);
 
 // Specify the number of downstream mesh shader thread groups to invoke from an amplification shader,

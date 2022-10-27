@@ -2467,6 +2467,8 @@ public:
     IRConstantBufferType* getConstantBufferType(
         IRType* elementType);
 
+    IRGLSLOutputParameterGroupType* getGLSLOutputParameterGroupType(IRType* valueType);
+
     IRConstExprRate* getConstExprRate();
     IRGroupSharedRate* getGroupSharedRate();
     IRActualGlobalRate* getActualGlobalRate();
