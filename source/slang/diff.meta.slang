@@ -26,7 +26,7 @@ interface IDifferentiable
     associatedtype Differential;
 
     [__BuiltinRequirement(_BuiltinRequirementKind.DZeroFunc)]
-    static Differential zero();
+    static Differential dzero();
 
     [__BuiltinRequirement(_BuiltinRequirementKind.DAddFunc)]
     static Differential dadd(Differential, Differential);
@@ -41,7 +41,7 @@ extension float : IDifferentiable
     typedef float Differential;
     
     [__unsafeForceInlineEarly]
-    static Differential zero()
+    static Differential dzero()
     {
         return float(0.f);
     }
@@ -64,7 +64,7 @@ extension vector<float, 3> : IDifferentiable
     typedef vector<float, 3> Differential;
 
     [__unsafeForceInlineEarly]
-    static Differential zero()
+    static Differential dzero()
     {
         return vector<float, 3>(0.f);
     }
@@ -87,7 +87,7 @@ extension vector<float, 2> : IDifferentiable
     typedef vector<float, 2> Differential;
 
     [__unsafeForceInlineEarly]
-    static Differential zero()
+    static Differential dzero()
     {
         return vector<float, 2>(0.f);
     }
@@ -110,7 +110,7 @@ extension vector<float, 4> : IDifferentiable
     typedef vector<float, 4> Differential;
 
     [__unsafeForceInlineEarly]
-    static Differential zero()
+    static Differential dzero()
     {
         return vector<float, 4>(0.f);
     }
