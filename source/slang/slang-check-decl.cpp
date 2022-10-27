@@ -3127,6 +3127,24 @@ namespace Slang
         DeclRef<Decl> requirementDeclRef,
         RefPtr<WitnessTable> witnessTable)
     {
+        // This method implements a general code synthesis pattern.
+        // For requirement of the form:
+        // ```
+        // static TResult requiredMethod(TParam1 p0, TParam2 p1, ...)
+        // ```
+        // Where TResult, TParam1, TParam2 is either `This` or `Differential`,
+        // We synthesize a memberwise dispatch to compute each field of `TResult`,
+        // resulting an implementation of the form:
+        // ```
+        // static TResult requiredMethod(TParam1 p0, TParam2 p1, ...)
+        // {
+        //     TResult result;
+        //     result.member0 = decltype(result.member0).requiredMethod(p0.member0, p1.member0);
+        //     result.member1 = decltype(result.member1).requiredMethod(p0.member1, p1.member1);
+        //     ...
+        //     return result;
+        // }
+        // ```
         List<Expr*> synArgs;
         ThisExpr* synThis = nullptr;
         auto synFunc = synthesizeMethodSignatureForRequirementWitness(
@@ -3177,6 +3195,8 @@ namespace Slang
             {
                 auto memberExpr = m_astBuilder->create<MemberExpr>();
                 memberExpr->baseExpression = arg;
+                // TODO: we should probably fetch the name from `[DerivativeMember]` if `arg` is
+                // Differential type.
                 memberExpr->name = varMember->getName();
                 paramFields.add(memberExpr);
                 paramIndex++;
@@ -3199,6 +3219,8 @@ namespace Slang
             // Assign the value to resultVar.
             auto leftVal = m_astBuilder->create<MemberExpr>();
             leftVal->baseExpression = resultVarExpr;
+            // TODO: we should probably fetch the name from `[DerivativeMember]` if `resultVarExpr`
+            // is Differential type.
             leftVal->name = varMember->getName();
 
             auto assignExpr = m_astBuilder->create<AssignExpr>();
@@ -3209,7 +3231,7 @@ namespace Slang
             seqStmt->stmts.add(assignStmt);
         }
 
-        //TODO: synthesize assignments for inherited members here.
+        // TODO: synthesize assignments for inherited members here.
         
         auto synReturn = m_astBuilder->create<ReturnStmt>();
         synReturn->expression = resultVarExpr;
