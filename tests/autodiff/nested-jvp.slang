@@ -58,7 +58,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
         float3 d_f90 = float3(0.9, 0.9, 0.9);
         float d_cosTheta = 1.0;
 
-        outputBuffer[0] = __jvp(fresnel)(
+        outputBuffer[0] = __fwd_diff(fresnel)(
             dpfloat3(f0, d_f0),
             dpfloat3(f90, d_f90),
             dpfloat(cosTheta, d_cosTheta)).d().y; // Expect: -0.031250
@@ -71,14 +71,14 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
         float db = -1.0;
         float dc = 0.2;
 
-        outputBuffer[1] = __jvp(g)(
+        outputBuffer[1] = __fwd_diff(g)(
             dpfloat(a, da),
             dpfloat(b, db),
             dpfloat(c, dc)).d();                 // Expect: -0.24375
 
         outputBuffer[2] = g(a, b, c);       // Expect: 0.95625
 
-        outputBuffer[3] = __jvp(g)(
+        outputBuffer[3] = __fwd_diff(g)(
             dpfloat(a, da),
             dpfloat(b, db),
             dpfloat(3.0, dc)).d();               // Expect: -0.4;

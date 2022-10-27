@@ -33,8 +33,8 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 
         outputBuffer[0] = f(dpa.p());                               // Expect: 6
         outputBuffer[1] = f(dpf3.p());                              // Expect: 8
-        outputBuffer[2] = __jvp(f)(dpf3).d();                       // Expect: 5.5
-        outputBuffer[3] = __jvp(f)(dpa).d();                        // Expect: 5
-        outputBuffer[4] = __jvp(g)(dpa).d();                        // Expect: 11.0
+        outputBuffer[2] = __fwd_diff(f)(dpf3).d();                       // Expect: 5.5
+        outputBuffer[3] = __fwd_diff(f)(dpa).d();                        // Expect: 5
+        outputBuffer[4] = __fwd_diff(g)(dpa).d();                        // Expect: 11.0
     }
 }

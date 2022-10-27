@@ -34,8 +34,8 @@ struct DerivativeCallProcessContext
                     do 
                     {
                         auto nextChild = child->getNextInst();
-                        // Look for IRJVPDifferentiate
-                        if (auto derivOf = as<IRJVPDifferentiate>(child))
+                        // Look for IRForwardDifferentiate
+                        if (auto derivOf = as<IRForwardDifferentiate>(child))
                         {
                             processDifferentiate(derivOf);
                         }
@@ -50,14 +50,14 @@ struct DerivativeCallProcessContext
 
     // Perform forward-mode automatic differentiation on 
     // the intstructions.
-    void processDifferentiate(IRJVPDifferentiate* derivOfInst)
+    void processDifferentiate(IRForwardDifferentiate* derivOfInst)
     {
         IRInst* jvpCallable = nullptr;
 
         // First get base function 
         auto origCallable = derivOfInst->getBaseFn();
 
-        // Resolve the derivative function for IRJVPDifferentiate(IRSpecialize(IRFunc))
+        // Resolve the derivative function for IRForwardDifferentiate(IRSpecialize(IRFunc))
         // Check the specialize inst for a reference to the derivative fn.
         // 
         if (auto origSpecialize = as<IRSpecialize>(origCallable))
@@ -68,7 +68,7 @@ struct DerivativeCallProcessContext
             }
         }
 
-        // Resolve the derivative function for an IRJVPDifferentiate(IRFunc)
+        // Resolve the derivative function for an IRForwardDifferentiate(IRFunc)
         //
         // Check for the 'JVPDerivativeReference' decorator on the
         // base function.

@@ -579,17 +579,17 @@ struct IRJVPDerivativeMemberReferenceDecoration : IRDecoration
 
 // An instruction that replaces the function symbol
 // with it's derivative function.
-struct IRJVPDifferentiate : IRInst
+struct IRForwardDifferentiate : IRInst
 {
     enum
     {
-        kOp = kIROp_JVPDifferentiate
+        kOp = kIROp_ForwardDifferentiate
     };
     // The base function for the call.
     IRUse base;
     IRInst* getBaseFn() { return getOperand(0); }
 
-    IR_LEAF_ISA(JVPDifferentiate)
+    IR_LEAF_ISA(ForwardDifferentiate)
 };
 
 // Dictionary item mapping a type with a corresponding 
@@ -2486,7 +2486,7 @@ public:
     IRInst* emitExtractExistentialWitnessTable(
         IRInst* existentialValue);
 
-    IRInst* emitJVPDifferentiateInst(IRType* type, IRInst* baseFn);
+    IRInst* emitForwardDifferentiateInst(IRType* type, IRInst* baseFn);
 
     IRInst* emitMakeDifferentialPair(IRType* type, IRInst* primal, IRInst* differential);
 

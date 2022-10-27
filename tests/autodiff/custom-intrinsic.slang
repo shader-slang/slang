@@ -108,12 +108,12 @@ void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
         dpfloat dpa = dpfloat(2.0, 1.0);
 
         outputBuffer[0] = f(dpa.p());        // Expect: 7.389056
-        outputBuffer[1] = __jvp(f)(dpa).d(); // Expect: 7.389056
+        outputBuffer[1] = __fwd_diff(f)(dpa).d(); // Expect: 7.389056
 
         // g() needs additional handling of  IRMakeDifferentialPair(PtrType). This needs to 
         // generate a new var, load from the individual vars and store into the pair var.
 
         //outputBuffer[2] = g(dpa.p());        // Expect: 1.381773
-        //outputBuffer[3] = __jvp(g)(dpa).d(); // Expect: -0.301168
+        //outputBuffer[3] = __fwd_diff(g)(dpa).d(); // Expect: -0.301168
     }
 }

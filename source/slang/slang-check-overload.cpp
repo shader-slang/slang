@@ -1548,11 +1548,11 @@ namespace Slang
         // Lookup the higher order function and process types accordingly. In the future,
         // if there are enough varieties, we can have dispatch logic instead of an
         // if-else ladder.
-        if (auto jvpExpr = as<JVPDifferentiateExpr>(funcExpr))
+        if (auto jvpExpr = as<ForwardDifferentiateExpr>(funcExpr))
         {
             if (auto origFuncType = as<FuncType>(jvpExpr->baseFunction->type))
             {
-                // Case: __jvp(name-resolved-to-decl-ref)
+                // Case: __fwd_diff(name-resolved-to-decl-ref)
 
                 auto baseFuncDeclRef = as<DeclRefExpr>(jvpExpr->baseFunction)->declRef.as<CallableDecl>();
                 SLANG_ASSERT(baseFuncDeclRef);
@@ -1567,7 +1567,7 @@ namespace Slang
             }
             else if (auto origOverloadedType = as<OverloadGroupType>(jvpExpr->baseFunction->type))
             {
-                // Case: __jvp(name-resolved-to-multiple-decl-ref)
+                // Case: __fwd_diff(name-resolved-to-multiple-decl-ref)
 
                 if (auto overloadExpr = as<OverloadedExpr>(jvpExpr->baseFunction))
                 {
@@ -1595,7 +1595,7 @@ namespace Slang
             }
             else if (auto baseFuncGenericDeclRef = as<DeclRefExpr>(jvpExpr->baseFunction)->declRef.as<GenericDecl>())
             {
-                // Case: __jvp(name-resolved-to-generic-decl)
+                // Case: __fwd_diff(name-resolved-to-generic-decl)
 
                 // Get inner function
                 DeclRef<Decl> unspecializedInnerRef = DeclRef<Decl>(
