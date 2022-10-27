@@ -13,7 +13,7 @@ namespace Slang
         // Nothing for now..
     };
 
-    bool processJVPDerivativeMarkers(
+    bool processForwardDifferentiableFuncs(
         IRModule*                           module,
         DiagnosticSink*                     sink,
         IRJVPDerivativePassOptions const&   options = IRJVPDerivativePassOptions());

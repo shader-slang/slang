@@ -7087,7 +7087,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         auto key = lowerRValueExpr(context, derivativeMember->memberDeclRef).val;
         SLANG_RELEASE_ASSERT(as<IRStructKey>(key));
         auto builder = getBuilder();
-        builder->addDecoration(inst, kIROp_JVPDerivativeMemberReferenceDecoration, key);
+        builder->addDecoration(inst, kIROp_DerivativeMemberDecoration, key);
     }
 
     LoweredValInfo lowerMemberVarDecl(VarDecl* fieldDecl)
@@ -7807,7 +7807,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
         if (decl->findModifier<ForwardDifferentiableAttribute>())
         {
-            getBuilder()->addJVPDerivativeMarkerDecoration(irFunc);
+            getBuilder()->addForwardDifferentiableDecoration(irFunc);
         }
 
         // Always force inline diff setter accessor to prevent downstream compiler from complaining
@@ -8222,7 +8222,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
             SLANG_ASSERT(loweredVal.flavor == LoweredValInfo::Flavor::Simple);
             IRInst* jvpFunc = loweredVal.val;
-            getBuilder()->addDecoration(irFunc, kIROp_JVPDerivativeReferenceDecoration, jvpFunc);
+            getBuilder()->addDecoration(irFunc, kIROp_ForwardDerivativeDecoration, jvpFunc);
 
             // Reset cursor.
             subContext->irBuilder->setInsertInto(irFunc);            
