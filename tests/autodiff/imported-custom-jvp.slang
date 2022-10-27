@@ -8,7 +8,8 @@ import test_intrinsics_jvp;
 typedef __DifferentialPair<float> dpfloat;
 typedef float.Differential dfloat;
 
-__differentiate_jvp float f(float x)
+[ForwardDifferentiable]
+float f(float x)
 {
     return pow_(x, 2.0);
 }

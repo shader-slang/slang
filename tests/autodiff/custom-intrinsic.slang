@@ -87,12 +87,14 @@ namespace myintrinsiclib
     }
 };
 
-__differentiate_jvp float f(float x)
+[ForwardDifferentiable]
+float f(float x)
 {
     return myintrinsiclib.exp(x);
 }
 
-__differentiate_jvp float g(float x)
+[ForwardDifferentiable]
+float g(float x)
 {
     float s;
     float t;

@@ -942,7 +942,7 @@ namespace Slang
         // Differentiable type checking.
         // TODO: This can be super slow.
         if (this->m_parentFunc && 
-            this->m_parentFunc->findModifier<JVPDerivativeModifier>())
+            this->m_parentFunc->findModifier<ForwardDifferentiableAttribute>())
         {
             maybeRegisterDifferentiableType(getASTBuilder(), checkedTerm->type.type);
         }

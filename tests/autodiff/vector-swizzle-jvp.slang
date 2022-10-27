@@ -8,12 +8,14 @@ typedef __DifferentialPair<float2> dpfloat2;
 typedef __DifferentialPair<float3> dpfloat3;
 typedef __DifferentialPair<float4> dpfloat4;
 
-__differentiate_jvp float2 f(float3 x)
+[ForwardDifferentiable]
+float2 f(float3 x)
 {
     return x.zy;
 }
 
-__differentiate_jvp float2 g(float3 x, float4 y)
+[ForwardDifferentiable]
+float2 g(float3 x, float4 y)
 {
     float3 a = x + y.zyx;
     float2 b = x.zx - y.yw;

@@ -36,12 +36,14 @@ dpfloat max_jvp(dpfloat x, dpfloat y)
 
 
 /* Fresnel Schlick example */
-__differentiate_jvp float3 fresnel(float3 f0, float3 f90, float cosTheta)
+[ForwardDifferentiable]
+float3 fresnel(float3 f0, float3 f90, float cosTheta)
 {
     return f0 + (f90 - f0) * pow_(max_(1 - cosTheta, 0.0), 5);
 }
 
-__differentiate_jvp float g(float a, float b, float c)
+[ForwardDifferentiable]
+float g(float a, float b, float c)
 {
     return fresnel(float3(a), float3(b), 2 * c * c).y;
 }
