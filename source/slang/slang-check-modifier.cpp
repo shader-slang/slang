@@ -625,7 +625,7 @@ namespace Slang
 
             callablePayloadAttr->location = (int32_t)val->value;
         }
-        else if (auto customJVPAttr = as<CustomJVPAttribute>(attr))
+        else if (auto customJVPAttr = as<ForwardDerivativeAttribute>(attr))
         {
             SLANG_ASSERT(attr->args.getCount() == 1);
             SLANG_ASSERT(as<Decl>(attrTarget));

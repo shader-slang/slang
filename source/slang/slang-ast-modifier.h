@@ -1023,9 +1023,9 @@ class ForwardDifferentiableAttribute : public Attribute
 
     /// The `[ForwardDerivative(function)]` attribute specifies a custom function that should
     /// be used as the derivative for the decorated function.
-class CustomJVPAttribute : public Attribute 
+class ForwardDerivativeAttribute : public Attribute 
 {
-    SLANG_AST_CLASS(CustomJVPAttribute)
+    SLANG_AST_CLASS(ForwardDerivativeAttribute)
 
     DeclRefExpr* funcDeclRef;
 };

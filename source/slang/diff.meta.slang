@@ -7,7 +7,7 @@ attribute_syntax [ForwardDifferentiable] : ForwardDifferentiableAttribute;
 
 // Custom Forward Derivative Function reference
 __attributeTarget(FunctionDeclBase)
-attribute_syntax [ForwardDerivative(function)]   : CustomJVPAttribute;
+attribute_syntax [ForwardDerivative(function)]   : ForwardDerivativeAttribute;
 
 /// Interface to denote types as differentiable.
 /// Allows for user-specified differential types as
