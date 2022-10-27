@@ -7,13 +7,13 @@ RWStructuredBuffer<float> outputBuffer;
 typedef __DifferentialPair<float> dpfloat;
 typedef __DifferentialPair<float3> dpfloat3;
 
-[__custom_jvp(pow_jvp)]
+[ForwardDerivative(pow_jvp)]
 float pow_(float x, float n)
 {
     return pow<float>(x, n);
 }
 
-[__custom_jvp(max_jvp)]
+[ForwardDerivative(max_jvp)]
 float max_(float x, float y)
 {
     return max<float>(x, y);
