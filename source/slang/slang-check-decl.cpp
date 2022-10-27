@@ -5230,7 +5230,7 @@ namespace Slang
 
     void SemanticsDeclHeaderVisitor::checkCallableDeclCommon(CallableDecl* decl)
     {
-        if (decl->findModifier<JVPDerivativeModifier>())
+        if (decl->findModifier<ForwardDifferentiableAttribute>())
         {
             this->getShared()->getDiffTypeContext()->requireDifferentiableTypeDictionary();
         }

@@ -68,8 +68,9 @@ struct myvector : IDifferentiable
     }
 };
 
+[ForwardDifferentiable]
 __generic<T : IDFloat, let N : int>
-__differentiate_jvp myvector<T, N> operator +(myvector<T, N> a, myvector<T, N> b)
+myvector<T, N> operator +(myvector<T, N> a, myvector<T, N> b)
 {
     myvector<T, N> output;
     for (int i = 0; i < N; i++)
@@ -79,8 +80,9 @@ __differentiate_jvp myvector<T, N> operator +(myvector<T, N> a, myvector<T, N> b
     return output;
 }
 
+[ForwardDifferentiable]
 __generic<T : IDFloat, let N : int>
-    __differentiate_jvp myvector<T, N> operator *(myvector<T, N> a, myvector<T, N> b)
+myvector<T, N> operator *(myvector<T, N> a, myvector<T, N> b)
 {
     myvector<T, N> output;
     for (int i = 0; i < N; i++)
@@ -90,8 +92,9 @@ __generic<T : IDFloat, let N : int>
     return output;
 }
 
+[ForwardDifferentiable]
 __generic<T : IDFloat, let N : int>
-    __differentiate_jvp myvector<T, N> operator *(T a, myvector<T, N> b)
+myvector<T, N> operator *(T a, myvector<T, N> b)
 {
     myvector<T, N> output;
     for (int i = 0; i < N; i++)
@@ -157,22 +160,26 @@ struct linearvector : MyLinearArithmeticType, IDifferentiable
     [DerivativeMember(Differential.val)]
     myvector<Real, N> val;
 
-    static __differentiate_jvp linearvector<N> ladd(linearvector<N> a, linearvector<N> b)
+    [ForwardDifferentiable]
+    static linearvector<N> ladd(linearvector<N> a, linearvector<N> b)
     {
         return linearvector<N>(a.val + b.val);
     }
 
-    static __differentiate_jvp linearvector<N> lmul(linearvector<N> a, linearvector<N> b)
+    [ForwardDifferentiable]
+    static linearvector<N> lmul(linearvector<N> a, linearvector<N> b)
     {
         return linearvector<N>(a.val * b.val);
     }
 
-    static __differentiate_jvp linearvector<N> lscale(float a, linearvector<N> b)
+    [ForwardDifferentiable]
+    static linearvector<N> lscale(float a, linearvector<N> b)
     {
         return linearvector<N>(a * b.val);
     }
 
-    static __differentiate_jvp float ldot(linearvector<N> a, linearvector<N> b)
+    [ForwardDifferentiable]
+    static float ldot(linearvector<N> a, linearvector<N> b)
     {
         return dot(a.val, b.val);
     }
@@ -194,7 +201,8 @@ struct linearvector : MyLinearArithmeticType, IDifferentiable
         return { myvector<Real, N>.dmul(a.val, b.val) };
     }
 
-    __differentiate_jvp __init(vector<Real, N> a)
+    [ForwardDifferentiable]
+    __init(vector<Real, N> a)
     {
         for (int i = 0; i < N; i++)
         {
@@ -202,7 +210,8 @@ struct linearvector : MyLinearArithmeticType, IDifferentiable
         }
     }
 
-    __differentiate_jvp __init(myvector<Real, N> a)
+    [ForwardDifferentiable]
+    __init(myvector<Real, N> a)
     {
         val = a;
     }
@@ -229,22 +238,26 @@ typedef __DifferentialPair<myfloat3> dpfloat3;
 
 extension float : MyLinearArithmeticType
 {
-    static __differentiate_jvp float ladd(float a, float b)
+    [ForwardDifferentiable]
+    static float ladd(float a, float b)
     {
         return a + b;
     }
 
-    static __differentiate_jvp float lmul(float a, float b)
+    [ForwardDifferentiable]
+    static float lmul(float a, float b)
     {
         return a * b;
     }
 
-    static __differentiate_jvp float lscale(float a, float b)
+    [ForwardDifferentiable]
+    static float lscale(float a, float b)
     {
         return a * b;
     }
 
-    static __differentiate_jvp float ldot(float a, float b)
+    [ForwardDifferentiable]
+    static float ldot(float a, float b)
     {
         return a * b;
     }
@@ -253,19 +266,22 @@ extension float : MyLinearArithmeticType
 typealias MyLinearArithmeticDifferentiableType = IDifferentiable & MyLinearArithmeticType;
 
 __generic<T : MyLinearArithmeticDifferentiableType>
-__differentiate_jvp T operator +(T a, T b)
+[ForwardDifferentiable]
+T operator +(T a, T b)
 {
     return T.ladd(a, b);
 }
 
 __generic<T : MyLinearArithmeticDifferentiableType>
-__differentiate_jvp T operator *(T a, T b)
+[ForwardDifferentiable]
+T operator *(T a, T b)
 {
     return T.lmul(a, b);
 }
 
 __generic<G : MyLinearArithmeticDifferentiableType>
-__differentiate_jvp G f(G x)
+[ForwardDifferentiable]
+G f(G x)
 {
     G a = x + x;
     G b = x * x;

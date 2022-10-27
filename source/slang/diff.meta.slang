@@ -2,7 +2,8 @@
 /// Modifer to mark a function for forward-mode differentiation.
 /// i.e. the compiler will automatically generate a new function
 /// that computes the jacobian-vector product of the original.
-syntax __differentiate_jvp : JVPDerivativeModifier;
+__attributeTarget(FunctionDeclBase)
+attribute_syntax [ForwardDifferentiable] : ForwardDifferentiableAttribute;
 
 // Custom JVP Function reference
 __attributeTarget(FunctionDeclBase)

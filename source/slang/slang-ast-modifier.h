@@ -30,7 +30,7 @@ class ExportedModifier : public Modifier { SLANG_AST_CLASS(ExportedModifier)};
 class ConstExprModifier : public Modifier { SLANG_AST_CLASS(ConstExprModifier)};
 class GloballyCoherentModifier : public Modifier { SLANG_AST_CLASS(GloballyCoherentModifier)};
 class ExternCppModifier : public Modifier { SLANG_AST_CLASS(ExternCppModifier)};
-class JVPDerivativeModifier : public Modifier { SLANG_AST_CLASS(JVPDerivativeModifier)};
+
 
 // Marks that the definition of a decl is not yet synthesized.
 class ToBeSynthesizedModifier : public Modifier {SLANG_AST_CLASS(ToBeSynthesizedModifier)};
@@ -1013,6 +1013,12 @@ class ComInterfaceAttribute : public Attribute
 class RequiresNVAPIAttribute : public Attribute
 {
     SLANG_AST_CLASS(RequiresNVAPIAttribute)
+};
+
+    /// The `[ForwardDifferentiable]` attribute indicates that a function can be forward-differentiated.
+class ForwardDifferentiableAttribute : public Attribute
+{
+    SLANG_AST_CLASS(ForwardDifferentiableAttribute)
 };
 
     /// The `[__custom_jvp(function)]` attribute specifies a custom function that should

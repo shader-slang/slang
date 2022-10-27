@@ -43,7 +43,8 @@ struct A : IDifferentiable
 
 typedef __DifferentialPair<A> dpA;
 
-__differentiate_jvp A f(A a)
+[ForwardDifferentiable]
+A f(A a)
 {
     A aout;
 

@@ -8,26 +8,30 @@ typedef __DifferentialPair<float2> dpfloat2;
 typedef __DifferentialPair<float3> dpfloat3;
 typedef __DifferentialPair<float4> dpfloat4;
 
-__differentiate_jvp float3 f(float3 x)
+[ForwardDifferentiable]
+float3 f(float3 x)
 {
     return x;
 }
 
-__differentiate_jvp float3 g(float3 x, float3 y)
+[ForwardDifferentiable]
+float3 g(float3 x, float3 y)
 {
     float3 a = x + y;
     float3 b = x - y;
     return a * b + 2 * x * y;
 }
 
-__differentiate_jvp float2 h(float2 x, float2 y)
+[ForwardDifferentiable]
+float2 h(float2 x, float2 y)
 {
     float2 a = x + y;
     float2 b = x - y;
     return a * b + 2 * x * y;
 }
 
-__differentiate_jvp float4 j(float4 x, float4 y)
+[ForwardDifferentiable]
+float4 j(float4 x, float4 y)
 {
     float4 a = x + y;
     float4 b = x - y;

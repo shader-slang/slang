@@ -7805,7 +7805,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         addNameHint(context, irFunc, decl);
         addLinkageDecoration(context, irFunc, decl);
 
-        if (decl->findModifier<JVPDerivativeModifier>())
+        if (decl->findModifier<ForwardDifferentiableAttribute>())
         {
             getBuilder()->addJVPDerivativeMarkerDecoration(irFunc);
         }

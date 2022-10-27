@@ -6,17 +6,20 @@ RWStructuredBuffer<float> outputBuffer;
 
 typedef __DifferentialPair<float> dpfloat;
 
-__differentiate_jvp float f(float x)
+[ForwardDifferentiable]
+float f(float x)
 {
     return dstd.exp(x);
 }
 
-__differentiate_jvp float g(float x)
+[ForwardDifferentiable]
+float g(float x)
 {
     return dstd.sin(x);
 }
 
-__differentiate_jvp float h(float x)
+[ForwardDifferentiable]
+float h(float x)
 {
     return dstd.cos(x);
 }

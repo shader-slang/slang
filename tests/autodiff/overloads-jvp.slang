@@ -7,17 +7,20 @@ RWStructuredBuffer<float> outputBuffer;
 typedef __DifferentialPair<float> dpfloat;
 typedef __DifferentialPair<float3> dpfloat3;
 
-__differentiate_jvp float f(float a)
+[ForwardDifferentiable]
+float f(float a)
 {
     return a * a + a;
 }
 
-__differentiate_jvp float f(float3 a)
+[ForwardDifferentiable]
+float f(float3 a)
 {
     return a.x * a.y + a.z;
 }
 
-__differentiate_jvp float g(float a)
+[ForwardDifferentiable]
+float g(float a)
 {
     // df((2.0, 4.0, 6.0), (1.0, 2.0, 3.0)) 
     // 2.0 * 2.0 + 4.0 * 1.0 + 3.0 = 11.0

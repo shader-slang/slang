@@ -324,7 +324,7 @@ namespace Slang
         // Differentiable type checking.
         // TODO: This can be super slow. Switch to caching the result asap.
         if (this->m_parentFunc && 
-            this->m_parentFunc->findModifier<JVPDerivativeModifier>())
+            this->m_parentFunc->findModifier<ForwardDifferentiableAttribute>())
         {
             auto diffTypeContext = this->getShared()->innermostDiffTypeContext();
             if (auto subtypeWitness = as<SubtypeWitness>(
