@@ -12,9 +12,9 @@ struct A : IDifferentiable
     float y;
 
     [__unsafeForceInlineEarly]
-    static Differential zero()
+    static Differential dzero()
     {
-        Differential b = {0.0, float.zero()};
+        Differential b = {0.0, float.dzero()};
         return b;
     }
 

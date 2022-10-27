@@ -55,13 +55,13 @@ struct myvector : IDifferentiable
         return output;
     }
 
-    static Differential zero()
+    static Differential dzero()
     {
         Differential output;
 
         for (int i = 0; i < N; i++)
         {
-            output.values[i] = T.zero();
+            output.values[i] = T.dzero();
         }
 
         return output;
@@ -123,7 +123,7 @@ typedef __DifferentialPair<myvector<T, N>> dpvector;
 __generic<T : IDFloat, let N : int>
 __DifferentialPair<T> dot_jvp(dpvector<T, N> a, dpvector<T, N> b)
 {
-    T.Differential curr_d = (T.zero());
+    T.Differential curr_d = (T.dzero());
     T curr_p = (T)0.0;
     for (int i = 0; i < N; i++)
     {
@@ -184,10 +184,10 @@ struct linearvector : MyLinearArithmeticType, IDifferentiable
         return dot(a.val, b.val);
     }
 
-    static Differential zero()
+    static Differential dzero()
     {
         lineardvector<N> dout;
-        dout.val = myvector<Real, N>.zero();
+        dout.val = myvector<Real, N>.dzero();
         return dout;
     }
 

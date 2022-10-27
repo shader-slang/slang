@@ -18,7 +18,7 @@ struct A : IDifferentiable
     float y;
 
     [__unsafeForceInlineEarly]
-    static Differential zero()
+    static Differential dzero()
     {
         B b = {0.0};
         return b;

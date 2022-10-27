@@ -100,7 +100,7 @@ extension myfloat3 : IDifferentiable
     [DerivativeMember(Differential.val)]
     extern vector<Real, 3> val;
 
-    static Differential zero()
+    static Differential dzero()
     {
         return myfloat3(0);
     }
@@ -126,7 +126,7 @@ extension myfloat4 : IDifferentiable
     [DerivativeMember(Differential.val)]
     extern vector<Real, 4> val;
 
-    static Differential zero()
+    static Differential dzero()
     {
         return myfloat4(0);
     }
