@@ -3491,7 +3491,7 @@ SLANG_NO_THROW void SLANG_MCALL ComponentType::computeDependencyBasedHash(
     // to the hash.
     auto entryPointName = getEntryPoint(entryPointIndex)->getName()->text;
     builder.addToDigest(entryPointName);
-    auto entryPointMangledName = getEntryPoint(entryPointIndex)->getEntryPointMangledName(entryPointIndex);
+    auto entryPointMangledName = getEntryPointMangledName(entryPointIndex);
     builder.addToDigest(entryPointMangledName);
     auto entryPointNameOverride = getEntryPointNameOverride(entryPointIndex);
     builder.addToDigest(entryPointNameOverride);

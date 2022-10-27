@@ -145,6 +145,12 @@
     <None Include="..\..\..\tools\gfx-unit-test\shader-cache-graphics.slang">
       <Filter>Source Files</Filter>
     </None>
+    <None Include="..\..\..\tools\gfx-unit-test\split-graphics-fragment.slang">
+      <Filter>Source Files</Filter>
+    </None>
+    <None Include="..\..\..\tools\gfx-unit-test\split-graphics-vertex.slang">
+      <Filter>Source Files</Filter>
+    </None>
     <None Include="..\..\..\tools\gfx-unit-test\swapchain-shader.slang">
       <Filter>Source Files</Filter>
     </None>

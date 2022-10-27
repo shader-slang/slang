@@ -699,6 +699,7 @@ namespace gfx_test
         const int kHeight = 256;
         const Format format = Format::R32G32B32A32_FLOAT;
 
+        ComPtr<IShaderProgram> shaderProgram;
         ComPtr<IRenderPassLayout> renderPass;
         ComPtr<IFramebuffer> framebuffer;
 
@@ -733,6 +734,12 @@ namespace gfx_test
             return colorBuffer;
         }
 
+        void createShaderProgram()
+        {
+            slang::ProgramLayout* slangReflection;
+            GFX_CHECK_CALL_ABORT(loadGraphicsProgram(device, shaderProgram, "shader-cache-graphics", "vertexMain", "fragmentMain", slangReflection));
+        }
+
         void createRequiredResources()
         {
             VertexStreamDesc vertexStreams[] = {
@@ -753,10 +760,6 @@ namespace gfx_test
 
             vertexBuffer = createVertexBuffer(device);
             colorBuffer = createColorBuffer(device);
-
-            ComPtr<IShaderProgram> shaderProgram;
-            slang::ProgramLayout* slangReflection;
-            GFX_CHECK_CALL_ABORT(loadGraphicsProgram(device, shaderProgram, "shader-cache-graphics", "vertexMain", "fragmentMain", slangReflection));
 
             IFramebufferLayout::TargetLayout targetLayout;
             targetLayout.format = format;
@@ -837,6 +840,100 @@ namespace gfx_test
         void run()
         {
             generateNewDevice();
+            createShaderProgram();
+            createRequiredResources();
+            submitGPUWork();
+
+            ComPtr<IShaderCacheStatistics> shaderCacheStats;
+
+            device->queryInterface(SLANG_UUID_IShaderCacheStatistics, (void**)shaderCacheStats.writeRef());
+            SLANG_CHECK(shaderCacheStats->getCacheMissCount() == 2);
+            SLANG_CHECK(shaderCacheStats->getCacheHitCount() == 0);
+            SLANG_CHECK(shaderCacheStats->getCacheEntryDirtyCount() == 0);
+        }
+    };
+
+    // Same as GraphicsShaderCache, but instead of having a singular file containing both a vertex and fragment shader, we
+    // now have two separate shader files, one containing the vertex shader and the other the fragment with the same
+    // names, with the expectation that we should record cache misses for both fetches.
+    //
+    // This test is intended to guard against the case where vertex/fragment/geometry shaders are split across
+    // multiple files with the same entry point name in each file and are loaded as three separate ComponentType objects.
+    // In this case, the current method for cache key generation will hash in the exact same modules, file dependencies,
+    // entry point names, and entry point name overrides, resulting in the same dependency hash being returned for all three
+    // and consequently, the wrong shader code being provided when the shaders are being created.
+    //
+    // We do not actively test geometry shaders here, but it is simply an extension of this test and should be expected
+    // to behave similarly.
+    struct SplitGraphicsShader : GraphicsShaderCache
+    {
+        void createShaderProgram()
+        {
+            slang::ProgramLayout* slangReflection;
+            const char* moduleNames[] = { "split-graphics-vertex", "split-graphics-fragment" };
+            GFX_CHECK_CALL_ABORT(loadSplitGraphicsProgram(device, shaderProgram, moduleNames, "main", "main", slangReflection));
+        }
+
+        Result loadSplitGraphicsProgram(
+            IDevice* device,
+            ComPtr<IShaderProgram>& outShaderProgram,
+            const char** shaderModuleNames,
+            const char* vertexEntryPointName,
+            const char* fragmentEntryPointName,
+            slang::ProgramLayout*& slangReflection)
+        {
+            ComPtr<slang::ISession> slangSession;
+            SLANG_RETURN_ON_FAIL(device->getSlangSession(slangSession.writeRef()));
+
+            ComPtr<slang::IBlob> diagnosticsBlob;
+            slang::IModule* vertexModule = slangSession->loadModule(shaderModuleNames[0], diagnosticsBlob.writeRef());
+            if (!vertexModule)
+                return SLANG_FAIL;
+            slang::IModule* fragmentModule = slangSession->loadModule(shaderModuleNames[1], diagnosticsBlob.writeRef());
+            if (!fragmentModule)
+                return SLANG_FAIL;
+
+            ComPtr<slang::IEntryPoint> vertexEntryPoint;
+            SLANG_RETURN_ON_FAIL(
+                vertexModule->findEntryPointByName(vertexEntryPointName, vertexEntryPoint.writeRef()));
+
+            ComPtr<slang::IEntryPoint> fragmentEntryPoint;
+            SLANG_RETURN_ON_FAIL(
+                fragmentModule->findEntryPointByName(fragmentEntryPointName, fragmentEntryPoint.writeRef()));
+
+            Slang::List<slang::IComponentType*> componentTypes;
+            componentTypes.add(vertexModule);
+            componentTypes.add(fragmentModule);
+
+            Slang::ComPtr<slang::IComponentType> composedProgram;
+            SlangResult result = slangSession->createCompositeComponentType(
+                componentTypes.getBuffer(),
+                componentTypes.getCount(),
+                composedProgram.writeRef(),
+                diagnosticsBlob.writeRef());
+            SLANG_RETURN_ON_FAIL(result);
+            slangReflection = composedProgram->getLayout();
+
+            Slang::List<slang::IComponentType*> entryPoints;
+            entryPoints.add(vertexEntryPoint);
+            entryPoints.add(fragmentEntryPoint);
+
+            gfx::IShaderProgram::Desc programDesc = {};
+            programDesc.slangGlobalScope = composedProgram.get();
+            programDesc.linkingStyle = gfx::IShaderProgram::LinkingStyle::SeparateEntryPointCompilation;
+            programDesc.entryPointCount = 2;
+            programDesc.slangEntryPoints = entryPoints.getBuffer();
+
+            auto shaderProgram = device->createProgram(programDesc);
+
+            outShaderProgram = shaderProgram;
+            return SLANG_OK;
+        }
+
+        void run()
+        {
+            generateNewDevice();
+            createShaderProgram();
             createRequiredResources();
             submitGPUWork();
 
@@ -1127,5 +1224,15 @@ namespace gfx_test
     SLANG_UNIT_TEST(graphicsShaderCacheVulkan)
     {
         runTestImpl(shaderCacheTestImpl<GraphicsShaderCache>, unitTestContext, Slang::RenderApiFlag::Vulkan);
+    }
+
+    SLANG_UNIT_TEST(splitGraphicsShaderCacheD3D12)
+    {
+        runTestImpl(shaderCacheTestImpl<SplitGraphicsShader>, unitTestContext, Slang::RenderApiFlag::D3D12);
+    }
+
+    SLANG_UNIT_TEST(splitGraphicsShaderCacheVulkan)
+    {
+        runTestImpl(shaderCacheTestImpl<SplitGraphicsShader>, unitTestContext, Slang::RenderApiFlag::Vulkan);
     }
 }
