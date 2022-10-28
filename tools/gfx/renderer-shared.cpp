@@ -8,8 +8,6 @@
 #include "../../slang.h"
 #include "../../source/core/slang-digest-util.h"
 
-#include <chrono>
-
 using namespace Slang;
 
 namespace gfx
@@ -353,8 +351,6 @@ Result RendererBase::getEntryPointCodeFromShaderCache(
     slang::IBlob** outCode,
     slang::IBlob** outDiagnostics)
 {
-//     std::chrono::time_point<std::chrono::system_clock> fetchStart, fetchEnd;
-//     fetchStart = std::chrono::system_clock::now();
     // Immediately call getEntryPointCode if no shader cache has been initialized
     if (!persistentShaderCache)
     {
@@ -366,35 +362,19 @@ Result RendererBase::getEntryPointCodeFromShaderCache(
     ComPtr<slang::ISession> session;
     getSlangSession(session.writeRef());
 
-//     std::chrono::time_point<std::chrono::system_clock> start, segmentEnd;
-//     std::chrono::duration<double> elapsed;
-
     slang::Digest shaderKey;
-//    start = std::chrono::system_clock::now();
     program->computeDependencyBasedHash(entryPointIndex, targetIndex, &shaderKey);
-//     segmentEnd = std::chrono::system_clock::now();
-//     elapsed = segmentEnd - start;
-//     printf("computeDependencyBasedHash: %f sec\n", elapsed.count());
 
     // Produce a hash using the AST for this program - This is needed to check whether a cache entry is effectively dirty,
     // or to save along with the compiled code into an entry so the entry can be checked if fetched later on.
     slang::Digest contentsHash;
-/*    start = std::chrono::system_clock::now();*/
-    program->computeASTBasedHash(&contentsHash);
-//     segmentEnd = std::chrono::system_clock::now();
-//     elapsed = segmentEnd - start;
-//     printf("computeASTBasedHash: %f sec\n", elapsed.count());
+    program->computeContentsBasedHash(&contentsHash);
 
     ComPtr<ISlangBlob> codeBlob;
 
     // Query the shader cache index for an entry with shaderKey as its key.
-/*    start = std::chrono::system_clock::now();*/
-    /*printf("Entering findEntry...\n");*/
     auto entry = persistentShaderCache->findEntry(shaderKey, codeBlob.writeRef());
-//     segmentEnd = std::chrono::system_clock::now();
-//     elapsed = segmentEnd - start;
-//     printf("findEntry: %f sec\n", elapsed.count());
-    if (entry && contentsHash == entry->Value.astBasedDigest)
+    if (entry && contentsHash == entry->Value.contentsBasedDigest)
     {
         // We found the entry in the cache, and the entry's contents are up-to-date. Nothing else needs to be done.
         shaderCacheHitCount++;
@@ -409,29 +389,16 @@ Result RendererBase::getEntryPointCodeFromShaderCache(
         // update the entry with the updated contents.
         if (!entry)
         {
-//             start = std::chrono::system_clock::now();
-//             printf("Entering addEntry...\n");
             persistentShaderCache->addEntry(shaderKey, contentsHash, codeBlob);
-//             segmentEnd = std::chrono::system_clock::now();
-//             elapsed = segmentEnd - start;
-//             printf("addEntry: %f sec\n", elapsed.count());
             shaderCacheMissCount++;
         }
         else
         {
-//             start = std::chrono::system_clock::now();
-//             printf("Entering updateEntry...\n");
             persistentShaderCache->updateEntry(entry, shaderKey, contentsHash, codeBlob);
-//             segmentEnd = std::chrono::system_clock::now();
-//             elapsed = segmentEnd - start;
-//             printf("updateEntry: %f sec\n", elapsed.count());
             shaderCacheEntryDirtyCount++;
         }
     }
 
-//     fetchEnd = std::chrono::system_clock::now();
-//     elapsed = fetchEnd - fetchStart;
-//     printf("Total time fetching entry: %f\n\n", elapsed.count());
     *outCode = codeBlob.detach();
     return SLANG_OK;
 }

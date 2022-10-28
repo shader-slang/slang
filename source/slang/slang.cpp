@@ -49,8 +49,6 @@
 
 #include "../../slang-tag-version.h"
 
-#include <chrono>
-
 // Used to print exception type names in internal-compiler-error messages
 #include <typeinfo>
 
@@ -3261,13 +3259,14 @@ void Module::updateDependencyBasedHash(
     SLANG_UNUSED(entryPointIndex);
 }
 
-void Module::updateASTBasedHash(DigestBuilder& builder)
+void Module::updateContentsBasedHash(DigestBuilder& builder)
 {
-    if (!serializedAST.getBuffer())
+    for (auto file : getFilePathDependencyList())
     {
-        serializedAST = ASTSerialUtil::serializeAST(getModuleDecl(), getLinkage()->getSessionImpl());
+        List<uint8_t> fileContents;
+        File::readAllBytes(file, fileContents);
+        builder.addToDigest(fileContents);
     }
-    builder.addToDigest(serializedAST);
 }
 
 void Module::addModuleDependency(Module* module)
@@ -3504,10 +3503,10 @@ SLANG_NO_THROW void SLANG_MCALL ComponentType::computeDependencyBasedHash(
     *outHash = builder.finalize();
 }
 
-SLANG_NO_THROW void SLANG_MCALL ComponentType::computeASTBasedHash(slang::Digest* outHash)
+SLANG_NO_THROW void SLANG_MCALL ComponentType::computeContentsBasedHash(slang::Digest* outHash)
 {
     DigestBuilder builder;
-    updateASTBasedHash(builder);
+    updateContentsBasedHash(builder);
     *outHash = builder.finalize();
 }
 
@@ -3855,13 +3854,13 @@ void CompositeComponentType::updateDependencyBasedHash(
     }
 }
 
-void CompositeComponentType::updateASTBasedHash(DigestBuilder& builder)
+void CompositeComponentType::updateContentsBasedHash(DigestBuilder& builder)
 {
     auto componentCount = getChildComponentCount();
 
     for (Index i = 0; i < componentCount; ++i)
     {
-        getChildComponent(i)->updateASTBasedHash(builder);
+        getChildComponent(i)->updateContentsBasedHash(builder);
     }
 }
 

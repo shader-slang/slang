@@ -6,8 +6,6 @@
 #include "../../source/core/slang-string-util.h"
 #include "../../source/core/slang-file-system.h"
 
-#include <chrono>
-
 namespace gfx
 {
 
@@ -34,13 +32,7 @@ PersistentShaderCache::PersistentShaderCache(const IDevice::ShaderCacheDesc& inD
         desc.shaderCacheFileSystem->queryInterface(ISlangMutableFileSystem::getTypeGuid(), (void**)mutableShaderCacheFileSystem.writeRef());
     }
 
-//     std::chrono::time_point<std::chrono::system_clock> start, segmentEnd;
-//     std::chrono::duration<double> elapsed;
-//     start = std::chrono::system_clock::now();
     loadCacheFromFile();
-//     segmentEnd = std::chrono::system_clock::now();
-//     elapsed = segmentEnd - start;
-//     printf("\tloadCacheFromFile: %f sec\n", elapsed.count());
 }
 
 // Load a previous cache index saved to disk. If not found, create a new cache index
@@ -71,9 +63,9 @@ void PersistentShaderCache::loadCacheFromFile()
         if (digests.getCount() != 2)
             continue;
         auto dependencyDigest = DigestUtil::fromString(digests[0]);
-        auto astDigest = DigestUtil::fromString(digests[1]);
+        auto contentsDigest = DigestUtil::fromString(digests[1]);
 
-        ShaderCacheEntry entry = { dependencyDigest, astDigest };
+        ShaderCacheEntry entry = { dependencyDigest, contentsDigest };
         auto entryNode = entries.AddLast(entry);
         keyToEntry.Add(dependencyDigest, entryNode);
 
@@ -104,13 +96,7 @@ LinkedNode<ShaderCacheEntry>* PersistentShaderCache::findEntry(const slang::Dige
         entries.AddFirst(entryNode);
         if (mutableShaderCacheFileSystem)
         {
-//             std::chrono::time_point<std::chrono::system_clock> start, segmentEnd;
-//             std::chrono::duration<double> elapsed;
-//             start = std::chrono::system_clock::now();
             saveCacheToFile();
-//             segmentEnd = std::chrono::system_clock::now();
-//             elapsed = segmentEnd - start;
-//             printf("\tsaveCacheToFile: %f sec\n", elapsed.count());
         }
     }
     return entryNode;
@@ -141,19 +127,13 @@ void PersistentShaderCache::addEntry(const slang::Digest& dependencyDigest, cons
 
     mutableShaderCacheFileSystem->saveFileBlob(DigestUtil::toString(dependencyDigest).getBuffer(), compiledCode);
 
-//     std::chrono::time_point<std::chrono::system_clock> start, segmentEnd;
-//     std::chrono::duration<double> elapsed;
-//     start = std::chrono::system_clock::now();
     saveCacheToFile();
-//     segmentEnd = std::chrono::system_clock::now();
-//     elapsed = segmentEnd - start;
-//     printf("\tsaveCacheToFile: %f sec\n", elapsed.count());
 }
 
 void PersistentShaderCache::updateEntry(
     LinkedNode<ShaderCacheEntry>* entryNode,
     const slang::Digest& dependencyDigest,
-    const slang::Digest& astDigest,
+    const slang::Digest& contentsDigest,
     ISlangBlob* updatedCode)
 {
     if (!mutableShaderCacheFileSystem)
@@ -163,16 +143,10 @@ void PersistentShaderCache::updateEntry(
         return;
     }
 
-    entryNode->Value.astBasedDigest = astDigest;
+    entryNode->Value.contentsBasedDigest = contentsDigest;
     mutableShaderCacheFileSystem->saveFileBlob(DigestUtil::toString(dependencyDigest).getBuffer(), updatedCode);
 
-//     std::chrono::time_point<std::chrono::system_clock> start, segmentEnd;
-//     std::chrono::duration<double> elapsed;
-//     start = std::chrono::system_clock::now();
     saveCacheToFile();
-//     segmentEnd = std::chrono::system_clock::now();
-//     elapsed = segmentEnd - start;
-//     printf("\tsaveCacheToFile: %f sec\n", elapsed.count());
 }
 
 void PersistentShaderCache::saveCacheToFile()
@@ -188,7 +162,7 @@ void PersistentShaderCache::saveCacheToFile()
     {
         indexSb << entry.dependencyBasedDigest;
         indexSb << " ";
-        indexSb << entry.astBasedDigest;
+        indexSb << entry.contentsBasedDigest;
         indexSb << "\n";
     }
 
