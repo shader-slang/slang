@@ -1977,6 +1977,11 @@ namespace Slang
         
         // Check/Resolve inner function declaration.
         expr->baseFunction = CheckTerm(expr->baseFunction);
+
+        // For now we only support using higher order expr as callee in an invoke expr.
+        // The actual type of the higher order function will be derived during resolve invoke.
+        expr->type = m_astBuilder->getBottomType();
+
         return expr;
     }
 
