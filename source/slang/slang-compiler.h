@@ -25,7 +25,6 @@
 #include "slang-content-assist-info.h"
 
 #include "slang-serialize-ir-types.h"
-#include "slang-serialize.h"
 
 #include "../compiler-core/slang-artifact-representation-impl.h"
 
@@ -2961,7 +2960,6 @@ namespace Slang
 
         ModuleDecl* baseModuleDecl = nullptr;
         List<RefPtr<Module>> stdlibModules;
-        RefPtr<SerialClasses> classes = nullptr;
 
         SourceManager   builtinSourceManager;
 

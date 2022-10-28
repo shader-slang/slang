@@ -49,7 +49,7 @@ struct ASTSerialUtil
         /// Will write dumped out node to files 
     static SlangResult testSerialize(NodeBase* node, RootNamePool* rootNamePool, SharedASTBuilder* sharedASTBuilder, SourceManager* sourceManager);
 
-    static List<uint8_t> serializeAST(ModuleDecl* moduleDecl, Session* globalSession);
+    static List<uint8_t> serializeAST(ModuleDecl* moduleDecl);
 };
 
 } // namespace Slang
