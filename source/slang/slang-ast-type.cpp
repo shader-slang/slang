@@ -169,6 +169,27 @@ Val* BottomType::_substituteImplOverride(
 
 HashCode BottomType::_getHashCodeOverride() { return HashCode(size_t(this)); }
 
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! DifferentialBottomType !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+void DifferentialBottomType::_toTextOverride(StringBuilder& out) { out << toSlice("diff_bottom"); }
+
+bool DifferentialBottomType::_equalsImplOverride(Type* type)
+{
+    if (auto bottomType = as<DifferentialBottomType>(type))
+        return true;
+    return false;
+}
+
+Type* DifferentialBottomType::_createCanonicalTypeOverride() { return this; }
+
+Val* DifferentialBottomType::_substituteImplOverride(
+    ASTBuilder* /* astBuilder */, SubstitutionSet /*subst*/, int* /*ioDiff*/)
+{
+    return this;
+}
+
+HashCode DifferentialBottomType::_getHashCodeOverride() { return HashCode(size_t(this)); }
+
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! DeclRefType !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 void DeclRefType::_toTextOverride(StringBuilder& out)
@@ -193,6 +214,7 @@ bool DeclRefType::_equalsImplOverride(Type * type)
 Type* DeclRefType::_createCanonicalTypeOverride()
 {
     // A declaration reference is already canonical
+    declRef.substitute(this->getASTBuilder(), this);
     return this;
 }
 
@@ -223,39 +245,8 @@ Val* DeclRefType::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSe
     // the outer interface, then try to replace the type with the
     // actual value of the associated type for the given implementation.
     //
-    if (auto substAssocTypeDecl = as<AssocTypeDecl>(substDeclRef.decl))
-    {
-        for (auto s = substDeclRef.substitutions.substitutions; s; s = s->outer)
-        {
-            auto thisSubst = as<ThisTypeSubstitution>(s);
-            if (!thisSubst)
-                continue;
-
-            if (auto interfaceDecl = as<InterfaceDecl>(substAssocTypeDecl->parentDecl))
-            {
-                if (thisSubst->interfaceDecl == interfaceDecl)
-                {
-                    // We need to look up the declaration that satisfies
-                    // the requirement named by the associated type.
-                    Decl* requirementKey = substAssocTypeDecl;
-                    RequirementWitness requirementWitness = tryLookUpRequirementWitness(astBuilder, thisSubst->witness, requirementKey);
-                    switch (requirementWitness.getFlavor())
-                    {
-                        default:
-                            // No usable value was found, so there is nothing we can do.
-                            break;
-
-                        case RequirementWitness::Flavor::val:
-                        {
-                            auto satisfyingVal = requirementWitness.getVal();
-                            return satisfyingVal;
-                        }
-                        break;
-                    }
-                }
-            }
-        }
-    }
+    if (auto satisfyingVal = _tryLookupConcreteAssociatedTypeFromThisTypeSubst(astBuilder, substDeclRef))
+        return satisfyingVal;
 
     // Re-construct the type in case we are using a specialized sub-class
     return DeclRefType::create(astBuilder, substDeclRef);

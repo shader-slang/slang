@@ -915,14 +915,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         DeclRefBase substDeclRef;
         substDeclRef.decl = decl;
         substDeclRef.substitutions = substSubst;
-
-        // TODO: The old code here used to try to translate a decl-ref
-        // to an associated type in a decl-ref for the concrete type
-        // in a particular implementation.
-        //
-        // I have only kept that logic in `DeclRefType::SubstituteImpl`,
-        // but it may turn out it is needed here too.
-
+                
         return substDeclRef;
     }
 
@@ -1140,7 +1133,46 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         return nullptr;
     }
 
-    //
+    Val* _tryLookupConcreteAssociatedTypeFromThisTypeSubst(ASTBuilder* builder, DeclRef<Decl> declRef)
+    {
+        auto substDeclRef = declRef.as<AssocTypeDecl>();
+        if (!substDeclRef)
+            return nullptr;
+
+        auto substAssocTypeDecl = substDeclRef.getDecl();
+
+        for (auto s = substDeclRef.substitutions.substitutions; s; s = s->outer)
+        {
+            auto thisSubst = as<ThisTypeSubstitution>(s);
+            if (!thisSubst)
+                continue;
+
+            if (auto interfaceDecl = as<InterfaceDecl>(substAssocTypeDecl->parentDecl))
+            {
+                if (thisSubst->interfaceDecl == interfaceDecl)
+                {
+                    // We need to look up the declaration that satisfies
+                    // the requirement named by the associated type.
+                    Decl* requirementKey = substAssocTypeDecl;
+                    RequirementWitness requirementWitness = tryLookUpRequirementWitness(builder, thisSubst->witness, requirementKey);
+                    switch (requirementWitness.getFlavor())
+                    {
+                    default:
+                        // No usable value was found, so there is nothing we can do.
+                        break;
+
+                    case RequirementWitness::Flavor::val:
+                    {
+                        auto satisfyingVal = requirementWitness.getVal();
+                        return satisfyingVal;
+                    }
+                    break;
+                    }
+                }
+            }
+        }
+        return nullptr;
+    }
 
     String DeclRefBase::toString() const
     {

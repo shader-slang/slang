@@ -60,6 +60,7 @@ INST(Nop, nop, 0, 0)
     INST(OptionalType, Optional, 1, 0)
 
     INST(DifferentialPairType, DiffPair, 1, 0)
+    INST(DifferentialBottomType, DiffBottomType, 0, 0)
 
     /* BindExistentialsTypeBase */
 
@@ -297,6 +298,7 @@ INST(GetOptionalValue, getOptionalValue, 1, 0)
 INST(OptionalHasValue, optionalHasValue, 1, 0)
 INST(MakeOptionalValue, makeOptionalValue, 1, 0)
 INST(MakeOptionalNone, makeOptionalNone, 1, 0)
+INST(DifferentialBottomValue, differentialBottomVal, 0, 0)
 INST(Call, call, 1, 0)
 
 INST(RTTIObject, rtti_object, 0, 0)
@@ -759,6 +761,7 @@ INST(Reinterpret,                       reinterpret,                1, 0)
 INST(CastPtrToBool, CastPtrToBool, 1, 0)
 INST(IsType, IsType, 3, 0)
 INST(ForwardDifferentiate,                   ForwardDifferentiate,            1, 0)
+INST(DifferentialEqualityTypeCast, DifferentialEqualityTypeCast, 1, 0)
 
 // Converts other resources (such as ByteAddressBuffer) to the equivalent StructuredBuffer
 INST(GetEquivalentStructuredBuffer,     getEquivalentStructuredBuffer, 1, 0)

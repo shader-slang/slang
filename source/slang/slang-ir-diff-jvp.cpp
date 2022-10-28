@@ -193,20 +193,20 @@ struct DifferentiableTypeConformanceContext
 
     IRStructKey* findZeroMethodStructKey()
     {
-        return getIDifferentiableStructKeyAtIndex(1);
+        return getIDifferentiableStructKeyAtIndex(2);
     }
 
     IRStructKey* findAddMethodStructKey()
     {
-        return getIDifferentiableStructKeyAtIndex(2);
+        return getIDifferentiableStructKeyAtIndex(3);
     }
 
     IRStructKey* getIDifferentiableStructKeyAtIndex(UInt index)
     {
         if (as<IRModuleInst>(inst) && differentiableInterfaceType)
         {
-            // Assume for now that IDifferentiable has exactly three fields.
-            SLANG_ASSERT(differentiableInterfaceType->getOperandCount() == 4);
+            // Assume for now that IDifferentiable has exactly five fields.
+            SLANG_ASSERT(differentiableInterfaceType->getOperandCount() == 5);
             if (auto entry = as<IRInterfaceRequirementEntry>(differentiableInterfaceType->getOperand(index)))
                 return as<IRStructKey>(entry->getRequirementKey());
             else

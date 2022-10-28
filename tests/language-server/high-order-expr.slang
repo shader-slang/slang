@@ -17,5 +17,5 @@ float df(float x)
 [numthreads(1, 1, 1)]
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
-    outputBuffer[0] = __fwd_diff(df)(__DifferentialPair<float>(x, 1.0)).d(); // Expect: 2.0
+    outputBuffer[0] = __fwd_diff(df)(DifferentialPair<float>(x, 1.0)).d(); // Expect: 2.0
 }

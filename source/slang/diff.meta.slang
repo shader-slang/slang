@@ -23,7 +23,7 @@ interface IDifferentiable
     // before anything else.
 
     [__BuiltinRequirement(_BuiltinRequirementKind.DifferentialType)]
-    associatedtype Differential;
+    associatedtype Differential : IDifferentiable;
 
     [__BuiltinRequirement(_BuiltinRequirementKind.DZeroFunc)]
     static Differential dzero();
@@ -128,21 +128,45 @@ extension vector<float, 4> : IDifferentiable
     }
 }
 
+__magic_type(DifferentialBottomType)
+__intrinsic_type($(kIROp_DifferentialBottomType))
+struct __DifferentialBottom : IDifferentiable
+{
+    typedef __DifferentialBottom Differential;
+
+    __intrinsic_op($(kIROp_DifferentialBottomValue))
+    static __DifferentialBottom dzero();
+
+    [__unsafeForceInlineEarly]
+    static __DifferentialBottom dadd(Differential a, Differential b)
+    {
+        return dzero();
+    }
+
+    [__unsafeForceInlineEarly]
+    static __DifferentialBottom dmul(This a, Differential b)
+    {
+        return dzero();
+    }
+}
+
     /// Pair type that serves to wrap the primal and
     /// differential types of an arbitrary type T.
-__generic<T : IDifferentiable>
+__generic<T : IDifferentiable, TDiff : IDifferentiable>
 __magic_type(DifferentialPairType)
 __intrinsic_type($(kIROp_DifferentialPairType))
-struct __DifferentialPair
+struct __DifferentialPair : IDifferentiable
 {
 
+    typedef __DifferentialPair<TDiff, __DifferentialBottom> Differential;
+
     __intrinsic_op($(kIROp_MakeDifferentialPair))
-    __init(T _primal, T.Differential _differential);
+    __init(T _primal, TDiff _differential);
 
     __intrinsic_op($(kIROp_DifferentialPairGetDifferential))
-    T.Differential d();
+    TDiff d();
 
-    T.Differential getDifferential()
+    TDiff getDifferential()
     {
         return d();
     }
@@ -154,7 +178,39 @@ struct __DifferentialPair
     {
         return p();
     }
+
+    // There are only two possible relationships between TDiff and T.Differnetial:
+    // 1. TDiff == T.Differential.
+    // 2. TDiff == bottom, T.Differential = someType
+    // In case 1, we can trivially cast between the two.
+    // In case 2, the result should yeild TargetType.dzero().
+    // We implement this behavior in an IRInst DifferentialEqualityTypeCast.
+
+    __intrinsic_op($(kIROp_DifferentialEqualityTypeCast))
+    static TDiff __type_equality_cast(T.Differential d);
+    __intrinsic_op($(kIROp_DifferentialEqualityTypeCast))
+    static T.Differential __type_equality_cast(TDiff d);
+
+    [__unsafeForceInlineEarly]
+    static Differential dzero()
+    {
+        return Differential(__type_equality_cast(T.dzero()), __DifferentialBottom.dzero());
+    }
+
+    [__unsafeForceInlineEarly]
+    static Differential dadd(Differential a, Differential b)
+    {
+        return Differential(__type_equality_cast(T.dadd(__type_equality_cast(a.p()), __type_equality_cast(b.p()))), __DifferentialBottom.dzero());
+    }
+
+    [__unsafeForceInlineEarly]
+    static Differential dmul(This a, Differential b)
+    {
+        return Differential(__type_equality_cast(T.dmul(a.p(), __type_equality_cast(b.p()))), __DifferentialBottom.dzero());
+    }
 };
+
+typealias DifferentialPair<T:IDifferentiable> = __DifferentialPair<T, T.Differential>;
 
 typealias IDFloat = IFloat & IDifferentiable;
 
@@ -171,9 +227,9 @@ namespace dstd
     T exp(T x);
 
     __generic<T : IDFloat>
-    __DifferentialPair<T> d_exp(__DifferentialPair<T> dpx)
+    DifferentialPair<T> d_exp(DifferentialPair<T> dpx)
     {
-        return __DifferentialPair<T>(
+        return DifferentialPair<T>(
             exp(dpx.p()),
             T.dmul(exp(dpx.p()), dpx.d()));
     }
@@ -189,9 +245,9 @@ namespace dstd
     T sin(T x);
 
     __generic<T : IDFloat>
-    __DifferentialPair<T> d_sin(__DifferentialPair<T> dpx)
+    DifferentialPair<T> d_sin(DifferentialPair<T> dpx)
     {
-        return __DifferentialPair<T>(
+        return DifferentialPair<T>(
             sin(dpx.p()),
             T.dmul(cos(dpx.p()), dpx.d()));
     }
@@ -207,9 +263,9 @@ namespace dstd
     T cos(T x);
 
     __generic<T : IDFloat>
-    __DifferentialPair<T> d_cos(__DifferentialPair<T> dpx)
+    DifferentialPair<T> d_cos(DifferentialPair<T> dpx)
     {
-        return __DifferentialPair<T>(
+        return DifferentialPair<T>(
             cos(dpx.p()),
             T.dmul(-sin(dpx.p()), dpx.d()));
     }

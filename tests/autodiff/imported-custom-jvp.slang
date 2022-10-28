@@ -5,7 +5,7 @@ RWStructuredBuffer<float> outputBuffer;
 
 import test_intrinsics_jvp;
 
-typedef __DifferentialPair<float> dpfloat;
+typedef DifferentialPair<float> dpfloat;
 typedef float.Differential dfloat;
 
 [ForwardDifferentiable]

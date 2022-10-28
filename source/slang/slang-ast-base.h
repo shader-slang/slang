@@ -254,7 +254,9 @@ private:
     // The actual values of the arguments
     List<Val* > args;
 public:
+    List<Val*>& getArgs() { return args; }
     const List<Val*>& getArgs() const { return args; }
+
     // Overrides should be public so base classes can access
     Substitutions* _applySubstitutionsShallowOverride(ASTBuilder* astBuilder, SubstitutionSet substSet, Substitutions* substOuter, int* ioDiff);
     bool _equalsOverride(Substitutions* subst);
@@ -263,6 +265,12 @@ public:
     GenericSubstitution(GenericDecl* decl)
     {
         genericDecl = decl;
+    }
+
+    GenericSubstitution(GenericDecl* decl, ArrayView<Val*> argVals)
+    {
+        genericDecl = decl;
+        args.addRange(argVals);
     }
 
     template<typename... TArgs>

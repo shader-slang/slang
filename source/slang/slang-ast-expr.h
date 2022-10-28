@@ -126,6 +126,12 @@ class InitializerListExpr : public Expr
     List<Expr*> args;
 };
 
+class GetArrayLengthExpr : public Expr
+{
+    SLANG_AST_CLASS(GetArrayLengthExpr)
+    Expr* arrayExpr = nullptr;
+};
+
 // A base class for expressions with arguments
 class ExprWithArgsBase : public Expr
 {

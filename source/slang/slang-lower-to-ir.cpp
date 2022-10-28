@@ -3053,6 +3053,15 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
                 baseVal.val));
     }
 
+    LoweredValInfo visitGetArrayLengthExpr(GetArrayLengthExpr* expr)
+    {
+        auto baseVal = lowerSubExpr(expr->arrayExpr);
+        auto type = lowerType(context, expr->arrayExpr->type);
+        auto arrayType = as<IRArrayType>(type);
+        SLANG_ASSERT(arrayType);
+        return LoweredValInfo::simple(arrayType->getElementCount());
+    }
+
     LoweredValInfo visitOverloadedExpr(OverloadedExpr* /*expr*/)
     {
         SLANG_UNEXPECTED("overloaded expressions should not occur in checked AST");
@@ -6777,7 +6786,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         IRInterfaceType* irInterface = subBuilder->createInterfaceType(operandCount, nullptr);
         
         // Add `irInterface` to decl mapping now to prevent cyclic lowering.
-        setValue(subContext, decl, LoweredValInfo::simple(irInterface));
+        setValue(context, decl, LoweredValInfo::simple(irInterface));
 
         // Setup subContext for proper lowering `ThisType`, associated types and
         // the interface decl's self reference.
@@ -7084,6 +7093,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
     void lowerDerivativeMemberModifier(IRInst* inst, DerivativeMemberAttribute* derivativeMember)
     {
+        ensureDecl(context, derivativeMember->memberDeclRef->declRef.getDecl()->parentDecl);
         auto key = lowerRValueExpr(context, derivativeMember->memberDeclRef).val;
         SLANG_RELEASE_ASSERT(as<IRStructKey>(key));
         auto builder = getBuilder();

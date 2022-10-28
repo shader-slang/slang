@@ -29,6 +29,9 @@ class ContainerDecl: public Decl
     List<Decl*> members;
     SourceLoc closingSourceLoc;
 
+    // The associated scope owned by this decl.
+    Scope* ownedScope = nullptr;
+
     template<typename T>
     FilteredMemberList<T> getMembersOfType()
     {

@@ -4,9 +4,9 @@
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
 
-typedef __DifferentialPair<float2> dpfloat2;
-typedef __DifferentialPair<float3> dpfloat3;
-typedef __DifferentialPair<float4> dpfloat4;
+typedef DifferentialPair<float2> dpfloat2;
+typedef DifferentialPair<float3> dpfloat3;
+typedef DifferentialPair<float4> dpfloat4;
 
 [ForwardDifferentiable]
 float3 f(float3 x)

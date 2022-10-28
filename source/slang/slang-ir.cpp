@@ -6282,6 +6282,8 @@ namespace Slang
         case kIROp_MakeOptionalNone:
         case kIROp_OptionalHasValue:
         case kIROp_GetOptionalValue:
+        case kIROp_MakeTuple:
+        case kIROp_GetTupleElement:
         case kIROp_Load:    // We are ignoring the possibility of loads from bad addresses, or `volatile` loads
         case kIROp_ImageSubscript:
         case kIROp_FieldExtract:

@@ -141,6 +141,16 @@ Type* SharedASTBuilder::getNoneType()
     return m_noneType;
 }
 
+Type* SharedASTBuilder::getDifferentialBottomType()
+{
+    if (!m_diffBottomType)
+    {
+        auto diffBottomTypeDecl = findMagicDecl("DifferentialBottomType");
+        m_diffBottomType = DeclRefType::create(m_astBuilder, makeDeclRef<Decl>(diffBottomTypeDecl));
+    }
+    return m_diffBottomType;
+}
+
 SharedASTBuilder::~SharedASTBuilder()
 {
     // Release built in types..
@@ -299,13 +309,22 @@ VectorExpressionType* ASTBuilder::getVectorType(
     return result;
 }
 
-DifferentialPairType* ASTBuilder::getDifferentialPairType(Type* valueType, Witness* conformanceWitness)
+DifferentialPairType* ASTBuilder::getDifferentialPairType(
+    Type* valueType,
+    Type* differentialType,
+    Witness* primalIsDifferentialWitness,
+    Witness* differentialIsDifferentiableWitness)
 {
     auto genericDecl = dynamicCast<GenericDecl>(m_sharedASTBuilder->findMagicDecl("DifferentialPairType"));
 
     auto typeDecl = genericDecl->inner;
 
-    auto substitutions = getOrCreate<GenericSubstitution>(genericDecl, valueType, conformanceWitness);
+    auto substitutions = getOrCreate<GenericSubstitution>(
+        genericDecl,
+        valueType,
+        differentialType,
+        primalIsDifferentialWitness,
+        differentialIsDifferentiableWitness);
 
     auto declRef = DeclRef<Decl>(typeDecl, substitutions);
     auto rsType = DeclRefType::create(this, declRef);
