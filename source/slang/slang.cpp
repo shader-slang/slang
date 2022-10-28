@@ -49,6 +49,8 @@
 
 #include "../../slang-tag-version.h"
 
+#include <chrono>
+
 // Used to print exception type names in internal-compiler-error messages
 #include <typeinfo>
 
@@ -3261,7 +3263,10 @@ void Module::updateDependencyBasedHash(
 
 void Module::updateASTBasedHash(DigestBuilder& builder)
 {
-    auto serializedAST = ASTSerialUtil::serializeAST(getModuleDecl());
+    if (!serializedAST.getBuffer())
+    {
+        serializedAST = ASTSerialUtil::serializeAST(getModuleDecl(), getLinkage()->getSessionImpl());
+    }
     builder.addToDigest(serializedAST);
 }
 

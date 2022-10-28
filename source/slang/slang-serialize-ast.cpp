@@ -12,6 +12,8 @@
 
 #include "slang-serialize-factory.h"
 
+#include <chrono>
+
 namespace Slang {
 
 // !!!!!!!!!!!!!!!!!!!!!! Generate fields for a type !!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -154,11 +156,18 @@ struct ASTFieldAccess
     return SLANG_OK;
 }
 
-/* static */List<uint8_t> ASTSerialUtil::serializeAST(ModuleDecl* moduleDecl)
+/* static */List<uint8_t> ASTSerialUtil::serializeAST(ModuleDecl* moduleDecl, Session* globalSession)
 {
-    //TODO: we should store `classes` in GlobalSession to avoid recomputing them every time.
     RefPtr<SerialClasses> classes;
-    SerialClassesUtil::create(classes);
+    if (!globalSession->classes)
+    {
+        SerialClassesUtil::create(classes);
+        globalSession->classes = classes;
+    }
+    else
+    {
+        classes = globalSession->classes;
+    }
 
     List<uint8_t> contents;
     OwnedMemoryStream stream(FileAccess::ReadWrite);

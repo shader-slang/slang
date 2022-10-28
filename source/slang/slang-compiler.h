@@ -25,6 +25,7 @@
 #include "slang-content-assist-info.h"
 
 #include "slang-serialize-ir-types.h"
+#include "slang-serialize.h"
 
 #include "../compiler-core/slang-artifact-representation-impl.h"
 
@@ -1474,6 +1475,8 @@ namespace Slang
         // and m_mangledExportSymbols holds the NodeBase* values for each index. 
         StringSlicePool m_mangledExportPool;
         List<NodeBase*> m_mangledExportSymbols;
+
+        List<uint8_t> serializedAST;
     };
     typedef Module LoadedModule;
 
@@ -2960,6 +2963,7 @@ namespace Slang
 
         ModuleDecl* baseModuleDecl = nullptr;
         List<RefPtr<Module>> stdlibModules;
+        RefPtr<SerialClasses> classes = nullptr;
 
         SourceManager   builtinSourceManager;
 
