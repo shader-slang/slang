@@ -298,7 +298,7 @@ namespace Slang
             SlangInt entryPointIndex,
             SlangInt targetIndex,
             slang::Digest* outHash) SLANG_OVERRIDE;
-        SLANG_NO_THROW void SLANG_MCALL computeASTBasedHash(slang::Digest* outHash) SLANG_OVERRIDE;
+        SLANG_NO_THROW void SLANG_MCALL computeContentsBasedHash(slang::Digest* outHash) SLANG_OVERRIDE;
 
             /// Get the linkage (aka "session" in the public API) for this component type.
         Linkage* getLinkage() { return m_linkage; }
@@ -313,10 +313,10 @@ namespace Slang
             DigestBuilder& hashBuilder,
             SlangInt entryPointIndex) = 0;
 
-            /// Update the hash builder with the AST contents for this component type.
-            /// The AST is associated with a Module component, so most derived ComponentType classes
-            /// will simply do nothing with this.
-        virtual void updateASTBasedHash(DigestBuilder& hashBuilder) = 0;
+            /// Update the hash builder with the source contents for this component type.
+            /// Module should be the only derived ComponentType class which has a meaningful
+            /// implementation; all others should do nothing.
+        virtual void updateContentsBasedHash(DigestBuilder& hashBuilder) = 0;
 
             /// Get the number of entry points linked into this component type.
         virtual Index getEntryPointCount() = 0;
@@ -519,7 +519,7 @@ namespace Slang
             DigestBuilder& hashBuilder,
             SlangInt entryPointIndex) override;
 
-        virtual void updateASTBasedHash(DigestBuilder& hashBuilder) override;
+        virtual void updateContentsBasedHash(DigestBuilder& hashBuilder) override;
 
         List<RefPtr<ComponentType>> const& getChildComponents() { return m_childComponents; };
         Index getChildComponentCount() { return m_childComponents.getCount(); }
@@ -601,7 +601,7 @@ namespace Slang
             DigestBuilder& hashBuilder,
             SlangInt entryPointIndex) override;
 
-        virtual void updateASTBasedHash(DigestBuilder& hashBuilder) override
+        virtual void updateContentsBasedHash(DigestBuilder& hashBuilder) override
         {
             SLANG_UNUSED(hashBuilder);
         }
@@ -794,7 +794,7 @@ namespace Slang
             DigestBuilder& hashBuilder,
             SlangInt entryPointIndex) override;
 
-        virtual void updateASTBasedHash(DigestBuilder& hashBuilder) override
+        virtual void updateContentsBasedHash(DigestBuilder& hashBuilder) override
         {
             SLANG_UNUSED(hashBuilder);
         }
@@ -899,16 +899,16 @@ namespace Slang
             return Super::computeDependencyBasedHash(entryPointIndex, targetIndex, outHash);
         }
 
-        SLANG_NO_THROW void SLANG_MCALL computeASTBasedHash(slang::Digest* outHash) SLANG_OVERRIDE
+        SLANG_NO_THROW void SLANG_MCALL computeContentsBasedHash(slang::Digest* outHash) SLANG_OVERRIDE
         {
-            return Super::computeASTBasedHash(outHash);
+            return Super::computeContentsBasedHash(outHash);
         }
 
         virtual void updateDependencyBasedHash(
             DigestBuilder& hashBuilder,
             SlangInt entryPointIndex) override;
 
-        virtual void updateASTBasedHash(DigestBuilder& hashBuilder) override
+        virtual void updateContentsBasedHash(DigestBuilder& hashBuilder) override
         {
             SLANG_UNUSED(hashBuilder);
         }
@@ -1126,16 +1126,16 @@ namespace Slang
             return Super::computeDependencyBasedHash(entryPointIndex, targetIndex, outHash);
         }
 
-        SLANG_NO_THROW void SLANG_MCALL computeASTBasedHash(slang::Digest* outHash) SLANG_OVERRIDE
+        SLANG_NO_THROW void SLANG_MCALL computeContentsBasedHash(slang::Digest* outHash) SLANG_OVERRIDE
         {
-            return Super::computeASTBasedHash(outHash);
+            return Super::computeContentsBasedHash(outHash);
         }
 
         virtual void updateDependencyBasedHash(
             DigestBuilder& hashBuilder,
             SlangInt entryPointIndex) override;
 
-        virtual void updateASTBasedHash(DigestBuilder& hashBuilder) override
+        virtual void updateContentsBasedHash(DigestBuilder& hashBuilder) override
         {
             SLANG_UNUSED(hashBuilder);
         }
@@ -1322,16 +1322,16 @@ namespace Slang
             return Super::computeDependencyBasedHash(entryPointIndex, targetIndex, outHash);
         }
 
-        SLANG_NO_THROW void SLANG_MCALL computeASTBasedHash(slang::Digest* outHash) SLANG_OVERRIDE
+        SLANG_NO_THROW void SLANG_MCALL computeContentsBasedHash(slang::Digest* outHash) SLANG_OVERRIDE
         {
-            return Super::computeASTBasedHash(outHash);
+            return Super::computeContentsBasedHash(outHash);
         }
 
         virtual void updateDependencyBasedHash(
             DigestBuilder& hashBuilder,
             SlangInt entryPointIndex) override;
 
-        virtual void updateASTBasedHash(DigestBuilder& hashBuilder) override;
+        virtual void updateContentsBasedHash(DigestBuilder& hashBuilder) override;
 
             /// Create a module (initially empty).
         Module(Linkage* linkage, ASTBuilder* astBuilder = nullptr);
@@ -1365,6 +1365,14 @@ namespace Slang
             /// This should only be called once, during creation of the module.
             ///
         void setIRModule(IRModule* irModule) { m_irModule = irModule; }
+
+        DigestBuilder& getContentsDigestBuilder() { return contentsBuilder; }
+
+            /// Set the contents digest for this module.
+        void setContentsDigest(slang::Digest digest) { contentsDigest = digest; }
+
+            /// Get the contents digest for this module.
+        slang::Digest getContentsDigest() { return contentsDigest; }
 
         Index getEntryPointCount() SLANG_OVERRIDE { return 0; }
         RefPtr<EntryPoint> getEntryPoint(Index index) SLANG_OVERRIDE { SLANG_UNUSED(index); return nullptr; }
@@ -1474,6 +1482,9 @@ namespace Slang
         // and m_mangledExportSymbols holds the NodeBase* values for each index. 
         StringSlicePool m_mangledExportPool;
         List<NodeBase*> m_mangledExportSymbols;
+
+        DigestBuilder contentsBuilder;
+        slang::Digest contentsDigest;
     };
     typedef Module LoadedModule;
 

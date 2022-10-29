@@ -326,6 +326,76 @@ struct SerialTypeInfo<Dictionary<KEY, VALUE>>
     }
 };
 
+// OrderedDictionary
+template <typename KEY, typename VALUE>
+struct SerialTypeInfo<OrderedDictionary<KEY, VALUE>>
+{
+    typedef OrderedDictionary<KEY, VALUE> NativeType;
+    struct SerialType
+    {
+        SerialIndex keys;            ///< Index an array
+        SerialIndex values;          ///< Index an array
+    };
+
+    typedef typename SerialTypeInfo<KEY>::SerialType KeySerialType;
+    typedef typename SerialTypeInfo<VALUE>::SerialType ValueSerialType;
+
+    enum { SerialAlignment = SLANG_ALIGN_OF(SerialIndex) };
+
+    static void toSerial(SerialWriter* writer, const void* native, void* serial)
+    {
+        auto& src = *(const NativeType*)native;
+        auto& dst = *(SerialType*)serial;
+
+        List<KeySerialType> keys;
+        List<ValueSerialType> values;
+
+        Index count = Index(src.Count());
+        keys.setCount(count);
+        values.setCount(count);
+
+        if (writer->getFlags() & SerialWriter::Flag::ZeroInitialize)
+        {
+            ::memset(keys.getBuffer(), 0, count * sizeof(KeySerialType));
+            ::memset(values.getBuffer(), 0, count * sizeof(ValueSerialType));
+        }
+
+        Index i = 0;
+        for (const auto& pair : src)
+        {
+            SerialTypeInfo<KEY>::toSerial(writer, &pair.Key, &keys[i]);
+            SerialTypeInfo<VALUE>::toSerial(writer, &pair.Value, &values[i]);
+            i++;
+        }
+
+        // When we add the array it is already converted to a serializable type, so add as SerialArray
+        dst.keys = writer->addSerialArray<KEY>(keys.getBuffer(), count);
+        dst.values = writer->addSerialArray<VALUE>(values.getBuffer(), count);
+    }
+    static void toNative(SerialReader* reader, const void* serial, void* native)
+    {
+        auto& src = *(const SerialType*)serial;
+        auto& dst = *(NativeType*)native;
+
+        // Clear it
+        dst = NativeType();
+
+        List<KEY> keys;
+        List<VALUE> values;
+
+        reader->getArray(src.keys, keys);
+        reader->getArray(src.values, values);
+
+        SLANG_ASSERT(keys.getCount() == values.getCount());
+
+        const Index count = keys.getCount();
+        for (Index i = 0; i < count; ++i)
+        {
+            dst.Add(keys[i], values[i]);
+        }
+    }
+};
+
 // KeyValuePair
 template<typename KEY, typename VALUE>
 struct SerialTypeInfo<KeyValuePair<KEY, VALUE>>

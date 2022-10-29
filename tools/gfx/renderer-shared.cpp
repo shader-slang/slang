@@ -368,13 +368,13 @@ Result RendererBase::getEntryPointCodeFromShaderCache(
     // Produce a hash using the AST for this program - This is needed to check whether a cache entry is effectively dirty,
     // or to save along with the compiled code into an entry so the entry can be checked if fetched later on.
     slang::Digest contentsHash;
-    program->computeASTBasedHash(&contentsHash);
+    program->computeContentsBasedHash(&contentsHash);
 
     ComPtr<ISlangBlob> codeBlob;
 
-    // Query the shader cache index for an entry with shaderKey as its key. 
+    // Query the shader cache index for an entry with shaderKey as its key.
     auto entry = persistentShaderCache->findEntry(shaderKey, codeBlob.writeRef());
-    if (entry && contentsHash == entry->Value.astBasedDigest)
+    if (entry && contentsHash == entry->Value.contentsBasedDigest)
     {
         // We found the entry in the cache, and the entry's contents are up-to-date. Nothing else needs to be done.
         shaderCacheHitCount++;

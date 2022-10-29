@@ -274,7 +274,7 @@ namespace Slang
         };
 
             /// Mapping from types to subtype witnesses for conformance to IDifferentiable.
-        Dictionary<DeclRefTypeKey, SubtypeWitness*>   m_mapTypeToIDifferentiableWitness;
+        OrderedDictionary<DeclRefTypeKey, SubtypeWitness*>   m_mapTypeToIDifferentiableWitness;
         
             /// List of external dictionaries (from imported modules)
         List<DeclRef<DifferentiableTypeDictionary>> m_importedDictionaries;

@@ -16,7 +16,7 @@ namespace gfx
 struct ShaderCacheEntry
 {
     slang::Digest dependencyBasedDigest;
-    slang::Digest astBasedDigest;
+    slang::Digest contentsBasedDigest;
 };
 
 class PersistentShaderCache : public RefObject
@@ -32,14 +32,14 @@ public:
     // Add an entry to the cache with the provided key and contents hashes. If
     // adding an entry causes the cache to exceed size limitations, this will also
     // delete the least recently used entry.
-    void addEntry(const slang::Digest& dependencyDigest, const slang::Digest& astDigest, ISlangBlob* compiledCode);
+    void addEntry(const slang::Digest& dependencyDigest, const slang::Digest& contentsDigest, ISlangBlob* compiledCode);
 
     // Update the contents hash for the specified entry in the cache and update the
     // corresponding file on disk.
     void updateEntry(
         LinkedNode<ShaderCacheEntry>* entryNode,
         const slang::Digest& dependencyDigest,
-        const slang::Digest& astDigest,
+        const slang::Digest& contentsDigest,
         ISlangBlob* updatedCode);
 
 private:
