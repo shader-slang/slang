@@ -1901,7 +1901,10 @@ protected:
     void handleFileDependency(String const& path, ISlangBlob* sourceBlob) SLANG_OVERRIDE
     {
         m_module->addFilePathDependency(path);
-        m_module->getContentsDigestBuilder().addToDigest(sourceBlob);
+        if (sourceBlob)
+        {
+            m_module->getContentsDigestBuilder().addToDigest(sourceBlob);
+        }
     }
 
     // The second task that this handler deals with is detecting
@@ -3043,7 +3046,9 @@ RefPtr<Module> Linkage::loadModule(
         return nullptr;
     }
 
-    module->setContentsDigest(module->getContentsDigestBuilder().finalize());
+    auto builder = module->getContentsDigestBuilder();
+    builder.addToDigest(sourceBlob);
+    module->setContentsDigest(builder.finalize());
 
     return module;
 }
