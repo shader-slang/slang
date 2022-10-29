@@ -3042,6 +3042,10 @@ RefPtr<Module> Linkage::loadModule(
         return nullptr;
     }
 
+    DigestBuilder builder;
+    builder.addToDigest(sourceBlob);
+    module->setContentsDigest(builder.finalize());
+
     return module;
 }
 
@@ -3261,12 +3265,7 @@ void Module::updateDependencyBasedHash(
 
 void Module::updateContentsBasedHash(DigestBuilder& builder)
 {
-    for (auto file : getFilePathDependencyList())
-    {
-        List<uint8_t> fileContents;
-        File::readAllBytes(file, fileContents);
-        builder.addToDigest(fileContents);
-    }
+    builder.addToDigest(getContentsDigest());
 }
 
 void Module::addModuleDependency(Module* module)
