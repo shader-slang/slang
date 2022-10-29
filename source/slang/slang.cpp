@@ -2285,8 +2285,6 @@ void FrontEndCompileRequest::parseTranslationUnit(
             getSink(),
             languageScope);
 
-        module->getContentsDigestBuilder().addToDigest(sourceFile->getContent());
-
         // Let's try dumping
 
         if (shouldDumpAST)
