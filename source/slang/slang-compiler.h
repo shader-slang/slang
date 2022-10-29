@@ -1366,6 +1366,8 @@ namespace Slang
             ///
         void setIRModule(IRModule* irModule) { m_irModule = irModule; }
 
+        DigestBuilder& getContentsDigestBuilder() { return contentsBuilder; }
+
             /// Set the contents digest for this module.
         void setContentsDigest(slang::Digest digest) { contentsDigest = digest; }
 
@@ -1481,6 +1483,7 @@ namespace Slang
         StringSlicePool m_mangledExportPool;
         List<NodeBase*> m_mangledExportSymbols;
 
+        DigestBuilder contentsBuilder;
         slang::Digest contentsDigest;
     };
     typedef Module LoadedModule;

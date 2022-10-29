@@ -1898,9 +1898,10 @@ protected:
     // by applications to decide when they need to "hot reload"
     // their shader code.
     //
-    void handleFileDependency(String const& path) SLANG_OVERRIDE
+    void handleFileDependency(String const& path, ISlangBlob* sourceBlob) SLANG_OVERRIDE
     {
         m_module->addFilePathDependency(path);
+        m_module->getContentsDigestBuilder().addToDigest(sourceBlob);
     }
 
     // The second task that this handler deals with is detecting
@@ -2283,6 +2284,8 @@ void FrontEndCompileRequest::parseTranslationUnit(
             tokens,
             getSink(),
             languageScope);
+
+        module->getContentsDigestBuilder().addToDigest(sourceFile->getContent());
 
         // Let's try dumping
 
@@ -3042,9 +3045,7 @@ RefPtr<Module> Linkage::loadModule(
         return nullptr;
     }
 
-    DigestBuilder builder;
-    builder.addToDigest(sourceBlob);
-    module->setContentsDigest(builder.finalize());
+    module->setContentsDigest(module->getContentsDigestBuilder().finalize());
 
     return module;
 }
