@@ -274,7 +274,7 @@ namespace Slang
         };
 
             /// Mapping from types to subtype witnesses for conformance to IDifferentiable.
-        Dictionary<DeclRefTypeKey, SubtypeWitness*>   m_mapTypeToIDifferentiableWitness;
+        OrderedDictionary<DeclRefTypeKey, SubtypeWitness*>   m_mapTypeToIDifferentiableWitness;
         
             /// List of external dictionaries (from imported modules)
         List<DeclRef<DifferentiableTypeDictionary>> m_importedDictionaries;
@@ -630,6 +630,10 @@ namespace Slang
             Expr*    base,
             SourceLoc       loc);
 
+        Expr* maybeUseSynthesizedDeclForLookupResult(
+            LookupResultItem const& item,
+            Expr* orignalExpr);
+
         Expr* ConstructLookupResultExpr(
             LookupResultItem const& item,
             Expr*            baseExpr,
@@ -804,7 +808,9 @@ namespace Slang
         void maybeRegisterDifferentiableType(ASTBuilder* builder, Type* type);
 
         // Construct the differential for 'type', if it exists.
-        Type* _getDifferential(ASTBuilder* builder, Type* type);
+        Type* getDifferentialType(ASTBuilder* builder, Type* type, SourceLoc loc);
+        Type* tryGetDifferentialType(ASTBuilder* builder, Type* type);
+
         
     public:
 
@@ -1063,6 +1069,12 @@ namespace Slang
             Dictionary<DeclRef<InterfaceDecl>, RefPtr<WitnessTable>>    mapInterfaceToWitnessTable;
         };
 
+        FuncDecl* synthesizeMethodSignatureForRequirementWitness(
+            ConformanceCheckingContext* context,
+            DeclRef<FuncDecl> requiredMemberDeclRef,
+            List<Expr*>& synArgs,
+            ThisExpr*& synThis);
+
             /// Attempt to synthesize a method that can satisfy `requiredMemberDeclRef` using `lookupResult`.
             ///
             /// On success, installs the syntethesized method in `witnessTable` and returns `true`.
@@ -1093,6 +1105,27 @@ namespace Slang
             LookupResult const&         lookupResult,
             DeclRef<Decl>               requiredMemberDeclRef,
             RefPtr<WitnessTable>        witnessTable);
+
+            /// Attempt to synthesize `zero`, `dadd` and `dmul` methods for a type that conforms to
+            /// `IDifferentiable`.
+            /// On success, installs the syntethesized functions and returns `true`.
+            /// Otherwise, returns `false`.
+        bool trySynthesizeDifferentialMethodRequirementWitness(
+            ConformanceCheckingContext* context,
+            DeclRef<Decl> requirementDeclRef,
+            RefPtr<WitnessTable> witnessTable);
+
+            /// Attempt to synthesize an associated `Differential` type for a type that conforms to
+            /// `IDifferentiable`.
+            ///
+            /// On success, installs the syntethesized type in `witnessTable`, injects `[DerivativeMember]`
+            /// modifiers on differentiable fields to point to the corresponding field in the synthesized
+            /// differential type, and returns `true`.
+            /// Otherwise, returns `false`.
+        bool trySynthesizeDifferentialAssociatedTypeRequirementWitness(
+            ConformanceCheckingContext* context,
+            DeclRef<Decl> requirementDeclRef,
+            RefPtr<WitnessTable> witnessTable);
 
             /// Registers a type as differentiable in the currrent semantic context, if the declaration represents
             /// a subtype of IDifferentable. Does nothing otherwise.
@@ -1809,8 +1842,8 @@ namespace Slang
 
         Expr* CheckExpr(Expr* expr);
 
-        Expr* CheckInvokeExprWithCheckedOperands(InvokeExpr *expr);
 
+        Expr* CheckInvokeExprWithCheckedOperands(InvokeExpr *expr);
         // Get the type to use when referencing a declaration
         QualType GetTypeForDeclRef(DeclRef<Decl> declRef, SourceLoc loc);
 
@@ -1954,7 +1987,7 @@ namespace Slang
         Expr* visitPointerTypeExpr(PointerTypeExpr* expr);
         Expr* visitModifiedTypeExpr(ModifiedTypeExpr* expr);
 
-        Expr* visitJVPDifferentiateExpr(JVPDifferentiateExpr* expr);
+        Expr* visitForwardDifferentiateExpr(ForwardDifferentiateExpr* expr);
 
             /// Perform semantic checking on a `modifier` that is being applied to the given `type`
         Val* checkTypeModifier(Modifier* modifier, Type* type);

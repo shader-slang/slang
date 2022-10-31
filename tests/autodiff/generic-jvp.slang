@@ -14,27 +14,32 @@ struct myvector
 
 extension myvector<3> : MyLinearArithmeticType
 {
-    static __differentiate_jvp myvector<3> ladd(myvector<3> a, myvector<3> b)
+    [ForwardDifferentiable]
+    static myvector<3> ladd(myvector<3> a, myvector<3> b)
     {
         return myvector<3>(a.val + b.val);
     }
 
-    static __differentiate_jvp myvector<3> lmul(myvector<3> a, myvector<3> b)
+    [ForwardDifferentiable]
+    static myvector<3> lmul(myvector<3> a, myvector<3> b)
     {
         return myvector<3>(a.val * b.val);
     }
 
-    static __differentiate_jvp myvector<3> lscale(float a, myvector<3> b)
+    [ForwardDifferentiable]
+    static myvector<3> lscale(float a, myvector<3> b)
     {
         return myvector<3>(a * b.val);
     }
 
-    static __differentiate_jvp float ldot(myvector<3> a, myvector<3> b)
+    [ForwardDifferentiable]
+    static float ldot(myvector<3> a, myvector<3> b)
     {
         return dot(a.val, b.val);
     }
 
-    __differentiate_jvp __init(vector<Real, 3> a)
+    [ForwardDifferentiable]
+__init(vector<Real, 3> a)
     {
         val = a;
     }
@@ -43,27 +48,32 @@ extension myvector<3> : MyLinearArithmeticType
 
 extension myvector<4> : MyLinearArithmeticType
 {
-    static __differentiate_jvp myvector<4> ladd(myvector<4> a, myvector<4> b)
+    [ForwardDifferentiable]
+    static myvector<4> ladd(myvector<4> a, myvector<4> b)
     {
         return myvector<4>(a.val + b.val);
     }
 
-    static __differentiate_jvp myvector<4> lmul(myvector<4> a, myvector<4> b)
+    [ForwardDifferentiable]
+    static myvector<4> lmul(myvector<4> a, myvector<4> b)
     {
         return myvector<4>(a.val * b.val);
     }
 
-    static __differentiate_jvp myvector<4> lscale(float a, myvector<4> b)
+    [ForwardDifferentiable]
+    static myvector<4> lscale(float a, myvector<4> b)
     {
         return myvector<4>(a * b.val);
     }
 
-    static __differentiate_jvp float ldot(myvector<4> a, myvector<4> b)
+    [ForwardDifferentiable]
+    static float ldot(myvector<4> a, myvector<4> b)
     {
         return dot(a.val, b.val);
     }
 
-    __differentiate_jvp __init(vector<Real, 4> a)
+    [ForwardDifferentiable]
+    __init(vector<Real, 4> a)
     {
         val = a;
     }
@@ -90,17 +100,19 @@ extension myfloat3 : IDifferentiable
     [DerivativeMember(Differential.val)]
     extern vector<Real, 3> val;
 
-    static Differential zero()
+    static Differential dzero()
     {
         return myfloat3(0);
     }
 
-    static __differentiate_jvp Differential dadd(Differential a, Differential b)
+    [ForwardDifferentiable]
+    static Differential dadd(Differential a, Differential b)
     {
         return a + b;
     }
 
-    static __differentiate_jvp Differential dmul(Differential a, Differential b)
+    [ForwardDifferentiable]
+    static Differential dmul(Differential a, Differential b)
     {
         return a * b;
     }
@@ -114,17 +126,19 @@ extension myfloat4 : IDifferentiable
     [DerivativeMember(Differential.val)]
     extern vector<Real, 4> val;
 
-    static Differential zero()
+    static Differential dzero()
     {
         return myfloat4(0);
     }
 
-    static __differentiate_jvp Differential dadd(Differential a, Differential b)
+    [ForwardDifferentiable]
+    static Differential dadd(Differential a, Differential b)
     {
         return a + b;
     }
 
-    static __differentiate_jvp Differential dmul(Differential a, Differential b)
+    [ForwardDifferentiable]
+    static Differential dmul(Differential a, Differential b)
     {
         return a * b;
     }
@@ -135,22 +149,26 @@ typedef __DifferentialPair<myfloat3> dpfloat3;
 
 extension float : MyLinearArithmeticType
 {
-    static __differentiate_jvp float ladd(float a, float b)
+    [ForwardDifferentiable]
+    static float ladd(float a, float b)
     {
         return a + b;
     }
 
-    static __differentiate_jvp float lmul(float a, float b)
+    [ForwardDifferentiable]
+    static float lmul(float a, float b)
     {
         return a * b;
     }
 
-    static __differentiate_jvp float lscale(float a, float b)
+    [ForwardDifferentiable]
+    static float lscale(float a, float b)
     {
         return a * b;
     }
-
-    static __differentiate_jvp float ldot(float a, float b)
+    
+    [ForwardDifferentiable]
+    static float ldot(float a, float b)
     {
         return a * b;
     }
@@ -159,19 +177,22 @@ extension float : MyLinearArithmeticType
 typealias MyLinearArithmeticDifferentiableType = IDifferentiable & MyLinearArithmeticType;
 
 __generic<T : MyLinearArithmeticDifferentiableType>
-__differentiate_jvp T operator +(T a, T b)
+[ForwardDifferentiable]
+T operator +(T a, T b)
 {
     return T.ladd(a, b);
 }
 
 __generic<T : MyLinearArithmeticDifferentiableType>
-__differentiate_jvp T operator *(T a, T b)
+[ForwardDifferentiable]
+T operator *(T a, T b)
 {
     return T.lmul(a, b);
 }
 
 __generic<G : MyLinearArithmeticDifferentiableType>
-__differentiate_jvp G f(G x)
+[ForwardDifferentiable]
+G f(G x)
 {
     G a = x + x;
     G b = x * x;
@@ -189,8 +210,8 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
         dpfloat3 dpf3 = dpfloat3(myfloat3(float3(1.0, 3.0, 5.0)), myfloat3(float3(0.5, 1.5, 2.5)));
 
         outputBuffer[0] = f(dpa.p());                       // Expect: 22.0
-        outputBuffer[1] = __jvp(f)(dpfloat(2.0, 0.5)).d();  // Expect: 9.5
-        outputBuffer[2] = __jvp(f)(dpf4).d().val.w;         // Expect: 27.5
-        outputBuffer[3] = __jvp(f)(dpf3).d().val.y;         // Expect: 40.5
+        outputBuffer[1] = __fwd_diff(f)(dpfloat(2.0, 0.5)).d();  // Expect: 9.5
+        outputBuffer[2] = __fwd_diff(f)(dpf4).d().val.w;         // Expect: 27.5
+        outputBuffer[3] = __fwd_diff(f)(dpf3).d().val.y;         // Expect: 40.5
     }
 }

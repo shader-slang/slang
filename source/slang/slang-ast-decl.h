@@ -35,12 +35,27 @@ class ContainerDecl: public Decl
         return FilteredMemberList<T>(members);
     }
 
+    void buildMemberDictionary();
+
     bool isMemberDictionaryValid() const { return dictionaryLastCount == members.getCount(); }
 
     void invalidateMemberDictionary() { dictionaryLastCount = -1; }
 
+    Dictionary<Name*, Decl*>& getMemberDictionary()
+    {
+        buildMemberDictionary();
+        return memberDictionary;
+    }
+
+    List<TransparentMemberInfo>& getTransparentMembers()
+    {
+        buildMemberDictionary();
+        return transparentMembers;
+    }
+
     SLANG_UNREFLECTED   // We don't want to reflect the following fields
 
+private:
     // Denotes how much of Members has been placed into the dictionary/transparentMembers.
     // If this value equals the Members.getCount(), the dictionary is completely full and valid.
     // If it's >= 0, then the Members after dictionaryLastCount are all that need to be added.

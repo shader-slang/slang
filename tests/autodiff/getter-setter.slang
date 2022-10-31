@@ -18,7 +18,7 @@ struct A : IDifferentiable
     float y;
 
     [__unsafeForceInlineEarly]
-    static Differential zero()
+    static Differential dzero()
     {
         B b = {0.0};
         return b;
@@ -41,7 +41,8 @@ struct A : IDifferentiable
 
 typedef __DifferentialPair<A> dpA;
 
-__differentiate_jvp A f(A a)
+[ForwardDifferentiable]
+A f(A a)
 {
     A aout;
     aout.y = 2 * a.x;
@@ -59,6 +60,6 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 
         dpA dpa = dpA(a, b);
 
-        outputBuffer[0] = __jvp(f)(dpa).d().z;                    // Expect: 1
+        outputBuffer[0] = __fwd_diff(f)(dpa).d().z;                    // Expect: 1
     }
 }

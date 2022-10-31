@@ -34,8 +34,8 @@ struct DerivativeCallProcessContext
                     do 
                     {
                         auto nextChild = child->getNextInst();
-                        // Look for IRJVPDifferentiate
-                        if (auto derivOf = as<IRJVPDifferentiate>(child))
+                        // Look for IRForwardDifferentiate
+                        if (auto derivOf = as<IRForwardDifferentiate>(child))
                         {
                             processDifferentiate(derivOf);
                         }
@@ -50,50 +50,39 @@ struct DerivativeCallProcessContext
 
     // Perform forward-mode automatic differentiation on 
     // the intstructions.
-    void processDifferentiate(IRJVPDifferentiate* derivOfInst)
+    void processDifferentiate(IRForwardDifferentiate* derivOfInst)
     {
         IRInst* jvpCallable = nullptr;
 
         // First get base function 
         auto origCallable = derivOfInst->getBaseFn();
 
-        IRSpecialize* specialization = nullptr;
-
-        // If the base is a specialize inst, get the inner fn.
+        // Resolve the derivative function for IRForwardDifferentiate(IRSpecialize(IRFunc))
+        // Check the specialize inst for a reference to the derivative fn.
+        // 
         if (auto origSpecialize = as<IRSpecialize>(origCallable))
         {
-            specialization = origSpecialize;
-            origCallable = origSpecialize->getBase();
+            if (auto jvpSpecRefDecorator = origSpecialize->findDecoration<IRForwardDerivativeDecoration>())
+            {
+                jvpCallable = jvpSpecRefDecorator->getForwardDerivativeFunc();
+            }
         }
 
-        // We should have either a generic or a function reference on our hands.
-        SLANG_ASSERT(as<IRGeneric>(origCallable) || as<IRFunc>(origCallable));
-
-        // Resolve the derivative function.
+        // Resolve the derivative function for an IRForwardDifferentiate(IRFunc)
         //
         // Check for the 'JVPDerivativeReference' decorator on the
         // base function.
-        if (auto jvpRefDecorator = origCallable->findDecoration<IRJVPDerivativeReferenceDecoration>())
+        //
+        if (auto jvpRefDecorator = origCallable->findDecoration<IRForwardDerivativeDecoration>())
         {
-            jvpCallable = jvpRefDecorator->getJVPFunc();
+            jvpCallable = jvpRefDecorator->getForwardDerivativeFunc();
         }
 
         SLANG_ASSERT(jvpCallable);
 
-        if (specialization)
-        {
-            // Replace the specialization target with the JVP func.
-            specialization->setOperand(0, jvpCallable);
-
-            // Then replace the JVPDifferentiate inst with the specialization.
-            derivOfInst->replaceUsesWith(specialization);
-        }
-        else
-        {
-            // Substitute all uses of the 'derivativeOf' operation 
-            // with the resolved derivative function.
-            derivOfInst->replaceUsesWith(jvpCallable);
-        }
+        // Substitute all uses of the 'derivativeOf' operation 
+        // with the resolved derivative function.
+        derivOfInst->replaceUsesWith(jvpCallable);
 
         // Remove the 'derivativeOf' inst.
         derivOfInst->removeAndDeallocate();

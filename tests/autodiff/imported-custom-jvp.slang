@@ -8,7 +8,8 @@ import test_intrinsics_jvp;
 typedef __DifferentialPair<float> dpfloat;
 typedef float.Differential dfloat;
 
-__differentiate_jvp float f(float x)
+[ForwardDifferentiable]
+float f(float x)
 {
     return pow_(x, 2.0);
 }
@@ -20,6 +21,6 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
         dpfloat dpa = dpfloat(2.0, 1.0);
         dpfloat dpb = dpfloat(1.5, 1.0);
 
-        outputBuffer[0] = __jvp(f)(dpa).d();                      // Expect: 2
+        outputBuffer[0] = __fwd_diff(f)(dpa).d();                      // Expect: 2
     }
 }

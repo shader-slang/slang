@@ -30,7 +30,13 @@ class ExportedModifier : public Modifier { SLANG_AST_CLASS(ExportedModifier)};
 class ConstExprModifier : public Modifier { SLANG_AST_CLASS(ConstExprModifier)};
 class GloballyCoherentModifier : public Modifier { SLANG_AST_CLASS(GloballyCoherentModifier)};
 class ExternCppModifier : public Modifier { SLANG_AST_CLASS(ExternCppModifier)};
-class JVPDerivativeModifier : public Modifier { SLANG_AST_CLASS(JVPDerivativeModifier)};
+
+
+// Marks that the definition of a decl is not yet synthesized.
+class ToBeSynthesizedModifier : public Modifier {SLANG_AST_CLASS(ToBeSynthesizedModifier)};
+
+// Marks that the definition of a decl is synthesized.
+class SynthesizedModifier : public Modifier { SLANG_AST_CLASS(SynthesizedModifier) };
 
 // An `extern` variable in an extension is used to introduce additional attributes on an existing
 // field.
@@ -584,6 +590,14 @@ class Attribute : public AttributeBase
     AttributeArgumentValueDict intArgVals;
 };
 
+// A modifier that indicates a built-in associated type requirement (e.g., `Differential`)
+class BuiltinRequirementAttribute : public Attribute
+{
+    SLANG_AST_CLASS(BuiltinRequirementAttribute);
+
+    BuiltinRequirementKind kind;
+};
+
 class UserDefinedAttribute : public Attribute 
 {
     SLANG_AST_CLASS(UserDefinedAttribute)
@@ -1001,11 +1015,17 @@ class RequiresNVAPIAttribute : public Attribute
     SLANG_AST_CLASS(RequiresNVAPIAttribute)
 };
 
-    /// The `[__custom_jvp(function)]` attribute specifies a custom function that should
-    /// be used as the derivative for the decorated function.
-class CustomJVPAttribute : public Attribute 
+    /// The `[ForwardDifferentiable]` attribute indicates that a function can be forward-differentiated.
+class ForwardDifferentiableAttribute : public Attribute
 {
-    SLANG_AST_CLASS(CustomJVPAttribute)
+    SLANG_AST_CLASS(ForwardDifferentiableAttribute)
+};
+
+    /// The `[ForwardDerivative(function)]` attribute specifies a custom function that should
+    /// be used as the derivative for the decorated function.
+class ForwardDerivativeAttribute : public Attribute 
+{
+    SLANG_AST_CLASS(ForwardDerivativeAttribute)
 
     DeclRefExpr* funcDeclRef;
 };

@@ -6,7 +6,8 @@ RWStructuredBuffer<float> outputBuffer;
 
 typedef __DifferentialPair<float> dpfloat;
 
-__differentiate_jvp void h(float x, float y, out float result)
+[ForwardDifferentiable]
+void h(float x, float y, out float result)
 {
     float m = x + y;
     float n = x - y;
@@ -23,7 +24,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     float dy = 0.5;
 
     dpfloat dresult;
-    __jvp(h)(dpfloat(x, dx), dpfloat(y, dy), dresult);
+    __fwd_diff(h)(dpfloat(x, dx), dpfloat(y, dy), dresult);
 
     outputBuffer[0] = dresult.d(); // Expect: 9.5
 

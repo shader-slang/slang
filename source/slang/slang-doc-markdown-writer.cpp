@@ -667,13 +667,10 @@ static bool _isFirstOverridden(Decl* decl)
 
     ContainerDecl* parentDecl = decl->parentDecl;
 
-    // Make sure we have the member dictionary.
-    buildMemberDictionary(parentDecl);
-
     Name* declName = decl->getName();
     if (declName)
     {
-        Decl** firstDeclPtr = parentDecl->memberDictionary.TryGetValue(declName);
+        Decl** firstDeclPtr = parentDecl->getMemberDictionary().TryGetValue(declName);
         return (firstDeclPtr && *firstDeclPtr == decl) || (firstDeclPtr == nullptr);
     }
 
@@ -1061,11 +1058,10 @@ void DocMarkdownWriter::writeAggType(const ASTMarkup::Entry& entry, AggTypeDeclB
 
     {
         // Make sure we've got a query-able member dictionary
-        buildMemberDictionary(aggTypeDecl);
-        SLANG_ASSERT(aggTypeDecl->isMemberDictionaryValid());
+        auto& memberDict = aggTypeDecl->getMemberDictionary();
 
         List<Decl*> uniqueMethods;
-        for (const auto& pair : aggTypeDecl->memberDictionary)
+        for (const auto& pair : memberDict)
         {
             CallableDecl* callableDecl = as<CallableDecl>(pair.Value);
             if (callableDecl && isVisible(callableDecl))

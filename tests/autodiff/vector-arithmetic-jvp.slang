@@ -8,26 +8,30 @@ typedef __DifferentialPair<float2> dpfloat2;
 typedef __DifferentialPair<float3> dpfloat3;
 typedef __DifferentialPair<float4> dpfloat4;
 
-__differentiate_jvp float3 f(float3 x)
+[ForwardDifferentiable]
+float3 f(float3 x)
 {
     return x;
 }
 
-__differentiate_jvp float3 g(float3 x, float3 y)
+[ForwardDifferentiable]
+float3 g(float3 x, float3 y)
 {
     float3 a = x + y;
     float3 b = x - y;
     return a * b + 2 * x * y;
 }
 
-__differentiate_jvp float2 h(float2 x, float2 y)
+[ForwardDifferentiable]
+float2 h(float2 x, float2 y)
 {
     float2 a = x + y;
     float2 b = x - y;
     return a * b + 2 * x * y;
 }
 
-__differentiate_jvp float4 j(float4 x, float4 y)
+[ForwardDifferentiable]
+float4 j(float4 x, float4 y)
 {
     float4 a = x + y;
     float4 b = x - y;
@@ -48,17 +52,17 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
         float4 a4 = float4(2.0, 1.0, 0.0, 2.0);
         float4 b4 = float4(1.5, -2.0, 1.0, 1.5);
 
-        outputBuffer[0] = __jvp(f)(dpfloat3(a, da)).d().z;    // Expect: 1
+        outputBuffer[0] = __fwd_diff(f)(dpfloat3(a, da)).d().z;    // Expect: 1
 
-        outputBuffer[1] = __jvp(g)(
+        outputBuffer[1] = __fwd_diff(g)(
             dpfloat3(a, da),
             dpfloat3(b, float3(2.0, 1.0, 0.0))).d().y;        // Expect: 8
 
-        outputBuffer[2] = __jvp(h)(
+        outputBuffer[2] = __fwd_diff(h)(
             dpfloat2(a2, float2(1.0, 0.0)),
             dpfloat2(b2, float2(1.0, 1.0))).d().x;            // Expect: 8
 
-        outputBuffer[3] = __jvp(j)(
+        outputBuffer[3] = __fwd_diff(j)(
             dpfloat4(a4, float4(1.0)),
             dpfloat4(b4, float4(2.0))).d().w;                 // Expect: 9
     }

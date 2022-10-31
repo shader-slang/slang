@@ -1424,7 +1424,7 @@ namespace Slang
         Val*                m_val = nullptr;
     };
 
-    typedef Dictionary<Decl*, RequirementWitness> RequirementDictionary;
+    typedef OrderedDictionary<Decl*, RequirementWitness> RequirementDictionary;
 
     struct WitnessTable : SerialRefObject
     {
@@ -1488,6 +1488,15 @@ namespace Slang
         kParameterDirection_Out,    ///< Copy out
         kParameterDirection_InOut,  ///< Copy in, copy out
         kParameterDirection_Ref,    ///< By-reference
+    };
+
+    /// The kind of a builtin interface requirement that can be automatically synthesized.
+    enum class BuiltinRequirementKind
+    {
+        DifferentialType, ///< The `IDifferentiable.Differential` associated type requirement 
+        DZeroFunc, ///< The `IDifferentiable.dzero` function requirement 
+        DAddFunc, ///< The `IDifferentiable.dadd` function requirement 
+        DMulFunc, ///< The `IDifferentiable.dmul` function requirement 
     };
 
 } // namespace Slang

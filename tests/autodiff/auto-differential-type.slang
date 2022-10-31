@@ -1,42 +1,34 @@
+// Tests automatic synthesis of Differential type requirement.
+
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj -output-using-type
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj -output-using-type
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
 
-struct B
-{
-    float3 z;
-    float.Differential k[10];
-};
-
 struct A : IDifferentiable
 {
-    typedef B Differential;
-
-    [DerivativeMember(B.z)]
-    float3 x;
-    [DerivativeMember(B.k)]
-    float y[10];
+    float x;
+    float y;
 
     [__unsafeForceInlineEarly]
     static Differential dzero()
     {
-        B b = {0.0};
+        Differential b = {0.0, float.dzero()};
         return b;
     }
 
     [__unsafeForceInlineEarly]
     static Differential dadd(Differential a, Differential b)
     {
-        B o = {a.z + b.z};
+        Differential o = {a.x + b.x, 0.0};
         return o;
     }
 
     [__unsafeForceInlineEarly]
     static Differential dmul(This a, Differential b)
     {
-        B o = {a.x * b.z};
+        Differential o = {a.x * b.x, 0.0};
         return o;
     }
 };
@@ -47,10 +39,8 @@ typedef __DifferentialPair<A> dpA;
 A f(A a)
 {
     A aout;
-
-    aout.y[5] = (2 * a.x).y;
-    aout.y[2] = (3 * a.y[4]);
-    aout.x = float3(5 * a.x.z, 3 * a.x.y, 0.5 * a.x.x);
+    aout.y = 2 * a.x;
+    aout.x = 5 * a.x;
 
     return aout;
 }
@@ -59,16 +49,11 @@ A f(A a)
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
     {
-        float arr[10] = { 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0 };
-        A a = {float3(1.0, 2.0, 3.0), arr};
-
-        float d_arr[10] = { 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0 };
-        B b = {float3(1.0, 0.5, 0.3), d_arr};
+        A a = {1.0, 2.0};
+        A.Differential b = {0.2};
 
         dpA dpa = dpA(a, b);
 
-        outputBuffer[0] = __fwd_diff(f)(dpa).d().z.z;  // Expect: 0.5
-        outputBuffer[1] = __fwd_diff(f)(dpa).d().k[5]; // Expect: 1
-        outputBuffer[2] = __fwd_diff(f)(dpa).d().k[2]; // Expect: 1.5
+        outputBuffer[0] = __fwd_diff(f)(dpa).d().x;                    // Expect: 1
     }
 }

@@ -292,7 +292,7 @@ namespace Slang
 
     bool SemanticsVisitor::validateAttribute(Attribute* attr, AttributeDecl* attribClassDecl, ModifiableSyntaxNode* attrTarget)
     {
-        if(auto numThreadsAttr = as<NumThreadsAttribute>(attr))
+        if (auto numThreadsAttr = as<NumThreadsAttribute>(attr))
         {
             SLANG_ASSERT(attr->args.getCount() == 3);
 
@@ -320,9 +320,9 @@ namespace Slang
                 values[i] = value;
             }
 
-            numThreadsAttr->x          = values[0];
-            numThreadsAttr->y          = values[1];
-            numThreadsAttr->z          = values[2]; 
+            numThreadsAttr->x = values[0];
+            numThreadsAttr->y = values[1];
+            numThreadsAttr->z = values[2];
         }
         else if (auto anyValueSizeAttr = as<AnyValueSizeAttribute>(attr))
         {
@@ -368,7 +368,7 @@ namespace Slang
             {
                 return false;
             }
-                    
+
             bindingAttr->binding = int32_t(binding->value);
             bindingAttr->set = int32_t(set->value);
         }
@@ -395,31 +395,31 @@ namespace Slang
             SLANG_ASSERT(attr->args.getCount() == 1);
             auto val = checkConstantIntVal(attr->args[0]);
 
-            if(!val) return false;
+            if (!val) return false;
 
             maxVertexCountAttr->value = (int32_t)val->value;
         }
-        else if(auto instanceAttr = as<InstanceAttribute>(attr))
+        else if (auto instanceAttr = as<InstanceAttribute>(attr))
         {
             SLANG_ASSERT(attr->args.getCount() == 1);
             auto val = checkConstantIntVal(attr->args[0]);
 
-            if(!val) return false;
+            if (!val) return false;
 
             instanceAttr->value = (int32_t)val->value;
         }
-        else if(auto entryPointAttr = as<EntryPointAttribute>(attr))
+        else if (auto entryPointAttr = as<EntryPointAttribute>(attr))
         {
             SLANG_ASSERT(attr->args.getCount() == 1);
 
             String stageName;
-            if(!checkLiteralStringVal(attr->args[0], &stageName))
+            if (!checkLiteralStringVal(attr->args[0], &stageName))
             {
                 return false;
             }
 
             auto stage = findStageByName(stageName);
-            if(stage == Stage::Unknown)
+            if (stage == Stage::Unknown)
             {
                 getSink()->diagnose(attr->args[0], Diagnostics::unknownStageName, stageName);
             }
@@ -427,10 +427,10 @@ namespace Slang
             entryPointAttr->stage = stage;
         }
         else if ((as<DomainAttribute>(attr)) ||
-                    (as<MaxTessFactorAttribute>(attr)) ||
-                    (as<OutputTopologyAttribute>(attr)) ||
-                    (as<PartitioningAttribute>(attr)) ||
-                    (as<PatchConstantFuncAttribute>(attr)))
+            (as<MaxTessFactorAttribute>(attr)) ||
+            (as<OutputTopologyAttribute>(attr)) ||
+            (as<PartitioningAttribute>(attr)) ||
+            (as<PatchConstantFuncAttribute>(attr)))
         {
             // Let it go thru iff single string attribute
             if (!hasStringArgs(attr, 1))
@@ -439,7 +439,7 @@ namespace Slang
             }
         }
         else if (as<OutputControlPointsAttribute>(attr) ||
-                    as<SPIRVInstructionOpAttribute>(attr))
+            as<SPIRVInstructionOpAttribute>(attr))
         {
             // Let it go thru iff single integral attribute
             if (!hasIntArgs(attr, 1))
@@ -481,6 +481,27 @@ namespace Slang
             if (!getAttributeTargetSyntaxClasses(attrUsageAttr->targetSyntaxClass, targetClassId))
             {
                 getSink()->diagnose(attr, Diagnostics::invalidAttributeTarget);
+                return false;
+            }
+        }
+        else if (auto builtinAssocTypeAttr = as<BuiltinRequirementAttribute>(attr))
+        {
+            if (attr->args.getCount() == 1)
+            {
+                //IntVal* outIntVal;
+                if (auto cInt = checkConstantEnumVal(attr->args[0]))
+                {
+                    builtinAssocTypeAttr->kind = (BuiltinRequirementKind)(cInt->value);
+                }
+                else
+                {
+                    getSink()->diagnose(attr, Diagnostics::expectedSingleIntArg, attr->keywordName);
+                    return false;
+                }
+            }
+            else
+            {
+                getSink()->diagnose(attr, Diagnostics::expectedSingleIntArg, attr->keywordName);
                 return false;
             }
         }
@@ -604,16 +625,105 @@ namespace Slang
 
             callablePayloadAttr->location = (int32_t)val->value;
         }
-        else if (auto customJVPAttr = as<CustomJVPAttribute>(attr))
+        else if (auto forwardDerivativeAttr = as<ForwardDerivativeAttribute>(attr))
         {
             SLANG_ASSERT(attr->args.getCount() == 1);
-            
-            // Ensure that the argument is a reference to a function definition or declaration.
-            auto funcExpr = as<DeclRefExpr>(CheckTerm(attr->args[0]));
-            if (!as<FuncType>(funcExpr->type))
-                return false;
+            SLANG_ASSERT(as<Decl>(attrTarget));
 
-            customJVPAttr->funcDeclRef = funcExpr;
+            // Ensure that the argument is a reference to a function definition or declaration.
+            auto diffExpr = CheckTerm(attr->args[0]);
+            if (diffExpr->type == getASTBuilder()->getErrorType())
+            {
+                // Could not resolve the term.
+                getSink()->diagnose(diffExpr, Slang::Diagnostics::invalidCustomDerivative, as<Decl>(attrTarget));
+                return false;
+            }
+
+            // Either diffExpr has a function type, or it is a reference to a generic.
+            if (!as<FuncType>(diffExpr->type) && 
+                    !(as<DeclRefExpr>(diffExpr) && 
+                      as<DeclRefExpr>(diffExpr)->declRef.as<GenericDecl>().getDecl() != nullptr))
+            {
+                return false;
+            }
+
+            auto diffDeclRef = as<DeclRefExpr>(diffExpr)->declRef;
+
+            UCount genericLevels = 0;
+            // If we've grabbed the outer generic for some reason,
+            // recursively construct GenericAppExpr<...>(generic)
+            // and check that to get a specialized func.
+            // 
+            while (diffDeclRef.as<GenericDecl>().getDecl() != nullptr)
+            {
+                // Forward to the inner decl
+                diffDeclRef = makeDeclRef(diffDeclRef.as<GenericDecl>().getDecl()->inner);
+
+                // Increment counter.
+                genericLevels += 1;
+            }
+
+            auto targetGeneric = as<GenericDecl>(as<Decl>(attrTarget)->parentDecl);
+            auto diffGeneric = as<GenericDecl>(diffDeclRef.getDecl()->parentDecl);
+            Expr* currentDiffExpr = diffExpr;
+
+            // Go back through each level, and use generic declarations in the
+            // target's generic scope as arguments for the diff function's generic.
+            // 
+            for (UIndex ii = 0; ii < genericLevels; ii++)
+            {
+                // Nest our expression inside a GenericAppExpr
+                auto genericAppExpr = getASTBuilder()->create<GenericAppExpr>();
+                genericAppExpr->functionExpr = currentDiffExpr;
+
+                // Construct references to the generic args in the current scope.
+                // TODO: Probably an easier way to do this.
+                for (auto member : targetGeneric->members)
+                {
+                    if (auto typeParamDecl = as<GenericTypeParamDecl>(member))
+                    {
+                        genericAppExpr->arguments.add(
+                            ConstructDeclRefExpr(makeDeclRef(typeParamDecl), nullptr, typeParamDecl->loc, nullptr));
+                    }
+                    else if (auto valueParamDecl = as<GenericValueParamDecl>(member))
+                    {
+                        genericAppExpr->arguments.add(
+                            ConstructDeclRefExpr(makeDeclRef(valueParamDecl), nullptr, valueParamDecl->loc, nullptr));
+                    }
+                }
+
+                // Set our generic-app-expr as the new expr.
+                currentDiffExpr = genericAppExpr;
+
+                // Peel the generic layer.
+                diffGeneric = as<GenericDecl>(diffGeneric->parentDecl);
+                targetGeneric = as<GenericDecl>(targetGeneric->parentDecl);
+            }
+
+            if ((diffGeneric == nullptr && targetGeneric != nullptr) || 
+                (targetGeneric == nullptr && diffGeneric != nullptr))
+            {
+                //getSink()->diagnose(diffDeclRef, Slang::Diagnostics::customDerivativeGenericSignatureMismatch, diffDeclRef, attrTarget);
+                SLANG_UNEXPECTED("");
+            }
+            
+            // If we had to change currentDiffExpr, then re-check the expr.
+            if (!currentDiffExpr->type)
+            {
+                currentDiffExpr = CheckTerm(currentDiffExpr);
+            }
+
+            // Ensure that the argument is a reference to a function definition or declaration.
+            auto currentDiffDeclRefExpr = as<DeclRefExpr>(currentDiffExpr);
+            auto currentDiffDeclRef = currentDiffDeclRefExpr->declRef;
+
+            if (!as<FuncType>(GetTypeForDeclRef(currentDiffDeclRef, currentDiffDeclRef.getLoc())))
+            {
+                getSink()->diagnose(currentDiffDeclRef, Slang::Diagnostics::customDerivativeNotAFunction, currentDiffDeclRef);
+            }
+            
+            // TODO: Can possibly just store a DeclRef (no need for DeclRefExpr)
+            forwardDerivativeAttr->funcDeclRef = as<DeclRefExpr>(ConstructDeclRefExpr(currentDiffDeclRef, nullptr, currentDiffDeclRefExpr->loc, diffExpr));
         }
         else if (auto comInterfaceAttr = as<ComInterfaceAttribute>(attr))
         {

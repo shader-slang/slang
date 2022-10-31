@@ -2089,11 +2089,11 @@ namespace Slang
     {
         return parseTaggedUnionType(parser);
     }
-        /// Parse an expression of the form __jvp(fn) where fn is an 
+        /// Parse an expression of the form __fwd_diff(fn) where fn is an 
         /// identifier pointing to a function.
-    static Expr* parseJVPDifferentiate(Parser* parser)
+    static Expr* parseForwardDifferentiate(Parser* parser)
     {
-        JVPDifferentiateExpr* jvpExpr = parser->astBuilder->create<JVPDifferentiateExpr>();
+        ForwardDifferentiateExpr* jvpExpr = parser->astBuilder->create<ForwardDifferentiateExpr>();
 
         parser->ReadToken(TokenType::LParent);
 
@@ -2104,9 +2104,9 @@ namespace Slang
         return jvpExpr;
     }
 
-    static NodeBase* parseJVPDifferentiate(Parser* parser, void* /* unused */)
+    static NodeBase* parseForwardDifferentiate(Parser* parser, void* /* unused */)
     {
-        return parseJVPDifferentiate(parser);
+        return parseForwardDifferentiate(parser);
     }
 
         /// Parse a `This` type expression
@@ -3078,11 +3078,6 @@ namespace Slang
             // would trigger a rebuild of the member dictionary that
             // would take O(N) time.
             //
-            // Eventually we should make `builtMemberDictionary()`
-            // incremental, so that it only has to process members
-            // added since the last time it was invoked.
-            //
-            buildMemberDictionary(parentDecl);
 
             // There might be multiple members of the same name
             // (if we define a namespace `foo` after an overloaded
@@ -3090,7 +3085,7 @@ namespace Slang
             // lookup will only give us the first.
             //
             Decl* firstDecl = nullptr;
-            parentDecl->memberDictionary.TryGetValue(nameAndLoc.name, firstDecl);
+            parentDecl->getMemberDictionary().TryGetValue(nameAndLoc.name, firstDecl);
             //
             // We will search through the declarations of the name
             // and find the first that is a namespace (if any).
@@ -6639,7 +6634,7 @@ namespace Slang
         _makeParseExpr("none", parseNoneExpr),
         _makeParseExpr("try",     parseTryExpr),
         _makeParseExpr("__TaggedUnion", parseTaggedUnionType),
-        _makeParseExpr("__jvp", parseJVPDifferentiate)
+        _makeParseExpr("__fwd_diff", parseForwardDifferentiate)
     };
 
     ConstArrayView<SyntaxParseInfo> getSyntaxParseInfos()

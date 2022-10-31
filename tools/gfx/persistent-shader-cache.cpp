@@ -63,9 +63,9 @@ void PersistentShaderCache::loadCacheFromFile()
         if (digests.getCount() != 2)
             continue;
         auto dependencyDigest = DigestUtil::fromString(digests[0]);
-        auto astDigest = DigestUtil::fromString(digests[1]);
+        auto contentsDigest = DigestUtil::fromString(digests[1]);
 
-        ShaderCacheEntry entry = { dependencyDigest, astDigest };
+        ShaderCacheEntry entry = { dependencyDigest, contentsDigest };
         auto entryNode = entries.AddLast(entry);
         keyToEntry.Add(dependencyDigest, entryNode);
 
@@ -133,7 +133,7 @@ void PersistentShaderCache::addEntry(const slang::Digest& dependencyDigest, cons
 void PersistentShaderCache::updateEntry(
     LinkedNode<ShaderCacheEntry>* entryNode,
     const slang::Digest& dependencyDigest,
-    const slang::Digest& astDigest,
+    const slang::Digest& contentsDigest,
     ISlangBlob* updatedCode)
 {
     if (!mutableShaderCacheFileSystem)
@@ -143,7 +143,7 @@ void PersistentShaderCache::updateEntry(
         return;
     }
 
-    entryNode->Value.astBasedDigest = astDigest;
+    entryNode->Value.contentsBasedDigest = contentsDigest;
     mutableShaderCacheFileSystem->saveFileBlob(DigestUtil::toString(dependencyDigest).getBuffer(), updatedCode);
 
     saveCacheToFile();
@@ -162,7 +162,7 @@ void PersistentShaderCache::saveCacheToFile()
     {
         indexSb << entry.dependencyBasedDigest;
         indexSb << " ";
-        indexSb << entry.astBasedDigest;
+        indexSb << entry.contentsBasedDigest;
         indexSb << "\n";
     }
 

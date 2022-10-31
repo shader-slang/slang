@@ -4457,20 +4457,18 @@ namespace slang
             SlangInt targetIndex,
             Digest* outHash) = 0;
 
-            /** Compute the hash code of this component type's AST. This hash effectively represents
-                the contents of the code covered by this component type, making its use ideal when we need
-                to confirm whether shader code changes have occurred. For example, a shader cache needs to be
-                able to check when a cache entry contains out-of-date code, which can be easily detected by
-                comparing the AST-based hashes since any change to the shader's code will be reflected in the
-                AST, and subsequently, the AST-based hash.
-
-                Not all component types will store an AST, and consequently, not all component types will have a
-                meaningful implementation for this function.
+            /** Compute the hash code of this component type's contents as indicated by the file dependencies.
+                This hash is ideal when we need to confirm whether shader code changes have occurred. For example,
+                a shader cache needs to be able to check when a cache entry contains out-of-date code, which can be
+                easily detected by comparing the contents-based hashes since they will directly reflect any change
+                to the shader's code.
 
                 This function should only have a meaningful implementation in ComponentType. All other types derived
-                from ComponentType that also inherit from IComponentType should do nothing.
+                from ComponentType that also inherit from IComponentType should do nothing. However, the only component
+                type that should ever be hashing its contents is Module as it represents all the code in a given
+                translation unit.
             */
-        virtual SLANG_NO_THROW void SLANG_MCALL computeASTBasedHash(Digest* outHash) = 0;
+        virtual SLANG_NO_THROW void SLANG_MCALL computeContentsBasedHash(Digest* outHash) = 0;
 
             /** Specialize the component by binding its specialization parameters to concrete arguments.
 

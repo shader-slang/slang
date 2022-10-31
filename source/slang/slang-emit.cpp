@@ -23,6 +23,7 @@
 #include "slang-ir-glsl-legalize.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-inline.h"
+#include "slang-ir-legalize-array-return-type.h"
 #include "slang-ir-legalize-varying-params.h"
 #include "slang-ir-link.h"
 #include "slang-ir-com-interface.h"
@@ -376,7 +377,7 @@ Result linkAndOptimizeIR(
     
     // Process higher-order calles to auto-diff passes.
     // 1. Generate JVP code wherever necessary. (Linearization or "forward-mode" pass)
-    processJVPDerivativeMarkers(irModule, sink);
+    processForwardDifferentiableFuncs(irModule, sink);
 
     // 2. Transpose JVP to VJP code wherever needed. (Transposition or "reverse-mode" pass)
     // processVJPDerivativeMarkers(module); // Disabled currently. No impl yet.
@@ -524,6 +525,10 @@ Result linkAndOptimizeIR(
         specializeArrayParameters(codeGenContext, irModule);
         simplifyIR(irModule);
     }
+
+    // Rewrite functions that return arrays to return them via `out` parameter,
+    // since our target languages doesn't allow returning arrays.
+    legalizeArrayReturnType(irModule);
 
 #if 0
     dumpIRIfEnabled(codeGenContext, irModule, "AFTER RESOURCE SPECIALIZATION");

@@ -1898,9 +1898,13 @@ protected:
     // by applications to decide when they need to "hot reload"
     // their shader code.
     //
-    void handleFileDependency(String const& path) SLANG_OVERRIDE
+    void handleFileDependency(String const& path, ISlangBlob* sourceBlob) SLANG_OVERRIDE
     {
         m_module->addFilePathDependency(path);
+        if (sourceBlob)
+        {
+            m_module->getContentsDigestBuilder().addToDigest(sourceBlob);
+        }
     }
 
     // The second task that this handler deals with is detecting
@@ -3042,6 +3046,10 @@ RefPtr<Module> Linkage::loadModule(
         return nullptr;
     }
 
+    auto builder = module->getContentsDigestBuilder();
+    builder.addToDigest(sourceBlob);
+    module->setContentsDigest(builder.finalize());
+
     return module;
 }
 
@@ -3259,10 +3267,9 @@ void Module::updateDependencyBasedHash(
     SLANG_UNUSED(entryPointIndex);
 }
 
-void Module::updateASTBasedHash(DigestBuilder& builder)
+void Module::updateContentsBasedHash(DigestBuilder& builder)
 {
-    auto serializedAST = ASTSerialUtil::serializeAST(getModuleDecl());
-    builder.addToDigest(serializedAST);
+    builder.addToDigest(getContentsDigest());
 }
 
 void Module::addModuleDependency(Module* module)
@@ -3491,16 +3498,18 @@ SLANG_NO_THROW void SLANG_MCALL ComponentType::computeDependencyBasedHash(
     // to the hash.
     auto entryPointName = getEntryPoint(entryPointIndex)->getName()->text;
     builder.addToDigest(entryPointName);
+    auto entryPointMangledName = getEntryPointMangledName(entryPointIndex);
+    builder.addToDigest(entryPointMangledName);
     auto entryPointNameOverride = getEntryPointNameOverride(entryPointIndex);
     builder.addToDigest(entryPointNameOverride);
 
     *outHash = builder.finalize();
 }
 
-SLANG_NO_THROW void SLANG_MCALL ComponentType::computeASTBasedHash(slang::Digest* outHash)
+SLANG_NO_THROW void SLANG_MCALL ComponentType::computeContentsBasedHash(slang::Digest* outHash)
 {
     DigestBuilder builder;
-    updateASTBasedHash(builder);
+    updateContentsBasedHash(builder);
     *outHash = builder.finalize();
 }
 
@@ -3848,13 +3857,13 @@ void CompositeComponentType::updateDependencyBasedHash(
     }
 }
 
-void CompositeComponentType::updateASTBasedHash(DigestBuilder& builder)
+void CompositeComponentType::updateContentsBasedHash(DigestBuilder& builder)
 {
     auto componentCount = getChildComponentCount();
 
     for (Index i = 0; i < componentCount; ++i)
     {
-        getChildComponent(i)->updateASTBasedHash(builder);
+        getChildComponent(i)->updateContentsBasedHash(builder);
     }
 }
 

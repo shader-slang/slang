@@ -10,6 +10,8 @@
 #include "source/core/slang-memory-file-system.h"
 #include "source/core/slang-file-system.h"
 
+#include "gfx-test-texture-util.h"
+
 using namespace gfx;
 using namespace Slang;
 
@@ -676,6 +678,274 @@ namespace gfx_test
         }
     };
 
+    // Same gist as the multiple entry point compute shader but with a graphics
+    // shader file containing a vertex and fragment shader
+    struct Vertex
+    {
+        float position[3];
+    };
+
+    static const int kVertexCount = 3;
+    static const Vertex kVertexData[kVertexCount] =
+    {
+        { 0, 0, 0.5 },
+        { 1, 0, 0.5 },
+        { 0, 1, 0.5 },
+    };
+
+    struct GraphicsShaderCache : BaseShaderCacheTest
+    {
+        const int kWidth = 256;
+        const int kHeight = 256;
+        const Format format = Format::R32G32B32A32_FLOAT;
+
+        ComPtr<IShaderProgram> shaderProgram;
+        ComPtr<IRenderPassLayout> renderPass;
+        ComPtr<IFramebuffer> framebuffer;
+
+        ComPtr<IBufferResource> vertexBuffer;
+        ComPtr<ITextureResource> colorBuffer;
+
+        ComPtr<IBufferResource> createVertexBuffer(IDevice* device)
+        {
+            IBufferResource::Desc vertexBufferDesc;
+            vertexBufferDesc.type = IResource::Type::Buffer;
+            vertexBufferDesc.sizeInBytes = kVertexCount * sizeof(Vertex);
+            vertexBufferDesc.defaultState = ResourceState::VertexBuffer;
+            vertexBufferDesc.allowedStates = ResourceState::VertexBuffer;
+            ComPtr<IBufferResource> vertexBuffer = device->createBufferResource(vertexBufferDesc, &kVertexData[0]);
+            SLANG_CHECK_ABORT(vertexBuffer != nullptr);
+            return vertexBuffer;
+        }
+
+        ComPtr<ITextureResource> createColorBuffer(IDevice* device)
+        {
+            gfx::ITextureResource::Desc colorBufferDesc;
+            colorBufferDesc.type = IResource::Type::Texture2D;
+            colorBufferDesc.size.width = kWidth;
+            colorBufferDesc.size.height = kHeight;
+            colorBufferDesc.size.depth = 1;
+            colorBufferDesc.numMipLevels = 1;
+            colorBufferDesc.format = format;
+            colorBufferDesc.defaultState = ResourceState::RenderTarget;
+            colorBufferDesc.allowedStates = { ResourceState::RenderTarget, ResourceState::CopySource };
+            ComPtr<ITextureResource> colorBuffer = device->createTextureResource(colorBufferDesc, nullptr);
+            SLANG_CHECK_ABORT(colorBuffer != nullptr);
+            return colorBuffer;
+        }
+
+        void createShaderProgram()
+        {
+            slang::ProgramLayout* slangReflection;
+            GFX_CHECK_CALL_ABORT(loadGraphicsProgram(device, shaderProgram, "shader-cache-graphics", "vertexMain", "fragmentMain", slangReflection));
+        }
+
+        void createRequiredResources()
+        {
+            VertexStreamDesc vertexStreams[] = {
+                { sizeof(Vertex), InputSlotClass::PerVertex, 0 },
+            };
+
+            InputElementDesc inputElements[] = {
+                // Vertex buffer data
+                { "POSITION", 0, Format::R32G32B32_FLOAT, offsetof(Vertex, position), 0 },
+            };
+            IInputLayout::Desc inputLayoutDesc = {};
+            inputLayoutDesc.inputElementCount = SLANG_COUNT_OF(inputElements);
+            inputLayoutDesc.inputElements = inputElements;
+            inputLayoutDesc.vertexStreamCount = SLANG_COUNT_OF(vertexStreams);
+            inputLayoutDesc.vertexStreams = vertexStreams;
+            auto inputLayout = device->createInputLayout(inputLayoutDesc);
+            SLANG_CHECK_ABORT(inputLayout != nullptr);
+
+            vertexBuffer = createVertexBuffer(device);
+            colorBuffer = createColorBuffer(device);
+
+            IFramebufferLayout::TargetLayout targetLayout;
+            targetLayout.format = format;
+            targetLayout.sampleCount = 1;
+
+            IFramebufferLayout::Desc framebufferLayoutDesc;
+            framebufferLayoutDesc.renderTargetCount = 1;
+            framebufferLayoutDesc.renderTargets = &targetLayout;
+            ComPtr<gfx::IFramebufferLayout> framebufferLayout = device->createFramebufferLayout(framebufferLayoutDesc);
+            SLANG_CHECK_ABORT(framebufferLayout != nullptr);
+
+            GraphicsPipelineStateDesc pipelineDesc = {};
+            pipelineDesc.program = shaderProgram.get();
+            pipelineDesc.inputLayout = inputLayout;
+            pipelineDesc.framebufferLayout = framebufferLayout;
+            pipelineDesc.depthStencil.depthTestEnable = false;
+            pipelineDesc.depthStencil.depthWriteEnable = false;
+            GFX_CHECK_CALL_ABORT(
+                device->createGraphicsPipelineState(pipelineDesc, pipelineState.writeRef()));
+
+            IRenderPassLayout::Desc renderPassDesc = {};
+            renderPassDesc.framebufferLayout = framebufferLayout;
+            renderPassDesc.renderTargetCount = 1;
+            IRenderPassLayout::TargetAccessDesc renderTargetAccess = {};
+            renderTargetAccess.loadOp = IRenderPassLayout::TargetLoadOp::Clear;
+            renderTargetAccess.storeOp = IRenderPassLayout::TargetStoreOp::Store;
+            renderTargetAccess.initialState = ResourceState::RenderTarget;
+            renderTargetAccess.finalState = ResourceState::CopySource;
+            renderPassDesc.renderTargetAccess = &renderTargetAccess;
+            GFX_CHECK_CALL_ABORT(device->createRenderPassLayout(renderPassDesc, renderPass.writeRef()));
+
+            gfx::IResourceView::Desc colorBufferViewDesc;
+            memset(&colorBufferViewDesc, 0, sizeof(colorBufferViewDesc));
+            colorBufferViewDesc.format = format;
+            colorBufferViewDesc.renderTarget.shape = gfx::IResource::Type::Texture2D;
+            colorBufferViewDesc.type = gfx::IResourceView::Type::RenderTarget;
+            auto rtv = device->createTextureView(colorBuffer, colorBufferViewDesc);
+
+            gfx::IFramebuffer::Desc framebufferDesc;
+            framebufferDesc.renderTargetCount = 1;
+            framebufferDesc.depthStencilView = nullptr;
+            framebufferDesc.renderTargetViews = rtv.readRef();
+            framebufferDesc.layout = framebufferLayout;
+            GFX_CHECK_CALL_ABORT(device->createFramebuffer(framebufferDesc, framebuffer.writeRef()));
+        }
+
+        void submitGPUWork()
+        {
+            ComPtr<ITransientResourceHeap> transientHeap;
+            ITransientResourceHeap::Desc transientHeapDesc = {};
+            transientHeapDesc.constantBufferSize = 4096;
+            GFX_CHECK_CALL_ABORT(
+                device->createTransientResourceHeap(transientHeapDesc, transientHeap.writeRef()));
+
+            ICommandQueue::Desc queueDesc = { ICommandQueue::QueueType::Graphics };
+            auto queue = device->createCommandQueue(queueDesc);
+            auto commandBuffer = transientHeap->createCommandBuffer();
+
+            auto encoder = commandBuffer->encodeRenderCommands(renderPass, framebuffer);
+            auto rootObject = encoder->bindPipeline(pipelineState);
+
+            gfx::Viewport viewport = {};
+            viewport.maxZ = 1.0f;
+            viewport.extentX = (float)kWidth;
+            viewport.extentY = (float)kHeight;
+            encoder->setViewportAndScissor(viewport);
+
+            encoder->setVertexBuffer(0, vertexBuffer);
+            encoder->setPrimitiveTopology(PrimitiveTopology::TriangleList);
+
+            encoder->draw(kVertexCount);
+            encoder->endEncoding();
+            commandBuffer->close();
+            queue->executeCommandBuffer(commandBuffer);
+            queue->waitOnHost();
+        }
+
+        void run()
+        {
+            generateNewDevice();
+            createShaderProgram();
+            createRequiredResources();
+            submitGPUWork();
+
+            ComPtr<IShaderCacheStatistics> shaderCacheStats;
+
+            device->queryInterface(SLANG_UUID_IShaderCacheStatistics, (void**)shaderCacheStats.writeRef());
+            SLANG_CHECK(shaderCacheStats->getCacheMissCount() == 2);
+            SLANG_CHECK(shaderCacheStats->getCacheHitCount() == 0);
+            SLANG_CHECK(shaderCacheStats->getCacheEntryDirtyCount() == 0);
+        }
+    };
+
+    // Same as GraphicsShaderCache, but instead of having a singular file containing both a vertex and fragment shader, we
+    // now have two separate shader files, one containing the vertex shader and the other the fragment with the same
+    // names, with the expectation that we should record cache misses for both fetches.
+    //
+    // This test is intended to guard against the case where vertex/fragment/geometry shaders are split across
+    // multiple files with the same entry point name in each file and are loaded as three separate ComponentType objects.
+    // In this case, the current method for cache key generation will hash in the exact same modules, file dependencies,
+    // entry point names, and entry point name overrides, resulting in the same dependency hash being returned for all three
+    // and consequently, the wrong shader code being provided when the shaders are being created.
+    //
+    // We do not actively test geometry shaders here, but it is simply an extension of this test and should be expected
+    // to behave similarly.
+    struct SplitGraphicsShader : GraphicsShaderCache
+    {
+        void createShaderProgram()
+        {
+            slang::ProgramLayout* slangReflection;
+            const char* moduleNames[] = { "split-graphics-vertex", "split-graphics-fragment" };
+            GFX_CHECK_CALL_ABORT(loadSplitGraphicsProgram(device, shaderProgram, moduleNames, "main", "main", slangReflection));
+        }
+
+        Result loadSplitGraphicsProgram(
+            IDevice* device,
+            ComPtr<IShaderProgram>& outShaderProgram,
+            const char** shaderModuleNames,
+            const char* vertexEntryPointName,
+            const char* fragmentEntryPointName,
+            slang::ProgramLayout*& slangReflection)
+        {
+            ComPtr<slang::ISession> slangSession;
+            SLANG_RETURN_ON_FAIL(device->getSlangSession(slangSession.writeRef()));
+
+            ComPtr<slang::IBlob> diagnosticsBlob;
+            slang::IModule* vertexModule = slangSession->loadModule(shaderModuleNames[0], diagnosticsBlob.writeRef());
+            if (!vertexModule)
+                return SLANG_FAIL;
+            slang::IModule* fragmentModule = slangSession->loadModule(shaderModuleNames[1], diagnosticsBlob.writeRef());
+            if (!fragmentModule)
+                return SLANG_FAIL;
+
+            ComPtr<slang::IEntryPoint> vertexEntryPoint;
+            SLANG_RETURN_ON_FAIL(
+                vertexModule->findEntryPointByName(vertexEntryPointName, vertexEntryPoint.writeRef()));
+
+            ComPtr<slang::IEntryPoint> fragmentEntryPoint;
+            SLANG_RETURN_ON_FAIL(
+                fragmentModule->findEntryPointByName(fragmentEntryPointName, fragmentEntryPoint.writeRef()));
+
+            Slang::List<slang::IComponentType*> componentTypes;
+            componentTypes.add(vertexModule);
+            componentTypes.add(fragmentModule);
+
+            Slang::ComPtr<slang::IComponentType> composedProgram;
+            SlangResult result = slangSession->createCompositeComponentType(
+                componentTypes.getBuffer(),
+                componentTypes.getCount(),
+                composedProgram.writeRef(),
+                diagnosticsBlob.writeRef());
+            SLANG_RETURN_ON_FAIL(result);
+            slangReflection = composedProgram->getLayout();
+
+            Slang::List<slang::IComponentType*> entryPoints;
+            entryPoints.add(vertexEntryPoint);
+            entryPoints.add(fragmentEntryPoint);
+
+            gfx::IShaderProgram::Desc programDesc = {};
+            programDesc.slangGlobalScope = composedProgram.get();
+            programDesc.linkingStyle = gfx::IShaderProgram::LinkingStyle::SeparateEntryPointCompilation;
+            programDesc.entryPointCount = 2;
+            programDesc.slangEntryPoints = entryPoints.getBuffer();
+
+            auto shaderProgram = device->createProgram(programDesc);
+
+            outShaderProgram = shaderProgram;
+            return SLANG_OK;
+        }
+
+        void run()
+        {
+            generateNewDevice();
+            createShaderProgram();
+            createRequiredResources();
+            submitGPUWork();
+
+            ComPtr<IShaderCacheStatistics> shaderCacheStats;
+
+            device->queryInterface(SLANG_UUID_IShaderCacheStatistics, (void**)shaderCacheStats.writeRef());
+            SLANG_CHECK(shaderCacheStats->getCacheMissCount() == 2);
+            SLANG_CHECK(shaderCacheStats->getCacheHitCount() == 0);
+            SLANG_CHECK(shaderCacheStats->getCacheEntryDirtyCount() == 0);
+        }
+    };
+
     // Same as MultipleEntryShaderCache, but we now set the maximum entry count limit, so the cache
     // should remove entries as needed when it reaches capacity.
     //
@@ -944,5 +1214,25 @@ namespace gfx_test
     SLANG_UNIT_TEST(cacheEvictionPolicyVulkan)
     {
         runTestImpl(shaderCacheTestImpl<CacheWithMaxEntryLimit>, unitTestContext, Slang::RenderApiFlag::Vulkan);
+    }
+
+    SLANG_UNIT_TEST(graphicsShaderCacheD3D12)
+    {
+        runTestImpl(shaderCacheTestImpl<GraphicsShaderCache>, unitTestContext, Slang::RenderApiFlag::D3D12);
+    }
+
+    SLANG_UNIT_TEST(graphicsShaderCacheVulkan)
+    {
+        runTestImpl(shaderCacheTestImpl<GraphicsShaderCache>, unitTestContext, Slang::RenderApiFlag::Vulkan);
+    }
+
+    SLANG_UNIT_TEST(splitGraphicsShaderCacheD3D12)
+    {
+        runTestImpl(shaderCacheTestImpl<SplitGraphicsShader>, unitTestContext, Slang::RenderApiFlag::D3D12);
+    }
+
+    SLANG_UNIT_TEST(splitGraphicsShaderCacheVulkan)
+    {
+        runTestImpl(shaderCacheTestImpl<SplitGraphicsShader>, unitTestContext, Slang::RenderApiFlag::Vulkan);
     }
 }

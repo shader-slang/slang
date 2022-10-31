@@ -20,8 +20,8 @@ class DeclRefExpr: public Expr
 
     
     // The declaration of the symbol being referenced
-    DeclRef<Decl> declRef;
 
+    DeclRef<Decl> declRef;
     // The name of the symbol being referenced
     Name* name = nullptr;
 
@@ -437,12 +437,12 @@ class HigherOrderInvokeExpr : public Expr
     Expr* baseFunction;
 };
 
-    /// An expression of the form `__jvp(fn)` to access the 
+    /// An expression of the form `__fwd_diff(fn)` to access the 
     /// forward-mode derivative version of the function `fn`
     ///
-class JVPDifferentiateExpr: public HigherOrderInvokeExpr
+class ForwardDifferentiateExpr: public HigherOrderInvokeExpr
 {
-    SLANG_AST_CLASS(JVPDifferentiateExpr)
+    SLANG_AST_CLASS(ForwardDifferentiateExpr)
 };
 
     /// A type expression of the form `__TaggedUnion(A, ...)`.

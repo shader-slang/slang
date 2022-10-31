@@ -3042,13 +3042,13 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
     // of the inner func-expr. This will be resolved 
     // to a concrete function during the derivative 
     // pass.
-    LoweredValInfo visitJVPDifferentiateExpr(JVPDifferentiateExpr* expr)
+    LoweredValInfo visitForwardDifferentiateExpr(ForwardDifferentiateExpr* expr)
     {
         auto baseVal = lowerSubExpr(expr->baseFunction);
         SLANG_ASSERT(baseVal.flavor == LoweredValInfo::Flavor::Simple);
 
         return LoweredValInfo::simple(
-            getBuilder()->emitJVPDifferentiateInst(
+            getBuilder()->emitForwardDifferentiateInst(
                 lowerType(context, expr->type),
                 baseVal.val));
     }
@@ -7087,7 +7087,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         auto key = lowerRValueExpr(context, derivativeMember->memberDeclRef).val;
         SLANG_RELEASE_ASSERT(as<IRStructKey>(key));
         auto builder = getBuilder();
-        builder->addDecoration(inst, kIROp_JVPDerivativeMemberReferenceDecoration, key);
+        builder->addDecoration(inst, kIROp_DerivativeMemberDecoration, key);
     }
 
     LoweredValInfo lowerMemberVarDecl(VarDecl* fieldDecl)
@@ -7805,9 +7805,9 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         addNameHint(context, irFunc, decl);
         addLinkageDecoration(context, irFunc, decl);
 
-        if (decl->findModifier<JVPDerivativeModifier>())
+        if (decl->findModifier<ForwardDifferentiableAttribute>())
         {
-            getBuilder()->addJVPDerivativeMarkerDecoration(irFunc);
+            getBuilder()->addForwardDifferentiableDecoration(irFunc);
         }
 
         // Always force inline diff setter accessor to prevent downstream compiler from complaining
@@ -8204,12 +8204,28 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             getBuilder()->addDecoration(irFunc, kIROp_ForceInlineDecoration);
         }
 
-        if (auto attr = decl->findModifier<CustomJVPAttribute>())
+        // Register the value now, to avoid any possible infinite recursion when lowering ForwardDerivativeAttribute
+        setGlobalValue(context, decl, LoweredValInfo::simple(findOuterMostGeneric(irFunc)));
+
+        if (auto attr = decl->findModifier<ForwardDerivativeAttribute>())
         {
-            auto loweredVal = lowerLValueExpr(this->context, attr->funcDeclRef);
+            // TODO(Sai): HACK.. we need to emit a decl-ref to handle this modifier correctly. 
+            // If we don't move the cursor to the parent, we sometimes emit supporting
+            // insts into the function body, which shouldn't happen.
+            // 
+            subContext->irBuilder->setInsertInto(irFunc->getParent());            
+            
+            auto diffFuncType = getFuncType(subContext->astBuilder, attr->funcDeclRef->declRef.as<CallableDecl>());
+            auto irDiffFuncType = lowerType(subContext, diffFuncType);
+
+            auto loweredVal = emitDeclRef(subContext, attr->funcDeclRef->declRef, irDiffFuncType);
+
             SLANG_ASSERT(loweredVal.flavor == LoweredValInfo::Flavor::Simple);
-            IRFunc* jvpFunc = as<IRFunc>(loweredVal.val);
-            getBuilder()->addDecoration(irFunc, kIROp_JVPDerivativeReferenceDecoration, jvpFunc);
+            IRInst* jvpFunc = loweredVal.val;
+            getBuilder()->addDecoration(irFunc, kIROp_ForwardDerivativeDecoration, jvpFunc);
+
+            // Reset cursor.
+            subContext->irBuilder->setInsertInto(irFunc);            
         }
 
         // For convenience, ensure that any additional global
