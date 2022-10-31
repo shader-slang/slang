@@ -536,6 +536,9 @@
     <ClCompile Include="..\..\..\source\slang\slang-ast-support-types.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\source\slang\slang-ast-synthesis.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\..\source\slang\slang-ast-type.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -986,7 +989,6 @@
     <ClCompile Include="..\..\..\source\slang\slang.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\source\slang\slang-ast-synthesis.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="..\..\..\source\slang\core.meta.slang">

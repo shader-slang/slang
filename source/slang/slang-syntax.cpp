@@ -915,7 +915,14 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         DeclRefBase substDeclRef;
         substDeclRef.decl = decl;
         substDeclRef.substitutions = substSubst;
-                
+
+        // TODO: The old code here used to try to translate a decl-ref
+        // to an associated type in a decl-ref for the concrete type
+        // in a particular implementation.
+        //
+        // I have only kept that logic in `DeclRefType::SubstituteImpl`,
+        // but it may turn out it is needed here too.
+
         return substDeclRef;
     }
 

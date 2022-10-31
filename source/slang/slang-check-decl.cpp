@@ -3235,7 +3235,7 @@ namespace Slang
     Stmt* _synthesizeMemberAssignMemberHelper(ASTSynthesizer& synth, Name* funcName, Type* leftType, Expr* leftValue, List<Expr*>&& args, int nestingLevel = 0)
     {
         if (nestingLevel > 16)
-            return false;
+            return nullptr;
 
         // If field type is an array, assign each element individually.
         if (auto arrayType = as<ArrayExpressionType>(leftType))
