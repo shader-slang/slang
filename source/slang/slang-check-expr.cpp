@@ -1946,17 +1946,11 @@ namespace Slang
         // Get a reference to the builtin 'IDifferentiable' interface
         auto differentiableInterface = m_astBuilder->getDifferentiableInterface();
 
-        auto differentialType = tryGetDifferentialType(m_astBuilder, primalType);
-        if (!differentialType)
-            differentialType = m_astBuilder->getDifferentialBottomType();
-        auto differentialConformanceWitness = as<Witness>(
-            tryGetInterfaceConformanceWitness(differentialType, differentiableInterface));
         auto conformanceWitness = as<Witness>(tryGetInterfaceConformanceWitness(primalType, differentiableInterface));
         // Check if the provided type inherits from IDifferentiable.
         // If not, return the original type.
-        if (conformanceWitness && differentialConformanceWitness)
-            return m_astBuilder->getDifferentialPairType(
-                primalType, differentialType, conformanceWitness, differentialConformanceWitness);
+        if (conformanceWitness)
+            return m_astBuilder->getDifferentialPairType(primalType, conformanceWitness);
         else
             return primalType;
     }

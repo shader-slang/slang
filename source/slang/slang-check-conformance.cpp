@@ -33,7 +33,6 @@ namespace Slang
                 else
                     return conjunction->rightWitness;
             }
-
             ExtractFromConjunctionSubtypeWitness* simplExtractFromConjunction = builder->create<ExtractFromConjunctionSubtypeWitness>();
             simplExtractFromConjunction->sub = extractFromConjunction->sub;
             simplExtractFromConjunction->sup = extractFromConjunction->sup;
@@ -145,7 +144,7 @@ namespace Slang
                     m_astBuilder->getOrCreate<DeclaredSubtypeWitness>(
                         bb->sub, bb->sup, bb->declRef.decl, bb->declRef.substitutions.substitutions);
 
-                TransitiveSubtypeWitness* transitiveWitness = m_astBuilder->getOrCreateWithDefaultCtor<TransitiveSubtypeWitness>(subType, bb->sup, declaredWitness);
+                TransitiveSubtypeWitness* transitiveWitness = m_astBuilder->getOrCreateWithDefaultCtor<TransitiveSubtypeWitness>();
                 transitiveWitness->sub = subType;
                 transitiveWitness->sup = bb->sup;
                 transitiveWitness->midToSup = declaredWitness;
@@ -377,6 +376,45 @@ namespace Slang
                     {
                         return true;
                     }
+                }
+            }
+
+            // If a generic type parameter does not declare itself to conform to `IDifferentiable`,
+            // we treat it as a subtype of `DifferentialBottom` to make it conform to `IDifferentiable`.
+            // Note: we only consider this option for `originalSubType` so a type that implements `IDifferential` but
+            // inherits from some other non differentiable types don't get to inherit `DifferentialBottom`.
+            if (m_astBuilder->isDifferentiableInterfaceAvailable() &&
+                subType == originalSubType &&
+                superTypeDeclRef.getDecl() == m_astBuilder->getDifferentiableInterface())
+            {
+                if (as<GenericTypeParamDecl>(declRefType->declRef.getDecl()) ||
+                    as<AssocTypeDecl>(declRefType->declRef.getDecl()))
+                {
+                    auto sup = DeclRefType::create(m_astBuilder, superTypeDeclRef);
+                    auto differentialBottomType = as<DeclRefType>(m_astBuilder->getDifferentialBottomType());
+                    auto container = differentialBottomType->declRef.as<ContainerDecl>().getDecl();
+                    SLANG_RELEASE_ASSERT(container);
+                    auto inheritanceDecl = container->getMembersOfType<InheritanceDecl>().getFirst();
+                    auto witnessDifferentialBottomIsIDifferentiable =
+                        m_astBuilder->getOrCreate<DeclaredSubtypeWitness>(
+                            m_astBuilder->getDifferentialBottomType(),
+                            sup,
+                            inheritanceDecl,
+                            nullptr);
+
+                    auto witnessSubIsDifferentialBottom =
+                        m_astBuilder->getOrCreate<DifferentialBottomSubtypeWitness>(
+                            subType, differentialBottomType);
+
+                    TransitiveSubtypeWitness* transitiveWitness =
+                        m_astBuilder->getOrCreateWithDefaultCtor<TransitiveSubtypeWitness>(
+                            witnessSubIsDifferentialBottom, witnessDifferentialBottomIsIDifferentiable);
+                    transitiveWitness->sub = subType;
+                    transitiveWitness->sup = sup;
+                    transitiveWitness->midToSup = witnessDifferentialBottomIsIDifferentiable;
+                    transitiveWitness->subToMid = witnessSubIsDifferentialBottom;
+                    *outWitness = transitiveWitness;
+                    return true;
                 }
             }
         }

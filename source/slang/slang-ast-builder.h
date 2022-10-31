@@ -331,9 +331,7 @@ public:
 
     DifferentialPairType* getDifferentialPairType(
         Type* valueType,
-        Type* differentialType,
-        Witness* primalIsDifferentialWitness,
-        Witness* differentialIsDifferentiableWitness);
+        Witness* primalIsDifferentialWitness);
 
     DeclRef<InterfaceDecl> getDifferentiableInterface();
 

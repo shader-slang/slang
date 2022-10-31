@@ -311,9 +311,7 @@ VectorExpressionType* ASTBuilder::getVectorType(
 
 DifferentialPairType* ASTBuilder::getDifferentialPairType(
     Type* valueType,
-    Type* differentialType,
-    Witness* primalIsDifferentialWitness,
-    Witness* differentialIsDifferentiableWitness)
+    Witness* primalIsDifferentialWitness)
 {
     auto genericDecl = dynamicCast<GenericDecl>(m_sharedASTBuilder->findMagicDecl("DifferentialPairType"));
 
@@ -322,9 +320,7 @@ DifferentialPairType* ASTBuilder::getDifferentialPairType(
     auto substitutions = getOrCreate<GenericSubstitution>(
         genericDecl,
         valueType,
-        differentialType,
-        primalIsDifferentialWitness,
-        differentialIsDifferentiableWitness);
+        primalIsDifferentialWitness);
 
     auto declRef = DeclRef<Decl>(typeDecl, substitutions);
     auto rsType = DeclRefType::create(this, declRef);

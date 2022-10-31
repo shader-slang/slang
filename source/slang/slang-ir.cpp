@@ -3629,6 +3629,7 @@ namespace Slang
 
     IRInst* IRBuilder::findDifferentiableTypeEntry(IRInst* irType, IRInst* scope)
     {
+        IRInst* foundResult = nullptr;
         for (auto child = scope->getFirstChild(); child; child = child->getNextInst()) 
         {
             if (child->getOp() == kIROp_DifferentiableTypeDictionary)
@@ -3640,13 +3641,20 @@ namespace Slang
 
                     if (irType == entryType)
                     {
-                        return entryConformanceWitness;
+                        foundResult = entryConformanceWitness;
+                        // If the found witness table is not a trivial one (i.e. DifferentialBottom:IDifferential),
+                        // return immediately. Otherwise, continue the search to see if we can find a better one.
+                        if (auto witness = as<IRWitnessTable>(foundResult))
+                        {
+                            if (witness->getConcreteType()->getOp() != kIROp_DifferentialBottomType)
+                                return foundResult;
+                        }
                     }
                 }
             }
         }
 
-        return nullptr;
+        return foundResult;
     }
 
     IRInst* IRBuilder::findDifferentiableTypeEntry(IRInst* irType)

@@ -23,7 +23,7 @@ interface IDifferentiable
     // before anything else.
 
     [__BuiltinRequirement(_BuiltinRequirementKind.DifferentialType)]
-    associatedtype Differential : IDifferentiable;
+    associatedtype Differential;
 
     [__BuiltinRequirement(_BuiltinRequirementKind.DZeroFunc)]
     static Differential dzero();
@@ -152,21 +152,21 @@ struct __DifferentialBottom : IDifferentiable
 
     /// Pair type that serves to wrap the primal and
     /// differential types of an arbitrary type T.
-__generic<T : IDifferentiable, TDiff : IDifferentiable>
+__generic<T : IDifferentiable>
 __magic_type(DifferentialPairType)
 __intrinsic_type($(kIROp_DifferentialPairType))
-struct __DifferentialPair : IDifferentiable
+struct DifferentialPair : IDifferentiable
 {
-
-    typedef __DifferentialPair<TDiff, __DifferentialBottom> Differential;
+    typedef DifferentialPair<T.Differential> Differential;
+    typedef T.Differential DifferentialElementType;
 
     __intrinsic_op($(kIROp_MakeDifferentialPair))
-    __init(T _primal, TDiff _differential);
+    __init(T _primal, T.Differential _differential);
 
     __intrinsic_op($(kIROp_DifferentialPairGetDifferential))
-    TDiff d();
+    T.Differential d();
 
-    TDiff getDifferential()
+    T.Differential getDifferential()
     {
         return d();
     }
@@ -179,38 +179,31 @@ struct __DifferentialPair : IDifferentiable
         return p();
     }
 
-    // There are only two possible relationships between TDiff and T.Differnetial:
-    // 1. TDiff == T.Differential.
-    // 2. TDiff == bottom, T.Differential = someType
-    // In case 1, we can trivially cast between the two.
-    // In case 2, the result should yeild TargetType.dzero().
-    // We implement this behavior in an IRInst DifferentialEqualityTypeCast.
-
-    __intrinsic_op($(kIROp_DifferentialEqualityTypeCast))
-    static TDiff __type_equality_cast(T.Differential d);
-    __intrinsic_op($(kIROp_DifferentialEqualityTypeCast))
-    static T.Differential __type_equality_cast(TDiff d);
-
     [__unsafeForceInlineEarly]
     static Differential dzero()
     {
-        return Differential(__type_equality_cast(T.dzero()), __DifferentialBottom.dzero());
+        return Differential(T.dzero(), Differential.DifferentialElementType.dzero());
     }
 
     [__unsafeForceInlineEarly]
     static Differential dadd(Differential a, Differential b)
     {
-        return Differential(__type_equality_cast(T.dadd(__type_equality_cast(a.p()), __type_equality_cast(b.p()))), __DifferentialBottom.dzero());
+        return Differential(
+            T.dadd(
+                a.p(),
+                b.p()
+            ),
+            Differential.DifferentialElementType.dzero());
     }
 
     [__unsafeForceInlineEarly]
     static Differential dmul(This a, Differential b)
     {
-        return Differential(__type_equality_cast(T.dmul(a.p(), __type_equality_cast(b.p()))), __DifferentialBottom.dzero());
+        return Differential(
+             T.dmul(a.p(), b.p()),
+            Differential.DifferentialElementType.dzero());
     }
 };
-
-typealias DifferentialPair<T:IDifferentiable> = __DifferentialPair<T, T.Differential>;
 
 typealias IDFloat = IFloat & IDifferentiable;
 

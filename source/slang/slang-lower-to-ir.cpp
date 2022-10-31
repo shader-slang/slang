@@ -1366,12 +1366,29 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         // produce transitive witnesses in shapes that will cuase us
         // problems here.
         //
-        IRInst* requirementKey = lowerSimpleVal(context, val->midToSup);
+        IRInst* midToSup = lowerSimpleVal(context, val->midToSup);
+
+        if (!baseWitnessTable)
+        {
+            // If we don't have a valid baseWitnessTable,
+            // we are in a situation that `subToMid` is a `DifferentialBottomSubtypeWitness`
+            // that applies for all non-differentiable types.
+            // In this case `midToSup` will give us the `DifferentialBottom:IDifferentiable`
+            // witness table and we can just use that as the final result of
+            // this transitive witness.
+            SLANG_RELEASE_ASSERT(midToSup && as<IRWitnessTableType>(midToSup->getDataType()));
+            return LoweredValInfo::simple(midToSup);
+        }
 
         return LoweredValInfo::simple(getBuilder()->emitLookupInterfaceMethodInst(
             getBuilder()->getWitnessTableType(lowerType(context, val->sup)),
             baseWitnessTable,
-            requirementKey));
+            midToSup));
+    }
+
+    LoweredValInfo visitDifferentialBottomSubtypeWitness(DifferentialBottomSubtypeWitness*)
+    {
+        return LoweredValInfo();
     }
 
     LoweredValInfo visitTaggedUnionSubtypeWitness(
@@ -5866,7 +5883,9 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 // add an entry to the context.
                 // 
                 if (irWitness && !getBuilder()->findDifferentiableTypeEntry(irType))
+                {
                     getBuilder()->addDifferentiableTypeEntry(irType, irWitness);
+                }
             }
             else if (auto importEntry = as<DifferentiableTypeDictionaryImportItem>(member))
             {

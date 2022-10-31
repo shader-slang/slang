@@ -193,20 +193,20 @@ struct DifferentiableTypeConformanceContext
 
     IRStructKey* findZeroMethodStructKey()
     {
-        return getIDifferentiableStructKeyAtIndex(2);
+        return getIDifferentiableStructKeyAtIndex(1);
     }
 
     IRStructKey* findAddMethodStructKey()
     {
-        return getIDifferentiableStructKeyAtIndex(3);
+        return getIDifferentiableStructKeyAtIndex(2);
     }
 
     IRStructKey* getIDifferentiableStructKeyAtIndex(UInt index)
     {
         if (as<IRModuleInst>(inst) && differentiableInterfaceType)
         {
-            // Assume for now that IDifferentiable has exactly five fields.
-            SLANG_ASSERT(differentiableInterfaceType->getOperandCount() == 5);
+            // Assume for now that IDifferentiable has exactly four fields.
+            SLANG_ASSERT(differentiableInterfaceType->getOperandCount() == 4);
             if (auto entry = as<IRInterfaceRequirementEntry>(differentiableInterfaceType->getOperand(index)))
                 return as<IRStructKey>(entry->getRequirementKey());
             else
@@ -462,45 +462,6 @@ struct DifferentialPairTypeBuilder
         }
     }
 
-    void _createGenericDiffPairType(IRBuilder* builder)
-    {
-        // Insert directly at top level (skip any generic scopes etc.)
-        auto insertLoc = builder->getInsertLoc();
-        builder->setInsertInto(builder->getModule()->getModuleInst());
-
-        // Make a generic version of the pair struct.
-        auto irGeneric = builder->emitGeneric();
-        irGeneric->setFullType(builder->getTypeKind());
-        builder->setInsertInto(irGeneric);
-
-        generatedTypeList.add(irGeneric);
-
-        auto irBlock = builder->emitBlock();
-        builder->setInsertInto(irBlock);
-
-        auto pTypeParam = builder->emitParam(builder->getTypeType());
-        builder->addNameHintDecoration(pTypeParam, UnownedTerminatedStringSlice("pT"));
-
-        auto dTypeParam = builder->emitParam(builder->getTypeType());
-        builder->addNameHintDecoration(dTypeParam, UnownedTerminatedStringSlice("dT"));
-
-        auto irStructType = builder->createStructType();
-        builder->emitReturn(irStructType);
-
-        auto primalKey = _getOrCreatePrimalStructKey(builder);
-        builder->addNameHintDecoration(primalKey, UnownedTerminatedStringSlice("primal"));
-        builder->createStructField(irStructType, primalKey, (IRType*) pTypeParam);
-
-        auto diffKey = _getOrCreateDiffStructKey(builder);
-        builder->addNameHintDecoration(diffKey, UnownedTerminatedStringSlice("differential"));
-        builder->createStructField(irStructType, diffKey, (IRType*) dTypeParam);
-        
-        // Reset cursor when done.
-        builder->setInsertLoc(insertLoc);
-
-        this->genericDiffPairType = irGeneric;
-    }
-
     IRStructKey* _getOrCreateDiffStructKey(IRBuilder* builder)
     {
         if (!this->globalDiffKey)
@@ -535,17 +496,6 @@ struct DifferentialPairTypeBuilder
         return this->globalPrimalKey;
     }
 
-    IRInst* _getOrCreateGenericDiffPairType(IRBuilder* builder)
-    {
-        if (!this->genericDiffPairType)
-        {
-            _createGenericDiffPairType(builder);
-        }
-
-        SLANG_ASSERT(this->genericDiffPairType);
-        return this->genericDiffPairType;
-    }
-    
     IRInst* _createDiffPairType(IRBuilder* builder, IRType* origBaseType)
     {
         if (auto diffBaseType = diffConformanceContext->getDifferentialForType(builder, origBaseType))

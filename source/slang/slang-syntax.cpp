@@ -319,7 +319,31 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
                 }
             }
         }
-
+        else if (auto transitiveTypeWitness = as<TransitiveSubtypeWitness>(subtypeWitness))
+        {
+            // Hard code witness entry that `T.Differential = DifferentialBottom` for `T` that
+            // coerce to `DifferentialBottom`.
+            if (astBuilder->getDifferentialBottomType()->equals(transitiveTypeWitness->subToMid->sup))
+            {
+                if (auto builtinAttr = requirementKey->findModifier<BuiltinRequirementAttribute>())
+                {
+                    if (builtinAttr->kind == BuiltinRequirementKind::DifferentialType)
+                    {
+                        return RequirementWitness(astBuilder->getDifferentialBottomType());
+                    }
+                }
+            }
+        }
+        else if (auto extractFromConjunctionTypeWitness = as<ExtractFromConjunctionSubtypeWitness>(subtypeWitness))
+        {
+            if (auto conjunctionTypeWitness = as<ConjunctionSubtypeWitness>(extractFromConjunctionTypeWitness->conjunctionWitness))
+            {
+                if (extractFromConjunctionTypeWitness->indexInConjunction == 0)
+                    return tryLookUpRequirementWitness(astBuilder, as<SubtypeWitness>(conjunctionTypeWitness->leftWitness), requirementKey);
+                else
+                    return tryLookUpRequirementWitness(astBuilder, as<SubtypeWitness>(conjunctionTypeWitness->rightWitness), requirementKey);
+            }
+        }
         // TODO: should handle the transitive case here too
 
         return RequirementWitness();
