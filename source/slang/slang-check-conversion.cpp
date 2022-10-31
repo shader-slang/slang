@@ -1169,9 +1169,6 @@ namespace Slang
                 fromExpr);
         }
 
-        // If we coerced to a differentiable type, log it.
-        maybeRegisterDifferentiableType(m_astBuilder, expr->type);
-
         return expr;
     }
 

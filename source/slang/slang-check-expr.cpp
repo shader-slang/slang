@@ -1884,7 +1884,31 @@ namespace Slang
             arg = CheckTerm(arg);
         }
 
-        return CheckInvokeExprWithCheckedOperands(expr);
+        // If we are in a differentiable function, register differential witness tables involved in
+        // this call.
+        if (m_parentFunc && m_parentFunc->hasModifier<DifferentiableAttribute>())
+        {
+            for (auto& arg : expr->arguments)
+            {
+                maybeRegisterDifferentiableType(m_astBuilder, arg->type.type);
+            }
+        }
+
+        auto checkedExpr = CheckInvokeExprWithCheckedOperands(expr);
+
+        if (m_parentFunc && m_parentFunc->hasModifier<DifferentiableAttribute>())
+        {
+            if (auto checkedInvokeExpr = as<InvokeExpr>(checkedExpr))
+            {
+                // Register types for final resolved invoke arguments again.
+                for (auto& arg : expr->arguments)
+                {
+                    maybeRegisterDifferentiableType(m_astBuilder, arg->type.type);
+                }
+            }
+            maybeRegisterDifferentiableType(m_astBuilder, checkedExpr->type.type);
+        }
+        return checkedExpr;
     }
 
     Expr* SemanticsExprVisitor::visitVarExpr(VarExpr *expr)
@@ -1987,6 +2011,15 @@ namespace Slang
         
         // Check/Resolve inner function declaration.
         expr->baseFunction = CheckTerm(expr->baseFunction);
+
+        // Register parameter types.
+        if (auto funcType = as<FuncType>(expr->baseFunction->type.type))
+        {
+            for (UInt i = 0; i < funcType->getParamCount(); i++)
+            {
+                maybeRegisterDifferentiableType(m_astBuilder, funcType->getParamType(i));
+            }
+        }
 
         // For now we only support using higher order expr as callee in an invoke expr.
         // The actual type of the higher order function will be derived during resolve invoke.

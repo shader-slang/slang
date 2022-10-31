@@ -1333,22 +1333,10 @@ struct JVPTranscriber
         }
         else
         {
-            // We special case a few non-differentiable types that sometimes appear in places
-            // where we're forced to provide a differential zero value. For instance, 
-            // float3(float, float, int) is accepted by the compiler, but is tricky in the context
-            // of differentiation since int is non-differentiable, and should be cast to float first.
-            // In the absence of such casts, this piece of code generates appropriate zero values.
-            // 
-            switch (primalType->getOp())
-            {
-                case kIROp_IntType:
-                    return builder->getIntValue(primalType, 0);
-                default:
-                    getSink()->diagnose(primalType->sourceLoc,
-                        Diagnostics::internalCompilerError,
-                        "could not generate zero value for given type");
-                    return nullptr;
-            }
+            getSink()->diagnose(primalType->sourceLoc,
+                Diagnostics::internalCompilerError,
+                "could not generate zero value for given type");
+            return nullptr;
         }
     }
 
