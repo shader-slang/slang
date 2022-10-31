@@ -1737,6 +1737,17 @@ void legalizeMeshOutputParam(
     condition.g = g;
     specializeFunctionCalls(codeGenContext, builder->getModule(), &condition);
 
+    Dictionary<IRStructKey*, UInt> keyIndexMap;
+    UInt i = 0;
+    if(auto structType = as<IRStructType>(meshOutputType->getElementType()))
+    {
+        for(auto f : structType->getFields())
+        {
+            keyIndexMap.Add(f->getKey(), i);
+            i++;
+        }
+    }
+
     //
     // Remove this global by making all writes actually write to the
     // newly introduced out variables.
@@ -1753,7 +1764,7 @@ void legalizeMeshOutputParam(
             traverseUses(p, [&](IRInst* s)
             {
                 instMatch_(s,
-                    [builder, globalOutputVal, p](IRStore* s)
+                    [&](IRStore* s)
                     {
                         // Store using the SOA representation
                         IRBuilderInsertLocScope locScope{builder};
@@ -1769,10 +1780,41 @@ void legalizeMeshOutputParam(
                         // Stores aren't used, safe to remove here without checking
                         s->removeAndDeallocate();
                     },
+                    // TODO: Ellie, this should extract the field and recurse
+                    // here, instead of just dealing with a single level
+                    [&](IRFieldAddress* m)
+                    {
+                        auto key = as<IRStructKey>(m->getField());
+                        traverseUses(m, [&](IRInst* u)
+                        {
+                            instMatch_(u,
+                                [&](IRStore* s)
+                                {
+                                    // TODO: Ellie, I suspect this is possible, for
+                                    // examples interfaces, shouldn't be possible here...
+                                    SLANG_ASSERT("Result of getField wasn't a struct key");
+
+                                    IRBuilderInsertLocScope locScope{builder};
+                                    builder->setInsertBefore(s);
+                                    SLANG_ASSERT(keyIndexMap.ContainsKey(key));
+                                    UInt index = keyIndexMap[key];
+                                    auto d = extractField(builder, globalOutputVal, index, key);
+                                    assign(builder, d, ScalarizedVal::value(s->getVal()), p->getIndex());
+                                    s->removeAndDeallocate();
+                                },
+                                // TODO: Ellie, swizzled stores
+                                [](IRInst* s)
+                                {
+                                    // TODO: Ellie
+                                    SLANG_ASSERT(!"Ellie: TODO");
+                                }
+                            );
+                        });
+                    },
+                    // TODO: Ellie, swizzled stores
                     [](IRInst* s)
                     {
                         // TODO: Ellie
-                        printf("UNHANDLED\n");
                         SLANG_ASSERT(!"Ellie: TODO");
                     }
                 );
