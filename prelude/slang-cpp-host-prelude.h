@@ -10,6 +10,7 @@
 #include "../source/slang-rt/slang-rt.h"
 #include "../slang-com-ptr.h"
 #include "slang-cpp-types.h"
+#include "slang-cpp-scalar-intrinsics.h"
 
 using namespace Slang;
 
