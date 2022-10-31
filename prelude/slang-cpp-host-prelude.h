@@ -11,6 +11,26 @@
 #include "../slang-com-ptr.h"
 #include "slang-cpp-types.h"
 
+#ifdef SLANG_LLVM
+#include "slang-llvm.h"
+#else // SLANG_LLVM
+#   if SLANG_GCC_FAMILY && __GNUC__ < 6
+#       include <cmath>
+#       define SLANG_PRELUDE_STD std::
+#   else
+#       include <math.h>
+#       define SLANG_PRELUDE_STD
+#   endif
+
+#   include <assert.h>
+#   include <stdlib.h>
+#   include <string.h>
+#   include <stdint.h>
+#endif // SLANG_LLVM
+
+
+#include "slang-cpp-scalar-intrinsics.h"
+
 using namespace Slang;
 
 template<typename TResult, typename... Args>
