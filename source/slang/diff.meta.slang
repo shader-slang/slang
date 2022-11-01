@@ -6,7 +6,7 @@ attribute_syntax [ForwardDifferentiable] : ForwardDifferentiableAttribute;
 
 // Custom Forward Derivative Function reference
 __attributeTarget(FunctionDeclBase)
-attribute_syntax [ForwardDerivative(function)]   : ForwardDerivativeAttribute;
+attribute_syntax [ForwardDerivative(function)] : ForwardDerivativeAttribute;
 
 /// Interface to denote types as differentiable.
 /// Allows for user-specified differential types as
@@ -77,6 +77,28 @@ struct DifferentialPair : IDifferentiable
     }
 
     [__unsafeForceInlineEarly]
+    static __DifferentialBottom dmul(This a, Differential b)
+    {
+        return dzero();
+    }
+}
+
+/// Pair type that serves to wrap the primal and
+/// differential types of an arbitrary type T.
+__generic<T : IDifferentiable>
+__magic_type(DifferentialPairType)
+__intrinsic_type($(kIROp_DifferentialPairType))
+struct DifferentialPair : IDifferentiable
+{
+    typedef DifferentialPair<T.Differential> Differential;
+    typedef T.Differential DifferentialElementType;
+
+    __intrinsic_op($(kIROp_MakeDifferentialPair))
+    __init(T _primal, T.Differential _differential);
+
+    __intrinsic_op($(kIROp_DifferentialPairGetDifferential))
+    T.Differential d();
+
     T.Differential getDifferential()
     {
         return d;
