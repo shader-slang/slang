@@ -5420,3 +5420,206 @@ struct VkSubpassInputMS<T>
 {
     T SubpassLoad(int sampleIndex);
 }
+
+///
+/// Shader Execution Reordering (SER)
+/// 
+/// NOTE! This API is currently experimental and may change in the future as SER is made available 
+/// in different APIs and downstream compilers.
+///
+/// Based on the NVAPI on D3D12 only currently.
+///
+/// White paper on SER on NVAPI https://developer.nvidia.com/sites/default/files/akamai/gameworks/ser-whitepaper.pdf
+/// 
+/// The NVAPI headers (R520) required for this functionality to work can be found here...
+/// 
+/// https://developer.nvidia.com/rtx/path-tracing/nvapi/get-started
+///
+
+    /// Immutable data type representing a ray hit or a miss. Can be used to invoke hit or miss shading,
+    /// or as a key in ReorderThread. Created by one of several methods described below. HitObject
+    /// and its related functions are available in raytracing shader types only.
+__target_intrinsic(hlsl, NvHitObject)
+[__requiresNVAPI]
+struct HitObject
+{
+        /// Executes ray traversal (including anyhit and intersection shaders) like TraceRay, but returns the
+        /// resulting hit information as a HitObject and does not trigger closesthit or miss shaders.
+    __target_intrinsic(hlsl, "NvTraceRayHitObject")
+    [__requiresNVAPI]
+    static HitObject TraceRay<payload_t>( 
+        RaytracingAccelerationStructure AccelerationStructure, 
+        uint RayFlags, 
+        uint InstanceInclusionMask, 
+        uint RayContributionToHitGroupIndex, 
+        uint MultiplierForGeometryContributionToHitGroupIndex, 
+        uint MissShaderIndex, 
+        RayDesc Ray, 
+        inout payload_t Payload);
+
+        /// Creates a HitObject representing a hit based on values explicitly passed as arguments, without
+        /// tracing a ray. The primitive specified by AccelerationStructure, InstanceIndex, GeometryIndex,
+        /// and PrimitiveIndex must exist. The shader table index is computed using the formula used with
+        /// TraceRay. The computed index must reference a valid hit group record in the shader table. The
+        /// Attributes parameter must either be an attribute struct, such as
+        /// BuiltInTriangleIntersectionAttributes, or another HitObject to copy the attributes from.
+    __target_intrinsic(hlsl, "NvMakeHit")
+    [__requiresNVAPI]
+    static HitObject MakeHit<attr_t>( 
+        RaytracingAccelerationStructure AccelerationStructure, 
+        uint InstanceIndex, 
+        uint GeometryIndex, 
+        uint PrimitiveIndex, 
+        uint HitKind, 
+        uint RayContributionToHitGroupIndex, 
+        uint MultiplierForGeometryContributionToHitGroupIndex, 
+        RayDesc Ray, 
+        attr_t attributes);
+
+        /// Creates a HitObject representing a hit based on values explicitly passed as arguments, without
+        /// tracing a ray. The primitive specified by AccelerationStructure, InstanceIndex, GeometryIndex,
+        /// and PrimitiveIndex must exist. The shader table index is explicitly provided as an argument
+        /// instead of being computed from the indexing formula used in TraceRay. The provided index must
+        /// reference a valid hit group record in the shader table. The Attributes parameter must either be an
+        /// attribute struct, such as BuiltInTriangleIntersectionAttributes, or another HitObject to copy the
+        /// attributes from.
+    __target_intrinsic(hlsl, "NvMakeHitWithRecordIndex")
+    [__requiresNVAPI]
+    static HitObject MakeHit<attr_t>( 
+        uint HitGroupRecordIndex, 
+        RaytracingAccelerationStructure AccelerationStructure, 
+        uint InstanceIndex, 
+        uint GeometryIndex, 
+        uint PrimitiveIndex, 
+        uint HitKind, 
+        RayDesc Ray, 
+        attr_t attributes); 
+
+        /// Creates a HitObject representing a miss based on values explicitly passed as arguments, without
+        /// tracing a ray. The provided shader table index must reference a valid miss record in the shader
+        /// table.
+    __target_intrinsic(hlsl, "NvMakeMiss")
+    [__requiresNVAPI]
+    static HitObject MakeMiss( 
+        uint MissShaderIndex, 
+        RayDesc Ray);
+
+        /// Creates a HitObject representing “NOP” (no operation) which is neither a hit nor a miss. Invoking a
+        /// NOP hit object using HitObject::Invoke has no effect. Reordering by hit objects using
+        /// ReorderThread will group NOP hit objects together. This can be useful in some reordering
+        /// scenarios where future control flow for some threads is known to process neither a hit nor a
+        /// miss.
+    __target_intrinsic(hlsl, "NvMakeNop")
+    [__requiresNVAPI]
+    static HitObject MakeNop();
+
+        /// Invokes closesthit or miss shading for the specified hit object. In case of a NOP HitObject, no
+        /// shader is invoked.
+    __target_intrinsic(hlsl, "NvInvokeHitObject")
+    [__requiresNVAPI]
+    static void Invoke<payload_t>(
+        RaytracingAccelerationStructure AccelerationStructure,
+        HitObject HitOrMiss, 
+        inout payload_t Payload);
+
+        /// Returns true if the HitObject encodes a miss, otherwise returns false.
+    __target_intrinsic(hlsl)
+    [__requiresNVAPI]
+    bool IsMiss();
+
+        /// Returns true if the HitObject encodes a hit, otherwise returns false.
+    __target_intrinsic(hlsl)
+    [__requiresNVAPI]
+    bool IsHit();
+
+        /// Returns true if the HitObject encodes a nop, otherwise returns false.
+    __target_intrinsic(hlsl)
+    [__requiresNVAPI]
+    bool IsNop();
+
+        /// Queries ray properties from HitObject. Valid if the hit object represents a hit or a miss.
+    __target_intrinsic(hlsl)
+    [__requiresNVAPI]
+    RayDesc GetRayDesc();
+
+        /// Queries shader table index from HitObject. Valid if the hit object represents a hit or a miss.
+    __target_intrinsic(hlsl)
+    [__requiresNVAPI]
+    uint GetShaderTableIndex();
+
+        /// Returns the instance index of a hit. Valid if the hit object represents a hit.
+    __target_intrinsic(hlsl)
+    [__requiresNVAPI]
+    uint GetInstanceIndex();
+
+        /// Returns the instance ID of a hit. Valid if the hit object represents a hit.
+    __target_intrinsic(hlsl)
+    [__requiresNVAPI]
+    uint GetInstanceID();
+
+        /// Returns the geometry index of a hit. Valid if the hit object represents a hit.
+    __target_intrinsic(hlsl)
+    [__requiresNVAPI]
+    uint GetGeometryIndex();
+
+        /// Returns the primitive index of a hit. Valid if the hit object represents a hit.
+    __target_intrinsic(hlsl)
+    [__requiresNVAPI]
+    uint GetPrimitiveIndex();
+
+        /// Returns the hit kind. Valid if the hit object represents a hit.
+    __target_intrinsic(hlsl)
+    [__requiresNVAPI]
+    uint GetHitKind();
+
+        /// Returns the attributes of a hit. Valid if the hit object represents a hit or a miss.
+    __target_intrinsic(hlsl, "$0.GetAttributes<$G0>()")
+    [__requiresNVAPI]
+    attr_t GetAttributes<attr_t>();
+
+        /// Loads a root constant from the local root table referenced by the hit object. Valid if the hit object
+        /// represents a hit or a miss. RootConstantOffsetInBytes must be a multiple of 4.
+    __target_intrinsic(hlsl)    
+    [__requiresNVAPI]
+    uint LoadLocalRootTableConstant(uint RootConstantOffsetInBytes);
+};
+
+    
+    /// Reorders threads based on a coherence hint value. NumCoherenceHintBits indicates how many of
+    /// the least significant bits of CoherenceHint should be considered during reordering (max: 16).
+    /// Applications should set this to the lowest value required to represent all possible values in
+    /// CoherenceHint. For best performance, all threads should provide the same value for
+    /// NumCoherenceHintBits.
+    /// Where possible, reordering will also attempt to retain locality in the thread’s launch indices
+    /// (DispatchRaysIndex in DXR).
+__target_intrinsic(hlsl, "NvReorderThread")
+[__requiresNVAPI]
+void ReorderThread( uint CoherenceHint, uint NumCoherenceHintBitsFromLSB );
+
+    /// Reorders threads based on a hit object, optionally extended by a coherence hint value. Coherence
+    /// hints behave as described in the generic variant of ReorderThread. The maximum number of
+    /// coherence hint bits in this variant of ReorderThread is 8. If no coherence hint is desired, set
+    /// NumCoherenceHitBits to zero.
+    /// Reordering will consider information in the HitObject and coherence hint with the following
+    /// priority:
+    /// 
+    /// 1. Shader ID stored in the HitObject
+    /// 2. Coherence hint, with the most significant hint bit having highest priority
+    /// 3. Spatial information stored in the HitObject
+    /// 
+    /// That is, ReorderThread will first attempt to group threads whose HitObject references the
+    /// same shader ID. (Miss shaders and NOP HitObjects are grouped separately). Within each of these
+    /// groups, it will attempt to order threads by the value of their coherence hints. And within ranges
+    /// of equal coherence hints, it will attempt to maximize locality in 3D space of the ray hit (if any).
+__target_intrinsic(hlsl, "NvReorderThread")
+[__requiresNVAPI]
+void ReorderThread( HitObject HitOrMiss, uint CoherenceHint, uint NumCoherenceHintBitsFromLSB );
+
+    /// Is equivalent to 
+    /// ```
+    /// void ReorderThread( HitObject HitOrMiss, uint CoherenceHint, uint NumCoherenceHintBitsFromLSB );
+    /// ```
+    /// With CoherenceHint and NumCoherenceHintBitsFromLSB as 0, meaning they are ignored.
+[__requiresNVAPI]
+__target_intrinsic(hlsl, "NvReorderThread")
+void ReorderThread( HitObject HitOrMiss );

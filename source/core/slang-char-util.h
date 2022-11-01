@@ -30,6 +30,8 @@ struct CharUtil
 
         /// True if it's alpha
     SLANG_FORCE_INLINE static bool isAlpha(char c) { return (getFlags(c) & (Flag::Upper | Flag::Lower)) != 0; }
+        /// True if it's alpha or a digit
+    SLANG_FORCE_INLINE static bool isAlphaOrDigit(char c) { return (getFlags(c) & (Flag::Upper | Flag::Lower | Flag::Digit)) != 0; }
 
         /// True if the character is a valid hex character
     SLANG_FORCE_INLINE static bool isHexDigit(char c) { return (getFlags(c) & Flag::HexDigit) != 0; }

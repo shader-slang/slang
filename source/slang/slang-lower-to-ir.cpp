@@ -7612,14 +7612,14 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
         // Constructors aren't really member functions, insofar
         // as they aren't called with a `this` parameter.
-        //
-        // TODO: We may also want to exclude `static` functions
-        // here for the same reason, but this routine is only
-        // used for the stdlib, where we don't currently have
-        // any `static` member functions to worry about.
-        //
         if(as<ConstructorDecl>(decl))
             return false;
+
+        // Exclude `static` functions for same reason.
+        if (decl->findModifier<HLSLStaticModifier>())
+        {
+            return false;
+        }
 
         auto dd = decl->parentDecl;
         for(;;)
