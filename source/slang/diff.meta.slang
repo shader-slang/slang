@@ -232,18 +232,18 @@ namespace dstd
     }
 
     __generic<let N : int>
-    __DifferentialPair<vector<float, N>> d_exp_vector(__DifferentialPair<vector<float, N>> dpx)
+    DifferentialPair<vector<float, N>> d_exp_vector(DifferentialPair<vector<float, N>> dpx)
     {
         vector<float, N> result;
         vector<float, N>.Differential d_result;
         for(int i = 0; i < N; ++i)
         { 
-            __DifferentialPair<float> dpexp = dstd.d_exp(__DifferentialPair<float>(dpx.p()[i], dpx.d()[i]));
+            DifferentialPair<float> dpexp = dstd.d_exp(DifferentialPair<float>(dpx.p()[i], dpx.d()[i]));
             result[i] = dpexp.p(); 
             d_result[i] = dpexp.d(); 
         }
 
-        return __DifferentialPair<vector<float, N>>(result, d_result);
+        return DifferentialPair<vector<float, N>>(result, d_result);
     }
 
 };
