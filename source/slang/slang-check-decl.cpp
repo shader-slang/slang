@@ -1457,21 +1457,6 @@ namespace Slang
             synth.pushScopeForContainer(aggTypeDecl);
         }
 
-        // Make the Differential type itself conform to `IDifferential` interface.
-        auto inheritanceIDiffernetiable = m_astBuilder->create<InheritanceDecl>();
-        inheritanceIDiffernetiable->base.type =
-            DeclRefType::create(m_astBuilder, m_astBuilder->getDifferentiableInterface());
-        inheritanceIDiffernetiable->parentDecl = aggTypeDecl;
-        aggTypeDecl->members.add(inheritanceIDiffernetiable);
-
-        // The `Differential` type of a `Differential` type is always `DifferentialBottomType`.
-        auto assocTypeDef = m_astBuilder->create<TypeDefDecl>();
-        assocTypeDef->nameAndLoc.name = getName("Differential");
-        assocTypeDef->type.type = m_astBuilder->getDifferentialBottomType();
-        assocTypeDef->parentDecl = aggTypeDecl;
-        assocTypeDef->setCheckState(DeclCheckState::Checked);
-        aggTypeDecl->members.add(assocTypeDef);
-
         // Helper function to add a `diffType` field into the synthesized type for the original
         // `member`.
         auto differentialType = DeclRefType::create(m_astBuilder, makeDeclRef(aggTypeDecl));
@@ -1543,10 +1528,6 @@ namespace Slang
         }
 
         auto satisfyingType = m_astBuilder->getOrCreateDeclRefType(aggTypeDecl, substSet);
-
-        // Synthesize the rest of IDifferential method conformances by recursively checking
-        // conformance on the synthesized decl.
-        checkAggTypeConformance(aggTypeDecl);
 
         if (doesTypeSatisfyAssociatedTypeConstraintRequirement(satisfyingType, requirementDeclRef, witnessTable))
         {
