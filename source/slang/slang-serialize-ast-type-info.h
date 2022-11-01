@@ -83,6 +83,9 @@ struct SerialGetFieldType<DeclRef<T>>
 template <typename T>
 struct SerialTypeInfo<DeclRef<T>> : public SerialDeclRefBaseTypeInfo {};
 
+template<>
+struct SerialTypeInfo<DeclRefBase> : public SerialDeclRefBaseTypeInfo {};
+
 // MatrixCoord can just go as is
 template <>
 struct SerialTypeInfo<MatrixCoord> : SerialIdentityTypeInfo<MatrixCoord> {};

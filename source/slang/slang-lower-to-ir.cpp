@@ -5866,47 +5866,6 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         return LoweredValInfo();
     }
 
-    LoweredValInfo visitDifferentiableTypeDictionary(DifferentiableTypeDictionary* decl)
-    {
-        for (auto & member : decl->members)
-        {
-            if (auto entry = as<DifferentiableTypeDictionaryItem>(member))
-            {
-
-                // Lower type and witness.
-                IRType* irType = lowerType(context, entry->baseType);
-                IRInst* irWitness = lowerVal(context, entry->confWitness).val;
-
-                SLANG_ASSERT(irType);
-
-                // If the witness can be lowered, and the differentiable type entry exists,
-                // add an entry to the context.
-                // 
-                if (irWitness && !getBuilder()->findDifferentiableTypeEntry(irType))
-                {
-                    getBuilder()->addDifferentiableTypeEntry(irType, irWitness);
-                }
-            }
-            else if (auto importEntry = as<DifferentiableTypeDictionaryImportItem>(member))
-            {
-                ensureDecl(context, importEntry->dictionaryRef.getDecl());
-            }
-            else
-            {
-                SLANG_UNEXPECTED("Unrecognized item in DifferentiableTypeDictionary");
-                UNREACHABLE_RETURN(LoweredValInfo());
-            }
-        }
-
-        if (auto diffTypeDict = getBuilder()->findOrEmitDifferentiableTypeDictionary())
-        {
-            // Place the dictionary at the end of modules and generic blocks.
-            diffTypeDict->moveToEnd();
-        }
-
-        return LoweredValInfo();
-    }
-
 #define IGNORED_CASE(NAME) \
     LoweredValInfo visit##NAME(NAME*) { return LoweredValInfo(); }
 
@@ -5916,7 +5875,6 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
     IGNORED_CASE(SyntaxDecl)
     IGNORED_CASE(AttributeDecl)
     IGNORED_CASE(NamespaceDecl)
-    IGNORED_CASE(DifferentiableTypeDictionaryItem)
 
 #undef IGNORED_CASE
 
@@ -7119,6 +7077,27 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         builder->addDecoration(inst, kIROp_DerivativeMemberDecoration, key);
     }
 
+    void lowerDifferentiableAttribute(IRGenContext* subContext, IRInst* inst, DifferentiableAttribute* attr)
+    {
+        auto irDict = getBuilder()->addDifferentiableTypeDictionaryDecoration(inst);
+        for (auto& entry : attr->m_mapTypeToIDifferentiableWitness)
+        {
+            // Lower type and witness.
+            IRType* irType = lowerType(subContext, entry.Value->sub);
+            IRInst* irWitness = lowerVal(subContext, entry.Value).val;
+
+            SLANG_ASSERT(irType);
+
+            // If the witness can be lowered, and the differentiable type entry exists,
+            // add an entry to the context.
+            // 
+            if (irWitness)
+            {
+                getBuilder()->addDifferentiableTypeEntry(irDict, irType, irWitness);
+            }
+        }
+    }
+
     LoweredValInfo lowerMemberVarDecl(VarDecl* fieldDecl)
     {
         // Each field declaration in the AST translates into
@@ -7164,12 +7143,11 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         {
             lowerDerivativeMemberModifier(irFieldKey, derivativeMemberModifier);
         }
-
+        
         // We allow a field to be marked as a target intrinsic,
         // so that we can override its mangled name in the
         // output for the chosen target.
         addTargetIntrinsicDecorations(irFieldKey, fieldDecl);
-
 
         return LoweredValInfo::simple(irFieldKey);
     }
@@ -7308,21 +7286,6 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             if (auto constraintDecl = as<GenericTypeConstraintDecl>(member))
             {
                 emitGenericConstraintDecl(subContext, constraintDecl);
-            }
-        }
-
-        // We only need dictionaries to be lowered for decls with executable code (i.e. statements)
-        // Do not lower type dictionaries for inhertiance decls or decls 
-        // that are declaring a type, since this can create a cyclic dependancy.
-        // 
-        if (as<FunctionDeclBase>(leafDecl))
-        {
-            for (auto diffTypeDict : genericDecl->getMembersOfType<DifferentiableTypeDictionary>())
-            {
-                // We directly use lowerDecl() instead of ensureDecl() to emit to
-                // the current generic block instead of the top-level module.
-                // 
-                lowerDecl(subContext, diffTypeDict);
             }
         }
 
@@ -7479,10 +7442,6 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                     {
                         markInstsToClone(valuesToClone, parentGeneric->getFirstBlock(), genericParam);
                     }
-                    
-                    // Add a differentiable type dictionary if necessary.
-                    if (auto diffTypeDict = subBuilder->findDifferentiableTypeDictionary(parentGeneric->getFirstBlock()))
-                        markInstsToClone(valuesToClone, parentGeneric->getFirstBlock(), diffTypeDict);
                 }
                 if (valuesToClone.Count() == 0)
                 {
@@ -7837,6 +7796,10 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         if (decl->findModifier<ForwardDifferentiableAttribute>())
         {
             getBuilder()->addForwardDifferentiableDecoration(irFunc);
+        }
+        if (auto differentialAttr = decl->findModifier<DifferentiableAttribute>())
+        {
+            lowerDifferentiableAttribute(subContext, irFunc, differentialAttr);
         }
 
         // Always force inline diff setter accessor to prevent downstream compiler from complaining

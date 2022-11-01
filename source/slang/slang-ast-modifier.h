@@ -977,6 +977,9 @@ class SpecializeAttribute : public Attribute
 class DifferentiableAttribute : public Attribute
 {
     SLANG_AST_CLASS(DifferentiableAttribute)
+
+    /// Mapping from types to subtype witnesses for conformance to IDifferentiable.
+    OrderedDictionary<DeclRefBase, SubtypeWitness*>   m_mapTypeToIDifferentiableWitness;
 };
 
 class DllImportAttribute : public Attribute

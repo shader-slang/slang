@@ -899,9 +899,24 @@ namespace Slang
         return result;
     }
 
+    void SemanticsVisitor::registerDifferentiableType(DeclRefType* type, SubtypeWitness* witness)
+    {
+        SLANG_RELEASE_ASSERT(m_parentDifferentiableAttr);
+        if (witness)
+        {
+            m_parentDifferentiableAttr->m_mapTypeToIDifferentiableWitness.AddIfNotExists(type->declRef, witness);
+        }
+    }
+
+
     void SemanticsVisitor::maybeRegisterDifferentiableType(ASTBuilder* builder, Type* type)
     {
         if (!builder->isDifferentiableInterfaceAvailable())
+        {
+            return;
+        }
+
+        if (!m_parentDifferentiableAttr)
         {
             return;
         }
@@ -927,10 +942,8 @@ namespace Slang
             if (auto subtypeWitness = as<SubtypeWitness>(
                 tryGetInterfaceConformanceWitness(type, getASTBuilder()->getDifferentiableInterface())))
             {
-                auto diffTypeContext = this->getShared()->innermostDiffTypeContext();
-                diffTypeContext->registerDifferentiableType((DeclRefType*)type, subtypeWitness);
+                registerDifferentiableType((DeclRefType*)type, subtypeWitness);
             }
-
             return;
         }
     }
@@ -2007,19 +2020,8 @@ namespace Slang
 
     Expr* SemanticsExprVisitor::visitForwardDifferentiateExpr(ForwardDifferentiateExpr* expr)
     {
-        this->getShared()->getDiffTypeContext()->requireDifferentiableTypeDictionary();
-        
         // Check/Resolve inner function declaration.
         expr->baseFunction = CheckTerm(expr->baseFunction);
-
-        // Register parameter types.
-        if (auto funcType = as<FuncType>(expr->baseFunction->type.type))
-        {
-            for (UInt i = 0; i < funcType->getParamCount(); i++)
-            {
-                maybeRegisterDifferentiableType(m_astBuilder, funcType->getParamType(i));
-            }
-        }
 
         // For now we only support using higher order expr as callee in an invoke expr.
         // The actual type of the higher order function will be derived during resolve invoke.

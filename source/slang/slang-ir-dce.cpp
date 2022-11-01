@@ -361,13 +361,6 @@ bool shouldInstBeLiveIfParentIsLive(IRInst* inst, IRDeadCodeEliminationOptions o
     case kIROp_WitnessTableEntry:
         return true;
 
-        // Special dictionaries used for differentiable type tracking 
-        // should be kept alive. These are removed by the auto-diff pass,
-        // once they are used.
-    case kIROp_DifferentiableTypeDictionaryItem:
-    case kIROp_DifferentiableTypeDictionary:
-        return true;
-
     default:
         break;
     }

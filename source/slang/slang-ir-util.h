@@ -24,6 +24,14 @@ Dictionary<IRInst*, IRInst*> buildInterfaceRequirementDict(IRInterfaceType* inte
 
 bool isComInterfaceType(IRType* type);
 
+
+IROp getTypeStyle(IROp op);
+
+inline bool isScalarIntegerType(IRType* type)
+{
+    return getTypeStyle(type->getOp()) == kIROp_IntType;
+}
+
 }
 
 #endif
