@@ -512,7 +512,7 @@ SlangResult RenderTestApp::initialize(
     auto result = device->createProgram(m_compilationOutput.output.desc, m_shaderProgram.writeRef(), outDiagnostics.writeRef());
     if (outDiagnostics)
     {
-        printf("Slang compilation error:\n%s\n", (const char*)outDiagnostics->getBufferPointer());
+        printf("Slang compilation diagnostic:\n%s\n", (const char*)outDiagnostics->getBufferPointer());
     }
     SLANG_RETURN_ON_FAIL(result);
 
