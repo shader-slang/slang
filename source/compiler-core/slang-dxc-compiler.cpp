@@ -520,12 +520,15 @@ SlangResult DXCDownstreamCompiler::compile(const CompileOptions& options, IArtif
     // TODO(JS): Enable in a better way perhaps?
     {
         // Strictly speaking the HLSL2021 was available in 1.6.2112, in preview
-        // We enable on 1.7.2207 as that is the first official version
-        const SemanticVersion hlsl2021Version(1, 7, 2207);
+        // We enable on 1.7.2207 as that is the first official version, but 
+        // since we may not be able to get the patch version, we'll just assume any version
+        // over 1.7 has can support the feature.
 
-        if (m_desc.version >= hlsl2021Version)
+        const SemanticVersion firstHlsl2021Version(1, 7);
+
+        if (m_desc.version >= firstHlsl2021Version)
         {
-            args.add(L"-hv");
+            args.add(L"-HV");
             args.add(L"2021");
         }
     }
