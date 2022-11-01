@@ -194,8 +194,26 @@ SlangResult DXCDownstreamCompiler::init(ISlangSharedLibrary* library)
         return SLANG_FAIL;
     }
 
-    m_desc = Desc(SLANG_PASS_THROUGH_DXC);
+    // Must be able to create the compiler. We inly do this here, because we want to get the compiler 
+    // version.
+    ComPtr<IDxcCompiler> dxcCompiler;
+    SLANG_RETURN_ON_FAIL(m_createInstance(CLSID_DxcCompiler, __uuidof(dxcCompiler), (LPVOID*)dxcCompiler.writeRef()));
 
+    ComPtr<IDxcVersionInfo> versionInfo;
+    if (SLANG_SUCCEEDED(dxcCompiler->QueryInterface(versionInfo.writeRef())))
+    {
+        uint32_t major;
+        uint32_t minor;
+        versionInfo->GetVersion(&major, &minor);
+
+        m_desc = Desc(SLANG_PASS_THROUGH_DXC, SemanticVersion(int(major), int(minor), 0));
+    }
+    else
+    {
+        // We don't know the version
+        m_desc = Desc(SLANG_PASS_THROUGH_DXC);
+    }
+    
     return SLANG_OK;
 }
 
@@ -580,38 +598,28 @@ SlangResult DXCDownstreamCompiler::getVersionString(slang::IBlob** outVersionStr
     ComPtr<IDxcCompiler> dxcCompiler;
     SLANG_RETURN_ON_FAIL(m_createInstance(CLSID_DxcCompiler, __uuidof(dxcCompiler), (LPVOID*)dxcCompiler.writeRef()));
 
-    ComPtr<ISlangBlob> version;
-    ComPtr<IDxcVersionInfo> versionInfo;
-    if (SLANG_SUCCEEDED(dxcCompiler->QueryInterface(versionInfo.writeRef())))
+    // Because the major/minor version alone does not necessarily capture different releases
+    // of the DX compiler, we also need to query for the commit hash. If we are unable to
+    // obtain the commit hash, then we return the shared library timestamp instead.
+    ComPtr<IDxcVersionInfo2> versionInfo2;
+    if (SLANG_SUCCEEDED(dxcCompiler->QueryInterface(versionInfo2.writeRef())))
     {
-        // Because the major/minor version alone does not necessarily capture different releases
-        // of the DX compiler, we also need to query for the commit hash. If we are unable to
-        // obtain the commit hash, then we return the shared library timestamp instead.
-        ComPtr<IDxcVersionInfo2> versionInfo2;
-        if (SLANG_SUCCEEDED(dxcCompiler->QueryInterface(versionInfo2.writeRef())))
+        StringBuilder versionString;
+
+        // Append the version
+        m_desc.version.append(versionString);
+        
+        char* commitHash = nullptr;
+        uint32_t unused;
+        versionInfo2->GetCommitInfo(&unused, &commitHash);
+        if (commitHash)
         {
-            uint32_t major;
-            uint32_t minor;
-            versionInfo->GetVersion(&major, &minor);
+            // Successfully queried the commit hash, append to the version and return.
+            versionString.append(commitHash);
+            CoTaskMemFree(commitHash);
 
-            StringBuilder versionString;
-            versionString.append(major);
-            versionString.append(".");
-            versionString.append(minor);
-
-            char* commitHash = nullptr;
-            uint32_t unused;
-            versionInfo2->GetCommitInfo(&unused, &commitHash);
-            if (commitHash)
-            {
-                // Successfully queried the commit hash, append to the version and return.
-                versionString.append(commitHash);
-                CoTaskMemFree(commitHash);
-
-                version = StringBlob::create(versionString.getBuffer());
-                *outVersionString = version.detach();
-                return SLANG_OK;
-            }
+            *outVersionString = StringBlob::moveCreate(versionString).detach();
+            return SLANG_OK;
         }
     }
 
@@ -619,8 +627,7 @@ SlangResult DXCDownstreamCompiler::getVersionString(slang::IBlob** outVersionStr
     // as the version instead.
     auto timestamp = SharedLibraryUtils::getSharedLibraryTimestamp(m_createInstance);
     auto timestampString = String(timestamp);
-    version = StringBlob::create(timestampString.getBuffer());
-    *outVersionString = version.detach();
+    *outVersionString = StringBlob::moveCreate(timestampString.getBuffer()).detach();
     return SLANG_OK;
 }
 
