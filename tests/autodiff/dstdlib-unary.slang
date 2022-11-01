@@ -1,7 +1,7 @@
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj -output-using-type
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj -output-using-type
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0], stride=4):out,name=outputBuffer
+//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
 
 typedef DifferentialPair<float> dpfloat;
@@ -35,8 +35,8 @@ void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     {
         dpfloat dpx = dpfloat(-3.0, 2.0);
-        outputBuffer[0] = diffAbs(dpx.p());
-        outputBuffer[1] = __fwd_diff(diffAbs)(dpx).d();
+        outputBuffer[6] = diffAbs(dpx.p());
+        outputBuffer[7] = __fwd_diff(diffAbs)(dpx).d();
 
         dpfloat dpa = dpfloat(2.0, 1.0);
 
