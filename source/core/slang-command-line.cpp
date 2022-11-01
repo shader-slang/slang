@@ -116,6 +116,14 @@ void CommandLine::appendArgs(StringBuilder& out) const
     }
 }
 
+void CommandLine::addArgIfNotFound(const String& in)
+{
+    if (m_args.indexOf(in) < 0)
+    {
+        addArg(in);
+    }
+}
+
 String CommandLine::toString() const
 {
     StringBuilder buf;

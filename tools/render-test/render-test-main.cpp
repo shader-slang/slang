@@ -1073,22 +1073,20 @@ static SlangResult _setSessionPrelude(const Options& options, const char* exePat
     // Let's see if we need to set up special prelude for HLSL
     if (options.nvapiExtnSlot.getLength())
     {
+        // We want to set the path to NVAPI
         String rootPath;
         SLANG_RETURN_ON_FAIL(TestToolUtil::getRootPath(exePath, rootPath));
-
         String includePath;
-        if (TestToolUtil::getIncludePath(rootPath, "external/nvapi/nvHLSLExtns.h", includePath) !=
-            SLANG_OK)
-        {
-            return SLANG_FAIL;
-        }
+        SLANG_RETURN_ON_FAIL(TestToolUtil::getIncludePath(rootPath, "external/nvapi/nvHLSLExtns.h", includePath))
 
         StringBuilder buf;
         // We have to choose a slot that NVAPI will use. 
         buf << "#define NV_SHADER_EXTN_SLOT " << options.nvapiExtnSlot << "\n";
 
         // Include the NVAPI header
-        buf << "#include \"" << includePath << "\"\n\n";
+        buf << "#include ";
+        StringEscapeUtil::appendQuoted(StringEscapeUtil::getHandler(StringEscapeUtil::Style::Cpp), includePath.getUnownedSlice(), buf);
+        buf << "\n\n";
 
         session->setLanguagePrelude(SLANG_SOURCE_LANGUAGE_HLSL, buf.getBuffer());
     }

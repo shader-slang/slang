@@ -59,14 +59,15 @@ TestReporter* TestContext::getTestReporter()
     return m_reporters[slangTestThreadIndex];
 }
 
-Result TestContext::init(const char* exePath)
+Result TestContext::init(const char* inExePath)
 {
     m_session = spCreateSession(nullptr);
     if (!m_session)
     {
         return SLANG_FAIL;
     }
-    SLANG_RETURN_ON_FAIL(TestToolUtil::getExeDirectoryPath(exePath, exeDirectoryPath));
+    exePath = inExePath;
+    SLANG_RETURN_ON_FAIL(TestToolUtil::getExeDirectoryPath(inExePath, exeDirectoryPath));
     return SLANG_OK;
 }
 

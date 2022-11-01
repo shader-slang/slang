@@ -62,6 +62,8 @@ struct CommandLine
     void addArg(const String& in) { m_args.add(in); }
     void addArgs(const String* args, Int argsCount) { for (Int i = 0; i < argsCount; ++i) addArg(args[i]); }
 
+    void addArgIfNotFound(const String& in);
+
         /// Find the index of an arg which is exact match for slice
     SLANG_INLINE Index findArgIndex(const UnownedStringSlice& slice) const { return m_args.indexOf(slice); }
 
