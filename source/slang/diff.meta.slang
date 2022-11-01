@@ -1,4 +1,3 @@
-
 /// Modifer to mark a function for forward-mode differentiation.
 /// i.e. the compiler will automatically generate a new function
 /// that computes the jacobian-vector product of the original.
@@ -9,6 +8,24 @@ attribute_syntax [ForwardDifferentiable] : ForwardDifferentiableAttribute;
 __attributeTarget(FunctionDeclBase)
 attribute_syntax [ForwardDerivative(function)]   : ForwardDerivativeAttribute;
 
+/// Interface to denote types as differentiable.
+/// Allows for user-specified differential types as
+/// well as automatic generation, for when the associated type
+/// hasn't been declared explicitly.
+/// Note that the requirements must currently be defined in this exact order
+/// since the auto-diff pass relies on the order to grab the struct keys.
+///
+__magic_type(DifferentiableType)
+interface IDifferentiable
+{
+    // Note: the compiler implementation requires the `Differential` associated type to be defined
+    // before anything else.
+
+    [__BuiltinRequirement(_BuiltinRequirementKind.DifferentialType)]
+    associatedtype Differential;
+
+    [__BuiltinRequirement(_BuiltinRequirementKind.DZeroFunc)]
+    static Differential dzero();
 
 __attributeTarget(FunctionDeclBase)
 attribute_syntax [ForwardDerivativeOf(function)]   : ForwardDerivativeOfAttribute;
@@ -16,6 +33,16 @@ attribute_syntax [ForwardDerivativeOf(function)]   : ForwardDerivativeOfAttribut
 __attributeTarget(DeclBase)
 attribute_syntax [DerivativeMember(memberName)] : DerivativeMemberAttribute;
 
+// Add extensions for the standard types
+extension float : IDifferentiable
+{
+    typedef float Differential;
+
+    [__unsafeForceInlineEarly]
+    static Differential dzero()
+    {
+        return float(0.f);
+    }
 
 /// Pair type that serves to wrap the primal and
 /// differential types of an arbitrary type T.
@@ -91,7 +118,7 @@ struct DifferentialPair : IDifferentiable
     vector<TYPE,COUNT> result; for(int i = 0; i < COUNT; ++i) { result[i] = FUNC(VALUE[i]); } return result
 
 // Natural Exponent
-    
+
 __generic<T : __BuiltinFloatingPointType>
 [ForwardDerivativeOf(exp)]
 DifferentialPair<T> __d_exp(DifferentialPair<T> dpx)
@@ -108,10 +135,10 @@ DifferentialPair<vector<T, N>> __d_exp_vector(DifferentialPair<vector<T, N>> dpx
     vector<T, N> result;
     vector<T, N>.Differential d_result;
     for(int i = 0; i < N; ++i)
-    { 
+    {
         DifferentialPair<T> dpexp = __d_exp(DifferentialPair<T>(dpx.p[i], __slang_noop_cast<T.Differential>(dpx.d[i])));
-        result[i] = dpexp.p; 
-        d_result[i] = __slang_noop_cast<T>(dpexp.d); 
+        result[i] = dpexp.p;
+        d_result[i] = __slang_noop_cast<T>(dpexp.d);
     }
     return DifferentialPair<vector<T, N>>(result, d_result);
 }
