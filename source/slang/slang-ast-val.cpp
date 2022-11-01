@@ -618,6 +618,41 @@ Val* TaggedUnionSubtypeWitness::_substituteImplOverride(ASTBuilder* astBuilder, 
     return substWitness;
 }
 
+bool DifferentialBottomSubtypeWitness::_equalsValOverride(Val* val)
+{
+    auto otherDiffBottomWitness = as<DifferentialBottomSubtypeWitness>(val);
+    if (!otherDiffBottomWitness)
+        return false;
+
+    return otherDiffBottomWitness->sub && otherDiffBottomWitness->sub->equals(sub);
+}
+
+void DifferentialBottomSubtypeWitness::_toTextOverride(StringBuilder& out)
+{
+    out << "DifferentialBottomSubtypeWitness(" << sub << ")";
+}
+
+HashCode DifferentialBottomSubtypeWitness::_getHashCodeOverride()
+{
+    return combineHash(3892, sub->getHashCode());
+}
+
+Val* DifferentialBottomSubtypeWitness::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff)
+{
+    int diff = 0;
+
+    auto substSub = as<Type>(sub->substituteImpl(astBuilder, subst, &diff));
+    auto substSup = as<Type>(sup->substituteImpl(astBuilder, subst, &diff));
+    if (!diff)
+        return this;
+
+    *ioDiff += diff;
+
+    DifferentialBottomSubtypeWitness* substWitness =
+        astBuilder->create<DifferentialBottomSubtypeWitness>(substSub, substSup);
+    return substWitness;
+}
+
 bool ConjunctionSubtypeWitness::_equalsValOverride(Val* val)
 {
     if (auto other = as<ConjunctionSubtypeWitness>(val))

@@ -306,6 +306,7 @@ IF EXIST ..\..\..\external\slang-glslang\bin\windows-aarch64\release\slang-glsla
     <ClInclude Include="..\..\..\source\slang\slang-ast-reflect.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ast-stmt.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ast-support-types.h" />
+    <ClInclude Include="..\..\..\source\slang\slang-ast-synthesis.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ast-type.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ast-val.h" />
     <ClInclude Include="..\..\..\source\slang\slang-capability-defs.h" />
@@ -468,6 +469,7 @@ IF EXIST ..\..\..\external\slang-glslang\bin\windows-aarch64\release\slang-glsla
     <ClCompile Include="..\..\..\source\slang\slang-ast-reflect.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ast-substitutions.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ast-support-types.cpp" />
+    <ClCompile Include="..\..\..\source\slang\slang-ast-synthesis.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ast-type.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ast-val.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-capability.cpp" />

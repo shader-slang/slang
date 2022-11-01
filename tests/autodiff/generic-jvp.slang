@@ -39,7 +39,7 @@ extension myvector<3> : MyLinearArithmeticType
     }
 
     [ForwardDifferentiable]
-__init(vector<Real, 3> a)
+    __init(vector<Real, 3> a)
     {
         val = a;
     }
@@ -83,7 +83,7 @@ extension myvector<4> : MyLinearArithmeticType
 typedef myvector<3> myfloat3;
 typedef myvector<4> myfloat4;
 
-typedef __DifferentialPair<Real> dpfloat;
+typedef DifferentialPair<Real> dpfloat;
 
 interface MyLinearArithmeticType
 {
@@ -144,8 +144,8 @@ extension myfloat4 : IDifferentiable
     }
 };
 
-typedef __DifferentialPair<myfloat4> dpfloat4;
-typedef __DifferentialPair<myfloat3> dpfloat3;
+typedef DifferentialPair<myfloat4> dpfloat4;
+typedef DifferentialPair<myfloat3> dpfloat3;
 
 extension float : MyLinearArithmeticType
 {

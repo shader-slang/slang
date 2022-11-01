@@ -4,7 +4,7 @@
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
 
-struct B
+struct B : IDifferentiable
 {
     float3 z;
     float.Differential k[10];
@@ -41,7 +41,7 @@ struct A : IDifferentiable
     }
 };
 
-typedef __DifferentialPair<A> dpA;
+typedef DifferentialPair<A> dpA;
 
 [ForwardDifferentiable]
 A f(A a)

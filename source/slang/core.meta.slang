@@ -2434,7 +2434,7 @@ __generic<T : IComparable>
 [__unsafeForceInlineEarly]
 bool operator >=(T v0, T v1)
 {
-    return v1.lessThanOrEquals(v1);
+    return v1.lessThan(v1);
 }
 __generic<T : IComparable>
 [__unsafeForceInlineEarly]

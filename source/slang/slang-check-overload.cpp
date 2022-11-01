@@ -1559,7 +1559,7 @@ namespace Slang
 
                 OverloadCandidate candidate;
                 candidate.flavor = OverloadCandidate::Flavor::Expr;
-                candidate.funcType = as<FuncType>(processJVPFuncType(this->getASTBuilder(), origFuncType));
+                candidate.funcType = as<FuncType>(processJVPFuncType(origFuncType));
                 candidate.resultType = candidate.funcType->getResultType();
                 candidate.item = LookupResultItem(baseFuncDeclRef);
 
@@ -1576,7 +1576,6 @@ namespace Slang
                         OverloadCandidate candidate;
                         candidate.flavor = OverloadCandidate::Flavor::Expr;
                         candidate.funcType = as<FuncType>(processJVPFuncType(
-                            this->getASTBuilder(),
                             as<FuncType>(GetTypeForDeclRef(item.declRef, item.declRef.decl->loc))));
                         candidate.resultType = candidate.funcType->getResultType();
                         candidate.item = LookupResultItem(item.declRef);
@@ -1606,7 +1605,7 @@ namespace Slang
                 auto funcType = getFuncType(this->getASTBuilder(), unspecializedInnerRef.as<CallableDecl>());
 
                 // Process func type to generate JVP func type.
-                auto jvpFuncType = as<FuncType>(processJVPFuncType(this->getASTBuilder(), funcType));
+                auto jvpFuncType = as<FuncType>(processJVPFuncType(funcType));
 
                 // Extract parameter list from processed type.
                 List<Type*> paramTypes;
@@ -1631,7 +1630,6 @@ namespace Slang
                     // This could potentially be a declRef.substitute(jvpFuncType)
                     //
                     candidate.funcType = as<FuncType>(processJVPFuncType(
-                        this->getASTBuilder(),
                         getFuncType(this->getASTBuilder(), innerRef.as<CallableDecl>())));
                         
                     candidate.resultType = candidate.funcType->getResultType();
