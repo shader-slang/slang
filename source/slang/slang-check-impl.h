@@ -794,15 +794,12 @@ namespace Slang
         bool shouldSkipChecking(Decl* decl, DeclCheckState state);
 
         // Auto-diff convenience functions for translating primal types to differential types.
-        Type* _toDifferentialParamType(ASTBuilder* builder, Type* primalType);
+        Type* _toDifferentialParamType(Type* primalType);
 
-        // Translate a return type to the return type of a forward-mode differentiated
-        // function.
-        //
-        Type* _toJVPReturnType(ASTBuilder* builder, Type* primalType);
-        
+        Type* getDifferentialPairType(Type* primalType);
+
         // Convert a function's original type to it's JVP type.
-        Type* processJVPFuncType(ASTBuilder* builder, FuncType* originalType);
+        Type* processJVPFuncType(FuncType* originalType);
 
         // Check and register a type if it is differentiable.
         void maybeRegisterDifferentiableType(ASTBuilder* builder, Type* type);
@@ -1038,6 +1035,11 @@ namespace Slang
             DeclRef<GenericDecl>        requirementGenDecl,
             RefPtr<WitnessTable>        witnessTable);
 
+        bool doesTypeSatisfyAssociatedTypeConstraintRequirement(
+            Type* satisfyingType,
+            DeclRef<AssocTypeDecl>  requiredAssociatedTypeDeclRef,
+            RefPtr<WitnessTable>    witnessTable);
+
         bool doesTypeSatisfyAssociatedTypeRequirement(
             Type*            satisfyingType,
             DeclRef<AssocTypeDecl>  requiredAssociatedTypeDeclRef,
@@ -1124,7 +1126,7 @@ namespace Slang
             /// Otherwise, returns `false`.
         bool trySynthesizeDifferentialAssociatedTypeRequirementWitness(
             ConformanceCheckingContext* context,
-            DeclRef<Decl> requirementDeclRef,
+            DeclRef<AssocTypeDecl> requirementDeclRef,
             RefPtr<WitnessTable> witnessTable);
 
             /// Registers a type as differentiable in the currrent semantic context, if the declaration represents
@@ -1988,6 +1990,8 @@ namespace Slang
         Expr* visitModifiedTypeExpr(ModifiedTypeExpr* expr);
 
         Expr* visitForwardDifferentiateExpr(ForwardDifferentiateExpr* expr);
+
+        Expr* visitGetArrayLengthExpr(GetArrayLengthExpr* expr);
 
             /// Perform semantic checking on a `modifier` that is being applied to the given `type`
         Val* checkTypeModifier(Modifier* modifier, Type* type);
