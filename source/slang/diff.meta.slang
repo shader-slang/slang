@@ -59,60 +59,15 @@ extension float : IDifferentiable
     }
 }
 
-extension vector<float, 3> : IDifferentiable
+__generic<let N:int>
+extension vector<float, N> : IDifferentiable
 {
-    typedef vector<float, 3> Differential;
+    typedef vector<float, N> Differential;
 
     [__unsafeForceInlineEarly]
     static Differential dzero()
     {
-        return vector<float, 3>(0.f);
-    }
-
-    [__unsafeForceInlineEarly]
-    static Differential dadd(Differential a, Differential b)
-    {
-        return a + b;
-    }
-
-    [__unsafeForceInlineEarly]
-    static Differential dmul(This a, Differential b)
-    {
-        return a * b;
-    }
-}
-
-extension vector<float, 2> : IDifferentiable
-{
-    typedef vector<float, 2> Differential;
-
-    [__unsafeForceInlineEarly]
-    static Differential dzero()
-    {
-        return vector<float, 2>(0.f);
-    }
-
-    [__unsafeForceInlineEarly]
-    static Differential dadd(Differential a, Differential b)
-    {
-        return a + b;
-    }
-
-    [__unsafeForceInlineEarly]
-    static Differential dmul(This a, Differential b)
-    {
-        return a * b;
-    }
-}
-
-extension vector<float, 4> : IDifferentiable
-{
-    typedef vector<float, 4> Differential;
-
-    [__unsafeForceInlineEarly]
-    static Differential dzero()
-    {
-        return vector<float, 4>(0.f);
+        return vector<float, N>(0.f);
     }
 
     [__unsafeForceInlineEarly]
@@ -207,6 +162,9 @@ struct DifferentialPair : IDifferentiable
 
 typealias IDFloat = IFloat & IDifferentiable;
 
+#define VECTOR_MAP_UNARY(TYPE, COUNT, FUNC, VALUE) \
+    vector<TYPE,COUNT> result; for(int i = 0; i < COUNT; ++i) { result[i] = FUNC(VALUE[i]); } return result
+
 namespace dstd
 {
     // Natural Exponent
@@ -262,4 +220,30 @@ namespace dstd
             cos(dpx.p()),
             T.dmul(-sin(dpx.p()), dpx.d()));
     }
+
+    __generic<let N : int>
+    __target_intrinsic(hlsl)
+    __target_intrinsic(glsl)
+    __target_intrinsic(spirv_direct, "12 resultType resultId glsl450 27 _0")
+    [ForwardDerivative(d_exp_vector)]
+    vector<float, N> exp(vector<float, N> x)
+    {
+        VECTOR_MAP_UNARY(float, N, dstd.exp, x);
+    }
+
+    __generic<let N : int>
+    __DifferentialPair<vector<float, N>> d_exp_vector(__DifferentialPair<vector<float, N>> dpx)
+    {
+        vector<float, N> result;
+        vector<float, N>.Differential d_result;
+        for(int i = 0; i < N; ++i)
+        { 
+            __DifferentialPair<float> dpexp = dstd.d_exp(__DifferentialPair<float>(dpx.p()[i], dpx.d()[i]));
+            result[i] = dpexp.p(); 
+            d_result[i] = dpexp.d(); 
+        }
+
+        return __DifferentialPair<vector<float, N>>(result, d_result);
+    }
+
 };
