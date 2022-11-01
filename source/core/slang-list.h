@@ -269,7 +269,7 @@ namespace Slang
 
         void insertRange(Index id, const List<T>& list) {    insertRange(id, list.m_buffer, list.m_count); }
 
-        void addRange(ArrayView<T> list) { insertRange(m_count, list.getBuffer(), list.Count()); }
+        void addRange(ArrayView<T> list) { insertRange(m_count, list.getBuffer(), list.getCount()); }
 
         void addRange(const T* vals, Index n) { insertRange(m_count, vals, n); }
 

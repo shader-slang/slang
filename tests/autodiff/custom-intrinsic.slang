@@ -4,7 +4,7 @@
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
 
-typedef __DifferentialPair<float> dpfloat;
+typedef DifferentialPair<float> dpfloat;
 
 typealias IDFloat = IFloat & IDifferentiable;
 
@@ -20,9 +20,9 @@ namespace myintrinsiclib
     T exp(T x);
 
     __generic<T : IDFloat>
-    __DifferentialPair<T> d_exp(__DifferentialPair<T> dpx)
+    DifferentialPair<T> d_exp(DifferentialPair<T> dpx)
     {
-        return __DifferentialPair<T>(
+        return DifferentialPair<T>(
             exp(dpx.p()),
             T.dmul(exp(dpx.p()), dpx.d()));
     }
@@ -39,9 +39,9 @@ namespace myintrinsiclib
     T sin(T x);
 
     __generic<T : IDFloat>
-    __DifferentialPair<T> d_sin(__DifferentialPair<T> dpx)
+    DifferentialPair<T> d_sin(DifferentialPair<T> dpx)
     {
-        return __DifferentialPair<T>(
+        return DifferentialPair<T>(
             sin(dpx.p()),
             T.dmul(cos(dpx.p()), dpx.d()));
     }
@@ -57,9 +57,9 @@ namespace myintrinsiclib
     T cos(T x);
 
     __generic<T : IDFloat>
-    __DifferentialPair<T> d_cos(__DifferentialPair<T> dpx)
+    DifferentialPair<T> d_cos(DifferentialPair<T> dpx)
     {
-        return __DifferentialPair<T>(
+        return DifferentialPair<T>(
             cos(dpx.p()),
             T.dmul(-sin(dpx.p()), dpx.d()));
     }
@@ -76,14 +76,14 @@ namespace myintrinsiclib
     }
 
     __generic<T : IDFloat>
-    void d_sincos(__DifferentialPair<T> x, out __DifferentialPair<T> s, out __DifferentialPair<T> c)
+    void d_sincos(DifferentialPair<T> x, out DifferentialPair<T> s, out DifferentialPair<T> c)
     {
         T _s;
         T _c;
         sincos(x.p(), _s, _c);
 
-        s = __DifferentialPair<T>(_s, T.dmul(_c, x.d()));
-        c = __DifferentialPair<T>(_c, T.dmul(-_s, x.d()));
+        s = DifferentialPair<T>(_s, T.dmul(_c, x.d()));
+        c = DifferentialPair<T>(_c, T.dmul(-_s, x.d()));
     }
 };
 

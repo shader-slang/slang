@@ -384,6 +384,12 @@ namespace Slang
             ///
         ReadyForConformances,
 
+            /// Any DeclRefTypes with substitutions have been fully resolved
+            /// to concrete type. E.g. `T.X` with `T=A` should resolve to `A.X`.
+            /// We need a separate pass to resolve these types because `A.X`
+            /// maybe synthesized and made available only after conformance checking.
+        TypesFullyResolved,
+
             /// The declaration is fully checked.
             ///
             /// This step includes any validation of the declaration that is
@@ -778,6 +784,12 @@ namespace Slang
         String toString() const;
         void toText(StringBuilder& out) const;
     };
+
+    // If this is a declref to an associatedtype with a ThisTypeSubsitution,
+    // try to find the concrete decl that satisfies the associatedtype requirement from the
+    // concrete type supplied by ThisTypeSubstittution.
+    Val* _tryLookupConcreteAssociatedTypeFromThisTypeSubst(ASTBuilder* builder, DeclRef<Decl> declRef);
+
 
     template<typename T>
     struct DeclRef : DeclRefBase

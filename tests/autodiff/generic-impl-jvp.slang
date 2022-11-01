@@ -8,8 +8,8 @@ typedef float Real;
 
 typealias IDFloat = IFloat & IDifferentiable;
 
-__generic<T, let N : int>
-struct dvector
+__generic<T : IDifferentiable, let N : int>
+struct dvector : IDifferentiable
 {
     T values[N];
 };
@@ -118,10 +118,10 @@ T dot(myvector<T, N> a, myvector<T, N> b)
 }
 
 __generic<T : IDFloat, let N : int>
-typedef __DifferentialPair<myvector<T, N>> dpvector;
+typedef DifferentialPair<myvector<T, N>> dpvector;
 
 __generic<T : IDFloat, let N : int>
-__DifferentialPair<T> dot_jvp(dpvector<T, N> a, dpvector<T, N> b)
+DifferentialPair<T> dot_jvp(dpvector<T, N> a, dpvector<T, N> b)
 {
     T.Differential curr_d = (T.dzero());
     T curr_p = (T)0.0;
@@ -135,11 +135,11 @@ __DifferentialPair<T> dot_jvp(dpvector<T, N> a, dpvector<T, N> b)
                         T.dmul(b.p().values[i], a.d().values[i])));
     }
 
-    return __DifferentialPair<T>(curr_p, curr_d);
+    return DifferentialPair<T>(curr_p, curr_d);
 }
 
 __generic<let N : int>
-struct lineardvector
+struct lineardvector : IDifferentiable
 {
     myvector<Real, N>.Differential val;
 
@@ -223,7 +223,7 @@ typedef linearvector<4> myfloat4;
 typedef lineardvector<3> mydfloat3;
 typedef lineardvector<4> mydfloat4;
 
-typedef __DifferentialPair<Real> dpfloat;
+typedef DifferentialPair<Real> dpfloat;
 
 interface MyLinearArithmeticType
 {
@@ -233,8 +233,8 @@ interface MyLinearArithmeticType
     static Real ldot(This a, This b);
 };
 
-typedef __DifferentialPair<myfloat4> dpfloat4;
-typedef __DifferentialPair<myfloat3> dpfloat3;
+typedef DifferentialPair<myfloat4> dpfloat4;
+typedef DifferentialPair<myfloat3> dpfloat3;
 
 extension float : MyLinearArithmeticType
 {

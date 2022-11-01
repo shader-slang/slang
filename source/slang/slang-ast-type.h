@@ -86,6 +86,20 @@ protected:
     {}
 };
 
+// The bottom/empty type as a result of Differentiating a Differential.
+class DifferentialBottomType : public DeclRefType
+{
+    SLANG_AST_CLASS(DifferentialBottomType)
+
+    // Overrides should be public so base classes can access
+    void _toTextOverride(StringBuilder& out);
+    Type* _createCanonicalTypeOverride();
+    bool _equalsImplOverride(Type* type);
+    HashCode _getHashCodeOverride();
+    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+};
+
+
 // Base class for types that can be used in arithmetic expressions
 class ArithmeticExpressionType : public DeclRefType 
 {

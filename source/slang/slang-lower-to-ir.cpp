@@ -1366,12 +1366,29 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         // produce transitive witnesses in shapes that will cuase us
         // problems here.
         //
-        IRInst* requirementKey = lowerSimpleVal(context, val->midToSup);
+        IRInst* midToSup = lowerSimpleVal(context, val->midToSup);
+
+        if (!baseWitnessTable)
+        {
+            // If we don't have a valid baseWitnessTable,
+            // we are in a situation that `subToMid` is a `DifferentialBottomSubtypeWitness`
+            // that applies for all non-differentiable types.
+            // In this case `midToSup` will give us the `DifferentialBottom:IDifferentiable`
+            // witness table and we can just use that as the final result of
+            // this transitive witness.
+            SLANG_RELEASE_ASSERT(midToSup && as<IRWitnessTableType>(midToSup->getDataType()));
+            return LoweredValInfo::simple(midToSup);
+        }
 
         return LoweredValInfo::simple(getBuilder()->emitLookupInterfaceMethodInst(
             getBuilder()->getWitnessTableType(lowerType(context, val->sup)),
             baseWitnessTable,
-            requirementKey));
+            midToSup));
+    }
+
+    LoweredValInfo visitDifferentialBottomSubtypeWitness(DifferentialBottomSubtypeWitness*)
+    {
+        return LoweredValInfo();
     }
 
     LoweredValInfo visitTaggedUnionSubtypeWitness(
@@ -3051,6 +3068,15 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
             getBuilder()->emitForwardDifferentiateInst(
                 lowerType(context, expr->type),
                 baseVal.val));
+    }
+
+    LoweredValInfo visitGetArrayLengthExpr(GetArrayLengthExpr* expr)
+    {
+        auto baseVal = lowerSubExpr(expr->arrayExpr);
+        auto type = lowerType(context, expr->arrayExpr->type);
+        auto arrayType = as<IRArrayType>(type);
+        SLANG_ASSERT(arrayType);
+        return LoweredValInfo::simple(arrayType->getElementCount());
     }
 
     LoweredValInfo visitOverloadedExpr(OverloadedExpr* /*expr*/)
@@ -5857,7 +5883,9 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 // add an entry to the context.
                 // 
                 if (irWitness && !getBuilder()->findDifferentiableTypeEntry(irType))
+                {
                     getBuilder()->addDifferentiableTypeEntry(irType, irWitness);
+                }
             }
             else if (auto importEntry = as<DifferentiableTypeDictionaryImportItem>(member))
             {
@@ -6777,7 +6805,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         IRInterfaceType* irInterface = subBuilder->createInterfaceType(operandCount, nullptr);
         
         // Add `irInterface` to decl mapping now to prevent cyclic lowering.
-        setValue(subContext, decl, LoweredValInfo::simple(irInterface));
+        setValue(context, decl, LoweredValInfo::simple(irInterface));
 
         // Setup subContext for proper lowering `ThisType`, associated types and
         // the interface decl's self reference.
@@ -7084,6 +7112,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
     void lowerDerivativeMemberModifier(IRInst* inst, DerivativeMemberAttribute* derivativeMember)
     {
+        ensureDecl(context, derivativeMember->memberDeclRef->declRef.getDecl()->parentDecl);
         auto key = lowerRValueExpr(context, derivativeMember->memberDeclRef).val;
         SLANG_RELEASE_ASSERT(as<IRStructKey>(key));
         auto builder = getBuilder();

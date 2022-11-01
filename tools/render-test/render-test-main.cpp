@@ -508,8 +508,9 @@ SlangResult RenderTestApp::initialize(
 
     // Once the shaders have been compiled we load them via the underlying API.
     //
-    SLANG_RETURN_ON_FAIL(
-        device->createProgram(m_compilationOutput.output.desc, m_shaderProgram.writeRef()));
+    ComPtr<ISlangBlob> outDiagnostics;
+    auto result = device->createProgram(m_compilationOutput.output.desc, m_shaderProgram.writeRef(), outDiagnostics.writeRef());
+    SLANG_RETURN_ON_FAIL(result);
 
 	m_device = device;
 

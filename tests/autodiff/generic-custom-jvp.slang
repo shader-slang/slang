@@ -6,7 +6,7 @@ RWStructuredBuffer<float> outputBuffer;
 typealias IDFloat = IFloat & IDifferentiable;
 
 __generic<T : IDFloat>
-typedef __DifferentialPair<T> dfloat;
+typedef DifferentialPair<T> dfloat;
 
 import test_intrinsics;
 
