@@ -7143,7 +7143,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         {
             lowerDerivativeMemberModifier(irFieldKey, derivativeMemberModifier);
         }
-        
+
         // We allow a field to be marked as a target intrinsic,
         // so that we can override its mangled name in the
         // output for the chosen target.
@@ -7151,10 +7151,6 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
         return LoweredValInfo::simple(irFieldKey);
     }
-
-
-
-
 
     bool isImportedDecl(Decl* decl)
     {
@@ -7174,6 +7170,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         GenericTypeConstraintDecl*  constraintDecl,
         IRType*                     supType)
     {
+
         auto subBuilder = subContext->irBuilder;
 
         // There are two cases we care about here.
