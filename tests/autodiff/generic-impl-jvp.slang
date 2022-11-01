@@ -8,8 +8,8 @@ typedef float Real;
 
 typealias IDFloat = IFloat & IDifferentiable;
 
-__generic<T : IDifferentiable, let N : int>
-struct dvector : IDifferentiable
+__generic<T, let N : int>
+struct dvector
 {
     T values[N];
 };
@@ -139,7 +139,7 @@ DifferentialPair<T> dot_jvp(dpvector<T, N> a, dpvector<T, N> b)
 }
 
 __generic<let N : int>
-struct lineardvector : IDifferentiable
+struct lineardvector
 {
     myvector<Real, N>.Differential val;
 
