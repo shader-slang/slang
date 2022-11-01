@@ -774,6 +774,11 @@ struct IRPrimitivesDecoration : public IRMeshOutputDecoration
     IR_LEAF_ISA(PrimitivesDecoration)
 };
 
+struct IRGLSLPrimitivesRateDecoration : public IRDecoration
+{
+    IR_LEAF_ISA(GLSLPrimitivesRateDecoration)
+};
+
 struct IRMeshOutputRef : public IRInst
 {
     enum { kOp = kIROp_MeshOutputRef };
@@ -2279,6 +2284,8 @@ public:
 
     void setInsertInto(IRInst* insertInto) { setInsertLoc(IRInsertLoc::atEnd(insertInto)); }
     void setInsertBefore(IRInst* insertBefore) { setInsertLoc(IRInsertLoc::before(insertBefore)); }
+    // TODO: Ellie, contrary to IRInsertLoc::after, this inserts instructions in the order they are emitted, should it have a better name (setInsertBeforeNext)?
+    void setInsertAfter(IRInst* insertAfter);
 
     void setInsertInto(IRModule* module) { setInsertInto(module->getModuleInst()); }
 

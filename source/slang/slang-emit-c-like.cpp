@@ -3063,6 +3063,11 @@ void CLikeSourceEmitter::emitInterpolationModifiers(IRInst* varInst, IRType* val
     emitInterpolationModifiersImpl(varInst, valueType, layout);
 }
 
+void CLikeSourceEmitter::emitMeshOutputModifiers(IRInst* varInst)
+{
+    emitMeshOutputModifiersImpl(varInst);
+}
+
     /// Emit modifiers that should apply even for a declaration of an SSA temporary.
 void CLikeSourceEmitter::emitTempModifiers(IRInst* temp)
 {
@@ -3091,6 +3096,7 @@ void CLikeSourceEmitter::emitVarModifiers(IRVarLayout* layout, IRInst* varDecl, 
         || layout->usesResourceKind(LayoutResourceKind::VaryingOutput))
     {
         emitInterpolationModifiers(varDecl, varType, layout);
+        emitMeshOutputModifiers(varDecl);
     }
 
     // Output target specific qualifiers

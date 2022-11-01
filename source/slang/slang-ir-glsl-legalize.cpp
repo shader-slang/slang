@@ -1,6 +1,8 @@
 // slang-ir-glsl-legalize.cpp
 #include "slang-ir-glsl-legalize.h"
 
+#include <functional>
+
 #include "slang-ir.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-inst-pass-base.h"
@@ -851,6 +853,14 @@ GLSLSystemValueInfo* getGLSLSystemValueInfo(
         // we ought to use if the `noperspective` modifier has been
         // applied to this varying input.
     }
+    else if (semanticName == "sv_cullprimitive")
+    {
+        name = "gl_CullPrimitiveEXT";
+    }
+    else if (semanticName == "sv_shadingrate")
+    {
+        name = "gl_PrimitiveShadingRateEXT";
+    }
 
     if( name )
     {
@@ -929,6 +939,7 @@ ScalarizedVal createSimpleGLSLGlobalVarying(
         break;
         case GlobalVaryingDeclarator::Flavor::meshOutputVertices:
         case GlobalVaryingDeclarator::Flavor::meshOutputIndices:
+        case GlobalVaryingDeclarator::Flavor::meshOutputPrimitives:
         {
             auto arrayType = builder->getUnsizedArrayType(type);
 
@@ -1013,6 +1024,11 @@ ScalarizedVal createSimpleGLSLGlobalVarying(
         {
             builder->addGLSLOuterArrayDecoration(globalParam, UnownedTerminatedStringSlice(outerArrayName));
         }
+    }
+
+    if(declarator && declarator->flavor == GlobalVaryingDeclarator::Flavor::meshOutputPrimitives)
+    {
+        builder->addDecoration(globalParam, kIROp_GLSLPrimitivesRateDecoration);
     }
 
     builder->addLayoutDecoration(globalParam, varLayout);
@@ -1737,20 +1753,33 @@ void legalizeMeshOutputParam(
     condition.g = g;
     specializeFunctionCalls(codeGenContext, builder->getModule(), &condition);
 
+    // TODO: Ellie: Inspecting types in the compiler makes me uneasy, this all
+    // breaks once we let go of types always being statically determined at
+    // compile time. Even if we did swing more towards dependent types, should
+    // mesh output types be more restricted?
     Dictionary<IRStructKey*, UInt> keyIndexMap;
-    UInt i = 0;
-    if(auto structType = as<IRStructType>(meshOutputType->getElementType()))
+    std::function<void(IRType*)> populateKeyIndexMap = [&](IRType* t)
     {
-        for(auto f : structType->getFields())
+        if(auto structType = as<IRStructType>(t))
         {
-            keyIndexMap.Add(f->getKey(), i);
-            i++;
+            UInt i = 0;
+            for(auto f : structType->getFields())
+            {
+                keyIndexMap.Add(f->getKey(), i);
+                i++;
+                populateKeyIndexMap(f->getFieldType());
+            }
         }
-    }
+    };
+    populateKeyIndexMap(meshOutputType->getElementType());
 
     //
     // Remove this global by making all writes actually write to the
     // newly introduced out variables.
+    //
+    // Sadly it's not as simple as just using this file's `assign` function as
+    // the writes may only be writing to parts of the output struct, or may not
+    // be writes at all (i.e. being passed as an out paramter).
     //
     traverseUses(g, [&](IRInst* u)
     {
@@ -1761,64 +1790,98 @@ void legalizeMeshOutputParam(
         {
             auto p = as<IRGetElementPtr>(v);
             SLANG_ASSERT(p && "Mesh Output sentinel parameter wasn't used as an array");
-            traverseUses(p, [&](IRInst* s)
+
+            std::function<void(ScalarizedVal&, IRInst*)> assignUses =
+                [&](ScalarizedVal& d, IRInst* a)
             {
-                instMatch_(s,
-                    [&](IRStore* s)
-                    {
-                        // Store using the SOA representation
-                        IRBuilderInsertLocScope locScope{builder};
-                        builder->setInsertBefore(s);
-
-                        // TODO: Ellie assignElement
-                        assign(
-                            builder,
-                            globalOutputVal,
-                            ScalarizedVal::value(s->getVal()),
-                            p->getIndex());
-
-                        // Stores aren't used, safe to remove here without checking
-                        s->removeAndDeallocate();
-                    },
-                    // TODO: Ellie, this should extract the field and recurse
-                    // here, instead of just dealing with a single level
-                    [&](IRFieldAddress* m)
-                    {
-                        auto key = as<IRStructKey>(m->getField());
-                        traverseUses(m, [&](IRInst* u)
+                // If we're just writing to an address, we can seamlessly
+                // replace it with the address to the SOA representation.
+                // GLSL's `out` function parameters have copy-out semantics, so
+                // this is all above board.
+                if(d.flavor == ScalarizedVal::Flavor::address)
+                {
+                    IRBuilderInsertLocScope locScope{builder};
+                    builder->setInsertBefore(a);
+                    a->replaceUsesWith(
+                        builder->emitElementAddress(
+                            a->getFullType(),
+                            d.irValue,
+                            p->getIndex()));
+                    return;
+                }
+                // Otherwise, go through the uses one by one and see what we can do
+                traverseUses(a, [&](IRInst* s)
+                {
+                    instMatch_(s,
+                        [&](IRFieldAddress* m)
                         {
-                            instMatch_(u,
-                                [&](IRStore* s)
-                                {
-                                    // TODO: Ellie, I suspect this is possible, for
-                                    // examples interfaces, shouldn't be possible here...
-                                    SLANG_ASSERT("Result of getField wasn't a struct key");
+                            auto key = as<IRStructKey>(m->getField());
+                            // TODO: Ellie, I suspect this is possible
+                            SLANG_ASSERT("Result of getField wasn't a struct key");
 
-                                    IRBuilderInsertLocScope locScope{builder};
-                                    builder->setInsertBefore(s);
-                                    SLANG_ASSERT(keyIndexMap.ContainsKey(key));
-                                    UInt index = keyIndexMap[key];
-                                    auto d = extractField(builder, globalOutputVal, index, key);
-                                    assign(builder, d, ScalarizedVal::value(s->getVal()), p->getIndex());
-                                    s->removeAndDeallocate();
-                                },
-                                // TODO: Ellie, swizzled stores
-                                [](IRInst* s)
+                            SLANG_ASSERT(keyIndexMap.ContainsKey(key));
+                            UInt fieldIndex = keyIndexMap[key];
+                            auto d_ = extractField(builder, d, fieldIndex, key);
+                            assignUses(d_, m);
+                        },
+                        [&](IRStore* s)
+                        {
+                            // Store using the SOA representation
+                            IRBuilderInsertLocScope locScope{builder};
+                            builder->setInsertBefore(s);
+
+                            // TODO: Ellie assignElement
+                            assign(
+                                builder,
+                                d,
+                                ScalarizedVal::value(s->getVal()),
+                                p->getIndex());
+
+                            // Stores aren't used, safe to remove here without checking
+                            s->removeAndDeallocate();
+                        },
+                        [&](IRCall* c)
+                        {
+                            // Translate
+                            //   foo(vertices[n])
+                            // to
+                            //   tmp
+                            //   foo(tmp)
+                            //   vertices[n] = tmp;
+                            //
+                            // This has copy-out semantics, which is really the
+                            // best we can hope for without going and
+                            // specializing foo.
+                            IRBuilderInsertLocScope locScope{builder};
+                            builder->setInsertBefore(c);
+                            auto ptr = as<IRPtrTypeBase>(a->getFullType());
+                            SLANG_ASSERT(ptr && "Mesh output parameter was passed by value");
+                            auto t = ptr->getValueType();
+                            auto tmp = builder->emitVar(t);
+                            for(uint i = 0; i < c->getOperandCount(); i++)
+                            {
+                                if(c->getOperand(i) == a)
                                 {
-                                    // TODO: Ellie
-                                    SLANG_ASSERT(!"Ellie: TODO");
+                                    c->setOperand(i, tmp);
                                 }
-                            );
-                        });
-                    },
-                    // TODO: Ellie, swizzled stores
-                    [](IRInst* s)
-                    {
-                        // TODO: Ellie
-                        SLANG_ASSERT(!"Ellie: TODO");
-                    }
-                );
-            });
+                            }
+                            builder->setInsertAfter(c);
+                            assign(builder, d,
+                                    ScalarizedVal::value(builder->emitLoad(tmp)),
+                                    p->getIndex());
+                        },
+                        [](IRSwizzledStore* s)
+                        {
+                            SLANG_UNEXPECTED("Swizzled store to a non-address ScalarizedVal");
+                        },
+                        [](IRInst* s)
+                        {
+                            SLANG_UNEXPECTED("Unhandled use of mesh output parameter during GLSL legalization");
+                        }
+                    );
+                });
+            };
+            assignUses(globalOutputVal, p);
         });
     });
 
@@ -1920,14 +1983,17 @@ void legalizeMeshOutputParam(
     // GLSL does permit redeclaring these particular ones, so it might be nice to
     // add a linkage decoration instead of it being an intrinsic in the event
     // that we start outputting the linkage decoration instead of it being an
-    // intrinsic in the event that we start outputting these
+    // intrinsic in the event that we start outputting these.
     auto blockParamType = builder->getGLSLOutputParameterGroupType(builder->getUnsizedArrayType(meshOutputBlockType));
     auto blockParam = builder->createGlobalParam(blockParamType);
+    bool isPerPrimitive = as<IRPrimitivesType>(meshOutputType);
+    auto typeName = isPerPrimitive ? "gl_MeshPerPrimitiveEXT" : "gl_MeshPerVertexEXT";
+    auto arrayName = isPerPrimitive ? "gl_MeshPrimitivesEXT" : "gl_MeshVerticesEXT";
     builder->addTargetIntrinsicDecoration(
         meshOutputBlockType,
         CapabilitySet(CapabilityAtom::GLSL),
-        UnownedStringSlice("gl_MeshPerVertexEXT"));
-    builder->addImportDecoration(blockParam, UnownedStringSlice("gl_MeshVerticesEXT"));
+        UnownedStringSlice(typeName));
+    builder->addImportDecoration(blockParam, UnownedStringSlice(arrayName));
 
     for(auto builtin : builtins)
     {

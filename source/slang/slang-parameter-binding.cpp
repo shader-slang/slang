@@ -1925,10 +1925,16 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
         arrayTypeLayout->elementTypeLayout = elementTypeLayout;
         arrayTypeLayout->type = arrayType;
 
-        for (auto rr : elementTypeLayout->resourceInfos)
+        // TODO: Ellie, this is probably not the right place to handle this
+        // On GLSL the indices type is built in and as such doesn't consume
+        // resources.
+        if(!isKhronosTarget(context->getTargetRequest()) || !as<IndicesType>(type))
         {
-            // TODO: Ellie, explain why only one slot is consumed here
-            arrayTypeLayout->findOrAddResourceInfo(rr.kind)->count = rr.count;
+            for (auto rr : elementTypeLayout->resourceInfos)
+            {
+                // TODO: Ellie, explain why only one slot is consumed here
+                arrayTypeLayout->findOrAddResourceInfo(rr.kind)->count = rr.count;
+            }
         }
 
         return arrayTypeLayout;

@@ -2029,6 +2029,19 @@ namespace Slang
         }
     }
 
+    void IRBuilder::setInsertAfter(IRInst* insertAfter)
+    {
+        auto next = insertAfter->getNextInst();
+        if(next)
+        {
+            setInsertBefore(next);
+        }
+        else
+        {
+            setInsertInto(insertAfter->parent);
+        }
+    }
+
     IRConstant* IRBuilder::_findOrEmitConstant(
         IRConstant&     keyInst)
     {

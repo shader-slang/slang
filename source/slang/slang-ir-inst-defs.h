@@ -703,9 +703,10 @@ INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
     INST(PayloadDecoration, payload, 0, 0)
 
     /* Mesh Shader outputs */
-        INST(VerticesDecoration, vertices, 0, 0)
-        INST(PrimitivesDecoration, primitives, 0, 0)
+        INST(VerticesDecoration, vertices, 1, 0)
+        INST(PrimitivesDecoration, primitives, 1, 0)
     INST_RANGE(MeshOutputDecoration, VerticesDecoration, PrimitivesDecoration)
+    INST(GLSLPrimitivesRateDecoration, perprimitive, 0, 0)
 
     /* StageAccessDecoration */
         INST(StageReadAccessDecoration, stageReadAccess, 0, 0)

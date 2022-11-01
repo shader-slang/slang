@@ -2270,6 +2270,15 @@ void GLSLSourceEmitter::emitInterpolationModifiersImpl(IRInst* varInst, IRType* 
     }
 }
 
+void GLSLSourceEmitter::emitMeshOutputModifiersImpl(IRInst* varInst)
+{
+    if(varInst->findDecoration<IRGLSLPrimitivesRateDecoration>())
+    {
+        m_writer->emit("perprimitiveEXT");
+        m_writer->emit(" ");
+    }
+}
+
 void GLSLSourceEmitter::emitVarDecorationsImpl(IRInst* varDecl)
 {
     // Deal with Vulkan raytracing layout stuff *before* we

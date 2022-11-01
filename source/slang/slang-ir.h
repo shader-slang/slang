@@ -1925,7 +1925,7 @@ uint32_t& _debugGetIRAllocCounter();
 
 // TODO: Ellie, comment and move somewhere more appropriate?
 
-template<typename F, typename I = IRInst> 
+template<typename F, typename I = IRInst>
 static void traverseUses(IRInst* inst, F f)
 {
     auto n = inst->firstUse;
