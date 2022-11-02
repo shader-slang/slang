@@ -1472,20 +1472,31 @@ IRTargetIntrinsicDecoration* CLikeSourceEmitter::findBestTargetIntrinsicDecorati
 /* static */bool CLikeSourceEmitter::isOrdinaryName(UnownedStringSlice const& name)
 {
     char const* cursor = name.begin();
-    char const* end = name.end();
+    char const*const end = name.end();
 
     // Consume an optional `.` at the start, which indicates
     // the ordinary name is for a member function.
-    if(cursor != end && *cursor == '.')
+    if(cursor < end && *cursor == '.')
         cursor++;
 
-    while(cursor != end)
+    // Must have at least one char, and first char can't be a digit
+    if (cursor >= end || CharUtil::isDigit(cursor[0]))
+        return false;
+
+    for(; cursor < end; ++cursor)
     {
-        int c = *cursor++;
-        if( (c >= 'a') && (c <= 'z') ) continue;
-        if( (c >= 'A') && (c <= 'Z') ) continue;
-        if( (c >= '0') && (c <= '9') ) continue;
-        if( c == '_' ) continue;
+        const auto c = *cursor;
+        if (CharUtil::isAlphaOrDigit(c) || c == '_')
+        {
+            continue;
+        }
+
+        // We allow :: for scope
+        if (c == ':' && cursor + 1 < end && cursor[1] == ':')
+        {
+            ++cursor;
+            continue;
+        }
 
         return false;
     }

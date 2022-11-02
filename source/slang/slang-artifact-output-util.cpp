@@ -99,7 +99,8 @@ SlangResult ArtifactOutputUtil::maybeDisassemble(Session* session, IArtifact* ar
     // If is text, we can just output
     if (ArtifactDescUtil::isText(desc))
     {
-        return writer->write((const char*)blob->getBufferPointer(), blob->getBufferSize());
+        auto text = StringUtil::getSlice(blob);
+        return writer->write(text.begin(), text.getLength());
     }
     else
     {

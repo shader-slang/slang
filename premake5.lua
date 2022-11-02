@@ -102,7 +102,7 @@ newoption {
  
  newoption {
     trigger     = "enable-nvapi",
-    description = "(Optional) If true will enable NVAPI, if NVAPI is found via CUDA_PATH",
+    description = "(Optional) If true will enable NVAPI, if NVAPI is found via external/nvapi",
     value       = "bool",
     default     = "false",
     allowed     = { { "true", "True"}, { "false", "False" } }
