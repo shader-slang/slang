@@ -181,8 +181,25 @@ protected:
 
     DxcCreateInstanceProc m_createInstance = nullptr;
 
+        /// The commit hash associated with the DXC dll used
+        /// If 0 length, no hash was found
+    String m_commitHash;            
+        /// The commit count. 0 if not set
+    uint32_t m_commitCount = 0;
+
     ComPtr<ISlangSharedLibrary> m_sharedLibrary;
 };
+
+static String _moveTaskMemAllocatedToString(char* chars)
+{
+    if (chars)
+    {
+        const String str(chars);
+        ::CoTaskMemFree(chars);
+        return str;
+    }
+    return String();
+}
 
 SlangResult DXCDownstreamCompiler::init(ISlangSharedLibrary* library)
 {
@@ -194,7 +211,69 @@ SlangResult DXCDownstreamCompiler::init(ISlangSharedLibrary* library)
         return SLANG_FAIL;
     }
 
-    m_desc = Desc(SLANG_PASS_THROUGH_DXC);
+    // Must be able to create the compiler. We inly do this here, because we want to get the compiler 
+    // version.
+    ComPtr<IDxcCompiler> dxcCompiler;
+    SLANG_RETURN_ON_FAIL(m_createInstance(CLSID_DxcCompiler, __uuidof(dxcCompiler), (LPVOID*)dxcCompiler.writeRef()));
+
+    uint32_t major = 0;
+    uint32_t minor = 0;
+    uint32_t patch = 0;
+
+    // Get the version info
+    {
+        ComPtr<IDxcVersionInfo> versionInfo;
+        if (SLANG_SUCCEEDED(dxcCompiler->QueryInterface(versionInfo.writeRef())))
+        {
+            versionInfo->GetVersion(&major, &minor);
+        }
+    }
+
+    // Get the commit hash
+    {
+
+        ComPtr<IDxcVersionInfo2> versionInfo;
+        if (SLANG_SUCCEEDED(dxcCompiler->QueryInterface(versionInfo.writeRef())))
+        {
+            char* commitHash = nullptr;
+            versionInfo->GetCommitInfo(&m_commitCount, &commitHash);
+            m_commitHash = _moveTaskMemAllocatedToString(commitHash);
+        }
+    }
+
+    // Try and get the custom build string, as we can potentially get the patch version from that.
+    if (patch == 0)
+    {
+        ComPtr<IDxcVersionInfo3> versionInfo;
+
+        if (SLANG_SUCCEEDED(dxcCompiler->QueryInterface(versionInfo.writeRef())))
+        {
+            char* customVersionCString = nullptr;
+            versionInfo->GetCustomVersionString(&customVersionCString);
+
+            const String customVersionString = _moveTaskMemAllocatedToString(customVersionCString);
+
+            SemanticVersion semanticVersion(int(major), int(minor), 0);
+            StringBuilder buf;
+            semanticVersion.append(buf);
+
+            if (customVersionString.startsWith(buf) && 
+                customVersionString.getLength() > buf.getLength() + 2 &&
+                customVersionString[buf.getLength()] == '.')
+            {
+                // Get the patch slice
+                UnownedStringSlice patchSlice = StringUtil::getAtInSplit(customVersionString.getUnownedSlice(), '.', 2);
+
+                Int patchValue;
+                if (SLANG_SUCCEEDED(StringUtil::parseInt(patchSlice, patchValue)) && patchValue > 0)
+                {
+                    patch = uint32_t(patchValue);
+                }
+            }
+        }
+    }
+
+    m_desc = Desc(SLANG_PASS_THROUGH_DXC, SemanticVersion(int(major), int(minor), int(patch)));
 
     return SLANG_OK;
 }
@@ -438,6 +517,22 @@ SlangResult DXCDownstreamCompiler::compile(const CompileOptions& options, IArtif
         searchDirectories.searchDirectories.add(asString(includePath));
     }
 
+    // TODO(JS): Enable in a better way perhaps?
+    {
+        // Strictly speaking the HLSL2021 was available in 1.6.2112, in preview
+        // We enable on 1.7.2207 as that is the first official version, but 
+        // since we may not be able to get the patch version, we'll just assume any version
+        // over 1.7 has can support the feature.
+
+        const SemanticVersion firstHlsl2021Version(1, 7);
+
+        if (m_desc.version >= firstHlsl2021Version)
+        {
+            args.add(L"-HV");
+            args.add(L"2021");
+        }
+    }
+
     String sourcePath = ArtifactUtil::findPath(sourceArtifact);
     OSString wideSourcePath = sourcePath.toWString();
 
@@ -577,50 +672,21 @@ SlangResult DXCDownstreamCompiler::convert(IArtifact* from, const ArtifactDesc& 
 
 SlangResult DXCDownstreamCompiler::getVersionString(slang::IBlob** outVersionString)
 {
-    ComPtr<IDxcCompiler> dxcCompiler;
-    SLANG_RETURN_ON_FAIL(m_createInstance(CLSID_DxcCompiler, __uuidof(dxcCompiler), (LPVOID*)dxcCompiler.writeRef()));
+    StringBuilder versionString;
+    // Append the version
+    m_desc.version.append(versionString);
 
-    ComPtr<ISlangBlob> version;
-    ComPtr<IDxcVersionInfo> versionInfo;
-    if (SLANG_SUCCEEDED(dxcCompiler->QueryInterface(versionInfo.writeRef())))
+    if (m_commitHash.getLength())
+    {        
+        versionString << "#" << m_commitHash;
+    }
+    else
     {
-        // Because the major/minor version alone does not necessarily capture different releases
-        // of the DX compiler, we also need to query for the commit hash. If we are unable to
-        // obtain the commit hash, then we return the shared library timestamp instead.
-        ComPtr<IDxcVersionInfo2> versionInfo2;
-        if (SLANG_SUCCEEDED(dxcCompiler->QueryInterface(versionInfo2.writeRef())))
-        {
-            uint32_t major;
-            uint32_t minor;
-            versionInfo->GetVersion(&major, &minor);
-
-            StringBuilder versionString;
-            versionString.append(major);
-            versionString.append(".");
-            versionString.append(minor);
-
-            char* commitHash = nullptr;
-            uint32_t unused;
-            versionInfo2->GetCommitInfo(&unused, &commitHash);
-            if (commitHash)
-            {
-                // Successfully queried the commit hash, append to the version and return.
-                versionString.append(commitHash);
-                CoTaskMemFree(commitHash);
-
-                version = StringBlob::create(versionString.getBuffer());
-                *outVersionString = version.detach();
-                return SLANG_OK;
-            }
-        }
+        // If we don't have the commitHash, we use the library timestamp, to uniquely identify.
+        versionString << " " << SharedLibraryUtils::getSharedLibraryTimestamp(m_createInstance);
     }
 
-    // If either of the QueryInterface calls fails, we return the shared library timestamp
-    // as the version instead.
-    auto timestamp = SharedLibraryUtils::getSharedLibraryTimestamp(m_createInstance);
-    auto timestampString = String(timestamp);
-    version = StringBlob::create(timestampString.getBuffer());
-    *outVersionString = version.detach();
+    *outVersionString = StringBlob::moveCreate(versionString).detach();
     return SLANG_OK;
 }
 
