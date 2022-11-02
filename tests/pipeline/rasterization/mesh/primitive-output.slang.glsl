@@ -5,10 +5,21 @@ layout(row_major) buffer;
 const vec3  colors_0[3] = { vec3(1.00000000000000000000, 1.00000000000000000000, 0.00000000000000000000), vec3(0.00000000000000000000, 1.00000000000000000000, 1.00000000000000000000), vec3(1.00000000000000000000, 0.00000000000000000000, 1.00000000000000000000) };
 const vec2  positions_0[3] = { vec2(0.00000000000000000000, -0.50000000000000000000), vec2(0.50000000000000000000, 0.50000000000000000000), vec2(-0.50000000000000000000, 0.50000000000000000000) };
 layout(location = 0)
-out vec3  _S1[];
+out vec3  _S1[3];
+
+out gl_MeshPerVertexEXT
+{
+    vec4 gl_Position;
+} gl_MeshVerticesEXT[3];
 
 perprimitiveEXT layout(location = 1)
-out vec3  _S2[];
+out vec3  _S2[1];
+
+perprimitiveEXT out gl_MeshPerPrimitiveEXT
+{
+    int gl_PrimitiveID;
+    bool gl_CullPrimitiveEXT;
+} gl_MeshPrimitivesEXT[1];
 
 struct Vertex_0
 {

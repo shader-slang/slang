@@ -3,7 +3,12 @@
 layout(row_major) uniform;
 layout(row_major) buffer;
 layout(location = 0)
-out vec3  _S1[];
+out vec3  _S1[3];
+
+out gl_MeshPerVertexEXT
+{
+    vec4 gl_Position;
+} gl_MeshVerticesEXT[3];
 
 layout(local_size_x = 3, local_size_y = 1, local_size_z = 1) in;
 layout(max_vertices = 3) out;

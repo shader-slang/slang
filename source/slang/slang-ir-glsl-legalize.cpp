@@ -941,7 +941,11 @@ ScalarizedVal createSimpleGLSLGlobalVarying(
         case GlobalVaryingDeclarator::Flavor::meshOutputIndices:
         case GlobalVaryingDeclarator::Flavor::meshOutputPrimitives:
         {
-            auto arrayType = builder->getUnsizedArrayType(type);
+            // It's legal to declare these as unsized arrays, but by sizing
+            // them by the (max) max size GLSL allows us to index into them
+            // with variable index.
+            SLANG_ASSERT(dd->elementCount && "Mesh output declarator didn't specify element count");
+            auto arrayType = builder->getArrayType(type, dd->elementCount);
 
             IRArrayTypeLayout::Builder arrayTypeLayoutBuilder(builder, typeLayout);
             if( auto resInfo = inTypeLayout->findSizeAttr(kind) )
@@ -1126,8 +1130,7 @@ ScalarizedVal createGLSLGlobalVaryingsImpl(
             default:
                 SLANG_UNEXPECTED("Unhandled mesh output type");
         }
-        // No need for anything downstream to know about this size
-        arrayDeclarator.elementCount = nullptr;
+        arrayDeclarator.elementCount = meshOutputType->getMaxElementCount();
         arrayDeclarator.next = declarator;
 
         return createGLSLGlobalVaryingsImpl(
@@ -1179,20 +1182,16 @@ ScalarizedVal createGLSLGlobalVaryingsImpl(
         {
             switch(dd->flavor)
             {
-            case GlobalVaryingDeclarator::Flavor::array:
-                {
-                    fullType = builder->getArrayType(
-                        fullType,
-                        dd->elementCount);
-                }
-                break;
             case GlobalVaryingDeclarator::Flavor::meshOutputVertices:
             case GlobalVaryingDeclarator::Flavor::meshOutputIndices:
             case GlobalVaryingDeclarator::Flavor::meshOutputPrimitives:
-                {
-                    fullType = builder->getUnsizedArrayType(fullType);
-                }
-                break;
+            case GlobalVaryingDeclarator::Flavor::array:
+            {
+                fullType = builder->getArrayType(
+                    fullType,
+                    dd->elementCount);
+            }
+            break;
             }
         }
 
@@ -1984,7 +1983,8 @@ void legalizeMeshOutputParam(
     // add a linkage decoration instead of it being an intrinsic in the event
     // that we start outputting the linkage decoration instead of it being an
     // intrinsic in the event that we start outputting these.
-    auto blockParamType = builder->getGLSLOutputParameterGroupType(builder->getUnsizedArrayType(meshOutputBlockType));
+    auto blockParamType = builder->getGLSLOutputParameterGroupType(
+        builder->getArrayType(meshOutputBlockType, meshOutputType->getMaxElementCount()));
     auto blockParam = builder->createGlobalParam(blockParamType);
     bool isPerPrimitive = as<IRPrimitivesType>(meshOutputType);
     auto typeName = isPerPrimitive ? "gl_MeshPerPrimitiveEXT" : "gl_MeshPerVertexEXT";

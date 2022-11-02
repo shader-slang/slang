@@ -46,13 +46,18 @@ void write_struct_0(out Texes_0 t_0)
 }
 
 layout(location = 0)
-out vec3  _S5[];
+out vec3  _S5[3];
 
 layout(location = 1)
-out vec2  _S6[];
+out vec2  _S6[3];
 
 layout(location = 2)
-out vec4  _S7[];
+out vec4  _S7[3];
+
+out gl_MeshPerVertexEXT
+{
+    vec4 gl_Position;
+} gl_MeshVerticesEXT[3];
 
 void everything_0()
 {
