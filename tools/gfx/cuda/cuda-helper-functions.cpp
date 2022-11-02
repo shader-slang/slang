@@ -72,6 +72,22 @@ void _optixLogCallback(unsigned int level, const char* tag, const char* message,
 #    endif
 } // namespace cuda
 
+Result SLANG_MCALL getCUDAAdapters(List<AdapterInfo>& outAdapters)
+{
+    int count;
+    cudaGetDeviceCount(&count);
+    for (int i = 0; i < count; i++)
+    {
+        cudaDeviceProp prop;
+        cudaGetDeviceProperties(&prop, i);
+        AdapterInfo info = {};
+        strncpy_s(info.name, prop.name, sizeof(AdapterInfo::name) - 1);
+        outAdapters.add(info);
+    }
+
+    return SLANG_OK;
+}
+
 Result SLANG_MCALL createCUDADevice(const IDevice::Desc* desc, IDevice** outDevice)
 {
 RefPtr<cuda::DeviceImpl> result = new cuda::DeviceImpl();
@@ -80,6 +96,13 @@ returnComPtr(outDevice, result);
 return SLANG_OK;
 }
 #else
+
+Result SLANG_MCALL getCUDAAdapters(List<AdapterInfo>& outAdapters)
+{
+    SLANG_UNUSED(outAdapters);
+    return SLANG_FAIL;
+}
+
 Result SLANG_MCALL createCUDADevice(const IDevice::Desc* desc, IDevice** outDevice)
 {
 SLANG_UNUSED(desc);

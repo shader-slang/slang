@@ -624,7 +624,7 @@ Result SLANG_MCALL getD3D12Adapters(List<AdapterInfo>& outAdapters)
     {
         DXGI_ADAPTER_DESC desc;
         dxgiAdapter->GetDesc(&desc);
-        AdapterInfo info;
+        AdapterInfo info = {};
         strncpy_s(info.name, String::fromWString(desc.Description).getBuffer(), sizeof(AdapterInfo::name) - 1);
         info.vendorID = desc.VendorId;
         info.deviceID = desc.DeviceId;

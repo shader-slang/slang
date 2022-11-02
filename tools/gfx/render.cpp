@@ -15,8 +15,10 @@ Result SLANG_MCALL createVKDevice(const IDevice::Desc* desc, IDevice** outDevice
 Result SLANG_MCALL createCUDADevice(const IDevice::Desc* desc, IDevice** outDevice);
 Result SLANG_MCALL createCPUDevice(const IDevice::Desc* desc, IDevice** outDevice);
 
+Result SLANG_MCALL getD3D11Adapters(List<AdapterInfo>& outAdapters);
 Result SLANG_MCALL getD3D12Adapters(List<AdapterInfo>& outAdapters);
 Result SLANG_MCALL getVKAdapters(List<AdapterInfo>& outAdapters);
+Result SLANG_MCALL getCUDAAdapters(List<AdapterInfo>& outAdapters);
 
 static bool debugLayerEnabled = false;
 bool isGfxDebugLayerEnabled() { return debugLayerEnabled; }
@@ -242,22 +244,33 @@ extern "C"
 
         switch (type)
         {
+#if SLANG_WINDOWS_FAMILY
         case DeviceType::DirectX11:
+            SLANG_RETURN_ON_FAIL(getD3D11Adapters(adapters));
             break;
         case DeviceType::DirectX12:
             SLANG_RETURN_ON_FAIL(getD3D12Adapters(adapters));
             break;
         case DeviceType::OpenGl:
-            break;
+            return SLANG_E_NOT_IMPLEMENTED;
         case DeviceType::Vulkan:
             SLANG_RETURN_ON_FAIL(getVKAdapters(adapters));
             break;
         case DeviceType::CUDA:
+            SLANG_RETURN_ON_FAIL(getCUDAAdapters(adapters));
             break;
+#elif SLANG_LINUX_FAMILY && !defined(__CYGWIN__)
+        case DeviceType::Vulkan:
+            SLANG_RETURN_ON_FAIL(getVKAdapters(adapters));
+            break;
+        case DeviceType::CUDA:
+            SLANG_RETURN_ON_FAIL(getCUDAAdapters(adapters));
+            break;
+#endif
         case DeviceType::CPU:
-            break;
-        case DeviceType::Default:
-            break;
+            return SLANG_E_NOT_IMPLEMENTED;
+        default:
+            return SLANG_E_INVALID_ARG;
         }
 
         if (adapters.getCount() > (Index)(bufferSize / sizeof(AdapterInfo)))
