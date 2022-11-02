@@ -132,8 +132,8 @@ namespace Slang
             Scope* newScope = astBuilder->create<Scope>();
             newScope->containerDecl = containerDecl;
             newScope->parent = currentScope;
-
             currentScope = newScope;
+            containerDecl->ownedScope = newScope;
         }
 
         void pushScopeAndSetParent(ContainerDecl* containerDecl)

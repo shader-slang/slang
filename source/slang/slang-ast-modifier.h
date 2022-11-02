@@ -977,6 +977,9 @@ class SpecializeAttribute : public Attribute
 class DifferentiableAttribute : public Attribute
 {
     SLANG_AST_CLASS(DifferentiableAttribute)
+
+    /// Mapping from types to subtype witnesses for conformance to IDifferentiable.
+    OrderedDictionary<DeclRefBase, SubtypeWitness*>   m_mapTypeToIDifferentiableWitness;
 };
 
 class DllImportAttribute : public Attribute
@@ -1016,14 +1019,14 @@ class RequiresNVAPIAttribute : public Attribute
 };
 
     /// The `[ForwardDifferentiable]` attribute indicates that a function can be forward-differentiated.
-class ForwardDifferentiableAttribute : public Attribute
+class ForwardDifferentiableAttribute : public DifferentiableAttribute
 {
     SLANG_AST_CLASS(ForwardDifferentiableAttribute)
 };
 
     /// The `[ForwardDerivative(function)]` attribute specifies a custom function that should
     /// be used as the derivative for the decorated function.
-class ForwardDerivativeAttribute : public Attribute 
+class ForwardDerivativeAttribute : public DifferentiableAttribute
 {
     SLANG_AST_CLASS(ForwardDerivativeAttribute)
 

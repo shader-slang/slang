@@ -17,7 +17,7 @@ struct A : IDifferentiable
     float y;
 };
 
-typedef __DifferentialPair<A> dpA;
+typedef DifferentialPair<A> dpA;
 
 A nonDiff(A a)
 {

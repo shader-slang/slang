@@ -41,7 +41,7 @@ struct A : IDifferentiable
     }
 };
 
-typedef __DifferentialPair<A> dpA;
+typedef DifferentialPair<A> dpA;
 
 [ForwardDifferentiable]
 A f(A a)

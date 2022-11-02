@@ -2434,7 +2434,7 @@ __generic<T : IComparable>
 [__unsafeForceInlineEarly]
 bool operator >=(T v0, T v1)
 {
-    return v1.lessThanOrEquals(v1);
+    return v1.lessThan(v1);
 }
 __generic<T : IComparable>
 [__unsafeForceInlineEarly]
@@ -2735,9 +2735,6 @@ attribute_syntax [anyValueSize(size:int)] : AnyValueSizeAttribute;
 
 __attributeTarget(InterfaceDecl)
 attribute_syntax [Specialize] : SpecializeAttribute;
-
-__attributeTarget(DeclBase)
-attribute_syntax [Differentiable] : DifferentiableAttribute;
 
 __attributeTarget(DeclBase)
 attribute_syntax [DerivativeMember(memberName)] : DerivativeMemberAttribute;

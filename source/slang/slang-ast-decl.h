@@ -29,6 +29,9 @@ class ContainerDecl: public Decl
     List<Decl*> members;
     SourceLoc closingSourceLoc;
 
+    // The associated scope owned by this decl.
+    Scope* ownedScope = nullptr;
+
     template<typename T>
     FilteredMemberList<T> getMembersOfType()
     {
@@ -507,36 +510,6 @@ class AttributeDecl : public ContainerDecl
     // What type of syntax node will be produced to represent this attribute.
     SyntaxClass<NodeBase> syntaxClass;
 };
-
-// A declaration to hold differentiable type conformances generated during
-// the semantic checking phase.
-// 
-class DifferentiableTypeDictionary : public ContainerDecl
-{
-    SLANG_AST_CLASS(DifferentiableTypeDictionary);
-};
-
-// A declaration to hold differentiable type conformances generated during
-// the semantic checking phase.
-// 
-class DifferentiableTypeDictionaryItem : public Decl
-{
-    SLANG_AST_CLASS(DifferentiableTypeDictionaryItem);
-
-    DeclRefType* baseType;
-    SubtypeWitness* confWitness;
-};
-
-// A declaration that references another dictionary (generally from another module)
-// Used to tell the IR lowering pass to process the referenced dictionary.
-// 
-class DifferentiableTypeDictionaryImportItem : public Decl
-{
-    SLANG_AST_CLASS(DifferentiableTypeDictionaryImportItem);
-
-    DeclRef<DifferentiableTypeDictionary> dictionaryRef;
-};
-
 
 bool isInterfaceRequirement(Decl* decl);
 

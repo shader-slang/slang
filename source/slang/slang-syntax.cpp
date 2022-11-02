@@ -319,7 +319,31 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
                 }
             }
         }
-
+        else if (auto transitiveTypeWitness = as<TransitiveSubtypeWitness>(subtypeWitness))
+        {
+            // Hard code witness entry that `T.Differential = DifferentialBottom` for `T` that
+            // coerce to `DifferentialBottom`.
+            if (astBuilder->getDifferentialBottomType()->equals(transitiveTypeWitness->subToMid->sup))
+            {
+                if (auto builtinAttr = requirementKey->findModifier<BuiltinRequirementAttribute>())
+                {
+                    if (builtinAttr->kind == BuiltinRequirementKind::DifferentialType)
+                    {
+                        return RequirementWitness(astBuilder->getDifferentialBottomType());
+                    }
+                }
+            }
+        }
+        else if (auto extractFromConjunctionTypeWitness = as<ExtractFromConjunctionSubtypeWitness>(subtypeWitness))
+        {
+            if (auto conjunctionTypeWitness = as<ConjunctionSubtypeWitness>(extractFromConjunctionTypeWitness->conjunctionWitness))
+            {
+                if (extractFromConjunctionTypeWitness->indexInConjunction == 0)
+                    return tryLookUpRequirementWitness(astBuilder, as<SubtypeWitness>(conjunctionTypeWitness->leftWitness), requirementKey);
+                else
+                    return tryLookUpRequirementWitness(astBuilder, as<SubtypeWitness>(conjunctionTypeWitness->rightWitness), requirementKey);
+            }
+        }
         // TODO: should handle the transitive case here too
 
         return RequirementWitness();
@@ -1140,7 +1164,46 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         return nullptr;
     }
 
-    //
+    Val* _tryLookupConcreteAssociatedTypeFromThisTypeSubst(ASTBuilder* builder, DeclRef<Decl> declRef)
+    {
+        auto substDeclRef = declRef.as<AssocTypeDecl>();
+        if (!substDeclRef)
+            return nullptr;
+
+        auto substAssocTypeDecl = substDeclRef.getDecl();
+
+        for (auto s = substDeclRef.substitutions.substitutions; s; s = s->outer)
+        {
+            auto thisSubst = as<ThisTypeSubstitution>(s);
+            if (!thisSubst)
+                continue;
+
+            if (auto interfaceDecl = as<InterfaceDecl>(substAssocTypeDecl->parentDecl))
+            {
+                if (thisSubst->interfaceDecl == interfaceDecl)
+                {
+                    // We need to look up the declaration that satisfies
+                    // the requirement named by the associated type.
+                    Decl* requirementKey = substAssocTypeDecl;
+                    RequirementWitness requirementWitness = tryLookUpRequirementWitness(builder, thisSubst->witness, requirementKey);
+                    switch (requirementWitness.getFlavor())
+                    {
+                    default:
+                        // No usable value was found, so there is nothing we can do.
+                        break;
+
+                    case RequirementWitness::Flavor::val:
+                    {
+                        auto satisfyingVal = requirementWitness.getVal();
+                        return satisfyingVal;
+                    }
+                    break;
+                    }
+                }
+            }
+        }
+        return nullptr;
+    }
 
     String DeclRefBase::toString() const
     {

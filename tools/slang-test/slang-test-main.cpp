@@ -1173,14 +1173,54 @@ String findExpectedPath(const TestInput& input, const char* postFix)
     return "";
 }
 
-static void _initSlangCompiler(TestContext* context, CommandLine& ioCmdLine)
+static SlangResult _initSlangCompiler(TestContext* context, CommandLine& ioCmdLine)
 {
     ioCmdLine.setExecutableLocation(ExecutableLocation(context->options.binDir, "slangc"));
 
     if (context->options.verbosePaths)
     {
-        ioCmdLine.addArg("-verbose-paths");
+        ioCmdLine.addArgIfNotFound("-verbose-paths");
     }
+
+    // Look for definition of a slot
+
+    {
+        const auto prefix = toSlice("-DNV_SHADER_EXTN_SLOT=");
+
+        bool usesNVAPI = false;
+
+        for (auto& arg : ioCmdLine.m_args)
+        {
+            if (arg.startsWith(prefix))
+            {
+                // Has NVAPI prefix, meaning 
+                usesNVAPI = true;
+                break;
+            }
+        }
+
+        // This is necessary because the session can be shared, and the prelude overwritten by the renderer.
+        if (usesNVAPI)
+        {
+            // We want to set the path to NVAPI
+            String rootPath;
+            SLANG_RETURN_ON_FAIL(TestToolUtil::getRootPath(context->exePath.getBuffer(), rootPath));
+            String includePath;
+            SLANG_RETURN_ON_FAIL(TestToolUtil::getIncludePath(rootPath, "external/nvapi/nvHLSLExtns.h", includePath))
+
+            StringBuilder buf;
+            
+            // Include the NVAPI header
+            buf << "#include ";
+
+            StringEscapeUtil::appendQuoted(StringEscapeUtil::getHandler(StringEscapeUtil::Style::Cpp), includePath.getUnownedSlice(), buf);
+            buf << "\n\n";
+
+            context->getSession()->setLanguagePrelude(SLANG_SOURCE_LANGUAGE_HLSL, buf.getBuffer());
+        }
+    }
+
+    return SLANG_OK;
 }
 
 TestResult asTestResult(ToolReturnCode code)
@@ -1291,7 +1331,7 @@ TestResult runDocTest(TestContext* context, TestInput& input)
     auto outputStem = input.outputStem;
 
     CommandLine cmdLine;
-    _initSlangCompiler(context, cmdLine);
+    
 
     cmdLine.addArg(input.filePath);
 
@@ -1299,6 +1339,8 @@ TestResult runDocTest(TestContext* context, TestInput& input)
     {
         cmdLine.addArg(arg);
     }
+
+    _initSlangCompiler(context, cmdLine);
 
     ExecuteResult exeRes;
     TEST_RETURN_ON_DONE(spawnAndWait(context, outputStem, input.spawnType, cmdLine, exeRes));
@@ -1769,8 +1811,7 @@ TestResult runSimpleTest(TestContext* context, TestInput& input)
     auto outputStem = input.outputStem;
 
     CommandLine cmdLine;
-    _initSlangCompiler(context, cmdLine);
-
+    
     if (input.testOptions->command != "SIMPLE_EX")
     {
         cmdLine.addArg(input.filePath);
@@ -1779,6 +1820,13 @@ TestResult runSimpleTest(TestContext* context, TestInput& input)
     for( auto arg : input.testOptions->args )
     {
         cmdLine.addArg(arg);
+    }
+
+    // If we can't set up for simple compilation, it's because some external resource isn't available
+    // such as NVAPI headers. In that case we just ignore the test.
+    if (SLANG_FAILED(_initSlangCompiler(context, cmdLine)))
+    {
+        return TestResult::Ignored;
     }
 
     ExecuteResult exeRes;

@@ -408,6 +408,35 @@ struct ASTDumpContext
         m_writer->emit("}");
     }
 
+    template <typename KEY, typename VALUE>
+    void dump(const OrderedDictionary<KEY, VALUE>& dict)
+    {
+        m_writer->emit(" { \n");
+        m_writer->indent();
+
+        for (auto iter : dict)
+        {
+            const auto& key = iter.Key;
+            const auto& value = iter.Value;
+
+            dump(key);
+            m_writer->emit(" : ");
+            dump(value);
+
+            m_writer->emit("\n");
+        }
+
+        m_writer->dedent();
+        m_writer->emit("}");
+    }
+
+    void dump(DeclRefBase declRef)
+    {
+        StringBuilder sb;
+        sb << declRef;
+        m_writer->emit(sb.ToString());
+    }
+
     void dump(const DeclCheckStateExt& extState)
     {
         auto state = extState.getState();

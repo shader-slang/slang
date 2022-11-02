@@ -60,6 +60,7 @@ INST(Nop, nop, 0, 0)
     INST(OptionalType, Optional, 1, 0)
 
     INST(DifferentialPairType, DiffPair, 1, 0)
+    INST(DifferentialBottomType, DiffBottomType, 0, 0)
 
     /* BindExistentialsTypeBase */
 
@@ -277,7 +278,6 @@ INST(lookup_interface_method, lookup_interface_method, 2, 0)
 INST(GetSequentialID, GetSequentialID, 1, 0)
 INST(lookup_witness_table, lookup_witness_table, 2, 0)
 INST(BindGlobalGenericParam, bind_global_generic_param, 2, 0)
-
 INST(Construct, construct, 0, 0)
 INST(AllocObj, allocObj, 0, 0)
 
@@ -297,6 +297,7 @@ INST(GetOptionalValue, getOptionalValue, 1, 0)
 INST(OptionalHasValue, optionalHasValue, 1, 0)
 INST(MakeOptionalValue, makeOptionalValue, 1, 0)
 INST(MakeOptionalNone, makeOptionalNone, 1, 0)
+INST(DifferentialBottomValue, differentialBottomVal, 0, 0)
 INST(Call, call, 1, 0)
 
 INST(RTTIObject, rtti_object, 0, 0)
@@ -714,6 +715,9 @@ INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
         /// the witness table to be easily picked up by emit.
     INST(COMWitnessDecoration, COMWitnessDecoration, 1, 0)
 
+    /* Differentiable Type Dictionary */
+    INST(DifferentiableTypeDictionaryDecoration, DifferentiableTypeDictionaryDecoration, 0, PARENT)
+
         /// Marks a struct type as being used as a structured buffer block.
         /// Recognized by SPIRV-emit pass so we can emit a SPIRV `BufferBlock` decoration.
     INST(SPIRVBufferBlockDecoration, spvBufferBlock, 0, 0)
@@ -759,6 +763,7 @@ INST(Reinterpret,                       reinterpret,                1, 0)
 INST(CastPtrToBool, CastPtrToBool, 1, 0)
 INST(IsType, IsType, 3, 0)
 INST(ForwardDifferentiate,                   ForwardDifferentiate,            1, 0)
+INST(DifferentialEqualityTypeCast, DifferentialEqualityTypeCast, 1, 0)
 
 // Converts other resources (such as ByteAddressBuffer) to the equivalent StructuredBuffer
 INST(GetEquivalentStructuredBuffer,     getEquivalentStructuredBuffer, 1, 0)
@@ -810,7 +815,6 @@ INST(ExistentialFuncSpecializationDictionary, ExistentialFuncSpecializationDicti
 INST(ExistentialTypeSpecializationDictionary, ExistentialTypeSpecializationDictionary, 0, PARENT)
 
 /* Differentiable Type Dictionary */
-INST(DifferentiableTypeDictionary, DifferentiableTypeDictionary, 0, PARENT)
 INST(DifferentiableTypeDictionaryItem, DifferentiableTypeDictionaryItem, 0, 0)
 
 #undef PARENT

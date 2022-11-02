@@ -1366,12 +1366,29 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         // produce transitive witnesses in shapes that will cuase us
         // problems here.
         //
-        IRInst* requirementKey = lowerSimpleVal(context, val->midToSup);
+        IRInst* midToSup = lowerSimpleVal(context, val->midToSup);
+
+        if (!baseWitnessTable)
+        {
+            // If we don't have a valid baseWitnessTable,
+            // we are in a situation that `subToMid` is a `DifferentialBottomSubtypeWitness`
+            // that applies for all non-differentiable types.
+            // In this case `midToSup` will give us the `DifferentialBottom:IDifferentiable`
+            // witness table and we can just use that as the final result of
+            // this transitive witness.
+            SLANG_RELEASE_ASSERT(midToSup && as<IRWitnessTableType>(midToSup->getDataType()));
+            return LoweredValInfo::simple(midToSup);
+        }
 
         return LoweredValInfo::simple(getBuilder()->emitLookupInterfaceMethodInst(
             getBuilder()->getWitnessTableType(lowerType(context, val->sup)),
             baseWitnessTable,
-            requirementKey));
+            midToSup));
+    }
+
+    LoweredValInfo visitDifferentialBottomSubtypeWitness(DifferentialBottomSubtypeWitness*)
+    {
+        return LoweredValInfo();
     }
 
     LoweredValInfo visitTaggedUnionSubtypeWitness(
@@ -3051,6 +3068,15 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
             getBuilder()->emitForwardDifferentiateInst(
                 lowerType(context, expr->type),
                 baseVal.val));
+    }
+
+    LoweredValInfo visitGetArrayLengthExpr(GetArrayLengthExpr* expr)
+    {
+        auto baseVal = lowerSubExpr(expr->arrayExpr);
+        auto type = lowerType(context, expr->arrayExpr->type);
+        auto arrayType = as<IRArrayType>(type);
+        SLANG_ASSERT(arrayType);
+        return LoweredValInfo::simple(arrayType->getElementCount());
     }
 
     LoweredValInfo visitOverloadedExpr(OverloadedExpr* /*expr*/)
@@ -5840,45 +5866,6 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         return LoweredValInfo();
     }
 
-    LoweredValInfo visitDifferentiableTypeDictionary(DifferentiableTypeDictionary* decl)
-    {
-        for (auto & member : decl->members)
-        {
-            if (auto entry = as<DifferentiableTypeDictionaryItem>(member))
-            {
-
-                // Lower type and witness.
-                IRType* irType = lowerType(context, entry->baseType);
-                IRInst* irWitness = lowerVal(context, entry->confWitness).val;
-
-                SLANG_ASSERT(irType);
-
-                // If the witness can be lowered, and the differentiable type entry exists,
-                // add an entry to the context.
-                // 
-                if (irWitness && !getBuilder()->findDifferentiableTypeEntry(irType))
-                    getBuilder()->addDifferentiableTypeEntry(irType, irWitness);
-            }
-            else if (auto importEntry = as<DifferentiableTypeDictionaryImportItem>(member))
-            {
-                ensureDecl(context, importEntry->dictionaryRef.getDecl());
-            }
-            else
-            {
-                SLANG_UNEXPECTED("Unrecognized item in DifferentiableTypeDictionary");
-                UNREACHABLE_RETURN(LoweredValInfo());
-            }
-        }
-
-        if (auto diffTypeDict = getBuilder()->findOrEmitDifferentiableTypeDictionary())
-        {
-            // Place the dictionary at the end of modules and generic blocks.
-            diffTypeDict->moveToEnd();
-        }
-
-        return LoweredValInfo();
-    }
-
 #define IGNORED_CASE(NAME) \
     LoweredValInfo visit##NAME(NAME*) { return LoweredValInfo(); }
 
@@ -5888,7 +5875,6 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
     IGNORED_CASE(SyntaxDecl)
     IGNORED_CASE(AttributeDecl)
     IGNORED_CASE(NamespaceDecl)
-    IGNORED_CASE(DifferentiableTypeDictionaryItem)
 
 #undef IGNORED_CASE
 
@@ -6777,7 +6763,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         IRInterfaceType* irInterface = subBuilder->createInterfaceType(operandCount, nullptr);
         
         // Add `irInterface` to decl mapping now to prevent cyclic lowering.
-        setValue(subContext, decl, LoweredValInfo::simple(irInterface));
+        setValue(context, decl, LoweredValInfo::simple(irInterface));
 
         // Setup subContext for proper lowering `ThisType`, associated types and
         // the interface decl's self reference.
@@ -7084,10 +7070,32 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
     void lowerDerivativeMemberModifier(IRInst* inst, DerivativeMemberAttribute* derivativeMember)
     {
+        ensureDecl(context, derivativeMember->memberDeclRef->declRef.getDecl()->parentDecl);
         auto key = lowerRValueExpr(context, derivativeMember->memberDeclRef).val;
         SLANG_RELEASE_ASSERT(as<IRStructKey>(key));
         auto builder = getBuilder();
         builder->addDecoration(inst, kIROp_DerivativeMemberDecoration, key);
+    }
+
+    void lowerDifferentiableAttribute(IRGenContext* subContext, IRInst* inst, DifferentiableAttribute* attr)
+    {
+        auto irDict = getBuilder()->addDifferentiableTypeDictionaryDecoration(inst);
+        for (auto& entry : attr->m_mapTypeToIDifferentiableWitness)
+        {
+            // Lower type and witness.
+            IRType* irType = lowerType(subContext, entry.Value->sub);
+            IRInst* irWitness = lowerVal(subContext, entry.Value).val;
+
+            SLANG_ASSERT(irType);
+
+            // If the witness can be lowered, and the differentiable type entry exists,
+            // add an entry to the context.
+            // 
+            if (irWitness)
+            {
+                getBuilder()->addDifferentiableTypeEntry(irDict, irType, irWitness);
+            }
+        }
     }
 
     LoweredValInfo lowerMemberVarDecl(VarDecl* fieldDecl)
@@ -7141,13 +7149,8 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // output for the chosen target.
         addTargetIntrinsicDecorations(irFieldKey, fieldDecl);
 
-
         return LoweredValInfo::simple(irFieldKey);
     }
-
-
-
-
 
     bool isImportedDecl(Decl* decl)
     {
@@ -7167,6 +7170,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         GenericTypeConstraintDecl*  constraintDecl,
         IRType*                     supType)
     {
+
         auto subBuilder = subContext->irBuilder;
 
         // There are two cases we care about here.
@@ -7279,21 +7283,6 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             if (auto constraintDecl = as<GenericTypeConstraintDecl>(member))
             {
                 emitGenericConstraintDecl(subContext, constraintDecl);
-            }
-        }
-
-        // We only need dictionaries to be lowered for decls with executable code (i.e. statements)
-        // Do not lower type dictionaries for inhertiance decls or decls 
-        // that are declaring a type, since this can create a cyclic dependancy.
-        // 
-        if (as<FunctionDeclBase>(leafDecl))
-        {
-            for (auto diffTypeDict : genericDecl->getMembersOfType<DifferentiableTypeDictionary>())
-            {
-                // We directly use lowerDecl() instead of ensureDecl() to emit to
-                // the current generic block instead of the top-level module.
-                // 
-                lowerDecl(subContext, diffTypeDict);
             }
         }
 
@@ -7450,10 +7439,6 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                     {
                         markInstsToClone(valuesToClone, parentGeneric->getFirstBlock(), genericParam);
                     }
-                    
-                    // Add a differentiable type dictionary if necessary.
-                    if (auto diffTypeDict = subBuilder->findDifferentiableTypeDictionary(parentGeneric->getFirstBlock()))
-                        markInstsToClone(valuesToClone, parentGeneric->getFirstBlock(), diffTypeDict);
                 }
                 if (valuesToClone.Count() == 0)
                 {
@@ -7612,14 +7597,14 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
         // Constructors aren't really member functions, insofar
         // as they aren't called with a `this` parameter.
-        //
-        // TODO: We may also want to exclude `static` functions
-        // here for the same reason, but this routine is only
-        // used for the stdlib, where we don't currently have
-        // any `static` member functions to worry about.
-        //
         if(as<ConstructorDecl>(decl))
             return false;
+
+        // Exclude `static` functions for same reason.
+        if (decl->findModifier<HLSLStaticModifier>())
+        {
+            return false;
+        }
 
         auto dd = decl->parentDecl;
         for(;;)
@@ -7808,6 +7793,10 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         if (decl->findModifier<ForwardDifferentiableAttribute>())
         {
             getBuilder()->addForwardDifferentiableDecoration(irFunc);
+        }
+        if (auto differentialAttr = decl->findModifier<DifferentiableAttribute>())
+        {
+            lowerDifferentiableAttribute(subContext, irFunc, differentialAttr);
         }
 
         // Always force inline diff setter accessor to prevent downstream compiler from complaining
