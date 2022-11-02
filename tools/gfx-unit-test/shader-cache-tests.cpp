@@ -12,6 +12,8 @@
 
 #include "gfx-test-texture-util.h"
 
+#include <chrono>
+
 using namespace gfx;
 using namespace Slang;
 
@@ -1148,12 +1150,71 @@ namespace gfx_test
         }
     };
 
+    struct FileGenFactory : BaseShaderCacheTest
+    {
+        void generateFiles()
+        {
+            for (GfxIndex i = 0; i < 1000; ++i)
+            {
+                String filename = String("test-tmp-perf-");
+                filename.append(i);
+                filename.append(".slang");
+                diskFileSystem->saveFile(filename.getBuffer(), contentsA.getBuffer(), contentsA.getLength());
+            }
+        }
+
+        void generateNewPipelineState(GfxIndex i)
+        {
+            String filename = String("test-tmp-perf-");
+            filename.append(i);
+            filename.append(".slang");
+
+            ComPtr<IShaderProgram> shaderProgram;
+            slang::ProgramLayout* slangReflection;
+            GFX_CHECK_CALL_ABORT(loadComputeProgram(device, shaderProgram, filename.getBuffer(), "computeMain", slangReflection));
+
+            ComputePipelineStateDesc pipelineDesc = {};
+            pipelineDesc.program = shaderProgram.get();
+            GFX_CHECK_CALL_ABORT(
+                device->createComputePipelineState(pipelineDesc, pipelineState.writeRef()));
+        }
+
+        void run()
+        {
+            shaderCache.entryCountLimit = 1000;
+            generateNewDevice();
+            createRequiredResources();
+            for (GfxIndex i = 0; i < 1000; ++i)
+            {
+                generateNewPipelineState(i);
+                submitGPUWork();
+            }
+
+            std::chrono::time_point<std::chrono::system_clock> start, segmentEnd;
+            std::chrono::duration<double> elapsed;
+            start = std::chrono::system_clock::now();
+            for (GfxIndex i = 0; i < 1000; ++i)
+            {
+                generateNewPipelineState(i);
+                submitGPUWork();
+            }
+            segmentEnd = std::chrono::system_clock::now();
+            elapsed = segmentEnd - start;
+            printf("Total test run time: %f sec\n", elapsed.count());
+        }
+    };
+
     template <typename T>
     void shaderCacheTestImpl(ComPtr<IDevice> device, UnitTestContext* context)
     {
         T test;
         test.init(device, context);
         test.run();
+    }
+
+    SLANG_UNIT_TEST(perfTest)
+    {
+        runTestImpl(shaderCacheTestImpl<FileGenFactory>, unitTestContext, Slang::RenderApiFlag::D3D12);
     }
 
     SLANG_UNIT_TEST(singleEntryShaderCacheD3D12)

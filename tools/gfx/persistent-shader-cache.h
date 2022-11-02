@@ -7,16 +7,30 @@
 #include "../../source/core/slang-string.h"
 #include "../../source/core/slang-dictionary.h"
 #include "../../source/core/slang-linked-list.h"
+#include "../../source/core/slang-stream.h"
 
 namespace gfx
 {
 
-    using namespace Slang;
+using namespace Slang;
 
 struct ShaderCacheEntry
 {
     slang::Digest dependencyBasedDigest;
     slang::Digest contentsBasedDigest;
+    double lastAccessedTime;
+
+    bool operator==(const ShaderCacheEntry& rhs)
+    {
+        return dependencyBasedDigest == rhs.dependencyBasedDigest
+            && contentsBasedDigest == rhs.contentsBasedDigest
+            && lastAccessedTime == rhs.lastAccessedTime;
+    }
+
+    uint32_t getHashCode()
+    {
+        return dependencyBasedDigest.getHashCode();
+    }
 };
 
 class PersistentShaderCache : public RefObject
@@ -47,8 +61,8 @@ private:
     // and save it to disk as filename.
     void loadCacheFromFile();
 
-    // Update the cache index on disk. This should be called any time an entry changes.
-    void saveCacheToFile();
+//     // Update the cache index on disk. This should be called any time an entry changes.
+//     void saveCacheToFile();
 
     // Delete the last entry (the least recently used) from entries, remove its key/value pair
     // from keyToEntry, and remove the corresponding file on disk. This should only be called
@@ -68,6 +82,12 @@ private:
 
     // The underlying file system used for the shader cache.
     ComPtr<ISlangMutableFileSystem> mutableShaderCacheFileSystem = nullptr;
+
+    // A file stream to the index file opened during cache load.
+    FileStream indexStream;
+
+    // Dictionary mapping each entry to its offset in the file stream.
+    Dictionary<ShaderCacheEntry, Int64> entryToOffset;
 };
 
 }
