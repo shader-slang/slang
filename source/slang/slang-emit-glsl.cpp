@@ -738,6 +738,47 @@ void GLSLSourceEmitter::_emitGLSLTypePrefix(IRType* type, bool promoteHalfToFloa
     }
 }
 
+void GLSLSourceEmitter::_maybeEmitGLSLBuiltin(IRInst* var, UnownedStringSlice name)
+{
+    if(name == "gl_MeshPrimitivesEXT" || name == "gl_MeshVerticesEXT")
+    {
+        // GLSL doesn't allow us to specify the struct outside the block
+        // declaration, so we snoop the underlying struct type here and emit
+        // that inline.
+
+        auto paramGroupType = as<IRGLSLOutputParameterGroupType>(var->getFullType());
+        SLANG_ASSERT(paramGroupType && "Mesh shader builtin output was not a paramter group");
+        auto arrayType = as<IRArrayTypeBase>(paramGroupType->getOperand(0));
+        SLANG_ASSERT(paramGroupType && "Mesh shader builtin output was not an array");
+        auto elementType = as<IRStructType>(arrayType->getElementType());
+        SLANG_ASSERT(paramGroupType && "Mesh shader builtin output was not an array of structs");
+        auto elementTypeNameOp = composeGetters<IRStringLit>(
+            elementType,
+            &IRInst::findDecoration<IRTargetIntrinsicDecoration>,
+            &IRTargetIntrinsicDecoration::getDefinitionOperand);
+        SLANG_ASSERT(elementTypeNameOp && "Mesh shader builtin output element type wasn't named");
+        auto elementTypeName = elementTypeNameOp->getStringSlice();
+
+        // // It would be nice to use emitVarModifiers here, however with
+        // // LRK::BuiltinVaryingOutput this is going to add an illegal location
+        // // layout qualifier.
+        // auto layout = getVarLayout(var);
+        // SLANG_ASSERT(layout && "Mesh shader builtin output has no layout");
+        // SLANG_ASSERT(layout->usesResourceKind(LayoutResourceKind::VaryingOutput));
+        // emitVarModifiers(layout, var, arrayType);
+        emitMeshOutputModifiers(var);
+        m_writer->emit("out");
+        m_writer->emit(" ");
+        m_writer->emit(elementTypeName);
+        emitStructDeclarationsBlock(elementType);
+        m_writer->emit(" ");
+        m_writer->emit(name);
+        emitArrayBrackets(arrayType);
+        m_writer->emit(";\n\n");
+    }
+    // Otherwise, do no redeclare anything
+}
+
 void GLSLSourceEmitter::_requireBaseType(BaseType baseType)
 {
     m_glslExtensionTracker->requireBaseTypeExtension(baseType);
@@ -1133,12 +1174,10 @@ bool GLSLSourceEmitter::tryEmitGlobalParamImpl(IRGlobalParam* varDecl, IRType* v
     //
     if (auto linkageDecoration = varDecl->findDecoration<IRLinkageDecoration>())
     {
-        if (linkageDecoration->getMangledName().startsWith("gl_"))
+        auto name = linkageDecoration->getMangledName();
+        if (name.startsWith("gl_"))
         {
-            // The variable represents an OpenGL system value,
-            // so we will assume that it doesn't need to be declared.
-            //
-            // TODO: handle case where we *should* declare the variable.
+            _maybeEmitGLSLBuiltin(varDecl, name);
             return true;
         }
     }

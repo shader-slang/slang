@@ -401,6 +401,9 @@ public:
     void emitFuncDecorations(IRFunc* func) { emitFuncDecorationsImpl(func); }
 
     void emitStruct(IRStructType* structType);
+    // This is used independently of `emitStruct` by some GLSL parameter group
+    // output functionality
+    void emitStructDeclarationsBlock(IRStructType* structType);
     void emitClass(IRClassType* structType);
 
         /// Emit type attributes that should appear after, e.g., a `struct` keyword

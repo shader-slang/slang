@@ -2926,6 +2926,13 @@ void CLikeSourceEmitter::emitStruct(IRStructType* structType)
     emitPostKeywordTypeAttributes(structType);
 
     m_writer->emit(getName(structType));
+
+    emitStructDeclarationsBlock(structType);
+    m_writer->emit(";\n\n");
+}
+
+void CLikeSourceEmitter::emitStructDeclarationsBlock(IRStructType* structType)
+{
     m_writer->emit("\n{\n");
     m_writer->indent();
 
@@ -2951,7 +2958,7 @@ void CLikeSourceEmitter::emitStruct(IRStructType* structType)
     }
 
     m_writer->dedent();
-    m_writer->emit("};\n\n");
+    m_writer->emit("}");
 }
 
 void CLikeSourceEmitter::emitClass(IRClassType* classType)

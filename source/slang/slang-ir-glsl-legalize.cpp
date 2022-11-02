@@ -1994,6 +1994,20 @@ void legalizeMeshOutputParam(
         CapabilitySet(CapabilityAtom::GLSL),
         UnownedStringSlice(typeName));
     builder->addImportDecoration(blockParam, UnownedStringSlice(arrayName));
+    if(isPerPrimitive)
+    {
+        builder->addDecoration(blockParam, kIROp_GLSLPrimitivesRateDecoration);
+    }
+    // // While this is probably a correct thing to do, LRK::VaryingOutput
+    // // isn't really used for redeclaraion of builtin outputs, and assumes
+    // // that it's got a layout location, the correct fix might be to add
+    // // LRK::BuiltinVaryingOutput, but that would be polluting LRK for no
+    // // real gain.
+    // //
+    // IRVarLayout::Builder varLayoutBuilder{builder, IRTypeLayout::Builder{builder}.build()};
+    // varLayoutBuilder.findOrAddResourceInfo(LayoutResourceKind::VaryingOutput);
+    // varLayoutBuilder.setStage(Stage::Mesh);
+    // builder->addLayoutDecoration(blockParam, varLayoutBuilder.build());
 
     for(auto builtin : builtins)
     {
