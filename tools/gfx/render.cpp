@@ -15,6 +15,9 @@ Result SLANG_MCALL createVKDevice(const IDevice::Desc* desc, IDevice** outDevice
 Result SLANG_MCALL createCUDADevice(const IDevice::Desc* desc, IDevice** outDevice);
 Result SLANG_MCALL createCPUDevice(const IDevice::Desc* desc, IDevice** outDevice);
 
+Result SLANG_MCALL getD3D12Adapters(List<AdapterInfo>& outAdapters);
+Result SLANG_MCALL getVKAdapters(List<AdapterInfo>& outAdapters);
+
 static bool debugLayerEnabled = false;
 bool isGfxDebugLayerEnabled() { return debugLayerEnabled; }
 
@@ -230,6 +233,40 @@ extern "C"
     SLANG_GFX_API SlangResult SLANG_MCALL gfxGetFormatInfo(Format format, FormatInfo* outInfo)
     {
         *outInfo = s_formatInfoMap.get(format);
+        return SLANG_OK;
+    }
+
+    SLANG_GFX_API SlangResult SLANG_MCALL gfxGetAdapters(DeviceType type, AdapterInfo* outAdapters, Size bufferSize, GfxCount* outAdapterCount)
+    {
+        List<AdapterInfo> adapters;
+
+        switch (type)
+        {
+        case DeviceType::DirectX11:
+            break;
+        case DeviceType::DirectX12:
+            SLANG_RETURN_ON_FAIL(getD3D12Adapters(adapters));
+            break;
+        case DeviceType::OpenGl:
+            break;
+        case DeviceType::Vulkan:
+            SLANG_RETURN_ON_FAIL(getVKAdapters(adapters));
+            break;
+        case DeviceType::CUDA:
+            break;
+        case DeviceType::CPU:
+            break;
+        case DeviceType::Default:
+            break;
+        }
+
+        if (adapters.getCount() > (Index)(bufferSize / sizeof(AdapterInfo)))
+            return SLANG_E_BUFFER_TOO_SMALL;
+
+        for (Index i = 0; i < adapters.getCount(); ++i)
+            outAdapters[i] = adapters[i];
+        *outAdapterCount = (GfxCount)adapters.getCount();
+
         return SLANG_OK;
     }
 

@@ -84,6 +84,8 @@ void translatePostBuildInfoDescs(
 
 } // namespace d3d12
 
+Result SLANG_MCALL getD3D12Adapters(List<AdapterInfo>& outAdapters);
+
 Result SLANG_MCALL createD3D12Device(const IDevice::Desc* desc, IDevice** outDevice);
 
 } // namespace gfx

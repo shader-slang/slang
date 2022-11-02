@@ -2,6 +2,7 @@
 #include "vk-helper-functions.h"
 
 #include "vk-device.h"
+#include "vk-util.h"
 
 namespace gfx
 {
@@ -450,6 +451,44 @@ VkImageAspectFlags getAspectMaskFromFormat(VkFormat format)
 }
 
 } // namespace vk
+
+Result SLANG_MCALL getVKAdapters(List<AdapterInfo>& outAdapters)
+{
+    VulkanModule module;
+    SLANG_RETURN_ON_FAIL(module.init(false));
+    VulkanApi api;
+    SLANG_RETURN_ON_FAIL(api.initGlobalProcs(module));
+
+    VkInstanceCreateInfo instanceCreateInfo = { VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO };
+    VkInstance instance;
+    SLANG_VK_RETURN_ON_FAIL(api.vkCreateInstance(&instanceCreateInfo, nullptr, &instance));
+
+    // This will fail due to not loading any extensions.
+    api.initInstanceProcs(instance);
+    // Make sure required functions for enumerating physical devices were loaded.
+    if (!api.vkEnumeratePhysicalDevices || !api.vkGetPhysicalDeviceProperties)
+        return SLANG_FAIL;
+
+    uint32_t numPhysicalDevices = 0;
+    SLANG_VK_RETURN_ON_FAIL(api.vkEnumeratePhysicalDevices(instance, &numPhysicalDevices, nullptr));
+
+    List<VkPhysicalDevice> physicalDevices;
+    physicalDevices.setCount(numPhysicalDevices);
+    SLANG_VK_RETURN_ON_FAIL(api.vkEnumeratePhysicalDevices(instance, &numPhysicalDevices, physicalDevices.getBuffer()));
+
+    for (const auto& physicalDevice : physicalDevices)
+    {
+        VkPhysicalDeviceProperties props;
+        api.vkGetPhysicalDeviceProperties(physicalDevice, &props);
+        AdapterInfo info;
+        strncpy_s(info.name, props.deviceName, sizeof(AdapterInfo::name) - 1);
+        info.vendorID = props.vendorID;
+        info.deviceID = props.deviceID;
+        outAdapters.add(info);
+    }
+
+    return SLANG_OK;
+}
 
 Result SLANG_MCALL createVKDevice(const IDevice::Desc* desc, IDevice** outRenderer)
 {
