@@ -399,7 +399,6 @@ INST(StructuredBufferLoad, structuredBufferLoad, 2, 0)
 //
 INST(StructuredBufferStore, structuredBufferStore, 3, 0)
 
-INST(MeshOutputSet, meshOutputSet, 3, 0)
 INST(MeshOutputRef, meshOutputRef, 2, 0)
 
 // Construct a vector from a scalar
