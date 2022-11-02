@@ -2737,9 +2737,6 @@ __attributeTarget(InterfaceDecl)
 attribute_syntax [Specialize] : SpecializeAttribute;
 
 __attributeTarget(DeclBase)
-attribute_syntax [Differentiable] : DifferentiableAttribute;
-
-__attributeTarget(DeclBase)
 attribute_syntax [DerivativeMember(memberName)] : DerivativeMemberAttribute;
 
 enum _BuiltinRequirementKind

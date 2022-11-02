@@ -715,6 +715,9 @@ INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
         /// the witness table to be easily picked up by emit.
     INST(COMWitnessDecoration, COMWitnessDecoration, 1, 0)
 
+    /* Differentiable Type Dictionary */
+    INST(DifferentiableTypeDictionaryDecoration, DifferentiableTypeDictionaryDecoration, 0, PARENT)
+
         /// Marks a struct type as being used as a structured buffer block.
         /// Recognized by SPIRV-emit pass so we can emit a SPIRV `BufferBlock` decoration.
     INST(SPIRVBufferBlockDecoration, spvBufferBlock, 0, 0)
@@ -812,7 +815,6 @@ INST(ExistentialFuncSpecializationDictionary, ExistentialFuncSpecializationDicti
 INST(ExistentialTypeSpecializationDictionary, ExistentialTypeSpecializationDictionary, 0, PARENT)
 
 /* Differentiable Type Dictionary */
-INST(DifferentiableTypeDictionary, DifferentiableTypeDictionary, 0, PARENT)
 INST(DifferentiableTypeDictionaryItem, DifferentiableTypeDictionaryItem, 0, 0)
 
 #undef PARENT

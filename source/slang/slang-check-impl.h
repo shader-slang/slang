@@ -214,75 +214,6 @@ namespace Slang
         Dictionary<OperatorOverloadCacheKey, OverloadCandidate> resolvedOperatorOverloadCache;
         Dictionary<BasicTypeKeyPair, ConversionCost> conversionCostCache;
     };
-
-    struct DifferentiableTypeSemanticContext
-    {
-    
-    public:
-            /// Registers a type as conforming to IDifferentiable, along with a witness 
-            /// describing the relationship.
-            ///
-        void registerDifferentiableType(DeclRefType* type, SubtypeWitness* witness);
-
-            /// Returns the list of registered differentiable types.
-        List<KeyValuePair<DeclRefType*, SubtypeWitness*>> getDifferentiableTypeConformanceList();
-
-            /// Creates a DifferentiableTypeDictionary AST container node with an entry for
-            /// every registered type. This can be inserted into the appropriate context for the
-            /// auto-diff pass.
-            ///
-        DifferentiableTypeDictionary* makeDifferentiableTypeDictionaryNode(ASTBuilder* builder);
-
-            /// Creates a DifferentiableTypeDictionary AST container node with an entry for
-            /// every registered type. This can be inserted into the appropriate context for the
-            /// auto-diff pass.
-            ///
-        void addImportedModule(ModuleDecl* importedModuleDecl);
-
-            /// Set flag to indicate that the type dictionary is requried.
-        void requireDifferentiableTypeDictionary();
-
-            /// Returns flag indicating whether the type dictionary is requried.
-        bool isDictionaryRequired();
-
-    private:
-        // Nested struct to override the '==' operator for DeclRefTypes
-        struct DeclRefTypeKey
-        {
-            DeclRefType* type;
-
-            DeclRefTypeKey(DeclRefType* type) : type(type) 
-            {};
-
-            DeclRefTypeKey(DeclRefTypeKey& typeKey) : type(typeKey.type)
-            {};
-
-            DeclRefTypeKey() : type(nullptr)
-            {};
-
-            bool operator==(const DeclRefTypeKey& other) const
-            {
-                return (other.type->declRef == this->type->declRef);
-            }
-
-            HashCode getHashCode() const
-            {
-                Hasher hasher;
-                hasher.hashObject(&type->declRef);
-                return hasher.getResult();
-            }
-        };
-
-            /// Mapping from types to subtype witnesses for conformance to IDifferentiable.
-        OrderedDictionary<DeclRefTypeKey, SubtypeWitness*>   m_mapTypeToIDifferentiableWitness;
-        
-            /// List of external dictionaries (from imported modules)
-        List<DeclRef<DifferentiableTypeDictionary>> m_importedDictionaries;
-
-            /// Flag to indicate if a differentiable type dictionary is required.
-        bool                                        m_isTypeDictionaryRequired = false;
-    };
-
         /// Shared state for a semantics-checking session.
     struct SharedSemanticsContext
     {
@@ -310,11 +241,6 @@ namespace Slang
         //
         List<ModuleDecl*> importedModulesList;
         HashSet<ModuleDecl*> importedModulesSet;
-        
-        DifferentiableTypeSemanticContext diffTypeContext;
-
-        List<DifferentiableTypeSemanticContext*> diffTypeContextStack;
-
     public:
         SharedSemanticsContext(
             Linkage*        linkage,
@@ -347,28 +273,6 @@ namespace Slang
             if (m_linkage)
                 return m_linkage->isInLanguageServer();
             return false;
-        }
-
-        DifferentiableTypeSemanticContext* getDiffTypeContext()
-        {
-            return &diffTypeContext;
-        }
-
-        DifferentiableTypeSemanticContext* innermostDiffTypeContext()
-        {
-            return (diffTypeContextStack.getCount() > 0) ? diffTypeContextStack.getLast() : &diffTypeContext;
-        }
-
-        void pushDiffTypeContext(DifferentiableTypeSemanticContext* context)
-        {
-            diffTypeContextStack.add(context);
-        }
-
-        DifferentiableTypeSemanticContext* popDiffTypeContext()
-        {
-            auto context = diffTypeContextStack.getLast();
-            diffTypeContextStack.removeLast();
-            return context;
         }
 
             /// Get the list of extension declarations that appear to apply to `decl` in this context
@@ -431,6 +335,7 @@ namespace Slang
             SemanticsContext result(*this);
             result.m_parentFunc = parentFunc;
             result.m_outerStmts = nullptr;
+            result.m_parentDifferentiableAttr = parentFunc->findModifier<DifferentiableAttribute>();
             return result;
         }
 
@@ -518,6 +423,8 @@ namespace Slang
 
             /// The parent function (if any) that surrounds the statement being checked.
         FunctionDeclBase* m_parentFunc = nullptr;
+
+        DifferentiableAttribute* m_parentDifferentiableAttr = nullptr;
 
             /// The linked list of lexically surrounding statements.
         OuterStmtInfo* m_outerStmts = nullptr;
@@ -800,6 +707,11 @@ namespace Slang
 
         // Convert a function's original type to it's JVP type.
         Type* processJVPFuncType(FuncType* originalType);
+
+        /// Registers a type as conforming to IDifferentiable, along with a witness 
+        /// describing the relationship.
+        ///
+        void registerDifferentiableType(DeclRefType* type, SubtypeWitness* witness);
 
         // Check and register a type if it is differentiable.
         void maybeRegisterDifferentiableType(ASTBuilder* builder, Type* type);
@@ -1128,16 +1040,6 @@ namespace Slang
             ConformanceCheckingContext* context,
             DeclRef<AssocTypeDecl> requirementDeclRef,
             RefPtr<WitnessTable> witnessTable);
-
-            /// Registers a type as differentiable in the currrent semantic context, if the declaration represents
-            /// a subtype of IDifferentable. Does nothing otherwise.
-        void tryAddDifferentiableConformanceToContext(
-            Decl* decl,
-            DifferentiableTypeSemanticContext* context);
-
-            /// Generates a dictionary node for the module with all registered differentiable types,
-            /// as well as information about differentiable types in imported modules.
-        void finishDifferentiableTypeDictionary(ModuleDecl* moduleDecl);
 
         // Find the appropriate member of a declared type to
         // satisfy a requirement of an interface the type

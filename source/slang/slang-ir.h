@@ -1323,6 +1323,7 @@ SIMPLE_IR_TYPE(GenericKind, Kind)
 struct IRDifferentialPairType : IRType
 {
     IRType* getValueType() { return (IRType*)getOperand(0); }
+    IRInst* getWitness() { return (IRInst*)getOperand(1); }
 
     IR_LEAF_ISA(DifferentialPairType)
 };
