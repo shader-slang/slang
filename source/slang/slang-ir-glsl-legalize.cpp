@@ -1823,6 +1823,11 @@ void legalizeMeshOutputParam(
                             auto d_ = extractField(builder, d, fieldIndex, key);
                             assignUses(d_, m);
                         },
+                        [&](IRGetElementPtr* g)
+                        {
+                            // Writing to something like `struct Vertex{ Foo foo[10]; }`
+                            SLANG_UNIMPLEMENTED_X("Writing to array member of mesh shader output struct");
+                        },
                         [&](IRStore* s)
                         {
                             // Store using the SOA representation
