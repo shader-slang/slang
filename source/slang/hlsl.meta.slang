@@ -5421,6 +5421,7 @@ struct VkSubpassInputMS<T>
     T SubpassLoad(int sampleIndex);
 }
 
+
 ///
 /// Shader Execution Reordering (SER)
 /// 
@@ -5445,8 +5446,7 @@ struct HitObject
 {
         /// Executes ray traversal (including anyhit and intersection shaders) like TraceRay, but returns the
         /// resulting hit information as a HitObject and does not trigger closesthit or miss shaders.
-    __target_intrinsic(hlsl, "NvTraceRayHitObject")
-    [__requiresNVAPI]
+    __specialized_for_target(hlsl)
     static HitObject TraceRay<payload_t>( 
         RaytracingAccelerationStructure AccelerationStructure, 
         uint RayFlags, 
@@ -5455,7 +5455,21 @@ struct HitObject
         uint MultiplierForGeometryContributionToHitGroupIndex, 
         uint MissShaderIndex, 
         RayDesc Ray, 
-        inout payload_t Payload);
+        inout payload_t Payload)
+        {
+            HitObject hitObj;
+            __traceRay(
+                AccelerationStructure, 
+                RayFlags, 
+                InstanceInclusionMask, 
+                RayContributionToHitGroupIndex, 
+                MultiplierForGeometryContributionToHitGroupIndex, 
+                MissShaderIndex, 
+                Ray, 
+                Payload,
+                hitObj);
+            return hitObj;
+        }
 
         /// Creates a HitObject representing a hit based on values explicitly passed as arguments, without
         /// tracing a ray. The primitive specified by AccelerationStructure, InstanceIndex, GeometryIndex,
@@ -5463,8 +5477,7 @@ struct HitObject
         /// TraceRay. The computed index must reference a valid hit group record in the shader table. The
         /// Attributes parameter must either be an attribute struct, such as
         /// BuiltInTriangleIntersectionAttributes, or another HitObject to copy the attributes from.
-    __target_intrinsic(hlsl, "NvMakeHit")
-    [__requiresNVAPI]
+    __specialized_for_target(hlsl)
     static HitObject MakeHit<attr_t>( 
         RaytracingAccelerationStructure AccelerationStructure, 
         uint InstanceIndex, 
@@ -5474,7 +5487,22 @@ struct HitObject
         uint RayContributionToHitGroupIndex, 
         uint MultiplierForGeometryContributionToHitGroupIndex, 
         RayDesc Ray, 
-        attr_t attributes);
+        attr_t attributes)
+    {
+        HitObject hitObj;
+        __makeHit(
+            AccelerationStructure, 
+            InstanceIndex,
+            GeometryIndex, 
+            PrimitiveIndex, 
+            HitKind, 
+            RayContributionToHitGroupIndex, 
+            MultiplierForGeometryContributionToHitGroupIndex, 
+            Ray,
+            attributes, 
+            hitObj);
+        return hitObj;
+    }
 
         /// Creates a HitObject representing a hit based on values explicitly passed as arguments, without
         /// tracing a ray. The primitive specified by AccelerationStructure, InstanceIndex, GeometryIndex,
@@ -5483,8 +5511,7 @@ struct HitObject
         /// reference a valid hit group record in the shader table. The Attributes parameter must either be an
         /// attribute struct, such as BuiltInTriangleIntersectionAttributes, or another HitObject to copy the
         /// attributes from.
-    __target_intrinsic(hlsl, "NvMakeHitWithRecordIndex")
-    [__requiresNVAPI]
+    __specialized_for_target(hlsl)
     static HitObject MakeHit<attr_t>( 
         uint HitGroupRecordIndex, 
         RaytracingAccelerationStructure AccelerationStructure, 
@@ -5493,7 +5520,21 @@ struct HitObject
         uint PrimitiveIndex, 
         uint HitKind, 
         RayDesc Ray, 
-        attr_t attributes); 
+        attr_t attributes)
+    {
+        HitObject hitObj;
+        __makeHitWithRecordIndex(
+            HitGroupRecordIndex, 
+            AccelerationStructure, 
+            InstanceIndex,
+            GeometryIndex, 
+            PrimitiveIndex, 
+            HitKind, 
+            Ray, 
+            attributes, 
+            hitObj);
+        return hitObj;
+    }
 
         /// Creates a HitObject representing a miss based on values explicitly passed as arguments, without
         /// tracing a ray. The provided shader table index must reference a valid miss record in the shader
@@ -5573,17 +5614,66 @@ struct HitObject
     uint GetHitKind();
 
         /// Returns the attributes of a hit. Valid if the hit object represents a hit or a miss.
-    __target_intrinsic(hlsl, "$0.GetAttributes<$G0>()")
-    [__requiresNVAPI]
-    attr_t GetAttributes<attr_t>();
+    __specialized_for_target(hlsl)
+    attr_t GetAttributes<attr_t>()
+    {
+        attr_t v;
+        __getAttributesFromHitObject(v);
+        return v;
+    }
 
         /// Loads a root constant from the local root table referenced by the hit object. Valid if the hit object
         /// represents a hit or a miss. RootConstantOffsetInBytes must be a multiple of 4.
     __target_intrinsic(hlsl)    
     [__requiresNVAPI]
     uint LoadLocalRootTableConstant(uint RootConstantOffsetInBytes);
-};
 
+    /// 
+    /// !!!! Internal impl. Do not use!
+    /// 
+
+    __target_intrinsic(hlsl, "NvGetAttributesFromHitObject($0, $1)")
+    [__requiresNVAPI]
+    void __getAttributesFromHitObject<T>(out T t);
+
+    __target_intrinsic(hlsl, "NvMakeHitWithRecordIndex")
+    [__requiresNVAPI]
+    static void __makeHitWithRecordIndex<attr_t>(uint HitGroupRecordIndex, 
+        RaytracingAccelerationStructure AccelerationStructure, 
+        uint InstanceIndex, 
+        uint GeometryIndex, 
+        uint PrimitiveIndex, 
+        uint HitKind, 
+        RayDesc Ray, 
+        attr_t attributes, 
+        out HitObject hitObj);
+
+    __target_intrinsic(hlsl, "NvMakeHit")
+    [__requiresNVAPI]
+    static void __makeHit<attr_t>(RaytracingAccelerationStructure AccelerationStructure, 
+        uint InstanceIndex, 
+        uint GeometryIndex, 
+        uint PrimitiveIndex, 
+        uint HitKind, 
+        uint RayContributionToHitGroupIndex, 
+        uint MultiplierForGeometryContributionToHitGroupIndex, 
+        RayDesc Ray, 
+        attr_t attributes, 
+        out HitObject hitObj);
+
+    __target_intrinsic(hlsl, "NvTraceRayHitObject")
+    [__requiresNVAPI]
+    static void __traceRay<payload_t>( 
+        RaytracingAccelerationStructure AccelerationStructure, 
+        uint RayFlags, 
+        uint InstanceInclusionMask, 
+        uint RayContributionToHitGroupIndex, 
+        uint MultiplierForGeometryContributionToHitGroupIndex, 
+        uint MissShaderIndex, 
+        RayDesc Ray, 
+        inout payload_t Payload,
+        out HitObject hitObj);
+};
     
     /// Reorders threads based on a coherence hint value. NumCoherenceHintBits indicates how many of
     /// the least significant bits of CoherenceHint should be considered during reordering (max: 16).

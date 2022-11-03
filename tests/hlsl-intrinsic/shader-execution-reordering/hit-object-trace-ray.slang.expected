@@ -6,7 +6,7 @@ standard output = {
 ; Note: shader requires additional functionality:
 ;       UAVs at every shader stage
 ;
-; shader hash: ff1fe13c5791fdce780d64762ab25ff9
+; shader hash: 5958a10f52253a55aac002cb7f042b33
 ;
 ; Buffer Definitions:
 ;
@@ -97,13 +97,13 @@ define void @"\01?rayGenerationMain@@YAXXZ"() #0 {
   %22 = call %dx.types.Handle @"dx.op.createHandleForLib.class.RWStructuredBuffer<NvShaderExtnStruct>"(i32 160, %"class.RWStructuredBuffer<NvShaderExtnStruct>" %3)  ; CreateHandleForLib(Resource)
   %23 = call i32 @dx.op.bufferUpdateCounter(i32 70, %dx.types.Handle %22, i8 1)  ; BufferUpdateCounter(uav,inc)
   %24 = call %dx.types.Handle @"dx.op.createHandleForLib.class.RWStructuredBuffer<NvShaderExtnStruct>"(i32 160, %"class.RWStructuredBuffer<NvShaderExtnStruct>" %3)  ; CreateHandleForLib(Resource)
-  call void @dx.op.rawBufferStore.i32(i32 140, %dx.types.Handle %24, i32 %23, i32 0, i32 73, i32 undef, i32 undef, i32 undef, i8 1, i32 4)  ; RawBufferStore(uav,index,elementOffset,value0,value1,value2,value3,mask,alignment)
+  call void @dx.op.rawBufferStore.i32(i32 140, %dx.types.Handle %24, i32 %23, i32 0, i32 83, i32 undef, i32 undef, i32 undef, i8 1, i32 4)  ; RawBufferStore(uav,index,elementOffset,value0,value1,value2,value3,mask,alignment)
   %25 = call %dx.types.Handle @"dx.op.createHandleForLib.class.RWStructuredBuffer<NvShaderExtnStruct>"(i32 160, %"class.RWStructuredBuffer<NvShaderExtnStruct>" %3)  ; CreateHandleForLib(Resource)
   call void @dx.op.rawBufferStore.i32(i32 140, %dx.types.Handle %25, i32 %23, i32 76, i32 %18, i32 undef, i32 undef, i32 undef, i8 1, i32 4)  ; RawBufferStore(uav,index,elementOffset,value0,value1,value2,value3,mask,alignment)
   %26 = call %dx.types.Handle @"dx.op.createHandleForLib.class.RWStructuredBuffer<NvShaderExtnStruct>"(i32 160, %"class.RWStructuredBuffer<NvShaderExtnStruct>" %3)  ; CreateHandleForLib(Resource)
   %27 = call i32 @dx.op.bufferUpdateCounter(i32 70, %dx.types.Handle %26, i8 1)  ; BufferUpdateCounter(uav,inc)
   %28 = icmp eq i32 %27, 0
-  br i1 %28, label %29, label %66
+  br i1 %28, label %66, label %29
 
 ; <label>:29                                      ; preds = %0
   %30 = call %dx.types.Handle @"dx.op.createHandleForLib.class.RWStructuredBuffer<NvShaderExtnStruct>"(i32 160, %"class.RWStructuredBuffer<NvShaderExtnStruct>" %3)  ; CreateHandleForLib(Resource)
@@ -168,23 +168,23 @@ declare i32 @dx.op.bufferUpdateCounter(i32, %dx.types.Handle, i8) #0
 ; Function Attrs: nounwind
 declare void @dx.op.rawBufferStore.i32(i32, %dx.types.Handle, i32, i32, i32, i32, i32, i32, i8, i32) #0
 
-; Function Attrs: nounwind readnone
-declare i32 @dx.op.dispatchRaysIndex.i32(i32, i8) #1
+; Function Attrs: nounwind
+declare void @dx.op.traceRay.struct.SomeValues_0(i32, %dx.types.Handle, i32, i32, i32, i32, i32, float, float, float, float, float, float, float, float, %struct.SomeValues_0*) #0
 
 ; Function Attrs: nounwind
 declare void @dx.op.callShader.struct.SomeValues_0(i32, i32, %struct.SomeValues_0*) #0
 
-; Function Attrs: nounwind
-declare void @dx.op.traceRay.struct.SomeValues_0(i32, %dx.types.Handle, i32, i32, i32, i32, i32, float, float, float, float, float, float, float, float, %struct.SomeValues_0*) #0
+; Function Attrs: nounwind readnone
+declare i32 @dx.op.dispatchRaysIndex.i32(i32, i8) #1
 
 ; Function Attrs: nounwind readonly
 declare %dx.types.Handle @"dx.op.createHandleForLib.class.RWStructuredBuffer<NvShaderExtnStruct>"(i32, %"class.RWStructuredBuffer<NvShaderExtnStruct>") #2
 
 ; Function Attrs: nounwind readonly
-declare %dx.types.Handle @"dx.op.createHandleForLib.class.RWStructuredBuffer<unsigned int>"(i32, %"class.RWStructuredBuffer<unsigned int>") #2
+declare %dx.types.Handle @dx.op.createHandleForLib.struct.RaytracingAccelerationStructure(i32, %struct.RaytracingAccelerationStructure) #2
 
 ; Function Attrs: nounwind readonly
-declare %dx.types.Handle @dx.op.createHandleForLib.struct.RaytracingAccelerationStructure(i32, %struct.RaytracingAccelerationStructure) #2
+declare %dx.types.Handle @"dx.op.createHandleForLib.class.RWStructuredBuffer<unsigned int>"(i32, %"class.RWStructuredBuffer<unsigned int>") #2
 
 attributes #0 = { nounwind }
 attributes #1 = { nounwind readnone }
@@ -216,10 +216,10 @@ attributes #2 = { nounwind readonly }
 !16 = !{i32 8, i32 7, i32 5, !17}
 !17 = !{i32 0}
 !18 = !{!19, !21}
-!19 = distinct !{!19, !20, !"\01??$NvTraceRayHitObject@USomeValues_0@@@@YA?AUNvHitObject@@URaytracingAccelerationStructure@@IIIIIURayDesc@@USomeValues_0@@@Z: %agg.result"}
-!20 = distinct !{!20, !"\01??$NvTraceRayHitObject@USomeValues_0@@@@YA?AUNvHitObject@@URaytracingAccelerationStructure@@IIIIIURayDesc@@USomeValues_0@@@Z"}
-!21 = distinct !{!21, !20, !"\01??$NvTraceRayHitObject@USomeValues_0@@@@YA?AUNvHitObject@@URaytracingAccelerationStructure@@IIIIIURayDesc@@USomeValues_0@@@Z: %Payload"}
+!19 = distinct !{!19, !20, !"\01?HitObject_TraceRay_0@@YA?AUNvHitObject@@URaytracingAccelerationStructure@@IIIIIURayDesc@@USomeValues_0@@@Z: %agg.result"}
+!20 = distinct !{!20, !"\01?HitObject_TraceRay_0@@YA?AUNvHitObject@@URaytracingAccelerationStructure@@IIIIIURayDesc@@USomeValues_0@@@Z"}
+!21 = distinct !{!21, !20, !"\01?HitObject_TraceRay_0@@YA?AUNvHitObject@@URaytracingAccelerationStructure@@IIIIIURayDesc@@USomeValues_0@@@Z: %Payload_0"}
 !22 = !{!23}
-!23 = distinct !{!23, !24, !"\01??$GetAttributes@USomeValues_0@@@NvHitObject@@QAA?AUSomeValues_0@@XZ: %agg.result"}
-!24 = distinct !{!24, !"\01??$GetAttributes@USomeValues_0@@@NvHitObject@@QAA?AUSomeValues_0@@XZ"}
+!23 = distinct !{!23, !24, !"\01?HitObject_GetAttributes_0@@YA?AUSomeValues_0@@UNvHitObject@@@Z: %agg.result"}
+!24 = distinct !{!24, !"\01?HitObject_GetAttributes_0@@YA?AUSomeValues_0@@UNvHitObject@@@Z"}
 }

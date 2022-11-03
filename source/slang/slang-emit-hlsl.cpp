@@ -1153,6 +1153,11 @@ void HLSLSourceEmitter::emitFrontMatterImpl(TargetRequest* targetReq)
         //
         m_writer->emit("#define SLANG_HLSL_ENABLE_NVAPI 1\n");
 
+        // TODO(JS): For now when using NVAPI for generated code we do not want to 
+        // use HLSL2021 features, that are typically used for Shader Execution Reordering
+        // so we turn on the 'macro' based interface by default
+        m_writer->emit(toSlice("#define NV_HITOBJECT_USE_MACRO_API 1\n"));
+
         // In addition, if the user has informed the Slang compiler of
         // the register/space that it wants to use for NVAPI, then we
         // need to pass along that information to prelude in the
