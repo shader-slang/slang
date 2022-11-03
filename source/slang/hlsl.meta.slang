@@ -5436,12 +5436,17 @@ struct VkSubpassInputMS<T>
 /// 
 /// https://developer.nvidia.com/rtx/path-tracing/nvapi/get-started
 ///
+/// For VK the specification is currently in this PR
+///
+/// https://github.com/KhronosGroup/GLSL/pull/196/files
 
     /// Immutable data type representing a ray hit or a miss. Can be used to invoke hit or miss shading,
     /// or as a key in ReorderThread. Created by one of several methods described below. HitObject
     /// and its related functions are available in raytracing shader types only.
-__target_intrinsic(hlsl, NvHitObject)
 [__requiresNVAPI]
+__target_intrinsic(hlsl, NvHitObject)
+__glsl_extension(GL_NV_shader_invocation_reorder)
+__target_intrinsic(glsl, hitObjectNV)
 struct HitObject
 {
         /// Executes ray traversal (including anyhit and intersection shaders) like TraceRay, but returns the
@@ -5539,11 +5544,22 @@ struct HitObject
         /// Creates a HitObject representing a miss based on values explicitly passed as arguments, without
         /// tracing a ray. The provided shader table index must reference a valid miss record in the shader
         /// table.
-    __target_intrinsic(hlsl, "NvMakeMiss")
     [__requiresNVAPI]
+    __target_intrinsic(hlsl, "NvMakeMiss")
+    __glsl_extension(GL_NV_shader_invocation_reorder)
     static HitObject MakeMiss( 
         uint MissShaderIndex, 
         RayDesc Ray);
+
+     __specialized_for_target(glsl)
+    static HitObject MakeMiss( 
+        uint MissShaderIndex, 
+        RayDesc Ray)
+    {
+        HitObject hitObj;
+        __makeMiss(MissShaderIndex, Ray.Origin, Ray.TMin, Ray.Direction, Ray.TMax, hitObj);
+        return hitObj;
+    }
 
         /// Creates a HitObject representing “NOP” (no operation) which is neither a hit nor a miss. Invoking a
         /// NOP hit object using HitObject::Invoke has no effect. Reordering by hit objects using
@@ -5564,53 +5580,61 @@ struct HitObject
         inout payload_t Payload);
 
         /// Returns true if the HitObject encodes a miss, otherwise returns false.
-    __target_intrinsic(hlsl)
     [__requiresNVAPI]
+    __target_intrinsic(hlsl)
+    __target_intrinsic(glsl, "hitObjectIsMissNV($0)")
     bool IsMiss();
 
         /// Returns true if the HitObject encodes a hit, otherwise returns false.
-    __target_intrinsic(hlsl)
     [__requiresNVAPI]
+    __target_intrinsic(hlsl)
+    __target_intrinsic(glsl, "hitObjectIsHitNV($0)")
     bool IsHit();
 
         /// Returns true if the HitObject encodes a nop, otherwise returns false.
-    __target_intrinsic(hlsl)
     [__requiresNVAPI]
+    __target_intrinsic(hlsl)
+    __target_intrinsic(glsl, "hitObjectIsEmptyNV($0)")
     bool IsNop();
 
         /// Queries ray properties from HitObject. Valid if the hit object represents a hit or a miss.
-    __target_intrinsic(hlsl)
     [__requiresNVAPI]
+    __target_intrinsic(hlsl)
     RayDesc GetRayDesc();
 
         /// Queries shader table index from HitObject. Valid if the hit object represents a hit or a miss.
-    __target_intrinsic(hlsl)
     [__requiresNVAPI]
+    __target_intrinsic(hlsl)
     uint GetShaderTableIndex();
 
         /// Returns the instance index of a hit. Valid if the hit object represents a hit.
-    __target_intrinsic(hlsl)
     [__requiresNVAPI]
+    __target_intrinsic(hlsl)
+    __target_intrinsic(glsl, "hitObjectGetInstanceCustomIndexNV($0)")
     uint GetInstanceIndex();
 
         /// Returns the instance ID of a hit. Valid if the hit object represents a hit.
-    __target_intrinsic(hlsl)
     [__requiresNVAPI]
+    __target_intrinsic(hlsl)
+    __target_intrinsic(glsl, "hitObjectGetInstanceIdNV($0)")
     uint GetInstanceID();
 
         /// Returns the geometry index of a hit. Valid if the hit object represents a hit.
-    __target_intrinsic(hlsl)
     [__requiresNVAPI]
+    __target_intrinsic(hlsl)
+    __target_intrinsic(glsl, "hitObjectGetGeometryIndexNV($0)")
     uint GetGeometryIndex();
 
         /// Returns the primitive index of a hit. Valid if the hit object represents a hit.
-    __target_intrinsic(hlsl)
     [__requiresNVAPI]
+    __target_intrinsic(hlsl)
+    __target_intrinsic(glsl, "hitObjectGetPrimitiveIndexNV($0)")
     uint GetPrimitiveIndex();
 
         /// Returns the hit kind. Valid if the hit object represents a hit.
-    __target_intrinsic(hlsl)
     [__requiresNVAPI]
+    __target_intrinsic(hlsl)
+    __target_intrinsic(glsl, "hitObjectGetHitKindNV($0)")
     uint GetHitKind();
 
         /// Returns the attributes of a hit. Valid if the hit object represents a hit or a miss.
@@ -5673,6 +5697,15 @@ struct HitObject
         RayDesc Ray, 
         inout payload_t Payload,
         out HitObject hitObj);
+
+    __target_intrinsic(glsl, "hitObjectRecordMissNV($5, $0, $1, $2, $3, $4)")
+    static void __makeMiss(
+        uint MissShaderIndex,
+        float3 Origin,
+        float TMin,
+        float3 Direction,
+        float TMax, 
+        out HitObject hitObj);
 };
     
     /// Reorders threads based on a coherence hint value. NumCoherenceHintBits indicates how many of
@@ -5682,8 +5715,10 @@ struct HitObject
     /// NumCoherenceHintBits.
     /// Where possible, reordering will also attempt to retain locality in the thread’s launch indices
     /// (DispatchRaysIndex in DXR).
-__target_intrinsic(hlsl, "NvReorderThread")
 [__requiresNVAPI]
+__target_intrinsic(hlsl, "NvReorderThread")
+__glsl_extension(GL_NV_shader_invocation_reorder)
+__target_intrinsic(glsl, "reorderThreadNV")
 void ReorderThread( uint CoherenceHint, uint NumCoherenceHintBitsFromLSB );
 
     /// Reorders threads based on a hit object, optionally extended by a coherence hint value. Coherence
@@ -5701,8 +5736,10 @@ void ReorderThread( uint CoherenceHint, uint NumCoherenceHintBitsFromLSB );
     /// same shader ID. (Miss shaders and NOP HitObjects are grouped separately). Within each of these
     /// groups, it will attempt to order threads by the value of their coherence hints. And within ranges
     /// of equal coherence hints, it will attempt to maximize locality in 3D space of the ray hit (if any).
-__target_intrinsic(hlsl, "NvReorderThread")
 [__requiresNVAPI]
+__target_intrinsic(hlsl, "NvReorderThread")
+__glsl_extension(GL_NV_shader_invocation_reorder)
+__target_intrinsic(glsl, "reorderThreadNV")
 void ReorderThread( HitObject HitOrMiss, uint CoherenceHint, uint NumCoherenceHintBitsFromLSB );
 
     /// Is equivalent to 
@@ -5712,4 +5749,6 @@ void ReorderThread( HitObject HitOrMiss, uint CoherenceHint, uint NumCoherenceHi
     /// With CoherenceHint and NumCoherenceHintBitsFromLSB as 0, meaning they are ignored.
 [__requiresNVAPI]
 __target_intrinsic(hlsl, "NvReorderThread")
+__glsl_extension(GL_NV_shader_invocation_reorder)
+__target_intrinsic(glsl, "reorderThreadNV")
 void ReorderThread( HitObject HitOrMiss );
