@@ -2078,6 +2078,25 @@ struct AdapterInfo
     uint32_t deviceID;
 };
 
+class AdapterList
+{
+public:
+    AdapterList(ISlangBlob* blob) : m_blob(blob) {}
+
+    const AdapterInfo* getAdapters() const
+    {
+        return reinterpret_cast<const AdapterInfo*>(m_blob ? m_blob->getBufferPointer() : nullptr);
+    }
+
+    GfxCount getCount() const
+    {
+        return (GfxCount)(m_blob ? m_blob->getBufferSize() / sizeof(AdapterInfo) : 0);
+    }
+
+private:
+    ComPtr<ISlangBlob> m_blob;
+};
+
 struct DeviceInfo
 {
     DeviceType deviceType;
@@ -2549,7 +2568,7 @@ extern "C"
     SLANG_GFX_API SlangResult SLANG_MCALL gfxGetFormatInfo(Format format, FormatInfo* outInfo);
 
     /// Gets a list of available adapters for a given device type
-    SLANG_GFX_API SlangResult SLANG_MCALL gfxGetAdapters(DeviceType type, AdapterInfo* outAdapters, Size bufferSize, GfxCount* outAdapterCount);
+    SLANG_GFX_API SlangResult SLANG_MCALL gfxGetAdapters(DeviceType type, ISlangBlob** outAdaptersBlob);
 
     /// Given a type returns a function that can construct it, or nullptr if there isn't one
     SLANG_GFX_API SlangResult SLANG_MCALL
@@ -2565,6 +2584,14 @@ extern "C"
     SLANG_GFX_API void SLANG_MCALL gfxEnableDebugLayer();
 
     SLANG_GFX_API const char* SLANG_MCALL gfxGetDeviceTypeName(DeviceType type);
+}
+
+/// Gets a list of available adapters for a given device type
+inline AdapterList gfxGetAdapters(DeviceType type)
+{
+    ComPtr<ISlangBlob> blob;
+    gfxGetAdapters(type, blob.writeRef());
+    return AdapterList(blob);
 }
 
 // Extended descs.

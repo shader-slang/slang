@@ -1,6 +1,7 @@
 // render.cpp
 #include "renderer-shared.h"
 #include "../../source/core/slang-math.h"
+#include "../../source/core/slang-blob.h"
 #include "open-gl/render-gl.h"
 #include "debug-layer/debug-device.h"
 
@@ -238,7 +239,7 @@ extern "C"
         return SLANG_OK;
     }
 
-    SLANG_GFX_API SlangResult SLANG_MCALL gfxGetAdapters(DeviceType type, AdapterInfo* outAdapters, Size bufferSize, GfxCount* outAdapterCount)
+    SLANG_GFX_API SlangResult SLANG_MCALL gfxGetAdapters(DeviceType type, ISlangBlob** outAdaptersBlob)
     {
         List<AdapterInfo> adapters;
 
@@ -273,12 +274,9 @@ extern "C"
             return SLANG_E_INVALID_ARG;
         }
 
-        if (adapters.getCount() > (Index)(bufferSize / sizeof(AdapterInfo)))
-            return SLANG_E_BUFFER_TOO_SMALL;
-
-        for (Index i = 0; i < adapters.getCount(); ++i)
-            outAdapters[i] = adapters[i];
-        *outAdapterCount = (GfxCount)adapters.getCount();
+        auto adaptersBlob = RawBlob::create(adapters.getBuffer(), adapters.getCount() * sizeof(AdapterInfo));
+        if (outAdaptersBlob)
+            returnComPtr(outAdaptersBlob, adaptersBlob);
 
         return SLANG_OK;
     }
