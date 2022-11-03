@@ -517,6 +517,10 @@ SlangResult DXCDownstreamCompiler::compile(const CompileOptions& options, IArtif
         searchDirectories.searchDirectories.add(asString(includePath));
     }
 
+    // TODO(JS): 
+    // We don't want to enable HLSL2021 on DXC by default even if it's available because it has
+    // changes that break things. Such as with operator ?:. So for now we disable.
+#if 0
     // TODO(JS): Enable in a better way perhaps?
     {
         // Strictly speaking the HLSL2021 was available in 1.6.2112, in preview
@@ -532,6 +536,7 @@ SlangResult DXCDownstreamCompiler::compile(const CompileOptions& options, IArtif
             args.add(L"2021");
         }
     }
+#endif
 
     String sourcePath = ArtifactUtil::findPath(sourceArtifact);
     OSString wideSourcePath = sourcePath.toWString();
