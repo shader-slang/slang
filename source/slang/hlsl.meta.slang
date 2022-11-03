@@ -5509,6 +5509,43 @@ struct HitObject
         return hitObj;
     }
 
+    __specialized_for_target(glsl)
+    static HitObject MakeHit<attr_t>( 
+        RaytracingAccelerationStructure AccelerationStructure, 
+        uint InstanceIndex, 
+        uint GeometryIndex, 
+        uint PrimitiveIndex, 
+        uint HitKind, 
+        uint RayContributionToHitGroupIndex, 
+        uint MultiplierForGeometryContributionToHitGroupIndex, 
+        RayDesc Ray, 
+        attr_t attributes)
+    {
+        HitObject hitObj;
+
+        [__vulkanRayPayload]
+        static attr_t p;
+
+        // Save the payload
+        p = attributes;
+
+        __glslMakeHit(hitObj,
+            AccelerationStructure,
+            InstanceIndex,
+            PrimitiveIndex,
+            GeometryIndex,
+            HitKind,
+            RayContributionToHitGroupIndex,                         /// sbtRecordOffset?
+            MultiplierForGeometryContributionToHitGroupIndex,       /// sbtRecordStride?
+            Ray.Origin,
+            Ray.TMin,
+            Ray.Direction, 
+            Ray.TMax,
+            __rayPayloadLocation(p));
+
+        return hitObj;
+    }
+
         /// Creates a HitObject representing a hit based on values explicitly passed as arguments, without
         /// tracing a ray. The primitive specified by AccelerationStructure, InstanceIndex, GeometryIndex,
         /// and PrimitiveIndex must exist. The shader table index is explicitly provided as an argument
@@ -5538,6 +5575,41 @@ struct HitObject
             Ray, 
             attributes, 
             hitObj);
+        return hitObj;
+    }
+
+    __specialized_for_target(glsl)
+    static HitObject MakeHit<attr_t>( 
+        uint HitGroupRecordIndex, 
+        RaytracingAccelerationStructure AccelerationStructure, 
+        uint InstanceIndex, 
+        uint GeometryIndex, 
+        uint PrimitiveIndex, 
+        uint HitKind, 
+        RayDesc Ray, 
+        attr_t attributes)
+    {
+        HitObject hitObj;
+
+        [__vulkanRayPayload]
+        static attr_t p;
+
+        // Save the payload
+        p = attributes;
+
+        __glslMakeHitWithIndex(hitObj,
+            AccelerationStructure, 
+            InstanceIndex,              ///? Same as instanceid ?
+            GeometryIndex, 
+            PrimitiveIndex,
+            HitKind,                    /// Assuming HitKinds are compatible
+            HitGroupRecordIndex,        /// sbtRecordIndex
+            Ray.Origin,
+            Ray.TMin,
+            Ray.Direction, 
+            Ray.TMax,
+            __rayPayloadLocation(p));
+
         return hitObj;
     }
 
@@ -5601,6 +5673,13 @@ struct HitObject
     [__requiresNVAPI]
     __target_intrinsic(hlsl)
     RayDesc GetRayDesc();
+
+    __specialized_for_target(glsl)
+    RayDesc GetRayDesc()
+    {
+        RayDesc ray = { __getRayWorldOrigin(), __getTMin(), __getRayDirection(), __getTMax() };
+        return ray;
+    }
 
         /// Queries shader table index from HitObject. Valid if the hit object represents a hit or a miss.
     [__requiresNVAPI]
@@ -5698,6 +5777,7 @@ struct HitObject
         inout payload_t Payload,
         out HitObject hitObj);
 
+    __glsl_extension(GL_NV_shader_invocation_reorder)
     __target_intrinsic(glsl, "hitObjectRecordMissNV($5, $0, $1, $2, $3, $4)")
     static void __makeMiss(
         uint MissShaderIndex,
@@ -5706,6 +5786,56 @@ struct HitObject
         float3 Direction,
         float TMax, 
         out HitObject hitObj);
+
+    __glsl_extension(GL_NV_shader_invocation_reorder)
+    __target_intrinsic(glsl, "hitObjectGetObjectRayDirectionNV($0)")
+    float3 __getRayDirection();
+
+    __glsl_extension(GL_NV_shader_invocation_reorder)
+    __target_intrinsic(glsl, "hitObjectGetWorldRayOriginNV($0)")
+    float3 __getRayWorldOrigin();
+
+    __glsl_extension(GL_NV_shader_invocation_reorder)
+    __target_intrinsic(glsl, "hitObjectGetRayTMaxNV($0)")
+    float __getTMax();
+
+    __glsl_extension(GL_NV_shader_invocation_reorder)
+    __target_intrinsic(glsl, "hitObjectGetRayTMinNV($0)")
+    float __getTMin();
+
+    __glsl_extension(GL_NV_shader_invocation_reorder)
+    __target_intrinsic(glsl, "hitObjectRecordHitWithIndexNV")
+    static void __glslMakeHitWithIndex(
+        HitObject hitObj,
+        RaytracingAccelerationStructure accelerationStructure,
+        uint instanceid,
+        uint primitiveid,
+        uint geometryindex,
+        uint hitKind,
+        uint sbtRecordIndex,
+        float3 origin,
+        float Tmin,
+        float3 direction,
+        float Tmax,
+        int attributeLocation);
+
+    __glsl_extension(GL_NV_shader_invocation_reorder)
+    __target_intrinsic(glsl, "hitObjectRecordHitNV")
+    static void __glslMakeHit(
+        HitObject hitObj,
+        RaytracingAccelerationStructure accelerationStructure,
+        uint instanceid,
+        uint primitiveid,
+        uint geometryindex,
+        uint hitKind,
+        uint sbtRecordOffset,
+        uint sbtRecordStride,
+        float3 origin,
+        float Tmin,
+        float3 direction,
+        float Tmax,
+        int attributeLocation);
+
 };
     
     /// Reorders threads based on a coherence hint value. NumCoherenceHintBits indicates how many of

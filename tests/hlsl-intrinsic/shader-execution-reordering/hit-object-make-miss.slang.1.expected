@@ -3,6 +3,7 @@ standard error = {
 }
 standard output = {
 #version 450
+#extension GL_NV_shader_invocation_reorder : require
 layout(row_major) uniform;
 layout(row_major) buffer;
 
