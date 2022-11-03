@@ -1,4 +1,4 @@
-// hit-object-make-hit.slang
+// hit-object-make-nop.slang
 
 //TEST:SIMPLE: -target dxil -entry rayGenerationMain -stage raygeneration -profile sm_6_5 -DNV_SHADER_EXTN_SLOT=u0 
 
