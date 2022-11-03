@@ -481,7 +481,7 @@ Result SLANG_MCALL getVKAdapters(List<AdapterInfo>& outAdapters)
         VkPhysicalDeviceProperties props;
         api.vkGetPhysicalDeviceProperties(physicalDevice, &props);
         AdapterInfo info = {};
-        strncpy_s(info.name, props.deviceName, sizeof(AdapterInfo::name) - 1);
+        memcpy(info.name, props.deviceName, Math::Min(strlen(props.deviceName), sizeof(AdapterInfo::name) - 1));
         info.vendorID = props.vendorID;
         info.deviceID = props.deviceID;
         outAdapters.add(info);

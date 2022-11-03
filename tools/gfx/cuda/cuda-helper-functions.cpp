@@ -81,7 +81,7 @@ Result SLANG_MCALL getCUDAAdapters(List<AdapterInfo>& outAdapters)
         cudaDeviceProp prop;
         cudaGetDeviceProperties(&prop, i);
         AdapterInfo info = {};
-        strncpy_s(info.name, prop.name, sizeof(AdapterInfo::name) - 1);
+        memcpy(info.name, prop.name, Math::Min(strlen(prop.name), sizeof(AdapterInfo::name) - 1));
         outAdapters.add(info);
     }
 
