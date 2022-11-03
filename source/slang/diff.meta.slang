@@ -47,15 +47,10 @@ extension float : IDifferentiable
 /// Pair type that serves to wrap the primal and
 /// differential types of an arbitrary type T.
 
-<<<<<<< HEAD
 __generic<T : IDifferentiable>
 __magic_type(DifferentialPairType)
 __intrinsic_type($(kIROp_DifferentialPairType))
 struct DifferentialPair : IDifferentiable
-=======
-__generic<let N : int>
-extension vector<float, N> : IDifferentiable
->>>>>>> 5ed535ed... WIP: Adding more functions
 {
     typedef DifferentialPair<T.Differential> Differential;
     typedef T.Differential DifferentialElementType;
