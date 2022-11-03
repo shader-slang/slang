@@ -5688,12 +5688,27 @@ struct HitObject
 
         /// Invokes closesthit or miss shading for the specified hit object. In case of a NOP HitObject, no
         /// shader is invoked.
-    __target_intrinsic(hlsl, "NvInvokeHitObject")
     [__requiresNVAPI]
+    __target_intrinsic(hlsl, "NvInvokeHitObject")
     static void Invoke<payload_t>(
         RaytracingAccelerationStructure AccelerationStructure,
         HitObject HitOrMiss, 
         inout payload_t Payload);
+
+    __specialized_for_target(glsl)
+    static void Invoke<payload_t>(
+        RaytracingAccelerationStructure AccelerationStructure,
+        HitObject HitOrMiss, 
+        inout payload_t Payload)
+    {
+        [__vulkanRayPayload]
+        static payload_t p;
+
+        // Save the payload
+        p = Payload;
+
+        __glslInvoke(HitOrMiss, __rayPayloadLocation(p));
+    }
 
         /// Returns true if the HitObject encodes a miss, otherwise returns false.
     [__requiresNVAPI]
@@ -5900,6 +5915,11 @@ struct HitObject
         float Tmax,
         int payload);
 
+    __glsl_extension(GL_NV_shader_invocation_reorder)
+    __target_intrinsic(glsl, "hitObjectExecuteShaderNV")
+    static void __glslInvoke(
+        HitObject hitObj,
+        int payload);
 };
     
     /// Reorders threads based on a coherence hint value. NumCoherenceHintBits indicates how many of
