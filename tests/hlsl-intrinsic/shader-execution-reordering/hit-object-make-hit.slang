@@ -21,20 +21,32 @@ uint calcValue(HitObject hit)
 {
     uint r = 0;
     
-    if (!hit.IsMiss())
+    if (hit.IsHit())
     {
         uint instanceIndex = hit.GetInstanceIndex();
         uint instanceID = hit.GetInstanceID();
         uint geometryIndex = hit.GetGeometryIndex();
         uint primitiveIndex = hit.GetPrimitiveIndex();
-
-        SomeValues objSomeValues = hit.GetAttributes<SomeValues>();
+        uint hitKind = hit.GetHitKind();
         
+        r += hitKind;
         r += instanceIndex;
         r += instanceID;
         r += geometryIndex;
         r += primitiveIndex;
+
+        RayDesc ray = hit.GetRayDesc();
+
+        r += uint(ray.TMin > 0);
+        r += uint(ray.TMax < ray.TMin);
+        
+        SomeValues objSomeValues = hit.GetAttributes<SomeValues>();
+        
         r += objSomeValues.a;
+    }
+    else if (hit.IsMiss())
+    {
+        r += 1;
     }
     
     return r;

@@ -21,7 +21,7 @@ uint calcValue(HitObject hit)
 {
     uint r = 0;
     
-    if (!hit.IsMiss())
+    if (hit.IsHit())
     {
         uint instanceIndex = hit.GetInstanceIndex();
         uint instanceID = hit.GetInstanceID();
@@ -76,6 +76,33 @@ void rayGenerationMain()
     
     // Change the payload
     SomeValues otherValues = { idx * -1, idx * 4.0f };
+    
+    // Now Invoke to cast another ray, with the new payload
+    HitObject::Invoke( scene, hit, otherValues );
+    
+    r += calcValue(hit);
+  
+    // !!! TODO(JS) !!!
+    // NOTE! If I enable this I end up with a recursive failure in AST traversal, if 
+    // otherValues is redefined. 
+    
+    // Reorder 
+    ReorderThread(hit, uint(idx & 3), 2);
+
+    
+    // Change the payload
+    otherValues = { idx * -2, idx * 8.0f };
+    
+    // Now Invoke to cast another ray, with the new payload
+    HitObject::Invoke( scene, hit, otherValues );
+    
+    r += calcValue(hit);
+
+    // Reorder 
+    ReorderThread(uint(idx & 1), 1);
+    
+    // Change the payload
+    otherValues = { idx * -4, idx * 16.0f };
     
     // Now Invoke to cast another ray, with the new payload
     HitObject::Invoke( scene, hit, otherValues );

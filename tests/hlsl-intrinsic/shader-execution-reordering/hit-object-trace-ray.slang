@@ -21,7 +21,7 @@ uint calcValue(HitObject hit)
 {
     uint r = 0;
     
-    if (!hit.IsMiss())
+    if (hit.IsHit())
     {
         uint instanceIndex = hit.GetInstanceIndex();
         uint instanceID = hit.GetInstanceID();
