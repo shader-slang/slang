@@ -1,6 +1,7 @@
 // render.cpp
 #include "renderer-shared.h"
 #include "../../source/core/slang-math.h"
+#include "../../source/core/slang-blob.h"
 #include "open-gl/render-gl.h"
 #include "debug-layer/debug-device.h"
 
@@ -14,6 +15,11 @@ Result SLANG_MCALL createD3D12Device(const IDevice::Desc* desc, IDevice** outDev
 Result SLANG_MCALL createVKDevice(const IDevice::Desc* desc, IDevice** outDevice);
 Result SLANG_MCALL createCUDADevice(const IDevice::Desc* desc, IDevice** outDevice);
 Result SLANG_MCALL createCPUDevice(const IDevice::Desc* desc, IDevice** outDevice);
+
+Result SLANG_MCALL getD3D11Adapters(List<AdapterInfo>& outAdapters);
+Result SLANG_MCALL getD3D12Adapters(List<AdapterInfo>& outAdapters);
+Result SLANG_MCALL getVKAdapters(List<AdapterInfo>& outAdapters);
+Result SLANG_MCALL getCUDAAdapters(List<AdapterInfo>& outAdapters);
 
 static bool debugLayerEnabled = false;
 bool isGfxDebugLayerEnabled() { return debugLayerEnabled; }
@@ -230,6 +236,48 @@ extern "C"
     SLANG_GFX_API SlangResult SLANG_MCALL gfxGetFormatInfo(Format format, FormatInfo* outInfo)
     {
         *outInfo = s_formatInfoMap.get(format);
+        return SLANG_OK;
+    }
+
+    SLANG_GFX_API SlangResult SLANG_MCALL gfxGetAdapters(DeviceType type, ISlangBlob** outAdaptersBlob)
+    {
+        List<AdapterInfo> adapters;
+
+        switch (type)
+        {
+#if SLANG_WINDOWS_FAMILY
+        case DeviceType::DirectX11:
+            SLANG_RETURN_ON_FAIL(getD3D11Adapters(adapters));
+            break;
+        case DeviceType::DirectX12:
+            SLANG_RETURN_ON_FAIL(getD3D12Adapters(adapters));
+            break;
+        case DeviceType::OpenGl:
+            return SLANG_E_NOT_IMPLEMENTED;
+        case DeviceType::Vulkan:
+            SLANG_RETURN_ON_FAIL(getVKAdapters(adapters));
+            break;
+        case DeviceType::CUDA:
+            SLANG_RETURN_ON_FAIL(getCUDAAdapters(adapters));
+            break;
+#elif SLANG_LINUX_FAMILY && !defined(__CYGWIN__)
+        case DeviceType::Vulkan:
+            SLANG_RETURN_ON_FAIL(getVKAdapters(adapters));
+            break;
+        case DeviceType::CUDA:
+            SLANG_RETURN_ON_FAIL(getCUDAAdapters(adapters));
+            break;
+#endif
+        case DeviceType::CPU:
+            return SLANG_E_NOT_IMPLEMENTED;
+        default:
+            return SLANG_E_INVALID_ARG;
+        }
+
+        auto adaptersBlob = RawBlob::create(adapters.getBuffer(), adapters.getCount() * sizeof(AdapterInfo));
+        if (outAdaptersBlob)
+            returnComPtr(outAdaptersBlob, adaptersBlob);
+
         return SLANG_OK;
     }
 

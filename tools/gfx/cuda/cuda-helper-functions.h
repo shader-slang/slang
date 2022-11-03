@@ -3,12 +3,13 @@
 
 #include "slang-gfx.h"
 #include "cuda-base.h"
+#include "../../../source/core/slang-list.h"
 
 namespace gfx
 {
-#ifdef GFX_ENABLE_CUDA
 using namespace Slang;
 
+#ifdef GFX_ENABLE_CUDA
 namespace cuda
 {
 SLANG_FORCE_INLINE bool _isError(CUresult result) { return result != 0; }
@@ -100,6 +101,8 @@ void _optixLogCallback(unsigned int level, const char* tag, const char* message,
 
 } // namespace cuda
 #endif
+
+Result SLANG_MCALL getCUDAAdapters(List<AdapterInfo>& outAdapters);
 
 Result SLANG_MCALL createCUDADevice(const IDevice::Desc* desc, IDevice** outDevice);
 
