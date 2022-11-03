@@ -6,6 +6,7 @@
 #include "d3d12-shader-object-layout.h"
 #include "d3d12-submitter.h"
 #include "../../../source/core/slang-short-list.h"
+#include "../../../source/core/slang-list.h"
 
 #ifndef __ID3D12GraphicsCommandList1_FWD_DEFINED__
 // If can't find a definition of CommandList1, just use an empty definition
@@ -83,6 +84,8 @@ void translatePostBuildInfoDescs(
     List<D3D12_RAYTRACING_ACCELERATION_STRUCTURE_POSTBUILD_INFO_DESC>& postBuildInfoDescs);
 
 } // namespace d3d12
+
+Result SLANG_MCALL getD3D12Adapters(List<AdapterInfo>& outAdapters);
 
 Result SLANG_MCALL createD3D12Device(const IDevice::Desc* desc, IDevice** outDevice);
 

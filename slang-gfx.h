@@ -98,7 +98,7 @@ enum class DeviceType
 enum class ProjectionStyle
 {
     Unknown,
-    OpenGl, 
+    OpenGl,
     DirectX,
     Vulkan,
     CountOf,
@@ -415,7 +415,7 @@ enum class Format
 // TODO: Width/Height/Depth/whatever should not be used. We should use extentX, extentY, etc.
 struct FormatInfo
 {
-    GfxCount channelCount;         ///< The amount of channels in the format. Only set if the channelType is set 
+    GfxCount channelCount;         ///< The amount of channels in the format. Only set if the channelType is set
     uint8_t channelType;           ///< One of SlangScalarType None if type isn't made up of elements of type. TODO: Change to uint32_t?
 
     Size blockSizeInBytes;         ///< The size of a block in bytes.
@@ -588,7 +588,7 @@ public:
     virtual SLANG_NO_THROW Type SLANG_MCALL getType() = 0;
     virtual SLANG_NO_THROW Result SLANG_MCALL getNativeResourceHandle(InteropHandle* outHandle) = 0;
     virtual SLANG_NO_THROW Result SLANG_MCALL getSharedHandle(InteropHandle* outHandle) = 0;
-	
+
     virtual SLANG_NO_THROW Result SLANG_MCALL setDebugName(const char* name) = 0;
     virtual SLANG_NO_THROW const char* SLANG_MCALL getDebugName() = 0;
 
@@ -2071,6 +2071,32 @@ public:
           0x8eccc8ec, 0x5c04, 0x4a51, { 0x99, 0x75, 0x13, 0xf8, 0xfe, 0xa1, 0x59, 0xf3 } \
     }
 
+struct AdapterInfo
+{
+    char name[128];
+    uint32_t vendorID;
+    uint32_t deviceID;
+};
+
+class AdapterList
+{
+public:
+    AdapterList(ISlangBlob* blob) : m_blob(blob) {}
+
+    const AdapterInfo* getAdapters() const
+    {
+        return reinterpret_cast<const AdapterInfo*>(m_blob ? m_blob->getBufferPointer() : nullptr);
+    }
+
+    GfxCount getCount() const
+    {
+        return (GfxCount)(m_blob ? m_blob->getBufferSize() / sizeof(AdapterInfo) : 0);
+    }
+
+private:
+    ComPtr<ISlangBlob> m_blob;
+};
+
 struct DeviceInfo
 {
     DeviceType deviceType;
@@ -2394,7 +2420,7 @@ public:
         slang::TypeReflection* type,
         ShaderObjectContainerType container,
         IShaderObject** outObject) = 0;
-    
+
     virtual SLANG_NO_THROW Result SLANG_MCALL createShaderObjectFromTypeLayout(
         slang::TypeLayoutReflection* typeLayout, IShaderObject** outObject) = 0;
 
@@ -2472,7 +2498,7 @@ public:
     virtual SLANG_NO_THROW Result SLANG_MCALL createQueryPool(
         const IQueryPool::Desc& desc, IQueryPool** outPool) = 0;
 
-    
+
     virtual SLANG_NO_THROW Result SLANG_MCALL getAccelerationStructurePrebuildInfo(
         const IAccelerationStructure::BuildInputs& buildInputs,
         IAccelerationStructure::PrebuildInfo* outPrebuildInfo) = 0;
@@ -2538,8 +2564,11 @@ extern "C"
     /// Checks if format is typeless
     SLANG_GFX_API bool SLANG_MCALL gfxIsTypelessFormat(Format format);
 
-    /// Gets information about the format 
+    /// Gets information about the format
     SLANG_GFX_API SlangResult SLANG_MCALL gfxGetFormatInfo(Format format, FormatInfo* outInfo);
+
+    /// Gets a list of available adapters for a given device type
+    SLANG_GFX_API SlangResult SLANG_MCALL gfxGetAdapters(DeviceType type, ISlangBlob** outAdaptersBlob);
 
     /// Given a type returns a function that can construct it, or nullptr if there isn't one
     SLANG_GFX_API SlangResult SLANG_MCALL
@@ -2555,6 +2584,14 @@ extern "C"
     SLANG_GFX_API void SLANG_MCALL gfxEnableDebugLayer();
 
     SLANG_GFX_API const char* SLANG_MCALL gfxGetDeviceTypeName(DeviceType type);
+}
+
+/// Gets a list of available adapters for a given device type
+inline AdapterList gfxGetAdapters(DeviceType type)
+{
+    ComPtr<ISlangBlob> blob;
+    gfxGetAdapters(type, blob.writeRef());
+    return AdapterList(blob);
 }
 
 // Extended descs.

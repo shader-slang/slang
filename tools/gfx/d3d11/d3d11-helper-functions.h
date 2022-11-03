@@ -3,6 +3,7 @@
 
 #include "slang-gfx.h"
 #include "d3d11-base.h"
+#include "../../../source/core/slang-list.h"
 
 namespace gfx
 {
@@ -280,6 +281,8 @@ namespace d3d11
         DXGI_FORMAT pixelFormat,
         D3D11_SHADER_RESOURCE_VIEW_DESC& descOut);
 } // namespace d3d11
+
+Result SLANG_MCALL getD3D11Adapters(List<AdapterInfo>& outAdapters);
 
 Result SLANG_MCALL createD3D11Device(const IDevice::Desc* desc, IDevice** outDevice);
 
