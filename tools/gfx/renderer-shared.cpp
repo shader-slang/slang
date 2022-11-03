@@ -374,7 +374,7 @@ Result RendererBase::getEntryPointCodeFromShaderCache(
 
     // Query the shader cache index for an entry with shaderKey as its key.
     auto entry = persistentShaderCache->findEntry(shaderKey, codeBlob.writeRef());
-    if (entry && contentsHash == entry->Value.contentsBasedDigest)
+    if (entry && contentsHash == entry->contentsBasedDigest)
     {
         // We found the entry in the cache, and the entry's contents are up-to-date. Nothing else needs to be done.
         shaderCacheHitCount++;
@@ -394,7 +394,7 @@ Result RendererBase::getEntryPointCodeFromShaderCache(
         }
         else
         {
-            persistentShaderCache->updateEntry(entry, shaderKey, contentsHash, codeBlob);
+            persistentShaderCache->updateEntry(shaderKey, contentsHash, codeBlob);
             shaderCacheEntryDirtyCount++;
         }
     }

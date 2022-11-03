@@ -158,7 +158,7 @@ namespace gfx_test
             diskFileSystem = OSFileSystem::getMutableSingleton();
             diskFileSystem = new RelativeFileSystem(diskFileSystem, "tools/gfx-unit-test");
 
-            shaderCache.shaderCacheFileSystem = cacheFileSystem;
+            shaderCache.shaderCacheFileSystem = diskFileSystem;
         }
 
         void submitGPUWork()
