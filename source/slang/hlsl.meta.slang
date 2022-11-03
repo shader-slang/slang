@@ -5638,9 +5638,17 @@ struct HitObject
         /// ReorderThread will group NOP hit objects together. This can be useful in some reordering
         /// scenarios where future control flow for some threads is known to process neither a hit nor a
         /// miss.
-    __target_intrinsic(hlsl, "NvMakeNop")
     [__requiresNVAPI]
+    __target_intrinsic(hlsl, "NvMakeNop")
     static HitObject MakeNop();
+
+    __specialized_for_target(glsl)
+    static HitObject MakeNop()
+    {
+        HitObject hitObj;
+        __makeNop(hitObj);
+        return hitObj;
+    }
 
         /// Invokes closesthit or miss shading for the specified hit object. In case of a NOP HitObject, no
         /// shader is invoked.
@@ -5786,6 +5794,10 @@ struct HitObject
         float3 Direction,
         float TMax, 
         out HitObject hitObj);
+
+    __glsl_extension(GL_NV_shader_invocation_reorder)
+    __target_intrinsic(glsl, "hitObjectRecordEmptyNV($0)")
+    static void __makeNop(out HitObject hitObj);
 
     __glsl_extension(GL_NV_shader_invocation_reorder)
     __target_intrinsic(glsl, "hitObjectGetObjectRayDirectionNV($0)")
