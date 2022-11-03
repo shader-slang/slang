@@ -3671,11 +3671,6 @@ static TypeLayoutResult _createTypeLayout(
     {
         return createArrayLikeTypeLayout(context, arrayType, arrayType->baseType, arrayType->arrayLength);
     }
-    else if (auto meshOutputType = as<MeshOutputType>(type))
-    {
-        // TODO: Ellie, explain why we aren't making an array layout here
-        return _createTypeLayout(context, meshOutputType->getElementType());
-    }
     else if (auto declRefType = as<DeclRefType>(type))
     {
         auto declRef = declRefType->declRef;
