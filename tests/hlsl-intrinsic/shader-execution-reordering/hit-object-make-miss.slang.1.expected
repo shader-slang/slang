@@ -6,8 +6,6 @@ standard output = {
 #extension GL_NV_shader_invocation_reorder : require
 layout(row_major) uniform;
 layout(row_major) buffer;
-
-#line 4504 0
 struct RayDesc_0
 {
     vec3 Origin_0;
@@ -16,42 +14,28 @@ struct RayDesc_0
     float TMax_0;
 };
 
-
-#line 5549
 hitObjectNV HitObject_MakeMiss_0(uint MissShaderIndex_0, RayDesc_0 Ray_0)
 {
-
-#line 5558
     hitObjectNV hitObj_0;
     hitObjectRecordMissNV((hitObj_0), (MissShaderIndex_0), (Ray_0.Origin_0), (Ray_0.TMin_0), (Ray_0.Direction_0), (Ray_0.TMax_0));
     return hitObj_0;
 }
 
-
-#line 11 1
 layout(std430, binding = 0) buffer _S1 {
     uint _data[];
 } outputBuffer_0;
 layout(local_size_x = 4, local_size_y = 1, local_size_z = 1) in;
 void main()
 {
-
-#line 16
     int idx_0 = int(gl_GlobalInvocationID.x);
-
     RayDesc_0 ray_0;
     ray_0.Origin_0 = vec3(float(idx_0), 0.00000000000000000000, 0.00000000000000000000);
     ray_0.TMin_0 = 0.00999999977648258209;
     ray_0.Direction_0 = vec3(0.00000000000000000000, 1.00000000000000000000, 0.00000000000000000000);
     ray_0.TMax_0 = 10000.00000000000000000000;
-
     hitObjectNV hit_0 = HitObject_MakeMiss_0(uint(idx_0), ray_0);
-
     bool _S2 = (hitObjectIsMissNV((hit_0)));
-
     uint _S3 = uint(int(_S2));
-
-#line 28
     ((outputBuffer_0)._data[(uint(idx_0))]) = _S3;
     return;
 }

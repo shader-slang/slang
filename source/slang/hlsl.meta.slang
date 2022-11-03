@@ -5743,6 +5743,7 @@ struct HitObject
         /// Queries shader table index from HitObject. Valid if the hit object represents a hit or a miss.
     [__requiresNVAPI]
     __target_intrinsic(hlsl)
+    __target_intrinsic(glsl, "hitObjectGetShaderBindingTableRecordIndexNV($0)")
     uint GetShaderTableIndex();
 
         /// Returns the instance index of a hit. Valid if the hit object represents a hit.
