@@ -5461,20 +5461,56 @@ struct HitObject
         uint MissShaderIndex, 
         RayDesc Ray, 
         inout payload_t Payload)
-        {
-            HitObject hitObj;
-            __traceRay(
-                AccelerationStructure, 
-                RayFlags, 
-                InstanceInclusionMask, 
-                RayContributionToHitGroupIndex, 
-                MultiplierForGeometryContributionToHitGroupIndex, 
-                MissShaderIndex, 
-                Ray, 
-                Payload,
-                hitObj);
-            return hitObj;
-        }
+    {
+        HitObject hitObj;
+        __traceRay(
+            AccelerationStructure, 
+            RayFlags, 
+            InstanceInclusionMask, 
+            RayContributionToHitGroupIndex, 
+            MultiplierForGeometryContributionToHitGroupIndex, 
+            MissShaderIndex, 
+            Ray, 
+            Payload,
+            hitObj);
+        return hitObj;
+    }
+
+    __specialized_for_target(glsl)
+    static HitObject TraceRay<payload_t>( 
+        RaytracingAccelerationStructure AccelerationStructure, 
+        uint RayFlags, 
+        uint InstanceInclusionMask, 
+        uint RayContributionToHitGroupIndex, 
+        uint MultiplierForGeometryContributionToHitGroupIndex, 
+        uint MissShaderIndex, 
+        RayDesc Ray, 
+        inout payload_t Payload)
+    {
+        HitObject hitObj;
+
+        [__vulkanRayPayload]
+        static payload_t p;
+
+        // Save the payload
+        p = Payload;
+
+        __glslTraceRay(
+            hitObj,
+            AccelerationStructure,
+            RayFlags,                                           // Assumes D3D/VK have some RayFlags values
+            InstanceInclusionMask,                              // cullMask
+            RayContributionToHitGroupIndex,                     // sbtRecordOffset
+            MultiplierForGeometryContributionToHitGroupIndex,   // sbtRecordStride
+            MissShaderIndex,
+            Ray.Origin,
+            Ray.TMin,
+            Ray.Direction, 
+            Ray.TMax,
+            __rayPayloadLocation(p));
+        
+        return hitObj;
+    }
 
         /// Creates a HitObject representing a hit based on values explicitly passed as arguments, without
         /// tracing a ray. The primitive specified by AccelerationStructure, InstanceIndex, GeometryIndex,
@@ -5847,6 +5883,22 @@ struct HitObject
         float3 direction,
         float Tmax,
         int attributeLocation);
+
+    __glsl_extension(GL_NV_shader_invocation_reorder)
+    __target_intrinsic(glsl, "hitObjectTraceRayNV")
+    static void __glslTraceRay(
+        HitObject hitObj,
+        RaytracingAccelerationStructure accelerationStructure,
+        uint rayFlags,
+        uint cullMask,
+        uint sbtRecordOffset,
+        uint sbtRecordStride,
+        uint missIndex,
+        float3 origin,
+        float Tmin,
+        float3 direction,
+        float Tmax,
+        int payload);
 
 };
     
