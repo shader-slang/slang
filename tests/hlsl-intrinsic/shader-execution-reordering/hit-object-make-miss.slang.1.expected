@@ -18,7 +18,7 @@ struct RayDesc_0
 hitObjectNV HitObject_MakeMiss_0(uint MissShaderIndex_0, RayDesc_0 Ray_0)
 {
     hitObjectNV hitObj_0;
-    hitObjectRecordMissNV((hitObj_0), (MissShaderIndex_0), (Ray_0.Origin_0), (Ray_0.TMin_0), (Ray_0.Direction_0), (Ray_0.TMax_0));
+    hitObjectRecordMissNV(hitObj_0, MissShaderIndex_0, Ray_0.Origin_0, Ray_0.TMin_0, Ray_0.Direction_0, Ray_0.TMax_0);
     return hitObj_0;
 }
 

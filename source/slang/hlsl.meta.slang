@@ -5490,7 +5490,7 @@ struct HitObject
         inout payload_t Payload)
     {
         HitObject hitObj;
-        __traceRay(
+        __hlslTraceRay(
             AccelerationStructure, 
             RayFlags, 
             InstanceInclusionMask, 
@@ -5542,6 +5542,49 @@ struct HitObject
         return hitObj;
     }
 
+        /// Executes motion ray traversal (including anyhit and intersection shaders) like TraceRay, but returns the
+        /// resulting hit information as a HitObject and does not trigger closesthit or miss shaders.
+    __specialized_for_target(glsl)
+    static HitObject TraceMotionRay<payload_t>( 
+        RaytracingAccelerationStructure AccelerationStructure, 
+        uint RayFlags, 
+        uint InstanceInclusionMask, 
+        uint RayContributionToHitGroupIndex, 
+        uint MultiplierForGeometryContributionToHitGroupIndex, 
+        uint MissShaderIndex, 
+        RayDesc Ray,
+        float CurrentTime,
+        inout payload_t Payload)
+    {
+        HitObject hitObj;
+
+        [__vulkanRayPayload]
+        static payload_t p;
+
+        // Save the payload
+        p = Payload;
+
+        __glslTraceMotionRay(
+            hitObj,
+            AccelerationStructure,
+            RayFlags,                                           // Assumes D3D/VK have some RayFlags values
+            InstanceInclusionMask,                              // cullMask
+            RayContributionToHitGroupIndex,                     // sbtRecordOffset
+            MultiplierForGeometryContributionToHitGroupIndex,   // sbtRecordStride
+            MissShaderIndex,
+            Ray.Origin,
+            Ray.TMin,
+            Ray.Direction, 
+            Ray.TMax,
+            CurrentTime,
+            __rayPayloadLocation(p));
+        
+        // Write the payload out
+        Payload = p;
+
+        return hitObj;
+    }
+
         /// Creates a HitObject representing a hit based on values explicitly passed as arguments, without
         /// tracing a ray. The primitive specified by AccelerationStructure, InstanceIndex, GeometryIndex,
         /// and PrimitiveIndex must exist. The shader table index is computed using the formula used with
@@ -5561,7 +5604,7 @@ struct HitObject
         attr_t attributes)
     {
         HitObject hitObj;
-        __makeHit(
+        __hlslMakeHit(
             AccelerationStructure, 
             InstanceIndex,
             GeometryIndex, 
@@ -5611,6 +5654,46 @@ struct HitObject
         return hitObj;
     }
 
+        /// See MakeHit but handles Motion 
+        /// Currently only supported on VK
+    __specialized_for_target(glsl)
+    static HitObject MakeMotionHit<attr_t>( 
+        RaytracingAccelerationStructure AccelerationStructure, 
+        uint InstanceIndex, 
+        uint GeometryIndex, 
+        uint PrimitiveIndex, 
+        uint HitKind, 
+        uint RayContributionToHitGroupIndex, 
+        uint MultiplierForGeometryContributionToHitGroupIndex, 
+        RayDesc Ray,
+        float CurrentTime,
+        attr_t attributes)
+    {
+        HitObject hitObj;
+
+        // Save the attributes
+        __ref attr_t attr = __hitObjectAttributes<attr_t>();
+
+        attr = attributes;
+
+        __glslMakeMotionHit(hitObj,
+            AccelerationStructure,
+            InstanceIndex,
+            PrimitiveIndex,
+            GeometryIndex,
+            HitKind,
+            RayContributionToHitGroupIndex,                         /// sbtRecordOffset?
+            MultiplierForGeometryContributionToHitGroupIndex,       /// sbtRecordStride?
+            Ray.Origin,
+            Ray.TMin,
+            Ray.Direction, 
+            Ray.TMax,
+            CurrentTime,
+            __hitObjectAttributesLocation(__hitObjectAttributes<attr_t>()));
+
+        return hitObj;
+    }
+
         /// Creates a HitObject representing a hit based on values explicitly passed as arguments, without
         /// tracing a ray. The primitive specified by AccelerationStructure, InstanceIndex, GeometryIndex,
         /// and PrimitiveIndex must exist. The shader table index is explicitly provided as an argument
@@ -5630,7 +5713,7 @@ struct HitObject
         attr_t attributes)
     {
         HitObject hitObj;
-        __makeHitWithRecordIndex(
+        __hlslMakeHitWithRecordIndex(
             HitGroupRecordIndex, 
             AccelerationStructure, 
             InstanceIndex,
@@ -5676,6 +5759,43 @@ struct HitObject
         return hitObj;
     }
 
+        /// See MakeHit but handles Motion 
+        /// Currently only supported on VK
+    __specialized_for_target(glsl)
+    static HitObject MakeMotionHit<attr_t>( 
+        uint HitGroupRecordIndex, 
+        RaytracingAccelerationStructure AccelerationStructure, 
+        uint InstanceIndex, 
+        uint GeometryIndex, 
+        uint PrimitiveIndex, 
+        uint HitKind, 
+        RayDesc Ray, 
+        float CurrentTime,
+        attr_t attributes)
+    {
+        HitObject hitObj;
+
+        // Save the attributes
+        __ref attr_t attr = __hitObjectAttributes<attr_t>();
+        attr = attributes;
+
+        __glslMakeMotionHitWithIndex(hitObj,
+            AccelerationStructure, 
+            InstanceIndex,              ///? Same as instanceid ?
+            GeometryIndex, 
+            PrimitiveIndex,
+            HitKind,                    /// Assuming HitKinds are compatible
+            HitGroupRecordIndex,        /// sbtRecordIndex
+            Ray.Origin,
+            Ray.TMin,
+            Ray.Direction, 
+            Ray.TMax,
+            CurrentTime,
+            __hitObjectAttributesLocation(__hitObjectAttributes<attr_t>()));
+
+        return hitObj;
+    }
+
         /// Creates a HitObject representing a miss based on values explicitly passed as arguments, without
         /// tracing a ray. The provided shader table index must reference a valid miss record in the shader
         /// table.
@@ -5686,13 +5806,26 @@ struct HitObject
         uint MissShaderIndex, 
         RayDesc Ray);
 
-     __specialized_for_target(glsl)
+    __specialized_for_target(glsl)
     static HitObject MakeMiss( 
         uint MissShaderIndex, 
         RayDesc Ray)
     {
         HitObject hitObj;
-        __makeMiss(MissShaderIndex, Ray.Origin, Ray.TMin, Ray.Direction, Ray.TMax, hitObj);
+        __glslMakeMiss(hitObj, MissShaderIndex, Ray.Origin, Ray.TMin, Ray.Direction, Ray.TMax);
+        return hitObj;
+    }
+
+        /// See MakeMiss but handles Motion 
+        /// Currently only supported on VK
+    __specialized_for_target(glsl)
+    static HitObject MakeMotionMiss( 
+        uint MissShaderIndex, 
+        RayDesc Ray,
+        float CurrentTime)
+    {
+        HitObject hitObj;
+        __glslMakeMotionMiss(hitObj, MissShaderIndex, Ray.Origin, Ray.TMin, Ray.Direction, Ray.TMax, CurrentTime);
         return hitObj;
     }
 
@@ -5709,7 +5842,7 @@ struct HitObject
     static HitObject MakeNop()
     {
         HitObject hitObj;
-        __makeNop(hitObj);
+        __glslMakeNop(hitObj);
         return hitObj;
     }
 
@@ -5766,7 +5899,7 @@ struct HitObject
     __specialized_for_target(glsl)
     RayDesc GetRayDesc()
     {
-        RayDesc ray = { __getRayWorldOrigin(), __getTMin(), __getRayDirection(), __getTMax() };
+        RayDesc ray = { __glslGetRayWorldOrigin(), __glslGetTMin(), __glslGetRayDirection(), __glslGetTMax() };
         return ray;
     }
 
@@ -5811,7 +5944,7 @@ struct HitObject
     attr_t GetAttributes<attr_t>()
     {
         attr_t v;
-        __getAttributesFromHitObject(v);
+        __hlslGetAttributesFromHitObject(v);
         return v;
     }
 
@@ -5832,11 +5965,11 @@ struct HitObject
 
     __target_intrinsic(hlsl, "NvGetAttributesFromHitObject($0, $1)")
     [__requiresNVAPI]
-    void __getAttributesFromHitObject<T>(out T t);
+    void __hlslGetAttributesFromHitObject<T>(out T t);
 
     __target_intrinsic(hlsl, "NvMakeHitWithRecordIndex")
     [__requiresNVAPI]
-    static void __makeHitWithRecordIndex<attr_t>(uint HitGroupRecordIndex, 
+    static void __hlslMakeHitWithRecordIndex<attr_t>(uint HitGroupRecordIndex, 
         RaytracingAccelerationStructure AccelerationStructure, 
         uint InstanceIndex, 
         uint GeometryIndex, 
@@ -5848,7 +5981,7 @@ struct HitObject
 
     __target_intrinsic(hlsl, "NvMakeHit")
     [__requiresNVAPI]
-    static void __makeHit<attr_t>(RaytracingAccelerationStructure AccelerationStructure, 
+    static void __hlslMakeHit<attr_t>(RaytracingAccelerationStructure AccelerationStructure, 
         uint InstanceIndex, 
         uint GeometryIndex, 
         uint PrimitiveIndex, 
@@ -5861,7 +5994,7 @@ struct HitObject
 
     __target_intrinsic(hlsl, "NvTraceRayHitObject")
     [__requiresNVAPI]
-    static void __traceRay<payload_t>( 
+    static void __hlslTraceRay<payload_t>( 
         RaytracingAccelerationStructure AccelerationStructure, 
         uint RayFlags, 
         uint InstanceInclusionMask, 
@@ -5878,35 +6011,48 @@ struct HitObject
 
     __glsl_extension(GL_NV_shader_invocation_reorder)
     __glsl_extension(GL_EXT_ray_tracing)
-    __target_intrinsic(glsl, "hitObjectRecordMissNV($5, $0, $1, $2, $3, $4)")
-    static void __makeMiss(
+    __target_intrinsic(glsl, "hitObjectRecordMissNV")
+    static void __glslMakeMiss(
+        HitObject hitObj,
+        uint MissShaderIndex,
+        float3 Origin,
+        float TMin,
+        float3 Direction,
+        float TMax);
+
+    __glsl_extension(GL_NV_shader_invocation_reorder)
+    __glsl_extension(GL_EXT_ray_tracing)
+    __glsl_extension(GLSL_NV_ray_tracing_motion_blur)
+    __target_intrinsic(glsl, "hitObjectRecordMissNV")
+    static void __glslMakeMotionMiss(
+        HitObject hitObj,
         uint MissShaderIndex,
         float3 Origin,
         float TMin,
         float3 Direction,
         float TMax, 
-        out HitObject hitObj);
+        float CurrentTime);
 
     __glsl_extension(GL_NV_shader_invocation_reorder)
     __glsl_extension(GL_EXT_ray_tracing)
     __target_intrinsic(glsl, "hitObjectRecordEmptyNV($0)")
-    static void __makeNop(out HitObject hitObj);
+    static void __glslMakeNop(HitObject hitObj);
 
     __glsl_extension(GL_NV_shader_invocation_reorder)
     __target_intrinsic(glsl, "hitObjectGetObjectRayDirectionNV($0)")
-    float3 __getRayDirection();
+    float3 __glslGetRayDirection();
 
     __glsl_extension(GL_NV_shader_invocation_reorder)
     __target_intrinsic(glsl, "hitObjectGetWorldRayOriginNV($0)")
-    float3 __getRayWorldOrigin();
+    float3 __glslGetRayWorldOrigin();
 
     __glsl_extension(GL_NV_shader_invocation_reorder)
     __target_intrinsic(glsl, "hitObjectGetRayTMaxNV($0)")
-    float __getTMax();
+    float __glslGetTMax();
 
     __glsl_extension(GL_NV_shader_invocation_reorder)
     __target_intrinsic(glsl, "hitObjectGetRayTMinNV($0)")
-    float __getTMin();
+    float __glslGetTMin();
 
     __glsl_extension(GL_NV_shader_invocation_reorder)
     __glsl_extension(GL_EXT_ray_tracing)
@@ -5923,6 +6069,25 @@ struct HitObject
         float Tmin,
         float3 direction,
         float Tmax,
+        int attributeLocation);
+
+    __glsl_extension(GL_NV_shader_invocation_reorder)
+    __glsl_extension(GL_EXT_ray_tracing)
+    __glsl_extension(GLSL_NV_ray_tracing_motion_blur)
+    __target_intrinsic(glsl, "hitObjectRecordHitWithIndexMotionNV ")
+    static void __glslMakeMotionHitWithIndex(
+        HitObject hitObj,
+        RaytracingAccelerationStructure accelerationStructure,
+        uint instanceid,
+        uint primitiveid,
+        uint geometryindex,
+        uint hitKind,
+        uint sbtRecordIndex,
+        float3 origin,
+        float Tmin,
+        float3 direction,
+        float Tmax,
+        float CurrentTime,
         int attributeLocation);
 
     __glsl_extension(GL_EXT_ray_tracing)
@@ -5945,6 +6110,26 @@ struct HitObject
 
     __glsl_extension(GL_EXT_ray_tracing)
     __glsl_extension(GL_NV_shader_invocation_reorder)
+    __glsl_extension(GLSL_NV_ray_tracing_motion_blur)
+    __target_intrinsic(glsl, "hitObjectRecordHitMotionNV")
+    static void __glslMakeMotionHit(
+        HitObject hitObj,
+        RaytracingAccelerationStructure accelerationStructure,
+        uint instanceid,
+        uint primitiveid,
+        uint geometryindex,
+        uint hitKind,
+        uint sbtRecordOffset,
+        uint sbtRecordStride,
+        float3 origin,
+        float Tmin,
+        float3 direction,
+        float Tmax,
+        float CurrentTime,
+        int attributeLocation);
+
+    __glsl_extension(GL_EXT_ray_tracing)
+    __glsl_extension(GL_NV_shader_invocation_reorder)
     __target_intrinsic(glsl, "hitObjectTraceRayNV")
     static void __glslTraceRay(
         HitObject hitObj,
@@ -5958,6 +6143,25 @@ struct HitObject
         float Tmin,
         float3 direction,
         float Tmax,
+        int payload);
+
+    __glsl_extension(GL_EXT_ray_tracing)
+    __glsl_extension(GL_NV_shader_invocation_reorder)
+    __glsl_extension(GLSL_NV_ray_tracing_motion_blur)
+    __target_intrinsic(glsl, "hitObjectTraceRayMotionNV")
+    static void __glslTraceMotionRay(
+        HitObject hitObj,
+        RaytracingAccelerationStructure accelerationStructure,
+        uint rayFlags,
+        uint cullMask,
+        uint sbtRecordOffset,
+        uint sbtRecordStride,
+        uint missIndex,
+        float3 origin,
+        float Tmin,
+        float3 direction,
+        float Tmax,
+        float currentTime,
         int payload);
 
     __glsl_extension(GL_EXT_ray_tracing)
