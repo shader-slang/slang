@@ -73,7 +73,7 @@ struct LegalType
 
     Flavor              flavor = Flavor::none;
     RefPtr<RefObject>   obj;
-    IRType*             irType;
+    IRType*             irType = nullptr;
 
     static LegalType simple(IRType* type)
     {
