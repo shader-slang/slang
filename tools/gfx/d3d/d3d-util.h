@@ -78,16 +78,18 @@ class D3DUtil
         /// Append text in in, into wide char array
     static void appendWideChars(const char* in, Slang::List<wchar_t>& out);
 
-    
+
     static SlangResult createFactory(DeviceCheckFlags flags, Slang::ComPtr<IDXGIFactory>& outFactory);
 
         /// Get the dxgiModule
     static HMODULE getDxgiModule();
 
         /// Find adapters
-    static SlangResult findAdapters(DeviceCheckFlags flags, const Slang::UnownedStringSlice& adapaterName, IDXGIFactory* dxgiFactory, Slang::List<Slang::ComPtr<IDXGIAdapter>>& dxgiAdapters);
+    static SlangResult findAdapters(DeviceCheckFlags flags, const AdapterLUID* adapterLUID, IDXGIFactory* dxgiFactory, Slang::List<Slang::ComPtr<IDXGIAdapter>>& dxgiAdapters);
         /// Find adapters
-    static SlangResult findAdapters(DeviceCheckFlags flags, const Slang::UnownedStringSlice& adapaterName, Slang::List<Slang::ComPtr<IDXGIAdapter>>& dxgiAdapters);
+    static SlangResult findAdapters(DeviceCheckFlags flags, const AdapterLUID* adapterLUID, Slang::List<Slang::ComPtr<IDXGIAdapter>>& dxgiAdapters);
+
+    static AdapterLUID getAdapterLUID(IDXGIAdapter* dxgiAdapter);
 
         /// True if the adapter is warp
     static bool isWarp(IDXGIFactory* dxgiFactory, IDXGIAdapter* adapter);

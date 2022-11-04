@@ -1367,7 +1367,7 @@ public:
                 auto subObjectLayout = subObjectRange.layout;
                 auto const& bindingRange =
                     layout->getBindingRange(subObjectRange.bindingRangeIndex);
-                
+
                 switch (bindingRange.bindingType)
                 {
                 case slang::BindingType::ConstantBuffer:
@@ -2039,16 +2039,9 @@ SLANG_NO_THROW Result SLANG_MCALL GLDevice::initialize(const Desc& desc)
     auto renderer = glGetString(GL_RENDERER);
     m_info.adapterName = (char*)renderer;
 
-    if (renderer && desc.adapter)
+    if (desc.adapterLUID)
     {
-        String lowerAdapter = String(desc.adapter).toLower();
-        String lowerRenderer = String((const char*)renderer).toLower();
-
-        // The adapter is not available
-        if (lowerRenderer.indexOf(lowerAdapter) == Index(-1))
-        {
-            return SLANG_E_NOT_AVAILABLE;
-        }
+        return SLANG_E_INVALID_ARG;
     }
 
     if (m_desc.nvapiExtnSlot >= 0)

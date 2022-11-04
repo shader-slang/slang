@@ -616,8 +616,7 @@ void translatePostBuildInfoDescs(
 Result SLANG_MCALL getD3D12Adapters(List<AdapterInfo>& outAdapters)
 {
     List<ComPtr<IDXGIAdapter>> dxgiAdapters;
-    DeviceCheckFlags flags = DeviceCheckFlag::UseHardwareDevice;
-    SLANG_RETURN_ON_FAIL(D3DUtil::findAdapters(flags, UnownedStringSlice(), dxgiAdapters));
+    SLANG_RETURN_ON_FAIL(D3DUtil::findAdapters(DeviceCheckFlag::UseHardwareDevice, nullptr, dxgiAdapters));
 
     outAdapters.clear();
     for (const auto& dxgiAdapter : dxgiAdapters)
@@ -629,6 +628,7 @@ Result SLANG_MCALL getD3D12Adapters(List<AdapterInfo>& outAdapters)
         memcpy(info.name, name.getBuffer(), Math::Min(name.getLength(), (Index)sizeof(AdapterInfo::name) - 1));
         info.vendorID = desc.VendorId;
         info.deviceID = desc.DeviceId;
+        info.luid = D3DUtil::getAdapterLUID(dxgiAdapter);
         outAdapters.add(info);
     }
     return SLANG_OK;

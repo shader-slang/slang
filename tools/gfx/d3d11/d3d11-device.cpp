@@ -112,12 +112,12 @@ SlangResult DeviceImpl::initialize(const Desc& desc)
             const auto deviceCheckFlags = combiner.getCombination(i);
             D3DUtil::createFactory(deviceCheckFlags, m_dxgiFactory);
 
-            // If we have an adapter set on the desc, look it up. We only need to do so for hardware
+            // If we have an adapter set on the desc, look it up.
             ComPtr<IDXGIAdapter> adapter;
-            if (desc.adapter && (deviceCheckFlags & DeviceCheckFlag::UseHardwareDevice))
+            if (desc.adapterLUID)
             {
                 List<ComPtr<IDXGIAdapter>> dxgiAdapters;
-                D3DUtil::findAdapters(deviceCheckFlags, Slang::UnownedStringSlice(desc.adapter), dxgiAdapters);
+                D3DUtil::findAdapters(deviceCheckFlags, desc.adapterLUID, m_dxgiFactory, dxgiAdapters);
                 if (dxgiAdapters.getCount() == 0)
                 {
                     continue;
@@ -147,7 +147,7 @@ SlangResult DeviceImpl::initialize(const Desc& desc)
                 m_device.writeRef(),
                 &featureLevel,
                 m_immediateContext.writeRef());
-            // Check if successfully constructed - if so we are done. 
+            // Check if successfully constructed - if so we are done.
             if (SLANG_SUCCEEDED(res))
             {
                 break;
@@ -882,7 +882,7 @@ Result DeviceImpl::createInputLayout(IInputLayout::Desc const& desc, IInputLayou
         default:
             return SLANG_FAIL;
         }
-            
+
         hlslCursor += sprintf(hlslCursor, "%s a%d : %s%d",
             typeName,
             (int)ii,
