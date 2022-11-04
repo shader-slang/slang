@@ -282,7 +282,7 @@ namespace gfx_test
             SLANG_CHECK(shaderCacheStats->getCacheMissCount() == 0);
             SLANG_CHECK(shaderCacheStats->getCacheHitCount() == 0);
             SLANG_CHECK(shaderCacheStats->getCacheEntryDirtyCount() == 1);
-        }    
+        }
     };
 
     // Several shader files on disk, modifications may be done to any file
