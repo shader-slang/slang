@@ -10,10 +10,6 @@
 
 #include <chrono>
 
-// TODO: Bring back the old code specifically for cases like MemoryFileSystem where
-// physical file paths cannot be queried for. But don't write the index on every update,
-// only on exit.
-
 namespace gfx
 {
 
@@ -67,7 +63,7 @@ void PersistentShaderCache::loadCacheFromFile()
         if (SLANG_FAILED(mutableShaderCacheFileSystem->getPath(PathKind::OperatingSystem, desc.cacheFilename, fullPath.writeRef())))
         {
             // If we fail to obtain a physical file path, then this must be a MemoryFileSystem. In this case, file streams
-            // will not quite work as they will dump the cache index to disk instead.
+            // will not work as they require the file to be on disk, so we will rely on a fall back implementation.
             isMemoryFileSystem = true;
             loadCacheFromMemory();
             return;
@@ -130,8 +126,8 @@ void PersistentShaderCache::loadCacheFromFile()
             {
                 // If we reach this point, then the current cache is at least the same size in entries as the cache
                 // that produced the index we're reading in, so we don't need to check if we're exceeding capacity.
+                auto entryIndexNode = orderedEntries.AddLast(entries.getCount());
                 entries.add(entry);
-                auto entryIndexNode = orderedEntries.AddLast(entries.getCount() - 1);
                 keyToEntry.Add(entry.dependencyBasedDigest, entryIndexNode);
             }
         }   
@@ -142,6 +138,7 @@ ShaderCacheEntry* PersistentShaderCache::findEntry(const slang::Digest& key, ISl
 {
     if (isMemoryFileSystem)
     {
+        // If we have an in-memory file system, immediately jump to the fall back implementation.
         return findEntryInMemory(key, outCompiledCode);
     }
 
@@ -183,6 +180,7 @@ void PersistentShaderCache::addEntry(const slang::Digest& dependencyDigest, cons
 
     if (isMemoryFileSystem)
     {
+        // Use the fall back implementation for an in-memory file system.
         return addEntryToMemory(dependencyDigest, contentsDigest, compiledCode);
     }
     
@@ -207,10 +205,12 @@ void PersistentShaderCache::addEntry(const slang::Digest& dependencyDigest, cons
     auto entryNode = orderedEntries.AddFirst(index);
     if (index == entries.getCount())
     {
+        // No entries were removed, so we can tack this entry on at the end.
         entries.add(entry);
     }
     else
     {
+        // An entry was deleted, so we overwrite that slot with the new entry.
         entries[index] = entry;
     }
     keyToEntry.Add(dependencyDigest, entryNode);
@@ -236,6 +236,7 @@ void PersistentShaderCache::updateEntry(
 
     if (isMemoryFileSystem)
     {
+        // Use the fall back implementation for an in-memory file system.
         return updateEntryInMemory(dependencyDigest, contentsDigest, updatedCode);
     }
 
@@ -277,16 +278,17 @@ Index PersistentShaderCache::deleteLRUEntry()
 // file system instead, which cannot utilize file streaming to update the index file in place.
 // Consequently, the cache index file is updated once on exit and is guaranteed to maintain the
 // correct order of entries from most to least recently used, removing the need to track a
-// last accessed time for all entries.
+// last accessed time for all entries. However, any kind of interruption in program execution
+// that results in the cache destructor not being called will result in an inaccurate cache index.
 // 
-// TODO: Should these still check that the underlying file system is mutable? The only in-memory
-// file system present in Slang right now is MemoryFileSystem which implements ISlangMutableFileSystem.
+// These currently assume that the underlying file system must be a MemoryFileSystem as this is the
+// only in-memory file system that currently exists in Slang, which is guaranteed to be mutable.
+// Mutability checks will need to be added if this changes in the future.
 void PersistentShaderCache::loadCacheFromMemory()
 {
     ComPtr<ISlangBlob> indexBlob;
     if (SLANG_FAILED(mutableShaderCacheFileSystem->loadFile(desc.cacheFilename, indexBlob.writeRef())))
     {
-        // Cache index not found, so we'll create and save a new one.
         mutableShaderCacheFileSystem->saveFile(desc.cacheFilename, nullptr, 0);
         return;
     }
@@ -298,7 +300,7 @@ void PersistentShaderCache::loadCacheFromMemory()
     for (auto line : lines)
     {
         List<UnownedStringSlice> entryFields;
-        StringUtil::split(line, ' ', entryFields); // This will return our two hashes as two elements in digests, unless we've reached the end.
+        StringUtil::split(line, ' ', entryFields);
         if (entryFields.getCount() != 2)
             continue;
 
@@ -311,9 +313,6 @@ void PersistentShaderCache::loadCacheFromMemory()
         entries.add(entry);
         keyToEntry.Add(entry.dependencyBasedDigest, entryNode);
 
-        // If there are more entries present in the cache file than the entry count limit allows,
-        // ignore the rest. Since we output the lines in the cache file in order of most to least
-        // recently used, the cache's behavior will still be correct.
         if (desc.entryCountLimit > 0 && orderedEntries.Count() == desc.entryCountLimit)
             break;
     }
@@ -324,13 +323,10 @@ ShaderCacheEntry* PersistentShaderCache::findEntryInMemory(const slang::Digest& 
     LinkedNode<Index>* entryNode;
     if (!keyToEntry.TryGetValue(key, entryNode))
     {
-        // The key was not found in the cache, so we return nullptr.
         *outCompiledCode = nullptr;
         return nullptr;
     }
 
-    // If the key is found, load the stored contents from disk. We then move the corresponding
-    // entry to the front of the linked list and update the cache file on disk
     mutableShaderCacheFileSystem->loadFile(DigestUtil::toString(key).getBuffer(), outCompiledCode);
     if (orderedEntries.FirstNode() != entryNode)
     {
@@ -342,12 +338,6 @@ ShaderCacheEntry* PersistentShaderCache::findEntryInMemory(const slang::Digest& 
 
 void PersistentShaderCache::addEntryToMemory(const slang::Digest& dependencyDigest, const slang::Digest& astDigest, ISlangBlob* compiledCode)
 {
-    // Check that we do not exceed the cache's size limit by adding another entry. If so,
-    // remove the least recently used entry first.
-    //
-    // In theory, this could loop infinitely since deleteLRUEntry() immediately returns if
-    // mutableShaderCacheFileSystem is not set. However, this situation is functionally impossible
-    // because we check immediately before this as well.
     auto index = entries.getCount();
     while (desc.entryCountLimit > 0 && orderedEntries.Count() >= desc.entryCountLimit)
     {

@@ -64,8 +64,8 @@ private:
     // with the new entry. This should only be called by addEntry() when the cache reaches maximum capacity.
     Index deleteLRUEntry();
 
-    // These functions perform the same tasks as the ones defined above. However, without access
-    // to a physical file path, in-memory file systems cannot leverage file streams and need to fallback
+    // These functions perform the same tasks as their counterparts defined above. However, without access
+    // to a physical file path, in-memory file systems cannot leverage file streams and need to fall back
     // on a different implementation.
     void loadCacheFromMemory();
     ShaderCacheEntry* findEntryInMemory(const slang::Digest& key, ISlangBlob** outCompiledCode);
@@ -76,24 +76,25 @@ private:
     // The shader cache's description.
     IDevice::ShaderCacheDesc desc;
 
-    // Dictionary mapping each shader's key to its corresponding node (entry) in the list
-    // of entries.
-    Dictionary<slang::Digest, LinkedNode<Index>*> keyToEntry;
-
-    // List of entries in the shader cache. The order of entries in this list must be the
-    // same as the order of entries in the cache index file.
-    List<ShaderCacheEntry> entries;
-
-    // Linked list containing the corresponding indices in 'entries' for entries in the
-    // shader cache of most to least recently used.
-    LinkedList<Index> orderedEntries;
-
     // The underlying file system used for the shader cache.
     ComPtr<ISlangMutableFileSystem> mutableShaderCacheFileSystem = nullptr;
     bool isMemoryFileSystem = false;
 
-    // A file stream to the index file opened during cache load.
+    // A file stream to the index file opened during cache load. This will only
+    // exist for a cache that exists on-disk.
     FileStream indexStream;
+
+    // Dictionary mapping each shader's key to its corresponding node (entry) in the
+    // linked list 'orderedEntries'.
+    Dictionary<slang::Digest, LinkedNode<Index>*> keyToEntry;
+
+    // Linked list containing the corresponding indices in 'entries' for entries in the
+    // shader cache ordered from most to least recently used.
+    LinkedList<Index> orderedEntries;
+
+    // List of entries in the shader cache. This list is not guaranteed to be in order of recency
+    // as the main and fall back implementations handle outputting to the file differently.
+    List<ShaderCacheEntry> entries;
 };
 
 }

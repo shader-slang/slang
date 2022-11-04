@@ -12,8 +12,6 @@
 
 #include "gfx-test-texture-util.h"
 
-#include <chrono>
-
 using namespace gfx;
 using namespace Slang;
 
@@ -36,10 +34,9 @@ namespace gfx_test
         // 
         // - diskFileSystem - Used to save any files that must exist on disk for subsequent
         //                    save/load function calls (most prominently loadComputeProgram()) to pick up.
-        // - cacheFileSystem - Used to hold for the actual cache for all tests. This removes the need to
-        //                     manually clean out old cache files from previous test runs as it is
-        //                     located in-memory. This is the file system passed to device creation
-        //                     as part of the shader cache desc.
+        //                    This is also used to test the file stream implementation for the cache.
+        // - memoryFileSystem - Used to test the fallback path for the cache in the case physical
+        //                      file paths cannot be obtained, which prevents usage of file streams.
         ComPtr<ISlangMutableFileSystem> diskFileSystem;
         ComPtr<ISlangMutableFileSystem> memoryFileSystem;
 
@@ -1200,61 +1197,6 @@ namespace gfx_test
         }
     };
 
-//     struct FileGenFactory : BaseShaderCacheTest
-//     {
-//         void generateFiles()
-//         {
-//             for (GfxIndex i = 0; i < 10000; ++i)
-//             {
-//                 String filename = String("test-tmp-perf-");
-//                 filename.append(i);
-//                 filename.append(".slang");
-//                 diskFileSystem->saveFile(filename.getBuffer(), contentsA.getBuffer(), contentsA.getLength());
-//             }
-//         }
-// 
-//         void generateNewPipelineState(GfxIndex i)
-//         {
-//             String filename = String("shader-cache-test/test-tmp-perf-");
-//             filename.append(i);
-//             filename.append(".slang");
-// 
-//             ComPtr<IShaderProgram> shaderProgram;
-//             slang::ProgramLayout* slangReflection;
-//             GFX_CHECK_CALL_ABORT(loadComputeProgram(device, shaderProgram, filename.getBuffer(), "computeMain", slangReflection));
-// 
-//             ComputePipelineStateDesc pipelineDesc = {};
-//             pipelineDesc.program = shaderProgram.get();
-//             GFX_CHECK_CALL_ABORT(
-//                 device->createComputePipelineState(pipelineDesc, pipelineState.writeRef()));
-//         }
-// 
-//         void run()
-//         {
-//             shaderCache.entryCountLimit = 1000;
-//             generateNewDevice();
-//             createRequiredResources();
-//             generateFiles();
-//             for (GfxIndex i = 0; i < 1000; ++i)
-//             {
-//                 generateNewPipelineState(i);
-//                 submitGPUWork();
-//             }
-// 
-//             std::chrono::time_point<std::chrono::system_clock> start, segmentEnd;
-//             std::chrono::duration<double> elapsed;
-//             start = std::chrono::system_clock::now();
-//             for (GfxIndex i = 0; i < 1000; ++i)
-//             {
-//                 generateNewPipelineState(i);
-//                 submitGPUWork();
-//             }
-//             segmentEnd = std::chrono::system_clock::now();
-//             elapsed = segmentEnd - start;
-//             printf("Total test run time: %f sec\n", elapsed.count());
-//         }
-//     };
-
     template <typename T>
     void shaderCacheTestImpl(ComPtr<IDevice> device, UnitTestContext* context)
     {
@@ -1262,11 +1204,6 @@ namespace gfx_test
         test.init(device, context);
         test.run();
     }
-
-//     SLANG_UNIT_TEST(perfTest)
-//     {
-//         runTestImpl(shaderCacheTestImpl<FileGenFactory>, unitTestContext, Slang::RenderApiFlag::D3D12);
-//     }
 
     SLANG_UNIT_TEST(singleEntryShaderCacheD3D12)
     {
