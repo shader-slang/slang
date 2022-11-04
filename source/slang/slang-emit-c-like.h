@@ -17,6 +17,43 @@
 namespace Slang
 {
 
+class LocationTracker
+{
+public:
+    enum class Kind
+    {
+        Invalid = -1,
+        RayPayload,
+        CallablePayload,
+        HitObjectAttribute,
+        CountOf,
+    };
+
+        /// Given a decoration returns the Kind, or Kind::Invalid if that is not appropriate
+    static Kind getKindFromDecoration(IRDecoration* decoration);
+
+    Index getValue(IRInst* inst, IRDecoration* decoration);
+
+    Index getValue(Kind kind, IRInst* inst, IRDecoration* decoration);
+
+protected:
+    struct Location
+    {
+        typedef Location ThisType;
+
+        bool operator==(const ThisType& rhs) const { return kind == rhs.kind && value == rhs.value; }
+        bool operator!=(const ThisType& rhs) const { return !(*this == rhs); }
+
+        Kind kind;          ///< The kind of location
+        Index value;          ///< The value of the location. Must be >= 0
+    };
+
+    Index m_nextValueForKind[Count(Kind::CountOf)] = { 0, };
+
+    Dictionary<IRInst*, Location> m_mapIRToLocations;
+};
+
+
 class CLikeSourceEmitter: public SourceEmitterBase
 {
 public:
@@ -201,14 +238,7 @@ public:
         {}
     };
 
-    enum class LocationKind
-    {
-        Invalid = -1,
-        RayPayload,
-        CallablePayload,
-        HitObjectAttribute,
-        CountOf,
-    };
+    
 
         /// Must be called before used
     virtual SlangResult init();
@@ -241,6 +271,8 @@ public:
     Linkage* getLinkage() { return m_codeGenContext->getLinkage(); }
     ComponentType* getProgram() { return m_codeGenContext->getProgram(); }
     TargetProgram* getTargetProgram() { return m_codeGenContext->getTargetProgram(); }
+
+    LocationTracker& getLocationTracker() { return m_locationTracker; }
 
     //
     // Types
@@ -371,12 +403,7 @@ public:
 
     void emitInterpolationModifiers(IRInst* varInst, IRType* valueType, IRVarLayout* layout);
 
-        /// Given a decoration returns the LocationKind, or LocationKind::Invalid if that is not appropriate
-    static LocationKind getLocationKindFromDecoration(IRDecoration* decoration);
-        
-    UInt getInstLocation(IRInst* inst, IRDecoration* decoration);
-
-    UInt getInstLocation(LocationKind kind, IRInst* inst, IRDecoration* decoration);
+    
 
         /// Emit modifiers that should apply even for a declaration of an SSA temporary.
     virtual void emitTempModifiers(IRInst* temp);
@@ -550,7 +577,9 @@ public:
     // to use for it when emitting code.
     Dictionary<IRInst*, String> m_mapInstToName;
 
-    Dictionary<IRInst*, UInt> m_mapIRToLocations[Count(LocationKind::CountOf)];
+    // Maps instructions to locations. Used for GLSL output for locations, but could potentially
+    // be used for other kinds of location.
+    LocationTracker m_locationTracker;
 };
 
 }

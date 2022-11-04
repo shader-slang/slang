@@ -710,7 +710,7 @@ const char* IntrinsicExpandContext::_emitSpecial(const char* cursor)
         // shaders.
         case 'X':
         {
-            typedef CLikeSourceEmitter::LocationKind LocationKind;
+            typedef LocationTracker::Kind LocationKind;
 
             SLANG_RELEASE_ASSERT(*cursor);
             const auto kindChar = *cursor++;
@@ -744,7 +744,7 @@ const char* IntrinsicExpandContext::_emitSpecial(const char* cursor)
                 IRDecoration* foundDecoration = nullptr;
                 for (auto decoration : argVar->getDecorations())
                 {
-                    const auto curKind = CLikeSourceEmitter::getLocationKindFromDecoration(decoration);
+                    const auto curKind = LocationTracker::getKindFromDecoration(decoration);
                     if (curKind == kind)
                     {
                         foundDecoration = decoration;
@@ -755,7 +755,7 @@ const char* IntrinsicExpandContext::_emitSpecial(const char* cursor)
                 // Must have found the decoration
                 SLANG_ASSERT(foundDecoration);
 
-                const auto location = m_emitter->getInstLocation(kind, argVar, foundDecoration);
+                const auto location = m_emitter->getLocationTracker().getValue(kind, argVar, foundDecoration);
                 m_writer->emit(location);
             }
         }

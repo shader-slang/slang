@@ -2243,6 +2243,8 @@ void GLSLSourceEmitter::emitVarDecorationsImpl(IRInst* varDecl)
 
     for (auto decoration : varDecl->getDecorations())
     {
+        typedef LocationTracker::Kind LocationKind;
+
         LocationKind locationKind = LocationKind::Invalid;
         UnownedStringSlice prefix;
         if (as<IRVulkanHitAttributesDecoration>(decoration))
@@ -2252,7 +2254,7 @@ void GLSLSourceEmitter::emitVarDecorationsImpl(IRInst* varDecl)
         else
         {
             // Handle attributes that have location
-            const LocationKind decorationLocationKind = getLocationKindFromDecoration(decoration);
+            const LocationKind decorationLocationKind = LocationTracker::getKindFromDecoration(decoration);
             if (decorationLocationKind == LocationKind::Invalid)
             {
                 // Next decoration
@@ -2262,7 +2264,7 @@ void GLSLSourceEmitter::emitVarDecorationsImpl(IRInst* varDecl)
             locationKind = decorationLocationKind;
 
             // Get the location value
-            const auto locationValue = getInstLocation(locationKind, varDecl, decoration);
+            const auto locationValue = m_locationTracker.getValue(locationKind, varDecl, decoration);
 
             m_writer->emit(toSlice("layout(location = "));
             m_writer->emit(locationValue);
