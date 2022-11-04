@@ -168,7 +168,7 @@ Result DeviceImpl::initVulkanInstanceAndDevice(
         instanceCreateInfo.ppEnabledExtensionNames = &instanceExtensions[0];
 
         const char* layerNames[] = { nullptr };
-        
+
         if (useValidationLayer)
         {
             // Depending on driver version, validation layer may or may not exist.
@@ -250,7 +250,6 @@ Result DeviceImpl::initVulkanInstanceAndDevice(
     }
 
     VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
-    Index selectedDeviceIndex = 0;
     if (handles[1].handleValue == 0)
     {
         uint32_t numPhysicalDevices = 0;
@@ -262,33 +261,27 @@ Result DeviceImpl::initVulkanInstanceAndDevice(
         SLANG_VK_RETURN_ON_FAIL(m_api.vkEnumeratePhysicalDevices(
             instance, &numPhysicalDevices, physicalDevices.getBuffer()));
 
-        if (m_desc.adapter)
+        // Use first physical device by default.
+        Index selectedDeviceIndex = 0;
+
+        // Search for requested adapter.
+        if (m_desc.adapterLUID)
         {
             selectedDeviceIndex = -1;
-
-            String lowerAdapter = String(m_desc.adapter).toLower();
-
             for (Index i = 0; i < physicalDevices.getCount(); ++i)
             {
-                auto physicalDevice = physicalDevices[i];
-
-                VkPhysicalDeviceProperties basicProps = {};
-                m_api.vkGetPhysicalDeviceProperties(physicalDevice, &basicProps);
-
-                String lowerName = String(basicProps.deviceName).toLower();
-
-                if (lowerName.indexOf(lowerAdapter) != Index(-1))
+                if (vk::getAdapterLUID(m_api, physicalDevices[i]) == *m_desc.adapterLUID)
                 {
                     selectedDeviceIndex = i;
                     break;
                 }
             }
             if (selectedDeviceIndex < 0)
-            {
-                // Device not found
-                return SLANG_FAIL;
-            }
+                return SLANG_E_NOT_FOUND;
         }
+
+        if (selectedDeviceIndex >= physicalDevices.getCount())
+            return SLANG_FAIL;
 
         physicalDevice = physicalDevices[selectedDeviceIndex];
     }
@@ -798,7 +791,7 @@ SlangResult DeviceImpl::readTextureResource(
     auto textureImpl = static_cast<TextureResourceImpl*>(texture);
 
     List<uint8_t> blobData;
-    
+
     auto desc = textureImpl->getDesc();
     auto width = desc->size.width;
     auto height = desc->size.height;

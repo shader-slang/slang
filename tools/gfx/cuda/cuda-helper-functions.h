@@ -99,6 +99,8 @@ void _optixLogCallback(unsigned int level, const char* tag, const char* message,
 
 #    endif
 
+AdapterLUID getAdapterLUID(int device);
+
 } // namespace cuda
 #endif
 

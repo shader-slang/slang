@@ -2071,11 +2071,36 @@ public:
           0x8eccc8ec, 0x5c04, 0x4a51, { 0x99, 0x75, 0x13, 0xf8, 0xfe, 0xa1, 0x59, 0xf3 } \
     }
 
+struct AdapterLUID
+{
+    uint8_t luid[16];
+
+    bool operator==(const AdapterLUID& other) const
+    {
+        for (int i = 0; i < sizeof(AdapterLUID::luid); ++i)
+            if (luid[i] != other.luid[i])
+                return false;
+        return true;
+    }
+    bool operator!=(const AdapterLUID& other) const
+    {
+        return !this->operator==(other);
+    }
+};
+
 struct AdapterInfo
 {
+    // Descriptive name of the adapter.
     char name[128];
+
+    // Unique identifier for the vendor (only available for D3D and Vulkan).
     uint32_t vendorID;
+
+    // Unique identifier for the physical device among devices from the vendor (only available for D3D and Vulkan)
     uint32_t deviceID;
+
+    // Logically unique identifier of the adapter.
+    AdapterLUID luid;
 };
 
 class AdapterList
@@ -2182,8 +2207,8 @@ public:
         // for the ID3D12Device. For Vulkan, the first InteropHandle is the VkInstance, the second is the VkPhysicalDevice,
         // and the third is the VkDevice. For CUDA, this only contains a single value for the CUDADevice.
         InteropHandles existingDeviceHandles;
-        // Name to identify the adapter to use
-        const char* adapter = nullptr;
+        // LUID of the adapter to use. Use getGfxAdapters() to get a list of available adapters.
+        AdapterLUID* adapterLUID = nullptr;
         // Number of required features.
         GfxCount requiredFeatureCount = 0;
         // Array of required feature names, whose size is `requiredFeatureCount`.
