@@ -14,8 +14,8 @@ struct SomeValues_0
 };
 
 layout(location = 0)
-rayPayloadEXT
-SomeValues_0 p_0;
+hitObjectAttributeNV
+SomeValues_0 t_0;
 
 struct RayDesc_0
 {
@@ -27,7 +27,6 @@ struct RayDesc_0
 
 hitObjectNV HitObject_MakeHit_0(uint HitGroupRecordIndex_0, accelerationStructureEXT AccelerationStructure_0, uint InstanceIndex_0, uint GeometryIndex_0, uint PrimitiveIndex_0, uint HitKind_0, RayDesc_0 Ray_0, SomeValues_0 attributes_0)
 {
-    p_0 = attributes_0;
     hitObjectNV hitObj_0;
     hitObjectRecordHitWithIndexNV(hitObj_0, AccelerationStructure_0, InstanceIndex_0, GeometryIndex_0, PrimitiveIndex_0, HitKind_0, HitGroupRecordIndex_0, Ray_0.Origin_0, Ray_0.TMin_0, Ray_0.Direction_0, Ray_0.TMax_0, (0));
     return hitObj_0;
@@ -48,9 +47,7 @@ RayDesc_0 HitObject_GetRayDesc_0(hitObjectNV this_0)
 
 SomeValues_0 HitObject_GetAttributes_0(hitObjectNV this_1)
 {
-    SomeValues_0 v_0;
-    this_1.__getAttributesFromHitObject(v_0);
-    return v_0;
+    return t_0;
 }
 
 uint calcValue_0(hitObjectNV hit_0)
@@ -87,15 +84,10 @@ uint calcValue_0(hitObjectNV hit_0)
     return r_0;
 }
 
-layout(location = 1)
-rayPayloadEXT
-SomeValues_0 p_1;
-
 hitObjectNV HitObject_MakeHit_1(accelerationStructureEXT AccelerationStructure_1, uint InstanceIndex_1, uint GeometryIndex_1, uint PrimitiveIndex_1, uint HitKind_1, uint RayContributionToHitGroupIndex_0, uint MultiplierForGeometryContributionToHitGroupIndex_0, RayDesc_0 Ray_1, SomeValues_0 attributes_1)
 {
-    p_1 = attributes_1;
     hitObjectNV hitObj_1;
-    hitObjectRecordHitNV(hitObj_1, AccelerationStructure_1, InstanceIndex_1, PrimitiveIndex_1, GeometryIndex_1, HitKind_1, RayContributionToHitGroupIndex_0, MultiplierForGeometryContributionToHitGroupIndex_0, Ray_1.Origin_0, Ray_1.TMin_0, Ray_1.Direction_0, Ray_1.TMax_0, (1));
+    hitObjectRecordHitNV(hitObj_1, AccelerationStructure_1, InstanceIndex_1, PrimitiveIndex_1, GeometryIndex_1, HitKind_1, RayContributionToHitGroupIndex_0, MultiplierForGeometryContributionToHitGroupIndex_0, Ray_1.Origin_0, Ray_1.TMin_0, Ray_1.Direction_0, Ray_1.TMax_0, (0));
     return hitObj_1;
 }
 

@@ -2675,6 +2675,9 @@ __attributeTarget(VarDeclBase)
 attribute_syntax [__vulkanCallablePayload(location : int = -1)] : VulkanCallablePayloadAttribute;
 
 __attributeTarget(VarDeclBase)
+attribute_syntax [__vulkanHitObjectAttributes(location : int = -1)] : VulkanHitObjectAttributesAttribute;
+
+__attributeTarget(VarDeclBase)
 attribute_syntax [__vulkanHitAttributes] : VulkanHitAttributesAttribute;
 
 __attributeTarget(FunctionDeclBase)

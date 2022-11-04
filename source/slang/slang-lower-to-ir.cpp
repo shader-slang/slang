@@ -2104,7 +2104,11 @@ void addVarDecorations(
         {
             builder->addVulkanCallablePayloadDecoration(inst, callablePayloadAttr->location);
         }
-        else if(as<VulkanHitAttributesAttribute>(mod))
+        else if (auto hitObjectAttr = as<VulkanHitObjectAttributesAttribute>(mod))
+        {
+            builder->addVulkanHitObjectAttributesDecoration(inst, hitObjectAttr->location);
+        }
+        else if (as<VulkanHitAttributesAttribute>(mod))
         {
             builder->addSimpleDecoration<IRVulkanHitAttributesDecoration>(inst);
         }

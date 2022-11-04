@@ -201,6 +201,15 @@ public:
         {}
     };
 
+    enum class LocationKind
+    {
+        Invalid = -1,
+        RayPayload,
+        CallablePayload,
+        HitObjectAttribute,
+        CountOf,
+    };
+
         /// Must be called before used
     virtual SlangResult init();
 
@@ -357,16 +366,17 @@ public:
     void emitStruct(IRStructType* structType);
     void emitClass(IRClassType* structType);
 
-
-
         /// Emit type attributes that should appear after, e.g., a `struct` keyword
     void emitPostKeywordTypeAttributes(IRInst* inst) { emitPostKeywordTypeAttributesImpl(inst); }
 
     void emitInterpolationModifiers(IRInst* varInst, IRType* valueType, IRVarLayout* layout);
 
-    UInt getRayPayloadLocation(IRInst* inst);
+        /// Given a decoration returns the LocationKind, or LocationKind::Invalid if that is not appropriate
+    static LocationKind getLocationKindFromDecoration(IRDecoration* decoration);
+        
+    UInt getInstLocation(IRInst* inst, IRDecoration* decoration);
 
-    UInt getCallablePayloadLocation(IRInst* inst);
+    UInt getInstLocation(LocationKind kind, IRInst* inst, IRDecoration* decoration);
 
         /// Emit modifiers that should apply even for a declaration of an SSA temporary.
     virtual void emitTempModifiers(IRInst* temp);
@@ -540,8 +550,7 @@ public:
     // to use for it when emitting code.
     Dictionary<IRInst*, String> m_mapInstToName;
 
-    Dictionary<IRInst*, UInt> m_mapIRValueToRayPayloadLocation;
-    Dictionary<IRInst*, UInt> m_mapIRValueToCallablePayloadLocation;
+    Dictionary<IRInst*, UInt> m_mapIRToLocations[Count(LocationKind::CountOf)];
 };
 
 }

@@ -239,6 +239,11 @@ IR_SIMPLE_DECORATION(VulkanCallablePayloadDecoration)
 /// to it.
 IR_SIMPLE_DECORATION(VulkanHitAttributesDecoration)
 
+/// A decoration that indicates that a variable represents
+/// vulkan hit object attributes, and should have a location assigned
+/// to it.
+IR_SIMPLE_DECORATION(VulkanHitObjectAttributesDecoration)
+
 struct IRRequireGLSLVersionDecoration : IRDecoration
 {
     enum { kOp = kIROp_RequireGLSLVersionDecoration };
@@ -3317,6 +3322,12 @@ public:
     {
         addDecoration(inst, kIROp_VulkanCallablePayloadDecoration, getIntValue(getIntType(), location));
     }
+
+    void addVulkanHitObjectAttributesDecoration(IRInst* inst, int location)
+    {
+        addDecoration(inst, kIROp_VulkanHitObjectAttributesDecoration, getIntValue(getIntType(), location));
+    }
+
 };
 
 void addHoistableInst(

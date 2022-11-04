@@ -5440,6 +5440,32 @@ struct VkSubpassInputMS<T>
 ///
 /// https://github.com/KhronosGroup/GLSL/pull/196/files
 
+/// Internal helper functions
+
+// This is a bit of a hack for GLSL HitObjectAttributes
+// It relies on [ForceInline] removing the surrounding function and just inserting the *contained* `t` as a global
+// The __ref should indicate the desire for the returned value to not be a copy of t, but *t*.
+// In practive __ref doesn't have this effect in practice.
+// 
+// We need this to be able access the payload outside of a function (which is all that TraceRay for example needs)
+// We access the HitObjectAttributes via this function for the desired type, and it acts *as if* it's just an access
+// to the global t.
+[ForceInline]
+__ref T __hitObjectAttributes<T>()
+{
+    [__vulkanHitObjectAttributes]   
+    static T t;
+    return t;
+}
+
+// Next is the custom intrinsic that will compute the hitObjectAttributes location
+// for GLSL-based targets.
+//
+__generic<Payload>
+__target_intrinsic(__glslRayTracing, "$XH")
+[__readNone]
+int __hitObjectAttributesLocation(Payload payload);
+
     /// Immutable data type representing a ray hit or a miss. Can be used to invoke hit or miss shading,
     /// or as a key in ReorderThread. Created by one of several methods described below. HitObject
     /// and its related functions are available in raytracing shader types only.
@@ -5509,6 +5535,9 @@ struct HitObject
             Ray.TMax,
             __rayPayloadLocation(p));
         
+        // Write the payload out
+        Payload = p;
+
         return hitObj;
     }
 
@@ -5559,11 +5588,10 @@ struct HitObject
     {
         HitObject hitObj;
 
-        [__vulkanRayPayload]
-        static attr_t p;
+        // Save the attributes
+        __ref attr_t attr = __hitObjectAttributes<attr_t>();
 
-        // Save the payload
-        p = attributes;
+        attr = attributes;
 
         __glslMakeHit(hitObj,
             AccelerationStructure,
@@ -5577,7 +5605,7 @@ struct HitObject
             Ray.TMin,
             Ray.Direction, 
             Ray.TMax,
-            __rayPayloadLocation(p));
+            __hitObjectAttributesLocation(__hitObjectAttributes<attr_t>()));
 
         return hitObj;
     }
@@ -5627,11 +5655,9 @@ struct HitObject
     {
         HitObject hitObj;
 
-        [__vulkanRayPayload]
-        static attr_t p;
-
-        // Save the payload
-        p = attributes;
+        // Save the attributes
+        __ref attr_t attr = __hitObjectAttributes<attr_t>();
+        attr = attributes;
 
         __glslMakeHitWithIndex(hitObj,
             AccelerationStructure, 
@@ -5644,7 +5670,7 @@ struct HitObject
             Ray.TMin,
             Ray.Direction, 
             Ray.TMax,
-            __rayPayloadLocation(p));
+            __hitObjectAttributesLocation(__hitObjectAttributes<attr_t>()));
 
         return hitObj;
     }
@@ -5708,6 +5734,9 @@ struct HitObject
         p = Payload;
 
         __glslInvoke(HitOrMiss, __rayPayloadLocation(p));
+
+        // Write payload result
+        Payload = p;
     }
 
         /// Returns true if the HitObject encodes a miss, otherwise returns false.
@@ -5785,6 +5814,11 @@ struct HitObject
         return v;
     }
 
+    __specialized_for_target(glsl)
+    attr_t GetAttributes<attr_t>()
+    {
+        return __hitObjectAttributes<attr_t>();
+    }
         /// Loads a root constant from the local root table referenced by the hit object. Valid if the hit object
         /// represents a hit or a miss. RootConstantOffsetInBytes must be a multiple of 4.
     __target_intrinsic(hlsl)    
@@ -5792,7 +5826,7 @@ struct HitObject
     uint LoadLocalRootTableConstant(uint RootConstantOffsetInBytes);
 
     /// 
-    /// !!!! Internal impl. Do not use!
+    /// !!!! Internal HLSL impl. Do not use! !!!!!!!!!!!!
     /// 
 
     __target_intrinsic(hlsl, "NvGetAttributesFromHitObject($0, $1)")
@@ -5836,6 +5870,10 @@ struct HitObject
         RayDesc Ray, 
         inout payload_t Payload,
         out HitObject hitObj);
+
+    /// 
+    /// !!!! Internal GLSL impl. Do not use! !!!!!!!!!!!!
+    /// 
 
     __glsl_extension(GL_NV_shader_invocation_reorder)
     __target_intrinsic(glsl, "hitObjectRecordMissNV($5, $0, $1, $2, $3, $4)")

@@ -3009,44 +3009,41 @@ void CLikeSourceEmitter::emitInterpolationModifiers(IRInst* varInst, IRType* val
     emitInterpolationModifiersImpl(varInst, valueType, layout);
 }
 
-UInt CLikeSourceEmitter::getRayPayloadLocation(IRInst* inst)
+/* static */CLikeSourceEmitter::LocationKind CLikeSourceEmitter::getLocationKindFromDecoration(IRDecoration* decoration)
 {
-    if (auto rayPayloadDecoration = inst->findDecoration<IRVulkanRayPayloadDecoration>())
+    switch (decoration->getOp())
     {
-        int explicitLocation = int(getIntVal(rayPayloadDecoration->getOperand(0)));
-
-        if (explicitLocation >= 0)
-            return UInt(explicitLocation);
+        case kIROp_VulkanRayPayloadDecoration:          return LocationKind::RayPayload; 
+        case kIROp_VulkanCallablePayloadDecoration:     return LocationKind::CallablePayload; 
+        case kIROp_VulkanHitObjectAttributesDecoration: return LocationKind::HitObjectAttribute;
+        default: break;
     }
-
-    auto& map = m_mapIRValueToRayPayloadLocation;
-    UInt value = 0;
-    if(map.TryGetValue(inst, value))
-        return value;
-
-    value = map.Count();
-    map.Add(inst, value);
-    return value;
+    return LocationKind::Invalid;
 }
 
-UInt CLikeSourceEmitter::getCallablePayloadLocation(IRInst* inst)
+UInt CLikeSourceEmitter::getInstLocation(IRInst* inst, IRDecoration* decoration)
 {
-    if (auto callablePayloadDecoration = inst->findDecoration<IRVulkanCallablePayloadDecoration>())
-    {
-        int explicitLocation = int(getIntVal(callablePayloadDecoration->getOperand(0)));
+    const LocationKind kind = getLocationKindFromDecoration(decoration);
+    SLANG_ASSERT(kind != LocationKind::Invalid);
+    return getInstLocation(kind, inst, decoration);
+}
 
+UInt CLikeSourceEmitter::getInstLocation(LocationKind kind, IRInst* inst, IRDecoration* decoration)
+{
+    if (decoration->getOperandCount() > 0)
+    {
+        // TODO(JS):
+        // There could be a clash with the auto generated location, and the user set value/ 
+        // Perhaps the implication in practice is that either all are marked or none.
+        const int explicitLocation = int(getIntVal(decoration->getOperand(0)));
         if (explicitLocation >= 0)
             return UInt(explicitLocation);
     }
 
-    auto& map = m_mapIRValueToCallablePayloadLocation;
-    UInt value = 0;
-    if(map.TryGetValue(inst, value))
-        return value;
+    auto& map = m_mapIRToLocations[Index(kind)];
 
-    value = map.Count();
-    map.Add(inst, value);
-    return value;
+    const UInt defaultValue = map.Count();
+    return map.GetOrAddValue(inst, defaultValue);
 }
 
     /// Emit modifiers that should apply even for a declaration of an SSA temporary.

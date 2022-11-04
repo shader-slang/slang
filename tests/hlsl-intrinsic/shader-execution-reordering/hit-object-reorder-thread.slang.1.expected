@@ -30,17 +30,20 @@ hitObjectNV HitObject_TraceRay_0(accelerationStructureEXT AccelerationStructure_
     p_0 = Payload_0;
     hitObjectNV hitObj_0;
     hitObjectTraceRayNV(hitObj_0, AccelerationStructure_0, RayFlags_0, InstanceInclusionMask_0, RayContributionToHitGroupIndex_0, MultiplierForGeometryContributionToHitGroupIndex_0, MissShaderIndex_0, Ray_0.Origin_0, Ray_0.TMin_0, Ray_0.Direction_0, Ray_0.TMax_0, (0));
+    Payload_0 = p_0;
     return hitObj_0;
 }
 
 layout(binding = 0)
 uniform accelerationStructureEXT scene_0;
 
+layout(location = 0)
+hitObjectAttributeNV
+SomeValues_0 t_0;
+
 SomeValues_0 HitObject_GetAttributes_0(hitObjectNV this_0)
 {
-    SomeValues_0 v_0;
-    this_0.__getAttributesFromHitObject(v_0);
-    return v_0;
+    return t_0;
 }
 
 uint calcValue_0(hitObjectNV hit_0)
@@ -71,6 +74,7 @@ void HitObject_Invoke_0(accelerationStructureEXT AccelerationStructure_1, hitObj
 {
     p_1 = Payload_1;
     hitObjectExecuteShaderNV(HitOrMiss_0, (1));
+    Payload_1 = p_1;
     return;
 }
 
