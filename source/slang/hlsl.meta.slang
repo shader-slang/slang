@@ -5472,6 +5472,7 @@ int __hitObjectAttributesLocation(Payload payload);
 [__requiresNVAPI]
 __target_intrinsic(hlsl, NvHitObject)
 __glsl_extension(GL_NV_shader_invocation_reorder)
+__glsl_extension(GL_EXT_ray_tracing)
 __target_intrinsic(glsl, hitObjectNV)
 struct HitObject
 {
@@ -5826,7 +5827,7 @@ struct HitObject
     uint LoadLocalRootTableConstant(uint RootConstantOffsetInBytes);
 
     /// 
-    /// !!!! Internal HLSL impl. Do not use! !!!!!!!!!!!!
+    /// !!!! Internal NVAPI HLSL impl. Not part of interface! !!!!!!!!!!!!
     /// 
 
     __target_intrinsic(hlsl, "NvGetAttributesFromHitObject($0, $1)")
@@ -5872,10 +5873,11 @@ struct HitObject
         out HitObject hitObj);
 
     /// 
-    /// !!!! Internal GLSL impl. Do not use! !!!!!!!!!!!!
+    /// !!!! Internal GLSL GL_NV_shader_invocation_reorder impl. Not part of interface! !!!!!!!!!!!!
     /// 
 
     __glsl_extension(GL_NV_shader_invocation_reorder)
+    __glsl_extension(GL_EXT_ray_tracing)
     __target_intrinsic(glsl, "hitObjectRecordMissNV($5, $0, $1, $2, $3, $4)")
     static void __makeMiss(
         uint MissShaderIndex,
@@ -5886,6 +5888,7 @@ struct HitObject
         out HitObject hitObj);
 
     __glsl_extension(GL_NV_shader_invocation_reorder)
+    __glsl_extension(GL_EXT_ray_tracing)
     __target_intrinsic(glsl, "hitObjectRecordEmptyNV($0)")
     static void __makeNop(out HitObject hitObj);
 
@@ -5906,6 +5909,7 @@ struct HitObject
     float __getTMin();
 
     __glsl_extension(GL_NV_shader_invocation_reorder)
+    __glsl_extension(GL_EXT_ray_tracing)
     __target_intrinsic(glsl, "hitObjectRecordHitWithIndexNV")
     static void __glslMakeHitWithIndex(
         HitObject hitObj,
@@ -5921,6 +5925,7 @@ struct HitObject
         float Tmax,
         int attributeLocation);
 
+    __glsl_extension(GL_EXT_ray_tracing)
     __glsl_extension(GL_NV_shader_invocation_reorder)
     __target_intrinsic(glsl, "hitObjectRecordHitNV")
     static void __glslMakeHit(
@@ -5938,6 +5943,7 @@ struct HitObject
         float Tmax,
         int attributeLocation);
 
+    __glsl_extension(GL_EXT_ray_tracing)
     __glsl_extension(GL_NV_shader_invocation_reorder)
     __target_intrinsic(glsl, "hitObjectTraceRayNV")
     static void __glslTraceRay(
@@ -5954,6 +5960,7 @@ struct HitObject
         float Tmax,
         int payload);
 
+    __glsl_extension(GL_EXT_ray_tracing)
     __glsl_extension(GL_NV_shader_invocation_reorder)
     __target_intrinsic(glsl, "hitObjectExecuteShaderNV")
     static void __glslInvoke(
@@ -5971,6 +5978,7 @@ struct HitObject
 [__requiresNVAPI]
 __target_intrinsic(hlsl, "NvReorderThread")
 __glsl_extension(GL_NV_shader_invocation_reorder)
+__glsl_extension(GL_EXT_ray_tracing)
 __target_intrinsic(glsl, "reorderThreadNV")
 void ReorderThread( uint CoherenceHint, uint NumCoherenceHintBitsFromLSB );
 
@@ -5992,6 +6000,7 @@ void ReorderThread( uint CoherenceHint, uint NumCoherenceHintBitsFromLSB );
 [__requiresNVAPI]
 __target_intrinsic(hlsl, "NvReorderThread")
 __glsl_extension(GL_NV_shader_invocation_reorder)
+__glsl_extension(GL_EXT_ray_tracing)
 __target_intrinsic(glsl, "reorderThreadNV")
 void ReorderThread( HitObject HitOrMiss, uint CoherenceHint, uint NumCoherenceHintBitsFromLSB );
 
