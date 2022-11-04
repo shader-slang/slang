@@ -37,6 +37,7 @@ class PersistentShaderCache : public RefObject
 {
 public:
     PersistentShaderCache(const IDevice::ShaderCacheDesc& inDesc);
+    ~PersistentShaderCache();
 
     // Fetch the cache entry corresponding to the provided key. If found, move the entry to
     // the front of entries and return the entry and the corresponding compiled code in
@@ -63,6 +64,15 @@ private:
     // with the new entry. This should only be called by addEntry() when the cache reaches maximum capacity.
     Index deleteLRUEntry();
 
+    // These functions perform the same tasks as the ones defined above. However, without access
+    // to a physical file path, in-memory file systems cannot leverage file streams and need to fallback
+    // on a different implementation.
+    void loadCacheFromMemory();
+    ShaderCacheEntry* findEntryInMemory(const slang::Digest& key, ISlangBlob** outCompiledCode);
+    void addEntryToMemory(const slang::Digest& dependencyDigest, const slang::Digest& contentsDigest, ISlangBlob* compiledCode);
+    void updateEntryInMemory(const slang::Digest& dependencyDigest, const slang::Digest& contentsDigest, ISlangBlob* updatedCode);
+    void saveCacheToMemory();
+
     // The shader cache's description.
     IDevice::ShaderCacheDesc desc;
 
@@ -80,6 +90,7 @@ private:
 
     // The underlying file system used for the shader cache.
     ComPtr<ISlangMutableFileSystem> mutableShaderCacheFileSystem = nullptr;
+    bool isMemoryFileSystem = false;
 
     // A file stream to the index file opened during cache load.
     FileStream indexStream;

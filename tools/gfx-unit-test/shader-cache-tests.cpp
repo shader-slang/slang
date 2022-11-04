@@ -156,7 +156,7 @@ namespace gfx_test
 
             cacheFileSystem = new MemoryFileSystem();
             diskFileSystem = OSFileSystem::getMutableSingleton();
-            diskFileSystem = new RelativeFileSystem(diskFileSystem, "tools/gfx-unit-test");
+            diskFileSystem = new RelativeFileSystem(diskFileSystem, "tools/gfx-unit-test/shader-cache-test");
 
             shaderCache.shaderCacheFileSystem = diskFileSystem;
         }
@@ -954,6 +954,10 @@ namespace gfx_test
     // This test does not modify shaders as other tests already test this, instead focusing on checking
     // that entries are correctly removed as cache limits are reached and that entries are always in
     // the right order.
+    //
+    // As opening multiple streams to the same file is dependent on the OS, this test is run on the
+    // in-memory file system. Cache eviction policy with an on-disk file system will need to be inspected
+    // manually.
     struct CacheWithMaxEntryLimit : MultipleEntryShaderCache
     {
         List<String> test0Lines; // C -> B -> A
@@ -1140,6 +1144,7 @@ namespace gfx_test
 
         void run()
         {
+            shaderCache.shaderCacheFileSystem = cacheFileSystem;
             runTest0();
             runTest1();
             runTest2();
@@ -1154,7 +1159,7 @@ namespace gfx_test
     {
         void generateFiles()
         {
-            for (GfxIndex i = 0; i < 1000; ++i)
+            for (GfxIndex i = 0; i < 10000; ++i)
             {
                 String filename = String("test-tmp-perf-");
                 filename.append(i);
@@ -1165,7 +1170,7 @@ namespace gfx_test
 
         void generateNewPipelineState(GfxIndex i)
         {
-            String filename = String("test-tmp-perf-");
+            String filename = String("shader-cache-test/test-tmp-perf-");
             filename.append(i);
             filename.append(".slang");
 
@@ -1181,10 +1186,11 @@ namespace gfx_test
 
         void run()
         {
-            shaderCache.entryCountLimit = 1000;
+            shaderCache.entryCountLimit = 10000;
             generateNewDevice();
             createRequiredResources();
-            for (GfxIndex i = 0; i < 1000; ++i)
+            generateFiles();
+            for (GfxIndex i = 0; i < 10000; ++i)
             {
                 generateNewPipelineState(i);
                 submitGPUWork();
@@ -1193,7 +1199,7 @@ namespace gfx_test
             std::chrono::time_point<std::chrono::system_clock> start, segmentEnd;
             std::chrono::duration<double> elapsed;
             start = std::chrono::system_clock::now();
-            for (GfxIndex i = 0; i < 1000; ++i)
+            for (GfxIndex i = 0; i < 10000; ++i)
             {
                 generateNewPipelineState(i);
                 submitGPUWork();
