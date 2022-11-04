@@ -23,17 +23,22 @@ public:
     enum class Kind
     {
         Invalid = -1,
-        RayPayload,
-        CallablePayload,
-        HitObjectAttribute,
+        RayPayload,                 ///< GLSL rayPayload
+        CallablePayload,            ///< GLSL callableData
+        HitObjectAttribute,         ///< GLSL hitObjectAttribute
         CountOf,
     };
 
         /// Given a decoration returns the Kind, or Kind::Invalid if that is not appropriate
     static Kind getKindFromDecoration(IRDecoration* decoration);
 
+        /// Get the location value associated with inst (and decoration).
+        /// Will return -1, if no location is associated
     Index getValue(IRInst* inst, IRDecoration* decoration);
 
+        /// Get the location value associated with inst (and decoration).
+        /// The kind must match that for the decoration.
+        /// Will return -1, if no location is associated
     Index getValue(Kind kind, IRInst* inst, IRDecoration* decoration);
 
 protected:
