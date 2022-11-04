@@ -65,8 +65,6 @@ struct Options
 
     Slang::List<Slang::String> renderFeatures;          /// Required render features for this test to run
 
-    Slang::String adapter;                              ///< The adapter to use either name or index
-
     uint32_t computeDispatchSize[3] = { 1, 1, 1 };
 
     Slang::String nvapiExtnSlot;                               ///< The nvapiRegister to use.
