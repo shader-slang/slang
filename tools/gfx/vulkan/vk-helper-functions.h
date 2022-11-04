@@ -175,6 +175,8 @@ VkPipelineStageFlags calcPipelineStageFlagsFromImageLayout(VkImageLayout layout)
 
 VkImageAspectFlags getAspectMaskFromFormat(VkFormat format);
 
+AdapterLUID getAdapterLUID(VulkanApi api, VkPhysicalDevice physicaDevice);
+
 } // namespace vk
 
 Result SLANG_MCALL getVKAdapters(List<AdapterInfo>& outAdapters);

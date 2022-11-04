@@ -2,7 +2,9 @@
 #include "slang-ast-base.h"
 #include "slang-ast-type.h"
 
-Slang::QualType::QualType(Type* type)
+namespace Slang
+{
+QualType::QualType(Type* type)
     : type(type)
     , isLeftValue(false)
 {
@@ -10,4 +12,6 @@ Slang::QualType::QualType(Type* type)
     {
         isLeftValue = true;
     }
+}
+
 }

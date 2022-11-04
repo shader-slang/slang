@@ -105,6 +105,55 @@ interface __BuiltinSignedArithmeticType : __BuiltinArithmeticType {}
 interface __BuiltinIntegerType : __BuiltinArithmeticType
 {}
 
+
+/// Interface to denote types as differentiable.
+/// Allows for user-specified differential types as
+/// well as automatic generation, for when the associated type
+/// hasn't been declared explicitly.
+/// Note that the requirements must currently be defined in this exact order
+/// since the auto-diff pass relies on the order to grab the struct keys.
+/// 
+__magic_type(DifferentiableType)
+interface IDifferentiable
+{
+    // Note: the compiler implementation requires the `Differential` associated type to be defined
+    // before anything else.
+
+    __builtin_requirement($( (int) BuiltinRequirementKind::DifferentialType) )
+    associatedtype Differential : IDifferentiable;
+
+    __builtin_requirement($( (int)BuiltinRequirementKind::DZeroFunc) )
+    static Differential dzero();
+
+    __builtin_requirement($( (int)BuiltinRequirementKind::DAddFunc) )
+    static Differential dadd(Differential, Differential);
+
+    __builtin_requirement($( (int)BuiltinRequirementKind::DMulFunc) )
+    static Differential dmul(This, Differential);
+};
+
+__magic_type(DifferentialBottomType)
+__intrinsic_type($(kIROp_DifferentialBottomType))
+struct __DifferentialBottom : IDifferentiable
+{
+    typedef __DifferentialBottom Differential;
+
+    __intrinsic_op($(kIROp_DifferentialBottomValue))
+    static __DifferentialBottom dzero();
+
+    [__unsafeForceInlineEarly]
+    static __DifferentialBottom dadd(Differential a, Differential b)
+    {
+        return dzero();
+    }
+
+    [__unsafeForceInlineEarly]
+    static __DifferentialBottom dmul(This a, Differential b)
+    {
+        return dzero();
+    }
+}
+
 /// A type that can represent non-integers
 [sealed]
 [builtin]
@@ -2741,16 +2790,6 @@ attribute_syntax [Specialize] : SpecializeAttribute;
 
 __attributeTarget(DeclBase)
 attribute_syntax [DerivativeMember(memberName)] : DerivativeMemberAttribute;
-
-enum _BuiltinRequirementKind
-{
-    DifferentialType = $( (int) BuiltinRequirementKind::DifferentialType),
-    DZeroFunc = $( (int) BuiltinRequirementKind::DZeroFunc),
-    DAddFunc = $( (int) BuiltinRequirementKind::DAddFunc),
-    DMulFunc = $( (int) BuiltinRequirementKind::DMulFunc),
-};
-__attributeTarget(DeclBase)
-attribute_syntax [__BuiltinRequirement(kind: _BuiltinRequirementKind)] : BuiltinRequirementAttribute;
 
 __attributeTarget(DeclBase)
 attribute_syntax [builtin] : BuiltinAttribute;

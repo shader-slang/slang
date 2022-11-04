@@ -484,27 +484,6 @@ namespace Slang
                 return false;
             }
         }
-        else if (auto builtinAssocTypeAttr = as<BuiltinRequirementAttribute>(attr))
-        {
-            if (attr->args.getCount() == 1)
-            {
-                //IntVal* outIntVal;
-                if (auto cInt = checkConstantEnumVal(attr->args[0]))
-                {
-                    builtinAssocTypeAttr->kind = (BuiltinRequirementKind)(cInt->value);
-                }
-                else
-                {
-                    getSink()->diagnose(attr, Diagnostics::expectedSingleIntArg, attr->keywordName);
-                    return false;
-                }
-            }
-            else
-            {
-                getSink()->diagnose(attr, Diagnostics::expectedSingleIntArg, attr->keywordName);
-                return false;
-            }
-        }
         else if (auto unrollAttr = as<UnrollAttribute>(attr))
         {
             // Check has an argument. We need this because default behavior is to give an error

@@ -608,7 +608,7 @@ struct IRDifferentiableTypeDictionaryItem : IRInst
     IRInst* getWitness() { return getOperand(1); }
 };
 
-struct IRDifferentiableTypeDictionaryDecoration : IRInst
+struct IRDifferentiableTypeDictionaryDecoration : IRDecoration
 {
     IR_LEAF_ISA(DifferentiableTypeDictionaryDecoration)
 };
@@ -2306,6 +2306,7 @@ public:
     IRInst* getBoolValue(bool value);
     IRInst* getIntValue(IRType* type, IRIntegerValue value);
     IRInst* getFloatValue(IRType* type, IRFloatingPointValue value);
+    IRInst* getDifferentialBottom();
     IRStringLit* getStringValue(const UnownedStringSlice& slice);
     IRPtrLit* _getPtrValue(void* ptr);
     IRPtrLit* getNullPtrValue(IRType* type);
@@ -2335,6 +2336,7 @@ public:
     IRAnyValueType* getAnyValueType(IRIntegerValue size);
     IRAnyValueType* getAnyValueType(IRInst* size);
     IRDynamicType* getDynamicType();
+    IRDifferentialBottomType* getDifferentialBottomType();
 
     IRTupleType* getTupleType(UInt count, IRType* const* types);
     IRTupleType* getTupleType(List<IRType*> const& types)
@@ -2393,7 +2395,7 @@ public:
 
     IRDifferentialPairType* getDifferentialPairType(
         IRType* valueType,
-        IRWitnessTable* witnessTable);
+        IRInst* witnessTable);
 
     IRFuncType* getFuncType(
         UInt            paramCount,
@@ -2605,6 +2607,8 @@ public:
     IRInst* emitGetOptionalValue(IRInst* optValue);
     IRInst* emitMakeOptionalValue(IRInst* optType, IRInst* value);
     IRInst* emitMakeOptionalNone(IRInst* optType, IRInst* defaultValue);
+    IRInst* emitDifferentialPairGetDifferential(IRType* diffType, IRInst* diffPair);
+    IRInst* emitDifferentialPairGetPrimal(IRInst* diffPair);
     IRInst* emitMakeVector(
         IRType*         type,
         UInt            argCount,

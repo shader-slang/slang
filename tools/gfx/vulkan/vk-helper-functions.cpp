@@ -450,41 +450,79 @@ VkImageAspectFlags getAspectMaskFromFormat(VkFormat format)
     }
 }
 
+AdapterLUID getAdapterLUID(VulkanApi api, VkPhysicalDevice physicalDevice)
+{
+    AdapterLUID luid = {};
+
+    VkPhysicalDeviceIDPropertiesKHR idProps = { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ID_PROPERTIES_KHR };
+    VkPhysicalDeviceProperties2 props = { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2 };
+    props.pNext = &idProps;
+    SLANG_ASSERT(api.vkGetPhysicalDeviceFeatures2);
+    api.vkGetPhysicalDeviceProperties2(physicalDevice, &props);
+    if (idProps.deviceLUIDValid)
+    {
+        SLANG_ASSERT(sizeof(AdapterLUID) >= VK_LUID_SIZE);
+        memcpy(&luid, idProps.deviceLUID, VK_LUID_SIZE);
+    }
+    else
+    {
+        SLANG_ASSERT(sizeof(AdapterLUID) >= VK_UUID_SIZE);
+        memcpy(&luid, idProps.deviceUUID, VK_UUID_SIZE);
+    }
+
+    return luid;
+}
+
 } // namespace vk
 
 Result SLANG_MCALL getVKAdapters(List<AdapterInfo>& outAdapters)
 {
-    VulkanModule module;
-    SLANG_RETURN_ON_FAIL(module.init(false));
-    VulkanApi api;
-    SLANG_RETURN_ON_FAIL(api.initGlobalProcs(module));
-
-    VkInstanceCreateInfo instanceCreateInfo = { VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO };
-    VkInstance instance;
-    SLANG_VK_RETURN_ON_FAIL(api.vkCreateInstance(&instanceCreateInfo, nullptr, &instance));
-
-    // This will fail due to not loading any extensions.
-    api.initInstanceProcs(instance);
-    // Make sure required functions for enumerating physical devices were loaded.
-    if (!api.vkEnumeratePhysicalDevices || !api.vkGetPhysicalDeviceProperties)
-        return SLANG_FAIL;
-
-    uint32_t numPhysicalDevices = 0;
-    SLANG_VK_RETURN_ON_FAIL(api.vkEnumeratePhysicalDevices(instance, &numPhysicalDevices, nullptr));
-
-    List<VkPhysicalDevice> physicalDevices;
-    physicalDevices.setCount(numPhysicalDevices);
-    SLANG_VK_RETURN_ON_FAIL(api.vkEnumeratePhysicalDevices(instance, &numPhysicalDevices, physicalDevices.getBuffer()));
-
-    for (const auto& physicalDevice : physicalDevices)
+    for (int forceSoftware = 0; forceSoftware <= 1; forceSoftware++)
     {
-        VkPhysicalDeviceProperties props;
-        api.vkGetPhysicalDeviceProperties(physicalDevice, &props);
-        AdapterInfo info = {};
-        memcpy(info.name, props.deviceName, Math::Min(strlen(props.deviceName), sizeof(AdapterInfo::name) - 1));
-        info.vendorID = props.vendorID;
-        info.deviceID = props.deviceID;
-        outAdapters.add(info);
+        VulkanModule module;
+        if (module.init(forceSoftware != 0) != SLANG_OK)
+            continue;
+        VulkanApi api;
+        if (api.initGlobalProcs(module) != SLANG_OK)
+            continue;
+
+        VkInstanceCreateInfo instanceCreateInfo = { VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO };
+        const char* instanceExtensions[] = {
+            VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME,
+        };
+        instanceCreateInfo.enabledExtensionCount = SLANG_COUNT_OF(instanceExtensions);
+        instanceCreateInfo.ppEnabledExtensionNames = &instanceExtensions[0];
+        VkInstance instance;
+        SLANG_VK_RETURN_ON_FAIL(api.vkCreateInstance(&instanceCreateInfo, nullptr, &instance));
+
+        // This will fail due to not loading any extensions.
+        api.initInstanceProcs(instance);
+
+        // Make sure required functions for enumerating physical devices were loaded.
+        if (api.vkEnumeratePhysicalDevices || api.vkGetPhysicalDeviceProperties)
+        {
+            uint32_t numPhysicalDevices = 0;
+            SLANG_VK_RETURN_ON_FAIL(api.vkEnumeratePhysicalDevices(instance, &numPhysicalDevices, nullptr));
+
+            List<VkPhysicalDevice> physicalDevices;
+            physicalDevices.setCount(numPhysicalDevices);
+            SLANG_VK_RETURN_ON_FAIL(api.vkEnumeratePhysicalDevices(instance, &numPhysicalDevices, physicalDevices.getBuffer()));
+
+            for (const auto& physicalDevice : physicalDevices)
+            {
+                VkPhysicalDeviceProperties props;
+                api.vkGetPhysicalDeviceProperties(physicalDevice, &props);
+                AdapterInfo info = {};
+                memcpy(info.name, props.deviceName, Math::Min(strlen(props.deviceName), sizeof(AdapterInfo::name) - 1));
+                info.vendorID = props.vendorID;
+                info.deviceID = props.deviceID;
+                info.luid = vk::getAdapterLUID(api, physicalDevice);
+                outAdapters.add(info);
+            }
+        }
+
+        api.vkDestroyInstance(instance, nullptr);
+        module.destroy();
     }
 
     return SLANG_OK;

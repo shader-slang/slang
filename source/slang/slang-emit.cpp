@@ -381,9 +381,6 @@ Result linkAndOptimizeIR(
 
     // 2. Transpose JVP to VJP code wherever needed. (Transposition or "reverse-mode" pass)
     // processVJPDerivativeMarkers(module); // Disabled currently. No impl yet.
-    
-    // 3. Fill in higher-order invocations with the generated functions.
-    processDerivativeCalls(irModule);
 
     stripAutoDiffDecorations(irModule);
 

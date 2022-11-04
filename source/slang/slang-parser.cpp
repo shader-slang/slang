@@ -6430,6 +6430,16 @@ namespace Slang
         return modifier;
     }
 
+    static NodeBase* parseBuiltinRequirementModifier(Parser* parser, void* /*userData*/)
+    {
+        BuiltinRequirementModifier* modifier = parser->astBuilder->create<BuiltinRequirementModifier>();
+        parser->ReadToken(TokenType::LParent);
+        modifier->kind = BuiltinRequirementKind(StringToInt(parser->ReadToken(TokenType::IntegerLiteral).getContent()));
+        parser->ReadToken(TokenType::RParent);
+
+        return modifier;
+    }
+
     static NodeBase* parseMagicTypeModifier(Parser* parser, void* /*userData*/)
     {
         MagicTypeModifier* modifier = parser->astBuilder->create<MagicTypeModifier>();
@@ -6618,6 +6628,8 @@ namespace Slang
         _makeParseModifier("__cuda_sm_version",     parseCUDASMVersionModifier),
 
         _makeParseModifier("__builtin_type",        parseBuiltinTypeModifier),
+        _makeParseModifier("__builtin_requirement", parseBuiltinRequirementModifier),
+
         _makeParseModifier("__magic_type",          parseMagicTypeModifier),
         _makeParseModifier("__intrinsic_type",      parseIntrinsicTypeModifier),
         _makeParseModifier("__implicit_conversion", parseImplicitConversionModifier),

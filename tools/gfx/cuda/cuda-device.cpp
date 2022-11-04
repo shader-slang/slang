@@ -150,13 +150,30 @@ SLANG_NO_THROW SlangResult SLANG_MCALL DeviceImpl::initialize(const Desc& desc)
 
     SLANG_RETURN_ON_FAIL(_initCuda(reportType));
 
-    SLANG_RETURN_ON_FAIL(_findMaxFlopsDeviceIndex(&m_deviceIndex));
+    if (desc.adapterLUID)
+    {
+        int deviceCount = -1;
+        cuDeviceGetCount(&deviceCount);
+        for (int deviceIndex = 0; deviceIndex < deviceCount; ++deviceIndex)
+        {
+            if (cuda::getAdapterLUID(deviceIndex) == *desc.adapterLUID)
+            {
+                m_deviceIndex = deviceIndex;
+                break;
+            }
+        }
+        if (m_deviceIndex >= deviceCount)
+            return SLANG_E_INVALID_ARG;
+    }
+    else
+    {
+        SLANG_RETURN_ON_FAIL(_findMaxFlopsDeviceIndex(&m_deviceIndex));
+    }
+
     SLANG_CUDA_RETURN_WITH_REPORT_ON_FAIL(cudaSetDevice(m_deviceIndex), reportType);
 
     m_context = new CUDAContext();
 
-    int count = -1;
-    cuDeviceGetCount(&count);
     SLANG_CUDA_RETURN_ON_FAIL(cuDeviceGet(&m_device, m_deviceIndex));
 
     SLANG_CUDA_RETURN_WITH_REPORT_ON_FAIL(
@@ -1103,7 +1120,7 @@ SLANG_NO_THROW Result SLANG_MCALL DeviceImpl::readBufferResource(
     ISlangBlob** outBlob)
 {
     auto bufferImpl = static_cast<BufferResourceImpl*>(buffer);
-    
+
     List<uint8_t> blobData;
 
     blobData.setCount((Index)size);
