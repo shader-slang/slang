@@ -70,22 +70,34 @@ struct DifferentialPair : IDifferentiable
     __intrinsic_op($(kIROp_MakeDifferentialPair))
     __init(T _primal, T.Differential _differential);
 
-    __intrinsic_op($(kIROp_DifferentialPairGetDifferential))
-    T.Differential d();
+    property p : T
+    {
+        __intrinsic_op($(kIROp_DifferentialPairGetPrimal))
+        get;
+    }
+
+    property v : T
+    {
+        __intrinsic_op($(kIROp_DifferentialPairGetPrimal))
+        get;
+    }
+
+    property d : T.Differential
+    {
+        __intrinsic_op($(kIROp_DifferentialPairGetDifferential))
+        get;
+    }
 
     [__unsafeForceInlineEarly]
     T.Differential getDifferential()
     {
-        return d();
+        return d;
     }
-
-    __intrinsic_op($(kIROp_DifferentialPairGetPrimal))
-    T p();
 
     [__unsafeForceInlineEarly]
     T getPrimal()
     {
-        return p();
+        return p;
     }
 
     [__unsafeForceInlineEarly]
@@ -99,18 +111,18 @@ struct DifferentialPair : IDifferentiable
     {
         return Differential(
             T.dadd(
-                a.p(),
-                b.p()
+                a.p,
+                b.p
             ),
-            T.Differential.dadd(a.d(), b.d()));
+            T.Differential.dadd(a.d, b.d));
     }
 
     [__unsafeForceInlineEarly]
     static Differential dmul(This a, Differential b)
     {
         return Differential(
-            T.dmul(a.p(), b.p()),
-            T.Differential.dmul(a.d(), b.d()));
+            T.dmul(a.p, b.p),
+            T.Differential.dmul(a.d, b.d));
     }
 };
 
@@ -135,8 +147,8 @@ namespace dstd
     DifferentialPair<T> d_exp(DifferentialPair<T> dpx)
     {
         return DifferentialPair<T>(
-            exp(dpx.p()),
-            T.dmul(exp(dpx.p()), dpx.d()));
+            exp(dpx.p),
+            T.dmul(exp(dpx.p), dpx.d));
     }
 
     // Sine
@@ -153,8 +165,8 @@ namespace dstd
     DifferentialPair<T> d_sin(DifferentialPair<T> dpx)
     {
         return DifferentialPair<T>(
-            sin(dpx.p()),
-            T.dmul(cos(dpx.p()), dpx.d()));
+            sin(dpx.p),
+            T.dmul(cos(dpx.p), dpx.d));
     }
 
     // Cosine
@@ -171,8 +183,8 @@ namespace dstd
     DifferentialPair<T> d_cos(DifferentialPair<T> dpx)
     {
         return DifferentialPair<T>(
-            cos(dpx.p()),
-            T.dmul(-sin(dpx.p()), dpx.d()));
+            cos(dpx.p),
+            T.dmul(-sin(dpx.p), dpx.d));
     }
 
     __generic<let N : int>
@@ -192,9 +204,9 @@ namespace dstd
         vector<float, N>.Differential d_result;
         for(int i = 0; i < N; ++i)
         { 
-            DifferentialPair<float> dpexp = dstd.d_exp(DifferentialPair<float>(dpx.p()[i], dpx.d()[i]));
-            result[i] = dpexp.p(); 
-            d_result[i] = dpexp.d(); 
+            DifferentialPair<float> dpexp = dstd.d_exp(DifferentialPair<float>(dpx.p[i], dpx.d[i]));
+            result[i] = dpexp.p; 
+            d_result[i] = dpexp.d; 
         }
 
         return DifferentialPair<vector<float, N>>(result, d_result);

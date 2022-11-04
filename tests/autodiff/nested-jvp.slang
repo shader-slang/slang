@@ -22,16 +22,16 @@ float max_(float x, float y)
 dpfloat pow_jvp(dpfloat x, dpfloat n)
 {
     return dpfloat(
-        pow(x.p(), n.p()),
-        x.d() * n.p() * pow(x.p(), n.p()-1) + 
-            ((n.d() != 0.0) ? (n.d() * pow(x.p(), n.p()) * log(x.p())) : 0.0));
+        pow(x.p, n.p),
+        x.d * n.p * pow(x.p, n.p-1) + 
+            ((n.d != 0.0) ? (n.d * pow(x.p, n.p) * log(x.p)) : 0.0));
 }
 
 dpfloat max_jvp(dpfloat x, dpfloat y)
 {
     return dpfloat(
-        max(x.p(), y.p()),
-        (x.p() > y.p()) ? x.d() : y.d());
+        max(x.p, y.p),
+        (x.p > y.p) ? x.d : y.d);
 }
 
 
@@ -63,7 +63,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
         outputBuffer[0] = __fwd_diff(fresnel)(
             dpfloat3(f0, d_f0),
             dpfloat3(f90, d_f90),
-            dpfloat(cosTheta, d_cosTheta)).d().y; // Expect: -0.031250
+            dpfloat(cosTheta, d_cosTheta)).d.y; // Expect: -0.031250
 
         float a = 1.0;
         float b = -0.4;
@@ -76,13 +76,13 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
         outputBuffer[1] = __fwd_diff(g)(
             dpfloat(a, da),
             dpfloat(b, db),
-            dpfloat(c, dc)).d();                 // Expect: -0.24375
+            dpfloat(c, dc)).d;                 // Expect: -0.24375
 
         outputBuffer[2] = g(a, b, c);       // Expect: 0.95625
 
         outputBuffer[3] = __fwd_diff(g)(
             dpfloat(a, da),
             dpfloat(b, db),
-            dpfloat(3.0, dc)).d();               // Expect: -0.4;
+            dpfloat(3.0, dc)).d;               // Expect: -0.4;
     }
 }
