@@ -112,7 +112,7 @@ interface __BuiltinIntegerType : __BuiltinArithmeticType
 /// hasn't been declared explicitly.
 /// Note that the requirements must currently be defined in this exact order
 /// since the auto-diff pass relies on the order to grab the struct keys.
-/// 
+///
 __magic_type(DifferentiableType)
 interface IDifferentiable
 {
@@ -371,7 +371,7 @@ ${{{{
         static $(kBaseTypes[tt].name) getPi() { return $(kBaseTypes[tt].name)(3.14159265358979323846264338328); }
 
         typedef $(kBaseTypes[tt].name) Differential;
-    
+
         [__unsafeForceInlineEarly]
         static Differential dzero()
         {
@@ -2857,6 +2857,9 @@ attribute_syntax [anyValueSize(size:int)] : AnyValueSizeAttribute;
 
 __attributeTarget(InterfaceDecl)
 attribute_syntax [Specialize] : SpecializeAttribute;
+
+__attributeTarget(DeclBase)
+attribute_syntax [DerivativeMember(memberName)] : DerivativeMemberAttribute;
 
 __attributeTarget(DeclBase)
 attribute_syntax [builtin] : BuiltinAttribute;

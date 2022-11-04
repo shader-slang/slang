@@ -99,6 +99,7 @@ struct DifferentialPair : IDifferentiable
     __intrinsic_op($(kIROp_DifferentialPairGetDifferential))
     T.Differential d();
 
+    [__unsafeForceInlineEarly]
     T.Differential getDifferential()
     {
         return d;

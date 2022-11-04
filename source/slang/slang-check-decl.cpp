@@ -27,7 +27,7 @@ namespace Slang
         {}
 
         void visitDeclGroup(DeclGroup*) {}
-        
+
         void visitDecl(Decl* decl)
         {
             checkModifiers(decl);
@@ -256,11 +256,6 @@ namespace Slang
         void visitParamDecl(ParamDecl* paramDecl);
 
         void _maybeRegisterDifferentialBottomTypeConformance(SemanticsContext& context);
-
-        void checkDerivativeOfAttribute(FunctionDeclBase* funcDecl);
-
-        void checkDerivativeAttribute(FunctionDeclBase* funcDecl, ForwardDerivativeAttribute* attr);
-
     };
 
         /// Should the given `decl` nested in `parentDecl` be treated as a static rather than instance declaration?
@@ -343,7 +338,7 @@ namespace Slang
     {
         // If it's an *actual* global it is not a global shader parameter
         if (decl->hasModifier<ActualGlobalModifier>()) { return false; }
-        
+
         // A global shader parameter must be declared at global or namespace
         // scope, so that it has a single definition across the module.
         //
@@ -568,7 +563,7 @@ namespace Slang
     }
 
     QualType getTypeForDeclRef(
-        ASTBuilder*     astBuilder, 
+        ASTBuilder*     astBuilder,
         DeclRef<Decl>   declRef,
         SourceLoc       loc)
     {
@@ -913,7 +908,7 @@ namespace Slang
             // NOTE! We purposefully do not iterate with the for(auto childDecl : containerDecl->members) here,
             // because the visitor may add to `members` whilst iteration takes place, invalidating the iterator
             // and likely a crash.
-            // 
+            //
             // Accessing the members via index side steps the issue.
             const auto& members = containerDecl->members;
             for(Index i = 0; i < members.getCount(); ++i)
@@ -1575,7 +1570,7 @@ namespace Slang
         // NOTE! We purposefully do not iterate with the for(auto m : genericDecl->members) here,
         // because the visitor may add to `members` whilst iteration takes place, invalidating the iterator
         // and likely a crash.
-        // 
+        //
         // Accessing the members via index side steps the issue.
         const auto& members = genericDecl->members;
         for (Index i = 0; i < members.getCount(); ++i)
@@ -3276,7 +3271,7 @@ namespace Slang
         }
         else
         {
-            // The general case. 
+            // The general case.
             // Create a variable for return value.
             synth.pushVarScope();
             auto varStmt = synth.emitVarDeclStmt(synFunc->returnType.type, getName("result"));
@@ -3324,7 +3319,7 @@ namespace Slang
             synReturn->expression = resultVarExpr;
             seqStmt->stmts.add(synReturn);
         }
-        
+
         context->parentDecl->members.add(synFunc);
         context->parentDecl->invalidateMemberDictionary();
         addModifier(synFunc, m_astBuilder->create<SynthesizedModifier>());
@@ -3827,7 +3822,7 @@ namespace Slang
                 return true;
             }
 
-            
+
         }
 
         // Look at the type being inherited from, and validate
@@ -3903,7 +3898,7 @@ namespace Slang
             // be required to implement all interface requirements,
             // just with `abstract` methods that replicate things?
             // (That's what C# does).
-            
+
             // Make a copy of inhertanceDecls firstsince `checkConformance` may modify decl->members.
             auto inheritanceDecls = decl->getMembersOfType<InheritanceDecl>().toList();
             for (auto inheritanceDecl : inheritanceDecls)
@@ -4587,100 +4582,10 @@ namespace Slang
         }
     }
 
-    void SemanticsDeclBodyVisitor::checkDerivativeOfAttribute(FunctionDeclBase* funcDecl)
-    {
-        auto attr = funcDecl->findModifier<ForwardDerivativeOfAttribute>();
-        if (!attr)
-            return;
-
-        List<Expr*> imaginaryArguments;
-        for (auto param : funcDecl->getParameters())
-        {
-            auto arg = m_astBuilder->create<VarExpr>();
-            arg->declRef.decl = param;
-            arg->type.isLeftValue = param->findModifier<OutModifier>() ? true : false;
-            arg->type.type = param->getType();
-            arg->loc = attr->loc;
-            if (auto pairType = as<DifferentialPairType>(param->getType()))
-            {
-                arg->type.type = pairType->getPrimalType();
-            }
-            imaginaryArguments.add(arg);
-        }
-        auto invokeExpr = constructUncheckedInvokeExpr(attr->funcExpr, imaginaryArguments);
-        auto resolved = ResolveInvoke(invokeExpr);
-        if (auto resolvedInvoke = as<InvokeExpr>(resolved))
-        {
-            if (auto calleeDeclRef = as<DeclRefExpr>(resolvedInvoke->functionExpr))
-            {
-                if (auto existingModifier = calleeDeclRef->declRef.getDecl()->findModifier<ForwardDerivativeAttribute>())
-                {
-                    // The primal function already has a `[ForwardDerivative]` attribute, this is invalid.
-                    getSink()->diagnose(attr, Diagnostics::declAlreadyHasAttribute, calleeDeclRef->declRef, "[ForwardDerivative]");
-                    getSink()->diagnose(existingModifier->loc, Diagnostics::seeDeclarationOf, calleeDeclRef->declRef.getDecl());
-                }
-                attr->funcExpr = calleeDeclRef;
-                auto fwdDerivativeAttr = m_astBuilder->create<ForwardDerivativeAttribute>();
-                fwdDerivativeAttr->loc = attr->loc;
-                auto outterGeneric = GetOuterGeneric(funcDecl);
-                auto declRef =
-                    DeclRef<Decl>((outterGeneric ? (Decl*)outterGeneric : funcDecl), nullptr);
-                auto declRefExpr = ConstructDeclRefExpr(declRef, nullptr, attr->loc, nullptr);
-                declRefExpr->type.type = nullptr;
-                fwdDerivativeAttr->args.add(declRefExpr);
-                fwdDerivativeAttr->funcExpr = declRefExpr;
-                checkDerivativeAttribute(as<FunctionDeclBase>(calleeDeclRef->declRef.getDecl()), fwdDerivativeAttr);
-                attr->backDeclRef = fwdDerivativeAttr->funcExpr;
-                fwdDerivativeAttr->funcExpr = nullptr;
-                return;
-            }
-        }
-        getSink()->diagnose(attr, Diagnostics::invalidCustomDerivative);
-    }
-
-    void SemanticsDeclBodyVisitor::checkDerivativeAttribute(FunctionDeclBase* funcDecl, ForwardDerivativeAttribute* attr)
-    {
-        if (!attr->funcExpr)
-            return;
-        if (attr->funcExpr->type.type)
-            return;
-
-        List<Expr*> imaginaryArguments;
-        for (auto param : funcDecl->getParameters())
-        {
-            auto arg = m_astBuilder->create<VarExpr>();
-            arg->declRef.decl = param;
-            arg->type.isLeftValue = param->findModifier<OutModifier>() ? true : false;
-            arg->type.type = param->getType();
-            arg->loc = attr->loc;
-            if (auto pairType = getDifferentialPairType(param->getType()))
-            {
-                arg->type.type = pairType;
-            }
-            imaginaryArguments.add(arg);
-        }
-        auto invokeExpr = constructUncheckedInvokeExpr(attr->funcExpr, imaginaryArguments);
-        auto resolved = ResolveInvoke(invokeExpr);
-        if (auto resolvedInvoke = as<InvokeExpr>(resolved))
-        {
-            if (auto calleeDeclRef = as<DeclRefExpr>(resolvedInvoke->functionExpr))
-            {
-                attr->funcExpr = calleeDeclRef;
-                return;
-            }
-        }
-        getSink()->diagnose(attr, Diagnostics::invalidCustomDerivative);
-    }
-
     void SemanticsDeclBodyVisitor::visitFunctionDeclBase(FunctionDeclBase* decl)
     {
         auto newContext = withParentFunc(decl);
         _maybeRegisterDifferentialBottomTypeConformance(newContext);
-
-        // Run checking on attributes that can't be fully checked in header checking stage.
-        checkDerivativeOfAttribute(decl);
-        if (auto derivativeAttr = decl->findModifier<ForwardDerivativeAttribute>())
-            checkDerivativeAttribute(decl, derivativeAttr);
 
         if (auto body = decl->body)
         {
@@ -5004,7 +4909,7 @@ namespace Slang
                 // Convert the constraint to an appropriate witness.
                 auto witness = tryGetSubtypeWitness(constraintDecl->sub, constraintDecl->sup);
 
-                // Must be non-null since we know there's a constraint. If null, something is 
+                // Must be non-null since we know there's a constraint. If null, something is
                 // very wrong.
                 //
                 SLANG_ASSERT(witness);
@@ -5046,7 +4951,7 @@ namespace Slang
                 // Use nullptr for this scenario
                 ioDict.AddIfNotExists(nullptr, decl);
             }
-        }  
+        }
     }
 
     Result SemanticsVisitor::checkFuncRedeclaration(
@@ -5213,7 +5118,7 @@ namespace Slang
         // with the case where the two function declarations
         // might represent different target-specific versions
         // of a function.
-       
+
         // If both of the declarations have a body, then there
         // is trouble, because we wouldn't know which one to
         // use during code generation.
@@ -6312,7 +6217,7 @@ namespace Slang
         m_candidateExtensionListsBuilt = false;
         m_mapTypeDeclToCandidateExtensions.Clear();
     }
-    
+
     void SharedSemanticsContext::_addCandidateExtensionsFromModule(ModuleDecl* moduleDecl)
     {
         for( auto& entry : moduleDecl->mapTypeToCandidateExtensions )

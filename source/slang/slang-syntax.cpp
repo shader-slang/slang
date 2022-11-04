@@ -327,9 +327,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         {
             if (auto declaredSubtypeWitnessMidToSup = as<DeclaredSubtypeWitness>(transitiveTypeWitness->midToSup))
             {
-                auto midKey = declaredSubtypeWitnessMidToSup->declRef;
-                auto midWitness = tryLookUpRequirementWitness(astBuilder, as<SubtypeWitness>(transitiveTypeWitness->subToMid), midKey);
-                if (midWitness.getFlavor() == RequirementWitness::Flavor::witnessTable)
+                if (auto builtinAttr = requirementKey->findModifier<BuiltinRequirementModifier>())
                 {
                     auto table = midWitness.getWitnessTable();
                     RequirementWitness result;
@@ -656,12 +654,12 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         return nullptr;
     }
 
-   
+
     // DeclRefBase
 
     Type* DeclRefBase::substitute(ASTBuilder* astBuilder, Type* type) const
     {
-        // Note that type can be nullptr, and so this function can return nullptr (although only correctly when no substitutions) 
+        // Note that type can be nullptr, and so this function can return nullptr (although only correctly when no substitutions)
 
         // No substitutions? Easy.
         if (!substitutions)
@@ -727,7 +725,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
     }
 
     Substitutions* specializeSubstitutionsShallow(
-        ASTBuilder*             astBuilder, 
+        ASTBuilder*             astBuilder,
         Substitutions*   substToSpecialize,
         Substitutions*   substsToApply,
         Substitutions*   restSubst,
@@ -1096,7 +1094,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         return astBuilder->create<NamedExpressionType>(specializedDeclRef);
     }
 
-    
+
     FuncType* getFuncType(
         ASTBuilder*                     astBuilder,
         DeclRef<CallableDecl> const&    declRef)
@@ -1242,7 +1240,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
                 out << ".";
             }
         }
-        
+
         // Print this type's name.
         auto name = decl->getName();
         if (name)
