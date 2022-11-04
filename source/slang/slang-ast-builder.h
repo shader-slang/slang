@@ -19,6 +19,7 @@ class SharedASTBuilder : public RefObject
 public:
     
     void registerBuiltinDecl(Decl* decl, BuiltinTypeModifier* modifier);
+    void registerBuiltinRequirementDecl(Decl* decl, BuiltinRequirementModifier* modifier);
     void registerMagicDecl(Decl* decl, MagicTypeModifier* modifier);
 
         /// Get the string type
@@ -48,6 +49,11 @@ public:
     Decl* findMagicDecl(String const& name);
 
     Decl* tryFindMagicDecl(String const& name);
+
+    Decl* findBuiltinRequirementDecl(BuiltinRequirementKind kind)
+    {
+        return m_builtinRequirementDecls[kind].GetValue();
+    }
 
         /// A name pool that can be used for lookup for findClassInfo etc. It is the same pool as the Session.
     NamePool* getNamePool() { return m_namePool; }
@@ -85,6 +91,7 @@ protected:
     Type* m_builtinTypes[Index(BaseType::CountOf)];
 
     Dictionary<String, Decl*> m_magicDecls;
+    Dictionary<BuiltinRequirementKind, Decl*> m_builtinRequirementDecls;
 
     Dictionary<UnownedStringSlice, const ReflectClassInfo*> m_sliceToTypeMap;
     Dictionary<Name*, const ReflectClassInfo*> m_nameToTypeMap;
@@ -334,6 +341,7 @@ public:
         Witness* primalIsDifferentialWitness);
 
     DeclRef<InterfaceDecl> getDifferentiableInterface();
+    Decl* getDifferentiableAssociatedTypeRequirement();
 
     bool isDifferentiableInterfaceAvailable();
 

@@ -428,7 +428,7 @@ namespace Slang
 
         // We will only ever need to synthesis a type to satisfy an associatedtype requirement.
         // In this case the lookup should have resolved to a known associatedtype decl.
-        auto builtinAssocTypeAttr = item.declRef.getDecl()->findModifier<BuiltinRequirementAttribute>();
+        auto builtinAssocTypeAttr = item.declRef.getDecl()->findModifier<BuiltinRequirementModifier>();
         if (!builtinAssocTypeAttr)
             return nullptr;
 
