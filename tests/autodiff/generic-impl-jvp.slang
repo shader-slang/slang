@@ -127,12 +127,12 @@ DifferentialPair<T> dot_jvp(dpvector<T, N> a, dpvector<T, N> b)
     T curr_p = (T)0.0;
     for (int i = 0; i < N; i++)
     {
-        curr_p = curr_p + (a.p().values[i] * b.p().values[i]);
+        curr_p = curr_p + (a.p.values[i] * b.p.values[i]);
         curr_d = T.dadd(
                     curr_d, 
                     T.dadd(
-                        T.dmul(a.p().values[i], b.d().values[i]),
-                        T.dmul(b.p().values[i], a.d().values[i])));
+                        T.dmul(a.p.values[i], b.d.values[i]),
+                        T.dmul(b.p.values[i], a.d.values[i])));
     }
 
     return DifferentialPair<T>(curr_p, curr_d);
@@ -298,9 +298,9 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
         dpfloat4 dpf4 = dpfloat4(myfloat4(float4(1.5, 2.0, 0.5, 1.0)), mydfloat4(float4(0.5, 0.8, 1.6, 2.5)));
         dpfloat3 dpf3 = dpfloat3(myfloat3(float3(1.0, 3.0, 5.0)), mydfloat3(float3(0.5, 1.5, 2.5)));
 
-        outputBuffer[0] = f(dpa.p());                               // Expect: 22.0
-        outputBuffer[1] = __fwd_diff(f)(dpfloat(2.0, 0.5)).d();          // Expect: 9.5
-        outputBuffer[2] = __fwd_diff(f)(dpf4).d().val.values[3];         // Expect: 27.5
-        outputBuffer[3] = __fwd_diff(f)(dpf3).d().val.values[1];         // Expect: 40.5
+        outputBuffer[0] = f(dpa.p);                               // Expect: 22.0
+        outputBuffer[1] = __fwd_diff(f)(dpfloat(2.0, 0.5)).d;          // Expect: 9.5
+        outputBuffer[2] = __fwd_diff(f)(dpf4).d.val.values[3];         // Expect: 27.5
+        outputBuffer[3] = __fwd_diff(f)(dpf3).d.val.values[1];         // Expect: 40.5
     }
 }

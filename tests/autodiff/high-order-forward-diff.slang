@@ -19,7 +19,7 @@ float f(float x)
 [ForwardDifferentiable]
 float df(float x)
 {
-    return __fwd_diff(f)(DifferentialPair<float>(x, 1.0)).d();
+    return __fwd_diff(f)(DifferentialPair<float>(x, 1.0)).d;
 }
 
 [numthreads(1, 1, 1)]
@@ -28,5 +28,5 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     // Given f(x) = x^4,
     // f''(x) = 12 * x^2
     // Expect f''(4) = 192
-    outputBuffer[0] = __fwd_diff(df)(DifferentialPair<float>(4.0, 1.0)).d();
+    outputBuffer[0] = __fwd_diff(df)(DifferentialPair<float>(4.0, 1.0)).d;
 }
