@@ -96,8 +96,23 @@ struct DifferentialPair : IDifferentiable
     __intrinsic_op($(kIROp_MakeDifferentialPair))
     __init(T _primal, T.Differential _differential);
 
-    __intrinsic_op($(kIROp_DifferentialPairGetDifferential))
-    T.Differential d();
+    property p : T
+    {
+        __intrinsic_op($(kIROp_DifferentialPairGetPrimal))
+        get;
+    }
+
+    property v : T
+    {
+        __intrinsic_op($(kIROp_DifferentialPairGetPrimal))
+        get;
+    }
+
+    property d : T.Differential
+    {
+        __intrinsic_op($(kIROp_DifferentialPairGetDifferential))
+        get;
+    }
 
     [__unsafeForceInlineEarly]
     T.Differential getDifferential()
