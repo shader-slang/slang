@@ -37,12 +37,12 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 
     __fwd_diff(h)(dpfloat(x, dx), dpfloat(y, dy), dpz);
 
-    outputBuffer[0] = dpz.d(); // Expect: 12.0
-    outputBuffer[1] = dpz.p(); // Expect: 6.75
+    outputBuffer[0] = dpz.d; // Expect: 12.0
+    outputBuffer[1] = dpz.p; // Expect: 6.75
 
     __fwd_diff(g)(dpfloat(x, dx), dpfloat(y, dy), dpz);
 
-    outputBuffer[2] = dpz.d(); // Expect: 21.5
-    outputBuffer[3] = dpz.p(); // Expect: 12.5
+    outputBuffer[2] = dpz.d; // Expect: 21.5
+    outputBuffer[3] = dpz.p; // Expect: 12.5
 
 }

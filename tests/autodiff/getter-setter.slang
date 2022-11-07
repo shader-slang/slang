@@ -60,6 +60,6 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 
         dpA dpa = dpA(a, b);
 
-        outputBuffer[0] = __fwd_diff(f)(dpa).d().z;                    // Expect: 1
+        outputBuffer[0] = __fwd_diff(f)(dpa).d.z;                    // Expect: 1
     }
 }
