@@ -110,15 +110,9 @@ void PersistentShaderCache::loadCacheFromFile()
             // The cache index is not guaranteed to be ordered by most recent access, so we need a temporary list to store
             // all the entries in order to sort them before filling in our linked list.
             List<ShaderCacheEntry> tempEntries;
-            size_t offset = 0;
-            for (Index i = 0; i < numEntries; ++i)
-            {
-                ShaderCacheEntry entry;
-                size_t bytesRead;
-                indexStream.read(&entry, sizeof(ShaderCacheEntry), bytesRead); // TODO: Error checking?
-
-                tempEntries.add(entry);
-            }
+            tempEntries.setCount(numEntries);
+            size_t bytesRead;
+            indexStream.read(tempEntries.getBuffer(), sizeof(ShaderCacheEntry) * numEntries, bytesRead);
 
             // We will need to sort tempEntries by last accessed time before we can add entries to our linked list.
             tempEntries.quickSort(tempEntries.getBuffer(), 0, tempEntries.getCount() - 1, [](ShaderCacheEntry a, ShaderCacheEntry b) { return a.lastAccessedTime > b.lastAccessedTime; });
