@@ -575,8 +575,9 @@ namespace Slang
             /// If `expr` has Ref<T> Type, convert it into an l-value expr that has T type.
         Expr* maybeOpenRef(Expr* expr);
 
+        void DiagnoseDeprecatedDeclRefUsage(DeclRef<Decl> declRef, SourceLoc loc, Expr* originalExpr);
 
-        Expr* ConstructDeclRefExpr(
+        DeclRefExpr* ConstructDeclRefExpr(
             DeclRef<Decl>   declRef,
             Expr*    baseExpr,
             SourceLoc loc,

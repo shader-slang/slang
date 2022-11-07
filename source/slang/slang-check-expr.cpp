@@ -254,7 +254,41 @@ namespace Slang
         return SourceLoc();
     }
 
-    Expr* SemanticsVisitor::ConstructDeclRefExpr(
+    void SemanticsVisitor::DiagnoseDeprecatedDeclRefUsage(
+        DeclRef<Decl> declRef,
+        SourceLoc loc,
+        Expr* originalExpr)
+    {
+        // This is slightly subtle, because we don't want to warn more than
+        // once for the same occurrence, however in some cases this function is
+        // called more than once for the same declref (specifically in the case
+        // of a non-overloaded function, once when the function is identified at
+        // first, and again when it's checked from
+        // CheckInvokeExprWithCheckedOperands).
+        //
+        // The correct fix is probably to make
+        // CheckInvokeExprWithCheckedOperands reuse the original declref,
+        // however that doesn't appear to be a simple change.
+        //
+        // What we do instead is see if there's already been a declRef
+        // constructed for this expression and rest assured that it's already
+        // had a diagnostic emitted.
+        auto originalDecl = as<DeclRefExpr>(originalExpr);
+        if(originalDecl && originalDecl->declRef)
+        {
+            return;
+        }
+        if (auto deprecatedAttr = declRef.getDecl()->findModifier<DeprecatedAttribute>())
+        {
+            getSink()->diagnose(
+                loc,
+                Diagnostics::deprecatedUsage,
+                declRef.getName(),
+                deprecatedAttr->message);
+        }
+    }
+
+    DeclRefExpr* SemanticsVisitor::ConstructDeclRefExpr(
         DeclRef<Decl>   declRef,
         Expr*    baseExpr,
         SourceLoc loc,
@@ -263,6 +297,10 @@ namespace Slang
         // Compute the type that this declaration reference will have in context.
         //
         auto type = GetTypeForDeclRef(declRef, loc);
+
+        // This is the bottleneck for using declarations which might be
+        // deprecated, diagnose here.
+        DiagnoseDeprecatedDeclRefUsage(declRef, loc, originalExpr);
 
         // Construct an appropriate expression based on the structured of
         // the declaration reference.
