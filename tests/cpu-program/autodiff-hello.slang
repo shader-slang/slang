@@ -92,14 +92,14 @@ struct BSDFParameters : IDifferentiable
 [ForwardDifferentiable]
 float myDot(float3 x, float3 y)
 {
-    //return dstd.dot(x, y);
-    float result = 0.f;
-    result = x[0] * y[0] + x[1] * y[1] + x[2] * y[2];
+    return dstd.dot(x, y);
+    //float result = 0.f;
+    //result = x[0] * y[0] + x[1] * y[1] + x[2] * y[2];
     /*
     for (int i = 0; i < 3; ++i)
         result = result + x[i] * y[i];
     */
-    return result;
+    //return result;
 }
 
 [ForwardDifferentiable]
@@ -171,10 +171,18 @@ struct NonDiff
 }
 
 [ForwardDifferentiable]
-bool myFunc(NonDiff fIn, inout float x)
+void myFunc(NonDiff fIn, inout float x, inout bool flag)
 {
     x = dstd.pow(x, fIn.a);
-    return (x > 1.f);
+    //x = dstd.detach(x);
+    flag = (x > 100.f);
+}
+
+[ForwardDifferentiable]
+void myFunc2(inout float3 x)
+{
+    x = dstd.abs(x);
+    x = dstd.detach(x);
 }
 
 void test2(float a)
@@ -183,8 +191,15 @@ void test2(float a)
     {
         NonDiff fIn = { a };
         dpfloat dpx = dpfloat(4.f, 1.f);
-        bool res = __fwd_diff(myFunc)(fIn, dpx);
-        printf("res = %d, val = %.3f, grad = %.3f\n", 1, dpx.p(), dpx.d());
+        bool res;
+        __fwd_diff(myFunc)(fIn, dpx, res);
+        printf("res = %d, val = %.3f, grad = %.3f\n", res, dpx.p(), dpx.d());
+    }
+
+    {
+        dpfloat3 dpx = dpfloat3(float3(2.f, -3.f, 10.f), float3(1.f, 1.f, -1.f));
+        __fwd_diff(myFunc2)(dpx);
+        printf("val = (%.3f, %.3f, %.3f), grad = (%.3f, %.3f, %.3f)\n", dpx.p().x, dpx.p().y, dpx.p().z, dpx.d().x, dpx.d().y, dpx.d().z);
     }
 }
 
