@@ -2122,9 +2122,51 @@ private:
     ComPtr<ISlangBlob> m_blob;
 };
 
+struct DeviceLimits
+{
+    /// Maximum dimension for 1D textures.
+    uint32_t maxTextureDimension1D;
+    /// Maximum dimensions for 2D textures.
+    uint32_t maxTextureDimension2D;
+    /// Maximum dimensions for 3D textures.
+    uint32_t maxTextureDimension3D;
+    /// Maximum dimensions for cube textures.
+    uint32_t maxTextureDimensionCube;
+    /// Maximum number of texture layers.
+    uint32_t maxTextureArrayLayers;
+
+    /// Maximum number of vertex input elements in a graphics pipeline.
+    uint32_t maxVertexInputElements;
+    /// Maximum offset of a vertex input element in the vertex stream.
+    uint32_t maxVertexInputElementOffset;
+    /// Maximum number of vertex streams in a graphics pipeline.
+    uint32_t maxVertexStreams;
+    /// Maximum stride of a vertex stream.
+    uint32_t maxVertexStreamStride;
+
+    /// Maximum number of threads per thread group.
+    uint32_t maxComputeThreadsPerGroup;
+    /// Maximum dimensions of a thread group.
+    uint32_t maxComputeThreadGroupSize[3];
+    /// Maximum number of thread groups per dimension in a single dispatch.
+    uint32_t maxComputeDispatchThreadGroups[3];
+
+    /// Maximum number of viewports per pipeline.
+    uint32_t maxViewports;
+    /// Maximum viewport dimensions.
+    uint32_t maxViewportDimensions[2];
+    /// Maximum framebuffer dimensions.
+    uint32_t maxFramebufferDimensions[3];
+
+    /// Maximum samplers visible in a shader stage.
+    uint32_t maxShaderVisibleSamplers;
+};
+
 struct DeviceInfo
 {
     DeviceType deviceType;
+
+    DeviceLimits limits;
 
     BindingStyle bindingStyle;
 
