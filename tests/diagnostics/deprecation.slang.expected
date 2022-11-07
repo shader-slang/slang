@@ -1,0 +1,21 @@
+result code = 0
+standard error = {
+tests/diagnostics/deprecation.slang(25): warning 31200: pi has been deprecated: more precise approximations are available elsewhere
+    pi;
+    ^~
+tests/diagnostics/deprecation.slang(27): warning 31200: foo has been deprecated: please use foo(bool)
+    foo(0);
+    ^~~
+tests/diagnostics/deprecation.slang(30): warning 31200: Billiards has been deprecated: no
+    Billiards b;
+    ^~~~~~~~~
+tests/diagnostics/deprecation.slang(31): warning 31200: bs has been deprecated: puns
+    b.bs;
+      ^~
+tests/diagnostics/deprecation.slang(33): warning 31200: bar has been deprecated: non-overloaded bar
+    bar();
+    ^~~
+}
+standard output = {
+}
+

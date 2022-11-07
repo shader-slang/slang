@@ -2654,11 +2654,13 @@ matrix<T,R,C> mul(matrix<T,R,N> right, matrix<T,N,C> left)
 
 // noise (deprecated)
 
+[deprecated("Always returns 0")]
 float noise(float x)
 {
     return 0;
 }
 
+[deprecated("Always returns 0")]
 __generic<let N : int> float noise(vector<float, N> x)
 {
     return 0;

@@ -342,6 +342,8 @@ DIAGNOSTIC(31144, Error, customDerivativeNotAFunction, "$0, used as a custom der
 DIAGNOSTIC(31145, Error, customDerivativeGenericSignatureMismatch, "cannot use $0 as custom derivative for $1. generic signature does not match")
 DIAGNOSTIC(31146, Error, customDerivativeSignatureMismatch, "cannot use $0 as custom derivative for $1. signature does not match")
 DIAGNOSTIC(31146, Error, invalidCustomDerivative, "unable to resolve custom differential for $0.")
+
+DIAGNOSTIC(31200, Warning, deprecatedUsage, "$0 has been deprecated: $1")
 // Enums
 
 DIAGNOSTIC(32000, Error, invalidEnumTagType,        "invalid tag type for 'enum': '$0'")
