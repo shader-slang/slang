@@ -2208,7 +2208,7 @@ public:
         // and the third is the VkDevice. For CUDA, this only contains a single value for the CUDADevice.
         InteropHandles existingDeviceHandles;
         // LUID of the adapter to use. Use getGfxAdapters() to get a list of available adapters.
-        AdapterLUID* adapterLUID = nullptr;
+        const AdapterLUID* adapterLUID = nullptr;
         // Number of required features.
         GfxCount requiredFeatureCount = 0;
         // Array of required feature names, whose size is `requiredFeatureCount`.
