@@ -161,7 +161,30 @@ void test1()
         printf("eval val = (%.3f, %.3f, %.3f), grad = (%.3f, %.3f, %.3f)\n", res.p().x, res.p().y, res.p().z, res.d().x, res.d().y, res.d().z);
 
         float3 eval_res = evalGGXDivByPDF(diff_wi.p(), diff_wo.p(), diff_h.p(), diff_params.p());
-        printf("eval val = (%.3f, %.3f, %.3f)", res.p().x, res.p().y, res.p().z);
+        printf("eval val = (%.3f, %.3f, %.3f)\n", res.p().x, res.p().y, res.p().z);
+    }
+}
+
+struct NonDiff
+{
+    float a;
+}
+
+[ForwardDifferentiable]
+bool myFunc(NonDiff fIn, inout float x)
+{
+    x = dstd.pow(x, fIn.a);
+    return (x > 1.f);
+}
+
+void test2(float a)
+{
+    printf("===== Test 2 =====\n");
+    {
+        NonDiff fIn = { a };
+        dpfloat dpx = dpfloat(4.f, 1.f);
+        bool res = __fwd_diff(myFunc)(fIn, dpx);
+        printf("res = %d, val = %.3f, grad = %.3f\n", 1, dpx.p(), dpx.d());
     }
 }
 
@@ -169,5 +192,6 @@ public __extern_cpp int main()
 {
     test0();
     test1();
+    test2(3.f);
     return 0;
 }
