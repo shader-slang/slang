@@ -244,7 +244,7 @@ Slang supports the following expression forms with nearly identical syntax to HL
 * Operators: `-a`, `b + c`, `d++`, `e %= f`
 
 > #### Note ####
-> Like HLSL but unlike most other C-family languages, the operators `&&` and `||`, along with the conditional operator `?:` do *not* currently perform "short-circuiting";
+> Like HLSL but unlike most other C-family languages, the operators `&&` and `||` do *not* currently perform "short-circuiting";
 > they evaluate all of their operands unconditionally.
 > The default behavior of these operators is likely to change in a future Slang release.
 

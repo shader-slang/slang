@@ -370,6 +370,9 @@ class ModifierCastExpr : public Expr
 class SelectExpr: public OperatorExpr
 {
     SLANG_AST_CLASS(SelectExpr)
+    Expr* predicate(){ return arguments[0]; }
+    Expr* trueExpr(){ return arguments[1]; }
+    Expr* falseExpr(){ return arguments[2]; }
 };
 
 class GenericAppExpr: public AppExprBase

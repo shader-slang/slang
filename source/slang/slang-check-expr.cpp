@@ -1360,6 +1360,7 @@ namespace Slang
 #undef CASE
             else if (opName == getName("?:"))
             {
+                // This is consistent with the short-circuiting semantics for scalar ?:
                 if (argCount != 3)
                     return nullptr;
                 if (constArgVals[0] != 0)

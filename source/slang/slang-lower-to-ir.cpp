@@ -3805,6 +3805,48 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
         return e;
     }
 
+    LoweredValInfo visitSelectExpr(SelectExpr* expr)
+    {
+        return visitSelectExprImpl(expr, TryClauseEnvironment());
+    }
+
+    LoweredValInfo visitSelectExprImpl(SelectExpr* expr, const TryClauseEnvironment& tryEnv)
+    {
+        // If we have an intrinsic operation defined for this function, use
+        // that instead by deferring to visitInvokeExpr.
+        auto declRefInvokee = as<DeclRefExpr>(expr->functionExpr);
+        SLANG_ASSERT(declRefInvokee);
+        if (auto intrinsicOp = declRefInvokee->declRef.getDecl()->findModifier<IntrinsicOpModifier>())
+        {
+            return visitInvokeExprImpl(expr, tryEnv);
+        }
+
+        // Otherwise push the true and false expressions into their own blocks
+        // and branch to only one.
+        auto type = lowerType(context, expr->trueExpr()->type);
+        SLANG_ASSERT(isTypeEqual(type, lowerType(context, expr->falseExpr()->type)));
+
+        auto builder = getBuilder();
+        auto irPredicate = getSimpleVal(context, lowerRValueExpr(context, expr->predicate()));
+        auto trueBlock = builder->createBlock();
+        auto falseBlock = builder->createBlock();
+        auto afterBlock = builder->createBlock();
+
+        builder->emitIfElseWithBlocks(irPredicate, trueBlock, falseBlock, afterBlock);
+
+        builder->setInsertInto(trueBlock);
+        auto trueVal = getSimpleVal(context, lowerRValueExpr(context, expr->trueExpr()));
+        builder->emitBranch(afterBlock, 1, &trueVal);
+
+        builder->setInsertInto(falseBlock);
+        auto falseVal = getSimpleVal(context, lowerRValueExpr(context, expr->falseExpr()));
+        builder->emitBranch(afterBlock, 1, &falseVal);
+
+        builder->setInsertInto(afterBlock);
+        auto param = builder->emitParam(type);
+        return LoweredValInfo::simple(param);
+    }
+
     LoweredValInfo visitInvokeExpr(InvokeExpr* expr)
     {
         return visitInvokeExprImpl(expr, TryClauseEnvironment());

@@ -1405,6 +1405,7 @@ Val* FuncCallIntVal::tryFoldImpl(ASTBuilder* astBuilder, Type* resultType, DeclR
         }
         else if (nameIs(opName, "?:"))
         {
+            // This is consistent with the short-circuiting semantics for scalar ?:
             resultValue = constArgs[0]->value != 0 ? constArgs[1]->value : constArgs[2]->value;
         }
         else

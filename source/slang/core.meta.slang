@@ -196,11 +196,12 @@ U operator,(T left, U right)
     return right;
 }
 
-// The ternary `?:` operator does not short-circuit in HLSL, and Slang continues to
-// follow that definition, so that this operator is effectively just an ordinary
-// function, rather than a special-case piece of syntax.
-//
-__generic<T> __intrinsic_op(select) T operator?:(bool condition, T ifTrue, T ifFalse);
+// The scalar ?: operator short-circuits so this definition serves only to
+// inform the compiler of the type of this expression and allow us to avoid
+// writing a special case part of the type checking just for this syntax
+__generic<T> T operator?:(bool condition, T ifTrue, T ifFalse);
+
+[deprecated("Please use 'select'. The strict semantics of the vector ?: operator are inconsistent with the scalar :? operator")]
 __generic<T, let N : int> __intrinsic_op(select) vector<T,N> operator?:(vector<bool,N> condition, vector<T,N> ifTrue, vector<T,N> ifFalse);
 
 ${{{{
