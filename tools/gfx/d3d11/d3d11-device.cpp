@@ -212,6 +212,81 @@ SlangResult DeviceImpl::initialize(const Desc& desc)
         m_immediateContext->GetData(m_disjointQuery, &disjointData, sizeof(disjointData), 0);
         m_info.timestampFrequency = disjointData.Frequency;
     }
+
+    // Get device limits.
+    {
+        uint32_t maxTextureDimensionUV = 2048;
+        if (featureLevel >= D3D_FEATURE_LEVEL_9_3)
+            maxTextureDimensionUV = 4096;
+        if (featureLevel >= D3D_FEATURE_LEVEL_10_0)
+            maxTextureDimensionUV = 8192;
+        if (featureLevel >= D3D_FEATURE_LEVEL_11_0)
+            maxTextureDimensionUV = 16384;
+
+        uint32_t maxTextureDimensionW = 256;
+        if (featureLevel >= D3D_FEATURE_LEVEL_10_0)
+            maxTextureDimensionW = 2048;
+
+        uint32_t maxTextureDimensionCube = 512;
+        if (featureLevel >= D3D_FEATURE_LEVEL_9_3)
+            maxTextureDimensionCube = maxTextureDimensionUV;
+
+        uint32_t maxInputElements = 16;
+        if (featureLevel >= D3D_FEATURE_LEVEL_10_1)
+            maxInputElements = 32;
+
+        uint32_t maxColorAttachments = 4;
+        if (featureLevel >= D3D_FEATURE_LEVEL_10_1)
+            maxColorAttachments = 8;
+
+        uint32_t maxComputeThreadGroupSizeXY = 0;
+        uint32_t maxComputeThreadGroupSizeZ = 0;
+        uint32_t maxComputeDispatchThreadGroupsZ = 0;
+        if (featureLevel >= D3D_FEATURE_LEVEL_10_0)
+        {
+            maxComputeThreadGroupSizeXY = D3D11_CS_4_X_THREAD_GROUP_MAX_X;
+            maxComputeThreadGroupSizeZ = 1;
+            maxComputeDispatchThreadGroupsZ = 1;
+        }
+        if (featureLevel >= D3D_FEATURE_LEVEL_11_0)
+        {
+            maxComputeThreadGroupSizeXY = D3D11_CS_THREAD_GROUP_MAX_X;
+            maxComputeThreadGroupSizeZ = D3D11_CS_THREAD_GROUP_MAX_Z;
+            maxComputeDispatchThreadGroupsZ = D3D11_CS_DISPATCH_MAX_THREAD_GROUPS_PER_DIMENSION;
+        }
+
+        DeviceLimits limits = {};
+        limits.maxTextureDimension1D = maxTextureDimensionUV;
+        limits.maxTextureDimension2D = maxTextureDimensionUV;
+        limits.maxTextureDimension3D = maxTextureDimensionW;
+        limits.maxTextureDimensionCube = maxTextureDimensionCube;
+        limits.maxTextureArrayLayers = maxTextureDimensionCube;
+
+        limits.maxVertexInputElements = maxInputElements;
+        limits.maxVertexInputElementOffset = 256; // TODO
+        limits.maxVertexStreams = D3D11_IA_VERTEX_INPUT_RESOURCE_SLOT_COUNT ;
+        limits.maxVertexStreamStride = D3D11_REQ_MULTI_ELEMENT_STRUCTURE_SIZE_IN_BYTES;
+
+        limits.maxComputeThreadsPerGroup = D3D11_CS_THREAD_GROUP_MAX_THREADS_PER_GROUP;
+        limits.maxComputeThreadGroupSize[0] = maxComputeThreadGroupSizeXY;
+        limits.maxComputeThreadGroupSize[1] = maxComputeThreadGroupSizeXY;
+        limits.maxComputeThreadGroupSize[2] = maxComputeThreadGroupSizeZ;
+        limits.maxComputeDispatchThreadGroups[0] = D3D11_CS_DISPATCH_MAX_THREAD_GROUPS_PER_DIMENSION;
+        limits.maxComputeDispatchThreadGroups[1] = D3D11_CS_DISPATCH_MAX_THREAD_GROUPS_PER_DIMENSION;
+        limits.maxComputeDispatchThreadGroups[2] = maxComputeDispatchThreadGroupsZ;
+
+        limits.maxViewports = D3D11_VIEWPORT_AND_SCISSORRECT_OBJECT_COUNT_PER_PIPELINE;
+        limits.maxViewportDimensions[0] = D3D11_VIEWPORT_BOUNDS_MAX;
+        limits.maxViewportDimensions[1] = D3D11_VIEWPORT_BOUNDS_MAX;
+        limits.maxFramebufferDimensions[0] = 4096; // TODO
+        limits.maxFramebufferDimensions[1] = 4096; // TODO
+        limits.maxFramebufferDimensions[2] = 1;
+
+        limits.maxShaderVisibleSamplers = D3D11_COMMONSHADER_SAMPLER_SLOT_COUNT;
+
+        m_info.limits = limits;
+    }
+
     return SLANG_OK;
 }
 
