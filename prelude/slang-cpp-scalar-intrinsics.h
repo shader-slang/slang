@@ -113,19 +113,16 @@ float f16tof32(const uint32_t value)
             return _bitCastIntToFloat(sign | ((value & 0x7fff) << 13)) * g_f16tof32Magic;
         }
     }
-    else if (exponent == 0x1F)
+    else 
     {
-        // Can be an infinity or NAN
-        exponent = 0xff;
-        // If the mantissa has bits set, it's NAN, otherwise it's INF (so 0)
-        mantissa = mantissa ? 0x200 : 0;
+        // If the exponent is NAN or INF exponent is 0x1f on input. 
+        // If that's the case, we just need to set the exponent to 0xff on output
+        // and the mantissa can just stay the same. If its 0 it's INF, else it is NAN and we just copy the bits
+        //
+        // Else we need to correct the exponent in the normalized case.
+        exponent = (exponent == 0x1F) ? 0xff : (exponent + (-15 + 127));
     }
-    else
-    {
-        // Normalized
-        exponent = exponent + (-15 + 127);
-    }
-
+    
     return _bitCastUIntToFloat(sign | (exponent << 23) | (mantissa << 13));
 }
 
