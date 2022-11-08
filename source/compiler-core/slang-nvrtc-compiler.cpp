@@ -231,18 +231,41 @@ static SlangResult _parseNVRTCLine(SliceAllocator& allocator, const UnownedStrin
 
         const auto split1 = split[1].trim();
 
-        if (split1 == "error")
+        if (split1 == toSlice("error") || 
+            split1 == toSlice("catastrophic error"))
         {
             outDiagnostic.severity = Severity::Error;
         }
-        else if (split1 == "warning")
+        else if (split1 == toSlice("warning"))
         {
             outDiagnostic.severity = Severity::Warning;
         }
+        else if (split1.indexOf(toSlice("error")) >= 0)
+        {
+            // If it contains 'error', I guess we'll assume it's an error.
+            outDiagnostic.severity = Severity::Error;
+        }
+        else if (split1.indexOf(toSlice("warning")) >= 0)
+        {
+            // If it contains 'warning' assume it's a warning.
+            outDiagnostic.severity = Severity::Warning;
+        }
+        else
+        {
+            // For now we'll assume it's an error
+            outDiagnostic.severity = Severity::Error;
+        }
+
         outDiagnostic.text = allocator.allocate(split[2].trim());
 
         SLANG_RETURN_ON_FAIL(_parseLocation(allocator, split[0], outDiagnostic));
         return SLANG_OK;
+    }
+    else
+    {
+        // Assume it's info
+        outDiagnostic.severity = Severity::Info;
+        outDiagnostic.text = allocator.allocate(line);
     }
    
     return SLANG_E_NOT_FOUND;
@@ -819,6 +842,18 @@ SlangResult NVRTCDownstreamCompiler::compile(const DownstreamCompileOptions& opt
         cmdLine.addArg("-DSLANG_CUDA_ENABLE_OPTIX");
     }
 
+    // Add any compiler specific options
+    // NOTE! If these clash with any previously set options (as set via other flags)
+    // compilation might fail.
+    if (options.compilerSpecificArguments.count > 0)
+    {
+        for (auto compilerSpecificArg : options.compilerSpecificArguments)
+        {
+            const char*const arg = compilerSpecificArg;
+            cmdLine.addArg(arg);
+        }
+    }
+
     SLANG_ASSERT(headers.getCount() == headerIncludeNames.getCount());
 
     ComPtr<ISlangBlob> sourceBlob;
@@ -868,6 +903,11 @@ SlangResult NVRTCDownstreamCompiler::compile(const DownstreamCompileOptions& opt
         {
             char* dst = rawDiagnostics.prepareForAppend(Index(logSize));
             SLANG_NVRTC_RETURN_ON_FAIL(m_nvrtcGetProgramLog(program, dst));
+
+            // If there is a terminating zero remove it, as the rawDiagnostics
+            // string will already contain one.
+            logSize -= size_t(logSize > 0 && dst[logSize - 1] == 0);
+
             rawDiagnostics.appendInPlace(dst, Index(logSize));
 
             diagnostics->setRaw(SliceUtil::asCharSlice(rawDiagnostics));
@@ -875,14 +915,47 @@ SlangResult NVRTCDownstreamCompiler::compile(const DownstreamCompileOptions& opt
 
         SliceAllocator allocator;
 
+        // Get all of the lines
+        List<UnownedStringSlice> lines;
+        StringUtil::calcLines(rawDiagnostics.getUnownedSlice(), lines);
+
+        // Remove any trailing empty lines
+        while (lines.getCount() && lines.getLast().getLength() == 0)
+        {
+            lines.removeLast();
+        }
+
+        // Find the index searching from last line, that is blank
+        // indicating the end of the output
+        Index lastIndex = lines.getCount();
+
+        // Look for the first blank line after this point.
+        // We'll assume any information after that blank line to the end of the diagnostic
+        // is compilation summary information.
+        for (Index i = lastIndex - 1; i >= 0; --i)
+        {
+            if (lines[i].getLength() == 0)
+            {
+                lastIndex = i;
+                break;
+            }
+        }
+
         // Parse the diagnostics here
-        for (auto line : LineParser(rawDiagnostics.getUnownedSlice()))
+        for (auto line : makeConstArrayView(lines.getBuffer(), lastIndex))
         {
             ArtifactDiagnostic diagnostic;
             SlangResult lineRes = _parseNVRTCLine(allocator, line, diagnostic);
 
             if (SLANG_SUCCEEDED(lineRes))
             {
+                // We only allow info diagnostics after a 'regular' diagnostic.
+                if (diagnostic.severity == ArtifactDiagnostic::Severity::Info && 
+                    diagnostics->getCount() == 0)
+                {
+                    continue;
+                }
+
                 diagnostics->add(diagnostic);
             }
             else if (lineRes != SLANG_E_NOT_FOUND)
@@ -891,8 +964,10 @@ SlangResult NVRTCDownstreamCompiler::compile(const DownstreamCompileOptions& opt
             }
         }
 
-        // if it has a compilation error.. set on output
-        if (diagnostics->hasOfAtLeastSeverity(ArtifactDiagnostic::Severity::Error))
+        // If it has a compilation error.. and there isn't already an error set
+        // set as failed.
+        if (SLANG_SUCCEEDED(diagnostics->getResult()) && 
+            diagnostics->hasOfAtLeastSeverity(ArtifactDiagnostic::Severity::Error))
         {
             diagnostics->setResult(SLANG_FAIL);
         }
