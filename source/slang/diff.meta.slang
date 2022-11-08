@@ -8,83 +8,10 @@ attribute_syntax [ForwardDifferentiable] : ForwardDifferentiableAttribute;
 __attributeTarget(FunctionDeclBase)
 attribute_syntax [ForwardDerivative(function)] : ForwardDerivativeAttribute;
 
-/// Interface to denote types as differentiable.
-/// Allows for user-specified differential types as
-/// well as automatic generation, for when the associated type
-/// hasn't been declared explicitly.
-/// Note that the requirements must currently be defined in this exact order
-/// since the auto-diff pass relies on the order to grab the struct keys.
-///
-__magic_type(DifferentiableType)
-interface IDifferentiable
-{
-    // Note: the compiler implementation requires the `Differential` associated type to be defined
-    // before anything else.
-
-    [__BuiltinRequirement(_BuiltinRequirementKind.DifferentialType)]
-    associatedtype Differential;
-
-    [__BuiltinRequirement(_BuiltinRequirementKind.DZeroFunc)]
-    static Differential dzero();
-
-__attributeTarget(FunctionDeclBase)
-attribute_syntax [ForwardDerivativeOf(function)]   : ForwardDerivativeOfAttribute;
-
-__attributeTarget(DeclBase)
-attribute_syntax [DerivativeMember(memberName)] : DerivativeMemberAttribute;
-
-// Add extensions for the standard types
-extension float : IDifferentiable
-{
-    typedef float Differential;
-
-    [__unsafeForceInlineEarly]
-    static Differential dzero()
-    {
-        return float(0.f);
-    }
 
 /// Pair type that serves to wrap the primal and
 /// differential types of an arbitrary type T.
 
-__generic<T : IDifferentiable>
-__magic_type(DifferentialPairType)
-__intrinsic_type($(kIROp_DifferentialPairType))
-struct DifferentialPair : IDifferentiable
-{
-    typedef DifferentialPair<T.Differential> Differential;
-    typedef T.Differential DifferentialElementType;
-
-    __intrinsic_op($(kIROp_MakeDifferentialPair))
-    __init(T _primal, T.Differential _differential);
-
-    property p : T
-    {
-        __intrinsic_op($(kIROp_DifferentialPairGetPrimal))
-        get;
-    }
-
-    property v : T
-    {
-        __intrinsic_op($(kIROp_DifferentialPairGetPrimal))
-        get;
-    }
-
-    property d : T.Differential
-    {
-        __intrinsic_op($(kIROp_DifferentialPairGetDifferential))
-        get;
-    }
-
-    [__unsafeForceInlineEarly]
-    static __DifferentialBottom dmul(This a, Differential b)
-    {
-        return dzero();
-    }
-}
-
-/// Pair type that serves to wrap the primal and
-/// differential types of an arbitrary type T.
 __generic<T : IDifferentiable>
 __magic_type(DifferentialPairType)
 __intrinsic_type($(kIROp_DifferentialPairType))

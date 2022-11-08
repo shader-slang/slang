@@ -371,7 +371,11 @@ ${{{{
         static $(kBaseTypes[tt].name) getPi() { return $(kBaseTypes[tt].name)(3.14159265358979323846264338328); }
 
         typedef $(kBaseTypes[tt].name) Differential;
+<<<<<<< HEAD
 
+=======
+    
+>>>>>>> 70470dab... Make `__BuiltinFloatingPointType` conform to `IDifferentiable`. (#2499)
         [__unsafeForceInlineEarly]
         static Differential dzero()
         {

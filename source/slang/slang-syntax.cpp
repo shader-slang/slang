@@ -327,7 +327,9 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         {
             if (auto declaredSubtypeWitnessMidToSup = as<DeclaredSubtypeWitness>(transitiveTypeWitness->midToSup))
             {
-                if (auto builtinAttr = requirementKey->findModifier<BuiltinRequirementModifier>())
+                auto midKey = declaredSubtypeWitnessMidToSup->declRef;
+                auto midWitness = tryLookUpRequirementWitness(astBuilder, as<SubtypeWitness>(transitiveTypeWitness->subToMid), midKey);
+                if (midWitness.getFlavor() == RequirementWitness::Flavor::witnessTable)
                 {
                     auto table = midWitness.getWitnessTable();
                     RequirementWitness result;
