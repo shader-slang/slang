@@ -1349,6 +1349,7 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         // The base (subToMid) will turn into a value with
         // witness-table type.
         IRInst* baseWitnessTable = lowerSimpleVal(context, val->subToMid);
+        IRInst* midToSup = nullptr;
 
         // The next step should map to an interface requirement
         // that is itself an interface conformance, so the result
@@ -1366,7 +1367,6 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         // produce transitive witnesses in shapes that will cuase us
         // problems here.
         //
-        IRInst* midToSup = lowerSimpleVal(context, val->midToSup);
 
         if (!baseWitnessTable)
         {
@@ -1378,6 +1378,15 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
             // this transitive witness.
             SLANG_RELEASE_ASSERT(midToSup && as<IRWitnessTableType>(midToSup->getDataType()));
             return LoweredValInfo::simple(midToSup);
+        }
+
+        if (auto declaredMidToSup = as<DeclaredSubtypeWitness>(val->midToSup))
+        {
+            midToSup = getInterfaceRequirementKey(context, declaredMidToSup->declRef.decl);
+        }
+        else
+        {
+            midToSup = lowerSimpleVal(context, val->midToSup);
         }
 
         return LoweredValInfo::simple(getBuilder()->emitLookupInterfaceMethodInst(

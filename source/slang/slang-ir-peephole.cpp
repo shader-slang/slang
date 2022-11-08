@@ -197,6 +197,29 @@ struct PeepholeContext : InstPassBase
                 }
             }
             break;
+        case kIROp_lookup_interface_method:
+            {
+                if (inst->getOperand(0)->getOp() == kIROp_WitnessTable)
+                {
+                    auto wt = as<IRWitnessTable>(inst->getOperand(0));
+                    auto key = inst->getOperand(1);
+                    for (auto item : wt->getChildren())
+                    {
+                        if (auto entry = as<IRWitnessTableEntry>(item))
+                        {
+                            if (entry->getRequirementKey() == key)
+                            {
+                                auto value = entry->getSatisfyingVal();
+                                inst->replaceUsesWith(value);
+                                inst->removeAndDeallocate();
+                                changed = true;
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+            break;
         default:
             break;
         }
