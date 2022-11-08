@@ -60,18 +60,24 @@ uint32_t f32tof16(const float value)
     }
     if (e == 0xff)
     {
-        // Remove last bit for rounding from mantissa
-        m >>= 1;
+        // Could be a NAN or INF. Is INF if *input* mantissa is 0.
         
+        // Remove last bit for rounding to make output mantissa.
+        m >>= 1;
+       
         // We *assume* float16/float32 signaling bit and remaining bits
         // semantics are the same. (The signalling bit convention is target specific!).
         // Non signal bit's usage within mantissa for a NAN are also target specific.
       
-        // If the mantissa is 0, we need to set a bit to distinguish from INF.
-        
-        // This is handled in (mantissa == 0) section. If it is set this way, 
-        // it will (typically) produce a signaling NAN.
-        return (bits | 0x7c00u | m) + uint32_t(m == 0);
+        // If the m is 0, it could be because the result is INF, but it could also be because all the 
+        // bits that made NAN were dropped as we have less mantissa bits in f16. 
+           
+        // To fix for this we make non zero if m is 0 and the input mantissa was not.
+        // This will (typically) produce a signalling NAN.
+        m += uint32_t(m == 0 && (inBits & 0x007fffffu));
+       
+        // Combine for output
+        return (bits | 0x7c00u | m);
     }
     if (e > 142)
     {
