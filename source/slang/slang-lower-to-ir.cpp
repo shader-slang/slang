@@ -8207,16 +8207,16 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
         if (auto attr = decl->findModifier<ForwardDerivativeAttribute>())
         {
-            // TODO(Sai): HACK.. we need to emit a decl-ref to handle this modifier correctly. 
-            // If we don't move the cursor to the parent, we sometimes emit supporting
-            // insts into the function body, which shouldn't happen.
-            // 
+            // We need to lower the decl ref to the custom derivative function to IR.
+            // The IR insts correspond to the decl ref is not part of the function we
+            // are processing. If we emit it directly to within the function, it could
+            // mess up the assumption on the form of the IR (e.g. having non decoration insts
+            // appearing in the middle of decoration insts). so we emit the decl ref to the
+            // function's parent for now.
+
             subContext->irBuilder->setInsertInto(irFunc->getParent());            
             
-            auto diffFuncType = getFuncType(subContext->astBuilder, attr->funcDeclRef->declRef.as<CallableDecl>());
-            auto irDiffFuncType = lowerType(subContext, diffFuncType);
-
-            auto loweredVal = emitDeclRef(subContext, attr->funcDeclRef->declRef, irDiffFuncType);
+            auto loweredVal = lowerRValueExpr(subContext, attr->funcExpr);
 
             SLANG_ASSERT(loweredVal.flavor == LoweredValInfo::Flavor::Simple);
             IRInst* jvpFunc = loweredVal.val;

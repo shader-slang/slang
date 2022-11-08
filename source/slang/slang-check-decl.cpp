@@ -256,6 +256,11 @@ namespace Slang
         void visitParamDecl(ParamDecl* paramDecl);
 
         void _maybeRegisterDifferentialBottomTypeConformance(SemanticsContext& context);
+
+        void checkDerivativeOfAttribute(FunctionDeclBase* funcDecl);
+
+        void checkDerivativeAttribute(FunctionDeclBase* funcDecl, ForwardDerivativeAttribute* attr);
+
     };
 
         /// Should the given `decl` nested in `parentDecl` be treated as a static rather than instance declaration?
@@ -4582,10 +4587,94 @@ namespace Slang
         }
     }
 
+    void SemanticsDeclBodyVisitor::checkDerivativeOfAttribute(FunctionDeclBase* funcDecl)
+    {
+        auto attr = funcDecl->findModifier<ForwardDerivativeOfAttribute>();
+        if (!attr)
+            return;
+
+        List<Expr*> imaginaryArguments;
+        for (auto param : funcDecl->getParameters())
+        {
+            auto arg = m_astBuilder->create<VarExpr>();
+            arg->declRef.decl = param;
+            arg->type.isLeftValue = param->findModifier<OutModifier>() ? true : false;
+            arg->type.type = param->getType();
+            arg->loc = attr->loc;
+            if (auto pairType = as<DifferentialPairType>(param->getType()))
+            {
+                arg->type.type = pairType->getPrimalType();
+            }
+            imaginaryArguments.add(arg);
+        }
+        auto invokeExpr = constructUncheckedInvokeExpr(attr->funcExpr, imaginaryArguments);
+        auto resolved = ResolveInvoke(invokeExpr);
+        if (auto resolvedInvoke = as<InvokeExpr>(resolved))
+        {
+            if (auto calleeDeclRef = as<DeclRefExpr>(resolvedInvoke->functionExpr))
+            {
+                if (auto existingModifier = calleeDeclRef->declRef.getDecl()->findModifier<ForwardDerivativeAttribute>())
+                {
+                    // The primal function already has a `[ForwardDerivative]` attribute, this is invalid.
+                    getSink()->diagnose(attr, Diagnostics::declAlreadyHasAttribute, calleeDeclRef->declRef, "[ForwardDerivative]");
+                    getSink()->diagnose(existingModifier->loc, Diagnostics::seeDeclarationOf, calleeDeclRef->declRef.getDecl());
+                }
+                auto fwdDerivativeAttr = m_astBuilder->create<ForwardDerivativeAttribute>();
+                fwdDerivativeAttr->loc = attr->loc;
+                auto declRefExpr = m_astBuilder->create<DeclRefExpr>();
+                declRefExpr->loc = attr->loc;
+                auto outterGeneric = GetOuterGeneric(funcDecl);
+                declRefExpr->declRef =
+                    DeclRef<Decl>((outterGeneric ? (Decl*)outterGeneric : funcDecl), nullptr);
+                fwdDerivativeAttr->args.add(declRefExpr);
+                fwdDerivativeAttr->funcExpr = declRefExpr;
+                addModifier(calleeDeclRef->declRef.getDecl(), fwdDerivativeAttr);
+                checkDerivativeAttribute(as<FunctionDeclBase>(calleeDeclRef->declRef.getDecl()), fwdDerivativeAttr);
+            }
+        }
+    }
+
+    void SemanticsDeclBodyVisitor::checkDerivativeAttribute(FunctionDeclBase* funcDecl, ForwardDerivativeAttribute* attr)
+    {
+        if (!attr->funcExpr)
+            return;
+        if (attr->funcExpr->type.type)
+            return;
+
+        List<Expr*> imaginaryArguments;
+        for (auto param : funcDecl->getParameters())
+        {
+            auto arg = m_astBuilder->create<VarExpr>();
+            arg->declRef.decl = param;
+            arg->type.isLeftValue = param->findModifier<OutModifier>() ? true : false;
+            arg->type.type = param->getType();
+            arg->loc = attr->loc;
+            if (auto pairType = getDifferentialPairType(param->getType()))
+            {
+                arg->type.type = pairType;
+            }
+            imaginaryArguments.add(arg);
+        }
+        auto invokeExpr = constructUncheckedInvokeExpr(attr->funcExpr, imaginaryArguments);
+        auto resolved = ResolveInvoke(invokeExpr);
+        if (auto resolvedInvoke = as<InvokeExpr>(resolved))
+        {
+            if (auto calleeDeclRef = as<DeclRefExpr>(resolvedInvoke->functionExpr))
+            {
+                attr->funcExpr = calleeDeclRef;
+            }
+        }
+    }
+
     void SemanticsDeclBodyVisitor::visitFunctionDeclBase(FunctionDeclBase* decl)
     {
         auto newContext = withParentFunc(decl);
         _maybeRegisterDifferentialBottomTypeConformance(newContext);
+
+        // Run checking on attributes that can't be fully checked in header checking stage.
+        checkDerivativeOfAttribute(decl);
+        if (auto derivativeAttr = decl->findModifier<ForwardDerivativeAttribute>())
+            checkDerivativeAttribute(decl, derivativeAttr);
 
         if (auto body = decl->body)
         {
