@@ -2071,11 +2071,36 @@ public:
           0x8eccc8ec, 0x5c04, 0x4a51, { 0x99, 0x75, 0x13, 0xf8, 0xfe, 0xa1, 0x59, 0xf3 } \
     }
 
+struct AdapterLUID
+{
+    uint8_t luid[16];
+
+    bool operator==(const AdapterLUID& other) const
+    {
+        for (int i = 0; i < sizeof(AdapterLUID::luid); ++i)
+            if (luid[i] != other.luid[i])
+                return false;
+        return true;
+    }
+    bool operator!=(const AdapterLUID& other) const
+    {
+        return !this->operator==(other);
+    }
+};
+
 struct AdapterInfo
 {
+    // Descriptive name of the adapter.
     char name[128];
+
+    // Unique identifier for the vendor (only available for D3D and Vulkan).
     uint32_t vendorID;
+
+    // Unique identifier for the physical device among devices from the vendor (only available for D3D and Vulkan)
     uint32_t deviceID;
+
+    // Logically unique identifier of the adapter.
+    AdapterLUID luid;
 };
 
 class AdapterList
@@ -2097,9 +2122,51 @@ private:
     ComPtr<ISlangBlob> m_blob;
 };
 
+struct DeviceLimits
+{
+    /// Maximum dimension for 1D textures.
+    uint32_t maxTextureDimension1D;
+    /// Maximum dimensions for 2D textures.
+    uint32_t maxTextureDimension2D;
+    /// Maximum dimensions for 3D textures.
+    uint32_t maxTextureDimension3D;
+    /// Maximum dimensions for cube textures.
+    uint32_t maxTextureDimensionCube;
+    /// Maximum number of texture layers.
+    uint32_t maxTextureArrayLayers;
+
+    /// Maximum number of vertex input elements in a graphics pipeline.
+    uint32_t maxVertexInputElements;
+    /// Maximum offset of a vertex input element in the vertex stream.
+    uint32_t maxVertexInputElementOffset;
+    /// Maximum number of vertex streams in a graphics pipeline.
+    uint32_t maxVertexStreams;
+    /// Maximum stride of a vertex stream.
+    uint32_t maxVertexStreamStride;
+
+    /// Maximum number of threads per thread group.
+    uint32_t maxComputeThreadsPerGroup;
+    /// Maximum dimensions of a thread group.
+    uint32_t maxComputeThreadGroupSize[3];
+    /// Maximum number of thread groups per dimension in a single dispatch.
+    uint32_t maxComputeDispatchThreadGroups[3];
+
+    /// Maximum number of viewports per pipeline.
+    uint32_t maxViewports;
+    /// Maximum viewport dimensions.
+    uint32_t maxViewportDimensions[2];
+    /// Maximum framebuffer dimensions.
+    uint32_t maxFramebufferDimensions[3];
+
+    /// Maximum samplers visible in a shader stage.
+    uint32_t maxShaderVisibleSamplers;
+};
+
 struct DeviceInfo
 {
     DeviceType deviceType;
+
+    DeviceLimits limits;
 
     BindingStyle bindingStyle;
 
@@ -2182,8 +2249,8 @@ public:
         // for the ID3D12Device. For Vulkan, the first InteropHandle is the VkInstance, the second is the VkPhysicalDevice,
         // and the third is the VkDevice. For CUDA, this only contains a single value for the CUDADevice.
         InteropHandles existingDeviceHandles;
-        // Name to identify the adapter to use
-        const char* adapter = nullptr;
+        // LUID of the adapter to use. Use getGfxAdapters() to get a list of available adapters.
+        const AdapterLUID* adapterLUID = nullptr;
         // Number of required features.
         GfxCount requiredFeatureCount = 0;
         // Array of required feature names, whose size is `requiredFeatureCount`.

@@ -52,18 +52,18 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
         float4 a4 = float4(2.0, 1.0, 0.0, 2.0);
         float4 b4 = float4(1.5, -2.0, 1.0, 1.5);
 
-        outputBuffer[0] = __fwd_diff(f)(dpfloat3(a, da)).d().z;    // Expect: 1
+        outputBuffer[0] = __fwd_diff(f)(dpfloat3(a, da)).d.z;    // Expect: 1
 
         outputBuffer[1] = __fwd_diff(g)(
             dpfloat3(a, da),
-            dpfloat3(b, float3(2.0, 1.0, 0.0))).d().y;        // Expect: 8
+            dpfloat3(b, float3(2.0, 1.0, 0.0))).d.y;        // Expect: 8
 
         outputBuffer[2] = __fwd_diff(h)(
             dpfloat2(a2, float2(1.0, 0.0)),
-            dpfloat2(b2, float2(1.0, 1.0))).d().x;            // Expect: 8
+            dpfloat2(b2, float2(1.0, 1.0))).d.x;            // Expect: 8
 
         outputBuffer[3] = __fwd_diff(j)(
             dpfloat4(a4, float4(1.0)),
-            dpfloat4(b4, float4(2.0))).d().w;                 // Expect: 9
+            dpfloat4(b4, float4(2.0))).d.w;                 // Expect: 9
     }
 }

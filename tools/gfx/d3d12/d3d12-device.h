@@ -236,7 +236,7 @@ public:
 
     Result _createDevice(
         DeviceCheckFlags deviceCheckFlags,
-        const UnownedStringSlice& nameMatch,
+        const AdapterLUID* adapterLUID,
         D3D_FEATURE_LEVEL featureLevel,
         D3D12DeviceInfo& outDeviceInfo);
 

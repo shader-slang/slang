@@ -153,10 +153,6 @@ static gfx::DeviceType _toRenderType(Slang::RenderApiType apiType)
         {
             outOptions.performanceProfile = true;
         }
-        else if (argValue == "-adapter")
-        {
-            SLANG_RETURN_ON_FAIL(reader.expectArg(outOptions.adapter));
-        }
         else if (argValue == "-output-using-type")
         {
             outOptions.outputUsingType = true;

@@ -1510,6 +1510,7 @@ namespace Slang
         DAddFunc, ///< The `IDifferentiable.dadd` function requirement 
         DMulFunc, ///< The `IDifferentiable.dmul` function requirement 
     };
+
 } // namespace Slang
 
 #endif
