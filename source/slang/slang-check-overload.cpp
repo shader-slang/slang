@@ -1573,10 +1573,15 @@ namespace Slang
                 {
                     for (auto item : overloadExpr->lookupResult2.items)
                     {
+                        auto funcType = as<FuncType>(GetTypeForDeclRef(item.declRef, item.declRef.decl->loc));
+                        if (!funcType)
+                            continue;
+                        funcType = as<FuncType>(processJVPFuncType(funcType));
+                        if (!funcType)
+                            continue;
                         OverloadCandidate candidate;
                         candidate.flavor = OverloadCandidate::Flavor::Expr;
-                        candidate.funcType = as<FuncType>(processJVPFuncType(
-                            as<FuncType>(GetTypeForDeclRef(item.declRef, item.declRef.decl->loc))));
+                        candidate.funcType = funcType;
                         candidate.resultType = candidate.funcType->getResultType();
                         candidate.item = LookupResultItem(item.declRef);
 
