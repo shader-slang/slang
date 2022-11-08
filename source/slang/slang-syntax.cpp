@@ -325,7 +325,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
             // coerce to `DifferentialBottom`.
             if (astBuilder->getDifferentialBottomType()->equals(transitiveTypeWitness->subToMid->sup))
             {
-                if (auto builtinAttr = requirementKey->findModifier<BuiltinRequirementAttribute>())
+                if (auto builtinAttr = requirementKey->findModifier<BuiltinRequirementModifier>())
                 {
                     if (builtinAttr->kind == BuiltinRequirementKind::DifferentialType)
                     {

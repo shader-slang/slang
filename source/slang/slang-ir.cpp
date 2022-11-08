@@ -1967,6 +1967,7 @@ namespace Slang
                 return getStringSlice() == rhs->getStringSlice();
             }
             case kIROp_VoidLit:
+            case kIROp_DifferentialBottomValue:
             {
                 return true;
             }
@@ -2009,6 +2010,7 @@ namespace Slang
                 return combineHash(code, Slang::getHashCode(slice.begin(), slice.getLength()));
             }
             case kIROp_VoidLit:
+            case kIROp_DifferentialBottomValue:
             {
                 return code;
             }
@@ -2074,10 +2076,18 @@ namespace Slang
             }
             case kIROp_VoidLit:
             {
-                const size_t instSize = prefixSize;
+                const size_t instSize = prefixSize + sizeof(void*);
                 irValue = static_cast<IRConstant*>(
                     _createInst(instSize, keyInst.getFullType(), keyInst.getOp()));
                 irValue->value.ptrVal = keyInst.value.ptrVal;
+                break;
+            }
+            case kIROp_DifferentialBottomValue:
+            {
+                const size_t instSize = prefixSize + sizeof(void*);
+                irValue = static_cast<IRConstant*>(
+                    _createInst(instSize, keyInst.getFullType(), keyInst.getOp()));
+                irValue->value.ptrVal = nullptr;
                 break;
             }
             case kIROp_StringLit:
@@ -2180,6 +2190,17 @@ namespace Slang
         }
         
         return _findOrEmitConstant(keyInst);
+    }
+
+    IRInst* IRBuilder::getDifferentialBottom()
+    {
+        IRType* type = getDifferentialBottomType();
+        IRConstant keyInst;
+        memset(&keyInst, 0, sizeof(keyInst));
+        keyInst.m_op = kIROp_DifferentialBottomValue;
+        keyInst.typeUse.usedValue = type;
+        keyInst.value.intVal = 0;
+        return (IRInst*)_findOrEmitConstant(keyInst);
     }
 
     IRStringLit* IRBuilder::getStringValue(const UnownedStringSlice& inSlice)
@@ -2564,6 +2585,12 @@ namespace Slang
 
     IRDynamicType* IRBuilder::getDynamicType() { return (IRDynamicType*)getType(kIROp_DynamicType); }
 
+    IRDifferentialBottomType* IRBuilder::getDifferentialBottomType()
+    {
+        return (IRDifferentialBottomType*)getType(kIROp_DifferentialBottomType);
+    }
+
+
     IRAssociatedType* IRBuilder::getAssociatedType(ArrayView<IRInterfaceType*> constraintTypes)
     {
         return (IRAssociatedType*)getType(kIROp_AssociatedType,
@@ -2760,7 +2787,7 @@ namespace Slang
 
     IRDifferentialPairType* IRBuilder::getDifferentialPairType(
         IRType* valueType,
-        IRWitnessTable* witnessTable)
+        IRInst* witnessTable)
     {
         IRInst* operands[] = { valueType, witnessTable };
         return (IRDifferentialPairType*)getType(
@@ -3387,6 +3414,25 @@ namespace Slang
         IRInst* const* args)
     {
         return emitIntrinsicInst(type, kIROp_makeVector, argCount, args);
+    }
+
+    IRInst* IRBuilder::emitDifferentialPairGetDifferential(IRType* diffType, IRInst* diffPair)
+    {
+        return emitIntrinsicInst(
+            diffType,
+            kIROp_DifferentialPairGetDifferential,
+            1,
+            &diffPair);
+    }
+
+    IRInst* IRBuilder::emitDifferentialPairGetPrimal(IRInst* diffPair)
+    {
+        auto valueType = as<IRDifferentialPairType>(diffPair->getDataType())->getValueType();
+        return emitIntrinsicInst(
+            valueType,
+            kIROp_DifferentialPairGetPrimal,
+            1,
+            &diffPair);
     }
 
     IRInst* IRBuilder::emitMakeMatrix(

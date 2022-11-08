@@ -23,8 +23,8 @@ namespace myintrinsiclib
     DifferentialPair<T> d_exp(DifferentialPair<T> dpx)
     {
         return DifferentialPair<T>(
-            exp(dpx.p()),
-            T.dmul(exp(dpx.p()), dpx.d()));
+            exp(dpx.p),
+            T.dmul(exp(dpx.p), dpx.d));
     }
 
     
@@ -42,8 +42,8 @@ namespace myintrinsiclib
     DifferentialPair<T> d_sin(DifferentialPair<T> dpx)
     {
         return DifferentialPair<T>(
-            sin(dpx.p()),
-            T.dmul(cos(dpx.p()), dpx.d()));
+            sin(dpx.p),
+            T.dmul(cos(dpx.p), dpx.d));
     }
 
     // Cosine
@@ -60,8 +60,8 @@ namespace myintrinsiclib
     DifferentialPair<T> d_cos(DifferentialPair<T> dpx)
     {
         return DifferentialPair<T>(
-            cos(dpx.p()),
-            T.dmul(-sin(dpx.p()), dpx.d()));
+            cos(dpx.p),
+            T.dmul(-sin(dpx.p), dpx.d));
     }
 
     // Sine and cosine
@@ -80,10 +80,10 @@ namespace myintrinsiclib
     {
         T _s;
         T _c;
-        sincos(x.p(), _s, _c);
+        sincos(x.p, _s, _c);
 
-        s = DifferentialPair<T>(_s, T.dmul(_c, x.d()));
-        c = DifferentialPair<T>(_c, T.dmul(-_s, x.d()));
+        s = DifferentialPair<T>(_s, T.dmul(_c, x.d));
+        c = DifferentialPair<T>(_c, T.dmul(-_s, x.d));
     }
 };
 
@@ -109,13 +109,13 @@ void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
     {
         dpfloat dpa = dpfloat(2.0, 1.0);
 
-        outputBuffer[0] = f(dpa.p());        // Expect: 7.389056
-        outputBuffer[1] = __fwd_diff(f)(dpa).d(); // Expect: 7.389056
+        outputBuffer[0] = f(dpa.p);        // Expect: 7.389056
+        outputBuffer[1] = __fwd_diff(f)(dpa).d; // Expect: 7.389056
 
         // g() needs additional handling of  IRMakeDifferentialPair(PtrType). This needs to 
         // generate a new var, load from the individual vars and store into the pair var.
 
-        //outputBuffer[2] = g(dpa.p());        // Expect: 1.381773
-        //outputBuffer[3] = __fwd_diff(g)(dpa).d(); // Expect: -0.301168
+        //outputBuffer[2] = g(dpa.p);        // Expect: 1.381773
+        //outputBuffer[3] = __fwd_diff(g)(dpa).d; // Expect: -0.301168
     }
 }

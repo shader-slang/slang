@@ -36,26 +36,26 @@ namespace Slang
             switch (inst->getOp())
             {
             case kIROp_Call:
+            case kIROp_makeStruct:
                 {
                     // Remove void argument.
-                    auto call = as<IRCall>(inst);
                     List<IRInst*> newArgs;
-                    for (UInt i = 0; i < call->getArgCount(); i++)
+                    for (UInt i = 0; i < inst->getOperandCount(); i++)
                     {
-                        auto arg = call->getArg(i);
+                        auto arg = inst->getOperand(i);
                         if (arg->getDataType() && arg->getDataType()->getOp() == kIROp_VoidType)
                         {
                             continue;
                         }
                         newArgs.add(arg);
                     }
-                    if (newArgs.getCount() != (Index)call->getArgCount())
+                    if (newArgs.getCount() != (Index)inst->getOperandCount())
                     {
                         IRBuilder builder(&sharedBuilderStorage);
-                        builder.setInsertBefore(call);
-                        auto newCall = builder.emitCallInst(call->getFullType(), call->getCallee(), newArgs);
-                        call->replaceUsesWith(newCall);
-                        call->removeAndDeallocate();
+                        builder.setInsertBefore(inst);
+                        auto newCall = builder.emitIntrinsicInst(inst->getFullType(), inst->getOp(), newArgs.getCount(), newArgs.getBuffer());
+                        inst->replaceUsesWith(newCall);
+                        inst->removeAndDeallocate();
                         inst = newCall;
                     }
                 }
@@ -111,16 +111,43 @@ namespace Slang
                 break;
             case kIROp_StructType:
                 {
-                    // TODO: cleanup void fields.
+                    List<IRInst*> toRemove;
+                    for (auto child : inst->getChildren())
+                    {
+                        if (auto field = as<IRStructField>(child))
+                        {
+                            if (field->getFieldType()->getOp() == kIROp_VoidType)
+                            {
+                                toRemove.add(field);
+                            }
+                        }
+                    }
+                    for (auto ii : toRemove)
+                        ii->removeAndDeallocate();
                 }
                 break;
             default:
                 break;
             }
 
-            // TODO: If inst has void type, all uses of it should be replaced with void val.
+            // If inst has void type, all uses of it should be replaced with void val.
             // We should do this only for a subset of opcodes known to be safe.
-
+            switch(inst->getOp())
+            {
+            case kIROp_Load:
+            case kIROp_getElement:
+            case kIROp_GetOptionalValue:
+            case kIROp_FieldExtract:
+            case kIROp_GetTupleElement:
+            case kIROp_GetResultError:
+            case kIROp_GetResultValue:
+                if (inst->getDataType()->getOp() == kIROp_VoidType)
+                {
+                    IRBuilder builder(&sharedBuilderStorage);
+                    builder.setInsertBefore(inst);
+                    inst->replaceUsesWith(builder.getVoidValue());
+                }
+            }
         }
 
         void processModule()

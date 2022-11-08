@@ -1266,10 +1266,6 @@ static SlangResult _innerMain(Slang::StdWriters* stdWriters, SlangSession* sessi
     StringBuilder rendererName;
     auto info = 
     rendererName << "[" << gfxGetDeviceTypeName(options.deviceType) << "] ";
-    if (options.adapter.getLength())
-    {
-        rendererName << "'" << options.adapter << "'";
-    }
 
     if (options.onlyStartup)
     {
@@ -1318,7 +1314,6 @@ static SlangResult _innerMain(Slang::StdWriters* stdWriters, SlangSession* sessi
     {
         IDevice::Desc desc = {};
         desc.deviceType = options.deviceType;
-        desc.adapter = options.adapter.getBuffer();
 
         desc.slang.lineDirectiveMode = SLANG_LINE_DIRECTIVE_MODE_NONE;
         if (options.generateSPIRVDirectly)
