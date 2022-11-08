@@ -18,7 +18,6 @@ namespace SLANG_PRELUDE_NAMESPACE {
 #   define SLANG_PRELUDE_PI           3.14159265358979323846
 #endif
 
-// ----------------------------- F32 -----------------------------------------
 
 union Union32 
 {
@@ -33,6 +32,98 @@ union Union64
     int64_t i;
     double d;
 };
+
+// 32 bit cast conversions
+SLANG_FORCE_INLINE int32_t _bitCastFloatToInt(float f) { Union32 u; u.f = f; return u.i; }
+SLANG_FORCE_INLINE float _bitCastIntToFloat(int32_t i) { Union32 u; u.i = i; return u.f; }
+SLANG_FORCE_INLINE uint32_t _bitCastFloatToUInt(float f) { Union32 u; u.f = f; return u.u; }
+SLANG_FORCE_INLINE float _bitCastUIntToFloat(uint32_t ui) { Union32 u; u.u = ui; return u.f; }
+
+// ----------------------------- F16 -----------------------------------------
+
+
+// This impl is based on FloatToHalf that is in Slang codebase
+uint32_t f32tof16(const float value)
+{
+    const uint32_t inBits = _bitCastFloatToUInt(value);
+
+    // bits initially set to just the sign bit
+    uint32_t bits = (inBits >> 16) & 0x8000;
+    // Mantissa can't be used as is, as it holds last bit, for rounding.
+    uint32_t m = (inBits >> 12) & 0x07ff;
+    uint32_t e = (inBits >> 23) & 0xff;
+
+    if (e < 103)
+    {
+        // It's zero
+        return bits;
+    }
+    if (e == 0xff)
+    {
+        // Remove last bit for rounding from mantissa
+        m >>= 1;
+        
+        // We *assume* float16/float32 signaling bit and remaining bits
+        // semantics are the same. (The signalling bit convention is target specific!).
+        // Non signal bit's usage within mantissa for a NAN are also target specific.
+      
+        // If the mantissa is 0, we need to set a bit to distinguish from INF.
+        
+        // This is handled in (mantissa == 0) section. If it is set this way, 
+        // it will (typically) produce a signaling NAN.
+        return (bits | 0x7c00u | m) + uint32_t(m == 0);
+    }
+    if (e > 142)
+    {
+        // INF. 
+        return bits | 0x7c00u;
+    }
+    if (e < 113)
+    {
+        m |= 0x0800u;
+        bits |= (m >> (114 - e)) + ((m >> (113 - e)) & 1);
+        return bits;
+    }
+    bits |= ((e - 112) << 10) | (m >> 1);
+    bits += m & 1;
+    return bits;
+}
+
+static const float g_f16tof32Magic = _bitCastIntToFloat((127 + (127 - 15)) << 23);
+
+float f16tof32(const uint32_t value)
+{
+    const uint32_t sign = (value & 0x8000) << 16;
+    uint32_t exponent = (value & 0x7c00) >> 10;
+    uint32_t mantissa = (value & 0x03ff);
+
+    if (exponent == 0)
+    {
+        // If mantissa is 0 we are done, as output is 0. 
+        // If it's not zero we must have a denormal.
+        if (mantissa)
+        {
+            // We have a denormal so use the magic to do exponent adjust
+            return _bitCastIntToFloat(sign | ((value & 0x7fff) << 13)) * g_f16tof32Magic;
+        }
+    }
+    else if (exponent == 0x1F)
+    {
+        // Can be an infinity or NAN
+        exponent = 0xff;
+        // If the mantissa has bits set, it's NAN, otherwise it's INF (so 0)
+        mantissa = mantissa ? 0x200 : 0;
+    }
+    else
+    {
+        // Normalized
+        exponent = exponent + (-15 + 127);
+    }
+
+    return _bitCastUIntToFloat(sign | (exponent << 23) | (mantissa << 13));
+}
+
+// ----------------------------- F32 -----------------------------------------
 
 // Helpers
 SLANG_FORCE_INLINE float F32_calcSafeRadians(float radians);
