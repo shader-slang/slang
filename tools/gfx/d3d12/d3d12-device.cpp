@@ -39,6 +39,7 @@ struct ShaderModelInfo
     SlangCompileTarget compileTarget;
     const char* profileName;
 };
+// List of shader models. Do not change oldest to newest order.
 static ShaderModelInfo kKnownShaderModels[] = {
 #define SHADER_MODEL_INFO_DXBC(major, minor) {D3D_SHADER_MODEL_##major##_##minor, SLANG_DXBC, "sm_" #major "_" #minor }
     SHADER_MODEL_INFO_DXBC(5, 1),
