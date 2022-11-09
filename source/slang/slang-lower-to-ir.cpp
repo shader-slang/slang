@@ -2144,24 +2144,12 @@ void addVarDecorations(
         {
             builder->addFormatDecoration(inst, formatAttr->format);
         }
-        else if(as<HLSLMeshShaderOutputModifier>(mod))
+        else if(auto meshShaderMod = as<HLSLMeshShaderOutputModifier>(mod))
         {
-            IROp op;
-            switch(mod->kType)
-            {
-            case ASTNodeType::HLSLVerticesModifier:
-                op = kIROp_VerticesDecoration;
-                break;
-            case ASTNodeType::HLSLIndicesModifier:
-                op = kIROp_PrimitivesDecoration;
-                break;
-            case ASTNodeType::HLSLPrimitivesModifier:
-                op = kIROp_PrimitivesDecoration;
-                break;
-            default:
-                SLANG_UNREACHABLE("Missing case for HLSLMeshShaderOutputModifier");
-                break;
-            }
+            IROp op = as<HLSLVerticesModifier>(meshShaderMod) ? kIROp_VerticesDecoration
+                    : as<HLSLIndicesModifier>(meshShaderMod) ? kIROp_PrimitivesDecoration
+                    : as<HLSLPrimitivesModifier>(meshShaderMod) ? kIROp_PrimitivesDecoration
+                    : (SLANG_UNREACHABLE("Missing case for HLSLMeshShaderOutputModifier"), IROp(0));
             // TODO: Ellie handle failure here
             IRIntegerValue maxSize;
             if(auto c = composeGetters<IRIntLit>(

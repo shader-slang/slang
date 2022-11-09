@@ -47,6 +47,7 @@ namespace Slang
 
         void checkDerivativeMemberAttribute(VarDeclBase* varDecl, DerivativeMemberAttribute* attr);
         void checkExtensionExternVarAttribute(VarDeclBase* varDecl, ExtensionExternVarModifier* m);
+        void checkMeshOutputDecl(VarDeclBase* varDecl);
 
         void checkVarDeclCommon(VarDeclBase* varDecl);
 
@@ -1177,6 +1178,8 @@ namespace Slang
             //
             validateArraySizeForVariable(varDecl);
         }
+
+        checkMeshOutputDecl(varDecl);
 
         // The NVAPI library allows user code to express extended operations
         // (not supported natively by D3D HLSL) by communicating with
@@ -5399,6 +5402,33 @@ namespace Slang
             typeExpr = CheckUsableType(typeExpr);
             paramDecl->type = typeExpr;
         }
+        checkMeshOutputDecl(paramDecl);
+    }
+
+    // This checks that the declaration is marked as "out" and changes the hlsl
+    // modifier based syntax into a proper type.
+    void SemanticsDeclHeaderVisitor::checkMeshOutputDecl(VarDeclBase* varDecl)
+    {
+        auto mod = varDecl->findModifier<HLSLMeshShaderOutputModifier>();
+        if(!mod)
+        {
+            return;
+        }
+        auto indexExpr = as<IndexExpr>(varDecl->type.exp);
+        if(!indexExpr)
+        {
+            getSink()->diagnose(varDecl, Diagnostics::hlslStyleMeshShaderOutputShouldBeAnArray);
+            return;
+        }
+        auto base = ExpectAType(indexExpr->baseExpression);
+        auto index = CheckIntegerConstantExpression(
+            indexExpr->indexExprs[0],
+            IntegerConstantExpressionCoercionType::AnyInteger,
+            nullptr,
+            getSink());
+
+        Type* d = m_astBuilder->getMeshOutputTypeFromModifier(mod, base, index);
+        varDecl->type.type = d;
     }
 
     void SemanticsDeclBodyVisitor::visitParamDecl(ParamDecl* paramDecl)

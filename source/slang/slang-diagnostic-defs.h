@@ -624,6 +624,8 @@ DIAGNOSTIC(52007, Error, typeCannotBeUsedInDynamicDispatch, "failed to generate 
 DIAGNOSTIC(52008, Error, dynamicDispatchOnSpecializeOnlyInterface, "type '$0' is marked for specialization only, but dynamic dispatch is needed for the call.")
 DIAGNOSTIC(53001,Error, invalidTypeMarshallingForImportedDLLSymbol, "invalid type marshalling in imported func $0.")
 
+DIAGNOSTIC(52000, Error, hlslStyleMeshShaderOutputShouldBeAnArray, "HLSL style Mesh Shader output should be an array.")
+
 //
 // 8xxxx - Issues specific to a particular library/technology/platform/etc.
 //

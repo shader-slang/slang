@@ -345,6 +345,11 @@ public:
 
     bool isDifferentiableInterfaceAvailable();
 
+    MeshOutputType* getMeshOutputTypeFromModifier(
+        HLSLMeshShaderOutputModifier* modifier,
+        Type* elementType,
+        IntVal* maxElementCount);
+
     DeclRef<Decl> getBuiltinDeclRef(const char* builtinMagicTypeName, Val* genericArg);
 
     Type* getAndType(Type* left, Type* right);
