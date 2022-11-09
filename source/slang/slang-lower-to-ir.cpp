@@ -3081,6 +3081,21 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
                 baseVal.val));
     }
 
+    // Emit IR to denote the forward-mode derivative
+    // of the inner func-expr. This will be resolved 
+    // to a concrete function during the derivative 
+    // pass.
+    LoweredValInfo visitBackwardDifferentiateExpr(BackwardDifferentiateExpr* expr)
+    {
+        auto baseVal = lowerSubExpr(expr->baseFunction);
+        SLANG_ASSERT(baseVal.flavor == LoweredValInfo::Flavor::Simple);
+
+        return LoweredValInfo::simple(
+            getBuilder()->emitBackwardDifferentiateInst(
+                lowerType(context, expr->type),
+                baseVal.val));
+    }
+
     LoweredValInfo visitGetArrayLengthExpr(GetArrayLengthExpr* expr)
     {
         auto baseVal = lowerSubExpr(expr->arrayExpr);
@@ -7798,6 +7813,10 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         if (decl->findModifier<ForwardDifferentiableAttribute>())
         {
             getBuilder()->addForwardDifferentiableDecoration(irFunc);
+        }
+        if (decl->findModifier<BackwardDifferentiableAttribute>())
+        {
+            getBuilder()->addBackwardDifferentiableDecoration(irFunc);
         }
         if (auto differentialAttr = decl->findModifier<DifferentiableAttribute>())
         {

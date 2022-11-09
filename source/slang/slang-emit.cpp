@@ -380,7 +380,7 @@ Result linkAndOptimizeIR(
     processForwardDifferentiableFuncs(irModule, sink);
 
     // 2. Transpose JVP to VJP code wherever needed. (Transposition or "reverse-mode" pass)
-    // processVJPDerivativeMarkers(module); // Disabled currently. No impl yet.
+    processBackwardDifferentiableFuncs(irModule, sink); // Disabled currently. No impl yet.
 
     stripAutoDiffDecorations(irModule);
 
