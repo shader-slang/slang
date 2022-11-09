@@ -4619,19 +4619,23 @@ namespace Slang
                     getSink()->diagnose(attr, Diagnostics::declAlreadyHasAttribute, calleeDeclRef->declRef, "[ForwardDerivative]");
                     getSink()->diagnose(existingModifier->loc, Diagnostics::seeDeclarationOf, calleeDeclRef->declRef.getDecl());
                 }
+                attr->funcExpr = calleeDeclRef;
                 auto fwdDerivativeAttr = m_astBuilder->create<ForwardDerivativeAttribute>();
                 fwdDerivativeAttr->loc = attr->loc;
-                auto declRefExpr = m_astBuilder->create<DeclRefExpr>();
-                declRefExpr->loc = attr->loc;
                 auto outterGeneric = GetOuterGeneric(funcDecl);
-                declRefExpr->declRef =
+                auto declRef =
                     DeclRef<Decl>((outterGeneric ? (Decl*)outterGeneric : funcDecl), nullptr);
+                auto declRefExpr = ConstructDeclRefExpr(declRef, nullptr, attr->loc, nullptr);
+                declRefExpr->type.type = nullptr;
                 fwdDerivativeAttr->args.add(declRefExpr);
                 fwdDerivativeAttr->funcExpr = declRefExpr;
-                addModifier(calleeDeclRef->declRef.getDecl(), fwdDerivativeAttr);
                 checkDerivativeAttribute(as<FunctionDeclBase>(calleeDeclRef->declRef.getDecl()), fwdDerivativeAttr);
+                attr->backDeclRef = fwdDerivativeAttr->funcExpr;
+                fwdDerivativeAttr->funcExpr = nullptr;
+                return;
             }
         }
+        getSink()->diagnose(attr, Diagnostics::invalidCustomDerivative);
     }
 
     void SemanticsDeclBodyVisitor::checkDerivativeAttribute(FunctionDeclBase* funcDecl, ForwardDerivativeAttribute* attr)
@@ -4662,8 +4666,10 @@ namespace Slang
             if (auto calleeDeclRef = as<DeclRefExpr>(resolvedInvoke->functionExpr))
             {
                 attr->funcExpr = calleeDeclRef;
+                return;
             }
         }
+        getSink()->diagnose(attr, Diagnostics::invalidCustomDerivative);
     }
 
     void SemanticsDeclBodyVisitor::visitFunctionDeclBase(FunctionDeclBase* decl)

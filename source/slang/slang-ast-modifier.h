@@ -1041,6 +1041,8 @@ class ForwardDerivativeOfAttribute : public Attribute
     SLANG_AST_CLASS(ForwardDerivativeOfAttribute)
 
     Expr* funcExpr;
+
+    Expr* backDeclRef; // DeclRef to this derivative function when initiated from primalFunction.
 };
 
     /// Indicates that the modified declaration is one of the "magic" declarations

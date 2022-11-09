@@ -2538,5 +2538,4 @@ void stripAutoDiffDecorations(IRModule* module)
     stripAutoDiffDecorationsFromChildren(module->getModuleInst());
 }
 
-
 }

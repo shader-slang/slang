@@ -301,17 +301,7 @@ namespace Slang
         auto parentGenericDeclRef = parentDeclRef.as<GenericDecl>();
         if( parentDeclRef )
         {
-            // In certain cases we want to skip emitting the parent
-            if(parentGenericDeclRef && (parentGenericDeclRef.getDecl()->inner != declRef.getDecl()))
-            {
-            }
-            else if(parentDeclRef.as<FunctionDeclBase>())
-            {
-            }
-            else
-            {
-                emitQualifiedName(context, parentDeclRef);
-            }
+            emitQualifiedName(context, parentDeclRef);
         }
 
         // A generic declaration is kind of a pseudo-declaration

@@ -14,4 +14,24 @@ QualType::QualType(Type* type)
     }
 }
 
+void removeModifier(ModifiableSyntaxNode* syntax, Modifier* toRemove)
+{
+    Modifier* prev = nullptr;
+    for (auto modifier = syntax->modifiers.first; modifier; modifier = modifier->next)
+    {
+        if (modifier == toRemove)
+        {
+            if (prev)
+            {
+                prev->next = modifier->next;
+            }
+            else
+            {
+                syntax->modifiers.first = syntax->modifiers.first->next;
+            }
+            break;
+        }
+        prev = modifier;
+    }
+}
 }

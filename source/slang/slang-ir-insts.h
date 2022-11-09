@@ -566,6 +566,17 @@ struct IRForwardDerivativeDecoration : IRDecoration
     IRInst* getForwardDerivativeFunc() { return getOperand(0); }
 };
 
+struct IRForwardDerivativeOfDecoration : IRDecoration
+{
+    enum
+    {
+        kOp = kIROp_ForwardDerivativeOfDecoration
+    };
+    IR_LEAF_ISA(ForwardDerivativeOfDecoration)
+
+    IRInst* getOriginalFunc() { return getOperand(0); }
+};
+
 struct IRDerivativeMemberDecoration : IRDecoration
 {
     enum
@@ -3207,9 +3218,14 @@ public:
         addDecoration(value, kIROp_ForwardDifferentiableDecoration);
     }
 
-    void addForwardDerivativeDecoration(IRInst* value, IRInst* jvpFn)
+    void addForwardDerivativeDecoration(IRInst* value, IRInst* fwdFunc)
     {
-        addDecoration(value, kIROp_ForwardDerivativeDecoration, jvpFn);
+        addDecoration(value, kIROp_ForwardDerivativeDecoration, fwdFunc);
+    }
+
+    void addForwardDerivativeOfDecoration(IRInst* value, IRInst* originalFunc)
+    {
+        addDecoration(value, kIROp_ForwardDerivativeOfDecoration, originalFunc);
     }
 
     void addCOMWitnessDecoration(IRInst* value, IRInst* witnessTable)
