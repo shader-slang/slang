@@ -5401,17 +5401,37 @@ namespace Slang
         {
             typeExpr = CheckUsableType(typeExpr);
             paramDecl->type = typeExpr;
+            checkMeshOutputDecl(paramDecl);
         }
-        checkMeshOutputDecl(paramDecl);
     }
 
     // This checks that the declaration is marked as "out" and changes the hlsl
     // modifier based syntax into a proper type.
     void SemanticsDeclHeaderVisitor::checkMeshOutputDecl(VarDeclBase* varDecl)
     {
-        auto mod = varDecl->findModifier<HLSLMeshShaderOutputModifier>();
-        if(!mod)
+        auto modifier = varDecl->findModifier<HLSLMeshShaderOutputModifier>();
+        auto meshOutputType = as<MeshOutputType>(varDecl->type.type);
+        bool isMeshOutput = modifier || meshOutputType;
+
+        if(!isMeshOutput)
         {
+            return;
+        }
+        if(!varDecl->findModifier<OutModifier>())
+        {
+            getSink()->diagnose(varDecl, Diagnostics::meshOutputMustBeOut);
+        }
+
+        //
+        // If necessary, convert to our typed representation
+        //
+        if(!modifier)
+        {
+            return;
+        }
+        if(meshOutputType)
+        {
+            getSink()->diagnose(modifier, Diagnostics::unnecessaryHLSLMeshOutputModifier);
             return;
         }
         auto indexExpr = as<IndexExpr>(varDecl->type.exp);
@@ -5427,7 +5447,7 @@ namespace Slang
             nullptr,
             getSink());
 
-        Type* d = m_astBuilder->getMeshOutputTypeFromModifier(mod, base, index);
+        Type* d = m_astBuilder->getMeshOutputTypeFromModifier(modifier, base, index);
         varDecl->type.type = d;
     }
 
