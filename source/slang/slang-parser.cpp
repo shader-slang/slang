@@ -2109,6 +2109,26 @@ namespace Slang
         return parseForwardDifferentiate(parser);
     }
 
+        /// Parse an expression of the form __bwd_diff(fn) where fn is an 
+        /// identifier pointing to a function.
+    static Expr* parseBackwardDifferentiate(Parser* parser)
+    {
+        BackwardDifferentiateExpr* bwdDiffExpr = parser->astBuilder->create<BackwardDifferentiateExpr>();
+
+        parser->ReadToken(TokenType::LParent);
+
+        bwdDiffExpr->baseFunction = parser->ParseExpression();
+
+        parser->ReadToken(TokenType::RParent);
+
+        return bwdDiffExpr;
+    }
+
+    static NodeBase* parseBackwardDifferentiate(Parser* parser, void* /* unused */)
+    {
+        return parseBackwardDifferentiate(parser);
+    }
+
         /// Parse a `This` type expression
     static Expr* parseThisTypeExpr(Parser* parser)
     {
@@ -6646,7 +6666,8 @@ namespace Slang
         _makeParseExpr("none", parseNoneExpr),
         _makeParseExpr("try",     parseTryExpr),
         _makeParseExpr("__TaggedUnion", parseTaggedUnionType),
-        _makeParseExpr("__fwd_diff", parseForwardDifferentiate)
+        _makeParseExpr("__fwd_diff", parseForwardDifferentiate),
+        _makeParseExpr("__bwd_diff", parseBackwardDifferentiate)
     };
 
     ConstArrayView<SyntaxParseInfo> getSyntaxParseInfos()

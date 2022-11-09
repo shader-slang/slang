@@ -9,6 +9,9 @@ attribute_syntax [ForwardDifferentiable] : ForwardDifferentiableAttribute;
 __attributeTarget(FunctionDeclBase)
 attribute_syntax [ForwardDerivative(function)]   : ForwardDerivativeAttribute;
 
+__attributeTarget(FunctionDeclBase)
+attribute_syntax [BackwardDifferentiable] : BackwardDifferentiableAttribute;
+
 
 __attributeTarget(FunctionDeclBase)
 attribute_syntax [ForwardDerivativeOf(function)]   : ForwardDerivativeOfAttribute;

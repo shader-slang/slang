@@ -1045,6 +1045,12 @@ class ForwardDerivativeOfAttribute : public Attribute
     Expr* backDeclRef; // DeclRef to this derivative function when initiated from primalFunction.
 };
 
+    /// The `[BackwardDifferentiable]` attribute indicates that a function can be backward-differentiated.
+class BackwardDifferentiableAttribute : public DifferentiableAttribute
+{
+    SLANG_AST_CLASS(BackwardDifferentiableAttribute)
+};
+
     /// Indicates that the modified declaration is one of the "magic" declarations
     /// that NVAPI uses to communicate extended operations. When NVAPI is being included
     /// via the prelude for downstream compilation, declarations with this modifier
