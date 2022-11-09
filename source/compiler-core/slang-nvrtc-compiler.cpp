@@ -241,15 +241,26 @@ static SlangResult _parseNVRTCLine(SliceAllocator& allocator, const UnownedStrin
         {
             severity = Severity::Warning;
         }
-        else if (split1.indexOf(toSlice("error")) >= 0)
+        else
         {
-            // If it contains 'error', I guess we'll assume it's an error.
-            severity = Severity::Error;
-        }
-        else if (split1.indexOf(toSlice("warning")) >= 0)
-        {
-            // If it contains 'warning' assume it's a warning.
-            severity = Severity::Warning;
+            // Fall back position to try and determine if this really is some kind of 
+            // error/warning without succeeding when it's due to some other property 
+            // of the output diagnostics. 
+            //
+            // Anything ending with " warning:" or " error:" in effect.
+            
+            // We can expand to include character after as this is split1, as must be followed by at a minimum 
+            // : (as the split has at least 3 parts).
+            const UnownedStringSlice expandSplit1(split1.begin(), split1.end() + 1);
+
+            if (expandSplit1.endsWith(toSlice(" error:")))
+            {
+                severity = Severity::Error;
+            }
+            else if (expandSplit1.endsWith(toSlice(" warning:")))
+            {
+                severity = Severity::Warning;
+            }
         }
 
         if (severity != Severity::Unknown)
