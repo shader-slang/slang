@@ -184,6 +184,9 @@ SLANG_NO_THROW SlangResult SLANG_MCALL DeviceImpl::initialize(const Desc& desc)
         m_features.add("half");
     }
 
+    cudaDeviceProp deviceProps;
+    cudaGetDeviceProperties(&deviceProps, m_deviceIndex);
+
     // Initialize DeviceInfo
     {
         m_info.deviceType = DeviceType::CUDA;
@@ -192,11 +195,40 @@ SLANG_NO_THROW SlangResult SLANG_MCALL DeviceImpl::initialize(const Desc& desc)
         m_info.apiName = "CUDA";
         static const float kIdentity[] = { 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1 };
         ::memcpy(m_info.identityProjectionMatrix, kIdentity, sizeof(kIdentity));
-        cudaDeviceProp deviceProperties;
-        cudaGetDeviceProperties(&deviceProperties, m_deviceIndex);
-        m_adapterName = deviceProperties.name;
+        m_adapterName = deviceProps.name;
         m_info.adapterName = m_adapterName.begin();
         m_info.timestampFrequency = 1000000;
+    }
+
+    // Get device limits.
+    {
+        DeviceLimits limits = {};
+        limits.maxTextureDimension1D = deviceProps.maxSurface1D;
+        limits.maxTextureDimension2D = Math::Min(deviceProps.maxSurface2D[0], deviceProps.maxSurface2D[1]);
+        limits.maxTextureDimension3D = Math::Min(deviceProps.maxSurface3D[0], Math::Min(deviceProps.maxSurface3D[1], deviceProps.maxSurface3D[2]));
+        limits.maxTextureDimensionCube = deviceProps.maxSurfaceCubemap;
+        limits.maxTextureArrayLayers = Math::Min(deviceProps.maxSurface1DLayered[2], deviceProps.maxSurface2DLayered[2]);
+
+        // limits.maxVertexInputElements
+        // limits.maxVertexInputElementOffset
+        // limits.maxVertexStreams
+        // limits.maxVertexStreamStride
+
+        limits.maxComputeThreadsPerGroup = deviceProps.maxThreadsPerBlock;
+        limits.maxComputeThreadGroupSize[0] = deviceProps.maxThreadsDim[0];
+        limits.maxComputeThreadGroupSize[1] = deviceProps.maxThreadsDim[1];
+        limits.maxComputeThreadGroupSize[2] = deviceProps.maxThreadsDim[2];
+        limits.maxComputeDispatchThreadGroups[0] = deviceProps.maxGridSize[0];
+        limits.maxComputeDispatchThreadGroups[1] = deviceProps.maxGridSize[1];
+        limits.maxComputeDispatchThreadGroups[2] = deviceProps.maxGridSize[2];
+
+        // limits.maxViewports
+        // limits.maxViewportDimensions
+        // limits.maxFramebufferDimensions
+
+        // limits.maxShaderVisibleSamplers
+
+        m_info.limits = limits;
     }
 
     return SLANG_OK;

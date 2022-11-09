@@ -321,6 +321,40 @@ Result DeviceImpl::initVulkanInstanceAndDevice(
     // Compute timestamp frequency.
     m_info.timestampFrequency = uint64_t(1e9 / basicProps.limits.timestampPeriod);
 
+    // Get device limits.
+    {
+        DeviceLimits limits = {};
+        limits.maxTextureDimension1D = basicProps.limits.maxImageDimension1D;
+        limits.maxTextureDimension2D = basicProps.limits.maxImageDimension2D;
+        limits.maxTextureDimension3D = basicProps.limits.maxImageDimension3D;
+        limits.maxTextureDimensionCube = basicProps.limits.maxImageDimensionCube;
+        limits.maxTextureArrayLayers = basicProps.limits.maxImageArrayLayers;
+
+        limits.maxVertexInputElements = basicProps.limits.maxVertexInputAttributes;
+        limits.maxVertexInputElementOffset = basicProps.limits.maxVertexInputAttributeOffset;
+        limits.maxVertexStreams = basicProps.limits.maxVertexInputBindings;
+        limits.maxVertexStreamStride = basicProps.limits.maxVertexInputBindingStride;
+
+        limits.maxComputeThreadsPerGroup = basicProps.limits.maxComputeWorkGroupInvocations;
+        limits.maxComputeThreadGroupSize[0] = basicProps.limits.maxComputeWorkGroupSize[0];
+        limits.maxComputeThreadGroupSize[1] = basicProps.limits.maxComputeWorkGroupSize[1];
+        limits.maxComputeThreadGroupSize[2] = basicProps.limits.maxComputeWorkGroupSize[2];
+        limits.maxComputeDispatchThreadGroups[0] = basicProps.limits.maxComputeWorkGroupCount[0];
+        limits.maxComputeDispatchThreadGroups[1] = basicProps.limits.maxComputeWorkGroupCount[1];
+        limits.maxComputeDispatchThreadGroups[2] = basicProps.limits.maxComputeWorkGroupCount[2];
+
+        limits.maxViewports = basicProps.limits.maxViewports;
+        limits.maxViewportDimensions[0] = basicProps.limits.maxViewportDimensions[0];
+        limits.maxViewportDimensions[1] = basicProps.limits.maxViewportDimensions[1];
+        limits.maxFramebufferDimensions[0] = basicProps.limits.maxFramebufferWidth;
+        limits.maxFramebufferDimensions[1] = basicProps.limits.maxFramebufferHeight;
+        limits.maxFramebufferDimensions[2] = basicProps.limits.maxFramebufferLayers;
+
+        limits.maxShaderVisibleSamplers = basicProps.limits.maxPerStageDescriptorSamplers;
+
+        m_info.limits = limits;
+    }
+
     // Get the API version
     const uint32_t majorVersion = VK_VERSION_MAJOR(basicProps.apiVersion);
     const uint32_t minorVersion = VK_VERSION_MINOR(basicProps.apiVersion);

@@ -234,6 +234,10 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         case RequirementWitness::Flavor::none:
             return RequirementWitness();
 
+        case RequirementWitness::Flavor::witnessTable:
+            SLANG_ASSERT(!subst);
+            return *this;
+
         case RequirementWitness::Flavor::declRef:
             {
                 int diff = 0;
@@ -321,16 +325,19 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         }
         else if (auto transitiveTypeWitness = as<TransitiveSubtypeWitness>(subtypeWitness))
         {
-            // Hard code witness entry that `T.Differential = DifferentialBottom` for `T` that
-            // coerce to `DifferentialBottom`.
-            if (astBuilder->getDifferentialBottomType()->equals(transitiveTypeWitness->subToMid->sup))
+            if (auto declaredSubtypeWitnessMidToSup = as<DeclaredSubtypeWitness>(transitiveTypeWitness->midToSup))
             {
-                if (auto builtinAttr = requirementKey->findModifier<BuiltinRequirementModifier>())
+                auto midKey = declaredSubtypeWitnessMidToSup->declRef;
+                auto midWitness = tryLookUpRequirementWitness(astBuilder, as<SubtypeWitness>(transitiveTypeWitness->subToMid), midKey);
+                if (midWitness.getFlavor() == RequirementWitness::Flavor::witnessTable)
                 {
-                    if (builtinAttr->kind == BuiltinRequirementKind::DifferentialType)
+                    auto table = midWitness.getWitnessTable();
+                    RequirementWitness result;
+                    if (table->requirementDictionary.TryGetValue(requirementKey, result))
                     {
-                        return RequirementWitness(astBuilder->getDifferentialBottomType());
+                        result = result.specialize(astBuilder, midKey.substitutions);
                     }
+                    return result;
                 }
             }
         }
