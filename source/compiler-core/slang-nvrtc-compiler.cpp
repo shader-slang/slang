@@ -228,47 +228,68 @@ static SlangResult _parseNVRTCLine(SliceAllocator& allocator, const UnownedStrin
     if (split.getCount() >= 3)
     {
         // tests/cuda/cuda-compile.cu(7): warning: variable "c" is used before its value is set
-
         const auto split1 = split[1].trim();
+
+        Severity severity = Severity::Unknown;
 
         if (split1 == toSlice("error") || 
             split1 == toSlice("catastrophic error"))
         {
-            outDiagnostic.severity = Severity::Error;
+            severity = Severity::Error;
         }
         else if (split1 == toSlice("warning"))
         {
-            outDiagnostic.severity = Severity::Warning;
+            severity = Severity::Warning;
         }
         else if (split1.indexOf(toSlice("error")) >= 0)
         {
             // If it contains 'error', I guess we'll assume it's an error.
-            outDiagnostic.severity = Severity::Error;
+            severity = Severity::Error;
         }
         else if (split1.indexOf(toSlice("warning")) >= 0)
         {
             // If it contains 'warning' assume it's a warning.
-            outDiagnostic.severity = Severity::Warning;
+            severity = Severity::Warning;
         }
-        else
+
+        if (severity != Severity::Unknown)
         {
-            // For now we'll assume it's an error
-            outDiagnostic.severity = Severity::Error;
+            // The text is everything following the : after the warning. 
+            UnownedStringSlice text(split[2].begin(), split.getLast().end());
+       
+            // Trim whitespace at start and end
+            text = text.trim();
+
+            // Set the diagnostic
+            outDiagnostic.severity = severity;
+            outDiagnostic.text = allocator.allocate(text);
+            SLANG_RETURN_ON_FAIL(_parseLocation(allocator, split[0], outDiagnostic));
+
+            return SLANG_OK;
         }
 
-        outDiagnostic.text = allocator.allocate(split[2].trim());
+        // TODO(JS): Note here if it's not possible to determine a line as being the main diagnostics
+        // we fall through to it potentially being a note.
+        //
+        // That could mean a valid diagnostic (from NVRTCs point of view) is ignored/noted, because this code
+        // can't parse it. Ideally that situation would lead to an error such that we can detect
+        // and things will fail.
+        // 
+        // So we might want to revisit this determination in the future.
+    }
 
-        SLANG_RETURN_ON_FAIL(_parseLocation(allocator, split[0], outDiagnostic));
-        return SLANG_OK;
-    }
-    else
+    // There isn't a diagnostic on this line
+    if (line.getLength() == 0 ||
+        line.trim().getLength() == 0)
     {
-        // Assume it's info
-        outDiagnostic.severity = Severity::Info;
-        outDiagnostic.text = allocator.allocate(line);
+        return SLANG_E_NOT_FOUND;
     }
-   
-    return SLANG_E_NOT_FOUND;
+
+    // We'll assume it's info, associated with a previous line
+    outDiagnostic.severity = Severity::Info;
+    outDiagnostic.text = allocator.allocate(line);
+
+    return SLANG_OK;
 }
 
 /* An implementation of Path::Visitor that can be used for finding NVRTC shared library installations. */
@@ -960,6 +981,8 @@ SlangResult NVRTCDownstreamCompiler::compile(const DownstreamCompileOptions& opt
             }
             else if (lineRes != SLANG_E_NOT_FOUND)
             {
+                // If there is an error exit
+                // But if SLANG_E_NOT_FOUND that just means this line couldn't be parsed, so ignore.
                 return lineRes;
             }
         }
