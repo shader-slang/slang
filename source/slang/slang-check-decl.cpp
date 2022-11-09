@@ -5855,7 +5855,11 @@ namespace Slang
             // without any additional substitutions.
             if (extDecl->targetType->equals(type))
             {
-                return extDeclRef;
+                auto subst = trySolveConstraintSystem(
+                    &constraints,
+                    DeclRef<Decl>(extGenericDecl, nullptr).as<GenericDecl>(),
+                    as<GenericSubstitution>(as<DeclRefType>(type)->declRef.substitutions.substitutions));
+                return DeclRef<Decl>(extDecl, subst).as<ExtensionDecl>();
             }
 
             if (!TryUnifyTypes(constraints, extDecl->targetType.Ptr(), type))

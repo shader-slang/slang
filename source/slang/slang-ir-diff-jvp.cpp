@@ -681,6 +681,17 @@ struct JVPTranscriber
         return builder->getFuncType(newParameterTypes, diffReturnType);
     }
 
+    IRWitnessTable* getDifferentialBottomWitness()
+    {
+        IRBuilder builder(sharedBuilder);
+        builder.setInsertInto(sharedBuilder->getModule()->getModuleInst());
+        auto result =
+            as<IRWitnessTable>(differentiableTypeConformanceContext.lookUpConformanceForType(
+                builder.getDifferentialBottomType()));
+        SLANG_ASSERT(result);
+        return result;
+    }
+
     // Get or construct `:IDifferentiable` conformance for a DifferentiablePair.
     IRWitnessTable* getDifferentialPairWitness(IRInst* inDiffPairType)
     {
@@ -688,23 +699,20 @@ struct JVPTranscriber
         builder.setInsertInto(inDiffPairType->parent);
         auto diffPairType = as<IRDifferentialPairType>(inDiffPairType);
         SLANG_ASSERT(diffPairType);
-        auto diffType = differentiateType(&builder, diffPairType->getValueType());
+        auto result =
+            as<IRWitnessTable>(differentiableTypeConformanceContext.lookUpConformanceForType(
+                builder.getDifferentialBottomType()));
+        if (result)
+            return result;
 
-        IRInst* tableInst = nullptr;
-        if (!differentiableTypeConformanceContext.differentiableWitnessDictionary.TryGetValue(diffPairType, tableInst))
-        {
-            IRWitnessTable* table = builder.createWitnessTable(autoDiffSharedContext->differentiableInterfaceType, diffPairType);
-            // The witness that `diffType` 
-            auto differentialType = builder.getDifferentialPairType(
-                diffType,
-                differentiableTypeConformanceContext.differentiableWitnessDictionary[diffType]
-                .GetValue());
-            builder.createWitnessTableEntry(table, autoDiffSharedContext->differentialAssocTypeStructKey, differentialType);
-            // Omit the method synthesis here, since we can just intercept those directly at `getXXMethodForType`.
-            differentiableTypeConformanceContext.differentiableWitnessDictionary[diffPairType] = table;
-            tableInst = table;
-        }
-        return as<IRWitnessTable>(tableInst);
+        auto table = builder.createWitnessTable(autoDiffSharedContext->differentiableInterfaceType, diffPairType);
+        auto diffType = differentiateType(&builder, diffPairType->getValueType());
+        auto differentialType = builder.getDifferentialPairType(diffType, getDifferentialBottomWitness());
+        builder.createWitnessTableEntry(table, autoDiffSharedContext->differentialAssocTypeStructKey, differentialType);
+        // Omit the method synthesis here, since we can just intercept those directly at `getXXMethodForType`.
+
+        differentiableTypeConformanceContext.differentiableWitnessDictionary[diffPairType] = table;
+        return table;
     }
 
     IRType* getOrCreateDiffPairType(IRInst* primalType, IRInst* witness)
@@ -722,10 +730,8 @@ struct JVPTranscriber
         builder.setInsertInto(primalType->parent);
         auto witness = as<IRWitnessTable>(
             differentiableTypeConformanceContext.lookUpConformanceForType((IRType*)primalType));
-        if (!witness && as<IRDifferentialPairType>(primalType))
-        {
-            witness = getDifferentialPairWitness(primalType);
-        }
+        if (!witness)
+            witness = getDifferentialBottomWitness();
         return builder.getDifferentialPairType(
             (IRType*)primalType,
             witness);
@@ -1612,30 +1618,25 @@ struct JVPTranscriber
 
     InstPair transcribeIfElse(IRBuilder* builder, IRIfElse* origIfElse)
     {
-        // The loop comes with three blocks.. we just need to transcribe each one
-        // and assemble the new loop instruction.
+        // IfElse Statements come with 4 blocks. We transcribe each block into it's
+        // linear form, and then wire them up in the same way as the original if-else
         
-        // Transcribe the target block (this is the 'condition' part of the loop, which
-        // will branch into the loop body).
-        // Note that for the condition we use the primal inst (condition values should not have a 
-        // differential)
+        // Transcribe condition block
         auto primalConditionBlock = findOrTranscribePrimalInst(builder, origIfElse->getCondition());
         SLANG_ASSERT(primalConditionBlock);
 
-        // Transcribe the break block (this is the block after the exiting the loop)
+        // Transcribe 'true' block (condition block branches into this if true)
         auto diffTrueBlock = findOrTranscribeDiffInst(builder, origIfElse->getTrueBlock());
         SLANG_ASSERT(diffTrueBlock);
 
-        // Transcribe the continue block (this is the 'update' part of the loop, which will
-        // branch into the condition block)
+        // Transcribe 'false' block (condition block branches into this if true)
+        // TODO (sai): What happens if there's no false block?
         auto diffFalseBlock = findOrTranscribeDiffInst(builder, origIfElse->getFalseBlock());
         SLANG_ASSERT(diffFalseBlock);
 
-        // Transcribe the continue block (this is the 'update' part of the loop, which will
-        // branch into the condition block)
+        // Transcribe 'after' block (true and false blocks branch into this)
         auto diffAfterBlock = findOrTranscribeDiffInst(builder, origIfElse->getAfterBlock());
         SLANG_ASSERT(diffAfterBlock);
-
         
         List<IRInst*> diffIfElseArgs;
         diffIfElseArgs.add(primalConditionBlock);
@@ -2199,41 +2200,29 @@ struct JVPDerivativeContext : public InstPassBase
     bool processPairTypes(IRBuilder* builder, IRInst* instWithChildren)
     {
         bool modified = false;
-        // Hoist and deduplicate all pair types to global scope when possible.
-        // This avoids emitting different struct types for equivalent pair types.
+        // Hoist all pair types to global scope when possible.
         auto moduleInst = module->getModuleInst();
-        Dictionary<IRInst*, IRInst*> diffPairTypes;
-        for (;;)
-        {
-            bool changed = false;
-            sharedBuilderStorage.deduplicateAndRebuildGlobalNumberingMap();
-            processInstsOfType<IRDifferentialPairType>(kIROp_DifferentialPairType, [&](IRDifferentialPairType* originalPairType)
+        processInstsOfType<IRDifferentialPairType>(kIROp_DifferentialPairType, [&](IRInst* originalPairType)
+            {
+                if (originalPairType->parent != moduleInst)
                 {
-                    IRInst* finalType = nullptr;
-                    if (diffPairTypes.TryGetValue(originalPairType->getValueType(), finalType))
+                    originalPairType->removeFromParent();
+                    ShortList<IRInst*> operands;
+                    for (UInt i = 0; i < originalPairType->getOperandCount(); i++)
                     {
-                        if (finalType != originalPairType)
-                        {
-                            originalPairType->replaceUsesWith(finalType);
-                            originalPairType->removeAndDeallocate();
-                            changed = true;
-                            return;
-                        }
+                        operands.add(originalPairType->getOperand(i));
                     }
-                    diffPairTypes[originalPairType->getValueType()] = originalPairType;
-                    if (originalPairType->parent != moduleInst)
-                    {
-                        if (originalPairType->getValueType()->getParent() != originalPairType->getParent())
-                        {
-                            originalPairType->insertAfter(originalPairType->getValueType());
-                            changed = true;
-                            return;
-                        }
-                    }
-                });
-            if (!changed)
-                break;
-        }
+                    auto newPairType = builder->findOrEmitHoistableInst(
+                        originalPairType->getFullType(),
+                        originalPairType->getOp(),
+                        originalPairType->getOperandCount(),
+                        operands.getArrayView().getBuffer());
+                    originalPairType->replaceUsesWith(newPairType);
+                    originalPairType->removeAndDeallocate();
+                }
+            });
+
+        sharedBuilderStorage.deduplicateAndRebuildGlobalNumberingMap();
 
         processAllInsts([&](IRInst* inst)
             {
