@@ -738,8 +738,11 @@ void GLSLSourceEmitter::_emitGLSLTypePrefix(IRType* type, bool promoteHalfToFloa
     }
 }
 
-void GLSLSourceEmitter::_maybeEmitGLSLBuiltin(IRInst* var, UnownedStringSlice name)
+void GLSLSourceEmitter::_maybeEmitGLSLBuiltin(IRGlobalParam* var, UnownedStringSlice name)
 {
+    // It's important for us to redeclare these mesh output builtins with an
+    // explicit array size to allow indexing into them with a variable
+    // according to the rules of GLSL.
     if(name == "gl_MeshPrimitivesEXT" || name == "gl_MeshVerticesEXT")
     {
         // GLSL doesn't allow us to specify the struct outside the block
@@ -776,7 +779,23 @@ void GLSLSourceEmitter::_maybeEmitGLSLBuiltin(IRInst* var, UnownedStringSlice na
         emitArrayBrackets(arrayType);
         m_writer->emit(";\n\n");
     }
-    // Otherwise, do no redeclare anything
+    else if(name == "gl_PrimitivePointIndicesEXT"
+            || name == "gl_PrimitiveLineIndicesEXT"
+            || name == "gl_PrimitiveTriangleIndicesEXT")
+    {
+        // GLSL has some specific requirements about how these are declared,
+        // Do it manually here to avoid `emitGlobalParam` emitting
+        // decorations/layout we are not allowed to output.
+        auto varType = composeGetters<IRType>(
+                var,
+                &IRGlobalParam::getDataType,
+                &IROutTypeBase::getValueType);
+        SLANG_ASSERT(varType && "Indices mesh output dind't have an 'out' type");
+
+        m_writer->emit("out ");
+        emitType(varType, getName(var));
+        m_writer->emit(";\n\n");
+    }
 }
 
 void GLSLSourceEmitter::_requireBaseType(BaseType baseType)

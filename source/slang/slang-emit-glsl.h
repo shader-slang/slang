@@ -65,7 +65,7 @@ protected:
 
     void _emitGLSLTypePrefix(IRType* type, bool promoteHalfToFloat = false);
 
-    void _maybeEmitGLSLBuiltin(IRInst* var, UnownedStringSlice name);
+    void _maybeEmitGLSLBuiltin(IRGlobalParam* var, UnownedStringSlice name);
 
     void _requireGLSLExtension(const UnownedStringSlice& name);
 
