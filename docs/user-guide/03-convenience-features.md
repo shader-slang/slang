@@ -220,7 +220,7 @@ int test()
 Slang currently supports overloading the following operators: `+`, `-`, `*`, `/`, `%`, `&`, `|`, `<`, `>`, `<=`, `>=`, `==`, `!=`, unary `-`, `~` and `!`. Please note that the `&&` and `||` operators are not supported.
 
 
-## Subscrit Operator
+## Subscript Operator
 
 Slang allows overriding `operator[]` with `__subscript` syntax:
 ```csharp
