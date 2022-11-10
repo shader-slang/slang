@@ -1,4 +1,4 @@
-// multi-level-break.slang
+// general-inline.slang
 
 //TEST(compute):COMPARE_COMPUTE: -shaderobj
 //TEST(compute):COMPARE_COMPUTE: -vk -shaderobj

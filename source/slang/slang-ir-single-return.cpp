@@ -54,7 +54,8 @@ struct SingleReturnContext : public InstPassBase
         {
             loopHeaderBlock->addParam(param);
         }
-        auto loopInst = (IRLoop*)builder.emitLoop(originalStartBlock, breakBlock, originalStartBlock);
+
+        builder.emitLoop(originalStartBlock, breakBlock, originalStartBlock);
 
         // Now replace all return insts as break insts.
         processChildInstsOfType<IRReturn>(kIROp_Return, func, [&](IRReturn* returnInst)
@@ -81,16 +82,6 @@ struct SingleReturnContext : public InstPassBase
             builder.emitReturn(retValParam);
         else
             builder.emitReturn();
-
-        // Now run the multi-level-break pass.
-        eliminateMultiLevelBreakForFunc(module, func);
-
-        // Now remove the trivial loop header.
-        SLANG_RELEASE_ASSERT(loopInst->getContinueBlock() == loopInst->getTargetBlock());
-        auto targetBlock = loopInst->getTargetBlock();
-        for (auto param : params)
-            targetBlock->addParam(param);
-        loopHeaderBlock->removeAndDeallocate();
     }
 };
 

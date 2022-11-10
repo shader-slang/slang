@@ -159,8 +159,9 @@ namespace Slang
 
             v->firstUse = this;
         }
-
+#ifdef SLANG_ENABLE_FULL_IR_VALIDATION
         debugValidate();
+#endif
     }
 
     void IRUse::set(IRInst* uv)
@@ -172,13 +173,15 @@ namespace Slang
     {
         // This `IRUse` is part of the linked list
         // of uses for  `usedValue`.
-
+#ifdef SLANG_ENABLE_FULL_IR_VALIDATION
         debugValidate();
+#endif
 
         if (usedValue)
         {
+#ifdef SLANG_ENABLE_FULL_IR_VALIDATION
             auto uv = usedValue;
-
+#endif
             *prevLink = nextUse;
             if(nextUse)
             {
@@ -190,8 +193,11 @@ namespace Slang
             nextUse     = nullptr;
             prevLink    = nullptr;
 
+#ifdef SLANG_ENABLE_FULL_IR_VALIDATION
             if(uv->firstUse)
                 uv->firstUse->debugValidate();
+#endif
+
         }
     }
 
