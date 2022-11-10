@@ -31,7 +31,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 
     DifferentialPair<A> dpa = DifferentialPair<A>({p, q}, {dp, dq});
 
-    __fwd_diff(g)(DifferentialPair<A>({p, q}, {dp, dq}), dpa);
+    __fwd_diff(g)(DifferentialPair<A>( { p, q }, { dp, dq }), dpa);
 
     outputBuffer[0] = dpa.p.p; // Expect: 0
     outputBuffer[1] = dpa.d.q.x; // Expect: 0

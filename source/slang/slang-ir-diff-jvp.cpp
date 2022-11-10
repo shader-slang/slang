@@ -333,16 +333,33 @@ struct DifferentialPairTypeBuilder
 
     IRInst* emitFieldAccessor(IRBuilder* builder, IRInst* baseInst, IRStructKey* key)
     {
-        auto baseTypeInfo = lowerDiffPairType(builder, baseInst->getDataType());
-        if (baseTypeInfo.isTrivial)
+        IRInst* pairType = nullptr;
+        if (auto basePtrType = as<IRPtrTypeBase>(baseInst->getDataType()))
         {
-            if (key == globalPrimalKey)
-                return baseInst;
-            else
-                return builder->getDifferentialBottom();
+            auto baseTypeInfo = lowerDiffPairType(builder, basePtrType->getValueType());
+
+            // TODO(sai): Not sure at the moment how to handle diff-bottom pointer types,
+            // especially since we probably don't need diff bottom anymore.
+            // 
+            SLANG_ASSERT(!baseTypeInfo.isTrivial);
+
+            pairType = builder->getPtrType(kIROp_PtrType, (IRType*)baseTypeInfo.loweredType);
+        }
+        else
+        {
+            auto baseTypeInfo = lowerDiffPairType(builder, baseInst->getDataType());
+            if (baseTypeInfo.isTrivial)
+            {
+                if (key == globalPrimalKey)
+                    return baseInst;
+                else
+                    return builder->getDifferentialBottom();
+            }
+
+            pairType = baseTypeInfo.loweredType;
         }
 
-        if (auto basePairStructType = as<IRStructType>(baseTypeInfo.loweredType))
+        if (auto basePairStructType = as<IRStructType>(pairType))
         {
             return as<IRFieldExtract>(builder->emitFieldExtract(
                     findField(basePairStructType, key)->getFieldType(),
@@ -350,7 +367,7 @@ struct DifferentialPairTypeBuilder
                     key
                 ));
         }
-        else if (auto ptrType = as<IRPtrTypeBase>(baseTypeInfo.loweredType))
+        else if (auto ptrType = as<IRPtrTypeBase>(pairType))
         {
             if (auto ptrInnerSpecializedType = as<IRSpecialize>(ptrType->getValueType()))
             {
@@ -376,7 +393,7 @@ struct DifferentialPairTypeBuilder
                     key));
             }
         }
-        else if (auto specializedType = as<IRSpecialize>(baseTypeInfo.loweredType))
+        else if (auto specializedType = as<IRSpecialize>(pairType))
         {
             // TODO: Stopped here -> The type being emitted is incorrect. don't emit the generic's
             // type, emit the specialization type.
@@ -864,7 +881,7 @@ struct JVPTranscriber
 
             SLANG_ASSERT(diffPairParam);
 
-            if (auto pairType = as<IRDifferentialPairType>(diffPairParam->getDataType()))
+            if (auto pairType = as<IRDifferentialPairType>(diffPairType))
             {
                 return InstPair(
                     builder->emitDifferentialPairGetPrimal(diffPairParam),
@@ -872,12 +889,18 @@ struct JVPTranscriber
                         (IRType*)pairBuilder->getDiffTypeFromPairType(builder, pairType),
                         diffPairParam));
             }
-            // If this is an `in/inout DifferentialPair<>` parameter, we can't produce
-            // its primal and diff parts right now because they would represent a reference
-            // to a pair field, which doesn't make sense since pair types are considered mutable.
-            // We encode the result as if the param is non-differentiable, and handle it
-            // with special care at load/store.
-            return InstPair(diffPairParam, nullptr);
+            else if (auto pairPtrType = as<IRPtrTypeBase>(diffPairType))
+            {
+                auto ptrInnerPairType = as<IRDifferentialPairType>(pairPtrType->getValueType());
+
+                return InstPair(
+                    builder->emitDifferentialPairAddressPrimal(diffPairParam),
+                    builder->emitDifferentialPairAddressDifferential(
+                        builder->getPtrType(
+                            kIROp_PtrType,
+                            (IRType*)pairBuilder->getDiffTypeFromPairType(builder, ptrInnerPairType)),
+                        diffPairParam));
+            }
         }
         
         
@@ -1008,6 +1031,7 @@ struct JVPTranscriber
         {
             // Special case load from an `out` param, which will not have corresponding `diff` and
             // `primal` insts yet.
+            
             auto load = builder->emitLoad(primalPtr);
             auto primalElement = builder->emitDifferentialPairGetPrimal(load);
             auto diffElement = builder->emitDifferentialPairGetDifferential(
@@ -2170,7 +2194,13 @@ struct JVPDerivativeContext : public InstPassBase
     {
         if (auto getDiffInst = as<IRDifferentialPairGetDifferential>(inst))
         {
-            if (lowerPairType(builder, getDiffInst->getBase()->getDataType(), nullptr))
+            auto pairType = getDiffInst->getBase()->getDataType();
+            if (auto pairPtrType = as<IRPtrTypeBase>(pairType))
+            {
+                pairType = pairPtrType->getValueType();
+            }
+
+            if (lowerPairType(builder, pairType, nullptr))
             {
                 builder->setInsertBefore(getDiffInst);
                 IRInst* diffFieldExtract = nullptr;
@@ -2182,7 +2212,13 @@ struct JVPDerivativeContext : public InstPassBase
         }
         else if (auto getPrimalInst = as<IRDifferentialPairGetPrimal>(inst))
         {
-            if (lowerPairType(builder, getPrimalInst->getBase()->getDataType(), nullptr))
+            auto pairType = getPrimalInst->getBase()->getDataType();
+            if (auto pairPtrType = as<IRPtrTypeBase>(pairType))
+            {
+                pairType = pairPtrType->getValueType();
+            }
+
+            if (lowerPairType(builder, pairType, nullptr))
             {
                 builder->setInsertBefore(getPrimalInst);
 

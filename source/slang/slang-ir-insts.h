@@ -2604,6 +2604,8 @@ public:
     IRInst* emitMakeOptionalNone(IRInst* optType, IRInst* defaultValue);
     IRInst* emitDifferentialPairGetDifferential(IRType* diffType, IRInst* diffPair);
     IRInst* emitDifferentialPairGetPrimal(IRInst* diffPair);
+    IRInst* emitDifferentialPairAddressDifferential(IRType* diffType, IRInst* diffPair);
+    IRInst* emitDifferentialPairAddressPrimal(IRInst* diffPair);
     IRInst* emitMakeVector(
         IRType*         type,
         UInt            argCount,

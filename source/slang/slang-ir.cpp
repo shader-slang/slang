@@ -3425,11 +3425,31 @@ namespace Slang
             &diffPair);
     }
 
+    IRInst* IRBuilder::emitDifferentialPairAddressDifferential(IRType* diffType, IRInst* diffPair)
+    {
+        return emitIntrinsicInst(
+            diffType,
+            kIROp_DifferentialPairGetDifferential,
+            1,
+            &diffPair);
+    }
+
     IRInst* IRBuilder::emitDifferentialPairGetPrimal(IRInst* diffPair)
     {
         auto valueType = as<IRDifferentialPairType>(diffPair->getDataType())->getValueType();
         return emitIntrinsicInst(
             valueType,
+            kIROp_DifferentialPairGetPrimal,
+            1,
+            &diffPair);
+    }
+
+    IRInst* IRBuilder::emitDifferentialPairAddressPrimal(IRInst* diffPair)
+    {
+        auto valueType = as<IRDifferentialPairType>(
+            as<IRPtrTypeBase>(diffPair->getDataType())->getValueType())->getValueType();
+        return emitIntrinsicInst(
+            this->getPtrType(kIROp_PtrType, valueType),
             kIROp_DifferentialPairGetPrimal,
             1,
             &diffPair);
