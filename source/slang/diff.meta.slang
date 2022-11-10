@@ -86,9 +86,6 @@ struct DifferentialPair : IDifferentiable
 };
 
 
-#define VECTOR_MAP_UNARY(TYPE, COUNT, FUNC, VALUE) \
-    vector<TYPE,COUNT> result; for(int i = 0; i < COUNT; ++i) { result[i] = FUNC(VALUE[i]); } return result
-
 #define VECTOR_MAP_D_UNARY(TYPE, COUNT, D_FUNC, VALUE) \
     vector<TYPE, COUNT> result; \
     vector<TYPE, COUNT>.Differential d_result; \
@@ -161,95 +158,39 @@ DifferentialPair<vector<T, N>> __d_abs_vector(DifferentialPair<vector<T, N>> dpx
 
 __generic<T : __BuiltinFloatingPointType>
 [ForwardDerivativeOf(sin)]
-DifferentialPair<T> d_sin(DifferentialPair<T> dpx)
+DifferentialPair<T> __d_sin(DifferentialPair<T> dpx)
 {
     return DifferentialPair<T>(
         sin(dpx.p),
         T.dmul(cos(dpx.p), dpx.d));
 }
 
+__generic<T : __BuiltinFloatingPointType, let N : int>
+[ForwardDerivativeOf(sin)]
+DifferentialPair<vector<T, N>> __d_sin_vector(DifferentialPair<vector<T, N>> dpx)
+{
+    VECTOR_MAP_D_UNARY(T, N, __d_sin, dpx);
+}
+
+// Cosine
+
 __generic<T : __BuiltinFloatingPointType>
 [ForwardDerivativeOf(cos)]
-DifferentialPair<T> d_cos(DifferentialPair<T> dpx)
+DifferentialPair<T> __d_cos(DifferentialPair<T> dpx)
 {
     return DifferentialPair<T>(
         cos(dpx.p),
         T.dmul(-sin(dpx.p), dpx.d));
 }
 
+__generic<T : __BuiltinFloatingPointType, let N : int>
+[ForwardDerivativeOf(cos)]
+DifferentialPair<vector<T, N>> __d_cos_vector(DifferentialPair<vector<T, N>> dpx)
+{
+    VECTOR_MAP_D_UNARY(T, N, __d_cos, dpx);
+}
+
 /*
-
-
-    // Extract sign of value
-    __generic<T : IDFloat>
-    __target_intrinsic(hlsl)
-    __target_intrinsic(glsl, "int(sign($0))")
-    __target_intrinsic(cuda, "$P_sign($0)")
-    __target_intrinsic(cpp, "$P_sign($0)")
-    __target_intrinsic(spirv_direct, "12 resultType resultId glsl450 fi(6,7) _0")
-    [ForwardDerivative(d_sign<T>)]
-    T sign(T x);
-
-    __generic<T : IDFloat>
-    DifferentialPair<T> d_sign(DifferentialPair<T> dpx)
-    {
-        return DifferentialPair<T>(
-            sign(dpx.p()),
-            T.dzero()
-        );
-    }
-
-    __generic<let N : int>
-    __target_intrinsic(hlsl)
-    __target_intrinsic(glsl)
-    __target_intrinsic(spirv_direct, "12 resultType resultId glsl450 fi(6,7) _0")
-    [ForwardDerivative(d_sign_vector)]
-    vector<float, N> sign(vector<float, N> x)
-    {
-        VECTOR_MAP_UNARY(N, dstd.sign, x);
-    }
-
-    __generic<let N : int>
-    DifferentialPair<vector<float, N>> d_sign_vector(DifferentialPair<vector<float, N>> dpx)
-    {
-        VECTOR_MAP_D_UNARY(N, dstd.d_sign, dpx);
-    }
-
-
-
-    // Natural Exponent
-    __generic<T : IDFloat>
-    __target_intrinsic(hlsl)
-    __target_intrinsic(glsl)
-    __target_intrinsic(cuda, "$P_exp($0)")
-    __target_intrinsic(cpp, "$P_exp($0)")
-    __target_intrinsic(spirv_direct, "12 resultType resultId glsl450 27 _0")
-    [ForwardDerivative(d_exp<T>)]
-    T exp(T x);
-
-    __generic<T : IDFloat>
-    DifferentialPair<T> d_exp(DifferentialPair<T> dpx)
-    {
-        return DifferentialPair<T>(
-            exp(dpx.p()),
-            T.dmul(exp(dpx.p()), dpx.d()));
-    }
-
-    __generic<let N : int>
-    __target_intrinsic(hlsl)
-    __target_intrinsic(glsl)
-    __target_intrinsic(spirv_direct, "12 resultType resultId glsl450 27 _0")
-    [ForwardDerivative(d_exp_vector)]
-    vector<float, N> exp(vector<float, N> x)
-    {
-        VECTOR_MAP_UNARY(N, dstd.exp, x);
-    }
-
-    __generic<let N : int>
-    DifferentialPair<vector<float, N>> d_exp_vector(DifferentialPair<vector<float, N>> dpx)
-    {
-        VECTOR_MAP_D_UNARY(N, dstd.d_exp, dpx);
-    }
 
     // Base-e logarithm
     // TODO: vectorize
@@ -269,44 +210,6 @@ DifferentialPair<T> d_cos(DifferentialPair<T> dpx)
             log(dpx.p()),
             T.dmul(T(1.0) / dpx.p(), dpx.d())
         );
-    }
-
-    // Sine
-    // TODO: vectorize
-    __generic<T : IDFloat>
-    __target_intrinsic(hlsl)
-    __target_intrinsic(glsl)
-    __target_intrinsic(cuda, "$P_sin($0)")
-    __target_intrinsic(cpp, "$P_sin($0)")
-    __target_intrinsic(spirv_direct, "12 resultType resultId glsl450 13 _0")
-    [ForwardDerivative(d_sin<T>)]
-    T sin(T x);
-
-    __generic<T : IDFloat>
-    DifferentialPair<T> d_sin(DifferentialPair<T> dpx)
-    {
-        return DifferentialPair<T>(
-            sin(dpx.p()),
-            T.dmul(cos(dpx.p()), dpx.d()));
-    }
-
-    // Cosine
-    // TODO: vectorize
-    __generic<T : IDFloat>
-    __target_intrinsic(hlsl)
-    __target_intrinsic(glsl)
-    __target_intrinsic(cuda, "$P_cos($0)")
-    __target_intrinsic(cpp, "$P_cos($0)")
-    __target_intrinsic(spirv_direct, "12 resultType resultId glsl450 14 _0")
-    [ForwardDerivative(d_cos<T>)]
-    T cos(T x);
-
-    __generic<T : IDFloat>
-    DifferentialPair<T> d_cos(DifferentialPair<T> dpx)
-    {
-        return DifferentialPair<T>(
-            cos(dpx.p()),
-            T.dmul(-sin(dpx.p()), dpx.d()));
     }
 
     // Sqrt root
