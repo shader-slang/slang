@@ -19,6 +19,9 @@ BreakableRegion* findBreakableRegion(Region* region)
     }
 }
 
+// Test if a loop is trivial: a trivial loop runs for a single iteration without any back edges, and
+// there is only one break out of the loop at the very end. The function generates `regionTree` if
+// it is needed and hasn't been generated yet.
 bool isTrivialSingleIterationLoop(IRGlobalValueWithCode* func, IRLoop* loop, RefPtr<RegionTree>& regionTree)
 {
     auto targetBlock = loop->getTargetBlock();
@@ -113,7 +116,7 @@ bool processFunc(IRGlobalValueWithCode* func)
                 }
 
                 // If there isn't any actual back jumps into loop target and there is a trivial
-                // break at the end of the loop out of it, we can remove the header and turn it into
+                // break at the end of the loop, we can remove the header and turn it into
                 // a normal branch.
                 auto targetBlock = loop->getTargetBlock();
                 if (isTrivialSingleIterationLoop(func, loop, regionTree))
@@ -128,6 +131,7 @@ bool processFunc(IRGlobalValueWithCode* func)
                     loop->removeAndDeallocate();
                 }
             }
+
             // If `block` does not end with an unconditional branch, bail.
             if (block->getTerminator()->getOp() != kIROp_unconditionalBranch)
                 break;
