@@ -33,9 +33,9 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 
     __fwd_diff(g)(DifferentialPair<A>( { p, q }, { dp, dq }), dpa);
 
-    outputBuffer[0] = dpa.p.p; // Expect: 0
-    outputBuffer[1] = dpa.d.q.x; // Expect: 0
-    outputBuffer[2] = dpa.d.q.y; // Expect: 0
-    outputBuffer[3] = dpa.d.q.z; // Expect: 0
+    outputBuffer[0] = dpa.p.p; // Expect: 4.0
+    outputBuffer[1] = dpa.d.q.x; // Expect: 6.5
+    outputBuffer[2] = dpa.d.q.y; // Expect: 8.5
+    outputBuffer[3] = dpa.d.q.z; // Expect: 11.25
 
 }
