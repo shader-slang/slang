@@ -711,6 +711,10 @@ INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
         /// generated derivative function.
     INST(BackwardDifferentiableDecoration, backwardDifferentiable, 1, 0)
 
+        /// Used by the auto-diff pass to hold a reference to the
+        /// generated derivative function.
+    INST(BackwardDerivativeDecoration, backwardDiffReference, 1, 0)
+
         /// Used by the auto-diff pass to hold a reference to a
         /// differential member of a type in its associated differential type.
     INST(DerivativeMemberDecoration, derivativeMemberDecoration, 1, 0)
