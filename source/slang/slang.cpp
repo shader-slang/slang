@@ -49,6 +49,8 @@
 
 #include "../../slang-tag-version.h"
 
+#include <sys/stat.h>
+
 // Used to print exception type names in internal-compiler-error messages
 #include <typeinfo>
 
@@ -1898,13 +1900,9 @@ protected:
     // by applications to decide when they need to "hot reload"
     // their shader code.
     //
-    void handleFileDependency(String const& path, ISlangBlob* sourceBlob) SLANG_OVERRIDE
+    void handleFileDependency(String const& path) SLANG_OVERRIDE
     {
         m_module->addFilePathDependency(path);
-        if (sourceBlob)
-        {
-            m_module->getContentsDigestBuilder().addToDigest(sourceBlob);
-        }
     }
 
     // The second task that this handler deals with is detecting
@@ -3046,10 +3044,6 @@ RefPtr<Module> Linkage::loadModule(
         return nullptr;
     }
 
-    auto builder = module->getContentsDigestBuilder();
-    builder.addToDigest(sourceBlob);
-    module->setContentsDigest(builder.finalize());
-
     return module;
 }
 
@@ -3269,7 +3263,33 @@ void Module::updateDependencyBasedHash(
 
 void Module::updateContentsBasedHash(DigestBuilder& builder)
 {
-    builder.addToDigest(getContentsDigest());
+    auto filePathDependencies = getFilePathDependencies();
+
+    DigestBuilder lastModifiedBuilder;
+    for (auto file : filePathDependencies)
+    {
+        struct stat fileStatus;
+        stat(file.getBuffer(), &fileStatus);
+        lastModifiedBuilder.addToDigest(fileStatus.st_mtime);
+    }
+
+    slang::Digest temp = lastModifiedBuilder.finalize();
+    if (temp != lastModifiedDigest)
+    {
+        // Changes were made to at least one of the file dependencies, so we will need to
+        // re-generate the contents digest and save the new digest.
+        DigestBuilder contentsBuilder;
+        for (auto file : filePathDependencies)
+        {
+            List<uint8_t> fileContents;
+            File::readAllBytes(file, fileContents);
+            contentsBuilder.addToDigest(fileContents);
+        }
+        contentsDigest = contentsBuilder.finalize();
+        lastModifiedDigest = temp;
+    }
+
+    builder.addToDigest(contentsDigest);
 }
 
 void Module::addModuleDependency(Module* module)
