@@ -850,7 +850,9 @@ struct JVPTranscriber
         bool isFuncParam = (func && origParam->getParent() == func->getFirstBlock());
         if (isFuncParam)
         {
-            IRInst* diffPairParam = builder->emitParam(diffPairType);
+            if (auto diffPairType = tryGetDiffPairType(builder, (IRType*)primalDataType))
+            {
+                IRInst* diffPairParam = builder->emitParam(diffPairType);
 
                 auto diffPairVarName = makeDiffPairName(origParam);
                 if (diffPairVarName.getLength() > 0)
@@ -858,20 +860,34 @@ struct JVPTranscriber
 
                 SLANG_ASSERT(diffPairParam);
 
-            if (auto pairType = as<IRDifferentialPairType>(diffPairParam->getDataType()))
-            {
-                return InstPair(
-                    builder->emitDifferentialPairGetPrimal(diffPairParam),
-                    builder->emitDifferentialPairGetDifferential(
-                        (IRType*)pairBuilder->getDiffTypeFromPairType(builder, pairType),
-                        diffPairParam));
+                if (auto pairType = as<IRDifferentialPairType>(diffPairParam->getDataType()))
+                {
+                    return InstPair(
+                        builder->emitDifferentialPairGetPrimal(diffPairParam),
+                        builder->emitDifferentialPairGetDifferential(
+                            (IRType*)pairBuilder->getDiffTypeFromPairType(builder, pairType),
+                            diffPairParam));
+                }
+                // If this is an `in/inout DifferentialPair<>` parameter, we can't produce
+                // its primal and diff parts right now because they would represent a reference
+                // to a pair field, which doesn't make sense since pair types are considered mutable.
+                // We encode the result as if the param is non-differentiable, and handle it
+                // with special care at load/store.
+                return InstPair(diffPairParam, nullptr);
             }
-            // If this is an `in/inout DifferentialPair<>` parameter, we can't produce
-            // its primal and diff parts right now because they would represent a reference
-            // to a pair field, which doesn't make sense since pair types are considered mutable.
-            // We encode the result as if the param is non-differentiable, and handle it
-            // with special care at load/store.
-            return InstPair(diffPairParam, nullptr);
+            return InstPair(
+                cloneInst(&cloneEnv, builder, origParam),
+                nullptr);
+        }
+        else
+        {
+            auto primal = cloneInst(&cloneEnv, builder, origParam);
+            IRInst* diff = nullptr;
+            if (IRType* diffType = differentiateType(builder, (IRType*)primalDataType))
+            {
+                diff = builder->emitParam(diffType);
+            }
+            return InstPair(primal, diff);
         }
     }
 
