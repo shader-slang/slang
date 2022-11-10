@@ -190,7 +190,7 @@ newoption {
     allowed     = { { "true", "True"}, { "false", "False" } }
  }
  newoption {
-    trigger = "full-debug-validation"
+    trigger = "full-debug-validation",
     description = "(Optional) If true will enable full IR validation in debug build. (SLOW!)",
     value = "bool",
     default = "false",
