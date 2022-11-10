@@ -95,7 +95,7 @@ namespace toc
         }
         const string shortTitlePrefix = "[//]: # (ShortTitle: ";
 
-        public static string maybeGetShortTitle(string originalTitle, string[] lines, int line)
+        public static string maybeGetShortTitleImpl(string originalTitle, string[] lines, int line)
         {
             string nextLine = getNextNonEmptyLine(lines, line);
             if (nextLine.StartsWith(shortTitlePrefix))
@@ -103,6 +103,26 @@ namespace toc
                 return nextLine.Substring(shortTitlePrefix.Length, nextLine.Length - shortTitlePrefix.Length - 1).Trim();
             }
             return originalTitle;
+        }
+
+        public static string escapeString(string input)
+        {
+            StringBuilder sb = new StringBuilder();
+            foreach (var ch in input)
+            {
+                if (ch == '<')
+                    sb.Append("&lt;");
+                else if (ch == '>')
+                    sb.Append("&gt;");
+                else
+                    sb.Append(ch);
+            }
+            return sb.ToString();
+        }
+        public static string maybeGetShortTitle(string originalTitle, string[] lines, int line)
+        {
+            string title = maybeGetShortTitleImpl(originalTitle, lines, line);
+            return escapeString(title);
         }
         public static string Run(string path)
         {
