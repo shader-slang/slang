@@ -2678,14 +2678,9 @@ struct BackwardDiffTranscriber
                 newParameterTypes.add(origType);
         }
 
-        // Transcribe return type to a pair.
-        // This will be void if the primal return type is non-differentiable.
-        //
-        auto origResultType = (IRType*)lookupPrimalInst(funcType->getResultType(), funcType->getResultType());
-        if (auto returnPairType = tryGetDiffPairType(builder, origResultType))
-            diffReturnType = returnPairType;
-        else
-            diffReturnType = builder->getVoidType();
+        newParameterTypes.add(funcType->getResultType());
+
+        diffReturnType = builder->getVoidType();
 
         return builder->getFuncType(newParameterTypes, diffReturnType);
     }
@@ -3742,13 +3737,13 @@ struct BackwardDiffTranscriber
         {
             auto originalName = nameHint->getName();
             StringBuilder newNameSb;
-            newNameSb << "s_jvp_" << originalName;
+            newNameSb << "s_diff_" << originalName;
             builder->addNameHintDecoration(diffFunc, newNameSb.getUnownedSlice());
         }
-        builder->addForwardDerivativeDecoration(origFunc, diffFunc);
+        builder->addBackwardDerivativeDecoration(origFunc, diffFunc);
 
         // Mark the generated derivative function itself as differentiable.
-        builder->addForwardDifferentiableDecoration(diffFunc);
+        builder->addBackwardDifferentiableDecoration(diffFunc);
 
         // Find and clone `DifferentiableTypeDictionaryDecoration` to the new diffFunc.
         if (auto dictDecor = origFunc->findDecoration<IRDifferentiableTypeDictionaryDecoration>())
@@ -4062,13 +4057,13 @@ struct BackwardDifferentiationContext : public InstPassBase
     //
     bool processReferencedFunctions(IRBuilder* builder)
     {
-        List<IRForwardDifferentiate*> autoDiffWorkList;
+        List<IRBackwardDifferentiate*> autoDiffWorkList;
 
         for (;;)
         {
             // Collect all `ForwardDifferentiate` insts from the module.
             autoDiffWorkList.clear();
-            processInstsOfType<IRForwardDifferentiate>(kIROp_ForwardDifferentiate, [&](IRForwardDifferentiate* fwdDiffInst)
+            processInstsOfType<IRBackwardDifferentiate>(kIROp_BackwardDifferentiate, [&](IRBackwardDifferentiate* fwdDiffInst)
                 {
                     autoDiffWorkList.add(fwdDiffInst);
                 });
@@ -4085,12 +4080,13 @@ struct BackwardDifferentiationContext : public InstPassBase
                 auto baseInst = fwdDiffInst->getBaseFn();
                 if (auto baseFunction = as<IRGlobalValueWithCode>(baseInst))
                 {
-                    if (auto existingDiffFunc = lookupJVPReference(baseFunction))
+                    // TODO: Handle user defined backward later
+                    /*if (auto existingDiffFunc = lookupJVPReference(baseFunction))
                     {
                         fwdDiffInst->replaceUsesWith(existingDiffFunc);
                         fwdDiffInst->removeAndDeallocate();
                     }
-                    else if (isMarkedForForwardDifferentiation(baseFunction))
+                    else */if (isMarkedForBackwardDifferentiation(baseFunction))
                     {
                         if (as<IRFunc>(baseFunction) || as<IRGeneric>(baseFunction))
                         {
@@ -4405,13 +4401,13 @@ struct BackwardDifferentiationContext : public InstPassBase
     // Checks decorators to see if the function should
     // be differentiated (kIROp_ForwardDifferentiableDecoration)
     // 
-    bool isMarkedForForwardDifferentiation(IRGlobalValueWithCode* callable)
+    bool isMarkedForBackwardDifferentiation(IRGlobalValueWithCode* callable)
     {
         for (auto decoration = callable->getFirstDecoration();
             decoration;
             decoration = decoration->getNextDecoration())
         {
-            if (decoration->getOp() == kIROp_ForwardDifferentiableDecoration)
+            if (decoration->getOp() == kIROp_BackwardDifferentiableDecoration)
             {
                 return true;
             }

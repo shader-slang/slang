@@ -3243,6 +3243,11 @@ public:
         addDecoration(value, kIROp_ForwardDerivativeDecoration, fwdFunc);
     }
 
+    void addBackwardDerivativeDecoration(IRInst* value, IRInst* jvpFn)
+    {
+        addDecoration(value, kIROp_BackwardDerivativeDecoration, jvpFn);
+    }
+
     void addCOMWitnessDecoration(IRInst* value, IRInst* witnessTable)
     {
         addDecoration(value, kIROp_COMWitnessDecoration, &witnessTable, 1);
