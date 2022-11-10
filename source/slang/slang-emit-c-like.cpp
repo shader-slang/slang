@@ -2703,6 +2703,7 @@ void CLikeSourceEmitter::emitSimpleFuncParamImpl(IRParam* param)
             || layout->usesResourceKind(LayoutResourceKind::VaryingOutput))
         {
             emitInterpolationModifiers(param, paramType, layout);
+            emitMeshOutputModifiers(param);
         }
     }
 

@@ -2111,7 +2111,11 @@ void legalizeEntryPointParameterForGLSL(
     {
         if (auto d = pp->findDecoration<IRMeshOutputDecoration>())
         {
-            builder->addDecoration(func, d->getOp(), d->getMaxSize());
+            // It's illegal to have differently sized indices and primitives
+            // outputs, for consistency, only attach a PrimitivesDecoration to
+            // the function.
+            auto op = as<IRIndicesDecoration>(d) ? kIROp_PrimitivesDecoration : d->getOp();
+            builder->addDecoration(func, op, d->getMaxSize());
         }
     }
 

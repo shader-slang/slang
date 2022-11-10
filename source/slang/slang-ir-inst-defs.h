@@ -703,6 +703,7 @@ INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
 
     /* Mesh Shader outputs */
         INST(VerticesDecoration, vertices, 1, 0)
+        INST(IndicesDecoration, indices, 1, 0)
         INST(PrimitivesDecoration, primitives, 1, 0)
     INST_RANGE(MeshOutputDecoration, VerticesDecoration, PrimitivesDecoration)
     INST(GLSLPrimitivesRateDecoration, perprimitive, 0, 0)

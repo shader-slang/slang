@@ -769,6 +769,11 @@ struct IRVerticesDecoration : public IRMeshOutputDecoration
     IR_LEAF_ISA(VerticesDecoration)
 };
 
+struct IRIndicesDecoration : public IRMeshOutputDecoration
+{
+    IR_LEAF_ISA(IndicesDecoration)
+};
+
 struct IRPrimitivesDecoration : public IRMeshOutputDecoration
 {
     IR_LEAF_ISA(PrimitivesDecoration)

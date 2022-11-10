@@ -2147,7 +2147,7 @@ void addVarDecorations(
         else if(auto meshShaderMod = as<HLSLMeshShaderOutputModifier>(mod))
         {
             IROp op = as<HLSLVerticesModifier>(meshShaderMod) ? kIROp_VerticesDecoration
-                    : as<HLSLIndicesModifier>(meshShaderMod) ? kIROp_PrimitivesDecoration
+                    : as<HLSLIndicesModifier>(meshShaderMod) ? kIROp_IndicesDecoration
                     : as<HLSLPrimitivesModifier>(meshShaderMod) ? kIROp_PrimitivesDecoration
                     : (SLANG_UNREACHABLE("Missing case for HLSLMeshShaderOutputModifier"), IROp(0));
             // TODO: Ellie handle failure here
@@ -2174,7 +2174,7 @@ void addVarDecorations(
             op = kIROp_VerticesDecoration;
             break;
         case kIROp_IndicesType:
-            op = kIROp_PrimitivesDecoration;
+            op = kIROp_IndicesDecoration;
             break;
         case kIROp_PrimitivesType:
             op = kIROp_PrimitivesDecoration;

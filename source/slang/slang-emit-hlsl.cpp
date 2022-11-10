@@ -313,9 +313,7 @@ void HLSLSourceEmitter::emitEntryPointAttributesImpl(IRFunc* irFunc, IREntryPoin
         }
     }
 
-    switch (stage)
-    {
-        case Stage::Compute:
+    auto emitNumThreadsAttribute = [&]()
         {
             Int sizeAlongAxis[kThreadGroupAxisCount];
             getComputeThreadGroupSize(irFunc, sizeAlongAxis);
@@ -327,6 +325,13 @@ void HLSLSourceEmitter::emitEntryPointAttributesImpl(IRFunc* irFunc, IREntryPoin
                 m_writer->emit(sizeAlongAxis[ii]);
             }
             m_writer->emit(")]\n");
+        };
+
+    switch (stage)
+    {
+        case Stage::Compute:
+        {
+            emitNumThreadsAttribute();
         }
         break;
         case Stage::Geometry:
@@ -403,6 +408,18 @@ void HLSLSourceEmitter::emitEntryPointAttributesImpl(IRFunc* irFunc, IREntryPoin
             if (irFunc->findDecoration<IREarlyDepthStencilDecoration>())
             {
                 m_writer->emit("[earlydepthstencil]\n");
+            }
+            break;
+        }
+        case Stage::Mesh:
+        {
+            emitNumThreadsAttribute();
+            if (auto decor = irFunc->findDecoration<IROutputTopologyDecoration>())
+            {
+                // TODO: Ellie validate here/elsewhere, what's allowed here is
+                // different from the tesselator
+                // The naming here is plural, so add an 's'
+                _emitHLSLDecorationSingleString("outputtopology", irFunc, decor->getTopology());
             }
             break;
         }
@@ -1101,6 +1118,18 @@ void HLSLSourceEmitter::emitInterpolationModifiersImpl(IRInst* varInst, IRType* 
             m_writer->emit(modeText);
             m_writer->emitChar(' ');
         }
+    }
+}
+
+void HLSLSourceEmitter::emitMeshOutputModifiersImpl(IRInst* varInst)
+{
+    if(auto modifier = varInst->findDecoration<IRMeshOutputDecoration>())
+    {
+        m_writer->emit(
+              as<IRVerticesDecoration>(modifier) ? "vertices "
+            : as<IRIndicesDecoration>(modifier) ? "indices "
+            : as<IRPrimitivesDecoration>(modifier) ? "primitives "
+            : (SLANG_UNEXPECTED("Unhandled type of mesh output decoration"), ""));
     }
 }
 

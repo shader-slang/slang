@@ -2,7 +2,8 @@
 
 // Test that a simple mesh shader compiles
 
-//TEST:CROSS_COMPILE:-target spirv -profile glsl_450+spirv_1_4 -entry main -stage mesh
+//TEST:CROSS_COMPILE:-target spirv-assembly -entry main -stage mesh -profile glsl_450+spirv_1_4
+//TEST:CROSS_COMPILE:-target dxil-assembly  -entry main -stage mesh -profile sm_6_6
 
 const static float2 positions[3] = {
   float2(0.0, -0.5),
