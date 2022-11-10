@@ -31,6 +31,11 @@ void computeMain(uint3 threadId : SV_DispatchThreadID)
 }
 ```
 
+> #### Note ####
+> Slang has official language extension support for Visual Studio Code. The extension is powered by the Slang compiler to support a wide range of
+> assisting features including auto-completion, function signature hinting, semantic highlighting and more.
+> Try it here: https://marketplace.visualstudio.com/items?itemName=shader-slang.slang-language-extension
+
 As you can see, `hello-world.slang` is no different from a normal HLSL shader file. In fact, Slang is compatible with most HLSL code you would write. On top of HLSL, Slang has added many new language and compiler features that simplifies various tasks with shader code, which we will cover in future chapters. For now we will demonstrate one key feature of Slang: cross-compiling to different platforms.
 
 Slang supports compiling shaders into many different targets including Direct3D 11, Direct3D 12, Vulkan, CUDA and C++ (for execution on CPU). You can run `slangc` with the following command line to compile `hello-world.slang` into Vulkan SPIRV:
