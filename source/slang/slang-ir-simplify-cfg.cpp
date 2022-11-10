@@ -19,23 +19,11 @@ BreakableRegion* findBreakableRegion(Region* region)
     }
 }
 
-bool isTrivialSingleIterationLoop(IRLoop* loop, RegionTree* regionTree)
+bool isTrivialSingleIterationLoop(IRGlobalValueWithCode* func, IRLoop* loop, RefPtr<RegionTree>& regionTree)
 {
-    if (!regionTree)
-        return false;
     auto targetBlock = loop->getTargetBlock();
     if (targetBlock->getPredecessors().getCount() != 1) return false;
     if (*targetBlock->getPredecessors().begin() != loop->getParent()) return false;
-    SimpleRegion* targetBlockRegion = nullptr;
-    if (!regionTree->mapBlockToRegion.TryGetValue(targetBlock, targetBlockRegion))
-        return false;
-    BreakableRegion* loopBreakableRegion = findBreakableRegion(targetBlockRegion);
-    LoopRegion* loopRegion = as<LoopRegion>(loopBreakableRegion);
-    if (!loopRegion)
-        return false;
-    auto func = as<IRGlobalValueWithCode>(loop->getParent()->getParent());
-    if (!func)
-        return false;
 
     int useCount = 0;
     for (auto use = loop->getBreakBlock()->firstUse; use; use = use->nextUse)
@@ -46,6 +34,22 @@ bool isTrivialSingleIterationLoop(IRLoop* loop, RegionTree* regionTree)
         if (useCount > 1)
             return false;
     }
+
+    // The loop has passed simple test.
+    // 
+    // We need to verify this is a trivial loop by checking if there is any multi-level breaks
+    // that skips out of this loop.
+
+    if (!regionTree)
+        regionTree = generateRegionTreeForFunc(func, nullptr);
+
+    SimpleRegion* targetBlockRegion = nullptr;
+    if (!regionTree->mapBlockToRegion.TryGetValue(targetBlock, targetBlockRegion))
+        return false;
+    BreakableRegion* loopBreakableRegion = findBreakableRegion(targetBlockRegion);
+    LoopRegion* loopRegion = as<LoopRegion>(loopBreakableRegion);
+    if (!loopRegion)
+        return false;
 
     for (auto block : func->getBlocks())
     {
@@ -64,6 +68,11 @@ bool isTrivialSingleIterationLoop(IRLoop* loop, RegionTree* regionTree)
                 continue;
             if (targetBlock != loop->getBreakBlock())
                 return false;
+            if (findBreakableRegion(targetRegion) != loopRegion)
+            {
+                // If the break is initiated from a nested region, this is not trivial.
+                return false;
+            }
         }
     }
 
@@ -76,7 +85,8 @@ bool processFunc(IRGlobalValueWithCode* func)
     if (!firstBlock)
         return false;
 
-    auto regionTree = generateRegionTreeForFunc(func, nullptr);
+    // Lazily generated region tree.
+    RefPtr<RegionTree> regionTree = nullptr;
 
     SharedIRBuilder sharedBuilder(func->getModule());
     IRBuilder builder(&sharedBuilder);
@@ -106,7 +116,7 @@ bool processFunc(IRGlobalValueWithCode* func)
                 // break at the end of the loop out of it, we can remove the header and turn it into
                 // a normal branch.
                 auto targetBlock = loop->getTargetBlock();
-                if (isTrivialSingleIterationLoop(loop, regionTree))
+                if (isTrivialSingleIterationLoop(func, loop, regionTree))
                 {
                     builder.setInsertBefore(loop);
                     List<IRInst*> args;
