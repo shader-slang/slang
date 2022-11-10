@@ -2144,24 +2144,6 @@ void addVarDecorations(
         {
             builder->addFormatDecoration(inst, formatAttr->format);
         }
-        else if(auto meshShaderMod = as<HLSLMeshShaderOutputModifier>(mod))
-        {
-            IROp op = as<HLSLVerticesModifier>(meshShaderMod) ? kIROp_VerticesDecoration
-                    : as<HLSLIndicesModifier>(meshShaderMod) ? kIROp_IndicesDecoration
-                    : as<HLSLPrimitivesModifier>(meshShaderMod) ? kIROp_PrimitivesDecoration
-                    : (SLANG_UNREACHABLE("Missing case for HLSLMeshShaderOutputModifier"), IROp(0));
-            // TODO: Ellie handle failure here
-            IRIntegerValue maxSize;
-            if(auto c = composeGetters<IRIntLit>(
-                inst,
-                &IRInst::getFullType,
-                &IROutTypeBase::getValueType,
-                &IRArrayType::getElementCount))
-            {
-                maxSize = c->getValue();
-            }
-            builder->addMeshOutputDecoration(op, inst, maxSize);
-        }
 
         // TODO: what are other modifiers we need to propagate through?
     }
@@ -2183,12 +2165,7 @@ void addVarDecorations(
             SLANG_UNREACHABLE("Missing case for IRMeshOutputType");
             break;
         }
-        IRIntegerValue maxSize;
-        if(auto c = composeGetters<IRIntLit>(t, &IRMeshOutputType::getMaxElementCount))
-        {
-            maxSize = c->getValue();
-        }
-        builder->addMeshOutputDecoration(op, inst, maxSize);
+        builder->addMeshOutputDecoration(op, inst, t->getMaxElementCount());
     }
 }
 

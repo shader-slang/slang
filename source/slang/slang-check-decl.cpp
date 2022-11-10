@@ -5432,12 +5432,20 @@ namespace Slang
         if(meshOutputType)
         {
             getSink()->diagnose(modifier, Diagnostics::unnecessaryHLSLMeshOutputModifier);
+            varDecl->type.type = m_astBuilder->getErrorType();
             return;
         }
         auto indexExpr = as<IndexExpr>(varDecl->type.exp);
         if(!indexExpr)
         {
-            getSink()->diagnose(varDecl, Diagnostics::hlslStyleMeshShaderOutputShouldBeAnArray);
+            getSink()->diagnose(varDecl, Diagnostics::meshOutputMustBeArray);
+            varDecl->type.type = m_astBuilder->getErrorType();
+            return;
+        }
+        if(indexExpr->indexExprs.getCount() != 1)
+        {
+            getSink()->diagnose(varDecl, Diagnostics::meshOutputArrayMustHaveSize);
+            varDecl->type.type = m_astBuilder->getErrorType();
             return;
         }
         auto base = ExpectAType(indexExpr->baseExpression);

@@ -3410,11 +3410,11 @@ public:
         addDecoration(inst, kIROp_VulkanHitObjectAttributesDecoration, getIntValue(getIntType(), location));
     }
 
-    void addMeshOutputDecoration(IROp d, IRInst* value, const int maxCount)
+    void addMeshOutputDecoration(IROp d, IRInst* value, IRInst* maxCount)
     {
         SLANG_ASSERT(IRMeshOutputDecoration::isaImpl(d));
         // TODO: Ellie, correct int type here?
-        addDecoration(value, d, getIntValue(getUIntType(), maxCount));
+        addDecoration(value, d, maxCount);
     }
 };
 

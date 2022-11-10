@@ -19,6 +19,16 @@ void legalizeMeshOutputTypes(IRModule* module)
             auto elemType = meshOutput->getElementType();
             auto maxCount = meshOutput->getMaxElementCount();
             auto arrayType = builder.getArrayType(elemType, maxCount);
+            IROp decorationOp
+                = as<IRVerticesType>(meshOutput)   ? kIROp_VerticesDecoration
+                : as<IRIndicesType>(meshOutput)    ? kIROp_IndicesDecoration
+                : as<IRPrimitivesType>(meshOutput) ? kIROp_PrimitivesDecoration
+                : (SLANG_UNREACHABLE("Missing case for IRMeshOutputType"), IROp(0));
+            // Ensure that all params are marked up as vertices/indices/primitives
+            traverseUses<IRParam>(meshOutput, [&](IRParam* i)
+                {
+                    builder.addMeshOutputDecoration(decorationOp, i, maxCount);
+                });
             meshOutput->replaceUsesWith(arrayType);
         }
     }

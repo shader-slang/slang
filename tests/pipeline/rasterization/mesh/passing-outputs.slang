@@ -2,11 +2,13 @@
 
 // This tests that writing to individual components of the output struct works
 
-//TEST:CROSS_COMPILE:-target spirv -profile glsl_450+spirv_1_4 -entry main -stage mesh
+//TEST:CROSS_COMPILE:-target spirv-assembly -entry main -stage mesh -profile glsl_450+spirv_1_4
 
-const static uint NUM_THREADS_X = 3;
-const static uint NUM_THREADS_Y = 1;
-const static uint NUM_THREADS_Z = 1;
+// DXC is stricter than we are about passing references to individual mesh shader outputs
+// We could get around this by doing what we do for GLSL, i.e. use a temporary
+// variable to pass as the out parameter, and then copy that into the array
+// after the function call.
+//TEST_DISABLED:CROSS_COMPILE:-target dxil-assembly  -entry main -stage mesh -profile sm_6_6
 
 const static uint MAX_VERTS = 3;
 const static uint MAX_PRIMS = 1;
@@ -86,7 +88,7 @@ void e<let N : uint>(out Vertices<Vertex, N> vs, uint tig)
 }
 
 [outputtopology("triangle")]
-[numthreads(NUM_THREADS_X, NUM_THREADS_Y, NUM_THREADS_Z)]
+[numthreads(3, 1, 1)]
 void main(
     in uint tig : SV_GroupIndex,
     out Vertices<Vertex, MAX_VERTS> verts,

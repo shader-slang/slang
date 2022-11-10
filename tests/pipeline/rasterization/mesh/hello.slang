@@ -23,15 +23,11 @@ struct Vertex
   float3 color : Color;
 };
 
-const static uint NUM_THREADS_X = 3;
-const static uint NUM_THREADS_Y = 1;
-const static uint NUM_THREADS_Z = 1;
-
 const static uint MAX_VERTS = 3;
 const static uint MAX_PRIMS = 1;
 
 [outputtopology("triangle")]
-[numthreads(NUM_THREADS_X, NUM_THREADS_Y, NUM_THREADS_Z)]
+[numthreads(3, 1, 1)]
 void main(
     in uint tig : SV_GroupIndex,
     out Vertices<Vertex, MAX_VERTS> verts,
