@@ -1843,7 +1843,6 @@ void legalizeMeshOutputParam(
                     {
                         // Store using the SOA representation
 
-                        // TODO: Ellie assignElement
                         assign(
                             builder,
                             d,
