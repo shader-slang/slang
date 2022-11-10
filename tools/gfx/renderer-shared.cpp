@@ -331,19 +331,6 @@ void PipelineStateBase::initializeBase(const PipelineStateDesc& inDesc)
     }
 }
 
-void updateCacheEntry(ISlangMutableFileSystem* fileSystem, slang::IBlob* compiledCode, String shaderFilename, slang::Digest ASTHash)
-{
-    auto hashSize = sizeof(slang::Digest);
-
-    auto bufferSize = hashSize + compiledCode->getBufferSize();
-    List<uint8_t> contents;
-    contents.setCount(bufferSize);
-    uint8_t* buffer = contents.begin();
-    memcpy(buffer, &ASTHash, hashSize);
-    memcpy(buffer + hashSize, (void*)compiledCode->getBufferPointer(), compiledCode->getBufferSize());
-    fileSystem->saveFile(shaderFilename.getBuffer(), buffer, bufferSize);
-}
-
 Result RendererBase::getEntryPointCodeFromShaderCache(
     slang::IComponentType* program,
     SlangInt entryPointIndex,

@@ -130,12 +130,6 @@ void PersistentShaderCache::loadCacheFromFile()
 
 ShaderCacheEntry* PersistentShaderCache::findEntry(const slang::Digest& key, ISlangBlob** outCompiledCode)
 {
-    if (isMemoryFileSystem)
-    {
-        // If we have an in-memory file system, immediately jump to the fall back implementation.
-        return findEntryInMemory(key, outCompiledCode);
-    }
-
     LinkedNode<Index>* entryIndexNode;
     if (!keyToEntry.TryGetValue(key, entryIndexNode))
     {
@@ -153,7 +147,7 @@ ShaderCacheEntry* PersistentShaderCache::findEntry(const slang::Digest& key, ISl
     {
         orderedEntries.RemoveFromList(entryIndexNode);
         orderedEntries.AddFirst(entryIndexNode);
-        if (mutableShaderCacheFileSystem)
+        if (mutableShaderCacheFileSystem && !isMemoryFileSystem)
         {
             auto offset = index * sizeof(ShaderCacheEntry);
             indexStream.seek(SeekOrigin::Start, offset + 2 * sizeof(slang::Digest));
@@ -170,12 +164,6 @@ void PersistentShaderCache::addEntry(const slang::Digest& dependencyDigest, cons
     {
         // Should not save new entries if the underlying file system isn't mutable.
         return;
-    }
-
-    if (isMemoryFileSystem)
-    {
-        // Use the fall back implementation for an in-memory file system.
-        return addEntryToMemory(dependencyDigest, contentsDigest, compiledCode);
     }
     
     // Check that we do not exceed the cache's size limit by adding another entry. If so,
@@ -211,9 +199,12 @@ void PersistentShaderCache::addEntry(const slang::Digest& dependencyDigest, cons
 
     mutableShaderCacheFileSystem->saveFileBlob(DigestUtil::toString(dependencyDigest).getBuffer(), compiledCode);
 
-    indexStream.seek(SeekOrigin::End, 0);
-    indexStream.write(&entry, sizeof(ShaderCacheEntry));
-    indexStream.flush();
+    if (!isMemoryFileSystem)
+    {
+        indexStream.seek(SeekOrigin::End, 0);
+        indexStream.write(&entry, sizeof(ShaderCacheEntry));
+        indexStream.flush();
+    }
 }
 
 void PersistentShaderCache::updateEntry(
@@ -228,12 +219,6 @@ void PersistentShaderCache::updateEntry(
         return;
     }
 
-    if (isMemoryFileSystem)
-    {
-        // Use the fall back implementation for an in-memory file system.
-        return updateEntryInMemory(dependencyDigest, contentsDigest, updatedCode);
-    }
-
     // Unlike in addEntry(), we only update the contents digest here because the last accessed time will have already
     // been updated while finding the entry.
     auto entryIndexNode = *keyToEntry.TryGetValue(dependencyDigest);
@@ -241,10 +226,13 @@ void PersistentShaderCache::updateEntry(
     entries[index].contentsBasedDigest = contentsDigest;
     mutableShaderCacheFileSystem->saveFileBlob(DigestUtil::toString(dependencyDigest).getBuffer(), updatedCode);
 
-    auto offset = index * sizeof(ShaderCacheEntry);
-    indexStream.seek(SeekOrigin::Start, offset + sizeof(slang::Digest));
-    indexStream.write(&contentsDigest, sizeof(slang::Digest));
-    indexStream.flush();
+    if (!isMemoryFileSystem)
+    {
+        auto offset = index * sizeof(ShaderCacheEntry);
+        indexStream.seek(SeekOrigin::Start, offset + sizeof(slang::Digest));
+        indexStream.write(&contentsDigest, sizeof(slang::Digest));
+        indexStream.flush();
+    }
 }
 
 Index PersistentShaderCache::deleteLRUEntry()
@@ -268,12 +256,11 @@ Index PersistentShaderCache::deleteLRUEntry()
     return index;
 }
 
-// The following functions perform the same functionality as the ones above but for an in-memory
-// file system instead, which cannot utilize file streaming to update the index file in place.
+// An in-memory file system cannot utilize file streaming to update the index file in place.
 // Consequently, the cache index file is updated once on exit and is guaranteed to maintain the
-// correct order of entries from most to least recently used, removing the need to track a
-// last accessed time for all entries. However, any kind of interruption in program execution
-// that results in the cache destructor not being called will result in an inaccurate cache index.
+// correct order of entries from most to least recently used. However, any kind of interruption
+// in program execution that results in the cache destructor not being called will result in an
+// inaccurate cache index.
 // 
 // These currently assume that the underlying file system must be a MemoryFileSystem as this is the
 // only in-memory file system that currently exists in Slang, which is guaranteed to be mutable.
@@ -310,55 +297,6 @@ void PersistentShaderCache::loadCacheFromMemory()
         if (desc.entryCountLimit > 0 && orderedEntries.Count() == desc.entryCountLimit)
             break;
     }
-}
-
-ShaderCacheEntry* PersistentShaderCache::findEntryInMemory(const slang::Digest& key, ISlangBlob** outCompiledCode)
-{
-    LinkedNode<Index>* entryNode;
-    if (!keyToEntry.TryGetValue(key, entryNode))
-    {
-        *outCompiledCode = nullptr;
-        return nullptr;
-    }
-
-    mutableShaderCacheFileSystem->loadFile(DigestUtil::toString(key).getBuffer(), outCompiledCode);
-    if (orderedEntries.FirstNode() != entryNode)
-    {
-        orderedEntries.RemoveFromList(entryNode);
-        orderedEntries.AddFirst(entryNode);
-    }
-    return &entries[entryNode->Value];
-}
-
-void PersistentShaderCache::addEntryToMemory(const slang::Digest& dependencyDigest, const slang::Digest& astDigest, ISlangBlob* compiledCode)
-{
-    auto index = entries.getCount();
-    while (desc.entryCountLimit > 0 && orderedEntries.Count() >= desc.entryCountLimit)
-    {
-        index = deleteLRUEntry();
-    }
-
-    ShaderCacheEntry entry = { dependencyDigest, astDigest, 0 };
-    auto entryNode = orderedEntries.AddFirst(index);
-    if (index == entries.getCount())
-    {
-        entries.add(entry);
-    }
-    else
-    {
-        entries[index] = entry;
-    }
-    keyToEntry.Add(dependencyDigest, entryNode);
-
-    mutableShaderCacheFileSystem->saveFileBlob(DigestUtil::toString(dependencyDigest).getBuffer(), compiledCode);
-}
-
-void PersistentShaderCache::updateEntryInMemory(const slang::Digest& dependencyDigest, const slang::Digest& contentsDigest, ISlangBlob* updatedCode)
-{
-    auto entryIndexNode = *keyToEntry.TryGetValue(dependencyDigest);
-    auto index = entryIndexNode->Value;
-    entries[index].contentsBasedDigest = contentsDigest;
-    mutableShaderCacheFileSystem->saveFileBlob(DigestUtil::toString(dependencyDigest).getBuffer(), updatedCode);
 }
 
 void PersistentShaderCache::saveCacheToMemory()

@@ -64,13 +64,9 @@ private:
     // with the new entry. This should only be called by addEntry() when the cache reaches maximum capacity.
     Index deleteLRUEntry();
 
-    // These functions perform the same tasks as their counterparts defined above. However, without access
-    // to a physical file path, in-memory file systems cannot leverage file streams and need to fall back
-    // on a different implementation.
+    // Without access to a physical file path, in-memory file systems cannot leverage file streams and
+    // need to fall back on a different implementation for loading and saving the cache to memory.
     void loadCacheFromMemory();
-    ShaderCacheEntry* findEntryInMemory(const slang::Digest& key, ISlangBlob** outCompiledCode);
-    void addEntryToMemory(const slang::Digest& dependencyDigest, const slang::Digest& contentsDigest, ISlangBlob* compiledCode);
-    void updateEntryInMemory(const slang::Digest& dependencyDigest, const slang::Digest& contentsDigest, ISlangBlob* updatedCode);
     void saveCacheToMemory();
 
     // The shader cache's description.
