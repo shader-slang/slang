@@ -547,6 +547,7 @@ bool isImportedDecl(IRGenContext* context, Decl* decl)
     if (!moduleDecl)
         return false;
 
+#if 0
     // HACK: don't treat standard library code as
     // being imported for right now, just because
     // we don't load its IR in the same way as
@@ -557,6 +558,7 @@ bool isImportedDecl(IRGenContext* context, Decl* decl)
     // in via the normal means.
     if (isFromStdLib(decl))
         return false;
+#endif
 
     if (moduleDecl != context->getMainModuleDecl())
         return true;
@@ -7782,22 +7784,16 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         return type->getOp() == kIROp_ClassType;
     }
 
-    LoweredValInfo lowerFuncDecl(FunctionDeclBase* decl)
+    LoweredValInfo lowerFuncDeclInContext(IRGenContext* subContext, IRBuilder* subBuilder, FunctionDeclBase* decl)
     {
-        // We are going to use a nested builder, because we will
-        // change the parent node that things get nested into.
-        //
-        NestedContext nestedContextFunc(this);
-        auto subBuilder = nestedContextFunc.getBuilder();
-        auto subContext = nestedContextFunc.getContext();
 
         auto outerGeneric = emitOuterGenerics(subContext, decl, decl);
 
         // need to create an IR function here
 
         IRFunc* irFunc = subBuilder->createFunc();
-        addNameHint(context, irFunc, decl);
-        addLinkageDecoration(context, irFunc, decl);
+        addNameHint(subContext, irFunc, decl);
+        addLinkageDecoration(subContext, irFunc, decl);
 
         if (decl->findModifier<ForwardDifferentiableAttribute>())
         {
@@ -7868,7 +7864,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             subBuilder->setInsertInto(entryBlock);
 
             UInt paramTypeIndex = 0;
-            for( auto paramInfo : parameterLists.params )
+            for (auto paramInfo : parameterLists.params)
             {
                 auto irParamType = paramTypes[paramTypeIndex++];
 
@@ -7876,91 +7872,91 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
                 IRParam* irParam = nullptr;
 
-                switch( paramInfo.direction )
+                switch (paramInfo.direction)
                 {
                 default:
+                {
+                    // The parameter is being used for input/output purposes,
+                    // so it will lower to an actual parameter with a pointer type.
+                    //
+                    // TODO: Is this the best representation we can use?
+
+                    irParam = subBuilder->emitParam(irParamType);
+                    if (auto paramDecl = paramInfo.decl)
                     {
-                        // The parameter is being used for input/output purposes,
-                        // so it will lower to an actual parameter with a pointer type.
-                        //
-                        // TODO: Is this the best representation we can use?
-
-                        irParam = subBuilder->emitParam(irParamType);
-                        if(auto paramDecl = paramInfo.decl)
-                        {
-                            addVarDecorations(context, irParam, paramDecl);
-                            subBuilder->addHighLevelDeclDecoration(irParam, paramDecl);
-                        }
-                        addParamNameHint(irParam, paramInfo);
-
-                        paramVal = LoweredValInfo::ptr(irParam);
-
-                        // TODO: We might want to copy the pointed-to value into
-                        // a temporary at the start of the function, and then copy
-                        // back out at the end, so that we don't have to worry
-                        // about things like aliasing in the function body.
-                        //
-                        // For now we will just use the storage that was passed
-                        // in by the caller, knowing that our current lowering
-                        // at call sites will guarantee a fresh/unique location.
+                        addVarDecorations(context, irParam, paramDecl);
+                        subBuilder->addHighLevelDeclDecoration(irParam, paramDecl);
                     }
-                    break;
+                    addParamNameHint(irParam, paramInfo);
+
+                    paramVal = LoweredValInfo::ptr(irParam);
+
+                    // TODO: We might want to copy the pointed-to value into
+                    // a temporary at the start of the function, and then copy
+                    // back out at the end, so that we don't have to worry
+                    // about things like aliasing in the function body.
+                    //
+                    // For now we will just use the storage that was passed
+                    // in by the caller, knowing that our current lowering
+                    // at call sites will guarantee a fresh/unique location.
+                }
+                break;
 
                 case kParameterDirection_In:
+                {
+                    // Simple case of a by-value input parameter.
+                    //
+                    // We start by declaring an IR parameter of the same type.
+                    //
+                    auto paramDecl = paramInfo.decl;
+                    irParam = subBuilder->emitParam(irParamType);
+                    if (paramDecl)
                     {
-                        // Simple case of a by-value input parameter.
-                        //
-                        // We start by declaring an IR parameter of the same type.
-                        //
-                        auto paramDecl = paramInfo.decl;
-                        irParam = subBuilder->emitParam(irParamType);
-                        if( paramDecl )
-                        {
-                            addVarDecorations(context, irParam, paramDecl);
-                            subBuilder->addHighLevelDeclDecoration(irParam, paramDecl);
-                        }
-                        addParamNameHint(irParam, paramInfo);
-                        paramVal = LoweredValInfo::simple(irParam);
-                        //
-                        // HLSL allows a function parameter to be used as a local
-                        // variable in the function body (just like C/C++), so
-                        // we need to support that case as well.
-                        //
-                        // However, if we notice that the parameter was marked
-                        // `const`, then we can skip this step.
-                        //
-                        // TODO: we should consider having all parameter be implicitly
-                        // immutable except in a specific "compatibility mode."
-                        //
-                        if(paramDecl && paramDecl->findModifier<ConstModifier>())
-                        {
-                            // This parameter was declared to be immutable,
-                            // so there should be no assignment to it in the
-                            // function body, and we don't need a temporary.
-                        }
-                        else
-                        {
-                            // The parameter migth get used as a temporary in
-                            // the function body. We will allocate a mutable
-                            // local variable for is value, and then assign
-                            // from the parameter to the local at the start
-                            // of the function.
-                            //
-                            auto irLocal = subBuilder->emitVar(irParamType);
-                            auto localVal = LoweredValInfo::ptr(irLocal);
-                            assign(subContext, localVal, paramVal);
-                            //
-                            // When code later in the body of the function refers
-                            // to the parameter declaration, it will actually refer
-                            // to the value stored in the local variable.
-                            //
-                            paramVal = localVal;
-                        }
+                        addVarDecorations(context, irParam, paramDecl);
+                        subBuilder->addHighLevelDeclDecoration(irParam, paramDecl);
                     }
-                    break;
+                    addParamNameHint(irParam, paramInfo);
+                    paramVal = LoweredValInfo::simple(irParam);
+                    //
+                    // HLSL allows a function parameter to be used as a local
+                    // variable in the function body (just like C/C++), so
+                    // we need to support that case as well.
+                    //
+                    // However, if we notice that the parameter was marked
+                    // `const`, then we can skip this step.
+                    //
+                    // TODO: we should consider having all parameter be implicitly
+                    // immutable except in a specific "compatibility mode."
+                    //
+                    if (paramDecl && paramDecl->findModifier<ConstModifier>())
+                    {
+                        // This parameter was declared to be immutable,
+                        // so there should be no assignment to it in the
+                        // function body, and we don't need a temporary.
+                    }
+                    else
+                    {
+                        // The parameter migth get used as a temporary in
+                        // the function body. We will allocate a mutable
+                        // local variable for is value, and then assign
+                        // from the parameter to the local at the start
+                        // of the function.
+                        //
+                        auto irLocal = subBuilder->emitVar(irParamType);
+                        auto localVal = LoweredValInfo::ptr(irLocal);
+                        assign(subContext, localVal, paramVal);
+                        //
+                        // When code later in the body of the function refers
+                        // to the parameter declaration, it will actually refer
+                        // to the value stored in the local variable.
+                        //
+                        paramVal = localVal;
+                    }
+                }
+                break;
                 }
 
-                if( auto paramDecl = paramInfo.decl )
+                if (auto paramDecl = paramInfo.decl)
                 {
                     setValue(subContext, paramDecl, paramVal);
                 }
@@ -8008,7 +8004,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             // a local variable to represent this value.
             //
             auto constructorDecl = as<ConstructorDecl>(decl);
-            if(constructorDecl)
+            if (constructorDecl)
             {
                 auto thisVar = subContext->irBuilder->emitVar(irResultType);
                 subContext->thisVal = LoweredValInfo::ptr(thisVar);
@@ -8031,7 +8027,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             //
             if (!subContext->irBuilder->getBlock()->getTerminator())
             {
-                if(constructorDecl)
+                if (constructorDecl)
                 {
                     // A constructor declaration should return the
                     // value of the `this` variable that was set
@@ -8044,7 +8040,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                     subContext->irBuilder->emitReturn(
                         getSimpleVal(subContext, subContext->thisVal));
                 }
-                else if(as<IRVoidType>(irResultType))
+                else if (as<IRVoidType>(irResultType))
                 {
                     // `void`-returning function can get an implicit
                     // return on exit of the body statement.
@@ -8075,7 +8071,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
         // If this declaration was marked as being an intrinsic for a particular
         // target, then we should reflect that here.
-        for( auto targetMod : decl->getModifiersOfType<SpecializedForTargetModifier>() )
+        for (auto targetMod : decl->getModifiersOfType<SpecializedForTargetModifier>())
         {
             // `targetMod` indicates that this particular declaration represents
             // a specialized definition of the particular function for the given
@@ -8099,11 +8095,11 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // TODO: We should wrap this an `SpecializedForTargetModifier` together into a single
         // case for enumerating the "capabilities" that a declaration requires.
         //
-        for(auto extensionMod : decl->getModifiersOfType<RequiredGLSLExtensionModifier>())
+        for (auto extensionMod : decl->getModifiersOfType<RequiredGLSLExtensionModifier>())
         {
             getBuilder()->addRequireGLSLExtensionDecoration(irFunc, extensionMod->extensionNameToken.getContent());
         }
-        for(auto versionMod : decl->getModifiersOfType<RequiredGLSLVersionModifier>())
+        for (auto versionMod : decl->getModifiersOfType<RequiredGLSLVersionModifier>())
         {
             getBuilder()->addRequireGLSLVersionDecoration(irFunc, Int(getIntegerLiteralValue(versionMod->versionNumberToken)));
         }
@@ -8116,12 +8112,12 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             getBuilder()->addRequireCUDASMVersionDecoration(irFunc, versionMod->version);
         }
 
-        if(decl->findModifier<RequiresNVAPIAttribute>())
+        if (decl->findModifier<RequiresNVAPIAttribute>())
         {
             getBuilder()->addSimpleDecoration<IRRequiresNVAPIDecoration>(irFunc);
         }
 
-        if(decl->findModifier<NoInlineAttribute>())
+        if (decl->findModifier<NoInlineAttribute>())
         {
             getBuilder()->addSimpleDecoration<IRNoInlineDecoration>(irFunc);
         }
@@ -8132,13 +8128,13 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             getBuilder()->addDecoration(irFunc, kIROp_InstanceDecoration, intLit);
         }
 
-        if(auto attr = decl->findModifier<MaxVertexCountAttribute>())
+        if (auto attr = decl->findModifier<MaxVertexCountAttribute>())
         {
             IRIntLit* intLit = _getIntLitFromAttribute(getBuilder(), attr);
             getBuilder()->addDecoration(irFunc, kIROp_MaxVertexCountDecoration, intLit);
         }
 
-        if(auto attr = decl->findModifier<NumThreadsAttribute>())
+        if (auto attr = decl->findModifier<NumThreadsAttribute>())
         {
             auto builder = getBuilder();
             IRType* intType = builder->getIntType();
@@ -8149,10 +8145,10 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 builder->getIntValue(intType, attr->z)
             };
 
-           builder->addDecoration(irFunc, kIROp_NumThreadsDecoration, operands, 3);
+            builder->addDecoration(irFunc, kIROp_NumThreadsDecoration, operands, 3);
         }
 
-        if(decl->findModifier<ReadNoneAttribute>())
+        if (decl->findModifier<ReadNoneAttribute>())
         {
             getBuilder()->addSimpleDecoration<IRReadNoneDecoration>(irFunc);
         }
@@ -8192,7 +8188,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             getBuilder()->addDecoration(irFunc, kIROp_SPIRVOpDecoration, intLit);
         }
 
-        if(decl->findModifier<UnsafeForceInlineEarlyAttribute>())
+        if (decl->findModifier<UnsafeForceInlineEarlyAttribute>())
         {
             getBuilder()->addDecoration(irFunc, kIROp_UnsafeForceInlineEarlyDecoration);
         }
@@ -8207,23 +8203,54 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
         if (auto attr = decl->findModifier<ForwardDerivativeAttribute>())
         {
-            // TODO(Sai): HACK.. we need to emit a decl-ref to handle this modifier correctly. 
-            // If we don't move the cursor to the parent, we sometimes emit supporting
-            // insts into the function body, which shouldn't happen.
-            // 
-            subContext->irBuilder->setInsertInto(irFunc->getParent());            
-            
-            auto diffFuncType = getFuncType(subContext->astBuilder, attr->funcDeclRef->declRef.as<CallableDecl>());
-            auto irDiffFuncType = lowerType(subContext, diffFuncType);
+            // We need to lower the decl ref to the custom derivative function to IR.
+            // The IR insts correspond to the decl ref is not part of the function we
+            // are processing. If we emit it directly to within the function, it could
+            // mess up the assumption on the form of the IR (e.g. having non decoration insts
+            // appearing in the middle of decoration insts). so we emit the decl ref to the
+            // function's parent for now.
 
-            auto loweredVal = emitDeclRef(subContext, attr->funcDeclRef->declRef, irDiffFuncType);
+            subContext->irBuilder->setInsertInto(irFunc->getParent());
+
+            auto loweredVal = lowerRValueExpr(subContext, attr->funcExpr);
 
             SLANG_ASSERT(loweredVal.flavor == LoweredValInfo::Flavor::Simple);
             IRInst* jvpFunc = loweredVal.val;
             getBuilder()->addDecoration(irFunc, kIROp_ForwardDerivativeDecoration, jvpFunc);
 
             // Reset cursor.
-            subContext->irBuilder->setInsertInto(irFunc);            
+            subContext->irBuilder->setInsertInto(irFunc);
+        }
+
+        if (auto attr = decl->findModifier<ForwardDerivativeOfAttribute>())
+        {
+            if (auto originalDeclRefExpr = as<DeclRefExpr>(attr->funcExpr))
+            {
+                NestedContext originalContextFunc(this);
+                auto originalSubBuilder = originalContextFunc.getBuilder();
+                auto originalSubContext = originalContextFunc.getContext();
+
+                auto originalFuncDecl = as<FunctionDeclBase>(originalDeclRefExpr->declRef.getDecl());
+                SLANG_RELEASE_ASSERT(originalFuncDecl);
+
+                auto originalFuncVal = lowerFuncDeclInContext(originalSubContext, originalSubBuilder, originalFuncDecl).val;
+                if (auto originalFuncGeneric = as<IRGeneric>(originalFuncVal))
+                {
+                    originalFuncVal = findGenericReturnVal(originalFuncGeneric);
+                }
+                originalSubBuilder->setInsertBefore(originalFuncVal);
+                auto derivativeFuncVal = lowerRValueExpr(originalSubContext, attr->backDeclRef);
+                originalSubBuilder->addForwardDerivativeDecoration(originalFuncVal, derivativeFuncVal.val);
+            }
+
+            subContext->irBuilder->setInsertInto(irFunc->getParent());
+            auto loweredVal = lowerRValueExpr(subContext, attr->funcExpr);
+
+            SLANG_ASSERT(loweredVal.flavor == LoweredValInfo::Flavor::Simple);
+            IRInst* originalFunc = loweredVal.val;
+            getBuilder()->addDecoration(irFunc, kIROp_ForwardDerivativeDecoration, originalFunc);
+
+            subContext->irBuilder->setInsertInto(irFunc);
         }
 
         // For convenience, ensure that any additional global
@@ -8237,6 +8264,17 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         auto finalVal = finishOuterGenerics(subBuilder, irFunc, outerGeneric);
 
         return LoweredValInfo::simple(finalVal);
+    }
+
+    LoweredValInfo lowerFuncDecl(FunctionDeclBase* decl)
+    {
+        // We are going to use a nested builder, because we will
+        // change the parent node that things get nested into.
+        //
+        NestedContext nestedContextFunc(this);
+        auto subBuilder = nestedContextFunc.getBuilder();
+        auto subContext = nestedContextFunc.getContext();
+        return lowerFuncDeclInContext(subContext, subBuilder, decl);
     }
 
     LoweredValInfo visitGenericDecl(GenericDecl * genDecl)

@@ -2859,9 +2859,6 @@ __attributeTarget(InterfaceDecl)
 attribute_syntax [Specialize] : SpecializeAttribute;
 
 __attributeTarget(DeclBase)
-attribute_syntax [DerivativeMember(memberName)] : DerivativeMemberAttribute;
-
-__attributeTarget(DeclBase)
 attribute_syntax [builtin] : BuiltinAttribute;
 
 __attributeTarget(DeclBase)

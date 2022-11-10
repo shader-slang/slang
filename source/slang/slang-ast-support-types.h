@@ -474,6 +474,10 @@ namespace Slang
         ModifiableSyntaxNode*    syntax,
         Modifier*                modifier);
 
+    void removeModifier(
+        ModifiableSyntaxNode* syntax,
+        Modifier* modifier);
+
     struct QualType
     {
         SLANG_VALUE_CLASS(QualType) 

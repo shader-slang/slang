@@ -9,19 +9,19 @@ typedef DifferentialPair<float> dpfloat;
 [ForwardDifferentiable]
 float f(float x)
 {
-    return dstd.exp(x);
+    return exp(x);
 }
 
 [ForwardDifferentiable]
 float g(float x)
 {
-    return dstd.sin(x);
+    return sin(x);
 }
 
 [ForwardDifferentiable]
 float h(float x)
 {
-    return dstd.cos(x);
+    return cos(x);
 }
 
 [numthreads(1, 1, 1)]
