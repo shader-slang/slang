@@ -10,7 +10,7 @@ typedef DifferentialPair<float> dpfloat;
 float f(float x)
 {
     float3 vx = float3(x, 2*x, 3*x);
-    float3 vexpx = dstd.exp(vx);
+    float3 vexpx = exp(vx);
     return vexpx.x + vexpx.y + vexpx.z;
 }
 

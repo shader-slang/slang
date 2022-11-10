@@ -542,6 +542,8 @@ namespace Slang
             Expr*    base,
             SourceLoc       loc);
 
+        InvokeExpr* constructUncheckedInvokeExpr(Expr* callee, const List<Expr*>& arguments);
+
         Expr* maybeUseSynthesizedDeclForLookupResult(
             LookupResultItem const& item,
             Expr* orignalExpr);

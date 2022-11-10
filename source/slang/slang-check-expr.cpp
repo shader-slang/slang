@@ -393,6 +393,15 @@ namespace Slang
         return derefExpr;
     }
 
+    InvokeExpr* SemanticsVisitor::constructUncheckedInvokeExpr(Expr* callee, const List<Expr*>& arguments)
+    {
+        auto result = m_astBuilder->create<InvokeExpr>();
+        result->loc = callee->loc;
+        result->functionExpr = callee;
+        result->arguments.addRange(arguments);
+        return result;
+    }
+
     Expr* SemanticsVisitor::maybeUseSynthesizedDeclForLookupResult(LookupResultItem const& item, Expr* originalExpr)
     {
         // If the only result from lookup is an entry in an interface decl, it could be that

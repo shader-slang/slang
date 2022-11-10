@@ -463,10 +463,7 @@ protected:
 class DifferentialPairType : public ArithmeticExpressionType 
 {
     SLANG_AST_CLASS(DifferentialPairType)
-
-    // The type of vector elements.
-    // As an invariant, this should be a basic type or an alias.
-    Type* baseType = nullptr;
+    Type* getPrimalType();
 };
 
 class DifferentiableType : public BuiltinType
