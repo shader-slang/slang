@@ -2,15 +2,81 @@
 
 #include "slang-ir-insts.h"
 #include "slang-ir.h"
+#include "slang-ir-restructure.h"
 
 namespace Slang
 {
+
+BreakableRegion* findBreakableRegion(Region* region)
+{
+    for (;;)
+    {
+        if (auto b = as<BreakableRegion>(region))
+            return b;
+        region = region->getParent();
+        if (!region)
+            return nullptr;
+    }
+}
+
+bool isTrivialSingleIterationLoop(IRLoop* loop, RegionTree* regionTree)
+{
+    if (!regionTree)
+        return false;
+    auto targetBlock = loop->getTargetBlock();
+    if (targetBlock->getPredecessors().getCount() != 1) return false;
+    if (*targetBlock->getPredecessors().begin() != loop->getParent()) return false;
+    SimpleRegion* targetBlockRegion = nullptr;
+    if (!regionTree->mapBlockToRegion.TryGetValue(targetBlock, targetBlockRegion))
+        return false;
+    BreakableRegion* loopBreakableRegion = findBreakableRegion(targetBlockRegion);
+    LoopRegion* loopRegion = as<LoopRegion>(loopBreakableRegion);
+    if (!loopRegion)
+        return false;
+    auto func = as<IRGlobalValueWithCode>(loop->getParent()->getParent());
+    if (!func)
+        return false;
+
+    int useCount = 0;
+    for (auto use = loop->getBreakBlock()->firstUse; use; use = use->nextUse)
+    {
+        if (use->getUser() == loop)
+            continue;
+        useCount++;
+        if (useCount > 1)
+            return false;
+    }
+
+    for (auto block : func->getBlocks())
+    {
+        SimpleRegion* region = nullptr;
+        if (!regionTree->mapBlockToRegion.TryGetValue(block, region))
+            return false;
+        if (!region->isDescendentOf(loopRegion))
+            continue;
+        for (auto branchTarget : block->getSuccessors())
+        {
+            SimpleRegion* targetRegion = nullptr;
+            if (!regionTree->mapBlockToRegion.TryGetValue(branchTarget, targetRegion))
+                return false;
+            // If multi-level break out that skips over this loop exists, then this is not a trivial loop.
+            if (targetRegion->isDescendentOf(loopRegion))
+                continue;
+            if (targetBlock != loop->getBreakBlock())
+                return false;
+        }
+    }
+
+    return true;
+}
 
 bool processFunc(IRGlobalValueWithCode* func)
 {
     auto firstBlock = func->getFirstBlock();
     if (!firstBlock)
         return false;
+
+    auto regionTree = generateRegionTreeForFunc(func, nullptr);
 
     SharedIRBuilder sharedBuilder(func->getModule());
     IRBuilder builder(&sharedBuilder);
@@ -35,10 +101,12 @@ bool processFunc(IRGlobalValueWithCode* func)
                     loop->continueBlock.set(loop->getTargetBlock());
                     continueBlock->removeAndDeallocate();
                 }
-                // If there isn't any actual back jumps into loop target, remove the header
-                // and turn it into a normal branch.
+
+                // If there isn't any actual back jumps into loop target and there is a trivial
+                // break at the end of the loop out of it, we can remove the header and turn it into
+                // a normal branch.
                 auto targetBlock = loop->getTargetBlock();
-                if (targetBlock->getPredecessors().getCount() == 1 && *targetBlock->getPredecessors().begin() == block)
+                if (isTrivialSingleIterationLoop(loop, regionTree))
                 {
                     builder.setInsertBefore(loop);
                     List<IRInst*> args;
