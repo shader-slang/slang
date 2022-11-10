@@ -8,7 +8,13 @@
 namespace Slang
 {
 
-BreakableRegion* findBreakableRegion(Region* region)
+struct CFGSimplificationContext
+{
+    RefPtr<RegionTree> regionTree;
+    RefPtr<IRDominatorTree> domTree;
+};
+
+static BreakableRegion* findBreakableRegion(Region* region)
 {
     for (;;)
     {
@@ -23,11 +29,10 @@ BreakableRegion* findBreakableRegion(Region* region)
 // Test if a loop is trivial: a trivial loop runs for a single iteration without any back edges, and
 // there is only one break out of the loop at the very end. The function generates `regionTree` if
 // it is needed and hasn't been generated yet.
-bool isTrivialSingleIterationLoop(
+static bool isTrivialSingleIterationLoop(
     IRGlobalValueWithCode* func,
     IRLoop* loop,
-    RefPtr<IRDominatorTree>& dom,
-    RefPtr<RegionTree>& regionTree)
+    CFGSimplificationContext& inoutContext)
 {
     auto targetBlock = loop->getTargetBlock();
     if (targetBlock->getPredecessors().getCount() != 1) return false;
@@ -48,13 +53,13 @@ bool isTrivialSingleIterationLoop(
     // We need to verify this is a trivial loop by checking if there is any multi-level breaks
     // that skips out of this loop.
 
-    if (!dom)
-        dom = computeDominatorTree(func);
-    if (!regionTree)
-        regionTree = generateRegionTreeForFunc(func, nullptr);
+    if (!inoutContext.domTree)
+        inoutContext.domTree = computeDominatorTree(func);
+    if (!inoutContext.regionTree)
+        inoutContext.regionTree = generateRegionTreeForFunc(func, nullptr);
 
     SimpleRegion* targetBlockRegion = nullptr;
-    if (!regionTree->mapBlockToRegion.TryGetValue(targetBlock, targetBlockRegion))
+    if (!inoutContext.regionTree->mapBlockToRegion.TryGetValue(targetBlock, targetBlockRegion))
         return false;
     BreakableRegion* loopBreakableRegion = findBreakableRegion(targetBlockRegion);
     LoopRegion* loopRegion = as<LoopRegion>(loopBreakableRegion);
@@ -62,18 +67,18 @@ bool isTrivialSingleIterationLoop(
         return false;
     for (auto block : func->getBlocks())
     {
-        if (!dom->dominates(loop->getTargetBlock(), block))
+        if (!inoutContext.domTree->dominates(loop->getTargetBlock(), block))
             continue;
-        if (dom->dominates(loop->getBreakBlock(), block))
+        if (inoutContext.domTree->dominates(loop->getBreakBlock(), block))
             continue;
         SimpleRegion* region = nullptr;
-        if (!regionTree->mapBlockToRegion.TryGetValue(block, region))
+        if (!inoutContext.regionTree->mapBlockToRegion.TryGetValue(block, region))
             return false;
 
         for (auto branchTarget : block->getSuccessors())
         {
             SimpleRegion* targetRegion = nullptr;
-            if (!regionTree->mapBlockToRegion.TryGetValue(branchTarget, targetRegion))
+            if (!inoutContext.regionTree->mapBlockToRegion.TryGetValue(branchTarget, targetRegion))
                 return false;
             // If multi-level break out that skips over this loop exists, then this is not a trivial loop.
             if (targetRegion->isDescendentOf(loopRegion))
@@ -91,15 +96,14 @@ bool isTrivialSingleIterationLoop(
     return true;
 }
 
-bool processFunc(IRGlobalValueWithCode* func)
+static bool processFunc(IRGlobalValueWithCode* func)
 {
     auto firstBlock = func->getFirstBlock();
     if (!firstBlock)
         return false;
 
     // Lazily generated region tree.
-    RefPtr<RegionTree> regionTree;
-    RefPtr<IRDominatorTree> domTree;
+    CFGSimplificationContext simplificationContext;
 
     SharedIRBuilder sharedBuilder(func->getModule());
     IRBuilder builder(&sharedBuilder);
@@ -129,7 +133,7 @@ bool processFunc(IRGlobalValueWithCode* func)
                 // break at the end of the loop, we can remove the header and turn it into
                 // a normal branch.
                 auto targetBlock = loop->getTargetBlock();
-                if (isTrivialSingleIterationLoop(func, loop, domTree, regionTree))
+                if (isTrivialSingleIterationLoop(func, loop, simplificationContext))
                 {
                     builder.setInsertBefore(loop);
                     List<IRInst*> args;
