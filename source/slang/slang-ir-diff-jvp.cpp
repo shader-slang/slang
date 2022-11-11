@@ -2545,7 +2545,7 @@ struct BackwardDiffTranscriber
 
     // Stores the mapping of arbitrary 'R-value' instructions to instructions that represent
     // their differential values.
-    Dictionary<IRInst*, IRInst*>            instMapD;
+    Dictionary<IRInst*, IRInst*> orginalToTranscribed;
 
     // Set of insts currently being transcribed. Used to avoid infinite loops.
     HashSet<IRInst*>                        instsInProgress;
@@ -2570,7 +2570,6 @@ struct BackwardDiffTranscriber
     // Map that stores the upper gradient given an IRInst*
     Dictionary<IRInst*, List<IRInst*>> upperGradients;
     Dictionary<IRInst*, IRInst*> primalToDiffParams;
-    Dictionary<IRInst*, IRInst*> paramsToDiffParams;
 
     SharedIRBuilder* sharedBuilder;
     // Witness table that `DifferentialBottom:IDifferential`.
@@ -2587,65 +2586,6 @@ struct BackwardDiffTranscriber
         return sink;
     }
 
-    void mapDifferentialInst(IRInst* origInst, IRInst* diffInst)
-    {
-        if (hasDifferentialInst(origInst))
-        {
-            if (lookupDiffInst(origInst) != diffInst)
-            {
-                SLANG_UNEXPECTED("Inconsistent differential mappings");
-            }
-        }
-        else
-        {
-            instMapD.Add(origInst, diffInst);
-        }
-    }
-
-    void mapPrimalInst(IRInst* origInst, IRInst* primalInst)
-    {
-        if (cloneEnv.mapOldValToNew.ContainsKey(origInst) && cloneEnv.mapOldValToNew[origInst] != primalInst)
-        {
-            getSink()->diagnose(origInst->sourceLoc,
-                Diagnostics::internalCompilerError,
-                "inconsistent primal instruction for original");
-        }
-        else
-        {
-            cloneEnv.mapOldValToNew[origInst] = primalInst;
-        }
-    }
-
-    IRInst* lookupDiffInst(IRInst* origInst)
-    {
-        return instMapD[origInst];
-    }
-
-    IRInst* lookupDiffInst(IRInst* origInst, IRInst* defaultInst)
-    {
-        return (hasDifferentialInst(origInst)) ? instMapD[origInst] : defaultInst;
-    }
-
-    bool hasDifferentialInst(IRInst* origInst)
-    {
-        return instMapD.ContainsKey(origInst);
-    }
-
-    IRInst* lookupPrimalInst(IRInst* origInst)
-    {
-        return cloneEnv.mapOldValToNew[origInst];
-    }
-
-    IRInst* lookupPrimalInst(IRInst* origInst, IRInst* defaultInst)
-    {
-        return (hasPrimalInst(origInst)) ? lookupPrimalInst(origInst) : defaultInst;
-    }
-
-    bool hasPrimalInst(IRInst* origInst)
-    {
-        return cloneEnv.mapOldValToNew.ContainsKey(origInst);
-    }
-
     IRFuncType* differentiateFunctionType(IRBuilder* builder, IRFuncType* funcType)
     {
         List<IRType*> newParameterTypes;
@@ -2654,7 +2594,6 @@ struct BackwardDiffTranscriber
         for (UIndex i = 0; i < funcType->getParamCount(); i++)
         {
             auto origType = funcType->getParamType(i);
-            origType = (IRType*)lookupPrimalInst(origType, origType);
             if (auto diffPairType = tryGetDiffPairType(builder, origType))
             {
                 auto inoutDiffPairType = builder->getPtrType(kIROp_InOutType, diffPairType);
@@ -2730,10 +2669,10 @@ struct BackwardDiffTranscriber
     IRType* differentiateType(IRBuilder* builder, IRType* origType)
     {
         IRInst* diffType = nullptr;
-        if (!instMapD.TryGetValue(origType, diffType))
+        if (!orginalToTranscribed.TryGetValue(origType, diffType))
         {
             diffType = _differentiateTypeImpl(builder, origType);
-            instMapD[origType] = diffType;
+            orginalToTranscribed[origType] = diffType;
         }
         return (IRType*)diffType;
     }
@@ -2748,7 +2687,7 @@ struct BackwardDiffTranscriber
         // If there is an explicit primal version of this type in the local scope, load that
         // otherwise use the original type. 
         //
-        IRInst* primalType = lookupPrimalInst(origType, origType);
+        IRInst* primalType = origType;
 
         // Special case certain compound types (PtrType, FuncType, etc..)
         // otherwise try to lookup a differential definition for the given type.
@@ -2835,7 +2774,7 @@ struct BackwardDiffTranscriber
 
     InstPair transcribeParam(IRBuilder* builder, IRParam* origParam)
     {
-        auto primalDataType = lookupPrimalInst(origParam->getDataType(), origParam->getDataType());
+        auto primalDataType = origParam->getDataType();
         // Do not differentiate generic type (and witness table) parameters
         if (as<IRTypeType>(primalDataType) || as<IRWitnessTableType>(primalDataType))
         {
@@ -2874,19 +2813,6 @@ struct BackwardDiffTranscriber
         return InstPair(
             cloneInst(&cloneEnv, builder, origParam),
             nullptr);
-    }
-
-    // Returns "d<var-name>" to use as a name hint for variables and parameters.
-    // If no primal name is available, returns a blank string.
-    // 
-    String getJVPVarName(IRInst* origVar)
-    {
-        if (auto namehintDecoration = origVar->findDecoration<IRNameHintDecoration>())
-        {
-            return ("d" + String(namehintDecoration->getName()));
-        }
-
-        return String("");
     }
 
     // Returns "dp<var-name>" to use as a name hint for parameters.
@@ -2948,13 +2874,6 @@ struct BackwardDiffTranscriber
         subBuilder.setInsertLoc(builder->getInsertLoc());
 
         IRBlock* diffBlock = subBuilder.emitBlock();
-
-        // Note: for blocks, we setup the mapping _before_
-        // processing the children since we could encounter
-        // a lookup while processing the children.
-        // 
-        mapPrimalInst(origBlock, diffBlock);
-        mapDifferentialInst(origBlock, diffBlock);
 
         subBuilder.setInsertInto(diffBlock);
 
@@ -3056,7 +2975,7 @@ struct BackwardDiffTranscriber
 
     IRInst* copyParam(IRBuilder* builder, IRParam* origParam)
     {
-        auto primalDataType = lookupPrimalInst(origParam->getDataType(), origParam->getDataType());
+        auto primalDataType = origParam->getDataType();
 
         if (auto diffPairType = tryGetDiffPairType(builder, (IRType*)primalDataType))
         {
@@ -3070,7 +2989,7 @@ struct BackwardDiffTranscriber
             SLANG_ASSERT(diffParam);
             auto paramValue = builder->emitLoad(diffParam);
             auto primal = builder->emitDifferentialPairGetPrimal(paramValue);
-            paramsToDiffParams.Add(origParam, primal);
+            orginalToTranscribed.Add(origParam, primal);
             primalToDiffParams.Add(primal, diffParam);
 
             return diffParam;
@@ -3088,12 +3007,12 @@ struct BackwardDiffTranscriber
         auto origRight = origArith->getOperand(1);
 
         IRInst* primalLeft;
-        if (!paramsToDiffParams.TryGetValue(origLeft, primalLeft))
+        if (!orginalToTranscribed.TryGetValue(origLeft, primalLeft))
         {
             primalLeft = origLeft;
         }
         IRInst* primalRight;
-        if (!paramsToDiffParams.TryGetValue(origRight, primalRight))
+        if (!orginalToTranscribed.TryGetValue(origRight, primalRight))
         {
             primalRight = origRight;
         }
@@ -3119,7 +3038,7 @@ struct BackwardDiffTranscriber
                 Diagnostics::unimplemented,
                 "this arithmetic instruction cannot be differentiated");
         }
-        paramsToDiffParams.Add(origArith, newInst);
+        orginalToTranscribed.Add(origArith, newInst);
         return InstPair(newInst, nullptr);
     }
 
