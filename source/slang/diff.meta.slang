@@ -190,138 +190,122 @@ DifferentialPair<vector<T, N>> __d_cos_vector(DifferentialPair<vector<T, N>> dpx
     VECTOR_MAP_D_UNARY(T, N, __d_cos, dpx);
 }
 
-/*
+// Base-e logarithm
 
-    // Base-e logarithm
-    // TODO: vectorize
-    __generic<T : IDFloat>
-    __target_intrinsic(hlsl)
-    __target_intrinsic(glsl)
-    __target_intrinsic(cuda, "$P_log($0)")
-    __target_intrinsic(cpp, "$P_log($0)")
-    __target_intrinsic(spirv_direct, "12 resultType resultId glsl450 28 _0")
-    [ForwardDerivative(d_log<T>)]
-    T log(T x);
-
-    __generic<T : IDFloat>
-    DifferentialPair<T> d_log(DifferentialPair<T> dpx)
-    {
-        return DifferentialPair<T>(
-            log(dpx.p()),
-            T.dmul(T(1.0) / dpx.p(), dpx.d())
-        );
-    }
-
-    // Sqrt root
-    // TODO: vectorize
-    __generic<T : IDFloat>
-    __target_intrinsic(hlsl)
-    __target_intrinsic(glsl)
-    __target_intrinsic(cuda, "$P_sqrt($0)")
-    __target_intrinsic(cpp, "$P_sqrt($0)")
-    __target_intrinsic(spirv_direct, "12 resultType resultId glsl450 31 _0")
-    [ForwardDerivative(d_sqrt<T>)]
-    T sqrt(T x);
-
-    __generic<T : IDFloat>
-    DifferentialPair<T> d_sqrt(DifferentialPair<T> dpx)
-    {
-        // Special case
-
-        //if (dpx.p() < T(1e-6f))
-        //{
-        //    return DifferentialPair<T>(T(0.0), T.dzero());
-        //}
-
-        T val = sqrt(dpx.p());
-        return DifferentialPair<T>(
-            val,
-            T.dmul(T(0.5) / val, dpx.d())
-        );
-    }
-
-    // Maximum
-    // TODO: vectorize
-    __generic<T : IDFloat>
-    __target_intrinsic(hlsl)
-    __target_intrinsic(glsl)
-    __target_intrinsic(cuda, "$P_max($0, $1)")
-    __target_intrinsic(cpp, "$P_max($0, $1)")
-    __target_intrinsic(spirv_direct, "12 resultType resultId glsl450 fus(40,41,42) _0")
-    [ForwardDerivative(d_max<T>)]
-    T max(T x, T y);
-
-    __generic<T : IDFloat>
-    DifferentialPair<T> d_max(DifferentialPair<T> dpx, DifferentialPair<T> dpy)
-    {
-        //// x.p > y.p ? x.d : y.d <==> 0.5 * ((x.d + y.d) + sign(x.p - y.p) * (x.d - y.d))
-        T.Differential d_res = T.dmul(sign(dpx.p() - dpy.p()), T.dadd(dpx.d(), T.dmul(T(-1.0), dpy.d())));
-        d_res = T.dadd(T.dadd(dpx.d(), dpy.d()), d_res);
-
-        return DifferentialPair<T>(
-            max(dpx.p(), dpy.p()),
-            T.dmul(T(0.5), d_res)
-            //dpx.p() > dpy.p() ? dpx.d() : dpy.d()
-        );
-    }
-
-    // Raise to a power
-    // TODO: vectorize
-    __generic<T : IDFloat>
-    __target_intrinsic(hlsl)
-    __target_intrinsic(glsl)
-    __target_intrinsic(cuda, "$P_pow($0, $1)")
-    __target_intrinsic(cpp, "$P_pow($0, $1)")
-    __target_intrinsic(spirv_direct, "12 resultType resultId glsl450 26 _0 _1")
-    [ForwardDerivative(d_pow<T>)]
-    T pow(T x, T y);
-
-    __generic<T : IDFloat>
-    DifferentialPair<T> d_pow(DifferentialPair<T> dpx, DifferentialPair<T> dpy)
-    {
-        // Special case
-        //if (dpx.p() < T(1e-6f))
-        //{
-        //    return DifferentialPair<T>(T(0.0), T.dzero());
-        //}
-
-        T val = pow(dpx.p(), dpy.p());
-        T.Differential d1 = T.dmul(val * log(dpx.p()), dpy.d());
-        T.Differential d2 = T.dmul(val * dpy.p() / dpx.p(), dpx.d());
-        return DifferentialPair<T>(
-            val,
-            T.dadd(d1, d2)
-        );
-    }
-
-    // Vector dot product
-    __generic<let N : int>
-    __target_intrinsic(hlsl)
-    __target_intrinsic(glsl)
-    [ForwardDerivative(d_dot<N>)]
-    float dot(vector<float, N> x, vector<float, N> y)
-    {
-        float result = 0.f;
-        for (int i = 0; i < N; ++i)
-            result = result + x[i] * y[i];
-        return result;
-    }
-
-    __generic<let N : int>
-    DifferentialPair<float> d_dot(DifferentialPair<vector<float, N>> dpx, DifferentialPair<vector<float, N>> dpy)
-    {
-        float result = 0.f;
-        float.Differential d_result = float.dzero();
-        for (int i = 0; i < N; ++i)
-        {
-            result = result + dpx.p()[i] * dpy.p()[i];
-            d_result = d_result + dpx.p()[i] * dpy.d()[i] + dpx.d()[i] * dpy.p()[i];
-        }
-        return DifferentialPair<float>(result, d_result);
-    }
-};
+__generic<T : __BuiltinFloatingPointType>
+[ForwardDerivativeOf(log)]
+DifferentialPair<T> __d_log(DifferentialPair<T> dpx)
+{
     return DifferentialPair<T>(
-        exp(dpx.p),
-        T.dmul(exp(dpx.p), dpx.d));
+        log(dpx.p),
+        T.dmul(T(1.0) / dpx.p, dpx.d)
+    );
+}
+
+__generic<T : __BuiltinFloatingPointType, let N : int>
+[ForwardDerivativeOf(log)]
+DifferentialPair<vector<T, N>> __d_log_vector(DifferentialPair<vector<T, N>> dpx)
+{
+    VECTOR_MAP_D_UNARY(T, N, __d_log, dpx);
+}
+
+// Square root
+
+__generic<T : __BuiltinFloatingPointType>
+[ForwardDerivativeOf(sqrt)]
+DifferentialPair<T> __d_sqrt(DifferentialPair<T> dpx)
+{
+    // Special case
+    if (dpx.p < T(1e-6))
+    {
+        return DifferentialPair<T>(T(0.0), T.dzero());
+    }
+
+    T val = sqrt(dpx.p);
+    return DifferentialPair<T>(
+        val,
+        T.dmul(T(0.5) / val, dpx.d)
+    );
+}
+
+__generic<T : __BuiltinFloatingPointType, let N : int>
+[ForwardDerivativeOf(sqrt)]
+DifferentialPair<vector<T, N>> __d_sqrt_vector(DifferentialPair<vector<T, N>> dpx)
+{
+    VECTOR_MAP_D_UNARY(T, N, __d_sqrt, dpx);
+}
+
+// Maximum
+// TODO: vectorize
+
+__generic<T : __BuiltinFloatingPointType>
+[ForwardDerivativeOf(max)]
+DifferentialPair<T> __d_max(DifferentialPair<T> dpx, DifferentialPair<T> dpy)
+{
+    return DifferentialPair<T>(
+        max(dpx.p, dpy.p),
+        dpx.p > dpy.p ? dpx.d : dpy.d
+    );
+}
+
+/*
+__generic<T : __BuiltinFloatingPointType, let N : int>
+[ForwardDerivativeOf(max)]
+DifferentialPair<vector<T, N>> __d_max(DifferentialPair<vector<T, N>> dpx, DifferentialPair<vector<T, N>> dpy)
+{
+    VECTOR_MAP_D_BINARY(T, N, __d_max, dpx, dpy);
 }
 */
+
+// Minimum
+// TODO: vectorize
+
+__generic<T : __BuiltinFloatingPointType>
+[ForwardDerivativeOf(min)]
+DifferentialPair<T> __d_min(DifferentialPair<T> dpx, DifferentialPair<T> dpy)
+{
+    return DifferentialPair<T>(
+        min(dpx.p, dpy.p),
+        dpx.p < dpy.p ? dpx.d : dpy.d
+    );
+}
+
+// Raise to a power
+// TODO: vectorize
+
+__generic<T : __BuiltinFloatingPointType>
+[ForwardDerivativeOf(pow)]
+DifferentialPair<T> __d_pow(DifferentialPair<T> dpx, DifferentialPair<T> dpy)
+{
+    // Special case
+    if (dpx.p < T(1e-6))
+    {
+        return DifferentialPair<T>(T(0.0), T.dzero());
+    }
+
+    T val = pow(dpx.p, dpy.p);
+    T.Differential d1 = T.dmul(val * log(dpx.p), dpy.d);
+    T.Differential d2 = T.dmul(val * dpy.p / dpx.p, dpx.d);
+    return DifferentialPair<T>(
+        val,
+        T.dadd(d1, d2)
+    );
+}
+
+// Vector dot product
+
+__generic<T : __BuiltinFloatingPointType, let N : int>
+[ForwardDerivativeOf(dot)]
+DifferentialPair<T> __d_dot(DifferentialPair<vector<T, N>> dpx, DifferentialPair<vector<T, N>> dpy)
+{
+    T result = T(0);
+    T.Differential d_result = T.dzero();
+    for (int i = 0; i < N; ++i)
+    {
+        result = result + dpx.p[i] * dpy.p[i];
+        d_result = T.dadd(d_result, T.dmul(dpx.p[i], __slang_noop_cast<T.Differential>(dpy.d[i])));
+        d_result = T.dadd(d_result, T.dmul(dpy.p[i], __slang_noop_cast<T.Differential>(dpx.d[i])));
+        //d_result = __slang_noop_cast<T>(d_result) + dpx.p[i] * __slang_noop_cast<T>(dpy.d[i]) + __slang_noop_cast<T>(dpx.d[i]) * dpy.p[i];
+    }
+    return DifferentialPair<T>(result, d_result);
+}

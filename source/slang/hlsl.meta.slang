@@ -773,19 +773,21 @@ void abort();
 // Detach and set derivatives to zero
 
 __generic<T : __BuiltinFloatingPointType>
-__target_intrinsic(hlsl)
-__target_intrinsic(glsl)
 T detach(T x)
 {
     return x;
 }
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
-__target_intrinsic(hlsl)
-__target_intrinsic(glsl)
 vector<T, N> detach(vector<T, N> x)
 {
     VECTOR_MAP_UNARY(T, N, detach, x);
+}
+
+__generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
+matrix<T, N, M> detach(matrix<T, N, M> x)
+{
+    MATRIX_MAP_UNARY(T, N, M, detach, x);
 }
 
 // Absolute value (HLSL SM 1.0)
@@ -1313,7 +1315,7 @@ matrix<T, N, M> ceil(matrix<T, N, M> x)
 bool CheckAccessFullyMapped(uint status);
 
 // Clamp (HLSL SM 1.0)
-__generic<T : __BuiltinArithmeticType>
+__generic<T : __BuiltinIntegerType>
 __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
 __target_intrinsic(spirv_direct, "12 resultType resultId glsl450 fus(43,44,45) _0 _1 _2")
@@ -1322,7 +1324,7 @@ T clamp(T x, T minBound, T maxBound)
     return min(max(x, minBound), maxBound);
 }
 
-__generic<T : __BuiltinArithmeticType, let N : int>
+__generic<T : __BuiltinIntegerType, let N : int>
 __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
 __target_intrinsic(spirv_direct, "12 resultType resultId glsl450 fus(43,44,45) _0 _1 _2")
@@ -1331,7 +1333,32 @@ vector<T, N> clamp(vector<T, N> x, vector<T, N> minBound, vector<T, N> maxBound)
     return min(max(x, minBound), maxBound);
 }
 
-__generic<T : __BuiltinArithmeticType, let N : int, let M : int>
+__generic<T : __BuiltinIntegerType, let N : int, let M : int>
+__target_intrinsic(hlsl)
+matrix<T,N,M> clamp(matrix<T,N,M> x, matrix<T,N,M> minBound, matrix<T,N,M> maxBound)
+{
+    return min(max(x, minBound), maxBound);
+}
+
+__generic<T : __BuiltinFloatingPointType>
+__target_intrinsic(hlsl)
+__target_intrinsic(glsl)
+__target_intrinsic(spirv_direct, "12 resultType resultId glsl450 fus(43,44,45) _0 _1 _2")
+T clamp(T x, T minBound, T maxBound)
+{
+    return min(max(x, minBound), maxBound);
+}
+
+__generic<T : __BuiltinFloatingPointType, let N : int>
+__target_intrinsic(hlsl)
+__target_intrinsic(glsl)
+__target_intrinsic(spirv_direct, "12 resultType resultId glsl450 fus(43,44,45) _0 _1 _2")
+vector<T, N> clamp(vector<T, N> x, vector<T, N> minBound, vector<T, N> maxBound)
+{
+    return min(max(x, minBound), maxBound);
+}
+
+__generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 __target_intrinsic(hlsl)
 matrix<T,N,M> clamp(matrix<T,N,M> x, matrix<T,N,M> minBound, matrix<T,N,M> maxBound)
 {
@@ -2509,7 +2536,7 @@ matrix<T, N, M> mad(matrix<T, N, M> mvalue, matrix<T, N, M> avalue, matrix<T, N,
 }
 
 // maximum
-__generic<T : __BuiltinArithmeticType>
+__generic<T : __BuiltinIntegerType>
 __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
 __target_intrinsic(cuda, "$P_max($0, $1)")
@@ -2521,7 +2548,7 @@ T max(T x, T y);
 // version needs to correctly handle the case where one of the inputs
 // is not-a-number.
 
-__generic<T : __BuiltinArithmeticType, let N : int>
+__generic<T : __BuiltinIntegerType, let N : int>
 __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
 __target_intrinsic(spirv_direct, "12 resultType resultId glsl450 fus(40,41,42) _0")
@@ -2530,7 +2557,31 @@ vector<T, N> max(vector<T, N> x, vector<T, N> y)
     VECTOR_MAP_BINARY(T, N, max, x, y);
 }
 
-__generic<T : __BuiltinArithmeticType, let N : int, let M : int>
+__generic<T : __BuiltinIntegerType, let N : int, let M : int>
+__target_intrinsic(hlsl)
+matrix<T, N, M> max(matrix<T, N, M> x, matrix<T, N, M> y)
+{
+    MATRIX_MAP_BINARY(T, N, M, max, x, y);
+}
+
+__generic<T : __BuiltinFloatingPointType>
+__target_intrinsic(hlsl)
+__target_intrinsic(glsl)
+__target_intrinsic(cuda, "$P_max($0, $1)")
+__target_intrinsic(cpp, "$P_max($0, $1)")
+__target_intrinsic(spirv_direct, "12 resultType resultId glsl450 fus(40,41,42) _0")
+T max(T x, T y);
+
+__generic<T : __BuiltinFloatingPointType, let N : int>
+__target_intrinsic(hlsl)
+__target_intrinsic(glsl)
+__target_intrinsic(spirv_direct, "12 resultType resultId glsl450 fus(40,41,42) _0")
+vector<T, N> max(vector<T, N> x, vector<T, N> y)
+{
+    VECTOR_MAP_BINARY(T, N, max, x, y);
+}
+
+__generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 __target_intrinsic(hlsl)
 matrix<T, N, M> max(matrix<T, N, M> x, matrix<T, N, M> y)
 {
@@ -2538,7 +2589,7 @@ matrix<T, N, M> max(matrix<T, N, M> x, matrix<T, N, M> y)
 }
 
 // minimum
-__generic<T : __BuiltinArithmeticType>
+__generic<T : __BuiltinIntegerType>
 __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
 __target_intrinsic(cuda, "$P_min($0, $1)")
@@ -2546,7 +2597,7 @@ __target_intrinsic(cpp, "$P_min($0, $1)")
 __target_intrinsic(spirv_direct, "12 resultType resultId glsl450 fus(37,38,39) _0")
 T min(T x, T y);
 
-__generic<T : __BuiltinArithmeticType, let N : int>
+__generic<T : __BuiltinIntegerType, let N : int>
 __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
 __target_intrinsic(spirv_direct, "12 resultType resultId glsl450 fus(37,38,39) _0")
@@ -2555,7 +2606,31 @@ vector<T,N> min(vector<T,N> x, vector<T,N> y)
     VECTOR_MAP_BINARY(T, N, min, x, y);
 }
 
-__generic<T : __BuiltinArithmeticType, let N : int, let M : int>
+__generic<T : __BuiltinIntegerType, let N : int, let M : int>
+__target_intrinsic(hlsl)
+matrix<T,N,M> min(matrix<T,N,M> x, matrix<T,N,M> y)
+{
+    MATRIX_MAP_BINARY(T, N, M, min, x, y);
+}
+
+__generic<T : __BuiltinFloatingPointType>
+__target_intrinsic(hlsl)
+__target_intrinsic(glsl)
+__target_intrinsic(cuda, "$P_min($0, $1)")
+__target_intrinsic(cpp, "$P_min($0, $1)")
+__target_intrinsic(spirv_direct, "12 resultType resultId glsl450 fus(37,38,39) _0")
+T min(T x, T y);
+
+__generic<T : __BuiltinFloatingPointType, let N : int>
+__target_intrinsic(hlsl)
+__target_intrinsic(glsl)
+__target_intrinsic(spirv_direct, "12 resultType resultId glsl450 fus(37,38,39) _0")
+vector<T,N> min(vector<T,N> x, vector<T,N> y)
+{
+    VECTOR_MAP_BINARY(T, N, min, x, y);
+}
+
+__generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 __target_intrinsic(hlsl)
 matrix<T,N,M> min(matrix<T,N,M> x, matrix<T,N,M> y)
 {
