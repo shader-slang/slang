@@ -112,7 +112,7 @@ interface __BuiltinIntegerType : __BuiltinArithmeticType
 /// hasn't been declared explicitly.
 /// Note that the requirements must currently be defined in this exact order
 /// since the auto-diff pass relies on the order to grab the struct keys.
-///
+/// 
 __magic_type(DifferentiableType)
 interface IDifferentiable
 {
@@ -371,11 +371,7 @@ ${{{{
         static $(kBaseTypes[tt].name) getPi() { return $(kBaseTypes[tt].name)(3.14159265358979323846264338328); }
 
         typedef $(kBaseTypes[tt].name) Differential;
-<<<<<<< HEAD
-
-=======
     
->>>>>>> 70470dab... Make `__BuiltinFloatingPointType` conform to `IDifferentiable`. (#2499)
         [__unsafeForceInlineEarly]
         static Differential dzero()
         {
@@ -1190,7 +1186,7 @@ for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
                         switch(baseShape)
                         {
                         case TextureFlavor::Shape::Shape1D:
-                            sb << "($" << aa++ << opStr << ")";
+                            sb << "($" << aa++ << opStr << ")"; 
                             if (isArray)
                             {
                                 sb << ".x";
@@ -1369,7 +1365,7 @@ for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
                                     }
 
                                     // Surface access is *byte* addressed in x in CUDA
-                                    if (i == 0)
+                                    if (i == 0) 
                                     {
                                         sb << " * $E";
                                     }
@@ -1390,7 +1386,7 @@ for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
                                 sb << "read";
 
                                 // Surface access is *byte* addressed in x in CUDA
-                                sb << "<$T0>($0, ($1).x * $E, ($1).y, ($1).z";
+                                sb << "<$T0>($0, ($1).x * $E, ($1).y, ($1).z"; 
                                 if (isArray)
                                 {
                                     sb << ", int(($1).w)";
@@ -1525,13 +1521,13 @@ for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
 
                             sb << (isArray ? "Layered" : "");
                             sb << "read$C<$T0>($0";
-
+                                
                             for (int i = 0; i < vecCount; ++i)
                             {
                                 sb << ", ($1)";
                                 if (vecCount > 1)
                                 {
-                                    sb << '.' << char(i + 'x');
+                                    sb << '.' << char(i + 'x');    
                                 }
                                 // Surface access is *byte* addressed in x in CUDA
                                 if (i == 0)
@@ -1602,7 +1598,7 @@ for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
                     }
 
                     // !!!!!!!!!!!!!!!!!! ref !!!!!!!!!!!!!!!!!!!!!!!!!
-
+                    
                     // Depending on the access level of the texture type,
                     // we either have just a getter (the default), or both
                     // a getter and setter.
@@ -1659,7 +1655,7 @@ for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
                             {
                                 sb << "Layered";
                             }
-                            sb << "<$T0>($0, ($2).x, ($2).y, ($2).z";
+                            sb << "<$T0>($0, ($2).x, ($2).y, ($2).z"; 
                             if (isArray)
                             {
                                 sb << ", int(($2).w)";
@@ -1762,7 +1758,7 @@ for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
                         sb << ", vec" << baseCoordCount << "(0.0)";
                         sb << ")$z\")\n";
                     }
-
+                    
 
                     if( baseShape != TextureFlavor::Shape::ShapeCube )
                     {
@@ -1786,7 +1782,7 @@ for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
 
                     // TODO(JS): Not clear how to map this to CUDA, because in HLSL, the gradient is a vector based on
                     // the dimension. On CUDA there is texNDGrad, but it always just takes ddx, ddy.
-                    // I could just assume 0 for elements not supplied, and ignore z. For now will just leave
+                    // I could just assume 0 for elements not supplied, and ignore z. For now will just leave                  
                     sb << "__target_intrinsic(glsl, \"$ctextureGrad($p, $2, $3, $4)$z\")\n";
                     sb << "T SampleGrad(" << samplerStateParam;
                     sb << "float" << kBaseTextureTypes[tt].coordCount + isArray << " location, ";
@@ -1855,7 +1851,7 @@ for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
                             sb << "Lod<$T0>($0, ($2).x, ($2).y, ($2).z";
                             if (isArray)
                             {
-                                sb << ", int(($2).w)";
+                                sb << ", int(($2).w)"; 
                             }
                             sb << ", $3)\")\n";
                         }
@@ -2560,7 +2556,7 @@ __generic<T : IComparable>
 [__unsafeForceInlineEarly]
 bool operator >=(T v0, T v1)
 {
-    return v1.lessThanOrEquals(v0);
+    return v1.lessThan(v1);
 }
 __generic<T : IComparable>
 [__unsafeForceInlineEarly]
