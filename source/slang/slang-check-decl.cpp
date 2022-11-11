@@ -27,7 +27,7 @@ namespace Slang
         {}
 
         void visitDeclGroup(DeclGroup*) {}
-
+        
         void visitDecl(Decl* decl)
         {
             checkModifiers(decl);
@@ -343,7 +343,7 @@ namespace Slang
     {
         // If it's an *actual* global it is not a global shader parameter
         if (decl->hasModifier<ActualGlobalModifier>()) { return false; }
-
+        
         // A global shader parameter must be declared at global or namespace
         // scope, so that it has a single definition across the module.
         //
@@ -568,7 +568,7 @@ namespace Slang
     }
 
     QualType getTypeForDeclRef(
-        ASTBuilder*     astBuilder,
+        ASTBuilder*     astBuilder, 
         DeclRef<Decl>   declRef,
         SourceLoc       loc)
     {
@@ -913,7 +913,7 @@ namespace Slang
             // NOTE! We purposefully do not iterate with the for(auto childDecl : containerDecl->members) here,
             // because the visitor may add to `members` whilst iteration takes place, invalidating the iterator
             // and likely a crash.
-            //
+            // 
             // Accessing the members via index side steps the issue.
             const auto& members = containerDecl->members;
             for(Index i = 0; i < members.getCount(); ++i)
@@ -1575,7 +1575,7 @@ namespace Slang
         // NOTE! We purposefully do not iterate with the for(auto m : genericDecl->members) here,
         // because the visitor may add to `members` whilst iteration takes place, invalidating the iterator
         // and likely a crash.
-        //
+        // 
         // Accessing the members via index side steps the issue.
         const auto& members = genericDecl->members;
         for (Index i = 0; i < members.getCount(); ++i)
@@ -3276,7 +3276,7 @@ namespace Slang
         }
         else
         {
-            // The general case.
+            // The general case. 
             // Create a variable for return value.
             synth.pushVarScope();
             auto varStmt = synth.emitVarDeclStmt(synFunc->returnType.type, getName("result"));
@@ -3324,7 +3324,7 @@ namespace Slang
             synReturn->expression = resultVarExpr;
             seqStmt->stmts.add(synReturn);
         }
-
+        
         context->parentDecl->members.add(synFunc);
         context->parentDecl->invalidateMemberDictionary();
         addModifier(synFunc, m_astBuilder->create<SynthesizedModifier>());
@@ -3827,7 +3827,7 @@ namespace Slang
                 return true;
             }
 
-
+            
         }
 
         // Look at the type being inherited from, and validate
@@ -3903,7 +3903,7 @@ namespace Slang
             // be required to implement all interface requirements,
             // just with `abstract` methods that replicate things?
             // (That's what C# does).
-
+            
             // Make a copy of inhertanceDecls firstsince `checkConformance` may modify decl->members.
             auto inheritanceDecls = decl->getMembersOfType<InheritanceDecl>().toList();
             for (auto inheritanceDecl : inheritanceDecls)
@@ -5004,7 +5004,7 @@ namespace Slang
                 // Convert the constraint to an appropriate witness.
                 auto witness = tryGetSubtypeWitness(constraintDecl->sub, constraintDecl->sup);
 
-                // Must be non-null since we know there's a constraint. If null, something is
+                // Must be non-null since we know there's a constraint. If null, something is 
                 // very wrong.
                 //
                 SLANG_ASSERT(witness);
@@ -5046,7 +5046,7 @@ namespace Slang
                 // Use nullptr for this scenario
                 ioDict.AddIfNotExists(nullptr, decl);
             }
-        }
+        }  
     }
 
     Result SemanticsVisitor::checkFuncRedeclaration(
@@ -5213,7 +5213,7 @@ namespace Slang
         // with the case where the two function declarations
         // might represent different target-specific versions
         // of a function.
-
+       
         // If both of the declarations have a body, then there
         // is trouble, because we wouldn't know which one to
         // use during code generation.
@@ -6312,7 +6312,7 @@ namespace Slang
         m_candidateExtensionListsBuilt = false;
         m_mapTypeDeclToCandidateExtensions.Clear();
     }
-
+    
     void SharedSemanticsContext::_addCandidateExtensionsFromModule(ModuleDecl* moduleDecl)
     {
         for( auto& entry : moduleDecl->mapTypeToCandidateExtensions )
