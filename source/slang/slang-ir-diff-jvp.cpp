@@ -2569,6 +2569,7 @@ struct BackwardDiffTranscriber
 
     // Map that stores the upper gradient given an IRInst*
     Dictionary<IRInst*, List<IRInst*>> upperGradients;
+    Dictionary<IRInst*, IRInst*> primalToDiffParams;
     Dictionary<IRInst*, IRInst*> paramsToDiffParams;
 
     SharedIRBuilder* sharedBuilder;
@@ -3516,7 +3517,6 @@ struct BackwardDiffTranscriber
                 continue;
             if (upperGrads->getCount() > 1)
             {
-                // TODO
                 auto sumGrad = upperGrads->getFirst();
                 for (auto i = 1; i < upperGrads->getCount(); i++)
                 {
@@ -4041,7 +4041,10 @@ struct BackwardDiffTranscriber
                 builder->addNameHintDecoration(diffParam, diffPairVarName.getUnownedSlice());
 
             SLANG_ASSERT(diffParam);
-            paramsToDiffParams.Add(origParam, diffParam);
+            auto paramValue = builder->emitLoad(diffParam);
+            auto primal = builder->emitDifferentialPairGetPrimal(paramValue);
+            paramsToDiffParams.Add(origParam, primal);
+            primalToDiffParams.Add(primal, diffParam);
 
             return diffParam;
         }
@@ -4099,6 +4102,18 @@ struct BackwardDiffTranscriber
 
         auto lhs = origArith->getOperand(0);
         auto rhs = origArith->getOperand(1);
+
+        if (as<IRInOutType>(lhs->getDataType()))
+        {
+            lhs = builder->emitLoad(lhs);
+            lhs = builder->emitDifferentialPairGetPrimal(lhs);
+        }
+        if (as<IRInOutType>(rhs->getDataType()))
+        {
+            rhs = builder->emitLoad(rhs);
+            rhs = builder->emitDifferentialPairGetPrimal(rhs);
+        }
+
         IRInst* leftGrad;
         IRInst* rightGrad;
 
@@ -4127,6 +4142,8 @@ struct BackwardDiffTranscriber
                 "this arithmetic instruction cannot be differentiated");
         }
 
+        lhs = origArith->getOperand(0);
+        rhs = origArith->getOperand(1);
         if (auto leftGrads = upperGradients.TryGetValue(lhs))
         {
             leftGrads->add(leftGrad);
@@ -4202,6 +4219,24 @@ struct BackwardDiffTranscriber
         case kIROp_Sub:
         case kIROp_Div:
             return transcribeBinaryArithBackward(builder, origInst, grad);
+
+        case kIROp_DifferentialPairGetPrimal:
+        {
+            if (auto param = primalToDiffParams.TryGetValue(origInst))
+            {
+                if (auto leftGrads = upperGradients.TryGetValue(*param))
+                {
+                    leftGrads->add(grad);
+                }
+                else
+                {
+                    upperGradients.Add(*param, grad);
+                }
+            }
+            else
+                SLANG_ASSERT(0);
+            return nullptr;
+        }
 
         default:
             // Not yet implemented
