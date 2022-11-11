@@ -3738,22 +3738,22 @@ struct BackwardDiffTranscriber
     }
 
     // Create an empty func to represent the transcribed func of `origFunc`.
-    InstPair transcribeFuncHeader(IRBuilder* builder, IRFunc* origFunc)
+    InstPair transcribeFuncHeader(IRBuilder* inBuilder, IRFunc* origFunc)
     {
-        auto oldLoc = builder->getInsertLoc();
+        IRBuilder builder(inBuilder->getSharedBuilder());
+        builder.setInsertBefore(origFunc);
 
         IRFunc* primalFunc = origFunc;
 
         differentiableTypeConformanceContext.setFunc(origFunc);
 
-        builder->setInsertBefore(origFunc);
         primalFunc = origFunc;
 
-        auto diffFunc = builder->createFunc();
+        auto diffFunc = builder.createFunc();
 
         SLANG_ASSERT(as<IRFuncType>(origFunc->getFullType()));
         IRType* diffFuncType = this->differentiateFunctionType(
-            builder,
+            &builder,
             as<IRFuncType>(origFunc->getFullType()));
         diffFunc->setFullType(diffFuncType);
 
@@ -3761,13 +3761,13 @@ struct BackwardDiffTranscriber
         {
             auto originalName = nameHint->getName();
             StringBuilder newNameSb;
-            newNameSb << "s_diff_" << originalName;
-            builder->addNameHintDecoration(diffFunc, newNameSb.getUnownedSlice());
+            newNameSb << "s_bwd_" << originalName;
+            builder.addNameHintDecoration(diffFunc, newNameSb.getUnownedSlice());
         }
-        builder->addBackwardDerivativeDecoration(origFunc, diffFunc);
+        builder.addBackwardDerivativeDecoration(origFunc, diffFunc);
 
         // Mark the generated derivative function itself as differentiable.
-        builder->addBackwardDifferentiableDecoration(diffFunc);
+        builder.addBackwardDifferentiableDecoration(diffFunc);
 
         // Find and clone `DifferentiableTypeDictionaryDecoration` to the new diffFunc.
         if (auto dictDecor = origFunc->findDecoration<IRDifferentiableTypeDictionaryDecoration>())
@@ -3775,26 +3775,21 @@ struct BackwardDiffTranscriber
             cloneDecoration(dictDecor, diffFunc);
         }
 
-        // Reset builder position
-        builder->setInsertLoc(oldLoc);
         auto result = InstPair(primalFunc, diffFunc);
         followUpFunctionsToTranscribe.add(result);
         return result;
     }
 
     // Transcribe a function definition.
-    InstPair transcribeFunc(IRBuilder* builder, IRFunc* primalFunc, IRFunc* diffFunc)
+    InstPair transcribeFunc(IRBuilder* inBuilder, IRFunc* primalFunc, IRFunc* diffFunc)
     {
-        auto oldLoc = builder->getInsertLoc();
+        IRBuilder builder(inBuilder->getSharedBuilder());
+        builder.setInsertInto(diffFunc);
 
         differentiableTypeConformanceContext.setFunc(primalFunc);
         // Transcribe children from origFunc into diffFunc
-        builder->setInsertInto(diffFunc);
         for (auto block = primalFunc->getFirstBlock(); block; block = block->getNextBlock())
-            this->transcribe(builder, block);
-
-        // Reset builder position
-        builder->setInsertLoc(oldLoc);
+            this->transcribeBlock(&builder, block);
 
         return InstPair(primalFunc, diffFunc);
     }
@@ -4330,9 +4325,9 @@ struct BackwardDifferentiationContext : public InstPassBase
                     }
                     else */if (isMarkedForBackwardDifferentiation(baseFunction))
                     {
-                        if (as<IRFunc>(baseFunction) || as<IRGeneric>(baseFunction))
+                        if (auto func = as<IRFunc>(baseFunction))
                         {
-                            IRInst* diffFunc = transcriberStorage.transcribe(builder, baseFunction);
+                            IRInst* diffFunc = transcriberStorage.transcribeFuncHeader(builder, func).differential;
                             SLANG_ASSERT(diffFunc);
                             fwdDiffInst->replaceUsesWith(diffFunc);
                             fwdDiffInst->removeAndDeallocate();
