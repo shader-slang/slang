@@ -2569,7 +2569,7 @@ struct BackwardDiffTranscriber
 
     // Map that stores the upper gradient given an IRInst*
     Dictionary<IRInst*, List<IRInst*>> upperGradients;
-    Dictionary<IRInst*, IRInst*> primalToDiffParams;
+    Dictionary<IRInst*, IRInst*> primalToDiffPair;
 
     SharedIRBuilder* sharedBuilder;
     // Witness table that `DifferentialBottom:IDifferential`.
@@ -2990,7 +2990,7 @@ struct BackwardDiffTranscriber
             auto paramValue = builder->emitLoad(diffParam);
             auto primal = builder->emitDifferentialPairGetPrimal(paramValue);
             orginalToTranscribed.Add(origParam, primal);
-            primalToDiffParams.Add(primal, diffParam);
+            primalToDiffPair.Add(primal, diffParam);
 
             return diffParam;
         }
@@ -3168,7 +3168,7 @@ struct BackwardDiffTranscriber
 
         case kIROp_DifferentialPairGetPrimal:
         {
-            if (auto param = primalToDiffParams.TryGetValue(origInst))
+            if (auto param = primalToDiffPair.TryGetValue(origInst))
             {
                 if (auto leftGrads = upperGradients.TryGetValue(*param))
                 {
