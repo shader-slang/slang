@@ -3025,6 +3025,7 @@ public:
     IRInst* emitBitAnd(IRType* type, IRInst* left, IRInst* right);
     IRInst* emitBitOr(IRType* type, IRInst* left, IRInst* right);
     IRInst* emitBitNot(IRType* type, IRInst* value);
+    IRInst* emitNeg(IRType* type, IRInst* value);
 
     IRInst* emitAdd(IRType* type, IRInst* left, IRInst* right);
     IRInst* emitSub(IRType* type, IRInst* left, IRInst* right);

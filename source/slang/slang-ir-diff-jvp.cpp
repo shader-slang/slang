@@ -2567,6 +2567,10 @@ struct BackwardDiffTranscriber
 
     List<InstPair>                          followUpFunctionsToTranscribe;
 
+    // Map that stores the upper gradient given an IRInst*
+    Dictionary<IRInst*, List<IRInst*>> upperGradients;
+    Dictionary<IRInst*, IRInst*> paramsToDiffParams;
+
     SharedIRBuilder* sharedBuilder;
     // Witness table that `DifferentialBottom:IDifferential`.
     IRWitnessTable* differentialBottomWitness = nullptr;
@@ -2673,7 +2677,10 @@ struct BackwardDiffTranscriber
             auto origType = funcType->getParamType(i);
             origType = (IRType*)lookupPrimalInst(origType, origType);
             if (auto diffPairType = tryGetDiffPairType(builder, origType))
-                newParameterTypes.add(diffPairType);
+            {
+                auto inoutDiffPairType = builder->getPtrType(kIROp_InOutType, diffPairType);
+                newParameterTypes.add(inoutDiffPairType);
+            }
             else
                 newParameterTypes.add(origType);
         }
@@ -2937,8 +2944,6 @@ struct BackwardDiffTranscriber
     {
         SLANG_ASSERT(origArith->getOperandCount() == 2);
 
-        IRInst* primalArith = cloneInst(&cloneEnv, builder, origArith);
-
         auto origLeft = origArith->getOperand(0);
         auto origRight = origArith->getOperand(1);
 
@@ -2954,26 +2959,17 @@ struct BackwardDiffTranscriber
             diffLeft = diffLeft ? diffLeft : getDifferentialZeroOfType(builder, primalLeft->getDataType());
             diffRight = diffRight ? diffRight : getDifferentialZeroOfType(builder, primalRight->getDataType());
 
-            auto resultType = primalArith->getDataType();
+            auto resultType = origArith->getDataType();
             switch (origArith->getOp())
             {
             case kIROp_Add:
-                return InstPair(primalArith, builder->emitAdd(resultType, diffLeft, diffRight));
+                return InstPair(builder->emitAdd(resultType, primalLeft, primalRight), nullptr);
             case kIROp_Mul:
-                return InstPair(primalArith, builder->emitAdd(resultType,
-                    builder->emitMul(resultType, diffLeft, primalRight),
-                    builder->emitMul(resultType, primalLeft, diffRight)));
+                return InstPair(builder->emitMul(resultType, primalLeft, primalRight), nullptr);
             case kIROp_Sub:
-                return InstPair(primalArith, builder->emitSub(resultType, diffLeft, diffRight));
+                return InstPair(builder->emitSub(resultType, primalLeft, primalRight), nullptr);
             case kIROp_Div:
-                return InstPair(primalArith, builder->emitDiv(resultType,
-                    builder->emitSub(
-                        resultType,
-                        builder->emitMul(resultType, diffLeft, primalRight),
-                        builder->emitMul(resultType, primalLeft, diffRight)),
-                    builder->emitMul(
-                        primalRight->getDataType(), primalRight, primalRight
-                    )));
+                return InstPair(builder->emitDiv(resultType, primalLeft, primalRight), nullptr);
             default:
                 getSink()->diagnose(origArith->sourceLoc,
                     Diagnostics::unimplemented,
@@ -2981,7 +2977,7 @@ struct BackwardDiffTranscriber
             }
         }
 
-        return InstPair(primalArith, nullptr);
+        return InstPair(nullptr, nullptr);
     }
 
 
@@ -3071,6 +3067,8 @@ struct BackwardDiffTranscriber
 
     InstPair transcribeReturn(IRBuilder* builder, IRReturn* origReturn)
     {
+        return InstPair(nullptr, nullptr);
+
         IRInst* origReturnVal = origReturn->getVal();
 
         auto returnDataType = (IRType*)lookupPrimalInst(origReturnVal->getDataType(), origReturnVal->getDataType());
@@ -3481,9 +3479,10 @@ struct BackwardDiffTranscriber
 
     InstPair transcribeBlock(IRBuilder* builder, IRBlock* origBlock)
     {
-        auto oldLoc = builder->getInsertLoc();
+        IRBuilder subBuilder(builder->getSharedBuilder());
+        subBuilder.setInsertLoc(builder->getInsertLoc());
 
-        IRInst* diffBlock = builder->emitBlock();
+        IRBlock* diffBlock = subBuilder.emitBlock();
 
         // Note: for blocks, we setup the mapping _before_
         // processing the children since we could encounter
@@ -3492,19 +3491,44 @@ struct BackwardDiffTranscriber
         mapPrimalInst(origBlock, diffBlock);
         mapDifferentialInst(origBlock, diffBlock);
 
-        builder->setInsertInto(diffBlock);
+        subBuilder.setInsertInto(diffBlock);
 
         // First transcribe every parameter in the block.
         for (auto param = origBlock->getFirstParam(); param; param = param->getNextParam())
-            this->transcribe(builder, param);
+            this->copyParam(&subBuilder, param);
+
+        // The extra param for input gradient
+        auto gradParam = subBuilder.emitParam(as<IRFuncType>(origBlock->getParent()->getFullType())->getResultType());
 
         // Then, run through every instruction and use the transcriber to generate the appropriate
         // derivative code.
         //
         for (auto child = origBlock->getFirstOrdinaryInst(); child; child = child->getNextInst())
-            this->transcribe(builder, child);
+            this->copyInst(&subBuilder, child);
 
-        builder->setInsertLoc(oldLoc);
+        auto lastInst = diffBlock->getLastOrdinaryInst();
+        List<IRInst*> grads = { gradParam };
+        upperGradients.Add(lastInst, grads);
+        for (auto child = diffBlock->getLastOrdinaryInst(); child; child = child->getPrevInst())
+        {
+            auto upperGrads = upperGradients.TryGetValue(child);
+            if (!upperGrads)
+                continue;
+            if (upperGrads->getCount() > 1)
+            {
+                // TODO
+                auto sumGrad = upperGrads->getFirst();
+                for (auto i = 1; i < upperGrads->getCount(); i++)
+                {
+                    sumGrad = subBuilder.emitAdd(sumGrad->getDataType(), sumGrad, (*upperGrads)[i]);
+                }
+                this->transcribeInstBackward(&subBuilder, child, sumGrad);
+            }
+            else
+                this->transcribeInstBackward(&subBuilder, child, upperGrads->getFirst());
+        }
+
+        subBuilder.emitReturn();
 
         return InstPair(diffBlock, diffBlock);
     }
@@ -4002,6 +4026,190 @@ struct BackwardDiffTranscriber
 
         return InstPair(nullptr, nullptr);
     }
+
+    IRInst* copyParam(IRBuilder* builder, IRParam* origParam)
+    {
+        auto primalDataType = lookupPrimalInst(origParam->getDataType(), origParam->getDataType());
+
+        if (auto diffPairType = tryGetDiffPairType(builder, (IRType*)primalDataType))
+        {
+            auto inoutDiffPairType = builder->getPtrType(kIROp_InOutType, diffPairType);
+            IRInst* diffParam = builder->emitParam(inoutDiffPairType);
+
+            auto diffPairVarName = makeDiffPairName(origParam);
+            if (diffPairVarName.getLength() > 0)
+                builder->addNameHintDecoration(diffParam, diffPairVarName.getUnownedSlice());
+
+            SLANG_ASSERT(diffParam);
+            paramsToDiffParams.Add(origParam, diffParam);
+
+            return diffParam;
+        }
+
+
+        return cloneInst(&cloneEnv, builder, origParam);
+    }
+
+    InstPair copyBinaryArith(IRBuilder* builder, IRInst* origArith)
+    {
+        SLANG_ASSERT(origArith->getOperandCount() == 2);
+
+        auto origLeft = origArith->getOperand(0);
+        auto origRight = origArith->getOperand(1);
+
+        IRInst* primalLeft;
+        if (!paramsToDiffParams.TryGetValue(origLeft, primalLeft))
+        {
+            primalLeft = origLeft;
+        }
+        IRInst* primalRight;
+        if (!paramsToDiffParams.TryGetValue(origRight, primalRight))
+        {
+            primalRight = origRight;
+        }
+
+        auto resultType = origArith->getDataType();
+        IRInst* newInst;
+        switch (origArith->getOp())
+        {
+        case kIROp_Add:
+            newInst = builder->emitAdd(resultType, primalLeft, primalRight);
+            break;
+        case kIROp_Mul:
+            newInst = builder->emitMul(resultType, primalLeft, primalRight);
+            break;
+        case kIROp_Sub:
+            newInst = builder->emitSub(resultType, primalLeft, primalRight);
+            break;
+        case kIROp_Div:
+            newInst = builder->emitDiv(resultType, primalLeft, primalRight);
+            break;
+        default:
+            getSink()->diagnose(origArith->sourceLoc,
+                Diagnostics::unimplemented,
+                "this arithmetic instruction cannot be differentiated");
+        }
+        paramsToDiffParams.Add(origArith, newInst);
+        return InstPair(newInst, nullptr);
+    }
+
+    IRInst* transcribeBinaryArithBackward(IRBuilder* builder, IRInst* origArith, IRInst* grad)
+    {
+        SLANG_ASSERT(origArith->getOperandCount() == 2);
+
+        auto lhs = origArith->getOperand(0);
+        auto rhs = origArith->getOperand(1);
+        IRInst* leftGrad;
+        IRInst* rightGrad;
+
+
+        switch (origArith->getOp())
+        {
+        case kIROp_Add:
+            leftGrad = grad;
+            rightGrad = grad;
+            break;
+        case kIROp_Mul:
+            leftGrad = builder->emitMul(grad->getDataType(), rhs, grad);
+            rightGrad = builder->emitMul(grad->getDataType(), lhs, grad);
+            break;
+        case kIROp_Sub:
+            leftGrad = grad;
+            rightGrad = builder->emitNeg(grad->getDataType(), grad);
+            break;
+        case kIROp_Div:
+            leftGrad = builder->emitMul(grad->getDataType(), rhs, grad);
+            rightGrad = builder->emitMul(grad->getDataType(), lhs, grad); // TODO 1.0 / Grad
+            break;
+        default:
+            getSink()->diagnose(origArith->sourceLoc,
+                Diagnostics::unimplemented,
+                "this arithmetic instruction cannot be differentiated");
+        }
+
+        if (auto leftGrads = upperGradients.TryGetValue(lhs))
+        {
+            leftGrads->add(leftGrad);
+        }
+        else
+        {
+            upperGradients.Add(lhs, leftGrad);
+        }
+        if (auto rightGrads = upperGradients.TryGetValue(rhs))
+        {
+            rightGrads->add(rightGrad);
+        }
+        else
+        {
+            upperGradients.Add(rhs, rightGrad);
+        }
+
+        return nullptr;
+    }
+
+    InstPair copyInst(IRBuilder* builder, IRInst* origInst)
+    {
+        // Handle common SSA-style operations
+        switch (origInst->getOp())
+        {
+        case kIROp_Param:
+            return transcribeParam(builder, as<IRParam>(origInst));
+
+        case kIROp_Return:
+            return InstPair(nullptr, nullptr);
+
+        case kIROp_Add:
+        case kIROp_Mul:
+        case kIROp_Sub:
+        case kIROp_Div:
+            return copyBinaryArith(builder, origInst);
+
+        default:
+            // Not yet implemented
+            SLANG_ASSERT(0);
+        }
+
+        return InstPair(nullptr, nullptr);
+    }
+
+    IRInst* transcribeParamBackward(IRBuilder* builder, IRInst* param, IRInst* grad)
+    {
+        IRInOutType* inoutParam = as<IRInOutType>(param->getDataType());
+        auto pairType = as<IRDifferentialPairType>(inoutParam->getValueType());
+        auto paramValue = builder->emitLoad(param);
+        auto primal = builder->emitDifferentialPairGetPrimal(paramValue);
+        auto diff = builder->emitDifferentialPairGetDifferential(
+            (IRType*)pairBuilder->getDiffTypeFromPairType(builder, pairType),
+            paramValue
+        );
+        auto newDiff = builder->emitAdd(grad->getDataType(), diff, grad);
+        auto updatedParam = builder->emitMakeDifferentialPair(pairType, primal, newDiff);
+        auto store = builder->emitStore(param, updatedParam);
+
+        return store;
+    }
+
+    IRInst* transcribeInstBackward(IRBuilder* builder, IRInst* origInst, IRInst* grad)
+    {
+        // Handle common SSA-style operations
+        switch (origInst->getOp())
+        {
+        case kIROp_Param:
+            return transcribeParamBackward(builder, as<IRParam>(origInst), grad);
+
+        case kIROp_Add:
+        case kIROp_Mul:
+        case kIROp_Sub:
+        case kIROp_Div:
+            return transcribeBinaryArithBackward(builder, origInst, grad);
+
+        default:
+            // Not yet implemented
+            SLANG_ASSERT(0);
+        }
+
+        return nullptr;
+    }
 };
 
 struct BackwardDifferentiationContext : public InstPassBase
@@ -4035,12 +4243,11 @@ struct BackwardDifferentiationContext : public InstPassBase
         // IRDifferentialPairGetPrimal with 'primal' field access, and
         // IRMakeDifferentialPair with an IRMakeStruct.
         //
-        // TODO: Commenting out for now, potentially the same as forward mode
-        //modified |= simplifyDifferentialBottomType(builder);
+        modified |= simplifyDifferentialBottomType(builder);
 
-        //modified |= processPairTypes(builder, module->getModuleInst());
+        modified |= processPairTypes(builder, module->getModuleInst());
 
-        //modified |= eliminateDifferentialBottomType(builder);
+        modified |= eliminateDifferentialBottomType(builder);
 
         return modified;
     }
@@ -4209,29 +4416,41 @@ struct BackwardDifferentiationContext : public InstPassBase
     bool processPairTypes(IRBuilder* builder, IRInst* instWithChildren)
     {
         bool modified = false;
-        // Hoist all pair types to global scope when possible.
+        // Hoist and deduplicate all pair types to global scope when possible.
+        // This avoids emitting different struct types for equivalent pair types.
         auto moduleInst = module->getModuleInst();
-        processInstsOfType<IRDifferentialPairType>(kIROp_DifferentialPairType, [&](IRInst* originalPairType)
-            {
-                if (originalPairType->parent != moduleInst)
+        Dictionary<IRInst*, IRInst*> diffPairTypes;
+        for (;;)
+        {
+            bool changed = false;
+            sharedBuilderStorage.deduplicateAndRebuildGlobalNumberingMap();
+            processInstsOfType<IRDifferentialPairType>(kIROp_DifferentialPairType, [&](IRDifferentialPairType* originalPairType)
                 {
-                    originalPairType->removeFromParent();
-                    ShortList<IRInst*> operands;
-                    for (UInt i = 0; i < originalPairType->getOperandCount(); i++)
+                    IRInst* finalType = nullptr;
+                    if (diffPairTypes.TryGetValue(originalPairType->getValueType(), finalType))
                     {
-                        operands.add(originalPairType->getOperand(i));
+                        if (finalType != originalPairType)
+                        {
+                            originalPairType->replaceUsesWith(finalType);
+                            originalPairType->removeAndDeallocate();
+                            changed = true;
+                            return;
+                        }
                     }
-                    auto newPairType = builder->findOrEmitHoistableInst(
-                        originalPairType->getFullType(),
-                        originalPairType->getOp(),
-                        originalPairType->getOperandCount(),
-                        operands.getArrayView().getBuffer());
-                    originalPairType->replaceUsesWith(newPairType);
-                    originalPairType->removeAndDeallocate();
-                }
-            });
-
-        sharedBuilderStorage.deduplicateAndRebuildGlobalNumberingMap();
+                    diffPairTypes[originalPairType->getValueType()] = originalPairType;
+                    if (originalPairType->parent != moduleInst)
+                    {
+                        if (originalPairType->getValueType()->getParent() != originalPairType->getParent())
+                        {
+                            originalPairType->insertAfter(originalPairType->getValueType());
+                            changed = true;
+                            return;
+                        }
+                    }
+                });
+            if (!changed)
+                break;
+        }
 
         processAllInsts([&](IRInst* inst)
             {
@@ -4415,23 +4634,20 @@ struct BackwardDifferentiationContext : public InstPassBase
         return false;
     }
 
-    IRStringLit* getForwardDerivativeFuncName(IRBuilder* builder,
-        IRInst* func)
+    IRStringLit* getBackwardDerivativeFuncName(IRInst* func)
     {
-        auto oldLoc = builder->getInsertLoc();
-        builder->setInsertBefore(func);
+        IRBuilder builder(&sharedBuilderStorage);
+        builder.setInsertBefore(func);
 
         IRStringLit* name = nullptr;
         if (auto linkageDecoration = func->findDecoration<IRLinkageDecoration>())
         {
-            name = builder->getStringValue((String(linkageDecoration->getMangledName()) + "_fwd_diff").getUnownedSlice());
+            name = builder.getStringValue((String(linkageDecoration->getMangledName()) + "_bwd_diff").getUnownedSlice());
         }
         else if (auto namehintDecoration = func->findDecoration<IRNameHintDecoration>())
         {
-            name = builder->getStringValue((String(namehintDecoration->getName()) + "_fwd_diff").getUnownedSlice());
+            name = builder.getStringValue((String(namehintDecoration->getName()) + "_bwd_diff").getUnownedSlice());
         }
-
-        builder->setInsertLoc(oldLoc);
 
         return name;
     }
@@ -4442,6 +4658,7 @@ struct BackwardDifferentiationContext : public InstPassBase
         autoDiffSharedContextStorage(module->getModuleInst()),
         transcriberStorage(&autoDiffSharedContextStorage, &sharedBuilderStorage)
     {
+        autoDiffSharedContextStorage.sharedBuilder = &sharedBuilderStorage;
         pairBuilderStorage.sharedContext = &autoDiffSharedContextStorage;
         transcriberStorage.sink = sink;
         transcriberStorage.autoDiffSharedContext = &(autoDiffSharedContextStorage);

@@ -4567,6 +4567,17 @@ namespace Slang
         return inst;
     }
 
+    IRInst* IRBuilder::emitNeg(IRType* type, IRInst* value)
+    {
+        auto inst = createInst<IRInst>(
+            this,
+            kIROp_Neg,
+            type,
+            value);
+        addInst(inst);
+        return inst;
+    }
+
     IRInst* IRBuilder::emitAdd(IRType* type, IRInst* left, IRInst* right)
     {
         auto inst = createInst<IRInst>(
