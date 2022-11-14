@@ -566,6 +566,16 @@ struct IRForwardDerivativeDecoration : IRDecoration
     IRInst* getForwardDerivativeFunc() { return getOperand(0); }
 };
 
+struct IRBackwardDifferentiableDecoration : IRDecoration
+{
+    enum
+    {
+        kOp = kIROp_BackwardDifferentiableDecoration
+    };
+    IR_LEAF_ISA(BackwardDifferentiableDecoration)
+};
+
+
 struct IRDerivativeMemberDecoration : IRDecoration
 {
     enum
@@ -592,6 +602,21 @@ struct IRForwardDifferentiate : IRInst
     IR_LEAF_ISA(ForwardDifferentiate)
 };
 
+// An instruction that replaces the function symbol
+// with it's derivative function.
+struct IRBackwardDifferentiate : IRInst
+{
+    enum
+    {
+        kOp = kIROp_BackwardDifferentiate
+    };
+    // The base function for the call.
+    IRUse base;
+    IRInst* getBaseFn() { return getOperand(0); }
+
+    IR_LEAF_ISA(BackwardDifferentiate)
+};
+
 // Dictionary item mapping a type with a corresponding 
 // IDifferentiable witness table
 // 
@@ -603,7 +628,7 @@ struct IRDifferentiableTypeDictionaryItem : IRInst
     IRInst* getWitness() { return getOperand(1); }
 };
 
-struct IRDifferentiableTypeDictionaryDecoration : IRInst
+struct IRDifferentiableTypeDictionaryDecoration : IRDecoration
 {
     IR_LEAF_ISA(DifferentiableTypeDictionaryDecoration)
 };
@@ -2301,6 +2326,7 @@ public:
     IRInst* getBoolValue(bool value);
     IRInst* getIntValue(IRType* type, IRIntegerValue value);
     IRInst* getFloatValue(IRType* type, IRFloatingPointValue value);
+    IRInst* getDifferentialBottom();
     IRStringLit* getStringValue(const UnownedStringSlice& slice);
     IRPtrLit* _getPtrValue(void* ptr);
     IRPtrLit* getNullPtrValue(IRType* type);
@@ -2330,6 +2356,7 @@ public:
     IRAnyValueType* getAnyValueType(IRIntegerValue size);
     IRAnyValueType* getAnyValueType(IRInst* size);
     IRDynamicType* getDynamicType();
+    IRDifferentialBottomType* getDifferentialBottomType();
 
     IRTupleType* getTupleType(UInt count, IRType* const* types);
     IRTupleType* getTupleType(List<IRType*> const& types)
@@ -2388,7 +2415,7 @@ public:
 
     IRDifferentialPairType* getDifferentialPairType(
         IRType* valueType,
-        IRWitnessTable* witnessTable);
+        IRInst* witnessTable);
 
     IRFuncType* getFuncType(
         UInt            paramCount,
@@ -2495,6 +2522,7 @@ public:
         IRInst* existentialValue);
 
     IRInst* emitForwardDifferentiateInst(IRType* type, IRInst* baseFn);
+    IRInst* emitBackwardDifferentiateInst(IRType* type, IRInst* baseFn);
 
     IRInst* emitMakeDifferentialPair(IRType* type, IRInst* primal, IRInst* differential);
 
@@ -2600,6 +2628,8 @@ public:
     IRInst* emitGetOptionalValue(IRInst* optValue);
     IRInst* emitMakeOptionalValue(IRInst* optType, IRInst* value);
     IRInst* emitMakeOptionalNone(IRInst* optType, IRInst* defaultValue);
+    IRInst* emitDifferentialPairGetDifferential(IRType* diffType, IRInst* diffPair);
+    IRInst* emitDifferentialPairGetPrimal(IRInst* diffPair);
     IRInst* emitMakeVector(
         IRType*         type,
         UInt            argCount,
@@ -2995,6 +3025,7 @@ public:
     IRInst* emitBitAnd(IRType* type, IRInst* left, IRInst* right);
     IRInst* emitBitOr(IRType* type, IRInst* left, IRInst* right);
     IRInst* emitBitNot(IRType* type, IRInst* value);
+    IRInst* emitNeg(IRType* type, IRInst* value);
 
     IRInst* emitAdd(IRType* type, IRInst* left, IRInst* right);
     IRInst* emitSub(IRType* type, IRInst* left, IRInst* right);
@@ -3203,9 +3234,19 @@ public:
         addDecoration(value, kIROp_ForwardDifferentiableDecoration);
     }
 
-    void addForwardDerivativeDecoration(IRInst* value, IRInst* jvpFn)
+    void addBackwardDifferentiableDecoration(IRInst* value)
     {
-        addDecoration(value, kIROp_ForwardDerivativeDecoration, jvpFn);
+        addDecoration(value, kIROp_BackwardDifferentiableDecoration);
+    }
+
+    void addForwardDerivativeDecoration(IRInst* value, IRInst* fwdFunc)
+    {
+        addDecoration(value, kIROp_ForwardDerivativeDecoration, fwdFunc);
+    }
+
+    void addBackwardDerivativeDecoration(IRInst* value, IRInst* jvpFn)
+    {
+        addDecoration(value, kIROp_BackwardDerivativeDecoration, jvpFn);
     }
 
     void addCOMWitnessDecoration(IRInst* value, IRInst* witnessTable)

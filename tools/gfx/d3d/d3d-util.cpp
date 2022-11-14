@@ -163,7 +163,7 @@ D3D12_DEPTH_STENCILOP_DESC D3DUtil::translateStencilOpDesc(DepthStencilOpDesc de
         case Format::R16G16B16A16_UINT:         return DXGI_FORMAT_R16G16B16A16_UINT;
         case Format::R16G16_UINT:               return DXGI_FORMAT_R16G16_UINT;
         case Format::R16_UINT:                  return DXGI_FORMAT_R16_UINT;
-    
+
         case Format::R8G8B8A8_UINT:             return DXGI_FORMAT_R8G8B8A8_UINT;
         case Format::R8G8_UINT:                 return DXGI_FORMAT_R8G8_UINT;
         case Format::R8_UINT:                   return DXGI_FORMAT_R8_UINT;
@@ -550,26 +550,21 @@ bool D3DUtil::isTypeless(DXGI_FORMAT format)
     }
 }
 
-/* static */SlangResult D3DUtil::findAdapters(DeviceCheckFlags flags, const Slang::UnownedStringSlice& adapaterName, List<ComPtr<IDXGIAdapter>>& outDxgiAdapters)
+/* static */SlangResult D3DUtil::findAdapters(DeviceCheckFlags flags, const AdapterLUID* adapterLUID, List<ComPtr<IDXGIAdapter>>& outDxgiAdapters)
 {
     ComPtr<IDXGIFactory> factory;
     SLANG_RETURN_ON_FAIL(createFactory(flags, factory));
-    return findAdapters(flags, adapaterName, factory, outDxgiAdapters);
+    return findAdapters(flags, adapterLUID, factory, outDxgiAdapters);
 }
 
-static bool _isMatch(IDXGIAdapter* adapter, const Slang::UnownedStringSlice& lowerAdapaterName)
+/* static */ AdapterLUID D3DUtil::getAdapterLUID(IDXGIAdapter* dxgiAdapter)
 {
-    if (lowerAdapaterName.getLength() == 0)
-    {
-        return true;
-    }
-
     DXGI_ADAPTER_DESC desc;
-    adapter->GetDesc(&desc);
-
-    String descName = String::fromWString(desc.Description).toLower();
-
-    return descName.indexOf(lowerAdapaterName) != Index(-1);
+    dxgiAdapter->GetDesc(&desc);
+    AdapterLUID luid = {};
+    SLANG_ASSERT(sizeof(AdapterLUID) >= sizeof(LUID));
+    memcpy(&luid, &desc.AdapterLuid, sizeof(LUID));
+    return luid;
 }
 
 /* static */bool D3DUtil::isWarp(IDXGIFactory* dxgiFactory, IDXGIAdapter* adapterIn)
@@ -841,10 +836,8 @@ D3D12_RESOURCE_STATES D3DUtil::getResourceState(ResourceState state)
     }
 }
 
-/* static */SlangResult D3DUtil::findAdapters(DeviceCheckFlags flags, const UnownedStringSlice& adapterName, IDXGIFactory* dxgiFactory, List<ComPtr<IDXGIAdapter>>& outDxgiAdapters)
+/* static */SlangResult D3DUtil::findAdapters(DeviceCheckFlags flags, const AdapterLUID* adapterLUID, IDXGIFactory* dxgiFactory, List<ComPtr<IDXGIAdapter>>& outDxgiAdapters)
 {
-    Slang::String lowerAdapterName = Slang::String(adapterName).toLower();
-
     outDxgiAdapters.clear();
 
     ComPtr<IDXGIAdapter> warpAdapter;
@@ -854,7 +847,7 @@ D3D12_RESOURCE_STATES D3DUtil::getResourceState(ResourceState state)
         if (SLANG_SUCCEEDED(dxgiFactory->QueryInterface(IID_PPV_ARGS(dxgiFactory4.writeRef()))))
         {
             dxgiFactory4->EnumWarpAdapter(IID_PPV_ARGS(warpAdapter.writeRef()));
-            if (_isMatch(warpAdapter, lowerAdapterName.getUnownedSlice()))
+            if (!adapterLUID || D3DUtil::getAdapterLUID(warpAdapter) == *adapterLUID)
             {
                 outDxgiAdapters.add(warpAdapter);
             }
@@ -872,7 +865,7 @@ D3D12_RESOURCE_STATES D3DUtil::getResourceState(ResourceState state)
         {
             continue;
         }
-        if (!_isMatch(dxgiAdapter, lowerAdapterName.getUnownedSlice()))
+        if (adapterLUID && D3DUtil::getAdapterLUID(dxgiAdapter) != *adapterLUID)
         {
             continue;
         }

@@ -474,6 +474,10 @@ namespace Slang
         ModifiableSyntaxNode*    syntax,
         Modifier*                modifier);
 
+    void removeModifier(
+        ModifiableSyntaxNode* syntax,
+        Modifier* modifier);
+
     struct QualType
     {
         SLANG_VALUE_CLASS(QualType) 
@@ -1510,6 +1514,7 @@ namespace Slang
         DAddFunc, ///< The `IDifferentiable.dadd` function requirement 
         DMulFunc, ///< The `IDifferentiable.dmul` function requirement 
     };
+
 } // namespace Slang
 
 #endif

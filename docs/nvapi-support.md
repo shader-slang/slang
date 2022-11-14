@@ -46,7 +46,7 @@ Thus causing the prelude to include nvHLSLExtns.h, and specifying the slot and p
 
 The actual values for the slot and optionally the space, are found by Slang examining the values of those values at the end of preprocessing input Slang source files. 
 
-This means that if compile Slang source that has implicit use NVAPI, the slot and optionally the space must be defined. This can be achieved with a command line -D, throught the API or through having suitable `#define`s in the Slang source code.
+This means that if you compile Slang source that has implicit use NVAPI, the slot and optionally the space must be defined. This can be achieved with a command line -D, throught the API or through having suitable `#define`s in the Slang source code.
 
 It is worth noting if you *replace* the default HLSL prelude, and use NVAPI then it will be necessary to have something like the default HLSL prelude part of your custom prelude.
 
@@ -55,7 +55,7 @@ Downstream Compiler Include
 
 There is a subtle detail that is perhaps worth noting here around the downstream compiler and `#include`s. When Slang outputs HLSL it typically does not contain any `#include`, because all of the `#include` in the original source code have been handled by Slang. Slang then outputs everything required to compile to the downstream compiler *without* any `#include`. When NVAPI is used explicitly this is still the case - the NVAPI headers are consumed by Slang, and then Slang will output HLSL that does not contain any `#include`.
 
-The astute reader may have noticed that the new default Slang HLSL prelude *does* contain an include. So when outputs NVAPI calls from implicit use, this #include will be enabled.
+The astute reader may have noticed that the default Slang HLSL prelude *does* contain an include, which is enabled via SLANG_HLSL_ENABLE_NVAPI macro which Slang will set with implicit NVAPI use. 
 
 ```
 #ifdef SLANG_HLSL_ENABLE_NVAPI
@@ -69,7 +69,7 @@ As it turns out all the includes specified to Slang (via command line -I or thro
 
 In the simplest use case where the path to `nvHLSLExtns.h` is specified in the include paths everything should 'just work' - as both Slang and the downstream compilers will see these include paths and so can handle the include. 
 
-Things are more complicated if there is mixed implicit/explitic NVAPI usage and in the Slang source the include path is set up such that NVAPI is included with 
+Things are more complicated if there is mixed implicit/explicit NVAPI usage and in the Slang source the include path is set up such that NVAPI is included with 
 
 ```
 #include "nvapi/nvHLSLExtns.h"

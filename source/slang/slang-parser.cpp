@@ -2109,6 +2109,26 @@ namespace Slang
         return parseForwardDifferentiate(parser);
     }
 
+        /// Parse an expression of the form __bwd_diff(fn) where fn is an 
+        /// identifier pointing to a function.
+    static Expr* parseBackwardDifferentiate(Parser* parser)
+    {
+        BackwardDifferentiateExpr* bwdDiffExpr = parser->astBuilder->create<BackwardDifferentiateExpr>();
+
+        parser->ReadToken(TokenType::LParent);
+
+        bwdDiffExpr->baseFunction = parser->ParseExpression();
+
+        parser->ReadToken(TokenType::RParent);
+
+        return bwdDiffExpr;
+    }
+
+    static NodeBase* parseBackwardDifferentiate(Parser* parser, void* /* unused */)
+    {
+        return parseBackwardDifferentiate(parser);
+    }
+
         /// Parse a `This` type expression
     static Expr* parseThisTypeExpr(Parser* parser)
     {
@@ -6430,6 +6450,16 @@ namespace Slang
         return modifier;
     }
 
+    static NodeBase* parseBuiltinRequirementModifier(Parser* parser, void* /*userData*/)
+    {
+        BuiltinRequirementModifier* modifier = parser->astBuilder->create<BuiltinRequirementModifier>();
+        parser->ReadToken(TokenType::LParent);
+        modifier->kind = BuiltinRequirementKind(StringToInt(parser->ReadToken(TokenType::IntegerLiteral).getContent()));
+        parser->ReadToken(TokenType::RParent);
+
+        return modifier;
+    }
+
     static NodeBase* parseMagicTypeModifier(Parser* parser, void* /*userData*/)
     {
         MagicTypeModifier* modifier = parser->astBuilder->create<MagicTypeModifier>();
@@ -6618,6 +6648,8 @@ namespace Slang
         _makeParseModifier("__cuda_sm_version",     parseCUDASMVersionModifier),
 
         _makeParseModifier("__builtin_type",        parseBuiltinTypeModifier),
+        _makeParseModifier("__builtin_requirement", parseBuiltinRequirementModifier),
+
         _makeParseModifier("__magic_type",          parseMagicTypeModifier),
         _makeParseModifier("__intrinsic_type",      parseIntrinsicTypeModifier),
         _makeParseModifier("__implicit_conversion", parseImplicitConversionModifier),
@@ -6634,7 +6666,8 @@ namespace Slang
         _makeParseExpr("none", parseNoneExpr),
         _makeParseExpr("try",     parseTryExpr),
         _makeParseExpr("__TaggedUnion", parseTaggedUnionType),
-        _makeParseExpr("__fwd_diff", parseForwardDifferentiate)
+        _makeParseExpr("__fwd_diff", parseForwardDifferentiate),
+        _makeParseExpr("__bwd_diff", parseBackwardDifferentiate)
     };
 
     ConstArrayView<SyntaxParseInfo> getSyntaxParseInfos()

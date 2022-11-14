@@ -214,6 +214,7 @@ namespace Slang
         Dictionary<OperatorOverloadCacheKey, OverloadCandidate> resolvedOperatorOverloadCache;
         Dictionary<BasicTypeKeyPair, ConversionCost> conversionCostCache;
     };
+
         /// Shared state for a semantics-checking session.
     struct SharedSemanticsContext
     {
@@ -274,7 +275,6 @@ namespace Slang
                 return m_linkage->isInLanguageServer();
             return false;
         }
-
             /// Get the list of extension declarations that appear to apply to `decl` in this context
         List<ExtensionDecl*> const& getCandidateExtensionsForTypeDecl(AggTypeDecl* decl);
 
@@ -373,6 +373,11 @@ namespace Slang
             SemanticsContext result(*this);
             result.m_enclosingTryClauseType = tryClauseType;
             return result;
+        }
+
+        DifferentiableAttribute* getParentDifferentiableAttribute()
+        {
+            return m_parentDifferentiableAttr;
         }
 
             /// A scope that is local to a particular expression, and
@@ -536,6 +541,8 @@ namespace Slang
         Expr* ConstructDerefExpr(
             Expr*    base,
             SourceLoc       loc);
+
+        InvokeExpr* constructUncheckedInvokeExpr(Expr* callee, const List<Expr*>& arguments);
 
         Expr* maybeUseSynthesizedDeclForLookupResult(
             LookupResultItem const& item,
@@ -707,6 +714,7 @@ namespace Slang
 
         // Convert a function's original type to it's JVP type.
         Type* processJVPFuncType(FuncType* originalType);
+        Type* processBackwardDiffFuncType(FuncType* originalType);
 
         /// Registers a type as conforming to IDifferentiable, along with a witness 
         /// describing the relationship.
@@ -1040,6 +1048,15 @@ namespace Slang
             ConformanceCheckingContext* context,
             DeclRef<AssocTypeDecl> requirementDeclRef,
             RefPtr<WitnessTable> witnessTable);
+
+        struct DifferentiableMemberInfo
+        {
+            Decl* memberDecl;
+            Type* diffType;
+        };
+
+            /// Gather differentiable members from decl.
+        List<DifferentiableMemberInfo> collectDifferentiableMemberInfo(ContainerDecl* decl);
 
         // Find the appropriate member of a declared type to
         // satisfy a requirement of an interface the type
@@ -1892,6 +1909,7 @@ namespace Slang
         Expr* visitModifiedTypeExpr(ModifiedTypeExpr* expr);
 
         Expr* visitForwardDifferentiateExpr(ForwardDifferentiateExpr* expr);
+        Expr* visitBackwardDifferentiateExpr(BackwardDifferentiateExpr* expr);
 
         Expr* visitGetArrayLengthExpr(GetArrayLengthExpr* expr);
 

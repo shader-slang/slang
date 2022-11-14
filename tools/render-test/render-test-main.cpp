@@ -510,7 +510,16 @@ SlangResult RenderTestApp::initialize(
     //
     ComPtr<ISlangBlob> outDiagnostics;
     auto result = device->createProgram(m_compilationOutput.output.desc, m_shaderProgram.writeRef(), outDiagnostics.writeRef());
-    SLANG_RETURN_ON_FAIL(result);
+
+    // If there was a failure creating a program, we can't continue
+    // Special case SLANG_E_NOT_AVAILABLE error code to make it a failure,
+    // as it is also used to indicate an attempt setup something failed gracefully (because it couldn't be supported)
+    // but that's not this.
+    if (SLANG_FAILED(result))
+    {
+        result = (result == SLANG_E_NOT_AVAILABLE) ? SLANG_FAIL : result;
+        return result;
+    }
 
 	m_device = device;
 
@@ -1266,10 +1275,6 @@ static SlangResult _innerMain(Slang::StdWriters* stdWriters, SlangSession* sessi
     StringBuilder rendererName;
     auto info = 
     rendererName << "[" << gfxGetDeviceTypeName(options.deviceType) << "] ";
-    if (options.adapter.getLength())
-    {
-        rendererName << "'" << options.adapter << "'";
-    }
 
     if (options.onlyStartup)
     {
@@ -1318,7 +1323,6 @@ static SlangResult _innerMain(Slang::StdWriters* stdWriters, SlangSession* sessi
     {
         IDevice::Desc desc = {};
         desc.deviceType = options.deviceType;
-        desc.adapter = options.adapter.getBuffer();
 
         desc.slang.lineDirectiveMode = SLANG_LINE_DIRECTIVE_MODE_NONE;
         if (options.generateSPIRVDirectly)

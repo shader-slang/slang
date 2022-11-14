@@ -705,7 +705,15 @@ INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
 
         /// Used by the auto-diff pass to hold a reference to the
         /// generated derivative function.
-    INST(ForwardDerivativeDecoration, jvpFnReference, 1, 0)
+    INST(ForwardDerivativeDecoration, fwdDerivative, 1, 0)
+
+        /// Used by the auto-diff pass to hold a reference to the
+        /// generated derivative function.
+    INST(BackwardDifferentiableDecoration, backwardDifferentiable, 1, 0)
+
+        /// Used by the auto-diff pass to hold a reference to the
+        /// generated derivative function.
+    INST(BackwardDerivativeDecoration, backwardDiffReference, 1, 0)
 
         /// Used by the auto-diff pass to hold a reference to a
         /// differential member of a type in its associated differential type.
@@ -763,6 +771,7 @@ INST(Reinterpret,                       reinterpret,                1, 0)
 INST(CastPtrToBool, CastPtrToBool, 1, 0)
 INST(IsType, IsType, 3, 0)
 INST(ForwardDifferentiate,                   ForwardDifferentiate,            1, 0)
+INST(BackwardDifferentiate,                  BackwardDifferentiate,           1, 0)
 INST(DifferentialEqualityTypeCast, DifferentialEqualityTypeCast, 1, 0)
 
 // Converts other resources (such as ByteAddressBuffer) to the equivalent StructuredBuffer

@@ -34,10 +34,10 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
         dpfloat dpa = dpfloat(2.0, 1.0);
         dpfloat3 dpf3 = dpfloat3(float3(1.0, 3.0, 5.0), float3(0.5, 1.5, 2.5));
 
-        outputBuffer[0] = f(dpa.p());                               // Expect: 6
-        outputBuffer[1] = f(dpf3.p());                              // Expect: 8
-        outputBuffer[2] = __fwd_diff(f)(dpf3).d();                       // Expect: 5.5
-        outputBuffer[3] = __fwd_diff(f)(dpa).d();                        // Expect: 5
-        outputBuffer[4] = __fwd_diff(g)(dpa).d();                        // Expect: 11.0
+        outputBuffer[0] = f(dpa.p);                               // Expect: 6
+        outputBuffer[1] = f(dpf3.p);                              // Expect: 8
+        outputBuffer[2] = __fwd_diff(f)(dpf3).d;                       // Expect: 5.5
+        outputBuffer[3] = __fwd_diff(f)(dpa).d;                        // Expect: 5
+        outputBuffer[4] = __fwd_diff(g)(dpa).d;                        // Expect: 11.0
     }
 }

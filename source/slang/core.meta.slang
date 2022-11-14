@@ -105,6 +105,55 @@ interface __BuiltinSignedArithmeticType : __BuiltinArithmeticType {}
 interface __BuiltinIntegerType : __BuiltinArithmeticType
 {}
 
+
+/// Interface to denote types as differentiable.
+/// Allows for user-specified differential types as
+/// well as automatic generation, for when the associated type
+/// hasn't been declared explicitly.
+/// Note that the requirements must currently be defined in this exact order
+/// since the auto-diff pass relies on the order to grab the struct keys.
+/// 
+__magic_type(DifferentiableType)
+interface IDifferentiable
+{
+    // Note: the compiler implementation requires the `Differential` associated type to be defined
+    // before anything else.
+
+    __builtin_requirement($( (int) BuiltinRequirementKind::DifferentialType) )
+    associatedtype Differential : IDifferentiable;
+
+    __builtin_requirement($( (int)BuiltinRequirementKind::DZeroFunc) )
+    static Differential dzero();
+
+    __builtin_requirement($( (int)BuiltinRequirementKind::DAddFunc) )
+    static Differential dadd(Differential, Differential);
+
+    __builtin_requirement($( (int)BuiltinRequirementKind::DMulFunc) )
+    static Differential dmul(This, Differential);
+};
+
+__magic_type(DifferentialBottomType)
+__intrinsic_type($(kIROp_DifferentialBottomType))
+struct __DifferentialBottom : IDifferentiable
+{
+    typedef __DifferentialBottom Differential;
+
+    __intrinsic_op($(kIROp_DifferentialBottomValue))
+    static __DifferentialBottom dzero();
+
+    [__unsafeForceInlineEarly]
+    static __DifferentialBottom dadd(Differential a, Differential b)
+    {
+        return dzero();
+    }
+
+    [__unsafeForceInlineEarly]
+    static __DifferentialBottom dmul(This a, Differential b)
+    {
+        return dzero();
+    }
+}
+
 /// A type that can represent non-integers
 [sealed]
 [builtin]
@@ -113,7 +162,7 @@ interface __BuiltinRealType : __BuiltinSignedArithmeticType {}
 /// A type that uses a floating-point representation
 [sealed]
 [builtin]
-interface __BuiltinFloatingPointType : __BuiltinRealType
+interface __BuiltinFloatingPointType : __BuiltinRealType, IDifferentiable
 {
         /// Initialize from a 32-bit floating-point value.
     __init(float value);
@@ -320,6 +369,26 @@ ${{{{
     case BaseType::Double:
 }}}}
         static $(kBaseTypes[tt].name) getPi() { return $(kBaseTypes[tt].name)(3.14159265358979323846264338328); }
+
+        typedef $(kBaseTypes[tt].name) Differential;
+    
+        [__unsafeForceInlineEarly]
+        static Differential dzero()
+        {
+            return Differential(0);
+        }
+
+        [__unsafeForceInlineEarly]
+        static Differential dadd(Differential a, Differential b)
+        {
+            return a + b;
+        }
+
+        [__unsafeForceInlineEarly]
+        static Differential dmul(Differential a, Differential b)
+        {
+            return a * b;
+        }
 ${{{{
         break;
     }
@@ -842,7 +911,6 @@ for (int tt = 0; tt < kBaseTypeCount; ++tt)
             sb << "    __init(" << kBaseTypes[ff].name << " value);\n";
         }
     }
-
     sb << "}\n";
 }
 
@@ -877,7 +945,6 @@ for( int C = 2; C <= 4; ++C )
         if(rr == R && cc == C) continue;
         sb << "__init(matrix<T," << rr << "," << cc << "> value);\n";
     }
-
     sb << "}\n";
 }
 
@@ -886,6 +953,7 @@ for (int tt = 0; tt < kBaseTypeCount; ++tt)
     if(kBaseTypes[tt].tag == BaseType::Void) continue;
     auto toType = kBaseTypes[tt].name;
 }}}}
+
 __generic<let R : int, let C : int> extension matrix<$(toType),R,C>
 {
 ${{{{
@@ -908,6 +976,60 @@ ${{{{
 ${{{{
 }
 }}}}
+
+__generic<T, U>
+__intrinsic_op(0)
+T __slang_noop_cast(U u);
+
+__generic<T:__BuiltinFloatingPointType, let N: int>
+extension vector<T, N> : IDifferentiable
+{
+    typedef vector<T, N> Differential;
+
+    [__unsafeForceInlineEarly]
+    static Differential dzero()
+    {
+        return Differential(__slang_noop_cast<T>(T.dzero()));
+    }
+
+    [__unsafeForceInlineEarly]
+    static Differential dadd(Differential a, Differential b)
+    {
+        return a + b;
+    }
+
+    [__unsafeForceInlineEarly]
+    static Differential dmul(This a, Differential b)
+    {
+        return a * b;
+    }
+}
+
+__generic<T:__BuiltinFloatingPointType, let R: int, let C: int>
+extension matrix<T, R, C> : IDifferentiable
+{
+    typedef matrix<T, R, C> Differential;
+
+    __init(T val);
+
+    [__unsafeForceInlineEarly]
+    static Differential dzero()
+    {
+        return matrix<T, R, C>(__slang_noop_cast<T>(T.dzero()));
+    }
+
+    [__unsafeForceInlineEarly]
+    static Differential dadd(Differential a, Differential b)
+    {
+        return a + b;
+    }
+
+    [__unsafeForceInlineEarly]
+    static Differential dmul(This a, Differential b)
+    {
+        return a * b;
+    }
+}
 
 //@ public:
 
@@ -2735,19 +2857,6 @@ attribute_syntax [anyValueSize(size:int)] : AnyValueSizeAttribute;
 
 __attributeTarget(InterfaceDecl)
 attribute_syntax [Specialize] : SpecializeAttribute;
-
-__attributeTarget(DeclBase)
-attribute_syntax [DerivativeMember(memberName)] : DerivativeMemberAttribute;
-
-enum _BuiltinRequirementKind
-{
-    DifferentialType = $( (int) BuiltinRequirementKind::DifferentialType),
-    DZeroFunc = $( (int) BuiltinRequirementKind::DZeroFunc),
-    DAddFunc = $( (int) BuiltinRequirementKind::DAddFunc),
-    DMulFunc = $( (int) BuiltinRequirementKind::DMulFunc),
-};
-__attributeTarget(DeclBase)
-attribute_syntax [__BuiltinRequirement(kind: _BuiltinRequirementKind)] : BuiltinRequirementAttribute;
 
 __attributeTarget(DeclBase)
 attribute_syntax [builtin] : BuiltinAttribute;

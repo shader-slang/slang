@@ -171,6 +171,11 @@ void SharedASTBuilder::registerBuiltinDecl(Decl* decl, BuiltinTypeModifier* modi
     m_builtinTypes[Index(modifier->tag)] = type;
 }
 
+void SharedASTBuilder::registerBuiltinRequirementDecl(Decl* decl, BuiltinRequirementModifier* modifier)
+{
+    m_builtinRequirementDecls[modifier->kind] = decl;
+}
+
 void SharedASTBuilder::registerMagicDecl(Decl* decl, MagicTypeModifier* modifier)
 {
     // In some cases the modifier will have been applied to the

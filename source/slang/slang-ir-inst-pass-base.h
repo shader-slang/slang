@@ -25,6 +25,17 @@ namespace Slang
             workListSet.Add(inst);
         }
 
+        IRInst* pop()
+        {
+            if (workList.getCount() == 0)
+                return nullptr;
+
+            IRInst* inst = workList.getLast();
+            workList.removeLast();
+            workListSet.Remove(inst);
+            return inst;
+        }
+
     public:
         InstPassBase(IRModule* inModule)
             : module(inModule)
@@ -40,10 +51,8 @@ namespace Slang
 
             while (workList.getCount() != 0)
             {
-                IRInst* inst = workList.getLast();
+                IRInst* inst = pop();
 
-                workList.removeLast();
-                workListSet.Remove(inst);
                 if (inst->getOp() == instOp)
                 {
                     f(as<InstType>(inst));
@@ -66,10 +75,7 @@ namespace Slang
 
             while (workList.getCount() != 0)
             {
-                IRInst* inst = workList.getLast();
-
-                workList.removeLast();
-                workListSet.Remove(inst);
+                IRInst* inst = pop();
                 if (inst->getOp() == instOp)
                 {
                     f(as<InstType>(inst));
@@ -92,10 +98,8 @@ namespace Slang
 
             while (workList.getCount() != 0)
             {
-                IRInst* inst = workList.getLast();
+                IRInst* inst = pop();
 
-                workList.removeLast();
-                workListSet.Remove(inst);
                 f(inst);
 
                 for (auto child = inst->getLastChild(); child; child = child->getPrevInst())

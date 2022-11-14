@@ -395,6 +395,15 @@ class MagicTypeModifier : public Modifier
     uint32_t tag = uint32_t(0);
 };
 
+// A modifier that indicates a built-in associated type requirement (e.g., `Differential`)
+class BuiltinRequirementModifier : public Modifier
+{
+    SLANG_AST_CLASS(BuiltinRequirementModifier);
+
+    BuiltinRequirementKind kind;
+};
+
+
 // A modifier applied to declarations of builtin types to indicate how they
 // should be lowered to the IR.
 //
@@ -588,14 +597,6 @@ class Attribute : public AttributeBase
     SLANG_AST_CLASS(Attribute)
  
     AttributeArgumentValueDict intArgVals;
-};
-
-// A modifier that indicates a built-in associated type requirement (e.g., `Differential`)
-class BuiltinRequirementAttribute : public Attribute
-{
-    SLANG_AST_CLASS(BuiltinRequirementAttribute);
-
-    BuiltinRequirementKind kind;
 };
 
 class UserDefinedAttribute : public Attribute 
@@ -1030,7 +1031,24 @@ class ForwardDerivativeAttribute : public DifferentiableAttribute
 {
     SLANG_AST_CLASS(ForwardDerivativeAttribute)
 
-    DeclRefExpr* funcDeclRef;
+    Expr* funcExpr;
+};
+
+    /// The `[ForwardDerivativeOf(primalFunction)]` attribute marks the decorated function as custom
+    /// derivative implementation for `primalFunction`.
+class ForwardDerivativeOfAttribute : public Attribute
+{
+    SLANG_AST_CLASS(ForwardDerivativeOfAttribute)
+
+    Expr* funcExpr;
+
+    Expr* backDeclRef; // DeclRef to this derivative function when initiated from primalFunction.
+};
+
+    /// The `[BackwardDifferentiable]` attribute indicates that a function can be backward-differentiated.
+class BackwardDifferentiableAttribute : public DifferentiableAttribute
+{
+    SLANG_AST_CLASS(BackwardDifferentiableAttribute)
 };
 
     /// Indicates that the modified declaration is one of the "magic" declarations

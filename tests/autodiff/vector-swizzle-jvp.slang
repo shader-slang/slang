@@ -29,16 +29,16 @@ void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
         float3 a = float3(2.0, 2.0, 2.0);
         float3 da = float3(1.0, 0.5, 1.0);
 
-        outputBuffer[0] = __fwd_diff(f)(dpfloat3(a, da)).d().x;  // Expect: 1
-        outputBuffer[1] = __fwd_diff(f)(dpfloat3(a, da)).d().y;  // Expect: 0.5
+        outputBuffer[0] = __fwd_diff(f)(dpfloat3(a, da)).d.x;  // Expect: 1
+        outputBuffer[1] = __fwd_diff(f)(dpfloat3(a, da)).d.y;  // Expect: 0.5
         
         float3 x = float3(0.5, 2.0, 0.5);
         float4 y = float4(-1.5, 1.0, 4.0, 2.0);
         float3 dx = float3(1.0, 0.0, -1.0);
         float4 dy = float4(0.0, 0.5, -0.25, 1.0);
 
-        outputBuffer[2] = __fwd_diff(g)(dpfloat3(x, dx), dpfloat4(y, dy)).d().x; // Expect: -2.25
-        outputBuffer[3] = __fwd_diff(g)(dpfloat3(x, dx), dpfloat4(y, dy)).d().y; // Expect: 0.5
+        outputBuffer[2] = __fwd_diff(g)(dpfloat3(x, dx), dpfloat4(y, dy)).d.x; // Expect: -2.25
+        outputBuffer[3] = __fwd_diff(g)(dpfloat3(x, dx), dpfloat4(y, dy)).d.y; // Expect: 0.5
         
     }
 }
