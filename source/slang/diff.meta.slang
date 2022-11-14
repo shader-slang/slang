@@ -102,6 +102,19 @@ struct DifferentialPair : IDifferentiable
     return DifferentialPair<vector<TYPE, COUNT>>(result, d_result)
 
 
+#define VECTOR_MAP_D_BINARY(TYPE, COUNT, D_FUNC, LEFT, RIGHT)                                                                          \
+    vector<TYPE, COUNT> result;                                                                                                        \
+    vector<TYPE, COUNT>.Differential d_result;                                                                                         \
+    for (int i = 0; i < N; ++i)                                                                                                        \
+    {                                                                                                                                  \
+        DifferentialPair<TYPE> dp_elem = D_FUNC(DifferentialPair<TYPE>(LEFT.p[i], __slang_noop_cast<TYPE.Differential>(LEFT.d[i])),    \
+                                                DifferentialPair<TYPE>(RIGHT.p[i], __slang_noop_cast<TYPE.Differential>(RIGHT.d[i]))); \
+        result[i] = dp_elem.p;                                                                                                         \
+        d_result[i] = __slang_noop_cast<TYPE>(dp_elem.d);                                                                              \
+    }                                                                                                                                  \
+    return DifferentialPair<vector<TYPE, COUNT>>(result, d_result)
+
+
 // Detach and set derivatives to zero
 
 __generic<T : __BuiltinFloatingPointType>
@@ -240,7 +253,6 @@ DifferentialPair<vector<T, N>> __d_sqrt_vector(DifferentialPair<vector<T, N>> dp
 }
 
 // Maximum
-// TODO: vectorize
 
 __generic<T : __BuiltinFloatingPointType>
 [ForwardDerivativeOf(max)]
@@ -252,17 +264,14 @@ DifferentialPair<T> __d_max(DifferentialPair<T> dpx, DifferentialPair<T> dpy)
     );
 }
 
-/*
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [ForwardDerivativeOf(max)]
-DifferentialPair<vector<T, N>> __d_max(DifferentialPair<vector<T, N>> dpx, DifferentialPair<vector<T, N>> dpy)
+DifferentialPair<vector<T, N>> __d_max_vector(DifferentialPair<vector<T, N>> dpx, DifferentialPair<vector<T, N>> dpy)
 {
     VECTOR_MAP_D_BINARY(T, N, __d_max, dpx, dpy);
 }
-*/
 
 // Minimum
-// TODO: vectorize
 
 __generic<T : __BuiltinFloatingPointType>
 [ForwardDerivativeOf(min)]
@@ -274,8 +283,14 @@ DifferentialPair<T> __d_min(DifferentialPair<T> dpx, DifferentialPair<T> dpy)
     );
 }
 
+__generic<T : __BuiltinFloatingPointType, let N : int>
+[ForwardDerivativeOf(min)]
+DifferentialPair<vector<T, N>> __d_min_vector(DifferentialPair<vector<T, N>> dpx, DifferentialPair<vector<T, N>> dpy)
+{
+    VECTOR_MAP_D_BINARY(T, N, __d_min, dpx, dpy);
+}
+
 // Raise to a power
-// TODO: vectorize
 
 __generic<T : __BuiltinFloatingPointType>
 [ForwardDerivativeOf(pow)]
@@ -296,6 +311,13 @@ DifferentialPair<T> __d_pow(DifferentialPair<T> dpx, DifferentialPair<T> dpy)
     );
 }
 
+__generic<T : __BuiltinFloatingPointType, let N : int>
+[ForwardDerivativeOf(pow)]
+DifferentialPair<vector<T, N>> __d_pow_vector(DifferentialPair<vector<T, N>> dpx, DifferentialPair<vector<T, N>> dpy)
+{
+    VECTOR_MAP_D_BINARY(T, N, __d_pow, dpx, dpy);
+}
+
 // Vector dot product
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
@@ -309,7 +331,6 @@ DifferentialPair<T> __d_dot(DifferentialPair<vector<T, N>> dpx, DifferentialPair
         result = result + dpx.p[i] * dpy.p[i];
         d_result = T.dadd(d_result, T.dmul(dpx.p[i], __slang_noop_cast<T.Differential>(dpy.d[i])));
         d_result = T.dadd(d_result, T.dmul(dpy.p[i], __slang_noop_cast<T.Differential>(dpx.d[i])));
-        //d_result = __slang_noop_cast<T>(d_result) + dpx.p[i] * __slang_noop_cast<T>(dpy.d[i]) + __slang_noop_cast<T>(dpx.d[i]) * dpy.p[i];
     }
     return DifferentialPair<T>(result, d_result);
 }

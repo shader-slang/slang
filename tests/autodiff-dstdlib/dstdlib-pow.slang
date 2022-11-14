@@ -14,6 +14,12 @@ float diffPow(float x, float y)
     return pow(x, y);
 }
 
+[ForwardDifferentiable]
+float2 diffPow2(float2 x, float2 y)
+{
+    return pow(x, y);
+}
+
 [numthreads(1, 1, 1)]
 void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
@@ -26,18 +32,12 @@ void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
     }
 
     {
-        dpfloat dpx = dpfloat(10.0, 0.0);
-        dpfloat dpy = dpfloat(2.5, 1.0);
-        dpfloat res = __fwd_diff(diffPow)(dpx, dpy);
-        outputBuffer[2] = res.p;               // Expect: 316.227722
-        outputBuffer[3] = res.d;               // Expect: 728.141235
-    }
-
-    {
-        dpfloat dpx = dpfloat(3.0, -2.0);
-        dpfloat dpy = dpfloat(4.0, 1.0);
-        dpfloat res = __fwd_diff(diffPow)(dpx, dpy);
-        outputBuffer[4] = res.p;               // Expect: 81.000000
-        outputBuffer[5] = res.d;               // Expect: -127.012398
+        dpfloat2 dpx = dpfloat2(float2(10.0, 3.0), float2(0.0, -2.0));
+        dpfloat2 dpy = dpfloat2(float2(2.5, 4.0), float2(1.0, 1.0));
+        dpfloat2 res = __fwd_diff(diffPow2)(dpx, dpy);
+        outputBuffer[2] = res.p[0];            // Expect: 316.227722
+        outputBuffer[3] = res.d[0];            // Expect: 728.141235
+        outputBuffer[4] = res.p[1];            // Expect: 81.000000
+        outputBuffer[5] = res.d[1];            // Expect: -127.012398
     }
 }
