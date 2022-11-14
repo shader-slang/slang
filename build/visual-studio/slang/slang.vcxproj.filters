@@ -665,6 +665,9 @@
     <ClCompile Include="..\..\..\source\slang\slang-ir-deduplicate.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\source\slang\slang-ir-diff-backward.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\..\source\slang\slang-ir-diff-call.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>

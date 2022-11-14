@@ -512,6 +512,7 @@ IF EXIST ..\..\..\external\slang-glslang\bin\windows-aarch64\release\slang-glsla
     <ClCompile Include="..\..\..\source\slang\slang-ir-constexpr.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-dce.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-deduplicate.cpp" />
+    <ClCompile Include="..\..\..\source\slang\slang-ir-diff-backward.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-diff-call.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-diff-jvp.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-dll-export.cpp" />
