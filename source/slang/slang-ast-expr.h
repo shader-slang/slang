@@ -451,6 +451,14 @@ class ForwardDifferentiateExpr: public HigherOrderInvokeExpr
     SLANG_AST_CLASS(ForwardDifferentiateExpr)
 };
 
+    /// An expression of the form `__bwd_diff(fn)` to access the 
+    /// forward-mode derivative version of the function `fn`
+    ///
+class BackwardDifferentiateExpr: public HigherOrderInvokeExpr
+{
+    SLANG_AST_CLASS(BackwardDifferentiateExpr)
+};
+
     /// A type expression of the form `__TaggedUnion(A, ...)`.
     ///
     /// An expression of this form will resolve to a `TaggedUnionType`

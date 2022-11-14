@@ -2,7 +2,7 @@
 #include "slang-glslang.h"
 
 
-#include "StandAlone/ResourceLimits.h"
+#include "glslang/Public/ResourceLimits.h"
 #include "StandAlone/Worklist.h"
 #include "glslang/Include/ShHandle.h"
 #include "glslang/Public/ShaderLang.h"

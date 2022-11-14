@@ -15,6 +15,13 @@ The following are not submodules files, and are produces elsewhere and placed in
 * external/spirv-tools-generated
 * external/glslang-generated
 
+Updating glslang
+----------------
+
+*On Linux, you can run the [`external/bump-glslang.sh`](../bump-glslang.sh) script.*
+
+*On any platform, you can follow the below instructions:*
+
 To get the latest version of one of the submodules you can use
 
 ```
