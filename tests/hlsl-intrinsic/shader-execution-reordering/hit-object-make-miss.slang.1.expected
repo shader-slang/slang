@@ -7,6 +7,9 @@ standard output = {
 #extension GL_NV_shader_invocation_reorder : require
 layout(row_major) uniform;
 layout(row_major) buffer;
+layout(std430, binding = 0) buffer _S1 {
+    uint _data[];
+} outputBuffer_0;
 struct RayDesc_0
 {
     vec3 Origin_0;
@@ -15,16 +18,6 @@ struct RayDesc_0
     float TMax_0;
 };
 
-hitObjectNV HitObject_MakeMiss_0(uint MissShaderIndex_0, RayDesc_0 Ray_0)
-{
-    hitObjectNV hitObj_0;
-    hitObjectRecordMissNV(hitObj_0, MissShaderIndex_0, Ray_0.Origin_0, Ray_0.TMin_0, Ray_0.Direction_0, Ray_0.TMax_0);
-    return hitObj_0;
-}
-
-layout(std430, binding = 0) buffer _S1 {
-    uint _data[];
-} outputBuffer_0;
 layout(local_size_x = 4, local_size_y = 1, local_size_z = 1) in;
 void main()
 {
@@ -34,10 +27,12 @@ void main()
     ray_0.TMin_0 = 0.00999999977648258209;
     ray_0.Direction_0 = vec3(0.00000000000000000000, 1.00000000000000000000, 0.00000000000000000000);
     ray_0.TMax_0 = 10000.00000000000000000000;
-    hitObjectNV hit_0 = HitObject_MakeMiss_0(uint(idx_0), ray_0);
-    bool _S2 = (hitObjectIsMissNV((hit_0)));
-    uint _S3 = uint(int(_S2));
-    ((outputBuffer_0)._data[(uint(idx_0))]) = _S3;
+    RayDesc_0 _S2 = ray_0;
+    hitObjectNV hitObj_0;
+    hitObjectRecordMissNV(hitObj_0, uint(idx_0), _S2.Origin_0, _S2.TMin_0, _S2.Direction_0, _S2.TMax_0);
+    bool _S3 = (hitObjectIsMissNV((hitObj_0)));
+    uint _S4 = uint(int(_S3));
+    ((outputBuffer_0)._data[(uint(idx_0))]) = _S4;
     return;
 }
 

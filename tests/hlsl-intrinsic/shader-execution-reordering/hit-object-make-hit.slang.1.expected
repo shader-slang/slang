@@ -17,6 +17,9 @@ layout(location = 0)
 hitObjectAttributeNV
 SomeValues_0 t_0;
 
+layout(binding = 0)
+uniform accelerationStructureEXT scene_0;
+
 struct RayDesc_0
 {
     vec3 Origin_0;
@@ -24,16 +27,6 @@ struct RayDesc_0
     vec3 Direction_0;
     float TMax_0;
 };
-
-hitObjectNV HitObject_MakeHit_0(uint HitGroupRecordIndex_0, accelerationStructureEXT AccelerationStructure_0, uint InstanceIndex_0, uint GeometryIndex_0, uint PrimitiveIndex_0, uint HitKind_0, RayDesc_0 Ray_0, SomeValues_0 attributes_0)
-{
-    hitObjectNV hitObj_0;
-    hitObjectRecordHitWithIndexNV(hitObj_0, AccelerationStructure_0, InstanceIndex_0, GeometryIndex_0, PrimitiveIndex_0, HitKind_0, HitGroupRecordIndex_0, Ray_0.Origin_0, Ray_0.TMin_0, Ray_0.Direction_0, Ray_0.TMax_0, (0));
-    return hitObj_0;
-}
-
-layout(binding = 0)
-uniform accelerationStructureEXT scene_0;
 
 RayDesc_0 HitObject_GetRayDesc_0(hitObjectNV this_0)
 {
@@ -84,13 +77,6 @@ uint calcValue_0(hitObjectNV hit_0)
     return r_0;
 }
 
-hitObjectNV HitObject_MakeHit_1(accelerationStructureEXT AccelerationStructure_1, uint InstanceIndex_1, uint GeometryIndex_1, uint PrimitiveIndex_1, uint HitKind_1, uint RayContributionToHitGroupIndex_0, uint MultiplierForGeometryContributionToHitGroupIndex_0, RayDesc_0 Ray_1, SomeValues_0 attributes_1)
-{
-    hitObjectNV hitObj_1;
-    hitObjectRecordHitNV(hitObj_1, AccelerationStructure_1, InstanceIndex_1, PrimitiveIndex_1, GeometryIndex_1, HitKind_1, RayContributionToHitGroupIndex_0, MultiplierForGeometryContributionToHitGroupIndex_0, Ray_1.Origin_0, Ray_1.TMin_0, Ray_1.Direction_0, Ray_1.TMax_0, (0));
-    return hitObj_1;
-}
-
 layout(std430, binding = 1) buffer _S7 {
     uint _data[];
 } outputBuffer_0;
@@ -100,17 +86,20 @@ void main()
     ivec2 launchID_0 = ivec2(_S8.xy);
     uvec3 _S9 = ((gl_LaunchSizeEXT));
     int idx_0 = launchID_0.x;
-    SomeValues_0 someValues_0 = { idx_0, float(idx_0) * 2.00000000000000000000 };
     RayDesc_0 ray_2;
     ray_2.Origin_0 = vec3(float(idx_0), 0.00000000000000000000, 0.00000000000000000000);
     ray_2.TMin_0 = 0.00999999977648258209;
     ray_2.Direction_0 = vec3(0.00000000000000000000, 1.00000000000000000000, 0.00000000000000000000);
     ray_2.TMax_0 = 10000.00000000000000000000;
-    hitObjectNV hit_1 = HitObject_MakeHit_0(0U, scene_0, uint(idx_0), uint(idx_0 * 2), uint(idx_0 * 3), 0U, ray_2, someValues_0);
-    uint r_4 = calcValue_0(hit_1);
-    hitObjectNV hit_2 = HitObject_MakeHit_1(scene_0, uint(idx_0), uint(idx_0 * 2), uint(idx_0 * 3), 0U, 0U, 4U, ray_2, someValues_0);
-    uint _S10 = calcValue_0(hit_2);
-    uint r_5 = r_4 + _S10;
+    RayDesc_0 _S10 = ray_2;
+    hitObjectNV hitObj_0;
+    hitObjectRecordHitWithIndexNV(hitObj_0, scene_0, uint(idx_0), uint(idx_0 * 2), uint(idx_0 * 3), 0U, 0U, _S10.Origin_0, _S10.TMin_0, _S10.Direction_0, _S10.TMax_0, (0));
+    uint r_4 = calcValue_0(hitObj_0);
+    RayDesc_0 _S11 = ray_2;
+    hitObjectNV hitObj_1;
+    hitObjectRecordHitNV(hitObj_1, scene_0, uint(idx_0), uint(idx_0 * 3), uint(idx_0 * 2), 0U, 0U, 4U, _S11.Origin_0, _S11.TMin_0, _S11.Direction_0, _S11.TMax_0, (0));
+    uint _S12 = calcValue_0(hitObj_1);
+    uint r_5 = r_4 + _S12;
     ((outputBuffer_0)._data[(uint(idx_0))]) = r_5;
     return;
 }

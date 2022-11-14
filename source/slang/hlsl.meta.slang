@@ -5507,6 +5507,7 @@ struct HitObject
         return hitObj;
     }
 
+    [ForceInline]
     __specialized_for_target(glsl)
     static HitObject TraceRay<payload_t>( 
         RaytracingAccelerationStructure AccelerationStructure, 
@@ -5548,6 +5549,7 @@ struct HitObject
 
         /// Executes motion ray traversal (including anyhit and intersection shaders) like TraceRay, but returns the
         /// resulting hit information as a HitObject and does not trigger closesthit or miss shaders.
+    [ForceInline]
     __specialized_for_target(glsl)
     static HitObject TraceMotionRay<payload_t>( 
         RaytracingAccelerationStructure AccelerationStructure, 
@@ -5622,6 +5624,7 @@ struct HitObject
         return hitObj;
     }
 
+    [ForceInline]
     __specialized_for_target(glsl)
     static HitObject MakeHit<attr_t>( 
         RaytracingAccelerationStructure AccelerationStructure, 
@@ -5660,6 +5663,7 @@ struct HitObject
 
         /// See MakeHit but handles Motion 
         /// Currently only supported on VK
+    [ForceInline]
     __specialized_for_target(glsl)
     static HitObject MakeMotionHit<attr_t>( 
         RaytracingAccelerationStructure AccelerationStructure, 
@@ -5730,6 +5734,7 @@ struct HitObject
         return hitObj;
     }
 
+    [ForceInline]
     __specialized_for_target(glsl)
     static HitObject MakeHit<attr_t>( 
         uint HitGroupRecordIndex, 
@@ -5765,6 +5770,7 @@ struct HitObject
 
         /// See MakeHit but handles Motion 
         /// Currently only supported on VK
+    [ForceInline]
     __specialized_for_target(glsl)
     static HitObject MakeMotionHit<attr_t>( 
         uint HitGroupRecordIndex, 
@@ -5810,6 +5816,7 @@ struct HitObject
         uint MissShaderIndex, 
         RayDesc Ray);
 
+    [ForceInline]
     __specialized_for_target(glsl)
     static HitObject MakeMiss( 
         uint MissShaderIndex, 
@@ -5822,6 +5829,7 @@ struct HitObject
 
         /// See MakeMiss but handles Motion 
         /// Currently only supported on VK
+    [ForceInline]
     __specialized_for_target(glsl)
     static HitObject MakeMotionMiss( 
         uint MissShaderIndex, 
@@ -5842,6 +5850,7 @@ struct HitObject
     __target_intrinsic(hlsl, "NvMakeNop")
     static HitObject MakeNop();
 
+    [ForceInline]
     __specialized_for_target(glsl)
     static HitObject MakeNop()
     {
