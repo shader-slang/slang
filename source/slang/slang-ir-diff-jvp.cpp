@@ -2740,6 +2740,9 @@ struct JVPDerivativeContext : public InstPassBase
                     case kIROp_ForwardDifferentiate:
                     case kIROp_BackwardDifferentiate:
                         autoDiffWorkList.add(inst);
+                        break;
+                    default:
+                        break;
                     }
                 });
 
