@@ -1,5 +1,5 @@
-//DISABLED_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj -output-using-type
-//DISABLED_TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj -output-using-type
+//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj -output-using-type
+//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj -output-using-type
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
@@ -16,8 +16,8 @@ float test(float x, float y)
 [numthreads(1, 1, 1)]
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
-    dpfloat dpa = dpfloat(2.0, 1.0);
-    dpfloat dpb = dpfloat(1.5, 1.0);
+    dpfloat dpa = dpfloat(2.0, 0.0);
+    dpfloat dpb = dpfloat(1.5, 0.0);
 
     __bwd_diff(test)(dpa, dpb, 1.0f);
     outputBuffer[0] = dpa.d; // Expect: 1

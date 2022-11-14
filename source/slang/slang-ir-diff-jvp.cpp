@@ -2017,528 +2017,6 @@ struct JVPTranscriber
     }
 };
 
-struct JVPDerivativeContext : public InstPassBase
-{
-
-    DiagnosticSink* getSink()
-    {
-        return sink;
-    }
-
-    bool processModule()
-    {
-        // We start by initializing our shared IR building state,
-        // since we will re-use that state for any code we
-        // generate along the way.
-        //
-        SharedIRBuilder* sharedBuilder = &sharedBuilderStorage;
-        sharedBuilder->init(module);
-        sharedBuilder->deduplicateAndRebuildGlobalNumberingMap();
-    
-        IRBuilder builderStorage(sharedBuilderStorage);
-        IRBuilder* builder = &builderStorage;
-
-        // Process all ForwardDifferentiate instructions (kIROp_ForwardDifferentiate), by 
-        // generating derivative code for the referenced function.
-        //
-        bool modified = processReferencedFunctions(builder);
-
-        // Replaces IRDifferentialPairType with an auto-generated struct,
-        // IRDifferentialPairGetDifferential with 'differential' field access,
-        // IRDifferentialPairGetPrimal with 'primal' field access, and
-        // IRMakeDifferentialPair with an IRMakeStruct.
-        // 
-        modified |= simplifyDifferentialBottomType(builder);
-
-        modified |= processPairTypes(builder, module->getModuleInst());
-
-        modified |= eliminateDifferentialBottomType(builder);
-
-        return modified;
-    }
-
-    IRInst* lookupJVPReference(IRInst* primalFunction)
-    {
-        if(auto jvpDefinition = primalFunction->findDecoration<IRForwardDerivativeDecoration>())
-            return jvpDefinition->getForwardDerivativeFunc();
-        return nullptr;
-    }
-
-    // Recursively process instructions looking for JVP calls (kIROp_ForwardDifferentiate),
-    // then check that the referenced function is marked correctly for differentiation.
-    //
-    bool processReferencedFunctions(IRBuilder* builder)
-    {
-        List<IRForwardDifferentiate*> autoDiffWorkList;
-
-        for (;;)
-        {
-            // Collect all `ForwardDifferentiate` insts from the module.
-            autoDiffWorkList.clear();
-            processInstsOfType<IRForwardDifferentiate>(kIROp_ForwardDifferentiate, [&](IRForwardDifferentiate* fwdDiffInst)
-            {
-                autoDiffWorkList.add(fwdDiffInst);
-            });
-
-            if (autoDiffWorkList.getCount() == 0)
-                break;
-
-            // Process collected `ForwardDifferentiate` insts and replace them with placeholders for
-            // differentiated functions.
-            transcriberStorage.followUpFunctionsToTranscribe.clear();
-
-            for (auto fwdDiffInst : autoDiffWorkList)
-            {
-                auto baseInst = fwdDiffInst->getBaseFn();
-                if (auto baseFunction = as<IRGlobalValueWithCode>(baseInst))
-                {
-                    if (auto existingDiffFunc = lookupJVPReference(baseFunction))
-                    {
-                        fwdDiffInst->replaceUsesWith(existingDiffFunc);
-                        fwdDiffInst->removeAndDeallocate();
-                    }
-                    else if (isMarkedForForwardDifferentiation(baseFunction))
-                    {
-                        if (as<IRFunc>(baseFunction) || as<IRGeneric>(baseFunction))
-                        {
-                            IRInst* diffFunc = transcriberStorage.transcribe(builder, baseFunction);
-                            SLANG_ASSERT(diffFunc);
-                            fwdDiffInst->replaceUsesWith(diffFunc);
-                            fwdDiffInst->removeAndDeallocate();
-                        }
-                        else
-                        {
-                            // TODO(Sai): This would probably be better with a more specific
-                            // error code.
-                            getSink()->diagnose(fwdDiffInst->sourceLoc,
-                                Diagnostics::internalCompilerError,
-                                "Unexpected instruction. Expected func or generic");
-                        }
-                    }
-                    else
-                    {
-                        // TODO(Sai): This would probably be better with a more specific
-                        // error code.
-                        getSink()->diagnose(fwdDiffInst->sourceLoc,
-                            Diagnostics::internalCompilerError,
-                            "Cannot differentiate functions not marked for differentiation");
-                    }
-                }
-            }
-            // Actually synthesize the derivatives.
-            List<InstPair> followUpWorkList = _Move(transcriberStorage.followUpFunctionsToTranscribe);
-            for (auto task : followUpWorkList)
-            {
-                auto diffFunc = as<IRFunc>(task.differential);
-                SLANG_ASSERT(diffFunc);
-                auto primalFunc = as<IRFunc>(task.primal);
-                SLANG_ASSERT(primalFunc);
-
-                transcriberStorage.transcribeFunc(builder, primalFunc, diffFunc);
-            }
-
-            // Transcribing the function body really shouldn't produce more follow up function body work.
-            // However it may produce new `ForwardDifferentiate` instructions, which we collect and process
-            // in the next iteration.
-            SLANG_RELEASE_ASSERT(transcriberStorage.followUpFunctionsToTranscribe.getCount() == 0);
-
-        }
-        return true;
-    }
-
-    IRInst* lowerPairType(IRBuilder* builder, IRType* pairType, bool* isTrivial = nullptr)
-    {
-        builder->setInsertBefore(pairType);
-        auto loweredPairTypeInfo = (&pairBuilderStorage)->lowerDiffPairType(
-            builder,
-            pairType);
-        if (isTrivial)
-            *isTrivial = loweredPairTypeInfo.isTrivial;
-        return loweredPairTypeInfo.loweredType;
-    }
-
-    IRInst* lowerMakePair(IRBuilder* builder, IRInst* inst)
-    {
-        
-        if (auto makePairInst = as<IRMakeDifferentialPair>(inst))
-        {
-            bool isTrivial = false;
-            auto pairType = as<IRDifferentialPairType>(makePairInst->getDataType());
-            if (auto loweredPairType = lowerPairType(builder, pairType, &isTrivial))
-            {
-                builder->setInsertBefore(makePairInst);
-                IRInst* result = nullptr;
-                if (isTrivial)
-                {
-                    result = makePairInst->getPrimalValue();
-                }
-                else
-                {
-                    IRInst* operands[2] = { makePairInst->getPrimalValue(), makePairInst->getDifferentialValue() };
-                    result = builder->emitMakeStruct((IRType*)(loweredPairType), 2, operands);
-                }
-                makePairInst->replaceUsesWith(result);
-                makePairInst->removeAndDeallocate();
-                return result;
-            }
-        }
-        
-        return nullptr;
-    }
-
-    IRInst* lowerPairAccess(IRBuilder* builder, IRInst* inst)
-    {
-        if (auto getDiffInst = as<IRDifferentialPairGetDifferential>(inst))
-        {
-            if (lowerPairType(builder, getDiffInst->getBase()->getDataType(), nullptr))
-            {
-                builder->setInsertBefore(getDiffInst);
-                IRInst* diffFieldExtract = nullptr;
-                diffFieldExtract = (&pairBuilderStorage)->emitDiffFieldAccess(builder, getDiffInst->getBase());
-                getDiffInst->replaceUsesWith(diffFieldExtract);
-                getDiffInst->removeAndDeallocate();
-                return diffFieldExtract;
-            }
-        }
-        else if (auto getPrimalInst = as<IRDifferentialPairGetPrimal>(inst))
-        {
-            if (lowerPairType(builder, getPrimalInst->getBase()->getDataType(), nullptr))
-            {
-                builder->setInsertBefore(getPrimalInst);
-
-                IRInst* primalFieldExtract = nullptr;
-                primalFieldExtract = (&pairBuilderStorage)->emitPrimalFieldAccess(builder, getPrimalInst->getBase());
-                getPrimalInst->replaceUsesWith(primalFieldExtract);
-                getPrimalInst->removeAndDeallocate();
-                return primalFieldExtract;
-            }
-        }
-        
-        return nullptr;
-    }
-
-    bool processPairTypes(IRBuilder* builder, IRInst* instWithChildren)
-    {
-        bool modified = false;
-        // Hoist and deduplicate all pair types to global scope when possible.
-        // This avoids emitting different struct types for equivalent pair types.
-        auto moduleInst = module->getModuleInst();
-        Dictionary<IRInst*, IRInst*> diffPairTypes;
-        for (;;)
-        {
-            bool changed = false;
-            sharedBuilderStorage.deduplicateAndRebuildGlobalNumberingMap();
-            processInstsOfType<IRDifferentialPairType>(kIROp_DifferentialPairType, [&](IRDifferentialPairType* originalPairType)
-                {
-                    IRInst* finalType = nullptr;
-                    if (diffPairTypes.TryGetValue(originalPairType->getValueType(), finalType))
-                    {
-                        if (finalType != originalPairType)
-                        {
-                            originalPairType->replaceUsesWith(finalType);
-                            originalPairType->removeAndDeallocate();
-                            changed = true;
-                            return;
-                        }
-                    }
-                    diffPairTypes[originalPairType->getValueType()] = originalPairType;
-                    if (originalPairType->parent != moduleInst)
-                    {
-                        if (originalPairType->getValueType()->getParent() != originalPairType->getParent())
-                        {
-                            originalPairType->insertAfter(originalPairType->getValueType());
-                            changed = true;
-                            return;
-                        }
-                    }
-                });
-            if (!changed)
-                break;
-        }
-
-        processAllInsts([&](IRInst* inst)
-            {
-                // Make sure the builder is at the right level.
-                builder->setInsertInto(instWithChildren);
-
-                switch (inst->getOp())
-                {
-                case kIROp_DifferentialPairGetDifferential:
-                case kIROp_DifferentialPairGetPrimal:
-                    lowerPairAccess(builder, inst);
-                    modified = true;
-                    break;
-
-                case kIROp_MakeDifferentialPair:
-                    lowerMakePair(builder, inst);
-                    modified = true;
-                    break;
-
-                default:
-                    break;
-                }
-            });
-
-        processInstsOfType<IRDifferentialPairType>(kIROp_DifferentialPairType, [&](IRDifferentialPairType* inst)
-            {
-                if (auto loweredType = lowerPairType(builder, inst))
-                {
-                    inst->replaceUsesWith(loweredType);
-                    inst->removeAndDeallocate();
-                }
-            });
-        return modified;
-    }
-
-    bool simplifyDifferentialBottomType(IRBuilder* builder)
-    {
-        bool modified = false;
-        auto diffBottom = builder->getDifferentialBottom();
-
-        bool changed = true;
-        List<IRUse*> uses;
-        while (changed)
-        {
-            changed = false;
-            // Replace all insts whose type is `DifferentialBottomType` to `diffBottom`.
-            processAllInsts([&](IRInst* inst)
-                {
-                    if (inst->getDataType() && inst->getDataType()->getOp() == kIROp_DifferentialBottomType)
-                    {
-                        if (inst != diffBottom)
-                        {
-                            inst->replaceUsesWith(diffBottom);
-                            inst->removeAndDeallocate();
-                            modified = true;
-                        }
-                    }
-                });
-            // Go through all uses of diffBottom and run simplification.
-            processAllInsts([&](IRInst* inst)
-                {
-                    if (!inst->hasUses())
-                        return;
-
-                    builder->setInsertBefore(inst);
-                    IRInst* valueToReplace = nullptr;
-                    switch (inst->getOp())
-                    {
-                    case kIROp_Store:
-                        if (as<IRStore>(inst)->getVal() == diffBottom)
-                        {
-                            inst->removeAndDeallocate();
-                            changed = true;
-                        }
-                        return;
-                    case kIROp_MakeDifferentialPair:
-                        // Our simplification could lead to a situation where
-                        // bottom is used to make a pair that has a non-bottom differential type,
-                        // in this case we should use zero instead.
-                        if (inst->getOperand(1) == diffBottom)
-                        {
-                            // Only apply if we are the second operand.
-                            auto pairType = as<IRDifferentialPairType>(inst->getDataType());
-                            if (pairBuilderStorage.getDiffTypeFromPairType(builder, pairType)->getOp() != kIROp_DifferentialBottomType)
-                            {
-                                auto zero = transcriberStorage.getDifferentialZeroOfType(builder, pairType->getValueType());
-                                inst->setOperand(1, zero);
-                                changed = true;
-                            }
-                        }
-                        return;
-                    case kIROp_DifferentialPairGetDifferential:
-                        if (inst->getOperand(0)->getOp() == kIROp_MakeDifferentialPair)
-                        {
-                            valueToReplace = inst->getOperand(0)->getOperand(1);
-                        }
-                        break;
-                    case kIROp_DifferentialPairGetPrimal:
-                        if (inst->getOperand(0)->getOp() == kIROp_MakeDifferentialPair)
-                        {
-                            valueToReplace = inst->getOperand(0)->getOperand(0);
-                        }
-                        break;
-                    case kIROp_Add:
-                        if (inst->getOperand(0) == diffBottom)
-                        {
-                            valueToReplace = inst->getOperand(1);
-                        }
-                        else if (inst->getOperand(1) == diffBottom)
-                        {
-                            valueToReplace = inst->getOperand(0);
-                        }
-                        break;
-                    case kIROp_Sub:
-                        if (inst->getOperand(0) == diffBottom)
-                        {
-                            // If left is bottom, and right is not bottom, then we should return -right.
-                            // However we can't possibly run into that case since both side of - operator
-                            // must be at the same order of differentiation.
-                            valueToReplace = diffBottom;
-                        }
-                        else if (inst->getOperand(1) == diffBottom)
-                        {
-                            valueToReplace = inst->getOperand(0);
-                        }
-                        break;
-                    case kIROp_Mul:
-                    case kIROp_Div:
-                        if (inst->getOperand(0) == diffBottom)
-                        {
-                            valueToReplace = diffBottom;
-                        }
-                        else if (inst->getOperand(1) == diffBottom)
-                        {
-                            valueToReplace = diffBottom;
-                        }
-                        break;
-                    default:
-                        break;
-                    }
-                    if (valueToReplace)
-                    {
-                        inst->replaceUsesWith(valueToReplace);
-                        changed = true;
-                    }
-                });
-            modified |= changed;
-        }
-
-        return modified;
-    }
-
-    bool eliminateDifferentialBottomType(IRBuilder* builder)
-    {
-        simplifyDifferentialBottomType(builder);
-
-        bool modified = false;
-        auto diffBottom = builder->getDifferentialBottom();
-        auto diffBottomType = diffBottom->getDataType();
-        diffBottom->replaceUsesWith(builder->getVoidValue());
-        diffBottom->removeAndDeallocate();
-        diffBottomType->replaceUsesWith(builder->getVoidType());
-
-        return modified;
-    }
-
-    // Checks decorators to see if the function should
-    // be differentiated (kIROp_ForwardDifferentiableDecoration)
-    // 
-    bool isMarkedForForwardDifferentiation(IRGlobalValueWithCode* callable)
-    {
-        for(auto decoration = callable->getFirstDecoration(); 
-            decoration;
-            decoration = decoration->getNextDecoration())
-        {
-            if (decoration->getOp() == kIROp_ForwardDifferentiableDecoration)
-            {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    IRStringLit* getForwardDerivativeFuncName(IRInst*       func)
-    {
-        IRBuilder builder(&sharedBuilderStorage);
-        builder.setInsertBefore(func);
-        
-        IRStringLit* name = nullptr;
-        if (auto linkageDecoration = func->findDecoration<IRLinkageDecoration>())
-        {
-            name = builder.getStringValue((String(linkageDecoration->getMangledName()) + "_fwd_diff").getUnownedSlice());
-        }
-        else if (auto namehintDecoration = func->findDecoration<IRNameHintDecoration>())
-        {
-            name = builder.getStringValue((String(namehintDecoration->getName()) + "_fwd_diff").getUnownedSlice());
-        }
-
-        return name;
-    }
-
-    JVPDerivativeContext(IRModule* module, DiagnosticSink* sink) :
-        InstPassBase(module),
-        sink(sink),
-        autoDiffSharedContextStorage(module->getModuleInst()),
-        transcriberStorage(&autoDiffSharedContextStorage, &sharedBuilderStorage)
-    {
-        autoDiffSharedContextStorage.sharedBuilder = &sharedBuilderStorage;
-        pairBuilderStorage.sharedContext = &autoDiffSharedContextStorage;
-        transcriberStorage.sink = sink;
-        transcriberStorage.autoDiffSharedContext = &(autoDiffSharedContextStorage);
-        transcriberStorage.pairBuilder = &(pairBuilderStorage);
-    }
-
-protected:
-    // A transcriber object that handles the main job of 
-    // processing instructions while maintaining state.
-    //
-    JVPTranscriber                  transcriberStorage;
-    
-    // Diagnostic object from the compile request for
-    // error messages.
-    DiagnosticSink*                 sink;
-
-    // Context to find and manage the witness tables for types 
-    // implementing `IDifferentiable`
-    AutoDiffSharedContext           autoDiffSharedContextStorage;
-
-    // Builder for dealing with differential pair types.
-    DifferentialPairTypeBuilder     pairBuilderStorage;
-
-};
-
-// Set up context and call main process method.
-//
-bool processForwardDifferentiableFuncs(
-        IRModule*                           module,
-        DiagnosticSink*                     sink,
-        IRJVPDerivativePassOptions const&)
-{   
-    // Simplify module to remove dead code.
-    IRDeadCodeEliminationOptions options;
-    options.keepExportsAlive = true;
-    options.keepLayoutsAlive = true;
-    eliminateDeadCode(module, options);
-
-    JVPDerivativeContext context(module, sink);
-    bool changed = context.processModule();
-    return changed;
-}
-
-void stripAutoDiffDecorationsFromChildren(IRInst* parent)
-{
-    for (auto inst : parent->getChildren())
-    {
-        for (auto decor = inst->getFirstDecoration(); decor; )
-        {
-            auto next = decor->getNextDecoration();
-            switch (decor->getOp())
-            {
-            case kIROp_ForwardDerivativeDecoration:
-            case kIROp_DerivativeMemberDecoration:
-            case kIROp_DifferentiableTypeDictionaryDecoration:
-                decor->removeAndDeallocate();
-                break;
-            default:
-                break;
-            }
-            decor = next;
-        }
-
-        if (inst->getFirstChild() != nullptr)
-        {
-            stripAutoDiffDecorationsFromChildren(inst);
-        }
-    }
-}
-
-void stripAutoDiffDecorations(IRModule* module)
-{
-    stripAutoDiffDecorationsFromChildren(module->getModuleInst());
-}
-
-
 
 struct BackwardDiffTranscriber
 {
@@ -2576,8 +2054,11 @@ struct BackwardDiffTranscriber
     IRWitnessTable* differentialBottomWitness = nullptr;
     Dictionary<InstPair, IRInst*> differentialPairTypes;
 
-    BackwardDiffTranscriber(AutoDiffSharedContext* shared, SharedIRBuilder* inSharedBuilder)
-        : differentiableTypeConformanceContext(shared), sharedBuilder(inSharedBuilder)
+    BackwardDiffTranscriber(AutoDiffSharedContext* shared, SharedIRBuilder* inSharedBuilder, DiagnosticSink* inSink)
+        : autoDiffSharedContext(shared)
+        , sink(inSink)
+        , differentiableTypeConformanceContext(shared)
+        , sharedBuilder(inSharedBuilder)
     {}
 
     DiagnosticSink* getSink()
@@ -3193,7 +2674,8 @@ struct BackwardDiffTranscriber
     }
 };
 
-struct BackwardDifferentiationContext : public InstPassBase
+
+struct JVPDerivativeContext : public InstPassBase
 {
 
     DiagnosticSink* getSink()
@@ -3223,7 +2705,7 @@ struct BackwardDifferentiationContext : public InstPassBase
         // IRDifferentialPairGetDifferential with 'differential' field access,
         // IRDifferentialPairGetPrimal with 'primal' field access, and
         // IRMakeDifferentialPair with an IRMakeStruct.
-        //
+        // 
         modified |= simplifyDifferentialBottomType(builder);
 
         modified |= processPairTypes(builder, module->getModuleInst());
@@ -3245,15 +2727,20 @@ struct BackwardDifferentiationContext : public InstPassBase
     //
     bool processReferencedFunctions(IRBuilder* builder)
     {
-        List<IRBackwardDifferentiate*> autoDiffWorkList;
+        List<IRInst*> autoDiffWorkList;
 
         for (;;)
         {
             // Collect all `ForwardDifferentiate` insts from the module.
             autoDiffWorkList.clear();
-            processInstsOfType<IRBackwardDifferentiate>(kIROp_BackwardDifferentiate, [&](IRBackwardDifferentiate* fwdDiffInst)
+            processAllInsts([&](IRInst* inst)
                 {
-                    autoDiffWorkList.add(fwdDiffInst);
+                    switch (inst->getOp())
+                    {
+                    case kIROp_ForwardDifferentiate:
+                    case kIROp_BackwardDifferentiate:
+                        autoDiffWorkList.add(inst);
+                    }
                 });
 
             if (autoDiffWorkList.getCount() == 0)
@@ -3262,43 +2749,59 @@ struct BackwardDifferentiationContext : public InstPassBase
             // Process collected `ForwardDifferentiate` insts and replace them with placeholders for
             // differentiated functions.
             transcriberStorage.followUpFunctionsToTranscribe.clear();
+            backwardTranscriberStorage.followUpFunctionsToTranscribe.clear();
 
-            for (auto fwdDiffInst : autoDiffWorkList)
+            for (auto differentiateInst : autoDiffWorkList)
             {
-                auto baseInst = fwdDiffInst->getBaseFn();
+                IRInst* baseInst = differentiateInst->getOperand(0);
+                
                 if (auto baseFunction = as<IRGlobalValueWithCode>(baseInst))
                 {
-                    // TODO: Handle user defined backward later
-                    /*if (auto existingDiffFunc = lookupJVPReference(baseFunction))
+                    if (as<IRForwardDifferentiate>(differentiateInst))
                     {
-                        fwdDiffInst->replaceUsesWith(existingDiffFunc);
-                        fwdDiffInst->removeAndDeallocate();
-                    }
-                    else */if (isMarkedForBackwardDifferentiation(baseFunction))
-                    {
-                        if (auto func = as<IRFunc>(baseFunction))
+                        if (auto existingDiffFunc = lookupJVPReference(baseFunction))
                         {
-                            IRInst* diffFunc = transcriberStorage.transcribeFuncHeader(builder, func).differential;
-                            SLANG_ASSERT(diffFunc);
-                            fwdDiffInst->replaceUsesWith(diffFunc);
-                            fwdDiffInst->removeAndDeallocate();
+                            differentiateInst->replaceUsesWith(existingDiffFunc);
+                            differentiateInst->removeAndDeallocate();
                         }
-                        else
+                        else if (isMarkedForForwardDifferentiation(baseFunction))
                         {
-                            // TODO(Sai): This would probably be better with a more specific
-                            // error code.
-                            getSink()->diagnose(fwdDiffInst->sourceLoc,
-                                Diagnostics::internalCompilerError,
-                                "Unexpected instruction. Expected func or generic");
+                            if (as<IRFunc>(baseFunction) || as<IRGeneric>(baseFunction))
+                            {
+                                IRInst* diffFunc = transcriberStorage.transcribe(builder, baseFunction);
+                                SLANG_ASSERT(diffFunc);
+                                differentiateInst->replaceUsesWith(diffFunc);
+                                differentiateInst->removeAndDeallocate();
+                            }
+                            else
+                            {
+                                getSink()->diagnose(differentiateInst->sourceLoc,
+                                    Diagnostics::internalCompilerError,
+                                    "Unexpected instruction. Expected func or generic");
+                            }
                         }
                     }
-                    else
+                    else if (as<IRBackwardDifferentiate>(differentiateInst))
                     {
-                        // TODO(Sai): This would probably be better with a more specific
-                        // error code.
-                        getSink()->diagnose(fwdDiffInst->sourceLoc,
-                            Diagnostics::internalCompilerError,
-                            "Cannot differentiate functions not marked for differentiation");
+                        if (isMarkedForBackwardDifferentiation(baseFunction))
+                        {
+                            if (as<IRFunc>(baseFunction) || as<IRGeneric>(baseFunction))
+                            {
+                                IRInst* diffFunc =
+                                    backwardTranscriberStorage
+                                        .transcribeFuncHeader(builder, (IRFunc*)baseFunction)
+                                        .differential;
+                                SLANG_ASSERT(diffFunc);
+                                differentiateInst->replaceUsesWith(diffFunc);
+                                differentiateInst->removeAndDeallocate();
+                            }
+                            else
+                            {
+                                getSink()->diagnose(differentiateInst->sourceLoc,
+                                    Diagnostics::internalCompilerError,
+                                    "Unexpected instruction. Expected func or generic");
+                            }
+                        }
                     }
                 }
             }
@@ -3312,6 +2815,16 @@ struct BackwardDifferentiationContext : public InstPassBase
                 SLANG_ASSERT(primalFunc);
 
                 transcriberStorage.transcribeFunc(builder, primalFunc, diffFunc);
+            }
+            followUpWorkList = _Move(backwardTranscriberStorage.followUpFunctionsToTranscribe);
+            for (auto task : followUpWorkList)
+            {
+                auto diffFunc = as<IRFunc>(task.differential);
+                SLANG_ASSERT(diffFunc);
+                auto primalFunc = as<IRFunc>(task.primal);
+                SLANG_ASSERT(primalFunc);
+
+                backwardTranscriberStorage.transcribeFunc(builder, primalFunc, diffFunc);
             }
 
             // Transcribing the function body really shouldn't produce more follow up function body work.
@@ -3601,6 +3114,41 @@ struct BackwardDifferentiationContext : public InstPassBase
     // Checks decorators to see if the function should
     // be differentiated (kIROp_ForwardDifferentiableDecoration)
     // 
+    bool isMarkedForForwardDifferentiation(IRGlobalValueWithCode* callable)
+    {
+        for (auto decoration = callable->getFirstDecoration();
+            decoration;
+            decoration = decoration->getNextDecoration())
+        {
+            if (decoration->getOp() == kIROp_ForwardDifferentiableDecoration)
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    IRStringLit* getForwardDerivativeFuncName(IRInst* func)
+    {
+        IRBuilder builder(&sharedBuilderStorage);
+        builder.setInsertBefore(func);
+
+        IRStringLit* name = nullptr;
+        if (auto linkageDecoration = func->findDecoration<IRLinkageDecoration>())
+        {
+            name = builder.getStringValue((String(linkageDecoration->getMangledName()) + "_fwd_diff").getUnownedSlice());
+        }
+        else if (auto namehintDecoration = func->findDecoration<IRNameHintDecoration>())
+        {
+            name = builder.getStringValue((String(namehintDecoration->getName()) + "_fwd_diff").getUnownedSlice());
+        }
+
+        return name;
+    }
+
+    // Checks decorators to see if the function should
+    // be differentiated (kIROp_ForwardDifferentiableDecoration)
+    // 
     bool isMarkedForBackwardDifferentiation(IRGlobalValueWithCode* callable)
     {
         for (auto decoration = callable->getFirstDecoration();
@@ -3633,24 +3181,28 @@ struct BackwardDifferentiationContext : public InstPassBase
         return name;
     }
 
-    BackwardDifferentiationContext(IRModule* module, DiagnosticSink* sink) :
+    JVPDerivativeContext(IRModule* module, DiagnosticSink* sink) :
         InstPassBase(module),
         sink(sink),
         autoDiffSharedContextStorage(module->getModuleInst()),
-        transcriberStorage(&autoDiffSharedContextStorage, &sharedBuilderStorage)
+        transcriberStorage(&autoDiffSharedContextStorage, &sharedBuilderStorage),
+        backwardTranscriberStorage(&autoDiffSharedContextStorage, &sharedBuilderStorage, sink)
     {
         autoDiffSharedContextStorage.sharedBuilder = &sharedBuilderStorage;
         pairBuilderStorage.sharedContext = &autoDiffSharedContextStorage;
         transcriberStorage.sink = sink;
         transcriberStorage.autoDiffSharedContext = &(autoDiffSharedContextStorage);
         transcriberStorage.pairBuilder = &(pairBuilderStorage);
+        backwardTranscriberStorage.pairBuilder = &pairBuilderStorage;
     }
 
 protected:
     // A transcriber object that handles the main job of 
     // processing instructions while maintaining state.
     //
-    BackwardDiffTranscriber                  transcriberStorage;
+    JVPTranscriber                  transcriberStorage;
+
+    BackwardDiffTranscriber         backwardTranscriberStorage;
 
     // Diagnostic object from the compile request for
     // error messages.
@@ -3667,7 +3219,7 @@ protected:
 
 // Set up context and call main process method.
 //
-bool processBackwardDifferentiableFuncs(
+bool processDifferentiableFuncs(
     IRModule* module,
     DiagnosticSink* sink,
     IRJVPDerivativePassOptions const&)
@@ -3678,9 +3230,41 @@ bool processBackwardDifferentiableFuncs(
     options.keepLayoutsAlive = true;
     eliminateDeadCode(module, options);
 
-    BackwardDifferentiationContext context(module, sink);
+    JVPDerivativeContext context(module, sink);
     bool changed = context.processModule();
     return changed;
+}
+
+void stripAutoDiffDecorationsFromChildren(IRInst* parent)
+{
+    for (auto inst : parent->getChildren())
+    {
+        for (auto decor = inst->getFirstDecoration(); decor; )
+        {
+            auto next = decor->getNextDecoration();
+            switch (decor->getOp())
+            {
+            case kIROp_ForwardDerivativeDecoration:
+            case kIROp_DerivativeMemberDecoration:
+            case kIROp_DifferentiableTypeDictionaryDecoration:
+                decor->removeAndDeallocate();
+                break;
+            default:
+                break;
+            }
+            decor = next;
+        }
+
+        if (inst->getFirstChild() != nullptr)
+        {
+            stripAutoDiffDecorationsFromChildren(inst);
+        }
+    }
+}
+
+void stripAutoDiffDecorations(IRModule* module)
+{
+    stripAutoDiffDecorationsFromChildren(module->getModuleInst());
 }
 
 }
