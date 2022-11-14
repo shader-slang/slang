@@ -2,6 +2,8 @@
 #pragma once
 
 #include "slang-ir.h"
+#include "slang-ir-insts.h"
+#include "slang-ir-clone.h"
 #include "slang-compiler.h"
 
 namespace Slang
