@@ -1303,14 +1303,14 @@ ScalarizedVal extractField(
             const auto& es = tupleVal->elements;
             if(fieldIndex == ~0)
             {
-                for(fieldIndex = 0; fieldIndex < es.getCount(); ++fieldIndex)
+                for(fieldIndex = 0; fieldIndex < (UInt)es.getCount(); ++fieldIndex)
                 {
                     if(es[fieldIndex].key == fieldKey)
                     {
                         break;
                     }
                 }
-                if(fieldIndex >= es.getCount())
+                if(fieldIndex >= (UInt)es.getCount())
                 {
                     SLANG_UNEXPECTED("Unable to find field index from struct key");
                 }
@@ -1867,7 +1867,7 @@ void legalizeMeshOutputParam(
                         SLANG_ASSERT(ptr && "Mesh output parameter was passed by value");
                         auto t = ptr->getValueType();
                         auto tmp = builder->emitVar(t);
-                        for(uint i = 0; i < c->getOperandCount(); i++)
+                        for(UInt i = 0; i < c->getOperandCount(); i++)
                         {
                             if(c->getOperand(i) == a)
                             {
