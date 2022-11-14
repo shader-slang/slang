@@ -1742,6 +1742,8 @@ matrix<T,N,M> exp2(matrix<T,N,M> x)
 __target_intrinsic(glsl, "unpackHalf2x16($0).x")
 __glsl_version(420)
 __target_intrinsic(hlsl)
+__cuda_sm_version(6.0)
+__target_intrinsic(cuda, "__half2float(__short_as_half($0))")
 float f16tof32(uint value);
 
 __generic<let N : int>
@@ -1757,6 +1759,8 @@ vector<float, N> f16tof32(vector<uint, N> value)
 __target_intrinsic(glsl, "packHalf2x16(vec2($0,0.0))")
 __glsl_version(420)
 __target_intrinsic(hlsl)
+__cuda_sm_version(6.0)
+__target_intrinsic(cuda, "__half_as_ushort(__float2half($0))")
 uint f32tof16(float value);
 
 __generic<let N : int>

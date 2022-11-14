@@ -1041,7 +1041,18 @@ class ForwardDerivativeAttribute : public DifferentiableAttribute
 {
     SLANG_AST_CLASS(ForwardDerivativeAttribute)
 
-    DeclRefExpr* funcDeclRef;
+    Expr* funcExpr;
+};
+
+    /// The `[ForwardDerivativeOf(primalFunction)]` attribute marks the decorated function as custom
+    /// derivative implementation for `primalFunction`.
+class ForwardDerivativeOfAttribute : public Attribute
+{
+    SLANG_AST_CLASS(ForwardDerivativeOfAttribute)
+
+    Expr* funcExpr;
+
+    Expr* backDeclRef; // DeclRef to this derivative function when initiated from primalFunction.
 };
 
     /// Indicates that the modified declaration is one of the "magic" declarations

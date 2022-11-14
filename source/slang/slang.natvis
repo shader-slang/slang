@@ -72,10 +72,11 @@
     </Expand>
   </Type>
   <Type Name="Slang::IRInst">
-    <DisplayString>{{{m_op} #{_debugUID}}}</DisplayString>
-    <Expand>
+      <DisplayString>{{{m_op} {(uint32_t)(void*)this, x}}}</DisplayString>
+      <DisplayString Optional="true">{{{m_op} #{_debugUID}}}</DisplayString>
+      <Expand>
       <Item Name="[op]">m_op</Item>
-      <Item Name="[UID]">_debugUID</Item>
+      <Item Name="[UID]"  Optional="true">_debugUID</Item>
       <Item Name="[type]">typeUse.usedValue</Item>
       <CustomListItems MaxItemsPerView="3">
 		  <Variable Name="child" InitialValue="m_decorationsAndChildren.first"/>
@@ -83,20 +84,20 @@
 			  <If Condition="child == 0">
 				  <Break/>
 			  </If>
-			  <If Condition="child->m_op == SlangDebug__IROpNameHint">
-				  <Item Name="[name]">((Slang::IRStringLit*)(((Slang::IRUse*)(child + 1))->usedValue))->value.stringVal.chars,[((Slang::IRStringLit*)(((Slang::IRUse*)(child + 1))->usedValue))->value.stringVal.numChars]s8</Item>
-			  </If>
-			  <If Condition="child->m_op == SlangDebug__IROpExport">
+			  <If Condition="child->m_op == kIROp_ExportDecoration">
 				  <Item Name="[exportName]">((Slang::IRStringLit*)(((Slang::IRUse*)(child + 1))->usedValue))->value.stringVal.chars,[((Slang::IRStringLit*)(((Slang::IRUse*)(child + 1))->usedValue))->value.stringVal.numChars]s8</Item>
 			  </If>
-			  <If Condition="child->m_op == SlangDebug__IROpImport">
+			  <If Condition="child->m_op == kIROp_ImportDecoration">
 				  <Item Name="[importName]">((Slang::IRStringLit*)(((Slang::IRUse*)(child + 1))->usedValue))->value.stringVal.chars,[((Slang::IRStringLit*)(((Slang::IRUse*)(child + 1))->usedValue))->value.stringVal.numChars]s8</Item>
+			  </If>
+			  <If Condition="child->m_op == kIROp_NameHintDecoration">
+				  <Item Name="[name]">((Slang::IRStringLit*)(((Slang::IRUse*)(child + 1))->usedValue))->value.stringVal.chars,[((Slang::IRStringLit*)(((Slang::IRUse*)(child + 1))->usedValue))->value.stringVal.numChars]s8</Item>
 			  </If>
 			  <Exec>child = child->next</Exec>
 		  </Loop>
       </CustomListItems>
-      <Item Name="[value]" Condition="m_op == SlangDebug__IROpStringLit">((IRStringLit*)this)->value.stringVal.chars,[((IRStringLit*)this)->value.stringVal.numChars]s8</Item>
-      <Item Name="[value]" Condition="m_op == SlangDebug__IROpIntLit">((IRIntLit*)this)->value.intVal</Item>
+      <Item Name="[value]" Condition="m_op == kIROp_StringLit">((IRStringLit*)this)->value.stringVal.chars,[((IRStringLit*)this)->value.stringVal.numChars]s8</Item>
+      <Item Name="[value]" Condition="m_op == kIROp_IntLit">((IRIntLit*)this)->value.intVal</Item>
 	  <!--
       <Synthetic Name="[operands]">
         <DisplayString>{{count = {operandCount}}}</DisplayString>
@@ -121,14 +122,14 @@
 			<Exec>child = pOperandInst->m_decorationsAndChildren.first</Exec>
 		    <Exec>nameDecoration = 0</Exec>
 		    <Loop Condition="child != 0">
-			    <If Condition="child->m_op == SlangDebug__IROpNameHint">
+			    <If Condition="child->m_op == kIROp_NameHintDecoration">
 				    <Exec>nameDecoration = child</Exec>
 				    <Break/>
 			    </If>
-			    <If Condition="child->m_op == SlangDebug__IROpExport &amp;&amp; (nameDecoration == 0 || nameDecoration->m_op != SlangDebug__IROpNameHint)">
+			    <If Condition="child->m_op == kIROp_ExportDecoration &amp;&amp; (nameDecoration == 0 || nameDecoration->m_op != kIROp_NameHintDecoration)">
 				    <Exec>nameDecoration = child</Exec>
 			    </If>
-			    <If Condition="child->m_op == SlangDebug__IROpImport &amp;&amp; (nameDecoration == 0 || nameDecoration->m_op != SlangDebug__IROpNameHint)">
+			    <If Condition="child->m_op == kIROp_ImportDecoration &amp;&amp; (nameDecoration == 0 || nameDecoration->m_op != kIROp_NameHintDecoration)">
 				    <Exec>nameDecoration = child</Exec>
 			    </If>
 			    <Exec>child = child->next</Exec>
@@ -150,14 +151,14 @@
 				  <Exec>child = pItem->m_decorationsAndChildren.first </Exec>
 			      <Exec>nameDecoration = 0</Exec>
 				  <Loop Condition="child != 0">
-				      <If Condition="child->m_op == SlangDebug__IROpNameHint">
+				      <If Condition="child->m_op == kIROp_NameHintDecoration">
 						  <Exec>nameDecoration = child</Exec>
 						  <Break/>
 				      </If>
-				      <If Condition="child->m_op == SlangDebug__IROpExport &amp;&amp; (nameDecoration == 0 || nameDecoration->m_op != SlangDebug__IROpNameHint)">
+				      <If Condition="child->m_op == kIROp_ExportDecoration &amp;&amp; (nameDecoration == 0 || nameDecoration->m_op != kIROp_NameHintDecoration)">
 						  <Exec>nameDecoration = child</Exec>
 				      </If>
-					  <If Condition="child->m_op == SlangDebug__IROpImport &amp;&amp; (nameDecoration == 0 || nameDecoration->m_op != SlangDebug__IROpNameHint)">
+					  <If Condition="child->m_op == kIROp_ImportDecoration &amp;&amp; (nameDecoration == 0 || nameDecoration->m_op != kIROp_NameHintDecoration)">
 						  <Exec>nameDecoration = child</Exec>
 					  </If>
 				      <Exec>child = child->next</Exec>

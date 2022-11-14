@@ -2,7 +2,6 @@
 #include "slang-ir-inline.h"
 
 #include "slang-ir-ssa-simplification.h"
-#include "slang-ir-single-return.h"
 
 // This file provides general facilities for inlining function calls.
 
@@ -318,12 +317,7 @@ struct InliningPassBase
             SLANG_ASSERT(argCounter == (Int)call->getArgCount());
         }
 
-        // For now, our inlining pass only handles the case where
-        // the callee is a "single-return" function, which means the callee
-        // function contains only one return at the end of the body.
-        
-        convertFuncToSingleReturnForm(m_module, callSite.callee);
-        inlineSingleReturnFuncBody(callSite, &env, &builder);    
+        inlineFuncBody(callSite, &env, &builder);    
     }
 
         // When instructions are cloned, with cloneInst no sourceLoc information is copied over by default.
@@ -375,19 +369,12 @@ struct InliningPassBase
         return clonedInst;
     }
 
-        /// Inline the body of the callee for `callSite`, where the callee has a single return.
-    void inlineSingleReturnFuncBody(
+        /// Inline the body of the callee for `callSite`.
+    void inlineFuncBody(
         CallSiteInfo const& callSite, IRCloneEnv* env, IRBuilder* builder)
     {
         auto call = callSite.call;
         auto callee = callSite.callee;
-
-        // We know that the callee has a single return block, so if we encounter
-        // a `returnVal` instruction then it must be the one and only
-        // return point for the function, and its operand will be the value
-        // the callee returns.
-        //
-        IRInst* returnedValue = nullptr;
 
         // Break the basic block containing the call inst into two basic blocks.
         auto callerBlock = callSite.call->getParent();
@@ -399,6 +386,13 @@ struct InliningPassBase
         // second half of the basic block right after `callerBlock`.
         afterBlock->insertAfter(callerBlock);
         afterBlock->sourceLoc = callSite.call->getNextInst()->sourceLoc;
+        // Define a param in afterBlock to receive the return value from the call.
+        builder->setInsertInto(afterBlock);
+
+        IRInst* returnValParam = nullptr;
+        if (callSite.call->getDataType()->getOp() != kIROp_VoidType)
+            returnValParam = builder->emitParam(callSite.call->getDataType());
+
         // Move all insts after the call in `callerBlock` to `afterBlock`.
         {
             auto inst = callSite.call->getNextInst();
@@ -422,8 +416,10 @@ struct InliningPassBase
 
         // Insert a branch into the cloned first block at the end of `callerBlock`.
         builder->setInsertInto(callerBlock);
-        auto newBranch = builder->emitBranch(as<IRBlock>(env->mapOldValToNew[callee->getFirstBlock()].GetValue()));
+        auto mainBlock = as<IRBlock>(env->mapOldValToNew[callee->getFirstBlock()].GetValue());
+        auto newBranch = builder->emitLoop(mainBlock, afterBlock, mainBlock);
         _setSourceLoc(newBranch, call, callSite);
+
         // Clone all basic blocks over to the call site.
         bool isFirstBlock = true;
         for (auto calleeBlock : callee->getBlocks())
@@ -464,9 +460,10 @@ struct InliningPassBase
                     // of the original call.
                     //
                     {
-                        auto returnBranch = builder->emitBranch(afterBlock);
+                        auto returnedValue = findCloneForOperand(env, inst->getOperand(0));
+                        auto returnBranch = builder->emitBranch(
+                            afterBlock, returnValParam ? 1 : 0, &returnedValue);
                         _setSourceLoc(returnBranch, inst, callSite);
-                        returnedValue = findCloneForOperand(env, inst->getOperand(0));
                     }
                     break;
                 }
@@ -478,9 +475,13 @@ struct InliningPassBase
         // the return value of the inlined function, then that value
         // should be used to replace any uses of the original call.
         //
-        if( returnedValue )
+        if (returnValParam)
         {
-            call->replaceUsesWith(returnedValue);
+            call->replaceUsesWith(returnValParam);
+        }
+        else
+        {
+            call->replaceUsesWith(builder->getVoidValue());
         }
 
         // Once we've cloned the body of the callee in at the call site,

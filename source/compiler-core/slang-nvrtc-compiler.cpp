@@ -14,6 +14,7 @@
 #include "../core/slang-semantic-version.h"
 
 #include "../core/slang-shared-library.h"
+#include "../core/slang-char-util.h"
 
 #include "slang-artifact-diagnostic-util.h"
 #include "slang-artifact-util.h"
@@ -228,24 +229,79 @@ static SlangResult _parseNVRTCLine(SliceAllocator& allocator, const UnownedStrin
     if (split.getCount() >= 3)
     {
         // tests/cuda/cuda-compile.cu(7): warning: variable "c" is used before its value is set
-
         const auto split1 = split[1].trim();
 
-        if (split1 == "error")
-        {
-            outDiagnostic.severity = Severity::Error;
-        }
-        else if (split1 == "warning")
-        {
-            outDiagnostic.severity = Severity::Warning;
-        }
-        outDiagnostic.text = allocator.allocate(split[2].trim());
+        Severity severity = Severity::Unknown;
 
-        SLANG_RETURN_ON_FAIL(_parseLocation(allocator, split[0], outDiagnostic));
-        return SLANG_OK;
+        if (split1 == toSlice("error") || 
+            split1 == toSlice("catastrophic error"))
+        {
+            severity = Severity::Error;
+        }
+        else if (split1 == toSlice("warning"))
+        {
+            severity = Severity::Warning;
+        }
+        else
+        {
+            // Fall back position to try and determine if this really is some kind of 
+            // error/warning without succeeding when it's due to some other property 
+            // of the output diagnostics. 
+            //
+            // Anything ending with " warning:" or " error:" in effect.
+            
+            // We can expand to include character after as this is split1, as must be followed by at a minimum 
+            // : (as the split has at least 3 parts).
+            const UnownedStringSlice expandSplit1(split1.begin(), split1.end() + 1);
+
+            if (expandSplit1.endsWith(toSlice(" error:")))
+            {
+                severity = Severity::Error;
+            }
+            else if (expandSplit1.endsWith(toSlice(" warning:")))
+            {
+                severity = Severity::Warning;
+            }
+        }
+
+        if (severity != Severity::Unknown)
+        {
+            // The text is everything following the : after the warning. 
+            UnownedStringSlice text(split[2].begin(), split.getLast().end());
+       
+            // Trim whitespace at start and end
+            text = text.trim();
+
+            // Set the diagnostic
+            outDiagnostic.severity = severity;
+            outDiagnostic.text = allocator.allocate(text);
+            SLANG_RETURN_ON_FAIL(_parseLocation(allocator, split[0], outDiagnostic));
+
+            return SLANG_OK;
+        }
+
+        // TODO(JS): Note here if it's not possible to determine a line as being the main diagnostics
+        // we fall through to it potentially being a note.
+        //
+        // That could mean a valid diagnostic (from NVRTCs point of view) is ignored/noted, because this code
+        // can't parse it. Ideally that situation would lead to an error such that we can detect
+        // and things will fail.
+        // 
+        // So we might want to revisit this determination in the future.
     }
-   
-    return SLANG_E_NOT_FOUND;
+
+    // There isn't a diagnostic on this line
+    if (line.getLength() == 0 ||
+        line.trim().getLength() == 0)
+    {
+        return SLANG_E_NOT_FOUND;
+    }
+
+    // We'll assume it's info, associated with a previous line
+    outDiagnostic.severity = Severity::Info;
+    outDiagnostic.text = allocator.allocate(line);
+
+    return SLANG_OK;
 }
 
 /* An implementation of Path::Visitor that can be used for finding NVRTC shared library installations. */
@@ -819,6 +875,18 @@ SlangResult NVRTCDownstreamCompiler::compile(const DownstreamCompileOptions& opt
         cmdLine.addArg("-DSLANG_CUDA_ENABLE_OPTIX");
     }
 
+    // Add any compiler specific options
+    // NOTE! If these clash with any previously set options (as set via other flags)
+    // compilation might fail.
+    if (options.compilerSpecificArguments.count > 0)
+    {
+        for (auto compilerSpecificArg : options.compilerSpecificArguments)
+        {
+            const char*const arg = compilerSpecificArg;
+            cmdLine.addArg(arg);
+        }
+    }
+
     SLANG_ASSERT(headers.getCount() == headerIncludeNames.getCount());
 
     ComPtr<ISlangBlob> sourceBlob;
@@ -868,6 +936,11 @@ SlangResult NVRTCDownstreamCompiler::compile(const DownstreamCompileOptions& opt
         {
             char* dst = rawDiagnostics.prepareForAppend(Index(logSize));
             SLANG_NVRTC_RETURN_ON_FAIL(m_nvrtcGetProgramLog(program, dst));
+
+            // If there is a terminating zero remove it, as the rawDiagnostics
+            // string will already contain one.
+            logSize -= size_t(logSize > 0 && dst[logSize - 1] == 0);
+
             rawDiagnostics.appendInPlace(dst, Index(logSize));
 
             diagnostics->setRaw(SliceUtil::asCharSlice(rawDiagnostics));
@@ -875,24 +948,61 @@ SlangResult NVRTCDownstreamCompiler::compile(const DownstreamCompileOptions& opt
 
         SliceAllocator allocator;
 
+        // Get all of the lines
+        List<UnownedStringSlice> lines;
+        StringUtil::calcLines(rawDiagnostics.getUnownedSlice(), lines);
+
+        // Remove any trailing empty lines
+        while (lines.getCount() && lines.getLast().getLength() == 0)
+        {
+            lines.removeLast();
+        }
+
+        // Find the index searching from last line, that is blank
+        // indicating the end of the output
+        Index lastIndex = lines.getCount();
+
+        // Look for the first blank line after this point.
+        // We'll assume any information after that blank line to the end of the diagnostic
+        // is compilation summary information.
+        for (Index i = lastIndex - 1; i >= 0; --i)
+        {
+            if (lines[i].getLength() == 0)
+            {
+                lastIndex = i;
+                break;
+            }
+        }
+
         // Parse the diagnostics here
-        for (auto line : LineParser(rawDiagnostics.getUnownedSlice()))
+        for (auto line : makeConstArrayView(lines.getBuffer(), lastIndex))
         {
             ArtifactDiagnostic diagnostic;
             SlangResult lineRes = _parseNVRTCLine(allocator, line, diagnostic);
 
             if (SLANG_SUCCEEDED(lineRes))
             {
+                // We only allow info diagnostics after a 'regular' diagnostic.
+                if (diagnostic.severity == ArtifactDiagnostic::Severity::Info && 
+                    diagnostics->getCount() == 0)
+                {
+                    continue;
+                }
+
                 diagnostics->add(diagnostic);
             }
             else if (lineRes != SLANG_E_NOT_FOUND)
             {
+                // If there is an error exit
+                // But if SLANG_E_NOT_FOUND that just means this line couldn't be parsed, so ignore.
                 return lineRes;
             }
         }
 
-        // if it has a compilation error.. set on output
-        if (diagnostics->hasOfAtLeastSeverity(ArtifactDiagnostic::Severity::Error))
+        // If it has a compilation error.. and there isn't already an error set
+        // set as failed.
+        if (SLANG_SUCCEEDED(diagnostics->getResult()) && 
+            diagnostics->hasOfAtLeastSeverity(ArtifactDiagnostic::Severity::Error))
         {
             diagnostics->setResult(SLANG_FAIL);
         }

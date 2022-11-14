@@ -39,6 +39,7 @@ struct ShaderModelInfo
     SlangCompileTarget compileTarget;
     const char* profileName;
 };
+// List of shader models. Do not change oldest to newest order.
 static ShaderModelInfo kKnownShaderModels[] = {
 #define SHADER_MODEL_INFO_DXBC(major, minor) {D3D_SHADER_MODEL_##major##_##minor, SLANG_DXBC, "sm_" #major "_" #minor }
     SHADER_MODEL_INFO_DXBC(5, 1),
@@ -337,11 +338,11 @@ Result DeviceImpl::_createDevice(
             // Apparently there is a problem with sm 6.3 with spurious errors, with debug layer
             // enabled
             D3D12_FEATURE_DATA_SHADER_MODEL featureShaderModel;
-            featureShaderModel.HighestShaderModel = D3D_SHADER_MODEL(0x63);
+            featureShaderModel.HighestShaderModel = D3D_SHADER_MODEL_6_3;
             SLANG_SUCCEEDED(device->CheckFeatureSupport(
                 D3D12_FEATURE_SHADER_MODEL, &featureShaderModel, sizeof(featureShaderModel)));
 
-            if (featureShaderModel.HighestShaderModel >= D3D_SHADER_MODEL(0x63))
+            if (featureShaderModel.HighestShaderModel >= D3D_SHADER_MODEL_6_3)
             {
                 // Filter out any messages that cause issues
                 // TODO: Remove this when the debug layers work properly
@@ -601,10 +602,6 @@ Result DeviceImpl::initialize(const Desc& desc)
     }
 
     D3D12_FEATURE_DATA_SHADER_MODEL shaderModelData = {};
-    if (m_extendedDesc.highestShaderModel != 0)
-        shaderModelData.HighestShaderModel = (D3D_SHADER_MODEL)m_extendedDesc.highestShaderModel;
-    else
-        shaderModelData.HighestShaderModel = kKnownShaderModels[SLANG_COUNT_OF(kKnownShaderModels)-1].shaderModel;
 
     // Find what features are supported
     {
@@ -612,10 +609,23 @@ Result DeviceImpl::initialize(const Desc& desc)
         SLANG_COMPILE_TIME_ASSERT(D3D_SHADER_MODEL_6_0 == 0x60);
 
         {
+            // CheckFeatureSupport(D3D12_FEATURE_SHADER_MODEL) can fail if the runtime/driver does not yet know the
+            // specified highest shader model. Therefore we assemble a list of shader models to check and
+            // walk it from highest to lowest to find the supported shader model.
+            Slang::ShortList<D3D_SHADER_MODEL> shaderModels;
+            if (m_extendedDesc.highestShaderModel != 0)
+                shaderModels.add((D3D_SHADER_MODEL)m_extendedDesc.highestShaderModel);
+            for (int i = SLANG_COUNT_OF(kKnownShaderModels) - 1; i >= 0; --i)
+                shaderModels.add(kKnownShaderModels[i].shaderModel);
+            for (D3D_SHADER_MODEL shaderModel : shaderModels)
+            {
+                shaderModelData.HighestShaderModel = shaderModel;
+                if (SLANG_SUCCEEDED(m_device->CheckFeatureSupport(D3D12_FEATURE_SHADER_MODEL, &shaderModelData, sizeof(shaderModelData))))
+                    break;
+            }
+
             // TODO: Currently warp causes a crash when using half, so disable for now
-            if (SLANG_SUCCEEDED(m_device->CheckFeatureSupport(
-                D3D12_FEATURE_SHADER_MODEL, &shaderModelData, sizeof(shaderModelData))) &&
-                m_deviceInfo.m_isWarp == false && shaderModelData.HighestShaderModel >= 0x62)
+            if (m_deviceInfo.m_isWarp == false && shaderModelData.HighestShaderModel >= D3D_SHADER_MODEL_6_2)
             {
                 // With sm_6_2 we have half
                 m_features.add("half");

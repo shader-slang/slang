@@ -3212,9 +3212,9 @@ public:
         addDecoration(value, kIROp_ForwardDifferentiableDecoration);
     }
 
-    void addForwardDerivativeDecoration(IRInst* value, IRInst* jvpFn)
+    void addForwardDerivativeDecoration(IRInst* value, IRInst* fwdFunc)
     {
-        addDecoration(value, kIROp_ForwardDerivativeDecoration, jvpFn);
+        addDecoration(value, kIROp_ForwardDerivativeDecoration, fwdFunc);
     }
 
     void addCOMWitnessDecoration(IRInst* value, IRInst* witnessTable)

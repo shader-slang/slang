@@ -217,8 +217,83 @@ int test()
     return rs.val; // returns 3.
 }
 ```
-
 Slang currently supports overloading the following operators: `+`, `-`, `*`, `/`, `%`, `&`, `|`, `<`, `>`, `<=`, `>=`, `==`, `!=`, unary `-`, `~` and `!`. Please note that the `&&` and `||` operators are not supported.
+
+
+## Subscript Operator
+
+Slang allows overriding `operator[]` with `__subscript` syntax:
+```csharp
+struct MyType
+{
+    int val[12];
+    __subscript(int x, int y) -> int
+    {
+        get { return val[x*3 + y]; }
+        set { val[x*3+y] = newValue; }
+    }
+}
+int test()
+{
+    MyType rs;
+    rs[0, 0] = 1;
+    rs[1, 0] = rs[0, 0] + 1
+    return rs[1, 0]; // returns 2.
+}
+```
+
+## `Optional<T>` type
+
+Slang supports the `Optional<T>` type to represent a value that may not exist.
+The dedicated `none` value can be used for any `Optional<T>` to represent no value.
+`Optional<T>::value` property can be used to retrieve the value.
+
+```csharp
+struct MyType
+{
+    int val;
+}
+
+int useVal(Optional<MyType> p)
+{
+    if (p == none)        // Equivalent to `p.hasValue`
+        return 0;
+    return p.value.val;
+}
+
+int caller()
+{
+    MyType v;
+    v.val = 0;
+    useVal(v);  // OK to pass `MyType` to `Optional<MyType>`.
+    useVal(none);  // OK to pass `none` to `Optional<MyType>`.
+    return 0;
+}
+```
+
+## `reinterpret<T>` operation
+
+Sometimes it is useful to reinterpret the bits of one type as another type, for example:
+```csharp
+struct MyType
+{
+    int a;
+    float2 b;
+    uint c;
+}
+
+MyType myVal;
+float4 myPackedVector = packMyTypeToFloat4(myVal);
+```
+
+The `packMyTypeToFloat4` function is usually implemented by bit casting each field in the source type and assign it into the corresponding field in the target type,
+by calling `intAsFloat`, `floatAsInt` and using bit operations to shift things in the right place.
+Instead of writing `packMyTypeToFloat4` function yourself, you can use Slang's builtin `reinterpret<T>` to do just that for you:
+```
+float4 myPackedVector = reinterpret<float4>(myVal);
+```
+
+`reinterpret` can pack any type into any other type as long as the target type is no smaller than the source type.
 
 ## `struct` inheritance (limited)
 
@@ -292,6 +367,33 @@ void test()
 ```
 
 This feature is similar to extensions in Swift and partial classes in C#.
+
+Multi-level break
+-------------------
+
+Slang allows `break` statements with a label to jump into any ancestor control flow break points, and not just the immediate parent.
+Example:
+```
+outter:
+for (int i = 0; i < 5; i++)
+{
+    inner:
+    for (int j = 0; j < 10; j++)
+    {
+        if (someCondition)
+            break outter;
+    }
+}
+```
+
+Force inlining
+-----------------
+Most of the downstream shader compilers will inline all the function calls. However you can instruct Slang compiler to do the inlining
+by using the `[ForceInline]` decoration:
+```
+[ForceInline]
+int f(int x) { return x + 1; }
+```
 
 Modules
 -------
