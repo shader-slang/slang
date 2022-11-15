@@ -1502,6 +1502,8 @@ tool "slangd"
          "external/miniz/miniz_tinfl.c",
          "external/miniz/miniz_zip.c"
      }
+     filter { "system:linux" }
+         defines { "_LARGEFILE64_SOURCE" }
  
      filter { "system:linux or macosx" }
          links { "dl"}
