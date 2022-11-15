@@ -40,6 +40,7 @@ RayDesc_0 HitObject_GetRayDesc_0(hitObjectNV this_0)
 
 SomeValues_0 HitObject_GetAttributes_0(hitObjectNV this_1)
 {
+    hitObjectGetAttributesNV((this_1), ((0)));
     return t_0;
 }
 

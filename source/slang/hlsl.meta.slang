@@ -6080,6 +6080,13 @@ struct HitObject
     __specialized_for_target(glsl)
     attr_t GetAttributes<attr_t>()
     {
+        // Work out the location
+        int attributeLocation = __hitObjectAttributesLocation(__hitObjectAttributes<attr_t>());
+
+        // Load the attributes from the location
+        __glslGetAttributes(attributeLocation);
+
+        // Return the attributes
         return __hitObjectAttributes<attr_t>();
     }
         /// Loads a root constant from the local root table referenced by the hit object. Valid if the hit object
@@ -6256,6 +6263,12 @@ struct HitObject
         float Tmax,
         float CurrentTime,
         int attributeLocation);
+
+    
+    __glsl_extension(GL_EXT_ray_tracing)
+    __glsl_extension(GL_NV_shader_invocation_reorder)
+    __target_intrinsic(glsl, "hitObjectGetAttributesNV($0, $1)")
+    void __glslGetAttributes(int attributeLocation);
 
     __glsl_extension(GL_EXT_ray_tracing)
     __glsl_extension(GL_NV_shader_invocation_reorder)

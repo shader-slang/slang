@@ -2267,7 +2267,7 @@ namespace Slang
             ///
         ProgramLayout* getOrCreateLayout(DiagnosticSink* sink);
 
-            /// Get the layout for the program on the taarget.
+            /// Get the layout for the program on the target.
             ///
             /// This routine assumes that `getOrCreateLayout`
             /// has already been called previously.
