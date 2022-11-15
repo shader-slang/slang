@@ -604,6 +604,15 @@ namespace Slang
 
             callablePayloadAttr->location = (int32_t)val->value;
         }
+        else if (auto hitObjectAttributesAttr = as<VulkanHitObjectAttributesAttribute>(attr))
+        {
+            SLANG_ASSERT(attr->args.getCount() == 1);
+            auto val = checkConstantIntVal(attr->args[0]);
+
+            if (!val) return false;
+
+            hitObjectAttributesAttr->location = (int32_t)val->value;
+        }
         else if (auto forwardDerivativeAttr = as<ForwardDerivativeAttribute>(attr))
         {
             SLANG_ASSERT(attr->args.getCount() == 1);
