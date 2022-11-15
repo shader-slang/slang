@@ -31,6 +31,7 @@ void ASTPrinter::addType(Type* type)
         m_builder << "<error>";
         return;
     }
+    type = type->getCanonicalType();
     if (m_optionFlags & OptionFlag::SimplifiedBuiltinType)
     {
         if (auto vectorType = as<VectorExpressionType>(type))
@@ -462,7 +463,9 @@ void ASTPrinter::addDeclResultType(const DeclRef<Decl>& inDeclRef)
 
 /* static */String ASTPrinter::getDeclSignatureString(DeclRef<Decl> declRef, ASTBuilder* astBuilder)
 {
-    ASTPrinter astPrinter(astBuilder);
+    ASTPrinter astPrinter(
+        astBuilder,
+        ASTPrinter::OptionFlag::NoInternalKeywords | ASTPrinter::OptionFlag::SimplifiedBuiltinType);
     astPrinter.addDeclSignature(declRef);
     return astPrinter.getString();
 }

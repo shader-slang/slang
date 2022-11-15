@@ -15,16 +15,22 @@ namespace Slang
 
 void printDiagnosticArg(StringBuilder& sb, Decl* decl)
 {
+    if (!decl)
+        return;
     sb << getText(decl->getName());
 }
 
 void printDiagnosticArg(StringBuilder& sb, Type* type)
 {
+    if (!type)
+        return;
     type->toText(sb);
 }
 
 void printDiagnosticArg(StringBuilder& sb, Val* val)
 {
+    if (!val)
+        return;
     val->toText(sb);
 }
 
@@ -44,13 +50,17 @@ void printDiagnosticArg(StringBuilder& sb, QualType const& type)
         sb << "<null>";
 }
 
-SourceLoc const& getDiagnosticPos(SyntaxNode const* syntax)
+SourceLoc getDiagnosticPos(SyntaxNode const* syntax)
 {
+    if (!syntax)
+        return SourceLoc();
     return syntax->loc;
 }
 
-SourceLoc const& getDiagnosticPos(TypeExp const& typeExp)
+SourceLoc getDiagnosticPos(TypeExp const& typeExp)
 {
+    if (!typeExp.exp)
+        return SourceLoc();
     return typeExp.exp->loc;
 }
 
@@ -1153,10 +1163,10 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
     }
 
     ThisTypeSubstitution* findThisTypeSubstitution(
-        Substitutions*  substs,
+        const Substitutions*  substs,
         InterfaceDecl*  interfaceDecl)
     {
-        for(Substitutions* s = substs; s; s = s->outer)
+        for(const Substitutions* s = substs; s; s = s->outer)
         {
             auto thisTypeSubst = as<ThisTypeSubstitution>(s);
             if(!thisTypeSubst)
@@ -1165,7 +1175,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
             if(thisTypeSubst->interfaceDecl != interfaceDecl)
                 continue;
 
-            return thisTypeSubst;
+            return const_cast<ThisTypeSubstitution*>(thisTypeSubst);
         }
 
         return nullptr;
@@ -1220,7 +1230,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
     }
 
     // Prints a partially qualified type name with generic substitutions.
-    static void _printNestedDecl(const Substitutions* substitutions, Decl* decl, StringBuilder& out)
+    void _printNestedDecl(const Substitutions* substitutions, Decl* decl, StringBuilder& out)
     {
         // If there is a parent scope for the declaration, print it first.
         // Exclude top-level namespaces like `tu0` or `core`.
@@ -1242,13 +1252,24 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
                 out << ".";
             }
         }
-        
-        // Print this type's name.
+        // If we have a ThisTypeSubstitution to an interface decl, print the substituted sub
+        // type instead.
+        if (auto interfaceDecl = as<InterfaceDecl>(decl))
+        {
+            auto thisSubst = findThisTypeSubstitution(substitutions, interfaceDecl);
+            if (auto subTypeWitness = as<SubtypeWitness>(thisSubst->witness))
+            {
+                out << subTypeWitness->sub;
+                goto namePrinted;
+            }
+        }
+        // Otherwise, just print this type's name.
         auto name = decl->getName();
         if (name)
         {
             out << name->text;
         }
+    namePrinted:;
 
         // Look for generic substitutions on this type.
         for (const Substitutions* subst = substitutions; subst; subst = subst->outer)
@@ -1264,6 +1285,9 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
                 bool isFirst = true;
                 for (const auto& it : genericSubstitution->getArgs())
                 {
+                    // Don't print out witnesses.
+                    if (as<Witness>(it))
+                        continue;
                     if (!isFirst)
                         out << ", ";
                     isFirst = false;

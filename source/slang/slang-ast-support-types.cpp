@@ -1,6 +1,7 @@
 #include "slang-ast-support-types.h"
 #include "slang-ast-base.h"
 #include "slang-ast-type.h"
+#include "slang-ast-expr.h"
 
 namespace Slang
 {
@@ -33,5 +34,32 @@ void removeModifier(ModifiableSyntaxNode* syntax, Modifier* toRemove)
         }
         prev = modifier;
     }
+}
+
+Expr* getInnerMostExprFromHigherOrderExpr(Expr* expr)
+{
+    HashSet<Expr*> workListSet;
+    while (auto higherOrder = as<HigherOrderInvokeExpr>(expr))
+    {
+        if (workListSet.Add(higherOrder))
+        {
+            expr = higherOrder->baseFunction;
+        }
+        else
+        {
+            // Circularity, return null.
+            return nullptr;
+        }
+    }
+    return expr;
+}
+
+UnownedStringSlice getHigherOrderOperatorName(HigherOrderInvokeExpr* expr)
+{
+    if (as<ForwardDifferentiateExpr>(expr))
+        return UnownedStringSlice("fwd_diff");
+    else if (as<BackwardDifferentiateExpr>(expr))
+        return UnownedStringSlice("bwd_diff");
+    return UnownedStringSlice();
 }
 }

@@ -381,6 +381,7 @@ IF EXIST ..\..\..\external\slang-glslang\bin\windows-aarch64\release\slang-glsla
     <ClInclude Include="..\..\..\source\slang\slang-ir-lower-result-type.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-lower-tuple-types.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-marshal-native-call.h" />
+    <ClInclude Include="..\..\..\source\slang\slang-ir-merge-import-symbols.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-metadata.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-missing-return.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-optix-entry-point-uniforms.h" />
@@ -550,6 +551,7 @@ IF EXIST ..\..\..\external\slang-glslang\bin\windows-aarch64\release\slang-glsla
     <ClCompile Include="..\..\..\source\slang\slang-ir-lower-result-type.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-lower-tuple-types.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-marshal-native-call.cpp" />
+    <ClCompile Include="..\..\..\source\slang\slang-ir-merge-import-symbols.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-metadata.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-missing-return.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-optix-entry-point-uniforms.cpp" />

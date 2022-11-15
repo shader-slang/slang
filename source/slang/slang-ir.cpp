@@ -19,6 +19,8 @@ namespace Slang
 
     void printDiagnosticArg(StringBuilder& sb, IRInst* irObject)
     {
+        if (!irObject)
+            return;
         if (auto nameHint = irObject->findDecoration<IRNameHintDecoration>())
             sb << nameHint->getName();
     }

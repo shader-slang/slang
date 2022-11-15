@@ -456,8 +456,15 @@ struct DifferentialPairTypeBuilder
 
     IRInst* _createDiffPairType(IRType* origBaseType, IRType* diffType)
     {
-        SLANG_ASSERT(!as<IRParam>(origBaseType));
-        SLANG_ASSERT(diffType);
+        switch (origBaseType->getOp())
+        {
+        case kIROp_lookup_interface_method:
+        case kIROp_Specialize:
+        case kIROp_Param:
+            return nullptr;
+        default:
+            break;
+        }
         if (diffType->getOp() != kIROp_DifferentialBottomType)
         {
             IRBuilder builder(sharedContext->sharedBuilder);
@@ -511,6 +518,8 @@ struct DifferentialPairTypeBuilder
         }
 
         auto diffType = getDiffTypeFromPairType(builder, pairType);
+        if (!diffType)
+            return result;
         result.loweredType = _createDiffPairType(pairType->getValueType(), (IRType*)diffType);
         result.isTrivial = (diffType->getOp() == kIROp_DifferentialBottomType);
         pairTypeCache.Add(originalPairType, result);
@@ -1407,35 +1416,27 @@ struct JVPTranscriber
         return InstPair(nullptr, nullptr);
     }
 
-    InstPair transcribeSpecialize(IRBuilder*, IRSpecialize* origSpecialize)
+    InstPair transcribeSpecialize(IRBuilder* builder, IRSpecialize* origSpecialize)
     {
         // In general, we should not see any specialize insts at this stage.
         // The exceptions are target intrinsics.
-        auto genericInnerVal = findInnerMostGenericReturnVal(as<IRGeneric>(origSpecialize->getBase()));
-        if (genericInnerVal->findDecoration<IRTargetIntrinsicDecoration>())
-        {
-            // Look for an IRForwardDerivativeDecoration on the specialize inst.
-            // (Normally, this would be on the inner IRFunc, but in this case only the JVP func
-            // can be specialized, so we put a decoration on the IRSpecialize)
-            //
-            if (auto jvpFuncDecoration = origSpecialize->findDecoration<IRForwardDerivativeDecoration>())
-            {
-                auto jvpFunc = jvpFuncDecoration->getForwardDerivativeFunc();
+        auto primal = cloneInst(&cloneEnv, builder, origSpecialize);
 
-                // Make sure this isn't itself a specialize .
-                SLANG_RELEASE_ASSERT(!as<IRSpecialize>(jvpFunc));
-
-                return InstPair(jvpFunc, jvpFunc);
-            }
-        }
-        else
+        // Look for an IRForwardDerivativeDecoration on the specialize inst.
+        // (Normally, this would be on the inner IRFunc, but in this case only the JVP func
+        // can be specialized, so we put a decoration on the IRSpecialize)
+        //
+        if (auto jvpFuncDecoration = origSpecialize->findDecoration<IRForwardDerivativeDecoration>())
         {
-            getSink()->diagnose(origSpecialize->sourceLoc,
-                    Diagnostics::unexpected,
-                    "should not be attempting to differentiate anything specialized here.");
+            auto jvpFunc = jvpFuncDecoration->getForwardDerivativeFunc();
+
+            // Make sure this isn't itself a specialize .
+            SLANG_RELEASE_ASSERT(!as<IRSpecialize>(jvpFunc));
+
+            return InstPair(primal, jvpFunc);
         }
-        
-        return InstPair(nullptr, nullptr);
+
+        return InstPair(primal, nullptr);
     }
 
     InstPair transcibeLookupInterfaceMethod(IRBuilder* builder, IRLookupWitnessMethod* origLookup)
@@ -2739,7 +2740,16 @@ struct JVPDerivativeContext : public InstPassBase
                     {
                     case kIROp_ForwardDifferentiate:
                     case kIROp_BackwardDifferentiate:
-                        autoDiffWorkList.add(inst);
+                        // Only process now if the operand is a materialized function.
+                        switch (inst->getOperand(0)->getOp())
+                        {
+                        case kIROp_Func:
+                        case kIROp_Specialize:
+                            autoDiffWorkList.add(inst);
+                            break;
+                        default:
+                            break;
+                        }
                         break;
                     default:
                         break;
@@ -2751,59 +2761,63 @@ struct JVPDerivativeContext : public InstPassBase
 
             // Process collected `ForwardDifferentiate` insts and replace them with placeholders for
             // differentiated functions.
+
             transcriberStorage.followUpFunctionsToTranscribe.clear();
             backwardTranscriberStorage.followUpFunctionsToTranscribe.clear();
 
             for (auto differentiateInst : autoDiffWorkList)
             {
                 IRInst* baseInst = differentiateInst->getOperand(0);
-                
-                if (auto baseFunction = as<IRGlobalValueWithCode>(baseInst))
+                if (as<IRForwardDifferentiate>(differentiateInst))
                 {
-                    if (as<IRForwardDifferentiate>(differentiateInst))
+                    if (auto existingDiffFunc = lookupJVPReference(baseInst))
                     {
-                        if (auto existingDiffFunc = lookupJVPReference(baseFunction))
+                        differentiateInst->replaceUsesWith(existingDiffFunc);
+                        differentiateInst->removeAndDeallocate();
+                    }
+                    else if (isMarkedForForwardDifferentiation(baseInst))
+                    {
+                        if (as<IRFunc>(baseInst) || as<IRGeneric>(baseInst))
                         {
-                            differentiateInst->replaceUsesWith(existingDiffFunc);
+                            IRInst* diffFunc = transcriberStorage.transcribe(builder, baseInst);
+                            SLANG_ASSERT(diffFunc);
+                            differentiateInst->replaceUsesWith(diffFunc);
                             differentiateInst->removeAndDeallocate();
                         }
-                        else if (isMarkedForForwardDifferentiation(baseFunction))
+                        else
                         {
-                            if (as<IRFunc>(baseFunction) || as<IRGeneric>(baseFunction))
-                            {
-                                IRInst* diffFunc = transcriberStorage.transcribe(builder, baseFunction);
-                                SLANG_ASSERT(diffFunc);
-                                differentiateInst->replaceUsesWith(diffFunc);
-                                differentiateInst->removeAndDeallocate();
-                            }
-                            else
-                            {
-                                getSink()->diagnose(differentiateInst->sourceLoc,
-                                    Diagnostics::internalCompilerError,
-                                    "Unexpected instruction. Expected func or generic");
-                            }
+                            getSink()->diagnose(differentiateInst->sourceLoc,
+                                Diagnostics::internalCompilerError,
+                                "Unexpected instruction. Expected func or generic");
                         }
                     }
-                    else if (as<IRBackwardDifferentiate>(differentiateInst))
+                    else
                     {
-                        if (isMarkedForBackwardDifferentiation(baseFunction))
+                        getSink()->diagnose(differentiateInst->sourceLoc,
+                            Diagnostics::internalCompilerError,
+                            "Requested differentiation on a function that isn't marked as differentiable.");
+                    }
+
+                }
+                else if (as<IRBackwardDifferentiate>(differentiateInst))
+                {
+                    if (isMarkedForBackwardDifferentiation(baseInst))
+                    {
+                        if (as<IRFunc>(baseInst))
                         {
-                            if (as<IRFunc>(baseFunction) || as<IRGeneric>(baseFunction))
-                            {
-                                IRInst* diffFunc =
-                                    backwardTranscriberStorage
-                                        .transcribeFuncHeader(builder, (IRFunc*)baseFunction)
-                                        .differential;
-                                SLANG_ASSERT(diffFunc);
-                                differentiateInst->replaceUsesWith(diffFunc);
-                                differentiateInst->removeAndDeallocate();
-                            }
-                            else
-                            {
-                                getSink()->diagnose(differentiateInst->sourceLoc,
-                                    Diagnostics::internalCompilerError,
-                                    "Unexpected instruction. Expected func or generic");
-                            }
+                            IRInst* diffFunc =
+                                backwardTranscriberStorage
+                                    .transcribeFuncHeader(builder, (IRFunc*)baseInst)
+                                    .differential;
+                            SLANG_ASSERT(diffFunc);
+                            differentiateInst->replaceUsesWith(diffFunc);
+                            differentiateInst->removeAndDeallocate();
+                        }
+                        else
+                        {
+                            getSink()->diagnose(differentiateInst->sourceLoc,
+                                Diagnostics::internalCompilerError,
+                                "Unexpected instruction. Expected func or generic");
                         }
                     }
                 }
@@ -3117,18 +3131,9 @@ struct JVPDerivativeContext : public InstPassBase
     // Checks decorators to see if the function should
     // be differentiated (kIROp_ForwardDifferentiableDecoration)
     // 
-    bool isMarkedForForwardDifferentiation(IRGlobalValueWithCode* callable)
+    bool isMarkedForForwardDifferentiation(IRInst* callable)
     {
-        for (auto decoration = callable->getFirstDecoration();
-            decoration;
-            decoration = decoration->getNextDecoration())
-        {
-            if (decoration->getOp() == kIROp_ForwardDifferentiableDecoration)
-            {
-                return true;
-            }
-        }
-        return false;
+        return callable->findDecoration<IRForwardDifferentiableDecoration>() != nullptr;
     }
 
     IRStringLit* getForwardDerivativeFuncName(IRInst* func)
@@ -3152,18 +3157,9 @@ struct JVPDerivativeContext : public InstPassBase
     // Checks decorators to see if the function should
     // be differentiated (kIROp_ForwardDifferentiableDecoration)
     // 
-    bool isMarkedForBackwardDifferentiation(IRGlobalValueWithCode* callable)
+    bool isMarkedForBackwardDifferentiation(IRInst* callable)
     {
-        for (auto decoration = callable->getFirstDecoration();
-            decoration;
-            decoration = decoration->getNextDecoration())
-        {
-            if (decoration->getOp() == kIROp_BackwardDifferentiableDecoration)
-            {
-                return true;
-            }
-        }
-        return false;
+        return callable->findDecoration<IRBackwardDifferentiableDecoration>() != nullptr;
     }
 
     IRStringLit* getBackwardDerivativeFuncName(IRInst* func)

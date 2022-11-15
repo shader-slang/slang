@@ -1046,7 +1046,9 @@ class ForwardDerivativeAttribute : public DifferentiableAttribute
 
     /// The `[ForwardDerivativeOf(primalFunction)]` attribute marks the decorated function as custom
     /// derivative implementation for `primalFunction`.
-class ForwardDerivativeOfAttribute : public Attribute
+    /// ForwardDerivativeOfAttribute inherits from DifferentiableAttribute because a derivative
+    /// function itself is considered differentiable.
+class ForwardDerivativeOfAttribute : public DifferentiableAttribute
 {
     SLANG_AST_CLASS(ForwardDerivativeOfAttribute)
 

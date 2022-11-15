@@ -19,6 +19,7 @@
 #include "slang-ir-string-hash.h"
 #include "slang-ir-clone.h"
 #include "slang-ir-lower-error-handling.h"
+#include "slang-ir-merge-import-symbols.h"
 
 #include "slang-mangle.h"
 #include "slang-type-layout.h"
@@ -8244,6 +8245,16 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             // Reset cursor.
             subContext->irBuilder->setInsertInto(irFunc);
         }
+        
+        // For convenience, ensure that any additional global
+        // values that were emitted while outputting the function
+        // body appear before the function itself in the list
+        // of global values.
+        irFunc->moveToEnd();
+
+        // If this function is defined inside an interface, add a reference to the IRFunc from
+        // the interface's type definition.
+        auto finalVal = finishOuterGenerics(subBuilder, irFunc, outerGeneric);
 
         if (auto attr = decl->findModifier<ForwardDerivativeOfAttribute>())
         {
@@ -8252,7 +8263,10 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 NestedContext originalContextFunc(this);
                 auto originalSubBuilder = originalContextFunc.getBuilder();
                 auto originalSubContext = originalContextFunc.getContext();
-
+                if (auto outterGeneric = getOuterGeneric(irFunc))
+                    originalSubBuilder->setInsertBefore(outterGeneric);
+                else
+                    originalSubBuilder->setInsertBefore(irFunc);
                 auto originalFuncDecl = as<FunctionDeclBase>(originalDeclRefExpr->declRef.getDecl());
                 SLANG_RELEASE_ASSERT(originalFuncDecl);
 
@@ -8265,27 +8279,10 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 auto derivativeFuncVal = lowerRValueExpr(originalSubContext, attr->backDeclRef);
                 originalSubBuilder->addForwardDerivativeDecoration(originalFuncVal, derivativeFuncVal.val);
             }
-
-            subContext->irBuilder->setInsertInto(irFunc->getParent());
-            auto loweredVal = lowerRValueExpr(subContext, attr->funcExpr);
-
-            SLANG_ASSERT(loweredVal.flavor == LoweredValInfo::Flavor::Simple);
-            IRInst* originalFunc = loweredVal.val;
-            getBuilder()->addDecoration(irFunc, kIROp_ForwardDerivativeDecoration, originalFunc);
-
+            getBuilder()->addForwardDifferentiableDecoration(irFunc);
             subContext->irBuilder->setInsertInto(irFunc);
+            finalVal->moveToEnd();
         }
-
-        // For convenience, ensure that any additional global
-        // values that were emitted while outputting the function
-        // body appear before the function itself in the list
-        // of global values.
-        irFunc->moveToEnd();
-
-        // If this function is defined inside an interface, add a reference to the IRFunc from
-        // the interface's type definition.
-        auto finalVal = finishOuterGenerics(subBuilder, irFunc, outerGeneric);
-
         return LoweredValInfo::simple(finalVal);
     }
 
@@ -8973,6 +8970,8 @@ RefPtr<IRModule> generateIRForTranslationUnit(
     // `unreachable` instructions remain.
 
     checkForMissingReturns(module, compileRequest->getSink());
+
+    mergeImportSymbols(module);
 
     // The "mandatory" optimization passes may make use of the
     // `IRHighLevelDeclDecoration` type to relate IR instructions
