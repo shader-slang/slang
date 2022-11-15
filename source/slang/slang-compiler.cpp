@@ -1014,7 +1014,16 @@ namespace Slang
                 auto& args = linkage->m_downstreamArgs.getArgsAt(nameIndex);
                 for (const auto& arg : args.m_args)
                 {
-                    compilerSpecificArguments.add(arg.value);
+                    // We special case some kinds of args, that can be handled directly
+                    if (arg.value.startsWith("-I"))
+                    {
+                        // We handle the -I option, by just adding to the include paths
+                        includePaths.add(arg.value.getUnownedSlice().tail(2));
+                    }
+                    else
+                    {
+                        compilerSpecificArguments.add(arg.value);
+                    }
                 }
             }
         }

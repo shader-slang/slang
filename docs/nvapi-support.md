@@ -63,19 +63,23 @@ The astute reader may have noticed that the default Slang HLSL prelude *does* co
 #endif
 ```
 
-This means that the *downstream* compiler (such as DXC and FXC) must be able to handle this include. 
+This means that the *downstream* compiler (such as DXC and FXC) must be able to handle this include. Include paths can be specified for downstream compilers via the [-X mechanism](command-line-slangc.md#downstream-arguments). So for example...
 
-As it turns out all the includes specified to Slang (via command line -I or through the API), are passed down to the include handlers for FXC and DXC. 
+```
+-Xfxc -IpathTo/nvapi -Xdxc -IpathTo/nvapi
+```
 
-In the simplest use case where the path to `nvHLSLExtns.h` is specified in the include paths everything should 'just work' - as both Slang and the downstream compilers will see these include paths and so can handle the include. 
+In the explicit scenario where `nvHLSLExtns.h` is included in Slang source, the include path must be specified in Slang through the regular mechanisms. 
 
-Things are more complicated if there is mixed implicit/explicit NVAPI usage and in the Slang source the include path is set up such that NVAPI is included with 
+In a scenario with both implicit and explicit use, both Slang *and* the downstream compiler need to have a suitable path specified. Things can be more complicated if there is mixed implicit/explicit NVAPI usage and in the Slang source the include path is set up such that NVAPI is included with 
 
 ```
 #include "nvapi/nvHLSLExtns.h"
 ```
 
-This won't work directly with the implicit usage, as the downstream compiler includes as `"nvHLSLExtns.h"`. One way to work around this by altering the HLSL prelude such as the same `#include` is used. 
+Since Slang and the downstream compilers can specify different include paths, the downstream compiler include path can be such that `#include "nvHLSLExtns.h"` works with the default prelude.
+
+Another way of working around this issue is to alter the prelude for downstream compilers such that it contains an absolute path for the `#include`. This is the mechanism that is currently used with the Slang test infrastructure. 
 
 Links
 -----
