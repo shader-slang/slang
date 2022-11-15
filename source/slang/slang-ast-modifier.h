@@ -829,6 +829,16 @@ class VulkanHitAttributesAttribute : public Attribute
     SLANG_AST_CLASS(VulkanHitAttributesAttribute)
 };
 
+// A `[__vulkanHitObjectAttributes(location)]` attribute, which is used in the
+// standard library implementation to indicate that a variable
+// actually represents the attributes on a HitObject as part of
+// Shader ExecutionReordering
+class VulkanHitObjectAttributesAttribute : public Attribute
+{
+    SLANG_AST_CLASS(VulkanHitObjectAttributesAttribute)
+
+    int location;
+};
 
 // A `[mutating]` attribute, which indicates that a member
 // function is allowed to modify things through its `this`

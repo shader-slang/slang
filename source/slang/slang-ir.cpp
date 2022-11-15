@@ -48,6 +48,7 @@ namespace Slang
             case kIROp_VulkanCallablePayloadDecoration:
             case kIROp_VulkanHitAttributesDecoration:
             case kIROp_VulkanRayPayloadDecoration:
+            case kIROp_VulkanHitObjectAttributesDecoration:
             {
                 return true;
             }

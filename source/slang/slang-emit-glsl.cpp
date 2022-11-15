@@ -2240,45 +2240,62 @@ void GLSLSourceEmitter::emitVarDecorationsImpl(IRInst* varDecl)
     // the payload won't automatically get a layout applied
     // (it isn't part of the user-visible interface...)
     //
-    if (varDecl->findDecoration<IRVulkanRayPayloadDecoration>())
-    {
-        m_writer->emit("layout(location = ");
-        m_writer->emit(getRayPayloadLocation(varDecl));
-        m_writer->emit(")\n");
-        if( getTargetCaps().implies(CapabilityAtom::GL_NV_ray_tracing) )
-        {
-            m_writer->emit("rayPayloadNV\n");
-        }
-        else
-        {
-            m_writer->emit("rayPayloadEXT\n");
-        }
-    }
-    if (varDecl->findDecoration<IRVulkanCallablePayloadDecoration>())
-    {
-        m_writer->emit("layout(location = ");
-        m_writer->emit(getCallablePayloadLocation(varDecl));
-        m_writer->emit(")\n");
-        if( getTargetCaps().implies(CapabilityAtom::GL_NV_ray_tracing) )
-        {
-            m_writer->emit("callableDataNV\n");
-        }
-        else
-        {
-            m_writer->emit("callableDataEXT\n");
-        }
-    }
 
-    if (varDecl->findDecoration<IRVulkanHitAttributesDecoration>())
+    for (auto decoration : varDecl->getDecorations())
     {
-        if( getTargetCaps().implies(CapabilityAtom::GL_NV_ray_tracing) )
+        typedef LocationTracker::Kind LocationKind;
+
+        LocationKind locationKind = LocationKind::Invalid;
+        UnownedStringSlice prefix;
+        if (as<IRVulkanHitAttributesDecoration>(decoration))
         {
-            m_writer->emit("hitAttributeNV\n");
+            prefix = toSlice("hitAttribute");
         }
         else
         {
-            m_writer->emit("hitAttributeEXT\n");
+            // Handle attributes that have location
+            const LocationKind decorationLocationKind = LocationTracker::getKindFromDecoration(decoration);
+            if (decorationLocationKind == LocationKind::Invalid)
+            {
+                // Next decoration
+                continue;
+            }
+
+            locationKind = decorationLocationKind;
+
+            // Get the location value
+            const auto locationValue = m_locationTracker.getValue(locationKind, varDecl, decoration);
+
+            m_writer->emit(toSlice("layout(location = "));
+            m_writer->emit(locationValue);
+            m_writer->emit(toSlice(")\n"));
+
+            switch (locationKind)
+            {
+                case LocationKind::CallablePayload:             prefix = toSlice("callableData"); break;
+                case LocationKind::HitObjectAttribute:          prefix = toSlice("hitObjectAttribute"); break;
+                case LocationKind::RayPayload:                  prefix = toSlice("rayPayload"); break;
+                default: break;
+            }
         }
+
+        SLANG_ASSERT(prefix.getLength());
+        m_writer->emit(prefix);
+
+        // Special case  hitObjectAttribute as is only NV currently 
+        if (locationKind == LocationKind::HitObjectAttribute ||
+            getTargetCaps().implies(CapabilityAtom::GL_NV_ray_tracing))
+        {
+            m_writer->emit(toSlice("NV"));
+        }
+        else
+        {
+            m_writer->emit(toSlice("EXT"));
+        }
+        m_writer->emit(toSlice("\n"));
+
+        // If we emit a location we are done.
+        break;
     }
 
     if (varDecl->findDecoration<IRGloballyCoherentDecoration>())
