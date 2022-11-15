@@ -193,7 +193,7 @@ uint64_t __asuint64(uint2 i)
     return (uint64_t(i.y) << 32) | i.x;
 }
 
-// 
+//
 
 __intrinsic_op($(kIROp_ByteAddressBufferLoad))
 T __byteAddressBufferLoad<T>(ByteAddressBuffer buffer, int offset);
@@ -310,7 +310,7 @@ struct $(item.name)
     }
 ${{{{
     if (item.op == kIROp_HLSLRWByteAddressBufferType)
-    {  
+    {
 }}}}
 
     // float32 and int64 atomic support. This is a Slang specific extension, it uses
@@ -323,7 +323,7 @@ ${{{{
     // Finally note you can *mix* NVAPI direct calls, and use of NVAPI intrinsics below. This doesn't cause
     // any clashes, as Slang will emit any NVAPI function it parsed (say via a include in Slang source) with
     // unique functions.
-    // 
+    //
     // https://www.khronos.org/registry/vulkan/specs/1.2-extensions/html/vkspec.html#VK_EXT_shader_atomic_float
     // https://htmlpreview.github.io/?https://github.com/KhronosGroup/SPIRV-Registry/blob/master/extensions/EXT/SPV_EXT_shader_atomic_float_add.html
 
@@ -428,7 +428,7 @@ ${{{{
     }
 
     // Min
-    
+
     __cuda_sm_version(3.5)
     __target_intrinsic(cuda, "atomicMin($0._getPtrAt<uint64_t>($1), $2)")
     uint64_t InterlockedMinU64(uint byteAddress, uint64_t value);
@@ -675,7 +675,7 @@ static const struct {
     char const* name;
 } kMutableStructuredBufferCases[] =
 {
-    { kIROp_HLSLRWStructuredBufferType,                "RWStructuredBuffer" }, 
+    { kIROp_HLSLRWStructuredBufferType,                "RWStructuredBuffer" },
     { kIROp_HLSLRasterizerOrderedStructuredBufferType, "RasterizerOrderedStructuredBuffer" },
 };
 for(auto item : kMutableStructuredBufferCases) {
@@ -751,28 +751,48 @@ struct TriangleStream
 
 #define VECTOR_MAP_UNARY(TYPE, COUNT, FUNC, VALUE) \
     vector<TYPE,COUNT> result; for(int i = 0; i < COUNT; ++i) { result[i] = FUNC(VALUE[i]); } return result
-    
+
 #define MATRIX_MAP_UNARY(TYPE, ROWS, COLS, FUNC, VALUE) \
     matrix<TYPE,ROWS,COLS> result; for(int i = 0; i < ROWS; ++i) { result[i] = FUNC(VALUE[i]); } return result
 
 #define VECTOR_MAP_BINARY(TYPE, COUNT, FUNC, LEFT, RIGHT) \
     vector<TYPE,COUNT> result; for(int i = 0; i < COUNT; ++i) { result[i] = FUNC(LEFT[i], RIGHT[i]); } return result
-    
+
 #define MATRIX_MAP_BINARY(TYPE, ROWS, COLS, FUNC, LEFT, RIGHT) \
     matrix<TYPE,ROWS,COLS> result; for(int i = 0; i < ROWS; ++i) { result[i] = FUNC(LEFT[i], RIGHT[i]); } return result
 
 #define VECTOR_MAP_TRINARY(TYPE, COUNT, FUNC, A, B, C) \
     vector<TYPE,COUNT> result; for(int i = 0; i < COUNT; ++i) { result[i] = FUNC(A[i], B[i], C[i]); } return result
-    
+
 #define MATRIX_MAP_TRINARY(TYPE, ROWS, COLS, FUNC, A, B, C) \
     matrix<TYPE,ROWS,COLS> result; for(int i = 0; i < ROWS; ++i) { result[i] = FUNC(A[i], B[i], C[i]); } return result
 
 // Try to terminate the current draw or dispatch call (HLSL SM 4.0)
 void abort();
 
+// Detach and set derivatives to zero
+
+__generic<T : __BuiltinFloatingPointType>
+T detach(T x)
+{
+    return x;
+}
+
+__generic<T : __BuiltinFloatingPointType, let N : int>
+vector<T, N> detach(vector<T, N> x)
+{
+    VECTOR_MAP_UNARY(T, N, detach, x);
+}
+
+__generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
+matrix<T, N, M> detach(matrix<T, N, M> x)
+{
+    MATRIX_MAP_UNARY(T, N, M, detach, x);
+}
+
 // Absolute value (HLSL SM 1.0)
 
-__generic<T : __BuiltinSignedArithmeticType>
+__generic<T : __BuiltinIntegerType>
 __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
 __target_intrinsic(cuda, "$P_abs($0)")
@@ -784,7 +804,7 @@ T abs(T x);
     return x < 0 ? -x : x;
 }*/
 
-__generic<T : __BuiltinSignedArithmeticType, let N : int>
+__generic<T : __BuiltinIntegerType, let N : int>
 __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
 __target_intrinsic(spirv_direct, "12 resultType resultId glsl450 fi(4,5) _0")
@@ -793,7 +813,31 @@ vector<T, N> abs(vector<T, N> x)
     VECTOR_MAP_UNARY(T, N, abs, x);
 }
 
-__generic<T : __BuiltinSignedArithmeticType, let N : int, let M : int>
+__generic<T : __BuiltinIntegerType, let N : int, let M : int>
+__target_intrinsic(hlsl)
+matrix<T,N,M> abs(matrix<T,N,M> x)
+{
+    MATRIX_MAP_UNARY(T, N, M, abs, x);
+}
+
+__generic<T : __BuiltinFloatingPointType>
+__target_intrinsic(hlsl)
+__target_intrinsic(glsl)
+__target_intrinsic(cuda, "$P_abs($0)")
+__target_intrinsic(cpp, "$P_abs($0)")
+__target_intrinsic(spirv_direct, "12 resultType resultId glsl450 fi(4,5) _0")
+T abs(T x);
+
+__generic<T : __BuiltinFloatingPointType, let N : int>
+__target_intrinsic(hlsl)
+__target_intrinsic(glsl)
+__target_intrinsic(spirv_direct, "12 resultType resultId glsl450 fi(4,5) _0")
+vector<T, N> abs(vector<T, N> x)
+{
+    VECTOR_MAP_UNARY(T, N, abs, x);
+}
+
+__generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 __target_intrinsic(hlsl)
 matrix<T,N,M> abs(matrix<T,N,M> x)
 {
@@ -1271,7 +1315,7 @@ matrix<T, N, M> ceil(matrix<T, N, M> x)
 bool CheckAccessFullyMapped(uint status);
 
 // Clamp (HLSL SM 1.0)
-__generic<T : __BuiltinArithmeticType>
+__generic<T : __BuiltinIntegerType>
 __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
 __target_intrinsic(spirv_direct, "12 resultType resultId glsl450 fus(43,44,45) _0 _1 _2")
@@ -1280,7 +1324,7 @@ T clamp(T x, T minBound, T maxBound)
     return min(max(x, minBound), maxBound);
 }
 
-__generic<T : __BuiltinArithmeticType, let N : int>
+__generic<T : __BuiltinIntegerType, let N : int>
 __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
 __target_intrinsic(spirv_direct, "12 resultType resultId glsl450 fus(43,44,45) _0 _1 _2")
@@ -1289,7 +1333,32 @@ vector<T, N> clamp(vector<T, N> x, vector<T, N> minBound, vector<T, N> maxBound)
     return min(max(x, minBound), maxBound);
 }
 
-__generic<T : __BuiltinArithmeticType, let N : int, let M : int>
+__generic<T : __BuiltinIntegerType, let N : int, let M : int>
+__target_intrinsic(hlsl)
+matrix<T,N,M> clamp(matrix<T,N,M> x, matrix<T,N,M> minBound, matrix<T,N,M> maxBound)
+{
+    return min(max(x, minBound), maxBound);
+}
+
+__generic<T : __BuiltinFloatingPointType>
+__target_intrinsic(hlsl)
+__target_intrinsic(glsl)
+__target_intrinsic(spirv_direct, "12 resultType resultId glsl450 fus(43,44,45) _0 _1 _2")
+T clamp(T x, T minBound, T maxBound)
+{
+    return min(max(x, minBound), maxBound);
+}
+
+__generic<T : __BuiltinFloatingPointType, let N : int>
+__target_intrinsic(hlsl)
+__target_intrinsic(glsl)
+__target_intrinsic(spirv_direct, "12 resultType resultId glsl450 fus(43,44,45) _0 _1 _2")
+vector<T, N> clamp(vector<T, N> x, vector<T, N> minBound, vector<T, N> maxBound)
+{
+    return min(max(x, minBound), maxBound);
+}
+
+__generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 __target_intrinsic(hlsl)
 matrix<T,N,M> clamp(matrix<T,N,M> x, matrix<T,N,M> minBound, matrix<T,N,M> maxBound)
 {
@@ -2391,7 +2460,7 @@ matrix<T, N, M> log(matrix<T, N, M> x)
 }
 
 // Base-10 logarithm
-__generic<T : __BuiltinFloatingPointType> 
+__generic<T : __BuiltinFloatingPointType>
 __target_intrinsic(hlsl)
 __target_intrinsic(glsl, "(log( $0 ) * $S0( 0.43429448190325182765112891891661) )" )
 __target_intrinsic(cuda, "$P_log10($0)")
@@ -2408,7 +2477,7 @@ vector<T,N> log10(vector<T,N> x)
     VECTOR_MAP_UNARY(T, N, log10, x);
 }
 
-__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> 
+__generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 __target_intrinsic(hlsl)
 matrix<T,N,M> log10(matrix<T,N,M> x)
 {
@@ -2467,7 +2536,7 @@ matrix<T, N, M> mad(matrix<T, N, M> mvalue, matrix<T, N, M> avalue, matrix<T, N,
 }
 
 // maximum
-__generic<T : __BuiltinArithmeticType>
+__generic<T : __BuiltinIntegerType>
 __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
 __target_intrinsic(cuda, "$P_max($0, $1)")
@@ -2479,7 +2548,7 @@ T max(T x, T y);
 // version needs to correctly handle the case where one of the inputs
 // is not-a-number.
 
-__generic<T : __BuiltinArithmeticType, let N : int>
+__generic<T : __BuiltinIntegerType, let N : int>
 __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
 __target_intrinsic(spirv_direct, "12 resultType resultId glsl450 fus(40,41,42) _0")
@@ -2488,7 +2557,31 @@ vector<T, N> max(vector<T, N> x, vector<T, N> y)
     VECTOR_MAP_BINARY(T, N, max, x, y);
 }
 
-__generic<T : __BuiltinArithmeticType, let N : int, let M : int>
+__generic<T : __BuiltinIntegerType, let N : int, let M : int>
+__target_intrinsic(hlsl)
+matrix<T, N, M> max(matrix<T, N, M> x, matrix<T, N, M> y)
+{
+    MATRIX_MAP_BINARY(T, N, M, max, x, y);
+}
+
+__generic<T : __BuiltinFloatingPointType>
+__target_intrinsic(hlsl)
+__target_intrinsic(glsl)
+__target_intrinsic(cuda, "$P_max($0, $1)")
+__target_intrinsic(cpp, "$P_max($0, $1)")
+__target_intrinsic(spirv_direct, "12 resultType resultId glsl450 fus(40,41,42) _0")
+T max(T x, T y);
+
+__generic<T : __BuiltinFloatingPointType, let N : int>
+__target_intrinsic(hlsl)
+__target_intrinsic(glsl)
+__target_intrinsic(spirv_direct, "12 resultType resultId glsl450 fus(40,41,42) _0")
+vector<T, N> max(vector<T, N> x, vector<T, N> y)
+{
+    VECTOR_MAP_BINARY(T, N, max, x, y);
+}
+
+__generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 __target_intrinsic(hlsl)
 matrix<T, N, M> max(matrix<T, N, M> x, matrix<T, N, M> y)
 {
@@ -2496,7 +2589,7 @@ matrix<T, N, M> max(matrix<T, N, M> x, matrix<T, N, M> y)
 }
 
 // minimum
-__generic<T : __BuiltinArithmeticType>
+__generic<T : __BuiltinIntegerType>
 __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
 __target_intrinsic(cuda, "$P_min($0, $1)")
@@ -2504,7 +2597,7 @@ __target_intrinsic(cpp, "$P_min($0, $1)")
 __target_intrinsic(spirv_direct, "12 resultType resultId glsl450 fus(37,38,39) _0")
 T min(T x, T y);
 
-__generic<T : __BuiltinArithmeticType, let N : int>
+__generic<T : __BuiltinIntegerType, let N : int>
 __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
 __target_intrinsic(spirv_direct, "12 resultType resultId glsl450 fus(37,38,39) _0")
@@ -2513,7 +2606,31 @@ vector<T,N> min(vector<T,N> x, vector<T,N> y)
     VECTOR_MAP_BINARY(T, N, min, x, y);
 }
 
-__generic<T : __BuiltinArithmeticType, let N : int, let M : int>
+__generic<T : __BuiltinIntegerType, let N : int, let M : int>
+__target_intrinsic(hlsl)
+matrix<T,N,M> min(matrix<T,N,M> x, matrix<T,N,M> y)
+{
+    MATRIX_MAP_BINARY(T, N, M, min, x, y);
+}
+
+__generic<T : __BuiltinFloatingPointType>
+__target_intrinsic(hlsl)
+__target_intrinsic(glsl)
+__target_intrinsic(cuda, "$P_min($0, $1)")
+__target_intrinsic(cpp, "$P_min($0, $1)")
+__target_intrinsic(spirv_direct, "12 resultType resultId glsl450 fus(37,38,39) _0")
+T min(T x, T y);
+
+__generic<T : __BuiltinFloatingPointType, let N : int>
+__target_intrinsic(hlsl)
+__target_intrinsic(glsl)
+__target_intrinsic(spirv_direct, "12 resultType resultId glsl450 fus(37,38,39) _0")
+vector<T,N> min(vector<T,N> x, vector<T,N> y)
+{
+    VECTOR_MAP_BINARY(T, N, min, x, y);
+}
+
+__generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 __target_intrinsic(hlsl)
 matrix<T,N,M> min(matrix<T,N,M> x, matrix<T,N,M> y)
 {
@@ -3308,7 +3425,7 @@ matrix<T, N, M> trunc(matrix<T, N, M> x)
     MATRIX_MAP_UNARY(T, N, M, trunc, x);
 }
 
-// Slang Specific 'Mask' Wave Intrinsics 
+// Slang Specific 'Mask' Wave Intrinsics
 
 typedef uint WaveMask;
 
@@ -3340,14 +3457,14 @@ bool WaveMaskIsFirstLane(WaveMask mask);
 
 __glsl_extension(GL_KHR_shader_subgroup_vote)
 __spirv_version(1.3)
-__target_intrinsic(glsl, "subgroupAll($1)") 
+__target_intrinsic(glsl, "subgroupAll($1)")
 __target_intrinsic(cuda, "(__all_sync($0, $1) != 0)")
 __target_intrinsic(hlsl, "WaveActiveAllTrue($1)")
 bool WaveMaskAllTrue(WaveMask mask, bool condition);
 
 __glsl_extension(GL_KHR_shader_subgroup_vote)
 __spirv_version(1.3)
-__target_intrinsic(glsl, "subgroupAny($1)") 
+__target_intrinsic(glsl, "subgroupAny($1)")
 __target_intrinsic(cuda, "(__any_sync($0, $1) != 0)")
 __target_intrinsic(hlsl, "WaveActiveAnyTrue($1)")
 bool WaveMaskAnyTrue(WaveMask mask, bool condition);
@@ -3378,7 +3495,7 @@ uint WaveMaskCountBits(WaveMask mask, bool value)
 // behavior as
 // "These intrinsics are dependent on active lanes and therefore flow control. In the model of this document, implementations
 // must enforce that the number of active lanes exactly corresponds to the programmer’s view of flow control."
-// 
+//
 // It seems this can only mean the active threads are the "threads the program flow would lead to". This implies a lockstep
 // "straight SIMD" style interpretation. That being the case this op on HLSL is just a memory barrier without any Sync.
 
@@ -3394,7 +3511,7 @@ void AllMemoryBarrierWithWaveMaskSync(WaveMask mask);
 // "The function subgroupBarrier() enforces that all active invocations within a subgroup must execute this function before any
 // are allowed to continue their execution"
 // TODO(JS):
-// It's not entirely clear what to do here on HLSL. 
+// It's not entirely clear what to do here on HLSL.
 // Reading the dxc wiki (https://github.com/Microsoft/DirectXShaderCompiler/wiki/Wave-Intrinsics), we have statements like:
 //    ... these intrinsics enable the elimination of barrier constructs when the scope of synchronization is within the width of the SIMD processor.
 //    Wave: A set of lanes executed simultaneously in the processor. No explicit barriers are required to guarantee that they execute in parallel.
@@ -3403,7 +3520,7 @@ void AllMemoryBarrierWithWaveMaskSync(WaveMask mask);
 // The barrier is left here though, because not only is the barrier make writes before the barrier across the wave appear to others afterwards, it's
 // also there to inform the compiler on what order reads and writes can take place. This might seem to be silly because of the 'Active' lanes
 // aspect of HLSL seems to make everything in lock step - but that's not quite so, it only has to apparently be that way as far as the programmers
-// model appears - divergence could perhaps potentially still happen. 
+// model appears - divergence could perhaps potentially still happen.
 __target_intrinsic(cuda, "__syncwarp($0)")
 __glsl_extension(GL_KHR_shader_subgroup_basic)
 __spirv_version(1.3)
@@ -3547,7 +3664,7 @@ __target_intrinsic(glsl, "subgroupXor($1)")
 __target_intrinsic(cuda, "_waveXor($0, $1)")
 __target_intrinsic(hlsl, "WaveActiveBitXor($1)")
 T WaveMaskBitXor(WaveMask mask, T expr);
-__generic<T : __BuiltinIntegerType, let N : int> 
+__generic<T : __BuiltinIntegerType, let N : int>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
 __target_intrinsic(glsl, "subgroupXor($1)")
@@ -3643,7 +3760,7 @@ __cuda_sm_version(7.0)
 __target_intrinsic(cuda, "_waveAllEqual($0, $1)")
 __target_intrinsic(hlsl, "WaveActiveAllEqual($1)")
 bool WaveMaskAllEqual(WaveMask mask, T value);
-__generic<T : __BuiltinType, let N : int> 
+__generic<T : __BuiltinType, let N : int>
 __glsl_extension(GL_KHR_shader_subgroup_vote)
 __spirv_version(1.3)
 __target_intrinsic(glsl, "subgroupAllEqual($1)")
@@ -3876,7 +3993,7 @@ T WaveActiveBitXor(T expr)
     return WaveMaskBitXor(WaveGetActiveMask(), expr);
 }
 
-__generic<T : __BuiltinIntegerType, let N : int> 
+__generic<T : __BuiltinIntegerType, let N : int>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
 __target_intrinsic(glsl, "subgroupXor($0)")
@@ -4011,7 +4128,7 @@ bool WaveActiveAllEqual(T value)
     return WaveMaskAllEqual(WaveGetActiveMask(), value);
 }
 
-__generic<T : __BuiltinType, let N : int> 
+__generic<T : __BuiltinType, let N : int>
 __glsl_extension(GL_KHR_shader_subgroup_vote)
 __spirv_version(1.3)
 __target_intrinsic(glsl, "subgroupAllEqual($0)")
@@ -4030,7 +4147,7 @@ bool WaveActiveAllEqual(matrix<T, N, M> value)
 
 __glsl_extension(GL_KHR_shader_subgroup_vote)
 __spirv_version(1.3)
-__target_intrinsic(glsl, "subgroupAll($0)") 
+__target_intrinsic(glsl, "subgroupAll($0)")
 __target_intrinsic(hlsl)
 bool WaveActiveAllTrue(bool condition)
 {
@@ -4039,7 +4156,7 @@ bool WaveActiveAllTrue(bool condition)
 
 __glsl_extension(GL_KHR_shader_subgroup_vote)
 __spirv_version(1.3)
-__target_intrinsic(glsl, "subgroupAny($0)") 
+__target_intrinsic(glsl, "subgroupAny($0)")
 __target_intrinsic(hlsl)
 bool WaveActiveAnyTrue(bool condition)
 {
@@ -4091,9 +4208,9 @@ uint _WaveCountBits(uint4 value)
     switch ((waveLaneCount - 1) / 32)
     {
         default:
-        case 0: return countbits(value.x); 
-        case 1: return countbits(value.x) + countbits(value.y); 
-        case 2: return countbits(value.x) + countbits(value.y) + countbits(value.z); 
+        case 0: return countbits(value.x);
+        case 1: return countbits(value.x) + countbits(value.y);
+        case 2: return countbits(value.x) + countbits(value.y) + countbits(value.z);
         case 3: return countbits(value.x) + countbits(value.y) + countbits(value.z) + countbits(value.w);
     }
 }
@@ -4395,7 +4512,7 @@ __target_intrinsic(hlsl)
 __target_intrinsic(cuda, "_wavePrefixProduct(_getMultiPrefixMask(($1).x), $0)")
 T WaveMultiPrefixProduct(T value, uint4 mask);
 
-__generic<T : __BuiltinArithmeticType, let N : int> 
+__generic<T : __BuiltinArithmeticType, let N : int>
 __target_intrinsic(hlsl)
 __target_intrinsic(cuda, "_wavePrefixProductMultiple(_getMultiPrefixMask(($1).x), $0)")
 vector<T,N> WaveMultiPrefixProduct(vector<T,N> value, uint4 mask);
@@ -4694,7 +4811,7 @@ void __traceMotionRay(
     float                           TMin,
     float3                          Direction,
     float                           TMax,
-    float                           CurrentTime,               
+    float                           CurrentTime,
     int                             PayloadLocation);
 
 __generic<payload_t>
@@ -4843,7 +4960,7 @@ __target_intrinsic(cuda, "optixGetObjectRayDirection")
 float3 ObjectRayDirection();
 
 // TODO: optix has an optixGetObjectToWorldTransformMatrix function that returns 12
-// floats by reference. 
+// floats by reference.
 __target_intrinsic(GL_NV_ray_tracing, "transpose(gl_ObjectToWorldNV)")
 __target_intrinsic(GL_EXT_ray_tracing, "transpose(gl_ObjectToWorldEXT)")
 float3x4 ObjectToWorld3x4();
@@ -4989,7 +5106,7 @@ struct FeedbackTexture2D<T : __BuiltinSamplerFeedbackType>
     __target_intrinsic(hlsl, "($0).WriteSamplerFeedbackLevel($1, $2, $3, $4)")
     __target_intrinsic(cpp, "($0).WriteSamplerFeedbackLevel($1, $2, $3, $4)")
     void WriteSamplerFeedbackLevel<S>(Texture2D<S> tex, SamplerState samp, float2 location, float lod);
-    
+
     // Without Clamp
 
     __target_intrinsic(hlsl, "($0).WriteSamplerFeedback($1, $2, $3)")
@@ -5428,16 +5545,16 @@ struct VkSubpassInputMS<T>
 
 ///
 /// Shader Execution Reordering (SER)
-/// 
-/// NOTE! This API is currently experimental and may change in the future as SER is made available 
+///
+/// NOTE! This API is currently experimental and may change in the future as SER is made available
 /// in different APIs and downstream compilers.
 ///
 /// Based on the NVAPI on D3D12 only currently.
 ///
 /// White paper on SER on NVAPI https://developer.nvidia.com/sites/default/files/akamai/gameworks/ser-whitepaper.pdf
-/// 
+///
 /// The NVAPI headers (R520) required for this functionality to work can be found here...
-/// 
+///
 /// https://developer.nvidia.com/rtx/path-tracing/nvapi/get-started
 ///
 
@@ -5451,25 +5568,25 @@ struct HitObject
         /// Executes ray traversal (including anyhit and intersection shaders) like TraceRay, but returns the
         /// resulting hit information as a HitObject and does not trigger closesthit or miss shaders.
     __specialized_for_target(hlsl)
-    static HitObject TraceRay<payload_t>( 
-        RaytracingAccelerationStructure AccelerationStructure, 
-        uint RayFlags, 
-        uint InstanceInclusionMask, 
-        uint RayContributionToHitGroupIndex, 
-        uint MultiplierForGeometryContributionToHitGroupIndex, 
-        uint MissShaderIndex, 
-        RayDesc Ray, 
+    static HitObject TraceRay<payload_t>(
+        RaytracingAccelerationStructure AccelerationStructure,
+        uint RayFlags,
+        uint InstanceInclusionMask,
+        uint RayContributionToHitGroupIndex,
+        uint MultiplierForGeometryContributionToHitGroupIndex,
+        uint MissShaderIndex,
+        RayDesc Ray,
         inout payload_t Payload)
         {
             HitObject hitObj;
             __traceRay(
-                AccelerationStructure, 
-                RayFlags, 
-                InstanceInclusionMask, 
-                RayContributionToHitGroupIndex, 
-                MultiplierForGeometryContributionToHitGroupIndex, 
-                MissShaderIndex, 
-                Ray, 
+                AccelerationStructure,
+                RayFlags,
+                InstanceInclusionMask,
+                RayContributionToHitGroupIndex,
+                MultiplierForGeometryContributionToHitGroupIndex,
+                MissShaderIndex,
+                Ray,
                 Payload,
                 hitObj);
             return hitObj;
@@ -5482,28 +5599,28 @@ struct HitObject
         /// Attributes parameter must either be an attribute struct, such as
         /// BuiltInTriangleIntersectionAttributes, or another HitObject to copy the attributes from.
     __specialized_for_target(hlsl)
-    static HitObject MakeHit<attr_t>( 
-        RaytracingAccelerationStructure AccelerationStructure, 
-        uint InstanceIndex, 
-        uint GeometryIndex, 
-        uint PrimitiveIndex, 
-        uint HitKind, 
-        uint RayContributionToHitGroupIndex, 
-        uint MultiplierForGeometryContributionToHitGroupIndex, 
-        RayDesc Ray, 
+    static HitObject MakeHit<attr_t>(
+        RaytracingAccelerationStructure AccelerationStructure,
+        uint InstanceIndex,
+        uint GeometryIndex,
+        uint PrimitiveIndex,
+        uint HitKind,
+        uint RayContributionToHitGroupIndex,
+        uint MultiplierForGeometryContributionToHitGroupIndex,
+        RayDesc Ray,
         attr_t attributes)
     {
         HitObject hitObj;
         __makeHit(
-            AccelerationStructure, 
+            AccelerationStructure,
             InstanceIndex,
-            GeometryIndex, 
-            PrimitiveIndex, 
-            HitKind, 
-            RayContributionToHitGroupIndex, 
-            MultiplierForGeometryContributionToHitGroupIndex, 
+            GeometryIndex,
+            PrimitiveIndex,
+            HitKind,
+            RayContributionToHitGroupIndex,
+            MultiplierForGeometryContributionToHitGroupIndex,
             Ray,
-            attributes, 
+            attributes,
             hitObj);
         return hitObj;
     }
@@ -5516,26 +5633,26 @@ struct HitObject
         /// attribute struct, such as BuiltInTriangleIntersectionAttributes, or another HitObject to copy the
         /// attributes from.
     __specialized_for_target(hlsl)
-    static HitObject MakeHit<attr_t>( 
-        uint HitGroupRecordIndex, 
-        RaytracingAccelerationStructure AccelerationStructure, 
-        uint InstanceIndex, 
-        uint GeometryIndex, 
-        uint PrimitiveIndex, 
-        uint HitKind, 
-        RayDesc Ray, 
+    static HitObject MakeHit<attr_t>(
+        uint HitGroupRecordIndex,
+        RaytracingAccelerationStructure AccelerationStructure,
+        uint InstanceIndex,
+        uint GeometryIndex,
+        uint PrimitiveIndex,
+        uint HitKind,
+        RayDesc Ray,
         attr_t attributes)
     {
         HitObject hitObj;
         __makeHitWithRecordIndex(
-            HitGroupRecordIndex, 
-            AccelerationStructure, 
+            HitGroupRecordIndex,
+            AccelerationStructure,
             InstanceIndex,
-            GeometryIndex, 
-            PrimitiveIndex, 
-            HitKind, 
-            Ray, 
-            attributes, 
+            GeometryIndex,
+            PrimitiveIndex,
+            HitKind,
+            Ray,
+            attributes,
             hitObj);
         return hitObj;
     }
@@ -5545,8 +5662,8 @@ struct HitObject
         /// table.
     __target_intrinsic(hlsl, "NvMakeMiss")
     [__requiresNVAPI]
-    static HitObject MakeMiss( 
-        uint MissShaderIndex, 
+    static HitObject MakeMiss(
+        uint MissShaderIndex,
         RayDesc Ray);
 
         /// Creates a HitObject representing “NOP” (no operation) which is neither a hit nor a miss. Invoking a
@@ -5564,7 +5681,7 @@ struct HitObject
     [__requiresNVAPI]
     static void Invoke<payload_t>(
         RaytracingAccelerationStructure AccelerationStructure,
-        HitObject HitOrMiss, 
+        HitObject HitOrMiss,
         inout payload_t Payload);
 
         /// Returns true if the HitObject encodes a miss, otherwise returns false.
@@ -5628,13 +5745,13 @@ struct HitObject
 
         /// Loads a root constant from the local root table referenced by the hit object. Valid if the hit object
         /// represents a hit or a miss. RootConstantOffsetInBytes must be a multiple of 4.
-    __target_intrinsic(hlsl)    
+    __target_intrinsic(hlsl)
     [__requiresNVAPI]
     uint LoadLocalRootTableConstant(uint RootConstantOffsetInBytes);
 
-    /// 
+    ///
     /// !!!! Internal impl. Do not use!
-    /// 
+    ///
 
     __target_intrinsic(hlsl, "NvGetAttributesFromHitObject($0, $1)")
     [__requiresNVAPI]
@@ -5642,43 +5759,43 @@ struct HitObject
 
     __target_intrinsic(hlsl, "NvMakeHitWithRecordIndex")
     [__requiresNVAPI]
-    static void __makeHitWithRecordIndex<attr_t>(uint HitGroupRecordIndex, 
-        RaytracingAccelerationStructure AccelerationStructure, 
-        uint InstanceIndex, 
-        uint GeometryIndex, 
-        uint PrimitiveIndex, 
-        uint HitKind, 
-        RayDesc Ray, 
-        attr_t attributes, 
+    static void __makeHitWithRecordIndex<attr_t>(uint HitGroupRecordIndex,
+        RaytracingAccelerationStructure AccelerationStructure,
+        uint InstanceIndex,
+        uint GeometryIndex,
+        uint PrimitiveIndex,
+        uint HitKind,
+        RayDesc Ray,
+        attr_t attributes,
         out HitObject hitObj);
 
     __target_intrinsic(hlsl, "NvMakeHit")
     [__requiresNVAPI]
-    static void __makeHit<attr_t>(RaytracingAccelerationStructure AccelerationStructure, 
-        uint InstanceIndex, 
-        uint GeometryIndex, 
-        uint PrimitiveIndex, 
-        uint HitKind, 
-        uint RayContributionToHitGroupIndex, 
-        uint MultiplierForGeometryContributionToHitGroupIndex, 
-        RayDesc Ray, 
-        attr_t attributes, 
+    static void __makeHit<attr_t>(RaytracingAccelerationStructure AccelerationStructure,
+        uint InstanceIndex,
+        uint GeometryIndex,
+        uint PrimitiveIndex,
+        uint HitKind,
+        uint RayContributionToHitGroupIndex,
+        uint MultiplierForGeometryContributionToHitGroupIndex,
+        RayDesc Ray,
+        attr_t attributes,
         out HitObject hitObj);
 
     __target_intrinsic(hlsl, "NvTraceRayHitObject")
     [__requiresNVAPI]
-    static void __traceRay<payload_t>( 
-        RaytracingAccelerationStructure AccelerationStructure, 
-        uint RayFlags, 
-        uint InstanceInclusionMask, 
-        uint RayContributionToHitGroupIndex, 
-        uint MultiplierForGeometryContributionToHitGroupIndex, 
-        uint MissShaderIndex, 
-        RayDesc Ray, 
+    static void __traceRay<payload_t>(
+        RaytracingAccelerationStructure AccelerationStructure,
+        uint RayFlags,
+        uint InstanceInclusionMask,
+        uint RayContributionToHitGroupIndex,
+        uint MultiplierForGeometryContributionToHitGroupIndex,
+        uint MissShaderIndex,
+        RayDesc Ray,
         inout payload_t Payload,
         out HitObject hitObj);
 };
-    
+
     /// Reorders threads based on a coherence hint value. NumCoherenceHintBits indicates how many of
     /// the least significant bits of CoherenceHint should be considered during reordering (max: 16).
     /// Applications should set this to the lowest value required to represent all possible values in
@@ -5696,11 +5813,11 @@ void ReorderThread( uint CoherenceHint, uint NumCoherenceHintBitsFromLSB );
     /// NumCoherenceHitBits to zero.
     /// Reordering will consider information in the HitObject and coherence hint with the following
     /// priority:
-    /// 
+    ///
     /// 1. Shader ID stored in the HitObject
     /// 2. Coherence hint, with the most significant hint bit having highest priority
     /// 3. Spatial information stored in the HitObject
-    /// 
+    ///
     /// That is, ReorderThread will first attempt to group threads whose HitObject references the
     /// same shader ID. (Miss shaders and NOP HitObjects are grouped separately). Within each of these
     /// groups, it will attempt to order threads by the value of their coherence hints. And within ranges
@@ -5709,7 +5826,7 @@ __target_intrinsic(hlsl, "NvReorderThread")
 [__requiresNVAPI]
 void ReorderThread( HitObject HitOrMiss, uint CoherenceHint, uint NumCoherenceHintBitsFromLSB );
 
-    /// Is equivalent to 
+    /// Is equivalent to
     /// ```
     /// void ReorderThread( HitObject HitOrMiss, uint CoherenceHint, uint NumCoherenceHintBitsFromLSB );
     /// ```
