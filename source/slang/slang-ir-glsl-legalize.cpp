@@ -1818,75 +1818,73 @@ void legalizeMeshOutputParam(
             {
                 IRBuilderInsertLocScope locScope{builder};
                 builder->setInsertBefore(s);
-                instMatch_(s,
-                    [&](IRFieldAddress* m)
-                    {
-                        auto key = as<IRStructKey>(m->getField());
-                        SLANG_ASSERT("Result of getField wasn't a struct key");
+                if(auto m = as<IRFieldAddress>(s))
+                {
+                    auto key = as<IRStructKey>(m->getField());
+                    SLANG_ASSERT("Result of getField wasn't a struct key");
 
-                        auto d_ = extractField(builder, d, ~0, key);
-                        assignUses(d_, m);
-                    },
-                    [&](IRGetElementPtr* g)
-                    {
-                        // Writing to something like `struct Vertex{ Foo foo[10]; }`
-                        // This case is also what's taken in the initial
-                        // traversal, as every mesh output is an array.
-                        auto elemType = composeGetters<IRType>(
-                            g,
-                            &IRInst::getFullType,
-                            &IRPtrTypeBase::getValueType);
-                        auto d_ = getSubscriptVal(builder, elemType, d, g->getIndex());
-                        assignUses(d_, g);
-                    },
-                    [&](IRStore* s)
-                    {
-                        // Store using the SOA representation
+                    auto d_ = extractField(builder, d, ~0, key);
+                    assignUses(d_, m);
+                }
+                else if(auto g = as<IRGetElementPtr>(s))
+                {
+                    // Writing to something like `struct Vertex{ Foo foo[10]; }`
+                    // This case is also what's taken in the initial
+                    // traversal, as every mesh output is an array.
+                    auto elemType = composeGetters<IRType>(
+                        g,
+                        &IRInst::getFullType,
+                        &IRPtrTypeBase::getValueType);
+                    auto d_ = getSubscriptVal(builder, elemType, d, g->getIndex());
+                    assignUses(d_, g);
+                }
+                else if(auto store = as<IRStore>(s))
+                {
+                    // Store using the SOA representation
 
-                        assign(
-                            builder,
-                            d,
-                            ScalarizedVal::value(s->getVal()));
+                    assign(
+                        builder,
+                        d,
+                        ScalarizedVal::value(store->getVal()));
 
-                        // Stores aren't used, safe to remove here without checking
-                        s->removeAndDeallocate();
-                    },
-                    [&](IRCall* c)
+                    // Stores aren't used, safe to remove here without checking
+                    store->removeAndDeallocate();
+                }
+                else if(auto c = as<IRCall>(s))
+                {
+                    // Translate
+                    //   foo(vertices[n])
+                    // to
+                    //   tmp
+                    //   foo(tmp)
+                    //   vertices[n] = tmp;
+                    //
+                    // This has copy-out semantics, which is really the
+                    // best we can hope for without going and
+                    // specializing foo.
+                    auto ptr = as<IRPtrTypeBase>(a->getFullType());
+                    SLANG_ASSERT(ptr && "Mesh output parameter was passed by value");
+                    auto t = ptr->getValueType();
+                    auto tmp = builder->emitVar(t);
+                    for(UInt i = 0; i < c->getOperandCount(); i++)
                     {
-                        // Translate
-                        //   foo(vertices[n])
-                        // to
-                        //   tmp
-                        //   foo(tmp)
-                        //   vertices[n] = tmp;
-                        //
-                        // This has copy-out semantics, which is really the
-                        // best we can hope for without going and
-                        // specializing foo.
-                        auto ptr = as<IRPtrTypeBase>(a->getFullType());
-                        SLANG_ASSERT(ptr && "Mesh output parameter was passed by value");
-                        auto t = ptr->getValueType();
-                        auto tmp = builder->emitVar(t);
-                        for(UInt i = 0; i < c->getOperandCount(); i++)
+                        if(c->getOperand(i) == a)
                         {
-                            if(c->getOperand(i) == a)
-                            {
-                                c->setOperand(i, tmp);
-                            }
+                            c->setOperand(i, tmp);
                         }
-                        builder->setInsertAfter(c);
-                        assign(builder, d,
-                                ScalarizedVal::value(builder->emitLoad(tmp)));
-                    },
-                    [](IRSwizzledStore* s)
-                    {
-                        SLANG_UNEXPECTED("Swizzled store to a non-address ScalarizedVal");
-                    },
-                    [](IRInst* s)
-                    {
-                        SLANG_UNEXPECTED("Unhandled use of mesh output parameter during GLSL legalization");
                     }
-                );
+                    builder->setInsertAfter(c);
+                    assign(builder, d,
+                            ScalarizedVal::value(builder->emitLoad(tmp)));
+                }
+                else if(auto swiz = as<IRSwizzledStore>(s))
+                {
+                    SLANG_UNEXPECTED("Swizzled store to a non-address ScalarizedVal");
+                }
+                else
+                {
+                    SLANG_UNEXPECTED("Unhandled use of mesh output parameter during GLSL legalization");
+                }
             });
         };
         assignUses(globalOutputVal, l);

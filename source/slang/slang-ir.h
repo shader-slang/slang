@@ -1946,15 +1946,16 @@ namespace detail
 // Use std::function to allow passing in anything from which std::function can
 // be deduced (pointers, lambdas, functors):
 // https://en.cppreference.com/w/cpp/utility/functional/function/deduction_guides
-// GetPtrArg<T> matches T against R(A*) and returns A
+// argType<T> matches T against R(A*) and returns A
 template<typename R, typename A>
-static A returnArg(std::function<R(A*)>);
+static A argType(std::function<R(A*)>);
 
 // Get the class type from a pointer to member function
 template<typename R, typename T>
 static T thisArg(R (T::*&&())());
 }
 
+#if __cplusplus >= 201703L
 // A tool to "pattern match" an instruction against multiple cases
 // Use like:
 //
@@ -1970,8 +1971,9 @@ static T thisArg(R (T::*&&())());
 template<typename R, typename F, typename... Fs>
 R instMatch(IRInst* i, R def, F f, Fs... fs)
 {
+    static_assert(__cplusplus >= 201703L, "Wait until we're on c++17 to use instMatch");
     // Recursive case
-    using P = decltype(detail::returnArg(std::function{std::declval<F>()}));
+    using P = decltype(detail::argType(std::function{std::declval<F>()}));
     if(auto s = as<P>(i))
     {
         return f(s);
@@ -2001,8 +2003,9 @@ R instMatch(IRInst* i, R def)
 template<typename F, typename... Fs>
 void instMatch_(IRInst* i, F f, Fs... fs)
 {
+    static_assert(__cplusplus >= 201703L, "Wait until we're on c++17 to use instMatch_");
     // Recursive case
-    using P = decltype(detail::returnArg(std::function{std::declval<F>()}));
+    using P = decltype(detail::argType(std::function{std::declval<F>()}));
     if(auto s = as<P>(i))
     {
         return f(s);
@@ -2015,6 +2018,7 @@ void instMatch_(IRInst* i)
 {
     // Base case with no eliminators
 }
+#endif
 
 // A tool to compose a bunch of downcasts and accessors
 // `composeGetters<R>(x, &MyStruct::getFoo, &MyOtherStruct::getBar)` translates to
@@ -2025,7 +2029,9 @@ R* composeGetters(T* t, F f, Fs... fs)
     using D = decltype(detail::thisArg(std::declval<F>));
     if(D* d = as<D>(t))
     {
-        auto* n = std::invoke(f, d);
+        // TODO: When we're on c++17, use std::invoke
+        // auto* n = std::invoke(f, d);
+        auto* n = (d->*f)();
         return composeGetters<R>(n, fs...);
     }
     return nullptr;
