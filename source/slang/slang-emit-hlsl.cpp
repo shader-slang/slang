@@ -1126,11 +1126,13 @@ void HLSLSourceEmitter::emitMeshOutputModifiersImpl(IRInst* varInst)
 {
     if(auto modifier = varInst->findDecoration<IRMeshOutputDecoration>())
     {
-        m_writer->emit(
-              as<IRVerticesDecoration>(modifier) ? "vertices "
-            : as<IRIndicesDecoration>(modifier) ? "indices "
+        const char* s =
+              as<IRVerticesDecoration>(modifier)   ? "vertices "
+            : as<IRIndicesDecoration>(modifier)    ? "indices "
             : as<IRPrimitivesDecoration>(modifier) ? "primitives "
-            : (SLANG_UNEXPECTED("Unhandled type of mesh output decoration"), ""));
+            : nullptr;
+        SLANG_EXPECT(s, "Unhandled type of mesh output decoration");
+        m_writer->emit(s);
     }
 }
 

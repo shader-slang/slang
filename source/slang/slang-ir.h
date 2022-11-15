@@ -1930,7 +1930,7 @@ static void traverseUses(IRInst* inst, F f)
 {
     auto n = inst->firstUse;
     IRUse* u;
-    while((u = n))
+    while((u = n) != nullptr)
     {
         n = u->nextUse;
         if(auto s = as<I>(u->getUser()))
