@@ -151,6 +151,7 @@ For completeness, here are the options that `slangc` currently accepts:
 
 * -Xname to specify arguments to downstream tool `name` (covered in more detail in "Downstream Arguments")
 
+<a id="downstream-arguments"></a>
 ### Downstream Arguments
 
 During a Slang compilation work may be performed by multiple other stages including downstream compilers and linkers. It isn't possible in general or perhaps even desirable to provide Slang command line equivalents of every option available at every stage of compilation. It is useful to be able to set options specific to a particular compilation stage - to alter code generation, linkage and other options.
@@ -232,6 +233,16 @@ Means that the dxc compilation in the render test (assuming dxc is invoked) will
 
 ```
 -Gfa
+```
+
+Some options are made available via the same mechanism for all downstream compilers. 
+
+* Use `-I` to specify include path for downstream compilers
+
+For example to specify an include path "somePath" to DXC you can use...
+
+```
+-Xdxc -IsomePath
 ```
 
 ### Specifying where dlls/shared libraries are loaded from
