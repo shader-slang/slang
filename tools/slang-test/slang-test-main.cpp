@@ -3687,13 +3687,14 @@ static bool _canIgnore(TestContext* context, const TestDetails& details)
         return true;
     }
 
-    // Work out what render api flags are actually available, lazily
-    const RenderApiFlags availableRenderApiFlags = requirements.usedRenderApiFlags ? _getAvailableRenderApiFlags(context) : 0;
-
+    // If there are no render API requirements, then we don't need to ignore.
     if (requirements.usedRenderApiFlags == 0)
     {
         return false;
     }
+
+    // Work out what render api flags are actually available, lazily
+    const RenderApiFlags availableRenderApiFlags = requirements.usedRenderApiFlags ? _getAvailableRenderApiFlags(context) : 0;
 
     // Are all the required rendering apis available?
     if ((requirements.usedRenderApiFlags & availableRenderApiFlags) != requirements.usedRenderApiFlags)
