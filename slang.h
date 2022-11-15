@@ -380,7 +380,7 @@ convention for interface methods.
 #endif // __cplusplus
 
 #ifndef SLANG_RETURN_NEVER
-#   define SLANG_RETURN_NEVER /* empty */
+#   define SLANG_RETURN_NEVER [[noreturn]]
 #endif // SLANG_RETURN_NEVER
 
 /* Macros for detecting processor */
