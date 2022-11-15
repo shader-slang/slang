@@ -365,6 +365,7 @@ IF EXIST ..\..\..\external\slang-glslang\bin\windows-aarch64\release\slang-glsla
     <ClInclude Include="..\..\..\source\slang\slang-ir-insts.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-layout.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-legalize-array-return-type.h" />
+    <ClInclude Include="..\..\..\source\slang\slang-ir-legalize-mesh-outputs.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-legalize-varying-params.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-link.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-liveness.h" />
@@ -533,6 +534,7 @@ IF EXIST ..\..\..\external\slang-glslang\bin\windows-aarch64\release\slang-glsla
     <ClCompile Include="..\..\..\source\slang\slang-ir-inline.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-layout.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-legalize-array-return-type.cpp" />
+    <ClCompile Include="..\..\..\source\slang\slang-ir-legalize-mesh-outputs.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-legalize-types.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-legalize-varying-params.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-link.cpp" />
