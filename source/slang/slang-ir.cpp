@@ -3110,6 +3110,17 @@ namespace Slang
         return inst;
     }
 
+    IRInst* IRBuilder::emitBackwardDifferentiateInst(IRType* type, IRInst* baseFn)
+    {
+        auto inst = createInst<IRBackwardDifferentiate>(
+            this,
+            kIROp_BackwardDifferentiate,
+            type,
+            baseFn);
+        addInst(inst);
+        return inst;
+    }
+
     IRInst* IRBuilder::emitMakeDifferentialPair(IRType* type, IRInst* primal, IRInst* differential)
     {
         IRInst* args[] = {primal, differential};
@@ -4551,6 +4562,17 @@ namespace Slang
         auto inst = createInst<IRInst>(
             this,
             kIROp_BitNot,
+            type,
+            value);
+        addInst(inst);
+        return inst;
+    }
+
+    IRInst* IRBuilder::emitNeg(IRType* type, IRInst* value)
+    {
+        auto inst = createInst<IRInst>(
+            this,
+            kIROp_Neg,
             type,
             value);
         addInst(inst);

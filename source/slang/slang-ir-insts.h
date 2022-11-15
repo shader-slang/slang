@@ -571,6 +571,16 @@ struct IRForwardDerivativeDecoration : IRDecoration
     IRInst* getForwardDerivativeFunc() { return getOperand(0); }
 };
 
+struct IRBackwardDifferentiableDecoration : IRDecoration
+{
+    enum
+    {
+        kOp = kIROp_BackwardDifferentiableDecoration
+    };
+    IR_LEAF_ISA(BackwardDifferentiableDecoration)
+};
+
+
 struct IRDerivativeMemberDecoration : IRDecoration
 {
     enum
@@ -595,6 +605,21 @@ struct IRForwardDifferentiate : IRInst
     IRInst* getBaseFn() { return getOperand(0); }
 
     IR_LEAF_ISA(ForwardDifferentiate)
+};
+
+// An instruction that replaces the function symbol
+// with it's derivative function.
+struct IRBackwardDifferentiate : IRInst
+{
+    enum
+    {
+        kOp = kIROp_BackwardDifferentiate
+    };
+    // The base function for the call.
+    IRUse base;
+    IRInst* getBaseFn() { return getOperand(0); }
+
+    IR_LEAF_ISA(BackwardDifferentiate)
 };
 
 // Dictionary item mapping a type with a corresponding 
@@ -2502,6 +2527,7 @@ public:
         IRInst* existentialValue);
 
     IRInst* emitForwardDifferentiateInst(IRType* type, IRInst* baseFn);
+    IRInst* emitBackwardDifferentiateInst(IRType* type, IRInst* baseFn);
 
     IRInst* emitMakeDifferentialPair(IRType* type, IRInst* primal, IRInst* differential);
 
@@ -3004,6 +3030,7 @@ public:
     IRInst* emitBitAnd(IRType* type, IRInst* left, IRInst* right);
     IRInst* emitBitOr(IRType* type, IRInst* left, IRInst* right);
     IRInst* emitBitNot(IRType* type, IRInst* value);
+    IRInst* emitNeg(IRType* type, IRInst* value);
 
     IRInst* emitAdd(IRType* type, IRInst* left, IRInst* right);
     IRInst* emitSub(IRType* type, IRInst* left, IRInst* right);
@@ -3212,9 +3239,19 @@ public:
         addDecoration(value, kIROp_ForwardDifferentiableDecoration);
     }
 
+    void addBackwardDifferentiableDecoration(IRInst* value)
+    {
+        addDecoration(value, kIROp_BackwardDifferentiableDecoration);
+    }
+
     void addForwardDerivativeDecoration(IRInst* value, IRInst* fwdFunc)
     {
         addDecoration(value, kIROp_ForwardDerivativeDecoration, fwdFunc);
+    }
+
+    void addBackwardDerivativeDecoration(IRInst* value, IRInst* jvpFn)
+    {
+        addDecoration(value, kIROp_BackwardDerivativeDecoration, jvpFn);
     }
 
     void addCOMWitnessDecoration(IRInst* value, IRInst* witnessTable)

@@ -714,6 +714,7 @@ namespace Slang
 
         // Convert a function's original type to it's JVP type.
         Type* processJVPFuncType(FuncType* originalType);
+        Type* processBackwardDiffFuncType(FuncType* originalType);
 
         /// Registers a type as conforming to IDifferentiable, along with a witness 
         /// describing the relationship.
@@ -1908,6 +1909,7 @@ namespace Slang
         Expr* visitModifiedTypeExpr(ModifiedTypeExpr* expr);
 
         Expr* visitForwardDifferentiateExpr(ForwardDifferentiateExpr* expr);
+        Expr* visitBackwardDifferentiateExpr(BackwardDifferentiateExpr* expr);
 
         Expr* visitGetArrayLengthExpr(GetArrayLengthExpr* expr);
 
