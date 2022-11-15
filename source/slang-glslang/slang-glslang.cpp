@@ -532,6 +532,8 @@ static int glslang_compileGLSLToSPIRV(const glslang_CompileRequest_1_1& request)
     CASE(MISS,              MissNV);
     CASE(CALLABLE,          CallableNV);
 
+    CASE(MESH,          Mesh);
+    CASE(AMPLIFICATION, Task);
 #undef CASE
 
     default:
