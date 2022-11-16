@@ -4675,7 +4675,10 @@ namespace Slang
     void SemanticsDeclBodyVisitor::visitFunctionDeclBase(FunctionDeclBase* decl)
     {
         auto newContext = withParentFunc(decl);
-        _maybeRegisterDifferentialBottomTypeConformance(newContext);
+        if (auto diffAttr = decl->findModifier<DifferentiableAttribute>())
+        {
+            diffAttr->m_mapTypeToIDifferentiableWitness.Clear();
+        }
 
         // Run checking on attributes that can't be fully checked in header checking stage.
         checkDerivativeOfAttribute(decl);

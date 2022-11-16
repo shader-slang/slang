@@ -157,7 +157,7 @@ bool ThisTypeSubstitution::_equalsOverride(Substitutions* subst)
 
 HashCode ThisTypeSubstitution::_getHashCodeOverride() const
 {
-    return witness->getHashCode();
+    return witness->sub->getHashCode();
 }
 
 } // namespace Slang

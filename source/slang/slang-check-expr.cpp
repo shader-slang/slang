@@ -960,23 +960,6 @@ namespace Slang
     Expr* SemanticsVisitor::CheckTerm(Expr* term)
     {
         auto checkedTerm = _CheckTerm(term);
-
-        // Differentiable type checking.
-        // TODO: This can be super slow.
-        if (this->m_parentFunc && 
-            this->m_parentFunc->findModifier<ForwardDifferentiableAttribute>())
-        {
-            maybeRegisterDifferentiableType(getASTBuilder(), checkedTerm->type.type);
-        }
-
-        // Differentiable type checking.
-        // TODO: This can be super slow.
-        if (this->m_parentFunc &&
-            this->m_parentFunc->findModifier<BackwardDifferentiableAttribute>())
-        {
-            maybeRegisterDifferentiableType(getASTBuilder(), checkedTerm->type.type);
-        }
-
         return checkedTerm;
     }
 

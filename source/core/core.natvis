@@ -100,7 +100,17 @@
             </LinkedListItems>
         </Expand>
     </Type>
-    
+    <Type Name="Slang::OrderedDictionary&lt;*,*&gt;">
+        <DisplayString>{{ size={_count} }}</DisplayString>
+        <Expand>
+            <LinkedListItems>
+                <Size>_count</Size>
+                <HeadPointer>kvPairs.head</HeadPointer>
+                <NextPointer>next</NextPointer>
+                <ValueNode>Value</ValueNode>
+            </LinkedListItems>
+        </Expand>
+    </Type>
 <Type Name="Slang::RefPtr&lt;*&gt;">
     <SmartPointer Usage="Minimal">pointer</SmartPointer>
     <DisplayString Condition="pointer == 0">empty</DisplayString>
