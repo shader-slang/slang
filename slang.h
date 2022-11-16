@@ -1868,6 +1868,7 @@ extern "C"
         SLANG_TYPE_KIND_GENERIC_TYPE_PARAMETER,
         SLANG_TYPE_KIND_INTERFACE,
         SLANG_TYPE_KIND_OUTPUT_STREAM,
+        SLANG_TYPE_KIND_MESH_OUTPUT,
         SLANG_TYPE_KIND_SPECIALIZED,
         SLANG_TYPE_KIND_FEEDBACK,
         SLANG_TYPE_KIND_COUNT,
@@ -1958,6 +1959,9 @@ extern "C"
 
         // HLSL register `space`, Vulkan GLSL `set`
         SLANG_PARAMETER_CATEGORY_REGISTER_SPACE,
+
+        // TODO: Ellie, Both APIs treat mesh outputs as more or less varying output,
+        // Does it deserve to be represented here??
 
         // A parameter whose type is to be specialized by a global generic type argument
         SLANG_PARAMETER_CATEGORY_GENERIC,

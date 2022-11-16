@@ -17,6 +17,48 @@
 namespace Slang
 {
 
+class LocationTracker
+{
+public:
+    enum class Kind
+    {
+        Invalid = -1,
+        RayPayload,                 ///< GLSL rayPayload
+        CallablePayload,            ///< GLSL callableData
+        HitObjectAttribute,         ///< GLSL hitObjectAttribute
+        CountOf,
+    };
+
+        /// Given a decoration returns the Kind, or Kind::Invalid if that is not appropriate
+    static Kind getKindFromDecoration(IRDecoration* decoration);
+
+        /// Get the location value associated with inst (and decoration).
+        /// Will return -1, if no location is associated
+    Index getValue(IRInst* inst, IRDecoration* decoration);
+
+        /// Get the location value associated with inst (and decoration).
+        /// The kind must match that for the decoration.
+        /// Will return -1, if no location is associated
+    Index getValue(Kind kind, IRInst* inst, IRDecoration* decoration);
+
+protected:
+    struct Location
+    {
+        typedef Location ThisType;
+
+        bool operator==(const ThisType& rhs) const { return kind == rhs.kind && value == rhs.value; }
+        bool operator!=(const ThisType& rhs) const { return !(*this == rhs); }
+
+        Kind kind;          ///< The kind of location
+        Index value;          ///< The value of the location. Must be >= 0
+    };
+
+    Index m_nextValueForKind[Count(Kind::CountOf)] = { 0, };
+
+    Dictionary<IRInst*, Location> m_mapIRToLocations;
+};
+
+
 class CLikeSourceEmitter: public SourceEmitterBase
 {
 public:
@@ -201,6 +243,8 @@ public:
         {}
     };
 
+    
+
         /// Must be called before used
     virtual SlangResult init();
 
@@ -232,6 +276,8 @@ public:
     Linkage* getLinkage() { return m_codeGenContext->getLinkage(); }
     ComponentType* getProgram() { return m_codeGenContext->getProgram(); }
     TargetProgram* getTargetProgram() { return m_codeGenContext->getTargetProgram(); }
+
+    LocationTracker& getLocationTracker() { return m_locationTracker; }
 
     //
     // Types
@@ -355,18 +401,18 @@ public:
     void emitFuncDecorations(IRFunc* func) { emitFuncDecorationsImpl(func); }
 
     void emitStruct(IRStructType* structType);
+    // This is used independently of `emitStruct` by some GLSL parameter group
+    // output functionality
+    void emitStructDeclarationsBlock(IRStructType* structType);
     void emitClass(IRClassType* structType);
-
-
 
         /// Emit type attributes that should appear after, e.g., a `struct` keyword
     void emitPostKeywordTypeAttributes(IRInst* inst) { emitPostKeywordTypeAttributesImpl(inst); }
 
     void emitInterpolationModifiers(IRInst* varInst, IRType* valueType, IRVarLayout* layout);
+    void emitMeshOutputModifiers(IRInst* varInst);
 
-    UInt getRayPayloadLocation(IRInst* inst);
-
-    UInt getCallablePayloadLocation(IRInst* inst);
+    
 
         /// Emit modifiers that should apply even for a declaration of an SSA temporary.
     virtual void emitTempModifiers(IRInst* temp);
@@ -450,6 +496,7 @@ public:
     virtual void emitSimpleFuncParamImpl(IRParam* param);
     virtual void emitSimpleFuncParamsImpl(IRFunc* func);
     virtual void emitInterpolationModifiersImpl(IRInst* varInst, IRType* valueType, IRVarLayout* layout) { SLANG_UNUSED(varInst); SLANG_UNUSED(valueType); SLANG_UNUSED(layout); }
+    virtual void emitMeshOutputModifiersImpl(IRInst* varInst) { SLANG_UNUSED(varInst) }
     virtual void emitSimpleTypeImpl(IRType* type) = 0;
     virtual void emitVarDecorationsImpl(IRInst* varDecl) { SLANG_UNUSED(varDecl);  }
     virtual void emitMatrixLayoutModifiersImpl(IRVarLayout* layout) { SLANG_UNUSED(layout);  }
@@ -540,8 +587,9 @@ public:
     // to use for it when emitting code.
     Dictionary<IRInst*, String> m_mapInstToName;
 
-    Dictionary<IRInst*, UInt> m_mapIRValueToRayPayloadLocation;
-    Dictionary<IRInst*, UInt> m_mapIRValueToCallablePayloadLocation;
+    // Maps instructions to locations. Used for GLSL output for locations, but could potentially
+    // be used for other kinds of location.
+    LocationTracker m_locationTracker;
 };
 
 }

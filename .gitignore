@@ -12,6 +12,7 @@
 *.zip
 *.ini
 .clang-format
+.gdb_history
 
 bin/
 intermediate/

@@ -6627,6 +6627,11 @@ namespace Slang
         _makeParseModifier("lineadj",       HLSLLineAdjModifier::kReflectClassInfo),
         _makeParseModifier("triangleadj",   HLSLTriangleAdjModifier::kReflectClassInfo),
 
+        // Modifiers for mesh shader parameters
+        _makeParseModifier("vertices",      HLSLVerticesModifier::kReflectClassInfo),
+        _makeParseModifier("indices",       HLSLIndicesModifier::kReflectClassInfo),
+        _makeParseModifier("primitives",    HLSLPrimitivesModifier::kReflectClassInfo),
+
         // Modifiers for unary operator declarations
         _makeParseModifier("__prefix",      PrefixModifier::kReflectClassInfo),
         _makeParseModifier("__postfix",     PostfixModifier::kReflectClassInfo),

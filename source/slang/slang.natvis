@@ -420,6 +420,10 @@
             <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::HLSLPointStreamType">(Slang::HLSLPointStreamType*)&amp;astNodeType</ExpandedItem>
             <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::HLSLLineStreamType">(Slang::HLSLLineStreamType*)&amp;astNodeType</ExpandedItem>
             <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::HLSLTriangleStreamType">(Slang::HLSLTriangleStreamType*)&amp;astNodeType</ExpandedItem>
+            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::MeshOutputType">(Slang::HLSLMeshOutputType*)&amp;astNodeType</ExpandedItem>
+            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::VerticesType">(Slang::VerticesType*)&amp;astNodeType</ExpandedItem>
+            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::IndicesType">(Slang::IndicesType*)&amp;astNodeType</ExpandedItem>
+            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::PrimitivesType">(Slang::PrimitivesType*)&amp;astNodeType</ExpandedItem>
             <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::UntypedBufferResourceType">(Slang::UntypedBufferResourceType*)&amp;astNodeType</ExpandedItem>
             <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::HLSLByteAddressBufferType">(Slang::HLSLByteAddressBufferType*)&amp;astNodeType</ExpandedItem>
             <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::HLSLRWByteAddressBufferType">(Slang::HLSLRWByteAddressBufferType*)&amp;astNodeType</ExpandedItem>

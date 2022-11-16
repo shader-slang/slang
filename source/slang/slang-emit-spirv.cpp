@@ -2894,7 +2894,7 @@ SlangResult emitSPIRVFromIR(
     auto sink = codeGenContext->getSink();
 
     SPIRVEmitContext context(irModule, targetRequest, sink);
-    legalizeIRForSPIRV(&context, irModule, irEntryPoints, sink);
+    legalizeIRForSPIRV(&context, irModule, irEntryPoints, codeGenContext);
 
     context.emitFrontMatter();
     for (auto irEntryPoint : irEntryPoints)

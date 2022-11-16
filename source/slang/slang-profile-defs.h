@@ -184,6 +184,14 @@ PROFILE(DX_Vertex_6_1,			    vs_6_1,				Vertex,	DX_6_1)
 PROFILE(DX_Vertex_6_2,			    vs_6_2,				Vertex,	DX_6_2)
 PROFILE(DX_Vertex_6_3,			    vs_6_3,				Vertex,	DX_6_3)
 
+PROFILE(DX_Mesh_6_5, ms_6_5,	Mesh,	DX_6_5)
+PROFILE(DX_Mesh_6_6, ms_6_6,	Mesh,	DX_6_6)
+PROFILE(DX_Mesh_6_7, ms_6_7,	Mesh,	DX_6_7)
+
+PROFILE(DX_Amplification_6_5,	as_6_5,	Amplification,	DX_6_5)
+PROFILE(DX_Amplification_6_6,	as_6_6,	Amplification,	DX_6_6)
+PROFILE(DX_Amplification_6_7,	as_6_7,	Amplification,	DX_6_7)
+
 // TODO: consider making `lib_*_*` alias these...
 PROFILE(DX_None_4_0,              sm_4_0,             Unknown, DX_4_0)
 PROFILE(DX_None_4_0_Level_9_0,    sm_4_0_level_9_0,   Unknown, DX_4_0_Level_9_0)

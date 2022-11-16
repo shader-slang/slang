@@ -984,6 +984,7 @@ top:
                 goto top;
             }
 
+            // TODO: Ellie, Is this really unreachable? User code input can get here
             SLANG_UNEXPECTED("subscript had no getter");
             UNREACHABLE_RETURN(LoweredValInfo());
         }
@@ -1925,6 +1926,14 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         return lowerGenericIntrinsicType(type, elementType, count);
     }
 
+    IRType* visitMeshOutputType(MeshOutputType* type)
+    {
+        Type* elementType = type->getElementType();
+        IntVal* count = type->getMaxElementCount();
+
+        return lowerGenericIntrinsicType(type, elementType, count);
+    }
+
     IRType* visitExtractExistentialType(ExtractExistentialType* type)
     {
         auto declRef = type->declRef;
@@ -2115,7 +2124,11 @@ void addVarDecorations(
         {
             builder->addVulkanCallablePayloadDecoration(inst, callablePayloadAttr->location);
         }
-        else if(as<VulkanHitAttributesAttribute>(mod))
+        else if (auto hitObjectAttr = as<VulkanHitObjectAttributesAttribute>(mod))
+        {
+            builder->addVulkanHitObjectAttributesDecoration(inst, hitObjectAttr->location);
+        }
+        else if (as<VulkanHitAttributesAttribute>(mod))
         {
             builder->addSimpleDecoration<IRVulkanHitAttributesDecoration>(inst);
         }
@@ -2133,6 +2146,26 @@ void addVarDecorations(
         }
 
         // TODO: what are other modifiers we need to propagate through?
+    }
+    if(auto t = composeGetters<IRMeshOutputType>(inst->getFullType(), &IROutTypeBase::getValueType))
+    {
+        IROp op;
+        switch(t->getOp())
+        {
+        case kIROp_VerticesType:
+            op = kIROp_VerticesDecoration;
+            break;
+        case kIROp_IndicesType:
+            op = kIROp_IndicesDecoration;
+            break;
+        case kIROp_PrimitivesType:
+            op = kIROp_PrimitivesDecoration;
+            break;
+        default:
+            SLANG_UNREACHABLE("Missing case for IRMeshOutputType");
+            break;
+        }
+        builder->addMeshOutputDecoration(op, inst, t->getMaxElementCount());
     }
 }
 

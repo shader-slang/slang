@@ -48,6 +48,7 @@ namespace Slang
             case kIROp_VulkanCallablePayloadDecoration:
             case kIROp_VulkanHitAttributesDecoration:
             case kIROp_VulkanRayPayloadDecoration:
+            case kIROp_VulkanHitObjectAttributesDecoration:
             {
                 return true;
             }
@@ -2028,6 +2029,19 @@ namespace Slang
         }
     }
 
+    void IRBuilder::setInsertAfter(IRInst* insertAfter)
+    {
+        auto next = insertAfter->getNextInst();
+        if(next)
+        {
+            setInsertBefore(next);
+        }
+        else
+        {
+            setInsertInto(insertAfter->parent);
+        }
+    }
+
     IRConstant* IRBuilder::_findOrEmitConstant(
         IRConstant&     keyInst)
     {
@@ -2850,6 +2864,15 @@ namespace Slang
             kIROp_ConstantBufferType,
             1,
             operands);
+    }
+
+    IRGLSLOutputParameterGroupType* IRBuilder::getGLSLOutputParameterGroupType(IRType* elementType)
+    {
+        IRInst* operands[] = { elementType };
+        return (IRGLSLOutputParameterGroupType*) getType(
+          kIROp_GLSLOutputParameterGroupType,
+          1,
+          operands);
     }
 
     IRConstExprRate* IRBuilder::getConstExprRate()
@@ -5835,7 +5858,29 @@ namespace Slang
         // _isTypeOperandEqual handles comparison of types so can defer to it
         return _isTypeOperandEqual(a, b);
     }
-     
+
+    bool isIntegralType(IRType *t)
+    {
+        if(auto basic = as<IRBasicType>(t))
+        {
+            switch(basic->getBaseType())
+            {
+            case BaseType::Int8:
+            case BaseType::Int16:
+            case BaseType::Int:
+            case BaseType::Int64:
+            case BaseType::UInt8:
+            case BaseType::UInt16:
+            case BaseType::UInt:
+            case BaseType::UInt64:
+                return true;
+            default:
+                return false;
+            }
+        }
+        return false;
+    }
+
     void findAllInstsBreadthFirst(IRInst* inst, List<IRInst*>& outInsts)
     {
         Index index = outInsts.getCount();
@@ -6274,6 +6319,7 @@ namespace Slang
         case kIROp_FieldAddress:
         case kIROp_getElement:
         case kIROp_getElementPtr:
+        case kIROp_MeshOutputRef:
         case kIROp_constructVectorFromScalar:
         case kIROp_swizzle:
         case kIROp_swizzleSet:  // Doesn't actually "set" anything - just returns the resulting vector
