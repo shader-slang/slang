@@ -1273,11 +1273,13 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         {
             if (auto interfaceDecl = as<InterfaceDecl>(decl))
             {
-                auto thisSubst = findThisTypeSubstitution(substitutions, interfaceDecl);
-                if (auto subTypeWitness = as<SubtypeWitness>(thisSubst->witness))
+                if (auto thisSubst = findThisTypeSubstitution(substitutions, interfaceDecl))
                 {
-                    out << subTypeWitness->sub;
-                    break;
+                    if (auto subTypeWitness = as<SubtypeWitness>(thisSubst->witness))
+                    {
+                        out << subTypeWitness->sub;
+                        break;
+                    }
                 }
             }
             // Otherwise, just print this type's name.
