@@ -6039,7 +6039,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         IRGenContext*                               subContext,
         WitnessTable*                               astWitnessTable,
         IRWitnessTable*                             irWitnessTable,
-        Dictionary<WitnessTable*, IRWitnessTable*>  mapASTToIRWitnessTable)
+        Dictionary<WitnessTable*, IRWitnessTable*>  &mapASTToIRWitnessTable)
     {
         auto subBuilder = subContext->irBuilder;
 
