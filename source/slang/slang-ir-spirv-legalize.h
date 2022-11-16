@@ -41,6 +41,6 @@ void legalizeIRForSPIRV(
     SPIRVEmitSharedContext* context,
     IRModule*               module,
     const List<IRFunc*>& entryPoints,
-    DiagnosticSink*         sink);
+    CodeGenContext*         codeGenContext);
 
 }
