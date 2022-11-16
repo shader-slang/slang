@@ -2179,9 +2179,11 @@ namespace Slang
                     nullptr);
                 auto candidateExpr = actions->createDifferentiateExpr(semantics);
                 actions->fillDifferentiateExpr(candidateExpr, semantics, lookupResultExpr);
+                candidateExpr->loc = overloadedExpr->loc;
                 result->candidiateExprs.add(candidateExpr);
             }
             result->type.type = astBuilder->getOverloadedType();
+            result->loc = expr->loc;
             return result;
         }
         else if (auto overloadedExpr2 = as<OverloadedExpr2>(expr->baseFunction))
@@ -2191,9 +2193,11 @@ namespace Slang
             {
                 auto candidateExpr = actions->createDifferentiateExpr(semantics);
                 actions->fillDifferentiateExpr(candidateExpr, semantics, item);
+                candidateExpr->loc = item->loc;
                 result->candidiateExprs.add(candidateExpr);
             }
             result->type.type = astBuilder->getOverloadedType();
+            result->loc = expr->loc;
             return result;
         }
 

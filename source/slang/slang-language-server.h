@@ -1,6 +1,7 @@
 #pragma once
 #include <chrono>
 #include "../../slang.h"
+#include "../core/slang-range.h"
 #include "../compiler-core/slang-json-rpc.h"
 #include "../compiler-core/slang-json-rpc-connection.h"
 #include "slang-workspace-version.h"
@@ -131,7 +132,8 @@ public:
         const LanguageServerProtocol::DocumentRangeFormattingParams& args, const JSONValue& responseId);
     SlangResult onTypeFormatting(
         const LanguageServerProtocol::DocumentOnTypeFormattingParams& args, const JSONValue& responseId);
-
+    String getExprDeclSignature(Expr* expr, String* outDocumentation, List<Slang::Range<Index>>* outParamRanges);
+    String getDeclRefSignature(DeclRef<Decl> declRef, String* outDocumentation, List<Slang::Range<Index>>* outParamRanges);
 private:
     SlangResult parseNextMessage();
     slang::IGlobalSession* getOrCreateGlobalSession();

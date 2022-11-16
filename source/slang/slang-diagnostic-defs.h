@@ -494,6 +494,8 @@ DIAGNOSTIC(38026, Error, globalTypeArgumentDoesNotConformToInterface, "type argu
 DIAGNOSTIC(38027, Error, mismatchExistentialSlotArgCount, "expected $0 existential slot arguments ($1 provided)")
 DIAGNOSTIC(38029, Error, typeArgumentDoesNotConformToInterface, "type argument '$0' does not conform to the required interface '$1'")
 
+DIAGNOSTIC(30830, Error, functionNotMarkedAsDifferentiable, "function '$0' is not marked as $1-differentiable.")
+
 DIAGNOSTIC(38200, Error, recursiveModuleImport, "module `$0` recursively imports itself")
 DIAGNOSTIC(39999, Error, errorInImportedModule, "import of module '$0' failed because of a compilation error")
 DIAGNOSTIC(39999, Fatal, complationCeased, "compilation ceased")

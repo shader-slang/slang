@@ -262,6 +262,16 @@ public:
     {
         if (dispatchIfNotNull(expr->base))
             return true;
+        auto humaneLoc = context->sourceManager->getHumaneLoc(expr->loc, SourceLocType::Actual);
+        auto tokenLen = context->doc->getTokenLength(humaneLoc.line, humaneLoc.column);
+        if (_isLocInRange(context, expr->loc, tokenLen))
+        {
+            ASTLookupResult result;
+            result.path = context->nodePath;
+            result.path.add(expr);
+            context->results.add(result);
+            return true;
+        }
         bool result = false;
         for (auto candidate : expr->candidiateExprs)
         {
@@ -408,7 +418,20 @@ public:
     }
     bool visitModifiedTypeExpr(ModifiedTypeExpr* expr) { return dispatchIfNotNull(expr->base.exp); }
     bool visitTryExpr(TryExpr* expr) { return dispatchIfNotNull(expr->base); }
-
+    bool visitHigherOrderInvokeExpr(HigherOrderInvokeExpr* expr)
+    {
+        auto humaneLoc = context->sourceManager->getHumaneLoc(expr->loc, SourceLocType::Actual);
+        auto tokenLen = context->doc->getTokenLength(humaneLoc.line, humaneLoc.column);
+        if (_isLocInRange(context, expr->loc, tokenLen))
+        {
+            ASTLookupResult result;
+            result.path = context->nodePath;
+            result.path.add(expr);
+            context->results.add(result);
+            return true;
+        }
+        return dispatchIfNotNull(expr->baseFunction);
+    }
 };
 
 struct ASTLookupStmtVisitor : public StmtVisitor<ASTLookupStmtVisitor, bool>
