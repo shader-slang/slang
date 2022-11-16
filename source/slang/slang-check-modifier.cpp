@@ -648,7 +648,6 @@ namespace Slang
                 getSink()->diagnose(primalFunc, Slang::Diagnostics::invalidCustomDerivative, as<Decl>(attrTarget));
                 return false;
             }
-
             forwardDerivativeOfAttr->funcExpr = primalFunc;
         }
         else if (auto comInterfaceAttr = as<ComInterfaceAttribute>(attr))

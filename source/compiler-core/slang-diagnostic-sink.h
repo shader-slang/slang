@@ -109,9 +109,9 @@ void printDiagnosticArg(StringBuilder& sb, RefPtr<T> ptr)
     printDiagnosticArg(sb, ptr.Ptr());
 }
 
-inline SourceLoc const& getDiagnosticPos(SourceLoc const& pos) { return pos;  }
+inline SourceLoc getDiagnosticPos(SourceLoc const& pos) { return pos;  }
 
-SourceLoc const& getDiagnosticPos(Token const& token);
+SourceLoc getDiagnosticPos(Token const& token);
     
 
 template<typename T>

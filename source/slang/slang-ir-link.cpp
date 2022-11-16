@@ -1452,9 +1452,9 @@ LinkedIR linkIR(
     List<IRModule*> irModules;
 
     // Link stdlib modules.
-    auto builtinLinkage = static_cast<Session*>(linkage->getGlobalSession())->getBuiltinLinkage();
-    for (auto& m : builtinLinkage->mapNameToLoadedModules)
-        irModules.add(m.Value->getIRModule());
+    auto& stdlibModules = static_cast<Session*>(linkage->getGlobalSession())->stdlibModules;
+    for (auto& m : stdlibModules)
+        irModules.add(m->getIRModule());
 
     // Link modules in the program.
     program->enumerateIRModules([&](IRModule* irModule)
