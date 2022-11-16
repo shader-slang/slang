@@ -2175,11 +2175,11 @@ namespace Slang
             {
                 auto lookupResultExpr = semantics->ConstructLookupResultExpr(item,
                     nullptr,
-                    expr->loc,
+                    overloadedExpr->loc,
                     nullptr);
                 auto candidateExpr = actions->createDifferentiateExpr(semantics);
                 actions->fillDifferentiateExpr(candidateExpr, semantics, lookupResultExpr);
-                candidateExpr->loc = overloadedExpr->loc;
+                candidateExpr->loc = expr->loc;
                 result->candidiateExprs.add(candidateExpr);
             }
             result->type.type = astBuilder->getOverloadedType();
@@ -2193,7 +2193,7 @@ namespace Slang
             {
                 auto candidateExpr = actions->createDifferentiateExpr(semantics);
                 actions->fillDifferentiateExpr(candidateExpr, semantics, item);
-                candidateExpr->loc = item->loc;
+                candidateExpr->loc = expr->loc;
                 result->candidiateExprs.add(candidateExpr);
             }
             result->type.type = astBuilder->getOverloadedType();

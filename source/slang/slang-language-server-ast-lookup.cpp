@@ -242,8 +242,11 @@ public:
     }
     bool visitOverloadedExpr(OverloadedExpr* expr)
     {
-        if (dispatchIfNotNull(expr->base))
-            return true;
+        {
+            PushNode pushNode(context, expr);
+            if (dispatchIfNotNull(expr->base))
+                return true;
+        }
         if (expr->lookupResult2.getName() &&
             _isLocInRange(
                 context,
@@ -262,17 +265,8 @@ public:
     {
         if (dispatchIfNotNull(expr->base))
             return true;
-        auto humaneLoc = context->sourceManager->getHumaneLoc(expr->loc, SourceLocType::Actual);
-        auto tokenLen = context->doc->getTokenLength(humaneLoc.line, humaneLoc.column);
-        if (_isLocInRange(context, expr->loc, tokenLen))
-        {
-            ASTLookupResult result;
-            result.path = context->nodePath;
-            result.path.add(expr);
-            context->results.add(result);
-            return true;
-        }
         bool result = false;
+        PushNode pushNode(context, expr);
         for (auto candidate : expr->candidiateExprs)
         {
             result |= dispatchIfNotNull(candidate);

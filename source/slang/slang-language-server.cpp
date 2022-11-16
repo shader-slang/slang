@@ -460,6 +460,29 @@ SlangResult LanguageServer::hover(
 
     Hover hover;
     auto leafNode = findResult[0].path.getLast();
+
+    auto maybeAppendAdditionalOverloadsHint = [&]()
+    {
+        Index numOverloads = 0;
+        for (Index i = findResult[0].path.getCount() - 1; i >= 0; i--)
+        {
+            auto node = findResult[0].path[i];
+            if (auto overloadExpr = as<OverloadedExpr>(node))
+            {
+                numOverloads = overloadExpr->lookupResult2.items.getCount();
+            }
+            else if (auto overloadedExpr2 = as<OverloadedExpr2>(node))
+            {
+                numOverloads = overloadedExpr2->candidiateExprs.getCount();
+            }
+        }
+        if (numOverloads > 1)
+        {
+            sb << "\n +" << numOverloads - 1 << " overload";
+            if (numOverloads > 2) sb << "s";
+        }
+    };
+
     auto fillDeclRefHoverInfo = [&](DeclRef<Decl> declRef)
     {
         if (declRef.getDecl())
@@ -473,7 +496,7 @@ SlangResult LanguageServer::hover(
             auto humaneLoc = version->linkage->getSourceManager()->getHumaneLoc(
                 declRef.getLoc(), SourceLocType::Actual);
             appendDefinitionLocation(sb, m_workspace, humaneLoc);
-
+            maybeAppendAdditionalOverloadsHint();
             auto nodeHumaneLoc =
                 version->linkage->getSourceManager()->getHumaneLoc(leafNode->loc);
             hover.range.start.line = int(nodeHumaneLoc.line - 1);
@@ -508,20 +531,13 @@ SlangResult LanguageServer::hover(
                 << signature
                 << "\n```\n";
             sb << documentation;
+            maybeAppendAdditionalOverloadsHint();
             auto humaneLoc = version->linkage->getSourceManager()->getHumaneLoc(
                 expr->loc, SourceLocType::Actual);
             hover.range.start.line = int(humaneLoc.line - 1);
             hover.range.end.line = int(humaneLoc.line - 1);
             hover.range.start.character = int(humaneLoc.column - 1);
             hover.range.end.character = hover.range.start.character + int(doc->getTokenLength(humaneLoc.line, humaneLoc.column));
-        }
-    };
-    auto maybeAppendAdditionalOverloadsHint = [&](Index numOverloads)
-    {
-        if (numOverloads > 1)
-        {
-            sb << "\n +" << numOverloads - 1 << " overload";
-            if (numOverloads > 2) sb << "s";
         }
     };
     if (auto declRefExpr = as<DeclRefExpr>(leafNode))
@@ -532,7 +548,6 @@ SlangResult LanguageServer::hover(
     {
         LookupResultItem& item = overloadedExpr->lookupResult2.item;
         fillDeclRefHoverInfo(item.declRef);
-        maybeAppendAdditionalOverloadsHint(overloadedExpr->lookupResult2.items.getCount());
     }
     else if (auto overloadedExpr2 = as<OverloadedExpr2>(leafNode))
     {
@@ -540,7 +555,6 @@ SlangResult LanguageServer::hover(
         {
             auto candidateExpr = overloadedExpr2->candidiateExprs[0];
             fillExprHoverInfo(candidateExpr);
-            maybeAppendAdditionalOverloadsHint(overloadedExpr2->candidiateExprs.getCount());
         }
     }
     else if (auto higherOrderExpr = as<HigherOrderInvokeExpr>(leafNode))
