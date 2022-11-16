@@ -41,6 +41,12 @@ SlangResult GLSLSourceEmitter::init()
             _requireRayTracing();
             break;
         }
+        case Stage::Mesh:
+        case Stage::Amplification:
+        {
+            _requireGLSLExtension(UnownedStringSlice::fromLiteral("GL_EXT_mesh_shader"));
+            break;
+        }
         default: break;
     }
 
@@ -732,6 +738,66 @@ void GLSLSourceEmitter::_emitGLSLTypePrefix(IRType* type, bool promoteHalfToFloa
     }
 }
 
+void GLSLSourceEmitter::_maybeEmitGLSLBuiltin(IRGlobalParam* var, UnownedStringSlice name)
+{
+    // It's important for us to redeclare these mesh output builtins with an
+    // explicit array size to allow indexing into them with a variable
+    // according to the rules of GLSL.
+    if(name == "gl_MeshPrimitivesEXT" || name == "gl_MeshVerticesEXT")
+    {
+        // GLSL doesn't allow us to specify the struct outside the block
+        // declaration, so we snoop the underlying struct type here and emit
+        // that inline.
+
+        auto paramGroupType = as<IRGLSLOutputParameterGroupType>(var->getFullType());
+        SLANG_ASSERT(paramGroupType && "Mesh shader builtin output was not a paramter group");
+        auto arrayType = as<IRArrayTypeBase>(paramGroupType->getOperand(0));
+        SLANG_ASSERT(paramGroupType && "Mesh shader builtin output was not an array");
+        auto elementType = as<IRStructType>(arrayType->getElementType());
+        SLANG_ASSERT(paramGroupType && "Mesh shader builtin output was not an array of structs");
+        auto elementTypeNameOp = composeGetters<IRStringLit>(
+            elementType,
+            &IRInst::findDecoration<IRTargetIntrinsicDecoration>,
+            &IRTargetIntrinsicDecoration::getDefinitionOperand);
+        SLANG_ASSERT(elementTypeNameOp && "Mesh shader builtin output element type wasn't named");
+        auto elementTypeName = elementTypeNameOp->getStringSlice();
+
+        // // It would be nice to use emitVarModifiers here, however with
+        // // LRK::BuiltinVaryingOutput this is going to add an illegal location
+        // // layout qualifier.
+        // auto layout = getVarLayout(var);
+        // SLANG_ASSERT(layout && "Mesh shader builtin output has no layout");
+        // SLANG_ASSERT(layout->usesResourceKind(LayoutResourceKind::VaryingOutput));
+        // emitVarModifiers(layout, var, arrayType);
+        emitMeshOutputModifiers(var);
+        m_writer->emit("out");
+        m_writer->emit(" ");
+        m_writer->emit(elementTypeName);
+        emitStructDeclarationsBlock(elementType);
+        m_writer->emit(" ");
+        m_writer->emit(name);
+        emitArrayBrackets(arrayType);
+        m_writer->emit(";\n\n");
+    }
+    else if(name == "gl_PrimitivePointIndicesEXT"
+            || name == "gl_PrimitiveLineIndicesEXT"
+            || name == "gl_PrimitiveTriangleIndicesEXT")
+    {
+        // GLSL has some specific requirements about how these are declared,
+        // Do it manually here to avoid `emitGlobalParam` emitting
+        // decorations/layout we are not allowed to output.
+        auto varType = composeGetters<IRType>(
+                var,
+                &IRGlobalParam::getDataType,
+                &IROutTypeBase::getValueType);
+        SLANG_ASSERT(varType && "Indices mesh output dind't have an 'out' type");
+
+        m_writer->emit("out ");
+        emitType(varType, getName(var));
+        m_writer->emit(";\n\n");
+    }
+}
+
 void GLSLSourceEmitter::_requireBaseType(BaseType baseType)
 {
     m_glslExtensionTracker->requireBaseTypeExtension(baseType);
@@ -922,24 +988,29 @@ void GLSLSourceEmitter::emitEntryPointAttributesImpl(IRFunc* irFunc, IREntryPoin
     auto profile = entryPointDecor->getProfile();
     auto stage = profile.getStage();
 
+    auto emitLocalSizeLayout = [&]()
+      {
+          Int sizeAlongAxis[kThreadGroupAxisCount];
+          getComputeThreadGroupSize(irFunc, sizeAlongAxis);
+
+          m_writer->emit("layout(");
+          char const* axes[] = { "x", "y", "z" };
+          for (int ii = 0; ii < kThreadGroupAxisCount; ++ii)
+          {
+              if (ii != 0) m_writer->emit(", ");
+              m_writer->emit("local_size_");
+              m_writer->emit(axes[ii]);
+              m_writer->emit(" = ");
+              m_writer->emit(sizeAlongAxis[ii]);
+          }
+          m_writer->emit(") in;\n");
+      };
+
     switch (stage)
     {
         case Stage::Compute:
         {
-            Int sizeAlongAxis[kThreadGroupAxisCount];
-            getComputeThreadGroupSize(irFunc, sizeAlongAxis);
-
-            m_writer->emit("layout(");
-            char const* axes[] = { "x", "y", "z" };
-            for (int ii = 0; ii < kThreadGroupAxisCount; ++ii)
-            {
-                if (ii != 0) m_writer->emit(", ");
-                m_writer->emit("local_size_");
-                m_writer->emit(axes[ii]);
-                m_writer->emit(" = ");
-                m_writer->emit(sizeAlongAxis[ii]);
-            }
-            m_writer->emit(") in;\n");
+            emitLocalSizeLayout();
         }
         break;
         case Stage::Geometry:
@@ -1001,6 +1072,32 @@ void GLSLSourceEmitter::emitEntryPointAttributesImpl(IRFunc* irFunc, IREntryPoin
             }
             break;
         }
+        case Stage::Mesh:
+        {
+            emitLocalSizeLayout();
+            if (auto decor = irFunc->findDecoration<IRVerticesDecoration>())
+            {
+                m_writer->emit("layout(max_vertices = ");
+                m_writer->emit(decor->getMaxSize()->getValue());
+                m_writer->emit(") out;\n");
+            }
+            if (auto decor = irFunc->findDecoration<IRPrimitivesDecoration>())
+            {
+                m_writer->emit("layout(max_primitives = ");
+                m_writer->emit(decor->getMaxSize()->getValue());
+                m_writer->emit(") out;\n");
+            }
+            if (auto decor = irFunc->findDecoration<IROutputTopologyDecoration>())
+            {
+                // TODO: Ellie validate here/elsewhere, what's allowed here is
+                // different from the tesselator
+                // The naming here is plural, so add an 's'
+                m_writer->emit("layout(");
+                m_writer->emit(decor->getTopology()->getStringSlice());
+                m_writer->emit("s) out;\n");
+            }
+        }
+        break;
         // TODO: There are other stages that will need this kind of handling.
         default:
             break;
@@ -1096,12 +1193,10 @@ bool GLSLSourceEmitter::tryEmitGlobalParamImpl(IRGlobalParam* varDecl, IRType* v
     //
     if (auto linkageDecoration = varDecl->findDecoration<IRLinkageDecoration>())
     {
-        if (linkageDecoration->getMangledName().startsWith("gl_"))
+        auto name = linkageDecoration->getMangledName();
+        if (name.startsWith("gl_"))
         {
-            // The variable represents an OpenGL system value,
-            // so we will assume that it doesn't need to be declared.
-            //
-            // TODO: handle case where we *should* declare the variable.
+            _maybeEmitGLSLBuiltin(varDecl, name);
             return true;
         }
     }
@@ -2230,6 +2325,15 @@ void GLSLSourceEmitter::emitInterpolationModifiersImpl(IRInst* varInst, IRType* 
         {
             _maybeEmitGLSLFlatModifier(valueType);
         }
+    }
+}
+
+void GLSLSourceEmitter::emitMeshOutputModifiersImpl(IRInst* varInst)
+{
+    if(varInst->findDecoration<IRGLSLPrimitivesRateDecoration>())
+    {
+        m_writer->emit("perprimitiveEXT");
+        m_writer->emit(" ");
     }
 }
 

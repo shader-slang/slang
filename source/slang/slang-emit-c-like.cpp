@@ -1224,6 +1224,10 @@ bool CLikeSourceEmitter::shouldFoldInstIntoUseSites(IRInst* inst)
         {
             return true;
         }
+        else if(as<IRMeshOutputType>(type))
+        {
+            return true;
+        }
     }
 
 
@@ -2699,6 +2703,7 @@ void CLikeSourceEmitter::emitSimpleFuncParamImpl(IRParam* param)
             || layout->usesResourceKind(LayoutResourceKind::VaryingOutput))
         {
             emitInterpolationModifiers(param, paramType, layout);
+            emitMeshOutputModifiers(param);
         }
     }
 
@@ -2922,6 +2927,13 @@ void CLikeSourceEmitter::emitStruct(IRStructType* structType)
     emitPostKeywordTypeAttributes(structType);
 
     m_writer->emit(getName(structType));
+
+    emitStructDeclarationsBlock(structType);
+    m_writer->emit(";\n\n");
+}
+
+void CLikeSourceEmitter::emitStructDeclarationsBlock(IRStructType* structType)
+{
     m_writer->emit("\n{\n");
     m_writer->indent();
 
@@ -2947,7 +2959,7 @@ void CLikeSourceEmitter::emitStruct(IRStructType* structType)
     }
 
     m_writer->dedent();
-    m_writer->emit("};\n\n");
+    m_writer->emit("}");
 }
 
 void CLikeSourceEmitter::emitClass(IRClassType* classType)
@@ -3059,6 +3071,11 @@ void CLikeSourceEmitter::emitInterpolationModifiers(IRInst* varInst, IRType* val
     emitInterpolationModifiersImpl(varInst, valueType, layout);
 }
 
+void CLikeSourceEmitter::emitMeshOutputModifiers(IRInst* varInst)
+{
+    emitMeshOutputModifiersImpl(varInst);
+}
+
     /// Emit modifiers that should apply even for a declaration of an SSA temporary.
 void CLikeSourceEmitter::emitTempModifiers(IRInst* temp)
 {
@@ -3087,6 +3104,7 @@ void CLikeSourceEmitter::emitVarModifiers(IRVarLayout* layout, IRInst* varDecl, 
         || layout->usesResourceKind(LayoutResourceKind::VaryingOutput))
     {
         emitInterpolationModifiers(varDecl, varType, layout);
+        emitMeshOutputModifiers(varDecl);
     }
 
     // Output target specific qualifiers
