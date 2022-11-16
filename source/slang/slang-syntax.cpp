@@ -375,7 +375,6 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         SLANG_ASSERT(!requirementDictionary.ContainsKey(decl));
 
         requirementDictionary.Add(decl, witness);
-        requirementList.add(KeyValuePair<Decl*, RequirementWitness>(decl, witness));
     }
 
     //

@@ -1446,7 +1446,6 @@ namespace Slang
     {
         SLANG_OBJ_CLASS(WitnessTable)
 
-        List<KeyValuePair<Decl*, RequirementWitness>> requirementList;
         RequirementDictionary requirementDictionary;
 
         void add(Decl* decl, RequirementWitness const& witness);

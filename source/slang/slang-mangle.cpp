@@ -315,7 +315,7 @@ namespace Slang
         // Inheritance declarations don't have meaningful names,
         // and so we should emit them based on the type
         // that is doing the inheriting.
-        if(auto inheritanceDeclRef = declRef.as<InheritanceDecl>())
+        if(auto inheritanceDeclRef = declRef.as<TypeConstraintDecl>())
         {
             emit(context, "I");
             emitType(context, getSup(context->astBuilder, inheritanceDeclRef));

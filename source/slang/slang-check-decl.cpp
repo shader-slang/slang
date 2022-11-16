@@ -3234,7 +3234,7 @@ namespace Slang
 
         // First we need to make sure the associated `Differential` type requirement is satisfied.
         bool hasDifferentialAssocType = false;
-        for (auto existingEntry : witnessTable->requirementList)
+        for (auto existingEntry : witnessTable->requirementDictionary)
         {
             if (auto builtinReqAttr = existingEntry.Key->findModifier<BuiltinRequirementModifier>())
             {
@@ -4678,10 +4678,6 @@ namespace Slang
     void SemanticsDeclBodyVisitor::visitFunctionDeclBase(FunctionDeclBase* decl)
     {
         auto newContext = withParentFunc(decl);
-        if (auto diffAttr = decl->findModifier<DifferentiableAttribute>())
-        {
-            diffAttr->m_mapTypeToIDifferentiableWitness.Clear();
-        }
 
         // Run checking on attributes that can't be fully checked in header checking stage.
         checkDerivativeOfAttribute(decl);
@@ -6011,7 +6007,7 @@ namespace Slang
             // without any additional substitutions.
             if (extDecl->targetType->equals(type))
             {
-                return extDeclRef;
+                return createDefaultSubstitutionsIfNeeded(m_astBuilder, this, extDeclRef).as<ExtensionDecl>();
             }
 
             if (!TryUnifyTypes(constraints, extDecl->targetType.Ptr(), type))

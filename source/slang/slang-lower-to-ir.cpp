@@ -19,8 +19,6 @@
 #include "slang-ir-string-hash.h"
 #include "slang-ir-clone.h"
 #include "slang-ir-lower-error-handling.h"
-#include "slang-ir-merge-import-symbols.h"
-
 #include "slang-mangle.h"
 #include "slang-type-layout.h"
 #include "slang-visitor.h"
@@ -6045,7 +6043,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
     {
         auto subBuilder = subContext->irBuilder;
 
-        for(auto entry : astWitnessTable->requirementList)
+        for(auto entry : astWitnessTable->requirementDictionary)
         {
             auto requiredMemberDecl = entry.Key;
             auto satisfyingWitness = entry.Value;
@@ -8999,8 +8997,6 @@ RefPtr<IRModule> generateIRForTranslationUnit(
     // `unreachable` instructions remain.
 
     checkForMissingReturns(module, compileRequest->getSink());
-
-    mergeImportSymbols(module);
 
     // The "mandatory" optimization passes may make use of the
     // `IRHighLevelDeclDecoration` type to relate IR instructions

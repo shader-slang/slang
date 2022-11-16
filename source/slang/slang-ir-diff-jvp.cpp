@@ -1416,27 +1416,35 @@ struct JVPTranscriber
         return InstPair(nullptr, nullptr);
     }
 
-    InstPair transcribeSpecialize(IRBuilder* builder, IRSpecialize* origSpecialize)
+    InstPair transcribeSpecialize(IRBuilder*, IRSpecialize* origSpecialize)
     {
         // In general, we should not see any specialize insts at this stage.
         // The exceptions are target intrinsics.
-        auto primal = cloneInst(&cloneEnv, builder, origSpecialize);
-
-        // Look for an IRForwardDerivativeDecoration on the specialize inst.
-        // (Normally, this would be on the inner IRFunc, but in this case only the JVP func
-        // can be specialized, so we put a decoration on the IRSpecialize)
-        //
-        if (auto jvpFuncDecoration = origSpecialize->findDecoration<IRForwardDerivativeDecoration>())
+        auto genericInnerVal = findInnerMostGenericReturnVal(as<IRGeneric>(origSpecialize->getBase()));
+        if (genericInnerVal->findDecoration<IRTargetIntrinsicDecoration>())
         {
-            auto jvpFunc = jvpFuncDecoration->getForwardDerivativeFunc();
+            // Look for an IRForwardDerivativeDecoration on the specialize inst.
+            // (Normally, this would be on the inner IRFunc, but in this case only the JVP func
+            // can be specialized, so we put a decoration on the IRSpecialize)
+            //
+            if (auto jvpFuncDecoration = origSpecialize->findDecoration<IRForwardDerivativeDecoration>())
+            {
+                auto jvpFunc = jvpFuncDecoration->getForwardDerivativeFunc();
 
-            // Make sure this isn't itself a specialize .
-            SLANG_RELEASE_ASSERT(!as<IRSpecialize>(jvpFunc));
+                // Make sure this isn't itself a specialize .
+                SLANG_RELEASE_ASSERT(!as<IRSpecialize>(jvpFunc));
 
-            return InstPair(primal, jvpFunc);
+                return InstPair(jvpFunc, jvpFunc);
+            }
+        }
+        else
+        {
+            getSink()->diagnose(origSpecialize->sourceLoc,
+                Diagnostics::unexpected,
+                "should not be attempting to differentiate anything specialized here.");
         }
 
-        return InstPair(primal, nullptr);
+        return InstPair(nullptr, nullptr);
     }
 
     InstPair transcibeLookupInterfaceMethod(IRBuilder* builder, IRLookupWitnessMethod* origLookup)
