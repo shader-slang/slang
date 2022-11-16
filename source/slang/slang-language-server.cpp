@@ -949,7 +949,6 @@ String LanguageServer::getExprDeclSignature(Expr* expr, String* outDocumentation
 
     SignatureInformation sigInfo;
 
-    List<Slang::Range<Index>> paramRanges;
     ASTPrinter printer(
         version->linkage->getASTBuilder(),
         ASTPrinter::OptionFlag::ParamNames | ASTPrinter::OptionFlag::NoInternalKeywords |
@@ -985,7 +984,8 @@ String LanguageServer::getExprDeclSignature(Expr* expr, String* outDocumentation
         }
         printer.addType(param);
         range.end = printer.getStringBuilder().getLength();
-        paramRanges.add(range);
+        if (outParamRanges)
+            outParamRanges->add(range);
         isFirst = false;
         paramIndex++;
     }

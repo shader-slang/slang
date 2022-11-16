@@ -2115,9 +2115,14 @@ namespace Slang
             resultDiffExpr->type = semantics->getForwardDiffFuncType(baseFuncType);
             if (auto declRefExpr = as<DeclRefExpr>(getInnerMostExprFromHigherOrderExpr(funcExpr)))
             {
-                if (auto funcDecl = declRefExpr->declRef.as<CallableDecl>())
+                auto funcDecl = declRefExpr->declRef.as<CallableDecl>().getDecl();
+                if (auto genDecl = as<GenericDecl>(declRefExpr->declRef.getDecl()))
                 {
-                    for (auto param : funcDecl.getDecl()->getParameters())
+                    funcDecl = as<CallableDecl>(genDecl->inner);
+                }
+                if (funcDecl)
+                {
+                    for (auto param : funcDecl->getParameters())
                     {
                         resultDiffExpr->newParameterNames.add(param->getName());
                     }
@@ -2144,14 +2149,19 @@ namespace Slang
             resultDiffExpr->type = semantics->getBackwardDiffFuncType(baseFuncType);
             if (auto declRefExpr = as<DeclRefExpr>(getInnerMostExprFromHigherOrderExpr(funcExpr)))
             {
-                if (auto funcDecl = declRefExpr->declRef.as<CallableDecl>())
+                auto funcDecl = declRefExpr->declRef.as<CallableDecl>().getDecl();
+                if (auto genDecl = as<GenericDecl>(declRefExpr->declRef.getDecl()))
                 {
-                    for (auto param : funcDecl.getDecl()->getParameters())
+                    funcDecl = as<CallableDecl>(genDecl->inner);
+                }
+                if (funcDecl)
+                {
+                    for (auto param : funcDecl->getParameters())
                     {
                         resultDiffExpr->newParameterNames.add(param->getName());
                     }
+                    resultDiffExpr->newParameterNames.add(semantics->getName("resultGradient"));
                 }
-                resultDiffExpr->newParameterNames.add(semantics->getName("resultGradient"));
             }
         }
     };
