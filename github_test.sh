@@ -9,7 +9,7 @@ else
 fi
 
 PLATFORM=$(uname -s | tr '[:upper:]' '[:lower:]')
-ARCHITECTURE=$(uname -p)
+ARCHITECTURE=$(uname -m)
 
 # Darwin is actually macosx (for paths etc)
 if [ "${PLATFORM}" == "darwin" ]; then

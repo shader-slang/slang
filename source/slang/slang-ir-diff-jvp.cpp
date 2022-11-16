@@ -2524,6 +2524,7 @@ struct BackwardDiffTranscriber
             newInst = builder->emitDiv(resultType, primalLeft, primalRight);
             break;
         default:
+            newInst = nullptr;
             getSink()->diagnose(origArith->sourceLoc,
                 Diagnostics::unimplemented,
                 "this arithmetic instruction cannot be differentiated");
