@@ -1254,22 +1254,25 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         }
         // If we have a ThisTypeSubstitution to an interface decl, print the substituted sub
         // type instead.
-        if (auto interfaceDecl = as<InterfaceDecl>(decl))
+        for (;;)
         {
-            auto thisSubst = findThisTypeSubstitution(substitutions, interfaceDecl);
-            if (auto subTypeWitness = as<SubtypeWitness>(thisSubst->witness))
+            if (auto interfaceDecl = as<InterfaceDecl>(decl))
             {
-                out << subTypeWitness->sub;
-                goto namePrinted;
+                auto thisSubst = findThisTypeSubstitution(substitutions, interfaceDecl);
+                if (auto subTypeWitness = as<SubtypeWitness>(thisSubst->witness))
+                {
+                    out << subTypeWitness->sub;
+                    break;
+                }
             }
+            // Otherwise, just print this type's name.
+            auto name = decl->getName();
+            if (name)
+            {
+                out << name->text;
+            }
+            break;
         }
-        // Otherwise, just print this type's name.
-        auto name = decl->getName();
-        if (name)
-        {
-            out << name->text;
-        }
-    namePrinted:;
 
         // Look for generic substitutions on this type.
         for (const Substitutions* subst = substitutions; subst; subst = subst->outer)
