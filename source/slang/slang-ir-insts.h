@@ -333,6 +333,7 @@ struct IROutputControlPointsDecoration : IRDecoration
     IRIntLit* getControlPointCount() { return cast<IRIntLit>(getOperand(0)); }
 };
 
+// This is used for mesh shaders too
 struct IROutputTopologyDecoration : IRDecoration
 {
     enum { kOp = kIROp_OutputTopologyDecoration };
@@ -753,6 +754,42 @@ struct IRStageWriteAccessDecoration : public IRStageAccessDecoration
 struct IRPayloadDecoration : public IRDecoration
 {
     IR_LEAF_ISA(PayloadDecoration)
+};
+
+// Mesh shader decorations
+
+struct IRMeshOutputDecoration : public IRDecoration
+{
+    IR_PARENT_ISA(MeshOutputDecoration)
+    IRIntLit* getMaxSize() { return cast<IRIntLit>(getOperand(0)); }
+};
+
+struct IRVerticesDecoration : public IRMeshOutputDecoration
+{
+    IR_LEAF_ISA(VerticesDecoration)
+};
+
+struct IRIndicesDecoration : public IRMeshOutputDecoration
+{
+    IR_LEAF_ISA(IndicesDecoration)
+};
+
+struct IRPrimitivesDecoration : public IRMeshOutputDecoration
+{
+    IR_LEAF_ISA(PrimitivesDecoration)
+};
+
+struct IRGLSLPrimitivesRateDecoration : public IRDecoration
+{
+    IR_LEAF_ISA(GLSLPrimitivesRateDecoration)
+};
+
+struct IRMeshOutputRef : public IRInst
+{
+    enum { kOp = kIROp_MeshOutputRef };
+    IR_LEAF_ISA(MeshOutputRef)
+    IRInst* getIndex() { return getOperand(1); }
+    IRInst* getOutputType() { return cast<IRPtrTypeBase>(getFullType())->getValueType(); }
 };
 
     /// An attribute that can be attached to another instruction as an operand.
@@ -2252,6 +2289,8 @@ public:
 
     void setInsertInto(IRInst* insertInto) { setInsertLoc(IRInsertLoc::atEnd(insertInto)); }
     void setInsertBefore(IRInst* insertBefore) { setInsertLoc(IRInsertLoc::before(insertBefore)); }
+    // TODO: Ellie, contrary to IRInsertLoc::after, this inserts instructions in the order they are emitted, should it have a better name (setInsertBeforeNext)?
+    void setInsertAfter(IRInst* insertAfter);
 
     void setInsertInto(IRModule* module) { setInsertInto(module->getModuleInst()); }
 
@@ -2439,6 +2478,8 @@ public:
 
     IRConstantBufferType* getConstantBufferType(
         IRType* elementType);
+
+    IRGLSLOutputParameterGroupType* getGLSLOutputParameterGroupType(IRType* valueType);
 
     IRConstExprRate* getConstExprRate();
     IRGroupSharedRate* getGroupSharedRate();
@@ -3369,6 +3410,12 @@ public:
         addDecoration(inst, kIROp_VulkanHitObjectAttributesDecoration, getIntValue(getIntType(), location));
     }
 
+    void addMeshOutputDecoration(IROp d, IRInst* value, IRInst* maxCount)
+    {
+        SLANG_ASSERT(IRMeshOutputDecoration::isaImpl(d));
+        // TODO: Ellie, correct int type here?
+        addDecoration(value, d, maxCount);
+    }
 };
 
 void addHoistableInst(
@@ -3398,6 +3445,20 @@ struct IRBuilderSourceLocRAII
     {
         SLANG_ASSERT(builder->getSourceLocInfo() == this);
         builder->setSourceLocInfo(next);
+    }
+};
+
+// A helper to restore the builder's insert location on destruction
+struct IRBuilderInsertLocScope
+{
+    IRBuilder* builder;
+    IRInsertLoc insertLoc;
+    IRBuilderInsertLocScope(IRBuilder* b)
+        : builder(b), insertLoc(builder->getInsertLoc())
+    {}
+    ~IRBuilderInsertLocScope()
+    {
+        builder->setInsertLoc(insertLoc);
     }
 };
 

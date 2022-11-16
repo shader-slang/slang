@@ -307,11 +307,10 @@ void legalizeIRForSPIRV(
     SPIRVEmitSharedContext* context,
     IRModule* module,
     const List<IRFunc*>& entryPoints,
-    DiagnosticSink* sink)
+    CodeGenContext* codeGenContext)
 {
-    SLANG_UNUSED(sink);
     GLSLExtensionTracker extensionTracker;
-    legalizeEntryPointsForGLSL(module->getSession(), module, entryPoints, sink, &extensionTracker);
+    legalizeEntryPointsForGLSL(module->getSession(), module, entryPoints, codeGenContext, &extensionTracker);
     legalizeSPIRV(context, module);
 }
 

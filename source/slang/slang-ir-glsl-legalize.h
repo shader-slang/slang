@@ -1,6 +1,7 @@
 // slang-ir-glsl-legalize.h
 #pragma once
 #include"../core/slang-list.h"
+#include "slang-compiler.h"
 
 namespace Slang
 {
@@ -17,7 +18,7 @@ void legalizeEntryPointsForGLSL(
     Session*                session,
     IRModule*               module,
     const List<IRFunc*>&    func,
-    DiagnosticSink*         sink,
+    CodeGenContext*         context,
     GLSLExtensionTracker*   glslExtensionTracker);
 
 void legalizeImageSubscriptForGLSL(IRModule* module);

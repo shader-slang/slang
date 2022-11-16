@@ -1075,6 +1075,22 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         return as<IntVal>(findInnerMostGenericSubstitution(declRef.substitutions)->getArgs()[1]);
     }
 
+    // MeshOutputType
+    // There's a subtle distinction between this and HLSLPatchType, the size
+    // here is the max possible size of the array, it's free to change at
+    // runtime. There's probably no circumstance where you'd want to be generic
+    // between the two, so we don't deduplicate this code.
+
+    Type* MeshOutputType::getElementType()
+    {
+        return as<Type>(findInnerMostGenericSubstitution(declRef.substitutions)->getArgs()[0]);
+    }
+
+    IntVal* MeshOutputType::getMaxElementCount()
+    {
+        return as<IntVal>(findInnerMostGenericSubstitution(declRef.substitutions)->getArgs()[1]);
+    }
+
     // Constructors for types
 
     ArrayExpressionType* getArrayType(

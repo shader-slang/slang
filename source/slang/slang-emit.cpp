@@ -24,6 +24,7 @@
 #include "slang-ir-insts.h"
 #include "slang-ir-inline.h"
 #include "slang-ir-legalize-array-return-type.h"
+#include "slang-ir-legalize-mesh-outputs.h"
 #include "slang-ir-legalize-varying-params.h"
 #include "slang-ir-link.h"
 #include "slang-ir-com-interface.h"
@@ -680,7 +681,7 @@ Result linkAndOptimizeIR(
             session,
             irModule,
             irEntryPoints,
-            codeGenContext->getSink(),
+            codeGenContext,
             glslExtensionTracker);
 
 #if 0
@@ -773,6 +774,13 @@ Result linkAndOptimizeIR(
     validateIRModuleIfEnabled(codeGenContext, irModule);
 
     cleanUpVoidType(irModule);
+
+    // For some small improvement in type safety we represent these as opaque
+    // structs instead of regular arrays.
+    //
+    // If any have survived this far, change them back to regular (decorated)
+    // arrays that the emitters can deal with.
+    legalizeMeshOutputTypes(irModule);
 
     // Lower all bit_cast operations on complex types into leaf-level
     // bit_cast on basic types.

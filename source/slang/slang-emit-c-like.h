@@ -401,12 +401,16 @@ public:
     void emitFuncDecorations(IRFunc* func) { emitFuncDecorationsImpl(func); }
 
     void emitStruct(IRStructType* structType);
+    // This is used independently of `emitStruct` by some GLSL parameter group
+    // output functionality
+    void emitStructDeclarationsBlock(IRStructType* structType);
     void emitClass(IRClassType* structType);
 
         /// Emit type attributes that should appear after, e.g., a `struct` keyword
     void emitPostKeywordTypeAttributes(IRInst* inst) { emitPostKeywordTypeAttributesImpl(inst); }
 
     void emitInterpolationModifiers(IRInst* varInst, IRType* valueType, IRVarLayout* layout);
+    void emitMeshOutputModifiers(IRInst* varInst);
 
     
 
@@ -492,6 +496,7 @@ public:
     virtual void emitSimpleFuncParamImpl(IRParam* param);
     virtual void emitSimpleFuncParamsImpl(IRFunc* func);
     virtual void emitInterpolationModifiersImpl(IRInst* varInst, IRType* valueType, IRVarLayout* layout) { SLANG_UNUSED(varInst); SLANG_UNUSED(valueType); SLANG_UNUSED(layout); }
+    virtual void emitMeshOutputModifiersImpl(IRInst* varInst) { SLANG_UNUSED(varInst) }
     virtual void emitSimpleTypeImpl(IRType* type) = 0;
     virtual void emitVarDecorationsImpl(IRInst* varDecl) { SLANG_UNUSED(varDecl);  }
     virtual void emitMatrixLayoutModifiersImpl(IRVarLayout* layout) { SLANG_UNUSED(layout);  }
