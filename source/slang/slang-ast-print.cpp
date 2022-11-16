@@ -358,9 +358,16 @@ void ASTPrinter::addDeclKindPrefix(Decl* decl)
                     continue;
                 if (as<BuiltinModifier>(modifier))
                     continue;
+                if (as<BuiltinRequirementModifier>(modifier))
+                    continue;
                 if (as<BuiltinTypeModifier>(modifier))
                     continue;
+                if (as<SpecializedForTargetModifier>(modifier))
+                    continue;
             }
+            // Don't print out attributes.
+            if (as<AttributeBase>(modifier))
+                continue;
             m_builder << modifier->getKeywordName()->text << " ";
         }
     }

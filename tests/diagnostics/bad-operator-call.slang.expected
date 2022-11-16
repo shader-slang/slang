@@ -3,11 +3,11 @@ standard error = {
 tests/diagnostics/bad-operator-call.slang(18): error 39999: no overload for '+=' applicable to arguments of type (int, S)
     a += b;
       ^~
-core.meta.slang(2430): note 39999: candidate: __unsafeForceInlineEarly func +=<T, R:int, C:int>(out matrix<T,R,C>, T) -> matrix<T,R,C>
-core.meta.slang(2422): note 39999: candidate: __unsafeForceInlineEarly func +=<T, R:int, C:int>(out matrix<T,R,C>, matrix<T,R,C>) -> matrix<T,R,C>
-core.meta.slang(2414): note 39999: candidate: __unsafeForceInlineEarly func +=<T, N:int>(out vector<T,N>, T) -> vector<T,N>
-core.meta.slang(2406): note 39999: candidate: __unsafeForceInlineEarly func +=<T, N:int>(out vector<T,N>, vector<T,N>) -> vector<T,N>
-core.meta.slang(2398): note 39999: candidate: __unsafeForceInlineEarly func +=<T>(out T, T) -> T
+core.meta.slang(2430): note 39999: candidate: func +=<T, R:int, C:int>(out matrix<T,R,C>, T) -> matrix<T,R,C>
+core.meta.slang(2422): note 39999: candidate: func +=<T, R:int, C:int>(out matrix<T,R,C>, matrix<T,R,C>) -> matrix<T,R,C>
+core.meta.slang(2414): note 39999: candidate: func +=<T, N:int>(out vector<T,N>, T) -> vector<T,N>
+core.meta.slang(2406): note 39999: candidate: func +=<T, N:int>(out vector<T,N>, vector<T,N>) -> vector<T,N>
+core.meta.slang(2398): note 39999: candidate: func +=<T>(out T, T) -> T
 tests/diagnostics/bad-operator-call.slang(20): error 39999: no overload for '+' applicable to arguments of type (int, S)
     a = a + b;
           ^
@@ -42,11 +42,11 @@ tests/diagnostics/bad-operator-call.slang(27): note 30048: argument was implicit
 tests/diagnostics/bad-operator-call.slang(31): error 39999: no overload for '+=' applicable to arguments of type (vector<float,3>, vector<int,4>)
     d += c;
       ^~
-core.meta.slang(2430): note 39999: candidate: __unsafeForceInlineEarly func +=<T, R:int, C:int>(out matrix<T,R,C>, T) -> matrix<T,R,C>
-core.meta.slang(2422): note 39999: candidate: __unsafeForceInlineEarly func +=<T, R:int, C:int>(out matrix<T,R,C>, matrix<T,R,C>) -> matrix<T,R,C>
-core.meta.slang(2414): note 39999: candidate: __unsafeForceInlineEarly func +=<T, N:int>(out vector<T,N>, T) -> vector<T,N>
-core.meta.slang(2406): note 39999: candidate: __unsafeForceInlineEarly func +=<T, N:int>(out vector<T,N>, vector<T,N>) -> vector<T,N>
-core.meta.slang(2398): note 39999: candidate: __unsafeForceInlineEarly func +=<T>(out T, T) -> T
+core.meta.slang(2430): note 39999: candidate: func +=<T, R:int, C:int>(out matrix<T,R,C>, T) -> matrix<T,R,C>
+core.meta.slang(2422): note 39999: candidate: func +=<T, R:int, C:int>(out matrix<T,R,C>, matrix<T,R,C>) -> matrix<T,R,C>
+core.meta.slang(2414): note 39999: candidate: func +=<T, N:int>(out vector<T,N>, T) -> vector<T,N>
+core.meta.slang(2406): note 39999: candidate: func +=<T, N:int>(out vector<T,N>, vector<T,N>) -> vector<T,N>
+core.meta.slang(2398): note 39999: candidate: func +=<T>(out T, T) -> T
 tests/diagnostics/bad-operator-call.slang(33): error 39999: no overload for '+' applicable to arguments of type (vector<int,4>, vector<float,3>)
     d = c + d;
           ^
