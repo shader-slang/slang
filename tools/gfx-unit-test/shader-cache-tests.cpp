@@ -271,7 +271,7 @@ namespace gfx_test
         {
             ComPtr<IShaderProgram> shaderProgram;
             slang::ProgramLayout* slangReflection;
-            char* shaderFilename;
+            const char* shaderFilename;
             switch (shaderIndex)
             {
             case 0:
@@ -361,7 +361,7 @@ namespace gfx_test
         {
             ComPtr<IShaderProgram> shaderProgram;
             slang::ProgramLayout* slangReflection;
-            char* entryPointName;
+            const char* entryPointName;
             switch (shaderIndex)
             {
             case 0:
