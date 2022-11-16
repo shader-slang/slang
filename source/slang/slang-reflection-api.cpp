@@ -335,6 +335,10 @@ SLANG_API SlangTypeKind spReflectionType_GetKind(SlangReflectionType* inType)
     {
         return SLANG_TYPE_KIND_OUTPUT_STREAM;
     }
+    else if( as<MeshOutputType>(type) )
+    {
+        return SLANG_TYPE_KIND_MESH_OUTPUT;
+    }
     else if (as<TextureBufferType>(type))
     {
         return SLANG_TYPE_KIND_TEXTURE_BUFFER;

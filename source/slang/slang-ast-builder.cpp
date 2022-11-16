@@ -345,6 +345,35 @@ bool ASTBuilder::isDifferentiableInterfaceAvailable()
     return (m_sharedASTBuilder->tryFindMagicDecl("DifferentiableType") != nullptr);
 }
 
+MeshOutputType* ASTBuilder::getMeshOutputTypeFromModifier(
+    HLSLMeshShaderOutputModifier* modifier,
+    Type* elementType,
+    IntVal* maxElementCount)
+{
+    SLANG_ASSERT(modifier);
+    SLANG_ASSERT(elementType);
+    SLANG_ASSERT(maxElementCount);
+
+    const char* declName
+        = as<HLSLVerticesModifier>(modifier) ? "VerticesType"
+        : as<HLSLIndicesModifier>(modifier) ? "IndicesType"
+        : as<HLSLPrimitivesModifier>(modifier) ? "PrimitivesType"
+        : (SLANG_UNEXPECTED("Unhandled mesh output modifier"), nullptr);
+    auto genericDecl = dynamicCast<GenericDecl>(m_sharedASTBuilder->findMagicDecl(declName));
+
+    auto typeDecl = genericDecl->inner;
+
+    auto substitutions = getOrCreate<GenericSubstitution>(
+        genericDecl,
+        elementType,
+        maxElementCount);
+
+    auto declRef = DeclRef<Decl>(typeDecl, substitutions);
+    auto rsType = DeclRefType::create(this, declRef);
+
+    return as<MeshOutputType>(rsType);
+}
+
 DeclRef<Decl> ASTBuilder::getBuiltinDeclRef(const char* builtinMagicTypeName, Val* genericArg)
 {
     DeclRef<Decl> declRef;

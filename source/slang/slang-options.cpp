@@ -264,6 +264,8 @@ struct OptionsParser
             { ".tesc", SLANG_SOURCE_LANGUAGE_GLSL,  SLANG_STAGE_HULL },
             { ".tese", SLANG_SOURCE_LANGUAGE_GLSL,  SLANG_STAGE_DOMAIN },
             { ".comp", SLANG_SOURCE_LANGUAGE_GLSL,  SLANG_STAGE_COMPUTE },
+            { ".mesh", SLANG_SOURCE_LANGUAGE_GLSL,  SLANG_STAGE_MESH },
+            { ".task", SLANG_SOURCE_LANGUAGE_GLSL,  SLANG_STAGE_AMPLIFICATION },
 
             { ".c",    SLANG_SOURCE_LANGUAGE_C,     SLANG_STAGE_NONE },
             { ".cpp",  SLANG_SOURCE_LANGUAGE_CPP,   SLANG_STAGE_NONE },

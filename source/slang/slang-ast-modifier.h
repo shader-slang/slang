@@ -902,6 +902,28 @@ class HLSLTriangleAdjModifier : public HLSLGeometryShaderInputPrimitiveTypeModif
     SLANG_AST_CLASS(HLSLTriangleAdjModifier)
 };
 
+// Mesh shader paramters
+
+class HLSLMeshShaderOutputModifier : public Modifier
+{
+    SLANG_AST_CLASS(HLSLMeshShaderOutputModifier)
+};
+
+class HLSLVerticesModifier : public HLSLMeshShaderOutputModifier
+{
+    SLANG_AST_CLASS(HLSLVerticesModifier)
+};
+
+class HLSLIndicesModifier : public HLSLMeshShaderOutputModifier
+{
+    SLANG_AST_CLASS(HLSLIndicesModifier)
+};
+
+class HLSLPrimitivesModifier : public HLSLMeshShaderOutputModifier
+{
+    SLANG_AST_CLASS(HLSLPrimitivesModifier)
+};
+
 // A modifier to indicate that a constructor/initializer can be used
 // to perform implicit type conversion, and to specify the cost of
 // the conversion, if applied.

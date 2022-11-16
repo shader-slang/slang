@@ -47,6 +47,7 @@ namespace Slang
 
         void checkDerivativeMemberAttribute(VarDeclBase* varDecl, DerivativeMemberAttribute* attr);
         void checkExtensionExternVarAttribute(VarDeclBase* varDecl, ExtensionExternVarModifier* m);
+        void checkMeshOutputDecl(VarDeclBase* varDecl);
 
         void checkVarDeclCommon(VarDeclBase* varDecl);
 
@@ -1177,6 +1178,8 @@ namespace Slang
             //
             validateArraySizeForVariable(varDecl);
         }
+
+        checkMeshOutputDecl(varDecl);
 
         // The NVAPI library allows user code to express extended operations
         // (not supported natively by D3D HLSL) by communicating with
@@ -5398,7 +5401,62 @@ namespace Slang
         {
             typeExpr = CheckUsableType(typeExpr);
             paramDecl->type = typeExpr;
+            checkMeshOutputDecl(paramDecl);
         }
+    }
+
+    // This checks that the declaration is marked as "out" and changes the hlsl
+    // modifier based syntax into a proper type.
+    void SemanticsDeclHeaderVisitor::checkMeshOutputDecl(VarDeclBase* varDecl)
+    {
+        auto modifier = varDecl->findModifier<HLSLMeshShaderOutputModifier>();
+        auto meshOutputType = as<MeshOutputType>(varDecl->type.type);
+        bool isMeshOutput = modifier || meshOutputType;
+
+        if(!isMeshOutput)
+        {
+            return;
+        }
+        if(!varDecl->findModifier<OutModifier>())
+        {
+            getSink()->diagnose(varDecl, Diagnostics::meshOutputMustBeOut);
+        }
+
+        //
+        // If necessary, convert to our typed representation
+        //
+        if(!modifier)
+        {
+            return;
+        }
+        if(meshOutputType)
+        {
+            getSink()->diagnose(modifier, Diagnostics::unnecessaryHLSLMeshOutputModifier);
+            varDecl->type.type = m_astBuilder->getErrorType();
+            return;
+        }
+        auto indexExpr = as<IndexExpr>(varDecl->type.exp);
+        if(!indexExpr)
+        {
+            getSink()->diagnose(varDecl, Diagnostics::meshOutputMustBeArray);
+            varDecl->type.type = m_astBuilder->getErrorType();
+            return;
+        }
+        if(indexExpr->indexExprs.getCount() != 1)
+        {
+            getSink()->diagnose(varDecl, Diagnostics::meshOutputArrayMustHaveSize);
+            varDecl->type.type = m_astBuilder->getErrorType();
+            return;
+        }
+        auto base = ExpectAType(indexExpr->baseExpression);
+        auto index = CheckIntegerConstantExpression(
+            indexExpr->indexExprs[0],
+            IntegerConstantExpressionCoercionType::AnyInteger,
+            nullptr,
+            getSink());
+
+        Type* d = m_astBuilder->getMeshOutputTypeFromModifier(modifier, base, index);
+        varDecl->type.type = d;
     }
 
     void SemanticsDeclBodyVisitor::visitParamDecl(ParamDecl* paramDecl)
