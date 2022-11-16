@@ -495,10 +495,9 @@ Type* OptionalType::getValueType()
 
 void NamedExpressionType::_toTextOverride(StringBuilder& out)
 {
-    Name* name = declRef.getName();
-    if (name)
+    if (declRef.getDecl())
     {
-        out << name->text;
+        _printNestedDecl(declRef.substitutions, declRef.getDecl(), out);
     }
 }
 

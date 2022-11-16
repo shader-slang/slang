@@ -190,6 +190,9 @@ namespace Slang
         // Reference to the declaration being applied
         LookupResultItem item;
 
+        // The expression when flavor is Expr.
+        Expr* exprVal = nullptr;
+
         // Type of function being applied (for cases where `item` is not used)
         FuncType* funcType = nullptr;
 
@@ -712,9 +715,9 @@ namespace Slang
 
         Type* getDifferentialPairType(Type* primalType);
 
-        // Convert a function's original type to it's JVP type.
-        Type* processJVPFuncType(FuncType* originalType);
-        Type* processBackwardDiffFuncType(FuncType* originalType);
+        // Convert a function's original type to it's forward/backward diff'd type.
+        Type* getForwardDiffFuncType(FuncType* originalType);
+        Type* getBackwardDiffFuncType(FuncType* originalType);
 
         /// Registers a type as conforming to IDifferentiable, along with a witness 
         /// describing the relationship.

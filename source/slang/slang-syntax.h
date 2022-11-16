@@ -276,7 +276,7 @@ namespace Slang
     //
 
     ThisTypeSubstitution* findThisTypeSubstitution(
-        Substitutions*  substs,
+        const Substitutions*  substs,
         InterfaceDecl*  interfaceDecl);
 
     RequirementWitness tryLookUpRequirementWitness(

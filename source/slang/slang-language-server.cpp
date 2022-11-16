@@ -987,6 +987,84 @@ SlangResult LanguageServer::signatureHelp(
         response.signatures.add(sigInfo);
     };
 
+    auto addExpr = [&](Expr* expr)
+    {
+        auto higherOrderExpr = as<HigherOrderInvokeExpr>(expr);
+        if (!higherOrderExpr)
+            return;
+        auto funcType = as<FuncType>(higherOrderExpr->type);
+        if (!funcType)
+            return;
+        auto declRefExpr = as<DeclRefExpr>(getInnerMostExprFromHigherOrderExpr(higherOrderExpr));
+        if (!declRefExpr)
+            return;
+        if (!declRefExpr->declRef.getDecl())
+            return;
+        
+        SignatureInformation sigInfo;
+
+        List<Slang::Range<Index>> paramRanges;
+        ASTPrinter printer(
+            version->linkage->getASTBuilder(),
+            ASTPrinter::OptionFlag::ParamNames | ASTPrinter::OptionFlag::NoInternalKeywords |
+            ASTPrinter::OptionFlag::SimplifiedBuiltinType);
+
+        printer.addDeclKindPrefix(declRefExpr->declRef.getDecl());
+        auto inner = higherOrderExpr;
+        int closingParentCount = 0;
+        while (inner)
+        {
+            printer.getStringBuilder() << getHigherOrderOperatorName(inner) << "(";
+            closingParentCount++;
+            inner = as<HigherOrderInvokeExpr>(inner->baseFunction);
+        }
+        printer.addDeclPath(declRefExpr->declRef);
+        for (int i = 0; i < closingParentCount; i++)
+            printer.getStringBuilder() << ")";
+        bool isFirst = true;
+        printer.getStringBuilder() << "(";
+        int paramIndex = 0;
+        for (auto param : funcType->paramTypes)
+        {
+            if (!isFirst)
+                printer.getStringBuilder() << ", ";
+            Slang::Range<Index> range;
+            range.begin = printer.getStringBuilder().getLength();
+            if (paramIndex < higherOrderExpr->newParameterNames.getCount())
+            {
+                if (higherOrderExpr->newParameterNames[paramIndex])
+                {
+                    printer.getStringBuilder() << higherOrderExpr->newParameterNames[paramIndex]->text << ": ";
+                }
+            }
+            printer.addType(param);
+            range.end = printer.getStringBuilder().getLength();
+            paramRanges.add(range);
+            isFirst = false;
+            paramIndex++;
+        }
+        printer.getStringBuilder() << ") -> ";
+        printer.addType(funcType->getResultType());
+
+        sigInfo.label = printer.getString();
+
+        StringBuilder docSB;
+        auto humaneLoc = version->linkage->getSourceManager()->getHumaneLoc(declRefExpr->declRef.getLoc(), SourceLocType::Actual);
+        _tryGetDocumentation(docSB, version, declRefExpr->declRef.getDecl());
+        appendDefinitionLocation(docSB, m_workspace, humaneLoc);
+        sigInfo.documentation.value = docSB.ProduceString();
+        sigInfo.documentation.kind = "markdown";
+
+        for (auto& range : paramRanges)
+        {
+            ParameterInformation paramInfo;
+            paramInfo.label[0] = (uint32_t)range.begin;
+            paramInfo.label[1] = (uint32_t)range.end;
+            sigInfo.parameters.add(paramInfo);
+        }
+        response.signatures.add(sigInfo);
+    };
+
     auto addFuncType = [&](FuncType* funcType)
     {
         SignatureInformation sigInfo;
@@ -1044,6 +1122,17 @@ SlangResult LanguageServer::signatureHelp(
         {
             addDeclRef(item.declRef);
         }
+    }
+    else if (auto overloadedExpr2 = as<OverloadedExpr2>(funcExpr))
+    {
+        for (auto item : overloadedExpr2->candidiateExprs)
+        {
+            addExpr(item);
+        }
+    }
+    else if (auto higherOrder = as<HigherOrderInvokeExpr>(funcExpr))
+    {
+        addExpr(higherOrder);
     }
     else if (auto funcType = as<FuncType>(funcExpr->type.type))
     {
