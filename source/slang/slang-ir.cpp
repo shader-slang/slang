@@ -3111,6 +3111,9 @@ namespace Slang
 
     IRInst* IRBuilder::emitMakeDifferentialPair(IRType* type, IRInst* primal, IRInst* differential)
     {
+        SLANG_RELEASE_ASSERT(as<IRDifferentialPairType>(type));
+        SLANG_RELEASE_ASSERT(as<IRDifferentialPairType>(type)->getValueType() != nullptr);
+
         IRInst* args[] = {primal, differential};
         auto inst = createInstWithTrailingArgs<IRMakeDifferentialPair>(
             this, kIROp_MakeDifferentialPair, type, 2, args);
