@@ -176,7 +176,6 @@ namespace Slang
             FixityChecked,
             TypeChecked,
             DirectionChecked,
-            ConstraintsChecked,
             Applicable,
         };
         Status status = Status::Unchecked;
@@ -1578,12 +1577,6 @@ namespace Slang
         bool TryCheckOverloadCandidateConstraints(
             OverloadResolveContext&		context,
             OverloadCandidate&	candidate);
-
-        // If we are calling a function through an higher-order differentiate operator,
-        // we need to check the function itself is marked as differentiable.
-        bool TryCheckOverloadCandidateDifferentiability(
-            OverloadResolveContext& context,
-            OverloadCandidate& candidate);
 
         // Try to check an overload candidate, but bail out
         // if any step fails

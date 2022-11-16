@@ -548,55 +548,6 @@ namespace Slang
         return true;
     }
 
-    bool SemanticsVisitor::TryCheckOverloadCandidateDifferentiability(
-        OverloadResolveContext& context,
-        OverloadCandidate& candidate)
-    {
-        if (!candidate.exprVal)
-            return true;
-        auto declRefExpr = as<DeclRefExpr>(getInnerMostExprFromHigherOrderExpr(candidate.exprVal));
-        if (!declRefExpr)
-            return true;
-        bool requireForwardDifferentiability = false;
-        bool requireBackwardDifferentiability = false;
-        auto expr = candidate.exprVal;
-        while (auto hoExpr = as<HigherOrderInvokeExpr>(expr))
-        {
-            if (as<BackwardDifferentiateExpr>(hoExpr))
-                requireBackwardDifferentiability = true;
-            if (as<ForwardDifferentiateExpr>(expr))
-                requireForwardDifferentiability = true;
-            expr = hoExpr->baseFunction;
-        }
-        auto maybeDiagnoseError = [&](const char* diffType)
-        {
-            if (context.mode != OverloadResolveContext::Mode::JustTrying)
-            {
-                getSink()->diagnose(
-                    declRefExpr->loc,
-                    Diagnostics::functionNotMarkedAsDifferentiable,
-                    declRefExpr->declRef,
-                    diffType);
-            }
-        };
-        if (requireBackwardDifferentiability)
-        {
-            if (declRefExpr->declRef.getDecl()->findModifier<BackwardDifferentiableAttribute>())
-                return true;
-            //TODO: support `BackwardDerivative` attribute if we add them later.
-            maybeDiagnoseError("backward");
-            return false;
-        }
-        if (requireForwardDifferentiability)
-        {
-            if (declRefExpr->declRef.getDecl()->findModifier<DifferentiableAttribute>())
-                return true;
-            maybeDiagnoseError("forward");
-            return false;
-        }
-        return true;
-    }
-
     void SemanticsVisitor::TryCheckOverloadCandidate(
         OverloadResolveContext&		context,
         OverloadCandidate&			candidate)
@@ -618,10 +569,6 @@ namespace Slang
 
         candidate.status = OverloadCandidate::Status::DirectionChecked;
         if (!TryCheckOverloadCandidateConstraints(context, candidate))
-            return;
-
-        candidate.status = OverloadCandidate::Status::ConstraintsChecked;
-        if (!TryCheckOverloadCandidateDifferentiability(context, candidate))
             return;
 
         candidate.status = OverloadCandidate::Status::Applicable;
@@ -699,8 +646,6 @@ namespace Slang
         if (!TryCheckOverloadCandidateConstraints(context, candidate))
             goto error;
 
-        if (!TryCheckOverloadCandidateDifferentiability(context, candidate))
-            goto error;
         {
             auto originalAppExpr = as<AppExprBase>(context.originalExpr);
 
