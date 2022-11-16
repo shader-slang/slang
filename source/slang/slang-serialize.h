@@ -359,8 +359,14 @@ public:
     SerialIndex addName(const Name* name);
 
         /// Adding import symbols
-    SerialIndex addImportSymbol(const UnownedStringSlice& slice) { return _addStringSlice(SerialTypeKind::ImportSymbol, m_importSymbolMap, slice); }
-    SerialIndex addImportSymbol(const String& string){ return _addStringSlice(SerialTypeKind::ImportSymbol, m_importSymbolMap, string.getUnownedSlice()); }
+    SerialIndex addImportSymbol(const UnownedStringSlice& slice)
+    {
+        return _addStringSlice(SerialTypeKind::ImportSymbol, m_importSymbolMap, slice);
+    }
+    SerialIndex addImportSymbol(const String& string)
+    {
+        return _addStringSlice(SerialTypeKind::ImportSymbol, m_importSymbolMap, string.getUnownedSlice());
+    }
 
         /// Set a the ptr associated with an index.
         /// NOTE! That there cannot be a pre-existing setting.

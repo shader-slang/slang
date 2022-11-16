@@ -402,8 +402,6 @@ Result linkAndOptimizeIR(
     if (sink->getErrorCount() != 0)
         return SLANG_FAIL;
 
-    eliminateMultiLevelBreak(irModule);
-
     // TODO(DG): There are multiple DCE steps here, which need to be changed
     //   so that they don't just throw out any non-entry point code
     // Debugging code for IR transformations...
@@ -804,6 +802,8 @@ Result linkAndOptimizeIR(
         {
             LivenessUtil::addVariableRangeStarts(irModule, livenessMode);
         }
+
+        eliminateMultiLevelBreak(irModule);
 
         // As a late step, we need to take the SSA-form IR and move things *out*
         // of SSA form, by eliminating all "phi nodes" (block parameters) and

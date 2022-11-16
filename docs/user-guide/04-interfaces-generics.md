@@ -155,6 +155,26 @@ struct MyObject : IComparable
 ```
 In this example, the `IComparable` interface declares that any conforming type must provide a `comparesTo` method that performs a comparison between an object to another object of the same type. The `MyObject` type satisfies this requirement by providing a `comparesTo` method that accepts a `MyObject` typed argument, since in the scope of `MyObject`, `This` type is equivalent to `MyObject`.
 
+### Static Constants
+
+You can define static constant requirements in an interface. The constants can be accessed in places where a compile-time constant is needed.
+```csharp
+interface IMyValue
+{
+    static const int value;
+}
+struct MyObject2 : IMyValue
+{
+    static const int value = 2;
+}
+struct GetValuePlus1<T:IMyValue>
+{
+    static const int value = T.value + 1;
+}
+
+static const int result = GetValuePlus1<MyObject2>.value;  // result == 3
+```
+
 ### Initializers
 
 Consider a generic method that wants to create and initialize a new instance of generic type `T`:
@@ -615,6 +635,40 @@ extension MyObject : IBar, IBar2
     float bar2() { return 2.0f }
 }
 ```
+
+`is` and `as` Operator
+----------------------------
+
+You can use `is` operator to test if an interface-typed value is of a specific concrete type, and use `as` operator to downcast the value into a specific type.
+The `as` operator returns an `Optional<T>` that is not `none` if the downcast succeeds.
+
+```csharp
+interface IFoo
+{
+    int foo();
+}
+struct MyImpl : IFoo
+{
+    int foo() { return 0; }
+}
+void test(IFoo foo)
+{
+    bool t = foo is MyImpl; // true
+    Optional<MyImpl> optV = foo as MyImpl;
+    if (t == (optV != none))
+        printf("success");
+    else
+        printf("fail");
+}
+void main()
+{
+    MyImpl v;
+    test(v);
+}
+// Result:
+// "success"
+```
+
 
 Extensions to Interfaces
 -----------------------------

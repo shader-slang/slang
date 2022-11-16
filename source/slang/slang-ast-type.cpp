@@ -473,6 +473,11 @@ Type* NamespaceType::_createCanonicalTypeOverride()
     return this;
 }
 
+Type* DifferentialPairType::getPrimalType()
+{
+    return as<Type>(findInnerMostGenericSubstitution(declRef.substitutions)->getArgs()[0]);
+}
+
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! PtrTypeBase !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 

@@ -870,16 +870,21 @@ struct JVPTranscriber
                 cloneInst(&cloneEnv, builder, origParam),
                 nullptr);    
         }
-        
-        if (auto diffPairType = tryGetDiffPairType(builder, (IRType*)primalDataType))
+
+        // Is this param a phi node or a function parameter?
+        auto func = as<IRGlobalValueWithCode>(origParam->getParent()->getParent());
+        bool isFuncParam = (func && origParam->getParent() == func->getFirstBlock());
+        if (isFuncParam)
         {
-            IRInst* diffPairParam = builder->emitParam(diffPairType);
+            if (auto diffPairType = tryGetDiffPairType(builder, (IRType*)primalDataType))
+            {
+                IRInst* diffPairParam = builder->emitParam(diffPairType);
 
-            auto diffPairVarName = makeDiffPairName(origParam);
-            if (diffPairVarName.getLength() > 0)
-                builder->addNameHintDecoration(diffPairParam, diffPairVarName.getUnownedSlice());
+                auto diffPairVarName = makeDiffPairName(origParam);
+                if (diffPairVarName.getLength() > 0)
+                    builder->addNameHintDecoration(diffPairParam, diffPairVarName.getUnownedSlice());
 
-            SLANG_ASSERT(diffPairParam);
+                SLANG_ASSERT(diffPairParam);
 
             if (auto pairType = as<IRDifferentialPairType>(diffPairType))
             {
@@ -902,6 +907,17 @@ struct JVPTranscriber
                         diffPairParam));
             }
         }
+        else
+        {
+            auto primal = cloneInst(&cloneEnv, builder, origParam);
+            IRInst* diff = nullptr;
+            if (IRType* diffType = differentiateType(builder, (IRType*)primalDataType))
+            {
+                diff = builder->emitParam(diffType);
+            }
+            return InstPair(primal, diff);
+        }
+    }
         
         
         return InstPair(
@@ -1343,42 +1359,49 @@ struct JVPTranscriber
         switch(origInst->getOp())
         {
             case kIROp_unconditionalBranch:
+            case kIROp_loop:
                 auto origBranch = as<IRUnconditionalBranch>(origInst);
 
                 // Grab the differentials for any phi nodes.
-                List<IRInst*> pairArgs;
+                List<IRInst*> newArgs;
                 for (UIndex ii = 0; ii < origBranch->getArgCount(); ii++)
                 {
                     auto origArg = origBranch->getArg(ii);
+                    auto primalArg = lookupPrimalInst(origArg);
+                    newArgs.add(primalArg);
 
-                    IRInst* pairArg = nullptr;
-                    if (auto diffPairType = tryGetDiffPairType(builder, (IRType*)origArg->getDataType()))
+                    if (differentiateType(builder, primalArg->getDataType()))
                     {
                         auto diffArg = lookupDiffInst(origArg, nullptr);
-                        if (!diffArg)
-                        {
-                            diffArg = getDifferentialZeroOfType(builder, (IRType*)origArg->getDataType());
-                        }
-                        
-                        pairArg = builder->emitMakeDifferentialPair(
-                            diffPairType,
-                            lookupPrimalInst(origArg),
-                            diffArg);
+                        if (diffArg)
+                            newArgs.add(diffArg);
                     }
-                    else
-                    {
-                        pairArg = lookupPrimalInst(origArg);
-                    }
-                    pairArgs.add(pairArg);
                 }
 
                 IRInst* diffBranch = nullptr;
                 if (auto diffBlock = findOrTranscribeDiffInst(builder, origBranch->getTargetBlock()))
                 {
-                    diffBranch = builder->emitBranch(
-                        as<IRBlock>(diffBlock),
-                        pairArgs.getCount(),
-                        pairArgs.getBuffer());
+                    if (auto origLoop = as<IRLoop>(origInst))
+                    {
+                        auto breakBlock = findOrTranscribeDiffInst(builder, origLoop->getBreakBlock());
+                        auto continueBlock = findOrTranscribeDiffInst(builder, origLoop->getContinueBlock());
+                        List<IRInst*> operands;
+                        operands.add(breakBlock);
+                        operands.add(continueBlock);
+                        operands.addRange(newArgs);
+                        diffBranch = builder->emitIntrinsicInst(
+                            nullptr,
+                            kIROp_loop,
+                            operands.getCount(),
+                            operands.getBuffer());
+                    }
+                    else
+                    {
+                        diffBranch = builder->emitBranch(
+                            as<IRBlock>(diffBlock),
+                            newArgs.getCount(),
+                            newArgs.getBuffer());
+                    }
                 }
 
                 // For now, every block in the original fn must have a corresponding
@@ -2541,6 +2564,5 @@ void stripAutoDiffDecorations(IRModule* module)
 {
     stripAutoDiffDecorationsFromChildren(module->getModuleInst());
 }
-
 
 }
