@@ -19,7 +19,6 @@
 #include "slang-ir-string-hash.h"
 #include "slang-ir-clone.h"
 #include "slang-ir-lower-error-handling.h"
-
 #include "slang-mangle.h"
 #include "slang-type-layout.h"
 #include "slang-visitor.h"
@@ -984,6 +983,7 @@ top:
                 goto top;
             }
 
+            // TODO: Ellie, Is this really unreachable? User code input can get here
             SLANG_UNEXPECTED("subscript had no getter");
             UNREACHABLE_RETURN(LoweredValInfo());
         }
@@ -1925,6 +1925,14 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         return lowerGenericIntrinsicType(type, elementType, count);
     }
 
+    IRType* visitMeshOutputType(MeshOutputType* type)
+    {
+        Type* elementType = type->getElementType();
+        IntVal* count = type->getMaxElementCount();
+
+        return lowerGenericIntrinsicType(type, elementType, count);
+    }
+
     IRType* visitExtractExistentialType(ExtractExistentialType* type)
     {
         auto declRef = type->declRef;
@@ -2115,7 +2123,11 @@ void addVarDecorations(
         {
             builder->addVulkanCallablePayloadDecoration(inst, callablePayloadAttr->location);
         }
-        else if(as<VulkanHitAttributesAttribute>(mod))
+        else if (auto hitObjectAttr = as<VulkanHitObjectAttributesAttribute>(mod))
+        {
+            builder->addVulkanHitObjectAttributesDecoration(inst, hitObjectAttr->location);
+        }
+        else if (as<VulkanHitAttributesAttribute>(mod))
         {
             builder->addSimpleDecoration<IRVulkanHitAttributesDecoration>(inst);
         }
@@ -2133,6 +2145,26 @@ void addVarDecorations(
         }
 
         // TODO: what are other modifiers we need to propagate through?
+    }
+    if(auto t = composeGetters<IRMeshOutputType>(inst->getFullType(), &IROutTypeBase::getValueType))
+    {
+        IROp op;
+        switch(t->getOp())
+        {
+        case kIROp_VerticesType:
+            op = kIROp_VerticesDecoration;
+            break;
+        case kIROp_IndicesType:
+            op = kIROp_IndicesDecoration;
+            break;
+        case kIROp_PrimitivesType:
+            op = kIROp_PrimitivesDecoration;
+            break;
+        default:
+            SLANG_UNREACHABLE("Missing case for IRMeshOutputType");
+            break;
+        }
+        builder->addMeshOutputDecoration(op, inst, t->getMaxElementCount());
     }
 }
 
@@ -3077,6 +3109,21 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
 
         return LoweredValInfo::simple(
             getBuilder()->emitForwardDifferentiateInst(
+                lowerType(context, expr->type),
+                baseVal.val));
+    }
+
+    // Emit IR to denote the forward-mode derivative
+    // of the inner func-expr. This will be resolved 
+    // to a concrete function during the derivative 
+    // pass.
+    LoweredValInfo visitBackwardDifferentiateExpr(BackwardDifferentiateExpr* expr)
+    {
+        auto baseVal = lowerSubExpr(expr->baseFunction);
+        SLANG_ASSERT(baseVal.flavor == LoweredValInfo::Flavor::Simple);
+
+        return LoweredValInfo::simple(
+            getBuilder()->emitBackwardDifferentiateInst(
                 lowerType(context, expr->type),
                 baseVal.val));
     }
@@ -5992,11 +6039,11 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         IRGenContext*                               subContext,
         WitnessTable*                               astWitnessTable,
         IRWitnessTable*                             irWitnessTable,
-        Dictionary<WitnessTable*, IRWitnessTable*>  mapASTToIRWitnessTable)
+        Dictionary<WitnessTable*, IRWitnessTable*>  &mapASTToIRWitnessTable)
     {
         auto subBuilder = subContext->irBuilder;
 
-        for(auto entry : astWitnessTable->requirementList)
+        for(auto entry : astWitnessTable->requirementDictionary)
         {
             auto requiredMemberDecl = entry.Key;
             auto satisfyingWitness = entry.Value;
@@ -7799,6 +7846,10 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         {
             getBuilder()->addForwardDifferentiableDecoration(irFunc);
         }
+        if (decl->findModifier<BackwardDifferentiableAttribute>())
+        {
+            getBuilder()->addBackwardDifferentiableDecoration(irFunc);
+        }
         if (auto differentialAttr = decl->findModifier<DifferentiableAttribute>())
         {
             lowerDifferentiableAttribute(subContext, irFunc, differentialAttr);
@@ -8221,6 +8272,16 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             // Reset cursor.
             subContext->irBuilder->setInsertInto(irFunc);
         }
+        
+        // For convenience, ensure that any additional global
+        // values that were emitted while outputting the function
+        // body appear before the function itself in the list
+        // of global values.
+        irFunc->moveToEnd();
+
+        // If this function is defined inside an interface, add a reference to the IRFunc from
+        // the interface's type definition.
+        auto finalVal = finishOuterGenerics(subBuilder, irFunc, outerGeneric);
 
         if (auto attr = decl->findModifier<ForwardDerivativeOfAttribute>())
         {
@@ -8229,7 +8290,10 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 NestedContext originalContextFunc(this);
                 auto originalSubBuilder = originalContextFunc.getBuilder();
                 auto originalSubContext = originalContextFunc.getContext();
-
+                if (auto outterGeneric = getOuterGeneric(irFunc))
+                    originalSubBuilder->setInsertBefore(outterGeneric);
+                else
+                    originalSubBuilder->setInsertBefore(irFunc);
                 auto originalFuncDecl = as<FunctionDeclBase>(originalDeclRefExpr->declRef.getDecl());
                 SLANG_RELEASE_ASSERT(originalFuncDecl);
 
@@ -8242,27 +8306,10 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 auto derivativeFuncVal = lowerRValueExpr(originalSubContext, attr->backDeclRef);
                 originalSubBuilder->addForwardDerivativeDecoration(originalFuncVal, derivativeFuncVal.val);
             }
-
-            subContext->irBuilder->setInsertInto(irFunc->getParent());
-            auto loweredVal = lowerRValueExpr(subContext, attr->funcExpr);
-
-            SLANG_ASSERT(loweredVal.flavor == LoweredValInfo::Flavor::Simple);
-            IRInst* originalFunc = loweredVal.val;
-            getBuilder()->addDecoration(irFunc, kIROp_ForwardDerivativeDecoration, originalFunc);
-
+            getBuilder()->addForwardDifferentiableDecoration(irFunc);
             subContext->irBuilder->setInsertInto(irFunc);
+            finalVal->moveToEnd();
         }
-
-        // For convenience, ensure that any additional global
-        // values that were emitted while outputting the function
-        // body appear before the function itself in the list
-        // of global values.
-        irFunc->moveToEnd();
-
-        // If this function is defined inside an interface, add a reference to the IRFunc from
-        // the interface's type definition.
-        auto finalVal = finishOuterGenerics(subBuilder, irFunc, outerGeneric);
-
         return LoweredValInfo::simple(finalVal);
     }
 

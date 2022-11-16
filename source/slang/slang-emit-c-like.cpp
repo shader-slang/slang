@@ -41,6 +41,56 @@ struct CLikeSourceEmitter::ComputeEmitActionsContext
     List<EmitAction>*   actions;
 };
 
+/* !!!!!!!!!!!!!!!!!!!!!!!!!!!! LocationTracker !!!!!!!!!!!!!!!!!!!!!!!!!! */
+
+/* static */LocationTracker::Kind LocationTracker::getKindFromDecoration(IRDecoration* decoration)
+{
+    switch (decoration->getOp())
+    {
+        case kIROp_VulkanRayPayloadDecoration:          return Kind::RayPayload;
+        case kIROp_VulkanCallablePayloadDecoration:     return Kind::CallablePayload;
+        case kIROp_VulkanHitObjectAttributesDecoration: return Kind::HitObjectAttribute;
+        default: break;
+    }
+    return Kind::Invalid;
+}
+
+Index LocationTracker::getValue(IRInst* inst, IRDecoration* decoration)
+{
+    const Kind kind = getKindFromDecoration(decoration);
+    SLANG_RELEASE_ASSERT(kind != Kind::Invalid);
+    if (kind == Kind::Invalid)
+    {
+        return -1;
+    }
+
+    return getValue(kind, inst, decoration);
+}
+
+Index LocationTracker::getValue(Kind kind, IRInst* inst, IRDecoration* decoration)
+{
+    if (decoration->getOperandCount() > 0)
+    {
+        // TODO(JS):
+        // There could be a clash with the auto generated location, and the user set value/ 
+        // Perhaps the implication in practice is that either all are marked or none.
+        const int explicitLocation = int(getIntVal(decoration->getOperand(0)));
+        if (explicitLocation >= 0)
+            return UInt(explicitLocation);
+    }
+
+    auto& nextValue = m_nextValueForKind[Index(kind)];
+
+    const Location defaultLocation{kind, nextValue};
+    const Location foundLocation = m_mapIRToLocations.GetOrAddValue(inst, defaultLocation);
+
+    // Increase if it was the default
+    nextValue += Index(defaultLocation == foundLocation);
+
+    // Has to match the kind
+    return (foundLocation.kind == kind) ? foundLocation.value : -1;
+}
+
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!! CLikeSourceEmitter !!!!!!!!!!!!!!!!!!!!!!!!!! */
 
 /* static */SourceLanguage CLikeSourceEmitter::getSourceLanguage(CodeGenTarget target)
@@ -1171,6 +1221,10 @@ bool CLikeSourceEmitter::shouldFoldInstIntoUseSites(IRInst* inst)
             return true;
         }
         else if(as<IRSamplerStateTypeBase>(type))
+        {
+            return true;
+        }
+        else if(as<IRMeshOutputType>(type))
         {
             return true;
         }
@@ -2649,6 +2703,7 @@ void CLikeSourceEmitter::emitSimpleFuncParamImpl(IRParam* param)
             || layout->usesResourceKind(LayoutResourceKind::VaryingOutput))
         {
             emitInterpolationModifiers(param, paramType, layout);
+            emitMeshOutputModifiers(param);
         }
     }
 
@@ -2872,6 +2927,13 @@ void CLikeSourceEmitter::emitStruct(IRStructType* structType)
     emitPostKeywordTypeAttributes(structType);
 
     m_writer->emit(getName(structType));
+
+    emitStructDeclarationsBlock(structType);
+    m_writer->emit(";\n\n");
+}
+
+void CLikeSourceEmitter::emitStructDeclarationsBlock(IRStructType* structType)
+{
     m_writer->emit("\n{\n");
     m_writer->indent();
 
@@ -2897,7 +2959,7 @@ void CLikeSourceEmitter::emitStruct(IRStructType* structType)
     }
 
     m_writer->dedent();
-    m_writer->emit("};\n\n");
+    m_writer->emit("}");
 }
 
 void CLikeSourceEmitter::emitClass(IRClassType* classType)
@@ -3009,44 +3071,9 @@ void CLikeSourceEmitter::emitInterpolationModifiers(IRInst* varInst, IRType* val
     emitInterpolationModifiersImpl(varInst, valueType, layout);
 }
 
-UInt CLikeSourceEmitter::getRayPayloadLocation(IRInst* inst)
+void CLikeSourceEmitter::emitMeshOutputModifiers(IRInst* varInst)
 {
-    if (auto rayPayloadDecoration = inst->findDecoration<IRVulkanRayPayloadDecoration>())
-    {
-        int explicitLocation = int(getIntVal(rayPayloadDecoration->getOperand(0)));
-
-        if (explicitLocation >= 0)
-            return UInt(explicitLocation);
-    }
-
-    auto& map = m_mapIRValueToRayPayloadLocation;
-    UInt value = 0;
-    if(map.TryGetValue(inst, value))
-        return value;
-
-    value = map.Count();
-    map.Add(inst, value);
-    return value;
-}
-
-UInt CLikeSourceEmitter::getCallablePayloadLocation(IRInst* inst)
-{
-    if (auto callablePayloadDecoration = inst->findDecoration<IRVulkanCallablePayloadDecoration>())
-    {
-        int explicitLocation = int(getIntVal(callablePayloadDecoration->getOperand(0)));
-
-        if (explicitLocation >= 0)
-            return UInt(explicitLocation);
-    }
-
-    auto& map = m_mapIRValueToCallablePayloadLocation;
-    UInt value = 0;
-    if(map.TryGetValue(inst, value))
-        return value;
-
-    value = map.Count();
-    map.Add(inst, value);
-    return value;
+    emitMeshOutputModifiersImpl(varInst);
 }
 
     /// Emit modifiers that should apply even for a declaration of an SSA temporary.
@@ -3077,6 +3104,7 @@ void CLikeSourceEmitter::emitVarModifiers(IRVarLayout* layout, IRInst* varDecl, 
         || layout->usesResourceKind(LayoutResourceKind::VaryingOutput))
     {
         emitInterpolationModifiers(varDecl, varType, layout);
+        emitMeshOutputModifiers(varDecl);
     }
 
     // Output target specific qualifiers

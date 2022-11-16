@@ -849,6 +849,44 @@ __intrinsic_type($(kIROp_ParameterBlockType))
 __magic_type(ParameterBlockType)
 struct ParameterBlock {}
 
+__generic<T, let MAX_VERTS : uint>
+__magic_type(VerticesType)
+__intrinsic_type($(kIROp_VerticesType))
+struct Vertices
+{
+    __subscript(uint index) -> T
+    {
+        // TODO: Ellie make sure these remains write only
+        __intrinsic_op($(kIROp_getElementPtr))
+        ref;
+    }
+};
+
+__generic<T, let MAX_PRIMITIVES : uint>
+__magic_type(IndicesType)
+__intrinsic_type($(kIROp_IndicesType))
+struct Indices
+{
+    __subscript(uint index) -> T
+    {
+        // TODO: Ellie: It's illegal to not write out the whole primitive at once, should we use set over ref?
+        __intrinsic_op($(kIROp_getElementPtr))
+        ref;
+    }
+};
+
+__generic<T, let MAX_PRIMITIVES : uint>
+__magic_type(PrimitivesType)
+__intrinsic_type($(kIROp_PrimitivesType))
+struct Primitives
+{
+    __subscript(uint index) -> T
+    {
+        __intrinsic_op($(kIROp_getElementPtr))
+        ref;
+    }
+};
+
 //@ hidden:
 
 // Need to add constructors to the types above
@@ -2795,6 +2833,9 @@ attribute_syntax [__vulkanRayPayload(location : int = -1)] : VulkanRayPayloadAtt
 
 __attributeTarget(VarDeclBase)
 attribute_syntax [__vulkanCallablePayload(location : int = -1)] : VulkanCallablePayloadAttribute;
+
+__attributeTarget(VarDeclBase)
+attribute_syntax [__vulkanHitObjectAttributes(location : int = -1)] : VulkanHitObjectAttributesAttribute;
 
 __attributeTarget(VarDeclBase)
 attribute_syntax [__vulkanHitAttributes] : VulkanHitAttributesAttribute;

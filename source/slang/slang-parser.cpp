@@ -2109,6 +2109,26 @@ namespace Slang
         return parseForwardDifferentiate(parser);
     }
 
+        /// Parse an expression of the form __bwd_diff(fn) where fn is an 
+        /// identifier pointing to a function.
+    static Expr* parseBackwardDifferentiate(Parser* parser)
+    {
+        BackwardDifferentiateExpr* bwdDiffExpr = parser->astBuilder->create<BackwardDifferentiateExpr>();
+
+        parser->ReadToken(TokenType::LParent);
+
+        bwdDiffExpr->baseFunction = parser->ParseExpression();
+
+        parser->ReadToken(TokenType::RParent);
+
+        return bwdDiffExpr;
+    }
+
+    static NodeBase* parseBackwardDifferentiate(Parser* parser, void* /* unused */)
+    {
+        return parseBackwardDifferentiate(parser);
+    }
+
         /// Parse a `This` type expression
     static Expr* parseThisTypeExpr(Parser* parser)
     {
@@ -6607,6 +6627,11 @@ namespace Slang
         _makeParseModifier("lineadj",       HLSLLineAdjModifier::kReflectClassInfo),
         _makeParseModifier("triangleadj",   HLSLTriangleAdjModifier::kReflectClassInfo),
 
+        // Modifiers for mesh shader parameters
+        _makeParseModifier("vertices",      HLSLVerticesModifier::kReflectClassInfo),
+        _makeParseModifier("indices",       HLSLIndicesModifier::kReflectClassInfo),
+        _makeParseModifier("primitives",    HLSLPrimitivesModifier::kReflectClassInfo),
+
         // Modifiers for unary operator declarations
         _makeParseModifier("__prefix",      PrefixModifier::kReflectClassInfo),
         _makeParseModifier("__postfix",     PostfixModifier::kReflectClassInfo),
@@ -6646,7 +6671,8 @@ namespace Slang
         _makeParseExpr("none", parseNoneExpr),
         _makeParseExpr("try",     parseTryExpr),
         _makeParseExpr("__TaggedUnion", parseTaggedUnionType),
-        _makeParseExpr("__fwd_diff", parseForwardDifferentiate)
+        _makeParseExpr("__fwd_diff", parseForwardDifferentiate),
+        _makeParseExpr("__bwd_diff", parseBackwardDifferentiate)
     };
 
     ConstArrayView<SyntaxParseInfo> getSyntaxParseInfos()

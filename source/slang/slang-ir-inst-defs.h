@@ -164,6 +164,12 @@ INST(Nop, nop, 0, 0)
             INST(HLSLTriangleStreamType,    TriangleStream, 1, 0)
         INST_RANGE(HLSLStreamOutputType, HLSLPointStreamType, HLSLTriangleStreamType)
 
+        /* MeshOutputType */
+            INST(VerticesType,   Vertices, 2, 0)
+            INST(IndicesType,    Indices,  2, 0)
+            INST(PrimitivesType, Primitives, 2, 0)
+        INST_RANGE(MeshOutputType, VerticesType, PrimitivesType)
+
         /* HLSLStructuredBufferTypeBase */
             INST(HLSLStructuredBufferType,                  StructuredBuffer,                   0, 0)
             INST(HLSLRWStructuredBufferType,                RWStructuredBuffer,                 0, 0)
@@ -393,6 +399,8 @@ INST(StructuredBufferLoad, structuredBufferLoad, 2, 0)
 //
 INST(StructuredBufferStore, structuredBufferStore, 3, 0)
 
+INST(MeshOutputRef, meshOutputRef, 2, 0)
+
 // Construct a vector from a scalar
 //
 // %dst = constructVectorFromScalar %T %N %val
@@ -586,6 +594,8 @@ INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
 
     INST(VulkanRayPayloadDecoration,        vulkanRayPayload,       0, 0)
     INST(VulkanHitAttributesDecoration,     vulkanHitAttributes,    0, 0)
+    INST(VulkanHitObjectAttributesDecoration, vulkanHitObjectAttributes, 0, 0)
+
     INST(RequireSPIRVVersionDecoration,     requireSPIRVVersion,    1, 0)
     INST(RequireGLSLVersionDecoration,      requireGLSLVersion,     1, 0)
     INST(RequireGLSLExtensionDecoration,    requireGLSLExtension,   1, 0)
@@ -691,6 +701,13 @@ INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
 
     INST(PayloadDecoration, payload, 0, 0)
 
+    /* Mesh Shader outputs */
+        INST(VerticesDecoration, vertices, 1, 0)
+        INST(IndicesDecoration, indices, 1, 0)
+        INST(PrimitivesDecoration, primitives, 1, 0)
+    INST_RANGE(MeshOutputDecoration, VerticesDecoration, PrimitivesDecoration)
+    INST(GLSLPrimitivesRateDecoration, perprimitive, 0, 0)
+
     /* StageAccessDecoration */
         INST(StageReadAccessDecoration, stageReadAccess, 0, 0)
         INST(StageWriteAccessDecoration, stageWriteAccess, 0, 0)
@@ -706,6 +723,14 @@ INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
         /// Used by the auto-diff pass to hold a reference to the
         /// generated derivative function.
     INST(ForwardDerivativeDecoration, fwdDerivative, 1, 0)
+
+        /// Used by the auto-diff pass to hold a reference to the
+        /// generated derivative function.
+    INST(BackwardDifferentiableDecoration, backwardDifferentiable, 1, 0)
+
+        /// Used by the auto-diff pass to hold a reference to the
+        /// generated derivative function.
+    INST(BackwardDerivativeDecoration, backwardDiffReference, 1, 0)
 
         /// Used by the auto-diff pass to hold a reference to a
         /// differential member of a type in its associated differential type.
@@ -763,6 +788,7 @@ INST(Reinterpret,                       reinterpret,                1, 0)
 INST(CastPtrToBool, CastPtrToBool, 1, 0)
 INST(IsType, IsType, 3, 0)
 INST(ForwardDifferentiate,                   ForwardDifferentiate,            1, 0)
+INST(BackwardDifferentiate,                  BackwardDifferentiate,           1, 0)
 INST(DifferentialEqualityTypeCast, DifferentialEqualityTypeCast, 1, 0)
 
 // Converts other resources (such as ByteAddressBuffer) to the equivalent StructuredBuffer

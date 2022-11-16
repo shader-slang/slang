@@ -69,7 +69,7 @@ void printDiagnosticArg(StringBuilder& sb, Token const& token)
     sb << token.getContent();
 }
 
-SourceLoc const& getDiagnosticPos(Token const& token)
+SourceLoc getDiagnosticPos(Token const& token)
 {
     return token.loc;
 }

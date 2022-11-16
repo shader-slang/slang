@@ -339,8 +339,9 @@ newoption {
      filter { "toolset:clang or gcc*", "language:C++" }
          buildoptions { "-Wno-reorder", "-Wno-class-memaccess"}
 
-     filter { "toolset:gcc*"}
-         buildoptions { "-Wno-implicit-fallthrough"  }
+     filter { "toolset:gcc*" }
+         buildoptions { "-Wno-implicit-fallthrough", "-Wno-maybe-uninitialized" }
+
 
      filter { "toolset:clang" }
           buildoptions { "-Wno-deprecated-register", "-Wno-tautological-compare", "-Wno-missing-braces", "-Wno-undefined-var-template", "-Wno-unused-function", "-Wno-return-std-move", "-Wno-ignored-optimization-argument", "-Wno-unknown-warning-option" }
@@ -1501,6 +1502,8 @@ tool "slangd"
          "external/miniz/miniz_tinfl.c",
          "external/miniz/miniz_zip.c"
      }
+     filter { "system:linux" }
+         defines { "_LARGEFILE64_SOURCE" }
  
      filter { "system:linux or macosx" }
          links { "dl"}

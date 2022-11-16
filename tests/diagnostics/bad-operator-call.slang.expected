@@ -3,38 +3,38 @@ standard error = {
 tests/diagnostics/bad-operator-call.slang(18): error 39999: no overload for '+=' applicable to arguments of type (int, S)
     a += b;
       ^~
-core.meta.slang(2219): note 39999: candidate: __unsafeForceInlineEarly func +=<T, R:int, C:int>(out matrix<T,R,C>, T) -> matrix<T,R,C>
-core.meta.slang(2211): note 39999: candidate: __unsafeForceInlineEarly func +=<T, R:int, C:int>(out matrix<T,R,C>, matrix<T,R,C>) -> matrix<T,R,C>
-core.meta.slang(2203): note 39999: candidate: __unsafeForceInlineEarly func +=<T, N:int>(out vector<T,N>, T) -> vector<T,N>
-core.meta.slang(2195): note 39999: candidate: __unsafeForceInlineEarly func +=<T, N:int>(out vector<T,N>, vector<T,N>) -> vector<T,N>
-core.meta.slang(2187): note 39999: candidate: __unsafeForceInlineEarly func +=<T>(out T, T) -> T
+core.meta.slang(2430): note 39999: candidate: func +=<T, R:int, C:int>(out matrix<T,R,C>, T) -> matrix<T,R,C>
+core.meta.slang(2422): note 39999: candidate: func +=<T, R:int, C:int>(out matrix<T,R,C>, matrix<T,R,C>) -> matrix<T,R,C>
+core.meta.slang(2414): note 39999: candidate: func +=<T, N:int>(out vector<T,N>, T) -> vector<T,N>
+core.meta.slang(2406): note 39999: candidate: func +=<T, N:int>(out vector<T,N>, vector<T,N>) -> vector<T,N>
+core.meta.slang(2398): note 39999: candidate: func +=<T>(out T, T) -> T
 tests/diagnostics/bad-operator-call.slang(20): error 39999: no overload for '+' applicable to arguments of type (int, S)
     a = a + b;
           ^
-core.meta.slang(2045): note 39999: candidate: __intrinsic_op func +(uintptr_t, uintptr_t) -> uintptr_t
-core.meta.slang(2037): note 39999: candidate: __intrinsic_op func +(uint64_t, uint64_t) -> uint64_t
-core.meta.slang(2029): note 39999: candidate: __intrinsic_op func +(uint, uint) -> uint
-core.meta.slang(2021): note 39999: candidate: __intrinsic_op func +(uint16_t, uint16_t) -> uint16_t
-core.meta.slang(2013): note 39999: candidate: __intrinsic_op func +(uint8_t, uint8_t) -> uint8_t
-core.meta.slang(2005): note 39999: candidate: __intrinsic_op func +(double, double) -> double
-core.meta.slang(1997): note 39999: candidate: __intrinsic_op func +(float, float) -> float
-core.meta.slang(1989): note 39999: candidate: __intrinsic_op func +(half, half) -> half
-core.meta.slang(1981): note 39999: candidate: __intrinsic_op func +(intptr_t, intptr_t) -> intptr_t
-core.meta.slang(1973): note 39999: candidate: __intrinsic_op func +(int64_t, int64_t) -> int64_t
+core.meta.slang(2256): note 39999: candidate: func +(uintptr_t, uintptr_t) -> uintptr_t
+core.meta.slang(2248): note 39999: candidate: func +(uint64_t, uint64_t) -> uint64_t
+core.meta.slang(2240): note 39999: candidate: func +(uint, uint) -> uint
+core.meta.slang(2232): note 39999: candidate: func +(uint16_t, uint16_t) -> uint16_t
+core.meta.slang(2224): note 39999: candidate: func +(uint8_t, uint8_t) -> uint8_t
+core.meta.slang(2216): note 39999: candidate: func +(double, double) -> double
+core.meta.slang(2208): note 39999: candidate: func +(float, float) -> float
+core.meta.slang(2200): note 39999: candidate: func +(half, half) -> half
+core.meta.slang(2192): note 39999: candidate: func +(intptr_t, intptr_t) -> intptr_t
+core.meta.slang(2184): note 39999: candidate: func +(int64_t, int64_t) -> int64_t
 tests/diagnostics/bad-operator-call.slang(20): note 39999: 3 more overload candidates
 tests/diagnostics/bad-operator-call.slang(22): error 39999: no overload for '~' applicable to arguments of type (S)
     a = ~b;
         ^
-core.meta.slang(1914): note 39999: candidate: __prefix __intrinsic_op func ~(uintptr_t) -> uintptr_t
-core.meta.slang(1910): note 39999: candidate: __prefix __intrinsic_op func ~(uint64_t) -> uint64_t
-core.meta.slang(1906): note 39999: candidate: __prefix __intrinsic_op func ~(uint) -> uint
-core.meta.slang(1902): note 39999: candidate: __prefix __intrinsic_op func ~(uint16_t) -> uint16_t
-core.meta.slang(1898): note 39999: candidate: __prefix __intrinsic_op func ~(uint8_t) -> uint8_t
-core.meta.slang(1894): note 39999: candidate: __prefix __intrinsic_op func ~(intptr_t) -> intptr_t
-core.meta.slang(1890): note 39999: candidate: __prefix __intrinsic_op func ~(int64_t) -> int64_t
-core.meta.slang(1886): note 39999: candidate: __prefix __intrinsic_op func ~(int) -> int
-core.meta.slang(1882): note 39999: candidate: __prefix __intrinsic_op func ~(int16_t) -> int16_t
-core.meta.slang(1878): note 39999: candidate: __prefix __intrinsic_op func ~(int8_t) -> int8_t
+core.meta.slang(2125): note 39999: candidate: __prefix func ~(uintptr_t) -> uintptr_t
+core.meta.slang(2121): note 39999: candidate: __prefix func ~(uint64_t) -> uint64_t
+core.meta.slang(2117): note 39999: candidate: __prefix func ~(uint) -> uint
+core.meta.slang(2113): note 39999: candidate: __prefix func ~(uint16_t) -> uint16_t
+core.meta.slang(2109): note 39999: candidate: __prefix func ~(uint8_t) -> uint8_t
+core.meta.slang(2105): note 39999: candidate: __prefix func ~(intptr_t) -> intptr_t
+core.meta.slang(2101): note 39999: candidate: __prefix func ~(int64_t) -> int64_t
+core.meta.slang(2097): note 39999: candidate: __prefix func ~(int) -> int
+core.meta.slang(2093): note 39999: candidate: __prefix func ~(int16_t) -> int16_t
+core.meta.slang(2089): note 39999: candidate: __prefix func ~(int8_t) -> int8_t
 tests/diagnostics/bad-operator-call.slang(27): error 30047: argument passed to parameter '0' must be l-value.
     a += c;
     ^
@@ -42,24 +42,24 @@ tests/diagnostics/bad-operator-call.slang(27): note 30048: argument was implicit
 tests/diagnostics/bad-operator-call.slang(31): error 39999: no overload for '+=' applicable to arguments of type (vector<float,3>, vector<int,4>)
     d += c;
       ^~
-core.meta.slang(2219): note 39999: candidate: __unsafeForceInlineEarly func +=<T, R:int, C:int>(out matrix<T,R,C>, T) -> matrix<T,R,C>
-core.meta.slang(2211): note 39999: candidate: __unsafeForceInlineEarly func +=<T, R:int, C:int>(out matrix<T,R,C>, matrix<T,R,C>) -> matrix<T,R,C>
-core.meta.slang(2203): note 39999: candidate: __unsafeForceInlineEarly func +=<T, N:int>(out vector<T,N>, T) -> vector<T,N>
-core.meta.slang(2195): note 39999: candidate: __unsafeForceInlineEarly func +=<T, N:int>(out vector<T,N>, vector<T,N>) -> vector<T,N>
-core.meta.slang(2187): note 39999: candidate: __unsafeForceInlineEarly func +=<T>(out T, T) -> T
+core.meta.slang(2430): note 39999: candidate: func +=<T, R:int, C:int>(out matrix<T,R,C>, T) -> matrix<T,R,C>
+core.meta.slang(2422): note 39999: candidate: func +=<T, R:int, C:int>(out matrix<T,R,C>, matrix<T,R,C>) -> matrix<T,R,C>
+core.meta.slang(2414): note 39999: candidate: func +=<T, N:int>(out vector<T,N>, T) -> vector<T,N>
+core.meta.slang(2406): note 39999: candidate: func +=<T, N:int>(out vector<T,N>, vector<T,N>) -> vector<T,N>
+core.meta.slang(2398): note 39999: candidate: func +=<T>(out T, T) -> T
 tests/diagnostics/bad-operator-call.slang(33): error 39999: no overload for '+' applicable to arguments of type (vector<int,4>, vector<float,3>)
     d = c + d;
           ^
-core.meta.slang(2051): note 39999: candidate: __intrinsic_op func +<4>(vector<uintptr_t,4>, uintptr_t) -> vector<uintptr_t,4>
-core.meta.slang(2049): note 39999: candidate: __intrinsic_op func +<3>(uintptr_t, vector<uintptr_t,3>) -> vector<uintptr_t,3>
-core.meta.slang(2045): note 39999: candidate: __intrinsic_op func +(uintptr_t, uintptr_t) -> uintptr_t
-core.meta.slang(2043): note 39999: candidate: __intrinsic_op func +<4>(vector<uint64_t,4>, uint64_t) -> vector<uint64_t,4>
-core.meta.slang(2041): note 39999: candidate: __intrinsic_op func +<3>(uint64_t, vector<uint64_t,3>) -> vector<uint64_t,3>
-core.meta.slang(2037): note 39999: candidate: __intrinsic_op func +(uint64_t, uint64_t) -> uint64_t
-core.meta.slang(2035): note 39999: candidate: __intrinsic_op func +<4>(vector<uint,4>, uint) -> vector<uint,4>
-core.meta.slang(2033): note 39999: candidate: __intrinsic_op func +<3>(uint, vector<uint,3>) -> vector<uint,3>
-core.meta.slang(2029): note 39999: candidate: __intrinsic_op func +(uint, uint) -> uint
-core.meta.slang(2027): note 39999: candidate: __intrinsic_op func +<4>(vector<uint16_t,4>, uint16_t) -> vector<uint16_t,4>
+core.meta.slang(2262): note 39999: candidate: func +<4>(uintptr_t4, uintptr_t) -> uintptr_t4
+core.meta.slang(2260): note 39999: candidate: func +<3>(uintptr_t, uintptr_t3) -> uintptr_t3
+core.meta.slang(2256): note 39999: candidate: func +(uintptr_t, uintptr_t) -> uintptr_t
+core.meta.slang(2254): note 39999: candidate: func +<4>(uint64_t4, uint64_t) -> uint64_t4
+core.meta.slang(2252): note 39999: candidate: func +<3>(uint64_t, uint64_t3) -> uint64_t3
+core.meta.slang(2248): note 39999: candidate: func +(uint64_t, uint64_t) -> uint64_t
+core.meta.slang(2246): note 39999: candidate: func +<4>(uint4, uint) -> uint4
+core.meta.slang(2244): note 39999: candidate: func +<3>(uint, uint3) -> uint3
+core.meta.slang(2240): note 39999: candidate: func +(uint, uint) -> uint
+core.meta.slang(2238): note 39999: candidate: func +<4>(uint16_t4, uint16_t) -> uint16_t4
 tests/diagnostics/bad-operator-call.slang(33): note 39999: 29 more overload candidates
 }
 standard output = {

@@ -829,6 +829,16 @@ class VulkanHitAttributesAttribute : public Attribute
     SLANG_AST_CLASS(VulkanHitAttributesAttribute)
 };
 
+// A `[__vulkanHitObjectAttributes(location)]` attribute, which is used in the
+// standard library implementation to indicate that a variable
+// actually represents the attributes on a HitObject as part of
+// Shader ExecutionReordering
+class VulkanHitObjectAttributesAttribute : public Attribute
+{
+    SLANG_AST_CLASS(VulkanHitObjectAttributesAttribute)
+
+    int location;
+};
 
 // A `[mutating]` attribute, which indicates that a member
 // function is allowed to modify things through its `this`
@@ -890,6 +900,28 @@ class HLSLLineAdjModifier : public HLSLGeometryShaderInputPrimitiveTypeModifier
 class HLSLTriangleAdjModifier : public HLSLGeometryShaderInputPrimitiveTypeModifier 
 {
     SLANG_AST_CLASS(HLSLTriangleAdjModifier)
+};
+
+// Mesh shader paramters
+
+class HLSLMeshShaderOutputModifier : public Modifier
+{
+    SLANG_AST_CLASS(HLSLMeshShaderOutputModifier)
+};
+
+class HLSLVerticesModifier : public HLSLMeshShaderOutputModifier
+{
+    SLANG_AST_CLASS(HLSLVerticesModifier)
+};
+
+class HLSLIndicesModifier : public HLSLMeshShaderOutputModifier
+{
+    SLANG_AST_CLASS(HLSLIndicesModifier)
+};
+
+class HLSLPrimitivesModifier : public HLSLMeshShaderOutputModifier
+{
+    SLANG_AST_CLASS(HLSLPrimitivesModifier)
 };
 
 // A modifier to indicate that a constructor/initializer can be used
@@ -1036,13 +1068,21 @@ class ForwardDerivativeAttribute : public DifferentiableAttribute
 
     /// The `[ForwardDerivativeOf(primalFunction)]` attribute marks the decorated function as custom
     /// derivative implementation for `primalFunction`.
-class ForwardDerivativeOfAttribute : public Attribute
+    /// ForwardDerivativeOfAttribute inherits from DifferentiableAttribute because a derivative
+    /// function itself is considered differentiable.
+class ForwardDerivativeOfAttribute : public DifferentiableAttribute
 {
     SLANG_AST_CLASS(ForwardDerivativeOfAttribute)
 
     Expr* funcExpr;
 
     Expr* backDeclRef; // DeclRef to this derivative function when initiated from primalFunction.
+};
+
+    /// The `[BackwardDifferentiable]` attribute indicates that a function can be backward-differentiated.
+class BackwardDifferentiableAttribute : public DifferentiableAttribute
+{
+    SLANG_AST_CLASS(BackwardDifferentiableAttribute)
 };
 
     /// Indicates that the modified declaration is one of the "magic" declarations
