@@ -262,6 +262,12 @@ struct ASTIterator
         {
             dispatchIfNotNull(expr->originalExpr);
         }
+
+        void visitHigherOrderInvokeExpr(HigherOrderInvokeExpr* expr)
+        {
+            iterator->maybeDispatchCallback(expr);
+            dispatchIfNotNull(expr->baseFunction);
+        }
     };
 
     struct ASTIteratorStmtVisitor : public StmtVisitor<ASTIteratorStmtVisitor>

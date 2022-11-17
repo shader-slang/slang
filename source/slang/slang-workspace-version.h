@@ -98,6 +98,8 @@ namespace Slang
 
         // Get length of an identifier token starting at the specified position.
         int getTokenLength(Index line, Index col);
+        int getTokenLength(Index offset);
+
     };
 
     struct DocumentDiagnostics
