@@ -10,7 +10,6 @@
 #include <time.h>
 
 #include "../core/slang-secure-crt.h"
-#include "../core/slang-range.h"
 #include "../core/slang-char-util.h"
 #include "../core/slang-string-util.h"
 
@@ -461,6 +460,29 @@ SlangResult LanguageServer::hover(
 
     Hover hover;
     auto leafNode = findResult[0].path.getLast();
+
+    auto maybeAppendAdditionalOverloadsHint = [&]()
+    {
+        Index numOverloads = 0;
+        for (Index i = findResult[0].path.getCount() - 1; i >= 0; i--)
+        {
+            auto node = findResult[0].path[i];
+            if (auto overloadExpr = as<OverloadedExpr>(node))
+            {
+                numOverloads = overloadExpr->lookupResult2.items.getCount();
+            }
+            else if (auto overloadedExpr2 = as<OverloadedExpr2>(node))
+            {
+                numOverloads = overloadedExpr2->candidiateExprs.getCount();
+            }
+        }
+        if (numOverloads > 1)
+        {
+            sb << "\n +" << numOverloads - 1 << " overload";
+            if (numOverloads > 2) sb << "s";
+        }
+    };
+
     auto fillDeclRefHoverInfo = [&](DeclRef<Decl> declRef)
     {
         if (declRef.getDecl())
@@ -474,7 +496,7 @@ SlangResult LanguageServer::hover(
             auto humaneLoc = version->linkage->getSourceManager()->getHumaneLoc(
                 declRef.getLoc(), SourceLocType::Actual);
             appendDefinitionLocation(sb, m_workspace, humaneLoc);
-
+            maybeAppendAdditionalOverloadsHint();
             auto nodeHumaneLoc =
                 version->linkage->getSourceManager()->getHumaneLoc(leafNode->loc);
             hover.range.start.line = int(nodeHumaneLoc.line - 1);
@@ -495,6 +517,29 @@ SlangResult LanguageServer::hover(
             }
         }
     };
+    auto fillExprHoverInfo = [&](Expr* expr)
+    {
+        if (auto declRefExpr = as<DeclRefExpr>(expr))
+            return fillDeclRefHoverInfo(declRefExpr->declRef);
+        if (auto higherOrderExpr = as<HigherOrderInvokeExpr>(expr))
+        {
+            String documentation;
+            String signature = getExprDeclSignature(expr, &documentation, nullptr);
+            if (signature.getLength() == 0)
+                return;
+            sb << "```\n"
+                << signature
+                << "\n```\n";
+            sb << documentation;
+            maybeAppendAdditionalOverloadsHint();
+            auto humaneLoc = version->linkage->getSourceManager()->getHumaneLoc(
+                expr->loc, SourceLocType::Actual);
+            hover.range.start.line = int(humaneLoc.line - 1);
+            hover.range.end.line = int(humaneLoc.line - 1);
+            hover.range.start.character = int(humaneLoc.column - 1);
+            hover.range.end.character = hover.range.start.character + int(doc->getTokenLength(humaneLoc.line, humaneLoc.column));
+        }
+    };
     if (auto declRefExpr = as<DeclRefExpr>(leafNode))
     {
         fillDeclRefHoverInfo(declRefExpr->declRef);
@@ -503,6 +548,18 @@ SlangResult LanguageServer::hover(
     {
         LookupResultItem& item = overloadedExpr->lookupResult2.item;
         fillDeclRefHoverInfo(item.declRef);
+    }
+    else if (auto overloadedExpr2 = as<OverloadedExpr2>(leafNode))
+    {
+        if (overloadedExpr2->candidiateExprs.getCount() > 0)
+        {
+            auto candidateExpr = overloadedExpr2->candidiateExprs[0];
+            fillExprHoverInfo(candidateExpr);
+        }
+    }
+    else if (auto higherOrderExpr = as<HigherOrderInvokeExpr>(leafNode))
+    {
+        fillExprHoverInfo(higherOrderExpr);
     }
     else if (auto importDecl = as<ImportDecl>(leafNode))
     {
@@ -871,6 +928,106 @@ SlangResult LanguageServer::semanticTokens(
     return SLANG_OK;
 }
 
+String LanguageServer::getExprDeclSignature(Expr* expr, String* outDocumentation, List<Slang::Range<Index>>* outParamRanges)
+{
+    if (auto declRefExpr = as<DeclRefExpr>(expr))
+    {
+        return getDeclRefSignature(declRefExpr->declRef, outDocumentation, outParamRanges);
+    }
+
+    auto higherOrderExpr = as<HigherOrderInvokeExpr>(expr);
+    auto declRefExpr = as<DeclRefExpr>(getInnerMostExprFromHigherOrderExpr(higherOrderExpr));
+    if (!declRefExpr)
+        return String();
+    if (!declRefExpr->declRef.getDecl())
+        return String();
+    auto funcType = as<FuncType>(higherOrderExpr->type);
+    if (!funcType)
+        return String();
+
+    auto version = m_workspace->getCurrentVersion();
+
+    SignatureInformation sigInfo;
+
+    ASTPrinter printer(
+        version->linkage->getASTBuilder(),
+        ASTPrinter::OptionFlag::ParamNames | ASTPrinter::OptionFlag::NoInternalKeywords |
+        ASTPrinter::OptionFlag::SimplifiedBuiltinType);
+
+    printer.addDeclKindPrefix(declRefExpr->declRef.getDecl());
+    auto inner = higherOrderExpr;
+    int closingParentCount = 0;
+    while (inner)
+    {
+        printer.getStringBuilder() << getHigherOrderOperatorName(inner) << "(";
+        closingParentCount++;
+        inner = as<HigherOrderInvokeExpr>(inner->baseFunction);
+    }
+    printer.addDeclPath(declRefExpr->declRef);
+    for (int i = 0; i < closingParentCount; i++)
+        printer.getStringBuilder() << ")";
+    bool isFirst = true;
+    printer.getStringBuilder() << "(";
+    int paramIndex = 0;
+    for (auto param : funcType->paramTypes)
+    {
+        if (!isFirst)
+            printer.getStringBuilder() << ", ";
+        Slang::Range<Index> range;
+        range.begin = printer.getStringBuilder().getLength();
+        if (paramIndex < higherOrderExpr->newParameterNames.getCount())
+        {
+            if (higherOrderExpr->newParameterNames[paramIndex])
+            {
+                printer.getStringBuilder() << higherOrderExpr->newParameterNames[paramIndex]->text << ": ";
+            }
+        }
+        printer.addType(param);
+        range.end = printer.getStringBuilder().getLength();
+        if (outParamRanges)
+            outParamRanges->add(range);
+        isFirst = false;
+        paramIndex++;
+    }
+    printer.getStringBuilder() << ") -> ";
+    printer.addType(funcType->getResultType());
+
+    if (outDocumentation)
+    {
+        StringBuilder docSB;
+        auto humaneLoc = version->linkage->getSourceManager()->getHumaneLoc(declRefExpr->declRef.getLoc(), SourceLocType::Actual);
+        _tryGetDocumentation(docSB, version, declRefExpr->declRef.getDecl());
+        appendDefinitionLocation(docSB, m_workspace, humaneLoc);
+        *outDocumentation = docSB.ProduceString();
+    }
+
+    return printer.getString();
+}
+
+String LanguageServer::getDeclRefSignature(DeclRef<Decl> declRef, String* outDocumentation, List<Slang::Range<Index>>* outParamRanges)
+{
+    auto version = m_workspace->getCurrentVersion();
+    ASTPrinter printer(
+        version->linkage->getASTBuilder(),
+        ASTPrinter::OptionFlag::ParamNames | ASTPrinter::OptionFlag::NoInternalKeywords |
+        ASTPrinter::OptionFlag::SimplifiedBuiltinType);
+
+    printer.addDeclKindPrefix(declRef.getDecl());
+    printer.addDeclPath(declRef);
+    printer.addDeclParams(declRef, outParamRanges);
+    printer.addDeclResultType(declRef);
+
+    if (outDocumentation)
+    {
+        StringBuilder docSB;
+        auto humaneLoc = version->linkage->getSourceManager()->getHumaneLoc(declRef.getLoc(), SourceLocType::Actual);
+        _tryGetDocumentation(docSB, version, declRef.getDecl());
+        appendDefinitionLocation(docSB, m_workspace, humaneLoc);
+        *outDocumentation = docSB.ProduceString();
+    }
+    return printer.getString();
+}
+
 SlangResult LanguageServer::signatureHelp(
     const LanguageServerProtocol::SignatureHelpParams& args, const JSONValue& responseId)
 {
@@ -958,23 +1115,9 @@ SlangResult LanguageServer::signatureHelp(
         SignatureInformation sigInfo;
 
         List<Slang::Range<Index>> paramRanges;
-        ASTPrinter printer(
-            version->linkage->getASTBuilder(),
-            ASTPrinter::OptionFlag::ParamNames | ASTPrinter::OptionFlag::NoInternalKeywords |
-                ASTPrinter::OptionFlag::SimplifiedBuiltinType);
-        
-        printer.addDeclKindPrefix(declRef.getDecl());
-        printer.addDeclPath(declRef);
-        printer.addDeclParams(declRef, &paramRanges);
-        printer.addDeclResultType(declRef);
-
-        sigInfo.label = printer.getString();
-
-        StringBuilder docSB;
-        auto humaneLoc = version->linkage->getSourceManager()->getHumaneLoc(declRef.getLoc(), SourceLocType::Actual);
-        _tryGetDocumentation(docSB, version, declRef.getDecl());
-        appendDefinitionLocation(docSB, m_workspace, humaneLoc);
-        sigInfo.documentation.value = docSB.ProduceString();
+        String documentation;
+        sigInfo.label = getDeclRefSignature(declRef, &documentation, &paramRanges);
+        sigInfo.documentation.value = documentation;
         sigInfo.documentation.kind = "markdown";
 
         for (auto& range : paramRanges)
@@ -989,72 +1132,14 @@ SlangResult LanguageServer::signatureHelp(
 
     auto addExpr = [&](Expr* expr)
     {
-        auto higherOrderExpr = as<HigherOrderInvokeExpr>(expr);
-        if (!higherOrderExpr)
-            return;
-        auto funcType = as<FuncType>(higherOrderExpr->type);
-        if (!funcType)
-            return;
-        auto declRefExpr = as<DeclRefExpr>(getInnerMostExprFromHigherOrderExpr(higherOrderExpr));
-        if (!declRefExpr)
-            return;
-        if (!declRefExpr->declRef.getDecl())
-            return;
-        
         SignatureInformation sigInfo;
-
         List<Slang::Range<Index>> paramRanges;
-        ASTPrinter printer(
-            version->linkage->getASTBuilder(),
-            ASTPrinter::OptionFlag::ParamNames | ASTPrinter::OptionFlag::NoInternalKeywords |
-            ASTPrinter::OptionFlag::SimplifiedBuiltinType);
-
-        printer.addDeclKindPrefix(declRefExpr->declRef.getDecl());
-        auto inner = higherOrderExpr;
-        int closingParentCount = 0;
-        while (inner)
-        {
-            printer.getStringBuilder() << getHigherOrderOperatorName(inner) << "(";
-            closingParentCount++;
-            inner = as<HigherOrderInvokeExpr>(inner->baseFunction);
-        }
-        printer.addDeclPath(declRefExpr->declRef);
-        for (int i = 0; i < closingParentCount; i++)
-            printer.getStringBuilder() << ")";
-        bool isFirst = true;
-        printer.getStringBuilder() << "(";
-        int paramIndex = 0;
-        for (auto param : funcType->paramTypes)
-        {
-            if (!isFirst)
-                printer.getStringBuilder() << ", ";
-            Slang::Range<Index> range;
-            range.begin = printer.getStringBuilder().getLength();
-            if (paramIndex < higherOrderExpr->newParameterNames.getCount())
-            {
-                if (higherOrderExpr->newParameterNames[paramIndex])
-                {
-                    printer.getStringBuilder() << higherOrderExpr->newParameterNames[paramIndex]->text << ": ";
-                }
-            }
-            printer.addType(param);
-            range.end = printer.getStringBuilder().getLength();
-            paramRanges.add(range);
-            isFirst = false;
-            paramIndex++;
-        }
-        printer.getStringBuilder() << ") -> ";
-        printer.addType(funcType->getResultType());
-
-        sigInfo.label = printer.getString();
-
-        StringBuilder docSB;
-        auto humaneLoc = version->linkage->getSourceManager()->getHumaneLoc(declRefExpr->declRef.getLoc(), SourceLocType::Actual);
-        _tryGetDocumentation(docSB, version, declRefExpr->declRef.getDecl());
-        appendDefinitionLocation(docSB, m_workspace, humaneLoc);
-        sigInfo.documentation.value = docSB.ProduceString();
+        String documentation;
+        sigInfo.label = getExprDeclSignature(expr, &documentation, &paramRanges);
+        if (sigInfo.label.getLength() == 0)
+            return;
+        sigInfo.documentation.value = documentation;
         sigInfo.documentation.kind = "markdown";
-
         for (auto& range : paramRanges)
         {
             ParameterInformation paramInfo;

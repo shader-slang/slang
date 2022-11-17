@@ -24,9 +24,9 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     // Expect f''(4) = 192
     float.Differential t = 2;
     outputBuffer[0] = __fwd_diff(__fwd_diff(f))(
-        DifferentialPair<DifferentialPair<float>>(
-            DifferentialPair<float>(4.0, 1.0), DifferentialPair<float>(1.0, 0.0))).d.d;
-            
+                          DifferentialPair<DifferentialPair<float>>(
+                              DifferentialPair<float>(4.0, 1.0), DifferentialPair<float>(1.0, 0.0))) .d.d;
+
     // sin''(x) = cos'(x) = -sin(x).
     // Expect sin''(Pi/2) = -1.
     outputBuffer[1] = __fwd_diff(__fwd_diff(sin))(

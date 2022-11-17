@@ -458,18 +458,23 @@ UnownedStringSlice DocumentVersion::peekIdentifier(Index& offset)
     return UnownedStringSlice("");
 }
 
-
-int DocumentVersion::getTokenLength(Index line, Index col)
+int DocumentVersion::getTokenLength(Index offset)
 {
-    auto offset = getOffset(line, col);
     if (offset >= 0)
     {
         Index pos = offset;
         for (; pos < text.getLength() && _isIdentifierChar(text[pos]); ++pos)
-        {}
+        {
+        }
         return (int)(pos - offset);
     }
     return 0;
+}
+
+int DocumentVersion::getTokenLength(Index line, Index col)
+{
+    auto offset = getOffset(line, col);
+    return getTokenLength(offset);
 }
 
 ASTMarkup* WorkspaceVersion::getOrCreateMarkupAST(ModuleDecl* module)
