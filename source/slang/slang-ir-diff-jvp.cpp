@@ -2728,6 +2728,8 @@ struct JVPDerivativeContext : public InstPassBase
         //
         SharedIRBuilder* sharedBuilder = &sharedBuilderStorage;
         sharedBuilder->init(module);
+
+        // TODO: Move DifferentialPairType outside function bodies.
         sharedBuilder->deduplicateAndRebuildGlobalNumberingMap();
 
         IRBuilder builderStorage(sharedBuilderStorage);

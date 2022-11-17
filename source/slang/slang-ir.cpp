@@ -3189,15 +3189,13 @@ namespace Slang
         //
         SLANG_ASSERT(witnessTableVal->getOp() != kIROp_StructKey);
 
-        auto inst = createInst<IRLookupWitnessMethod>(
-            this,
-            kIROp_lookup_interface_method,
-            type,
-            witnessTableVal,
-            interfaceMethodVal);
+        IRInst* args[] = {witnessTableVal, interfaceMethodVal};
 
-        addInst(inst);
-        return inst;
+        return findOrEmitHoistableInst(
+            type,
+            kIROp_lookup_interface_method,
+            2,
+            args);
     }
 
     IRInst* IRBuilder::emitGetSequentialIDInst(IRInst* rttiObj)
