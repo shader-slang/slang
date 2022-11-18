@@ -401,8 +401,6 @@ namespace Slang
             return m_parentDifferentiableAttr;
         }
 
-        bool isInNoDiffEnv() { return m_noDiff; }
-
             /// A scope that is local to a particular expression, and
             /// that can be used to allocate temporary bindings that
             /// might be needed by that expression or its sub-expressions.
@@ -431,10 +429,10 @@ namespace Slang
             return result;
         }
 
-        SemanticsContext withNoDiff()
+        SemanticsContext withTreatAsDifferentiable(TreatAsDifferentiableExpr* expr)
         {
             SemanticsContext result(*this);
-            result.m_noDiff = true;
+            result.m_treatAsDifferentiableExpr = expr;
             return result;
         }
 
@@ -471,8 +469,9 @@ namespace Slang
             /// is considered valid in the current context.
         bool m_allowStaticReferenceToNonStaticMember = false;
 
-            /// Whether or not we are in a `no_diff` environment.
-        bool m_noDiff = false;
+            /// Whether or not we are in a `no_diff` environment (and therefore should treat the call to
+            /// a non-differentiable function as differentiable and not issue a diagnostic).
+        TreatAsDifferentiableExpr* m_treatAsDifferentiableExpr = nullptr;
 
         ASTBuilder* m_astBuilder = nullptr;
     };
@@ -1943,7 +1942,7 @@ namespace Slang
 
         Expr* visitForwardDifferentiateExpr(ForwardDifferentiateExpr* expr);
         Expr* visitBackwardDifferentiateExpr(BackwardDifferentiateExpr* expr);
-        Expr* visitDiffDecorateExpr(DiffDecorateExpr* expr);
+        Expr* visitTreatAsDifferentiableExpr(TreatAsDifferentiableExpr* expr);
 
         Expr* visitGetArrayLengthExpr(GetArrayLengthExpr* expr);
 

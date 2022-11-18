@@ -593,13 +593,13 @@ struct IRBackwardDifferentiableDecoration : IRDecoration
     IR_LEAF_ISA(BackwardDifferentiableDecoration)
 };
 
-struct IRNonDifferentiableCallDecoration : IRDecoration
+struct IRTreatAsDifferentiableCallDecoration : IRDecoration
 {
     enum
     {
-        kOp = kIROp_NonDifferentiableCallDecoration
+        kOp = kIROp_TreatAsDifferentiableCallDecoration
     };
-    IR_LEAF_ISA(NonDifferentiableCallDecoration)
+    IR_LEAF_ISA(TreatAsDifferentiableCallDecoration)
 };
 
 struct IRDerivativeMemberDecoration : IRDecoration

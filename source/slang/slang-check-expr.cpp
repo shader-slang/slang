@@ -1948,7 +1948,7 @@ namespace Slang
 
         auto checkedExpr = CheckInvokeExprWithCheckedOperands(expr);
 
-        if (m_parentFunc && m_parentFunc->hasModifier<DifferentiableAttribute>())
+        if (m_parentDifferentiableAttr)
         {
             if (auto checkedInvokeExpr = as<InvokeExpr>(checkedExpr))
             {
@@ -1957,19 +1957,26 @@ namespace Slang
                 {
                     maybeRegisterDifferentiableType(m_astBuilder, arg->type.type);
                 }
-                if (!m_noDiff)
+                if (auto calleeExpr = as<DeclRefExpr>(checkedInvokeExpr->functionExpr))
                 {
-                    if (auto calleeExpr = as<DeclRefExpr>(checkedInvokeExpr->functionExpr))
+                    if (auto calleeDecl = as<FunctionDeclBase>(calleeExpr->declRef.getDecl()))
                     {
-                        if (auto calleeDecl = as<FunctionDeclBase>(calleeExpr->declRef.getDecl()))
+                        if (getShared()->isDifferentiableFunc(calleeDecl))
                         {
-                            if (getShared()->isDifferentiableFunc(calleeDecl))
+                            if (!m_treatAsDifferentiableExpr)
                             {
-                                auto newFuncExpr = getASTBuilder()->create<DiffDecorateExpr>();
+                                auto newFuncExpr =
+                                    getASTBuilder()->create<TreatAsDifferentiableExpr>();
                                 newFuncExpr->type = checkedInvokeExpr->type;
                                 newFuncExpr->innerExpr = checkedInvokeExpr;
                                 newFuncExpr->loc = checkedInvokeExpr->loc;
                                 checkedExpr = newFuncExpr;
+                            }
+                            else
+                            {
+                                getSink()->diagnose(
+                                    m_treatAsDifferentiableExpr,
+                                    Diagnostics::useOfNoDiffOnDifferentiableFunc);
                             }
                         }
                     }
@@ -2272,9 +2279,9 @@ namespace Slang
         return _checkDifferentiateExpr(this, expr, &actions);
     }
 
-    Expr* SemanticsExprVisitor::visitDiffDecorateExpr(DiffDecorateExpr* expr)
+    Expr* SemanticsExprVisitor::visitTreatAsDifferentiableExpr(TreatAsDifferentiableExpr* expr)
     {
-        auto subContext = withNoDiff();
+        auto subContext = withTreatAsDifferentiable(expr);
         expr->innerExpr = dispatchExpr(expr->innerExpr, subContext);
         expr->type = expr->innerExpr->type;
         auto innerExpr = expr->innerExpr;
@@ -2285,6 +2292,10 @@ namespace Slang
         if (!as<InvokeExpr>(innerExpr))
         {
             getSink()->diagnose(expr, Diagnostics::invalidUseOfNoDiff);
+        }
+        else if (!m_parentDifferentiableAttr)
+        {
+            getSink()->diagnose(expr, Diagnostics::cannotUseNoDiffInNonDifferentiableFunc);
         }
         return expr;
     }

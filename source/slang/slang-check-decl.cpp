@@ -6476,6 +6476,7 @@ namespace Slang
             switch (assocDecl.kind)
             {
             case DeclAssociationKind::ForwardDerivativeFunc:
+            case DeclAssociationKind::BackwardDerivativeFunc:
                 return true;
             default:
                 break;

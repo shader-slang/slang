@@ -3114,14 +3114,11 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
                 baseVal.val));
     }
 
-    LoweredValInfo visitDiffDecorateExpr(DiffDecorateExpr* expr)
+    LoweredValInfo visitTreatAsDifferentiableExpr(TreatAsDifferentiableExpr* expr)
     {
         auto baseVal = lowerSubExpr(expr->innerExpr);
         SLANG_ASSERT(baseVal.flavor == LoweredValInfo::Flavor::Simple);
-        if (auto call = as<IRCall>(baseVal.val))
-        {
-            getBuilder()->addDecoration(call, kIROp_NonDifferentiableCallDecoration);
-        }
+        getBuilder()->addDecoration(baseVal.val, kIROp_TreatAsDifferentiableCallDecoration);
         return baseVal;
     }
 

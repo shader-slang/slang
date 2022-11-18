@@ -466,9 +466,9 @@ class BackwardDifferentiateExpr: public DifferentiateExpr
 };
 
     /// An express to mark its inner expression as an intended non-differential call.
-class DiffDecorateExpr : public Expr
+class TreatAsDifferentiableExpr : public Expr
 {
-    SLANG_AST_CLASS(DiffDecorateExpr)
+    SLANG_AST_CLASS(TreatAsDifferentiableExpr)
 
     Expr* innerExpr;
     Scope* scope;

@@ -1,11 +1,14 @@
 result code = -1
 standard error = {
-tests/diagnostics/autodiff.slang(15): error 41020: derivative cannot be propagated through call to non-differentiable function `nonDiff`, use 'no_diff' to clarify intention.
-        val = nonDiff(x * 2.0f);
-                     ^
-tests/diagnostics/autodiff.slang(22): error 41021: a differentiable function must have at least one differentiable output.
-void g(float x)
-     ^
+tests/diagnostics/autodiff.slang(20): error 38031: 'no_diff' can only be used to decorate a call.
+    float x1 = no_diff x; // invalid use of no_diff here.
+               ^~~~~~~
+tests/diagnostics/autodiff.slang(21): error 38032: use 'no_diff' on a call to a differentiable function has no meaning.
+    return no_diff f(x);  // no_diff on a differentiable call has no meaning.
+           ^~~~~~~
+tests/diagnostics/autodiff.slang(26): error 38033: cannot use 'no_diff' in a non-differentiable function.
+    return no_diff nonDiff(x); // no_diff in a non-differentiable function
+           ^~~~~~~
 }
 standard output = {
 }

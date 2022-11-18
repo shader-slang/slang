@@ -222,7 +222,7 @@ public:
             case kIROp_FloatLit:
                 return true;
             case kIROp_Call:
-                return inst->findDecoration<IRNonDifferentiableCallDecoration>() || isDifferentiableFunc(as<IRCall>(inst)->getCallee());
+                return inst->findDecoration<IRTreatAsDifferentiableCallDecoration>() || isDifferentiableFunc(as<IRCall>(inst)->getCallee());
             case kIROp_Load:
                 // We don't have more knowledge on whether diff is available at the destination address.
                 // Just assume it is producing diff.
