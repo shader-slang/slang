@@ -347,7 +347,7 @@ public:
                             // A Phi Node is producing diff if any of its candidate values are producing diff.
                             if (auto branch = as<IRUnconditionalBranch>(p->getTerminator()))
                             {
-                                if (branch->getArgCount() > paramIndex)
+                                if (branch->getArgCount() > (UInt)paramIndex)
                                 {
                                     auto arg = branch->getArg(paramIndex);
                                     addToExpectDiffWorkList(arg);
