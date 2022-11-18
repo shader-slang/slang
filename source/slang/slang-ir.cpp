@@ -3163,6 +3163,18 @@ namespace Slang
         UInt            argCount,
         IRInst* const*  args)
     {
+        auto innerReturnVal = findInnerMostGenericReturnVal(as<IRGeneric>(genericVal));
+
+        if (as<IRWitnessTable>(innerReturnVal))
+        {
+            return findOrEmitHoistableInst(
+                type,
+                kIROp_Specialize,
+                genericVal,
+                argCount,
+                args);
+        }
+
         auto inst = createInstWithTrailingArgs<IRSpecialize>(
             this,
             kIROp_Specialize,

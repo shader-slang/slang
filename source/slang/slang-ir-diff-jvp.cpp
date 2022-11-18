@@ -198,7 +198,19 @@ struct DifferentiableTypeConformanceContext
 
     DifferentiableTypeConformanceContext(AutoDiffSharedContext* shared)
         : sharedContext(shared)
-    {}
+    {
+    }
+
+    void buildGlobalWitnessDictionary()
+    {
+        for (auto globalInst : sharedContext->moduleInst->getChildren())
+        {
+            if (auto pairType = as<IRDifferentialPairType>(globalInst))
+            {
+                differentiableWitnessDictionary.Add(pairType->getValueType(), pairType->getWitness());
+            }
+        }
+    }
 
     void setFunc(IRGlobalValueWithCode* func)
     {
@@ -237,7 +249,7 @@ struct DifferentiableTypeConformanceContext
     IRInst* lookUpConformanceForType(IRInst* type)
     {
         IRInst* foundResult = nullptr;
-        differentiableWitnessDictionary.TryGetValue(type, foundResult);
+        differentiableWitnessDictionary .TryGetValue(type, foundResult);
         return foundResult;
     }
 
@@ -591,7 +603,9 @@ struct JVPTranscriber
 
     JVPTranscriber(AutoDiffSharedContext* shared, SharedIRBuilder* inSharedBuilder)
         : differentiableTypeConformanceContext(shared), sharedBuilder(inSharedBuilder)
-    {}
+    {
+        
+    }
 
     DiagnosticSink* getSink()
     {
@@ -725,19 +739,19 @@ struct JVPTranscriber
         builder.setInsertInto(inDiffPairType->parent);
         auto diffPairType = as<IRDifferentialPairType>(inDiffPairType);
         SLANG_ASSERT(diffPairType);
-        auto result =
-            as<IRWitnessTable>(differentiableTypeConformanceContext.lookUpConformanceForType(
-                builder.getDifferentialBottomType()));
-        if (result)
-            return result;
 
         auto table = builder.createWitnessTable(autoDiffSharedContext->differentiableInterfaceType, diffPairType);
-        auto diffType = differentiateType(&builder, diffPairType->getValueType());
-        auto differentialType = builder.getDifferentialPairType(diffType, getDifferentialBottomWitness());
-        builder.createWitnessTableEntry(table, autoDiffSharedContext->differentialAssocTypeStructKey, differentialType);
+
+        // Differentiate the pair type to get it's differential (which is itself a pair)
+        auto diffDiffPairType = differentiateType(&builder, diffPairType);
+
+        // And place it in the synthesized witness table.
+        builder.createWitnessTableEntry(table, autoDiffSharedContext->differentialAssocTypeStructKey, diffDiffPairType);
         // Omit the method synthesis here, since we can just intercept those directly at `getXXMethodForType`.
 
+        // Record this in the context for future lookups
         differentiableTypeConformanceContext.differentiableWitnessDictionary[diffPairType] = table;
+
         return table;
     }
 
@@ -756,8 +770,19 @@ struct JVPTranscriber
         builder.setInsertInto(primalType->parent);
         auto witness = as<IRWitnessTable>(
             differentiableTypeConformanceContext.lookUpConformanceForType((IRType*)primalType));
+
         if (!witness)
-            witness = getDifferentialBottomWitness();
+        {
+            if (auto primalPairType = as<IRDifferentialPairType>(primalType))
+            {
+                witness = getDifferentialPairWitness(primalPairType);
+            }
+            else
+            {
+                witness = getDifferentialBottomWitness();
+            }
+        }
+
         return builder.getDifferentialPairType(
             (IRType*)primalType,
             witness);
@@ -2728,9 +2753,10 @@ struct JVPDerivativeContext : public InstPassBase
         //
         SharedIRBuilder* sharedBuilder = &sharedBuilderStorage;
         sharedBuilder->init(module);
-
-        // TODO: Move DifferentialPairType outside function bodies.
         sharedBuilder->deduplicateAndRebuildGlobalNumberingMap();
+
+        // TODO(sai): Move this call.
+        transcriberStorage.differentiableTypeConformanceContext.buildGlobalWitnessDictionary();
 
         IRBuilder builderStorage(sharedBuilderStorage);
         IRBuilder* builder = &builderStorage;
@@ -2746,6 +2772,9 @@ struct JVPDerivativeContext : public InstPassBase
         // IRMakeDifferentialPair with an IRMakeStruct.
         // 
         modified |= simplifyDifferentialBottomType(builder);
+
+        // De-duplicate any remaining types.
+        sharedBuilder->deduplicateAndRebuildGlobalNumberingMap();
 
         modified |= processPairTypes(builder, module->getModuleInst());
 
