@@ -1893,6 +1893,34 @@ namespace Slang
                         }
                     }
                 }
+
+                if (auto higherOrderInvoke = as<DifferentiateExpr>(invoke->functionExpr))
+                {
+                    if (auto funcDeclExpr = as<DeclRefExpr>(getInnerMostExprFromHigherOrderExpr(higherOrderInvoke)))
+                    {
+                        auto funcDecl = as<FunctionDeclBase>(funcDeclExpr->declRef.getDecl());
+                        if (funcDecl)
+                        {
+                            DifferentiateExpr* forwardDiff = nullptr;
+                            DifferentiateExpr* backwardDiff = nullptr;
+                            for (auto node = as<DifferentiateExpr>(invoke->functionExpr); node; node = as<DifferentiateExpr>(node->baseFunction))
+                            {
+                                if (auto fwd = as<ForwardDifferentiateExpr>(node))
+                                    forwardDiff = fwd;
+                                if (auto bwd = as<BackwardDifferentiateExpr>(node))
+                                    backwardDiff = bwd;
+                            }
+                            if (forwardDiff && !getShared()->isDifferentiableFunc(funcDecl))
+                            {
+                                getSink()->diagnose(forwardDiff, Diagnostics::functionNotMarkedAsDifferentiable, funcDecl, "forward");
+                            }
+                            if (backwardDiff && !getShared()->isBackwardDifferentiableFunc(funcDecl))
+                            {
+                                getSink()->diagnose(forwardDiff, Diagnostics::functionNotMarkedAsDifferentiable, funcDecl, "backward");
+                            }
+                        }
+                    }
+                }
             }
         }
         return rs;
@@ -1928,6 +1956,23 @@ namespace Slang
                 for (auto& arg : expr->arguments)
                 {
                     maybeRegisterDifferentiableType(m_astBuilder, arg->type.type);
+                }
+                if (!m_noDiff)
+                {
+                    if (auto calleeExpr = as<DeclRefExpr>(checkedInvokeExpr->functionExpr))
+                    {
+                        if (auto calleeDecl = as<FunctionDeclBase>(calleeExpr->declRef.getDecl()))
+                        {
+                            if (getShared()->isDifferentiableFunc(calleeDecl))
+                            {
+                                auto newFuncExpr = getASTBuilder()->create<DiffDecorateExpr>();
+                                newFuncExpr->type = checkedInvokeExpr->type;
+                                newFuncExpr->innerExpr = checkedInvokeExpr;
+                                newFuncExpr->loc = checkedInvokeExpr->loc;
+                                checkedExpr = newFuncExpr;
+                            }
+                        }
+                    }
                 }
             }
             maybeRegisterDifferentiableType(m_astBuilder, checkedExpr->type.type);
@@ -2227,9 +2272,11 @@ namespace Slang
         return _checkDifferentiateExpr(this, expr, &actions);
     }
 
-    Expr* SemanticsExprVisitor::visitNoDiffExpr(NoDiffExpr* expr)
+    Expr* SemanticsExprVisitor::visitDiffDecorateExpr(DiffDecorateExpr* expr)
     {
-        expr->innerExpr = CheckTerm(expr->innerExpr);
+        auto subContext = withNoDiff();
+        expr->innerExpr = dispatchExpr(expr->innerExpr, subContext);
+        expr->type = expr->innerExpr->type;
         auto innerExpr = expr->innerExpr;
         while (auto parenExpr = as<ParenExpr>(innerExpr))
         {
@@ -2239,10 +2286,8 @@ namespace Slang
         {
             getSink()->diagnose(expr, Diagnostics::invalidUseOfNoDiff);
         }
-        expr->type = expr->innerExpr->type;
         return expr;
     }
-
 
     Expr* SemanticsExprVisitor::visitGetArrayLengthExpr(GetArrayLengthExpr* expr)
     {

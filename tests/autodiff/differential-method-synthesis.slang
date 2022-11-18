@@ -31,7 +31,7 @@ A f(A a)
     aout.y = 2 * a.b.x;
     aout.b.x = 5 * a.b.x;
 
-    return nonDiff(aout);
+    return no_diff(nonDiff(aout));
 }
 
 [numthreads(1, 1, 1)]

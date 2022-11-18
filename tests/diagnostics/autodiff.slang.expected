@@ -1,6 +1,6 @@
 result code = -1
 standard error = {
-tests/diagnostics/autodiff.slang(15): error 41020: derivative cannot be propagated through call to non-differnetiable function `nonDiff`, use 'no_diff' to clarify intention.
+tests/diagnostics/autodiff.slang(15): error 41020: derivative cannot be propagated through call to non-differentiable function `nonDiff`, use 'no_diff' to clarify intention.
         val = nonDiff(x * 2.0f);
                      ^
 tests/diagnostics/autodiff.slang(22): error 41021: a differentiable function must have at least one differentiable output.

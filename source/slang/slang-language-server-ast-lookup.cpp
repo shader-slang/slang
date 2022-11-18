@@ -426,7 +426,7 @@ public:
         }
         return dispatchIfNotNull(expr->baseFunction);
     }
-    bool visitNoDiffExpr(NoDiffExpr* expr)
+    bool visitDiffDecorateExpr(DiffDecorateExpr* expr)
     {
         return dispatchIfNotNull(expr->innerExpr);
     }

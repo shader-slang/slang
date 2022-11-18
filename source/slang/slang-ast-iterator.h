@@ -269,7 +269,7 @@ struct ASTIterator
             dispatchIfNotNull(expr->baseFunction);
         }
 
-        void visitNoDiffExpr(NoDiffExpr* expr)
+        void visitDiffDecorateExpr(DiffDecorateExpr* expr)
         {
             dispatchIfNotNull(expr->innerExpr);
         }

@@ -3114,7 +3114,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
                 baseVal.val));
     }
 
-    LoweredValInfo visitNoDiffExpr(NoDiffExpr* expr)
+    LoweredValInfo visitDiffDecorateExpr(DiffDecorateExpr* expr)
     {
         auto baseVal = lowerSubExpr(expr->innerExpr);
         SLANG_ASSERT(baseVal.flavor == LoweredValInfo::Flavor::Simple);

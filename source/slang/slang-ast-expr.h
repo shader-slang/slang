@@ -466,12 +466,14 @@ class BackwardDifferentiateExpr: public DifferentiateExpr
 };
 
     /// An express to mark its inner expression as an intended non-differential call.
-class NoDiffExpr : public Expr
+class DiffDecorateExpr : public Expr
 {
-    SLANG_AST_CLASS(NoDiffExpr)
+    SLANG_AST_CLASS(DiffDecorateExpr)
 
     Expr* innerExpr;
     Scope* scope;
+
+    bool isCalleeDifferentiable = false;
 };
 
     /// A type expression of the form `__TaggedUnion(A, ...)`.

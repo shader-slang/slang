@@ -5086,9 +5086,9 @@ namespace Slang
         return tryExpr;
     }
 
-    static NodeBase* parseNoDiffExpr(Parser* parser, void* /*userData*/)
+    static NodeBase* parseDiffDecorateExpr(Parser* parser, void* /*userData*/)
     {
-        auto noDiffExpr = parser->astBuilder->create<NoDiffExpr>();
+        auto noDiffExpr = parser->astBuilder->create<DiffDecorateExpr>();
         noDiffExpr->innerExpr = parser->ParseLeafExpression();
         noDiffExpr->scope = parser->currentScope;
         return noDiffExpr;
@@ -6678,7 +6678,7 @@ namespace Slang
         _makeParseExpr("nullptr", parseNullPtrExpr),
         _makeParseExpr("none", parseNoneExpr),
         _makeParseExpr("try",     parseTryExpr),
-        _makeParseExpr("no_diff", parseNoDiffExpr),
+        _makeParseExpr("no_diff", parseDiffDecorateExpr),
         _makeParseExpr("__TaggedUnion", parseTaggedUnionType),
         _makeParseExpr("__fwd_diff", parseForwardDifferentiate),
         _makeParseExpr("__bwd_diff", parseBackwardDifferentiate)

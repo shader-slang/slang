@@ -284,6 +284,13 @@ namespace Slang
             /// Register a candidate extension `extDecl` for `typeDecl` encountered during checking.
         void registerCandidateExtension(AggTypeDecl* typeDecl, ExtensionDecl* extDecl);
 
+        void registerAssociatedDecl(Decl* original, DeclAssociationKind assoc, Decl* declaration);
+
+        List<DeclAssociation> const& getAssociatedDeclsForDecl(Decl* decl);
+
+        bool isDifferentiableFunc(FunctionDeclBase* func);
+        bool isBackwardDifferentiableFunc(FunctionDeclBase* func);
+
     private:
             /// Mapping from type declarations to the known extensiosn that apply to them
         Dictionary<AggTypeDecl*, RefPtr<CandidateExtensionList>> m_mapTypeDeclToCandidateExtensions;
@@ -293,6 +300,17 @@ namespace Slang
 
             /// Add candidate extensions declared in `moduleDecl` to `m_mapTypeDeclToCandidateExtensions`
         void _addCandidateExtensionsFromModule(ModuleDecl* moduleDecl);
+
+            /// Mapping from a decl to additional declarations of the same decl.
+            /// The additional declarations provide a location to hold extra decorations.
+        OrderedDictionary<Decl*, RefPtr<DeclAssociationList>> m_mapDeclToAssociatedDecls;
+
+            /// Is the `m_mapDeclToAssociatedDecls` dictionary valid and up to date?
+        bool m_associatedDeclListsBuilt = false;
+
+            /// Add associated decls declared in `moduleDecl` to `m_mapDeclToAssociatedDecls`
+        void _addDeclAssociationsFromModule(ModuleDecl* moduleDecl);
+
     };
 
         /// Local/scoped state of the semantic-checking system
@@ -383,6 +401,8 @@ namespace Slang
             return m_parentDifferentiableAttr;
         }
 
+        bool isInNoDiffEnv() { return m_noDiff; }
+
             /// A scope that is local to a particular expression, and
             /// that can be used to allocate temporary bindings that
             /// might be needed by that expression or its sub-expressions.
@@ -408,6 +428,13 @@ namespace Slang
         {
             SemanticsContext result(*this);
             result.m_exprLocalScope = exprLocalScope;
+            return result;
+        }
+
+        SemanticsContext withNoDiff()
+        {
+            SemanticsContext result(*this);
+            result.m_noDiff = true;
             return result;
         }
 
@@ -443,6 +470,9 @@ namespace Slang
             /// Whether an expr referencing to a non-static member in static style (e.g. `Type.member`)
             /// is considered valid in the current context.
         bool m_allowStaticReferenceToNonStaticMember = false;
+
+            /// Whether or not we are in a `no_diff` environment.
+        bool m_noDiff = false;
 
         ASTBuilder* m_astBuilder = nullptr;
     };
@@ -1913,7 +1943,7 @@ namespace Slang
 
         Expr* visitForwardDifferentiateExpr(ForwardDifferentiateExpr* expr);
         Expr* visitBackwardDifferentiateExpr(BackwardDifferentiateExpr* expr);
-        Expr* visitNoDiffExpr(NoDiffExpr* expr);
+        Expr* visitDiffDecorateExpr(DiffDecorateExpr* expr);
 
         Expr* visitGetArrayLengthExpr(GetArrayLengthExpr* expr);
 
