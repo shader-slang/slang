@@ -5881,7 +5881,10 @@ namespace Slang
             return static_cast<IRConstant*>(a)->isValueEqual(static_cast<IRConstant*>(b)) &&
                 isTypeEqual(a->getFullType(), b->getFullType());
         }
-
+        if (IRSpecialize::isaImpl(opA) || opA == kIROp_lookup_interface_method)
+        {
+            return _areTypeOperandsEqual(a, b);
+        }
         SLANG_ASSERT(!"Unhandled comparison");
 
         // We can't equate any other type..

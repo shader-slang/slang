@@ -284,6 +284,13 @@ namespace Slang
             /// Register a candidate extension `extDecl` for `typeDecl` encountered during checking.
         void registerCandidateExtension(AggTypeDecl* typeDecl, ExtensionDecl* extDecl);
 
+        void registerAssociatedDecl(Decl* original, DeclAssociationKind assoc, Decl* declaration);
+
+        List<DeclAssociation> const& getAssociatedDeclsForDecl(Decl* decl);
+
+        bool isDifferentiableFunc(FunctionDeclBase* func);
+        bool isBackwardDifferentiableFunc(FunctionDeclBase* func);
+
     private:
             /// Mapping from type declarations to the known extensiosn that apply to them
         Dictionary<AggTypeDecl*, RefPtr<CandidateExtensionList>> m_mapTypeDeclToCandidateExtensions;
@@ -293,6 +300,17 @@ namespace Slang
 
             /// Add candidate extensions declared in `moduleDecl` to `m_mapTypeDeclToCandidateExtensions`
         void _addCandidateExtensionsFromModule(ModuleDecl* moduleDecl);
+
+            /// Mapping from a decl to additional declarations of the same decl.
+            /// The additional declarations provide a location to hold extra decorations.
+        OrderedDictionary<Decl*, RefPtr<DeclAssociationList>> m_mapDeclToAssociatedDecls;
+
+            /// Is the `m_mapDeclToAssociatedDecls` dictionary valid and up to date?
+        bool m_associatedDeclListsBuilt = false;
+
+            /// Add associated decls declared in `moduleDecl` to `m_mapDeclToAssociatedDecls`
+        void _addDeclAssociationsFromModule(ModuleDecl* moduleDecl);
+
     };
 
         /// Local/scoped state of the semantic-checking system
@@ -411,6 +429,13 @@ namespace Slang
             return result;
         }
 
+        SemanticsContext withTreatAsDifferentiable(TreatAsDifferentiableExpr* expr)
+        {
+            SemanticsContext result(*this);
+            result.m_treatAsDifferentiableExpr = expr;
+            return result;
+        }
+
         SemanticsContext allowStaticReferenceToNonStaticMember()
         {
             SemanticsContext result(*this);
@@ -443,6 +468,10 @@ namespace Slang
             /// Whether an expr referencing to a non-static member in static style (e.g. `Type.member`)
             /// is considered valid in the current context.
         bool m_allowStaticReferenceToNonStaticMember = false;
+
+            /// Whether or not we are in a `no_diff` environment (and therefore should treat the call to
+            /// a non-differentiable function as differentiable and not issue a diagnostic).
+        TreatAsDifferentiableExpr* m_treatAsDifferentiableExpr = nullptr;
 
         ASTBuilder* m_astBuilder = nullptr;
     };
@@ -723,9 +752,6 @@ namespace Slang
         /// describing the relationship.
         ///
         void registerDifferentiableType(DeclRefType* type, SubtypeWitness* witness);
-
-        // Check and register a type if it is differentiable.
-        void maybeRegisterDifferentiableType(ASTBuilder* builder, Type* type);
 
         // Construct the differential for 'type', if it exists.
         Type* getDifferentialType(ASTBuilder* builder, Type* type, SourceLoc loc);
@@ -1061,6 +1087,9 @@ namespace Slang
             /// Gather differentiable members from decl.
         List<DifferentiableMemberInfo> collectDifferentiableMemberInfo(ContainerDecl* decl);
 
+        // Check and register a type if it is differentiable.
+        void maybeRegisterDifferentiableType(ASTBuilder* builder, Type* type);
+
         // Find the appropriate member of a declared type to
         // satisfy a requirement of an interface the type
         // claims to conform to.
@@ -1265,8 +1294,6 @@ namespace Slang
 
             /// Given an immutable `expr` used as an l-value emit a special diagnostic if it was derived from `this`.
         void maybeDiagnoseThisNotLValue(Expr* expr);
-
-        void registerExtension(ExtensionDecl* decl);
 
         // Figure out what type an initializer/constructor declaration
         // is supposed to return. In most cases this is just the type
@@ -1913,6 +1940,7 @@ namespace Slang
 
         Expr* visitForwardDifferentiateExpr(ForwardDifferentiateExpr* expr);
         Expr* visitBackwardDifferentiateExpr(BackwardDifferentiateExpr* expr);
+        Expr* visitTreatAsDifferentiableExpr(TreatAsDifferentiableExpr* expr);
 
         Expr* visitGetArrayLengthExpr(GetArrayLengthExpr* expr);
 

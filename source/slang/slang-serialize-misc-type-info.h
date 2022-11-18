@@ -188,7 +188,11 @@ struct SerialTypeInfo<const DiagnosticInfo*>
     }
 };
 
-
+// DeclAssociation
+template <>
+struct SerialTypeInfo<DeclAssociation> : SerialIdentityTypeInfo<DeclAssociation> {};
+template <>
+struct SerialTypeInfo<DeclAssociationKind> : public SerialConvertTypeInfo<DeclAssociationKind, uint8_t> {};
 
 } // namespace Slang
 
