@@ -894,27 +894,32 @@ struct JVPTranscriber
                     builder->addNameHintDecoration(diffPairParam, diffPairVarName.getUnownedSlice());
 
                 SLANG_ASSERT(diffPairParam);
+            
+                if (auto pairType = as<IRDifferentialPairType>(diffPairType))
+                {
+                    return InstPair(
+                        builder->emitDifferentialPairGetPrimal(diffPairParam),
+                        builder->emitDifferentialPairGetDifferential(
+                            (IRType*)pairBuilder->getDiffTypeFromPairType(builder, pairType),
+                            diffPairParam));
+                }
+                else if (auto pairPtrType = as<IRPtrTypeBase>(diffPairType))
+                {
+                    auto ptrInnerPairType = as<IRDifferentialPairType>(pairPtrType->getValueType());
 
-            if (auto pairType = as<IRDifferentialPairType>(diffPairType))
-            {
-                return InstPair(
-                    builder->emitDifferentialPairGetPrimal(diffPairParam),
-                    builder->emitDifferentialPairGetDifferential(
-                        (IRType*)pairBuilder->getDiffTypeFromPairType(builder, pairType),
-                        diffPairParam));
+                    return InstPair(
+                        builder->emitDifferentialPairAddressPrimal(diffPairParam),
+                        builder->emitDifferentialPairAddressDifferential(
+                            builder->getPtrType(
+                                kIROp_PtrType,
+                                (IRType*)pairBuilder->getDiffTypeFromPairType(builder, ptrInnerPairType)),
+                            diffPairParam));
+                }
             }
-            else if (auto pairPtrType = as<IRPtrTypeBase>(diffPairType))
-            {
-                auto ptrInnerPairType = as<IRDifferentialPairType>(pairPtrType->getValueType());
 
-                return InstPair(
-                    builder->emitDifferentialPairAddressPrimal(diffPairParam),
-                    builder->emitDifferentialPairAddressDifferential(
-                        builder->getPtrType(
-                            kIROp_PtrType,
-                            (IRType*)pairBuilder->getDiffTypeFromPairType(builder, ptrInnerPairType)),
-                        diffPairParam));
-            }
+            return InstPair(
+                    cloneInst(&cloneEnv, builder, origParam),
+                    nullptr);
         }
         else
         {
@@ -926,12 +931,7 @@ struct JVPTranscriber
             }
             return InstPair(primal, diff);
         }
-    }
         
-        
-        return InstPair(
-            cloneInst(&cloneEnv, builder, origParam),
-            nullptr);
     }
 
     // Returns "d<var-name>" to use as a name hint for variables and parameters.
