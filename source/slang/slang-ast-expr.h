@@ -472,8 +472,6 @@ class TreatAsDifferentiableExpr : public Expr
 
     Expr* innerExpr;
     Scope* scope;
-
-    bool isCalleeDifferentiable = false;
 };
 
     /// A type expression of the form `__TaggedUnion(A, ...)`.
