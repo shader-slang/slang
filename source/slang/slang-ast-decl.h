@@ -391,6 +391,12 @@ class ModuleDecl : public NamespaceDeclBase
     //
     Module* module = nullptr;
 
+        /// Map a decl to the list of its associated decls.
+        ///
+        /// This mapping is filled in during semantic checking, as the decl declarations get checked or generated.
+        ///
+    OrderedDictionary<Decl*, RefPtr<DeclAssociationList>> mapDeclToAssociatedDecls;
+
     SLANG_UNREFLECTED
 
         /// Map a type to the list of extensions of that type (if any) declared in this module
@@ -398,6 +404,7 @@ class ModuleDecl : public NamespaceDeclBase
         /// This mapping is filled in during semantic checking, as `ExtensionDecl`s get checked.
         ///
     Dictionary<AggTypeDecl*, RefPtr<CandidateExtensionList>> mapTypeToCandidateExtensions;
+
 };
 
     /// A declaration that brings members of another declaration or namespace into scope

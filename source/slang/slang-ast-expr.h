@@ -465,6 +465,15 @@ class BackwardDifferentiateExpr: public DifferentiateExpr
     SLANG_AST_CLASS(BackwardDifferentiateExpr)
 };
 
+    /// An express to mark its inner expression as an intended non-differential call.
+class TreatAsDifferentiableExpr : public Expr
+{
+    SLANG_AST_CLASS(TreatAsDifferentiableExpr)
+
+    Expr* innerExpr;
+    Scope* scope;
+};
+
     /// A type expression of the form `__TaggedUnion(A, ...)`.
     ///
     /// An expression of this form will resolve to a `TaggedUnionType`

@@ -90,6 +90,8 @@ struct ErrorHandlingLoweringContext
             args.add(tryCall->getArg(i));
         }
         auto call = builder.emitCallInst(resultType, tryCall->getCallee(), args);
+        tryCall->transferDecorationsTo(call);
+
         auto isFail = builder.emitIsResultError(call);
         auto failBlock = tryCall->getFailureBlock();
         auto successBlock = tryCall->getSuccessBlock();
