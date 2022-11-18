@@ -6159,9 +6159,10 @@ struct HitObject
         float3 Direction,
         float TMax);
 
+    // "void hitObjectRecordMissNV(hitObjectNV, uint, vec3, float, vec3, float);"
     __glsl_extension(GL_NV_shader_invocation_reorder)
     __glsl_extension(GL_EXT_ray_tracing)
-    __glsl_extension(GLSL_NV_ray_tracing_motion_blur)
+    __glsl_extension(GL_NV_ray_tracing_motion_blur)
     __target_intrinsic(glsl, "hitObjectRecordMissNV")
     static void __glslMakeMotionMiss(
         HitObject hitObj,
@@ -6193,15 +6194,16 @@ struct HitObject
     __target_intrinsic(glsl, "hitObjectGetRayTMinNV($0)")
     float __glslGetTMin();
 
+    // "void hitObjectRecordHitWithIndexNV(hitObjectNV, accelerationStructureEXT,int,int,int,uint,uint,vec3,float,vec3,float,int);"
     __glsl_extension(GL_NV_shader_invocation_reorder)
     __glsl_extension(GL_EXT_ray_tracing)
     __target_intrinsic(glsl, "hitObjectRecordHitWithIndexNV")
     static void __glslMakeHitWithIndex(
         HitObject hitObj,
         RaytracingAccelerationStructure accelerationStructure,
-        uint instanceid,
-        uint primitiveid,
-        uint geometryindex,
+        int instanceid,
+        int primitiveid,
+        int geometryindex,
         uint hitKind,
         uint sbtRecordIndex,
         float3 origin,
@@ -6210,16 +6212,17 @@ struct HitObject
         float Tmax,
         int attributeLocation);
 
+    //  "void hitObjectRecordHitWithIndexMotionNV(hitObjectNV, accelerationStructureEXT,int,int,int,uint,uint,vec3,float,vec3,float,float,int);"
     __glsl_extension(GL_NV_shader_invocation_reorder)
     __glsl_extension(GL_EXT_ray_tracing)
-    __glsl_extension(GLSL_NV_ray_tracing_motion_blur)
-    __target_intrinsic(glsl, "hitObjectRecordHitWithIndexMotionNV ")
+    __glsl_extension(GL_NV_ray_tracing_motion_blur)
+    __target_intrinsic(glsl, "hitObjectRecordHitWithIndexMotionNV")
     static void __glslMakeMotionHitWithIndex(
         HitObject hitObj,
         RaytracingAccelerationStructure accelerationStructure,
-        uint instanceid,
-        uint primitiveid,
-        uint geometryindex,
+        int instanceid,
+        int primitiveid,
+        int geometryindex,
         uint hitKind,
         uint sbtRecordIndex,
         float3 origin,
@@ -6229,15 +6232,16 @@ struct HitObject
         float CurrentTime,
         int attributeLocation);
 
+    // "void hitObjectRecordHitNV(hitObjectNV,accelerationStructureEXT,int,int,int,uint,uint,uint,vec3,float,vec3,float,int);"
     __glsl_extension(GL_EXT_ray_tracing)
     __glsl_extension(GL_NV_shader_invocation_reorder)
     __target_intrinsic(glsl, "hitObjectRecordHitNV")
     static void __glslMakeHit(
         HitObject hitObj,
         RaytracingAccelerationStructure accelerationStructure,
-        uint instanceid,
-        uint primitiveid,
-        uint geometryindex,
+        int instanceid,
+        int primitiveid,
+        int geometryindex,
         uint hitKind,
         uint sbtRecordOffset,
         uint sbtRecordStride,
@@ -6247,16 +6251,17 @@ struct HitObject
         float Tmax,
         int attributeLocation);
 
+        // "void hitObjectRecordHitMotionNV(hitObjectNV,accelerationStructureEXT,int,int,int,uint,uint,uint,vec3,float,vec3,float,float,int);"
     __glsl_extension(GL_EXT_ray_tracing)
     __glsl_extension(GL_NV_shader_invocation_reorder)
-    __glsl_extension(GLSL_NV_ray_tracing_motion_blur)
+    __glsl_extension(GL_NV_ray_tracing_motion_blur)
     __target_intrinsic(glsl, "hitObjectRecordHitMotionNV")
     static void __glslMakeMotionHit(
         HitObject hitObj,
         RaytracingAccelerationStructure accelerationStructure,
-        uint instanceid,
-        uint primitiveid,
-        uint geometryindex,
+        int instanceid,
+        int primitiveid,
+        int geometryindex,
         uint hitKind,
         uint sbtRecordOffset,
         uint sbtRecordStride,
@@ -6292,7 +6297,7 @@ struct HitObject
 
     __glsl_extension(GL_EXT_ray_tracing)
     __glsl_extension(GL_NV_shader_invocation_reorder)
-    __glsl_extension(GLSL_NV_ray_tracing_motion_blur)
+    __glsl_extension(GL_NV_ray_tracing_motion_blur)
     __target_intrinsic(glsl, "hitObjectTraceRayMotionNV")
     static void __glslTraceMotionRay(
         HitObject hitObj,
