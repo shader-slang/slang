@@ -226,6 +226,7 @@ public:
             case kIROp_Load:
                 // We don't have more knowledge on whether diff is available at the destination address.
                 // Just assume it is producing diff.
+                //TODO: propagate the info if this is a load of a temporary variable intended to receive result from an `out` parameter.
                 return isDifferentiableType(diffTypeContext, inst->getDataType());
             default:
                 // default case is to assume the inst produces a diff value if any

@@ -3114,6 +3114,17 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
                 baseVal.val));
     }
 
+    LoweredValInfo visitNoDiffExpr(NoDiffExpr* expr)
+    {
+        auto baseVal = lowerSubExpr(expr->innerExpr);
+        SLANG_ASSERT(baseVal.flavor == LoweredValInfo::Flavor::Simple);
+        if (auto call = as<IRCall>(baseVal.val))
+        {
+            getBuilder()->addDecoration(call, kIROp_NonDifferentiableCallDecoration);
+        }
+        return baseVal;
+    }
+
     // Emit IR to denote the forward-mode derivative
     // of the inner func-expr. This will be resolved 
     // to a concrete function during the derivative 

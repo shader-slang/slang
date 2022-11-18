@@ -268,6 +268,11 @@ struct ASTIterator
             iterator->maybeDispatchCallback(expr);
             dispatchIfNotNull(expr->baseFunction);
         }
+
+        void visitNoDiffExpr(NoDiffExpr* expr)
+        {
+            dispatchIfNotNull(expr->innerExpr);
+        }
     };
 
     struct ASTIteratorStmtVisitor : public StmtVisitor<ASTIteratorStmtVisitor>

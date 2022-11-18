@@ -426,6 +426,10 @@ public:
         }
         return dispatchIfNotNull(expr->baseFunction);
     }
+    bool visitNoDiffExpr(NoDiffExpr* expr)
+    {
+        return dispatchIfNotNull(expr->innerExpr);
+    }
 };
 
 struct ASTLookupStmtVisitor : public StmtVisitor<ASTLookupStmtVisitor, bool>

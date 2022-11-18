@@ -2227,6 +2227,23 @@ namespace Slang
         return _checkDifferentiateExpr(this, expr, &actions);
     }
 
+    Expr* SemanticsExprVisitor::visitNoDiffExpr(NoDiffExpr* expr)
+    {
+        expr->innerExpr = CheckTerm(expr->innerExpr);
+        auto innerExpr = expr->innerExpr;
+        while (auto parenExpr = as<ParenExpr>(innerExpr))
+        {
+            innerExpr = parenExpr->base;
+        }
+        if (!as<InvokeExpr>(innerExpr))
+        {
+            getSink()->diagnose(expr, Diagnostics::invalidUseOfNoDiff);
+        }
+        expr->type = expr->innerExpr->type;
+        return expr;
+    }
+
+
     Expr* SemanticsExprVisitor::visitGetArrayLengthExpr(GetArrayLengthExpr* expr)
     {
         expr->arrayExpr = CheckTerm(expr->arrayExpr);
