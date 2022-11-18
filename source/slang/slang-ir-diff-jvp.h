@@ -121,6 +121,7 @@ namespace Slang
 
         void setFunc(IRGlobalValueWithCode* func);
 
+        void buildGlobalWitnessDictionary();
 
         // Lookup a witness table for the concreteType. One should exist if concreteType
         // inherits (successfully) from IDifferentiable.

@@ -27,7 +27,7 @@ float g(float x)
 [ForwardDifferentiable]
 float g2(float x)
 {
-    return g(x);
+    return no_diff(g(x));
 }
 
 struct A
@@ -50,7 +50,7 @@ struct A
 float h2(A a, float k)
 {
     float v = k * k;
-    return a.doSomethingNotDifferentiable(k) + v;
+    return no_diff(a.doSomethingNotDifferentiable(k)) + v;
 }
 
 [numthreads(1, 1, 1)]

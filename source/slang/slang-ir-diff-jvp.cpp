@@ -3184,4 +3184,14 @@ IRInst* DifferentiableTypeConformanceContext::lookUpInterfaceMethod(IRBuilder* b
     return nullptr;
 }
 
+void DifferentiableTypeConformanceContext::buildGlobalWitnessDictionary()
+{
+    for (auto globalInst : sharedContext->moduleInst->getChildren())
+    {
+        if (auto pairType = as<IRDifferentialPairType>(globalInst))
+        {
+            differentiableWitnessDictionary.Add(pairType->getValueType(), pairType->getWitness());
+        }
+    }
+}
 }
