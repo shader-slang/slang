@@ -724,9 +724,6 @@ namespace Slang
         ///
         void registerDifferentiableType(DeclRefType* type, SubtypeWitness* witness);
 
-        // Check and register a type if it is differentiable.
-        void maybeRegisterDifferentiableType(ASTBuilder* builder, Type* type);
-
         // Construct the differential for 'type', if it exists.
         Type* getDifferentialType(ASTBuilder* builder, Type* type, SourceLoc loc);
         Type* tryGetDifferentialType(ASTBuilder* builder, Type* type);
@@ -1060,6 +1057,9 @@ namespace Slang
 
             /// Gather differentiable members from decl.
         List<DifferentiableMemberInfo> collectDifferentiableMemberInfo(ContainerDecl* decl);
+
+        // Check and register a type if it is differentiable.
+        void maybeRegisterDifferentiableType(ASTBuilder* builder, Type* type);
 
         // Find the appropriate member of a declared type to
         // satisfy a requirement of an interface the type

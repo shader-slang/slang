@@ -11,6 +11,7 @@
 #include "slang-ir-diff-jvp.h"
 #include "slang-ir-inline.h"
 #include "slang-ir-insts.h"
+#include "slang-ir-check-differentiability.h"
 #include "slang-ir-missing-return.h"
 #include "slang-ir-sccp.h"
 #include "slang-ir-ssa.h"
@@ -8997,6 +8998,9 @@ RefPtr<IRModule> generateIRForTranslationUnit(
     // `unreachable` instructions remain.
 
     checkForMissingReturns(module, compileRequest->getSink());
+
+    // Check for invalid differentiable function body.
+    checkAutoDiffUsages(module, compileRequest->getSink());
 
     // The "mandatory" optimization passes may make use of the
     // `IRHighLevelDeclDecoration` type to relate IR instructions

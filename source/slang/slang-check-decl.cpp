@@ -4684,6 +4684,22 @@ namespace Slang
         if (auto derivativeAttr = decl->findModifier<ForwardDerivativeAttribute>())
             checkDerivativeAttribute(decl, derivativeAttr);
 
+        if (newContext.getParentDifferentiableAttribute())
+        {
+            // Register additional types outside the function body first.
+            auto oldAttr = m_parentDifferentiableAttr;
+            m_parentDifferentiableAttr = newContext.getParentDifferentiableAttribute();
+            for (auto param : decl->getParameters())
+                maybeRegisterDifferentiableType(m_astBuilder, param->type.type);
+            maybeRegisterDifferentiableType(m_astBuilder, decl->returnType.type);
+            if (as<ConstructorDecl>(decl) || !isEffectivelyStatic(decl))
+            {
+                auto thisType = calcThisType(makeDeclRef(decl));
+                maybeRegisterDifferentiableType(m_astBuilder, thisType);
+            }
+            m_parentDifferentiableAttr = oldAttr;
+        }
+
         if (auto body = decl->body)
         {
             checkStmt(decl->body, newContext);

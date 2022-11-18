@@ -736,6 +736,9 @@ INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
         /// differential member of a type in its associated differential type.
     INST(DerivativeMemberDecoration, derivativeMemberDecoration, 1, 0)
 
+        /// Marks a call as an intended non differentiable call.
+    INST(NonDifferentiableCallDecoration, nonDifferentiableCallDecoration, 0, 0)
+
         /// Marks a class type as a COM interface implementation, which enables
         /// the witness table to be easily picked up by emit.
     INST(COMWitnessDecoration, COMWitnessDecoration, 1, 0)
