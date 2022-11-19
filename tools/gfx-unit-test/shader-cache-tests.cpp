@@ -1197,6 +1197,57 @@ namespace gfx_test
         }
     };
 
+    // This test is specifically for source files which live entirely in memory. The key difference between
+    // these and physical source files is such files have their contents hash added to the file dependencies
+    // list instead of a file path, meaning any given specific set of shader contents will be treated as a
+    // wholly unique module.
+    struct NonPhysicalFileDependencyEntry : BaseShaderCacheTest
+    {
+        void generateNewPipelineState(Slang::String shaderContents)
+        {
+            ComPtr<IShaderProgram> shaderProgram;
+            GFX_CHECK_CALL_ABORT(loadComputeProgramFromSource(device, shaderProgram, shaderContents));
+
+            ComputePipelineStateDesc pipelineDesc = {};
+            pipelineDesc.program = shaderProgram.get();
+            GFX_CHECK_CALL_ABORT(
+                device->createComputePipelineState(pipelineDesc, pipelineState.writeRef()));
+        }
+
+        void runTests()
+        {
+            generateNewDevice();
+            createRequiredResources();
+            generateNewPipelineState(contentsA);
+            submitGPUWork();
+
+            device->queryInterface(SLANG_UUID_IShaderCacheStatistics, (void**)shaderCacheStats.writeRef());
+            SLANG_CHECK(shaderCacheStats->getCacheMissCount() == 1);
+            SLANG_CHECK(shaderCacheStats->getCacheHitCount() == 0);
+            SLANG_CHECK(shaderCacheStats->getCacheEntryDirtyCount() == 0);
+
+            generateNewDevice();
+            createRequiredResources();
+            generateNewPipelineState(contentsA);
+            submitGPUWork();
+
+            device->queryInterface(SLANG_UUID_IShaderCacheStatistics, (void**)shaderCacheStats.writeRef());
+            SLANG_CHECK(shaderCacheStats->getCacheMissCount() == 0);
+            SLANG_CHECK(shaderCacheStats->getCacheHitCount() == 1);
+            SLANG_CHECK(shaderCacheStats->getCacheEntryDirtyCount() == 0);
+
+            generateNewDevice();
+            createRequiredResources();
+            generateNewPipelineState(contentsC);
+            submitGPUWork();
+
+            device->queryInterface(SLANG_UUID_IShaderCacheStatistics, (void**)shaderCacheStats.writeRef());
+            SLANG_CHECK(shaderCacheStats->getCacheMissCount() == 1);
+            SLANG_CHECK(shaderCacheStats->getCacheHitCount() == 0);
+            SLANG_CHECK(shaderCacheStats->getCacheEntryDirtyCount() == 0);
+        }
+    };
+
     template <typename T>
     void shaderCacheTestImpl(ComPtr<IDevice> device, UnitTestContext* context)
     {
@@ -1283,5 +1334,15 @@ namespace gfx_test
     SLANG_UNIT_TEST(splitGraphicsShaderCacheVulkan)
     {
         runTestImpl(shaderCacheTestImpl<SplitGraphicsShader>, unitTestContext, Slang::RenderApiFlag::Vulkan);
+    }
+
+    SLANG_UNIT_TEST(nonPhysicalFileDependenciesCacheEntryD3D12)
+    {
+        runTestImpl(shaderCacheTestImpl<NonPhysicalFileDependencyEntry>, unitTestContext, Slang::RenderApiFlag::D3D12);
+    }
+
+    SLANG_UNIT_TEST(nonPhysicalFileDependenciesCacheEntryVulkan)
+    {
+        runTestImpl(shaderCacheTestImpl<NonPhysicalFileDependencyEntry>, unitTestContext, Slang::RenderApiFlag::Vulkan);
     }
 }

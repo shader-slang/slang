@@ -3266,27 +3266,46 @@ void Module::updateContentsBasedHash(DigestBuilder& builder)
     auto filePathDependencies = getFilePathDependencies();
 
     DigestBuilder lastModifiedBuilder;
+    auto statFailed = false;
     for (auto file : filePathDependencies)
     {
         struct stat fileStatus;
-        stat(file.getBuffer(), &fileStatus);
+        auto res = stat(file.getBuffer(), &fileStatus);
+        if (res != 0)
+        {
+            statFailed = true;
+            break;
+        }
         lastModifiedBuilder.addToDigest(fileStatus.st_mtime);
     }
 
     slang::Digest temp = lastModifiedBuilder.finalize();
-    if (temp != lastModifiedDigest)
+    if (statFailed || temp != lastModifiedDigest)
     {
-        // Changes were made to at least one of the file dependencies, so we will need to
-        // re-generate the contents digest and save the new digest.
+        // Either a stat() call failed, or changes were made to at least one of the file dependencies,
+        // so we will need to re-generate the contents digest and save the new digest.
         DigestBuilder contentsBuilder;
         for (auto file : filePathDependencies)
         {
             List<uint8_t> fileContents;
-            File::readAllBytes(file, fileContents);
-            contentsBuilder.addToDigest(fileContents);
+            if (SLANG_FAILED(File::readAllBytes(file, fileContents)))
+            {
+                // Failure to read the file means this is a digest for the contents of a source
+                // file which does not live on disk.
+                contentsBuilder.addToDigest(DigestUtil::fromString(file.getUnownedSlice()));
+            }
+            else
+            {
+                contentsBuilder.addToDigest(fileContents);
+            }
         }
         contentsDigest = contentsBuilder.finalize();
-        lastModifiedDigest = temp;
+        if (!statFailed)
+        {
+            // If no stat() calls failed, then we have a valid last modified digest and should
+            // update the one we have saved.
+            lastModifiedDigest = temp;
+        }
     }
 
     builder.addToDigest(contentsDigest);
