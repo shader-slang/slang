@@ -162,6 +162,9 @@ namespace Slang
 
         Token ReadToken();
         Token ReadToken(TokenType type);
+
+        // Same as `ReadToken`, but force skip to the matching closing token on error.
+        Token ReadMatchingToken(TokenType type);
         Token ReadToken(const char* string);
 
         bool LookAheadToken(TokenType type);
@@ -563,15 +566,53 @@ namespace Slang
         if (!isRecovering)
         {
             Unexpected(this, expected);
+            return tokenReader.peekToken();
+        }
+
+        // Try to find a place to recover
+        if (TryRecoverBefore(this, expected))
+        {
+            isRecovering = false;
+            return tokenReader.advanceToken();
+        }
+        // This could be dangerous: if `ReadToken()` is being called
+        // in a loop we may never make forward progress, so we use
+        // a counter to limit the maximum amount of times we are allowed
+        // to peek the same token. If the outter parsing logic is
+        // correct, we will pop back to the right level. If there are
+        // erroneous parsing logic, this counter is to prevent us
+        // looping infinitely.
+        static const int kMaxTokenPeekCount = 64;
+        sameTokenPeekedTimes++;
+        if (sameTokenPeekedTimes < kMaxTokenPeekCount)
+            return tokenReader.peekToken();
+        else
+        {
+            sameTokenPeekedTimes = 0;
+            return tokenReader.advanceToken();
+        }
+    }
+
+    Token Parser::ReadMatchingToken(TokenType expected)
+    {
+        if (tokenReader.peekTokenType() == expected)
+        {
+            isRecovering = false;
+            sameTokenPeekedTimes = 0;
+            return tokenReader.advanceToken();
+        }
+
+        if (!isRecovering)
+        {
+            Unexpected(this, expected);
             switch (expected)
             {
+            case TokenType::RBrace:
             case TokenType::RParent:
             case TokenType::RBracket:
-            case TokenType::RBrace:
-                // Fall through to recover.
                 break;
             default:
-                return tokenReader.peekToken();
+               return tokenReader.peekToken();
             }
         }
 
@@ -1684,7 +1725,7 @@ namespace Slang
                 //
                 parser->ReadToken(TokenType::LParent);
                 declarator = parseDeclarator(parser, options);
-                parser->ReadToken(TokenType::RParent);
+                parser->ReadMatchingToken(TokenType::RParent);
             }
             break;
 
