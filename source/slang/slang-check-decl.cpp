@@ -6024,6 +6024,13 @@ namespace Slang
             // without any additional substitutions.
             if (extDecl->targetType->equals(type))
             {
+                /*
+                auto subst = trySolveConstraintSystem(
+                    &constraints,
+                    DeclRef<Decl>(extGenericDecl, nullptr).as<GenericDecl>(),
+                    as<GenericSubstitution>(as<DeclRefType>(type)->declRef.substitutions.substitutions));
+                return DeclRef<Decl>(extDecl, subst).as<ExtensionDecl>();
+                */
                 return createDefaultSubstitutionsIfNeeded(m_astBuilder, this, extDeclRef).as<ExtensionDecl>();
             }
 
