@@ -1496,6 +1496,28 @@ namespace Slang
         List<ExtensionDecl*> candidateExtensions;
     };
 
+
+    enum class DeclAssociationKind
+    {
+        ForwardDerivativeFunc, BackwardDerivativeFunc,
+    };
+
+    struct DeclAssociation
+    {
+        SLANG_VALUE_CLASS(DeclAssociation)
+        DeclAssociationKind kind;
+        Decl* decl;
+    };
+
+    /// A reference-counted object to hold a list of associated decls for a decl.
+    ///
+    struct DeclAssociationList : SerialRefObject
+    {
+        SLANG_OBJ_CLASS(DeclAssociationList)
+
+        List<DeclAssociation> associations;
+    };
+
         /// Represents the "direction" that a parameter is being passed (e.g., `in` or `out`
     enum ParameterDirection
     {

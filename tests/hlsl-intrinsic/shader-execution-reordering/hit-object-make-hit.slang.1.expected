@@ -94,11 +94,11 @@ void main()
     ray_2.TMax_0 = 10000.00000000000000000000;
     RayDesc_0 _S10 = ray_2;
     hitObjectNV hitObj_0;
-    hitObjectRecordHitWithIndexNV(hitObj_0, scene_0, uint(idx_0), uint(idx_0 * 2), uint(idx_0 * 3), 0U, 0U, _S10.Origin_0, _S10.TMin_0, _S10.Direction_0, _S10.TMax_0, (0));
+    hitObjectRecordHitWithIndexNV(hitObj_0, scene_0, int(uint(idx_0)), int(uint(idx_0 * 2)), int(uint(idx_0 * 3)), 0U, 0U, _S10.Origin_0, _S10.TMin_0, _S10.Direction_0, _S10.TMax_0, (0));
     uint r_4 = calcValue_0(hitObj_0);
     RayDesc_0 _S11 = ray_2;
     hitObjectNV hitObj_1;
-    hitObjectRecordHitNV(hitObj_1, scene_0, uint(idx_0), uint(idx_0 * 3), uint(idx_0 * 2), 0U, 0U, 4U, _S11.Origin_0, _S11.TMin_0, _S11.Direction_0, _S11.TMax_0, (0));
+    hitObjectRecordHitNV(hitObj_1, scene_0, int(uint(idx_0)), int(uint(idx_0 * 3)), int(uint(idx_0 * 2)), 0U, 0U, 4U, _S11.Origin_0, _S11.TMin_0, _S11.Direction_0, _S11.TMax_0, (0));
     uint _S12 = calcValue_0(hitObj_1);
     uint r_5 = r_4 + _S12;
     ((outputBuffer_0)._data[(uint(idx_0))]) = r_5;

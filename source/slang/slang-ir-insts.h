@@ -572,6 +572,18 @@ struct IRForwardDerivativeDecoration : IRDecoration
     IRInst* getForwardDerivativeFunc() { return getOperand(0); }
 };
 
+
+struct IRBackwardDerivativeDecoration : IRDecoration
+{
+    enum
+    {
+        kOp = kIROp_BackwardDerivativeDecoration
+    };
+    IR_LEAF_ISA(BackwardDerivativeDecoration)
+
+    IRInst* getBackwardDerivativeFunc() { return getOperand(0); }
+};
+
 struct IRBackwardDifferentiableDecoration : IRDecoration
 {
     enum
@@ -581,6 +593,14 @@ struct IRBackwardDifferentiableDecoration : IRDecoration
     IR_LEAF_ISA(BackwardDifferentiableDecoration)
 };
 
+struct IRTreatAsDifferentiableCallDecoration : IRDecoration
+{
+    enum
+    {
+        kOp = kIROp_TreatAsDifferentiableCallDecoration
+    };
+    IR_LEAF_ISA(TreatAsDifferentiableCallDecoration)
+};
 
 struct IRDerivativeMemberDecoration : IRDecoration
 {
@@ -2676,6 +2696,8 @@ public:
     IRInst* emitMakeOptionalNone(IRInst* optType, IRInst* defaultValue);
     IRInst* emitDifferentialPairGetDifferential(IRType* diffType, IRInst* diffPair);
     IRInst* emitDifferentialPairGetPrimal(IRInst* diffPair);
+    IRInst* emitDifferentialPairAddressDifferential(IRType* diffType, IRInst* diffPair);
+    IRInst* emitDifferentialPairAddressPrimal(IRInst* diffPair);
     IRInst* emitMakeVector(
         IRType*         type,
         UInt            argCount,

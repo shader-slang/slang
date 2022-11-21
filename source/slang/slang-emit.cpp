@@ -358,6 +358,7 @@ Result linkAndOptimizeIR(
     // perform specialization of functions based on parameter
     // values that need to be compile-time constants.
     //
+
     dumpIRIfEnabled(codeGenContext, irModule, "BEFORE-SPECIALIZE");
     if (!codeGenContext->isSpecializationDisabled())
         specializeModule(irModule);

@@ -11,6 +11,7 @@
 #include "slang-ir-diff-jvp.h"
 #include "slang-ir-inline.h"
 #include "slang-ir-insts.h"
+#include "slang-ir-check-differentiability.h"
 #include "slang-ir-missing-return.h"
 #include "slang-ir-sccp.h"
 #include "slang-ir-ssa.h"
@@ -3111,6 +3112,14 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
             getBuilder()->emitForwardDifferentiateInst(
                 lowerType(context, expr->type),
                 baseVal.val));
+    }
+
+    LoweredValInfo visitTreatAsDifferentiableExpr(TreatAsDifferentiableExpr* expr)
+    {
+        auto baseVal = lowerSubExpr(expr->innerExpr);
+        SLANG_ASSERT(baseVal.flavor == LoweredValInfo::Flavor::Simple);
+        getBuilder()->addDecoration(baseVal.val, kIROp_TreatAsDifferentiableCallDecoration);
+        return baseVal;
     }
 
     // Emit IR to denote the forward-mode derivative
@@ -8997,6 +9006,9 @@ RefPtr<IRModule> generateIRForTranslationUnit(
     // `unreachable` instructions remain.
 
     checkForMissingReturns(module, compileRequest->getSink());
+
+    // Check for invalid differentiable function body.
+    checkAutoDiffUsages(module, compileRequest->getSink());
 
     // The "mandatory" optimization passes may make use of the
     // `IRHighLevelDeclDecoration` type to relate IR instructions
