@@ -563,32 +563,39 @@ namespace Slang
         if (!isRecovering)
         {
             Unexpected(this, expected);
-            return tokenReader.peekToken();
+            switch (expected)
+            {
+            case TokenType::RParent:
+            case TokenType::RBracket:
+            case TokenType::RBrace:
+                // Fall through to recover.
+                break;
+            default:
+                return tokenReader.peekToken();
+            }
         }
+
+        // Try to find a place to recover
+        if (TryRecoverBefore(this, expected))
+        {
+            isRecovering = false;
+            return tokenReader.advanceToken();
+        }
+        // This could be dangerous: if `ReadToken()` is being called
+        // in a loop we may never make forward progress, so we use
+        // a counter to limit the maximum amount of times we are allowed
+        // to peek the same token. If the outter parsing logic is
+        // correct, we will pop back to the right level. If there are
+        // erroneous parsing logic, this counter is to prevent us
+        // looping infinitely.
+        static const int kMaxTokenPeekCount = 64;
+        sameTokenPeekedTimes++;
+        if (sameTokenPeekedTimes < kMaxTokenPeekCount)
+            return tokenReader.peekToken();
         else
         {
-            // Try to find a place to recover
-            if (TryRecoverBefore(this, expected))
-            {
-                isRecovering = false;
-                return tokenReader.advanceToken();
-            }
-            // This could be dangerous: if `ReadToken()` is being called
-            // in a loop we may never make forward progress, so we use
-            // a counter to limit the maximum amount of times we are allowed
-            // to peek the same token. If the outter parsing logic is
-            // correct, we will pop back to the right level. If there are
-            // erroneous parsing logic, this counter is to prevent us
-            // looping infinitely.
-            static const int kMaxTokenPeekCount = 64;
-            sameTokenPeekedTimes++;
-            if (sameTokenPeekedTimes < kMaxTokenPeekCount)
-                return tokenReader.peekToken();
-            else
-            {
-                sameTokenPeekedTimes = 0;
-                return tokenReader.advanceToken();
-            }
+            sameTokenPeekedTimes = 0;
+            return tokenReader.advanceToken();
         }
     }
 
@@ -3834,6 +3841,17 @@ namespace Slang
             }
             break;
 
+        case TokenType::LBrace:
+        case TokenType::LParent:
+            {
+                // We shouldn't be seeing an LBrace or an LParent when expecting a decl.
+                // However recovery logic may lead us here. In this case we just
+                // skip the whole `{}` block and return an empty decl.
+                SkipBalancedToken(&parser->tokenReader);
+                decl = parser->astBuilder->create<EmptyDecl>();
+                decl->loc = loc;
+            }
+            break;
         // If nothing else matched, we try to parse an "ordinary" declarator-based declaration
         default:
             decl = ParseDeclaratorDecl(parser, containerDecl, modifiers);
