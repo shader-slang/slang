@@ -218,17 +218,14 @@ IRInst* DifferentialPairTypeBuilder::_createDiffPairType(IRType* origBaseType, I
     default:
         break;
     }
-    if (diffType->getOp() != kIROp_DifferentialBottomType)
-    {
-        IRBuilder builder(sharedContext->sharedBuilder);
-        builder.setInsertBefore(diffType);
 
-        auto pairStructType = builder.createStructType();
-        builder.createStructField(pairStructType, _getOrCreatePrimalStructKey(), origBaseType);
-        builder.createStructField(pairStructType, _getOrCreateDiffStructKey(), (IRType*)diffType);
-        return pairStructType;
-    }
-    return origBaseType;
+    IRBuilder builder(sharedContext->sharedBuilder);
+    builder.setInsertBefore(diffType);
+
+    auto pairStructType = builder.createStructType();
+    builder.createStructField(pairStructType, _getOrCreatePrimalStructKey(), origBaseType);
+    builder.createStructField(pairStructType, _getOrCreateDiffStructKey(), (IRType*)diffType);
+    return pairStructType;
 }
 
 IRInst* DifferentialPairTypeBuilder::getDiffTypeFromPairType(IRBuilder* builder, IRDifferentialPairType* type)
@@ -269,7 +266,7 @@ DifferentialPairTypeBuilder::LoweredPairTypeInfo DifferentialPairTypeBuilder::lo
     if (!diffType)
         return result;
     result.loweredType = _createDiffPairType(pairType->getValueType(), (IRType*)diffType);
-    result.isTrivial = (diffType->getOp() == kIROp_DifferentialBottomType);
+    result.isTrivial = false;
     pairTypeCache.Add(originalPairType, result);
 
     return result;

@@ -164,17 +164,6 @@ struct JVPTranscriber
         return builder->getFuncType(newParameterTypes, diffReturnType);
     }
 
-    IRWitnessTable* getDifferentialBottomWitness()
-    {
-        IRBuilder builder(sharedBuilder);
-        builder.setInsertInto(sharedBuilder->getModule()->getModuleInst());
-        auto result =
-            as<IRWitnessTable>(differentiableTypeConformanceContext.lookUpConformanceForType(
-                builder.getDifferentialBottomType()));
-        SLANG_ASSERT(result);
-        return result;
-    }
-
     // Get or construct `:IDifferentiable` conformance for a DifferentiablePair.
     IRWitnessTable* getDifferentialPairWitness(IRInst* inDiffPairType)
     {
@@ -219,10 +208,6 @@ struct JVPTranscriber
             if (auto primalPairType = as<IRDifferentialPairType>(primalType))
             {
                 witness = getDifferentialPairWitness(primalPairType);
-            }
-            else
-            {
-                witness = getDifferentialBottomWitness();
             }
         }
 
@@ -1732,11 +1717,6 @@ void DifferentiableTypeConformanceContext::setFunc(IRGlobalValueWithCode* func)
             auto existingItem = differentiableWitnessDictionary.TryGetValue(item->getConcreteType());
             if (existingItem)
             {
-                if (auto witness = as<IRWitnessTable>(item->getWitness()))
-                {
-                    if (witness->getConcreteType()->getOp() == kIROp_DifferentialBottomType)
-                        continue;
-                }
                 *existingItem = item->getWitness();
             }
             else

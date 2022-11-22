@@ -81,17 +81,6 @@ struct BackwardDiffTranscriber
         return builder->getFuncType(newParameterTypes, diffReturnType);
     }
 
-    IRWitnessTable* getDifferentialBottomWitness()
-    {
-        IRBuilder builder(sharedBuilder);
-        builder.setInsertInto(sharedBuilder->getModule()->getModuleInst());
-        auto result =
-            as<IRWitnessTable>(differentiableTypeConformanceContext.lookUpConformanceForType(
-                builder.getDifferentialBottomType()));
-        SLANG_ASSERT(result);
-        return result;
-    }
-
     // Get or construct `:IDifferentiable` conformance for a DifferentiablePair.
     IRWitnessTable* getDifferentialPairWitness(IRInst* inDiffPairType)
     {
@@ -99,15 +88,10 @@ struct BackwardDiffTranscriber
         builder.setInsertInto(inDiffPairType->parent);
         auto diffPairType = as<IRDifferentialPairType>(inDiffPairType);
         SLANG_ASSERT(diffPairType);
-        auto result =
-            as<IRWitnessTable>(differentiableTypeConformanceContext.lookUpConformanceForType(
-                builder.getDifferentialBottomType()));
-        if (result)
-            return result;
 
         auto table = builder.createWitnessTable(autoDiffSharedContext->differentiableInterfaceType, diffPairType);
         auto diffType = differentiateType(&builder, diffPairType->getValueType());
-        auto differentialType = builder.getDifferentialPairType(diffType, getDifferentialBottomWitness());
+        auto differentialType = builder.getDifferentialPairType(diffType, nullptr);
         builder.createWitnessTableEntry(table, autoDiffSharedContext->differentialAssocTypeStructKey, differentialType);
         // Omit the method synthesis here, since we can just intercept those directly at `getXXMethodForType`.
 
@@ -130,8 +114,7 @@ struct BackwardDiffTranscriber
         builder.setInsertInto(primalType->parent);
         auto witness = as<IRWitnessTable>(
             differentiableTypeConformanceContext.lookUpConformanceForType((IRType*)primalType));
-        if (!witness)
-            witness = getDifferentialBottomWitness();
+
         return builder.getDifferentialPairType(
             (IRType*)primalType,
             witness);
