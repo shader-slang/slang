@@ -677,16 +677,8 @@ struct ReverseDerivativePass : public InstPassBase
 
     bool processModule()
     {
-        // We start by initializing our shared IR building state,
-        // since we will re-use that state for any code we
-        // generate along the way.
-        //
-        // TODO: Hoist local types here.
-        SharedIRBuilder* sharedBuilder = &sharedBuilderStorage;
-        sharedBuilder->init(module);
-        sharedBuilder->deduplicateAndRebuildGlobalNumberingMap();
 
-        IRBuilder builderStorage(sharedBuilderStorage);
+        IRBuilder builderStorage(autodiffContext->sharedBuilder);
         IRBuilder* builder = &builderStorage;
 
         // Process all ForwardDifferentiate instructions (kIROp_ForwardDifferentiate), by 
@@ -719,7 +711,6 @@ struct ReverseDerivativePass : public InstPassBase
                 {
                     switch (inst->getOp())
                     {
-                    case kIROp_ForwardDifferentiate:
                     case kIROp_BackwardDifferentiate:
                         // Only process now if the operand is a materialized function.
                         switch (inst->getOperand(0)->getOp())
@@ -818,14 +809,13 @@ struct ReverseDerivativePass : public InstPassBase
         return name;
     }
 
-    ReverseDerivativePass(IRModule* module, DiagnosticSink* sink) :
-        InstPassBase(module),
+    ReverseDerivativePass(AutoDiffSharedContext* context, DiagnosticSink* sink) :
+        InstPassBase(context->moduleInst->getModule()),
         sink(sink),
-        autoDiffSharedContextStorage(module->getModuleInst()),
-        backwardTranscriberStorage(&autoDiffSharedContextStorage, &sharedBuilderStorage, sink)
+        backwardTranscriberStorage(context, context->sharedBuilder, sink),
+        autodiffContext(context),
+        pairBuilderStorage(context)
     {
-        autoDiffSharedContextStorage.sharedBuilder = &sharedBuilderStorage;
-        pairBuilderStorage.sharedContext = &autoDiffSharedContextStorage;
         backwardTranscriberStorage.pairBuilder = &pairBuilderStorage;
     }
 
@@ -837,15 +827,23 @@ protected:
 
     // Diagnostic object from the compile request for
     // error messages.
-    DiagnosticSink* sink;
-
-    // Context to find and manage the witness tables for types 
-    // implementing `IDifferentiable`
-    AutoDiffSharedContext           autoDiffSharedContextStorage;
+    DiagnosticSink*                 sink;
 
     // Builder for dealing with differential pair types.
     DifferentialPairTypeBuilder     pairBuilderStorage;
 
+    // Autodiff Shared Context
+    AutoDiffSharedContext*          autodiffContext;
 };
+
+bool processReverseDerivativeCalls(
+    AutoDiffSharedContext*                  autodiffContext,
+    DiagnosticSink*                         sink,
+    IRReverseDerivativePassOptions const&)
+{
+    ReverseDerivativePass revPass(autodiffContext, sink);
+    bool changed = revPass.processModule();
+    return changed;
+}
 
 }

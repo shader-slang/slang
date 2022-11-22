@@ -6,7 +6,7 @@
 #include "slang-ir-insts.h"
 #include "slang-mangle.h"
 #include "slang-ir-string-hash.h"
-#include "slang-ir-diff-jvp.h"
+#include "slang-ir-autodiff.h"
 #include "slang-module-library.h"
 
 #include "../compiler-core/slang-artifact.h"

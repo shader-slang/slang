@@ -1521,7 +1521,7 @@ struct JVPTranscriber
     }
 };
 
-struct JVPDerivativeContext : public InstPassBase
+struct ForwardDerivativePass : public InstPassBase
 {
 
     DiagnosticSink* getSink()
@@ -1531,19 +1531,10 @@ struct JVPDerivativeContext : public InstPassBase
 
     bool processModule()
     {
-        // We start by initializing our shared IR building state,
-        // since we will re-use that state for any code we
-        // generate along the way.
-        //
-        // TODO: Hoist local types here.
-        SharedIRBuilder* sharedBuilder = &sharedBuilderStorage;
-        sharedBuilder->init(module);
-        sharedBuilder->deduplicateAndRebuildGlobalNumberingMap();
-
         // TODO(sai): Move this call.
         transcriberStorage.differentiableTypeConformanceContext.buildGlobalWitnessDictionary();
 
-        IRBuilder builderStorage(sharedBuilderStorage);
+        IRBuilder builderStorage(this->autodiffContext->sharedBuilder);
         IRBuilder* builder = &builderStorage;
 
         // Process all ForwardDifferentiate instructions (kIROp_ForwardDifferentiate), by 
@@ -1577,7 +1568,6 @@ struct JVPDerivativeContext : public InstPassBase
                     switch (inst->getOp())
                     {
                     case kIROp_ForwardDifferentiate:
-                    case kIROp_BackwardDifferentiate:
                         // Only process now if the operand is a materialized function.
                         switch (inst->getOperand(0)->getOp())
                         {
@@ -1658,7 +1648,6 @@ struct JVPDerivativeContext : public InstPassBase
         return true;
     }
 
-
     // Checks decorators to see if the function should
     // be differentiated (kIROp_ForwardDifferentiableDecoration)
     // 
@@ -1685,42 +1674,15 @@ struct JVPDerivativeContext : public InstPassBase
         return name;
     }
 
-    // Checks decorators to see if the function should
-    // be differentiated (kIROp_ForwardDifferentiableDecoration)
-    // 
-    bool isMarkedForBackwardDifferentiation(IRInst* callable)
-    {
-        return callable->findDecoration<IRBackwardDifferentiableDecoration>() != nullptr;
-    }
-
-    IRStringLit* getBackwardDerivativeFuncName(IRInst* func)
-    {
-        IRBuilder builder(&sharedBuilderStorage);
-        builder.setInsertBefore(func);
-
-        IRStringLit* name = nullptr;
-        if (auto linkageDecoration = func->findDecoration<IRLinkageDecoration>())
-        {
-            name = builder.getStringValue((String(linkageDecoration->getMangledName()) + "_bwd_diff").getUnownedSlice());
-        }
-        else if (auto namehintDecoration = func->findDecoration<IRNameHintDecoration>())
-        {
-            name = builder.getStringValue((String(namehintDecoration->getName()) + "_bwd_diff").getUnownedSlice());
-        }
-
-        return name;
-    }
-
-    JVPDerivativeContext(IRModule* module, DiagnosticSink* sink) :
-        InstPassBase(module),
+    ForwardDerivativePass(AutoDiffSharedContext* context, DiagnosticSink* sink) :
+        InstPassBase(context->moduleInst->getModule()),
         sink(sink),
-        autoDiffSharedContextStorage(module->getModuleInst()),
-        transcriberStorage(&autoDiffSharedContextStorage, &sharedBuilderStorage)
+        transcriberStorage(context, context->sharedBuilder),
+        pairBuilderStorage(context),
+        autodiffContext(context)
     {
-        autoDiffSharedContextStorage.sharedBuilder = &sharedBuilderStorage;
-        pairBuilderStorage.sharedContext = &autoDiffSharedContextStorage;
         transcriberStorage.sink = sink;
-        transcriberStorage.autoDiffSharedContext = &(autoDiffSharedContextStorage);
+        transcriberStorage.autoDiffSharedContext = context;
         transcriberStorage.pairBuilder = &(pairBuilderStorage);
     }
 
@@ -1732,11 +1694,10 @@ protected:
 
     // Diagnostic object from the compile request for
     // error messages.
-    DiagnosticSink* sink;
+    DiagnosticSink*                 sink;
 
-    // Context to find and manage the witness tables for types 
-    // implementing `IDifferentiable`
-    AutoDiffSharedContext           autoDiffSharedContextStorage;
+    // Shared context.
+    AutoDiffSharedContext*          autodiffContext;
 
     // Builder for dealing with differential pair types.
     DifferentialPairTypeBuilder     pairBuilderStorage;
@@ -1746,67 +1707,15 @@ protected:
 // Set up context and call main process method.
 //
 bool processForwardDerivativeCalls(
-    IRModule* module,
+    AutoDiffSharedContext* autodiffContext,
     DiagnosticSink* sink,
-    IRJVPDerivativePassOptions const&)
+    ForwardDerivativePassOptions const&)
 {
-    JVPDerivativeContext context(module, sink);
-    bool changed = context.processModule();
+    ForwardDerivativePass fwdPass(autodiffContext, sink);
+    bool changed = fwdPass.processModule();
     return changed;
 }
 
-AutoDiffSharedContext::AutoDiffSharedContext(IRModuleInst* inModuleInst)
-    : moduleInst(inModuleInst)
-{
-    differentiableInterfaceType = as<IRInterfaceType>(findDifferentiableInterface());
-    if (differentiableInterfaceType)
-    {
-        differentialAssocTypeStructKey = findDifferentialTypeStructKey();
-        differentialAssocTypeWitnessStructKey = findDifferentialTypeWitnessStructKey();
-        zeroMethodStructKey = findZeroMethodStructKey();
-        addMethodStructKey = findAddMethodStructKey();
-        mulMethodStructKey = findMulMethodStructKey();
-
-        if (differentialAssocTypeStructKey)
-            isInterfaceAvailable = true;
-    }
-}
-
-IRInst* AutoDiffSharedContext::findDifferentiableInterface()
-{
-    if (auto module = as<IRModuleInst>(moduleInst))
-    {
-        for (auto globalInst : module->getGlobalInsts())
-        {
-            // TODO: This seems like a particularly dangerous way to look for an interface.
-            // See if we can lower IDifferentiable to a separate IR inst.
-            //
-            if (globalInst->getOp() == kIROp_InterfaceType &&
-                as<IRInterfaceType>(globalInst)->findDecoration<IRNameHintDecoration>()->getName() == "IDifferentiable")
-            {
-                return globalInst;
-            }
-        }
-    }
-    return nullptr;
-}
-
-IRStructKey* AutoDiffSharedContext::getIDifferentiableStructKeyAtIndex(UInt index)
-{
-    if (as<IRModuleInst>(moduleInst) && differentiableInterfaceType)
-    {
-        // Assume for now that IDifferentiable has exactly five fields.
-        SLANG_ASSERT(differentiableInterfaceType->getOperandCount() == 5);
-        if (auto entry = as<IRInterfaceRequirementEntry>(differentiableInterfaceType->getOperand(index)))
-            return as<IRStructKey>(entry->getRequirementKey());
-        else
-        {
-            SLANG_UNEXPECTED("IDifferentiable interface entry unexpected type");
-        }
-    }
-
-    return nullptr;
-}
 
 void DifferentiableTypeConformanceContext::setFunc(IRGlobalValueWithCode* func)
 {

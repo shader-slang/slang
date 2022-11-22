@@ -147,6 +147,15 @@ struct DifferentiableTypeConformanceContext
 
 struct DifferentialPairTypeBuilder
 {
+    struct LoweredPairTypeInfo
+    {
+        IRInst* loweredType;
+        bool isTrivial;
+    };
+
+    DifferentialPairTypeBuilder() = default;
+
+    DifferentialPairTypeBuilder(AutoDiffSharedContext* sharedContext) : sharedContext(sharedContext) {}
 
     IRStructField* findField(IRInst* type, IRStructKey* key);
 
@@ -163,12 +172,6 @@ struct DifferentialPairTypeBuilder
     IRStructKey* _getOrCreatePrimalStructKey();
 
     IRInst* _createDiffPairType(IRType* origBaseType, IRType* diffType);
-
-    struct LoweredPairTypeInfo
-    {
-        IRInst* loweredType;
-        bool isTrivial;
-    };
 
     IRInst* getDiffTypeFromPairType(IRBuilder* builder, IRDifferentialPairType* type);
 

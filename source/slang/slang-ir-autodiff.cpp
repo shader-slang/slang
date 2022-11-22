@@ -1,6 +1,7 @@
 #include "slang-ir-autodiff.h"
 #include "slang-ir-autodiff-rev.h"
 #include "slang-ir-autodiff-fwd.h"
+#include "slang-ir-autodiff-pairs.h"
 
 namespace Slang
 {
@@ -91,14 +92,6 @@ IRInst* DifferentialPairTypeBuilder::emitFieldAccessor(IRBuilder* builder, IRIns
     else
     {
         auto baseTypeInfo = lowerDiffPairType(builder, baseInst->getDataType());
-        if (baseTypeInfo.isTrivial)
-        {
-            if (key == globalPrimalKey)
-                return baseInst;
-            else
-                return builder->getDifferentialBottom();
-        }
-
         pairType = baseTypeInfo.loweredType;
     }
 
@@ -238,12 +231,6 @@ IRInst* DifferentialPairTypeBuilder::_createDiffPairType(IRType* origBaseType, I
     return origBaseType;
 }
 
-struct LoweredPairTypeInfo
-{
-    IRInst* loweredType;
-    bool isTrivial;
-};
-
 IRInst* DifferentialPairTypeBuilder::getDiffTypeFromPairType(IRBuilder* builder, IRDifferentialPairType* type)
 {
     auto witnessTable = type->getWitness();
@@ -256,7 +243,8 @@ IRInst* DifferentialPairTypeBuilder::getDiffTypeWitnessFromPairType(IRBuilder* b
     return _lookupWitness(builder, witnessTable, sharedContext->differentialAssocTypeWitnessStructKey);
 }
 
-LoweredPairTypeInfo DifferentialPairTypeBuilder::lowerDiffPairType(IRBuilder* builder, IRType* originalPairType)
+DifferentialPairTypeBuilder::LoweredPairTypeInfo DifferentialPairTypeBuilder::lowerDiffPairType(
+    IRBuilder* builder, IRType* originalPairType)
 {
     LoweredPairTypeInfo result = {};
     
@@ -285,6 +273,60 @@ LoweredPairTypeInfo DifferentialPairTypeBuilder::lowerDiffPairType(IRBuilder* bu
     pairTypeCache.Add(originalPairType, result);
 
     return result;
+}
+
+
+AutoDiffSharedContext::AutoDiffSharedContext(IRModuleInst* inModuleInst)
+    : moduleInst(inModuleInst)
+{
+    differentiableInterfaceType = as<IRInterfaceType>(findDifferentiableInterface());
+    if (differentiableInterfaceType)
+    {
+        differentialAssocTypeStructKey = findDifferentialTypeStructKey();
+        differentialAssocTypeWitnessStructKey = findDifferentialTypeWitnessStructKey();
+        zeroMethodStructKey = findZeroMethodStructKey();
+        addMethodStructKey = findAddMethodStructKey();
+        mulMethodStructKey = findMulMethodStructKey();
+
+        if (differentialAssocTypeStructKey)
+            isInterfaceAvailable = true;
+    }
+}
+
+IRInst* AutoDiffSharedContext::findDifferentiableInterface()
+{
+    if (auto module = as<IRModuleInst>(moduleInst))
+    {
+        for (auto globalInst : module->getGlobalInsts())
+        {
+            // TODO: This seems like a particularly dangerous way to look for an interface.
+            // See if we can lower IDifferentiable to a separate IR inst.
+            //
+            if (globalInst->getOp() == kIROp_InterfaceType &&
+                as<IRInterfaceType>(globalInst)->findDecoration<IRNameHintDecoration>()->getName() == "IDifferentiable")
+            {
+                return globalInst;
+            }
+        }
+    }
+    return nullptr;
+}
+
+IRStructKey* AutoDiffSharedContext::getIDifferentiableStructKeyAtIndex(UInt index)
+{
+    if (as<IRModuleInst>(moduleInst) && differentiableInterfaceType)
+    {
+        // Assume for now that IDifferentiable has exactly five fields.
+        SLANG_ASSERT(differentiableInterfaceType->getOperandCount() == 5);
+        if (auto entry = as<IRInterfaceRequirementEntry>(differentiableInterfaceType->getOperand(index)))
+            return as<IRStructKey>(entry->getRequirementKey());
+        else
+        {
+            SLANG_UNEXPECTED("IDifferentiable interface entry unexpected type");
+        }
+    }
+
+    return nullptr;
 }
 
 
@@ -323,36 +365,46 @@ void stripAutoDiffDecorations(IRModule* module)
 bool processAutodiffCalls(
     IRModule*                           module,
     DiagnosticSink*                     sink,
-    IRAutodiffPassOptions const&        options = IRAutodiffPassOptions())
+    IRAutodiffPassOptions const&)
 {
     // Simplify module to remove dead code.
     IRDeadCodeEliminationOptions dceOptions;
     dceOptions.keepExportsAlive = true;
     dceOptions.keepLayoutsAlive = true;
-    eliminateDeadCode(module, options);
+    eliminateDeadCode(module, dceOptions);
 
     bool modified = false;
 
+    // Create shared context for all auto-diff related passes
+    AutoDiffSharedContext autodiffContext(module->getModuleInst());
+
+    // We start by initializing our shared IR building state,
+    // since we will re-use that state for any code we
+    // generate along the way.
+    //
+    SharedIRBuilder sharedBuilder;
+    sharedBuilder.init(module);
+    sharedBuilder.deduplicateAndRebuildGlobalNumberingMap();
+
+    autodiffContext.sharedBuilder = &sharedBuilder;
+
     // Process forward derivative calls.
-    modified |= processForwardDerivativeCalls(module, sink);
+    modified |= processForwardDerivativeCalls(&autodiffContext, sink);
 
     // Process reverse derivative calls.
-    modified |= processReverseDerivativeCalls(module, sink);
-
-    modified |= simplifyDifferentialBottomType(builder);
+    modified |= processReverseDerivativeCalls(&autodiffContext, sink);
 
     // Replaces IRDifferentialPairType with an auto-generated struct,
     // IRDifferentialPairGetDifferential with 'differential' field access,
     // IRDifferentialPairGetPrimal with 'primal' field access, and
     // IRMakeDifferentialPair with an IRMakeStruct.
     // 
-    modified |= processPairTypes(builder, module->getModuleInst());
-
-    modified |= eliminateDifferentialBottomType(builder);
+    modified |= processPairTypes(&autodiffContext);
 
     // Remove auto-diff related decorations.
     stripAutoDiffDecorations(module);
 
+    return modified;
 }
 
 

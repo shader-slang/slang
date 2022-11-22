@@ -1,6 +1,6 @@
 #include "slang-ir-check-differentiability.h"
 
-#include "slang-ir-diff-jvp.h"
+#include "slang-ir-autodiff.h"
 #include "slang-ir-inst-pass-base.h"
 
 namespace Slang

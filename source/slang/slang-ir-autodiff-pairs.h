@@ -16,4 +16,6 @@
 namespace Slang
 {
 
+bool processPairTypes(AutoDiffSharedContext* context);
+
 }

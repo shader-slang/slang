@@ -5,6 +5,14 @@ namespace Slang
 
 struct DiffPairLoweringPass : InstPassBase
 {
+    DiffPairLoweringPass(AutoDiffSharedContext* context) :
+        InstPassBase(context->moduleInst->getModule()), 
+        pairBuilderStorage(context),
+        autodiffContext(context)
+    { 
+        pairBuilder = &pairBuilderStorage;
+    }
+
     IRInst* lowerPairType(IRBuilder* builder, IRType* pairType, bool* isTrivial = nullptr)
     {
         builder->setInsertBefore(pairType);
@@ -88,7 +96,7 @@ struct DiffPairLoweringPass : InstPassBase
         return nullptr;
     }
 
-    bool processPairTypes(IRBuilder* builder, IRInst* instWithChildren)
+    bool processInstWithChildren(IRBuilder* builder, IRInst* instWithChildren)
     {
         bool modified = false;
         // Hoist all pair types to global scope when possible.
@@ -113,7 +121,7 @@ struct DiffPairLoweringPass : InstPassBase
                 }
             });
 
-        sharedBuilderStorage.deduplicateAndRebuildGlobalNumberingMap();
+        autodiffContext->sharedBuilder->deduplicateAndRebuildGlobalNumberingMap();
 
         processAllInsts([&](IRInst* inst)
             {
@@ -149,144 +157,26 @@ struct DiffPairLoweringPass : InstPassBase
         return modified;
     }
 
-    bool simplifyDifferentialBottomType(IRBuilder* builder)
+    bool processModule()
     {
-        bool modified = false;
-        auto diffBottom = builder->getDifferentialBottom();
-
-        bool changed = true;
-        List<IRUse*> uses;
-        while (changed)
-        {
-            changed = false;
-            // Replace all insts whose type is `DifferentialBottomType` to `diffBottom`.
-            processAllInsts([&](IRInst* inst)
-                {
-                    if (inst->getDataType() && inst->getDataType()->getOp() == kIROp_DifferentialBottomType)
-                    {
-                        if (inst != diffBottom)
-                        {
-                            inst->replaceUsesWith(diffBottom);
-                            inst->removeAndDeallocate();
-                            modified = true;
-                        }
-                    }
-                });
-            // Go through all uses of diffBottom and run simplification.
-            processAllInsts([&](IRInst* inst)
-                {
-                    if (!inst->hasUses())
-                        return;
-
-                    builder->setInsertBefore(inst);
-                    IRInst* valueToReplace = nullptr;
-                    switch (inst->getOp())
-                    {
-                    case kIROp_Store:
-                        if (as<IRStore>(inst)->getVal() == diffBottom)
-                        {
-                            inst->removeAndDeallocate();
-                            changed = true;
-                        }
-                        return;
-                    case kIROp_MakeDifferentialPair:
-                        // Our simplification could lead to a situation where
-                        // bottom is used to make a pair that has a non-bottom differential type,
-                        // in this case we should use zero instead.
-                        if (inst->getOperand(1) == diffBottom)
-                        {
-                            // Only apply if we are the second operand.
-                            auto pairType = as<IRDifferentialPairType>(inst->getDataType());
-                            if (pairBuilder->getDiffTypeFromPairType(builder, pairType)->getOp() != kIROp_DifferentialBottomType)
-                            {
-                                auto zero = transcriberStorage.getDifferentialZeroOfType(builder, pairType->getValueType());
-                                inst->setOperand(1, zero);
-                                changed = true;
-                            }
-                        }
-                        return;
-                    case kIROp_DifferentialPairGetDifferential:
-                        if (inst->getOperand(0)->getOp() == kIROp_MakeDifferentialPair)
-                        {
-                            valueToReplace = inst->getOperand(0)->getOperand(1);
-                        }
-                        break;
-                    case kIROp_DifferentialPairGetPrimal:
-                        if (inst->getOperand(0)->getOp() == kIROp_MakeDifferentialPair)
-                        {
-                            valueToReplace = inst->getOperand(0)->getOperand(0);
-                        }
-                        break;
-                    case kIROp_Add:
-                        if (inst->getOperand(0) == diffBottom)
-                        {
-                            valueToReplace = inst->getOperand(1);
-                        }
-                        else if (inst->getOperand(1) == diffBottom)
-                        {
-                            valueToReplace = inst->getOperand(0);
-                        }
-                        break;
-                    case kIROp_Sub:
-                        if (inst->getOperand(0) == diffBottom)
-                        {
-                            // If left is bottom, and right is not bottom, then we should return -right.
-                            // However we can't possibly run into that case since both side of - operator
-                            // must be at the same order of differentiation.
-                            valueToReplace = diffBottom;
-                        }
-                        else if (inst->getOperand(1) == diffBottom)
-                        {
-                            valueToReplace = inst->getOperand(0);
-                        }
-                        break;
-                    case kIROp_Mul:
-                    case kIROp_Div:
-                        if (inst->getOperand(0) == diffBottom)
-                        {
-                            valueToReplace = diffBottom;
-                        }
-                        else if (inst->getOperand(1) == diffBottom)
-                        {
-                            valueToReplace = diffBottom;
-                        }
-                        break;
-                    default:
-                        break;
-                    }
-                    if (valueToReplace)
-                    {
-                        inst->replaceUsesWith(valueToReplace);
-                        changed = true;
-                    }
-                });
-            modified |= changed;
-        }
-
-        return modified;
-    }
-
-    bool eliminateDifferentialBottomType(IRBuilder* builder)
-    {
-        simplifyDifferentialBottomType(builder);
-
-        bool modified = false;
-        auto diffBottom = builder->getDifferentialBottom();
-        auto diffBottomType = diffBottom->getDataType();
-        diffBottom->replaceUsesWith(builder->getVoidValue());
-        diffBottom->removeAndDeallocate();
-        diffBottomType->replaceUsesWith(builder->getVoidType());
-
-        return modified;
+        IRBuilder builder(autodiffContext->sharedBuilder);
+        return processInstWithChildren(&builder, module->getModuleInst());
     }
 
     private: 
     
-    IRModule* module;
+    AutoDiffSharedContext* autodiffContext;
     
     DifferentialPairTypeBuilder* pairBuilder;
 
-
+    DifferentialPairTypeBuilder pairBuilderStorage;
 
 };
+
+bool processPairTypes(AutoDiffSharedContext* context)
+{
+    DiffPairLoweringPass pairLoweringPass(context);
+    return pairLoweringPass.processModule();
+}
+
 }

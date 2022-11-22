@@ -17,8 +17,8 @@ struct IRReverseDerivativePassOptions
 };
 
 bool processReverseDerivativeCalls(
-    IRModule*                           module,
-    DiagnosticSink*                     sink,
+    AutoDiffSharedContext*                  autodiffContext,
+    DiagnosticSink*                         sink,
     IRReverseDerivativePassOptions const&   options = IRReverseDerivativePassOptions());
 
 

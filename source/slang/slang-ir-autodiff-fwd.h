@@ -30,14 +30,14 @@ namespace Slang
     
     typedef DiffInstPair<IRInst*, IRInst*> InstPair;
 
-    struct IRJVPDerivativePassOptions
+    struct ForwardDerivativePassOptions
     {
         // Nothing for now..
     };
 
     bool processForwardDerivativeCalls(
-        IRModule*                           module,
-        DiagnosticSink*                     sink,
-        IRJVPDerivativePassOptions const&   options = IRJVPDerivativePassOptions());
+        AutoDiffSharedContext*                  autodiffContext,
+        DiagnosticSink*                         sink,
+        ForwardDerivativePassOptions const&     options = ForwardDerivativePassOptions());
 
 }

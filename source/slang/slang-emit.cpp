@@ -11,7 +11,7 @@
 #include "slang-ir-cleanup-void.h"
 #include "slang-ir-dce.h"
 #include "slang-ir-diff-call.h"
-#include "slang-ir-diff-jvp.h"
+#include "slang-ir-autodiff.h"
 #include "slang-ir-dll-export.h"
 #include "slang-ir-dll-import.h"
 #include "slang-ir-eliminate-phis.h"
@@ -377,10 +377,7 @@ Result linkAndOptimizeIR(
 
     dumpIRIfEnabled(codeGenContext, irModule, "BEFORE-AUTODIFF");
     
-    // Process higher-order calles to auto-diff passes.
-    processDifferentiableFuncs(irModule, sink);
-
-    stripAutoDiffDecorations(irModule);
+    processAutodiffCalls(irModule, sink);
 
     dumpIRIfEnabled(codeGenContext, irModule, "AFTER-AUTODIFF");
 
