@@ -1085,6 +1085,25 @@ class BackwardDifferentiableAttribute : public DifferentiableAttribute
     SLANG_AST_CLASS(BackwardDifferentiableAttribute)
 };
 
+    /// The `[BackwardDerivative(function)]` attribute specifies a custom function that should
+    /// be used as the backward-derivative for the decorated function.
+class BackwardDerivativeAttribute : public DifferentiableAttribute
+{
+    SLANG_AST_CLASS(BackwardDerivativeAttribute)
+    Expr* funcExpr;
+};
+
+    /// The `[BackwardDerivativeOf(primalFunction)]` attribute marks the decorated function as custom
+    /// backward-derivative implementation for `primalFunction`.
+class BackwardDerivativeOfAttribute : public DifferentiableAttribute
+{
+    SLANG_AST_CLASS(BackwardDerivativeOfAttribute)
+
+    Expr* funcExpr;
+
+    Expr* backDeclRef; // DeclRef to this derivative function when initiated from primalFunction.
+};
+
     /// Indicates that the modified declaration is one of the "magic" declarations
     /// that NVAPI uses to communicate extended operations. When NVAPI is being included
     /// via the prelude for downstream compilation, declarations with this modifier

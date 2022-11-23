@@ -659,6 +659,25 @@ struct IRDifferentiableTypeDictionaryDecoration : IRDecoration
     IR_LEAF_ISA(DifferentiableTypeDictionaryDecoration)
 };
 
+struct IRDifferentiableMethodRequirementDictionaryDecoration : IRDecoration
+{
+    IR_LEAF_ISA(DifferentiableMethodRequirementDictionaryDecoration)
+};
+
+struct IRDifferentiableMethodRequirementDictionaryItem : IRInst
+{
+    IR_PARENT_ISA(DifferentiableMethodRequirementDictionaryItem)
+};
+
+struct IRForwardDifferentiableMethodRequirementDictionaryItem : IRDifferentiableMethodRequirementDictionaryItem
+{
+    IR_LEAF_ISA(ForwardDifferentiableMethodRequirementDictionaryItem)
+};
+
+struct IRBackwardDifferentiableMethodRequirementDictionaryItem : IRDifferentiableMethodRequirementDictionaryItem
+{
+    IR_LEAF_ISA(BackwardDifferentiableMethodRequirementDictionaryItem)
+};
 
 // An instruction that specializes another IR value
 // (representing a generic) to a particular set of generic arguments 

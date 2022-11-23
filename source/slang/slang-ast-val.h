@@ -490,4 +490,27 @@ class SNormModifierVal : public ResourceFormatModifierVal
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
 };
 
+    /// Represents the result of differentiating a function.
+class DifferentiateVal : public Val
+{
+    SLANG_AST_CLASS(DifferentiateVal)
+
+    DeclRef<Decl> func;
+
+    bool _equalsValOverride(Val* val);
+    void _toTextOverride(StringBuilder& out);
+    HashCode _getHashCodeOverride();
+    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+};
+
+class ForwardDifferentiateVal : public DifferentiateVal
+{
+    SLANG_AST_CLASS(ForwardDifferentiateVal)
+};
+
+class BackwardDifferentiateVal : public DifferentiateVal
+{
+    SLANG_AST_CLASS(BackwardDifferentiateVal)
+};
+
 } // namespace Slang
