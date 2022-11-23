@@ -1580,7 +1580,7 @@ namespace Slang
                 List<Type*> paramTypes;
 
                 for (UIndex ii = 0; ii < diffFuncType->getParamCount(); ii++)
-                    paramTypes.add(diffFuncType->getParamType(ii));
+                    paramTypes.add(removeParamDirType(diffFuncType->getParamType(ii)));
 
                 // Try to infer generic arguments, based on the updated context.
                 DeclRef<Decl> innerRef = inferGenericArguments(
