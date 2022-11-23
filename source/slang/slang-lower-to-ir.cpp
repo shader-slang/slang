@@ -6952,42 +6952,45 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                     setValue(context, constraintDecl, LoweredValInfo::simple(constraintEntry));
                 }
             }
-            else if (auto callableDecl = as<CallableDecl>(requirementDecl))
+            else
             {
-                // Differentiable functions has additional requirements for the derivatives.
-                for (auto diffDecl : callableDecl->getMembersOfType<DerivativeRequirementDecl>())
+                if (auto callableDecl = as<CallableDecl>(requirementDecl))
                 {
-                    auto diffKey = getInterfaceRequirementKey(diffDecl);
-                    IRInst* diffVal = ensureDecl(subContext, diffDecl).val;
-                    auto diffEntry = subBuilder->createInterfaceRequirementEntry(diffKey, diffVal);
-                    if (diffVal)
+                    // Differentiable functions has additional requirements for the derivatives.
+                    for (auto diffDecl : callableDecl->getMembersOfType<DerivativeRequirementDecl>())
                     {
-                        switch (diffVal->getOp())
+                        auto diffKey = getInterfaceRequirementKey(diffDecl);
+                        IRInst* diffVal = ensureDecl(subContext, diffDecl).val;
+                        auto diffEntry = subBuilder->createInterfaceRequirementEntry(diffKey, diffVal);
+                        if (diffVal)
                         {
-                        case kIROp_Func:
-                        case kIROp_Generic:
-                        {
-                            // Remove lowered `IRFunc`s since we only care about
-                            // function types.
-                            auto reqType = diffVal->getFullType();
-                            diffEntry->setRequirementVal(reqType);
-                            break;
+                            switch (diffVal->getOp())
+                            {
+                            case kIROp_Func:
+                            case kIROp_Generic:
+                            {
+                                // Remove lowered `IRFunc`s since we only care about
+                                // function types.
+                                auto reqType = diffVal->getFullType();
+                                diffEntry->setRequirementVal(reqType);
+                                break;
+                            }
+                            default:
+                                break;
+                            }
                         }
-                        default:
-                            break;
-                        }
-                    }
-                    irInterface->setOperand(entryIndex, diffEntry);
-                    entryIndex++;
+                        irInterface->setOperand(entryIndex, diffEntry);
+                        entryIndex++;
 
-                    setValue(context, diffDecl, LoweredValInfo::simple(diffEntry));
-                    insertRequirementKeyAssociation(irInterface, diffDecl, requirementKey, diffKey);
+                        setValue(context, diffDecl, LoweredValInfo::simple(diffEntry));
+                        insertRequirementKeyAssociation(irInterface, diffDecl, requirementKey, diffKey);
+                    }
                 }
+                // Add lowered requirement entry to current decl mapping to prevent
+                // the function requirements from being lowered again when we get to
+                // `ensureAllDeclsRec`.
+                setValue(context, requirementDecl, LoweredValInfo::simple(entry));
             }
-            // Add lowered requirement entry to current decl mapping to prevent
-            // the function requirements from being lowered again when we get to
-            // `ensureAllDeclsRec`.
-            setValue(context, requirementDecl, LoweredValInfo::simple(entry));
         }
 
 

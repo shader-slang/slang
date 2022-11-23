@@ -1,6 +1,7 @@
 // slang-ast-substitutions.cpp
 #include "slang-ast-builder.h"
 #include <assert.h>
+
 #include "slang-generated-ast-macro.h"
 
 namespace Slang {
