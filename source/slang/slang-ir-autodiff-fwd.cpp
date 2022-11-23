@@ -181,7 +181,7 @@ struct JVPTranscriber
         if (auto returnPairType = tryGetDiffPairType(builder, origResultType))
             diffReturnType = returnPairType;
         else
-            diffReturnType = builder->getVoidType();
+            diffReturnType = origResultType;
 
         return builder->getFuncType(newParameterTypes, diffReturnType);
     }
