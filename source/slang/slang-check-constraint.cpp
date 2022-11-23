@@ -741,6 +741,9 @@ namespace Slang
         Type*               fst,
         Type*               snd)
     {
+        fst = removeParamDirType(fst);
+        snd = removeParamDirType(snd);
+
         // Unifying a type `A & B` with `T` amounts to unifying
         // `A` with `T` and also `B` with `T` while
         // unifying a type `T` with `A & B` amounts to either 
@@ -768,6 +771,9 @@ namespace Slang
         Type*  fst,
         Type*  snd)
     {
+        fst = removeParamDirType(fst);
+        snd = removeParamDirType(snd);
+
         if (fst->equals(snd)) return true;
 
         // An error type can unify with anything, just so we avoid cascading errors.
