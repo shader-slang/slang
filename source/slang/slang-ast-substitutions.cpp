@@ -1,7 +1,6 @@
 // slang-ast-substitutions.cpp
 #include "slang-ast-builder.h"
 #include <assert.h>
-#include "slang-syntax.h"
 #include "slang-generated-ast-macro.h"
 
 namespace Slang {
@@ -120,26 +119,6 @@ Substitutions* ThisTypeSubstitution::_applySubstitutionsShallowOverride(ASTBuild
 
     // NOTE: Must use .as because we must have a smart pointer here to keep in scope.
     auto substWitness = as<SubtypeWitness>(witness->substituteImpl(astBuilder, substSet, &diff));
-
-    for (auto subst = substSet.substitutions; subst; subst = subst->outer)
-    {
-        if (auto otherSubst = as<ThisTypeSubstitution>(subst))
-        {
-            if (otherSubst->witness->sup->equals(substWitness->sub))
-            {
-                // We have a `ThisTypeSubstitution` from `substSet` that substitutes the sub type of
-                // this `ThisTypeSubst` to a more concrete type. In this case, we want to construct
-                // a transitive sub type witness to make our witness more concrete.
-                auto transitiveWitness = astBuilder->create<TransitiveSubtypeWitness>();
-                transitiveWitness->sub = otherSubst->witness->sub;
-                transitiveWitness->sup = substWitness->sup;
-                transitiveWitness->subToMid = otherSubst->witness;
-                transitiveWitness->midToSup = substWitness;
-                substWitness = transitiveWitness;
-                diff++;
-            }
-        }
-    }
 
     if (!diff) return this;
 
