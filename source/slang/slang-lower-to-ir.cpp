@@ -6863,14 +6863,6 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             {
                 operandCount += associatedTypeDecl->getMembersOfType<TypeConstraintDecl>().getCount();
             }
-            else if (auto callableDecl = as<CallableDecl>(requirementDecl))
-            {
-                // Differentiable functions has additional requirements for the derivatives.
-                if (callableDecl->getMembersOfType<ForwardDerivativeRequirementDecl>().getCount())
-                    operandCount++;
-                if (callableDecl->getMembersOfType<BackwardDerivativeRequirementDecl>().getCount())
-                    operandCount++;
-            }
         }
 
         // Allocate an IRInterfaceType with the `operandCount` operands.
@@ -6957,33 +6949,10 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 if (auto callableDecl = as<CallableDecl>(requirementDecl))
                 {
                     // Differentiable functions has additional requirements for the derivatives.
-                    for (auto diffDecl : callableDecl->getMembersOfType<DerivativeRequirementDecl>())
+                    for (auto diffDecl : callableDecl->getMembersOfType<DerivativeRequirementReferenceDecl>())
                     {
-                        auto diffKey = getInterfaceRequirementKey(diffDecl);
-                        IRInst* diffVal = ensureDecl(subContext, diffDecl).val;
-                        auto diffEntry = subBuilder->createInterfaceRequirementEntry(diffKey, diffVal);
-                        if (diffVal)
-                        {
-                            switch (diffVal->getOp())
-                            {
-                            case kIROp_Func:
-                            case kIROp_Generic:
-                            {
-                                // Remove lowered `IRFunc`s since we only care about
-                                // function types.
-                                auto reqType = diffVal->getFullType();
-                                diffEntry->setRequirementVal(reqType);
-                                break;
-                            }
-                            default:
-                                break;
-                            }
-                        }
-                        irInterface->setOperand(entryIndex, diffEntry);
-                        entryIndex++;
-
-                        setValue(context, diffDecl, LoweredValInfo::simple(diffEntry));
-                        insertRequirementKeyAssociation(irInterface, diffDecl, requirementKey, diffKey);
+                        auto diffKey = getInterfaceRequirementKey(diffDecl->referencedDecl);
+                        insertRequirementKeyAssociation(irInterface, diffDecl->referencedDecl, requirementKey, diffKey);
                     }
                 }
                 // Add lowered requirement entry to current decl mapping to prevent
