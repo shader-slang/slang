@@ -309,6 +309,10 @@ namespace Slang
 
     GenericSubstitution* findInnerMostGenericSubstitution(Substitutions* subst);
 
+    ThisTypeSubstitution* findThisTypeSubstitution(
+        const Substitutions* substs,
+        InterfaceDecl* interfaceDecl);
+
     enum class UserDefinedAttributeTargets
     {
         None = 0,

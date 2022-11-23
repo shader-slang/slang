@@ -100,8 +100,19 @@ struct JVPTranscriber
         return instMapD.ContainsKey(origInst);
     }
 
+    bool shouldUseOriginalAsPrimal(IRInst* origInst)
+    {
+        if (as<IRGlobalValueWithCode>(origInst))
+            return true;
+        if (origInst->parent && origInst->parent->getOp() == kIROp_Module)
+            return true;
+        return false;
+    }
+
     IRInst* lookupPrimalInst(IRInst* origInst)
     {
+        if (shouldUseOriginalAsPrimal(origInst))
+            return origInst;
         return cloneEnv.mapOldValToNew[origInst];
     }
 
@@ -112,9 +123,11 @@ struct JVPTranscriber
 
     bool hasPrimalInst(IRInst* origInst)
     {
+        if (shouldUseOriginalAsPrimal(origInst))
+            return true;
         return cloneEnv.mapOldValToNew.ContainsKey(origInst);
     }
-    
+
     IRInst* findOrTranscribeDiffInst(IRBuilder* builder, IRInst* origInst)
     {
         if (!hasDifferentialInst(origInst))
@@ -128,6 +141,9 @@ struct JVPTranscriber
 
     IRInst* findOrTranscribePrimalInst(IRBuilder* builder, IRInst* origInst)
     {
+        if (shouldUseOriginalAsPrimal(origInst))
+            return origInst;
+
         if (!hasPrimalInst(origInst))
         {
             transcribe(builder, origInst);
@@ -687,7 +703,10 @@ struct JVPTranscriber
 
         IRInst* diffCallee = nullptr;
 
-        if (auto derivativeReferenceDecor = primalCallee->findDecoration<IRForwardDerivativeDecoration>())
+        if (instMapD.TryGetValue(origCallee, diffCallee))
+        {
+        }
+        else if (auto derivativeReferenceDecor = primalCallee->findDecoration<IRForwardDerivativeDecoration>())
         {
             // If the user has already provided an differentiated implementation, use that.
             diffCallee = derivativeReferenceDecor->getForwardDerivativeFunc();
@@ -901,48 +920,111 @@ struct JVPTranscriber
         return InstPair(nullptr, nullptr);
     }
 
-    InstPair transcribeSpecialize(IRBuilder*, IRSpecialize* origSpecialize)
+    IRInst* findInterfaceRequirement(IRInterfaceType* type, IRInst* key)
     {
-        // In general, we should not see any specialize insts at this stage.
-        // The exceptions are target intrinsics.
-        auto genericInnerVal = findInnerMostGenericReturnVal(as<IRGeneric>(origSpecialize->getBase()));
-        if (genericInnerVal->findDecoration<IRTargetIntrinsicDecoration>())
+        for (UInt i = 0; i < type->getOperandCount(); i++)
         {
-            // Look for an IRForwardDerivativeDecoration on the specialize inst.
-            // (Normally, this would be on the inner IRFunc, but in this case only the JVP func
-            // can be specialized, so we put a decoration on the IRSpecialize)
-            //
-            if (auto jvpFuncDecoration = origSpecialize->findDecoration<IRForwardDerivativeDecoration>())
+            if (auto req = as<IRInterfaceRequirementEntry>(type->getOperand(i)))
             {
-                auto jvpFunc = jvpFuncDecoration->getForwardDerivativeFunc();
-
-                // Make sure this isn't itself a specialize .
-                SLANG_RELEASE_ASSERT(!as<IRSpecialize>(jvpFunc));
-
-                return InstPair(jvpFunc, jvpFunc);
+                if (req->getRequirementKey() == key)
+                    return req->getRequirementVal();
             }
+        }
+        return nullptr;
+    }
+
+    InstPair transcribeSpecialize(IRBuilder* builder, IRSpecialize* origSpecialize)
+    {
+        auto primalBase = findOrTranscribePrimalInst(builder, origSpecialize->getBase());
+        List<IRInst*> primalArgs;
+        for (UInt i = 0; i < origSpecialize->getArgCount(); i++)
+        {
+            primalArgs.add(findOrTranscribePrimalInst(builder, origSpecialize->getArg(i)));
+        }
+        auto primalType = findOrTranscribePrimalInst(builder, origSpecialize->getFullType());
+        auto primalSpecialize = (IRSpecialize*)builder->emitSpecializeInst(
+            (IRType*)primalType, primalBase, primalArgs.getCount(), primalArgs.getBuffer());
+
+        IRInst* diffBase = nullptr;
+        if (instMapD.TryGetValue(origSpecialize->getBase(), diffBase))
+        {
+            List<IRInst*> args;
+            for (UInt i = 0; i < primalSpecialize->getArgCount(); i++)
+            {
+                args.add(primalSpecialize->getArg(i));
+            }
+            auto diffSpecialize = builder->emitSpecializeInst(
+                builder->getTypeKind(), diffBase, args.getCount(), args.getBuffer());
+            return InstPair(primalSpecialize, diffSpecialize);
+        }
+
+        auto genericInnerVal = findInnerMostGenericReturnVal(as<IRGeneric>(origSpecialize->getBase()));
+        // Look for an IRForwardDerivativeDecoration on the specialize inst.
+        // (Normally, this would be on the inner IRFunc, but in this case only the JVP func
+        // can be specialized, so we put a decoration on the IRSpecialize)
+        //
+        if (auto jvpFuncDecoration = origSpecialize->findDecoration<IRForwardDerivativeDecoration>())
+        {
+            auto jvpFunc = jvpFuncDecoration->getForwardDerivativeFunc();
+
+            // Make sure this isn't itself a specialize .
+            SLANG_RELEASE_ASSERT(!as<IRSpecialize>(jvpFunc));
+
+            return InstPair(primalSpecialize, jvpFunc);
+        }
+        else if (auto derivativeDecoration = genericInnerVal->findDecoration<IRForwardDerivativeDecoration>())
+        {
+            diffBase = derivativeDecoration->getForwardDerivativeFunc();
+            List<IRInst*> args;
+            for (UInt i = 0; i < primalSpecialize->getArgCount(); i++)
+            {
+                args.add(primalSpecialize->getArg(i));
+            }
+            auto diffSpecialize = builder->emitSpecializeInst(
+                builder->getTypeKind(), diffBase, args.getCount(), args.getBuffer());
+            return InstPair(primalSpecialize, diffSpecialize);
         }
         else
         {
-            getSink()->diagnose(origSpecialize->sourceLoc,
-                Diagnostics::unexpected,
-                "should not be attempting to differentiate anything specialized here.");
+            return InstPair(primalSpecialize, nullptr);
         }
-
-        return InstPair(nullptr, nullptr);
     }
 
-    InstPair transcibeLookupInterfaceMethod(IRBuilder* builder, IRLookupWitnessMethod* origLookup)
+    InstPair transcribeLookupInterfaceMethod(IRBuilder* builder, IRLookupWitnessMethod* lookupInst)
     {
-        // This is slightly counter-intuitive, but we don't perform any differentiation
-        // logic here. We simple clone the original lookup which points to the original function,
-        // or the cloned version in case we're inside a generic scope.
-        // The differentiation logic is inserted later when this is used in an IRCall.
-        // This decision is mostly to maintain a uniform convention of ForwardDifferentiate(Lookup(Table))
-        // rather than have Lookup(ForwardDifferentiate(Table))
-        // 
-        auto diffLookup = cloneInst(&cloneEnv, builder, origLookup);
-        return InstPair(diffLookup, diffLookup);
+        auto primalWt = findOrTranscribePrimalInst(builder, lookupInst->getWitnessTable());
+        auto primalKey = findOrTranscribePrimalInst(builder, lookupInst->getRequirementKey());
+        auto primalType = findOrTranscribePrimalInst(builder, lookupInst->getFullType());
+        auto primal = (IRSpecialize*)builder->emitLookupInterfaceMethodInst((IRType*)primalType, primalWt, primalKey);
+
+        auto interfaceType = as<IRInterfaceType>(as<IRWitnessTableTypeBase>(lookupInst->getWitnessTable()->getDataType())->getConformanceType());
+        if (!interfaceType)
+        {
+            return InstPair(primal, nullptr);
+        }
+        auto dict = interfaceType->findDecoration<IRDifferentiableMethodRequirementDictionaryDecoration>();
+        if (!dict)
+        {
+            return InstPair(primal, nullptr);
+        }
+
+        for (auto child : dict->getChildren())
+        {
+            if (auto item = as<IRForwardDifferentiableMethodRequirementDictionaryItem>(child))
+            {
+                if (item->getOperand(0) == lookupInst->getRequirementKey())
+                {
+                    auto diffKey = item->getOperand(1);
+                    if (auto diffType = findInterfaceRequirement(interfaceType, diffKey))
+                    {
+                        auto diff = builder->emitLookupInterfaceMethodInst((IRType*)diffType, primalWt, diffKey);
+                        return InstPair(primal, diff);
+                    }
+                    break;
+                }
+            }
+        }
+        return InstPair(primal, nullptr);
     }
 
     // In differential computation, the 'default' differential value is always zero.
@@ -1188,6 +1270,12 @@ struct JVPTranscriber
         return InstPair(primalPair, diffPair);
     }
 
+    InstPair trascribeNonDiffInst(IRBuilder* builder, IRInst* origInst)
+    {
+        auto primal = cloneInst(&cloneEnv, builder, origInst);
+        return InstPair(primal, nullptr);
+    }
+
     InstPair transcribeDifferentialPairGetElement(IRBuilder* builder, IRInst* origInst)
     {
         SLANG_ASSERT(
@@ -1335,6 +1423,7 @@ struct JVPTranscriber
         // 
         instsInProgress.Add(origInst);
         InstPair pair = transcribeInst(builder, origInst);
+        instsInProgress.Remove(origInst);
 
         if (auto primalInst = pair.primal)
         {
@@ -1363,11 +1452,9 @@ struct JVPTranscriber
             }
             return pair.differential;
         }
-        instsInProgress.Remove(origInst);
-
         getSink()->diagnose(origInst->sourceLoc,
-                    Diagnostics::internalCompilerError,
-                    "failed to transcibe instruction");
+            Diagnostics::internalCompilerError,
+            "failed to transcibe instruction");
         return nullptr;
     }
 
@@ -1407,7 +1494,10 @@ struct JVPTranscriber
 
         case kIROp_Construct:
             return transcribeConstruct(builder, origInst);
-        
+
+        case kIROp_lookup_interface_method:
+            return transcribeLookupInterfaceMethod(builder, as<IRLookupWitnessMethod>(origInst));
+
         case kIROp_Call:
             return transcribeCall(builder, as<IRCall>(origInst));
         
@@ -1429,9 +1519,6 @@ struct JVPTranscriber
         case kIROp_Specialize:
             return transcribeSpecialize(builder, as<IRSpecialize>(origInst));
 
-        case kIROp_lookup_interface_method:
-            return transcibeLookupInterfaceMethod(builder, as<IRLookupWitnessMethod>(origInst));
-
         case kIROp_FieldExtract:
         case kIROp_FieldAddress:
             return transcribeFieldExtract(builder, origInst);
@@ -1450,6 +1537,15 @@ struct JVPTranscriber
         case kIROp_DifferentialPairGetPrimal:
         case kIROp_DifferentialPairGetDifferential:
             return transcribeDifferentialPairGetElement(builder, origInst);
+        case kIROp_ExtractExistentialWitnessTable:
+        case kIROp_ExtractExistentialType:
+        case kIROp_ExtractExistentialValue:
+        case kIROp_WrapExistential:
+        case kIROp_MakeExistential:
+        case kIROp_MakeExistentialWithRTTI:
+            return trascribeNonDiffInst(builder, origInst);
+        case kIROp_StructKey:
+            return InstPair(origInst, nullptr);
         }
     
         // If none of the cases have been hit, check if the instruction is a
@@ -1496,7 +1592,6 @@ struct JVPTranscriber
             return transcribeGeneric(builder, as<IRGeneric>(origInst)); 
         }
 
-        
         // If we reach this statement, the instruction type is likely unhandled.
         getSink()->diagnose(origInst->sourceLoc,
                     Diagnostics::unimplemented,
@@ -1558,6 +1653,7 @@ struct ForwardDerivativePass : public InstPassBase
                         {
                         case kIROp_Func:
                         case kIROp_Specialize:
+                        case kIROp_lookup_interface_method:
                             autoDiffWorkList.add(inst);
                             break;
                         default:
@@ -1587,29 +1683,15 @@ struct ForwardDerivativePass : public InstPassBase
                         differentiateInst->replaceUsesWith(existingDiffFunc);
                         differentiateInst->removeAndDeallocate();
                     }
-                    else if (isMarkedForForwardDifferentiation(baseInst))
-                    {
-                        if (as<IRFunc>(baseInst) || as<IRGeneric>(baseInst))
-                        {
-                            IRInst* diffFunc = transcriberStorage.transcribe(builder, baseInst);
-                            SLANG_ASSERT(diffFunc);
-                            differentiateInst->replaceUsesWith(diffFunc);
-                            differentiateInst->removeAndDeallocate();
-                        }
-                        else
-                        {
-                            getSink()->diagnose(differentiateInst->sourceLoc,
-                                Diagnostics::internalCompilerError,
-                                "Unexpected instruction. Expected func or generic");
-                        }
-                    }
                     else
                     {
-                        getSink()->diagnose(differentiateInst->sourceLoc,
-                            Diagnostics::internalCompilerError,
-                            "Requested differentiation on a function that isn't marked as differentiable.");
+                        IRBuilder subBuilder(*builder);
+                        subBuilder.setInsertBefore(differentiateInst);
+                        IRInst* diffFunc = transcriberStorage.transcribe(&subBuilder, baseInst);
+                        SLANG_ASSERT(diffFunc);
+                        differentiateInst->replaceUsesWith(diffFunc);
+                        differentiateInst->removeAndDeallocate();
                     }
-
                 }
             }
             // Actually synthesize the derivatives.
@@ -1638,6 +1720,8 @@ struct ForwardDerivativePass : public InstPassBase
     // 
     bool isMarkedForForwardDifferentiation(IRInst* callable)
     {
+        if (auto gen = as<IRGeneric>(callable))
+            callable = findGenericReturnVal(gen);
         return callable->findDecoration<IRForwardDifferentiableDecoration>() != nullptr;
     }
 

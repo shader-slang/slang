@@ -746,6 +746,9 @@ INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
     /* Differentiable Type Dictionary */
     INST(DifferentiableTypeDictionaryDecoration, DifferentiableTypeDictionaryDecoration, 0, PARENT)
 
+        /// Decorates an interface type and stores the mapping from a normal function requirement key to its derivative requirement key.
+    INST(DifferentiableMethodRequirementDictionaryDecoration, DifferentiableMethodRequirementDictionaryDecoration, 0, PARENT)
+
         /// Marks a struct type as being used as a structured buffer block.
         /// Recognized by SPIRV-emit pass so we can emit a SPIRV `BufferBlock` decoration.
     INST(SPIRVBufferBlockDecoration, spvBufferBlock, 0, 0)
@@ -845,6 +848,11 @@ INST(ExistentialTypeSpecializationDictionary, ExistentialTypeSpecializationDicti
 
 /* Differentiable Type Dictionary */
 INST(DifferentiableTypeDictionaryItem, DifferentiableTypeDictionaryItem, 0, 0)
+
+/* DifferentiableMethodRequirementDictionaryItem */
+    INST(ForwardDifferentiableMethodRequirementDictionaryItem, DifferentiableMethodRequirementDictionaryItem, 0, 0)
+    INST(BackwardDifferentiableMethodRequirementDictionaryItem, DifferentiableMethodRequirementDictionaryItem, 0, 0)
+INST_RANGE(DifferentiableMethodRequirementDictionaryItem, ForwardDifferentiableMethodRequirementDictionaryItem, BackwardDifferentiableMethodRequirementDictionaryItem)
 
 #undef PARENT
 #undef USE_OTHER

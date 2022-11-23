@@ -1398,6 +1398,27 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
             midToSup));
     }
 
+    LoweredValInfo visitForwardDifferentiateVal(ForwardDifferentiateVal* val)
+    {
+        // TODO: properly fill in type info here.
+        // We should consider fold all cases of witness table entries to `Val`, and make the `DeclRef` case a `DeclRefVal`.
+        // So that we can hold the type in `DeclRefVal`.
+        auto funcVal = emitDeclRef(context, val->func, context->irBuilder->getTypeKind());
+        SLANG_RELEASE_ASSERT(funcVal.flavor == LoweredValInfo::Flavor::Simple);
+
+        auto diff = getBuilder()->emitForwardDifferentiateInst(getBuilder()->getTypeKind(), funcVal.val);
+        return LoweredValInfo::simple(diff);
+    }
+
+    LoweredValInfo visitBackwardDifferentiateVal(BackwardDifferentiateVal* val)
+    {
+        auto funcVal = emitDeclRef(context, val->func, context->irBuilder->getTypeKind());
+        SLANG_RELEASE_ASSERT(funcVal.flavor == LoweredValInfo::Flavor::Simple);
+
+        auto diff = getBuilder()->emitBackwardDifferentiateInst(getBuilder()->getTypeKind(), funcVal.val);
+        return LoweredValInfo::simple(diff);
+    }
+
     LoweredValInfo visitDifferentialBottomSubtypeWitness(DifferentialBottomSubtypeWitness*)
     {
         return LoweredValInfo();
@@ -6786,6 +6807,24 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         return LoweredValInfo::simple(assocType);
     }
 
+    void insertRequirementKeyAssociation(IRInterfaceType* interfaceType, Decl* requirementDecl, IRInst* originalKey, IRInst* associatedKey)
+    {
+        auto decor = interfaceType->findDecoration<IRDifferentiableMethodRequirementDictionaryDecoration>();
+        if (!decor)
+        {
+            decor =
+                (IRDifferentiableMethodRequirementDictionaryDecoration*)
+                    context->irBuilder->addDecoration(
+                        interfaceType, kIROp_DifferentiableMethodRequirementDictionaryDecoration);
+        }
+        auto op = as<ForwardDerivativeRequirementDecl>(requirementDecl)
+                      ? kIROp_ForwardDifferentiableMethodRequirementDictionaryItem
+                      : kIROp_BackwardDifferentiableMethodRequirementDictionaryItem;
+        IRInst* args[] = {originalKey, associatedKey};
+        auto assoc = context->irBuilder->emitIntrinsicInst(nullptr, op, 2, args);
+        assoc->insertAtEnd(decor);
+    }
+
     LoweredValInfo visitInterfaceDecl(InterfaceDecl* decl)
     {
         // The members of an interface will turn into the keys that will
@@ -6823,6 +6862,14 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             if (auto associatedTypeDecl = as<AssocTypeDecl>(requirementDecl))
             {
                 operandCount += associatedTypeDecl->getMembersOfType<TypeConstraintDecl>().getCount();
+            }
+            else if (auto callableDecl = as<CallableDecl>(requirementDecl))
+            {
+                // Differentiable functions has additional requirements for the derivatives.
+                if (callableDecl->getMembersOfType<ForwardDerivativeRequirementDecl>().getCount())
+                    operandCount++;
+                if (callableDecl->getMembersOfType<BackwardDerivativeRequirementDecl>().getCount())
+                    operandCount++;
             }
         }
 
@@ -6907,12 +6954,45 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             }
             else
             {
+                if (auto callableDecl = as<CallableDecl>(requirementDecl))
+                {
+                    // Differentiable functions has additional requirements for the derivatives.
+                    for (auto diffDecl : callableDecl->getMembersOfType<DerivativeRequirementDecl>())
+                    {
+                        auto diffKey = getInterfaceRequirementKey(diffDecl);
+                        IRInst* diffVal = ensureDecl(subContext, diffDecl).val;
+                        auto diffEntry = subBuilder->createInterfaceRequirementEntry(diffKey, diffVal);
+                        if (diffVal)
+                        {
+                            switch (diffVal->getOp())
+                            {
+                            case kIROp_Func:
+                            case kIROp_Generic:
+                            {
+                                // Remove lowered `IRFunc`s since we only care about
+                                // function types.
+                                auto reqType = diffVal->getFullType();
+                                diffEntry->setRequirementVal(reqType);
+                                break;
+                            }
+                            default:
+                                break;
+                            }
+                        }
+                        irInterface->setOperand(entryIndex, diffEntry);
+                        entryIndex++;
+
+                        setValue(context, diffDecl, LoweredValInfo::simple(diffEntry));
+                        insertRequirementKeyAssociation(irInterface, diffDecl, requirementKey, diffKey);
+                    }
+                }
                 // Add lowered requirement entry to current decl mapping to prevent
                 // the function requirements from being lowered again when we get to
                 // `ensureAllDeclsRec`.
                 setValue(context, requirementDecl, LoweredValInfo::simple(entry));
             }
         }
+
 
         addNameHint(context, irInterface, decl);
         addLinkageDecoration(context, irInterface, decl);
