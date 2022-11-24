@@ -23,7 +23,7 @@ struct A : IInterface
 [ForwardDifferentiable]
 float sqr<T:IInterface>(inout T obj, float x)
 {
-    return obj.sample() + x*x;
+    return (no_diff obj.sample()) + x*x;
 }
 
 [numthreads(1, 1, 1)]

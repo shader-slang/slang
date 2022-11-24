@@ -2539,6 +2539,10 @@ interface IComparable
     bool lessThanOrEquals(This other);
 }
 
+__attributeTarget(DeclBase)
+attribute_syntax [TreatAsDifferentiable] : TreatAsDifferentiableAttribute;
+
+[TreatAsDifferentiable]
 interface IArithmetic : IComparable
 {
     This add(This other);
