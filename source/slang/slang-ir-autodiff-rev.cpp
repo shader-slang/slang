@@ -6,6 +6,11 @@
 #include "slang-ir-util.h"
 #include "slang-ir-inst-pass-base.h"
 
+#include "slang-ir-autodiff-fwd.h"
+#include "slang-ir-autodiff-propagate.h"
+#include "slang-ir-autodiff-unzip.h"
+#include "slang-ir-autodiff-transpose.h"
+
 
 namespace Slang
 {
@@ -44,12 +49,33 @@ struct BackwardDiffTranscriber
     IRWitnessTable* differentialBottomWitness = nullptr;
     Dictionary<InstPair, IRInst*> differentialPairTypes;
 
+    // References to other passes that for reverse-mode transcription.
+    ForwardDerivativeTranscriber    *fwdDiffTranscriber;
+    DiffTransposePass               *diffTransposePass;
+    DiffPropagationPass             *diffPropagationPass;
+    DiffUnzipPass                   *diffUnzipPass;
+
+    // Allocate space for the passes.
+    ForwardDerivativeTranscriber    fwdDiffTranscriberStorage;
+    DiffTransposePass               diffTransposePassStorage;
+    DiffPropagationPass             diffPropagationPassStorage;
+    DiffUnzipPass                   diffUnzipPassStorage;
+
+
     BackwardDiffTranscriber(AutoDiffSharedContext* shared, SharedIRBuilder* inSharedBuilder, DiagnosticSink* inSink)
         : autoDiffSharedContext(shared)
         , sink(inSink)
         , differentiableTypeConformanceContext(shared)
         , sharedBuilder(inSharedBuilder)
-    {}
+        , fwdDiffTranscriberStorage(shared, inSharedBuilder)
+        , diffTransposePassStorage(shared)
+        , diffPropagationPassStorage(shared)
+        , diffUnzipPassStorage(shared)
+        , fwdDiffTranscriber(&fwdDiffTranscriberStorage)
+        , diffTransposePass(&diffTransposePassStorage)
+        , diffPropagationPass(&diffPropagationPassStorage)
+        , diffUnzipPass(&diffUnzipPassStorage)
+    { }
 
     DiagnosticSink* getSink()
     {
@@ -413,18 +439,128 @@ struct BackwardDiffTranscriber
         return result;
     }
 
-    // Transcribe a function definition.
-    InstPair transcribeFunc(IRBuilder* inBuilder, IRFunc* primalFunc, IRFunc* diffFunc)
+    // Puts parameters into their own block.
+    void makeParameterBlock(IRBuilder* builder, IRFunc* func)
     {
-        IRBuilder builder(inBuilder->getSharedBuilder());
-        builder.setInsertInto(diffFunc);
+        auto firstBlock = func->getFirstBlock();
+        auto param = func->getFirstParam();
 
-        differentiableTypeConformanceContext.setFunc(primalFunc);
-        // Transcribe children from origFunc into diffFunc
-        for (auto block = primalFunc->getFirstBlock(); block; block = block->getNextBlock())
-            this->transcribeBlock(&builder, block);
+        builder->setInsertBefore(firstBlock);
+        
+        auto paramBlock = builder->emitBlock();
 
-        return InstPair(primalFunc, diffFunc);
+        for (; param; param->getNextInst())
+        {
+            // Copy inst into the new parameter block.
+            auto clonedParam = cloneInst(&cloneEnv, builder, param);
+            param->replaceUsesWith(clonedParam);
+            param->removeAndDeallocate();
+        }
+
+        // Add terminator inst.
+        builder->emitBranch(firstBlock);
+
+        // Replace this block as the first block.
+        firstBlock->replaceUsesWith(paramBlock);
+    }
+
+    // Transcribe a function definition.
+    InstPair transcribeFunc(IRBuilder* builder, IRFunc* primalFunc, IRFunc* diffFunc)
+    {
+        // Reverse-mode transcription uses 4 separate steps:
+        // TODO(sai): Fill in documentation.
+
+        // Generate a temporary forward derivative function as an intermediate step.
+        IRFunc* fwdDiffFunc = as<IRFunc>(fwdDiffTranscriber->transcribeFuncHeader(builder, (IRFunc*)primalFunc).differential);
+        SLANG_ASSERT(fwdDiffFunc);
+
+        // Clone the function header.
+        IRInst* unzippedFwdDiffFunc = cloneInst(&cloneEnv, builder, fwdDiffFunc);
+
+        // Transcribe the body of the primal function into it's linear (fwd-diff) form.
+        // TODO(sai): Handle the case when we already have a user-defined fwd-derivative function.
+        fwdDiffTranscriber->transcribeFunc(builder, primalFunc, as<IRFunc>(fwdDiffFunc));
+        
+        // Split first block into a paramter block.
+        this->makeParameterBlock(builder, as<IRFunc>(fwdDiffFunc));
+        
+        // This steps adds a decoration to instructions that are computing the differential.
+        diffPropagationPass->propagateDiffInstDecoration(fwdDiffFunc);
+
+        // Copy primal insts to the first block of the unzipped function, copy diff insts to the
+        // second block of the unzipped function.
+        // 
+        diffUnzipPass->unzipDiffInsts(fwdDiffFunc, unzippedFwdDiffFunc);
+        
+        // Clone the primal blocks from unzippedFwdDiffFunc
+        // to the reverse-mode function.
+        // TODO: This is the spot where we can make a decision to split
+        // the primal and differential into two different funcitons
+        // instead of two blocks in the same function.
+        // 
+        // Special care needs to be taken for the first block since it holds the parameters
+        builder->setInsertInto(diffFunc);
+        
+        auto revDiffParameterBlock = this->transcribeParameterBlock(builder, as<IRFunc>(unzippedFwdDiffFunc));
+
+        // Note: we make an assumption that the last parameter is the differential output parameter
+        // ideally we should track this using a map/dict, rather than relying on this logic.
+        auto dOutParameter = revDiffParameterBlock->getLastParam();
+        
+        for (auto block = as<IRFunc>(unzippedFwdDiffFunc)->getFirstBlock()->getNextBlock(); block; block = block->getNextBlock())
+        {
+            if (!block->findDecoration<IRDifferentialInstDecoration>())
+            {
+                IRInst* newBlock = cloneInst(&cloneEnv, builder, block);
+            }
+        }
+
+        // Transpose differential blocks into 
+        diffTransposePass->transposeFunc(unzippedFwdDiffFunc, diffFunc, dOutParameter);
+    }
+
+    IRBlock* transcribeParameterBlock(IRBuilder* builder, IRFunc* unzippedFwdDiffFunc)
+    {
+        IRBlock* fwdDiffParameterBlock = as<IRFunc>(unzippedFwdDiffFunc)->getFirstBlock();
+
+        // Turn fwd-diff versions of the parameters into reverse-diff versions.
+        auto revDiffParameterBlock = builder->emitBlock();
+
+        for (auto child = fwdDiffParameterBlock->getFirstParam(); child; child->getNextParam())
+        {
+            auto fwdParam = as<IRParam>(child);
+            SLANG_ASSERT(fwdParam);
+            
+            // TODO: Handle ptr<pair> types.
+            if (auto diffPairType = as<IRDifferentialPairType>(fwdParam->getDataType()))
+            {
+                // Create inout version. (Is this right, or should this just be a ptrtype)
+                auto inoutDiffPairType = builder->getInOutType(diffPairType);
+                builder->emitParam(inoutDiffPairType);
+            }
+        }
+
+        // There should not be any other non-param insts in a parameter block,
+        // other than the terminator inst.
+        SLANG_ASSERT(as<IRTerminatorInst>(child));
+
+        // Add a derivative of the output d_out parameter here.
+        auto fwdDiffReturnType = as<IRFuncType>(unzippedFwdDiffFunc->getDataType())->getResultType();
+
+        IRType* dOutParamType = nullptr;
+
+        // TODO(sai): Handle case where result type is not a pair.
+        if (auto fwdReturnPairType = as<DifferentialPairType>(fwdDiffReturnType))
+        {
+            // Parameter type for the output parameter.
+            dOutParamType = as<IRType>(pairBuilder->getDiffTypeFromPairType(builder, fwdReturnPairType)); 
+        }
+
+        SLANG_ASSERT(dOutParamType);
+
+        builder->emitParam(dOutParamType);
+
+        return revDiffParameterBlock;
     }
 
     IRInst* copyParam(IRBuilder* builder, IRParam* origParam)
@@ -652,7 +788,6 @@ struct BackwardDiffTranscriber
 
 struct ReverseDerivativePass : public InstPassBase
 {
-
     DiagnosticSink* getSink()
     {
         return sink;
@@ -664,7 +799,7 @@ struct ReverseDerivativePass : public InstPassBase
         IRBuilder builderStorage(autodiffContext->sharedBuilder);
         IRBuilder* builder = &builderStorage;
 
-        // Process all ForwardDifferentiate instructions (kIROp_ForwardDifferentiate), by 
+        // Process all ForwardDifferentiate instructions (kIROp_ForwardDifferentiate), by  
         // generating derivative code for the referenced function.
         //
         bool modified = processReferencedFunctions(builder);

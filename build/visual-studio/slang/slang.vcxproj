@@ -309,6 +309,9 @@ IF EXIST ..\..\..\external\slang-glslang\bin\windows-aarch64\release\slang-glsla
     <ClInclude Include="..\..\..\source\slang\slang-ast-synthesis.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ast-type.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ast-val.h" />
+    <ClInclude Include="..\..\..\source\slang\slang-autodiff-propagate.h" />
+    <ClInclude Include="..\..\..\source\slang\slang-autodiff-transpose.h" />
+    <ClInclude Include="..\..\..\source\slang\slang-autodiff-unzip.h" />
     <ClInclude Include="..\..\..\source\slang\slang-capability-defs.h" />
     <ClInclude Include="..\..\..\source\slang\slang-capability.h" />
     <ClInclude Include="..\..\..\source\slang\slang-check-impl.h" />

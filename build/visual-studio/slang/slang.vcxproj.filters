@@ -60,6 +60,15 @@
     <ClInclude Include="..\..\..\source\slang\slang-ast-val.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\source\slang\slang-autodiff-propagate.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\source\slang\slang-autodiff-transpose.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\source\slang\slang-autodiff-unzip.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\..\source\slang\slang-capability-defs.h">
       <Filter>Header Files</Filter>
     </ClInclude>

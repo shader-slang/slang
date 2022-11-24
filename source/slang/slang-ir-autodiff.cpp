@@ -327,6 +327,60 @@ IRStructKey* AutoDiffSharedContext::getIDifferentiableStructKeyAtIndex(UInt inde
 }
 
 
+
+void DifferentiableTypeConformanceContext::setFunc(IRGlobalValueWithCode* func)
+{
+    parentFunc = func;
+
+    auto decor = func->findDecoration<IRDifferentiableTypeDictionaryDecoration>();
+    SLANG_RELEASE_ASSERT(decor);
+
+    // Build lookup dictionary for type witnesses.
+    for (auto child = decor->getFirstChild(); child; child = child->next)
+    {
+        if (auto item = as<IRDifferentiableTypeDictionaryItem>(child))
+        {
+            auto existingItem = differentiableWitnessDictionary.TryGetValue(item->getConcreteType());
+            if (existingItem)
+            {
+                *existingItem = item->getWitness();
+            }
+            else
+            {
+                differentiableWitnessDictionary.Add((IRType*)item->getConcreteType(), item->getWitness());
+            }
+        }
+    }
+}
+
+IRInst* DifferentiableTypeConformanceContext::lookUpConformanceForType(IRInst* type)
+{
+    IRInst* foundResult = nullptr;
+    differentiableWitnessDictionary.TryGetValue(type, foundResult);
+    return foundResult;
+}
+
+IRInst* DifferentiableTypeConformanceContext::lookUpInterfaceMethod(IRBuilder* builder, IRType* origType, IRStructKey* key)
+{
+    if (auto conformance = lookUpConformanceForType(origType))
+    {
+        return _lookupWitness(builder, conformance, key);
+    }
+    return nullptr;
+}
+
+void DifferentiableTypeConformanceContext::buildGlobalWitnessDictionary()
+{
+    for (auto globalInst : sharedContext->moduleInst->getChildren())
+    {
+        if (auto pairType = as<IRDifferentialPairType>(globalInst))
+        {
+            differentiableWitnessDictionary.Add(pairType->getValueType(), pairType->getWitness());
+        }
+    }
+}
+
+
 void stripAutoDiffDecorationsFromChildren(IRInst* parent)
 {
     for (auto inst : parent->getChildren())
