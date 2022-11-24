@@ -18,6 +18,19 @@ const TypeExp& TypeConstraintDecl::_getSupOverride() const
     //return TypeExp::empty;
 }
 
+InterfaceDecl* findParentInterfaceDecl(Decl* decl)
+{
+    auto ancestor = decl->parentDecl;
+    for (; ancestor; ancestor = ancestor->parentDecl)
+    {
+        if (auto interfaceDecl = as<InterfaceDecl>(ancestor))
+            return interfaceDecl;
+
+        if (as<ExtensionDecl>(ancestor))
+            return nullptr;
+    }
+    return nullptr;
+}
 
 bool isInterfaceRequirement(Decl* decl)
 {

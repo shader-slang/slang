@@ -111,6 +111,8 @@ struct JVPTranscriber
 
     IRInst* lookupPrimalInst(IRInst* origInst)
     {
+        if (!origInst)
+            return nullptr;
         if (shouldUseOriginalAsPrimal(origInst))
             return origInst;
         return cloneEnv.mapOldValToNew[origInst];
@@ -118,11 +120,15 @@ struct JVPTranscriber
 
     IRInst* lookupPrimalInst(IRInst* origInst, IRInst* defaultInst)
     {
+        if (!origInst)
+            return nullptr;
         return (hasPrimalInst(origInst)) ? lookupPrimalInst(origInst) : defaultInst;
     }
 
     bool hasPrimalInst(IRInst* origInst)
     {
+        if (!origInst)
+            return true;
         if (shouldUseOriginalAsPrimal(origInst))
             return true;
         return cloneEnv.mapOldValToNew.ContainsKey(origInst);
@@ -175,7 +181,7 @@ struct JVPTranscriber
         if (auto returnPairType = tryGetDiffPairType(builder, origResultType))
             diffReturnType = returnPairType;
         else
-            diffReturnType = builder->getVoidType();
+            diffReturnType = origResultType;
 
         return builder->getFuncType(newParameterTypes, diffReturnType);
     }
@@ -735,13 +741,12 @@ struct JVPTranscriber
             SLANG_ASSERT(primalArg);
 
             auto primalType = primalArg->getDataType();
-            auto diffArg = findOrTranscribeDiffInst(builder, origArg);
-
-            if (!diffArg)
-                diffArg = getDifferentialZeroOfType(builder, primalType);
-
             if (auto pairType = tryGetDiffPairType(builder, primalType))
             {
+                auto diffArg = findOrTranscribeDiffInst(builder, origArg);
+                if (!diffArg)
+                    diffArg = getDifferentialZeroOfType(builder, primalType);
+
                 // If a pair type can be formed, this must be non-null.
                 SLANG_RELEASE_ASSERT(diffArg);
                 auto diffPair = builder->emitMakeDifferentialPair(pairType, primalArg, diffArg);
@@ -980,6 +985,18 @@ struct JVPTranscriber
             {
                 args.add(primalSpecialize->getArg(i));
             }
+            auto diffSpecialize = builder->emitSpecializeInst(
+                builder->getTypeKind(), diffBase, args.getCount(), args.getBuffer());
+            return InstPair(primalSpecialize, diffSpecialize);
+        }
+        else if (auto diffDecor = genericInnerVal->findDecoration<IRForwardDifferentiableDecoration>())
+        {
+            List<IRInst*> args;
+            for (UInt i = 0; i < primalSpecialize->getArgCount(); i++)
+            {
+                args.add(primalSpecialize->getArg(i));
+            }
+            diffBase = findOrTranscribeDiffInst(builder, origSpecialize->getBase());
             auto diffSpecialize = builder->emitSpecializeInst(
                 builder->getTypeKind(), diffBase, args.getCount(), args.getBuffer());
             return InstPair(primalSpecialize, diffSpecialize);
@@ -1365,14 +1382,13 @@ struct JVPTranscriber
         {
             differentiableTypeConformanceContext.setFunc(innerFunc);
         }
+        else if (auto funcType = as<IRFuncType>(innerVal))
+        {
+        }
         else
         {
             return InstPair(origGeneric, nullptr);
         }
-
-        // For now, we assume there's only one generic layer. So this inst must be top level
-        bool isTopLevel = (as<IRModuleInst>(origGeneric->getParent()) != nullptr);
-        SLANG_RELEASE_ASSERT(isTopLevel);
 
         IRGeneric* primalGeneric = origGeneric;
 
@@ -1395,10 +1411,6 @@ struct JVPTranscriber
 
         diffGeneric->setFullType(diffType);
 
-        // TODO(sai): Replace naming scheme
-        // if (auto jvpName = this->getJVPFuncName(builder, primalFn))
-        //    builder->addNameHintDecoration(diffFunc, jvpName);
-        
         // Transcribe children from origFunc into diffFunc.
         builder.setInsertInto(diffGeneric);
         for (auto block = origGeneric->getFirstBlock(); block; block = block->getNextBlock())

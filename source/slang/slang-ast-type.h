@@ -872,4 +872,6 @@ class ModifiedType : public Type
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
 };
 
+Type* removeParamDirType(Type* type);
+
 } // namespace Slang
