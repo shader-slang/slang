@@ -1,4 +1,4 @@
-// Test calling differentiable function through dynamic dispatch.
+// Test calling differentiable generic function with inout generic parameter.
 
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj -output-using-type
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj -output-using-type
@@ -20,15 +20,11 @@ struct A : IInterface
     float sample() { z = z + 1.0; return 1.0; }
 };
 
-
 [ForwardDifferentiable]
 float sqr<T:IInterface>(inout T obj, float x)
 {
     return obj.sample() + x*x;
 }
-
-//TEST_INPUT: type_conformance A:IInterface = 0
-
 
 [numthreads(1, 1, 1)]
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
