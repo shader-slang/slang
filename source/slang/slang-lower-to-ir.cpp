@@ -3139,7 +3139,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
     {
         auto baseVal = lowerSubExpr(expr->innerExpr);
         SLANG_ASSERT(baseVal.flavor == LoweredValInfo::Flavor::Simple);
-        getBuilder()->addDecoration(baseVal.val, kIROp_TreatAsDifferentiableCallDecoration);
+        getBuilder()->addDecoration(baseVal.val, kIROp_TreatAsDifferentiableDecoration);
         return baseVal;
     }
 
@@ -6867,7 +6867,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
         // Allocate an IRInterfaceType with the `operandCount` operands.
         IRInterfaceType* irInterface = subBuilder->createInterfaceType(operandCount, nullptr);
-        
+
         // Add `irInterface` to decl mapping now to prevent cyclic lowering.
         setValue(context, decl, LoweredValInfo::simple(irInterface));
 
@@ -6981,6 +6981,11 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         {
             subBuilder->addBuiltinDecoration(irInterface);
         }
+        if (decl->hasModifier<TreatAsDifferentiableAttribute>())
+        {
+            subBuilder->addDecoration(irInterface, kIROp_TreatAsDifferentiableDecoration);
+        }
+
         subBuilder->setInsertInto(irInterface);
         // TODO: are there any interface members that should be
         // nested inside the interface type itself?
@@ -8305,6 +8310,11 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         if (decl->findModifier<ForceInlineAttribute>())
         {
             getBuilder()->addDecoration(irFunc, kIROp_ForceInlineDecoration);
+        }
+
+        if (decl->findModifier<TreatAsDifferentiableAttribute>())
+        {
+            getBuilder()->addDecoration(irFunc, kIROp_TreatAsDifferentiableDecoration);
         }
 
         // Register the value now, to avoid any possible infinite recursion when lowering ForwardDerivativeAttribute

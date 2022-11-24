@@ -97,6 +97,9 @@ public:
         if (differentiableFunctions.Contains(func))
             return true;
 
+        if (func->findDecoration<IRTreatAsDifferentiableDecoration>())
+            return true;
+
         if (auto lookupInterfaceMethod = as<IRLookupWitnessMethod>(func))
         {
             auto wit = lookupInterfaceMethod->getWitnessTable();
@@ -108,6 +111,8 @@ public:
             auto interfaceType = witType->getConformanceType();
             if (!interfaceType)
                 return false;
+            if (interfaceType->findDecoration<IRTreatAsDifferentiableDecoration>())
+                return true;
             if (sharedContext.differentiableInterfaceType && interfaceType == sharedContext.differentiableInterfaceType)
                 return true;
             auto dictDecor = interfaceType->findDecoration<IRDifferentiableMethodRequirementDictionaryDecoration>();
@@ -250,7 +255,7 @@ public:
             case kIROp_FloatLit:
                 return true;
             case kIROp_Call:
-                return inst->findDecoration<IRTreatAsDifferentiableCallDecoration>() || isDifferentiableFunc(as<IRCall>(inst)->getCallee());
+                return inst->findDecoration<IRTreatAsDifferentiableDecoration>() || isDifferentiableFunc(as<IRCall>(inst)->getCallee());
             case kIROp_Load:
                 // We don't have more knowledge on whether diff is available at the destination address.
                 // Just assume it is producing diff.

@@ -85,6 +85,7 @@ typedef myvector<4> myfloat4;
 
 typedef DifferentialPair<Real> dpfloat;
 
+[TreatAsDifferentiable]
 interface MyLinearArithmeticType
 {
     static This ladd(This a, This b);

@@ -974,6 +974,15 @@ class ForceInlineAttribute : public Attribute
     SLANG_AST_CLASS(ForceInlineAttribute)
 };
 
+
+// A `[TreatAsDifferentiableAttribute]` attribute indicates that a function or an interface
+// should be treated as differentiable in IR validation step.
+//
+class TreatAsDifferentiableAttribute : public Attribute
+{
+    SLANG_AST_CLASS(TreatAsDifferentiableAttribute)
+};
+
     /// An attribute that marks a type declaration as either allowing or
     /// disallowing the type to be inherited from in other modules.
 class InheritanceControlAttribute : public Attribute { SLANG_AST_CLASS(InheritanceControlAttribute) };
