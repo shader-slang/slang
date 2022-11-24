@@ -97,6 +97,34 @@ public:
         if (differentiableFunctions.Contains(func))
             return true;
 
+        if (auto lookupInterfaceMethod = as<IRLookupWitnessMethod>(func))
+        {
+            auto wit = lookupInterfaceMethod->getWitnessTable();
+            if (!wit)
+                return false;
+            auto witType = as<IRWitnessTableTypeBase>(wit->getDataType());
+            if (!witType)
+                return false;
+            auto interfaceType = witType->getConformanceType();
+            if (!interfaceType)
+                return false;
+            if (sharedContext.differentiableInterfaceType && interfaceType == sharedContext.differentiableInterfaceType)
+                return true;
+            auto dictDecor = interfaceType->findDecoration<IRDifferentiableMethodRequirementDictionaryDecoration>();
+            if (!dictDecor)
+                return false;
+            for (auto child : dictDecor->getChildren())
+            {
+                if (auto entry = as<IRDifferentiableMethodRequirementDictionaryItem>(child))
+                {
+                    if (entry->getOperand(0) == lookupInterfaceMethod->getRequirementKey())
+                    {
+                        return true;
+                    }
+                }
+            }
+        }
+
         for (; func; func = func->parent)
         {
             if (as<IRGeneric>(func))
