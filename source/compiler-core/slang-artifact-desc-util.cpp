@@ -502,33 +502,35 @@ static const KindExtension g_cpuKindExts[] =
     return false;
 }
 
-/* static */ArtifactDesc ArtifactDescUtil::getDescFromExtension(const UnownedStringSlice& slice)
+/* static */ArtifactDesc ArtifactDescUtil::getDescFromPath(const UnownedStringSlice& filename)
 {
-    if (slice == "slang-module" ||
-        slice == "slang-lib")
+    auto extension = Path::getPathExt(filename);
+
+    if (extension == "slang-module" ||
+        extension == "slang-lib")
     {
         return ArtifactDesc::make(ArtifactKind::Library, ArtifactPayload::SlangIR);
     }
 
     // Metal
     // https://developer.apple.com/documentation/metal/shader_libraries/building_a_library_with_metal_s_command-line_tools
-    if (slice == toSlice("air"))
+    if (extension == toSlice("air"))
     {
         return ArtifactDesc::make(ArtifactKind::ObjectCode, ArtifactPayload::MetalAIR);
     }
-    else if (slice == toSlice("metallib") || slice == toSlice("metalar"))
+    else if (extension == toSlice("metallib") || extension == toSlice("metalar"))
     {
         return ArtifactDesc::make(ArtifactKind::Library, ArtifactPayload::MetalAIR);
     }
 
-    if (slice == toSlice("zip"))
+    if (extension == toSlice("zip"))
     {
         return ArtifactDesc::make(ArtifactKind::Zip, ArtifactPayload::Unknown);
     }
 
-    if (slice.startsWith(toSlice("riff")))
+    if (extension.startsWith(toSlice("riff")))
     {
-        auto tail = slice.tail(4);
+        auto tail = extension.tail(4);
         if (tail.getLength() == 0)
         {
             return ArtifactDesc::make(ArtifactKind::RiffContainer, ArtifactPayload::Unknown);
@@ -543,30 +545,25 @@ static const KindExtension g_cpuKindExts[] =
         }
     }
 
-    if (slice == toSlice("asm"))
+    if (extension == toSlice("asm"))
     {
         // We'll assume asm means current CPU assembler..
+        // TODO: Ellie: Is this correct in the presence of spv.asm and dxil.asm?
         return ArtifactDesc::make(ArtifactKind::Assembly, ArtifactPayload::HostCPU);
     }
 
     for (const auto& kindExt : g_cpuKindExts)
     {
-        if (slice == kindExt.ext)
+        if (extension == kindExt.ext)
         {
             // We'll assume it's for the host CPU for now..
             return ArtifactDesc::make(kindExt.kind, Payload::HostCPU);
         }
     }
 
-    const auto target = TypeTextUtil::findCompileTargetFromExtension(slice);
+    const auto target = TypeTextUtil::findCompileTargetFromFilename(filename);
 
     return makeDescForCompileTarget(target);
-}
-
-/* static */ArtifactDesc ArtifactDescUtil::getDescFromPath(const UnownedStringSlice& slice)
-{
-    auto extension = Path::getPathExt(slice);
-    return getDescFromExtension(extension);
 }
 
 /* static*/ SlangResult ArtifactDescUtil::appendCpuExtensionForKind(Kind kind, StringBuilder& out)

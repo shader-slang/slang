@@ -53,9 +53,6 @@ struct ArtifactDescUtil
         /// True if artifact  appears to be linkable
     static bool isLinkable(const ArtifactDesc& desc);
 
-        /// Try to determine the desc from just a file extension (passed without .)
-    static ArtifactDesc getDescFromExtension(const UnownedStringSlice& slice);
-
         /// Try to determine the desc from a path
     static ArtifactDesc getDescFromPath(const UnownedStringSlice& slice);
 

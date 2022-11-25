@@ -2,6 +2,7 @@
 #include "slang-type-text-util.h"
 
 #include "slang-string-util.h"
+#include "slang-io.h"
 
 namespace Slang
 {
@@ -236,15 +237,23 @@ static const ArchiveTypeInfo s_archiveTypeInfos[] =
     return UnownedStringSlice::fromLiteral("unknown");
 }
 
-/* static */SlangCompileTarget TypeTextUtil::findCompileTargetFromExtension(const UnownedStringSlice& slice)
+/* static */SlangCompileTarget TypeTextUtil::findCompileTargetFromFilename(const UnownedStringSlice& filename)
 {
-    if (slice.getLength())
+    if (filename.getLength())
     {
         for (const auto& info : s_compileTargetInfos)
         {
-            if (StringUtil::indexOfInSplit(UnownedStringSlice(info.extensions), ',', slice) >= 0)
+            List<UnownedStringSlice> exts;
+            StringUtil::split(UnownedStringSlice(info.extensions), ',', exts);
+            for(const auto& ext : exts)
             {
-                return info.target;
+                // Ignore any empty extensions,
+                // Make sure that this is actually an extension of our filename
+                // by checking for a preceding period
+                if(ext.getLength() && Path::hasExtension(filename, ext))
+                {
+                    return info.target;
+                }
             }
         }
     }

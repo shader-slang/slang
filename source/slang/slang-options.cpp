@@ -338,7 +338,7 @@ struct OptionsParser
         }
         else
         {
-            const SlangCompileTarget target = TypeTextUtil::findCompileTargetFromExtension(ext.getUnownedSlice());
+            const SlangCompileTarget target = TypeTextUtil::findCompileTargetFromFilename(path.getUnownedSlice());
             // If the target is not found the value returned is Unknown. This is okay because
             // we allow an unknown-format `-o`, assuming we get a target format
             // from another argument.

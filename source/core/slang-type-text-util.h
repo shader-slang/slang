@@ -33,9 +33,9 @@ struct TypeTextUtil
         /// Get the compilers name
     static UnownedStringSlice getPassThroughName(SlangPassThrough passThru);
 
-        /// Given a file extension determines suitable target
+        /// Given a file name determines suitable target from the extension
         /// If doesn't match any target will return SLANG_TARGET_UNKNOWN
-    static SlangCompileTarget findCompileTargetFromExtension(const UnownedStringSlice& slice);
+    static SlangCompileTarget findCompileTargetFromFilename(const UnownedStringSlice& filename);
 
         /// Given a name suitable target
         /// If doesn't match any target will return SLANG_TARGET_UNKNOWN

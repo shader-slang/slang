@@ -125,6 +125,10 @@ namespace Slang
 
         static String getPathExt(const String& path) { return getPathExt(path.getUnownedSlice()); }
         static UnownedStringSlice getPathExt(const UnownedStringSlice& path);
+        // hasExtension allow for dots in the matched extension, whereas comparing
+        // with the result of getPathExt will only compare against the very
+        // last extension
+        static bool hasExtension(const UnownedStringSlice& path, const UnownedStringSlice& ext);
 
         static String getParentDirectory(const String& path);
 

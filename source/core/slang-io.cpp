@@ -264,6 +264,13 @@ namespace Slang
         }
     }
 
+    bool Path::hasExtension(const UnownedStringSlice& path, const UnownedStringSlice& ext)
+    {
+        return path.getLength() > ext.getLength()
+            && path[path.getLength() - 1 - ext.getLength()] == '.'
+            && path.endsWith(ext);
+    }
+
     String Path::getParentDirectory(const String& path)
     {
         Index pos = findLastSeparatorIndex(path);
