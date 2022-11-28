@@ -7,9 +7,9 @@
 #include "slang-ir-inst-pass-base.h"
 
 #include "slang-ir-autodiff-fwd.h"
-#include "slang-ir-autodiff-propagate.h"
-#include "slang-ir-autodiff-unzip.h"
-#include "slang-ir-autodiff-transpose.h"
+#include "slang-autodiff-propagate.h"
+#include "slang-autodiff-unzip.h"
+#include "slang-autodiff-transpose.h"
 
 
 namespace Slang
@@ -440,25 +440,28 @@ struct BackwardDiffTranscriber
     }
 
     // Puts parameters into their own block.
-    void makeParameterBlock(IRBuilder* builder, IRFunc* func)
+    void makeParameterBlock(IRBuilder* inBuilder, IRFunc* func)
     {
+        IRBuilder builder(inBuilder->getSharedBuilder());
+
         auto firstBlock = func->getFirstBlock();
-        auto param = func->getFirstParam();
+        IRInst* param = func->getFirstParam();
 
-        builder->setInsertBefore(firstBlock);
+        builder.setInsertBefore(firstBlock);
         
-        auto paramBlock = builder->emitBlock();
+        auto paramBlock = builder.emitBlock();
+        builder.setInsertInto(paramBlock);
 
-        for (; param; param->getNextInst())
+        for (; param; param = param->getNextInst())
         {
             // Copy inst into the new parameter block.
-            auto clonedParam = cloneInst(&cloneEnv, builder, param);
+            auto clonedParam = cloneInst(&cloneEnv, &builder, param);
             param->replaceUsesWith(clonedParam);
             param->removeAndDeallocate();
         }
 
         // Add terminator inst.
-        builder->emitBranch(firstBlock);
+        builder.emitBranch(firstBlock);
 
         // Replace this block as the first block.
         firstBlock->replaceUsesWith(paramBlock);
@@ -475,7 +478,7 @@ struct BackwardDiffTranscriber
         SLANG_ASSERT(fwdDiffFunc);
 
         // Clone the function header.
-        IRInst* unzippedFwdDiffFunc = cloneInst(&cloneEnv, builder, fwdDiffFunc);
+        IRFunc* unzippedFwdDiffFunc = as<IRFunc>(cloneInst(&cloneEnv, builder, fwdDiffFunc));
 
         // Transcribe the body of the primal function into it's linear (fwd-diff) form.
         // TODO(sai): Handle the case when we already have a user-defined fwd-derivative function.
@@ -485,7 +488,7 @@ struct BackwardDiffTranscriber
         this->makeParameterBlock(builder, as<IRFunc>(fwdDiffFunc));
         
         // This steps adds a decoration to instructions that are computing the differential.
-        diffPropagationPass->propagateDiffInstDecoration(fwdDiffFunc);
+        diffPropagationPass->propagateDiffInstDecoration(builder, fwdDiffFunc);
 
         // Copy primal insts to the first block of the unzipped function, copy diff insts to the
         // second block of the unzipped function.
@@ -526,7 +529,8 @@ struct BackwardDiffTranscriber
         // Turn fwd-diff versions of the parameters into reverse-diff versions.
         auto revDiffParameterBlock = builder->emitBlock();
 
-        for (auto child = fwdDiffParameterBlock->getFirstParam(); child; child->getNextParam())
+        IRParam* child;
+        for (child = fwdDiffParameterBlock->getFirstParam(); child; child->getNextParam())
         {
             auto fwdParam = as<IRParam>(child);
             SLANG_ASSERT(fwdParam);
@@ -550,7 +554,7 @@ struct BackwardDiffTranscriber
         IRType* dOutParamType = nullptr;
 
         // TODO(sai): Handle case where result type is not a pair.
-        if (auto fwdReturnPairType = as<DifferentialPairType>(fwdDiffReturnType))
+        if (auto fwdReturnPairType = as<IRDifferentialPairType>(fwdDiffReturnType))
         {
             // Parameter type for the output parameter.
             dOutParamType = as<IRType>(pairBuilder->getDiffTypeFromPairType(builder, fwdReturnPairType)); 
@@ -935,6 +939,9 @@ struct ReverseDerivativePass : public InstPassBase
         pairBuilderStorage(context)
     {
         backwardTranscriberStorage.pairBuilder = &pairBuilderStorage;
+        backwardTranscriberStorage.fwdDiffTranscriberStorage.sink = sink;
+        backwardTranscriberStorage.fwdDiffTranscriberStorage.autoDiffSharedContext = context;
+        backwardTranscriberStorage.fwdDiffTranscriberStorage.pairBuilder = &(pairBuilderStorage);
     }
 
 protected:

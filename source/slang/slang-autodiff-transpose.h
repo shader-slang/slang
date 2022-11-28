@@ -27,6 +27,8 @@ struct DiffTransposePass
 
         RevAssignment(IRInst* lvalue, IRInst* rvalue) : lvalue(lvalue), rvalue(rvalue)
         { }
+        RevAssignment() : lvalue(nullptr), rvalue(nullptr)
+        { }
     };
 
     struct TranspositionResult
@@ -198,7 +200,7 @@ struct DiffTransposePass
         return currentValue;
     }
 
-    List<IRInst*> addRevAssignmentForFwdInst(IRInst* fwdInst, IRInst* assignment)
+    void addRevAssignmentForFwdInst(IRInst* fwdInst, IRInst* assignment)
     {
         if (!hasRevAssignments(fwdInst))
         {

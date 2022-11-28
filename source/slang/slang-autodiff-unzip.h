@@ -6,7 +6,7 @@
 #include "slang-compiler.h"
 
 #include "slang-ir-autodiff.h"
-#include "slang-ir-autodiff-propagate.h"
+#include "slang-autodiff-propagate.h"
 
 namespace Slang
 {
@@ -21,14 +21,14 @@ struct DiffUnzipPass
         autodiffContext(autodiffContext)
     { }
 
-    void unzipDiffInsts(IRFunc* func)
+    void unzipDiffInsts(IRFunc* func, IRFunc* unzippedFunc)
     {
         IRBuilder builderStorage;
         builderStorage.init(autodiffContext->sharedBuilder);
         
         IRBuilder* builder = &builderStorage;
 
-        builder->setInsertInto(func);
+        builder->setInsertInto(unzippedFunc);
 
         // Work with two-block functions for now.
         SLANG_ASSERT(func->getFirstBlock() != nullptr);
