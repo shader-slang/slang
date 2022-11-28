@@ -1118,9 +1118,9 @@ namespace Slang
 
         SlangResult result = SLANG_OK;
 #if SLANG_WINDOWS_FAMILY
-        ::OVERLAPPED overlapped = {0};
-        ::DWORD flags = lockType == LockType::Shared ? LOCKFILE_FAIL_IMMEDIATELY : (LOCKFILE_EXCLUSIVE_LOCK | LOCKFILE_FAIL_IMMEDIATELY);
-        if (::LockFileEx(m_fileHandle, flags, 0, ~0, ~0, &overlapped) == 0)
+        OVERLAPPED overlapped = {0};
+        DWORD flags = lockType == LockType::Shared ? LOCKFILE_FAIL_IMMEDIATELY : (LOCKFILE_EXCLUSIVE_LOCK | LOCKFILE_FAIL_IMMEDIATELY);
+        if (::LockFileEx(m_fileHandle, flags, DWORD(0), ~DWORD(0), ~DWORD(0), &overlapped) == 0)
         {
             result = SLANG_E_TIME_OUT;
         }
@@ -1141,15 +1141,15 @@ namespace Slang
 
         SlangResult result = SLANG_OK;
 #if SLANG_WINDOWS_FAMILY
-        ::OVERLAPPED overlapped = {0};
+        OVERLAPPED overlapped = {0};
         overlapped.hEvent = ::CreateEvent(NULL, TRUE, FALSE, NULL);
-        ::DWORD flags = lockType == LockType::Shared ? 0 : LOCKFILE_EXCLUSIVE_LOCK;
-        if (::LockFileEx(m_fileHandle, flags, 0, ~0, ~0, &overlapped) == 0)
+        DWORD flags = lockType == LockType::Shared ? 0 : LOCKFILE_EXCLUSIVE_LOCK;
+        if (::LockFileEx(m_fileHandle, flags, DWORD(0), ~DWORD(0), ~DWORD(0), &overlapped) == 0)
         {
             auto err = ::GetLastError();
             if (err == ERROR_IO_PENDING)
             {
-                ::DWORD bytes;
+                DWORD bytes;
                 if (::GetOverlappedResult(m_fileHandle, &overlapped, &bytes, TRUE) == 0)
                 {
                     result = SLANG_E_INTERNAL_FAIL;
@@ -1177,8 +1177,8 @@ namespace Slang
             return SLANG_E_CANNOT_OPEN;
 
 #if SLANG_WINDOWS_FAMILY
-        ::OVERLAPPED overlapped = {0};
-        if (::UnlockFileEx(m_fileHandle, 0, ~0, ~0, &overlapped) == 0)
+        OVERLAPPED overlapped = {0};
+        if (::UnlockFileEx(m_fileHandle, DWORD(0), ~DWORD(0), ~DWORD(0), &overlapped) == 0)
         {
             return SLANG_E_INTERNAL_FAIL;
         }
