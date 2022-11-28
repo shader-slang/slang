@@ -50,6 +50,9 @@
     <ClCompile Include="..\..\..\tools\slang-unit-test\unit-test-json.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\tools\slang-unit-test\unit-test-lock-file.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\..\tools\slang-unit-test\unit-test-md5.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
