@@ -283,6 +283,7 @@
     <ClCompile Include="..\..\..\tools\slang-unit-test\unit-test-io.cpp" />
     <ClCompile Include="..\..\..\tools\slang-unit-test\unit-test-json-native.cpp" />
     <ClCompile Include="..\..\..\tools\slang-unit-test\unit-test-json.cpp" />
+    <ClCompile Include="..\..\..\tools\slang-unit-test\unit-test-lock-file.cpp" />
     <ClCompile Include="..\..\..\tools\slang-unit-test\unit-test-md5.cpp" />
     <ClCompile Include="..\..\..\tools\slang-unit-test\unit-test-memory-arena.cpp" />
     <ClCompile Include="..\..\..\tools\slang-unit-test\unit-test-offset-container.cpp" />
