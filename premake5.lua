@@ -1441,6 +1441,9 @@ tool "slangd"
      includedirs { "." }
      addSourceDir "tools/unit-test"
      links { "lz4", "miniz", "core", "compiler-core",  "slang" }
+     if not targetInfo.isWindows then
+         links { "pthread" }
+     end
  
  if enableProfile then
      tool "slang-profile"
