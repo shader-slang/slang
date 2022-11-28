@@ -1182,7 +1182,7 @@ namespace Slang
         {
             return SLANG_E_INTERNAL_FAIL;
         }
-#elif
+#else
         if (::flock(m_fileHandle, LOCK_UN) == 0)
         {
             return SLANG_E_INTERNAL_FAIL;
