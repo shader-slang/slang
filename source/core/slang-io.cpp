@@ -1091,7 +1091,7 @@ namespace Slang
         );
         m_isOpen = m_fileHandle != INVALID_HANDLE_VALUE;
 #else
-        m_fileHandle = ::open(fileName.getBuffer(), O_WRONLY | O_CREAT);
+        m_fileHandle = ::open(fileName.getBuffer(), O_RDWR | O_CREAT, 0600);
         m_isOpen = m_fileHandle != -1;
 #endif
         return m_isOpen ? SLANG_OK : SLANG_E_CANNOT_OPEN;
