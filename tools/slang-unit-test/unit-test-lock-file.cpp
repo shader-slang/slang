@@ -4,8 +4,9 @@
 #include "../../source/core/slang-io.h"
 
 #include <atomic>
-#include <thread>
 #include <future>
+#include <thread>
+#include <vector>
 
 using namespace Slang;
 
