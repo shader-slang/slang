@@ -52,8 +52,14 @@ struct DiffUnzipPass
         // 
         splitBlock(mainBlock, primalBlock, diffBlock);
 
-        mainBlock->replaceUsesWith(primalBlock);
-        mainBlock->removeAndDeallocate();
+        // Clone in the parameter block.
+        // TODO: Will need to generalize this so we can handle multi-block
+        // reverse-mode.
+        cloneEnv.mapOldValToNew[mainBlock] = primalBlock;
+        IRBlock* paramBlock = func->getFirstBlock();
+        IRInst* newParamBlock = cloneInst(&cloneEnv, builder, paramBlock);
+
+        newParamBlock->insertBefore(primalBlock);
     }
 
     void splitBlock(IRBlock* mainBlock, IRBlock* primalBlock, IRBlock* diffBlock)
@@ -67,8 +73,10 @@ struct DiffUnzipPass
         diffBuilder.init(autodiffContext->sharedBuilder);
         diffBuilder.setInsertInto(diffBlock);
 
-        for (auto child = mainBlock->getFirstChild(); child; child = child->getNextInst())
+        for (auto child = mainBlock->getFirstChild(); child;)
         {
+            IRInst* nextChild = child->getNextInst();
+
             if (isDifferentialInst(child) || as<IRTerminatorInst>(child))
             {
                 auto newInst = cloneInst(&cloneEnv, &diffBuilder, child);
@@ -81,11 +89,16 @@ struct DiffUnzipPass
                 child->replaceUsesWith(newInst);
                 child->removeAndDeallocate();
             }
+
+            child = nextChild;
         }
 
-        // Nothing should be left in the block
+        // Nothing should be left in the original block.
         SLANG_ASSERT(mainBlock->getFirstChild() == nullptr);
 
+        // Branch from primal to differential block.
+        // Functionally, the new blocks should produce the same output as the
+        // old block.
         primalBuilder.emitBranch(diffBlock);
     }
 };

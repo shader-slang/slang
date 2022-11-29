@@ -56,6 +56,7 @@ struct DiffPropagationPass : InstPassBase
     // Propagate IRDifferentialInstDecoration for all children of instWithChildren.
     void propagateDiffInstDecoration(IRBuilder* builder, IRInst* instWithChildren)
     {
+        List<IRInst*> initialList;
         // Mark 'GetDifferential' insts as differential.
         processChildInstsOfType<IRDifferentialPairGetDifferential>(
             kIROp_DifferentialPairGetDifferential, 
@@ -63,6 +64,7 @@ struct DiffPropagationPass : InstPassBase
             [&](IRDifferentialPairGetDifferential* getDifferentialInst)
             {
                 builder->markInstAsDifferential(getDifferentialInst);
+                initialList.add(getDifferentialInst);
             });
 
 
@@ -70,11 +72,11 @@ struct DiffPropagationPass : InstPassBase
         workListSet.Clear();
 
         // Add the marked insts to the work list.
-        for (auto child = instWithChildren->getFirstChild(); child; child = child->getNextInst())
+        for (auto inst : initialList)
         {
             // Look for insts marked as differential.
-            if (isDifferentialInst(child))
-                addPendingUsersToWorkList(child);
+            if (isDifferentialInst(inst))
+                addPendingUsersToWorkList(inst);
         }
 
         // Propagate to all users..

@@ -17,6 +17,8 @@ struct DiffTransposePass
 
     Dictionary<IRInst*, List<IRInst*>>      assignmentsMap;
 
+    Dictionary<IRInst*, IRInst*>            primalsMap;
+
     DiffTransposePass(AutoDiffSharedContext* autodiffContext) : autodiffContext(autodiffContext)
     { }
 
@@ -44,21 +46,39 @@ struct DiffTransposePass
         { }
     };
 
+    struct FuncTranspositionInfo
+    {
+        // Inst that represents the reverse-mode derivative
+        // of the *output* of the function.
+        // 
+        IRInst* dOutInst;
+
+        // Mapping between *primal* insts in the forward-mode function, and the 
+        // reverse-mode function
+        //
+        Dictionary<IRInst*, IRInst*>* primalsMap;
+    };
+
     void transposeFunc(
         IRFunc* fwdDiffFunc,
         IRFunc* revDiffFunc,
         // TODO: Maybe there's a more elegant way to pass this information.
-        IRParam* dOutParameter)
+        FuncTranspositionInfo transposeInfo)
     {
+        // Extract the fwd-rev primals mapping.
+        // TODO: This should probably just be a method parameter for 
+        // all transposeXX() methods?
+        this->primalsMap = transposeInfo.primalsMap;
+
         // Traverse all instructions/blocks in reverse (starting from the terminator inst)
         // look for insts/blocks marked with IRDifferentialInstDecoration,
         // and transpose them in the revDiffFunc.
         //
-        IRBuilder* builder;
-        builder->init(autodiffContext->sharedBuilder);
+        IRBuilder builder;
+        builder.init(autodiffContext->sharedBuilder);
 
         // Insert after the last block.
-        builder->setInsertInto(revDiffFunc);
+        builder.setInsertInto(revDiffFunc);
 
         for (IRBlock* block = fwdDiffFunc->getFirstBlock(); block; block = block->getNextBlock())
         {
@@ -71,23 +91,29 @@ struct DiffTransposePass
                 continue;
             }
 
-            IRBlock* revBlock = builder->emitBlock();
+            // Set dOutParameter as the transpose gradient for the return inst, if any.
+            if (auto returnInst = as<IRReturn>(block->getTerminator()))
+            {
+                this->addRevAssignmentForFwdInst(returnInst, transposeInfo.dOutInst);
+            }
+
+            IRBlock* revBlock = builder.emitBlock();
             this->transposeBlock(block, revBlock);
         }
     }
 
     void transposeBlock(IRBlock* fwdBlock, IRBlock* revBlock)
     {
-        IRBuilder* builder;
-        builder->init(autodiffContext->sharedBuilder);
-
+        IRBuilder builder;
+        builder.init(autodiffContext->sharedBuilder);
+ 
         // Insert after the last block.
-        builder->setInsertInto(revBlock);
+        builder.setInsertInto(revBlock);
 
         // Note the 'reverse' traversal here.
         for (IRInst* child = fwdBlock->getLastChild(); child; child = child->getPrevInst())
         {
-            transposeInst(builder, child);
+            transposeInst(&builder, child);
         }
     }
 
@@ -117,13 +143,124 @@ struct DiffTransposePass
         {
             case kIROp_Add:
             case kIROp_Mul:
+            case kIROp_Sub:
                 return transposeArithmetic(builder, fwdInst, revValue);
+
+            case kIROp_Return:
+                return transposeReturn(builder, as<IRReturn>(fwdInst), revValue);
+
+            case kIROp_MakeDifferentialPair:
+                return transposeMakePair(builder, as<IRMakeDifferentialPair>(fwdInst), revValue);
+
+            case kIROp_DifferentialPairGetDifferential:
+                return transposeGetDifferential(builder, as<IRDifferentialPairGetDifferential>(fwdInst), revValue);
 
             default:
                 SLANG_ASSERT_FAILURE("Unhandled instruction");
         }
+    }
 
-        return TranspositionResult();
+    TranspositionResult transposeMakePair(IRBuilder*, IRMakeDifferentialPair* fwdMakePair, IRInst* revValue)
+    {
+        // (P = (A, dA)) -> (dA += dP)
+        return TranspositionResult(
+                    List<RevAssignment>(
+                        RevAssignment(
+                            fwdMakePair->getDifferentialValue(), 
+                            revValue)));
+    }
+
+    TranspositionResult transposeGetDifferential(IRBuilder*, IRDifferentialPairGetDifferential* fwdGetDiff, IRInst* revValue)
+    {
+        // (A = GetDiff(P)) -> (dP.d += dA)
+        return TranspositionResult(
+                    List<RevAssignment>(
+                        RevAssignment(
+                            fwdGetDiff->getBase(),
+                            revValue)));
+    }
+
+    // Gather all reverse-mode gradients for parameters, and store to the differential
+    // 
+    void accumulateParamAssignments(IRBuilder* builder, IRParam* revParam)
+    {
+        // Assert that param is an IRPtrTypeBase<IRDifferentialPairType>
+        SLANG_ASSERT(as<IRPtrTypeBase>(revParam->getDataType()));
+        SLANG_ASSERT(as<IRPtrTypeBase>(revParam->getDataType())->getValueType()->getOp() == kIROp_DifferentialPairType);
+
+        
+        // Gather gradients.
+        auto gradients = getRevAssignments(revParam);
+        if (gradients.getCount() == 0)
+        {
+            // Ignore.
+            return;
+        }
+        else
+        {
+            // Load the current value.
+            auto revLoad = builder->emitLoad(revParam);
+
+            // Add the current value to the aggregation list.
+            gradients.add(revLoad);
+            
+            // Get the _total_ value.
+            auto aggregateGradient = emitAggregateValue(builder, gradients);
+
+            // Store this back into the parameter.
+            builder->emitStore(revParam, aggregateGradient);
+        }
+    }
+
+    TranspositionResult transposeReturn(IRBuilder*, IRReturn* fwdReturn, IRInst* revValue)
+    {
+        
+        if (as<IRDifferentialPairType>(fwdReturn->getVal()->getDataType()))
+        {
+            // If the type is a differential pair, we add the reverse-value for the *pair* 
+            // itself. TODO: Signal this through flags in the 'RevAssignment' struct.
+            // (return (A, dA)) -> (dA += dOut)
+            return TranspositionResult(
+                        List<RevAssignment>(
+                            RevAssignment(
+                                fwdReturn->getVal(), 
+                                revValue)));
+        }
+        else
+        {
+            // (return A) -> (empty)
+            return TranspositionResult();
+        }
+    }
+
+    // Lookup the clone of the given primal inst, in the 
+    // current reverse-mode function context.
+    // 
+    // Note: This method can be hijacked to instead turn the primal inst
+    // into an intermediate parameter.
+    // 
+    IRInst* lookUpPrimalInst(IRInst* fwdPrimalInst)
+    {
+        if (primalsMap.ContainsKey(fwdPrimalInst))
+            return primalsMap[fwdPrimalInst];
+        else
+        {
+            SLANG_UNEXPECTED("Could not find mapping for primal inst");
+        }
+    }
+
+    // Lookup the clone of the given primal inst, in the 
+    // current reverse-mode function context. Returns
+    // a default value if one does not exist.
+    // 
+    IRInst* lookUpPrimalInst(IRInst* fwdPrimalInst, IRInst* defaultInst)
+    {
+        if (primalsMap.ContainsKey(fwdPrimalInst))
+            return primalsMap[fwdPrimalInst];
+        else
+        {
+            return defaultInst;
+        }
     }
 
     TranspositionResult transposeArithmetic(IRBuilder* builder, IRInst* fwdInst, IRInst* revValue)
@@ -137,11 +274,24 @@ struct DiffTransposePass
                 return TranspositionResult(
                         List<RevAssignment>(
                             RevAssignment(
-                                fwdInst->getOperand(0),
+                                lookUpPrimalInst(fwdInst->getOperand(0)),
                                 revValue),
                             RevAssignment(
-                                fwdInst->getOperand(0),
+                                lookUpPrimalInst(fwdInst->getOperand(1)),
                                 revValue)));
+            }
+            case kIROp_Sub:
+            {
+                // (Out = dA - dB) -> [(dA += dOut), (dB -= dOut)]
+                return TranspositionResult(
+                        List<RevAssignment>(
+                            RevAssignment(
+                                lookUpPrimalInst(fwdInst->getOperand(0)),
+                                revValue),
+                            RevAssignment(
+                                lookUpPrimalInst(fwdInst->getOperand(1)),
+                                builder->emitNeg(
+                                    revValue->getDataType(), revValue))));
             }
             case kIROp_Mul: 
             {
@@ -151,8 +301,8 @@ struct DiffTransposePass
                     return TranspositionResult(
                         List<RevAssignment>(
                             RevAssignment(
-                                fwdInst->getOperand(0),
-                                builder->emitMul(floatType, fwdInst->getOperand(1), revValue))));
+                                lookUpPrimalInst(fwdInst->getOperand(0)),
+                                builder->emitMul(floatType, lookUpPrimalInst(fwdInst->getOperand(1)), revValue))));
                 }
                 else if (isDifferentialInst(fwdInst->getOperand(1)))
                 {
@@ -160,8 +310,8 @@ struct DiffTransposePass
                     return TranspositionResult(
                         List<RevAssignment>(
                             RevAssignment(
-                                fwdInst->getOperand(1),
-                                builder->emitMul(floatType, fwdInst->getOperand(0), revValue))));
+                                lookUpPrimalInst(fwdInst->getOperand(1)),
+                                builder->emitMul(floatType, lookUpPrimalInst(fwdInst->getOperand(0)), revValue))));
                 }
                 else
                 {
@@ -187,6 +337,14 @@ struct DiffTransposePass
             // If there's not values to add up, emit a 0 value.
             return initialValue;
         }
+        else if (values.getCount() == 1)
+        {
+            // If there's only one value to add up, just return it in order
+            // to avoid a stack of 0 + 0 + 0 + ...
+            return values[0];
+        }
+
+        // If there's more than one value, aggregate them by adding them up.
 
         SLANG_ASSERT(values[0]->getDataType()->getOp() == kIROp_FloatType);
 
