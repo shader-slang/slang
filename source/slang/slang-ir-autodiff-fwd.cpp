@@ -136,6 +136,128 @@ IRFuncType* ForwardDerivativeTranscriber::differentiateFunctionType(IRBuilder* b
             newParameterTypes.add(origType);
     }
 
+<<<<<<< HEAD
+=======
+    void mapPrimalInst(IRInst* origInst, IRInst* primalInst)
+    {
+        if (cloneEnv.mapOldValToNew.ContainsKey(origInst) && cloneEnv.mapOldValToNew[origInst] != primalInst)
+        {
+            getSink()->diagnose(origInst->sourceLoc,
+                Diagnostics::internalCompilerError,
+                "inconsistent primal instruction for original");
+        }
+        else
+        {
+            cloneEnv.mapOldValToNew[origInst] = primalInst;
+        }
+    }
+
+    IRInst* lookupDiffInst(IRInst* origInst)
+    {
+        return instMapD[origInst];
+    }
+
+    IRInst* lookupDiffInst(IRInst* origInst, IRInst* defaultInst)
+    {
+        return (hasDifferentialInst(origInst)) ? instMapD[origInst] : defaultInst;
+    }
+
+    bool hasDifferentialInst(IRInst* origInst)
+    {
+        return instMapD.ContainsKey(origInst);
+    }
+
+    bool shouldUseOriginalAsPrimal(IRInst* origInst)
+    {
+        if (as<IRGlobalValueWithCode>(origInst))
+            return true;
+        if (origInst->parent && origInst->parent->getOp() == kIROp_Module)
+            return true;
+        return false;
+    }
+
+    IRInst* lookupPrimalInst(IRInst* origInst)
+    {
+        if (!origInst)
+            return nullptr;
+        if (shouldUseOriginalAsPrimal(origInst))
+            return origInst;
+        return cloneEnv.mapOldValToNew[origInst];
+    }
+
+    IRInst* lookupPrimalInst(IRInst* origInst, IRInst* defaultInst)
+    {
+        if (!origInst)
+            return nullptr;
+        return (hasPrimalInst(origInst)) ? lookupPrimalInst(origInst) : defaultInst;
+    }
+
+    bool hasPrimalInst(IRInst* origInst)
+    {
+        if (!origInst)
+            return true;
+        if (shouldUseOriginalAsPrimal(origInst))
+            return true;
+        return cloneEnv.mapOldValToNew.ContainsKey(origInst);
+    }
+
+    IRInst* findOrTranscribeDiffInst(IRBuilder* builder, IRInst* origInst)
+    {
+        if (!hasDifferentialInst(origInst))
+        {
+            transcribe(builder, origInst);
+            SLANG_ASSERT(hasDifferentialInst(origInst));
+        }
+
+        return lookupDiffInst(origInst);
+    }
+
+    IRInst* findOrTranscribePrimalInst(IRBuilder* builder, IRInst* origInst)
+    {
+        if (shouldUseOriginalAsPrimal(origInst))
+            return origInst;
+
+        if (!hasPrimalInst(origInst))
+        {
+            transcribe(builder, origInst);
+            SLANG_ASSERT(hasPrimalInst(origInst));
+        }
+
+        return lookupPrimalInst(origInst);
+    }
+
+    IRFuncType* differentiateFunctionType(IRBuilder* builder, IRFuncType* funcType)
+    {
+        List<IRType*> newParameterTypes;
+        IRType* diffReturnType;
+
+        for (UIndex i = 0; i < funcType->getParamCount(); i++)
+        {
+            bool noDiff = false;
+            auto origType = funcType->getParamType(i);
+            if (auto attrType = as<IRAttributedType>(origType))
+            {
+                if (attrType->findAttr<IRNoDiffAttr>())
+                {
+                    noDiff = true;
+                    origType = attrType->getBaseType();
+                }
+            }
+            origType = (IRType*) lookupPrimalInst(origType, origType);
+            if (noDiff)
+            {
+                newParameterTypes.add(origType);
+            }
+            else
+            {
+                if (auto diffPairType = tryGetDiffPairType(builder, origType))
+                    newParameterTypes.add(diffPairType);
+                else
+                    newParameterTypes.add(origType);
+            }
+        }
+
+>>>>>>> 8533e9e6 (Allow `no_diff` modifier on parameters to exclude parameter from differentiation.)
         // Transcribe return type to a pair.
         // This will be void if the primal return type is non-differentiable.
         //
@@ -356,7 +478,68 @@ InstPair ForwardDerivativeTranscriber::transcribeParam(IRBuilder* builder, IRPar
 
         return InstPair(
                 cloneInst(&cloneEnv, builder, origParam),
+<<<<<<< HEAD
                 nullptr);
+=======
+                nullptr);    
+        }
+
+        // Is this param a phi node or a function parameter?
+        auto func = as<IRGlobalValueWithCode>(origParam->getParent()->getParent());
+        bool isFuncParam = (func && origParam->getParent() == func->getFirstBlock());
+        if (isFuncParam)
+        {
+            if (auto diffPairType = tryGetDiffPairType(builder, (IRType*)primalDataType))
+            {
+                IRInst* diffPairParam = builder->emitParam(diffPairType);
+
+                auto diffPairVarName = makeDiffPairName(origParam);
+                if (diffPairVarName.getLength() > 0)
+                    builder->addNameHintDecoration(diffPairParam, diffPairVarName.getUnownedSlice());
+
+                SLANG_ASSERT(diffPairParam);
+            
+                if (auto pairType = as<IRDifferentialPairType>(diffPairType))
+                {
+                    return InstPair(
+                        builder->emitDifferentialPairGetPrimal(diffPairParam),
+                        builder->emitDifferentialPairGetDifferential(
+                            (IRType*)pairBuilder->getDiffTypeFromPairType(builder, pairType),
+                            diffPairParam));
+                }
+                else if (auto pairPtrType = as<IRPtrTypeBase>(diffPairType))
+                {
+                    auto ptrInnerPairType = as<IRDifferentialPairType>(pairPtrType->getValueType());
+
+                    return InstPair(
+                        builder->emitDifferentialPairAddressPrimal(diffPairParam),
+                        builder->emitDifferentialPairAddressDifferential(
+                            builder->getPtrType(
+                                kIROp_PtrType,
+                                (IRType*)pairBuilder->getDiffTypeFromPairType(builder, ptrInnerPairType)),
+                            diffPairParam));
+                }
+            }
+            auto primalInst = cloneInst(&cloneEnv, builder, origParam);
+            if (auto primalParam = as<IRParam>(primalInst))
+            {
+                SLANG_RELEASE_ASSERT(builder->getInsertLoc().getBlock());
+                builder->getInsertLoc().getBlock()->addParam(primalParam);
+            }
+            return InstPair(primalInst, nullptr);
+        }
+        else
+        {
+            auto primal = cloneInst(&cloneEnv, builder, origParam);
+            IRInst* diff = nullptr;
+            if (IRType* diffType = differentiateType(builder, (IRType*)primalDataType))
+            {
+                diff = builder->emitParam(diffType);
+            }
+            return InstPair(primal, diff);
+        }
+        
+>>>>>>> 8533e9e6 (Allow `no_diff` modifier on parameters to exclude parameter from differentiation.)
     }
     else
     {

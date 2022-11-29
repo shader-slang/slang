@@ -106,6 +106,10 @@ namespace Slang
         return declRef.substitute(astBuilder, declRef.getDecl()->type.Ptr());
     }
 
+        /// same as getType, but take into account the additional type modifiers from the parameter's modifier list
+        /// and return a ModifiedType if such modifiers exist.
+    Type* getParamType(ASTBuilder* astBuilder, DeclRef<VarDeclBase> const& paramDeclRef);
+
     inline SubstExpr<Expr> getInitExpr(ASTBuilder* astBuilder, DeclRef<VarDeclBase> const& declRef)
     {
         return declRef.substitute(astBuilder, declRef.getDecl()->initExpr);

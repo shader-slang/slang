@@ -90,17 +90,33 @@ struct BackwardDiffTranscriber
 
         for (UIndex i = 0; i < funcType->getParamCount(); i++)
         {
+            bool noDiff = false;
             auto origType = funcType->getParamType(i);
-            if (auto diffPairType = tryGetDiffPairType(builder, origType))
+            if (auto attrType = as<IRAttributedType>(origType))
             {
-                auto inoutDiffPairType = builder->getPtrType(kIROp_InOutType, diffPairType);
-                newParameterTypes.add(inoutDiffPairType);
+                if (attrType->findAttr<IRNoDiffAttr>())
+                {
+                    noDiff = true;
+                    origType = attrType->getBaseType();
+                }
+            }
+            if (noDiff)
+            {
+                newParameterTypes.add(origType);
             }
             else
-                newParameterTypes.add(origType);
+            {
+                if (auto diffPairType = tryGetDiffPairType(builder, origType))
+                {
+                    auto inoutDiffPairType = builder->getPtrType(kIROp_InOutType, diffPairType);
+                    newParameterTypes.add(inoutDiffPairType);
+                }
+                else
+                    newParameterTypes.add(origType);
+            }
         }
 
-        newParameterTypes.add(funcType->getResultType());
+        newParameterTypes.add(differentiateType(builder, funcType->getResultType()));
 
         diffReturnType = builder->getVoidType();
 

@@ -2051,6 +2051,12 @@ namespace Slang
 
     Type* SemanticsVisitor::getDifferentialPairType(Type* primalType)
     {
+        if (auto modifiedType = as<ModifiedType>(primalType))
+        {
+            if (modifiedType->findModifier<NoDiffModifierVal>())
+                return modifiedType->base;
+        }
+
         // Get a reference to the builtin 'IDifferentiable' interface
         auto differentiableInterface = m_astBuilder->getDifferentiableInterface();
 
@@ -3385,6 +3391,10 @@ namespace Slang
         {
             // TODO: validate that `type` is either `float` or a vector of `float`s
             return m_astBuilder->getSNormModifierVal();
+        }
+        else if (auto noDiffModifier = as<NoDiffModifier>(modifier))
+        {
+            return m_astBuilder->getNoDiffModifierVal();
         }
         else
         {

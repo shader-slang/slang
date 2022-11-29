@@ -490,6 +490,14 @@ class SNormModifierVal : public ResourceFormatModifierVal
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
 };
 
+class NoDiffModifierVal : public TypeModifierVal
+{
+    SLANG_AST_CLASS(NoDiffModifierVal)
+
+    void _toTextOverride(StringBuilder& out);
+    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+};
+
     /// Represents the result of differentiating a function.
 class DifferentiateVal : public Val
 {

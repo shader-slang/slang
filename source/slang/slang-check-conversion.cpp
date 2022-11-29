@@ -579,6 +579,7 @@ namespace Slang
 
         case ASTNodeType::UNormModifierVal:
         case ASTNodeType::SNormModifierVal:
+        case ASTNodeType::NoDiffModifierVal:
             return true;
         }
     }
@@ -597,6 +598,7 @@ namespace Slang
 
         case ASTNodeType::UNormModifierVal:
         case ASTNodeType::SNormModifierVal:
+        case ASTNodeType::NoDiffModifierVal:
             return true;
         }
     }

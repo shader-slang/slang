@@ -2075,6 +2075,12 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         return LoweredValInfo::simple(getBuilder()->getAttr(kIROp_SNormAttr));
     }
 
+    LoweredValInfo visitNoDiffModifierVal(NoDiffModifierVal* astVal)
+    {
+        SLANG_UNUSED(astVal);
+        return LoweredValInfo::simple(getBuilder()->getAttr(kIROp_NoDiffAttr));
+    }
+
     // We do not expect to encounter the following types in ASTs that have
     // passed front-end semantic checking.
 #define UNEXPECTED_CASE(NAME) IRType* visit##NAME(NAME*) { SLANG_UNEXPECTED(#NAME); UNREACHABLE_RETURN(nullptr); }
@@ -2783,7 +2789,7 @@ IRLoweringParameterInfo getParameterInfo(
 {
     IRLoweringParameterInfo info;
 
-    info.type = getType(context->astBuilder, paramDecl);
+    info.type = getParamType(context->astBuilder, paramDecl);
     info.decl = paramDecl;
     info.direction = getParameterDirection(paramDecl);
     info.isThisParam = false;
