@@ -1178,5 +1178,14 @@ Val* ModifiedType::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionS
     return substType;
 }
 
+Type* removeParamDirType(Type* type)
+{
+    for (auto paramDirType = as<ParamDirectionType>(type); paramDirType;)
+    {
+        type = paramDirType->getValueType();
+        paramDirType = as<ParamDirectionType>(type);
+    }
+    return type;
+}
 
 } // namespace Slang

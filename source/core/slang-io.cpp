@@ -29,6 +29,7 @@
 
 #   include <dirent.h>
 #   include <sys/stat.h>
+#   include <sys/file.h>
 #endif
 
 #if SLANG_APPLE_FAMILY
@@ -272,7 +273,7 @@ namespace Slang
         else
             return "";
     }
-    
+
     /* static */void Path::append(StringBuilder& ioBuilder, const UnownedStringSlice& path)
     {
         if (ioBuilder.getLength() == 0)
@@ -287,7 +288,7 @@ namespace Slang
             {
                 ioBuilder.append(kPathDelimiter);
             }
-            // Check that path doesn't start with a path delimiter 
+            // Check that path doesn't start with a path delimiter
             SLANG_ASSERT(!isDelimiter(path[0]));
             // Append the path
             ioBuilder.append(path);
@@ -325,7 +326,7 @@ namespace Slang
     {
         switch (element.getLength())
         {
-            case 0:     
+            case 0:
             {
                 // We'll just assume it is
                 return true;
@@ -333,7 +334,7 @@ namespace Slang
             case 2:
             {
                 // Look for a windows like drive spec
-                const char firstChar = element[0]; 
+                const char firstChar = element[0];
                 return element[1] == ':' && ((firstChar >= 'a' && firstChar <= 'z') || (firstChar >= 'A' && firstChar <= 'Z'));
             }
             default:    return false;
@@ -363,7 +364,7 @@ namespace Slang
             return true;
         }
 
-        // Check for drive 
+        // Check for drive
         if (isDriveSpecification(getFirstElement(path)))
         {
             return true;
@@ -387,19 +388,19 @@ namespace Slang
             while (cur < end && !isDelimiter(*cur)) cur++;
 
             splitOut.add(UnownedStringSlice(start, cur));
-           
+
             // Next
             start = cur + 1;
         }
 
-        // Okay if the end is empty. And we aren't with a spec like // or c:/ , then drop the final slash 
+        // Okay if the end is empty. And we aren't with a spec like // or c:/ , then drop the final slash
         if (splitOut.getCount() > 1 && splitOut.getLast().getLength() == 0)
         {
             if (splitOut.getCount() == 2 && isDriveSpecification(splitOut[0]))
             {
                 return;
             }
-            // Remove the last 
+            // Remove the last
             splitOut.removeLast();
         }
     }
@@ -440,7 +441,7 @@ namespace Slang
             return SLANG_E_NOT_FOUND;
         }
 
-        // We allow splitPath.getCount() == 0, because 
+        // We allow splitPath.getCount() == 0, because
         // the original path could have been '.' or './.'
         //
         // Special handling this case is in Path::join
@@ -470,7 +471,7 @@ namespace Slang
             const UnownedStringSlice& cur = ioSplit[i];
             if (cur == "." && ioSplit.getCount() > 1)
             {
-                // Just remove it 
+                // Just remove it
                 ioSplit.removeAt(i);
                 i--;
             }
@@ -525,7 +526,7 @@ namespace Slang
     {
 #if defined(_WIN32)
         return _wmkdir(path.toWString()) == 0;
-#else 
+#else
         return mkdir(path.getBuffer(), 0777) == 0;
 #endif
     }
@@ -581,14 +582,14 @@ namespace Slang
         if (!absPath)
         {
             return SLANG_FAIL;
-        }  
+        }
 
         canonicalPathOut =  String::fromWString(absPath);
         ::free(absPath);
         return SLANG_OK;
 #else
 #   if 1
-        
+
         // http://man7.org/linux/man-pages/man3/realpath.3.html
         char* canonicalPath = ::realpath(path.begin(), nullptr);
         if (canonicalPath)
@@ -637,7 +638,7 @@ namespace Slang
         SlangPathType pathType;
         SLANG_RETURN_ON_FAIL(getPathType(path, &pathType));
 
-        
+
         switch (pathType)
         {
             case SLANG_PATH_TYPE_FILE:
@@ -706,7 +707,7 @@ namespace Slang
     /* static */SlangResult Path::find(const String& directoryPath, const char* pattern, Visitor* visitor)
     {
         DIR* directory = opendir(directoryPath.getBuffer());
-        
+
         if (!directory)
         {
             return SLANG_E_NOT_FOUND;
@@ -766,7 +767,7 @@ namespace Slang
     /// Gets the path to the executable that was invoked that led to the current threads execution
     /// If run from a shared library/dll will be the path of the executable that loaded said library
     /// @param outPath Pointer to buffer to hold the path.
-    /// @param ioPathSize Size of the buffer to hold the path (including zero terminator). 
+    /// @param ioPathSize Size of the buffer to hold the path (including zero terminator).
     /// @return SLANG_OK on success, SLANG_E_BUFFER_TOO_SMALL if buffer is too small. If ioPathSize is changed it will be the required size
     static SlangResult _calcExectuablePath(char* outPath, size_t* ioSize)
     {
@@ -776,7 +777,7 @@ namespace Slang
 
 #if SLANG_WINDOWS_FAMILY
         // https://docs.microsoft.com/en-us/windows/desktop/api/libloaderapi/nf-libloaderapi-getmodulefilenamea
-        
+
         DWORD res = ::GetModuleFileNameA(::GetModuleHandle(nullptr), outPath, DWORD(bufferSize));
         // If it fits it's the size not including terminator. So must be less than bufferSize
         if (res < bufferSize)
@@ -801,7 +802,7 @@ namespace Slang
         // Zero terminate
         outPath[resSize - 1] = 0;
         return SLANG_OK;
-#   else        
+#   else
         String text = Slang::File::readAllText("/proc/self/maps");
         Index startIndex = text.indexOf('/');
         if (startIndex == Index(-1))
@@ -963,7 +964,7 @@ namespace Slang
         SLANG_RETURN_ON_FAIL(stream.write(data, size));
         return SLANG_OK;
     }
-    
+
     SlangResult File::writeAllText(const Slang::String& fileName, const Slang::String& text)
     {
         RefPtr<FileStream> stream = new FileStream;
@@ -975,7 +976,7 @@ namespace Slang
 
         return SLANG_OK;
     }
-    
+
     /* static */SlangResult File::writeNativeText(const String& path, const void* data, size_t size)
     {
         FILE* file = fopen(path.getBuffer(), "w");
@@ -1075,4 +1076,127 @@ namespace Slang
         return uri;
     }
 
+
+    SlangResult LockFile::open(const String& fileName)
+    {
+#if SLANG_WINDOWS_FAMILY
+        m_fileHandle = ::CreateFileW(
+            fileName.toWString(),
+            GENERIC_READ | GENERIC_WRITE,
+            FILE_SHARE_READ | FILE_SHARE_WRITE,
+            NULL,
+            CREATE_ALWAYS,
+            FILE_ATTRIBUTE_NORMAL | FILE_FLAG_OVERLAPPED,
+            NULL
+        );
+        m_isOpen = m_fileHandle != INVALID_HANDLE_VALUE;
+#else
+        m_fileHandle = ::open(fileName.getBuffer(), O_RDWR | O_CREAT, 0600);
+        m_isOpen = m_fileHandle != -1;
+#endif
+        return m_isOpen ? SLANG_OK : SLANG_E_CANNOT_OPEN;
+    }
+
+    void LockFile::close()
+    {
+        if (!m_isOpen)
+            return;
+
+#if SLANG_WINDOWS_FAMILY
+        ::CloseHandle(m_fileHandle);
+#else
+        ::close(m_fileHandle);
+#endif
+
+        m_isOpen = false;
+    }
+
+    SlangResult LockFile::tryLock(LockType lockType)
+    {
+        if (!m_isOpen)
+            return SLANG_E_CANNOT_OPEN;
+
+        SlangResult result = SLANG_OK;
+#if SLANG_WINDOWS_FAMILY
+        OVERLAPPED overlapped = {0};
+        DWORD flags = lockType == LockType::Shared ? LOCKFILE_FAIL_IMMEDIATELY : (LOCKFILE_EXCLUSIVE_LOCK | LOCKFILE_FAIL_IMMEDIATELY);
+        if (::LockFileEx(m_fileHandle, flags, DWORD(0), ~DWORD(0), ~DWORD(0), &overlapped) == 0)
+        {
+            result = SLANG_E_TIME_OUT;
+        }
+#else
+        int operation = lockType == LockType::Shared ? (LOCK_SH | LOCK_NB) : (LOCK_EX | LOCK_NB);
+        if (::flock(m_fileHandle, operation) != 0)
+        {
+            result = SLANG_E_TIME_OUT;
+        }
+#endif
+        return result;
+    }
+
+    SlangResult LockFile::lock(LockType lockType)
+    {
+        if (!m_isOpen)
+            return SLANG_E_CANNOT_OPEN;
+
+        SlangResult result = SLANG_OK;
+#if SLANG_WINDOWS_FAMILY
+        OVERLAPPED overlapped = {0};
+        overlapped.hEvent = ::CreateEvent(NULL, TRUE, FALSE, NULL);
+        DWORD flags = lockType == LockType::Shared ? 0 : LOCKFILE_EXCLUSIVE_LOCK;
+        if (::LockFileEx(m_fileHandle, flags, DWORD(0), ~DWORD(0), ~DWORD(0), &overlapped) == 0)
+        {
+            auto err = ::GetLastError();
+            if (err == ERROR_IO_PENDING)
+            {
+                DWORD bytes;
+                if (::GetOverlappedResult(m_fileHandle, &overlapped, &bytes, TRUE) == 0)
+                {
+                    result = SLANG_E_INTERNAL_FAIL;
+                }
+            }
+            else
+            {
+                result = SLANG_E_INTERNAL_FAIL;
+            }
+        }
+        ::CloseHandle(overlapped.hEvent);
+#else
+        int operation = lockType == LockType::Shared ? LOCK_SH : LOCK_EX;
+        if (::flock(m_fileHandle, operation) != 0)
+        {
+            result = SLANG_E_INTERNAL_FAIL;
+        }
+#endif
+        return result;
+}
+
+    SlangResult LockFile::unlock()
+    {
+        if (!m_isOpen)
+            return SLANG_E_CANNOT_OPEN;
+
+#if SLANG_WINDOWS_FAMILY
+        OVERLAPPED overlapped = {0};
+        if (::UnlockFileEx(m_fileHandle, DWORD(0), ~DWORD(0), ~DWORD(0), &overlapped) == 0)
+        {
+            return SLANG_E_INTERNAL_FAIL;
+        }
+#else
+        if (::flock(m_fileHandle, LOCK_UN) != 0)
+        {
+            return SLANG_E_INTERNAL_FAIL;
+        }
+#endif
+        return SLANG_OK;
+}
+
+    LockFile::LockFile()
+        : m_isOpen(false)
+    {}
+
+    LockFile::~LockFile()
+    {
+        close();
+    }
 }

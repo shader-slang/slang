@@ -974,6 +974,15 @@ class ForceInlineAttribute : public Attribute
     SLANG_AST_CLASS(ForceInlineAttribute)
 };
 
+
+// A `[TreatAsDifferentiableAttribute]` attribute indicates that a function or an interface
+// should be treated as differentiable in IR validation step.
+//
+class TreatAsDifferentiableAttribute : public Attribute
+{
+    SLANG_AST_CLASS(TreatAsDifferentiableAttribute)
+};
+
     /// An attribute that marks a type declaration as either allowing or
     /// disallowing the type to be inherited from in other modules.
 class InheritanceControlAttribute : public Attribute { SLANG_AST_CLASS(InheritanceControlAttribute) };
@@ -1083,6 +1092,25 @@ class ForwardDerivativeOfAttribute : public DifferentiableAttribute
 class BackwardDifferentiableAttribute : public DifferentiableAttribute
 {
     SLANG_AST_CLASS(BackwardDifferentiableAttribute)
+};
+
+    /// The `[BackwardDerivative(function)]` attribute specifies a custom function that should
+    /// be used as the backward-derivative for the decorated function.
+class BackwardDerivativeAttribute : public DifferentiableAttribute
+{
+    SLANG_AST_CLASS(BackwardDerivativeAttribute)
+    Expr* funcExpr;
+};
+
+    /// The `[BackwardDerivativeOf(primalFunction)]` attribute marks the decorated function as custom
+    /// backward-derivative implementation for `primalFunction`.
+class BackwardDerivativeOfAttribute : public DifferentiableAttribute
+{
+    SLANG_AST_CLASS(BackwardDerivativeOfAttribute)
+
+    Expr* funcExpr;
+
+    Expr* backDeclRef; // DeclRef to this derivative function when initiated from primalFunction.
 };
 
     /// Indicates that the modified declaration is one of the "magic" declarations
