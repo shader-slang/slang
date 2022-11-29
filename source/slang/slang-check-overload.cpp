@@ -729,7 +729,7 @@ namespace Slang
                 {
                     auto expr = m_astBuilder->create<PartiallyAppliedGenericExpr>();
                     expr->loc = context.loc;
-                    expr->originalExpr = originalAppExpr;
+                    expr->originalExpr = baseExpr;
                     expr->baseGenericDeclRef = as<DeclRefExpr>(baseExpr)->declRef.as<GenericDecl>();
                     expr->substWithKnownGenericArgs = (GenericSubstitution*)candidate.subst;
                     return expr;
