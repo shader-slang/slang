@@ -24,6 +24,7 @@ namespace gfx_test
         RenderApiFlag::Enum api;
 
         ComPtr<IDevice> device;
+        ComPtr<IShaderCacheStatistics> shaderCacheStats;
         ComPtr<IPipelineState> pipelineState;
         ComPtr<IResourceView> bufferView;
 
@@ -33,12 +34,11 @@ namespace gfx_test
         // 
         // - diskFileSystem - Used to save any files that must exist on disk for subsequent
         //                    save/load function calls (most prominently loadComputeProgram()) to pick up.
-        // - cacheFileSystem - Used to hold for the actual cache for all tests. This removes the need to
-        //                     manually clean out old cache files from previous test runs as it is
-        //                     located in-memory. This is the file system passed to device creation
-        //                     as part of the shader cache desc.
+        //                    This is also used to test the file stream implementation for the cache.
+        // - memoryFileSystem - Used to test the fallback path for the cache in the case physical
+        //                      file paths cannot be obtained, which prevents usage of file streams.
         ComPtr<ISlangMutableFileSystem> diskFileSystem;
-        ComPtr<ISlangMutableFileSystem> cacheFileSystem;
+        ComPtr<ISlangMutableFileSystem> memoryFileSystem;
 
         // Simple compute shaders we can pipe to our individual shader files for cache testing
         String contentsA = String(
@@ -114,6 +114,7 @@ namespace gfx_test
             bufferView = nullptr;
             pipelineState = nullptr;
             device = nullptr;
+            shaderCacheStats = nullptr;
         }
 
         // TODO: This should be removed at some point. Currently exists as a workaround for module loading
@@ -152,11 +153,10 @@ namespace gfx_test
                 SLANG_IGNORE_TEST
             }
 
-            cacheFileSystem = new MemoryFileSystem();
+            memoryFileSystem = new MemoryFileSystem();
             diskFileSystem = OSFileSystem::getMutableSingleton();
-            diskFileSystem = new RelativeFileSystem(diskFileSystem, "tools/gfx-unit-test");
-
-            shaderCache.shaderCacheFileSystem = cacheFileSystem;
+            diskFileSystem->createDirectory("tools/gfx-unit-test/shader-cache-test");
+            diskFileSystem = new RelativeFileSystem(diskFileSystem, "tools/gfx-unit-test/shader-cache-test");
         }
 
         void submitGPUWork()
@@ -185,6 +185,44 @@ namespace gfx_test
             queue->executeCommandBuffer(commandBuffer);
             queue->waitOnHost();
         }
+
+        void cleanUpFiles()
+        {
+            freeOldResources();
+
+            List<String> filePaths;
+            diskFileSystem->enumeratePathContents(
+                ".",
+                [](SlangPathType pathType, const char* name, void* userData)
+                {
+                    if (pathType == SlangPathType::SLANG_PATH_TYPE_FILE)
+                    {
+                        List<String>& out = *(List<String>*)userData;
+                        out.add(String(name));
+                    }
+                },
+                &filePaths);
+
+            for (auto file : filePaths)
+            {
+                diskFileSystem->remove(file.getBuffer());
+            }
+            // Get a mutable singleton so we can delete the folder.
+            auto fileSystem = OSFileSystem::getMutableSingleton();
+            fileSystem->remove("tools/gfx-unit-test/shader-cache-test");
+        }
+
+        void run()
+        {
+            shaderCache.shaderCacheFileSystem = diskFileSystem;
+            runTests();
+            shaderCache.shaderCacheFileSystem = memoryFileSystem;
+            runTests();
+
+            cleanUpFiles();
+        }
+
+        virtual void runTests() = 0;
     };
 
     // Due to needing a workaround to prevent loading old, outdated modules, we need to
@@ -205,7 +243,7 @@ namespace gfx_test
 
             ComPtr<IShaderProgram> shaderProgram;
             slang::ProgramLayout* slangReflection;
-            GFX_CHECK_CALL_ABORT(loadComputeProgram(device, shaderProgram, "test-tmp-single-entry", "computeMain", slangReflection));
+            GFX_CHECK_CALL_ABORT(loadComputeProgram(device, shaderProgram, "shader-cache-test/test-tmp-single-entry", "computeMain", slangReflection));
 
             ComputePipelineStateDesc pipelineDesc = {};
             pipelineDesc.program = shaderProgram.get();
@@ -213,10 +251,8 @@ namespace gfx_test
                 device->createComputePipelineState(pipelineDesc, pipelineState.writeRef()));
         }
 
-        void run()
+        void runTests()
         {
-            ComPtr<IShaderCacheStatistics> shaderCacheStats;
-
             generateNewDevice();
             createRequiredResources();
             generateNewPipelineState(contentsA);
@@ -275,13 +311,13 @@ namespace gfx_test
             switch (shaderIndex)
             {
             case 0:
-                shaderFilename = "test-tmp-multi-entry-A";
+                shaderFilename = "shader-cache-test/test-tmp-multi-entry-A";
                 break;
             case 1:
-                shaderFilename = "test-tmp-multi-entry-B";
+                shaderFilename = "shader-cache-test/test-tmp-multi-entry-B";
                 break;
             case 2:
-                shaderFilename = "test-tmp-multi-entry-C";
+                shaderFilename = "shader-cache-test/test-tmp-multi-entry-C";
                 break;
             default:
                 // Should never reach this point since we wrote the test
@@ -305,10 +341,8 @@ namespace gfx_test
             submitGPUWork();
         }
 
-        void run()
+        void runTests()
         {
-            ComPtr<IShaderCacheStatistics> shaderCacheStats;
-
             generateNewDevice();
             createRequiredResources();
             modifyShaderA(contentsA);
@@ -385,10 +419,8 @@ namespace gfx_test
                 device->createComputePipelineState(pipelineDesc, pipelineState.writeRef()));
         }
 
-        void run()
+        void runTests()
         {
-            ComPtr<IShaderCacheStatistics> shaderCacheStats;
-
             generateNewDevice();
             createRequiredResources();
             generateNewPipelineState(0);
@@ -513,7 +545,7 @@ namespace gfx_test
         {
             ComPtr<IShaderProgram> shaderProgram;
             slang::ProgramLayout* slangReflection;
-            GFX_CHECK_CALL_ABORT(loadComputeProgram(device, shaderProgram, "test-tmp-importing", "computeMain", slangReflection));
+            GFX_CHECK_CALL_ABORT(loadComputeProgram(device, shaderProgram, "shader-cache-test/test-tmp-importing", "computeMain", slangReflection));
 
             ComputePipelineStateDesc pipelineDesc = {};
             pipelineDesc.program = shaderProgram.get();
@@ -521,10 +553,8 @@ namespace gfx_test
                 device->createComputePipelineState(pipelineDesc, pipelineState.writeRef()));
         }
 
-        void run()
+        void runTests()
         {
-            ComPtr<IShaderCacheStatistics> shaderCacheStats;
-
             generateNewDevice();
             createRequiredResources();
             initializeFiles();
@@ -652,10 +682,8 @@ namespace gfx_test
                 device->createComputePipelineState(pipelineDesc, pipelineState.writeRef()));
         }
 
-        void run()
+        void runTests()
         {
-            ComPtr<IShaderCacheStatistics> shaderCacheStats;
-
             generateNewDevice();
             createRequiredResources();
             generateNewPipelineState();
@@ -837,14 +865,12 @@ namespace gfx_test
             queue->waitOnHost();
         }
 
-        void run()
+        void runTests()
         {
             generateNewDevice();
             createShaderProgram();
             createRequiredResources();
             submitGPUWork();
-
-            ComPtr<IShaderCacheStatistics> shaderCacheStats;
 
             device->queryInterface(SLANG_UUID_IShaderCacheStatistics, (void**)shaderCacheStats.writeRef());
             SLANG_CHECK(shaderCacheStats->getCacheMissCount() == 2);
@@ -930,14 +956,12 @@ namespace gfx_test
             return SLANG_OK;
         }
 
-        void run()
+        void runTests()
         {
             generateNewDevice();
             createShaderProgram();
             createRequiredResources();
             submitGPUWork();
-
-            ComPtr<IShaderCacheStatistics> shaderCacheStats;
 
             device->queryInterface(SLANG_UUID_IShaderCacheStatistics, (void**)shaderCacheStats.writeRef());
             SLANG_CHECK(shaderCacheStats->getCacheMissCount() == 2);
@@ -952,6 +976,10 @@ namespace gfx_test
     // This test does not modify shaders as other tests already test this, instead focusing on checking
     // that entries are correctly removed as cache limits are reached and that entries are always in
     // the right order.
+    //
+    // As opening multiple streams to the same file is dependent on the OS, this test is run on the
+    // in-memory file system. Cache eviction policy with an on-disk file system will need to be inspected
+    // manually.
     struct CacheWithMaxEntryLimit : MultipleEntryShaderCache
     {
         List<String> test0Lines; // C -> B -> A
@@ -959,14 +987,12 @@ namespace gfx_test
         List<String> test2Lines; // A -> B
         List<String> test3Lines; // A -> C
         List<String> test4Lines; // C -> B -> A
-        List<String> entryKeys; // C, B, A
-
-        ComPtr<IShaderCacheStatistics> shaderCacheStats;
+        List<String> entryKeys;  // C, B, A
 
         void getCacheFile(List<String>& lines)
         {
             ComPtr<ISlangBlob> contentsBlob;
-            cacheFileSystem->loadFile(shaderCache.cacheFilename, contentsBlob.writeRef());
+            memoryFileSystem->loadFile(shaderCache.cacheFilename, contentsBlob.writeRef());
             List<UnownedStringSlice> temp;
             StringUtil::calcLines(UnownedStringSlice((char*)contentsBlob->getBufferPointer()), temp);
             for (auto line : temp)
@@ -999,19 +1025,26 @@ namespace gfx_test
             shaderCache.entryCountLimit = 3;
             generateNewDevice();
             createRequiredResources();
+            modifyShaderA(contentsA);
+            modifyShaderB(contentsB);
+            modifyShaderC(contentsC);
             generateNewPipelineState(0);
             submitGPUWork();
             generateNewPipelineState(1);
             submitGPUWork();
             generateNewPipelineState(2);
             submitGPUWork();
-            getCacheFile(test0Lines);
 
             device->queryInterface(SLANG_UUID_IShaderCacheStatistics, (void**)shaderCacheStats.writeRef());
             SLANG_CHECK(shaderCacheStats->getCacheMissCount() == 3);
             SLANG_CHECK(shaderCacheStats->getCacheHitCount() == 0);
             SLANG_CHECK(shaderCacheStats->getCacheEntryDirtyCount() == 0);
 
+            // This needs to be called in order to force the cache file to be updated, otherwise we will
+            // be unable to perform the necessary checks.
+            freeOldResources();
+
+            getCacheFile(test0Lines);
             SLANG_CHECK(test0Lines.getCount() == 3);
 
             // This segment also doubles as the point where we fetch the keys for all three shaders
@@ -1026,9 +1059,9 @@ namespace gfx_test
             }
 
             ComPtr<ISlangBlob> unused;
-            SLANG_CHECK(SLANG_SUCCEEDED(cacheFileSystem->loadFile(entryKeys[0].getBuffer(), unused.writeRef())));
-            SLANG_CHECK(SLANG_SUCCEEDED(cacheFileSystem->loadFile(entryKeys[1].getBuffer(), unused.writeRef())));
-            SLANG_CHECK(SLANG_SUCCEEDED(cacheFileSystem->loadFile(entryKeys[2].getBuffer(), unused.writeRef())));
+            SLANG_CHECK(SLANG_SUCCEEDED(memoryFileSystem->loadFile(entryKeys[0].getBuffer(), unused.writeRef())));
+            SLANG_CHECK(SLANG_SUCCEEDED(memoryFileSystem->loadFile(entryKeys[1].getBuffer(), unused.writeRef())));
+            SLANG_CHECK(SLANG_SUCCEEDED(memoryFileSystem->loadFile(entryKeys[2].getBuffer(), unused.writeRef())));
         }
 
         // Cache limit 2, access shaders A then B then C
@@ -1046,19 +1079,21 @@ namespace gfx_test
             submitGPUWork();
             generateNewPipelineState(2);
             submitGPUWork();
-            getCacheFile(test1Lines);
 
             device->queryInterface(SLANG_UUID_IShaderCacheStatistics, (void**)shaderCacheStats.writeRef());
             SLANG_CHECK(shaderCacheStats->getCacheMissCount() == 3);
             SLANG_CHECK(shaderCacheStats->getCacheHitCount() == 0);
             SLANG_CHECK(shaderCacheStats->getCacheEntryDirtyCount() == 0);
 
+            freeOldResources();
+
+            getCacheFile(test1Lines);
             SLANG_CHECK(test1Lines.getCount() == 2);
 
             ComPtr<ISlangBlob> unused;
-            SLANG_CHECK(SLANG_SUCCEEDED(cacheFileSystem->loadFile(entryKeys[0].getBuffer(), unused.writeRef())));
-            SLANG_CHECK(SLANG_SUCCEEDED(cacheFileSystem->loadFile(entryKeys[1].getBuffer(), unused.writeRef())));
-            SLANG_CHECK(SLANG_FAILED(cacheFileSystem->loadFile(entryKeys[2].getBuffer(), unused.writeRef())));
+            SLANG_CHECK(SLANG_SUCCEEDED(memoryFileSystem->loadFile(entryKeys[0].getBuffer(), unused.writeRef())));
+            SLANG_CHECK(SLANG_SUCCEEDED(memoryFileSystem->loadFile(entryKeys[1].getBuffer(), unused.writeRef())));
+            SLANG_CHECK(SLANG_FAILED(memoryFileSystem->loadFile(entryKeys[2].getBuffer(), unused.writeRef())));
         }
 
         // Cache limit 2, access shaders B and then A
@@ -1070,19 +1105,21 @@ namespace gfx_test
             submitGPUWork();
             generateNewPipelineState(0);
             submitGPUWork();
-            getCacheFile(test2Lines);
 
             device->queryInterface(SLANG_UUID_IShaderCacheStatistics, (void**)shaderCacheStats.writeRef());
             SLANG_CHECK(shaderCacheStats->getCacheMissCount() == 1);
             SLANG_CHECK(shaderCacheStats->getCacheHitCount() == 1);
             SLANG_CHECK(shaderCacheStats->getCacheEntryDirtyCount() == 0);
 
+            freeOldResources();
+
+            getCacheFile(test2Lines);
             SLANG_CHECK(test2Lines.getCount() == 2);
 
             ComPtr<ISlangBlob> unused;
-            SLANG_CHECK(SLANG_FAILED(cacheFileSystem->loadFile(entryKeys[0].getBuffer(), unused.writeRef())));
-            SLANG_CHECK(SLANG_SUCCEEDED(cacheFileSystem->loadFile(entryKeys[1].getBuffer(), unused.writeRef())));
-            SLANG_CHECK(SLANG_SUCCEEDED(cacheFileSystem->loadFile(entryKeys[2].getBuffer(), unused.writeRef())));
+            SLANG_CHECK(SLANG_FAILED(memoryFileSystem->loadFile(entryKeys[0].getBuffer(), unused.writeRef())));
+            SLANG_CHECK(SLANG_SUCCEEDED(memoryFileSystem->loadFile(entryKeys[1].getBuffer(), unused.writeRef())));
+            SLANG_CHECK(SLANG_SUCCEEDED(memoryFileSystem->loadFile(entryKeys[2].getBuffer(), unused.writeRef())));
         }
 
         // Cache limit 2, access shaders C and then A
@@ -1094,19 +1131,21 @@ namespace gfx_test
             submitGPUWork();
             generateNewPipelineState(0);
             submitGPUWork();
-            getCacheFile(test3Lines);
 
             device->queryInterface(SLANG_UUID_IShaderCacheStatistics, (void**)shaderCacheStats.writeRef());
             SLANG_CHECK(shaderCacheStats->getCacheMissCount() == 1);
             SLANG_CHECK(shaderCacheStats->getCacheHitCount() == 1);
             SLANG_CHECK(shaderCacheStats->getCacheEntryDirtyCount() == 0);
 
+            freeOldResources();
+
+            getCacheFile(test3Lines);
             SLANG_CHECK(test3Lines.getCount() == 2);
 
             ComPtr<ISlangBlob> unused;
-            SLANG_CHECK(SLANG_SUCCEEDED(cacheFileSystem->loadFile(entryKeys[0].getBuffer(), unused.writeRef())));
-            SLANG_CHECK(SLANG_FAILED(cacheFileSystem->loadFile(entryKeys[1].getBuffer(), unused.writeRef())));
-            SLANG_CHECK(SLANG_SUCCEEDED(cacheFileSystem->loadFile(entryKeys[2].getBuffer(), unused.writeRef())));
+            SLANG_CHECK(SLANG_SUCCEEDED(memoryFileSystem->loadFile(entryKeys[0].getBuffer(), unused.writeRef())));
+            SLANG_CHECK(SLANG_FAILED(memoryFileSystem->loadFile(entryKeys[1].getBuffer(), unused.writeRef())));
+            SLANG_CHECK(SLANG_SUCCEEDED(memoryFileSystem->loadFile(entryKeys[2].getBuffer(), unused.writeRef())));
         }
 
         // Cache limit 3, access shaders A then B then C
@@ -1121,22 +1160,24 @@ namespace gfx_test
             submitGPUWork();
             generateNewPipelineState(2);
             submitGPUWork();
-            getCacheFile(test4Lines);
 
             device->queryInterface(SLANG_UUID_IShaderCacheStatistics, (void**)shaderCacheStats.writeRef());
             SLANG_CHECK(shaderCacheStats->getCacheMissCount() == 1);
             SLANG_CHECK(shaderCacheStats->getCacheHitCount() == 2);
             SLANG_CHECK(shaderCacheStats->getCacheEntryDirtyCount() == 0);
 
+            freeOldResources();
+
+            getCacheFile(test4Lines);
             SLANG_CHECK(test4Lines.getCount() == 3);
 
             ComPtr<ISlangBlob> unused;
-            SLANG_CHECK(SLANG_SUCCEEDED(cacheFileSystem->loadFile(entryKeys[0].getBuffer(), unused.writeRef())));
-            SLANG_CHECK(SLANG_SUCCEEDED(cacheFileSystem->loadFile(entryKeys[1].getBuffer(), unused.writeRef())));
-            SLANG_CHECK(SLANG_SUCCEEDED(cacheFileSystem->loadFile(entryKeys[2].getBuffer(), unused.writeRef())));
+            SLANG_CHECK(SLANG_SUCCEEDED(memoryFileSystem->loadFile(entryKeys[0].getBuffer(), unused.writeRef())));
+            SLANG_CHECK(SLANG_SUCCEEDED(memoryFileSystem->loadFile(entryKeys[1].getBuffer(), unused.writeRef())));
+            SLANG_CHECK(SLANG_SUCCEEDED(memoryFileSystem->loadFile(entryKeys[2].getBuffer(), unused.writeRef())));
         }
 
-        void run()
+        void runTests()
         {
             runTest0();
             runTest1();
@@ -1145,6 +1186,65 @@ namespace gfx_test
             runTest4();
 
             checkCacheFiles();
+        }
+
+        void run()
+        {
+            shaderCache.shaderCacheFileSystem = memoryFileSystem;
+            runTests();
+
+            cleanUpFiles();
+        }
+    };
+
+    // This test is specifically for source files which live entirely in memory. The key difference between
+    // these and physical source files is such files have their contents hash added to the file dependencies
+    // list instead of a file path, meaning any given specific set of shader contents will be treated as a
+    // wholly unique module.
+    struct NonPhysicalFileDependencyEntry : BaseShaderCacheTest
+    {
+        void generateNewPipelineState(Slang::String shaderContents)
+        {
+            ComPtr<IShaderProgram> shaderProgram;
+            GFX_CHECK_CALL_ABORT(loadComputeProgramFromSource(device, shaderProgram, shaderContents));
+
+            ComputePipelineStateDesc pipelineDesc = {};
+            pipelineDesc.program = shaderProgram.get();
+            GFX_CHECK_CALL_ABORT(
+                device->createComputePipelineState(pipelineDesc, pipelineState.writeRef()));
+        }
+
+        void runTests()
+        {
+            generateNewDevice();
+            createRequiredResources();
+            generateNewPipelineState(contentsA);
+            submitGPUWork();
+
+            device->queryInterface(SLANG_UUID_IShaderCacheStatistics, (void**)shaderCacheStats.writeRef());
+            SLANG_CHECK(shaderCacheStats->getCacheMissCount() == 1);
+            SLANG_CHECK(shaderCacheStats->getCacheHitCount() == 0);
+            SLANG_CHECK(shaderCacheStats->getCacheEntryDirtyCount() == 0);
+
+            generateNewDevice();
+            createRequiredResources();
+            generateNewPipelineState(contentsA);
+            submitGPUWork();
+
+            device->queryInterface(SLANG_UUID_IShaderCacheStatistics, (void**)shaderCacheStats.writeRef());
+            SLANG_CHECK(shaderCacheStats->getCacheMissCount() == 0);
+            SLANG_CHECK(shaderCacheStats->getCacheHitCount() == 1);
+            SLANG_CHECK(shaderCacheStats->getCacheEntryDirtyCount() == 0);
+
+            generateNewDevice();
+            createRequiredResources();
+            generateNewPipelineState(contentsC);
+            submitGPUWork();
+
+            device->queryInterface(SLANG_UUID_IShaderCacheStatistics, (void**)shaderCacheStats.writeRef());
+            SLANG_CHECK(shaderCacheStats->getCacheMissCount() == 1);
+            SLANG_CHECK(shaderCacheStats->getCacheHitCount() == 0);
+            SLANG_CHECK(shaderCacheStats->getCacheEntryDirtyCount() == 0);
         }
     };
 
@@ -1234,5 +1334,15 @@ namespace gfx_test
     SLANG_UNIT_TEST(splitGraphicsShaderCacheVulkan)
     {
         runTestImpl(shaderCacheTestImpl<SplitGraphicsShader>, unitTestContext, Slang::RenderApiFlag::Vulkan);
+    }
+
+    SLANG_UNIT_TEST(nonPhysicalFileDependenciesCacheEntryD3D12)
+    {
+        runTestImpl(shaderCacheTestImpl<NonPhysicalFileDependencyEntry>, unitTestContext, Slang::RenderApiFlag::D3D12);
+    }
+
+    SLANG_UNIT_TEST(nonPhysicalFileDependenciesCacheEntryVulkan)
+    {
+        runTestImpl(shaderCacheTestImpl<NonPhysicalFileDependencyEntry>, unitTestContext, Slang::RenderApiFlag::Vulkan);
     }
 }

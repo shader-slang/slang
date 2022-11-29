@@ -25,14 +25,14 @@ namespace Slang
         static SlangResult writeNativeText(const String& filename, const void* data, size_t size);
 
         static SlangResult writeAllBytes(const String& fileName, const void* data, size_t size);
-        
+
         static SlangResult remove(const String& fileName);
 
         static SlangResult makeExecutable(const String& fileName);
 
             /// Creates a temporary file typically in some way based on the prefix
             /// The file will be *created* with the outFileName, on success.
-            /// It's creation in necessary to lock that particular name.  
+            /// It's creation in necessary to lock that particular name.
         static SlangResult generateTemporary(const UnownedStringSlice& prefix, String& outFileName);
     };
 
@@ -47,15 +47,15 @@ namespace Slang
             {
                     /// Can only simplify to an absolute path. Will return an error if not possible.
                     /// Useful to constrain a path, such as when wanting something like 'chroot'.
-                AbsoluteOnly = 0x1,             
-                    /// If the simplified path is a root path, remove the root. 
+                AbsoluteOnly = 0x1,
+                    /// If the simplified path is a root path, remove the root.
                     /// Will mean that for example
                     /// "/" -> "."
                     /// "/a/.." -> "."
                     /// "/a" -> "a"
-                    /// Its worth noting that a path prefixed "/" will never be returned and if *just* the root it specified 
+                    /// Its worth noting that a path prefixed "/" will never be returned and if *just* the root it specified
                     /// it will return as ".".
-                NoRoot       = 0x2,             
+                NoRoot       = 0x2,
             };
         };
 
@@ -136,7 +136,7 @@ namespace Slang
             /// Combine path sections and store the result in outBuilder
         static void combineIntoBuilder(const UnownedStringSlice& path1, const UnownedStringSlice& path2, StringBuilder& outBuilder);
 
-            /// Append a path, taking into account path separators onto the end of ioBuilder 
+            /// Append a path, taking into account path separators onto the end of ioBuilder
         static void append(StringBuilder& ioBuilder, const UnownedStringSlice& path);
 
         static bool createDirectory(const String& path);
@@ -155,12 +155,12 @@ namespace Slang
             /// Relative paths that are in effect "." will become []
         static void split(const UnownedStringSlice& path, List<UnownedStringSlice>& splitOut);
 
-            /// Strips .. and . as much as it can 
+            /// Strips .. and . as much as it can
         static String simplify(const UnownedStringSlice& path);
         static String simplify(const String& path) { return simplify(path.getUnownedSlice()); }
 
             /// Given a path simplifies it such the the resultant path is absolute (ie contains no . or ..)
-            /// Same behavior as simplify around the root 
+            /// Same behavior as simplify around the root
         static SlangResult simplify(const UnownedStringSlice& path, SimplifyStyle style, StringBuilder& outPath);
         static SlangResult simplify(const String& path, SimplifyStyle style, StringBuilder& outPath) { return simplify(path.getUnownedSlice(), style, outPath); }
         static SlangResult simplify(const char* path, SimplifyStyle style, StringBuilder& outPath) { return simplify(UnownedStringSlice(path), style, outPath); }
@@ -199,7 +199,7 @@ namespace Slang
             /// Returns the first element of the path or an empty slice if there is none
             /// This broadly equivalent to returning the first element of split
             /// @param path Path to extract first element from
-            /// @return The first element of the path, or empty 
+            /// @return The first element of the path, or empty
         static UnownedStringSlice getFirstElement(const UnownedStringSlice& path);
 
             /// Remove a file or directory at specified path. The directory must be empty for it to be removed
@@ -223,6 +223,59 @@ namespace Slang
         static URI fromLocalFilePath(UnownedStringSlice path);
         static URI fromString(UnownedStringSlice uriString);
         static bool isSafeURIChar(char ch);
+    };
+
+        /// Helper class abstracting lock files.
+        /// Uses LockFileEx() on windows systems and flock() on POSIX systems.
+    class LockFile
+    {
+    public:
+        enum class LockType
+        {
+            Exclusive,
+            Shared,
+        };
+
+            /// Open the lock file. This will create the file if it doesn't exist yet.
+            /// @param fileName File name to open.
+            /// @return SLANG_OK on success.
+        SlangResult open(const String& fileName);
+
+            /// Closes the lock file.
+        void close();
+
+            /// Returns true if the lock file is open.
+        bool isOpen() const { return m_isOpen; }
+
+            /// Acquire the lock in non-blocking mode.
+            /// @param lockType Lock type (Exclusive or Shared).
+            /// @return SLANG_OK on success. SLANG_E_TIME_OUT if the lock is already held.
+        SlangResult tryLock(LockType lockType = LockType::Exclusive);
+
+            /// Acquire the lock in blocking mode.
+            /// @param lockType Lock type (Exclusive or Shared).
+            /// @return SLANG_OK on success.
+        SlangResult lock(LockType lockType = LockType::Exclusive);
+
+            /// Release the lock.
+            /// @return SLANG_OK on success.
+        SlangResult unlock();
+
+        LockFile();
+        ~LockFile();
+
+    private:
+        LockFile(const LockFile&) = delete;
+        LockFile(LockFile&) = delete;
+        LockFile& operator=(const LockFile&) = delete;
+        LockFile& operator=(const LockFile&&) = delete;
+
+#if SLANG_WINDOWS_FAMILY
+        void* m_fileHandle;
+#else
+        int m_fileHandle;
+#endif
+        bool m_isOpen;
     };
 
 }

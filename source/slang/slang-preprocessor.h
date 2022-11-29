@@ -28,7 +28,7 @@ using preprocessor::Preprocessor;
 struct PreprocessorHandler
 {
     virtual void handleEndOfTranslationUnit(Preprocessor* preprocessor);
-    virtual void handleFileDependency(String const& path, ISlangBlob* contents = nullptr);
+    virtual void handleFileDependency(String const& path);
 };
 
     /// Description of a preprocessor options/dependencies

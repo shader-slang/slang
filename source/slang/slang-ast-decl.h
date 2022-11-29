@@ -518,13 +518,22 @@ class AttributeDecl : public ContainerDecl
     SyntaxClass<NodeBase> syntaxClass;
 };
 
-// A synthesized decl used as a placeholder for a differentiable function requirement.
+// A synthesized decl used as a placeholder for a differentiable function requirement. This decl will
+// be a child of interface decl.
 // This allows us to form an interface requirement key for the derivative of an interface function.
 // The synthesized `DerivativeRequirementDecl` will be a child of the original function requirement
 // decl after an interface type is checked.
 class DerivativeRequirementDecl : public FunctionDeclBase
 {
     SLANG_AST_CLASS(DerivativeRequirementDecl)
+};
+
+// A reference to a synthesized decl representing a differentiable function requirement, this decl will
+// be a child in the orignal function.
+class DerivativeRequirementReferenceDecl : public FunctionDeclBase
+{
+    SLANG_AST_CLASS(DerivativeRequirementReferenceDecl)
+    DerivativeRequirementDecl* referencedDecl;
 };
 
 class ForwardDerivativeRequirementDecl : public DerivativeRequirementDecl
@@ -538,5 +547,6 @@ class BackwardDerivativeRequirementDecl : public DerivativeRequirementDecl
 };
 
 bool isInterfaceRequirement(Decl* decl);
+InterfaceDecl* findParentInterfaceDecl(Decl* decl);
 
 } // namespace Slang

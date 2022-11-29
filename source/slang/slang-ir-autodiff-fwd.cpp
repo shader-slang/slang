@@ -71,24 +71,30 @@ bool ForwardDerivativeTranscriber::shouldUseOriginalAsPrimal(IRInst* origInst)
     return false;
 }
 
-IRInst* ForwardDerivativeTranscriber::lookupPrimalInst(IRInst* origInst)
-{
-    if (shouldUseOriginalAsPrimal(origInst))
-        return origInst;
-    return cloneEnv.mapOldValToNew[origInst];
-}
+    IRInst* lookupPrimalInst(IRInst* origInst)
+    {
+        if (!origInst)
+            return nullptr;
+        if (shouldUseOriginalAsPrimal(origInst))
+            return origInst;
+        return cloneEnv.mapOldValToNew[origInst];
+    }
 
-IRInst* ForwardDerivativeTranscriber::lookupPrimalInst(IRInst* origInst, IRInst* defaultInst)
-{
-    return (hasPrimalInst(origInst)) ? lookupPrimalInst(origInst) : defaultInst;
-}
+    IRInst* lookupPrimalInst(IRInst* origInst, IRInst* defaultInst)
+    {
+        if (!origInst)
+            return nullptr;
+        return (hasPrimalInst(origInst)) ? lookupPrimalInst(origInst) : defaultInst;
+    }
 
-bool ForwardDerivativeTranscriber::hasPrimalInst(IRInst* origInst)
-{
-    if (shouldUseOriginalAsPrimal(origInst))
-        return true;
-    return cloneEnv.mapOldValToNew.ContainsKey(origInst);
-}
+    bool hasPrimalInst(IRInst* origInst)
+    {
+        if (!origInst)
+            return true;
+        if (shouldUseOriginalAsPrimal(origInst))
+            return true;
+        return cloneEnv.mapOldValToNew.ContainsKey(origInst);
+    }
 
 IRInst* ForwardDerivativeTranscriber::findOrTranscribeDiffInst(IRBuilder* builder, IRInst* origInst)
 {
@@ -130,14 +136,14 @@ IRFuncType* ForwardDerivativeTranscriber::differentiateFunctionType(IRBuilder* b
             newParameterTypes.add(origType);
     }
 
-    // Transcribe return type to a pair.
-    // This will be void if the primal return type is non-differentiable.
-    //
-    auto origResultType = (IRType*) lookupPrimalInst(funcType->getResultType(), funcType->getResultType());
-    if (auto returnPairType = tryGetDiffPairType(builder, origResultType))
-        diffReturnType = returnPairType;
-    else
-        diffReturnType = builder->getVoidType();
+        // Transcribe return type to a pair.
+        // This will be void if the primal return type is non-differentiable.
+        //
+        auto origResultType = (IRType*) lookupPrimalInst(funcType->getResultType(), funcType->getResultType());
+        if (auto returnPairType = tryGetDiffPairType(builder, origResultType))
+            diffReturnType = returnPairType;
+        else
+            diffReturnType = origResultType;
 
     return builder->getFuncType(newParameterTypes, diffReturnType);
 }
@@ -696,28 +702,27 @@ InstPair ForwardDerivativeTranscriber::transcribeCall(IRBuilder* builder, IRCall
         auto primalArg = findOrTranscribePrimalInst(builder, origArg);
         SLANG_ASSERT(primalArg);
 
-        auto primalType = primalArg->getDataType();
-        auto diffArg = findOrTranscribeDiffInst(builder, origArg);
+            auto primalType = primalArg->getDataType();
+            if (auto pairType = tryGetDiffPairType(builder, primalType))
+            {
+                auto diffArg = findOrTranscribeDiffInst(builder, origArg);
+                if (!diffArg)
+                    diffArg = getDifferentialZeroOfType(builder, primalType);
 
-        if (!diffArg)
-            diffArg = getDifferentialZeroOfType(builder, primalType);
-
-        if (auto pairType = tryGetDiffPairType(builder, primalType))
-        {
-            // If a pair type can be formed, this must be non-null.
-            SLANG_RELEASE_ASSERT(diffArg);
-            auto diffPair = builder->emitMakeDifferentialPair(pairType, primalArg, diffArg);
-            args.add(diffPair);
+                // If a pair type can be formed, this must be non-null.
+                SLANG_RELEASE_ASSERT(diffArg);
+                auto diffPair = builder->emitMakeDifferentialPair(pairType, primalArg, diffArg);
+                args.add(diffPair);
+            }
+            else
+            {
+                // Add original/primal argument.
+                args.add(primalArg);
+            }
         }
-        else
-        {
-            // Add original/primal argument.
-            args.add(primalArg);
-        }
-    }
-    
-    IRType* diffReturnType = nullptr;
-    diffReturnType = tryGetDiffPairType(builder, origCall->getFullType());
+        
+        IRType* diffReturnType = nullptr;
+        diffReturnType = tryGetDiffPairType(builder, origCall->getFullType());
 
     if (!diffReturnType)
     {
@@ -932,25 +937,37 @@ InstPair ForwardDerivativeTranscriber::transcribeSpecialize(IRBuilder* builder, 
         // Make sure this isn't itself a specialize .
         SLANG_RELEASE_ASSERT(!as<IRSpecialize>(jvpFunc));
 
-        return InstPair(primalSpecialize, jvpFunc);
-    }
-    else if (auto derivativeDecoration = genericInnerVal->findDecoration<IRForwardDerivativeDecoration>())
-    {
-        diffBase = derivativeDecoration->getForwardDerivativeFunc();
-        List<IRInst*> args;
-        for (UInt i = 0; i < primalSpecialize->getArgCount(); i++)
-        {
-            args.add(primalSpecialize->getArg(i));
+            return InstPair(primalSpecialize, jvpFunc);
         }
-        auto diffSpecialize = builder->emitSpecializeInst(
-            builder->getTypeKind(), diffBase, args.getCount(), args.getBuffer());
-        return InstPair(primalSpecialize, diffSpecialize);
+        else if (auto derivativeDecoration = genericInnerVal->findDecoration<IRForwardDerivativeDecoration>())
+        {
+            diffBase = derivativeDecoration->getForwardDerivativeFunc();
+            List<IRInst*> args;
+            for (UInt i = 0; i < primalSpecialize->getArgCount(); i++)
+            {
+                args.add(primalSpecialize->getArg(i));
+            }
+            auto diffSpecialize = builder->emitSpecializeInst(
+                builder->getTypeKind(), diffBase, args.getCount(), args.getBuffer());
+            return InstPair(primalSpecialize, diffSpecialize);
+        }
+        else if (auto diffDecor = genericInnerVal->findDecoration<IRForwardDifferentiableDecoration>())
+        {
+            List<IRInst*> args;
+            for (UInt i = 0; i < primalSpecialize->getArgCount(); i++)
+            {
+                args.add(primalSpecialize->getArg(i));
+            }
+            diffBase = findOrTranscribeDiffInst(builder, origSpecialize->getBase());
+            auto diffSpecialize = builder->emitSpecializeInst(
+                builder->getTypeKind(), diffBase, args.getCount(), args.getBuffer());
+            return InstPair(primalSpecialize, diffSpecialize);
+        }
+        else
+        {
+            return InstPair(primalSpecialize, nullptr);
+        }
     }
-    else
-    {
-        return InstPair(primalSpecialize, nullptr);
-    }
-}
 
 InstPair ForwardDerivativeTranscriber::transcribeLookupInterfaceMethod(IRBuilder* builder, IRLookupWitnessMethod* lookupInst)
 {
@@ -1319,24 +1336,23 @@ InstPair ForwardDerivativeTranscriber::transcribeFunc(IRBuilder* inBuilder, IRFu
     return InstPair(primalFunc, diffFunc);
 }
 
-// Transcribe a generic definition
-InstPair ForwardDerivativeTranscriber::transcribeGeneric(IRBuilder* inBuilder, IRGeneric* origGeneric)
-{
-    auto innerVal = findInnerMostGenericReturnVal(origGeneric);
-    if (auto innerFunc = as<IRFunc>(innerVal))
+    // Transcribe a generic definition
+    InstPair transcribeGeneric(IRBuilder* inBuilder, IRGeneric* origGeneric)
     {
-        differentiableTypeConformanceContext.setFunc(innerFunc);
-    }
-    else
-    {
-        return InstPair(origGeneric, nullptr);
-    }
+        auto innerVal = findInnerMostGenericReturnVal(origGeneric);
+        if (auto innerFunc = as<IRFunc>(innerVal))
+        {
+            differentiableTypeConformanceContext.setFunc(innerFunc);
+        }
+        else if (auto funcType = as<IRFuncType>(innerVal))
+        {
+        }
+        else
+        {
+            return InstPair(origGeneric, nullptr);
+        }
 
-    // For now, we assume there's only one generic layer. So this inst must be top level
-    bool isTopLevel = (as<IRModuleInst>(origGeneric->getParent()) != nullptr);
-    SLANG_RELEASE_ASSERT(isTopLevel);
-
-    IRGeneric* primalGeneric = origGeneric;
+        IRGeneric* primalGeneric = origGeneric;
 
     IRBuilder builder(inBuilder->getSharedBuilder());
     builder.setInsertBefore(origGeneric);
@@ -1357,14 +1373,10 @@ InstPair ForwardDerivativeTranscriber::transcribeGeneric(IRBuilder* inBuilder, I
 
     diffGeneric->setFullType(diffType);
 
-    // TODO(sai): Replace naming scheme
-    // if (auto jvpName = this->getJVPFuncName(builder, primalFn))
-    //    builder->addNameHintDecoration(diffFunc, jvpName);
-    
-    // Transcribe children from origFunc into diffFunc.
-    builder.setInsertInto(diffGeneric);
-    for (auto block = origGeneric->getFirstBlock(); block; block = block->getNextBlock())
-        this->transcribe(&builder, block);
+        // Transcribe children from origFunc into diffFunc.
+        builder.setInsertInto(diffGeneric);
+        for (auto block = origGeneric->getFirstBlock(); block; block = block->getNextBlock())
+            this->transcribe(&builder, block);
 
     return InstPair(primalGeneric, diffGeneric);
 }

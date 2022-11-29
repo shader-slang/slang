@@ -3139,7 +3139,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
     {
         auto baseVal = lowerSubExpr(expr->innerExpr);
         SLANG_ASSERT(baseVal.flavor == LoweredValInfo::Flavor::Simple);
-        getBuilder()->addDecoration(baseVal.val, kIROp_TreatAsDifferentiableCallDecoration);
+        getBuilder()->addDecoration(baseVal.val, kIROp_TreatAsDifferentiableDecoration);
         return baseVal;
     }
 
@@ -6863,19 +6863,11 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             {
                 operandCount += associatedTypeDecl->getMembersOfType<TypeConstraintDecl>().getCount();
             }
-            else if (auto callableDecl = as<CallableDecl>(requirementDecl))
-            {
-                // Differentiable functions has additional requirements for the derivatives.
-                if (callableDecl->getMembersOfType<ForwardDerivativeRequirementDecl>().getCount())
-                    operandCount++;
-                if (callableDecl->getMembersOfType<BackwardDerivativeRequirementDecl>().getCount())
-                    operandCount++;
-            }
         }
 
         // Allocate an IRInterfaceType with the `operandCount` operands.
         IRInterfaceType* irInterface = subBuilder->createInterfaceType(operandCount, nullptr);
-        
+
         // Add `irInterface` to decl mapping now to prevent cyclic lowering.
         setValue(context, decl, LoweredValInfo::simple(irInterface));
 
@@ -6957,33 +6949,10 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 if (auto callableDecl = as<CallableDecl>(requirementDecl))
                 {
                     // Differentiable functions has additional requirements for the derivatives.
-                    for (auto diffDecl : callableDecl->getMembersOfType<DerivativeRequirementDecl>())
+                    for (auto diffDecl : callableDecl->getMembersOfType<DerivativeRequirementReferenceDecl>())
                     {
-                        auto diffKey = getInterfaceRequirementKey(diffDecl);
-                        IRInst* diffVal = ensureDecl(subContext, diffDecl).val;
-                        auto diffEntry = subBuilder->createInterfaceRequirementEntry(diffKey, diffVal);
-                        if (diffVal)
-                        {
-                            switch (diffVal->getOp())
-                            {
-                            case kIROp_Func:
-                            case kIROp_Generic:
-                            {
-                                // Remove lowered `IRFunc`s since we only care about
-                                // function types.
-                                auto reqType = diffVal->getFullType();
-                                diffEntry->setRequirementVal(reqType);
-                                break;
-                            }
-                            default:
-                                break;
-                            }
-                        }
-                        irInterface->setOperand(entryIndex, diffEntry);
-                        entryIndex++;
-
-                        setValue(context, diffDecl, LoweredValInfo::simple(diffEntry));
-                        insertRequirementKeyAssociation(irInterface, diffDecl, requirementKey, diffKey);
+                        auto diffKey = getInterfaceRequirementKey(diffDecl->referencedDecl);
+                        insertRequirementKeyAssociation(irInterface, diffDecl->referencedDecl, requirementKey, diffKey);
                     }
                 }
                 // Add lowered requirement entry to current decl mapping to prevent
@@ -7012,6 +6981,11 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         {
             subBuilder->addBuiltinDecoration(irInterface);
         }
+        if (decl->hasModifier<TreatAsDifferentiableAttribute>())
+        {
+            subBuilder->addDecoration(irInterface, kIROp_TreatAsDifferentiableDecoration);
+        }
+
         subBuilder->setInsertInto(irInterface);
         // TODO: are there any interface members that should be
         // nested inside the interface type itself?
@@ -8336,6 +8310,11 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         if (decl->findModifier<ForceInlineAttribute>())
         {
             getBuilder()->addDecoration(irFunc, kIROp_ForceInlineDecoration);
+        }
+
+        if (decl->findModifier<TreatAsDifferentiableAttribute>())
+        {
+            getBuilder()->addDecoration(irFunc, kIROp_TreatAsDifferentiableDecoration);
         }
 
         // Register the value now, to avoid any possible infinite recursion when lowering ForwardDerivativeAttribute
