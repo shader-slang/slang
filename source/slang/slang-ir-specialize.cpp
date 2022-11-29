@@ -1627,6 +1627,7 @@ struct SpecializationContext
             // that we can now specialize).
             //
             addUsersToWorkList(inst);
+            addToWorkList(witnessTable);
 
             inst->replaceUsesWith(witnessTable);
             inst->removeAndDeallocate();
