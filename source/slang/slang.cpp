@@ -49,6 +49,8 @@
 
 #include "../../slang-tag-version.h"
 
+#include <sys/stat.h>
+
 // Used to print exception type names in internal-compiler-error messages
 #include <typeinfo>
 
@@ -1898,13 +1900,9 @@ protected:
     // by applications to decide when they need to "hot reload"
     // their shader code.
     //
-    void handleFileDependency(String const& path, ISlangBlob* sourceBlob) SLANG_OVERRIDE
+    void handleFileDependency(String const& path) SLANG_OVERRIDE
     {
         m_module->addFilePathDependency(path);
-        if (sourceBlob)
-        {
-            m_module->getContentsDigestBuilder().addToDigest(sourceBlob);
-        }
     }
 
     // The second task that this handler deals with is detecting
@@ -3046,10 +3044,6 @@ RefPtr<Module> Linkage::loadModule(
         return nullptr;
     }
 
-    auto builder = module->getContentsDigestBuilder();
-    builder.addToDigest(sourceBlob);
-    module->setContentsDigest(builder.finalize());
-
     return module;
 }
 
@@ -3269,7 +3263,52 @@ void Module::updateDependencyBasedHash(
 
 void Module::updateContentsBasedHash(DigestBuilder& builder)
 {
-    builder.addToDigest(getContentsDigest());
+    auto filePathDependencies = getFilePathDependencies();
+
+    DigestBuilder lastModifiedBuilder;
+    auto statFailed = false;
+    for (auto file : filePathDependencies)
+    {
+        struct stat fileStatus;
+        auto res = stat(file.getBuffer(), &fileStatus);
+        if (res != 0)
+        {
+            statFailed = true;
+            break;
+        }
+        lastModifiedBuilder.addToDigest(fileStatus.st_mtime);
+    }
+
+    slang::Digest temp = lastModifiedBuilder.finalize();
+    if (statFailed || temp != lastModifiedDigest)
+    {
+        // Either a stat() call failed, or changes were made to at least one of the file dependencies,
+        // so we will need to re-generate the contents digest and save the new digest.
+        DigestBuilder contentsBuilder;
+        for (auto file : filePathDependencies)
+        {
+            List<uint8_t> fileContents;
+            if (SLANG_FAILED(File::readAllBytes(file, fileContents)))
+            {
+                // Failure to read the file means this is a digest for the contents of a source
+                // file which does not live on disk.
+                contentsBuilder.addToDigest(DigestUtil::fromString(file.getUnownedSlice()));
+            }
+            else
+            {
+                contentsBuilder.addToDigest(fileContents);
+            }
+        }
+        contentsDigest = contentsBuilder.finalize();
+        if (!statFailed)
+        {
+            // If no stat() calls failed, then we have a valid last modified digest and should
+            // update the one we have saved.
+            lastModifiedDigest = temp;
+        }
+    }
+
+    builder.addToDigest(contentsDigest);
 }
 
 void Module::addModuleDependency(Module* module)

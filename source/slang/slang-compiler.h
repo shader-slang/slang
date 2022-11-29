@@ -1366,14 +1366,6 @@ namespace Slang
             ///
         void setIRModule(IRModule* irModule) { m_irModule = irModule; }
 
-        DigestBuilder& getContentsDigestBuilder() { return contentsBuilder; }
-
-            /// Set the contents digest for this module.
-        void setContentsDigest(slang::Digest digest) { contentsDigest = digest; }
-
-            /// Get the contents digest for this module.
-        slang::Digest getContentsDigest() { return contentsDigest; }
-
         Index getEntryPointCount() SLANG_OVERRIDE { return 0; }
         RefPtr<EntryPoint> getEntryPoint(Index index) SLANG_OVERRIDE { SLANG_UNUSED(index); return nullptr; }
         String getEntryPointMangledName(Index index) SLANG_OVERRIDE { SLANG_UNUSED(index); return String(); }
@@ -1483,7 +1475,7 @@ namespace Slang
         StringSlicePool m_mangledExportPool;
         List<NodeBase*> m_mangledExportSymbols;
 
-        DigestBuilder contentsBuilder;
+        slang::Digest lastModifiedDigest;
         slang::Digest contentsDigest;
     };
     typedef Module LoadedModule;
