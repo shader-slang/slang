@@ -7,9 +7,9 @@
 #include "slang-ir-inst-pass-base.h"
 
 #include "slang-ir-autodiff-fwd.h"
-#include "slang-autodiff-propagate.h"
-#include "slang-autodiff-unzip.h"
-#include "slang-autodiff-transpose.h"
+#include "slang-ir-autodiff-propagate.h"
+#include "slang-ir-autodiff-unzip.h"
+#include "slang-ir-autodiff-transpose.h"
 
 
 namespace Slang
@@ -487,9 +487,6 @@ struct BackwardDiffTranscriber
         IRFunc* fwdDiffFunc = as<IRFunc>(fwdDiffTranscriber->transcribeFuncHeader(builder, (IRFunc*)primalFunc).differential);
         SLANG_ASSERT(fwdDiffFunc);
 
-        // Clone the function header.
-        IRFunc* unzippedFwdDiffFunc = as<IRFunc>(cloneInst(&cloneEnv, builder, fwdDiffFunc));
-
         // Transcribe the body of the primal function into it's linear (fwd-diff) form.
         // TODO(sai): Handle the case when we already have a user-defined fwd-derivative function.
         fwdDiffTranscriber->transcribeFunc(builder, primalFunc, as<IRFunc>(fwdDiffFunc));
@@ -503,7 +500,7 @@ struct BackwardDiffTranscriber
         // Copy primal insts to the first block of the unzipped function, copy diff insts to the
         // second block of the unzipped function.
         // 
-        diffUnzipPass->unzipDiffInsts(fwdDiffFunc, unzippedFwdDiffFunc);
+        IRFunc* unzippedFwdDiffFunc = diffUnzipPass->unzipDiffInsts(fwdDiffFunc);
         
         // Clone the primal blocks from unzippedFwdDiffFunc
         // to the reverse-mode function.
@@ -512,97 +509,94 @@ struct BackwardDiffTranscriber
         // instead of two blocks in the same function.
         // 
         // Special care needs to be taken for the first block since it holds the parameters
+        
+        // Clone all blocks into a temporary diff func.
+        // We're using a temporary sice we don't want to clone decorations, 
+        // only blocks, and right now there's no provision in slang-ir-clone.h
+        // for that.
+        // 
+        builder->setInsertInto(diffFunc->getParent());
+        auto tempDiffFunc = as<IRFunc>(cloneInst(&cloneEnv, builder, unzippedFwdDiffFunc));
+
+        // Move blocks to the diffFunc shell.
+        {
+            List<IRBlock*> workList;
+            for (auto block = tempDiffFunc->getFirstBlock(); block; block = block->getNextBlock())
+                workList.add(block);
+            
+            for (auto block : workList)
+                block->insertAtEnd(diffFunc);
+        }
+
+        // Transpose the first block (parameter block)
+        transcribeParameterBlock(builder, diffFunc);
+
         builder->setInsertInto(diffFunc);
 
-        // Run through all non-diff blocks and create empty clones.
-        for (auto block = unzippedFwdDiffFunc->getFirstBlock(); block; block = block->getNextBlock())
-        {
-            if (!isDifferentialInst(block))
-            {
-                auto newBlock = cloneInstAndOperands(&cloneEnv, builder, block);
-                this->cloneEnv.mapOldValToNew[block] = newBlock;
-            }
-        }
-        
-        // Transcribe the parameter block (first block)
-        auto revDiffParameterBlock = this->transcribeParameterBlock(
-            builder,
-            as<IRFunc>(unzippedFwdDiffFunc));
-
-        // Note: we make an assumption that the last parameter is the differential output parameter
-        // ideally we should track this using a map/dict, rather than relying on this logic.
-        auto dOutParameter = revDiffParameterBlock->getLastParam();
-        
-        // Run back over all the cloned non-diff empty blocks and fill them in by cloning everything.
-        builder->setInsertInto(diffFunc);
-        for (auto block = as<IRFunc>(unzippedFwdDiffFunc)->getFirstBlock()->getNextBlock(); block; block = block->getNextBlock())
-        {
-            if (!isDifferentialInst(block))
-            {
-                auto newBlock = lookUp(&cloneEnv, block);
-                cloneInstDecorationsAndChildren(
-                    &cloneEnv, builder->getSharedBuilder(), block, newBlock);
-            }
-        }
+        auto dOutParameter = diffFunc->getLastParam();
 
         // Transpose differential blocks from unzippedFwdDiffFunc into diffFunc (with dOutParameter) representing the 
-        diffTransposePass->transposeFunc(unzippedFwdDiffFunc, diffFunc, dOutParameter);
+        DiffTransposePass::FuncTranspositionInfo info = {dOutParameter, nullptr};
+        diffTransposePass->transposeDiffBlocksInFunc(diffFunc, info);
+
+        // Clean up by deallocating intermediate steps.
+        tempDiffFunc->removeAndDeallocate();
+        unzippedFwdDiffFunc->removeAndDeallocate();
+        fwdDiffFunc->removeAndDeallocate();
 
         return InstPair(primalFunc, diffFunc);
     }
 
-    IRBlock* transcribeParameterBlock(IRBuilder* builder, IRFunc* unzippedFwdDiffFunc)
+    void transcribeParameterBlock(IRBuilder* builder, IRFunc* diffFunc)
     {
-        
-        IRBlock* fwdDiffParameterBlock = as<IRFunc>(unzippedFwdDiffFunc)->getFirstBlock();
+        IRBlock* fwdDiffParameterBlock = diffFunc->getFirstBlock();
 
-        IRBlock* revDiffParameterBlock = nullptr;
-        if (auto clonedBlock = as<IRBlock>(lookUp(&cloneEnv, unzippedFwdDiffFunc->getFirstBlock())))
-        {
-            revDiffParameterBlock = clonedBlock;
-            builder->setInsertInto(clonedBlock);
-        }
-        else
-            revDiffParameterBlock = builder->emitBlock();
-        
+        // Find the 'next' block using the terminator inst of the parameter block.
+        auto fwdParamBlockBranch = as<IRUnconditionalBranch>(fwdDiffParameterBlock->getTerminator());
+        auto nextBlock = fwdParamBlockBranch->getTargetBlock();
+
+        builder->setInsertInto(fwdDiffParameterBlock);
 
         // 1. Turn fwd-diff versions of the parameters into reverse-diff versions by wrapping them as InOutType<>
-        IRParam* child;
-        for (child = fwdDiffParameterBlock->getFirstParam(); child; child = child->getNextParam())
+        for (auto child = fwdDiffParameterBlock->getFirstParam(); child;)
         {
+            IRParam* nextChild = child->getNextParam();
+
             auto fwdParam = as<IRParam>(child);
             SLANG_ASSERT(fwdParam);
             
             // TODO: Handle ptr<pair> types.
             if (auto diffPairType = as<IRDifferentialPairType>(fwdParam->getDataType()))
             {
-                // Create inout version. (Is this right, or should this just be a ptrtype)
+                // Create inout version. 
                 auto inoutDiffPairType = builder->getInOutType(diffPairType);
-                builder->emitParam(inoutDiffPairType);
+                auto newParam = builder->emitParam(inoutDiffPairType);
+
+                // Map the _load_ of the new parameter as the clone of the old one.
+                auto newParamLoad = builder->emitLoad(newParam);
+                newParamLoad->insertAtStart(nextBlock); // Move to first block _after_ the parameter block.
+                fwdParam->replaceUsesWith(newParamLoad);
+                fwdParam->removeAndDeallocate();
             }
+            else
+            {
+                // Default case (parameter has nothing to do with differentiation)
+                // Do nothing.
+            }
+
+            child = nextChild;
         }
 
-        // 2. Add a parameter for 'derivative of the output' (d_out).
-        auto fwdDiffReturnType = as<IRFuncType>(unzippedFwdDiffFunc->getDataType())->getResultType();
+        auto paramCount = as<IRFuncType>(diffFunc->getDataType())->getParamCount();
 
-        IRType* dOutParamType = nullptr;
-
-        // TODO(sai): Handle case where result type is not a pair.
-        if (auto fwdReturnPairType = as<IRDifferentialPairType>(fwdDiffReturnType))
-        {
-            // Parameter type for the output parameter.
-            dOutParamType = as<IRType>(pairBuilder->getDiffTypeFromPairType(builder, fwdReturnPairType)); 
-        }
+        // 2. Add a parameter for 'derivative of the output' (d_out). 
+        // The type is the last parameter type of the function.
+        // 
+        auto dOutParamType = as<IRFuncType>(diffFunc->getDataType())->getParamType(paramCount - 1);
 
         SLANG_ASSERT(dOutParamType);
 
         builder->emitParam(dOutParamType);
-
-        // Clone in the terminator inst from the old parameter block.
-        auto fwdParamBlockTerminator = fwdDiffParameterBlock->getTerminator();
-        cloneInst(&cloneEnv, builder, fwdParamBlockTerminator);
-
-        return revDiffParameterBlock;
     }
 
     IRInst* copyParam(IRBuilder* builder, IRParam* origParam)

@@ -71,30 +71,30 @@ bool ForwardDerivativeTranscriber::shouldUseOriginalAsPrimal(IRInst* origInst)
     return false;
 }
 
-    IRInst* lookupPrimalInst(IRInst* origInst)
-    {
-        if (!origInst)
-            return nullptr;
-        if (shouldUseOriginalAsPrimal(origInst))
-            return origInst;
-        return cloneEnv.mapOldValToNew[origInst];
-    }
+IRInst* ForwardDerivativeTranscriber::lookupPrimalInst(IRInst* origInst)
+{
+    if (!origInst)
+        return nullptr;
+    if (shouldUseOriginalAsPrimal(origInst))
+        return origInst;
+    return cloneEnv.mapOldValToNew[origInst];
+}
 
-    IRInst* lookupPrimalInst(IRInst* origInst, IRInst* defaultInst)
-    {
-        if (!origInst)
-            return nullptr;
-        return (hasPrimalInst(origInst)) ? lookupPrimalInst(origInst) : defaultInst;
-    }
+IRInst* ForwardDerivativeTranscriber::lookupPrimalInst(IRInst* origInst, IRInst* defaultInst)
+{
+    if (!origInst)
+        return nullptr;
+    return (hasPrimalInst(origInst)) ? lookupPrimalInst(origInst) : defaultInst;
+}
 
-    bool hasPrimalInst(IRInst* origInst)
-    {
-        if (!origInst)
-            return true;
-        if (shouldUseOriginalAsPrimal(origInst))
-            return true;
-        return cloneEnv.mapOldValToNew.ContainsKey(origInst);
-    }
+bool ForwardDerivativeTranscriber::hasPrimalInst(IRInst* origInst)
+{
+    if (!origInst)
+        return true;
+    if (shouldUseOriginalAsPrimal(origInst))
+        return true;
+    return cloneEnv.mapOldValToNew.ContainsKey(origInst);
+}
 
 IRInst* ForwardDerivativeTranscriber::findOrTranscribeDiffInst(IRBuilder* builder, IRInst* origInst)
 {
@@ -1336,23 +1336,23 @@ InstPair ForwardDerivativeTranscriber::transcribeFunc(IRBuilder* inBuilder, IRFu
     return InstPair(primalFunc, diffFunc);
 }
 
-    // Transcribe a generic definition
-    InstPair transcribeGeneric(IRBuilder* inBuilder, IRGeneric* origGeneric)
+// Transcribe a generic definition
+InstPair ForwardDerivativeTranscriber::transcribeGeneric(IRBuilder* inBuilder, IRGeneric* origGeneric)
+{
+    auto innerVal = findInnerMostGenericReturnVal(origGeneric);
+    if (auto innerFunc = as<IRFunc>(innerVal))
     {
-        auto innerVal = findInnerMostGenericReturnVal(origGeneric);
-        if (auto innerFunc = as<IRFunc>(innerVal))
-        {
-            differentiableTypeConformanceContext.setFunc(innerFunc);
-        }
-        else if (auto funcType = as<IRFuncType>(innerVal))
-        {
-        }
-        else
-        {
-            return InstPair(origGeneric, nullptr);
-        }
+        differentiableTypeConformanceContext.setFunc(innerFunc);
+    }
+    else if (auto funcType = as<IRFuncType>(innerVal))
+    {
+    }
+    else
+    {
+        return InstPair(origGeneric, nullptr);
+    }
 
-        IRGeneric* primalGeneric = origGeneric;
+    IRGeneric* primalGeneric = origGeneric;
 
     IRBuilder builder(inBuilder->getSharedBuilder());
     builder.setInsertBefore(origGeneric);

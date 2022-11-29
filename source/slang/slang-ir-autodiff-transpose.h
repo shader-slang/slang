@@ -15,11 +15,14 @@ struct DiffTransposePass
 {
     AutoDiffSharedContext*                  autodiffContext;
 
+    DifferentialPairTypeBuilder             pairBuilder;
+
     Dictionary<IRInst*, List<IRInst*>>      assignmentsMap;
 
-    Dictionary<IRInst*, IRInst*>            primalsMap;
+    Dictionary<IRInst*, IRInst*>*           primalsMap;
 
-    DiffTransposePass(AutoDiffSharedContext* autodiffContext) : autodiffContext(autodiffContext)
+    DiffTransposePass(AutoDiffSharedContext* autodiffContext) : 
+        autodiffContext(autodiffContext), pairBuilder(autodiffContext)
     { }
 
     struct RevAssignment
@@ -59,16 +62,11 @@ struct DiffTransposePass
         Dictionary<IRInst*, IRInst*>* primalsMap;
     };
 
-    void transposeFunc(
-        IRFunc* fwdDiffFunc,
+    void transposeDiffBlocksInFunc(
         IRFunc* revDiffFunc,
         // TODO: Maybe there's a more elegant way to pass this information.
         FuncTranspositionInfo transposeInfo)
     {
-        // Extract the fwd-rev primals mapping.
-        // TODO: This should probably just be a method parameter for 
-        // all transposeXX() methods?
-        this->primalsMap = transposeInfo.primalsMap;
 
         // Traverse all instructions/blocks in reverse (starting from the terminator inst)
         // look for insts/blocks marked with IRDifferentialInstDecoration,
@@ -80,7 +78,10 @@ struct DiffTransposePass
         // Insert after the last block.
         builder.setInsertInto(revDiffFunc);
 
-        for (IRBlock* block = fwdDiffFunc->getFirstBlock(); block; block = block->getNextBlock())
+        List<IRBlock*> workList;
+
+        // Build initial list of blocks to process by checking if they're differential blocks.
+        for (IRBlock* block = revDiffFunc->getFirstBlock(); block; block = block->getNextBlock())
         {
             if (!isDifferentialInst(block))
             {
@@ -90,7 +91,15 @@ struct DiffTransposePass
                 // or entirely with differential insts.
                 continue;
             }
+            workList.add(block);
+        }
 
+        // TODO: We *might* need a step here that 'sorts' the work list in reverse order starting with 'leaf'
+        // differential blocks, and following the branches backwards.
+        // The alternative is to make phi nodes and treat all intermediaries & their gradients as arguments.
+
+        for (auto block : workList)
+        {
             // Set dOutParameter as the transpose gradient for the return inst, if any.
             if (auto returnInst = as<IRReturn>(block->getTerminator()))
             {
@@ -99,6 +108,12 @@ struct DiffTransposePass
 
             IRBlock* revBlock = builder.emitBlock();
             this->transposeBlock(block, revBlock);
+
+            // TODO: This should only really be used for the transition from
+            // the 'last' primal block(s) to the first differential block.
+            // Transitions from differential blocks to 
+            block->replaceUsesWith(revBlock);
+            block->removeAndDeallocate();
         }
     }
 
@@ -113,7 +128,36 @@ struct DiffTransposePass
         // Note the 'reverse' traversal here.
         for (IRInst* child = fwdBlock->getLastChild(); child; child = child->getPrevInst())
         {
+            if (as<IRDecoration>(child))
+                continue;
+
             transposeInst(&builder, child);
+        }
+
+        // After processing the block's instructions, we 'flush' any remaining gradients 
+        // in the assignments map.
+        // For now, these are only function parameter gradients (or of the form IRLoad(IRParam))
+        // TODO: We should be flushing *all* gradients accumulated in this block to some 
+        // function scope variable, since control flow can affect what blocks contribute to
+        // for a specific inst.
+        // 
+        for (auto pair : assignmentsMap)
+        {
+            if (auto param = as<IRLoad>(pair.Key))
+                accumulateGradientsForLoad(&builder, param);
+        }
+
+        // Emit a terminator inst.
+        // TODO: need a be a lot smarter here. For now, we assume a single differential
+        // block, so it should end in a return statement.
+        if (as<IRReturn>(fwdBlock->getTerminator()))
+        {
+            // Emit a void return.
+            builder.emitReturn();
+        }
+        else
+        {
+            SLANG_UNEXPECTED("Unhandled block terminator");
         }
     }
 
@@ -124,7 +168,7 @@ struct DiffTransposePass
         if (hasRevAssignments(inst))
         {
             // Emit the aggregate of all the assignments here. This will form the derivative
-            revValue = emitAggregateValue(builder, getRevAssignments(inst));
+            revValue = emitAggregateValue(builder, popRevAssignments(inst));
         }
 
         auto transposeResult = transposeInst(builder, inst, revValue);
@@ -182,15 +226,22 @@ struct DiffTransposePass
 
     // Gather all reverse-mode gradients for parameters, and store to the differential
     // 
-    void accumulateParamAssignments(IRBuilder* builder, IRParam* revParam)
+    void accumulateGradientsForLoad(IRBuilder* builder, IRLoad* revLoad)
     {
-        // Assert that param is an IRPtrTypeBase<IRDifferentialPairType>
+        auto revParam = revLoad->getPtr();
+
+        // Don't currently handle loads from non-param insts.
+        SLANG_ASSERT(as<IRParam>(revParam));
+
+        // Assert that param type is of the form IRPtrTypeBase<IRDifferentialPairType<T>>
         SLANG_ASSERT(as<IRPtrTypeBase>(revParam->getDataType()));
         SLANG_ASSERT(as<IRPtrTypeBase>(revParam->getDataType())->getValueType()->getOp() == kIROp_DifferentialPairType);
 
-        
+        auto paramPairType = as<IRDifferentialPairType>(as<IRPtrTypeBase>(revParam->getDataType())->getValueType());
+        auto diffType = (IRType*) pairBuilder.getDiffTypeFromPairType(builder, paramPairType);
+
         // Gather gradients.
-        auto gradients = getRevAssignments(revParam);
+        auto gradients = popRevAssignments(revLoad);
         if (gradients.getCount() == 0)
         {
             // Ignore.
@@ -198,17 +249,26 @@ struct DiffTransposePass
         }
         else
         {
-            // Load the current value.
-            auto revLoad = builder->emitLoad(revParam);
+            // Re-emit a load to get the _current_ value of revParam.
+            auto revCurrLoad = builder->emitLoad(revParam);
+
+            // Grab the current gradient value.
+            auto revCurrGrad = builder->emitDifferentialPairGetDifferential(diffType, revCurrLoad);
 
             // Add the current value to the aggregation list.
-            gradients.add(revLoad);
+            gradients.add(revCurrGrad);
             
             // Get the _total_ value.
             auto aggregateGradient = emitAggregateValue(builder, gradients);
 
+            // Grab the current primal value.
+            auto revCurrPrimal = builder->emitDifferentialPairGetPrimal(revCurrLoad);
+
+            // Make the pair with the new gradient.
+            auto newDiffPair = builder->emitMakeDifferentialPair(paramPairType, revCurrPrimal, aggregateGradient);
+
             // Store this back into the parameter.
-            builder->emitStore(revParam, aggregateGradient);
+            builder->emitStore(revParam, newDiffPair);
         }
     }
 
@@ -233,36 +293,6 @@ struct DiffTransposePass
         }
     }
 
-    // Lookup the clone of the given primal inst, in the 
-    // current reverse-mode function context.
-    // 
-    // Note: This method can be hijacked to instead turn the primal inst
-    // into an intermediate parameter.
-    // 
-    IRInst* lookUpPrimalInst(IRInst* fwdPrimalInst)
-    {
-        if (primalsMap.ContainsKey(fwdPrimalInst))
-            return primalsMap[fwdPrimalInst];
-        else
-        {
-            SLANG_UNEXPECTED("Could not find mapping for primal inst");
-        }
-    }
-
-    // Lookup the clone of the given primal inst, in the 
-    // current reverse-mode function context. Returns
-    // a default value if one does not exist.
-    // 
-    IRInst* lookUpPrimalInst(IRInst* fwdPrimalInst, IRInst* defaultInst)
-    {
-        if (primalsMap.ContainsKey(fwdPrimalInst))
-            return primalsMap[fwdPrimalInst];
-        else
-        {
-            return defaultInst;
-        }
-    }
-
     TranspositionResult transposeArithmetic(IRBuilder* builder, IRInst* fwdInst, IRInst* revValue)
     {
         IRType* floatType = builder->getType(kIROp_FloatType);
@@ -274,10 +304,10 @@ struct DiffTransposePass
                 return TranspositionResult(
                         List<RevAssignment>(
                             RevAssignment(
-                                lookUpPrimalInst(fwdInst->getOperand(0)),
+                                fwdInst->getOperand(0),
                                 revValue),
                             RevAssignment(
-                                lookUpPrimalInst(fwdInst->getOperand(1)),
+                                fwdInst->getOperand(1),
                                 revValue)));
             }
             case kIROp_Sub:
@@ -286,10 +316,10 @@ struct DiffTransposePass
                 return TranspositionResult(
                         List<RevAssignment>(
                             RevAssignment(
-                                lookUpPrimalInst(fwdInst->getOperand(0)),
+                                fwdInst->getOperand(0),
                                 revValue),
                             RevAssignment(
-                                lookUpPrimalInst(fwdInst->getOperand(1)),
+                                fwdInst->getOperand(1),
                                 builder->emitNeg(
                                     revValue->getDataType(), revValue))));
             }
@@ -301,8 +331,8 @@ struct DiffTransposePass
                     return TranspositionResult(
                         List<RevAssignment>(
                             RevAssignment(
-                                lookUpPrimalInst(fwdInst->getOperand(0)),
-                                builder->emitMul(floatType, lookUpPrimalInst(fwdInst->getOperand(1)), revValue))));
+                                fwdInst->getOperand(0),
+                                builder->emitMul(floatType, fwdInst->getOperand(1), revValue))));
                 }
                 else if (isDifferentialInst(fwdInst->getOperand(1)))
                 {
@@ -310,8 +340,8 @@ struct DiffTransposePass
                     return TranspositionResult(
                         List<RevAssignment>(
                             RevAssignment(
-                                lookUpPrimalInst(fwdInst->getOperand(1)),
-                                builder->emitMul(floatType, lookUpPrimalInst(fwdInst->getOperand(0)), revValue))));
+                                fwdInst->getOperand(1),
+                                builder->emitMul(floatType, fwdInst->getOperand(0), revValue))));
                 }
                 else
                 {
@@ -371,6 +401,13 @@ struct DiffTransposePass
     List<IRInst*> getRevAssignments(IRInst* fwdInst)
     {
         return assignmentsMap[fwdInst];
+    }
+
+    List<IRInst*> popRevAssignments(IRInst* fwdInst)
+    {
+        List<IRInst*> val = assignmentsMap[fwdInst].GetValue();
+        assignmentsMap.Remove(fwdInst);
+        return val;
     }
 
     bool hasRevAssignments(IRInst* fwdInst)

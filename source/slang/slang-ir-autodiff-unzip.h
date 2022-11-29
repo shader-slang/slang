@@ -6,7 +6,7 @@
 #include "slang-compiler.h"
 
 #include "slang-ir-autodiff.h"
-#include "slang-autodiff-propagate.h"
+#include "slang-ir-autodiff-propagate.h"
 
 namespace Slang
 {
@@ -21,45 +21,49 @@ struct DiffUnzipPass
         autodiffContext(autodiffContext)
     { }
 
-    void unzipDiffInsts(IRFunc* func, IRFunc* unzippedFunc)
+    IRFunc* unzipDiffInsts(IRFunc* func)
     {
         IRBuilder builderStorage;
         builderStorage.init(autodiffContext->sharedBuilder);
         
         IRBuilder* builder = &builderStorage;
 
+        // Clone the entire function.
+        // TODO: Maybe don't clone? The reverse-mode process seems to clone several times.
+        // TODO: Looks like we get a copy of the decorations?
+        IRFunc* unzippedFunc = as<IRFunc>(cloneInst(&cloneEnv, builder, func));
+
         builder->setInsertInto(unzippedFunc);
 
-        // Work with two-block functions for now.
-        SLANG_ASSERT(func->getFirstBlock() != nullptr);
-        SLANG_ASSERT(func->getFirstBlock()->getNextBlock() != nullptr);
-        SLANG_ASSERT(func->getFirstBlock()->getNextBlock()->getNextBlock() == nullptr);
+        // Work *only* with two-block functions for now.
+        SLANG_ASSERT(unzippedFunc->getFirstBlock() != nullptr);
+        SLANG_ASSERT(unzippedFunc->getFirstBlock()->getNextBlock() != nullptr);
+        SLANG_ASSERT(unzippedFunc->getFirstBlock()->getNextBlock()->getNextBlock() == nullptr);
 
         // Ignore the first block (this is reserved for parameters), start
         // at the second block. (For now, we work with only a single block of insts)
         // TODO: expand to handle multi-block functions later.
 
-        IRBlock* mainBlock = func->getFirstBlock()->getNextBlock();
+        IRBlock* mainBlock = unzippedFunc->getFirstBlock()->getNextBlock();
         
+        // Emit new blocks for split vesions of mainblock.
         IRBlock* primalBlock = builder->emitBlock();
         IRBlock* diffBlock = builder->emitBlock(); 
 
         // Mark the differential block as a differential inst.
         builder->markInstAsDifferential(diffBlock);
 
-        // Split this block into two. This method should also emit
+        // Split the main block into two. This method should also emit
         // a branch statement from primalBlock to diffBlock.
+        // TODO: extend this code to split multiple blocks
         // 
         splitBlock(mainBlock, primalBlock, diffBlock);
 
-        // Clone in the parameter block.
-        // TODO: Will need to generalize this so we can handle multi-block
-        // reverse-mode.
-        cloneEnv.mapOldValToNew[mainBlock] = primalBlock;
-        IRBlock* paramBlock = func->getFirstBlock();
-        IRInst* newParamBlock = cloneInst(&cloneEnv, builder, paramBlock);
-
-        newParamBlock->insertBefore(primalBlock);
+        // Replace occurences of mainBlock with primalBlock
+        mainBlock->replaceUsesWith(primalBlock);
+        mainBlock->removeAndDeallocate();
+        
+        return unzippedFunc;
     }
 
     void splitBlock(IRBlock* mainBlock, IRBlock* primalBlock, IRBlock* diffBlock)
