@@ -60,7 +60,6 @@ INST(Nop, nop, 0, 0)
     INST(OptionalType, Optional, 1, 0)
 
     INST(DifferentialPairType, DiffPair, 1, 0)
-    INST(DifferentialBottomType, DiffBottomType, 0, 0)
 
     /* BindExistentialsTypeBase */
 

@@ -864,8 +864,6 @@ SIMPLE_IR_TYPE(NativeStringType, StringTypeBase)
 
 SIMPLE_IR_TYPE(DynamicType, Type)
 
-SIMPLE_IR_TYPE(DifferentialBottomType, Type)
-
 // True if types are equal
 // Note compares nominal types by name alone 
 bool isTypeEqual(IRType* a, IRType* b);
