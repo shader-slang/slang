@@ -169,27 +169,6 @@ Val* BottomType::_substituteImplOverride(
 
 HashCode BottomType::_getHashCodeOverride() { return HashCode(size_t(this)); }
 
-// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! DifferentialBottomType !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
-void DifferentialBottomType::_toTextOverride(StringBuilder& out) { out << toSlice("diff_bottom"); }
-
-bool DifferentialBottomType::_equalsImplOverride(Type* type)
-{
-    if (auto bottomType = as<DifferentialBottomType>(type))
-        return true;
-    return false;
-}
-
-Type* DifferentialBottomType::_createCanonicalTypeOverride() { return this; }
-
-Val* DifferentialBottomType::_substituteImplOverride(
-    ASTBuilder* /* astBuilder */, SubstitutionSet /*subst*/, int* /*ioDiff*/)
-{
-    return this;
-}
-
-HashCode DifferentialBottomType::_getHashCodeOverride() { return HashCode(size_t(this)); }
-
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! DeclRefType !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 void DeclRefType::_toTextOverride(StringBuilder& out)

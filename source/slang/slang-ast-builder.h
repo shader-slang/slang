@@ -36,8 +36,6 @@ public:
     Type* getNullPtrType();
         /// Get the NullPtr type
     Type* getNoneType();
-        /// Get the DifferentialBottom type.
-    Type* getDifferentialBottomType();
 
     const ReflectClassInfo* findClassInfo(Name* name);
     SyntaxClass<NodeBase> findSyntaxClass(Name* name);
@@ -306,7 +304,6 @@ public:
     Type* getOverloadedType() { return m_sharedASTBuilder->m_overloadedType; }
     Type* getErrorType() { return m_sharedASTBuilder->m_errorType; }
     Type* getBottomType() { return m_sharedASTBuilder->m_bottomType; }
-    Type* getDifferentialBottomType() { return m_sharedASTBuilder->getDifferentialBottomType(); }
     Type* getStringType() { return m_sharedASTBuilder->getStringType(); }
     Type* getNullPtrType() { return m_sharedASTBuilder->getNullPtrType(); }
     Type* getNoneType() { return m_sharedASTBuilder->getNoneType(); }
