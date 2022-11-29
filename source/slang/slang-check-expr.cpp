@@ -1054,6 +1054,14 @@ namespace Slang
         {
             return overloadedExpr2->base;
         }
+        else if (auto genApp = as<GenericAppExpr>(expr))
+        {
+            return GetBaseExpr(genApp->functionExpr);
+        }
+        else if (auto partiallyApplied = as<PartiallyAppliedGenericExpr>(expr))
+        {
+            return GetBaseExpr(partiallyApplied->originalExpr);
+        }
         return nullptr;
     }
 
