@@ -1,4 +1,4 @@
-// Test that calling a generic member method.
+// Test calling a generic member method with partially specified generic arguments.
 
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj
 //TEST(compute,vulkan):COMPARE_COMPUTE_EX:-vk -slang -compute -shaderobj
