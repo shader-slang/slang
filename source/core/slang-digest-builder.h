@@ -17,7 +17,7 @@ namespace Slang
             hashGen.init(&context);
         }
 
-        template<typename T, std::enable_if_t<std::is_arithmetic_v<T> || std::is_enum_v<T>, bool> = true>
+        template<typename T, typename std::enable_if<std::is_arithmetic<T>::value || std::is_enum<T>::value, int>::type = 0>
         DigestBuilder& operator<<(const T value)
         {
             append(value);
@@ -54,7 +54,7 @@ namespace Slang
             return *this;
         }
 
-        template<typename T, std::enable_if_t<std::is_pod_v<T>, bool> = true>
+        template<typename T, typename std::enable_if<std::is_pod<T>::value, int>::type = 0>
         DigestBuilder& operator<<(const List<T>& list)
         {
             append(list);
@@ -66,7 +66,7 @@ namespace Slang
             hashGen.update(&context, data, size);
         }
 
-        template<typename T, std::enable_if_t<std::is_arithmetic_v<T> || std::is_enum_v<T>, bool> = true>
+        template<typename T, typename std::enable_if<std::is_arithmetic<T>::value || std::is_enum<T>::value, int>::type = 0>
         void append(const T value)
         {
             append(&value, sizeof(T));
@@ -97,7 +97,7 @@ namespace Slang
             append(&digest, sizeof(digest));
         }
 
-        template<typename T, std::enable_if_t<std::is_pod_v<T>, bool> = true>
+        template<typename T, typename std::enable_if<std::is_pod<T>::value, int>::type = 0>
         void append(const List<T>& list)
         {
             append(list.getBuffer(), list.getCount() * sizeof(T));
