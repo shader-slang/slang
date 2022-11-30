@@ -448,12 +448,6 @@ bool processAutodiffCalls(
     DiagnosticSink*                     sink,
     IRAutodiffPassOptions const&)
 {
-    // Simplify module to remove dead code.
-    IRDeadCodeEliminationOptions dceOptions;
-    dceOptions.keepExportsAlive = true;
-    dceOptions.keepLayoutsAlive = true;
-    eliminateDeadCode(module, dceOptions);
-
     bool modified = false;
 
     // Create shared context for all auto-diff related passes
@@ -486,7 +480,6 @@ bool processAutodiffCalls(
 
     // Remove auto-diff related decorations.
     stripAutoDiffDecorations(module);
-
 
     return modified;
 }
