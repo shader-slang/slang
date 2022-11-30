@@ -60,7 +60,7 @@ extern Slang::String get_slang_hlsl_prelude();
 
 namespace Slang {
 
-/* static */const BaseTypeInfo BaseTypeInfo::s_info[Index(BaseType::CountOf)] = 
+/* static */const BaseTypeInfo BaseTypeInfo::s_info[Index(BaseType::CountOf)] =
 {
     { 0, 0, uint8_t(BaseType::Void) },
     { uint8_t(sizeof(bool)),   0, uint8_t(BaseType::Bool) },
@@ -142,7 +142,7 @@ void Session::init()
     m_completionTokenName = getNamePool()->getName("#?");
 
     m_sharedLibraryLoader = DefaultSharedLibraryLoader::getSingleton();
-    
+
     // Set up shared AST builder
     m_sharedASTBuilder = new SharedASTBuilder;
     m_sharedASTBuilder->init(this);
@@ -218,11 +218,11 @@ void Session::_initCodeGenTransitionMap()
 
     // Set up the default ways to do compilations between code gen targets
     auto& map = m_codeGenTransitionMap;
-    
+
     // TODO(JS): There currently isn't a 'downstream compiler' for direct spirv output. If we did
     // it would presumably a transition from SlangIR to SPIRV.
 
-    // For C and C++ we default to use the 'genericCCpp' compiler 
+    // For C and C++ we default to use the 'genericCCpp' compiler
     {
         const CodeGenTarget sources[] = { CodeGenTarget::CSource, CodeGenTarget::CPPSource };
         for (auto source : sources)
@@ -236,7 +236,7 @@ void Session::_initCodeGenTransitionMap()
         }
     }
 
-    
+
     // Add all the straightforward transitions
     map.addTransition(CodeGenTarget::CUDASource, CodeGenTarget::PTX, PassThroughMode::NVRTC);
     map.addTransition(CodeGenTarget::HLSL, CodeGenTarget::DXBytecode, PassThroughMode::Fxc);
@@ -317,7 +317,7 @@ SlangResult Session::compileStdLib(slang::CompileStdLibFlags compileFlags)
 
         // For all the modules add their doc output to docStrings
         for (Module* stdlibModule : stdlibModules)
-        { 
+        {
             RefPtr<ASTMarkup> markup(new ASTMarkup);
             ASTMarkupUtil::extract(stdlibModule->getModuleDecl(), sourceManager, &sink, markup);
 
@@ -433,9 +433,9 @@ SlangResult Session::_readBuiltinModule(ISlangFileSystem* fileSystem, Scope* sco
         // Load the riff container
         SLANG_RETURN_ON_FAIL(RiffUtil::read(&stream, riffContainer));
     }
-    
+
     // Load up the module
-    
+
     SerialContainerData containerData;
 
     Linkage* linkage = getBuiltinLinkage();
@@ -471,7 +471,7 @@ SlangResult Session::_readBuiltinModule(ISlangFileSystem* fileSystem, Scope* sco
             {
                 registerBuiltinDecls(this, moduleDecl);
             }
-            
+
             module->setModuleDecl(moduleDecl);
         }
 
@@ -524,7 +524,7 @@ static T makeFromSizeVersioned(const uint8_t* src)
     SLANG_COMPILE_TIME_ASSERT(sizeof(((T*)src)->structureSize) == sizeof(size_t));
 
     // The structureSize field *must* be the first element of T
-    // Ideally would use SLANG_COMPILE_TIME_ASSERT, but that doesn't work on gcc. 
+    // Ideally would use SLANG_COMPILE_TIME_ASSERT, but that doesn't work on gcc.
     // Can't just assert, because determined to be a constant expression
     {
         auto offset = SLANG_OFFSET_OF(T, structureSize);
@@ -538,7 +538,7 @@ static T makeFromSizeVersioned(const uint8_t* src)
     const size_t dstSize = sizeof(T);
 
     // If they are the same size, and appropriate alignment we can just cast and return
-    if (srcSize == dstSize && 
+    if (srcSize == dstSize &&
         (size_t(src) & (SLANG_ALIGN_OF(T) - 1)) == 0)
     {
         return *(const T*)src;
@@ -638,7 +638,7 @@ SLANG_NO_THROW void SLANG_MCALL Session::setDownstreamCompilerPath(
 {
     PassThroughMode passThrough = PassThroughMode(inPassThrough);
     SLANG_ASSERT(int(passThrough) > int(PassThroughMode::None) && int(passThrough) < int(PassThroughMode::CountOf));
-    
+
     if (m_downstreamCompilerPaths[int(passThrough)] != path)
     {
         // Make access redetermine compiler
@@ -747,7 +747,7 @@ SlangPassThrough Session::getDownstreamCompilerForTransition(SlangCompileTarget 
     const auto desc = ArtifactDescUtil::makeDescForCompileTarget(inTarget);
 
     // Special case host-callable
-    if ((desc.kind == ArtifactKind::HostCallable) && 
+    if ((desc.kind == ArtifactKind::HostCallable) &&
         (source == CodeGenTarget::CSource || source == CodeGenTarget::CPPSource))
     {
         // We prefer LLVM if it's available
@@ -1213,7 +1213,7 @@ SLANG_NO_THROW slang::TypeReflection* SLANG_MCALL Linkage::getContainerType(
             containerTypeReflection = type;
             break;
         }
-        
+
         m_containerTypes.Add(key, containerTypeReflection);
     }
 
@@ -1329,45 +1329,45 @@ void Linkage::updateDependencyBasedHash(
 {
     // Add the Slang compiler version to the hash
     auto version = String(getBuildTagString());
-    builder.addToDigest(version);
+    builder.append(version);
 
     // Add the search directory paths to the hash
     auto searchDirectoryList = getSearchDirectories().searchDirectories;
     for (auto& searchDir : searchDirectoryList)
     {
         auto searchPath = searchDir.path;
-        builder.addToDigest(searchPath);
+        builder.append(searchPath);
     }
 
     // Add the preprocessor definitions to the hash
     for (auto& key : preprocessorDefinitions)
     {
-        builder.addToDigest(key.Key);
-        builder.addToDigest(key.Value);
+        builder.append(key.Key);
+        builder.append(key.Value);
     }
 
     // Add the target specified by targetIndex
     auto targetReq = targets[targetIndex];
-    builder.addToDigest(targetReq->getTarget());
-    builder.addToDigest(targetReq->getTargetFlags());
-    builder.addToDigest(targetReq->getFloatingPointMode());
-    builder.addToDigest(targetReq->getLineDirectiveMode());
-    builder.addToDigest(targetReq->shouldDumpIntermediates());
-    builder.addToDigest(targetReq->getForceGLSLScalarBufferLayout());
-    builder.addToDigest(targetReq->shouldTrackLiveness());
+    builder.append(targetReq->getTarget());
+    builder.append(targetReq->getTargetFlags());
+    builder.append(targetReq->getFloatingPointMode());
+    builder.append(targetReq->getLineDirectiveMode());
+    builder.append(targetReq->shouldDumpIntermediates());
+    builder.append(targetReq->getForceGLSLScalarBufferLayout());
+    builder.append(targetReq->shouldTrackLiveness());
 
     auto targetProfile = targetReq->getTargetProfile();
-    builder.addToDigest(targetProfile.getStage());
-    builder.addToDigest(targetProfile.getVersion());
-    builder.addToDigest(targetProfile.getFamily());
+    builder.append(targetProfile.getStage());
+    builder.append(targetProfile.getVersion());
+    builder.append(targetProfile.getFamily());
 
     auto targetProfileName = String(targetProfile.getName());
-    builder.addToDigest(targetProfileName);
+    builder.append(targetProfileName);
 
     auto cookedCapabilities = targetReq->getTargetCaps().getExpandedAtoms();
     for (auto& capability : cookedCapabilities)
     {
-        builder.addToDigest(capability);
+        builder.append(capability);
     }
 
     // Add the downstream compiler version (if it exists) to the hash
@@ -1378,7 +1378,7 @@ void Linkage::updateDependencyBasedHash(
         ComPtr<ISlangBlob> versionString;
         if (SLANG_SUCCEEDED(downstreamCompiler->getVersionString(versionString.writeRef())))
         {
-            builder.addToDigest(versionString);
+            builder.append(versionString);
         }
     }
 }
@@ -1597,18 +1597,18 @@ SlangResult TranslationUnitRequest::requireSourceFiles()
         IArtifact* artifact = m_sourceArtifacts[i];
 
         PathInfo pathInfo = PathInfo::makeUnknown();
-        
+
         if (auto extRep = findRepresentation<IExtFileArtifactRepresentation>(artifact))
         {
             auto extFileSystem = extRep->getFileSystem();
 
-            // TODO(JS): 
-            // Ideally we'd confirm that the file system was the same, such we could know that the unique 
+            // TODO(JS):
+            // Ideally we'd confirm that the file system was the same, such we could know that the unique
             // identity is appropriate for the current file system.
             //
             // We just assume compatibility for the moment, because repro will be a different file system
             // but we need to use the unique identity that is there.
-      
+
             //if (extFileSystem == linkageFileSystem)
             {
                 // Get the unique identity
@@ -1665,7 +1665,7 @@ SlangResult TranslationUnitRequest::requireSourceFiles()
                 pathInfo.getName());
             return blobRes;
         }
-        
+
         auto sourceFile = sourceManager->createSourceFileWithBlob(pathInfo, blob);
         _addSourceFile(sourceFile);
     }
@@ -1699,10 +1699,10 @@ void TranslationUnitRequest::_addSourceFile(SourceFile* sourceFile)
     }
 }
 
-List<SourceFile*> const& TranslationUnitRequest::getSourceFiles() 
-{ 
+List<SourceFile*> const& TranslationUnitRequest::getSourceFiles()
+{
     SLANG_ASSERT(m_sourceArtifacts.getCount() == m_sourceFiles.getCount());
-    return m_sourceFiles; 
+    return m_sourceFiles;
 }
 
 EndToEndCompileRequest::~EndToEndCompileRequest()
@@ -1741,7 +1741,7 @@ void EndToEndCompileRequest::setWriter(WriterChannel chan, ISlangWriter* writer)
     // For diagnostic output, if the user passes in nullptr, we set on m_sink.writer as that enables buffering on DiagnosticSink
     if (chan == WriterChannel::Diagnostic)
     {
-        m_sink.writer = writer; 
+        m_sink.writer = writer;
     }
 }
 
@@ -1771,10 +1771,10 @@ Expr* Linkage::parseTermString(String typeStr, Scope* scope)
     // Create a SourceManager on the stack, so any allocations for 'SourceFile'/'SourceView' etc will be cleaned up
     SourceManager localSourceManager;
     localSourceManager.initialize(getSourceManager(), nullptr);
-        
+
     Slang::SourceFile* srcFile = localSourceManager.createSourceFileWithString(PathInfo::makeTypeParse(), typeStr);
-    
-    // We'll use a temporary diagnostic sink  
+
+    // We'll use a temporary diagnostic sink
     DiagnosticSink sink(&localSourceManager, nullptr);
 
     // RAII type to make make sure current SourceManager is restored after parse.
@@ -1833,7 +1833,7 @@ Type* ComponentType::getTypeFromString(
     // TODO(JS): For now just used the linkages ASTBuilder to keep on scope
     //
     // The parseTermString uses the linkage ASTBuilder for it's parsing.
-    // 
+    //
     // It might be possible to just create a temporary ASTBuilder - the worry though is
     // that the parsing sets a member variable in AST node to one of these scopes, and then
     // it become a dangling pointer. So for now we go with the linkages.
@@ -1867,7 +1867,7 @@ CompileRequestBase::CompileRequestBase(
 
 FrontEndCompileRequest::FrontEndCompileRequest(
     Linkage*        linkage,
-    StdWriters*     writers, 
+    StdWriters*     writers,
     DiagnosticSink* sink)
     : CompileRequestBase(linkage, sink)
     , m_writers(writers)
@@ -1987,7 +1987,7 @@ protected:
 };
 
 
-// Holds the hierarchy of views, the children being views that were 'initiated' (have an initiating SourceLoc) in the parent. 
+// Holds the hierarchy of views, the children being views that were 'initiated' (have an initiating SourceLoc) in the parent.
 typedef Dictionary<SourceView*, List<SourceView*>> ViewInitiatingHierarchy;
 
 // Calculate the hierarchy from the sourceManager
@@ -2041,7 +2041,7 @@ static SourceView* _findInitialSourceView(SourceFile* sourceFile)
             {
                 return view;
             }
-        }        
+        }
     }
 
     return nullptr;
@@ -2154,10 +2154,10 @@ void FrontEndCompileRequest::parseTranslationUnit(
 
     // TODO(JS): NOTE! Here we are using the searchDirectories on the linkage. This is because
     // currently the API only allows the setting search paths on linkage.
-    // 
+    //
     // Here we should probably be using the searchDirectories on the FrontEndCompileRequest.
     // If searchDirectories.parent pointed to the one in the Linkage would mean linkage paths
-    // would be checked too (after those on the FrontEndCompileRequest). 
+    // would be checked too (after those on the FrontEndCompileRequest).
     IncludeSystem includeSystem(&linkage->searchDirectories, linkage->getFileSystemExt(), linkage->getSourceManager());
 
     Scope* languageScope = nullptr;
@@ -2185,11 +2185,11 @@ void FrontEndCompileRequest::parseTranslationUnit(
         combinedPreprocessorDefinitions.Add(def.Key, def.Value);
 
     // Define standard macros, if not already defined. This style assumes using `#if __SOME_VAR` style, as in
-    // 
+    //
     // ```
     // #if __SLANG_COMPILER__
     // ```
-    // 
+    //
     // This choice is made because slang outputs a warning on using a variable in an #if if not defined
     //
     // Of course this means using #ifndef/#ifdef/defined() is probably not appropraite with thes variables.
@@ -2366,7 +2366,7 @@ void FrontEndCompileRequest::generateIR()
     for( auto& translationUnit : translationUnits )
     {
         // We want to only run generateIRForTranslationUnit once here. This is for two side effects:
-        // * it can dump ir 
+        // * it can dump ir
         // * it can generate diagnostics
 
         /// Generate IR for translation unit.
@@ -2397,7 +2397,7 @@ void FrontEndCompileRequest::generateIR()
                 IRSerialWriter writer;
                 writer.write(irModule, nullptr, SerialOptionFlag::RawSourceLocation, &serialData);
 
-                // Destroy irModule such that memory can be used for newly constructed read irReadModule  
+                // Destroy irModule such that memory can be used for newly constructed read irReadModule
                 irModule = nullptr;
             }
             RefPtr<IRModule> irReadModule;
@@ -2500,12 +2500,12 @@ SlangResult FrontEndCompileRequest::executeActionsInner()
                 RefPtr<ASTMarkup> markup(new ASTMarkup);
                 ASTMarkupUtil::extract(translationUnit->getModuleDecl(), getSourceManager(), getSink(), markup);
 
-                // Convert to markdown            
+                // Convert to markdown
                 DocMarkdownWriter markdownWriter(markup, astBuilder);
                 markdownWriter.writeAll();
 
                 UnownedStringSlice docText = markdownWriter.getOutput().getUnownedSlice();
-                writer->write(docText.begin(), docText.getLength());            
+                writer->write(docText.begin(), docText.getLength());
             }
         }
     }
@@ -2767,7 +2767,7 @@ void FrontEndCompileRequest::addTranslationUnitSourceArtifact(
     IArtifact*      sourceArtifact)
 {
     auto translationUnit = translationUnits[translationUnitIndex];
-    
+
     // Add the source file
     translationUnit->addSourceArtifact(sourceArtifact);
 }
@@ -2811,9 +2811,9 @@ void FrontEndCompileRequest::addTranslationUnitSourceFile(
     SlangResult existsRes = SLANG_OK;
 
     // If we require caching, we demand it's loaded here.
-    // 
-    // In practice this probably means repro capture is enabled. So we want to 
-    // load the blob such that it's in the cache, even if it doesn't actually 
+    //
+    // In practice this probably means repro capture is enabled. So we want to
+    // load the blob such that it's in the cache, even if it doesn't actually
     // have to be loaded for the compilation.
     if (getLinkage()->m_requireCacheFileSystem)
     {
@@ -2967,7 +2967,7 @@ void Linkage::_diagnoseErrorInImportedModule(
 RefPtr<Module> Linkage::loadModule(
     Name*               name,
     const PathInfo&     filePathInfo,
-    ISlangBlob*         sourceBlob, 
+    ISlangBlob*         sourceBlob,
     SourceLoc const&    srcLoc,
     DiagnosticSink*     sink,
     const LoadedModuleDictionary* additionalLoadedModules)
@@ -3133,7 +3133,7 @@ RefPtr<Module> Linkage::findOrImportModule(
     PathInfo pathIncludedFromInfo = getSourceManager()->getPathInfo(loc, SourceLocType::Actual);
     PathInfo filePathInfo;
 
-    // We have to load via the found path - as that is how file was originally loaded 
+    // We have to load via the found path - as that is how file was originally loaded
     if (SLANG_FAILED(includeSystem.findFile(fileName, pathIncludedFromInfo.foundPath, filePathInfo)))
     {
         sink->diagnose(loc, Diagnostics::cannotFindFile, fileName);
@@ -3276,7 +3276,7 @@ void Module::updateContentsBasedHash(DigestBuilder& builder)
             statFailed = true;
             break;
         }
-        lastModifiedBuilder.addToDigest(fileStatus.st_mtime);
+        lastModifiedBuilder.append(fileStatus.st_mtime);
     }
 
     slang::Digest temp = lastModifiedBuilder.finalize();
@@ -3292,11 +3292,11 @@ void Module::updateContentsBasedHash(DigestBuilder& builder)
             {
                 // Failure to read the file means this is a digest for the contents of a source
                 // file which does not live on disk.
-                contentsBuilder.addToDigest(DigestUtil::fromString(file.getUnownedSlice()));
+                contentsBuilder.append(DigestUtil::fromString(file.getUnownedSlice()));
             }
             else
             {
-                contentsBuilder.addToDigest(fileContents);
+                contentsBuilder.append(fileContents);
             }
         }
         contentsDigest = contentsBuilder.finalize();
@@ -3308,7 +3308,7 @@ void Module::updateContentsBasedHash(DigestBuilder& builder)
         }
     }
 
-    builder.addToDigest(contentsDigest);
+    builder.append(contentsDigest);
 }
 
 void Module::addModuleDependency(Module* module)
@@ -3378,7 +3378,7 @@ void Module::_processFindDeclsExportSymbolsRec(Decl* decl)
 {
     if (_canExportDeclSymbol(decl->astNodeType))
     {
-        // It's a reference to a declaration in another module, so first get the symbol name. 
+        // It's a reference to a declaration in another module, so first get the symbol name.
         String mangledName = getMangledName(getASTBuilder(), decl);
 
         Index index = Index(m_mangledExportPool.add(mangledName));
@@ -3425,7 +3425,7 @@ NodeBase* Module::findExportFromMangledName(const UnownedStringSlice& slice)
         if (m_mangledExportSymbols.getCount() == 0)
         {
             m_mangledExportSymbols.add(nullptr);
-        }        
+        }
     }
 
     const Index index = m_mangledExportPool.findIndex(slice);
@@ -3517,7 +3517,7 @@ SLANG_NO_THROW void SLANG_MCALL ComponentType::computeDependencyBasedHash(
     DigestBuilder builder;
 
     // A note on enums that may be hashed in as part of the following two function calls:
-    // 
+    //
     // While enums are not guaranteed to be encoded the same way across all versions of
     // the compiler, part of hashing the linkage is hashing in the compiler version.
     // Consequently, any encoding differences as a result of different compiler versions
@@ -3530,17 +3530,17 @@ SLANG_NO_THROW void SLANG_MCALL ComponentType::computeDependencyBasedHash(
     auto fileDeps = getFilePathDependencies();
     for (auto& file : fileDeps)
     {
-        builder.addToDigest(file);
+        builder.append(file);
     }
 
     // Add the name and name override for the specified entry point
     // to the hash.
     auto entryPointName = getEntryPoint(entryPointIndex)->getName()->text;
-    builder.addToDigest(entryPointName);
+    builder.append(entryPointName);
     auto entryPointMangledName = getEntryPointMangledName(entryPointIndex);
-    builder.addToDigest(entryPointMangledName);
+    builder.append(entryPointMangledName);
     auto entryPointNameOverride = getEntryPointNameOverride(entryPointIndex);
-    builder.addToDigest(entryPointNameOverride);
+    builder.append(entryPointNameOverride);
 
     *outHash = builder.finalize();
 }
@@ -4310,7 +4310,7 @@ SpecializedComponentType::SpecializedComponentType(
     // An even longer-term strategy would be to allow type layout to
     // be performed on IR types, so taht we don't need to have front-end
     // code worrying about this stuff.
-    // 
+    //
     for(auto arg : specializationArgs)
     {
         auto argType = as<Type>(arg.val);
@@ -4394,7 +4394,7 @@ void SpecializedComponentType::updateDependencyBasedHash(
     {
         auto specializationArg = getSpecializationArg(i);
         auto argString = specializationArg.val->toString();
-        builder.addToDigest(argString);
+        builder.append(argString);
     }
 
     slang::Digest baseHash;
@@ -4515,8 +4515,8 @@ void Linkage::setFileSystem(ISlangFileSystem* inFileSystem)
 
     // Release what's there
     m_fileSystemExt.setNull();
-    
-    // If nullptr passed in set up default 
+
+    // If nullptr passed in set up default
     if (inFileSystem == nullptr)
     {
         m_fileSystemExt = new Slang::CacheFileSystem(Slang::OSFileSystem::getExtSingleton());
@@ -4527,11 +4527,11 @@ void Linkage::setFileSystem(ISlangFileSystem* inFileSystem)
         {
             m_fileSystemExt = cacheFileSystem;
         }
-        else 
+        else
         {
             if (m_requireCacheFileSystem)
             {
-                m_fileSystemExt = new Slang::CacheFileSystem(inFileSystem); 
+                m_fileSystemExt = new Slang::CacheFileSystem(inFileSystem);
             }
             else
             {
@@ -4542,7 +4542,7 @@ void Linkage::setFileSystem(ISlangFileSystem* inFileSystem)
                 if (!m_fileSystemExt)
                 {
                     // Construct a wrapper to emulate the extended interface behavior
-                    m_fileSystemExt = new Slang::CacheFileSystem(m_fileSystem); 
+                    m_fileSystemExt = new Slang::CacheFileSystem(m_fileSystem);
                 }
             }
         }
@@ -4588,7 +4588,7 @@ void Session::addBuiltinSource(
     DiagnosticSink sink(sourceManager, Lexer::sourceLocationLexer);
     RefPtr<FrontEndCompileRequest> compileRequest = new FrontEndCompileRequest(
         m_builtinLinkage,
-        nullptr, 
+        nullptr,
         &sink);
     compileRequest->m_isStandardLibraryCode = true;
 
@@ -4873,7 +4873,7 @@ char const* EndToEndCompileRequest::getDiagnosticOutput()
     return m_diagnosticOutput.begin();
 }
 
-SlangResult EndToEndCompileRequest::getDiagnosticOutputBlob(ISlangBlob** outBlob)   
+SlangResult EndToEndCompileRequest::getDiagnosticOutputBlob(ISlangBlob** outBlob)
 {
     if (!outBlob) return SLANG_E_INVALID_ARG;
 
@@ -4927,7 +4927,7 @@ SlangResult _addLibraryReference(EndToEndCompileRequest* req, IArtifact* artifac
     }
     else
     {
-        // TODO(JS): 
+        // TODO(JS):
         // Do we want to check the path exists?
     }
 
@@ -5122,7 +5122,7 @@ SlangResult EndToEndCompileRequest::EndToEndCompileRequest::compile()
                 return saveRes;
             }
         }
-        else if (m_dumpReproOnError && SLANG_FAILED(res)) 
+        else if (m_dumpReproOnError && SLANG_FAILED(res))
         {
             String reproFileName;
             SlangResult saveRes = SLANG_FAIL;
@@ -5453,7 +5453,7 @@ SlangResult EndToEndCompileRequest::isParameterLocationUsed(Int entryPointIndex,
     if (!metadata)
         return SLANG_E_NOT_AVAILABLE;
 
-    
+
     // TODO: optimize this with a binary search through a sorted list
     for (const auto& range : metadata->getUsedBindingRanges())
     {
