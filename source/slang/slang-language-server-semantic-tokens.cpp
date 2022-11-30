@@ -194,6 +194,16 @@ List<SemanticToken> getSemanticTokens(Linkage* linkage, Module* module, UnownedS
                     maybeInsertToken(token);
                 }
             }
+            else if (auto attr = as<Attribute>(node))
+            {
+                if (attr->getKeywordName())
+                {
+                    SemanticToken token = _createSemanticToken(
+                        manager, attr->getKeywordNameAndLoc().loc, attr->getKeywordName());
+                    token.type = SemanticTokenType::Type;
+                    maybeInsertToken(token);
+                }
+            }
         });
     // Insert macro tokens.
     auto& preprocessorInfo = linkage->contentAssistInfo.preprocessorInfo;
