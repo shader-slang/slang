@@ -1,7 +1,7 @@
 //TEST:LANG_SERVER:
 //HOVER:9,29
 
-struct MyType { }
+struct MyType {}
 
 void main()
 {
