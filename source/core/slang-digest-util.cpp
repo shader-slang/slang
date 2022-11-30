@@ -12,15 +12,15 @@ namespace Slang
 /*static*/ Digest DigestUtil::computeDigestForStringSlice(UnownedStringSlice text)
 {
     DigestBuilder builder;
-    builder.addToDigest(text);
+    builder.append(text);
     return builder.finalize();
 }
 
 /*static*/ Digest DigestUtil::combine(const Digest& digestA, const Digest& digestB)
 {
     DigestBuilder builder;
-    builder.addToDigest(digestA);
-    builder.addToDigest(digestB);
+    builder.append(digestA);
+    builder.append(digestB);
     return builder.finalize();
 }
 
