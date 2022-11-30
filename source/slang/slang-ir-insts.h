@@ -584,6 +584,15 @@ struct IRBackwardDerivativeDecoration : IRDecoration
     IRInst* getBackwardDerivativeFunc() { return getOperand(0); }
 };
 
+struct IRDifferentialInstDecoration : IRDecoration
+{
+    enum
+    {
+        kOp = kIROp_DifferentialInstDecoration
+    };
+    IR_LEAF_ISA(DifferentialInstDecoration)
+};
+
 struct IRBackwardDifferentiableDecoration : IRDecoration
 {
     enum
@@ -3333,6 +3342,11 @@ public:
     void addBackwardDerivativeDecoration(IRInst* value, IRInst* jvpFn)
     {
         addDecoration(value, kIROp_BackwardDerivativeDecoration, jvpFn);
+    }
+
+    void markInstAsDifferential(IRInst* value)
+    {
+        addDecoration(value, kIROp_DifferentialInstDecoration);
     }
 
     void addCOMWitnessDecoration(IRInst* value, IRInst* witnessTable)

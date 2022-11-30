@@ -335,7 +335,10 @@ IF EXIST ..\..\..\external\slang-glslang\bin\windows-aarch64\release\slang-glsla
     <ClInclude Include="..\..\..\source\slang\slang-ir-augment-make-existential.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-autodiff-fwd.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-autodiff-pairs.h" />
+    <ClInclude Include="..\..\..\source\slang\slang-ir-autodiff-propagate.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-autodiff-rev.h" />
+    <ClInclude Include="..\..\..\source\slang\slang-ir-autodiff-transpose.h" />
+    <ClInclude Include="..\..\..\source\slang\slang-ir-autodiff-unzip.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-autodiff.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-bind-existentials.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-byte-address-legalize.h" />
