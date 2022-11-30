@@ -160,6 +160,7 @@ namespace Slang
             ExtractExistentialValueExpr* openedValue = m_astBuilder->create<ExtractExistentialValueExpr>();
             openedValue->declRef = varDeclRef;
             openedValue->type = QualType(openedType);
+            openedValue->originalExpr = expr;
 
             // The result of opening an existential is an l-value
             // if the original existential is an l-value.
