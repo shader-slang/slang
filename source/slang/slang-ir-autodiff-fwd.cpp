@@ -135,14 +135,15 @@ IRFuncType* ForwardDerivativeTranscriber::differentiateFunctionType(IRBuilder* b
         else
             newParameterTypes.add(origType);
     }
-        // Transcribe return type to a pair.
-        // This will be void if the primal return type is non-differentiable.
-        //
-        auto origResultType = (IRType*) lookupPrimalInst(funcType->getResultType(), funcType->getResultType());
-        if (auto returnPairType = tryGetDiffPairType(builder, origResultType))
-            diffReturnType = returnPairType;
-        else
-            diffReturnType = origResultType;
+
+    // Transcribe return type to a pair.
+    // This will be void if the primal return type is non-differentiable.
+    //
+    auto origResultType = (IRType*) lookupPrimalInst(funcType->getResultType(), funcType->getResultType());
+    if (auto returnPairType = tryGetDiffPairType(builder, origResultType))
+        diffReturnType = returnPairType;
+    else
+        diffReturnType = origResultType;
 
     return builder->getFuncType(newParameterTypes, diffReturnType);
 }
@@ -357,11 +358,11 @@ InstPair ForwardDerivativeTranscriber::transcribeParam(IRBuilder* builder, IRPar
         if (auto primalParam = as<IRParam>(primalInst))
         {
             SLANG_RELEASE_ASSERT(builder->getInsertLoc().getBlock());
+            primalParam->removeFromParent();
             builder->getInsertLoc().getBlock()->addParam(primalParam);
         }
         return InstPair(primalInst, nullptr);
     }
-
     else
     {
         auto primal = cloneInst(&cloneEnv, builder, origParam);
@@ -372,7 +373,6 @@ InstPair ForwardDerivativeTranscriber::transcribeParam(IRBuilder* builder, IRPar
         }
         return InstPair(primal, diff);
     }
-    
 }
 
 // Returns "d<var-name>" to use as a name hint for variables and parameters.
