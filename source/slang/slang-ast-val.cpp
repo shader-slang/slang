@@ -780,6 +780,20 @@ Val* SNormModifierVal::_substituteImplOverride(ASTBuilder* astBuilder, Substitut
     return this;
 }
 
+// NoDiffModifierVal
+void NoDiffModifierVal::_toTextOverride(StringBuilder& out)
+{
+    out.append("no_diff");
+}
+
+Val* NoDiffModifierVal::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff)
+{
+    SLANG_UNUSED(astBuilder);
+    SLANG_UNUSED(subst);
+    SLANG_UNUSED(ioDiff);
+    return this;
+}
+
 // PolynomialIntVal
 
 bool PolynomialIntVal::_equalsValOverride(Val* val)

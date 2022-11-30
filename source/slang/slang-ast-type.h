@@ -850,6 +850,15 @@ class ModifiedType : public Type
     Type* base;
     List<Val*> modifiers;
 
+    template<typename T>
+    T* findModifier()
+    {
+        for (auto v : modifiers)
+            if (auto rs = as<T>(v))
+                return rs;
+        return nullptr;
+    }
+
     // Overrides should be public so base classes can access
     void _toTextOverride(StringBuilder& out);
     bool _equalsImplOverride(Type* type);

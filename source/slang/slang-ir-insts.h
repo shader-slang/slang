@@ -906,6 +906,11 @@ struct IRFuncThrowTypeAttr : IRAttr
     IRType* getErrorType() { return (IRType*)getOperand(0); }
 };
 
+struct IRNoDiffAttr : IRAttr
+{
+    IR_LEAF_ISA(NoDiffAttr)
+};
+
     /// An attribute that specifies size information for a single resource kind.
 struct IRTypeSizeAttr : public IRLayoutResourceInfoAttr
 {

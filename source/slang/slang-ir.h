@@ -716,20 +716,35 @@ struct IRInst
     void _insertAt(IRInst* inPrev, IRInst* inNext, IRInst* inParent);
 };
 
+inline bool isModifierInst(IROp op)
+{
+    switch (op)
+    {
+    case kIROp_AttributedType:
+        return true;
+    }
+    return false;
+}
+
 template<typename T>
 T* dynamicCast(IRInst* inst)
 {
     if (inst && T::isaImpl(inst->getOp()))
         return static_cast<T*>(inst);
+    if (inst)
+    {
+        if (isModifierInst(inst->getOp()))
+        {
+            return dynamicCast<T>(inst->getOperand(0));
+        }
+    }
     return nullptr;
 }
 
 template<typename T>
 const T* dynamicCast(const IRInst* inst)
 {
-    if (inst && T::isaImpl(inst->getOp()))
-        return static_cast<const T*>(inst);
-    return nullptr;
+    return dynamicCast<T>(const_cast<IRInst*>(inst));
 }
 
 // `dynamic_cast` equivalent (we just use dynamicCast)

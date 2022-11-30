@@ -358,6 +358,7 @@ public:
     }
     Val* getUNormModifierVal();
     Val* getSNormModifierVal();
+    Val* getNoDiffModifierVal();
 
     TypeType* getTypeType(Type* type);
 

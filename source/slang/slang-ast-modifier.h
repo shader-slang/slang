@@ -1210,6 +1210,10 @@ class SNormModifier : public ResourceElementFormatModifier
     SLANG_AST_CLASS(SNormModifier)
 };
 
+class NoDiffModifier : public TypeModifier
+{
+    SLANG_AST_CLASS(NoDiffModifier)
+};
 
 
 } // namespace Slang

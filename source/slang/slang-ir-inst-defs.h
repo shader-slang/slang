@@ -826,6 +826,8 @@ INST_RANGE(Layout, VarLayout, EntryPointLayout)
     INST(CaseTypeLayoutAttr, caseLayout, 1, 0)
     INST(UNormAttr, unorm, 0, 0)
     INST(SNormAttr, snorm, 0, 0)
+    INST(NoDiffAttr, no_diff, 0, 0)
+
     /* SemanticAttr */
         INST(UserSemanticAttr, userSemantic, 2, 0)
         INST(SystemValueSemanticAttr, systemValueSemantic, 2, 0)

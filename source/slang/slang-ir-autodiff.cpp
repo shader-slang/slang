@@ -413,6 +413,36 @@ void stripAutoDiffDecorations(IRModule* module)
     stripAutoDiffDecorationsFromChildren(module->getModuleInst());
 }
 
+struct StripNoDiffTypeAttributePass : InstPassBase
+{
+    StripNoDiffTypeAttributePass(IRModule* module) :
+        InstPassBase(module)
+    {
+    }
+    void processModule()
+    {
+        processInstsOfType<IRAttributedType>(kIROp_AttributedType, [&](IRAttributedType* attrType)
+            {
+                if (attrType->getAllAttrs().getCount() == 1)
+                {
+                    if (attrType->findAttr<IRNoDiffAttr>())
+                    {
+                        attrType->replaceUsesWith(attrType->getBaseType());
+                        attrType->removeAndDeallocate();
+                    }
+                }
+            });
+        sharedBuilderStorage.init(module);
+        sharedBuilderStorage.deduplicateAndRebuildGlobalNumberingMap();
+    }
+};
+
+void stripNoDiffTypeAttribute(IRModule* module)
+{
+    StripNoDiffTypeAttributePass pass(module);
+    pass.processModule();
+}
+
 bool processAutodiffCalls(
     IRModule*                           module,
     DiagnosticSink*                     sink,
@@ -452,8 +482,11 @@ bool processAutodiffCalls(
     // 
     modified |= processPairTypes(&autodiffContext);
 
+    stripNoDiffTypeAttribute(module);
+
     // Remove auto-diff related decorations.
     stripAutoDiffDecorations(module);
+
 
     return modified;
 }

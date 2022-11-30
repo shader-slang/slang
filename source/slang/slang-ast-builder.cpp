@@ -408,6 +408,11 @@ Val* ASTBuilder::getSNormModifierVal()
     return getOrCreate<SNormModifierVal>();
 }
 
+Val* ASTBuilder::getNoDiffModifierVal()
+{
+    return getOrCreate<NoDiffModifierVal>();
+}
+
 TypeType* ASTBuilder::getTypeType(Type* type)
 {
     return getOrCreate<TypeType>(type);
