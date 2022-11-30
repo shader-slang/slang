@@ -228,16 +228,13 @@ struct DiffTransposePass
     // 
     void accumulateGradientsForLoad(IRBuilder* builder, IRLoad* revLoad)
     {
-        auto revParam = revLoad->getPtr();
-
-        // Don't currently handle loads from non-param insts.
-        SLANG_ASSERT(as<IRParam>(revParam));
+        auto revPtr = revLoad->getPtr();
 
         // Assert that param type is of the form IRPtrTypeBase<IRDifferentialPairType<T>>
-        SLANG_ASSERT(as<IRPtrTypeBase>(revParam->getDataType()));
-        SLANG_ASSERT(as<IRPtrTypeBase>(revParam->getDataType())->getValueType()->getOp() == kIROp_DifferentialPairType);
+        SLANG_ASSERT(as<IRPtrTypeBase>(revPtr->getDataType()));
+        SLANG_ASSERT(as<IRPtrTypeBase>(revPtr->getDataType())->getValueType()->getOp() == kIROp_DifferentialPairType);
 
-        auto paramPairType = as<IRDifferentialPairType>(as<IRPtrTypeBase>(revParam->getDataType())->getValueType());
+        auto paramPairType = as<IRDifferentialPairType>(as<IRPtrTypeBase>(revPtr->getDataType())->getValueType());
         auto diffType = (IRType*) pairBuilder.getDiffTypeFromPairType(builder, paramPairType);
 
         // Gather gradients.
@@ -249,8 +246,8 @@ struct DiffTransposePass
         }
         else
         {
-            // Re-emit a load to get the _current_ value of revParam.
-            auto revCurrLoad = builder->emitLoad(revParam);
+            // Re-emit a load to get the _current_ value of revPtr.
+            auto revCurrLoad = builder->emitLoad(revPtr);
 
             // Grab the current gradient value.
             auto revCurrGrad = builder->emitDifferentialPairGetDifferential(diffType, revCurrLoad);
@@ -268,7 +265,7 @@ struct DiffTransposePass
             auto newDiffPair = builder->emitMakeDifferentialPair(paramPairType, revCurrPrimal, aggregateGradient);
 
             // Store this back into the parameter.
-            builder->emitStore(revParam, newDiffPair);
+            builder->emitStore(revPtr, newDiffPair);
         }
     }
 
