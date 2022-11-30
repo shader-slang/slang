@@ -133,12 +133,10 @@ struct DiffPairLoweringPass : InstPassBase
                 case kIROp_DifferentialPairGetDifferential:
                 case kIROp_DifferentialPairGetPrimal:
                     lowerPairAccess(builder, inst);
-                    modified = true;
                     break;
 
                 case kIROp_MakeDifferentialPair:
                     lowerMakePair(builder, inst);
-                    modified = true;
                     break;
 
                 default:
@@ -152,6 +150,7 @@ struct DiffPairLoweringPass : InstPassBase
                 {
                     inst->replaceUsesWith(loweredType);
                     inst->removeAndDeallocate();
+                    modified = true;
                 }
             });
         return modified;

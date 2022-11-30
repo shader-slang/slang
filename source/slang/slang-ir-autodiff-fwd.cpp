@@ -691,7 +691,8 @@ InstPair ForwardDerivativeTranscriber::transcribeCall(IRBuilder* builder, IRCall
             differentiateFunctionType(builder, as<IRFuncType>(primalCallee->getFullType())),
             primalCallee);
     }
-    else
+
+    if (!diffCallee)
     {
         // The callee is non differentiable, just return primal value with null diff value.
         IRInst* primalCall = cloneInst(&cloneEnv, builder, origCall);
@@ -1614,8 +1615,8 @@ struct ForwardDerivativePass : public InstPassBase
     //
     bool processReferencedFunctions(IRBuilder* builder)
     {
+        bool changed = false;
         List<IRInst*> autoDiffWorkList;
-
         for (;;)
         {
             // Collect all `ForwardDifferentiate` insts from the module.
@@ -1669,6 +1670,7 @@ struct ForwardDerivativePass : public InstPassBase
                         differentiateInst->replaceUsesWith(diffFunc);
                         differentiateInst->removeAndDeallocate();
                     }
+                    changed = true;
                 }
             }
             // Actually synthesize the derivatives.
@@ -1689,7 +1691,7 @@ struct ForwardDerivativePass : public InstPassBase
             SLANG_RELEASE_ASSERT(transcriberStorage.followUpFunctionsToTranscribe.getCount() == 0);
 
         }
-        return true;
+        return changed;
     }
 
     // Checks decorators to see if the function should
