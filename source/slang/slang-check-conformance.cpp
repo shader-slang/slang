@@ -87,8 +87,10 @@ namespace Slang
             // that `subType` has been proven to be *equal*
             // to `superTypeDeclRef`.
             //
-            SLANG_UNEXPECTED("reflexive type witness");
-            UNREACHABLE_RETURN(nullptr);
+            auto witness = m_astBuilder->create<TypeEqualityWitness>();
+            witness->sub = subType;
+            witness->sup = subType;
+            return witness;
         }
 
         // We might have one or more steps in the breadcrumb trail, e.g.:

@@ -358,33 +358,36 @@ Result linkAndOptimizeIR(
     // perform specialization of functions based on parameter
     // values that need to be compile-time constants.
     //
+    // Specialization passes and auto-diff passes runs in an iterative loop
+    // since each pass can enable the other pass to progress further.
+    for (;;)
+    {
+        bool changed = false;
 
-    dumpIRIfEnabled(codeGenContext, irModule, "BEFORE-SPECIALIZE");
-    if (!codeGenContext->isSpecializationDisabled())
-        specializeModule(irModule);
-    dumpIRIfEnabled(codeGenContext, irModule, "AFTER-SPECIALIZE");
+        dumpIRIfEnabled(codeGenContext, irModule, "BEFORE-SPECIALIZE");
+        if (!codeGenContext->isSpecializationDisabled())
+            changed |= specializeModule(irModule);
+        dumpIRIfEnabled(codeGenContext, irModule, "AFTER-SPECIALIZE");
 
-    applySparseConditionalConstantPropagation(irModule);
-    eliminateDeadCode(irModule);
+        validateIRModuleIfEnabled(codeGenContext, irModule);
+    
+        // Inline calls to any functions marked with [__unsafeInlineEarly] again,
+        // since we may be missing out cases prevented by the functions that we just specialzied.
+        performMandatoryEarlyInlining(irModule);
 
+        dumpIRIfEnabled(codeGenContext, irModule, "BEFORE-AUTODIFF");
+        changed |= processAutodiffCalls(irModule, sink);
+        dumpIRIfEnabled(codeGenContext, irModule, "AFTER-AUTODIFF");
+
+        if (!changed)
+            break;
+    }
+    
     lowerReinterpret(targetRequest, irModule, sink);
 
     validateIRModuleIfEnabled(codeGenContext, irModule);
-    
-    // Inline calls to any functions marked with [__unsafeInlineEarly] again,
-    // since we may be missing out cases prevented by the functions that we just specialzied.
-    performMandatoryEarlyInlining(irModule);
 
-    dumpIRIfEnabled(codeGenContext, irModule, "BEFORE-AUTODIFF");
-    
-    processAutodiffCalls(irModule, sink);
-
-    dumpIRIfEnabled(codeGenContext, irModule, "AFTER-AUTODIFF");
-
-    validateIRModuleIfEnabled(codeGenContext, irModule);
-
-    applySparseConditionalConstantPropagation(irModule);
-    eliminateDeadCode(irModule);
+    simplifyIR(irModule);
 
     // For targets that supports dynamic dispatch, we need to lower the
     // generics / interface types to ordinary functions and types using

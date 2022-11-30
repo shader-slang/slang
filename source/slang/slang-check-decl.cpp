@@ -4715,7 +4715,8 @@ namespace Slang
             maybeRegisterDifferentiableType(m_astBuilder, decl->returnType.type);
             if (as<ConstructorDecl>(decl) || !isEffectivelyStatic(decl))
             {
-                auto thisType = calcThisType(makeDeclRef(decl));
+                auto parentDeclRef = createDefaultSubstitutionsIfNeeded(m_astBuilder, this, makeDeclRef(decl->parentDecl));
+                auto thisType = calcThisType(parentDeclRef);
                 maybeRegisterDifferentiableType(m_astBuilder, thisType);
             }
             m_parentDifferentiableAttr = oldAttr;
