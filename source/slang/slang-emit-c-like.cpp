@@ -2261,6 +2261,24 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
         m_writer->emit(")");
         break;
     }
+    case kIROp_GetStringHash:
+    {
+        auto getStringHashInst = as<IRGetStringHash>(inst);
+        auto stringLit = getStringHashInst->getStringLit();
+
+        if (stringLit)
+        {
+            auto slice = stringLit->getStringSlice();
+            m_writer->emit(static_cast<int32_t>(getStableHashCode32(slice.begin(), slice.getLength())));
+        }
+        else
+        {
+            // Couldn't handle 
+            diagnoseUnhandledInst(inst);
+        }
+        break;
+    }
+
     default:
         diagnoseUnhandledInst(inst);
         break;
