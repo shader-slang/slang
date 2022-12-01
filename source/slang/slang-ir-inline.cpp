@@ -517,6 +517,100 @@ void performMandatoryEarlyInlining(IRModule* module)
     pass.considerAllCallSites();
 }
 
+namespace { // anonymous
+
+struct StringEarlyInliningPass : InliningPassBase
+{
+    typedef InliningPassBase Super;
+
+    StringEarlyInliningPass(IRModule* module)
+        : Super(module)
+    {}
+
+    bool doesTypeRequireInline(IRType* type)
+    {
+        // I guess there is a question here about what type around string requires
+        // inlining. 
+        const auto op = type->getOp();
+        switch (op)
+        {
+            case kIROp_StringType:
+            case kIROp_NativeStringType:
+            {
+                return true;
+            }
+            default: break;
+        }
+
+        return false;
+    }
+
+    bool _shouldInline(CallSiteInfo const& info)
+    {
+        auto callee = info.callee;
+
+        if (doesTypeRequireInline(callee->getResultType()))
+        {
+            return true;
+        }
+
+        const auto count = Count(callee->getParamCount());
+        for (Index i = 0; i < count; ++i)
+        {
+            if (doesTypeRequireInline(callee->getParamType(UInt(i))))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    bool shouldInline(CallSiteInfo const& info)
+    {
+        if (_shouldInline(info))
+        {
+            m_didInline = true;
+            return true;
+        }
+        return false;
+    }
+
+    bool m_didInline = false;
+};
+
+} // anonymous
+
+void performStringInlining(IRModule* module)
+{
+    // TODO(JS): 
+    // This is perhaps not as efficient as might be desirable. 
+    // A more optimized version might not need to pass over all of the module
+    // to find new call sites. 
+    // For now it's simple though.
+    //
+    // Another problem here is recursion. Right now Slang compiler doesn't accept recursive input.
+    // but the Slang language doesn't. 
+    // There are GPU targets that allow recursion (such as CUDA).
+    //
+    // We don't want the possibility of hit an infinite loop here.
+
+    while(true)
+   {
+        StringEarlyInliningPass pass(module);
+        pass.considerAllCallSites();
+
+        // If inlining took place, it could lead to *another* call site that requires
+        // inlining, so attempt to inline again.
+        if (pass.m_didInline)
+        {
+            continue;
+        }
+
+        break;
+    }
+}
+
 struct ForceInliningPass : InliningPassBase
 {
     typedef InliningPassBase Super;

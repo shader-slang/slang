@@ -6,6 +6,9 @@ namespace Slang
     struct IRModule;
     struct IRCall;
 
+        /// Any call to a function that takes or returns a string parameter is inlined
+    void performStringInlining(IRModule* module);
+
         /// Inline any call sites to functions marked `[unsafeForceInlineEarly]`
     void performMandatoryEarlyInlining(IRModule* module);
 

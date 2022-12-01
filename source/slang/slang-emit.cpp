@@ -371,6 +371,13 @@ Result linkAndOptimizeIR(
 
     validateIRModuleIfEnabled(codeGenContext, irModule);
     
+
+    // If the target isn't CPU like, inline functions with string
+    if (!ArtifactDescUtil::isCpuLikeTarget(artifactDesc))
+    {
+        performStringInlining(irModule);
+    }
+
     // Inline calls to any functions marked with [__unsafeInlineEarly] again,
     // since we may be missing out cases prevented by the functions that we just specialzied.
     performMandatoryEarlyInlining(irModule);
