@@ -519,11 +519,12 @@ void performMandatoryEarlyInlining(IRModule* module)
 
 namespace { // anonymous
 
-struct StringEarlyInliningPass : InliningPassBase
+// Inlines calls that involve String types
+struct StringInliningPass : InliningPassBase
 {
     typedef InliningPassBase Super;
 
-    StringEarlyInliningPass(IRModule* module)
+    StringInliningPass(IRModule* module)
         : Super(module)
     {}
 
@@ -572,8 +573,10 @@ struct StringEarlyInliningPass : InliningPassBase
 
 } // anonymous
 
-void performStringInlining(IRModule* module)
+Result performStringInlining(IRModule* module, DiagnosticSink* sink)
 {
+    SLANG_UNUSED(sink);
+
     // TODO(JS): 
     // This is perhaps not as efficient as might be desirable. 
     // A more optimized version might not need to pass over all of the module
@@ -588,15 +591,20 @@ void performStringInlining(IRModule* module)
     // 
     while(true)
     {
-        StringEarlyInliningPass pass(module);
+        StringInliningPass pass(module);
         if (pass.considerAllCallSites())
         {
             // If there was a change try inlining again
             continue;
         }
-        
+     
+        // Done.
         break;
     }
+
+    
+
+    return SLANG_OK;
 }
 
 struct ForceInliningPass : InliningPassBase

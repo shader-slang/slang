@@ -53,6 +53,8 @@
 #include "slang-ir-wrap-structured-buffers.h"
 #include "slang-ir-liveness.h"
 #include "slang-ir-glsl-liveness.h"
+#include "slang-ir-string-hash.h"
+
 #include "slang-legalize-types.h"
 #include "slang-lower-to-ir.h"
 #include "slang-mangle.h"
@@ -390,8 +392,7 @@ Result linkAndOptimizeIR(
     {
         // We could fail because
         // 1) It's not inlinable for some reason (for example if it's recursive)
-        // 2) We could (perhaps, somehow) end up with getStringHash that the operand is not a string literal
-        performStringInlining(irModule);
+        SLANG_RETURN_ON_FAIL(performStringInlining(irModule, sink));
     }
 
     lowerReinterpret(targetRequest, irModule, sink);
@@ -399,6 +400,13 @@ Result linkAndOptimizeIR(
     validateIRModuleIfEnabled(codeGenContext, irModule);
 
     simplifyIR(irModule);
+
+    if (!ArtifactDescUtil::isCpuLikeTarget(artifactDesc))
+    {
+        // We could fail because
+        // 1) We could (perhaps, somehow) end up with getStringHash that the operand is not a string literal
+        SLANG_RETURN_ON_FAIL(checkGetStringHashInsts(irModule, sink));
+    }
 
     // For targets that supports dynamic dispatch, we need to lower the
     // generics / interface types to ordinary functions and types using
