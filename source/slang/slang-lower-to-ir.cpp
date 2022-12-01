@@ -8,7 +8,7 @@
 #include "slang-ir-constexpr.h"
 #include "slang-ir-dce.h"
 #include "slang-ir-diff-call.h"
-#include "slang-ir-diff-jvp.h"
+#include "slang-ir-autodiff.h"
 #include "slang-ir-inline.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-check-differentiability.h"
@@ -1398,6 +1398,27 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
             midToSup));
     }
 
+    LoweredValInfo visitForwardDifferentiateVal(ForwardDifferentiateVal* val)
+    {
+        // TODO: properly fill in type info here.
+        // We should consider fold all cases of witness table entries to `Val`, and make the `DeclRef` case a `DeclRefVal`.
+        // So that we can hold the type in `DeclRefVal`.
+        auto funcVal = emitDeclRef(context, val->func, context->irBuilder->getTypeKind());
+        SLANG_RELEASE_ASSERT(funcVal.flavor == LoweredValInfo::Flavor::Simple);
+
+        auto diff = getBuilder()->emitForwardDifferentiateInst(getBuilder()->getTypeKind(), funcVal.val);
+        return LoweredValInfo::simple(diff);
+    }
+
+    LoweredValInfo visitBackwardDifferentiateVal(BackwardDifferentiateVal* val)
+    {
+        auto funcVal = emitDeclRef(context, val->func, context->irBuilder->getTypeKind());
+        SLANG_RELEASE_ASSERT(funcVal.flavor == LoweredValInfo::Flavor::Simple);
+
+        auto diff = getBuilder()->emitBackwardDifferentiateInst(getBuilder()->getTypeKind(), funcVal.val);
+        return LoweredValInfo::simple(diff);
+    }
+
     LoweredValInfo visitDifferentialBottomSubtypeWitness(DifferentialBottomSubtypeWitness*)
     {
         return LoweredValInfo();
@@ -2052,6 +2073,12 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
     {
         SLANG_UNUSED(astVal);
         return LoweredValInfo::simple(getBuilder()->getAttr(kIROp_SNormAttr));
+    }
+
+    LoweredValInfo visitNoDiffModifierVal(NoDiffModifierVal* astVal)
+    {
+        SLANG_UNUSED(astVal);
+        return LoweredValInfo::simple(getBuilder()->getAttr(kIROp_NoDiffAttr));
     }
 
     // We do not expect to encounter the following types in ASTs that have
@@ -2762,7 +2789,7 @@ IRLoweringParameterInfo getParameterInfo(
 {
     IRLoweringParameterInfo info;
 
-    info.type = getType(context->astBuilder, paramDecl);
+    info.type = getParamType(context->astBuilder, paramDecl);
     info.decl = paramDecl;
     info.direction = getParameterDirection(paramDecl);
     info.isThisParam = false;
@@ -3118,7 +3145,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
     {
         auto baseVal = lowerSubExpr(expr->innerExpr);
         SLANG_ASSERT(baseVal.flavor == LoweredValInfo::Flavor::Simple);
-        getBuilder()->addDecoration(baseVal.val, kIROp_TreatAsDifferentiableCallDecoration);
+        getBuilder()->addDecoration(baseVal.val, kIROp_TreatAsDifferentiableDecoration);
         return baseVal;
     }
 
@@ -6786,6 +6813,24 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         return LoweredValInfo::simple(assocType);
     }
 
+    void insertRequirementKeyAssociation(IRInterfaceType* interfaceType, Decl* requirementDecl, IRInst* originalKey, IRInst* associatedKey)
+    {
+        auto decor = interfaceType->findDecoration<IRDifferentiableMethodRequirementDictionaryDecoration>();
+        if (!decor)
+        {
+            decor =
+                (IRDifferentiableMethodRequirementDictionaryDecoration*)
+                    context->irBuilder->addDecoration(
+                        interfaceType, kIROp_DifferentiableMethodRequirementDictionaryDecoration);
+        }
+        auto op = as<ForwardDerivativeRequirementDecl>(requirementDecl)
+                      ? kIROp_ForwardDifferentiableMethodRequirementDictionaryItem
+                      : kIROp_BackwardDifferentiableMethodRequirementDictionaryItem;
+        IRInst* args[] = {originalKey, associatedKey};
+        auto assoc = context->irBuilder->emitIntrinsicInst(nullptr, op, 2, args);
+        assoc->insertAtEnd(decor);
+    }
+
     LoweredValInfo visitInterfaceDecl(InterfaceDecl* decl)
     {
         // The members of an interface will turn into the keys that will
@@ -6828,7 +6873,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
         // Allocate an IRInterfaceType with the `operandCount` operands.
         IRInterfaceType* irInterface = subBuilder->createInterfaceType(operandCount, nullptr);
-        
+
         // Add `irInterface` to decl mapping now to prevent cyclic lowering.
         setValue(context, decl, LoweredValInfo::simple(irInterface));
 
@@ -6907,12 +6952,22 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             }
             else
             {
+                if (auto callableDecl = as<CallableDecl>(requirementDecl))
+                {
+                    // Differentiable functions has additional requirements for the derivatives.
+                    for (auto diffDecl : callableDecl->getMembersOfType<DerivativeRequirementReferenceDecl>())
+                    {
+                        auto diffKey = getInterfaceRequirementKey(diffDecl->referencedDecl);
+                        insertRequirementKeyAssociation(irInterface, diffDecl->referencedDecl, requirementKey, diffKey);
+                    }
+                }
                 // Add lowered requirement entry to current decl mapping to prevent
                 // the function requirements from being lowered again when we get to
                 // `ensureAllDeclsRec`.
                 setValue(context, requirementDecl, LoweredValInfo::simple(entry));
             }
         }
+
 
         addNameHint(context, irInterface, decl);
         addLinkageDecoration(context, irInterface, decl);
@@ -6932,6 +6987,11 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         {
             subBuilder->addBuiltinDecoration(irInterface);
         }
+        if (decl->hasModifier<TreatAsDifferentiableAttribute>())
+        {
+            subBuilder->addDecoration(irInterface, kIROp_TreatAsDifferentiableDecoration);
+        }
+
         subBuilder->setInsertInto(irInterface);
         // TODO: are there any interface members that should be
         // nested inside the interface type itself?
@@ -8256,6 +8316,11 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         if (decl->findModifier<ForceInlineAttribute>())
         {
             getBuilder()->addDecoration(irFunc, kIROp_ForceInlineDecoration);
+        }
+
+        if (decl->findModifier<TreatAsDifferentiableAttribute>())
+        {
+            getBuilder()->addDecoration(irFunc, kIROp_TreatAsDifferentiableDecoration);
         }
 
         // Register the value now, to avoid any possible infinite recursion when lowering ForwardDerivativeAttribute

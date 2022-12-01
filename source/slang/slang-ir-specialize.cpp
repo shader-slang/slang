@@ -44,6 +44,8 @@ struct SpecializationContext
     // we are specializing.
     IRModule* module;
 
+    bool changed = false;
+
     // We know that we can only perform generic specialization when all
     // of the arguments to a generic are also fully specialized.
     // The "is fully specialized" condition is something we
@@ -793,8 +795,6 @@ struct SpecializationContext
         SharedIRBuilder* sharedBuilder = &sharedBuilderStorage;
         sharedBuilder->init(module);
 
-        bool changed = true;
-
         // Read specialization dictionary from module if it is defined.
         // This prevents us from generating duplicated specializations
         // when this pass is invoked iteratively.
@@ -839,9 +839,9 @@ struct SpecializationContext
         // We start out simple by putting the root instruction for the
         // module onto our work list.
         //
-        while (changed)
+        for (;;)
         {
-            changed = false;
+            bool iterChanged = false;
             addToWorkList(module->getModuleInst());
 
             while (workList.Count() != 0)
@@ -868,7 +868,7 @@ struct SpecializationContext
                     // specialization opportunities (generic specialization,
                     // existential specialization, simplifications, etc.)
                     //
-                    changed |= maybeSpecializeInst(inst);
+                    iterChanged |= maybeSpecializeInst(inst);
 
                     // Finally, we need to make our logic recurse through
                     // the whole IR module, so we want to add the children
@@ -896,8 +896,15 @@ struct SpecializationContext
                 addDirtyInstsToWorkListRec(module->getModuleInst());
             }
 
-            if (changed)
+            if (iterChanged)
+            {
                 simplifyIR(module);
+                this->changed = true;
+            }
+            else
+            {
+                break;
+            }
         }
 
         // Once the work list has gone dry, we should have the invariant
@@ -1776,6 +1783,11 @@ struct SpecializationContext
             type = sbType->getElementType();
             goto top;
         }
+        else if (auto attributedType = as<IRAttributedType>(type))
+        {
+            type = attributedType->getBaseType();
+            goto top;
+        }
         else if( auto structType = as<IRStructType>(type) )
         {
             UInt count = 0;
@@ -2070,6 +2082,11 @@ struct SpecializationContext
             type = sbType->getElementType();
             goto top;
         }
+        else if (auto attributedType = as<IRAttributedType>(type))
+        {
+            type = attributedType->getBaseType();
+            goto top;
+        }
         else if( auto structType = as<IRStructType>(type) )
         {
             UInt count = 0;
@@ -2114,7 +2131,8 @@ struct SpecializationContext
         }
         else if( as<IRPointerLikeType>(baseType) ||
                  as<IRHLSLStructuredBufferTypeBase>(baseType) ||
-                 as<IRArrayTypeBase>(baseType))
+                 as<IRArrayTypeBase>(baseType) ||
+                 as<IRAttributedType>(baseType) )
         {
             // A `BindExistentials<P<T>, ...>` can be simplified to
             // `P<BindExistentials<T, ...>>` when `P` is a pointer-like
@@ -2127,6 +2145,8 @@ struct SpecializationContext
                 baseElementType = arrayType->getElementType();
             else if (auto baseSBType = as<IRHLSLStructuredBufferTypeBase>(baseType))
                 baseElementType = baseSBType->getElementType();
+            else if (auto baseAttrType = as<IRAttributedType>(baseType))
+                baseElementType = baseAttrType->getBaseType();
 
             IRInst* wrappedElementType = builder.getBindExistentialsType(
                 baseElementType,
@@ -2283,12 +2303,13 @@ struct SpecializationContext
     }
 };
 
-void specializeModule(
+bool specializeModule(
     IRModule*   module)
 {
     SpecializationContext context;
     context.module = module;
     context.processModule();
+    return context.changed;
 }
 
 

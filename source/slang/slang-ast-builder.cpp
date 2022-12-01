@@ -141,16 +141,6 @@ Type* SharedASTBuilder::getNoneType()
     return m_noneType;
 }
 
-Type* SharedASTBuilder::getDifferentialBottomType()
-{
-    if (!m_diffBottomType)
-    {
-        auto diffBottomTypeDecl = findMagicDecl("DifferentialBottomType");
-        m_diffBottomType = DeclRefType::create(m_astBuilder, makeDeclRef<Decl>(diffBottomTypeDecl));
-    }
-    return m_diffBottomType;
-}
-
 SharedASTBuilder::~SharedASTBuilder()
 {
     // Release built in types..
@@ -416,6 +406,11 @@ Val* ASTBuilder::getUNormModifierVal()
 Val* ASTBuilder::getSNormModifierVal()
 {
     return getOrCreate<SNormModifierVal>();
+}
+
+Val* ASTBuilder::getNoDiffModifierVal()
+{
+    return getOrCreate<NoDiffModifierVal>();
 }
 
 TypeType* ASTBuilder::getTypeType(Type* type)

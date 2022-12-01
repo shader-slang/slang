@@ -132,28 +132,6 @@ interface IDifferentiable
     static Differential dmul(This, Differential);
 };
 
-__magic_type(DifferentialBottomType)
-__intrinsic_type($(kIROp_DifferentialBottomType))
-struct __DifferentialBottom : IDifferentiable
-{
-    typedef __DifferentialBottom Differential;
-
-    __intrinsic_op($(kIROp_DifferentialBottomValue))
-    static __DifferentialBottom dzero();
-
-    [__unsafeForceInlineEarly]
-    static __DifferentialBottom dadd(Differential a, Differential b)
-    {
-        return dzero();
-    }
-
-    [__unsafeForceInlineEarly]
-    static __DifferentialBottom dmul(This a, Differential b)
-    {
-        return dzero();
-    }
-}
-
 /// A type that can represent non-integers
 [sealed]
 [builtin]
@@ -2539,6 +2517,10 @@ interface IComparable
     bool lessThanOrEquals(This other);
 }
 
+__attributeTarget(DeclBase)
+attribute_syntax [TreatAsDifferentiable] : TreatAsDifferentiableAttribute;
+
+[TreatAsDifferentiable]
 interface IArithmetic : IComparable
 {
     This add(This other);

@@ -72,6 +72,21 @@ namespace gfx_test
         return SLANG_OK;
     }
 
+    Slang::Result loadComputeProgramFromSource(
+        gfx::IDevice* device,
+        Slang::ComPtr<gfx::IShaderProgram>& outShaderProgram,
+        Slang::String source)
+    {
+        Slang::ComPtr<slang::IBlob> diagnosticsBlob;
+
+        gfx::IShaderProgram::CreateDesc2 programDesc = {};
+        programDesc.sourceType = gfx::ShaderModuleSourceType::SlangSource;
+        programDesc.sourceData = (void*)source.getBuffer();
+        programDesc.sourceDataSize = source.getLength();
+
+        return device->createProgram2(programDesc, outShaderProgram.writeRef(), diagnosticsBlob.writeRef());
+    }
+
     Slang::Result loadGraphicsProgram(
         gfx::IDevice* device,
         Slang::ComPtr<gfx::IShaderProgram>& outShaderProgram,

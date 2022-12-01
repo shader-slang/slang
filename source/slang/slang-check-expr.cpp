@@ -160,6 +160,7 @@ namespace Slang
             ExtractExistentialValueExpr* openedValue = m_astBuilder->create<ExtractExistentialValueExpr>();
             openedValue->declRef = varDeclRef;
             openedValue->type = QualType(openedType);
+            openedValue->originalExpr = expr;
 
             // The result of opening an existential is an l-value
             // if the original existential is an l-value.
@@ -1053,6 +1054,14 @@ namespace Slang
         else if (auto overloadedExpr2 = as<OverloadedExpr2>(expr))
         {
             return overloadedExpr2->base;
+        }
+        else if (auto genApp = as<GenericAppExpr>(expr))
+        {
+            return GetBaseExpr(genApp->functionExpr);
+        }
+        else if (auto partiallyApplied = as<PartiallyAppliedGenericExpr>(expr))
+        {
+            return GetBaseExpr(partiallyApplied->originalExpr);
         }
         return nullptr;
     }
@@ -2043,6 +2052,12 @@ namespace Slang
 
     Type* SemanticsVisitor::getDifferentialPairType(Type* primalType)
     {
+        if (auto modifiedType = as<ModifiedType>(primalType))
+        {
+            if (modifiedType->findModifier<NoDiffModifierVal>())
+                return modifiedType->base;
+        }
+
         // Get a reference to the builtin 'IDifferentiable' interface
         auto differentiableInterface = m_astBuilder->getDifferentiableInterface();
 
@@ -3377,6 +3392,10 @@ namespace Slang
         {
             // TODO: validate that `type` is either `float` or a vector of `float`s
             return m_astBuilder->getSNormModifierVal();
+        }
+        else if (auto noDiffModifier = as<NoDiffModifier>(modifier))
+        {
+            return m_astBuilder->getNoDiffModifierVal();
         }
         else
         {

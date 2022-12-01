@@ -780,6 +780,20 @@ Val* SNormModifierVal::_substituteImplOverride(ASTBuilder* astBuilder, Substitut
     return this;
 }
 
+// NoDiffModifierVal
+void NoDiffModifierVal::_toTextOverride(StringBuilder& out)
+{
+    out.append("no_diff");
+}
+
+Val* NoDiffModifierVal::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff)
+{
+    SLANG_UNUSED(astBuilder);
+    SLANG_UNUSED(subst);
+    SLANG_UNUSED(ioDiff);
+    return this;
+}
+
 // PolynomialIntVal
 
 bool PolynomialIntVal::_equalsValOverride(Val* val)
@@ -1515,5 +1529,45 @@ Val* WitnessLookupIntVal::tryFold(ASTBuilder* astBuilder, SubtypeWitness* witnes
     witnessResult->type = type;
     return witnessResult;
 }
+
+
+bool DifferentiateVal::_equalsValOverride(Val* val)
+{
+    if (auto other = as<DifferentiateVal>(val))
+    {
+        return other->astNodeType == astNodeType && other->func == func;
+    }
+    return false;
+}
+
+void DifferentiateVal::_toTextOverride(StringBuilder& out)
+{
+    out << "DifferentiateVal(";
+    out << func;
+    out << ")";
+}
+
+HashCode DifferentiateVal::_getHashCodeOverride()
+{
+    HashCode result = (HashCode)astNodeType;
+    result = combineHash(result, func.getHashCode());
+    return result;
+}
+
+Val* DifferentiateVal::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff)
+{
+    int diff = 0;
+    auto newFunc = func.substituteImpl(astBuilder, subst, &diff);
+    *ioDiff += diff;
+    if (diff)
+    {
+        auto result = as<DifferentiateVal>(astBuilder->createByNodeType(astNodeType));
+        result->func = newFunc;
+        return result;
+    }
+    // Nothing found: don't substitute.
+    return this;
+}
+
 
 } // namespace Slang

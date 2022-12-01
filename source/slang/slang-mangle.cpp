@@ -517,6 +517,10 @@ namespace Slang
             emitQualifiedName(context, innerDecl);
             return;
         }
+        else if (as<ForwardDerivativeRequirementDecl>(decl))
+            emitRaw(context, "FwdReq_");
+        else if (as<BackwardDerivativeRequirementDecl>(decl))
+            emitRaw(context, "BwdReq_");
         else
         {
             // TODO: handle other cases

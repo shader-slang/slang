@@ -263,6 +263,8 @@ List<Edit> formatSource(UnownedStringSlice text, Index lineStart, Index lineEnd,
             }
             else if (!originalHasLineBreak && newHasLineBreak)
             {
+                if (edt.offset < text.getLength() && edt.offset >= 0 && text[edt.offset] == '}')
+                    continue;
                 edt.text = " ";
             }
             else

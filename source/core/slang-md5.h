@@ -22,7 +22,7 @@
  *
  * See md5.c for more information.
  */
- 
+
 #ifdef HAVE_OPENSSL
 #include <openssl/md5.h>
 #elif !defined(_MD5_H)
@@ -51,34 +51,13 @@ namespace Slang
     public:
         void init(MD5Context* ctx);
 
-        // Helper update function for raw values (e.g. ints, uints)
-        template<typename T,
-            typename = typename std::enable_if<std::is_enum<T>::value || std::is_arithmetic<T>::value>::type>
-        void update(MD5Context* ctx, const T& val)
-        {
-            update(ctx, &val, sizeof(T));
-        }
-        // Helper update function for Slang::List
-        template<typename T>
-        void update(MD5Context* ctx, const List<T>& list)
-        {
-            update(ctx, list.getBuffer(), list.getCount());
-        }
-        // Helper update function for UnownedStringSlice
-        void update(MD5Context* ctx, UnownedStringSlice string);
-        // Helper update function for Slang::String
-        void update(MD5Context* ctx, String str);
-        // Helper update function for Checksums
-        void update(MD5Context* ctx, const slang::Digest& checksum);
-        // Helper update function for ISlangBlob
-        void update(MD5Context* ctx, ISlangBlob* blob);
+        void update(MD5Context* ctx, const void* data, SlangInt size);
 
         void finalize(MD5Context* ctx, slang::Digest* result);
 
     private:
         static const void* body(MD5Context* ctx, const void* data, SlangInt size);
-        void update(MD5Context* ctx, const void* data, SlangInt size);
     };
 }
- 
+
 #endif

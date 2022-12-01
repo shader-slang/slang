@@ -32,10 +32,9 @@ void PreprocessorHandler::handleEndOfTranslationUnit(Preprocessor* preprocessor)
     SLANG_UNUSED(preprocessor);
 }
 
-void PreprocessorHandler::handleFileDependency(String const& path, ISlangBlob* contents)
+void PreprocessorHandler::handleFileDependency(String const& path)
 {
     SLANG_UNUSED(path);
-    SLANG_UNUSED(contents);
 }
 
 // In order to simplify the naming scheme, we will nest the implementaiton of the
@@ -2973,7 +2972,7 @@ static SlangResult readFile(
     //
     if( auto handler = context->m_preprocessor->handler )
     {
-        handler->handleFileDependency(path, *outBlob);
+        handler->handleFileDependency(path);
     }
 
     return SLANG_OK;

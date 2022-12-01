@@ -60,7 +60,6 @@ INST(Nop, nop, 0, 0)
     INST(OptionalType, Optional, 1, 0)
 
     INST(DifferentialPairType, DiffPair, 1, 0)
-    INST(DifferentialBottomType, DiffBottomType, 0, 0)
 
     /* BindExistentialsTypeBase */
 
@@ -728,16 +727,19 @@ INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
         /// generated derivative function.
     INST(BackwardDifferentiableDecoration, backwardDifferentiable, 1, 0)
 
-        /// Used by the auto-diff pass to hold a reference to the
-        /// generated derivative function.
+        /// Decorated function is marked for the reverse-mode differentiation pass.
     INST(BackwardDerivativeDecoration, backwardDiffReference, 1, 0)
+
+        /// Used by the auto-diff pass to mark insts that compute
+        /// a differential value.
+    INST(DifferentialInstDecoration, diffInstDecoration, 0, 0)
 
         /// Used by the auto-diff pass to hold a reference to a
         /// differential member of a type in its associated differential type.
     INST(DerivativeMemberDecoration, derivativeMemberDecoration, 1, 0)
 
-        /// Treat the IRCall as a call to a differentiable function.
-    INST(TreatAsDifferentiableCallDecoration, treatAsDifferentiableCallDecoration, 0, 0)
+        /// Treat a function as differentiable function, or an IRCall as a call to a differentiable function.
+    INST(TreatAsDifferentiableDecoration, treatAsDifferentiableDecoration, 0, 0)
 
         /// Marks a class type as a COM interface implementation, which enables
         /// the witness table to be easily picked up by emit.
@@ -745,6 +747,9 @@ INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
 
     /* Differentiable Type Dictionary */
     INST(DifferentiableTypeDictionaryDecoration, DifferentiableTypeDictionaryDecoration, 0, PARENT)
+
+        /// Decorates an interface type and stores the mapping from a normal function requirement key to its derivative requirement key.
+    INST(DifferentiableMethodRequirementDictionaryDecoration, DifferentiableMethodRequirementDictionaryDecoration, 0, PARENT)
 
         /// Marks a struct type as being used as a structured buffer block.
         /// Recognized by SPIRV-emit pass so we can emit a SPIRV `BufferBlock` decoration.
@@ -821,6 +826,8 @@ INST_RANGE(Layout, VarLayout, EntryPointLayout)
     INST(CaseTypeLayoutAttr, caseLayout, 1, 0)
     INST(UNormAttr, unorm, 0, 0)
     INST(SNormAttr, snorm, 0, 0)
+    INST(NoDiffAttr, no_diff, 0, 0)
+
     /* SemanticAttr */
         INST(UserSemanticAttr, userSemantic, 2, 0)
         INST(SystemValueSemanticAttr, systemValueSemantic, 2, 0)
@@ -845,6 +852,11 @@ INST(ExistentialTypeSpecializationDictionary, ExistentialTypeSpecializationDicti
 
 /* Differentiable Type Dictionary */
 INST(DifferentiableTypeDictionaryItem, DifferentiableTypeDictionaryItem, 0, 0)
+
+/* DifferentiableMethodRequirementDictionaryItem */
+    INST(ForwardDifferentiableMethodRequirementDictionaryItem, DifferentiableMethodRequirementDictionaryItem, 0, 0)
+    INST(BackwardDifferentiableMethodRequirementDictionaryItem, DifferentiableMethodRequirementDictionaryItem, 0, 0)
+INST_RANGE(DifferentiableMethodRequirementDictionaryItem, ForwardDifferentiableMethodRequirementDictionaryItem, BackwardDifferentiableMethodRequirementDictionaryItem)
 
 #undef PARENT
 #undef USE_OTHER
