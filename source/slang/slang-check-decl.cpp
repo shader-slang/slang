@@ -107,6 +107,9 @@ namespace Slang
 
         void visitAccessorDecl(AccessorDecl* decl);
         void visitSetterDecl(SetterDecl* decl);
+
+        void cloneModifiers(Decl* dest, Decl* src);
+        void setFuncTypeIntoRequirementDecl(CallableDecl* decl, FuncType* funcType);
     };
 
     struct SemanticsDeclRedeclarationVisitor
@@ -255,8 +258,6 @@ namespace Slang
         void visitFunctionDeclBase(FunctionDeclBase* funcDecl);
 
         void visitParamDecl(ParamDecl* paramDecl);
-
-        void _maybeRegisterDifferentialBottomTypeConformance(SemanticsContext& context);
 
         void checkDerivativeOfAttribute(FunctionDeclBase* funcDecl);
 
@@ -1866,6 +1867,32 @@ namespace Slang
             return false;
         }
 
+        bool hasBackwardDerivative = false;
+        bool hasForwardDerivative = false;
+        if (requiredMemberDeclRef.getDecl()->hasModifier<BackwardDifferentiableAttribute>())
+        {
+            if (!satisfyingMemberDeclRef.getDecl()->hasModifier<BackwardDifferentiableAttribute>()
+                && !satisfyingMemberDeclRef.getDecl()->hasModifier<BackwardDerivativeAttribute>())
+            {
+                // A non-`BackwardDifferentiable` method can't satisfy a `BackwardDifferentiable` requirement and vice versa.
+                return false;
+            }
+            hasBackwardDerivative = true;
+            hasForwardDerivative = true;
+        }
+        else if (requiredMemberDeclRef.getDecl()->hasModifier<ForwardDifferentiableAttribute>())
+        {
+            if (!satisfyingMemberDeclRef.getDecl()->hasModifier<ForwardDifferentiableAttribute>()
+                && !satisfyingMemberDeclRef.getDecl()->hasModifier<ForwardDerivativeAttribute>()
+                && !satisfyingMemberDeclRef.getDecl()->hasModifier<BackwardDifferentiableAttribute>()
+                && !satisfyingMemberDeclRef.getDecl()->hasModifier<BackwardDerivativeAttribute>())
+            {
+                // A non-`ForwardDifferentiable` method can't satisfy a `ForwardDifferentiable` requirement and vice versa.
+                return false;
+            }
+            hasForwardDerivative = true;
+        }
+
         // A signature matches the required one if it has the right number of parameters,
         // and those parameters have the right types, and also the result/return type
         // is the required one.
@@ -1896,6 +1923,34 @@ namespace Slang
         witnessTable->add(
             requiredMemberDeclRef.getDecl(),
             RequirementWitness(satisfyingMemberDeclRef));
+
+        if (hasForwardDerivative || hasBackwardDerivative)
+        {
+            int fwdReqFound = 0;
+            int bwdReqFound = 0;
+            for (auto reqRefDecl : requiredMemberDeclRef.getDecl()->getMembersOfType<DerivativeRequirementReferenceDecl>())
+            {
+                if (auto fwdReq = as<ForwardDerivativeRequirementDecl>(reqRefDecl->referencedDecl))
+                {
+                    ForwardDifferentiateVal* val = m_astBuilder->create<ForwardDifferentiateVal>();
+                    val->func = satisfyingMemberDeclRef;
+                    witnessTable->add(fwdReq, RequirementWitness(val));
+                    fwdReqFound++;
+                }
+                else if (auto bwdReq = as<BackwardDerivativeRequirementDecl>(reqRefDecl->referencedDecl))
+                {
+                    BackwardDifferentiateVal* val = m_astBuilder->create<BackwardDifferentiateVal>();
+                    val->func = satisfyingMemberDeclRef;
+                    witnessTable->add(bwdReq, RequirementWitness(val));
+                    bwdReqFound++;
+                }
+            }
+
+            SLANG_RELEASE_ASSERT(
+                fwdReqFound == (hasForwardDerivative ? 1 : 0) &&
+                bwdReqFound == (hasBackwardDerivative ? 1 : 0));
+        }
+
         return true;
     }
 
@@ -3260,73 +3315,52 @@ namespace Slang
         auto seqStmt = synth.pushSeqStmtScope();
         blockStmt->body = seqStmt;
 
-        if (synFunc->returnType.type->equals(m_astBuilder->getDifferentialBottomType()))
-        {
-            // Trivial case, the `Differential` type is `DifferentialBottom`.
-            // We will just return `DifferentialBottom.dzero()`.
-            auto resultExpr = m_astBuilder->create<InvokeExpr>();
-            auto dzeroMember = m_astBuilder->create<StaticMemberExpr>();
-            auto base = m_astBuilder->create<SharedTypeExpr>();
-            auto typetype = m_astBuilder->create<TypeType>();
-            typetype->type = m_astBuilder->getDifferentialBottomType();
-            base->type.type = typetype;
-            dzeroMember->baseExpression = base;
-            dzeroMember->name = getName("dzero");
-            resultExpr->functionExpr = dzeroMember;
-            auto synReturn = m_astBuilder->create<ReturnStmt>();
-            synReturn->expression = resultExpr;
-            seqStmt->stmts.add(synReturn);
-        }
-        else
-        {
-            // The general case. 
-            // Create a variable for return value.
-            synth.pushVarScope();
-            auto varStmt = synth.emitVarDeclStmt(synFunc->returnType.type, getName("result"));
-            auto resultVarExpr = synth.emitVarExpr(varStmt, synFunc->returnType.type);
+        // Create a variable for return value.
+        synth.pushVarScope();
+        auto varStmt = synth.emitVarDeclStmt(synFunc->returnType.type, getName("result"));
+        auto resultVarExpr = synth.emitVarExpr(varStmt, synFunc->returnType.type);
 
-            for (auto member : context->parentDecl->members)
+        for (auto member : context->parentDecl->members)
+        {
+            auto derivativeAttr = member->findModifier<DerivativeMemberAttribute>();
+            if (!derivativeAttr)
+                continue;
+            auto varMember = as<VarDeclBase>(member);
+            if (!varMember)
+                continue;
+            ensureDecl(varMember, DeclCheckState::ReadyForReference);
+            auto memberType = varMember->getType();
+            auto diffMemberType = tryGetDifferentialType(m_astBuilder, memberType);
+            if (!diffMemberType)
+                continue;
+
+            // Construct reference exprs to the member's corresponding fields in each parameter.
+            List<Expr*> paramFields;
+            int paramIndex = 0;
+            for (auto arg : synArgs)
             {
-                auto derivativeAttr = member->findModifier<DerivativeMemberAttribute>();
-                if (!derivativeAttr)
-                    continue;
-                auto varMember = as<VarDeclBase>(member);
-                if (!varMember)
-                    continue;
-                ensureDecl(varMember, DeclCheckState::ReadyForReference);
-                auto memberType = varMember->getType();
-                auto diffMemberType = tryGetDifferentialType(m_astBuilder, memberType);
-                if (!diffMemberType)
-                    continue;
-
-                // Construct reference exprs to the member's corresponding fields in each parameter.
-                List<Expr*> paramFields;
-                int paramIndex = 0;
-                for (auto arg : synArgs)
-                {
-                    auto memberExpr = m_astBuilder->create<MemberExpr>();
-                    memberExpr->baseExpression = arg;
-                    // TODO: we should probably fetch the name from `[DerivativeMember]` if `arg` is
-                    // Differential type.
-                    memberExpr->name = varMember->getName();
-                    paramFields.add(memberExpr);
-                    paramIndex++;
-                }
-
-                // Invoke the method for the field and assign the value to resultVar.
-                // TODO: we should probably fetch the name from `[DerivativeMember]` if `resultVarExpr`
-                // is Differential type.
-                auto leftVal = synth.emitMemberExpr(resultVarExpr, varMember->getName());
-                if (!_synthesizeMemberAssignMemberHelper(synth, requirementDeclRef.getName(), memberType, leftVal, _Move(paramFields)))
-                    return false;
+                auto memberExpr = m_astBuilder->create<MemberExpr>();
+                memberExpr->baseExpression = arg;
+                // TODO: we should probably fetch the name from `[DerivativeMember]` if `arg` is
+                // Differential type.
+                memberExpr->name = varMember->getName();
+                paramFields.add(memberExpr);
+                paramIndex++;
             }
 
-            // TODO: synthesize assignments for inherited members here.
-
-            auto synReturn = m_astBuilder->create<ReturnStmt>();
-            synReturn->expression = resultVarExpr;
-            seqStmt->stmts.add(synReturn);
+            // Invoke the method for the field and assign the value to resultVar.
+            // TODO: we should probably fetch the name from `[DerivativeMember]` if `resultVarExpr`
+            // is Differential type.
+            auto leftVal = synth.emitMemberExpr(resultVarExpr, varMember->getName());
+            if (!_synthesizeMemberAssignMemberHelper(synth, requirementDeclRef.getName(), memberType, leftVal, _Move(paramFields)))
+                return false;
         }
+
+        // TODO: synthesize assignments for inherited members here.
+
+        auto synReturn = m_astBuilder->create<ReturnStmt>();
+        synReturn->expression = resultVarExpr;
+        seqStmt->stmts.add(synReturn);
         
         context->parentDecl->members.add(synFunc);
         context->parentDecl->invalidateMemberDictionary();
@@ -3659,7 +3693,8 @@ namespace Slang
         {
             if(isAssociatedTypeDecl(requiredMemberDeclRef))
                 continue;
-
+            if (requiredMemberDeclRef.as<DerivativeRequirementDecl>())
+                continue;
             auto requirementSatisfied = findWitnessForInterfaceRequirement(
                 context,
                 subType,
@@ -4575,21 +4610,6 @@ namespace Slang
             getSink()->diagnose(decl, Slang::Diagnostics::assocTypeInInterfaceOnly);
     }
 
-    void SemanticsDeclBodyVisitor::_maybeRegisterDifferentialBottomTypeConformance(SemanticsContext& context)
-    {
-        auto parentDifferentiableAttr = context.getParentDifferentiableAttribute();
-        if (parentDifferentiableAttr)
-        {
-            auto diffBottomType = m_astBuilder->getDifferentialBottomType();
-            auto idifferentiable = DeclRef<InterfaceDecl>(m_astBuilder->getDifferentiableInterface(), nullptr);
-            auto witness = as<SubtypeWitness>(tryGetInterfaceConformanceWitness(diffBottomType, idifferentiable));
-            SLANG_ASSERT(witness);
-            parentDifferentiableAttr->m_mapTypeToIDifferentiableWitness.Add(
-                as<DeclRefType>(diffBottomType)->declRef,
-                witness);
-        }
-    }
-
     void SemanticsDeclBodyVisitor::checkDerivativeOfAttribute(FunctionDeclBase* funcDecl)
     {
         auto attr = funcDecl->findModifier<ForwardDerivativeOfAttribute>();
@@ -4695,7 +4715,8 @@ namespace Slang
             maybeRegisterDifferentiableType(m_astBuilder, decl->returnType.type);
             if (as<ConstructorDecl>(decl) || !isEffectivelyStatic(decl))
             {
-                auto thisType = calcThisType(makeDeclRef(decl));
+                auto parentDeclRef = createDefaultSubstitutionsIfNeeded(m_astBuilder, this, makeDeclRef(decl->parentDecl));
+                auto thisType = calcThisType(parentDeclRef);
                 maybeRegisterDifferentiableType(m_astBuilder, thisType);
             }
             m_parentDifferentiableAttr = oldAttr;
@@ -5515,6 +5536,43 @@ namespace Slang
         }
     }
 
+    void SemanticsDeclHeaderVisitor::cloneModifiers(Decl* dest, Decl* src)
+    {
+        dest->modifiers = src->modifiers;
+    }
+    void SemanticsDeclHeaderVisitor::setFuncTypeIntoRequirementDecl(CallableDecl* decl, FuncType* funcType)
+    {
+        if (!funcType)
+            return;
+        decl->returnType.type = funcType->getResultType();
+        decl->errorType.type = funcType->getErrorType();
+        for (UInt i = 0; i < funcType->getParamCount(); i++)
+        {
+            auto paramType = funcType->getParamType(i);
+            if (auto dirType = as<ParamDirectionType>(paramType))
+                paramType = dirType->getValueType();
+            auto param = m_astBuilder->create<ParamDecl>();
+            param->type.type = paramType;
+            auto paramDir = funcType->getParamDirection(i);
+            switch (paramDir)
+            {
+            case ParameterDirection::kParameterDirection_InOut:
+                addModifier(param, m_astBuilder->create<InOutModifier>());
+                break;
+            case ParameterDirection::kParameterDirection_Out:
+                addModifier(param, m_astBuilder->create<OutModifier>());
+                break;
+            case ParameterDirection::kParameterDirection_Ref:
+                addModifier(param, m_astBuilder->create<RefModifier>());
+                break;
+            default:
+                break;
+            }
+            decl->members.add(param);
+            param->parentDecl = decl;
+        }
+    }
+
     void SemanticsDeclHeaderVisitor::checkCallableDeclCommon(CallableDecl* decl)
     {
         for(auto paramDecl : decl->getParameters())
@@ -5532,6 +5590,40 @@ namespace Slang
             errorType = TypeExp(m_astBuilder->getBottomType());
         }
         decl->errorType = errorType;
+
+        if (auto interfaceDecl = findParentInterfaceDecl(decl))
+        {
+            if (decl->hasModifier<ForwardDifferentiableAttribute>())
+            {
+                auto reqDecl = m_astBuilder->create<ForwardDerivativeRequirementDecl>();
+                cloneModifiers(reqDecl, decl);
+                auto declRef = DeclRef<CallableDecl>(decl, createDefaultSubstitutions(m_astBuilder, this, decl));
+                auto diffFuncType = getForwardDiffFuncType(getFuncType(m_astBuilder, declRef));
+                setFuncTypeIntoRequirementDecl(reqDecl, as<FuncType>(diffFuncType));
+                interfaceDecl->members.add(reqDecl);
+                reqDecl->parentDecl = interfaceDecl;
+
+                auto reqRef = m_astBuilder->create<DerivativeRequirementReferenceDecl>();
+                reqRef->referencedDecl = reqDecl;
+                reqRef->parentDecl = decl;
+                decl->members.add(reqRef);
+            }
+            if (decl->hasModifier<BackwardDifferentiableAttribute>())
+            {
+                auto reqDecl = m_astBuilder->create<BackwardDerivativeRequirementDecl>();
+                cloneModifiers(reqDecl, decl);
+                auto declRef = DeclRef<CallableDecl>(decl, createDefaultSubstitutions(m_astBuilder, this, decl));
+                auto diffFuncType = getBackwardDiffFuncType(getFuncType(m_astBuilder, declRef));
+                setFuncTypeIntoRequirementDecl(reqDecl, as<FuncType>(diffFuncType));
+                interfaceDecl->members.add(reqDecl);
+                reqDecl->parentDecl = interfaceDecl;
+
+                auto reqRef = m_astBuilder->create<DerivativeRequirementReferenceDecl>();
+                reqRef->referencedDecl = reqDecl;
+                reqRef->parentDecl = decl;
+                decl->members.add(reqRef);
+            }
+        }
     }
 
     void SemanticsDeclHeaderVisitor::visitFuncDecl(FuncDecl* funcDecl)

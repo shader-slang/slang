@@ -18,6 +18,11 @@ namespace gfx_test
         const char* entryPointName,
         slang::ProgramLayout*& slangReflection);
 
+    Slang::Result loadComputeProgramFromSource(
+        gfx::IDevice* device,
+        Slang::ComPtr<gfx::IShaderProgram>& outShaderProgram,
+        Slang::String source);
+
     Slang::Result loadGraphicsProgram(
         gfx::IDevice* device,
         Slang::ComPtr<gfx::IShaderProgram>& outShaderProgram,

@@ -4152,6 +4152,11 @@ namespace slang
                 && values[3] == rhs.values[3];
         }
 
+        bool operator!=(const Digest& rhs)
+        {
+            return !(*this == rhs);
+        }
+
         uint32_t getHashCode()
         {
             return values[0];

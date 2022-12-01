@@ -584,6 +584,15 @@ struct IRBackwardDerivativeDecoration : IRDecoration
     IRInst* getBackwardDerivativeFunc() { return getOperand(0); }
 };
 
+struct IRDifferentialInstDecoration : IRDecoration
+{
+    enum
+    {
+        kOp = kIROp_DifferentialInstDecoration
+    };
+    IR_LEAF_ISA(DifferentialInstDecoration)
+};
+
 struct IRBackwardDifferentiableDecoration : IRDecoration
 {
     enum
@@ -593,13 +602,13 @@ struct IRBackwardDifferentiableDecoration : IRDecoration
     IR_LEAF_ISA(BackwardDifferentiableDecoration)
 };
 
-struct IRTreatAsDifferentiableCallDecoration : IRDecoration
+struct IRTreatAsDifferentiableDecoration : IRDecoration
 {
     enum
     {
-        kOp = kIROp_TreatAsDifferentiableCallDecoration
+        kOp = kIROp_TreatAsDifferentiableDecoration
     };
-    IR_LEAF_ISA(TreatAsDifferentiableCallDecoration)
+    IR_LEAF_ISA(TreatAsDifferentiableDecoration)
 };
 
 struct IRDerivativeMemberDecoration : IRDecoration
@@ -659,6 +668,25 @@ struct IRDifferentiableTypeDictionaryDecoration : IRDecoration
     IR_LEAF_ISA(DifferentiableTypeDictionaryDecoration)
 };
 
+struct IRDifferentiableMethodRequirementDictionaryDecoration : IRDecoration
+{
+    IR_LEAF_ISA(DifferentiableMethodRequirementDictionaryDecoration)
+};
+
+struct IRDifferentiableMethodRequirementDictionaryItem : IRInst
+{
+    IR_PARENT_ISA(DifferentiableMethodRequirementDictionaryItem)
+};
+
+struct IRForwardDifferentiableMethodRequirementDictionaryItem : IRDifferentiableMethodRequirementDictionaryItem
+{
+    IR_LEAF_ISA(ForwardDifferentiableMethodRequirementDictionaryItem)
+};
+
+struct IRBackwardDifferentiableMethodRequirementDictionaryItem : IRDifferentiableMethodRequirementDictionaryItem
+{
+    IR_LEAF_ISA(BackwardDifferentiableMethodRequirementDictionaryItem)
+};
 
 // An instruction that specializes another IR value
 // (representing a generic) to a particular set of generic arguments 
@@ -876,6 +904,11 @@ struct IRFuncThrowTypeAttr : IRAttr
     IR_LEAF_ISA(FuncThrowTypeAttr)
 
     IRType* getErrorType() { return (IRType*)getOperand(0); }
+};
+
+struct IRNoDiffAttr : IRAttr
+{
+    IR_LEAF_ISA(NoDiffAttr)
 };
 
     /// An attribute that specifies size information for a single resource kind.
@@ -2420,7 +2453,6 @@ public:
     IRAnyValueType* getAnyValueType(IRIntegerValue size);
     IRAnyValueType* getAnyValueType(IRInst* size);
     IRDynamicType* getDynamicType();
-    IRDifferentialBottomType* getDifferentialBottomType();
 
     IRTupleType* getTupleType(UInt count, IRType* const* types);
     IRTupleType* getTupleType(List<IRType*> const& types)
@@ -3315,6 +3347,11 @@ public:
     void addBackwardDerivativeDecoration(IRInst* value, IRInst* jvpFn)
     {
         addDecoration(value, kIROp_BackwardDerivativeDecoration, jvpFn);
+    }
+
+    void markInstAsDifferential(IRInst* value)
+    {
+        addDecoration(value, kIROp_DifferentialInstDecoration);
     }
 
     void addCOMWitnessDecoration(IRInst* value, IRInst* witnessTable)

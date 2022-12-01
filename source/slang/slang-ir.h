@@ -727,9 +727,7 @@ T* dynamicCast(IRInst* inst)
 template<typename T>
 const T* dynamicCast(const IRInst* inst)
 {
-    if (inst && T::isaImpl(inst->getOp()))
-        return static_cast<const T*>(inst);
-    return nullptr;
+    return dynamicCast<T>(const_cast<IRInst*>(inst));
 }
 
 // `dynamic_cast` equivalent (we just use dynamicCast)
@@ -863,8 +861,6 @@ SIMPLE_IR_TYPE(StringType, StringTypeBase)
 SIMPLE_IR_TYPE(NativeStringType, StringTypeBase)
 
 SIMPLE_IR_TYPE(DynamicType, Type)
-
-SIMPLE_IR_TYPE(DifferentialBottomType, Type)
 
 // True if types are equal
 // Note compares nominal types by name alone 

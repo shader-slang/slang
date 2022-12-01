@@ -1122,6 +1122,14 @@ namespace Slang
                         AddModifier(&modifierLink, parsedModifier);
                         continue;
                     }
+                    else if (AdvanceIf(parser, "no_diff"))
+                    {
+                        parsedModifier = parser->astBuilder->create<NoDiffModifier>();
+                        parsedModifier->keywordName = nameToken.getName();
+                        parsedModifier->loc = nameToken.loc;
+                        AddModifier(&modifierLink, parsedModifier);
+                        continue;
+                    }
 
                     // If there was no match for a modifier keyword, then we
                     // must be at the end of the modifier sequence
@@ -1459,7 +1467,7 @@ namespace Slang
 
         // Allow a declaration to use the keyword `void` for a parameter list,
         // since that was required in ancient C, and continues to be supported
-        // in a bunc hof its derivatives even if it is a Bad Design Choice
+        // in a bunch of its derivatives even if it is a Bad Design Choice
         //
         // TODO: conditionalize this so we don't keep this around for "pure"
         // Slang code

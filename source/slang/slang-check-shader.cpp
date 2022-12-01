@@ -583,6 +583,17 @@ namespace Slang
         return varDecl->getName();
     }
 
+    Type* getParamType(ASTBuilder* astBuilder, DeclRef<VarDeclBase> const& paramDeclRef)
+    {
+        auto paramType = getType(astBuilder, paramDeclRef);
+        if (paramDeclRef.getDecl()->findModifier<NoDiffModifier>())
+        {
+            auto modifierVal = static_cast<Val*>(astBuilder->getOrCreate<NoDiffModifierVal>());
+            paramType = astBuilder->getModifiedType(paramType, 1, &modifierVal);
+        }
+        return paramType;
+    }
+
     void Module::_collectShaderParams()
     {
         auto moduleDecl = m_moduleDecl;

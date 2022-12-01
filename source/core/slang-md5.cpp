@@ -34,11 +34,11 @@
  * optimizations are not included to reduce source code size and avoid
  * compile-time configuration.
  */
- 
+
 #ifndef HAVE_OPENSSL
- 
+
 #include <string.h>
- 
+
 #include "slang-md5.h"
 
 namespace Slang
@@ -55,7 +55,7 @@ namespace Slang
     #define H(x, y, z)			(((x) ^ (y)) ^ (z))
     #define H2(x, y, z)			((x) ^ ((y) ^ (z)))
     #define I(x, y, z)			((y) ^ ((x) | ~(z)))
- 
+
     /*
      * The MD5 transformation for all four rounds.
      */
@@ -63,7 +63,7 @@ namespace Slang
 	    (a) += f((b), (c), (d)) + (x) + (t); \
 	    (a) = (((a) << (s)) | (((a) & 0xffffffff) >> (32 - (s)))); \
 	    (a) += (b);
- 
+
     /*
      * SET reads 4 input bytes in little-endian byte order and stores them in a
      * properly aligned word in host byte order.
@@ -94,7 +94,7 @@ namespace Slang
     #define GET(n) \
 	    (ctx->block[(n)])
     #endif
- 
+
     /*
      * This processes one or more 64-byte data blocks, but does NOT update the bit
      * counters.  There are no alignment requirements.
@@ -104,20 +104,20 @@ namespace Slang
 	    const unsigned char* ptr;
 	    MD5_u32plus a, b, c, d;
 	    MD5_u32plus saved_a, saved_b, saved_c, saved_d;
- 
+
 	    ptr = (const unsigned char*)data;
- 
+
 	    a = ctx->a;
 	    b = ctx->b;
 	    c = ctx->c;
 	    d = ctx->d;
- 
+
 	    do {
 		    saved_a = a;
 		    saved_b = b;
 		    saved_c = c;
 		    saved_d = d;
- 
+
     /* Round 1 */
 		    STEP(F, a, b, c, d, SET(0), 0xd76aa478, 7)
 		    STEP(F, d, a, b, c, SET(1), 0xe8c7b756, 12)
@@ -135,7 +135,7 @@ namespace Slang
 		    STEP(F, d, a, b, c, SET(13), 0xfd987193, 12)
 		    STEP(F, c, d, a, b, SET(14), 0xa679438e, 17)
 		    STEP(F, b, c, d, a, SET(15), 0x49b40821, 22)
- 
+
     /* Round 2 */
 		    STEP(G, a, b, c, d, GET(1), 0xf61e2562, 5)
 		    STEP(G, d, a, b, c, GET(6), 0xc040b340, 9)
@@ -153,7 +153,7 @@ namespace Slang
 		    STEP(G, d, a, b, c, GET(2), 0xfcefa3f8, 9)
 		    STEP(G, c, d, a, b, GET(7), 0x676f02d9, 14)
 		    STEP(G, b, c, d, a, GET(12), 0x8d2a4c8a, 20)
- 
+
     /* Round 3 */
 		    STEP(H, a, b, c, d, GET(5), 0xfffa3942, 4)
 		    STEP(H2, d, a, b, c, GET(8), 0x8771f681, 11)
@@ -171,7 +171,7 @@ namespace Slang
 		    STEP(H2, d, a, b, c, GET(12), 0xe6db99e5, 11)
 		    STEP(H, c, d, a, b, GET(15), 0x1fa27cf8, 16)
 		    STEP(H2, b, c, d, a, GET(2), 0xc4ac5665, 23)
- 
+
     /* Round 4 */
 		    STEP(I, a, b, c, d, GET(0), 0xf4292244, 6)
 		    STEP(I, d, a, b, c, GET(7), 0x432aff97, 10)
@@ -189,88 +189,68 @@ namespace Slang
 		    STEP(I, d, a, b, c, GET(11), 0xbd3af235, 10)
 		    STEP(I, c, d, a, b, GET(2), 0x2ad7d2bb, 15)
 		    STEP(I, b, c, d, a, GET(9), 0xeb86d391, 21)
- 
+
 		    a += saved_a;
 		    b += saved_b;
 		    c += saved_c;
 		    d += saved_d;
- 
+
 		    ptr += 64;
 	    } while (size -= 64);
- 
+
 	    ctx->a = a;
 	    ctx->b = b;
 	    ctx->c = c;
 	    ctx->d = d;
- 
+
 	    return ptr;
     }
- 
+
     void MD5HashGen::init(MD5Context* ctx)
     {
 	    ctx->a = 0x67452301;
 	    ctx->b = 0xefcdab89;
 	    ctx->c = 0x98badcfe;
 	    ctx->d = 0x10325476;
- 
+
 	    ctx->lo = 0;
 	    ctx->hi = 0;
-    }
-
-    void MD5HashGen::update(MD5Context* ctx, UnownedStringSlice string)
-    {
-        update(ctx, string.begin(), string.getLength());
-    }
-
-    void MD5HashGen::update(MD5Context* ctx, String str)
-    {
-        update(ctx, str.getBuffer(), str.getLength());
-    }
-
-    void MD5HashGen::update(MD5Context* ctx, const slang::Digest& hash)
-    {
-        update(ctx, hash.values, sizeof(hash.values));
-    }
-
-    void MD5HashGen::update(MD5Context* ctx, ISlangBlob* blob)
-    {
-        update(ctx, blob->getBufferPointer(), blob->getBufferSize());
     }
 
     void MD5HashGen::update(MD5Context* ctx, const void* data, SlangInt size)
     {
 	    MD5_u32plus saved_lo;
 	    SlangInt used, available;
- 
+
 	    saved_lo = ctx->lo;
 	    if ((ctx->lo = (saved_lo + size) & 0x1fffffff) < saved_lo)
 		    ctx->hi++;
 	    ctx->hi += (MD5_u32plus)size >> 29;
- 
+
 	    used = saved_lo & 0x3f;
- 
+
 	    if (used) {
 		    available = 64 - used;
- 
+
 		    if (size < available) {
 			    memcpy(&ctx->buffer[used], data, size);
 			    return;
 		    }
- 
+
 		    memcpy(&ctx->buffer[used], data, available);
 		    data = (const unsigned char*)data + available;
 		    size -= available;
 		    body(ctx, ctx->buffer, 64);
 	    }
- 
+
 	    if (size >= 64) {
 		    data = body(ctx, data, size & ~(SlangInt)0x3f);
 		    size &= 0x3f;
 	    }
- 
+
 	    memcpy(ctx->buffer, data, size);
     }
- 
+
     #define OUTUINT(dst, src) \
 	    (dst)[0] = (uint32_t)src; \
 
@@ -279,39 +259,39 @@ namespace Slang
 	    (dst)[1] = (unsigned char)((src) >> 8); \
 	    (dst)[2] = (unsigned char)((src) >> 16); \
 	    (dst)[3] = (unsigned char)((src) >> 24);
- 
+
     void MD5HashGen::finalize(MD5Context* ctx, slang::Digest* result)
     {
 	    unsigned long used, available;
- 
+
 	    used = ctx->lo & 0x3f;
- 
+
 	    ctx->buffer[used++] = 0x80;
- 
+
 	    available = 64 - used;
- 
+
 	    if (available < 8) {
 		    memset(&ctx->buffer[used], 0, available);
 		    body(ctx, ctx->buffer, 64);
 		    used = 0;
 		    available = 64;
 	    }
- 
+
 	    memset(&ctx->buffer[used], 0, available - 8);
- 
+
 	    ctx->lo <<= 3;
 	    OUTCHAR(&ctx->buffer[56], ctx->lo)
 	    OUTCHAR(&ctx->buffer[60], ctx->hi)
- 
+
 	    body(ctx, ctx->buffer, 64);
 
 	    OUTUINT(&result->values[0], ctx->a)
 	    OUTUINT(&result->values[1], ctx->b)
 	    OUTUINT(&result->values[2], ctx->c)
 	    OUTUINT(&result->values[3], ctx->d)
- 
+
 	    memset(ctx, 0, sizeof(*ctx));
     }
 }
- 
+
 #endif

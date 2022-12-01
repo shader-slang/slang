@@ -1120,7 +1120,6 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
 
         return astBuilder->create<NamedExpressionType>(specializedDeclRef);
     }
-
     
     FuncType* getFuncType(
         ASTBuilder*                     astBuilder,
@@ -1133,7 +1132,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         for (auto paramDeclRef : getParameters(declRef))
         {
             auto paramDecl = paramDeclRef.getDecl();
-            auto paramType = getType(astBuilder, paramDeclRef);
+            auto paramType = getParamType(astBuilder, paramDeclRef);
             if( paramDecl->findModifier<RefModifier>() )
             {
                 paramType = astBuilder->getRefType(paramType);

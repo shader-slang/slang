@@ -2214,17 +2214,6 @@ namespace Slang
         return _findOrEmitConstant(keyInst);
     }
 
-    IRInst* IRBuilder::getDifferentialBottom()
-    {
-        IRType* type = getDifferentialBottomType();
-        IRConstant keyInst;
-        memset(&keyInst, 0, sizeof(keyInst));
-        keyInst.m_op = kIROp_DifferentialBottomValue;
-        keyInst.typeUse.usedValue = type;
-        keyInst.value.intVal = 0;
-        return (IRInst*)_findOrEmitConstant(keyInst);
-    }
-
     IRStringLit* IRBuilder::getStringValue(const UnownedStringSlice& inSlice)
     {
         IRConstant keyInst;
@@ -2606,12 +2595,6 @@ namespace Slang
     }
 
     IRDynamicType* IRBuilder::getDynamicType() { return (IRDynamicType*)getType(kIROp_DynamicType); }
-
-    IRDifferentialBottomType* IRBuilder::getDifferentialBottomType()
-    {
-        return (IRDifferentialBottomType*)getType(kIROp_DifferentialBottomType);
-    }
-
 
     IRAssociatedType* IRBuilder::getAssociatedType(ArrayView<IRInterfaceType*> constraintTypes)
     {

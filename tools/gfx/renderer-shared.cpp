@@ -331,19 +331,6 @@ void PipelineStateBase::initializeBase(const PipelineStateDesc& inDesc)
     }
 }
 
-void updateCacheEntry(ISlangMutableFileSystem* fileSystem, slang::IBlob* compiledCode, String shaderFilename, slang::Digest ASTHash)
-{
-    auto hashSize = sizeof(slang::Digest);
-
-    auto bufferSize = hashSize + compiledCode->getBufferSize();
-    List<uint8_t> contents;
-    contents.setCount(bufferSize);
-    uint8_t* buffer = contents.begin();
-    memcpy(buffer, &ASTHash, hashSize);
-    memcpy(buffer + hashSize, (void*)compiledCode->getBufferPointer(), compiledCode->getBufferSize());
-    fileSystem->saveFile(shaderFilename.getBuffer(), buffer, bufferSize);
-}
-
 Result RendererBase::getEntryPointCodeFromShaderCache(
     slang::IComponentType* program,
     SlangInt entryPointIndex,
@@ -374,7 +361,7 @@ Result RendererBase::getEntryPointCodeFromShaderCache(
 
     // Query the shader cache index for an entry with shaderKey as its key.
     auto entry = persistentShaderCache->findEntry(shaderKey, codeBlob.writeRef());
-    if (entry && contentsHash == entry->Value.contentsBasedDigest)
+    if (entry && contentsHash == entry->contentsBasedDigest)
     {
         // We found the entry in the cache, and the entry's contents are up-to-date. Nothing else needs to be done.
         shaderCacheHitCount++;
@@ -394,7 +381,7 @@ Result RendererBase::getEntryPointCodeFromShaderCache(
         }
         else
         {
-            persistentShaderCache->updateEntry(entry, shaderKey, contentsHash, codeBlob);
+            persistentShaderCache->updateEntry(shaderKey, contentsHash, codeBlob);
             shaderCacheEntryDirtyCount++;
         }
     }

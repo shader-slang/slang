@@ -425,6 +425,7 @@ class ExtractExistentialValueExpr: public Expr
 {
     SLANG_AST_CLASS(ExtractExistentialValueExpr)
     DeclRef<VarDeclBase> declRef;
+    Expr* originalExpr;
 };
 
 class OpenRefExpr : public Expr
