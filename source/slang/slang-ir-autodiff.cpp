@@ -27,6 +27,18 @@ IRInst* _lookupWitness(IRBuilder* builder, IRInst* witness, IRInst* requirementK
     return nullptr;
 }
 
+bool isNoDiffParam(IRType* paramType)
+{
+    while (auto ptrType = as<IRPtrTypeBase>(paramType))
+        paramType = ptrType->getValueType();
+    while (auto attrType = as<IRAttributedType>(paramType))
+    {
+        if (attrType->findAttr<IRNoDiffAttr>())
+            return true;
+    }
+    return false;
+}
+
 IRStructField* DifferentialPairTypeBuilder::findField(IRInst* type, IRStructKey* key)
 {
     if (auto irStructType = as<IRStructType>(type))

@@ -699,6 +699,10 @@ InstPair ForwardDerivativeTranscriber::transcribeCall(IRBuilder* builder, IRCall
         return InstPair(primalCall, nullptr);
     }
 
+    auto calleeType = as<IRFuncType>(diffCallee->getDataType());
+    SLANG_ASSERT(calleeType);
+    SLANG_RELEASE_ASSERT(calleeType->getParamCount() == origCall->getArgCount());
+
     List<IRInst*> args;
     // Go over the parameter list and create pairs for each input (if required)
     for (UIndex ii = 0; ii < origCall->getArgCount(); ii++)
@@ -707,7 +711,10 @@ InstPair ForwardDerivativeTranscriber::transcribeCall(IRBuilder* builder, IRCall
         auto primalArg = findOrTranscribePrimalInst(builder, origArg);
         SLANG_ASSERT(primalArg);
 
-            auto primalType = primalArg->getDataType();
+        auto primalType = primalArg->getDataType();
+        auto paramType = calleeType->getParamType(ii);
+        if (!isNoDiffParam(paramType))
+        {
             if (auto pairType = tryGetDiffPairType(builder, primalType))
             {
                 auto diffArg = findOrTranscribeDiffInst(builder, origArg);
@@ -718,16 +725,16 @@ InstPair ForwardDerivativeTranscriber::transcribeCall(IRBuilder* builder, IRCall
                 SLANG_RELEASE_ASSERT(diffArg);
                 auto diffPair = builder->emitMakeDifferentialPair(pairType, primalArg, diffArg);
                 args.add(diffPair);
-            }
-            else
-            {
-                // Add original/primal argument.
-                args.add(primalArg);
+                continue;
             }
         }
+        // Argument is not differentiable.
+        // Add original/primal argument.
+        args.add(primalArg);
+    }
         
-        IRType* diffReturnType = nullptr;
-        diffReturnType = tryGetDiffPairType(builder, origCall->getFullType());
+    IRType* diffReturnType = nullptr;
+    diffReturnType = tryGetDiffPairType(builder, origCall->getFullType());
 
     if (!diffReturnType)
     {

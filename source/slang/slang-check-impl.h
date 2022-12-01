@@ -16,6 +16,8 @@ namespace Slang
     bool isEffectivelyStatic(
         Decl*           decl);
 
+    bool isGlobalDecl(Decl* decl);
+
     Type* checkProperType(
         Linkage*        linkage,
         TypeExp         typeExp,

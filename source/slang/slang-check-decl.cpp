@@ -340,6 +340,16 @@ namespace Slang
         return isEffectivelyStatic(decl, parentDecl);
     }
 
+    bool isGlobalDecl(Decl* decl)
+    {
+        if (!decl)
+            return false;
+        auto parentDecl = decl->parentDecl;
+        if (auto genericDecl = as<GenericDecl>(parentDecl))
+            parentDecl = genericDecl->parentDecl;
+        return as<NamespaceDeclBase>(parentDecl) != nullptr;
+    }
+
         /// Is `decl` a global shader parameter declaration?
     bool isGlobalShaderParameter(VarDeclBase* decl)
     {

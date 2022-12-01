@@ -197,6 +197,8 @@ void stripAutoDiffDecorations(IRModule* module);
 
 IRInst* _lookupWitness(IRBuilder* builder, IRInst* witness, IRInst* requirementKey);
 
+bool isNoDiffParam(IRType* paramType);
+
 struct IRAutodiffPassOptions
 {
     // Nothing for now...
