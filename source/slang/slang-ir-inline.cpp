@@ -34,7 +34,7 @@ struct InliningPassBase
     {
     }
 
-        /// Consider all the call sites in the module for inliing
+        /// Consider all the call sites in the module for inlining
     bool considerAllCallSites()
     {
         return considerAllCallSitesRec(m_module->getModuleInst());
@@ -529,8 +529,11 @@ struct StringEarlyInliningPass : InliningPassBase
 
     bool doesTypeRequireInline(IRType* type)
     {
+        // TODO(JS):
         // I guess there is a question here about what type around string requires
         // inlining. 
+        // For example if we had an array of strings etc.
+        // For now we just consider just basic string types.
         const auto op = type->getOp();
         switch (op)
         {
@@ -545,7 +548,7 @@ struct StringEarlyInliningPass : InliningPassBase
         return false;
     }
 
-    bool _shouldInline(CallSiteInfo const& info)
+    bool shouldInline(CallSiteInfo const& info)
     {
         auto callee = info.callee;
 
@@ -565,18 +568,6 @@ struct StringEarlyInliningPass : InliningPassBase
 
         return false;
     }
-
-    bool shouldInline(CallSiteInfo const& info)
-    {
-        if (_shouldInline(info))
-        {
-            m_didInline = true;
-            return true;
-        }
-        return false;
-    }
-
-    bool m_didInline = false;
 };
 
 } // anonymous
@@ -587,26 +578,23 @@ void performStringInlining(IRModule* module)
     // This is perhaps not as efficient as might be desirable. 
     // A more optimized version might not need to pass over all of the module
     // to find new call sites. 
-    // For now it's simple though.
     //
-    // Another problem here is recursion. Right now Slang compiler doesn't accept recursive input.
-    // but the Slang language doesn't. 
-    // There are GPU targets that allow recursion (such as CUDA).
+    // Another problem here is recursion. Right now Slang compiler doesn't accept recursive input,
+    // but the Slang language is supposed to support recursion on targets that support it. 
+    // There are GPU targets that allow recursion such as CUDA.
     //
-    // We don't want the possibility of hit an infinite loop here.
-
+    // Another approach would be (when enabled) when inlining occurs, would be instead of continuing 
+    // *after*, to start the checks/inlining from where the inline took place. 
+    // 
     while(true)
-   {
+    {
         StringEarlyInliningPass pass(module);
-        pass.considerAllCallSites();
-
-        // If inlining took place, it could lead to *another* call site that requires
-        // inlining, so attempt to inline again.
-        if (pass.m_didInline)
+        if (pass.considerAllCallSites())
         {
+            // If there was a change try inlining again
             continue;
         }
-
+        
         break;
     }
 }
