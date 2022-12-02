@@ -29,9 +29,8 @@ indent_size = 4
 #
 insert_final_newline = true
 
-# Remove any extra whitespace characters at the
-# end of a line. This is just for tidyness, to
-# minimize the chances of introducing whitspace
-# diffs that are hard to spot.
-#
-trim_trailing_whitespace = true
+# Removing end of line whitespace is somewhat desirable, but 
+# seems to add unwanted noise to PRs. This is especially when different
+# contributors source editors may or may not honor this setting. 
+# So disable for now.
+trim_trailing_whitespace = false
