@@ -89,6 +89,24 @@ struct DifferentialPair : IDifferentiable
     }
 };
 
+[ForceInline]
+void updatePrimal<T : IDifferentiable>(inout DifferentialPair<T> p, T newPrimal)
+{
+    p = DifferentialPair<T>(newPrimal, p.d);
+}
+
+[ForceInline]
+void updateDiff<T : IDifferentiable>(inout DifferentialPair<T> p, T.Differential newDiff)
+{
+    p = DifferentialPair<T>(p.p, newDiff);
+}
+
+[ForceInline]
+void updatePair<T : IDifferentiable>(inout DifferentialPair<T> p, T newPrimal, T.Differential newDiff)
+{
+    p = DifferentialPair<T>(newPrimal, newDiff);
+}
+
 
 #define VECTOR_MAP_D_UNARY(TYPE, COUNT, D_FUNC, VALUE) \
     vector<TYPE, COUNT> result; \
