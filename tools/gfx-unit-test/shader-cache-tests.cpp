@@ -5,7 +5,6 @@
 #include "tools/gfx-util/shader-cursor.h"
 #include "source/core/slang-basic.h"
 #include "source/core/slang-string-util.h"
-#include "source/core/slang-digest-util.h"
 
 #include "source/core/slang-memory-file-system.h"
 #include "source/core/slang-file-system.h"

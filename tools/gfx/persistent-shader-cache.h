@@ -8,16 +8,19 @@
 #include "../../source/core/slang-dictionary.h"
 #include "../../source/core/slang-linked-list.h"
 #include "../../source/core/slang-stream.h"
+#include "../../source/core/slang-crypto.h"
 
 namespace gfx
 {
 
 using namespace Slang;
 
+using DigestType = MD5::Digest;
+
 struct ShaderCacheEntry
 {
-    slang::Digest dependencyBasedDigest;
-    slang::Digest contentsBasedDigest;
+    DigestType dependencyBasedDigest;
+    DigestType contentsBasedDigest;
     double lastAccessedTime;
 
     bool operator==(const ShaderCacheEntry& rhs)
@@ -42,16 +45,16 @@ public:
     // Fetch the cache entry corresponding to the provided key. If found, move the entry to
     // the front of entries and return the entry and the corresponding compiled code in
     // outCompiledCode. Else, return nullptr.
-    ShaderCacheEntry* findEntry(const slang::Digest& key, ISlangBlob** outCompiledCode);
+    ShaderCacheEntry* findEntry(const DigestType& key, ISlangBlob** outCompiledCode);
 
     // Add an entry to the cache with the provided key and contents hashes. If
     // adding an entry causes the cache to exceed size limitations, this will also
     // delete the least recently used entry.
-    void addEntry(const slang::Digest& dependencyDigest, const slang::Digest& contentsDigest, ISlangBlob* compiledCode);
+    void addEntry(const DigestType& dependencyDigest, const DigestType& contentsDigest, ISlangBlob* compiledCode);
 
     // Update the contents hash for the specified entry in the cache and update the
     // corresponding file on disk.
-    void updateEntry(const slang::Digest& dependencyDigest, const slang::Digest& contentsDigest, ISlangBlob* updatedCode);
+    void updateEntry(const DigestType& dependencyDigest, const DigestType& contentsDigest, ISlangBlob* updatedCode);
 
 private:
     // Load a previous cache index saved to disk. If not found, create a new cache index
@@ -82,7 +85,7 @@ private:
 
     // Dictionary mapping each shader's key to its corresponding node (entry) in the
     // linked list 'orderedEntries'.
-    Dictionary<slang::Digest, LinkedNode<Index>*> keyToEntry;
+    Dictionary<DigestType, LinkedNode<Index>*> keyToEntry;
 
     // Linked list containing the corresponding indices in 'entries' for entries in the
     // shader cache ordered from most to least recently used.
