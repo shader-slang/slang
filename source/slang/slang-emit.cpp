@@ -385,6 +385,8 @@ Result linkAndOptimizeIR(
             break;
     }
 
+    finalizeAutoDiffPass(irModule);
+
     // If we have a target that is GPU like we use the string hashing mechanism
     // but for that to work we need to inline such that calls (or returns) of strings
     // boil down into getStringHash(stringLiteral)
@@ -394,8 +396,6 @@ Result linkAndOptimizeIR(
         // 1) It's not inlinable for some reason (for example if it's recursive)
         SLANG_RETURN_ON_FAIL(performStringInlining(irModule, sink));
     }
-
-    finalizeAutoDiffPass(irModule);
 
     lowerReinterpret(targetRequest, irModule, sink);
 
