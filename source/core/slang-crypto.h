@@ -21,30 +21,30 @@ namespace Slang
 
     /// Represents a hash digest. Only sizes of multiple of 4 are supported.
     template<SlangInt N>
-    class Digest
+    class HashDigest
     {
     public:
         static_assert(N % 4 == 0, "size must be multiple of 4");
         uint32_t data[N / 4] = { 0 };
 
-        Digest() = default;
+        HashDigest() = default;
 
-        Digest(const char* str)
+        HashDigest(const char* str)
         {
             DigestUtil::stringToDigest(str, ::strlen(str), data, N);
         }
 
-        Digest(const String& str)
+        HashDigest(const String& str)
         {
             DigestUtil::stringToDigest(str.getBuffer(), str.getLength(), data, N);
         }
 
-        Digest(const UnownedStringSlice& str)
+        HashDigest(const UnownedStringSlice& str)
         {
             DigestUtil::stringToDigest(str.begin(), str.getLength(), data, N);
         }
 
-        Digest(ISlangBlob* blob)
+        HashDigest(ISlangBlob* blob)
         {
             if (blob->getBufferSize() == N)
             {
@@ -62,12 +62,12 @@ namespace Slang
             return RawBlob::create(data, sizeof(data));
         }
 
-        bool operator==(const Digest& other) const
+        bool operator==(const HashDigest& other) const
         {
             return ::memcmp(data, other.data, sizeof(data)) == 0;
         }
 
-        bool operator!=(const Digest& other) const
+        bool operator!=(const HashDigest& other) const
         {
             return !(*this == other);
         }
@@ -82,7 +82,7 @@ namespace Slang
     class MD5
     {
     public:
-        using Digest = Digest<16>;
+        using Digest = HashDigest<16>;
 
         MD5();
 
@@ -105,7 +105,7 @@ namespace Slang
     class SHA1
     {
     public:
-        using Digest = Digest<20>;
+        using Digest = HashDigest<20>;
 
         SHA1();
 
@@ -162,7 +162,7 @@ namespace Slang
         }
 
         template<SlangInt N>
-        void append(const Digest<N>& digest)
+        void append(const HashDigest<N>& digest)
         {
             append(digest.data, sizeof(digest.data));
         }

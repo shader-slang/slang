@@ -7,33 +7,33 @@ using namespace Slang;
 
 SLANG_UNIT_TEST(crypto)
 {
-    // Digest
+    // HashDigest
     {
-        using DigestType = Digest<8>;
-        DigestType empty;
+        using Digest = HashDigest<8>;
+        Digest empty;
         SLANG_CHECK(empty.data[0] == 0 && empty.data[1] == 0);
         SLANG_CHECK(empty.toString() == "0000000000000000");
 
-        DigestType all = DigestType("ffffffffffffffff");
+        Digest all = Digest("ffffffffffffffff");
         SLANG_CHECK(all.data[0] == 0xffffffff && all.data[1] == 0xffffffff);
         SLANG_CHECK(all.toString() == "ffffffffffffffff");
 
-        SLANG_CHECK(empty == DigestType("0000000000000000"));
-        SLANG_CHECK(all == DigestType("ffffffffffffffff"));
+        SLANG_CHECK(empty == Digest("0000000000000000"));
+        SLANG_CHECK(all == Digest("ffffffffffffffff"));
         SLANG_CHECK(empty != all);
 
-        SLANG_CHECK(DigestType("invalid") == empty);
-        SLANG_CHECK(DigestType("X000000000000000") == empty);
-        SLANG_CHECK(DigestType(" 000000000000000") == empty);
+        SLANG_CHECK(Digest("invalid") == empty);
+        SLANG_CHECK(Digest("X000000000000000") == empty);
+        SLANG_CHECK(Digest(" 000000000000000") == empty);
 
-        SLANG_CHECK(DigestType("0123456789abcdef").toString() == "0123456789abcdef");
+        SLANG_CHECK(Digest("0123456789abcdef").toString() == "0123456789abcdef");
 
-        Slang::ComPtr<ISlangBlob> blob = DigestType("0123456789abcdef").toBlob();
+        Slang::ComPtr<ISlangBlob> blob = Digest("0123456789abcdef").toBlob();
         const uint8_t check[] = { 0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef };
         SLANG_CHECK(blob->getBufferSize() == 8);
         SLANG_CHECK(::memcmp(blob->getBufferPointer(), check, 8) == 0);
 
-        SLANG_CHECK(DigestType(blob) == DigestType("0123456789abcdef"));
+        SLANG_CHECK(Digest(blob) == Digest("0123456789abcdef"));
     }
 
     // MD5
