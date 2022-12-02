@@ -27,14 +27,16 @@ IRInst* _lookupWitness(IRBuilder* builder, IRInst* witness, IRInst* requirementK
     return nullptr;
 }
 
-bool isNoDiffParam(IRType* paramType)
+bool isNoDiffType(IRType* paramType)
 {
     while (auto ptrType = as<IRPtrTypeBase>(paramType))
         paramType = ptrType->getValueType();
     while (auto attrType = as<IRAttributedType>(paramType))
     {
         if (attrType->findAttr<IRNoDiffAttr>())
+        {
             return true;
+        }
     }
     return false;
 }
@@ -92,19 +94,14 @@ IRInst* DifferentialPairTypeBuilder::emitFieldAccessor(IRBuilder* builder, IRIns
     IRInst* pairType = nullptr;
     if (auto basePtrType = as<IRPtrTypeBase>(baseInst->getDataType()))
     {
-        auto baseTypeInfo = lowerDiffPairType(builder, basePtrType->getValueType());
+        auto loweredType = lowerDiffPairType(builder, basePtrType->getValueType());
 
-        // TODO(sai): Not sure at the moment how to handle diff-bottom pointer types,
-        // especially since we probably don't need diff bottom anymore.
-        // 
-        SLANG_ASSERT(!baseTypeInfo.isTrivial);
-
-        pairType = builder->getPtrType(kIROp_PtrType, (IRType*)baseTypeInfo.loweredType);
+        pairType = builder->getPtrType(kIROp_PtrType, (IRType*)loweredType);
     }
     else
     {
-        auto baseTypeInfo = lowerDiffPairType(builder, baseInst->getDataType());
-        pairType = baseTypeInfo.loweredType;
+        auto loweredType = lowerDiffPairType(builder, baseInst->getDataType());
+        pairType = loweredType;
     }
 
     if (auto basePairStructType = as<IRStructType>(pairType))
@@ -252,33 +249,29 @@ IRInst* DifferentialPairTypeBuilder::getDiffTypeWitnessFromPairType(IRBuilder* b
     return _lookupWitness(builder, witnessTable, sharedContext->differentialAssocTypeWitnessStructKey);
 }
 
-DifferentialPairTypeBuilder::LoweredPairTypeInfo DifferentialPairTypeBuilder::lowerDiffPairType(
+IRInst* DifferentialPairTypeBuilder::lowerDiffPairType(
     IRBuilder* builder, IRType* originalPairType)
 {
-    LoweredPairTypeInfo result = {};
-    
+    IRInst* result = nullptr;
     if (pairTypeCache.TryGetValue(originalPairType, result))
         return result;
     auto pairType = as<IRDifferentialPairType>(originalPairType);
     if (!pairType)
     {
-        result.isTrivial = true;
-        result.loweredType = originalPairType;
+        result = originalPairType;
         return result;
     }
     auto primalType = pairType->getValueType();
     if (as<IRParam>(primalType))
     {
-        result.isTrivial = false;
-        result.loweredType = nullptr;
+        result = nullptr;
         return result;
     }
 
     auto diffType = getDiffTypeFromPairType(builder, pairType);
     if (!diffType)
         return result;
-    result.loweredType = _createDiffPairType(pairType->getValueType(), (IRType*)diffType);
-    result.isTrivial = false;
+    result = _createDiffPairType(pairType->getValueType(), (IRType*)diffType);
     pairTypeCache.Add(originalPairType, result);
 
     return result;
@@ -481,6 +474,22 @@ bool processAutodiffCalls(
     // Process reverse derivative calls.
     modified |= processReverseDerivativeCalls(&autodiffContext, sink);
 
+    return modified;
+}
+
+bool finalizeAutoDiffPass(IRModule* module)
+{
+    bool modified = false;
+
+    // Create shared context for all auto-diff related passes
+    AutoDiffSharedContext autodiffContext(module->getModuleInst());
+
+    SharedIRBuilder sharedBuilder;
+    sharedBuilder.init(module);
+    sharedBuilder.deduplicateAndRebuildGlobalNumberingMap();
+
+    autodiffContext.sharedBuilder = &sharedBuilder;
+
     // Replaces IRDifferentialPairType with an auto-generated struct,
     // IRDifferentialPairGetDifferential with 'differential' field access,
     // IRDifferentialPairGetPrimal with 'primal' field access, and
@@ -493,7 +502,7 @@ bool processAutodiffCalls(
     // Remove auto-diff related decorations.
     stripAutoDiffDecorations(module);
 
-    return modified;
+    return false;
 }
 
 

@@ -1930,36 +1930,20 @@ namespace Slang
         if(!requiredResultType->equals(satisfyingResultType))
             return false;
 
-        witnessTable->add(
-            requiredMemberDeclRef.getDecl(),
-            RequirementWitness(satisfyingMemberDeclRef));
-
         if (hasForwardDerivative || hasBackwardDerivative)
         {
-            int fwdReqFound = 0;
-            int bwdReqFound = 0;
-            for (auto reqRefDecl : requiredMemberDeclRef.getDecl()->getMembersOfType<DerivativeRequirementReferenceDecl>())
+            auto parentInterfaceDecl = as<InterfaceDecl>(getParentDecl(requiredMemberDeclRef.getDecl()));
+            if (parentInterfaceDecl)
             {
-                if (auto fwdReq = as<ForwardDerivativeRequirementDecl>(reqRefDecl->referencedDecl))
-                {
-                    ForwardDifferentiateVal* val = m_astBuilder->create<ForwardDifferentiateVal>();
-                    val->func = satisfyingMemberDeclRef;
-                    witnessTable->add(fwdReq, RequirementWitness(val));
-                    fwdReqFound++;
-                }
-                else if (auto bwdReq = as<BackwardDerivativeRequirementDecl>(reqRefDecl->referencedDecl))
-                {
-                    BackwardDifferentiateVal* val = m_astBuilder->create<BackwardDifferentiateVal>();
-                    val->func = satisfyingMemberDeclRef;
-                    witnessTable->add(bwdReq, RequirementWitness(val));
-                    bwdReqFound++;
-                }
+                auto idiffType = DeclRefType::create(m_astBuilder, m_astBuilder->getDifferentiableInterface());
+                bool noDiffThisSatisfying = !isDeclaredSubtype(witnessTable->witnessedType, idiffType);
+                bool noDiffThisRequirement = (requiredMemberDeclRef.getDecl()->findModifier<NoDiffThisAttribute>() != nullptr);
+                if (noDiffThisRequirement != noDiffThisSatisfying)
+                    return false;
             }
-
-            SLANG_RELEASE_ASSERT(
-                fwdReqFound == (hasForwardDerivative ? 1 : 0) &&
-                bwdReqFound == (hasBackwardDerivative ? 1 : 0));
         }
+
+        _addMethodWitness(witnessTable, requiredMemberDeclRef, satisfyingMemberDeclRef);
 
         return true;
     }
@@ -2553,7 +2537,10 @@ namespace Slang
         // mangled name!
         //
         synFuncDecl->nameAndLoc = requiredMemberDeclRef.getDecl()->nameAndLoc;
-
+        if (synFuncDecl->nameAndLoc.name)
+        {
+            synFuncDecl->nameAndLoc.name = getSession()->getNameObj("$__syn_" + synFuncDecl->nameAndLoc.name->text);
+        }
         // The result type of our synthesized method will be the expected
         // result type from the interface requirement.
         //
@@ -2602,6 +2589,12 @@ namespace Slang
             synArg->declRef = makeDeclRef(synParamDecl);
             synArg->type = paramType;
             synArgs.add(synArg);
+
+            if (paramDeclRef.getDecl()->findModifier<NoDiffModifier>())
+            {
+                auto noDiffModifier = m_astBuilder->create<NoDiffModifier>();
+                addModifier(synParamDecl, noDiffModifier);
+            }
         }
 
 
@@ -2635,11 +2628,50 @@ namespace Slang
                 synThis->type.isLeftValue = true;
 
                 auto synMutatingAttr = m_astBuilder->create<MutatingAttribute>();
-                synFuncDecl->modifiers.first = synMutatingAttr;
+                addModifier(synFuncDecl, synMutatingAttr);
+            }
+
+            if (requiredMemberDeclRef.getDecl()->hasModifier<NoDiffThisAttribute>())
+            {
+                auto noDiffThisAttr = m_astBuilder->create<NoDiffThisAttribute>();
+                addModifier(synFuncDecl, noDiffThisAttr);
+            }
+            if (requiredMemberDeclRef.getDecl()->hasModifier<ForwardDifferentiableAttribute>())
+            {
+                auto attr = m_astBuilder->create<ForwardDifferentiableAttribute>();
+                addModifier(synFuncDecl, attr);
+            }
+            if (requiredMemberDeclRef.getDecl()->hasModifier<BackwardDifferentiableAttribute>())
+            {
+                auto attr = m_astBuilder->create<BackwardDifferentiableAttribute>();
+                addModifier(synFuncDecl, attr);
             }
         }
 
         return synFuncDecl;
+    }
+
+    void SemanticsVisitor::_addMethodWitness(
+        WitnessTable* witnessTable,
+        DeclRef<CallableDecl> requiredMemberDeclRef,
+        DeclRef<CallableDecl> satisfyingMemberDeclRef)
+    {
+        for (auto reqRefDecl : requiredMemberDeclRef.getDecl()->getMembersOfType<DerivativeRequirementReferenceDecl>())
+        {
+            if (auto fwdReq = as<ForwardDerivativeRequirementDecl>(reqRefDecl->referencedDecl))
+            {
+                ForwardDifferentiateVal* val = m_astBuilder->create<ForwardDifferentiateVal>();
+                val->func = satisfyingMemberDeclRef;
+                witnessTable->add(fwdReq, RequirementWitness(val));
+            }
+            else if (auto bwdReq = as<BackwardDerivativeRequirementDecl>(reqRefDecl->referencedDecl))
+            {
+                BackwardDifferentiateVal* val = m_astBuilder->create<BackwardDifferentiateVal>();
+                val->func = satisfyingMemberDeclRef;
+                witnessTable->add(bwdReq, RequirementWitness(val));
+            }
+        }
+        witnessTable->add(requiredMemberDeclRef, RequirementWitness(satisfyingMemberDeclRef));
     }
 
     bool SemanticsVisitor::trySynthesizeMethodRequirementWitness(
@@ -2816,8 +2848,7 @@ namespace Slang
         // difference between our synthetic method and a hand-written
         // one with the same behavior.
         //
-        witnessTable->add(requiredMemberDeclRef,
-            RequirementWitness(makeDeclRef(synFuncDecl)));
+        _addMethodWitness(witnessTable, requiredMemberDeclRef, makeDeclRef(synFuncDecl));
         return true;
     }
 
@@ -5603,6 +5634,7 @@ namespace Slang
 
         if (auto interfaceDecl = findParentInterfaceDecl(decl))
         {
+            bool isDiffFunc = false;
             if (decl->hasModifier<ForwardDifferentiableAttribute>())
             {
                 auto reqDecl = m_astBuilder->create<ForwardDerivativeRequirementDecl>();
@@ -5617,6 +5649,7 @@ namespace Slang
                 reqRef->referencedDecl = reqDecl;
                 reqRef->parentDecl = decl;
                 decl->members.add(reqRef);
+                isDiffFunc = true;
             }
             if (decl->hasModifier<BackwardDifferentiableAttribute>())
             {
@@ -5632,6 +5665,35 @@ namespace Slang
                 reqRef->referencedDecl = reqDecl;
                 reqRef->parentDecl = decl;
                 decl->members.add(reqRef);
+                isDiffFunc = true;
+            }
+            if (isDiffFunc)
+            {
+                auto interfaceDeclRef = createDefaultSubstitutionsIfNeeded(m_astBuilder, this, makeDeclRef(interfaceDecl));
+                auto interfaceType = DeclRefType::create(m_astBuilder, interfaceDeclRef);
+                bool noDiffThisRequirement = !isTypeDifferentiable(interfaceType);
+                if (noDiffThisRequirement)
+                {
+                    auto noDiffThisModifier = m_astBuilder->create<NoDiffThisAttribute>();
+                    addModifier(decl, noDiffThisModifier);
+                }
+            }
+        }
+        if (decl->findModifier<DifferentiableAttribute>())
+        {
+            // Add `no_diff` modifiers to parameters.
+            // This is necessary to preserve no-diff-ness for generic function before and after
+            // specialization.
+            for (auto paramDecl : decl->getParameters())
+            {
+                if (paramDecl->type.type && !isTypeDifferentiable(paramDecl->type.type))
+                {
+                    if (!paramDecl->hasModifier<NoDiffModifier>())
+                    {
+                        auto noDiffModifier = m_astBuilder->create<NoDiffModifier>();
+                        addModifier(paramDecl, noDiffModifier);
+                    }
+                }
             }
         }
     }

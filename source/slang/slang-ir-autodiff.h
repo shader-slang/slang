@@ -147,12 +147,6 @@ struct DifferentiableTypeConformanceContext
 
 struct DifferentialPairTypeBuilder
 {
-    struct LoweredPairTypeInfo
-    {
-        IRInst* loweredType;
-        bool isTrivial;
-    };
-
     DifferentialPairTypeBuilder() = default;
 
     DifferentialPairTypeBuilder(AutoDiffSharedContext* sharedContext) : sharedContext(sharedContext) {}
@@ -177,10 +171,16 @@ struct DifferentialPairTypeBuilder
 
     IRInst* getDiffTypeWitnessFromPairType(IRBuilder* builder, IRDifferentialPairType* type);
 
-    LoweredPairTypeInfo lowerDiffPairType(IRBuilder* builder, IRType* originalPairType);
+    IRInst* lowerDiffPairType(IRBuilder* builder, IRType* originalPairType);
 
+    struct PairStructKey
+    {
+        IRInst* originalType;
+        IRInst* diffType;
+    };
 
-    Dictionary<IRInst*, LoweredPairTypeInfo> pairTypeCache;
+    // Cache from `IRDifferentialPairType` to materialized struct type.
+    Dictionary<IRInst*, IRInst*> pairTypeCache;
 
     IRStructKey* globalPrimalKey = nullptr;
 
@@ -197,7 +197,7 @@ void stripAutoDiffDecorations(IRModule* module);
 
 IRInst* _lookupWitness(IRBuilder* builder, IRInst* witness, IRInst* requirementKey);
 
-bool isNoDiffParam(IRType* paramType);
+bool isNoDiffType(IRType* paramType);
 
 struct IRAutodiffPassOptions
 {
@@ -208,5 +208,7 @@ bool processAutodiffCalls(
     IRModule*                           module,
     DiagnosticSink*                     sink,
     IRAutodiffPassOptions const&   options = IRAutodiffPassOptions());
+
+bool finalizeAutoDiffPass(IRModule* module);
 
 };

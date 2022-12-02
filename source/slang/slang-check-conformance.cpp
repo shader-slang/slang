@@ -527,6 +527,11 @@ namespace Slang
         return false;
     }
 
+    bool SemanticsVisitor::isTypeDifferentiable(Type* type)
+    {
+        return isDeclaredSubtype(type, m_astBuilder->getDiffInterfaceType());
+    }
+
     Val* SemanticsVisitor::tryGetSubtypeWitness(
         Type*            subType,
         DeclRef<AggTypeDecl>    superTypeDeclRef)
