@@ -395,6 +395,8 @@ Result linkAndOptimizeIR(
         SLANG_RETURN_ON_FAIL(performStringInlining(irModule, sink));
     }
 
+    finalizeAutoDiffPass(irModule);
+
     lowerReinterpret(targetRequest, irModule, sink);
 
     validateIRModuleIfEnabled(codeGenContext, irModule);
@@ -403,8 +405,7 @@ Result linkAndOptimizeIR(
 
     if (!ArtifactDescUtil::isCpuLikeTarget(artifactDesc))
     {
-        // We could fail because
-        // 1) We could (perhaps, somehow) end up with getStringHash that the operand is not a string literal
+        // We could fail because (perhaps, somehow) end up with getStringHash that the operand is not a string literal
         SLANG_RETURN_ON_FAIL(checkGetStringHashInsts(irModule, sink));
     }
 

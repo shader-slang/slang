@@ -16,6 +16,8 @@ namespace Slang
     bool isEffectivelyStatic(
         Decl*           decl);
 
+    bool isGlobalDecl(Decl* decl);
+
     Type* checkProperType(
         Linkage*        linkage,
         TypeExp         typeExp,
@@ -1026,6 +1028,11 @@ namespace Slang
             List<Expr*>& synArgs,
             ThisExpr*& synThis);
 
+        void _addMethodWitness(
+            WitnessTable* witnessTable,
+            DeclRef<CallableDecl> requirement,
+            DeclRef<CallableDecl> method);
+
             /// Attempt to synthesize a method that can satisfy `requiredMemberDeclRef` using `lookupResult`.
             ///
             /// On success, installs the syntethesized method in `witnessTable` and returns `true`.
@@ -1430,6 +1437,8 @@ namespace Slang
             Type* supType);
 
         bool isInterfaceType(Type* type);
+
+        bool isTypeDifferentiable(Type* type);
 
             /// Check whether `subType` is a sub-type of `superTypeDeclRef`,
             /// and return a witness to the sub-type relationship if it holds

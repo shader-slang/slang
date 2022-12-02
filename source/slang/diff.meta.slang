@@ -11,12 +11,15 @@ attribute_syntax [ForwardDerivative(function)] : ForwardDerivativeAttribute;
 __attributeTarget(FunctionDeclBase)
 attribute_syntax [BackwardDifferentiable] : BackwardDifferentiableAttribute;
 
-
 __attributeTarget(FunctionDeclBase)
 attribute_syntax [ForwardDerivativeOf(function)] : ForwardDerivativeOfAttribute;
 
 __attributeTarget(DeclBase)
 attribute_syntax [DerivativeMember(memberName)] : DerivativeMemberAttribute;
+
+// Exclude "this" parameter from differentiation.
+__attributeTarget(FunctionDeclBase)
+attribute_syntax [NoDiffThis] : NoDiffThisAttribute;
 
 
 /// Pair type that serves to wrap the primal and
@@ -88,6 +91,24 @@ struct DifferentialPair : IDifferentiable
             T.Differential.dmul(a.d, b.d));
     }
 };
+
+[ForceInline]
+void updatePrimal<T : IDifferentiable>(inout DifferentialPair<T> p, T newPrimal)
+{
+    p = DifferentialPair<T>(newPrimal, p.d);
+}
+
+[ForceInline]
+void updateDiff<T : IDifferentiable>(inout DifferentialPair<T> p, T.Differential newDiff)
+{
+    p = DifferentialPair<T>(p.p, newDiff);
+}
+
+[ForceInline]
+void updatePair<T : IDifferentiable>(inout DifferentialPair<T> p, T newPrimal, T.Differential newDiff)
+{
+    p = DifferentialPair<T>(newPrimal, newDiff);
+}
 
 
 #define VECTOR_MAP_D_UNARY(TYPE, COUNT, D_FUNC, VALUE) \

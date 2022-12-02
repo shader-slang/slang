@@ -71,6 +71,8 @@ jobs:
           7z a "$binArchive" prelude\*.h
           7z a "$binArchive" bin\*\*\slang.dll
           7z a "$binArchive" bin\*\*\slang.lib
+          7z a "$binArchive" bin\*\*\slang-rt.lib
+          7z a "$binArchive" bin\*\*\slang-rt.dll
           7z a "$binArchive" bin\*\*\slang-glslang.dll
           7z a "$binArchive" bin\*\*\slang-llvm.dll
           7z a "$binArchive" bin\*\*\gfx.dll
