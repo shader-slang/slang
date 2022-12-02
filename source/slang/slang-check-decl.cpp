@@ -1501,8 +1501,7 @@ namespace Slang
 
         // Make the Differential type itself conform to `IDifferential` interface.
         auto inheritanceIDiffernetiable = m_astBuilder->create<InheritanceDecl>();
-        inheritanceIDiffernetiable->base.type =
-            DeclRefType::create(m_astBuilder, m_astBuilder->getDifferentiableInterface());
+        inheritanceIDiffernetiable->base.type = m_astBuilder->getDiffInterfaceType();
         inheritanceIDiffernetiable->parentDecl = aggTypeDecl;
         aggTypeDecl->members.add(inheritanceIDiffernetiable);
 
@@ -1935,8 +1934,7 @@ namespace Slang
             auto parentInterfaceDecl = as<InterfaceDecl>(getParentDecl(requiredMemberDeclRef.getDecl()));
             if (parentInterfaceDecl)
             {
-                auto idiffType = DeclRefType::create(m_astBuilder, m_astBuilder->getDifferentiableInterface());
-                bool noDiffThisSatisfying = !isDeclaredSubtype(witnessTable->witnessedType, idiffType);
+                bool noDiffThisSatisfying = !isTypeDifferentiable(witnessTable->witnessedType);
                 bool noDiffThisRequirement = (requiredMemberDeclRef.getDecl()->findModifier<NoDiffThisAttribute>() != nullptr);
                 if (noDiffThisRequirement != noDiffThisSatisfying)
                     return false;
