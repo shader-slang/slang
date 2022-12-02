@@ -8,7 +8,6 @@ namespace Slang
 struct HoistLocalTypesContext
 {
     IRModule* module;
-    DiagnosticSink* sink;
 
     SharedIRBuilder sharedBuilderStorage;
 
@@ -98,11 +97,10 @@ struct HoistLocalTypesContext
     }
 };
 
-void hoistLocalTypes(IRModule* module, DiagnosticSink* sink)
+void hoistLocalTypes(IRModule* module)
 {
     HoistLocalTypesContext context;
     context.module = module;
-    context.sink = sink;
     context.processModule();
 }
 

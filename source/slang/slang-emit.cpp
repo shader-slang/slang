@@ -382,7 +382,9 @@ Result linkAndOptimizeIR(
         if (!changed)
             break;
     }
-    
+
+    finalizeAutoDiffPass(irModule);
+
     lowerReinterpret(targetRequest, irModule, sink);
 
     validateIRModuleIfEnabled(codeGenContext, irModule);

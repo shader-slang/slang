@@ -1,4 +1,5 @@
 #include "slang-ir-autodiff-pairs.h"
+#include "slang-ir-hoist-local-types.h"
 
 namespace Slang
 {
@@ -13,25 +14,22 @@ struct DiffPairLoweringPass : InstPassBase
         pairBuilder = &pairBuilderStorage;
     }
 
-    IRInst* lowerPairType(IRBuilder* builder, IRType* pairType, bool* isTrivial = nullptr)
+    IRInst* lowerPairType(IRBuilder* builder, IRType* pairType)
     {
         builder->setInsertBefore(pairType);
-        auto loweredPairTypeInfo = pairBuilder->lowerDiffPairType(
+        auto loweredPairType = pairBuilder->lowerDiffPairType(
             builder,
             pairType);
-        if (isTrivial)
-            *isTrivial = loweredPairTypeInfo.isTrivial;
-        return loweredPairTypeInfo.loweredType;
+        return loweredPairType;
     }
 
     IRInst* lowerMakePair(IRBuilder* builder, IRInst* inst)
     {
-
         if (auto makePairInst = as<IRMakeDifferentialPair>(inst))
         {
             bool isTrivial = false;
             auto pairType = as<IRDifferentialPairType>(makePairInst->getDataType());
-            if (auto loweredPairType = lowerPairType(builder, pairType, &isTrivial))
+            if (auto loweredPairType = lowerPairType(builder, pairType))
             {
                 builder->setInsertBefore(makePairInst);
                 IRInst* result = nullptr;
@@ -63,7 +61,7 @@ struct DiffPairLoweringPass : InstPassBase
                 pairType = pairPtrType->getValueType();
             }
 
-            if (lowerPairType(builder, pairType, nullptr))
+            if (lowerPairType(builder, pairType))
             {
                 builder->setInsertBefore(getDiffInst);
                 IRInst* diffFieldExtract = nullptr;
@@ -81,7 +79,7 @@ struct DiffPairLoweringPass : InstPassBase
                 pairType = pairPtrType->getValueType();
             }
 
-            if (lowerPairType(builder, pairType, nullptr))
+            if (lowerPairType(builder, pairType))
             {
                 builder->setInsertBefore(getPrimalInst);
 
@@ -99,27 +97,9 @@ struct DiffPairLoweringPass : InstPassBase
     bool processInstWithChildren(IRBuilder* builder, IRInst* instWithChildren)
     {
         bool modified = false;
+
         // Hoist all pair types to global scope when possible.
-        auto moduleInst = module->getModuleInst();
-        processInstsOfType<IRDifferentialPairType>(kIROp_DifferentialPairType, [&](IRInst* originalPairType)
-            {
-                if (originalPairType->parent != moduleInst)
-                {
-                    originalPairType->removeFromParent();
-                    ShortList<IRInst*> operands;
-                    for (UInt i = 0; i < originalPairType->getOperandCount(); i++)
-                    {
-                        operands.add(originalPairType->getOperand(i));
-                    }
-                    auto newPairType = builder->findOrEmitHoistableInst(
-                        originalPairType->getFullType(),
-                        originalPairType->getOp(),
-                        originalPairType->getOperandCount(),
-                        operands.getArrayView().getBuffer());
-                    originalPairType->replaceUsesWith(newPairType);
-                    originalPairType->removeAndDeallocate();
-                }
-            });
+        hoistLocalTypes(module);
 
         autodiffContext->sharedBuilder->deduplicateAndRebuildGlobalNumberingMap();
 
