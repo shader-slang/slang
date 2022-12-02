@@ -1113,6 +1113,13 @@ class BackwardDerivativeOfAttribute : public DifferentiableAttribute
     Expr* backDeclRef; // DeclRef to this derivative function when initiated from primalFunction.
 };
 
+    /// The `[NoDiffThis]` attribute is used to specify that the `this` parameter should not be
+    /// included for differentiation.
+class NoDiffThisAttribute : public Attribute
+{
+    SLANG_AST_CLASS(NoDiffThisAttribute)
+};
+
     /// Indicates that the modified declaration is one of the "magic" declarations
     /// that NVAPI uses to communicate extended operations. When NVAPI is being included
     /// via the prelude for downstream compilation, declarations with this modifier

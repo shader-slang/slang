@@ -106,6 +106,8 @@ struct ForwardDerivativeTranscriber
 
     IRType* _differentiateTypeImpl(IRBuilder* builder, IRType* origType);
 
+    IRType* differentiateExtractExistentialType(IRBuilder* builder, IRExtractExistentialType* origType, IRInst*& witnessTable);
+
     IRType* tryGetDiffPairType(IRBuilder* builder, IRType* primalType);
 
     InstPair transcribeParam(IRBuilder* builder, IRParam* origParam);
