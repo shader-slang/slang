@@ -2593,6 +2593,7 @@ namespace Slang
             if (paramDeclRef.getDecl()->findModifier<NoDiffModifier>())
             {
                 auto noDiffModifier = m_astBuilder->create<NoDiffModifier>();
+                noDiffModifier->keywordName = getSession()->getNameObj("no_diff");
                 addModifier(synParamDecl, noDiffModifier);
             }
         }
@@ -5691,6 +5692,7 @@ namespace Slang
                     if (!paramDecl->hasModifier<NoDiffModifier>())
                     {
                         auto noDiffModifier = m_astBuilder->create<NoDiffModifier>();
+                        noDiffModifier->keywordName = getSession()->getNameObj("no_diff");
                         addModifier(paramDecl, noDiffModifier);
                     }
                 }
