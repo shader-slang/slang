@@ -1757,13 +1757,6 @@ bool GLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
 
             return true;
         }
-        case kIROp_GetStringHash:
-        {
-            const UnownedStringSlice slice = as<IRStringLit>(inst->getOperand(0))->getStringSlice();
-            m_writer->emit(static_cast<int32_t>(getStableHashCode32(slice.begin(), slice.getLength())));
-
-            return true;
-        }
         case kIROp_ImageLoad:
         {
             m_writer->emit("imageLoad(");

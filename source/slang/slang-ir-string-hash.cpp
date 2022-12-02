@@ -18,6 +18,11 @@ static void _findGetStringHashRec(IRInst* inst, List<IRGetStringHash*>& outInsts
     }
 }
 
+void findGetStringHashInsts(IRModule* module, List<IRGetStringHash*>& outInsts)
+{
+    _findGetStringHashRec(module->getModuleInst(), outInsts);
+}
+
 void findGlobalHashedStringLiterals(IRModule* module, StringSlicePool& pool)
 {
     IRModuleInst* moduleInst = module->getModuleInst();
@@ -76,6 +81,29 @@ void addGlobalHashedStringLiterals(const StringSlicePool& pool, SharedIRBuilder&
 
     // Mark to keep alive
     builder.addKeepAliveDecoration(globalHashedInst);
+}
+
+Result checkGetStringHashInsts(IRModule* module, DiagnosticSink* sink)
+{
+    // Check all getStringHash are all on string literals
+    List<IRGetStringHash*> insts;
+    findGetStringHashInsts(module, insts);
+
+    for (auto inst : insts)
+    {
+        if (inst->getStringLit() == nullptr)
+        {
+            if (sink)
+            {
+                sink->diagnose(inst, Diagnostics::getStringHashMustBeOnStringLiteral);
+            }
+
+            // Doesn't access a string literal
+            return SLANG_FAIL;
+        }
+    }
+    
+    return SLANG_OK;
 }
 
 }
