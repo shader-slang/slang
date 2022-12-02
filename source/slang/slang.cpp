@@ -44,9 +44,6 @@
 
 #include "slang-check-impl.h"
 
-#include "../core/slang-md5.h"
-#include "../core/slang-digest-util.h"
-
 #include "../../slang-tag-version.h"
 
 #include <sys/stat.h>
@@ -1324,7 +1321,7 @@ SLANG_NO_THROW SlangResult SLANG_MCALL Linkage::createCompileRequest(
 }
 
 void Linkage::updateDependencyBasedHash(
-    DigestBuilder& builder,
+    DigestBuilder<MD5>& builder,
     SlangInt targetIndex)
 {
     // Add the Slang compiler version to the hash
@@ -1693,9 +1690,8 @@ void TranslationUnitRequest::_addSourceFile(SourceFile* sourceFile)
         // fake path in the list of file path dependencies. This is needed to account
         // for non-file-based dependencies later when shader files are being hashed for
         // the shader cache.
-
-        slang::Digest sourceHash = DigestUtil::computeDigestForStringSlice(sourceFile->getContent());
-        getModule()->addFilePathDependency(DigestUtil::toString(sourceHash));
+        auto sourceHash = MD5::compute(sourceFile->getContent().begin(), sourceFile->getContent().getLength());
+        getModule()->addFilePathDependency(sourceHash.toString());
     }
 }
 
@@ -3252,7 +3248,7 @@ ISlangUnknown* Module::getInterface(const Guid& guid)
 }
 
 void Module::updateDependencyBasedHash(
-    DigestBuilder& builder,
+    DigestBuilder<MD5>& builder,
     SlangInt entryPointIndex)
 {
     // CompositeComponentType will have already hashed this Module's file
@@ -3261,11 +3257,11 @@ void Module::updateDependencyBasedHash(
     SLANG_UNUSED(entryPointIndex);
 }
 
-void Module::updateContentsBasedHash(DigestBuilder& builder)
+void Module::updateContentsBasedHash(DigestBuilder<MD5>& builder)
 {
     auto filePathDependencies = getFilePathDependencies();
 
-    DigestBuilder lastModifiedBuilder;
+    DigestBuilder<MD5> lastModifiedBuilder;
     auto statFailed = false;
     for (auto file : filePathDependencies)
     {
@@ -3279,12 +3275,12 @@ void Module::updateContentsBasedHash(DigestBuilder& builder)
         lastModifiedBuilder.append(fileStatus.st_mtime);
     }
 
-    slang::Digest temp = lastModifiedBuilder.finalize();
+    MD5::Digest temp = lastModifiedBuilder.finalize();
     if (statFailed || temp != lastModifiedDigest)
     {
         // Either a stat() call failed, or changes were made to at least one of the file dependencies,
         // so we will need to re-generate the contents digest and save the new digest.
-        DigestBuilder contentsBuilder;
+        DigestBuilder<MD5> contentsBuilder;
         for (auto file : filePathDependencies)
         {
             List<uint8_t> fileContents;
@@ -3292,7 +3288,7 @@ void Module::updateContentsBasedHash(DigestBuilder& builder)
             {
                 // Failure to read the file means this is a digest for the contents of a source
                 // file which does not live on disk.
-                contentsBuilder.append(DigestUtil::fromString(file.getUnownedSlice()));
+                contentsBuilder.append(file);
             }
             else
             {
@@ -3512,9 +3508,9 @@ SLANG_NO_THROW SlangResult SLANG_MCALL ComponentType::getEntryPointCode(
 SLANG_NO_THROW void SLANG_MCALL ComponentType::computeDependencyBasedHash(
     SlangInt entryPointIndex,
     SlangInt targetIndex,
-    slang::Digest* outHash)
+    slang::IBlob** outHash)
 {
-    DigestBuilder builder;
+    DigestBuilder<MD5> builder;
 
     // A note on enums that may be hashed in as part of the following two function calls:
     //
@@ -3542,14 +3538,16 @@ SLANG_NO_THROW void SLANG_MCALL ComponentType::computeDependencyBasedHash(
     auto entryPointNameOverride = getEntryPointNameOverride(entryPointIndex);
     builder.append(entryPointNameOverride);
 
-    *outHash = builder.finalize();
+    auto hash = builder.finalize().toBlob();
+    *outHash = hash.detach();
 }
 
-SLANG_NO_THROW void SLANG_MCALL ComponentType::computeContentsBasedHash(slang::Digest* outHash)
+SLANG_NO_THROW void SLANG_MCALL ComponentType::computeContentsBasedHash(slang::IBlob** outHash)
 {
-    DigestBuilder builder;
+    DigestBuilder<MD5> builder;
     updateContentsBasedHash(builder);
-    *outHash = builder.finalize();
+    auto hash = builder.finalize().toBlob();
+    *outHash = hash.detach();
 }
 
 SLANG_NO_THROW SlangResult SLANG_MCALL ComponentType::getEntryPointHostCallable(
@@ -3885,7 +3883,7 @@ CompositeComponentType::CompositeComponentType(
 }
 
 void CompositeComponentType::updateDependencyBasedHash(
-    DigestBuilder& builder,
+    DigestBuilder<MD5>& builder,
     SlangInt entryPointIndex)
 {
     auto componentCount = getChildComponentCount();
@@ -3896,7 +3894,7 @@ void CompositeComponentType::updateDependencyBasedHash(
     }
 }
 
-void CompositeComponentType::updateContentsBasedHash(DigestBuilder& builder)
+void CompositeComponentType::updateContentsBasedHash(DigestBuilder<MD5>& builder)
 {
     auto componentCount = getChildComponentCount();
 
@@ -4386,7 +4384,7 @@ SpecializedComponentType::SpecializedComponentType(
 }
 
 void SpecializedComponentType::updateDependencyBasedHash(
-    DigestBuilder& builder,
+    DigestBuilder<MD5>& builder,
     SlangInt entryPointIndex)
 {
     auto specializationArgCount = getSpecializationArgCount();
@@ -4397,7 +4395,6 @@ void SpecializedComponentType::updateDependencyBasedHash(
         builder.append(argString);
     }
 
-    slang::Digest baseHash;
     getBaseComponentType()->updateDependencyBasedHash(builder, entryPointIndex);
 }
 
@@ -4446,7 +4443,7 @@ void RenamedEntryPointComponentType::acceptVisitor(
 }
 
 void RenamedEntryPointComponentType::updateDependencyBasedHash(
-    DigestBuilder& builder,
+    DigestBuilder<MD5>& builder,
     SlangInt entryPointIndex)
 {
     // CompositeComponentType will have already hashed the name override and file

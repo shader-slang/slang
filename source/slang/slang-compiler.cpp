@@ -224,7 +224,7 @@ namespace Slang
     }
 
     void EntryPoint::updateDependencyBasedHash(
-        DigestBuilder& builder,
+        DigestBuilder<MD5>& builder,
         SlangInt entryPointIndex)
     {
         // CompositeComponentType will have already hashed the relevant entry point's name
@@ -302,7 +302,7 @@ namespace Slang
     }
 
     void TypeConformance::updateDependencyBasedHash(
-        DigestBuilder& builder,
+        DigestBuilder<MD5>& builder,
         SlangInt entryPointIndex)
     {
         SLANG_UNUSED(entryPointIndex);
