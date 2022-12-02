@@ -6,7 +6,6 @@
 #include "../../source/core/slang-file-system.h"
 
 #include "../../slang.h"
-#include "../../source/core/slang-digest-util.h"
 
 using namespace Slang;
 
@@ -349,13 +348,15 @@ Result RendererBase::getEntryPointCodeFromShaderCache(
     ComPtr<slang::ISession> session;
     getSlangSession(session.writeRef());
 
-    slang::Digest shaderKey;
-    program->computeDependencyBasedHash(entryPointIndex, targetIndex, &shaderKey);
+    ComPtr<ISlangBlob> shaderKeyBlob;
+    program->computeDependencyBasedHash(entryPointIndex, targetIndex, shaderKeyBlob.writeRef());
+    DigestType shaderKey(shaderKeyBlob);
 
     // Produce a hash using the AST for this program - This is needed to check whether a cache entry is effectively dirty,
     // or to save along with the compiled code into an entry so the entry can be checked if fetched later on.
-    slang::Digest contentsHash;
-    program->computeContentsBasedHash(&contentsHash);
+    ComPtr<ISlangBlob> contentsHashBlob;
+    program->computeContentsBasedHash(contentsHashBlob.writeRef());
+    DigestType contentsHash(contentsHashBlob);
 
     ComPtr<ISlangBlob> codeBlob;
 
