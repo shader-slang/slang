@@ -141,6 +141,16 @@ Type* SharedASTBuilder::getNoneType()
     return m_noneType;
 }
 
+Type* SharedASTBuilder::getDiffInterfaceType()
+{
+    if (!m_diffInterfaceType)
+    {
+        auto decl = findMagicDecl("DifferentiableType");
+        m_diffInterfaceType = DeclRefType::create(m_astBuilder, makeDeclRef<Decl>(decl));
+    }
+    return m_diffInterfaceType;
+}
+
 SharedASTBuilder::~SharedASTBuilder()
 {
     // Release built in types..

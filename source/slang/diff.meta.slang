@@ -11,12 +11,15 @@ attribute_syntax [ForwardDerivative(function)] : ForwardDerivativeAttribute;
 __attributeTarget(FunctionDeclBase)
 attribute_syntax [BackwardDifferentiable] : BackwardDifferentiableAttribute;
 
-
 __attributeTarget(FunctionDeclBase)
 attribute_syntax [ForwardDerivativeOf(function)] : ForwardDerivativeOfAttribute;
 
 __attributeTarget(DeclBase)
 attribute_syntax [DerivativeMember(memberName)] : DerivativeMemberAttribute;
+
+// Exclude "this" parameter from differentiation.
+__attributeTarget(FunctionDeclBase)
+attribute_syntax [NoDiffThis] : NoDiffThisAttribute;
 
 
 /// Pair type that serves to wrap the primal and

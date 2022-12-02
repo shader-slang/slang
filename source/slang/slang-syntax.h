@@ -329,10 +329,11 @@ namespace Slang
         /// Get the module dclaration that a declaration is associated with, if any.
     ModuleDecl* getModuleDecl(Decl* decl);
 
-    /// Get the module that a declaration is associated with, if any.
+        /// Get the module that a declaration is associated with, if any.
     Module* getModule(Decl* decl);
 
-   
+        /// Get the parent decl, skipping any generic decls in between.
+    Decl* getParentDecl(Decl* decl);
 
 } // namespace Slang
 
