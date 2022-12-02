@@ -2884,6 +2884,11 @@ void collectParameterLists(
             auto thisType = getThisParamTypeForContainer(context, parentDeclRef);
             if(thisType)
             {
+                if (declRef.getDecl()->findModifier<NoDiffThisAttribute>())
+                {
+                    auto noDiffAttr = context->astBuilder->getNoDiffModifierVal();
+                    thisType = context->astBuilder->getModifiedType(thisType, 1, &noDiffAttr);
+                }
                 addThisParameter(innerThisParamDirection, thisType, ioParameterLists);
             }
         }

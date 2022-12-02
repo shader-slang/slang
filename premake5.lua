@@ -292,6 +292,8 @@ newoption {
          location(buildLocation)
      end
  
+     flags "MultiProcessorCompile"
+ 
      --
      -- Make slang-test the startup project.
      --
