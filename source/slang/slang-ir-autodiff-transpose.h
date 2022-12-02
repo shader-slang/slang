@@ -13,39 +13,53 @@ namespace Slang
 
 struct DiffTransposePass
 {
-    AutoDiffSharedContext*                  autodiffContext;
+    
+    struct RevGradient
+    {
+        enum Flavor 
+        {
+            Simple,
+            Swizzle,
+            GetElement,
+            GetDifferential,
+            FieldExtract,
 
-    DifferentialPairTypeBuilder             pairBuilder;
+            Invalid
+        };
 
-    Dictionary<IRInst*, List<IRInst*>>      assignmentsMap;
+        RevGradient() :
+            flavor(Flavor::Invalid), targetInst(nullptr), revGradInst(nullptr), fwdGradInst(nullptr)
+        { }
+        
+        RevGradient(Flavor flavor, IRInst* targetInst, IRInst* revGradInst, IRInst* fwdGradInst) : 
+            flavor(flavor), targetInst(targetInst), revGradInst(revGradInst), fwdGradInst(fwdGradInst)
+        { }
 
-    Dictionary<IRInst*, IRInst*>*           primalsMap;
+        RevGradient(IRInst* targetInst, IRInst* revGradInst, IRInst* fwdGradInst) : 
+            flavor(Flavor::Simple), targetInst(targetInst), revGradInst(revGradInst), fwdGradInst(fwdGradInst)
+        { }
+        
+        IRInst* targetInst;
+        IRInst* revGradInst;
+        IRInst* fwdGradInst;
+
+        Flavor flavor;
+    };
 
     DiffTransposePass(AutoDiffSharedContext* autodiffContext) : 
-        autodiffContext(autodiffContext), pairBuilder(autodiffContext)
+        autodiffContext(autodiffContext), pairBuilder(autodiffContext), diffTypeContext(autodiffContext)
     { }
-
-    struct RevAssignment
-    {
-        IRInst* lvalue;
-        IRInst* rvalue;
-
-        RevAssignment(IRInst* lvalue, IRInst* rvalue) : lvalue(lvalue), rvalue(rvalue)
-        { }
-        RevAssignment() : lvalue(nullptr), rvalue(nullptr)
-        { }
-    };
 
     struct TranspositionResult
     {
         // Holds a set of pairs of 
         // (original-inst, inst-to-accumulate-for-orig-inst)
-        List<RevAssignment> revPairs;
+        List<RevGradient> revPairs;
 
         TranspositionResult()
         { }
 
-        TranspositionResult(List<RevAssignment> revPairs) : revPairs(revPairs)
+        TranspositionResult(List<RevGradient> revPairs) : revPairs(revPairs)
         { }
     };
 
@@ -64,9 +78,10 @@ struct DiffTransposePass
 
     void transposeDiffBlocksInFunc(
         IRFunc* revDiffFunc,
-        // TODO: Maybe there's a more elegant way to pass this information.
         FuncTranspositionInfo transposeInfo)
     {
+        // Grab all differentiable type information.
+        diffTypeContext.setFunc(revDiffFunc);
 
         // Traverse all instructions/blocks in reverse (starting from the terminator inst)
         // look for insts/blocks marked with IRDifferentialInstDecoration,
@@ -103,7 +118,7 @@ struct DiffTransposePass
             // Set dOutParameter as the transpose gradient for the return inst, if any.
             if (auto returnInst = as<IRReturn>(block->getTerminator()))
             {
-                this->addRevAssignmentForFwdInst(returnInst, transposeInfo.dOutInst);
+                this->addRevGradientForFwdInst(returnInst, RevGradient(returnInst, transposeInfo.dOutInst, nullptr));
             }
 
             IRBlock* revBlock = builder.emitBlock();
@@ -116,6 +131,8 @@ struct DiffTransposePass
             block->removeAndDeallocate();
         }
     }
+
+    // A[cond_inst] -> (B or C) -> D => D[cond_inst] -> (B_T -> C_T) -> A_T
 
     void transposeBlock(IRBlock* fwdBlock, IRBlock* revBlock)
     {
@@ -141,7 +158,7 @@ struct DiffTransposePass
         // function scope variable, since control flow can affect what blocks contribute to
         // for a specific inst.
         // 
-        for (auto pair : assignmentsMap)
+        for (auto pair : gradientsMap)
         {
             if (auto param = as<IRLoad>(pair.Key))
                 accumulateGradientsForLoad(&builder, param);
@@ -163,20 +180,55 @@ struct DiffTransposePass
 
     void transposeInst(IRBuilder* builder, IRInst* inst)
     {
-        // Look for assignment entry for this inst.
-        IRInst* revValue = builder->getFloatValue(builder->getType(kIROp_FloatType), 0.0);
-        if (hasRevAssignments(inst))
+        // Look for gradient entries for this inst.
+        List<RevGradient> gradients;
+        if (hasRevGradients(inst))
+            gradients = popRevGradients(inst);
+
+        // Are we dealing with DifferentialPairType? 
+        if (as<IRDifferentialPairType>(inst->getDataType()))
         {
-            // Emit the aggregate of all the assignments here. This will form the derivative
-            revValue = emitAggregateValue(builder, popRevAssignments(inst));
+            // This will be a 'hybrid' primal-differential inst, 
+            // so we add a pair (primal_value, 0) as an additional
+            // gradient to represent the primal part of the computation.
+            // 
+            // Now, if the unzip pass has done it's job, the _only_ 
+            // case should be that inst is IRMakeDifferentialPair
+            // 
+            SLANG_ASSERT(as<IRMakeDifferentialPair>(inst));
+            auto primalType = as<IRDifferentialPairType>(inst->getDataType())->getValueType();
+            auto diffType = (IRType*)pairBuilder.getDiffTypeFromPairType(builder, as<IRDifferentialPairType>(inst->getDataType()));
+
+            auto primalInst = as<IRMakeDifferentialPair>(inst)->getPrimalValue();
+            auto zeroMethod = diffTypeContext.getZeroMethodForType(builder, primalType);
+
+            // Must exist. 
+            SLANG_ASSERT(zeroMethod);
+            auto diffInst = builder->emitCallInst(diffType, zeroMethod, List<IRInst*>());
+            
+            gradients.add(
+                RevGradient(
+                    inst,
+                    builder->emitMakeDifferentialPair(inst->getDataType(), primalInst, diffInst),
+                    nullptr));
         }
+        
+
+        // Emit the aggregate of all the gradients here. This will form the total derivative for this inst.
+        auto revValue = emitAggregateValue(builder, inst->getDataType(), gradients);
+
+        // If revValue is null, gradients are not applicable to this inst 
+        // (store, pointer manipulation etc). Ignore the inst entirely.
+        //
+        if (!revValue)
+            return;
 
         auto transposeResult = transposeInst(builder, inst, revValue);
         
-        // Add the new results to the assignments map.
-        for (auto pair : transposeResult.revPairs)
+        // Add the new results to the gradients map.
+        for (auto gradient : transposeResult.revPairs)
         {
-            addRevAssignmentForFwdInst(pair.lvalue, pair.rvalue);
+            addRevGradientForFwdInst(gradient.targetInst, gradient);
         }
     }
     
@@ -189,6 +241,9 @@ struct DiffTransposePass
             case kIROp_Mul:
             case kIROp_Sub:
                 return transposeArithmetic(builder, fwdInst, revValue);
+            
+            case kIROp_swizzle:
+                return transposeSwizzle(builder, as<IRSwizzle>(fwdInst), revValue);
 
             case kIROp_Return:
                 return transposeReturn(builder, as<IRReturn>(fwdInst), revValue);
@@ -198,47 +253,91 @@ struct DiffTransposePass
 
             case kIROp_DifferentialPairGetDifferential:
                 return transposeGetDifferential(builder, as<IRDifferentialPairGetDifferential>(fwdInst), revValue);
+            
+            case kIROp_Construct:
+                return transposeConstruct(builder, fwdInst, revValue);
 
             default:
                 SLANG_ASSERT_FAILURE("Unhandled instruction");
         }
     }
 
-    TranspositionResult transposeMakePair(IRBuilder*, IRMakeDifferentialPair* fwdMakePair, IRInst* revValue)
+    TranspositionResult transposeSwizzle(IRBuilder*, IRSwizzle* fwdSwizzle, IRInst* revValue)
+    {
+        // (A = p.x) -> (p = float3(dA, 0, 0))
+        return TranspositionResult(
+                    List<RevGradient>(
+                        RevGradient(
+                            RevGradient::Flavor::Swizzle,
+                            fwdSwizzle->getBase(),
+                            revValue,
+                            fwdSwizzle)));
+    }
+
+    TranspositionResult transposeMakePair(IRBuilder* builder, IRMakeDifferentialPair* fwdMakePair, IRInst* revValue)
     {
         // (P = (A, dA)) -> (dA += dP)
         return TranspositionResult(
-                    List<RevAssignment>(
-                        RevAssignment(
+                    List<RevGradient>(
+                        RevGradient(
+                            RevGradient::Flavor::Simple,
                             fwdMakePair->getDifferentialValue(), 
-                            revValue)));
+                            builder->emitDifferentialPairGetDifferential(
+                                fwdMakePair->getDifferentialValue()->getDataType(),
+                                revValue),
+                            fwdMakePair)));
     }
 
     TranspositionResult transposeGetDifferential(IRBuilder*, IRDifferentialPairGetDifferential* fwdGetDiff, IRInst* revValue)
     {
         // (A = GetDiff(P)) -> (dP.d += dA)
         return TranspositionResult(
-                    List<RevAssignment>(
-                        RevAssignment(
+                    List<RevGradient>(
+                        RevGradient(
+                            RevGradient::Flavor::GetDifferential,
                             fwdGetDiff->getBase(),
-                            revValue)));
+                            revValue,
+                            fwdGetDiff)));
     }
 
-    // Gather all reverse-mode gradients for parameters, and store to the differential
+    TranspositionResult transposeConstruct(IRBuilder* builder, IRInst* fwdConstruct, IRInst* revValue)
+    {
+        // For now, we support only vector types. Extend this to other built-in types if necessary.
+        SLANG_ASSERT(as<IRVectorType>(fwdConstruct->getDataType()));
+
+        List<RevGradient> gradients;
+        for (UIndex ii = 0; ii < fwdConstruct->getOperandCount(); ii++)
+        {
+            auto gradAtIndex = builder->emitElementExtract(
+                fwdConstruct->getOperand(ii)->getDataType(),
+                revValue,
+                builder->getIntValue(builder->getIntType(), ii));
+
+            gradients.add(RevGradient(
+                            RevGradient::Flavor::Simple,
+                            fwdConstruct->getOperand(ii),
+                            gradAtIndex,
+                            fwdConstruct));
+        }
+
+        // (A = float3(X, Y, Z)) -> [(dX += dA), (dY += dA), (dZ += dA)]
+        return TranspositionResult(gradients);
+    }
+
+    // Gather all reverse-mode gradients for a Load inst, aggregate them and store them in the ptr.
     // 
     void accumulateGradientsForLoad(IRBuilder* builder, IRLoad* revLoad)
     {
         auto revPtr = revLoad->getPtr();
-
-        // Assert that param type is of the form IRPtrTypeBase<IRDifferentialPairType<T>>
+ 
+        // Assert that ptr type is of the form IRPtrTypeBase<IRDifferentialPairType<T>>
         SLANG_ASSERT(as<IRPtrTypeBase>(revPtr->getDataType()));
         SLANG_ASSERT(as<IRPtrTypeBase>(revPtr->getDataType())->getValueType()->getOp() == kIROp_DifferentialPairType);
 
         auto paramPairType = as<IRDifferentialPairType>(as<IRPtrTypeBase>(revPtr->getDataType())->getValueType());
-        auto diffType = (IRType*) pairBuilder.getDiffTypeFromPairType(builder, paramPairType);
 
         // Gather gradients.
-        auto gradients = popRevAssignments(revLoad);
+        auto gradients = popRevGradients(revLoad);
         if (gradients.getCount() == 0)
         {
             // Ignore.
@@ -247,41 +346,41 @@ struct DiffTransposePass
         else
         {
             // Re-emit a load to get the _current_ value of revPtr.
-            auto revCurrLoad = builder->emitLoad(revPtr);
-
-            // Grab the current gradient value.
-            auto revCurrGrad = builder->emitDifferentialPairGetDifferential(diffType, revCurrLoad);
+            auto revCurrGrad = builder->emitLoad(revPtr);
 
             // Add the current value to the aggregation list.
-            gradients.add(revCurrGrad);
+            gradients.add(
+                RevGradient(
+                    revLoad,
+                    revCurrGrad,
+                    nullptr));
             
             // Get the _total_ value.
-            auto aggregateGradient = emitAggregateValue(builder, gradients);
+            auto aggregateGradient = emitAggregateValue(builder, paramPairType, gradients);
 
-            // Grab the current primal value.
-            auto revCurrPrimal = builder->emitDifferentialPairGetPrimal(revCurrLoad);
-
-            // Make the pair with the new gradient.
-            auto newDiffPair = builder->emitMakeDifferentialPair(paramPairType, revCurrPrimal, aggregateGradient);
-
-            // Store this back into the parameter.
-            builder->emitStore(revPtr, newDiffPair);
+            // Store this back into the pointer.
+            builder->emitStore(revPtr, aggregateGradient);
         }
     }
 
     TranspositionResult transposeReturn(IRBuilder*, IRReturn* fwdReturn, IRInst* revValue)
     {
-        
+        // TODO: This check needs to be changed to something like: isRelevantDifferentialPair()
         if (as<IRDifferentialPairType>(fwdReturn->getVal()->getDataType()))
         {
-            // If the type is a differential pair, we add the reverse-value for the *pair* 
-            // itself. TODO: Signal this through flags in the 'RevAssignment' struct.
-            // (return (A, dA)) -> (dA += dOut)
+            // This is a subtle case, even though the returned value is returning
+            // a pair, we need to pretend that the primal value is not being returned
+            // since we only care about transposing differential computation.
+            // So we're going to assume there is an implicit GetDifferential()
+            // around the return value before returning.
+            // 
             return TranspositionResult(
-                        List<RevAssignment>(
-                            RevAssignment(
+                        List<RevGradient>(
+                            RevGradient(
+                                RevGradient::Flavor::GetDifferential,
                                 fwdReturn->getVal(), 
-                                revValue)));
+                                revValue,
+                                fwdReturn)));
         }
         else
         {
@@ -290,35 +389,136 @@ struct DiffTransposePass
         }
     }
 
+    IRInst* promoteToType(IRBuilder* builder, IRType* targetType, IRInst* inst)
+    {
+        auto currentType = inst->getDataType();
+
+        switch (targetType->getOp())
+        {
+
+        case kIROp_VectorType:
+        {
+            // current type should be a scalar.
+            SLANG_ASSERT(!as<IRVectorType>(currentType->getDataType()));
+
+            auto targetVectorType = as<IRVectorType>(targetType);
+            
+            List<IRInst*> operands;
+            for (Index ii = 0; ii < as<IRIntLit>(targetVectorType->getElementCount())->getValue(); ii++)
+            {
+                operands.add(inst);
+            }
+
+            IRInst* newInst = builder->emitConstructorInst(targetType, operands.getCount(), operands.getBuffer());
+            
+            if (isDifferentialInst(inst))
+                builder->markInstAsDifferential(newInst);
+            
+            return newInst;
+        }
+        
+        default:
+            SLANG_ASSERT_FAILURE("Unhandled target type for promotion");
+        }
+    }
+
+    IRInst* promoteOperandsToTargetType(IRBuilder* builder, IRInst* fwdInst)
+    {
+        auto oldLoc = builder->getInsertLoc();
+        // If operands are not of the same type, cast them to the target type.
+        IRType* targetType = fwdInst->getDataType();
+
+        bool needNewInst = false;
+        
+        List<IRInst*> newOperands;
+        for (UIndex ii = 0; ii < fwdInst->getOperandCount(); ii++)
+        {
+            auto operand = fwdInst->getOperand(ii);
+            if (operand->getDataType() != targetType)
+            {
+                // Insert new operand just after the old operand, so we have the old
+                // operands available.
+                // 
+                builder->setInsertAfter(operand);
+
+                IRInst* newOperand = promoteToType(builder, targetType, operand);
+                newOperands.add(newOperand);
+
+                needNewInst = true;
+            }
+            else
+            {
+                newOperands.add(operand);
+            }
+        }
+
+        if(needNewInst)
+        {
+            builder->setInsertAfter(fwdInst);
+            IRInst* newInst = builder->emitIntrinsicInst(
+                fwdInst->getDataType(),
+                fwdInst->getOp(),
+                newOperands.getCount(),
+                newOperands.getBuffer());
+            
+            builder->setInsertLoc(oldLoc);
+
+            if (isDifferentialInst(fwdInst))
+                builder->markInstAsDifferential(newInst);
+
+            return newInst;
+        }
+        else
+        {
+            builder->setInsertLoc(oldLoc);
+            return fwdInst;
+        }
+    }
+
     TranspositionResult transposeArithmetic(IRBuilder* builder, IRInst* fwdInst, IRInst* revValue)
     {
-        IRType* floatType = builder->getType(kIROp_FloatType);
+        
+        // Only handle arithmetic on uniform types. If the types aren't uniform, we need some
+        // promotion/demotion logic. Note that this can create a new inst in place of the old, but since we're
+        // at the transposition step for the old inst, and already have it's aggregate gradient, there's
+        // no need to worry about the 'gradientsMap' being out-of-date
+        // TODO: There are some opportunities for optimization here (otherwise we might be increasing the intermediate
+        // data size unnecessarily)
+        // 
+        fwdInst = promoteOperandsToTargetType(builder, fwdInst);
+
+        auto operandType = fwdInst->getOperand(0)->getDataType();
+
         switch(fwdInst->getOp())
         {
             case kIROp_Add:
             {
                 // (Out = dA + dB) -> [(dA += dOut), (dB += dOut)]
                 return TranspositionResult(
-                        List<RevAssignment>(
-                            RevAssignment(
+                        List<RevGradient>(
+                            RevGradient(
                                 fwdInst->getOperand(0),
-                                revValue),
-                            RevAssignment(
+                                revValue,
+                                fwdInst),
+                            RevGradient(
                                 fwdInst->getOperand(1),
-                                revValue)));
+                                revValue,
+                                fwdInst)));
             }
             case kIROp_Sub:
             {
                 // (Out = dA - dB) -> [(dA += dOut), (dB -= dOut)]
                 return TranspositionResult(
-                        List<RevAssignment>(
-                            RevAssignment(
+                        List<RevGradient>(
+                            RevGradient(
                                 fwdInst->getOperand(0),
-                                revValue),
-                            RevAssignment(
+                                revValue,
+                                fwdInst),
+                            RevGradient(
                                 fwdInst->getOperand(1),
                                 builder->emitNeg(
-                                    revValue->getDataType(), revValue))));
+                                    revValue->getDataType(), revValue),
+                                fwdInst)));
             }
             case kIROp_Mul: 
             {
@@ -326,19 +526,21 @@ struct DiffTransposePass
                 {
                     // (Out = dA * B) -> (dA += B * dOut)
                     return TranspositionResult(
-                        List<RevAssignment>(
-                            RevAssignment(
+                        List<RevGradient>(
+                            RevGradient(
                                 fwdInst->getOperand(0),
-                                builder->emitMul(floatType, fwdInst->getOperand(1), revValue))));
+                                builder->emitMul(operandType, fwdInst->getOperand(1), revValue),
+                                fwdInst)));
                 }
                 else if (isDifferentialInst(fwdInst->getOperand(1)))
                 {
                     // (Out = A * dB) -> (dB += A * dOut)
                     return TranspositionResult(
-                        List<RevAssignment>(
-                            RevAssignment(
+                        List<RevGradient>(
+                            RevGradient(
                                 fwdInst->getOperand(1),
-                                builder->emitMul(floatType, fwdInst->getOperand(0), revValue))));
+                                builder->emitMul(operandType, fwdInst->getOperand(0), revValue),
+                                fwdInst)));
                 }
                 else
                 {
@@ -351,66 +553,244 @@ struct DiffTransposePass
         }
     }
 
-    IRInst* emitAggregateValue(IRBuilder* builder, List<IRInst*> values)
+    RevGradient materializeGradientOfSwizzle(IRBuilder* builder, RevGradient gradient)
     {
-        // We're handling the case where the types are all float,
-        // so we can use a bunch of kIROp_Add insts to add them up.
-        // If this is an arbitrary type T, we need to lookup and 
-        // call T.dadd()
+        // Peek at the fwd-mode swizzle inst to see what type we need to materialize.
+        IRSwizzle* fwdSwizzleInst = as<IRSwizzle>(gradient.fwdGradInst);
+        SLANG_ASSERT(fwdSwizzleInst);
 
-        IRInst* initialValue = builder->getFloatValue(builder->getType(kIROp_FloatType), 0.0);
-        if (values.getCount() == 0)
+        auto baseType = fwdSwizzleInst->getBase()->getDataType();
+
+        // Assume for now that this is a vector type.
+        SLANG_ASSERT(as<IRVectorType>(baseType));
+
+        IRInst* elementCountInst = as<IRVectorType>(baseType)->getElementCount();
+        IRType* elementType = as<IRVectorType>(baseType)->getElementType();
+
+        // Must be a concrete integer (auto-diff must always occur after specialization)
+        // For generic code, we would need to generate a for loop.
+        // 
+        SLANG_ASSERT(as<IRIntLit>(elementCountInst));
+
+        auto elementCount = as<IRIntLit>(elementCountInst)->getValue();
+
+        // Make a list of 0s
+        List<IRInst*> constructArgs;
+        auto zeroMethod = diffTypeContext.getZeroMethodForType(builder, elementType);
+
+        // Must exist. 
+        SLANG_ASSERT(zeroMethod);
+
+        auto zeroValueInst = builder->emitCallInst(elementType, zeroMethod, List<IRInst*>());
+        
+        for (Index ii = 0; ii < elementCount; ii++)
         {
-            // If there's not values to add up, emit a 0 value.
-            return initialValue;
+            constructArgs.add(zeroValueInst);
         }
-        else if (values.getCount() == 1)
+
+        // Replace swizzled elements with their gradients.
+        for (UIndex ii = 0; ii < fwdSwizzleInst->getElementCount(); ii++)
+        {
+            auto sourceIndex = ii;
+            auto targetIndexInst = fwdSwizzleInst->getElementIndex(ii);
+            SLANG_ASSERT(as<IRIntLit>(targetIndexInst));
+            auto targetIndex = as<IRIntLit>(targetIndexInst)->getValue();
+
+            // Special-case for when the swizzled output is a single element.
+            if (fwdSwizzleInst->getElementCount() == 1)
+            {
+                constructArgs[targetIndex] = gradient.revGradInst;
+            }
+            else
+            {
+                auto gradAtIndex = builder->emitElementExtract(elementType, gradient.revGradInst, builder->getIntValue(builder->getIntType(), sourceIndex));
+                constructArgs[targetIndex] = gradAtIndex;
+            }
+        }
+
+        return RevGradient(
+            gradient.targetInst,
+            builder->emitConstructorInst(baseType, elementCount, constructArgs.getBuffer()),
+            gradient.fwdGradInst);
+    }
+
+    RevGradient materializeGradient(IRBuilder* builder, RevGradient gradient)
+    {
+        switch (gradient.flavor)
+        {
+            case RevGradient::Flavor::Simple:
+                return gradient;
+            
+            case RevGradient::Flavor::Swizzle:
+                return materializeGradientOfSwizzle(builder, gradient);
+
+            default:
+                SLANG_ASSERT_FAILURE("Unhandled gradient flavor for materialization");
+        }
+    }
+
+    IRInst* emitAggregateDifferentialPair(IRBuilder* builder, IRType* aggregateType, List<RevGradient> pairGradients)
+    {
+        SLANG_ASSERT(as<IRDifferentialPairType>(aggregateType));
+
+        IRType* diffType = (IRType*)pairBuilder.getDiffTypeFromPairType(builder, as<IRDifferentialPairType>(aggregateType));
+
+        IRInst* primalInst = nullptr;
+        IRInst* diffInst = nullptr;
+
+        List<RevGradient> gradients;
+        for (auto gradient : pairGradients)
+        {
+            switch (gradient.flavor)
+            {
+            case RevGradient::Flavor::Simple:
+            {
+                // In this case, the gradient is a 'pair' already, but we need to treat the primal element 
+                // as if it didn't exist (we simply copy it over)
+                // If we already saw a pair, throw an error since we don't know how to combine to primals.
+                // (i.e. something went wrong prior to this step.)
+                // 
+                if (primalInst)
+                {
+                    SLANG_UNEXPECTED("Encountered multiple pair types in emitAggregateDifferentialPair");
+                }
+                
+                primalInst = builder->emitDifferentialPairGetPrimal(gradient.revGradInst);
+                gradients.add(
+                    RevGradient(
+                        RevGradient::Flavor::Simple,
+                        gradient.targetInst,
+                        builder->emitDifferentialPairGetDifferential(
+                            diffType,
+                            gradient.revGradInst),
+                        gradient.fwdGradInst));
+                break;
+            }
+
+            case RevGradient::Flavor::GetDifferential:
+            {
+                // In this case, the gradient is the result of transposing a GetDifferential
+                // so we have only the gradient part. Just add it to the list of gradients to aggregate
+                gradients.add(
+                    RevGradient(
+                        RevGradient::Flavor::Simple,
+                        gradient.targetInst,
+                        gradient.revGradInst,
+                        gradient.fwdGradInst));
+                break;
+            }
+            default:
+                SLANG_UNEXPECTED("Unexpected gradient flavor in emitAggregateDifferentialPair");
+            }
+        }
+
+        // Aggregate only the differentials
+        diffInst = emitAggregateValue(builder, diffType, gradients);
+
+        // Pack them back together.
+        return builder->emitMakeDifferentialPair(aggregateType, primalInst, diffInst);
+    }
+
+    IRInst* emitAggregateValue(IRBuilder* builder, IRType* aggregateType, List<RevGradient> gradients)
+    {
+        // If we're dealing with the differential-pair types, we need to use a different aggregation method, since
+        // a differential pair is really a 'hybrid' primal-differential type.
+        //
+        if (as<IRDifferentialPairType>(aggregateType))
+            return emitAggregateDifferentialPair(builder, aggregateType, gradients);
+
+        // Process non-simple gradients into simple gradients.
+        // TODO: This is where we can improve efficiency later.
+        // For instance if we have one gradient each for var.x, var.y and var.z
+        // we can construct one single gradient vector out of the three vectors (i.e. float3(x_grad, y_grad, z_grad))
+        // instead of creating one vector for each gradient and accumulating them 
+        // (i.e. float3(x_grad, 0, 0) + float3(0, y_grad, 0) + float3(0, 0, z_grad))
+        // The same concept can be extended for struct and array types (and for any combination of the three)
+        // 
+        List<RevGradient> simpleGradients;
+        for (auto gradient : gradients)
+        {
+            simpleGradients.add(materializeGradient(builder, gradient));
+        }
+
+        if (simpleGradients.getCount() == 0)
+        {
+            // If there are no gradients to add up, check the type and emit a 0/null value.
+            if (aggregateType != nullptr && !as<IRVoidType>(aggregateType))
+            {
+                // If type is non-null/non-void, call T.dzero() to produce a 0 gradient.
+                auto zeroMethod = diffTypeContext.getZeroMethodForType(builder, aggregateType);
+                return builder->emitCallInst(
+                    (IRType*)diffTypeContext.getDifferentialForType(builder, aggregateType),
+                    zeroMethod,
+                    List<IRInst*>());
+            }
+            else
+            {
+                // Otherwise, gradients may not be applicable for this inst. return null
+                return nullptr;
+            }
+        }
+        else if (simpleGradients.getCount() == 1)
         {
             // If there's only one value to add up, just return it in order
             // to avoid a stack of 0 + 0 + 0 + ...
-            return values[0];
+            return simpleGradients[0].revGradInst;
         }
 
-        // If there's more than one value, aggregate them by adding them up.
-
-        SLANG_ASSERT(values[0]->getDataType()->getOp() == kIROp_FloatType);
-
-        IRInst* currentValue = initialValue;
-        for (auto value : values)
+        // If there's more than one gradient, aggregate them by adding them up.
+        IRInst* currentValue = nullptr;
+        for (auto gradient : simpleGradients)
         {
-            currentValue = builder->emitAdd(
-                builder->getType(kIROp_FloatType), currentValue, value);
+            if (!currentValue)
+            {
+                currentValue = gradient.revGradInst;
+                continue;
+            }
+
+            auto addMethod = diffTypeContext.getAddMethodForType(builder, aggregateType);
+            currentValue = builder->emitCallInst(aggregateType, addMethod, List<IRInst*>(currentValue, gradient.revGradInst));
         }
 
         return currentValue;
     }
 
-    void addRevAssignmentForFwdInst(IRInst* fwdInst, IRInst* assignment)
+    void addRevGradientForFwdInst(IRInst* fwdInst, RevGradient assignment)
     {
-        if (!hasRevAssignments(fwdInst))
+        if (!hasRevGradients(fwdInst))
         {
-            assignmentsMap[fwdInst] = List<IRInst*>();
+            gradientsMap[fwdInst] = List<RevGradient>();
         }
 
-        assignmentsMap[fwdInst].GetValue().add(assignment);
+        gradientsMap[fwdInst].GetValue().add(assignment);
     }
 
-    List<IRInst*> getRevAssignments(IRInst* fwdInst)
+    List<RevGradient> getRevGradients(IRInst* fwdInst)
     {
-        return assignmentsMap[fwdInst];
+        return gradientsMap[fwdInst];
     }
 
-    List<IRInst*> popRevAssignments(IRInst* fwdInst)
+    List<RevGradient> popRevGradients(IRInst* fwdInst)
     {
-        List<IRInst*> val = assignmentsMap[fwdInst].GetValue();
-        assignmentsMap.Remove(fwdInst);
+        List<RevGradient> val = gradientsMap[fwdInst].GetValue();
+        gradientsMap.Remove(fwdInst);
         return val;
     }
 
-    bool hasRevAssignments(IRInst* fwdInst)
+    bool hasRevGradients(IRInst* fwdInst)
     {
-        return assignmentsMap.ContainsKey(fwdInst);
+        return gradientsMap.ContainsKey(fwdInst);
     }
+
+    AutoDiffSharedContext*                  autodiffContext;
+
+    DifferentiableTypeConformanceContext    diffTypeContext;
+
+    DifferentialPairTypeBuilder             pairBuilder;
+
+    Dictionary<IRInst*, List<RevGradient>>      gradientsMap;
+
+    Dictionary<IRInst*, IRInst*>*           primalsMap;
 };
 
 

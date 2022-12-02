@@ -81,6 +81,7 @@ struct DiffUnzipPass
         {
             IRInst* nextChild = child->getNextInst();
 
+            // TODO: Use insertAfter to move the insts instead of cloning.
             if (isDifferentialInst(child) || as<IRTerminatorInst>(child))
             {
                 auto newInst = cloneInst(&cloneEnv, &diffBuilder, child);
