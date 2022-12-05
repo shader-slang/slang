@@ -242,12 +242,12 @@ namespace Slang
         return empty;
     }
 
-    List<String> const& EntryPoint::getFilePathDependencies()
+    List<SourceFile*> const& EntryPoint::getFileDependencies()
     {
         if(auto module = getModule())
-            return getModule()->getFilePathDependencies();
+            return getModule()->getFileDependencies();
         
-        static List<String> empty;
+        static List<SourceFile*> empty;
         return empty;
     }
 
@@ -269,8 +269,8 @@ namespace Slang
         if (auto declaredWitness = as<DeclaredSubtypeWitness>(witness))
         {
             auto declModule = getModule(declaredWitness->declRef.getDecl());
-            m_moduleDependency.addDependency(declModule);
-            m_pathDependency.addDependency(declModule);
+            m_moduleDependencyList.addDependency(declModule);
+            m_fileDependencyList.addDependency(declModule);
             if (m_requirementSet.Add(declModule))
             {
                 m_requirements.add(declModule);
@@ -316,12 +316,12 @@ namespace Slang
 
     List<Module*> const& TypeConformance::getModuleDependencies()
     {
-        return m_moduleDependency.getModuleList();
+        return m_moduleDependencyList.getModuleList();
     }
 
-    List<String> const& TypeConformance::getFilePathDependencies()
+    List<SourceFile*> const& TypeConformance::getFileDependencies()
     {
-        return m_pathDependency.getFilePathList();
+        return m_fileDependencyList.getFileList();
     }
 
     Index TypeConformance::getRequirementCount() { return m_requirements.getCount(); }

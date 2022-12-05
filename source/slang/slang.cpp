@@ -1674,25 +1674,7 @@ void TranslationUnitRequest::_addSourceFile(SourceFile* sourceFile)
 {
     m_sourceFiles.add(sourceFile);
 
-    // We want to record that the compiled module has a dependency
-    // on the path of the source file, but we also need to account
-    // for cases where the user added a source string/blob without
-    // an associated path and/or wasn't from a file.
-
-    auto pathInfo = sourceFile->getPathInfo();
-    if (pathInfo.hasFoundPath())
-    {
-        getModule()->addFilePathDependency(pathInfo.foundPath);
-    }
-    else
-    {
-        // No path exists for this source, so we generate a new string to use as a
-        // fake path in the list of file path dependencies. This is needed to account
-        // for non-file-based dependencies later when shader files are being hashed for
-        // the shader cache.
-        auto sourceHash = MD5::compute(sourceFile->getContent().begin(), sourceFile->getContent().getLength());
-        getModule()->addFilePathDependency(sourceHash.toString());
-    }
+    getModule()->addFileDependency(sourceFile);
 }
 
 List<SourceFile*> const& TranslationUnitRequest::getSourceFiles()
@@ -1896,9 +1878,9 @@ protected:
     // by applications to decide when they need to "hot reload"
     // their shader code.
     //
-    void handleFileDependency(String const& path) SLANG_OVERRIDE
+    void handleFileDependency(SourceFile* sourceFile) SLANG_OVERRIDE
     {
-        m_module->addFilePathDependency(path);
+        m_module->addFileDependency(sourceFile);
     }
 
     // The second task that this handler deals with is detecting
@@ -3200,23 +3182,23 @@ void ModuleDependencyList::_addDependency(Module* module)
 }
 
 //
-// FilePathDependencyList
+// FileDependencyList
 //
 
-void FilePathDependencyList::addDependency(String const& path)
+void FileDependencyList::addDependency(SourceFile* sourceFile)
 {
-    if(m_filePathSet.Contains(path))
+    if(m_fileSet.Contains(sourceFile))
         return;
 
-    m_filePathList.add(path);
-    m_filePathSet.Add(path);
+    m_fileList.add(sourceFile);
+    m_fileSet.Add(sourceFile);
 }
 
-void FilePathDependencyList::addDependency(Module* module)
+void FileDependencyList::addDependency(Module* module)
 {
-    for(auto& path : module->getFilePathDependencyList())
+    for(SourceFile* sourceFile : module->getFileDependencyList())
     {
-        addDependency(path);
+        addDependency(sourceFile);
     }
 }
 
@@ -3310,12 +3292,12 @@ void Module::updateContentsBasedHash(DigestBuilder<MD5>& builder)
 void Module::addModuleDependency(Module* module)
 {
     m_moduleDependencyList.addDependency(module);
-    m_filePathDependencyList.addDependency(module);
+    m_fileDependencyList.addDependency(module);
 }
 
-void Module::addFilePathDependency(String const& path)
+void Module::addFileDependency(SourceFile* sourceFile)
 {
-    m_filePathDependencyList.addDependency(path);
+    m_fileDependencyList.addDependency(sourceFile);
 }
 
 void Module::setModuleDecl(ModuleDecl* moduleDecl)
@@ -3864,9 +3846,9 @@ CompositeComponentType::CompositeComponentType(
         {
             m_moduleDependencyList.addDependency(module);
         }
-        for(auto filePath : child->getFilePathDependencies())
+        for(auto sourceFile : child->getFileDependencies())
         {
-            m_filePathDependencyList.addDependency(filePath);
+            m_fileDependencyList.addDependency(sourceFile);
         }
 
         auto childRequirementCount = child->getRequirementCount();
@@ -3959,9 +3941,9 @@ List<Module*> const& CompositeComponentType::getModuleDependencies()
     return m_moduleDependencyList.getModuleList();
 }
 
-List<String> const& CompositeComponentType::getFilePathDependencies()
+List<SourceFile*> const& CompositeComponentType::getFileDependencies()
 {
-    return m_filePathDependencyList.getFilePathList();
+    return m_fileDependencyList.getFileList();
 }
 
 void CompositeComponentType::acceptVisitor(ComponentTypeVisitor* visitor, SpecializationInfo* specializationInfo)
@@ -4226,7 +4208,7 @@ SpecializedComponentType::SpecializedComponentType(
     // The starting point for our lists comes from the base component type.
     //
     m_moduleDependencies = base->getModuleDependencies();
-    m_filePathDependencies = base->getFilePathDependencies();
+    m_fileDependencies = base->getFileDependencies();
 
     Index baseRequirementCount = base->getRequirementCount();
     for( Index r = 0; r < baseRequirementCount; r++ )
@@ -4238,11 +4220,11 @@ SpecializedComponentType::SpecializedComponentType(
     // dependencies and requirements based on the modules that
     // were collected when looking at the specialization arguments.
 
-    // We want to avoid adding the same file path dependency more than once.
+    // We want to avoid adding the same file dependency more than once.
     //
-    HashSet<String> filePathDependencySet;
-    for(auto path : m_filePathDependencies)
-        filePathDependencySet.Add(path);
+    HashSet<SourceFile*> fileDependencySet;
+    for(SourceFile* sourceFile : m_fileDependencies)
+        fileDependencySet.Add(sourceFile);
 
     for(auto module : moduleCollector.m_modulesList)
     {
@@ -4259,7 +4241,7 @@ SpecializedComponentType::SpecializedComponentType(
         m_requirements.add(module);
 
         // The speciialized component type will also have a dependency
-        // on all the file paths that any of the modules involved in
+        // on all the files that any of the modules involved in
         // it depend on (including those that are required but not
         // yet linked in).
         //
@@ -4268,12 +4250,12 @@ SpecializedComponentType::SpecializedComponentType(
         // source files, so we want to include anything that could
         // affect the validity of generated code.
         //
-        for(auto path : module->getFilePathDependencies())
+        for(SourceFile* sourceFile : module->getFileDependencies())
         {
-            if(filePathDependencySet.Contains(path))
+            if(fileDependencySet.Contains(sourceFile))
                 continue;
-            filePathDependencySet.Add(path);
-            m_filePathDependencies.add(path);
+            fileDependencySet.Add(sourceFile);
+            m_fileDependencies.add(sourceFile);
         }
 
         // Finalyl we also add the module for the specialization arguments
@@ -5144,14 +5126,15 @@ int EndToEndCompileRequest::getDependencyFileCount()
 {
     auto frontEndReq = getFrontEndReq();
     auto program = frontEndReq->getGlobalAndEntryPointsComponentType();
-    return (int)program->getFilePathDependencies().getCount();
+    return (int)program->getFileDependencies().getCount();
 }
 
 char const* EndToEndCompileRequest::getDependencyFilePath(int index)
 {
     auto frontEndReq = getFrontEndReq();
     auto program = frontEndReq->getGlobalAndEntryPointsComponentType();
-    return program->getFilePathDependencies()[index].begin();
+    SourceFile* sourceFile = program->getFileDependencies()[index];
+    return sourceFile->getPathInfo().hasFileFoundPath() ? sourceFile->getPathInfo().foundPath.getBuffer() : "unknown";
 }
 
 int EndToEndCompileRequest::getTranslationUnitCount()

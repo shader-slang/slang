@@ -216,15 +216,15 @@ namespace Slang
         HashSet<Module*>    m_moduleSet;
     };
 
-        /// Tracks an unordered list of filesystem paths that something depends on
-    struct FilePathDependencyList
+        /// Tracks an unordered list of source files that something depends on
+    struct FileDependencyList
     {
     public:
-            /// Get the list of paths that are depended on.
-        List<String> const& getFilePathList() { return m_filePathList; }
+            /// Get the list of files that are depended on.
+        List<SourceFile*> const& getFileList() { return m_fileList; }
 
-            /// Add a path to the list, if it is not already present
-        void addDependency(String const& path);
+            /// Add a file to the list, if it is not already present
+        void addDependency(SourceFile* sourceFile);
 
             /// Add all of the paths that `module` depends on to the list
         void addDependency(Module* module);
@@ -236,11 +236,11 @@ namespace Slang
         // multiple times from `getFilePathList`, but because
         // order isn't important, we could potentially do better
         // in terms of memory (at some cost in performance) by
-        // just sorting the `m_filePathList` every once in
+        // just sorting the `m_fileList` every once in
         // a while and then deduplicating.
 
-        List<String>    m_filePathList;
-        HashSet<String> m_filePathSet;
+        List<SourceFile*>    m_fileList;
+        HashSet<SourceFile*> m_fileSet;
     };
 
     class EntryPoint;
@@ -371,9 +371,9 @@ namespace Slang
             ///
         virtual List<Module*> const& getModuleDependencies() = 0;
 
-            /// Get the full list of filesystem paths this component type depends on.
+            /// Get the full list of source files this component type depends on.
             ///
-        virtual List<String> const& getFilePathDependencies() = 0;
+        virtual List<SourceFile*> const& getFileDependencies() = 0;
 
             /// Callback for use with `enumerateIRModules`
         typedef void (*EnumerateIRModulesCallback)(IRModule* irModule, void* userData);
@@ -540,7 +540,7 @@ namespace Slang
         RefPtr<ComponentType> getRequirement(Index index) SLANG_OVERRIDE;
 
         List<Module*> const& getModuleDependencies() SLANG_OVERRIDE;
-        List<String> const& getFilePathDependencies() SLANG_OVERRIDE;
+        List<SourceFile*> const& getFileDependencies() SLANG_OVERRIDE;
 
         class CompositeSpecializationInfo : public SpecializationInfo
         {
@@ -584,7 +584,7 @@ namespace Slang
         List<ComponentType*> m_requirements;
 
         ModuleDependencyList m_moduleDependencyList;
-        FilePathDependencyList m_filePathDependencyList;
+        FileDependencyList m_fileDependencyList;
     };
 
         /// A component type created by specializing another component type.
@@ -638,7 +638,7 @@ namespace Slang
         RefPtr<ComponentType> getRequirement(Index index) SLANG_OVERRIDE;
 
         List<Module*> const& getModuleDependencies() SLANG_OVERRIDE { return m_moduleDependencies; }
-        List<String> const& getFilePathDependencies() SLANG_OVERRIDE { return m_filePathDependencies; }
+        List<SourceFile*> const& getFileDependencies() SLANG_OVERRIDE { return m_fileDependencies; }
 
                     /// Get a list of tagged-union types referenced by the specialization parameters.
         List<TaggedUnionType*> const& getTaggedUnionTypes() { return m_taggedUnionTypes; }
@@ -673,7 +673,7 @@ namespace Slang
         List<TaggedUnionType*> m_taggedUnionTypes;
 
         List<Module*> m_moduleDependencies;
-        List<String> m_filePathDependencies;
+        List<SourceFile*> m_fileDependencies;
         List<RefPtr<ComponentType>> m_requirements;
     };
 
@@ -748,9 +748,9 @@ namespace Slang
         {
             return m_base->getModuleDependencies();
         }
-        List<String> const& getFilePathDependencies() SLANG_OVERRIDE
+        List<SourceFile*> const& getFileDependencies() SLANG_OVERRIDE
         {
-            return m_base->getFilePathDependencies();
+            return m_base->getFileDependencies();
         }
 
         SLANG_NO_THROW Index SLANG_MCALL getSpecializationParamCount() SLANG_OVERRIDE
@@ -948,7 +948,7 @@ namespace Slang
             /// but may also include modules that are required by its generic type arguments.
             ///
         List<Module*> const& getModuleDependencies() SLANG_OVERRIDE; // { return getModule()->getModuleDependencies(); }
-        List<String> const& getFilePathDependencies() SLANG_OVERRIDE; // { return getModule()->getFilePathDependencies(); }
+        List<SourceFile*> const& getFileDependencies() SLANG_OVERRIDE; // { return getModule()->getFileDependencies(); }
 
             /// Create a dummy `EntryPoint` that is only usable for pass-through compilation.
         static RefPtr<EntryPoint> createDummyForPassThrough(
@@ -1141,7 +1141,7 @@ namespace Slang
         }
 
         List<Module*> const& getModuleDependencies() SLANG_OVERRIDE;
-        List<String> const& getFilePathDependencies() SLANG_OVERRIDE;
+        List<SourceFile*> const& getFileDependencies() SLANG_OVERRIDE;
 
         SLANG_NO_THROW Index SLANG_MCALL getSpecializationParamCount() SLANG_OVERRIDE { return 0; }
 
@@ -1182,8 +1182,8 @@ namespace Slang
             DiagnosticSink* sink) SLANG_OVERRIDE;
     private:
         SubtypeWitness* m_subtypeWitness;
-        ModuleDependencyList m_moduleDependency;
-        FilePathDependencyList m_pathDependency;
+        ModuleDependencyList m_moduleDependencyList;
+        FileDependencyList m_fileDependencyList;
         List<RefPtr<Module>> m_requirements;
         HashSet<Module*> m_requirementSet;
         RefPtr<IRModule> m_irModule;
@@ -1345,14 +1345,14 @@ namespace Slang
             /// Get the list of other modules this module depends on
         List<Module*> const& getModuleDependencyList() { return m_moduleDependencyList.getModuleList(); }
 
-            /// Get the list of filesystem paths this module depends on
-        List<String> const& getFilePathDependencyList() { return m_filePathDependencyList.getFilePathList(); }
+            /// Get the list of files this module depends on
+        List<SourceFile*> const& getFileDependencyList() { return m_fileDependencyList.getFileList(); }
 
             /// Register a module that this module depends on
         void addModuleDependency(Module* module);
 
-            /// Register a filesystem path that this module depends on
-        void addFilePathDependency(String const& path);
+            /// Register a source file that this module depends on
+        void addFileDependency(SourceFile* sourceFile);
 
             /// Set the AST for this module.
             ///
@@ -1381,7 +1381,7 @@ namespace Slang
         RefPtr<ComponentType> getRequirement(Index index) SLANG_OVERRIDE;
 
         List<Module*> const& getModuleDependencies() SLANG_OVERRIDE { return m_moduleDependencyList.getModuleList(); }
-        List<String> const& getFilePathDependencies() SLANG_OVERRIDE { return m_filePathDependencyList.getFilePathList(); }
+        List<SourceFile*> const& getFileDependencies() SLANG_OVERRIDE { return m_fileDependencyList.getFileList(); }
 
             /// Given a mangled name finds the exported NodeBase associated with this module.
             /// If not found returns nullptr.
@@ -1443,8 +1443,8 @@ namespace Slang
         // List of modules this module depends on
         ModuleDependencyList m_moduleDependencyList;
 
-        // List of filesystem paths this module depends on
-        FilePathDependencyList m_filePathDependencyList;
+        // List of source files this module depends on
+        FileDependencyList m_fileDependencyList;
 
         // Entry points that were defined in thsi module
         //
