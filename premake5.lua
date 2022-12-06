@@ -722,7 +722,7 @@ end
 -- build items needed for other dependencies
 ---
 
-function generatorProject(name, sourcePath, isSharedLib)
+function generatorProject(name, sourcePath, projectKind)
     -- We use the `group` command here to specify that the
     -- next project we create shold be placed into a group
     -- named "generator" in a generated IDE solution/workspace.
@@ -736,12 +736,12 @@ function generatorProject(name, sourcePath, isSharedLib)
     -- Set up the project, but do NOT add any source files.
     baseSlangProject(name, sourcePath)
 
-    -- By default, just use static lib to force something
-    -- to build.
-    if isSharedLib then
-        kind "SharedLib"
+    -- By default the generator projects run a custom tool and don't
+    -- require any premake machinery to compile a binary for them.
+    if projectKind == nil then
+        kind "Utility"
     else
-        kind "StaticLib"
+        kind (projectKind)
     end
 end
 
@@ -866,6 +866,11 @@ tool "slang-cpp-extractor"
 
     links { "compiler-core", "core" }
 
+tool "slang-lookup-generator"
+    uuid "3242baa7-fc4c-4f76-83bc-e4403099dc1d"
+    includedirs { "." }
+
+    links { "compiler-core", "core" }
 
 tool "test-process"
     uuid "BE412850-4BB9-429A-877C-BFBC4B34186C"
@@ -1242,10 +1247,9 @@ generatorProject("run-generators", nil)
         "source/core/slang-string.cpp",
     }
 
-    -- First, we need to ensure that `slang-generate`/`slang-cpp-extactor`
-    -- gets built before `slang`, so we declare a non-linking dependency between
+    -- First, we need to ensure that various source-generation tools
+    -- get built before `slang`, so we declare a non-linking dependency between
     -- the projects here:
-    --
     dependson { "slang-cpp-extractor", "slang-generate", "slang-embed" }
 
     local executableSuffix = getExecutableSuffix()
@@ -1264,6 +1268,51 @@ generatorProject("run-generators", nil)
     if executeBinary then
         metaSlangGenerator()
         preludeGenerator()
+    end
+
+    filter { }
+
+generatorProject("generate-lookup-tables")
+    tables = {
+        {
+            json = "external/spirv-headers/include/spirv/unified1/extinst.glsl.std.450.grammar.json",
+            header = "spirv/unified1/GLSL.std.450.h",
+            prefix = "GLSLstd450",
+            type = "GLSLstd450"
+        },
+        {
+            json = "external/spirv-headers/include/spirv/unified1/spirv.core.grammar.json",
+            header = "spirv/unified1/spirv.h",
+            prefix = "Spv",
+            type = "SpvOp"
+        }
+    }
+    for _, t in pairs(tables) do
+        files {t.json}
+    end
+
+    dependson { "slang-lookup-generator" }
+
+    local builddir = getBuildDir()
+    if executeBinary then
+        for _, t in pairs(tables) do
+            filter("files:" .. t.json)
+
+            local inJson = "%{file.abspath}"
+            local cppFilename = "slang-lookup-" .. t.type:lower() .. ".cpp"
+            local cppPath = "%{wks.location}/source/slang/" .. cppFilename
+            local buildcmd = '"' .. builddir .. '/slang-lookup-generator" '
+                .. inJson .. " "
+                .. cppPath .. " "
+                .. t.type .. " "
+                .. t.prefix .. " "
+                .. t.header
+
+            buildmessage ("slang-lookup-generator for " .. cppFilename)
+            buildcommands { buildcmd }
+            buildinputs { inJson, builddir .. "/slang-lookup-generator" .. getExecutableSuffix() }
+            buildoutputs (cppPath)
+        end
     end
 
     filter { }
@@ -1314,7 +1363,7 @@ if enableEmbedStdLib then
 end
 
 if enableEmbedStdLib then
-    generatorProject("embed-stdlib-generator", nil, true)
+    generatorProject("embed-stdlib-generator", nil, "SharedLib")
 
         -- We include these, even though they are not really part of the dummy
         -- build, so that the filters below can pick up the appropriate locations.
@@ -1422,6 +1471,12 @@ standardProject("slang", "source/slang")
         "prelude/slang-cpp-host-prelude.h.cpp"
     }
 
+    -- Similarly for any generated lookup tables
+    files {
+        "source/slang/slang-lookup-spvop.cpp",
+        "source/slang/slang-lookup-glslstd450.cpp"
+    }
+
     --
     -- The most challenging part of building `slang` is that we need
     -- to invoke generators such as slang-cpp-extractor and slang-generate
@@ -1430,6 +1485,7 @@ standardProject("slang", "source/slang")
 
     if not skipSourceGeneration then
         dependson { "run-generators" }
+        dependson { "generate-lookup-tables" }
     end
 
     -- If we have slang-llvm copy it

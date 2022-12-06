@@ -1213,7 +1213,7 @@ struct SPIRVEmitContext
         // ...
 
         default:
-            SLANG_UNIMPLEMENTED_X("unhandled instruction opcode");
+            SLANG_UNIMPLEMENTED_X("unhandled instruction opcode for global instruction");
             UNREACHABLE_RETURN(nullptr);
         }
     }
@@ -1579,7 +1579,7 @@ struct SPIRVEmitContext
         switch( inst->getOp() )
         {
         default:
-            SLANG_UNIMPLEMENTED_X("unhandled instruction opcode");
+            SLANG_UNIMPLEMENTED_X("unhandled instruction opcode for local instruction");
             break;
         case kIROp_Specialize:
             return nullptr;
