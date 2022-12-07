@@ -1568,7 +1568,7 @@ struct SPIRVEmitContext
     // The instructions that appear inside the basic blocks of
     // functions are what we will call "local" instructions.
     //
-    // When emititng blobal instructions, we usually have to
+    // When emitting global instructions, we usually have to
     // pick the right logical section to emit them into, while
     // for local instructions they will usually emit into
     // a known parent (the basic block that contains them).
