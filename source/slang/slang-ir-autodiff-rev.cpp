@@ -511,7 +511,10 @@ struct BackwardDiffTranscriber
         this->makeParameterBlock(builder, as<IRFunc>(fwdDiffFunc));
         
         // This steps adds a decoration to instructions that are computing the differential.
-        diffPropagationPass->propagateDiffInstDecoration(builder, fwdDiffFunc);
+        // TODO: This is disabled for now because fwd-mode already adds differential decorations
+        // wherever need. We need to run this pass only for user-writted forward derivativecode.
+        // 
+        // diffPropagationPass->propagateDiffInstDecoration(builder, fwdDiffFunc);
 
         // Copy primal insts to the first block of the unzipped function, copy diff insts to the
         // second block of the unzipped function.
