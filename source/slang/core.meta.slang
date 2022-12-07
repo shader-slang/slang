@@ -447,7 +447,7 @@ struct Ptr
             __store(__getElementPtr(this, index), newValue);
         }
 
-        __intrinsic_op($(kIROp_getElementPtr))
+        __intrinsic_op($(kIROp_GetElementPtr))
         ref;
     }
 };
@@ -458,10 +458,10 @@ T __load<T>(Ptr<T> ptr);
 __intrinsic_op($(kIROp_Store))
 void __store<T>(Ptr<T> ptr, T val);
 
-__intrinsic_op($(kIROp_getElementPtr))
+__intrinsic_op($(kIROp_GetElementPtr))
 Ptr<T> __getElementPtr<T>(Ptr<T> ptr, int index);
 
-__intrinsic_op($(kIROp_getElementPtr))
+__intrinsic_op($(kIROp_GetElementPtr))
 Ptr<T> __getElementPtr<T>(Ptr<T> ptr, int64_t index);
 
 __generic<T>
@@ -631,22 +631,22 @@ __intrinsic_type($(kIROp_StringType))
 struct String
 {
     __target_intrinsic(cpp)
-    __intrinsic_op($(kIROp_makeString))
+    __intrinsic_op($(kIROp_MakeString))
     __init(int val);
     __target_intrinsic(cpp)
-    __intrinsic_op($(kIROp_makeString))
+    __intrinsic_op($(kIROp_MakeString))
     __init(uint val);
     __target_intrinsic(cpp)
-    __intrinsic_op($(kIROp_makeString))
+    __intrinsic_op($(kIROp_MakeString))
     __init(int64_t val);
     __target_intrinsic(cpp)
-    __intrinsic_op($(kIROp_makeString))
+    __intrinsic_op($(kIROp_MakeString))
     __init(uint64_t val);
     __target_intrinsic(cpp)
-    __intrinsic_op($(kIROp_makeString))
+    __intrinsic_op($(kIROp_MakeString))
     __init(float val);
     __target_intrinsic(cpp)
-    __intrinsic_op($(kIROp_makeString))
+    __intrinsic_op($(kIROp_MakeString))
     __init(double val);
 
     __target_intrinsic(cpp)
@@ -762,7 +762,7 @@ struct vector
 
         /// Initialize a vector where all elements have the same scalar `value`.
     __implicit_conversion($(kConversionCost_ScalarToVector))
-    __intrinsic_op($(kIROp_constructVectorFromScalar))
+    __intrinsic_op($(kIROp_MakeVectorFromScalar))
     __init(T value);
 
         /// Initialize a vector from a value of the same type
@@ -853,7 +853,7 @@ struct Vertices
     __subscript(uint index) -> T
     {
         // TODO: Ellie make sure these remains write only
-        __intrinsic_op($(kIROp_getElementPtr))
+        __intrinsic_op($(kIROp_GetElementPtr))
         ref;
     }
 };
@@ -866,7 +866,7 @@ struct Indices
     __subscript(uint index) -> T
     {
         // TODO: Ellie: It's illegal to not write out the whole primitive at once, should we use set over ref?
-        __intrinsic_op($(kIROp_getElementPtr))
+        __intrinsic_op($(kIROp_GetElementPtr))
         ref;
     }
 };
@@ -878,7 +878,7 @@ struct Primitives
 {
     __subscript(uint index) -> T
     {
-        __intrinsic_op($(kIROp_getElementPtr))
+        __intrinsic_op($(kIROp_GetElementPtr))
         ref;
     }
 };
@@ -889,49 +889,49 @@ struct Primitives
 
 __generic<T> __extension vector<T, 2>
 {
-    __intrinsic_op($(kIROp_makeVector))
+    __intrinsic_op($(kIROp_MakeVector))
     __init(T x, T y);
 }
 __generic<T> __extension vector<T, 3>
 {
-    __intrinsic_op($(kIROp_makeVector))
+    __intrinsic_op($(kIROp_MakeVector))
     __init(T x, T y, T z);
 
     [__unsafeForceInlineEarly]
-    __intrinsic_op($(kIROp_makeVector))
+    __intrinsic_op($(kIROp_MakeVector))
     __init(vector<T,2> xy, T z);
 
     [__unsafeForceInlineEarly]
-    __intrinsic_op($(kIROp_makeVector))
+    __intrinsic_op($(kIROp_MakeVector))
     __init(T x, vector<T,2> yz);
 }
 __generic<T> __extension vector<T, 4>
 {
-    __intrinsic_op($(kIROp_makeVector))
+    __intrinsic_op($(kIROp_MakeVector))
     __init(T x, T y, T z, T w);
 
     [__unsafeForceInlineEarly]
-    __intrinsic_op($(kIROp_makeVector))
+    __intrinsic_op($(kIROp_MakeVector))
     __init(vector<T,2> xy, T z, T w);
 
     [__unsafeForceInlineEarly]
-    __intrinsic_op($(kIROp_makeVector))
+    __intrinsic_op($(kIROp_MakeVector))
     __init(T x, vector<T,2> yz, T w);
 
     [__unsafeForceInlineEarly]
-    __intrinsic_op($(kIROp_makeVector))
+    __intrinsic_op($(kIROp_MakeVector))
     __init(T x, T y, vector<T,2> zw);
 
     [__unsafeForceInlineEarly]
-    __intrinsic_op($(kIROp_makeVector))
+    __intrinsic_op($(kIROp_MakeVector))
     __init(vector<T,2> xy, vector<T,2> zw);
 
     [__unsafeForceInlineEarly]
-    __intrinsic_op($(kIROp_makeVector))
+    __intrinsic_op($(kIROp_MakeVector))
     __init(vector<T,3> xyz, T w);
 
     [__unsafeForceInlineEarly]
-    __intrinsic_op($(kIROp_makeVector))
+    __intrinsic_op($(kIROp_MakeVector))
     __init(T x, vector<T,3> yzw);
 }
 
@@ -2119,7 +2119,7 @@ __intrinsic_op(0)
 __prefix Ptr<T> operator&(__ref T value);
 
 __generic<T>
-__intrinsic_op($(kIROp_getElementPtr))
+__intrinsic_op($(kIROp_GetElementPtr))
 Ptr<T> operator+(Ptr<T> value, int64_t offset);
 
 __generic<T>

@@ -89,8 +89,8 @@ bool opCanBeConstExpr(IROp op)
     case kIROp_Lsh:
     case kIROp_Rsh:
     case kIROp_Select:
-    case kIROp_constructVectorFromScalar:
-    case kIROp_makeVector:
+    case kIROp_MakeVectorFromScalar:
+    case kIROp_MakeVector:
     case kIROp_MakeMatrix:
     case kIROp_MakeMatrixFromScalar:
     case kIROp_MatrixReshape:
@@ -112,11 +112,11 @@ bool opCanBeConstExpr(IROp op)
     case kIROp_MakeOptionalValue:
     case kIROp_MakeResultError:
     case kIROp_MakeResultValue:
-    case kIROp_makeString:
-    case kIROp_makeUInt64:
-    case kIROp_makeArray:
+    case kIROp_MakeString:
+    case kIROp_MakeUInt64:
+    case kIROp_MakeArray:
     case kIROp_swizzle:
-    case kIROp_getElement:
+    case kIROp_GetElement:
     case kIROp_FieldExtract:
     case kIROp_ExtractExistentialType:
     case kIROp_ExtractExistentialValue:

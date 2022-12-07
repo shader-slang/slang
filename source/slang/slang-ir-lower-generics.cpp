@@ -39,7 +39,7 @@ namespace Slang
             for (auto use = rtti.Value->firstUse; use; use = nextUse)
             {
                 nextUse = use->nextUse;
-                if (use->getUser()->getOp() == kIROp_getAddr)
+                if (use->getUser()->getOp() == kIROp_GetAddr)
                 {
                     use->getUser()->replaceUsesWith(idOperand);
                 }

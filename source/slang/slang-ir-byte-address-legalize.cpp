@@ -297,7 +297,7 @@ struct ByteAddressBufferLegalizationContext
             auto elementCountInst = as<IRIntLit>(arrayType->getElementCount());
             if( elementCountInst )
             {
-                return emitLegalSequenceLoad(type, buffer, baseOffset, immediateOffset, kIROp_makeArray, arrayType->getElementType(), elementCountInst->getValue());
+                return emitLegalSequenceLoad(type, buffer, baseOffset, immediateOffset, kIROp_MakeArray, arrayType->getElementType(), elementCountInst->getValue());
             }
         }
         else if( auto matType = as<IRMatrixType>(type) )
@@ -335,7 +335,7 @@ struct ByteAddressBufferLegalizationContext
             auto elementCountInst = as<IRIntLit>(vecType->getElementCount());
             if( m_options.scalarizeVectorLoadStore && elementCountInst)
             {
-                return emitLegalSequenceLoad(type, buffer, baseOffset, immediateOffset, kIROp_makeVector, vecType->getElementType(), elementCountInst->getValue());
+                return emitLegalSequenceLoad(type, buffer, baseOffset, immediateOffset, kIROp_MakeVector, vecType->getElementType(), elementCountInst->getValue());
             }
 
             // If we aren't scalarizing a vetor load then we next need
@@ -621,7 +621,7 @@ struct ByteAddressBufferLegalizationContext
             return getEquivalentStructuredBufferParam(elementType, byteAddressBufferParam);
         }
 
-        if( byteAddressBuffer->getOp() == kIROp_getElement )
+        if( byteAddressBuffer->getOp() == kIROp_GetElement )
         {
             // If the code is fetching the byte-address buffer from an
             // array, then we need to create an "equivalent" structured

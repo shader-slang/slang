@@ -729,7 +729,7 @@ struct IRLookupWitnessMethod : IRInst
     IRInst* getWitnessTable() { return witnessTable.get(); }
     IRInst* getRequirementKey() { return requirementKey.get(); }
 
-    IR_LEAF_ISA(lookup_interface_method)
+    IR_LEAF_ISA(LookupWitness)
 };
 
 // Returns the sequential ID of an RTTI object.
@@ -1613,14 +1613,14 @@ struct IRFieldAddress : IRInst
 
 struct IRGetElement : IRInst
 {
-    IR_LEAF_ISA(getElement);
+    IR_LEAF_ISA(GetElement);
     IRInst* getBase() { return getOperand(0); }
     IRInst* getIndex() { return getOperand(1); }
 };
 
 struct IRGetElementPtr : IRInst
 {
-    IR_LEAF_ISA(getElementPtr);
+    IR_LEAF_ISA(GetElementPtr);
     IRInst* getBase() { return getOperand(0); }
     IRInst* getIndex() { return getOperand(1); }
 };
@@ -1639,7 +1639,7 @@ struct IRGetManagedPtrWriteRef : IRInst
 
 struct IRGetAddress : IRInst
 {
-    IR_LEAF_ISA(getAddr);
+    IR_LEAF_ISA(GetAddr);
 };
 
 struct IRImageSubscript : IRInst

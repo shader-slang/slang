@@ -255,7 +255,7 @@ SlangResult HLSLIntrinsicSet::makeIntrinsic(IRInst* inst, HLSLIntrinsic& out)
     // All the special cases
     switch (inst->getOp())
     {
-        case kIROp_constructVectorFromScalar:
+        case kIROp_MakeVectorFromScalar:
         case kIROp_MakeMatrixFromScalar:
         {
             SLANG_ASSERT(inst->getOperandCount() == 1);
@@ -297,7 +297,7 @@ SlangResult HLSLIntrinsicSet::makeIntrinsic(IRInst* inst, HLSLIntrinsic& out)
             }
             return SLANG_FAIL;
         }
-        case kIROp_makeVector:
+        case kIROp_MakeVector:
         case kIROp_VectorReshape:
         {
             if (inst->getOperandCount() == 1 && as<IRBasicType>(inst->getOperand(0)->getDataType()))
@@ -355,7 +355,7 @@ SlangResult HLSLIntrinsicSet::makeIntrinsic(IRInst* inst, HLSLIntrinsic& out)
             }
             break;
         }
-        case kIROp_getElement:
+        case kIROp_GetElement:
         {
             IRInst* target = inst->getOperand(0);
             IRType* targetType = target->getDataType();
@@ -367,7 +367,7 @@ SlangResult HLSLIntrinsicSet::makeIntrinsic(IRInst* inst, HLSLIntrinsic& out)
             }
             break;
         }
-        case kIROp_getElementPtr:
+        case kIROp_GetElementPtr:
         {
             IRInst* target = inst->getOperand(0);
             IRType* targetType = target->getDataType();
@@ -581,7 +581,7 @@ HLSLIntrinsic::Op HLSLIntrinsicOpLookup::getOpForIROp(IRInst* inst)
         case kIROp_Not:     return Op::Not;
         case kIROp_BitNot:  return Op::BitNot;
 
-        case kIROp_constructVectorFromScalar: return Op::ConstructFromScalar;
+        case kIROp_MakeVectorFromScalar: return Op::ConstructFromScalar;
 
         default:            return Op::Invalid;
     }

@@ -829,7 +829,7 @@ void LivenessContext::_findAliasesAndAccesses(IRInst* root)
             // We want to find instructions that access the root
             switch (cur->getOp())
             {
-                case kIROp_getElementPtr:
+                case kIROp_GetElementPtr:
                 {
                     base = static_cast<IRGetElementPtr*>(cur)->getBase();
                     accessType = AccessType::Alias;
@@ -841,7 +841,7 @@ void LivenessContext::_findAliasesAndAccesses(IRInst* root)
                     accessType = AccessType::Alias;
                     break;
                 }
-                case kIROp_getAddr:
+                case kIROp_GetAddr:
                 {
                     IRGetAddress* getAddr = static_cast<IRGetAddress*>(cur);
                     base = getAddr->getOperand(0);
@@ -882,7 +882,7 @@ void LivenessContext::_findAliasesAndAccesses(IRInst* root)
                     accessType = AccessType::Access;
                     break;
                 }
-                case kIROp_getElement:
+                case kIROp_GetElement:
                 case kIROp_FieldExtract:
                 {
                     // These will never take place on the var which is accessed through a pointer, so can be ignored

@@ -2400,7 +2400,7 @@ bool CPPSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOut
             // try doing automatically
             return _tryEmitInstExprAsIntrinsic(inst, inOuterPrec);
         }
-        case kIROp_lookup_interface_method:
+        case kIROp_LookupWitness:
         {
             emitInstExpr(inst->getOperand(0), inOuterPrec);
             m_writer->emit("->");
@@ -2420,7 +2420,7 @@ bool CPPSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOut
             m_writer->emit(")");
             return true;
         }
-        case kIROp_getAddr:
+        case kIROp_GetAddr:
         {
             // Once we clean up the pointer emitting logic, we can
             // just use GetElementAddress instruction in place of

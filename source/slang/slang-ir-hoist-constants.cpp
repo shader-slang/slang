@@ -62,10 +62,10 @@ struct HoistConstantPass : InstPassBase
                 case kIROp_Rsh:
                 case kIROp_MatrixReshape:
                 case kIROp_VectorReshape:
-                case kIROp_makeVector:
+                case kIROp_MakeVector:
                 case kIROp_MakeMatrix:
                 case kIROp_MakeMatrixFromScalar:
-                case kIROp_constructVectorFromScalar:
+                case kIROp_MakeVectorFromScalar:
                 case kIROp_MakeOptionalNone:
                 case kIROp_MakeOptionalValue:
                 case kIROp_MakeDifferentialPair:

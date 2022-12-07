@@ -59,7 +59,7 @@ struct PeepholeContext : InstPassBase
             }
             break;
         case kIROp_FieldExtract:
-            if (inst->getOperand(0)->getOp() == kIROp_makeStruct)
+            if (inst->getOperand(0)->getOp() == kIROp_MakeStruct)
             {
                 auto field = as<IRFieldExtract>(inst)->field.get();
                 Index fieldIndex = -1;
@@ -200,7 +200,7 @@ struct PeepholeContext : InstPassBase
                 }
             }
             break;
-        case kIROp_lookup_interface_method:
+        case kIROp_LookupWitness:
             {
                 if (inst->getOperand(0)->getOp() == kIROp_WitnessTable)
                 {

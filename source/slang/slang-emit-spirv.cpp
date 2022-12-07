@@ -1591,9 +1591,9 @@ struct SPIRVEmitContext
             return emitFieldAddress(parent, as<IRFieldAddress>(inst));
         case kIROp_FieldExtract:
             return emitFieldExtract(parent, as<IRFieldExtract>(inst));
-        case kIROp_getElementPtr:
+        case kIROp_GetElementPtr:
             return emitGetElementPtr(parent, as<IRGetElementPtr>(inst));
-        case kIROp_getElement:
+        case kIROp_GetElement:
             return emitGetElement(parent, as<IRGetElement>(inst));
         case kIROp_Load:
             return emitLoad(parent, as<IRLoad>(inst));

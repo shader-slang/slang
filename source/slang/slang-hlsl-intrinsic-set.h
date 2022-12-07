@@ -17,7 +17,7 @@ generic 'construction' for built in types including vectors and matrices.
 For the moment the cpp emit code, determines what kind of construct is needed, and has special handling for ConstructConvert and
 ConstructFromScalar.
 
-That currently we do not see constructVectorFromScalar - for example when we do...
+That currently we do not see MakeVectorFromScalar - for example when we do...
 
 int2 fromScalar = 1;
 
@@ -25,7 +25,7 @@ This appears as a construction from an int.
 
 That the better thing to do would be that there were IR instructions for the specific types of construction. I suppose there is a question
 about whether there should be separate instructions for vector/matrix, or emit code should just use the destination type. In practice I think
-it's fine that there isn't an instruction separating vector/matrix. That being the case I guess we arguably don't need constructVectorFromScalar,
+it's fine that there isn't an instruction separating vector/matrix. That being the case I guess we arguably don't need MakeVectorFromScalar,
 just constructXXXFromScalar. Would be good if there was a suitable name to encompass vector/matrix.
 */
 #define SLANG_HLSL_INTRINSIC_OP(x) \
