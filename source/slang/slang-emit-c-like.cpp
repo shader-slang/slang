@@ -1779,6 +1779,12 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
     case kIROp_Construct:
     case kIROp_makeVector:
     case kIROp_MakeMatrix:
+    case kIROp_MakeMatrixFromScalar:
+    case kIROp_MatrixTruncate:
+    case kIROp_CastFloatToInt:
+    case kIROp_CastIntToFloat:
+    case kIROp_IntCast:
+    case kIROp_FloatCast:
         // Simple constructor call
         emitType(inst->getDataType());
         emitArgs(inst);
@@ -1798,6 +1804,8 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
         m_writer->emit(")");
         break;
     case kIROp_constructVectorFromScalar:
+    case kIROp_CastPtrToInt:
+    case kIROp_CastIntToPtr:
     {
         // Simple constructor call
         auto prec = getInfo(EmitOp::Prefix);

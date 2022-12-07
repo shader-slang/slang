@@ -198,6 +198,9 @@ struct InliningPassBase
         //
         outCallSite.callee = calleeFunc;
 
+        if (callee->findDecoration<IRIntrinsicOpDecoration>())
+            return true;
+
         // At this point the `CallSiteInfo` is complete and
         // could be used for inlining, but we have additional
         // checks to make.
@@ -238,6 +241,27 @@ struct InliningPassBase
         SharedIRBuilder sharedBuilder(m_module);
         IRBuilder builder(sharedBuilder);
         builder.setInsertBefore(call);
+
+        // If callee is an intrinsic op, just issue that intrinsic and be done.
+        if (auto intrinsicOpDecor = callee->findDecoration<IRIntrinsicOpDecoration>())
+        {
+            List<IRInst*> args;
+            for (UInt i = 0; i < call->getArgCount(); i++)
+                args.add(call->getArg(i));
+            auto op = intrinsicOpDecor->getIntrinsicOp();
+            if (op == 0)
+            {
+                SLANG_RELEASE_ASSERT(call->getArgCount() >= 1);
+                call->replaceUsesWith(call->getArg(0));
+            }
+            else
+            {
+                auto newCall = builder.emitIntrinsicInst(call->getFullType(), op, args.getCount(), args.getBuffer());
+                call->replaceUsesWith(newCall);
+            }
+            call->removeAndDeallocate();
+            return;
+        }
 
         // If the callee is a generic function, then we will
         // need to include the substitution of generic parameters
@@ -506,6 +530,8 @@ struct MandatoryEarlyInliningPass : InliningPassBase
     {
         if(info.callee->findDecoration<IRUnsafeForceInlineEarlyDecoration>())
             return true;
+        if (info.callee->findDecoration<IRIntrinsicOpDecoration>())
+            return true;
         return false;
     }
 };
@@ -618,7 +644,8 @@ struct ForceInliningPass : InliningPassBase
     bool shouldInline(CallSiteInfo const& info)
     {
         if (info.callee->findDecoration<IRForceInlineDecoration>() ||
-            info.callee->findDecoration<IRUnsafeForceInlineEarlyDecoration>())
+            info.callee->findDecoration<IRUnsafeForceInlineEarlyDecoration>()||
+            info.callee->findDecoration<IRIntrinsicOpDecoration>())
             return true;
         return false;
     }

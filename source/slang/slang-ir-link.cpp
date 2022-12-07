@@ -432,6 +432,7 @@ static void cloneExtraDecorationsFromInst(
         case kIROp_PublicDecoration:
         case kIROp_SequentialIDDecoration:
         case kIROp_ForwardDerivativeDecoration:
+        case kIROp_IntrinsicOpDecoration:
             if (!clonedInst->findDecorationImpl(decoration->getOp()))
             {
                 cloneInst(context, builder, decoration);
