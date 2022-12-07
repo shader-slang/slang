@@ -197,6 +197,7 @@ namespace Slang
     };
 
         /// Tracks an ordered list of modules that something depends on.
+        /// TODO: Shader caching currently relies on this being in well defined order.
     struct ModuleDependencyList
     {
     public:
@@ -217,6 +218,7 @@ namespace Slang
     };
 
         /// Tracks an unordered list of source files that something depends on
+        /// TODO: Shader caching currently relies on this being in well defined order.
     struct FileDependencyList
     {
     public:
