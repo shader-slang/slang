@@ -89,11 +89,12 @@ bool opCanBeConstExpr(IROp op)
     case kIROp_Lsh:
     case kIROp_Rsh:
     case kIROp_Select:
-    case kIROp_Construct:
     case kIROp_constructVectorFromScalar:
     case kIROp_makeVector:
     case kIROp_MakeMatrix:
     case kIROp_MakeMatrixFromScalar:
+    case kIROp_MatrixReshape:
+    case kIROp_VectorReshape:
     case kIROp_CastFloatToInt:
     case kIROp_CastIntToFloat:
     case kIROp_IntCast:

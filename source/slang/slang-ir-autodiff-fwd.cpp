@@ -1587,7 +1587,8 @@ InstPair ForwardDerivativeTranscriber::transcribeInst(IRBuilder* builder, IRInst
     case kIROp_makeVector:
     case kIROp_MakeMatrix:
     case kIROp_MakeMatrixFromScalar:
-    case kIROp_MatrixTruncate:
+    case kIROp_MatrixReshape:
+    case kIROp_VectorReshape:
     case kIROp_IntCast:
     case kIROp_FloatCast:
         return transcribeConstruct(builder, origInst);

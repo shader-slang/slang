@@ -2695,10 +2695,16 @@ public:
         UInt            argCount,
         IRInst* const*  args);
 
-    IRInst* emitConstructorInst(
-        IRType*         type,
-        UInt            argCount,
-        IRInst* const* args);
+        /// Emits appropriate inst for constructing a default value of `type`.
+        /// If `fallback` is true, will emit `DefaultConstruct` inst on unknown types.
+        /// Otherwise, returns nullptr if we can't materialize the inst.
+    IRInst* emitDefaultConstruct(IRType* type, bool fallback = true);
+
+    IRInst* emitCast(
+        IRType* type,
+        IRInst* value);
+
+    IRInst* emitVectorReshape(IRType* type, IRInst* value);
 
     IRInst* emitMakeUInt64(IRInst* low, IRInst* high);
 

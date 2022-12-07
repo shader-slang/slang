@@ -157,7 +157,7 @@ IRFunc* specializeDispatchFunction(SharedGenericsLoweringContext* sharedContext,
         }
         else
         {
-            auto defaultValue = builder->emitConstructorInst(callInst->getDataType(), 0, nullptr);
+            auto defaultValue = builder->emitDefaultConstruct(callInst->getDataType());
             builder->emitReturn(defaultValue);
         }
     }

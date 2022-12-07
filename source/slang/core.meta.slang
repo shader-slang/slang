@@ -1012,7 +1012,7 @@ for( int C = 2; C <= 4; ++C )
     for( int cc = C; cc <= 4; ++cc )
     {
         if(rr == R && cc == C) continue;
-        sb << "__intrinsic_op(" << int(kIROp_MatrixTruncate) << ") __init(matrix<T," << rr << "," << cc << "> value);\n";
+        sb << "__intrinsic_op(" << int(kIROp_MatrixReshape) << ") __init(matrix<T," << rr << "," << cc << "> value);\n";
     }
     sb << "}\n";
 }

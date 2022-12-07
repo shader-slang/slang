@@ -286,7 +286,7 @@ namespace Slang
             auto intErr = err;
             if (err->getDataType()->getOp() != kIROp_IntType)
             {
-                intErr = builder.emitConstructorInst(builder.getIntType(), 1, &err);
+                intErr = builder.emitCast(builder.getIntType(),err);
             }
             auto errIsError = builder.emitLess(intErr, builder.getIntValue(builder.getIntType(), 0));
             IRBlock *trueBlock, *falseBlock, *afterBlock;

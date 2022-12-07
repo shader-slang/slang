@@ -1025,10 +1025,6 @@ bool LivenessContext::_isAccessTerminator(IRTerminatorInst* terminator)
         // Strip construct
         switch (val->getOp())
         {
-        case kIROp_Construct:
-            if (val->getOperandCount() == 1)
-                val = val->getOperand(0);
-            break;
         case kIROp_CastIntToFloat:
         case kIROp_CastFloatToInt:
         case kIROp_IntCast:

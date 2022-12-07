@@ -25,25 +25,6 @@ void CUDAExtensionTracker::finalize()
     }
 }
 
-static bool _isSingleNameBasicType(IROp op)
-{
-    switch (op)
-    {
-        case kIROp_Int64Type:   
-        case kIROp_UInt8Type: 
-        case kIROp_UInt16Type:
-        case kIROp_UIntType: 
-        case kIROp_UInt64Type:
-        case kIROp_IntPtrType:
-        case kIROp_UIntPtrType:
-        {
-            return false;
-        }
-        default: return true;
-
-    }
-}
-
 UnownedStringSlice CUDASourceEmitter::getBuiltinTypeName(IROp op)
 {
     switch (op)
@@ -547,7 +528,6 @@ void CUDASourceEmitter::_emitInitializerListValue(IRType* dstType, IRInst* value
 
     switch (value->getOp())
     {
-        case kIROp_Construct:
         case kIROp_MakeMatrix:
         case kIROp_makeVector:
         {
@@ -731,22 +711,6 @@ bool CUDASourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
                         return true;
                     }
                 }
-            }
-            break;
-        }
-        case kIROp_Construct:
-        {
-            // Simple constructor call
-            // On CUDA some of the built in types can't be used as constructors directly
-
-            IRType* type = inst->getDataType();
-            if (auto basicType = as<IRBasicType>(type) && !_isSingleNameBasicType(type->getOp()))
-            {
-                m_writer->emit("(");
-                emitType(inst->getDataType());
-                m_writer->emit(")");
-                emitArgs(inst);
-                return true;
             }
             break;
         }

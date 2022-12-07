@@ -1601,11 +1601,13 @@ struct SPIRVEmitContext
             return emitStore(parent, as<IRStore>(inst));
         case kIROp_swizzle:
             return emitSwizzle(parent, as<IRSwizzle>(inst));
-        case kIROp_Construct:
         case kIROp_IntCast:
         case kIROp_FloatCast:
         case kIROp_CastIntToFloat:
         case kIROp_CastFloatToInt:
+        case kIROp_MatrixReshape:
+        case kIROp_VectorReshape:
+            // TODO: break emitConstruct into separate functions for each opcode.
             return emitConstruct(parent, inst);
         case kIROp_BitCast:
             return emitInst(
