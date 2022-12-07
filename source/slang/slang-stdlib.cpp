@@ -198,9 +198,9 @@ namespace Slang
         BaseTypeConversionInfo const& fromInfo)
     {
         if (toInfo.tag == fromInfo.tag)
-            return (IROp)0;
+            return kIROp_Nop;
 
-        IROp intrinsicOpCode = (IROp)0;
+        IROp intrinsicOpCode = kIROp_Nop;
         auto toStyle = getTypeStyle(toInfo.tag);
         auto fromStyle = getTypeStyle(fromInfo.tag);
         if (toStyle == kIROp_BoolType) toStyle = kIROp_IntType;

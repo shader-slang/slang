@@ -223,6 +223,19 @@ struct PeepholeContext : InstPassBase
                 }
             }
             break;
+        case kIROp_DefaultConstruct:
+            {
+                IRBuilder builder(&sharedBuilderStorage);
+                builder.setInsertBefore(inst);
+                // See if we can replace the default construct inst with concrete values.
+                if (auto newCtor = builder.emitDefaultConstruct(inst->getFullType(), false))
+                {
+                    inst->replaceUsesWith(newCtor);
+                    inst->removeAndDeallocate();
+                    changed = true;
+                }
+            }
+            break;
         default:
             break;
         }

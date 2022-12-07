@@ -45,7 +45,7 @@ void legalizeImageSubscriptStoreForGLSL(IRBuilder& builder, IRInst* storeInst)
     auto legalizedCoord = imageSubscript->getCoord();
     if (coordType != imageSubscript->getCoord()->getDataType())
     {
-        legalizedCoord = builder.emitConstructorInst(coordType, 1, &legalizedCoord);
+        legalizedCoord = builder.emitCast(coordType, legalizedCoord);
     }
     switch (storeInst->getOp())
     {
@@ -55,11 +55,10 @@ void legalizeImageSubscriptStoreForGLSL(IRBuilder& builder, IRInst* storeInst)
             if (getIRVectorElementSize(imageElementType) != 4)
             {
                 auto vectorBaseType = getIRVectorBaseType(imageElementType);
-                newValue = builder.emitConstructorInst(
+                newValue = builder.emitVectorReshape(
                     builder.getVectorType(
                         vectorBaseType, builder.getIntValue(builder.getIntType(), 4)),
-                    1,
-                    &newValue);
+                    newValue);
             }
             auto imageStore = builder.emitImageStore(
                 builder.getVoidType(),
@@ -95,11 +94,10 @@ void legalizeImageSubscriptStoreForGLSL(IRBuilder& builder, IRInst* storeInst)
             if (getIRVectorElementSize(imageElementType) != 4)
             {
                 auto vectorBaseType = getIRVectorBaseType(imageElementType);
-                newValue = builder.emitConstructorInst(
+                newValue = builder.emitVectorReshape(
                     builder.getVectorType(
                         vectorBaseType, builder.getIntValue(builder.getIntType(), 4)),
-                    1,
-                    &newValue);
+                    newValue);
             }
             auto imageStore = builder.emitImageStore(
                 builder.getVoidType(), imageSubscript->getImage(), legalizedCoord, newValue);
@@ -1332,10 +1330,9 @@ ScalarizedVal adaptType(
     IRType*                 /*fromType*/)
 {
     // TODO: actually consider what needs to go on here...
-    return ScalarizedVal::value(builder->emitConstructorInst(
+    return ScalarizedVal::value(builder->emitCast(
         toType,
-        1,
-        &val));
+        val));
 }
 
 ScalarizedVal adaptType(
@@ -1602,7 +1599,7 @@ IRInst* materializeTupleValue(
         // so we can simply materialize the elements and then
         // construct a value of that type.
         //
-        // TODO: this should be using a `makeStruct` instruction.
+        SLANG_RELEASE_ASSERT(as<IRStructType>(type));
 
         List<IRInst*> elementVals;
         for( Index ee = 0; ee < elementCount; ++ee )
@@ -1611,7 +1608,7 @@ IRInst* materializeTupleValue(
             elementVals.add(elementVal);
         }
 
-        return builder->emitConstructorInst(
+        return builder->emitMakeStruct(
             tupleVal->type,
             elementVals.getCount(),
             elementVals.getBuffer());

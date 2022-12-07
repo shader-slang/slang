@@ -249,7 +249,7 @@ struct InliningPassBase
             for (UInt i = 0; i < call->getArgCount(); i++)
                 args.add(call->getArg(i));
             auto op = intrinsicOpDecor->getIntrinsicOp();
-            if (op == 0)
+            if (op == kIROp_Nop)
             {
                 SLANG_RELEASE_ASSERT(call->getArgCount() >= 1);
                 call->replaceUsesWith(call->getArg(0));

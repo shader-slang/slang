@@ -1776,11 +1776,11 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
         emitSimpleValue(inst);
         break;
 
-    case kIROp_Construct:
     case kIROp_makeVector:
     case kIROp_MakeMatrix:
     case kIROp_MakeMatrixFromScalar:
-    case kIROp_MatrixTruncate:
+    case kIROp_MatrixReshape:
+    case kIROp_VectorReshape:
     case kIROp_CastFloatToInt:
     case kIROp_CastIntToFloat:
     case kIROp_IntCast:
