@@ -29,7 +29,7 @@ IRFunc* specializeDispatchFunction(SharedGenericsLoweringContext* sharedContext,
         case kIROp_Call:
             callInst = cast<IRCall>(inst);
             break;
-        case kIROp_lookup_interface_method:
+        case kIROp_LookupWitness:
             lookupInst = cast<IRLookupWitnessMethod>(inst);
             break;
         case kIROp_Return:

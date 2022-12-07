@@ -515,7 +515,7 @@ struct SpecializationContext
             // Certain instructions cannot ever be considered
             // fully specialized because they should never
             // be substituted into a generic as its arguments.
-        case kIROp_lookup_interface_method:
+        case kIROp_LookupWitness:
         case kIROp_ExtractExistentialType:
         case kIROp_BindExistentialsType:
             break;
@@ -588,7 +588,7 @@ struct SpecializationContext
             //
             return maybeSpecializeGeneric(cast<IRSpecialize>(inst));
 
-        case kIROp_lookup_interface_method:
+        case kIROp_LookupWitness:
             // The remaining case we need to consider here for generics
             // is when we have a `lookup_witness_method` instruction
             // that is being applied to a concrete witness table,
@@ -625,9 +625,9 @@ struct SpecializationContext
         case kIROp_FieldAddress:
             return maybeSpecializeFieldAddress(as<IRFieldAddress>(inst));
 
-        case kIROp_getElement:
+        case kIROp_GetElement:
             return maybeSpecializeGetElement(as<IRGetElement>(inst));
-        case kIROp_getElementPtr:
+        case kIROp_GetElementPtr:
             return maybeSpecializeGetElementAddress(as<IRGetElementPtr>(inst));
 
         case kIROp_BindExistentialsType:

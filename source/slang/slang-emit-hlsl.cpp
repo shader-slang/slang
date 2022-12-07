@@ -433,7 +433,7 @@ bool HLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
 {
     switch (inst->getOp())
     {
-        case kIROp_makeVector:
+        case kIROp_MakeVector:
         case kIROp_MakeMatrix:
         {
             if (inst->getOperandCount() == 1)

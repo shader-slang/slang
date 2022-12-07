@@ -529,7 +529,7 @@ void CUDASourceEmitter::_emitInitializerListValue(IRType* dstType, IRInst* value
     switch (value->getOp())
     {
         case kIROp_MakeMatrix:
-        case kIROp_makeVector:
+        case kIROp_MakeVector:
         {
             IRType* type = value->getDataType();
 
@@ -714,7 +714,7 @@ bool CUDASourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             }
             break;
         }
-        case kIROp_makeArray:
+        case kIROp_MakeArray:
         {
             IRType* dataType = inst->getDataType();
             IRArrayType* arrayType = as<IRArrayType>(dataType);

@@ -185,7 +185,7 @@ struct AssociatedTypeLookupSpecializationContext
         // Replace all `lookup_interface_method():IRWitnessTable` with call to specialized functions.
         workOnModule(sharedContext, [this](IRInst* inst)
         {
-            if (inst->getOp() == kIROp_lookup_interface_method)
+            if (inst->getOp() == kIROp_LookupWitness)
             {
                 processLookupInterfaceMethodInst(cast<IRLookupWitnessMethod>(inst));
             }

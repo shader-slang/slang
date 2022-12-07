@@ -1584,7 +1584,7 @@ InstPair ForwardDerivativeTranscriber::transcribeInst(IRBuilder* builder, IRInst
 
     case kIROp_CastIntToFloat:
     case kIROp_CastFloatToInt:
-    case kIROp_makeVector:
+    case kIROp_MakeVector:
     case kIROp_MakeMatrix:
     case kIROp_MakeMatrixFromScalar:
     case kIROp_MatrixReshape:
@@ -1593,7 +1593,7 @@ InstPair ForwardDerivativeTranscriber::transcribeInst(IRBuilder* builder, IRInst
     case kIROp_FloatCast:
         return transcribeConstruct(builder, origInst);
 
-    case kIROp_lookup_interface_method:
+    case kIROp_LookupWitness:
         return transcribeLookupInterfaceMethod(builder, as<IRLookupWitnessMethod>(origInst));
 
     case kIROp_Call:
@@ -1602,7 +1602,7 @@ InstPair ForwardDerivativeTranscriber::transcribeInst(IRBuilder* builder, IRInst
     case kIROp_swizzle:
         return transcribeSwizzle(builder, as<IRSwizzle>(origInst));
     
-    case kIROp_constructVectorFromScalar:
+    case kIROp_MakeVectorFromScalar:
     case kIROp_MakeTuple:
         return transcribeByPassthrough(builder, origInst);
 
@@ -1620,8 +1620,8 @@ InstPair ForwardDerivativeTranscriber::transcribeInst(IRBuilder* builder, IRInst
     case kIROp_FieldExtract:
     case kIROp_FieldAddress:
         return transcribeFieldExtract(builder, origInst);
-    case kIROp_getElement:
-    case kIROp_getElementPtr:
+    case kIROp_GetElement:
+    case kIROp_GetElementPtr:
         return transcribeGetElement(builder, origInst);
     
     case kIROp_loop:
@@ -1750,7 +1750,7 @@ struct ForwardDerivativePass : public InstPassBase
                         {
                         case kIROp_Func:
                         case kIROp_Specialize:
-                        case kIROp_lookup_interface_method:
+                        case kIROp_LookupWitness:
                             autoDiffWorkList.add(inst);
                             break;
                         default:

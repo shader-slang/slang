@@ -3189,7 +3189,7 @@ namespace Slang
 
         return findOrEmitHoistableInst(
             type,
-            kIROp_lookup_interface_method,
+            kIROp_LookupWitness,
             2,
             args);
     }
@@ -3408,7 +3408,7 @@ namespace Slang
             auto inner = emitDefaultConstruct(as<IRVectorType>(actualType)->getElementType(), fallback);
             if (!inner)
                 return nullptr;
-            return emitIntrinsicInst(type, kIROp_constructVectorFromScalar, 1, &inner);
+            return emitIntrinsicInst(type, kIROp_MakeVectorFromScalar, 1, &inner);
         }
         case kIROp_MatrixType:
         {
@@ -3544,7 +3544,7 @@ namespace Slang
     IRInst* IRBuilder::emitMakeUInt64(IRInst* low, IRInst* high)
     {
         IRInst* args[2] = {low, high};
-        return emitIntrinsicInst(getUInt64Type(), kIROp_makeUInt64, 2, args);
+        return emitIntrinsicInst(getUInt64Type(), kIROp_MakeUInt64, 2, args);
     }
 
     IRInst* IRBuilder::emitMakeRTTIObject(IRInst* typeInst)
@@ -3575,7 +3575,7 @@ namespace Slang
 
     IRInst* IRBuilder::emitMakeString(IRInst* nativeStr)
     {
-        return emitIntrinsicInst(getStringType(), kIROp_makeString, 1, &nativeStr);
+        return emitIntrinsicInst(getStringType(), kIROp_MakeString, 1, &nativeStr);
     }
 
     IRInst* IRBuilder::emitGetNativeString(IRInst* str)
@@ -3677,7 +3677,7 @@ namespace Slang
         UInt            argCount,
         IRInst* const* args)
     {
-        return emitIntrinsicInst(type, kIROp_makeVector, argCount, args);
+        return emitIntrinsicInst(type, kIROp_MakeVector, argCount, args);
     }
 
     IRInst* IRBuilder::emitDifferentialPairGetDifferential(IRType* diffType, IRInst* diffPair)
@@ -3732,7 +3732,7 @@ namespace Slang
         UInt            argCount,
         IRInst* const* args)
     {
-        return emitIntrinsicInst(type, kIROp_makeArray, argCount, args);
+        return emitIntrinsicInst(type, kIROp_MakeArray, argCount, args);
     }
 
     IRInst* IRBuilder::emitMakeStruct(
@@ -3740,7 +3740,7 @@ namespace Slang
         UInt            argCount,
         IRInst* const* args)
     {
-        return emitIntrinsicInst(type, kIROp_makeStruct, argCount, args);
+        return emitIntrinsicInst(type, kIROp_MakeStruct, argCount, args);
     }
 
     IRInst* IRBuilder::emitMakeExistential(
@@ -4283,7 +4283,7 @@ namespace Slang
     {
         auto inst = createInst<IRFieldAddress>(
             this,
-            kIROp_getElement,
+            kIROp_GetElement,
             type,
             base,
             index);
@@ -4299,7 +4299,7 @@ namespace Slang
     {
         auto inst = createInst<IRFieldAddress>(
             this,
-            kIROp_getElementPtr,
+            kIROp_GetElementPtr,
             type,
             basePtr,
             index);
@@ -4314,7 +4314,7 @@ namespace Slang
     {
         auto inst = createInst<IRGetAddress>(
             this,
-            kIROp_getAddr,
+            kIROp_GetAddr,
             type,
             value);
 
@@ -6090,7 +6090,7 @@ namespace Slang
             return static_cast<IRConstant*>(a)->isValueEqual(static_cast<IRConstant*>(b)) &&
                 isTypeEqual(a->getFullType(), b->getFullType());
         }
-        if (IRSpecialize::isaImpl(opA) || opA == kIROp_lookup_interface_method)
+        if (IRSpecialize::isaImpl(opA) || opA == kIROp_LookupWitness)
         {
             return _areTypeOperandsEqual(a, b);
         }
@@ -6537,19 +6537,19 @@ namespace Slang
         case kIROp_undefined:
         case kIROp_DefaultConstruct:
         case kIROp_Specialize:
-        case kIROp_lookup_interface_method:
+        case kIROp_LookupWitness:
         case kIROp_GetSequentialID:
-        case kIROp_getAddr:
+        case kIROp_GetAddr:
         case kIROp_GetValueFromBoundInterface:
-        case kIROp_makeUInt64:
-        case kIROp_makeVector:
+        case kIROp_MakeUInt64:
+        case kIROp_MakeVector:
         case kIROp_MakeMatrix:
         case kIROp_MakeMatrixFromScalar:
         case kIROp_MatrixReshape:
         case kIROp_VectorReshape:
-        case kIROp_makeArray:
-        case kIROp_makeStruct:
-        case kIROp_makeString:
+        case kIROp_MakeArray:
+        case kIROp_MakeStruct:
+        case kIROp_MakeString:
         case kIROp_getNativeStr:
         case kIROp_MakeResultError:
         case kIROp_MakeResultValue:
@@ -6566,10 +6566,10 @@ namespace Slang
         case kIROp_ImageSubscript:
         case kIROp_FieldExtract:
         case kIROp_FieldAddress:
-        case kIROp_getElement:
-        case kIROp_getElementPtr:
+        case kIROp_GetElement:
+        case kIROp_GetElementPtr:
         case kIROp_MeshOutputRef:
-        case kIROp_constructVectorFromScalar:
+        case kIROp_MakeVectorFromScalar:
         case kIROp_swizzle:
         case kIROp_swizzleSet:  // Doesn't actually "set" anything - just returns the resulting vector
         case kIROp_Add:

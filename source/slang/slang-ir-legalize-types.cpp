@@ -1629,10 +1629,10 @@ static LegalVal legalizeInst(
     case kIROp_FieldExtract:
         return legalizeFieldExtract(context, type, args[0], args[1]);
 
-    case kIROp_getElement:
+    case kIROp_GetElement:
         return legalizeGetElement(context, type, args[0], args[1]);
 
-    case kIROp_getElementPtr:
+    case kIROp_GetElementPtr:
         return legalizeGetElementPtr(context, type, args[0], args[1]);
 
     case kIROp_Store:
@@ -1642,7 +1642,7 @@ static LegalVal legalizeInst(
         return legalizeCall(context, (IRCall*)inst);
     case kIROp_Return:
         return legalizeRetVal(context, args[0], (IRReturn*)inst);
-    case kIROp_makeStruct:
+    case kIROp_MakeStruct:
         return legalizeMakeStruct(
             context,
             type,

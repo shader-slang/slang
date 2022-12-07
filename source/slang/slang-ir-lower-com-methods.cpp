@@ -31,7 +31,7 @@ struct ComMethodLoweringContext : public InstPassBase
         SLANG_ASSERT(callee);
 
         IRLookupWitnessMethod* innerMostCallee = callee;
-        while (innerMostCallee->getOperand(0)->getOp() == kIROp_lookup_interface_method)
+        while (innerMostCallee->getOperand(0)->getOp() == kIROp_LookupWitness)
         {
             innerMostCallee = as<IRLookupWitnessMethod>(innerMostCallee->getOperand(0));
         }
@@ -83,7 +83,7 @@ struct ComMethodLoweringContext : public InstPassBase
         auto funcValue = inst->getOperand(0);
 
         // Detect if this is a call into a COM interface method.
-        if (funcValue->getOp() == kIROp_lookup_interface_method)
+        if (funcValue->getOp() == kIROp_LookupWitness)
         {
             const auto operand0TypeOp = funcValue->getOperand(0)->getDataType();
             if (auto tableType = as<IRWitnessTableTypeBase>(operand0TypeOp))

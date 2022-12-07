@@ -220,7 +220,7 @@ IRInst* DifferentialPairTypeBuilder::_createDiffPairType(IRType* origBaseType, I
 {
     switch (origBaseType->getOp())
     {
-    case kIROp_lookup_interface_method:
+    case kIROp_LookupWitness:
     case kIROp_Specialize:
     case kIROp_Param:
         return nullptr;
