@@ -707,13 +707,13 @@ struct DiffTransposePass
 
             auto zeroValueInst = builder->emitCallInst(elementType, zeroMethod, List<IRInst*>());
             
-            for (Index ii = 0; ii < elementCount; ii++)
+            for (Index ii = 0; ii < ((Index)elementCount); ii++)
             {
                 constructArgs.add(zeroValueInst);
             }
 
             // Replace swizzled elements with their gradients.
-            for (UIndex ii = 0; ii < fwdSwizzleInst->getElementCount(); ii++)
+            for (Index ii = 0; ii < ((Index)fwdSwizzleInst->getElementCount()); ii++)
             {
                 auto sourceIndex = ii;
                 auto targetIndexInst = fwdSwizzleInst->getElementIndex(ii);
