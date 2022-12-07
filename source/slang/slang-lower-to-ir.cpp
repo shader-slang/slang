@@ -16,6 +16,7 @@
 #include "slang-ir-sccp.h"
 #include "slang-ir-ssa.h"
 #include "slang-ir-strip.h"
+#include "slang-ir-simplify-cfg.h"
 #include "slang-ir-validate.h"
 #include "slang-ir-string-hash.h"
 #include "slang-ir-clone.h"
@@ -721,22 +722,9 @@ LoweredValInfo emitCallToDeclRef(
 
     if( auto ctorDeclRef = funcDeclRef.as<ConstructorDecl>() )
     {
-        if(!ctorDeclRef.getDecl()->body && isFromStdLib(ctorDeclRef.decl))
+        if(!ctorDeclRef.getDecl()->body && isFromStdLib(ctorDeclRef.decl) && !as<InterfaceDecl>(ctorDeclRef.decl->parentDecl))
         {
-            // HACK: For legacy reasons, all of the built-in initializers
-            // in the standard library are declared without proper
-            // intrinsic-op modifiers, so we will assume that an
-            // initializer without a body should map to `kIROp_Construct`.
-            //
-            // TODO: We should make all the initializers in the
-            // standard library have either a body or a proper
-            // intrinsic-op modifier.
-            //
-            // TODO: We should eliminate `kIROp_Construct` from the
-            // IR completely, in favor of more detailed/specific ops
-            // that cover the cases we actually care about.
-            //
-            return LoweredValInfo::simple(builder->emitConstructorInst(type, argCount, args));
+            SLANG_UNREACHABLE("stdlib error: __init() has no definition.");
         }
     }
 
@@ -8328,6 +8316,12 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             getBuilder()->addDecoration(irFunc, kIROp_TreatAsDifferentiableDecoration);
         }
 
+        if (auto intrinsicOp = decl->findModifier<IntrinsicOpModifier>())
+        {
+            auto op = getBuilder()->getIntValue(getBuilder()->getIntType(), intrinsicOp->op);
+            getBuilder()->addDecoration(irFunc, kIROp_IntrinsicOpDecoration, op);
+        }
+
         // Register the value now, to avoid any possible infinite recursion when lowering ForwardDerivativeAttribute
         setGlobalValue(context, decl, LoweredValInfo::simple(findOuterMostGeneric(irFunc)));
 
@@ -9060,12 +9054,10 @@ RefPtr<IRModule> generateIRForTranslationUnit(
     performMandatoryEarlyInlining(module);
 
     // Next, attempt to promote local variables to SSA
-    // temporaries whenever possible.
-    constructSSA(module);
-
-    // Do basic constant folding and dead code elimination
-    // using Sparse Conditional Constant Propagation (SCCP)
+    // temporaries and do basic simplifications.
     //
+    constructSSA(module);
+    simplifyCFG(module);
     applySparseConditionalConstantPropagation(module);
 
     // Propagate `constexpr`-ness through the dataflow graph (and the

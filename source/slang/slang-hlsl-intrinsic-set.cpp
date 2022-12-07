@@ -256,12 +256,17 @@ SlangResult HLSLIntrinsicSet::makeIntrinsic(IRInst* inst, HLSLIntrinsic& out)
     switch (inst->getOp())
     {
         case kIROp_constructVectorFromScalar:
+        case kIROp_MakeMatrixFromScalar:
         {
             SLANG_ASSERT(inst->getOperandCount() == 1);
             calcIntrinsic(Op::ConstructFromScalar, inst, 1, out);
             return SLANG_OK;
         }
         case kIROp_Construct:
+        case kIROp_IntCast:
+        case kIROp_FloatCast:
+        case kIROp_CastIntToFloat:
+        case kIROp_CastFloatToInt:
         {
             IRType* dstType = inst->getDataType();
             IRType* srcType = inst->getOperand(0)->getDataType();
@@ -307,6 +312,7 @@ SlangResult HLSLIntrinsicSet::makeIntrinsic(IRInst* inst, HLSLIntrinsic& out)
             return SLANG_OK;
         }
         case kIROp_MakeMatrix:
+        case kIROp_MatrixTruncate:
         {
             // We only emit as if it has one operand, but we can tell how many it actually has from the return type
             calcIntrinsic(Op::Init, inst, inst->getOperandCount(), out);

@@ -95,6 +95,19 @@ struct IRTargetIntrinsicDecoration : IRTargetSpecificDecoration
     }
 };
 
+struct IRIntrinsicOpDecoration : IRDecoration
+{
+    enum { kOp = kIROp_IntrinsicOpDecoration };
+    IR_LEAF_ISA(IntrinsicOpDecoration)
+
+    IRIntLit* getIntrinsicOpOperand() { return cast<IRIntLit>(getOperand(0)); }
+
+    IROp getIntrinsicOp()
+    {
+        return (IROp)getIntrinsicOpOperand()->getValue();
+    }
+};
+
 struct IRGLSLOuterArrayDecoration : IRDecoration
 {
     enum { kOp = kIROp_GLSLOuterArrayDecoration };

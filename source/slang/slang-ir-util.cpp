@@ -100,4 +100,33 @@ IROp getTypeStyle(IROp op)
     }
 }
 
+IROp getTypeStyle(BaseType op)
+{
+    switch (op)
+    {
+    case BaseType::Void:
+        return kIROp_VoidType;
+    case BaseType::Bool:
+        return kIROp_BoolType;
+    case BaseType::Char:
+    case BaseType::Int8:
+    case BaseType::Int16:
+    case BaseType::Int:
+    case BaseType::Int64:
+    case BaseType::IntPtr:
+    case BaseType::UInt8:
+    case BaseType::UInt16:
+    case BaseType::UInt:
+    case BaseType::UInt64:
+    case BaseType::UIntPtr:
+        return kIROp_IntType;
+    case BaseType::Half:
+    case BaseType::Float:
+    case BaseType::Double:
+        return kIROp_FloatType;
+    default:
+        return kIROp_Invalid;
+    }
+}
+
 }

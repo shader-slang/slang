@@ -112,6 +112,9 @@ struct PeepholeContext : InstPassBase
             }
             break;
         case kIROp_Reinterpret:
+        case kIROp_BitCast:
+        case kIROp_IntCast:
+        case kIROp_FloatCast:
             {
                 if (isTypeEqual(inst->getOperand(0)->getDataType(), inst->getDataType()))
                 {

@@ -1023,9 +1023,21 @@ bool LivenessContext::_isAccessTerminator(IRTerminatorInst* terminator)
         // we have a cast between uint/int (for example) that isn't a problem
 
         // Strip construct
-        if (val->getOp() == kIROp_Construct && val->getOperandCount() == 1)
+        switch (val->getOp())
         {
+        case kIROp_Construct:
+            if (val->getOperandCount() == 1)
+                val = val->getOperand(0);
+            break;
+        case kIROp_CastIntToFloat:
+        case kIROp_CastFloatToInt:
+        case kIROp_IntCast:
+        case kIROp_FloatCast:
+        case kIROp_CastIntToPtr:
+        case kIROp_CastPtrToInt:
+        case kIROp_CastPtrToBool:
             val = val->getOperand(0);
+            break;
         }
 
         // If it *is* the root it's an access

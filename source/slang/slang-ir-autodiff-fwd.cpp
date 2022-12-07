@@ -1582,7 +1582,14 @@ InstPair ForwardDerivativeTranscriber::transcribeInst(IRBuilder* builder, IRInst
     case kIROp_Leq:
         return transcribeBinaryLogic(builder, origInst);
 
-    case kIROp_Construct:
+    case kIROp_CastIntToFloat:
+    case kIROp_CastFloatToInt:
+    case kIROp_makeVector:
+    case kIROp_MakeMatrix:
+    case kIROp_MakeMatrixFromScalar:
+    case kIROp_MatrixTruncate:
+    case kIROp_IntCast:
+    case kIROp_FloatCast:
         return transcribeConstruct(builder, origInst);
 
     case kIROp_lookup_interface_method:

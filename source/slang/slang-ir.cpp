@@ -6319,6 +6319,8 @@ namespace Slang
         case kIROp_makeUInt64:
         case kIROp_makeVector:
         case kIROp_MakeMatrix:
+        case kIROp_MakeMatrixFromScalar:
+        case kIROp_MatrixTruncate:
         case kIROp_makeArray:
         case kIROp_makeStruct:
         case kIROp_makeString:
@@ -6373,6 +6375,12 @@ namespace Slang
         case kIROp_ExtractExistentialWitnessTable:
         case kIROp_WrapExistential:
         case kIROp_BitCast:
+        case kIROp_CastFloatToInt:
+        case kIROp_CastIntToFloat:
+        case kIROp_IntCast:
+        case kIROp_FloatCast:
+        case kIROp_CastPtrToInt:
+        case kIROp_CastIntToPtr:
         case kIROp_AllocObj:
         case kIROp_PackAnyValue:
         case kIROp_UnpackAnyValue:

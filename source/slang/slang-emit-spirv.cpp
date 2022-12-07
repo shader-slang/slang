@@ -1602,6 +1602,10 @@ struct SPIRVEmitContext
         case kIROp_swizzle:
             return emitSwizzle(parent, as<IRSwizzle>(inst));
         case kIROp_Construct:
+        case kIROp_IntCast:
+        case kIROp_FloatCast:
+        case kIROp_CastIntToFloat:
+        case kIROp_CastFloatToInt:
             return emitConstruct(parent, inst);
         case kIROp_BitCast:
             return emitInst(
